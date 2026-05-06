@@ -72,5 +72,6 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b904787d62fb8ee45a34f6f914857c3d, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _chickenClassRegistry: {fileID: 11400000, guid: 1885b7d81a1e4eb47b84e9c58967f601, type: 2}

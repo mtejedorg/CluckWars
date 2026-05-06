@@ -37,47 +37,51 @@ Zenject (Extenject) is the DI framework for the entire project. All service depe
 
 ### 3.1 Binding Pattern
 
-All major services are bound in a `GameInstaller` MonoInstaller on the main scene:
+Two contexts split bindings by lifetime:
+
+- **`ProjectInstaller`** lives on `Assets/_Game/Resources/ProjectContext.prefab`. Binds singletons that survive scene loads — services, static data, cross-scene state.
+- **`GameInstaller`** lives on the `SceneContext` GameObject in `Game.unity`. Binds match-scoped wiring — `MatchConfigSO`, the Fusion runner.
 
 ```csharp
-public class GameInstaller : MonoInstaller
-{
-    public override void InstallBindings()
-    {
-        Container.Bind<INetworkService>().To<FusionNetworkService>().AsSingle();
-        Container.Bind<IUGSService>().To<UGSService>().AsSingle();
-        Container.Bind<IAudioService>().To<UnityAudioService>().AsSingle();
-        Container.Bind<IInputProvider>().To<MobileInputProvider>().AsSingle();
-    }
-}
+// ProjectInstaller (Resources/ProjectContext.prefab)
+Container.Bind<ILogService>().To<UnityLogService>().AsSingle()
+    .WithArguments(_logMinLevel);
+Container.Bind<IUGSService>().To<NullUGSService>().AsSingle();      // demo default
+Container.Bind<IAudioService>().To<NullAudioService>().AsSingle();  // demo default
+Container.Bind<IInputProvider>().To<KeyboardInputProvider>().AsSingle();
+Container.Bind<ISessionSelectionService>().To<SessionSelectionService>().AsSingle();
+Container.Bind<ChickenClassRegistrySO>().FromInstance(_chickenClassRegistry).AsSingle();
+
+// GameInstaller (Game.unity SceneContext)
+Container.Bind<MatchConfigSO>().FromInstance(_matchConfig).AsSingle();
+Container.Bind<INetworkService>().To<FusionNetworkService>()
+    .FromNewComponentOnNewGameObject().AsSingle().NonLazy();
 ```
 
-Swapping an implementation post-funding = change one `To<>()` binding. Zero other code changes.
+Swapping an implementation post-funding = change one `To<>()` binding in `ProjectInstaller`. Zero other code changes.
 
-### 3.2 Null / Demo Bindings
+### 3.2 Null Bindings (Demo Default)
 
-For demo builds or local dev, a `DemoInstaller` overrides specific bindings:
+The demo build binds null/no-op implementations directly in `ProjectInstaller` — there is no separate `DemoInstaller`. `NullUGSService` is the default; the real `UGSService` will land in Phase 10 alongside its dependencies.
+
+### 3.3 Compile-Time Override
+
+Scripting define `UGS_DISABLED` is reserved to force `NullUGSService` regardless of inspector config in clean demo/production builds. Bindings inside `ProjectInstaller` honor this define when the real `UGSService` lands.
+
+### 3.4 Self-Injection from `ProjectContext`
+
+Two cases skip Zenject's normal scene-component injection path:
+
+1. `Bootstrap.unity` has no `SceneContext` (it's just a menu scene).
+2. Fusion's `Runner.Spawn` instantiates `NetworkBehaviour`s outside Zenject's lifecycle.
+
+Both self-inject from `ProjectContext`:
 
 ```csharp
-public class DemoInstaller : MonoInstaller
-{
-    public override void InstallBindings()
-    {
-        Container.Bind<IUGSService>().To<NullUGSService>().AsSingle();
-    }
-}
+if (_log == null) ProjectContext.Instance.Container.Inject(this);
 ```
 
-This is the "mute UGS" mechanism — swap the binding, nothing else changes.
-
-### 3.3 Runtime vs Compile-Time Switching
-
-| Method | How | When to use |
-|---|---|---|
-| Runtime flag | `DemoInstaller` swaps bindings at startup via a config flag in `MatchConfigSO` | Dev and testing |
-| Compile-time | Scripting define `UGS_DISABLED` forces `NullUGSService` regardless of config | Clean demo/production builds |
-
-Both are supported simultaneously. Compile-time override takes priority.
+**Do not** gate on `ProjectContext.HasInstance` — it returns `false` until something reads `.Instance` for the first time. Reading `.Instance` directly triggers the lazy load.
 
 ---
 
@@ -101,25 +105,29 @@ No game logic class ever calls Fusion directly. All networking goes through:
 ```csharp
 public interface INetworkService
 {
-    void StartHost(string sessionId);
-    void StartClient(string sessionId);
-    void StartDedicatedServer(string sessionId);
-    void Shutdown();
+    bool IsRunning { get; }
+    NetworkRunner Runner { get; }
 
-    void SendInput(IGameInput input);
-    event Action<PlayerRef, IGameInput> OnInputReceived;
-    event Action<PlayerRef> OnPlayerJoined;
-    event Action<PlayerRef> OnPlayerLeft;
+    Task StartSoloAsync();                            // GameMode.Single — solo dev / Phase 1-4
+    Task StartHostAsync(string sessionName);          // GameMode.Shared — Phase 5+
+    Task JoinSessionAsync(string sessionName);        // GameMode.Shared — Phase 5+
+    Task ShutdownAsync();
+
+    event Action<NetworkRunner> OnRunnerReady;
+    event Action<NetworkRunner, PlayerRef> OnPlayerJoined;
+    event Action<NetworkRunner, PlayerRef> OnPlayerLeft;
+    event Action<ShutdownReason> OnShutdown;
 }
 ```
 
-Concrete implementations:
+Concrete implementation:
 
 ```
 INetworkService
-├── FusionNetworkService       ← demo + post-funding
-└── LocalNetworkService        ← offline/unit testing, no Fusion dependency
+└── FusionNetworkService       ← all modes; offline path is GameMode.Single
 ```
+
+There is **no** separate `LocalNetworkService`. `NetworkBehaviour` requires a `NetworkRunner`, so even the offline path runs Fusion in `GameMode.Single` with one player. The cost is one local socket; the benefit is no fork in spawn / state-sync logic between solo and multiplayer.
 
 ### 4.3 Session Modes
 
@@ -158,16 +166,21 @@ public enum SessionMode
 ### 4.6 Input Struct
 
 ```csharp
-public struct PlayerInput : INetworkInput
+public struct PlayerNetworkInput : INetworkInput
 {
     public Vector2 Movement;
-    public NetworkBool AttackHeld;
-    public NetworkBool Ability1Pressed;
-    public NetworkBool Ability2Pressed; // Assassin only, ignored otherwise
+    public NetworkButtons Buttons;   // see InputButton enum below
+}
+
+public enum InputButton
+{
+    Attack   = 0,
+    Ability1 = 1,
+    Ability2 = 2,   // Assassin only; ignored otherwise
 }
 ```
 
-Game logic reads exclusively from the Fusion input buffer — never from `Input.GetKey` directly.
+`NetworkButtons` is Fusion's bitfield helper — cheaper to wire than three separate `NetworkBool`s and gives us free press/release edge detection later. Game logic reads exclusively from the Fusion input buffer — never from `Input.GetKey` / `Keyboard.current` directly.
 
 ---
 
@@ -335,11 +348,11 @@ Implementations:
 
 ```
 IInputProvider
-├── MobileInputProvider     ← virtual joystick + touch buttons
-└── KeyboardInputProvider   ← WASD + keyboard shortcuts (PC dev)
+├── KeyboardInputProvider   ← WASD + keyboard shortcuts (PC dev) — shipped Phase 1
+└── MobileInputProvider     ← virtual joystick + touch buttons — Phase 8
 ```
 
-Platform detected at startup; correct provider injected via Zenject. `PlayerInput` struct fed into Fusion is always identical regardless of source.
+Platform detected at startup; correct provider injected via Zenject. `PlayerNetworkInput` struct fed into Fusion is always identical regardless of source.
 
 ---
 
@@ -406,24 +419,24 @@ Tick rate (30/s) matches Android target. Raise if device benchmarks allow.
 /Assets
 ├── _Game/
 │   ├── Scripts/
-│   │   ├── Networking/         ← INetworkService, FusionNetworkService, LocalNetworkService
-│   │   ├── Gameplay/           ← GameManager, all systems, ChickenController
-│   │   ├── Abilities/          ← AbilityBaseSO + concrete ability SOs
-│   │   ├── Input/              ← IInputProvider + implementations
-│   │   ├── Audio/              ← IAudioService + implementations
-│   │   ├── Services/           ← IUGSService, UGSService, NullUGSService
-│   │   ├── Visuals/            ← ChickenAnimator, FoodPileVisuals, ChickenVisuals
-│   │   ├── Installers/         ← Zenject GameInstaller, DemoInstaller
-│   │   └── UI/                 ← HUD, menus, character select
-│   ├── Data/                   ← All ScriptableObject assets
-│   ├── Prefabs/
-│   ├── Scenes/
-│   └── Art/
-│       └── URP/                ← URP Renderer Data, render features, shader graphs
-├── Plugins/                    ← Photon Fusion 2 SDK, Zenject
-└── Tests/
-    ├── Unit/                   ← Game logic tests using LocalNetworkService
-    └── Integration/            ← Scene-level tests
+│   │   ├── Networking/         ← INetworkService, FusionNetworkService, PlayerNetworkInput
+│   │   ├── Gameplay/           ← ChickenController, ChickenMovement, ChickenClass(es), MatchBootstrapper
+│   │   ├── Abilities/          ← AbilityBaseSO + concrete ability SOs (Phase 6)
+│   │   ├── Input/              ← IInputProvider + KeyboardInputProvider (MobileInputProvider Phase 8)
+│   │   ├── Audio/              ← IAudioService + Null/Unity implementations
+│   │   ├── Logging/            ← LogLevel, ILogService, UnityLogService
+│   │   ├── Services/           ← IUGSService, NullUGSService, ISessionSelectionService
+│   │   ├── Visuals/            ← ChickenAnimator, ChickenVisuals (FoodPileVisuals Phase 4)
+│   │   ├── Installers/         ← ProjectInstaller, GameInstaller
+│   │   ├── Bootstrap/          ← SceneLoader (Bootstrap → Game transition)
+│   │   └── UI/                 ← CharacterSelectController (HUD, menus later)
+│   ├── Data/                   ← All ScriptableObject assets (Classes/, ChickenClassRegistry, MatchConfig)
+│   ├── Resources/              ← ProjectContext.prefab (Zenject auto-loads from here)
+│   ├── Prefabs/                ← Chicken.prefab, SpawnPoint.prefab
+│   ├── Scenes/                 ← Bootstrap.unity (idx 0), Game.unity (idx 1)
+│   └── Art/                    ← Animations/, URP renderer data
+├── Photon/Fusion/              ← Fusion 2 SDK
+└── Plugins/Zenject/            ← Extenject (OptionalExtras stripped)
 ```
 
 ---

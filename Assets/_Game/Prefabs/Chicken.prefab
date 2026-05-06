@@ -17,6 +17,7 @@ GameObject:
   - component: {fileID: 1781100138392423414}
   - component: {fileID: 5731265523250509895}
   - component: {fileID: 5004226852992495544}
+  - component: {fileID: 3349953020513663677}
   m_Layer: 0
   m_Name: Chicken
   m_TagString: Untagged
@@ -175,7 +176,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 380ae4113bd96504999e25f4682b33f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenController
-  _stats: {fileID: 11400000, guid: c5336fe6807057d43ba09b44bf81f4e9, type: 2}
+  _fallbackStats: {fileID: 0}
+  _Class: 0
 --- !u!95 &5731265523250509895
 Animator:
   serializedVersion: 7
@@ -212,3 +214,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ChickenAnimator
   _animator: {fileID: 5731265523250509895}
   _speedSmoothing: 12
+--- !u!114 &3349953020513663677
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 83cf22122239dc047a4f33631934b2c8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ChickenVisuals
+  _renderers: []

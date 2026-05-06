@@ -1,3 +1,4 @@
+using CluckWars.Logging;
 using CluckWars.Networking;
 using CluckWars.Services;
 using Fusion;
@@ -19,29 +20,35 @@ namespace CluckWars.Gameplay
     /// </remarks>
     public sealed class MatchBootstrapper : MonoBehaviour
     {
+        private const string Source = "MatchBootstrap";
+
         [SerializeField] private NetworkObject _chickenPrefab;
         [SerializeField] private Transform[] _spawnPoints;
 
         private INetworkService _networkService;
         private ISessionSelectionService _selection;
+        private ILogService _log;
 
         [Inject]
-        public void Construct(INetworkService networkService, ISessionSelectionService selection)
+        public void Construct(INetworkService networkService, ISessionSelectionService selection, ILogService log)
         {
             _networkService = networkService;
             _selection = selection;
+            _log = log;
         }
 
         private async void Start()
         {
             if (_chickenPrefab == null)
             {
-                Debug.LogError("[MatchBootstrapper] Chicken prefab not assigned.");
+                _log?.Error(Source, "Chicken prefab not assigned on MatchBootstrapper.");
                 return;
             }
 
+            _log?.Info(Source, $"Starting solo session. Selected class = {(_selection != null ? _selection.SelectedClass.ToString() : "(no selection service)")}.");
             _networkService.OnPlayerJoined += HandlePlayerJoined;
             await _networkService.StartSoloAsync();
+            _log?.Debug(Source, "StartSoloAsync awaited; runner is up.");
         }
 
         private void OnDestroy()
@@ -55,10 +62,12 @@ namespace CluckWars.Gameplay
             // Single mode: only the local player exists, so we always spawn.
             // Shared mode: each client spawns its own chicken (state authority follows).
             var isLocal = runner.GameMode == GameMode.Single || player == runner.LocalPlayer;
+            _log?.Debug(Source, $"OnPlayerJoined player={player} isLocal={isLocal} mode={runner.GameMode}.");
             if (!isLocal) return;
 
             var pos = PickSpawnPosition();
             var chosenClass = _selection != null ? _selection.SelectedClass : ChickenClass.Warrior;
+            _log?.Info(Source, $"Spawning chicken: class={chosenClass}, pos={pos}.");
 
             runner.Spawn(
                 _chickenPrefab,

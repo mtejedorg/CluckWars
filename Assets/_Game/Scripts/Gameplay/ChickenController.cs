@@ -1,3 +1,4 @@
+using CluckWars.Logging;
 using CluckWars.Networking;
 using CluckWars.Visuals;
 using Fusion;
@@ -21,6 +22,8 @@ namespace CluckWars.Gameplay
     [RequireComponent(typeof(CharacterController))]
     public sealed class ChickenController : NetworkBehaviour
     {
+        private const string Source = "Chicken";
+
         [Tooltip("Fallback used only if the class registry is missing or has no entry for this chicken's class.")]
         [SerializeField] private ChickenStatsSO _fallbackStats;
 
@@ -28,6 +31,7 @@ namespace CluckWars.Gameplay
         private ChickenMovement _movement;
         private ChickenClassRegistrySO _registry;
         private ChickenStatsSO _activeStats;
+        private ILogService _log;
 
         /// <summary>The chicken's archetype. Replicated; set by the spawner via <c>OnBeforeSpawned</c>.</summary>
         [Networked] public ChickenClass Class { get; set; } = ChickenClass.Warrior;
@@ -35,39 +39,45 @@ namespace CluckWars.Gameplay
         public ChickenStatsSO Stats => _activeStats != null ? _activeStats : _fallbackStats;
 
         [Inject]
-        public void Construct(ChickenClassRegistrySO registry)
+        public void Construct(ChickenClassRegistrySO registry, ILogService log)
         {
             _registry = registry;
+            _log = log;
         }
 
         public override void Spawned()
         {
             // Fusion spawns NetworkBehaviours outside of Zenject's normal injection path,
             // so we self-inject from ProjectContext if Construct hasn't been called yet.
-            if (_registry == null && ProjectContext.HasInstance)
+            // Accessing .Instance triggers the lazy load if needed.
+            if (_log == null)
             {
                 ProjectContext.Instance.Container.Inject(this);
             }
+
+            _log?.Debug(Source, $"Spawned. Class={Class}, HasStateAuthority={HasStateAuthority}, registryBound={_registry != null}.");
 
             _characterController = GetComponent<CharacterController>();
             _activeStats = ResolveStatsForClass(Class);
 
             if (_activeStats == null)
             {
-                Debug.LogError(
-                    $"[ChickenController] {name} could not resolve stats for class '{Class}'. " +
-                    "Assign _fallbackStats on the prefab or populate the ChickenClassRegistry.",
-                    this);
+                _log?.Error(Source, $"{name}: could not resolve stats for class '{Class}'. Assign _fallbackStats on the prefab or populate ChickenClassRegistry.");
                 return;
             }
 
+            _log?.Info(Source, $"Stats resolved: '{_activeStats.DisplayName}', moveSpeed={_activeStats.MoveSpeed}.");
             _movement = new ChickenMovement(_characterController, _activeStats);
 
             // Apply the per-class tint locally on every peer so even proxies look right.
             if (_registry != null && _registry.TryGet(Class, out var entry))
             {
                 var visuals = GetComponent<ChickenVisuals>();
-                if (visuals != null) visuals.ApplyTint(entry.TintColor);
+                if (visuals != null)
+                {
+                    visuals.ApplyTint(entry.TintColor);
+                    _log?.Debug(Source, $"Applied tint {entry.TintColor} for class {Class}.");
+                }
             }
         }
 

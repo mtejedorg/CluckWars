@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using CluckWars.Input;
+using CluckWars.Logging;
 using Fusion;
 using Fusion.Sockets;
 using UnityEngine;
@@ -23,7 +24,10 @@ namespace CluckWars.Networking
     [DisallowMultipleComponent]
     public sealed class FusionNetworkService : MonoBehaviour, INetworkService, INetworkRunnerCallbacks
     {
+        private const string Source = "Fusion";
+
         private IInputProvider _inputProvider;
+        private ILogService _log;
         private NetworkRunner _runner;
 
         public bool IsRunning => _runner != null && _runner.IsRunning;
@@ -35,9 +39,10 @@ namespace CluckWars.Networking
         public event Action<ShutdownReason> OnShutdown;
 
         [Inject]
-        public void Construct(IInputProvider inputProvider)
+        public void Construct(IInputProvider inputProvider, ILogService log)
         {
             _inputProvider = inputProvider;
+            _log = log;
         }
 
         public Task StartSoloAsync() => StartAsync(GameMode.Single, "Solo");
@@ -48,9 +53,11 @@ namespace CluckWars.Networking
         {
             if (_runner != null)
             {
-                Debug.LogWarning("[FusionNetworkService] StartAsync called while a runner is already active.");
+                _log?.Warn(Source, "StartAsync called while a runner is already active. Ignoring.");
                 return;
             }
+
+            _log?.Info(Source, $"StartGame requested: mode={mode}, session='{sessionName}'.");
 
             _runner = gameObject.AddComponent<NetworkRunner>();
             _runner.ProvideInput = true;
@@ -75,11 +82,12 @@ namespace CluckWars.Networking
 
             if (result.Ok)
             {
+                _log?.Info(Source, $"StartGame OK. LocalPlayer={_runner.LocalPlayer}.");
                 OnRunnerReady?.Invoke(_runner);
             }
             else
             {
-                Debug.LogError($"[FusionNetworkService] StartGame failed: {result.ShutdownReason}");
+                _log?.Error(Source, $"StartGame failed: {result.ShutdownReason}.");
             }
         }
 
@@ -97,6 +105,7 @@ namespace CluckWars.Networking
         {
             if (_inputProvider == null) return;
 
+            var movement = _inputProvider.GetMovement();
             var buttons = new NetworkButtons();
             if (_inputProvider.GetAttackHeld()) buttons.Set((int)InputButton.Attack, true);
             if (_inputProvider.GetAbility1Pressed()) buttons.Set((int)InputButton.Ability1, true);
@@ -104,19 +113,33 @@ namespace CluckWars.Networking
 
             input.Set(new PlayerNetworkInput
             {
-                Movement = _inputProvider.GetMovement(),
+                Movement = movement,
                 Buttons = buttons,
             });
+
+            // Verbose-only because this fires every simulation tick (30 Hz). Gated by IsEnabled
+            // so we don't allocate the formatted string when filtered out.
+            if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose) && (movement.sqrMagnitude > 0.0001f || buttons.Bits != 0))
+            {
+                _log.Verbose(Source, $"OnInput tick: move={movement}, attack={buttons.IsSet((int)InputButton.Attack)}, a1={buttons.IsSet((int)InputButton.Ability1)}, a2={buttons.IsSet((int)InputButton.Ability2)}.");
+            }
         }
 
         void INetworkRunnerCallbacks.OnPlayerJoined(NetworkRunner runner, PlayerRef player)
-            => OnPlayerJoined?.Invoke(runner, player);
+        {
+            _log?.Debug(Source, $"OnPlayerJoined: player={player}.");
+            OnPlayerJoined?.Invoke(runner, player);
+        }
 
         void INetworkRunnerCallbacks.OnPlayerLeft(NetworkRunner runner, PlayerRef player)
-            => OnPlayerLeft?.Invoke(runner, player);
+        {
+            _log?.Debug(Source, $"OnPlayerLeft: player={player}.");
+            OnPlayerLeft?.Invoke(runner, player);
+        }
 
         void INetworkRunnerCallbacks.OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason)
         {
+            _log?.Info(Source, $"OnShutdown: reason={shutdownReason}.");
             OnShutdown?.Invoke(shutdownReason);
             _runner = null;
         }

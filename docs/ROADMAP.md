@@ -52,6 +52,22 @@ Single chicken walking on empty map using keyboard. ✅
 
 ---
 
+## Cross-Cutting Infrastructure ✅ (off-cycle, between Phase 2 & 3)
+
+Not part of the original phase plan; added after Phase 2 close-out to debug a
+silent injection failure in the Bootstrap scene. Stable on `develop`.
+
+- [x] `LogLevel` enum (Verbose / Debug / Info / Warn / Error / Off)
+- [x] `ILogService` + `UnityLogService` with `MinLevel` filter, `Source` tag, `[mm:ss.fff][Level][Source] message` format
+- [x] Bound app-wide in `ProjectInstaller`; `_logMinLevel` defaults to Verbose
+- [x] Diagnostic logging across `CharacterSelectController`, `SceneLoader`, `MatchBootstrapper`, `FusionNetworkService` (incl. per-tick OnInput at Verbose), `ChickenController`
+- [x] **Lazy-load fix** at three self-inject sites: drop `ProjectContext.HasInstance` guard, call `ProjectContext.Instance.Container.Inject(this)` directly. `HasInstance` returns false until something reads `.Instance`, which silently disabled all self-injection on cold-start scenes.
+
+### Deliverable
+Single chokepoint for log output with level filter; structured Console narrative for the full Bootstrap → Game spawn flow makes future bugs trivially diagnosable.
+
+---
+
 ## Phase 3: Combat System (Week 3-4)
 
 ### Goals
@@ -159,9 +175,10 @@ Players can equip and activate 2 abilities per chicken, cooldowns work.
 - Android build working
 
 ### Tasks
+- [x] `IInputProvider` interface + `KeyboardInputProvider` (Phase 1)
 - [ ] `MobileInputProvider` (virtual joystick + buttons)
 - [ ] Platform detection (Windows vs Android) at startup
-- [ ] Zenject input provider binding per platform
+- [ ] Zenject input provider binding per platform (override `IInputProvider` in `ProjectInstaller` based on `Application.platform`)
 - [ ] Android build export
 - [ ] Test on real Android device (mid-range 2021+)
 - [ ] FPS monitoring & optimization (target 30 fps)

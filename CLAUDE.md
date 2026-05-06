@@ -29,6 +29,7 @@ This file provides Claude with the context needed to contribute effectively to C
 │   ├── Abilities/      AbilityBaseSO + concrete ability SOs
 │   ├── Input/          IInputProvider, MobileInputProvider, KeyboardInputProvider
 │   ├── Audio/          IAudioService, UnityAudioService, NullAudioService
+│   ├── Logging/        LogLevel, ILogService, UnityLogService
 │   ├── Services/       IUGSService, NullUGSService, ISessionSelectionService
 │   ├── Visuals/        ChickenAnimator, ChickenVisuals, FoodPileVisuals
 │   ├── Installers/     ProjectInstaller, GameInstaller
@@ -55,7 +56,8 @@ This file provides Claude with the context needed to contribute effectively to C
 - **ScriptableObjects use `SO` suffix** — e.g., `ChickenStatsSO`, `AbilityBaseSO`, `MatchConfigSO`.
 - **SO assets live in `/Assets/_Game/Data/`**.
 - **Game logic reads input only from the Fusion buffer** — never `Input.GetKey` directly.
-- **Zenject for all DI** — bindings live in `GameInstaller`; demo/null overrides in `DemoInstaller`.
+- **Zenject for all DI** — `ProjectInstaller` for app-wide singletons, `GameInstaller` for match-scoped. Null implementations are bound directly in `ProjectInstaller` for the demo build (no separate `DemoInstaller`).
+- **All log output goes through `ILogService`** — no ad-hoc `Debug.Log`. Pass a `Source` tag string per call. Default `MinLevel` is `Verbose` during dev; raise it for release builds via the `_logMinLevel` field on `ProjectInstaller`.
 - **URP materials only** — no Built-in RP shaders. Use Lit, Unlit, or custom URP Shader Graph.
 - **Animation is local** — `ChickenAnimator` reads `[Networked]` state; nothing animation-related is synced over the network.
 - **VFX are local** — triggered by observed networked state changes, never sent over network.
@@ -65,10 +67,12 @@ This file provides Claude with the context needed to contribute effectively to C
 ## Key Interfaces
 
 ```csharp
-INetworkService   // All Fusion calls go through here
-IInputProvider    // GetMovement(), GetAttackHeld(), GetAbility1/2Pressed()
-IAudioService     // PlaySFX(), PlayMusic(), Stop/Volume
-IUGSService       // Auth, Lobby, Relay — NullUGSService in demo
+INetworkService              // All Fusion calls go through here
+IInputProvider               // GetMovement(), GetAttackHeld(), GetAbility1/2Pressed()
+IAudioService                // PlaySFX(), PlayMusic(), Stop/Volume
+IUGSService                  // Auth, Lobby, Relay — NullUGSService in demo
+ILogService                  // Verbose/Debug/Info/Warn/Error with Source tag + level filter
+ISessionSelectionService     // Carries chosen ChickenClass from menu to match
 ```
 
 ---
@@ -82,9 +86,13 @@ Two contexts:
 
 ```csharp
 // ProjectInstaller (Resources/ProjectContext.prefab)
+Container.Bind<ILogService>().To<UnityLogService>().AsSingle()
+    .WithArguments(_logMinLevel);                                       // Verbose by default
 Container.Bind<IUGSService>().To<NullUGSService>().AsSingle();          // demo
 Container.Bind<IAudioService>().To<NullAudioService>().AsSingle();      // demo
 Container.Bind<IInputProvider>().To<KeyboardInputProvider>().AsSingle();
+Container.Bind<ISessionSelectionService>().To<SessionSelectionService>().AsSingle();
+Container.Bind<ChickenClassRegistrySO>().FromInstance(_chickenClassRegistry).AsSingle();
 
 // GameInstaller (Game.unity SceneContext)
 Container.Bind<MatchConfigSO>().FromInstance(_matchConfig).AsSingle();
@@ -95,6 +103,22 @@ Container.Bind<INetworkService>().To<FusionNetworkService>()
 Single-player dev sessions go through `FusionNetworkService.StartSoloAsync()` (`GameMode.Single`). There is no separate `LocalNetworkService` — `NetworkBehaviour` requires a `NetworkRunner`, so even the offline path is a Fusion runner with one player.
 
 Scripting define `UGS_DISABLED` forces `NullUGSService` in any build regardless of config.
+
+### Self-injection from `ProjectContext`
+
+`Bootstrap.unity` has no `SceneContext`, and Fusion spawns `NetworkBehaviour`s outside Zenject's normal injection path. Both cases use the same self-inject pattern in `Awake` / `Spawned`:
+
+```csharp
+if (_log == null)               // _log is set by [Inject] Construct, so null = "not yet injected"
+{
+    ProjectContext.Instance.Container.Inject(this);
+}
+```
+
+Two non-obvious gotchas the hard way:
+
+1. **Don't gate on `ProjectContext.HasInstance`** — that returns `false` until something accesses `.Instance` for the first time. Reading `.Instance` directly triggers the lazy load.
+2. **Two `ProjectInstaller`s live in the project** — ours under `CluckWars.Installers` and a stale one shipped inside Zenject's `OptionalExtras/IntegrationTests`. Always pick the `CluckWars.Installers` one when adding via the Inspector. The OptionalExtras folders were deleted to prevent this kind of name collision.
 
 ---
 
@@ -143,12 +167,10 @@ Adding a new ability = create a concrete `AbilityBaseSO` asset + asset file in `
 - **Networked state:** position, HP, carried cargo, stun, ability cooldowns, base food, pile amounts.
 - **Input struct:**
   ```csharp
-  public struct PlayerInput : INetworkInput
+  public struct PlayerNetworkInput : INetworkInput
   {
       public Vector2 Movement;
-      public NetworkBool AttackHeld;
-      public NetworkBool Ability1Pressed;
-      public NetworkBool Ability2Pressed; // Assassin only
+      public NetworkButtons Buttons;   // Attack=0, Ability1=1, Ability2=2 (see InputButton enum)
   }
   ```
 - **StateAuthority only** runs game systems. Results replicate via `[Networked]`.
@@ -204,6 +226,9 @@ Notion originals: linked in project instructions for deep reads.
 ## Current Phase
 
 **Phase 2 complete:** All four classes (Warrior / Speedy / Fatty / Assassin) selectable from the Bootstrap scene via 1-4 + Space. Spawned chicken adopts class-specific stats and tint via `ChickenClassRegistrySO`. `ChickenAnimator` drives the locomotion blend locally on every peer. `ISessionSelectionService` carries the choice from menu to match.
+
+**Cross-cutting infra also landed:** `ILogService` + `UnityLogService` with `LogLevel` (Verbose / Debug / Info / Warn / Error / Off). All gameplay code logs through it with a `Source` tag; default `MinLevel` is Verbose. The fix for the lazy-load Zenject bug (`ProjectContext.HasInstance` returning `false` on cold start) is in develop at commit `3bc2e13`; awaiting the user's smoke-test confirmation before declaring stable.
+
 **Next:** Phase 3 — combat. `ChickenCombat`, attack input, damage / HP, hit reactions, death stun.
 
 ---
