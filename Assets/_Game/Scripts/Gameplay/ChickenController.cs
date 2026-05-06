@@ -31,12 +31,14 @@ namespace CluckWars.Gameplay
         private ChickenMovement _movement;
         private ChickenClassRegistrySO _registry;
         private ChickenStatsSO _activeStats;
+        private ChickenCombat _combat;
         private ILogService _log;
 
         /// <summary>The chicken's archetype. Replicated; set by the spawner via <c>OnBeforeSpawned</c>.</summary>
         [Networked] public ChickenClass Class { get; set; } = ChickenClass.Warrior;
 
         public ChickenStatsSO Stats => _activeStats != null ? _activeStats : _fallbackStats;
+        public ChickenCombat Combat => _combat;
 
         [Inject]
         public void Construct(ChickenClassRegistrySO registry, ILogService log)
@@ -58,6 +60,7 @@ namespace CluckWars.Gameplay
             _log?.Debug(Source, $"Spawned. Class={Class}, HasStateAuthority={HasStateAuthority}, registryBound={_registry != null}.");
 
             _characterController = GetComponent<CharacterController>();
+            _combat = GetComponent<ChickenCombat>();
             _activeStats = ResolveStatsForClass(Class);
 
             if (_activeStats == null)
@@ -85,6 +88,9 @@ namespace CluckWars.Gameplay
         {
             if (_movement == null) return;
             if (!HasStateAuthority) return;
+
+            // Stun lockout: dead-stunned chickens can't move. Combat owns the IsStunned flag.
+            if (_combat != null && _combat.IsStunned) return;
 
             if (GetInput<PlayerNetworkInput>(out var input))
             {

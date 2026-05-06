@@ -18,6 +18,7 @@ GameObject:
   - component: {fileID: 5731265523250509895}
   - component: {fileID: 5004226852992495544}
   - component: {fileID: 3349953020513663677}
+  - component: {fileID: -8672661885974516826}
   m_Layer: 0
   m_Name: Chicken
   m_TagString: Untagged
@@ -138,6 +139,7 @@ MonoBehaviour:
   NestedObjects: []
   NetworkedBehaviours:
   - {fileID: 1781100138392423414}
+  - {fileID: -8672661885974516826}
   ForceRemoteRenderTimeframe: 0
 --- !u!143 &6032245462738825523
 CharacterController:
@@ -227,3 +229,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ChickenVisuals
   _renderers: []
+--- !u!114 &-8672661885974516826
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8f3e7c14b9d4f0a83e1d2c5e0a7b912, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenCombat
+  _stunDuration: 5
+  _targetMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  _HP: 0
+  _IsStunned: 0

@@ -76,15 +76,19 @@ Single chokepoint for log output with level filter; structured Console narrative
 - Death stun (5 seconds)
 
 ### Tasks
-- [ ] `ChickenCombat` component with proximity detection
-- [ ] Attack input handling + button mashing feel
-- [ ] Damage calculation (simple: HP -= attacker.Attack)
-- [ ] Hit animation trigger
-- [ ] Stun on death (5 sec, chicken can't move/act)
-- [ ] Dropped cargo on death (cargo items spawn as pickups)
+- [x] `ChickenCombat` component with proximity detection (`Physics.OverlapSphere` on Swing; nearest valid target selected)
+- [x] Attack input handling + button mashing feel (`AttackTimer` throttles held-button to one swing per `AttackCooldown`)
+- [x] Damage calculation (`HP -= stats.Attack` via `RPC_ApplyDamage` to target's StateAuthority — Shared Mode authority crossing)
+- [x] Hit animation trigger (`ChangeDetector` on `HP` decrease → `ChickenAnimator.TriggerHit()` on every peer)
+- [x] Stun on death (5 sec via `TickTimer`; `ChickenController` skips movement while `IsStunned`)
+- [ ] Dropped cargo on death — deferred to Phase 4 (cargo system doesn't exist yet). `ChickenCombat.OnDeath` event ready for `ChickenCargo` to subscribe.
+
+### Prefab work (Maestro, in Editor)
+- Add `ChickenCombat` to the Chicken prefab.
+- AnimatorController needs `Attack` (trigger), `Hit` (trigger), `Stunned` (bool) parameters — hashes already declared in `ChickenAnimator`.
 
 ### Deliverable
-Two chickens can fight, one dies, stunned for 5 sec.
+Two chickens can fight, one dies, stunned for 5 sec. (Solo dev session can only verify "no target in range" verbose logs; full validation in Phase 5.)
 
 ---
 

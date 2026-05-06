@@ -9,8 +9,9 @@ namespace CluckWars.Visuals
     /// Lives as a sibling component on the Chicken prefab.
     /// </summary>
     /// <remarks>
-    /// Phase 2 only drives the locomotion blend. Combat triggers (<c>Attack</c>, <c>Hit</c>,
-    /// <c>Stunned</c>) will be hooked up when Phase 3 lands the combat networked state.
+    /// Phase 2 drove only the locomotion blend; Phase 3 added <c>Attack</c> / <c>Hit</c>
+    /// / <c>Stunned</c> hooks driven by <see cref="ChickenCombat"/>'s ChangeDetector so
+    /// every peer sees the same reaction to networked HP / stun changes.
     /// </remarks>
     [RequireComponent(typeof(ChickenController))]
     public sealed class ChickenAnimator : MonoBehaviour
@@ -55,6 +56,21 @@ namespace CluckWars.Visuals
 
             _smoothedSpeed01 = Mathf.Lerp(_smoothedSpeed01, target01, 1f - Mathf.Exp(-_speedSmoothing * dt));
             _animator.SetFloat(SpeedHash, _smoothedSpeed01);
+        }
+
+        public void TriggerAttack()
+        {
+            if (_animator != null) _animator.SetTrigger(AttackHash);
+        }
+
+        public void TriggerHit()
+        {
+            if (_animator != null) _animator.SetTrigger(HitHash);
+        }
+
+        public void SetStunned(bool stunned)
+        {
+            if (_animator != null) _animator.SetBool(StunnedHash, stunned);
         }
     }
 }

@@ -129,7 +129,7 @@ ChickenController (NetworkBehaviour)
 ├── [Networked] ChickenClass   Replicated; spawner sets via OnBeforeSpawned
 ├── ChickenStatsSO              Resolved at Spawned() from ChickenClassRegistrySO
 ├── ChickenMovement             Reads Fusion input, moves with client-side prediction
-├── ChickenCombat               Attack detection + damage application       (Phase 3)
+├── ChickenCombat               Attack detection + damage RPC + death stun
 ├── ChickenCargo                Collection, carrying, deposit               (Phase 4)
 ├── AbilityController           Equipped AbilitySOs, cooldown tracking      (Phase 6)
 ├── ChickenAnimator             Local — drives Animator from [Networked] state
@@ -225,11 +225,23 @@ Notion originals: linked in project instructions for deep reads.
 
 ## Current Phase
 
-**Phase 2 complete:** All four classes (Warrior / Speedy / Fatty / Assassin) selectable from the Bootstrap scene via 1-4 + Space. Spawned chicken adopts class-specific stats and tint via `ChickenClassRegistrySO`. `ChickenAnimator` drives the locomotion blend locally on every peer. `ISessionSelectionService` carries the choice from menu to match.
+**Phase 2 stable.** Numpad fallback for class-select keys landed in commit `d681afe` after Maestro's smoke test confirmed top-row digits worked but full-size keyboards default to numpad. Both digit rows are now accepted. Lazy-load fix from `3bc2e13` confirmed working.
 
-**Cross-cutting infra also landed:** `ILogService` + `UnityLogService` with `LogLevel` (Verbose / Debug / Info / Warn / Error / Off). All gameplay code logs through it with a `Source` tag; default `MinLevel` is Verbose. The fix for the lazy-load Zenject bug (`ProjectContext.HasInstance` returning `false` on cold start) is in develop at commit `3bc2e13`; awaiting the user's smoke-test confirmation before declaring stable.
+**Phase 3 — combat — code landed.** `ChickenCombat` is a `NetworkBehaviour` sibling on the Chicken prefab:
 
-**Next:** Phase 3 — combat. `ChickenCombat`, attack input, damage / HP, hit reactions, death stun.
+- `[Networked] HP` (float), `[Networked] IsStunned` (bool), `StunTimer` and `AttackTimer` (`TickTimer`), `AttackEpoch` (int).
+- StateAuthority drives the swing on each `FixedUpdateNetwork` if the Attack button is held and the cooldown is ready. Targets are picked via `Physics.OverlapSphere` filtered by `_targetMask` and `ChickenCombat` presence; the nearest is chosen.
+- Damage application crosses the Shared-Mode authority boundary via `[Rpc(RpcSources.All, RpcTargets.StateAuthority)] RPC_ApplyDamage`. The target's authority decreases HP, sets `IsStunned`, and starts `StunTimer` for `_stunDuration` (default 5s).
+- Visual reactions (`Hit` trigger on HP decrease, `Stunned` bool on stun toggle, `Attack` trigger on `AttackEpoch++`) are driven by a `ChangeDetector` in `Render()` using cached `PropertyReader<T>` instances, so every peer reacts to the same networked state without extra RPCs.
+- Public `event Action OnDeath` fires on every peer when stun begins. Phase 4's `ChickenCargo` will subscribe to drop carried food on the ground.
+
+`ChickenController.FixedUpdateNetwork` now skips movement when `_combat.IsStunned` is true, so dead chickens are frozen for the full stun. `ChickenAnimator` exposes `TriggerAttack()`, `TriggerHit()`, `SetStunned(bool)` for combat to call.
+
+**Outstanding for Maestro before smoke-test:**
+- Add `ChickenCombat` component to the Chicken prefab in the Inspector. `[RequireComponent]` will surface a missing-component warning if it's not there before play.
+- Confirm the AnimatorController on the Chicken has `Attack` (trigger), `Hit` (trigger), `Stunned` (bool) parameters — otherwise `SetTrigger`/`SetBool` calls log warnings per swing/hit.
+
+Single-player solo mode can't fully smoke-test combat (nothing to hit), but `Swing → no target in range` verbose logs should fire each cooldown when LMB is held. Full validation lands with Phase 5 multi-client.
 
 ---
 
