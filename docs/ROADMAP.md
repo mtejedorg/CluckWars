@@ -4,44 +4,51 @@
 
 ---
 
-## Phase 1: Bootstrap & Foundation (Week 1-2)
+## Phase 1: Bootstrap & Foundation ✅
 
 ### Goals
 - Project structure & packages installed
 - Zenject setup with DI binding
-- Networking interface + local network service
+- Networking interface + Fusion solo session
 - First walking chicken (no combat, no abilities)
 
 ### Tasks
 - [x] Unity 6000.3 LTS (Unity 6) project created, URP configured, folder structure initialized
-- [ ] Photon Fusion 2 imported & verified
-- [ ] Zenject imported & configured
-- [ ] `INetworkService` + `LocalNetworkService` implemented
-- [ ] `ChickenController` with basic movement (no animation yet)
-- [ ] Main scene with demo character walking around
-- [ ] WASD controls working on Windows
+- [x] Photon Fusion 2 imported & verified
+- [x] Zenject imported & configured (`ProjectContext` + `SceneContext`)
+- [x] `INetworkService` + `FusionNetworkService` implemented (Single mode for solo dev)
+- [x] `ChickenController` (NetworkBehaviour) with basic movement
+- [x] Bootstrap → Game scene transition wired
+- [x] WASD controls working on Windows via Input System
 
 ### Deliverable
-Single chicken walking on empty map using keyboard.
+Single chicken walking on empty map using keyboard. ✅
 
 ---
 
-## Phase 2: Character Systems (Week 2-3)
+## Phase 2: Character Systems ✅
 
 ### Goals
 - 4 character classes with distinct stats
-- Animation system (walk, idle, collecting, attacking, hit, stun)
+- Animation system (locomotion blend; combat triggers reserved for Phase 3)
 - ScriptableObject-based class definitions
 
 ### Tasks
-- [ ] `ChickenStatsSO` created for each class (Fatty, Speedy, Warrior, Assassin)
-- [ ] `MatchConfigSO` with tunable values (timer, food targets, tick rate)
-- [ ] Animation state machine (Animator + ChickenAnimator component)
-- [ ] Character selection UI (pick class + color)
-- [ ] All 4 classes instantiable and animating correctly
+- [x] `ChickenStatsSO` for each class (Warrior, Speedy, Fatty, Assassin) authored in `Data/Classes/`
+- [x] `MatchConfigSO` with tunable values (timer, food target, tick rate)
+- [x] `ChickenClass` enum + `ChickenClassRegistrySO` mapping class → stats + tint
+- [x] `ChickenAnimator` driving `Speed` blend from local position-delta velocity
+- [x] `ChickenVisuals` applying per-class tint via `MaterialPropertyBlock`
+- [x] `ISessionSelectionService` carrying menu choice across the scene transition
+- [x] `CharacterSelectController` (placeholder IMGUI; UGUI menu lands in Phase 7)
+- [x] Class-aware spawn: `MatchBootstrapper` sets `ChickenController.Class` via `OnBeforeSpawned`
 
 ### Deliverable
-4 different chickens with working animations, selectable at start.
+4 different chickens with working locomotion animation, selectable at start. ✅
+
+### Deferred to Phase 7
+- Proper UGUI character-select screen (replacing the IMGUI placeholder)
+- Per-class meshes (placeholder capsule + tint for now)
 
 ---
 
@@ -85,21 +92,22 @@ Players can collect from piles, see visual feedback, deposit at base.
 
 ---
 
-## Phase 5: Networking (Week 5-6)
+## Phase 5: Multiplayer Networking (Week 5-6)
 
 ### Goals
-- Photon Fusion 2 integration
+- Extend `FusionNetworkService` from Single → Shared mode
 - Multiple players on LAN
-- Sync all networked state
+- Sync all networked state added by Phases 3-4
 
 ### Tasks
-- [ ] `FusionNetworkService` implementation (Shared Mode for demo)
-- [ ] Zenject binding swap (LocalNetworkService → FusionNetworkService)
-- [ ] NetworkBehaviour setup on ChickenController, FoodPile, GameManager
-- [ ] Input sync via Fusion `PlayerInput` struct
-- [ ] State sync via `[Networked]` for position, HP, cargo, stun, food piles
-- [ ] Player join/leave handling
-- [ ] LAN host/client UI (session name entry)
+- [x] `FusionNetworkService` skeleton with `StartHostAsync` / `JoinSessionAsync` (Phase 1)
+- [x] `NetworkBehaviour` on `ChickenController` (Phase 1)
+- [x] Input sync via Fusion `PlayerNetworkInput` struct (Phase 1)
+- [ ] `NetworkBehaviour` on `FoodPile`, `GameManager`
+- [ ] State sync via `[Networked]` for HP, cargo, stun, food piles, deposit totals
+- [ ] LAN host/client UI (session name entry, replaces IMGUI character-select)
+- [ ] Late-join handling: state authority transfer in Shared Mode
+- [ ] Tested with PC host + Android client on same Wi-Fi
 
 ### Deliverable
 2 devices (Windows PC host + Android client) can play together on LAN.

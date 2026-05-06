@@ -29,10 +29,11 @@ This file provides Claude with the context needed to contribute effectively to C
 │   ├── Abilities/      AbilityBaseSO + concrete ability SOs
 │   ├── Input/          IInputProvider, MobileInputProvider, KeyboardInputProvider
 │   ├── Audio/          IAudioService, UnityAudioService, NullAudioService
-│   ├── Services/       IUGSService, UGSService, NullUGSService
-│   ├── Visuals/        ChickenAnimator, FoodPileVisuals, ChickenVisuals
-│   ├── Installers/     Zenject GameInstaller, DemoInstaller
-│   └── UI/             HUD, menus, character select
+│   ├── Services/       IUGSService, NullUGSService, ISessionSelectionService
+│   ├── Visuals/        ChickenAnimator, ChickenVisuals, FoodPileVisuals
+│   ├── Installers/     ProjectInstaller, GameInstaller
+│   ├── Bootstrap/      SceneLoader (Boot → Game transition)
+│   └── UI/             CharacterSelectController, HUD, menus
 ├── Data/               ScriptableObject assets (Classes/, Abilities/, MatchConfigSO)
 ├── Prefabs/
 ├── Scenes/
@@ -101,14 +102,21 @@ Scripting define `UGS_DISABLED` forces `NullUGSService` in any build regardless 
 
 ```
 ChickenController (NetworkBehaviour)
-├── ChickenStatsSO       ScriptableObject with class stats
-├── ChickenMovement      Reads Fusion input, moves with client-side prediction
-├── ChickenCombat        Attack detection + damage application
-├── ChickenCargo         Collection, carrying, deposit
-├── AbilityController    Equipped AbilitySOs, cooldown tracking
-├── ChickenAnimator      Local only — drives Animator from [Networked] state
-└── ChickenVisuals       Local only — materials/mesh, never networked
+├── [Networked] ChickenClass   Replicated; spawner sets via OnBeforeSpawned
+├── ChickenStatsSO              Resolved at Spawned() from ChickenClassRegistrySO
+├── ChickenMovement             Reads Fusion input, moves with client-side prediction
+├── ChickenCombat               Attack detection + damage application       (Phase 3)
+├── ChickenCargo                Collection, carrying, deposit               (Phase 4)
+├── AbilityController           Equipped AbilitySOs, cooldown tracking      (Phase 6)
+├── ChickenAnimator             Local — drives Animator from [Networked] state
+└── ChickenVisuals              Local — applies tint via MaterialPropertyBlock
 ```
+
+**Class-aware spawn flow:**
+
+1. Bootstrap scene: `CharacterSelectController` writes the chosen `ChickenClass` to `ISessionSelectionService` (singleton bound in `ProjectContext`).
+2. Game scene: `MatchBootstrapper` reads the selection and calls `Runner.Spawn(prefab, …, onBeforeSpawned: …)` to set `ChickenController.Class` before `Spawned()` fires anywhere.
+3. Every peer's `Spawned()` self-injects from `ProjectContext.Instance.Container`, looks up the entry in `ChickenClassRegistrySO`, applies stats + tint locally.
 
 ---
 
@@ -195,8 +203,8 @@ Notion originals: linked in project instructions for deep reads.
 
 ## Current Phase
 
-**Phase 1 complete:** Bootstrap → Game scene flow live, Zenject `ProjectContext` + `SceneContext` wired, `FusionNetworkService` running in `GameMode.Single`, single Warrior chicken walks with WASD.
-**Next:** Phase 2 — 4 character classes, animation state machine (`ChickenAnimator`), character selection UI.
+**Phase 2 complete:** All four classes (Warrior / Speedy / Fatty / Assassin) selectable from the Bootstrap scene via 1-4 + Space. Spawned chicken adopts class-specific stats and tint via `ChickenClassRegistrySO`. `ChickenAnimator` drives the locomotion blend locally on every peer. `ISessionSelectionService` carries the choice from menu to match.
+**Next:** Phase 3 — combat. `ChickenCombat`, attack input, damage / HP, hit reactions, death stun.
 
 ---
 

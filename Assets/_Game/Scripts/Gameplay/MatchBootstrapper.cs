@@ -1,4 +1,5 @@
 using CluckWars.Networking;
+using CluckWars.Services;
 using Fusion;
 using UnityEngine;
 using Zenject;
@@ -6,13 +7,15 @@ using Zenject;
 namespace CluckWars.Gameplay
 {
     /// <summary>
-    /// Phase-1 entry point for a match. Lives in the Game scene as a single GameObject
+    /// Phase-2 entry point for a match. Lives in the Game scene as a single GameObject
     /// with a serialized chicken prefab. On Start it kicks off a solo Fusion session,
-    /// then spawns the local player's chicken when <c>OnPlayerJoined</c> fires.
+    /// then spawns the local player's chicken — using the class chosen via
+    /// <see cref="ISessionSelectionService"/> in the Bootstrap menu — when
+    /// <c>OnPlayerJoined</c> fires.
     /// </summary>
     /// <remarks>
-    /// In Phase 5+ this will read the desired <c>GameMode</c> (Solo / Host / Join)
-    /// from a main-menu flow instead of always going to Single.
+    /// In Phase 5+ this will also read the desired <c>GameMode</c> (Solo / Host / Join)
+    /// from the menu instead of always going to Single.
     /// </remarks>
     public sealed class MatchBootstrapper : MonoBehaviour
     {
@@ -20,11 +23,13 @@ namespace CluckWars.Gameplay
         [SerializeField] private Transform[] _spawnPoints;
 
         private INetworkService _networkService;
+        private ISessionSelectionService _selection;
 
         [Inject]
-        public void Construct(INetworkService networkService)
+        public void Construct(INetworkService networkService, ISessionSelectionService selection)
         {
             _networkService = networkService;
+            _selection = selection;
         }
 
         private async void Start()
@@ -53,7 +58,20 @@ namespace CluckWars.Gameplay
             if (!isLocal) return;
 
             var pos = PickSpawnPosition();
-            runner.Spawn(_chickenPrefab, pos, Quaternion.identity, player);
+            var chosenClass = _selection != null ? _selection.SelectedClass : ChickenClass.Warrior;
+
+            runner.Spawn(
+                _chickenPrefab,
+                pos,
+                Quaternion.identity,
+                player,
+                onBeforeSpawned: (_, networkObject) =>
+                {
+                    // Set the Networked Class before Spawned() runs so every peer sees the
+                    // chosen class on first read and can resolve stats / tint correctly.
+                    var controller = networkObject.GetComponent<ChickenController>();
+                    if (controller != null) controller.Class = chosenClass;
+                });
         }
 
         private Vector3 PickSpawnPosition()
