@@ -130,7 +130,7 @@ ChickenController (NetworkBehaviour)
 ├── ChickenStatsSO              Resolved at Spawned() from ChickenClassRegistrySO
 ├── ChickenMovement             Reads Fusion input, moves with client-side prediction
 ├── ChickenCombat               Attack detection + damage RPC + death stun
-├── ChickenCargo                Collection, carrying, deposit               (Phase 4)
+├── ChickenCargo                Collect from piles, deposit at base, drop on death
 ├── AbilityController           Equipped AbilitySOs, cooldown tracking      (Phase 6)
 ├── ChickenAnimator             Local — drives Animator from [Networked] state
 └── ChickenVisuals              Local — applies tint via MaterialPropertyBlock
@@ -225,23 +225,11 @@ Notion originals: linked in project instructions for deep reads.
 
 ## Current Phase
 
-**Phase 2 stable.** Numpad fallback for class-select keys landed in commit `d681afe` after Maestro's smoke test confirmed top-row digits worked but full-size keyboards default to numpad. Both digit rows are now accepted. Lazy-load fix from `3bc2e13` confirmed working.
+**Phase 4 stable.** Solo collect → carry → deposit loop verified end-to-end. `FoodPile`, `PlayerBase`, `ChickenCargo`, `FoodPileVisuals`, and the `CargoHud` IMGUI overlay all working. Placeholder `FoodPile.prefab` and `PlayerBase.prefab` use cube child meshes with **trigger** colliders so chickens can walk through them while `OverlapSphere` still picks them up; chicken movement is 2D (no jump), so triggers are the right call.
 
-**Phase 3 — combat — code landed.** `ChickenCombat` is a `NetworkBehaviour` sibling on the Chicken prefab:
+**Phase 4b deferred:** food-pickup prefab spawned on death so cargo isn't simply lost. Held until Phase 5 lands multi-client (single-player can't validate the spawn → pickup loop anyway). Hook is already in place via `ChickenCombat.OnDeath`.
 
-- `[Networked] HP` (float), `[Networked] IsStunned` (bool), `StunTimer` and `AttackTimer` (`TickTimer`), `AttackEpoch` (int).
-- StateAuthority drives the swing on each `FixedUpdateNetwork` if the Attack button is held and the cooldown is ready. Targets are picked via `Physics.OverlapSphere` filtered by `_targetMask` and `ChickenCombat` presence; the nearest is chosen.
-- Damage application crosses the Shared-Mode authority boundary via `[Rpc(RpcSources.All, RpcTargets.StateAuthority)] RPC_ApplyDamage`. The target's authority decreases HP, sets `IsStunned`, and starts `StunTimer` for `_stunDuration` (default 5s).
-- Visual reactions (`Hit` trigger on HP decrease, `Stunned` bool on stun toggle, `Attack` trigger on `AttackEpoch++`) are driven by a `ChangeDetector` in `Render()` using cached `PropertyReader<T>` instances, so every peer reacts to the same networked state without extra RPCs.
-- Public `event Action OnDeath` fires on every peer when stun begins. Phase 4's `ChickenCargo` will subscribe to drop carried food on the ground.
-
-`ChickenController.FixedUpdateNetwork` now skips movement when `_combat.IsStunned` is true, so dead chickens are frozen for the full stun. `ChickenAnimator` exposes `TriggerAttack()`, `TriggerHit()`, `SetStunned(bool)` for combat to call.
-
-**Outstanding for Maestro before smoke-test:**
-- Add `ChickenCombat` component to the Chicken prefab in the Inspector. `[RequireComponent]` will surface a missing-component warning if it's not there before play.
-- Confirm the AnimatorController on the Chicken has `Attack` (trigger), `Hit` (trigger), `Stunned` (bool) parameters — otherwise `SetTrigger`/`SetBool` calls log warnings per swing/hit.
-
-Single-player solo mode can't fully smoke-test combat (nothing to hit), but `Swing → no target in range` verbose logs should fire each cooldown when LMB is held. Full validation lands with Phase 5 multi-client.
+**Next:** Phase 5 — multiplayer networking. Lift `FusionNetworkService` from `GameMode.Single` to `Shared`, add LAN host/join UI to replace the Bootstrap IMGUI menu, validate every Phase 3-4 RPC path with a real second client (Windows host + Android client on same Wi-Fi). See `docs/ROADMAP.md` Phase 5 task list.
 
 ---
 

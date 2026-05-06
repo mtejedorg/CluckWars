@@ -32,6 +32,7 @@ namespace CluckWars.Gameplay
         private ChickenClassRegistrySO _registry;
         private ChickenStatsSO _activeStats;
         private ChickenCombat _combat;
+        private ChickenCargo _cargo;
         private ILogService _log;
 
         /// <summary>The chicken's archetype. Replicated; set by the spawner via <c>OnBeforeSpawned</c>.</summary>
@@ -39,6 +40,7 @@ namespace CluckWars.Gameplay
 
         public ChickenStatsSO Stats => _activeStats != null ? _activeStats : _fallbackStats;
         public ChickenCombat Combat => _combat;
+        public ChickenCargo Cargo => _cargo;
 
         [Inject]
         public void Construct(ChickenClassRegistrySO registry, ILogService log)
@@ -61,6 +63,7 @@ namespace CluckWars.Gameplay
 
             _characterController = GetComponent<CharacterController>();
             _combat = GetComponent<ChickenCombat>();
+            _cargo = GetComponent<ChickenCargo>();
             _activeStats = ResolveStatsForClass(Class);
 
             if (_activeStats == null)

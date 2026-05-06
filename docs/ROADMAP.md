@@ -100,15 +100,22 @@ Two chickens can fight, one dies, stunned for 5 sec. (Solo dev session can only 
 - Base depositing
 
 ### Tasks
-- [ ] `FoodPile` NetworkObject with `[Networked]` food amount
-- [ ] `FoodPileVisuals` (scale + color based on remaining %)
-- [ ] `ChickenCargo` component (collection rate, carrying, deposit)
-- [ ] Base zones (no interaction, just visual)
-- [ ] HUD showing current cargo / max cargo
-- [ ] Food pickup from ground (dropped cargo after death)
+- [x] `FoodPile` NetworkBehaviour with `[Networked] Amount` + `RPC_Drain` (master client owns scene-placed piles)
+- [x] `FoodPileVisuals` — scales mesh + tints color from full→empty per `Amount / MaxAmount`
+- [x] `ChickenCargo` NetworkBehaviour: per-tick collect from nearest in-range pile, deposit at nearest in-range base
+- [x] `PlayerBase` NetworkBehaviour with `[Networked] FoodTotal` + `RPC_AddFood` (per-player ownership wiring deferred to Phase 7 win condition)
+- [x] `CargoHud` IMGUI overlay — local cargo / capacity, base total, stun indicator
+- [x] Cargo zeroed on death via `ChickenCombat.OnDeath` subscription
+- [ ] Food pickup prefab (dropped cargo as collectables) — deferred to Phase 4b once Phase 5 multi-client lands and we can validate it
+
+### Prefab/scene work (Maestro, in Editor)
+- Add `ChickenCargo` to the Chicken prefab.
+- Author a `FoodPile` prefab (or scene-placed NetworkObject): NetworkObject + FoodPile + FoodPileVisuals + a child mesh, baked into Game.unity.
+- Author a `PlayerBase` placeholder: NetworkObject + PlayerBase + a tinted child mesh, placed in Game.unity.
+- Add a single empty GameObject to Game.unity with the `CargoHud` component.
 
 ### Deliverable
-Players can collect from piles, see visual feedback, deposit at base.
+Players can collect from piles, see visual feedback, deposit at base. (Solo-testable end-to-end except food-drop pickups.)
 
 ---
 

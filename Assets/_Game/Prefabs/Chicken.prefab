@@ -19,6 +19,7 @@ GameObject:
   - component: {fileID: 5004226852992495544}
   - component: {fileID: 3349953020513663677}
   - component: {fileID: -8672661885974516826}
+  - component: {fileID: -4654369670535789821}
   m_Layer: 0
   m_Name: Chicken
   m_TagString: Untagged
@@ -140,6 +141,7 @@ MonoBehaviour:
   NetworkedBehaviours:
   - {fileID: 1781100138392423414}
   - {fileID: -8672661885974516826}
+  - {fileID: -4654369670535789821}
   ForceRemoteRenderTimeframe: 0
 --- !u!143 &6032245462738825523
 CharacterController:
@@ -247,3 +249,20 @@ MonoBehaviour:
     m_Bits: 4294967295
   _HP: 0
   _IsStunned: 0
+--- !u!114 &-4654369670535789821
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f48c1e7d2a9b4f3e85d6c1b2a3f4e5d6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenCargo
+  _searchRadius: 5
+  _searchMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  _Cargo: 0
