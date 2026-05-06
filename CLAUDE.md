@@ -24,7 +24,7 @@ This file provides Claude with the context needed to contribute effectively to C
 ```
 /Assets/_Game/
 ├── Scripts/
-│   ├── Networking/     INetworkService, FusionNetworkService, LocalNetworkService
+│   ├── Networking/     INetworkService, FusionNetworkService, PlayerNetworkInput
 │   ├── Gameplay/       GameManager, systems (Food, Combat, Ability, MatchState)
 │   ├── Abilities/      AbilityBaseSO + concrete ability SOs
 │   ├── Input/          IInputProvider, MobileInputProvider, KeyboardInputProvider
@@ -74,16 +74,24 @@ IUGSService       // Auth, Lobby, Relay — NullUGSService in demo
 
 ## Zenject Binding Pattern
 
-```csharp
-// GameInstaller.cs (production)
-Container.Bind<INetworkService>().To<FusionNetworkService>().AsSingle();
-Container.Bind<IUGSService>().To<UGSService>().AsSingle();
-Container.Bind<IAudioService>().To<UnityAudioService>().AsSingle();
-Container.Bind<IInputProvider>().To<MobileInputProvider>().AsSingle();
+Two contexts:
 
-// DemoInstaller.cs (overrides for demo/dev)
-Container.Bind<IUGSService>().To<NullUGSService>().AsSingle();
+- **`ProjectInstaller`** — lives on `Assets/_Game/Resources/ProjectContext.prefab`. Binds app-wide singletons (`IInputProvider`, `IAudioService`, `IUGSService`). Survives scene loads.
+- **`GameInstaller`** — lives on the `SceneContext` GameObject in `Game.unity`. Binds match-scoped state (`MatchConfigSO`, `INetworkService`).
+
+```csharp
+// ProjectInstaller (Resources/ProjectContext.prefab)
+Container.Bind<IUGSService>().To<NullUGSService>().AsSingle();          // demo
+Container.Bind<IAudioService>().To<NullAudioService>().AsSingle();      // demo
+Container.Bind<IInputProvider>().To<KeyboardInputProvider>().AsSingle();
+
+// GameInstaller (Game.unity SceneContext)
+Container.Bind<MatchConfigSO>().FromInstance(_matchConfig).AsSingle();
+Container.Bind<INetworkService>().To<FusionNetworkService>()
+    .FromNewComponentOnNewGameObject().AsSingle().NonLazy();
 ```
+
+Single-player dev sessions go through `FusionNetworkService.StartSoloAsync()` (`GameMode.Single`). There is no separate `LocalNetworkService` — `NetworkBehaviour` requires a `NetworkRunner`, so even the offline path is a Fusion runner with one player.
 
 Scripting define `UGS_DISABLED` forces `NullUGSService` in any build regardless of config.
 
@@ -187,8 +195,8 @@ Notion originals: linked in project instructions for deep reads.
 
 ## Current Phase
 
-**Phase 1 complete:** Unity 6000.3 LTS project initialized with URP.  
-**Next:** Bootstrap — Zenject setup, `INetworkService`/`LocalNetworkService`, first walking chicken.
+**Phase 1 complete:** Bootstrap → Game scene flow live, Zenject `ProjectContext` + `SceneContext` wired, `FusionNetworkService` running in `GameMode.Single`, single Warrior chicken walks with WASD.
+**Next:** Phase 2 — 4 character classes, animation state machine (`ChickenAnimator`), character selection UI.
 
 ---
 
