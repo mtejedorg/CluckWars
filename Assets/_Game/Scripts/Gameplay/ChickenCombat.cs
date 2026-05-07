@@ -180,11 +180,17 @@ namespace CluckWars.Gameplay
             }
 
             _log?.Debug(Source, $"Swing → {target.name} for {stats.Attack} dmg.");
-            target.RPC_ApplyDamage(stats.Attack);
+            target.RPC_ApplyDamage(stats.Attack, Object.InputAuthority);
         }
 
+        /// <summary>
+        /// Public so other systems (Roll &amp; Trample) can deal damage / stun directly
+        /// without going through the swing pipeline. Same authority crossing as the
+        /// regular attack path: caller is any client, applied on the target's
+        /// StateAuthority.
+        /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        private void RPC_ApplyDamage(float amount)
+        public void RPC_ApplyDamage(float amount, PlayerRef attacker)
         {
             if (IsStunned) return; // dead chickens can't be hit again until they respawn
 
@@ -195,14 +201,47 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            HP = Mathf.Max(0f, HP - amount);
-            _log?.Debug(Source, $"RPC_ApplyDamage: -{amount} → HP={HP}.");
+            // Spine Coat: bounce the damage back to the attacker; recipient eats nothing.
+            if (_controller != null && _controller.ReflectDamage && attacker.IsRealPlayer)
+            {
+                ReflectDamageTo(attacker, amount);
+                return;
+            }
+
+            // Turtle Mode and similar reduce incoming damage.
+            float resisted = amount;
+            if (_controller != null && _controller.DamageResistance > 0f)
+            {
+                resisted *= Mathf.Clamp01(1f - _controller.DamageResistance);
+            }
+
+            HP = Mathf.Max(0f, HP - resisted);
+            _log?.Debug(Source, $"RPC_ApplyDamage: -{resisted:0.0} (raw {amount:0.0}, resist {_controller?.DamageResistance:0.00}) → HP={HP}.");
 
             if (HP <= 0f)
             {
                 IsStunned = true;
                 StunTimer = TickTimer.CreateFromSeconds(Runner, _stunDuration);
             }
+        }
+
+        private void ReflectDamageTo(PlayerRef attacker, float amount)
+        {
+            // Find the attacker's chicken combat by InputAuthority and bounce damage
+            // through the same RPC. Self-attribution so the reflector takes no damage.
+            var combats = FindObjectsByType<ChickenCombat>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < combats.Length; i++)
+            {
+                var c = combats[i];
+                if (c == null || c == this) continue;
+                if (c.Object != null && c.Object.InputAuthority == attacker)
+                {
+                    _log?.Debug(Source, $"Spine Coat: reflected {amount:0.0} back to {attacker}.");
+                    c.RPC_ApplyDamage(amount, Object.InputAuthority);
+                    return;
+                }
+            }
+            _log?.Verbose(Source, $"Spine Coat: attacker {attacker} not found, damage dropped.");
         }
 
         private void Respawn(ChickenStatsSO stats)

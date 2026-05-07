@@ -266,7 +266,16 @@ The HUD picked up timer + end overlay duties: `CargoHud` (despite the name, kept
 - Create `SpeedBurst.asset` and `EggShell.asset` under `/Assets/_Game/Data/Abilities/` via the new `Cluck Wars/Ability/…` menu items. Tune Duration / Cooldown / SpeedMultiplier there; current defaults are placeholders.
 - Drag the assets into `AbilityController._slot0` on the Chicken prefab. Slot 1 only matters once Assassin gets a second ability — leave null for now.
 
-**Phase 6b deferred:** Roll & Trample (offensive sweep), Invisibility (visuals opacity), Doppelganger (decoy spawn), Spine Coat (reflect — needs RPC re-targeting to attacker), Turtle Mode (slow + resistance — needs damage-resistance scalar), Sneaky Steal. Each is a single concrete `AbilityBaseSO` subclass; no architectural changes needed.
+**Phase 6b — code landed.** Four more concrete `AbilityBaseSO` subclasses + the supporting controller / combat / visuals hooks they need:
+
+- `TurtleModeAbilitySO` — sets `MoveSpeedMultiplier` (slow) + `DamageResistance` (% damage absorbed). Resets both on deactivate.
+- `SpineCoatAbilitySO` — toggles `ReflectDamage`. While on, `ChickenCombat.RPC_ApplyDamage` bounces the damage back to the attacker (looked up via `Object.InputAuthority`) instead of applying it locally.
+- `InvisibilityAbilitySO` — sets `ChickenController.VisualOpacity`. `ChickenVisuals.LateUpdate` polls and re-pushes the tint with the new alpha. Local-only fade; remote peers don't see the invisibility (networked opacity is Phase 9 polish).
+- `RollTrampleAbilitySO` — one-shot offensive sweep on activate. `Physics.OverlapSphere` centered ahead of the caster, slams every hit chicken with `TrampleDamage` (default 200, enough to instant-stun a full-HP target). No persistent state.
+
+`ChickenController` gained three new state hooks: `DamageResistance`, `ReflectDamage`, `VisualOpacity`. `ChickenCombat.RPC_ApplyDamage` now takes a `PlayerRef attacker` argument so reflection knows where to bounce; `Swing()` passes `Object.InputAuthority` automatically.
+
+**Phase 6c deferred:** Sneaky Steal (needs `ChickenCargo.RPC_StealCargo` for cross-authority cargo moves) and Doppelganger (needs a decoy NetworkObject prefab + mimicry AI).
 
 ---
 

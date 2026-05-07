@@ -156,8 +156,12 @@ Players can collect from piles, see visual feedback, deposit at base. (Solo-test
 - [x] `AbilityContext` (passed to ability hooks; holds the `ChickenController` ref so SOs are free of `GetComponent` calls).
 - [x] `SpeedBurstAbilitySO` — multiplies `ChickenController.MoveSpeedMultiplier` while active.
 - [x] `EggShellAbilitySO` — toggles `MovementLocked` + `DamageImmune` while active.
-- [ ] `RollTrampleAbilitySO` — Phase 6b (offensive, needs hit-detection sweep).
-- [ ] `InvisibilityAbilitySO` — Phase 6b (visual-only stealth, needs `ChickenVisuals` opacity hook).
+- [x] `RollTrampleAbilitySO` — one-shot `Physics.OverlapSphere` sweep ahead of the caster, slams hit chickens with damage via `ChickenCombat.RPC_ApplyDamage`.
+- [x] `InvisibilityAbilitySO` — drives `ChickenController.VisualOpacity`; `ChickenVisuals` polls in `LateUpdate` and re-pushes the tint with the new alpha. Local-only fade; networked invisibility deferred to Phase 9.
+- [x] `TurtleModeAbilitySO` — sets `MoveSpeedMultiplier` (slow) + `DamageResistance` (absorbs %).
+- [x] `SpineCoatAbilitySO` — toggles `ReflectDamage`; `RPC_ApplyDamage` bounces incoming damage to the attacker via a self-RPC, recipient eats nothing.
+- [ ] `SneakyStealAbilitySO` — Phase 6c (needs `ChickenCargo.RPC_StealCargo` for cross-authority cargo moves).
+- [ ] `DoppelgangerAbilitySO` — Phase 6c (needs a decoy `NetworkObject` prefab + AI mimicry).
 - [x] `AbilityController` on Chicken (NetworkBehaviour): 2 slots (slot 0 universal, slot 1 Assassin-only), `[Networked] ActiveSlot` + `ActivationTimer` + per-slot cooldown timers, single-active-at-a-time policy.
 - [x] Ability button UI with radial cooldown indicator — `TouchControlsHud` now adds a `Image.FillMethod.Radial360` overlay per ability button, fillAmount = remaining/total cooldown.
 - [x] Movement / damage hooks on `ChickenController` (`MoveSpeedMultiplier`, `MovementLocked`, `DamageImmune`) read by `ChickenMovement` and `ChickenCombat.RPC_ApplyDamage`.

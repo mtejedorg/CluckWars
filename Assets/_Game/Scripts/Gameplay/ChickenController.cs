@@ -58,6 +58,15 @@ namespace CluckWars.Gameplay
         /// <summary>While true, <c>ChickenCombat.RPC_ApplyDamage</c> drops incoming damage.</summary>
         public bool DamageImmune { get; set; }
 
+        /// <summary>0 = full damage, 1 = no damage taken. Multiplied with incoming damage in <c>ChickenCombat</c>.</summary>
+        public float DamageResistance { get; set; }
+
+        /// <summary>When true, incoming damage is sent back to the attacker instead of applied here.</summary>
+        public bool ReflectDamage { get; set; }
+
+        /// <summary>0 = invisible, 1 = fully opaque. Read by <c>ChickenVisuals</c> for the Invisibility ability.</summary>
+        public float VisualOpacity { get; set; } = 1f;
+
         [Inject]
         public void Construct(ChickenClassRegistrySO registry, ILogService log)
         {
