@@ -35,7 +35,16 @@ namespace CluckWars.Installers
             // Stateless service stand-ins.
             Container.Bind<IUGSService>().To<NullUGSService>().AsSingle();
             Container.Bind<IAudioService>().To<NullAudioService>().AsSingle();
-            Container.Bind<IInputProvider>().To<KeyboardInputProvider>().AsSingle();
+
+            // Input: keyboard + on-screen touch HUD compose into one provider so the
+            // local player can drive the chicken from either source. The touch HUD is
+            // dormant until the Game scene's TouchControlsHud builds itself; on PC the
+            // keyboard side dominates, on mobile the touch side does.
+            Container.Bind<IInputProvider>()
+                .FromMethod(_ => new CompositeInputProvider(
+                    new KeyboardInputProvider(),
+                    new TouchInputProvider()))
+                .AsSingle();
 
             // Cross-scene mutable state for menu → match handoff.
             Container.Bind<ISessionSelectionService>().To<SessionSelectionService>().AsSingle();

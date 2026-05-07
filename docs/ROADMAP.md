@@ -190,9 +190,9 @@ Players can equip and activate 2 abilities per chicken, cooldowns work.
 
 ### Tasks
 - [x] `IInputProvider` interface + `KeyboardInputProvider` (Phase 1)
-- [ ] `MobileInputProvider` (virtual joystick + buttons)
-- [ ] Platform detection (Windows vs Android) at startup
-- [ ] Zenject input provider binding per platform (override `IInputProvider` in `ProjectInstaller` based on `Application.platform`)
+- [x] `VirtualJoystick`, `HoldButton`, `TouchControlsHud`, `TouchInputProvider` (landed early in Phase 5)
+- [x] `CompositeInputProvider` ORs keyboard + touch — same input path on PC and mobile, clicking buttons with the mouse exercises the touch flow without a build
+- [x] No platform branching needed at install time: composite is bound app-wide. Touch HUD activates whenever it's present in scene (Game.unity), keyboard is always live
 - [ ] Android build export
 - [ ] Test on real Android device (mid-range 2021+)
 - [ ] FPS monitoring & optimization (target 30 fps)
