@@ -45,8 +45,14 @@ namespace CluckWars.Gameplay
 
             if (HasStateAuthority)
             {
-                Amount = _initialAmount;
-                MaxAmount = _initialAmount;
+                // Only seed the prefab default if the spawner didn't preset Amount /
+                // MaxAmount via onBeforeSpawned (e.g., MapGenerator wants a bigger
+                // center pile than the small ones around it).
+                if (MaxAmount <= 0f)
+                {
+                    Amount = _initialAmount;
+                    MaxAmount = _initialAmount;
+                }
                 _log?.Debug(Source, $"{name}: Spawned. Amount={Amount}/{MaxAmount}.");
             }
         }

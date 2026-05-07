@@ -181,10 +181,16 @@ namespace CluckWars.Gameplay
             var hits = Physics.OverlapSphere(transform.position, _searchRadius, _searchMask, QueryTriggerInteraction.Collide);
             PlayerBase best = null;
             float bestSqr = float.MaxValue;
+            var ownerRef = Object.InputAuthority;
             foreach (var col in hits)
             {
                 var b = col.GetComponentInParent<PlayerBase>();
                 if (b == null) continue;
+                // Phase 7b: only deposit at our own base. Unowned bases are ignored
+                // too — GameManager assigns ownership lazily on the master client,
+                // so the first frame of a join may have no match; the next tick
+                // fixes it.
+                if (b.Owner != ownerRef) continue;
                 float sqr = (b.transform.position - transform.position).sqrMagnitude;
                 float r = b.DepositRadius;
                 if (sqr > r * r) continue;

@@ -14,11 +14,13 @@ namespace CluckWars.Gameplay
     /// timer expires).
     /// </summary>
     /// <remarks>
-    /// Scope-trimmed for Phase 7: scans every <c>PlayerBase</c> in the scene and
-    /// picks the one with the highest <c>FoodTotal</c>. Per-player base ownership
-    /// (one base per joined PlayerRef, deposit only into your own) is Phase 7b —
-    /// it requires hooking player-join to base assignment, which we'll do once
-    /// the lifecycle itself is validated.
+    /// Phase 7b adds per-player base ownership: the master client polls every
+    /// FixedUpdateNetwork tick, finds players without an assigned base, and
+    /// stamps them onto the first unowned <see cref="PlayerBase"/>. Win condition
+    /// then skips unowned bases so a stray scene-baked base can't trigger a
+    /// PlayerRef.None winner. <see cref="ChickenCargo"/> deposits filter by
+    /// <see cref="PlayerBase.Owner"/> so only the player's own base accepts
+    /// their deposits.
     /// </remarks>
     [RequireComponent(typeof(NetworkObject))]
     public sealed class GameManager : NetworkBehaviour
@@ -73,6 +75,12 @@ namespace CluckWars.Gameplay
         public override void FixedUpdateNetwork()
         {
             if (!HasStateAuthority) return;
+
+            // Base ownership: cheap to poll, runs every tick. Idempotent — players
+            // already assigned skip the inner loop, so the cost is O(players × bases)
+            // and the upper bound is 4×4 for the demo.
+            AssignBasesToPlayers();
+
             if (State != MatchState.Active) return;
 
             // Cheap throttle: 4 wins-checks per second is plenty and keeps Physics /
@@ -91,6 +99,43 @@ namespace CluckWars.Gameplay
             }
         }
 
+        private void AssignBasesToPlayers()
+        {
+            var bases = FindObjectsByType<PlayerBase>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            if (bases.Length == 0) return;
+
+            foreach (var player in Runner.ActivePlayers)
+            {
+                if (!player.IsRealPlayer) continue;
+                if (PlayerHasBase(bases, player)) continue;
+
+                var freeBase = FindUnownedBase(bases);
+                if (freeBase == null) break; // no more bases to hand out
+
+                freeBase.Owner = player;
+                _log?.Info(Source, $"Assigned {freeBase.name} to {player}.");
+            }
+        }
+
+        private static bool PlayerHasBase(PlayerBase[] bases, PlayerRef player)
+        {
+            for (int i = 0; i < bases.Length; i++)
+            {
+                if (bases[i] != null && bases[i].Owner == player) return true;
+            }
+            return false;
+        }
+
+        private static PlayerBase FindUnownedBase(PlayerBase[] bases)
+        {
+            for (int i = 0; i < bases.Length; i++)
+            {
+                var b = bases[i];
+                if (b != null && !b.Owner.IsRealPlayer) return b;
+            }
+            return null;
+        }
+
         private void StartMatch()
         {
             State = MatchState.Active;
@@ -102,13 +147,14 @@ namespace CluckWars.Gameplay
 
         private void EvaluateWinCondition()
         {
-            // Phase 7 simplification: any base reaching the food target ends the match.
-            // Phase 7b will scope this to bases owned by a real PlayerRef.
+            // Owned bases only — a stray unowned base hitting the target shouldn't
+            // trigger a PlayerRef.None winner.
             var bases = FindObjectsByType<PlayerBase>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
             for (int i = 0; i < bases.Length; i++)
             {
                 var b = bases[i];
-                if (b == null || b.FoodTotal < FoodTargetToWin) continue;
+                if (b == null || !b.Owner.IsRealPlayer) continue;
+                if (b.FoodTotal < FoodTargetToWin) continue;
                 EndMatch(b.Owner, b.FoodTotal, reason: "food target reached");
                 return;
             }
@@ -116,16 +162,15 @@ namespace CluckWars.Gameplay
 
         private void EndOnTimerExpiry()
         {
-            // Find the highest-total base. Ties are broken by whoever the iterator
-            // hits first; good enough for the demo, can be refined when scoring rules
-            // are revisited.
+            // Highest-total OWNED base wins. Ties broken by iteration order; good
+            // enough for the demo, refine when scoring rules are revisited.
             var bases = FindObjectsByType<PlayerBase>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
             PlayerRef winner = PlayerRef.None;
             float bestTotal = -1f;
             for (int i = 0; i < bases.Length; i++)
             {
                 var b = bases[i];
-                if (b == null) continue;
+                if (b == null || !b.Owner.IsRealPlayer) continue;
                 if (b.FoodTotal > bestTotal)
                 {
                     bestTotal = b.FoodTotal;

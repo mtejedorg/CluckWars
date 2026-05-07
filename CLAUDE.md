@@ -250,7 +250,20 @@ The HUD picked up timer + end overlay duties: `CargoHud` (despite the name, kept
 - Author a `GameManager` prefab: NetworkObject + `GameManager` script.
 - Drag the prefab into `MatchBootstrapper._gameManagerPrefab` on the MatchBootstrapper GameObject in `Game.unity`.
 
-**Phase 7b deferred:** per-player base ownership (assign `PlayerBase.Owner` on join, restrict deposits to own base, full leaderboard). Spawn-at-base-edge.
+**Phase 7b — per-player bases — code landed.** `GameManager.AssignBasesToPlayers` runs every `FixedUpdateNetwork` tick on the master client: iterates `Runner.ActivePlayers`, and for any player without a base, stamps `Owner` onto the first unowned `PlayerBase` in scene. Idempotent and cheap (4 × 4 worst case). `ChickenCargo.FindNearestBaseInRange` now filters by `b.Owner == Object.InputAuthority` — chickens only deposit at their own base. Win check (`EvaluateWinCondition` + `EndOnTimerExpiry`) now skips unowned bases so a stray scene-baked base can't trigger a `PlayerRef.None` winner. `CargoHud` shows per-player labels: `P1: 42  P2: 17  ?: 0` for any base GameManager hasn't assigned yet.
+
+**Procedural map — code landed.** `MapGenerator` (MonoBehaviour, in `Scripts/Gameplay/`) replaces hand-placed scene clutter with one configurable component:
+
+- **Local on every peer (Awake):** builds a Unity Plane primitive scaled to `_planeSize`, optionally tinted with `_groundMaterial`. Caches 4 corner spawn positions for `MatchBootstrapper`.
+- **Master client only** (subscribes to `INetworkService.OnRunnerReady`): `Runner.Spawn`s 4 `PlayerBase` instances at the corners (slightly inset toward center), 1 large center `FoodPile` (configurable `_centerPileAmount` + visual scale), and N small piles around the center on a jittered ring (`_smallPileCount` / min / max radius). Per-instance `Amount` / `MaxAmount` set via `onBeforeSpawned` so the center pile can hold more than the satellites.
+
+`FoodPile.Spawned` was tweaked to only seed the prefab default when `MaxAmount <= 0`, so callers using `onBeforeSpawned` can override per-instance.
+
+**Outstanding for Maestro before smoke-test:**
+- Add a `MapGenerator` GameObject to `Game.unity`. Drag `Chicken/PlayerBase.prefab` into `_basePrefab`, `FoodPile.prefab` into `_foodPilePrefab`. Optional: assign a URP/Lit material to `_groundMaterial` so the plane isn't magenta.
+- Remove the hand-placed `Plane`, `PlayerBase` instance, and `FoodPile` instance from `Game.unity` — `MapGenerator` builds them at runtime now.
+
+**Spawn-at-base-edge** is still deferred — random `_spawnPoints` selection is fine for the demo (players walk to their base in <2s anyway). Roll into Phase 9 polish if scope allows.
 
 **Phase 6 — abilities — code landed.** Two new namespaces, one new component, two SO implementations:
 

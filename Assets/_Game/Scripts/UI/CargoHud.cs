@@ -118,16 +118,22 @@ namespace CluckWars.UI
         private string BuildBaseTotalsText()
         {
             if (_bases.Length == 0) return "Base total: (no base in scene)";
-            if (_bases.Length == 1) return $"Base total: {Mathf.FloorToInt(_bases[0].FoodTotal)}";
 
-            // Multi-base: comma-separated. Per-player labels arrive with Phase 7b.
-            var sb = new System.Text.StringBuilder("Bases: ");
+            // Phase 7b: per-player labels — "P3: 42" for owned bases, plain "?: N"
+            // for any base GameManager hasn't assigned yet.
+            var sb = new System.Text.StringBuilder();
+            int written = 0;
             for (int i = 0; i < _bases.Length; i++)
             {
-                if (i > 0) sb.Append(", ");
-                sb.Append(Mathf.FloorToInt(_bases[i].FoodTotal));
+                var b = _bases[i];
+                if (b == null) continue;
+                if (written > 0) sb.Append("  ");
+                if (b.Owner.IsRealPlayer) sb.Append('P').Append(b.Owner.PlayerId).Append(": ");
+                else sb.Append("?: ");
+                sb.Append(Mathf.FloorToInt(b.FoodTotal));
+                written++;
             }
-            return sb.ToString();
+            return written == 0 ? "Bases: —" : sb.ToString();
         }
 
         private void DrawTopBar()

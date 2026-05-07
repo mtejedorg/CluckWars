@@ -188,8 +188,9 @@ Players can equip and activate 1 ability per chicken (2 for Assassin once `_slot
 - [x] Win condition check (first to `MatchConfigSO.FoodTargetToWin` OR highest total when timer expires). Throttled to 4× / sec via `Runner.SimulationTime`.
 - [x] Match timer (top-center MM:SS overlay) + end screen (centered banner showing winner + final food). Both rendered by `CargoHud` IMGUI.
 - [x] `MatchBootstrapper` spawns the `GameManager` prefab on master-client side after `StartGame` completes.
-- [ ] Spawn system polish — currently picks a random scene transform from `_spawnPoints`; "spawn at base edge on join" lands with Phase 7b per-player base wiring.
-- [ ] Per-player base ownership (each `PlayerBase.Owner` assigned on join; `ChickenCargo` deposits only into its own player's base) — Phase 7b.
+- [ ] Spawn system polish — currently picks a random scene transform from `_spawnPoints`; "spawn at base edge on join" deferred to Phase 9 (low-impact polish; players can walk to base in <2s anyway).
+- [x] Per-player base ownership — Phase 7b. `GameManager` polls every tick, finds players without an assigned base, stamps them onto the first unowned `PlayerBase`. `ChickenCargo` deposits only at bases where `Owner == Object.InputAuthority`. Win check skips unowned bases. HUD shows per-player labels (`P1: 42  P2: 17`).
+- [x] Procedural map (programmer art) — `MapGenerator` MonoBehaviour. Local on every peer: builds a Plane primitive + caches 4 corner spawn positions. Master client only (after `OnRunnerReady`): spawns 4 corner `PlayerBase`s + 1 center `FoodPile` (larger amount, scaled mesh) + N small piles on a jittered ring. `FoodPile.Spawned` adjusted to honor pre-set `Amount` / `MaxAmount` from `onBeforeSpawned`.
 - [ ] Placeholder balancing pass — tune `MatchConfigSO`, `FoodPile._initialAmount`, `ChickenStatsSO.CollectionRate`, ability cooldowns once 4-player playtest data is available.
 - [x] Score display during match — `CargoHud` shows each base's running food total in the right panel; full per-player leaderboard arrives with Phase 7b.
 
