@@ -214,6 +214,8 @@ Android phone can host or join LAN match with full touch controls.
 - [ ] Balance tweaks based on playtesting
 - [ ] UI responsiveness on mobile
 - [ ] Error handling & reconnection logic
+- [ ] **`PrefabRegistrySO`** — consolidate scattered prefab references (chicken, food pickup, food pile, base) into one SO under `/Assets/_Game/Data/`. Lookup by logical ID via DI; remove per-component SerializeField slots. See TDD §6.6.
+- [ ] **`ColorSchemeSO`** — consolidate per-player / food-state / ability-accent colors into one SO. Visuals components read from it instead of serializing local `Color` fields. See TDD §6.6.
 
 ### Deliverable
 Demo is stable and playable for 30+ min sessions without crashes.

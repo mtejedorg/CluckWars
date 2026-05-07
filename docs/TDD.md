@@ -330,6 +330,15 @@ All SO class names use the `SO` suffix. All SO assets live under `/Assets/_Game/
 
 `MatchConfigSO` holds all tunable match values: timer, food targets, pile sizes, tick rate, UGS enabled flag.
 
+#### Planned: centralized asset registries (post-demo refactor)
+
+Today, prefab references and per-class colors are scattered: `MatchBootstrapper._chickenPrefab`, `ChickenCargo._foodPickupPrefab`, ad-hoc `Color` fields on individual visual components, etc. This works but hunting for "where is the X prefab assigned" gets tedious as systems grow. After the demo we consolidate into two registry SOs:
+
+- **`PrefabRegistrySO`** — single asset under `/Assets/_Game/Data/` mapping logical IDs (`Chicken`, `FoodPile`, `FoodPickup`, `PlayerBase`, …) to `NetworkObject` references. Spawning systems take the registry via DI and look up by ID instead of holding a SerializeField slot per prefab. One source of truth, easy to inspect, easy to reassign in bulk.
+- **`ColorSchemeSO`** — single asset holding palettes for player identity (Red / Blue / Green / Yellow), food states (full → empty), team accents, ability VFX. Visuals components read from this rather than serializing local color fields. Lets us re-skin the entire game from one inspector.
+
+Both registries are deferred — they're refactor work, not new features. Track in Phase 9 polish or post-demo.
+
 ---
 
 ## 7. Input Architecture
