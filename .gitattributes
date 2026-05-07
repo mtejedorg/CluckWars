@@ -1,0 +1,134 @@
+# Cluck Wars — line ending + binary classification
+#
+# Strategy: store everything text-like as LF in the repo, regardless of OS.
+# This kills the recurring CRLF↔LF churn we were seeing on prefab / scene /
+# meta saves from the Windows Unity editor + IDE round-trips.
+#
+# Pair this with .editorconfig (which tells VSCode / Rider / Unity's IDE to
+# write LF on save) and the three sources of truth (git, editor, Unity)
+# all agree on LF.
+#
+# After modifying these rules, run:
+#     git add --renormalize .
+#     git checkout -- .
+# to refresh the working tree.
+
+# --- Default ----------------------------------------------------------------
+* text=auto eol=lf
+
+# --- Code -------------------------------------------------------------------
+*.cs        text diff=csharp eol=lf
+*.csproj    text eol=lf
+*.shader    text eol=lf
+*.cginc     text eol=lf
+*.compute   text eol=lf
+*.hlsl      text eol=lf
+
+# Visual Studio solution files behave better with CRLF on Windows tooling.
+*.sln       text eol=crlf
+
+# --- Unity YAML assets (Force Text mode) ------------------------------------
+# Unity Smart Merge handles 3-way merges of these if you wire up
+# `merge=unityyamlmerge` via `git config merge.unityyamlmerge.driver` —
+# leaving that off here so cloners don't have to configure git locally;
+# the eol=lf is the part that solves the churn.
+*.unity         text eol=lf
+*.prefab        text eol=lf
+*.asset         text eol=lf
+*.meta          text eol=lf
+*.controller    text eol=lf
+*.anim          text eol=lf
+*.mat           text eol=lf
+*.physicMaterial    text eol=lf
+*.physicsMaterial2D text eol=lf
+*.mixer         text eol=lf
+*.lighting      text eol=lf
+*.guiskin       text eol=lf
+*.fontsettings  text eol=lf
+*.preset        text eol=lf
+*.terrainlayer  text eol=lf
+*.signal        text eol=lf
+*.spriteatlas   text eol=lf
+*.giparams      text eol=lf
+*.shadergraph   text eol=lf
+*.shadersubgraph text eol=lf
+
+# --- Project / Packages config ---------------------------------------------
+ProjectSettings/*.asset text eol=lf
+ProjectSettings/*.txt   text eol=lf
+Packages/*.json         text eol=lf
+Packages/*.lock         text eol=lf
+
+# --- Docs & data ------------------------------------------------------------
+*.md        text eol=lf
+*.txt       text eol=lf
+*.json      text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.xml       text eol=lf
+*.gitignore text eol=lf
+*.gitattributes text eol=lf
+
+# --- Binary: art ------------------------------------------------------------
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.bmp       binary
+*.tga       binary
+*.tif       binary
+*.tiff      binary
+*.psd       binary
+*.exr       binary
+*.hdr       binary
+*.ico       binary
+*.cubemap   binary
+
+# --- Binary: 3D / models ----------------------------------------------------
+*.fbx       binary
+*.obj       binary
+*.blend     binary
+*.dae       binary
+*.3ds       binary
+*.dxf       binary
+*.max       binary
+*.ma        binary
+*.mb        binary
+
+# --- Binary: audio ----------------------------------------------------------
+*.wav       binary
+*.mp3       binary
+*.ogg       binary
+*.aif       binary
+*.aiff      binary
+*.flac      binary
+
+# --- Binary: video ----------------------------------------------------------
+*.mp4       binary
+*.mov       binary
+*.avi       binary
+*.webm      binary
+
+# --- Binary: native libs / packages ----------------------------------------
+*.dll       binary
+*.so        binary
+*.dylib     binary
+*.aar       binary
+*.jar       binary
+*.unitypackage binary
+
+# --- Binary: archives -------------------------------------------------------
+*.zip       binary
+*.tar       binary
+*.gz        binary
+*.7z        binary
+*.rar       binary
+
+# --- Binary: fonts ----------------------------------------------------------
+*.ttf       binary
+*.otf       binary
+*.fon       binary
+*.fnt       binary
+
+# --- Binary: misc -----------------------------------------------------------
+*.pdf       binary
