@@ -227,6 +227,8 @@ Notion originals: linked in project instructions for deep reads.
 
 **Phase 5 — multiplayer networking — code landed.** Bootstrap-scene UI now picks both class (1-4) and session mode (S=Solo / H=Host / J=Join) before SPACE confirms and loads `Game.unity`. `MatchBootstrapper` branches on the selected mode and calls `StartSoloAsync` / `StartHostAsync(sessionName)` / `JoinSessionAsync(sessionName)` accordingly. Session name is hardcoded to `cluck-lan` for the demo — Host creates it, Join joins by exact name; both peers must use the same Photon AppId (`PhotonAppSettings.asset` already has `AppIdFusion = 259bda28-…`).
 
+The Bootstrap menu is a procedural UGUI canvas built at runtime by `CharacterSelectController.BuildCanvas()` — clickable buttons for class + mode + Start, with the same keyboard shortcuts (1-4 / numpad, S/H/J, SPACE/ENTER) still wired in `Update`. An `EventSystem` with `InputSystemUIInputModule` is auto-created if the scene doesn't already have one (Bootstrap.unity stays minimal). Project locked to landscape: `ProjectSettings.asset` disallows portrait autorotation, and the controller's `Awake` re-asserts that at runtime as a safety net.
+
 Late-join handling is already correct: `HandlePlayerJoined` filters `player == runner.LocalPlayer` so each peer spawns only its own chicken; remote chickens, food piles, and bases replicate via Fusion's normal state sync. No code change needed for that.
 
 `ISessionSelectionService` extended with `SessionMode Mode` + `string SessionName` (defaults: `Solo` + `"cluck-lan"`).
