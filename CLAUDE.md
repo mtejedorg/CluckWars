@@ -277,7 +277,17 @@ The HUD picked up timer + end overlay duties: `CargoHud` (despite the name, kept
 
 **Phase 6c — code landed.** `SneakyStealAbilitySO` ships the cargo-theft pattern: thief calls `OverlapSphere`, finds the nearest enemy `ChickenCargo` with cargo on board, optimistically credits its own `Cargo` (capped to free space + victim's stock), then calls `target.RPC_DrainStolen(amount)` to drain on the victim's authority side. New `ChickenCargo.RPC_DrainStolen` is `RpcSources.All → RpcTargets.StateAuthority` and clamps to current cargo so over-requests are harmless — same shape as `FoodPile.RPC_Drain`.
 
-**Phase 6d deferred:** Doppelganger. Needs a decoy NetworkObject prefab (chicken-shaped: NetworkObject + minimal lifetime script + visuals + animator, no controller / combat / cargo) which is significant Editor work. Hand off to Maestro when he wants to author that prefab; the SO is a quick wrap once the prefab exists.
+**Phase 6d — code landed.** All 8 abilities now have concrete `AbilityBaseSO` subclasses. Doppelganger is the last and is implemented as a Chicken-prefab-variant decoy that takes hits + plays animations like a real chicken, but doesn't read input.
+
+The decoy mechanic relies on a single new flag — `ChickenController.IsDecoy` — that gates input-processing branches in `ChickenController.FixedUpdateNetwork` (no input movement), `ChickenCombat.FixedUpdateNetwork` (no swing input read), and `AbilityController.FixedUpdateNetwork` (no ability input). All three early-return when the flag is set. Damage RPCs, hit-anim ChangeDetectors, tint, and the chicken's idle pose all still work — the decoy looks alive and reacts to hits.
+
+- **`Doppelganger`** (NetworkBehaviour, `Scripts/Gameplay/`): `[Networked] LifetimeTimer` + per-frame despawn check on the StateAuthority. On `Spawned` it sets `IsDecoy = true` on the sibling `ChickenController` and subscribes to `ChickenCombat.OnDeath`; if killed, the decoy `Runner.Despawn`s immediately rather than entering the stun-and-respawn cycle. If lifetime expires first, same outcome.
+- **`DoppelgangerAbilitySO`** (`Scripts/Abilities/`): `Runner.Spawn`s the decoy at a side-offset (default 1.2m) from the caster. `onBeforeSpawned` sets `ChickenController.Class = caster.Class` (so the existing tint code Just Works on every peer) and arms `Doppelganger.LifetimeTimer`. Caster gets InputAuthority over the decoy. `OnDeactivate` is a no-op.
+
+**Outstanding for Maestro before smoke-test:**
+- The `Doppelganger.prefab` exists already as a Chicken-prefab variant with `ChickenCargo` stripped — keep it as a variant so `Doppelganger` script + animator + visuals + combat carry over for free. Make sure the `Doppelganger` component is added to that variant.
+- Create a `Doppelganger.asset` via `Cluck Wars/Ability/Doppelganger`, drag the prefab into the asset's `_decoyPrefab` slot.
+- Equip on the Chicken prefab (Assassin slot 1 is the natural home).
 
 ---
 

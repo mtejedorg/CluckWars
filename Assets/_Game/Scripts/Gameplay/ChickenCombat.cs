@@ -104,6 +104,11 @@ namespace CluckWars.Gameplay
                 return;
             }
 
+            // Decoys (Doppelganger) take hits and play hit anims via the [Networked]
+            // state path, but never swing — skip input read so the caster's attack
+            // button doesn't fire through the decoy.
+            if (_controller != null && _controller.IsDecoy) return;
+
             if (!GetInput<PlayerNetworkInput>(out var input)) return;
 
             if (input.Buttons.IsSet((int)InputButton.Attack) && AttackTimer.ExpiredOrNotRunning(Runner))

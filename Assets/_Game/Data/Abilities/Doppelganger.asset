@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5d7c2a8b4e6f493d8a01c5f3e7b2d9a4, type: 3}
+  m_Name: Doppelganger
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.DoppelgangerAbilitySO
+  DisplayName: Doppelganger
+  ShortLabel: 
+  AccentColor: {r: 0.45, g: 0.7, b: 1, a: 1}
+  Duration: 1.5
+  Cooldown: 8
+  AbilityAnimationClip: {fileID: 0}
+  _decoyPrefab: {fileID: 1012061175775692847, guid: dadc0068bfdc302458b5991aeceb8669, type: 3}
+  DecoyLifetimeSeconds: 4
+  SideOffset: 1.2

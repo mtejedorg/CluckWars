@@ -87,6 +87,10 @@ namespace CluckWars.Gameplay
         {
             if (!HasStateAuthority || !_initialized) return;
 
+            // Decoys (Doppelganger) share input authority with the caster — silence
+            // ability input and timer ticking on them entirely.
+            if (_controller != null && _controller.IsDecoy) return;
+
             // Auto-deactivate when the duration timer expires.
             if (ActiveSlot != InvalidSlot && ActivationTimer.Expired(Runner))
             {

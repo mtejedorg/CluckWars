@@ -67,6 +67,15 @@ namespace CluckWars.Gameplay
         /// <summary>0 = invisible, 1 = fully opaque. Read by <c>ChickenVisuals</c> for the Invisibility ability.</summary>
         public float VisualOpacity { get; set; } = 1f;
 
+        /// <summary>
+        /// True for the Doppelganger decoy: skips input processing in
+        /// <see cref="FixedUpdateNetwork"/> (and similar guards in
+        /// <c>ChickenCombat</c> / <c>AbilityController</c>) so the caster's input
+        /// doesn't drive both their real chicken and the decoy. Hits, animations,
+        /// and tint still work — the decoy is a static prop that takes damage.
+        /// </summary>
+        public bool IsDecoy { get; set; }
+
         [Inject]
         public void Construct(ChickenClassRegistrySO registry, ILogService log)
         {
@@ -117,6 +126,10 @@ namespace CluckWars.Gameplay
         {
             if (_movement == null) return;
             if (!HasStateAuthority) return;
+
+            // Decoys (Doppelganger) share input authority with the caster — skip input
+            // tick or the decoy walks in lockstep with the real chicken.
+            if (IsDecoy) return;
 
             // Stun lockout: dead-stunned chickens can't move. Combat owns the IsStunned flag.
             if (_combat != null && _combat.IsStunned) return;

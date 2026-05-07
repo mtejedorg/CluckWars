@@ -161,7 +161,7 @@ Players can collect from piles, see visual feedback, deposit at base. (Solo-test
 - [x] `TurtleModeAbilitySO` — sets `MoveSpeedMultiplier` (slow) + `DamageResistance` (absorbs %).
 - [x] `SpineCoatAbilitySO` — toggles `ReflectDamage`; `RPC_ApplyDamage` bounces incoming damage to the attacker via a self-RPC, recipient eats nothing.
 - [x] `SneakyStealAbilitySO` — Phase 6c. One-shot OverlapSphere find-nearest-enemy-with-cargo, optimistic self-credit + `ChickenCargo.RPC_DrainStolen` to take from the victim's authority. Capped to thief free space and victim cargo.
-- [ ] `DoppelgangerAbilitySO` — Phase 6d. Needs a decoy NetworkObject prefab (chicken-shaped, NetworkObject + minimal `Doppelganger` script + ChickenAnimator + ChickenVisuals; no controller / combat / cargo) so Maestro authors that prefab before the SO can ship.
+- [x] `DoppelgangerAbilitySO` — Phase 6d. `Runner.Spawn` a `Doppelganger` decoy at a side-offset from the caster; spawner sets `MimickedClass` + `LifetimeTimer` in `onBeforeSpawned` so every peer sees the right tint + despawn time from tick zero. `Doppelganger` script self-injects `ChickenClassRegistrySO`, applies tint locally on Spawned, despawns when the timer expires. **Prefab still needs authoring in the Editor** — see "Editor work" below.
 - [x] `AbilityController` on Chicken (NetworkBehaviour): 2 slots (slot 0 universal, slot 1 Assassin-only), `[Networked] ActiveSlot` + `ActivationTimer` + per-slot cooldown timers, single-active-at-a-time policy.
 - [x] Ability button UI with radial cooldown indicator — `TouchControlsHud` now adds a `Image.FillMethod.Radial360` overlay per ability button, fillAmount = remaining/total cooldown.
 - [x] Movement / damage hooks on `ChickenController` (`MoveSpeedMultiplier`, `MovementLocked`, `DamageImmune`) read by `ChickenMovement` and `ChickenCombat.RPC_ApplyDamage`.
@@ -170,6 +170,7 @@ Players can collect from piles, see visual feedback, deposit at base. (Solo-test
 - Create `SpeedBurst.asset` and `EggShell.asset` under `/Assets/_Game/Data/Abilities/` via the new menu items (`Cluck Wars/Ability/Speed Burst` and `…/Egg Shell`). Tune Duration / Cooldown there; defaults are placeholders.
 - Add `AbilityController` to the Chicken prefab.
 - Drag the new ability assets into `AbilityController._slot0` (and `_slot1` for Assassin builds) on the Chicken prefab.
+- **Phase 6d**: author a `Doppelganger.prefab` — NetworkObject + `Doppelganger` script + `ChickenVisuals` + chicken-shaped child mesh + small trigger collider. No controller / combat / cargo / animator. Then create a `Doppelganger.asset` via `Cluck Wars/Ability/Doppelganger` and drag the prefab into the asset's `_decoyPrefab` slot.
 
 ### Deliverable
 Players can equip and activate 1 ability per chicken (2 for Assassin once `_slot1` is populated). Cooldowns drawn as radial fill on the touch HUD. Roll & Trample + Invisibility ship in Phase 6b once the system is validated solo.
