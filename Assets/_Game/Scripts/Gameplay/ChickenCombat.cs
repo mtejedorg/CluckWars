@@ -188,6 +188,13 @@ namespace CluckWars.Gameplay
         {
             if (IsStunned) return; // dead chickens can't be hit again until they respawn
 
+            // Egg Shell and similar abilities flip DamageImmune — drop the damage entirely.
+            if (_controller != null && _controller.DamageImmune)
+            {
+                _log?.Verbose(Source, $"Damage absorbed by immunity ({amount:0.0}).");
+                return;
+            }
+
             HP = Mathf.Max(0f, HP - amount);
             _log?.Debug(Source, $"RPC_ApplyDamage: -{amount} → HP={HP}.");
 

@@ -20,6 +20,7 @@ GameObject:
   - component: {fileID: 3349953020513663677}
   - component: {fileID: -8672661885974516826}
   - component: {fileID: -4654369670535789821}
+  - component: {fileID: 101601932164880250}
   m_Layer: 0
   m_Name: Chicken
   m_TagString: Untagged
@@ -142,6 +143,7 @@ MonoBehaviour:
   - {fileID: 1781100138392423414}
   - {fileID: -8672661885974516826}
   - {fileID: -4654369670535789821}
+  - {fileID: 101601932164880250}
   ForceRemoteRenderTimeframe: 0
 --- !u!143 &6032245462738825523
 CharacterController:
@@ -267,3 +269,18 @@ MonoBehaviour:
     m_Bits: 4294967295
   _foodPickupPrefab: {fileID: 8362016333457472506, guid: a8794a9118fa75e44946e9a0fb7d9a54, type: 3}
   _Cargo: 0
+--- !u!114 &101601932164880250
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c2f9a4b1e6d4b7e89a3d5c0f1b8e2a4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.AbilityController
+  _slot0: {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
+  _slot1: {fileID: 0}
+  _ActiveSlot: 0

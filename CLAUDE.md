@@ -240,11 +240,23 @@ Late-join handling is already correct: `HandlePlayerJoined` filters `player == r
 - Pick H on the Windows host, J on the Android client. Both should land in the same scene with their own chicken; piles and bases sync.
 - Verify cross-client paths from Phases 3-4: damage RPC, drain RPC, deposit RPC.
 
-**Phase 4b — drop on death — code landed.** New `FoodPickup` NetworkBehaviour (in `Scripts/Gameplay/`) is a small world-spawned object with `[Networked] Amount` + `RPC_Drain`. `ChickenCargo.HandleDeath` now spawns one at the dying chicken's position (slight forward offset so it doesn't sit dead-center on the stunned body) carrying the chicken's cargo amount, then zeros local Cargo. Initial `Amount` / `MaxAmount` are set in the spawner's `onBeforeSpawned` callback so they replicate from tick zero. `ChickenCargo.FixedUpdateNetwork` now also runs `TryCollectFromNearbyPickup` after pile collection — any chicken (including the dropper, once stun ends) walks over it and credits its cargo. Pickup auto-despawns when drained to zero or after `_despawnDelay` (30s).
+**Phase 4b — drop on death — done.** `FoodPickup` NetworkBehaviour spawned by `ChickenCargo.HandleDeath` carrying cargo amount; auto-despawns when drained or after 30s. Picked up by walking over it. Verified prefab + Chicken wiring is committed.
+
+**Phase 6 — abilities — code landed.** Two new namespaces, one new component, two SO implementations:
+
+- **`Assets/_Game/Scripts/Abilities/`** — `AbilityBaseSO` (abstract: Duration / Cooldown / accent color / animation clip + abstract `OnActivate(ctx)` / `OnDeactivate(ctx)`), `AbilityContext` (carries the `ChickenController` so SOs stay clean of `GetComponent`), and the first two concrete SOs:
+  - **`SpeedBurstAbilitySO`** — multiplies `ChickenController.MoveSpeedMultiplier` for the duration.
+  - **`EggShellAbilitySO`** — toggles `MovementLocked` + `DamageImmune` for the duration.
+- **`Assets/_Game/Scripts/Gameplay/AbilityController.cs`** — NetworkBehaviour on the Chicken prefab. Two equipped slots (slot 0 universal, slot 1 Assassin-only). `[Networked]` ActiveSlot + ActivationTimer + per-slot Cooldown timers. Reads `Ability1` / `Ability2` from the Fusion input buffer, single-active-at-a-time, deactivates on duration expiry or owner death.
+- **Hooks on `ChickenController`** — three new public properties (`MoveSpeedMultiplier`, `MovementLocked`, `DamageImmune`) live only on the StateAuthority; `ChickenMovement` reads them per tick (lock zeros planar input but keeps gravity), and `ChickenCombat.RPC_ApplyDamage` short-circuits when the target is immune. Other peers don't mirror these — they observe the resulting position / HP via existing `[Networked]` state. Cooldown progress IS networked (via `AbilityController` state), so the touch HUD's radial fill is correct on every peer.
+- **`TouchControlsHud`** now creates a radial-fill cooldown overlay per ability button. Each frame it finds the local chicken via `HasInputAuthority` and reads `AbilityController.CooldownRemaining(slot)` — overlay fillAmount = remaining/total, so a freshly-cast ability is fully covered and shrinks counter-clockwise from the top.
 
 **Outstanding for Maestro before smoke-test:**
-- Author a `FoodPickup.prefab`: NetworkObject + FoodPickup + small trigger collider + small child cube/sphere mesh (placeholder visual). The Inspector will need a tiny scale (~0.5) and a tinted color so it's visually distinct from FoodPile / PlayerBase.
-- Drop the new prefab into the Chicken prefab's `ChickenCargo._foodPickupPrefab` slot. Without that reference, death just logs a warning and cargo is silently lost (graceful fallback).
+- Add `AbilityController` to the Chicken prefab.
+- Create `SpeedBurst.asset` and `EggShell.asset` under `/Assets/_Game/Data/Abilities/` via the new `Cluck Wars/Ability/…` menu items. Tune Duration / Cooldown / SpeedMultiplier there; current defaults are placeholders.
+- Drag the assets into `AbilityController._slot0` on the Chicken prefab. Slot 1 only matters once Assassin gets a second ability — leave null for now.
+
+**Phase 6b deferred:** Roll & Trample (offensive sweep), Invisibility (visuals opacity), Doppelganger (decoy spawn), Spine Coat (reflect — needs RPC re-targeting to attacker), Turtle Mode (slow + resistance — needs damage-resistance scalar), Sneaky Steal. Each is a single concrete `AbilityBaseSO` subclass; no architectural changes needed.
 
 ---
 

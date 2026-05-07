@@ -33,6 +33,7 @@ namespace CluckWars.Gameplay
         private ChickenStatsSO _activeStats;
         private ChickenCombat _combat;
         private ChickenCargo _cargo;
+        private AbilityController _abilities;
         private ILogService _log;
 
         /// <summary>The chicken's archetype. Replicated; set by the spawner via <c>OnBeforeSpawned</c>.</summary>
@@ -41,6 +42,21 @@ namespace CluckWars.Gameplay
         public ChickenStatsSO Stats => _activeStats != null ? _activeStats : _fallbackStats;
         public ChickenCombat Combat => _combat;
         public ChickenCargo Cargo => _cargo;
+        public AbilityController Abilities => _abilities;
+
+        // ---- Ability state (StateAuthority-side only) ------------------------
+        // Abilities mutate these locally on the StateAuthority. Other peers don't
+        // need to mirror these values — they observe the resulting [Networked]
+        // position / HP changes instead.
+
+        /// <summary>Multiplier applied to <c>Stats.MoveSpeed</c> by active abilities. 1 = no buff.</summary>
+        public float MoveSpeedMultiplier { get; set; } = 1f;
+
+        /// <summary>While true, <c>ChickenMovement</c> ignores planar input but keeps gravity.</summary>
+        public bool MovementLocked { get; set; }
+
+        /// <summary>While true, <c>ChickenCombat.RPC_ApplyDamage</c> drops incoming damage.</summary>
+        public bool DamageImmune { get; set; }
 
         [Inject]
         public void Construct(ChickenClassRegistrySO registry, ILogService log)
@@ -64,6 +80,7 @@ namespace CluckWars.Gameplay
             _characterController = GetComponent<CharacterController>();
             _combat = GetComponent<ChickenCombat>();
             _cargo = GetComponent<ChickenCargo>();
+            _abilities = GetComponent<AbilityController>();
             _activeStats = ResolveStatsForClass(Class);
 
             if (_activeStats == null)
@@ -73,7 +90,7 @@ namespace CluckWars.Gameplay
             }
 
             _log?.Info(Source, $"Stats resolved: '{_activeStats.DisplayName}', moveSpeed={_activeStats.MoveSpeed}.");
-            _movement = new ChickenMovement(_characterController, _activeStats);
+            _movement = new ChickenMovement(_characterController, this);
 
             // Apply the per-class tint locally on every peer so even proxies look right.
             if (_registry != null && _registry.TryGet(Class, out var entry))

@@ -1,3 +1,4 @@
+using CluckWars.Gameplay;
 using CluckWars.Logging;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -43,11 +44,16 @@ namespace CluckWars.Input
         [SerializeField] private Color _attackPressedColor  = new Color(1.00f, 0.50f, 0.25f, 0.95f);
         [SerializeField] private Color _abilityNormalColor  = new Color(0.30f, 0.55f, 0.95f, 0.55f);
         [SerializeField] private Color _abilityPressedColor = new Color(0.55f, 0.80f, 1.00f, 0.95f);
+        [SerializeField] private Color _cooldownOverlayColor = new Color(0f, 0f, 0f, 0.55f);
 
         private VirtualJoystick _joystick;
         private HoldButton _attack;
         private HoldButton _ability1;
         private HoldButton _ability2;
+        private Image _ability1CooldownOverlay;
+        private Image _ability2CooldownOverlay;
+        private ChickenController _localChicken;
+        private float _localChickenLastSearch;
         private ILogService _log;
 
         public Vector2 Movement => _joystick != null ? _joystick.Value : Vector2.zero;
@@ -112,10 +118,61 @@ namespace CluckWars.Input
 
             BuildJoystick(canvasGO.transform);
             _ability1 = BuildAbilityButton(canvasGO.transform, "Ability1",
-                _ability1AnchoredPosition, _abilityButtonSize, "Q / 1", isRightAligned: true);
+                _ability1AnchoredPosition, _abilityButtonSize, "Q / 1", isRightAligned: true,
+                out _ability1CooldownOverlay);
             _ability2 = BuildAbilityButton(canvasGO.transform, "Ability2",
-                _ability2AnchoredPosition, _abilityButtonSize, "E / 2", isRightAligned: true);
+                _ability2AnchoredPosition, _abilityButtonSize, "E / 2", isRightAligned: true,
+                out _ability2CooldownOverlay);
             _attack = BuildAttackButton(canvasGO.transform);
+        }
+
+        private void Update()
+        {
+            // Refresh local chicken reference if it's been despawned (death stun
+            // can't despawn the chicken, but a host migration / scene reload could).
+            if (_localChicken == null || _localChicken.Object == null || !_localChicken.Object.IsValid)
+            {
+                if (Time.unscaledTime - _localChickenLastSearch > 0.5f)
+                {
+                    _localChickenLastSearch = Time.unscaledTime;
+                    _localChicken = FindLocalChicken();
+                }
+            }
+
+            UpdateCooldownOverlay(_ability1CooldownOverlay, slot: 0);
+            UpdateCooldownOverlay(_ability2CooldownOverlay, slot: 1);
+        }
+
+        private static ChickenController FindLocalChicken()
+        {
+            var all = FindObjectsByType<ChickenController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < all.Length; i++)
+            {
+                var c = all[i];
+                if (c.Object != null && c.Object.IsValid && c.HasInputAuthority) return c;
+            }
+            return null;
+        }
+
+        private void UpdateCooldownOverlay(Image overlay, int slot)
+        {
+            if (overlay == null) return;
+
+            // Default: ready (no overlay). Covers the no-chicken / no-ability-equipped case.
+            float fill = 0f;
+
+            var abilities = _localChicken != null ? _localChicken.Abilities : null;
+            if (abilities != null)
+            {
+                var equipped = slot == 0 ? abilities.Slot0 : abilities.Slot1;
+                if (equipped != null && equipped.Cooldown > 0f)
+                {
+                    var remaining = abilities.CooldownRemaining(slot);
+                    fill = Mathf.Clamp01(remaining / equipped.Cooldown);
+                }
+            }
+
+            overlay.fillAmount = fill;
         }
 
         private void BuildJoystick(Transform canvas)
@@ -170,7 +227,7 @@ namespace CluckWars.Input
         }
 
         private HoldButton BuildAbilityButton(Transform canvas, string name, Vector2 anchoredPosition,
-            float size, string label, bool isRightAligned)
+            float size, string label, bool isRightAligned, out Image cooldownOverlay)
         {
             var go = CreateUI(name, canvas, out var rt);
             rt.anchorMin = new Vector2(isRightAligned ? 1f : 0f, 0f);
@@ -182,6 +239,23 @@ namespace CluckWars.Input
             var img = go.AddComponent<Image>();
             img.color = _abilityNormalColor;
             img.raycastTarget = true;
+
+            // Cooldown overlay (between background and label) — radial fill from top,
+            // counter-clockwise. fillAmount = remainingCooldown / totalCooldown:
+            // 1 = just activated (fully covered), 0 = ready (uncovered).
+            var overlayGO = CreateUI("CooldownOverlay", go.transform, out var overlayRT);
+            overlayRT.anchorMin = Vector2.zero;
+            overlayRT.anchorMax = Vector2.one;
+            overlayRT.offsetMin = Vector2.zero;
+            overlayRT.offsetMax = Vector2.zero;
+            cooldownOverlay = overlayGO.AddComponent<Image>();
+            cooldownOverlay.color = _cooldownOverlayColor;
+            cooldownOverlay.type = Image.Type.Filled;
+            cooldownOverlay.fillMethod = Image.FillMethod.Radial360;
+            cooldownOverlay.fillOrigin = (int)Image.Origin360.Top;
+            cooldownOverlay.fillClockwise = false;
+            cooldownOverlay.fillAmount = 0f;
+            cooldownOverlay.raycastTarget = false;
 
             CreateLabel(go.transform, label, fontSize: 28);
 

@@ -152,14 +152,23 @@ Players can collect from piles, see visual feedback, deposit at base. (Solo-test
 - Cooldown tracking
 
 ### Tasks
-- [ ] `AbilityBaseSO` abstract class
-- [ ] Concrete ability SOs (2-4 per class)
-- [ ] `AbilityController` on chicken (equip, activate, cooldown)
-- [ ] Ability button UI with cooldown indicator
-- [ ] Effects for each ability (visuals only for now, no gameplay beyond stun/invuln)
+- [x] `AbilityBaseSO` abstract class — `OnActivate(ctx)` / `OnDeactivate(ctx)` + Duration / Cooldown / DisplayName / ShortLabel / AccentColor / optional AbilityAnimationClip.
+- [x] `AbilityContext` (passed to ability hooks; holds the `ChickenController` ref so SOs are free of `GetComponent` calls).
+- [x] `SpeedBurstAbilitySO` — multiplies `ChickenController.MoveSpeedMultiplier` while active.
+- [x] `EggShellAbilitySO` — toggles `MovementLocked` + `DamageImmune` while active.
+- [ ] `RollTrampleAbilitySO` — Phase 6b (offensive, needs hit-detection sweep).
+- [ ] `InvisibilityAbilitySO` — Phase 6b (visual-only stealth, needs `ChickenVisuals` opacity hook).
+- [x] `AbilityController` on Chicken (NetworkBehaviour): 2 slots (slot 0 universal, slot 1 Assassin-only), `[Networked] ActiveSlot` + `ActivationTimer` + per-slot cooldown timers, single-active-at-a-time policy.
+- [x] Ability button UI with radial cooldown indicator — `TouchControlsHud` now adds a `Image.FillMethod.Radial360` overlay per ability button, fillAmount = remaining/total cooldown.
+- [x] Movement / damage hooks on `ChickenController` (`MoveSpeedMultiplier`, `MovementLocked`, `DamageImmune`) read by `ChickenMovement` and `ChickenCombat.RPC_ApplyDamage`.
+
+### Prefab/asset work (Maestro, in Editor)
+- Create `SpeedBurst.asset` and `EggShell.asset` under `/Assets/_Game/Data/Abilities/` via the new menu items (`Cluck Wars/Ability/Speed Burst` and `…/Egg Shell`). Tune Duration / Cooldown there; defaults are placeholders.
+- Add `AbilityController` to the Chicken prefab.
+- Drag the new ability assets into `AbilityController._slot0` (and `_slot1` for Assassin builds) on the Chicken prefab.
 
 ### Deliverable
-Players can equip and activate 2 abilities per chicken, cooldowns work.
+Players can equip and activate 1 ability per chicken (2 for Assassin once `_slot1` is populated). Cooldowns drawn as radial fill on the touch HUD. Roll & Trample + Invisibility ship in Phase 6b once the system is validated solo.
 
 ---
 
