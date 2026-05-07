@@ -119,6 +119,65 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &201738475
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 201738477}
+  - component: {fileID: 201738476}
+  m_Layer: 0
+  m_Name: TouchControlsHud
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &201738476
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 201738475}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7c2a8e1d6b9405e8a4f1c3d2e8b7a05, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Input.TouchControlsHud
+  _referenceResolution: {x: 1920, y: 1080}
+  _joystickRadius: 140
+  _knobRadius: 64
+  _joystickAnchoredPosition: {x: 220, y: 220}
+  _attackButtonSize: 220
+  _attackAnchoredPosition: {x: -220, y: 200}
+  _abilityButtonSize: 140
+  _ability1AnchoredPosition: {x: -440, y: 240}
+  _ability2AnchoredPosition: {x: -260, y: 420}
+  _joystickBaseColor: {r: 1, g: 1, b: 1, a: 0.2}
+  _joystickKnobColor: {r: 1, g: 1, b: 1, a: 0.55}
+  _attackNormalColor: {r: 0.95, g: 0.3, b: 0.25, a: 0.55}
+  _attackPressedColor: {r: 1, g: 0.5, b: 0.25, a: 0.95}
+  _abilityNormalColor: {r: 0.3, g: 0.55, b: 0.95, a: 0.55}
+  _abilityPressedColor: {r: 0.55, g: 0.8, b: 1, a: 0.95}
+--- !u!4 &201738477
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 201738475}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2077443972}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &275103247
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -181,6 +240,51 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 4938252781278210438, guid: 43ee9abb260159f46a5fe0c9852adfc6, type: 3}
   m_PrefabInstance: {fileID: 275103247}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &280241443
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 280241445}
+  - component: {fileID: 280241444}
+  m_Layer: 0
+  m_Name: CargoHud
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &280241444
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 280241443}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a92b4d6e1f3a48579b2e0c8d4a1e7b3c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.UI.CargoHud
+  _refreshInterval: 0.5
+--- !u!4 &280241445
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 280241443}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2077443972}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &353153896
 GameObject:
   m_ObjectHideFlags: 0
@@ -722,6 +826,39 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &2077443971
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2077443972}
+  m_Layer: 0
+  m_Name: Hud
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2077443972
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2077443971}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 280241445}
+  - {fileID: 201738477}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2090406287
 GameObject:
   m_ObjectHideFlags: 0
@@ -996,3 +1133,4 @@ SceneRoots:
   - {fileID: 1343707440}
   - {fileID: 2830223254535740216}
   - {fileID: 3091200433276415621}
+  - {fileID: 2077443972}
