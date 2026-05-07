@@ -235,5 +235,21 @@ namespace CluckWars.Gameplay
 
             _log?.Info(Source, $"Death drop: spawned FoodPickup with {dropped:0.00} food at {dropPosition}.");
         }
+
+        /// <summary>
+        /// Asks this chicken's StateAuthority to remove up to <paramref name="amount"/>
+        /// from its <see cref="Cargo"/>. The thief credits its own cargo optimistically
+        /// before calling this RPC; the victim's authority clamps to whatever's
+        /// actually there, so any over-request is harmless. Used by Sneaky Steal.
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_DrainStolen(float amount)
+        {
+            if (amount <= 0f || Cargo <= 0f) return;
+            var actual = Mathf.Min(amount, Cargo);
+            Cargo -= actual;
+            if (Cargo < 0f) Cargo = 0f;
+            _log?.Debug(Source, $"Stolen: -{actual:0.00} → Cargo={Cargo:0.0}.");
+        }
     }
 }

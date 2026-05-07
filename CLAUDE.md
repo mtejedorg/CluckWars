@@ -275,7 +275,9 @@ The HUD picked up timer + end overlay duties: `CargoHud` (despite the name, kept
 
 `ChickenController` gained three new state hooks: `DamageResistance`, `ReflectDamage`, `VisualOpacity`. `ChickenCombat.RPC_ApplyDamage` now takes a `PlayerRef attacker` argument so reflection knows where to bounce; `Swing()` passes `Object.InputAuthority` automatically.
 
-**Phase 6c deferred:** Sneaky Steal (needs `ChickenCargo.RPC_StealCargo` for cross-authority cargo moves) and Doppelganger (needs a decoy NetworkObject prefab + mimicry AI).
+**Phase 6c — code landed.** `SneakyStealAbilitySO` ships the cargo-theft pattern: thief calls `OverlapSphere`, finds the nearest enemy `ChickenCargo` with cargo on board, optimistically credits its own `Cargo` (capped to free space + victim's stock), then calls `target.RPC_DrainStolen(amount)` to drain on the victim's authority side. New `ChickenCargo.RPC_DrainStolen` is `RpcSources.All → RpcTargets.StateAuthority` and clamps to current cargo so over-requests are harmless — same shape as `FoodPile.RPC_Drain`.
+
+**Phase 6d deferred:** Doppelganger. Needs a decoy NetworkObject prefab (chicken-shaped: NetworkObject + minimal lifetime script + visuals + animator, no controller / combat / cargo) which is significant Editor work. Hand off to Maestro when he wants to author that prefab; the SO is a quick wrap once the prefab exists.
 
 ---
 

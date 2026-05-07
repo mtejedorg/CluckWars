@@ -160,8 +160,8 @@ Players can collect from piles, see visual feedback, deposit at base. (Solo-test
 - [x] `InvisibilityAbilitySO` — drives `ChickenController.VisualOpacity`; `ChickenVisuals` polls in `LateUpdate` and re-pushes the tint with the new alpha. Local-only fade; networked invisibility deferred to Phase 9.
 - [x] `TurtleModeAbilitySO` — sets `MoveSpeedMultiplier` (slow) + `DamageResistance` (absorbs %).
 - [x] `SpineCoatAbilitySO` — toggles `ReflectDamage`; `RPC_ApplyDamage` bounces incoming damage to the attacker via a self-RPC, recipient eats nothing.
-- [ ] `SneakyStealAbilitySO` — Phase 6c (needs `ChickenCargo.RPC_StealCargo` for cross-authority cargo moves).
-- [ ] `DoppelgangerAbilitySO` — Phase 6c (needs a decoy `NetworkObject` prefab + AI mimicry).
+- [x] `SneakyStealAbilitySO` — Phase 6c. One-shot OverlapSphere find-nearest-enemy-with-cargo, optimistic self-credit + `ChickenCargo.RPC_DrainStolen` to take from the victim's authority. Capped to thief free space and victim cargo.
+- [ ] `DoppelgangerAbilitySO` — Phase 6d. Needs a decoy NetworkObject prefab (chicken-shaped, NetworkObject + minimal `Doppelganger` script + ChickenAnimator + ChickenVisuals; no controller / combat / cargo) so Maestro authors that prefab before the SO can ship.
 - [x] `AbilityController` on Chicken (NetworkBehaviour): 2 slots (slot 0 universal, slot 1 Assassin-only), `[Networked] ActiveSlot` + `ActivationTimer` + per-slot cooldown timers, single-active-at-a-time policy.
 - [x] Ability button UI with radial cooldown indicator — `TouchControlsHud` now adds a `Image.FillMethod.Radial360` overlay per ability button, fillAmount = remaining/total cooldown.
 - [x] Movement / damage hooks on `ChickenController` (`MoveSpeedMultiplier`, `MovementLocked`, `DamageImmune`) read by `ChickenMovement` and `ChickenCombat.RPC_ApplyDamage`.
