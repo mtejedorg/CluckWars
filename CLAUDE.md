@@ -240,7 +240,11 @@ Late-join handling is already correct: `HandlePlayerJoined` filters `player == r
 - Pick H on the Windows host, J on the Android client. Both should land in the same scene with their own chicken; piles and bases sync.
 - Verify cross-client paths from Phases 3-4: damage RPC, drain RPC, deposit RPC.
 
-**Phase 4b still deferred:** food-pickup prefab on death. Now that Phase 5 enables multi-client, it's unblocked — pick it up after Phase 5 smoke-test passes if scope allows, otherwise roll into Phase 9 polish.
+**Phase 4b — drop on death — code landed.** New `FoodPickup` NetworkBehaviour (in `Scripts/Gameplay/`) is a small world-spawned object with `[Networked] Amount` + `RPC_Drain`. `ChickenCargo.HandleDeath` now spawns one at the dying chicken's position (slight forward offset so it doesn't sit dead-center on the stunned body) carrying the chicken's cargo amount, then zeros local Cargo. Initial `Amount` / `MaxAmount` are set in the spawner's `onBeforeSpawned` callback so they replicate from tick zero. `ChickenCargo.FixedUpdateNetwork` now also runs `TryCollectFromNearbyPickup` after pile collection — any chicken (including the dropper, once stun ends) walks over it and credits its cargo. Pickup auto-despawns when drained to zero or after `_despawnDelay` (30s).
+
+**Outstanding for Maestro before smoke-test:**
+- Author a `FoodPickup.prefab`: NetworkObject + FoodPickup + small trigger collider + small child cube/sphere mesh (placeholder visual). The Inspector will need a tiny scale (~0.5) and a tinted color so it's visually distinct from FoodPile / PlayerBase.
+- Drop the new prefab into the Chicken prefab's `ChickenCargo._foodPickupPrefab` slot. Without that reference, death just logs a warning and cargo is silently lost (graceful fallback).
 
 ---
 

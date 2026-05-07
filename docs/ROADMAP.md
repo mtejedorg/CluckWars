@@ -106,7 +106,7 @@ Two chickens can fight, one dies, stunned for 5 sec. (Solo dev session can only 
 - [x] `PlayerBase` NetworkBehaviour with `[Networked] FoodTotal` + `RPC_AddFood` (per-player ownership wiring deferred to Phase 7 win condition)
 - [x] `CargoHud` IMGUI overlay — local cargo / capacity, base total, stun indicator
 - [x] Cargo zeroed on death via `ChickenCombat.OnDeath` subscription
-- [ ] Food pickup prefab (dropped cargo as collectables) — deferred to Phase 4b once Phase 5 multi-client lands and we can validate it
+- [x] Food pickup prefab (dropped cargo as collectables) — Phase 4b: `FoodPickup` NetworkBehaviour spawned by `ChickenCargo.HandleDeath` carrying the chicken's cargo amount; any chicken in pickup range drains it via `RPC_Drain` and credits its own cargo. Auto-despawns when empty or after `_despawnDelay` (30s default).
 
 ### Prefab/scene work (Maestro, in Editor)
 - Add `ChickenCargo` to the Chicken prefab.

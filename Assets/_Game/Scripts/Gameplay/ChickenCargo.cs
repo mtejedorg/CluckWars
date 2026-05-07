@@ -14,7 +14,10 @@ namespace CluckWars.Gameplay
     /// <remarks>
     /// Cargo is a <c>float</c> so a 1 unit/sec collection rate accumulates smoothly across
     /// 30 Hz ticks (each tick adds ~0.033). The HUD floors it for display.
-    /// On death, cargo is zeroed — pickup-prefab drops are deferred to Phase 4b.
+    /// On death, the StateAuthority spawns a <see cref="FoodPickup"/> NetworkObject
+    /// at the chicken's position carrying the cargo amount, then zeros local Cargo.
+    /// Any chicken (including the dropper, after stun ends) can pick it up by walking
+    /// over it.
     /// </remarks>
     [RequireComponent(typeof(ChickenController))]
     [RequireComponent(typeof(NetworkObject))]
@@ -28,6 +31,9 @@ namespace CluckWars.Gameplay
 
         [Tooltip("Layers searched for piles and bases. Default = Everything; tighten once a Pickup layer is authored.")]
         [SerializeField] private LayerMask _searchMask = ~0;
+
+        [Tooltip("FoodPickup prefab spawned on death, carrying whatever cargo this chicken was holding. If null, cargo is just lost.")]
+        [SerializeField] private NetworkObject _foodPickupPrefab;
 
         [Networked] public float Cargo { get; set; }
 
@@ -79,6 +85,7 @@ namespace CluckWars.Gameplay
             if (_combat != null && _combat.IsStunned) return;
 
             TryCollectFromNearbyPile(stats);
+            TryCollectFromNearbyPickup(stats);
             TryDepositAtNearbyBase();
         }
 
@@ -96,6 +103,22 @@ namespace CluckWars.Gameplay
 
             Cargo += takeable;
             pile.RPC_Drain(takeable);
+        }
+
+        private void TryCollectFromNearbyPickup(ChickenStatsSO stats)
+        {
+            if (Cargo >= stats.CargoCapacity) return;
+
+            var pickup = FindNearestPickupInRange();
+            if (pickup == null || pickup.IsEmpty) return;
+
+            float spaceLeft = stats.CargoCapacity - Cargo;
+            float takeable = Mathf.Min(pickup.Amount, spaceLeft);
+            if (takeable <= 0f) return;
+
+            Cargo += takeable;
+            pickup.RPC_Drain(takeable);
+            _log?.Verbose(Source, $"Picked up {takeable:0.00} from {pickup.name}.");
         }
 
         private void TryDepositAtNearbyBase()
@@ -132,6 +155,27 @@ namespace CluckWars.Gameplay
             return best;
         }
 
+        private FoodPickup FindNearestPickupInRange()
+        {
+            var hits = Physics.OverlapSphere(transform.position, _searchRadius, _searchMask, QueryTriggerInteraction.Collide);
+            FoodPickup best = null;
+            float bestSqr = float.MaxValue;
+            foreach (var col in hits)
+            {
+                var pickup = col.GetComponentInParent<FoodPickup>();
+                if (pickup == null || pickup.IsEmpty) continue;
+                float sqr = (pickup.transform.position - transform.position).sqrMagnitude;
+                float r = pickup.PickupRadius;
+                if (sqr > r * r) continue;
+                if (sqr < bestSqr)
+                {
+                    bestSqr = sqr;
+                    best = pickup;
+                }
+            }
+            return best;
+        }
+
         private PlayerBase FindNearestBaseInRange()
         {
             var hits = Physics.OverlapSphere(transform.position, _searchRadius, _searchMask, QueryTriggerInteraction.Collide);
@@ -155,13 +199,41 @@ namespace CluckWars.Gameplay
 
         private void HandleDeath()
         {
-            // Authority-only mutation: only the chicken's owner zeros its cargo.
-            // OnDeath fires on every peer (it's driven by ChangeDetector on IsStunned),
-            // so guard with HasStateAuthority.
+            // Authority-only mutation: only the chicken's owner spawns the pickup
+            // and zeros its own cargo. OnDeath fires on every peer (it's driven by
+            // a ChangeDetector on IsStunned in ChickenCombat), so guard with HasStateAuthority.
             if (!HasStateAuthority) return;
-            if (Cargo <= 0f) return;
-            _log?.Info(Source, $"Death drop: {Cargo:0.00} cargo lost.");
+
+            float dropped = Cargo;
+            if (dropped <= 0f) return;
             Cargo = 0f;
+
+            if (_foodPickupPrefab == null)
+            {
+                _log?.Warn(Source, $"Death drop: {dropped:0.00} cargo lost — _foodPickupPrefab not assigned on the Chicken prefab.");
+                return;
+            }
+
+            // Slight forward offset so the pickup doesn't spawn dead-center on the
+            // stunned chicken's collider; helps the dropping chicken not auto-collect
+            // it the instant stun ends.
+            var dropPosition = transform.position + transform.forward * 0.4f;
+            Runner.Spawn(
+                _foodPickupPrefab,
+                dropPosition,
+                Quaternion.identity,
+                Object.StateAuthority,
+                onBeforeSpawned: (_, networkObject) =>
+                {
+                    var pickup = networkObject.GetComponent<FoodPickup>();
+                    if (pickup != null)
+                    {
+                        pickup.Amount = dropped;
+                        pickup.MaxAmount = dropped;
+                    }
+                });
+
+            _log?.Info(Source, $"Death drop: spawned FoodPickup with {dropped:0.00} food at {dropPosition}.");
         }
     }
 }

@@ -265,4 +265,5 @@ MonoBehaviour:
   _searchMask:
     serializedVersion: 2
     m_Bits: 4294967295
+  _foodPickupPrefab: {fileID: 8362016333457472506, guid: a8794a9118fa75e44946e9a0fb7d9a54, type: 3}
   _Cargo: 0
