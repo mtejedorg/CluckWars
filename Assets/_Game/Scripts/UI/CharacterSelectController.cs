@@ -9,15 +9,16 @@ using Zenject;
 namespace CluckWars.UI
 {
     /// <summary>
-    /// Phase-2 placeholder character select. Lives in <c>Bootstrap.unity</c>.
-    /// Number keys 1-4 pick a class, Space/Enter loads <c>Game.unity</c>. An
-    /// <see cref="OnGUI"/> overlay shows the current selection.
+    /// Phase-2 placeholder character select, extended in Phase 5 with a session-mode
+    /// picker (Solo / Host / Join). Lives in <c>Bootstrap.unity</c>.
+    /// 1-4 / numpad 1-4 pick a class, S / H / J pick the mode, Space or Enter loads
+    /// <c>Game.unity</c>. An <see cref="OnGUI"/> overlay shows current selection.
     /// </summary>
     /// <remarks>
     /// Self-injects from <c>ProjectContext</c> in Awake so it works without a
     /// <c>SceneContext</c> in the Bootstrap scene. Disables a sibling
     /// <see cref="SceneLoader"/>'s auto-load so the scene waits for player input.
-    /// The proper UGUI menu lands in Phase 7.
+    /// The proper UGUI menu lands in Phase 7 (session-name entry, lobby list, etc.).
     /// </remarks>
     [RequireComponent(typeof(SceneLoader))]
     public sealed class CharacterSelectController : MonoBehaviour
@@ -78,34 +79,53 @@ namespace CluckWars.UI
 
             // Accept both top-row digit keys and numpad — Spanish keyboards in particular
             // report shifted top-row digits oddly, and full-size keyboards default to numpad.
-            if (kb.digit1Key.wasPressedThisFrame || kb.numpad1Key.wasPressedThisFrame) Select(ChickenClass.Warrior, "1");
-            else if (kb.digit2Key.wasPressedThisFrame || kb.numpad2Key.wasPressedThisFrame) Select(ChickenClass.Speedy, "2");
-            else if (kb.digit3Key.wasPressedThisFrame || kb.numpad3Key.wasPressedThisFrame) Select(ChickenClass.Fatty, "3");
-            else if (kb.digit4Key.wasPressedThisFrame || kb.numpad4Key.wasPressedThisFrame) Select(ChickenClass.Assassin, "4");
+            if (kb.digit1Key.wasPressedThisFrame || kb.numpad1Key.wasPressedThisFrame) SelectClass(ChickenClass.Warrior, "1");
+            else if (kb.digit2Key.wasPressedThisFrame || kb.numpad2Key.wasPressedThisFrame) SelectClass(ChickenClass.Speedy, "2");
+            else if (kb.digit3Key.wasPressedThisFrame || kb.numpad3Key.wasPressedThisFrame) SelectClass(ChickenClass.Fatty, "3");
+            else if (kb.digit4Key.wasPressedThisFrame || kb.numpad4Key.wasPressedThisFrame) SelectClass(ChickenClass.Assassin, "4");
+
+            if (kb.sKey.wasPressedThisFrame) SelectMode(SessionMode.Solo);
+            else if (kb.hKey.wasPressedThisFrame) SelectMode(SessionMode.Host);
+            else if (kb.jKey.wasPressedThisFrame) SelectMode(SessionMode.Join);
 
             if (kb.spaceKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame)
             {
-                _log?.Info(Source, $"Confirm pressed. Loading next scene with selection = {_selection.SelectedClass}.");
+                _log?.Info(Source,
+                    $"Confirm pressed. Loading next scene: class={_selection.SelectedClass}, " +
+                    $"mode={_selection.Mode}, session='{_selection.SessionName}'.");
                 _sceneLoader.LoadNext();
             }
         }
 
-        private void Select(ChickenClass cls, string keyName)
+        private void SelectClass(ChickenClass cls, string keyName)
         {
             _selection.SelectedClass = cls;
             _log?.Debug(Source, $"Key '{keyName}' pressed → SelectedClass = {cls}.");
         }
 
+        private void SelectMode(SessionMode mode)
+        {
+            _selection.Mode = mode;
+            _log?.Debug(Source, $"Mode = {mode} (session='{_selection.SessionName}').");
+        }
+
         private void OnGUI()
         {
             const int pad = 16;
-            GUI.Box(new Rect(pad, pad, 360, 130), "Cluck Wars — Pick your chicken");
+            GUI.Box(new Rect(pad, pad, 360, 200), "Cluck Wars — Pick your chicken");
             GUI.Label(new Rect(pad + 12, pad + 28, 340, 22), "[1] Warrior   [2] Speedy");
             GUI.Label(new Rect(pad + 12, pad + 50, 340, 22), "[3] Fatty     [4] Assassin");
 
-            var selected = _selection != null ? _selection.SelectedClass.ToString() : "(injection failed — see console)";
-            GUI.Label(new Rect(pad + 12, pad + 76, 340, 22), $"Selected: {selected}");
-            GUI.Label(new Rect(pad + 12, pad + 100, 340, 22), "Press SPACE / ENTER to start");
+            var selectedClass = _selection != null ? _selection.SelectedClass.ToString() : "(injection failed — see console)";
+            GUI.Label(new Rect(pad + 12, pad + 76, 340, 22), $"Class: {selectedClass}");
+
+            GUI.Label(new Rect(pad + 12, pad + 102, 340, 22), "[S] Solo   [H] Host   [J] Join");
+            var selectedMode = _selection != null
+                ? $"Mode: {_selection.Mode}  (session='{_selection.SessionName}')"
+                : "Mode: (injection failed)";
+            GUI.Label(new Rect(pad + 12, pad + 124, 340, 22), selectedMode);
+
+            GUI.Label(new Rect(pad + 12, pad + 156, 340, 22), "Press SPACE / ENTER to start");
         }
     }
 }

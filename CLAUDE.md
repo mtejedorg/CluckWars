@@ -225,11 +225,18 @@ Notion originals: linked in project instructions for deep reads.
 
 ## Current Phase
 
-**Phase 4 stable.** Solo collect → carry → deposit loop verified end-to-end. `FoodPile`, `PlayerBase`, `ChickenCargo`, `FoodPileVisuals`, and the `CargoHud` IMGUI overlay all working. Placeholder `FoodPile.prefab` and `PlayerBase.prefab` use cube child meshes with **trigger** colliders so chickens can walk through them while `OverlapSphere` still picks them up; chicken movement is 2D (no jump), so triggers are the right call.
+**Phase 5 — multiplayer networking — code landed.** Bootstrap-scene UI now picks both class (1-4) and session mode (S=Solo / H=Host / J=Join) before SPACE confirms and loads `Game.unity`. `MatchBootstrapper` branches on the selected mode and calls `StartSoloAsync` / `StartHostAsync(sessionName)` / `JoinSessionAsync(sessionName)` accordingly. Session name is hardcoded to `cluck-lan` for the demo — Host creates it, Join joins by exact name; both peers must use the same Photon AppId (`PhotonAppSettings.asset` already has `AppIdFusion = 259bda28-…`).
 
-**Phase 4b deferred:** food-pickup prefab spawned on death so cargo isn't simply lost. Held until Phase 5 lands multi-client (single-player can't validate the spawn → pickup loop anyway). Hook is already in place via `ChickenCombat.OnDeath`.
+Late-join handling is already correct: `HandlePlayerJoined` filters `player == runner.LocalPlayer` so each peer spawns only its own chicken; remote chickens, food piles, and bases replicate via Fusion's normal state sync. No code change needed for that.
 
-**Next:** Phase 5 — multiplayer networking. Lift `FusionNetworkService` from `GameMode.Single` to `Shared`, add LAN host/join UI to replace the Bootstrap IMGUI menu, validate every Phase 3-4 RPC path with a real second client (Windows host + Android client on same Wi-Fi). See `docs/ROADMAP.md` Phase 5 task list.
+`ISessionSelectionService` extended with `SessionMode Mode` + `string SessionName` (defaults: `Solo` + `"cluck-lan"`).
+
+**Outstanding for Maestro before smoke-test:**
+- One Windows build + one Android build, both pointing at the same Photon AppId.
+- Pick H on the Windows host, J on the Android client. Both should land in the same scene with their own chicken; piles and bases sync.
+- Verify cross-client paths from Phases 3-4: damage RPC, drain RPC, deposit RPC.
+
+**Phase 4b still deferred:** food-pickup prefab on death. Now that Phase 5 enables multi-client, it's unblocked — pick it up after Phase 5 smoke-test passes if scope allows, otherwise roll into Phase 9 polish.
 
 ---
 

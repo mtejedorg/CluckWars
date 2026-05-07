@@ -130,14 +130,17 @@ Players can collect from piles, see visual feedback, deposit at base. (Solo-test
 - [x] `FusionNetworkService` skeleton with `StartHostAsync` / `JoinSessionAsync` (Phase 1)
 - [x] `NetworkBehaviour` on `ChickenController` (Phase 1)
 - [x] Input sync via Fusion `PlayerNetworkInput` struct (Phase 1)
-- [ ] `NetworkBehaviour` on `FoodPile`, `GameManager`
-- [ ] State sync via `[Networked]` for HP, cargo, stun, food piles, deposit totals
-- [ ] LAN host/client UI (session name entry, replaces IMGUI character-select)
-- [ ] Late-join handling: state authority transfer in Shared Mode
+- [x] `NetworkBehaviour` on `FoodPile`, `PlayerBase` (Phase 4 — `GameManager` deferred to Phase 7)
+- [x] State sync via `[Networked]` for HP, IsStunned, Cargo, FoodPile.Amount, PlayerBase.FoodTotal (Phase 3-4)
+- [x] Bootstrap-scene mode picker: Solo / Host / Join via S/H/J keys; session name hardcoded to `cluck-lan` for the demo (UGUI session entry lands in Phase 7)
+- [x] `MatchBootstrapper` branches on selected `SessionMode`; late-join already works because `HandlePlayerJoined` filters `player == runner.LocalPlayer` so each peer only spawns its own chicken and Fusion replicates the rest automatically
 - [ ] Tested with PC host + Android client on same Wi-Fi
 
+### Photon prerequisites
+- `Assets/Photon/Fusion/Resources/PhotonAppSettings.asset` has `AppIdFusion = 259bda28-...` ✓. "LAN" still routes through Photon Cloud relay; both peers use the same AppId + same session name to be matchmade.
+
 ### Deliverable
-2 devices (Windows PC host + Android client) can play together on LAN.
+2 devices (Windows PC host + Android client) can play together via Photon Cloud-routed Shared session.
 
 ---
 

@@ -8,15 +8,16 @@ using Zenject;
 namespace CluckWars.Gameplay
 {
     /// <summary>
-    /// Phase-2 entry point for a match. Lives in the Game scene as a single GameObject
-    /// with a serialized chicken prefab. On Start it kicks off a solo Fusion session,
-    /// then spawns the local player's chicken — using the class chosen via
-    /// <see cref="ISessionSelectionService"/> in the Bootstrap menu — when
+    /// Entry point for a match. Lives in the Game scene as a single GameObject with a
+    /// serialized chicken prefab. On Start it reads the user's mode + class from
+    /// <see cref="ISessionSelectionService"/>, kicks off the matching Fusion session
+    /// (Solo / Host / Join), and spawns the local player's chicken when
     /// <c>OnPlayerJoined</c> fires.
     /// </summary>
     /// <remarks>
-    /// In Phase 5+ this will also read the desired <c>GameMode</c> (Solo / Host / Join)
-    /// from the menu instead of always going to Single.
+    /// In Shared Mode, every joined player's <c>OnPlayerJoined</c> fires on every
+    /// peer; we filter on <c>player == runner.LocalPlayer</c> so each client only
+    /// spawns its own chicken. Remote chickens replicate automatically.
     /// </remarks>
     public sealed class MatchBootstrapper : MonoBehaviour
     {
@@ -45,10 +46,28 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            _log?.Info(Source, $"Starting solo session. Selected class = {(_selection != null ? _selection.SelectedClass.ToString() : "(no selection service)")}.");
+            var mode = _selection != null ? _selection.Mode : SessionMode.Solo;
+            var sessionName = _selection != null ? _selection.SessionName : "cluck-lan";
+            var chosenClass = _selection != null ? _selection.SelectedClass : ChickenClass.Warrior;
+
+            _log?.Info(Source, $"Starting session: mode={mode}, session='{sessionName}', class={chosenClass}.");
             _networkService.OnPlayerJoined += HandlePlayerJoined;
-            await _networkService.StartSoloAsync();
-            _log?.Debug(Source, "StartSoloAsync awaited; runner is up.");
+
+            switch (mode)
+            {
+                case SessionMode.Host:
+                    await _networkService.StartHostAsync(sessionName);
+                    break;
+                case SessionMode.Join:
+                    await _networkService.JoinSessionAsync(sessionName);
+                    break;
+                case SessionMode.Solo:
+                default:
+                    await _networkService.StartSoloAsync();
+                    break;
+            }
+
+            _log?.Debug(Source, $"Network start awaited (mode={mode}); runner is up.");
         }
 
         private void OnDestroy()
