@@ -179,12 +179,17 @@ Players can equip and activate 1 ability per chicken (2 for Assassin once `_slot
 - Basic balancing (food targets, timer, pile sizes)
 
 ### Tasks
-- [ ] `GameManager` with match lifecycle
-- [ ] Win condition check (first to 150 food OR most at 3 min)
-- [ ] Match timer + end screen
-- [ ] Spawn system (players spawn at base edge on join)
-- [ ] Placeholder balancing values tested (adjust food amounts, cargo rates, cooldowns)
-- [ ] Score/leaderboard display during and after match
+- [x] `GameManager` (NetworkBehaviour) with `MatchState` enum (`WaitingForPlayers` → `Active` → `Ended`), `[Networked]` `MatchTimer` (`TickTimer`), `WinnerPlayer` (`PlayerRef`), `WinnerFoodTotal` (float). Master-client owned.
+- [x] Win condition check (first to `MatchConfigSO.FoodTargetToWin` OR highest total when timer expires). Throttled to 4× / sec via `Runner.SimulationTime`.
+- [x] Match timer (top-center MM:SS overlay) + end screen (centered banner showing winner + final food). Both rendered by `CargoHud` IMGUI.
+- [x] `MatchBootstrapper` spawns the `GameManager` prefab on master-client side after `StartGame` completes.
+- [ ] Spawn system polish — currently picks a random scene transform from `_spawnPoints`; "spawn at base edge on join" lands with Phase 7b per-player base wiring.
+- [ ] Per-player base ownership (each `PlayerBase.Owner` assigned on join; `ChickenCargo` deposits only into its own player's base) — Phase 7b.
+- [ ] Placeholder balancing pass — tune `MatchConfigSO`, `FoodPile._initialAmount`, `ChickenStatsSO.CollectionRate`, ability cooldowns once 4-player playtest data is available.
+- [x] Score display during match — `CargoHud` shows each base's running food total in the right panel; full per-player leaderboard arrives with Phase 7b.
+
+### Editor work after this commit
+- Author a `GameManager` prefab: NetworkObject + `GameManager` script. Drag into `MatchBootstrapper._gameManagerPrefab` on the Game scene's MatchBootstrapper GameObject.
 
 ### Deliverable
 4 players can play a complete 5-10 min match and see winner.

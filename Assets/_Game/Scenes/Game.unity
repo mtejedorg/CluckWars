@@ -163,6 +163,7 @@ MonoBehaviour:
   _attackPressedColor: {r: 1, g: 0.5, b: 0.25, a: 0.95}
   _abilityNormalColor: {r: 0.3, g: 0.55, b: 0.95, a: 0.55}
   _abilityPressedColor: {r: 0.55, g: 0.8, b: 1, a: 0.95}
+  _cooldownOverlayColor: {r: 0, g: 0, b: 0, a: 0.55}
 --- !u!4 &201738477
 Transform:
   m_ObjectHideFlags: 0
@@ -427,6 +428,7 @@ MonoBehaviour:
   - {fileID: 1260163023}
   - {fileID: 275103248}
   - {fileID: 1535614659}
+  _gameManagerPrefab: {fileID: 2225548547438419160, guid: 1e2d0fcf4e226a246a080f777381e9cd, type: 3}
 --- !u!1 &940308661
 GameObject:
   m_ObjectHideFlags: 0

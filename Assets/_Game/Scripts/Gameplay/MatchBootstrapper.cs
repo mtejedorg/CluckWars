@@ -26,6 +26,9 @@ namespace CluckWars.Gameplay
         [SerializeField] private NetworkObject _chickenPrefab;
         [SerializeField] private Transform[] _spawnPoints;
 
+        [Tooltip("Scene-spawned by the master client once Fusion is running. Drives match lifecycle (timer / win condition / end overlay).")]
+        [SerializeField] private NetworkObject _gameManagerPrefab;
+
         private INetworkService _networkService;
         private ISessionSelectionService _selection;
         private ILogService _log;
@@ -68,6 +71,39 @@ namespace CluckWars.Gameplay
             }
 
             _log?.Debug(Source, $"Network start awaited (mode={mode}); runner is up.");
+
+            TrySpawnGameManager();
+        }
+
+        private void TrySpawnGameManager()
+        {
+            if (_gameManagerPrefab == null)
+            {
+                _log?.Warn(Source, "GameManager prefab not assigned — match has no timer / win condition.");
+                return;
+            }
+
+            var runner = _networkService.Runner;
+            if (runner == null) return;
+
+            // Only the master client (or solo player) spawns the manager. In Shared
+            // Mode, every client's local-player check passes for itself; the master
+            // client is the one whose LocalPlayer equals runner.LocalPlayer AND is
+            // first to spawn. We additionally guard so we don't end up with two
+            // managers if joins race.
+            if (runner.GameMode != GameMode.Single && !runner.IsSharedModeMasterClient)
+            {
+                _log?.Debug(Source, "Not master client; GameManager will replicate from the master.");
+                return;
+            }
+            if (FindFirstObjectByType<GameManager>() != null)
+            {
+                _log?.Debug(Source, "GameManager already in scene; skipping spawn.");
+                return;
+            }
+
+            _log?.Info(Source, "Master client spawning GameManager.");
+            runner.Spawn(_gameManagerPrefab, Vector3.zero, Quaternion.identity);
         }
 
         private void OnDestroy()

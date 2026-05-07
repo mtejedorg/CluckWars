@@ -242,6 +242,16 @@ Late-join handling is already correct: `HandlePlayerJoined` filters `player == r
 
 **Phase 4b — drop on death — done.** `FoodPickup` NetworkBehaviour spawned by `ChickenCargo.HandleDeath` carrying cargo amount; auto-despawns when drained or after 30s. Picked up by walking over it. Verified prefab + Chicken wiring is committed.
 
+**Phase 7 — match loop — code landed.** `GameManager` (NetworkBehaviour, master-client owned) drives a 3-state machine (`WaitingForPlayers` → `Active` → `Ended`) with `[Networked] MatchTimer` (`TickTimer`), `WinnerPlayer` (`PlayerRef`), `WinnerFoodTotal` (float). On Spawned the master client transitions to `Active` and starts the match-duration countdown from `MatchConfigSO.MatchDurationSeconds`. Win check fires 4× / sec on the StateAuthority: scans every `PlayerBase` in scene; first to `MatchConfigSO.FoodTargetToWin` ends the match, else timer expiry picks the highest total. `MatchBootstrapper` spawns the GameManager prefab once Fusion is up, master-client-side only (`runner.IsSharedModeMasterClient`).
+
+The HUD picked up timer + end overlay duties: `CargoHud` (despite the name, kept stable to avoid scene re-wiring) now renders a top-center MM:SS timer while `Active` and a centered "MATCH ENDED" banner with winner / final-food when `Ended`. Per-base totals show in the right panel — when Phase 7b lands per-player base ownership, the same code will display per-player labels naturally.
+
+**Outstanding for Maestro before smoke-test:**
+- Author a `GameManager` prefab: NetworkObject + `GameManager` script.
+- Drag the prefab into `MatchBootstrapper._gameManagerPrefab` on the MatchBootstrapper GameObject in `Game.unity`.
+
+**Phase 7b deferred:** per-player base ownership (assign `PlayerBase.Owner` on join, restrict deposits to own base, full leaderboard). Spawn-at-base-edge.
+
 **Phase 6 — abilities — code landed.** Two new namespaces, one new component, two SO implementations:
 
 - **`Assets/_Game/Scripts/Abilities/`** — `AbilityBaseSO` (abstract: Duration / Cooldown / accent color / animation clip + abstract `OnActivate(ctx)` / `OnDeactivate(ctx)`), `AbilityContext` (carries the `ChickenController` so SOs stay clean of `GetComponent`), and the first two concrete SOs:
