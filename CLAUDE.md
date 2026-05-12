@@ -301,6 +301,20 @@ The HUD picked up timer + end overlay duties: `CargoHud` (despite the name, kept
 
 **Phase 6c — code landed.** `SneakyStealAbilitySO` ships the cargo-theft pattern: thief calls `OverlapSphere`, finds the nearest enemy `ChickenCargo` with cargo on board, optimistically credits its own `Cargo` (capped to free space + victim's stock), then calls `target.RPC_DrainStolen(amount)` to drain on the victim's authority side. New `ChickenCargo.RPC_DrainStolen` is `RpcSources.All → RpcTargets.StateAuthority` and clamps to current cargo so over-requests are harmless — same shape as `FoodPile.RPC_Drain`.
 
+**Pre-Phase-8 advancements (Phase 9b).** Five code-only items shipped on top of Phase 9, picked because they don't need device profiling or playtest data:
+
+- **Isometric camera (`MatchCamera`)** — per ART.md §2. Orthographic, 45° yaw + 30° pitch, framed via `_orthoSize`. Drop on the Main Camera in `Game.unity`; tweak `_orthoSize` if the plane clips off-screen.
+- **UGUI `MatchHud`** — replaces the IMGUI `CargoHud`. Top bar with centered MM:SS timer + 4 player food totals (color-coded). Bottom-left HP + cargo bars (`Image.FillMethod.Horizontal`). Centered match-end overlay with sorted leaderboard + live "Next match in Ns…" countdown. Centered session-end overlay on disconnect with auto-return to Bootstrap. Disables any existing `CargoHud` on Awake so the two HUDs don't overlap during migration.
+- **Player nameplates (`ChickenNameplate`)** — floating "P1/P2/P3/P4" `TextMesh` above each chicken, tinted with the 4-color player palette (Red/Blue/Green/Yellow). Billboards toward the camera every frame. Drop on the Chicken prefab.
+- **Intro countdown** — `GameManager.IntroTimer` (`[Networked]`) runs for `_introSeconds` (default 3) before the match timer ticks. `MatchHud` shows a big centered "3 / 2 / 1 / GO!" overlay. `MatchTimer` is offset by the intro window so playable duration stays equal to `MatchConfigSO.MatchDurationSeconds`; win-condition checks gate out during intro.
+- **Ability button accent** — `TouchControlsHud` re-tints each ability button using the equipped `AbilityBaseSO.AccentColor` (Speed Burst, Egg Shell, etc. now visually distinct). Cached per-slot; only writes on equipped-SO change.
+
+**Outstanding for Maestro before smoke-test:**
+- Add `MatchCamera` to the Main Camera GameObject in `Game.unity`.
+- Add `MatchHud` to a fresh GameObject under `Hud` (or anywhere in Game.unity) — it builds its own canvas + disables the legacy `CargoHud` on Awake.
+- Add `ChickenNameplate` to the Chicken prefab.
+- Tune `AbilityBaseSO.AccentColor` on each of the 8 ability assets if you want stronger per-ability palette differences.
+
 **Phase 9 — polish pass — code landed.** Four shippable waves; the remaining roadmap items in Phase 9 (network desync hunting, on-device profiling, animator polish, balance) need real-device or playtest data, not code.
 
 - **Audio (`b7eb0ae`)** — `UnityAudioService` replaces `NullAudioService`. Two `AudioSource`s on a child of `ProjectContext` (so audio survives scene loads); SFX via `PlayOneShot`, music looping. `AudioRegistrySO` centralizes the clip refs. SFX wired in: combat (Swing on attack epoch / Hit on HP-decrease / Stun on stun-begin), cargo (Deposit, Pickup), abilities (Activate, Expire), match (Start + music, End / Victory sting + stop music). Maestro creates the registry asset, drops clips into named fields, drags into `ProjectInstaller._audioRegistry`.

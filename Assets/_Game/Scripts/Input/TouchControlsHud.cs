@@ -1,3 +1,4 @@
+using CluckWars.Abilities;
 using CluckWars.Gameplay;
 using CluckWars.Logging;
 using UnityEngine;
@@ -51,6 +52,10 @@ namespace CluckWars.Input
         private float _localChickenLastSearch;
         private ILogService _log;
         private ColorSchemeSO _colors;
+
+        // Cached so we re-apply the ability tint only when the equipped SO changes.
+        private AbilityBaseSO _appliedSlot0;
+        private AbilityBaseSO _appliedSlot1;
 
         public Vector2 Movement => _joystick != null ? _joystick.Value : Vector2.zero;
         public bool AttackHeld => _attack != null && _attack.IsHeld;
@@ -141,6 +146,53 @@ namespace CluckWars.Input
 
             UpdateCooldownOverlay(_ability1CooldownOverlay, slot: 0);
             UpdateCooldownOverlay(_ability2CooldownOverlay, slot: 1);
+            UpdateAbilityAccents();
+        }
+
+        private void UpdateAbilityAccents()
+        {
+            // Re-tint the ability buttons to the equipped ability's AccentColor so
+            // Speed Burst vs Egg Shell vs Roll & Trample read visually distinct.
+            // Only applies when the equipped SO actually changes (per spawn).
+            var abilities = _localChicken != null ? _localChicken.Abilities : null;
+            if (abilities == null) return;
+
+            if (abilities.Slot0 != _appliedSlot0)
+            {
+                _appliedSlot0 = abilities.Slot0;
+                ApplyAccent(_ability1, abilities.Slot0);
+            }
+            if (abilities.Slot1 != _appliedSlot1)
+            {
+                _appliedSlot1 = abilities.Slot1;
+                ApplyAccent(_ability2, abilities.Slot1);
+            }
+        }
+
+        private void ApplyAccent(HoldButton btn, AbilityBaseSO equipped)
+        {
+            if (btn == null) return;
+
+            Color normal, pressed;
+            if (equipped == null)
+            {
+                // No ability equipped → keep the neutral palette.
+                normal = _colors.AbilityNormal;
+                pressed = _colors.AbilityPressed;
+            }
+            else
+            {
+                // Tint with the SO's AccentColor, but preserve the scheme's
+                // normal/pressed alphas so visibility stays consistent.
+                normal = equipped.AccentColor;
+                normal.a = _colors.AbilityNormal.a;
+                pressed = equipped.AccentColor;
+                pressed.a = _colors.AbilityPressed.a;
+            }
+
+            var img = btn.GetComponent<Image>();
+            if (img != null) img.color = normal;
+            btn.SetVisuals(img, normal, pressed);
         }
 
         private static ChickenController FindLocalChicken()

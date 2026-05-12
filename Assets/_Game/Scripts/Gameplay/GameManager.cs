@@ -33,10 +33,15 @@ namespace CluckWars.Gameplay
         [Networked] public PlayerRef WinnerPlayer { get; set; }
         [Networked] public float WinnerFoodTotal { get; set; }
         [Networked] public TickTimer RestartCountdown { get; set; }
+        [Networked] public TickTimer IntroTimer { get; set; }
 
         [Tooltip("Seconds after a match ends before the world resets and a new round starts.")]
         [Min(1f)]
         [SerializeField] private float _restartDelaySeconds = 6f;
+
+        [Tooltip("Pre-match \"3, 2, 1, GO!\" intro window (seconds). Match timer is offset by this so the actual playable duration matches MatchConfigSO.MatchDurationSeconds.")]
+        [Min(0f)]
+        [SerializeField] private float _introSeconds = 3f;
 
         private MatchConfigSO _config;
         private ILogService _log;
@@ -59,13 +64,24 @@ namespace CluckWars.Gameplay
             }
         }
 
-        /// <summary>Seconds remaining on the match timer, or 0 once Ended.</summary>
+        /// <summary>True while the pre-match intro countdown is running.</summary>
+        public bool IsIntroActive => IntroTimer.IsRunning && !IntroTimer.Expired(Runner);
+
+        /// <summary>Seconds left on the intro countdown, or 0 if not in intro.</summary>
+        public float IntroRemaining => IsIntroActive ? (IntroTimer.RemainingTime(Runner) ?? 0f) : 0f;
+
+        /// <summary>
+        /// Playable seconds remaining (excludes the pre-match intro window).
+        /// During the intro this freezes at <c>MatchDurationSeconds</c> so the
+        /// HUD doesn't tick down before "GO!".
+        /// </summary>
         public float TimeRemaining
         {
             get
             {
                 if (State != MatchState.Active) return 0f;
-                return MatchTimer.RemainingTime(Runner) ?? 0f;
+                float matchRemain = MatchTimer.RemainingTime(Runner) ?? 0f;
+                return Mathf.Max(0f, matchRemain - IntroRemaining);
             }
         }
 
@@ -114,6 +130,11 @@ namespace CluckWars.Gameplay
             }
 
             if (State != MatchState.Active) return;
+
+            // No win checks during the intro countdown. Bases are all empty
+            // anyway, but be explicit so future logic doesn't accidentally end
+            // the match during "3, 2, 1, GO!".
+            if (IsIntroActive) return;
 
             // Cheap throttle: 4 wins-checks per second is plenty and keeps Physics /
             // FindObjectsByType pressure low.
@@ -188,7 +209,11 @@ namespace CluckWars.Gameplay
         private void StartMatch()
         {
             State = MatchState.Active;
-            MatchTimer = TickTimer.CreateFromSeconds(Runner, MatchDurationSeconds);
+            // Match timer is offset by the intro window so the playable phase still
+            // equals MatchConfigSO.MatchDurationSeconds. HUD subtracts when intro
+            // is active so the displayed time freezes at MM:SS until "GO!".
+            IntroTimer = TickTimer.CreateFromSeconds(Runner, _introSeconds);
+            MatchTimer = TickTimer.CreateFromSeconds(Runner, MatchDurationSeconds + _introSeconds);
             WinnerPlayer = PlayerRef.None;
             WinnerFoodTotal = 0f;
             _audio?.PlaySFX(_audioReg != null ? _audioReg.MatchStart : null);
@@ -196,7 +221,7 @@ namespace CluckWars.Gameplay
             {
                 _audio?.PlayMusic(_audioReg.MatchMusic, 0.6f);
             }
-            _log?.Info(Source, $"Match started: {MatchDurationSeconds}s, target {FoodTargetToWin} food.");
+            _log?.Info(Source, $"Match started: {MatchDurationSeconds}s playable + {_introSeconds}s intro, target {FoodTargetToWin} food.");
         }
 
         private void EvaluateWinCondition()

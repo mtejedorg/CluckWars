@@ -238,6 +238,11 @@ Android phone can host or join LAN match with full touch controls.
 - [x] **Audio service** — `UnityAudioService` (was `NullAudioService`) + `AudioRegistrySO`. SFX cues wired in `ChickenCombat` (Swing / Hit / Stun), `ChickenCargo` (Deposit / Pickup), `AbilityController` (Activate / Expire), `GameManager` (MatchStart + Music / MatchEnd / Victory). Maestro drops clips into the registry asset.
 - [x] **`PrefabRegistrySO`** — consolidates Chicken / Doppelganger / FoodPile / FoodPickup / PlayerBase / GameManager prefabs into one SO. Consumers prefer registry value, fall back to legacy SerializeField slots — gradual migration. See TDD §6.6.
 - [x] **`ColorSchemeSO`** — HUD palette + food-pile states + button states + cooldown overlay in one SO. `TouchControlsHud`, `CharacterSelectController`, `FoodPileVisuals` all refactored to read from it. Per-class chicken tints stay on `ChickenClassRegistrySO`; per-ability accents stay on `AbilityBaseSO`. See TDD §6.6.
+- [x] **Isometric `MatchCamera`** per ART.md §2 — orthographic, 45° yaw + 30° pitch, framed to map.
+- [x] **UGUI `MatchHud`** — replaces IMGUI `CargoHud`. Top bar (timer + per-player totals), bottom-left HP/cargo bars, centered match-end leaderboard, session-end overlay. Auto-disables legacy CargoHud.
+- [x] **Player nameplates (`ChickenNameplate`)** — "P1/P2/.." `TextMesh` billboards above each chicken.
+- [x] **Intro countdown** — `GameManager.IntroTimer` + "3, 2, 1, GO!" overlay; match timer offset so playable duration is unchanged.
+- [x] **Ability button accent** — TouchControlsHud re-tints each ability button with the equipped `AbilityBaseSO.AccentColor`.
 
 ### Deliverable
 Demo is stable and playable for 30+ min sessions without crashes.
