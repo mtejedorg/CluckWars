@@ -33,7 +33,7 @@ namespace CluckWars.Gameplay
         [Tooltip("Layers searched for piles and bases. Default = Everything; tighten once a Pickup layer is authored.")]
         [SerializeField] private LayerMask _searchMask = ~0;
 
-        [Tooltip("FoodPickup prefab spawned on death, carrying whatever cargo this chicken was holding. If null, cargo is just lost.")]
+        [Tooltip("Legacy per-component override. If null, PrefabRegistry.FoodPickup is used. If both are null, cargo is silently lost on death.")]
         [SerializeField] private NetworkObject _foodPickupPrefab;
 
         [Networked] public float Cargo { get; set; }
@@ -47,14 +47,22 @@ namespace CluckWars.Gameplay
         private ILogService _log;
         private IAudioService _audio;
         private AudioRegistrySO _audioReg;
+        private PrefabRegistrySO _prefabRegistry;
         private bool _subscribedToDeath;
 
         [Inject]
-        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg)
+        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry)
         {
             _log = log;
             _audio = audio;
             _audioReg = audioReg;
+            _prefabRegistry = prefabRegistry;
+        }
+
+        private NetworkObject ResolveFoodPickupPrefab()
+        {
+            if (_prefabRegistry != null && _prefabRegistry.FoodPickup != null) return _prefabRegistry.FoodPickup;
+            return _foodPickupPrefab;
         }
 
         public override void Spawned()
@@ -224,9 +232,10 @@ namespace CluckWars.Gameplay
             if (dropped <= 0f) return;
             Cargo = 0f;
 
-            if (_foodPickupPrefab == null)
+            var pickupPrefab = ResolveFoodPickupPrefab();
+            if (pickupPrefab == null)
             {
-                _log?.Warn(Source, $"Death drop: {dropped:0.00} cargo lost — _foodPickupPrefab not assigned on the Chicken prefab.");
+                _log?.Warn(Source, $"Death drop: {dropped:0.00} cargo lost — no FoodPickup prefab (neither PrefabRegistry nor legacy slot).");
                 return;
             }
 
@@ -235,7 +244,7 @@ namespace CluckWars.Gameplay
             // it the instant stun ends.
             var dropPosition = transform.position + transform.forward * 0.4f;
             Runner.Spawn(
-                _foodPickupPrefab,
+                pickupPrefab,
                 dropPosition,
                 Quaternion.identity,
                 Object.StateAuthority,

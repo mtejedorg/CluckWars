@@ -27,6 +27,9 @@ namespace CluckWars.Installers
         [Tooltip("Drop the AudioRegistry asset here so audio cues resolve. If null, an empty runtime instance is bound and all SFX are silent.")]
         [SerializeField] private AudioRegistrySO _audioRegistry;
 
+        [Tooltip("Drop the PrefabRegistry asset here so runtime-spawned NetworkObjects (chicken, base, pile, pickup, GameManager) resolve from one place instead of scattered slots.")]
+        [SerializeField] private PrefabRegistrySO _prefabRegistry;
+
         public override void InstallBindings()
         {
             // Logger bound first so other bindings can complain through it during install if they need to.
@@ -82,6 +85,20 @@ namespace CluckWars.Installers
                 Debug.LogWarning(
                     "[ProjectInstaller] AudioRegistry not assigned. " +
                     "All audio cues will be silent.");
+            }
+
+            // PrefabRegistry: same shape as AudioRegistry. Empty instance is bound
+            // when the asset slot is null so consumers can always inject it; they
+            // fall back to per-component SerializeField slots when a field is null.
+            var prefabRegistry = _prefabRegistry != null
+                ? _prefabRegistry
+                : ScriptableObject.CreateInstance<PrefabRegistrySO>();
+            Container.Bind<PrefabRegistrySO>().FromInstance(prefabRegistry).AsSingle();
+            if (_prefabRegistry == null)
+            {
+                Debug.LogWarning(
+                    "[ProjectInstaller] PrefabRegistry not assigned. " +
+                    "Each consumer will fall back to its legacy SerializeField slot.");
             }
         }
     }

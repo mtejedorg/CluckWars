@@ -28,33 +28,48 @@ namespace CluckWars.Gameplay
     {
         private const string Source = "MatchBootstrap";
 
+        [Tooltip("Legacy per-component override. If null, PrefabRegistry.Chicken is used.")]
         [SerializeField] private NetworkObject _chickenPrefab;
 
         [Tooltip("Optional fallback spawn points. Ignored when a MapGenerator is present in the scene — that becomes the source of truth.")]
         [SerializeField] private Transform[] _legacySpawnPoints;
 
-        [Tooltip("Scene-spawned by the master client once Fusion is running. Drives match lifecycle (timer / win condition / end overlay).")]
+        [Tooltip("Legacy per-component override. If null, PrefabRegistry.GameManager is used.")]
         [SerializeField] private NetworkObject _gameManagerPrefab;
 
         private MapGenerator _mapGenerator;
 
         private INetworkService _networkService;
         private ISessionSelectionService _selection;
+        private PrefabRegistrySO _prefabRegistry;
         private ILogService _log;
 
         [Inject]
-        public void Construct(INetworkService networkService, ISessionSelectionService selection, ILogService log)
+        public void Construct(INetworkService networkService, ISessionSelectionService selection, PrefabRegistrySO prefabRegistry, ILogService log)
         {
             _networkService = networkService;
             _selection = selection;
+            _prefabRegistry = prefabRegistry;
             _log = log;
+        }
+
+        private NetworkObject ResolveChickenPrefab()
+        {
+            if (_prefabRegistry != null && _prefabRegistry.Chicken != null) return _prefabRegistry.Chicken;
+            return _chickenPrefab;
+        }
+
+        private NetworkObject ResolveGameManagerPrefab()
+        {
+            if (_prefabRegistry != null && _prefabRegistry.GameManager != null) return _prefabRegistry.GameManager;
+            return _gameManagerPrefab;
         }
 
         private async void Start()
         {
-            if (_chickenPrefab == null)
+            if (ResolveChickenPrefab() == null)
             {
-                _log?.Error(Source, "Chicken prefab not assigned on MatchBootstrapper.");
+                _log?.Error(Source, "Chicken prefab not assigned (neither PrefabRegistry.Chicken nor legacy slot).");
                 return;
             }
 
@@ -86,7 +101,8 @@ namespace CluckWars.Gameplay
 
         private void TrySpawnGameManager()
         {
-            if (_gameManagerPrefab == null)
+            var gmPrefab = ResolveGameManagerPrefab();
+            if (gmPrefab == null)
             {
                 _log?.Warn(Source, "GameManager prefab not assigned — match has no timer / win condition.");
                 return;
@@ -112,7 +128,7 @@ namespace CluckWars.Gameplay
             }
 
             _log?.Info(Source, "Master client spawning GameManager.");
-            runner.Spawn(_gameManagerPrefab, Vector3.zero, Quaternion.identity);
+            runner.Spawn(gmPrefab, Vector3.zero, Quaternion.identity);
         }
 
         private void OnDestroy()
@@ -134,7 +150,7 @@ namespace CluckWars.Gameplay
             _log?.Info(Source, $"Spawning chicken: class={chosenClass}, pos={pos}.");
 
             runner.Spawn(
-                _chickenPrefab,
+                ResolveChickenPrefab(),
                 pos,
                 Quaternion.identity,
                 player,

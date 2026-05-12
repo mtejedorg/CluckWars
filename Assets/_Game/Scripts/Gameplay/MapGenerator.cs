@@ -31,7 +31,9 @@ namespace CluckWars.Gameplay
         private const string Source = "MapGen";
 
         [Header("Prefabs (master spawns these via Runner.Spawn)")]
+        [Tooltip("Legacy per-component override. If null, PrefabRegistry.PlayerBase is used.")]
         [SerializeField] private NetworkObject _basePrefab;
+        [Tooltip("Legacy per-component override. If null, PrefabRegistry.FoodPile is used.")]
         [SerializeField] private NetworkObject _foodPilePrefab;
 
         [Header("Ground plane (local visual on every peer)")]
@@ -81,6 +83,7 @@ namespace CluckWars.Gameplay
         [SerializeField] private float _smallPileMaxRadius = 8f;
 
         private INetworkService _network;
+        private PrefabRegistrySO _prefabRegistry;
         private ILogService _log;
         private Vector3[] _spawnPoints;
         private bool _runnerHandled;
@@ -89,10 +92,23 @@ namespace CluckWars.Gameplay
         public IReadOnlyList<Vector3> SpawnPoints => _spawnPoints;
 
         [Inject]
-        public void Construct(INetworkService network, ILogService log)
+        public void Construct(INetworkService network, PrefabRegistrySO prefabRegistry, ILogService log)
         {
             _network = network;
+            _prefabRegistry = prefabRegistry;
             _log = log;
+        }
+
+        private NetworkObject ResolveBasePrefab()
+        {
+            if (_prefabRegistry != null && _prefabRegistry.PlayerBase != null) return _prefabRegistry.PlayerBase;
+            return _basePrefab;
+        }
+
+        private NetworkObject ResolveFoodPilePrefab()
+        {
+            if (_prefabRegistry != null && _prefabRegistry.FoodPile != null) return _prefabRegistry.FoodPile;
+            return _foodPilePrefab;
         }
 
         private void Awake()
@@ -210,9 +226,10 @@ namespace CluckWars.Gameplay
 
         private void SpawnBases(NetworkRunner runner)
         {
-            if (_basePrefab == null)
+            var basePrefab = ResolveBasePrefab();
+            if (basePrefab == null)
             {
-                _log?.Warn(Source, "Base prefab not assigned — skipping base spawn.");
+                _log?.Warn(Source, "Base prefab not assigned (neither PrefabRegistry.PlayerBase nor legacy slot) — skipping base spawn.");
                 return;
             }
 
@@ -223,7 +240,7 @@ namespace CluckWars.Gameplay
                 var pos = Vector3.Lerp(_spawnPoints[i], Vector3.zero, 0.15f);
                 int cornerIndex = i;
                 runner.Spawn(
-                    _basePrefab,
+                    basePrefab,
                     pos,
                     Quaternion.identity,
                     onBeforeSpawned: (_, networkObject) =>
@@ -240,15 +257,16 @@ namespace CluckWars.Gameplay
 
         private void SpawnFoodPiles(NetworkRunner runner)
         {
-            if (_foodPilePrefab == null)
+            var pilePrefab = ResolveFoodPilePrefab();
+            if (pilePrefab == null)
             {
-                _log?.Warn(Source, "FoodPile prefab not assigned — skipping pile spawn.");
+                _log?.Warn(Source, "FoodPile prefab not assigned (neither PrefabRegistry.FoodPile nor legacy slot) — skipping pile spawn.");
                 return;
             }
 
             // Center pile — bigger Amount + bigger visual.
             var centerObj = runner.Spawn(
-                _foodPilePrefab,
+                pilePrefab,
                 Vector3.zero,
                 Quaternion.identity,
                 onBeforeSpawned: (_, networkObject) =>
@@ -273,7 +291,7 @@ namespace CluckWars.Gameplay
                 var pos = new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
 
                 runner.Spawn(
-                    _foodPilePrefab,
+                    pilePrefab,
                     pos,
                     Quaternion.identity,
                     onBeforeSpawned: (_, networkObject) =>
