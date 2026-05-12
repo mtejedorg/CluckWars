@@ -46,12 +46,21 @@ namespace CluckWars.Visuals
         private void LateUpdate()
         {
             if (_controller == null) return;
+
+            // VisualOpacity is [Networked] (defaults to 0). Treat 0 as "not yet
+            // replicated" → fall back to fully visible. The Invisibility ability
+            // uses 0.2 (ghostly outline) rather than full 0, so this is safe in
+            // practice and prevents a 1-frame flicker on proxies between Spawned
+            // and the first snapshot.
+            float raw = _controller.VisualOpacity;
+            float effective = raw > 0f ? raw : 1f;
+
             // Watch for opacity changes (Invisibility ability) and re-push the tint
             // with the new alpha. Cheap: only writes the property block when it
             // actually changes.
-            if (!Mathf.Approximately(_controller.VisualOpacity, _lastAppliedOpacity))
+            if (!Mathf.Approximately(effective, _lastAppliedOpacity))
             {
-                _lastAppliedOpacity = Mathf.Clamp01(_controller.VisualOpacity);
+                _lastAppliedOpacity = Mathf.Clamp01(effective);
                 var c = _currentTint;
                 c.a = _lastAppliedOpacity;
                 PushColor(c);

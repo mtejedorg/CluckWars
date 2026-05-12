@@ -64,8 +64,13 @@ namespace CluckWars.Gameplay
         /// <summary>When true, incoming damage is sent back to the attacker instead of applied here.</summary>
         public bool ReflectDamage { get; set; }
 
-        /// <summary>0 = invisible, 1 = fully opaque. Read by <c>ChickenVisuals</c> for the Invisibility ability.</summary>
-        public float VisualOpacity { get; set; } = 1f;
+        /// <summary>
+        /// 0 = invisible, 1 = fully opaque. Read by <c>ChickenVisuals</c> on every peer
+        /// for the Invisibility ability. Networked so the fade is visible to every
+        /// player, not just the caster (the caster's StateAuthority writes the value
+        /// and it replicates with the rest of the chicken's state).
+        /// </summary>
+        [Networked] public float VisualOpacity { get; set; }
 
         /// <summary>
         /// True for the Doppelganger decoy: skips input processing in
@@ -109,6 +114,11 @@ namespace CluckWars.Gameplay
 
             _log?.Info(Source, $"Stats resolved: '{_activeStats.DisplayName}', moveSpeed={_activeStats.MoveSpeed}.");
             _movement = new ChickenMovement(_characterController, this);
+
+            // VisualOpacity is [Networked] (defaults to 0). Seed to fully visible on
+            // the StateAuthority so we don't briefly render an invisible chicken
+            // before the Invisibility ability ever fires.
+            if (HasStateAuthority && VisualOpacity <= 0f) VisualOpacity = 1f;
 
             // Apply the per-class tint locally on every peer so even proxies look right.
             if (_registry != null && _registry.TryGet(Class, out var entry))

@@ -5,17 +5,11 @@ namespace CluckWars.Abilities
     /// <summary>
     /// Fades the chicken to near-invisible for the duration. Other chickens can
     /// still hit you if they aim well; opacity is a visual hint, not a true cloak
-    /// (Phase 9 will add proper targeting penalties). Mutates
-    /// <c>ChickenController.VisualOpacity</c> which <c>ChickenVisuals</c> polls each
-    /// frame. Note: opacity is a local property on the StateAuthority — remote
-    /// peers see the visual via the chicken's standard tint replication, so
-    /// invisibility is local-only (good enough for solo / Phase 6 demo).
+    /// (proper targeting penalties — break enemy auto-aim, hide HP bar — can land
+    /// in a later polish pass). Mutates <c>ChickenController.VisualOpacity</c>,
+    /// which is <c>[Networked]</c>, so the fade replicates to every peer's
+    /// <c>ChickenVisuals.LateUpdate</c>.
     /// </summary>
-    /// <remarks>
-    /// Networked invisibility (so other players see the fade) requires either a
-    /// <c>[Networked]</c> opacity field or piggybacking on an existing networked
-    /// state change. Deferred to Phase 9 polish.
-    /// </remarks>
     [CreateAssetMenu(fileName = "Invisibility", menuName = "Cluck Wars/Ability/Invisibility", order = 4)]
     public sealed class InvisibilityAbilitySO : AbilityBaseSO
     {
