@@ -9,12 +9,14 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6e3a8b1c4d2f479a85c0e7b3d8f1a5c2, type: 3}
-  m_Name: EggShell
-  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.EggShellAbilitySO
-  DisplayName: Egg Shell
-  ShortLabel: EGG
-  AccentColor: {r: 0.92, g: 0.94, b: 1.00, a: 1}
+  m_Script: {fileID: 11500000, guid: 1b4e8c2a9f6d473d8a51c3e7f0d2b8a6, type: 3}
+  m_Name: TurtleMode
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.TurtleModeAbilitySO
+  DisplayName: Turtle Mode
+  ShortLabel: TRT
+  AccentColor: {r: 0.55, g: 0.42, b: 0.25, a: 1}
   Duration: 2.0
   Cooldown: 12
   AbilityAnimationClip: {fileID: 0}
+  SpeedMultiplier: 0.25
+  DamageResistance: 0.8

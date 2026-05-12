@@ -9,12 +9,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6e3a8b1c4d2f479a85c0e7b3d8f1a5c2, type: 3}
-  m_Name: EggShell
-  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.EggShellAbilitySO
-  DisplayName: Egg Shell
-  ShortLabel: EGG
-  AccentColor: {r: 0.92, g: 0.94, b: 1.00, a: 1}
+  m_Script: {fileID: 11500000, guid: 7f1d3a8c5e2b496c9d04b8e7a3c0f1e9, type: 3}
+  m_Name: SpineCoat
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SpineCoatAbilitySO
+  DisplayName: Spine Coat
+  ShortLabel: SPN
+  AccentColor: {r: 0.55, g: 0.65, b: 0.20, a: 1}
   Duration: 2.0
-  Cooldown: 12
+  Cooldown: 10
   AbilityAnimationClip: {fileID: 0}

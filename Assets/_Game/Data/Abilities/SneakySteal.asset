@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e8b1f7c4d3a496d8a51f0c3e7d2b8a4, type: 3}
+  m_Name: SneakySteal
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SneakyStealAbilitySO
+  DisplayName: Sneaky Steal
+  ShortLabel: STL
+  AccentColor: {r: 0.92, g: 0.35, b: 0.75, a: 1}
+  Duration: 0.5
+  Cooldown: 8
+  AbilityAnimationClip: {fileID: 0}
+  StealRange: 3
+  StealAmount: 5

@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4b8d6f2a9c1e3d7589b2a5f0c1e3d6b4, type: 3}
   m_Name: SpeedBurst
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SpeedBurstAbilitySO
-  DisplayName: 
-  ShortLabel: 
-  AccentColor: {r: 0.45, g: 0.7, b: 1, a: 1}
+  DisplayName: Speed Burst
+  ShortLabel: SPD
+  AccentColor: {r: 0.30, g: 0.85, b: 0.95, a: 1}
   Duration: 1.5
   Cooldown: 8
   AbilityAnimationClip: {fileID: 0}
