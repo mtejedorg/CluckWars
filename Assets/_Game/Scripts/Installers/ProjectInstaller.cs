@@ -24,6 +24,9 @@ namespace CluckWars.Installers
         [Tooltip("Drop the ChickenClassRegistry asset here so Game-scene systems can resolve it.")]
         [SerializeField] private ChickenClassRegistrySO _chickenClassRegistry;
 
+        [Tooltip("Drop the AudioRegistry asset here so audio cues resolve. If null, an empty runtime instance is bound and all SFX are silent.")]
+        [SerializeField] private AudioRegistrySO _audioRegistry;
+
         public override void InstallBindings()
         {
             // Logger bound first so other bindings can complain through it during install if they need to.
@@ -34,7 +37,13 @@ namespace CluckWars.Installers
 
             // Stateless service stand-ins.
             Container.Bind<IUGSService>().To<NullUGSService>().AsSingle();
-            Container.Bind<IAudioService>().To<NullAudioService>().AsSingle();
+
+            // UnityAudioService lives under the ProjectContext transform so its
+            // AudioSources survive scene loads. NullAudioService can still be bound
+            // here in headless / test builds.
+            Container.Bind<IAudioService>()
+                .FromMethod(_ => new UnityAudioService(transform))
+                .AsSingle();
 
             // Input: keyboard + on-screen touch HUD compose into one provider so the
             // local player can drive the chicken from either source. The touch HUD is
@@ -59,6 +68,20 @@ namespace CluckWars.Installers
                 Debug.LogWarning(
                     "[ProjectInstaller] ChickenClassRegistry not assigned. " +
                     "Class-aware spawning will fall back to the prefab's serialized stats.");
+            }
+
+            // AudioRegistry: bind whatever asset is supplied, or a runtime-empty
+            // instance so consumers don't have to null-check the binding. Empty
+            // clip fields are already a silent no-op in UnityAudioService.
+            var audioRegistry = _audioRegistry != null
+                ? _audioRegistry
+                : ScriptableObject.CreateInstance<AudioRegistrySO>();
+            Container.Bind<AudioRegistrySO>().FromInstance(audioRegistry).AsSingle();
+            if (_audioRegistry == null)
+            {
+                Debug.LogWarning(
+                    "[ProjectInstaller] AudioRegistry not assigned. " +
+                    "All audio cues will be silent.");
             }
         }
     }

@@ -1,4 +1,5 @@
 using CluckWars.Abilities;
+using CluckWars.Audio;
 using CluckWars.Logging;
 using CluckWars.Networking;
 using Fusion;
@@ -50,10 +51,17 @@ namespace CluckWars.Gameplay
         private AbilityContext _ctx;
         private ChickenCombat _combat;
         private ILogService _log;
+        private IAudioService _audio;
+        private AudioRegistrySO _audioReg;
         private bool _initialized;
 
         [Inject]
-        public void Construct(ILogService log) => _log = log;
+        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg)
+        {
+            _log = log;
+            _audio = audio;
+            _audioReg = audioReg;
+        }
 
         public override void Spawned()
         {
@@ -168,6 +176,7 @@ namespace CluckWars.Gameplay
             ActivationTimer = TickTimer.CreateFromSeconds(Runner, ability.Duration);
             SetCooldown(slot, TickTimer.CreateFromSeconds(Runner, ability.Cooldown));
             ability.OnActivate(_ctx);
+            _audio?.PlaySFX(_audioReg != null ? _audioReg.AbilityActivate : null);
             _log?.Info(Source, $"Activated slot {slot} ({ability.DisplayName}) for {ability.Duration:0.00}s, CD {ability.Cooldown:0.00}s.");
         }
 
@@ -177,6 +186,7 @@ namespace CluckWars.Gameplay
             if (ability != null)
             {
                 ability.OnDeactivate(_ctx);
+                _audio?.PlaySFX(_audioReg != null ? _audioReg.AbilityExpire : null);
                 _log?.Debug(Source, $"Deactivated {ability.DisplayName}.");
             }
             ActiveSlot = InvalidSlot;

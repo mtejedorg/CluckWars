@@ -1,3 +1,4 @@
+using CluckWars.Audio;
 using CluckWars.Logging;
 using Fusion;
 using UnityEngine;
@@ -44,10 +45,17 @@ namespace CluckWars.Gameplay
         private ChickenController _controller;
         private ChickenCombat _combat;
         private ILogService _log;
+        private IAudioService _audio;
+        private AudioRegistrySO _audioReg;
         private bool _subscribedToDeath;
 
         [Inject]
-        public void Construct(ILogService log) => _log = log;
+        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg)
+        {
+            _log = log;
+            _audio = audio;
+            _audioReg = audioReg;
+        }
 
         public override void Spawned()
         {
@@ -118,6 +126,7 @@ namespace CluckWars.Gameplay
 
             Cargo += takeable;
             pickup.RPC_Drain(takeable);
+            _audio?.PlaySFX(_audioReg != null ? _audioReg.Pickup : null);
             _log?.Verbose(Source, $"Picked up {takeable:0.00} from {pickup.name}.");
         }
 
@@ -131,6 +140,7 @@ namespace CluckWars.Gameplay
             float dropped = Cargo;
             Cargo = 0f;
             playerBase.RPC_AddFood(dropped);
+            _audio?.PlaySFX(_audioReg != null ? _audioReg.Deposit : null);
             _log?.Debug(Source, $"Deposited {dropped:0.00} at {playerBase.name}.");
         }
 

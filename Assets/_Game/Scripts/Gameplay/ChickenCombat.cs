@@ -1,4 +1,5 @@
 using System;
+using CluckWars.Audio;
 using CluckWars.Logging;
 using CluckWars.Networking;
 using CluckWars.Visuals;
@@ -48,6 +49,8 @@ namespace CluckWars.Gameplay
         private PropertyReader<bool> _stunReader;
         private PropertyReader<int> _attackEpochReader;
         private ILogService _log;
+        private IAudioService _audio;
+        private AudioRegistrySO _audioReg;
         private bool _hpInitialized;
 
         /// <summary>Fires on every peer when this chicken transitions into death stun.</summary>
@@ -56,7 +59,12 @@ namespace CluckWars.Gameplay
         public bool IsDead => HP <= 0f;
 
         [Inject]
-        public void Construct(ILogService log) => _log = log;
+        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg)
+        {
+            _log = log;
+            _audio = audio;
+            _audioReg = audioReg;
+        }
 
         public override void Spawned()
         {
@@ -127,7 +135,11 @@ namespace CluckWars.Gameplay
                     case nameof(HP):
                     {
                         var (prev, cur) = _hpReader.Read(previous, current);
-                        if (cur < prev) _animator?.TriggerHit();
+                        if (cur < prev)
+                        {
+                            _animator?.TriggerHit();
+                            _audio?.PlaySFX(_audioReg != null ? _audioReg.Hit : null);
+                        }
                         break;
                     }
                     case nameof(IsStunned):
@@ -137,6 +149,7 @@ namespace CluckWars.Gameplay
                         if (cur)
                         {
                             _log?.Info(Source, "Death stun begin.");
+                            _audio?.PlaySFX(_audioReg != null ? _audioReg.Stun : null);
                             OnDeath?.Invoke();
                         }
                         else
@@ -147,6 +160,7 @@ namespace CluckWars.Gameplay
                     }
                     case nameof(AttackEpoch):
                         _animator?.TriggerAttack();
+                        _audio?.PlaySFX(_audioReg != null ? _audioReg.Swing : null);
                         break;
                 }
             }

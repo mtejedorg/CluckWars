@@ -1,3 +1,4 @@
+using CluckWars.Audio;
 using CluckWars.Logging;
 using Fusion;
 using UnityEngine;
@@ -39,6 +40,8 @@ namespace CluckWars.Gameplay
 
         private MatchConfigSO _config;
         private ILogService _log;
+        private IAudioService _audio;
+        private AudioRegistrySO _audioReg;
         private float _winCheckIntervalSeconds = 0.25f;
         private float _nextWinCheckTime;
 
@@ -67,10 +70,12 @@ namespace CluckWars.Gameplay
         }
 
         [Inject]
-        public void Construct(MatchConfigSO config, ILogService log)
+        public void Construct(MatchConfigSO config, ILogService log, IAudioService audio, AudioRegistrySO audioReg)
         {
             _config = config;
             _log = log;
+            _audio = audio;
+            _audioReg = audioReg;
         }
 
         public override void Spawned()
@@ -186,6 +191,11 @@ namespace CluckWars.Gameplay
             MatchTimer = TickTimer.CreateFromSeconds(Runner, MatchDurationSeconds);
             WinnerPlayer = PlayerRef.None;
             WinnerFoodTotal = 0f;
+            _audio?.PlaySFX(_audioReg != null ? _audioReg.MatchStart : null);
+            if (_audioReg != null && _audioReg.MatchMusic != null)
+            {
+                _audio?.PlayMusic(_audioReg.MatchMusic, 0.6f);
+            }
             _log?.Info(Source, $"Match started: {MatchDurationSeconds}s, target {FoodTargetToWin} food.");
         }
 
@@ -230,6 +240,12 @@ namespace CluckWars.Gameplay
             WinnerPlayer = winner;
             WinnerFoodTotal = winnerTotal;
             RestartCountdown = TickTimer.CreateFromSeconds(Runner, _restartDelaySeconds);
+            _audio?.StopMusic();
+            // MatchVictory if anyone actually won, MatchEnd otherwise (timer expiry with no scorer).
+            var endCue = winner.IsRealPlayer
+                ? (_audioReg != null ? _audioReg.MatchVictory : null)
+                : (_audioReg != null ? _audioReg.MatchEnd : null);
+            _audio?.PlaySFX(endCue);
             _log?.Info(Source, $"Match ended ({reason}). Winner={winner}, total={winnerTotal:0.0}. Next round in {_restartDelaySeconds}s.");
         }
 
