@@ -285,6 +285,26 @@ namespace CluckWars.Gameplay
                 cargos[i]?.RPC_ResetForNewMatch();
             }
 
+            // Teleport each chicken back to its corner so the new round opens with
+            // everyone where they started. MapGenerator.SpawnPoints is in the same
+            // order as PlayerBase.CornerIndex, so the playerId-modulo mapping that
+            // MatchBootstrapper uses on join is reproduced here.
+            var mapGen = FindFirstObjectByType<MapGenerator>();
+            var spawnPoints = mapGen != null ? mapGen.SpawnPoints : null;
+            if (spawnPoints != null && spawnPoints.Count > 0)
+            {
+                var controllers = FindObjectsByType<ChickenController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+                for (int i = 0; i < controllers.Length; i++)
+                {
+                    var ctrl = controllers[i];
+                    if (ctrl == null || ctrl.Object == null) continue;
+                    var player = ctrl.Object.InputAuthority;
+                    if (!player.IsRealPlayer) continue;
+                    int cornerIdx = Mathf.Abs(player.PlayerId) % spawnPoints.Count;
+                    ctrl.RPC_TeleportTo(spawnPoints[cornerIdx]);
+                }
+            }
+
             // Resume the match.
             State = MatchState.Active;
             MatchTimer = TickTimer.CreateFromSeconds(Runner, MatchDurationSeconds);

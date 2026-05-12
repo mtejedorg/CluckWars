@@ -140,6 +140,30 @@ namespace CluckWars.Gameplay
             }
         }
 
+        /// <summary>
+        /// Hard-teleport this chicken to <paramref name="position"/>. Toggles the
+        /// sibling <c>CharacterController</c> off so its internal physics state
+        /// doesn't fight the position write, then back on. Called by
+        /// <c>GameManager.RestartMatch</c> across the authority boundary —
+        /// <c>RpcSources.All → RpcTargets.StateAuthority</c> routes the call to
+        /// the chicken's owning client.
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_TeleportTo(Vector3 position)
+        {
+            if (_characterController != null)
+            {
+                _characterController.enabled = false;
+                transform.position = position;
+                _characterController.enabled = true;
+            }
+            else
+            {
+                transform.position = position;
+            }
+            _log?.Debug(Source, $"Teleported to {position}.");
+        }
+
         private ChickenStatsSO ResolveStatsForClass(ChickenClass cls)
         {
             if (_registry != null && _registry.TryGet(cls, out var entry) && entry.Stats != null)
