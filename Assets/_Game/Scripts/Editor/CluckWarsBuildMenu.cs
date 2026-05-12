@@ -165,7 +165,7 @@ namespace CluckWars.EditorTools
             }
 
             // Min API 24 (Android 7.0) covers any 2021+ device the GDD targets.
-            const AndroidSdkVersions desiredMin = AndroidSdkVersions.AndroidApiLevel24;
+            var desiredMin = AndroidSdkVersions.AndroidApiLevel24;
             if (PlayerSettings.Android.minSdkVersion < desiredMin)
             {
                 Debug.Log($"{LogTag} Raising Android minSdkVersion {PlayerSettings.Android.minSdkVersion} → {desiredMin}.");

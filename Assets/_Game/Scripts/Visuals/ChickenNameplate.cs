@@ -41,7 +41,8 @@ namespace CluckWars.Visuals
         private TextMesh _text;
         private Transform _textTransform;
         private int _appliedPlayerId = -2;
-        private ChickenClass _appliedClass = (ChickenClass)(-1);
+        private ChickenClass _appliedClass;
+        private bool _appliedClassValid;
 
         private void Awake()
         {
@@ -90,10 +91,11 @@ namespace CluckWars.Visuals
             {
                 int playerId = obj.InputAuthority.PlayerId;
                 var klass = _controller.Class;
-                if (playerId != _appliedPlayerId || klass != _appliedClass)
+                if (playerId != _appliedPlayerId || !_appliedClassValid || klass != _appliedClass)
                 {
                     _appliedPlayerId = playerId;
                     _appliedClass = klass;
+                    _appliedClassValid = true;
                     if (playerId < 0)
                     {
                         _text.text = klass.ToString();
