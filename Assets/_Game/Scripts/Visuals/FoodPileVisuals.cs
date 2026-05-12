@@ -1,5 +1,6 @@
 using CluckWars.Gameplay;
 using UnityEngine;
+using Zenject;
 
 namespace CluckWars.Visuals
 {
@@ -26,11 +27,17 @@ namespace CluckWars.Visuals
         [Tooltip("Scale at 0% (still visible so the pile doesn't disappear unexpectedly during draining).")]
         [SerializeField] private Vector3 _emptyScale = new Vector3(0.3f, 0.3f, 0.3f);
 
-        [SerializeField] private Color _fullColor = new Color(1f, 0.85f, 0.3f);   // ripe corn
-        [SerializeField] private Color _emptyColor = new Color(0.4f, 0.3f, 0.15f); // husk
+        [Tooltip("Legacy per-pile override. If null, ColorScheme.FoodPileFull is used.")]
+        [SerializeField] private Color _fullColorOverride = new Color(0f, 0f, 0f, 0f);
+        [Tooltip("Legacy per-pile override. If null/alpha=0, ColorScheme.FoodPileEmpty is used.")]
+        [SerializeField] private Color _emptyColorOverride = new Color(0f, 0f, 0f, 0f);
 
         private FoodPile _pile;
         private MaterialPropertyBlock _propertyBlock;
+        private ColorSchemeSO _colors;
+
+        [Inject]
+        public void Construct(ColorSchemeSO colors) => _colors = colors;
 
         private void Awake()
         {
@@ -39,7 +46,23 @@ namespace CluckWars.Visuals
             if ((_renderers == null || _renderers.Length == 0) && _meshRoot != null)
                 _renderers = _meshRoot.GetComponentsInChildren<Renderer>(includeInactive: true);
             _propertyBlock = new MaterialPropertyBlock();
+
+            // FoodPileVisuals lives on a procedurally-spawned NetworkObject (MapGenerator
+            // spawns the pile at runtime), so Zenject's scene-time injection doesn't fire.
+            // Self-inject the color scheme — same pattern as the NetworkBehaviours.
+            if (_colors == null)
+            {
+                ProjectContext.Instance.Container.Inject(this);
+            }
         }
+
+        private Color FullColor => _fullColorOverride.a > 0f
+            ? _fullColorOverride
+            : (_colors != null ? _colors.FoodPileFull : new Color(1f, 0.85f, 0.3f));
+
+        private Color EmptyColor => _emptyColorOverride.a > 0f
+            ? _emptyColorOverride
+            : (_colors != null ? _colors.FoodPileEmpty : new Color(0.4f, 0.3f, 0.15f));
 
         private void LateUpdate()
         {
@@ -57,7 +80,7 @@ namespace CluckWars.Visuals
 
             if (_renderers != null && _renderers.Length > 0)
             {
-                var color = Color.Lerp(_emptyColor, _fullColor, ratio);
+                var color = Color.Lerp(EmptyColor, FullColor, ratio);
                 for (int i = 0; i < _renderers.Length; i++)
                 {
                     var r = _renderers[i];

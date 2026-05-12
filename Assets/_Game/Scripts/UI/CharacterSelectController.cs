@@ -29,17 +29,9 @@ namespace CluckWars.UI
     {
         private const string Source = "CharacterSelect";
 
-        // --- Visual tunables ---
-        private static readonly Color PanelColor    = new Color(0.08f, 0.08f, 0.10f, 0.92f);
-        private static readonly Color ButtonNormal  = new Color(0.18f, 0.18f, 0.22f, 1f);
-        private static readonly Color ButtonHover   = new Color(0.28f, 0.28f, 0.34f, 1f);
-        private static readonly Color ButtonActive  = new Color(0.95f, 0.65f, 0.20f, 1f);  // food-orange
-        private static readonly Color TextColor     = new Color(0.95f, 0.95f, 0.95f, 1f);
-        private static readonly Color TextOnActive  = new Color(0.10f, 0.08f, 0.05f, 1f);
-        private static readonly Color StartColor    = new Color(0.30f, 0.65f, 0.30f, 1f);
-
         private ISessionSelectionService _selection;
         private ILogService _log;
+        private ColorSchemeSO _colors;
         private SceneLoader _sceneLoader;
 
         private readonly Dictionary<ChickenClass, Button> _classButtons = new();
@@ -47,10 +39,11 @@ namespace CluckWars.UI
         private Text _statusLabel;
 
         [Inject]
-        public void Construct(ISessionSelectionService selection, ILogService log)
+        public void Construct(ISessionSelectionService selection, ILogService log, ColorSchemeSO colors)
         {
             _selection = selection;
             _log = log;
+            _colors = colors;
         }
 
         private void Awake()
@@ -156,21 +149,21 @@ namespace CluckWars.UI
                 _statusLabel.text = $"Class: {_selection.SelectedClass}    Mode: {_selection.Mode}    Session: \"{_selection.SessionName}\"";
         }
 
-        private static void ApplyButtonState(Button button, bool isActive)
+        private void ApplyButtonState(Button button, bool isActive)
         {
             if (button == null) return;
             var img = button.GetComponent<Image>();
-            if (img != null) img.color = isActive ? ButtonActive : ButtonNormal;
+            if (img != null) img.color = isActive ? _colors.ButtonActive : _colors.ButtonNormal;
 
             var text = button.GetComponentInChildren<Text>();
-            if (text != null) text.color = isActive ? TextOnActive : TextColor;
+            if (text != null) text.color = isActive ? _colors.TextOnActive : _colors.TextOnButton;
 
             // Tweak the ColorBlock so hover doesn't visually overwrite the active state.
             var colors = button.colors;
-            colors.normalColor      = isActive ? ButtonActive : ButtonNormal;
-            colors.highlightedColor = isActive ? ButtonActive : ButtonHover;
-            colors.pressedColor     = ButtonHover;
-            colors.selectedColor    = isActive ? ButtonActive : ButtonHover;
+            colors.normalColor      = isActive ? _colors.ButtonActive : _colors.ButtonNormal;
+            colors.highlightedColor = isActive ? _colors.ButtonActive : _colors.ButtonHover;
+            colors.pressedColor     = _colors.ButtonHover;
+            colors.selectedColor    = isActive ? _colors.ButtonActive : _colors.ButtonHover;
             button.colors = colors;
         }
 
@@ -207,7 +200,7 @@ namespace CluckWars.UI
             // keeps the panel honest if anyone changes the row count / sizes later.
             var panel = CreateUIObject("Panel", canvasGO.transform, out var panelRT);
             var panelImg = panel.AddComponent<Image>();
-            panelImg.color = PanelColor;
+            panelImg.color = _colors.PanelBackground;
             panelRT.anchorMin = new Vector2(0.5f, 0.5f);
             panelRT.anchorMax = new Vector2(0.5f, 0.5f);
             panelRT.pivot     = new Vector2(0.5f, 0.5f);
@@ -264,15 +257,18 @@ namespace CluckWars.UI
             // Start button
             var startBtn = CreateButton(panel.transform, "Start Match  (SPACE)", () => Confirm("click"));
             var startImg = startBtn.GetComponent<Image>();
-            if (startImg != null) startImg.color = StartColor;
+            if (startImg != null) startImg.color = _colors.StartButton;
             var startLE = startBtn.gameObject.AddComponent<LayoutElement>();
             startLE.minHeight = 72f;
             startLE.preferredHeight = 72f;
             var startColors = startBtn.colors;
-            startColors.normalColor      = StartColor;
-            startColors.highlightedColor = new Color(0.40f, 0.78f, 0.40f, 1f);
-            startColors.pressedColor     = new Color(0.22f, 0.50f, 0.22f, 1f);
-            startColors.selectedColor    = StartColor;
+            // Tinted variants derived from StartButton — saves another SO field
+            // while keeping the visual feedback distinct.
+            var startBase = _colors.StartButton;
+            startColors.normalColor      = startBase;
+            startColors.highlightedColor = new Color(startBase.r * 1.3f, startBase.g * 1.2f, startBase.b * 1.3f, startBase.a);
+            startColors.pressedColor     = new Color(startBase.r * 0.75f, startBase.g * 0.75f, startBase.b * 0.75f, startBase.a);
+            startColors.selectedColor    = startBase;
             startBtn.colors = startColors;
         }
 
@@ -286,13 +282,13 @@ namespace CluckWars.UI
             return go;
         }
 
-        private static Text CreateText(string name, Transform parent, string content, int fontSize, TextAnchor alignment)
+        private Text CreateText(string name, Transform parent, string content, int fontSize, TextAnchor alignment)
         {
             var go = CreateUIObject(name, parent, out _);
             var text = go.AddComponent<Text>();
             text.text = content;
             text.fontSize = fontSize;
-            text.color = TextColor;
+            text.color = _colors.TextOnButton;
             text.alignment = alignment;
             text.horizontalOverflow = HorizontalWrapMode.Overflow;
             text.verticalOverflow = VerticalWrapMode.Overflow;
@@ -300,10 +296,12 @@ namespace CluckWars.UI
             return text;
         }
 
-        private static void CreateSectionLabel(Transform parent, string label)
+        private void CreateSectionLabel(Transform parent, string label)
         {
             var t = CreateText(label + "Label", parent, label, fontSize: 22, alignment: TextAnchor.MiddleLeft);
-            t.color = new Color(0.7f, 0.7f, 0.75f, 1f);
+            // Section header — slightly dimmed version of the standard text tint.
+            var c = _colors.TextOnButton;
+            t.color = new Color(c.r * 0.75f, c.g * 0.75f, c.b * 0.78f, c.a);
             var le = t.gameObject.AddComponent<LayoutElement>();
             le.minHeight = 30f;
         }
@@ -322,7 +320,7 @@ namespace CluckWars.UI
             return go;
         }
 
-        private static Button CreateChoiceButton(Transform parent, string label, System.Action onClick)
+        private Button CreateChoiceButton(Transform parent, string label, System.Action onClick)
         {
             var btn = CreateButton(parent, label, onClick);
             var le = btn.gameObject.AddComponent<LayoutElement>();
@@ -330,21 +328,21 @@ namespace CluckWars.UI
             return btn;
         }
 
-        private static Button CreateButton(Transform parent, string label, System.Action onClick)
+        private Button CreateButton(Transform parent, string label, System.Action onClick)
         {
             var go = CreateUIObject("Btn_" + label, parent, out _);
             var img = go.AddComponent<Image>();
-            img.color = ButtonNormal;
+            img.color = _colors.ButtonNormal;
             img.raycastTarget = true;
 
             var btn = go.AddComponent<Button>();
             btn.targetGraphic = img;
             var colors = btn.colors;
-            colors.normalColor      = ButtonNormal;
-            colors.highlightedColor = ButtonHover;
-            colors.pressedColor     = ButtonHover;
-            colors.selectedColor    = ButtonHover;
-            colors.disabledColor    = ButtonNormal;
+            colors.normalColor      = _colors.ButtonNormal;
+            colors.highlightedColor = _colors.ButtonHover;
+            colors.pressedColor     = _colors.ButtonHover;
+            colors.selectedColor    = _colors.ButtonHover;
+            colors.disabledColor    = _colors.ButtonNormal;
             btn.colors = colors;
 
             btn.onClick.AddListener(() => onClick?.Invoke());

@@ -30,6 +30,9 @@ namespace CluckWars.Installers
         [Tooltip("Drop the PrefabRegistry asset here so runtime-spawned NetworkObjects (chicken, base, pile, pickup, GameManager) resolve from one place instead of scattered slots.")]
         [SerializeField] private PrefabRegistrySO _prefabRegistry;
 
+        [Tooltip("Drop the ColorScheme asset here so HUD / food / button colors come from one palette instead of inline literals. If null, an empty instance is bound with its built-in defaults.")]
+        [SerializeField] private ColorSchemeSO _colorScheme;
+
         public override void InstallBindings()
         {
             // Logger bound first so other bindings can complain through it during install if they need to.
@@ -100,6 +103,14 @@ namespace CluckWars.Installers
                     "[ProjectInstaller] PrefabRegistry not assigned. " +
                     "Each consumer will fall back to its legacy SerializeField slot.");
             }
+
+            // ColorScheme: empty instance still carries the SO's built-in default
+            // colors (defined as field initializers), so consumers always get a
+            // usable palette even when the asset isn't assigned.
+            var colorScheme = _colorScheme != null
+                ? _colorScheme
+                : ScriptableObject.CreateInstance<ColorSchemeSO>();
+            Container.Bind<ColorSchemeSO>().FromInstance(colorScheme).AsSingle();
         }
     }
 }

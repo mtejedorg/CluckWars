@@ -37,14 +37,9 @@ namespace CluckWars.Input
         [SerializeField] private Vector2 _ability1AnchoredPosition = new Vector2(-440f, 240f);
         [SerializeField] private Vector2 _ability2AnchoredPosition = new Vector2(-260f, 420f);
 
-        [Header("Visuals")]
-        [SerializeField] private Color _joystickBaseColor   = new Color(1f, 1f, 1f, 0.20f);
-        [SerializeField] private Color _joystickKnobColor   = new Color(1f, 1f, 1f, 0.55f);
-        [SerializeField] private Color _attackNormalColor   = new Color(0.95f, 0.30f, 0.25f, 0.55f);
-        [SerializeField] private Color _attackPressedColor  = new Color(1.00f, 0.50f, 0.25f, 0.95f);
-        [SerializeField] private Color _abilityNormalColor  = new Color(0.30f, 0.55f, 0.95f, 0.55f);
-        [SerializeField] private Color _abilityPressedColor = new Color(0.55f, 0.80f, 1.00f, 0.95f);
-        [SerializeField] private Color _cooldownOverlayColor = new Color(0f, 0f, 0f, 0.55f);
+        // Visuals come from ColorSchemeSO — no inline literals here anymore.
+        // Defaults are the SO's field initializers, so even an empty / default
+        // scheme produces the same visuals as before this refactor.
 
         private VirtualJoystick _joystick;
         private HoldButton _attack;
@@ -55,6 +50,7 @@ namespace CluckWars.Input
         private ChickenController _localChicken;
         private float _localChickenLastSearch;
         private ILogService _log;
+        private ColorSchemeSO _colors;
 
         public Vector2 Movement => _joystick != null ? _joystick.Value : Vector2.zero;
         public bool AttackHeld => _attack != null && _attack.IsHeld;
@@ -62,7 +58,11 @@ namespace CluckWars.Input
         public bool Ability2Pressed => _ability2 != null && _ability2.WasPressedThisFrame;
 
         [Inject]
-        public void Construct(ILogService log) => _log = log;
+        public void Construct(ILogService log, ColorSchemeSO colors)
+        {
+            _log = log;
+            _colors = colors;
+        }
 
         private void Awake()
         {
@@ -186,7 +186,7 @@ namespace CluckWars.Input
             baseRT.anchoredPosition = _joystickAnchoredPosition;
 
             var baseImg = baseGO.AddComponent<Image>();
-            baseImg.color = _joystickBaseColor;
+            baseImg.color = _colors.JoystickBase;
             baseImg.raycastTarget = true;
 
             // Knob (child of base)
@@ -198,7 +198,7 @@ namespace CluckWars.Input
             knobRT.anchoredPosition = Vector2.zero;
 
             var knobImg = knobGO.AddComponent<Image>();
-            knobImg.color = _joystickKnobColor;
+            knobImg.color = _colors.JoystickKnob;
             knobImg.raycastTarget = false; // base captures all input
 
             _joystick = baseGO.AddComponent<VirtualJoystick>();
@@ -216,13 +216,13 @@ namespace CluckWars.Input
             rt.anchoredPosition = _attackAnchoredPosition;
 
             var img = go.AddComponent<Image>();
-            img.color = _attackNormalColor;
+            img.color = _colors.AttackNormal;
             img.raycastTarget = true;
 
             CreateLabel(go.transform, "ATTACK", fontSize: 36);
 
             var btn = go.AddComponent<HoldButton>();
-            btn.SetVisuals(img, _attackNormalColor, _attackPressedColor);
+            btn.SetVisuals(img, _colors.AttackNormal, _colors.AttackPressed);
             return btn;
         }
 
@@ -237,7 +237,7 @@ namespace CluckWars.Input
             rt.anchoredPosition = anchoredPosition;
 
             var img = go.AddComponent<Image>();
-            img.color = _abilityNormalColor;
+            img.color = _colors.AbilityNormal;
             img.raycastTarget = true;
 
             // Cooldown overlay (between background and label) — radial fill from top,
@@ -249,7 +249,7 @@ namespace CluckWars.Input
             overlayRT.offsetMin = Vector2.zero;
             overlayRT.offsetMax = Vector2.zero;
             cooldownOverlay = overlayGO.AddComponent<Image>();
-            cooldownOverlay.color = _cooldownOverlayColor;
+            cooldownOverlay.color = _colors.CooldownDim;
             cooldownOverlay.type = Image.Type.Filled;
             cooldownOverlay.fillMethod = Image.FillMethod.Radial360;
             cooldownOverlay.fillOrigin = (int)Image.Origin360.Top;
@@ -260,7 +260,7 @@ namespace CluckWars.Input
             CreateLabel(go.transform, label, fontSize: 28);
 
             var btn = go.AddComponent<HoldButton>();
-            btn.SetVisuals(img, _abilityNormalColor, _abilityPressedColor);
+            btn.SetVisuals(img, _colors.AbilityNormal, _colors.AbilityPressed);
             return btn;
         }
 
