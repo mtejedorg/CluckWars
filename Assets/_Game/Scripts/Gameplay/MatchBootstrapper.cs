@@ -18,16 +18,25 @@ namespace CluckWars.Gameplay
     /// In Shared Mode, every joined player's <c>OnPlayerJoined</c> fires on every
     /// peer; we filter on <c>player == runner.LocalPlayer</c> so each client only
     /// spawns its own chicken. Remote chickens replicate automatically.
+    ///
+    /// Spawn positions come from <see cref="MapGenerator.SpawnPoints"/> when the
+    /// scene has a <c>MapGenerator</c>; <see cref="_legacySpawnPoints"/> is a
+    /// fallback for scenes without one. Players are pinned to corners by
+    /// <c>PlayerId % count</c> so peers agree on positions without coordination.
     /// </remarks>
     public sealed class MatchBootstrapper : MonoBehaviour
     {
         private const string Source = "MatchBootstrap";
 
         [SerializeField] private NetworkObject _chickenPrefab;
-        [SerializeField] private Transform[] _spawnPoints;
+
+        [Tooltip("Optional fallback spawn points. Ignored when a MapGenerator is present in the scene — that becomes the source of truth.")]
+        [SerializeField] private Transform[] _legacySpawnPoints;
 
         [Tooltip("Scene-spawned by the master client once Fusion is running. Drives match lifecycle (timer / win condition / end overlay).")]
         [SerializeField] private NetworkObject _gameManagerPrefab;
+
+        private MapGenerator _mapGenerator;
 
         private INetworkService _networkService;
         private ISessionSelectionService _selection;
@@ -120,7 +129,7 @@ namespace CluckWars.Gameplay
             _log?.Debug(Source, $"OnPlayerJoined player={player} isLocal={isLocal} mode={runner.GameMode}.");
             if (!isLocal) return;
 
-            var pos = PickSpawnPosition();
+            var pos = PickSpawnPosition(player);
             var chosenClass = _selection != null ? _selection.SelectedClass : ChickenClass.Warrior;
             _log?.Info(Source, $"Spawning chicken: class={chosenClass}, pos={pos}.");
 
@@ -138,13 +147,30 @@ namespace CluckWars.Gameplay
                 });
         }
 
-        private Vector3 PickSpawnPosition()
+        private Vector3 PickSpawnPosition(PlayerRef player)
         {
-            if (_spawnPoints == null || _spawnPoints.Length == 0)
+            // Prefer MapGenerator's computed corners. Lookup is cached; null check
+            // re-resolves if the MapGenerator was added after Start ran.
+            if (_mapGenerator == null) _mapGenerator = FindFirstObjectByType<MapGenerator>();
+            if (_mapGenerator != null && _mapGenerator.SpawnPoints != null && _mapGenerator.SpawnPoints.Count > 0)
+            {
+                var points = _mapGenerator.SpawnPoints;
+                // PlayerId-modulo so each peer deterministically picks the same
+                // corner for a given player. PlayerId is non-negative for real
+                // players, but the modulo guards against the solo-mode default
+                // (PlayerId 0) just in case.
+                int idx = Mathf.Abs(player.PlayerId) % points.Count;
+                return points[idx];
+            }
+
+            // Legacy fallback for scenes without a MapGenerator.
+            if (_legacySpawnPoints == null || _legacySpawnPoints.Length == 0)
                 return Vector3.zero;
 
-            var idx = Random.Range(0, _spawnPoints.Length);
-            return _spawnPoints[idx] != null ? _spawnPoints[idx].position : Vector3.zero;
+            int legacyIdx = Mathf.Abs(player.PlayerId) % _legacySpawnPoints.Length;
+            return _legacySpawnPoints[legacyIdx] != null
+                ? _legacySpawnPoints[legacyIdx].position
+                : Vector3.zero;
         }
     }
 }
