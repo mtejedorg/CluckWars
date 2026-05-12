@@ -31,6 +31,11 @@ namespace CluckWars.Gameplay
         [Networked] public TickTimer MatchTimer { get; set; }
         [Networked] public PlayerRef WinnerPlayer { get; set; }
         [Networked] public float WinnerFoodTotal { get; set; }
+        [Networked] public TickTimer RestartCountdown { get; set; }
+
+        [Tooltip("Seconds after a match ends before the world resets and a new round starts.")]
+        [Min(1f)]
+        [SerializeField] private float _restartDelaySeconds = 6f;
 
         private MatchConfigSO _config;
         private ILogService _log;
@@ -39,6 +44,17 @@ namespace CluckWars.Gameplay
 
         public float MatchDurationSeconds => _config != null ? _config.MatchDurationSeconds : 180f;
         public int FoodTargetToWin => _config != null ? _config.FoodTargetToWin : 150;
+        public float RestartDelaySeconds => _restartDelaySeconds;
+
+        /// <summary>Seconds remaining until the next match starts, or 0 if not in Ended state.</summary>
+        public float RestartRemaining
+        {
+            get
+            {
+                if (State != MatchState.Ended) return 0f;
+                return RestartCountdown.RemainingTime(Runner) ?? 0f;
+            }
+        }
 
         /// <summary>Seconds remaining on the match timer, or 0 once Ended.</summary>
         public float TimeRemaining
@@ -80,6 +96,17 @@ namespace CluckWars.Gameplay
             // already assigned skip the inner loop, so the cost is O(players × bases)
             // and the upper bound is 4×4 for the demo.
             AssignBasesToPlayers();
+
+            // Match ended — wait out the restart countdown, then reset the world
+            // and start a fresh round.
+            if (State == MatchState.Ended)
+            {
+                if (RestartCountdown.Expired(Runner))
+                {
+                    RestartMatch();
+                }
+                return;
+            }
 
             if (State != MatchState.Active) return;
 
@@ -185,7 +212,69 @@ namespace CluckWars.Gameplay
             State = MatchState.Ended;
             WinnerPlayer = winner;
             WinnerFoodTotal = winnerTotal;
-            _log?.Info(Source, $"Match ended ({reason}). Winner={winner}, total={winnerTotal:0.0}.");
+            RestartCountdown = TickTimer.CreateFromSeconds(Runner, _restartDelaySeconds);
+            _log?.Info(Source, $"Match ended ({reason}). Winner={winner}, total={winnerTotal:0.0}. Next round in {_restartDelaySeconds}s.");
+        }
+
+        /// <summary>
+        /// Resets every networked entity master can touch (bases, piles, loose pickups)
+        /// and RPCs each chicken's authority to clear its own combat / cargo state.
+        /// State then flips back to <see cref="MatchState.Active"/> with a fresh
+        /// match timer so a new round begins immediately.
+        /// </summary>
+        private void RestartMatch()
+        {
+            _log?.Info(Source, "Restarting match — resetting world.");
+
+            // Master has authority over scene NetworkObjects (bases, piles) — mutate
+            // their networked state directly; replication carries the new values to
+            // every peer on the next snapshot.
+            var bases = FindObjectsByType<PlayerBase>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < bases.Length; i++)
+            {
+                if (bases[i] != null) bases[i].FoodTotal = 0f;
+            }
+
+            var piles = FindObjectsByType<FoodPile>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < piles.Length; i++)
+            {
+                var p = piles[i];
+                if (p == null) continue;
+                // Refill to whatever capacity was set at spawn (per-instance via
+                // onBeforeSpawned for center vs satellite piles).
+                p.Amount = p.MaxAmount;
+            }
+
+            // Loose ground-dropped pickups don't belong in the fresh match — kill them.
+            var pickups = FindObjectsByType<FoodPickup>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < pickups.Length; i++)
+            {
+                var pk = pickups[i];
+                if (pk != null && pk.Object != null && pk.Object.IsValid)
+                    Runner.Despawn(pk.Object);
+            }
+
+            // Chickens are owned by each player — cross-authority writes go via RPC.
+            // Calling these on every chicken routes to that chicken's state authority.
+            var combats = FindObjectsByType<ChickenCombat>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < combats.Length; i++)
+            {
+                combats[i]?.RPC_ResetForNewMatch();
+            }
+
+            var cargos = FindObjectsByType<ChickenCargo>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < cargos.Length; i++)
+            {
+                cargos[i]?.RPC_ResetForNewMatch();
+            }
+
+            // Resume the match.
+            State = MatchState.Active;
+            MatchTimer = TickTimer.CreateFromSeconds(Runner, MatchDurationSeconds);
+            WinnerPlayer = PlayerRef.None;
+            WinnerFoodTotal = 0f;
+            RestartCountdown = default;
+            _nextWinCheckTime = 0f;
         }
     }
 }

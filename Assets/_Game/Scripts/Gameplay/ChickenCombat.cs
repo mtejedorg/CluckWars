@@ -230,6 +230,22 @@ namespace CluckWars.Gameplay
             }
         }
 
+        /// <summary>
+        /// Reset combat state for a new round. Called by <c>GameManager.RestartMatch</c>
+        /// from the master client; routes to each chicken's StateAuthority so the
+        /// chicken's owner mutates their own <c>[Networked]</c> state.
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_ResetForNewMatch()
+        {
+            var stats = _controller != null ? _controller.Stats : null;
+            HP = stats != null ? stats.MaxHP : 100f;
+            IsStunned = false;
+            StunTimer = default;
+            AttackTimer = default;
+            _log?.Debug(Source, $"Reset for new match: HP={HP}.");
+        }
+
         private void ReflectDamageTo(PlayerRef attacker, float amount)
         {
             // Find the attacker's chicken combat by InputAuthority and bounce damage

@@ -195,8 +195,14 @@ namespace CluckWars.UI
             GUI.skin.label.fontSize = 24;
             GUI.Label(new Rect(x, y + 50, width, 36), winnerText);
             GUI.Label(new Rect(x, y + 90, width, 36), $"Final food: {Mathf.FloorToInt(_gameManager.WinnerFoodTotal)}");
-            GUI.skin.label.fontSize = 16;
-            GUI.Label(new Rect(x, y + 138, width, 28), "(restart by reloading the scene — auto-restart in Phase 9 polish)");
+
+            // Restart countdown: live tick driven by GameManager.RestartCountdown.
+            float restartIn = _gameManager.RestartRemaining;
+            string restartText = restartIn > 0f
+                ? $"Next match in {Mathf.CeilToInt(restartIn)}s…"
+                : "Starting next match…";
+            GUI.skin.label.fontSize = 18;
+            GUI.Label(new Rect(x, y + 138, width, 28), restartText);
             GUI.skin.label.alignment = prevAlign;
             GUI.skin.label.fontSize = prevSize;
         }

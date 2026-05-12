@@ -257,5 +257,16 @@ namespace CluckWars.Gameplay
             if (Cargo < 0f) Cargo = 0f;
             _log?.Debug(Source, $"Stolen: -{actual:0.00} → Cargo={Cargo:0.0}.");
         }
+
+        /// <summary>
+        /// Reset cargo state for a new round. Called by <c>GameManager.RestartMatch</c>
+        /// from the master client; routes to each chicken's StateAuthority.
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_ResetForNewMatch()
+        {
+            Cargo = 0f;
+            _log?.Debug(Source, "Reset for new match: Cargo=0.");
+        }
     }
 }

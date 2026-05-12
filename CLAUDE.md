@@ -263,7 +263,18 @@ The HUD picked up timer + end overlay duties: `CargoHud` (despite the name, kept
 - Add a `MapGenerator` GameObject to `Game.unity`. Drag `Chicken/PlayerBase.prefab` into `_basePrefab`, `FoodPile.prefab` into `_foodPilePrefab`. Optional: assign a URP/Lit material to `_groundMaterial` so the plane isn't magenta.
 - Remove the hand-placed `Plane`, `PlayerBase` instance, and `FoodPile` instance from `Game.unity` — `MapGenerator` builds them at runtime now.
 
-**Spawn-at-base-edge** is still deferred — random `_spawnPoints` selection is fine for the demo (players walk to their base in <2s anyway). Roll into Phase 9 polish if scope allows.
+**Match restart loop — code landed.** `GameManager` now drives a full reset cycle. On `EndMatch` it arms `[Networked] RestartCountdown` (`TickTimer`, default 6s). `FixedUpdateNetwork` watches for the countdown to expire while `State == Ended` and then calls `RestartMatch`:
+
+- Master mutates scene-NetworkObject state directly: every `PlayerBase.FoodTotal` to 0, every `FoodPile.Amount` back to its `MaxAmount`.
+- Loose `FoodPickup`s on the ground are `Runner.Despawn`ed so the fresh round starts clean.
+- Per-chicken state is cross-authority, so master iterates and fires `ChickenCombat.RPC_ResetForNewMatch` + `ChickenCargo.RPC_ResetForNewMatch` on every chicken — both are `RpcSources.All → RpcTargets.StateAuthority` so the call routes to the chicken's owning client, which restores HP / clears stun / zeros cargo.
+- `State` flips back to `Active`, `MatchTimer` is reset to `MatchDurationSeconds`, `WinnerPlayer` cleared.
+
+`CargoHud` end overlay now reads `_gameManager.RestartRemaining` and shows "Next match in Ns…" instead of the old "(reload the scene)" hint.
+
+**Chicken position reset is deferred** — chickens stay wherever they were when the round ended. Per-corner teleport on restart can land in Phase 9 polish once we add a stable PlayerId → corner mapping in `GameManager`.
+
+**Spawn-at-base-edge** is still deferred — `MatchBootstrapper` now uses `MapGenerator.SpawnPoints` keyed by `Mathf.Abs(player.PlayerId) % count` for deterministic per-peer agreement. Pairing spawn corner with the base eventually assigned to that player is a small Phase 9 polish item.
 
 **Phase 6 — abilities — code landed.** Two new namespaces, one new component, two SO implementations:
 
