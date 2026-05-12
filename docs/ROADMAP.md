@@ -229,14 +229,15 @@ Android phone can host or join LAN match with full touch controls.
 - Stability, bug fixes, performance tuning
 
 ### Tasks
-- [ ] Catch all networking bugs (drop-outs, desync)
-- [ ] Optimize for Android (reduce draw calls, check memory)
-- [ ] Fix animation blending bugs
-- [ ] Balance tweaks based on playtesting
-- [ ] UI responsiveness on mobile
-- [ ] Error handling & reconnection logic
-- [ ] **`PrefabRegistrySO`** — consolidate scattered prefab references (chicken, food pickup, food pile, base) into one SO under `/Assets/_Game/Data/`. Lookup by logical ID via DI; remove per-component SerializeField slots. See TDD §6.6.
-- [ ] **`ColorSchemeSO`** — consolidate per-player / food-state / ability-accent colors into one SO. Visuals components read from it instead of serializing local `Color` fields. See TDD §6.6.
+- [ ] Catch all networking bugs (drop-outs, desync) — needs real-device multiplayer testing
+- [ ] Optimize for Android (reduce draw calls, check memory) — needs on-device profiling
+- [ ] Fix animation blending bugs — needs hand-authored AnimatorController states
+- [ ] Balance tweaks based on playtesting — needs playtest data
+- [ ] UI responsiveness on mobile — IMGUI HUD still in place; UGUI redesign (ART.md §6.1) is the next polish target
+- [x] **Error handling & reconnection** — `CargoHud` subscribes to `INetworkService.OnShutdown`, replaces the match HUD with a "SESSION ENDED" overlay (reason + countdown), then `SceneManager.LoadScene("Bootstrap")` after `_disconnectReturnDelay`.
+- [x] **Audio service** — `UnityAudioService` (was `NullAudioService`) + `AudioRegistrySO`. SFX cues wired in `ChickenCombat` (Swing / Hit / Stun), `ChickenCargo` (Deposit / Pickup), `AbilityController` (Activate / Expire), `GameManager` (MatchStart + Music / MatchEnd / Victory). Maestro drops clips into the registry asset.
+- [x] **`PrefabRegistrySO`** — consolidates Chicken / Doppelganger / FoodPile / FoodPickup / PlayerBase / GameManager prefabs into one SO. Consumers prefer registry value, fall back to legacy SerializeField slots — gradual migration. See TDD §6.6.
+- [x] **`ColorSchemeSO`** — HUD palette + food-pile states + button states + cooldown overlay in one SO. `TouchControlsHud`, `CharacterSelectController`, `FoodPileVisuals` all refactored to read from it. Per-class chicken tints stay on `ChickenClassRegistrySO`; per-ability accents stay on `AbilityBaseSO`. See TDD §6.6.
 
 ### Deliverable
 Demo is stable and playable for 30+ min sessions without crashes.
