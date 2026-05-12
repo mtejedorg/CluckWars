@@ -4,6 +4,8 @@ using CluckWars.Visuals;
 using Fusion;
 using UnityEngine;
 using Zenject;
+// CluckWars.Logging.LogLevel collides with Fusion.LogLevel; alias to ours.
+using LogLevel = CluckWars.Logging.LogLevel;
 
 namespace CluckWars.Gameplay
 {
