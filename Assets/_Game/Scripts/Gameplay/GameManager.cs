@@ -54,6 +54,22 @@ namespace CluckWars.Gameplay
         public int FoodTargetToWin => _config != null ? _config.FoodTargetToWin : 150;
         public float RestartDelaySeconds => _restartDelaySeconds;
 
+        /// <summary>
+        /// Static singleton accessor — there's one <see cref="GameManager"/> per
+        /// session and it's the canonical "is the match running" gate that
+        /// chicken / combat / ability systems poll each tick. Null in lobby
+        /// before the master client has spawned it, and between matches.
+        /// </summary>
+        public static GameManager Instance { get; private set; }
+
+        /// <summary>
+        /// True only when the playable phase of a round is active: <c>State == Active</c>
+        /// and we're past the intro countdown. Chickens / combat / abilities gate
+        /// on this so the lobby (<see cref="MatchState.WaitingForPlayers"/>),
+        /// intro window, and end screen all freeze gameplay.
+        /// </summary>
+        public bool IsMatchRunning => State == MatchState.Active && !IsIntroActive;
+
         /// <summary>Seconds remaining until the next match starts, or 0 if not in Ended state.</summary>
         public float RestartRemaining
         {
@@ -98,15 +114,43 @@ namespace CluckWars.Gameplay
         {
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
 
-            // Only the master client (StateAuthority for scene NetworkObjects) starts
-            // the match. The GDD has a "WaitingForPlayers" lobby state; for the demo
-            // we go straight into Active so a solo dev session starts the timer
-            // immediately.
+            Instance = this;
+
+            // Master client behavior:
+            // - Solo (GameMode.Single): auto-start. There's no one to wait for.
+            // - Shared mode: stay in WaitingForPlayers (lobby). Host clicks the
+            //   Start button in MatchHud → StartMatchNow() transitions to Active.
+            //   Joiners sit in the lobby until then.
             if (HasStateAuthority)
             {
-                StartMatch();
+                if (Runner != null && Runner.GameMode == GameMode.Single)
+                {
+                    StartMatch();
+                }
+                else
+                {
+                    State = MatchState.WaitingForPlayers;
+                    _log?.Info(Source, "Lobby armed — waiting for host to Start.");
+                }
             }
             _log?.Info(Source, $"Spawned. State={State}, target={FoodTargetToWin}, duration={MatchDurationSeconds}s.");
+        }
+
+        public override void Despawned(NetworkRunner runner, bool hasState)
+        {
+            if (Instance == this) Instance = null;
+        }
+
+        /// <summary>
+        /// Host-side entry point — called by <c>MatchHud</c>'s Start button.
+        /// Idempotent; no-ops if the match is already running or if the caller
+        /// doesn't have StateAuthority (i.e., is not the master client).
+        /// </summary>
+        public void StartMatchNow()
+        {
+            if (!HasStateAuthority) return;
+            if (State != MatchState.WaitingForPlayers) return;
+            StartMatch();
         }
 
         public override void FixedUpdateNetwork()
@@ -346,9 +390,11 @@ namespace CluckWars.Gameplay
                 }
             }
 
-            // Resume the match.
+            // Resume the match — fresh intro countdown + timer, same window as
+            // the initial StartMatch so each round opens identically.
             State = MatchState.Active;
-            MatchTimer = TickTimer.CreateFromSeconds(Runner, MatchDurationSeconds);
+            IntroTimer = TickTimer.CreateFromSeconds(Runner, _introSeconds);
+            MatchTimer = TickTimer.CreateFromSeconds(Runner, MatchDurationSeconds + _introSeconds);
             WinnerPlayer = PlayerRef.None;
             WinnerFoodTotal = 0f;
             RestartCountdown = default;

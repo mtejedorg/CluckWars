@@ -66,6 +66,10 @@ namespace CluckWars.UI
         private Text _sessionEndReason;
         private Text _sessionEndCountdown;
         private Text _introLabel;
+        private GameObject _lobbyPanel;
+        private Text _lobbyHint;
+        private Button _lobbyStartButton;
+        private Text _lobbyPlayerCount;
 
         // Cached scene refs.
         private ChickenController _localController;
@@ -234,7 +238,36 @@ namespace CluckWars.UI
             RefreshLocalStats();
             RefreshMatchEndOverlay();
             RefreshIntroOverlay();
+            RefreshLobbyOverlay();
             TickHitFlash();
+        }
+
+        private void RefreshLobbyOverlay()
+        {
+            if (_lobbyPanel == null) return;
+
+            bool show = _gameManager != null && _gameManager.State == MatchState.WaitingForPlayers;
+            if (_lobbyPanel.activeSelf != show) _lobbyPanel.SetActive(show);
+            if (!show) return;
+
+            // Player count straight off the runner — works in both solo
+            // (count = 1) and shared mode (grows as joiners arrive).
+            int playerCount = 0;
+            var runner = _network != null ? _network.Runner : null;
+            if (runner != null)
+            {
+                foreach (var _ in runner.ActivePlayers) playerCount++;
+            }
+            if (_lobbyPlayerCount != null)
+                _lobbyPlayerCount.text = $"Players: {playerCount}";
+
+            bool isHost = runner != null &&
+                (runner.GameMode == GameMode.Single || runner.IsSharedModeMasterClient);
+
+            if (_lobbyStartButton != null)
+                _lobbyStartButton.gameObject.SetActive(isHost);
+            if (_lobbyHint != null)
+                _lobbyHint.gameObject.SetActive(!isHost);
         }
 
         private void TickHitFlash()
@@ -468,7 +501,94 @@ namespace CluckWars.UI
             BuildLocalStatsPanel(canvasGO.transform);
             BuildMatchEndOverlay(canvasGO.transform);
             BuildSessionEndOverlay(canvasGO.transform);
+            BuildLobbyOverlay(canvasGO.transform);
             BuildIntroOverlay(canvasGO.transform);
+        }
+
+        private void BuildLobbyOverlay(Transform parent)
+        {
+            var panel = CreateUI("LobbyPanel", parent, out var rt);
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot     = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(620f, 360f);
+            rt.anchoredPosition = Vector2.zero;
+            AddBackground(panel, PanelColor(0.92f));
+            _lobbyPanel = panel;
+
+            var title = AddText(panel.transform, "Title", "MATCH LOBBY", 44, TextAnchor.MiddleCenter, FontStyle.Bold);
+            var titleRT = title.rectTransform;
+            titleRT.anchorMin = new Vector2(0f, 1f);
+            titleRT.anchorMax = new Vector2(1f, 1f);
+            titleRT.pivot     = new Vector2(0.5f, 1f);
+            titleRT.sizeDelta = new Vector2(0f, 64f);
+            titleRT.anchoredPosition = new Vector2(0f, -24f);
+
+            _lobbyPlayerCount = AddText(panel.transform, "PlayerCount", "Players: 1", 22, TextAnchor.MiddleCenter, FontStyle.Normal);
+            var pcRT = _lobbyPlayerCount.rectTransform;
+            pcRT.anchorMin = new Vector2(0f, 1f);
+            pcRT.anchorMax = new Vector2(1f, 1f);
+            pcRT.pivot     = new Vector2(0.5f, 1f);
+            pcRT.sizeDelta = new Vector2(0f, 32f);
+            pcRT.anchoredPosition = new Vector2(0f, -110f);
+
+            // Hint shown to non-hosts. Hidden when the local peer IS the host.
+            _lobbyHint = AddText(panel.transform, "Hint", "Waiting for host to start the match…", 22, TextAnchor.MiddleCenter, FontStyle.Italic);
+            var hintRT = _lobbyHint.rectTransform;
+            hintRT.anchorMin = new Vector2(0f, 1f);
+            hintRT.anchorMax = new Vector2(1f, 1f);
+            hintRT.pivot     = new Vector2(0.5f, 1f);
+            hintRT.sizeDelta = new Vector2(0f, 36f);
+            hintRT.anchoredPosition = new Vector2(0f, -170f);
+            _lobbyHint.color = new Color(0.85f, 0.85f, 0.85f, 0.9f);
+
+            // Start button. Shown only to the host (master client).
+            _lobbyStartButton = BuildButton(panel.transform, "StartMatch", "START MATCH",
+                new Color(0.30f, 0.65f, 0.30f, 1f),
+                onClick: () =>
+                {
+                    var gm = GameManager.Instance;
+                    if (gm != null)
+                    {
+                        _log?.Info(Source, "Lobby Start button → GameManager.StartMatchNow().");
+                        gm.StartMatchNow();
+                    }
+                });
+            var btnRT = ((RectTransform)_lobbyStartButton.transform);
+            btnRT.anchorMin = new Vector2(0.5f, 0f);
+            btnRT.anchorMax = new Vector2(0.5f, 0f);
+            btnRT.pivot     = new Vector2(0.5f, 0f);
+            btnRT.sizeDelta = new Vector2(320f, 72f);
+            btnRT.anchoredPosition = new Vector2(0f, 32f);
+
+            panel.SetActive(false);
+        }
+
+        private Button BuildButton(Transform parent, string name, string label, Color baseColor, System.Action onClick)
+        {
+            var go = CreateUI(name, parent, out _);
+            var img = go.AddComponent<Image>();
+            img.color = baseColor;
+            img.raycastTarget = true;
+
+            var btn = go.AddComponent<Button>();
+            btn.targetGraphic = img;
+            var colors = btn.colors;
+            colors.normalColor      = baseColor;
+            colors.highlightedColor = new Color(baseColor.r * 1.3f, baseColor.g * 1.2f, baseColor.b * 1.3f, baseColor.a);
+            colors.pressedColor     = new Color(baseColor.r * 0.75f, baseColor.g * 0.75f, baseColor.b * 0.75f, baseColor.a);
+            colors.selectedColor    = baseColor;
+            colors.disabledColor    = new Color(baseColor.r * 0.5f, baseColor.g * 0.5f, baseColor.b * 0.5f, baseColor.a * 0.6f);
+            btn.colors = colors;
+            btn.onClick.AddListener(() => onClick?.Invoke());
+
+            var labelText = AddText(go.transform, "Label", label, 26, TextAnchor.MiddleCenter, FontStyle.Bold);
+            var labelRT = labelText.rectTransform;
+            labelRT.anchorMin = Vector2.zero;
+            labelRT.anchorMax = Vector2.one;
+            labelRT.offsetMin = Vector2.zero;
+            labelRT.offsetMax = Vector2.zero;
+            return btn;
         }
 
         private void BuildHitFlash(Transform parent)

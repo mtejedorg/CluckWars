@@ -118,6 +118,12 @@ namespace CluckWars.Gameplay
                 Deactivate();
             }
 
+            // Lobby / intro / end lockout — no ability activation outside the
+            // playable phase. Cooldowns are TickTimer-based so they still
+            // advance regardless of this gate; the gate just prevents NEW casts.
+            var gm = GameManager.Instance;
+            if (gm == null || !gm.IsMatchRunning) return;
+
             // Stunned chickens can't activate — cooldown still ticks regardless.
             if (_combat != null && _combat.IsStunned) return;
 

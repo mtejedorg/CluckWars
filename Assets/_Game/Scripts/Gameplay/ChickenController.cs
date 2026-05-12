@@ -151,6 +151,12 @@ namespace CluckWars.Gameplay
             // tick or the decoy walks in lockstep with the real chicken.
             if (IsDecoy) return;
 
+            // Lobby / intro / end-screen lockout — chickens freeze until the host
+            // starts a round and the intro countdown finishes. GameManager.Instance
+            // is null until the master client spawns it; treat that as "not running".
+            var gm = GameManager.Instance;
+            if (gm == null || !gm.IsMatchRunning) return;
+
             // Stun lockout: dead-stunned chickens can't move. Combat owns the IsStunned flag.
             if (_combat != null && _combat.IsStunned) return;
 

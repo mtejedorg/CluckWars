@@ -117,6 +117,10 @@ namespace CluckWars.Gameplay
             // button doesn't fire through the decoy.
             if (_controller != null && _controller.IsDecoy) return;
 
+            // Lobby / intro / end lockout — no swings before the host starts.
+            var gm = GameManager.Instance;
+            if (gm == null || !gm.IsMatchRunning) return;
+
             if (!GetInput<PlayerNetworkInput>(out var input)) return;
 
             if (input.Buttons.IsSet((int)InputButton.Attack) && AttackTimer.ExpiredOrNotRunning(Runner))

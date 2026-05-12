@@ -128,6 +128,10 @@ namespace CluckWars.Gameplay
 
         // ---- Local plane + spawn points ---------------------------------------
 
+        private const float BaseInsetFraction = 0.15f;
+
+        private Vector3[] _corners; // raw corner positions; bases + spawn points both derive from these.
+
         private void ComputeSpawnPoints()
         {
             float d = _baseCornerDistance;
@@ -144,13 +148,24 @@ namespace CluckWars.Gameplay
                     "Snapping to 12. Set a non-trivial value (≥ 4) in the inspector.");
                 d = 12f;
             }
-            _spawnPoints = new[]
+
+            _corners = new[]
             {
                 new Vector3(+d, 0f, +d),
                 new Vector3(-d, 0f, +d),
                 new Vector3(-d, 0f, -d),
                 new Vector3(+d, 0f, -d),
             };
+
+            // Spawn points coincide with where SpawnBases will drop each base —
+            // chickens spawn AT their corner's base (inside its deposit trigger
+            // since the base collider is a trigger anyway). This pairs spawn
+            // index N with the base whose CornerIndex == N by construction.
+            _spawnPoints = new Vector3[_corners.Length];
+            for (int i = 0; i < _corners.Length; i++)
+            {
+                _spawnPoints[i] = Vector3.Lerp(_corners[i], Vector3.zero, BaseInsetFraction);
+            }
         }
 
         private void BuildPlane()
@@ -248,9 +263,10 @@ namespace CluckWars.Gameplay
 
             for (int i = 0; i < _spawnPoints.Length; i++)
             {
-                // Place the base slightly inside the corner so the chicken can wrap
-                // around it without bouncing the camera off the playfield edge.
-                var pos = Vector3.Lerp(_spawnPoints[i], Vector3.zero, 0.15f);
+                // Bases sit at the spawn-point position by construction (see
+                // ComputeSpawnPoints) — keeps chicken-spawn and base location
+                // perfectly aligned so spawn corner N == base CornerIndex N.
+                var pos = _spawnPoints[i];
                 int cornerIndex = i;
                 runner.Spawn(
                     basePrefab,
