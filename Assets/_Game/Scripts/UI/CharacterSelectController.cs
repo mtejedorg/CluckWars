@@ -202,14 +202,16 @@ namespace CluckWars.UI
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
 
-            // Center panel
+            // Center panel — anchored mid-screen, content layout grows vertically.
+            // Sum of children + spacing + padding lands around 644 px; a ContentSizeFitter
+            // keeps the panel honest if anyone changes the row count / sizes later.
             var panel = CreateUIObject("Panel", canvasGO.transform, out var panelRT);
             var panelImg = panel.AddComponent<Image>();
             panelImg.color = PanelColor;
             panelRT.anchorMin = new Vector2(0.5f, 0.5f);
             panelRT.anchorMax = new Vector2(0.5f, 0.5f);
             panelRT.pivot     = new Vector2(0.5f, 0.5f);
-            panelRT.sizeDelta = new Vector2(960f, 600f);
+            panelRT.sizeDelta = new Vector2(960f, 680f);  // baseline; ContentSizeFitter overrides height
             panelRT.anchoredPosition = Vector2.zero;
 
             var panelLayout = panel.AddComponent<VerticalLayoutGroup>();
@@ -220,6 +222,12 @@ namespace CluckWars.UI
             panelLayout.childForceExpandHeight = false;
             panelLayout.childControlWidth = true;
             panelLayout.childControlHeight = true;
+
+            // Auto-grow vertically so we don't have to keep the magic-number height
+            // in sync with the row inventory by hand. Width stays at 960.
+            var panelFitter = panel.AddComponent<ContentSizeFitter>();
+            panelFitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            panelFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             // Title
             var title = CreateText("Title", panel.transform, "Cluck Wars", fontSize: 56, alignment: TextAnchor.MiddleCenter);
