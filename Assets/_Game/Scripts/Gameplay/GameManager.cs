@@ -136,12 +136,29 @@ namespace CluckWars.Gameplay
                 if (!player.IsRealPlayer) continue;
                 if (PlayerHasBase(bases, player)) continue;
 
-                var freeBase = FindUnownedBase(bases);
+                // Prefer the corner matching the player's PlayerId so spawn corner
+                // and assigned base agree (MatchBootstrapper picks SpawnPoints[
+                // playerId % count]). Falls back to first-unowned for scene-baked
+                // bases that don't carry a CornerIndex.
+                int desiredCorner = Mathf.Abs(player.PlayerId) % bases.Length;
+                var pairedBase = FindUnownedBaseAtCorner(bases, desiredCorner);
+                var freeBase = pairedBase ?? FindUnownedBase(bases);
                 if (freeBase == null) break; // no more bases to hand out
 
                 freeBase.Owner = player;
-                _log?.Info(Source, $"Assigned {freeBase.name} to {player}.");
+                _log?.Info(Source, $"Assigned {freeBase.name} (corner {freeBase.CornerIndex}) to {player}.");
             }
+        }
+
+        private static PlayerBase FindUnownedBaseAtCorner(PlayerBase[] bases, int cornerIndex)
+        {
+            for (int i = 0; i < bases.Length; i++)
+            {
+                var b = bases[i];
+                if (b == null || b.Owner.IsRealPlayer) continue;
+                if (b.CornerIndex == cornerIndex) return b;
+            }
+            return null;
         }
 
         private static bool PlayerHasBase(PlayerBase[] bases, PlayerRef player)

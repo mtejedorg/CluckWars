@@ -26,6 +26,18 @@ namespace CluckWars.Gameplay
         [Networked] public float FoodTotal { get; set; }
         [Networked] public PlayerRef Owner { get; set; }
 
+        /// <summary>
+        /// Which corner this base represents (0..3). Set by <c>MapGenerator</c> at
+        /// spawn time via <c>onBeforeSpawned</c>; pairs with
+        /// <c>MapGenerator.SpawnPoints[CornerIndex]</c> so a player joining at
+        /// corner N is also assigned the base at corner N.
+        ///
+        /// <c>GameManager.AssignBasesToPlayers</c> looks for a CornerIndex match
+        /// first and falls back to first-unowned, so scene-baked legacy bases
+        /// (which all default to 0) still receive an owner.
+        /// </summary>
+        [Networked] public int CornerIndex { get; set; }
+
         public float DepositRadius => _depositRadius;
 
         private ILogService _log;

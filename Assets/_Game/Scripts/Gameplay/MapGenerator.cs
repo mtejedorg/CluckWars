@@ -221,7 +221,19 @@ namespace CluckWars.Gameplay
                 // Place the base slightly inside the corner so the chicken can wrap
                 // around it without bouncing the camera off the playfield edge.
                 var pos = Vector3.Lerp(_spawnPoints[i], Vector3.zero, 0.15f);
-                runner.Spawn(_basePrefab, pos, Quaternion.identity);
+                int cornerIndex = i;
+                runner.Spawn(
+                    _basePrefab,
+                    pos,
+                    Quaternion.identity,
+                    onBeforeSpawned: (_, networkObject) =>
+                    {
+                        // Tag with corner index so GameManager pairs the base with the
+                        // player who spawned at the matching corner. SpawnPoints[i]
+                        // and CornerIndex i agree by construction.
+                        var pb = networkObject.GetComponent<PlayerBase>();
+                        if (pb != null) pb.CornerIndex = cornerIndex;
+                    });
             }
             _log?.Info(Source, $"Spawned {_spawnPoints.Length} corner bases.");
         }
