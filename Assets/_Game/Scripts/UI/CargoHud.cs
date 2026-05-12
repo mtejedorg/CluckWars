@@ -1,5 +1,10 @@
 using CluckWars.Gameplay;
+using CluckWars.Logging;
+using CluckWars.Networking;
+using Fusion;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using Zenject;
 
 namespace CluckWars.UI
 {
@@ -17,7 +22,16 @@ namespace CluckWars.UI
     /// </remarks>
     public sealed class CargoHud : MonoBehaviour
     {
+        private const string Source = "CargoHud";
+
         [SerializeField] private float _refreshInterval = 0.5f;
+
+        [Tooltip("Seconds the 'Session ended' overlay stays up before auto-returning to the Bootstrap scene.")]
+        [Min(0.5f)]
+        [SerializeField] private float _disconnectReturnDelay = 5f;
+
+        [Tooltip("Bootstrap scene name to load after a disconnect. Matches the build-settings scene list entry.")]
+        [SerializeField] private string _bootstrapSceneName = "Bootstrap";
 
         private ChickenCargo _localCargo;
         private ChickenController _localController;
@@ -25,8 +39,65 @@ namespace CluckWars.UI
         private GameManager _gameManager;
         private float _nextRefresh;
 
+        // Disconnect state — set when INetworkService.OnShutdown fires.
+        private INetworkService _network;
+        private ILogService _log;
+        private ShutdownReason? _shutdownReason;
+        private float _shutdownAtUnscaledTime;
+        private bool _returnTriggered;
+
+        [Inject]
+        public void Construct(INetworkService network, ILogService log)
+        {
+            _network = network;
+            _log = log;
+        }
+
+        private void Awake()
+        {
+            // Self-inject defensively — CargoHud lives under the Hud GameObject in
+            // Game.unity, scene-context injection should fire, but the pattern is
+            // cheap and matches the rest of the codebase.
+            if (_network == null)
+            {
+                ProjectContext.Instance.Container.Inject(this);
+            }
+            if (_network != null)
+            {
+                _network.OnShutdown += HandleShutdown;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (_network != null) _network.OnShutdown -= HandleShutdown;
+        }
+
+        private void HandleShutdown(ShutdownReason reason)
+        {
+            _shutdownReason = reason;
+            _shutdownAtUnscaledTime = Time.unscaledTime;
+            _log?.Warn(Source, $"Network shutdown observed: {reason}. Returning to '{_bootstrapSceneName}' in {_disconnectReturnDelay}s.");
+        }
+
         private void Update()
         {
+            // Disconnect path: tick the auto-return countdown and trigger the
+            // scene reload exactly once when the delay elapses. Match-HUD
+            // refresh stops so we don't pay FindObjectsByType cost while we're
+            // already on the way out.
+            if (_shutdownReason.HasValue)
+            {
+                if (!_returnTriggered &&
+                    Time.unscaledTime - _shutdownAtUnscaledTime >= _disconnectReturnDelay)
+                {
+                    _returnTriggered = true;
+                    _log?.Info(Source, $"Loading '{_bootstrapSceneName}' after disconnect.");
+                    SceneManager.LoadScene(_bootstrapSceneName);
+                }
+                return;
+            }
+
             if (Time.unscaledTime < _nextRefresh
                 && _localCargo != null
                 && _bases.Length > 0
@@ -75,9 +146,40 @@ namespace CluckWars.UI
 
         private void OnGUI()
         {
+            // Disconnect overlay takes over the whole HUD — match panel + timer
+            // are stale once the runner is down.
+            if (_shutdownReason.HasValue)
+            {
+                DrawSessionEndOverlay();
+                return;
+            }
+
             DrawCargoPanel();
             DrawTopBar();
             DrawEndOverlay();
+        }
+
+        private void DrawSessionEndOverlay()
+        {
+            const int width = 560;
+            const int height = 180;
+            int x = (Screen.width - width) / 2;
+            int y = (Screen.height - height) / 2;
+
+            GUI.Box(new Rect(x, y, width, height), "SESSION ENDED");
+
+            var prevAlign = GUI.skin.label.alignment;
+            var prevSize = GUI.skin.label.fontSize;
+            GUI.skin.label.alignment = TextAnchor.MiddleCenter;
+            GUI.skin.label.fontSize = 22;
+            GUI.Label(new Rect(x, y + 50, width, 36), $"Reason: {_shutdownReason}");
+
+            float elapsed = Time.unscaledTime - _shutdownAtUnscaledTime;
+            float remaining = Mathf.Max(0f, _disconnectReturnDelay - elapsed);
+            GUI.Label(new Rect(x, y + 100, width, 36), $"Returning to menu in {Mathf.CeilToInt(remaining)}s…");
+
+            GUI.skin.label.alignment = prevAlign;
+            GUI.skin.label.fontSize = prevSize;
         }
 
         private void DrawCargoPanel()
