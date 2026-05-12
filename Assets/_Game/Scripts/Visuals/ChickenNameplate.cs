@@ -41,6 +41,7 @@ namespace CluckWars.Visuals
         private TextMesh _text;
         private Transform _textTransform;
         private int _appliedPlayerId = -2;
+        private ChickenClass _appliedClass = (ChickenClass)(-1);
 
         private void Awake()
         {
@@ -80,22 +81,27 @@ namespace CluckWars.Visuals
         {
             if (_text == null || _controller == null) return;
 
-            // Apply once the NetworkObject is alive and we know the input authority.
+            // Apply once the NetworkObject is alive and we know the input
+            // authority + class. Both can change post-Spawn (class is set via
+            // onBeforeSpawned but the Doppelganger decoy re-stamps it), so we
+            // re-render the label any time either changes.
             var obj = _controller.Object;
             if (obj != null && obj.IsValid)
             {
                 int playerId = obj.InputAuthority.PlayerId;
-                if (playerId != _appliedPlayerId)
+                var klass = _controller.Class;
+                if (playerId != _appliedPlayerId || klass != _appliedClass)
                 {
                     _appliedPlayerId = playerId;
+                    _appliedClass = klass;
                     if (playerId < 0)
                     {
-                        _text.text = "?";
+                        _text.text = klass.ToString();
                         _text.color = new Color(0.7f, 0.7f, 0.7f, 1f);
                     }
                     else
                     {
-                        _text.text = $"P{playerId + 1}";
+                        _text.text = $"P{playerId + 1} {klass}";
                         _text.color = PlayerColors[playerId % PlayerColors.Length];
                     }
                 }

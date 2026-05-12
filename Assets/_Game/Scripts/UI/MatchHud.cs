@@ -87,6 +87,13 @@ namespace CluckWars.UI
         private float _goExpiresAtUnscaledTime;
         private const float GoFlourishDuration = 0.6f;
 
+        // Hit-flash — red overlay on local-chicken HP decrease.
+        private Image _hitFlash;
+        private float _lastLocalHp = float.NaN;
+        private float _hitFlashAlpha;
+        [SerializeField] private float _hitFlashPeakAlpha = 0.35f;
+        [SerializeField] private float _hitFlashFadeSeconds = 0.35f;
+
         [Inject]
         public void Construct(INetworkService network, ILogService log, ColorSchemeSO colors)
         {
@@ -227,6 +234,41 @@ namespace CluckWars.UI
             RefreshLocalStats();
             RefreshMatchEndOverlay();
             RefreshIntroOverlay();
+            TickHitFlash();
+        }
+
+        private void TickHitFlash()
+        {
+            if (_hitFlash == null) return;
+
+            // Detect HP decrease on the local chicken → trigger a fresh peak.
+            if (_localCombat != null)
+            {
+                float hp = _localCombat.HP;
+                if (!float.IsNaN(_lastLocalHp) && hp < _lastLocalHp - 0.01f)
+                {
+                    _hitFlashAlpha = _hitFlashPeakAlpha;
+                }
+                _lastLocalHp = hp;
+            }
+            else
+            {
+                _lastLocalHp = float.NaN;
+            }
+
+            // Fade out smoothly using unscaled time so the flash is consistent
+            // even if Time.timeScale is changed.
+            if (_hitFlashAlpha > 0f)
+            {
+                float fadePerSec = _hitFlashFadeSeconds > 0f
+                    ? _hitFlashPeakAlpha / _hitFlashFadeSeconds
+                    : _hitFlashPeakAlpha;
+                _hitFlashAlpha = Mathf.Max(0f, _hitFlashAlpha - fadePerSec * Time.unscaledDeltaTime);
+            }
+
+            var c = _hitFlash.color;
+            c.a = _hitFlashAlpha;
+            _hitFlash.color = c;
         }
 
         private void RefreshIntroOverlay()
@@ -421,11 +463,26 @@ namespace CluckWars.UI
             scaler.referenceResolution = _referenceResolution;
             scaler.matchWidthOrHeight = 0.5f;
 
+            BuildHitFlash(canvasGO.transform); // first so it sits under the rest
             BuildTopBar(canvasGO.transform);
             BuildLocalStatsPanel(canvasGO.transform);
             BuildMatchEndOverlay(canvasGO.transform);
             BuildSessionEndOverlay(canvasGO.transform);
             BuildIntroOverlay(canvasGO.transform);
+        }
+
+        private void BuildHitFlash(Transform parent)
+        {
+            // Full-screen tinted overlay. Built first / lowest in the canvas
+            // order so the rest of the HUD draws on top.
+            var go = CreateUI("HitFlash", parent, out var rt);
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+            _hitFlash = go.AddComponent<Image>();
+            _hitFlash.color = new Color(0.95f, 0.20f, 0.20f, 0f);
+            _hitFlash.raycastTarget = false;
         }
 
         private void BuildIntroOverlay(Transform parent)

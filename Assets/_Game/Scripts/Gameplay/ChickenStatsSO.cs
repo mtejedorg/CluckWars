@@ -1,3 +1,4 @@
+using CluckWars.Abilities;
 using UnityEngine;
 
 namespace CluckWars.Gameplay
@@ -27,5 +28,23 @@ namespace CluckWars.Gameplay
         [Header("Cargo")]
         [Min(1)] public int CargoCapacity = 10;
         [Min(0f)] public float CollectionRate = 1f; // food per second
+
+        [Header("Abilities")]
+        [Tooltip("Pool of abilities this class is allowed to equip (GDD §7.1). Empty = no restriction (any ability can be equipped). Filled during balance pass.")]
+        public AbilityBaseSO[] AvailableAbilities;
+
+        /// <summary>
+        /// True if <paramref name="ability"/> can be equipped on a chicken of this
+        /// class, or if the allowlist is empty (no restriction).
+        /// </summary>
+        public bool Allows(AbilityBaseSO ability)
+        {
+            if (AvailableAbilities == null || AvailableAbilities.Length == 0) return true;
+            for (int i = 0; i < AvailableAbilities.Length; i++)
+            {
+                if (AvailableAbilities[i] == ability) return true;
+            }
+            return false;
+        }
     }
 }

@@ -84,6 +84,19 @@ namespace CluckWars.Gameplay
 
             _initialized = true;
             _log?.Debug(Source, $"Spawned. Slot0={(Slot0 != null ? Slot0.name : "(none)")}, Slot1={(Slot1 != null ? Slot1.name : "(none)")}.");
+
+            // Class-vs-ability allowlist check (GDD §7.1). Empty allowlist on the
+            // class means "any ability", so this only warns when a class has an
+            // explicit pool and the equipped slot isn't in it. Doesn't block —
+            // the ability still works; this is a design-intent guard.
+            var stats = _controller != null ? _controller.Stats : null;
+            if (stats != null)
+            {
+                if (Slot0 != null && !stats.Allows(Slot0))
+                    _log?.Warn(Source, $"Slot0 ability '{Slot0.name}' is not in {stats.DisplayName}'s ability pool.");
+                if (Slot1 != null && !stats.Allows(Slot1))
+                    _log?.Warn(Source, $"Slot1 ability '{Slot1.name}' is not in {stats.DisplayName}'s ability pool.");
+            }
         }
 
         public override void Despawned(NetworkRunner runner, bool hasState)

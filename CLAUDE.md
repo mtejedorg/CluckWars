@@ -301,6 +301,13 @@ The HUD picked up timer + end overlay duties: `CargoHud` (despite the name, kept
 
 **Phase 6c — code landed.** `SneakyStealAbilitySO` ships the cargo-theft pattern: thief calls `OverlapSphere`, finds the nearest enemy `ChickenCargo` with cargo on board, optimistically credits its own `Cargo` (capped to free space + victim's stock), then calls `target.RPC_DrainStolen(amount)` to drain on the victim's authority side. New `ChickenCargo.RPC_DrainStolen` is `RpcSources.All → RpcTargets.StateAuthority` and clamps to current cargo so over-requests are harmless — same shape as `FoodPile.RPC_Drain`.
 
+**Pre-test polish — code-only items that either save diagnosis time during the deferred test session or capture design intent now:**
+
+- **`DebugHud`** (toggle with **F1**) — IMGUI overlay showing FPS, network mode + active player count, GameManager state + timer + intro / restart countdowns, local chicken (class / HP / cargo / equipped abilities + cooldowns / active slot), per-base ownership + food total, loose pickup count. Read-only — no commands or networked side effects. Drop the component anywhere in `Game.unity`.
+- **Class on nameplate** — `ChickenNameplate` now reads `ChickenController.Class` and renders "P1 Warrior" / "P2 Speedy" / etc. instead of just "P1". Re-renders when either authority or class changes (Doppelganger decoy re-stamps both).
+- **Per-class ability allowlist** — `ChickenStatsSO.AvailableAbilities` (GDD §7.1). Empty array = no restriction (current behavior); fill in to gate which abilities a class can equip. `AbilityController.Spawned` warns (doesn't block) when an equipped slot isn't in the class's pool.
+- **Hit-flash overlay** — full-screen red tint in `MatchHud` that pulses when the local chicken's HP drops. Fades back to transparent over ~0.35s. Tunable peak alpha / fade seconds on the MatchHud component.
+
 **Pre-Phase-8 advancements (Phase 9b).** Five code-only items shipped on top of Phase 9, picked because they don't need device profiling or playtest data:
 
 - **Isometric camera (`MatchCamera`)** — per ART.md §2. Orthographic, 45° yaw + 30° pitch, framed via `_orthoSize`. Drop on the Main Camera in `Game.unity`; tweak `_orthoSize` if the plane clips off-screen.
