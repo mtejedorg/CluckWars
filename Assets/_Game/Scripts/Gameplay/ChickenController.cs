@@ -134,7 +134,17 @@ namespace CluckWars.Gameplay
 
         public override void FixedUpdateNetwork()
         {
-            if (_movement == null) return;
+            if (_movement == null)
+            {
+                // Most common reason: ChickenClassRegistry isn't bound or has no
+                // entry for this class, AND the prefab's _fallbackStats slot is
+                // empty, so ResolveStatsForClass returned null in Spawned. Surface
+                // this loudly during testing so on-device "I can't move" doesn't
+                // get diagnosed as a touch-input bug when it's really stats.
+                if (_log != null && _log.IsEnabled(LogLevel.Verbose))
+                    _log.Verbose(Source, "FixedUpdateNetwork: _movement is null (stats unresolved?). Skipping tick.");
+                return;
+            }
             if (!HasStateAuthority) return;
 
             // Decoys (Doppelganger) share input authority with the caster — skip input
