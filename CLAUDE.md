@@ -301,6 +301,14 @@ The HUD picked up timer + end overlay duties: `CargoHud` (despite the name, kept
 
 **Phase 6c — code landed.** `SneakyStealAbilitySO` ships the cargo-theft pattern: thief calls `OverlapSphere`, finds the nearest enemy `ChickenCargo` with cargo on board, optimistically credits its own `Cargo` (capped to free space + victim's stock), then calls `target.RPC_DrainStolen(amount)` to drain on the victim's authority side. New `ChickenCargo.RPC_DrainStolen` is `RpcSources.All → RpcTargets.StateAuthority` and clamps to current cargo so over-requests are harmless — same shape as `FoodPile.RPC_Drain`.
 
+**Build menu.** `Assets/_Game/Scripts/Editor/CluckWarsBuildMenu.cs` ships a one-button build pipeline:
+
+- `Cluck Wars / Build / Windows` (`Ctrl+Shift+W`) — `StandaloneWindows64`, output `Builds/Windows/CluckWars.exe`.
+- `Cluck Wars / Build / Android` (`Ctrl+Shift+A`) — forces IL2CPP + ARM64 + minSdk 24, output `Builds/Android/CluckWars-<version>.apk` (.apk, not .aab — sideload-friendly).
+- `Cluck Wars / Build / Windows + Android` (`Ctrl+Shift+B`) — sequential.
+- `Cluck Wars / Build / Reveal Builds Folder` — opens `Builds/` in Explorer.
+- Reads scenes from `EditorBuildSettings`, warns if Bootstrap.unity isn't index 0. `Builds/` is gitignored.
+
 **Pre-test polish — code-only items that either save diagnosis time during the deferred test session or capture design intent now:**
 
 - **`DebugHud`** (toggle with **F1**) — IMGUI overlay showing FPS, network mode + active player count, GameManager state + timer + intro / restart countdowns, local chicken (class / HP / cargo / equipped abilities + cooldowns / active slot), per-base ownership + food total, loose pickup count. Read-only — no commands or networked side effects. Drop the component anywhere in `Game.unity`.
