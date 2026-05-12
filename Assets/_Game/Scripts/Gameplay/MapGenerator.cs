@@ -131,6 +131,19 @@ namespace CluckWars.Gameplay
         private void ComputeSpawnPoints()
         {
             float d = _baseCornerDistance;
+            if (d < 1f)
+            {
+                // The "all spawns at origin" footgun — a zero / tiny corner
+                // distance collapses every spawn point onto the same XZ and
+                // stacks chickens, which then push each other into permanent
+                // drift via CharacterController collision. Force a sane minimum
+                // and shout about it.
+                _log?.Warn(Source,
+                    $"_baseCornerDistance={_baseCornerDistance} is too small. " +
+                    "All spawn corners would collapse onto the origin and chickens would stack. " +
+                    "Snapping to 12. Set a non-trivial value (≥ 4) in the inspector.");
+                d = 12f;
+            }
             _spawnPoints = new[]
             {
                 new Vector3(+d, 0f, +d),

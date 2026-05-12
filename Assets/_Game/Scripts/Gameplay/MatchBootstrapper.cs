@@ -146,8 +146,25 @@ namespace CluckWars.Gameplay
             if (!isLocal) return;
 
             var pos = PickSpawnPosition(player);
+
+            // Defensive: nudge spawn slightly up + per-player horizontally so that
+            // even if PickSpawnPosition collapses to the same XZ (degenerate
+            // SpawnPoints, all-zero fallback, …), two chickens don't spawn
+            // perfectly overlapping. CharacterController vs CharacterController
+            // collision otherwise leaves the losing chicken drifting in one
+            // direction indefinitely — exactly the "non-hosts can't steer" bug.
+            var safetyJitter = new Vector3(
+                Mathf.Sin(player.PlayerId * 1.7f) * 0.25f,
+                0.05f * (1 + Mathf.Abs(player.PlayerId)),  // tiny per-player vertical stagger
+                Mathf.Cos(player.PlayerId * 1.7f) * 0.25f);
+            pos += safetyJitter;
+
             var chosenClass = _selection != null ? _selection.SelectedClass : ChickenClass.Warrior;
-            _log?.Info(Source, $"Spawning chicken: class={chosenClass}, pos={pos}.");
+            _log?.Info(Source,
+                $"Spawning chicken: class={chosenClass}, " +
+                $"player={player} (PlayerId={player.PlayerId}), " +
+                $"pos={pos}, mapGen={(_mapGenerator != null ? "present" : "missing")}, " +
+                $"spawnPoints={(_mapGenerator != null && _mapGenerator.SpawnPoints != null ? _mapGenerator.SpawnPoints.Count : 0)}.");
 
             runner.Spawn(
                 ResolveChickenPrefab(),
