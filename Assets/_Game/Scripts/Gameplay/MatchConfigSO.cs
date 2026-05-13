@@ -19,5 +19,8 @@ namespace CluckWars.Gameplay
         [Header("Networking")]
         [Tooltip("Fusion simulation tick rate. 30 Hz keeps mid-range Android stable.")]
         [Range(15, 60)] public int TickRate = 30;
+
+        [Tooltip("Room capacity passed to StartGameArgs.PlayerCount. The host can start a match with any number 1..MaxPlayers — this is just the upper limit Photon enforces on joiners.")]
+        [Range(1, 16)] public int MaxPlayers = 4;
     }
 }

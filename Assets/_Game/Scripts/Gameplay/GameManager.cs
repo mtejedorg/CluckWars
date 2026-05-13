@@ -144,12 +144,23 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Host-side entry point — called by <c>MatchHud</c>'s Start button.
         /// Idempotent; no-ops if the match is already running or if the caller
-        /// doesn't have StateAuthority (i.e., is not the master client).
+        /// doesn't have StateAuthority (i.e., is not the master client). No
+        /// minimum-player-count gate: host can start with just themselves on
+        /// the line.
         /// </summary>
         public void StartMatchNow()
         {
-            if (!HasStateAuthority) return;
-            if (State != MatchState.WaitingForPlayers) return;
+            if (!HasStateAuthority)
+            {
+                _log?.Debug(Source, "StartMatchNow ignored — this peer is not the master client.");
+                return;
+            }
+            if (State != MatchState.WaitingForPlayers)
+            {
+                _log?.Debug(Source, $"StartMatchNow ignored — match is already in state {State}.");
+                return;
+            }
+            _log?.Info(Source, "StartMatchNow accepted — host pressed Start.");
             StartMatch();
         }
 

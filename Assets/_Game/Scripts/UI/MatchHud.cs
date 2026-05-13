@@ -83,6 +83,7 @@ namespace CluckWars.UI
         private INetworkService _network;
         private ILogService _log;
         private ColorSchemeSO _colors;
+        private MatchConfigSO _matchConfig;
         private ShutdownReason? _shutdownReason;
         private float _shutdownAtUnscaledTime;
         private bool _returnTriggered;
@@ -99,11 +100,12 @@ namespace CluckWars.UI
         [SerializeField] private float _hitFlashFadeSeconds = 0.35f;
 
         [Inject]
-        public void Construct(INetworkService network, ILogService log, ColorSchemeSO colors)
+        public void Construct(INetworkService network, ILogService log, ColorSchemeSO colors, MatchConfigSO matchConfig)
         {
             _network = network;
             _log = log;
             _colors = colors;
+            _matchConfig = matchConfig;
         }
 
         private void Awake()
@@ -259,7 +261,10 @@ namespace CluckWars.UI
                 foreach (var _ in runner.ActivePlayers) playerCount++;
             }
             if (_lobbyPlayerCount != null)
-                _lobbyPlayerCount.text = $"Players: {playerCount}";
+            {
+                int maxPlayers = _matchConfig != null ? _matchConfig.MaxPlayers : 4;
+                _lobbyPlayerCount.text = $"Players: {playerCount} / {maxPlayers}";
+            }
 
             bool isHost = runner != null &&
                 (runner.GameMode == GameMode.Single || runner.IsSharedModeMasterClient);
@@ -267,7 +272,14 @@ namespace CluckWars.UI
             if (_lobbyStartButton != null)
                 _lobbyStartButton.gameObject.SetActive(isHost);
             if (_lobbyHint != null)
-                _lobbyHint.gameObject.SetActive(!isHost);
+            {
+                // Always visible; text adapts so the host knows they can start
+                // whenever and joiners know they're waiting on the host.
+                _lobbyHint.gameObject.SetActive(true);
+                _lobbyHint.text = isHost
+                    ? "Start whenever ready — no minimum players required."
+                    : "Waiting for host to start the match…";
+            }
         }
 
         private void TickHitFlash()

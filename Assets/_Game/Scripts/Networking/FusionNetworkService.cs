@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using CluckWars.Gameplay;
 using CluckWars.Input;
 using CluckWars.Logging;
 using Fusion;
@@ -27,6 +28,7 @@ namespace CluckWars.Networking
         private const string Source = "Fusion";
 
         private IInputProvider _inputProvider;
+        private MatchConfigSO _matchConfig;
         private ILogService _log;
         private NetworkRunner _runner;
 
@@ -39,9 +41,10 @@ namespace CluckWars.Networking
         public event Action<ShutdownReason> OnShutdown;
 
         [Inject]
-        public void Construct(IInputProvider inputProvider, ILogService log)
+        public void Construct(IInputProvider inputProvider, MatchConfigSO matchConfig, ILogService log)
         {
             _inputProvider = inputProvider;
+            _matchConfig = matchConfig;
             _log = log;
         }
 
@@ -71,23 +74,24 @@ namespace CluckWars.Networking
                 sceneInfo.AddSceneRef(sceneRef, LoadSceneMode.Additive);
             }
 
+            int maxPlayers = _matchConfig != null ? Mathf.Clamp(_matchConfig.MaxPlayers, 1, 16) : 4;
             var result = await _runner.StartGame(new StartGameArgs
             {
                 GameMode = mode,
                 SessionName = sessionName,
                 Scene = sceneInfo,
                 SceneManager = sceneManager,
-                PlayerCount = 4,
+                PlayerCount = maxPlayers,
             });
 
             if (result.Ok)
             {
-                _log?.Info(Source, $"StartGame OK. LocalPlayer={_runner.LocalPlayer}.");
+                _log?.Info(Source, $"StartGame OK. LocalPlayer={_runner.LocalPlayer}, MaxPlayers={maxPlayers}, IsSharedModeMasterClient={_runner.IsSharedModeMasterClient}.");
                 OnRunnerReady?.Invoke(_runner);
             }
             else
             {
-                _log?.Error(Source, $"StartGame failed: {result.ShutdownReason}.");
+                _log?.Error(Source, $"StartGame failed: result.ShutdownReason={result.ShutdownReason}, errorMessage='{result.ErrorMessage}'. Common causes: wrong AppId, region mismatch, room full ({maxPlayers}/{maxPlayers}), or no internet.");
             }
         }
 
@@ -144,12 +148,27 @@ namespace CluckWars.Networking
             _runner = null;
         }
 
-        // Phase 1: stub the rest. Wire them up as features land.
         void INetworkRunnerCallbacks.OnInputMissing(NetworkRunner runner, PlayerRef player, NetworkInput input) { }
-        void INetworkRunnerCallbacks.OnConnectedToServer(NetworkRunner runner) { }
-        void INetworkRunnerCallbacks.OnDisconnectedFromServer(NetworkRunner runner, NetDisconnectReason reason) { }
-        void INetworkRunnerCallbacks.OnConnectRequest(NetworkRunner runner, NetworkRunnerCallbackArgs.ConnectRequest request, byte[] token) { }
-        void INetworkRunnerCallbacks.OnConnectFailed(NetworkRunner runner, NetAddress remoteAddress, NetConnectFailedReason reason) { }
+
+        // Connect / disconnect callbacks now log explicitly so cross-device
+        // join failures (3rd-player-can't-connect, etc.) leave a trail in
+        // adb logcat instead of silently failing.
+        void INetworkRunnerCallbacks.OnConnectedToServer(NetworkRunner runner)
+        {
+            _log?.Info(Source, $"OnConnectedToServer. LocalPlayer={runner.LocalPlayer}, IsSharedModeMasterClient={runner.IsSharedModeMasterClient}.");
+        }
+        void INetworkRunnerCallbacks.OnDisconnectedFromServer(NetworkRunner runner, NetDisconnectReason reason)
+        {
+            _log?.Warn(Source, $"OnDisconnectedFromServer. reason={reason}.");
+        }
+        void INetworkRunnerCallbacks.OnConnectRequest(NetworkRunner runner, NetworkRunnerCallbackArgs.ConnectRequest request, byte[] token)
+        {
+            _log?.Debug(Source, $"OnConnectRequest from {request.RemoteAddress}.");
+        }
+        void INetworkRunnerCallbacks.OnConnectFailed(NetworkRunner runner, NetAddress remoteAddress, NetConnectFailedReason reason)
+        {
+            _log?.Error(Source, $"OnConnectFailed: remote={remoteAddress}, reason={reason}.");
+        }
         void INetworkRunnerCallbacks.OnUserSimulationMessage(NetworkRunner runner, SimulationMessagePtr message) { }
         void INetworkRunnerCallbacks.OnSessionListUpdated(NetworkRunner runner, List<SessionInfo> sessionList) { }
         void INetworkRunnerCallbacks.OnCustomAuthenticationResponse(NetworkRunner runner, Dictionary<string, object> data) { }
