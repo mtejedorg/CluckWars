@@ -2,6 +2,10 @@
 
 **Target:** Playable demo on LAN with 4 players, all classes, core abilities, full match loop.
 
+**Status snapshot:** Phases 1–7b shipped + closed. Phases 8 (Android build / on-device profile) and 9 (polish / balance / audio / VFX / animator) are code-complete on the parts that don't need device data; everything that needs device data is bundled into the **Dedicated test session** below.
+
+For current-state details: `docs/STATE.md`. For architecture: `docs/ARCHITECTURE.md`. For build + diagnostic flows: `docs/TESTING.md`.
+
 ---
 
 ## Phase 1: Bootstrap & Foundation ✅
@@ -81,7 +85,7 @@ Single chokepoint for log output with level filter; structured Console narrative
 - [x] Damage calculation (`HP -= stats.Attack` via `RPC_ApplyDamage` to target's StateAuthority — Shared Mode authority crossing)
 - [x] Hit animation trigger (`ChangeDetector` on `HP` decrease → `ChickenAnimator.TriggerHit()` on every peer)
 - [x] Stun on death (5 sec via `TickTimer`; `ChickenController` skips movement while `IsStunned`)
-- [ ] Dropped cargo on death — deferred to Phase 4 (cargo system doesn't exist yet). `ChickenCombat.OnDeath` event ready for `ChickenCargo` to subscribe.
+- [x] Dropped cargo on death (Phase 4b). `FoodPickup` NetworkBehaviour spawned by `ChickenCargo.HandleDeath` carrying cargo amount; auto-despawns when drained or after 30s. Picked up by walking over it.
 
 ### Prefab work (Maestro, in Editor)
 - Add `ChickenCombat` to the Chicken prefab.
@@ -134,7 +138,7 @@ Players can collect from piles, see visual feedback, deposit at base. (Solo-test
 - [x] State sync via `[Networked]` for HP, IsStunned, Cargo, FoodPile.Amount, PlayerBase.FoodTotal (Phase 3-4)
 - [x] Bootstrap-scene mode picker: Solo / Host / Join via S/H/J keys; session name hardcoded to `cluck-lan` for the demo (UGUI session entry lands in Phase 7)
 - [x] `MatchBootstrapper` branches on selected `SessionMode`; late-join already works because `HandlePlayerJoined` filters `player == runner.LocalPlayer` so each peer only spawns its own chicken and Fusion replicates the rest automatically
-- [ ] Tested with PC host + Android client on same Wi-Fi
+- [ ] Tested with PC host + Android client on same Wi-Fi — **bundled into dedicated test session**.
 
 ### Photon prerequisites
 - `Assets/Photon/Fusion/Resources/PhotonAppSettings.asset` has `AppIdFusion = 259bda28-...` ✓. "LAN" still routes through Photon Cloud relay; both peers use the same AppId + same session name to be matchmade.
@@ -188,11 +192,11 @@ Players can equip and activate 1 ability per chicken (2 for Assassin once `_slot
 - [x] Win condition check (first to `MatchConfigSO.FoodTargetToWin` OR highest total when timer expires). Throttled to 4× / sec via `Runner.SimulationTime`.
 - [x] Match timer (top-center MM:SS overlay) + end screen (centered banner showing winner + final food). Both rendered by `CargoHud` IMGUI.
 - [x] `MatchBootstrapper` spawns the `GameManager` prefab on master-client side after `StartGame` completes.
-- [ ] Spawn system polish — currently picks a random scene transform from `_spawnPoints`; "spawn at base edge on join" deferred to Phase 9 (low-impact polish; players can walk to base in <2s anyway).
+- [x] Spawn system polish — `MapGenerator.SpawnPoints` now coincide with base positions (`Vector3.Lerp(corner, origin, 0.15)`). `MatchBootstrapper.PickSpawnPosition(player)` uses `Mathf.Abs(player.PlayerId) % count` so spawn corner and base CornerIndex agree by construction. `RestartMatch` teleports each chicken back to its corner.
 - [x] Per-player base ownership — Phase 7b. `GameManager` polls every tick, finds players without an assigned base, stamps them onto the first unowned `PlayerBase`. `ChickenCargo` deposits only at bases where `Owner == Object.InputAuthority`. Win check skips unowned bases. HUD shows per-player labels (`P1: 42  P2: 17`).
 - [x] Procedural map (programmer art) — `MapGenerator` MonoBehaviour. Local on every peer: builds a Plane primitive + 4 invisible boundary walls + caches 4 corner spawn positions. Master client only (after `OnRunnerReady`): spawns 4 corner `PlayerBase`s + 1 center `FoodPile` (larger amount, scaled mesh) + N small piles on a jittered ring. `FoodPile.Spawned` adjusted to honor pre-set `Amount` / `MaxAmount` from `onBeforeSpawned`. `MatchBootstrapper` reads `MapGenerator.SpawnPoints` indexed by `PlayerId % count`.
 - [x] Match restart loop — `GameManager.RestartCountdown` arms on `EndMatch`; expiry triggers `RestartMatch` which zeros base totals, refills piles to `MaxAmount`, despawns loose `FoodPickup`s, RPCs `ChickenCombat.RPC_ResetForNewMatch` + `ChickenCargo.RPC_ResetForNewMatch` on every chicken, then flips State back to Active with a fresh `MatchTimer`. End-screen overlay shows the live "Next match in Ns…" countdown.
-- [ ] Placeholder balancing pass — tune `MatchConfigSO`, `FoodPile._initialAmount`, `ChickenStatsSO.CollectionRate`, ability cooldowns once 4-player playtest data is available.
+- [ ] Placeholder balancing pass — tune `MatchConfigSO`, `FoodPile._initialAmount`, `ChickenStatsSO.CollectionRate`, ability cooldowns once 4-player playtest data is available. **Bundled into dedicated test session.**
 - [x] Score display during match — `CargoHud` shows each base's running food total in the right panel; full per-player leaderboard arrives with Phase 7b.
 
 ### Editor work after this commit
@@ -214,9 +218,9 @@ Players can equip and activate 1 ability per chicken (2 for Assassin once `_slot
 - [x] `VirtualJoystick`, `HoldButton`, `TouchControlsHud`, `TouchInputProvider` (landed early in Phase 5)
 - [x] `CompositeInputProvider` ORs keyboard + touch — same input path on PC and mobile, clicking buttons with the mouse exercises the touch flow without a build
 - [x] No platform branching needed at install time: composite is bound app-wide. Touch HUD activates whenever it's present in scene (Game.unity), keyboard is always live
-- [ ] Android build export
-- [ ] Test on real Android device (mid-range 2021+)
-- [ ] FPS monitoring & optimization (target 30 fps)
+- [x] One-button Android build export — `Cluck Wars / Build / Android` (`Ctrl+Shift+A`) forces IL2CPP + ARM64 + minSdk 24, output `Builds/Android/CluckWars-<version>.apk`. See `docs/TESTING.md`.
+- [ ] Test on real Android device (mid-range 2021+) — **bundled into deferred test session**.
+- [ ] FPS monitoring & optimization (target 30 fps) — **bundled into deferred test session**.
 
 ### Deliverable
 Android phone can host or join LAN match with full touch controls.
@@ -229,11 +233,11 @@ Android phone can host or join LAN match with full touch controls.
 - Stability, bug fixes, performance tuning
 
 ### Tasks
-- [ ] Catch all networking bugs (drop-outs, desync) — needs real-device multiplayer testing
-- [ ] Optimize for Android (reduce draw calls, check memory) — needs on-device profiling
-- [ ] Fix animation blending bugs — needs hand-authored AnimatorController states
-- [ ] Balance tweaks based on playtesting — needs playtest data
-- [ ] UI responsiveness on mobile — IMGUI HUD still in place; UGUI redesign (ART.md §6.1) is the next polish target
+- [ ] Catch all networking bugs (drop-outs, desync) — needs real-device multiplayer testing. **Bundled into dedicated test session.**
+- [ ] Optimize for Android (reduce draw calls, check memory) — needs on-device profiling. **Bundled.**
+- [ ] Fix animation blending bugs — needs hand-authored AnimatorController states. **Bundled.**
+- [ ] Balance tweaks based on playtesting — needs playtest data. **Bundled.**
+- [x] UI responsiveness on mobile — UGUI `MatchHud` replaced the legacy IMGUI `CargoHud`. Layout follows ART.md §6.1. Auto-disables legacy CargoHud on Awake. Per-aspect fine-tune deferred to the dedicated test session.
 - [x] **Error handling & reconnection** — `CargoHud` subscribes to `INetworkService.OnShutdown`, replaces the match HUD with a "SESSION ENDED" overlay (reason + countdown), then `SceneManager.LoadScene("Bootstrap")` after `_disconnectReturnDelay`.
 - [x] **Audio service** — `UnityAudioService` (was `NullAudioService`) + `AudioRegistrySO`. SFX cues wired in `ChickenCombat` (Swing / Hit / Stun), `ChickenCargo` (Deposit / Pickup), `AbilityController` (Activate / Expire), `GameManager` (MatchStart + Music / MatchEnd / Victory). Maestro drops clips into the registry asset.
 - [x] **`PrefabRegistrySO`** — consolidates Chicken / Doppelganger / FoodPile / FoodPickup / PlayerBase / GameManager prefabs into one SO. Consumers prefer registry value, fall back to legacy SerializeField slots — gradual migration. See TDD §6.6.
@@ -243,6 +247,13 @@ Android phone can host or join LAN match with full touch controls.
 - [x] **Player nameplates (`ChickenNameplate`)** — "P1/P2/.." `TextMesh` billboards above each chicken.
 - [x] **Intro countdown** — `GameManager.IntroTimer` + "3, 2, 1, GO!" overlay; match timer offset so playable duration is unchanged.
 - [x] **Ability button accent** — TouchControlsHud re-tints each ability button with the equipped `AbilityBaseSO.AccentColor`.
+- [x] **Match restart loop** — `GameManager.RestartCountdown` (6s after Ended) resets bases / piles / pickups / chicken state via RPCs, teleports each chicken to its corner, then transitions back to Active with a fresh intro.
+- [x] **Host-controlled lobby** — `GameManager` stays in `WaitingForPlayers` (Shared Mode); host clicks "START MATCH" in `MatchHud`. No minimum-player gate. Solo auto-starts.
+- [x] **Match camera follow** — `MatchCamera` smooth-damps focus toward the local chicken; default `_orthoSize = 8` for close framing (overrides ART.md §2 "full map fixed" for playability).
+- [x] **Per-class ability allowlist** — `ChickenStatsSO.AvailableAbilities` (GDD §7.1). Empty = no restriction (current default). `AbilityController.Spawned` warns but doesn't block.
+- [x] **Hit-flash overlay** — `MatchHud` flashes a red full-screen tint when local chicken HP drops; fades over 0.35s.
+- [x] **Debug HUD (F1)** — `DebugHud` MonoBehaviour with FPS, network state, GameManager state, chicken stats, base ownership, pickup count. See `docs/TESTING.md`.
+- [x] **Fusion connect-callback logging** — `OnConnectedToServer` / `OnDisconnectedFromServer` / `OnConnectFailed` / `OnConnectRequest` all log explicitly (were silent stubs). Hardens the "third player can't connect" diagnosis path.
 
 ### Deliverable
 Demo is stable and playable for 30+ min sessions without crashes.
@@ -251,13 +262,34 @@ Demo is stable and playable for 30+ min sessions without crashes.
 
 ## Demo Milestone Checklist
 
-- [ ] Any device (PC or Android) can host LAN session
-- [ ] 4 players connect and play full 5-10 min match
-- [ ] All 4 classes playable with at least 2 abilities
-- [ ] Full loop: spawn → collect → fight → win condition → end screen
-- [ ] Windows & Android builds stable at target FPS
-- [ ] Session join by ID (no UGS)
-- [ ] No compiler warnings or errors
+Code-side status / pending dedicated test session validation:
+
+- [~] **Any device (PC or Android) can host LAN session** — Solo / Host / Join modes shipped, Photon AppId wired. Pending: Windows ↔ Android LAN smoke test.
+- [~] **4 players connect and play full 5-10 min match** — `MaxPlayers=4` enforced in `StartGameArgs`. Pending: 4-device LAN validation (last test hit "third player can't connect"; connect-callback logging in place to diagnose).
+- [x] **All 4 classes playable with at least 2 abilities** — all 8 abilities authored as `.asset` instances with distinct accent colors. Per-class allowlist (`ChickenStatsSO.AvailableAbilities`) empty → any class can equip any ability for now; balance pass to lock down later.
+- [x] **Full loop: spawn → collect → fight → win condition → end screen → restart**
+- [ ] Windows & Android builds stable at target FPS — pending on-device profiling.
+- [x] **Session join by ID (no UGS)** — session name `cluck-lan` hardcoded; UGS bypassed via `NullUGSService`. UGUI lobby entry comes with Phase 10.
+- [x] **No compiler warnings or errors** as of `v0.3.0-alpha` + subsequent fixes.
+
+Legend: `[x]` shipped & verified, `[~]` shipped but pending device validation, `[ ]` not shipped.
+
+---
+
+## Dedicated test session — bundled work
+
+Everything that needs real-device, multi-device, or playtest data is queued for a single focused session. Doing this in one batch (rather than piecemeal) avoids partial rebuilds. See `docs/TESTING.md` for the run order.
+
+- Android build sanity + on-device FPS profile.
+- Cross-device LAN smoke test (2 / 3 / 4 peers).
+- "Third player can't connect" repro — connect-callback logs should pinpoint cause.
+- Draw-call / memory profile on Android.
+- AnimatorController state authoring (Hit / Attack / Stunned / Idle) — needs visual feedback to tune.
+- VFX particle systems per ART.md §7.
+- Audio clip recording / mixing into `AudioRegistry.asset`.
+- Balance pass: `MatchConfigSO` (duration / food target / max players), `FoodPile._initialAmount`, `ChickenStatsSO` per-class numbers, all 8 abilities' `Duration` / `Cooldown` / per-ability tunables.
+- Mobile layout fine-tune for real phone aspect ratios.
+- `MatchCamera._orthoSize` + `_followSmoothTime` final tuning.
 
 ---
 
