@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using CluckWars.Gameplay;
 using CluckWars.Logging;
 using CluckWars.Networking;
+using CluckWars.Services;
 using Fusion;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -70,6 +71,7 @@ namespace CluckWars.UI
         private Text _lobbyHint;
         private Button _lobbyStartButton;
         private Text _lobbyPlayerCount;
+        private Text _lobbyJoinCode;
 
         // Cached scene refs.
         private ChickenController _localController;
@@ -80,10 +82,11 @@ namespace CluckWars.UI
         private float _nextRefresh;
 
         // Disconnect state.
-        private INetworkService _network;
-        private ILogService _log;
-        private ColorSchemeSO _colors;
-        private MatchConfigSO _matchConfig;
+        private INetworkService          _network;
+        private ILogService              _log;
+        private ColorSchemeSO            _colors;
+        private MatchConfigSO            _matchConfig;
+        private ISessionSelectionService _selection;
         private ShutdownReason? _shutdownReason;
         private float _shutdownAtUnscaledTime;
         private bool _returnTriggered;
@@ -100,12 +103,18 @@ namespace CluckWars.UI
         [SerializeField] private float _hitFlashFadeSeconds = 0.35f;
 
         [Inject]
-        public void Construct(INetworkService network, ILogService log, ColorSchemeSO colors, MatchConfigSO matchConfig)
+        public void Construct(
+            INetworkService network,
+            ILogService log,
+            ColorSchemeSO colors,
+            MatchConfigSO matchConfig,
+            ISessionSelectionService selection)
         {
-            _network = network;
-            _log = log;
-            _colors = colors;
+            _network   = network;
+            _log       = log;
+            _colors    = colors;
             _matchConfig = matchConfig;
+            _selection = selection;
         }
 
         private void Awake()
@@ -269,12 +278,16 @@ namespace CluckWars.UI
             bool isHost = runner != null &&
                 (runner.GameMode == GameMode.Single || runner.IsSharedModeMasterClient);
 
+            if (_lobbyJoinCode != null)
+            {
+                var code = _selection?.SessionName;
+                _lobbyJoinCode.text = string.IsNullOrEmpty(code) ? string.Empty : $"Code: {code}";
+            }
+
             if (_lobbyStartButton != null)
                 _lobbyStartButton.gameObject.SetActive(isHost);
             if (_lobbyHint != null)
             {
-                // Always visible; text adapts so the host knows they can start
-                // whenever and joiners know they're waiting on the host.
                 _lobbyHint.gameObject.SetActive(true);
                 _lobbyHint.text = isHost
                     ? "Start whenever ready — no minimum players required."
@@ -523,7 +536,7 @@ namespace CluckWars.UI
             rt.anchorMin = new Vector2(0.5f, 0.5f);
             rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot     = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(620f, 360f);
+            rt.sizeDelta = new Vector2(620f, 420f);
             rt.anchoredPosition = Vector2.zero;
             AddBackground(panel, PanelColor(0.92f));
             _lobbyPanel = panel;
@@ -536,13 +549,23 @@ namespace CluckWars.UI
             titleRT.sizeDelta = new Vector2(0f, 64f);
             titleRT.anchoredPosition = new Vector2(0f, -24f);
 
+            // Join code — populated from ISessionSelectionService.SessionName in RefreshLobbyOverlay.
+            _lobbyJoinCode = AddText(panel.transform, "JoinCode", "", 32, TextAnchor.MiddleCenter, FontStyle.Bold);
+            _lobbyJoinCode.color = new Color(0.4f, 1f, 0.5f, 1f);
+            var codeRT = _lobbyJoinCode.rectTransform;
+            codeRT.anchorMin = new Vector2(0f, 1f);
+            codeRT.anchorMax = new Vector2(1f, 1f);
+            codeRT.pivot     = new Vector2(0.5f, 1f);
+            codeRT.sizeDelta = new Vector2(0f, 44f);
+            codeRT.anchoredPosition = new Vector2(0f, -104f);
+
             _lobbyPlayerCount = AddText(panel.transform, "PlayerCount", "Players: 1", 22, TextAnchor.MiddleCenter, FontStyle.Normal);
             var pcRT = _lobbyPlayerCount.rectTransform;
             pcRT.anchorMin = new Vector2(0f, 1f);
             pcRT.anchorMax = new Vector2(1f, 1f);
             pcRT.pivot     = new Vector2(0.5f, 1f);
-            pcRT.sizeDelta = new Vector2(0f, 32f);
-            pcRT.anchoredPosition = new Vector2(0f, -110f);
+            pcRT.sizeDelta = new Vector2(0f, 30f);
+            pcRT.anchoredPosition = new Vector2(0f, -162f);
 
             // Hint shown to non-hosts. Hidden when the local peer IS the host.
             _lobbyHint = AddText(panel.transform, "Hint", "Waiting for host to start the match…", 22, TextAnchor.MiddleCenter, FontStyle.Italic);
@@ -551,7 +574,7 @@ namespace CluckWars.UI
             hintRT.anchorMax = new Vector2(1f, 1f);
             hintRT.pivot     = new Vector2(0.5f, 1f);
             hintRT.sizeDelta = new Vector2(0f, 36f);
-            hintRT.anchoredPosition = new Vector2(0f, -170f);
+            hintRT.anchoredPosition = new Vector2(0f, -208f);
             _lobbyHint.color = new Color(0.85f, 0.85f, 0.85f, 0.9f);
 
             // Start button. Shown only to the host (master client).

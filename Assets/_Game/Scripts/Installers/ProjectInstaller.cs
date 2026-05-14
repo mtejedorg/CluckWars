@@ -41,8 +41,13 @@ namespace CluckWars.Installers
                 .AsSingle()
                 .WithArguments(_logMinLevel);
 
-            // Stateless service stand-ins.
+            // UGS: real service when the packages are present; NullUGSService in
+            // offline/demo builds (define UGS_DISABLED in Project Settings to force null).
+#if UGS_DISABLED
             Container.Bind<IUGSService>().To<NullUGSService>().AsSingle();
+#else
+            Container.Bind<IUGSService>().To<UGSService>().AsSingle();
+#endif
 
             // UnityAudioService lives under the ProjectContext transform so its
             // AudioSources survive scene loads. NullAudioService can still be bound

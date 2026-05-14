@@ -18,7 +18,7 @@ All tags are local until pushed.
 
 ---
 
-## What works (Phase 1–9 complete, code-side)
+## What works (Phases 1–9 complete + Phase 10 in progress)
 
 ### Core loop
 - 4 classes (Warrior / Speedy / Fatty / Assassin) — selectable in Bootstrap menu.
@@ -37,11 +37,21 @@ All tags are local until pushed.
 - Match restart loop: bases zeroed, piles refilled, pickups despawned, chickens reset + teleported to their corners.
 
 ### Networking
-- Photon Fusion 2, Shared Mode (LAN/cloud-relayed). Solo mode = single-player Fusion runner.
-- Bootstrap menu offers Solo / Host / Join with shared session name `cluck-lan`.
-- Photon AppId already configured: `PhotonAppSettings.AppIdFusion = 259bda28-…`.
+- Photon Fusion 2, Shared Mode. Solo mode = single-player Fusion runner.
+- Photon Cloud relay already enables internet play (not LAN-only).
+- Bootstrap menu: Solo / Host / Join. Host creates a UGS Lobby → unique 6-char join code. Joiner enters code or picks from lobby browser. Code becomes the Fusion session name.
+- Photon AppId configured: `PhotonAppSettings.AppIdFusion = 259bda28-…`.
 - Reconnection: `OnShutdown` → "SESSION ENDED" overlay → auto-return to Bootstrap.
 - Connect / Disconnect / ConnectRequest / ConnectFailed callbacks all log explicitly.
+
+### UGS (Phase 10 — code complete, pending Editor setup)
+- `UGSService` (Auth + Lobby) bound in `ProjectInstaller` via `#if UGS_DISABLED` guard.
+- `NullUGSService` used when `UGS_DISABLED` is defined (demo/offline fallback → "cluck-lan").
+- Host: `CreateLobbyAsync` → join code displayed in Bootstrap + MatchHud lobby panel.
+- Join: `JoinLobbyByCodeAsync` (type code) or `QueryLobbiesAsync` (browse list).
+- Join code = Fusion session name — one code serves both UGS and Photon matchmaking.
+- Lobby heartbeat (15s) runs automatically while host is in-session; stops on `LeaveLobbyAsync`.
+- **Requires Unity Dashboard project link** — see "Outstanding before next test session" below.
 
 ### UI
 - **Bootstrap menu**: procedural UGUI canvas, class + mode picker, keyboard shortcuts (1-4, S/H/J, SPACE).
@@ -73,10 +83,11 @@ All bound app-wide in `ProjectInstaller`. Empty asset slots bind a runtime-empty
 ## Outstanding before next test session
 
 ### Pending Maestro (Editor work)
-- None blocking. Optional polish: fill `AudioRegistry` clips, tune class ability allowlists in `ChickenStatsSO.AvailableAbilities`.
+- **UGS Dashboard link** (required for Phase 10): Unity Editor → Edit → Project Settings → Services → link to your Unity Cloud Organization. Then enable Authentication and Lobby services in the Dashboard. Without this, `UGSService.InitializeAsync()` will throw.
+- Optional: fill `AudioRegistry` clips, tune class ability allowlists in `ChickenStatsSO.AvailableAbilities`.
 
 ### Pending agents (code)
-- Nothing scheduled until test feedback arrives.
+- Nothing blocking after Phase 10 code landed. Test session will validate UGS live paths.
 
 ---
 

@@ -1,5 +1,8 @@
 {
   "dependencies": {
+    "com.unity.services.core": "1.16.0",
+    "com.unity.services.authentication": "3.6.1",
+    "com.unity.services.multiplayer": "2.2.2",
     "com.unity.ai.navigation": "2.0.12",
     "com.unity.collab-proxy": "2.12.4",
     "com.unity.ide.rider": "3.0.39",

@@ -293,10 +293,36 @@ Everything that needs real-device, multi-device, or playtest data is queued for 
 
 ---
 
+## Phase 10: UGS Integration (in progress) 🚧
+
+### Goals
+- Replace hardcoded `cluck-lan` session name with unique per-match join codes.
+- Players anywhere can create/find games without sharing IPs or being on the same LAN.
+- Anonymous player identity for future account/progression work.
+
+### Tasks
+- [x] `LobbyInfo` data class (`Services/LobbyInfo.cs`)
+- [x] `IUGSService` expanded: Auth + `CreateLobbyAsync` / `JoinLobbyByCodeAsync` / `JoinLobbyAsync` / `QueryLobbiesAsync` / `LeaveLobbyAsync`
+- [x] `NullUGSService` updated — offline fallback returns `"cluck-lan"` so solo dev flow unchanged
+- [x] `UGSService` — real implementation: anonymous Auth, Lobby create/join/query, host heartbeat (15s)
+- [x] `ProjectInstaller` — binds `UGSService` unless `UGS_DISABLED` define is set
+- [x] `CharacterSelectController` — Host: lobby name input + "Create Lobby" button + code display; Join: code input + "Join by Code" + lobby browser panel (scrollable list + Refresh + Back)
+- [x] `MatchHud` — lobby panel shows `Code: <code>` so host can share it in-game
+- [x] UGS packages added to `Packages/manifest.json` (`core 1.13.0`, `authentication 3.3.3`, `lobbies 1.2.2`)
+- [ ] **Maestro: link Unity project to Cloud Dashboard** (Edit → Project Settings → Services). Enable Authentication + Lobby. Required before the code compiles against live UGS.
+- [ ] Live smoke test: Host on PC, Join from Android using the displayed code.
+
+### Architecture note
+UGS Relay is **not** part of Phase 10. Photon Cloud relay already handles internet routing — adding UGS Relay would require a custom Fusion transport adapter with no net benefit. Deferred to Phase 11 (dedicated server work).
+
+### Deliverable
+Players on different networks can find each other via lobby browser or 6-char code. No LAN requirement.
+
+---
+
 ## Post-Demo Roadmap (TBD)
 
-- **Phase 10:** UGS integration (Relay, Lobby, Authentication)
-- **Phase 11:** Dedicated server mode for production
+- **Phase 11:** Dedicated server mode for production (+ UGS Relay if Photon is replaced)
 - **Phase 12:** Account progression, cosmetic skins
 - **Phase 13:** Seasonal content
 - **Phase 14:** Additional flavor (pirate, space)
