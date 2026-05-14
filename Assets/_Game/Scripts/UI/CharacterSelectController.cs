@@ -60,11 +60,7 @@ namespace CluckWars.UI
 
         // ---- State -----------------------------------------------------
         private bool _isBusy;
-        /// <summary>
-        /// True once a lobby has been successfully created and its code is
-        /// displayed. The next Confirm() call should load the game, NOT
-        /// create another lobby.
-        /// </summary>
+        // True after lobby creation; makes the next Confirm() call load the game instead of recreating the lobby.
         private bool _lobbyReady;
 
         // ---- Injection -------------------------------------------------

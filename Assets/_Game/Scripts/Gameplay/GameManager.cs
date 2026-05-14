@@ -112,7 +112,17 @@ namespace CluckWars.Gameplay
 
         public override void Spawned()
         {
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            if (_log == null)
+            {
+                // GameManager needs MatchConfigSO which is bound in GameInstaller (scene scope),
+                // not in ProjectContext. Use the SceneContext child container so both
+                // scene-level and project-level bindings are available.
+                var sceneCtx = FindFirstObjectByType<SceneContext>();
+                if (sceneCtx != null)
+                    sceneCtx.Container.Inject(this);
+                else
+                    ProjectContext.Instance.Container.Inject(this);
+            }
 
             Instance = this;
 
