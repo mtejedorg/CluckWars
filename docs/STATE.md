@@ -87,6 +87,8 @@ All bound app-wide in `ProjectInstaller`. Empty asset slots bind a runtime-empty
 - `Cluck Wars / Build / Android` (`Ctrl+Shift+A`) — IL2CPP + ARM64 + minSdk 24, `Builds/Android/CluckWars-<version>.apk`.
 - `Cluck Wars / Build / Windows + Android` (`Ctrl+Shift+B`) — sequential.
 - `Cluck Wars / Build / Reveal Builds Folder`.
+- `Cluck Wars / Balance / Balance Editor` — **new** Editor window: editable table of all 4 `ChickenStatsSO` assets (HP / Spd / Turn / Atk / AtkRange / AtkCD / Cap / Rate) + all 8 `AbilityBaseSO` assets (Duration / Cooldown / AccentColor). "Save All ★" flushes dirty assets. Auto-discovers assets — no list to maintain.
+- **F2 in-game toggle** in `DebugHud` — runtime Balance panel (right side of screen): class stats table from `ChickenClassRegistrySO` + local chicken's equipped ability timings (Duration / Cooldown, active slot indicator).
 
 ---
 
@@ -101,7 +103,7 @@ All bound app-wide in `ProjectInstaller`. Empty asset slots bind a runtime-empty
 - Optional: fill `AudioRegistry` clips, tune class ability allowlists in `ChickenStatsSO.AvailableAbilities`.
 
 ### Pending agents (code)
-- Phase 11 + DCBA all code complete. Nothing else blocking agents.
+- Phase 11 + DCBA + VFX accents + Balance tooling all code complete. Nothing else blocking agents.
 - `ISessionSelectionService` now carries `Ability0`/`Ability1`; `MatchBootstrapper` calls `AbilityController.SetSlots()` in `onBeforeSpawned`. Ability selection is only meaningful after Maestro fills `ChickenStatsSO.AvailableAbilities` per class in the Editor.
 
 ---
@@ -121,7 +123,7 @@ All require real-device or playtest data; queued so they don't get done piecemea
 - Network desync hunting (cross-device LAN).
 - On-device FPS / draw-call / memory profiling.
 - AnimatorController state authoring — **state machine done** (Idle/Walk/Attack/Hit/Stunned states + all transitions). Needs `.anim` clip assets assigned to each state once artwork is recorded/imported.
-- VFX particle systems — **code complete** (`ChickenVFX.cs`: hit sparks, death burst, stun orbit, deposit gold shower). Maestro: add `ChickenVFX` component to Chicken prefab. Ability accents deferred.
+- VFX particle systems — **code complete** (`ChickenVFX.cs`: hit sparks, death burst, stun orbit, deposit gold shower, **ability accent burst**). `VFX_Ability` PS: 16-particle sphere, tinted dynamically from `AbilityBaseSO.AccentColor` at activation, floats upward. Maestro: add `ChickenVFX` component to Chicken prefab.
 - Audio clip recording / mixing.
 - Balance pass (food rates, ability cooldowns, attack damage, HP).
 - Mobile layout fine-tune for actual phone aspects.
@@ -132,6 +134,8 @@ All require real-device or playtest data; queued so they don't get done piecemea
 ## Recent commits (most recent first)
 
 ```
+(pending) Balance: BalanceEditorWindow + DebugHud F2 panel
+(pending) VFX: ability accent burst (ChickenVFX)
 (pending) VFX: ChickenVFX procedural particle systems
 (pending) Animator: combat state machine wired
 (pending) DCBA: dead visuals, screen shake, match stats, AI bots

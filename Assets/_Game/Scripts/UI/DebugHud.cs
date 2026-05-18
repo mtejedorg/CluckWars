@@ -1,4 +1,5 @@
 using System.Text;
+using CluckWars.Abilities;
 using CluckWars.Gameplay;
 using CluckWars.Networking;
 using Fusion;
@@ -30,12 +31,17 @@ namespace CluckWars.UI
 
         private INetworkService _network;
 
+        // Injected optionally — may be null when registry asset is not bound.
+        [InjectOptional] private ChickenClassRegistrySO _classRegistry;
+
         private float _accumulatedFrames;
         private float _accumulatedTime;
         private float _fps;
         private float _nextRefreshUnscaledTime;
+        private bool  _balanceVisible;
 
-        private readonly StringBuilder _sb = new StringBuilder(1024);
+        private readonly StringBuilder _sb        = new StringBuilder(1024);
+        private readonly StringBuilder _balanceSb = new StringBuilder(1024);
 
         [Inject]
         public void Construct(INetworkService network) => _network = network;
@@ -59,32 +65,44 @@ namespace CluckWars.UI
             }
 
             var kb = Keyboard.current;
-            if (kb != null && kb.f1Key.wasPressedThisFrame)
+            if (kb != null)
             {
-                _visible = !_visible;
+                if (kb.f1Key.wasPressedThisFrame) _visible        = !_visible;
+                if (kb.f2Key.wasPressedThisFrame) _balanceVisible = !_balanceVisible;
             }
         }
 
         private void OnGUI()
         {
-            if (!_visible) return;
-
             const int pad = 12;
-            const int width = 360;
 
-            _sb.Clear();
-            BuildReport(_sb);
+            if (_visible)
+            {
+                const int width  = 360;
+                const int height = 22 * 18;
+                int x = pad;
+                int y = 110;
 
-            // Center-left so it doesn't fight the top bar or right-side panels.
-            int x = pad;
-            int y = 110;
+                _sb.Clear();
+                BuildReport(_sb);
 
-            // Approximate height — works because IMGUI clips and overflowing the
-            // box is purely cosmetic.
-            int height = 22 * 18;
+                GUI.Box(new Rect(x, y, width, height), "Debug (F1)");
+                GUI.Label(new Rect(x + 10, y + 24, width - 20, height - 32), _sb.ToString());
+            }
 
-            GUI.Box(new Rect(x, y, width, height), "Debug (F1)");
-            GUI.Label(new Rect(x + 10, y + 24, width - 20, height - 32), _sb.ToString());
+            if (_balanceVisible)
+            {
+                const int width  = 480;
+                const int height = 22 * 24;
+                int x = Screen.width - width - pad;
+                int y = 110;
+
+                _balanceSb.Clear();
+                BuildBalanceReport(_balanceSb);
+
+                GUI.Box(new Rect(x, y, width, height), "Balance (F2)");
+                GUI.Label(new Rect(x + 10, y + 24, width - 20, height - 32), _balanceSb.ToString());
+            }
         }
 
         private void BuildReport(StringBuilder sb)
@@ -187,6 +205,84 @@ namespace CluckWars.UI
             }
             var pickups = FindObjectsByType<FoodPickup>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
             sb.Append("Pickups: ").AppendLine(pickups.Length.ToString());
+        }
+
+        // ---- Balance report (F2) -------------------------------------------------
+
+        private void BuildBalanceReport(StringBuilder sb)
+        {
+            // ── Classes ─────────────────────────────────────────────────────────
+            sb.AppendLine("[Classes]");
+            sb.AppendLine("Name          HP    Spd  Turn  Atk   CD  Cap  Rate");
+
+            if (_classRegistry != null)
+            {
+                foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
+                {
+                    if (!_classRegistry.TryGet(cls, out var entry)) continue;
+                    var s = entry.Stats;
+                    if (s == null) continue;
+                    sb.Append(s.DisplayName.PadRight(13))
+                      .Append(s.MaxHP.ToString("0").PadLeft(5))
+                      .Append(s.MoveSpeed.ToString("0.0").PadLeft(6))
+                      .Append(s.TurnSpeed.ToString("0").PadLeft(6))
+                      .Append(s.Attack.ToString("0").PadLeft(5))
+                      .Append(s.AttackCooldown.ToString("0.00").PadLeft(5))
+                      .Append(s.CargoCapacity.ToString().PadLeft(5))
+                      .Append(s.CollectionRate.ToString("0.0").PadLeft(6))
+                      .AppendLine();
+                }
+            }
+            else
+            {
+                sb.AppendLine("  (ClassRegistry not bound)");
+            }
+
+            // ── Local chicken ability timings ────────────────────────────────────
+            sb.AppendLine();
+            sb.AppendLine("[Local Abilities]");
+
+            ChickenController localCtrl = null;
+            var ctrls = FindObjectsByType<ChickenController>(
+                FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < ctrls.Length; i++)
+            {
+                var c = ctrls[i];
+                if (c.Object != null && c.Object.IsValid && c.HasInputAuthority)
+                {
+                    localCtrl = c;
+                    break;
+                }
+            }
+
+            if (localCtrl == null || localCtrl.Abilities == null)
+            {
+                sb.AppendLine("  (no local chicken spawned)");
+                return;
+            }
+
+            var a = localCtrl.Abilities;
+            sb.AppendLine("Slot  Ability              Duration  Cooldown");
+            AppendAbilityLine(sb, 0, a.Slot0);
+            AppendAbilityLine(sb, 1, a.Slot1);
+
+            if (a.ActiveSlot != AbilityController.InvalidSlot)
+                sb.Append("  Active slot ").AppendLine(a.ActiveSlot.ToString());
+        }
+
+        private static void AppendAbilityLine(StringBuilder sb, int slot, AbilityBaseSO ability)
+        {
+            if (ability == null)
+            {
+                sb.Append("  ").Append(slot).AppendLine("     —");
+                return;
+            }
+            sb.Append("  ").Append(slot).Append("    ")
+              .Append(ability.DisplayName.PadRight(20))
+              .Append(ability.Duration.ToString("0.00").PadLeft(6))
+              .Append("s")
+              .Append(ability.Cooldown.ToString("0.0").PadLeft(9))
+              .AppendLine("s");
         }
     }
 }

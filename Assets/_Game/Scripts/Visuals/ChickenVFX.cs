@@ -50,15 +50,18 @@ namespace CluckWars.Visuals
         private ChickenController _controller;
         private ChickenCombat     _combat;
         private ChickenCargo      _cargo;
+        private AbilityController _abilities;
 
         private ParticleSystem _hitPS;
         private ParticleSystem _deathPS;
         private ParticleSystem _stunPS;
         private ParticleSystem _depositPS;
+        private ParticleSystem _abilityPS;
 
         private float _lastHp    = float.NaN;
         private float _lastCargo = float.NaN;
         private bool  _wasStunned;
+        private int   _lastActiveSlot = AbilityController.InvalidSlot;
 
         // ---- Unity lifecycle --------------------------------------------------
 
@@ -67,12 +70,14 @@ namespace CluckWars.Visuals
             _controller = GetComponent<ChickenController>();
             _combat     = GetComponent<ChickenCombat>();
             _cargo      = GetComponent<ChickenCargo>();
+            _abilities  = GetComponent<AbilityController>();
 
             var mat  = BuildMaterial();
             _hitPS     = BuildHitPS(mat);
             _deathPS   = BuildDeathPS(mat);
             _stunPS    = BuildStunPS(mat);
             _depositPS = BuildDepositPS(mat);
+            _abilityPS = BuildAbilityPS(mat);
         }
 
         private void LateUpdate()
@@ -99,6 +104,24 @@ namespace CluckWars.Visuals
 
             _lastHp    = hp;
             _wasStunned = isStunned;
+
+            // ── Ability activation: AccentColor burst on slot activation ─────────
+            if (_abilities != null)
+            {
+                int activeSlot = _abilities.ActiveSlot;
+                if (activeSlot != AbilityController.InvalidSlot &&
+                    _lastActiveSlot == AbilityController.InvalidSlot)
+                {
+                    var ability = _abilities.ActiveAbility;
+                    if (ability != null && _abilityPS != null)
+                    {
+                        var main = _abilityPS.main;
+                        main.startColor = new ParticleSystem.MinMaxGradient(ability.AccentColor);
+                        _abilityPS.Play();
+                    }
+                }
+                _lastActiveSlot = activeSlot;
+            }
 
             // ── Food deposit: Cargo drops to near-zero while alive ─────────────
             // [Networked] Cargo replicates to every peer so this fires everywhere.
@@ -272,6 +295,37 @@ namespace CluckWars.Visuals
             sh.shapeType = ParticleSystemShapeType.Cone;
             sh.angle     = 35f;
             sh.radius    = 0.10f;
+
+            AddFadeOut(ps);
+            return ps;
+        }
+
+        // ---- Ability accent burst ----------------------------------------------------
+
+        /// <summary>
+        /// One-shot spherical burst tinted with <see cref="AbilityBaseSO.AccentColor"/>.
+        /// The color is overwritten dynamically each time an ability activates, so a
+        /// single shared system covers all eight abilities without per-ability instances.
+        /// </summary>
+        private ParticleSystem BuildAbilityPS(Material mat)
+        {
+            var ps   = MakePS("VFX_Ability", new Vector3(0f, 1.0f, 0f), mat);
+            var main = ps.main;
+            main.startLifetime   = new ParticleSystem.MinMaxCurve(0.30f, 0.55f);
+            main.startSpeed      = new ParticleSystem.MinMaxCurve(1.5f,  3.5f);
+            main.startSize       = new ParticleSystem.MinMaxCurve(0.04f, 0.09f);
+            main.startColor      = Color.white; // overwritten at play-time with AccentColor
+            main.gravityModifier = -0.8f;       // particles float upward and outward
+            main.maxParticles    = 32;
+
+            var em = ps.emission;
+            em.rateOverTime = 0;
+            em.SetBursts(new[] { new ParticleSystem.Burst(0f, 16) });
+
+            var sh = ps.shape;
+            sh.enabled   = true;
+            sh.shapeType = ParticleSystemShapeType.Sphere;
+            sh.radius    = 0.25f;
 
             AddFadeOut(ps);
             return ps;
