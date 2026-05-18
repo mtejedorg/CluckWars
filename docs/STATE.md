@@ -120,7 +120,7 @@ All require real-device or playtest data; queued so they don't get done piecemea
 
 - Network desync hunting (cross-device LAN).
 - On-device FPS / draw-call / memory profiling.
-- AnimatorController state authoring (hit / attack / stunned animations).
+- AnimatorController state authoring — **state machine done** (Idle/Walk/Attack/Hit/Stunned states + all transitions). Needs `.anim` clip assets assigned to each state once artwork is recorded/imported.
 - VFX particle systems (sparkles, glows, impacts, stun stars, ability accents).
 - Audio clip recording / mixing.
 - Balance pass (food rates, ability cooldowns, attack damage, HP).
@@ -132,6 +132,7 @@ All require real-device or playtest data; queued so they don't get done piecemea
 ## Recent commits (most recent first)
 
 ```
+(pending) Animator: combat state machine wired
 (pending) DCBA: dead visuals, screen shake, match stats, AI bots
 (pending) Phase 11: class stat cards + ability slot picker
 aa6a154 Lobby UX + Fusion connect callbacks
