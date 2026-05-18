@@ -83,6 +83,14 @@ namespace CluckWars.Gameplay
         /// </summary>
         public bool IsDecoy { get; set; }
 
+        /// <summary>
+        /// True for AI-controlled bots spawned in solo mode. Prevents
+        /// <see cref="FixedUpdateNetwork"/> from reading Fusion player input;
+        /// movement is driven by <see cref="BotController"/> via <see cref="BotTick"/>.
+        /// Set in <c>onBeforeSpawned</c> by <see cref="MatchBootstrapper"/>.
+        /// </summary>
+        [Networked] public bool IsBot { get; set; }
+
         [Inject]
         public void Construct(ChickenClassRegistrySO registry, ILogService log)
         {
@@ -153,6 +161,9 @@ namespace CluckWars.Gameplay
             // tick or the decoy walks in lockstep with the real chicken.
             if (IsDecoy) return;
 
+            // Bots are steered by BotController.BotTick; skip Fusion input read.
+            if (IsBot) return;
+
             // Lobby / intro / end-screen lockout — chickens freeze until the host
             // starts a round and the intro countdown finishes. GameManager.Instance
             // is null until the master client spawns it; treat that as "not running".
@@ -190,6 +201,20 @@ namespace CluckWars.Gameplay
                 transform.position = position;
             }
             _log?.Debug(Source, $"Teleported to {position}.");
+        }
+
+        /// <summary>
+        /// Drives movement for bot-controlled chickens. Called by
+        /// <see cref="BotController"/> each <c>FixedUpdateNetwork</c> tick instead
+        /// of reading Fusion player input. Only valid on the StateAuthority peer;
+        /// no-ops otherwise so remote proxies are unaffected.
+        /// </summary>
+        /// <param name="movement">XZ steering direction, magnitude 0–1.</param>
+        /// <param name="deltaTime">Runner.DeltaTime from the calling NetworkBehaviour.</param>
+        public void BotTick(Vector2 movement, float deltaTime)
+        {
+            if (!HasStateAuthority || _movement == null) return;
+            _movement.Tick(movement, deltaTime);
         }
 
         private ChickenStatsSO ResolveStatsForClass(ChickenClass cls)

@@ -148,6 +148,8 @@ namespace CluckWars.Gameplay
             float dropped = Cargo;
             Cargo = 0f;
             playerBase.RPC_AddFood(dropped);
+            // Track food deposited for the match-end stats overlay.
+            GetComponent<ChickenMatchStats>()?.RPC_AddDeposit(dropped);
             _audio?.PlaySFX(_audioReg != null ? _audioReg.Deposit : null);
             _log?.Debug(Source, $"Deposited {dropped:0.00} at {playerBase.name}.");
         }

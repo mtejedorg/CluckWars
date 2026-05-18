@@ -38,15 +38,18 @@ namespace CluckWars.Visuals
         };
 
         private ChickenController _controller;
+        private ChickenCombat     _combat;
         private TextMesh _text;
         private Transform _textTransform;
         private int _appliedPlayerId = -2;
         private ChickenClass _appliedClass;
         private bool _appliedClassValid;
+        private bool _wasStunned;
 
         private void Awake()
         {
             _controller = GetComponent<ChickenController>();
+            _combat     = GetComponent<ChickenCombat>();
             BuildLabel();
         }
 
@@ -82,6 +85,29 @@ namespace CluckWars.Visuals
         {
             if (_text == null || _controller == null) return;
 
+            // ── Death skull ──────────────────────────────────────────────────
+            bool isNowStunned = _combat != null && _combat.IsStunned;
+            if (isNowStunned != _wasStunned)
+            {
+                _wasStunned = isNowStunned;
+                if (!isNowStunned)
+                {
+                    // Just respawned — force normal label rebuild next block.
+                    _appliedPlayerId  = -2;
+                    _appliedClassValid = false;
+                }
+            }
+
+            if (isNowStunned)
+            {
+                _text.text  = "☠";
+                _text.color = new Color(0.75f, 0.20f, 0.20f, 0.85f);
+                // Billboard + early return — skip normal rebuild while dead.
+                BillboardToCamera();
+                return;
+            }
+
+            // ── Normal label ────────────────────────────────────────────────
             // Apply once the NetworkObject is alive and we know the input
             // authority + class. Both can change post-Spawn (class is set via
             // onBeforeSpawned but the Doppelganger decoy re-stamps it), so we
@@ -109,6 +135,11 @@ namespace CluckWars.Visuals
                 }
             }
 
+            BillboardToCamera();
+        }
+
+        private void BillboardToCamera()
+        {
             // Billboard toward whatever camera is currently rendering. Fixed
             // isometric camera in production, so this is effectively a constant
             // rotation; still doing it each frame for editor flexibility.
@@ -117,9 +148,7 @@ namespace CluckWars.Visuals
             {
                 var lookDir = _textTransform.position - cam.transform.position;
                 if (lookDir.sqrMagnitude > 1e-6f)
-                {
                     _textTransform.rotation = Quaternion.LookRotation(lookDir, Vector3.up);
-                }
             }
         }
     }

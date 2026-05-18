@@ -37,6 +37,10 @@ namespace CluckWars.Gameplay
         [Tooltip("Legacy per-component override. If null, PrefabRegistry.GameManager is used.")]
         [SerializeField] private NetworkObject _gameManagerPrefab;
 
+        [Tooltip("Number of AI bots to spawn in Solo mode (0–3). Bots fill corners 1–3 with classes Speedy / Fatty / Assassin.")]
+        [Range(0, 3)]
+        [SerializeField] private int _soloBotsToSpawn = 3;
+
         private MapGenerator _mapGenerator;
 
         private INetworkService _networkService;
@@ -97,6 +101,9 @@ namespace CluckWars.Gameplay
             _log?.Debug(Source, $"Network start awaited (mode={mode}); runner is up.");
 
             TrySpawnGameManager();
+
+            if (mode == SessionMode.Solo)
+                TrySpawnBots();
         }
 
         private void TrySpawnGameManager()
@@ -129,6 +136,63 @@ namespace CluckWars.Gameplay
 
             _log?.Info(Source, "Master client spawning GameManager.");
             runner.Spawn(gmPrefab, Vector3.zero, Quaternion.identity);
+        }
+
+        /// <summary>
+        /// Spawns AI bot chickens to fill the non-player corners in solo mode.
+        /// Bots use <see cref="PlayerRef.None"/> as input authority so Fusion never
+        /// feeds them player input; <see cref="BotController"/> drives them instead.
+        /// </summary>
+        private void TrySpawnBots()
+        {
+            if (_soloBotsToSpawn <= 0) return;
+
+            var runner = _networkService.Runner;
+            if (runner == null) return;
+
+            var chickenPrefab = ResolveChickenPrefab();
+            if (chickenPrefab == null) return;
+
+            // Distribute variety: Speedy → corner 1, Fatty → corner 2, Assassin → corner 3.
+            var botClasses = new[] { ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };
+
+            var mapGen   = FindFirstObjectByType<MapGenerator>();
+            var spawnPts = mapGen != null ? mapGen.SpawnPoints : null;
+
+            int count = Mathf.Min(_soloBotsToSpawn, 3);
+            for (int i = 0; i < count; i++)
+            {
+                int     cornerIdx = (i + 1) % 4;         // corners 1, 2, 3
+                var     botClass  = botClasses[i % botClasses.Length];
+                Vector3 pos       = Vector3.zero;
+
+                if (spawnPts != null && cornerIdx < spawnPts.Count)
+                    pos = spawnPts[cornerIdx];
+
+                // Safety jitter — mirrors HandlePlayerJoined so bots never stack.
+                pos += new Vector3(
+                    Mathf.Sin((i + 4) * 1.7f) * 0.25f,
+                    0.05f,
+                    Mathf.Cos((i + 4) * 1.7f) * 0.25f);
+
+                int captured = i; // capture loop variable for lambda
+                runner.Spawn(
+                    chickenPrefab,
+                    pos,
+                    Quaternion.identity,
+                    inputAuthority: PlayerRef.None,
+                    onBeforeSpawned: (_, networkObject) =>
+                    {
+                        var ctrl = networkObject.GetComponent<ChickenController>();
+                        if (ctrl != null)
+                        {
+                            ctrl.Class = botClasses[captured % botClasses.Length];
+                            ctrl.IsBot = true;
+                        }
+                    });
+
+                _log?.Info(Source, $"Spawning bot {i}: class={botClass}, corner={cornerIdx}, pos={pos}.");
+            }
         }
 
         private void OnDestroy()
@@ -177,6 +241,15 @@ namespace CluckWars.Gameplay
                     // chosen class on first read and can resolve stats / tint correctly.
                     var controller = networkObject.GetComponent<ChickenController>();
                     if (controller != null) controller.Class = chosenClass;
+
+                    // Apply player-chosen abilities when the player selected from a pool.
+                    // Null means "use the prefab default" — SetSlots ignores null args.
+                    if (_selection != null &&
+                        (_selection.Ability0 != null || _selection.Ability1 != null))
+                    {
+                        var abilityCtrl = networkObject.GetComponent<AbilityController>();
+                        abilityCtrl?.SetSlots(_selection.Ability0, _selection.Ability1);
+                    }
                 });
         }
 

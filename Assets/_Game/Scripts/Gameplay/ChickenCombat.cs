@@ -117,6 +117,9 @@ namespace CluckWars.Gameplay
             // button doesn't fire through the decoy.
             if (_controller != null && _controller.IsDecoy) return;
 
+            // Bots are driven by BotController.BotTrySwing — skip input read.
+            if (_controller != null && _controller.IsBot) return;
+
             // Lobby / intro / end lockout — no swings before the host starts.
             var gm = GameManager.Instance;
             if (gm == null || !gm.IsMatchRunning) return;
@@ -127,6 +130,23 @@ namespace CluckWars.Gameplay
             {
                 Swing(stats);
             }
+        }
+
+        /// <summary>
+        /// Bot-facing swing entry point — called directly by <see cref="BotController"/>
+        /// each tick. Bypasses Fusion player input; the cooldown gate still applies.
+        /// Only runs on the <see cref="HasStateAuthority"/> peer.
+        /// </summary>
+        public void BotTrySwing()
+        {
+            if (!HasStateAuthority) return;
+            if (IsStunned) return;
+            var stats = _controller?.Stats;
+            if (stats == null) return;
+            var gm = GameManager.Instance;
+            if (gm == null || !gm.IsMatchRunning) return;
+            if (!AttackTimer.ExpiredOrNotRunning(Runner)) return;
+            Swing(stats);
         }
 
         public override void Render()
@@ -143,6 +163,11 @@ namespace CluckWars.Gameplay
                         {
                             _animator?.TriggerHit();
                             _audio?.PlaySFX(_audioReg != null ? _audioReg.Hit : null);
+                            // Small shake only on the local chicken's camera — every
+                            // peer calls Render() but only the input-authority peer
+                            // has the real MatchCamera for the human player.
+                            if (HasInputAuthority)
+                                CluckWars.Visuals.MatchCamera.Instance?.ApplyShake(0.12f, 0.25f);
                         }
                         break;
                     }
@@ -155,6 +180,9 @@ namespace CluckWars.Gameplay
                             _log?.Info(Source, "Death stun begin.");
                             _audio?.PlaySFX(_audioReg != null ? _audioReg.Stun : null);
                             OnDeath?.Invoke();
+                            // Death gets a bigger shake to punctuate the event.
+                            if (HasInputAuthority)
+                                CluckWars.Visuals.MatchCamera.Instance?.ApplyShake(0.35f, 0.45f);
                         }
                         else
                         {
@@ -245,6 +273,33 @@ namespace CluckWars.Gameplay
             {
                 IsStunned = true;
                 StunTimer = TickTimer.CreateFromSeconds(Runner, _stunDuration);
+                CreditKillToAttacker(attacker);
+            }
+        }
+
+        /// <summary>
+        /// Finds the attacker's <see cref="ChickenMatchStats"/> by InputAuthority and
+        /// credits a kill. Only real players earn kills; bots are ignored as both
+        /// killers and victims. Runs on the target's StateAuthority (called from
+        /// <see cref="RPC_ApplyDamage"/>).
+        /// </summary>
+        private void CreditKillToAttacker(PlayerRef attacker)
+        {
+            if (!attacker.IsRealPlayer) return;
+            // No self-kill credit (e.g. reflected damage hitting the reflector).
+            if (Object != null && attacker == Object.InputAuthority) return;
+
+            var allStats = FindObjectsByType<ChickenMatchStats>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < allStats.Length; i++)
+            {
+                var s = allStats[i];
+                if (s == null || s.Object == null) continue;
+                if (s.Object.InputAuthority == attacker)
+                {
+                    s.RPC_CreditKill();
+                    _log?.Debug(Source, $"Kill credited to {attacker}.");
+                    return;
+                }
             }
         }
 

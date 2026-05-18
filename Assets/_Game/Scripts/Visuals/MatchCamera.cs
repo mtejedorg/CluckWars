@@ -66,8 +66,20 @@ namespace CluckWars.Visuals
         private Vector3 _focusVelocity;
         private float _nextLocalChickenSearchTime;
 
+        // Screen shake
+        private float _shakeRemaining;
+        private float _shakeDuration;
+        private float _shakePeak;
+
+        /// <summary>
+        /// Scene-wide singleton set in <c>Awake</c>. Abilities and combat use this
+        /// to trigger positional impulses without needing a direct reference.
+        /// </summary>
+        public static MatchCamera Instance { get; private set; }
+
         private void Awake()
         {
+            Instance = this;
             _camera = GetComponent<Camera>();
             _currentFocus = _focusPoint;
             ApplyCamera();
@@ -100,6 +112,41 @@ namespace CluckWars.Visuals
 
             _currentFocus = Vector3.SmoothDamp(_currentFocus, target, ref _focusVelocity, _followSmoothTime);
             ApplyTransform(_currentFocus);
+
+            // Screen shake — positional impulse that decays linearly to zero
+            // over the requested duration. Applied after ApplyTransform so it's
+            // additive to the follow position, not smoothed out by SmoothDamp.
+            if (_shakeRemaining > 0f)
+            {
+                float t   = _shakeDuration > 0f ? _shakeRemaining / _shakeDuration : 0f;
+                float mag = _shakePeak * t;
+                _shakeRemaining = Mathf.Max(0f, _shakeRemaining - Time.deltaTime);
+                if (_shakeRemaining <= 0f) _shakePeak = 0f;
+
+                transform.position += new Vector3(
+                    (Random.value * 2f - 1f) * mag,
+                    (Random.value * 2f - 1f) * mag * 0.3f,  // less vertical jitter
+                    (Random.value * 2f - 1f) * mag);
+            }
+        }
+
+        /// <summary>
+        /// Trigger a positional shake impulse on the camera. If a stronger or longer
+        /// shake is already running it wins; otherwise the new values override.
+        /// Safe to call from any peer — guards internally so only the local camera shakes.
+        /// </summary>
+        public void ApplyShake(float magnitude, float duration)
+        {
+            if (magnitude > _shakePeak)
+            {
+                _shakePeak      = magnitude;
+                _shakeDuration  = duration;
+                _shakeRemaining = duration;
+            }
+            else if (_shakeRemaining < duration)
+            {
+                _shakeRemaining = duration;
+            }
         }
 
         private Vector3 ResolveLocalChickenPosition()

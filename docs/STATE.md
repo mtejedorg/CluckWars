@@ -18,7 +18,7 @@ All tags are local until pushed.
 
 ---
 
-## What works (Phases 1–9 complete + Phase 10 in progress)
+## What works (Phases 1–9 complete + Phases 10–11 complete + DCBA polish)
 
 ### Core loop
 - 4 classes (Warrior / Speedy / Fatty / Assassin) — selectable in Bootstrap menu.
@@ -28,6 +28,12 @@ All tags are local until pushed.
 - Food drop on death; pickup-on-overlap.
 - All 8 abilities equippable: Speed Burst, Egg Shell, Roll & Trample, Invisibility, Spine Coat, Turtle Mode, Sneaky Steal, Doppelganger.
 - Per-class ability allowlist exists on `ChickenStatsSO` (empty = no restriction).
+
+### DCBA polish (code complete — pending Maestro prefab wiring for B + A)
+- **D — Dead visual states**: `ChickenVisuals` greys out + goes semi-transparent (0.40 alpha) when `IsStunned`. `ChickenNameplate` shows red "☠" while dead; restores the normal label on respawn.
+- **C — Screen shake**: `MatchCamera.Instance.ApplyShake()` called on HP decrease (0.12 mag / 0.25s) and on death (0.35 mag / 0.45s). Linear decay, y-axis damped 0.3×. Only fires on `HasInputAuthority` (local chicken).
+- **B — Match stats**: New `ChickenMatchStats` NetworkBehaviour (`[Networked] Kills` + `FoodDeposited`). `ChickenCombat.CreditKillToAttacker()` credits kills via RPC. `ChickenCargo.TryDepositAtNearbyBase()` records deposits. `GameManager.RestartMatch()` resets stats. Match-end overlay shows `food | kills` per player. **Maestro: add `ChickenMatchStats` component to Chicken prefab.**
+- **A — AI bots (solo mode)**: `ChickenController.IsBot` [Networked] + `BotTick()`. New `BotController` NetworkBehaviour (FSM: Idle / CollectFood / ReturnToBase; throttled Think @ 0.3s). `MatchBootstrapper._soloBotsToSpawn = 3` spawns bots at corners 1–3 with `PlayerRef.None` after solo start. Bots deposit at nearest unowned base. `GameManager.RestartMatch()` teleports bots back to their corners. **Maestro: add `BotController` component to Chicken prefab.**
 
 ### Match lifecycle
 - `GameManager` state machine: `WaitingForPlayers` → `Active` → `Ended` → restart.
@@ -53,10 +59,14 @@ All tags are local until pushed.
 - Lobby heartbeat (15s) runs automatically while host is in-session; stops on `LeaveLobbyAsync`.
 - **Requires Unity Dashboard project link** — see "Outstanding before next test session" below.
 
-### UI
-- **Bootstrap menu**: procedural UGUI canvas, class + mode picker, keyboard shortcuts (1-4, S/H/J, SPACE).
-- **MatchHud** (UGUI): top bar timer + per-player totals (Players: X / Y), bottom-left HP + cargo bars, centered match-end leaderboard with restart countdown, session-end overlay, lobby panel with Start button, intro countdown overlay, hit-flash on local damage.
-- **TouchControlsHud**: joystick + attack + 2 ability buttons. Ability button tint = equipped `AbilityBaseSO.AccentColor`. Cooldown radial fill.
+### UI (Phase 10 visual redesign — Clash Royale/Supercell warm palette)
+- **Design tokens** (ART.md §6, `cluckwars-tokens-v2`): panel `#3a2210` warm dark wood, gold `#f5c842`, green CTA `#33a332`, text `#fef5e0`. All inline in code; independent of serialised SO.
+- **Player palette** updated to colorblind-safe Okabe-Ito set: Orange `#E8751A`, Blue `#1A7FC4`, Pink `#C4286F`, Teal `#0D9E7A`.
+- **Bootstrap menu**: full-screen `#0e0804` background, warm wood panel, "CLUCK WARS" title in gold, section labels in gold accent. Keyboard shortcuts (1-4, S/H/J, SPACE). UGS lobby browser with scrollable list.
+  - **Class stat cards** (Phase 11): flat class buttons replaced with tall cards showing a class-tint top strip, bold name, SPD/HP/CGO stat bars (normalized across all 4 classes from `ChickenClassRegistrySO`; falls back to design-time percentages when registry not bound), and ability-pool hint. Entire card is a `Button`.
+  - **Ability slot picker** (Phase 11): "ABILITIES" section below class cards with two slots, each showing `◀ AbilityName ▶` arrows to cycle through `ChickenStatsSO.AvailableAbilities` for the selected class. Shows "Default" when pool is empty (which is the current state — pools fill during balance pass). Slot labels tinted with `AbilityBaseSO.AccentColor`. Selections stored in `ISessionSelectionService.Ability0/.Ability1`.
+- **MatchHud** (UGUI): ranked leaderboard top-left (4 rows sorted live by food score, with player-color dot + progress bar + score). Timer badge top-right in gold. HP + cargo bars bottom-left above joystick. Centered overlays: lobby (with green Start button), match-end (ranked results), session-end, intro countdown (gold "3, 2, 1, GO!").
+- **TouchControlsHud**: joystick + attack + 2 ability buttons in MOBA arc. Ability tint = equipped `AbilityBaseSO.AccentColor`. Cooldown radial fill.
 - **DebugHud** (F1 toggle): FPS, network state, GameManager state, local chicken stats, base ownership, pickup count.
 
 ### Map / camera
@@ -84,10 +94,15 @@ All bound app-wide in `ProjectInstaller`. Empty asset slots bind a runtime-empty
 
 ### Pending Maestro (Editor work)
 - **UGS Dashboard link** (required for Phase 10): Unity Editor → Edit → Project Settings → Services → link to your Unity Cloud Organization. Then enable Authentication and Lobby services in the Dashboard. Without this, `UGSService.InitializeAsync()` will throw.
+- **ColorScheme.asset**: Select the asset in the Project window and click "Reset" in the Inspector to apply the Phase 10 default palette (warm brown, gold, green CTA). The `MatchHud` and `CharacterSelectController` use inline design-token colors that are already correct; only the `TouchControlsHud` button visuals still read from the SO.
+- **DCBA — Chicken prefab components** (required for B + A):
+  - Add `ChickenMatchStats` component to the Chicken prefab (alongside `ChickenController`). No Inspector wiring — auto-resets each round.
+  - Add `BotController` component to the Chicken prefab. No Inspector wiring needed; self-guards on `IsBot = false` for player chickens.
 - Optional: fill `AudioRegistry` clips, tune class ability allowlists in `ChickenStatsSO.AvailableAbilities`.
 
 ### Pending agents (code)
-- Nothing blocking after Phase 10 code landed. Test session will validate UGS live paths.
+- Phase 11 + DCBA all code complete. Nothing else blocking agents.
+- `ISessionSelectionService` now carries `Ability0`/`Ability1`; `MatchBootstrapper` calls `AbilityController.SetSlots()` in `onBeforeSpawned`. Ability selection is only meaningful after Maestro fills `ChickenStatsSO.AvailableAbilities` per class in the Editor.
 
 ---
 
@@ -117,6 +132,8 @@ All require real-device or playtest data; queued so they don't get done piecemea
 ## Recent commits (most recent first)
 
 ```
+(pending) DCBA: dead visuals, screen shake, match stats, AI bots
+(pending) Phase 11: class stat cards + ability slot picker
 aa6a154 Lobby UX + Fusion connect callbacks
 8fca391 Fix CS0104: ambiguous LogLevel
 7ccb850 Lobby + spawn-at-base

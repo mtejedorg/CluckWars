@@ -23,7 +23,9 @@ namespace CluckWars.Visuals
         private MaterialPropertyBlock _propertyBlock;
         private Color _currentTint = Color.white;
         private float _lastAppliedOpacity = 1f;
+        private bool  _isDeadState;
         private ChickenController _controller;
+        private ChickenCombat     _combat;
 
         private void Awake()
         {
@@ -33,6 +35,7 @@ namespace CluckWars.Visuals
             }
             _propertyBlock = new MaterialPropertyBlock();
             _controller = GetComponent<ChickenController>();
+            _combat     = GetComponent<ChickenCombat>();
         }
 
         public void ApplyTint(Color color)
@@ -55,14 +58,29 @@ namespace CluckWars.Visuals
             float raw = _controller.VisualOpacity;
             float effective = raw > 0f ? raw : 1f;
 
-            // Watch for opacity changes (Invisibility ability) and re-push the tint
-            // with the new alpha. Cheap: only writes the property block when it
-            // actually changes.
-            if (!Mathf.Approximately(effective, _lastAppliedOpacity))
+            bool isStunned  = _combat != null && _combat.IsStunned;
+            bool stunChanged = isStunned != _isDeadState;
+
+            // Repaint when opacity changes (Invisibility ability) OR stun state flips.
+            // Cheap: only writes the property block when something actually changed.
+            if (!Mathf.Approximately(effective, _lastAppliedOpacity) || stunChanged)
             {
                 _lastAppliedOpacity = Mathf.Clamp01(effective);
-                var c = _currentTint;
-                c.a = _lastAppliedOpacity;
+                _isDeadState        = isStunned;
+
+                Color c;
+                if (isStunned)
+                {
+                    // Grey-out + semi-transparent ghost so dead chickens read as
+                    // clearly non-interactive without disappearing entirely.
+                    c   = Color.Lerp(_currentTint, new Color(0.4f, 0.4f, 0.4f, 1f), 0.75f);
+                    c.a = 0.40f;
+                }
+                else
+                {
+                    c   = _currentTint;
+                    c.a = _lastAppliedOpacity;
+                }
                 PushColor(c);
             }
         }

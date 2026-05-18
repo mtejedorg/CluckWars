@@ -391,6 +391,13 @@ namespace CluckWars.Gameplay
                 cargos[i]?.RPC_ResetForNewMatch();
             }
 
+            // Reset per-chicken match stats so kills and food totals start fresh.
+            var matchStats = FindObjectsByType<ChickenMatchStats>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < matchStats.Length; i++)
+            {
+                matchStats[i]?.RPC_ResetStats();
+            }
+
             // Teleport each chicken back to its corner so the new round opens with
             // everyone where they started. MapGenerator.SpawnPoints is in the same
             // order as PlayerBase.CornerIndex, so the playerId-modulo mapping that
@@ -400,14 +407,25 @@ namespace CluckWars.Gameplay
             if (spawnPoints != null && spawnPoints.Count > 0)
             {
                 var controllers = FindObjectsByType<ChickenController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+                // Track which spawn corners are taken so bots get the remaining ones.
+                int botCornerCounter = 1; // bots occupy corners 1, 2, 3
                 for (int i = 0; i < controllers.Length; i++)
                 {
                     var ctrl = controllers[i];
                     if (ctrl == null || ctrl.Object == null) continue;
                     var player = ctrl.Object.InputAuthority;
-                    if (!player.IsRealPlayer) continue;
-                    int cornerIdx = Mathf.Abs(player.PlayerId) % spawnPoints.Count;
-                    ctrl.RPC_TeleportTo(spawnPoints[cornerIdx]);
+                    if (player.IsRealPlayer)
+                    {
+                        int cornerIdx = Mathf.Abs(player.PlayerId) % spawnPoints.Count;
+                        ctrl.RPC_TeleportTo(spawnPoints[cornerIdx]);
+                    }
+                    else if (ctrl.IsBot)
+                    {
+                        // Assign bots to corners 1, 2, 3 in order (same as initial spawn).
+                        int botCorner = botCornerCounter % spawnPoints.Count;
+                        botCornerCounter++;
+                        ctrl.RPC_TeleportTo(spawnPoints[botCorner]);
+                    }
                 }
             }
 
