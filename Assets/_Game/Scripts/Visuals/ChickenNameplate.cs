@@ -39,9 +39,12 @@ namespace CluckWars.Visuals
 
         private ChickenController _controller;
         private ChickenCombat     _combat;
-        private TextMesh _text;
+        private ChickenCargo      _cargo;
+        private TextMesh  _text;
         private Transform _textTransform;
-        private int _appliedPlayerId = -2;
+        private TextMesh  _cargoText;
+        private Transform _cargoTransform;
+        private int  _appliedPlayerId  = -2;
         private ChickenClass _appliedClass;
         private bool _appliedClassValid;
         private bool _wasStunned;
@@ -50,7 +53,9 @@ namespace CluckWars.Visuals
         {
             _controller = GetComponent<ChickenController>();
             _combat     = GetComponent<ChickenCombat>();
+            _cargo      = GetComponent<ChickenCargo>();
             BuildLabel();
+            BuildCargoLabel();
         }
 
         private void BuildLabel()
@@ -136,6 +141,7 @@ namespace CluckWars.Visuals
             }
 
             BillboardToCamera();
+            UpdateCargoLabel();
         }
 
         private void BillboardToCamera()
@@ -149,6 +155,85 @@ namespace CluckWars.Visuals
                 var lookDir = _textTransform.position - cam.transform.position;
                 if (lookDir.sqrMagnitude > 1e-6f)
                     _textTransform.rotation = Quaternion.LookRotation(lookDir, Vector3.up);
+            }
+        }
+
+        // ── Cargo line ─────────────────────────────────────────────────────────
+
+        private void BuildCargoLabel()
+        {
+            var go = new GameObject("CargoIndicator");
+            go.transform.SetParent(transform, worldPositionStays: false);
+            // Sits 0.42 world-units below the main nameplate.
+            go.transform.localPosition = new Vector3(0f, _offset.y - 0.42f, 0f);
+            _cargoTransform = go.transform;
+
+            _cargoText               = go.AddComponent<TextMesh>();
+            _cargoText.anchor        = TextAnchor.MiddleCenter;
+            _cargoText.alignment     = TextAlignment.Center;
+            _cargoText.fontSize      = 72;
+            _cargoText.characterSize = _characterSize * 0.80f;
+            _cargoText.fontStyle     = FontStyle.Bold;
+            _cargoText.text          = "";
+            _cargoText.color         = Color.green;
+
+            var mr = go.GetComponent<MeshRenderer>();
+            if (mr != null)
+            {
+                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                mr.receiveShadows    = false;
+            }
+        }
+
+        private void UpdateCargoLabel()
+        {
+            if (_cargoText == null || _cargoTransform == null) return;
+
+            // Guard: wait until the NetworkObject is live (cargo is [Networked]).
+            if (_cargo == null || _cargo.Object == null || !_cargo.Object.IsValid)
+            {
+                _cargoText.text = "";
+                return;
+            }
+
+            // Hide cargo while dead — skull from main label covers this state.
+            if (_combat != null && _combat.IsStunned)
+            {
+                _cargoText.text = "";
+                return;
+            }
+
+            float cap = _cargo.Capacity;
+            if (cap <= 0f) { _cargoText.text = ""; return; }
+
+            float frac    = _cargo.Fraction;
+            int   carried = Mathf.FloorToInt(_cargo.Cargo);
+            int   capInt  = Mathf.FloorToInt(cap);
+
+            if (frac >= 1f)
+            {
+                _cargoText.text  = "■ FULL!";
+                _cargoText.color = new Color(1f, 0.18f, 0.08f, 1f); // bright red
+            }
+            else if (carried > 0)
+            {
+                _cargoText.text  = $"{carried}/{capInt}";
+                _cargoText.color = frac >= 0.7f
+                    ? new Color(1f, 0.55f, 0.05f, 1f)   // orange
+                    : new Color(0.95f, 0.88f, 0.20f, 1f); // yellow
+            }
+            else
+            {
+                _cargoText.text = "";  // empty cargo → no clutter
+            }
+
+            // Billboard same as main label.
+            var cam = Camera.main;
+            if (cam != null)
+            {
+                var lookDir = _cargoTransform.position - cam.transform.position;
+                if (lookDir.sqrMagnitude > 1e-6f)
+                    _cargoTransform.rotation = Quaternion.LookRotation(lookDir, Vector3.up);
             }
         }
     }

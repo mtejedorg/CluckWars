@@ -126,9 +126,19 @@ namespace CluckWars.Gameplay
 
             if (!GetInput<PlayerNetworkInput>(out var input)) return;
 
-            if (input.Buttons.IsSet((int)InputButton.Attack) && AttackTimer.ExpiredOrNotRunning(Runner))
+            if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose) &&
+                (input.Buttons.Bits != 0))
+                _log.Verbose(Source, $"Input tick: attack={input.Buttons.IsSet((int)InputButton.Attack)}, " +
+                    $"a1={input.Buttons.IsSet((int)InputButton.Ability1)}, " +
+                    $"a2={input.Buttons.IsSet((int)InputButton.Ability2)}.");
+
+            if (input.Buttons.IsSet((int)InputButton.Attack))
             {
-                Swing(stats);
+                if (AttackTimer.ExpiredOrNotRunning(Runner))
+                    Swing(stats);
+                else
+                    _log?.Verbose(Source, $"Attack pressed but on cooldown " +
+                        $"({AttackTimer.RemainingTime(Runner):0.00}s remaining).");
             }
         }
 

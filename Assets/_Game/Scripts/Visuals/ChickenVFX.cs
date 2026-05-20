@@ -57,10 +57,12 @@ namespace CluckWars.Visuals
         private ParticleSystem _stunPS;
         private ParticleSystem _depositPS;
         private ParticleSystem _abilityPS;
+        private ParticleSystem _cargoFullPS;
 
         private float _lastHp    = float.NaN;
         private float _lastCargo = float.NaN;
         private bool  _wasStunned;
+        private bool  _wasCargoFull;
         private int   _lastActiveSlot = AbilityController.InvalidSlot;
 
         // ---- Unity lifecycle --------------------------------------------------
@@ -73,11 +75,12 @@ namespace CluckWars.Visuals
             _abilities  = GetComponent<AbilityController>();
 
             var mat  = BuildMaterial();
-            _hitPS     = BuildHitPS(mat);
-            _deathPS   = BuildDeathPS(mat);
-            _stunPS    = BuildStunPS(mat);
-            _depositPS = BuildDepositPS(mat);
-            _abilityPS = BuildAbilityPS(mat);
+            _hitPS       = BuildHitPS(mat);
+            _deathPS     = BuildDeathPS(mat);
+            _stunPS      = BuildStunPS(mat);
+            _depositPS   = BuildDepositPS(mat);
+            _abilityPS   = BuildAbilityPS(mat);
+            _cargoFullPS = BuildCargoFullPS(mat);
         }
 
         private void LateUpdate()
@@ -123,14 +126,26 @@ namespace CluckWars.Visuals
                 _lastActiveSlot = activeSlot;
             }
 
-            // ── Food deposit: Cargo drops to near-zero while alive ─────────────
-            // [Networked] Cargo replicates to every peer so this fires everywhere.
+            // ── Food deposit + cargo-full ring ────────────────────────────────
+            // [Networked] Cargo replicates to every peer so both effects fire
+            // on all clients automatically — no extra RPC needed.
             if (_cargo != null)
             {
-                float cargo = _cargo.Cargo;
+                float cargo       = _cargo.Cargo;
+                bool  isCargoFull = _cargo.IsFull && !isStunned;
+
+                // Deposit burst: cargo just dropped from a meaningful amount to empty.
                 if (!float.IsNaN(_lastCargo) && _lastCargo > 1f && cargo < 0.1f && !isStunned)
                     _depositPS?.Play();
-                _lastCargo = cargo;
+
+                // Cargo-full ring: looping orbit that turns on/off with capacity state.
+                if (isCargoFull && !_wasCargoFull)
+                    _cargoFullPS?.Play();
+                else if (!isCargoFull && _wasCargoFull)
+                    _cargoFullPS?.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+
+                _lastCargo    = cargo;
+                _wasCargoFull = isCargoFull;
             }
         }
 
@@ -326,6 +341,39 @@ namespace CluckWars.Visuals
             sh.enabled   = true;
             sh.shapeType = ParticleSystemShapeType.Sphere;
             sh.radius    = 0.25f;
+
+            AddFadeOut(ps);
+            return ps;
+        }
+
+        // ---- Cargo-full ring --------------------------------------------------
+
+        /// <summary>
+        /// Looping gold orbit that plays while the chicken is carrying a full load.
+        /// Identical in shape to the stun ring but gold-tinted and at waist height,
+        /// so players can spot at a glance whether a chicken is full and needs to
+        /// return to base.
+        /// </summary>
+        private ParticleSystem BuildCargoFullPS(Material mat)
+        {
+            var ps   = MakePS("VFX_CargoFull", new Vector3(0f, 0.65f, 0f), mat, looping: true);
+            var main = ps.main;
+            main.startLifetime   = new ParticleSystem.MinMaxCurve(0.40f, 0.60f);
+            main.startSpeed      = new ParticleSystem.MinMaxCurve(0.30f, 0.65f);
+            main.startSize       = new ParticleSystem.MinMaxCurve(0.04f, 0.07f);
+            main.startColor      = new Color(1.00f, 0.85f, 0.15f, 1f); // bright gold
+            main.gravityModifier = -0.25f; // float very gently upward
+            main.maxParticles    = 48;
+
+            var em = ps.emission;
+            em.rateOverTime = 12f;
+
+            // Horizontal circle — same silhouette as the stun orbit but lower.
+            var sh = ps.shape;
+            sh.enabled          = true;
+            sh.shapeType        = ParticleSystemShapeType.Circle;
+            sh.radius           = 0.38f;
+            sh.radiusThickness  = 1f;
 
             AddFadeOut(ps);
             return ps;

@@ -1,5 +1,7 @@
+using CluckWars.Logging;
 using Fusion;
 using UnityEngine;
+using Zenject;
 
 namespace CluckWars.Gameplay
 {
@@ -29,6 +31,7 @@ namespace CluckWars.Gameplay
     [RequireComponent(typeof(NetworkObject))]
     public sealed class BotController : NetworkBehaviour
     {
+        private const string Source = "Bot";
         private enum BotState { Idle, CollectFood, ReturnToBase }
 
         [Tooltip("Seconds between path-replanning decisions. Lower = more responsive, higher = cheaper.")]
@@ -46,19 +49,32 @@ namespace CluckWars.Gameplay
         private ChickenController _controller;
         private ChickenCombat     _combat;
         private ChickenCargo      _cargo;
+        private ILogService        _log;
 
-        private BotState   _state   = BotState.Idle;
+        private BotState   _state     = BotState.Idle;
+        private BotState   _prevState = BotState.Idle;
         private Vector3    _moveTarget;
         private PlayerBase _homeBase;
         private float      _nextThinkTime;
+
+        [Inject]
+        public void Construct(ILogService log)
+        {
+            _log = log;
+        }
 
         // ---- Fusion lifecycle --------------------------------------------------
 
         public override void Spawned()
         {
+            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+
             _controller = GetComponent<ChickenController>();
             _combat     = GetComponent<ChickenCombat>();
             _cargo      = GetComponent<ChickenCargo>();
+
+            _log?.Debug(Source, $"Spawned. HasStateAuthority={HasStateAuthority}, " +
+                $"IsBot={(_controller != null ? _controller.IsBot.ToString() : "n/a")}.");
         }
 
         public override void FixedUpdateNetwork()
@@ -90,11 +106,16 @@ namespace CluckWars.Gameplay
 
         private void Think()
         {
+            _prevState = _state;
+
             // Priority 1: return to base when cargo is sufficiently full.
             if (_cargo != null && _cargo.Fraction >= _returnThreshold)
             {
                 _state      = BotState.ReturnToBase;
                 _moveTarget = GetHomeBasePosition();
+                if (_state != _prevState)
+                    _log?.Debug(Source, $"State {_prevState} → ReturnToBase " +
+                        $"(cargo={_cargo.Fraction:P0}). Target={_moveTarget}.");
                 return;
             }
 
@@ -104,11 +125,16 @@ namespace CluckWars.Gameplay
             {
                 _state      = BotState.CollectFood;
                 _moveTarget = pile.transform.position;
+                if (_state != _prevState)
+                    _log?.Debug(Source, $"State {_prevState} → CollectFood. " +
+                        $"Target pile='{pile.name}' at {_moveTarget}.");
                 return;
             }
 
             // Nothing to do — idle.
             _state = BotState.Idle;
+            if (_state != _prevState)
+                _log?.Debug(Source, $"State {_prevState} → Idle (no piles found).");
         }
 
         private void Navigate()
@@ -155,6 +181,10 @@ namespace CluckWars.Gameplay
                 if (sqr < bestSqr) { bestSqr = sqr; nearest = b; }
             }
             _homeBase = nearest;
+            if (_homeBase != null)
+                _log?.Debug(Source, $"Home base resolved: '{_homeBase.name}' at {_homeBase.transform.position}.");
+            else
+                _log?.Warn(Source, "GetHomeBasePosition: no unowned base found — bot will idle in place.");
             return _homeBase != null ? _homeBase.transform.position : selfPos;
         }
 

@@ -227,29 +227,64 @@ namespace CluckWars.Gameplay
                 if (!player.IsRealPlayer) continue;
                 if (PlayerHasBase(bases, player)) continue;
 
-                // Prefer the corner matching the player's PlayerId so spawn corner
-                // and assigned base agree (MatchBootstrapper picks SpawnPoints[
-                // playerId % count]). Falls back to first-unowned for scene-baked
-                // bases that don't carry a CornerIndex.
-                int desiredCorner = Mathf.Abs(player.PlayerId) % bases.Length;
-                var pairedBase = FindUnownedBaseAtCorner(bases, desiredCorner);
-                var freeBase = pairedBase ?? FindUnownedBase(bases);
-                if (freeBase == null) break; // no more bases to hand out
+                // Assign the nearest unowned base to where this player's chicken
+                // is currently standing. This is robust across corner-permutation
+                // shuffles (MatchBootstrapper randomises starting edges each game),
+                // PlayerId values in Fusion Single vs Shared mode, and late-join
+                // scenarios.  Falls back to first-unowned if the chicken hasn't
+                // spawned yet (GameManager ticks every frame so it retries).
+                var freeBase = FindNearestUnownedBaseToPlayer(bases, player)
+                               ?? FindUnownedBase(bases);
+                if (freeBase == null)
+                {
+                    _log?.Warn(Source, $"No free base for player {player} " +
+                        $"(bases={bases.Length}). Will retry next tick.");
+                    continue; // don't break — other players may still need bases
+                }
 
                 freeBase.Owner = player;
-                _log?.Info(Source, $"Assigned {freeBase.name} (corner {freeBase.CornerIndex}) to {player}.");
+                _log?.Info(Source, $"Assigned '{freeBase.name}' (corner {freeBase.CornerIndex}) " +
+                    $"to player {player} (PlayerId={player.PlayerId}).");
             }
         }
 
-        private static PlayerBase FindUnownedBaseAtCorner(PlayerBase[] bases, int cornerIndex)
+        /// <summary>
+        /// Finds the unowned <see cref="PlayerBase"/> closest to the chicken
+        /// controlled by <paramref name="player"/>. Returns null if the chicken
+        /// hasn't spawned yet or no unowned base is available.
+        /// </summary>
+        private PlayerBase FindNearestUnownedBaseToPlayer(PlayerBase[] bases, PlayerRef player)
         {
+            var chickens = FindObjectsByType<ChickenController>(
+                FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+
+            Vector3 chickenPos  = Vector3.zero;
+            bool    chickenFound = false;
+            for (int i = 0; i < chickens.Length; i++)
+            {
+                var c = chickens[i];
+                if (c == null || c.Object == null || !c.Object.IsValid) continue;
+                if (c.Object.InputAuthority != player) continue;
+                chickenPos   = c.transform.position;
+                chickenFound = true;
+                break;
+            }
+            if (!chickenFound) return null;
+
+            PlayerBase best    = null;
+            float      bestSqr = float.MaxValue;
             for (int i = 0; i < bases.Length; i++)
             {
                 var b = bases[i];
                 if (b == null || b.Owner.IsRealPlayer) continue;
-                if (b.CornerIndex == cornerIndex) return b;
+                float sqr = (b.transform.position - chickenPos).sqrMagnitude;
+                if (sqr < bestSqr) { bestSqr = sqr; best = b; }
             }
-            return null;
+            _log?.Debug(Source, best != null
+                ? $"Nearest unowned base to player {player}: '{best.name}' " +
+                  $"(corner {best.CornerIndex}) at dist {Mathf.Sqrt(bestSqr):0.0}."
+                : $"No unowned base found near player {player} chicken.");
+            return best;
         }
 
         private static bool PlayerHasBase(PlayerBase[] bases, PlayerRef player)
@@ -404,6 +439,8 @@ namespace CluckWars.Gameplay
             // MatchBootstrapper uses on join is reproduced here.
             var mapGen = FindFirstObjectByType<MapGenerator>();
             var spawnPoints = mapGen != null ? mapGen.SpawnPoints : null;
+            _log?.Debug(Source, $"RestartMatch: {bases.Length} bases, {piles.Length} piles reset. " +
+                $"spawnPoints={(spawnPoints != null ? spawnPoints.Count.ToString() : "null")}.");
             if (spawnPoints != null && spawnPoints.Count > 0)
             {
                 var controllers = FindObjectsByType<ChickenController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);

@@ -50,6 +50,13 @@ namespace CluckWars.Gameplay
         private PrefabRegistrySO _prefabRegistry;
         private bool _subscribedToDeath;
 
+        // Cached base list — refreshed every BaseCacheTTL simulation seconds so we
+        // don't call FindObjectsByType every tick while remaining responsive to
+        // late-spawned or newly-owned bases.  No physics collider required.
+        private PlayerBase[] _cachedBases;
+        private double       _baseCacheSimTime = double.NegativeInfinity;
+        private const double BaseCacheTTL      = 1.5;
+
         [Inject]
         public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry)
         {
@@ -107,10 +114,23 @@ namespace CluckWars.Gameplay
 
         private void TryCollectFromNearbyPile(ChickenStatsSO stats)
         {
-            if (Cargo >= stats.CargoCapacity) return;
+            if (Cargo >= stats.CargoCapacity)
+            {
+                _log?.Verbose(Source, $"TryCollect: cargo full ({Cargo:0.0}/{stats.CargoCapacity}).");
+                return;
+            }
 
             var pile = FindNearestPileInRange();
-            if (pile == null || pile.IsEmpty) return;
+            if (pile == null)
+            {
+                _log?.Verbose(Source, "TryCollect: no pile in range.");
+                return;
+            }
+            if (pile.IsEmpty)
+            {
+                _log?.Verbose(Source, $"TryCollect: nearest pile '{pile.name}' is empty.");
+                return;
+            }
 
             float spaceLeft = stats.CargoCapacity - Cargo;
             float desired = stats.CollectionRate * Runner.DeltaTime;
@@ -119,6 +139,7 @@ namespace CluckWars.Gameplay
 
             Cargo += takeable;
             pile.RPC_Drain(takeable);
+            _log?.Verbose(Source, $"Collected {takeable:0.000} from '{pile.name}'. Cargo={Cargo:0.0}/{stats.CargoCapacity}.");
         }
 
         private void TryCollectFromNearbyPickup(ChickenStatsSO stats)
@@ -143,7 +164,12 @@ namespace CluckWars.Gameplay
             if (Cargo <= 0f) return;
 
             var playerBase = FindNearestBaseInRange();
-            if (playerBase == null) return;
+            if (playerBase == null)
+            {
+                _log?.Verbose(Source, $"TryDeposit: carrying {Cargo:0.0} but no owned base in range " +
+                    $"(owner={Object.InputAuthority}, pos={transform.position}).");
+                return;
+            }
 
             float dropped = Cargo;
             Cargo = 0f;
@@ -198,27 +224,31 @@ namespace CluckWars.Gameplay
 
         private PlayerBase FindNearestBaseInRange()
         {
-            var hits = Physics.OverlapSphere(transform.position, _searchRadius, _searchMask, QueryTriggerInteraction.Collide);
-            PlayerBase best = null;
-            float bestSqr = float.MaxValue;
-            var ownerRef = Object.InputAuthority;
-            foreach (var col in hits)
+            // Direct scene scan — no physics collider required on the PlayerBase.
+            // Cache refreshes every BaseCacheTTL seconds so we pick up late-spawned
+            // bases and newly-assigned owners without calling FindObjectsByType
+            // every simulation tick.
+            if (_cachedBases == null ||
+                Runner.SimulationTime - _baseCacheSimTime > BaseCacheTTL)
             {
-                var b = col.GetComponentInParent<PlayerBase>();
-                if (b == null) continue;
-                // Phase 7b: only deposit at our own base. Unowned bases are ignored
-                // too — GameManager assigns ownership lazily on the master client,
-                // so the first frame of a join may have no match; the next tick
-                // fixes it.
+                _cachedBases      = FindObjectsByType<PlayerBase>(
+                    FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+                _baseCacheSimTime = Runner.SimulationTime;
+                _log?.Debug(Source, $"Base cache refreshed: {_cachedBases.Length} bases found.");
+            }
+
+            var    ownerRef = Object.InputAuthority;
+            PlayerBase best = null;
+            float  bestSqr  = float.MaxValue;
+            for (int i = 0; i < _cachedBases.Length; i++)
+            {
+                var b = _cachedBases[i];
+                if (b == null || b.Object == null || !b.Object.IsValid) continue;
                 if (b.Owner != ownerRef) continue;
                 float sqr = (b.transform.position - transform.position).sqrMagnitude;
-                float r = b.DepositRadius;
+                float r   = b.DepositRadius;
                 if (sqr > r * r) continue;
-                if (sqr < bestSqr)
-                {
-                    bestSqr = sqr;
-                    best = b;
-                }
+                if (sqr < bestSqr) { bestSqr = sqr; best = b; }
             }
             return best;
         }

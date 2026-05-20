@@ -130,7 +130,13 @@ namespace CluckWars.Gameplay
             if (!GetInput<PlayerNetworkInput>(out var input)) return;
 
             // No double-cast: ignore presses while another ability is active.
-            if (ActiveSlot != InvalidSlot) return;
+            if (ActiveSlot != InvalidSlot)
+            {
+                if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose) &&
+                    (input.Buttons.IsSet((int)InputButton.Ability1) || input.Buttons.IsSet((int)InputButton.Ability2)))
+                    _log.Verbose(Source, $"Ability press ignored — slot {ActiveSlot} already active.");
+                return;
+            }
 
             if (input.Buttons.IsSet((int)InputButton.Ability1)) TryActivate(0);
             else if (input.Buttons.IsSet((int)InputButton.Ability2)) TryActivate(1);
@@ -200,8 +206,17 @@ namespace CluckWars.Gameplay
         private void TryActivate(int slot)
         {
             var ability = GetSlot(slot);
-            if (ability == null) return;
-            if (!GetCooldown(slot).ExpiredOrNotRunning(Runner)) return;
+            if (ability == null)
+            {
+                _log?.Debug(Source, $"TryActivate slot {slot}: no ability assigned.");
+                return;
+            }
+            if (!GetCooldown(slot).ExpiredOrNotRunning(Runner))
+            {
+                _log?.Debug(Source, $"TryActivate slot {slot} ({ability.DisplayName}): " +
+                    $"on cooldown ({CooldownRemaining(slot):0.0}s remaining).");
+                return;
+            }
 
             ActiveSlot = slot;
             ActivationTimer = TickTimer.CreateFromSeconds(Runner, ability.Duration);
