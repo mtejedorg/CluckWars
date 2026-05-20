@@ -43,6 +43,12 @@ namespace CluckWars.Gameplay
 
         private MapGenerator _mapGenerator;
 
+        // Corner permutation — a shuffled [0,1,2,3] assigned once per session so
+        // every player/bot spawns at a different starting edge each game.
+        // Online: seeded from the session name (deterministic → all peers agree).
+        // Solo:   seeded randomly (single peer, no coordination needed).
+        private int[] _cornerPermutation;
+
         private INetworkService _networkService;
         private ISessionSelectionService _selection;
         private PrefabRegistrySO _prefabRegistry;
@@ -82,6 +88,7 @@ namespace CluckWars.Gameplay
             var chosenClass = _selection != null ? _selection.SelectedClass : ChickenClass.Warrior;
 
             _log?.Info(Source, $"Starting session: mode={mode}, session='{sessionName}', class={chosenClass}.");
+            InitCornerPermutation(sessionName, isSolo: mode == SessionMode.Solo);
             _networkService.OnPlayerJoined += HandlePlayerJoined;
 
             switch (mode)
@@ -162,7 +169,8 @@ namespace CluckWars.Gameplay
             int count = Mathf.Min(_soloBotsToSpawn, 3);
             for (int i = 0; i < count; i++)
             {
-                int     cornerIdx = (i + 1) % 4;         // corners 1, 2, 3
+                // Bots take permutation slots 1, 2, 3; slot 0 belongs to the solo player.
+                int     cornerIdx = ShuffledCorner((i + 1) % 4);
                 var     botClass  = botClasses[i % botClasses.Length];
                 Vector3 pos       = Vector3.zero;
 
@@ -261,22 +269,78 @@ namespace CluckWars.Gameplay
             if (_mapGenerator != null && _mapGenerator.SpawnPoints != null && _mapGenerator.SpawnPoints.Count > 0)
             {
                 var points = _mapGenerator.SpawnPoints;
-                // PlayerId-modulo so each peer deterministically picks the same
-                // corner for a given player. PlayerId is non-negative for real
-                // players, but the modulo guards against the solo-mode default
-                // (PlayerId 0) just in case.
-                int idx = Mathf.Abs(player.PlayerId) % points.Count;
-                return points[idx];
+                // Map PlayerId → permutation slot → shuffled corner index.
+                // PlayerId is non-negative for real players (solo = 0).
+                int raw     = Mathf.Abs(player.PlayerId) % 4;
+                int idx     = ShuffledCorner(raw);
+                return points[idx % points.Count];
             }
 
             // Legacy fallback for scenes without a MapGenerator.
             if (_legacySpawnPoints == null || _legacySpawnPoints.Length == 0)
                 return Vector3.zero;
 
-            int legacyIdx = Mathf.Abs(player.PlayerId) % _legacySpawnPoints.Length;
+            int legacyRaw = Mathf.Abs(player.PlayerId) % _legacySpawnPoints.Length;
+            int legacyIdx = ShuffledCorner(legacyRaw) % _legacySpawnPoints.Length;
             return _legacySpawnPoints[legacyIdx] != null
                 ? _legacySpawnPoints[legacyIdx].position
                 : Vector3.zero;
+        }
+
+        // ---- Corner randomisation -----------------------------------------------
+
+        /// <summary>
+        /// Returns the shuffled corner index for a given raw slot (0–3).
+        /// Falls back to the identity mapping if the permutation hasn't been
+        /// initialised yet (safety guard).
+        /// </summary>
+        private int ShuffledCorner(int rawSlot)
+        {
+            if (_cornerPermutation == null) return rawSlot;
+            return _cornerPermutation[rawSlot % _cornerPermutation.Length];
+        }
+
+        /// <summary>
+        /// Builds <see cref="_cornerPermutation"/> via a Fisher-Yates shuffle.
+        /// <para>
+        /// <b>Solo</b>: truly random seed — no coordination needed.
+        /// <b>Online</b>: seeded from the session name so every peer computes the
+        /// identical shuffle and assigns the same corner to each player.
+        /// </para>
+        /// </summary>
+        private void InitCornerPermutation(string sessionName, bool isSolo)
+        {
+            _cornerPermutation = new[] { 0, 1, 2, 3 };
+            var rng = isSolo
+                ? new System.Random()                         // different each solo session
+                : new System.Random(SessionNameSeed(sessionName)); // same on all peers
+
+            for (int i = _cornerPermutation.Length - 1; i > 0; i--)
+            {
+                int j = rng.Next(i + 1);
+                (int a, int b) = (_cornerPermutation[i], _cornerPermutation[j]);
+                _cornerPermutation[i] = b;
+                _cornerPermutation[j] = a;
+            }
+
+            _log?.Info(Source,
+                $"Corner permutation [{string.Join(",", _cornerPermutation)}] " +
+                $"(seed={( isSolo ? "random" : sessionName )}).");
+        }
+
+        /// <summary>
+        /// Stable hash of the session name used as a shared RNG seed in online play.
+        /// Using a manual polynomial hash avoids relying on <c>string.GetHashCode()</c>
+        /// whose output can vary between .NET versions / platforms.
+        /// </summary>
+        private static int SessionNameSeed(string s)
+        {
+            unchecked
+            {
+                int h = 17;
+                foreach (char c in s) h = h * 31 + c;
+                return h;
+            }
         }
     }
 }

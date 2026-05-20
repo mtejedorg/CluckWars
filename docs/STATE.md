@@ -134,6 +134,7 @@ All require real-device or playtest data; queued so they don't get done piecemea
 ## Recent commits (most recent first)
 
 ```
+(pending) Spawn: random starting edge per session (Fisher-Yates)
 (pending) Data: ability allowlists + default slot1 (EggShell)
 (pending) Balance: BalanceEditorWindow + DebugHud F2 panel
 (pending) VFX: ability accent burst (ChickenVFX)
