@@ -8,17 +8,18 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ## Latest tag
 
-`v0.3.0-alpha` — Pre-test polish + build tooling. Pinned at commit `312f511`.
+`v0.3.1-alpha` — Debug logging, deposit fix, cargo feedback, base tinting. Pinned at commit `7fe855e`.
 
 Earlier tags:
-- `v0.1.0-alpha` (`10e527c`) — Core gameplay loop closed.
+- `v0.3.0-alpha` (`312f511`) — Pre-test polish + build tooling.
 - `v0.2.0-alpha` (`7ee1742`) — Phase 9 polish (audio service, registries, reconnection).
+- `v0.1.0-alpha` (`10e527c`) — Core gameplay loop closed.
 
-All tags are local until pushed.
+All tags pushed to origin.
 
 ---
 
-## What works (Phases 1–9 complete + Phases 10–11 complete + DCBA polish)
+## What works (Phases 1–9 complete + Phases 10–11 complete + DCBA polish + v0.3.1 fixes)
 
 ### Core loop
 - 4 classes (Warrior / Speedy / Fatty / Assassin) — selectable in Bootstrap menu.
@@ -68,6 +69,13 @@ All tags are local until pushed.
 - **MatchHud** (UGUI): ranked leaderboard top-left (4 rows sorted live by food score, with player-color dot + progress bar + score). Timer badge top-right in gold. HP + cargo bars bottom-left above joystick. Centered overlays: lobby (with green Start button), match-end (ranked results), session-end, intro countdown (gold "3, 2, 1, GO!").
 - **TouchControlsHud**: joystick + attack + 2 ability buttons in MOBA arc. Ability tint = equipped `AbilityBaseSO.AccentColor`. Cooldown radial fill.
 - **DebugHud** (F1 toggle): FPS, network state, GameManager state, local chicken stats, base ownership, pickup count.
+
+### v0.3.1 — Debug logging, deposit fix, cargo feedback, base tinting
+
+- **Debug logging**: `BotController`, `ChickenCombat`, `AbilityController`, `ChickenCargo`, `GameManager` fully instrumented. Bot FSM logs every state transition (Idle/CollectFood/ReturnToBase) with cargo fraction.
+- **Deposit fix**: `GameManager.AssignBasesToPlayers` now uses nearest-position matching — fixes the 75% base-ownership failure caused by `MatchBootstrapper`'s Fisher-Yates corner shuffle vs. the old `PlayerId % 4` corner selection. `ChickenCargo.FindNearestBaseInRange` removed `Physics.OverlapSphere` dependency — uses `FindObjectsByType<PlayerBase>` with a 1.5 s cache; `PlayerBase` prefab no longer needs a trigger collider.
+- **Cargo feedback**: `MatchHud` cargo bar shifts gold→orange→red, shows "FULL → RETURN TO BASE!" label at capacity. `ChickenNameplate` adds a world-space cargo line (`3/10`, orange ≥70%, red "■ FULL!"). `ChickenVFX` adds a looping gold orbit ring (`VFX_CargoFull`) while cargo is at capacity.
+- **Base tinting**: `PlayerBase.LateUpdate` polls `Owner` each frame and applies corner-indexed colors (Orange/Blue/Pink/Teal) via `MaterialPropertyBlock` + direct material fallback. Replaced a broken `ChangeDetector + Render()` approach that silently skipped locally-written `[Networked]` props in `GameMode.Single`.
 
 ### Map / camera
 - `MapGenerator`: procedural plane + 4 invisible boundary walls + 4 corner bases + 1 large center pile + N small piles on a jittered ring. All master-spawned.
@@ -134,14 +142,12 @@ All require real-device or playtest data; queued so they don't get done piecemea
 ## Recent commits (most recent first)
 
 ```
-(pending) Spawn: random starting edge per session (Fisher-Yates)
-(pending) Data: ability allowlists + default slot1 (EggShell)
-(pending) Balance: BalanceEditorWindow + DebugHud F2 panel
-(pending) VFX: ability accent burst (ChickenVFX)
-(pending) VFX: ChickenVFX procedural particle systems
-(pending) Animator: combat state machine wired
-(pending) DCBA: dead visuals, screen shake, match stats, AI bots
-(pending) Phase 11: class stat cards + ability slot picker
+7fe855e Debug logging, deposit fix, cargo feedback, base tinting  ← v0.3.1-alpha
+1aa3b93 Fix: multiple chickens spawning at same base
+540797a Visuals: per-class scale applied at spawn
+90a071f Balance: faster movement + closer camera (test feedback)
+ca39dfb Spawn: random starting edge per session
+94ec419 Settings, project link + docs
 aa6a154 Lobby UX + Fusion connect callbacks
 8fca391 Fix CS0104: ambiguous LogLevel
 7ccb850 Lobby + spawn-at-base
@@ -165,4 +171,4 @@ fdae00d Pre-Phase-8 advancements (iso cam, UGUI HUD, intro, nameplates)
 
 - All work on `develop`.
 - `main` has not been merged since project start (per Maestro's decision — wait for stable test pass before promoting).
-- ~41 local commits ahead of origin/develop at time of last snapshot. Push tags + branch when convenient.
+- `develop` and `v0.3.1-alpha` pushed to origin. Branch is clean.
