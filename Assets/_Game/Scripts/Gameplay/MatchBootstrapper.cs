@@ -49,6 +49,11 @@ namespace CluckWars.Gameplay
         // Solo:   seeded randomly (single peer, no coordination needed).
         private int[] _cornerPermutation;
 
+        // Deduplication guards — prevent double-spawning if Fusion somehow fires
+        // OnPlayerJoined more than once or if TrySpawnBots is called again.
+        private readonly System.Collections.Generic.HashSet<PlayerRef> _spawnedPlayers = new();
+        private bool _botsSpawned;
+
         private INetworkService _networkService;
         private ISessionSelectionService _selection;
         private PrefabRegistrySO _prefabRegistry;
@@ -152,6 +157,8 @@ namespace CluckWars.Gameplay
         /// </summary>
         private void TrySpawnBots()
         {
+            if (_botsSpawned) return;
+            _botsSpawned = true;
             if (_soloBotsToSpawn <= 0) return;
 
             var runner = _networkService.Runner;
@@ -211,13 +218,20 @@ namespace CluckWars.Gameplay
 
         private void HandlePlayerJoined(NetworkRunner runner, PlayerRef player)
         {
-            // Single mode: only the local player exists, so we always spawn.
-            // Shared mode: each client spawns its own chicken (state authority follows).
-            var isLocal = runner.GameMode == GameMode.Single || player == runner.LocalPlayer;
-            _log?.Debug(Source, $"OnPlayerJoined player={player} isLocal={isLocal} mode={runner.GameMode}.");
-            if (!isLocal) return;
+            // Only the local player spawns their own chicken; remote chickens
+            // are spawned by their own peer and replicated here automatically.
+            // (The old `GameMode.Single` shortcut was too broad — it treated
+            // every PlayerRef as local, which triggered duplicate spawns when
+            // Fusion fired additional OnPlayerJoined events.)
+            _log?.Debug(Source, $"OnPlayerJoined player={player} local={runner.LocalPlayer} mode={runner.GameMode}.");
+            if (player != runner.LocalPlayer) return;
+            if (!_spawnedPlayers.Add(player))
+            {
+                _log?.Warn(Source, $"HandlePlayerJoined: already spawned {player} — ignoring duplicate.");
+                return;
+            }
 
-            var pos = PickSpawnPosition(player);
+            var pos = PickSpawnPosition(runner, player);
 
             // Defensive: nudge spawn slightly up + per-player horizontally so that
             // even if PickSpawnPosition collapses to the same XZ (degenerate
@@ -261,7 +275,7 @@ namespace CluckWars.Gameplay
                 });
         }
 
-        private Vector3 PickSpawnPosition(PlayerRef player)
+        private Vector3 PickSpawnPosition(NetworkRunner runner, PlayerRef player)
         {
             // Prefer MapGenerator's computed corners. Lookup is cached; null check
             // re-resolves if the MapGenerator was added after Start ran.
@@ -269,10 +283,13 @@ namespace CluckWars.Gameplay
             if (_mapGenerator != null && _mapGenerator.SpawnPoints != null && _mapGenerator.SpawnPoints.Count > 0)
             {
                 var points = _mapGenerator.SpawnPoints;
-                // Map PlayerId → permutation slot → shuffled corner index.
-                // PlayerId is non-negative for real players (solo = 0).
-                int raw     = Mathf.Abs(player.PlayerId) % 4;
-                int idx     = ShuffledCorner(raw);
+                // Single mode: always slot 0 for the human player so they never
+                // collide with bot slot 1, regardless of what Fusion assigns as PlayerId.
+                // Shared mode: PlayerId is sequential (0-based) across up to 4 players.
+                int raw = (runner.GameMode == GameMode.Single)
+                    ? 0
+                    : Mathf.Abs(player.PlayerId) % 4;
+                int idx = ShuffledCorner(raw);
                 return points[idx % points.Count];
             }
 

@@ -67,19 +67,18 @@ namespace CluckWars.Networking
             _runner.AddCallbacks(this);
 
             var sceneManager = gameObject.AddComponent<NetworkSceneManagerDefault>();
-            var sceneInfo = new NetworkSceneInfo();
-            var sceneRef = SceneRef.FromIndex(SceneManager.GetActiveScene().buildIndex);
-            if (sceneRef.IsValid)
-            {
-                sceneInfo.AddSceneRef(sceneRef, LoadSceneMode.Additive);
-            }
 
+            // Do NOT pass the current scene as sceneInfo. The scene is already
+            // loaded by Unity; telling Fusion to load it additively would create
+            // a second copy of every MonoBehaviour (MatchBootstrapper, MapGenerator,
+            // etc.), causing duplicate chicken spawns and double bot registration.
+            // Fusion registers existing NetworkObjects in the active scene
+            // automatically without needing an explicit SceneRef here.
             int maxPlayers = _matchConfig != null ? Mathf.Clamp(_matchConfig.MaxPlayers, 1, 16) : 4;
             var result = await _runner.StartGame(new StartGameArgs
             {
                 GameMode = mode,
                 SessionName = sessionName,
-                Scene = sceneInfo,
                 SceneManager = sceneManager,
                 PlayerCount = maxPlayers,
             });
