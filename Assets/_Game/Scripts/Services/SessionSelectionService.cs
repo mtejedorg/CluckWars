@@ -1,4 +1,5 @@
 using System;
+using CluckWars.Abilities;
 using CluckWars.Gameplay;
 
 namespace CluckWars.Services
@@ -29,6 +30,11 @@ namespace CluckWars.Services
         // creates "cluck-lan", any peer that picks Join joins it. Phase 7 will replace
         // this with proper UGUI session entry.
         public string SessionName { get; set; } = "cluck-lan";
+
+        // Null = use the prefab-default slot; set by CharacterSelectController when
+        // the player picks from a non-empty AvailableAbilities pool.
+        public AbilityBaseSO Ability0 { get; set; }
+        public AbilityBaseSO Ability1 { get; set; }
 
         public event Action<ChickenClass> OnSelectionChanged;
     }

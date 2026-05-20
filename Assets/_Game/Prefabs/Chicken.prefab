@@ -22,6 +22,9 @@ GameObject:
   - component: {fileID: -4654369670535789821}
   - component: {fileID: 101601932164880250}
   - component: {fileID: 9204612626180569764}
+  - component: {fileID: 7617149068659373758}
+  - component: {fileID: 7853284419870734786}
+  - component: {fileID: 7224469946525777145}
   m_Layer: 0
   m_Name: Chicken
   m_TagString: Untagged
@@ -145,6 +148,8 @@ MonoBehaviour:
   - {fileID: -8672661885974516826}
   - {fileID: -4654369670535789821}
   - {fileID: 101601932164880250}
+  - {fileID: 7617149068659373758}
+  - {fileID: 7853284419870734786}
   ForceRemoteRenderTimeframe: 0
 --- !u!143 &6032245462738825523
 CharacterController:
@@ -186,6 +191,7 @@ MonoBehaviour:
   _fallbackStats: {fileID: 0}
   _Class: 0
   _VisualOpacity: 0
+  _IsBot: 0
 --- !u!95 &5731265523250509895
 Animator:
   serializedVersion: 7
@@ -284,7 +290,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.AbilityController
   _slot0: {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
-  _slot1: {fileID: 0}
+  _slot1: {fileID: 11400000, guid: 0d5566bf334a1c44a9711ea9b34a4ac6, type: 2}
   _ActiveSlot: 0
 --- !u!114 &9204612626180569764
 MonoBehaviour:
@@ -301,3 +307,53 @@ MonoBehaviour:
   _offset: {x: 0, y: 1.7, z: 0}
   _fontSize: 96
   _characterSize: 0.05
+--- !u!114 &7617149068659373758
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d3258e9f2e07b7d41a8480f1201fddc7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenMatchStats
+  _Kills: 0
+  _FoodDeposited: 0
+--- !u!114 &7853284419870734786
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 255bff1c293ecab46be11c8de994dd46, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.BotController
+  _thinkInterval: 0.3
+  _arrivalRadius: 1.5
+  _returnThreshold: 0.7
+--- !u!114 &7224469946525777145
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 114e0725498d09940906531de4ef2c01, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ChickenVFX
+  _hitCount: 8
+  _hitColor: {r: 1, g: 0.78, b: 0.2, a: 1}
+  _deathCount: 22
+  _deathColor: {r: 0.95, g: 0.3, b: 0.2, a: 1}
+  _stunColor: {r: 1, g: 0.96, b: 0.35, a: 1}
+  _stunOrbitRadius: 0.4
+  _stunHeadOffset: 1.75
+  _depositCount: 12
+  _depositColor: {r: 0.96, g: 0.78, b: 0.26, a: 1}

@@ -21,3 +21,12 @@ MonoBehaviour:
   AttackCooldown: 0.4
   CargoCapacity: 4
   CollectionRate: 1
+  AvailableAbilities:
+  - {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
+  - {fileID: 11400000, guid: 0d5566bf334a1c44a9711ea9b34a4ac6, type: 2}
+  - {fileID: 11400000, guid: 4c1a8e7b3d2f495d8a01c5e7b2f9d4b1, type: 2}
+  - {fileID: 11400000, guid: 8d2c4a7b1e5f486d8a01c5e7b2f9d4c3, type: 2}
+  - {fileID: 11400000, guid: 6b3c8e2a1f4d495d8a01c5e7b2f9d4d5, type: 2}
+  - {fileID: 11400000, guid: 5f7b2c8a4d3e495d8a01c5e7b2f9d4e7, type: 2}
+  - {fileID: 11400000, guid: 7a1d8c4b3e2f495d8a01c5e7b2f9d4f9, type: 2}
+  - {fileID: 11400000, guid: 02f818d76a9212941bda628e88c11b76, type: 2}

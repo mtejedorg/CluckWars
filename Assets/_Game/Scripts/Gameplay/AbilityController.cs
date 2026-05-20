@@ -163,6 +163,18 @@ namespace CluckWars.Gameplay
 
         public bool IsReady(int slot) => GetSlot(slot) != null && CooldownRemaining(slot) <= 0f;
 
+        /// <summary>
+        /// Assigns ability assets before <see cref="Spawned"/> runs.
+        /// Called by <see cref="MatchBootstrapper"/> inside the <c>onBeforeSpawned</c>
+        /// callback so every peer already has the chosen abilities on first <c>Spawned</c>
+        /// read. Null arguments leave the existing (prefab-default) value unchanged.
+        /// </summary>
+        public void SetSlots(AbilityBaseSO slot0, AbilityBaseSO slot1)
+        {
+            if (slot0 != null) _slot0 = slot0;
+            if (slot1 != null) _slot1 = slot1;
+        }
+
         // ---- Internals ---------------------------------------------------------
 
         private AbilityBaseSO GetSlot(int slot) => slot switch

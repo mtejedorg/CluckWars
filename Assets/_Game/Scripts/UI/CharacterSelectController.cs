@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using CluckWars.Abilities;
 using CluckWars.Bootstrap;
 using CluckWars.Gameplay;
 using CluckWars.Logging;
@@ -19,11 +20,21 @@ namespace CluckWars.UI
     /// Phase 10: integrates UGS Lobby — Host creates a lobby and receives a
     /// shareable join code; Joiners enter the code or pick from the browser.
     /// The join code is used as the Photon Fusion session name.
+    /// Visual theme: warm Clash Royale / Supercell style (cluckwars-tokens-v2).
     /// </summary>
     [RequireComponent(typeof(SceneLoader))]
     public sealed class CharacterSelectController : MonoBehaviour
     {
         private const string Source = "CharacterSelect";
+
+        // ---- Design tokens (Phase 10 redesign — ART.md §6, cluckwars-tokens-v2) ---
+        // Inline so the warm palette is self-contained regardless of the serialised
+        // ColorSchemeSO asset version in the scene.
+        private static readonly Color DtScreenBg    = new Color(0.06f, 0.03f, 0.02f, 1.00f); // #0e0804
+        private static readonly Color DtPanelBg     = new Color(0.23f, 0.13f, 0.06f, 0.96f); // #3a2210
+        private static readonly Color DtGold        = new Color(0.96f, 0.78f, 0.26f, 1.00f); // #f5c842
+        private static readonly Color DtGoldMid     = new Color(0.83f, 0.63f, 0.13f, 0.90f); // #d4a020
+        private static readonly Color DtTextPrimary = new Color(1.00f, 0.96f, 0.88f, 1.00f); // #fef5e0
 
         // ---- Injected --------------------------------------------------
         private ISessionSelectionService _selection;
@@ -32,9 +43,17 @@ namespace CluckWars.UI
         private IUGSService              _ugs;
         private SceneLoader              _sceneLoader;
 
-        // ---- Class / mode button maps ----------------------------------
-        private readonly Dictionary<ChickenClass, Button> _classButtons = new();
-        private readonly Dictionary<SessionMode, Button>  _modeButtons  = new();
+        // ---- Class card maps (replaces flat class buttons) -------------
+        private readonly Dictionary<ChickenClass, Image> _cardBgImages  = new();
+        private readonly Dictionary<ChickenClass, Text>  _cardNameTexts = new();
+        private readonly Dictionary<SessionMode, Button> _modeButtons   = new();
+
+        // ---- Ability picker --------------------------------------------
+        private ChickenClassRegistrySO _classRegistry;
+        private int  _abilityIndex0;
+        private int  _abilityIndex1;
+        private Text _abilitySlot0Label;
+        private Text _abilitySlot1Label;
 
         // ---- Dynamic labels --------------------------------------------
         private Text   _statusLabel;
@@ -70,12 +89,14 @@ namespace CluckWars.UI
             ISessionSelectionService selection,
             ILogService log,
             ColorSchemeSO colors,
-            IUGSService ugs)
+            IUGSService ugs,
+            [InjectOptional] ChickenClassRegistrySO classRegistry)
         {
-            _selection = selection;
-            _log       = log;
-            _colors    = colors;
-            _ugs       = ugs;
+            _selection     = selection;
+            _log           = log;
+            _colors        = colors;
+            _ugs           = ugs;
+            _classRegistry = classRegistry;
         }
 
         // ---- Unity lifecycle -------------------------------------------
@@ -148,7 +169,12 @@ namespace CluckWars.UI
             if (_selection == null) return;
             _selection.SelectedClass = cls;
             _log?.Debug(Source, $"{source} → SelectedClass={cls}.");
+            // Reset ability indices when class changes so the picker starts at the
+            // first valid option for the new class pool.
+            _abilityIndex0 = 0;
+            _abilityIndex1 = 1;
             RefreshClassVisuals();
+            RefreshAbilityPicker();
         }
 
         private void SelectMode(SessionMode mode)
@@ -297,7 +323,7 @@ namespace CluckWars.UI
             var row = new GameObject("LobbyEntry_" + info.JoinCode, typeof(RectTransform));
             row.transform.SetParent(_lobbyListContent, worldPositionStays: false);
             var rowImg = row.AddComponent<Image>();
-            rowImg.color = new Color(0.18f, 0.18f, 0.22f, 1f);
+            rowImg.color = new Color(0.31f, 0.18f, 0.08f, 1f); // medium brown row tint
             var rowLayout = row.AddComponent<HorizontalLayoutGroup>();
             rowLayout.padding = new RectOffset(12, 8, 4, 4);
             rowLayout.spacing = 8f;
@@ -355,8 +381,21 @@ namespace CluckWars.UI
 
         private void RefreshClassVisuals()
         {
-            foreach (var kv in _classButtons)
-                ApplyButtonState(kv.Value, kv.Key == _selection.SelectedClass);
+            if (_selection == null) return;
+            foreach (var kv in _cardBgImages)
+            {
+                bool sel = kv.Key == _selection.SelectedClass;
+                if (kv.Value != null)
+                    kv.Value.color = sel
+                        ? new Color(0.40f, 0.25f, 0.06f, 1f)  // #663f10 warm amber selected
+                        : new Color(0.18f, 0.10f, 0.04f, 1f); // #2e1a0a dark unselected
+            }
+            foreach (var kv in _cardNameTexts)
+            {
+                bool sel = kv.Key == _selection.SelectedClass;
+                if (kv.Value != null)
+                    kv.Value.color = sel ? DtGold : DtTextPrimary;
+            }
         }
 
         private void RefreshModeSection()
@@ -390,17 +429,25 @@ namespace CluckWars.UI
         private void ApplyButtonState(Button button, bool isActive)
         {
             if (button == null) return;
+
+            var btnNormal = new Color(0.31f, 0.18f, 0.08f, 1f); // medium brown
+            var btnHover  = new Color(0.42f, 0.25f, 0.12f, 1f); // lighter hover
+            var btnActive = new Color(0.83f, 0.63f, 0.13f, 1f); // gold #d4a020
+
             var img = button.GetComponent<Image>();
-            if (img != null) img.color = isActive ? _colors.ButtonActive : _colors.ButtonNormal;
+            if (img != null) img.color = isActive ? btnActive : btnNormal;
 
             var text = button.GetComponentInChildren<Text>();
-            if (text != null) text.color = isActive ? _colors.TextOnActive : _colors.TextOnButton;
+            if (text != null)
+                text.color = isActive
+                    ? new Color(0.10f, 0.08f, 0.05f, 1f) // dark on gold
+                    : DtTextPrimary;
 
             var cb = button.colors;
-            cb.normalColor      = isActive ? _colors.ButtonActive : _colors.ButtonNormal;
-            cb.highlightedColor = isActive ? _colors.ButtonActive : _colors.ButtonHover;
-            cb.pressedColor     = _colors.ButtonHover;
-            cb.selectedColor    = isActive ? _colors.ButtonActive : _colors.ButtonHover;
+            cb.normalColor      = isActive ? btnActive : btnNormal;
+            cb.highlightedColor = isActive ? btnActive : btnHover;
+            cb.pressedColor     = btnHover;
+            cb.selectedColor    = isActive ? btnActive : btnHover;
             button.colors = cb;
         }
 
@@ -425,9 +472,17 @@ namespace CluckWars.UI
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight  = 0.5f;
 
+            // Full-screen dark background — #0e0804 near-black warm brown.
+            var bgGO = CreateUIObject("ScreenBackground", canvasGO.transform, out var bgRT);
+            bgGO.AddComponent<Image>().color = DtScreenBg;
+            bgRT.anchorMin = Vector2.zero;
+            bgRT.anchorMax = Vector2.one;
+            bgRT.offsetMin = Vector2.zero;
+            bgRT.offsetMax = Vector2.zero;
+
             // Center panel
             var panel = CreateUIObject("Panel", canvasGO.transform, out var panelRT);
-            panel.AddComponent<Image>().color = _colors.PanelBackground;
+            panel.AddComponent<Image>().color = DtPanelBg;
             panelRT.anchorMin        = new Vector2(0.5f, 0.5f);
             panelRT.anchorMax        = new Vector2(0.5f, 0.5f);
             panelRT.pivot            = new Vector2(0.5f, 0.5f);
@@ -446,18 +501,18 @@ namespace CluckWars.UI
             panelFitter.verticalFit   = ContentSizeFitter.FitMode.PreferredSize;
 
             // Title
-            var title = CreateText("Title", panel.transform, "Cluck Wars", 56, TextAnchor.MiddleCenter);
+            var title = CreateText("Title", panel.transform, "CLUCK WARS", 64, TextAnchor.MiddleCenter);
             title.fontStyle = FontStyle.Bold;
-            title.gameObject.AddComponent<LayoutElement>().minHeight = 72f;
+            title.color     = DtGold;
+            title.gameObject.AddComponent<LayoutElement>().minHeight = 80f;
 
-            // CLASS
+            // CLASS — stat cards (replaces flat buttons)
             CreateSectionLabel(panel.transform, "CLASS");
-            var classRow = CreateRow(panel.transform, "ClassRow", 84f, 12f);
-            _classButtons.Clear();
-            _classButtons[ChickenClass.Warrior]  = CreateChoiceButton(classRow.transform, "[1] Warrior",  () => SelectClass(ChickenClass.Warrior,  "click"));
-            _classButtons[ChickenClass.Speedy]   = CreateChoiceButton(classRow.transform, "[2] Speedy",   () => SelectClass(ChickenClass.Speedy,   "click"));
-            _classButtons[ChickenClass.Fatty]    = CreateChoiceButton(classRow.transform, "[3] Fatty",    () => SelectClass(ChickenClass.Fatty,    "click"));
-            _classButtons[ChickenClass.Assassin] = CreateChoiceButton(classRow.transform, "[4] Assassin", () => SelectClass(ChickenClass.Assassin, "click"));
+            BuildClassCards(panel.transform);
+
+            // ABILITIES — per-slot picker
+            CreateSectionLabel(panel.transform, "ABILITIES");
+            BuildAbilityPicker(panel.transform);
 
             // SESSION
             CreateSectionLabel(panel.transform, "SESSION");
@@ -505,12 +560,12 @@ namespace CluckWars.UI
             // Action button
             _actionButton = CreateButton(panel.transform, "Start Match  (SPACE)", () => Confirm("click"));
             _actionButtonText = _actionButton.GetComponentInChildren<Text>();
+            var startBase = new Color(0.20f, 0.64f, 0.20f, 1f); // DtGreenMid #33a332
             var actionImg = _actionButton.GetComponent<Image>();
-            if (actionImg != null) actionImg.color = _colors.StartButton;
+            if (actionImg != null) actionImg.color = startBase;
             var actionLE = _actionButton.gameObject.AddComponent<LayoutElement>();
             actionLE.minHeight       = 72f;
             actionLE.preferredHeight = 72f;
-            var startBase   = _colors.StartButton;
             var actionColors = _actionButton.colors;
             actionColors.normalColor      = startBase;
             actionColors.highlightedColor = new Color(startBase.r * 1.3f, startBase.g * 1.2f, startBase.b * 1.3f, startBase.a);
@@ -544,7 +599,7 @@ namespace CluckWars.UI
 
             // Centered browser panel.
             var panel = CreateUIObject("BrowserPanel", overlayGO.transform, out var panelRT);
-            panel.AddComponent<Image>().color = _colors.PanelBackground;
+            panel.AddComponent<Image>().color = DtPanelBg;
             panelRT.anchorMin        = new Vector2(0.5f, 0.5f);
             panelRT.anchorMax        = new Vector2(0.5f, 0.5f);
             panelRT.pivot            = new Vector2(0.5f, 0.5f);
@@ -652,7 +707,7 @@ namespace CluckWars.UI
             var text = go.AddComponent<Text>();
             text.text              = content;
             text.fontSize          = fontSize;
-            text.color             = _colors.TextOnButton;
+            text.color             = DtTextPrimary; // warm white #fef5e0
             text.alignment         = alignment;
             text.horizontalOverflow = HorizontalWrapMode.Overflow;
             text.verticalOverflow   = VerticalWrapMode.Overflow;
@@ -662,9 +717,8 @@ namespace CluckWars.UI
 
         private void CreateSectionLabel(Transform parent, string label)
         {
-            var t = CreateText(label + "Label", parent, label, 21, TextAnchor.MiddleLeft);
-            var c = _colors.TextOnButton;
-            t.color = new Color(c.r * 0.75f, c.g * 0.75f, c.b * 0.78f, c.a);
+            var t = CreateText(label + "Label", parent, label, 20, TextAnchor.MiddleLeft);
+            t.color = DtGoldMid; // warm gold accent for section headers
             t.gameObject.AddComponent<LayoutElement>().minHeight = 28f;
         }
 
@@ -672,7 +726,7 @@ namespace CluckWars.UI
         {
             var go = CreateUIObject("Input", parent, out _);
             var img = go.AddComponent<Image>();
-            img.color = new Color(0.12f, 0.12f, 0.15f, 1f);
+            img.color = new Color(0.14f, 0.07f, 0.03f, 1f); // very dark warm brown input bg
             var field = go.AddComponent<InputField>();
             field.targetGraphic = img;
             go.AddComponent<LayoutElement>().minHeight = minHeight;
@@ -715,20 +769,23 @@ namespace CluckWars.UI
 
         private Button CreateButton(Transform parent, string label, Action onClick)
         {
+            // Use design-token colors directly so the result is independent of the
+            // serialised ColorSchemeSO asset version.
+            var btnNormal = new Color(0.31f, 0.18f, 0.08f, 1f); // medium brown
+            var btnHover  = new Color(0.42f, 0.25f, 0.12f, 1f); // lighter brown hover
+
             var go  = CreateUIObject("Btn_" + label, parent, out _);
             var img = go.AddComponent<Image>();
-            img.color         = _colors.ButtonNormal;
+            img.color         = btnNormal;
             img.raycastTarget = true;
             var btn = go.AddComponent<Button>();
             btn.targetGraphic = img;
             var cb = btn.colors;
-            cb.normalColor      = _colors.ButtonNormal;
-            cb.highlightedColor = _colors.ButtonHover;
-            cb.pressedColor     = _colors.ButtonHover;
-            cb.selectedColor    = _colors.ButtonHover;
-            cb.disabledColor    = new Color(_colors.ButtonNormal.r * 0.5f,
-                                            _colors.ButtonNormal.g * 0.5f,
-                                            _colors.ButtonNormal.b * 0.5f, 0.8f);
+            cb.normalColor      = btnNormal;
+            cb.highlightedColor = btnHover;
+            cb.pressedColor     = btnHover;
+            cb.selectedColor    = btnHover;
+            cb.disabledColor    = new Color(btnNormal.r * 0.5f, btnNormal.g * 0.5f, btnNormal.b * 0.5f, 0.8f);
             btn.colors = cb;
             btn.onClick.AddListener(() => onClick?.Invoke());
 
@@ -747,6 +804,309 @@ namespace CluckWars.UI
             var f = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (f == null) f = Resources.GetBuiltinResource<Font>("Arial.ttf");
             return f;
+        }
+
+        // ---- Class stat cards ------------------------------------------
+
+        private void BuildClassCards(Transform parent)
+        {
+            // Compute stat maxima for normalized bars.
+            float maxSpd = 1f, maxHp = 1f, maxCgo = 1f;
+            var allClasses = new[]
+            {
+                ChickenClass.Warrior, ChickenClass.Speedy,
+                ChickenClass.Fatty,   ChickenClass.Assassin,
+            };
+            foreach (var c in allClasses)
+            {
+                if (_classRegistry == null || !_classRegistry.TryGet(c, out var e) || e.Stats == null) continue;
+                maxSpd = Mathf.Max(maxSpd, e.Stats.MoveSpeed);
+                maxHp  = Mathf.Max(maxHp,  e.Stats.MaxHP);
+                maxCgo = Mathf.Max(maxCgo, (float)e.Stats.CargoCapacity);
+            }
+
+            var row = CreateUIObject("ClassCardsRow", parent, out _);
+            var layout = row.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing                = 10f;
+            layout.childForceExpandWidth  = true;
+            layout.childForceExpandHeight = true;
+            layout.childControlWidth      = true;
+            layout.childControlHeight     = true;
+            row.AddComponent<LayoutElement>().minHeight = 180f;
+
+            _cardBgImages.Clear();
+            _cardNameTexts.Clear();
+            foreach (var cls in allClasses)
+                BuildClassCard(row.transform, cls, maxSpd, maxHp, maxCgo);
+        }
+
+        private void BuildClassCard(Transform parent, ChickenClass cls,
+            float maxSpd, float maxHp, float maxCgo)
+        {
+            var tint         = GetClassTint(cls);
+            var stats        = GetClassStats(cls);
+            int abilityCount = GetAvailableAbilities(cls).Length;
+            string shortKey  = cls switch
+            {
+                ChickenClass.Warrior  => "[1]",
+                ChickenClass.Speedy   => "[2]",
+                ChickenClass.Fatty    => "[3]",
+                ChickenClass.Assassin => "[4]",
+                _                     => "[ ]",
+            };
+
+            // Card root — dark bg, vertical layout, entire card is a button.
+            var cardGO  = CreateUIObject("Card_" + cls, parent, out _);
+            var cardImg = cardGO.AddComponent<Image>();
+            cardImg.color = new Color(0.18f, 0.10f, 0.04f, 1f);
+            _cardBgImages[cls] = cardImg;
+
+            var cardLayout = cardGO.AddComponent<VerticalLayoutGroup>();
+            cardLayout.padding                = new RectOffset(0, 0, 0, 0);
+            cardLayout.spacing                = 0f;
+            cardLayout.childForceExpandWidth  = true;
+            cardLayout.childForceExpandHeight = false;
+            cardLayout.childControlWidth      = true;
+            cardLayout.childControlHeight     = true;
+
+            var capturedCls = cls;
+            var btn = cardGO.AddComponent<Button>();
+            btn.targetGraphic = cardImg;
+            btn.onClick.AddListener(() => SelectClass(capturedCls, "card-click"));
+            var bc = btn.colors;
+            bc.normalColor      = cardImg.color;
+            bc.highlightedColor = new Color(0.28f, 0.16f, 0.06f, 1f);
+            bc.pressedColor     = DtGoldMid;
+            bc.selectedColor    = new Color(0.40f, 0.25f, 0.06f, 1f);
+            btn.colors = bc;
+
+            // Top tint strip (10 px).
+            var stripGO = CreateUIObject("Strip", cardGO.transform, out _);
+            stripGO.AddComponent<Image>().color = tint;
+            stripGO.AddComponent<LayoutElement>().minHeight = 10f;
+
+            // Body.
+            var body       = CreateUIObject("Body", cardGO.transform, out _);
+            var bodyLayout = body.AddComponent<VerticalLayoutGroup>();
+            bodyLayout.padding                = new RectOffset(8, 8, 6, 6);
+            bodyLayout.spacing                = 4f;
+            bodyLayout.childForceExpandWidth  = true;
+            bodyLayout.childForceExpandHeight = false;
+            bodyLayout.childControlWidth      = true;
+            bodyLayout.childControlHeight     = true;
+            body.AddComponent<LayoutElement>().flexibleHeight = 1f;
+
+            // Class name.
+            var nameLabel = CreateText("Name", body.transform, $"{shortKey} {cls}", 22, TextAnchor.MiddleCenter);
+            nameLabel.fontStyle = FontStyle.Bold;
+            nameLabel.gameObject.AddComponent<LayoutElement>().minHeight = 30f;
+            _cardNameTexts[cls] = nameLabel;
+
+            // Stat bars.
+            if (stats != null)
+            {
+                BuildStatBar(body.transform, "SPD", maxSpd > 0f ? stats.MoveSpeed           / maxSpd : 0f, tint);
+                BuildStatBar(body.transform, "HP",  maxHp  > 0f ? stats.MaxHP                / maxHp  : 0f, tint);
+                BuildStatBar(body.transform, "CGO", maxCgo > 0f ? (float)stats.CargoCapacity / maxCgo : 0f, tint);
+            }
+            else
+            {
+                // Placeholder bars when registry is not bound.
+                float[] d = cls switch
+                {
+                    ChickenClass.Warrior  => new[] { 0.55f, 0.75f, 0.55f },
+                    ChickenClass.Speedy   => new[] { 1.00f, 0.45f, 0.40f },
+                    ChickenClass.Fatty    => new[] { 0.30f, 1.00f, 1.00f },
+                    ChickenClass.Assassin => new[] { 0.80f, 0.50f, 0.40f },
+                    _                     => new[] { 0.50f, 0.50f, 0.50f },
+                };
+                BuildStatBar(body.transform, "SPD", d[0], tint);
+                BuildStatBar(body.transform, "HP",  d[1], tint);
+                BuildStatBar(body.transform, "CGO", d[2], tint);
+            }
+
+            // Ability-pool hint.
+            string hintText = abilityCount > 0 ? $"{abilityCount} in pool" : "all abilities";
+            var hint = CreateText("Hint", body.transform, hintText, 16, TextAnchor.MiddleCenter);
+            hint.color = DtGoldMid;
+            hint.gameObject.AddComponent<LayoutElement>().minHeight = 20f;
+        }
+
+        private void BuildStatBar(Transform parent, string label, float fill, Color barColor)
+        {
+            var row = CreateUIObject("StatRow_" + label, parent, out _);
+            var rowLayout = row.AddComponent<HorizontalLayoutGroup>();
+            rowLayout.spacing                = 4f;
+            rowLayout.childForceExpandWidth  = false;
+            rowLayout.childForceExpandHeight = true;
+            rowLayout.childControlWidth      = true;
+            rowLayout.childControlHeight     = true;
+            row.AddComponent<LayoutElement>().minHeight = 13f;
+
+            // Label (fixed width).
+            var lbl  = CreateText("Lbl", row.transform, label, 11, TextAnchor.MiddleLeft);
+            lbl.color = DtGoldMid;
+            var lblLE = lbl.gameObject.AddComponent<LayoutElement>();
+            lblLE.minWidth       = 30f;
+            lblLE.preferredWidth = 30f;
+            lblLE.flexibleWidth  = 0f;
+
+            // Bar background (flex width).
+            var bgGO = CreateUIObject("BarBg", row.transform, out _);
+            bgGO.AddComponent<Image>().color = new Color(0.08f, 0.05f, 0.02f, 1f);
+            bgGO.AddComponent<LayoutElement>().flexibleWidth = 1f;
+
+            // Fill (anchor-based, percentage of background width).
+            var fillGO = CreateUIObject("Fill", bgGO.transform, out var fillRT);
+            fillGO.AddComponent<Image>().color = barColor;
+            fillRT.anchorMin = new Vector2(0f, 0.15f);
+            fillRT.anchorMax = new Vector2(Mathf.Clamp01(fill), 0.85f);
+            fillRT.offsetMin = Vector2.zero;
+            fillRT.offsetMax = Vector2.zero;
+        }
+
+        // ---- Ability slot picker ---------------------------------------
+
+        private void BuildAbilityPicker(Transform parent)
+        {
+            var row = CreateUIObject("AbilityPickerRow", parent, out _);
+            var rowLayout = row.AddComponent<HorizontalLayoutGroup>();
+            rowLayout.spacing                = 16f;
+            rowLayout.childForceExpandWidth  = true;
+            rowLayout.childForceExpandHeight = true;
+            rowLayout.childControlWidth      = true;
+            rowLayout.childControlHeight     = true;
+            row.AddComponent<LayoutElement>().minHeight = 56f;
+
+            BuildAbilitySlot(row.transform, 0, out _abilitySlot0Label);
+
+            // Thin vertical divider.
+            var divGO = CreateUIObject("Divider", row.transform, out _);
+            divGO.AddComponent<Image>().color = new Color(0.40f, 0.30f, 0.15f, 0.60f);
+            var divLE = divGO.AddComponent<LayoutElement>();
+            divLE.minWidth       = 2f;
+            divLE.preferredWidth = 2f;
+            divLE.flexibleWidth  = 0f;
+
+            BuildAbilitySlot(row.transform, 1, out _abilitySlot1Label);
+
+            RefreshAbilityPicker();
+        }
+
+        private void BuildAbilitySlot(Transform parent, int slot, out Text nameLabel)
+        {
+            var container = CreateUIObject($"AbilitySlot{slot}", parent, out _);
+            var layout = container.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing                = 4f;
+            layout.childForceExpandWidth  = false;
+            layout.childForceExpandHeight = true;
+            layout.childControlWidth      = true;
+            layout.childControlHeight     = true;
+            layout.childAlignment         = TextAnchor.MiddleCenter;
+
+            var leftBtn = CreateButton(container.transform, "◀", () => CycleAbility(slot, -1));
+            leftBtn.gameObject.AddComponent<LayoutElement>().minWidth = 38f;
+            leftBtn.gameObject.GetComponent<LayoutElement>().preferredWidth = 38f;
+
+            var slotLabel = CreateText($"AbilityName{slot}", container.transform, "—", 20, TextAnchor.MiddleCenter);
+            slotLabel.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            nameLabel = slotLabel;
+
+            var rightBtn = CreateButton(container.transform, "▶", () => CycleAbility(slot, +1));
+            rightBtn.gameObject.AddComponent<LayoutElement>().minWidth = 38f;
+            rightBtn.gameObject.GetComponent<LayoutElement>().preferredWidth = 38f;
+        }
+
+        private void RefreshAbilityPicker()
+        {
+            if (_selection == null) return;
+            var abilities = GetAvailableAbilities(_selection.SelectedClass);
+
+            // Slot 0.
+            if (_abilitySlot0Label != null)
+            {
+                if (abilities.Length > 0)
+                {
+                    _abilityIndex0 = Mathf.Clamp(_abilityIndex0, 0, abilities.Length - 1);
+                    var ab = abilities[_abilityIndex0];
+                    _abilitySlot0Label.text  = ab != null ? ab.DisplayName : "—";
+                    _abilitySlot0Label.color = ab != null ? ab.AccentColor : DtTextPrimary;
+                    _selection.Ability0 = ab;
+                }
+                else
+                {
+                    _abilitySlot0Label.text  = "Default";
+                    _abilitySlot0Label.color = DtGoldMid;
+                    _selection.Ability0 = null;
+                }
+            }
+
+            // Slot 1 — avoid duplicating slot 0 when pool has at least 2 entries.
+            if (_abilitySlot1Label != null)
+            {
+                if (abilities.Length > 1)
+                {
+                    _abilityIndex1 = Mathf.Clamp(_abilityIndex1, 0, abilities.Length - 1);
+                    if (_abilityIndex1 == _abilityIndex0)
+                        _abilityIndex1 = (_abilityIndex0 + 1) % abilities.Length;
+                    var ab = abilities[_abilityIndex1];
+                    _abilitySlot1Label.text  = ab != null ? ab.DisplayName : "—";
+                    _abilitySlot1Label.color = ab != null ? ab.AccentColor : DtTextPrimary;
+                    _selection.Ability1 = ab;
+                }
+                else
+                {
+                    // Pool has 0 or 1 entry → no second slot selection.
+                    _abilitySlot1Label.text  = abilities.Length == 1 ? "—" : "Default";
+                    _abilitySlot1Label.color = DtGoldMid;
+                    _selection.Ability1 = null;
+                }
+            }
+        }
+
+        private void CycleAbility(int slot, int direction)
+        {
+            if (_selection == null) return;
+            var abilities = GetAvailableAbilities(_selection.SelectedClass);
+            if (abilities.Length == 0) return;
+
+            if (slot == 0)
+                _abilityIndex0 = (_abilityIndex0 + direction + abilities.Length) % abilities.Length;
+            else
+                _abilityIndex1 = (_abilityIndex1 + direction + abilities.Length) % abilities.Length;
+
+            RefreshAbilityPicker();
+        }
+
+        // ---- Class registry helpers ------------------------------------
+
+        private AbilityBaseSO[] GetAvailableAbilities(ChickenClass cls)
+        {
+            if (_classRegistry == null) return Array.Empty<AbilityBaseSO>();
+            if (!_classRegistry.TryGet(cls, out var entry)) return Array.Empty<AbilityBaseSO>();
+            var pool = entry.Stats?.AvailableAbilities;
+            return pool != null && pool.Length > 0 ? pool : Array.Empty<AbilityBaseSO>();
+        }
+
+        private Color GetClassTint(ChickenClass cls)
+        {
+            if (_classRegistry != null && _classRegistry.TryGet(cls, out var entry))
+                return entry.TintColor;
+            // Fallback: Okabe-Ito inspired per-class colors.
+            return cls switch
+            {
+                ChickenClass.Warrior  => new Color(0.91f, 0.46f, 0.10f, 1f), // orange
+                ChickenClass.Speedy   => new Color(0.10f, 0.50f, 0.77f, 1f), // blue
+                ChickenClass.Fatty    => new Color(0.77f, 0.16f, 0.43f, 1f), // pink/magenta
+                ChickenClass.Assassin => new Color(0.05f, 0.62f, 0.48f, 1f), // teal
+                _                     => Color.white,
+            };
+        }
+
+        private ChickenStatsSO GetClassStats(ChickenClass cls)
+        {
+            if (_classRegistry == null) return null;
+            return _classRegistry.TryGet(cls, out var entry) ? entry.Stats : null;
         }
     }
 }

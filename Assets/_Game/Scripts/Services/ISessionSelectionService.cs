@@ -1,4 +1,5 @@
 using System;
+using CluckWars.Abilities;
 using CluckWars.Gameplay;
 
 namespace CluckWars.Services
@@ -29,6 +30,12 @@ namespace CluckWars.Services
 
         /// <summary>Session name used by Host / Join. Single LAN preset for the demo.</summary>
         string SessionName { get; set; }
+
+        /// <summary>Ability the local player wants equipped in slot 0. Null = use prefab default.</summary>
+        AbilityBaseSO Ability0 { get; set; }
+
+        /// <summary>Ability the local player wants equipped in slot 1. Null = use prefab default.</summary>
+        AbilityBaseSO Ability1 { get; set; }
 
         event Action<ChickenClass> OnSelectionChanged;
     }
