@@ -293,12 +293,13 @@ Everything that needs real-device, multi-device, or playtest data is queued for 
 
 ---
 
-## Phase 10: UGS Integration (in progress) 🚧
+## Phase 10: UGS Integration + UI Visual Redesign ✅ (pending Maestro editor steps)
 
 ### Goals
 - Replace hardcoded `cluck-lan` session name with unique per-match join codes.
 - Players anywhere can create/find games without sharing IPs or being on the same LAN.
 - Anonymous player identity for future account/progression work.
+- Full UI visual redesign: warm Clash Royale / Supercell style (cluckwars-tokens-v2 design system).
 
 ### Tasks
 - [x] `LobbyInfo` data class (`Services/LobbyInfo.cs`)
@@ -306,17 +307,20 @@ Everything that needs real-device, multi-device, or playtest data is queued for 
 - [x] `NullUGSService` updated — offline fallback returns `"cluck-lan"` so solo dev flow unchanged
 - [x] `UGSService` — real implementation: anonymous Auth, Lobby create/join/query, host heartbeat (15s)
 - [x] `ProjectInstaller` — binds `UGSService` unless `UGS_DISABLED` define is set
-- [x] `CharacterSelectController` — Host: lobby name input + "Create Lobby" button + code display; Join: code input + "Join by Code" + lobby browser panel (scrollable list + Refresh + Back)
-- [x] `MatchHud` — lobby panel shows `Code: <code>` so host can share it in-game
-- [x] UGS packages added to `Packages/manifest.json` (`core 1.13.0`, `authentication 3.3.3`, `lobbies 1.2.2`)
-- [ ] **Maestro: link Unity project to Cloud Dashboard** (Edit → Project Settings → Services). Enable Authentication + Lobby. Required before the code compiles against live UGS.
+- [x] `CharacterSelectController` — full redesign: `#0e0804` screen bg, warm brown panel, gold "CLUCK WARS" title, gold section labels; Host: lobby name + code display; Join: code input + lobby browser
+- [x] `MatchHud` — Phase 10 HUD redesign: ranked leaderboard top-left (sorted by score, color dots, progress bars), timer badge top-right in gold, warm brown overlays, Okabe-Ito player colors
+- [x] `ColorSchemeSO` — updated defaults: warm brown palette, gold accent, green CTA, warm white text
+- [x] UGS packages added to `Packages/manifest.json` (`core 1.16.0`, `authentication 3.6.1`, `multiplayer 2.2.2`)
+- [x] Bug fixes: host lobby loop, second-player-becomes-host, `ZenjectException` on `GameManager.Spawned()`
+- [ ] **Maestro: link Unity project to Cloud Dashboard** (Edit → Project Settings → Services). Enable Authentication + Lobby. Required before UGS paths activate.
+- [ ] **Maestro: reset `ColorScheme.asset`** in Inspector ("Reset" button) to pick up Phase 10 palette for `TouchControlsHud` button visuals.
 - [ ] Live smoke test: Host on PC, Join from Android using the displayed code.
 
 ### Architecture note
 UGS Relay is **not** part of Phase 10. Photon Cloud relay already handles internet routing — adding UGS Relay would require a custom Fusion transport adapter with no net benefit. Deferred to Phase 11 (dedicated server work).
 
 ### Deliverable
-Players on different networks can find each other via lobby browser or 6-char code. No LAN requirement.
+Players on different networks find each other via lobby browser or 6-char code. Match HUD shows ranked race leaderboard. Warm Supercell visual theme throughout.
 
 ---
 

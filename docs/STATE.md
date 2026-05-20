@@ -97,14 +97,14 @@ All bound app-wide in `ProjectInstaller`. Empty asset slots bind a runtime-empty
 ### Pending Maestro (Editor work)
 - **UGS Dashboard link** (required for Phase 10): Unity Editor → Edit → Project Settings → Services → link to your Unity Cloud Organization. Then enable Authentication and Lobby services in the Dashboard. Without this, `UGSService.InitializeAsync()` will throw.
 - **ColorScheme.asset**: Select the asset in the Project window and click "Reset" in the Inspector to apply the Phase 10 default palette (warm brown, gold, green CTA). The `MatchHud` and `CharacterSelectController` use inline design-token colors that are already correct; only the `TouchControlsHud` button visuals still read from the SO.
-- **DCBA — Chicken prefab components** (required for B + A):
-  - Add `ChickenMatchStats` component to the Chicken prefab (alongside `ChickenController`). No Inspector wiring — auto-resets each round.
-  - Add `BotController` component to the Chicken prefab. No Inspector wiring needed; self-guards on `IsBot = false` for player chickens.
-- Optional: fill `AudioRegistry` clips, tune class ability allowlists in `ChickenStatsSO.AvailableAbilities`.
+- ~~DCBA — Chicken prefab components~~ **Done by Maestro**: `ChickenMatchStats`, `BotController`, `ChickenVFX` all added to Chicken prefab.
+- Optional: fill `AudioRegistry` clips.
 
 ### Pending agents (code)
-- Phase 11 + DCBA + VFX accents + Balance tooling all code complete. Nothing else blocking agents.
-- `ISessionSelectionService` now carries `Ability0`/`Ability1`; `MatchBootstrapper` calls `AbilityController.SetSlots()` in `onBeforeSpawned`. Ability selection is only meaningful after Maestro fills `ChickenStatsSO.AvailableAbilities` per class in the Editor.
+- All code + data complete. Nothing else blocking agents.
+- `ISessionSelectionService` now carries `Ability0`/`Ability1`; `MatchBootstrapper` calls `AbilityController.SetSlots()` in `onBeforeSpawned`.
+- All 4 `ChickenStatsSO` assets now list all 8 abilities in `AvailableAbilities` — ability picker is fully functional for all classes.
+- `AbilityController._slot1` on Chicken prefab defaulted to EggShell (slot0 = SpeedBurst).
 
 ---
 
@@ -134,6 +134,7 @@ All require real-device or playtest data; queued so they don't get done piecemea
 ## Recent commits (most recent first)
 
 ```
+(pending) Data: ability allowlists + default slot1 (EggShell)
 (pending) Balance: BalanceEditorWindow + DebugHud F2 panel
 (pending) VFX: ability accent burst (ChickenVFX)
 (pending) VFX: ChickenVFX procedural particle systems
