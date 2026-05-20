@@ -329,7 +329,7 @@ MonoBehaviour:
   _pitch: 30
   _focusPoint: {x: 0, y: 0, z: 0}
   _distance: 30
-  _orthoSize: 10
+  _orthoSize: 5
   _backgroundColor: {r: 0.1, g: 0.12, b: 0.16, a: 1}
   _useSolidColor: 1
 --- !u!114 &353153901

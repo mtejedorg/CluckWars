@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Speedy
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenStatsSO
   DisplayName: Speed
-  MoveSpeed: 6
+  MoveSpeed: 10
   TurnSpeed: 720
   MaxHP: 80
   Attack: 8
