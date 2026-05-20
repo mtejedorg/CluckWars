@@ -130,6 +130,12 @@ namespace CluckWars.Gameplay
             // before the Invisibility ability ever fires.
             if (HasStateAuthority && VisualOpacity <= 0f) VisualOpacity = 1f;
 
+            // Apply per-class scale. Affects both the visual mesh and the
+            // CharacterController world-space bounds, so Fatty has a larger hitbox
+            // and Speedy a smaller one — consistent with their archetypes.
+            transform.localScale = Vector3.one * _activeStats.Scale;
+            _log?.Debug(Source, $"Applied scale {_activeStats.Scale} for class {Class}.");
+
             // Apply the per-class tint locally on every peer so even proxies look right.
             if (_registry != null && _registry.TryGet(Class, out var entry))
             {

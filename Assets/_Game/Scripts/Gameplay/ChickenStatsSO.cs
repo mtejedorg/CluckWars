@@ -29,6 +29,10 @@ namespace CluckWars.Gameplay
         [Min(1)] public int CargoCapacity = 10;
         [Min(0f)] public float CollectionRate = 1f; // food per second
 
+        [Header("Visuals")]
+        [Tooltip("Uniform scale applied to the chicken's transform at spawn. Drives visual size and CharacterController world-space bounds simultaneously.")]
+        [Min(0.1f)] public float Scale = 1f;
+
         [Header("Abilities")]
         [Tooltip("Pool of abilities this class is allowed to equip (GDD §7.1). Empty = no restriction (any ability can be equipped). Filled during balance pass.")]
         public AbilityBaseSO[] AvailableAbilities;
