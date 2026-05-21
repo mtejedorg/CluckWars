@@ -33,6 +33,56 @@ The Android build forces:
 
 ---
 
+## Unity MCP (agent ↔ Editor bridge)
+
+The project has the **Unity MCP** package installed (`com.unity.ai.assistant`).
+It lets Claude agents call Unity Editor APIs directly — inspect scenes, run
+`AssetDatabase` queries, trigger builds, etc. — without manual back-and-forth.
+
+### One-time setup (already done on Maestro's machine)
+
+Config is in `.claude/mcp.json` (project-local, gitignored).  
+To restore it on a new machine, add this entry to your Claude Code MCP config:
+
+```json
+{
+  "mcpServers": {
+    "unity-mcp": {
+      "command": "C:\\Users\\MARCO\\.unity\\relay\\relay_win.exe",
+      "args": ["--mcp"]
+    }
+  }
+}
+```
+
+Or via CLI:
+```bash
+claude mcp add unity-mcp "%USERPROFILE%\.unity\relay\relay_win.exe" --args --mcp
+```
+
+If you ever have **multiple Unity projects open** simultaneously, add the project
+path disambiguator to `args`:
+```json
+"args": ["--mcp", "--project-path", "C:\\Users\\MARCO\\Documents\\GitHub\\CluckWars"]
+```
+
+### Activating the connection
+
+After adding the config and **restarting Claude Code**:
+
+1. In Unity: **Edit → Project Settings → AI → Unity MCP**
+2. Click **Accept** on the pending connection request.
+3. `unity-mcp` should appear under **Connected Clients**.
+4. Tools such as `Unity_ManageScene`, `Unity_GetAssets`, etc. will be available
+   to agents in this session.
+
+> **Note:** The relay process (`relay_win.exe`) must be running — it starts
+> automatically when Unity opens the project. If tools appear unavailable after
+> a fresh Editor launch, open `Edit → Project Settings → AI → Unity MCP` once
+> to wake the relay.
+
+---
+
 ## Running
 
 ### Solo (PC or Android)

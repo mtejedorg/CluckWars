@@ -49,6 +49,7 @@ When you begin a session:
 - `Cluck Wars / Build / Windows + Android` (`Ctrl+Shift+B`) in the Unity Editor builds both targets to `Builds/`.
 - F1 in-game toggles the Debug HUD.
 - `adb logcat -s Unity:* CluckWars:*` for Android device logs.
+- **Unity MCP** is configured — agents can call Unity Editor APIs directly (scene inspection, asset queries, etc.). See `docs/TESTING.md § Unity MCP` for setup details.
 
 Full diagnostic playbook: `docs/TESTING.md`.
 
