@@ -3,6 +3,18 @@ using UnityEngine;
 namespace CluckWars.Abilities
 {
     /// <summary>
+    /// Ability category as per GDD §7.2. Shown in the character-select picker to
+    /// help players understand what an ability does before equipping it.
+    /// </summary>
+    public enum AbilityCategory : byte
+    {
+        Damage  = 0,
+        Control = 1,
+        Defense = 2,
+        Utility = 3,
+    }
+
+    /// <summary>
     /// Base ScriptableObject for every ability. Adding a new ability = subclass
     /// this, override <see cref="OnActivate"/> + <see cref="OnDeactivate"/>, drop
     /// a concrete asset under <c>/Assets/_Game/Data/Abilities/</c>. No code
@@ -23,6 +35,8 @@ namespace CluckWars.Abilities
         public string ShortLabel;
         [Tooltip("Accent color for VFX / UI highlight. Phase 6 uses it for the cooldown overlay tint.")]
         public Color AccentColor = new Color(0.45f, 0.7f, 1f, 1f);
+        [Tooltip("GDD §7.2 category. Used by the character-select ability grid to group abilities.")]
+        public AbilityCategory Category = AbilityCategory.Utility;
 
         [Header("Timings")]
         [Tooltip("How long the active effect lasts after activation (seconds). GDD calls for 1–2s on most abilities.")]

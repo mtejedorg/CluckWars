@@ -107,6 +107,12 @@ namespace CluckWars.Gameplay
         public bool ReflectDamage { get; set; }
 
         /// <summary>
+        /// Knockback impulse (world-units/sec) applied to the attacker when Spine Coat
+        /// reflects damage. Set by <c>SpineCoatAbilitySO</c>; 0 when inactive.
+        /// </summary>
+        public float SpineCoatKnockbackStrength { get; set; }
+
+        /// <summary>
         /// 0 = invisible, 1 = fully opaque. Networked so the fade is visible to every player.
         /// </summary>
         [Networked] public float VisualOpacity { get; set; }

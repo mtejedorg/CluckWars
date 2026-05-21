@@ -67,8 +67,20 @@ namespace CluckWars.Gameplay
         /// <summary>How long the root lasts on the triggered chicken (Root zones only).</summary>
         [Networked] public float RootDuration  { get; set; }
 
+        /// <summary>
+        /// Per-spawn radius override. When set to a value &gt; 0 in
+        /// <c>onBeforeSpawned</c> by ability SOs, this takes precedence over
+        /// the prefab's serialized <c>_triggerRadius</c>.
+        /// </summary>
+        [Networked] public float NetworkedRadius { get; set; }
+
         // ---- Read-only accessor (ChickenController uses this) -----------------
-        public float TriggerRadius => _triggerRadius;
+
+        /// <summary>
+        /// Returns <see cref="NetworkedRadius"/> if set, else the prefab's
+        /// serialized default <c>_triggerRadius</c>.
+        /// </summary>
+        public float TriggerRadius => NetworkedRadius > 0f ? NetworkedRadius : _triggerRadius;
 
         private ILogService _log;
 

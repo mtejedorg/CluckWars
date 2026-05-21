@@ -227,6 +227,8 @@ namespace CluckWars.Gameplay
 
         private void ReflectDamageTo(PlayerRef attacker, float amount)
         {
+            float knockback = _controller != null ? _controller.SpineCoatKnockbackStrength : 0f;
+
             var combats = FindObjectsByType<ChickenCombat>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
             for (int i = 0; i < combats.Length; i++)
             {
@@ -236,6 +238,19 @@ namespace CluckWars.Gameplay
                 {
                     _log?.Debug(Source, $"Spine Coat: reflected {amount:0.0} back to {attacker}.");
                     c.RPC_ApplyDamage(amount, Object.InputAuthority);
+
+                    // Knockback: push the attacker away from the defender.
+                    if (knockback > 0f)
+                    {
+                        var attackerCtrl = c.GetComponent<ChickenController>();
+                        if (attackerCtrl != null)
+                        {
+                            var dir = (c.transform.position - transform.position);
+                            dir.y = 0f;
+                            if (dir.sqrMagnitude < 0.001f) dir = transform.forward;
+                            attackerCtrl.RPC_ApplyKnockback(dir.normalized * knockback);
+                        }
+                    }
                     return;
                 }
             }
