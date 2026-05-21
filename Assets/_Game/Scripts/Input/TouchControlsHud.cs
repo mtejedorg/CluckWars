@@ -47,6 +47,10 @@ namespace CluckWars.Input
         private Image _ability1CooldownOverlay;
         private Image _ability2CooldownOverlay;
         private Image _ability3CooldownOverlay;
+        // Base button images — dimmed when ability is on cooldown (B4 requirement).
+        private Image _ability1BaseImg;
+        private Image _ability2BaseImg;
+        private Image _ability3BaseImg;
         private ChickenController _localChicken;
         private float _localChickenLastSearch;
         private ILogService _log;
@@ -119,13 +123,13 @@ namespace CluckWars.Input
             BuildJoystick(canvasGO.transform);
             _ability1 = BuildAbilityButton(canvasGO.transform, "Ability1",
                 _ability1AnchoredPosition, _abilityButtonSize, "Q / 1", isRightAligned: true,
-                out _ability1CooldownOverlay);
+                out _ability1CooldownOverlay, out _ability1BaseImg);
             _ability2 = BuildAbilityButton(canvasGO.transform, "Ability2",
                 _ability2AnchoredPosition, _abilityButtonSize, "E / 2", isRightAligned: true,
-                out _ability2CooldownOverlay);
+                out _ability2CooldownOverlay, out _ability2BaseImg);
             _ability3 = BuildAbilityButton(canvasGO.transform, "Ability3",
                 _ability3AnchoredPosition, _abilityButtonSize, "R / 3", isRightAligned: true,
-                out _ability3CooldownOverlay);
+                out _ability3CooldownOverlay, out _ability3BaseImg);
         }
 
         private void Update()
@@ -139,9 +143,9 @@ namespace CluckWars.Input
                 }
             }
 
-            UpdateCooldownOverlay(_ability1CooldownOverlay, slot: 0);
-            UpdateCooldownOverlay(_ability2CooldownOverlay, slot: 1);
-            UpdateCooldownOverlay(_ability3CooldownOverlay, slot: 2);
+            UpdateCooldownOverlay(_ability1CooldownOverlay, _ability1BaseImg, slot: 0);
+            UpdateCooldownOverlay(_ability2CooldownOverlay, _ability2BaseImg, slot: 1);
+            UpdateCooldownOverlay(_ability3CooldownOverlay, _ability3BaseImg, slot: 2);
             UpdateAbilityAccents();
         }
 
@@ -174,20 +178,21 @@ namespace CluckWars.Input
             Color normal, pressed;
             if (equipped == null)
             {
-                normal = _colors.AbilityNormal;
+                normal  = _colors.AbilityNormal;
                 pressed = _colors.AbilityPressed;
             }
             else
             {
-                normal = equipped.AccentColor;
-                normal.a = _colors.AbilityNormal.a;
-                pressed = equipped.AccentColor;
+                normal    = equipped.AccentColor;
+                normal.a  = _colors.AbilityNormal.a;
+                pressed   = equipped.AccentColor;
                 pressed.a = _colors.AbilityPressed.a;
             }
 
             var img = btn.GetComponent<Image>();
             if (img != null) img.color = normal;
             btn.SetVisuals(img, normal, pressed);
+            // Note: alpha will be overridden each frame by UpdateCooldownOverlay.
         }
 
         private static ChickenController FindLocalChicken()
@@ -201,7 +206,7 @@ namespace CluckWars.Input
             return null;
         }
 
-        private void UpdateCooldownOverlay(Image overlay, int slot)
+        private void UpdateCooldownOverlay(Image overlay, Image baseImg, int slot)
         {
             if (overlay == null) return;
 
@@ -218,6 +223,15 @@ namespace CluckWars.Input
             }
 
             overlay.fillAmount = fill;
+
+            // B4: grey-out the base button when ability is on cooldown.
+            // Alpha 0.45 on cooldown, 1.0 when ready — clear visual affordance.
+            if (baseImg != null)
+            {
+                var c = baseImg.color;
+                c.a = fill > 0f ? 0.45f : 1.0f;
+                baseImg.color = c;
+            }
         }
 
         private void BuildJoystick(Transform canvas)
@@ -250,7 +264,7 @@ namespace CluckWars.Input
         }
 
         private HoldButton BuildAbilityButton(Transform canvas, string name, Vector2 anchoredPosition,
-            float size, string label, bool isRightAligned, out Image cooldownOverlay)
+            float size, string label, bool isRightAligned, out Image cooldownOverlay, out Image baseImg)
         {
             var go = CreateUI(name, canvas, out var rt);
             rt.anchorMin = new Vector2(isRightAligned ? 1f : 0f, 0f);
@@ -262,6 +276,7 @@ namespace CluckWars.Input
             var img = go.AddComponent<Image>();
             img.color = _colors.AbilityNormal;
             img.raycastTarget = true;
+            baseImg = img; // expose for the cooldown grey-out system
 
             var overlayGO = CreateUI("CooldownOverlay", go.transform, out var overlayRT);
             overlayRT.anchorMin = Vector2.zero;

@@ -154,6 +154,56 @@ namespace CluckWars.Gameplay
         public bool IsReady(int slot) => GetSlot(slot) != null && CooldownRemaining(slot) <= 0f;
 
         /// <summary>
+        /// Number of ability slots available to this chicken.
+        /// Assassins (Combo passive) get 3; all other classes get 2.
+        /// </summary>
+        public int EquippedSlotCount
+        {
+            get
+            {
+                var stats = _controller != null ? _controller.Stats : null;
+                return (stats != null && stats.Passive == ChickenPassive.Combo) ? 3 : 2;
+            }
+        }
+
+        /// <summary>
+        /// Bot-only activation API. Mirrors the exact gates from the player input
+        /// path so cooldown / stun / double-cast rules are always honoured.
+        /// Returns <c>true</c> if the ability fired this call.
+        /// Must be called from the StateAuthority (bot FSM already guards this).
+        /// </summary>
+        public bool BotTryActivate(int slot)
+        {
+            if (!HasStateAuthority) return false;
+            var gm = GameManager.Instance;
+            if (gm == null || !gm.IsMatchRunning) return false;
+            if (_combat != null && _combat.IsStunned) return false;
+            if (ActiveSlot != InvalidSlot) return false;
+            if (!IsReady(slot)) return false;
+            TryActivate(slot);
+            return ActiveSlot == slot;
+        }
+
+        /// <summary>
+        /// Scans slots 0..<see cref="EquippedSlotCount"/>-1 for the first
+        /// non-null, ready ability whose resolved <see cref="BotRole"/> matches
+        /// <paramref name="role"/>. Returns <c>true</c> and writes the slot index
+        /// to <paramref name="slot"/> when found.
+        /// </summary>
+        public bool TryGetReadySlotForRole(BotRole role, out int slot)
+        {
+            int count = EquippedSlotCount;
+            for (int i = 0; i < count; i++)
+            {
+                var ability = GetSlot(i);
+                if (ability == null || !IsReady(i)) continue;
+                if (ability.ResolveBotRole() == role) { slot = i; return true; }
+            }
+            slot = InvalidSlot;
+            return false;
+        }
+
+        /// <summary>
         /// Assigns ability assets before <see cref="Spawned"/> runs.
         /// Called by <see cref="MatchBootstrapper"/> inside the <c>onBeforeSpawned</c>
         /// callback so every peer already has the chosen abilities on first <c>Spawned</c>

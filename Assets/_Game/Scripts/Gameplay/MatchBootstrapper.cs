@@ -1,3 +1,4 @@
+using CluckWars.Abilities;
 using CluckWars.Logging;
 using CluckWars.Networking;
 using CluckWars.Services;
@@ -40,6 +41,16 @@ namespace CluckWars.Gameplay
         [Tooltip("Number of AI bots to spawn in Solo mode (0–3). Bots fill corners 1–3 with classes Speedy / Fatty / Assassin.")]
         [Range(0, 3)]
         [SerializeField] private int _soloBotsToSpawn = 3;
+
+        [Header("Bot Loadout")]
+        [Tooltip("Slot-0 ability for all bots (Offense role). Assign Flying Peck .asset.")]
+        [SerializeField] private AbilityBaseSO _botOffenseAbility;
+
+        [Tooltip("Slot-1 ability for all bots (Escape role). Assign Speed Burst .asset.")]
+        [SerializeField] private AbilityBaseSO _botEscapeAbility;
+
+        [Tooltip("Slot-2 ability for Assassin bots (Steal role). Assign Sneaky Steal .asset.")]
+        [SerializeField] private AbilityBaseSO _botStealAbility;
 
         private MapGenerator _mapGenerator;
 
@@ -191,6 +202,11 @@ namespace CluckWars.Gameplay
                     Mathf.Cos((i + 4) * 1.7f) * 0.25f);
 
                 int captured = i; // capture loop variable for lambda
+                var capturedBotClass     = botClasses[i % botClasses.Length];
+                var capturedOffense      = _botOffenseAbility;
+                var capturedEscape       = _botEscapeAbility;
+                var capturedSteal        = _botStealAbility;
+
                 runner.Spawn(
                     chickenPrefab,
                     pos,
@@ -201,8 +217,19 @@ namespace CluckWars.Gameplay
                         var ctrl = networkObject.GetComponent<ChickenController>();
                         if (ctrl != null)
                         {
-                            ctrl.Class = botClasses[captured % botClasses.Length];
+                            ctrl.Class = capturedBotClass;
                             ctrl.IsBot = true;
+                        }
+
+                        // Equip the fixed bot loadout so the bot FSM has something to cast.
+                        var abilities = networkObject.GetComponent<AbilityController>();
+                        if (abilities != null)
+                        {
+                            bool isAssassin = capturedBotClass == ChickenClass.Assassin;
+                            var stealSlot   = isAssassin ? capturedSteal : null;
+                            if (capturedOffense == null || capturedEscape == null)
+                                _log?.Warn(Source, $"Bot loadout incomplete: offenseAbility or escapeAbility not assigned. Bot will run ability-less.");
+                            abilities.SetSlots(capturedOffense, capturedEscape, stealSlot);
                         }
                     });
 

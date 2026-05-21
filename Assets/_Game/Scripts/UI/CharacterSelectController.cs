@@ -48,16 +48,14 @@ namespace CluckWars.UI
         private readonly Dictionary<ChickenClass, Text>  _cardNameTexts = new();
         private readonly Dictionary<SessionMode, Button> _modeButtons   = new();
 
-        // ---- Ability picker --------------------------------------------
+        // ---- Ability picker (B3: slot-selector + categorized scrollable grid) --
         private ChickenClassRegistrySO _classRegistry;
         private AbilityRegistrySO      _abilityRegistry;
-        private int  _abilityIndex0;
-        private int  _abilityIndex1;
-        private int  _abilityIndex2 = 2;
-        private Text _abilitySlot0Label;
-        private Text _abilitySlot1Label;
-        private Text       _abilitySlot2Label;
-        private GameObject _abilitySlot2Container;
+        /// <summary>Which slot the player is currently configuring (0, 1, or 2).</summary>
+        private int _selectedPickerSlot;
+        private readonly Button[] _slotSelectorBtns = new Button[3];
+        private Transform _abilityGridContent;
+        private Text      _abilityGridSlotHeader;
 
         // ---- Dynamic labels --------------------------------------------
         private Text   _statusLabel;
@@ -175,11 +173,15 @@ namespace CluckWars.UI
             if (_selection == null) return;
             _selection.SelectedClass = cls;
             _log?.Debug(Source, $"{source} → SelectedClass={cls}.");
-            // Reset ability indices when class changes so the picker starts at the
-            // first valid option for the new class pool.
-            _abilityIndex0 = 0;
-            _abilityIndex1 = 1;
-            _abilityIndex2 = 2;
+            // Reset ability selections when class changes so the new class starts
+            // with a fresh first-two-abilities default.
+            _selectedPickerSlot = 0;
+            if (_selection != null)
+            {
+                _selection.Ability0 = null;
+                _selection.Ability1 = null;
+                _selection.Ability2 = null;
+            }
             RefreshClassVisuals();
             RefreshAbilityPicker();
         }
@@ -973,171 +975,239 @@ namespace CluckWars.UI
             fillRT.offsetMax = Vector2.zero;
         }
 
-        // ---- Ability slot picker ---------------------------------------
+        // ---- Ability slot picker (B3: slot-selector + categorized grid) --------
 
         private void BuildAbilityPicker(Transform parent)
         {
-            var row = CreateUIObject("AbilityPickerRow", parent, out _);
-            var rowLayout = row.AddComponent<HorizontalLayoutGroup>();
-            rowLayout.spacing                = 16f;
-            rowLayout.childForceExpandWidth  = true;
-            rowLayout.childForceExpandHeight = true;
-            rowLayout.childControlWidth      = true;
-            rowLayout.childControlHeight     = true;
-            row.AddComponent<LayoutElement>().minHeight = 56f;
+            // Slot selector row: [Slot 1] [Slot 2] [Slot 3 (Assassin)]
+            var selectorRow = CreateRow(parent, "SlotSelectorRow", 48f, 8f);
+            for (int s = 0; s < 3; s++)
+            {
+                int captured = s;
+                string label = s == 2 ? "Slot 3 ★" : $"Slot {s + 1}";
+                var btn = CreateChoiceButton(selectorRow.transform, label, () => SelectPickerSlot(captured));
+                _slotSelectorBtns[s] = btn;
+            }
 
-            BuildAbilitySlot(row.transform, 0, out _abilitySlot0Label);
+            // Header: currently configuring which slot + currently equipped name.
+            _abilityGridSlotHeader = CreateText("GridHeader", parent, "", 20, TextAnchor.MiddleLeft);
+            _abilityGridSlotHeader.color = DtGoldMid;
+            _abilityGridSlotHeader.gameObject.AddComponent<LayoutElement>().minHeight = 26f;
 
-            // Thin vertical divider.
-            var divGO = CreateUIObject("Divider", row.transform, out _);
-            divGO.AddComponent<Image>().color = new Color(0.40f, 0.30f, 0.15f, 0.60f);
-            var divLE = divGO.AddComponent<LayoutElement>();
-            divLE.minWidth       = 2f;
-            divLE.preferredWidth = 2f;
-            divLE.flexibleWidth  = 0f;
+            // Scroll view that holds the categorized ability grid.
+            var scrollGO  = CreateUIObject("AbilityScrollRect", parent, out _);
+            var scrollLE  = scrollGO.AddComponent<LayoutElement>();
+            scrollLE.minHeight    = 220f;
+            scrollLE.flexibleHeight = 0f;
+            var scrollRect = scrollGO.AddComponent<ScrollRect>();
+            scrollRect.horizontal = false;
+            scrollRect.vertical   = true;
 
-            BuildAbilitySlot(row.transform, 1, out _abilitySlot1Label);
+            var viewportGO = CreateUIObject("Viewport", scrollGO.transform, out var viewportRT);
+            viewportRT.anchorMin = Vector2.zero;
+            viewportRT.anchorMax = Vector2.one;
+            viewportRT.offsetMin = Vector2.zero;
+            viewportRT.offsetMax = Vector2.zero;
+            var vpImg = viewportGO.AddComponent<Image>();
+            vpImg.color = new Color(0f, 0f, 0f, 0.10f);
+            var mask = viewportGO.AddComponent<Mask>();
+            mask.showMaskGraphic = false;
+            scrollRect.viewport = viewportRT;
 
-            // Slot 2 — Assassin (Combo passive) only. Hidden until class is Assassin.
-            _abilitySlot2Container = CreateUIObject("Slot2Section", row.transform, out _);
-            var slot2HLayout = _abilitySlot2Container.AddComponent<HorizontalLayoutGroup>();
-            slot2HLayout.spacing               = 4f;
-            slot2HLayout.childForceExpandWidth = true;
-            slot2HLayout.childForceExpandHeight = true;
-            slot2HLayout.childControlWidth     = true;
-            slot2HLayout.childControlHeight    = true;
-            _abilitySlot2Container.AddComponent<LayoutElement>().flexibleWidth = 1f;
-
-            var div2GO = CreateUIObject("Divider2", _abilitySlot2Container.transform, out _);
-            div2GO.AddComponent<Image>().color = new Color(0.40f, 0.30f, 0.15f, 0.60f);
-            var div2LE = div2GO.AddComponent<LayoutElement>();
-            div2LE.minWidth       = 2f;
-            div2LE.preferredWidth = 2f;
-            div2LE.flexibleWidth  = 0f;
-
-            BuildAbilitySlot(_abilitySlot2Container.transform, 2, out _abilitySlot2Label);
-            _abilitySlot2Container.SetActive(false);
+            var contentGO = CreateUIObject("GridContent", viewportGO.transform, out var contentRT);
+            contentRT.anchorMin = new Vector2(0f, 1f);
+            contentRT.anchorMax = new Vector2(1f, 1f);
+            contentRT.pivot     = new Vector2(0f, 1f);
+            contentRT.offsetMin = Vector2.zero;
+            contentRT.offsetMax = Vector2.zero;
+            var contentLayout = contentGO.AddComponent<VerticalLayoutGroup>();
+            contentLayout.padding               = new RectOffset(6, 6, 6, 6);
+            contentLayout.spacing               = 4f;
+            contentLayout.childForceExpandWidth = true;
+            contentLayout.childForceExpandHeight = false;
+            contentLayout.childControlWidth     = true;
+            contentLayout.childControlHeight    = true;
+            var contentFitter = contentGO.AddComponent<ContentSizeFitter>();
+            contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            scrollRect.content = contentRT;
+            _abilityGridContent = contentGO.transform;
 
             RefreshAbilityPicker();
         }
 
-        private void BuildAbilitySlot(Transform parent, int slot, out Text nameLabel)
+        /// <summary>Switches which slot the picker is currently configuring.</summary>
+        private void SelectPickerSlot(int slot)
         {
-            var container = CreateUIObject($"AbilitySlot{slot}", parent, out _);
-            var layout = container.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing                = 4f;
-            layout.childForceExpandWidth  = false;
-            layout.childForceExpandHeight = true;
-            layout.childControlWidth      = true;
-            layout.childControlHeight     = true;
-            layout.childAlignment         = TextAnchor.MiddleCenter;
-
-            var leftBtn = CreateButton(container.transform, "◀", () => CycleAbility(slot, -1));
-            leftBtn.gameObject.AddComponent<LayoutElement>().minWidth = 38f;
-            leftBtn.gameObject.GetComponent<LayoutElement>().preferredWidth = 38f;
-
-            var slotLabel = CreateText($"AbilityName{slot}", container.transform, "—", 20, TextAnchor.MiddleCenter);
-            slotLabel.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-            nameLabel = slotLabel;
-
-            var rightBtn = CreateButton(container.transform, "▶", () => CycleAbility(slot, +1));
-            rightBtn.gameObject.AddComponent<LayoutElement>().minWidth = 38f;
-            rightBtn.gameObject.GetComponent<LayoutElement>().preferredWidth = 38f;
+            if (_selection == null) return;
+            bool isAssassin = _selection.SelectedClass == ChickenClass.Assassin;
+            if (slot == 2 && !isAssassin) return; // slot 3 is Assassin-only
+            _selectedPickerSlot = slot;
+            RefreshAbilityPicker();
         }
+
+        /// <summary>Equips <paramref name="ability"/> in the selected slot, avoids duplicates.</summary>
+        private void EquipAbilityInSelectedSlot(AbilityBaseSO ability)
+        {
+            if (_selection == null || ability == null) return;
+            int slot = _selectedPickerSlot;
+
+            // Dedup: if this ability is already in another slot, swap them.
+            if (slot != 0 && _selection.Ability0 == ability) _selection.Ability0 = GetSlotAbility(slot);
+            if (slot != 1 && _selection.Ability1 == ability) _selection.Ability1 = GetSlotAbility(slot);
+            if (slot != 2 && _selection.Ability2 == ability) _selection.Ability2 = GetSlotAbility(slot);
+
+            if (slot == 0)      _selection.Ability0 = ability;
+            else if (slot == 1) _selection.Ability1 = ability;
+            else if (slot == 2) _selection.Ability2 = ability;
+
+            _log?.Debug(Source, $"Slot {slot} ← {ability.DisplayName}.");
+            RefreshAbilityPicker();
+        }
+
+        private AbilityBaseSO GetSlotAbility(int slot) => slot switch
+        {
+            0 => _selection?.Ability0,
+            1 => _selection?.Ability1,
+            2 => _selection?.Ability2,
+            _ => null,
+        };
 
         private void RefreshAbilityPicker()
         {
             if (_selection == null) return;
-            var abilities = GetAvailableAbilities(_selection.SelectedClass);
-
-            // Slot 0.
-            if (_abilitySlot0Label != null)
-            {
-                if (abilities.Length > 0)
-                {
-                    _abilityIndex0 = Mathf.Clamp(_abilityIndex0, 0, abilities.Length - 1);
-                    var ab = abilities[_abilityIndex0];
-                    _abilitySlot0Label.text  = ab != null ? ab.DisplayName : "—";
-                    _abilitySlot0Label.color = ab != null ? ab.AccentColor : DtTextPrimary;
-                    _selection.Ability0 = ab;
-                }
-                else
-                {
-                    _abilitySlot0Label.text  = "Default";
-                    _abilitySlot0Label.color = DtGoldMid;
-                    _selection.Ability0 = null;
-                }
-            }
-
-            // Slot 1 — avoid duplicating slot 0 when pool has at least 2 entries.
-            if (_abilitySlot1Label != null)
-            {
-                if (abilities.Length > 1)
-                {
-                    _abilityIndex1 = Mathf.Clamp(_abilityIndex1, 0, abilities.Length - 1);
-                    if (_abilityIndex1 == _abilityIndex0)
-                        _abilityIndex1 = (_abilityIndex0 + 1) % abilities.Length;
-                    var ab = abilities[_abilityIndex1];
-                    _abilitySlot1Label.text  = ab != null ? ab.DisplayName : "—";
-                    _abilitySlot1Label.color = ab != null ? ab.AccentColor : DtTextPrimary;
-                    _selection.Ability1 = ab;
-                }
-                else
-                {
-                    _abilitySlot1Label.text  = abilities.Length == 1 ? "—" : "Default";
-                    _abilitySlot1Label.color = DtGoldMid;
-                    _selection.Ability1 = null;
-                }
-            }
-
-            // Slot 2 — Assassin (Combo passive) only.
             bool isAssassin = _selection.SelectedClass == ChickenClass.Assassin;
-            _abilitySlot2Container?.SetActive(isAssassin);
-            if (isAssassin && _abilitySlot2Label != null)
+
+            // Clamp selected slot.
+            if (_selectedPickerSlot == 2 && !isAssassin) _selectedPickerSlot = 0;
+
+            // Initialise slot abilities to first two distinct entries if null.
+            var pool = GetAvailableAbilities(_selection.SelectedClass);
+            if (pool.Length > 0 && _selection.Ability0 == null)
+                _selection.Ability0 = pool[0];
+            if (pool.Length > 1 && _selection.Ability1 == null)
+                _selection.Ability1 = pool.Length > 1 ? pool[1] : pool[0];
+            if (isAssassin && pool.Length > 2 && _selection.Ability2 == null)
+                _selection.Ability2 = pool[2];
+            if (!isAssassin) _selection.Ability2 = null;
+
+            // Slot selector button states.
+            for (int s = 0; s < 3; s++)
             {
-                if (abilities.Length > 2)
-                {
-                    _abilityIndex2 = Mathf.Clamp(_abilityIndex2, 0, abilities.Length - 1);
-                    // Avoid duplicating slot 0 or slot 1.
-                    int safety = 0;
-                    while ((_abilityIndex2 == _abilityIndex0 || _abilityIndex2 == _abilityIndex1) && safety < abilities.Length)
-                    {
-                        _abilityIndex2 = (_abilityIndex2 + 1) % abilities.Length;
-                        safety++;
-                    }
-                    var ab = abilities[_abilityIndex2];
-                    _abilitySlot2Label.text  = ab != null ? ab.DisplayName : "—";
-                    _abilitySlot2Label.color = ab != null ? ab.AccentColor : DtTextPrimary;
-                    _selection.Ability2 = ab;
-                }
-                else
-                {
-                    _abilitySlot2Label.text  = "—";
-                    _abilitySlot2Label.color = DtGoldMid;
-                    _selection.Ability2 = null;
-                }
+                if (_slotSelectorBtns[s] == null) continue;
+                bool visible = s < 2 || isAssassin;
+                _slotSelectorBtns[s].gameObject.SetActive(visible);
+                if (visible) ApplyButtonState(_slotSelectorBtns[s], s == _selectedPickerSlot);
             }
-            else
+
+            // Header.
+            if (_abilityGridSlotHeader != null)
             {
-                // Not Assassin — clear slot 2 selection.
-                _selection.Ability2 = null;
+                var equipped = GetSlotAbility(_selectedPickerSlot);
+                string equippedName = equipped != null ? equipped.DisplayName : "—";
+                _abilityGridSlotHeader.text =
+                    $"Slot {_selectedPickerSlot + 1}  ▸  {equippedName}";
+            }
+
+            // Rebuild grid.
+            if (_abilityGridContent != null)
+            {
+                foreach (Transform child in _abilityGridContent)
+                    Destroy(child.gameObject);
+                BuildAbilityGrid(pool);
             }
         }
 
-        private void CycleAbility(int slot, int direction)
+        /// <summary>
+        /// Populates the scrollable grid with ability cards grouped by category.
+        /// </summary>
+        private void BuildAbilityGrid(AbilityBaseSO[] pool)
         {
-            if (_selection == null) return;
-            var abilities = GetAvailableAbilities(_selection.SelectedClass);
-            if (abilities.Length == 0) return;
+            if (pool == null || pool.Length == 0)
+            {
+                var empty = CreateText("EmptyLabel", _abilityGridContent,
+                    "No abilities in registry. Assign AbilityRegistrySO.", 18, TextAnchor.MiddleCenter);
+                empty.color = DtGoldMid;
+                return;
+            }
 
-            if (slot == 0)
-                _abilityIndex0 = (_abilityIndex0 + direction + abilities.Length) % abilities.Length;
-            else if (slot == 1)
-                _abilityIndex1 = (_abilityIndex1 + direction + abilities.Length) % abilities.Length;
-            else if (slot == 2)
-                _abilityIndex2 = (_abilityIndex2 + direction + abilities.Length) % abilities.Length;
+            var categories = new[]
+            {
+                AbilityCategory.Damage,
+                AbilityCategory.Control,
+                AbilityCategory.Defense,
+                AbilityCategory.Utility,
+            };
 
-            RefreshAbilityPicker();
+            foreach (var cat in categories)
+            {
+                bool sectionOpen = false;
+                for (int i = 0; i < pool.Length; i++)
+                {
+                    var ab = pool[i];
+                    if (ab == null || ab.Category != cat) continue;
+
+                    if (!sectionOpen)
+                    {
+                        BuildGridCategoryHeader(cat);
+                        sectionOpen = true;
+                    }
+                    BuildAbilityCard(ab);
+                }
+            }
+        }
+
+        private void BuildGridCategoryHeader(AbilityCategory cat)
+        {
+            var hdr = CreateText("CatHdr_" + cat, _abilityGridContent,
+                cat.ToString().ToUpperInvariant(), 16, TextAnchor.MiddleLeft);
+            hdr.color     = DtGoldMid;
+            hdr.fontStyle = FontStyle.Bold;
+            var hdrLE = hdr.gameObject.AddComponent<LayoutElement>();
+            hdrLE.minHeight = 22f;
+        }
+
+        private void BuildAbilityCard(AbilityBaseSO ab)
+        {
+            bool isEquipped = _selection != null &&
+                (_selection.Ability0 == ab || _selection.Ability1 == ab || _selection.Ability2 == ab);
+
+            var cardGO = CreateUIObject("Card_" + ab.name, _abilityGridContent, out _);
+            var cardImg = cardGO.AddComponent<Image>();
+            cardImg.color = isEquipped
+                ? new Color(ab.AccentColor.r * 0.45f, ab.AccentColor.g * 0.45f, ab.AccentColor.b * 0.55f, 1f)
+                : new Color(0.18f, 0.10f, 0.04f, 1f);
+
+            var cardLayout = cardGO.AddComponent<HorizontalLayoutGroup>();
+            cardLayout.padding                = new RectOffset(10, 10, 5, 5);
+            cardLayout.spacing                = 8f;
+            cardLayout.childForceExpandWidth  = false;
+            cardLayout.childForceExpandHeight = true;
+            cardLayout.childControlWidth      = true;
+            cardLayout.childControlHeight     = true;
+            cardGO.AddComponent<LayoutElement>().minHeight = 40f;
+
+            // Ability name (accent colored).
+            var nameText = CreateText("Name", cardGO.transform, ab.DisplayName, 20, TextAnchor.MiddleLeft);
+            nameText.color = isEquipped ? Color.white : ab.AccentColor;
+            nameText.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+
+            // Cooldown tier badge.
+            string tier = ab.Cooldown < 7f ? "Short" : (ab.Cooldown <= 12f ? "Medium" : "Long");
+            var tierText = CreateText("Tier", cardGO.transform, tier, 16, TextAnchor.MiddleRight);
+            tierText.color = new Color(0.65f, 0.65f, 0.65f, 1f);
+            tierText.gameObject.AddComponent<LayoutElement>().minWidth = 52f;
+
+            // Click selects this ability for the active slot.
+            var capturedAb = ab;
+            var btn = cardGO.AddComponent<Button>();
+            btn.targetGraphic = cardImg;
+            var bc = btn.colors;
+            bc.normalColor      = cardImg.color;
+            bc.highlightedColor = new Color(0.28f, 0.18f, 0.08f, 1f);
+            bc.pressedColor     = ab.AccentColor;
+            bc.selectedColor    = cardImg.color;
+            btn.colors = bc;
+            btn.onClick.AddListener(() => EquipAbilityInSelectedSlot(capturedAb));
         }
 
         // ---- Class registry helpers ------------------------------------

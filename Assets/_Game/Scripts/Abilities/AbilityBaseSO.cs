@@ -15,6 +15,22 @@ namespace CluckWars.Abilities
     }
 
     /// <summary>
+    /// How the bot AI should use this ability.
+    /// <c>Auto</c> derives the role from <see cref="AbilityCategory"/>:
+    /// Damage→Offense, Control→Control, Defense→Defense, Utility→Escape.
+    /// Override only when Auto would be wrong (e.g. Sneaky Steal = Steal).
+    /// </summary>
+    public enum BotRole : byte
+    {
+        Auto    = 0, // derive from AbilityCategory (see AbilityBaseSO.ResolveBotRole)
+        Offense = 1, // close in and deal damage / stun the rival
+        Defense = 2, // turtle up / block hits
+        Control = 3, // displace or pin a rival
+        Escape  = 4, // dash / blur away from danger
+        Steal   = 5, // snatch cargo from a rival
+    }
+
+    /// <summary>
     /// Base ScriptableObject for every ability. Adding a new ability = subclass
     /// this, override <see cref="OnActivate"/> + <see cref="OnDeactivate"/>, drop
     /// a concrete asset under <c>/Assets/_Game/Data/Abilities/</c>. No code
@@ -38,6 +54,10 @@ namespace CluckWars.Abilities
         [Tooltip("GDD §7.2 category. Used by the character-select ability grid to group abilities.")]
         public AbilityCategory Category = AbilityCategory.Utility;
 
+        [Header("Bot")]
+        [Tooltip("How the bot AI classifies and uses this ability. Auto derives the role from Category.")]
+        public BotRole BotRole = BotRole.Auto;
+
         [Header("Timings")]
         [Tooltip("How long the active effect lasts after activation (seconds). GDD calls for 1–2s on most abilities.")]
         [Min(0.05f)] public float Duration = 1.5f;
@@ -48,6 +68,24 @@ namespace CluckWars.Abilities
         [Header("Animation")]
         [Tooltip("Optional clip override. Phase 6 doesn't drive animations from abilities — slot reserved for Phase 9 polish.")]
         public AnimationClip AbilityAnimationClip;
+
+        /// <summary>
+        /// Returns the effective <see cref="BotRole"/> for this ability.
+        /// When <see cref="BotRole"/> is <c>Auto</c>, derives from
+        /// <see cref="Category"/>: Damage→Offense, Control→Control,
+        /// Defense→Defense, Utility→Escape.
+        /// </summary>
+        public BotRole ResolveBotRole() => BotRole switch
+        {
+            BotRole.Auto => Category switch
+            {
+                AbilityCategory.Damage  => BotRole.Offense,
+                AbilityCategory.Defense => BotRole.Defense,
+                AbilityCategory.Control => BotRole.Control,
+                _                       => BotRole.Escape, // Utility → Escape
+            },
+            _ => BotRole,
+        };
 
         public abstract void OnActivate(AbilityContext ctx);
         public abstract void OnDeactivate(AbilityContext ctx);
