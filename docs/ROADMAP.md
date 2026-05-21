@@ -2,9 +2,11 @@
 
 **Target:** Playable demo on LAN with 4 players, all classes, core abilities, full match loop.
 
-**Status snapshot:** Phases 1–7b shipped + closed. Phases 8 (Android build / on-device profile) and 9 (polish / balance / audio / VFX / animator) are code-complete on the parts that don't need device data; everything that needs device data is bundled into the **Dedicated test session** below.
+**Status snapshot:** Phases 1–10 shipped + closed (demo is feature-complete and playable). Device-dependent work is bundled into the **Dedicated test session** below.
 
-For current-state details: `docs/STATE.md`. For architecture: `docs/ARCHITECTURE.md`. For build + diagnostic flows: `docs/TESTING.md`.
+> **ACTIVE WORK — Phase R: v0.3 Mechanics Refactor.** The GDD moved v0.2 → v0.3 (basic attack removed, ability system redesigned, interaction/control system rewritten). The shipped code still implements v0.2. **Phase R** (near the bottom of this file, before the Post-Demo section) is split into **Part A — Parity** (rebuild today's playable state under v0.3 rules) and **Part B — Continuation** (the new content v0.3 unlocks). Start there.
+
+For current-state details: `docs/STATE.md`. For architecture: `docs/ARCHITECTURE.md`. For build + diagnostic flows: `docs/TESTING.md`. For the design itself: `docs/GDD.md` (now v0.3).
 
 ---
 
@@ -321,6 +323,135 @@ UGS Relay is **not** part of Phase 10. Photon Cloud relay already handles intern
 
 ### Deliverable
 Players on different networks find each other via lobby browser or 6-char code. Match HUD shows ranked race leaderboard. Warm Supercell visual theme throughout.
+
+---
+
+## Phase R: v0.3 Mechanics Refactor (ACTIVE)
+
+**Why this exists:** the GDD was revised v0.2 → v0.3 (see `docs/GDD.md` changelog). The shipped game implements v0.2: a button-mash *basic attack*, an `Attack` stat, one ability slot per class (two for Assassin), and a flat "combat" model. v0.3 deletes the basic attack entirely, makes **all** interaction ability-driven, gives every class **2 ability slots (3 for Assassin)**, replaces the `Attack` stat with a **class passive**, and introduces a formal **Interaction & Control System** (collision slow, pile slow, and four control states: Stunned / Slowed / Knocked Back / Rooted).
+
+This phase is split in two:
+
+- **Part A — Parity.** Get back to *exactly today's playable demo* (collect → deposit → win → restart, abilities equip & fire, death-stun drops cargo) but re-implemented under v0.3 rules. No new gameplay content beyond what already works — just the new rule-set and the foundational systems v0.3 redefines. **Done = the demo is as functional as it is on `develop` today, with zero references to "attack" left in gameplay code.**
+- **Part B — Continuation.** The net-new content v0.3 unlocks: the brand-new abilities (Cluck Shock, Peck, Roll & Push, Feather Trap, Feather Aura, Root Egg), the primitives they need (knockback, root, placed zones), the expanded selection UI, and the balance pass.
+
+> **Read before starting:** `docs/CONVENTIONS.md`. The hard rules that matter most here: (1) gameplay reads input only from the Fusion buffer inside `FixedUpdateNetwork`; (2) every `FixedUpdateNetwork` opens with `if (!HasStateAuthority) return;`; (3) cross-authority writes go through `[Rpc(RpcSources.All, RpcTargets.StateAuthority)]`; (4) **never rename a MonoBehaviour/SO `.cs` class that is referenced by a prefab or `.asset`** — the serialized reference is by type+GUID and renaming silently breaks the prefab. Repurpose in place instead.
+
+---
+
+### Part A — Parity under v0.3 rules
+
+#### A1. Input: delete Attack, add Ability3
+- [x] `Networking/PlayerNetworkInput.cs` — in `enum InputButton`, remove `Attack`. Renumber to `Ability1 = 0, Ability2 = 1, Ability3 = 2`. (Wire indices only need to be consistent across peers, and every peer runs the same build, so renumbering is safe.)
+- [x] `Input/IInputProvider.cs` — remove `GetAttackHeld()`, add `GetAbility3Pressed()`.
+- [x] `Input/KeyboardInputProvider.cs` — drop the LMB attack read; map `GetAbility3Pressed()` to a third key (e.g. `rKey.wasPressedThisFrame`). Keep Q/E for Ability1/2.
+- [x] `Input/TouchInputProvider.cs` and `Input/CompositeInputProvider.cs` — same interface change (composite ORs all providers; mirror the existing `GetAbility2Pressed` plumbing for slot 3).
+- [x] `Networking/FusionNetworkService.cs` (~line 113) — remove the `InputButton.Attack` set, add the `InputButton.Ability3` set, and fix the verbose `OnInput` log string that prints `attack=…`.
+
+#### A2. Strip the basic attack from `ChickenCombat`
+- [x] `Gameplay/ChickenCombat.cs` — **keep the class name `ChickenCombat`** (the Chicken prefab references it by type; renaming breaks the prefab — see CONVENTIONS GUID note). It becomes a pure *health / damage-receiver / death-stun* component. Remove: `Swing()`, `BotTrySwing()`, `AttackTimer`, `AttackEpoch`, the `InputButton.Attack` read in `FixedUpdateNetwork`, and the `AttackEpoch` branch in `Render()` (which fired the attack anim + swing SFX).
+- [x] Keep everything damage abilities still need: `[Networked] HP`, `[Networked] IsStunned`, `StunTimer`, `RPC_ApplyDamage`, `RPC_ResetForNewMatch`, the `OnDeath` event, `CreditKillToAttacker`, `ReflectDamageTo`, and the `HP` / `IsStunned` `ChangeDetector` branches in `Render()`.
+- [x] `RPC_ApplyDamage` currently reads `stats.Attack` only at the call site (in `Swing`), so the RPC itself is fine — it takes `amount` as a parameter. Damage abilities already pass their own `amount` (see `RollTrampleAbilitySO.OnActivate`). No RPC signature change needed.
+
+#### A3. `ChickenStatsSO`: drop Attack, drop the allowlist, add Passive
+- [x] `Gameplay/ChickenStatsSO.cs` — remove `Attack`, `AttackRange`, `AttackCooldown` (the whole `[Header("Combat")]` block except `MaxHP`, which stays under a renamed `[Header("Health")]`).
+- [x] Remove `AvailableAbilities` and the `Allows()` method. v0.3 §7.1: *all abilities available to all classes — no class-based restrictions.* The "ability compatibility matrix" TBD was deleted from the GDD.
+- [x] Add a passive descriptor. Create `Gameplay/ChickenPassive.cs` → `public enum ChickenPassive : byte { None = 0, Immovable, Slippery, Tough, Combo }` (byte-backed to match the `ChickenClass : byte` convention — see CONVENTIONS footgun on byte enums). Add `public ChickenPassive Passive;` to `ChickenStatsSO`. Author the four class `.asset`s with their passive (Maestro editor step below): Fatty=Immovable, Speedy=Slippery, Warrior=Tough, Assassin=Combo.
+
+#### A4. `AbilityController`: 3 slots, Assassin-gated 3rd
+- [x] `Gameplay/AbilityController.cs` — add `_slot2` (SerializeField), `Cooldown2` (`[Networked] TickTimer`), and extend `GetSlot` / `GetCooldown` / `SetCooldown` / `Slot2` accessor to cover index 2.
+- [x] In `FixedUpdateNetwork`, add `else if (input.Buttons.IsSet((int)InputButton.Ability3)) TryActivate(2);`.
+- [x] Gate slot 2 to Assassin: in `TryActivate`, if `slot == 2` and `_controller.Stats.Passive != ChickenPassive.Combo`, log + return. (This is how the **Combo** passive is implemented — it *is* "you get the 3rd slot".)
+- [x] Extend `SetSlots(slot0, slot1)` → `SetSlots(slot0, slot1, slot2)` (null = keep prefab default, same as today).
+- [x] Remove the `stats.Allows(...)` warning block in `Spawned()` (the allowlist is gone in A3).
+
+#### A5. Ability selection: 2 pickers (3 for Assassin), global pool
+- [x] `Services/SessionSelectionService.cs` + `Services/ISessionSelectionService.cs` — add `AbilityBaseSO Ability2 { get; set; }` alongside the existing `Ability0` / `Ability1`.
+- [x] All abilities must be selectable by every class. The selection UI currently sources the per-class pool from `entry.Stats?.AvailableAbilities` (deleted in A3). Replace that source with a **single global pool**. Recommended: author an `AbilityRegistrySO` (mirror the existing `ChickenClassRegistrySO` / `PrefabRegistrySO` pattern in `Gameplay/`), bind it `FromInstance` in `ProjectInstaller`, and have `CharacterSelectController.GetAvailableAbilities` return `_abilityRegistry.All` regardless of class.
+- [x] `UI/CharacterSelectController.cs` — show **2** ability pickers for every class, **3** when `SelectedClass == Assassin` (check via the class's `Passive == Combo`, or just `== ChickenClass.Assassin`). Wire the 3rd picker to `_selection.Ability2`. (Selection UI today already supports 2 — see the `GetAvailableAbilities` calls around lines 1023 / 1070; extend, don't rewrite.)
+- [x] `Gameplay/MatchBootstrapper.cs` (~line 273) — pass the 3rd slot: `abilityCtrl?.SetSlots(_selection.Ability0, _selection.Ability1, _selection.Ability2);`.
+
+#### A6. Control-state model on the chicken
+v0.3 §6.4 defines four states. Stun already exists and already drops cargo (`ChickenCombat` death → `OnDeath` → `ChickenCargo` drop). Add scaffolding for the other three on `ChickenController` (these are StateAuthority-side fields read by `ChickenMovement`, exactly like the existing `MoveSpeedMultiplier` / `MovementLocked` ability hooks):
+- [x] **Slowed** — add a `SlowMultiplier` accumulator (1 = no slow; abilities/sources multiply it down). `ChickenMovement.Tick` already multiplies by `MoveSpeedMultiplier`; multiply by `SlowMultiplier` too. Reset to 1 each tick and re-apply active slow sources (so overlapping sources don't leak). Tag sources distinctly per §6.3 (collision / pile / ability) so a future passive can exempt one source — a small `enum SlowSource` + a per-source flag is enough for now.
+- [x] **Rooted** — add `bool Rooted`. In `ChickenMovement`, treat like `MovementLocked` for *planar* movement, **but** Rooted must still allow ability casts (movement-lock from Egg Shell already blocks input; Rooted should block movement only). Gravity still runs.
+- [x] **Knocked Back** — add a `Vector3 ExternalDisplacement` (or a short `TickTimer`-driven impulse). `ChickenMovement` applies it on top of planar movement and decays it. Full knockback abilities are Part B; Part A just lands the field + the movement integration so the state exists.
+
+#### A7. Slow sources (collision + pile)
+- [x] **Pile slow** (§6.2) — `Gameplay/ChickenCargo.cs` already detects "standing on a pile and collecting". While that condition holds, set the pile slow source on the owner each tick. Applies to all classes equally.
+- [x] **Collision slow** (§6.1) — passive friction when two chickens touch. Simplest networked-safe approach: each tick on the StateAuthority, `Physics.OverlapSphere` at the chicken's position on the chicken layer (the same pattern `ChickenCombat.Swing` used to use); if another live chicken is within contact range, set the collision slow source. No damage, no knockback. (Avoid relying on `OnTriggerStay` for networked state — keep the check inside `FixedUpdateNetwork` on the authority.)
+- [x] Magnitudes are placeholders for now; final tuning is a balance-pass item (Part B / test session). GDD TBD #6 (pile slow magnitude) and #7 (collision slow magnitude).
+
+#### A8. Class passives (the other three)
+**Combo** is done in A4. Implement the rest at their natural hook points:
+- [x] **Immovable** (Fatty) — when knockback is applied (A6 `ExternalDisplacement`), scale it down hard if `Passive == Immovable`. (No knockback abilities ship until Part B, so this is just the scaling hook for now.)
+- [x] **Slippery** (Speedy) — control-state *durations* (slow / root / knockback) are reduced for this chicken. Apply a duration multiplier wherever a control state's timer is set on a Slippery target. Damage-stun is unaffected (stun is always 5s).
+- [x] **Tough** (Warrior) — outgoing damage abilities deal more. Apply in the damage path: simplest is to scale `amount` up at the *caster* side before calling `RPC_ApplyDamage` when the caster's `Passive == Tough`. (Scaling at the caster keeps the target's RPC authority-clean.)
+
+#### A9. Ability pool re-mapping (parity subset only)
+v0.3 reorganizes abilities into Damage / Control / Defense / Utility. Seven of today's eight map directly; only **Roll & Trample** is removed (it splits into **Flying Peck** + **Roll & Push**). For parity, keep the seven that already work and convert Roll & Trample into Flying Peck:
+- [x] Keep as-is (update `DisplayName` / `ShortLabel` / `[CreateAssetMenu]` category only if you want the menu to read by category): `SpeedBurstAbilitySO`, `EggShellAbilitySO`, `TurtleModeAbilitySO`, `SpineCoatAbilitySO`, `InvisibilityAbilitySO`, `SneakyStealAbilitySO`, `DoppelgangerAbilitySO`.
+- [x] `Abilities/RollTrampleAbilitySO.cs` → repurpose **in place** into **Flying Peck** (damage dash, HP on contact). Keep the class name to preserve the existing `.asset` reference, OR if you want a clean class name, create `FlyingPeckAbilitySO` + new `.asset` and delete the old pair (script + `.cs.meta` + `.asset` + `.asset.meta`) together — see CONVENTIONS GUID note. Update `DisplayName = "Flying Peck"`, menu name, and (Part B) add the forward dash on the caster.
+- [ ] **Roll & Push** (control, push no damage) is **deferred to Part B** — it needs the knockback primitive.
+- [x] Net result: 7 working abilities, full slot/selection/cooldown pipeline intact = functional parity with today.
+
+#### A10. Animation
+- [x] `Visuals/ChickenAnimator.cs` — remove the `Attack` trigger and its hash. The v0.3 animation table renames "Attacking" → "Ability Cast"; add an `AbilityCast` trigger fired by `AbilityController.TryActivate` (it can reuse the shared ability clip per `AbilityBaseSO.AbilityAnimationClip`). Keep `Hit` / `Stunned`.
+
+#### A11. Bots
+- [x] `Gameplay/BotController.cs` (line ~102) — remove the `_combat?.BotTrySwing();` call (method deleted in A2). Bots keep their collect → deposit FSM. Bots *using abilities* is optional polish in Part B.
+
+#### A12. Docs + cleanup
+- [x] Grep the whole gameplay codebase for `Attack`, `Swing`, `AttackEpoch`, `AttackCooldown`, `Allows`, `AvailableAbilities` — confirm zero gameplay references remain (Photon's internal `InputButton.Right` is unrelated).
+- [x] Update `docs/STATE.md` (remove the "GDD v0.3 pending" warning once landed; list the new ability set and passives) and `docs/TDD.md` (combat → interaction system, slot count). Tick the relevant boxes here.
+
+#### Maestro (Unity Editor) steps for Part A
+- Author/refresh the four class `.asset`s in `Assets/_Game/Data/Classes/`: set the new `Passive` field, confirm the `Attack`/`AttackRange`/`AttackCooldown` fields are gone after recompile.
+- On the **Chicken prefab**: confirm `ChickenCombat` is still attached (type unchanged). Add the `_slot2` ability reference for Assassin builds on `AbilityController`. The AnimatorController: delete the `Attack` trigger param, add `AbilityCast`.
+- Rename/re-author the Flying Peck `.asset` (and delete the old Roll & Trample `.asset` if you took the new-class route).
+- If you add `AbilityRegistrySO`: create the `.asset`, populate it with all ability assets, and assign it in `ProjectInstaller`'s inspector slot.
+
+**Part A deliverable:** a build that plays identically to today — 4 chickens, collect/deposit/win/restart, equip & fire abilities, die → 5s stun → drop cargo → respawn — with the basic attack gone, 2/3 ability slots, passives wired, and the slow + control-state scaffolding live. Validate solo + (in the test session) multi-device.
+
+---
+
+### Part B — Continuation (new v0.3 content)
+
+Everything below is net-new gameplay the v0.3 design unlocks. It builds on the Part A scaffolding (control states, slow sources, passive hooks, 3-slot controller).
+
+#### B1. Interaction primitives (build these first — the new abilities depend on them)
+- [ ] **Knockback** — a networked impulse: caster calls an RPC on the target's StateAuthority that sets the target's `ExternalDisplacement` (A6) for a short window. Respects Fatty's **Immovable** passive (A8). Pattern: same authority crossing as `RPC_ApplyDamage`.
+- [ ] **Root** — set the target's `Rooted` (A6) for a duration; respects Speedy's **Slippery** duration reduction. The chicken can still cast while rooted (§6.4).
+- [ ] **Placed zone** — a spawned `NetworkObject` with a trigger volume that applies an effect (slow or root) to chickens overlapping it. Reuse the existing spawn pattern from `FoodPickup` / `Doppelganger` (`Runner.Spawn` with `onBeforeSpawned` to set networked params from tick zero; self-despawn via `TickTimer`). Needed by Feather Trap and Root Egg.
+
+#### B2. New abilities (each = new `AbilityBaseSO` subclass + `.asset` under `Data/Abilities/`, per the GDD v0.3 §7.2 pool)
+- [ ] **Cluck Shock** (Damage, Medium) — AoE HP burst around self. `OverlapSphere` at caster, `RPC_ApplyDamage` to each hit (like the old Roll & Trample sweep but centered on self).
+- [ ] **Peck** (Damage, Short) — instant short-range HP hit + minor knockback. Uses B1 knockback.
+- [ ] **Roll & Push** (Control, Short) — roll forward + push target away, **no damage**. Uses B1 knockback only.
+- [ ] **Feather Trap** (Control, Medium) — throw a feather cloud to a location; slows anyone walking through. Uses B1 placed zone (slow).
+- [ ] **Feather Aura** (Control, Medium) — emit a feather cloud around self; slows nearby chickens. Per-tick `OverlapSphere` applying the ability slow source for the active duration.
+- [ ] **Root Egg** (Control, Medium) — place an egg that roots the first chicken to step on it. Uses B1 placed zone (root), consumed on first trigger.
+
+#### B3. Expanded selection UI
+- [ ] `UI/CharacterSelectController.cs` — the pool grows from 8 to ~13 abilities. Replace the flat picker with a scrollable grid grouped by category (Damage / Control / Defense / Utility), showing each ability's cooldown tier. Keep the 2-slot (3 for Assassin) equip rule from A5.
+
+#### B4. Cooldown UI for slot 3 + tiers
+- [ ] `Input/TouchControlsHud.cs` — the radial-fill cooldown overlay already exists for 2 buttons; add the 3rd button (Assassin) and surface the Short/Medium tier (e.g. accent intensity). v0.3 §10 makes greyed-when-on-cooldown a hard UI requirement — confirm it reads correctly.
+
+#### B5. Bots use abilities (optional polish)
+- [ ] `Gameplay/BotController.cs` — let the FSM occasionally fire an equipped ability when a rival is in range. Purely to make solo mode livelier.
+
+#### B6. Balance pass (bundles with the Dedicated test session)
+- [ ] Per-ability cooldown values within the v0.3 tiers (Short 3–6s, Medium 8–12s) — GDD TBD #3.
+- [ ] Pile slow + collision slow magnitudes — GDD TBD #6 / #7.
+- [ ] Control-state durations (slow / root / knockback) and the Slippery reduction factor.
+- [ ] Passive magnitudes: Immovable knockback reduction, Tough damage bonus.
+- [ ] Use the existing `Assets/_Game/Editor/BalanceEditorWindow.cs` where it helps.
+
+#### B7. Animation / VFX per ability (test session)
+- [ ] Author the 2–3 shared ability clips (§4) and a feather-cloud / egg VFX. Wire via `AbilityBaseSO.AbilityAnimationClip` and the local VFX pattern (`ChickenVFX`, observed-state-driven — see CONVENTIONS "VFX are local").
+
+**Part B deliverable:** the full v0.3 ability roster (≈13 abilities across 4 categories) selectable and balanced, all four control states exercised by real abilities, passives meaningfully felt, on top of the Part A foundation.
 
 ---
 

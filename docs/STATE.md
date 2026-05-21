@@ -19,16 +19,26 @@ All tags pushed to origin.
 
 ---
 
-## What works (Phases 1–9 complete + Phases 10–11 complete + DCBA polish + v0.3.1 fixes)
+## What works (Phases 1–9 complete + Phase 10 complete + DCBA polish + v0.3.1 fixes + Phase R Part A)
 
 ### Core loop
 - 4 classes (Warrior / Speedy / Fatty / Assassin) — selectable in Bootstrap menu.
+  Each class has a named passive: Warrior=Tough, Speedy=Slippery, Fatty=Immovable, Assassin=Combo.
 - Movement: keyboard (WASD) + touch (joystick). `CompositeInputProvider` ORs both.
-- Combat: button-mash proximity attack, HP, hit reaction, 5-sec death stun.
+  Keys: Q = Ability1, E = Ability2, R = Ability3 (Assassin/Combo only).
+- **No basic attack** (v0.3). All combat is ability-driven.
+  HP, hit reaction, 5-sec death stun still fully networked.
 - Food collect from piles → carry → deposit at base.
+  Pile slow: standing on a pile applies a 0.80× speed penalty (GDD §6.2).
+  Collision slow: brushing another chicken applies a 0.75× speed penalty (GDD §6.1).
 - Food drop on death; pickup-on-overlap.
-- All 8 abilities equippable: Speed Burst, Egg Shell, Roll & Trample, Invisibility, Spine Coat, Turtle Mode, Sneaky Steal, Doppelganger.
-- Per-class ability allowlist exists on `ChickenStatsSO` (empty = no restriction).
+- 7 abilities in the global pool (all classes can equip any):
+  Speed Burst, Egg Shell, Flying Peck (fka Roll & Trample), Invisibility,
+  Spine Coat, Turtle Mode, Sneaky Steal, Doppelganger.
+  (8th ability Roll & Push deferred to Part B — needs knockback primitive.)
+- 2 ability slots for all classes; 3 slots for Assassin (Combo passive gates slot 2).
+- Global ability pool via `AbilityRegistrySO` — no per-class restrictions.
+- Rooted + ExternalDisplacement control states scaffolded (no abilities trigger them yet — Part B).
 
 ### DCBA polish (code complete — pending Maestro prefab wiring for B + A)
 - **D — Dead visual states**: `ChickenVisuals` greys out + goes semi-transparent (0.40 alpha) when `IsStunned`. `ChickenNameplate` shows red "☠" while dead; restores the normal label on respawn.
@@ -67,7 +77,7 @@ All tags pushed to origin.
   - **Class stat cards** (Phase 11): flat class buttons replaced with tall cards showing a class-tint top strip, bold name, SPD/HP/CGO stat bars (normalized across all 4 classes from `ChickenClassRegistrySO`; falls back to design-time percentages when registry not bound), and ability-pool hint. Entire card is a `Button`.
   - **Ability slot picker** (Phase 11): "ABILITIES" section below class cards with two slots, each showing `◀ AbilityName ▶` arrows to cycle through `ChickenStatsSO.AvailableAbilities` for the selected class. Shows "Default" when pool is empty (which is the current state — pools fill during balance pass). Slot labels tinted with `AbilityBaseSO.AccentColor`. Selections stored in `ISessionSelectionService.Ability0/.Ability1`.
 - **MatchHud** (UGUI): ranked leaderboard top-left (4 rows sorted live by food score, with player-color dot + progress bar + score). Timer badge top-right in gold. HP + cargo bars bottom-left above joystick. Centered overlays: lobby (with green Start button), match-end (ranked results), session-end, intro countdown (gold "3, 2, 1, GO!").
-- **TouchControlsHud**: joystick + attack + 2 ability buttons in MOBA arc. Ability tint = equipped `AbilityBaseSO.AccentColor`. Cooldown radial fill.
+- **TouchControlsHud**: joystick + 3 ability buttons. Attack button removed (v0.3); former attack position is now Ability3 (R key / Assassin slot). Ability tint = equipped `AbilityBaseSO.AccentColor`. Cooldown radial fill for all 3 slots.
 - **DebugHud** (F1 toggle): FPS, network state, GameManager state, local chicken stats, base ownership, pickup count.
 
 ### v0.3.1 — Debug logging, deposit fix, cargo feedback, base tinting
@@ -95,24 +105,49 @@ All bound app-wide in `ProjectInstaller`. Empty asset slots bind a runtime-empty
 - `Cluck Wars / Build / Android` (`Ctrl+Shift+A`) — IL2CPP + ARM64 + minSdk 24, `Builds/Android/CluckWars-<version>.apk`.
 - `Cluck Wars / Build / Windows + Android` (`Ctrl+Shift+B`) — sequential.
 - `Cluck Wars / Build / Reveal Builds Folder`.
-- `Cluck Wars / Balance / Balance Editor` — **new** Editor window: editable table of all 4 `ChickenStatsSO` assets (HP / Spd / Turn / Atk / AtkRange / AtkCD / Cap / Rate) + all 8 `AbilityBaseSO` assets (Duration / Cooldown / AccentColor). "Save All ★" flushes dirty assets. Auto-discovers assets — no list to maintain.
+- `Cluck Wars / Balance / Balance Editor` — Editor window: editable table of all 4 `ChickenStatsSO` assets (HP / Spd / Turn / Cap / Rate — Attack fields removed in v0.3) + all 8 `AbilityBaseSO` assets (Duration / Cooldown / AccentColor). "Save All ★" flushes dirty assets. Auto-discovers assets — no list to maintain.
 - **F2 in-game toggle** in `DebugHud` — runtime Balance panel (right side of screen): class stats table from `ChickenClassRegistrySO` + local chicken's equipped ability timings (Duration / Cooldown, active slot indicator).
 
 ---
 
 ## Outstanding before next test session
 
-### Pending Maestro (Editor work)
-- **UGS Dashboard link** (required for Phase 10): Unity Editor → Edit → Project Settings → Services → link to your Unity Cloud Organization. Then enable Authentication and Lobby services in the Dashboard. Without this, `UGSService.InitializeAsync()` will throw.
-- **ColorScheme.asset**: Select the asset in the Project window and click "Reset" in the Inspector to apply the Phase 10 default palette (warm brown, gold, green CTA). The `MatchHud` and `CharacterSelectController` use inline design-token colors that are already correct; only the `TouchControlsHud` button visuals still read from the SO.
-- ~~DCBA — Chicken prefab components~~ **Done by Maestro**: `ChickenMatchStats`, `BotController`, `ChickenVFX` all added to Chicken prefab.
+### Pending Maestro (Editor work — Phase R Part A)
+
+These steps must be done in the Unity Editor after the code compiles cleanly:
+
+1. **Four class `.asset`s** (`Assets/_Game/Data/Classes/`): set the new `Passive` field for each
+   (Warrior=Tough, Speedy=Slippery, Fatty=Immovable, Assassin=Combo).
+   The old `Attack`/`AttackRange`/`AttackCooldown`/`AvailableAbilities` fields will be gone
+   after recompile — Unity will strip them automatically.
+
+2. **AbilityRegistry**: create an `AbilityRegistrySO` asset via `Cluck Wars / Ability Registry`.
+   Drag all 7 ability assets (`Assets/_Game/Data/Abilities/`) into its `All` array.
+   Assign it in `ProjectInstaller._abilityRegistry` on the `ProjectContext` prefab.
+
+3. **Chicken prefab — `AbilityController`**: the `_slot2` field is now exposed.
+   For Assassin builds, assign a default ability to `_slot2` (e.g., Sneaky Steal).
+
+4. **Chicken prefab — AnimatorController**: delete the `Attack` (trigger) parameter,
+   add `AbilityCast` (trigger). `ChickenAnimator` now fires `TriggerAbilityCast()`.
+
+5. **Flying Peck `.asset`** (was Roll & Trample): the asset file itself is unchanged (same GUID).
+   Open it and update `DisplayName` = "Flying Peck", `ShortLabel` = "FP".
+
+6. **ProjectInstaller**: remove any reference to the old `_attackButtonSize`/`_attackAnchoredPosition`
+   inspector values on `TouchControlsHud` — those fields were removed; the GameObject will
+   reset to the new `_ability3AnchoredPosition` default.
+
+Pre-existing Maestro tasks still pending:
+- **UGS Dashboard link** (Phase 10): Unity → Project Settings → Services → link org. Enable Auth + Lobby.
+- **ColorScheme.asset**: hit "Reset" in Inspector for Phase 10 warm palette on `TouchControlsHud`.
 - Optional: fill `AudioRegistry` clips.
 
 ### Pending agents (code)
-- All code + data complete. Nothing else blocking agents.
-- `ISessionSelectionService` now carries `Ability0`/`Ability1`; `MatchBootstrapper` calls `AbilityController.SetSlots()` in `onBeforeSpawned`.
-- All 4 `ChickenStatsSO` assets now list all 8 abilities in `AvailableAbilities` — ability picker is fully functional for all classes.
-- `AbilityController._slot1` on Chicken prefab defaulted to EggShell (slot0 = SpeedBurst).
+- Phase R Part A: **complete** (this session). See ROADMAP.md § Phase R for what's done.
+- Phase R Part B: deferred — knockback/root primitives + 6 new abilities + balance pass.
+- `ISessionSelectionService` now carries `Ability0`/`Ability1`/`Ability2`; `MatchBootstrapper`
+  calls `AbilityController.SetSlots(slot0, slot1, slot2)` in `onBeforeSpawned`.
 
 ---
 
@@ -130,7 +165,7 @@ All require real-device or playtest data; queued so they don't get done piecemea
 
 - Network desync hunting (cross-device LAN).
 - On-device FPS / draw-call / memory profiling.
-- AnimatorController state authoring — **state machine done** (Idle/Walk/Attack/Hit/Stunned states + all transitions). Needs `.anim` clip assets assigned to each state once artwork is recorded/imported.
+- AnimatorController state authoring — **state machine needs update** (replace `Attack` trigger with `AbilityCast` trigger per Phase R A10). States: Idle/Walk/AbilityCast/Hit/Stunned. Needs `.anim` clip assets once artwork is recorded/imported.
 - VFX particle systems — **code complete** (`ChickenVFX.cs`: hit sparks, death burst, stun orbit, deposit gold shower, **ability accent burst**). `VFX_Ability` PS: 16-particle sphere, tinted dynamically from `AbilityBaseSO.AccentColor` at activation, floats upward. Maestro: add `ChickenVFX` component to Chicken prefab.
 - Audio clip recording / mixing.
 - Balance pass (food rates, ability cooldowns, attack damage, HP).

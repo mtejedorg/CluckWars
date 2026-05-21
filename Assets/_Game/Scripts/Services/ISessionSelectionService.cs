@@ -37,6 +37,9 @@ namespace CluckWars.Services
         /// <summary>Ability the local player wants equipped in slot 1. Null = use prefab default.</summary>
         AbilityBaseSO Ability1 { get; set; }
 
+        /// <summary>Ability the local player wants equipped in slot 2. Assassin (Combo passive) only. Null = use prefab default.</summary>
+        AbilityBaseSO Ability2 { get; set; }
+
         event Action<ChickenClass> OnSelectionChanged;
     }
 }

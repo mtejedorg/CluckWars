@@ -50,10 +50,14 @@ namespace CluckWars.UI
 
         // ---- Ability picker --------------------------------------------
         private ChickenClassRegistrySO _classRegistry;
+        private AbilityRegistrySO      _abilityRegistry;
         private int  _abilityIndex0;
         private int  _abilityIndex1;
+        private int  _abilityIndex2 = 2;
         private Text _abilitySlot0Label;
         private Text _abilitySlot1Label;
+        private Text       _abilitySlot2Label;
+        private GameObject _abilitySlot2Container;
 
         // ---- Dynamic labels --------------------------------------------
         private Text   _statusLabel;
@@ -90,13 +94,15 @@ namespace CluckWars.UI
             ILogService log,
             ColorSchemeSO colors,
             IUGSService ugs,
-            [InjectOptional] ChickenClassRegistrySO classRegistry)
+            [InjectOptional] ChickenClassRegistrySO classRegistry,
+            [InjectOptional] AbilityRegistrySO abilityRegistry)
         {
-            _selection     = selection;
-            _log           = log;
-            _colors        = colors;
-            _ugs           = ugs;
-            _classRegistry = classRegistry;
+            _selection       = selection;
+            _log             = log;
+            _colors          = colors;
+            _ugs             = ugs;
+            _classRegistry   = classRegistry;
+            _abilityRegistry = abilityRegistry;
         }
 
         // ---- Unity lifecycle -------------------------------------------
@@ -173,6 +179,7 @@ namespace CluckWars.UI
             // first valid option for the new class pool.
             _abilityIndex0 = 0;
             _abilityIndex1 = 1;
+            _abilityIndex2 = 2;
             RefreshClassVisuals();
             RefreshAbilityPicker();
         }
@@ -925,8 +932,9 @@ namespace CluckWars.UI
                 BuildStatBar(body.transform, "CGO", d[2], tint);
             }
 
-            // Ability-pool hint.
-            string hintText = abilityCount > 0 ? $"{abilityCount} in pool" : "all abilities";
+            // Ability-pool hint (v0.3: global pool shared by all classes).
+            int slots = (cls == ChickenClass.Assassin) ? 3 : 2;
+            string hintText = abilityCount > 0 ? $"{slots} slots · {abilityCount} abilities" : $"{slots} slots";
             var hint = CreateText("Hint", body.transform, hintText, 16, TextAnchor.MiddleCenter);
             hint.color = DtGoldMid;
             hint.gameObject.AddComponent<LayoutElement>().minHeight = 20f;
@@ -989,6 +997,26 @@ namespace CluckWars.UI
             divLE.flexibleWidth  = 0f;
 
             BuildAbilitySlot(row.transform, 1, out _abilitySlot1Label);
+
+            // Slot 2 — Assassin (Combo passive) only. Hidden until class is Assassin.
+            _abilitySlot2Container = CreateUIObject("Slot2Section", row.transform, out _);
+            var slot2HLayout = _abilitySlot2Container.AddComponent<HorizontalLayoutGroup>();
+            slot2HLayout.spacing               = 4f;
+            slot2HLayout.childForceExpandWidth = true;
+            slot2HLayout.childForceExpandHeight = true;
+            slot2HLayout.childControlWidth     = true;
+            slot2HLayout.childControlHeight    = true;
+            _abilitySlot2Container.AddComponent<LayoutElement>().flexibleWidth = 1f;
+
+            var div2GO = CreateUIObject("Divider2", _abilitySlot2Container.transform, out _);
+            div2GO.AddComponent<Image>().color = new Color(0.40f, 0.30f, 0.15f, 0.60f);
+            var div2LE = div2GO.AddComponent<LayoutElement>();
+            div2LE.minWidth       = 2f;
+            div2LE.preferredWidth = 2f;
+            div2LE.flexibleWidth  = 0f;
+
+            BuildAbilitySlot(_abilitySlot2Container.transform, 2, out _abilitySlot2Label);
+            _abilitySlot2Container.SetActive(false);
 
             RefreshAbilityPicker();
         }
@@ -1056,11 +1084,43 @@ namespace CluckWars.UI
                 }
                 else
                 {
-                    // Pool has 0 or 1 entry → no second slot selection.
                     _abilitySlot1Label.text  = abilities.Length == 1 ? "—" : "Default";
                     _abilitySlot1Label.color = DtGoldMid;
                     _selection.Ability1 = null;
                 }
+            }
+
+            // Slot 2 — Assassin (Combo passive) only.
+            bool isAssassin = _selection.SelectedClass == ChickenClass.Assassin;
+            _abilitySlot2Container?.SetActive(isAssassin);
+            if (isAssassin && _abilitySlot2Label != null)
+            {
+                if (abilities.Length > 2)
+                {
+                    _abilityIndex2 = Mathf.Clamp(_abilityIndex2, 0, abilities.Length - 1);
+                    // Avoid duplicating slot 0 or slot 1.
+                    int safety = 0;
+                    while ((_abilityIndex2 == _abilityIndex0 || _abilityIndex2 == _abilityIndex1) && safety < abilities.Length)
+                    {
+                        _abilityIndex2 = (_abilityIndex2 + 1) % abilities.Length;
+                        safety++;
+                    }
+                    var ab = abilities[_abilityIndex2];
+                    _abilitySlot2Label.text  = ab != null ? ab.DisplayName : "—";
+                    _abilitySlot2Label.color = ab != null ? ab.AccentColor : DtTextPrimary;
+                    _selection.Ability2 = ab;
+                }
+                else
+                {
+                    _abilitySlot2Label.text  = "—";
+                    _abilitySlot2Label.color = DtGoldMid;
+                    _selection.Ability2 = null;
+                }
+            }
+            else
+            {
+                // Not Assassin — clear slot 2 selection.
+                _selection.Ability2 = null;
             }
         }
 
@@ -1072,20 +1132,27 @@ namespace CluckWars.UI
 
             if (slot == 0)
                 _abilityIndex0 = (_abilityIndex0 + direction + abilities.Length) % abilities.Length;
-            else
+            else if (slot == 1)
                 _abilityIndex1 = (_abilityIndex1 + direction + abilities.Length) % abilities.Length;
+            else if (slot == 2)
+                _abilityIndex2 = (_abilityIndex2 + direction + abilities.Length) % abilities.Length;
 
             RefreshAbilityPicker();
         }
 
         // ---- Class registry helpers ------------------------------------
 
+        /// <summary>
+        /// v0.3: returns the global ability pool from <see cref="AbilityRegistrySO"/>.
+        /// The <paramref name="cls"/> parameter is kept for API compatibility but is
+        /// no longer used to filter — all classes share the full pool.
+        /// </summary>
         private AbilityBaseSO[] GetAvailableAbilities(ChickenClass cls)
         {
-            if (_classRegistry == null) return Array.Empty<AbilityBaseSO>();
-            if (!_classRegistry.TryGet(cls, out var entry)) return Array.Empty<AbilityBaseSO>();
-            var pool = entry.Stats?.AvailableAbilities;
-            return pool != null && pool.Length > 0 ? pool : Array.Empty<AbilityBaseSO>();
+            if (_abilityRegistry != null && _abilityRegistry.All != null && _abilityRegistry.All.Length > 0)
+                return _abilityRegistry.All;
+            // Registry not assigned — return empty; picker will show "Default" labels.
+            return Array.Empty<AbilityBaseSO>();
         }
 
         private Color GetClassTint(ChickenClass cls)

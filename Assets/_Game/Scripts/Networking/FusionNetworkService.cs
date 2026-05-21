@@ -110,9 +110,9 @@ namespace CluckWars.Networking
 
             var movement = _inputProvider.GetMovement();
             var buttons = new NetworkButtons();
-            if (_inputProvider.GetAttackHeld()) buttons.Set((int)InputButton.Attack, true);
             if (_inputProvider.GetAbility1Pressed()) buttons.Set((int)InputButton.Ability1, true);
             if (_inputProvider.GetAbility2Pressed()) buttons.Set((int)InputButton.Ability2, true);
+            if (_inputProvider.GetAbility3Pressed()) buttons.Set((int)InputButton.Ability3, true);
 
             input.Set(new PlayerNetworkInput
             {
@@ -124,7 +124,7 @@ namespace CluckWars.Networking
             // so we don't allocate the formatted string when filtered out.
             if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose) && (movement.sqrMagnitude > 0.0001f || buttons.Bits != 0))
             {
-                _log.Verbose(Source, $"OnInput tick: move={movement}, attack={buttons.IsSet((int)InputButton.Attack)}, a1={buttons.IsSet((int)InputButton.Ability1)}, a2={buttons.IsSet((int)InputButton.Ability2)}.");
+                _log.Verbose(Source, $"OnInput tick: move={movement}, a1={buttons.IsSet((int)InputButton.Ability1)}, a2={buttons.IsSet((int)InputButton.Ability2)}, a3={buttons.IsSet((int)InputButton.Ability3)}.");
             }
         }
 

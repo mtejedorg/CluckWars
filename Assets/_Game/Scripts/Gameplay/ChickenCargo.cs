@@ -42,6 +42,14 @@ namespace CluckWars.Gameplay
         public float Fraction => Capacity > 0f ? Mathf.Clamp01(Cargo / Capacity) : 0f;
         public bool IsFull => Cargo >= Capacity;
 
+        /// <summary>
+        /// True when this chicken was standing on a non-empty food pile during the
+        /// previous simulation tick. Read by <see cref="ChickenController"/> to apply
+        /// the pile-slow source (GDD §6.2). One-tick lag is imperceptible; piles
+        /// don't move.
+        /// </summary>
+        public bool IsPileSlow { get; private set; }
+
         private ChickenController _controller;
         private ChickenCombat _combat;
         private ILogService _log;
@@ -114,13 +122,19 @@ namespace CluckWars.Gameplay
 
         private void TryCollectFromNearbyPile(ChickenStatsSO stats)
         {
+            var pile = FindNearestPileInRange();
+
+            // IsPileSlow is true whenever the chicken is within a pile's collect
+            // radius, regardless of cargo capacity. ChickenController reads this flag
+            // the NEXT tick to apply the pile-slow source (GDD §6.2).
+            IsPileSlow = (pile != null && !pile.IsEmpty);
+
             if (Cargo >= stats.CargoCapacity)
             {
                 _log?.Verbose(Source, $"TryCollect: cargo full ({Cargo:0.0}/{stats.CargoCapacity}).");
                 return;
             }
 
-            var pile = FindNearestPileInRange();
             if (pile == null)
             {
                 _log?.Verbose(Source, "TryCollect: no pile in range.");

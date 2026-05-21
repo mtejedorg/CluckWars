@@ -4,10 +4,12 @@ using UnityEngine.InputSystem;
 namespace CluckWars.Input
 {
     /// <summary>
-    /// Standalone-Windows input. WASD = movement, LMB = attack, Q/E = abilities.
+    /// Standalone-Windows input. WASD = movement, Q = Ability1, E = Ability2, R = Ability3.
     /// Uses Unity Input System (already shipped in Packages/manifest.json).
     /// </summary>
     /// <remarks>
+    /// v0.3: LMB attack removed. R-key added for Ability3 (Assassin slot only).
+    ///
     /// Phase 1 caveat: <c>wasPressedThisFrame</c> is sampled at Unity Update rate,
     /// while Fusion calls <c>OnInput</c> at the simulation tick rate (30 Hz). For
     /// edge-triggered abilities we will need to latch presses between OnInput calls.
@@ -28,12 +30,6 @@ namespace CluckWars.Input
             return new Vector2(x, y);
         }
 
-        public bool GetAttackHeld()
-        {
-            var mouse = Mouse.current;
-            return mouse != null && mouse.leftButton.isPressed;
-        }
-
         public bool GetAbility1Pressed()
         {
             var kb = Keyboard.current;
@@ -44,6 +40,12 @@ namespace CluckWars.Input
         {
             var kb = Keyboard.current;
             return kb != null && kb.eKey.wasPressedThisFrame;
+        }
+
+        public bool GetAbility3Pressed()
+        {
+            var kb = Keyboard.current;
+            return kb != null && kb.rKey.wasPressedThisFrame;
         }
     }
 }

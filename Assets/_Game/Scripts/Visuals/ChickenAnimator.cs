@@ -9,18 +9,23 @@ namespace CluckWars.Visuals
     /// Lives as a sibling component on the Chicken prefab.
     /// </summary>
     /// <remarks>
-    /// Phase 2 drove only the locomotion blend; Phase 3 added <c>Attack</c> / <c>Hit</c>
-    /// / <c>Stunned</c> hooks driven by <see cref="ChickenCombat"/>'s ChangeDetector so
-    /// every peer sees the same reaction to networked HP / stun changes.
+    /// Phase 2 drove only the locomotion blend; Phase 3 added <c>Hit</c> / <c>Stunned</c>
+    /// hooks driven by <see cref="ChickenCombat"/>'s ChangeDetector so every peer sees
+    /// the same reaction to networked HP / stun changes.
+    ///
+    /// v0.3: the <c>Attack</c> trigger (and its hash) have been replaced by
+    /// <c>AbilityCast</c>. Fired from <see cref="AbilityController.TryActivate"/> on
+    /// slot activation. Maestro must update the AnimatorController: delete the
+    /// <c>Attack</c> parameter, add <c>AbilityCast</c> (trigger).
     /// </remarks>
     [RequireComponent(typeof(ChickenController))]
     public sealed class ChickenAnimator : MonoBehaviour
     {
         // Hashed once. Animator parameter strings live here, not scattered through callsites.
-        public static readonly int SpeedHash = Animator.StringToHash("Speed");
-        public static readonly int AttackHash = Animator.StringToHash("Attack");   // Phase 3
-        public static readonly int HitHash = Animator.StringToHash("Hit");         // Phase 3
-        public static readonly int StunnedHash = Animator.StringToHash("Stunned"); // Phase 3
+        public static readonly int SpeedHash       = Animator.StringToHash("Speed");
+        public static readonly int AbilityCastHash = Animator.StringToHash("AbilityCast"); // v0.3 (replaces Attack)
+        public static readonly int HitHash         = Animator.StringToHash("Hit");
+        public static readonly int StunnedHash     = Animator.StringToHash("Stunned");
 
         [SerializeField] private Animator _animator;
 
@@ -43,8 +48,6 @@ namespace CluckWars.Visuals
         {
             if (_animator == null || _controller == null || _controller.Stats == null) return;
 
-            // Derive instantaneous speed from world-position delta. Works for both the
-            // owner (predicted) and proxies (interpolated networked transform).
             var delta = transform.position - _previousPosition;
             delta.y = 0f;
             _previousPosition = transform.position;
@@ -58,9 +61,16 @@ namespace CluckWars.Visuals
             _animator.SetFloat(SpeedHash, _smoothedSpeed01);
         }
 
-        public void TriggerAttack()
+        /// <summary>
+        /// Fires the <c>AbilityCast</c> trigger when the local or remote chicken
+        /// activates an ability. Called by <see cref="AbilityController"/> on the
+        /// state authority; on remote peers the animator reacts to the
+        /// <c>[Networked] ActiveSlot</c> change via a future ChangeDetector hook
+        /// (Phase 9 / Part B polish).
+        /// </summary>
+        public void TriggerAbilityCast()
         {
-            if (_animator != null) _animator.SetTrigger(AttackHash);
+            if (_animator != null) _animator.SetTrigger(AbilityCastHash);
         }
 
         public void TriggerHit()

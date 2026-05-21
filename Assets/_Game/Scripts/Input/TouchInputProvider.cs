@@ -15,12 +15,6 @@ namespace CluckWars.Input
             return hud != null ? hud.Movement : Vector2.zero;
         }
 
-        public bool GetAttackHeld()
-        {
-            var hud = TouchControlsHud.Instance;
-            return hud != null && hud.AttackHeld;
-        }
-
         public bool GetAbility1Pressed()
         {
             var hud = TouchControlsHud.Instance;
@@ -31,6 +25,12 @@ namespace CluckWars.Input
         {
             var hud = TouchControlsHud.Instance;
             return hud != null && hud.Ability2Pressed;
+        }
+
+        public bool GetAbility3Pressed()
+        {
+            var hud = TouchControlsHud.Instance;
+            return hud != null && hud.Ability3Pressed;
         }
     }
 }

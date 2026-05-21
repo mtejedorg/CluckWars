@@ -1,8 +1,9 @@
-# Game Design Document v0.2
+# Game Design Document v0.3
 
-**Version:** 0.2  
+**Version:** 0.3  
 **Date:** May 2026  
 **Status:** Draft  
+**Changelog v0.3:** Removed basic attack; redesigned ability system (2 slots all classes, 3 for Assassin, no class restrictions); renamed Section 6 to Interaction & Control System; added Slow Sources and Control States; full ability pool redesign into 4 categories; added class passives; updated controls and TBD items.  
 **Changelog v0.2:** Added visual direction (2.5D), food pile visuals, animation states
 
 ---
@@ -25,12 +26,15 @@ Four chickens enter a farm. Only the fattest leaves. Cluck Wars is a fast-paced 
 ## 2. Core Game Loop
 
 ```
-SELECT character & upgrades → SPAWN at base edge → MOVE to food pile
-→ STAND on pile to collect cargo (cargo rate / sec) → CARRY food back to base
-→ DEPOSIT food at base → REPEAT until time runs out or target is reached
+SELECT character & abilities → SPAWN at base edge → MOVE to food pile
+→ STAND on pile to collect cargo (cargo rate / sec) [chickens are slowed while on pile]
+→ CARRY food back to base → DEPOSIT food at base
+→ REPEAT until time runs out or target is reached
                     ↕
-         FIGHT / STEAL / DISRUPT rivals along the way
+     USE ABILITIES to disrupt, protect, control or steal
 ```
+
+**Core Strategic Principle:** Every aggressive interaction costs a cooldown. Cooldown management is the primary skill.
 
 **Win Condition:**
 - First player to reach **150 food units** stored at base wins immediately, OR
@@ -113,10 +117,9 @@ Characters have two base facing directions (left, right). Vertical movement is h
 | Walk | Moving | Base locomotion |
 | Idle | Stationary > 2 seconds | Subtle loop |
 | Collecting | Standing on food pile with cargo filling | Distinct from idle — signals intent |
-| Attacking | Attack button held near enemy | Rapid, energetic |
+| Ability Cast | Ability button pressed | Defined per AbilitySO — 2–3 shared clips reused |
 | Hit | Receiving damage | Brief hit reaction |
 | Stunned | Death stun active (5 seconds) | Held until stun expires |
-| Ability | Defined per AbilitySO | 2–3 shared animations reused across abilities |
 
 Ability animations are defined in the `AbilitySO` asset — each ability references one of the shared animation clips. Adding a new ability does not require a new animation unless explicitly needed.
 
@@ -124,7 +127,7 @@ Ability animations are defined in the `AbilitySO` asset — each ability referen
 
 ## 5. Character Classes
 
-Each player selects one class before the match. Classes define the stat spread and determine which abilities are available to equip.
+Each player selects one class before the match. Classes define the stat spread and passive ability. All abilities are available to all classes — selection happens during character selection, with no class-based restrictions.
 
 ### Core Stats
 
@@ -135,7 +138,6 @@ Each player selects one class before the match. Classes define the stat spread a
 | HP | Total hit points before being stunned |
 | Resistance | Damage reduction — affects how long the chicken survives hits |
 | Speed | Movement speed across the map |
-| Attack | Base damage contribution in combat encounters |
 
 ### 5.1 Fatty Chicken 🐔
 
@@ -148,7 +150,8 @@ Each player selects one class before the match. Classes define the stat spread a
 | HP | ⭐⭐⭐⭐ |
 | Resistance | ⭐⭐⭐⭐ |
 | Speed | ⭐⭐ |
-| Attack | ⭐⭐ |
+
+**Passive — Immovable:** Greatly reduced knockback distance from push abilities.
 
 **Role:** Bulk carrier. Best at maximizing food per trip. Dominant on uncontested piles, but slow enough that rivals can intercept it en route to base.
 
@@ -163,7 +166,8 @@ Each player selects one class before the match. Classes define the stat spread a
 | HP | ⭐⭐ |
 | Resistance | ⭐ |
 | Speed | ⭐⭐⭐⭐⭐ |
-| Attack | ⭐⭐⭐ |
+
+**Passive — Slippery:** Control abilities (slow, root, knockback) have reduced duration. Damage stuns apply normally.
 
 **Role:** Hit-and-run collector. Must avoid prolonged fights — dies fast if caught. Thrives on chaos, excels at snatching dropped cargo after fights.
 
@@ -178,7 +182,8 @@ Each player selects one class before the match. Classes define the stat spread a
 | HP | ⭐⭐⭐ |
 | Resistance | ⭐⭐⭐ |
 | Speed | ⭐⭐⭐ |
-| Attack | ⭐⭐⭐⭐ |
+
+**Passive — Tough:** All damage abilities deal increased damage to targets.
 
 **Role:** All-rounder. Excels at contesting piles and eliminating threats. No glaring weakness but no dominant strength — wins through consistent play and good decision-making.
 
@@ -193,51 +198,112 @@ Each player selects one class before the match. Classes define the stat spread a
 | HP | ⭐⭐ |
 | Resistance | ⭐⭐ |
 | Speed | ⭐⭐⭐⭐ |
-| Attack | ⭐⭐⭐⭐⭐ |
 
-**Role:** Disruptor. Low cargo means the Assassin wins by denying others, not by farming. Chains abilities and attacks to stun rivals and steal dropped cargo. **Unique: equips 2 abilities instead of 1.**
+**Passive — Combo:** Equips **3 abilities** instead of 2. No other stat advantage.
+
+**Role:** Disruptor. Low cargo means the Assassin wins by denying others, not by farming. Chains abilities to stun rivals and steal dropped cargo. The extra ability slot amplifies cooldown management as the core skill expression.
 
 ---
 
-## 6. Combat System
+## 6. Interaction & Control System
 
-Combat is **skill-based and manual** — not auto-resolved. When two chickens are in proximity, players can attack by **repeatedly pressing the attack button**. The outcome is influenced by:
+There is no basic attack. All chicken-to-chicken interaction is fully ability-driven. The outcome of every encounter is determined by:
 
-- **Attack stat** — provides a minor damage advantage, not a decisive one.
-- **Player skill** — timing, button frequency, and knowing when to disengage.
-- **Abilities** — short-burst effects that can swing a fight dramatically.
-- **Positioning** — catching a loaded rival mid-route is often more valuable than winning a direct fight.
+- **Ability choice** — what you equipped, what your opponent equipped, and who has cooldowns available.
+- **Cooldown management** — the primary skill expression. Every aggressive use costs a cooldown. A chicken with no cooldowns available is vulnerable.
+- **Positioning** — catching a loaded rival mid-route is often more valuable than winning a direct confrontation.
+- **Class passives** — modify how control states interact with each class (see Section 5).
 
-**Design intent:** Attack stat differences should make fights feel slightly unequal, not predetermined. A Speedy Chicken should be able to win against a Warrior through good play and ability usage. Combat must feel fun and kinetic, never frustrating or purely stat-gated.
+### 6.1 Collision Behavior
 
-Fights also create **secondary opportunities** — when two players are locked in combat, a third can swoop in to steal dropped cargo or contest an unguarded pile. This emergent dynamic should be encouraged by the map layout and pacing.
+When two chickens are in physical contact, a **collision slow** applies to both. This is a **passive friction effect** — no damage, no knockback, no ability required. It makes contested piles and chokepoints naturally slower and more dangerous for loaded carriers.
+
+### 6.2 Pile Slow
+
+All chickens are **slowed while standing on any food pile**. This is a separate slow source from collision slow, applied equally to all classes regardless of passives (Speedy's Slippery passive does not reduce pile slow — subject to balancing).
+
+### 6.3 Slow Sources (3 distinct types)
+
+| Source | Trigger | Notes |
+|---|---|---|
+| Collision slow | Passive — two chickens in contact | No damage, no knockback |
+| Pile slow | Passive — standing on any food pile | Applies to all classes equally |
+| Ability slow | Applied by specific abilities (Feather Trap, Feather Aura, etc.) | Affected by Speedy's Slippery passive |
+
+These sources are tagged separately in code to allow passive abilities to cover specific sources without affecting others.
+
+### 6.4 Control States
+
+| State | Source | Effect | Drops Cargo? |
+|---|---|---|---|
+| Stunned | HP reaches zero from damage abilities | Full incapacitation, 5 seconds, drops all cargo, respawn at base | ✅ Yes |
+| Slowed | Collision / pile / slow abilities | Reduced movement speed | ❌ No |
+| Knocked Back | Push abilities | Involuntary displacement, interrupts collection | ❌ No |
+| Rooted | Trap abilities | Cannot move, can still use abilities | ❌ No |
+
+**Stun is the only state that drops cargo.** All other control states disrupt without rewarding the aggressor directly — the reward is the window of opportunity they create.
+
+### 6.5 Design Intent
+
+Every aggressive action has a cost (cooldown) and a window (the effect duration). Skilled play is about converting that window into a real advantage — pushing a carrier off route, rooting them while collecting their pile, or timing a damage ability to stun a fully-loaded rival.
+
+**Secondary opportunities:** When an ability exchange stuns a chicken, its dropped cargo becomes freely collectable by any player. A third party watching two players clash and collecting the dropped cargo is an intended and encouraged dynamic.
 
 ---
 
 ## 7. Abilities System
 
 ### 7.1 Rules
-- Each class equips **1 ability** during character selection (pre-match).
-- **Assassin** equips **2 abilities**.
-- Abilities are selected from a **shared pool** — availability per class is TBD and will be defined during balancing.
-- Each ability has a **cooldown** *(all values TBD)*.
-- All abilities have an **active duration of 1–2 seconds**.
+- Each class equips **2 abilities** during character selection (pre-match).
+- **Assassin** equips **3 abilities** (Combo passive — see Section 5.4).
+- **All abilities are available to all classes** — no class-based restrictions.
+- Each ability has a **cooldown** defined by tier (see 7.3).
 - **All abilities must be balanced against each other** — the monetization model must never create a pay-to-win dynamic. This is a non-negotiable design principle.
 
 ### 7.2 Ability Pool
 
-| Ability | Description | Type | Notes |
-|---|---|---|---|
-| Speed Burst | Greatly increases movement speed | Mobility | Escape or chase |
-| Egg Shell | Become invulnerable inside an egg — immobile while active | Defensive | Blocks damage, not repositioning |
-| Roll & Trample | Roll forward, stunning chickens in path | Offensive/Mobility | Also useful as escape |
-| Doppelganger | Spawn a brief decoy copy of yourself | Deceptive | Breaks targeting, creates confusion |
-| Invisibility | Temporarily invisible to other players | Deceptive | Strong for Assassin combos |
-| Spine Coat | Contact with you deals damage to the attacker | Reactive | Punishes aggressive play |
-| Turtle Mode | Near-zero speed, greatly increased resistance | Defensive | Protects cargo during a dangerous crossing |
-| Sneaky Steal | Instantly steal a small amount of cargo from a nearby rival without entering combat | Utility | Unique non-combat ability — bypasses fight entirely |
+#### Damage — deal HP; can stun if target HP reaches zero
 
-*All cooldown and duration values are TBD pending playtesting. Balance pass required before any ability is made available for purchase.*
+| Ability | Description | Cooldown |
+|---|---|---|
+| Flying Peck | Dash forward, HP damage on contact | Short |
+| Cluck Shock | AoE HP burst around self | Medium |
+| Peck | Instant short-range HP hit + minor knockback | Short |
+
+#### Control — no HP damage; disrupt movement or actions
+
+| Ability | Description | Cooldown |
+|---|---|---|
+| Roll & Push | Roll forward, push target away — no damage | Short |
+| Feather Trap | Throw feather cloud to a location; slows anyone walking through | Medium |
+| Feather Aura | Emit feather cloud around self, slows nearby chickens | Medium |
+| Root Egg | Place egg that roots the first chicken that steps on it | Medium |
+
+#### Defense — protect self or cargo
+
+| Ability | Description | Cooldown |
+|---|---|---|
+| Egg Shell | Invulnerable egg form, immobile while active | Short |
+| Turtle Mode | Near-zero speed, greatly increased resistance | Short |
+| Spine Coat | Damages + knockbacks any chicken that contacts you | Medium |
+
+#### Utility — non-combat advantage
+
+| Ability | Description | Cooldown |
+|---|---|---|
+| Speed Burst | Short movement speed boost | Short |
+| Invisibility | Temporarily invisible to other players | Medium |
+| Doppelganger | Spawn decoy copy of yourself | Medium |
+| Sneaky Steal | Instantly steal small cargo from nearby rival, no HP interaction | Short |
+
+### 7.3 Cooldown Tiers
+
+| Tier | Range |
+|---|---|
+| Short | 3–6 seconds *(exact values TBD per ability)* |
+| Medium | 8–12 seconds *(exact values TBD per ability)* |
+
+*Balance pass required before any ability is made available for purchase.*
 
 ---
 
@@ -289,12 +355,12 @@ Skins are the primary long-term monetization vehicle and are **purely cosmetic**
 
 - **Designed mobile-first** — all inputs must work on touchscreen without compromise.
 - **Movement:** Virtual joystick (left thumb).
-- **Attack:** Tap button rapidly when near an enemy (right thumb area).
-- **Ability:** Dedicated button(s) per equipped ability (right thumb area).
+- **Abilities:** Two dedicated ability buttons in the right thumb area. Assassin has three.
 - **Collecting food:** Passive and automatic — stand on a pile and cargo fills at Cargo Rate per second. No button needed.
+- **Cooldown readability:** Ability buttons use a radial fill indicator and are greyed out while on cooldown. Clear visual state is a UI requirement.
 - UI must be **minimal and readable** at small screen sizes.
 - Character silhouettes must be **instantly readable** in isometric view — class identity must be clear at a glance.
-- Attack and ability buttons must feel **responsive and satisfying** — core to the mobile experience.
+- Ability buttons must feel **responsive and satisfying** — core to the mobile experience.
 
 ---
 
@@ -304,11 +370,11 @@ Skins are the primary long-term monetization vehicle and are **purely cosmetic**
 |---|---|---|
 | 1 | Food target value (placeholder: 150 units) | High |
 | 2 | Match timer (placeholder: 3 min) | High |
-| 3 | All ability cooldown values | High |
+| 3 | Ability cooldown values per ability (short: 3–6s, medium: 8–12s) | High |
 | 4 | Cargo Rate values per class | High |
 | 5 | In-game currency earn formula | High |
-| 6 | Class ability compatibility matrix | High |
-| 7 | Attack button feel & tuning on mobile | High |
+| 6 | Pile slow magnitude | High |
+| 7 | Collision slow magnitude | High |
 | 8 | Map randomization rules and constraints | Medium |
 | 9 | Exact food distribution per pile | Medium |
 | 10 | Seasonal content scope and cadence | Low |

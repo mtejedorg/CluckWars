@@ -19,8 +19,9 @@ namespace CluckWars.Networking
     /// </summary>
     public enum InputButton
     {
-        Attack = 0,
-        Ability1 = 1,
-        Ability2 = 2,
+        // Attack removed in v0.3 — all combat is ability-driven.
+        Ability1 = 0,
+        Ability2 = 1,
+        Ability3 = 2, // Assassin (Combo passive) only.
     }
 }

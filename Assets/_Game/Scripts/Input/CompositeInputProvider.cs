@@ -38,13 +38,6 @@ namespace CluckWars.Input
             return best;
         }
 
-        public bool GetAttackHeld()
-        {
-            for (int i = 0; i < _providers.Length; i++)
-                if (_providers[i].GetAttackHeld()) return true;
-            return false;
-        }
-
         public bool GetAbility1Pressed()
         {
             // Read all so each provider's edge-state is consumed once this tick.
@@ -59,6 +52,14 @@ namespace CluckWars.Input
             bool any = false;
             for (int i = 0; i < _providers.Length; i++)
                 any |= _providers[i].GetAbility2Pressed();
+            return any;
+        }
+
+        public bool GetAbility3Pressed()
+        {
+            bool any = false;
+            for (int i = 0; i < _providers.Length; i++)
+                any |= _providers[i].GetAbility3Pressed();
             return any;
         }
     }

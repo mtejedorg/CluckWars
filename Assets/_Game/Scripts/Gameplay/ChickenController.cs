@@ -10,21 +10,49 @@ using LogLevel = CluckWars.Logging.LogLevel;
 namespace CluckWars.Gameplay
 {
     /// <summary>
-    /// Top-level networked chicken. Phase 2 makes it class-aware: a
-    /// <c>[Networked]</c> <see cref="Class"/> selects the active <see cref="ChickenStatsSO"/>
-    /// from the injected registry, with the prefab's serialized <c>_stats</c> kept
-    /// only as a safety fallback.
+    /// Tags which system is currently contributing a slow to a chicken.
+    /// Multiple sources can be active simultaneously; the minimum multiplier wins.
+    /// Tracked so a future passive can exempt a specific source (e.g. a passive
+    /// that ignores pile slow but not ability slow).
+    /// </summary>
+    [System.Flags]
+    public enum SlowSource : byte
+    {
+        None      = 0,
+        Collision = 1 << 0, // Two chickens brushing each other (GDD §6.1).
+        Pile      = 1 << 1, // Standing on a food pile while collecting (GDD §6.2).
+        Ability   = 1 << 2, // Applied by an ability (e.g. Feather Trap).
+    }
+
+    /// <summary>
+    /// Top-level networked chicken. Class-aware: a <c>[Networked]</c>
+    /// <see cref="Class"/> selects the active <see cref="ChickenStatsSO"/> from
+    /// the injected registry, with the prefab's serialized <c>_stats</c> kept only
+    /// as a safety fallback.
     /// </summary>
     /// <remarks>
     /// State authority drives motion via the Fusion input buffer; pure-MonoBehaviour
     /// helpers (animator, visuals) stay local and react to <c>[Networked]</c> state.
-    /// Combat / cargo / abilities will hang off this same GameObject in later phases.
+    ///
+    /// v0.3: added <see cref="SlowMultiplier"/>, <see cref="Rooted"/>,
+    /// <see cref="ExternalDisplacement"/> for the Interaction &amp; Control System
+    /// (GDD §6). Also added passive hooks: <see cref="ApplySlow"/>,
+    /// <see cref="ApplyKnockback"/>, <see cref="ApplyOutgoingDamage"/>.
     /// </remarks>
     [RequireComponent(typeof(NetworkObject))]
     [RequireComponent(typeof(CharacterController))]
     public sealed class ChickenController : NetworkBehaviour
     {
         private const string Source = "Chicken";
+
+        // ---- Passive tuning constants (balance-pass values; Part B / test session) ---
+        private const float CollisionSlowRadius   = 1.2f;  // metres — two chickens touching
+        private const float CollisionSlowFactor   = 0.75f; // GDD TBD #7
+        private const float PileSlowFactor        = 0.80f; // GDD TBD #6
+        private const float SlipperySlowRetention = 0.50f; // slows are 50% as effective for Slippery
+        private const float ImmovableKnockbackFactor = 0.15f; // knockback heavily reduced for Immovable
+        private const float ToughDamageBonus      = 1.25f; // 25% bonus outgoing damage for Tough
+        private const float KnockbackDecayRate    = 8f;    // 1/s; ExternalDisplacement decays to zero
 
         [Tooltip("Fallback used only if the class registry is missing or has no entry for this chicken's class.")]
         [SerializeField] private ChickenStatsSO _fallbackStats;
@@ -38,6 +66,9 @@ namespace CluckWars.Gameplay
         private AbilityController _abilities;
         private ILogService _log;
 
+        // Slow accumulation — reset to None/1 at top of each FixedUpdateNetwork.
+        private SlowSource _activeSlowSources;
+
         /// <summary>The chicken's archetype. Replicated; set by the spawner via <c>OnBeforeSpawned</c>.</summary>
         [Networked] public ChickenClass Class { get; set; } = ChickenClass.Warrior;
 
@@ -46,7 +77,7 @@ namespace CluckWars.Gameplay
         public ChickenCargo Cargo => _cargo;
         public AbilityController Abilities => _abilities;
 
-        // ---- Ability state (StateAuthority-side only) ------------------------
+        // ---- Ability state (StateAuthority-side only) -------------------------
         // Abilities mutate these locally on the StateAuthority. Other peers don't
         // need to mirror these values — they observe the resulting [Networked]
         // position / HP changes instead.
@@ -60,36 +91,45 @@ namespace CluckWars.Gameplay
         /// <summary>While true, <c>ChickenCombat.RPC_ApplyDamage</c> drops incoming damage.</summary>
         public bool DamageImmune { get; set; }
 
-        /// <summary>0 = full damage, 1 = no damage taken. Multiplied with incoming damage in <c>ChickenCombat</c>.</summary>
+        /// <summary>0 = full damage, 1 = no damage taken.</summary>
         public float DamageResistance { get; set; }
 
         /// <summary>When true, incoming damage is sent back to the attacker instead of applied here.</summary>
         public bool ReflectDamage { get; set; }
 
         /// <summary>
-        /// 0 = invisible, 1 = fully opaque. Read by <c>ChickenVisuals</c> on every peer
-        /// for the Invisibility ability. Networked so the fade is visible to every
-        /// player, not just the caster (the caster's StateAuthority writes the value
-        /// and it replicates with the rest of the chicken's state).
+        /// 0 = invisible, 1 = fully opaque. Networked so the fade is visible to every player.
         /// </summary>
         [Networked] public float VisualOpacity { get; set; }
 
-        /// <summary>
-        /// True for the Doppelganger decoy: skips input processing in
-        /// <see cref="FixedUpdateNetwork"/> (and similar guards in
-        /// <c>ChickenCombat</c> / <c>AbilityController</c>) so the caster's input
-        /// doesn't drive both their real chicken and the decoy. Hits, animations,
-        /// and tint still work — the decoy is a static prop that takes damage.
-        /// </summary>
+        /// <summary>True for the Doppelganger decoy: skips input processing.</summary>
         public bool IsDecoy { get; set; }
 
-        /// <summary>
-        /// True for AI-controlled bots spawned in solo mode. Prevents
-        /// <see cref="FixedUpdateNetwork"/> from reading Fusion player input;
-        /// movement is driven by <see cref="BotController"/> via <see cref="BotTick"/>.
-        /// Set in <c>onBeforeSpawned</c> by <see cref="MatchBootstrapper"/>.
-        /// </summary>
+        /// <summary>True for AI-controlled bots spawned in solo mode.</summary>
         [Networked] public bool IsBot { get; set; }
+
+        // ---- v0.3 Control-state fields (GDD §6.4) ----------------------------
+
+        /// <summary>
+        /// Accumulated speed multiplier from all active slow sources this tick.
+        /// 1 = no slow; reset to 1 at the top of each <c>FixedUpdateNetwork</c>
+        /// and then re-populated by <see cref="ApplySlow"/> calls.
+        /// Read by <see cref="ChickenMovement"/>.
+        /// </summary>
+        public float SlowMultiplier { get; set; } = 1f;
+
+        /// <summary>
+        /// Planar movement blocked (like <see cref="MovementLocked"/>) but abilities
+        /// can still be cast while rooted. Gravity still runs.
+        /// </summary>
+        public bool Rooted { get; set; }
+
+        /// <summary>
+        /// External velocity impulse (units per second) applied by knockback effects.
+        /// Decayed to zero by <see cref="ChickenMovement"/> each tick.
+        /// Set via <see cref="ApplyKnockback"/> to respect the Immovable passive.
+        /// </summary>
+        public Vector3 ExternalDisplacement { get; set; }
 
         [Inject]
         public void Construct(ChickenClassRegistrySO registry, ILogService log)
@@ -100,9 +140,6 @@ namespace CluckWars.Gameplay
 
         public override void Spawned()
         {
-            // Fusion spawns NetworkBehaviours outside of Zenject's normal injection path,
-            // so we self-inject from ProjectContext if Construct hasn't been called yet.
-            // Accessing .Instance triggers the lazy load if needed.
             if (_log == null)
             {
                 ProjectContext.Instance.Container.Inject(this);
@@ -122,21 +159,14 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            _log?.Info(Source, $"Stats resolved: '{_activeStats.DisplayName}', moveSpeed={_activeStats.MoveSpeed}.");
+            _log?.Info(Source, $"Stats resolved: '{_activeStats.DisplayName}', moveSpeed={_activeStats.MoveSpeed}, passive={_activeStats.Passive}.");
             _movement = new ChickenMovement(_characterController, this);
 
-            // VisualOpacity is [Networked] (defaults to 0). Seed to fully visible on
-            // the StateAuthority so we don't briefly render an invisible chicken
-            // before the Invisibility ability ever fires.
             if (HasStateAuthority && VisualOpacity <= 0f) VisualOpacity = 1f;
 
-            // Apply per-class scale. Affects both the visual mesh and the
-            // CharacterController world-space bounds, so Fatty has a larger hitbox
-            // and Speedy a smaller one — consistent with their archetypes.
             transform.localScale = Vector3.one * _activeStats.Scale;
             _log?.Debug(Source, $"Applied scale {_activeStats.Scale} for class {Class}.");
 
-            // Apply the per-class tint locally on every peer so even proxies look right.
             if (_registry != null && _registry.TryGet(Class, out var entry))
             {
                 var visuals = GetComponent<ChickenVisuals>();
@@ -152,31 +182,36 @@ namespace CluckWars.Gameplay
         {
             if (_movement == null)
             {
-                // Most common reason: ChickenClassRegistry isn't bound or has no
-                // entry for this class, AND the prefab's _fallbackStats slot is
-                // empty, so ResolveStatsForClass returned null in Spawned. Surface
-                // this loudly during testing so on-device "I can't move" doesn't
-                // get diagnosed as a touch-input bug when it's really stats.
                 if (_log != null && _log.IsEnabled(LogLevel.Verbose))
                     _log.Verbose(Source, "FixedUpdateNetwork: _movement is null (stats unresolved?). Skipping tick.");
                 return;
             }
             if (!HasStateAuthority) return;
 
-            // Decoys (Doppelganger) share input authority with the caster — skip input
-            // tick or the decoy walks in lockstep with the real chicken.
+            // Decoys (Doppelganger) share input authority with the caster — skip all
+            // logic so the decoy doesn't walk in lockstep with the real chicken.
             if (IsDecoy) return;
 
-            // Bots are steered by BotController.BotTick; skip Fusion input read.
+            // ---- Reset and re-compute slow sources each tick -----------------
+            // This runs for both player chickens AND bots so BotController.BotTick
+            // benefits from the final SlowMultiplier that's set here.
+            SlowMultiplier = 1f;
+            _activeSlowSources = SlowSource.None;
+
+            CheckCollisionSlow();
+
+            // Pile slow: ChickenCargo sets IsPileSlow on the previous tick (1-tick
+            // lag is imperceptible; piles don't move).
+            if (_cargo != null && _cargo.IsPileSlow)
+                ApplySlow(SlowSource.Pile, PileSlowFactor);
+
+            // Bots exit here — BotController.BotTick handles their movement with
+            // the SlowMultiplier already computed above.
             if (IsBot) return;
 
-            // Lobby / intro / end-screen lockout — chickens freeze until the host
-            // starts a round and the intro countdown finishes. GameManager.Instance
-            // is null until the master client spawns it; treat that as "not running".
             var gm = GameManager.Instance;
             if (gm == null || !gm.IsMatchRunning) return;
 
-            // Stun lockout: dead-stunned chickens can't move. Combat owns the IsStunned flag.
             if (_combat != null && _combat.IsStunned) return;
 
             if (GetInput<PlayerNetworkInput>(out var input))
@@ -185,14 +220,53 @@ namespace CluckWars.Gameplay
             }
         }
 
+        // ---- Passive hooks ---------------------------------------------------
+
         /// <summary>
-        /// Hard-teleport this chicken to <paramref name="position"/>. Toggles the
-        /// sibling <c>CharacterController</c> off so its internal physics state
-        /// doesn't fight the position write, then back on. Called by
-        /// <c>GameManager.RestartMatch</c> across the authority boundary —
-        /// <c>RpcSources.All → RpcTargets.StateAuthority</c> routes the call to
-        /// the chicken's owning client.
+        /// Applies a speed penalty from a tagged source. Multiple sources stack
+        /// multiplicatively (the minimum multiplier wins). Respects the
+        /// <see cref="ChickenPassive.Slippery"/> passive which halves the effect.
+        /// Call <em>after</em> resetting <c>SlowMultiplier = 1f</c> at the top of
+        /// each tick.
         /// </summary>
+        public void ApplySlow(SlowSource source, float factor)
+        {
+            _activeSlowSources |= source;
+            // Slippery passive: slow effect is partially negated.
+            if (Stats?.Passive == ChickenPassive.Slippery)
+                factor = Mathf.Lerp(1f, factor, SlipperySlowRetention);
+            SlowMultiplier = Mathf.Min(SlowMultiplier, factor);
+        }
+
+        /// <summary>
+        /// Sets an external displacement impulse on this chicken (integrated and
+        /// decayed by <see cref="ChickenMovement"/>).
+        /// Respects the <see cref="ChickenPassive.Immovable"/> passive which
+        /// drastically reduces the impulse for Fatty.
+        /// Must be called on the StateAuthority.
+        /// </summary>
+        public void ApplyKnockback(Vector3 impulse)
+        {
+            if (Stats?.Passive == ChickenPassive.Immovable)
+                impulse *= ImmovableKnockbackFactor;
+            ExternalDisplacement = impulse;
+        }
+
+        /// <summary>
+        /// Scales an outgoing damage amount by this chicken's passive.
+        /// <see cref="ChickenPassive.Tough"/> (Warrior) grants a bonus.
+        /// Call before <see cref="ChickenCombat.RPC_ApplyDamage"/> when the
+        /// damage source is this chicken's ability.
+        /// </summary>
+        public float ApplyOutgoingDamage(float rawAmount)
+        {
+            if (Stats?.Passive == ChickenPassive.Tough)
+                return rawAmount * ToughDamageBonus;
+            return rawAmount;
+        }
+
+        // ---- Networking helpers ----------------------------------------------
+
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_TeleportTo(Vector3 position)
         {
@@ -212,23 +286,43 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Drives movement for bot-controlled chickens. Called by
         /// <see cref="BotController"/> each <c>FixedUpdateNetwork</c> tick instead
-        /// of reading Fusion player input. Only valid on the StateAuthority peer;
-        /// no-ops otherwise so remote proxies are unaffected.
+        /// of reading Fusion player input. Only valid on the StateAuthority peer.
         /// </summary>
-        /// <param name="movement">XZ steering direction, magnitude 0–1.</param>
-        /// <param name="deltaTime">Runner.DeltaTime from the calling NetworkBehaviour.</param>
         public void BotTick(Vector2 movement, float deltaTime)
         {
             if (!HasStateAuthority || _movement == null) return;
             _movement.Tick(movement, deltaTime);
         }
 
+        // ---- Private helpers -------------------------------------------------
+
+        /// <summary>
+        /// Checks whether another live chicken is within contact range and, if so,
+        /// applies the collision slow source. Runs once per FixedUpdateNetwork on
+        /// the authority — avoids relying on OnTriggerStay which is unreliable for
+        /// networked state (CONVENTIONS.md).
+        /// </summary>
+        private void CheckCollisionSlow()
+        {
+            var hits = Physics.OverlapSphere(
+                transform.position, CollisionSlowRadius, ~0,
+                QueryTriggerInteraction.Ignore);
+
+            for (int i = 0; i < hits.Length; i++)
+            {
+                var other = hits[i].GetComponentInParent<ChickenController>();
+                if (other == null || other == this) continue;
+                // Ignore dead chickens (stunned / falling through respawn).
+                if (other.Combat != null && other.Combat.IsDead) continue;
+                ApplySlow(SlowSource.Collision, CollisionSlowFactor);
+                break; // One other chicken is enough to trigger the slow.
+            }
+        }
+
         private ChickenStatsSO ResolveStatsForClass(ChickenClass cls)
         {
             if (_registry != null && _registry.TryGet(cls, out var entry) && entry.Stats != null)
-            {
                 return entry.Stats;
-            }
             return _fallbackStats;
         }
     }

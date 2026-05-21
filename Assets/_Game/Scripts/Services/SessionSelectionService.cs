@@ -31,10 +31,12 @@ namespace CluckWars.Services
         // this with proper UGUI session entry.
         public string SessionName { get; set; } = "cluck-lan";
 
-        // Null = use the prefab-default slot; set by CharacterSelectController when
-        // the player picks from a non-empty AvailableAbilities pool.
+        // Null = use the prefab-default slot; set by CharacterSelectController when the
+        // player picks from the global AbilityRegistrySO pool.
         public AbilityBaseSO Ability0 { get; set; }
         public AbilityBaseSO Ability1 { get; set; }
+        // Slot 2 — Assassin (Combo passive) only.
+        public AbilityBaseSO Ability2 { get; set; }
 
         public event Action<ChickenClass> OnSelectionChanged;
     }

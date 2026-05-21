@@ -9,7 +9,7 @@ namespace CluckWars.Gameplay
     /// Simple FSM AI for bot chickens spawned in solo mode. Runs only on the
     /// master client (StateAuthority). Drives locomotion via
     /// <see cref="ChickenController.BotTick"/> and attacks via
-    /// <see cref="ChickenCombat.BotTrySwing"/>.
+    /// <see cref="ChickenCombat"/>.
     /// </summary>
     /// <remarks>
     /// <b>States</b>
@@ -19,9 +19,8 @@ namespace CluckWars.Gameplay
     ///   <item><c>ReturnToBase</c> — walks toward the bot's nearest unowned base
     ///     when cargo exceeds <c>_returnThreshold</c> fraction.</item>
     /// </list>
-    /// Attack is attempted every tick regardless of locomotion state — if an enemy
-    /// enters <c>_aggroRange</c> the bot swings immediately. The attack cooldown in
-    /// <see cref="ChickenCombat"/> prevents abuse.
+    /// v0.3: basic attack removed. Bots collect and deposit only; ability use is
+    /// optional polish deferred to Part B.
     ///
     /// <b>Maestro</b>: add this component to the Chicken prefab alongside
     /// <see cref="ChickenController"/>. It self-guards on <c>IsBot</c> so it is
@@ -97,9 +96,6 @@ namespace CluckWars.Gameplay
             }
 
             Navigate();
-
-            // Opportunistic melee: the combat cooldown prevents rapid-fire swings.
-            _combat?.BotTrySwing();
         }
 
         // ---- FSM ---------------------------------------------------------------

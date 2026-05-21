@@ -33,6 +33,10 @@ namespace CluckWars.Installers
         [Tooltip("Drop the ColorScheme asset here so HUD / food / button colors come from one palette instead of inline literals. If null, an empty instance is bound with its built-in defaults.")]
         [SerializeField] private ColorSchemeSO _colorScheme;
 
+        [Tooltip("Drop the AbilityRegistry asset here (created via Cluck Wars / Ability Registry). " +
+                 "Populates the global ability pool for the character-select screen (GDD v0.3 §7.1).")]
+        [SerializeField] private AbilityRegistrySO _abilityRegistry;
+
         public override void InstallBindings()
         {
             // Logger bound first so other bindings can complain through it during install if they need to.
@@ -116,6 +120,20 @@ namespace CluckWars.Installers
                 ? _colorScheme
                 : ScriptableObject.CreateInstance<ColorSchemeSO>();
             Container.Bind<ColorSchemeSO>().FromInstance(colorScheme).AsSingle();
+
+            // AbilityRegistry: empty instance is safe — CharacterSelectController falls back
+            // to an empty pool and shows "Default" labels for each slot.
+            var abilityRegistry = _abilityRegistry != null
+                ? _abilityRegistry
+                : ScriptableObject.CreateInstance<AbilityRegistrySO>();
+            Container.Bind<AbilityRegistrySO>().FromInstance(abilityRegistry).AsSingle();
+            if (_abilityRegistry == null)
+            {
+                Debug.LogWarning(
+                    "[ProjectInstaller] AbilityRegistry not assigned. " +
+                    "Character-select ability picker will show no abilities. " +
+                    "Create an AbilityRegistry asset and assign it here.");
+            }
         }
     }
 }

@@ -1,4 +1,3 @@
-using CluckWars.Abilities;
 using UnityEngine;
 
 namespace CluckWars.Gameplay
@@ -6,6 +5,11 @@ namespace CluckWars.Gameplay
     /// <summary>
     /// Per-class tunables. One asset per class lives in /Assets/_Game/Data/Classes/.
     /// </summary>
+    /// <remarks>
+    /// v0.3: <c>Attack</c>, <c>AttackRange</c>, <c>AttackCooldown</c> removed (basic attack
+    /// deleted). <c>AvailableAbilities</c> / <c>Allows()</c> removed — all abilities are
+    /// available to all classes (GDD §7.1). <c>Passive</c> field added.
+    /// </remarks>
     [CreateAssetMenu(
         fileName = "ChickenStats",
         menuName = "Cluck Wars/Chicken Stats",
@@ -15,40 +19,23 @@ namespace CluckWars.Gameplay
         [Header("Identity")]
         public string DisplayName = "Warrior";
 
+        [Header("Passive")]
+        [Tooltip("This class's unique passive mechanic (GDD v0.3 §5.2). Set in the Inspector after recompile.")]
+        public ChickenPassive Passive = ChickenPassive.None;
+
+        [Header("Health")]
+        [Min(1f)] public float MaxHP = 100f;
+
         [Header("Movement")]
         [Min(0f)] public float MoveSpeed = 4f;
         [Min(0f)] public float TurnSpeed = 720f; // deg/sec
-
-        [Header("Combat")]
-        [Min(1f)] public float MaxHP = 100f;
-        [Min(0f)] public float Attack = 10f;
-        [Min(0f)] public float AttackRange = 1.5f;
-        [Min(0f)] public float AttackCooldown = 0.4f;
 
         [Header("Cargo")]
         [Min(1)] public int CargoCapacity = 10;
         [Min(0f)] public float CollectionRate = 1f; // food per second
 
         [Header("Visuals")]
-        [Tooltip("Uniform scale applied to the chicken's transform at spawn. Drives visual size and CharacterController world-space bounds simultaneously.")]
+        [Tooltip("Uniform scale applied to the chicken's transform at spawn.")]
         [Min(0.1f)] public float Scale = 1f;
-
-        [Header("Abilities")]
-        [Tooltip("Pool of abilities this class is allowed to equip (GDD §7.1). Empty = no restriction (any ability can be equipped). Filled during balance pass.")]
-        public AbilityBaseSO[] AvailableAbilities;
-
-        /// <summary>
-        /// True if <paramref name="ability"/> can be equipped on a chicken of this
-        /// class, or if the allowlist is empty (no restriction).
-        /// </summary>
-        public bool Allows(AbilityBaseSO ability)
-        {
-            if (AvailableAbilities == null || AvailableAbilities.Length == 0) return true;
-            for (int i = 0; i < AvailableAbilities.Length; i++)
-            {
-                if (AvailableAbilities[i] == ability) return true;
-            }
-            return false;
-        }
     }
 }

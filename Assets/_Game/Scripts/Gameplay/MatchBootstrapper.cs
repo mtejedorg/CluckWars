@@ -267,10 +267,10 @@ namespace CluckWars.Gameplay
                     // Apply player-chosen abilities when the player selected from a pool.
                     // Null means "use the prefab default" — SetSlots ignores null args.
                     if (_selection != null &&
-                        (_selection.Ability0 != null || _selection.Ability1 != null))
+                        (_selection.Ability0 != null || _selection.Ability1 != null || _selection.Ability2 != null))
                     {
                         var abilityCtrl = networkObject.GetComponent<AbilityController>();
-                        abilityCtrl?.SetSlots(_selection.Ability0, _selection.Ability1);
+                        abilityCtrl?.SetSlots(_selection.Ability0, _selection.Ability1, _selection.Ability2);
                     }
                 });
         }

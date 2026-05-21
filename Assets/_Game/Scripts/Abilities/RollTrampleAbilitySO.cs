@@ -4,18 +4,20 @@ using UnityEngine;
 namespace CluckWars.Abilities
 {
     /// <summary>
-    /// One-shot offensive sweep: on activate, finds every chicken in a forward cone
-    /// (approximated with an <see cref="Physics.OverlapSphere"/> centered ahead of
-    /// the caster) and slams them with damage hefty enough to send them into death
-    /// stun. Active duration is mostly cosmetic — the gameplay impact happens at
-    /// activation time. <c>OnDeactivate</c> is a no-op.
+    /// Flying Peck — damage ability. On activate, finds every chicken in a forward
+    /// cone (approximated with an <see cref="Physics.OverlapSphere"/> centered
+    /// ahead of the caster) and slams them with damage.
     /// </summary>
     /// <remarks>
-    /// Polishing the actual "roll" animation + a forward dash on the caster is
-    /// Phase 9 work. For now the chicken stays put and only the AoE strike fires
-    /// — enough to validate the mechanic and the AbilityController architecture.
+    /// <b>Class name unchanged</b> — kept as <c>RollTrampleAbilitySO</c> so the
+    /// existing <c>.asset</c> serialized reference (GUID-bound) remains valid.
+    /// The forward dash + animation from the original v0.2 "Roll &amp; Trample"
+    /// design are Part B work.
+    ///
+    /// <b>Tough passive:</b> caster's outgoing damage is scaled via
+    /// <see cref="ChickenController.ApplyOutgoingDamage"/> before the RPC fires.
     /// </remarks>
-    [CreateAssetMenu(fileName = "RollTrample", menuName = "Cluck Wars/Ability/Roll & Trample", order = 5)]
+    [CreateAssetMenu(fileName = "FlyingPeck", menuName = "Cluck Wars/Ability/Damage/Flying Peck", order = 5)]
     public sealed class RollTrampleAbilitySO : AbilityBaseSO
     {
         [Tooltip("How far in front of the caster the sweep is centered.")]
@@ -24,7 +26,7 @@ namespace CluckWars.Abilities
         [Tooltip("Sweep radius around the offset point. Generous — catches chickens slightly off-line.")]
         [Min(0.5f)] public float SweepRadius = 1.8f;
 
-        [Tooltip("Damage dealt to each chicken in the sweep. Default = enough to instant-stun a full-HP target.")]
+        [Tooltip("Base damage dealt to each chicken in the sweep. Scaled up by Warrior's Tough passive.")]
         [Min(1f)] public float TrampleDamage = 200f;
 
         public override void OnActivate(AbilityContext ctx)
@@ -35,11 +37,15 @@ namespace CluckWars.Abilities
 
             var center = caster.transform.position + caster.transform.forward * ForwardOffset;
             var hits = Physics.OverlapSphere(center, SweepRadius, ~0, QueryTriggerInteraction.Ignore);
+
+            // Tough passive: Warrior deals extra damage with all damage abilities.
+            float finalDamage = caster.ApplyOutgoingDamage(TrampleDamage);
+
             for (int i = 0; i < hits.Length; i++)
             {
                 var target = hits[i].GetComponentInParent<ChickenCombat>();
                 if (target == null || target == casterCombat || target.IsDead) continue;
-                target.RPC_ApplyDamage(TrampleDamage, caster.Object.InputAuthority);
+                target.RPC_ApplyDamage(finalDamage, caster.Object.InputAuthority);
             }
         }
 
