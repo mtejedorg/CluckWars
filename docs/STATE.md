@@ -19,7 +19,7 @@ All tags pushed to origin.
 
 ---
 
-## What works (Phases 1–9 complete + Phase 10 complete + DCBA polish + v0.3.1 fixes + Phase R Part A)
+## What works (Phases 1–9 complete + Phase 10 complete + DCBA polish + v0.3.1 fixes + Phase R Part A + Phase R Part B)
 
 ### Core loop
 - 4 classes (Warrior / Speedy / Fatty / Assassin) — selectable in Bootstrap menu.
@@ -32,19 +32,24 @@ All tags pushed to origin.
   Pile slow: standing on a pile applies a 0.80× speed penalty (GDD §6.2).
   Collision slow: brushing another chicken applies a 0.75× speed penalty (GDD §6.1).
 - Food drop on death; pickup-on-overlap.
-- 7 abilities in the global pool (all classes can equip any):
+- **13 abilities in the global pool** (all classes can equip any):
   Speed Burst, Egg Shell, Flying Peck (fka Roll & Trample), Invisibility,
-  Spine Coat, Turtle Mode, Sneaky Steal, Doppelganger.
-  (8th ability Roll & Push deferred to Part B — needs knockback primitive.)
+  Spine Coat (now also knockbacks attacker), Turtle Mode, Sneaky Steal, Doppelganger.
+  **New in Part B:** Cluck Shock, Peck, Roll & Push, Feather Trap, Feather Aura, Root Egg.
 - 2 ability slots for all classes; 3 slots for Assassin (Combo passive gates slot 2).
 - Global ability pool via `AbilityRegistrySO` — no per-class restrictions.
-- Rooted + ExternalDisplacement control states scaffolded (no abilities trigger them yet — Part B).
+- All 4 control states now exercised by real abilities:
+  - Knockback: Peck, Roll & Push, Spine Coat reflect
+  - Root: Root Egg zone
+  - Slow: Feather Trap zone, Feather Aura broadcast
+  - Speed boost: Speed Burst, Roll & Push (caster-side)
+- `AbilityCategory` and `BotRole` authored on every AbilityBaseSO subclass.
 
 ### DCBA polish (code complete — pending Maestro prefab wiring for B + A)
 - **D — Dead visual states**: `ChickenVisuals` greys out + goes semi-transparent (0.40 alpha) when `IsStunned`. `ChickenNameplate` shows red "☠" while dead; restores the normal label on respawn.
 - **C — Screen shake**: `MatchCamera.Instance.ApplyShake()` called on HP decrease (0.12 mag / 0.25s) and on death (0.35 mag / 0.45s). Linear decay, y-axis damped 0.3×. Only fires on `HasInputAuthority` (local chicken).
 - **B — Match stats**: New `ChickenMatchStats` NetworkBehaviour (`[Networked] Kills` + `FoodDeposited`). `ChickenCombat.CreditKillToAttacker()` credits kills via RPC. `ChickenCargo.TryDepositAtNearbyBase()` records deposits. `GameManager.RestartMatch()` resets stats. Match-end overlay shows `food | kills` per player. **Maestro: add `ChickenMatchStats` component to Chicken prefab.**
-- **A — AI bots (solo mode)**: `ChickenController.IsBot` [Networked] + `BotTick()`. New `BotController` NetworkBehaviour (FSM: Idle / CollectFood / ReturnToBase; throttled Think @ 0.3s). `MatchBootstrapper._soloBotsToSpawn = 3` spawns bots at corners 1–3 with `PlayerRef.None` after solo start. Bots deposit at nearest unowned base. `GameManager.RestartMatch()` teleports bots back to their corners. **Maestro: add `BotController` component to Chicken prefab.**
+- **A — AI bots (solo mode)**: `ChickenController.IsBot` [Networked] + `BotTick()`. `BotController` NetworkBehaviour (FSM: **Idle / CollectFood / ReturnToBase / Flee / Hunt**; throttled Think @ 0.3s). Phase R-Bot: 5-tier decision priority, `FindNearestRival` perception, `ReactWithAbility()` role-preference dispatch (Defense→Escape→Control on Flee; Steal→Offense→Control on Hunt), per-class personality (`ApplyClassPersonality()`). `MatchBootstrapper._soloBotsToSpawn = 3` + `_botOffenseAbility` / `_botEscapeAbility` / `_botStealAbility` (Maestro assigns). **Maestro: also add `BotController` component to Chicken prefab.**
 
 ### Match lifecycle
 - `GameManager` state machine: `WaitingForPlayers` → `Active` → `Ended` → restart.
@@ -75,9 +80,9 @@ All tags pushed to origin.
 - **Player palette** updated to colorblind-safe Okabe-Ito set: Orange `#E8751A`, Blue `#1A7FC4`, Pink `#C4286F`, Teal `#0D9E7A`.
 - **Bootstrap menu**: full-screen `#0e0804` background, warm wood panel, "CLUCK WARS" title in gold, section labels in gold accent. Keyboard shortcuts (1-4, S/H/J, SPACE). UGS lobby browser with scrollable list.
   - **Class stat cards** (Phase 11): flat class buttons replaced with tall cards showing a class-tint top strip, bold name, SPD/HP/CGO stat bars (normalized across all 4 classes from `ChickenClassRegistrySO`; falls back to design-time percentages when registry not bound), and ability-pool hint. Entire card is a `Button`.
-  - **Ability slot picker** (Phase 11): "ABILITIES" section below class cards with two slots, each showing `◀ AbilityName ▶` arrows to cycle through `ChickenStatsSO.AvailableAbilities` for the selected class. Shows "Default" when pool is empty (which is the current state — pools fill during balance pass). Slot labels tinted with `AbilityBaseSO.AccentColor`. Selections stored in `ISessionSelectionService.Ability0/.Ability1`.
+  - **Ability slot picker** (B3): "ABILITIES" section replaced by a slot-selector row (Slot 1 / Slot 2 / Slot 3★) + scrollable ability grid grouped by `AbilityCategory` (Damage/Control/Defense/Utility), with cooldown tier badge (Short/Medium/Long). Click a card to equip it in the selected slot. Dedup: equipping an ability already in another slot swaps them. Slot 3 visible only for Assassin.
 - **MatchHud** (UGUI): ranked leaderboard top-left (4 rows sorted live by food score, with player-color dot + progress bar + score). Timer badge top-right in gold. HP + cargo bars bottom-left above joystick. Centered overlays: lobby (with green Start button), match-end (ranked results), session-end, intro countdown (gold "3, 2, 1, GO!").
-- **TouchControlsHud**: joystick + 3 ability buttons. Attack button removed (v0.3); former attack position is now Ability3 (R key / Assassin slot). Ability tint = equipped `AbilityBaseSO.AccentColor`. Cooldown radial fill for all 3 slots.
+- **TouchControlsHud** (B4): joystick + 3 ability buttons. Attack button removed (v0.3); former attack position is now Ability3 (R key / Assassin slot). Ability tint = equipped `AbilityBaseSO.AccentColor`. Cooldown radial fill for all 3 slots. **Buttons grey out (alpha 0.45) while on cooldown** — v0.3 §10 hard UI requirement.
 - **DebugHud** (F1 toggle): FPS, network state, GameManager state, local chicken stats, base ownership, pickup count.
 
 ### v0.3.1 — Debug logging, deposit fix, cargo feedback, base tinting
@@ -112,7 +117,7 @@ All bound app-wide in `ProjectInstaller`. Empty asset slots bind a runtime-empty
 
 ## Outstanding before next test session
 
-### Pending Maestro (Editor work — Phase R Part A)
+### Pending Maestro (Editor work — Phase R Part A + Part B)
 
 These steps must be done in the Unity Editor after the code compiles cleanly:
 
@@ -138,15 +143,34 @@ These steps must be done in the Unity Editor after the code compiles cleanly:
    inspector values on `TouchControlsHud` — those fields were removed; the GameObject will
    reset to the new `_ability3AnchoredPosition` default.
 
+**New Phase R Part B Maestro tasks:**
+
+7. **AbilityZone prefab**: create a NetworkObject prefab with the `AbilityZone` script + a trigger sphere collider at `_triggerRadius` = 1.5. Assign to `PrefabRegistrySO.AbilityZone`. (Without this, FeatherTrap and RootEgg log a warning and do nothing.)
+
+8. **Six new ability `.asset`s** — create in `Assets/_Game/Data/Abilities/`:
+   - Cluck Shock (via `Cluck Wars/Ability/Damage/Cluck Shock`): Category=Damage, Cooldown≈10s
+   - Peck (`Cluck Wars/Ability/Damage/Peck`): Category=Damage, Cooldown≈4s
+   - Roll & Push (`Cluck Wars/Ability/Control/Roll and Push`): Category=Control, Cooldown≈4s
+   - Feather Trap (`Cluck Wars/Ability/Control/Feather Trap`): Category=Control, Cooldown≈10s
+   - Feather Aura (`Cluck Wars/Ability/Control/Feather Aura`): Category=Control, Cooldown≈10s
+   - Root Egg (`Cluck Wars/Ability/Control/Root Egg`): Category=Control, Cooldown≈10s
+   Set `AccentColor` and `DisplayName` on each.
+
+9. **AbilityRegistry**: add all 6 new `.asset`s to `AbilityRegistrySO.All`.
+
+10. **Sneaky Steal `.asset`**: set `BotRole = Steal` in Inspector.
+
+11. **MatchBootstrapper** (Game scene): assign `_botOffenseAbility` (Flying Peck `.asset`), `_botEscapeAbility` (Speed Burst `.asset`), `_botStealAbility` (Sneaky Steal `.asset`).
+
 Pre-existing Maestro tasks still pending:
 - **UGS Dashboard link** (Phase 10): Unity → Project Settings → Services → link org. Enable Auth + Lobby.
 - **ColorScheme.asset**: hit "Reset" in Inspector for Phase 10 warm palette on `TouchControlsHud`.
 - Optional: fill `AudioRegistry` clips.
 
 ### Pending agents (code)
-- Phase R Part A: **complete** (this session). See ROADMAP.md § Phase R for what's done.
-- Phase R Part B: deferred — knockback/root primitives + 6 new abilities + balance pass.
-- `ISessionSelectionService` now carries `Ability0`/`Ability1`/`Ability2`; `MatchBootstrapper`
+- Phase R Part A: **complete**. See ROADMAP.md § Phase R for what's done.
+- Phase R Part B: **complete** (code). Remaining: Maestro steps below + B6 balance pass (test session) + B7 VFX (test session).
+- `ISessionSelectionService` carries `Ability0`/`Ability1`/`Ability2`; `MatchBootstrapper`
   calls `AbilityController.SetSlots(slot0, slot1, slot2)` in `onBeforeSpawned`.
 
 ---
@@ -177,24 +201,16 @@ All require real-device or playtest data; queued so they don't get done piecemea
 ## Recent commits (most recent first)
 
 ```
+0772810 Part B — B3/B4/B5: bot AI, ability grid UI, cooldown grey-out
+c3f70c9 Part B — B2: new ability SOs + SpineCoat knockback
+b120170 Part B — B1: interaction primitives (knockback, root, placed zones)
+578a2ce Phase R Part A: v0.3 parity refactor
 7fe855e Debug logging, deposit fix, cargo feedback, base tinting  ← v0.3.1-alpha
 1aa3b93 Fix: multiple chickens spawning at same base
 540797a Visuals: per-class scale applied at spawn
 90a071f Balance: faster movement + closer camera (test feedback)
 ca39dfb Spawn: random starting edge per session
-94ec419 Settings, project link + docs
-aa6a154 Lobby UX + Fusion connect callbacks
-8fca391 Fix CS0104: ambiguous LogLevel
-7ccb850 Lobby + spawn-at-base
-fc09ddc Spawn-position safety
-c4824d9 ChickenController: verbose log when _movement is null
-d572e97 MatchCamera: smooth-follow local chicken + closer default zoom
-85a96b3 Fix CS0221: ChickenClass is byte-backed
 312f511 Build menu                                           ← v0.3.0-alpha
-383dd67 Pre-test polish: debug HUD, nameplate, allowlist, hit-flash
-226fab4 All 8 ability assets with distinct AccentColors
-46a41e4 Pre-Phase-8 wiring
-fdae00d Pre-Phase-8 advancements (iso cam, UGUI HUD, intro, nameplates)
 7ee1742 Phase 9 wiring                                       ← v0.2.0-alpha
 ```
 

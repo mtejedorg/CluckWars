@@ -420,26 +420,28 @@ v0.3 reorganizes abilities into Damage / Control / Defense / Utility. Seven of t
 Everything below is net-new gameplay the v0.3 design unlocks. It builds on the Part A scaffolding (control states, slow sources, passive hooks, 3-slot controller).
 
 #### B1. Interaction primitives (build these first — the new abilities depend on them)
-- [ ] **Knockback** — a networked impulse: caster calls an RPC on the target's StateAuthority that sets the target's `ExternalDisplacement` (A6) for a short window. Respects Fatty's **Immovable** passive (A8). Pattern: same authority crossing as `RPC_ApplyDamage`.
-- [ ] **Root** — set the target's `Rooted` (A6) for a duration; respects Speedy's **Slippery** duration reduction. The chicken can still cast while rooted (§6.4).
-- [ ] **Placed zone** — a spawned `NetworkObject` with a trigger volume that applies an effect (slow or root) to chickens overlapping it. Reuse the existing spawn pattern from `FoodPickup` / `Doppelganger` (`Runner.Spawn` with `onBeforeSpawned` to set networked params from tick zero; self-despawn via `TickTimer`). Needed by Feather Trap and Root Egg.
+- [x] **Knockback** — `RPC_ApplyKnockback` on `ChickenController`; respects Immovable passive. *(B1 commit)*
+- [x] **Root** — `RPC_ApplyRoot` + `_rootUntil` timer; respects Slippery duration reduction. *(B1 commit)*
+- [x] **Placed zone** — `AbilityZone` NetworkBehaviour with `Effect` (Slow/Root), `LifetimeTimer`, `NetworkedRadius`; static `ActiveZones` list for zero-RPC slow detection. *(B1 commit)*
 
 #### B2. New abilities (each = new `AbilityBaseSO` subclass + `.asset` under `Data/Abilities/`, per the GDD v0.3 §7.2 pool)
-- [ ] **Cluck Shock** (Damage, Medium) — AoE HP burst around self. `OverlapSphere` at caster, `RPC_ApplyDamage` to each hit (like the old Roll & Trample sweep but centered on self).
-- [ ] **Peck** (Damage, Short) — instant short-range HP hit + minor knockback. Uses B1 knockback.
-- [ ] **Roll & Push** (Control, Short) — roll forward + push target away, **no damage**. Uses B1 knockback only.
-- [ ] **Feather Trap** (Control, Medium) — throw a feather cloud to a location; slows anyone walking through. Uses B1 placed zone (slow).
-- [ ] **Feather Aura** (Control, Medium) — emit a feather cloud around self; slows nearby chickens. Per-tick `OverlapSphere` applying the ability slow source for the active duration.
-- [ ] **Root Egg** (Control, Medium) — place an egg that roots the first chicken to step on it. Uses B1 placed zone (root), consumed on first trigger.
+- [x] **Cluck Shock** (Damage, Medium) — AoE HP burst around self. *(B2 commit)*
+- [x] **Peck** (Damage, Short) — nearest-enemy HP hit + minor knockback. *(B2 commit)*
+- [x] **Roll & Push** (Control, Short) — roll forward + sphere push, no damage. *(B2 commit)*
+- [x] **Feather Trap** (Control, Medium) — spawns slow zone `ForwardOffset` metres ahead. *(B2 commit)*
+- [x] **Feather Aura** (Control, Medium) — broadcasts `AuraSlowActive/Radius/Factor` on caster; nearby chickens self-apply slow. *(B2 commit)*
+- [x] **Root Egg** (Control, Medium) — spawns root zone consumed on first trigger. *(B2 commit)*
+- [x] **SpineCoat knockback** — `ReflectKnockback` field; `ReflectDamageTo` pushes attacker away. *(B2 commit)*
+- **Maestro:** Create `.asset` files for all 6 new SOs in `Data/Abilities/`; set `Category` and `AccentColor` on each; set `BotRole = Steal` on Sneaky Steal `.asset`.
 
 #### B3. Expanded selection UI
-- [ ] `UI/CharacterSelectController.cs` — the pool grows from 8 to ~13 abilities. Replace the flat picker with a scrollable grid grouped by category (Damage / Control / Defense / Utility), showing each ability's cooldown tier. Keep the 2-slot (3 for Assassin) equip rule from A5.
+- [x] `UI/CharacterSelectController.cs` — slot-selector row + scrollable ability grid grouped by `AbilityCategory`, tier badge (Short/Medium/Long), click-to-equip. *(B3 commit)*
 
 #### B4. Cooldown UI for slot 3 + tiers
-- [ ] `Input/TouchControlsHud.cs` — the radial-fill cooldown overlay already exists for 2 buttons; add the 3rd button (Assassin) and surface the Short/Medium tier (e.g. accent intensity). v0.3 §10 makes greyed-when-on-cooldown a hard UI requirement — confirm it reads correctly.
+- [x] `Input/TouchControlsHud.cs` — base button `Image` alpha dims to 0.45 while on cooldown (fill > 0), restores to 1.0 when ready. Hard UI requirement met. *(B3 commit)*
 
-#### B5. Bots use abilities (optional polish)
-- [ ] `Gameplay/BotController.cs` — let the FSM occasionally fire an equipped ability when a rival is in range. Purely to make solo mode livelier.
+#### B5. Bot AI rework (ability-driven) ✅
+Full Phase R-Bot implementation shipped. See Phase R-Bot section below for detail. *(B3 commit)*
 
 #### B6. Balance pass (bundles with the Dedicated test session)
 - [ ] Per-ability cooldown values within the v0.3 tiers (Short 3–6s, Medium 8–12s) — GDD TBD #3.
@@ -452,6 +454,106 @@ Everything below is net-new gameplay the v0.3 design unlocks. It builds on the P
 - [ ] Author the 2–3 shared ability clips (§4) and a feather-cloud / egg VFX. Wire via `AbilityBaseSO.AbilityAnimationClip` and the local VFX pattern (`ChickenVFX`, observed-state-driven — see CONVENTIONS "VFX are local").
 
 **Part B deliverable:** the full v0.3 ability roster (≈13 abilities across 4 categories) selectable and balanced, all four control states exercised by real abilities, passives meaningfully felt, on top of the Part A foundation.
+
+---
+
+## Phase R-Bot: Ability-Driven Bot AI
+
+**Depends on Part A** (3-slot `AbilityController`, basic attack removed). Can land before Part B's new abilities — it works with whatever abilities are equipped. The more of Part B's abilities exist, the richer it gets, but it must not *require* them.
+
+### The problem
+v0.2 bots "fought" by walking into a rival and letting `ChickenCombat.BotTrySwing` mash an auto-attack. That method is deleted in Part A (A2/A11). Today's `BotController` (`Gameplay/BotController.cs`) is therefore a pure farmer: it collects from the nearest pile and deposits past a cargo threshold (states `Idle` / `CollectFood` / `ReturnToBase`). In v0.3 **all** interaction is ability-driven, so a bot that never casts an ability never interacts — it's a target dummy. The AI has to learn to *use its 2–3 equipped abilities* offensively and defensively.
+
+### Design goals
+- **Simple**: one FSM, one throttled think tick (keep the existing 0.3s cadence), no pathfinding/navmesh, no per-ability hardcoding.
+- **Effective**: protects its own cargo, punishes loaded rivals (stun → they drop cargo → scoop it), and contests piles.
+- **Generic**: works with *any* equipped ability via category/role tags — never `if (ability is SneakyStealAbilitySO)`.
+- **Characterful**: light per-class personality from tuning numbers, not separate code paths.
+- **Network-clean**: everything runs on the StateAuthority (master client) only, exactly like today. Ability activation goes through a bot hook that reuses the existing cooldown/active/stun gates — no Fusion input buffer involvement.
+
+### How it behaves (decision priority, evaluated top-down each Think)
+The proven farm loop stays as the backbone; offense/defense layer on top as two new states plus an ability-reaction step.
+
+1. **FLEE / PROTECT** — *carrying a meaningful haul (`Fraction ≥ _protectCargoThreshold`) AND a rival within `_dangerRadius`.* Move toward home base to bank the haul; fire a ready ability by role preference **Defense → Escape → Control** (turtle up / dash away / shove the chaser off). This is the highest priority because dropped cargo is the biggest swing in the game.
+2. **DEPOSIT** — *`Fraction ≥ _returnThreshold`* → `ReturnToBase` (existing behavior).
+3. **HUNT** — *a rival within `_huntRadius` is loaded (`rivalFraction ≥ _huntCargoThreshold`), the bot has cargo space, and the class is in an aggressive mood.* Move toward the rival; once within `_abilityRange` fire by role preference **Steal → Offense → Control** (snatch cargo / stun them so they drop it / pin them). Then fall through to COLLECT next think to scoop the dropped `FoodPickup`s.
+4. **COLLECT** — nearest non-empty pile (existing). Opportunistic: if a rival is standing on the *same* pile, fire a ready **Control** ability to displace them.
+5. **IDLE** — nothing to do (existing).
+
+### How it picks an ability (the generic part)
+A bot can't reason about an ability it can't classify. Two small authoring tags on `AbilityBaseSO` solve it (the category tag is shared with Part B's selection-UI grouping, so it's not bot-only work):
+
+- `AbilityCategory { Damage, Control, Defense, Utility }` — the GDD §7.2 category.
+- `BotRole { Auto, Offense, Defense, Control, Escape, Steal }` — how the *bot* should use it. `Auto` derives from category: `Damage→Offense`, `Control→Control`, `Defense→Defense`, `Utility→Escape`. Override only where Auto is wrong — e.g. **Sneaky Steal** = `Steal`. (Doppelganger/Invisibility/Speed Burst all want `Escape`, which is the Utility default — no override needed.)
+
+The bot asks its controller "give me a ready slot whose role is X" and activates it. It tries roles in the priority order for the current state and fires the first match.
+
+### Per-class personality (tuning only — one switch on `_controller.Class` at Spawned)
+| Class (passive) | Mood | Key tuning | Prefers |
+|---|---|---|---|
+| Warrior (Tough) | Aggressive | large `_huntRadius`, low `_huntCargoThreshold`, hunts even while lightly loaded | Offense |
+| Assassin (Combo) | Opportunist disruptor | hunts vulnerable carriers, flees early (squishy), uses 3rd slot | Steal → Offense |
+| Fatty (Immovable) | Cautious turtle | never hunts, deposits early (low `_returnThreshold`) | Defense |
+| Speedy (Slippery) | Hit-and-run | hunts only to snatch drops, flees very early | Escape |
+
+These are just different default values for the same serialized fields — no class-specific branches in the logic.
+
+### Implementation roadmap (for a zero-context Sonnet)
+
+> All new perception (`FindObjectsByType` / `OverlapSphere`) stays **inside the throttled `Think()`** (every `_thinkInterval`, default 0.3s), never per-tick. All state writes are StateAuthority-only (the FSM already early-returns on `!HasStateAuthority`). Follow CONVENTIONS: self-injection, `ILogService` with a `Source` tag, no `Debug.Log`.
+
+**BOT-1 — Tag abilities.**
+- [x] `Abilities/AbilityBaseSO.cs` — `BotRole` enum + `public BotRole BotRole` field + `ResolveBotRole()` helper. *(B3 commit)*
+- [ ] **Maestro:** set `Category` on every ability `.asset`; set `BotRole = Steal` on Sneaky Steal `.asset`. Everything else stays `Auto`.
+
+**BOT-2 — Bot activation API on `AbilityController`.**
+- [x] `Gameplay/AbilityController.cs` — `BotTryActivate(int slot)`, `EquippedSlotCount`, `TryGetReadySlotForRole(BotRole, out int)`. *(B3 commit)*
+
+**BOT-3 — Give bots a randomized loadout from a small preset pool.**
+Bots currently get no abilities (the bot `onBeforeSpawned` in `TrySpawnBots()` never calls `SetSlots`), so they fall back to whatever prefab defaults exist. The AI needs *something* equipped to function. Rather than one fixed kit (boring — all bots play the same) or full open random selection (more than we want to build now), define a **small pool of curated 2-slot loadout presets and pick one at random per bot**, with **some presets restricted to certain classes** for flavor. All abilities used are Part A's already-working ones.
+
+Loadout presets (each = slot0 / slot1 / optional Assassin slot2 + the classes allowed to roll it):
+
+| Preset | Slot 0 | Slot 1 | Slot 2 (Assassin) | Allowed classes |
+|---|---|---|---|---|
+| Bruiser | Flying Peck (Offense) | Egg Shell (Defense) | — | All |
+| Skirmisher | Flying Peck (Offense) | Speed Burst (Escape) | — | All |
+| Tank | Spine Coat (Defense) | Turtle Mode (Defense) | — | Fatty, Warrior |
+| Trickster | Flying Peck (Offense) | Invisibility (Escape) | — | Speedy, Assassin |
+| Thief | Sneaky Steal (Steal) | Speed Burst (Escape) | Flying Peck (Offense) | Assassin only |
+
+This gives variety (no two bots guaranteed identical), keeps a sane shape (every preset has ≥1 way to threaten + ≥1 way to survive), and gives class identity via restrictions: Fatty/Warrior can roll the slow, sticky **Tank** kit; Speedy/Assassin can roll the evasive **Trickster** kit; only the Assassin can roll **Thief** (and only the Assassin's 3rd slot is ever used). The AI's role-preference lists fall through gracefully whatever rolls — e.g. a Tank bot fleeing prefers Defense and finds it; a Skirmisher bot fleeing falls through to Escape (Speed Burst).
+
+> **Not a GDD contradiction.** GDD §7.1 says *players* face no class-based ability restrictions. These restrictions are **bot-AI flavor only** — they shape how bots feel, not what a human may equip. Keep that boundary: never reuse this table to gate the player selection UI.
+
+Wiring (simplest path, no `AbilityRegistrySO` dependency):
+- [ ] `Gameplay/MatchBootstrapper.cs` — add a small serializable `[System.Serializable] struct BotLoadoutPreset { AbilityBaseSO Slot0, Slot1, Slot2; ChickenClass[] AllowedClasses; }` and a `[SerializeField] BotLoadoutPreset[] _botLoadouts;`. Maestro authors the rows above in the inspector (drop in the Flying Peck / Egg Shell / Speed Burst / Spine Coat / Turtle Mode / Invisibility / Sneaky Steal `.asset`s). An empty/omitted `AllowedClasses` means "all classes".
+- [ ] Add a helper `BotLoadoutPreset PickBotLoadout(ChickenClass cls)`: filter `_botLoadouts` to presets whose `AllowedClasses` is empty or contains `cls`, then pick one with `UnityEngine.Random`. **Solo-only**, single authoritative client, so plain `Random` is fine — no cross-peer seeding needed (contrast with the corner-permutation seeding, which exists only because online peers must agree). If the filtered set is empty, fall back to the first preset or skip (log a Warn).
+- [ ] In `TrySpawnBots()` (~line 199, bot `onBeforeSpawned`), after `ctrl.IsBot = true`, resolve `var lo = PickBotLoadout(botClass);` and call `networkObject.GetComponent<AbilityController>()?.SetSlots(lo.Slot0, lo.Slot1, botClass == ChickenClass.Assassin ? lo.Slot2 : null);`. (`SetSlots` ignores null args; the Assassin 3rd-slot gate from BOT-2/A4 keeps a non-Assassin's slot 2 inert anyway — the null is just tidy.) Compute the loadout *outside* the lambda and capture it, mirroring the existing `int captured = i;` pattern, so the random roll is stable for that spawn.
+- [ ] Guard for missing assets/empty pool: log a Warn via `ILogService` and let the bot run ability-less rather than NRE.
+- [ ] Log the rolled preset per bot at Info (e.g. `"Bot 2 (Assassin) → Thief loadout"`) so solo playtests are debuggable.
+
+> **Deferred (not this pass):** weighted / fully-open random loadouts drawn from the populated `AbilityRegistrySO` once Part B's full roster exists (e.g. probability tables per class). The preset pool above is the deliberate, easily-extended placeholder — add a row to grow it.
+
+**BOT-4 — Perception.**
+- [x] `Gameplay/BotController.cs` — `FindNearestRival(out dist, out cargoFraction, requireCargo)` inside throttled `Think()`. *(B3 commit)*
+
+**BOT-5 — Decision priority + new states.**
+- [x] `BotState` extended with `Flee` + `Hunt`. `Think()` rewritten to 5-tier priority. *(B3 commit)*
+
+**BOT-6 — Ability reaction.**
+- [x] `ReactWithAbility(BotRole[] rolePreferences)` dispatches role-preference list per state. *(B3 commit)*
+
+**BOT-7 — Personality params.**
+- [x] `_dangerRadius`, `_huntRadius`, `_abilityRange`, `_protectCargoThreshold`, `_huntCargoThreshold` added. `ApplyClassPersonality()` sets per-class defaults in `Spawned()`. *(B3 commit)*
+
+**BOT-8 — Tuning, balance, validation.**
+- [ ] Add to the **Dedicated test session** balance list: bot radii/thresholds per class, oscillation check.
+- [ ] Verify solo mode: 3 bots farm, protect hauls, hunt loaded rivals.
+- [ ] **Maestro:** assign `_botOffenseAbility` (Flying Peck), `_botEscapeAbility` (Speed Burst), `_botStealAbility` (Sneaky Steal) on `MatchBootstrapper` in the Game scene.
+
+### Phase R-Bot deliverable
+Solo-mode bots that play the v0.3 game: farm efficiently, protect a full haul (turtle/dash/shove when chased), hunt loaded rivals to stun-and-rob them, and contest piles — each class with a recognisably different temperament, all driven by their equipped abilities through one small FSM.
 
 ---
 
