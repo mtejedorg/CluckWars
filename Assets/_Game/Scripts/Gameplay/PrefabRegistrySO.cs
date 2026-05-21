@@ -31,5 +31,9 @@ namespace CluckWars.Gameplay
 
         [Header("Match")]
         public NetworkObject GameManager;
+
+        [Header("Abilities")]
+        [Tooltip("Generic placed-effect zone used by Feather Trap and Root Egg. Create one prefab (NetworkObject + AbilityZone) and assign here.")]
+        public NetworkObject AbilityZone;
     }
 }

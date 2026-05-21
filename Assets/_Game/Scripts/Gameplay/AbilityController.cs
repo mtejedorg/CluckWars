@@ -60,14 +60,16 @@ namespace CluckWars.Gameplay
         private ILogService _log;
         private IAudioService _audio;
         private AudioRegistrySO _audioReg;
+        private PrefabRegistrySO _prefabRegistry;
         private bool _initialized;
 
         [Inject]
-        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg)
+        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry)
         {
             _log = log;
             _audio = audio;
             _audioReg = audioReg;
+            _prefabRegistry = prefabRegistry;
         }
 
         public override void Spawned()
@@ -218,6 +220,9 @@ namespace CluckWars.Gameplay
             ActiveSlot = slot;
             ActivationTimer = TickTimer.CreateFromSeconds(Runner, ability.Duration);
             SetCooldown(slot, TickTimer.CreateFromSeconds(Runner, ability.Cooldown));
+            // Refresh context fields that abilities need for NetworkObject spawning.
+            _ctx.Runner         = Runner;
+            _ctx.PrefabRegistry = _prefabRegistry;
             ability.OnActivate(_ctx);
             _animator?.TriggerAbilityCast();
             _audio?.PlaySFX(_audioReg != null ? _audioReg.AbilityActivate : null);

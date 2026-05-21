@@ -426,6 +426,13 @@ namespace CluckWars.Gameplay
                 cargos[i]?.RPC_ResetForNewMatch();
             }
 
+            // Reset v0.3 control states (slow timers, root, knockback, aura).
+            var chickenControllers = FindObjectsByType<ChickenController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < chickenControllers.Length; i++)
+            {
+                chickenControllers[i]?.RPC_ResetControlStates();
+            }
+
             // Reset per-chicken match stats so kills and food totals start fresh.
             var matchStats = FindObjectsByType<ChickenMatchStats>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
             for (int i = 0; i < matchStats.Length; i++)

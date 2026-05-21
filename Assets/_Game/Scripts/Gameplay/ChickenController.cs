@@ -46,13 +46,15 @@ namespace CluckWars.Gameplay
         private const string Source = "Chicken";
 
         // ---- Passive tuning constants (balance-pass values; Part B / test session) ---
-        private const float CollisionSlowRadius   = 1.2f;  // metres — two chickens touching
-        private const float CollisionSlowFactor   = 0.75f; // GDD TBD #7
-        private const float PileSlowFactor        = 0.80f; // GDD TBD #6
-        private const float SlipperySlowRetention = 0.50f; // slows are 50% as effective for Slippery
+        private const float CollisionSlowRadius      = 1.2f;  // metres — two chickens touching
+        private const float CollisionSlowFactor      = 0.75f; // GDD TBD #7
+        private const float PileSlowFactor           = 0.80f; // GDD TBD #6
+        private const float SlipperySlowRetention    = 0.50f; // slows are 50% as effective for Slippery
+        private const float SlipperyDurationReduction = 0.40f; // control-state durations 60% shorter for Slippery
         private const float ImmovableKnockbackFactor = 0.15f; // knockback heavily reduced for Immovable
-        private const float ToughDamageBonus      = 1.25f; // 25% bonus outgoing damage for Tough
-        private const float KnockbackDecayRate    = 8f;    // 1/s; ExternalDisplacement decays to zero
+        private const float ToughDamageBonus         = 1.25f; // 25% bonus outgoing damage for Tough
+        private const float KnockbackDecayRate       = 8f;    // 1/s; ExternalDisplacement decays to zero
+        private const float AuraSlowSearchRadius     = 10f;   // broadphase for CheckAuraSlow
 
         [Tooltip("Fallback used only if the class registry is missing or has no entry for this chicken's class.")]
         [SerializeField] private ChickenStatsSO _fallbackStats;
@@ -68,6 +70,13 @@ namespace CluckWars.Gameplay
 
         // Slow accumulation — reset to None/1 at top of each FixedUpdateNetwork.
         private SlowSource _activeSlowSources;
+
+        // Timer-based ability slow (StateAuthority-side; set by RPC_ApplyAbilitySlow).
+        private double _abilitySlowUntil  = double.MinValue;
+        private float  _abilitySlowFactor = 1f;
+
+        // Timer-based root (StateAuthority-side; set by RPC_ApplyRoot).
+        private double _rootUntil = double.MinValue;
 
         /// <summary>The chicken's archetype. Replicated; set by the spawner via <c>OnBeforeSpawned</c>.</summary>
         [Networked] public ChickenClass Class { get; set; } = ChickenClass.Warrior;
@@ -107,6 +116,16 @@ namespace CluckWars.Gameplay
 
         /// <summary>True for AI-controlled bots spawned in solo mode.</summary>
         [Networked] public bool IsBot { get; set; }
+
+        // ---- v0.3 Feather Aura (Networked so every peer sees the caster's state) ---
+
+        /// <summary>True while the Feather Aura ability is active on this chicken.
+        /// Replicated so nearby chickens can self-apply the slow in their own FUN.</summary>
+        [Networked] public bool  AuraSlowActive { get; set; }
+        /// <summary>World-units radius of the active aura slow effect.</summary>
+        [Networked] public float AuraSlowRadius { get; set; }
+        /// <summary>Speed multiplier broadcast by the aura (applied to chickens inside the radius).</summary>
+        [Networked] public float AuraSlowFactor { get; set; }
 
         // ---- v0.3 Control-state fields (GDD §6.4) ----------------------------
 
@@ -195,8 +214,9 @@ namespace CluckWars.Gameplay
             // ---- Reset and re-compute slow sources each tick -----------------
             // This runs for both player chickens AND bots so BotController.BotTick
             // benefits from the final SlowMultiplier that's set here.
-            SlowMultiplier = 1f;
+            SlowMultiplier     = 1f;
             _activeSlowSources = SlowSource.None;
+            Rooted             = false; // re-evaluated by timer check below
 
             CheckCollisionSlow();
 
@@ -204,6 +224,19 @@ namespace CluckWars.Gameplay
             // lag is imperceptible; piles don't move).
             if (_cargo != null && _cargo.IsPileSlow)
                 ApplySlow(SlowSource.Pile, PileSlowFactor);
+
+            // Ability slow timer (RPC_ApplyAbilitySlow — zones, aura, etc.).
+            if (Runner.SimulationTime < _abilitySlowUntil)
+                ApplySlow(SlowSource.Ability, _abilitySlowFactor);
+
+            // Feather Aura: self-check from nearby casters broadcasting an aura.
+            CheckAuraSlow();
+
+            // Placed-zone slow (Feather Trap).
+            CheckAbilityZoneSlow();
+
+            // Root timer: RPC_ApplyRoot sets _rootUntil; Rooted persists until it elapses.
+            if (Runner.SimulationTime < _rootUntil) Rooted = true;
 
             // Bots exit here — BotController.BotTick handles their movement with
             // the SlowMultiplier already computed above.
@@ -283,6 +316,62 @@ namespace CluckWars.Gameplay
             _log?.Debug(Source, $"Teleported to {position}.");
         }
 
+        // ---- v0.3 Interaction primitive RPCs (B1) — all route to StateAuthority ----
+
+        /// <summary>
+        /// Applies an external displacement (knockback) impulse. Routes to the
+        /// chicken's StateAuthority; integrated + decayed by <see cref="ChickenMovement"/>.
+        /// Respects <see cref="ChickenPassive.Immovable"/>.
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_ApplyKnockback(Vector3 impulse)
+        {
+            ApplyKnockback(impulse); // already scales by Immovable passive
+            _log?.Debug(Source, $"RPC_ApplyKnockback: impulse={impulse:F2}.");
+        }
+
+        /// <summary>
+        /// Applies a timed ability slow. Respects <see cref="ChickenPassive.Slippery"/>
+        /// — duration is reduced for Speedy.
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_ApplyAbilitySlow(float duration, float factor)
+        {
+            if (Stats?.Passive == ChickenPassive.Slippery) duration *= SlipperyDurationReduction;
+            _abilitySlowUntil  = Runner.SimulationTime + duration;
+            _abilitySlowFactor = factor;
+            _log?.Debug(Source, $"RPC_ApplyAbilitySlow: factor={factor:P0} for {duration:0.0}s.");
+        }
+
+        /// <summary>
+        /// Roots this chicken for <paramref name="duration"/> seconds — movement
+        /// blocked, abilities still castable (GDD §6.4). Respects
+        /// <see cref="ChickenPassive.Slippery"/>.
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_ApplyRoot(float duration)
+        {
+            if (Stats?.Passive == ChickenPassive.Slippery) duration *= SlipperyDurationReduction;
+            _rootUntil = Runner.SimulationTime + duration;
+            _log?.Debug(Source, $"RPC_ApplyRoot: rooted for {duration:0.0}s.");
+        }
+
+        /// <summary>
+        /// Resets all v0.3 control states (slow, root, knockback, aura).
+        /// Called by <see cref="GameManager"/> on match restart.
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_ResetControlStates()
+        {
+            _abilitySlowUntil    = double.MinValue;
+            _abilitySlowFactor   = 1f;
+            _rootUntil           = double.MinValue;
+            Rooted               = false;
+            AuraSlowActive       = false;
+            ExternalDisplacement = Vector3.zero;
+            _log?.Debug(Source, "Control states reset for new match.");
+        }
+
         /// <summary>
         /// Drives movement for bot-controlled chickens. Called by
         /// <see cref="BotController"/> each <c>FixedUpdateNetwork</c> tick instead
@@ -316,6 +405,45 @@ namespace CluckWars.Gameplay
                 if (other.Combat != null && other.Combat.IsDead) continue;
                 ApplySlow(SlowSource.Collision, CollisionSlowFactor);
                 break; // One other chicken is enough to trigger the slow.
+            }
+        }
+
+        /// <summary>
+        /// Checks whether this chicken is inside the aura of any nearby caster with
+        /// <see cref="AuraSlowActive"/> set. Runs locally on this chicken's authority —
+        /// no RPC needed because <c>AuraSlowActive/Radius/Factor</c> are Networked.
+        /// </summary>
+        private void CheckAuraSlow()
+        {
+            var hits = Physics.OverlapSphere(
+                transform.position, AuraSlowSearchRadius, ~0,
+                QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < hits.Length; i++)
+            {
+                var caster = hits[i].GetComponentInParent<ChickenController>();
+                if (caster == null || caster == this) continue;
+                if (!caster.AuraSlowActive) continue;
+                float sqr = (caster.transform.position - transform.position).sqrMagnitude;
+                if (sqr <= caster.AuraSlowRadius * caster.AuraSlowRadius)
+                    ApplySlow(SlowSource.Ability, caster.AuraSlowFactor);
+            }
+        }
+
+        /// <summary>
+        /// Applies the slow factor from any active <see cref="AbilityZone"/>s of
+        /// type <see cref="ZoneEffect.Slow"/> within their trigger radius. Runs
+        /// locally — no RPC needed because zones are Networked scene objects.
+        /// </summary>
+        private void CheckAbilityZoneSlow()
+        {
+            for (int i = 0; i < AbilityZone.ActiveZones.Count; i++)
+            {
+                var zone = AbilityZone.ActiveZones[i];
+                if (zone == null || zone.Effect != ZoneEffect.Slow) continue;
+                float sqr = (zone.transform.position - transform.position).sqrMagnitude;
+                float r   = zone.TriggerRadius;
+                if (sqr <= r * r)
+                    ApplySlow(SlowSource.Ability, zone.SlowFactor);
             }
         }
 
