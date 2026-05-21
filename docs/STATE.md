@@ -49,7 +49,7 @@ All tags pushed to origin.
 - **D — Dead visual states**: `ChickenVisuals` greys out + goes semi-transparent (0.40 alpha) when `IsStunned`. `ChickenNameplate` shows red "☠" while dead; restores the normal label on respawn.
 - **C — Screen shake**: `MatchCamera.Instance.ApplyShake()` called on HP decrease (0.12 mag / 0.25s) and on death (0.35 mag / 0.45s). Linear decay, y-axis damped 0.3×. Only fires on `HasInputAuthority` (local chicken).
 - **B — Match stats**: New `ChickenMatchStats` NetworkBehaviour (`[Networked] Kills` + `FoodDeposited`). `ChickenCombat.CreditKillToAttacker()` credits kills via RPC. `ChickenCargo.TryDepositAtNearbyBase()` records deposits. `GameManager.RestartMatch()` resets stats. Match-end overlay shows `food | kills` per player. **Maestro: add `ChickenMatchStats` component to Chicken prefab.**
-- **A — AI bots (solo mode)**: `ChickenController.IsBot` [Networked] + `BotTick()`. `BotController` NetworkBehaviour (FSM: **Idle / CollectFood / ReturnToBase / Flee / Hunt**; throttled Think @ 0.3s). Phase R-Bot: 5-tier decision priority, `FindNearestRival` perception, `ReactWithAbility()` role-preference dispatch (Defense→Escape→Control on Flee; Steal→Offense→Control on Hunt), per-class personality (`ApplyClassPersonality()`). `MatchBootstrapper._soloBotsToSpawn = 3` + `_botOffenseAbility` / `_botEscapeAbility` / `_botStealAbility` (Maestro assigns). **Maestro: also add `BotController` component to Chicken prefab.**
+- **A — AI bots (solo mode)**: `ChickenController.IsBot` [Networked] + `BotTick()`. `BotController` NetworkBehaviour (FSM: **Idle / CollectFood / ReturnToBase / Flee / Hunt**; throttled Think @ 0.3s). Phase R-Bot: 5-tier decision priority, `FindNearestRival` perception, `ReactWithAbility()` role-preference dispatch (Defense→Escape→Control on Flee; Steal→Offense→Control on Hunt), per-class personality (`ApplyClassPersonality()`). `MatchBootstrapper._soloBotsToSpawn = 3`; bots roll a random eligible loadout from the `_botLoadouts` preset pool (BOT-3, `TryPickBotLoadout` — class restrictions are bot-only flavor). **Maestro: add `BotController` component to Chicken prefab + author the `_botLoadouts` preset rows.**
 
 ### Match lifecycle
 - `GameManager` state machine: `WaitingForPlayers` → `Active` → `Ended` → restart.
@@ -160,7 +160,7 @@ These steps must be done in the Unity Editor after the code compiles cleanly:
 
 10. **Sneaky Steal `.asset`**: set `BotRole = Steal` in Inspector.
 
-11. **MatchBootstrapper** (Game scene): assign `_botOffenseAbility` (Flying Peck `.asset`), `_botEscapeAbility` (Speed Burst `.asset`), `_botStealAbility` (Sneaky Steal `.asset`).
+11. **MatchBootstrapper** (Game scene): author the `_botLoadouts` preset rows (BOT-3). Recommended set from ROADMAP Phase R-Bot BOT-3 — Bruiser (Flying Peck + Egg Shell, all), Skirmisher (Flying Peck + Speed Burst, all), Tank (Spine Coat + Turtle Mode, Fatty/Warrior), Trickster (Flying Peck + Invisibility, Speedy/Assassin), Thief (Sneaky Steal + Speed Burst + Flying Peck slot2, Assassin). Each row: set `Name`, the slot `.asset`s, and `AllowedClasses` (empty = all). Until authored, bots spawn ability-less (a Warn is logged).
 
 Pre-existing Maestro tasks still pending:
 - **UGS Dashboard link** (Phase 10): Unity → Project Settings → Services → link org. Enable Auth + Lobby.
@@ -170,6 +170,7 @@ Pre-existing Maestro tasks still pending:
 ### Pending agents (code)
 - Phase R Part A: **complete**. See ROADMAP.md § Phase R for what's done.
 - Phase R Part B: **complete** (code). Remaining: Maestro steps below + B6 balance pass (test session) + B7 VFX (test session).
+- Phase R-Bot: **complete** (code), including BOT-3 randomized loadout. `MatchBootstrapper` has a `BotLoadoutPreset[] _botLoadouts` pool; `TrySpawnBots` rolls a random eligible preset per bot via `TryPickBotLoadout` and equips it through `SetSlots`. Class restrictions on presets are bot-AI flavor only (do not gate the player UI — GDD §7.1). Remaining: Maestro authors the preset rows (step 11 below) + BOT-8 tuning (test session).
 - `ISessionSelectionService` carries `Ability0`/`Ability1`/`Ability2`; `MatchBootstrapper`
   calls `AbilityController.SetSlots(slot0, slot1, slot2)` in `onBeforeSpawned`.
 

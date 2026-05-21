@@ -152,11 +152,10 @@ MonoBehaviour:
   _joystickRadius: 140
   _knobRadius: 64
   _joystickAnchoredPosition: {x: 220, y: 220}
-  _attackButtonSize: 220
-  _attackAnchoredPosition: {x: -220, y: 200}
   _abilityButtonSize: 140
   _ability1AnchoredPosition: {x: -440, y: 240}
   _ability2AnchoredPosition: {x: -260, y: 420}
+  _ability3AnchoredPosition: {x: -220, y: 200}
 --- !u!4 &201738477
 Transform:
   m_ObjectHideFlags: 0
@@ -282,7 +281,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 10
+  orthographic size: 5
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -330,6 +329,9 @@ MonoBehaviour:
   _focusPoint: {x: 0, y: 0, z: 0}
   _distance: 30
   _orthoSize: 5
+  _followLocalChicken: 1
+  _followSmoothTime: 0.15
+  _localChickenSearchInterval: 0.5
   _backgroundColor: {r: 0.1, g: 0.12, b: 0.16, a: 1}
   _useSolidColor: 1
 --- !u!114 &353153901
@@ -423,6 +425,33 @@ MonoBehaviour:
   _chickenPrefab: {fileID: 8810401778881765308, guid: 715ce6f3a16e16c4daaced5f3b81b068, type: 3}
   _legacySpawnPoints: []
   _gameManagerPrefab: {fileID: 2225548547438419160, guid: 1e2d0fcf4e226a246a080f777381e9cd, type: 3}
+  _soloBotsToSpawn: 3
+  _botLoadouts:
+  - Name: Bruiser
+    Slot0: {fileID: 11400000, guid: 4c1a8e7b3d2f495d8a01c5e7b2f9d4b1, type: 2}
+    Slot1: {fileID: 11400000, guid: 0d5566bf334a1c44a9711ea9b34a4ac6, type: 2}
+    Slot2: {fileID: 0}
+    AllowedClasses: 
+  - Name: Skirmisher
+    Slot0: {fileID: 11400000, guid: 4c1a8e7b3d2f495d8a01c5e7b2f9d4b1, type: 2}
+    Slot1: {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
+    Slot2: {fileID: 0}
+    AllowedClasses: 
+  - Name: Tank
+    Slot0: {fileID: 11400000, guid: 6b3c8e2a1f4d495d8a01c5e7b2f9d4d5, type: 2}
+    Slot1: {fileID: 11400000, guid: 5f7b2c8a4d3e495d8a01c5e7b2f9d4e7, type: 2}
+    Slot2: {fileID: 0}
+    AllowedClasses: 0200
+  - Name: Trickster
+    Slot0: {fileID: 11400000, guid: 4c1a8e7b3d2f495d8a01c5e7b2f9d4b1, type: 2}
+    Slot1: {fileID: 11400000, guid: 8d2c4a7b1e5f486d8a01c5e7b2f9d4c3, type: 2}
+    Slot2: {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
+    AllowedClasses: 0103
+  - Name: Thief
+    Slot0: {fileID: 11400000, guid: 7a1d8c4b3e2f495d8a01c5e7b2f9d4f9, type: 2}
+    Slot1: {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
+    Slot2: {fileID: 11400000, guid: 4c1a8e7b3d2f495d8a01c5e7b2f9d4b1, type: 2}
+    AllowedClasses: 03
 --- !u!1 &1048915988
 GameObject:
   m_ObjectHideFlags: 0

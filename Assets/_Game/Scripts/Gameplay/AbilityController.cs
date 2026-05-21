@@ -2,6 +2,7 @@ using CluckWars.Abilities;
 using CluckWars.Audio;
 using CluckWars.Logging;
 using CluckWars.Networking;
+using CluckWars.Visuals;
 using Fusion;
 using UnityEngine;
 using Zenject;

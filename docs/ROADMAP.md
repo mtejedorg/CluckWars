@@ -2,9 +2,9 @@
 
 **Target:** Playable demo on LAN with 4 players, all classes, core abilities, full match loop.
 
-**Status snapshot:** Phases 1–10 shipped + closed (demo is feature-complete and playable). Device-dependent work is bundled into the **Dedicated test session** below.
+**Status snapshot:** Phases 1–10 shipped + closed. **Phase R Part A (parity) and Part B (new content) are now shipped in code** — the game runs on v0.3 rules (no basic attack, 2/3 ability slots, passives, 13-ability pool, four control states). Device-dependent work (balance, on-device profiling, VFX/anim authoring) stays bundled into the **Dedicated test session** below.
 
-> **ACTIVE WORK — Phase R: v0.3 Mechanics Refactor.** The GDD moved v0.2 → v0.3 (basic attack removed, ability system redesigned, interaction/control system rewritten). The shipped code still implements v0.2. **Phase R** (near the bottom of this file, before the Post-Demo section) is split into **Part A — Parity** (rebuild today's playable state under v0.3 rules) and **Part B — Continuation** (the new content v0.3 unlocks). Start there.
+> **Phase R is code-complete.** Part A, Part B, and the full Phase R-Bot AI (including BOT-3's randomized preset loadout) are shipped in code. The only outstanding items are non-code: **Maestro authors the `_botLoadouts` preset rows** in the Game-scene inspector, plus the **BOT-8** hysteresis/balance tuning (bundled into the Dedicated test session). See [Phase R-Bot](#phase-r-bot-ability-driven-bot-ai).
 
 For current-state details: `docs/STATE.md`. For architecture: `docs/ARCHITECTURE.md`. For build + diagnostic flows: `docs/TESTING.md`. For the design itself: `docs/GDD.md` (now v0.3).
 
@@ -326,20 +326,22 @@ Players on different networks find each other via lobby browser or 6-char code. 
 
 ---
 
-## Phase R: v0.3 Mechanics Refactor (ACTIVE)
+## Phase R: v0.3 Mechanics Refactor
 
-**Why this exists:** the GDD was revised v0.2 → v0.3 (see `docs/GDD.md` changelog). The shipped game implements v0.2: a button-mash *basic attack*, an `Attack` stat, one ability slot per class (two for Assassin), and a flat "combat" model. v0.3 deletes the basic attack entirely, makes **all** interaction ability-driven, gives every class **2 ability slots (3 for Assassin)**, replaces the `Attack` stat with a **class passive**, and introduces a formal **Interaction & Control System** (collision slow, pile slow, and four control states: Stunned / Slowed / Knocked Back / Rooted).
+**Why this exists:** the GDD was revised v0.2 → v0.3 (see `docs/GDD.md` changelog). v0.2 had a button-mash *basic attack*, an `Attack` stat, one ability slot per class (two for Assassin), and a flat "combat" model. v0.3 deletes the basic attack entirely, makes **all** interaction ability-driven, gives every class **2 ability slots (3 for Assassin)**, replaces the `Attack` stat with a **class passive**, and introduces a formal **Interaction & Control System** (collision slow, pile slow, and four control states: Stunned / Slowed / Knocked Back / Rooted).
 
-This phase is split in two:
+**Status: Part A, Part B, and the Phase R-Bot AI are all shipped in code** (see the ✅ markers below). The only outstanding items are non-code: Maestro authoring the bot loadout presets in the inspector, plus BOT-8 tuning/balance (test session). This phase was split in two:
 
-- **Part A — Parity.** Get back to *exactly today's playable demo* (collect → deposit → win → restart, abilities equip & fire, death-stun drops cargo) but re-implemented under v0.3 rules. No new gameplay content beyond what already works — just the new rule-set and the foundational systems v0.3 redefines. **Done = the demo is as functional as it is on `develop` today, with zero references to "attack" left in gameplay code.**
-- **Part B — Continuation.** The net-new content v0.3 unlocks: the brand-new abilities (Cluck Shock, Peck, Roll & Push, Feather Trap, Feather Aura, Root Egg), the primitives they need (knockback, root, placed zones), the expanded selection UI, and the balance pass.
+- **Part A — Parity ✅.** Got back to *today's playable demo* (collect → deposit → win → restart, abilities equip & fire, death-stun drops cargo) re-implemented under v0.3 rules — basic attack gone, 2/3 ability slots, passives, slow + control-state scaffolding.
+- **Part B — Continuation ✅ (code).** The net-new content: the brand-new abilities (Cluck Shock, Peck, Roll & Push, Feather Trap, Feather Aura, Root Egg), the primitives they need (knockback, root, placed zones), the expanded selection UI. Balance values + VFX/anim authoring remain in the test session.
 
 > **Read before starting:** `docs/CONVENTIONS.md`. The hard rules that matter most here: (1) gameplay reads input only from the Fusion buffer inside `FixedUpdateNetwork`; (2) every `FixedUpdateNetwork` opens with `if (!HasStateAuthority) return;`; (3) cross-authority writes go through `[Rpc(RpcSources.All, RpcTargets.StateAuthority)]`; (4) **never rename a MonoBehaviour/SO `.cs` class that is referenced by a prefab or `.asset`** — the serialized reference is by type+GUID and renaming silently breaks the prefab. Repurpose in place instead.
 
 ---
 
-### Part A — Parity under v0.3 rules
+### Part A — Parity under v0.3 rules ✅ SHIPPED
+
+*Verified in code: `InputButton.Attack` gone + `Ability3` added; `ChickenCombat` is now a pure health/damage/stun component (no swing); `ChickenStatsSO` has `ChickenPassive Passive` and no `Attack`; `AbilityController` runs 3 slots with the Combo-gated 3rd; `AbilityRegistrySO` + global pool; control-state + slow scaffolding present. The per-task checkboxes below are retained for historical reference.*
 
 #### A1. Input: delete Attack, add Ability3
 - [x] `Networking/PlayerNetworkInput.cs` — in `enum InputButton`, remove `Attack`. Renumber to `Ability1 = 0, Ability2 = 1, Ability3 = 2`. (Wire indices only need to be consistent across peers, and every peer runs the same build, so renumbering is safe.)
@@ -415,9 +417,11 @@ v0.3 reorganizes abilities into Damage / Control / Defense / Utility. Seven of t
 
 ---
 
-### Part B — Continuation (new v0.3 content)
+### Part B — Continuation (new v0.3 content) ✅ SHIPPED (code) — balance/VFX deferred to test session
 
 Everything below is net-new gameplay the v0.3 design unlocks. It builds on the Part A scaffolding (control states, slow sources, passive hooks, 3-slot controller).
+
+*Verified in code: the new ability SOs exist (`CluckShockAbilitySO`, `FeatherTrapAbilitySO`, `RootEggAbilitySO`, plus Peck / Roll & Push / Feather Aura per STATE.md), the interaction primitives (knockback / root / placed zone) are in, and `CharacterSelectController` has the category-grouped grid. **Still open:** B6 (per-ability balance values) and B7 (animation/VFX authoring) — both inherently belong to the **Dedicated test session**, consistent with the rest of the roadmap.*
 
 #### B1. Interaction primitives (build these first — the new abilities depend on them)
 - [x] **Knockback** — `RPC_ApplyKnockback` on `ChickenController`; respects Immovable passive. *(B1 commit)*
@@ -509,8 +513,8 @@ These are just different default values for the same serialized fields — no cl
 **BOT-2 — Bot activation API on `AbilityController`.**
 - [x] `Gameplay/AbilityController.cs` — `BotTryActivate(int slot)`, `EquippedSlotCount`, `TryGetReadySlotForRole(BotRole, out int)`. *(B3 commit)*
 
-**BOT-3 — Give bots a randomized loadout from a small preset pool.**
-Bots currently get no abilities (the bot `onBeforeSpawned` in `TrySpawnBots()` never calls `SetSlots`), so they fall back to whatever prefab defaults exist. The AI needs *something* equipped to function. Rather than one fixed kit (boring — all bots play the same) or full open random selection (more than we want to build now), define a **small pool of curated 2-slot loadout presets and pick one at random per bot**, with **some presets restricted to certain classes** for flavor. All abilities used are Part A's already-working ones.
+**BOT-3 — Give bots a randomized loadout from a small preset pool.** ✅ SHIPPED (code) — Maestro authoring pending
+*Done in code:* `MatchBootstrapper` now exposes a `BotLoadoutPreset[] _botLoadouts` array (replacing the old fixed `_botOffenseAbility`/`_botEscapeAbility`/`_botStealAbility` fields), and `TrySpawnBots()` rolls a random eligible preset per bot via `TryPickBotLoadout`. Each bot gets a curated 2-slot kit (3 for Assassin), with some presets restricted to certain classes for flavor. **Remaining:** Maestro authors the preset rows in the Game-scene inspector (BOT-8). All abilities used are Part A's already-working ones.
 
 Loadout presets (each = slot0 / slot1 / optional Assassin slot2 + the classes allowed to roll it):
 
@@ -527,11 +531,11 @@ This gives variety (no two bots guaranteed identical), keeps a sane shape (every
 > **Not a GDD contradiction.** GDD §7.1 says *players* face no class-based ability restrictions. These restrictions are **bot-AI flavor only** — they shape how bots feel, not what a human may equip. Keep that boundary: never reuse this table to gate the player selection UI.
 
 Wiring (simplest path, no `AbilityRegistrySO` dependency):
-- [ ] `Gameplay/MatchBootstrapper.cs` — add a small serializable `[System.Serializable] struct BotLoadoutPreset { AbilityBaseSO Slot0, Slot1, Slot2; ChickenClass[] AllowedClasses; }` and a `[SerializeField] BotLoadoutPreset[] _botLoadouts;`. Maestro authors the rows above in the inspector (drop in the Flying Peck / Egg Shell / Speed Burst / Spine Coat / Turtle Mode / Invisibility / Sneaky Steal `.asset`s). An empty/omitted `AllowedClasses` means "all classes".
-- [ ] Add a helper `BotLoadoutPreset PickBotLoadout(ChickenClass cls)`: filter `_botLoadouts` to presets whose `AllowedClasses` is empty or contains `cls`, then pick one with `UnityEngine.Random`. **Solo-only**, single authoritative client, so plain `Random` is fine — no cross-peer seeding needed (contrast with the corner-permutation seeding, which exists only because online peers must agree). If the filtered set is empty, fall back to the first preset or skip (log a Warn).
-- [ ] In `TrySpawnBots()` (~line 199, bot `onBeforeSpawned`), after `ctrl.IsBot = true`, resolve `var lo = PickBotLoadout(botClass);` and call `networkObject.GetComponent<AbilityController>()?.SetSlots(lo.Slot0, lo.Slot1, botClass == ChickenClass.Assassin ? lo.Slot2 : null);`. (`SetSlots` ignores null args; the Assassin 3rd-slot gate from BOT-2/A4 keeps a non-Assassin's slot 2 inert anyway — the null is just tidy.) Compute the loadout *outside* the lambda and capture it, mirroring the existing `int captured = i;` pattern, so the random roll is stable for that spawn.
-- [ ] Guard for missing assets/empty pool: log a Warn via `ILogService` and let the bot run ability-less rather than NRE.
-- [ ] Log the rolled preset per bot at Info (e.g. `"Bot 2 (Assassin) → Thief loadout"`) so solo playtests are debuggable.
+- [x] `Gameplay/MatchBootstrapper.cs` — nested `[System.Serializable] struct BotLoadoutPreset { string Name; AbilityBaseSO Slot0, Slot1, Slot2; ChickenClass[] AllowedClasses; }` (with `AllowsClass` / `HasAnyAbility` / `DisplayLabel` helpers) + `[SerializeField] BotLoadoutPreset[] _botLoadouts;`. Old fixed fields removed. Empty/omitted `AllowedClasses` = all classes.
+- [x] Helper `bool TryPickBotLoadout(ChickenClass cls, out BotLoadoutPreset preset)`: filters `_botLoadouts` to presets that have ≥1 ability AND allow `cls`, then picks uniformly with `UnityEngine.Random`. **Solo-only**, single authoritative client, so plain `Random` is fine — no cross-peer seeding needed (contrast with the corner-permutation seeding). Returns false when nothing is eligible.
+- [x] In `TrySpawnBots()`, the loadout is rolled *outside* the `onBeforeSpawned` lambda (so the random pick is stable per spawn) and applied via `SetSlots(loadout.Slot0, loadout.Slot1, botClass == Assassin ? loadout.Slot2 : null)`. Also removed the dead `int captured = i;` and the redundant `capturedBotClass` left over from the fixed-loadout version.
+- [x] Guard: empty/ineligible pool → `ILogService` Warn and the bot runs ability-less (no NRE). Rolled preset logged per bot at Info via `DisplayLabel`.
+- [ ] **Maestro:** author the preset rows on `MatchBootstrapper._botLoadouts` in the Game scene inspector (the five presets in the table above). Until then bots spawn ability-less (logged).
 
 > **Deferred (not this pass):** weighted / fully-open random loadouts drawn from the populated `AbilityRegistrySO` once Part B's full roster exists (e.g. probability tables per class). The preset pool above is the deliberate, easily-extended placeholder — add a row to grow it.
 
@@ -548,9 +552,9 @@ Wiring (simplest path, no `AbilityRegistrySO` dependency):
 - [x] `_dangerRadius`, `_huntRadius`, `_abilityRange`, `_protectCargoThreshold`, `_huntCargoThreshold` added. `ApplyClassPersonality()` sets per-class defaults in `Spawned()`. *(B3 commit)*
 
 **BOT-8 — Tuning, balance, validation.**
-- [ ] Add to the **Dedicated test session** balance list: bot radii/thresholds per class, oscillation check.
+- [ ] Add to the **Dedicated test session** balance list: bot radii/thresholds per class, oscillation check (add Hunt↔Flee hysteresis if a bot flip-flops on the think boundary — e.g. require the trigger to hold two consecutive thinks, or separate enter/exit radii).
 - [ ] Verify solo mode: 3 bots farm, protect hauls, hunt loaded rivals.
-- [ ] **Maestro:** assign `_botOffenseAbility` (Flying Peck), `_botEscapeAbility` (Speed Burst), `_botStealAbility` (Sneaky Steal) on `MatchBootstrapper` in the Game scene.
+- [ ] **Maestro:** author the `_botLoadouts` preset rows on `MatchBootstrapper` in the Game scene (the five presets in BOT-3's table). This is the same outstanding item listed under BOT-3 — until done, bots spawn ability-less (a Warn is logged).
 
 ### Phase R-Bot deliverable
 Solo-mode bots that play the v0.3 game: farm efficiently, protect a full haul (turtle/dash/shove when chased), hunt loaded rivals to stun-and-rob them, and contest piles — each class with a recognisably different temperament, all driven by their equipped abilities through one small FSM.

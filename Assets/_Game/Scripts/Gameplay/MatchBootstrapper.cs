@@ -43,14 +43,11 @@ namespace CluckWars.Gameplay
         [SerializeField] private int _soloBotsToSpawn = 3;
 
         [Header("Bot Loadout")]
-        [Tooltip("Slot-0 ability for all bots (Offense role). Assign Flying Peck .asset.")]
-        [SerializeField] private AbilityBaseSO _botOffenseAbility;
-
-        [Tooltip("Slot-1 ability for all bots (Escape role). Assign Speed Burst .asset.")]
-        [SerializeField] private AbilityBaseSO _botEscapeAbility;
-
-        [Tooltip("Slot-2 ability for Assassin bots (Steal role). Assign Sneaky Steal .asset.")]
-        [SerializeField] private AbilityBaseSO _botStealAbility;
+        [Tooltip("Curated loadout presets for bots. Each bot rolls a random preset whose " +
+            "AllowedClasses permits its class (BOT-3). Author rows in the inspector — see " +
+            "docs/ROADMAP.md Phase R-Bot BOT-3 for the recommended set " +
+            "(Bruiser / Skirmisher / Tank / Trickster / Thief).")]
+        [SerializeField] private BotLoadoutPreset[] _botLoadouts;
 
         private MapGenerator _mapGenerator;
 
@@ -201,11 +198,12 @@ namespace CluckWars.Gameplay
                     0.05f,
                     Mathf.Cos((i + 4) * 1.7f) * 0.25f);
 
-                int captured = i; // capture loop variable for lambda
-                var capturedBotClass     = botClasses[i % botClasses.Length];
-                var capturedOffense      = _botOffenseAbility;
-                var capturedEscape       = _botEscapeAbility;
-                var capturedSteal        = _botStealAbility;
+                // Roll a loadout preset OUTSIDE the lambda so the random pick is stable
+                // for this spawn. botClass is loop-local, so capturing it directly is safe.
+                bool haveLoadout = TryPickBotLoadout(botClass, out var loadout);
+                if (!haveLoadout)
+                    _log?.Warn(Source, $"No bot loadout preset available for {botClass} — bot " +
+                        "will run ability-less. Author rows on MatchBootstrapper._botLoadouts.");
 
                 runner.Spawn(
                     chickenPrefab,
@@ -217,30 +215,101 @@ namespace CluckWars.Gameplay
                         var ctrl = networkObject.GetComponent<ChickenController>();
                         if (ctrl != null)
                         {
-                            ctrl.Class = capturedBotClass;
+                            ctrl.Class = botClass;
                             ctrl.IsBot = true;
                         }
 
-                        // Equip the fixed bot loadout so the bot FSM has something to cast.
-                        var abilities = networkObject.GetComponent<AbilityController>();
-                        if (abilities != null)
+                        if (haveLoadout)
                         {
-                            bool isAssassin = capturedBotClass == ChickenClass.Assassin;
-                            var stealSlot   = isAssassin ? capturedSteal : null;
-                            if (capturedOffense == null || capturedEscape == null)
-                                _log?.Warn(Source, $"Bot loadout incomplete: offenseAbility or escapeAbility not assigned. Bot will run ability-less.");
-                            abilities.SetSlots(capturedOffense, capturedEscape, stealSlot);
+                            // Slot 2 is the Combo (Assassin) 3rd slot — AbilityController gates
+                            // it by passive, so pass null for non-Assassins for tidiness.
+                            var abilities = networkObject.GetComponent<AbilityController>();
+                            if (abilities != null)
+                            {
+                                var slot2 = botClass == ChickenClass.Assassin ? loadout.Slot2 : null;
+                                abilities.SetSlots(loadout.Slot0, loadout.Slot1, slot2);
+                            }
                         }
                     });
 
-                _log?.Info(Source, $"Spawning bot {i}: class={botClass}, corner={cornerIdx}, pos={pos}.");
+                _log?.Info(Source, $"Spawning bot {i}: class={botClass}, corner={cornerIdx}, " +
+                    $"loadout={(haveLoadout ? loadout.DisplayLabel : "(none)")}, pos={pos}.");
             }
+        }
+
+        /// <summary>
+        /// Picks a random loadout preset the given class is allowed to roll (ROADMAP
+        /// Phase R-Bot, BOT-3). Solo-only — bots exist only in single-player, so a plain
+        /// <see cref="UnityEngine.Random"/> draw is fine (no cross-peer seeding needed,
+        /// unlike the corner permutation). Skips presets with no abilities assigned.
+        /// Returns false when the pool is empty or nothing is eligible for the class.
+        /// </summary>
+        private bool TryPickBotLoadout(ChickenClass cls, out BotLoadoutPreset preset)
+        {
+            preset = default;
+            if (_botLoadouts == null || _botLoadouts.Length == 0) return false;
+
+            // Gather eligible presets, then pick one uniformly.
+            var eligible = new System.Collections.Generic.List<BotLoadoutPreset>(_botLoadouts.Length);
+            for (int i = 0; i < _botLoadouts.Length; i++)
+            {
+                var p = _botLoadouts[i];
+                if (p.HasAnyAbility && p.AllowsClass(cls)) eligible.Add(p);
+            }
+            if (eligible.Count == 0) return false;
+
+            preset = eligible[UnityEngine.Random.Range(0, eligible.Count)];
+            return true;
         }
 
         private void OnDestroy()
         {
             if (_networkService != null)
                 _networkService.OnPlayerJoined -= HandlePlayerJoined;
+        }
+
+        /// <summary>
+        /// One bot loadout option. Authored as inspector rows on
+        /// <see cref="MatchBootstrapper"/>; a bot rolls a random preset whose
+        /// <see cref="AllowedClasses"/> permits its class. <see cref="Slot2"/> is only
+        /// equipped on Assassin bots (the Combo 3rd slot).
+        /// </summary>
+        /// <remarks>
+        /// <see cref="AllowedClasses"/> is <b>bot-AI flavor only</b> — it shapes how bots
+        /// feel and must NOT be reused to gate the player ability-selection UI. Per GDD
+        /// §7.1, players face no class-based ability restrictions.
+        /// </remarks>
+        [System.Serializable]
+        public struct BotLoadoutPreset
+        {
+            [Tooltip("Display name — inspector readability + logs only.")]
+            public string Name;
+
+            [Tooltip("Slot-0 ability (typically Offense).")]
+            public AbilityBaseSO Slot0;
+
+            [Tooltip("Slot-1 ability (typically Defense or Escape).")]
+            public AbilityBaseSO Slot1;
+
+            [Tooltip("Slot-2 ability — only equipped on Assassin bots (Combo 3rd slot). Optional.")]
+            public AbilityBaseSO Slot2;
+
+            [Tooltip("Classes allowed to roll this preset. Empty = all classes. Bot-AI flavor " +
+                "only — does NOT affect player ability selection (GDD §7.1).")]
+            public ChickenClass[] AllowedClasses;
+
+            /// <summary>True if <paramref name="cls"/> may roll this preset (empty list = all).</summary>
+            public bool AllowsClass(ChickenClass cls)
+            {
+                if (AllowedClasses == null || AllowedClasses.Length == 0) return true;
+                for (int i = 0; i < AllowedClasses.Length; i++)
+                    if (AllowedClasses[i] == cls) return true;
+                return false;
+            }
+
+            public bool HasAnyAbility => Slot0 != null || Slot1 != null || Slot2 != null;
+
+            public string DisplayLabel => string.IsNullOrEmpty(Name) ? "(unnamed)" : Name;
         }
 
         private void HandlePlayerJoined(NetworkRunner runner, PlayerRef player)

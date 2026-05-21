@@ -14,17 +14,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ColorSchemeSO
   FoodPileFull: {r: 1, g: 0.85, b: 0.3, a: 1}
   FoodPileEmpty: {r: 0.4, g: 0.3, b: 0.15, a: 1}
-  PanelBackground: {r: 0.08, g: 0.08, b: 0.1, a: 0.92}
-  ButtonNormal: {r: 0.18, g: 0.18, b: 0.22, a: 1}
-  ButtonHover: {r: 0.28, g: 0.28, b: 0.34, a: 1}
-  ButtonActive: {r: 0.95, g: 0.65, b: 0.2, a: 1}
-  StartButton: {r: 0.3, g: 0.65, b: 0.3, a: 1}
-  TextOnButton: {r: 0.95, g: 0.95, b: 0.95, a: 1}
+  PanelBackground: {r: 0.23, g: 0.13, b: 0.06, a: 0.96}
+  ButtonNormal: {r: 0.31, g: 0.18, b: 0.08, a: 1}
+  ButtonHover: {r: 0.42, g: 0.25, b: 0.12, a: 1}
+  ButtonActive: {r: 0.83, g: 0.63, b: 0.13, a: 1}
+  StartButton: {r: 0.2, g: 0.64, b: 0.2, a: 1}
+  TextOnButton: {r: 1, g: 0.96, b: 0.88, a: 1}
   TextOnActive: {r: 0.1, g: 0.08, b: 0.05, a: 1}
-  JoystickBase: {r: 1, g: 1, b: 1, a: 0.2}
+  JoystickBase: {r: 1, g: 1, b: 1, a: 0.22}
   JoystickKnob: {r: 1, g: 1, b: 1, a: 0.55}
-  AttackNormal: {r: 0.95, g: 0.3, b: 0.25, a: 0.55}
-  AttackPressed: {r: 1, g: 0.5, b: 0.25, a: 0.95}
-  AbilityNormal: {r: 0.3, g: 0.55, b: 0.95, a: 0.55}
-  AbilityPressed: {r: 0.55, g: 0.8, b: 1, a: 0.95}
+  AttackNormal: {r: 0.91, g: 0.28, b: 0.16, a: 0.6}
+  AttackPressed: {r: 0.95, g: 0.46, b: 0.2, a: 0.95}
+  AbilityNormal: {r: 0.1, g: 0.5, b: 0.77, a: 0.55}
+  AbilityPressed: {r: 0.3, g: 0.7, b: 0.95, a: 0.95}
   CooldownDim: {r: 0, g: 0, b: 0, a: 0.55}

@@ -10,11 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9c2f4a7d8b1e463c8de0f1a3b5c7d2e8, type: 3}
-  m_Name: RollTrample
+  m_Name: FlyingPeck
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.RollTrampleAbilitySO
-  DisplayName: Roll & Trample
-  ShortLabel: RAM
-  AccentColor: {r: 1.00, g: 0.55, b: 0.20, a: 1}
+  DisplayName: Flying Peck
+  ShortLabel: FP
+  AccentColor: {r: 1, g: 0.55, b: 0.2, a: 1}
+  Category: 3
+  BotRole: 0
   Duration: 0.6
   Cooldown: 10
   AbilityAnimationClip: {fileID: 0}

@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6e0d2c4f5a9b3e7c8d9f0e1a2b3c4d5, type: 3}
+  m_Name: AbilityRegistry
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.AbilityRegistrySO
+  All:
+  - {fileID: 11400000, guid: 079c14ab0b344ca898f4be63fbf58374, type: 2}
+  - {fileID: 11400000, guid: 02f818d76a9212941bda628e88c11b76, type: 2}
+  - {fileID: 11400000, guid: 0d5566bf334a1c44a9711ea9b34a4ac6, type: 2}
+  - {fileID: 11400000, guid: f2c3f98e23f645109023f309da56e7e3, type: 2}
+  - {fileID: 11400000, guid: 141d6483e4594575ae36717f9dd3b056, type: 2}
+  - {fileID: 11400000, guid: 4c1a8e7b3d2f495d8a01c5e7b2f9d4b1, type: 2}
+  - {fileID: 11400000, guid: 8d2c4a7b1e5f486d8a01c5e7b2f9d4c3, type: 2}
+  - {fileID: 11400000, guid: 4c026dfa11fd40cd9914aa8fb37090b6, type: 2}
+  - {fileID: 11400000, guid: 2c83a53a116a48ffad2d306d2b38a396, type: 2}
+  - {fileID: 11400000, guid: 085acf61f49c49d68a044735c873c974, type: 2}
+  - {fileID: 11400000, guid: 7a1d8c4b3e2f495d8a01c5e7b2f9d4f9, type: 2}
+  - {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
+  - {fileID: 11400000, guid: 6b3c8e2a1f4d495d8a01c5e7b2f9d4d5, type: 2}
+  - {fileID: 11400000, guid: 5f7b2c8a4d3e495d8a01c5e7b2f9d4e7, type: 2}

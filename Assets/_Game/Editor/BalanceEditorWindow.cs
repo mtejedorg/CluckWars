@@ -93,19 +93,18 @@ namespace CluckWars.Editor
             DrawRule();
 
             // Column widths
-            const float wName = 90, wF = 52, wI = 42;
+            const float wName = 90, wPassive = 90, wF = 52, wI = 42;
 
             // Header row
             EditorGUILayout.BeginHorizontal();
             ColHeader("Class",   wName);
+            ColHeader("Passive", wPassive);
             ColHeader("MaxHP",   wF);
             ColHeader("MoveSpd", wF);
             ColHeader("Turn°",   wF);
-            ColHeader("Atk",     wF);
-            ColHeader("AtkRng",  wF);
-            ColHeader("AtkCD",   wF);
             ColHeader("Cap",     wI);
             ColHeader("Rate",    wF);
+            ColHeader("Scale",   wF);
             EditorGUILayout.EndHorizontal();
 
             DrawRule();
@@ -117,14 +116,13 @@ namespace CluckWars.Editor
                 EditorGUILayout.BeginHorizontal();
 
                 EditorGUILayout.LabelField(s.DisplayName, GUILayout.Width(wName));
+                s.Passive        = (ChickenPassive)EditorGUILayout.EnumPopup(s.Passive, GUILayout.Width(wPassive));
                 s.MaxHP          = FloatField(s.MaxHP,          wF, minVal: 1f);
                 s.MoveSpeed      = FloatField(s.MoveSpeed,      wF, minVal: 0f);
                 s.TurnSpeed      = FloatField(s.TurnSpeed,      wF, minVal: 0f);
-                s.Attack         = FloatField(s.Attack,         wF, minVal: 0f);
-                s.AttackRange    = FloatField(s.AttackRange,    wF, minVal: 0f);
-                s.AttackCooldown = FloatField(s.AttackCooldown, wF, minVal: 0f);
                 s.CargoCapacity  = IntField(s.CargoCapacity,    wI, minVal: 1);
                 s.CollectionRate = FloatField(s.CollectionRate, wF, minVal: 0f);
+                s.Scale          = FloatField(s.Scale,          wF, minVal: 0.1f);
 
                 EditorGUILayout.EndHorizontal();
                 if (EditorGUI.EndChangeCheck())
