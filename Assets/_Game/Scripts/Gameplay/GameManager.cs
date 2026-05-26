@@ -219,8 +219,8 @@ namespace CluckWars.Gameplay
 
         private void AssignBasesToPlayers()
         {
-            var bases = FindObjectsByType<PlayerBase>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            if (bases.Length == 0) return;
+            var bases = PlayerBase.ActiveBases;
+            if (bases.Count == 0) return;
 
             foreach (var player in Runner.ActivePlayers)
             {
@@ -238,7 +238,7 @@ namespace CluckWars.Gameplay
                 if (freeBase == null)
                 {
                     _log?.Warn(Source, $"No free base for player {player} " +
-                        $"(bases={bases.Length}). Will retry next tick.");
+                        $"(bases={bases.Count}). Will retry next tick.");
                     continue; // don't break — other players may still need bases
                 }
 
@@ -253,14 +253,13 @@ namespace CluckWars.Gameplay
         /// controlled by <paramref name="player"/>. Returns null if the chicken
         /// hasn't spawned yet or no unowned base is available.
         /// </summary>
-        private PlayerBase FindNearestUnownedBaseToPlayer(PlayerBase[] bases, PlayerRef player)
+        private PlayerBase FindNearestUnownedBaseToPlayer(System.Collections.Generic.List<PlayerBase> bases, PlayerRef player)
         {
-            var chickens = FindObjectsByType<ChickenController>(
-                FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            var chickens = ChickenController.ActiveControllers;
 
             Vector3 chickenPos  = Vector3.zero;
             bool    chickenFound = false;
-            for (int i = 0; i < chickens.Length; i++)
+            for (int i = 0; i < chickens.Count; i++)
             {
                 var c = chickens[i];
                 if (c == null || c.Object == null || !c.Object.IsValid) continue;
@@ -273,7 +272,7 @@ namespace CluckWars.Gameplay
 
             PlayerBase best    = null;
             float      bestSqr = float.MaxValue;
-            for (int i = 0; i < bases.Length; i++)
+            for (int i = 0; i < bases.Count; i++)
             {
                 var b = bases[i];
                 if (b == null || b.Owner.IsRealPlayer) continue;
@@ -287,18 +286,18 @@ namespace CluckWars.Gameplay
             return best;
         }
 
-        private static bool PlayerHasBase(PlayerBase[] bases, PlayerRef player)
+        private static bool PlayerHasBase(System.Collections.Generic.List<PlayerBase> bases, PlayerRef player)
         {
-            for (int i = 0; i < bases.Length; i++)
+            for (int i = 0; i < bases.Count; i++)
             {
                 if (bases[i] != null && bases[i].Owner == player) return true;
             }
             return false;
         }
 
-        private static PlayerBase FindUnownedBase(PlayerBase[] bases)
+        private static PlayerBase FindUnownedBase(System.Collections.Generic.List<PlayerBase> bases)
         {
-            for (int i = 0; i < bases.Length; i++)
+            for (int i = 0; i < bases.Count; i++)
             {
                 var b = bases[i];
                 if (b != null && !b.Owner.IsRealPlayer) return b;
@@ -328,8 +327,8 @@ namespace CluckWars.Gameplay
         {
             // Owned bases only — a stray unowned base hitting the target shouldn't
             // trigger a PlayerRef.None winner.
-            var bases = FindObjectsByType<PlayerBase>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < bases.Length; i++)
+            var bases = PlayerBase.ActiveBases;
+            for (int i = 0; i < bases.Count; i++)
             {
                 var b = bases[i];
                 if (b == null || !b.Owner.IsRealPlayer) continue;
@@ -343,10 +342,10 @@ namespace CluckWars.Gameplay
         {
             // Highest-total OWNED base wins. Ties broken by iteration order; good
             // enough for the demo, refine when scoring rules are revisited.
-            var bases = FindObjectsByType<PlayerBase>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            var bases = PlayerBase.ActiveBases;
             PlayerRef winner = PlayerRef.None;
             float bestTotal = -1f;
-            for (int i = 0; i < bases.Length; i++)
+            for (int i = 0; i < bases.Count; i++)
             {
                 var b = bases[i];
                 if (b == null || !b.Owner.IsRealPlayer) continue;
@@ -387,14 +386,14 @@ namespace CluckWars.Gameplay
             // Master has authority over scene NetworkObjects (bases, piles) — mutate
             // their networked state directly; replication carries the new values to
             // every peer on the next snapshot.
-            var bases = FindObjectsByType<PlayerBase>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < bases.Length; i++)
+            var bases = PlayerBase.ActiveBases;
+            for (int i = 0; i < bases.Count; i++)
             {
                 if (bases[i] != null) bases[i].FoodTotal = 0f;
             }
 
-            var piles = FindObjectsByType<FoodPile>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < piles.Length; i++)
+            var piles = FoodPile.ActivePiles;
+            for (int i = 0; i < piles.Count; i++)
             {
                 var p = piles[i];
                 if (p == null) continue;
@@ -404,8 +403,9 @@ namespace CluckWars.Gameplay
             }
 
             // Loose ground-dropped pickups don't belong in the fresh match — kill them.
-            var pickups = FindObjectsByType<FoodPickup>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < pickups.Length; i++)
+            var pickups = FoodPickup.ActivePickups;
+            // Iterate backwards when despawning to avoid list modification issues
+            for (int i = pickups.Count - 1; i >= 0; i--)
             {
                 var pk = pickups[i];
                 if (pk != null && pk.Object != null && pk.Object.IsValid)
@@ -414,28 +414,28 @@ namespace CluckWars.Gameplay
 
             // Chickens are owned by each player — cross-authority writes go via RPC.
             // Calling these on every chicken routes to that chicken's state authority.
-            var combats = FindObjectsByType<ChickenCombat>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < combats.Length; i++)
+            var combats = ChickenCombat.ActiveCombats;
+            for (int i = 0; i < combats.Count; i++)
             {
                 combats[i]?.RPC_ResetForNewMatch();
             }
 
-            var cargos = FindObjectsByType<ChickenCargo>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < cargos.Length; i++)
+            var cargos = ChickenCargo.ActiveCargos;
+            for (int i = 0; i < cargos.Count; i++)
             {
                 cargos[i]?.RPC_ResetForNewMatch();
             }
 
             // Reset v0.3 control states (slow timers, root, knockback, aura).
-            var chickenControllers = FindObjectsByType<ChickenController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < chickenControllers.Length; i++)
+            var chickenControllers = ChickenController.ActiveControllers;
+            for (int i = 0; i < chickenControllers.Count; i++)
             {
                 chickenControllers[i]?.RPC_ResetControlStates();
             }
 
             // Reset per-chicken match stats so kills and food totals start fresh.
-            var matchStats = FindObjectsByType<ChickenMatchStats>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < matchStats.Length; i++)
+            var matchStats = ChickenMatchStats.ActiveStats;
+            for (int i = 0; i < matchStats.Count; i++)
             {
                 matchStats[i]?.RPC_ResetStats();
             }
@@ -446,14 +446,14 @@ namespace CluckWars.Gameplay
             // MatchBootstrapper uses on join is reproduced here.
             var mapGen = FindFirstObjectByType<MapGenerator>();
             var spawnPoints = mapGen != null ? mapGen.SpawnPoints : null;
-            _log?.Debug(Source, $"RestartMatch: {bases.Length} bases, {piles.Length} piles reset. " +
+            _log?.Debug(Source, $"RestartMatch: {bases.Count} bases, {piles.Count} piles reset. " +
                 $"spawnPoints={(spawnPoints != null ? spawnPoints.Count.ToString() : "null")}.");
             if (spawnPoints != null && spawnPoints.Count > 0)
             {
-                var controllers = FindObjectsByType<ChickenController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+                var controllers = ChickenController.ActiveControllers;
                 // Track which spawn corners are taken so bots get the remaining ones.
                 int botCornerCounter = 1; // bots occupy corners 1, 2, 3
-                for (int i = 0; i < controllers.Length; i++)
+                for (int i = 0; i < controllers.Count; i++)
                 {
                     var ctrl = controllers[i];
                     if (ctrl == null || ctrl.Object == null) continue;

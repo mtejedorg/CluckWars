@@ -26,6 +26,8 @@ namespace CluckWars.Gameplay
     {
         private const string Source = "Cargo";
 
+        public static readonly System.Collections.Generic.List<ChickenCargo> ActiveCargos = new System.Collections.Generic.List<ChickenCargo>();
+
         [Tooltip("Generous broadphase radius for finding piles/bases. Per-target ranges (FoodPile.CollectRadius / PlayerBase.DepositRadius) gate the actual interaction.")]
         [Min(0.5f)]
         [SerializeField] private float _searchRadius = 5f;
@@ -58,12 +60,8 @@ namespace CluckWars.Gameplay
         private PrefabRegistrySO _prefabRegistry;
         private bool _subscribedToDeath;
 
-        // Cached base list — refreshed every BaseCacheTTL simulation seconds so we
-        // don't call FindObjectsByType every tick while remaining responsive to
-        // late-spawned or newly-owned bases.  No physics collider required.
-        private PlayerBase[] _cachedBases;
-        private double       _baseCacheSimTime = double.NegativeInfinity;
-        private const double BaseCacheTTL      = 1.5;
+        // Static array for broadphase overlaps to prevent per-tick allocation
+        private static readonly Collider[] _overlapHits = new Collider[16];
 
         [Inject]
         public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry)
@@ -82,6 +80,7 @@ namespace CluckWars.Gameplay
 
         public override void Spawned()
         {
+            ActiveCargos.Add(this);
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
 
             _controller = GetComponent<ChickenController>();
@@ -98,6 +97,7 @@ namespace CluckWars.Gameplay
 
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
+            ActiveCargos.Remove(this);
             if (_combat != null && _subscribedToDeath)
             {
                 _combat.OnDeath -= HandleDeath;
@@ -196,11 +196,12 @@ namespace CluckWars.Gameplay
 
         private FoodPile FindNearestPileInRange()
         {
-            var hits = Physics.OverlapSphere(transform.position, _searchRadius, _searchMask, QueryTriggerInteraction.Collide);
+            int hitCount = Physics.OverlapSphereNonAlloc(transform.position, _searchRadius, _overlapHits, _searchMask, QueryTriggerInteraction.Collide);
             FoodPile best = null;
             float bestSqr = float.MaxValue;
-            foreach (var col in hits)
+            for (int i = 0; i < hitCount; i++)
             {
+                var col = _overlapHits[i];
                 var pile = col.GetComponentInParent<FoodPile>();
                 if (pile == null) continue;
                 float sqr = (pile.transform.position - transform.position).sqrMagnitude;
@@ -217,11 +218,12 @@ namespace CluckWars.Gameplay
 
         private FoodPickup FindNearestPickupInRange()
         {
-            var hits = Physics.OverlapSphere(transform.position, _searchRadius, _searchMask, QueryTriggerInteraction.Collide);
+            int hitCount = Physics.OverlapSphereNonAlloc(transform.position, _searchRadius, _overlapHits, _searchMask, QueryTriggerInteraction.Collide);
             FoodPickup best = null;
             float bestSqr = float.MaxValue;
-            foreach (var col in hits)
+            for (int i = 0; i < hitCount; i++)
             {
+                var col = _overlapHits[i];
                 var pickup = col.GetComponentInParent<FoodPickup>();
                 if (pickup == null || pickup.IsEmpty) continue;
                 float sqr = (pickup.transform.position - transform.position).sqrMagnitude;
@@ -238,25 +240,13 @@ namespace CluckWars.Gameplay
 
         private PlayerBase FindNearestBaseInRange()
         {
-            // Direct scene scan — no physics collider required on the PlayerBase.
-            // Cache refreshes every BaseCacheTTL seconds so we pick up late-spawned
-            // bases and newly-assigned owners without calling FindObjectsByType
-            // every simulation tick.
-            if (_cachedBases == null ||
-                Runner.SimulationTime - _baseCacheSimTime > BaseCacheTTL)
-            {
-                _cachedBases      = FindObjectsByType<PlayerBase>(
-                    FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-                _baseCacheSimTime = Runner.SimulationTime;
-                _log?.Debug(Source, $"Base cache refreshed: {_cachedBases.Length} bases found.");
-            }
-
-            var    ownerRef = Object.InputAuthority;
+            var bases = PlayerBase.ActiveBases;
+            var ownerRef = Object.InputAuthority;
             PlayerBase best = null;
             float  bestSqr  = float.MaxValue;
-            for (int i = 0; i < _cachedBases.Length; i++)
+            for (int i = 0; i < bases.Count; i++)
             {
-                var b = _cachedBases[i];
+                var b = bases[i];
                 if (b == null || b.Object == null || !b.Object.IsValid) continue;
                 if (b.Owner != ownerRef) continue;
                 float sqr = (b.transform.position - transform.position).sqrMagnitude;

@@ -28,6 +28,8 @@ namespace CluckWars.Gameplay
         [Min(0f)]
         [SerializeField] private float _collectRadius = 1.6f;
 
+        public static readonly System.Collections.Generic.List<FoodPile> ActivePiles = new System.Collections.Generic.List<FoodPile>();
+
         [Networked] public float Amount { get; set; }
         [Networked] public float MaxAmount { get; set; }
 
@@ -41,6 +43,7 @@ namespace CluckWars.Gameplay
 
         public override void Spawned()
         {
+            ActivePiles.Add(this);
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
 
             if (HasStateAuthority)
@@ -55,6 +58,11 @@ namespace CluckWars.Gameplay
                 }
                 _log?.Debug(Source, $"{name}: Spawned. Amount={Amount}/{MaxAmount}.");
             }
+        }
+
+        public override void Despawned(NetworkRunner runner, bool hasState)
+        {
+            ActivePiles.Remove(this);
         }
 
         /// <summary>

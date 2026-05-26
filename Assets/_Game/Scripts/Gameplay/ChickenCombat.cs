@@ -30,6 +30,8 @@ namespace CluckWars.Gameplay
     {
         private const string Source = "Combat";
 
+        public static readonly System.Collections.Generic.List<ChickenCombat> ActiveCombats = new System.Collections.Generic.List<ChickenCombat>();
+
         [Tooltip("Stun duration after dying. GDD calls for 5 seconds.")]
         [Min(0f)]
         [SerializeField] private float _stunDuration = 5f;
@@ -63,6 +65,7 @@ namespace CluckWars.Gameplay
 
         public override void Spawned()
         {
+            ActiveCombats.Add(this);
             // Same self-inject pattern as ChickenController — Fusion spawns NetworkBehaviours
             // outside Zenject's normal injection path. Reading .Instance triggers lazy load.
             if (_log == null)
@@ -79,6 +82,11 @@ namespace CluckWars.Gameplay
             _stunReader = GetPropertyReader<bool>(nameof(IsStunned));
 
             _log?.Debug(Source, $"Spawned. HasStateAuthority={HasStateAuthority}.");
+        }
+
+        public override void Despawned(NetworkRunner runner, bool hasState)
+        {
+            ActiveCombats.Remove(this);
         }
 
         public override void FixedUpdateNetwork()
@@ -197,8 +205,8 @@ namespace CluckWars.Gameplay
             if (!attacker.IsRealPlayer) return;
             if (Object != null && attacker == Object.InputAuthority) return;
 
-            var allStats = FindObjectsByType<ChickenMatchStats>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < allStats.Length; i++)
+            var allStats = ChickenMatchStats.ActiveStats;
+            for (int i = 0; i < allStats.Count; i++)
             {
                 var s = allStats[i];
                 if (s == null || s.Object == null) continue;
@@ -229,8 +237,8 @@ namespace CluckWars.Gameplay
         {
             float knockback = _controller != null ? _controller.SpineCoatKnockbackStrength : 0f;
 
-            var combats = FindObjectsByType<ChickenCombat>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < combats.Length; i++)
+            var combats = ChickenCombat.ActiveCombats;
+            for (int i = 0; i < combats.Count; i++)
             {
                 var c = combats[i];
                 if (c == null || c == this) continue;

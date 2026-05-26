@@ -263,15 +263,14 @@ namespace CluckWars.Gameplay
         private ChickenController FindNearestRival(
             out float dist, out float cargoFraction, bool requireCargo)
         {
-            var all = FindObjectsByType<ChickenController>(
-                FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            var all = ChickenController.ActiveControllers;
             var selfPos = _controller.transform.position;
 
             ChickenController best = null;
             float bestSqr = float.MaxValue;
             float bestCargo = 0f;
 
-            for (int i = 0; i < all.Length; i++)
+            for (int i = 0; i < all.Count; i++)
             {
                 var c = all[i];
                 if (c == null || c == _controller) continue;
@@ -300,11 +299,11 @@ namespace CluckWars.Gameplay
         /// <summary>Finds the nearest non-empty food pile.</summary>
         private FoodPile FindNearestPile()
         {
-            var piles   = FindObjectsByType<FoodPile>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            var piles   = FoodPile.ActivePiles;
             var selfPos = _controller.transform.position;
             FoodPile best    = null;
             float    bestSqr = float.MaxValue;
-            for (int i = 0; i < piles.Length; i++)
+            for (int i = 0; i < piles.Count; i++)
             {
                 var p = piles[i];
                 if (p == null || p.IsEmpty) continue;
@@ -323,11 +322,11 @@ namespace CluckWars.Gameplay
             if (_homeBase != null && _homeBase.Object != null && _homeBase.Object.IsValid)
                 return _homeBase.transform.position;
 
-            var bases   = FindObjectsByType<PlayerBase>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            var bases   = PlayerBase.ActiveBases;
             var selfPos = _controller.transform.position;
             PlayerBase nearest = null;
             float bestSqr = float.MaxValue;
-            for (int i = 0; i < bases.Length; i++)
+            for (int i = 0; i < bases.Count; i++)
             {
                 var b = bases[i];
                 if (b == null || b.Owner.IsRealPlayer) continue;

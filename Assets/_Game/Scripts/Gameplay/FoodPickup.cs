@@ -31,6 +31,8 @@ namespace CluckWars.Gameplay
         [Min(1f)]
         [SerializeField] private float _despawnDelay = 30f;
 
+        public static readonly System.Collections.Generic.List<FoodPickup> ActivePickups = new System.Collections.Generic.List<FoodPickup>();
+
         [Networked] public float Amount { get; set; }
         [Networked] public float MaxAmount { get; set; }
         [Networked] private TickTimer ExpiryTimer { get; set; }
@@ -45,6 +47,7 @@ namespace CluckWars.Gameplay
 
         public override void Spawned()
         {
+            ActivePickups.Add(this);
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
 
             if (HasStateAuthority)
@@ -53,6 +56,11 @@ namespace CluckWars.Gameplay
                 ExpiryTimer = TickTimer.CreateFromSeconds(Runner, _despawnDelay);
                 _log?.Debug(Source, $"{name}: Spawned with Amount={Amount:0.00}, despawn in {_despawnDelay}s.");
             }
+        }
+
+        public override void Despawned(NetworkRunner runner, bool hasState)
+        {
+            ActivePickups.Remove(this);
         }
 
         public override void FixedUpdateNetwork()

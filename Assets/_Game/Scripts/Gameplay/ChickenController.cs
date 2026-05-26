@@ -56,6 +56,11 @@ namespace CluckWars.Gameplay
         private const float KnockbackDecayRate       = 8f;    // 1/s; ExternalDisplacement decays to zero
         private const float AuraSlowSearchRadius     = 10f;   // broadphase for CheckAuraSlow
 
+        public static readonly System.Collections.Generic.List<ChickenController> ActiveControllers = new System.Collections.Generic.List<ChickenController>();
+
+        // Static array for broadphase overlaps to prevent per-tick allocation
+        private static readonly Collider[] _overlapHits = new Collider[16];
+
         [Tooltip("Fallback used only if the class registry is missing or has no entry for this chicken's class.")]
         [SerializeField] private ChickenStatsSO _fallbackStats;
 
@@ -165,6 +170,7 @@ namespace CluckWars.Gameplay
 
         public override void Spawned()
         {
+            ActiveControllers.Add(this);
             if (_log == null)
             {
                 ProjectContext.Instance.Container.Inject(this);
@@ -201,6 +207,11 @@ namespace CluckWars.Gameplay
                     _log?.Debug(Source, $"Applied tint {entry.TintColor} for class {Class}.");
                 }
             }
+        }
+
+        public override void Despawned(NetworkRunner runner, bool hasState)
+        {
+            ActiveControllers.Remove(this);
         }
 
         public override void FixedUpdateNetwork()
@@ -399,13 +410,13 @@ namespace CluckWars.Gameplay
         /// </summary>
         private void CheckCollisionSlow()
         {
-            var hits = Physics.OverlapSphere(
-                transform.position, CollisionSlowRadius, ~0,
+            int hitCount = Physics.OverlapSphereNonAlloc(
+                transform.position, CollisionSlowRadius, _overlapHits, ~0,
                 QueryTriggerInteraction.Ignore);
 
-            for (int i = 0; i < hits.Length; i++)
+            for (int i = 0; i < hitCount; i++)
             {
-                var other = hits[i].GetComponentInParent<ChickenController>();
+                var other = _overlapHits[i].GetComponentInParent<ChickenController>();
                 if (other == null || other == this) continue;
                 // Ignore dead chickens (stunned / falling through respawn).
                 if (other.Combat != null && other.Combat.IsDead) continue;
@@ -421,12 +432,12 @@ namespace CluckWars.Gameplay
         /// </summary>
         private void CheckAuraSlow()
         {
-            var hits = Physics.OverlapSphere(
-                transform.position, AuraSlowSearchRadius, ~0,
+            int hitCount = Physics.OverlapSphereNonAlloc(
+                transform.position, AuraSlowSearchRadius, _overlapHits, ~0,
                 QueryTriggerInteraction.Ignore);
-            for (int i = 0; i < hits.Length; i++)
+            for (int i = 0; i < hitCount; i++)
             {
-                var caster = hits[i].GetComponentInParent<ChickenController>();
+                var caster = _overlapHits[i].GetComponentInParent<ChickenController>();
                 if (caster == null || caster == this) continue;
                 if (!caster.AuraSlowActive) continue;
                 float sqr = (caster.transform.position - transform.position).sqrMagnitude;

@@ -18,11 +18,23 @@ namespace CluckWars.Gameplay
     [RequireComponent(typeof(NetworkObject))]
     public sealed class ChickenMatchStats : NetworkBehaviour
     {
+        public static readonly System.Collections.Generic.List<ChickenMatchStats> ActiveStats = new System.Collections.Generic.List<ChickenMatchStats>();
+
         /// <summary>Number of kills this chicken scored this round.</summary>
         [Networked] public int Kills { get; set; }
 
         /// <summary>Total food this chicken successfully deposited at its base this round.</summary>
         [Networked] public float FoodDeposited { get; set; }
+
+        public override void Spawned()
+        {
+            ActiveStats.Add(this);
+        }
+
+        public override void Despawned(NetworkRunner runner, bool hasState)
+        {
+            ActiveStats.Remove(this);
+        }
 
         /// <summary>
         /// Credit one kill. Called by <see cref="ChickenCombat.CreditKillToAttacker"/>

@@ -23,6 +23,8 @@ namespace CluckWars.Gameplay
         [Min(0f)]
         [SerializeField] private float _depositRadius = 2.5f;
 
+        public static readonly System.Collections.Generic.List<PlayerBase> ActiveBases = new System.Collections.Generic.List<PlayerBase>();
+
         [Networked] public float FoodTotal { get; set; }
         [Networked] public PlayerRef Owner { get; set; }
 
@@ -68,9 +70,15 @@ namespace CluckWars.Gameplay
 
         public override void Spawned()
         {
+            ActiveBases.Add(this);
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
             _log?.Debug(Source, $"{name}: Spawned. HasStateAuthority={HasStateAuthority}, " +
                 $"Owner={Owner}, CornerIndex={CornerIndex}.");
+        }
+
+        public override void Despawned(NetworkRunner runner, bool hasState)
+        {
+            ActiveBases.Remove(this);
         }
 
         // LateUpdate polls Owner every frame — O(1) PlayerRef comparison.

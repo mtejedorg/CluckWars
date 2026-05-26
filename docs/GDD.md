@@ -243,6 +243,8 @@ These sources are tagged separately in code to allow passive abilities to cover 
 
 **Stun is the only state that drops cargo.** All other control states disrupt without rewarding the aggressor directly — the reward is the window of opportunity they create.
 
+Each state has a distinct **on-character visual overlay** (stars/💀 for stun, blue tint + 🐌 for slow, motion lines + 💨 for knockback, vines + 🌱 for root) so the state reads at a glance in the isometric view. Full visual spec: ART.md §6.10.
+
 ### 6.5 Design Intent
 
 Every aggressive action has a cost (cooldown) and a window (the effect duration). Skilled play is about converting that window into a real advantage — pushing a carrier off route, rooting them while collecting their pile, or timing a damage ability to stun a fully-loaded rival.
@@ -262,39 +264,41 @@ Every aggressive action has a cost (cooldown) and a window (the effect duration)
 
 ### 7.2 Ability Pool
 
+Each ability carries an icon glyph (stored on `AbilityBaseSO.Icon`, surfaced via `ResolveIcon()`) shown on the hex button and the character-select cards. Full accent-color + icon reference: ART.md §3.
+
 #### Damage — deal HP; can stun if target HP reaches zero
 
-| Ability | Description | Cooldown |
-|---|---|---|
-| Flying Peck | Dash forward, HP damage on contact | Short |
-| Cluck Shock | AoE HP burst around self | Medium |
-| Peck | Instant short-range HP hit + minor knockback | Short |
+| Icon | Ability | Description | Cooldown |
+|---|---|---|---|
+| 🪽 | Flying Peck | Dash forward, HP damage on contact | Short |
+| ⚡ | Cluck Shock | AoE HP burst around self | Medium |
+| 🐦 | Peck | Instant short-range HP hit + minor knockback | Short |
 
 #### Control — no HP damage; disrupt movement or actions
 
-| Ability | Description | Cooldown |
-|---|---|---|
-| Roll & Push | Roll forward, push target away — no damage | Short |
-| Feather Trap | Throw feather cloud to a location; slows anyone walking through | Medium |
-| Feather Aura | Emit feather cloud around self, slows nearby chickens | Medium |
-| Root Egg | Place egg that roots the first chicken that steps on it | Medium |
+| Icon | Ability | Description | Cooldown |
+|---|---|---|---|
+| 🌀 | Roll & Push | Roll forward, push target away — no damage | Short |
+| 🪤 | Feather Trap | Throw feather cloud to a location; slows anyone walking through | Medium |
+| 💨 | Feather Aura | Emit feather cloud around self, slows nearby chickens | Medium |
+| 🌱 | Root Egg | Place egg that roots the first chicken that steps on it | Medium |
 
 #### Defense — protect self or cargo
 
-| Ability | Description | Cooldown |
-|---|---|---|
-| Egg Shell | Invulnerable egg form, immobile while active | Short |
-| Turtle Mode | Near-zero speed, greatly increased resistance | Short |
-| Spine Coat | Damages + knockbacks any chicken that contacts you | Medium |
+| Icon | Ability | Description | Cooldown |
+|---|---|---|---|
+| 🥚 | Egg Shell | Invulnerable egg form, immobile while active | Short |
+| 🐢 | Turtle Mode | Near-zero speed, greatly increased resistance | Short |
+| 🦔 | Spine Coat | Damages + knockbacks any chicken that contacts you | Medium |
 
 #### Utility — non-combat advantage
 
-| Ability | Description | Cooldown |
-|---|---|---|
-| Speed Burst | Short movement speed boost | Short |
-| Invisibility | Temporarily invisible to other players | Medium |
-| Doppelganger | Spawn decoy copy of yourself | Medium |
-| Sneaky Steal | Instantly steal small cargo from nearby rival, no HP interaction | Short |
+| Icon | Ability | Description | Cooldown |
+|---|---|---|---|
+| 💨 | Speed Burst | Short movement speed boost | Short |
+| 👻 | Invisibility | Temporarily invisible to other players | Medium |
+| 👥 | Doppelganger | Spawn decoy copy of yourself | Medium |
+| 🤏 | Sneaky Steal | Instantly steal small cargo from nearby rival, no HP interaction | Short |
 
 ### 7.3 Cooldown Tiers
 
@@ -394,3 +398,25 @@ Each flavor is a **standalone game** built on the same codebase, sharing mechani
 | Cluck Station *(planned)* | TBD | Outer space | TBD |
 
 **Design principle:** Core loop, stats, ability system, and progression must be engineered to be **theme-agnostic** from day one. Any flavor-specific mechanic variation must be a configurable layer, not a code fork.
+
+---
+
+## 13. Annex: Implementation Discrepancies & Additions
+
+This annex catalogs features and logic currently present in the codebase that are either undocumented in the main GDD or deviate from the documented spec. These discrepancies will be evaluated for formal inclusion in the next GDD version.
+
+### 13.1 AI Bots (Solo Mode)
+The codebase includes a fully functional AI bot system (`BotController.cs`) for solo or offline play, which is not covered in the multiplayer-focused core GDD.
+- **Bot FSM:** Bots operate on a 5-tier priority system evaluated every 0.3 seconds:
+  1. **Flee:** If loaded with cargo and a rival is nearby, rush to base and use Defensive/Escape/Control abilities.
+  2. **Deposit:** If cargo exceeds a return threshold, head back to base.
+  3. **Hunt:** If a rival is loaded and in range, chase and attack with Steal/Offense/Control abilities.
+  4. **Collect:** Walk to the nearest food pile (using Control abilities if contested).
+  5. **Idle:** Do nothing if no actions are available.
+- **Class Personalities:** Bots modify their behavior based on their chosen class. For example, Warrior bots hunt aggressively, Fatty bots play cautiously and deposit early, Assassin bots opportunistically hunt loaded rivals, and Speedy bots do hit-and-runs.
+
+### 13.2 "Slippery" Passive Discrepancy
+According to Section 5.2, the Speedy Chicken's "Slippery" passive reduces the *duration* of control abilities. However, the current code implementation (`ChickenController.RPC_ApplyAbilitySlow`) also reduces the *magnitude* of the slow effect by 50% (`SlipperySlowRetention = 0.50f`), making Speedy significantly more resistant to crowd control than documented. This undocumented buff requires a balance review.
+
+### 13.3 Other Unspecified Logic
+- **Base Assignment Tie-breaker:** Section 2 states that the player with the most food stored at their base wins when the timer expires. In the code, if multiple players are tied with the exact same amount of food, the `GameManager` resolves the tie arbitrarily based on the Unity internal iteration order. A formal tie-breaker rule needs to be designed.
