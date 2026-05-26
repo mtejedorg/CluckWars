@@ -22,6 +22,8 @@ namespace CluckWars.Abilities
         [Tooltip("Base damage to each chicken in range. Scaled by Warrior's Tough passive.")]
         [Min(1f)] public float ShockDamage = 20f;
 
+        protected override string DefaultIcon => "⚡";
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;

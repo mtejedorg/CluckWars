@@ -31,6 +31,8 @@ namespace CluckWars.Abilities
         [Tooltip("Trigger radius within which a chicken activates the root.")]
         [Min(0.3f)] public float EggRadius = 0.8f;
 
+        protected override string DefaultIcon => "🌱";
+
         public override void OnActivate(AbilityContext ctx)
         {
             if (ctx.Runner == null || ctx.PrefabRegistry == null || ctx.PrefabRegistry.AbilityZone == null)

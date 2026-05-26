@@ -17,6 +17,8 @@ namespace CluckWars.Abilities
         [Tooltip("Damage reduction scalar while active. 0.8 = 80% of incoming damage absorbed.")]
         [Range(0f, 1f)] public float DamageResistance = 0.8f;
 
+        protected override string DefaultIcon => "🐢";
+
         public override void OnActivate(AbilityContext ctx)
         {
             ctx.Controller.MoveSpeedMultiplier = SpeedMultiplier;

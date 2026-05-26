@@ -1,4 +1,3 @@
-@ -0,0 +1,106 @@
 # This .gitignore file should be placed at the root of your Unity project directory
 #
 # Get latest from https://github.com/github/gitignore/blob/main/Unity.gitignore
@@ -126,3 +125,19 @@ InitTestScene*.unity*
 /[Aa]ssets/[Ss]ceneDependencyCache*
 /.claude
 .vsconfig
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json
+
+# Agent & local tool specific ignores
+.agents/
+.gemini/
+.graphifyignore
+.mcp.json
+graphify-out/
+Design.zip
+
+# Auto-imported TextMesh Pro assets (imported via editor scripts)
+/Assets/TextMesh Pro/
+/Assets/TextMesh Pro.meta

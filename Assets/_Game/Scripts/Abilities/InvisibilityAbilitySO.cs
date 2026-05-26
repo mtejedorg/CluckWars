@@ -16,6 +16,8 @@ namespace CluckWars.Abilities
         [Tooltip("Alpha while active. 0 = totally invisible (fragile), 0.2 ≈ ghostly outline (readable).")]
         [Range(0f, 1f)] public float Opacity = 0.2f;
 
+        protected override string DefaultIcon => "👻";
+
         public override void OnActivate(AbilityContext ctx)
         {
             ctx.Controller.VisualOpacity = Opacity;

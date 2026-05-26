@@ -36,6 +36,8 @@ namespace CluckWars.Abilities
         [Tooltip("Speed multiplier applied to chickens inside the zone (< 1 = slower).")]
         [Range(0.1f, 0.9f)] public float SlowFactor = 0.45f;
 
+        protected override string DefaultIcon => "🪤";
+
         public override void OnActivate(AbilityContext ctx)
         {
             if (ctx.Runner == null || ctx.PrefabRegistry == null || ctx.PrefabRegistry.AbilityZone == null)

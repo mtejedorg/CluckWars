@@ -305,7 +305,7 @@ namespace CluckWars.UI
 
                 if (row.ColorDot != null) row.ColorDot.color = playerColor;
 
-                row.PlayerLabel.text  = $"#{i + 1}  P{cornerIdx + 1}";
+                row.PlayerLabel.text  = $"{Ordinal(i)}  P{cornerIdx + 1}";
                 row.PlayerLabel.color = playerColor;
 
                 if (row.ScoreLabel != null)
@@ -552,6 +552,15 @@ namespace CluckWars.UI
             return 0;
         }
 
+        /// <summary>0-based rank → "1st"/"2nd"/"3rd"/"4th" (design v3 leaderboard).</summary>
+        private static string Ordinal(int zeroBasedRank) => zeroBasedRank switch
+        {
+            0 => "1st",
+            1 => "2nd",
+            2 => "3rd",
+            _ => $"{zeroBasedRank + 1}th",
+        };
+
         private List<(int cornerIdx, float total)> BuildSortedLeaderboard()
         {
             var list = new List<(int, float)>(_bases.Length);
@@ -630,6 +639,39 @@ namespace CluckWars.UI
             _lbRows = new LeaderboardRow[4];
             for (int i = 0; i < 4; i++)
                 BuildLeaderboardRow(panel.transform, i);
+
+            BuildTargetBadge(panel.transform);
+        }
+
+        /// <summary>
+        /// "★ FIRST TO N" win-target badge sitting just under the leaderboard panel
+        /// (design v3 HUD). N pulls from <see cref="MatchConfigSO.FoodTargetToWin"/>.
+        /// </summary>
+        private void BuildTargetBadge(Transform leaderboardPanel)
+        {
+            int goal = _matchConfig != null ? Mathf.Max(1, Mathf.RoundToInt(_matchConfig.FoodTargetToWin)) : 150;
+
+            var badge = CreateUI("TargetBadge", leaderboardPanel, out var rt);
+            rt.anchorMin        = new Vector2(0f, 0f);
+            rt.anchorMax        = new Vector2(1f, 0f);
+            rt.pivot            = new Vector2(0.5f, 1f);
+            rt.sizeDelta        = new Vector2(-12f, 30f);
+            rt.anchoredPosition = new Vector2(0f, -6f);
+            var bg = badge.AddComponent<Image>();
+            bg.sprite = UiGfx.Rounded(8);
+            bg.type   = Image.Type.Sliced;
+            bg.pixelsPerUnitMultiplier = 1f;
+            bg.color = new Color(DtGold.r, DtGold.g, DtGold.b, 0.14f);
+            bg.raycastTarget = false;
+
+            var label = AddText(badge.transform, "Label", $"FIRST TO {goal}", 18,
+                TextAnchor.MiddleCenter, FontStyle.Bold);
+            label.color = DtGold;
+            var lRT = label.rectTransform;
+            lRT.anchorMin = Vector2.zero;
+            lRT.anchorMax = Vector2.one;
+            lRT.offsetMin = Vector2.zero;
+            lRT.offsetMax = Vector2.zero;
         }
 
         private void BuildLeaderboardRow(Transform parent, int rowIdx)
@@ -993,6 +1035,9 @@ namespace CluckWars.UI
         {
             var go  = CreateUI(name, parent, out _);
             var img = go.AddComponent<Image>();
+            img.sprite        = UiGfx.Rounded(12);
+            img.type          = Image.Type.Sliced;
+            img.pixelsPerUnitMultiplier = 1f;
             img.color         = baseColor;
             img.raycastTarget = true;
 
@@ -1058,6 +1103,9 @@ namespace CluckWars.UI
         private static void AddBackground(GameObject go, Color color)
         {
             var img = go.AddComponent<Image>();
+            img.sprite        = UiGfx.Rounded(12);   // glossy rounded panel (ART.md §6.1)
+            img.type          = Image.Type.Sliced;
+            img.pixelsPerUnitMultiplier = 1f;
             img.color         = color;
             img.raycastTarget = false; // HUD doesn't eat clicks; TouchControlsHud owns input
         }
@@ -1075,10 +1123,8 @@ namespace CluckWars.UI
             text.horizontalOverflow = HorizontalWrapMode.Overflow;
             text.verticalOverflow   = VerticalWrapMode.Overflow;
             text.raycastTarget      = false;
-
-            var f = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (f == null) f = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            text.font = f;
+            text.font               = UiGfx.ChunkyFont();
+            UiGfx.AddShadow(text);
             return text;
         }
 

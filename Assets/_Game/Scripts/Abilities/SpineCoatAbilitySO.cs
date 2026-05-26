@@ -20,6 +20,8 @@ namespace CluckWars.Abilities
         [Tooltip("Knockback impulse (world-units/sec) pushed onto the attacker on reflect. 0 = no knockback.")]
         [Min(0f)] public float ReflectKnockback = 8f;
 
+        protected override string DefaultIcon => "🦔";
+
         public override void OnActivate(AbilityContext ctx)
         {
             ctx.Controller.ReflectDamage               = true;

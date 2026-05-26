@@ -26,6 +26,8 @@ namespace CluckWars.Abilities
         [Tooltip("Knockback impulse strength (world-units/sec) applied to the hit target.")]
         [Min(0f)] public float KnockbackStrength = 6f;
 
+        protected override string DefaultIcon => "🐦";
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;

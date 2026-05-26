@@ -23,6 +23,8 @@ namespace CluckWars.Abilities
         [Tooltip("How much cargo to steal. Capped to the victim's actual cargo and the thief's free space.")]
         [Min(1f)] public float StealAmount = 5f;
 
+        protected override string DefaultIcon => "🤏";
+
         public override void OnActivate(AbilityContext ctx)
         {
             var thief = ctx.Controller;

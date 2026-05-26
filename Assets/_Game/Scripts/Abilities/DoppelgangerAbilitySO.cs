@@ -26,6 +26,8 @@ namespace CluckWars.Abilities
         [Tooltip("Lateral offset from the caster where the decoy spawns. Side-step so it isn't sitting on top of the caster.")]
         [Min(0f)] public float SideOffset = 1.2f;
 
+        protected override string DefaultIcon => "👥";
+
         public override void OnActivate(AbilityContext ctx)
         {
             if (_decoyPrefab == null) return;

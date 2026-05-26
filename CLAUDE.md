@@ -29,6 +29,7 @@ should rarely need edits.
 | **How do I build / run / diagnose?** Build menu shortcuts, debug HUD (F1), adb logcat commands, source-tag reference, diagnostic flows per bug type. | `docs/TESTING.md` |
 | **What's the plan, what's shipped, what's next?** Per-phase status, dedicated test session work list. | `docs/ROADMAP.md` |
 | **Why does the design look like this?** GDD / TDD / ART. | `docs/GDD.md` / `docs/TDD.md` / `docs/ART.md` |
+| **How does the open-source Unity MCP work?** MCP architecture, UI Toolkit rules, asset structure, and Claude integration. | `docs/UNITY_MCP_GUIDE.md` |
 
 ---
 
@@ -49,7 +50,7 @@ When you begin a session:
 - `Cluck Wars / Build / Windows + Android` (`Ctrl+Shift+B`) in the Unity Editor builds both targets to `Builds/`.
 - F1 in-game toggles the Debug HUD.
 - `adb logcat -s Unity:* CluckWars:*` for Android device logs.
-- **Unity MCP** is configured — agents can call Unity Editor APIs directly (scene inspection, asset queries, etc.). See `docs/TESTING.md § Unity MCP` for setup details.
+- **Unity MCP** (Open-source `IvanMurzak/Unity-MCP`) is configured — agents can call Unity Editor APIs directly (scene inspection, asset queries, etc.). See `docs/UNITY_MCP_GUIDE.md` for setup and architecture details.
 
 Full diagnostic playbook: `docs/TESTING.md`.
 

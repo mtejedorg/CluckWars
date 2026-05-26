@@ -27,6 +27,8 @@ namespace CluckWars.Abilities
         [Tooltip("Speed multiplier applied to chickens inside the aura (< 1 = slower).")]
         [Range(0.1f, 0.9f)] public float AuraSlowFactor = 0.55f;
 
+        protected override string DefaultIcon => "💨";
+
         public override void OnActivate(AbilityContext ctx)
         {
             var c = ctx.Controller;

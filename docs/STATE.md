@@ -112,6 +112,31 @@ All bound app-wide in `ProjectInstaller`. Empty asset slots bind a runtime-empty
 - `Cluck Wars / Build / Reveal Builds Folder`.
 - `Cluck Wars / Balance / Balance Editor` — Editor window: editable table of all 4 `ChickenStatsSO` assets (HP / Spd / Turn / Cap / Rate — Attack fields removed in v0.3) + all 8 `AbilityBaseSO` assets (Duration / Cooldown / AccentColor). "Save All ★" flushes dirty assets. Auto-discovers assets — no list to maintain.
 - **F2 in-game toggle** in `DebugHud` — runtime Balance panel (right side of screen): class stats table from `ChickenClassRegistrySO` + local chicken's equipped ability timings (Duration / Cooldown, active slot indicator).
+- **MemPalace integration**: Local AI memory system installed in `.venv`. Configured with `mempalace.yaml`, `entities.json`, and `C:\Users\MARCO\.mempalace\identity.txt`. Mined 111 files including gitignored ones (like `.claude/skills/*/SKILL.md`) using `.venv\Scripts\mempalace mine --include-ignored .claude .`. Run `.venv\Scripts\mempalace wake-up` to load context.
+
+### v0.3.2 — UI v3 design pass (Design.zip)
+
+Applied the newest design wireframes (`cluckwars-hud-v3` / `-charselect-v3` / `-ability-ref` / `-tokens-v3`) to the code-driven UGUI. ART.md replaced with the design author's richer v0.3 spec and reconciled to the v3 wireframes (no attack button, control-state overlays, ability icons). GDD §6.4/§7.2 annotated with icons + overlay note.
+
+- **Ability icons**: `AbilityBaseSO` gained an `Icon` (emoji glyph) field + `ResolveIcon()` + per-subclass `DefaultIcon`. All 14 ability subclasses carry their design-v3 glyph (🪽⚡🐦🌀🪤💨🌱🥚🐢🦔💨👻👥🤏). Existing `.asset`s need no re-authoring — blank `Icon` falls back to the subclass default.
+- **TouchControlsHud**: hex ability buttons rebuilt to design v3 — centered icon glyph + short label, top-left slot-index badge (`1`/`2`/gold `★3`), centered seconds-remaining cooldown number, accent tint from `AbilityBaseSO.AccentColor`, icon dims on cooldown. Slot 3 hidden unless an ability is equipped in slot 2 (Assassin). MOBA arc positions: 2-ability stack / 3-ability triangle. Per-slot refs refactored into an `AbilityBtn[3]` struct array.
+- **MatchHud**: leaderboard rows now show ordinal rank (`1st`–`4th`); added a `★ FIRST TO N` win-target badge under the panel (N from `MatchConfigSO.FoodTargetToWin`).
+- **CharacterSelectController**: ability cards prefix the icon glyph; each class card shows its passive (name + one-line desc — Tough/Slippery/Immovable/Combo). Cards row height bumped to fit.
+
+**Real fonts shipped**: `Assets/_Game/Resources/Fonts/` now contains the actual **Lilita One** (headings/labels), **Nunito** (body/descriptions), and **Noto Emoji monochrome** (ability icon glyphs) `.ttf`s, loaded at runtime via `Resources.Load<Font>`. No OS-font dependency. `UiGfx.ChunkyFont/BodyFont/EmojiFont` resolve them (OS/built-in fallback only if the Resources load fails).
+
+**TMP for emoji icons**: legacy `UnityEngine.UI.Text` cannot render supplementary-plane emoji (🪽 = U+1FABD, 🪤, etc.), so the **ability icon glyphs use TextMeshPro** (`UiGfx.AddIcon` builds a runtime `TMP_FontAsset` from Noto Emoji and renders the glyph, accent-tinted). A `[InitializeOnLoad]` editor script (`Editor/TmpEssentialsAutoImport.cs`) auto-imports **TMP Essential Resources** on first compile so this works without the manual `Window ▸ TextMeshPro ▸ Import…` step. All other (BMP) text stays on legacy Text with the real Lilita One / Nunito.
+
+**Procedural chicken art**: `UiGfx.Chicken(classKey)` bakes a per-class chicken figure (gradient body, head, comb, beak, eye, legs, shadow; class silhouette + colors from design v3) into a cached sprite — shown on every class card.
+
+**Glossy visual rebuild (`UiGfx`)**: `Assets/_Game/Scripts/UI/UiGfx.cs` bakes rounded-rect / hexagon / circle / gloss-gradient / chicken sprites **procedurally at runtime** (no imported sprite assets needed) + the spec's text drop-shadow. Applied across all three code-driven UIs:
+- **CharacterSelectController**: glossy rounded wood panel + gold ribbon title, glossy gradient class cards (class-color strip + gold selection glow), glossy accent-tinted ability cards, gold/green gradient buttons, rounded input fields, glossy lobby-browser panel. Class cards now use ignored-layout `GlossyBg` children + manual selection visuals (Button transition = None, clicks bubble from the bg frame).
+- **TouchControlsHud**: ability buttons are now **pointy-top hexagons** (procedural hex sprite) with hex-masked radial cooldown; joystick base/knob and slot badges are real circles; chunky font + shadows.
+- **MatchHud**: rounded glossy panels (leaderboard, timer, local stats, overlays), rounded target badge + buttons, chunky font + shadows.
+
+**Still deferred from the full design** (next steps, not blockers): on-character control-state overlays (stars/vines/motion-lines/nameplate badges — ART §6.10), match-end/lobby/intro overlay art (crown, medals, ribbons, winner chicken), and moving HP/cargo bars fully onto the world chicken (§6.3 — `ChickenNameplate` already carries the world-space cargo line). A couple of the newest emoji (🪽 wing, 🪤 trap) may show a fallback box if the bundled Noto Emoji build lacks that codepoint; everything else renders.
+
+**Pending Maestro (optional polish)**: align each ability `.asset`'s `AccentColor` to the ART.md §3 v3 hexes if desired; import Lilita One + Nunito + an emoji sprite asset as TMP fonts to render glyphs and the glossy type.
 
 ---
 

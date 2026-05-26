@@ -13,6 +13,8 @@ namespace CluckWars.Abilities
         [Tooltip("Multiplier applied to MoveSpeed while active. 2.5 ≈ doubled top speed without feeling teleporty.")]
         [Min(1f)] public float SpeedMultiplier = 2.5f;
 
+        protected override string DefaultIcon => "💨";
+
         public override void OnActivate(AbilityContext ctx)
         {
             ctx.Controller.MoveSpeedMultiplier = SpeedMultiplier;

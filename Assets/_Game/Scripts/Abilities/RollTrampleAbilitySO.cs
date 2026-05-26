@@ -29,6 +29,8 @@ namespace CluckWars.Abilities
         [Tooltip("Base damage dealt to each chicken in the sweep. Scaled up by Warrior's Tough passive.")]
         [Min(1f)] public float TrampleDamage = 200f;
 
+        protected override string DefaultIcon => "🪽";
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;
