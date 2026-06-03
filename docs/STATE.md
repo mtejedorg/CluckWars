@@ -244,6 +244,7 @@ All require real-device or playtest data; queued so they don't get done piecemea
 ## Recent commits (most recent first)
 
 ```
+508f6e6 Fix: NullUGSService join case bug + build menu restore-target + test docs
 0772810 Part B — B3/B4/B5: bot AI, ability grid UI, cooldown grey-out
 c3f70c9 Part B — B2: new ability SOs + SpineCoat knockback
 b120170 Part B — B1: interaction primitives (knockback, root, placed zones)
