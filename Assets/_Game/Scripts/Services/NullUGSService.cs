@@ -26,7 +26,7 @@ namespace CluckWars.Services
             Task.FromResult(OfflineLobby);
 
         public Task<LobbyInfo> JoinLobbyByCodeAsync(string joinCode) =>
-            Task.FromResult(new LobbyInfo("offline", "Offline", joinCode.Trim().ToUpper(), 1, 4));
+            Task.FromResult(new LobbyInfo("offline", "Offline", joinCode.Trim(), 1, 4));
 
         public Task<LobbyInfo> JoinLobbyAsync(LobbyInfo lobby) =>
             Task.FromResult(lobby);

@@ -92,6 +92,22 @@ All tags pushed to origin.
 - **Cargo feedback**: `MatchHud` cargo bar shifts gold→orange→red, shows "FULL → RETURN TO BASE!" label at capacity. `ChickenNameplate` adds a world-space cargo line (`3/10`, orange ≥70%, red "■ FULL!"). `ChickenVFX` adds a looping gold orbit ring (`VFX_CargoFull`) while cargo is at capacity.
 - **Base tinting**: `PlayerBase.LateUpdate` polls `Owner` each frame and applies corner-indexed colors (Orange/Blue/Pink/Teal) via `MaterialPropertyBlock` + direct material fallback. Replaced a broken `ChangeDetector + Render()` approach that silently skipped locally-written `[Networked]` props in `GameMode.Single`.
 
+### Playtest fix (2026-06-01) — food collection range (game-breaking)
+- **Food collection was completely broken** (found via MCP playtest): no chicken — bot or human — could ever drain a pile, so every match ran the full 3 min and ended 0–0–0–0 on the timer. The match-end + auto-restart path handled the all-zero tie without errors, which is why it had gone unnoticed.
+- **Root cause:** `ChickenCargo.FindNearestPileInRange` / `FindNearestPickupInRange` / `FindNearestBaseInRange` compared the **full 3D distance** (`sqrMagnitude`) against the tuned radius, but a chicken's pivot floats ~1 unit above pile/base pivots (capsule centre). Bots parked at their arrival distance (~1.45 horizontal) from a 1.6-radius pile, yet the 3D distance was ~1.8 → always out of range. (Deposit's generous 2.5 radius happened to absorb the ~1 u Y offset, masking the same latent bug there — which is why the v0.3.1 "deposit fix" looked fine but collection never got the same treatment.)
+- **Fix:** added `HorizontalSqr(a,b)` (XZ-only squared distance) and routed all three proximity gates through it — Y no longer gates interaction. Verified live in play mode: bots immediately began draining piles, filling cargo, and depositing; leaderboard climbed to 27 / 18 / 9 within ~20 s. Clean compile, no new errors.
+
+### Menu UI pass (2026-06-01) — lobby redesign + char-select polish
+- **Match Lobby rebuilt to the landscape design** (`Design/cluckwars-overlays-v3.jsx` `CWLobbyV3L`): 300px settings rail (MATCH LOBBY ribbon, host-only INVITE CODE card with gold letter tiles + SHARE/COPY, MATCH SETTINGS card, status pill, START + BACK) and a **2×2 player-card grid**. Cards are player-colored (Okabe-Ito P1 orange / P2 blue / P3 pink / P4 teal): accent bar, baked chicken sprite, name + Pn + HOST/CPU badge, `CLASS · PASSIVE`, ability mini-hexes (dashed for empty slots), and READY/PICKING badge. Solo fills 3 CPU bots (DashFox/BrunoB/PeckNoir); Host/Join show "WAITING FOR Pn" seats. Host pre-creates the UGS lobby and populates the code tiles; COPY/SHARE write the code to the clipboard. New markup `Assets/UI/Lobby.uxml`, styles in `CluckWarsTheme.uss` (`.cw-lobby-*`, `.cw-player-*`, `.cw-code-tile`, `.cw-status-*`), data wiring in `MenuUiController` (`BuildPlayerGrid`/`MakeLobbyCard`/`MakeMiniHex`/`SetCodeTiles`/`UpdateLobbyStatus`).
+- **Character Select polish**: selected class chip now carries a faint class-color wash (not just a tinted border); equipped ability cards show a numbered slot badge (1/2/3) tinted to the ability accent — both per design `CWCharacterSelectV3L`. Softened the shared Gloss sheen on lobby rail cards so they read as dark surfaces instead of a bright grey band.
+- Verified live (play mode, MCP screenshots): Solo lobby renders the 2×2 grid with correct per-class data; Assassin char-select shows ★S3 + numbered badges; no runtime exceptions.
+
+### On-device fix (2026-06-01) — menu UI overflowed on the phone (PanelSettings scale mode)
+- **Symptom:** on a Pixel 9 (real-device test), the menu UI rendered ~2.6× too large — Character Select's whole right column (ability grid + READY) was pushed off-screen, unusable. In the Editor at the same 2424×1080 resolution it looked perfect, which isolated it to **scaling, not layout**.
+- **Root cause:** `Assets/Resources/PanelSettings.asset` had `m_ScaleMode: 1` = **ConstantPhysicalSize**, which scales the UI by **screen DPI** (Editor ≈96 dpi → ×1.0; Pixel 9 ≈420 dpi → ×~2.6). The `m_ReferenceResolution 1920×1080` + `m_Match 0.5` were set but **ignored** in that mode.
+- **Fix:** `m_ScaleMode: 2` = **ScaleWithScreenSize** → UI now scales by resolution, so the phone renders like the Editor at the same resolution. Verified in-Editor at 2424×1080 (Pixel 9 landscape): Character Select and Lobby both fit fully. **Requires an APK rebuild to verify on device** (PanelSettings is baked into the player build).
+- Tooling note: a co-op test skill was added at `.claude/skills/coop-test/SKILL.md` (`/coop-test`) for PC-Editor + Android-phone Photon testing. Driving the phone menu via `adb input tap` is unreliable (landscape app on a portrait `ROTATION_0` display → coordinate-space mismatch); have a human do phone-side taps, or drive only single gestures (joystick swipes).
+
 ### Map / camera
 - `MapGenerator`: procedural plane + 4 invisible boundary walls + 4 corner bases + 1 large center pile + N small piles on a jittered ring. All master-spawned.
 - Spawn points coincide with base positions (`Vector3.Lerp(corner, origin, 0.15)`); chickens spawn at their base.
@@ -203,9 +219,10 @@ Pre-existing Maestro tasks still pending:
 
 ## Known bugs / open questions (need device testing)
 
-1. **Third player can't connect** (reported 2026-05-08). Connect callbacks now log every transition — next test should reveal whether it's `OnConnectFailed`, region mismatch, or session-name collision.
-2. **Solo-on-Android movement** (reported 2026-05-08, may already be fixed). Was: chicken doesn't move with joystick. Likely root cause: spawn collision drift, addressed by spawn jitter + base-aligned spawns. Verify after rebuild.
-3. **Spawn-stacking** (reported 2026-05-08, mitigated). `MapGenerator.ComputeSpawnPoints` now warns if `_baseCornerDistance < 1`. Spawn jitter in `MatchBootstrapper.HandlePlayerJoined` breaks symmetry even if positions collide.
+1. ~~**Join case-sensitivity**~~ **FIXED (2026-06-03)** — `NullUGSService.JoinLobbyByCodeAsync` was uppercasing the join code to "CLUCK-LAN" while host used lowercase "cluck-lan". Photon room names are case-sensitive so the two clients never met. Fix: removed `.ToUpper()` from `JoinLobbyByCodeAsync` — both sides now use the code verbatim (lowercase).
+2. **Third player can't connect** (reported 2026-05-08). **Retest after bug-1 fix** — the case mismatch was the prime suspect. Connect callbacks log every transition since v0.3.1.
+3. **Solo-on-Android movement** (reported 2026-05-08, may already be fixed). Was: chicken doesn't move with joystick. Likely root cause: spawn collision drift, addressed by spawn jitter + base-aligned spawns. Verify after rebuild on Pixel 9.
+4. **Spawn-stacking** (reported 2026-05-08, mitigated). `MapGenerator.ComputeSpawnPoints` now warns if `_baseCornerDistance < 1`. Spawn jitter in `MatchBootstrapper.HandlePlayerJoined` breaks symmetry even if positions collide.
 
 ---
 

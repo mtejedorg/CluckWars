@@ -44,7 +44,33 @@ namespace CluckWars.EditorTools
             Build(BuildTarget.Android, AndroidSubdir, apkName);
         }
 
-        [MenuItem("Cluck Wars/Build/Windows + Android %#b", priority = 3)]
+        [MenuItem("Cluck Wars/Build/Android (Emulator)", priority = 4)]
+        public static void BuildAndroidEmulator()
+        {
+            // Unity 6000.3+: AndroidArchitecture.X86_64 is internally "x86-64 (Magic Leap)"
+            // and is rejected by BuildPipeline.BuildPlayer. ARM64-only APK runs on modern
+            // Android 12+ emulators via the native ARM translation bridge.
+            ConfigureAndroidPlayerSettings();
+            Debug.Log($"{LogTag} Emulator build: ARM64 (x86_64 removed — Unity 6 treats it as Magic Leap).");
+            var apkName = $"CluckWars-{SanitizedVersion()}-emu.apk";
+            Build(BuildTarget.Android, AndroidSubdir, apkName);
+        }
+
+        [MenuItem("Cluck Wars/Build/Android + Restore Windows Target", priority = 3)]
+        public static void BuildAndroidAndRestoreTarget()
+        {
+            BuildAndroid();
+            // Switch back so subsequent Editor play-mode sessions and MCP calls
+            // work without the domain-reload stall caused by the Android target switch.
+            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.StandaloneWindows64)
+            {
+                Debug.Log($"{LogTag} Restoring build target → StandaloneWindows64.");
+                EditorUserBuildSettings.SwitchActiveBuildTarget(
+                    BuildTargetGroup.Standalone, BuildTarget.StandaloneWindows64);
+            }
+        }
+
+        [MenuItem("Cluck Wars/Build/Windows + Android %#b", priority = 5)]
         public static void BuildAll()
         {
             BuildWindows();

@@ -31,6 +31,29 @@ The Android build forces:
 - **Android SDK + NDK + JDK** — either bundle with the Editor install (default), or point Unity at your own in `Edit / Preferences / External Tools`.
 - **Photon AppId** already configured at `Assets/Photon/Fusion/Resources/PhotonAppSettings.asset` → `AppIdFusion = 259bda28-…`. Both peers need the same AppId to be matchmade.
 
+### Known gotchas
+
+**Emulator ARM limitation (Unity 6)**
+The `google_apis;android-34;x86_64` AVD (`cluck_emu`) has no ARM64 native bridge.
+ARM64-only IL2CPP APKs crash silently at launch — zero Unity logs appear in logcat.
+Use the real Pixel 9 (`adb -s 57080DLAQ0030B`) for all gameplay tests. The emulator
+is useful for adb scripting practice but cannot run the APK.
+
+**`AndroidArchitecture.X86_64` = Magic Leap in Unity 6**
+`AndroidArchitecture.X86_64` (value 8) maps to "x86-64 (Magic Leap)" in Unity 6000.3+
+and is rejected by `BuildPipeline.BuildPlayer` with a `UnityException`. The
+`Cluck Wars / Build / Android (Emulator)` menu item has been updated to ARM64-only.
+
+**MCP saturation after Android build**
+`Cluck Wars/Build/Android` (Ctrl+Shift+A) switches the active build target to Android,
+triggering a full domain reload. If MCP calls follow immediately, they queue and expire —
+the IvanMurzak command cache floods with `[Command Cache] Cleaned 60 expired entries`
+in `%LOCALAPPDATA%\Unity\Editor\Editor.log` and all tool calls time out for ~2 minutes.
+
+**Workaround:** use `Cluck Wars/Build/Android + Restore Windows Target` — it builds then
+switches back to Windows, keeping MCP responsive. If already stuck, wait for
+`[Command Cache] Cleaned` to stop repeating, then reconnect.
+
 ---
 
 ## Unity MCP (agent ↔ Editor bridge)
