@@ -194,6 +194,21 @@ namespace CluckWars.Gameplay
             _log?.Debug(Source, $"Deposited {dropped:0.00} at {playerBase.name}.");
         }
 
+        /// <summary>
+        /// Squared horizontal (XZ) distance. Collection/pickup/deposit proximity is a
+        /// ground-plane test: a chicken's pivot floats ~1 unit above pile/base pivots
+        /// (capsule centre), so a full 3D distance pushes an in-range chicken outside the
+        /// tuned radius and the interaction silently never fires. Playtest evidence: bots
+        /// parked ~1.45 horizontal from a 1.6-radius pile, but 3D distance was ~1.8 → no
+        /// pile ever drained, no one could score. Comparing XZ only fixes it robustly.
+        /// </summary>
+        private static float HorizontalSqr(Vector3 a, Vector3 b)
+        {
+            float dx = a.x - b.x;
+            float dz = a.z - b.z;
+            return dx * dx + dz * dz;
+        }
+
         private FoodPile FindNearestPileInRange()
         {
             int hitCount = Physics.OverlapSphereNonAlloc(transform.position, _searchRadius, _overlapHits, _searchMask, QueryTriggerInteraction.Collide);
@@ -204,7 +219,7 @@ namespace CluckWars.Gameplay
                 var col = _overlapHits[i];
                 var pile = col.GetComponentInParent<FoodPile>();
                 if (pile == null) continue;
-                float sqr = (pile.transform.position - transform.position).sqrMagnitude;
+                float sqr = HorizontalSqr(pile.transform.position, transform.position);
                 float r = pile.CollectRadius;
                 if (sqr > r * r) continue;
                 if (sqr < bestSqr)
@@ -226,7 +241,7 @@ namespace CluckWars.Gameplay
                 var col = _overlapHits[i];
                 var pickup = col.GetComponentInParent<FoodPickup>();
                 if (pickup == null || pickup.IsEmpty) continue;
-                float sqr = (pickup.transform.position - transform.position).sqrMagnitude;
+                float sqr = HorizontalSqr(pickup.transform.position, transform.position);
                 float r = pickup.PickupRadius;
                 if (sqr > r * r) continue;
                 if (sqr < bestSqr)
@@ -249,7 +264,7 @@ namespace CluckWars.Gameplay
                 var b = bases[i];
                 if (b == null || b.Object == null || !b.Object.IsValid) continue;
                 if (b.Owner != ownerRef) continue;
-                float sqr = (b.transform.position - transform.position).sqrMagnitude;
+                float sqr = HorizontalSqr(b.transform.position, transform.position);
                 float r   = b.DepositRadius;
                 if (sqr > r * r) continue;
                 if (sqr < bestSqr) { bestSqr = sqr; best = b; }
