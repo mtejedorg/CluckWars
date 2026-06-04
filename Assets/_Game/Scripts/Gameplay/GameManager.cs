@@ -461,14 +461,14 @@ namespace CluckWars.Gameplay
                     if (player.IsRealPlayer)
                     {
                         int cornerIdx = Mathf.Abs(player.PlayerId) % spawnPoints.Count;
-                        ctrl.RPC_TeleportTo(spawnPoints[cornerIdx]);
+                        ctrl.RPC_TeleportTo(spawnPoints[cornerIdx] + Vector3.up * 0.05f);
                     }
                     else if (ctrl.IsBot)
                     {
                         // Assign bots to corners 1, 2, 3 in order (same as initial spawn).
                         int botCorner = botCornerCounter % spawnPoints.Count;
                         botCornerCounter++;
-                        ctrl.RPC_TeleportTo(spawnPoints[botCorner]);
+                        ctrl.RPC_TeleportTo(spawnPoints[botCorner] + Vector3.up * 0.05f);
                     }
                 }
             }
