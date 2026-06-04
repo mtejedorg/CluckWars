@@ -1,0 +1,112 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
+
+    <ui:VisualElement name="CharacterSelectPage" class="cw-screen cw-page">
+
+        <!-- Header ribbon (+ home button, absolutely placed top-left) -->
+        <ui:VisualElement style="align-items: center; justify-content: center; padding-top: 12px; padding-bottom: 8px; flex-shrink: 0;">
+            <ui:Button name="HomeBtn" text="◀ HOME" class="cw-home-btn" />
+            <ui:VisualElement class="cw-ribbon">
+                <ui:Label text="CHOOSE YOUR CHICKEN" class="cw-title" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Body -->
+        <ui:VisualElement name="Body" class="cw-cs-body" style="padding-left: 12px; padding-right: 12px; padding-bottom: 8px;">
+
+            <!-- Column A: class chips (chicken art assigned by controller) -->
+            <ui:VisualElement name="ClassList" class="cw-cs-classes">
+                <ui:VisualElement name="ClassWarrior" class="cw-class-chip">
+                    <ui:VisualElement name="ClassWarriorArt" class="cw-class-chip__art" />
+                    <ui:VisualElement style="flex-grow: 1;">
+                        <ui:Label text="WARRIOR" class="cw-class-chip__name" />
+                        <ui:Label text="All-Rounder" class="cw-class-chip__role" />
+                    </ui:VisualElement>
+                    <ui:Label text="x2" class="cw-slot-pill" />
+                </ui:VisualElement>
+                <ui:VisualElement name="ClassSpeedy" class="cw-class-chip">
+                    <ui:VisualElement name="ClassSpeedyArt" class="cw-class-chip__art" />
+                    <ui:VisualElement style="flex-grow: 1;">
+                        <ui:Label text="SPEEDY" class="cw-class-chip__name" />
+                        <ui:Label text="Hit &amp; Run" class="cw-class-chip__role" />
+                    </ui:VisualElement>
+                    <ui:Label text="x2" class="cw-slot-pill" />
+                </ui:VisualElement>
+                <ui:VisualElement name="ClassFatty" class="cw-class-chip">
+                    <ui:VisualElement name="ClassFattyArt" class="cw-class-chip__art" />
+                    <ui:VisualElement style="flex-grow: 1;">
+                        <ui:Label text="FATTY" class="cw-class-chip__name" />
+                        <ui:Label text="Bulk Carrier" class="cw-class-chip__role" />
+                    </ui:VisualElement>
+                    <ui:Label text="x2" class="cw-slot-pill" />
+                </ui:VisualElement>
+                <ui:VisualElement name="ClassAssassin" class="cw-class-chip">
+                    <ui:VisualElement name="ClassAssassinArt" class="cw-class-chip__art" />
+                    <ui:VisualElement style="flex-grow: 1;">
+                        <ui:Label text="ASSASSIN" class="cw-class-chip__name" />
+                        <ui:Label text="Disruptor" class="cw-class-chip__role" />
+                    </ui:VisualElement>
+                    <ui:Label text="★3" class="cw-slot-pill cw-slot-pill--star" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <!-- Column B: preview (chicken sprite + disc tint assigned by controller) -->
+            <ui:VisualElement name="Preview" class="cw-cs-preview" style="align-items: center;">
+                <ui:VisualElement style="width: 100%; height: 160px; align-items: center; justify-content: center;">
+                    <ui:VisualElement name="PreviewGlow" class="cw-radial-glow" style="width: 190px; height: 190px;" />
+                    <ui:VisualElement name="PreviewDisc" class="cw-preview-disc">
+                        <ui:VisualElement name="PreviewChicken" class="cw-chicken" style="width: 122px; height: 122px;" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:Label name="PreviewName" text="WARRIOR CHICKEN" class="cw-heading" style="font-size: 18px;" />
+                <ui:Label name="PreviewPassive" text="PASSIVE · TOUGH" class="cw-slot-pill" style="margin-top: 4px; margin-bottom: 4px; font-size: 11px;" />
+                <ui:Label name="PreviewDesc" text="Deals increased ability damage." class="cw-body" style="-unity-text-align: middle-center; font-size: 12px;" />
+
+                <ui:VisualElement name="StatList" class="cw-stat-grid" style="width: 100%; margin-top: 10px; padding-left: 4px; padding-right: 4px;">
+                    <ui:VisualElement name="StatCargo" class="cw-stat-row">
+                        <ui:Label text="CARGO" class="cw-stat-label" />
+                        <ui:VisualElement class="cw-stat-pips">
+                            <ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="StatRate" class="cw-stat-row">
+                        <ui:Label text="RATE" class="cw-stat-label" />
+                        <ui:VisualElement class="cw-stat-pips">
+                            <ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="StatHp" class="cw-stat-row">
+                        <ui:Label text="HP" class="cw-stat-label" />
+                        <ui:VisualElement class="cw-stat-pips">
+                            <ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="StatResist" class="cw-stat-row">
+                        <ui:Label text="RESIST" class="cw-stat-label" />
+                        <ui:VisualElement class="cw-stat-pips">
+                            <ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="StatSpeed" class="cw-stat-row">
+                        <ui:Label text="SPEED" class="cw-stat-label" />
+                        <ui:VisualElement class="cw-stat-pips">
+                            <ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <!-- Column C: detail (slots + grid + ready) -->
+            <ui:VisualElement name="Detail" class="cw-cs-detail">
+                <ui:VisualElement class="cw-well" style="padding-top: 18px; padding-bottom: 10px; padding-left: 8px; padding-right: 8px; margin-bottom: 8px; position: relative;">
+                    <ui:Label name="EquippedLabel" text="EQUIPPED · 0/2" class="cw-equipped-tab" />
+                    <ui:VisualElement name="SlotRow" style="flex-direction: row; justify-content: center; align-items: flex-start;" />
+                </ui:VisualElement>
+
+                <ui:ScrollView name="AbilityGrid" class="cw-well" style="flex-grow: 1; padding-left: 6px; padding-right: 6px; padding-top: 4px; padding-bottom: 4px; margin-bottom: 8px;" />
+
+                <ui:Button name="ReadyBtn" text="PICK 2 ABILITIES" class="cw-btn cw-btn--neutral" style="flex-shrink: 0; letter-spacing: 3px;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

@@ -1035,11 +1035,16 @@ namespace CluckWars.UI
         {
             var go  = CreateUI(name, parent, out _);
             var img = go.AddComponent<Image>();
-            img.sprite        = UiGfx.Rounded(12);
-            img.type          = Image.Type.Sliced;
-            img.pixelsPerUnitMultiplier = 1f;
             img.color         = baseColor;
             img.raycastTarget = true;
+            
+            go.AddComponent<SDFImageEffect>();
+            var mat = new Material(Shader.Find("CluckWars/UI/SDF"));
+            mat.SetColor("_Color", Color.white);
+            mat.SetFloat("_Radius", 12f);
+            mat.SetColor("_BorderColor", new Color(Mathf.Min(1f, baseColor.r * 1.2f), Mathf.Min(1f, baseColor.g * 1.2f), Mathf.Min(1f, baseColor.b * 1.2f), 1f));
+            mat.SetFloat("_BorderWidth", 3f);
+            img.material = mat;
 
             var btn = go.AddComponent<Button>();
             btn.targetGraphic = img;
@@ -1100,14 +1105,21 @@ namespace CluckWars.UI
             return go;
         }
 
-        private static void AddBackground(GameObject go, Color color)
+        private static void AddBackground(GameObject go, Color color, float radius = 12f, Color? borderColor = null, float borderWidth = 0f)
         {
             var img = go.AddComponent<Image>();
-            img.sprite        = UiGfx.Rounded(12);   // glossy rounded panel (ART.md §6.1)
-            img.type          = Image.Type.Sliced;
-            img.pixelsPerUnitMultiplier = 1f;
             img.color         = color;
             img.raycastTarget = false; // HUD doesn't eat clicks; TouchControlsHud owns input
+            
+            go.AddComponent<SDFImageEffect>();
+            var mat = new Material(Shader.Find("CluckWars/UI/SDF"));
+            mat.SetColor("_Color", Color.white);
+            mat.SetFloat("_Radius", radius);
+            if (borderColor.HasValue) {
+                mat.SetColor("_BorderColor", borderColor.Value);
+                mat.SetFloat("_BorderWidth", borderWidth);
+            }
+            img.material = mat;
         }
 
         private static Text AddText(Transform parent, string name, string content,

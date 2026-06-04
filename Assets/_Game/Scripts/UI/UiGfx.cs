@@ -459,39 +459,44 @@ namespace CluckWars.UI
         {
             var frame = go.GetComponent<Image>();
             if (frame == null) frame = go.AddComponent<Image>();
-            frame.sprite = Rounded(radius);
-            frame.type   = Image.Type.Sliced;
-            frame.color  = border;
+            frame.color  = fill;
             frame.pixelsPerUnitMultiplier = 1f;
 
-            var fillGO = new GameObject("Fill", typeof(RectTransform));
-            fillGO.transform.SetParent(go.transform, false);
-            var fillRT = (RectTransform)fillGO.transform;
-            fillRT.anchorMin = Vector2.zero; fillRT.anchorMax = Vector2.one;
-            fillRT.offsetMin = new Vector2(borderPx, borderPx);
-            fillRT.offsetMax = new Vector2(-borderPx, -borderPx);
-            var fillImg = fillGO.AddComponent<Image>();
-            fillImg.sprite = Rounded(Mathf.Max(2, radius - borderPx));
-            fillImg.type   = Image.Type.Sliced;
-            fillImg.color  = fill;
-            fillImg.pixelsPerUnitMultiplier = 1f;
-            fillImg.raycastTarget = false;
-
-            if (gloss)
-            {
-                var glossGO = new GameObject("Gloss", typeof(RectTransform));
-                glossGO.transform.SetParent(fillGO.transform, false);
-                var gRT = (RectTransform)glossGO.transform;
-                gRT.anchorMin = Vector2.zero; gRT.anchorMax = Vector2.one;
-                gRT.offsetMin = Vector2.zero; gRT.offsetMax = Vector2.zero;
-                var gImg = glossGO.AddComponent<Image>();
-                gImg.sprite = Gloss();
-                gImg.type   = Image.Type.Simple;
-                gImg.color  = Color.white;
-                gImg.raycastTarget = false;
+            var sdf = go.GetComponent<SDFImageEffect>();
+            if (sdf == null) sdf = go.AddComponent<SDFImageEffect>();
+            
+            var mat = new Material(Shader.Find("CluckWars/UI/SDF"));
+            mat.SetColor("_Color", Color.white);
+            mat.SetFloat("_Radius", radius);
+            if (borderPx > 0) {
+                mat.SetColor("_BorderColor", border);
+                mat.SetFloat("_BorderWidth", borderPx);
             }
+            frame.material = mat;
 
-            return fillImg;
+            return frame;
+        }
+
+        public static Image StyleHexagon(GameObject go, Color fill, Color border, int borderPx = 3)
+        {
+            var frame = go.GetComponent<Image>();
+            if (frame == null) frame = go.AddComponent<Image>();
+            frame.color  = fill;
+            frame.pixelsPerUnitMultiplier = 1f;
+
+            var sdf = go.GetComponent<SDFImageEffect>();
+            if (sdf == null) sdf = go.AddComponent<SDFImageEffect>();
+            
+            var mat = new Material(Shader.Find("CluckWars/UI/SDF"));
+            mat.SetColor("_Color", Color.white);
+            mat.SetFloat("_Shape", 1f); // 1 = Hexagon
+            if (borderPx > 0) {
+                mat.SetColor("_BorderColor", border);
+                mat.SetFloat("_BorderWidth", borderPx);
+            }
+            frame.material = mat;
+
+            return frame;
         }
     }
 }

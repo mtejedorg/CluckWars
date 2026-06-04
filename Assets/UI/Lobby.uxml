@@ -1,0 +1,78 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
+
+    <ui:VisualElement name="LobbyPage" class="cw-screen">
+
+        <!-- Ambient corner glow (design §LobbyL) -->
+        <ui:VisualElement class="cw-radial-glow" style="top: -15%; left: -12%; width: 55%; height: 130%; opacity: 0.5;" />
+
+        <ui:VisualElement class="cw-lobby-body">
+
+            <!-- ─ LEFT RAIL: ribbon + invite + settings + status + start ─ -->
+            <ui:VisualElement name="LobbyRail" class="cw-lobby-rail">
+
+                <ui:VisualElement style="align-items: flex-start; margin-bottom: 4px;">
+                    <ui:VisualElement class="cw-ribbon">
+                        <ui:Label text="MATCH LOBBY" class="cw-title" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- Invite code (host mode) -->
+                <ui:VisualElement name="InviteCard" class="cw-card cw-lobby-card">
+                    <ui:Label text="INVITE CODE · TAP TO COPY" class="cw-lobby-cardlabel" />
+                    <ui:VisualElement name="CodeTiles" class="cw-code-tiles" />
+                    <ui:VisualElement class="cw-lobby-btnrow">
+                        <ui:Button name="ShareBtn" text="SHARE" class="cw-mini-btn cw-mini-btn--gold" />
+                        <ui:Button name="CopyBtn" text="COPY" class="cw-mini-btn" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- Join code entry (join mode) -->
+                <ui:VisualElement name="JoinCard" class="cw-card cw-lobby-card cw-hidden">
+                    <ui:Label text="ENTER JOIN CODE" class="cw-lobby-cardlabel" />
+                    <ui:TextField name="LobbyJoinField" class="cw-input" style="margin-top: 6px;" />
+                </ui:VisualElement>
+
+                <!-- Match settings -->
+                <ui:VisualElement class="cw-card cw-lobby-card">
+                    <ui:Label text="MATCH SETTINGS" class="cw-lobby-cardhead" />
+                    <ui:VisualElement class="cw-setting-row">
+                        <ui:Label text="ARENA" class="cw-setting-k" /><ui:Label text="Sunny Farm" class="cw-setting-v" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="cw-setting-row">
+                        <ui:Label text="TIME" class="cw-setting-k" /><ui:Label name="SetTime" text="3:00" class="cw-setting-v" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="cw-setting-row">
+                        <ui:Label text="GOAL" class="cw-setting-k" /><ui:Label name="SetGoal" text="150 food" class="cw-setting-v" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="cw-setting-row">
+                        <ui:Label text="MODE" class="cw-setting-k" /><ui:Label name="SetMode" text="Free-for-all" class="cw-setting-v" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- Status -->
+                <ui:VisualElement name="StatusPill" class="cw-status-pill">
+                    <ui:VisualElement name="StatusDot" class="cw-status-dot" />
+                    <ui:Label name="StatusCount" text="1/4" class="cw-status-count" />
+                    <ui:Label name="StatusText" text="Waiting…" class="cw-status-text" />
+                </ui:VisualElement>
+
+                <ui:VisualElement style="flex-grow: 1; min-height: 8px;" />
+
+                <ui:Button name="StartBtn" text="START MATCH ▶" class="cw-btn cw-btn--green cw-lobby-start" />
+                <ui:Button name="BackBtn" text="◀ BACK" class="cw-lobby-back" />
+                <ui:Label name="LobbyStatus" text="" class="cw-lobby-error" />
+            </ui:VisualElement>
+
+            <!-- ─ RIGHT: 2×2 player grid ─ -->
+            <ui:VisualElement class="cw-lobby-right">
+                <ui:VisualElement class="cw-players-head">
+                    <ui:Label text="PLAYERS" class="cw-players-title" />
+                    <ui:VisualElement class="cw-players-divider" />
+                </ui:VisualElement>
+                <ui:VisualElement name="PlayerGrid" class="cw-player-grid" />
+            </ui:VisualElement>
+
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

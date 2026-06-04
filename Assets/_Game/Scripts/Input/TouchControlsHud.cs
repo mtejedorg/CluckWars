@@ -321,10 +321,7 @@ namespace CluckWars.Input
             rt.anchoredPosition = anchoredPosition;
 
             int hexPx = Mathf.RoundToInt(size);
-            var img = go.AddComponent<Image>();
-            img.sprite = UiGfx.Hex(hexPx);          // pointy-top glossy hex (ART.md §6.6)
-            img.type   = Image.Type.Simple;
-            img.color = _colors.AbilityNormal;
+            var img = UiGfx.StyleHexagon(go, _colors.AbilityNormal, UiGfx.CardBorder, 2);
             img.raycastTarget = true;
             refs.BaseImg = img; // expose for the cooldown grey-out system
 

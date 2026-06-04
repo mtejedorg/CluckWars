@@ -15,6 +15,7 @@ MonoBehaviour:
   DisplayName: Doppelganger
   ShortLabel: DOP
   AccentColor: {r: 0.65, g: 0.40, b: 0.85, a: 1}
+  Category: 3
   Duration: 1.5
   Cooldown: 15
   AbilityAnimationClip: {fileID: 0}

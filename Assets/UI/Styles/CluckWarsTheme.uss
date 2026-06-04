@@ -1,0 +1,567 @@
+/* ============================================================================
+   Cluck Wars — UI Toolkit theme (menu front-end)
+   Tokens from Design/cluckwars-tokens-v3.jsx + Design/docs/ART.md §6.1.
+   USS-valid only: NO text-shadow / box-shadow / inherit / gap / linear-gradient
+   (those silently dropped on the recovery-uxml branch). Gloss/gradient depth
+   comes from the baked Gloss.png sheen over a flat fill; rounded corners are
+   native border-radius + overflow:hidden. Class/ability colors & the chicken
+   sprite are applied in C# at bind time (MenuUiController) over these classes.
+   Fonts are set on the root in C# (UiGfx.ChunkyFont) as a guaranteed fallback;
+   url() font refs below are the primary path.
+   ============================================================================ */
+
+/* ---- Screen root + pages -------------------------------------------------- */
+.cw-screen {
+    flex-grow: 1;
+    background-color: rgb(14, 8, 4);          /* #0e0804 design screenBg */
+    overflow: hidden;
+    align-items: stretch;
+    justify-content: flex-start;
+}
+.cw-page { flex-grow: 1; align-items: stretch; justify-content: flex-start; }
+.cw-hidden { display: none; }
+
+/* ---- Typography ----------------------------------------------------------- */
+/* Headings stay on one line (nowrap) so ribbons/badges grow to fit instead of
+   wrapping like the old UGUI ("CHA / RACT"). Body text wraps normally. */
+.cw-title, .cw-heading, .cw-label {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    color: rgb(254, 245, 224);               /* #fef5e0 */
+    -unity-text-align: middle-center;
+    white-space: nowrap;
+}
+.cw-title   { font-size: 44px; letter-spacing: 2px; }
+.cw-heading { font-size: 24px; letter-spacing: 1px; }
+.cw-label   { font-size: 20px; }
+
+.cw-body {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 16px;
+    color: rgb(196, 160, 96);                /* #c4a060 secondary */
+    white-space: normal;
+}
+
+.cw-accent    { color: rgb(245, 200, 66); }  /* #f5c842 */
+.cw-text-dark { color: rgb(26, 14, 4); }
+
+/* ---- Glossy surfaces ------------------------------------------------------ */
+.cw-panel {
+    background-color: rgb(58, 34, 16);        /* #3a2210 */
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(138, 106, 58); border-right-color: rgb(138, 106, 58);
+    border-top-color: rgb(138, 106, 58); border-bottom-color: rgb(138, 106, 58);
+    border-top-left-radius: 14px; border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
+    overflow: hidden;
+    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+.cw-card {
+    background-color: rgb(58, 40, 22);        /* #3a2816 */
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
+    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
+    border-top-left-radius: 10px; border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+    overflow: hidden;
+    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    transition-property: scale; transition-duration: 0.12s;
+}
+.cw-card--selected { scale: 1.04 1.04; }
+
+/* ---- Buttons -------------------------------------------------------------- */
+.cw-btn {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 20px;
+    color: rgb(254, 245, 224);
+    -unity-text-align: middle-center;
+    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    border-top-left-radius: 10px; border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    padding-top: 12px; padding-bottom: 12px; padding-left: 22px; padding-right: 22px;
+    transition-property: scale; transition-duration: 0.10s;
+}
+.cw-btn:hover  { scale: 1.03 1.03; }
+.cw-btn:active { scale: 0.97 0.97; }
+.cw-btn--gold {
+    background-color: rgb(212, 160, 32);
+    border-left-color: rgb(184, 138, 20); border-right-color: rgb(184, 138, 20);
+    border-top-color: rgb(184, 138, 20); border-bottom-color: rgb(184, 138, 20);
+    color: rgb(26, 14, 4);
+}
+.cw-btn--green {
+    background-color: rgb(51, 163, 50);
+    border-left-color: rgb(34, 139, 34); border-right-color: rgb(34, 139, 34);
+    border-top-color: rgb(34, 139, 34); border-bottom-color: rgb(34, 139, 34);
+}
+.cw-btn--neutral {
+    background-color: rgb(58, 40, 22);
+    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
+    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
+}
+
+/* Home/back button — absolutely placed at a header's top-left, leaves the
+   centered ribbon undisturbed. */
+.cw-home-btn {
+    position: absolute; left: 14px; top: 16px;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 14px; letter-spacing: 1px; color: rgb(254, 245, 224);
+    -unity-text-align: middle-center;
+    background-color: rgb(58, 40, 22);
+    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    -unity-background-image-tint-color: rgba(255, 232, 190, 0.4);
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
+    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
+    border-top-left-radius: 8px; border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
+    padding-top: 7px; padding-bottom: 7px; padding-left: 14px; padding-right: 14px;
+    transition-property: scale; transition-duration: 0.1s;
+}
+.cw-home-btn:hover  { scale: 1.04 1.04; }
+.cw-home-btn:active { scale: 0.96 0.96; }
+
+/* ---- Ribbon --------------------------------------------------------------- */
+.cw-ribbon {
+    background-color: rgb(212, 160, 32);
+    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-left-color: rgb(245, 200, 66); border-right-color: rgb(245, 200, 66);
+    border-top-color: rgb(245, 200, 66); border-bottom-color: rgb(245, 200, 66);
+    border-top-left-radius: 8px; border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
+    padding-top: 8px; padding-bottom: 8px; padding-left: 24px; padding-right: 24px;
+    align-items: center; justify-content: center;
+}
+.cw-ribbon .cw-title { color: rgb(26, 14, 4); font-size: 28px; }
+
+/* ---- Class chip ----------------------------------------------------------- */
+.cw-class-chip {
+    flex-direction: row; align-items: center;
+    background-color: rgb(58, 40, 22);
+    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
+    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
+    border-top-left-radius: 10px; border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+    padding-top: 6px; padding-bottom: 6px; padding-left: 8px; padding-right: 8px;
+    margin-bottom: 6px;
+    transition-property: scale; transition-duration: 0.12s;
+}
+.cw-class-chip:hover { scale: 1.02 1.02; }
+.cw-class-chip__art { width: 48px; height: 48px; -unity-background-scale-mode: scale-to-fit; flex-shrink: 0; margin-right: 8px; }
+.cw-class-chip__name { font-size: 18px; white-space: nowrap; -unity-text-align: middle-left; }
+.cw-class-chip__role { font-size: 11px; color: rgb(196, 160, 96); white-space: nowrap; -unity-text-align: middle-left; }
+.cw-slot-pill {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 11px;
+    padding-top: 1px; padding-bottom: 1px; padding-left: 6px; padding-right: 6px;
+    border-top-left-radius: 6px; border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
+    background-color: rgba(0, 0, 0, 0.4);
+    color: rgb(196, 160, 96);
+}
+.cw-slot-pill--star { background-color: rgb(245, 200, 66); color: rgb(26, 14, 4); }
+
+/* ---- Chicken preview ------------------------------------------------------ */
+.cw-chicken { -unity-background-scale-mode: scale-to-fit; }
+.cw-radial-glow {
+    background-image: url("project://database/Assets/UI/Sprites/RadialGlow.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    position: absolute;
+}
+/* Glowing circular platform behind the preview chicken (design §ColumnB).
+   border-color + the inner radial glow tint are set in C# to the class color. */
+.cw-preview-disc {
+    width: 150px; height: 150px;
+    border-top-left-radius: 75px; border-top-right-radius: 75px;
+    border-bottom-left-radius: 75px; border-bottom-right-radius: 75px;
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-left-color: rgba(192, 64, 48, 0.5); border-right-color: rgba(192, 64, 48, 0.5);
+    border-top-color: rgba(192, 64, 48, 0.5); border-bottom-color: rgba(192, 64, 48, 0.5);
+    align-items: center; justify-content: center;
+    overflow: visible;
+}
+
+/* ---- Stat bars (2-column grid, small pips — design §ColumnB) -------------- */
+.cw-stat-grid { flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
+.cw-stat-row { flex-direction: row; align-items: center; margin-bottom: 4px; width: 48%; }
+.cw-stat-label {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 9px; color: rgb(196, 160, 96); width: 38px;
+}
+.cw-stat-pips { flex-direction: row; }
+.cw-pip {
+    width: 7px; height: 11px; margin-right: 2px;
+    border-top-left-radius: 1px; border-top-right-radius: 1px;
+    border-bottom-left-radius: 1px; border-bottom-right-radius: 1px;
+    background-color: rgba(20, 12, 6, 0.7);
+}
+.cw-pip--on { background-color: rgb(245, 200, 66); }
+
+/* ---- Hex ability slot ----------------------------------------------------- */
+.cw-hex {
+    width: 58px; height: 67px;
+    background-image: url("project://database/Assets/UI/Sprites/HexBase.png");
+    -unity-background-scale-mode: scale-to-fit;
+    align-items: center; justify-content: center;
+    transition-property: scale; transition-duration: 0.12s;
+}
+.cw-hex--empty { background-image: url("project://database/Assets/UI/Sprites/HexInactive.png"); }
+.cw-hex--active { scale: 1.08 1.08; }
+.cw-hex__icon { font-size: 26px; -unity-text-align: middle-center; }
+.cw-slot-caption {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 11px; letter-spacing: 1px; color: rgb(196, 160, 96); -unity-text-align: middle-center;
+}
+/* "EQUIPPED · n/m" floats as a tab on the slot panel's top border (design §ColumnC). */
+.cw-equipped-tab {
+    position: absolute; top: -9px; left: 12px;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 10px; letter-spacing: 1px; color: rgb(245, 200, 66);
+    padding-top: 1px; padding-bottom: 1px; padding-left: 8px; padding-right: 8px;
+    background-color: rgb(42, 26, 12);
+    border-left-width: 1px; border-right-width: 1px; border-top-width: 1px; border-bottom-width: 1px;
+    border-left-color: rgb(138, 106, 58); border-right-color: rgb(138, 106, 58);
+    border-top-color: rgb(138, 106, 58); border-bottom-color: rgb(138, 106, 58);
+    border-top-left-radius: 5px; border-top-right-radius: 5px;
+    border-bottom-left-radius: 5px; border-bottom-right-radius: 5px;
+}
+
+/* ---- Ability grid (4-per-row compact cards — design §ColumnC) ------------- */
+.cw-category-header {
+    flex-direction: row; align-items: center;
+    padding-top: 2px; padding-bottom: 2px; padding-left: 6px; padding-right: 6px;
+    border-left-width: 3px;       /* color set in C# to the category color */
+    border-top-left-radius: 3px; border-bottom-left-radius: 3px;
+    margin-bottom: 4px; margin-top: 6px;
+    /* faint left-to-right tint set in C# via backgroundColor */
+}
+.cw-category-header__label {
+    font-size: 12px; letter-spacing: 1px; color: rgb(254, 245, 224);
+}
+.cw-category-header__blurb { font-size: 9px; color: rgb(196, 160, 96); margin-left: 8px; }
+
+.cw-ability-grid { flex-direction: row; flex-wrap: wrap; margin-bottom: 4px; }
+.cw-ability-card {
+    width: 23%; height: 76px;
+    margin-right: 1.5%; margin-bottom: 6px;
+    align-items: center; justify-content: center;
+    padding-top: 6px; padding-bottom: 5px; padding-left: 2px; padding-right: 2px;
+    background-color: rgb(48, 32, 17);
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
+    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
+    border-top-left-radius: 9px; border-top-right-radius: 9px;
+    border-bottom-left-radius: 9px; border-bottom-right-radius: 9px;
+    transition-property: scale; transition-duration: 0.1s;
+}
+.cw-ability-card:hover { scale: 1.05 1.05; }
+.cw-ability-card__icon { font-size: 26px; height: 30px; -unity-text-align: middle-center; }
+.cw-ability-card__name {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 10px; color: rgb(254, 245, 224); -unity-text-align: middle-center;
+    white-space: nowrap; margin-top: 2px; margin-bottom: 3px;
+}
+.cw-cd-badge {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 9px; letter-spacing: 0.5px;
+    padding-top: 1px; padding-bottom: 1px; padding-left: 5px; padding-right: 5px;
+    border-top-left-radius: 3px; border-top-right-radius: 3px;
+    border-bottom-left-radius: 3px; border-bottom-right-radius: 3px;
+}
+.cw-cd-badge--short { background-color: rgba(74, 230, 106, 0.18); color: rgb(124, 217, 154); }
+.cw-cd-badge--med   { background-color: rgba(245, 200, 66, 0.18); color: rgb(245, 200, 66); }
+
+/* Numbered slot badge on an equipped ability card (design §ColumnC) — the
+   circle's fill is set in C# to the ability accent color. */
+.cw-ability-badge {
+    position: absolute; top: -7px; right: -6px;
+    width: 19px; height: 19px;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 11px; color: rgb(254, 245, 224); -unity-text-align: middle-center;
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-left-color: rgb(26, 14, 4); border-right-color: rgb(26, 14, 4);
+    border-top-color: rgb(26, 14, 4); border-bottom-color: rgb(26, 14, 4);
+    border-top-left-radius: 10px; border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+}
+
+/* ---- Inset well + text input --------------------------------------------- */
+.cw-well {
+    background-color: rgba(10, 6, 2, 0.4);
+    border-left-width: 1px; border-right-width: 1px; border-top-width: 1px; border-bottom-width: 1px;
+    border-left-color: rgba(138, 106, 58, 0.4); border-right-color: rgba(138, 106, 58, 0.4);
+    border-top-color: rgba(138, 106, 58, 0.4); border-bottom-color: rgba(138, 106, 58, 0.4);
+    border-top-left-radius: 10px; border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+}
+.cw-input {
+    background-color: rgb(26, 14, 8);
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
+    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
+    border-top-left-radius: 8px; border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
+    min-height: 44px; font-size: 24px; color: rgb(254, 245, 224);
+}
+
+/* ============================================================================
+   Match Lobby (landscape: 260px settings rail + 2×2 player grid — design §LobbyL)
+   ============================================================================ */
+.cw-lobby-body { flex-grow: 1; flex-direction: row; }
+
+.cw-lobby-rail {
+    width: 300px; flex-shrink: 0;
+    padding-top: 14px; padding-bottom: 14px; padding-left: 16px; padding-right: 16px;
+    border-right-width: 1px; border-right-color: rgba(138, 106, 58, 0.4);
+}
+.cw-lobby-card {
+    padding-top: 9px; padding-bottom: 9px; padding-left: 11px; padding-right: 11px;
+    margin-top: 9px;
+    /* Soften the shared Gloss sheen so the rail cards read as dark surfaces
+       (design) instead of a bright grey band across the top. */
+    -unity-background-image-tint-color: rgba(255, 232, 190, 0.32);
+}
+.cw-lobby-cardlabel {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 10px; letter-spacing: 1px; color: rgb(196, 160, 96);
+}
+.cw-lobby-cardhead {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 14px; letter-spacing: 1px; color: rgb(245, 200, 66); margin-bottom: 3px;
+}
+
+/* Gold invite-code letter tiles */
+.cw-code-tiles { flex-direction: row; flex-wrap: wrap; margin-top: 6px; }
+.cw-code-tile {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 22px; color: rgb(26, 14, 4);
+    background-color: rgb(212, 160, 32);
+    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    border-left-width: 1px; border-right-width: 1px; border-top-width: 1px; border-bottom-width: 1px;
+    border-left-color: rgb(184, 138, 20); border-right-color: rgb(184, 138, 20);
+    border-top-color: rgb(184, 138, 20); border-bottom-color: rgb(184, 138, 20);
+    border-top-left-radius: 4px; border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px; border-bottom-right-radius: 4px;
+    padding-top: 1px; padding-bottom: 1px; padding-left: 8px; padding-right: 8px;
+    margin-right: 4px; margin-bottom: 4px;
+}
+
+.cw-lobby-btnrow { flex-direction: row; margin-top: 8px; }
+.cw-mini-btn {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    flex-grow: 1; flex-basis: 0;
+    font-size: 13px; letter-spacing: 1px; color: rgb(254, 245, 224);
+    -unity-text-align: middle-center;
+    background-color: rgb(58, 40, 22);
+    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    border-left-width: 1px; border-right-width: 1px; border-top-width: 1px; border-bottom-width: 1px;
+    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
+    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
+    border-top-left-radius: 6px; border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
+    padding-top: 5px; padding-bottom: 5px; padding-left: 0; padding-right: 0;
+    margin-right: 6px;
+}
+.cw-mini-btn--gold {
+    background-color: rgb(212, 160, 32); color: rgb(26, 14, 4);
+    border-left-color: rgb(184, 138, 20); border-right-color: rgb(184, 138, 20);
+    border-top-color: rgb(184, 138, 20); border-bottom-color: rgb(184, 138, 20);
+}
+
+/* Settings rows */
+.cw-setting-row { flex-direction: row; justify-content: space-between; margin-top: 3px; }
+.cw-setting-k {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 12px; letter-spacing: 0.5px; color: rgb(196, 160, 96);
+}
+.cw-setting-v {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 12px; color: rgb(254, 245, 224);
+}
+
+/* Status pill */
+.cw-status-pill {
+    flex-direction: row; align-items: center; margin-top: 10px;
+    padding-top: 6px; padding-bottom: 6px; padding-left: 10px; padding-right: 10px;
+    background-color: rgba(245, 200, 66, 0.06);
+    border-left-width: 1px; border-right-width: 1px; border-top-width: 1px; border-bottom-width: 1px;
+    border-left-color: rgba(245, 200, 66, 0.25); border-right-color: rgba(245, 200, 66, 0.25);
+    border-top-color: rgba(245, 200, 66, 0.25); border-bottom-color: rgba(245, 200, 66, 0.25);
+    border-top-left-radius: 6px; border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
+}
+.cw-status-dot {
+    width: 9px; height: 9px; margin-right: 8px;
+    border-top-left-radius: 5px; border-top-right-radius: 5px;
+    border-bottom-left-radius: 5px; border-bottom-right-radius: 5px;
+    background-color: rgb(245, 200, 66);
+}
+.cw-status-count {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 13px; color: rgb(254, 245, 224); margin-right: 6px;
+}
+.cw-status-text {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 12px; color: rgb(245, 200, 66); flex-grow: 1; -unity-text-align: middle-right;
+}
+
+.cw-lobby-start { letter-spacing: 2px; }
+.cw-lobby-back {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 13px; color: rgb(196, 160, 96); -unity-text-align: middle-center;
+    background-color: rgba(0, 0, 0, 0); background-image: none;
+    border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
+    margin-top: 8px; padding-top: 6px; padding-bottom: 6px;
+}
+.cw-lobby-error {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    margin-top: 6px; min-height: 16px; font-size: 12px;
+    color: rgb(255, 120, 110); -unity-text-align: middle-center; white-space: normal;
+}
+
+/* Right column + player grid */
+.cw-lobby-right {
+    flex-grow: 1; min-width: 0;
+    padding-top: 14px; padding-bottom: 14px; padding-left: 16px; padding-right: 16px;
+}
+.cw-players-head { flex-direction: row; align-items: center; margin-bottom: 8px; }
+.cw-players-title {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 14px; letter-spacing: 1px; color: rgb(245, 200, 66); margin-right: 8px;
+}
+.cw-players-divider { flex-grow: 1; height: 1px; background-color: rgba(245, 200, 66, 0.4); }
+
+.cw-player-grid {
+    flex-grow: 1; flex-direction: row; flex-wrap: wrap;
+    justify-content: space-between; align-content: space-between;
+}
+.cw-player-card {
+    width: 49%; height: 48%;
+    flex-direction: row; align-items: center;
+    padding-top: 8px; padding-bottom: 8px; padding-left: 10px; padding-right: 10px;
+    background-color: rgb(48, 32, 18);
+    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    /* border + tint set in C# to the player color */
+    border-top-left-radius: 10px; border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+    overflow: hidden;
+}
+.cw-player-card--empty {
+    background-color: rgba(20, 14, 8, 0.3); background-image: none;
+    align-items: center; justify-content: center;
+    border-left-color: rgba(138, 106, 58, 0.55); border-right-color: rgba(138, 106, 58, 0.55);
+    border-top-color: rgba(138, 106, 58, 0.55); border-bottom-color: rgba(138, 106, 58, 0.55);
+}
+.cw-player-accent {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+    /* color set in C# */
+}
+.cw-player-art {
+    width: 52px; height: 52px; flex-shrink: 0; margin-right: 9px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+.cw-player-mid { flex-grow: 1; min-width: 0; }
+.cw-player-namerow { flex-direction: row; align-items: center; }
+.cw-player-name {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 15px; color: rgb(254, 245, 224); white-space: nowrap; margin-right: 5px;
+}
+.cw-player-pn {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 9px; margin-right: 5px;  /* color set in C# to player color */
+}
+.cw-player-host {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 8px; letter-spacing: 0.5px; color: rgb(26, 14, 4);
+    background-color: rgb(245, 200, 66);
+    padding-top: 1px; padding-bottom: 1px; padding-left: 5px; padding-right: 5px;
+    border-top-left-radius: 3px; border-top-right-radius: 3px;
+    border-bottom-left-radius: 3px; border-bottom-right-radius: 3px;
+}
+.cw-player-class {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 10px; color: rgb(196, 160, 96); white-space: nowrap; margin-top: 2px;
+}
+.cw-player-chips { flex-direction: row; margin-top: 5px; }
+.cw-mini-hex {
+    width: 24px; height: 28px; margin-right: 4px;
+    background-image: url("project://database/Assets/UI/Sprites/HexBase.png");
+    -unity-background-scale-mode: scale-to-fit;
+    align-items: center; justify-content: center;
+}
+.cw-mini-hex--empty { background-image: url("project://database/Assets/UI/Sprites/HexInactive.png"); }
+.cw-mini-hex__icon { font-size: 12px; -unity-text-align: middle-center; }
+
+.cw-player-state {
+    flex-shrink: 0; margin-left: 6px;
+    padding-top: 4px; padding-bottom: 4px; padding-left: 9px; padding-right: 9px;
+    -unity-text-align: middle-center;
+    border-top-left-radius: 6px; border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
+}
+.cw-player-state--ready {
+    background-color: rgb(51, 163, 50);
+    border-left-width: 1px; border-right-width: 1px; border-top-width: 1px; border-bottom-width: 1px;
+    border-left-color: rgb(74, 230, 106); border-right-color: rgb(74, 230, 106);
+    border-top-color: rgb(74, 230, 106); border-bottom-color: rgb(74, 230, 106);
+}
+.cw-player-state--picking {
+    background-color: rgba(40, 30, 20, 0.6);
+    border-left-width: 1px; border-right-width: 1px; border-top-width: 1px; border-bottom-width: 1px;
+    border-left-color: rgb(138, 106, 58); border-right-color: rgb(138, 106, 58);
+    border-top-color: rgb(138, 106, 58); border-bottom-color: rgb(138, 106, 58);
+}
+.cw-player-state__label {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 11px; letter-spacing: 0.5px; color: rgb(254, 245, 224);
+}
+.cw-player-empty-label {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 11px; letter-spacing: 1px; color: rgb(196, 160, 96);
+}
+
+/* ============================================================================
+   Responsive — root carries .layout--portrait or .layout--landscape
+   (toggled in C# from GeometryChangedEvent). Default = portrait column.
+   ============================================================================ */
+.cw-cs-body { flex-grow: 1; }
+.layout--portrait  .cw-cs-body { flex-direction: column; }
+.layout--landscape .cw-cs-body { flex-direction: row; }
+
+.layout--portrait  .cw-cs-classes { flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
+.layout--portrait  .cw-cs-classes .cw-class-chip { width: 49%; }
+/* Landscape = the v3 design's compact 3-column layout (class list + preview are
+   fixed-width, ability grid fills the rest). The body is width-capped + centered
+   so on an ultra-wide (20:9) phone it renders at the design's density instead of
+   stretching into sparse columns — the menu/gameplay keep the full-bleed black bg. */
+.layout--landscape .cw-cs-body { width: 100%; max-width: 1500px; margin-left: auto; margin-right: auto; }
+.layout--landscape .cw-cs-classes { flex-direction: column; width: 190px; flex-shrink: 0; }
+.layout--landscape .cw-cs-classes .cw-class-chip { width: auto; }
+
+.layout--landscape .cw-cs-preview { width: 210px; flex-shrink: 0; margin-left: 10px; margin-right: 10px; }
+.layout--portrait  .cw-cs-preview { width: 100%; margin-top: 8px; }
+
+.cw-cs-detail { flex-grow: 1; }
+
+.layout--portrait  .cw-mode-row { flex-direction: column; align-items: stretch; }
+.layout--landscape .cw-mode-row { flex-direction: row; justify-content: center; }
+
+/* Lobby reflow: landscape = rail + grid (default); portrait = stacked, 1-col cards */
+.layout--portrait .cw-lobby-body { flex-direction: column; }
+.layout--portrait .cw-lobby-rail { width: 100%; flex-shrink: 1; border-right-width: 0; }
+.layout--portrait .cw-player-grid { flex-direction: column; flex-wrap: nowrap; }
+.layout--portrait .cw-player-card { width: 100%; height: auto; margin-bottom: 8px; }
