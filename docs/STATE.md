@@ -220,9 +220,11 @@ Pre-existing Maestro tasks still pending:
 ## Known bugs / open questions (need device testing)
 
 1. ~~**Join case-sensitivity**~~ **FIXED (2026-06-03)** — `NullUGSService.JoinLobbyByCodeAsync` was uppercasing the join code to "CLUCK-LAN" while host used lowercase "cluck-lan". Photon room names are case-sensitive so the two clients never met. Fix: removed `.ToUpper()` from `JoinLobbyByCodeAsync` — both sides now use the code verbatim (lowercase).
-2. **Third player can't connect** (reported 2026-05-08). **Retest after bug-1 fix** — the case mismatch was the prime suspect. Connect callbacks log every transition since v0.3.1.
-3. **Solo-on-Android movement** (reported 2026-05-08, may already be fixed). Was: chicken doesn't move with joystick. Likely root cause: spawn collision drift, addressed by spawn jitter + base-aligned spawns. Verify after rebuild on Pixel 9.
-4. **Spawn-stacking** (reported 2026-05-08, mitigated). `MapGenerator.ComputeSpawnPoints` now warns if `_baseCornerDistance < 1`. Spawn jitter in `MatchBootstrapper.HandlePlayerJoined` breaks symmetry even if positions collide.
+2. ~~**RestartMatch Y=0 fall-through**~~ **FIXED (2026-06-04, commit d69fad3)** — `GameManager.RestartMatch()` called `RPC_TeleportTo(spawnPoints[i])` with raw Y=0 positions. `MatchBootstrapper` initial spawn adds `+0.05f Y` jitter; restart did not. On Android (IL2CPP real device) the chicken clipped into the floor mesh and fell infinitely on every round restart. Fix: added `Vector3.up * 0.05f` to both real-player and bot teleport targets in `RestartMatch()`.
+3. ~~**ChickenCargo 3D distance**~~ **FIXED (2026-06-04, commit 61c46d8)** — See "Playtest fix" above. Previously `FindNearestPileInRange` used a 3D `sqrMagnitude` check, but the code was duplicated in the original commit without the XZ-only fix being applied to all three proximity methods. All three now use `HorizontalSqr()`.
+4. **UGS mismatch: Android uses real UGSService, Editor uses NullUGSService** (discovered 2026-06-04). The Android APK does NOT have `UGS_DISABLED` defined and the Unity project is linked to the Unity Dashboard on the Pixel 9 — it authenticates and creates real lobbies with unique codes. The Editor has `UGS_DISABLED` → `NullUGSService` → fixed session `cluck-lan`. **Both-HOST never connects them** (different sessions). Workaround: Editor must JOIN using the phone's lobby code. Long-term fix: add `UGS_DISABLED` to Android build scripting defines (or remove it from all platforms and use real UGS everywhere).
+5. **Third player can't connect** (reported 2026-05-08). **Partially retested 2026-06-04** — 2-player session confirmed working. 3-player test not yet run this session.
+6. **Solo-on-Android movement** (reported 2026-05-08). Not explicitly retested this session.
 
 ---
 
@@ -247,20 +249,35 @@ All require real-device or playtest data; queued so they don't get done piecemea
 every GPU mode that supports ES 3.1+). See `docs/TESTING.md` § Known gotchas for the full
 failure matrix.
 
-**Plan for the upcoming co-op test:**
-1. Build Windows EXEs (`Ctrl+Shift+W`) — test all multiplayer scenarios with 2-4 Windows instances.
-2. Android smoke test on Pixel 9 via USB (`adb -s 57080DLAQ0030B`).
-3. **Do not fight the emulator.** It can't run the APK on this machine.
+**Co-op test completed 2026-06-04 — Editor + Pixel 9:**
+- Solo mode (Editor): ✅ 4 chickens, bots, food loop, zero errors.
+- 2-client multiplayer: ✅ Editor joined Pixel 9's real UGS session (`PNDMWK`) via JOIN-by-code flow. 2 chickens confirmed in same Photon room (`players=2`).
+- Join-case fix (508f6e6): ✅ `JoinLobbyByCodeAsync("PNDMWK")` returned verbatim → correct session joined.
+- Round restart: 🐛 Fixed (d69fad3) — Y=0 teleport caused Android fall-through. Now +0.05f Y.
+- Food collection: ✅ Cargo draining confirmed in both solo and 2-player.
+- **Key discovery:** Android APK uses real `UGSService` (Dashboard linked); Editor uses `NullUGSService`. Both-HOST fails. Connect via JOIN-by-code instead. See bug #4 above.
 
-**Infrastructure fixed this session:**
-- ADB v40/v41 war resolved: SDK platform-tools ADB replaced with v41 copy. Both paths now identical.
-- `cluck_emu2` AVD created (`google_apis_playstore;android-34;x86_64`, Pixel 5, 4 GB RAM, `angle_indirect` GPU — currently configured but not useful due to Hyper-V).
+**Next test priorities:**
+1. Rebuild Android APK (to pick up d69fad3 + 61c46d8 fixes), retest round restart on Pixel 9.
+2. Test 3-player connect (BUG-5).
+3. Add `UGS_DISABLED` to Android build defines OR fully enable real UGS on all platforms.
+
+**Infrastructure:**
+- ADB v40/v41 war resolved: SDK platform-tools ADB replaced with v41 copy.
+- `cluck_emu2` AVD created but not useful (Hyper-V + ES 3.1+ conflict).
 
 ---
 
 ## Recent commits (most recent first)
 
 ```
+126ee4b Docs: add Antigravity CLI (agy) guide
+e8c326c Chore: update packages and NuGet DLLs
+b5ede4a UI v3: SDF shader system, atomic view components, UXML + Bootstrap wiring
+61c46d8 Fix: ChickenCargo proximity checks use XZ distance instead of 3D
+d69fad3 Fix: RestartMatch teleports chicken to Y=0 causing Android fall-through
+5d67dd0 Docs: record emulator failure matrix + pivot to Windows-first testing
+f53aaef Docs: update STATE.md recent commits after co-op test session fixes
 508f6e6 Fix: NullUGSService join case bug + build menu restore-target + test docs
 0772810 Part B — B3/B4/B5: bot AI, ability grid UI, cooldown grey-out
 c3f70c9 Part B — B2: new ability SOs + SpineCoat knockback
