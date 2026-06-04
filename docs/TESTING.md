@@ -33,11 +33,33 @@ The Android build forces:
 
 ### Known gotchas
 
-**Emulator ARM limitation (Unity 6)**
-The `google_apis;android-34;x86_64` AVD (`cluck_emu`) has no ARM64 native bridge.
-ARM64-only IL2CPP APKs crash silently at launch — zero Unity logs appear in logcat.
-Use the real Pixel 9 (`adb -s 57080DLAQ0030B`) for all gameplay tests. The emulator
-is useful for adb scripting practice but cannot run the APK.
+**Android x86_64 emulator cannot run Unity 6 URP — use Pixel 9 or Windows builds**
+
+Tested exhaustively (2026-06-04) with `cluck_emu2` (AVD: `google_apis_playstore;android-34;x86_64`,
+Pixel 5 profile, 4 GB RAM). The blocker is a Hyper-V + Unity URP GPU requirement conflict:
+
+| GPU mode | ES 3.1+? | Emulator stable? | Result |
+|---|---|---|---|
+| `swiftshader_indirect` | ❌ ES 2.0 only | ✅ | Unity URP crashes — `EGL_BAD_CONFIG: no ES 3.1 support` |
+| `host` | ✅ | ❌ | Emulator process killed by OS (Hyper-V + GPU passthrough) |
+| `angle_indirect` | ✅ | ❌ | Emulator crashes (ANGLE D3D11 init fails under WHPX) |
+| `mesa_indirect` | ✅ (ES 3.1) | ❌ | Emulator crashes during Unity render init |
+
+**Root cause:** Hyper-V/WHPX is enabled on this machine. Every GPU mode that exposes ES 3.1+
+crashes the emulator process. `swiftshader_indirect` survives but only provides ES 2.0,
+which Unity URP rejects — it then sends `SIGILL` to itself (`SI_TKILL`) and dies.
+
+**Decision:** All Android testing on the real Pixel 9 (`adb -s 57080DLAQ0030B`).
+Emulators not viable for this stack.
+
+> `cluck_emu2` remains configured with `angle_indirect` in case you ever want to retry after
+> a Hyper-V change. To revert to `swiftshader_indirect` (at least keeps emulator alive):
+> edit `~/.android/avd/cluck_emu2.avd/config.ini` → `hw.gpu.mode = swiftshader_indirect`
+
+**ADB version alignment (one-time fix, already done)**
+`$SDKROOT\platform-tools\adb.exe` was v40; `C:\Users\MARCO\Documents\platform-tools\adb.exe`
+was v41. The two servers fought every command, causing `device offline` drops mid-install.
+Fix: v41 binary was copied over the SDK v40 — both paths are now v41. Never switch between them.
 
 **`AndroidArchitecture.X86_64` = Magic Leap in Unity 6**
 `AndroidArchitecture.X86_64` (value 8) maps to "x86-64 (Magic Leap)" in Unity 6000.3+
@@ -291,12 +313,24 @@ See `docs/STATE.md` § "Deferred work". Items there are all blocked on either:
 
 When the test session is scheduled, run through these in order:
 
-1. **Build sanity** — `Ctrl+Shift+B` produces clean Windows + Android binaries. No compile errors. Reveal folder, confirm files present.
-2. **Solo Windows** — class select works, match starts, all 8 abilities equippable and functional, food loop completes, win condition fires, restart loop works.
-3. **Solo Android** — touch HUD responds, joystick + attack + abilities all register, camera follow is acceptable, FPS roughly steady.
-4. **Two-device LAN** — Windows host + Android client. Lobby shows player count, host starts match, both chickens spawn at distinct corners, damage / drain / deposit / pickup RPCs cross the wire correctly, match end + restart cycle on both peers.
-5. **Three- or four-device LAN** — repeat (4) with more joiners. Catch the "third player failed to connect" if it returns.
-6. **Balance pass** — playtest 5-10 min matches, tune `MatchConfigSO` + per-ability `Duration` / `Cooldown` + `ChickenStatsSO` per-class numbers.
-7. **Audio pass** — drop AudioClip refs into `AudioRegistry.asset`. Mix levels.
-8. **Animator pass** — author Hit/Attack/Stunned/Idle state machine + transitions in the AnimatorController.
-9. **VFX pass** — particle systems for the events listed in `ART.md` §7.
+**Phase 1 — Windows Editor + builds (no device needed)**
+
+1. **Build sanity** — `Cluck Wars/Build/Android + Restore Windows Target` (`Ctrl+Shift+A` restores target) + `Ctrl+Shift+W` for Windows. Confirm both produce without errors. Use the "Restore Windows Target" variant to keep MCP responsive.
+2. **Solo in Editor** — Enter play mode. Class select, Solo. Verify bots spawn, food loop runs, win condition fires, restart loop works. Check Debug HUD (F1) for state.
+3. **Solo Windows EXE** — run `Builds/Windows/CluckWars.exe` standalone. Same checks.
+4. **2-player Host + Join** — open two Windows EXEs. P1 = Host, P2 = Join with code. Verify both land in the same Photon room (case fix ships in v0.3.2), lobby shows 2 players, host can start, both chickens at distinct corners.
+5. **3-player stress** — add a third Windows EXE joiner. Verify BUG-2 (third player can't connect) is closed after the join-case fix.
+6. **4-player full lobby** — fourth EXE. Full arena test: all food mechanics, combat, abilities, win/restart.
+
+**Phase 2 — Android smoke test (Pixel 9 via USB)**
+
+7. **USB connect** — `adb devices` should show `57080DLAQ0030B`. `adb install -r Builds/Android/CluckWars-*.apk`.
+8. **Solo Android** — launch, class select, Solo. Joystick moves chicken, abilities trigger. Camera follows. FPS stable (target 30).
+9. **Cross-platform join** — Windows host + Android joiner. Confirm cross-platform session works end to end.
+
+**Phase 3 — Polish passes (need device data)**
+
+10. **Balance pass** — playtest 5-10 min matches, tune `MatchConfigSO` + per-ability `Duration` / `Cooldown` + `ChickenStatsSO` per-class numbers.
+11. **Audio pass** — drop AudioClip refs into `AudioRegistry.asset`. Mix levels.
+12. **Animator pass** — author Hit/AbilityCast/Stunned/Idle state machine + transitions in the AnimatorController.
+13. **VFX pass** — particle systems for the events listed in `ART.md` §7.

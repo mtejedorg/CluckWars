@@ -241,6 +241,23 @@ All require real-device or playtest data; queued so they don't get done piecemea
 
 ---
 
+## Testing strategy (updated 2026-06-04)
+
+**Android x86_64 emulators are not viable** for Unity 6 URP on this machine (Hyper-V blocks
+every GPU mode that supports ES 3.1+). See `docs/TESTING.md` § Known gotchas for the full
+failure matrix.
+
+**Plan for the upcoming co-op test:**
+1. Build Windows EXEs (`Ctrl+Shift+W`) — test all multiplayer scenarios with 2-4 Windows instances.
+2. Android smoke test on Pixel 9 via USB (`adb -s 57080DLAQ0030B`).
+3. **Do not fight the emulator.** It can't run the APK on this machine.
+
+**Infrastructure fixed this session:**
+- ADB v40/v41 war resolved: SDK platform-tools ADB replaced with v41 copy. Both paths now identical.
+- `cluck_emu2` AVD created (`google_apis_playstore;android-34;x86_64`, Pixel 5, 4 GB RAM, `angle_indirect` GPU — currently configured but not useful due to Hyper-V).
+
+---
+
 ## Recent commits (most recent first)
 
 ```
