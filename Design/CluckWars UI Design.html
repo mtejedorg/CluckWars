@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CluckWars — UI Design v0.3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body, #root { width: 100%; height: 100%; overflow: hidden; font-family: 'Nunito', sans-serif; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="cluckwars-tokens-v2.jsx"></script>
+<script type="text/babel" src="cluckwars-screens-v2.jsx"></script>
+<script type="text/babel" src="cluckwars-tokens-v3.jsx"></script>
+<script type="text/babel" src="cluckwars-charselect-v3.jsx"></script>
+<script type="text/babel" src="cluckwars-hud-v3.jsx"></script>
+<script type="text/babel" src="cluckwars-landscape-v3.jsx"></script>
+<script type="text/babel" src="cluckwars-ability-ref.jsx"></script>
+<script type="text/babel" src="cluckwars-overlays-v3.jsx"></script>
+
+<script type="text/babel">
+const { DesignCanvas, DCSection, DCArtboard } = window;
+const { TweaksPanel, TweakSection, TweakRadio, TweakToggle, TweakSelect, TweakSlider, useTweaks } = window;
+const {
+  CWCharacterSelectV3, CWMatchHUDv3,
+  CWControlStatesSheet, CWAbilityButtonSheet,
+  CWCharacterSelectV3L, CWMatchHUDv3L,
+  CWControlStatesSheetL, CWAbilityButtonSheetL,
+  CWAbilityReference, CWAbilityReferenceL,
+  CWMatchEndV3, CWMatchEndV3L,
+  CWLobbyV3, CWLobbyV3L,
+  CWMatchEnd, CWLobby, CWIntroCountdown,
+} = window;
+
+// iPhone 14 portrait & landscape
+const PHONE_W = 390;
+const PHONE_H = 844;
+const PHONE_L_W = 844;
+const PHONE_L_H = 390;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "previewClass": "warrior",
+  "cargoState": "half",
+  "cooldownActive": true,
+  "showAnnotations": false,
+  "phoneFrame": true
+}/*EDITMODE-END*/;
+
+// Phone bezel — works in portrait OR landscape
+const PhoneBezel = ({ children, framed, orientation = 'portrait' }) => {
+  if (!framed) return <div style={{ width:'100%', height:'100%', borderRadius:24, overflow:'hidden' }}>{children}</div>;
+  const isLandscape = orientation === 'landscape';
+  return (
+    <div style={{
+      width:'100%', height:'100%',
+      padding:8, background:'#0a0604', borderRadius:46,
+      boxShadow:'0 0 0 2px #1a0e04, inset 0 0 0 1px rgba(255,200,100,0.05), 0 8px 20px rgba(0,0,0,0.6)',
+      position:'relative',
+    }}>
+      <div style={{ width:'100%', height:'100%', borderRadius:38, overflow:'hidden', position:'relative',
+        boxShadow:'inset 0 0 0 1px rgba(255,255,255,0.04)' }}>
+        {children}
+
+        {/* Status bar — top in portrait, left edge (rotated read) in landscape */}
+        {!isLandscape && (
+          <>
+            <div style={{ position:'absolute', top:0, left:0, right:0, height:30, zIndex:50,
+              display:'flex', alignItems:'flex-end', justifyContent:'space-between',
+              padding:'0 22px 5px', pointerEvents:'none' }}>
+              <span style={{ color:'#fef5e0', fontFamily:"'Nunito',sans-serif", fontWeight:700,
+                fontSize:12, textShadow:'0 1px 2px rgba(0,0,0,0.6)' }}>9:41</span>
+              <div style={{ display:'flex', alignItems:'center', gap:5,
+                color:'#fef5e0', fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:10 }}>
+                <span>●●●</span>
+                <span style={{ width:18, height:9, border:'1.5px solid #fef5e0', borderRadius:2,
+                  position:'relative', display:'inline-block' }}>
+                  <span style={{ position:'absolute', top:1, left:1, width:12, height:5, background:'#fef5e0', borderRadius:1 }} />
+                </span>
+              </div>
+            </div>
+            {/* Notch (portrait — top center) */}
+            <div style={{ position:'absolute', top:6, left:'50%', transform:'translateX(-50%)',
+              width:96, height:24, background:'#0a0604', borderRadius:14, zIndex:51,
+              boxShadow:'inset 0 0 0 1px rgba(255,255,255,0.04)' }} />
+          </>
+        )}
+        {isLandscape && (
+          <>
+            {/* Notch — left center in landscape (camera bar on the short edge) */}
+            <div style={{ position:'absolute', left:6, top:'50%', transform:'translateY(-50%)',
+              width:24, height:96, background:'#0a0604', borderRadius:14, zIndex:51,
+              boxShadow:'inset 0 0 0 1px rgba(255,255,255,0.04)' }} />
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+function App() {
+  const [tk, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  // Cargo state → pct + cargo text
+  const cargo = {
+    empty: { pct: 0.0, label: '0/20' },
+    half:  { pct: 0.45, label: '9/20' },
+    near:  { pct: 0.78, label: '16/20' },
+    full:  { pct: 1.0,  label: '20/20' },
+  }[tk.cargoState];
+
+  // Cooldowns — animate or static
+  const [cdTick, setCdTick] = React.useState(0);
+  React.useEffect(() => {
+    if (!tk.cooldownActive) return;
+    const id = setInterval(() => setCdTick(t => t + 1), 200);
+    return () => clearInterval(id);
+  }, [tk.cooldownActive]);
+  const phase = (cdTick % 30) / 30;
+  const cd2 = tk.cooldownActive ? [0, 1 - phase] : [0, 0.4];
+  const cd3 = tk.cooldownActive ? [0, 1 - phase, 1 - ((phase + 0.3) % 1)] : [0, 0.4, 0.7];
+
+  // 2-ability standard loadout for HUD (Flying Peck + Egg Shell)
+  const std2 = ['fly_peck','shell'];
+  // 3-ability assassin loadout (Sneaky Steal + Speed Burst + Flying Peck)
+  const std3 = ['steal','burst','fly_peck'];
+
+  // Pre-filled character select state for "v0.3 filled" artboard
+  const filledLoadouts = {
+    warrior:  ['fly_peck','shell'],
+    speedy:   ['burst','peck'],
+    fatty:    ['turtle','spine'],
+    assassin: ['steal','burst','fly_peck'],
+  };
+
+  return (
+    <>
+      <DesignCanvas>
+
+        {/* ═══════════════ ① CHARACTER SELECT — PORTRAIT ═══════════════ */}
+        <DCSection id="charselect-p" title="① Character Select · PORTRAIT (390×844)">
+          <DCArtboard id="cs-p-empty" label="A · class picked, slots empty" width={PHONE_W} height={PHONE_H}>
+            <PhoneBezel framed={tk.phoneFrame}>
+              <CWCharacterSelectV3 initialClass={tk.previewClass} />
+            </PhoneBezel>
+          </DCArtboard>
+          <DCArtboard id="cs-p-filled" label="B · slots filled, READY active" width={PHONE_W} height={PHONE_H}>
+            <PhoneBezel framed={tk.phoneFrame}>
+              <CWCharacterSelectV3 initialClass={tk.previewClass}
+                initialSlots={filledLoadouts[tk.previewClass]} />
+            </PhoneBezel>
+          </DCArtboard>
+          <DCArtboard id="cs-p-assassin" label="C · Assassin · 3 slots (★)" width={PHONE_W} height={PHONE_H}>
+            <PhoneBezel framed={tk.phoneFrame}>
+              <CWCharacterSelectV3 initialClass="assassin" initialSlots={['steal','burst']} />
+            </PhoneBezel>
+          </DCArtboard>
+        </DCSection>
+
+        {/* ═══════════════ ① CHARACTER SELECT — LANDSCAPE ═══════════════ */}
+        <DCSection id="charselect-l" title="① Character Select · LANDSCAPE (844×390)">
+          <DCArtboard id="cs-l-empty" label="A · class picked, slots empty" width={PHONE_L_W} height={PHONE_L_H}>
+            <PhoneBezel framed={tk.phoneFrame} orientation="landscape">
+              <CWCharacterSelectV3L initialClass={tk.previewClass} />
+            </PhoneBezel>
+          </DCArtboard>
+          <DCArtboard id="cs-l-filled" label="B · slots filled, READY active" width={PHONE_L_W} height={PHONE_L_H}>
+            <PhoneBezel framed={tk.phoneFrame} orientation="landscape">
+              <CWCharacterSelectV3L initialClass={tk.previewClass}
+                initialSlots={filledLoadouts[tk.previewClass]} />
+            </PhoneBezel>
+          </DCArtboard>
+          <DCArtboard id="cs-l-assassin" label="C · Assassin · 3 slots (★)" width={PHONE_L_W} height={PHONE_L_H}>
+            <PhoneBezel framed={tk.phoneFrame} orientation="landscape">
+              <CWCharacterSelectV3L initialClass="assassin" initialSlots={['steal','burst']} />
+            </PhoneBezel>
+          </DCArtboard>
+        </DCSection>
+
+        {/* ═══════════════ ② MATCH HUD — PORTRAIT ═══════════════ */}
+        <DCSection id="hud-p" title="② Match HUD · PORTRAIT — no attack button">
+          <DCArtboard id="hud-p-2" label="Standard · 2 abilities (vertical arc)" width={PHONE_W} height={PHONE_H}>
+            <PhoneBezel framed={tk.phoneFrame}>
+              <CWMatchHUDv3 abilityIds={std2} cargoPct={cargo.pct} cargo={cargo.label}
+                cooldowns={cd2} showStateAnnotations={tk.showAnnotations} />
+            </PhoneBezel>
+          </DCArtboard>
+          <DCArtboard id="hud-p-3" label="Assassin · 3 abilities (triangle)" width={PHONE_W} height={PHONE_H}>
+            <PhoneBezel framed={tk.phoneFrame}>
+              <CWMatchHUDv3 abilityIds={std3} cargoPct={cargo.pct} cargo={cargo.label}
+                cooldowns={cd3} showStateAnnotations={tk.showAnnotations} />
+            </PhoneBezel>
+          </DCArtboard>
+        </DCSection>
+
+        {/* ═══════════════ ② MATCH HUD — LANDSCAPE ═══════════════ */}
+        <DCSection id="hud-l" title="② Match HUD · LANDSCAPE — no attack button">
+          <DCArtboard id="hud-l-2" label="Standard · 2 abilities (arc)" width={PHONE_L_W} height={PHONE_L_H}>
+            <PhoneBezel framed={tk.phoneFrame} orientation="landscape">
+              <CWMatchHUDv3L abilityIds={std2} cargoPct={cargo.pct} cargo={cargo.label}
+                cooldowns={cd2} showStateAnnotations={tk.showAnnotations} />
+            </PhoneBezel>
+          </DCArtboard>
+          <DCArtboard id="hud-l-3" label="Assassin · 3 abilities (triangle)" width={PHONE_L_W} height={PHONE_L_H}>
+            <PhoneBezel framed={tk.phoneFrame} orientation="landscape">
+              <CWMatchHUDv3L abilityIds={std3} cargoPct={cargo.pct} cargo={cargo.label}
+                cooldowns={cd3} showStateAnnotations={tk.showAnnotations} />
+            </PhoneBezel>
+          </DCArtboard>
+        </DCSection>
+
+        {/* ═══════════════ ③ CONTROL STATES — both ═══════════════ */}
+        <DCSection id="states" title="③ Control State overlays — NEW in v0.3">
+          <DCArtboard id="states-p" label="Portrait · 2×2 grid" width={780} height={620}>
+            <CWControlStatesSheet />
+          </DCArtboard>
+          <DCArtboard id="states-l" label="Landscape · 4-up row" width={1100} height={420}>
+            <CWControlStatesSheetL />
+          </DCArtboard>
+        </DCSection>
+
+        {/* ═══════════════ ④ ABILITY BUTTON — both ═══════════════ */}
+        <DCSection id="abtn" title="④ Ability Button — component states">
+          <DCArtboard id="abtn-p" label="Portrait · 2×2 + anatomy" width={780} height={560}>
+            <CWAbilityButtonSheet />
+          </DCArtboard>
+          <DCArtboard id="abtn-l" label="Landscape · 4-up row + anatomy" width={1100} height={420}>
+            <CWAbilityButtonSheetL />
+          </DCArtboard>
+        </DCSection>
+
+        {/* ═══════════════ ⑤ ABILITY REFERENCE — all 14 ═══════════════ */}
+        <DCSection id="abref" title="⑤ Ability Reference — all 14 abilities & icons">
+          <DCArtboard id="abref-p" label="Portrait · grouped by category" width={900} height={1100}>
+            <CWAbilityReference />
+          </DCArtboard>
+          <DCArtboard id="abref-l" label="Landscape · 4 columns, one per category" width={1400} height={560}>
+            <CWAbilityReferenceL />
+          </DCArtboard>
+        </DCSection>
+
+        {/* ═══════════════ ⑥ MATCH END — redesigned for v0.3 ═══════════════ */}
+        <DCSection id="matchend" title="⑥ Match End — redesigned (v0.3)">
+          <DCArtboard id="me-p" label="Portrait · victory hero + standings" width={PHONE_W} height={PHONE_H}>
+            <PhoneBezel framed={tk.phoneFrame}>
+              <CWMatchEndV3 />
+            </PhoneBezel>
+          </DCArtboard>
+          <DCArtboard id="me-l" label="Landscape · hero left, standings right" width={PHONE_L_W} height={PHONE_L_H}>
+            <PhoneBezel framed={tk.phoneFrame} orientation="landscape">
+              <CWMatchEndV3L />
+            </PhoneBezel>
+          </DCArtboard>
+        </DCSection>
+
+        {/* ═══════════════ ⑦ LOBBY — redesigned for v0.3 ═══════════════ */}
+        <DCSection id="lobby" title="⑦ Match Lobby — redesigned (v0.3)">
+          <DCArtboard id="lobby-p" label="Portrait · player cards stacked" width={PHONE_W} height={PHONE_H}>
+            <PhoneBezel framed={tk.phoneFrame}>
+              <CWLobbyV3 />
+            </PhoneBezel>
+          </DCArtboard>
+          <DCArtboard id="lobby-l" label="Landscape · settings left, 2×2 player grid" width={PHONE_L_W} height={PHONE_L_H}>
+            <PhoneBezel framed={tk.phoneFrame} orientation="landscape">
+              <CWLobbyV3L />
+            </PhoneBezel>
+          </DCArtboard>
+        </DCSection>
+
+        {/* ────────────────────────────────────────────────── */}
+        <DCSection id="unchanged" title="v0.2 overlays — archived for reference">
+          <DCArtboard id="matchend-old" label="Match End (v0.2 — archived)" width={640} height={420}>
+            <CWMatchEnd />
+          </DCArtboard>
+          <DCArtboard id="lobby-old" label="Lobby (v0.2 — archived)" width={640} height={420}>
+            <CWLobby />
+          </DCArtboard>
+          <DCArtboard id="intro" label="Intro countdown" width={640} height={420}>
+            <CWIntroCountdown number={3} />
+          </DCArtboard>
+        </DCSection>
+
+      </DesignCanvas>
+
+      <TweaksPanel>
+        <TweakSection label="Preview" />
+        <TweakSelect label="Class for char-select"
+          value={tk.previewClass}
+          options={[
+            { value:'warrior',  label:'Warrior (2 slots)' },
+            { value:'speedy',   label:'Speedy (2 slots)' },
+            { value:'fatty',    label:'Fatty (2 slots)' },
+            { value:'assassin', label:'Assassin (★ 3 slots)' },
+          ]}
+          onChange={(v) => setTweak('previewClass', v)} />
+        <TweakRadio label="Cargo state"
+          value={tk.cargoState}
+          options={[
+            { value:'empty', label:'Empty' },
+            { value:'half',  label:'Half' },
+            { value:'near',  label:'70%+' },
+            { value:'full',  label:'Full' },
+          ]}
+          onChange={(v) => setTweak('cargoState', v)} />
+
+        <TweakSection label="Match HUD" />
+        <TweakToggle label="Live cooldown animation"
+          value={tk.cooldownActive}
+          onChange={(v) => setTweak('cooldownActive', v)} />
+        <TweakToggle label="Show design annotations"
+          value={tk.showAnnotations}
+          onChange={(v) => setTweak('showAnnotations', v)} />
+
+        <TweakSection label="Presentation" />
+        <TweakToggle label="Phone bezel"
+          value={tk.phoneFrame}
+          onChange={(v) => setTweak('phoneFrame', v)} />
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

@@ -132,7 +132,18 @@ entities.json
 
 # Agent & local tool specific ignores
 .agents/
+.agent/
 .gemini/
+/scratch/
+/*.json
+!/package.json
+/*_output.txt
+/check_*.txt
+/bootstrap_check.txt
+/game_uidocs.txt
+/uxml_test.txt
+*.cs.bak
+*.cs.bak.meta
 .graphifyignore
 .mcp.json
 graphify-out/
@@ -141,3 +152,7 @@ Design.zip
 # Auto-imported TextMesh Pro assets (imported via editor scripts)
 /Assets/TextMesh Pro/
 /Assets/TextMesh Pro.meta
+
+# Design canvas local state
+Design/.design-canvas.state.json
+Design/.thumbnail

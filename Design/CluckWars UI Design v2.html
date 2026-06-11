@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CluckWars — UI Design v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body, #root { width: 100%; height: 100%; overflow: hidden; font-family: 'Nunito', sans-serif; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="cluckwars-tokens-v2.jsx"></script>
+<script type="text/babel" src="cluckwars-screens-v2.jsx"></script>
+
+<script type="text/babel">
+const { DesignCanvas, DCSection, DCArtboard } = window;
+const {
+  CWCharacterSelect, CWMatchHUD, CWMatchEnd,
+  CWLobby, CWIntroCountdown, CWTouchLayout,
+} = window;
+
+const MOBILE_W = 1170;
+const MOBILE_H = 540;
+const CONSOLE_W = 960;
+const CONSOLE_H = 540;
+const OVERLAY_W = 640;
+const OVERLAY_H = 420;
+
+function App() {
+  return (
+    <DesignCanvas>
+      {/* ─── Character Select ─── */}
+      <DCSection id="charselect" title="Character Select">
+        <DCArtboard id="cs-mobile" label="Mobile (19.5:9)" width={MOBILE_W} height={MOBILE_H}>
+          <CWCharacterSelect platform="mobile" />
+        </DCArtboard>
+        <DCArtboard id="cs-console" label="Console (16:9)" width={CONSOLE_W} height={CONSOLE_H}>
+          <CWCharacterSelect platform="console" />
+        </DCArtboard>
+      </DCSection>
+
+      {/* ─── Match HUD ─── */}
+      <DCSection id="matchhud" title="Match HUD — In-Game">
+        <DCArtboard id="hud-mobile" label="Mobile — MOBA Controls" width={MOBILE_W} height={MOBILE_H}>
+          <CWMatchHUD platform="mobile" />
+        </DCArtboard>
+        <DCArtboard id="hud-console" label="Console — Gamepad" width={CONSOLE_W} height={CONSOLE_H}>
+          <CWMatchHUD platform="console" />
+        </DCArtboard>
+      </DCSection>
+
+      {/* ─── Overlays ─── */}
+      <DCSection id="overlays" title="Overlays & States">
+        <DCArtboard id="matchend" label="Match End" width={OVERLAY_W} height={OVERLAY_H}>
+          <CWMatchEnd />
+        </DCArtboard>
+        <DCArtboard id="lobby" label="Match Lobby" width={OVERLAY_W} height={OVERLAY_H}>
+          <CWLobby />
+        </DCArtboard>
+        <DCArtboard id="intro" label="Intro Countdown" width={OVERLAY_W} height={OVERLAY_H}>
+          <CWIntroCountdown number={3} />
+        </DCArtboard>
+      </DCSection>
+
+      {/* ─── Touch Layout ─── */}
+      <DCSection id="touch" title="Touch Controls Reference">
+        <DCArtboard id="touch-ref" label="MOBA-Style Layout" width={MOBILE_W} height={MOBILE_H}>
+          <CWTouchLayout />
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

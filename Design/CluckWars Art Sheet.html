@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CluckWars — Concept Art Sheet v0.1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body, #root { width: 100%; height: 100%; overflow: hidden; font-family: 'Nunito', sans-serif; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="cluckwars-tokens-v2.jsx"></script>
+<script type="text/babel" src="art-sheet-components.jsx"></script>
+
+<script type="text/babel">
+const { DesignCanvas, DCSection, DCArtboard } = window;
+const { ArtCharacterCard, ArtLineup, ArtFoodPiles, ArtArenaMap } = window;
+
+const CARD_W = 680;
+const CARD_H = 480;
+
+function App() {
+  return (
+    <DesignCanvas>
+      {/* ─── Character Concepts ─── */}
+      <DCSection id="characters" title="Character Concepts">
+        <DCArtboard id="ch-fatty" label="Fatty Chicken — Bulk Carrier" width={CARD_W} height={CARD_H}>
+          <ArtCharacterCard classKey="fatty" />
+        </DCArtboard>
+        <DCArtboard id="ch-speedy" label="Speedy Chicken — Hit & Run" width={CARD_W} height={CARD_H}>
+          <ArtCharacterCard classKey="speedy" />
+        </DCArtboard>
+        <DCArtboard id="ch-warrior" label="Warrior Chicken — All-Rounder" width={CARD_W} height={CARD_H}>
+          <ArtCharacterCard classKey="warrior" />
+        </DCArtboard>
+        <DCArtboard id="ch-assassin" label="Assassin Chicken — Disruptor" width={CARD_W} height={CARD_H}>
+          <ArtCharacterCard classKey="assassin" />
+        </DCArtboard>
+      </DCSection>
+
+      {/* ─── Lineup & Proportions ─── */}
+      <DCSection id="lineup" title="Lineup & Proportions">
+        <DCArtboard id="lineup-all" label="All Classes — Scale Comparison" width={1100} height={420}>
+          <ArtLineup />
+        </DCArtboard>
+      </DCSection>
+
+      {/* ─── Food Pile Visual States ─── */}
+      <DCSection id="food" title="Food Pile Visual States">
+        <DCArtboard id="food-states" label="Depletion Progression — Full to Empty" width={1000} height={380}>
+          <ArtFoodPiles />
+        </DCArtboard>
+      </DCSection>
+
+      {/* ─── Arena Map Concept ─── */}
+      <DCSection id="map" title="Arena Map Concept">
+        <DCArtboard id="map-iso" label="Isometric Layout — Zone Reference" width={880} height={650}>
+          <ArtArenaMap />
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
