@@ -136,14 +136,29 @@ After adding the config and **restarting Claude Code**:
 2. `GameMode.Single` runner spawns. No lobby — `GameManager` auto-starts the match.
 3. Movement works immediately after the 3-second intro countdown.
 
-### Multiplayer (LAN via Photon Cloud relay)
+### Multiplayer (via Photon Cloud relay + UGS Lobby)
 
-1. **Host** (any device): pick class, press **H** + SPACE. Lands in the **lobby** (`MATCH LOBBY` overlay).
-2. **Joiner(s)**: pick class, press **J** + SPACE. Connects to the host's room. Sees "Waiting for host to start the match…" overlay.
+1. **Host** (any device): pick class, press **H** + SPACE. UGS creates a lobby with a unique
+   6-char join code (shown in the **MATCH LOBBY** overlay). The code is also the Fusion session name.
+2. **Joiner(s)**: pick class, press **J** + SPACE, enter the host's code (or pick from the lobby browser).
 3. Host clicks **START MATCH** when ready. Player count is shown live as `Players: X / Y` (Y from `MatchConfigSO.MaxPlayers`, default 4). **No minimum — host can start with just themselves.**
 4. Intro countdown plays on every peer simultaneously, then the round begins.
 
-Session name is hardcoded to `cluck-lan`. Both peers must use that exact name + same AppId.
+> Since 2026-06-11 **all platforms use the real `UGSService`** — `UGS_DISABLED` was removed from
+> the Standalone scripting defines (it previously made Editor/Windows use `NullUGSService` with the
+> fixed `cluck-lan` session while Android used real UGS, so cross-platform both-HOST never met —
+> BUG-4). If you need the offline fallback, re-add `UGS_DISABLED` to the platform's defines.
+
+### Multi-client Windows testing (the standard multiplayer loop)
+
+```powershell
+.\tools\run-clients.ps1 -Count 3     # launch 3 windowed clients, per-client logs
+.\tools\run-clients.ps1 -Tail 1     # live-tail client 1's log
+```
+
+Each instance writes to `Builds/Windows/logs/clientN.log`. Build the EXE first (`Ctrl+Shift+W`).
+This replaces emulator-based testing entirely; for real-device checks use the Pixel 9
+(or `/coop-test` for an orchestrated Editor + phone session).
 
 ---
 
