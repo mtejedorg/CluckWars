@@ -154,6 +154,37 @@ Applied the newest design wireframes (`cluckwars-hud-v3` / `-charselect-v3` / `-
 
 **Pending Maestro (optional polish)**: align each ability `.asset`'s `AccentColor` to the ART.md §3 v3 hexes if desired; import Lilita One + Nunito + an emoji sprite asset as TMP fonts to render glyphs and the glossy type.
 
+### Solo-first polish pass (2026-06-12) — scoring fix, GDD map, bot AI, placeholder models
+
+Direction set by Maestro: perfect solo mode before returning to multiplayer.
+
+- **Solo scoring fixed (commit `e03b106`) — bots are real competitors now.**
+  Root cause: bots share `[Player:None]` input authority, so they deposited at *any*
+  unowned base (pooled, misattributed scores) and both win checks skipped
+  non-real-player bases — bots could never win, so solo matches carried no balance
+  signal. Fix: `[Networked] int HomeCornerIndex` on `ChickenController` (stamped at
+  spawn for humans + bots), corner-gated deposits, `PlayerBase.BotClaimed` +
+  `IsClaimed`, bot-inclusive win checks, `GameManager.WinnerCorner`, corner-true
+  restart teleports (the old PlayerId-modulo mapping ignored the corner shuffle).
+  Identity unified on corner numbers (P1–P4 + "(CPU)") across leaderboard,
+  nameplates, base tints, and the winner banner. Verified live end-to-end.
+- **Map now builds the GDD §3 layout (commit `4fc3036`)**: center pile (60) + 4
+  personal islands (15, on each base→center line) + 4 contested islands (25,
+  between adjacent corners), positions jittered per match. Replaces the old
+  center-80 + ring-of-4×30. Total food 220.
+- **Bot AI (same commit)**: BOT-8 hysteresis (state exit radii ×1.35), Hunt re-scans
+  for a *loaded* rival when the nearest is empty, bots perceive ground pickups
+  (scoop death-drops instead of walking off), contest-pile Control cast range-gated.
+- **Placeholder models (commit `1f419b9`)**: `PlaceholderMeshFactory` +
+  `PlaceholderModel` swap meshes at Awake — chunky chicken (GDD §4 silhouette),
+  grain-mound piles, nest-with-eggs bases. Tints/scale feedback/colliders untouched.
+  Remove the component per-prefab when real art lands.
+- **Log floor raised**: `ProjectContext` `_logMinLevel` Verbose → Debug (per-tick
+  cargo Verbose spam filled the entire console buffer and masked Info diagnostics).
+- **Still open in the solo track**: collision/zone polish verification (BUG: none
+  observed — needs an ability-heavy play session), Editor/runtime balance pass with
+  the new map totals, ground/visual treatment for the arena (bare grey plane).
+
 ### Project reorganization (2026-06-11) — UI consolidation, BUG-4 fix, test infra
 
 - **UI consolidated on UI Toolkit (Path B of `docs/UI_HANDOFF.md` — now marked RESOLVED).**
