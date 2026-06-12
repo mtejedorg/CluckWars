@@ -154,6 +154,31 @@ Applied the newest design wireframes (`cluckwars-hud-v3` / `-charselect-v3` / `-
 
 **Pending Maestro (optional polish)**: align each ability `.asset`'s `AccentColor` to the ART.md §3 v3 hexes if desired; import Lilita One + Nunito + an emoji sprite asset as TMP fonts to render glyphs and the glossy type.
 
+### Project reorganization (2026-06-11) — UI consolidation, BUG-4 fix, test infra
+
+- **UI consolidated on UI Toolkit (Path B of `docs/UI_HANDOFF.md` — now marked RESOLVED).**
+  The Bootstrap menu is solely `MenuUI` (`UIDocument` + `MenuUiController`) + `Assets/UI/*.uxml`
+  + `CluckWarsTheme.uss`. Deleted the failed atomic-prefab experiment: inactive `MenuCanvas`
+  removed from Bootstrap.unity, `CharacterSelectController` component removed from the
+  `Bootstrap` GO, 6 dead UI scripts (`CharacterSelectController`, 5 `Ui*View`), 5 one-shot
+  editor scripts (`UiPrefabBuilder`/`2`, `WireMenuScene`, `FixPrefabsAndCanvas`, `MenuUiWiring`),
+  and 5 broken prefabs in `Assets/_Game/Prefabs/UI/`. `UiGfx`/`SDFImageEffect`/SDF shader kept —
+  the in-game HUD still uses them. **Verified live**: clean compile (0 errors), MainMenu +
+  Character Select render the v3 design correctly in play mode (MCP screenshots).
+  New rule in `docs/CONVENTIONS.md` § UI rules: menu UI is UXML/USS only; never procedural UGUI.
+- **BUG-4 FIXED + verified**: removed `UGS_DISABLED` from Standalone scripting defines —
+  all platforms now bind the real `UGSService`. Verified in Editor play mode:
+  `IUGSService` resolves to `UGSService`, `InitializeAsync` + `SignInAnonymouslyAsync` succeed
+  (project IS Dashboard-linked). The fixed `cluck-lan` session is gone; hosts always get a
+  real lobby code. Editor↔Android both-HOST mismatch eliminated.
+  **Windows EXE must be rebuilt** (`Ctrl+Shift+W`) to pick this up.
+- **Test infra**: `tools/run-clients.ps1` launches N windowed Windows clients with per-client
+  logs (`Builds/Windows/logs/clientN.log`) — the standard multiplayer loop (emulators remain
+  dead). TESTING.md updated (launcher + real-UGS multiplayer flow).
+- **Repo hygiene**: root scratch files purged + gitignored (`args*.json`, `*_output.txt`,
+  `scratch/`, `.agent/`, `*.cs.bak`), `Design/` wireframes now tracked,
+  `UI_HANDOFF.md` moved to `docs/`.
+
 ---
 
 ## Outstanding before next test session
@@ -222,7 +247,7 @@ Pre-existing Maestro tasks still pending:
 1. ~~**Join case-sensitivity**~~ **FIXED (2026-06-03)** — `NullUGSService.JoinLobbyByCodeAsync` was uppercasing the join code to "CLUCK-LAN" while host used lowercase "cluck-lan". Photon room names are case-sensitive so the two clients never met. Fix: removed `.ToUpper()` from `JoinLobbyByCodeAsync` — both sides now use the code verbatim (lowercase).
 2. ~~**RestartMatch Y=0 fall-through**~~ **FIXED (2026-06-04, commit d69fad3)** — `GameManager.RestartMatch()` called `RPC_TeleportTo(spawnPoints[i])` with raw Y=0 positions. `MatchBootstrapper` initial spawn adds `+0.05f Y` jitter; restart did not. On Android (IL2CPP real device) the chicken clipped into the floor mesh and fell infinitely on every round restart. Fix: added `Vector3.up * 0.05f` to both real-player and bot teleport targets in `RestartMatch()`.
 3. ~~**ChickenCargo 3D distance**~~ **FIXED (2026-06-04, commit 61c46d8)** — See "Playtest fix" above. Previously `FindNearestPileInRange` used a 3D `sqrMagnitude` check, but the code was duplicated in the original commit without the XZ-only fix being applied to all three proximity methods. All three now use `HorizontalSqr()`.
-4. **UGS mismatch: Android uses real UGSService, Editor uses NullUGSService** (discovered 2026-06-04). The Android APK does NOT have `UGS_DISABLED` defined and the Unity project is linked to the Unity Dashboard on the Pixel 9 — it authenticates and creates real lobbies with unique codes. The Editor has `UGS_DISABLED` → `NullUGSService` → fixed session `cluck-lan`. **Both-HOST never connects them** (different sessions). Workaround: Editor must JOIN using the phone's lobby code. Long-term fix: add `UGS_DISABLED` to Android build scripting defines (or remove it from all platforms and use real UGS everywhere).
+4. ~~**UGS mismatch: Android real UGSService vs Editor NullUGSService**~~ **FIXED (2026-06-11)** — removed `UGS_DISABLED` from Standalone defines; all platforms use the real `UGSService`. Verified in Editor play mode (init + anonymous sign-in OK). Rebuild the Windows EXE to pick it up.
 5. **Third player can't connect** (reported 2026-05-08). **Partially retested 2026-06-04** — 2-player session confirmed working. 3-player test not yet run this session.
 6. **Solo-on-Android movement** (reported 2026-05-08). Not explicitly retested this session.
 

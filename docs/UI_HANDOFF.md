@@ -1,5 +1,17 @@
 # UI Engineering Handoff
 
+> **RESOLVED (2026-06-11): Path B — UI Toolkit — was chosen and is live.**
+> The Bootstrap scene's active menu is the `MenuUI` GameObject (`UIDocument` +
+> `MenuUiController`) driving `Assets/UI/*.uxml` + `Assets/UI/Styles/CluckWarsTheme.uss`.
+> The failed atomic-prefab path described below (inactive `MenuCanvas`, broken
+> prefabs in `Assets/_Game/Prefabs/UI/`, `CharacterSelectController` + `Ui*View`
+> scripts, and the `UiPrefabBuilder*`/`WireMenuScene`/`FixPrefabsAndCanvas`
+> editor scripts) has been **deleted**. The in-game HUD (`MatchHud`,
+> `TouchControlsHud`, `DebugHud` + `UiGfx`) remains procedural UGUI — it works
+> and is out of scope for this migration.
+> **Rule going forward: all menu/screen UI is UXML/USS. See `docs/CONVENTIONS.md`.**
+> The rest of this document is kept as historical context.
+
 ## Context
 We have been attempting to replicate a highly polished, responsive Character Select UI based on a Figma design. Initially, the UI was built procedurally via C# code (instantiating GameObjects and adding RectTransforms on the fly). This proved too brittle and verbose. 
 

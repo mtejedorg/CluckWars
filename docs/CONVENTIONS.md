@@ -196,6 +196,26 @@ Two `CharacterController`s spawned at the same XZ shove each other in collision 
 
 ---
 
+## UI rules (settled 2026-06-11 — do not re-litigate)
+
+- **All menu/screen UI is UI Toolkit**: layout in `Assets/UI/*.uxml`, styling in
+  `Assets/UI/Styles/CluckWarsTheme.uss`, logic in `MenuUiController` (binds data +
+  navigation only — no layout code in C#). Design source of truth: `Design/*.jsx`
+  wireframes + `docs/ART.md` tokens.
+- **Never build menu UI procedurally in C#** (RectTransforms/LayoutGroups from code)
+  and **never generate UGUI prefabs via editor scripts** — both approaches were tried
+  and failed; see `docs/UI_HANDOFF.md` for the postmortem.
+- The **in-game HUD** (`MatchHud`, `TouchControlsHud`, `DebugHud`, drawn with `UiGfx`)
+  is the one legacy procedural-UGUI island. It works; leave it unless a full HUD
+  migration to UXML is explicitly scheduled.
+- **Verify UI changes visually**: with the Editor open, use Unity MCP
+  `screenshot-game-view` in play mode after any UXML/USS change. UI work without a
+  screenshot check is not done.
+- `Assets/Resources/PanelSettings.asset` must stay `ScaleWithScreenSize` (`m_ScaleMode: 2`)
+  — `ConstantPhysicalSize` re-broke mobile scaling once already (2026-06-01).
+
+---
+
 ## Commit hygiene
 
 - One concern per commit. Avoid "fix bug + add feature + refactor" mega-commits.
