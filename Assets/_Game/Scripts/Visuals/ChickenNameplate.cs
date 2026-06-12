@@ -120,22 +120,28 @@ namespace CluckWars.Visuals
             var obj = _controller.Object;
             if (obj != null && obj.IsValid)
             {
-                int playerId = obj.InputAuthority.PlayerId;
+                // Identity = home corner, matching leaderboard P-numbers and base
+                // tints for humans and bots alike (InputAuthority can't tell bots
+                // apart — they all share [Player:None]).
+                int corner = _controller.HomeCornerIndex;
                 var klass = _controller.Class;
-                if (playerId != _appliedPlayerId || !_appliedClassValid || klass != _appliedClass)
+                if (corner != _appliedPlayerId || !_appliedClassValid || klass != _appliedClass)
                 {
-                    _appliedPlayerId = playerId;
+                    _appliedPlayerId = corner;
                     _appliedClass = klass;
                     _appliedClassValid = true;
-                    if (playerId < 0)
+                    if (corner < 0)
                     {
                         _text.text = klass.ToString();
                         _text.color = new Color(0.7f, 0.7f, 0.7f, 1f);
                     }
                     else
                     {
-                        _text.text = $"P{playerId + 1} {klass}";
-                        _text.color = PlayerColors[playerId % PlayerColors.Length];
+                        bool isBot = _controller.IsBot;
+                        _text.text = isBot
+                            ? $"P{corner + 1} {klass} (CPU)"
+                            : $"P{corner + 1} {klass}";
+                        _text.color = PlayerColors[corner % PlayerColors.Length];
                     }
                 }
             }

@@ -508,10 +508,17 @@ namespace CluckWars.UI
 
             if (_matchEndTitle != null)
             {
+                // Winner identity is the corner (matches leaderboard P-numbers and
+                // nameplates). WinnerPlayer is None when a bot wins — WinnerCorner
+                // still carries who it was.
                 var winner = _gameManager.WinnerPlayer;
-                _matchEndTitle.text = winner.IsRealPlayer
-                    ? $"PLAYER {winner.PlayerId + 1} WINS!"
-                    : "MATCH ENDED";
+                int corner = _gameManager.WinnerCorner;
+                if (corner >= 0)
+                    _matchEndTitle.text = winner.IsRealPlayer
+                        ? $"P{corner + 1} WINS!"
+                        : $"P{corner + 1} (CPU) WINS!";
+                else
+                    _matchEndTitle.text = "MATCH ENDED";
             }
 
             var rows = BuildSortedLeaderboard();

@@ -29,6 +29,17 @@ namespace CluckWars.Gameplay
         [Networked] public PlayerRef Owner { get; set; }
 
         /// <summary>
+        /// True when a solo-mode bot claims this base. Bots share
+        /// <c>PlayerRef.None</c> input authority so <see cref="Owner"/> can't carry
+        /// their identity — this flag makes the base count for win checks and tinting.
+        /// Set by <c>GameManager.AssignBasesToPlayers</c>.
+        /// </summary>
+        [Networked] public NetworkBool BotClaimed { get; set; }
+
+        /// <summary>A base is in play when a human owns it or a bot claims it.</summary>
+        public bool IsClaimed => Owner.IsRealPlayer || BotClaimed;
+
+        /// <summary>
         /// Which corner this base represents (0..3). Set by <c>MapGenerator</c> at
         /// spawn time via <c>onBeforeSpawned</c>; pairs with
         /// <c>MapGenerator.SpawnPoints[CornerIndex]</c> so a player joining at
@@ -63,6 +74,7 @@ namespace CluckWars.Gameplay
         // very first valid frame always triggers an apply (even if Owner is still
         // PlayerRef.None, which gives the grey unowned tint).
         private PlayerRef _lastOwnerForTint;
+        private bool      _lastBotClaimedForTint;
         private bool      _tintInitialized;
 
         [Inject]
@@ -88,10 +100,11 @@ namespace CluckWars.Gameplay
         private void LateUpdate()
         {
             if (Object == null || !Object.IsValid) return;
-            if (_tintInitialized && Owner == _lastOwnerForTint) return;
+            if (_tintInitialized && Owner == _lastOwnerForTint && (bool)BotClaimed == _lastBotClaimedForTint) return;
 
-            _tintInitialized  = true;
-            _lastOwnerForTint = Owner;
+            _tintInitialized       = true;
+            _lastOwnerForTint      = Owner;
+            _lastBotClaimedForTint = BotClaimed;
             ApplyOwnerTint();
         }
 
@@ -105,7 +118,7 @@ namespace CluckWars.Gameplay
         /// </summary>
         private void ApplyOwnerTint()
         {
-            var color = Owner.IsRealPlayer
+            var color = IsClaimed
                 ? PlayerColors[CornerIndex % PlayerColors.Length]
                 : UnownedColor;
 

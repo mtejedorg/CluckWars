@@ -255,15 +255,19 @@ namespace CluckWars.Gameplay
 
         private PlayerBase FindNearestBaseInRange()
         {
+            // Deposit gate is the chicken's home corner, not InputAuthority — bots all
+            // share [Player:None] authority, so an owner comparison would let every bot
+            // deposit at every unowned base (pooled, misattributed scores).
             var bases = PlayerBase.ActiveBases;
-            var ownerRef = Object.InputAuthority;
+            int homeCorner = _controller != null ? _controller.HomeCornerIndex : -1;
+            if (homeCorner < 0) return null;
             PlayerBase best = null;
             float  bestSqr  = float.MaxValue;
             for (int i = 0; i < bases.Count; i++)
             {
                 var b = bases[i];
                 if (b == null || b.Object == null || !b.Object.IsValid) continue;
-                if (b.Owner != ownerRef) continue;
+                if (b.CornerIndex != homeCorner) continue;
                 float sqr = HorizontalSqr(b.transform.position, transform.position);
                 float r   = b.DepositRadius;
                 if (sqr > r * r) continue;

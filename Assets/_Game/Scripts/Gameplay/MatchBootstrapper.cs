@@ -217,6 +217,7 @@ namespace CluckWars.Gameplay
                         {
                             ctrl.Class = botClass;
                             ctrl.IsBot = true;
+                            ctrl.HomeCornerIndex = cornerIdx;
                         }
 
                         if (haveLoadout)
@@ -327,6 +328,7 @@ namespace CluckWars.Gameplay
                 return;
             }
 
+            int homeCorner = PickSpawnCorner(runner, player);
             var pos = PickSpawnPosition(runner, player);
 
             // Defensive: nudge spawn slightly up + per-player horizontally so that
@@ -358,7 +360,11 @@ namespace CluckWars.Gameplay
                     // Set the Networked Class before Spawned() runs so every peer sees the
                     // chosen class on first read and can resolve stats / tint correctly.
                     var controller = networkObject.GetComponent<ChickenController>();
-                    if (controller != null) controller.Class = chosenClass;
+                    if (controller != null)
+                    {
+                        controller.Class = chosenClass;
+                        controller.HomeCornerIndex = homeCorner;
+                    }
 
                     // Apply player-chosen abilities when the player selected from a pool.
                     // Null means "use the prefab default" — SetSlots ignores null args.
@@ -371,6 +377,20 @@ namespace CluckWars.Gameplay
                 });
         }
 
+        /// <summary>
+        /// The shuffled corner index (0..3) for a player — single source of truth
+        /// shared by spawn-position selection and <c>HomeCornerIndex</c> stamping.
+        /// Single mode: the human always takes permutation slot 0 (bots take 1–3).
+        /// Shared mode: PlayerId is sequential (0-based) across up to 4 players.
+        /// </summary>
+        private int PickSpawnCorner(NetworkRunner runner, PlayerRef player)
+        {
+            int raw = (runner.GameMode == GameMode.Single)
+                ? 0
+                : Mathf.Abs(player.PlayerId) % 4;
+            return ShuffledCorner(raw);
+        }
+
         private Vector3 PickSpawnPosition(NetworkRunner runner, PlayerRef player)
         {
             // Prefer MapGenerator's computed corners. Lookup is cached; null check
@@ -379,13 +399,7 @@ namespace CluckWars.Gameplay
             if (_mapGenerator != null && _mapGenerator.SpawnPoints != null && _mapGenerator.SpawnPoints.Count > 0)
             {
                 var points = _mapGenerator.SpawnPoints;
-                // Single mode: always slot 0 for the human player so they never
-                // collide with bot slot 1, regardless of what Fusion assigns as PlayerId.
-                // Shared mode: PlayerId is sequential (0-based) across up to 4 players.
-                int raw = (runner.GameMode == GameMode.Single)
-                    ? 0
-                    : Mathf.Abs(player.PlayerId) % 4;
-                int idx = ShuffledCorner(raw);
+                int idx = PickSpawnCorner(runner, player);
                 return points[idx % points.Count];
             }
 

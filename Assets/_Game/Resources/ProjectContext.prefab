@@ -74,7 +74,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b904787d62fb8ee45a34f6f914857c3d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _logMinLevel: 0
+  _logMinLevel: 1
   _chickenClassRegistry: {fileID: 11400000, guid: 1885b7d81a1e4eb47b84e9c58967f601, type: 2}
   _audioRegistry: {fileID: 11400000, guid: 08200a3748d678f409c6cd1c7a53a326, type: 2}
   _prefabRegistry: {fileID: 11400000, guid: 98b68981e7a09644188bef851cbd9a3f, type: 2}

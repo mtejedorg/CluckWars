@@ -128,6 +128,14 @@ namespace CluckWars.Gameplay
         /// <summary>True for AI-controlled bots spawned in solo mode.</summary>
         [Networked] public bool IsBot { get; set; }
 
+        /// <summary>
+        /// Corner (0..3) this chicken spawned at — its match identity. Drives base
+        /// ownership, deposit gating, leaderboard attribution, nameplate numbering,
+        /// and restart teleports for humans and bots alike. Stamped by
+        /// <c>MatchBootstrapper</c> in <c>onBeforeSpawned</c>; -1 = not yet assigned.
+        /// </summary>
+        [Networked] public int HomeCornerIndex { get; set; } = -1;
+
         // ---- v0.3 Feather Aura (Networked so every peer sees the caster's state) ---
 
         /// <summary>True while the Feather Aura ability is active on this chicken.

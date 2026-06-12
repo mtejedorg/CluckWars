@@ -31,6 +31,9 @@ namespace CluckWars.Gameplay
         [Networked] public MatchState State { get; set; }
         [Networked] public TickTimer MatchTimer { get; set; }
         [Networked] public PlayerRef WinnerPlayer { get; set; }
+        /// <summary>Corner (0..3) of the winning base; -1 = no winner. Carries the
+        /// winner's identity when a bot wins (WinnerPlayer stays None for bots).</summary>
+        [Networked] public int WinnerCorner { get; set; } = -1;
         [Networked] public float WinnerFoodTotal { get; set; }
         [Networked] public TickTimer RestartCountdown { get; set; }
         [Networked] public TickTimer IntroTimer { get; set; }
@@ -227,13 +230,12 @@ namespace CluckWars.Gameplay
                 if (!player.IsRealPlayer) continue;
                 if (PlayerHasBase(bases, player)) continue;
 
-                // Assign the nearest unowned base to where this player's chicken
-                // is currently standing. This is robust across corner-permutation
-                // shuffles (MatchBootstrapper randomises starting edges each game),
-                // PlayerId values in Fusion Single vs Shared mode, and late-join
-                // scenarios.  Falls back to first-unowned if the chicken hasn't
-                // spawned yet (GameManager ticks every frame so it retries).
-                var freeBase = FindNearestUnownedBaseToPlayer(bases, player)
+                // Prefer the base whose CornerIndex matches the chicken's stamped
+                // HomeCornerIndex (exact identity), then fall back to nearest /
+                // first-unowned for robustness (late joins, chicken not spawned yet —
+                // GameManager ticks every frame so it retries).
+                var freeBase = FindHomeCornerBaseForPlayer(bases, player)
+                               ?? FindNearestUnownedBaseToPlayer(bases, player)
                                ?? FindUnownedBase(bases);
                 if (freeBase == null)
                 {
@@ -246,6 +248,49 @@ namespace CluckWars.Gameplay
                 _log?.Info(Source, $"Assigned '{freeBase.name}' (corner {freeBase.CornerIndex}) " +
                     $"to player {player} (PlayerId={player.PlayerId}).");
             }
+
+            // Bots: claim the base at each bot's home corner so it counts for win
+            // checks and tints. Bots share [Player:None] authority, so Owner can't
+            // carry their identity — BotClaimed does.
+            var chickens = ChickenController.ActiveControllers;
+            for (int i = 0; i < chickens.Count; i++)
+            {
+                var c = chickens[i];
+                if (c == null || !c.IsBot || c.HomeCornerIndex < 0) continue;
+                for (int j = 0; j < bases.Count; j++)
+                {
+                    var b = bases[j];
+                    if (b == null || b.BotClaimed || b.Owner.IsRealPlayer) continue;
+                    if (b.CornerIndex != c.HomeCornerIndex) continue;
+                    b.BotClaimed = true;
+                    _log?.Info(Source, $"Bot ({c.Class}) claimed '{b.name}' (corner {b.CornerIndex}).");
+                }
+            }
+        }
+
+        /// <summary>
+        /// The unowned base whose CornerIndex equals the player's chicken
+        /// <c>HomeCornerIndex</c>. Null if the chicken hasn't spawned, has no
+        /// stamped corner, or the matching base is taken.
+        /// </summary>
+        private PlayerBase FindHomeCornerBaseForPlayer(System.Collections.Generic.List<PlayerBase> bases, PlayerRef player)
+        {
+            var chickens = ChickenController.ActiveControllers;
+            for (int i = 0; i < chickens.Count; i++)
+            {
+                var c = chickens[i];
+                if (c == null || c.Object == null || !c.Object.IsValid) continue;
+                if (c.Object.InputAuthority != player) continue;
+                if (c.HomeCornerIndex < 0) return null;
+                for (int j = 0; j < bases.Count; j++)
+                {
+                    var b = bases[j];
+                    if (b == null || b.Owner.IsRealPlayer || b.BotClaimed) continue;
+                    if (b.CornerIndex == c.HomeCornerIndex) return b;
+                }
+                return null;
+            }
+            return null;
         }
 
         /// <summary>
@@ -314,6 +359,7 @@ namespace CluckWars.Gameplay
             IntroTimer = TickTimer.CreateFromSeconds(Runner, _introSeconds);
             MatchTimer = TickTimer.CreateFromSeconds(Runner, MatchDurationSeconds + _introSeconds);
             WinnerPlayer = PlayerRef.None;
+            WinnerCorner = -1;
             WinnerFoodTotal = 0f;
             _audio?.PlaySFX(_audioReg != null ? _audioReg.MatchStart : null);
             if (_audioReg != null && _audioReg.MatchMusic != null)
@@ -325,43 +371,47 @@ namespace CluckWars.Gameplay
 
         private void EvaluateWinCondition()
         {
-            // Owned bases only — a stray unowned base hitting the target shouldn't
-            // trigger a PlayerRef.None winner.
+            // Claimed bases only (human-owned or bot-claimed) — a stray unclaimed
+            // base hitting the target shouldn't trigger a phantom winner. Bots
+            // compete on equal terms: a bot base reaching the target ends the match.
             var bases = PlayerBase.ActiveBases;
             for (int i = 0; i < bases.Count; i++)
             {
                 var b = bases[i];
-                if (b == null || !b.Owner.IsRealPlayer) continue;
+                if (b == null || !b.IsClaimed) continue;
                 if (b.FoodTotal < FoodTargetToWin) continue;
-                EndMatch(b.Owner, b.FoodTotal, reason: "food target reached");
+                EndMatch(b.Owner, b.CornerIndex, b.FoodTotal, reason: "food target reached");
                 return;
             }
         }
 
         private void EndOnTimerExpiry()
         {
-            // Highest-total OWNED base wins. Ties broken by iteration order; good
-            // enough for the demo, refine when scoring rules are revisited.
+            // Highest-total CLAIMED base wins (human or bot). Ties broken by
+            // iteration order; good enough for the demo.
             var bases = PlayerBase.ActiveBases;
             PlayerRef winner = PlayerRef.None;
+            int winnerCorner = -1;
             float bestTotal = -1f;
             for (int i = 0; i < bases.Count; i++)
             {
                 var b = bases[i];
-                if (b == null || !b.Owner.IsRealPlayer) continue;
+                if (b == null || !b.IsClaimed) continue;
                 if (b.FoodTotal > bestTotal)
                 {
                     bestTotal = b.FoodTotal;
                     winner = b.Owner;
+                    winnerCorner = b.CornerIndex;
                 }
             }
-            EndMatch(winner, Mathf.Max(0f, bestTotal), reason: "timer expired");
+            EndMatch(winner, winnerCorner, Mathf.Max(0f, bestTotal), reason: "timer expired");
         }
 
-        private void EndMatch(PlayerRef winner, float winnerTotal, string reason)
+        private void EndMatch(PlayerRef winner, int winnerCorner, float winnerTotal, string reason)
         {
             State = MatchState.Ended;
             WinnerPlayer = winner;
+            WinnerCorner = winnerCorner;
             WinnerFoodTotal = winnerTotal;
             RestartCountdown = TickTimer.CreateFromSeconds(Runner, _restartDelaySeconds);
             _audio?.StopMusic();
@@ -451,25 +501,19 @@ namespace CluckWars.Gameplay
             if (spawnPoints != null && spawnPoints.Count > 0)
             {
                 var controllers = ChickenController.ActiveControllers;
-                // Track which spawn corners are taken so bots get the remaining ones.
-                int botCornerCounter = 1; // bots occupy corners 1, 2, 3
+                // Every chicken carries its spawn corner in HomeCornerIndex — humans
+                // and bots alike — so restart teleports are exact (the old PlayerId-
+                // modulo mapping ignored the corner-permutation shuffle and could
+                // send a player to a rival's corner).
+                int fallbackCorner = 0;
                 for (int i = 0; i < controllers.Count; i++)
                 {
                     var ctrl = controllers[i];
                     if (ctrl == null || ctrl.Object == null) continue;
-                    var player = ctrl.Object.InputAuthority;
-                    if (player.IsRealPlayer)
-                    {
-                        int cornerIdx = Mathf.Abs(player.PlayerId) % spawnPoints.Count;
-                        ctrl.RPC_TeleportTo(spawnPoints[cornerIdx] + Vector3.up * 0.05f);
-                    }
-                    else if (ctrl.IsBot)
-                    {
-                        // Assign bots to corners 1, 2, 3 in order (same as initial spawn).
-                        int botCorner = botCornerCounter % spawnPoints.Count;
-                        botCornerCounter++;
-                        ctrl.RPC_TeleportTo(spawnPoints[botCorner] + Vector3.up * 0.05f);
-                    }
+                    if (!ctrl.Object.InputAuthority.IsRealPlayer && !ctrl.IsBot) continue;
+                    int corner = ctrl.HomeCornerIndex;
+                    if (corner < 0) corner = fallbackCorner++; // legacy chickens without a stamp
+                    ctrl.RPC_TeleportTo(spawnPoints[corner % spawnPoints.Count] + Vector3.up * 0.05f);
                 }
             }
 
@@ -479,6 +523,7 @@ namespace CluckWars.Gameplay
             IntroTimer = TickTimer.CreateFromSeconds(Runner, _introSeconds);
             MatchTimer = TickTimer.CreateFromSeconds(Runner, MatchDurationSeconds + _introSeconds);
             WinnerPlayer = PlayerRef.None;
+            WinnerCorner = -1;
             WinnerFoodTotal = 0f;
             RestartCountdown = default;
             _nextWinCheckTime = 0f;

@@ -322,14 +322,24 @@ namespace CluckWars.Gameplay
             if (_homeBase != null && _homeBase.Object != null && _homeBase.Object.IsValid)
                 return _homeBase.transform.position;
 
+            // Exact identity first: the base at this bot's HomeCornerIndex (the only
+            // one it can deposit at). Nearest-unowned is a legacy fallback for
+            // chickens without a stamped corner.
             var bases   = PlayerBase.ActiveBases;
             var selfPos = _controller.transform.position;
+            int homeCorner = _controller.HomeCornerIndex;
             PlayerBase nearest = null;
             float bestSqr = float.MaxValue;
             for (int i = 0; i < bases.Count; i++)
             {
                 var b = bases[i];
-                if (b == null || b.Owner.IsRealPlayer) continue;
+                if (b == null) continue;
+                if (homeCorner >= 0)
+                {
+                    if (b.CornerIndex == homeCorner) { nearest = b; break; }
+                    continue;
+                }
+                if (b.Owner.IsRealPlayer) continue;
                 float sqr = (b.transform.position - selfPos).sqrMagnitude;
                 if (sqr < bestSqr) { bestSqr = sqr; nearest = b; }
             }
