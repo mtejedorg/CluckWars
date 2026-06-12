@@ -71,6 +71,10 @@ namespace CluckWars.Gameplay
         [Min(0f)]
         [SerializeField] private float _abilityRange = 4.0f;
 
+        [Tooltip("Hysteresis: radii grow by this factor while the matching state is active, so a rival hovering on the boundary can't flip the FSM every think tick (BOT-8).")]
+        [Min(1f)]
+        [SerializeField] private float _stateExitRadiusFactor = 1.35f;
+
         // ---- Component references -------------------------------------------
 
         private ChickenController _controller;
@@ -148,9 +152,15 @@ namespace CluckWars.Gameplay
 
             float cargoFraction = _cargo != null ? _cargo.Fraction : 0f;
 
+            // Hysteresis (BOT-8): while already fleeing/hunting, the trigger radius
+            // grows so a rival hovering on the boundary can't flip the state every
+            // 0.3s think. Entering still uses the base radius.
+            float dangerR = _state == BotState.Flee ? _dangerRadius * _stateExitRadiusFactor : _dangerRadius;
+            float huntR   = _state == BotState.Hunt ? _huntRadius   * _stateExitRadiusFactor : _huntRadius;
+
             // Priority 1: FLEE — loaded + rival within danger radius.
             if (cargoFraction >= _protectCargoThreshold &&
-                _perceivedRival != null && _perceivedRivalDist <= _dangerRadius)
+                _perceivedRival != null && _perceivedRivalDist <= dangerR)
             {
                 _state      = BotState.Flee;
                 _moveTarget = GetHomeBasePosition();
@@ -172,31 +182,52 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            // Priority 3: HUNT — rival loaded + in hunt radius + bot is aggressive.
-            if (_huntRadius > 0f && _perceivedRival != null &&
-                _perceivedRivalDist <= _huntRadius &&
-                _perceivedRivalCargo >= _huntCargoThreshold)
+            // Priority 3: HUNT — a loaded rival in hunt radius + bot is aggressive.
+            // The nearest rival may be empty while a loaded one stands a little
+            // further away — re-scan with requireCargo before giving up on the hunt.
+            if (_huntRadius > 0f)
             {
-                _state      = BotState.Hunt;
-                _moveTarget = _perceivedRival.transform.position;
-                if (_perceivedRivalDist <= _abilityRange)
-                    ReactWithAbility(new[] { BotRole.Steal, BotRole.Offense, BotRole.Control },
-                        alwaysFireIfReady: false);
+                var target     = _perceivedRival;
+                var targetDist = _perceivedRivalDist;
+                var targetCargo = _perceivedRivalCargo;
+                if (target == null || targetCargo < _huntCargoThreshold)
+                    target = FindNearestRival(out targetDist, out targetCargo, requireCargo: true);
 
-                if (_state != _prevState)
-                    _log?.Debug(Source, $"→ Hunt rival at dist={_perceivedRivalDist:0.0}, cargo={_perceivedRivalCargo:P0}.");
-                return;
+                if (target != null && targetDist <= huntR && targetCargo >= _huntCargoThreshold)
+                {
+                    _state      = BotState.Hunt;
+                    _moveTarget = target.transform.position;
+                    if (targetDist <= _abilityRange)
+                        ReactWithAbility(new[] { BotRole.Steal, BotRole.Offense, BotRole.Control },
+                            alwaysFireIfReady: false);
+
+                    if (_state != _prevState)
+                        _log?.Debug(Source, $"→ Hunt rival at dist={targetDist:0.0}, cargo={targetCargo:P0}.");
+                    return;
+                }
             }
 
-            // Priority 4: COLLECT — nearest non-empty pile.
-            var pile = FindNearestPile();
+            // Priority 4: COLLECT — nearest non-empty pile OR ground pickup,
+            // whichever is closer. Pickups matter most right after a hunt: the
+            // stunned victim's dropped cargo is usually at the bot's feet.
+            var pile   = FindNearestPile(out float pileSqr);
+            var pickup = FindNearestPickup(out float pickupSqr);
+            if (pickup != null && (pile == null || pickupSqr < pileSqr))
+            {
+                _state      = BotState.CollectFood;
+                _moveTarget = pickup.transform.position;
+                if (_state != _prevState)
+                    _log?.Debug(Source, $"→ CollectFood (ground pickup, dist={Mathf.Sqrt(pickupSqr):0.0}).");
+                return;
+            }
             if (pile != null)
             {
                 _state      = BotState.CollectFood;
                 _moveTarget = pile.transform.position;
 
-                // If a rival is contesting the same pile, try to displace them.
-                if (_perceivedRival != null)
+                // If a rival is contesting the same pile (and we're close enough for
+                // the ability to actually land), try to displace them.
+                if (_perceivedRival != null && _perceivedRivalDist <= _abilityRange)
                 {
                     float rivalToPile = (_perceivedRival.transform.position - pile.transform.position).magnitude;
                     if (rivalToPile < _arrivalRadius * 2.5f)
@@ -297,7 +328,7 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>Finds the nearest non-empty food pile.</summary>
-        private FoodPile FindNearestPile()
+        private FoodPile FindNearestPile(out float bestSqrOut)
         {
             var piles   = FoodPile.ActivePiles;
             var selfPos = _controller.transform.position;
@@ -310,6 +341,26 @@ namespace CluckWars.Gameplay
                 float sqr = (p.transform.position - selfPos).sqrMagnitude;
                 if (sqr < bestSqr) { bestSqr = sqr; best = p; }
             }
+            bestSqrOut = bestSqr;
+            return best;
+        }
+
+        /// <summary>Finds the nearest non-empty ground pickup (death-dropped cargo).</summary>
+        private FoodPickup FindNearestPickup(out float bestSqrOut)
+        {
+            var pickups = FoodPickup.ActivePickups;
+            var selfPos = _controller.transform.position;
+            FoodPickup best    = null;
+            float      bestSqr = float.MaxValue;
+            for (int i = 0; i < pickups.Count; i++)
+            {
+                var p = pickups[i];
+                if (p == null || p.IsEmpty) continue;
+                if (p.Object == null || !p.Object.IsValid) continue;
+                float sqr = (p.transform.position - selfPos).sqrMagnitude;
+                if (sqr < bestSqr) { bestSqr = sqr; best = p; }
+            }
+            bestSqrOut = bestSqr;
             return best;
         }
 

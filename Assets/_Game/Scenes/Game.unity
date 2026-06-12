@@ -505,12 +505,13 @@ MonoBehaviour:
   _wallsVisible: 0
   _wallMaterial: {fileID: 0}
   _baseCornerDistance: 12
-  _centerPileAmount: 80
+  _centerPileAmount: 60
   _centerPileVisualScale: 1.5
-  _smallPileAmount: 30
-  _smallPileCount: 4
-  _smallPileMinRadius: 4
-  _smallPileMaxRadius: 8
+  _personalPileAmount: 15
+  _personalPileInset: 0.35
+  _contestedPileAmount: 25
+  _contestedEdgeInset: 0.8
+  _pilePositionJitter: 1.5
 --- !u!1 &1280783553
 GameObject:
   m_ObjectHideFlags: 0

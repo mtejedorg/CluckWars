@@ -59,28 +59,34 @@ namespace CluckWars.Gameplay
         [Min(2f)]
         [SerializeField] private float _baseCornerDistance = 12f;
 
-        [Header("Food piles")]
-        [Tooltip("Initial food in the central showcase pile (≈ 2× a small pile).")]
+        [Header("Food piles (GDD §3: center + personal + contested islands)")]
+        [Tooltip("Initial food in the central pile — large, high risk, high reward (GDD §3: 60).")]
         [Min(5f)]
-        [SerializeField] private float _centerPileAmount = 80f;
+        [SerializeField] private float _centerPileAmount = 60f;
 
         [Tooltip("Center pile mesh scale multiplier — makes it visually bigger without changing gameplay rules beyond the food count.")]
         [Min(0.5f)]
         [SerializeField] private float _centerPileVisualScale = 1.5f;
 
-        [Tooltip("Initial food in each small satellite pile (uses prefab default if 0).")]
+        [Tooltip("Food in each player's personal island — small, relatively safe early game (GDD §3: 15).")]
         [Min(0f)]
-        [SerializeField] private float _smallPileAmount = 30f;
+        [SerializeField] private float _personalPileAmount = 15f;
 
-        [Tooltip("How many small piles to scatter around the center.")]
-        [Min(0)]
-        [SerializeField] private int _smallPileCount = 4;
+        [Tooltip("Personal island position = Lerp(corner, center, inset). 0.35 puts it a few units in front of the base, toward the action.")]
+        [Range(0.2f, 0.6f)]
+        [SerializeField] private float _personalPileInset = 0.35f;
 
-        [Tooltip("Inner / outer radius of the small-pile ring around the center.")]
-        [Min(1f)]
-        [SerializeField] private float _smallPileMinRadius = 4f;
-        [Min(1f)]
-        [SerializeField] private float _smallPileMaxRadius = 8f;
+        [Tooltip("Food in each contested island between adjacent player pairs — designed to provoke early fights (GDD §3: 25).")]
+        [Min(0f)]
+        [SerializeField] private float _contestedPileAmount = 25f;
+
+        [Tooltip("Contested island position = edge midpoint scaled toward center. 0.8 keeps it between the two neighbours but inside the walls.")]
+        [Range(0.4f, 1f)]
+        [SerializeField] private float _contestedEdgeInset = 0.8f;
+
+        [Tooltip("Random XZ jitter applied to personal + contested island positions each match (GDD §3: positions randomized within constraints). Center pile never moves.")]
+        [Min(0f)]
+        [SerializeField] private float _pilePositionJitter = 1.5f;
 
         private INetworkService _network;
         private PrefabRegistrySO _prefabRegistry;
@@ -293,48 +299,65 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            // Center pile — bigger Amount + bigger visual.
-            var centerObj = runner.Spawn(
-                pilePrefab,
-                Vector3.zero,
-                Quaternion.identity,
-                onBeforeSpawned: (_, networkObject) =>
-                {
-                    var pile = networkObject.GetComponent<FoodPile>();
-                    if (pile != null)
-                    {
-                        pile.Amount = _centerPileAmount;
-                        pile.MaxAmount = _centerPileAmount;
-                    }
-                });
+            // GDD §3 layout — three strategic options per player:
+            //   Secure:  personal island near own base (low yield, safe).
+            //   Contest: large central pile (high risk, high reward).
+            //   Invade:  rivals' islands / loaded carriers.
+            // Center is fixed; personal + contested islands get per-match XZ jitter
+            // (GDD: "food island positions are randomized within constraints").
+            // Master-spawned NetworkObjects replicate, so plain Random is fine —
+            // no cross-peer seeding needed.
+
+            // Center pile — bigger Amount + bigger visual. Never moves.
+            var centerObj = SpawnPile(runner, pilePrefab, Vector3.zero, _centerPileAmount);
             if (centerObj != null)
             {
                 centerObj.transform.localScale = Vector3.one * _centerPileVisualScale;
             }
 
-            // Small piles — evenly spaced around the ring with a jittered radius.
-            for (int i = 0; i < _smallPileCount; i++)
+            // Personal islands — one in front of each base, on the base→center line.
+            for (int i = 0; i < _corners.Length; i++)
             {
-                float angle = (i / (float)_smallPileCount) * Mathf.PI * 2f;
-                float radius = Random.Range(_smallPileMinRadius, _smallPileMaxRadius);
-                var pos = new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
-
-                runner.Spawn(
-                    pilePrefab,
-                    pos,
-                    Quaternion.identity,
-                    onBeforeSpawned: (_, networkObject) =>
-                    {
-                        if (_smallPileAmount <= 0f) return; // let prefab default seed
-                        var pile = networkObject.GetComponent<FoodPile>();
-                        if (pile != null)
-                        {
-                            pile.Amount = _smallPileAmount;
-                            pile.MaxAmount = _smallPileAmount;
-                        }
-                    });
+                var pos = Vector3.Lerp(_corners[i], Vector3.zero, _personalPileInset) + JitterXZ();
+                SpawnPile(runner, pilePrefab, pos, _personalPileAmount);
             }
-            _log?.Info(Source, $"Spawned center pile + {_smallPileCount} small piles.");
+
+            // Contested islands — between each pair of adjacent corners, pulled
+            // slightly toward the center so they sit inside the walls.
+            for (int i = 0; i < _corners.Length; i++)
+            {
+                var mid = (_corners[i] + _corners[(i + 1) % _corners.Length]) * 0.5f;
+                var pos = mid * _contestedEdgeInset + JitterXZ();
+                SpawnPile(runner, pilePrefab, pos, _contestedPileAmount);
+            }
+
+            _log?.Info(Source, $"Spawned GDD layout: center ({_centerPileAmount}) + " +
+                $"4 personal ({_personalPileAmount}) + 4 contested ({_contestedPileAmount}) piles. " +
+                $"Total food = {_centerPileAmount + 4f * (_personalPileAmount + _contestedPileAmount):0}.");
+        }
+
+        private Vector3 JitterXZ()
+        {
+            var j = Random.insideUnitCircle * _pilePositionJitter;
+            return new Vector3(j.x, 0f, j.y);
+        }
+
+        private NetworkObject SpawnPile(NetworkRunner runner, NetworkObject pilePrefab, Vector3 pos, float amount)
+        {
+            return runner.Spawn(
+                pilePrefab,
+                pos,
+                Quaternion.identity,
+                onBeforeSpawned: (_, networkObject) =>
+                {
+                    if (amount <= 0f) return; // let prefab default seed
+                    var pile = networkObject.GetComponent<FoodPile>();
+                    if (pile != null)
+                    {
+                        pile.Amount = amount;
+                        pile.MaxAmount = amount;
+                    }
+                });
         }
     }
 }
