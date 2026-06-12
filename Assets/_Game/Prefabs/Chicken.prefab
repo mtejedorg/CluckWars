@@ -25,6 +25,7 @@ GameObject:
   - component: {fileID: 7617149068659373758}
   - component: {fileID: 7853284419870734786}
   - component: {fileID: 7224469946525777145}
+  - component: {fileID: 8123582145153776448}
   m_Layer: 0
   m_Name: Chicken
   m_TagString: Untagged
@@ -192,6 +193,10 @@ MonoBehaviour:
   _Class: 0
   _VisualOpacity: 0
   _IsBot: 0
+  _HomeCornerIndex: -1
+  _AuraSlowActive: 0
+  _AuraSlowRadius: 0
+  _AuraSlowFactor: 0
 --- !u!95 &5731265523250509895
 Animator:
   serializedVersion: 7
@@ -254,9 +259,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenCombat
   _stunDuration: 5
-  _targetMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
   _HP: 0
   _IsStunned: 0
 --- !u!114 &-4654369670535789821
@@ -291,6 +293,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.AbilityController
   _slot0: {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
   _slot1: {fileID: 11400000, guid: 0d5566bf334a1c44a9711ea9b34a4ac6, type: 2}
+  _slot2: {fileID: 0}
   _ActiveSlot: 0
 --- !u!114 &9204612626180569764
 MonoBehaviour:
@@ -336,6 +339,12 @@ MonoBehaviour:
   _thinkInterval: 0.3
   _arrivalRadius: 1.5
   _returnThreshold: 0.7
+  _protectCargoThreshold: 0.4
+  _dangerRadius: 5
+  _huntRadius: 8
+  _huntCargoThreshold: 0.3
+  _abilityRange: 4
+  _stateExitRadiusFactor: 1.35
 --- !u!114 &7224469946525777145
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -357,3 +366,16 @@ MonoBehaviour:
   _stunHeadOffset: 1.75
   _depositCount: 12
   _depositColor: {r: 0.96, g: 0.78, b: 0.26, a: 1}
+--- !u!114 &8123582145153776448
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bfdedfdc7a1eeb543adbecff26074434, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.PlaceholderModel
+  _kind: 0

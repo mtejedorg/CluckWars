@@ -67,6 +67,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.PlayerBase
   _depositRadius: 2.5
   _FoodTotal: 0
+  _BotClaimed:
+    _value: 0
+  _CornerIndex: 0
 --- !u!1 &6497727121566101870
 GameObject:
   m_ObjectHideFlags: 0
@@ -79,6 +82,7 @@ GameObject:
   - component: {fileID: 8909582907467889000}
   - component: {fileID: 2674841141964620999}
   - component: {fileID: 1405756617267196819}
+  - component: {fileID: 2946688940279365341}
   m_Layer: 0
   m_Name: Cube
   m_TagString: Untagged
@@ -179,3 +183,16 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &2946688940279365341
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6497727121566101870}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bfdedfdc7a1eeb543adbecff26074434, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.PlaceholderModel
+  _kind: 2
