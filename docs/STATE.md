@@ -154,6 +154,37 @@ Applied the newest design wireframes (`cluckwars-hud-v3` / `-charselect-v3` / `-
 
 **Pending Maestro (optional polish)**: align each ability `.asset`'s `AccentColor` to the ART.md §3 v3 hexes if desired; import Lilita One + Nunito + an emoji sprite asset as TMP fonts to render glyphs and the glossy type.
 
+### Ability range/usability feedback (2026-06-13, commit `b86da7e`)
+
+Maestro: targeted abilities were "super confusing" — no visible reach, no signal
+for when a press would do anything. Added a layered feedback model:
+
+- `AbilityBaseSO` gained `IndicatorRange` / `RequiresEnemyInRange` / `IsUsable(caster)`
+  + a `HasEnemyInRange` helper. **Peck**, **Cluck Shock**, **Sneaky Steal** override
+  them (Steal additionally requires the target to be carrying cargo).
+- `AbilityController.TryActivate` now refuses to fire a range-gated ability with no
+  valid target — the cooldown isn't burned on a guaranteed whiff.
+- `TouchControlsHud` ability buttons have **three states**: accent+dimmed on cooldown,
+  desaturated grey when ready-but-no-target, full accent when actually usable.
+- New `AbilityRangeIndicator` (on the Chicken prefab): a local on-ground **range ring**
+  that's faint when no target is in reach and **brightens + thickens** the instant an
+  enemy enters, plus an expanding **cast flash** at the ability's true radius when it
+  fires. Local VFX only (no RPCs), same `ActiveSlot`-poll pattern as `ChickenVFX`.
+- Verified live in solo: ring + both buttons grey with no enemy near; ring turns gold
+  and buttons colour (PCK red, CSK yellow) when a bot is inside range. `IsUsable`
+  confirmed `False`@far / `True`@1.4u.
+
+> **Tooling gotcha (next agent, read this):** a new `.cs` written to disk *while the
+> Unity Editor was busy/MCP-disconnected* imported with a `MonoImporter` + `.meta` but
+> was **silently excluded from Assembly-CSharp's source list** — `assets-refresh`,
+> `ImportAsset(ForceUpdate)`, deleting the `.meta`, and `RequestScriptCompilation` all
+> failed to add it (type stayed MISSING, `scriptCompilationFailed=False`). Diagnosis:
+> `CompilationPipeline.GetAssemblies()` → `Assembly-CSharp.sourceFiles` didn't contain
+> the path. Fix that worked: `AssetDatabase.DeleteAsset(path)` then **recreate the file
+> through Unity's own `script-update-or-create` tool** (param keys: `filePath` +
+> `content`) so Unity registers it cleanly. Prefer creating new scripts via that tool
+> rather than the raw Write tool when the editor may be mid-reload.
+
 ### Solo-first polish pass (2026-06-12) — scoring fix, GDD map, bot AI, placeholder models
 
 Direction set by Maestro: perfect solo mode before returning to multiplayer.
