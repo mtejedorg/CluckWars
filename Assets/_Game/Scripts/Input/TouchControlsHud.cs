@@ -227,6 +227,9 @@ namespace CluckWars.Input
             return null;
         }
 
+        // Desaturated tint for "ready but no target in range" (range-gated abilities).
+        private static readonly Color OutOfRangeTint = new Color(0.42f, 0.44f, 0.47f, 1f);
+
         private void UpdateCooldownOverlay(int slot)
         {
             var refs = _abilityBtns[slot];
@@ -234,15 +237,19 @@ namespace CluckWars.Input
 
             float fill      = 0f;
             float remaining = 0f;
+            bool  usable    = true;
+            AbilityBaseSO equipped = null;
             var abilities = _localChicken != null ? _localChicken.Abilities : null;
             if (abilities != null)
             {
-                AbilityBaseSO equipped = SlotAbility(abilities, slot);
+                equipped = SlotAbility(abilities, slot);
                 if (equipped != null && equipped.Cooldown > 0f)
                 {
                     remaining = abilities.CooldownRemaining(slot);
                     fill      = Mathf.Clamp01(remaining / equipped.Cooldown);
                 }
+                if (equipped != null)
+                    usable = equipped.IsUsable(_localChicken);
             }
 
             refs.CooldownOverlay.fillAmount = fill;
@@ -256,18 +263,22 @@ namespace CluckWars.Input
                 if (onCd) refs.CooldownNumber.text = Mathf.CeilToInt(remaining).ToString();
             }
 
-            // B4: grey-out the base button (and dim the glyph) when on cooldown.
-            // Alpha 0.45 on cooldown, 1.0 when ready — clear visual affordance.
+            // Three visual states, in priority order:
+            //   cooldown        → accent color, dimmed (alpha 0.45 / glyph 0.35)
+            //   ready, no target→ desaturated grey (range-gated abilities only)
+            //   ready, usable   → full accent color, alpha 1.0
             if (refs.BaseImg != null)
             {
-                var c = refs.BaseImg.color;
-                c.a = fill > 0f ? 0.45f : 1.0f;
+                bool onCd = fill > 0f;
+                var accent = equipped != null ? equipped.AccentColor : _colors.AbilityNormal;
+                Color c = onCd || usable ? accent : OutOfRangeTint;
+                c.a = onCd ? 0.45f : (usable ? 1.0f : 0.7f);
                 refs.BaseImg.color = c;
             }
             if (refs.Icon != null)
             {
                 var c = refs.Icon.color;
-                c.a = fill > 0f ? 0.35f : 1.0f;
+                c.a = fill > 0f ? 0.35f : (usable ? 1.0f : 0.5f);
                 refs.Icon.color = c;
             }
         }

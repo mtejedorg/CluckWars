@@ -104,6 +104,64 @@ namespace CluckWars.Abilities
             _ => BotRole,
         };
 
+        // ---- Targeting / usability feedback (HUD range rings + grey-out) ------
+
+        /// <summary>
+        /// World-space range this ability cares about, surfaced for UI feedback
+        /// (ground range ring, usability grey-out). 0 = no meaningful range
+        /// (self-buffs, placed zones). Subclasses with a tuned range field
+        /// override this to expose it — no asset re-authoring needed.
+        /// </summary>
+        public virtual float IndicatorRange => 0f;
+
+        /// <summary>
+        /// True when activating without an enemy inside <see cref="IndicatorRange"/>
+        /// would do nothing (Peck, Sneaky Steal, Cluck Shock). The HUD greys the
+        /// button out and <c>AbilityController.TryActivate</c> refuses the cast so
+        /// the cooldown isn't burned on a guaranteed whiff.
+        /// </summary>
+        public virtual bool RequiresEnemyInRange => false;
+
+        /// <summary>
+        /// Can this ability do something right now (cooldown aside)? Default: yes.
+        /// Range-gated abilities override via <see cref="RequiresEnemyInRange"/> /
+        /// <see cref="HasEnemyInRange"/>; Sneaky Steal additionally requires the
+        /// target to carry cargo.
+        /// </summary>
+        public virtual bool IsUsable(Gameplay.ChickenController caster)
+        {
+            if (!RequiresEnemyInRange || IndicatorRange <= 0f) return true;
+            return HasEnemyInRange(caster, IndicatorRange);
+        }
+
+        /// <summary>
+        /// Any live, non-decoy rival within <paramref name="range"/> of the caster?
+        /// Scans the static controller registry (≤4 chickens) — cheap enough for
+        /// per-frame HUD polling. Distance is 3D squared, matching the
+        /// OverlapSphere checks the abilities themselves use on activation.
+        /// </summary>
+        protected static bool HasEnemyInRange(Gameplay.ChickenController caster, float range, bool requireCargo = false)
+        {
+            if (caster == null) return false;
+            var all = Gameplay.ChickenController.ActiveControllers;
+            var selfPos = caster.transform.position;
+            float rangeSqr = range * range;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var c = all[i];
+                if (c == null || c == caster || c.IsDecoy) continue;
+                if (c.Combat == null || c.Combat.IsDead) continue;
+                if ((c.transform.position - selfPos).sqrMagnitude > rangeSqr) continue;
+                if (requireCargo)
+                {
+                    var cargo = c.GetComponent<Gameplay.ChickenCargo>();
+                    if (cargo == null || cargo.Cargo <= 0f) continue;
+                }
+                return true;
+            }
+            return false;
+        }
+
         public abstract void OnActivate(AbilityContext ctx);
         public abstract void OnDeactivate(AbilityContext ctx);
     }

@@ -25,6 +25,13 @@ namespace CluckWars.Abilities
 
         protected override string DefaultIcon => "🤏";
 
+        public override float IndicatorRange => StealRange;
+        public override bool RequiresEnemyInRange => true;
+
+        /// <summary>Usable only when a rival *carrying cargo* is in steal range.</summary>
+        public override bool IsUsable(Gameplay.ChickenController caster)
+            => HasEnemyInRange(caster, StealRange, requireCargo: true);
+
         public override void OnActivate(AbilityContext ctx)
         {
             var thief = ctx.Controller;

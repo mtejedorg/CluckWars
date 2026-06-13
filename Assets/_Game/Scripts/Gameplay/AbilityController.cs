@@ -267,6 +267,14 @@ namespace CluckWars.Gameplay
                     $"on cooldown ({CooldownRemaining(slot):0.0}s remaining).");
                 return;
             }
+            // Range-gated abilities (Peck, Sneaky Steal, Cluck Shock) refuse to fire
+            // into empty air — no cooldown burn on a guaranteed whiff. The HUD shows
+            // the same state by greying the button while no target is in range.
+            if (!ability.IsUsable(_controller))
+            {
+                _log?.Debug(Source, $"TryActivate slot {slot} ({ability.DisplayName}): no valid target in range.");
+                return;
+            }
 
             ActiveSlot = slot;
             ActivationTimer = TickTimer.CreateFromSeconds(Runner, ability.Duration);
