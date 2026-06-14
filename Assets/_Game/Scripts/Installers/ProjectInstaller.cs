@@ -91,12 +91,16 @@ namespace CluckWars.Installers
             var audioRegistry = _audioRegistry != null
                 ? _audioRegistry
                 : ScriptableObject.CreateInstance<AudioRegistrySO>();
+            // Synthesise any clip the asset doesn't supply, so the game has sound
+            // even with no recorded audio assets. Authored clips win; only null
+            // fields are filled. (Counterpart to the procedural placeholder meshes.)
+            CluckWars.Audio.ProceduralAudioBank.FillMissing(audioRegistry);
             Container.Bind<AudioRegistrySO>().FromInstance(audioRegistry).AsSingle();
             if (_audioRegistry == null)
             {
-                Debug.LogWarning(
-                    "[ProjectInstaller] AudioRegistry not assigned. " +
-                    "All audio cues will be silent.");
+                Debug.Log(
+                    "[ProjectInstaller] AudioRegistry asset not assigned — using " +
+                    "fully procedural SFX bank.");
             }
 
             // PrefabRegistry: same shape as AudioRegistry. Empty instance is bound
