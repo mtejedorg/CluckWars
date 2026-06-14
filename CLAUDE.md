@@ -30,6 +30,7 @@ should rarely need edits.
 | **What's the plan, what's shipped, what's next?** Per-phase status, dedicated test session work list. | `docs/ROADMAP.md` |
 | **Why does the design look like this?** GDD / TDD / ART. | `docs/GDD.md` / `docs/TDD.md` / `docs/ART.md` |
 | **How does the open-source Unity MCP work?** MCP architecture, UI Toolkit rules, asset structure, and Claude integration. | `docs/UNITY_MCP_GUIDE.md` |
+| **Why this engine / other big choices?** Architecture decision records (e.g. Unity vs Godot). | `docs/adr/` |
 
 ---
 
