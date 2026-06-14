@@ -1,3 +1,4 @@
+using CluckWars.Abilities;
 using CluckWars.Gameplay;
 using UnityEngine;
 
@@ -116,11 +117,29 @@ namespace CluckWars.Visuals
                     _lastActiveSlot == AbilityController.InvalidSlot)
                 {
                     var ability = _abilities.ActiveAbility;
-                    if (ability != null && _abilityPS != null)
+                    if (ability != null)
                     {
-                        var main = _abilityPS.main;
-                        main.startColor = new ParticleSystem.MinMaxGradient(ability.AccentColor);
-                        _abilityPS.Play();
+                        if (_abilityPS != null)
+                        {
+                            var main = _abilityPS.main;
+                            main.startColor = new ParticleSystem.MinMaxGradient(ability.AccentColor);
+                            _abilityPS.Play();
+                        }
+
+                        // Attacker-side punch (local player only): a light shake on any
+                        // cast, a stronger one when a Damage ability fires. Damage
+                        // abilities are range-gated and AbilityController refuses to
+                        // activate them with no target in range — so a Damage cast that
+                        // got here necessarily CONNECTED. That makes "I landed a hit"
+                        // detectable locally with zero extra networking.
+                        if (_controller != null && _controller.HasInputAuthority &&
+                            MatchCamera.Instance != null)
+                        {
+                            bool damage = ability.Category == AbilityCategory.Damage;
+                            MatchCamera.Instance.ApplyShake(
+                                damage ? 0.18f : 0.06f,
+                                damage ? 0.22f : 0.12f);
+                        }
                     }
                 }
                 _lastActiveSlot = activeSlot;
