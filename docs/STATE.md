@@ -154,6 +154,33 @@ Applied the newest design wireframes (`cluckwars-hud-v3` / `-charselect-v3` / `-
 
 **Pending Maestro (optional polish)**: align each ability `.asset`'s `AccentColor` to the ART.md §3 v3 hexes if desired; import Lilita One + Nunito + an emoji sprite asset as TMP fonts to render glyphs and the glossy type.
 
+### Game-feel / juice pass — stage 1 of 3 (2026-06-13)
+
+Maestro feedback: "0 feedback in abilities, game ultra boring." Agreed the ability
+feedback was too narrow (only 3 of 13 abilities) and the game felt dead. Plan
+chosen: **juice first, then bots, then design.** This is the juice stage.
+
+- **Procedural audio (commit `…ProceduralAudioBank`)**: AudioRegistry was empty →
+  total silence. `ProceduralAudioBank.FillMissing` synthesises every SFX at startup
+  (sine/square/saw/noise + ADSR, click-free) — cast, hit, stun, deposit/victory arps,
+  pickups, match cues. Wired in `ProjectInstaller`; only null fields are filled, so
+  real `.wav`s override transparently. The game now has sound everywhere it had none.
+- **Control-state visuals (commit `…ControlStateVFX`)**: the biggest gap — slow/root/
+  knockback produced NO on-target visual. `ControlStateVFX` (Chicken prefab) draws a
+  colour-coded ground ring on any affected chicken: yellow=stun, green=root, cyan=slow
+  (+ white knockback shockwave). Reads StateAuthority control-state fields (solo-correct;
+  **MP needs SlowMultiplier/Rooted/ExternalDisplacement networked** — noted in class doc).
+  Verified: slowed→cyan, rooted→green, unaffected→none.
+- **Cast/hit-connect shake (commit `f2080dd`)**: `ChickenVFX` shakes the local camera on
+  cast — light for any ability, punchy for Damage. Range-gated Damage abilities can't
+  fire without a target, so a Damage cast that lands here = a confirmed hit (no extra
+  networking). Pairs with the audible cast SFX + accent burst.
+
+**Next juice-pass stages (not yet done):** (2) aggressive bots that actually pressure
+you so fights happen; (3) pacing/design tuning (cooldowns, map/food density, fight
+incentives) — "boring" is partly a real design issue, acknowledged with Maestro.
+Also still deferred: networking the control-state fields for MP feedback parity.
+
 ### Ability range/usability feedback (2026-06-13, commit `b86da7e`)
 
 Maestro: targeted abilities were "super confusing" — no visible reach, no signal
