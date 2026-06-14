@@ -27,6 +27,7 @@ GameObject:
   - component: {fileID: 7224469946525777145}
   - component: {fileID: 8123582145153776448}
   - component: {fileID: 3315600165271083367}
+  - component: {fileID: 1575773519577157392}
   m_Layer: 0
   m_Name: Chicken
   m_TagString: Untagged
@@ -393,3 +394,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.AbilityRangeIndicator
   _flashDuration: 0.35
+--- !u!114 &1575773519577157392
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c118f81fa1dc2de40885ea232fbc15dc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ControlStateVFX
