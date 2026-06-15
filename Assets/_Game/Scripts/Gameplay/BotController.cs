@@ -71,6 +71,13 @@ namespace CluckWars.Gameplay
         [Min(0f)]
         [SerializeField] private float _abilityRange = 4.0f;
 
+        [Tooltip("Aggressive classes pick fights with rivals even when the rival carries no cargo (creates skirmishes / pressure). Off = only hunt loaded rivals.")]
+        [SerializeField] private bool _engageUnloaded = false;
+
+        [Tooltip("Radius within which an _engageUnloaded bot will chase an unloaded rival to pressure them. Tighter than _huntRadius so they don't chase from across the map.")]
+        [Min(0f)]
+        [SerializeField] private float _engageRadius = 6.0f;
+
         [Tooltip("Hysteresis: radii grow by this factor while the matching state is active, so a rival hovering on the boundary can't flip the FSM every think tick (BOT-8).")]
         [Min(1f)]
         [SerializeField] private float _stateExitRadiusFactor = 1.35f;
@@ -182,10 +189,12 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            // Priority 3: HUNT — a loaded rival in hunt radius + bot is aggressive.
-            // The nearest rival may be empty while a loaded one stands a little
-            // further away — re-scan with requireCargo before giving up on the hunt.
-            if (_huntRadius > 0f)
+            // Priority 3: HUNT — a loaded rival anywhere in hunt radius, OR (aggressive
+            // class) ANY rival inside the tighter engage radius even unloaded → pick a
+            // fight. The latter is what makes the player feel pressured instead of left
+            // to farm in peace. The nearest rival may be empty while a loaded one stands
+            // a little further away — re-scan with requireCargo before giving up.
+            if (_huntRadius > 0f || _engageUnloaded)
             {
                 var target     = _perceivedRival;
                 var targetDist = _perceivedRivalDist;
@@ -193,12 +202,28 @@ namespace CluckWars.Gameplay
                 if (target == null || targetCargo < _huntCargoThreshold)
                     target = FindNearestRival(out targetDist, out targetCargo, requireCargo: true);
 
-                if (target != null && targetDist <= huntR && targetCargo >= _huntCargoThreshold)
+                bool loadedHunt = target != null && targetDist <= huntR && targetCargo >= _huntCargoThreshold;
+
+                // Aggressive engage: chase the nearest rival (loaded or not) when close.
+                bool aggroEngage = false;
+                if (!loadedHunt && _engageUnloaded && _perceivedRival != null)
+                {
+                    float engageR = _state == BotState.Hunt ? _engageRadius * _stateExitRadiusFactor : _engageRadius;
+                    if (_perceivedRivalDist <= engageR)
+                    {
+                        target = _perceivedRival; targetDist = _perceivedRivalDist; targetCargo = _perceivedRivalCargo;
+                        aggroEngage = true;
+                    }
+                }
+
+                if (loadedHunt || aggroEngage)
                 {
                     _state      = BotState.Hunt;
                     _moveTarget = target.transform.position;
                     if (targetDist <= _abilityRange)
-                        ReactWithAbility(new[] { BotRole.Steal, BotRole.Offense, BotRole.Control },
+                        ReactWithAbility(aggroEngage
+                                ? new[] { BotRole.Offense, BotRole.Control, BotRole.Steal }   // empty target: hurt/pin
+                                : new[] { BotRole.Steal, BotRole.Offense, BotRole.Control },  // loaded target: rob first
                             alwaysFireIfReady: false);
 
                     if (_state != _prevState)
@@ -415,41 +440,52 @@ namespace CluckWars.Gameplay
             switch (_controller.Class)
             {
                 case ChickenClass.Warrior:
-                    // Aggressive: hunts early, large detection, medium protect.
+                    // Aggressive bruiser: picks fights with anyone nearby, loaded or not.
                     _huntRadius            = 10f;
                     _huntCargoThreshold    = 0.15f;
                     _protectCargoThreshold = 0.50f;
                     _dangerRadius          = 5.0f;
+                    _engageUnloaded        = true;
+                    _engageRadius          = 8.5f;
                     break;
 
                 case ChickenClass.Assassin:
-                    // Opportunist: hunts loaded rivals, flees early (squishy).
+                    // Opportunist disruptor: harasses unloaded rivals, robs loaded ones,
+                    // flees early (squishy).
                     _huntRadius            = 8.0f;
                     _huntCargoThreshold    = 0.20f;
                     _protectCargoThreshold = 0.30f;
                     _dangerRadius          = 6.0f;
+                    _engageUnloaded        = true;
+                    _engageRadius          = 6.5f;
                     break;
 
                 case ChickenClass.Fatty:
-                    // Cautious turtle: never hunts (huntRadius = 0), deposits early.
+                    // Cautious turtle: never hunts (huntRadius = 0), deposits early,
+                    // never picks fights — the farming foil to the aggressive classes.
                     _huntRadius            = 0f;
                     _huntCargoThreshold    = 1f;
                     _protectCargoThreshold = 0.25f;
                     _dangerRadius          = 7.0f;
                     _returnThreshold       = 0.50f;
+                    _engageUnloaded        = false;
                     break;
 
                 case ChickenClass.Speedy:
-                    // Hit-and-run: hunts only to snatch drops, flees very early.
+                    // Hit-and-run harasser: darts in to peck a nearby rival, then flees
+                    // very early when it picks anything up.
                     _huntRadius            = 5.0f;
                     _huntCargoThreshold    = 0.40f;
                     _protectCargoThreshold = 0.20f;
                     _dangerRadius          = 8.0f;
+                    _engageUnloaded        = true;
+                    _engageRadius          = 6.0f;
                     break;
             }
             _log?.Debug(Source, $"Personality for {_controller.Class}: " +
                 $"hunt={_huntRadius:0.0}, huntThresh={_huntCargoThreshold:P0}, " +
-                $"protect={_protectCargoThreshold:P0}, danger={_dangerRadius:0.0}.");
+                $"protect={_protectCargoThreshold:P0}, danger={_dangerRadius:0.0}, " +
+                $"engageUnloaded={_engageUnloaded}, engageR={_engageRadius:0.0}.");
         }
     }
 }
