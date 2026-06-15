@@ -154,6 +154,29 @@ Applied the newest design wireframes (`cluckwars-hud-v3` / `-charselect-v3` / `-
 
 **Pending Maestro (optional polish)**: align each ability `.asset`'s `AccentColor` to the ART.md §3 v3 hexes if desired; import Lilita One + Nunito + an emoji sprite asset as TMP fonts to render glyphs and the glossy type.
 
+### Juice pass — stages 2 & 3: input fix, cooldowns, aggressive bots (2026-06-13)
+
+- **Ability buttons "not working" — root-caused + fixed (commit `54d3a75`).** Input
+  was a one-frame edge (`HoldButton.WasPressedThisFrame` / keyboard) but Fusion's
+  `OnInput` runs at tick rate (~30 Hz) not per render frame (~60 Hz), so presses on
+  non-tick frames were silently dropped (~half of taps did nothing). Movement was fine
+  (continuous). `FusionNetworkService.Update` now latches each press edge and `OnInput`
+  consumes it, so no press is lost. Touch + keyboard. **Pre-existing latent bug** — only
+  surfaced when a human actually tapped (scripted activation bypassed this path). User
+  confirmed fixed + feels better.
+- **Cooldowns trimmed ~25–35% (commit `1bcd204`)** per feedback ("a bit too high").
+  Short tier now 3s (Peck/RollPush), most Medium 6–8s; Doppelganger 15→11, CluckShock
+  10→7. Edited the 14 ability `.asset`s directly.
+- **Aggressive bots (commit `21195cf`)**: bots only hunted *loaded* rivals → passive vs
+  an empty player. Warrior/Assassin/Speedy now engage any rival inside a tighter engage
+  radius (8.5/6.5/6.0) even unloaded, when not hauling; Fatty stays the farming foil.
+  Verified: empty player next to Assassin → it Hunts and closes in.
+
+**Next (juice plan stage 3 — design/pacing):** still open — match length, map/food
+density, win-target vs the 220 food on the map, fight incentives. Plus the deferred
+MP item: network the control-state fields (SlowMultiplier/Rooted/ExternalDisplacement)
+so the new control-state rings show on remote peers, not just solo.
+
 ### Game-feel / juice pass — stage 1 of 3 (2026-06-13)
 
 Maestro feedback: "0 feedback in abilities, game ultra boring." Agreed the ability
