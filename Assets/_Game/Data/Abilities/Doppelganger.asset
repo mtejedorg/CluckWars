@@ -17,7 +17,7 @@ MonoBehaviour:
   AccentColor: {r: 0.65, g: 0.40, b: 0.85, a: 1}
   Category: 3
   Duration: 1.5
-  Cooldown: 15
+  Cooldown: 11
   AbilityAnimationClip: {fileID: 0}
   _decoyPrefab: {fileID: 1012061175775692847, guid: dadc0068bfdc302458b5991aeceb8669, type: 3}
   DecoyLifetimeSeconds: 4

@@ -18,7 +18,7 @@ MonoBehaviour:
   Category: 1
   BotRole: 0
   Duration: 0.3
-  Cooldown: 10
+  Cooldown: 7
   AbilityAnimationClip: {fileID: 0}
   EggLifetime: 8
   RootDuration: 2

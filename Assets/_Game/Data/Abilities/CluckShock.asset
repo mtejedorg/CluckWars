@@ -18,7 +18,7 @@ MonoBehaviour:
   Category: 0
   BotRole: 0
   Duration: 0.5
-  Cooldown: 10
+  Cooldown: 7
   AbilityAnimationClip: {fileID: 0}
   ShockRadius: 2.5
   ShockDamage: 20

@@ -18,7 +18,7 @@ MonoBehaviour:
   Category: 0
   BotRole: 0
   Duration: 0.3
-  Cooldown: 4
+  Cooldown: 3
   AbilityAnimationClip: {fileID: 0}
   PeckRange: 2
   PeckDamage: 15

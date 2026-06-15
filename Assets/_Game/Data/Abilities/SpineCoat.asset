@@ -17,5 +17,5 @@ MonoBehaviour:
   AccentColor: {r: 0.55, g: 0.65, b: 0.20, a: 1}
   Category: 2
   Duration: 2.0
-  Cooldown: 10
+  Cooldown: 8
   AbilityAnimationClip: {fileID: 0}

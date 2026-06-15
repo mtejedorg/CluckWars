@@ -18,7 +18,7 @@ MonoBehaviour:
   Category: 1
   BotRole: 0
   Duration: 0.8
-  Cooldown: 4
+  Cooldown: 3
   AbilityAnimationClip: {fileID: 0}
   ForwardOffset: 1.2
   PushRadius: 1.8
