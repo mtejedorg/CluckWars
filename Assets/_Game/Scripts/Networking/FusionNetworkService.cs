@@ -32,6 +32,15 @@ namespace CluckWars.Networking
         private ILogService _log;
         private NetworkRunner _runner;
 
+        // Latched ability-press edges. Edge-triggered presses (HoldButton /
+        // keyboard wasPressedThisFrame) live for a single render frame, but
+        // OnInput runs at tick rate (~30 Hz), not every frame (~60 Hz) — so a
+        // press landing on a non-tick frame was being cleared before OnInput ever
+        // read it and got silently dropped (≈half of taps "did nothing"). We OR
+        // every render frame's press into these latches and consume them in
+        // OnInput, so no press is ever lost regardless of frame/tick alignment.
+        private bool _pendingAbility1, _pendingAbility2, _pendingAbility3;
+
         public bool IsRunning => _runner != null && _runner.IsRunning;
         public NetworkRunner Runner => _runner;
 
@@ -104,15 +113,28 @@ namespace CluckWars.Networking
 
         // ---------- INetworkRunnerCallbacks ----------
 
+        // Every render frame: latch any ability-press edge so it survives until the
+        // next OnInput tick. Movement is continuous and stays read live in OnInput.
+        private void Update()
+        {
+            if (_inputProvider == null) return;
+            if (_inputProvider.GetAbility1Pressed()) _pendingAbility1 = true;
+            if (_inputProvider.GetAbility2Pressed()) _pendingAbility2 = true;
+            if (_inputProvider.GetAbility3Pressed()) _pendingAbility3 = true;
+        }
+
         void INetworkRunnerCallbacks.OnInput(NetworkRunner runner, NetworkInput input)
         {
             if (_inputProvider == null) return;
 
             var movement = _inputProvider.GetMovement();
             var buttons = new NetworkButtons();
-            if (_inputProvider.GetAbility1Pressed()) buttons.Set((int)InputButton.Ability1, true);
-            if (_inputProvider.GetAbility2Pressed()) buttons.Set((int)InputButton.Ability2, true);
-            if (_inputProvider.GetAbility3Pressed()) buttons.Set((int)InputButton.Ability3, true);
+            // Consume the latch OR a same-frame live press (covers either Update/OnInput
+            // ordering), then clear so each press activates exactly once.
+            if (_pendingAbility1 || _inputProvider.GetAbility1Pressed()) buttons.Set((int)InputButton.Ability1, true);
+            if (_pendingAbility2 || _inputProvider.GetAbility2Pressed()) buttons.Set((int)InputButton.Ability2, true);
+            if (_pendingAbility3 || _inputProvider.GetAbility3Pressed()) buttons.Set((int)InputButton.Ability3, true);
+            _pendingAbility1 = _pendingAbility2 = _pendingAbility3 = false;
 
             input.Set(new PlayerNetworkInput
             {
