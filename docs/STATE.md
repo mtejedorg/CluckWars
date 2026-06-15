@@ -172,10 +172,16 @@ Applied the newest design wireframes (`cluckwars-hud-v3` / `-charselect-v3` / `-
   radius (8.5/6.5/6.0) even unloaded, when not hauling; Fatty stays the farming foil.
   Verified: empty player next to Assassin → it Hunts and closes in.
 
+- **Networked control-state VFX triggers (commit `c6e80e6`)**: control-state rings +
+  knockback shockwave were solo-only (read local fields). Now `[Networked] ControlVfx
+  ControlFlags` (Slowed/Rooted, set on StateAuthority each tick) + `[Networked] byte
+  KnockbackEventId` (one-shot, bumped in `ApplyKnockback`) drive the VFX on every peer.
+  Architecture per Maestro: **network the minimal trigger, render particles locally** —
+  the gameplay effect already replicated via the networked transform. Verified solo;
+  cross-device replication is automatic via `[Networked]` (validate on multi-device test).
+
 **Next (juice plan stage 3 — design/pacing):** still open — match length, map/food
-density, win-target vs the 220 food on the map, fight incentives. Plus the deferred
-MP item: network the control-state fields (SlowMultiplier/Rooted/ExternalDisplacement)
-so the new control-state rings show on remote peers, not just solo.
+density, win-target vs the 220 food on the map, fight incentives.
 
 ### Game-feel / juice pass — stage 1 of 3 (2026-06-13)
 
