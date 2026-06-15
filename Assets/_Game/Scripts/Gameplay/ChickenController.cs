@@ -25,6 +25,21 @@ namespace CluckWars.Gameplay
     }
 
     /// <summary>
+    /// Compact, replicated control-state flags used purely to drive on-target VFX
+    /// (the slow/root ground rings) on every peer. The gameplay effect itself
+    /// already replicates via the networked transform (a slowed/rooted chicken
+    /// moves differently, which every peer sees) — only this minimal trigger
+    /// crosses the wire so the *particles/rings stay local* on each client.
+    /// </summary>
+    [System.Flags]
+    public enum ControlVfx : byte
+    {
+        None   = 0,
+        Slowed = 1 << 0,
+        Rooted = 1 << 1,
+    }
+
+    /// <summary>
     /// Top-level networked chicken. Class-aware: a <c>[Networked]</c>
     /// <see cref="Class"/> selects the active <see cref="ChickenStatsSO"/> from
     /// the injected registry, with the prefab's serialized <c>_stats</c> kept only
@@ -127,6 +142,20 @@ namespace CluckWars.Gameplay
 
         /// <summary>True for AI-controlled bots spawned in solo mode.</summary>
         [Networked] public bool IsBot { get; set; }
+
+        /// <summary>
+        /// Replicated slow/root state, set on the StateAuthority each tick. Read by
+        /// <c>ControlStateVFX</c> on every peer to drive the local ground rings — the
+        /// VFX themselves never cross the wire, only this flag does.
+        /// </summary>
+        [Networked] public ControlVfx ControlFlags { get; set; }
+
+        /// <summary>
+        /// Bumped on the StateAuthority each time a knockback impulse is applied. A
+        /// one-shot networked "event" — peers watch for the change and fire the local
+        /// knockback shockwave once. Wraps at 255 (only the change matters).
+        /// </summary>
+        [Networked] public byte KnockbackEventId { get; set; }
 
         /// <summary>
         /// Corner (0..3) this chicken spawned at — its match identity. Drives base
@@ -263,6 +292,13 @@ namespace CluckWars.Gameplay
             // Root timer: RPC_ApplyRoot sets _rootUntil; Rooted persists until it elapses.
             if (Runner.SimulationTime < _rootUntil) Rooted = true;
 
+            // Publish the compact control-state for remote VFX. Particles stay local
+            // on each peer; this replicated flag is the only thing that crosses.
+            var vfx = ControlVfx.None;
+            if (SlowMultiplier < 0.92f) vfx |= ControlVfx.Slowed;
+            if (Rooted)                 vfx |= ControlVfx.Rooted;
+            if (ControlFlags != vfx)    ControlFlags = vfx;
+
             // Bots exit here — BotController.BotTick handles their movement with
             // the SlowMultiplier already computed above.
             if (IsBot) return;
@@ -308,6 +344,8 @@ namespace CluckWars.Gameplay
             if (Stats?.Passive == ChickenPassive.Immovable)
                 impulse *= ImmovableKnockbackFactor;
             ExternalDisplacement = impulse;
+            // Fire the networked one-shot so every peer plays the shockwave locally.
+            if (impulse.sqrMagnitude > 1f) KnockbackEventId++;
         }
 
         /// <summary>

@@ -17,16 +17,12 @@ namespace CluckWars.Visuals
     /// </list>
     /// </summary>
     /// <remarks>
-    /// Reads StateAuthority control-state fields directly (<c>SlowMultiplier</c>,
-    /// <c>Rooted</c>, <c>ExternalDisplacement</c>) plus networked <c>IsStunned</c>.
-    /// Correct in <b>solo</b> (single authoritative peer). For multiplayer these
-    /// three fields need replicating — see the network note below. Local VFX only,
-    /// no RPCs; same LineRenderer pattern as <see cref="AbilityRangeIndicator"/>.
-    ///
-    /// <b>Network note:</b> when we return to multiplayer, mirror SlowMultiplier /
-    /// Rooted / ExternalDisplacement into [Networked] fields (or a packed byte of
-    /// state flags) so remote peers drive this from replicated state, exactly like
-    /// IsStunned already does.
+    /// Driven entirely by <b>replicated</b> state so it's correct on every peer:
+    /// <c>ChickenController.ControlFlags</c> (Slowed/Rooted), <c>KnockbackEventId</c>
+    /// (the one-shot knockback event), and the already-networked <c>IsStunned</c>.
+    /// The particles / LineRenderers themselves are 100% local — only those compact
+    /// triggers cross the wire. Same LineRenderer pattern as
+    /// <see cref="AbilityRangeIndicator"/>.
     /// </remarks>
     [RequireComponent(typeof(ChickenController))]
     public sealed class ControlStateVFX : MonoBehaviour
@@ -52,7 +48,8 @@ namespace CluckWars.Visuals
 
         private float _knockTimer = -1f;
         private const float KnockDuration = 0.3f;
-        private float _prevKnockMag;
+        private byte  _lastKnockEventId;
+        private bool  _knockInitialized;
 
         private void Awake()
         {
@@ -85,9 +82,11 @@ namespace CluckWars.Visuals
         private void UpdateStatusRing()
         {
             // Priority: stun > root > slow (most-incapacitating wins the ring colour).
+            // All three read replicated state, so the ring is correct on every peer.
+            var flags    = _controller.ControlFlags;
             bool stunned = _combat != null && _combat.IsStunned;
-            bool rooted  = _controller.Rooted;
-            bool slowed  = _controller.SlowMultiplier < 0.92f;
+            bool rooted  = (flags & ControlVfx.Rooted) != 0;
+            bool slowed  = (flags & ControlVfx.Slowed) != 0;
 
             Color c;
             if (stunned)      c = StunColor;
@@ -106,11 +105,20 @@ namespace CluckWars.Visuals
 
         private void UpdateKnockback()
         {
-            // Rising edge on the knockback impulse magnitude → fire the shockwave.
-            float mag = _controller.ExternalDisplacement.magnitude;
-            if (mag > 2f && _prevKnockMag <= 2f)
+            // Replicated one-shot: a changed KnockbackEventId means a knockback was
+            // applied (on any peer). Fire the shockwave once. Seed the baseline on the
+            // first frame so a non-zero starting id (late join) doesn't false-trigger.
+            byte id = _controller.KnockbackEventId;
+            if (!_knockInitialized)
+            {
+                _knockInitialized = true;
+                _lastKnockEventId = id;
+            }
+            else if (id != _lastKnockEventId)
+            {
+                _lastKnockEventId = id;
                 _knockTimer = 0f;
-            _prevKnockMag = mag;
+            }
 
             if (_knockTimer < 0f) return;
 
