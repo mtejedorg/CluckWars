@@ -19,6 +19,76 @@ All tags pushed to origin.
 
 ---
 
+## ⚠ Active handoff — full-project revision (2026-07-05)
+
+A complete code + design revision of the vertical slice was performed on
+2026-07-05. Findings and an executable roadmap live in
+**`docs/HANDOFF_REVISION_2026-07.md`** — read it before starting new work.
+Headlines: match economy is broken (win target unreachable for 3 of 4 classes,
+fighting doesn't pay), Flying Peck is a 200-dmg instakill, Root Egg self-roots
+its caster, the root-zone radius override is ignored, the death-drop pipeline
+rides the ChangeDetector pattern already documented as unreliable in solo, and
+player identity is fragmented (PlayerRef vs HomeCornerIndex vs BotClaimed —
+source of the Spine-Coat-inert-vs-bots and rejoin corner-collision bugs).
+The handoff defines workstreams WS0–WS5 with per-task acceptance criteria.
+
+**Progress:** WS0 done (`5f23a7c`, residue removed). **WS1 + WS2 done 2026-07-06**
+(see the session entry below). Remaining: WS3 (identity unification — do before
+the next 3–4 player device session), WS4 (editor wiring), WS5 (arena visuals).
+
+---
+
+## Session 2026-07-06 — WS1 balance pass + WS2 fixes
+
+**WS1 — Balance economy pass** (`5cc558b`, `c8697b3`). Rationale: at 1 food/s
+and a 150 target, three of four classes could not reach the win target inside
+the 180 s timer at all (real throughput ~0.4–0.6/s → 250–375 s); only Fatty
+approached it, every match ended on the timer, and a Peck kill took 5+ casts —
+farming was always safer than fighting. New numbers target uncontested
+time-to-target ≈ 70 % of the timer so both win conditions are live and a stun
+(5 s + cargo drop) is worth ~10–15 food of tempo:
+- `FoodTargetToWin` 150 → **70** (MatchDuration unchanged at 180 s).
+- CollectionRate: Warrior/Speedy/Assassin 1 → **2**, Fatty 2 → **3**.
+- CargoCapacity: Assassin 4 → **5** (so Sneaky Steal isn't self-clamped),
+  Fatty 25 → **20** (one haul ≠ 28 % of the target).
+- Damage: Peck 15 → **28**, CluckShock 20 → **35**, FlyingPeck 200 → **50**,
+  SneakySteal amount 5 → **4**. Code defaults in the four SOs match the assets.
+- Slippery passive is now **duration-only** per GDD §5.2 — the undocumented
+  50 % slow-magnitude reduction in `ChickenController.ApplySlow` was removed;
+  GDD annex 13.2 marked resolved.
+
+**WS2 — Small code fixes** (`03626ab`, `38b706a`, `61e15a7`, `2d836cd`, `f683331`):
+- Flying Peck gained `IndicatorRange` / `RequiresEnemyInRange` overrides —
+  HUD grey-out + TryActivate refusal, no more free-cast cooldown burn.
+- `AbilityZone` has a `[Networked] OwnerChicken` (NetworkBehaviourId) stamped
+  in `onBeforeSpawned` by Root Egg and Feather Trap; zones never affect their
+  caster (root scan + `CheckAbilityZoneSlow` both skip the owner; GDD §7.2 note).
+- Root zone scan uses the `TriggerRadius` property (networked per-spawn
+  override) instead of the serialized prefab default.
+- Death consequences (cargo drop, ability cancel) moved to a new
+  `ChickenCombat.OnDeathAuthority` event invoked synchronously in
+  `RPC_ApplyDamage` — no longer riding the Render ChangeDetector, which has
+  silently skipped locally-written props in GameMode.Single. `OnDeath` kept
+  for every-peer cosmetics.
+- Cleanup: dead `KnockbackDecayRate` const removed from ChickenController;
+  `MatchBootstrapper.Start` (async void) wrapped in try/catch logging via
+  ILogService; the two `Debug.LogWarning` in RootEgg/FeatherTrap SOs removed
+  (TODO(logging) left — no service locator); HP stamped in `onBeforeSpawned`
+  from MatchBootstrapper (player + bot spawns, class-registry lookup) so
+  proxies never see a transient HP=0/IsDead frame — lazy init kept as fallback.
+  Note: `MatchBootstrapper.Construct` now also injects `ChickenClassRegistrySO`.
+
+**Verification:** batchmode compile of the full project — zero errors (only
+the two pre-existing CS0618 AndroidApiLevel24 warnings in CluckWarsBuildMenu).
+Play-mode pacing/acceptance checks NOT run: the Editor was closed (Unity MCP
+unreachable), and the WS4 wiring backlog (AbilityZone prefab +
+`PrefabRegistrySO.AbilityZone`, `_botLoadouts`) means Root Egg / Feather Trap /
+bot-ability behaviour isn't observable in solo yet anyway. Run the WS1/WS2
+acceptance passes (pacing to 70, Peck TTK 3–4 casts, no self-root, death drop
+×5) after WS4 wiring.
+
+---
+
 ## What works (Phases 1–9 complete + Phase 10 complete + DCBA polish + v0.3.1 fixes + Phase R Part A + Phase R Part B)
 
 ### Core loop
