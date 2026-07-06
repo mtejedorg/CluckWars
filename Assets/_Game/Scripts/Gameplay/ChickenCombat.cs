@@ -50,8 +50,22 @@ namespace CluckWars.Gameplay
         private AudioRegistrySO _audioReg;
         private bool _hpInitialized;
 
-        /// <summary>Fires on every peer when this chicken transitions into death stun.</summary>
+        /// <summary>
+        /// Fires on every peer when this chicken transitions into death stun.
+        /// Driven by the <see cref="ChangeDetector"/> in <see cref="Render"/> —
+        /// cosmetics only (animator, SFX, shake, nameplate). State-mutating
+        /// consequences must use <see cref="OnDeathAuthority"/> instead: the
+        /// ChangeDetector has silently skipped locally-written [Networked] props
+        /// in GameMode.Single (see STATE.md v0.3.1 base-tinting entry).
+        /// </summary>
         public event Action OnDeath;
+
+        /// <summary>
+        /// Fires only on the StateAuthority, synchronously inside
+        /// <see cref="RPC_ApplyDamage"/> when death occurs. Subscribe here for
+        /// state-mutating consequences (cargo drop, ability cancel).
+        /// </summary>
+        public event Action OnDeathAuthority;
 
         public bool IsDead => HP <= 0f;
 
@@ -192,6 +206,10 @@ namespace CluckWars.Gameplay
                 IsStunned = true;
                 StunTimer = TickTimer.CreateFromSeconds(Runner, _stunDuration);
                 CreditKillToAttacker(attacker);
+                // Authority-side consequences (cargo drop, ability cancel) fire
+                // here, not from Render's ChangeDetector — that path can silently
+                // skip locally-written props in GameMode.Single.
+                OnDeathAuthority?.Invoke();
             }
         }
 

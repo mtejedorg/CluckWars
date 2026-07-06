@@ -87,7 +87,7 @@ namespace CluckWars.Gameplay
                 ActiveSlot = InvalidSlot;
             }
 
-            if (_combat != null) _combat.OnDeath += HandleOwnerDeath;
+            if (_combat != null) _combat.OnDeathAuthority += HandleOwnerDeath;
 
             _initialized = true;
             _log?.Debug(Source, $"Spawned. Slot0={(Slot0 != null ? Slot0.name : "(none)")}, " +
@@ -97,7 +97,7 @@ namespace CluckWars.Gameplay
 
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
-            if (_combat != null) _combat.OnDeath -= HandleOwnerDeath;
+            if (_combat != null) _combat.OnDeathAuthority -= HandleOwnerDeath;
         }
 
         public override void FixedUpdateNetwork()

@@ -88,7 +88,7 @@ namespace CluckWars.Gameplay
 
             if (_combat != null && !_subscribedToDeath)
             {
-                _combat.OnDeath += HandleDeath;
+                _combat.OnDeathAuthority += HandleDeath;
                 _subscribedToDeath = true;
             }
 
@@ -100,7 +100,7 @@ namespace CluckWars.Gameplay
             ActiveCargos.Remove(this);
             if (_combat != null && _subscribedToDeath)
             {
-                _combat.OnDeath -= HandleDeath;
+                _combat.OnDeathAuthority -= HandleDeath;
                 _subscribedToDeath = false;
             }
         }
@@ -278,9 +278,9 @@ namespace CluckWars.Gameplay
 
         private void HandleDeath()
         {
-            // Authority-only mutation: only the chicken's owner spawns the pickup
-            // and zeros its own cargo. OnDeath fires on every peer (it's driven by
-            // a ChangeDetector on IsStunned in ChickenCombat), so guard with HasStateAuthority.
+            // Subscribed to OnDeathAuthority — fires synchronously on the
+            // StateAuthority inside RPC_ApplyDamage, so the guard below is
+            // redundant, but kept as cheap insurance.
             if (!HasStateAuthority) return;
 
             float dropped = Cargo;
