@@ -42,7 +42,8 @@ namespace CluckWars.Abilities
         {
             if (ctx.Runner == null || ctx.PrefabRegistry == null || ctx.PrefabRegistry.AbilityZone == null)
             {
-                Debug.LogWarning("[FeatherTrap] Runner or AbilityZone prefab not available in context.");
+                // TODO(logging): SOs have no injected ILogService; surface this once
+                // AbilityContext exposes the caster's logger. Do NOT add a service locator.
                 return;
             }
 

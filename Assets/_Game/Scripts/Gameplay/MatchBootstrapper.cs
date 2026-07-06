@@ -65,15 +65,28 @@ namespace CluckWars.Gameplay
         private INetworkService _networkService;
         private ISessionSelectionService _selection;
         private PrefabRegistrySO _prefabRegistry;
+        private ChickenClassRegistrySO _classRegistry;
         private ILogService _log;
 
         [Inject]
-        public void Construct(INetworkService networkService, ISessionSelectionService selection, PrefabRegistrySO prefabRegistry, ILogService log)
+        public void Construct(INetworkService networkService, ISessionSelectionService selection, PrefabRegistrySO prefabRegistry, ChickenClassRegistrySO classRegistry, ILogService log)
         {
             _networkService = networkService;
             _selection = selection;
             _prefabRegistry = prefabRegistry;
+            _classRegistry = classRegistry;
             _log = log;
+        }
+
+        /// <summary>
+        /// MaxHP for a class via the registry, or 0 when unresolvable (leaves
+        /// ChickenCombat's lazy first-tick init as the fallback).
+        /// </summary>
+        private float ResolveMaxHp(ChickenClass cls)
+        {
+            if (_classRegistry != null && _classRegistry.TryGet(cls, out var entry) && entry.Stats != null)
+                return entry.Stats.MaxHP;
+            return 0f;
         }
 
         private NetworkObject ResolveChickenPrefab()
@@ -90,40 +103,49 @@ namespace CluckWars.Gameplay
 
         private async void Start()
         {
-            if (ResolveChickenPrefab() == null)
+            // async void: an unhandled exception here would vanish into Unity's
+            // synchronization context without any CluckWars-tagged log — guard it.
+            try
             {
-                _log?.Error(Source, "Chicken prefab not assigned (neither PrefabRegistry.Chicken nor legacy slot).");
-                return;
+                if (ResolveChickenPrefab() == null)
+                {
+                    _log?.Error(Source, "Chicken prefab not assigned (neither PrefabRegistry.Chicken nor legacy slot).");
+                    return;
+                }
+
+                var mode = _selection != null ? _selection.Mode : SessionMode.Solo;
+                var sessionName = _selection != null ? _selection.SessionName : "cluck-lan";
+                var chosenClass = _selection != null ? _selection.SelectedClass : ChickenClass.Warrior;
+
+                _log?.Info(Source, $"Starting session: mode={mode}, session='{sessionName}', class={chosenClass}.");
+                InitCornerPermutation(sessionName, isSolo: mode == SessionMode.Solo);
+                _networkService.OnPlayerJoined += HandlePlayerJoined;
+
+                switch (mode)
+                {
+                    case SessionMode.Host:
+                        await _networkService.StartHostAsync(sessionName);
+                        break;
+                    case SessionMode.Join:
+                        await _networkService.JoinSessionAsync(sessionName);
+                        break;
+                    case SessionMode.Solo:
+                    default:
+                        await _networkService.StartSoloAsync();
+                        break;
+                }
+
+                _log?.Debug(Source, $"Network start awaited (mode={mode}); runner is up.");
+
+                TrySpawnGameManager();
+
+                if (mode == SessionMode.Solo)
+                    TrySpawnBots();
             }
-
-            var mode = _selection != null ? _selection.Mode : SessionMode.Solo;
-            var sessionName = _selection != null ? _selection.SessionName : "cluck-lan";
-            var chosenClass = _selection != null ? _selection.SelectedClass : ChickenClass.Warrior;
-
-            _log?.Info(Source, $"Starting session: mode={mode}, session='{sessionName}', class={chosenClass}.");
-            InitCornerPermutation(sessionName, isSolo: mode == SessionMode.Solo);
-            _networkService.OnPlayerJoined += HandlePlayerJoined;
-
-            switch (mode)
+            catch (System.Exception e)
             {
-                case SessionMode.Host:
-                    await _networkService.StartHostAsync(sessionName);
-                    break;
-                case SessionMode.Join:
-                    await _networkService.JoinSessionAsync(sessionName);
-                    break;
-                case SessionMode.Solo:
-                default:
-                    await _networkService.StartSoloAsync();
-                    break;
+                _log?.Error(Source, $"Session start failed: {e}");
             }
-
-            _log?.Debug(Source, $"Network start awaited (mode={mode}); runner is up.");
-
-            TrySpawnGameManager();
-
-            if (mode == SessionMode.Solo)
-                TrySpawnBots();
         }
 
         private void TrySpawnGameManager()
@@ -205,6 +227,8 @@ namespace CluckWars.Gameplay
                     _log?.Warn(Source, $"No bot loadout preset available for {botClass} — bot " +
                         "will run ability-less. Author rows on MatchBootstrapper._botLoadouts.");
 
+                float botMaxHp = ResolveMaxHp(botClass);
+
                 runner.Spawn(
                     chickenPrefab,
                     pos,
@@ -219,6 +243,12 @@ namespace CluckWars.Gameplay
                             ctrl.IsBot = true;
                             ctrl.HomeCornerIndex = cornerIdx;
                         }
+
+                        // Proxy HP hardening: replicate full HP from tick zero so
+                        // proxies never see a transient HP=0 / IsDead=true frame.
+                        // ChickenCombat's lazy first-tick init remains the fallback.
+                        var combat = networkObject.GetComponent<ChickenCombat>();
+                        if (combat != null && botMaxHp > 0f) combat.HP = botMaxHp;
 
                         if (haveLoadout)
                         {
@@ -365,6 +395,13 @@ namespace CluckWars.Gameplay
                         controller.Class = chosenClass;
                         controller.HomeCornerIndex = homeCorner;
                     }
+
+                    // Proxy HP hardening: replicate full HP from tick zero so
+                    // proxies never see a transient HP=0 / IsDead=true frame.
+                    // ChickenCombat's lazy first-tick init remains the fallback.
+                    float maxHp = ResolveMaxHp(chosenClass);
+                    var combat = networkObject.GetComponent<ChickenCombat>();
+                    if (combat != null && maxHp > 0f) combat.HP = maxHp;
 
                     // Apply player-chosen abilities when the player selected from a pool.
                     // Null means "use the prefab default" — SetSlots ignores null args.

@@ -110,13 +110,17 @@ namespace CluckWars.Gameplay
             var stats = _controller.Stats;
             if (stats == null) return;
 
-            // Lazy first-tick HP init: ChickenController.Spawned may not have resolved
-            // Stats yet by the time our Spawned ran (component order on the prefab is fragile).
+            // Lazy first-tick HP init — fallback only: spawners stamp HP in
+            // onBeforeSpawned (MatchBootstrapper, registry lookup by class) so it
+            // replicates from tick zero; this covers spawn paths that didn't.
             if (!_hpInitialized)
             {
-                HP = stats.MaxHP;
+                if (HP <= 0f)
+                {
+                    HP = stats.MaxHP;
+                    _log?.Info(Source, $"HP lazily initialized to {HP} (not stamped at spawn).");
+                }
                 _hpInitialized = true;
-                _log?.Info(Source, $"HP initialized to {HP}.");
             }
 
             if (IsStunned)

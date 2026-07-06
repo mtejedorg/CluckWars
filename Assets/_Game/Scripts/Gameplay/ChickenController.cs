@@ -67,7 +67,6 @@ namespace CluckWars.Gameplay
         private const float SlipperyDurationReduction = 0.40f; // control-state durations 60% shorter for Slippery (duration-only per GDD §5.2)
         private const float ImmovableKnockbackFactor = 0.15f; // knockback heavily reduced for Immovable
         private const float ToughDamageBonus         = 1.25f; // 25% bonus outgoing damage for Tough
-        private const float KnockbackDecayRate       = 8f;    // 1/s; ExternalDisplacement decays to zero
         private const float AuraSlowSearchRadius     = 10f;   // broadphase for CheckAuraSlow
 
         public static readonly System.Collections.Generic.List<ChickenController> ActiveControllers = new System.Collections.Generic.List<ChickenController>();
