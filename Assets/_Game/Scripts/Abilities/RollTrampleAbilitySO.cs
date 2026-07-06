@@ -27,7 +27,7 @@ namespace CluckWars.Abilities
         [Min(0.5f)] public float SweepRadius = 1.8f;
 
         [Tooltip("Base damage dealt to each chicken in the sweep. Scaled up by Warrior's Tough passive.")]
-        [Min(1f)] public float TrampleDamage = 200f;
+        [Min(1f)] public float TrampleDamage = 50f;
 
         protected override string DefaultIcon => "🪽";
 

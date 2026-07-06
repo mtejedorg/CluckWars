@@ -21,4 +21,4 @@ MonoBehaviour:
   Cooldown: 7
   AbilityAnimationClip: {fileID: 0}
   ShockRadius: 2.5
-  ShockDamage: 20
+  ShockDamage: 35

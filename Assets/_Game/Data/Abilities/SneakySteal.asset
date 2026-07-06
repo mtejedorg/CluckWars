@@ -21,4 +21,4 @@ MonoBehaviour:
   Cooldown: 6
   AbilityAnimationClip: {fileID: 0}
   StealRange: 3
-  StealAmount: 5
+  StealAmount: 4

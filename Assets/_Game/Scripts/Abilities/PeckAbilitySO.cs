@@ -21,7 +21,7 @@ namespace CluckWars.Abilities
         [Min(0.5f)] public float PeckRange = 2.0f;
 
         [Tooltip("Base damage. Scaled by Warrior's Tough passive.")]
-        [Min(1f)] public float PeckDamage = 15f;
+        [Min(1f)] public float PeckDamage = 28f;
 
         [Tooltip("Knockback impulse strength (world-units/sec) applied to the hit target.")]
         [Min(0f)] public float KnockbackStrength = 6f;

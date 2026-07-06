@@ -20,7 +20,7 @@ namespace CluckWars.Abilities
         [Min(0.5f)] public float ShockRadius = 2.5f;
 
         [Tooltip("Base damage to each chicken in range. Scaled by Warrior's Tough passive.")]
-        [Min(1f)] public float ShockDamage = 20f;
+        [Min(1f)] public float ShockDamage = 35f;
 
         protected override string DefaultIcon => "⚡";
 

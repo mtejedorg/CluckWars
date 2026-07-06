@@ -21,7 +21,7 @@ namespace CluckWars.Abilities
         [Min(0.5f)] public float StealRange = 3f;
 
         [Tooltip("How much cargo to steal. Capped to the victim's actual cargo and the thief's free space.")]
-        [Min(1f)] public float StealAmount = 5f;
+        [Min(1f)] public float StealAmount = 4f;
 
         protected override string DefaultIcon => "🤏";
 

@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: MatchConfig
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.MatchConfigSO
   MatchDurationSeconds: 180
-  FoodTargetToWin: 150
+  FoodTargetToWin: 70
   DeathStunSeconds: 5
   TickRate: 30

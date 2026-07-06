@@ -22,4 +22,4 @@ MonoBehaviour:
   AbilityAnimationClip: {fileID: 0}
   ForwardOffset: 1.6
   SweepRadius: 1.8
-  TrampleDamage: 200
+  TrampleDamage: 50
