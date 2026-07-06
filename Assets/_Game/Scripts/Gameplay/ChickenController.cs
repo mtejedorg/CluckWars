@@ -500,6 +500,7 @@ namespace CluckWars.Gameplay
             {
                 var zone = AbilityZone.ActiveZones[i];
                 if (zone == null || zone.Effect != ZoneEffect.Slow) continue;
+                if (zone.OwnerChicken == this.Id) continue; // own Feather Trap never slows the owner (GDD §7.2)
                 float sqr = (zone.transform.position - transform.position).sqrMagnitude;
                 float r   = zone.TriggerRadius;
                 if (sqr <= r * r)

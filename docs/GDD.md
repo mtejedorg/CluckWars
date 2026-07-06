@@ -283,6 +283,11 @@ Each ability carries an icon glyph (stored on `AbilityBaseSO.Icon`, surfaced via
 | 💨 | Feather Aura | Emit feather cloud around self, slows nearby chickens | Medium |
 | 🌱 | Root Egg | Place egg that roots the first chicken that steps on it | Medium |
 
+Placed zones (Feather Trap, Root Egg) never affect their own caster: the trap
+is thrown for *others* — the owner walks through their own feather cloud
+unslowed, and a Root Egg placed at the caster's feet does not root the caster
+(decided 2026-07, WS2-2).
+
 #### Defense — protect self or cargo
 
 | Icon | Ability | Description | Cooldown |

@@ -55,6 +55,7 @@ namespace CluckWars.Abilities
             float capDuration   = ZoneDuration;
             float capSlowFactor = SlowFactor;
             float capRadius     = ZoneRadius;
+            var   capOwner      = caster.Id;
 
             ctx.Runner.Spawn(
                 ctx.PrefabRegistry.AbilityZone,
@@ -66,6 +67,7 @@ namespace CluckWars.Abilities
                     var zone = networkObject.GetComponent<AbilityZone>();
                     if (zone == null) return;
                     zone.Effect          = ZoneEffect.Slow;
+                    zone.OwnerChicken    = capOwner;
                     zone.SlowFactor      = capSlowFactor;
                     zone.NetworkedRadius = capRadius;
                     zone.LifetimeTimer   = TickTimer.CreateFromSeconds(runner, capDuration);

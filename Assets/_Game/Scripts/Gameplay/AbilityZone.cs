@@ -74,6 +74,13 @@ namespace CluckWars.Gameplay
         /// </summary>
         [Networked] public float NetworkedRadius { get; set; }
 
+        /// <summary>
+        /// The caster's <see cref="ChickenController"/> behaviour id, stamped in
+        /// <c>onBeforeSpawned</c>. Zones never affect their own caster (a Root
+        /// Egg placed at the caster's feet would otherwise self-root next tick).
+        /// </summary>
+        [Networked] public NetworkBehaviourId OwnerChicken { get; set; }
+
         // ---- Read-only accessor (ChickenController uses this) -----------------
 
         /// <summary>
@@ -126,6 +133,7 @@ namespace CluckWars.Gameplay
                 {
                     var chicken = hits[i].GetComponentInParent<ChickenController>();
                     if (chicken == null) continue;
+                    if (chicken.Id == OwnerChicken) continue; // zones never affect their caster
                     if (chicken.Combat != null && chicken.Combat.IsStunned) continue;
 
                     chicken.RPC_ApplyRoot(RootDuration);

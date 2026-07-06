@@ -46,6 +46,7 @@ namespace CluckWars.Abilities
             float capLifetime      = EggLifetime;
             float capRootDuration  = RootDuration;
             float capRadius        = EggRadius;
+            var   capOwner         = ctx.Controller.Id;
 
             ctx.Runner.Spawn(
                 ctx.PrefabRegistry.AbilityZone,
@@ -57,6 +58,7 @@ namespace CluckWars.Abilities
                     var zone = networkObject.GetComponent<AbilityZone>();
                     if (zone == null) return;
                     zone.Effect          = ZoneEffect.Root;
+                    zone.OwnerChicken    = capOwner;
                     zone.RootDuration    = capRootDuration;
                     zone.NetworkedRadius = capRadius;
                     zone.LifetimeTimer   = TickTimer.CreateFromSeconds(runner, capLifetime);
