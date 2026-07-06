@@ -64,8 +64,7 @@ namespace CluckWars.Gameplay
         private const float CollisionSlowRadius      = 1.2f;  // metres — two chickens touching
         private const float CollisionSlowFactor      = 0.75f; // GDD TBD #7
         private const float PileSlowFactor           = 0.80f; // GDD TBD #6
-        private const float SlipperySlowRetention    = 0.50f; // slows are 50% as effective for Slippery
-        private const float SlipperyDurationReduction = 0.40f; // control-state durations 60% shorter for Slippery
+        private const float SlipperyDurationReduction = 0.40f; // control-state durations 60% shorter for Slippery (duration-only per GDD §5.2)
         private const float ImmovableKnockbackFactor = 0.15f; // knockback heavily reduced for Immovable
         private const float ToughDamageBonus         = 1.25f; // 25% bonus outgoing damage for Tough
         private const float KnockbackDecayRate       = 8f;    // 1/s; ExternalDisplacement decays to zero
@@ -318,17 +317,15 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// Applies a speed penalty from a tagged source. Multiple sources stack
-        /// multiplicatively (the minimum multiplier wins). Respects the
-        /// <see cref="ChickenPassive.Slippery"/> passive which halves the effect.
+        /// multiplicatively (the minimum multiplier wins). Slippery does NOT
+        /// reduce slow magnitude — per GDD §5.2 the passive is duration-only
+        /// (handled in <see cref="RPC_ApplyAbilitySlow"/> / <see cref="RPC_ApplyRoot"/>).
         /// Call <em>after</em> resetting <c>SlowMultiplier = 1f</c> at the top of
         /// each tick.
         /// </summary>
         public void ApplySlow(SlowSource source, float factor)
         {
             _activeSlowSources |= source;
-            // Slippery passive: slow effect is partially negated.
-            if (Stats?.Passive == ChickenPassive.Slippery)
-                factor = Mathf.Lerp(1f, factor, SlipperySlowRetention);
             SlowMultiplier = Mathf.Min(SlowMultiplier, factor);
         }
 

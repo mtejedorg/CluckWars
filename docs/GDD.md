@@ -415,8 +415,8 @@ The codebase includes a fully functional AI bot system (`BotController.cs`) for 
   5. **Idle:** Do nothing if no actions are available.
 - **Class Personalities:** Bots modify their behavior based on their chosen class. For example, Warrior bots hunt aggressively, Fatty bots play cautiously and deposit early, Assassin bots opportunistically hunt loaded rivals, and Speedy bots do hit-and-runs.
 
-### 13.2 "Slippery" Passive Discrepancy
-According to Section 5.2, the Speedy Chicken's "Slippery" passive reduces the *duration* of control abilities. However, the current code implementation (`ChickenController.RPC_ApplyAbilitySlow`) also reduces the *magnitude* of the slow effect by 50% (`SlipperySlowRetention = 0.50f`), making Speedy significantly more resistant to crowd control than documented. This undocumented buff requires a balance review.
+### 13.2 "Slippery" Passive Discrepancy — RESOLVED (2026-07)
+According to Section 5.2, the Speedy Chicken's "Slippery" passive reduces the *duration* of control abilities. The code previously also reduced the *magnitude* of slows by 50% (`SlipperySlowRetention`), an undocumented double-dip. Resolved in the WS1 balance pass: the magnitude branch in `ChickenController.ApplySlow` was removed; the passive is now duration-only (`SlipperyDurationReduction` in `RPC_ApplyAbilitySlow` / `RPC_ApplyRoot`), matching §5.2.
 
 ### 13.3 Other Unspecified Logic
 - **Base Assignment Tie-breaker:** Section 2 states that the player with the most food stored at their base wins when the timer expires. In the code, if multiple players are tied with the exact same amount of food, the `GameManager` resolves the tie arbitrarily based on the Unity internal iteration order. A formal tie-breaker rule needs to be designed.
