@@ -101,7 +101,7 @@ namespace CluckWars.Gameplay
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
 
             ActiveZones.Add(this);
-            _log?.Debug(Source, $"Spawned. Effect={Effect}, Radius={_triggerRadius}, " +
+            _log?.Debug(Source, $"Spawned. Effect={Effect}, Radius={TriggerRadius}, " +
                 $"Slow={SlowFactor:P0}, RootDuration={RootDuration:0.0}s.");
         }
 
@@ -126,7 +126,7 @@ namespace CluckWars.Gameplay
             if (Effect == ZoneEffect.Root)
             {
                 var hits = Physics.OverlapSphere(
-                    transform.position, _triggerRadius, ~0,
+                    transform.position, TriggerRadius, ~0,
                     QueryTriggerInteraction.Ignore);
 
                 for (int i = 0; i < hits.Length; i++)
