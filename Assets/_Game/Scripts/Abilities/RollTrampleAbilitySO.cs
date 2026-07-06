@@ -31,6 +31,9 @@ namespace CluckWars.Abilities
 
         protected override string DefaultIcon => "🪽";
 
+        public override float IndicatorRange => ForwardOffset + SweepRadius;
+        public override bool RequiresEnemyInRange => true;
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;
