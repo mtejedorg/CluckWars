@@ -32,9 +32,76 @@ player identity is fragmented (PlayerRef vs HomeCornerIndex vs BotClaimed —
 source of the Spine-Coat-inert-vs-bots and rejoin corner-collision bugs).
 The handoff defines workstreams WS0–WS5 with per-task acceptance criteria.
 
-**Progress:** WS0 done (`5f23a7c`, residue removed). **WS1 + WS2 done 2026-07-06**
-(see the session entry below). Remaining: WS3 (identity unification — do before
-the next 3–4 player device session), WS4 (editor wiring), WS5 (arena visuals).
+**Progress:** WS0 done (`5f23a7c`). WS1 + WS2 done and committed (session entry
+below). WS3 + WS4 + WS5 were executed by Antigravity on 2026-07-06; a same-day
+code review (`docs/HANDOFF_REVISION_FIXUP_2026-07.md`) found two critical
+defects, a rejoin flaw, and zero verification — **the fix-up items B1/B2/B3/B5/B6
+were then applied on 2026-07-07** and the full §C SOLO verification pass ran
+clean the same day (session entry below) — committed. The revision handoffs
+are closed except two follow-ups: a WS1 balance overshoot (win target reached
+in ~1 min; raise target or trim rates after a human feel-pass) and the §C
+multi-client checks (3-client ownership + leave/rejoin), which need a human
+session with a fresh Windows build.
+
+---
+
+## Session 2026-07-07 — fix-up of Antigravity's WS3–WS5 delivery
+
+Review findings + rationale: `docs/HANDOFF_REVISION_FIXUP_2026-07.md`. Applied:
+
+- **B1 (critical):** the three damage abilities (Peck / Cluck Shock / Flying
+  Peck) passed `caster.Id` (ChickenController's behaviour id) into
+  `RPC_ApplyDamage`, but the receiver resolves the attacker via
+  `TryFindBehaviour<ChickenCombat>` — a different behaviour slot, so kill
+  credit and Spine Coat reflect silently never resolved. All three now pass
+  `casterCombat.Id`. Attacker id space is ChickenCombat everywhere.
+- **B2 (critical):** Antigravity's scene save had wiped the five valid BOT-3
+  loadout presets (authored in `3e44db0`) down to three empty rows → every bot
+  spawned ability-less. Restored Bruiser/Skirmisher/Tank/Trickster/Thief
+  verbatim (all ability GUIDs re-verified against `.meta`s) and added a sixth
+  preset **Trapper** (Feather Trap + Peck, all classes) so the AbilityZone
+  path is exercised by bots in solo.
+- **B3:** `MatchBootstrapper.PickSpawnCorner` no longer trusts the sorted-
+  roster index alone (slots shift after a leave; stamped `HomeCornerIndex`
+  values don't → rejoiner collided with a live player's corner). It now scans
+  forward from the preferred slot to the first corner not stamped on any live,
+  non-decoy chicken (`IsCornerOccupied`). Fresh sessions behave identically.
+- **B5:** decoy victims no longer credit kills (`CreditKillToAttacker` early-
+  returns on `IsDecoy`) — a 4 s Doppelganger was a free kill every cooldown.
+- **B6:** ARCHITECTURE.md pairing section rewritten (occupied-corner scan
+  documented; stale "same modulo" sentence removed).
+
+**Verification (solo play mode, Editor + MCP, 2026-07-07 ~16:50):** all §C
+solo checks PASSED —
+- Kill credit incl. bot attackers: organic match showed bot kills=2/1/0;
+  forced Peck kill credited the human +1. (Impossible before B1.)
+- Spine Coat reflect vs bots: forced test — bot HP 80→60 on reflected hit,
+  reflector untouched.
+- Death drop: 1 organic pickup + forced loaded-kill spawned pickup, victim
+  stunned.
+- Zone owner exclusion + radius: forced Root Egg at caster's feet, bot
+  teleported onto it — sampler logged `humanEverRooted=False,
+  botEverRooted=True, zonesLeft=0` (consumed); zone radius honoured the
+  authored 0.8 override.
+- Bot loadouts live (Bruiser/Skirmisher rolled); corner identity clean (human
+  owns corner-0 base, bots claimed 1–3); restart teleported everyone home;
+  grass floor renders (screenshot); ZERO errors/exceptions in the session
+  window.
+- Hardening added during verification: `ChickenCargo.FindNearestPickupInRange`
+  now skips pickups whose NetworkObject isn't live (the subagent's session
+  logged 54× `InvalidOperationException: FoodPickup.Amount … before Spawned`;
+  not reproduced in normal play, but the physics-scan path had no
+  `Object.IsValid` guard — `BotController` already had one).
+
+**Open items:**
+1. **Balance follow-up (WS1 overshoot):** the 70 target is reached in ~45–60 s
+   (leader hit 75.5; next round leader was at 42 with 2:35 left). Design goal
+   was ~70 % of the 180 s timer. Recommend raising `FoodTargetToWin` to
+   ~110–120 (or trimming CollectionRate) after a human feel-pass.
+2. **Multi-client (§C 6–8) still needs a human session:** 3-client corner
+   ownership, leave/rejoin free corner (B3), cross-peer VFX. Requires a fresh
+   Windows EXE build (`Ctrl+Shift+W`) + `tools/run-clients.ps1`; menu
+   interaction per client makes it impractical to drive agent-only.
 
 ---
 

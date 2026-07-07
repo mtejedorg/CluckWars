@@ -157,16 +157,20 @@ MapGenerator._spawnPoints[i] = Lerp(_corners[i], 0, 0.15)   ← where chickens s
 MapGenerator.SpawnBases:                                    ← spawns base at _spawnPoints[i]
     base.CornerIndex = i  via onBeforeSpawned
 
-MatchBootstrapper.PickSpawnPosition(player):
-    idx = Mathf.Abs(player.PlayerId) % spawnPoints.Count
-    return spawnPoints[idx]                                  ← same idx as base.CornerIndex
+MatchBootstrapper.PickSpawnCorner(player):
+    preferred = sorted-roster index of player                ← plain join order in a fresh session
+    corner    = first ShuffledCorner(preferred + offset)     ← scan forward past corners already
+                not stamped on any live chicken                stamped on a HomeCornerIndex
+    stamp chicken.HomeCornerIndex = corner  via onBeforeSpawned
 
 GameManager.AssignBasesToPlayers:
-    desiredCorner = playerId % bases.Length
-    pick unowned base whose CornerIndex == desiredCorner     ← falls back to first-unowned
+    pick base whose CornerIndex == chicken.HomeCornerIndex   ← exact identity, no fallbacks
 ```
 
-So player N spawns at corner N, gets assigned base N. Restart teleport uses the same modulo.
+The occupied-corner scan makes rejoins safe: roster slots shift when someone
+leaves, but stamped `HomeCornerIndex` values don't — a rejoiner takes the free
+corner instead of colliding with a live player. Restart teleports, deposits,
+leaderboard rows, and nameplates all key off the same stamped corner.
 
 ---
 
