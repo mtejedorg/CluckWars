@@ -18,3 +18,4 @@ MonoBehaviour:
   FoodPickup: {fileID: 8362016333457472506, guid: a8794a9118fa75e44946e9a0fb7d9a54, type: 3}
   PlayerBase: {fileID: 8733462546905348637, guid: 599508b03d6810c43a30cc50c0522851, type: 3}
   GameManager: {fileID: 2225548547438419160, guid: 1e2d0fcf4e226a246a080f777381e9cd, type: 3}
+  AbilityZone: {fileID: 6186989543064900895, guid: c70a65d7219fd4647aedf0cb81701207, type: 3}

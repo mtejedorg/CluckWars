@@ -431,12 +431,12 @@ MonoBehaviour:
     Slot0: {fileID: 11400000, guid: 4c1a8e7b3d2f495d8a01c5e7b2f9d4b1, type: 2}
     Slot1: {fileID: 11400000, guid: 0d5566bf334a1c44a9711ea9b34a4ac6, type: 2}
     Slot2: {fileID: 0}
-    AllowedClasses: 
+    AllowedClasses:
   - Name: Skirmisher
     Slot0: {fileID: 11400000, guid: 4c1a8e7b3d2f495d8a01c5e7b2f9d4b1, type: 2}
     Slot1: {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
     Slot2: {fileID: 0}
-    AllowedClasses: 
+    AllowedClasses:
   - Name: Tank
     Slot0: {fileID: 11400000, guid: 6b3c8e2a1f4d495d8a01c5e7b2f9d4d5, type: 2}
     Slot1: {fileID: 11400000, guid: 5f7b2c8a4d3e495d8a01c5e7b2f9d4e7, type: 2}
@@ -452,6 +452,11 @@ MonoBehaviour:
     Slot1: {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
     Slot2: {fileID: 11400000, guid: 4c1a8e7b3d2f495d8a01c5e7b2f9d4b1, type: 2}
     AllowedClasses: 03
+  - Name: Trapper
+    Slot0: {fileID: 11400000, guid: 141d6483e4594575ae36717f9dd3b056, type: 2}
+    Slot1: {fileID: 11400000, guid: 4c026dfa11fd40cd9914aa8fb37090b6, type: 2}
+    Slot2: {fileID: 0}
+    AllowedClasses:
 --- !u!1 &1048915988
 GameObject:
   m_ObjectHideFlags: 0
@@ -498,7 +503,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.MapGenerator
   _basePrefab: {fileID: 0}
   _foodPilePrefab: {fileID: 0}
-  _groundMaterial: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  _groundMaterial: {fileID: 2100000, guid: 1bc3c7d5c8e686b428e56c26a09f6332, type: 2}
   _planeSize: 30
   _wallHeight: 5
   _wallThickness: 0.5
