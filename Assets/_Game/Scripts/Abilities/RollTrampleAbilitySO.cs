@@ -50,7 +50,7 @@ namespace CluckWars.Abilities
             {
                 var target = hits[i].GetComponentInParent<ChickenCombat>();
                 if (target == null || target == casterCombat || target.IsDead) continue;
-                target.RPC_ApplyDamage(finalDamage, caster.Object.InputAuthority);
+                target.RPC_ApplyDamage(finalDamage, casterCombat.Id);
             }
         }
 

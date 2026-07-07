@@ -62,7 +62,10 @@ namespace CluckWars.Abilities
             if (bestTarget == null) return;
 
             float finalDamage = caster.ApplyOutgoingDamage(PeckDamage);
-            bestTarget.RPC_ApplyDamage(finalDamage, caster.Object.InputAuthority);
+            // Attacker id space is ChickenCombat — the receiver resolves it via
+            // TryFindBehaviour<ChickenCombat>; the controller's Id is a different
+            // behaviour slot and silently fails to resolve.
+            bestTarget.RPC_ApplyDamage(finalDamage, casterCombat.Id);
 
             // Knockback: direction away from caster.
             if (bestCtrl != null && KnockbackStrength > 0f)
