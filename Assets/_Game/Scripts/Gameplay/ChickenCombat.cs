@@ -177,7 +177,7 @@ namespace CluckWars.Gameplay
         /// caller is any client, applied on the target's StateAuthority.
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_ApplyDamage(float amount, PlayerRef attacker)
+        public void RPC_ApplyDamage(float amount, NetworkBehaviourId attackerId, bool isReflected = false)
         {
             if (IsStunned) return; // dead chickens can't be hit again until they respawn
 
@@ -189,9 +189,9 @@ namespace CluckWars.Gameplay
             }
 
             // Spine Coat: bounce the damage back to the attacker; recipient eats nothing.
-            if (_controller != null && _controller.ReflectDamage && attacker.IsRealPlayer)
+            if (_controller != null && _controller.ReflectDamage && !isReflected)
             {
-                ReflectDamageTo(attacker, amount);
+                ReflectDamageTo(attackerId, amount);
                 return;
             }
 
@@ -209,7 +209,7 @@ namespace CluckWars.Gameplay
             {
                 IsStunned = true;
                 StunTimer = TickTimer.CreateFromSeconds(Runner, _stunDuration);
-                CreditKillToAttacker(attacker);
+                CreditKillToAttacker(attackerId);
                 // Authority-side consequences (cargo drop, ability cancel) fire
                 // here, not from Render's ChangeDetector — that path can silently
                 // skip locally-written props in GameMode.Single.
@@ -218,25 +218,24 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Finds the attacker's <see cref="ChickenMatchStats"/> by InputAuthority and
-        /// credits a kill. Only real players earn kills; bots are ignored as both
-        /// killers and victims. Runs on the target's StateAuthority.
+        /// Resolves the attacker's <see cref="ChickenMatchStats"/> from its
+        /// <see cref="ChickenCombat"/> behaviour id and credits a kill. Humans and
+        /// bots both earn kills; decoy victims credit nothing (a 4-second
+        /// Doppelganger would otherwise be a free kill every cooldown).
+        /// Runs on the target's StateAuthority.
         /// </summary>
-        private void CreditKillToAttacker(PlayerRef attacker)
+        private void CreditKillToAttacker(NetworkBehaviourId attackerId)
         {
-            if (!attacker.IsRealPlayer) return;
-            if (Object != null && attacker == Object.InputAuthority) return;
+            if (attackerId == this.Id) return;
+            if (_controller != null && _controller.IsDecoy) return;
 
-            var allStats = ChickenMatchStats.ActiveStats;
-            for (int i = 0; i < allStats.Count; i++)
+            if (Runner.TryFindBehaviour(attackerId, out ChickenCombat attackerCombat))
             {
-                var s = allStats[i];
-                if (s == null || s.Object == null) continue;
-                if (s.Object.InputAuthority == attacker)
+                var s = attackerCombat.GetComponent<ChickenMatchStats>();
+                if (s != null)
                 {
                     s.RPC_CreditKill();
-                    _log?.Debug(Source, $"Kill credited to {attacker}.");
-                    return;
+                    _log?.Debug(Source, $"Kill credited to {attackerId}.");
                 }
             }
         }
@@ -255,36 +254,33 @@ namespace CluckWars.Gameplay
             _log?.Debug(Source, $"Reset for new match: HP={HP}.");
         }
 
-        private void ReflectDamageTo(PlayerRef attacker, float amount)
+        private void ReflectDamageTo(NetworkBehaviourId attackerId, float amount)
         {
             float knockback = _controller != null ? _controller.SpineCoatKnockbackStrength : 0f;
 
-            var combats = ChickenCombat.ActiveCombats;
-            for (int i = 0; i < combats.Count; i++)
+            if (Runner.TryFindBehaviour(attackerId, out ChickenCombat attackerCombat))
             {
-                var c = combats[i];
-                if (c == null || c == this) continue;
-                if (c.Object != null && c.Object.InputAuthority == attacker)
-                {
-                    _log?.Debug(Source, $"Spine Coat: reflected {amount:0.0} back to {attacker}.");
-                    c.RPC_ApplyDamage(amount, Object.InputAuthority);
+                if (attackerCombat == this) return; // Don't reflect to self
+                _log?.Debug(Source, $"Spine Coat: reflected {amount:0.0} back to {attackerId}.");
+                attackerCombat.RPC_ApplyDamage(amount, this.Id, true);
 
-                    // Knockback: push the attacker away from the defender.
-                    if (knockback > 0f)
+                // Knockback: push the attacker away from the defender.
+                if (knockback > 0f)
+                {
+                    var attackerCtrl = attackerCombat.GetComponent<ChickenController>();
+                    if (attackerCtrl != null)
                     {
-                        var attackerCtrl = c.GetComponent<ChickenController>();
-                        if (attackerCtrl != null)
-                        {
-                            var dir = (c.transform.position - transform.position);
-                            dir.y = 0f;
-                            if (dir.sqrMagnitude < 0.001f) dir = transform.forward;
-                            attackerCtrl.RPC_ApplyKnockback(dir.normalized * knockback);
-                        }
+                        var dir = (attackerCombat.transform.position - transform.position);
+                        dir.y = 0f;
+                        if (dir.sqrMagnitude < 0.001f) dir = transform.forward;
+                        attackerCtrl.RPC_ApplyKnockback(dir.normalized * knockback);
                     }
-                    return;
                 }
             }
-            _log?.Verbose(Source, $"Spine Coat: attacker {attacker} not found, damage dropped.");
+            else
+            {
+                _log?.Verbose(Source, $"Spine Coat: attacker {attackerId} not found, damage dropped.");
+            }
         }
 
         private void Respawn(ChickenStatsSO stats)

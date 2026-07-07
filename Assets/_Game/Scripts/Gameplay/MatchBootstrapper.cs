@@ -359,6 +359,7 @@ namespace CluckWars.Gameplay
             }
 
             int homeCorner = PickSpawnCorner(runner, player);
+            if (homeCorner < 0) return;
             var pos = PickSpawnPosition(runner, player);
 
             // Defensive: nudge spawn slightly up + per-player horizontally so that
@@ -418,14 +419,48 @@ namespace CluckWars.Gameplay
         /// The shuffled corner index (0..3) for a player — single source of truth
         /// shared by spawn-position selection and <c>HomeCornerIndex</c> stamping.
         /// Single mode: the human always takes permutation slot 0 (bots take 1–3).
-        /// Shared mode: PlayerId is sequential (0-based) across up to 4 players.
+        /// Shared mode: prefers the player's sorted-roster slot, then scans forward
+        /// to the first corner not already stamped on a spawned chicken — roster
+        /// position alone collides after a leave + rejoin (slots shift, stamped
+        /// <c>HomeCornerIndex</c> values don't). Returns -1 when all corners are
+        /// taken (5th joiner) so the caller refuses the spawn.
         /// </summary>
         private int PickSpawnCorner(NetworkRunner runner, PlayerRef player)
         {
-            int raw = (runner.GameMode == GameMode.Single)
-                ? 0
-                : Mathf.Abs(player.PlayerId) % 4;
-            return ShuffledCorner(raw);
+            if (runner.GameMode == GameMode.Single) return ShuffledCorner(0);
+
+            // Preferred slot: index among the PlayerId-sorted roster. In a fresh
+            // session this reproduces plain join order (0,1,2,3).
+            var activePlayers = new System.Collections.Generic.List<PlayerRef>(runner.ActivePlayers);
+            activePlayers.Sort((a, b) => a.PlayerId.CompareTo(b.PlayerId));
+            int preferred = Mathf.Max(0, activePlayers.IndexOf(player));
+
+            // Corner truth is the replicated HomeCornerIndex stamps on live
+            // chickens, not the roster. Two players joining in the same instant
+            // can still race to one corner (each hasn't seen the other's chicken
+            // yet) — rare, and GameManager's invariant Warn surfaces it.
+            for (int offset = 0; offset < 4; offset++)
+            {
+                int corner = ShuffledCorner((preferred + offset) % 4);
+                if (!IsCornerOccupied(corner)) return corner;
+            }
+
+            _log?.Error(Source, $"Spawn refused for {player}: all 4 corners are occupied.");
+            return -1;
+        }
+
+        /// <summary>True when any live, non-decoy chicken has <paramref name="corner"/> stamped.</summary>
+        private static bool IsCornerOccupied(int corner)
+        {
+            var chickens = ChickenController.ActiveControllers;
+            for (int i = 0; i < chickens.Count; i++)
+            {
+                var c = chickens[i];
+                if (c == null || c.Object == null || !c.Object.IsValid) continue;
+                if (c.IsDecoy) continue;
+                if (c.HomeCornerIndex == corner) return true;
+            }
+            return false;
         }
 
         private Vector3 PickSpawnPosition(NetworkRunner runner, PlayerRef player)
@@ -437,6 +472,7 @@ namespace CluckWars.Gameplay
             {
                 var points = _mapGenerator.SpawnPoints;
                 int idx = PickSpawnCorner(runner, player);
+                if (idx < 0) return Vector3.zero;
                 return points[idx % points.Count];
             }
 
@@ -444,10 +480,10 @@ namespace CluckWars.Gameplay
             if (_legacySpawnPoints == null || _legacySpawnPoints.Length == 0)
                 return Vector3.zero;
 
-            int legacyRaw = Mathf.Abs(player.PlayerId) % _legacySpawnPoints.Length;
-            int legacyIdx = ShuffledCorner(legacyRaw) % _legacySpawnPoints.Length;
-            return _legacySpawnPoints[legacyIdx] != null
-                ? _legacySpawnPoints[legacyIdx].position
+            int legacyIdx = PickSpawnCorner(runner, player);
+            if (legacyIdx < 0) return Vector3.zero;
+            return _legacySpawnPoints[legacyIdx % _legacySpawnPoints.Length] != null
+                ? _legacySpawnPoints[legacyIdx % _legacySpawnPoints.Length].position
                 : Vector3.zero;
         }
 

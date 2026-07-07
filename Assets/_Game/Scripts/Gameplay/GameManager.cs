@@ -231,16 +231,43 @@ namespace CluckWars.Gameplay
                 if (PlayerHasBase(bases, player)) continue;
 
                 // Prefer the base whose CornerIndex matches the chicken's stamped
-                // HomeCornerIndex (exact identity), then fall back to nearest /
-                // first-unowned for robustness (late joins, chicken not spawned yet —
-                // GameManager ticks every frame so it retries).
-                var freeBase = FindHomeCornerBaseForPlayer(bases, player)
-                               ?? FindNearestUnownedBaseToPlayer(bases, player)
-                               ?? FindUnownedBase(bases);
+                // HomeCornerIndex (exact identity). No fallbacks.
+                var freeBase = FindHomeCornerBaseForPlayer(bases, player);
                 if (freeBase == null)
                 {
-                    _log?.Warn(Source, $"No free base for player {player} " +
-                        $"(bases={bases.Count}). Will retry next tick.");
+                    // If the home corner base is somehow taken by someone else, this is a real
+                    // invariant violation. Warn and continue. (FindHomeCornerBaseForPlayer returns
+                    // null if the base is taken, or if the chicken hasn't spawned yet).
+                    var allChickens = ChickenController.ActiveControllers;
+                    bool chickenFound = false;
+                    for (int i = 0; i < allChickens.Count; i++)
+                    {
+                        var c = allChickens[i];
+                        if (c != null && c.Object != null && c.Object.InputAuthority == player)
+                        {
+                            chickenFound = true;
+                            if (c.HomeCornerIndex >= 0)
+                            {
+                                // Chicken has a valid corner but base is null, check if taken
+                                for (int j = 0; j < bases.Count; j++)
+                                {
+                                    var b = bases[j];
+                                    if (b != null && b.CornerIndex == c.HomeCornerIndex && (b.Owner.IsRealPlayer || b.BotClaimed))
+                                    {
+                                        _log?.Warn(Source, $"Invariant violation: base {b.name} (corner {b.CornerIndex}) is already claimed, but player {player} has it as home corner.");
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                    }
+
+                    if (!chickenFound)
+                    {
+                        // Expected: chicken hasn't spawned yet. Retry next tick.
+                        continue;
+                    }
+                    
                     continue; // don't break — other players may still need bases
                 }
 
@@ -298,38 +325,7 @@ namespace CluckWars.Gameplay
         /// controlled by <paramref name="player"/>. Returns null if the chicken
         /// hasn't spawned yet or no unowned base is available.
         /// </summary>
-        private PlayerBase FindNearestUnownedBaseToPlayer(System.Collections.Generic.List<PlayerBase> bases, PlayerRef player)
-        {
-            var chickens = ChickenController.ActiveControllers;
 
-            Vector3 chickenPos  = Vector3.zero;
-            bool    chickenFound = false;
-            for (int i = 0; i < chickens.Count; i++)
-            {
-                var c = chickens[i];
-                if (c == null || c.Object == null || !c.Object.IsValid) continue;
-                if (c.Object.InputAuthority != player) continue;
-                chickenPos   = c.transform.position;
-                chickenFound = true;
-                break;
-            }
-            if (!chickenFound) return null;
-
-            PlayerBase best    = null;
-            float      bestSqr = float.MaxValue;
-            for (int i = 0; i < bases.Count; i++)
-            {
-                var b = bases[i];
-                if (b == null || b.Owner.IsRealPlayer) continue;
-                float sqr = (b.transform.position - chickenPos).sqrMagnitude;
-                if (sqr < bestSqr) { bestSqr = sqr; best = b; }
-            }
-            _log?.Debug(Source, best != null
-                ? $"Nearest unowned base to player {player}: '{best.name}' " +
-                  $"(corner {best.CornerIndex}) at dist {Mathf.Sqrt(bestSqr):0.0}."
-                : $"No unowned base found near player {player} chicken.");
-            return best;
-        }
 
         private static bool PlayerHasBase(System.Collections.Generic.List<PlayerBase> bases, PlayerRef player)
         {
@@ -340,15 +336,7 @@ namespace CluckWars.Gameplay
             return false;
         }
 
-        private static PlayerBase FindUnownedBase(System.Collections.Generic.List<PlayerBase> bases)
-        {
-            for (int i = 0; i < bases.Count; i++)
-            {
-                var b = bases[i];
-                if (b != null && !b.Owner.IsRealPlayer) return b;
-            }
-            return null;
-        }
+
 
         private void StartMatch()
         {

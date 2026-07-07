@@ -185,6 +185,11 @@ namespace CluckWars.Gameplay
                 return;
             }
 
+            if (playerBase.IsClaimed && playerBase.Owner != Object.InputAuthority && !(_controller != null && _controller.IsBot))
+            {
+                _log?.Warn(Source, $"Assert: base '{playerBase.name}' is claimed by {playerBase.Owner} but player {Object.InputAuthority} is depositing into it.");
+            }
+
             float dropped = Cargo;
             Cargo = 0f;
             playerBase.RPC_AddFood(dropped);
@@ -240,7 +245,12 @@ namespace CluckWars.Gameplay
             {
                 var col = _overlapHits[i];
                 var pickup = col.GetComponentInParent<FoodPickup>();
-                if (pickup == null || pickup.IsEmpty) continue;
+                if (pickup == null) continue;
+                // Physics can hand back a pickup whose NetworkObject isn't live
+                // (just despawned by RestartMatch, or not yet Spawned) — touching
+                // its [Networked] Amount then throws InvalidOperationException.
+                if (pickup.Object == null || !pickup.Object.IsValid) continue;
+                if (pickup.IsEmpty) continue;
                 float sqr = HorizontalSqr(pickup.transform.position, transform.position);
                 float r = pickup.PickupRadius;
                 if (sqr > r * r) continue;
