@@ -45,6 +45,35 @@ session with a fresh Windows build.
 
 ---
 
+## Session 2026-07-07 (b) — interior walls, solid piles, bot pathfinding
+
+Maestro direction: chases were pure speed races — add walls and make piles
+non-traversable so routing/juking matters. Implemented + verified live:
+
+- **Interior walls** (`MapGenerator.BuildInteriorWalls`): up to 6 visible low
+  (1.1 u) wall segments per match, placed by rejection sampling in an annulus
+  with keep-clear zones around the center pile, corner bases, and nominal
+  island positions. Walls are LOCAL geometry, so online layouts seed from the
+  session name (same determinism trick as the corner permutation); solo rolls
+  fresh each match. All tunables serialized.
+- **Solid piles** (`FoodPile.CreateBlocker`): code-built child capsule
+  (r=0.65 — under CollectRadius minus the chicken capsule, so edge collection
+  still works) + `NavMeshObstacle` carve. Deactivates when the pile empties
+  (stub walkable, mesh un-carves); reactivates on match-restart refill.
+- **Bot pathfinding** (`BotController.ResolveSteerPoint`): runtime NavMesh
+  baked in `MapGenerator.BuildNavMesh` (NavMeshSurface, physics colliders, so
+  invisible boundary walls count); bots follow `NavMesh.CalculatePath` corners,
+  recomputing when the target drifts >1 m; direct steering fallback. Solid-pile
+  centers are off-mesh — `SamplePosition` snaps the path to the collectable rim.
+- **Verified (solo play mode):** 4 walls placed, NavMesh 99 tris, cross-map
+  path `PathComplete` with 4 corners; blockers solid=3 / walkable-empty=6
+  mid-match; bots deposited 48/36/57 by ~1:07 (not stuck, contesting center);
+  walls render as desaturated wood, see-over height; zero errors/exceptions.
+  Side effect: routing slowed pacing slightly (nobody at 70 by 1:07 vs ~45 s
+  before) — partially offsets the WS1 overshoot; re-measure before retuning.
+
+---
+
 ## Session 2026-07-07 — fix-up of Antigravity's WS3–WS5 delivery
 
 Review findings + rationale: `docs/HANDOFF_REVISION_FIXUP_2026-07.md`. Applied:

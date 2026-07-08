@@ -65,6 +65,10 @@ SELECT character & abilities → SPAWN at base edge → MOVE to food pile
 
 **Food piles do not respawn.** Once depleted, they are gone for the match. This creates increasing scarcity over time, forcing players to transition from farming to fighting as the match progresses.
 
+**Interior walls (v0.3.3):** a handful of low, visible wall segments are scattered across the arena each match (seeded from the session code so all peers agree; randomized within keep-clear constraints around the center pile, bases, and islands). Walls block movement but not sight — the isometric camera sees over them. Purpose: chases and escapes become *routing* plays (cutting corners, juking around cover, knocking rivals into walls) instead of pure speed races.
+
+**Piles are solid while stocked (v0.3.3):** a stocked food pile cannot be walked through — it blocks like a wall and carves the bot NavMesh. Collection is unchanged (stand at the pile's edge). A depleted pile stub becomes walkable again. Together with interior walls this gives slower classes real counterplay against faster chasers.
+
 **Food Distribution Philosophy:**  
 Players must constantly evaluate three strategic options:
 1. **Secure** — farm their personal island safely but with low yield.

@@ -1,8 +1,11 @@
 using System.Collections.Generic;
 using CluckWars.Logging;
 using CluckWars.Networking;
+using CluckWars.Services;
 using Fusion;
+using Unity.AI.Navigation;
 using UnityEngine;
+using UnityEngine.AI;
 using Zenject;
 
 namespace CluckWars.Gameplay
@@ -54,6 +57,21 @@ namespace CluckWars.Gameplay
         [Tooltip("Optional material for the walls when _wallsVisible is true.")]
         [SerializeField] private Material _wallMaterial;
 
+        [Header("Interior walls (visible cover — chases route around them)")]
+        [Tooltip("Number of interior wall segments. 0 disables. Walls are LOCAL geometry that blocks movement, so online layouts are seeded from the session name — every peer builds the identical map.")]
+        [Range(0, 12)]
+        [SerializeField] private int _interiorWallCount = 6;
+        [Tooltip("Min (x) / max (y) length of an interior wall segment.")]
+        [SerializeField] private Vector2 _interiorWallLengthRange = new Vector2(3f, 6f);
+        [Tooltip("Interior wall height. Low enough to see over in the iso view; must stay above the NavMesh step height (0.75) so bots can't path over.")]
+        [Min(0.8f)]
+        [SerializeField] private float _interiorWallHeight = 1.1f;
+        [Tooltip("Keep-clear radius around the center pile, corner bases and nominal island positions so walls never seal off an objective.")]
+        [Min(1f)]
+        [SerializeField] private float _interiorWallClearance = 3f;
+        [Tooltip("Tint for interior walls when no _wallMaterial is assigned. Desaturated per ART.md — map stays muted so chickens pop.")]
+        [SerializeField] private Color _interiorWallColor = new Color(0.45f, 0.36f, 0.26f, 1f);
+
         [Header("Bases")]
         [Tooltip("How far each corner base sits from the center.")]
         [Min(2f)]
@@ -90,6 +108,7 @@ namespace CluckWars.Gameplay
 
         private INetworkService _network;
         private PrefabRegistrySO _prefabRegistry;
+        private ISessionSelectionService _selection;
         private ILogService _log;
         private Vector3[] _spawnPoints;
         private bool _runnerHandled;
@@ -98,10 +117,11 @@ namespace CluckWars.Gameplay
         public IReadOnlyList<Vector3> SpawnPoints => _spawnPoints;
 
         [Inject]
-        public void Construct(INetworkService network, PrefabRegistrySO prefabRegistry, ILogService log)
+        public void Construct(INetworkService network, PrefabRegistrySO prefabRegistry, ISessionSelectionService selection, ILogService log)
         {
             _network = network;
             _prefabRegistry = prefabRegistry;
+            _selection = selection;
             _log = log;
         }
 
@@ -122,6 +142,8 @@ namespace CluckWars.Gameplay
             ComputeSpawnPoints();
             BuildPlane();
             BuildBoundaryWalls();
+            BuildInteriorWalls();
+            BuildNavMesh();
 
             if (_network != null) _network.OnRunnerReady += HandleRunnerReady;
             else _log?.Warn(Source, "INetworkService not injected; bases/piles won't spawn.");
@@ -235,6 +257,109 @@ namespace CluckWars.Gameplay
             {
                 var mr = wall.GetComponent<MeshRenderer>();
                 if (mr != null) mr.sharedMaterial = _wallMaterial;
+            }
+        }
+
+        // ---- Interior walls + NavMesh ------------------------------------------
+
+        /// <summary>
+        /// Places visible interior wall segments that block movement — chases
+        /// become routing plays instead of pure speed races. Walls are LOCAL
+        /// geometry on every peer, so online layouts are seeded from the session
+        /// name (same determinism trick as MatchBootstrapper's corner
+        /// permutation); solo just rolls a fresh layout each match.
+        /// Rejection sampling keeps every wall clear of the center pile, the
+        /// corner bases, and the nominal island positions so no objective is
+        /// ever sealed off.
+        /// </summary>
+        private void BuildInteriorWalls()
+        {
+            if (_interiorWallCount <= 0) return;
+
+            bool online = _selection != null && _selection.Mode != SessionMode.Solo;
+            string sessionName = online ? _selection.SessionName : null;
+            var rng = online
+                ? new System.Random(SessionNameSeed(sessionName))
+                : new System.Random();
+
+            // Keep-clear points: center pile, corner bases, nominal (pre-jitter)
+            // island positions. Pile jitter is ±1.5 and _interiorWallClearance
+            // covers it.
+            var keepClear = new List<Vector3> { Vector3.zero };
+            for (int i = 0; i < _corners.Length; i++)
+            {
+                keepClear.Add(_spawnPoints[i]);
+                keepClear.Add(Vector3.Lerp(_corners[i], Vector3.zero, _personalPileInset));
+                keepClear.Add((_corners[i] + _corners[(i + 1) % _corners.Length]) * 0.5f * _contestedEdgeInset);
+            }
+
+            float minR = _interiorWallClearance + 1.5f;   // outside the center pile's clearance
+            float maxR = _planeSize * 0.5f - 2f;          // inside the boundary walls
+            int placed = 0;
+            for (int attempt = 0; attempt < _interiorWallCount * 12 && placed < _interiorWallCount; attempt++)
+            {
+                float len   = Mathf.Lerp(_interiorWallLengthRange.x, _interiorWallLengthRange.y, (float)rng.NextDouble());
+                float polar = (float)rng.NextDouble() * Mathf.PI * 2f;
+                float r     = Mathf.Lerp(minR, maxR, (float)rng.NextDouble());
+                var center  = new Vector3(Mathf.Cos(polar) * r, 0f, Mathf.Sin(polar) * r);
+                float yaw   = (float)rng.NextDouble() * 180f;
+
+                // Conservative clearance: point-to-wall-center distance must beat
+                // the keep-clear radius plus the wall's half length.
+                float keepOut = _interiorWallClearance + len * 0.5f;
+                bool blocked = false;
+                for (int p = 0; p < keepClear.Count && !blocked; p++)
+                    if ((keepClear[p] - center).sqrMagnitude < keepOut * keepOut) blocked = true;
+                if (blocked) continue;
+
+                var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                wall.name = $"InteriorWall_{placed}";
+                wall.transform.SetParent(transform, worldPositionStays: false);
+                wall.transform.localPosition = center + Vector3.up * (_interiorWallHeight * 0.5f);
+                wall.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
+                wall.transform.localScale = new Vector3(len, _interiorWallHeight, _wallThickness);
+                var mr = wall.GetComponent<MeshRenderer>();
+                if (mr != null)
+                {
+                    if (_wallMaterial != null) mr.sharedMaterial = _wallMaterial;
+                    mr.material.color = _interiorWallColor; // per-wall instance; ≤12 walls
+                }
+
+                keepClear.Add(center); // walls also keep clear of each other
+                placed++;
+            }
+
+            _log?.Info(Source, $"Built {placed}/{_interiorWallCount} interior walls " +
+                $"(seed={(online ? $"session '{sessionName}'" : "solo-random")}).");
+        }
+
+        /// <summary>
+        /// Bakes a runtime NavMesh from the generated geometry (physics colliders,
+        /// so the invisible boundary walls count too). Bots path around interior
+        /// walls via this mesh; FoodPiles spawn later and carve dynamically with
+        /// a NavMeshObstacle on their blocker.
+        /// </summary>
+        private void BuildNavMesh()
+        {
+            var surface = gameObject.AddComponent<NavMeshSurface>();
+            surface.collectObjects = CollectObjects.Children;
+            surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
+            surface.BuildNavMesh();
+            _log?.Info(Source, "NavMesh baked for bot pathing.");
+        }
+
+        /// <summary>
+        /// Stable session-name hash — identical on every peer/platform. Kept in
+        /// sync with <c>MatchBootstrapper.SessionNameSeed</c> (same polynomial);
+        /// duplicated because both classes need it before any shared home exists.
+        /// </summary>
+        private static int SessionNameSeed(string s)
+        {
+            unchecked
+            {
+                int h = 17;
+                foreach (char c in s) h = h * 31 + c;
+                return h;
             }
         }
 

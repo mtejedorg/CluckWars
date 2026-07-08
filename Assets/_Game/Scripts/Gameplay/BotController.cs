@@ -2,6 +2,7 @@ using CluckWars.Abilities;
 using CluckWars.Logging;
 using Fusion;
 using UnityEngine;
+using UnityEngine.AI;
 using Zenject;
 
 namespace CluckWars.Gameplay
@@ -97,6 +98,11 @@ namespace CluckWars.Gameplay
         private Vector3    _moveTarget;
         private PlayerBase _homeBase;
         private float      _nextThinkTime;
+
+        // ---- NavMesh path following (walls + solid piles are obstacles) ------
+        private NavMeshPath _navPath;
+        private Vector3     _lastPathTarget = new Vector3(float.MinValue, 0f, float.MinValue);
+        private int         _navCorner = -1;
 
         // ---- Perceived rival (cached per think tick, used by ReactWithAbility) --
         private ChickenController _perceivedRival;
@@ -296,7 +302,8 @@ namespace CluckWars.Gameplay
 
         private void Navigate()
         {
-            var toTarget = _moveTarget - _controller.transform.position;
+            var selfPos  = _controller.transform.position;
+            var toTarget = _moveTarget - selfPos;
             toTarget.y = 0f;
 
             if (toTarget.sqrMagnitude <= _arrivalRadius * _arrivalRadius)
@@ -305,9 +312,52 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            var dir   = toTarget.normalized;
-            var input = new Vector2(dir.x, dir.z);
-            _controller.BotTick(input, Runner.DeltaTime);
+            // Steer along the NavMesh path (walls + solid piles are obstacles);
+            // fall back to the direct line when no path resolves.
+            var steer = ResolveSteerPoint(selfPos);
+            var dir   = steer - selfPos;
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.0001f) dir = toTarget;
+            dir.Normalize();
+            _controller.BotTick(new Vector2(dir.x, dir.z), Runner.DeltaTime);
+        }
+
+        /// <summary>
+        /// The next NavMesh path corner to steer toward. Recomputes the path when
+        /// <see cref="_moveTarget"/> drifts more than a metre from the last
+        /// computed target (piles are static, chased chickens move). Targets on
+        /// carved ground (a solid pile's center) snap to the nearest edge via
+        /// <c>SamplePosition</c>, which is exactly the collectable rim. Falls back
+        /// to direct steering when sampling or pathing fails — CharacterController
+        /// sliding still handles glancing contacts.
+        /// </summary>
+        private Vector3 ResolveSteerPoint(Vector3 selfPos)
+        {
+            if (_navPath == null) _navPath = new NavMeshPath();
+
+            if ((_moveTarget - _lastPathTarget).sqrMagnitude > 1f)
+            {
+                _lastPathTarget = _moveTarget;
+                bool ok = NavMesh.SamplePosition(selfPos, out var fromHit, 2f, NavMesh.AllAreas)
+                       && NavMesh.SamplePosition(_moveTarget, out var toHit, 2.5f, NavMesh.AllAreas)
+                       && NavMesh.CalculatePath(fromHit.position, toHit.position, NavMesh.AllAreas, _navPath)
+                       && _navPath.corners.Length > 1;
+                _navCorner = ok ? 1 : -1;
+            }
+
+            if (_navCorner < 0 || _navPath.status == NavMeshPathStatus.PathInvalid)
+                return _moveTarget;
+
+            var corners = _navPath.corners;
+            // Advance past corners we've reached (XZ, ~0.6 m threshold).
+            while (_navCorner < corners.Length - 1)
+            {
+                float dx = corners[_navCorner].x - selfPos.x;
+                float dz = corners[_navCorner].z - selfPos.z;
+                if (dx * dx + dz * dz > 0.36f) break;
+                _navCorner++;
+            }
+            return corners[Mathf.Min(_navCorner, corners.Length - 1)];
         }
 
         // ---- Perception helpers (run inside throttled Think) ----------------
