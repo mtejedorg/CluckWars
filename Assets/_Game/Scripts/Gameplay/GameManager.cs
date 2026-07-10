@@ -622,7 +622,7 @@ namespace CluckWars.Gameplay
             int rolled = Random.Range(1, 5); // 1..4 inclusive
             ActiveEvent = (MatchEventKind)rolled;
 
-            _log?.Info(Source, $"[MatchSummary] FINAL MINUTE EVENT FIRED: {ActiveEvent}");
+            _log?.Info(Source, $"FINAL MINUTE EVENT FIRED: {ActiveEvent}");
 
             switch (ActiveEvent)
             {
