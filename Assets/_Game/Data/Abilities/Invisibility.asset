@@ -16,7 +16,7 @@ MonoBehaviour:
   ShortLabel: INV
   AccentColor: {r: 0.55, g: 0.85, b: 0.85, a: 1}
   Category: 3
-  Duration: 2.0
+  Duration: 4.0
   Cooldown: 8
   AbilityAnimationClip: {fileID: 0}
   Opacity: 0.2
