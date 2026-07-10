@@ -55,6 +55,18 @@ namespace CluckWars.Gameplay
         private PrefabRegistrySO _prefabRegistry;
         private float _winCheckIntervalSeconds = 0.25f;
         private float _nextWinCheckTime;
+        private int _pickupsSpawnedCount;
+        private int _pickupsCollectedCount;
+
+        public static void RegisterPickupSpawned()
+        {
+            if (Instance != null) Instance._pickupsSpawnedCount++;
+        }
+
+        public static void RegisterPickupCollected()
+        {
+            if (Instance != null) Instance._pickupsCollectedCount++;
+        }
 
         public float MatchDurationSeconds => _config != null ? _config.MatchDurationSeconds : 180f;
         public int FoodTargetToWin => _config != null ? _config.FoodTargetToWin : 150;
@@ -359,6 +371,8 @@ namespace CluckWars.Gameplay
             WinnerPlayer = PlayerRef.None;
             WinnerCorner = -1;
             WinnerFoodTotal = 0f;
+            _pickupsSpawnedCount = 0;
+            _pickupsCollectedCount = 0;
             _audio?.PlaySFX(_audioReg != null ? _audioReg.MatchStart : null);
             if (_audioReg != null && _audioReg.MatchMusic != null)
             {
@@ -453,6 +467,32 @@ namespace CluckWars.Gameplay
                 : (_audioReg != null ? _audioReg.MatchEnd : null);
             _audio?.PlaySFX(endCue);
             _log?.Info(Source, $"Match ended ({reason}). Winner={winner}, total={winnerTotal:0.0}. Next round in {_restartDelaySeconds}s.");
+
+            // KPI match summary instrumentation (IP7)
+            if (HasStateAuthority)
+            {
+                System.Text.StringBuilder sb = new System.Text.StringBuilder();
+                sb.AppendLine();
+                sb.AppendLine("=== MATCH SUMMARY ===");
+                sb.AppendLine($"Match Length: {MatchDurationSeconds - TimeRemaining:0.0}s");
+                sb.AppendLine($"Winner Corner: {winnerCorner} (Food: {winnerTotal:0.0})");
+                sb.AppendLine($"Event Fired: {ActiveEvent}");
+                sb.AppendLine($"Pickups: Spawned={_pickupsSpawnedCount}, Collected={_pickupsCollectedCount}");
+                sb.AppendLine("Players Stats:");
+                var statsList = ChickenMatchStats.ActiveStats;
+                for (int i = 0; i < statsList.Count; i++)
+                {
+                    var s = statsList[i];
+                    if (s == null || s.Object == null || !s.Object.IsValid) continue;
+                    var cc = s.GetComponent<ChickenController>();
+                    if (cc != null && !cc.IsDecoy)
+                    {
+                        sb.AppendLine($"  P{cc.HomeCornerIndex + 1} ({cc.Class}): Kills={s.Kills}, Deposited={s.FoodDeposited:0.0}");
+                    }
+                }
+                sb.AppendLine("=====================");
+                _log?.Info("MatchSummary", sb.ToString());
+            }
         }
 
         /// <summary>
@@ -560,6 +600,8 @@ namespace CluckWars.Gameplay
             RestartCountdown = default;
             _nextWinCheckTime = 0f;
             ActiveEvent = MatchEventKind.None;
+            _pickupsSpawnedCount = 0;
+            _pickupsCollectedCount = 0;
         }
 
         private void TriggerFinalMinuteEvent()

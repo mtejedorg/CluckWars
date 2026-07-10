@@ -55,6 +55,7 @@ namespace CluckWars.Gameplay
                 if (MaxAmount <= 0f) MaxAmount = Amount;
                 ExpiryTimer = TickTimer.CreateFromSeconds(Runner, _despawnDelay);
                 _log?.Debug(Source, $"{name}: Spawned with Amount={Amount:0.00}, despawn in {_despawnDelay}s.");
+                GameManager.RegisterPickupSpawned();
             }
         }
 
@@ -88,6 +89,7 @@ namespace CluckWars.Gameplay
             _log?.Verbose(Source, $"{name}: drained {actual:0.00} → {Amount:0.0}/{MaxAmount}.");
             if (Amount <= 0f)
             {
+                GameManager.RegisterPickupCollected();
                 Runner.Despawn(Object);
             }
         }
