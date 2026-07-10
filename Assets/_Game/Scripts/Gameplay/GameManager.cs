@@ -657,7 +657,9 @@ namespace CluckWars.Gameplay
                 float radius = Random.Range(4.5f, 6.5f);
                 pos = new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
 
-                if (!Physics.CheckSphere(pos + Vector3.up * 0.6f, 1.0f))
+                // Sphere bottom sits at y=0.1 so the ground plane collider never
+                // rejects a candidate — only walls, pile blockers, and bases do.
+                if (!Physics.CheckSphere(pos + Vector3.up * 0.8f, 0.7f))
                 {
                     foundSpot = true;
                     break;
