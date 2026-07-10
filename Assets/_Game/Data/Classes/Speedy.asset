@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ed6e9857b0983b74e910182e09fa9e1b, type: 3}
   m_Name: Speedy
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenStatsSO
-  DisplayName: Speed
+  DisplayName: Speedy
   Passive: 2
   MaxHP: 80
   MoveSpeed: 10

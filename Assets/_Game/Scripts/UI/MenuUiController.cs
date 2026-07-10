@@ -63,7 +63,7 @@ namespace CluckWars.UI
 
         private static readonly Dictionary<ChickenClass, ClassMeta> Meta = new()
         {
-            [ChickenClass.Warrior]  = new ClassMeta { Name = "WARRIOR CHICKEN",  Role = "All-Rounder",  Tint = UiGfx.Hex32("C04030"), Slots = 2, PassiveName = "TOUGH",     PassiveDesc = "Deals increased ability damage.",  Stats = new[]{3,3,4,3,3} },
+            [ChickenClass.Warrior]  = new ClassMeta { Name = "WARRIOR CHICKEN",  Role = "All-Rounder",  Tint = UiGfx.Hex32("C04030"), Slots = 2, PassiveName = "MIGHTY",     PassiveDesc = "+25% outgoing ability damage.",  Stats = new[]{3,3,4,3,3} },
             [ChickenClass.Speedy]   = new ClassMeta { Name = "SPEEDY CHICKEN",   Role = "Hit & Run",    Tint = UiGfx.Hex32("E85A2A"), Slots = 2, PassiveName = "SLIPPERY",  PassiveDesc = "Reduced control-effect duration.", Stats = new[]{2,3,2,1,5} },
             [ChickenClass.Fatty]    = new ClassMeta { Name = "FATTY CHICKEN",    Role = "Bulk Carrier", Tint = UiGfx.Hex32("F5D75A"), Slots = 2, PassiveName = "IMMOVABLE", PassiveDesc = "Greatly reduced knockback.",       Stats = new[]{5,5,5,5,2} },
             [ChickenClass.Assassin] = new ClassMeta { Name = "ASSASSIN CHICKEN", Role = "Disruptor",    Tint = UiGfx.Hex32("7B68EE"), Slots = 3, PassiveName = "COMBO",     PassiveDesc = "Equips 3 abilities instead of 2.", Stats = new[]{2,2,2,2,4} },
@@ -861,7 +861,7 @@ namespace CluckWars.UI
         /// <summary>Ported from the old CharacterSelectController for parity.</summary>
         public static (string name, string desc, string subRole) GetPassiveInfo(ChickenClass cls) => cls switch
         {
-            ChickenClass.Warrior  => ("TOUGH",     "Deals increased ability damage.", "All-Rounder"),
+            ChickenClass.Warrior  => ("MIGHTY",     "+25% outgoing ability damage.", "All-Rounder"),
             ChickenClass.Speedy   => ("SLIPPERY",  "Reduced control-effect duration.", "Hit & Run"),
             ChickenClass.Fatty    => ("IMMOVABLE", "Greatly reduced knockback.", "Bulk Carrier"),
             ChickenClass.Assassin => ("COMBO",     "Equips 3 abilities instead of 2.", "Disruptor"),

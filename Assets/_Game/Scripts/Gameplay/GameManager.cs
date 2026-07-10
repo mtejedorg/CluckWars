@@ -375,24 +375,58 @@ namespace CluckWars.Gameplay
 
         private void EndOnTimerExpiry()
         {
-            // Highest-total CLAIMED base wins (human or bot). Ties broken by
-            // iteration order; good enough for the demo.
             var bases = PlayerBase.ActiveBases;
-            PlayerRef winner = PlayerRef.None;
-            int winnerCorner = -1;
-            float bestTotal = -1f;
+            PlayerBase bestBase = null;
             for (int i = 0; i < bases.Count; i++)
             {
                 var b = bases[i];
                 if (b == null || !b.IsClaimed) continue;
-                if (b.FoodTotal > bestTotal)
+                if (bestBase == null)
                 {
-                    bestTotal = b.FoodTotal;
-                    winner = b.Owner;
-                    winnerCorner = b.CornerIndex;
+                    bestBase = b;
+                    continue;
+                }
+                if (b.FoodTotal > bestBase.FoodTotal)
+                {
+                    bestBase = b;
+                }
+                else if (Mathf.Approximately(b.FoodTotal, bestBase.FoodTotal))
+                {
+                    int bKills = GetKillsForCorner(b.CornerIndex);
+                    int bestKills = GetKillsForCorner(bestBase.CornerIndex);
+                    if (bKills > bestKills)
+                    {
+                        bestBase = b;
+                    }
+                    else if (bKills == bestKills)
+                    {
+                        if (b.CornerIndex < bestBase.CornerIndex)
+                        {
+                            bestBase = b;
+                        }
+                    }
                 }
             }
-            EndMatch(winner, winnerCorner, Mathf.Max(0f, bestTotal), reason: "timer expired");
+            PlayerRef winner = bestBase != null ? bestBase.Owner : PlayerRef.None;
+            int winnerCorner = bestBase != null ? bestBase.CornerIndex : -1;
+            float bestTotal = bestBase != null ? bestBase.FoodTotal : 0f;
+            EndMatch(winner, winnerCorner, bestTotal, reason: "timer expired");
+        }
+
+        private int GetKillsForCorner(int cornerIndex)
+        {
+            var statsList = ChickenMatchStats.ActiveStats;
+            for (int i = 0; i < statsList.Count; i++)
+            {
+                var s = statsList[i];
+                if (s == null || s.Object == null || !s.Object.IsValid) continue;
+                var cc = s.GetComponent<ChickenController>();
+                if (cc != null && cc.HomeCornerIndex == cornerIndex && !cc.IsDecoy)
+                {
+                    return s.Kills;
+                }
+            }
+            return 0;
         }
 
         private void EndMatch(PlayerRef winner, int winnerCorner, float winnerTotal, string reason)

@@ -59,8 +59,8 @@
                     </ui:VisualElement>
                 </ui:VisualElement>
                 <ui:Label name="PreviewName" text="WARRIOR CHICKEN" class="cw-heading" style="font-size: 18px;" />
-                <ui:Label name="PreviewPassive" text="PASSIVE · TOUGH" class="cw-slot-pill" style="margin-top: 4px; margin-bottom: 4px; font-size: 11px;" />
-                <ui:Label name="PreviewDesc" text="Deals increased ability damage." class="cw-body" style="-unity-text-align: middle-center; font-size: 12px;" />
+                <ui:Label name="PreviewPassive" text="PASSIVE · MIGHTY" class="cw-slot-pill" style="margin-top: 4px; margin-bottom: 4px; font-size: 11px;" />
+                <ui:Label name="PreviewDesc" text="+25% outgoing ability damage." class="cw-body" style="-unity-text-align: middle-center; font-size: 12px;" />
 
                 <ui:VisualElement name="StatList" class="cw-stat-grid" style="width: 100%; margin-top: 10px; padding-left: 4px; padding-right: 4px;">
                     <ui:VisualElement name="StatCargo" class="cw-stat-row">
