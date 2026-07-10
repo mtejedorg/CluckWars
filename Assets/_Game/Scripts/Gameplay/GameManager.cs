@@ -649,9 +649,25 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            float angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
-            float radius = Random.Range(4.5f, 6.5f);
-            Vector3 pos = new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
+            Vector3 pos = Vector3.zero;
+            bool foundSpot = false;
+            for (int i = 0; i < 8; i++)
+            {
+                float angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
+                float radius = Random.Range(4.5f, 6.5f);
+                pos = new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
+
+                if (!Physics.CheckSphere(pos + Vector3.up * 0.6f, 1.0f))
+                {
+                    foundSpot = true;
+                    break;
+                }
+            }
+
+            if (!foundSpot)
+            {
+                _log?.Warn(Source, "GoldenPile event: Failed to find non-overlapping position after 8 attempts. Spawning at last candidate.");
+            }
 
             _eventPile = Runner.Spawn(
                 _prefabRegistry.FoodPile,
