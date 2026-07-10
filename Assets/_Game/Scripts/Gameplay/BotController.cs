@@ -165,6 +165,13 @@ namespace CluckWars.Gameplay
 
             float cargoFraction = _cargo != null ? _cargo.Fraction : 0f;
 
+            // Latch ReturnToBase until all cargo is deposited (IP1)
+            if (_state == BotState.ReturnToBase && _cargo != null && _cargo.Cargo > 0f)
+            {
+                _moveTarget = GetHomeBasePosition();
+                return;
+            }
+
             // Hysteresis (BOT-8): while already fleeing/hunting, the trigger radius
             // grows so a rival hovering on the boundary can't flip the state every
             // 0.3s think. Entering still uses the base radius.

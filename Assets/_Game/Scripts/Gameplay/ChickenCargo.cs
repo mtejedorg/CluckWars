@@ -3,6 +3,7 @@ using CluckWars.Logging;
 using Fusion;
 using UnityEngine;
 using Zenject;
+using LogLevel = CluckWars.Logging.LogLevel;
 
 namespace CluckWars.Gameplay
 {
@@ -52,24 +53,39 @@ namespace CluckWars.Gameplay
         /// </summary>
         public bool IsPileSlow { get; private set; }
 
+        /// <summary>
+        /// True when this chicken is currently depositing cargo at their own base.
+        /// </summary>
+        public bool IsDepositing
+        {
+            get
+            {
+                if (Cargo <= 0f) return false;
+                if (_combat != null && _combat.IsStunned) return false;
+                return FindNearestBaseInRange() != null;
+            }
+        }
+
         private ChickenController _controller;
         private ChickenCombat _combat;
         private ILogService _log;
         private IAudioService _audio;
         private AudioRegistrySO _audioReg;
         private PrefabRegistrySO _prefabRegistry;
+        private MatchConfigSO _matchConfig;
         private bool _subscribedToDeath;
 
         // Static array for broadphase overlaps to prevent per-tick allocation
         private static readonly Collider[] _overlapHits = new Collider[16];
 
         [Inject]
-        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry)
+        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry, MatchConfigSO matchConfig)
         {
             _log = log;
             _audio = audio;
             _audioReg = audioReg;
             _prefabRegistry = prefabRegistry;
+            _matchConfig = matchConfig;
         }
 
         private NetworkObject ResolveFoodPickupPrefab()
@@ -190,13 +206,21 @@ namespace CluckWars.Gameplay
                 _log?.Warn(Source, $"Assert: base '{playerBase.name}' is claimed by {playerBase.Owner} but player {Object.InputAuthority} is depositing into it.");
             }
 
-            float dropped = Cargo;
-            Cargo = 0f;
-            playerBase.RPC_AddFood(dropped);
+            float rate = _matchConfig != null ? _matchConfig.DepositRatePerSecond : 6f;
+            float transfer = Mathf.Min(Cargo, rate * Runner.DeltaTime);
+            if (transfer <= 0f) return;
+
+            Cargo -= transfer;
+            playerBase.RPC_AddFood(transfer);
             // Track food deposited for the match-end stats overlay.
-            GetComponent<ChickenMatchStats>()?.RPC_AddDeposit(dropped);
-            _audio?.PlaySFX(_audioReg != null ? _audioReg.Deposit : null);
-            _log?.Debug(Source, $"Deposited {dropped:0.00} at {playerBase.name}.");
+            GetComponent<ChickenMatchStats>()?.RPC_AddDeposit(transfer);
+
+            if (Cargo <= 0f)
+            {
+                Cargo = 0f;
+                _audio?.PlaySFX(_audioReg != null ? _audioReg.Deposit : null);
+                _log?.Debug(Source, $"Deposited complete at {playerBase.name}.");
+            }
         }
 
         /// <summary>

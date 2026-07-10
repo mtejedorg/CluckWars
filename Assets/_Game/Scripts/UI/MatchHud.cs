@@ -481,10 +481,12 @@ namespace CluckWars.UI
                             ? new Color(1.00f, 0.55f, 0.05f, 1f) // orange — nearly full
                             : DtGoldMid;                          // gold — normal
 
-                    _cargoLabel.text = fraction >= 1f
-                        ? "FULL  →  RETURN TO BASE!"
-                        : $"Cargo  {Mathf.FloorToInt(cur)} / {Mathf.FloorToInt(cap)}";
-                    _cargoLabel.color = fraction >= 1f
+                    _cargoLabel.text = _localCargo.IsDepositing
+                        ? "DEPOSITING..."
+                        : fraction >= 1f
+                            ? "FULL  →  RETURN TO BASE!"
+                            : $"Cargo  {Mathf.FloorToInt(cur)} / {Mathf.FloorToInt(cap)}";
+                    _cargoLabel.color = (fraction >= 1f || _localCargo.IsDepositing)
                         ? new Color(1f, 0.9f, 0.85f, 1f)
                         : DtTextPrimary;
                 }
