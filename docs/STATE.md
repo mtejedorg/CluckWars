@@ -620,8 +620,9 @@ Applied the full gameplay and system improvement plan (`docs/IMPROVEMENT_PLAN_20
 Applied and committed four sequential fixes on `develop` based on code-review feedback:
 1. **IP-fix1:** Updated self-injection in `ChickenCargo.Spawned()` to search `SceneContext` first before falling back to `ProjectContext.Instance`, preventing Zenject unresolved-dependency exceptions for runtime-spawned chickens (which need `MatchConfigSO` bound only in scene scope).
 2. **IP-fix2:** Stored the spawned golden pile `NetworkObject` in a private field `_eventPile` in `GameManager` and despawned it upon `RestartMatch()` (if still valid) to prevent golden piles from persisting and multiplying across matches.
-3. **IP-fix3:** Added rejection sampling (up to 8 candidate positions) in `SpawnGoldenPile()` using `Physics.CheckSphere(candidatePos + Vector3.up * 0.6f, 1.0f)` to prevent the golden pile from spawning inside interior walls, bases, or other piles.
+3. **IP-fix3:** Added rejection sampling (up to 8 candidate positions) in `SpawnGoldenPile()` using `Physics.CheckSphere` to prevent the golden pile from spawning inside interior walls, bases, or other piles.
 4. **IP-fix4:** Cleaned up logging tags in `TriggerFinalMinuteEvent()` by removing the `[MatchSummary]` prefix to preserve the rule that `[MatchSummary]` is printed exactly once per match.
+5. **IP-fix5:** Corrected the IP-fix3 overlap sphere — at `y=0.6, r=1.0` it dipped below the ground plane and rejected every candidate; raised to `y=0.8, r=0.7` so only walls/blockers/bases reject a spot.
 
 
 ---
