@@ -18,7 +18,7 @@ MonoBehaviour:
   Category: 3
   BotRole: 5
   Duration: 0.5
-  Cooldown: 6
+  Cooldown: 5
   AbilityAnimationClip: {fileID: 0}
   StealRange: 3
-  StealAmount: 4
+  StealAmount: 6
