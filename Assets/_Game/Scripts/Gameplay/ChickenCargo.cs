@@ -97,7 +97,14 @@ namespace CluckWars.Gameplay
         public override void Spawned()
         {
             ActiveCargos.Add(this);
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            if (_log == null)
+            {
+                var sceneCtx = FindFirstObjectByType<SceneContext>();
+                if (sceneCtx != null)
+                    sceneCtx.Container.Inject(this);
+                else
+                    ProjectContext.Instance.Container.Inject(this);
+            }
 
             _controller = GetComponent<ChickenController>();
             _combat = GetComponent<ChickenCombat>();
