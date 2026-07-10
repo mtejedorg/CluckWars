@@ -445,6 +445,9 @@ namespace CluckWars.Gameplay
             {
                 var s = statsList[i];
                 if (s == null || s.Object == null || !s.Object.IsValid) continue;
+                // Same duplicate-component guard as the match summary: only the
+                // primary ChickenMatchStats accumulates kills via RPC.
+                if (s.GetComponent<ChickenMatchStats>() != s) continue;
                 var cc = s.GetComponent<ChickenController>();
                 if (cc != null && cc.HomeCornerIndex == cornerIndex && !cc.IsDecoy)
                 {
@@ -456,6 +459,8 @@ namespace CluckWars.Gameplay
 
         private void EndMatch(PlayerRef winner, int winnerCorner, float winnerTotal, string reason)
         {
+            // TimeRemaining reads 0 once State leaves Active — capture elapsed first.
+            float elapsedSeconds = MatchDurationSeconds - TimeRemaining;
             State = MatchState.Ended;
             WinnerPlayer = winner;
             WinnerCorner = winnerCorner;
@@ -475,7 +480,7 @@ namespace CluckWars.Gameplay
                 System.Text.StringBuilder sb = new System.Text.StringBuilder();
                 sb.AppendLine();
                 sb.AppendLine("=== MATCH SUMMARY ===");
-                sb.AppendLine($"Match Length: {MatchDurationSeconds - TimeRemaining:0.0}s");
+                sb.AppendLine($"Match Length: {elapsedSeconds:0.0}s");
                 sb.AppendLine($"Winner Corner: {winnerCorner} (Food: {winnerTotal:0.0})");
                 sb.AppendLine($"Event Fired: {ActiveEvent}");
                 sb.AppendLine($"Pickups: Spawned={_pickupsSpawnedCount}, Collected={_pickupsCollectedCount}");
@@ -485,6 +490,9 @@ namespace CluckWars.Gameplay
                 {
                     var s = statsList[i];
                     if (s == null || s.Object == null || !s.Object.IsValid) continue;
+                    // Guard against duplicate ChickenMatchStats components on one
+                    // chicken: only the primary (first) component receives the RPCs.
+                    if (s.GetComponent<ChickenMatchStats>() != s) continue;
                     var cc = s.GetComponent<ChickenController>();
                     if (cc != null && !cc.IsDecoy)
                     {
