@@ -28,7 +28,6 @@ GameObject:
   - component: {fileID: 8123582145153776448}
   - component: {fileID: 3315600165271083367}
   - component: {fileID: 1575773519577157392}
-  - component: {fileID: 6267713829493415362}
   - component: {fileID: 2782470975654170646}
   - component: {fileID: 4098563086577120186}
   m_Layer: 0
@@ -156,7 +155,6 @@ MonoBehaviour:
   - {fileID: 101601932164880250}
   - {fileID: 7617149068659373758}
   - {fileID: 7853284419870734786}
-  - {fileID: 6267713829493415362}
   - {fileID: 2782470975654170646}
   ForceRemoteRenderTimeframe: 0
 --- !u!143 &6032245462738825523
@@ -203,6 +201,10 @@ MonoBehaviour:
   _ControlFlags: 0
   _KnockbackEventId: 0
   _HomeCornerIndex: -1
+  _UnderdogSurgeActive:
+    _value: 0
+  _LeaderBountyActive:
+    _value: 0
   _AuraSlowActive: 0
   _AuraSlowRadius: 0
   _AuraSlowFactor: 0
@@ -415,20 +417,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c118f81fa1dc2de40885ea232fbc15dc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ControlStateVFX
---- !u!114 &6267713829493415362
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7475174928668115606}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d3258e9f2e07b7d41a8480f1201fddc7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenMatchStats
-  _Kills: 0
-  _FoodDeposited: 0
 --- !u!114 &2782470975654170646
 MonoBehaviour:
   m_ObjectHideFlags: 0
