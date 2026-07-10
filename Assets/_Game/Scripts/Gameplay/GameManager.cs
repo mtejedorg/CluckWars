@@ -57,6 +57,7 @@ namespace CluckWars.Gameplay
         private float _nextWinCheckTime;
         private int _pickupsSpawnedCount;
         private int _pickupsCollectedCount;
+        private NetworkObject _eventPile;
 
         public static void RegisterPickupSpawned()
         {
@@ -524,6 +525,16 @@ namespace CluckWars.Gameplay
                 p.Amount = p.MaxAmount;
             }
 
+            // Despawn the golden pile if it was spawned in the current round
+            if (_eventPile != null)
+            {
+                if (_eventPile.IsValid)
+                {
+                    Runner.Despawn(_eventPile);
+                }
+                _eventPile = null;
+            }
+
             // Loose ground-dropped pickups don't belong in the fresh match — kill them.
             var pickups = FoodPickup.ActivePickups;
             // Iterate backwards when despawning to avoid list modification issues
@@ -642,7 +653,7 @@ namespace CluckWars.Gameplay
             float radius = Random.Range(4.5f, 6.5f);
             Vector3 pos = new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
 
-            Runner.Spawn(
+            _eventPile = Runner.Spawn(
                 _prefabRegistry.FoodPile,
                 pos,
                 Quaternion.identity,
