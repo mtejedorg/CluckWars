@@ -561,6 +561,28 @@ Solo-mode bots that play the v0.3 game: farm efficiently, protect a full haul (t
 
 ---
 
+## Phase IP: Gameplay & Balance Improvements (2026-07-10) ✅
+
+### Goals
+- Implement the July 2026 Improvement Plan to polish correctness, identity, timed deposit, final-minute comeback events, kill bounties, economy, Assassin class balance, and KPI summary logging.
+
+### Tasks
+- [x] Correct Speedy class display name typo.
+- [x] Implement deterministic tie-breaker in `GameManager`.
+- [x] Rename Warrior passive from Tough to Mighty (+25% ability damage).
+- [x] Implement timed rate-based deposit (6 food/sec) with UI indicator and bot latch.
+- [x] Implement T-60s final-minute comeback events (Golden Pile, Underdog Surge, Leader Bounty, Restock) with HUD alerts and audio cues.
+- [x] Implement +5 food kill bounty dropped on death of non-decoy chickens.
+- [x] Retune match economy win target to 110 food.
+- [x] Tune Assassin class stats (Move Speed 9, Cargo Capacity 8) and Sneaky Steal ability (Cooldown 5, Steal Amount 6).
+- [x] Increase Invisibility duration to 4 seconds.
+- [x] Add pickup tracking and structured `MatchSummary` end-game console logging.
+
+### Deliverable
+Full gameplay improvement plan implemented, compile-verified, and documented. ✅
+
+---
+
 ## Post-Demo Roadmap (TBD)
 
 - **Phase 11:** Dedicated server mode for production (+ UGS Relay if Photon is replaced)

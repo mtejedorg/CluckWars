@@ -187,7 +187,7 @@ Each player selects one class before the match. Classes define the stat spread a
 | Resistance | ⭐⭐⭐ |
 | Speed | ⭐⭐⭐ |
 
-**Passive — Tough:** All damage abilities deal increased damage to targets.
+**Passive — Mighty:** All damage abilities deal +25% outgoing ability damage to targets.
 
 **Role:** All-rounder. Excels at contesting piles and eliminating threats. No glaring weakness but no dominant strength — wins through consistent play and good decision-making.
 
@@ -197,15 +197,15 @@ Each player selects one class before the match. Classes define the stat spread a
 
 | Stat | Value |
 |---|---|
-| Cargo Capacity | ⭐⭐ |
+| Cargo Capacity | ⭐⭐⭐ |
 | Cargo Rate | ⭐⭐ |
 | HP | ⭐⭐ |
 | Resistance | ⭐⭐ |
-| Speed | ⭐⭐⭐⭐ |
+| Speed | ⭐⭐⭐⭐⭐ |
 
 **Passive — Combo:** Equips **3 abilities** instead of 2. No other stat advantage.
 
-**Role:** Disruptor. Low cargo means the Assassin wins by denying others, not by farming. Chains abilities to stun rivals and steal dropped cargo. The extra ability slot amplifies cooldown management as the core skill expression.
+**Role:** Disruptor. Moderate cargo capacity and highest movement speed allows the Assassin to win by denying others, chasing loaded rivals, and stealing cargo. The extra ability slot amplifies cooldown management as the core skill expression.
 
 ---
 
@@ -427,5 +427,16 @@ The codebase includes a fully functional AI bot system (`BotController.cs`) for 
 ### 13.2 "Slippery" Passive Discrepancy — RESOLVED (2026-07)
 According to Section 5.2, the Speedy Chicken's "Slippery" passive reduces the *duration* of control abilities. The code previously also reduced the *magnitude* of slows by 50% (`SlipperySlowRetention`), an undocumented double-dip. Resolved in the WS1 balance pass: the magnitude branch in `ChickenController.ApplySlow` was removed; the passive is now duration-only (`SlipperyDurationReduction` in `RPC_ApplyAbilitySlow` / `RPC_ApplyRoot`), matching §5.2.
 
-### 13.3 Other Unspecified Logic
-- **Base Assignment Tie-breaker:** Section 2 states that the player with the most food stored at their base wins when the timer expires. In the code, if multiple players are tied with the exact same amount of food, the `GameManager` resolves the tie arbitrarily based on the Unity internal iteration order. A formal tie-breaker rule needs to be designed.
+### 13.3 Base Assignment Tie-breaker — RESOLVED (2026-07)
+Section 2 states that the player with the most food stored at their base wins when the timer expires. In the code, if multiple players are tied with the exact same amount of food, the `GameManager` resolves the tie deterministically: first by food, then by kills, then by lower corner index.
+
+### 13.4 Assassin Balance Rescue — IMPLEMENTED (2026-07)
+The Assassin class was tuned to be more competitive:
+- **MoveSpeed:** Increased from 8 to 9.
+- **CargoCapacity:** Increased from 5 to 8.
+- **Sneaky Steal Ability:** Cooldown decreased from 6 to 5 seconds; StealAmount increased from 4 to 6.
+
+### 13.5 Comeback Events & Kill Bounty — IMPLEMENTED (2026-07)
+To make final minutes and combat more dynamic:
+- **Comeback Events:** At 60 seconds remaining, one of four events is rolled: Golden Pile (spawns 25-food pile near center), Underdog Surge (buffs speed/rate of last place player), Leader Bounty (spawns +8 food around leader on death), or Restock (refills piles by 10 food).
+- **Kill Bounty:** Spawns +5 food pickups between killer and victim (60% bias to killer) on any non-decoy kill.

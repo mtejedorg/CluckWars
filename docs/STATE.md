@@ -577,6 +577,46 @@ failure matrix.
 
 ---
 
+## Session 2026-07-10 — Improvement Plan (IP0 to IP8) Complete
+
+Applied the full gameplay and system improvement plan (`docs/IMPROVEMENT_PLAN_2026-07-09.md`) across all nine workstreams:
+
+- **IP0: Quick correctness + identity fixes:**
+  - Corrected spelling of `Speedy` class display name.
+  - Implemented deterministic tie-breaker in `GameManager.EndOnTimerExpiry` (highest food, then kills, then lowest base corner index).
+  - Renamed Warrior passive display from "Tough" to "Mighty" (+25% outgoing ability damage).
+- **IP1: Timed deposit:**
+  - Converted instant deposits to rate-based deposits of 6 food/sec.
+  - Added visual HUD `DEPOSITING...` indicator state.
+  - Latched bot `ReturnToBase` behavior until cargo is empty.
+- **IP2: Final-minute comeback events:**
+  - Rolled a random comeback event at T-60s remaining:
+    - **Golden Pile:** Spawns 25-food pile near center.
+    - **Underdog Surge:** Buffs last-place player's movement speed and collection rate.
+    - **Leader Bounty:** Marks current leader with a nameplate star ("★") and drops +8 food on death.
+    - **Restock:** Refills all active piles by +10 food.
+  - Polled event state in `MatchHud` to display centered alert banner and small persistent label, and play audio cue locally.
+- **IP3: Kill bounty:**
+  - Any non-decoy death spawns +5 food pickups between victim and killer (60% killer bias).
+- **IP4: Economy retune:**
+  - Raised default match win target from 70 to 110 food.
+- **IP5: Assassin rescue:**
+  - Tuned Assassin stats: Move Speed 8 -> 9, Cargo Capacity 5 -> 8.
+  - Tuned Sneaky Steal: Cooldown 6 -> 5, Steal Amount 4 -> 6.
+- **IP6: Noise abilities duration:**
+  - Bumped Invisibility duration from 2 to 4 seconds.
+- **IP7: KPI instrumentation:**
+  - Added automatic tracking of pickups spawned and collected.
+  - Logs a structured, grep-able `MatchSummary` block on state authority at match end containing length, winner, active event, player kills/deposits, and pickup counts.
+- **IP8: Documentation sync:**
+  - Synchronized GDD, STATE, and ROADMAP docs.
+
+**Verification Status:**
+- Fully compile-verified locally via `dotnet build` with zero errors.
+- **Pending Maestro:** A play-mode pass to verify game feel, bot behavior, and comeback event pacing in Unity Editor.
+
+---
+
 ## Recent commits (most recent first)
 
 ```
