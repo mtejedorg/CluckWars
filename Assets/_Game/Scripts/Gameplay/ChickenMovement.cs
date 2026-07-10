@@ -59,9 +59,15 @@ namespace CluckWars.Gameplay
             else
                 _verticalVelocity += Physics.gravity.y * deltaTime;
 
+            float speedMult = _owner.MoveSpeedMultiplier;
+            if (_owner.UnderdogSurgeActive)
+            {
+                speedMult *= 1.4f;
+            }
+
             // Speed = base × ability multiplier × slow multiplier (all are ≥ 0).
             var speed = stats.MoveSpeed
-                * Mathf.Max(0f, _owner.MoveSpeedMultiplier)
+                * Mathf.Max(0f, speedMult)
                 * Mathf.Max(0f, _owner.SlowMultiplier);
 
             var displacement = planar * speed;

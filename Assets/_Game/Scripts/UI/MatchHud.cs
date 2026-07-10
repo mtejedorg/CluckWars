@@ -3,6 +3,7 @@ using CluckWars.Gameplay;
 using CluckWars.Logging;
 using CluckWars.Networking;
 using CluckWars.Services;
+using CluckWars.Audio;
 using Fusion;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -94,6 +95,12 @@ namespace CluckWars.UI
         private Text       _lobbyPlayerCount;
         private Text       _lobbyJoinCode;
 
+        private Text       _eventLabel;
+        private GameObject _eventBannerPanel;
+        private Text       _eventBannerText;
+        private float      _bannerExpireTime;
+        private MatchEventKind _lastSeenEvent = MatchEventKind.None;
+
         // ---- Cached scene refs -------------------------------------------------
 
         private ChickenController _localController;
@@ -111,6 +118,8 @@ namespace CluckWars.UI
         private ColorSchemeSO            _colors;
         private MatchConfigSO            _matchConfig;
         private ISessionSelectionService _selection;
+        private IAudioService            _audio;
+        private AudioRegistrySO          _audioReg;
         private ShutdownReason?          _shutdownReason;
         private float                    _shutdownAtUnscaledTime;
         private bool                     _returnTriggered;
@@ -134,13 +143,17 @@ namespace CluckWars.UI
             ILogService              log,
             ColorSchemeSO            colors,
             MatchConfigSO            matchConfig,
-            ISessionSelectionService selection)
+            ISessionSelectionService selection,
+            IAudioService            audio,
+            AudioRegistrySO          audioReg)
         {
             _network     = network;
             _log         = log;
             _colors      = colors;
             _matchConfig = matchConfig;
             _selection   = selection;
+            _audio       = audio;
+            _audioReg    = audioReg;
         }
 
         // ---- Unity lifecycle ---------------------------------------------------
@@ -276,6 +289,7 @@ namespace CluckWars.UI
             RefreshIntroOverlay();
             RefreshLobbyOverlay();
             TickHitFlash();
+            PollComebackEvent();
         }
 
         // ---- Leaderboard refresh -----------------------------------------------
@@ -610,6 +624,7 @@ namespace CluckWars.UI
             BuildSessionEndOverlay(canvasGO.transform);
             BuildLobbyOverlay(canvasGO.transform);
             BuildIntroOverlay(canvasGO.transform);   // topmost — never intercepts input
+            BuildEventBanner(canvasGO.transform);
         }
 
         // ---- Leaderboard (top-left) -------------------------------------------
@@ -788,6 +803,16 @@ namespace CluckWars.UI
             tRT.anchorMax = Vector2.one;
             tRT.offsetMin = Vector2.zero;
             tRT.offsetMax = Vector2.zero;
+
+            _eventLabel = AddText(badge.transform, "EventLabel", "", 12, TextAnchor.MiddleCenter, FontStyle.Bold);
+            _eventLabel.color = DtGold;
+            var eRT = _eventLabel.rectTransform;
+            eRT.anchorMin = new Vector2(0f, 0f);
+            eRT.anchorMax = new Vector2(1f, 0f);
+            eRT.pivot = new Vector2(0.5f, 1f);
+            eRT.sizeDelta = new Vector2(192f, 20f);
+            eRT.anchoredPosition = new Vector2(0f, -6f);
+            _eventLabel.gameObject.SetActive(false);
         }
 
         // ---- Local stats panel (bottom-left, above joystick) ------------------
@@ -1152,5 +1177,99 @@ namespace CluckWars.UI
         /// <summary>Warm dark wood panel color at the given alpha.</summary>
         private static Color PanelColor(float alpha) =>
             new Color(DtPanelBg.r, DtPanelBg.g, DtPanelBg.b, alpha);
+
+        private void BuildEventBanner(Transform parent)
+        {
+            _eventBannerPanel = CreateUI("EventBanner", parent, out var rt);
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(600f, 80f);
+            rt.anchoredPosition = new Vector2(0f, 150f);
+
+            AddBackground(_eventBannerPanel, new Color(DtPanelBg.r, DtPanelBg.g, DtPanelBg.b, 0.95f));
+
+            var lineGO = CreateUI("BottomLine", _eventBannerPanel.transform, out var lineRT);
+            lineRT.anchorMin = new Vector2(0f, 0f);
+            lineRT.anchorMax = new Vector2(1f, 0f);
+            lineRT.pivot = new Vector2(0.5f, 0f);
+            lineRT.sizeDelta = new Vector2(0f, 3f);
+            lineRT.anchoredPosition = Vector2.zero;
+            lineGO.AddComponent<Image>().color = DtGold;
+
+            _eventBannerText = AddText(_eventBannerPanel.transform, "Label", "", 24, TextAnchor.MiddleCenter, FontStyle.Bold);
+            _eventBannerText.color = DtGold;
+            var tRT = _eventBannerText.rectTransform;
+            tRT.anchorMin = Vector2.zero;
+            tRT.anchorMax = Vector2.one;
+            tRT.offsetMin = Vector2.zero;
+            tRT.offsetMax = Vector2.zero;
+
+            _eventBannerPanel.SetActive(false);
+        }
+
+        private void PollComebackEvent()
+        {
+            if (_gameManager == null) return;
+
+            MatchEventKind evt = _gameManager.ActiveEvent;
+            if (evt != _lastSeenEvent)
+            {
+                _lastSeenEvent = evt;
+                if (evt != MatchEventKind.None)
+                {
+                    string bannerName = evt switch
+                    {
+                        MatchEventKind.GoldenPile => "GOLDEN PILE",
+                        MatchEventKind.UnderdogSurge => "UNDERDOG SURGE",
+                        MatchEventKind.LeaderBounty => "BOUNTY ON THE LEADER",
+                        MatchEventKind.Restock => "RESTOCK",
+                        _ => evt.ToString().ToUpper()
+                    };
+
+                    if (_eventBannerText != null)
+                    {
+                        _eventBannerText.text = $"FINAL MINUTE: {bannerName}!";
+                    }
+                    if (_eventBannerPanel != null)
+                    {
+                        _eventBannerPanel.SetActive(true);
+                    }
+                    _bannerExpireTime = Time.unscaledTime + 3f;
+
+                    _audio?.PlaySFX(_audioReg != null ? _audioReg.MatchStart : null);
+                }
+                else
+                {
+                    if (_eventBannerPanel != null) _eventBannerPanel.SetActive(false);
+                }
+            }
+
+            if (_eventBannerPanel != null && _eventBannerPanel.activeSelf && Time.unscaledTime >= _bannerExpireTime)
+            {
+                _eventBannerPanel.SetActive(false);
+            }
+
+            if (_eventLabel != null)
+            {
+                if (evt != MatchEventKind.None)
+                {
+                    string labelName = evt switch
+                    {
+                        MatchEventKind.GoldenPile => "GOLDEN PILE",
+                        MatchEventKind.UnderdogSurge => "UNDERDOG SURGE",
+                        MatchEventKind.LeaderBounty => "BOUNTY ON THE LEADER",
+                        MatchEventKind.Restock => "RESTOCK",
+                        _ => evt.ToString().ToUpper()
+                    };
+                    _eventLabel.text = labelName;
+                    _eventLabel.gameObject.SetActive(true);
+                }
+                else
+                {
+                    _eventLabel.gameObject.SetActive(false);
+                }
+            }
+        }
     }
 }

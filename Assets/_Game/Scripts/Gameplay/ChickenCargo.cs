@@ -163,7 +163,12 @@ namespace CluckWars.Gameplay
             }
 
             float spaceLeft = stats.CargoCapacity - Cargo;
-            float desired = stats.CollectionRate * Runner.DeltaTime;
+            float collectionRate = stats.CollectionRate;
+            if (_controller != null && _controller.UnderdogSurgeActive)
+            {
+                collectionRate *= 1.5f;
+            }
+            float desired = collectionRate * Runner.DeltaTime;
             float takeable = Mathf.Min(desired, spaceLeft, pile.Amount);
             if (takeable <= 0f) return;
 
@@ -310,31 +315,102 @@ namespace CluckWars.Gameplay
             return best;
         }
 
-        private void HandleDeath()
+        private void HandleDeath(NetworkBehaviourId attackerId)
         {
             // Subscribed to OnDeathAuthority — fires synchronously on the
             // StateAuthority inside RPC_ApplyDamage, so the guard below is
             // redundant, but kept as cheap insurance.
             if (!HasStateAuthority) return;
+            if (_controller != null && _controller.IsDecoy) return;
+
+            Vector3 victimPos = transform.position;
 
             float dropped = Cargo;
-            if (dropped <= 0f) return;
-            Cargo = 0f;
-
-            var pickupPrefab = ResolveFoodPickupPrefab();
-            if (pickupPrefab == null)
+            if (dropped > 0f)
             {
-                _log?.Warn(Source, $"Death drop: {dropped:0.00} cargo lost — no FoodPickup prefab (neither PrefabRegistry nor legacy slot).");
-                return;
+                Cargo = 0f;
+                var pickupPrefab = ResolveFoodPickupPrefab();
+                if (pickupPrefab != null)
+                {
+                    // Slight forward offset so the pickup doesn't spawn dead-center on the
+                    // stunned chicken's collider; helps the dropping chicken not auto-collect
+                    // it the instant stun ends.
+                    var dropPosition = victimPos + transform.forward * 0.4f;
+                    Runner.Spawn(
+                        pickupPrefab,
+                        dropPosition,
+                        Quaternion.identity,
+                        Object.StateAuthority,
+                        onBeforeSpawned: (_, networkObject) =>
+                        {
+                            var pickup = networkObject.GetComponent<FoodPickup>();
+                            if (pickup != null)
+                            {
+                                pickup.Amount = dropped;
+                                pickup.MaxAmount = dropped;
+                            }
+                        });
+                    _log?.Info(Source, $"Death drop: spawned FoodPickup with {dropped:0.00} food at {dropPosition}.");
+                }
             }
 
-            // Slight forward offset so the pickup doesn't spawn dead-center on the
-            // stunned chicken's collider; helps the dropping chicken not auto-collect
-            // it the instant stun ends.
-            var dropPosition = transform.position + transform.forward * 0.4f;
+            var pPrefab = ResolveFoodPickupPrefab();
+            if (pPrefab != null)
+            {
+                // Kill Bounty (IP3): +5 food in pickups
+                bool hasKiller = false;
+                Vector3 killerPos = victimPos;
+                if (attackerId != NetworkBehaviourId.None && attackerId != (_combat != null ? _combat.Id : NetworkBehaviourId.None))
+                {
+                    if (Runner.TryFindBehaviour(attackerId, out ChickenCombat attackerCombat))
+                    {
+                        killerPos = attackerCombat.transform.position;
+                        hasKiller = true;
+                    }
+                }
+
+                if (hasKiller)
+                {
+                    Vector3 toKiller = killerPos - victimPos;
+                    float dist = toKiller.magnitude;
+                    Vector3 dir = dist > 0.1f ? toKiller.normalized : transform.forward;
+                    for (int i = 0; i < 5; i++)
+                    {
+                        float t = 0.5f + (i / 4f) * 0.3f; // 0.5 to 0.8
+                        Vector3 spawnPos = victimPos + dir * (dist * t);
+                        spawnPos += new Vector3(Random.Range(-0.1f, 0.1f), 0f, Random.Range(-0.1f, 0.1f));
+                        SpawnSinglePickup(pPrefab, spawnPos, 1f);
+                    }
+                }
+                else
+                {
+                    // No killer / self-kill
+                    for (int i = 0; i < 5; i++)
+                    {
+                        float angle = i * 72f * Mathf.Deg2Rad;
+                        Vector3 offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 0.6f;
+                        SpawnSinglePickup(pPrefab, victimPos + offset, 1f);
+                    }
+                }
+
+                // Leader Bounty (IP2): +8 food in pickups
+                if (_controller != null && _controller.LeaderBountyActive)
+                {
+                    for (int i = 0; i < 8; i++)
+                    {
+                        float angle = i * 45f * Mathf.Deg2Rad;
+                        Vector3 offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 0.8f;
+                        SpawnSinglePickup(pPrefab, victimPos + offset, 1f);
+                    }
+                }
+            }
+        }
+
+        private void SpawnSinglePickup(NetworkObject prefab, Vector3 position, float amount)
+        {
             Runner.Spawn(
-                pickupPrefab,
-                dropPosition,
+                prefab,
+                position,
                 Quaternion.identity,
                 Object.StateAuthority,
                 onBeforeSpawned: (_, networkObject) =>
@@ -342,12 +418,10 @@ namespace CluckWars.Gameplay
                     var pickup = networkObject.GetComponent<FoodPickup>();
                     if (pickup != null)
                     {
-                        pickup.Amount = dropped;
-                        pickup.MaxAmount = dropped;
+                        pickup.Amount = amount;
+                        pickup.MaxAmount = amount;
                     }
                 });
-
-            _log?.Info(Source, $"Death drop: spawned FoodPickup with {dropped:0.00} food at {dropPosition}.");
         }
 
         /// <summary>

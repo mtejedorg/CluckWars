@@ -163,6 +163,9 @@ namespace CluckWars.Gameplay
         /// </summary>
         [Networked] public int HomeCornerIndex { get; set; } = -1;
 
+        [Networked] public NetworkBool UnderdogSurgeActive { get; set; }
+        [Networked] public NetworkBool LeaderBountyActive { get; set; }
+
         // ---- v0.3 Feather Aura (Networked so every peer sees the caster's state) ---
 
         /// <summary>True while the Feather Aura ability is active on this chicken.
@@ -428,6 +431,8 @@ namespace CluckWars.Gameplay
             Rooted               = false;
             AuraSlowActive       = false;
             ExternalDisplacement = Vector3.zero;
+            UnderdogSurgeActive  = false;
+            LeaderBountyActive   = false;
             _log?.Debug(Source, "Control states reset for new match.");
         }
 

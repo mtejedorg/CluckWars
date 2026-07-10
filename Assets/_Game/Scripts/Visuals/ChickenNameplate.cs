@@ -47,6 +47,7 @@ namespace CluckWars.Visuals
         private int  _appliedPlayerId  = -2;
         private ChickenClass _appliedClass;
         private bool _appliedClassValid;
+        private bool _appliedBountyActive;
         private bool _wasStunned;
 
         private void Awake()
@@ -125,22 +126,25 @@ namespace CluckWars.Visuals
                 // apart — they all share [Player:None]).
                 int corner = _controller.HomeCornerIndex;
                 var klass = _controller.Class;
-                if (corner != _appliedPlayerId || !_appliedClassValid || klass != _appliedClass)
+                bool bountyActive = _controller.LeaderBountyActive;
+                if (corner != _appliedPlayerId || !_appliedClassValid || klass != _appliedClass || bountyActive != _appliedBountyActive)
                 {
                     _appliedPlayerId = corner;
                     _appliedClass = klass;
                     _appliedClassValid = true;
+                    _appliedBountyActive = bountyActive;
                     if (corner < 0)
                     {
-                        _text.text = klass.ToString();
+                        _text.text = bountyActive ? $"★ {klass} ★" : klass.ToString();
                         _text.color = new Color(0.7f, 0.7f, 0.7f, 1f);
                     }
                     else
                     {
                         bool isBot = _controller.IsBot;
-                        _text.text = isBot
+                        string label = isBot
                             ? $"P{corner + 1} {klass} (CPU)"
                             : $"P{corner + 1} {klass}";
+                        _text.text = bountyActive ? $"★ {label} ★" : label;
                         _text.color = PlayerColors[corner % PlayerColors.Length];
                     }
                 }

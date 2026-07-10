@@ -300,7 +300,7 @@ namespace CluckWars.Gameplay
             ActiveSlot = InvalidSlot;
         }
 
-        private void HandleOwnerDeath()
+        private void HandleOwnerDeath(NetworkBehaviourId attackerId)
         {
             if (!HasStateAuthority) return;
             if (ActiveSlot != InvalidSlot) Deactivate();

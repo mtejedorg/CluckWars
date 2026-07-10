@@ -65,7 +65,7 @@ namespace CluckWars.Gameplay
         /// <see cref="RPC_ApplyDamage"/> when death occurs. Subscribe here for
         /// state-mutating consequences (cargo drop, ability cancel).
         /// </summary>
-        public event Action OnDeathAuthority;
+        public event Action<NetworkBehaviourId> OnDeathAuthority;
 
         public bool IsDead => HP <= 0f;
 
@@ -213,7 +213,7 @@ namespace CluckWars.Gameplay
                 // Authority-side consequences (cargo drop, ability cancel) fire
                 // here, not from Render's ChangeDetector — that path can silently
                 // skip locally-written props in GameMode.Single.
-                OnDeathAuthority?.Invoke();
+                OnDeathAuthority?.Invoke(attackerId);
             }
         }
 

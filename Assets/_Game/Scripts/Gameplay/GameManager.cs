@@ -3,6 +3,7 @@ using CluckWars.Logging;
 using Fusion;
 using UnityEngine;
 using Zenject;
+using LogLevel = CluckWars.Logging.LogLevel;
 
 namespace CluckWars.Gameplay
 {
@@ -37,6 +38,7 @@ namespace CluckWars.Gameplay
         [Networked] public float WinnerFoodTotal { get; set; }
         [Networked] public TickTimer RestartCountdown { get; set; }
         [Networked] public TickTimer IntroTimer { get; set; }
+        [Networked] public MatchEventKind ActiveEvent { get; set; }
 
         [Tooltip("Seconds after a match ends before the world resets and a new round starts.")]
         [Min(1f)]
@@ -50,6 +52,7 @@ namespace CluckWars.Gameplay
         private ILogService _log;
         private IAudioService _audio;
         private AudioRegistrySO _audioReg;
+        private PrefabRegistrySO _prefabRegistry;
         private float _winCheckIntervalSeconds = 0.25f;
         private float _nextWinCheckTime;
 
@@ -105,12 +108,13 @@ namespace CluckWars.Gameplay
         }
 
         [Inject]
-        public void Construct(MatchConfigSO config, ILogService log, IAudioService audio, AudioRegistrySO audioReg)
+        public void Construct(MatchConfigSO config, ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry)
         {
             _config = config;
             _log = log;
             _audio = audio;
             _audioReg = audioReg;
+            _prefabRegistry = prefabRegistry;
         }
 
         public override void Spawned()
@@ -203,6 +207,12 @@ namespace CluckWars.Gameplay
             // anyway, but be explicit so future logic doesn't accidentally end
             // the match during "3, 2, 1, GO!".
             if (IsIntroActive) return;
+
+            // Comeback event check at T-60
+            if (State == MatchState.Active && !IsIntroActive && TimeRemaining <= 60f && ActiveEvent == MatchEventKind.None)
+            {
+                TriggerFinalMinuteEvent();
+            }
 
             // Cheap throttle: 4 wins-checks per second is plenty and keeps Physics /
             // FindObjectsByType pressure low.
@@ -549,6 +559,140 @@ namespace CluckWars.Gameplay
             WinnerFoodTotal = 0f;
             RestartCountdown = default;
             _nextWinCheckTime = 0f;
+            ActiveEvent = MatchEventKind.None;
+        }
+
+        private void TriggerFinalMinuteEvent()
+        {
+            if (!HasStateAuthority) return;
+
+            int rolled = Random.Range(1, 5); // 1..4 inclusive
+            ActiveEvent = (MatchEventKind)rolled;
+
+            _log?.Info(Source, $"[MatchSummary] FINAL MINUTE EVENT FIRED: {ActiveEvent}");
+
+            switch (ActiveEvent)
+            {
+                case MatchEventKind.GoldenPile:
+                    SpawnGoldenPile();
+                    break;
+                case MatchEventKind.UnderdogSurge:
+                    ApplyUnderdogSurge();
+                    break;
+                case MatchEventKind.LeaderBounty:
+                    ApplyLeaderBounty();
+                    break;
+                case MatchEventKind.Restock:
+                    RestockPiles();
+                    break;
+            }
+        }
+
+        private void SpawnGoldenPile()
+        {
+            if (_prefabRegistry == null || _prefabRegistry.FoodPile == null)
+            {
+                _log?.Warn(Source, "GoldenPile event: FoodPile prefab not found in registry.");
+                return;
+            }
+
+            float angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
+            float radius = Random.Range(4.5f, 6.5f);
+            Vector3 pos = new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
+
+            Runner.Spawn(
+                _prefabRegistry.FoodPile,
+                pos,
+                Quaternion.identity,
+                onBeforeSpawned: (_, networkObject) =>
+                {
+                    var pile = networkObject.GetComponent<FoodPile>();
+                    if (pile != null)
+                    {
+                        pile.Amount = 25f;
+                        pile.MaxAmount = 25f;
+                    }
+                });
+
+            _log?.Info(Source, $"GoldenPile spawned at {pos} with 25 food.");
+        }
+
+        private void ApplyUnderdogSurge()
+        {
+            var controllers = ChickenController.ActiveControllers;
+            ChickenController underdog = null;
+            float lowestFood = float.MaxValue;
+
+            for (int i = 0; i < controllers.Count; i++)
+            {
+                var ctrl = controllers[i];
+                if (ctrl == null || ctrl.Object == null || !ctrl.Object.IsValid || ctrl.IsDecoy) continue;
+
+                float food = GetBaseFoodForCorner(ctrl.HomeCornerIndex);
+                if (food < lowestFood)
+                {
+                    lowestFood = food;
+                    underdog = ctrl;
+                }
+            }
+
+            if (underdog != null)
+            {
+                underdog.UnderdogSurgeActive = true;
+                _log?.Info(Source, $"UnderdogSurge applied to {underdog.name} (Corner {underdog.HomeCornerIndex}, Food: {lowestFood}).");
+            }
+        }
+
+        private void ApplyLeaderBounty()
+        {
+            var controllers = ChickenController.ActiveControllers;
+            ChickenController leader = null;
+            float highestFood = -1f;
+
+            for (int i = 0; i < controllers.Count; i++)
+            {
+                var ctrl = controllers[i];
+                if (ctrl == null || ctrl.Object == null || !ctrl.Object.IsValid || ctrl.IsDecoy) continue;
+
+                float food = GetBaseFoodForCorner(ctrl.HomeCornerIndex);
+                if (food > highestFood)
+                {
+                    highestFood = food;
+                    leader = ctrl;
+                }
+            }
+
+            if (leader != null)
+            {
+                leader.LeaderBountyActive = true;
+                _log?.Info(Source, $"LeaderBounty applied to {leader.name} (Corner {leader.HomeCornerIndex}, Food: {highestFood}).");
+            }
+        }
+
+        private float GetBaseFoodForCorner(int corner)
+        {
+            var bases = PlayerBase.ActiveBases;
+            for (int i = 0; i < bases.Count; i++)
+            {
+                var b = bases[i];
+                if (b != null && b.CornerIndex == corner)
+                {
+                    return b.FoodTotal;
+                }
+            }
+            return 0f;
+        }
+
+        private void RestockPiles()
+        {
+            var piles = FoodPile.ActivePiles;
+            for (int i = 0; i < piles.Count; i++)
+            {
+                var p = piles[i];
+                if (p == null) continue;
+                p.Amount = Mathf.Min(p.MaxAmount, p.Amount + 10f);
+            }
+            _log?.Info(Source, "Restocked all food piles by +10.");
         }
     }
 }
