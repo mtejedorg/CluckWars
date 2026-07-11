@@ -613,7 +613,14 @@ Applied the full gameplay and system improvement plan (`docs/IMPROVEMENT_PLAN_20
 
 **Verification Status:**
 - Fully compile-verified locally via `dotnet build` with zero errors.
-- **Pending Maestro:** A play-mode pass to verify game feel, bot behavior, and comeback event pacing in Unity Editor.
+- **Play-mode verified 2026-07-11** (solo bot matches driven via Unity MCP, Editor play mode; 3 full matches, zero errors):
+  - **IP1 deposit drain:** "Deposited complete" logs fire from the per-tick path; base totals climb gradually; bots complete full deposits. No Zenject exception on chicken spawn (IP-fix1 confirmed live).
+  - **Events — 3 of 4 observed** (random roll, one per match): *UnderdogSurge* applied to the true last-place chicken (corner 0, food 0); *LeaderBounty* marked the true leader (corner 2, food 103); *GoldenPile* spawned at (-5.7, 0, 1.7) with 25 food, first-candidate placement, no overlap warning. *Restock* not yet rolled — verify when it comes up naturally or force via a debug default.
+  - **HUD:** persistent event label renders beside the timer; end-of-match overlay + auto-restart loop work; "FIRST TO 110" target displayed (IP4).
+  - **IP4 pacing:** all 3 matches ended by reaching 110 before timer expiry. Matches 1–2 ended ~120–135 s (shortly after the T-60 event; exact lengths lost to the pre-IP-fix6 logging bug), match 3 measured 165.8 s. Winner totals 110.1 / 110.3 / 110.5. Within or marginally above the 100–160 s design band — no retune needed, but it sits at the slow edge; revisit after the human feel pass.
+  - **IP3/IP5 signal:** hunter bots posted 9–14 kills per match and an Assassin bot won match 3 (110.5 food, 14 kills) — fighting now pays, possibly generously; watch kill-farming in the feel pass.
+  - **Two new defects found by the summary instrumentation, fixed and re-verified:** IP-fix6 (Match Length always logged 180.0 — `TimeRemaining` reads 0 once `State` leaves Active; elapsed now captured at `EndMatch` entry) and IP-fix7 (Chicken.prefab carried a duplicate `ChickenMatchStats` component — pre-existing authoring slip — producing ghost zero rows in the summary and risking a wrong tie-breaker kill count; removed from the prefab, variant re-baked, plus a primary-component guard in code).
+- **Pending Maestro:** human feel pass (deposit interception window, banner readability on device), the *Restock* event observation, kill-bounty generosity check, and the usual Android device smoke test.
 
 ### Code-Review Follow-up Fixes
 
