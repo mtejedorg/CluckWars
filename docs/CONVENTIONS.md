@@ -44,6 +44,19 @@ public override void Spawned()      // or Awake() in Bootstrap
 
 **Don't gate on `ProjectContext.HasInstance`** — it returns false until something accesses `.Instance`. Reading `.Instance` directly triggers the lazy load. This was a real bug (`3bc2e13`).
 
+**If `Construct()` takes a scene-scoped type** (anything bound in `GameInstaller`, e.g. `MatchConfigSO`, `INetworkService`), plain `ProjectContext.Instance.Container.Inject(this)` will throw an unresolved-dependency exception — `ProjectContext` only knows about `ProjectInstaller` bindings. Self-inject from the `SceneContext` first, falling back to `ProjectContext` only if none exists:
+
+```csharp
+if (_log == null)
+{
+    var sceneCtx = FindFirstObjectByType<SceneContext>();
+    if (sceneCtx != null) sceneCtx.Container.Inject(this);
+    else ProjectContext.Instance.Container.Inject(this);
+}
+```
+
+This matters most for runtime-spawned `NetworkBehaviour`s (chickens, piles, etc.) — the self-inject path fires on every spawn, so a mismatch here crashes the game on the very first spawn, not just in some edge case. Before adding a new `[Inject]` parameter to any `Construct()`, check which installer binds that type and update the self-inject call site to match. Real bug: `ChickenCargo` gained a `MatchConfigSO` dependency (timed deposit rate) but kept the `ProjectContext`-only self-inject, so every chicken spawn threw (`14fbf8f`).
+
 ### Bind by instance
 
 Static-data SOs use `FromInstance`:
