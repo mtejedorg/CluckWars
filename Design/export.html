@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>CluckWars — Asset Export Harness</title>
+<!--
+  Single-component export harness for headless-Chrome sprite capture.
+  Query params:
+    ?comp=<windowGlobalName>   component to mount (e.g. XPanel, CWChicken, XEmoji)
+    &w=<px>&h=<px>             logical size of the component container
+    &scale=<n>                 CSS zoom applied to the container (default 2);
+                               Chrome --window-size must be w*scale x h*scale
+    &props=<urlencoded-json>   optional props spread into the component
+    &bg=<css-color>            optional body background (default transparent —
+                               pair with --default-background-color=00000000)
+  Errors (unknown component, bad props JSON) render as red text on white so a
+  bad capture is visually obvious in the PNG.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: transparent; font-family: 'Nunito', sans-serif; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="cluckwars-tokens-v2.jsx"></script>
+<script type="text/babel" src="cluckwars-tokens-v3.jsx"></script>
+<script type="text/babel" src="cluckwars-screens-v2.jsx"></script>
+<script type="text/babel" src="cluckwars-charselect-v3.jsx"></script>
+<script type="text/babel" src="cluckwars-hud-v3.jsx"></script>
+<script type="text/babel" src="cluckwars-landscape-v3.jsx"></script>
+<script type="text/babel" src="cluckwars-ability-ref.jsx"></script>
+<script type="text/babel" src="cluckwars-overlays-v3.jsx"></script>
+<script type="text/babel" src="export-atoms.jsx"></script>
+
+<script type="text/babel">
+const params = new URLSearchParams(location.search);
+const compName = params.get('comp') || '';
+const w = parseFloat(params.get('w') || '256');
+const h = parseFloat(params.get('h') || '256');
+const scale = parseFloat(params.get('scale') || '2');
+const bg = params.get('bg');
+
+let props = {};
+let propsError = null;
+const rawProps = params.get('props');
+if (rawProps) {
+  try { props = JSON.parse(rawProps); }
+  catch (e) { propsError = 'bad props JSON: ' + e.message; }
+}
+
+const ExportError = ({ msg }) => (
+  <div style={{
+    color:'#ff2020', background:'#ffffff', fontSize:24,
+    fontFamily:'monospace', padding:12, minHeight:64,
+  }}>
+    EXPORT ERROR: {msg}
+  </div>
+);
+
+function Root() {
+  const C = window[compName];
+  if (propsError) return <ExportError msg={propsError} />;
+  if (typeof C !== 'function') return <ExportError msg={`component "${compName}" not found on window`} />;
+  return (
+    <div style={{ width:w, height:h, zoom:scale, overflow:'hidden' }}>
+      <C {...props} />
+    </div>
+  );
+}
+
+if (bg) document.body.style.background = bg;
+
+// Wait for the display fonts before mounting so Lilita One / Nunito render.
+Promise.all([
+  document.fonts.load("16px 'Lilita One'"),
+  document.fonts.load("700 16px 'Nunito'"),
+]).then(() => document.fonts.ready).then(() => {
+  ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+});
+</script>
+</body>
+</html>
