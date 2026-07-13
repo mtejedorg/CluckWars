@@ -161,3 +161,7 @@ Design/.thumbnail
 Assets/packages-merged-link/
 Assets/packages-merged-link.meta
 Assets/Resources/PerformanceTestRun*
+
+# Unity crash-recovery scratch scenes — regenerated on crash, never tracked
+/[Aa]ssets/_Recovery/
+/[Aa]ssets/_Recovery.meta
