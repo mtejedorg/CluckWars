@@ -53,7 +53,7 @@
     border-top-left-radius: 14px; border-top-right-radius: 14px;
     border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
     overflow: hidden;
-    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/GlossOverlay.png");
     -unity-background-scale-mode: stretch-to-fill;
 }
 
@@ -65,44 +65,35 @@
     border-top-left-radius: 10px; border-top-right-radius: 10px;
     border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
     overflow: hidden;
-    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/GlossOverlay.png");
     -unity-background-scale-mode: stretch-to-fill;
     transition-property: scale; transition-duration: 0.12s;
 }
 .cw-card--selected { scale: 1.04 1.04; }
 
 /* ---- Buttons -------------------------------------------------------------- */
+/* The Stage-0 ButtonGrayscale atom (9-slice 52) is a beveled glossy pill, tinted
+   per-variant at runtime — replaces flat bg-color + Gloss + colored borders.
+   No element border (the bevel is baked); tint colours are pushed brighter than
+   the target since -unity-background-image-tint-color multiplies the ~grey face. */
 .cw-btn {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 20px;
     color: rgb(254, 245, 224);
     -unity-text-align: middle-center;
-    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    background-color: rgba(0, 0, 0, 0);   /* clear the default runtime-Button grey */
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/ButtonGrayscale.png");
     -unity-background-scale-mode: stretch-to-fill;
-    border-top-left-radius: 10px; border-top-right-radius: 10px;
-    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
-    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
-    padding-top: 12px; padding-bottom: 12px; padding-left: 22px; padding-right: 22px;
+    -unity-background-image-tint-color: rgb(150, 112, 66);
+    border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
+    padding-top: 12px; padding-bottom: 16px; padding-left: 26px; padding-right: 26px;
     transition-property: scale; transition-duration: 0.10s;
 }
 .cw-btn:hover  { scale: 1.03 1.03; }
 .cw-btn:active { scale: 0.97 0.97; }
-.cw-btn--gold {
-    background-color: rgb(212, 160, 32);
-    border-left-color: rgb(184, 138, 20); border-right-color: rgb(184, 138, 20);
-    border-top-color: rgb(184, 138, 20); border-bottom-color: rgb(184, 138, 20);
-    color: rgb(26, 14, 4);
-}
-.cw-btn--green {
-    background-color: rgb(51, 163, 50);
-    border-left-color: rgb(34, 139, 34); border-right-color: rgb(34, 139, 34);
-    border-top-color: rgb(34, 139, 34); border-bottom-color: rgb(34, 139, 34);
-}
-.cw-btn--neutral {
-    background-color: rgb(58, 40, 22);
-    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
-    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
-}
+.cw-btn--gold    { -unity-background-image-tint-color: rgb(235, 182, 60); color: rgb(26, 14, 4); }
+.cw-btn--green   { -unity-background-image-tint-color: rgb(70, 190, 70); }
+.cw-btn--neutral { -unity-background-image-tint-color: rgb(150, 112, 66); }
 
 /* Home/back button — absolutely placed at a header's top-left, leaves the
    centered ribbon undisturbed. */
@@ -111,32 +102,26 @@
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 14px; letter-spacing: 1px; color: rgb(254, 245, 224);
     -unity-text-align: middle-center;
-    background-color: rgb(58, 40, 22);
-    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    background-color: rgba(0, 0, 0, 0);
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/ButtonGrayscale.png");
     -unity-background-scale-mode: stretch-to-fill;
-    -unity-background-image-tint-color: rgba(255, 232, 190, 0.4);
-    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
-    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
-    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
-    border-top-left-radius: 8px; border-top-right-radius: 8px;
-    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
-    padding-top: 7px; padding-bottom: 7px; padding-left: 14px; padding-right: 14px;
+    -unity-background-image-tint-color: rgb(150, 112, 66);
+    border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
+    padding-top: 8px; padding-bottom: 11px; padding-left: 16px; padding-right: 16px;
     transition-property: scale; transition-duration: 0.1s;
 }
 .cw-home-btn:hover  { scale: 1.04 1.04; }
 .cw-home-btn:active { scale: 0.96 0.96; }
 
 /* ---- Ribbon --------------------------------------------------------------- */
+/* The Stage-0 Ribbon atom is a grayscale banner-with-tails (9-slice 92,32),
+   tinted gold at runtime — replaces the flat gold bar + Gloss sheen. The 92px
+   side borders are the fixed tails, so content padding clears them. */
 .cw-ribbon {
-    background-color: rgb(212, 160, 32);
-    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/Ribbon.png");
     -unity-background-scale-mode: stretch-to-fill;
-    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
-    border-left-color: rgb(245, 200, 66); border-right-color: rgb(245, 200, 66);
-    border-top-color: rgb(245, 200, 66); border-bottom-color: rgb(245, 200, 66);
-    border-top-left-radius: 8px; border-top-right-radius: 8px;
-    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
-    padding-top: 8px; padding-bottom: 8px; padding-left: 24px; padding-right: 24px;
+    -unity-background-image-tint-color: rgb(212, 160, 32);
+    padding-top: 10px; padding-bottom: 14px; padding-left: 44px; padding-right: 44px;
     align-items: center; justify-content: center;
 }
 .cw-ribbon .cw-title { color: rgb(26, 14, 4); font-size: 28px; }
@@ -145,7 +130,7 @@
 .cw-class-chip {
     flex-direction: row; align-items: center;
     background-color: rgb(58, 40, 22);
-    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/GlossOverlay.png");
     -unity-background-scale-mode: stretch-to-fill;
     border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
     border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
@@ -367,7 +352,7 @@
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 22px; color: rgb(26, 14, 4);
     background-color: rgb(212, 160, 32);
-    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/GlossOverlay.png");
     -unity-background-scale-mode: stretch-to-fill;
     border-left-width: 1px; border-right-width: 1px; border-top-width: 1px; border-bottom-width: 1px;
     border-left-color: rgb(184, 138, 20); border-right-color: rgb(184, 138, 20);
@@ -384,21 +369,16 @@
     flex-grow: 1; flex-basis: 0;
     font-size: 13px; letter-spacing: 1px; color: rgb(254, 245, 224);
     -unity-text-align: middle-center;
-    background-color: rgb(58, 40, 22);
-    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    background-color: rgba(0, 0, 0, 0);
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/ButtonGrayscale.png");
     -unity-background-scale-mode: stretch-to-fill;
-    border-left-width: 1px; border-right-width: 1px; border-top-width: 1px; border-bottom-width: 1px;
-    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
-    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
-    border-top-left-radius: 6px; border-top-right-radius: 6px;
-    border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
-    padding-top: 5px; padding-bottom: 5px; padding-left: 0; padding-right: 0;
+    -unity-background-image-tint-color: rgb(150, 112, 66);
+    border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
+    padding-top: 6px; padding-bottom: 8px; padding-left: 0; padding-right: 0;
     margin-right: 6px;
 }
 .cw-mini-btn--gold {
-    background-color: rgb(212, 160, 32); color: rgb(26, 14, 4);
-    border-left-color: rgb(184, 138, 20); border-right-color: rgb(184, 138, 20);
-    border-top-color: rgb(184, 138, 20); border-bottom-color: rgb(184, 138, 20);
+    -unity-background-image-tint-color: rgb(235, 182, 60); color: rgb(26, 14, 4);
 }
 
 /* Settings rows */
@@ -473,7 +453,7 @@
     flex-direction: row; align-items: center;
     padding-top: 8px; padding-bottom: 8px; padding-left: 10px; padding-right: 10px;
     background-color: rgb(48, 32, 18);
-    background-image: url("project://database/Assets/UI/Sprites/Gloss.png");
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/GlossOverlay.png");
     -unity-background-scale-mode: stretch-to-fill;
     border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
     /* border + tint set in C# to the player color */
