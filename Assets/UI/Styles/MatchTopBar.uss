@@ -1,0 +1,92 @@
+/* ============================================================================
+   Cluck Wars : match top-bar HUD (Stage 2a rebuild)
+   Consumed by Assets/UI/MatchTopBar.uxml + (senior-dev) MatchHudController.cs.
+   Design source: docs/ART.md 6.3  +  Design CWMatchHUDv3L (leaderboard row + CWTimer).
+   Sprites: Assets/_Game/Art/UI/  (Stage-0 export; PlayerDotGlossy is neutral gray,
+   tinted per player via -unity-background-image-tint-color; HudTopGradient is the
+   top fade strip).
+   Palette values mirror Assets/UI/Styles/CluckWarsTokens.uss (--cw-*):
+     text #fef5e0 rgb(254,245,224) : gold #f5c842 rgb(245,200,66)
+     P1 #E8751A rgb(232,117,26) : P2 #1A7FC4 rgb(26,127,196)
+     P3 #C4286F rgb(196,40,111) : P4 #0D9E7A rgb(13,158,122)
+   USS-valid only: NO text-shadow / box-shadow / gap / linear-gradient : depth comes
+   from the baked glossy dot sprite + beveled borders + flat fills, exactly as the
+   Stage-1 overlays do.
+   ============================================================================ */
+
+/* ---- Full-width transparent top strip (dark to clear fade) ---------------- */
+.cw-topbar {
+    position: absolute; left: 0; top: 0; right: 0;
+    height: 92px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Backgrounds/HudTopGradient.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    /* no background-color : never a solid bar, only the fade sprite shows */
+}
+.cw-topbar-row {
+    flex-direction: row;
+    align-items: center; justify-content: center;
+    height: 100%;
+    padding-top: 8px; padding-left: 12px; padding-right: 12px;
+}
+
+/* ============================================================================
+   SCORE BADGES  (glossy pills : gradient player-color dot + "P#: score")
+   ============================================================================ */
+.cw-score {
+    flex-direction: row; align-items: center;
+    height: 38px;
+    padding-top: 4px; padding-bottom: 4px; padding-left: 8px; padding-right: 15px;
+    margin-left: 4px; margin-right: 4px;
+    background-color: rgba(20, 14, 8, 0.72);
+    /* subtle player-color border glow : per-pill color set in cw-score--p# below */
+    border-left-width: 1px; border-right-width: 1px; border-top-width: 1px; border-bottom-width: 1px;
+    border-top-left-radius: 19px; border-top-right-radius: 19px;
+    border-bottom-left-radius: 19px; border-bottom-right-radius: 19px;
+}
+/* pill border tint per player (subtle glow) */
+.cw-score--p1 { border-left-color: rgba(232,117,26,0.55); border-right-color: rgba(232,117,26,0.55); border-top-color: rgba(232,117,26,0.7); border-bottom-color: rgba(232,117,26,0.4); }
+.cw-score--p2 { border-left-color: rgba(26,127,196,0.55);  border-right-color: rgba(26,127,196,0.55);  border-top-color: rgba(26,127,196,0.7);  border-bottom-color: rgba(26,127,196,0.4); }
+.cw-score--p3 { border-left-color: rgba(196,40,111,0.55);  border-right-color: rgba(196,40,111,0.55);  border-top-color: rgba(196,40,111,0.7);  border-bottom-color: rgba(196,40,111,0.4); }
+.cw-score--p4 { border-left-color: rgba(13,158,122,0.55);  border-right-color: rgba(13,158,122,0.55);  border-top-color: rgba(13,158,122,0.7);  border-bottom-color: rgba(13,158,122,0.4); }
+
+/* glossy player dot : neutral grayscale sprite tinted to player color */
+.cw-score-dot {
+    width: 22px; height: 22px; flex-shrink: 0; margin-right: 8px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/PlayerDotGlossy.png");
+    -unity-background-scale-mode: scale-to-fit;
+}
+.cw-score-dot--p1 { -unity-background-image-tint-color: rgb(232, 117, 26); }
+.cw-score-dot--p2 { -unity-background-image-tint-color: rgb(26, 127, 196); }
+.cw-score-dot--p3 { -unity-background-image-tint-color: rgb(196, 40, 111); }
+.cw-score-dot--p4 { -unity-background-image-tint-color: rgb(13, 158, 122); }
+
+/* "P#: score" label in the player color (Lilita One, chunky) */
+.cw-score-label {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 18px; letter-spacing: 0.5px; white-space: nowrap;
+    -unity-text-align: middle-left;
+}
+.cw-score-label--p1 { color: rgb(232, 117, 26); }
+.cw-score-label--p2 { color: rgb(26, 127, 196); }
+.cw-score-label--p3 { color: rgb(196, 40, 111); }
+.cw-score-label--p4 { color: rgb(13, 158, 122); }
+
+/* ============================================================================
+   MATCH TIMER  (embossed badge : dark bg, gold beveled border, spaced digits)
+   ============================================================================ */
+.cw-timer {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 28px; letter-spacing: 3px;
+    color: rgb(254, 245, 224);
+    -unity-text-align: middle-center; white-space: nowrap;
+    flex-shrink: 0;
+    margin-left: 26px; margin-right: 26px;
+    padding-top: 5px; padding-bottom: 7px; padding-left: 22px; padding-right: 22px;
+    background-color: rgb(42, 26, 12);
+    /* gold border with a top-highlight / bottom-shade bevel for the emboss */
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-top-color: rgb(245, 200, 66); border-left-color: rgb(212, 160, 32);
+    border-right-color: rgb(212, 160, 32); border-bottom-color: rgb(150, 110, 20);
+    border-top-left-radius: 10px; border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+}
