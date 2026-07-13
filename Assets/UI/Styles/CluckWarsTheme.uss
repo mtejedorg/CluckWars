@@ -172,9 +172,18 @@
 .cw-slot-pill--star { background-color: rgb(245, 200, 66); color: rgb(26, 14, 4); }
 
 /* ---- Chicken preview ------------------------------------------------------ */
+/* Class figures are the Stage-0 design-exported sprites (Assets/_Game/Art/UI/
+   Chickens/), applied by adding a .cw-chicken--<class> modifier in C#. These
+   replaced the procedural UiGfx.Chicken() blobs in the Stage-3 fidelity pass.
+   The base class only sets scale-mode so the same modifier paints the preview,
+   the class-list chips, and the lobby player cards at their own sizes. */
 .cw-chicken { -unity-background-scale-mode: scale-to-fit; }
+.cw-chicken--warrior  { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_warrior.png"); }
+.cw-chicken--speedy   { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_speedy.png"); }
+.cw-chicken--fatty    { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_fatty.png"); }
+.cw-chicken--assassin { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_assassin.png"); }
 .cw-radial-glow {
-    background-image: url("project://database/Assets/UI/Sprites/RadialGlow.png");
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/RadialGlow.png");
     -unity-background-scale-mode: stretch-to-fill;
     position: absolute;
 }
@@ -208,16 +217,25 @@
 .cw-pip--on { background-color: rgb(245, 200, 66); }
 
 /* ---- Hex ability slot ----------------------------------------------------- */
+/* The hex is the shared Stage-0 HexGlossy atom, tinted per-ability AccentColor
+   in C# (empty slots get a dim neutral tint) — same sprite the touch HUD uses. */
 .cw-hex {
     width: 58px; height: 67px;
-    background-image: url("project://database/Assets/UI/Sprites/HexBase.png");
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/HexGlossy.png");
     -unity-background-scale-mode: scale-to-fit;
     align-items: center; justify-content: center;
     transition-property: scale; transition-duration: 0.12s;
 }
-.cw-hex--empty { background-image: url("project://database/Assets/UI/Sprites/HexInactive.png"); }
 .cw-hex--active { scale: 1.08 1.08; }
+/* "+" placeholder glyph, shown only while the slot is empty. */
 .cw-hex__icon { font-size: 26px; -unity-text-align: middle-center; }
+/* Exported ability icon sprite, shown once a slot is filled (icon painted by a
+   .cw-hex-icon--* modifier). Sits on top of the tinted hex. */
+.cw-hex__sprite {
+    position: absolute;
+    width: 34px; height: 34px;
+    -unity-background-scale-mode: scale-to-fit;
+}
 .cw-slot-caption {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
     font-size: 11px; letter-spacing: 1px; color: rgb(196, 160, 96); -unity-text-align: middle-center;
@@ -266,6 +284,9 @@
 }
 .cw-ability-card:hover { scale: 1.05 1.05; }
 .cw-ability-card__icon { font-size: 26px; height: 30px; -unity-text-align: middle-center; }
+/* Exported ability icon sprite variant (Stage-3) — replaces the emoji glyph on
+   the ability-grid cards. Painted by a .cw-hex-icon--* modifier. */
+.cw-ability-card__sprite { width: 34px; height: 34px; -unity-background-scale-mode: scale-to-fit; }
 .cw-ability-card__name {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
     font-size: 10px; color: rgb(254, 245, 224); -unity-text-align: middle-center;
@@ -499,12 +520,17 @@
 .cw-player-chips { flex-direction: row; margin-top: 5px; }
 .cw-mini-hex {
     width: 24px; height: 28px; margin-right: 4px;
-    background-image: url("project://database/Assets/UI/Sprites/HexBase.png");
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/HexGlossy.png");
     -unity-background-scale-mode: scale-to-fit;
     align-items: center; justify-content: center;
 }
-.cw-mini-hex--empty { background-image: url("project://database/Assets/UI/Sprites/HexInactive.png"); }
 .cw-mini-hex__icon { font-size: 12px; -unity-text-align: middle-center; }
+/* Exported ability icon sprite on a lobby-card mini-hex (Stage-3). */
+.cw-mini-hex__sprite {
+    position: absolute;
+    width: 16px; height: 16px;
+    -unity-background-scale-mode: scale-to-fit;
+}
 
 .cw-player-state {
     flex-shrink: 0; margin-left: 6px;
@@ -565,3 +591,27 @@
 .layout--portrait .cw-lobby-rail { width: 100%; flex-shrink: 1; border-right-width: 0; }
 .layout--portrait .cw-player-grid { flex-direction: column; flex-wrap: nowrap; }
 .layout--portrait .cw-player-card { width: 100%; height: auto; margin-bottom: 8px; }
+
+/* ============================================================================
+   ABILITY ICON SPRITES  (14 : type-name -> exported Icon_*.png)
+   Mirrors Assets/UI/Styles/TouchControls.uss so the character-select slot hexes,
+   ability-grid cards, and lobby mini-hexes paint the same Stage-0 design icons
+   the touch HUD uses. The class applied to an element comes from the shared
+   CluckWars.UI.AbilityIconStyle map (keyed by concrete ability SO type).
+   These rules only set background-image — the element carries its own size via
+   .cw-hex__sprite / .cw-ability-card__sprite / .cw-mini-hex__sprite.
+   ============================================================================ */
+.cw-hex-icon--fly-peck { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_FlyingPeck.png"); }
+.cw-hex-icon--cluck    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_CluckShock.png"); }
+.cw-hex-icon--peck     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_Peck.png"); }
+.cw-hex-icon--roll     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_RollAndPush.png"); }
+.cw-hex-icon--trap     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_FeatherTrap.png"); }
+.cw-hex-icon--aura     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_FeatherAura.png"); }
+.cw-hex-icon--root     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_RootEgg.png"); }
+.cw-hex-icon--shell    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_EggShell.png"); }
+.cw-hex-icon--turtle   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_TurtleMode.png"); }
+.cw-hex-icon--spine    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_SpineCoat.png"); }
+.cw-hex-icon--burst    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_SpeedBurst.png"); }
+.cw-hex-icon--invis    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_Invisibility.png"); }
+.cw-hex-icon--doppel   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_Doppelganger.png"); }
+.cw-hex-icon--steal    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_SneakySteal.png"); }

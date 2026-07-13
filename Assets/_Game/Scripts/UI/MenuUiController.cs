@@ -49,6 +49,13 @@ namespace CluckWars.UI
         private Label _previewName, _previewPassive, _previewDesc, _equippedLabel;
         private Button _readyBtn;
         private readonly List<VisualElement> _slotHexes = new();
+        // Icon USS class currently applied to each slot's sprite element (for swap).
+        private readonly List<string> _slotAppliedIcon = new();
+        // .cw-chicken--<class> currently on the big preview figure (for swap).
+        private string _previewChickenClass;
+
+        // Dim neutral tint for an empty ability hex (no equipped accent).
+        private static readonly Color HexEmptyTint = new Color(0.45f, 0.38f, 0.28f, 0.7f);
 
         private static readonly ChickenClass[] Order =
             { ChickenClass.Warrior, ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };
@@ -223,9 +230,10 @@ namespace CluckWars.UI
                 _classChips[cls] = chip;
                 chip.RegisterCallback<ClickEvent>(_ => SelectClass(cls));
 
-                // Class chip art (baked chicken sprite, assigned at runtime).
+                // Class chip art — exported design chicken sprite (Stage-3). Chips
+                // are fixed per class, so the modifier is applied once here.
                 var art = chip.Q<VisualElement>(ChipNames[i] + "Art");
-                if (art != null) art.style.backgroundImage = new StyleBackground(UiGfx.Chicken(KeyOf(cls)));
+                if (art != null) art.AddToClassList("cw-chicken--" + KeyOf(cls));
             }
 
             _previewChicken = _charSelect.Q<VisualElement>("PreviewChicken");
@@ -279,7 +287,12 @@ namespace CluckWars.UI
             }
 
             if (_previewChicken != null)
-                _previewChicken.style.backgroundImage = new StyleBackground(UiGfx.Chicken(KeyOf(cls)));
+            {
+                if (!string.IsNullOrEmpty(_previewChickenClass))
+                    _previewChicken.RemoveFromClassList(_previewChickenClass);
+                _previewChickenClass = "cw-chicken--" + KeyOf(cls);
+                _previewChicken.AddToClassList(_previewChickenClass);
+            }
             if (_previewGlow != null)
                 _previewGlow.style.unityBackgroundImageTintColor = Fade(TintOf(cls), 0.35f);
             if (_previewDisc != null)
@@ -322,6 +335,7 @@ namespace CluckWars.UI
             if (_slotRow == null) return;
             _slotRow.Clear();
             _slotHexes.Clear();
+            _slotAppliedIcon.Clear();
             int slots = Meta[cls].Slots;
             if (_pickerSlot >= slots) _pickerSlot = 0;
 
@@ -338,14 +352,21 @@ namespace CluckWars.UI
 
                 var hex = new VisualElement();
                 hex.AddToClassList("cw-hex");
+                // Exported ability-icon sprite (shown when filled) + "+" placeholder
+                // (shown when empty); RefreshSlotVisuals toggles between them.
+                var sprite = new VisualElement();
+                sprite.AddToClassList("cw-hex__sprite");
+                sprite.style.display = DisplayStyle.None;
                 var icon = new Label("+");
                 icon.AddToClassList("cw-hex__icon");
+                hex.Add(sprite);
                 hex.Add(icon);
 
                 col.Add(caption); col.Add(hex);
                 col.RegisterCallback<ClickEvent>(_ => SelectPickerSlot(idx));
                 _slotRow.Add(col);
                 _slotHexes.Add(hex);
+                _slotAppliedIcon.Add(null);
             }
 
             // Non-Assassin classes show a dimmed, locked slot-3 hex (design §ColumnC).
@@ -362,7 +383,7 @@ namespace CluckWars.UI
 
                 var lockHex = new VisualElement();
                 lockHex.AddToClassList("cw-hex");
-                lockHex.AddToClassList("cw-hex--empty");
+                lockHex.style.unityBackgroundImageTintColor = HexEmptyTint;
                 var lockIcon = new Label("🔒");
                 lockIcon.AddToClassList("cw-hex__icon");
                 var ef = UiGfx.EmojiFont();
@@ -405,25 +426,39 @@ namespace CluckWars.UI
             {
                 var hex = _slotHexes[i];
                 var ab = GetEquipped(i);
-                var icon = hex.Q<Label>(className: "cw-hex__icon");
+                var plus   = hex.Q<Label>(className: "cw-hex__icon");
+                var sprite = hex.Q<VisualElement>(className: "cw-hex__sprite");
                 bool active = i == _pickerSlot;
 
-                hex.EnableInClassList("cw-hex--empty", ab == null);
+                // Swap the exported icon sprite class on change.
+                if (sprite != null)
+                {
+                    if (!string.IsNullOrEmpty(_slotAppliedIcon[i]))
+                        sprite.RemoveFromClassList(_slotAppliedIcon[i]);
+                    string cls = AbilityIconStyle.ClassFor(ab);
+                    _slotAppliedIcon[i] = cls;
+                    if (!string.IsNullOrEmpty(cls))
+                    {
+                        sprite.AddToClassList(cls);
+                        sprite.style.display = DisplayStyle.Flex;
+                    }
+                    else sprite.style.display = DisplayStyle.None;
+                }
+
                 if (ab != null)
                 {
                     hex.style.unityBackgroundImageTintColor = ab.AccentColor;
-                    if (icon != null)
-                    {
-                        icon.text = ab.ResolveIcon();
-                        var ef = UiGfx.EmojiFont();
-                        if (ef != null) icon.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(ef));
-                        icon.style.color = UiGfx.TextPrimary;
-                    }
+                    if (plus != null) plus.style.display = DisplayStyle.None; // sprite carries it
                 }
                 else
                 {
-                    hex.style.unityBackgroundImageTintColor = Color.white;
-                    if (icon != null) { icon.text = "+"; icon.style.color = UiGfx.Gold; }
+                    hex.style.unityBackgroundImageTintColor = HexEmptyTint;
+                    if (plus != null)
+                    {
+                        plus.style.display = DisplayStyle.Flex;
+                        plus.text = "+";
+                        plus.style.color = UiGfx.Gold;
+                    }
                 }
                 hex.EnableInClassList("cw-hex--active", active);
             }
@@ -471,11 +506,26 @@ namespace CluckWars.UI
             var card = new VisualElement();
             card.AddToClassList("cw-ability-card");
 
-            var icon = new Label(ab.ResolveIcon());
-            icon.AddToClassList("cw-ability-card__icon");
-            var ef = UiGfx.EmojiFont();
-            if (ef != null) icon.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(ef));
-            icon.style.color = ab.AccentColor; // colorful glyph per ability (design)
+            // Exported design icon sprite; fall back to the emoji glyph only for an
+            // ability with no sprite mapping (shouldn't happen for shipped abilities).
+            VisualElement icon;
+            string iconCls = AbilityIconStyle.ClassFor(ab);
+            if (!string.IsNullOrEmpty(iconCls))
+            {
+                var s = new VisualElement();
+                s.AddToClassList("cw-ability-card__sprite");
+                s.AddToClassList(iconCls);
+                icon = s;
+            }
+            else
+            {
+                var lbl = new Label(ab.ResolveIcon());
+                lbl.AddToClassList("cw-ability-card__icon");
+                var ef = UiGfx.EmojiFont();
+                if (ef != null) lbl.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(ef));
+                lbl.style.color = ab.AccentColor;
+                icon = lbl;
+            }
 
             // Readable full name on the card (cards are wide enough); fall back to asset name.
             string label = !string.IsNullOrEmpty(ab.DisplayName) ? ab.DisplayName : ab.name;
@@ -733,7 +783,7 @@ namespace CluckWars.UI
 
             var art = new VisualElement();
             art.AddToClassList("cw-player-art");
-            art.style.backgroundImage = new StyleBackground(UiGfx.Chicken(KeyOf(cls)));
+            art.AddToClassList("cw-chicken--" + KeyOf(cls));
             card.Add(art);
 
             var mid = new VisualElement();
@@ -794,14 +844,26 @@ namespace CluckWars.UI
         {
             var hex = new VisualElement();
             hex.AddToClassList("cw-mini-hex");
-            if (ab == null) { hex.AddToClassList("cw-mini-hex--empty"); return hex; }
+            if (ab == null) { hex.style.unityBackgroundImageTintColor = HexEmptyTint; return hex; }
             hex.style.unityBackgroundImageTintColor = ab.AccentColor;
-            var icon = new Label(ab.ResolveIcon());
-            icon.AddToClassList("cw-mini-hex__icon");
-            var ef = UiGfx.EmojiFont();
-            if (ef != null) icon.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(ef));
-            icon.style.color = UiGfx.TextPrimary;
-            hex.Add(icon);
+
+            string iconCls = AbilityIconStyle.ClassFor(ab);
+            if (!string.IsNullOrEmpty(iconCls))
+            {
+                var s = new VisualElement();
+                s.AddToClassList("cw-mini-hex__sprite");
+                s.AddToClassList(iconCls);
+                hex.Add(s);
+            }
+            else
+            {
+                var icon = new Label(ab.ResolveIcon());
+                icon.AddToClassList("cw-mini-hex__icon");
+                var ef = UiGfx.EmojiFont();
+                if (ef != null) icon.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(ef));
+                icon.style.color = UiGfx.TextPrimary;
+                hex.Add(icon);
+            }
             return hex;
         }
 

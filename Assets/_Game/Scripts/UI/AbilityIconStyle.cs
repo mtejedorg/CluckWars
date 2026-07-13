@@ -1,0 +1,50 @@
+using System.Collections.Generic;
+using CluckWars.Abilities;
+
+namespace CluckWars.UI
+{
+    /// <summary>
+    /// Single source of truth mapping an ability's concrete ScriptableObject type
+    /// to the USS class that paints its exported <c>Icon_*.png</c> sprite (Stage-0
+    /// design export). Both the in-game touch HUD (<see cref="Input.TouchControlsController"/>)
+    /// and the menu front-end (<see cref="MenuUiController"/> character-select +
+    /// lobby) paint ability icons from these classes, so the mapping lives here
+    /// once instead of being duplicated per screen.
+    /// </summary>
+    /// <remarks>
+    /// Keyed by concrete type name — stable and authoring-independent, so it is
+    /// robust vs. ShortLabel / DisplayName drift ("Flying Peck" is still the
+    /// <c>RollTrampleAbilitySO</c> type, renamed in v0.3 with the same asset GUID).
+    /// The matching <c>.cw-hex-icon--*</c> rules are defined in every stylesheet
+    /// that shows ability icons (Assets/UI/Styles/TouchControls.uss and
+    /// CluckWarsTheme.uss).
+    /// </remarks>
+    public static class AbilityIconStyle
+    {
+        private static readonly Dictionary<string, string> ByType = new()
+        {
+            { "RollTrampleAbilitySO", "cw-hex-icon--fly-peck" },
+            { "CluckShockAbilitySO",  "cw-hex-icon--cluck" },
+            { "PeckAbilitySO",        "cw-hex-icon--peck" },
+            { "RollPushAbilitySO",    "cw-hex-icon--roll" },
+            { "FeatherTrapAbilitySO", "cw-hex-icon--trap" },
+            { "FeatherAuraAbilitySO", "cw-hex-icon--aura" },
+            { "RootEggAbilitySO",     "cw-hex-icon--root" },
+            { "EggShellAbilitySO",    "cw-hex-icon--shell" },
+            { "TurtleModeAbilitySO",  "cw-hex-icon--turtle" },
+            { "SpineCoatAbilitySO",   "cw-hex-icon--spine" },
+            { "SpeedBurstAbilitySO",  "cw-hex-icon--burst" },
+            { "InvisibilityAbilitySO","cw-hex-icon--invis" },
+            { "DoppelgangerAbilitySO","cw-hex-icon--doppel" },
+            { "SneakyStealAbilitySO", "cw-hex-icon--steal" },
+        };
+
+        /// <summary>
+        /// USS icon class painting the exported sprite for <paramref name="ability"/>,
+        /// or <c>null</c> when the ability is null or has no exported sprite (the
+        /// caller then hides its icon element and lets a text label carry it).
+        /// </summary>
+        public static string ClassFor(AbilityBaseSO ability) =>
+            ability != null && ByType.TryGetValue(ability.GetType().Name, out var cls) ? cls : null;
+    }
+}

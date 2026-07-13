@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
 using CluckWars.Logging;
@@ -39,27 +38,9 @@ namespace CluckWars.Input
 
         public static TouchControlsController Instance { get; private set; }
 
-        // Maps the equipped ability's concrete SO type name to its icon USS class
-        // (one .cw-hex-icon--* per exported Icon_*.png). Type name is stable and
-        // authoring-independent — robust vs. ShortLabel drift. "Flying Peck" is
-        // still the RollTrampleAbilitySO type (renamed in v0.3, same asset GUID).
-        private static readonly Dictionary<string, string> IconClassByType = new()
-        {
-            { "RollTrampleAbilitySO", "cw-hex-icon--fly-peck" },
-            { "CluckShockAbilitySO",  "cw-hex-icon--cluck" },
-            { "PeckAbilitySO",        "cw-hex-icon--peck" },
-            { "RollPushAbilitySO",    "cw-hex-icon--roll" },
-            { "FeatherTrapAbilitySO", "cw-hex-icon--trap" },
-            { "FeatherAuraAbilitySO", "cw-hex-icon--aura" },
-            { "RootEggAbilitySO",     "cw-hex-icon--root" },
-            { "EggShellAbilitySO",    "cw-hex-icon--shell" },
-            { "TurtleModeAbilitySO",  "cw-hex-icon--turtle" },
-            { "SpineCoatAbilitySO",   "cw-hex-icon--spine" },
-            { "SpeedBurstAbilitySO",  "cw-hex-icon--burst" },
-            { "InvisibilityAbilitySO","cw-hex-icon--invis" },
-            { "DoppelgangerAbilitySO","cw-hex-icon--doppel" },
-            { "SneakyStealAbilitySO", "cw-hex-icon--steal" },
-        };
+        // Ability -> exported-icon USS class comes from the shared
+        // CluckWars.UI.AbilityIconStyle (single source of truth, also used by the
+        // character-select / lobby menus).
 
         // Desaturated tint for "ready but no target in range" (range-gated abilities).
         private static readonly Color OutOfRangeTint = new Color(0.42f, 0.44f, 0.47f, 1f);
@@ -321,9 +302,7 @@ namespace CluckWars.Input
                 if (!string.IsNullOrEmpty(_appliedIconCls[slot]))
                     refs.Icon.RemoveFromClassList(_appliedIconCls[slot]);
 
-                string cls = null;
-                if (equipped != null)
-                    IconClassByType.TryGetValue(equipped.GetType().Name, out cls);
+                string cls = CluckWars.UI.AbilityIconStyle.ClassFor(equipped);
 
                 if (!string.IsNullOrEmpty(cls))
                 {
