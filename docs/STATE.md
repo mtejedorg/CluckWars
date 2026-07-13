@@ -19,6 +19,53 @@ All tags pushed to origin.
 
 ---
 
+## ⚙ In flight — full UI rebuild against the committed design (2026-07-12)
+
+Rebuilding the entire UI to match `Design/CluckWars UI Design.html` + `docs/ART.md`
+§6, because three prior attempts drifted by re-implementing the design's CSS gloss
+by hand in C# (`UiGfx`). New approach: **share real assets with the design** and
+use **UI Toolkit for all screen-space UI** (menus, HUD, overlays, touch controls —
+chosen for mobile perf: retained-mode, no UGUI canvas-rebuild spikes). World-space
+on-character bars stay sprite/TMP. This supersedes the old "HUD is UGUI" convention.
+
+- **Stage 0 — asset pipeline (DONE, committed `4d790cd`).** `tools/export-design-assets.ps1`
+  renders 39 design atoms via headless Chrome (`Design/export.html` + `export-atoms.jsx`)
+  to `Assets/_Game/Art/UI/` (14 tintable atoms, 4 chickens, 19 icons, 2 backgrounds).
+  Import settings applied by committed AssetPostprocessor
+  `Assets/_Game/Scripts/Editor/UiSpriteImportSettings.cs` (Sprite type, per-atom
+  9-slice borders, RGBA32-for-gradients) — **never hand-author sprite .meta YAML**
+  (it corrupted 3 ways: truncated writes, invalid-GUID parse fails). USS token bridge
+  `tools/generate-uss-tokens.ps1` → `Assets/UI/Styles/CluckWarsTokens.uss`. Verified
+  in-editor: 39 sprites, correct borders, zero errors, self-healing on reimport.
+- **Stage 1 — overlays (DONE, play-mode verified).** Replaced the procedural-UGUI
+  match-end / lobby / intro-countdown / session-end panels (−453 lines from
+  `MatchHud.cs`) with a UI Toolkit document `Assets/UI/MatchOverlays.uxml` +
+  `Assets/UI/Styles/MatchOverlays.uss` (built on the Stage-0 sprites + tokens) and
+  `Assets/_Game/Scripts/UI/MatchOverlaysController.cs` (self-injecting driver that
+  mirrors MatchHud's old refresh logic). `MatchOverlaysUI` GameObject wired into
+  `Game.unity` (UIDocument, shared PanelSettings, sortingOrder 100). Verified in
+  play mode against the design captures (`CWMatchEndV3L` / `CWLobbyV3L` /
+  `CWIntroCountdown`): all three render with full design fidelity — glossy panels,
+  crown, winner ribbon + chicken platform, gold/silver/bronze medals, player-color
+  bars, invite-code tiles, 2×2 player grid, gold countdown + glow + GET READY. Zero
+  console errors; no double-rendered overlays. In-match HUD (leaderboard/timer/
+  HP/cargo/hexes) still UGUI — that's Stage 2.
+  - **Known gaps (data-availability, deferred):** per-row/winner equipped-ability
+    hex chips (no per-corner loadout source), S/D (stuns/deposits) stat columns
+    (only `Kills` networked → rows show `K{n}` only), and the design's LEAVE/REMATCH
+    buttons (game auto-restarts; shows a "Starting next match…" line instead).
+    Minor copy nuance: design personalizes the local win to "VICTORY!/YOU"; the
+    controller always shows "P{n} WINS!". None block Stage 1.
+- **Stage 2 (NEXT):** match HUD + touch controls (UI Toolkit). **Stage 3:**
+  character-select fidelity pass. **Stage 4:** on-character bars + control-state
+  overlays (§6.10). Retire `UiGfx` as each screen migrates.
+
+Pipeline note: the Fable-pinned `code-architect` orchestrator hit its model limit
+mid-session; orchestration continued on Opus (main session) delegating to
+`ui-designer` / `senior-dev` (which inherit Opus).
+
+---
+
 ## ⚠ Active handoff — full-project revision (2026-07-05)
 
 A complete code + design revision of the vertical slice was performed on

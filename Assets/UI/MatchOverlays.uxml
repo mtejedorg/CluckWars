@@ -1,0 +1,153 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <!-- Cluck Wars — in-match overlays (Stage 1 rebuild, UI Toolkit).
+         One UIDocument holds all four overlay roots. Each root is a full-screen
+         absolute container, hidden by default (display:none). MatchOverlaysController
+         toggles visibility per GameManager.State / shutdown, and fills the
+         data containers (#MeRows, #LobbyGrid, #CodeTiles) at bind time.
+         Design refs: Design/cluckwars-overlays-v3.jsx  CWMatchEndV3L / CWLobbyV3L
+                      Design/cluckwars-screens-v2.jsx    CWIntroCountdown
+         Tokens: Assets/UI/Styles/CluckWarsTokens.uss (cw- vars)
+         Styles: Assets/UI/Styles/MatchOverlays.uss -->
+    <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTokens.uss" />
+    <ui:Style src="project://database/Assets/UI/Styles/MatchOverlays.uss" />
+
+    <ui:VisualElement name="OverlayRoot" class="cw-overlay-host" picking-mode="Ignore">
+
+        <!-- ============================================================ -->
+        <!--  MATCH END  (CWMatchEndV3L)                                   -->
+        <!-- ============================================================ -->
+        <ui:VisualElement name="MatchEndOverlay" class="cw-overlay cw-overlay--dim" style="display: none;">
+            <ui:VisualElement name="MatchEndPanel" class="cw-me-panel">
+
+                <!-- LEFT: winner hero -->
+                <ui:VisualElement name="MeHero" class="cw-me-hero">
+                    <ui:VisualElement name="MeCrown" class="cw-me-crown" />
+                    <ui:VisualElement name="MeWinRibbon" class="cw-me-ribbon">
+                        <ui:Label name="MeWinRibbonLabel" text="P1 WINS!" class="cw-me-ribbon__label" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement name="MeWinChickenWrap" class="cw-me-chickenwrap">
+                        <ui:VisualElement name="MeWinGlow" class="cw-me-winglow" />
+                        <ui:VisualElement name="MeWinChicken" class="cw-me-winchicken" />
+                        <ui:VisualElement name="MeWinRing" class="cw-me-winring" />
+                    </ui:VisualElement>
+
+                    <ui:Label name="MeWinName" text="YOU" class="cw-me-winname" />
+                    <ui:Label name="MeWinSub" text="WARRIOR · P1" class="cw-me-winsub" />
+
+                    <ui:VisualElement name="MeWinFoodRow" class="cw-me-winfoodrow">
+                        <ui:VisualElement class="cw-me-foodicon" />
+                        <ui:Label name="MeWinScore" text="152" class="cw-me-winscore" />
+                        <ui:Label text="FOOD" class="cw-me-winscore__unit" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- vertical divider -->
+                <ui:VisualElement class="cw-me-divider" />
+
+                <!-- RIGHT: standings -->
+                <ui:VisualElement name="MeRight" class="cw-me-right">
+                    <ui:VisualElement class="cw-me-head">
+                        <ui:Label text="FINAL STANDINGS" class="cw-me-head__title" />
+                        <ui:VisualElement class="cw-me-head__rule" />
+                        <ui:Label name="MeTargetNote" text="target 150 · reached" class="cw-me-head__note" />
+                    </ui:VisualElement>
+
+                    <!-- Controller fills with up to 4 .cw-me-row rows -->
+                    <ui:VisualElement name="MeRows" class="cw-me-rows" />
+
+                    <ui:Label name="MeRestart" text="Next match in 5s…" class="cw-me-restart" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- ============================================================ -->
+        <!--  MATCH LOBBY  (CWLobbyV3L)                                    -->
+        <!-- ============================================================ -->
+        <ui:VisualElement name="LobbyOverlay" class="cw-overlay cw-overlay--dim" style="display: none;">
+            <ui:VisualElement name="LobbyPanel" class="cw-lob-panel">
+
+                <!-- LEFT rail: ribbon + invite + settings + status + start -->
+                <ui:VisualElement name="LobbyRail" class="cw-lob-rail">
+                    <ui:VisualElement class="cw-me-ribbon cw-me-ribbon--gold">
+                        <ui:Label text="MATCH LOBBY" class="cw-me-ribbon__label" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement name="LobbyInviteCard" class="cw-lob-card">
+                        <ui:Label text="INVITE CODE · TAP TO COPY" class="cw-lob-card__label" />
+                        <!-- Controller fills with .cw-code-tile letters (host only) -->
+                        <ui:VisualElement name="CodeTiles" class="cw-code-tiles" />
+                        <ui:VisualElement class="cw-lob-btnrow">
+                            <ui:Button name="LobbyShareBtn" text="SHARE" class="cw-mini-btn cw-mini-btn--gold" />
+                            <ui:Button name="LobbyCopyBtn" text="COPY" class="cw-mini-btn" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+
+                    <ui:VisualElement name="LobbySettingsCard" class="cw-lob-card">
+                        <ui:Label text="MATCH SETTINGS" class="cw-lob-card__head" />
+                        <ui:VisualElement class="cw-setting-row">
+                            <ui:Label text="ARENA" class="cw-setting-k" />
+                            <ui:Label text="Sunny Farm" class="cw-setting-v" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="cw-setting-row">
+                            <ui:Label text="TIME" class="cw-setting-k" />
+                            <ui:Label name="LobbySettingTime" text="3:00" class="cw-setting-v" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="cw-setting-row">
+                            <ui:Label text="GOAL" class="cw-setting-k" />
+                            <ui:Label name="LobbySettingGoal" text="150 food" class="cw-setting-v" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="cw-setting-row">
+                            <ui:Label text="MODE" class="cw-setting-k" />
+                            <ui:Label text="Free-for-all" class="cw-setting-v" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+
+                    <ui:VisualElement name="LobbyStatusPill" class="cw-status-pill">
+                        <ui:VisualElement name="LobbyStatusDot" class="cw-status-dot" />
+                        <ui:Label name="LobbyStatusCount" text="1/4" class="cw-status-count" />
+                        <ui:Label name="LobbyStatusText" text="Waiting…" class="cw-status-text" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement class="cw-flex-spacer" />
+
+                    <ui:Button name="LobbyStartBtn" text="START MATCH ▶" class="cw-btn cw-btn--green cw-lob-start" />
+                    <ui:Label name="LobbyHint" text="Waiting for host to start the match…" class="cw-lob-hint" />
+                </ui:VisualElement>
+
+                <!-- RIGHT: 2×2 player grid -->
+                <ui:VisualElement name="LobbyRight" class="cw-lob-right">
+                    <ui:VisualElement class="cw-players-head">
+                        <ui:Label text="PLAYERS" class="cw-players-title" />
+                        <ui:VisualElement class="cw-players-divider" />
+                    </ui:VisualElement>
+                    <!-- Controller fills with 4 player cards (filled or empty) -->
+                    <ui:VisualElement name="LobbyGrid" class="cw-player-grid" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- ============================================================ -->
+        <!--  SESSION END  (small panel)                                   -->
+        <!-- ============================================================ -->
+        <ui:VisualElement name="SessionEndOverlay" class="cw-overlay cw-overlay--dim" style="display: none;">
+            <ui:VisualElement name="SessionEndPanel" class="cw-se-panel">
+                <ui:Label text="SESSION ENDED" class="cw-se-title" />
+                <ui:Label name="SessionEndReason" text="Reason: —" class="cw-se-reason" />
+                <ui:Label name="SessionEndCountdown" text="Returning to menu in 5s…" class="cw-se-countdown" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- ============================================================ -->
+        <!--  INTRO COUNTDOWN  (CWIntroCountdown) — topmost, never eats input -->
+        <!-- ============================================================ -->
+        <ui:VisualElement name="IntroOverlay" class="cw-overlay cw-overlay--introdim" style="display: none;" picking-mode="Ignore">
+            <ui:VisualElement name="IntroGlow" class="cw-intro-glow" picking-mode="Ignore" />
+            <ui:Label name="IntroNumber" text="3" class="cw-intro-number" picking-mode="Ignore" />
+            <ui:VisualElement name="IntroRibbon" class="cw-me-ribbon cw-me-ribbon--subdued" picking-mode="Ignore">
+                <ui:Label text="GET READY" class="cw-me-ribbon__label" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+</ui:UXML>

@@ -4,11 +4,9 @@ using CluckWars.Logging;
 using CluckWars.Networking;
 using CluckWars.Services;
 using CluckWars.Audio;
-using Fusion;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using Zenject;
 
@@ -34,13 +32,6 @@ namespace CluckWars.UI
 
         [SerializeField] private float   _refreshInterval     = 0.25f;
         [SerializeField] private Vector2 _referenceResolution = new Vector2(1920f, 1080f);
-
-        [Tooltip("Seconds the 'Session ended' overlay stays up before auto-returning.")]
-        [Min(0.5f)]
-        [SerializeField] private float _disconnectReturnDelay = 5f;
-
-        [Tooltip("Bootstrap scene to load after a disconnect.")]
-        [SerializeField] private string _bootstrapSceneName = "Bootstrap";
 
         // ----------------------------------------------------------------
         // Design-token palette — Phase 10 redesign (ART.md §6, cluckwars-tokens-v2).
@@ -81,19 +72,6 @@ namespace CluckWars.UI
         private Text       _hpLabel;
         private Image      _cargoFill;
         private Text       _cargoLabel;
-        private GameObject _matchEndPanel;
-        private Text       _matchEndTitle;
-        private Text[]     _leaderboardRows;
-        private Text       _restartCountdownLabel;
-        private GameObject _sessionEndPanel;
-        private Text       _sessionEndReason;
-        private Text       _sessionEndCountdown;
-        private Text       _introLabel;
-        private GameObject _lobbyPanel;
-        private Text       _lobbyHint;
-        private Button     _lobbyStartButton;
-        private Text       _lobbyPlayerCount;
-        private Text       _lobbyJoinCode;
 
         private Text       _eventLabel;
         private GameObject _eventBannerPanel;
@@ -107,7 +85,6 @@ namespace CluckWars.UI
         private ChickenCombat     _localCombat;
         private ChickenCargo      _localCargo;
         private PlayerBase[]      _bases     = System.Array.Empty<PlayerBase>();
-        private ChickenMatchStats[] _matchStats = System.Array.Empty<ChickenMatchStats>();
         private GameManager       _gameManager;
         private float             _nextRefresh;
 
@@ -117,16 +94,8 @@ namespace CluckWars.UI
         private ILogService              _log;
         private ColorSchemeSO            _colors;
         private MatchConfigSO            _matchConfig;
-        private ISessionSelectionService _selection;
         private IAudioService            _audio;
         private AudioRegistrySO          _audioReg;
-        private ShutdownReason?          _shutdownReason;
-        private float                    _shutdownAtUnscaledTime;
-        private bool                     _returnTriggered;
-
-        // Intro "GO!" flourish — lingers briefly after the countdown hits zero.
-        private float        _goExpiresAtUnscaledTime;
-        private const float  GoFlourishDuration = 0.6f;
 
         // Hit-flash — red overlay on local-chicken HP decrease.
         private Image _hitFlash;
@@ -143,7 +112,6 @@ namespace CluckWars.UI
             ILogService              log,
             ColorSchemeSO            colors,
             MatchConfigSO            matchConfig,
-            ISessionSelectionService selection,
             IAudioService            audio,
             AudioRegistrySO          audioReg)
         {
@@ -151,7 +119,6 @@ namespace CluckWars.UI
             _log         = log;
             _colors      = colors;
             _matchConfig = matchConfig;
-            _selection   = selection;
             _audio       = audio;
             _audioReg    = audioReg;
         }
@@ -161,16 +128,10 @@ namespace CluckWars.UI
         private void Awake()
         {
             if (_network == null) ProjectContext.Instance.Container.Inject(this);
-            if (_network != null) _network.OnShutdown += HandleShutdown;
 
             DisableLegacyCargoHud();
             EnsureEventSystem();
             BuildCanvas();
-        }
-
-        private void OnDestroy()
-        {
-            if (_network != null) _network.OnShutdown -= HandleShutdown;
         }
 
         private void DisableLegacyCargoHud()
@@ -189,23 +150,10 @@ namespace CluckWars.UI
             new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
         }
 
-        private void HandleShutdown(ShutdownReason reason)
-        {
-            _shutdownReason         = reason;
-            _shutdownAtUnscaledTime = Time.unscaledTime;
-            _log?.Warn(Source, $"Network shutdown: {reason}. Returning to '{_bootstrapSceneName}' in {_disconnectReturnDelay}s.");
-        }
-
         // ---- Lifecycle tick ----------------------------------------------------
 
         private void Update()
         {
-            if (_shutdownReason.HasValue)
-            {
-                TickSessionEnd();
-                return;
-            }
-
             if (Time.unscaledTime < _nextRefresh
                 && _localController != null
                 && _bases.Length > 0
@@ -218,24 +166,6 @@ namespace CluckWars.UI
 
             RefreshSceneRefs();
             RefreshDynamic();
-        }
-
-        private void TickSessionEnd()
-        {
-            if (_sessionEndPanel != null) _sessionEndPanel.SetActive(true);
-            if (_matchEndPanel   != null) _matchEndPanel.SetActive(false);
-
-            float elapsed   = Time.unscaledTime - _shutdownAtUnscaledTime;
-            float remaining = Mathf.Max(0f, _disconnectReturnDelay - elapsed);
-            if (_sessionEndReason    != null) _sessionEndReason.text    = $"Reason: {_shutdownReason}";
-            if (_sessionEndCountdown != null) _sessionEndCountdown.text = $"Returning to menu in {Mathf.CeilToInt(remaining)}s…";
-
-            if (!_returnTriggered && remaining <= 0f)
-            {
-                _returnTriggered = true;
-                _log?.Info(Source, $"Loading '{_bootstrapSceneName}' after disconnect.");
-                SceneManager.LoadScene(_bootstrapSceneName);
-            }
         }
 
         private void RefreshSceneRefs()
@@ -261,9 +191,6 @@ namespace CluckWars.UI
             if (_bases.Length == 0 || HasStaleBase())
                 _bases = FindObjectsByType<PlayerBase>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
 
-            // Refresh match stats refs every scene-ref pass (every _refreshInterval).
-            _matchStats = FindObjectsByType<ChickenMatchStats>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-
             if (_gameManager == null || _gameManager.Object == null || !_gameManager.Object.IsValid)
                 _gameManager = FindFirstObjectByType<GameManager>();
         }
@@ -285,9 +212,6 @@ namespace CluckWars.UI
             RefreshTimer();
             RefreshLeaderboard();
             RefreshLocalStats();
-            RefreshMatchEndOverlay();
-            RefreshIntroOverlay();
-            RefreshLobbyOverlay();
             TickHitFlash();
             PollComebackEvent();
         }
@@ -333,47 +257,6 @@ namespace CluckWars.UI
             }
         }
 
-        // ---- Lobby overlay refresh ---------------------------------------------
-
-        private void RefreshLobbyOverlay()
-        {
-            if (_lobbyPanel == null) return;
-
-            bool show = _gameManager != null && _gameManager.State == MatchState.WaitingForPlayers;
-            if (_lobbyPanel.activeSelf != show) _lobbyPanel.SetActive(show);
-            if (!show) return;
-
-            int playerCount = 0;
-            var runner = _network?.Runner;
-            if (runner != null)
-                foreach (var _ in runner.ActivePlayers) playerCount++;
-
-            if (_lobbyPlayerCount != null)
-            {
-                int maxPlayers = _matchConfig != null ? _matchConfig.MaxPlayers : 4;
-                _lobbyPlayerCount.text = $"Players: {playerCount} / {maxPlayers}";
-            }
-
-            bool isHost = runner != null &&
-                (runner.GameMode == GameMode.Single || runner.IsSharedModeMasterClient);
-
-            if (_lobbyJoinCode != null)
-            {
-                var code = _selection?.SessionName;
-                _lobbyJoinCode.text = string.IsNullOrEmpty(code) ? string.Empty : $"Code: {code}";
-            }
-
-            if (_lobbyStartButton != null)
-                _lobbyStartButton.gameObject.SetActive(isHost);
-            if (_lobbyHint != null)
-            {
-                _lobbyHint.gameObject.SetActive(true);
-                _lobbyHint.text = isHost
-                    ? "Start whenever ready — no minimum players required."
-                    : "Waiting for host to start the match…";
-            }
-        }
-
         // ---- Hit-flash ---------------------------------------------------------
 
         private void TickHitFlash()
@@ -403,34 +286,6 @@ namespace CluckWars.UI
             var c = _hitFlash.color;
             c.a = _hitFlashAlpha;
             _hitFlash.color = c;
-        }
-
-        // ---- Intro countdown ---------------------------------------------------
-
-        private void RefreshIntroOverlay()
-        {
-            if (_introLabel == null) return;
-            if (_gameManager == null) { _introLabel.gameObject.SetActive(false); return; }
-
-            if (_gameManager.IsIntroActive)
-            {
-                float remaining = _gameManager.IntroRemaining;
-                int   displayed = Mathf.CeilToInt(remaining);
-                _introLabel.text = displayed.ToString();
-                _introLabel.gameObject.SetActive(true);
-                _goExpiresAtUnscaledTime = Time.unscaledTime + GoFlourishDuration;
-                return;
-            }
-
-            if (Time.unscaledTime < _goExpiresAtUnscaledTime)
-            {
-                _introLabel.text = "GO!";
-                _introLabel.gameObject.SetActive(true);
-            }
-            else
-            {
-                _introLabel.gameObject.SetActive(false);
-            }
         }
 
         // ---- Timer -------------------------------------------------------------
@@ -514,67 +369,6 @@ namespace CluckWars.UI
             }
         }
 
-        // ---- Match-end overlay -------------------------------------------------
-
-        private void RefreshMatchEndOverlay()
-        {
-            bool show = _gameManager != null && _gameManager.State == MatchState.Ended;
-            if (_matchEndPanel != null) _matchEndPanel.SetActive(show);
-            if (!show) return;
-
-            if (_matchEndTitle != null)
-            {
-                // Winner identity is the corner (matches leaderboard P-numbers and
-                // nameplates). WinnerPlayer is None when a bot wins — WinnerCorner
-                // still carries who it was.
-                var winner = _gameManager.WinnerPlayer;
-                int corner = _gameManager.WinnerCorner;
-                if (corner >= 0)
-                    _matchEndTitle.text = winner.IsRealPlayer
-                        ? $"P{corner + 1} WINS!"
-                        : $"P{corner + 1} (CPU) WINS!";
-                else
-                    _matchEndTitle.text = "MATCH ENDED";
-            }
-
-            var rows = BuildSortedLeaderboard();
-            for (int i = 0; i < _leaderboardRows.Length; i++)
-            {
-                var row = _leaderboardRows[i];
-                if (row == null) continue;
-                if (i >= rows.Count) { row.text = ""; continue; }
-                var (cornerIdx, total) = rows[i];
-                int kills = GetKillsForCorner(cornerIdx);
-                row.text  = $"#{i + 1}  P{cornerIdx + 1}:  {Mathf.FloorToInt(total)} food  |  {kills} kills";
-                row.color = PlayerColors[cornerIdx % PlayerColors.Length];
-            }
-
-            if (_restartCountdownLabel != null)
-            {
-                float restartIn = _gameManager.RestartRemaining;
-                _restartCountdownLabel.text = restartIn > 0f
-                    ? $"Next match in {Mathf.CeilToInt(restartIn)}s…"
-                    : "Starting next match…";
-            }
-        }
-
-        /// <summary>
-        /// Returns the kill count for the player assigned to <paramref name="cornerIdx"/>.
-        /// Matches by <c>InputAuthority.PlayerId</c> since PlayerId == cornerIdx for real
-        /// players (set up that way by <see cref="GameManager.AssignBasesToPlayers"/>).
-        /// Returns 0 if no stats object is found (bot corners, unspawned, etc.).
-        /// </summary>
-        private int GetKillsForCorner(int cornerIdx)
-        {
-            for (int i = 0; i < _matchStats.Length; i++)
-            {
-                var s = _matchStats[i];
-                if (s == null || s.Object == null || !s.Object.IsValid) continue;
-                if (s.Object.InputAuthority.PlayerId == cornerIdx) return s.Kills;
-            }
-            return 0;
-        }
-
         /// <summary>0-based rank → "1st"/"2nd"/"3rd"/"4th" (design v3 leaderboard).</summary>
         private static string Ordinal(int zeroBasedRank) => zeroBasedRank switch
         {
@@ -620,10 +414,6 @@ namespace CluckWars.UI
             BuildLeaderboardPanel(canvasGO.transform);
             BuildTimerBadge(canvasGO.transform);
             BuildLocalStatsPanel(canvasGO.transform);
-            BuildMatchEndOverlay(canvasGO.transform);
-            BuildSessionEndOverlay(canvasGO.transform);
-            BuildLobbyOverlay(canvasGO.transform);
-            BuildIntroOverlay(canvasGO.transform);   // topmost — never intercepts input
             BuildEventBanner(canvasGO.transform);
         }
 
@@ -876,230 +666,6 @@ namespace CluckWars.UI
             lblRT.offsetMax = Vector2.zero;
         }
 
-        // ---- Match-end overlay ------------------------------------------------
-
-        private void BuildMatchEndOverlay(Transform parent)
-        {
-            var panel = CreateUI("MatchEndPanel", parent, out var rt);
-            rt.anchorMin        = new Vector2(0.5f, 0.5f);
-            rt.anchorMax        = new Vector2(0.5f, 0.5f);
-            rt.pivot            = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta        = new Vector2(640f, 460f);
-            rt.anchoredPosition = Vector2.zero;
-            AddBackground(panel, PanelColor(0.96f));
-            _matchEndPanel = panel;
-
-            // Gold top border
-            var borderGO = CreateUI("TopBorder", panel.transform, out var borderRT);
-            borderRT.anchorMin        = new Vector2(0f, 1f);
-            borderRT.anchorMax        = new Vector2(1f, 1f);
-            borderRT.pivot            = new Vector2(0.5f, 1f);
-            borderRT.sizeDelta        = new Vector2(0f, 4f);
-            borderRT.anchoredPosition = Vector2.zero;
-            borderGO.AddComponent<Image>().color = DtGold;
-
-            _matchEndTitle = AddText(panel.transform, "Title", "MATCH ENDED", 44, TextAnchor.MiddleCenter, FontStyle.Bold);
-            _matchEndTitle.color = DtGold;
-            var titleRT = _matchEndTitle.rectTransform;
-            titleRT.anchorMin        = new Vector2(0f, 1f);
-            titleRT.anchorMax        = new Vector2(1f, 1f);
-            titleRT.pivot            = new Vector2(0.5f, 1f);
-            titleRT.sizeDelta        = new Vector2(0f, 64f);
-            titleRT.anchoredPosition = new Vector2(0f, -24f);
-
-            _leaderboardRows = new Text[4];
-            for (int i = 0; i < 4; i++)
-            {
-                var row = AddText(panel.transform, $"LB{i}", "", 28, TextAnchor.MiddleCenter, FontStyle.Bold);
-                var rrt = row.rectTransform;
-                rrt.anchorMin        = new Vector2(0f, 1f);
-                rrt.anchorMax        = new Vector2(1f, 1f);
-                rrt.pivot            = new Vector2(0.5f, 1f);
-                rrt.sizeDelta        = new Vector2(0f, 48f);
-                rrt.anchoredPosition = new Vector2(0f, -(108f + i * 54f));
-                _leaderboardRows[i]  = row;
-            }
-
-            _restartCountdownLabel = AddText(panel.transform, "RestartCountdown", "",
-                20, TextAnchor.MiddleCenter, FontStyle.Normal);
-            _restartCountdownLabel.color = new Color(DtTextPrimary.r, DtTextPrimary.g, DtTextPrimary.b, 0.70f);
-            var cdRT = _restartCountdownLabel.rectTransform;
-            cdRT.anchorMin        = new Vector2(0f, 0f);
-            cdRT.anchorMax        = new Vector2(1f, 0f);
-            cdRT.pivot            = new Vector2(0.5f, 0f);
-            cdRT.sizeDelta        = new Vector2(0f, 36f);
-            cdRT.anchoredPosition = new Vector2(0f, 18f);
-
-            panel.SetActive(false);
-        }
-
-        // ---- Session-end overlay ----------------------------------------------
-
-        private void BuildSessionEndOverlay(Transform parent)
-        {
-            var panel = CreateUI("SessionEndPanel", parent, out var rt);
-            rt.anchorMin        = new Vector2(0.5f, 0.5f);
-            rt.anchorMax        = new Vector2(0.5f, 0.5f);
-            rt.pivot            = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta        = new Vector2(620f, 220f);
-            rt.anchoredPosition = Vector2.zero;
-            AddBackground(panel, PanelColor(0.96f));
-            _sessionEndPanel = panel;
-
-            // Gold top border
-            var borderGO = CreateUI("TopBorder", panel.transform, out var borderRT);
-            borderRT.anchorMin        = new Vector2(0f, 1f);
-            borderRT.anchorMax        = new Vector2(1f, 1f);
-            borderRT.pivot            = new Vector2(0.5f, 1f);
-            borderRT.sizeDelta        = new Vector2(0f, 4f);
-            borderRT.anchoredPosition = Vector2.zero;
-            borderGO.AddComponent<Image>().color = DtGold;
-
-            var title = AddText(panel.transform, "Title", "SESSION ENDED", 40, TextAnchor.MiddleCenter, FontStyle.Bold);
-            title.color = DtGold;
-            var titleRT = title.rectTransform;
-            titleRT.anchorMin        = new Vector2(0f, 1f);
-            titleRT.anchorMax        = new Vector2(1f, 1f);
-            titleRT.pivot            = new Vector2(0.5f, 1f);
-            titleRT.sizeDelta        = new Vector2(0f, 56f);
-            titleRT.anchoredPosition = new Vector2(0f, -20f);
-
-            _sessionEndReason = AddText(panel.transform, "Reason", "", 22, TextAnchor.MiddleCenter, FontStyle.Normal);
-            var reasonRT = _sessionEndReason.rectTransform;
-            reasonRT.anchorMin        = new Vector2(0f, 1f);
-            reasonRT.anchorMax        = new Vector2(1f, 1f);
-            reasonRT.pivot            = new Vector2(0.5f, 1f);
-            reasonRT.sizeDelta        = new Vector2(0f, 36f);
-            reasonRT.anchoredPosition = new Vector2(0f, -90f);
-
-            _sessionEndCountdown = AddText(panel.transform, "Countdown", "", 20, TextAnchor.MiddleCenter, FontStyle.Normal);
-            var cdRT = _sessionEndCountdown.rectTransform;
-            cdRT.anchorMin        = new Vector2(0f, 0f);
-            cdRT.anchorMax        = new Vector2(1f, 0f);
-            cdRT.pivot            = new Vector2(0.5f, 0f);
-            cdRT.sizeDelta        = new Vector2(0f, 36f);
-            cdRT.anchoredPosition = new Vector2(0f, 28f);
-
-            panel.SetActive(false);
-        }
-
-        // ---- Lobby overlay ----------------------------------------------------
-
-        private void BuildLobbyOverlay(Transform parent)
-        {
-            var panel = CreateUI("LobbyPanel", parent, out var rt);
-            rt.anchorMin        = new Vector2(0.5f, 0.5f);
-            rt.anchorMax        = new Vector2(0.5f, 0.5f);
-            rt.pivot            = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta        = new Vector2(640f, 440f);
-            rt.anchoredPosition = Vector2.zero;
-            AddBackground(panel, PanelColor(0.96f));
-            _lobbyPanel = panel;
-
-            // Gold top border
-            var borderGO = CreateUI("TopBorder", panel.transform, out var borderRT);
-            borderRT.anchorMin        = new Vector2(0f, 1f);
-            borderRT.anchorMax        = new Vector2(1f, 1f);
-            borderRT.pivot            = new Vector2(0.5f, 1f);
-            borderRT.sizeDelta        = new Vector2(0f, 4f);
-            borderRT.anchoredPosition = Vector2.zero;
-            borderGO.AddComponent<Image>().color = DtGold;
-
-            var title = AddText(panel.transform, "Title", "MATCH LOBBY", 44, TextAnchor.MiddleCenter, FontStyle.Bold);
-            title.color = DtGold;
-            var titleRT = title.rectTransform;
-            titleRT.anchorMin        = new Vector2(0f, 1f);
-            titleRT.anchorMax        = new Vector2(1f, 1f);
-            titleRT.pivot            = new Vector2(0.5f, 1f);
-            titleRT.sizeDelta        = new Vector2(0f, 64f);
-            titleRT.anchoredPosition = new Vector2(0f, -24f);
-
-            _lobbyJoinCode = AddText(panel.transform, "JoinCode", "", 32, TextAnchor.MiddleCenter, FontStyle.Bold);
-            _lobbyJoinCode.color = new Color(0.4f, 1f, 0.5f, 1f); // green for the shareable code
-            var codeRT = _lobbyJoinCode.rectTransform;
-            codeRT.anchorMin        = new Vector2(0f, 1f);
-            codeRT.anchorMax        = new Vector2(1f, 1f);
-            codeRT.pivot            = new Vector2(0.5f, 1f);
-            codeRT.sizeDelta        = new Vector2(0f, 44f);
-            codeRT.anchoredPosition = new Vector2(0f, -104f);
-
-            _lobbyPlayerCount = AddText(panel.transform, "PlayerCount", "Players: 1",
-                22, TextAnchor.MiddleCenter, FontStyle.Normal);
-            var pcRT = _lobbyPlayerCount.rectTransform;
-            pcRT.anchorMin        = new Vector2(0f, 1f);
-            pcRT.anchorMax        = new Vector2(1f, 1f);
-            pcRT.pivot            = new Vector2(0.5f, 1f);
-            pcRT.sizeDelta        = new Vector2(0f, 30f);
-            pcRT.anchoredPosition = new Vector2(0f, -162f);
-
-            _lobbyHint = AddText(panel.transform, "Hint", "Waiting for host to start the match…",
-                22, TextAnchor.MiddleCenter, FontStyle.Italic);
-            _lobbyHint.color = new Color(DtTextPrimary.r, DtTextPrimary.g, DtTextPrimary.b, 0.75f);
-            var hintRT = _lobbyHint.rectTransform;
-            hintRT.anchorMin        = new Vector2(0f, 1f);
-            hintRT.anchorMax        = new Vector2(1f, 1f);
-            hintRT.pivot            = new Vector2(0.5f, 1f);
-            hintRT.sizeDelta        = new Vector2(0f, 36f);
-            hintRT.anchoredPosition = new Vector2(0f, -208f);
-
-            // "Start Match" button — host only
-            _lobbyStartButton = BuildButton(panel.transform, "StartMatch", "START MATCH",
-                DtGreenMid,
-                onClick: () =>
-                {
-                    var gm = GameManager.Instance;
-                    if (gm != null)
-                    {
-                        _log?.Info(Source, "Lobby Start → GameManager.StartMatchNow().");
-                        gm.StartMatchNow();
-                    }
-                });
-            var btnRT = (RectTransform)_lobbyStartButton.transform;
-            btnRT.anchorMin        = new Vector2(0.5f, 0f);
-            btnRT.anchorMax        = new Vector2(0.5f, 0f);
-            btnRT.pivot            = new Vector2(0.5f, 0f);
-            btnRT.sizeDelta        = new Vector2(320f, 72f);
-            btnRT.anchoredPosition = new Vector2(0f, 32f);
-
-            panel.SetActive(false);
-        }
-
-        private Button BuildButton(Transform parent, string name, string label,
-            Color baseColor, System.Action onClick)
-        {
-            var go  = CreateUI(name, parent, out _);
-            var img = go.AddComponent<Image>();
-            img.color         = baseColor;
-            img.raycastTarget = true;
-            
-            go.AddComponent<SDFImageEffect>();
-            var mat = new Material(Shader.Find("CluckWars/UI/SDF"));
-            mat.SetColor("_Color", Color.white);
-            mat.SetFloat("_Radius", 12f);
-            mat.SetColor("_BorderColor", new Color(Mathf.Min(1f, baseColor.r * 1.2f), Mathf.Min(1f, baseColor.g * 1.2f), Mathf.Min(1f, baseColor.b * 1.2f), 1f));
-            mat.SetFloat("_BorderWidth", 3f);
-            img.material = mat;
-
-            var btn = go.AddComponent<Button>();
-            btn.targetGraphic = img;
-            var cb = btn.colors;
-            cb.normalColor      = baseColor;
-            cb.highlightedColor = new Color(baseColor.r * 1.3f, baseColor.g * 1.2f, baseColor.b * 1.3f, baseColor.a);
-            cb.pressedColor     = new Color(baseColor.r * 0.75f, baseColor.g * 0.75f, baseColor.b * 0.75f, baseColor.a);
-            cb.selectedColor    = baseColor;
-            cb.disabledColor    = new Color(baseColor.r * 0.5f, baseColor.g * 0.5f, baseColor.b * 0.5f, baseColor.a * 0.6f);
-            btn.colors = cb;
-            btn.onClick.AddListener(() => onClick?.Invoke());
-
-            var labelText = AddText(go.transform, "Label", label, 26, TextAnchor.MiddleCenter, FontStyle.Bold);
-            var labelRT   = labelText.rectTransform;
-            labelRT.anchorMin = Vector2.zero;
-            labelRT.anchorMax = Vector2.one;
-            labelRT.offsetMin = Vector2.zero;
-            labelRT.offsetMax = Vector2.zero;
-            return btn;
-        }
-
         // ---- Hit-flash (full-screen) ------------------------------------------
 
         private void BuildHitFlash(Transform parent)
@@ -1112,21 +678,6 @@ namespace CluckWars.UI
             _hitFlash               = go.AddComponent<Image>();
             _hitFlash.color         = new Color(0.95f, 0.20f, 0.20f, 0f);
             _hitFlash.raycastTarget = false;
-        }
-
-        // ---- Intro countdown (centered, topmost) ------------------------------
-
-        private void BuildIntroOverlay(Transform parent)
-        {
-            _introLabel = AddText(parent, "IntroCountdown", "", 220, TextAnchor.MiddleCenter, FontStyle.Bold);
-            _introLabel.color = DtGold;
-            var rt = _introLabel.rectTransform;
-            rt.anchorMin        = new Vector2(0.5f, 0.5f);
-            rt.anchorMax        = new Vector2(0.5f, 0.5f);
-            rt.pivot            = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta        = new Vector2(600f, 280f);
-            rt.anchoredPosition = Vector2.zero;
-            _introLabel.gameObject.SetActive(false);
         }
 
         // ---- Static UI helpers ------------------------------------------------
@@ -1173,10 +724,6 @@ namespace CluckWars.UI
             UiGfx.AddShadow(text);
             return text;
         }
-
-        /// <summary>Warm dark wood panel color at the given alpha.</summary>
-        private static Color PanelColor(float alpha) =>
-            new Color(DtPanelBg.r, DtPanelBg.g, DtPanelBg.b, alpha);
 
         private void BuildEventBanner(Transform parent)
         {

@@ -431,12 +431,12 @@ MonoBehaviour:
     Slot0: {fileID: 11400000, guid: 4c1a8e7b3d2f495d8a01c5e7b2f9d4b1, type: 2}
     Slot1: {fileID: 11400000, guid: 0d5566bf334a1c44a9711ea9b34a4ac6, type: 2}
     Slot2: {fileID: 0}
-    AllowedClasses:
+    AllowedClasses: 
   - Name: Skirmisher
     Slot0: {fileID: 11400000, guid: 4c1a8e7b3d2f495d8a01c5e7b2f9d4b1, type: 2}
     Slot1: {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
     Slot2: {fileID: 0}
-    AllowedClasses:
+    AllowedClasses: 
   - Name: Tank
     Slot0: {fileID: 11400000, guid: 6b3c8e2a1f4d495d8a01c5e7b2f9d4d5, type: 2}
     Slot1: {fileID: 11400000, guid: 5f7b2c8a4d3e495d8a01c5e7b2f9d4e7, type: 2}
@@ -456,7 +456,7 @@ MonoBehaviour:
     Slot0: {fileID: 11400000, guid: 141d6483e4594575ae36717f9dd3b056, type: 2}
     Slot1: {fileID: 11400000, guid: 4c026dfa11fd40cd9914aa8fb37090b6, type: 2}
     Slot2: {fileID: 0}
-    AllowedClasses:
+    AllowedClasses: 
 --- !u!1 &1048915988
 GameObject:
   m_ObjectHideFlags: 0
@@ -509,6 +509,11 @@ MonoBehaviour:
   _wallThickness: 0.5
   _wallsVisible: 0
   _wallMaterial: {fileID: 0}
+  _interiorWallCount: 6
+  _interiorWallLengthRange: {x: 3, y: 6}
+  _interiorWallHeight: 1.1
+  _interiorWallClearance: 3
+  _interiorWallColor: {r: 0.45, g: 0.36, b: 0.26, a: 1}
   _baseCornerDistance: 12
   _centerPileAmount: 60
   _centerPileVisualScale: 1.5
@@ -563,10 +568,79 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.UI.MatchHud
   _refreshInterval: 0.25
   _referenceResolution: {x: 1920, y: 1080}
-  _disconnectReturnDelay: 5
-  _bootstrapSceneName: Bootstrap
   _hitFlashPeakAlpha: 0.35
   _hitFlashFadeSeconds: 0.35
+--- !u!1 &1469255914
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1469255915}
+  - component: {fileID: 1469255917}
+  - component: {fileID: 1469255916}
+  m_Layer: 0
+  m_Name: MatchOverlaysUI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1469255915
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1469255914}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2077443972}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1469255916
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1469255914}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1031d549f57dff4dabc8d221e8ace77, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.UI.MatchOverlaysController
+  _refreshInterval: 0.25
+  _disconnectReturnDelay: 5
+  _bootstrapSceneName: Bootstrap
+--- !u!114 &1469255917
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1469255914}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
+  m_PanelSettings: {fileID: 11400000, guid: 6516cbb44934c5e49bf27bf558e820e9, type: 2}
+  m_ParentUI: {fileID: 0}
+  sourceAsset: {fileID: 9197481963319205126, guid: ead7ee207797b3e42a9e43d05ceca434, type: 3}
+  m_SortingOrder: 100
+  m_Position: 0
+  m_WorldSpaceSizeMode: 1
+  m_WorldSpaceWidth: 1920
+  m_WorldSpaceHeight: 1080
+  m_PivotReferenceSize: 0
+  m_Pivot: 0
+  m_WorldSpaceCollider: {fileID: 0}
 --- !u!1 &1845003835
 GameObject:
   m_ObjectHideFlags: 0
@@ -726,6 +800,7 @@ Transform:
   - {fileID: 280241445}
   - {fileID: 201738477}
   - {fileID: 1280783554}
+  - {fileID: 1469255915}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2090406287
