@@ -70,11 +70,28 @@ on-character bars stay sprite/TMP. This supersedes the old "HUD is UGUI" convent
   unchanged. Wired on `Hud/TouchControlsHud` GameObject (UIDocument sortingOrder 95,
   old component removed). Verified: controls render with correct accents/icons/badges,
   no double-render, zero errors, controller singleton bound.
-  - **Follow-up:** dead `TouchControlsHud.cs` (+ possibly `VirtualJoystick.cs` /
-    `HoldButton.cs`) left in place — remove once confirmed unreferenced (a few
-    comment-only mentions remain in ColorSchemeSO/ProjectInstaller/MatchHud).
-- **Stage 3 (NEXT):** character-select fidelity pass. **Stage 4:** on-character
-  bars + control-state overlays (§6.10). Retire `UiGfx` as each screen migrates.
+  - **Cleanup (DONE, committed `4ec42f6`).** Deleted the now-dead UGUI trio
+    `TouchControlsHud.cs` / `VirtualJoystick.cs` / `HoldButton.cs` (verified
+    unreferenced by any live scene/prefab; only comment-only mentions remained).
+    Same commit untracked `Assets/_Recovery/` (Unity crash-recovery scene swept
+    in by a `git add -A` in `775ecae`) and added a `.gitignore` rule. The
+    manifest/NuGet bumps in `775ecae` were a legit ivanmurzak MCP 0.82.4→0.83.1
+    upgrade, kept.
+- **Stage 3 — character-select fidelity (DONE, play-mode verified, committed
+  `65496e4`).** Char-select was already UITK (menu migration) but leaned on
+  procedural `UiGfx.Chicken()` blobs, emoji ability glyphs, and legacy
+  `Assets/UI/Sprites/Hex*`/`RadialGlow`. Repointed to the Stage-0 exports:
+  `Chickens/Chicken_*` (via new `.cw-chicken--<class>` USS modifiers on chips +
+  preview + lobby cards), `Icons/Icon_*` (slot hexes, ability-grid cards, lobby
+  mini-hexes), `Atoms/HexGlossy` (accent-tinted) + `Atoms/RadialGlow`. New
+  `CluckWars.UI.AbilityIconStyle` single-sources the ability→`.cw-hex-icon--*`
+  map (TouchControlsController dropped its private copy and uses it too).
+  `CluckWarsTheme.uss` gained the 14 shared icon rules. UXML unchanged.
+  - **Deferred:** shared `Gloss.png` sheen on menu cards/ribbons/buttons (spans
+    MainMenu/Lobby — the later `CardBg`/`Ribbon`/`ButtonGrayscale` atom pass) and
+    `UiGfx.Chicken()` in `MatchOverlaysController` (Stage-1 win screen) still live.
+- **Stage 4 (NEXT):** on-character HP/cargo bars + control-state overlays (§6.10).
+  Retire `UiGfx` as its last consumers migrate.
 
 Pipeline note: the Fable-pinned `code-architect` orchestrator hit its model limit
 mid-session; orchestration continued on Opus (main session) delegating to
