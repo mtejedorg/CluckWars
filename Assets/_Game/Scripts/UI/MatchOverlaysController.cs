@@ -68,6 +68,8 @@ namespace CluckWars.UI
 
         private Label         _meRibbon, _meWinSub, _meWinName, _meWinScore, _meTargetNote, _meRestart;
         private VisualElement _meWinChicken, _meWinGlow, _meWinRing, _meRows;
+        // .cw-chicken--<class> currently on the win-screen hero art (for swap).
+        private string        _meWinChickenClass;
 
         private VisualElement _codeTiles, _lobbyGrid, _lobbyStatusDot, _lobbyInviteCard;
         private Label         _lobbyStatusCount, _lobbyStatusText, _lobbyHint, _lobbySettingTime, _lobbySettingGoal;
@@ -271,7 +273,12 @@ namespace CluckWars.UI
             // Winner hero art + tints
             var winnerClass = ClassForCorner(winnerCorner);
             if (_meWinChicken != null)
-                _meWinChicken.style.backgroundImage = new StyleBackground(UiGfx.Chicken(KeyOf(winnerClass)));
+            {
+                if (!string.IsNullOrEmpty(_meWinChickenClass))
+                    _meWinChicken.RemoveFromClassList(_meWinChickenClass);
+                _meWinChickenClass = "cw-chicken--" + KeyOf(winnerClass);
+                _meWinChicken.AddToClassList(_meWinChickenClass);
+            }
             if (_meWinGlow != null)
                 _meWinGlow.style.unityBackgroundImageTintColor = Fade(winnerColor, 0.45f);
             if (_meWinRing != null) SetBorderColor(_meWinRing, winnerColor);
@@ -468,7 +475,7 @@ namespace CluckWars.UI
 
             var art = new VisualElement();
             art.AddToClassList("cw-player-art");
-            art.style.backgroundImage = new StyleBackground(UiGfx.Chicken(KeyOf(cls)));
+            art.AddToClassList("cw-chicken--" + KeyOf(cls));
             card.Add(art);
 
             var mid = new VisualElement();

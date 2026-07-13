@@ -76,8 +76,16 @@
 .cw-me-winchicken {
     width: 96px; height: 96px;
     -unity-background-scale-mode: scale-to-fit;
-    /* background-image (winner class chicken) set in C# */
+    /* class figure set in C# via a .cw-chicken--<class> modifier */
 }
+
+/* Class figures — Stage-0 design-exported sprites (shared with the menu
+   char-select). Applied by adding a .cw-chicken--<class> modifier in C# to the
+   win-screen hero art + the per-player leaderboard rows. Retired UiGfx.Chicken(). */
+.cw-chicken--warrior  { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_warrior.png"); }
+.cw-chicken--speedy   { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_speedy.png"); }
+.cw-chicken--fatty    { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_fatty.png"); }
+.cw-chicken--assassin { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_assassin.png"); }
 .cw-me-winring {
     position: absolute; bottom: 4px;
     width: 74px; height: 20px;
