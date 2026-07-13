@@ -56,9 +56,25 @@ on-character bars stay sprite/TMP. This supersedes the old "HUD is UGUI" convent
     buttons (game auto-restarts; shows a "Starting next match…" line instead).
     Minor copy nuance: design personalizes the local win to "VICTORY!/YOU"; the
     controller always shows "P{n} WINS!". None block Stage 1.
-- **Stage 2 (NEXT):** match HUD + touch controls (UI Toolkit). **Stage 3:**
-  character-select fidelity pass. **Stage 4:** on-character bars + control-state
-  overlays (§6.10). Retire `UiGfx` as each screen migrates.
+- **Stage 2a — top-bar HUD (DONE, play-mode verified, committed `da1429d`).**
+  Replaced MatchHud's UGUI leaderboard + timer with `Assets/UI/MatchTopBar.uxml`
+  /`.uss` + `MatchHudController.cs` (4 per-player score pills + centered timer,
+  ART §6.3). `MatchTopBarUI` wired in `Game.unity` (sortingOrder 90). −321 net from
+  `MatchHud.cs`; kept HP/cargo (Stage 4), hit-flash, event banner.
+- **Stage 2b — touch controls (DONE, play-mode verified).** Replaced UGUI
+  `TouchControlsHud` with `Assets/UI/TouchControls.uxml`/`.uss` +
+  `TouchControlsController.cs` (UITK joystick + 3 hex ability buttons, bottom-up
+  cooldown clip, ability-accent tints via exported `Icon_*` sprites, slot-3 hidden
+  unless Assassin). `TouchInputProvider` now reads `TouchControlsController.Instance`
+  — same `Movement`/edge-triggered `AbilityNPressed` contract, gameplay input
+  unchanged. Wired on `Hud/TouchControlsHud` GameObject (UIDocument sortingOrder 95,
+  old component removed). Verified: controls render with correct accents/icons/badges,
+  no double-render, zero errors, controller singleton bound.
+  - **Follow-up:** dead `TouchControlsHud.cs` (+ possibly `VirtualJoystick.cs` /
+    `HoldButton.cs`) left in place — remove once confirmed unreferenced (a few
+    comment-only mentions remain in ColorSchemeSO/ProjectInstaller/MatchHud).
+- **Stage 3 (NEXT):** character-select fidelity pass. **Stage 4:** on-character
+  bars + control-state overlays (§6.10). Retire `UiGfx` as each screen migrates.
 
 Pipeline note: the Fable-pinned `code-architect` orchestrator hit its model limit
 mid-session; orchestration continued on Opus (main session) delegating to

@@ -1,0 +1,157 @@
+/* ============================================================================
+   Cluck Wars : on-screen touch controls (Stage 2b rebuild)
+   Consumed by Assets/UI/TouchControls.uxml + TouchControlsController.cs.
+   Design source: docs/ART.md 6.6 (hex anatomy) + 6.7 (MOBA touch layout).
+   Sprites: Assets/_Game/Art/UI/  (Stage-0 export)
+     Atoms/JoystickBase.png, Atoms/JoystickKnob.png  : joystick
+     Atoms/HexGlossy.png  : neutral hex, tinted per-ability AccentColor at runtime
+                            via -unity-background-image-tint-color
+     Icons/Icon_*.png     : 14 ability icons, swapped via .cw-hex-icon--* classes
+   Reference resolution 1920x1080 (shared PanelSettings ScaleWithScreenSize).
+   Positions mirror the shipped UGUI tunables (ART 6.7 reference table):
+     A1 center (-170,170)  A2 center (-210,360)  A3 center (-410,270) from BR
+     joystick center (220,220) from BL, base 280, knob 128, maxRadius 108.
+   USS-valid only: NO gradient / box-shadow / text-shadow / gap : depth comes
+   from the baked glossy sprites + flat fills + beveled borders, exactly as the
+   Stage-1/2a surfaces do. Cooldown is a bottom-up clip, never a radial fill.
+   ============================================================================ */
+
+/* ---- Full-screen transparent host (never eats input outside the controls) -- */
+.cw-touch-root {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    /* no background : the 3D game shows through everywhere but the controls */
+}
+
+/* ============================================================================
+   VIRTUAL JOYSTICK  (bottom-left)
+   ============================================================================ */
+.cw-joy-base {
+    position: absolute;
+    left: 80px; bottom: 80px;
+    width: 280px; height: 280px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/JoystickBase.png");
+    -unity-background-scale-mode: scale-to-fit;
+}
+.cw-joy-knob {
+    position: absolute;
+    left: 76px; top: 76px;            /* (280-128)/2 : centered in base */
+    width: 128px; height: 128px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/JoystickKnob.png");
+    -unity-background-scale-mode: scale-to-fit;
+    /* controller drives style.translate to follow the finger */
+}
+
+/* ============================================================================
+   HEX ABILITY BUTTONS  (right-hand MOBA arc)
+   Each hex is 150px; the controller sets -unity-background-image-tint-color to
+   the equipped AccentColor (or a desaturated grey when ready-but-no-target,
+   or dimmed while on cooldown).
+   ============================================================================ */
+.cw-hex {
+    position: absolute;
+    width: 150px; height: 150px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/HexGlossy.png");
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: rgb(115, 179, 255); /* neutral until equipped */
+    justify-content: center; align-items: center;
+}
+/* MOBA arc positions (element edge offsets derived from the center anchors) */
+.cw-hex--a1 { right: 95px;  bottom: 95px;  }   /* center (-170,170) */
+.cw-hex--a2 { right: 135px; bottom: 285px; }   /* center (-210,360) */
+.cw-hex--a3 { right: 335px; bottom: 195px; }   /* center (-410,270) : Assassin */
+
+/* --- Layer 6 : cooldown clip (dark overlay rising from the bottom) --------- */
+/* The wrapper's height % = remaining/total; overflow hidden crops the fill's
+   top so the dark hex silhouette rises from the bottom edge upward. */
+.cw-hex-cd {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 0%;
+    overflow: hidden;
+}
+.cw-hex-cd-fill {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 150px;                    /* == hex height, so the silhouette aligns */
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/HexGlossy.png");
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: rgba(0, 0, 0, 0.62); /* ART 6.6 layer 6 */
+}
+
+/* --- Layer 7 : ability icon (design-exported sprite, swapped per-ability) -- */
+.cw-hex-icon {
+    width: 64px; height: 64px;
+    margin-bottom: 14px;              /* nudge up : short label sits below */
+    -unity-background-scale-mode: scale-to-fit;
+    /* background-image set by a .cw-hex-icon--* class at runtime */
+}
+
+/* --- Layer 7 : short label under the icon --------------------------------- */
+.cw-hex-label {
+    position: absolute;
+    bottom: 30px; left: 0; right: 0;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 15px; letter-spacing: 0.5px;
+    color: rgb(254, 245, 224);
+    -unity-text-align: middle-center; white-space: nowrap;
+}
+
+/* --- Layer 9 : cooldown seconds (centered, only while cd > 0) -------------- */
+.cw-hex-cdnum {
+    position: absolute;
+    left: 0; right: 0; top: 0; bottom: 0;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 46px;
+    color: rgb(254, 245, 224);
+    -unity-text-align: middle-center;
+    display: none;                    /* controller shows while cooling down */
+}
+
+/* --- Layer 8 : slot-index badge (top-left circle) ------------------------- */
+.cw-hex-badge {
+    position: absolute;
+    top: 20px; left: 20px;
+    width: 38px; height: 38px;
+    background-color: rgba(26, 14, 4, 0.95);
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-top-color: rgba(255,255,255,0.25); border-left-color: rgba(255,255,255,0.15);
+    border-right-color: rgba(0,0,0,0.35); border-bottom-color: rgba(0,0,0,0.45);
+    border-top-left-radius: 19px; border-top-right-radius: 19px;
+    border-bottom-left-radius: 19px; border-bottom-right-radius: 19px;
+    justify-content: center; align-items: center;
+}
+/* slot 3 : gold-filled Combo privilege (Assassin) */
+.cw-hex-badge--combo {
+    background-color: rgb(245, 200, 66);
+    border-top-color: rgb(255, 224, 140); border-left-color: rgb(212, 160, 32);
+    border-right-color: rgb(212, 160, 32); border-bottom-color: rgb(150, 110, 20);
+}
+.cw-hex-badge-text {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 20px;
+    color: rgb(254, 245, 224);
+    -unity-text-align: middle-center;
+}
+.cw-hex-badge-text--combo {
+    color: rgb(26, 14, 4);            /* dark star on gold */
+}
+
+/* ============================================================================
+   ABILITY ICON SPRITES  (14 : type-name -> exported Icon_*.png)
+   The controller adds exactly one of these to the .cw-hex-icon element per
+   equipped ability. Keys mirror CW_ABILITIES_V3 ids (Design/cluckwars-tokens-v3).
+   ============================================================================ */
+.cw-hex-icon--fly-peck { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_FlyingPeck.png"); }
+.cw-hex-icon--cluck    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_CluckShock.png"); }
+.cw-hex-icon--peck     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_Peck.png"); }
+.cw-hex-icon--roll     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_RollAndPush.png"); }
+.cw-hex-icon--trap     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_FeatherTrap.png"); }
+.cw-hex-icon--aura     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_FeatherAura.png"); }
+.cw-hex-icon--root     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_RootEgg.png"); }
+.cw-hex-icon--shell    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_EggShell.png"); }
+.cw-hex-icon--turtle   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_TurtleMode.png"); }
+.cw-hex-icon--spine    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_SpineCoat.png"); }
+.cw-hex-icon--burst    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_SpeedBurst.png"); }
+.cw-hex-icon--invis    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_Invisibility.png"); }
+.cw-hex-icon--doppel   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_Doppelganger.png"); }
+.cw-hex-icon--steal    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_SneakySteal.png"); }

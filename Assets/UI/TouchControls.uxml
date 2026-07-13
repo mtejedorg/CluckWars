@@ -1,0 +1,66 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <!-- Cluck Wars : on-screen touch controls (Stage 2b rebuild, UI Toolkit).
+         Left virtual joystick + right-hand MOBA arc of 3 hex ability buttons.
+         Replaces the procedural-UGUI TouchControlsHud. TouchControlsController
+         (senior-dev's half) drives every named element per-frame: the knob's
+         translate, per-slot accent tint / cooldown clip / desaturation /
+         slot-3 visibility, icon sprite, short label, slot badge, cd seconds.
+         Design refs: docs/ART.md 6.6 (hex anatomy) + 6.7 (MOBA touch layout).
+         Tokens: Assets/UI/Styles/CluckWarsTokens.uss (cw- vars)
+         Styles: Assets/UI/Styles/TouchControls.uss
+         Picking: the root is Ignore (taps outside controls fall through); only
+         the joystick base + the 3 hexes are interactive (picking-mode Position).
+         Cooldown is a bottom-up clip (ART 6.6 layer 6), NOT a radial fill. -->
+    <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTokens.uss" />
+    <ui:Style src="project://database/Assets/UI/Styles/TouchControls.uss" />
+
+    <ui:VisualElement name="TouchRoot" class="cw-touch-root" picking-mode="Ignore">
+
+        <!-- ===== LEFT : virtual joystick ===== -->
+        <ui:VisualElement name="JoystickBase" class="cw-joy-base">
+            <ui:VisualElement name="JoystickKnob" class="cw-joy-knob" picking-mode="Ignore" />
+        </ui:VisualElement>
+
+        <!-- ===== RIGHT : hex ability cluster (MOBA arc) ===== -->
+
+        <!-- Slot 1 : primary thumb anchor -->
+        <ui:VisualElement name="Ability1" class="cw-hex cw-hex--a1">
+            <ui:VisualElement name="Cooldown1" class="cw-hex-cd" picking-mode="Ignore">
+                <ui:VisualElement class="cw-hex-cd-fill" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="Icon1" class="cw-hex-icon" picking-mode="Ignore" />
+            <ui:Label name="Label1" text="" class="cw-hex-label" picking-mode="Ignore" />
+            <ui:Label name="CooldownNum1" text="" class="cw-hex-cdnum" picking-mode="Ignore" />
+            <ui:VisualElement name="Badge1" class="cw-hex-badge" picking-mode="Ignore">
+                <ui:Label name="BadgeText1" text="1" class="cw-hex-badge-text" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Slot 2 : arc above-left -->
+        <ui:VisualElement name="Ability2" class="cw-hex cw-hex--a2">
+            <ui:VisualElement name="Cooldown2" class="cw-hex-cd" picking-mode="Ignore">
+                <ui:VisualElement class="cw-hex-cd-fill" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="Icon2" class="cw-hex-icon" picking-mode="Ignore" />
+            <ui:Label name="Label2" text="" class="cw-hex-label" picking-mode="Ignore" />
+            <ui:Label name="CooldownNum2" text="" class="cw-hex-cdnum" picking-mode="Ignore" />
+            <ui:VisualElement name="Badge2" class="cw-hex-badge" picking-mode="Ignore">
+                <ui:Label name="BadgeText2" text="2" class="cw-hex-badge-text" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Slot 3 : Assassin Combo (gold star badge). Hidden unless slot 2 equipped. -->
+        <ui:VisualElement name="Ability3" class="cw-hex cw-hex--a3">
+            <ui:VisualElement name="Cooldown3" class="cw-hex-cd" picking-mode="Ignore">
+                <ui:VisualElement class="cw-hex-cd-fill" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="Icon3" class="cw-hex-icon" picking-mode="Ignore" />
+            <ui:Label name="Label3" text="" class="cw-hex-label" picking-mode="Ignore" />
+            <ui:Label name="CooldownNum3" text="" class="cw-hex-cdnum" picking-mode="Ignore" />
+            <ui:VisualElement name="Badge3" class="cw-hex-badge cw-hex-badge--combo" picking-mode="Ignore">
+                <ui:Label name="BadgeText3" text="★" class="cw-hex-badge-text cw-hex-badge-text--combo" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+</ui:UXML>

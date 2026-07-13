@@ -128,8 +128,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 201738477}
-  - component: {fileID: 201738479}
-  - component: {fileID: 201738478}
+  - component: {fileID: 201738476}
   m_Layer: 0
   m_Name: TouchControlsHud
   m_TagString: Untagged
@@ -137,6 +136,26 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!114 &201738476
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 201738475}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7c2a8e1d6b9405e8a4f1c3d2e8b7a05, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Input.TouchControlsHud
+  _referenceResolution: {x: 1920, y: 1080}
+  _joystickRadius: 140
+  _knobRadius: 64
+  _joystickAnchoredPosition: {x: 220, y: 220}
+  _abilityButtonSize: 140
+  _ability1AnchoredPosition: {x: -440, y: 240}
+  _ability2AnchoredPosition: {x: -260, y: 420}
+  _ability3AnchoredPosition: {x: -220, y: 200}
 --- !u!4 &201738477
 Transform:
   m_ObjectHideFlags: 0
@@ -152,41 +171,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 2077443972}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &201738478
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 201738475}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 84ab72b3059b6cf47a1f4d5ffdb846b7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Input.TouchControlsController
---- !u!114 &201738479
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 201738475}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
-  m_PanelSettings: {fileID: 11400000, guid: 6516cbb44934c5e49bf27bf558e820e9, type: 2}
-  m_ParentUI: {fileID: 0}
-  sourceAsset: {fileID: 9197481963319205126, guid: 81e18cb4eb0c06549b07ef27a757b070, type: 3}
-  m_SortingOrder: 95
-  m_Position: 0
-  m_WorldSpaceSizeMode: 1
-  m_WorldSpaceWidth: 1920
-  m_WorldSpaceHeight: 1080
-  m_PivotReferenceSize: 0
-  m_Pivot: 0
-  m_WorldSpaceCollider: {fileID: 0}
 --- !u!1 &280241443
 GameObject:
   m_ObjectHideFlags: 0
