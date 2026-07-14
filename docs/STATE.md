@@ -149,8 +149,10 @@ Highlights of the re-survey:
   (controller-built). Remaining §6.5 polish is background particles + per-row
   proportional score bars (Stage D). Per current ART.md, LEAVE/REMATCH buttons and
   S/D columns are **not** in the spec (restart countdown is) — dropped from scope.
-- Char-select is missing the lore quote, skin-slots row, and (hidden-for-now) console
-  hints (Stage C). Ability hex §6.6 details (cooldown seconds number, dimming) need an
+- **Stage C (Menu Context):**
+  - [x] Lore quote added under character name.
+  - [x] Skin slots added (3 slots: Default + 2 locked).
+  - [x] Console hints added (hidden by default). Ability hex §6.6 details (cooldown seconds number, dimming) need an
   audit (Stage E). Hygiene: `AbilityIconStyle` loud-failure guard + `CargoHud` deletion
   (Stage F). Full-flow verification + docs closeout (Stage G).
 

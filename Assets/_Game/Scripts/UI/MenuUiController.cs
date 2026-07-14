@@ -46,7 +46,7 @@ namespace CluckWars.UI
 
         private readonly Dictionary<ChickenClass, VisualElement> _classChips = new();
         private VisualElement _previewChicken, _previewGlow, _previewDisc, _slotRow, _abilityGrid;
-        private Label _previewName, _previewPassive, _previewDesc, _equippedLabel;
+        private Label _previewName, _previewQuote, _previewPassive, _previewDesc, _equippedLabel;
         private Button _readyBtn;
         private readonly List<VisualElement> _slotHexes = new();
         // Icon USS class currently applied to each slot's sprite element (for swap).
@@ -240,6 +240,7 @@ namespace CluckWars.UI
             _previewGlow    = _charSelect.Q<VisualElement>("PreviewGlow");
             _previewDisc    = _charSelect.Q<VisualElement>("PreviewDisc");
             _previewName    = _charSelect.Q<Label>("PreviewName");
+            _previewQuote   = _charSelect.Q<Label>("PreviewQuote");
             _previewPassive = _charSelect.Q<Label>("PreviewPassive");
             _previewDesc    = _charSelect.Q<Label>("PreviewDesc");
             _slotRow        = _charSelect.Q<VisualElement>("SlotRow");
@@ -247,6 +248,13 @@ namespace CluckWars.UI
             _equippedLabel  = _charSelect.Q<Label>("EquippedLabel");
             _readyBtn       = _charSelect.Q<Button>("ReadyBtn");
             if (_readyBtn != null) _readyBtn.clicked += OnReady;
+
+            var ef = UiGfx.EmojiFont();
+            if (ef != null)
+            {
+                var emojis = _charSelect.Query<Label>(className: "cw-emoji-text").ToList();
+                foreach (var e in emojis) e.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(ef));
+            }
 
             Bind<Button>(_charSelect, "HomeBtn", b => b.clicked += ShowMainMenu);
         }
@@ -302,6 +310,13 @@ namespace CluckWars.UI
                 _previewDisc.style.backgroundColor = Fade(tint, 0.10f); // subtle class-tinted platform
             }
             if (_previewName != null)    { _previewName.text = m.Name; _previewName.style.color = TintOf(cls); }
+            if (_previewQuote != null)
+            {
+                if (_classRegistry != null && _classRegistry.TryGet(cls, out var entry) && !string.IsNullOrEmpty(entry.LoreQuote))
+                    _previewQuote.text = $"\"{entry.LoreQuote}\"";
+                else
+                    _previewQuote.text = "";
+            }
             if (_previewPassive != null) { _previewPassive.text = $"PASSIVE · {m.PassiveName}"; _previewPassive.style.backgroundColor = TintOf(cls); _previewPassive.style.color = UiGfx.TextPrimary; }
             if (_previewDesc != null)    _previewDesc.text = m.PassiveDesc;
 

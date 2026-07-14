@@ -59,7 +59,13 @@
                     </ui:VisualElement>
                 </ui:VisualElement>
                 <ui:Label name="PreviewName" text="WARRIOR CHICKEN" class="cw-heading" style="font-size: 18px;" />
-                <ui:Label name="PreviewPassive" text="PASSIVE · MIGHTY" class="cw-slot-pill" style="margin-top: 4px; margin-bottom: 4px; font-size: 11px;" />
+                <ui:Label name="PreviewQuote" text="&quot;Mighty of wing, short of temper.&quot;" class="cw-body" style="font-style: italic; color: rgba(255, 255, 255, 0.6); margin-top: 2px; margin-bottom: 6px; font-size: 13px;" />
+                <ui:VisualElement name="SkinSlots" style="flex-direction: row; margin-bottom: 8px; align-items: center;">
+                    <ui:Label text="DEFAULT" class="cw-slot-pill" style="margin: 0; background-color: rgb(192, 64, 48);" />
+                    <ui:Label text="🔒" class="cw-slot-pill cw-emoji-text" style="margin: 0; margin-left: 4px; opacity: 0.5;" />
+                    <ui:Label text="🔒" class="cw-slot-pill cw-emoji-text" style="margin: 0; margin-left: 4px; opacity: 0.5;" />
+                </ui:VisualElement>
+                <ui:Label name="PreviewPassive" text="PASSIVE · MIGHTY" class="cw-slot-pill" style="margin-top: 0px; margin-bottom: 4px; font-size: 11px;" />
                 <ui:Label name="PreviewDesc" text="+25% outgoing ability damage." class="cw-body" style="-unity-text-align: middle-center; font-size: 12px;" />
 
                 <ui:VisualElement name="StatList" class="cw-stat-grid" style="width: 100%; margin-top: 10px; padding-left: 4px; padding-right: 4px;">
@@ -108,5 +114,6 @@
                 <ui:Button name="ReadyBtn" text="PICK 2 ABILITIES" class="cw-btn cw-btn--neutral" style="flex-shrink: 0; letter-spacing: 3px;" />
             </ui:VisualElement>
         </ui:VisualElement>
+        <ui:Label name="ConsoleHints" text="←→ Select · A Confirm · LB/RB Tab" class="cw-body cw-console-hints" style="position: absolute; bottom: 8px; left: 16px; opacity: 0.6; display: none; font-size: 14px;" />
     </ui:VisualElement>
 </ui:UXML>
