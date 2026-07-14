@@ -115,11 +115,43 @@ on-character bars stay sprite/TMP. This supersedes the old "HUD is UGUI" convent
   - **Deferred to an art pass** (these mutate the body and would fight the
     hit-flash/animator): stun desaturation + tilt, slow speed-trail, knockback motion
     lines / ghost trail (knockback also has no persistent replicated flag to observe).
-- **Open decision:** `MatchHud` still draws the old **screen-space corner HP/cargo
-  panel** (`BuildLocalStatsPanel`/`BuildBar`/`RefreshLocalStats`, UGUI). §6.3 puts
-  those bars on the chicken and calls for a minimal HUD, so it is now redundant —
-  but it is a player-facing readout that may be easier to read on a phone than the
-  small world-space bar. Remove it (and shrink `MatchHud` further) once confirmed.
+- **MatchHud corner HP/cargo panel — REMOVED (Maestro confirmed).** Superseded by the
+  Stage-4a on-character bars (§6.3: bars on the chicken, minimal HUD). Also swept the
+  leftovers it orphaned, plus some stranded by the Stage-2a leaderboard removal
+  (`_bases`/`HasStaleBase`, `PlayerColors`, `DtGoldMid`). `MatchHud` is now only the
+  hit-flash + final-minute event banner — the two full-screen effects with no
+  on-character or UI Toolkit home.
+- **`UiGfx` procedural art generators — DELETED.** The rebuild's whole point: the
+  runtime-baked rounded-rect / hex / gloss / circle / **chicken** sprites were the drift
+  that made three prior attempts miss the design. Last callers went with Stage 4, so
+  they're gone (−438 lines), along with the rasteriser and the UGUI/TMP helpers stranded
+  by the UI Toolkit move. `UiGfx` is now just the §6.1 colour tokens + `Hex32` + the two
+  brand fonts + `AddShadow`. **Do not add sprite generation back** — UI art comes from
+  the design export, screen layout is UXML/USS, on-character indicators are world-space
+  sprites.
+
+### UI rebuild — what's still open
+
+The rebuild itself is done (Stages 0–4 + cleanups). Remaining, in rough priority:
+
+1. **Ability-icon fallback is now unreachable-ish.** `AbilityIconStyle` maps 14 SO types
+   to exported icons; a *new* ability with no entry silently falls back to the emoji
+   glyph. Add a registry test (or an editor validation) so a missing mapping fails loudly.
+2. **§6.10 art pass (deferred deliberately).** Stun desaturation + body tilt, slow
+   speed-trail, knockback motion lines / ghost trail. These mutate the chicken body, so
+   they'd fight the hit-flash and animator — they need a real VFX pass, not procedural
+   stand-ins. Knockback also has no persistent replicated flag to observe.
+3. **Stage-1 overlay gaps (from `a650ba7`, still open):** per-row ability hex chips,
+   S/D stat columns (only Kills is networked), and LEAVE/REMATCH buttons (currently
+   auto-restart).
+4. **`BarTrough` never exported.** `tools/export-design-assets.ps1` logs
+   `FAILED: no PNG produced for BarTrough` — 38 of 39 atoms exported. Nothing consumes it
+   today (world-space bars use procedural quads), but the export is silently incomplete.
+5. **Mobile pass.** None of the rebuilt UI has been checked on the Pixel 9 — touch-control
+   hit targets, the world-space bar legibility at phone DPI, and UITK panel scaling all
+   want a device run.
+6. **`CargoHud` (IMGUI)** is still in the scene and still auto-disabled by `MatchHud.Awake`.
+   Now fully redundant — delete the component and drop the disable call.
 
 Pipeline note: the Fable-pinned `code-architect` orchestrator hit its model limit
 mid-session; orchestration continued on Opus (main session) delegating to
