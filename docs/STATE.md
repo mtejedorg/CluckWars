@@ -156,7 +156,7 @@ Highlights of the re-survey:
 - **Stage D (Match-End Polish):** [x] Background particles added; per-row proportional score bars implemented; winner row subtle accent background added.
 - **Stage E (Ability Buttons):** [x] Audited hex button sizes/positions, cooldown numbers, and dimming (already matching the design spec).
 - **Stage F (Hygiene Sweep):** [x] Added `AbilityIconStyle` loud-failure guard (`InitializeOnLoadMethod`); deleted `CargoHud` legacy IMGUI component and script.
-- **Stage G (Full Verification + Docs):** Full-flow verification + docs closeout.
+- **Stage G (Full Verification + Docs):** [x] Full-flow verification complete (verified top-bar scoreboard, timer, touch controls hex layout, ability icons). Docs closeout complete.
 
 Still excluded from the handoff (unchanged): the **§6.10 body-mutating art pass**
 (needs real VFX — would fight hit-flash/animator; knockback has no replicated flag),
