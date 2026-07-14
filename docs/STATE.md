@@ -90,8 +90,36 @@ on-character bars stay sprite/TMP. This supersedes the old "HUD is UGUI" convent
   - **Deferred:** shared `Gloss.png` sheen on menu cards/ribbons/buttons (spans
     MainMenu/Lobby — the later `CardBg`/`Ribbon`/`ButtonGrayscale` atom pass) and
     `UiGfx.Chicken()` in `MatchOverlaysController` (Stage-1 win screen) still live.
-- **Stage 4 (NEXT):** on-character HP/cargo bars + control-state overlays (§6.10).
-  Retire `UiGfx` as its last consumers migrate.
+- **Deferred-from-Stage-3 cleanups (DONE).**
+  - Match-end overlay chicken on exported sprites (`c5c8f86`) — retired the last
+    `UiGfx.Chicken()` consumer; `MatchOverlays.uss` gained the `.cw-chicken--*` rules.
+  - Menu surfaces on exported design atoms (`7b9b142`) — ribbons use the `Ribbon`
+    atom (grayscale banner-with-tails, tinted gold); buttons use `ButtonGrayscale`
+    (beveled pill, tinted per gold/green/neutral variant, border dropped since the
+    bevel is baked, background cleared to transparent so the runtime-Button default
+    grey stops showing through); the C#-colour-washed card surfaces moved to the
+    `GlossOverlay` atom. **Deleted `Assets/UI/Sprites/`** — all four legacy sprites
+    now unreferenced (verified by GUID). All screen UI paints from `Assets/_Game/Art/UI/`.
+- **Stage 4a — on-character HP/cargo bars + identity ring (DONE, verified, `9201801`).**
+  New `Assets/_Game/Scripts/Visuals/ChickenWorldBars.cs` on `Chicken.prefab`: HP bar
+  (green→yellow→red off `ChickenCombat.HP / Stats.MaxHP`), cargo bar (hidden at zero
+  cargo), and a per-corner Okabe-Ito identity ring at the feet. World-space
+  SpriteRenderers (URP 2D sprite shader), billboarded; hidden while stunned.
+- **Stage 4b — control-state overlays §6.10 (DONE, verified, `3a5abf2`).**
+  New `ChickenStateOverlays.cs`: stun → orbiting stars, root → green foot blob,
+  slow → pulsing blue foot blob (ability slow / Feather-Aura / pile drag). Nameplate
+  gained 🌱 / 🐌 badges beside the existing ☠. Strictly additive sprites — they never
+  touch the chicken's material or animator, so they can't fight the hit-flash.
+  Verified live: dead P2 → stars + ☠ + bars hidden; slowed P4 → blue blob + 🐌;
+  healthy chickens → no overlays.
+  - **Deferred to an art pass** (these mutate the body and would fight the
+    hit-flash/animator): stun desaturation + tilt, slow speed-trail, knockback motion
+    lines / ghost trail (knockback also has no persistent replicated flag to observe).
+- **Open decision:** `MatchHud` still draws the old **screen-space corner HP/cargo
+  panel** (`BuildLocalStatsPanel`/`BuildBar`/`RefreshLocalStats`, UGUI). §6.3 puts
+  those bars on the chicken and calls for a minimal HUD, so it is now redundant —
+  but it is a player-facing readout that may be easier to read on a phone than the
+  small world-space bar. Remove it (and shrink `MatchHud` further) once confirmed.
 
 Pipeline note: the Fable-pinned `code-architect` orchestrator hit its model limit
 mid-session; orchestration continued on Opus (main session) delegating to
