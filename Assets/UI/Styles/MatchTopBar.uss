@@ -12,6 +12,13 @@
     -unity-background-scale-mode: stretch-to-fill;
 }
 
+/* Intro countdown (ART.md 6.5): top bar stays visible but recedes to 40%
+   opacity behind the "GET READY" overlay. Toggled by MatchHudController
+   from MatchOverlaysController's intro-countdown state. */
+.cw-topbar--dimmed {
+    opacity: 0.4;
+}
+
 .cw-topbar-layout {
     flex-direction: row;
     justify-content: space-between;

@@ -575,12 +575,13 @@ namespace CluckWars.UI
         // ========================================================================
         private void RefreshIntro(GameManager gm)
         {
-            if (gm == null) { SetShown(_introOverlay, false); return; }
+            if (gm == null) { SetShown(_introOverlay, false); SetTopBarDimmed(false); return; }
 
             if (gm.IsIntroActive)
             {
                 if (_introNumber != null) _introNumber.text = Mathf.CeilToInt(gm.IntroRemaining).ToString();
                 SetShown(_introOverlay, true);
+                SetTopBarDimmed(true);
                 _goExpiresAtUnscaledTime = Time.unscaledTime + GoFlourishDuration;
                 return;
             }
@@ -589,12 +590,21 @@ namespace CluckWars.UI
             {
                 if (_introNumber != null) _introNumber.text = "GO!";
                 SetShown(_introOverlay, true);
+                SetTopBarDimmed(true);
             }
             else
             {
                 SetShown(_introOverlay, false);
+                SetTopBarDimmed(false);
             }
         }
+
+        /// <summary>
+        /// ART.md §6.5: the top bar (a separate UIDocument/controller,
+        /// <see cref="MatchHudController"/>) stays visible at 40% opacity behind
+        /// the intro countdown overlay rather than being hidden outright.
+        /// </summary>
+        private static void SetTopBarDimmed(bool dimmed) => MatchHudController.Instance?.SetIntroDimmed(dimmed);
 
         // ========================================================================
         //  Data helpers

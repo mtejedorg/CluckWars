@@ -18,6 +18,14 @@ namespace CluckWars.UI
     {
         private const string Source = "MatchHud";
 
+        /// <summary>
+        /// Lets <see cref="MatchOverlaysController"/> (a separate UIDocument/controller)
+        /// dim the top bar during the intro countdown (ART.md §6.5: "Player badges +
+        /// timer visible at 40% opacity behind the overlay"). Same lookup pattern as
+        /// <see cref="CluckWars.Input.TouchControlsController"/>.
+        /// </summary>
+        public static MatchHudController Instance { get; private set; }
+
         [SerializeField] private float _refreshInterval = 0.25f;
 
         // Okabe-Ito per-player identity colors (ART.md §6).
@@ -33,7 +41,9 @@ namespace CluckWars.UI
         private MatchConfigSO _matchConfig;
 
         private VisualElement _root;
+        private VisualElement _topBarRoot;
         private bool          _bound;
+        private bool          _introDimmed;
 
         private struct LbRow
         {
@@ -62,12 +72,19 @@ namespace CluckWars.UI
 
         private void Awake()
         {
+            Instance = this;
+
             if (_log == null)
             {
                 var sceneCtx = FindFirstObjectByType<SceneContext>();
                 if (sceneCtx != null) sceneCtx.Container.Inject(this);
                 else                  ProjectContext.Instance.Container.Inject(this);
             }
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
         }
 
         private void OnEnable() => TryBind();
@@ -77,6 +94,8 @@ namespace CluckWars.UI
             var doc = GetComponent<UIDocument>();
             _root = doc != null ? doc.rootVisualElement : null;
             if (_root == null) return;
+
+            _topBarRoot = _root.Q<VisualElement>("TopBarRoot");
 
             for (int i = 0; i < 4; i++)
             {
@@ -100,6 +119,25 @@ namespace CluckWars.UI
             }
 
             _bound = true;
+            ApplyIntroDimmed();
+        }
+
+        /// <summary>
+        /// Toggles the top bar's 40%-opacity "behind the intro overlay" state
+        /// (ART.md §6.5). Called by <see cref="MatchOverlaysController"/>'s
+        /// intro-countdown refresh, which owns the separate overlay UIDocument.
+        /// </summary>
+        public void SetIntroDimmed(bool dimmed)
+        {
+            _introDimmed = dimmed;
+            if (_bound) ApplyIntroDimmed();
+        }
+
+        private void ApplyIntroDimmed()
+        {
+            if (_topBarRoot == null) return;
+            if (_introDimmed) _topBarRoot.AddToClassList("cw-topbar--dimmed");
+            else              _topBarRoot.RemoveFromClassList("cw-topbar--dimmed");
         }
 
         private void Update()
