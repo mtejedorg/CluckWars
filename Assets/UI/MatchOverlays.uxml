@@ -17,6 +17,14 @@
         <!--  MATCH END  (CWMatchEndV3L)                                   -->
         <!-- ============================================================ -->
         <ui:VisualElement name="MatchEndOverlay" class="cw-overlay cw-overlay--dim" style="display: none;">
+            <!-- Background particles -->
+            <ui:VisualElement class="cw-bg-particle cw-bg-particle--1" />
+            <ui:VisualElement class="cw-bg-particle cw-bg-particle--2" />
+            <ui:VisualElement class="cw-bg-particle cw-bg-particle--3" />
+            <ui:VisualElement class="cw-bg-particle cw-bg-particle--4" />
+            <ui:VisualElement class="cw-bg-particle cw-bg-particle--5" />
+            <ui:VisualElement class="cw-bg-particle cw-bg-particle--6" />
+
             <ui:VisualElement name="MatchEndPanel" class="cw-me-panel">
 
                 <!-- LEFT: winner hero -->

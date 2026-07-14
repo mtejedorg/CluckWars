@@ -323,7 +323,11 @@ namespace CluckWars.UI
 
             var row = new VisualElement();
             row.AddToClassList("cw-me-row");
-            if (isWinner) SetBorderColor(row, color);
+            if (isWinner)
+            {
+                SetBorderColor(row, color);
+                row.style.backgroundColor = Fade(color, 0.2f);
+            }
 
             // Rank medal (1-3) or player-tinted dot (4th+).
             var medal = new VisualElement();

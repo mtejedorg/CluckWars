@@ -25,6 +25,20 @@
 /* ============================================================================
    MATCH END  (landscape hero + standings)
    ============================================================================ */
+.cw-bg-particle {
+    position: absolute;
+    width: 24px; height: 24px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/PlayerDotGlossy.png");
+    -unity-background-image-tint-color: rgba(245, 200, 66, 0.15);
+    -unity-background-scale-mode: scale-to-fit;
+}
+.cw-bg-particle--1 { left: 10%; top: 20%; scale: 0.8 0.8; opacity: 0.8; }
+.cw-bg-particle--2 { right: 15%; top: 15%; scale: 1.2 1.2; opacity: 0.6; }
+.cw-bg-particle--3 { left: 25%; bottom: 25%; scale: 0.6 0.6; opacity: 0.7; }
+.cw-bg-particle--4 { right: 20%; bottom: 30%; scale: 1.5 1.5; opacity: 0.4; }
+.cw-bg-particle--5 { left: 50%; top: 10%; scale: 0.9 0.9; opacity: 0.5; }
+.cw-bg-particle--6 { left: 70%; bottom: 15%; scale: 1.1 1.1; opacity: 0.9; }
+
 .cw-me-panel {
     width: 94%; max-width: 1180px; max-height: 90%;
     flex-direction: row; align-items: stretch;
