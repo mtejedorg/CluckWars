@@ -130,28 +130,35 @@ on-character bars stay sprite/TMP. This supersedes the old "HUD is UGUI" convent
   the design export, screen layout is UXML/USS, on-character indicators are world-space
   sprites.
 
-### UI rebuild — what's still open
+### UI rebuild — what's still open → **see `docs/HANDOFF-UI-FINAL.md`**
 
-The rebuild itself is done (Stages 0–4 + cleanups). Remaining, in rough priority:
+The rebuild itself is done (Stages 0–4 + cleanups). A 2026-07-14 re-survey against
+ART.md §6 recalculated the remaining gaps and packaged them as a self-contained,
+execute-all-at-once handoff (`docs/HANDOFF-UI-FINAL.md`, Stages A–G, one commit each).
+Highlights of the re-survey:
 
-1. **Ability-icon fallback is now unreachable-ish.** `AbilityIconStyle` maps 14 SO types
-   to exported icons; a *new* ability with no entry silently falls back to the emoji
-   glyph. Add a registry test (or an editor validation) so a missing mapping fails loudly.
-2. **§6.10 art pass (deferred deliberately).** Stun desaturation + body tilt, slow
-   speed-trail, knockback motion lines / ghost trail. These mutate the chicken body, so
-   they'd fight the hit-flash and animator — they need a real VFX pass, not procedural
-   stand-ins. Knockback also has no persistent replicated flag to observe.
-3. **Stage-1 overlay gaps (from `a650ba7`, still open):** per-row ability hex chips,
-   S/D stat columns (only Kills is networked), and LEAVE/REMATCH buttons (currently
-   auto-restart).
-4. **`BarTrough` never exported.** `tools/export-design-assets.ps1` logs
-   `FAILED: no PNG produced for BarTrough` — 38 of 39 atoms exported. Nothing consumes it
-   today (world-space bars use procedural quads), but the export is silently incomplete.
-5. **Mobile pass.** None of the rebuilt UI has been checked on the Pixel 9 — touch-control
-   hit targets, the world-space bar legibility at phone DPI, and UITK panel scaling all
-   want a device run.
-6. **`CargoHud` (IMGUI)** is still in the scene and still auto-disabled by `MatchHud.Awake`.
-   Now fully redundant — delete the component and drop the disable call.
+- **Biggest gap found: the match top bar is not §6.3.** What shipped (Stage 2a) is a
+  centered chip strip `[P1][P2][TIMER][P3][P4]`; the design wants a **top-left ranked
+  leaderboard panel** (rows sorted live by food, ordinal + glossy dot + P# + progress
+  bar + gold score, local-row/leader highlights), a **★ FIRST TO 150 badge** (from
+  `MatchConfigSO.FoodTargetToWin`), and a **top-right embossed timer badge**. → Stage A.
+- **Correction:** `BarTrough.png` *was* exported and is committed since Stage 0
+  (`4d790cd`) — the earlier "FAILED: no PNG produced" note was stale. Stage B swaps
+  `ChickenWorldBars`' procedural quads for `BarTrough`/`BarFill` and moves the cargo
+  count from the nameplate to the bar stack.
+- **Correction:** the match-end leaderboard already has medals + dots + winner ring
+  (controller-built). Remaining §6.5 polish is background particles + per-row
+  proportional score bars (Stage D). Per current ART.md, LEAVE/REMATCH buttons and
+  S/D columns are **not** in the spec (restart countdown is) — dropped from scope.
+- Char-select is missing the lore quote, skin-slots row, and (hidden-for-now) console
+  hints (Stage C). Ability hex §6.6 details (cooldown seconds number, dimming) need an
+  audit (Stage E). Hygiene: `AbilityIconStyle` loud-failure guard + `CargoHud` deletion
+  (Stage F). Full-flow verification + docs closeout (Stage G).
+
+Still excluded from the handoff (unchanged): the **§6.10 body-mutating art pass**
+(needs real VFX — would fight hit-flash/animator; knockback has no replicated flag),
+**§6.8 console adaptation** (post-demo), and the **mobile/Pixel-9 device pass**
+(physical device required — Maestro action).
 
 Pipeline note: the Fable-pinned `code-architect` orchestrator hit its model limit
 mid-session; orchestration continued on Opus (main session) delegating to
