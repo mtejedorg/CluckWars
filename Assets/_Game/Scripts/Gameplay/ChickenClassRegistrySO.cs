@@ -24,6 +24,7 @@ namespace CluckWars.Gameplay
             public ChickenStatsSO Stats;
             [ColorUsage(showAlpha: false, hdr: false)]
             public Color TintColor;
+            public string LoreQuote;
         }
 
         [SerializeField] private Entry[] _entries = Array.Empty<Entry>();

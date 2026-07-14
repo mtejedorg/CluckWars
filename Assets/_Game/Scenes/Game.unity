@@ -196,7 +196,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 280241445}
-  - component: {fileID: 280241444}
   m_Layer: 0
   m_Name: CargoHud
   m_TagString: Untagged
@@ -204,21 +203,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &280241444
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 280241443}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a92b4d6e1f3a48579b2e0c8d4a1e7b3c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.UI.CargoHud
-  _refreshInterval: 0.5
-  _disconnectReturnDelay: 5
-  _bootstrapSceneName: Bootstrap
 --- !u!4 &280241445
 Transform:
   m_ObjectHideFlags: 0

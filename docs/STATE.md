@@ -152,9 +152,11 @@ Highlights of the re-survey:
 - **Stage C (Menu Context):**
   - [x] Lore quote added under character name.
   - [x] Skin slots added (3 slots: Default + 2 locked).
-  - [x] Console hints added (hidden by default). Ability hex §6.6 details (cooldown seconds number, dimming) need an
-  audit (Stage E). Hygiene: `AbilityIconStyle` loud-failure guard + `CargoHud` deletion
-  (Stage F). Full-flow verification + docs closeout (Stage G).
+  - [x] Console hints added (hidden by default).
+- **Stage D (Match-End Polish):** [x] Background particles added; per-row proportional score bars implemented; winner row subtle accent background added.
+- **Stage E (Ability Buttons):** [x] Audited hex button sizes/positions, cooldown numbers, and dimming (already matching the design spec).
+- **Stage F (Hygiene Sweep):** [x] Added `AbilityIconStyle` loud-failure guard (`InitializeOnLoadMethod`); deleted `CargoHud` legacy IMGUI component and script.
+- **Stage G (Full Verification + Docs):** Full-flow verification + docs closeout.
 
 Still excluded from the handoff (unchanged): the **§6.10 body-mutating art pass**
 (needs real VFX — would fight hit-flash/animator; knockback has no replicated flag),

@@ -92,20 +92,10 @@ namespace CluckWars.UI
         {
             if (_network == null) ProjectContext.Instance.Container.Inject(this);
 
-            DisableLegacyCargoHud();
             EnsureEventSystem();
             BuildCanvas();
         }
 
-        private void DisableLegacyCargoHud()
-        {
-            var legacy = FindFirstObjectByType<CargoHud>();
-            if (legacy != null)
-            {
-                legacy.enabled = false;
-                _log?.Debug(Source, "Disabled sibling CargoHud (IMGUI) — MatchHud (UGUI) takes over.");
-            }
-        }
 
         private static void EnsureEventSystem()
         {
