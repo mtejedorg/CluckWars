@@ -49,6 +49,7 @@ namespace CluckWars.Visuals
         private bool _appliedClassValid;
         private bool _appliedBountyActive;
         private bool _wasStunned;
+        private string _appliedStateIcon = string.Empty;
 
         private void Awake()
         {
@@ -127,12 +128,15 @@ namespace CluckWars.Visuals
                 int corner = _controller.HomeCornerIndex;
                 var klass = _controller.Class;
                 bool bountyActive = _controller.LeaderBountyActive;
-                if (corner != _appliedPlayerId || !_appliedClassValid || klass != _appliedClass || bountyActive != _appliedBountyActive)
+                string stateIcon = StateIcon();
+                if (corner != _appliedPlayerId || !_appliedClassValid || klass != _appliedClass
+                    || bountyActive != _appliedBountyActive || stateIcon != _appliedStateIcon)
                 {
                     _appliedPlayerId = corner;
                     _appliedClass = klass;
                     _appliedClassValid = true;
                     _appliedBountyActive = bountyActive;
+                    _appliedStateIcon = stateIcon;
                     if (corner < 0)
                     {
                         _text.text = bountyActive ? $"★ {klass} ★" : klass.ToString();
@@ -144,7 +148,8 @@ namespace CluckWars.Visuals
                         string label = isBot
                             ? $"P{corner + 1} {klass} (CPU)"
                             : $"P{corner + 1} {klass}";
-                        _text.text = bountyActive ? $"★ {label} ★" : label;
+                        if (bountyActive) label = $"★ {label} ★";
+                        _text.text = stateIcon.Length > 0 ? $"{stateIcon} {label}" : label;
                         _text.color = PlayerColors[corner % PlayerColors.Length];
                     }
                 }
@@ -152,6 +157,23 @@ namespace CluckWars.Visuals
 
             BillboardToCamera();
             UpdateCargoLabel();
+        }
+
+        /// <summary>
+        /// Control-state badge for the nameplate (ART.md §6.10). The stunned skull
+        /// is handled earlier — this covers the movement states, root outranking
+        /// slow since it's the harder lock. Returns "" when unaffected.
+        /// The matching world-space overlays live on <see cref="ChickenStateOverlays"/>.
+        /// </summary>
+        private string StateIcon()
+        {
+            if (_controller == null) return string.Empty;
+            if (_controller.Rooted) return "🌱";
+
+            bool slowed = _controller.SlowMultiplier < 0.999f
+                          || _controller.AuraSlowActive
+                          || (_cargo != null && _cargo.IsPileSlow);
+            return slowed ? "🐌" : string.Empty;
         }
 
         private void BillboardToCamera()

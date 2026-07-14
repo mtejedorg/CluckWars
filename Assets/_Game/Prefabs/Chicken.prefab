@@ -31,6 +31,7 @@ GameObject:
   - component: {fileID: 2782470975654170646}
   - component: {fileID: 4098563086577120186}
   - component: {fileID: 3984440509192767271}
+  - component: {fileID: 9089316586229822183}
   m_Layer: 0
   m_Name: Chicken
   m_TagString: Untagged
@@ -478,3 +479,18 @@ MonoBehaviour:
   _barWidth: 0.82
   _hpHeight: 0.11
   _ringRadius: 0.42
+--- !u!114 &9089316586229822183
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 76e95ecb22d73074285ff2b102e0ee31, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ChickenStateOverlays
+  _starHeight: 1.62
+  _starOrbitRadius: 0.26
+  _starSpinSpeed: 180
