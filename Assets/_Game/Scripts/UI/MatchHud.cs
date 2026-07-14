@@ -24,9 +24,6 @@ namespace CluckWars.UI
     /// on the chicken itself in world space (<c>ChickenWorldBars</c>, ART.md §6.3 —
     /// the HUD is deliberately minimal because "the game area is sacred").
     /// </summary>
-    /// <remarks>
-    /// Auto-disables any sibling <c>CargoHud</c> on Awake.
-    /// </remarks>
     public sealed class MatchHud : MonoBehaviour
     {
         private const string Source = "MatchHud";
@@ -95,7 +92,6 @@ namespace CluckWars.UI
             EnsureEventSystem();
             BuildCanvas();
         }
-
 
         private static void EnsureEventSystem()
         {
