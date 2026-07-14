@@ -30,6 +30,7 @@ GameObject:
   - component: {fileID: 1575773519577157392}
   - component: {fileID: 2782470975654170646}
   - component: {fileID: 4098563086577120186}
+  - component: {fileID: 3984440509192767271}
   m_Layer: 0
   m_Name: Chicken
   m_TagString: Untagged
@@ -461,3 +462,19 @@ MonoBehaviour:
   _stunHeadOffset: 1.75
   _depositCount: 12
   _depositColor: {r: 0.96, g: 0.78, b: 0.26, a: 1}
+--- !u!114 &3984440509192767271
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8ab78f791f72aaa44b82bca0a1d5c3be, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ChickenWorldBars
+  _barOffset: {x: 0, y: 1.16, z: 0}
+  _barWidth: 0.82
+  _hpHeight: 0.11
+  _ringRadius: 0.42
