@@ -157,6 +157,18 @@ Highlights of the re-survey:
 - **Stage E (Ability Buttons):** [x] Audited hex button sizes/positions, cooldown numbers, and dimming (already matching the design spec).
 - **Stage F (Hygiene Sweep):** [x] Added `AbilityIconStyle` loud-failure guard (`InitializeOnLoadMethod`); deleted `CargoHud` legacy IMGUI component and script.
 - **Stage G (Full Verification + Docs):** [x] Full-flow verification complete (verified top-bar scoreboard, timer, touch controls hex layout, ability icons). Docs closeout complete.
+- **2026-07-14 post-handoff QA pass** (independent review of the Stage A–G commits):
+  confirmed Stages A–D and F–G as shipped correctly; Stage E's audit-only empty commit
+  was verified accurate (TouchControls' §6.6 cooldown dim/number/badges were already
+  correct from Stage 2b). Fixed one real gap the handoff itself specified but Stage A
+  never implemented: the top bar (`MatchHudController`, a separate UIDocument from
+  `MatchOverlaysController`) never dimmed to 40% opacity behind the intro countdown
+  (ART.md §6.5). Added `MatchHudController.Instance` + `SetIntroDimmed(bool)` (mirrors
+  `TouchControlsController`'s Instance pattern) and a `.cw-topbar--dimmed` USS class,
+  toggled from `MatchOverlaysController.RefreshIntro`. Also removed a stale doc-comment
+  on `MatchHud` claiming it "auto-disables any sibling CargoHud" (the method was deleted
+  in Stage F but the comment wasn't), and deleted the now-empty `Hud/CargoHud`
+  GameObject that Stage F's component removal left behind in `Game.unity`.
 
 Still excluded from the handoff (unchanged): the **§6.10 body-mutating art pass**
 (needs real VFX — would fight hit-flash/animator; knockback has no replicated flag),
