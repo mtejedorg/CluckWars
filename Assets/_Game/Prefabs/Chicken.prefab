@@ -479,6 +479,8 @@ MonoBehaviour:
   _barWidth: 0.82
   _hpHeight: 0.11
   _ringRadius: 0.42
+  _barTroughSprite: {fileID: 21300000, guid: 6cc6ffc6806a8b54a8f045056867309a, type: 3}
+  _barFillSprite: {fileID: 21300000, guid: 58c0fba96e5c45f4ebe96b7eeb1b80df, type: 3}
 --- !u!114 &9089316586229822183
 MonoBehaviour:
   m_ObjectHideFlags: 0

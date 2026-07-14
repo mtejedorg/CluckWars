@@ -143,9 +143,8 @@ Highlights of the re-survey:
   bar + gold score, local-row/leader highlights), a **★ FIRST TO 150 badge** (from
   `MatchConfigSO.FoodTargetToWin`), and a **top-right embossed timer badge**. → Stage A.
 - **Correction:** `BarTrough.png` *was* exported and is committed since Stage 0
-  (`4d790cd`) — the earlier "FAILED: no PNG produced" note was stale. Stage B swaps
-  `ChickenWorldBars`' procedural quads for `BarTrough`/`BarFill` and moves the cargo
-  count from the nameplate to the bar stack.
+  (`4d790cd`). Stage B swapped `ChickenWorldBars`' procedural quads for
+  `BarTrough`/`BarFill` and moved the cargo count from the nameplate to the bar stack.
 - **Correction:** the match-end leaderboard already has medals + dots + winner ring
   (controller-built). Remaining §6.5 polish is background particles + per-row
   proportional score bars (Stage D). Per current ART.md, LEAVE/REMATCH buttons and
