@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using CluckWars.Gameplay;
 using CluckWars.Logging;
 using UnityEngine;
@@ -7,21 +8,11 @@ using Zenject;
 namespace CluckWars.UI
 {
     /// <summary>
-    /// UI Toolkit driver for the match top-bar HUD (Stage 2a UI rebuild):
-    /// four per-player score badges + the centered match timer. Layout lives in
+    /// UI Toolkit driver for the match top-bar HUD (Stage 2a + Stage A UI rebuild):
+    /// ranked leaderboard panel + win target + the embossed match timer. Layout lives in
     /// <c>Assets/UI/MatchTopBar.uxml</c>; styling in
-    /// <c>Assets/UI/Styles/MatchTopBar.uss</c>. Replaces the procedural-UGUI
-    /// leaderboard + timer badge that used to live in <see cref="MatchHud"/>.
+    /// <c>Assets/UI/Styles/MatchTopBar.uss</c>.
     /// </summary>
-    /// <remarks>
-    /// Each badge maps to a fixed corner (P1→corner 0 … P4→corner 3) and shows that
-    /// base's live <see cref="PlayerBase.FoodTotal"/> — a per-player score, not a
-    /// ranked list (the design HUD is the minimal top bar; the ranked leaderboard
-    /// only appears on the match-end overlay). A badge hides when no base owns its
-    /// corner yet. Scene refs are found the same way MatchHud did — no networked
-    /// per-corner score exists to inject. Self-inject falls back to SceneContext
-    /// first per CONVENTIONS IP-fix1.
-    /// </remarks>
     [RequireComponent(typeof(UIDocument))]
     public sealed class MatchHudController : MonoBehaviour
     {
@@ -29,8 +20,7 @@ namespace CluckWars.UI
 
         [SerializeField] private float _refreshInterval = 0.25f;
 
-        // Okabe-Ito per-player identity colors (ART.md §6), matching MatchHud /
-        // MatchOverlays so every surface reads the same palette.
+        // Okabe-Ito per-player identity colors (ART.md §6).
         private static readonly Color[] PlayerColors =
         {
             new Color(0.91f, 0.46f, 0.10f, 1f), // P1 Orange #E8751A
@@ -40,24 +30,44 @@ namespace CluckWars.UI
         };
 
         private ILogService _log;
+        private MatchConfigSO _matchConfig;
 
         private VisualElement _root;
         private bool          _bound;
 
-        private readonly VisualElement[] _scoreBadges = new VisualElement[4];
-        private readonly Label[]         _scoreLabels = new Label[4];
-        private Label                    _timer;
+        private struct LbRow
+        {
+            public VisualElement Root;
+            public Label         Ord;
+            public VisualElement Dot;
+            public Label         Name;
+            public VisualElement BarFill;
+            public Label         Score;
+        }
+
+        private readonly LbRow[] _lbRows = new LbRow[4];
+        private Label            _timer;
+        private Label            _winTargetBadge;
 
         private PlayerBase[] _bases = System.Array.Empty<PlayerBase>();
         private GameManager  _gameManager;
         private float        _nextRefresh;
 
         [Inject]
-        public void Construct(ILogService log) => _log = log;
+        public void Construct(ILogService log, MatchConfigSO matchConfig)
+        {
+            _log = log;
+            _matchConfig = matchConfig;
+        }
 
         private void Awake()
         {
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            if (_log == null)
+            {
+                var sceneCtx = FindFirstObjectByType<SceneContext>();
+                if (sceneCtx != null) sceneCtx.Container.Inject(this);
+                else                  ProjectContext.Instance.Container.Inject(this);
+            }
         }
 
         private void OnEnable() => TryBind();
@@ -70,10 +80,25 @@ namespace CluckWars.UI
 
             for (int i = 0; i < 4; i++)
             {
-                _scoreBadges[i] = _root.Q<VisualElement>($"Score_P{i + 1}");
-                _scoreLabels[i] = _root.Q<Label>($"Label_P{i + 1}");
+                _lbRows[i] = new LbRow
+                {
+                    Root    = _root.Q<VisualElement>($"LbRow{i}"),
+                    Ord     = _root.Q<Label>($"LbOrd{i}"),
+                    Dot     = _root.Q<VisualElement>($"LbDot{i}"),
+                    Name    = _root.Q<Label>($"LbName{i}"),
+                    BarFill = _root.Q<VisualElement>($"LbBarFill{i}"),
+                    Score   = _root.Q<Label>($"LbScore{i}"),
+                };
             }
             _timer = _root.Q<Label>("MatchTimer");
+            _winTargetBadge = _root.Q<Label>("WinTargetBadge");
+
+            if (_winTargetBadge != null)
+            {
+                int target = _matchConfig != null ? Mathf.Max(1, _matchConfig.FoodTargetToWin) : 150;
+                _winTargetBadge.text = $"★ FIRST TO {target}";
+            }
+
             _bound = true;
         }
 
@@ -137,28 +162,95 @@ namespace CluckWars.UI
 
         private void RefreshScores()
         {
-            for (int corner = 0; corner < 4; corner++)
-            {
-                var badge = _scoreBadges[corner];
-                var label = _scoreLabels[corner];
-                if (badge == null || label == null) continue;
-
-                PlayerBase b = BaseForCorner(corner);
-                bool show = b != null;
-                badge.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
-                if (show)
-                    label.text = $"P{corner + 1}: {Mathf.FloorToInt(b.FoodTotal)}";
-            }
-        }
-
-        private PlayerBase BaseForCorner(int corner)
-        {
+            var sorted = new List<(int corner, float total)>(_bases.Length);
             for (int i = 0; i < _bases.Length; i++)
             {
                 var b = _bases[i];
-                if (b != null && b.CornerIndex == corner) return b;
+                if (b != null && b.Object != null && b.Object.IsValid)
+                    sorted.Add((b.CornerIndex, b.FoodTotal));
             }
-            return null;
+            sorted.Sort((a, b) => b.total.CompareTo(a.total));
+
+            int localCorner = LocalCorner();
+            float winTarget = _matchConfig != null ? Mathf.Max(1f, _matchConfig.FoodTargetToWin) : 150f;
+
+            for (int rank = 0; rank < 4; rank++)
+            {
+                var rowRefs = _lbRows[rank];
+                if (rowRefs.Root == null) continue;
+
+                if (rank < sorted.Count)
+                {
+                    rowRefs.Root.style.display = DisplayStyle.Flex;
+                    var (corner, total) = sorted[rank];
+                    Color color = PlayerColors[corner % PlayerColors.Length];
+
+                    if (rowRefs.Ord != null) rowRefs.Ord.text = Ordinal(rank + 1);
+                    if (rowRefs.Dot != null) rowRefs.Dot.style.unityBackgroundImageTintColor = color;
+                    if (rowRefs.Name != null)
+                    {
+                        rowRefs.Name.text = $"P{corner + 1}";
+                        rowRefs.Name.style.color = color;
+                    }
+
+                    if (rowRefs.BarFill != null)
+                    {
+                        float pct = Mathf.Clamp01(total / winTarget);
+                        rowRefs.BarFill.style.width = Length.Percent(pct * 100f);
+                        rowRefs.BarFill.style.backgroundColor = color;
+                    }
+
+                    if (rowRefs.Score != null) rowRefs.Score.text = Mathf.FloorToInt(total).ToString();
+
+                    // The local player's row gets a player-color left border + tint.
+                    if (corner == localCorner)
+                    {
+                        rowRefs.Root.style.borderLeftColor = color;
+                        rowRefs.Root.style.backgroundColor = Fade(color, 0.2f);
+                    }
+                    else
+                    {
+                        rowRefs.Root.style.borderLeftColor = Color.clear;
+                        // The leader's row gets a faint gold wash.
+                        if (rank == 0)
+                        {
+                            rowRefs.Root.AddToClassList("cw-lb-row--leader");
+                            rowRefs.Root.style.backgroundColor = new StyleColor(StyleKeyword.Null); // Clear inline to use USS
+                        }
+                        else
+                        {
+                            rowRefs.Root.RemoveFromClassList("cw-lb-row--leader");
+                            rowRefs.Root.style.backgroundColor = Color.clear;
+                        }
+                    }
+                }
+                else
+                {
+                    rowRefs.Root.style.display = DisplayStyle.None;
+                }
+            }
+        }
+
+        private static string Ordinal(int number) => number switch
+        {
+            1 => "1st",
+            2 => "2nd",
+            3 => "3rd",
+            _ => $"{number}th"
+        };
+
+        private static Color Fade(Color c, float a) => new Color(c.r, c.g, c.b, a);
+
+        private int LocalCorner()
+        {
+            var controllers = FindObjectsByType<ChickenController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < controllers.Length; i++)
+            {
+                var c = controllers[i];
+                if (c != null && c.Object != null && c.Object.IsValid && c.HasInputAuthority)
+                    return c.HomeCornerIndex;
+            }
+            return -1;
         }
     }
 }

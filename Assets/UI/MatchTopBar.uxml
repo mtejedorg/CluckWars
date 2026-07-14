@@ -1,45 +1,63 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
-    <!-- Cluck Wars : match top-bar HUD (Stage 2a rebuild, UI Toolkit).
-         A full-width, transparent top strip (HudTopGradient dark to clear fade)
-         holding a centered row: [P1 pill][P2 pill]  [TIMER]  [P3 pill][P4 pill].
-         Every dynamic element has a stable name so MatchHudController (senior-dev's
-         half) can drive it per-frame. Static player colors (dot tint + label color)
-         are baked into USS modifier classes so the document is visually correct at
-         author time; the controller only sets the score number, the timer text, and
-         per-element show/hide (a badge hides when a corner is empty).
-         picking-mode is Ignore everywhere : the HUD strip must never eat game input.
-         Design refs: docs/ART.md 6.3 (top bar) + Design CWMatchHUDv3L leaderboard/timer.
-         Tokens: Assets/UI/Styles/CluckWarsTokens.uss (cw- vars)
-         Styles: Assets/UI/Styles/MatchTopBar.uss -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTokens.uss" />
     <ui:Style src="project://database/Assets/UI/Styles/MatchTopBar.uss" />
 
     <ui:VisualElement name="TopBarRoot" class="cw-topbar" picking-mode="Ignore">
-        <ui:VisualElement name="TopBarRow" class="cw-topbar-row" picking-mode="Ignore">
+        <ui:VisualElement name="TopBarLayout" class="cw-topbar-layout" picking-mode="Ignore">
+            
+            <!-- ===== LEFT: Ranked Leaderboard + Target ===== -->
+            <ui:VisualElement name="LeaderboardContainer" class="cw-lb-container" picking-mode="Ignore">
+                <ui:VisualElement name="LeaderboardPanel" class="cw-lb-panel" picking-mode="Ignore">
+                    
+                    <!-- 4 fixed rows for the leaderboard, populated by controller -->
+                    <ui:VisualElement name="LbRow0" class="cw-lb-row" picking-mode="Ignore">
+                        <ui:Label name="LbOrd0" text="1st" class="cw-lb-ord" picking-mode="Ignore" />
+                        <ui:VisualElement name="LbDot0" class="cw-lb-dot" picking-mode="Ignore" />
+                        <ui:Label name="LbName0" text="P1" class="cw-lb-name" picking-mode="Ignore" />
+                        <ui:VisualElement class="cw-lb-bar-trough" picking-mode="Ignore">
+                            <ui:VisualElement name="LbBarFill0" class="cw-lb-bar-fill" picking-mode="Ignore" />
+                        </ui:VisualElement>
+                        <ui:Label name="LbScore0" text="0" class="cw-lb-score" picking-mode="Ignore" />
+                    </ui:VisualElement>
 
-            <!-- ===== LEFT group : P1, P2 ===== -->
-            <ui:VisualElement name="Score_P1" class="cw-score cw-score--p1" picking-mode="Ignore">
-                <ui:VisualElement name="Dot_P1" class="cw-score-dot cw-score-dot--p1" picking-mode="Ignore" />
-                <ui:Label name="Label_P1" text="P1: 0" class="cw-score-label cw-score-label--p1" picking-mode="Ignore" />
+                    <ui:VisualElement name="LbRow1" class="cw-lb-row" picking-mode="Ignore">
+                        <ui:Label name="LbOrd1" text="2nd" class="cw-lb-ord" picking-mode="Ignore" />
+                        <ui:VisualElement name="LbDot1" class="cw-lb-dot" picking-mode="Ignore" />
+                        <ui:Label name="LbName1" text="P2" class="cw-lb-name" picking-mode="Ignore" />
+                        <ui:VisualElement class="cw-lb-bar-trough" picking-mode="Ignore">
+                            <ui:VisualElement name="LbBarFill1" class="cw-lb-bar-fill" picking-mode="Ignore" />
+                        </ui:VisualElement>
+                        <ui:Label name="LbScore1" text="0" class="cw-lb-score" picking-mode="Ignore" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement name="LbRow2" class="cw-lb-row" picking-mode="Ignore">
+                        <ui:Label name="LbOrd2" text="3rd" class="cw-lb-ord" picking-mode="Ignore" />
+                        <ui:VisualElement name="LbDot2" class="cw-lb-dot" picking-mode="Ignore" />
+                        <ui:Label name="LbName2" text="P3" class="cw-lb-name" picking-mode="Ignore" />
+                        <ui:VisualElement class="cw-lb-bar-trough" picking-mode="Ignore">
+                            <ui:VisualElement name="LbBarFill2" class="cw-lb-bar-fill" picking-mode="Ignore" />
+                        </ui:VisualElement>
+                        <ui:Label name="LbScore2" text="0" class="cw-lb-score" picking-mode="Ignore" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement name="LbRow3" class="cw-lb-row" picking-mode="Ignore">
+                        <ui:Label name="LbOrd3" text="4th" class="cw-lb-ord" picking-mode="Ignore" />
+                        <ui:VisualElement name="LbDot3" class="cw-lb-dot" picking-mode="Ignore" />
+                        <ui:Label name="LbName3" text="P4" class="cw-lb-name" picking-mode="Ignore" />
+                        <ui:VisualElement class="cw-lb-bar-trough" picking-mode="Ignore">
+                            <ui:VisualElement name="LbBarFill3" class="cw-lb-bar-fill" picking-mode="Ignore" />
+                        </ui:VisualElement>
+                        <ui:Label name="LbScore3" text="0" class="cw-lb-score" picking-mode="Ignore" />
+                    </ui:VisualElement>
+
+                </ui:VisualElement>
+
+                <ui:Label name="WinTargetBadge" text="★ FIRST TO 150" class="cw-target-badge" picking-mode="Ignore" />
             </ui:VisualElement>
 
-            <ui:VisualElement name="Score_P2" class="cw-score cw-score--p2" picking-mode="Ignore">
-                <ui:VisualElement name="Dot_P2" class="cw-score-dot cw-score-dot--p2" picking-mode="Ignore" />
-                <ui:Label name="Label_P2" text="P2: 0" class="cw-score-label cw-score-label--p2" picking-mode="Ignore" />
-            </ui:VisualElement>
-
-            <!-- ===== CENTER : match timer ===== -->
-            <ui:Label name="MatchTimer" text="00:00" class="cw-timer" picking-mode="Ignore" />
-
-            <!-- ===== RIGHT group : P3, P4 ===== -->
-            <ui:VisualElement name="Score_P3" class="cw-score cw-score--p3" picking-mode="Ignore">
-                <ui:VisualElement name="Dot_P3" class="cw-score-dot cw-score-dot--p3" picking-mode="Ignore" />
-                <ui:Label name="Label_P3" text="P3: 0" class="cw-score-label cw-score-label--p3" picking-mode="Ignore" />
-            </ui:VisualElement>
-
-            <ui:VisualElement name="Score_P4" class="cw-score cw-score--p4" picking-mode="Ignore">
-                <ui:VisualElement name="Dot_P4" class="cw-score-dot cw-score-dot--p4" picking-mode="Ignore" />
-                <ui:Label name="Label_P4" text="P4: 0" class="cw-score-label cw-score-label--p4" picking-mode="Ignore" />
+            <!-- ===== RIGHT: Embossed Timer ===== -->
+            <ui:VisualElement name="TimerContainer" class="cw-timer-container" picking-mode="Ignore">
+                <ui:Label name="MatchTimer" text="00:00" class="cw-timer" picking-mode="Ignore" />
             </ui:VisualElement>
 
         </ui:VisualElement>
