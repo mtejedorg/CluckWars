@@ -51,7 +51,21 @@ In Server Mode, clients cannot call `Runner.Spawn`. The following spawn sites mu
 *   **File/Line Anchor:** [ChickenMovement.cs:33](file:///C:/Users/MARCO/Documents/GitHub/CluckWars/Assets/_Game/Scripts/Gameplay/ChickenMovement.cs#L33) (`_verticalVelocity`)
 *   **Issue:** `_verticalVelocity` is currently a private local float. During resimulation (rewinding and replaying ticks on client prediction), this value will not be rolled back correctly, leading to prediction jitter on vertical movement (jumping/falling).
 *   **Rework:** `_verticalVelocity` must be decorated with `[Networked]` or wrapped inside a predicted struct so Fusion's rollback system can restore its correct tick state.
+*   **Additional non-rollback fields:** `ChickenController._abilitySlowUntil`, `_rootUntil`, and `_activeSlowSources` are plain fields ticked in `FixedUpdateNetwork`. Fine under single-authority Shared Mode; under client prediction resimulation they drift (slow/root timers re-integrated per resim pass). Same decision applies: `[Networked]` them or run the local chicken without prediction.
 *   **Input Latches:** `_pendingAbility` latches and inputs in [FusionNetworkService.cs](file:///C:/Users/MARCO/Documents/GitHub/CluckWars/Assets/_Game/Scripts/Networking/FusionNetworkService.cs) must not clear or mutate state unsafely during predictions without a proper `[Networked]` wrapper to prevent resimulation double-triggers.
+
+### 5. RPC Receiver-Side Validation (H5 — trust surface)
+
+The demo posture is trust-the-client; in Server Mode these RPCs become the cheat API unless the receiver validates. Two of them are total-compromise primitives today, so cheap validation is worth adding even before the port if the demo goes public:
+
+| RPC | Validation to add |
+|---|---|
+| `PlayerBase.RPC_AddFood` | caller's chicken within `DepositRadius` + margin of this base; base owned by caller |
+| `ChickenController.RPC_TeleportTo` | only accepted from match-flow authority (GameManager), never from arbitrary peers |
+| `ChickenCombat.RPC_ApplyDamage` | amount ≤ max ability damage in the registry; attacker in range; rate-limited per attacker |
+| `ChickenCargo.RPC_DrainStolen` | thief in steal range; amount ≤ steal cap |
+| `ChickenCargo.RPC_ResetForNewMatch` | only from match-flow authority |
+| `ChickenMatchStats.RPC_CreditKill` | victim actually died this tick; attacker was the recorded damage source |
 
 ## Consequences
 

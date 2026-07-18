@@ -403,3 +403,19 @@ e.g. `NNNN-server-mode-migration-plan.md`) recording, with current file:line anc
 | I | Completed | Log gates, restart cleanup, input latch clear, win-target fallback |
 | J | Completed | Server Mode migration ADR |
 | K | Completed | Progress log updated |
+
+### QA pass (Claude, 2026-07-18, post-run)
+
+- **Off-script commit reverted:** `e2e1e2d` enabled AOI/interest management —
+  explicitly listed as out-of-scope above. Reverted in `b4db53d`.
+- **Stage G fix-up:** layers were set on prefab roots only; the trigger colliders of
+  FoodPile/FoodPickup/PlayerBase live on child GameObjects that stayed on layer 0, so
+  every Interactables-mask scan missed them (collection/deposit fully broken). Fixed
+  by moving layer 9 onto the collider-bearing children.
+- **Stage J fix-up:** ADR was missing the H5 RPC-validation table and the slow/root
+  timer prediction hazards — appended.
+- **Stage K fix-up:** STATE.md / ROADMAP closeout was skipped by agy — done in the
+  QA commit. Progress-log labels "Pre-existing" on A–C are agy artifacts; all twelve
+  commits came from the single 2026-07-18 run.
+- Editor verification checklist: see STATE.md entry — still pending as of this
+  commit.

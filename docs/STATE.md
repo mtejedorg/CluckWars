@@ -19,6 +19,50 @@ All tags pushed to origin.
 
 ---
 
+## ⚙ Networking review fixes landed (2026-07-18) — EDITOR VERIFICATION PENDING
+
+Full networking subsystem review (findings C1–L9) executed as
+`docs/HANDOFF-NETWORKING-2026-07.md` via Antigravity (commits `fd3d237..8eae101`),
+then QA'd by Claude (AOI revert `b4db53d` + fix-ups). What changed:
+
+- **C1 fixed:** `Fusion.NetworkTransform` added to `Chicken.prefab` — remote chickens
+  could never move before this (solo mode masked it). Script fileID verified by hash.
+- **C2 fixed:** duplicate `BotController` + `ChickenVFX` removed from `Chicken.prefab`.
+  **⚠ All bot pacing data before 2026-07-18 (incl. the WS1 overshoot numbers) was
+  measured with double-speed bots — re-measure before any balance conclusions.**
+- **Tick rate 64→32** (`NetworkProjectConfig.fusion`); dead `MatchConfigSO.TickRate`
+  removed. Send rate 16 Hz via existing send indices.
+- **Drain/deposit RPCs batched to ~4 Hz** (`ChickenCargo` accumulators). Known
+  tradeoff: the optimistic-credit food-dup window (review M4) widens from ~1 tick to
+  ~0.25 s under pile/pickup contention — documented, accepted for demo.
+- **Master-leave resilience:** GameManager/FoodPile/PlayerBase flagged
+  `MasterClientObject` (`Flags: 393217`); promotion re-arm poll in
+  `MatchBootstrapper.Update`. Note: `DestroyWhenStateAuthorityLeaves` (0x40000) was
+  deliberately left set — if the 3-client host-quit test still destroys world
+  objects, clear it (→ `Flags: 131073`).
+- **Photon `FixedRegion: eu`** pinned (M1 split-region join fix).
+- **Physics layers** `Chickens` (8) / `Interactables` (9) authored; masks tightened
+  from `~0`; buffers 16→32; aura slow now iterates `ActiveControllers` registry.
+  Claude fix-up: agy set layers only on prefab roots — moved layer 9 onto the
+  collider-bearing child GameObjects (FoodPile/FoodPickup/PlayerBase), without which
+  all collection/deposit was broken.
+- **Center pile scale** now `[Networked] VisualScale`, stamped `onBeforeSpawned`,
+  applied before `CreateBlocker` (M2 cross-peer collision desync).
+- **Hygiene:** verbose-log gates, runner restart cleanup (failed start no longer
+  bricks retry), input latches cleared outside running matches, win-target fallback
+  aligned to 110.
+- **ADR 0002** (`docs/adr/`) records the Server Mode migration plan (H4) + RPC
+  validation list (H5).
+- **Reverted:** agy went off-script once and enabled AOI/interest management
+  (explicitly out of scope) — reverted in `b4db53d`. Watch for this pattern.
+
+**NOT yet done — blocks the multi-client test session:** the editor verification
+checklist at the bottom of `docs/HANDOFF-NETWORKING-2026-07.md` (compile check,
+solo run, 2-client remote-movement check, 3-client host-quit test, intro
+button-mash check, bot pacing re-measure).
+
+---
+
 ## ⚙ In flight — full UI rebuild against the committed design (2026-07-12)
 
 Rebuilding the entire UI to match `Design/CluckWars UI Design.html` + `docs/ART.md`
