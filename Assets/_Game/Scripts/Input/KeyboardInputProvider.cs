@@ -11,7 +11,7 @@ namespace CluckWars.Input
     /// v0.3: LMB attack removed. R-key added for Ability3 (Assassin slot only).
     ///
     /// Phase 1 caveat: <c>wasPressedThisFrame</c> is sampled at Unity Update rate,
-    /// while Fusion calls <c>OnInput</c> at the simulation tick rate (30 Hz). For
+    /// while Fusion calls <c>OnInput</c> at the simulation tick rate (32 Hz). For
     /// edge-triggered abilities we will need to latch presses between OnInput calls.
     /// Not a problem until Phase 6 — flagged here for future work.
     /// </remarks>

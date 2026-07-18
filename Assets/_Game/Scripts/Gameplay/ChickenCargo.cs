@@ -15,7 +15,7 @@ namespace CluckWars.Gameplay
     /// </summary>
     /// <remarks>
     /// Cargo is a <c>float</c> so a 1 unit/sec collection rate accumulates smoothly across
-    /// 30 Hz ticks (each tick adds ~0.033). The HUD floors it for display.
+    /// 32 Hz ticks (each tick adds ~0.031). The HUD floors it for display.
     /// On death, the StateAuthority spawns a <see cref="FoodPickup"/> NetworkObject
     /// at the chicken's position carrying the cargo amount, then zeros local Cargo.
     /// Any chicken (including the dropper, after stun ends) can pick it up by walking

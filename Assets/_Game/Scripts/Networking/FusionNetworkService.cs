@@ -34,7 +34,7 @@ namespace CluckWars.Networking
 
         // Latched ability-press edges. Edge-triggered presses (HoldButton /
         // keyboard wasPressedThisFrame) live for a single render frame, but
-        // OnInput runs at tick rate (~30 Hz), not every frame (~60 Hz) — so a
+        // OnInput runs at tick rate (~32 Hz), not every frame (~60 Hz) — so a
         // press landing on a non-tick frame was being cleared before OnInput ever
         // read it and got silently dropped (≈half of taps "did nothing"). We OR
         // every render frame's press into these latches and consume them in
@@ -142,7 +142,7 @@ namespace CluckWars.Networking
                 Buttons = buttons,
             });
 
-            // Verbose-only because this fires every simulation tick (30 Hz). Gated by IsEnabled
+            // Verbose-only because this fires every simulation tick (32 Hz). Gated by IsEnabled
             // so we don't allocate the formatted string when filtered out.
             if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose) && (movement.sqrMagnitude > 0.0001f || buttons.Bits != 0))
             {
