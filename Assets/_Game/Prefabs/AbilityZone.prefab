@@ -47,7 +47,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkObject
   SortKey: 1111160077
-  ObjectInterest: 0
+  ObjectInterest: 1
   Flags: 262145
   NestedObjects: []
   NetworkedBehaviours:

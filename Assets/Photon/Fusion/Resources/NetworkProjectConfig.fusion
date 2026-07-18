@@ -16,7 +16,7 @@
     "ClientsRecordFrameAndPacketTimingTraces": false,
     "Simulation": {
         "InputDataWordCount": 0,
-        "ReplicationFeatures": 3,
+        "ReplicationFeatures": 1,
         "InputTransferMode": 0,
         "SimulationUpdateTimeMode": 0,
         "PlayerCount": 10,
@@ -61,9 +61,6 @@
         "PageShift": 15,
         "PageCount": 256,
         "GlobalsSize": 0
-    },
-    "InterestSettings": {
-        "AoiRadius": 32
     },
     "AssembliesToWeave": [
         "Fusion.Unity",
