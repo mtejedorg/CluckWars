@@ -434,11 +434,7 @@ namespace CluckWars.Gameplay
             // no cross-peer seeding needed.
 
             // Center pile — bigger Amount + bigger visual. Never moves.
-            var centerObj = SpawnPile(runner, pilePrefab, Vector3.zero, _centerPileAmount);
-            if (centerObj != null)
-            {
-                centerObj.transform.localScale = Vector3.one * _centerPileVisualScale;
-            }
+            SpawnPile(runner, pilePrefab, Vector3.zero, _centerPileAmount, _centerPileVisualScale);
 
             // Personal islands — one in front of each base, on the base→center line.
             for (int i = 0; i < _corners.Length; i++)
@@ -467,7 +463,7 @@ namespace CluckWars.Gameplay
             return new Vector3(j.x, 0f, j.y);
         }
 
-        private NetworkObject SpawnPile(NetworkRunner runner, NetworkObject pilePrefab, Vector3 pos, float amount)
+        private NetworkObject SpawnPile(NetworkRunner runner, NetworkObject pilePrefab, Vector3 pos, float amount, float scale = 1f)
         {
             return runner.Spawn(
                 pilePrefab,
@@ -475,12 +471,15 @@ namespace CluckWars.Gameplay
                 Quaternion.identity,
                 onBeforeSpawned: (_, networkObject) =>
                 {
-                    if (amount <= 0f) return; // let prefab default seed
                     var pile = networkObject.GetComponent<FoodPile>();
                     if (pile != null)
                     {
-                        pile.Amount = amount;
-                        pile.MaxAmount = amount;
+                        if (amount > 0f)
+                        {
+                            pile.Amount = amount;
+                            pile.MaxAmount = amount;
+                        }
+                        pile.VisualScale = scale;
                     }
                 });
         }

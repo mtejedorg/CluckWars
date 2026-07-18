@@ -41,6 +41,7 @@ namespace CluckWars.Gameplay
 
         [Networked] public float Amount { get; set; }
         [Networked] public float MaxAmount { get; set; }
+        [Networked] public float VisualScale { get; set; }
 
         public float CollectRadius => _collectRadius;
         public bool IsEmpty => Amount <= 0f;
@@ -55,6 +56,9 @@ namespace CluckWars.Gameplay
         {
             ActivePiles.Add(this);
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
+
+            float scale = VisualScale <= 0f ? 1f : VisualScale;
+            transform.localScale = Vector3.one * scale;
 
             CreateBlocker();
 
