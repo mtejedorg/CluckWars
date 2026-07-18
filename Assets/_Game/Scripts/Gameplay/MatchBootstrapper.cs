@@ -528,6 +528,37 @@ namespace CluckWars.Gameplay
                 $"(seed={( isSolo ? "random" : sessionName )}).");
         }
 
+        private float _lastPromotionPollTime;
+        private bool _wasMasterClientLastCheck;
+
+        private void Update()
+        {
+            var runner = _networkService != null ? _networkService.Runner : null;
+            if (runner == null || !runner.IsRunning)
+            {
+                _wasMasterClientLastCheck = false;
+                return;
+            }
+
+            if (Time.time - _lastPromotionPollTime >= 1.0f)
+            {
+                _lastPromotionPollTime = Time.time;
+                bool isMaster = runner.IsSharedModeMasterClient;
+                if (isMaster && !_wasMasterClientLastCheck)
+                {
+                    _log?.Info(Source, "Local peer promoted to Master Client. Re-arming match generators.");
+                    TrySpawnGameManager();
+
+                    var mapGen = FindFirstObjectByType<MapGenerator>();
+                    if (mapGen != null)
+                    {
+                        mapGen.ReArmForMasterPromotion();
+                    }
+                }
+                _wasMasterClientLastCheck = isMaster;
+            }
+        }
+
         /// <summary>
         /// Stable hash of the session name used as a shared RNG seed in online play.
         /// Using a manual polynomial hash avoids relying on <c>string.GetHashCode()</c>

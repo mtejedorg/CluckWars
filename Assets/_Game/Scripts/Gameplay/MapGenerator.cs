@@ -484,5 +484,31 @@ namespace CluckWars.Gameplay
                     }
                 });
         }
+
+        public void ReArmForMasterPromotion()
+        {
+            if (!_runnerHandled) return;
+            var runner = _network != null ? _network.Runner : null;
+            if (runner == null || !runner.IsRunning) return;
+
+            _log?.Info(Source, "Re-arming MapGenerator for Master promotion.");
+            if (FindObjectsByType<PlayerBase>(FindObjectsSortMode.None).Length == 0)
+            {
+                SpawnBases(runner);
+            }
+            else
+            {
+                _log?.Debug(Source, "Bases already exist; skipping spawn during promotion.");
+            }
+
+            if (FindObjectsByType<FoodPile>(FindObjectsSortMode.None).Length == 0)
+            {
+                SpawnFoodPiles(runner);
+            }
+            else
+            {
+                _log?.Debug(Source, "Food piles already exist; skipping spawn during promotion.");
+            }
+        }
     }
 }
