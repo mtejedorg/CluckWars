@@ -20,6 +20,9 @@ MonoBehaviour:
   Duration: 0.8
   Cooldown: 3
   AbilityAnimationClip: {fileID: 0}
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256
   ForwardOffset: 1.2
   PushRadius: 1.8
   PushStrength: 10

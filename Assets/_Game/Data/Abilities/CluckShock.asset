@@ -20,5 +20,8 @@ MonoBehaviour:
   Duration: 0.5
   Cooldown: 7
   AbilityAnimationClip: {fileID: 0}
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256
   ShockRadius: 2.5
   ShockDamage: 35

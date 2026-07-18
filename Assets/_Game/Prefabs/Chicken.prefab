@@ -31,7 +31,7 @@ GameObject:
   - component: {fileID: 3984440509192767271}
   - component: {fileID: 9089316586229822183}
   - component: {fileID: 4310573928164825946}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: Chicken
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -288,7 +288,7 @@ MonoBehaviour:
   _searchRadius: 5
   _searchMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 512
   _foodPickupPrefab: {fileID: 8362016333457472506, guid: a8794a9118fa75e44946e9a0fb7d9a54, type: 3}
   _Cargo: 0
 --- !u!114 &101601932164880250

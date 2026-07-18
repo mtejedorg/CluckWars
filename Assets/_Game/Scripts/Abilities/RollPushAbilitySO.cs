@@ -44,7 +44,7 @@ namespace CluckWars.Abilities
 
             // Push all chickens in the forward cone.
             var center = caster.transform.position + caster.transform.forward * ForwardOffset;
-            var hits = Physics.OverlapSphere(center, PushRadius, ~0, QueryTriggerInteraction.Ignore);
+            var hits = Physics.OverlapSphere(center, PushRadius, SearchMask, QueryTriggerInteraction.Ignore);
 
             for (int i = 0; i < hits.Length; i++)
             {

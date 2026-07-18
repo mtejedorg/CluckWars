@@ -72,6 +72,10 @@ namespace CluckWars.Abilities
         [Tooltip("Optional clip override. Phase 6 doesn't drive animations from abilities — slot reserved for Phase 9 polish.")]
         public AnimationClip AbilityAnimationClip;
 
+        [Header("Physics Scans")]
+        [Tooltip("Layer mask for physics scans inside the ability (Stage G).")]
+        public LayerMask SearchMask = 256; // 1 << 8 (Chickens layer)
+
         /// <summary>
         /// Per-subclass default icon glyph (design v3, cluckwars-tokens-v3).
         /// Used by <see cref="ResolveIcon"/> when the serialized <see cref="Icon"/>

@@ -42,7 +42,7 @@ namespace CluckWars.Abilities
             if (spaceLeft <= 0f) return;
 
             // Find nearest enemy chicken with cargo on board.
-            var hits = Physics.OverlapSphere(thief.transform.position, StealRange, ~0, QueryTriggerInteraction.Ignore);
+            var hits = Physics.OverlapSphere(thief.transform.position, StealRange, SearchMask, QueryTriggerInteraction.Ignore);
             ChickenCargo target = null;
             float bestSqr = float.MaxValue;
             for (int i = 0; i < hits.Length; i++)

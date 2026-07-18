@@ -20,6 +20,9 @@ MonoBehaviour:
   Duration: 0.3
   Cooldown: 3
   AbilityAnimationClip: {fileID: 0}
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256
   PeckRange: 2
   PeckDamage: 28
   KnockbackStrength: 6

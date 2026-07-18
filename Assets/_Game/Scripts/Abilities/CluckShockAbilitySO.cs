@@ -35,7 +35,7 @@ namespace CluckWars.Abilities
 
             float finalDamage = caster.ApplyOutgoingDamage(ShockDamage);
             var hits = Physics.OverlapSphere(
-                caster.transform.position, ShockRadius, ~0,
+                caster.transform.position, ShockRadius, SearchMask,
                 QueryTriggerInteraction.Ignore);
 
             for (int i = 0; i < hits.Length; i++)

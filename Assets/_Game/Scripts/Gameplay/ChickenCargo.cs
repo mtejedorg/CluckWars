@@ -89,7 +89,7 @@ namespace CluckWars.Gameplay
         private int _baseDepositTicks;
 
         // Static array for broadphase overlaps to prevent per-tick allocation
-        private static readonly Collider[] _overlapHits = new Collider[16];
+        private static readonly Collider[] _overlapHits = new Collider[32];
 
         [Inject]
         public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry, MatchConfigSO matchConfig)

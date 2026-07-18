@@ -41,7 +41,7 @@ namespace CluckWars.Abilities
             if (casterCombat == null) return;
 
             var center = caster.transform.position + caster.transform.forward * ForwardOffset;
-            var hits = Physics.OverlapSphere(center, SweepRadius, ~0, QueryTriggerInteraction.Ignore);
+            var hits = Physics.OverlapSphere(center, SweepRadius, SearchMask, QueryTriggerInteraction.Ignore);
 
             // Tough passive: Warrior deals extra damage with all damage abilities.
             float finalDamage = caster.ApplyOutgoingDamage(TrampleDamage);

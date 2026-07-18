@@ -49,6 +49,9 @@ namespace CluckWars.Gameplay
         /// </summary>
         public static readonly List<AbilityZone> ActiveZones = new List<AbilityZone>();
 
+        // Static array for broadphase overlaps to prevent per-tick allocation (Stage G)
+        private static readonly Collider[] _overlapHits = new Collider[32];
+
         // ---- Serialized tunables ----------------------------------------------
 
         [Tooltip("Radius within which the zone effect triggers. Must match the visual / collider size.")]
@@ -125,13 +128,13 @@ namespace CluckWars.Gameplay
             // for Root Egg; persistent for a future multi-trigger root variant).
             if (Effect == ZoneEffect.Root)
             {
-                var hits = Physics.OverlapSphere(
-                    transform.position, TriggerRadius, ~0,
+                int hitCount = Physics.OverlapSphereNonAlloc(
+                    transform.position, TriggerRadius, _overlapHits, 1 << 8,
                     QueryTriggerInteraction.Ignore);
 
-                for (int i = 0; i < hits.Length; i++)
+                for (int i = 0; i < hitCount; i++)
                 {
-                    var chicken = hits[i].GetComponentInParent<ChickenController>();
+                    var chicken = _overlapHits[i].GetComponentInParent<ChickenController>();
                     if (chicken == null) continue;
                     if (chicken.Id == OwnerChicken) continue; // zones never affect their caster
                     if (chicken.Combat != null && chicken.Combat.IsStunned) continue;

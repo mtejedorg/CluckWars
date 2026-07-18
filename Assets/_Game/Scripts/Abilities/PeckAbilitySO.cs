@@ -43,7 +43,7 @@ namespace CluckWars.Abilities
             float bestSqr = PeckRange * PeckRange;
 
             var hits = Physics.OverlapSphere(
-                caster.transform.position, PeckRange, ~0,
+                caster.transform.position, PeckRange, SearchMask,
                 QueryTriggerInteraction.Ignore);
 
             for (int i = 0; i < hits.Length; i++)

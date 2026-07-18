@@ -72,7 +72,7 @@ namespace CluckWars.Gameplay
         public static readonly System.Collections.Generic.List<ChickenController> ActiveControllers = new System.Collections.Generic.List<ChickenController>();
 
         // Static array for broadphase overlaps to prevent per-tick allocation
-        private static readonly Collider[] _overlapHits = new Collider[16];
+        private static readonly Collider[] _overlapHits = new Collider[32];
 
         [Tooltip("Fallback used only if the class registry is missing or has no entry for this chicken's class.")]
         [SerializeField] private ChickenStatsSO _fallbackStats;
@@ -458,7 +458,7 @@ namespace CluckWars.Gameplay
         private void CheckCollisionSlow()
         {
             int hitCount = Physics.OverlapSphereNonAlloc(
-                transform.position, CollisionSlowRadius, _overlapHits, ~0,
+                transform.position, CollisionSlowRadius, _overlapHits, 1 << 8,
                 QueryTriggerInteraction.Ignore);
 
             for (int i = 0; i < hitCount; i++)
@@ -479,17 +479,16 @@ namespace CluckWars.Gameplay
         /// </summary>
         private void CheckAuraSlow()
         {
-            int hitCount = Physics.OverlapSphereNonAlloc(
-                transform.position, AuraSlowSearchRadius, _overlapHits, ~0,
-                QueryTriggerInteraction.Ignore);
-            for (int i = 0; i < hitCount; i++)
+            for (int i = 0; i < ActiveControllers.Count; i++)
             {
-                var caster = _overlapHits[i].GetComponentInParent<ChickenController>();
+                var caster = ActiveControllers[i];
                 if (caster == null || caster == this) continue;
                 if (!caster.AuraSlowActive) continue;
                 float sqr = (caster.transform.position - transform.position).sqrMagnitude;
                 if (sqr <= caster.AuraSlowRadius * caster.AuraSlowRadius)
+                {
                     ApplySlow(SlowSource.Ability, caster.AuraSlowFactor);
+                }
             }
         }
 
