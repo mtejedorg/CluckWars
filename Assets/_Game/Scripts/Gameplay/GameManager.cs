@@ -70,7 +70,7 @@ namespace CluckWars.Gameplay
         }
 
         public float MatchDurationSeconds => _config != null ? _config.MatchDurationSeconds : 180f;
-        public int FoodTargetToWin => _config != null ? _config.FoodTargetToWin : 150;
+        public int FoodTargetToWin => _config != null ? _config.FoodTargetToWin : 110;
         public float RestartDelaySeconds => _restartDelaySeconds;
 
         /// <summary>

@@ -237,14 +237,20 @@ namespace CluckWars.Gameplay
 
             if (Cargo >= stats.CargoCapacity)
             {
-                _log?.Verbose(Source, $"TryCollect: cargo full ({Cargo:0.0}/{stats.CargoCapacity}).");
+                if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
+                {
+                    _log.Verbose(Source, $"TryCollect: cargo full ({Cargo:0.0}/{stats.CargoCapacity}).");
+                }
                 FlushPileDrain();
                 return;
             }
 
             if (pile.IsEmpty)
             {
-                _log?.Verbose(Source, $"TryCollect: nearest pile '{pile.name}' is empty.");
+                if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
+                {
+                    _log.Verbose(Source, $"TryCollect: nearest pile '{pile.name}' is empty.");
+                }
                 FlushPileDrain();
                 return;
             }
@@ -275,7 +281,10 @@ namespace CluckWars.Gameplay
                 FlushPileDrain();
             }
 
-            _log?.Verbose(Source, $"Collected {takeable:0.000} from '{pile.name}'. Cargo={Cargo:0.0}/{stats.CargoCapacity}.");
+            if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
+            {
+                _log.Verbose(Source, $"Collected {takeable:0.000} from '{pile.name}'. Cargo={Cargo:0.0}/{stats.CargoCapacity}.");
+            }
         }
 
         private void TryCollectFromNearbyPickup(ChickenStatsSO stats)
@@ -325,7 +334,10 @@ namespace CluckWars.Gameplay
             }
 
             _audio?.PlaySFX(_audioReg != null ? _audioReg.Pickup : null);
-            _log?.Verbose(Source, $"Picked up {takeable:0.00} from {pickup.name}.");
+            if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
+            {
+                _log.Verbose(Source, $"Picked up {takeable:0.00} from {pickup.name}.");
+            }
         }
 
         private void TryDepositAtNearbyBase()
@@ -336,8 +348,11 @@ namespace CluckWars.Gameplay
                 FlushBaseDeposit();
                 if (Cargo > 0f)
                 {
-                    _log?.Verbose(Source, $"TryDeposit: carrying {Cargo:0.0} but no owned base in range " +
-                        $"(owner={Object.InputAuthority}, pos={transform.position}).");
+                    if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
+                    {
+                        _log.Verbose(Source, $"TryDeposit: carrying {Cargo:0.0} but no owned base in range " +
+                            $"(owner={Object.InputAuthority}, pos={transform.position}).");
+                    }
                 }
                 return;
             }

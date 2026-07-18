@@ -126,7 +126,10 @@ namespace CluckWars.Gameplay
             var actual = Mathf.Min(amount, Amount);
             Amount -= actual;
             if (Amount < 0f) Amount = 0f;
-            _log?.Verbose(Source, $"{name}: drained {actual:0.00} → {Amount:0.0}/{MaxAmount}.");
+            if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
+            {
+                _log.Verbose(Source, $"{name}: drained {actual:0.00} → {Amount:0.0}/{MaxAmount}.");
+            }
         }
     }
 }

@@ -100,6 +100,9 @@ namespace CluckWars.Networking
             else
             {
                 _log?.Error(Source, $"StartGame failed: result.ShutdownReason={result.ShutdownReason}, errorMessage='{result.ErrorMessage}'. Common causes: wrong AppId, region mismatch, room full ({maxPlayers}/{maxPlayers}), or no internet.");
+                Destroy(_runner);
+                Destroy(sceneManager);
+                _runner = null;
             }
         }
 
@@ -118,6 +121,15 @@ namespace CluckWars.Networking
         private void Update()
         {
             if (_inputProvider == null) return;
+
+            if (GameManager.Instance == null || !GameManager.Instance.IsMatchRunning)
+            {
+                _pendingAbility1 = false;
+                _pendingAbility2 = false;
+                _pendingAbility3 = false;
+                return;
+            }
+
             if (_inputProvider.GetAbility1Pressed()) _pendingAbility1 = true;
             if (_inputProvider.GetAbility2Pressed()) _pendingAbility2 = true;
             if (_inputProvider.GetAbility3Pressed()) _pendingAbility3 = true;
@@ -166,6 +178,11 @@ namespace CluckWars.Networking
         {
             _log?.Info(Source, $"OnShutdown: reason={shutdownReason}.");
             OnShutdown?.Invoke(shutdownReason);
+            var sceneManager = GetComponent<NetworkSceneManagerDefault>();
+            if (sceneManager != null)
+            {
+                Destroy(sceneManager);
+            }
             _runner = null;
         }
 
