@@ -28,8 +28,6 @@ GameObject:
   - component: {fileID: 8123582145153776448}
   - component: {fileID: 3315600165271083367}
   - component: {fileID: 1575773519577157392}
-  - component: {fileID: 2782470975654170646}
-  - component: {fileID: 4098563086577120186}
   - component: {fileID: 3984440509192767271}
   - component: {fileID: 9089316586229822183}
   - component: {fileID: 4310573928164825946}
@@ -158,7 +156,6 @@ MonoBehaviour:
   - {fileID: 101601932164880250}
   - {fileID: 7617149068659373758}
   - {fileID: 7853284419870734786}
-  - {fileID: 2782470975654170646}
   - {fileID: 4310573928164825946}
   ForceRemoteRenderTimeframe: 0
 --- !u!143 &6032245462738825523
@@ -421,50 +418,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c118f81fa1dc2de40885ea232fbc15dc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ControlStateVFX
---- !u!114 &2782470975654170646
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7475174928668115606}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 255bff1c293ecab46be11c8de994dd46, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.BotController
-  _thinkInterval: 0.3
-  _arrivalRadius: 1.5
-  _returnThreshold: 0.7
-  _protectCargoThreshold: 0.4
-  _dangerRadius: 5
-  _huntRadius: 8
-  _huntCargoThreshold: 0.3
-  _abilityRange: 4
-  _engageUnloaded: 0
-  _engageRadius: 6
-  _stateExitRadiusFactor: 1.35
---- !u!114 &4098563086577120186
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7475174928668115606}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 114e0725498d09940906531de4ef2c01, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ChickenVFX
-  _hitCount: 8
-  _hitColor: {r: 1, g: 0.78, b: 0.2, a: 1}
-  _deathCount: 22
-  _deathColor: {r: 0.95, g: 0.3, b: 0.2, a: 1}
-  _stunColor: {r: 1, g: 0.96, b: 0.35, a: 1}
-  _stunOrbitRadius: 0.4
-  _stunHeadOffset: 1.75
-  _depositCount: 12
-  _depositColor: {r: 0.96, g: 0.78, b: 0.26, a: 1}
 --- !u!114 &3984440509192767271
 MonoBehaviour:
   m_ObjectHideFlags: 0
