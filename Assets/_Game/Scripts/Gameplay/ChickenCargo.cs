@@ -75,6 +75,19 @@ namespace CluckWars.Gameplay
         private MatchConfigSO _matchConfig;
         private bool _subscribedToDeath;
 
+        // Accumulators for batched RPCs (Stage D)
+        private FoodPile _activePileTarget;
+        private float _pendingPileDrain;
+        private int _pileDrainTicks;
+
+        private FoodPickup _activePickupTarget;
+        private float _pendingPickupDrain;
+        private int _pickupDrainTicks;
+
+        private PlayerBase _activeBaseTarget;
+        private float _pendingBaseFood;
+        private int _baseDepositTicks;
+
         // Static array for broadphase overlaps to prevent per-tick allocation
         private static readonly Collider[] _overlapHits = new Collider[16];
 
@@ -128,15 +141,73 @@ namespace CluckWars.Gameplay
             }
         }
 
+        public void FlushPileDrain()
+        {
+            if (_pendingPileDrain > 0f)
+            {
+                if (_activePileTarget != null && _activePileTarget.Object != null && _activePileTarget.Object.IsValid)
+                {
+                    _activePileTarget.RPC_Drain(_pendingPileDrain);
+                }
+                _pendingPileDrain = 0f;
+            }
+            _activePileTarget = null;
+            _pileDrainTicks = 0;
+        }
+
+        public void FlushPickupDrain()
+        {
+            if (_pendingPickupDrain > 0f)
+            {
+                if (_activePickupTarget != null && _activePickupTarget.Object != null && _activePickupTarget.Object.IsValid)
+                {
+                    _activePickupTarget.RPC_Drain(_pendingPickupDrain);
+                }
+                _pendingPickupDrain = 0f;
+            }
+            _activePickupTarget = null;
+            _pickupDrainTicks = 0;
+        }
+
+        public void FlushBaseDeposit()
+        {
+            if (_pendingBaseFood > 0f)
+            {
+                if (_activeBaseTarget != null && _activeBaseTarget.Object != null && _activeBaseTarget.Object.IsValid)
+                {
+                    _activeBaseTarget.RPC_AddFood(_pendingBaseFood);
+                    GetComponent<ChickenMatchStats>()?.RPC_AddDeposit(_pendingBaseFood);
+                }
+                _pendingBaseFood = 0f;
+            }
+            _activeBaseTarget = null;
+            _baseDepositTicks = 0;
+        }
+
+        public void FlushAll()
+        {
+            FlushPileDrain();
+            FlushPickupDrain();
+            FlushBaseDeposit();
+        }
+
         public override void FixedUpdateNetwork()
         {
             if (!HasStateAuthority) return;
 
             var stats = _controller != null ? _controller.Stats : null;
-            if (stats == null) return;
+            if (stats == null)
+            {
+                FlushAll();
+                return;
+            }
 
             // Stunned chickens can't collect or deposit.
-            if (_combat != null && _combat.IsStunned) return;
+            if (_combat != null && _combat.IsStunned)
+            {
+                FlushAll();
+                return;
+            }
 
             TryCollectFromNearbyPile(stats);
             TryCollectFromNearbyPickup(stats);
@@ -152,20 +223,29 @@ namespace CluckWars.Gameplay
             // the NEXT tick to apply the pile-slow source (GDD §6.2).
             IsPileSlow = (pile != null && !pile.IsEmpty);
 
-            if (Cargo >= stats.CargoCapacity)
+            if (pile == null)
             {
-                _log?.Verbose(Source, $"TryCollect: cargo full ({Cargo:0.0}/{stats.CargoCapacity}).");
+                FlushPileDrain();
                 return;
             }
 
-            if (pile == null)
+            if (pile != _activePileTarget)
             {
-                _log?.Verbose(Source, "TryCollect: no pile in range.");
+                FlushPileDrain();
+                _activePileTarget = pile;
+            }
+
+            if (Cargo >= stats.CargoCapacity)
+            {
+                _log?.Verbose(Source, $"TryCollect: cargo full ({Cargo:0.0}/{stats.CargoCapacity}).");
+                FlushPileDrain();
                 return;
             }
+
             if (pile.IsEmpty)
             {
                 _log?.Verbose(Source, $"TryCollect: nearest pile '{pile.name}' is empty.");
+                FlushPileDrain();
                 return;
             }
 
@@ -176,40 +256,101 @@ namespace CluckWars.Gameplay
                 collectionRate *= 1.5f;
             }
             float desired = collectionRate * Runner.DeltaTime;
-            float takeable = Mathf.Min(desired, spaceLeft, pile.Amount);
-            if (takeable <= 0f) return;
+
+            float availableInPile = Mathf.Max(0f, pile.Amount - _pendingPileDrain);
+            float takeable = Mathf.Min(desired, spaceLeft, availableInPile);
+            if (takeable <= 0f)
+            {
+                FlushPileDrain();
+                return;
+            }
 
             Cargo += takeable;
-            pile.RPC_Drain(takeable);
+            _pendingPileDrain += takeable;
+            _pileDrainTicks++;
+
+            int ticksToFlush = Mathf.RoundToInt(0.25f * Runner.TickRate);
+            if (_pileDrainTicks >= ticksToFlush)
+            {
+                FlushPileDrain();
+            }
+
             _log?.Verbose(Source, $"Collected {takeable:0.000} from '{pile.name}'. Cargo={Cargo:0.0}/{stats.CargoCapacity}.");
         }
 
         private void TryCollectFromNearbyPickup(ChickenStatsSO stats)
         {
-            if (Cargo >= stats.CargoCapacity) return;
-
             var pickup = FindNearestPickupInRange();
-            if (pickup == null || pickup.IsEmpty) return;
+            if (pickup == null)
+            {
+                FlushPickupDrain();
+                return;
+            }
+
+            if (pickup != _activePickupTarget)
+            {
+                FlushPickupDrain();
+                _activePickupTarget = pickup;
+            }
+
+            if (Cargo >= stats.CargoCapacity)
+            {
+                FlushPickupDrain();
+                return;
+            }
+
+            if (pickup.IsEmpty)
+            {
+                FlushPickupDrain();
+                return;
+            }
 
             float spaceLeft = stats.CargoCapacity - Cargo;
-            float takeable = Mathf.Min(pickup.Amount, spaceLeft);
-            if (takeable <= 0f) return;
+            float availableInPickup = Mathf.Max(0f, pickup.Amount - _pendingPickupDrain);
+            float takeable = Mathf.Min(availableInPickup, spaceLeft);
+            if (takeable <= 0f)
+            {
+                FlushPickupDrain();
+                return;
+            }
 
             Cargo += takeable;
-            pickup.RPC_Drain(takeable);
+            _pendingPickupDrain += takeable;
+            _pickupDrainTicks++;
+
+            int ticksToFlush = Mathf.RoundToInt(0.25f * Runner.TickRate);
+            if (_pickupDrainTicks >= ticksToFlush)
+            {
+                FlushPickupDrain();
+            }
+
             _audio?.PlaySFX(_audioReg != null ? _audioReg.Pickup : null);
             _log?.Verbose(Source, $"Picked up {takeable:0.00} from {pickup.name}.");
         }
 
         private void TryDepositAtNearbyBase()
         {
-            if (Cargo <= 0f) return;
-
             var playerBase = FindNearestBaseInRange();
             if (playerBase == null)
             {
-                _log?.Verbose(Source, $"TryDeposit: carrying {Cargo:0.0} but no owned base in range " +
-                    $"(owner={Object.InputAuthority}, pos={transform.position}).");
+                FlushBaseDeposit();
+                if (Cargo > 0f)
+                {
+                    _log?.Verbose(Source, $"TryDeposit: carrying {Cargo:0.0} but no owned base in range " +
+                        $"(owner={Object.InputAuthority}, pos={transform.position}).");
+                }
+                return;
+            }
+
+            if (playerBase != _activeBaseTarget)
+            {
+                FlushBaseDeposit();
+                _activeBaseTarget = playerBase;
+            }
+
+            if (Cargo <= 0f)
+            {
+                FlushBaseDeposit();
                 return;
             }
 
@@ -220,18 +361,27 @@ namespace CluckWars.Gameplay
 
             float rate = _matchConfig != null ? _matchConfig.DepositRatePerSecond : 6f;
             float transfer = Mathf.Min(Cargo, rate * Runner.DeltaTime);
-            if (transfer <= 0f) return;
+            if (transfer <= 0f)
+            {
+                FlushBaseDeposit();
+                return;
+            }
 
             Cargo -= transfer;
-            playerBase.RPC_AddFood(transfer);
-            // Track food deposited for the match-end stats overlay.
-            GetComponent<ChickenMatchStats>()?.RPC_AddDeposit(transfer);
+            _pendingBaseFood += transfer;
+            _baseDepositTicks++;
 
-            if (Cargo <= 0f)
+            int ticksToFlush = Mathf.RoundToInt(0.25f * Runner.TickRate);
+            if (_baseDepositTicks >= ticksToFlush || Cargo <= 0f)
             {
-                Cargo = 0f;
-                _audio?.PlaySFX(_audioReg != null ? _audioReg.Deposit : null);
-                _log?.Debug(Source, $"Deposited complete at {playerBase.name}.");
+                bool isDone = (Cargo <= 0f);
+                FlushBaseDeposit();
+                if (isDone)
+                {
+                    Cargo = 0f;
+                    _audio?.PlaySFX(_audioReg != null ? _audioReg.Deposit : null);
+                    _log?.Debug(Source, $"Deposited complete at {playerBase.name}.");
+                }
             }
         }
 
@@ -328,6 +478,10 @@ namespace CluckWars.Gameplay
             // StateAuthority inside RPC_ApplyDamage, so the guard below is
             // redundant, but kept as cheap insurance.
             if (!HasStateAuthority) return;
+            
+            // Flush any pending collection/deposit before processing death drop.
+            FlushAll();
+            
             if (_controller != null && _controller.IsDecoy) return;
 
             Vector3 victimPos = transform.position;
@@ -454,6 +608,17 @@ namespace CluckWars.Gameplay
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_ResetForNewMatch()
         {
+            // Drop any pending drains/deposits because a new round starts
+            _pendingPileDrain = 0f;
+            _pendingPickupDrain = 0f;
+            _pendingBaseFood = 0f;
+            _activePileTarget = null;
+            _activePickupTarget = null;
+            _activeBaseTarget = null;
+            _pileDrainTicks = 0;
+            _pickupDrainTicks = 0;
+            _baseDepositTicks = 0;
+
             Cargo = 0f;
             _log?.Debug(Source, "Reset for new match: Cargo=0.");
         }
