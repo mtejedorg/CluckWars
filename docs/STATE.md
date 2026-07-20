@@ -174,12 +174,12 @@ on-character bars stay sprite/TMP. This supersedes the old "HUD is UGUI" convent
   the design export, screen layout is UXML/USS, on-character indicators are world-space
   sprites.
 
-### UI rebuild — what's still open → **see `docs/HANDOFF-UI-FINAL.md`**
+### UI rebuild — CLOSED (2026-07-14, Stages A–G)
 
 The rebuild itself is done (Stages 0–4 + cleanups). A 2026-07-14 re-survey against
-ART.md §6 recalculated the remaining gaps and packaged them as a self-contained,
-execute-all-at-once handoff (`docs/HANDOFF-UI-FINAL.md`, Stages A–G, one commit each).
-Highlights of the re-survey:
+ART.md §6 recalculated the remaining gaps and executed them as Stages A–G, one commit
+each (source handoff doc removed after completion — verified via git log/play-mode,
+see the QA pass note below). Highlights of the re-survey:
 
 - **Biggest gap found: the match top bar is not §6.3.** What shipped (Stage 2a) is a
   centered chip strip `[P1][P2][TIMER][P3][P4]`; the design wants a **top-left ranked
@@ -225,12 +225,11 @@ mid-session; orchestration continued on Opus (main session) delegating to
 
 ---
 
-## ⚠ Active handoff — full-project revision (2026-07-05)
+## ✅ Full-project revision — CLOSED (2026-07-05 to 2026-07-07)
 
 A complete code + design revision of the vertical slice was performed on
-2026-07-05. Findings and an executable roadmap live in
-**`docs/HANDOFF_REVISION_2026-07.md`** — read it before starting new work.
-Headlines: match economy is broken (win target unreachable for 3 of 4 classes,
+2026-07-05 (source handoff doc removed after completion — full history below and
+in git log). Headlines: match economy is broken (win target unreachable for 3 of 4 classes,
 fighting doesn't pay), Flying Peck is a 200-dmg instakill, Root Egg self-roots
 its caster, the root-zone radius override is ignored, the death-drop pipeline
 rides the ChangeDetector pattern already documented as unreliable in solo, and
@@ -240,7 +239,7 @@ The handoff defines workstreams WS0–WS5 with per-task acceptance criteria.
 
 **Progress:** WS0 done (`5f23a7c`). WS1 + WS2 done and committed (session entry
 below). WS3 + WS4 + WS5 were executed by Antigravity on 2026-07-06; a same-day
-code review (`docs/HANDOFF_REVISION_FIXUP_2026-07.md`) found two critical
+code review found two critical
 defects, a rejoin flaw, and zero verification — **the fix-up items B1/B2/B3/B5/B6
 were then applied on 2026-07-07** and the full §C SOLO verification pass ran
 clean the same day (session entry below) — committed. The revision handoffs
@@ -282,7 +281,7 @@ non-traversable so routing/juking matters. Implemented + verified live:
 
 ## Session 2026-07-07 — fix-up of Antigravity's WS3–WS5 delivery
 
-Review findings + rationale: `docs/HANDOFF_REVISION_FIXUP_2026-07.md`. Applied:
+Review findings + rationale (source handoff doc removed after completion). Applied:
 
 - **B1 (critical):** the three damage abilities (Peck / Cluck Shock / Flying
   Peck) passed `caster.Id` (ChickenController's behaviour id) into
@@ -445,7 +444,7 @@ acceptance passes (pacing to 70, Peck TTK 3–4 casts, no self-root, death drop
 - Join: `JoinLobbyByCodeAsync` (type code) or `QueryLobbiesAsync` (browse list).
 - Join code = Fusion session name — one code serves both UGS and Photon matchmaking.
 - Lobby heartbeat (15s) runs automatically while host is in-session; stops on `LeaveLobbyAsync`.
-- **Requires Unity Dashboard project link** — see "Outstanding before next test session" below.
+- **Dashboard link done** (2026-06-11) — see "Project reorganization" session entry below.
 
 ### UI (Phase 10 visual redesign — Clash Royale/Supercell warm palette)
 - **Design tokens** (ART.md §6, `cluckwars-tokens-v2`): panel `#3a2210` warm dark wood, gold `#f5c842`, green CTA `#33a332`, text `#fef5e0`. All inline in code; independent of serialised SO.
@@ -673,60 +672,38 @@ Direction set by Maestro: perfect solo mode before returning to multiplayer.
 
 ## Outstanding before next test session
 
-### Pending Maestro (Editor work — Phase R Part A + Part B)
+**Verified against live code/assets 2026-07-20** — Phase R Part A + Part B editor
+tasks are done except item 1 below. The old 11-item Maestro checklist has been
+retired; only real open items remain.
 
-These steps must be done in the Unity Editor after the code compiles cleanly:
+1. **Commit the uncommitted `Doppelganger.prefab` fix.** Working tree has an
+   unstaged change adding `Fusion.NetworkTransform` to the Doppelganger decoy
+   prefab (the Stage A / C1 networking fix — `Chicken.prefab` had it, the
+   Doppelganger clone didn't). Without this, decoys spawned by the Doppelganger
+   ability freeze for remote peers exactly like the original C1 bug. Review and
+   commit it before the next multi-client test.
+2. **Chicken prefab — `AbilityController._slot2` is still empty** (`{fileID: 0}`).
+   Assign a default Assassin slot-3 ability (e.g. Sneaky Steal) in the Inspector.
+3. **Run the networking editor-verification checklist** — see
+   `docs/HANDOFF-NETWORKING-2026-07.md` bottom section. Stages A–K are code-complete
+   and committed, but the checklist itself (2-client remote-movement, 3-client
+   host-quit, intro button-mash, bot pacing re-measure) has never been executed.
+   This is the actual gate before scheduling a multi-client test session.
+4. **Delete the orphaned duplicate** `Assets/_Game/Prefabs/AbilityZone.prefab`
+   (unreferenced — the live one used by `PrefabRegistry` is
+   `Assets/_Game/Prefabs/Abilities/AbilityZone.prefab`).
 
-1. **Four class `.asset`s** (`Assets/_Game/Data/Classes/`): set the new `Passive` field for each
-   (Warrior=Tough, Speedy=Slippery, Fatty=Immovable, Assassin=Combo).
-   The old `Attack`/`AttackRange`/`AttackCooldown`/`AvailableAbilities` fields will be gone
-   after recompile — Unity will strip them automatically.
-
-2. **AbilityRegistry**: create an `AbilityRegistrySO` asset via `Cluck Wars / Ability Registry`.
-   Drag all 7 ability assets (`Assets/_Game/Data/Abilities/`) into its `All` array.
-   Assign it in `ProjectInstaller._abilityRegistry` on the `ProjectContext` prefab.
-
-3. **Chicken prefab — `AbilityController`**: the `_slot2` field is now exposed.
-   For Assassin builds, assign a default ability to `_slot2` (e.g., Sneaky Steal).
-
-4. **Chicken prefab — AnimatorController**: delete the `Attack` (trigger) parameter,
-   add `AbilityCast` (trigger). `ChickenAnimator` now fires `TriggerAbilityCast()`.
-
-5. **Flying Peck `.asset`** (was Roll & Trample): the asset file itself is unchanged (same GUID).
-   Open it and update `DisplayName` = "Flying Peck", `ShortLabel` = "FP".
-
-6. **ProjectInstaller**: remove any reference to the old `_attackButtonSize`/`_attackAnchoredPosition`
-   inspector values on `TouchControlsHud` — those fields were removed; the GameObject will
-   reset to the new `_ability3AnchoredPosition` default.
-
-**New Phase R Part B Maestro tasks:**
-
-7. **AbilityZone prefab**: create a NetworkObject prefab with the `AbilityZone` script + a trigger sphere collider at `_triggerRadius` = 1.5. Assign to `PrefabRegistrySO.AbilityZone`. (Without this, FeatherTrap and RootEgg log a warning and do nothing.)
-
-8. **Six new ability `.asset`s** — create in `Assets/_Game/Data/Abilities/`:
-   - Cluck Shock (via `Cluck Wars/Ability/Damage/Cluck Shock`): Category=Damage, Cooldown≈10s
-   - Peck (`Cluck Wars/Ability/Damage/Peck`): Category=Damage, Cooldown≈4s
-   - Roll & Push (`Cluck Wars/Ability/Control/Roll and Push`): Category=Control, Cooldown≈4s
-   - Feather Trap (`Cluck Wars/Ability/Control/Feather Trap`): Category=Control, Cooldown≈10s
-   - Feather Aura (`Cluck Wars/Ability/Control/Feather Aura`): Category=Control, Cooldown≈10s
-   - Root Egg (`Cluck Wars/Ability/Control/Root Egg`): Category=Control, Cooldown≈10s
-   Set `AccentColor` and `DisplayName` on each.
-
-9. **AbilityRegistry**: add all 6 new `.asset`s to `AbilityRegistrySO.All`.
-
-10. **Sneaky Steal `.asset`**: set `BotRole = Steal` in Inspector.
-
-11. **MatchBootstrapper** (Game scene): author the `_botLoadouts` preset rows (BOT-3). Recommended set from ROADMAP Phase R-Bot BOT-3 — Bruiser (Flying Peck + Egg Shell, all), Skirmisher (Flying Peck + Speed Burst, all), Tank (Spine Coat + Turtle Mode, Fatty/Warrior), Trickster (Flying Peck + Invisibility, Speedy/Assassin), Thief (Sneaky Steal + Speed Burst + Flying Peck slot2, Assassin). Each row: set `Name`, the slot `.asset`s, and `AllowedClasses` (empty = all). Until authored, bots spawn ability-less (a Warn is logged).
-
-Pre-existing Maestro tasks still pending:
-- **UGS Dashboard link** (Phase 10): Unity → Project Settings → Services → link org. Enable Auth + Lobby.
+Optional / low-priority:
 - **ColorScheme.asset**: hit "Reset" in Inspector for Phase 10 warm palette on `TouchControlsHud`.
-- Optional: fill `AudioRegistry` clips.
+- Fill `AudioRegistry` clips (currently silent → procedural audio bank fallback covers it).
+- Human feel-pass (from the improvement-plan closeout): deposit interception window,
+  banner readability, observe the *Restock* comeback event at least once, sanity-check
+  kill-bounty generosity.
 
 ### Pending agents (code)
-- Phase R Part A: **complete**. See ROADMAP.md § Phase R for what's done.
-- Phase R Part B: **complete** (code). Remaining: Maestro steps below + B6 balance pass (test session) + B7 VFX (test session).
-- Phase R-Bot: **complete** (code), including BOT-3 randomized loadout. `MatchBootstrapper` has a `BotLoadoutPreset[] _botLoadouts` pool; `TrySpawnBots` rolls a random eligible preset per bot via `TryPickBotLoadout` and equips it through `SetSlots`. Class restrictions on presets are bot-AI flavor only (do not gate the player UI — GDD §7.1). Remaining: Maestro authors the preset rows (step 11 below) + BOT-8 tuning (test session).
+- Phase R Part A + Part B: **complete** (code + assets, verified). See ROADMAP.md § Phase R.
+- Phase R-Bot: **complete**, including BOT-3 randomized loadout — 6 presets authored
+  in `Game.unity` (`_botLoadouts`: Bruiser/Skirmisher/Tank/Trickster/Thief/Trapper).
 - `ISessionSelectionService` carries `Ability0`/`Ability1`/`Ability2`; `MatchBootstrapper`
   calls `AbilityController.SetSlots(slot0, slot1, slot2)` in `onBeforeSpawned`.
 
@@ -785,7 +762,7 @@ failure matrix.
 
 ## Session 2026-07-10 — Improvement Plan (IP0 to IP8) Complete
 
-Applied the full gameplay and system improvement plan (`docs/IMPROVEMENT_PLAN_2026-07-09.md`) across all nine workstreams:
+Applied the full gameplay and system improvement plan (source doc removed after completion) across all nine workstreams:
 
 - **IP0: Quick correctness + identity fixes:**
   - Corrected spelling of `Speedy` class display name.
