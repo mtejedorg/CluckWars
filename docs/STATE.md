@@ -672,26 +672,16 @@ Direction set by Maestro: perfect solo mode before returning to multiplayer.
 
 ## Outstanding before next test session
 
-**Verified against live code/assets 2026-07-20** — Phase R Part A + Part B editor
-tasks are done except item 1 below. The old 11-item Maestro checklist has been
-retired; only real open items remain.
+**Verified against live code/assets 2026-07-20; housekeeping pass same day closed
+3 of the 4 items found in that verification** (Doppelganger fix committed `ece94b1`,
+Assassin slot-3 assigned `183e421`, dead duplicate prefab removed `4ba742d`). One
+real item remains:
 
-1. **Commit the uncommitted `Doppelganger.prefab` fix.** Working tree has an
-   unstaged change adding `Fusion.NetworkTransform` to the Doppelganger decoy
-   prefab (the Stage A / C1 networking fix — `Chicken.prefab` had it, the
-   Doppelganger clone didn't). Without this, decoys spawned by the Doppelganger
-   ability freeze for remote peers exactly like the original C1 bug. Review and
-   commit it before the next multi-client test.
-2. **Chicken prefab — `AbilityController._slot2` is still empty** (`{fileID: 0}`).
-   Assign a default Assassin slot-3 ability (e.g. Sneaky Steal) in the Inspector.
-3. **Run the networking editor-verification checklist** — see
+1. **Run the networking editor-verification checklist** — see
    `docs/HANDOFF-NETWORKING-2026-07.md` bottom section. Stages A–K are code-complete
    and committed, but the checklist itself (2-client remote-movement, 3-client
    host-quit, intro button-mash, bot pacing re-measure) has never been executed.
    This is the actual gate before scheduling a multi-client test session.
-4. **Delete the orphaned duplicate** `Assets/_Game/Prefabs/AbilityZone.prefab`
-   (unreferenced — the live one used by `PrefabRegistry` is
-   `Assets/_Game/Prefabs/Abilities/AbilityZone.prefab`).
 
 Optional / low-priority:
 - **ColorScheme.asset**: hit "Reset" in Inspector for Phase 10 warm palette on `TouchControlsHud`.
