@@ -75,7 +75,7 @@ PrefabInstance:
     - target: {fileID: 8810401778881765308, guid: 715ce6f3a16e16c4daaced5f3b81b068, type: 3}
       propertyPath: 'NetworkedBehaviours.Array.data[5]'
       value: 
-      objectReference: {fileID: 4310573928164825946, guid: 715ce6f3a16e16c4daaced5f3b81b068, type: 3}
+      objectReference: {fileID: 5736875493823057097}
     - target: {fileID: 8810401778881765308, guid: 715ce6f3a16e16c4daaced5f3b81b068, type: 3}
       propertyPath: 'NetworkedBehaviours.Array.data[6]'
       value: 
@@ -129,6 +129,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d3258e9f2e07b7d41a8480f1201fddc7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenMatchStats
+--- !u!114 &5736875493823057097 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4310573928164825946, guid: 715ce6f3a16e16c4daaced5f3b81b068, type: 3}
+  m_PrefabInstance: {fileID: 8380994380187867027}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1437319008701371653}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 158639473, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkTransform
 --- !u!114 &8441913460749156585 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 101601932164880250, guid: 715ce6f3a16e16c4daaced5f3b81b068, type: 3}
