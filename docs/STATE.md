@@ -19,6 +19,50 @@ All tags pushed to origin.
 
 ---
 
+## ✅ Test-session setup pass (2026-07-20)
+
+Pre-flight for Maestro's hands-on test session. Verified against the real Editor
+(Unity 6000.3.14f1, MCP live) and the real asset files — not against doc prose.
+
+**Verified healthy (no action needed):**
+- **Compile clean.** `assets-refresh` (ForceSynchronousImport) → zero errors; every
+  `CluckWars.*` type resolves. Covers checklist item 1 of the networking handoff.
+- **`Chicken.prefab` is fully wired.** MCP component dump confirms `Fusion.NetworkObject`
+  + **`Fusion.NetworkTransform`** (C1 fixed), and exactly **one** each of `BotController`
+  and `ChickenVFX` (C2 duplicates gone). `ChickenMatchStats` + `BotController` both
+  present — the two "pending Maestro prefab wiring" notes below were **stale**.
+- **`_botLoadouts` intact** — all six presets with live ability GUIDs (it was wiped once
+  by a bad scene save in B2, so it is now re-verified).
+- **Logging is convention-clean.** No `Debug.Log` anywhere in runtime gameplay. The only
+  hits are legitimate: editor-only tooling (`CluckWarsBuildMenu`, `TmpEssentialsAutoImport`),
+  the sink itself (`UnityLogService`), pre-logger bootstrap (`ProjectInstaller`), and an
+  `#if UNITY_EDITOR OnValidate` authoring check (`ChickenClassRegistrySO`).
+
+**Added — the project's first automated tests.**
+`Assets/_Game/Scripts/Editor/Tests/CoreLogicTests.cs` — 8 EditMode tests, **8/8 green**
+via `tests-run`. Pins `UiGfx.Hex32` parsing, `MenuUiController.GetPassiveInfo` per-class
+metadata (incl. the Assassin COMBO passive that gates the 3rd ability slot), and
+`ChickenClassRegistrySO` lookup + its documented Warrior fallback.
+
+> **Why an Editor folder and not an `.asmdef`:** game code lives in the predefined
+> `Assembly-CSharp`, which a test `.asmdef` cannot reference. Wrapping the game in its own
+> asmdef would be the "proper" fix but is **unsafe to do casually** — Fusion 2's IL weaver
+> is configured against the current assembly set, and a new asmdef can silently stop
+> `NetworkBehaviour` weaving (a clean compile will NOT catch it; it fails at runtime).
+> Tests in an `Editor/` folder compile into `Assembly-CSharp-Editor`, which auto-references
+> the game assembly — full access, zero weaver risk. Revisit the asmdef split deliberately,
+> not before a test session.
+
+**Doc fixes:** `.claude/CLAUDE.md` pointed at `Assets/Scenes/` for the main scenes; they
+actually live in `Assets/_Game/Scenes/`. Corrected.
+
+**Known cosmetic inconsistency (not fixed — design call):** the Warrior passive is named
+`Tough` in code (`ChickenController.ToughDamageBonus = 1.25f`) and in these docs, but the
+UI shows **MIGHTY**. The mechanic itself is real and correctly wired — Peck / CluckShock /
+RollTrample all route through `ChickenController.ApplyOutgoingDamage`. Naming only.
+
+---
+
 ## ⚙ Networking review fixes landed (2026-07-18) — EDITOR VERIFICATION PENDING
 
 Full networking subsystem review (findings C1–L9) executed as
@@ -56,10 +100,19 @@ then QA'd by Claude (AOI revert `b4db53d` + fix-ups). What changed:
 - **Reverted:** agy went off-script once and enabled AOI/interest management
   (explicitly out of scope) — reverted in `b4db53d`. Watch for this pattern.
 
-**NOT yet done — blocks the multi-client test session:** the editor verification
-checklist at the bottom of `docs/HANDOFF-NETWORKING-2026-07.md` (compile check,
-solo run, 2-client remote-movement check, 3-client host-quit test, intro
-button-mash check, bot pacing re-measure).
+**Editor verification checklist** (bottom of `docs/HANDOFF-NETWORKING-2026-07.md`) —
+status as of the 2026-07-20 setup pass:
+- [x] **1. Compile + prefab integrity** — zero errors; `Chicken.prefab` has
+  `NetworkTransform` and no duplicate `BotController`/`ChickenVFX`. Done via MCP.
+- [ ] 2. Solo run — bots at believable (halved) speed, single VFX bursts, no errors @32 Hz.
+- [ ] 3. 2-client — **remote chicken visibly moves** (the whole point of C1), totals
+      consistent across peers, center pile 1.5× on both.
+- [ ] 4. 3-client host-quit — world objects survive, master promotes, match continues.
+- [ ] 5. Intro button-mash — nothing fires at match start.
+- [ ] 6. Bot pacing re-measure vs. the WS1 numbers (Stage B halved bot speed).
+
+Items 2–6 need a human at the keyboard (play mode + multi-client) — they are the
+test session. See the ordered plan in `docs/TESTING.md`.
 
 ---
 
@@ -416,11 +469,11 @@ acceptance passes (pacing to 70, Peck TTK 3–4 casts, no self-root, death drop
   - Speed boost: Speed Burst, Roll & Push (caster-side)
 - `AbilityCategory` and `BotRole` authored on every AbilityBaseSO subclass.
 
-### DCBA polish (code complete — pending Maestro prefab wiring for B + A)
+### DCBA polish (code complete — prefab wiring VERIFIED DONE 2026-07-20)
 - **D — Dead visual states**: `ChickenVisuals` greys out + goes semi-transparent (0.40 alpha) when `IsStunned`. `ChickenNameplate` shows red "☠" while dead; restores the normal label on respawn.
 - **C — Screen shake**: `MatchCamera.Instance.ApplyShake()` called on HP decrease (0.12 mag / 0.25s) and on death (0.35 mag / 0.45s). Linear decay, y-axis damped 0.3×. Only fires on `HasInputAuthority` (local chicken).
-- **B — Match stats**: New `ChickenMatchStats` NetworkBehaviour (`[Networked] Kills` + `FoodDeposited`). `ChickenCombat.CreditKillToAttacker()` credits kills via RPC. `ChickenCargo.TryDepositAtNearbyBase()` records deposits. `GameManager.RestartMatch()` resets stats. Match-end overlay shows `food | kills` per player. **Maestro: add `ChickenMatchStats` component to Chicken prefab.**
-- **A — AI bots (solo mode)**: `ChickenController.IsBot` [Networked] + `BotTick()`. `BotController` NetworkBehaviour (FSM: **Idle / CollectFood / ReturnToBase / Flee / Hunt**; throttled Think @ 0.3s). Phase R-Bot: 5-tier decision priority, `FindNearestRival` perception, `ReactWithAbility()` role-preference dispatch (Defense→Escape→Control on Flee; Steal→Offense→Control on Hunt), per-class personality (`ApplyClassPersonality()`). `MatchBootstrapper._soloBotsToSpawn = 3`; bots roll a random eligible loadout from the `_botLoadouts` preset pool (BOT-3, `TryPickBotLoadout` — class restrictions are bot-only flavor). **Maestro: add `BotController` component to Chicken prefab + author the `_botLoadouts` preset rows.**
+- **B — Match stats**: New `ChickenMatchStats` NetworkBehaviour (`[Networked] Kills` + `FoodDeposited`). `ChickenCombat.CreditKillToAttacker()` credits kills via RPC. `ChickenCargo.TryDepositAtNearbyBase()` records deposits. `GameManager.RestartMatch()` resets stats. Match-end overlay shows `food | kills` per player. ~~Maestro: add `ChickenMatchStats` component to Chicken prefab.~~ **DONE** — verified present on `Chicken.prefab` via MCP component dump, 2026-07-20.
+- **A — AI bots (solo mode)**: `ChickenController.IsBot` [Networked] + `BotTick()`. `BotController` NetworkBehaviour (FSM: **Idle / CollectFood / ReturnToBase / Flee / Hunt**; throttled Think @ 0.3s). Phase R-Bot: 5-tier decision priority, `FindNearestRival` perception, `ReactWithAbility()` role-preference dispatch (Defense→Escape→Control on Flee; Steal→Offense→Control on Hunt), per-class personality (`ApplyClassPersonality()`). `MatchBootstrapper._soloBotsToSpawn = 3`; bots roll a random eligible loadout from the `_botLoadouts` preset pool (BOT-3, `TryPickBotLoadout` — class restrictions are bot-only flavor). ~~Maestro: add `BotController` component to Chicken prefab + author the `_botLoadouts` preset rows.~~ **DONE** — verified 2026-07-20: exactly one `BotController` on `Chicken.prefab` (no C2 duplicate), and all six `_botLoadouts` presets (Bruiser/Skirmisher/Tank/Trickster/Thief/Trapper) intact with live ability GUIDs in `Assets/_Game/Scenes/Game.unity`.
 
 ### Match lifecycle
 - `GameManager` state machine: `WaitingForPlayers` → `Active` → `Ended` → restart.

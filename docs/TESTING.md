@@ -162,6 +162,60 @@ This replaces emulator-based testing entirely; for real-device checks use the Pi
 
 ---
 
+## Automated tests
+
+### EditMode unit suite
+
+`Assets/_Game/Scripts/Editor/Tests/CoreLogicTests.cs` — the project's automated
+regression net. Covers the Fusion-independent pure logic (colour-token parsing,
+per-class passive metadata, class-registry lookup + Warrior fallback).
+
+**Run it three ways:**
+
+| How | Command |
+|---|---|
+| Editor UI | `Window ▸ General ▸ Test Runner ▸ EditMode ▸ Run All` |
+| Agent (Unity MCP) | `tests-run` with `testMode: EditMode` |
+| Headless CI | `Unity.exe -runTests -batchmode -projectPath . -testPlatform EditMode -testResults results.xml` |
+
+Expected: **8/8 passed, 0 failed.** Any red here means a shared helper regressed —
+fix before spending a play-mode session chasing it.
+
+**Scope limits — read before adding tests.** Movement, damage, cargo, and match flow
+live in `NetworkBehaviour`s and need a live `NetworkRunner`; they are **not**
+unit-testable and are covered by the play-mode + multi-client plan instead. Do not try
+to "fix" this by wrapping the game in an `.asmdef`: game code is in the predefined
+`Assembly-CSharp`, and adding a runtime asmdef can silently break **Fusion's IL weaver**
+(NetworkBehaviours stop being woven — compiles fine, fails at runtime). The tests live
+in an `Editor/` folder precisely to get game-code access without that risk.
+
+### Log levels — turning up the signal
+
+`ILogService` filters by `level >= MinLevel` (`CluckWars.Logging.LogLevel`):
+
+| Level | Value | Use |
+|---|---|---|
+| `Verbose` | 0 | every-frame trace, input, transform deltas |
+| `Debug` | 1 | state transitions, network events, spawn flow |
+| `Info` | 2 | milestones (match start, scene load) |
+| `Warn` | 3 | recoverable anomalies |
+| `Error` | 4 | unrecoverable, usually with an exception |
+| `Off` | 5 | silence |
+
+Set it on the **`ProjectContext` prefab → `ProjectInstaller` → `Log Min Level`**
+(`Assets/_Game/Resources/ProjectContext.prefab`; field `_logMinLevel`, defaults to
+`Verbose`).
+
+- **`Debug`** is the right level for a test session — you get bot FSM transitions,
+  spawn flow, and network events without the per-tick `Verbose` firehose.
+- Drop to **`Verbose`** only when chasing a specific bug (per-tick cargo/collect
+  tracing). Note the hot Verbose calls are `IsEnabled`-gated, so raising `MinLevel`
+  genuinely removes the string-building cost.
+- Never test at `Warn` — you lose the state-transition breadcrumbs that make a
+  failure diagnosable.
+
+---
+
 ## Debug HUD (F1)
 
 While playing, press **F1** to toggle the developer overlay (`DebugHud` MonoBehaviour). Shows:
@@ -314,6 +368,110 @@ For agents handling a Maestro bug report, ask for:
 6. **Commit SHA** the build was made from (`git rev-parse HEAD` at build time; matches the APK's bundle version if iterations follow the build menu's filename pattern).
 
 That set is usually enough to localize the bug to a subsystem without another test cycle.
+
+---
+
+## Test session plan — networking verification (authoritative, 2026-07-20)
+
+The ordered plan for the current session. It closes the editor-verification checklist
+in `docs/HANDOFF-NETWORKING-2026-07.md` (items 2–6; item 1 is already done). Run in
+order — each stage gates the next. **Set `Log Min Level = Debug` first** (see
+"Log levels" above).
+
+Legend: **Watch** = log tags/levels to follow. **Pass** = the criterion. Stop and
+capture logs on any fail rather than pushing to the next stage.
+
+### T0 — Static gate (2 min, no play mode)
+
+| Step | Watch | Pass |
+|---|---|---|
+| Run the EditMode suite (`Test Runner ▸ EditMode ▸ Run All`) | — | 8/8 green |
+| Clear the Console, then `Ctrl+R` (reimport/recompile) | Console `Error` | zero errors |
+
+### T1 — Solo smoke, in Editor (golden path)
+
+Play from `Bootstrap.unity`. Pick a class → **S** (Solo) → **SPACE**.
+
+| Step | Watch | Pass |
+|---|---|---|
+| Runner starts, map builds | `[Fusion]` Info, `[MapGen]` Debug | `StartGame OK`; piles/bases/walls spawn, no NRE |
+| Intro countdown 3-2-1 | `[GameManager]` Info | countdown runs then `Match started` |
+| **Bot speed (Stage B regression)** | `[BotController]` Debug FSM transitions | bots move at a *believable* pace — **not** the old double-speed. This is the C2 fix landing |
+| Food loop | `[Cargo]` Debug, `[FoodPile]`, `[PlayerBase]` | bots drain piles, cargo fills, deposits land; leaderboard climbs |
+| VFX | visual | **single** burst per cast — a double burst means a duplicate `ChickenVFX` came back |
+| Win + restart | `[GameManager]` Info | win fires at target, match-end overlay, auto-restart resets bases/piles/positions |
+| Whole run | Console `Error` | **zero** errors/exceptions |
+
+F1 toggles the Debug HUD for live state; F2 shows the balance panel.
+
+### T2 — Intro input latch (Stage I.3 edge case)
+
+During the 3-2-1 countdown, **mash Q / E / R and the touch ability hexes**.
+
+**Pass:** nothing fires on match frame one — no `[Ability]` activation logs until
+after `GO!`. A cast landing at t=0 means the latch-clear regressed.
+
+### T3 — 2-client, the C1 headline (**the single most important test**)
+
+Build first: `Cluck Wars ▸ Build ▸ Windows` (`Ctrl+Shift+W`), then:
+
+```powershell
+.\tools\run-clients.ps1 -Count 2
+```
+
+Client 1 = **H**ost (note the 6-char code), client 2 = **J**oin + code. Host presses
+START MATCH.
+
+| Check | Watch | Pass |
+|---|---|---|
+| Both peers in one room | `[Fusion]` Info both logs | same session name; `Players: 2 / 4` |
+| **Remote chicken visibly moves** | watch the *other* player's chicken | it **moves**. Frozen-at-spawn = `NetworkTransform` not replicating → C1 regressed. Everything else is secondary to this |
+| Food totals agree | `[Cargo]`/`[PlayerBase]` on both | scores match across screens (±one 4 Hz batch — Stage D batches to ~0.25 s) |
+| Center pile | visual, both peers | 1.5× on **both**, and both collide with it at the same radius (Stage H) |
+| Abilities cross-peer | `[Ability]`, `[Combat]` | damage/stun/knockback replicate; VFX fire on both |
+
+Per-client logs: `Builds/Windows/logs/clientN.log`; live tail with
+`.\tools\run-clients.ps1 -Tail 1`.
+
+### T4 — 3-client host-quit (Stage E, the risky one)
+
+```powershell
+.\tools\run-clients.ps1 -Count 3
+```
+
+All three join, start the match, then **close client 1 (the master) mid-match**.
+
+**Pass:** piles / bases / `GameManager` **survive**; a remaining peer is promoted
+master; the match keeps running and is still winnable.
+
+**Fail mode + the known fix:** if world objects vanish and gameplay freezes, the
+`DestroyWhenStateAuthorityLeaves` bit (0x40000) is still set — STATE.md records the
+remedy: change the world-object prefabs' `NetworkObject` `Flags: 393217` → **`131073`**.
+That is a deliberate, documented follow-up, not an improvisation.
+
+### T5 — Abuse pass (only after T1–T4 are green)
+
+- Spam class-select / Back / Start during lobby and intro.
+- Deposit at another player's base; stand between two piles; die with a full cargo.
+- Join with a wrong/lowercase code (case fix shipped v0.3.2).
+- Let a match end on the **timer** with a 0–0–0–0 tie (this path historically hid the
+  broken-collection bug).
+- 4th client → full lobby; then a 5th → expect a clean `ServerFull` refusal.
+
+### T6 — Bot pacing re-measure (Stage B caveat)
+
+All pacing data before 2026-07-18 was measured with **double-speed bots** and is void.
+Run 2–3 solo matches and record time-to-win-target. Design goal: uncontested
+time-to-target ≈ **70 % of the 180 s timer**. Feed the numbers to the balance pass —
+do **not** retune off the old WS1 overshoot numbers.
+
+### T7 — Pixel 9 (optional, needs the device)
+
+`Ctrl+Shift+A` (use the **Restore Windows Target** variant to keep MCP alive), then
+`adb install -r Builds/Android/CluckWars-*.apk`. Solo smoke + a cross-platform join
+against a Windows host. Watch `adb logcat -s Unity:* CluckWars:*`. Check FPS ≈ 30 and
+that the menu fits the screen (the `ScaleWithScreenSize` fix — PanelSettings is baked
+into the player, so this only proves out in a real build).
 
 ---
 
