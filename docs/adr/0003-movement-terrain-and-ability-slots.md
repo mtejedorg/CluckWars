@@ -103,7 +103,57 @@ along its preferred lanes to open them.
 > Every class's power curve is a function of how open the map is.**
 
 Anything that breaks the monotonic open-up (refilling piles mid-match, spawning new
-obstacles) must be justified against this pillar.
+obstacles) must be justified against this pillar. **The center pile is the one sanctioned
+exception — see below.**
+
+### Decision 2b — The center pile is permanent (the anchor)
+
+The center pile **can never be removed**. It is the one piece of terrain that survives to the
+final second.
+
+```
+Amount ∈ [floor, max]      // floor ≈ 60% of max — never drainable below
+regen  → slowly refills toward max
+```
+
+Conceptually: *a mountain with food on it. You harvest the surface; the mountain stays.*
+
+**Why this is required, not optional.** Without it, every traversal ability becomes dead
+weight exactly when the map opens — Vault, Barge and Blink are all useless on an empty field,
+and the Run/Skip/Deny triangle collapses to pure Run in the endgame. That is the precise
+failure the triangle exists to prevent. A permanent central obstacle keeps **Skip** live for
+the whole match, and gives Fatty a permanent home turf (a cleaner fix for Fatty's late game
+than the terrain-maker mitigation below — the two are complementary).
+
+The late-game arena becomes a **donut**: open field, one contested core, fights orbiting it.
+A strictly better endgame shape than an empty plane.
+
+**Do NOT make it literally infinite.** Unbounded food removes scarcity; the win condition
+degenerates into an uncontested hauling-throughput race with no way to deny anyone. The floor
++ regen model gives something better: **the center pile's size is a live readout of contest
+intensity.** One farmer → regen keeps pace, it stays fat. Three fighting over it → they
+out-drain regen, it shrinks toward the floor, and cover vanishes exactly as the fight gets
+crowded. Self-balancing and readable from across the map.
+
+**Shape thresholds** (discrete, not continuous — readable for players *and* it avoids NavMesh
+re-carve thrash):
+
+| State | Amount | Form | Play effect |
+|---|---|---|---|
+| **Mountain** | 100–75% | full radius, solid | route around entirely; max cover |
+| **Plateau** | 75–40% | same radius, 3–4 channels cut through | chokepoints — fight lanes open |
+| **Mesa** (floor) | 40%–floor | smaller solid core + wide slow-apron | permanent; max contest, min cover |
+
+⚠ **Scope:** the Plateau's channels need multiple colliders, not one capsule — materially more
+work than radius stepping. **Slice 1 ships radius-only stepping** (Mountain → smaller → Mesa);
+channels are a later enhancement. That tests the tempo idea at a fraction of the cost.
+
+**Camping is self-limiting** — scoring requires depositing at your *base*, so the centre is
+inherently a round-trip and cargo capacity caps any stay. Camping to *deny* is legitimate
+area denial and self-corrects in a 4-player FFA.
+
+The final-minute comeback events / golden pile (IP2) should now be tuned to land at or near
+the centre, reinforcing convergence.
 
 ---
 
@@ -213,18 +263,24 @@ slot without a cooldown ring.
 
 ## Open questions
 
-1. **Pile exhaustion curve.** The map holds ~220 food; the win target is 110. Piles must be
-   *partly* exhausted at the 3-minute mark — not fully, or the late game has nothing to fight
-   over. Target: pile mass ~30–40% remaining at timer expiry. Needs measurement.
-2. **Center pile as last stand.** The center pile is 1.5×. If tuned to drain slowest it
-   becomes the natural endgame convergence point — an emergent shrinking arena. Probably
-   desirable; make it intentional.
-3. **Positive feedback loop.** Speedy's scoring action (emptying piles) also builds Speedy's
+1. **Pile exhaustion curve.** The map holds ~220 food; the win target is 110. Outer piles
+   must be *partly* exhausted at the 3-minute mark — not fully, or the late game has nothing
+   to fight over outside the centre. Target: outer pile mass ~30–40% remaining at timer
+   expiry. Needs measurement. Note the centre's regen adds to effective map supply — retune
+   `FoodTargetToWin` against total *throughput*, not starting mass.
+2. ~~Center pile as last stand.~~ **RESOLVED — see Decision 2b.** Permanent, floored, with
+   regen and discrete shape states.
+3. **Center regen rate** is now the single most sensitive number in the design: too high and
+   the endgame is a free farm with no scarcity; too low and the centre erodes to Mesa in the
+   first minute and stops being an obstacle. Start conservative (regen ≈ one player's steady
+   drain) and measure.
+4. **Positive feedback loop.** Speedy's scoring action (emptying piles) also builds Speedy's
    late-game advantage. The opened lane benefits everyone, which dampens it, but watch for
    runaway leaders.
-4. **Readability.** Players must be able to *see* a pile shrinking and predict when a lane
-   opens. Without that the map "randomly" changes. Needs a visual pass.
-5. **Final-minute events.** The existing comeback events / golden pile (IP2) should be tuned
+5. **Readability.** Players must be able to *see* a pile shrinking and predict when a lane
+   opens. Without that the map "randomly" changes. Needs a visual pass. The centre's three
+   named states (Mountain/Plateau/Mesa) should be visually unmistakable at a glance.
+6. **Final-minute events.** The existing comeback events / golden pile (IP2) should be tuned
    to land in the now-open late game. Late-scaling passives (e.g. Second Wind) may want to
    key off match time.
 
@@ -234,9 +290,11 @@ slot without a cooldown ring.
 
 Do **not** build this in one pass. Ship the cheapest slice that can falsify the whole idea:
 
-1. **Slice 1 — continuous pile footprint.** `blockerRadius`/`visualScale` as functions of
-   `Amount/MaxAmount`. Cheap (plumbing exists), and immediately testable: does the map
-   opening up *feel* like a tempo change?
+1. **Slice 1 — pile footprint + permanent centre.** `blockerRadius`/`visualScale` stepped
+   from `Amount/MaxAmount` on outer piles; centre pile gets floor + regen + radius-only shape
+   stepping (no channels yet). Cheap — the plumbing exists — and immediately testable: does
+   the map opening up *feel* like a tempo change, and does the centre hold as a late-game
+   arena?
 2. **Slice 2 — Vault on Flying Peck only.** Add `TerrainTraversal`, implement `Vault`, bump
    wall density. Playtest **Warrior vs Speedy** — that single matchup tests the whole
    triangle.
