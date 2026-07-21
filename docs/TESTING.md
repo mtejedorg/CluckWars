@@ -130,17 +130,22 @@ After adding the config and **restarting Claude Code**:
 
 ## Running
 
+> ⚠️ **There are no menu keyboard shortcuts.** The old `1-4 / S / H / J / SPACE` bindings
+> belonged to the procedural-UGUI `CharacterSelectController`, which was **deleted** in the
+> UI Toolkit migration. `MenuUiController` never reimplemented them. **Navigate the menus by
+> clicking.** (In-game keys — WASD, Q/E/R, F1, F2 — are unaffected and still work.)
+
 ### Solo (PC or Android)
 
-1. Pick a class (1-4) and press **S** for Solo + SPACE.
+1. Click a class card, then click **SOLO**, then click the confirm/start button.
 2. `GameMode.Single` runner spawns. No lobby — `GameManager` auto-starts the match.
 3. Movement works immediately after the 3-second intro countdown.
 
 ### Multiplayer (via Photon Cloud relay + UGS Lobby)
 
-1. **Host** (any device): pick class, press **H** + SPACE. UGS creates a lobby with a unique
+1. **Host** (any device): click a class, click **HOST**, confirm. UGS creates a lobby with a unique
    6-char join code (shown in the **MATCH LOBBY** overlay). The code is also the Fusion session name.
-2. **Joiner(s)**: pick class, press **J** + SPACE, enter the host's code (or pick from the lobby browser).
+2. **Joiner(s)**: click a class, click **JOIN**, confirm, then type the host's code (or pick from the lobby browser).
 3. Host clicks **START MATCH** when ready. Player count is shown live as `Players: X / Y` (Y from `MatchConfigSO.MaxPlayers`, default 4). **No minimum — host can start with just themselves.**
 4. Intro countdown plays on every peer simultaneously, then the round begins.
 
@@ -390,7 +395,8 @@ capture logs on any fail rather than pushing to the next stage.
 
 ### T1 — Solo smoke, in Editor (golden path)
 
-Play from `Bootstrap.unity`. Pick a class → **S** (Solo) → **SPACE**.
+Play from `Bootstrap.unity`. **Click** a class card → **SOLO** → confirm. (No menu
+keyboard shortcuts exist — see the warning under "Running".)
 
 | Step | Watch | Pass |
 |---|---|---|
@@ -419,8 +425,8 @@ Build first: `Cluck Wars ▸ Build ▸ Windows` (`Ctrl+Shift+W`), then:
 .\tools\run-clients.ps1 -Count 2
 ```
 
-Client 1 = **H**ost (note the 6-char code), client 2 = **J**oin + code. Host presses
-START MATCH.
+Client 1 = **Host** (note the 6-char code), client 2 = **Join** + code — all by clicking.
+Host clicks START MATCH.
 
 | Check | Watch | Pass |
 |---|---|---|

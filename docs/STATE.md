@@ -19,6 +19,59 @@ All tags pushed to origin.
 
 ---
 
+## 🎮 Maestro playtest feedback — movement & terrain (2026-07-21) — OPEN
+
+First hands-on feedback of the test session. This is **design direction, not a bug list.**
+
+**Core principle (new, load-bearing):**
+> **A straight path should never work.** Chasing and escaping must be *routing* problems,
+> not pure speed races. If the fastest chicken always wins by running in a straight line,
+> movement abilities are decoration.
+
+**Requested changes:**
+1. **Bigger food piles — physical size, NOT food amount.** Keep `FoodAmount` as-is; grow the
+   visual mesh + the `CreateBlocker` capsule so piles read as real obstacles you must route
+   around. ⚠ Watch the coupling documented in `FoodPile.CreateBlocker`: the blocker radius
+   (currently 0.65) is deliberately held *under* `CollectRadius` minus the chicken capsule so
+   edge-collection still works. Growing the blocker without re-deriving that relationship
+   will silently break collection again (the 2026-06-01 game-breaking bug).
+2. **More interior walls.** `MapGenerator.BuildInteriorWalls` currently caps at 6 segments
+   placed by rejection sampling. Raise the count/density so the arena has real lanes.
+   Re-check the keep-clear zones (center pile, corner bases, island positions) and NavMesh
+   bake — bots path via `NavMesh.CalculatePath`, so denser geometry must stay solvable.
+3. **Define which abilities "skip" terrain.** ← *the real design task.* There is currently
+   **no terrain-traversal concept in the ability system at all.** Needs an explicit spec:
+   which abilities ignore walls/piles (jump-over? dash-through? teleport?), and how that is
+   expressed on `AbilityBaseSO` (e.g. a `TerrainTraversal` enum: `None` / `OverLow` /
+   `Through` / `Teleport`). Candidates to classify: Flying Peck, Roll & Push, Roll & Trample,
+   Speed Burst, Doppelganger. Once abilities can bypass terrain, walls/piles stop being pure
+   friction and become **counterplay** — which is the whole point of items 1 and 2.
+
+**Sequencing note:** item 3 is the design decision; 1 and 2 are tuning that only pays off
+once 3 exists. Doing 1+2 alone risks a slower, more annoying game rather than a more tactical
+one. Route through `mechanics-designer` for the traversal spec, then `level-designer` for
+wall/pile density.
+
+**Balance caveat:** bot pacing must be re-measured *after* these land — the Stage-B
+double-speed-bot correction already invalidated all pre-2026-07-18 pacing data, and denser
+terrain will slow routing further (the 2026-07-07 walls pass already cost ~20 s of pace).
+
+---
+
+## ⚠️ Menu keyboard shortcuts do not exist (documented 2026-07-21)
+
+The `1-4 / S / H / J / SPACE` bindings described throughout older docs belonged to the
+procedural-UGUI `CharacterSelectController`, **deleted** in the UI Toolkit migration.
+`MenuUiController` never reimplemented them; only doc-comments reference the old class.
+**Menus are click-only.** In-game keys (WASD, Q/E/R, F1, F2) are unaffected — they route
+through `FusionNetworkService`'s input latch, not the menu.
+
+Not a bug — a missing feature nobody noticed because the UI is clickable. Re-adding
+shortcuts would meaningfully speed up multi-client test loops (4 clients × menu clicks per
+run); logged as a candidate, not scheduled.
+
+---
+
 ## ✅ Test-session setup pass (2026-07-20)
 
 Pre-flight for Maestro's hands-on test session. Verified against the real Editor
