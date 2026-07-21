@@ -19,6 +19,30 @@ All tags pushed to origin.
 
 ---
 
+## 🧭 ADR 0003 — movement, terrain & ability slots (2026-07-21) — DESIGN ACCEPTED
+
+The feedback below converged into a full design, now recorded as
+**`docs/adr/0003-movement-terrain-and-ability-slots.md`**. Read that before touching
+movement, abilities, or piles. Headlines:
+
+- **New design pillar — the map opens as the match progresses.** Food piles are consumable
+  terrain: blocker radius + visual scale are continuous functions of `Amount/MaxAmount`, so
+  draining a pile is a *permanent edit to the map*. Early game is a maze (Fatty strong), late
+  game is a track (Speedy strong). Gives the match a tempo arc with no scripting, and turns
+  the speed spread from a flat balance problem into a time-dependent one.
+- **Three mobility currencies** (Run / Skip / Deny) via a new `TerrainTraversal` field
+  (`None`/`Vault`/`Barge`/`Blink`). Fastest class gets no traversal; slowest gets the best.
+  `MoveSpeed` spread compresses 2.5× → 1.4×.
+- **Slot model:** 1 mandatory class-passive slot + 1 Common + 2 Character abilities.
+  Assassin's COMBO passive grants a 3rd Character slot; OPPORTUNIST is the alternative fork.
+  All 14 existing abilities are assigned to class pools — nothing wasted, nothing new needed.
+- **Build order is strict** and starts with the pile slice (mostly plumbed already), NOT the
+  slot restructure. Speed retune comes last.
+
+Original raw feedback preserved below for provenance.
+
+---
+
 ## 🎮 Maestro playtest feedback — movement & terrain (2026-07-21) — OPEN
 
 First hands-on feedback of the test session. This is **design direction, not a bug list.**
