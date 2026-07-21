@@ -99,11 +99,24 @@ along its preferred lanes to open them.
 
 ### Design pillar (binding)
 
-> **The map opens as the match progresses. Early game is a maze; late game is a track.
-> Every class's power curve is a function of how open the map is.**
+> **The map's *density* drops as the match progresses. Every class's power curve is a
+> function of how open the map is.**
 
-Anything that breaks the monotonic open-up (refilling piles mid-match, spawning new
-obstacles) must be justified against this pillar. **The center pile is the one sanctioned
+⚠ **Correction (2026-07-21):** an earlier draft framed this as "early game is a maze, late
+game is a track." That overstated it. **Interior walls and boundary walls are permanent** —
+`MapGenerator.BuildInteriorWalls` places up to 6 low wall segments that never disappear. Only
+*piles* are consumable. So the real arc is:
+
+```
+early:  walls + centre + many outer piles     (dense)
+late:   walls + centre                        (moderate — lanes, not an empty field)
+```
+
+That is a **gentler, better arc** than the original framing. The map never becomes a bare
+plane, so routing always matters and no ability is ever fully obsoleted by the clock.
+
+Anything that breaks the monotonic density drop (refilling outer piles mid-match, spawning
+new obstacles) must be justified against this pillar. **The centre pile is the one sanctioned
 exception — see below.**
 
 ### Decision 2b — The center pile is permanent (the anchor)
@@ -118,12 +131,20 @@ regen  → slowly refills toward max
 
 Conceptually: *a mountain with food on it. You harvest the surface; the mountain stays.*
 
-**Why this is required, not optional.** Without it, every traversal ability becomes dead
-weight exactly when the map opens — Vault, Barge and Blink are all useless on an empty field,
-and the Run/Skip/Deny triangle collapses to pure Run in the endgame. That is the precise
-failure the triangle exists to prevent. A permanent central obstacle keeps **Skip** live for
-the whole match, and gives Fatty a permanent home turf (a cleaner fix for Fatty's late game
-than the terrain-maker mitigation below — the two are complementary).
+**Why.** ⚠ An earlier draft justified this as "otherwise traversal abilities die when the map
+opens." **That was wrong** — permanent interior walls already guarantee Vault/Barge/Blink
+always have targets. The centre pile does not rescue the triangle; walls already do. Its
+actual value is narrower but still real:
+
+1. **Forced convergence.** As outer piles deplete, the centre becomes the only rich resource
+   — the endgame reliably collapses into one contested arena instead of four players farming
+   separate corners. This is the frantic-endgame mechanic.
+2. **Fatty's anchor.** A permanent, large obstacle is home turf for the Barge/Deny class —
+   complements the terrain-maker mitigation below rather than replacing it.
+3. **A resource floor.** The late game always has something worth fighting over, so the match
+   cannot decay into an empty-map stalemate.
+
+The late-game arena becomes a **donut**: lanes between permanent walls, one contested core.
 
 The late-game arena becomes a **donut**: open field, one contested core, fights orbiting it.
 A strictly better endgame shape than an empty plane.
@@ -213,6 +234,58 @@ classes.
 2. **Power budget:** an active at 6s cooldown / 1.5s duration has ~25% uptime. A passive
    should be **40–60% of that active's peak effect at 100% uptime**. Above → passives
    dominate; below → dead content.
+
+---
+
+## Decision 4 — The collect → carry → deposit loop is load-bearing. Keep it.
+
+Considered and **rejected**: removing carrying entirely (chickens "eat" at piles and score
+directly). Also considered and **kept**: depositing only at your *own* base (already enforced
+at `ChickenCargo.FindNearestBaseInRange` — `if (b.CornerIndex != homeCorner) continue;`).
+
+### Why carrying stays
+
+**The round trip *is* the game.** The loop has three phases with different risk:
+
+| Phase | State | Risk |
+|---|---|---|
+| Collect | stationary at a pile | exposed, predictable |
+| **Carry** | travelling, loaded | **maximum — this is when you are a target** |
+| Deposit | at your base | safe |
+
+The carry phase is the only reason players fight each other. Delete it and:
+
+- **The entire ADR is pointless.** No travel → no routes → routing, chasing, interception and
+  therefore Run/Skip/Deny all stop mattering. Decisions 1–3 exist to make *travel* interesting.
+- **Death stops costing anything** but time — the cargo drop is the core risk/reward.
+- **Sneaky Steal dies.** It exists solely because rivals carry cargo.
+- **Fatty loses its identity** — "bulk carrier" (cargo 20) is meaningless with nothing to carry.
+- Cargo bars, the FULL→RETURN TO BASE prompt, and the cargo-full VFX all become dead code.
+
+If the round trip feels tedious, the fix is to make the *trip* interesting — which is exactly
+what Decisions 1–2 do — not to delete the trip.
+
+### Why own-base-only stays
+
+A fixed, known destination is what makes **interception** possible. If a rival is at the
+centre pile and their base is the NE corner, their route is knowable — so cutting them off
+with a Vault shortcut is a *play*. Deposit-anywhere would let players always pick the nearest
+base, shortening trips, randomising destinations, and destroying the geometry that chases
+depend on.
+
+**Predictability is a feature here, not a limitation.** It is the basis of all interception
+play, and it is what makes corner identity and home-turf defence meaningful.
+
+### Optional future: "graze" as a pressure valve
+
+Not adopted now; recorded so it isn't re-derived. Allow eating at a pile for **immediate but
+reduced** score (~30% of carried value). Creates a real decision under pressure: being chased
+with full cargo and no safe route home? Graze to bank *something* rather than lose everything
+on death.
+
+⚠ **Tuning risk:** if the graze ratio is too generous everyone grazes, travel collapses, and
+this becomes the rejected "eat-only" design by the back door. Only revisit after Slices 1–2,
+and treat the ratio as hostile.
 
 ---
 
