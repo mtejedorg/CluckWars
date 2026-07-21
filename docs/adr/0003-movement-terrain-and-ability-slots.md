@@ -68,7 +68,8 @@ Spread drops **2.5× → 1.4×**, yet classes feel *more* distinct because they 
 **This is the core mechanic of the game, not a tuning detail.**
 
 A food pile is three things at once: a **resource**, an **obstacle**, and a **lane that can
-be opened**. Its physical footprint is a continuous function of the food remaining in it:
+be opened**. Its physical footprint is a **stepped** function of the food remaining in it
+(discrete buckets, not continuous — see the NavMesh warning in Implementation notes):
 
 ```
 blockerRadius  = f(Amount / MaxAmount)
@@ -144,9 +145,16 @@ actual value is narrower but still real:
 3. **A resource floor.** The late game always has something worth fighting over, so the match
    cannot decay into an empty-map stalemate.
 
-The late-game arena becomes a **donut**: lanes between permanent walls, one contested core.
+The late-game arena becomes a **donut**: lanes between the permanent walls, one contested
+core, fights orbiting it.
 
-The late-game arena becomes a **donut**: open field, one contested core, fights orbiting it.
+**"Empty" and "not collectable" are different states.** A permanent pile at its floor is
+simultaneously *not empty* (it is still terrain, still blocking) and *not harvestable* (that
+food cannot be taken). Every consumer must distinguish them, or the floor becomes an infinite
+food source. Concretely: `Available = Amount − DrainFloor` is what cargo credits against, and
+`HasCollectableFood` (not `IsEmpty`) is what collection and bot pile-targeting gate on. This
+is the highest-risk detail in Decision 2b — it silently breaks the economy and parks bots on
+the centre forever if missed.
 A strictly better endgame shape than an empty plane.
 
 **Do NOT make it literally infinite.** Unbounded food removes scarcity; the win condition
@@ -161,9 +169,15 @@ re-carve thrash):
 
 | State | Amount | Form | Play effect |
 |---|---|---|---|
-| **Mountain** | 100–75% | full radius, solid | route around entirely; max cover |
-| **Plateau** | 75–40% | same radius, 3–4 channels cut through | chokepoints — fight lanes open |
-| **Mesa** (floor) | 40%–floor | smaller solid core + wide slow-apron | permanent; max contest, min cover |
+Percentages are of the pile's **usable range `[floor, max]`**, not of `MaxAmount`. (An earlier
+draft expressed them against `MaxAmount`, which was incoherent: with a 60% floor, "Mesa at
+40%" is unreachable and the centre would never leave the top of the table. Normalising over
+the usable range is also what makes the centre's size a visible readout of contest intensity —
+across `[0,1]` the full-to-floor span is only 1.0 → 0.82, which nobody can see.)
+
+| **Mountain** | top ~25% of range | full radius, solid | route around entirely; max cover |
+| **Plateau** | middle | same radius, 3–4 channels cut through | chokepoints — fight lanes open |
+| **Mesa** | at/near floor | smallest radius + wide slow-apron | permanent; max contest, min cover |
 
 ⚠ **Scope:** the Plateau's channels need multiple colliders, not one capsule — materially more
 work than radius stepping. **Slice 1 ships radius-only stepping** (Mountain → smaller → Mesa);
@@ -314,14 +328,24 @@ Most of Decision 2 is already plumbed:
   already deactivates when the pile empties.
 - The line-24 tooltip already says the pile "will be visually scaled against" its amount.
 
-The change is to make radius and scale **continuous** in `Amount/MaxAmount` rather than
-binary. `Amount` is networked, so all peers agree with no new state.
+The change is to make radius and scale **stepped** in `Amount/MaxAmount` rather than binary.
+`Amount` is networked, so all peers agree with no new state.
 
 ⚠ **The collection-radius coupling.** `_blockerRadius` is deliberately held *under*
-`CollectRadius` minus the chicken capsule so edge collection still works. A continuous
-radius must respect that bound **at its maximum**, or collection silently breaks — this is
-exactly the 2026-06-01 game-breaking bug (every match ended 0-0-0-0). Re-derive the bound;
-do not just scale the number up.
+`CollectRadius` minus the chicken capsule + skin width, so edge collection still works.
+Note the blocker is a **child** of the pile root and `CollectRadius` is a raw, unscaled
+world-space float — so *shrinking is inherently safe* and the bound only ever binds **at
+maximum size**. The robust fix is therefore not to re-derive a number but to **cap the top
+bucket at exactly the currently-authored size**, which makes the whole class of bug
+unreachable. Violating this reproduces the 2026-06-01 game-breaking bug (every match ended
+0-0-0-0).
+
+Measured margins at max (chicken radius 0.5 + skin 0.08; `CollectRadius` 1.6):
+outer pile **0.37** clearance; centre pile at 1.5× root scale **0.045** — correct but thin.
+That thinness is pre-existing, not introduced by this ADR, but the centre now spends far more
+of the match at full size, so it is exercised harder. Watch centre-pile collection in
+playtest; if it ever fails, drop `_centerPileVisualScale` 1.5 → 1.4 (margin 0.089) rather
+than touching `_blockerRadius`.
 
 ⚠ **NavMesh churn.** A continuously-resizing `NavMeshObstacle` re-carves the NavMesh. Update
 in steps (quantise to ~4–5 size buckets), not per-tick, or bot pathfinding will thrash.
@@ -353,7 +377,16 @@ slot without a cooldown ring.
 5. **Readability.** Players must be able to *see* a pile shrinking and predict when a lane
    opens. Without that the map "randomly" changes. Needs a visual pass. The centre's three
    named states (Mountain/Plateau/Mesa) should be visually unmistakable at a glance.
-6. **Final-minute events.** The existing comeback events / golden pile (IP2) should be tuned
+6. **`GameManager.RestockPiles()` contradicts the pillar — decision needed.** The `Restock`
+   comeback event refills **every** pile by +10 (`GameManager.cs:765`). That re-densifies the
+   map in the final minute, precisely when the design wants it open, and re-scatters the
+   resource exactly when fights should be converging on the centre. It is a second,
+   unacknowledged exception to the density pillar.
+   **Recommendation:** drop `Restock` from the event pool, or repoint it at the centre pile
+   only. The `GoldenPile` event already supplies comeback drama and — per item 7 — should
+   spawn near the centre, which reinforces convergence instead of fighting it.
+   *(Found during Slice 1 implementation; left unchanged as out of scope.)*
+7. **Final-minute events.** The existing comeback events / golden pile (IP2) should be tuned
    to land in the now-open late game. Late-scaling passives (e.g. Second Wind) may want to
    key off match time.
 
