@@ -19,6 +19,62 @@ All tags pushed to origin.
 
 ---
 
+## 🧱 ADR 0003 Slice 1 — pile footprints + permanent centre (2026-07-22) — SHIPPED (untested)
+
+Commit `856cd07` on `develop`. **Not pushed, not playtested.** Slices 2–4 (Vault /
+`TerrainTraversal`, slot restructure, speed retune) are untouched.
+
+**What changed**
+
+- `FoodPile` root scale is now a **stepped** function of `Amount/MaxAmount`. The `Blocker`
+  child holds the capsule + carving `NavMeshObstacle`, so root scale shrinks the mesh, the
+  collider and the NavMesh carve together. Draining a pile permanently opens a lane.
+- Stepping is quantised to **4 buckets**, applied in `Render()` only when the bucket changes
+  — a carving obstacle re-carves the NavMesh on every resize, and per-frame re-carving
+  thrashes bot `NavMesh.CalculatePath`.
+- The **top bucket equals the previously authored size**, so the blocker never grows past
+  what already shipped. The `CollectRadius` bound therefore holds by construction.
+- **Centre pile is permanent** (`[Networked] bool IsPermanent`, stamped by `MapGenerator`
+  via `onBeforeSpawned` — centre and outer piles share one prefab). Clamps drains at 60% of
+  max, regenerates 0.5 food/s, never empties, never stops blocking. Its footprint steps over
+  its usable `[floor, max]` range, so its size reads as contest intensity.
+- `ChickenCargo` + `BotController` now gate on the new `FoodPile.Available` /
+  `HasCollectableFood` instead of `Amount` / `IsEmpty`. Without this the centre would have
+  been an **infinite food source** at its floor (cargo credits optimistically before the
+  drain RPC lands), and bots would have parked on it collecting nothing forever.
+
+**New tunables** (all serialized, no code edit needed): `_footprintSteps` 4 ·
+`_minFootprintScale` 0.45 · `_permanentFloorFraction` 0.6 · `_permanentRegenPerSecond` 0.5 ·
+`MapGenerator._centerPileIsPermanent` true.
+
+**Blocker/collect margin at max** (chicken capsule 0.5 + skin 0.08, `CollectRadius` 1.6):
+outer pile 0.65 → closest approach 1.23, **margin 0.37**. Centre pile 0.65 × 1.5 → 0.975 →
+closest approach 1.555, **margin 0.045**. The centre's margin is thin but is *unchanged from
+what already ships* — not a regression, but it wants widening (drop
+`_centerPileVisualScale` to ~1.4, or raise `_collectRadius`) before the blocker is ever
+allowed to grow.
+
+**⚠ No Maestro prefab wiring required** — the new fields are code defaults on
+`FoodPile.prefab` and `MapGenerator`, and `IsPermanent` is set at spawn, not authored.
+Re-serialize the prefab only if you want to override a default in the inspector.
+
+**Open / needs playtest**
+
+1. **Regen rate 0.5/s is ADR open question 3 and the most sensitive number in the design.**
+   Measure it first. Too high → endgame free farm; too low → centre erodes to floor in the
+   first minute.
+2. `FoodPileVisuals` already lerps the *mesh child* by fill ratio, so the mesh now shrinks
+   twice (root step × child lerp). Probably desirable; confirm it reads well before tuning.
+3. `GameManager.RestockPiles()` (comeback event) refills **all** piles by +10, which
+   contradicts the ADR's monotonic-density pillar. Left alone — out of Slice 1 scope, but it
+   needs a decision.
+4. Bot pacing must be re-measured; all pre-2026-07-18 pacing data is void.
+
+Verified: zero compile errors (Fusion IL weaver ran over the new networked property),
+EditMode suite 8/8 green. **No play-mode or multi-client verification yet.**
+
+---
+
 ## 🧭 ADR 0003 — movement, terrain & ability slots (2026-07-21) — DESIGN ACCEPTED
 
 The feedback below converged into a full design, now recorded as
