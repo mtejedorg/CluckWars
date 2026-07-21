@@ -47,10 +47,33 @@ First hands-on feedback of the test session. This is **design direction, not a b
    Speed Burst, Doppelganger. Once abilities can bypass terrain, walls/piles stop being pure
    friction and become **counterplay** — which is the whole point of items 1 and 2.
 
-**Sequencing note:** item 3 is the design decision; 1 and 2 are tuning that only pays off
-once 3 exists. Doing 1+2 alone risks a slower, more annoying game rather than a more tactical
-one. Route through `mechanics-designer` for the traversal spec, then `level-designer` for
-wall/pile density.
+4. **Class speed differential may be too high — but DO NOT tune it yet.** Maestro's read is
+   that the fast/slow spread currently feels excessive. Explicitly **deferred until item 3
+   lands**, because the two are coupled and tuning speed first would be thrown away:
+   - a class that is *both* fastest *and* can skip terrain is doubly dominant;
+   - a slow "bully" class is only viable if terrain gives it something speed can't buy —
+     shortcuts it can take, chokepoints it can hold, or routes it can deny.
+
+   Terrain traversal is the *other half* of the speed knob. Once abilities can bypass
+   geometry, raw `MoveSpeed` stops being the only currency of a chase, and the right spread
+   may fall out naturally. **Re-evaluate the spread only after the traversal spec exists** —
+   then tune `ChickenStatsSO.MoveSpeed` per class against real routing, not straight lines.
+
+**Sequencing note (strict):** item 3 is the design decision; 1, 2 and 4 are tuning that only
+pays off once 3 exists. Doing 1+2 alone risks a slower, more annoying game rather than a more
+tactical one; doing 4 alone gets re-done. Order: **3 → 1+2 → 4 → re-measure pacing.**
+Route through `mechanics-designer` for the traversal spec, then `level-designer` for
+wall/pile density, then a balance pass for speed.
+
+**Fun assessment (Maestro, verbatim):** *"Game is still not funny but I think I see the path."*
+
+Worth recording as a **diagnosis shift**, not just a mood. The 2026-06-13 read of "ultra
+boring" was treated as a **juice** problem and answered with three juice passes (procedural
+audio, control-state visuals, cast shake, aggressive bots). Those landed and the game still
+isn't fun — so the remaining deficit is now understood to be a **movement/terrain design**
+problem, not a feedback/polish one. That reframing is the most useful output of this session:
+stop adding juice, fix what the moment-to-moment movement decision actually is. Items 1–4
+above are the hypothesis; the next playtest tests it.
 
 **Balance caveat:** bot pacing must be re-measured *after* these land — the Stage-B
 double-speed-bot correction already invalidated all pre-2026-07-18 pacing data, and denser
