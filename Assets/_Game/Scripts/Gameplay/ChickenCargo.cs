@@ -245,11 +245,13 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            if (pile.IsEmpty)
+            // HasCollectableFood, not IsEmpty: the centre pile is permanent (ADR 0003
+            // Decision 2b) and still holds its floor, but that floor is terrain, not food.
+            if (!pile.HasCollectableFood)
             {
                 if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
                 {
-                    _log.Verbose(Source, $"TryCollect: nearest pile '{pile.name}' is empty.");
+                    _log.Verbose(Source, $"TryCollect: nearest pile '{pile.name}' has nothing collectable.");
                 }
                 FlushPileDrain();
                 return;
@@ -263,7 +265,9 @@ namespace CluckWars.Gameplay
             }
             float desired = collectionRate * Runner.DeltaTime;
 
-            float availableInPile = Mathf.Max(0f, pile.Amount - _pendingPileDrain);
+            // pile.Available, not pile.Amount — a permanent pile's floor is not takeable,
+            // and crediting cargo against it would make the centre an infinite food source.
+            float availableInPile = Mathf.Max(0f, pile.Available - _pendingPileDrain);
             float takeable = Mathf.Min(desired, spaceLeft, availableInPile);
             if (takeable <= 0f)
             {

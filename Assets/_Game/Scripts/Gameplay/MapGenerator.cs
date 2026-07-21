@@ -82,9 +82,12 @@ namespace CluckWars.Gameplay
         [Min(5f)]
         [SerializeField] private float _centerPileAmount = 60f;
 
-        [Tooltip("Center pile mesh scale multiplier — makes it visually bigger without changing gameplay rules beyond the food count.")]
+        [Tooltip("Center pile mesh scale multiplier — makes it visually bigger without changing gameplay rules beyond the food count. NOTE: this also scales the pile's blocker collider, and 1.5 already sits close to the CollectRadius bound (see FoodPile._blockerRadius). Don't raise it without re-deriving that margin.")]
         [Min(0.5f)]
         [SerializeField] private float _centerPileVisualScale = 1.5f;
+
+        [Tooltip("Make the center pile permanent (ADR 0003 Decision 2b): it can never be drained below its floor and slowly regenerates, so it stays a solid obstacle and the one contested resource of the late game. Floor and regen rate are tuned on the FoodPile prefab.")]
+        [SerializeField] private bool _centerPileIsPermanent = true;
 
         [Tooltip("Food in each player's personal island — small, relatively safe early game (GDD §3: 15).")]
         [Min(0f)]
@@ -433,8 +436,10 @@ namespace CluckWars.Gameplay
             // Master-spawned NetworkObjects replicate, so plain Random is fine —
             // no cross-peer seeding needed.
 
-            // Center pile — bigger Amount + bigger visual. Never moves.
-            SpawnPile(runner, pilePrefab, Vector3.zero, _centerPileAmount, _centerPileVisualScale);
+            // Center pile — bigger Amount + bigger visual. Never moves, and (ADR 0003
+            // Decision 2b) never fully drains: the outer piles are consumed away over the
+            // match, so the centre is what the endgame converges on.
+            SpawnPile(runner, pilePrefab, Vector3.zero, _centerPileAmount, _centerPileVisualScale, _centerPileIsPermanent);
 
             // Personal islands — one in front of each base, on the base→center line.
             for (int i = 0; i < _corners.Length; i++)
@@ -452,9 +457,11 @@ namespace CluckWars.Gameplay
                 SpawnPile(runner, pilePrefab, pos, _contestedPileAmount);
             }
 
-            _log?.Info(Source, $"Spawned GDD layout: center ({_centerPileAmount}) + " +
+            _log?.Info(Source, $"Spawned GDD layout: center ({_centerPileAmount}" +
+                $"{(_centerPileIsPermanent ? ", permanent" : "")}) + " +
                 $"4 personal ({_personalPileAmount}) + 4 contested ({_contestedPileAmount}) piles. " +
-                $"Total food = {_centerPileAmount + 4f * (_personalPileAmount + _contestedPileAmount):0}.");
+                $"Starting food = {_centerPileAmount + 4f * (_personalPileAmount + _contestedPileAmount):0}" +
+                $"{(_centerPileIsPermanent ? " (+ centre regen)" : "")}.");
         }
 
         private Vector3 JitterXZ()
@@ -463,7 +470,13 @@ namespace CluckWars.Gameplay
             return new Vector3(j.x, 0f, j.y);
         }
 
-        private NetworkObject SpawnPile(NetworkRunner runner, NetworkObject pilePrefab, Vector3 pos, float amount, float scale = 1f)
+        /// <summary>
+        /// Centre and outer piles share one prefab, so everything that differs between them
+        /// is stamped here through <c>onBeforeSpawned</c> — that's the only way a
+        /// <c>[Networked]</c> property is replicated from tick zero, before <c>Spawned()</c>
+        /// runs on any peer and sizes the pile's footprint.
+        /// </summary>
+        private NetworkObject SpawnPile(NetworkRunner runner, NetworkObject pilePrefab, Vector3 pos, float amount, float scale = 1f, bool permanent = false)
         {
             return runner.Spawn(
                 pilePrefab,
@@ -472,15 +485,22 @@ namespace CluckWars.Gameplay
                 onBeforeSpawned: (_, networkObject) =>
                 {
                     var pile = networkObject.GetComponent<FoodPile>();
-                    if (pile != null)
+                    if (pile == null)
                     {
-                        if (amount > 0f)
-                        {
-                            pile.Amount = amount;
-                            pile.MaxAmount = amount;
-                        }
-                        pile.VisualScale = scale;
+                        // Silently skipping here would ship a centre pile that drains to
+                        // zero with no visible cause — say so instead.
+                        _log?.Warn(Source, $"Pile prefab '{pilePrefab.name}' has no FoodPile component; " +
+                            "amount, visual scale and the permanent flag were not applied.");
+                        return;
                     }
+
+                    if (amount > 0f)
+                    {
+                        pile.Amount = amount;
+                        pile.MaxAmount = amount;
+                    }
+                    pile.VisualScale = scale;
+                    pile.IsPermanent = permanent;
                 });
         }
 

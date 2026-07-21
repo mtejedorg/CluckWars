@@ -409,7 +409,11 @@ namespace CluckWars.Gameplay
             return best;
         }
 
-        /// <summary>Finds the nearest non-empty food pile.</summary>
+        /// <summary>
+        /// Finds the nearest pile that still has food a chicken can actually take.
+        /// Not <c>IsEmpty</c>: the permanent centre pile (ADR 0003 Decision 2b) is never
+        /// empty, so a bot would otherwise park on its floor and collect nothing forever.
+        /// </summary>
         private FoodPile FindNearestPile(out float bestSqrOut)
         {
             var piles   = FoodPile.ActivePiles;
@@ -419,7 +423,7 @@ namespace CluckWars.Gameplay
             for (int i = 0; i < piles.Count; i++)
             {
                 var p = piles[i];
-                if (p == null || p.IsEmpty) continue;
+                if (p == null || !p.HasCollectableFood) continue;
                 float sqr = (p.transform.position - selfPos).sqrMagnitude;
                 if (sqr < bestSqr) { bestSqr = sqr; best = p; }
             }
