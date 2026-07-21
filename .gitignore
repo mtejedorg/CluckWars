@@ -144,6 +144,10 @@ entities.json
 /uxml_test.txt
 *.cs.bak
 *.cs.bak.meta
+# Backup / merge-conflict leftovers of any kind
+*.bak
+*.orig
+*.rej
 .graphifyignore
 .mcp.json
 graphify-out/
