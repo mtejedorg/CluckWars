@@ -15,17 +15,17 @@ MonoBehaviour:
   _entries:
   - Class: 0
     Stats: {fileID: 11400000, guid: c5336fe6807057d43ba09b44bf81f4e9, type: 2}
-    TintColor: {r: 1, g: 0, b: 0, a: 0}
+    TintColor: {r: 0.7529412, g: 0.2509804, b: 0.1882353, a: 1}
     LoreQuote: Mighty of wing, short of temper.
   - Class: 1
     Stats: {fileID: 11400000, guid: b9f7fbede9b28ae489bdefabd9b4a8ba, type: 2}
-    TintColor: {r: 0.9033946, g: 1, b: 0, a: 0}
+    TintColor: {r: 0.9098039, g: 0.3529412, b: 0.1647059, a: 1}
     LoreQuote: Blink and she's already back home.
   - Class: 2
     Stats: {fileID: 11400000, guid: cb8b4aa3fcd58054daff2e725896035b, type: 2}
-    TintColor: {r: 0, g: 0.031219006, b: 1, a: 0}
+    TintColor: {r: 0.9607843, g: 0.8431373, b: 0.3529412, a: 1}
     LoreQuote: An immovable object with a big appetite.
   - Class: 3
     Stats: {fileID: 11400000, guid: 05f659d445a74b74e815b51607b9363d, type: 2}
-    TintColor: {r: 0, g: 0, b: 0, a: 0}
+    TintColor: {r: 0.4823529, g: 0.4078431, b: 0.9333333, a: 1}
     LoreQuote: You'll hear the cluck after the strike.

@@ -303,6 +303,71 @@ and treat the ratio as hostile.
 
 ---
 
+## Decision 5 — Terrain vocabulary: three obstacle classes
+
+**The problem this fixes.** Every interior obstacle today is the same thing: a 1.1-high wall
+segment. With one obstacle type, Vault either clears *everything* or *nothing* — "ignore all
+terrain" is a toggle, not an ability, and Vault/Barge become indistinguishable. **Traversal
+tiers are only meaningful if the terrain discriminates between them.** Props are therefore not
+decoration; they are the vocabulary the traversal design reads.
+
+| Class | Height | Run | Vault | Barge | Blink | Reads as |
+|---|---|---|---|---|---|---|
+| **Low** | 0.9 | ❌ | ✅ | ✅ | ✅ | crate / low fence |
+| **Standard** | 1.1 *(current)* | ❌ | ✅ | ❌ | ✅ | wall segment |
+| **Tall** | 2.5 | ❌ | ❌ | ❌ | ✅ | rock / silo |
+| **Pile** | scales with fill | ❌ | ✅ | ✅ | ✅ | food mound |
+| **Boundary** | 5 | ❌ | ❌ | ❌ | ❌ | arena edge |
+
+⚠ **Every class must stay above the NavMesh step height (0.75)**, or bots simply walk over it
+and it is decoration, not terrain. This is why "Low" is 0.9 and not 0.5 — it must still block
+*running* to be an obstacle at all. Low is distinguished from Standard by being **bargeable**,
+not by being shorter to walk over.
+
+Discrimination is by an explicit `ObstacleClass` tag on a `TerrainObstacle` component, **not**
+inferred from height — traversal abilities query the tag. Height is the physical/visual
+expression of the class, not its definition.
+
+**Density.** Current 6 standard segments → roughly **8 standard + 6 low + 2–3 tall**. Low
+props are cheap cover that reward Barge; tall props are hard walls that only Blink answers.
+Clearance scales per class — tall props need a larger keep-clear so they cannot seal a lane.
+
+All obstacles are **permanent** (never consumed — only piles are), **local geometry**, and
+**session-seeded** so every peer builds an identical map, exactly like today's interior walls.
+
+## Decision 6 — Map shape stays square (for now)
+
+Considered: circle, octagon, cross/plus. **Retaining the square.**
+
+**The screen-shape argument does not apply.** `MatchCamera` is orthographic isometric and
+*follows the local chicken* (`_orthoSize` 8) — the whole map is never on screen at once. So
+the Android aspect ratio does not constrain map shape; shape is a pure gameplay lever.
+
+Reasons to keep it:
+
+1. **Boundary shape is a weak lever next to interior layout.** A square with good obstacles
+   routes better than an exotic outline with none. Decision 5 is the strong lever, and it is
+   the one being pulled.
+2. **Changing it invalidates a lot of tuned, coupled math** — corner spawn points, the island
+   ring (`_personalPileInset`, `_contestedEdgeInset`), 4 flush boundary walls, clearance
+   radii, and the `_planeSize * 0.5 − 2` sampling bound.
+3. **4 corners ↔ 4 players is provably fair** — perfect 4-fold symmetry. Circles and hexes
+   make base placement arbitrary and risk asymmetry.
+4. The square **already funnels through the centre**: corner-to-corner diagonals pass through
+   the middle, which is exactly the convergence Decision 2b wants.
+
+**Known quirk to fix with obstacles, not geometry.** Interior walls are sampled in a *polar
+annulus* over a *square* plane, bounded at `r ≤ planeSize/2 − 2`. The square's corners sit at
+`r ≈ planeSize × 0.707/2`, outside that bound — so **the corner regions behind the bases are
+both dead space and wall-free**. Decision 5's placement should deliberately reach into them.
+
+**Revisit after playtest**, with data. If the square still feels flat once Decisions 2 and 5
+are in, the cheapest next experiment is an **octagon** (chamfer the corners: 8 boundary walls,
+removes the dead pockets). A **cross/plus** is the maximally convergent option — each player
+gets a defensible home arm — but risks a corridor-y feel and makes centre-camping dominant.
+
+---
+
 ## Fatty's late game must not be a countdown to defeat
 
 The arc above risks a feels-bad class: "Fatty loses once the map opens." Mitigation, and it
@@ -401,12 +466,17 @@ Do **not** build this in one pass. Ship the cheapest slice that can falsify the 
    stepping (no channels yet). Cheap — the plumbing exists — and immediately testable: does
    the map opening up *feel* like a tempo change, and does the centre hold as a late-game
    arena?
-2. **Slice 2 — Vault on Flying Peck only.** Add `TerrainTraversal`, implement `Vault`, bump
-   wall density. Playtest **Warrior vs Speedy** — that single matchup tests the whole
+2. **Slice 1b — terrain vocabulary (Decision 5).** Three obstacle classes + density bump.
+   Pulled ahead of the traversal work: obstacles are testable on their own (does denser,
+   more varied cover make chases interesting?) and Slice 2 needs terrain that discriminates
+   or it under-tests Vault. Geometry only — primitives with per-class tints, no art
+   dependency.
+3. **Slice 2 — Vault on Flying Peck only.** Add `TerrainTraversal`, implement `Vault` reading
+   `ObstacleClass`. Playtest **Warrior vs Speedy** — that single matchup tests the whole
    triangle.
-3. **Slice 3 — slot restructure + passives.** Large UI/data work. Do not commit until 1 and 2
-   feel good.
-4. **Slice 4 — speed retune.** Last. The numbers are meaningless until traversal exists.
+4. **Slice 3 — slot restructure + passives.** Large UI/data work. Do not commit until the
+   earlier slices feel good.
+5. **Slice 4 — speed retune.** Last. The numbers are meaningless until traversal exists.
 
 Re-measure bot pacing after each slice. All pacing data before 2026-07-18 is void (measured
 with double-speed bots).
