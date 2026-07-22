@@ -19,6 +19,125 @@ All tags pushed to origin.
 
 ---
 
+## 🧱 ADR 0003 Slice 1b — terrain vocabulary (2026-07-22) — SHIPPED (untested)
+
+On `develop`. **Not pushed, not playtested.** Slices 2–4 untouched. Geometry only —
+no ability, slot, passive or `MoveSpeed` work.
+
+**What changed**
+
+- **New `TerrainObstacle` component** (`Assets/_Game/Scripts/Gameplay/TerrainObstacle.cs`)
+  carrying `public enum ObstacleClass : byte { Low, Standard, Tall }`. Plain
+  `MonoBehaviour`, **not** networked — interior terrain is local geometry built identically
+  on every peer. Slice 2's Vault/Barge/Blink must query `TerrainObstacle.Class`;
+  discrimination is by tag and **never** inferred from height.
+- `MapGenerator.BuildInteriorWalls` → `BuildInteriorObstacles`. One rejection sampler now
+  drives three classes: **Low 0.9** (crate, Barge-able later), **Standard 1.1** (the old
+  wall segment), **Tall 2.5** (rock/silo, Blink-only). All three stay above the NavMesh step
+  height 0.75 — Low is 0.9 *deliberately*; do not lower it.
+- **Dead corners are now reachable.** Sampling moved from a polar annulus (`r ≤ planeSize/2
+  − 2`, which excludes a square's corners) to uniform **square** sampling plus an exact
+  rotated-AABB containment test against the boundary walls. Measured: obstacles now reach
+  r ≈ 17.5 vs the old hard bound of 13.0, with 2–4 obstacles per map beyond r = 13.
+- **Clearance is now measured to the obstacle's surface**, not its bounding circle
+  (`DistanceToBox`). This was required, not cosmetic: a 6×0.5 wall has a 3 m bounding
+  circle, so the old radius test refused to let any long wall within 6 m of an objective and
+  the map could only fit 3–4 of the 6 requested walls. With surface distance, Standard
+  places 8/8 every time.
+- **One shared material per class** (3 total) replaces the old `mr.material` per-wall clone.
+  At 17 obstacles that would have been 17 material instances. Verified: 4 distinct
+  `sharedMaterial`s across the whole generated map (ground + 3 classes). Materials are
+  created lazily and destroyed in `OnDestroy`.
+- Placement is **best-effort and loud**: `_log.Warn` with a per-class placed/requested
+  breakdown whenever the map can't fit the request. `BuildNavMesh` now logs the triangle
+  count and warns on a 0-triangle bake.
+
+**New tunables** (all serialized with tooltips): `_standardObstacleCount` 8 ·
+`_lowObstacleCount` 6 · `_tallObstacleCount` 3 (0 cleanly disables a class) ·
+`_lowObstacleFootprintRange` (1.2, 2.2) · `_lowObstacleHeight` 0.9 ·
+`_lowObstacleClearanceScale` 0.8 · `_tallObstacleFootprintRange` (1.6, 2.4) ·
+`_tallObstacleHeight` 2.5 · `_tallObstacleClearanceScale` 1.5 · `_obstacleSpacing` 1.5 ·
+`_obstacleEdgeMargin` 1.5 · `_obstaclePlacementAttempts` 40 · per-class tint colours.
+`_interiorWallCount` is **retired** (→ `_standardObstacleCount`).
+`_interiorWallClearance` **3.0 → 2.2**, and its meaning changed to a surface gap.
+
+**⚠ Placement is near the geometric limit for Tall.** The map protects 13 objectives
+(centre, 4 bases/spawns, 4 personal islands, 4 contested islands) on a 30 m plane; no point
+on it is more than ~4.8 m from the nearest objective. Measured ceiling:
+`_tallObstacleClearanceScale` above ~1.6 makes Tall place **0/3 silently**. 1.5 places 3/3.
+If Tall count is ever raised, re-measure rather than assuming.
+
+**NavMesh** (measured, 8 runs at defaults): empty arena 8 tris · pre-Slice-1b density
+(6 Standard) ~84–88 tris · Slice 1b defaults **~218–230 tris**. Roughly 2.6× the old bake
+for ~3× the obstacles — small in absolute terms and well inside a sane budget; bake stays
+sub-frame. Bot pathing cost scales with this, so re-measure bot pacing next playtest.
+
+**⚠ No Maestro prefab wiring required.** `Game.unity`'s `MapGenerator` was re-serialized
+in place with the new keys. `TerrainObstacle` is added at generation time, never authored.
+
+---
+
+## 🧪 EditMode test suite expanded 8 → 101 (2026-07-22) — 99 pass / 2 fail
+
+`Assets/_Game/Scripts/Editor/Tests/` is now a **categorised** suite, one file per
+subsystem, so a red test names the area instead of just "something broke". Full
+breakdown + how to run it: `docs/TESTING.md ▸ Automated tests`.
+
+| File | Tests |
+|---|---|
+| `CoreLogicTests.cs` (existing, extended) | 10 |
+| `DataIntegrityTests.cs` — real SO assets in `Assets/_Game/Data/` | 14 |
+| `AbilitySystemTests.cs` — registry completeness, authoring, icon coverage | 14 |
+| `EconomyAndPilesTests.cs` — ADR 0003 pile maths + match economy | 22 |
+| `ContractsAndEnumsTests.cs` — enum/serialisation contracts, seed parity | 12 |
+| `ServicesAndInputTests.cs` — Null\* services, session selection, input merge | 16 |
+| `ProjectConfigTests.cs` — build settings, layers, prefab wiring, URP, naming | 13 |
+
+Run: `Window ▸ General ▸ Test Runner ▸ EditMode`, or MCP `tests-run` with
+`{"testMode":"EditMode","testNamespace":"CluckWars.Tests"}`. Runs in ~1.5 s.
+
+### ⚠ Two tests are RED on purpose — both are real authoring gaps
+
+Both live in `ChickenClassRegistry.asset` and neither produces a compile error, a
+console warning, or a runtime exception. Leave the tests failing until the asset is
+fixed; do **not** weaken them.
+
+1. **`ClassRegistry_EveryEntry_HasADistinctVisibleTint` — the Assassin renders black.**
+   Its `TintColor` is `RGBA(0,0,0,0)` while Warrior/Speedy/Fatty carry real colours.
+   `ChickenController.Spawned` pushes the entry tint straight into
+   `ChickenVisuals.ApplyTint` → the renderer's `_BaseColor`, so the Assassin is a black
+   silhouette on the field. Looks like an unfinished row, not a stealth design choice.
+   **Fix:** author an Assassin colour (the menu already uses `#7B68EE` for it).
+
+2. **`ClassRegistry_TintAlpha_IsReachableBy_MenuUiControllerTintOf` — the registry tint
+   is dead code in the menu.** All four entries have alpha 0. `MenuUiController.TintOf`
+   gates on `e.TintColor.a > 0f` before using the registry value, but `Entry.TintColor`
+   is declared `[ColorUsage(showAlpha: false)]`, so the alpha slider is *hidden in the
+   Inspector* and the gate can never open. The menu therefore always falls back to its
+   own hard-coded `Meta` palette while the arena uses the registry values — two
+   different colours for the same class, by construction.
+   **Fix (pick one):** author alpha 1 on all four entries, or drop the `.a > 0f` gate
+   in `MenuUiController.TintOf`. Deciding which of the two palettes is canonical is a
+   design call, not a code one.
+
+### Production code touched
+
+One change, made solely to create a testable surface:
+`FoodPile.cs` gained a `public static class FoodPileMath` holding the pure footprint /
+drain arithmetic (`ClampSteps`, `FloorFraction`, `DrainFloor`, `Available`, `Drain`,
+`FootprintStep`, `FootprintScale`), and `FoodPile` now delegates to it. Behaviour is
+unchanged — the `NetworkBehaviour` itself is untestable in EditMode because `Amount` is
+`[Networked]` and throws when read before `Spawned`. `RPC_Drain` now computes the new
+amount through `FoodPileMath.Drain` and early-returns when nothing changed.
+
+### New footgun found
+
+`Fusion.Assert` collides with `NUnit.Framework.Assert` — same family as the documented
+`Fusion.LogLevel` collision. Any test file importing `Fusion` needs
+`using Assert = NUnit.Framework.Assert;` or every assertion is `CS0104`.
+
+---
+
 ## 🧱 ADR 0003 Slice 1 — pile footprints + permanent centre (2026-07-22) — SHIPPED (untested)
 
 Commit `856cd07` on `develop`. **Not pushed, not playtested.** Slices 2–4 (Vault /
