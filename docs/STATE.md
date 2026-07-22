@@ -198,6 +198,63 @@ in `FoodPileVisuals`, and bot pacing all still need a human.
 
 ---
 
+## ✅ BUG-FIX PASS (2026-07-22, loop) — 3.5 of 4 closed
+
+Fixed and **re-verified in live play mode under deliberately poisoned input**, not just by
+unit test. EditMode **101/101** after every change.
+
+| # | Bug | Status |
+|---|---|---|
+| 1 | Bots got off-class abilities (Warrior-only Flying Peck on Speedy/Fatty/Assassin) | **FIXED** |
+| 2 | `GetDefaultPassiveForClass` returned an alternative, not the signature | **FIXED** |
+| 3 | Slot composition unenforced (Warrior had 2 Common) | **FIXED** |
+| 4 | Four alternative passives inert | **3 of 4 fixed** — Juggernaut remains |
+
+**How 1–3 were fixed.** `PassiveAbilitySO.IsSignature` (overridden true on
+Mighty/Slippery/Immovable/Combo) makes the default lookup deterministic instead of depending
+on `AbilityRegistrySO.All` authoring order. `AbilityRegistrySO` gained `IsAllowedFor`,
+`CommonAbilities`, `GetCharacterAbilitiesForClass` and `ComposeDefaultLoadout` as the single
+authority on gating. `MatchBootstrapper.ResolveLegalLoadout` sanitises **every** spawn —
+player *and* bot — into 1 Common + 2 Character plus a class-legal passive, backfilling and
+de-duplicating.
+
+> **The lesson worth keeping:** filtering bot *presets* was not enough. A preset whose class
+> flavor allowed Fatty still handed it Speedy-only Feather Trap, and slot reuse put the same
+> ability in two Speedy slots. Only validating at the single spawn chokepoint — which both
+> paths now share — actually held the invariant.
+
+**Verification method:** fed the human a duplicate Common, an off-class ability and an
+off-class passive, then asserted on the spawned world. Result: `ALL CHICKENS LEGAL` —
+every chicken 1 Common + 2 Character, zero off-class, zero duplicates, all passives legal
+and signature.
+
+**Passive hooks (bug 4).** `PassiveAbilitySO` now exposes `ModifyOutgoingDamage`
+(target-aware), `ModifyIncomingDamage` and `ModifyControlDuration`, called from existing
+gameplay chokepoints. Bracer (100→85 incoming) and Second Wind (100→70 control duration) are
+verified live. Opportunist (+30% vs slowed/rooted/stunned) is implemented and conditional by
+design — it returns unmodified damage when there is no resolved target, so a null-target
+probe reports "inert" and that is correct. The four signature passives deliberately do NOT
+override these; they still run through the older `ChickenPassive` enum path, and overriding
+would double-apply.
+
+### ⚠ Still open
+
+- **Juggernaut is inert.** "Barge shoves chickens as well as terrain" needs `ChickenTraversal`
+  integration, not a damage/duration modifier. Left honestly unimplemented rather than faked
+  with an unrelated stat tweak.
+- **Passive effect values still deviate from the ADR** (Bracer was specced as *Vault cooldown
+  −1.5s*, not damage resistance). The hooks now exist, so re-pointing them at the ADR-intended
+  effects is cheap — but it is a design call, not a mechanical one.
+
+### 🔧 Correction to the previous entry
+
+The earlier claim that **`ChickenTraversal.Abort()` has zero call sites was WRONG.** It is
+called from both `RPC_TeleportTo` and `RPC_ResetControlStates`. The original grep used
+`_traversal\.` and missed the null-conditional `_traversal?.Abort()`. Antigravity's report
+was accurate on this point and my verification was not.
+
+---
+
 ## 🔬 LIVE PLAY-MODE VERIFICATION (2026-07-22) — read this before testing
 
 Ran a real solo match in the Editor and inspected the running world. **The systems work;
