@@ -189,8 +189,38 @@ Re-serialize the prefab only if you want to override a default in the inspector.
    needs a decision.
 4. Bot pacing must be re-measured; all pre-2026-07-18 pacing data is void.
 
-Verified: zero compile errors (Fusion IL weaver ran over the new networked property),
-EditMode suite 8/8 green. **No play-mode or multi-client verification yet.**
+Verified: zero compile errors (Fusion IL weaver ran over the new networked property).
+The pile maths added by this slice is now covered by the 22 tests in
+`EconomyAndPilesTests.cs` (see the test-suite entry above), including the
+blocker-vs-`CollectRadius` margin for both the outer and the centre pile.
+**No play-mode or multi-client verification yet** — the regen rate, the double-shrink
+in `FoodPileVisuals`, and bot pacing all still need a human.
+
+---
+
+## ✅ Verification pass (2026-07-21, Editor live)
+
+Ran after the Unity MCP reconnected, covering everything that was implemented while it
+was down.
+
+- **Compile clean** — `assets-refresh` ForceSynchronousImport → zero errors.
+- **EditMode suite: 101/101 PASS.** (8 → 101 tests: the original `CoreLogicTests` plus the
+  `DataIntegrity` / `AbilitySystem` / `EconomyAndPiles` / `ContractsAndEnums` /
+  `ServicesAndInput` / `ProjectConfig` suites.)
+- **Two real failures fixed, not silenced.** `DataIntegrityTests` caught that
+  `ChickenClassRegistry` tints were unauthored — Assassin pure black `(0,0,0)`, all four at
+  `alpha 0`. `ChickenController.cs:244` applies `TintColor` to the chicken body with **no
+  alpha guard**, so Assassin rendered black in-world; `MenuUiController` *does* guard on
+  `a > 0f` and silently fell back to its hardcoded palette, which is exactly why the menu
+  looked right and hid the bug. Authored all four to the Hex32 values the menu already uses
+  (C04030 / E85A2A / F5D75A / 7B68EE) at alpha 1. Both tests now green.
+- **`Game.unity` re-serialization confirmed** — the scene carries the Slice 1b tunables
+  (8 Standard / 6 Low / 3 Tall, heights 0.9 / 2.5, clearance 2.2) and the retired
+  `_interiorWallCount` is gone. No stale values will override the new defaults at play time.
+
+**Still unverified — needs a human in play mode:** whether the pile tempo change and the
+denser terrain actually *feel* right. That is the entire hypothesis of Slices 1 and 1b, and
+no automated check can answer it. See `docs/TESTING.md` T1.
 
 ---
 
