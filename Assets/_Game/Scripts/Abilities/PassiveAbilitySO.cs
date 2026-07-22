@@ -17,6 +17,18 @@ namespace CluckWars.Abilities
             SlotKind = AbilitySlotKind.Character;
         }
 
+        /// <summary>
+        /// True for a class's <b>signature</b> passive — the one it gets by default and the
+        /// one the GDD names as that class's identity (Warrior MIGHTY/Tough, Speedy SLIPPERY,
+        /// Fatty IMMOVABLE, Assassin COMBO). False for the alternative fork.
+        /// <para>
+        /// This exists because "default passive" must NOT be "whichever passive happens to sit
+        /// first in <c>AbilityRegistrySO.All</c>" — that array is authoring order, and it made
+        /// Warrior default to Bracer and Speedy to Second Wind, both of which are alternatives.
+        /// </para>
+        /// </summary>
+        public virtual bool IsSignature => false;
+
         public override void OnDeactivate(AbilityContext ctx) { }
     }
 }

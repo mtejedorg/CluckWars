@@ -1,3 +1,4 @@
+using System.Linq;
 using CluckWars.Abilities;
 using CluckWars.Logging;
 using CluckWars.Networking;
@@ -66,15 +67,17 @@ namespace CluckWars.Gameplay
         private ISessionSelectionService _selection;
         private PrefabRegistrySO _prefabRegistry;
         private ChickenClassRegistrySO _classRegistry;
+        private AbilityRegistrySO _abilityRegistry;
         private ILogService _log;
 
         [Inject]
-        public void Construct(INetworkService networkService, ISessionSelectionService selection, PrefabRegistrySO prefabRegistry, ChickenClassRegistrySO classRegistry, ILogService log)
+        public void Construct(INetworkService networkService, ISessionSelectionService selection, PrefabRegistrySO prefabRegistry, ChickenClassRegistrySO classRegistry, AbilityRegistrySO abilityRegistry, ILogService log)
         {
             _networkService = networkService;
             _selection = selection;
             _prefabRegistry = prefabRegistry;
             _classRegistry = classRegistry;
+            _abilityRegistry = abilityRegistry;
             _log = log;
         }
 
@@ -250,16 +253,21 @@ namespace CluckWars.Gameplay
                         var combat = networkObject.GetComponent<ChickenCombat>();
                         if (combat != null && botMaxHp > 0f) combat.HP = botMaxHp;
 
-                        if (haveLoadout)
+                        // Bots go through the SAME sanitiser as players. Preset filtering alone
+                        // was not enough: a preset whose class flavor allowed Fatty still handed
+                        // it Speedy-only Feather Trap, and slot reuse produced the same ability
+                        // twice on Speedy (both observed live 2026-07-22). Routing both paths
+                        // through one chokepoint is what actually guarantees the invariant.
+                        var abilities = networkObject.GetComponent<AbilityController>();
+                        if (abilities != null)
                         {
-                            // Slot 2 is the Combo (Assassin) 3rd slot — AbilityController gates
-                            // it by passive, so pass null for non-Assassins for tidiness.
-                            var abilities = networkObject.GetComponent<AbilityController>();
-                            if (abilities != null)
-                            {
-                                var slot2 = botClass == ChickenClass.Assassin ? loadout.Slot2 : null;
-                                abilities.SetSlots(loadout.Passive, loadout.Slot0, loadout.Slot1, slot2);
-                            }
+                            ResolveLegalLoadout(botClass,
+                                haveLoadout ? loadout.Passive : null,
+                                haveLoadout ? loadout.Slot0 : null,
+                                haveLoadout ? loadout.Slot1 : null,
+                                haveLoadout ? loadout.Slot2 : null,
+                                out var botPassive, out var b0, out var b1, out var b2);
+                            abilities.SetSlots(botPassive, b0, b1, b2);
                         }
                     });
 
@@ -281,16 +289,101 @@ namespace CluckWars.Gameplay
             if (_botLoadouts == null || _botLoadouts.Length == 0) return false;
 
             // Gather eligible presets, then pick one uniformly.
+            // A preset qualifies only if its own class flavor permits the class AND every
+            // ability it carries is legal for that class under the ADR 0003 Decision 3 mask.
+            // Without the second test a preset with an empty (= any class) flavor happily
+            // handed Warrior-only Flying Peck to Speedy/Fatty/Assassin bots — observed live
+            // 2026-07-22, and it silently voided the whole point of class-gated pools.
             var eligible = new System.Collections.Generic.List<BotLoadoutPreset>(_botLoadouts.Length);
             for (int i = 0; i < _botLoadouts.Length; i++)
             {
                 var p = _botLoadouts[i];
-                if (p.HasAnyAbility && p.AllowsClass(cls)) eligible.Add(p);
+                if (!p.HasAnyAbility || !p.AllowsClass(cls)) continue;
+                if (!PresetIsClassLegal(p, cls)) continue;
+                eligible.Add(p);
             }
-            if (eligible.Count == 0) return false;
+
+            if (eligible.Count == 0)
+            {
+                // No authored preset is legal for this class — compose one from the pools
+                // rather than spawning a bot with an off-class or empty loadout.
+                if (_abilityRegistry != null)
+                {
+                    _abilityRegistry.ComposeDefaultLoadout(cls, out var common, out var c0, out var c1);
+                    if (common != null || c0 != null)
+                    {
+                        preset = new BotLoadoutPreset
+                        {
+                            Name    = $"Composed({cls})",
+                            Slot0   = common,
+                            Slot1   = c0,
+                            Slot2   = c1,
+                            Passive = _abilityRegistry.GetDefaultPassiveForClass(cls),
+                        };
+                        _log?.Debug(Source, $"No legal bot preset for {cls} — composed 1 Common + 2 Character from the registry.");
+                        return true;
+                    }
+                }
+                return false;
+            }
 
             preset = eligible[UnityEngine.Random.Range(0, eligible.Count)];
             return true;
+        }
+
+        /// <summary>
+        /// Sanitises a chosen loadout into a legal one for <paramref name="cls"/>:
+        /// <b>1 Common + 2 Character</b> actives plus a class-legal passive
+        /// (ADR 0003 Decision 3). Anything off-class, duplicated or missing is replaced from
+        /// the class pools rather than being passed through.
+        /// </summary>
+        /// <remarks>
+        /// Enforced here, at the single spawn chokepoint, rather than trusting the picker UI —
+        /// a live match on 2026-07-22 spawned a Warrior holding two Common abilities and a
+        /// non-signature inert passive, because nothing validated the selection on the way in.
+        /// Bots go through <see cref="PresetIsClassLegal"/> for the same reason.
+        /// </remarks>
+        private void ResolveLegalLoadout(ChickenClass cls,
+            PassiveAbilitySO chosenPassive, AbilityBaseSO a0, AbilityBaseSO a1, AbilityBaseSO a2,
+            out PassiveAbilitySO passive, out AbilityBaseSO slot0, out AbilityBaseSO slot1, out AbilityBaseSO slot2)
+        {
+            passive = chosenPassive; slot0 = a0; slot1 = a1; slot2 = a2;
+            if (_abilityRegistry == null) return;
+
+            // Passive must exist and be legal for this class; else fall back to the signature.
+            if (passive == null || !AbilityRegistrySO.IsAllowedFor(passive, cls))
+                passive = _abilityRegistry.GetDefaultPassiveForClass(cls);
+
+            var chosen = new[] { a0, a1, a2 };
+            var common = chosen.FirstOrDefault(a => a != null && a.SlotKind == AbilitySlotKind.Common);
+            var chars  = chosen.Where(a => a != null
+                                        && a.SlotKind == AbilitySlotKind.Character
+                                        && AbilityRegistrySO.IsAllowedFor(a, cls))
+                               .Distinct().ToList();
+
+            // Backfill anything the selection failed to supply.
+            _abilityRegistry.ComposeDefaultLoadout(cls, out var defCommon, out var defC0, out var defC1);
+            common ??= defCommon;
+            foreach (var fill in new[] { defC0, defC1 })
+                if (chars.Count < 2 && fill != null && !chars.Contains(fill)) chars.Add(fill);
+
+            slot0 = common;
+            slot1 = chars.Count > 0 ? chars[0] : null;
+            slot2 = chars.Count > 1 ? chars[1] : null;
+        }
+
+        /// <summary>
+        /// Every ability the preset carries must be equippable by <paramref name="cls"/>
+        /// (ADR 0003 Decision 3). Empty slots are fine; an off-class ability disqualifies the
+        /// whole preset. Slot2 is only equipped on Combo Assassins, but it is validated here
+        /// too so a preset can never leak an off-class ability into that slot either.
+        /// </summary>
+        private static bool PresetIsClassLegal(in BotLoadoutPreset p, ChickenClass cls)
+        {
+            return SlotIsLegal(p.Slot0, cls) && SlotIsLegal(p.Slot1, cls) && SlotIsLegal(p.Slot2, cls);
+
+            static bool SlotIsLegal(AbilityBaseSO a, ChickenClass c) =>
+                a == null || AbilityRegistrySO.IsAllowedFor(a, c);
         }
 
         private void OnDestroy()
@@ -407,12 +500,16 @@ namespace CluckWars.Gameplay
                     var combat = networkObject.GetComponent<ChickenCombat>();
                     if (combat != null && maxHp > 0f) combat.HP = maxHp;
 
-                    // Apply player-chosen abilities when the player selected from a pool.
-                    // Null means "use the prefab default" — SetSlots ignores null args.
+                    // Apply player-chosen abilities, sanitised against the class pools so an
+                    // off-class or malformed selection can never reach the world (ADR 0003
+                    // Decision 3: 1 Common + 2 Character, plus a mandatory class passive).
                     if (_selection != null)
                     {
                         var abilityCtrl = networkObject.GetComponent<AbilityController>();
-                        abilityCtrl?.SetSlots(_selection.Passive, _selection.Ability0, _selection.Ability1, _selection.Ability2);
+                        ResolveLegalLoadout(chosenClass,
+                            _selection.Passive, _selection.Ability0, _selection.Ability1, _selection.Ability2,
+                            out var passive, out var s0, out var s1, out var s2);
+                        abilityCtrl?.SetSlots(passive, s0, s1, s2);
                     }
                 });
         }

@@ -17,6 +17,9 @@ namespace CluckWars.Abilities
             SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Warrior;
         }
+        /// <summary>Signature passive for this class — the default (ADR 0003 Decision 3).</summary>
+        public override bool IsSignature => true;
+
 
         protected override string DefaultIcon => "⚔️";
 
