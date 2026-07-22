@@ -24,5 +24,21 @@ namespace CluckWars.Abilities
         {
             // Registered on spawn via AbilityController
         }
-    }
+    
+        /// <summary>
+        /// Assassin alternative: +30% damage against a target that is already slowed,
+        /// rooted or stunned — the payoff for the Deny corner of the mobility triangle.
+        /// </summary>
+        public override float ModifyOutgoingDamage(float amount, CluckWars.Gameplay.ChickenController self,
+                                                   CluckWars.Gameplay.ChickenController target)
+        {
+            if (target == null) return amount;
+            // 0.92 mirrors the threshold ChickenController uses to raise the Slowed VFX flag,
+            // so "looks slowed" and "counts as slowed" can't drift apart.
+            bool controlled = target.Rooted
+                              || target.SlowMultiplier < 0.92f
+                              || (target.Combat != null && target.Combat.IsStunned);
+            return controlled ? amount * 1.30f : amount;
+        }
+}
 }

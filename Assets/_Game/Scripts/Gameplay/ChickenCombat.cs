@@ -195,8 +195,13 @@ namespace CluckWars.Gameplay
                 return;
             }
 
+            // Slotted-passive incoming modifier (ADR 0003) — e.g. Bracer's flat resistance.
+            // Applied before ability-driven resistance so the two stack multiplicatively
+            // rather than one masking the other.
+            float amountAfterPassive = _controller != null ? _controller.ApplyIncomingDamage(amount) : amount;
+
             // Turtle Mode and similar reduce incoming damage.
-            float resisted = amount;
+            float resisted = amountAfterPassive;
             if (_controller != null && _controller.DamageResistance > 0f)
             {
                 resisted *= Mathf.Clamp01(1f - _controller.DamageResistance);

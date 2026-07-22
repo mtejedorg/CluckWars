@@ -24,5 +24,9 @@ namespace CluckWars.Abilities
         {
             // Registered on spawn via AbilityController
         }
-    }
+    
+        /// <summary>Speedy alternative: control effects wear off 30% faster.</summary>
+        public override float ModifyControlDuration(float seconds, CluckWars.Gameplay.ChickenController self)
+            => seconds * 0.70f;
+}
 }

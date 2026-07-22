@@ -24,5 +24,9 @@ namespace CluckWars.Abilities
         {
             // Registered on spawn via AbilityController
         }
-    }
+    
+        /// <summary>Warrior alternative: 15% damage resistance (ADR 0003 passive pool).</summary>
+        public override float ModifyIncomingDamage(float amount, CluckWars.Gameplay.ChickenController self)
+            => amount * 0.85f;
+}
 }

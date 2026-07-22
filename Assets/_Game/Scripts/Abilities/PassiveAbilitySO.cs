@@ -29,6 +29,27 @@ namespace CluckWars.Abilities
         /// </summary>
         public virtual bool IsSignature => false;
 
+        // ---- Effect hooks ---------------------------------------------------
+        // Passives are permanent, so they cannot express their effect through
+        // OnActivate/OnDeactivate the way an active ability does. Instead gameplay calls
+        // these at its existing chokepoints. Base implementations are identity functions,
+        // so a passive that overrides nothing is inert BY CHOICE rather than by accident.
+        //
+        // The four signature passives (Mighty/Slippery/Immovable/Combo) deliberately do NOT
+        // override these — they are still driven by the older ChickenPassive enum path in
+        // ChickenController, which predates this system and already works. Do not duplicate
+        // their effects here or they will apply twice.
+
+        /// <summary>Scale damage this chicken is about to deal. Called from <c>ChickenController.ApplyOutgoingDamage</c>.</summary>
+        /// <param name="target">May be null when the caller has no single resolved target.</param>
+        public virtual float ModifyOutgoingDamage(float amount, ChickenController self, ChickenController target) => amount;
+
+        /// <summary>Scale damage this chicken is about to receive. Called from <c>ChickenCombat.RPC_ApplyDamage</c>.</summary>
+        public virtual float ModifyIncomingDamage(float amount, ChickenController self) => amount;
+
+        /// <summary>Scale the duration of an incoming control effect (slow/root). Called from <c>ChickenController</c>.</summary>
+        public virtual float ModifyControlDuration(float seconds, ChickenController self) => seconds;
+
         public override void OnDeactivate(AbilityContext ctx) { }
     }
 }

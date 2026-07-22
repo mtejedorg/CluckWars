@@ -380,11 +380,38 @@ namespace CluckWars.Gameplay
         /// Call before <see cref="ChickenCombat.RPC_ApplyDamage"/> when the
         /// damage source is this chicken's ability.
         /// </summary>
-        public float ApplyOutgoingDamage(float rawAmount)
+        public float ApplyOutgoingDamage(float rawAmount) => ApplyOutgoingDamage(rawAmount, null);
+
+        /// <summary>
+        /// Target-aware overload. Pass the victim when it is known so passives that care
+        /// about the target's control state (Opportunist) can read it; the parameterless
+        /// overload stays valid for callers that have no single resolved target.
+        /// </summary>
+        public float ApplyOutgoingDamage(float rawAmount, ChickenController target)
         {
+            float amount = rawAmount;
             if (IsPassiveActive(ChickenPassive.Tough))
-                return rawAmount * ToughDamageBonus;
-            return rawAmount;
+                amount *= ToughDamageBonus;
+
+            // Slotted-passive hook (ADR 0003). Signature passives run through the enum path
+            // above and deliberately do not override this, so nothing applies twice.
+            var p = _abilities != null ? _abilities.Passive : null;
+            if (p != null) amount = p.ModifyOutgoingDamage(amount, this, target);
+            return amount;
+        }
+
+        /// <summary>Applies slotted-passive incoming-damage modifiers. Called by <see cref="ChickenCombat"/>.</summary>
+        public float ApplyIncomingDamage(float rawAmount)
+        {
+            var p = _abilities != null ? _abilities.Passive : null;
+            return p != null ? p.ModifyIncomingDamage(rawAmount, this) : rawAmount;
+        }
+
+        /// <summary>Applies slotted-passive control-duration modifiers (slow/root).</summary>
+        private float ApplyPassiveControlDuration(float seconds)
+        {
+            var p = _abilities != null ? _abilities.Passive : null;
+            return p != null ? p.ModifyControlDuration(seconds, this) : seconds;
         }
 
         // ---- Networking helpers ----------------------------------------------
@@ -428,6 +455,7 @@ namespace CluckWars.Gameplay
         public void RPC_ApplyAbilitySlow(float duration, float factor)
         {
             if (IsPassiveActive(ChickenPassive.Slippery)) duration *= SlipperyDurationReduction;
+            duration = ApplyPassiveControlDuration(duration);
             _abilitySlowUntil  = Runner.SimulationTime + duration;
             _abilitySlowFactor = factor;
             _log?.Debug(Source, $"RPC_ApplyAbilitySlow: factor={factor:P0} for {duration:0.0}s.");
@@ -442,6 +470,7 @@ namespace CluckWars.Gameplay
         public void RPC_ApplyRoot(float duration)
         {
             if (IsPassiveActive(ChickenPassive.Slippery)) duration *= SlipperyDurationReduction;
+            duration = ApplyPassiveControlDuration(duration);
             _rootUntil = Runner.SimulationTime + duration;
             _log?.Debug(Source, $"RPC_ApplyRoot: rooted for {duration:0.0}s.");
         }
