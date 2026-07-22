@@ -198,6 +198,60 @@ in `FoodPileVisuals`, and bot pacing all still need a human.
 
 ---
 
+## 🛑 ADR 0003 Slices 2–4 landed — DEVELOPMENT CLOSED (2026-07-22)
+
+Built via cravify (Antigravity plans+executes, Claude reviews the plan and the result).
+Verified in the live Editor: **compiles clean, EditMode suite 101/101 green.**
+
+### What actually works
+
+- **Traversal is live.** `AbilityBaseSO.TerrainTraversal`; Flying Peck = Vault, Roll & Push =
+  Barge, Doppelganger = Blink. `AbilityController` opens the window on activation (line ~316)
+  and closes it in `Deactivate()`, which is reached from timer expiry, stun, match end and
+  owner death. `ChickenController` owns and ticks the engine.
+- **Slot model.** `AbilitySlotKind` + `ChickenClassFlags`; all 14 active abilities tagged
+  Common/Character with class masks per Decision 3 (Invisibility shared Speedy+Assassin,
+  mask 10). `AbilityRegistrySO` gained `ActiveAbilities` / `Passives` /
+  `GetPassivesForClass` / `GetDefaultPassiveForClass`, so passives cannot leak into the
+  active-ability grid. `BotLoadoutPreset` gained a `Passive` field with class-signature
+  fallback — bots never spawn with a null passive.
+- **Speed retune.** Speedy 10→9, Assassin 9→8.5, Warrior 7→7.5, Fatty 4→6.5. Spread
+  2.5× → 1.4×.
+- **UI.** `CharacterSelect.uxml` gained a passive-selection row (UXML, not procedural C#).
+
+### ⚠ Known incomplete — do NOT assume these work
+
+1. **The four NON-signature passives are inert.** `Bracer`, `SecondWind`, `Juggernaut`,
+   `Opportunist` have an **empty `OnActivate`** and are referenced nowhere outside
+   `AbilityIconStyle.cs` (icons only). They are selectable in the UI and do **nothing**.
+   The four signature passives (Mighty/Tough, Slippery, Immovable, Combo) DO work, because
+   `ChickenController.IsPassiveActive` bridges them to the pre-existing `ChickenPassive`
+   enum — the only path gameplay actually reads.
+   **Consequence:** the Assassin COMBO-vs-OPPORTUNIST build fork from Decision 3 is
+   currently cosmetic. Picking Opportunist gives you nothing.
+2. **Authored passive effects deviate from the ADR.** Bracer was specced as *"Vault cooldown
+   −1.5s"* but authored as *"15% damage resistance"*; Second Wind and Juggernaut likewise
+   drifted. This matters beyond naming — Bracer was designed to tie a passive into the
+   traversal triangle, and a flat damage reduction is exactly the stat-padding the ADR's
+   passive guardrail forbids.
+3. **`ChickenTraversal.Abort()` has zero call sites.** The implementation report claimed it
+   was wired into `Despawned()` and `RPC_ResetControlStates()`; **it is not.** Practical
+   coverage is decent because `Deactivate()` → `End()` handles expiry/stun/match-end/death,
+   but a teleport or despawn mid-window is unhandled. `End()` includes the unstick logic, so
+   the worst case is a leaked collider reference rather than a permanently phased chicken —
+   but this should be closed before shipping.
+4. **Nothing here is play-tested.** Compile + unit tests only. Whether the mobility triangle
+   is actually *fun* is entirely unverified — which was the whole point of the exercise.
+
+### Tooling note
+
+**The `unity-mcp` server (Unity's own AI assistant) requires a paid Unity PRO subscription
+and will never work on this machine.** Use `ai-game-developer` (IvanMurzak) exclusively —
+it hosts `assets-refresh`, `console-get-logs` and `tests-run`. Don't waste time re-approving
+the other one.
+
+---
+
 ## ✅ Verification pass (2026-07-21, Editor live)
 
 Ran after the Unity MCP reconnected, covering everything that was implemented while it
