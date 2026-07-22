@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
@@ -16,6 +17,11 @@ namespace CluckWars.Tests
     /// Scope note: NetworkBehaviour logic (movement, damage RPCs, cargo, match flow) is NOT
     /// unit-testable here — it needs a live NetworkRunner. That surface is covered by the
     /// MCP-driven play-mode smoke checks and the manual test plan (see docs/TESTING.md).
+    ///
+    /// This file is the "small pure helpers" bucket. The rest of the suite is split by
+    /// subsystem so a red test names the area immediately — see DataIntegrityTests,
+    /// AbilitySystemTests, EconomyAndPilesTests, ContractsAndEnumsTests,
+    /// ServicesAndInputTests and ProjectConfigTests.
     /// </summary>
     public sealed class CoreLogicTests
     {
@@ -41,6 +47,37 @@ namespace CluckWars.Tests
             Color32 white = UiGfx.Hex32("ffffff");
             Assert.AreEqual(255, white.r); Assert.AreEqual(255, white.g); Assert.AreEqual(255, white.b);
             Assert.AreEqual(255, white.a);
+        }
+
+        [Test]
+        public void Hex32_IsCaseInsensitive()
+        {
+            // The ART.md tokens are copied out of the design's CSS, which mixes cases.
+            Color32 lower = UiGfx.Hex32("f5c842");
+            Color32 upper = UiGfx.Hex32("F5C842");
+            Assert.AreEqual(lower.r, upper.r);
+            Assert.AreEqual(lower.g, upper.g);
+            Assert.AreEqual(lower.b, upper.b);
+        }
+
+        [Test]
+        public void UiGfxThemeTokens_AreAllDistinct()
+        {
+            // The §6.1 palette. Two tokens collapsing to the same value means a UI
+            // surface silently lost its contrast against its own border or background.
+            var tokens = typeof(UiGfx)
+                .GetFields(BindingFlags.Public | BindingFlags.Static)
+                .Where(f => f.FieldType == typeof(Color))
+                .ToDictionary(f => f.Name, f => (Color)f.GetValue(null));
+
+            Assert.IsNotEmpty(tokens, "UiGfx exposes no Color tokens — the test is stale.");
+
+            var dupes = tokens.GroupBy(kv => kv.Value)
+                .Where(g => g.Count() > 1)
+                .Select(g => string.Join(" == ", g.Select(kv => kv.Key)))
+                .ToList();
+
+            Assert.IsEmpty(dupes, "Two UiGfx theme tokens resolve to the same colour.");
         }
 
         // ---- MenuUiController.GetPassiveInfo — per-class passive metadata ------

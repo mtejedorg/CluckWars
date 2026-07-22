@@ -169,27 +169,70 @@ This replaces emulator-based testing entirely; for real-device checks use the Pi
 
 ## Automated tests
 
-### EditMode unit suite
+### EditMode unit suite — the pre-playtest health gate
 
-`Assets/_Game/Scripts/Editor/Tests/CoreLogicTests.cs` — the project's automated
-regression net. Covers the Fusion-independent pure logic (colour-token parsing,
-per-class passive metadata, class-registry lookup + Warrior fallback).
+**101 EditMode tests** in `Assets/_Game/Scripts/Editor/Tests/`, split one file per
+subsystem so a red test names the area immediately. Run this **before** every play
+session: it takes ~1.5 s and catches the class of problem that otherwise burns the
+first twenty minutes of a playtest (an unassigned inspector slot, a pile tuned past
+its collect radius, an ability nobody can equip).
+
+| File | Tests | What it guards |
+|---|---|---|
+| `CoreLogicTests.cs` | 10 | Small pure helpers: `UiGfx.Hex32` parsing + palette distinctness, `MenuUiController.GetPassiveInfo`, `ChickenClassRegistrySO` lookup and its documented Warrior fallback. |
+| `DataIntegrityTests.cs` | 14 | The **real SO assets** in `Assets/_Game/Data/` — every class has stats + the GDD passive + a distinct visible tint, `MatchConfig` values are in range, every `PrefabRegistry` slot is assigned, no `ColorScheme` colour is invisible, no audio clip is wired to two cues. Highest-value category: these are the failures that only surface as a crash or a silent no-op mid-match. |
+| `AbilitySystemTests.cs` | 14 | Registry completeness (no orphan ability type, no unregistered asset, no duplicate/null entry), per-asset authoring (labels, accent alpha, cooldown ≥ duration), `ResolveBotRole()` never leaves `Auto`, range-gated abilities expose a non-zero `IndicatorRange`, physics scanners include layer 8, and `AbilityIconStyle` covers every concrete subclass. |
+| `EconomyAndPilesTests.cs` | 22 | ADR 0003 pile maths via `FoodPileMath` (top bucket is exactly the authored size, stepping is quantised and monotonic, a permanent pile never reaches step 0 and never drains below its floor) plus the **blocker-vs-`CollectRadius` margin** read off the real prefab, and win-target reachability against the real `MatchConfig` + class stats. |
+| `ContractsAndEnumsTests.cs` | 12 | Serialisation-sensitive contracts: byte backing types, `ChickenClass` numbering, the zero member of every `[Networked]` enum, exhaustive `ResolveBotRole` / `GetPassiveInfo` coverage, and **`SessionNameSeed` parity** between `MapGenerator` and `MatchBootstrapper` (the two duplicated copies that keep peers' wall layouts identical). |
+| `ServicesAndInputTests.cs` | 16 | `SessionSelectionService` defaults + change-event semantics, `NullUGSService` / `NullAudioService` (what an offline demo build actually runs on), `LobbyInfo`, and `CompositeInputProvider` — including that it reads **every** provider each tick rather than short-circuiting, which is what keeps edge-triggered ability presses from leaking into the next tick. |
+| `ProjectConfigTests.cs` | 13 | Build-settings scene order, physics layer names, `Chicken.prefab` component composition (incl. the `NetworkTransform` from finding C1 and the no-duplicates rule from C2), colliders on layer 9 in every interactable prefab, `Doppelganger` is a cargo-stripped variant, URP-only materials, SO folder + `SO`-suffix conventions. |
+
+`TestAssets.cs` is a shared helper, not a fixture — it centralises asset paths so a
+moved asset produces one clear failure instead of a scatter of NREs.
 
 **Run it three ways:**
 
 | How | Command |
 |---|---|
 | Editor UI | `Window ▸ General ▸ Test Runner ▸ EditMode ▸ Run All` |
-| Agent (Unity MCP) | `tests-run` with `testMode: EditMode` |
+| Agent (Unity MCP) | `tests-run` with `{"testMode":"EditMode","testNamespace":"CluckWars.Tests"}` |
 | Headless CI | `Unity.exe -runTests -batchmode -projectPath . -testPlatform EditMode -testResults results.xml` |
 
-Expected: **8/8 passed, 0 failed.** Any red here means a shared helper regressed —
-fix before spending a play-mode session chasing it.
+Filter to one category with `testClass`, e.g.
+`tests-run {"testMode":"EditMode","testClass":"DataIntegrityTests"}`.
 
-**Scope limits — read before adding tests.** Movement, damage, cargo, and match flow
-live in `NetworkBehaviour`s and need a live `NetworkRunner`; they are **not**
-unit-testable and are covered by the play-mode + multi-client plan instead. Do not try
-to "fix" this by wrapping the game in an `.asmdef`: game code is in the predefined
+**Baseline as of 2026-07-22: 99 passed / 2 failed.** The two reds are *real* and
+deliberately left failing — see `docs/STATE.md` for the write-up. Do not weaken them;
+they go green when the class-registry tints are authored.
+
+**Writing new tests — two gotchas.**
+
+- Fusion ships its own `Assert`, so any test file that also imports `Fusion` needs
+  `using Assert = NUnit.Framework.Assert;` at the top (same family as the documented
+  `Fusion.LogLevel` collision — see `CONVENTIONS.md ▸ Footguns`).
+- Populate private serialized fields with `ScriptableObject.CreateInstance` +
+  reflection and always `Object.DestroyImmediate` in a `finally` or `[TearDown]`.
+
+### What the automated suite does NOT cover
+
+**All Fusion-networked runtime behaviour.** Everything that needs a live
+`NetworkRunner` is out of scope by construction, including:
+
+- movement, knockback, root/slow application, and the whole control-state stack;
+- damage RPCs, kill credit, Spine Coat reflect, death drop;
+- cargo collection, the deposit rate, the optimistic-credit duplication window,
+  and the two-chickens-deposit-at-once race;
+- match flow ticks — state machine, timer, win check, restart, comeback events;
+- the permanent pile's regen tick and the NavMesh re-carve when a footprint steps;
+- bot FSM behaviour, pathfinding, and the Flee-with-no-escape-ability stall;
+- everything cross-peer: replication, ability cooldowns on remote peers, master
+  promotion, reconnection, and the `OnShutdown` → Bootstrap transition.
+
+The unit suite passing means **"the build is healthy enough to start a playtest"**,
+never "the game works". Those behaviours are covered by the play-mode plan below and
+by `tools/run-clients.ps1` for anything needing 2+ clients.
+
+Do **not** try to close that gap with an `.asmdef`: game code is in the predefined
 `Assembly-CSharp`, and adding a runtime asmdef can silently break **Fusion's IL weaver**
 (NetworkBehaviours stop being woven — compiles fine, fails at runtime). The tests live
 in an `Editor/` folder precisely to get game-code access without that risk.

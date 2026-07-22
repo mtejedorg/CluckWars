@@ -151,6 +151,18 @@ using LogLevel = CluckWars.Logging.LogLevel;
 
 Hit in `8fca391`. `FusionNetworkService` was already disambiguated with `Logging.LogLevel.Verbose` inline.
 
+### `Fusion.Assert` collides with `NUnit.Framework.Assert`
+
+Same shape, different types. Any EditMode test file that imports `Fusion` (to assert
+on `NetworkObject` / `NetworkTransform` wiring, say) gets `CS0104: 'Assert' is an
+ambiguous reference` on **every** assertion. Alias it:
+
+```csharp
+using Assert = NUnit.Framework.Assert;
+```
+
+Hit while building `ProjectConfigTests.cs` (2026-07-22).
+
 ### `ChickenClass` is `byte`-backed — can't cast `-1`
 
 `enum ChickenClass : byte`. `(ChickenClass)(-1)` doesn't fit in a byte and throws `CS0221`. Use a separate `bool _valid` flag instead of a sentinel value.

@@ -7,6 +7,79 @@ using Zenject;
 namespace CluckWars.Gameplay
 {
     /// <summary>
+    /// The pure arithmetic behind <see cref="FoodPile"/> (ADR 0003 Decision 2 / 2b),
+    /// lifted out of the <c>NetworkBehaviour</c> so it can be unit-tested in EditMode.
+    /// Every method is a total function of its arguments — no networked state, no
+    /// transform, no runner. <see cref="FoodPile"/> is the only production caller and
+    /// simply feeds it the current <c>Amount</c> / <c>MaxAmount</c> / serialized tunables.
+    /// </summary>
+    public static class FoodPileMath
+    {
+        /// <summary>Guards a stale serialized step count — the footprint needs at least two buckets.</summary>
+        public static int ClampSteps(int steps) => Mathf.Max(2, steps);
+
+        /// <summary>Drain floor as a fraction of max: the permanent floor, or 0 for an ordinary pile.</summary>
+        public static float FloorFraction(bool isPermanent, float permanentFloorFraction) =>
+            isPermanent ? Mathf.Clamp01(permanentFloorFraction) : 0f;
+
+        /// <summary>Lowest <c>Amount</c> a drain may leave.</summary>
+        public static float DrainFloor(float maxAmount, float floorFraction) => maxAmount * floorFraction;
+
+        /// <summary>
+        /// Food a chicken may actually take right now. A permanent pile still holds its
+        /// floor, but that food is not collectable — crediting cargo against
+        /// <c>Amount</c> instead of this is what would make the centre an infinite source.
+        /// </summary>
+        public static float Available(float amount, float maxAmount, float floorFraction) =>
+            Mathf.Max(0f, amount - DrainFloor(maxAmount, floorFraction));
+
+        /// <summary>
+        /// Resulting <c>Amount</c> after draining up to <paramref name="requested"/> food.
+        /// Over-requests clamp to whatever sits above the floor; the floor is never breached.
+        /// </summary>
+        public static float Drain(float amount, float maxAmount, float floorFraction, float requested)
+        {
+            if (requested <= 0f) return amount;
+
+            float available = Available(amount, maxAmount, floorFraction);
+            if (available <= 0f) return amount;
+
+            float next = amount - Mathf.Min(requested, available);
+            float floor = DrainFloor(maxAmount, floorFraction);
+            return next < floor ? floor : next;
+        }
+
+        /// <summary>
+        /// Which discrete footprint size a fill maps to.
+        /// 0 = empty (no footprint at all); 1 = smallest non-empty; <paramref name="steps"/> = full.
+        /// For a permanent pile the fill is normalised over its usable range <c>[floor, max]</c>,
+        /// so it still spans every step instead of being pinned to the top two — that is what
+        /// makes the centre's size a readout of contest intensity.
+        /// </summary>
+        public static int FootprintStep(float amount, float maxAmount, float floorFraction, int steps)
+        {
+            if (amount <= 0f) return 0;
+
+            int s = ClampSteps(steps);
+            float fill = maxAmount > 0f ? Mathf.Clamp01(amount / maxAmount) : 0f;
+            float t = Mathf.Clamp01((fill - floorFraction) / Mathf.Max(1f - floorFraction, 0.0001f));
+
+            return Mathf.Clamp(Mathf.CeilToInt(t * s), 1, s);
+        }
+
+        /// <summary>
+        /// Uniform root scale for a given step. The top step is exactly 1 (the authored size),
+        /// which is what keeps the blocker-vs-<c>CollectRadius</c> margin valid by construction.
+        /// </summary>
+        public static float FootprintScale(int step, int steps, float minFootprintScale)
+        {
+            int s = ClampSteps(steps);
+            float u = (Mathf.Clamp(step, 1, s) - 1f) / (s - 1f);
+            return Mathf.Lerp(Mathf.Clamp01(minFootprintScale), 1f, u);
+        }
+    }
+
+    /// <summary>
     /// A networked food pile. State authority owns <see cref="Amount"/>; chickens drain it
     /// via <see cref="RPC_Drain"/> from any client. Visual feedback is local
     /// (<c>FoodPileVisuals</c>) and reacts to networked-state changes.
@@ -91,13 +164,13 @@ namespace CluckWars.Gameplay
         public bool IsEmpty => Amount <= 0f;
 
         /// <summary>Drain floor as a fraction of <see cref="MaxAmount"/>. Zero for ordinary piles.</summary>
-        private float FloorFraction => IsPermanent ? Mathf.Clamp01(_permanentFloorFraction) : 0f;
+        private float FloorFraction => FoodPileMath.FloorFraction(IsPermanent, _permanentFloorFraction);
 
         /// <summary>Number of discrete footprint sizes, guarded against a stale serialized 0.</summary>
-        private int Steps => Mathf.Max(2, _footprintSteps);
+        private int Steps => FoodPileMath.ClampSteps(_footprintSteps);
 
         /// <summary>Lowest <see cref="Amount"/> a drain may leave. Zero for ordinary piles.</summary>
-        public float DrainFloor => MaxAmount * FloorFraction;
+        public float DrainFloor => FoodPileMath.DrainFloor(MaxAmount, FloorFraction);
 
         /// <summary>
         /// Food a chicken may actually take right now. Distinct from <see cref="Amount"/>:
@@ -105,7 +178,7 @@ namespace CluckWars.Gameplay
         /// Callers must credit their cargo against this, not against <see cref="Amount"/>,
         /// or the centre pile becomes an infinite food source at its floor.
         /// </summary>
-        public float Available => Mathf.Max(0f, Amount - DrainFloor);
+        public float Available => FoodPileMath.Available(Amount, MaxAmount, FloorFraction);
 
         /// <summary>True when there is food left to collect (as opposed to left standing).</summary>
         public bool HasCollectableFood => Available > 0f;
@@ -199,23 +272,12 @@ namespace CluckWars.Gameplay
         /// <c>[floor, max]</c>, so it still spans every step instead of being pinned to the
         /// top two — that is what makes the centre's size a readout of contest intensity.
         /// </summary>
-        private int FootprintStep()
-        {
-            if (IsEmpty) return 0;
-
-            float fill = MaxAmount > 0f ? Mathf.Clamp01(Amount / MaxAmount) : 0f;
-            float floor = FloorFraction;
-            float t = Mathf.Clamp01((fill - floor) / Mathf.Max(1f - floor, 0.0001f));
-
-            return Mathf.Clamp(Mathf.CeilToInt(t * Steps), 1, Steps);
-        }
+        private int FootprintStep() =>
+            FoodPileMath.FootprintStep(Amount, MaxAmount, FloorFraction, _footprintSteps);
 
         /// <summary>Uniform root scale for a given step. The top step is exactly the authored size.</summary>
-        private float FootprintScale(int step)
-        {
-            float u = (Mathf.Clamp(step, 1, Steps) - 1f) / (Steps - 1f);
-            return Mathf.Lerp(Mathf.Clamp01(_minFootprintScale), 1f, u);
-        }
+        private float FootprintScale(int step) =>
+            FoodPileMath.FootprintScale(step, _footprintSteps, _minFootprintScale);
 
         /// <summary>
         /// Local, driven entirely by the networked <see cref="Amount"/> — every peer computes
@@ -257,14 +319,14 @@ namespace CluckWars.Gameplay
         {
             if (amount <= 0f) return;
 
-            float available = Available;
-            if (available <= 0f) return;
+            float before = Amount;
+            float next = FoodPileMath.Drain(before, MaxAmount, FloorFraction, amount);
+            if (Mathf.Approximately(next, before)) return;
 
-            var actual = Mathf.Min(amount, available);
-            Amount -= actual;
+            Amount = next;
 
+            float actual = before - next;
             float floor = DrainFloor;
-            if (Amount < floor) Amount = floor;
 
             if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
             {
