@@ -423,6 +423,38 @@ slot without a cooldown ring.
 
 ---
 
+## Build-order override (2026-07-21, Maestro)
+
+The strict slice order below was **overridden by design decision**: build all slices before
+playtesting. Maestro's rationale — *"for me that is the first vertical slice; I don't consider
+a not-funny game a slice."* The staged order was optimised for falsifying the hypothesis
+cheaply; Maestro is optimising for a coherent thing to actually evaluate. Both are valid;
+this is the call that was made, recorded so the reversal isn't mistaken for drift.
+
+**Consequence to be aware of:** the cheap falsification point is gone. If the movement
+redesign does not land, the sunk cost is now the traversal movement code *and* the slot/passive
+system *and* its UI, rather than one afternoon. Mitigation: keep the slices as separate
+commits so any one of them can be reverted independently.
+
+**Explicitly excluded from the build:** the Fatty late-game mitigation (Fatty shifting from
+terrain *user* to terrain *maker*). Approach still undecided — see Decisions owed.
+
+## Decisions owed (unresolved — none of these are designed yet)
+
+Consolidated so they cannot be lost. Every one needs a human call, not an implementation.
+
+| # | Decision | Status |
+|---|---|---|
+| 1 | **`GameManager.RestockPiles()`** refills every pile in the final minute — directly against the density pillar. Recommend dropping it from the event pool or repointing it at the centre. | Code untouched |
+| 2 | **Centre regen rate (0.5/s)** — the most sensitive number in the design. Too high = free farm; too low = centre erodes in the first minute. | Educated guess, unvalidated |
+| 3 | **Outer-pile exhaustion curve** — target ~30–40% mass remaining at timer expiry, or the late game has nothing to fight over outside the centre. | Unmeasured |
+| 4 | **Positive feedback loop** — Speedy's scoring action (emptying piles) also opens Speedy's own late-game lanes. Opened lanes benefit everyone, which dampens it, but watch for runaway leaders. | Unaddressed |
+| 5 | **Fatty's late game** — the "terrain maker" mitigation is a rationale, not a mechanic. Nothing currently stops Fatty's last minute feeling hopeless. | **Deliberately unbuilt** |
+| 6 | **"Graze"** (reduced score for eating in place) — recorded as an optional pressure valve. A generous ratio reintroduces the rejected eat-only design by the back door. | Not adopted |
+| 7 | **Warrior passive naming** — code and GDD say `Tough`, the UI says `MIGHTY`. The +25% mechanic itself is correctly wired. | Cosmetic |
+| 8 | **Plateau channels** on the centre pile (3–4 gaps cut through) — needs multiple colliders rather than one capsule. | Deferred, cosmetic gap |
+| 9 | **Cross-platform layout determinism** — obstacle placement evaluates float comparisons independently on each peer; a 1-ULP difference at an exact accept/reject boundary would cascade into a different map. Pre-existing, not introduced by this ADR. Robust fix: quantise sampled values to a fixed grid before testing. | Unverified risk |
+
 ## Open questions
 
 1. **Pile exhaustion curve.** The map holds ~220 food; the win target is 110. Outer piles
