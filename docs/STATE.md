@@ -198,6 +198,50 @@ in `FoodPileVisuals`, and bot pacing all still need a human.
 
 ---
 
+## 🔬 LIVE PLAY-MODE VERIFICATION (2026-07-22) — read this before testing
+
+Ran a real solo match in the Editor and inspected the running world. **The systems work;
+four data/wiring bugs remain.** Everything below is observed, not inferred.
+
+### ✅ Verified working in a live match
+
+| Check | Result |
+|---|---|
+| Obstacles | **17** — Low 6 / Standard 8 / Tall 3, heights 0.9 / 1.1 / 2.5 (all above the 0.75 NavMesh step) |
+| Dead corners | furthest obstacle at **r=17.25** vs the old polar bound of 13.0 — corners reached |
+| Materials | **3 distinct**, not 17 instances |
+| NavMesh | bakes to **260 tris**; bots path normally |
+| Bot AI | full FSM live — `CollectFood → ReturnToBase → Deposit`, scores climbing (71/50/40) |
+| Piles | 9 total, **exactly 1 permanent** |
+| Permanent centre | `amt 57.1/60, avail 21.1, scale 1.50, blocking=True` — floor maths exact (57.1 − 36 = 21.1) |
+| Depleted piles | shrink to **scale 0.45** and `blocking=False` — **lanes really do open** |
+| Speed retune | Speedy 9.0 / Assassin 8.5 / Warrior 7.5 / Fatty 6.5 — live |
+| Traversal matrix | matches the ADR exactly: Vault=Low+Standard+Piles, Barge=Low+Piles, Blink=all, None=nothing |
+| Traversal window | `Begin(Vault)` → `Tick` → `End` restores cleanly, no stuck state |
+| Class tints | Warrior renders red (C04030) — the tint fix is visibly correct |
+
+### ❌ Bugs found — fix before drawing conclusions about feel
+
+1. **Class gating is NOT enforced on bots.** Speedy, Fatty *and* Assassin bots all spawned
+   with **Flying Peck**, which is `AllowedClasses = Warrior` (mask 1). The
+   `_botLoadouts` presets are stamped without checking the new `AllowedClasses` mask, so the
+   central promise of Slice 3 — class identity — is not actually holding for bots.
+2. **`GetDefaultPassiveForClass` returns the WRONG passive.** Warrior got **Bracer** and
+   Speedy got **Second Wind** — both *alternatives*, and both **inert**. It should return the
+   signature passive (Mighty / Slippery / Immovable / Combo). Net effect: **2 of 4 chickens in
+   the match had a passive that does nothing.**
+3. **Slot composition is not enforced.** The human Warrior spawned with Speed Burst + Egg
+   Shell (both **Common**) + Flying Peck, i.e. 2 Common + 1 Character. Decision 3 specifies
+   **1 Common + 2 Character**.
+4. **The four alternative passives remain inert** (empty `OnActivate`, no gameplay consumer) —
+   see the closeout section below.
+
+**Consequence for the feel test:** terrain, piles, NavMesh, bot pathing and the traversal
+engine are all genuinely exercisable right now. Class identity and passives are not — treat
+any judgement about class differentiation as unreliable until 1–3 are fixed.
+
+---
+
 ## 🛑 ADR 0003 Slices 2–4 landed — DEVELOPMENT CLOSED (2026-07-22)
 
 Built via cravify (Antigravity plans+executes, Claude reviews the plan and the result).
