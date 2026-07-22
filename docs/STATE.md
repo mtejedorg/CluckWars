@@ -198,7 +198,44 @@ in `FoodPileVisuals`, and bot pacing all still need a human.
 
 ---
 
-## ✅ BUG-FIX PASS (2026-07-22, loop) — 3.5 of 4 closed
+## 🟢 GREEN LIGHT (2026-07-22) — all 4 bugs closed, verified live
+
+All four live-verification bugs are fixed. Final state, asserted in a running match:
+
+```
+terrain: 17 obstacles (Low=6, Standard=8, Tall=3)
+piles:   9, permanent=1, shrunk=6          navmesh: 291 tris
+OK Assassin [bot]   Egg Shell + Doppelganger/Blink + Invisibility | Combo      | 8.5
+OK Fatty    [bot]   Egg Shell + Roll & Push/Barge + Root Egg      | Immovable  | 6.5
+OK Fatty    [HUMAN] Egg Shell + Roll & Push/Barge + Root Egg      | Juggernaut | 6.5
+OK Speedy   [bot]   Peck + Feather Trap + Feather Aura            | Slippery   | 9.0
+=== LIVE GREEN ===
+```
+
+Every chicken: **1 Common + 2 Character**, zero off-class, zero duplicates, a legal passive,
+a live traversal engine, and the retuned speed. `shrunk=6` shows the pile-footprint pillar
+working mid-match. EditMode **101/101** throughout.
+
+**Juggernaut implemented** — the last inert passive. `PassiveAbilitySO.OnTraversalTick` is
+called on the authority while a traversal window is open (skipped during unstick), and
+Juggernaut uses it to shove rivals aside mid-Barge via `RPC_ApplyKnockback`.
+
+> **Design constraint worth remembering:** a `ScriptableObject` passive asset is shared by
+> every chicken that equips it, so it can hold **no per-owner state** — "already shoved this
+> victim" is impossible. The shove is therefore a small *continuous* per-tick impulse rather
+> than one big hit, which also reads better for a plough-through.
+
+### Remaining (design calls, not bugs)
+
+- **Passive effect values still deviate from the ADR** — Bracer was specced as *Vault cooldown
+  −1.5s* and is implemented as 15% damage resistance; Second Wind and Juggernaut drifted
+  similarly. The hooks now exist, so re-pointing them is cheap. Your call.
+- Decisions owed 1–4 and 6–9 in ADR 0003 are untouched.
+- **Feel and Photon remain unverified** — that is the human test.
+
+---
+
+## ✅ BUG-FIX PASS (2026-07-22, loop) — superseded by the green light above
 
 Fixed and **re-verified in live play mode under deliberately poisoned input**, not just by
 unit test. EditMode **101/101** after every change.

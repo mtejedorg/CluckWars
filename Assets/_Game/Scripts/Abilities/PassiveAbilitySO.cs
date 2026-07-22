@@ -50,6 +50,19 @@ namespace CluckWars.Abilities
         /// <summary>Scale the duration of an incoming control effect (slow/root). Called from <c>ChickenController</c>.</summary>
         public virtual float ModifyControlDuration(float seconds, ChickenController self) => seconds;
 
+        /// <summary>
+        /// Called on the state authority each tick while a traversal window is open
+        /// (not while unsticking). Lets a passive react to <i>how</i> its owner is moving
+        /// through terrain — the Skip corner of the mobility triangle.
+        /// </summary>
+        /// <remarks>
+        /// <b>No per-owner state is available here.</b> A <see cref="ScriptableObject"/> asset is
+        /// shared by every chicken that equips it, so anything stored on <c>this</c> would be
+        /// global. Effects must therefore be expressed per-tick and idempotent, not as
+        /// once-per-window bookkeeping.
+        /// </remarks>
+        public virtual void OnTraversalTick(ChickenController self, TerrainTraversal tier) { }
+
         public override void OnDeactivate(AbilityContext ctx) { }
     }
 }

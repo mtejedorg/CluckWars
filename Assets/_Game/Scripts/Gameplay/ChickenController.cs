@@ -270,6 +270,15 @@ namespace CluckWars.Gameplay
             if (_traversal != null)
             {
                 _traversal.Tick(Runner.DeltaTime);
+
+                // Let a slotted passive react while the window is genuinely open (Juggernaut's
+                // barge-shove). Skipped during unstick — the caster is being extracted from
+                // geometry there, not actively ploughing through it.
+                if (_traversal.Tier != TerrainTraversal.None && !_traversal.IsUnsticking)
+                {
+                    var passive = _abilities != null ? _abilities.Passive : null;
+                    passive?.OnTraversalTick(this, _traversal.Tier);
+                }
             }
 
             // Decoys (Doppelganger) share input authority with the caster — skip all
