@@ -57,20 +57,61 @@ namespace CluckWars.Gameplay
         [Tooltip("Optional material for the walls when _wallsVisible is true.")]
         [SerializeField] private Material _wallMaterial;
 
-        [Header("Interior walls (visible cover — chases route around them)")]
-        [Tooltip("Number of interior wall segments. 0 disables. Walls are LOCAL geometry that blocks movement, so online layouts are seeded from the session name — every peer builds the identical map.")]
-        [Range(0, 12)]
-        [SerializeField] private int _interiorWallCount = 6;
-        [Tooltip("Min (x) / max (y) length of an interior wall segment.")]
+        [Header("Interior terrain — Standard (wall segments; ADR 0003 Decision 5)")]
+        [Tooltip("Number of Standard wall segments. 0 cleanly disables the class. Interior terrain is LOCAL geometry that blocks movement, so online layouts are seeded from the session name — every peer builds the identical map.")]
+        [Range(0, 16)]
+        [SerializeField] private int _standardObstacleCount = 8;
+        [Tooltip("Min (x) / max (y) length of a Standard wall segment. Depth is _wallThickness.")]
         [SerializeField] private Vector2 _interiorWallLengthRange = new Vector2(3f, 6f);
-        [Tooltip("Interior wall height. Low enough to see over in the iso view; must stay above the NavMesh step height (0.75) so bots can't path over.")]
+        [Tooltip("Standard obstacle height. Low enough to see over in the iso view; must stay above the NavMesh step height (0.75) so bots can't path over.")]
         [Min(0.8f)]
         [SerializeField] private float _interiorWallHeight = 1.1f;
-        [Tooltip("Keep-clear radius around the center pile, corner bases and nominal island positions so walls never seal off an objective.")]
-        [Min(1f)]
-        [SerializeField] private float _interiorWallClearance = 3f;
-        [Tooltip("Tint for interior walls when no _wallMaterial is assigned. Desaturated per ART.md — map stays muted so chickens pop.")]
+        [Tooltip("Tint for Standard obstacles. Desaturated per ART.md — map stays muted so chickens pop.")]
         [SerializeField] private Color _interiorWallColor = new Color(0.45f, 0.36f, 0.26f, 1f);
+
+        [Header("Interior terrain — Low (crates / fences; Barge-able in Slice 2)")]
+        [Tooltip("Number of Low obstacles. 0 cleanly disables the class.")]
+        [Range(0, 16)]
+        [SerializeField] private int _lowObstacleCount = 6;
+        [Tooltip("Min (x) / max (y) footprint side of a Low obstacle. Width and depth are drawn independently, so crates come out slightly rectangular.")]
+        [SerializeField] private Vector2 _lowObstacleFootprintRange = new Vector2(1.2f, 2.2f);
+        [Tooltip("Low obstacle height. MUST stay above the NavMesh step height (0.75) or bots walk straight over it and it stops being terrain — 0.9 is deliberate. Low is distinguished from Standard by being Barge-able, NOT by being shorter to walk over.")]
+        [Min(0.8f)]
+        [SerializeField] private float _lowObstacleHeight = 0.9f;
+        [Tooltip("Clearance multiplier for Low obstacles — cheap cover, so they may pack tighter than a wall segment.")]
+        [Range(0.25f, 3f)]
+        [SerializeField] private float _lowObstacleClearanceScale = 0.8f;
+        [Tooltip("Tint for Low obstacles. Lighter crate wood, still muted.")]
+        [SerializeField] private Color _lowObstacleColor = new Color(0.54f, 0.43f, 0.30f, 1f);
+
+        [Header("Interior terrain — Tall (rocks / silos; Blink-only in Slice 2)")]
+        [Tooltip("Number of Tall obstacles. 0 cleanly disables the class. Keep this low — Tall is a hard wall nothing but Blink answers.")]
+        [Range(0, 8)]
+        [SerializeField] private int _tallObstacleCount = 3;
+        [Tooltip("Min (x) / max (y) footprint side of a Tall obstacle.")]
+        [SerializeField] private Vector2 _tallObstacleFootprintRange = new Vector2(1.6f, 2.4f);
+        [Tooltip("Tall obstacle height. Reads as a rock / silo — tall enough to be unmistakably un-vaultable at a glance.")]
+        [Min(0.8f)]
+        [SerializeField] private float _tallObstacleHeight = 2.5f;
+        [Tooltip("Clearance multiplier for Tall obstacles. >1 on purpose: a Tall prop nothing but Blink can cross must never sit close enough to another obstacle or an objective to seal a lane. 1.5 is the measured ceiling — above ~1.6 no point on a 30m map is far enough from all 13 objectives and Tall silently stops placing.")]
+        [Range(0.25f, 3f)]
+        [SerializeField] private float _tallObstacleClearanceScale = 1.5f;
+        [Tooltip("Tint for Tall obstacles. Cool grey stone — reads as 'not wood, not crossable'.")]
+        [SerializeField] private Color _tallObstacleColor = new Color(0.37f, 0.38f, 0.41f, 1f);
+
+        [Header("Interior terrain — shared placement rules")]
+        [Tooltip("Walkable gap kept between every objective (centre pile, corner bases/spawns, nominal island positions) and the nearest obstacle SURFACE — not its centre. 2.2 is over two chicken diameters. Measured to the surface because a bounding-circle test refuses to let any long wall near an objective and the map then physically cannot hold the ADR's density. Scaled per class.")]
+        [Min(1f)]
+        [SerializeField] private float _interiorWallClearance = 2.2f;
+        [Tooltip("Minimum gap between two obstacles' footprints (not their centres). Must stay wider than a chicken (radius 0.5) or obstacles fuse into impassable clumps. Scaled per class.")]
+        [Min(0.5f)]
+        [SerializeField] private float _obstacleSpacing = 1.5f;
+        [Tooltip("Margin between the sampling square and the boundary walls. Obstacles are sampled in SQUARE space (not a polar annulus) so they reach the dead corners behind the bases — ADR 0003 Decision 6.")]
+        [Min(0.5f)]
+        [SerializeField] private float _obstacleEdgeMargin = 1.5f;
+        [Tooltip("Rejection-sampling attempt budget per requested obstacle. Placement is best-effort: if the map can't fit the requested density the generator places fewer and logs it rather than relaxing clearances.")]
+        [Range(4, 80)]
+        [SerializeField] private int _obstaclePlacementAttempts = 40;
 
         [Header("Bases")]
         [Tooltip("How far each corner base sits from the center.")]
@@ -145,7 +186,7 @@ namespace CluckWars.Gameplay
             ComputeSpawnPoints();
             BuildPlane();
             BuildBoundaryWalls();
-            BuildInteriorWalls();
+            BuildInteriorObstacles();
             BuildNavMesh();
 
             if (_network != null) _network.OnRunnerReady += HandleRunnerReady;
@@ -155,6 +196,7 @@ namespace CluckWars.Gameplay
         private void OnDestroy()
         {
             if (_network != null) _network.OnRunnerReady -= HandleRunnerReady;
+            DestroyObstacleMaterials();
         }
 
         // ---- Local plane + spawn points ---------------------------------------
@@ -263,21 +305,92 @@ namespace CluckWars.Gameplay
             }
         }
 
-        // ---- Interior walls + NavMesh ------------------------------------------
+        // ---- Interior terrain + NavMesh ----------------------------------------
+
+        /// <summary>Per-class placement recipe, assembled from the serialized fields.</summary>
+        private readonly struct ObstacleSpec
+        {
+            public readonly ObstacleClass Class;
+            public readonly int Count;
+            public readonly Vector2 WidthRange;   // local X extent
+            public readonly Vector2 DepthRange;   // local Z extent
+            public readonly float Height;
+            public readonly float ClearanceScale;
+            public readonly Color Tint;
+
+            public ObstacleSpec(ObstacleClass cls, int count, Vector2 widthRange, Vector2 depthRange,
+                                float height, float clearanceScale, Color tint)
+            {
+                Class = cls;
+                Count = count;
+                WidthRange = widthRange;
+                DepthRange = depthRange;
+                Height = height;
+                ClearanceScale = clearanceScale;
+                Tint = tint;
+            }
+        }
+
+        /// <summary>An already-placed obstacle, remembered so later obstacles keep clear of it.</summary>
+        private readonly struct PlacedObstacle
+        {
+            public readonly Vector3 Position;
+            public readonly float FootprintRadius;
+            public PlacedObstacle(Vector3 position, float footprintRadius)
+            {
+                Position = position;
+                FootprintRadius = footprintRadius;
+            }
+        }
+
+        private static readonly int SColorId     = Shader.PropertyToID("_Color");
+        private static readonly int SBaseColorId = Shader.PropertyToID("_BaseColor");
+
+        /// <summary>One shared material per <see cref="ObstacleClass"/>, created on first use.</summary>
+        private Material[] _obstacleMaterials;
 
         /// <summary>
-        /// Places visible interior wall segments that block movement — chases
-        /// become routing plays instead of pure speed races. Walls are LOCAL
-        /// geometry on every peer, so online layouts are seeded from the session
-        /// name (same determinism trick as MatchBootstrapper's corner
+        /// Builds the interior terrain vocabulary (ADR 0003 Decision 5): Low crates,
+        /// Standard wall segments and Tall rocks, each tagged with a
+        /// <see cref="TerrainObstacle"/> that Slice 2's Vault / Barge / Blink query.
+        /// Terrain is LOCAL geometry on every peer, so online layouts are seeded from
+        /// the session name (same determinism trick as MatchBootstrapper's corner
         /// permutation); solo just rolls a fresh layout each match.
-        /// Rejection sampling keeps every wall clear of the center pile, the
-        /// corner bases, and the nominal island positions so no objective is
-        /// ever sealed off.
+        ///
+        /// Classes are processed in a FIXED order (Tall → Standard → Low) and every
+        /// attempt draws its full sample from the RNG before any rejection test runs,
+        /// so the RNG stream advances identically on every peer. Nothing here may
+        /// branch on peer-local state or the maps desync.
+        ///
+        /// Rejection sampling keeps every obstacle clear of the center pile, the corner
+        /// bases/spawns and the nominal island positions so no objective is ever sealed
+        /// off. Placement is best-effort: when the map cannot fit the requested density
+        /// the generator places fewer and says so, rather than relaxing the clearances.
         /// </summary>
-        private void BuildInteriorWalls()
+        private void BuildInteriorObstacles()
         {
-            if (_interiorWallCount <= 0) return;
+            // Fixed order, biggest keep-clear first: Tall props claim their space while
+            // the map is still empty, so they don't get squeezed out by cheap crates.
+            var specs = new[]
+            {
+                new ObstacleSpec(ObstacleClass.Tall, _tallObstacleCount,
+                    _tallObstacleFootprintRange, _tallObstacleFootprintRange,
+                    _tallObstacleHeight, _tallObstacleClearanceScale, _tallObstacleColor),
+                new ObstacleSpec(ObstacleClass.Standard, _standardObstacleCount,
+                    _interiorWallLengthRange, new Vector2(_wallThickness, _wallThickness),
+                    _interiorWallHeight, 1f, _interiorWallColor),
+                new ObstacleSpec(ObstacleClass.Low, _lowObstacleCount,
+                    _lowObstacleFootprintRange, _lowObstacleFootprintRange,
+                    _lowObstacleHeight, _lowObstacleClearanceScale, _lowObstacleColor),
+            };
+
+            int requested = 0;
+            for (int i = 0; i < specs.Length; i++) requested += Mathf.Max(0, specs[i].Count);
+            if (requested <= 0)
+            {
+                _log?.Info(Source, "Interior terrain disabled — every obstacle count is 0.");
+                return;
+            }
 
             bool online = _selection != null && _selection.Mode != SessionMode.Solo;
             string sessionName = online ? _selection.SessionName : null;
@@ -285,62 +398,218 @@ namespace CluckWars.Gameplay
                 ? new System.Random(SessionNameSeed(sessionName))
                 : new System.Random();
 
-            // Keep-clear points: center pile, corner bases, nominal (pre-jitter)
-            // island positions. Pile jitter is ±1.5 and _interiorWallClearance
-            // covers it.
-            var keepClear = new List<Vector3> { Vector3.zero };
+            // Keep-clear points: center pile, corner bases/spawns, nominal (pre-jitter)
+            // island positions. Pile jitter is ±1.5 and _interiorWallClearance covers it.
+            var objectives = new List<Vector3> { Vector3.zero };
             for (int i = 0; i < _corners.Length; i++)
             {
-                keepClear.Add(_spawnPoints[i]);
-                keepClear.Add(Vector3.Lerp(_corners[i], Vector3.zero, _personalPileInset));
-                keepClear.Add((_corners[i] + _corners[(i + 1) % _corners.Length]) * 0.5f * _contestedEdgeInset);
+                objectives.Add(_spawnPoints[i]);
+                objectives.Add(Vector3.Lerp(_corners[i], Vector3.zero, _personalPileInset));
+                objectives.Add((_corners[i] + _corners[(i + 1) % _corners.Length]) * 0.5f * _contestedEdgeInset);
             }
 
-            float minR = _interiorWallClearance + 1.5f;   // outside the center pile's clearance
-            float maxR = _planeSize * 0.5f - 2f;          // inside the boundary walls
-            int placed = 0;
-            for (int attempt = 0; attempt < _interiorWallCount * 12 && placed < _interiorWallCount; attempt++)
+            var placed = new List<PlacedObstacle>(requested);
+            var breakdown = new System.Text.StringBuilder();
+            int total = 0;
+            for (int i = 0; i < specs.Length; i++)
             {
-                float len   = Mathf.Lerp(_interiorWallLengthRange.x, _interiorWallLengthRange.y, (float)rng.NextDouble());
-                float polar = (float)rng.NextDouble() * Mathf.PI * 2f;
-                float r     = Mathf.Lerp(minR, maxR, (float)rng.NextDouble());
-                var center  = new Vector3(Mathf.Cos(polar) * r, 0f, Mathf.Sin(polar) * r);
+                int made = PlaceObstacleClass(specs[i], rng, objectives, placed);
+                total += made;
+                if (i > 0) breakdown.Append(", ");
+                breakdown.Append($"{made}/{specs[i].Count} {specs[i].Class}");
+            }
+
+            string seedNote = online ? $"session '{sessionName}'" : "solo-random";
+            if (total < requested)
+            {
+                // Under-placement is not fatal, but it silently thins the map — the whole
+                // point of the density bump — so it must be visible, not swallowed.
+                _log?.Warn(Source, $"Interior terrain: placed only {total}/{requested} obstacles " +
+                    $"({breakdown}) within the attempt budget ({_obstaclePlacementAttempts}/obstacle). " +
+                    $"Lower the counts, or reduce _interiorWallClearance / _obstacleSpacing. Seed={seedNote}.");
+            }
+            else
+            {
+                _log?.Info(Source, $"Interior terrain: placed {total}/{requested} obstacles " +
+                    $"({breakdown}). Seed={seedNote}.");
+            }
+        }
+
+        /// <summary>
+        /// Rejection-samples <paramref name="spec"/>.Count obstacles into the arena.
+        /// Returns how many actually fit. Positions are sampled in SQUARE space rather
+        /// than the old polar annulus — a square's corners sit outside any radial bound,
+        /// so the regions behind the bases used to be both dead space and obstacle-free
+        /// (ADR 0003 Decision 6). Containment is then enforced by an exact
+        /// rotated-bounds test against the boundary walls.
+        /// </summary>
+        private int PlaceObstacleClass(in ObstacleSpec spec, System.Random rng,
+                                       List<Vector3> objectives, List<PlacedObstacle> placed)
+        {
+            if (spec.Count <= 0) return 0;   // count 0 cleanly disables the class
+
+            float half = _planeSize * 0.5f;
+            float objectiveKeepOut = _interiorWallClearance * spec.ClearanceScale;
+            float gap = _obstacleSpacing * spec.ClearanceScale;
+            int budget = spec.Count * _obstaclePlacementAttempts;
+            int made = 0;
+
+            for (int attempt = 0; attempt < budget && made < spec.Count; attempt++)
+            {
+                // Draw the complete sample BEFORE any rejection test: the RNG stream must
+                // advance by exactly five draws per attempt on every peer, or two clients
+                // sharing a seed walk different sequences and build different maps.
+                float width = Mathf.Lerp(spec.WidthRange.x, spec.WidthRange.y, (float)rng.NextDouble());
+                float depth = Mathf.Lerp(spec.DepthRange.x, spec.DepthRange.y, (float)rng.NextDouble());
+                float x     = Mathf.Lerp(-half, half, (float)rng.NextDouble());
+                float z     = Mathf.Lerp(-half, half, (float)rng.NextDouble());
                 float yaw   = (float)rng.NextDouble() * 180f;
 
-                // Conservative clearance: point-to-wall-center distance must beat
-                // the keep-clear radius plus the wall's half length.
-                float keepOut = _interiorWallClearance + len * 0.5f;
+                var center = new Vector3(x, 0f, z);
+                float footprintRadius = 0.5f * Mathf.Sqrt(width * width + depth * depth);
+
+                if (!FitsInsideBoundary(center, width, depth, yaw)) continue;
+
+                // Clearance is measured to the obstacle's SURFACE, not to its bounding
+                // circle. That matters: a 6×0.5 wall's bounding circle is 3 m, so a
+                // radius test would refuse to let any long wall within 6 m of an
+                // objective and the map physically cannot hold the target density.
+                // Surface distance is both the honest reading of "keep-clear radius"
+                // and what actually determines whether an objective stays approachable.
                 bool blocked = false;
-                for (int p = 0; p < keepClear.Count && !blocked; p++)
-                    if ((keepClear[p] - center).sqrMagnitude < keepOut * keepOut) blocked = true;
+                for (int i = 0; i < objectives.Count && !blocked; i++)
+                    if (DistanceToBox(objectives[i], center, yaw, width, depth) < objectiveKeepOut) blocked = true;
                 if (blocked) continue;
 
-                var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                wall.name = $"InteriorWall_{placed}";
-                wall.transform.SetParent(transform, worldPositionStays: false);
-                wall.transform.localPosition = center + Vector3.up * (_interiorWallHeight * 0.5f);
-                wall.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
-                wall.transform.localScale = new Vector3(len, _interiorWallHeight, _wallThickness);
-                var mr = wall.GetComponent<MeshRenderer>();
+                // Footprint-to-footprint gap: a long wall and a crate need the same
+                // walkable lane between them regardless of their sizes.
+                for (int i = 0; i < placed.Count && !blocked; i++)
+                {
+                    float surface = DistanceToBox(placed[i].Position, center, yaw, width, depth);
+                    if (surface - placed[i].FootprintRadius < gap) blocked = true;
+                }
+                if (blocked) continue;
+
+                var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                go.name = $"Terrain_{spec.Class}_{made}";
+                go.transform.SetParent(transform, worldPositionStays: false);
+                go.transform.localPosition = center + Vector3.up * (spec.Height * 0.5f);
+                go.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
+                go.transform.localScale = new Vector3(width, spec.Height, depth);
+
+                // The tag Slice 2's Vault / Barge / Blink read. Discrimination is by
+                // class, never inferred from spec.Height.
+                go.AddComponent<TerrainObstacle>().SetClass(spec.Class);
+
+                var mr = go.GetComponent<MeshRenderer>();
                 if (mr != null)
                 {
-                    if (_wallMaterial != null) mr.sharedMaterial = _wallMaterial;
-                    mr.material.color = _interiorWallColor; // per-wall instance; ≤12 walls
+                    var mat = EnsureClassMaterial(spec, mr.sharedMaterial);
+                    if (mat != null) mr.sharedMaterial = mat;
                 }
 
-                keepClear.Add(center); // walls also keep clear of each other
-                placed++;
+                placed.Add(new PlacedObstacle(center, footprintRadius));
+                made++;
             }
 
-            _log?.Info(Source, $"Built {placed}/{_interiorWallCount} interior walls " +
-                $"(seed={(online ? $"session '{sessionName}'" : "solo-random")}).");
+            return made;
+        }
+
+        /// <summary>
+        /// Shortest distance on the XZ plane from <paramref name="point"/> to the surface
+        /// of a yaw-rotated box. 0 when the point is inside the box. Pure float maths with
+        /// no branching on state, so every peer computes the same answer.
+        /// </summary>
+        private static float DistanceToBox(Vector3 point, Vector3 center, float yawDegrees, float width, float depth)
+        {
+            float rad = yawDegrees * Mathf.Deg2Rad;
+            float c = Mathf.Cos(rad), s = Mathf.Sin(rad);
+            float dx = point.x - center.x, dz = point.z - center.z;
+
+            // World → box-local (yaw only; obstacles never pitch or roll).
+            float lx = dx * c - dz * s;
+            float lz = dx * s + dz * c;
+
+            float ox = Mathf.Max(Mathf.Abs(lx) - width * 0.5f, 0f);
+            float oz = Mathf.Max(Mathf.Abs(lz) - depth * 0.5f, 0f);
+            return Mathf.Sqrt(ox * ox + oz * oz);
+        }
+
+        /// <summary>
+        /// True when the yaw-rotated box fits strictly inside the boundary walls with
+        /// <c>_obstacleEdgeMargin</c> to spare. Uses the exact axis-aligned extents of
+        /// the rotated box, so a long wall angled into a corner is accepted or rejected
+        /// on its real footprint rather than a conservative bounding circle.
+        /// </summary>
+        private bool FitsInsideBoundary(Vector3 center, float width, float depth, float yawDegrees)
+        {
+            float rad = yawDegrees * Mathf.Deg2Rad;
+            float c = Mathf.Abs(Mathf.Cos(rad));
+            float s = Mathf.Abs(Mathf.Sin(rad));
+            float hx = 0.5f * (c * width + s * depth);
+            float hz = 0.5f * (s * width + c * depth);
+
+            // The boundary walls' inner faces sit exactly at ±_planeSize/2.
+            float limit = _planeSize * 0.5f - _obstacleEdgeMargin;
+            return Mathf.Abs(center.x) + hx <= limit
+                && Mathf.Abs(center.z) + hz <= limit;
+        }
+
+        /// <summary>
+        /// Returns the one shared material for this obstacle class, creating it on first
+        /// use from <c>_wallMaterial</c> (or the primitive's own default) and tinting it.
+        /// Deliberately NOT <c>mr.material</c>: that clones a material per object, which
+        /// at ~17 obstacles costs 17 instances, breaks batching and adds GC churn on the
+        /// Android target. Three shared materials keep the whole terrain set batchable.
+        /// </summary>
+        private Material EnsureClassMaterial(in ObstacleSpec spec, Material primitiveDefault)
+        {
+            _obstacleMaterials ??= new Material[(int)ObstacleClass.Tall + 1];
+
+            int idx = (int)spec.Class;
+            if (_obstacleMaterials[idx] != null) return _obstacleMaterials[idx];
+
+            var template = _wallMaterial != null ? _wallMaterial : primitiveDefault;
+            if (template == null)
+            {
+                // Untinted grey terrain is a readability bug (players can't tell Low from
+                // Tall), so surface it instead of shipping a silently colourless map.
+                _log?.Warn(Source, $"No material template for {spec.Class} obstacles " +
+                    "(_wallMaterial unassigned and the primitive has no default material) — " +
+                    "terrain will render untinted and the three classes won't be distinguishable.");
+                return null;
+            }
+
+            var mat = new Material(template)
+            {
+                name = $"TerrainObstacle_{spec.Class}",
+                hideFlags = HideFlags.DontSave,
+            };
+            // URP Lit exposes _BaseColor; keep _Color set too for any Built-in-style
+            // material someone drops into _wallMaterial.
+            if (mat.HasProperty(SBaseColorId)) mat.SetColor(SBaseColorId, spec.Tint);
+            if (mat.HasProperty(SColorId)) mat.SetColor(SColorId, spec.Tint);
+
+            _obstacleMaterials[idx] = mat;
+            return mat;
+        }
+
+        private void DestroyObstacleMaterials()
+        {
+            if (_obstacleMaterials == null) return;
+            for (int i = 0; i < _obstacleMaterials.Length; i++)
+            {
+                if (_obstacleMaterials[i] != null) Destroy(_obstacleMaterials[i]);
+                _obstacleMaterials[i] = null;
+            }
         }
 
         /// <summary>
         /// Bakes a runtime NavMesh from the generated geometry (physics colliders,
         /// so the invisible boundary walls count too). Bots path around interior
-        /// walls via this mesh; FoodPiles spawn later and carve dynamically with
-        /// a NavMeshObstacle on their blocker.
+        /// terrain via this mesh; FoodPiles spawn later and carve dynamically with
+        /// a NavMeshObstacle on their blocker. The triangle count is logged because
+        /// interior density directly drives both bake cost and bot pathing cost.
         /// </summary>
         private void BuildNavMesh()
         {
@@ -348,7 +617,18 @@ namespace CluckWars.Gameplay
             surface.collectObjects = CollectObjects.Children;
             surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
             surface.BuildNavMesh();
-            _log?.Info(Source, "NavMesh baked for bot pathing.");
+
+            int triangles = NavMesh.CalculateTriangulation().indices.Length / 3;
+            if (triangles <= 0)
+            {
+                // An empty navmesh means every bot falls back to standing still — never
+                // let that pass as a successful bake.
+                _log?.Warn(Source, "NavMesh bake produced 0 triangles — bots will not be able to path.");
+            }
+            else
+            {
+                _log?.Info(Source, $"NavMesh baked for bot pathing ({triangles} triangles).");
+            }
         }
 
         /// <summary>

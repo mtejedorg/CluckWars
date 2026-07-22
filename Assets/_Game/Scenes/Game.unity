@@ -547,11 +547,24 @@ MonoBehaviour:
   _wallThickness: 0.5
   _wallsVisible: 0
   _wallMaterial: {fileID: 0}
-  _interiorWallCount: 6
+  _standardObstacleCount: 8
   _interiorWallLengthRange: {x: 3, y: 6}
   _interiorWallHeight: 1.1
-  _interiorWallClearance: 3
   _interiorWallColor: {r: 0.45, g: 0.36, b: 0.26, a: 1}
+  _lowObstacleCount: 6
+  _lowObstacleFootprintRange: {x: 1.2, y: 2.2}
+  _lowObstacleHeight: 0.9
+  _lowObstacleClearanceScale: 0.8
+  _lowObstacleColor: {r: 0.54, g: 0.43, b: 0.3, a: 1}
+  _tallObstacleCount: 3
+  _tallObstacleFootprintRange: {x: 1.6, y: 2.4}
+  _tallObstacleHeight: 2.5
+  _tallObstacleClearanceScale: 1.5
+  _tallObstacleColor: {r: 0.37, g: 0.38, b: 0.41, a: 1}
+  _interiorWallClearance: 2.2
+  _obstacleSpacing: 1.5
+  _obstacleEdgeMargin: 1.5
+  _obstaclePlacementAttempts: 40
   _baseCornerDistance: 12
   _centerPileAmount: 60
   _centerPileVisualScale: 1.5
