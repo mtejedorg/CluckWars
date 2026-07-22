@@ -258,7 +258,7 @@ namespace CluckWars.Gameplay
                             if (abilities != null)
                             {
                                 var slot2 = botClass == ChickenClass.Assassin ? loadout.Slot2 : null;
-                                abilities.SetSlots(loadout.Slot0, loadout.Slot1, slot2);
+                                abilities.SetSlots(loadout.Passive, loadout.Slot0, loadout.Slot1, slot2);
                             }
                         }
                     });
@@ -315,6 +315,9 @@ namespace CluckWars.Gameplay
         {
             [Tooltip("Display name — inspector readability + logs only.")]
             public string Name;
+
+            [Tooltip("Class passive (optional; falls back to class signature passive if null).")]
+            public PassiveAbilitySO Passive;
 
             [Tooltip("Slot-0 ability (typically Offense).")]
             public AbilityBaseSO Slot0;
@@ -406,11 +409,10 @@ namespace CluckWars.Gameplay
 
                     // Apply player-chosen abilities when the player selected from a pool.
                     // Null means "use the prefab default" — SetSlots ignores null args.
-                    if (_selection != null &&
-                        (_selection.Ability0 != null || _selection.Ability1 != null || _selection.Ability2 != null))
+                    if (_selection != null)
                     {
                         var abilityCtrl = networkObject.GetComponent<AbilityController>();
-                        abilityCtrl?.SetSlots(_selection.Ability0, _selection.Ability1, _selection.Ability2);
+                        abilityCtrl?.SetSlots(_selection.Passive, _selection.Ability0, _selection.Ability1, _selection.Ability2);
                     }
                 });
         }

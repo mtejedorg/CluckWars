@@ -219,6 +219,8 @@ namespace CluckWars.UI
         // ======================================================================
         //  CHARACTER SELECT
         // ======================================================================
+        private Button _passiveOpt1, _passiveOpt2;
+
         private void BuildCharacterSelect()
         {
             _classChips.Clear();
@@ -243,6 +245,8 @@ namespace CluckWars.UI
             _previewQuote   = _charSelect.Q<Label>("PreviewQuote");
             _previewPassive = _charSelect.Q<Label>("PreviewPassive");
             _previewDesc    = _charSelect.Q<Label>("PreviewDesc");
+            _passiveOpt1    = _charSelect.Q<Button>("PassiveOpt1");
+            _passiveOpt2    = _charSelect.Q<Button>("PassiveOpt2");
             _slotRow        = _charSelect.Q<VisualElement>("SlotRow");
             _abilityGrid    = _charSelect.Q<VisualElement>("AbilityGrid");
             _equippedLabel  = _charSelect.Q<Label>("EquippedLabel");
@@ -267,10 +271,30 @@ namespace CluckWars.UI
             _selection.Ability0 = null;
             _selection.Ability1 = null;
             _selection.Ability2 = null;
+
+            var passives = _abilityRegistry?.GetPassivesForClass(cls).ToList();
+            if (passives != null && passives.Count > 0)
+            {
+                _selection.Passive = passives[0];
+            }
+
+            RefreshCharacterSelect();
+        }
+
+        private void SelectPassive(PassiveAbilitySO passive)
+        {
+            if (_selection == null || passive == null) return;
+            _selection.Passive = passive;
+            if (!(passive is ComboPassiveSO))
+            {
+                _selection.Ability2 = null;
+                if (_pickerSlot >= 2) _pickerSlot = 0;
+            }
             RefreshCharacterSelect();
         }
 
         private ChickenClass Cls => _selection?.SelectedClass ?? ChickenClass.Warrior;
+        private int ActiveSlotsForClass => (_selection?.Passive is ComboPassiveSO) ? 3 : 2;
 
         private Color TintOf(ChickenClass cls)
         {
@@ -317,8 +341,47 @@ namespace CluckWars.UI
                 else
                     _previewQuote.text = "";
             }
-            if (_previewPassive != null) { _previewPassive.text = $"PASSIVE · {m.PassiveName}"; _previewPassive.style.backgroundColor = TintOf(cls); _previewPassive.style.color = UiGfx.TextPrimary; }
-            if (_previewDesc != null)    _previewDesc.text = m.PassiveDesc;
+
+            var passives = _abilityRegistry?.GetPassivesForClass(cls).ToList();
+            if (passives != null && passives.Count >= 2)
+            {
+                var p1 = passives[0];
+                var p2 = passives[1];
+
+                if (_selection != null && (_selection.Passive == null || (_selection.Passive != p1 && _selection.Passive != p2)))
+                {
+                    _selection.Passive = p1;
+                }
+
+                if (_passiveOpt1 != null)
+                {
+                    _passiveOpt1.text = p1.DisplayName.ToUpper();
+                    _passiveOpt1.clickable = new Clickable(() => SelectPassive(p1));
+                    bool sel1 = _selection?.Passive == p1;
+                    _passiveOpt1.EnableInClassList("cw-btn--green", sel1);
+                    _passiveOpt1.EnableInClassList("cw-btn--neutral", !sel1);
+                }
+                if (_passiveOpt2 != null)
+                {
+                    _passiveOpt2.text = p2.DisplayName.ToUpper();
+                    _passiveOpt2.clickable = new Clickable(() => SelectPassive(p2));
+                    bool sel2 = _selection?.Passive == p2;
+                    _passiveOpt2.EnableInClassList("cw-btn--green", sel2);
+                    _passiveOpt2.EnableInClassList("cw-btn--neutral", !sel2);
+                }
+            }
+
+            var curPassive = _selection?.Passive;
+            if (_previewPassive != null && curPassive != null)
+            {
+                _previewPassive.text = $"PASSIVE · {curPassive.DisplayName.ToUpper()}";
+                _previewPassive.style.backgroundColor = TintOf(cls);
+                _previewPassive.style.color = UiGfx.TextPrimary;
+            }
+            if (_previewDesc != null && curPassive != null)
+            {
+                _previewDesc.text = curPassive.ShortLabel;
+            }
 
             RefreshStats(cls);
             RebuildSlots(cls);
@@ -351,7 +414,7 @@ namespace CluckWars.UI
             _slotRow.Clear();
             _slotHexes.Clear();
             _slotAppliedIcon.Clear();
-            int slots = Meta[cls].Slots;
+            int slots = ActiveSlotsForClass;
             if (_pickerSlot >= slots) _pickerSlot = 0;
 
             for (int i = 0; i < slots; i++)
@@ -361,7 +424,14 @@ namespace CluckWars.UI
                 col.style.alignItems = Align.Center;
                 col.style.marginLeft = 14; col.style.marginRight = 14;
 
-                var caption = new Label(i == 2 ? "★ S3" : $"S{i + 1}");
+                string capText = i switch
+                {
+                    0 => "S1 · COMMON",
+                    1 => "S2 · CLASS",
+                    2 => "★ S3 · CLASS",
+                    _ => $"S{i + 1}",
+                };
+                var caption = new Label(capText);
                 caption.AddToClassList("cw-slot-caption");
                 caption.style.marginBottom = 4;
 
@@ -384,7 +454,7 @@ namespace CluckWars.UI
                 _slotAppliedIcon.Add(null);
             }
 
-            // Non-Assassin classes show a dimmed, locked slot-3 hex (design §ColumnC).
+            // Non-Assassin / non-Combo loadouts show a dimmed, locked slot-3 hex (design §ColumnC).
             if (slots == 2)
             {
                 var lockCol = new VisualElement();
@@ -392,7 +462,7 @@ namespace CluckWars.UI
                 lockCol.style.marginLeft = 14; lockCol.style.marginRight = 14;
                 lockCol.style.opacity = 0.35f;
 
-                var lockCap = new Label("ASSASSIN");
+                var lockCap = new Label("COMBO");
                 lockCap.AddToClassList("cw-slot-caption");
                 lockCap.style.marginBottom = 4;
 
@@ -486,13 +556,31 @@ namespace CluckWars.UI
             _abilityGrid.Clear();
 
             var all  = _abilityRegistry?.All;
-            var pool = (all == null ? Enumerable.Empty<AbilityBaseSO>() : all.Where(a => a != null)).ToList();
+            var pool = (all == null ? Enumerable.Empty<AbilityBaseSO>() : all.Where(a => a != null && !(a is PassiveAbilitySO))).ToList();
             if (pool.Count == 0)
             {
                 var note = new Label("No abilities in registry.\nAssign AbilityRegistrySO in ProjectInstaller.");
                 note.AddToClassList("cw-body");
                 _abilityGrid.Add(note);
                 return;
+            }
+
+            var flag = Cls switch
+            {
+                ChickenClass.Warrior  => ChickenClassFlags.Warrior,
+                ChickenClass.Speedy   => ChickenClassFlags.Speedy,
+                ChickenClass.Fatty    => ChickenClassFlags.Fatty,
+                ChickenClass.Assassin => ChickenClassFlags.Assassin,
+                _ => ChickenClassFlags.None,
+            };
+
+            if (_pickerSlot == 0)
+            {
+                pool = pool.Where(a => a.SlotKind == AbilitySlotKind.Common).ToList();
+            }
+            else
+            {
+                pool = pool.Where(a => a.SlotKind == AbilitySlotKind.Character && (a.AllowedClasses & flag) != 0).ToList();
             }
 
             foreach (var (cat, cm) in Cats)
@@ -573,7 +661,7 @@ namespace CluckWars.UI
 
         private int SlotOf(AbilityBaseSO ab)
         {
-            int slots = Meta[Cls].Slots;
+            int slots = ActiveSlotsForClass;
             for (int i = 0; i < slots; i++) if (GetEquipped(i) == ab) return i;
             return -1;
         }
@@ -599,7 +687,7 @@ namespace CluckWars.UI
             }
 
             // advance picker to next empty slot
-            int slots = Meta[Cls].Slots;
+            int slots = ActiveSlotsForClass;
             for (int i = 0; i < slots; i++)
                 if (GetEquipped(i) == null) { _pickerSlot = i; break; }
 
@@ -610,12 +698,13 @@ namespace CluckWars.UI
 
         private void RefreshEquippedState()
         {
-            int slots = Meta[Cls].Slots;
+            int slots = ActiveSlotsForClass;
             int n = 0;
             for (int i = 0; i < slots; i++) if (GetEquipped(i) != null) n++;
+            bool hasPassive = _selection?.Passive != null;
             if (_equippedLabel != null) _equippedLabel.text = $"EQUIPPED · {n}/{slots}";
 
-            bool ready = n >= slots;
+            bool ready = n >= slots && hasPassive;
             if (_readyBtn != null)
             {
                 _readyBtn.text = ready ? "READY ▶" : $"PICK {slots - n} MORE";

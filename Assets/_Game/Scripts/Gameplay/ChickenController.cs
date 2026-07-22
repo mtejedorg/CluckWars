@@ -79,12 +79,15 @@ namespace CluckWars.Gameplay
 
         private CharacterController _characterController;
         private ChickenMovement _movement;
+        private ChickenTraversal _traversal;
         private ChickenClassRegistrySO _registry;
         private ChickenStatsSO _activeStats;
         private ChickenCombat _combat;
         private ChickenCargo _cargo;
         private AbilityController _abilities;
         private ILogService _log;
+
+        public ChickenTraversal Traversal => _traversal;
 
         // Slow accumulation — reset to None/1 at top of each FixedUpdateNetwork.
         private SlowSource _activeSlowSources;
@@ -230,6 +233,7 @@ namespace CluckWars.Gameplay
 
             _log?.Info(Source, $"Stats resolved: '{_activeStats.DisplayName}', moveSpeed={_activeStats.MoveSpeed}, passive={_activeStats.Passive}.");
             _movement = new ChickenMovement(_characterController, this);
+            _traversal = new ChickenTraversal(_characterController, _log);
 
             if (HasStateAuthority && VisualOpacity <= 0f) VisualOpacity = 1f;
 
@@ -249,6 +253,7 @@ namespace CluckWars.Gameplay
 
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
+            _traversal?.Abort();
             ActiveControllers.Remove(this);
         }
 
@@ -261,6 +266,11 @@ namespace CluckWars.Gameplay
                 return;
             }
             if (!HasStateAuthority) return;
+
+            if (_traversal != null)
+            {
+                _traversal.Tick(Runner.DeltaTime);
+            }
 
             // Decoys (Doppelganger) share input authority with the caster — skip all
             // logic so the decoy doesn't walk in lockstep with the real chicken.
@@ -317,6 +327,23 @@ namespace CluckWars.Gameplay
 
         // ---- Passive hooks ---------------------------------------------------
 
+        public bool IsPassiveActive(ChickenPassive enumPassive)
+        {
+            if (_abilities != null && _abilities.Passive != null)
+            {
+                var p = _abilities.Passive;
+                return enumPassive switch
+                {
+                    ChickenPassive.Tough     => p is Abilities.MightyPassiveSO,
+                    ChickenPassive.Slippery  => p is Abilities.SlipperyPassiveSO,
+                    ChickenPassive.Immovable => p is Abilities.ImmovablePassiveSO,
+                    ChickenPassive.Combo     => p is Abilities.ComboPassiveSO,
+                    _ => false,
+                };
+            }
+            return Stats != null && Stats.Passive == enumPassive;
+        }
+
         /// <summary>
         /// Applies a speed penalty from a tagged source. Multiple sources stack
         /// multiplicatively (the minimum multiplier wins). Slippery does NOT
@@ -340,7 +367,7 @@ namespace CluckWars.Gameplay
         /// </summary>
         public void ApplyKnockback(Vector3 impulse)
         {
-            if (Stats?.Passive == ChickenPassive.Immovable)
+            if (IsPassiveActive(ChickenPassive.Immovable))
                 impulse *= ImmovableKnockbackFactor;
             ExternalDisplacement = impulse;
             // Fire the networked one-shot so every peer plays the shockwave locally.
@@ -355,7 +382,7 @@ namespace CluckWars.Gameplay
         /// </summary>
         public float ApplyOutgoingDamage(float rawAmount)
         {
-            if (Stats?.Passive == ChickenPassive.Tough)
+            if (IsPassiveActive(ChickenPassive.Tough))
                 return rawAmount * ToughDamageBonus;
             return rawAmount;
         }
@@ -365,6 +392,7 @@ namespace CluckWars.Gameplay
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_TeleportTo(Vector3 position)
         {
+            _traversal?.Abort();
             if (_characterController != null)
             {
                 _characterController.enabled = false;
@@ -399,7 +427,7 @@ namespace CluckWars.Gameplay
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_ApplyAbilitySlow(float duration, float factor)
         {
-            if (Stats?.Passive == ChickenPassive.Slippery) duration *= SlipperyDurationReduction;
+            if (IsPassiveActive(ChickenPassive.Slippery)) duration *= SlipperyDurationReduction;
             _abilitySlowUntil  = Runner.SimulationTime + duration;
             _abilitySlowFactor = factor;
             _log?.Debug(Source, $"RPC_ApplyAbilitySlow: factor={factor:P0} for {duration:0.0}s.");
@@ -413,7 +441,7 @@ namespace CluckWars.Gameplay
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_ApplyRoot(float duration)
         {
-            if (Stats?.Passive == ChickenPassive.Slippery) duration *= SlipperyDurationReduction;
+            if (IsPassiveActive(ChickenPassive.Slippery)) duration *= SlipperyDurationReduction;
             _rootUntil = Runner.SimulationTime + duration;
             _log?.Debug(Source, $"RPC_ApplyRoot: rooted for {duration:0.0}s.");
         }
@@ -425,6 +453,7 @@ namespace CluckWars.Gameplay
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_ResetControlStates()
         {
+            _traversal?.Abort();
             _abilitySlowUntil    = double.MinValue;
             _abilitySlowFactor   = 1f;
             _rootUntil           = double.MinValue;

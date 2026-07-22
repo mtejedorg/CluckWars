@@ -37,6 +37,14 @@ namespace CluckWars.UI
             { "InvisibilityAbilitySO","cw-hex-icon--invis" },
             { "DoppelgangerAbilitySO","cw-hex-icon--doppel" },
             { "SneakyStealAbilitySO", "cw-hex-icon--steal" },
+            { "MightyPassiveSO",      "cw-hex-icon--mighty" },
+            { "BracerPassiveSO",      "cw-hex-icon--bracer" },
+            { "SlipperyPassiveSO",    "cw-hex-icon--slippery" },
+            { "SecondWindPassiveSO",  "cw-hex-icon--wind" },
+            { "ImmovablePassiveSO",   "cw-hex-icon--immovable" },
+            { "JuggernautPassiveSO",  "cw-hex-icon--juggernaut" },
+            { "ComboPassiveSO",       "cw-hex-icon--combo" },
+            { "OpportunistPassiveSO", "cw-hex-icon--opportunist" },
         };
 
         /// <summary>

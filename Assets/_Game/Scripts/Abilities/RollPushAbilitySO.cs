@@ -21,6 +21,13 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Control/Roll and Push", order = 8)]
     public sealed class RollPushAbilitySO : AbilityBaseSO
     {
+        public RollPushAbilitySO()
+        {
+            TerrainTraversal = TerrainTraversal.Barge;
+            SlotKind = AbilitySlotKind.Character;
+            AllowedClasses = ChickenClassFlags.Fatty;
+        }
+
         [Tooltip("How far ahead the push sweep is centered.")]
         [Min(0.5f)] public float ForwardOffset = 1.2f;
 

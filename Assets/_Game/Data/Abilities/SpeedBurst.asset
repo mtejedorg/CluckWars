@@ -16,6 +16,9 @@ MonoBehaviour:
   ShortLabel: SPD
   AccentColor: {r: 0.30, g: 0.85, b: 0.95, a: 1}
   Category: 3
+  TerrainTraversal: 0
+  SlotKind: 0
+  AllowedClasses: 15
   Duration: 1.5
   Cooldown: 6
   AbilityAnimationClip: {fileID: 0}

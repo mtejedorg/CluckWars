@@ -16,6 +16,9 @@ MonoBehaviour:
   ShortLabel: DOP
   AccentColor: {r: 0.65, g: 0.40, b: 0.85, a: 1}
   Category: 3
+  TerrainTraversal: 3
+  SlotKind: 1
+  AllowedClasses: 8
   Duration: 1.5
   Cooldown: 11
   AbilityAnimationClip: {fileID: 0}

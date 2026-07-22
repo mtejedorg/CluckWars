@@ -141,6 +141,7 @@ namespace CluckWars.Tests
         {
             foreach (var a in AllAssets())
             {
+                if (a is PassiveAbilitySO) continue;
                 Assert.GreaterOrEqual(a.Duration, 0.05f,
                     $"{a.name}: Duration {a.Duration} is below the SO's own [Min(0.05)].");
                 Assert.GreaterOrEqual(a.Cooldown, 0f,

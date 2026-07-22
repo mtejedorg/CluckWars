@@ -16,6 +16,9 @@ MonoBehaviour:
   ShortLabel: STL
   AccentColor: {r: 0.92, g: 0.35, b: 0.75, a: 1}
   Category: 3
+  TerrainTraversal: 0
+  SlotKind: 1
+  AllowedClasses: 8
   BotRole: 5
   Duration: 0.5
   Cooldown: 5

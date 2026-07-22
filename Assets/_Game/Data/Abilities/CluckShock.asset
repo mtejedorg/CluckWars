@@ -16,6 +16,9 @@ MonoBehaviour:
   ShortLabel: CSK
   AccentColor: {r: 1, g: 0.9, b: 0.1, a: 1}
   Category: 0
+  TerrainTraversal: 0
+  SlotKind: 1
+  AllowedClasses: 1
   BotRole: 0
   Duration: 0.5
   Cooldown: 7

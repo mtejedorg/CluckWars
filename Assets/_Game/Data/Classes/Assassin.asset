@@ -15,7 +15,7 @@ MonoBehaviour:
   DisplayName: Assassin
   Passive: 4
   MaxHP: 70
-  MoveSpeed: 9
+  MoveSpeed: 8.5
   TurnSpeed: 720
   CargoCapacity: 8
   CollectionRate: 2

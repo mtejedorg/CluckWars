@@ -31,6 +31,9 @@ namespace CluckWars.Services
         /// <summary>Session name used by Host / Join. Single LAN preset for the demo.</summary>
         string SessionName { get; set; }
 
+        /// <summary>Class passive chosen by the local player. Mandatory in ADR 0003.</summary>
+        PassiveAbilitySO Passive { get; set; }
+
         /// <summary>Ability the local player wants equipped in slot 0. Null = use prefab default.</summary>
         AbilityBaseSO Ability0 { get; set; }
 

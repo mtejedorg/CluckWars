@@ -16,6 +16,9 @@ MonoBehaviour:
   ShortLabel: RPH
   AccentColor: {r: 0.2, g: 0.85, b: 0.35, a: 1}
   Category: 1
+  TerrainTraversal: 2
+  SlotKind: 1
+  AllowedClasses: 4
   BotRole: 0
   Duration: 0.8
   Cooldown: 3

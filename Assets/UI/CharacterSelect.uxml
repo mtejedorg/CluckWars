@@ -65,6 +65,10 @@
                     <ui:Label text="🔒" class="cw-slot-pill cw-emoji-text" style="margin: 0; margin-left: 4px; opacity: 0.5;" />
                     <ui:Label text="🔒" class="cw-slot-pill cw-emoji-text" style="margin: 0; margin-left: 4px; opacity: 0.5;" />
                 </ui:VisualElement>
+                <ui:VisualElement name="PassiveOptionRow" style="flex-direction: row; margin-top: 4px; margin-bottom: 4px; align-items: center;">
+                    <ui:Button name="PassiveOpt1" text="MIGHTY" class="cw-slot-pill cw-btn" style="margin: 2px; font-size: 11px;" />
+                    <ui:Button name="PassiveOpt2" text="BRACER" class="cw-slot-pill cw-btn" style="margin: 2px; font-size: 11px;" />
+                </ui:VisualElement>
                 <ui:Label name="PreviewPassive" text="PASSIVE · MIGHTY" class="cw-slot-pill" style="margin-top: 0px; margin-bottom: 4px; font-size: 11px;" />
                 <ui:Label name="PreviewDesc" text="+25% outgoing ability damage." class="cw-body" style="-unity-text-align: middle-center; font-size: 12px;" />
 

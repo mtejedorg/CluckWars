@@ -17,6 +17,13 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "Doppelganger", menuName = "Cluck Wars/Ability/Doppelganger", order = 7)]
     public sealed class DoppelgangerAbilitySO : AbilityBaseSO
     {
+        public DoppelgangerAbilitySO()
+        {
+            TerrainTraversal = TerrainTraversal.Blink;
+            SlotKind = AbilitySlotKind.Character;
+            AllowedClasses = ChickenClassFlags.Assassin;
+        }
+
         [Tooltip("Decoy NetworkObject prefab (Chicken-prefab variant with ChickenCargo stripped + Doppelganger added).")]
         [SerializeField] private NetworkObject _decoyPrefab;
 

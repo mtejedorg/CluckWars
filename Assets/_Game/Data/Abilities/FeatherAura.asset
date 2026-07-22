@@ -16,6 +16,9 @@ MonoBehaviour:
   ShortLabel: FAU
   AccentColor: {r: 0.6, g: 0.3, b: 0.9, a: 1}
   Category: 1
+  TerrainTraversal: 0
+  SlotKind: 1
+  AllowedClasses: 2
   BotRole: 0
   Duration: 3
   Cooldown: 7

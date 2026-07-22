@@ -16,6 +16,9 @@ MonoBehaviour:
   ShortLabel: PCK
   AccentColor: {r: 1, g: 0.3, b: 0.1, a: 1}
   Category: 0
+  TerrainTraversal: 0
+  SlotKind: 0
+  AllowedClasses: 15
   BotRole: 0
   Duration: 0.3
   Cooldown: 3

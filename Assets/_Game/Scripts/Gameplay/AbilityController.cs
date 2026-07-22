@@ -33,6 +33,9 @@ namespace CluckWars.Gameplay
         private const string Source = "Ability";
         public const int InvalidSlot = -1;
 
+        [Tooltip("Equipped class passive ability. Mandatory; if unassigned, falls back to class default.")]
+        [SerializeField] private PassiveAbilitySO _passive;
+
         [Tooltip("Equipped ability for slot 0. Used by every class.")]
         [SerializeField] private AbilityBaseSO _slot0;
 
@@ -48,6 +51,7 @@ namespace CluckWars.Gameplay
         [Networked] private TickTimer Cooldown1 { get; set; }
         [Networked] private TickTimer Cooldown2 { get; set; }
 
+        public PassiveAbilitySO Passive => _passive;
         public AbilityBaseSO Slot0 => _slot0;
         public AbilityBaseSO Slot1 => _slot1;
         public AbilityBaseSO Slot2 => _slot2;
@@ -87,10 +91,22 @@ namespace CluckWars.Gameplay
                 ActiveSlot = InvalidSlot;
             }
 
+            if (_passive == null && _controller != null)
+            {
+                var reg = ProjectContext.Instance.Container.TryResolve<AbilityRegistrySO>();
+                if (reg != null) _passive = reg.GetDefaultPassiveForClass(_controller.Class);
+            }
+
+            if (_passive != null)
+            {
+                _passive.OnActivate(_ctx);
+            }
+
             if (_combat != null) _combat.OnDeathAuthority += HandleOwnerDeath;
 
             _initialized = true;
-            _log?.Debug(Source, $"Spawned. Slot0={(Slot0 != null ? Slot0.name : "(none)")}, " +
+            _log?.Debug(Source, $"Spawned. Passive={(_passive != null ? _passive.name : "(none)")}, " +
+                $"Slot0={(Slot0 != null ? Slot0.name : "(none)")}, " +
                 $"Slot1={(Slot1 != null ? Slot1.name : "(none)")}, " +
                 $"Slot2={(Slot2 != null ? Slot2.name : "(none)")}.");
         }
@@ -113,9 +129,17 @@ namespace CluckWars.Gameplay
             }
 
             var gm = GameManager.Instance;
-            if (gm == null || !gm.IsMatchRunning) return;
+            if (gm == null || !gm.IsMatchRunning)
+            {
+                if (ActiveSlot != InvalidSlot) Deactivate();
+                return;
+            }
 
-            if (_combat != null && _combat.IsStunned) return;
+            if (_combat != null && _combat.IsStunned)
+            {
+                if (ActiveSlot != InvalidSlot) Deactivate();
+                return;
+            }
 
             if (!GetInput<PlayerNetworkInput>(out var input)) return;
 
@@ -162,6 +186,8 @@ namespace CluckWars.Gameplay
         {
             get
             {
+                if (_passive != null && _passive is ComboPassiveSO) return 3;
+                if (_controller != null && _controller.IsPassiveActive(ChickenPassive.Combo)) return 3;
                 var stats = _controller != null ? _controller.Stats : null;
                 return (stats != null && stats.Passive == ChickenPassive.Combo) ? 3 : 2;
             }
@@ -210,11 +236,17 @@ namespace CluckWars.Gameplay
         /// callback so every peer already has the chosen abilities on first <c>Spawned</c>
         /// read. Null arguments leave the existing (prefab-default) value unchanged.
         /// </summary>
-        public void SetSlots(AbilityBaseSO slot0, AbilityBaseSO slot1, AbilityBaseSO slot2 = null)
+        public void SetSlots(PassiveAbilitySO passive, AbilityBaseSO slot0, AbilityBaseSO slot1, AbilityBaseSO slot2 = null)
         {
+            if (passive != null) _passive = passive;
             if (slot0 != null) _slot0 = slot0;
             if (slot1 != null) _slot1 = slot1;
             if (slot2 != null) _slot2 = slot2;
+        }
+
+        public void SetSlots(AbilityBaseSO slot0, AbilityBaseSO slot1, AbilityBaseSO slot2 = null)
+        {
+            SetSlots(null, slot0, slot1, slot2);
         }
 
         // ---- Internals ---------------------------------------------------------
@@ -245,14 +277,10 @@ namespace CluckWars.Gameplay
         private void TryActivate(int slot)
         {
             // Slot 2 requires the Combo (Assassin) passive.
-            if (slot == 2)
+            if (slot == 2 && EquippedSlotCount < 3)
             {
-                var stats = _controller != null ? _controller.Stats : null;
-                if (stats == null || stats.Passive != ChickenPassive.Combo)
-                {
-                    _log?.Debug(Source, "TryActivate slot 2: only available to Assassin (Combo passive).");
-                    return;
-                }
+                _log?.Debug(Source, "TryActivate slot 2: only available to Assassin with Combo passive.");
+                return;
             }
 
             var ability = GetSlot(slot);
@@ -282,6 +310,12 @@ namespace CluckWars.Gameplay
             // Refresh context fields that abilities need for NetworkObject spawning.
             _ctx.Runner         = Runner;
             _ctx.PrefabRegistry = _prefabRegistry;
+
+            if (ability.TerrainTraversal != TerrainTraversal.None && _controller != null)
+            {
+                _controller.Traversal?.Begin(ability.TerrainTraversal);
+            }
+
             ability.OnActivate(_ctx);
             _animator?.TriggerAbilityCast();
             _audio?.PlaySFX(_audioReg != null ? _audioReg.AbilityActivate : null);
@@ -296,6 +330,10 @@ namespace CluckWars.Gameplay
                 ability.OnDeactivate(_ctx);
                 _audio?.PlaySFX(_audioReg != null ? _audioReg.AbilityExpire : null);
                 _log?.Debug(Source, $"Deactivated {ability.DisplayName}.");
+            }
+            if (_controller != null && _controller.Traversal != null)
+            {
+                _controller.Traversal.End();
             }
             ActiveSlot = InvalidSlot;
         }

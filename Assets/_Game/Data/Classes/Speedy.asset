@@ -15,7 +15,7 @@ MonoBehaviour:
   DisplayName: Speedy
   Passive: 2
   MaxHP: 80
-  MoveSpeed: 10
+  MoveSpeed: 9
   TurnSpeed: 720
   CargoCapacity: 6
   CollectionRate: 2

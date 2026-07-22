@@ -16,6 +16,9 @@ MonoBehaviour:
   ShortLabel: FTR
   AccentColor: {r: 0.2, g: 0.7, b: 0.6, a: 1}
   Category: 1
+  TerrainTraversal: 0
+  SlotKind: 1
+  AllowedClasses: 2
   BotRole: 0
   Duration: 0.3
   Cooldown: 7

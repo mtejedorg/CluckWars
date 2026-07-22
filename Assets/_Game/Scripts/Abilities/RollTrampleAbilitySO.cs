@@ -20,6 +20,13 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "FlyingPeck", menuName = "Cluck Wars/Ability/Damage/Flying Peck", order = 5)]
     public sealed class RollTrampleAbilitySO : AbilityBaseSO
     {
+        public RollTrampleAbilitySO()
+        {
+            TerrainTraversal = TerrainTraversal.Vault;
+            SlotKind = AbilitySlotKind.Character;
+            AllowedClasses = ChickenClassFlags.Warrior;
+        }
+
         [Tooltip("How far in front of the caster the sweep is centered.")]
         [Min(0.5f)] public float ForwardOffset = 1.6f;
 

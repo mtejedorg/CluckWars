@@ -1,3 +1,4 @@
+using CluckWars.Gameplay;
 using UnityEngine;
 
 namespace CluckWars.Abilities
@@ -12,6 +13,31 @@ namespace CluckWars.Abilities
         Control = 1,
         Defense = 2,
         Utility = 3,
+    }
+
+    /// <summary>
+    /// ADR 0003 Decision 3 pool classification.
+    /// Common abilities sit in a shared pool; Character abilities sit in a per-class pool.
+    /// </summary>
+    public enum AbilitySlotKind : byte
+    {
+        Common    = 0,
+        Character = 1,
+    }
+
+    /// <summary>
+    /// Bitmask of classes allowed to equip a Character-slot ability (ADR 0003 Decision 3).
+    /// Derived from existing <see cref="ChickenClass"/> ordinals (Warrior=0, Speedy=1, Fatty=2, Assassin=3).
+    /// </summary>
+    [System.Flags]
+    public enum ChickenClassFlags : byte
+    {
+        None     = 0,
+        Warrior  = 1 << 0, // 1
+        Speedy   = 1 << 1, // 2
+        Fatty    = 1 << 2, // 4
+        Assassin = 1 << 3, // 8
+        All      = Warrior | Speedy | Fatty | Assassin, // 15
     }
 
     /// <summary>
@@ -56,6 +82,16 @@ namespace CluckWars.Abilities
         public Color AccentColor = new Color(0.45f, 0.7f, 1f, 1f);
         [Tooltip("GDD §7.2 category. Used by the character-select ability grid to group abilities.")]
         public AbilityCategory Category = AbilityCategory.Utility;
+
+        [Header("ADR 0003 Classification")]
+        [Tooltip("Terrain traversal capability granted to the caster while this ability is active (ADR 0003 Decision 1).")]
+        public TerrainTraversal TerrainTraversal = TerrainTraversal.None;
+
+        [Tooltip("Pool classification: Common (shared) vs Character (class pool) per ADR 0003 Decision 3.")]
+        public AbilitySlotKind SlotKind = AbilitySlotKind.Common;
+
+        [Tooltip("Bitmask of classes allowed to equip this ability when SlotKind is Character. All (15) for Common.")]
+        public ChickenClassFlags AllowedClasses = ChickenClassFlags.All;
 
         [Header("Bot")]
         [Tooltip("How the bot AI classifies and uses this ability. Auto derives the role from Category.")]
