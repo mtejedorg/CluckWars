@@ -243,11 +243,13 @@ namespace CluckWars.Gameplay
 
         private void BuildPlane()
         {
-            // Unity's Plane primitive is 10 m square and faces up — scale to taste.
-            var plane = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            // Use Cube instead of Plane so the floor has a 1m thick BoxCollider.
+            // This prevents CharacterControllers from tunneling through on slower mobile devices.
+            var plane = GameObject.CreatePrimitive(PrimitiveType.Cube);
             plane.name = "GeneratedGround";
             plane.transform.SetParent(transform, worldPositionStays: false);
-            plane.transform.localScale = Vector3.one * (_planeSize / 10f);
+            plane.transform.localScale = new Vector3(_planeSize, 1f, _planeSize);
+            plane.transform.localPosition = new Vector3(0f, -0.5f, 0f);
 
             if (_groundMaterial != null)
             {
@@ -569,7 +571,10 @@ namespace CluckWars.Gameplay
             int idx = (int)spec.Class;
             if (_obstacleMaterials[idx] != null) return _obstacleMaterials[idx];
 
-            var template = _wallMaterial != null ? _wallMaterial : primitiveDefault;
+            // Use _groundMaterial as a URP-compatible fallback if _wallMaterial is null,
+            // to avoid pulling in the built-in Standard shader primitiveDefault.
+            var template = _wallMaterial != null ? _wallMaterial :
+                           (_groundMaterial != null ? _groundMaterial : primitiveDefault);
             if (template == null)
             {
                 // Untinted grey terrain is a readability bug (players can't tell Low from
