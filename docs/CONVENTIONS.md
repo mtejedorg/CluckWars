@@ -203,6 +203,13 @@ The closer `MatchCamera._orthoSize` is, the less screen-relative motion you'll s
 
 Two `CharacterController`s spawned at the same XZ shove each other in collision response — the loser drifts indefinitely. Mitigations in place: spawn jitter per `PlayerId` (`MatchBootstrapper.HandlePlayerJoined`) and a degenerate-`_baseCornerDistance` guard (`MapGenerator.ComputeSpawnPoints`). Don't undo either without replacing.
 
+### `Plane`/`MeshCollider` tunneling on Android, `primitiveDefault` renders magenta
+
+Two related footguns hit in `MapGenerator.BuildPlane` (fixed 2026-07-23, commit `5032ae9`):
+
+- **Ground tunneling**: a `PrimitiveType.Plane` is a flat, paper-thin `MeshCollider`. On Android's lower/more variable framerate, a `CharacterController`'s per-step movement can tunnel straight through it — chickens fell forever. Fix: use `PrimitiveType.Cube` scaled thin (e.g. `(_planeSize, 1, _planeSize)`) for a real `BoxCollider`, same pattern `CreateWall` already uses for the arena walls. Any new runtime-generated ground/floor geometry should default to Cube, not Plane.
+- **Magenta materials**: `GameObject.CreatePrimitive`'s default material uses the Built-in RP Standard shader, which URP can't render (shows magenta). Any material fallback chain must bottom out in a real project material (e.g. `_groundMaterial`) — never let it fall through to the primitive's own default.
+
 ---
 
 ## Asset / prefab GUID stability
