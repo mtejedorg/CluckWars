@@ -121,13 +121,13 @@ namespace CluckWars.Gameplay
         [Header("Food piles (GDD §3: center + personal + contested islands)")]
         [Tooltip("Initial food in the central pile — large, high risk, high reward (GDD §3: 60).")]
         [Min(5f)]
-        [SerializeField] private float _centerPileAmount = 60f;
+        [SerializeField] private float _centerPileAmount = 20f;
 
         [Tooltip("Full world X,Z footprint of the centre island at 100% fill. A chicken is 1.0 wide, so 7×4 is seven chickens by four — a landmark you route around, not a prop. Safe to grow: FoodPile measures collection from the pile SURFACE, so a bigger island can no longer break collecting from it. Do keep the lanes to the contested piles open (currently 4.6 units at 7×4).")]
         [SerializeField] private Vector2 _centerPileFootprint = new Vector2(7f, 4f);
 
         [Tooltip("Make the center pile permanent (ADR 0003 Decision 2b): it can never be drained below its floor and slowly regenerates, so it stays a solid obstacle and the one contested resource of the late game. Floor and regen rate are tuned on the FoodPile prefab.")]
-        [SerializeField] private bool _centerPileIsPermanent = true;
+        [SerializeField] private bool _centerPileIsPermanent = false;
 
         [Tooltip("Food in each player's personal island. Deliberately safe but WEAK: nobody " +
             "contests it, but it must stay below the lowest ChickenStatsSO.CargoCapacity in " +
@@ -136,7 +136,7 @@ namespace CluckWars.Gameplay
             "contested pile or the centre island. Pinned by EconomyAndPilesTests. GDD §3's old " +
             "value (15) predates cargo capacities and let every class fill up in one trip.")]
         [Min(0f)]
-        [SerializeField] private float _personalPileAmount = 4f;
+        [SerializeField] private float _personalPileAmount = 5f;
 
         [Tooltip("Full world X,Z footprint of each personal island at 100% fill. Smallest of the three: it sits in front of a base and must not wall its owner in.")]
         [SerializeField] private Vector2 _personalPileFootprint = new Vector2(2.2f, 2.2f);
@@ -147,7 +147,7 @@ namespace CluckWars.Gameplay
 
         [Tooltip("Food in each contested island between adjacent player pairs — designed to provoke early fights (GDD §3: 25).")]
         [Min(0f)]
-        [SerializeField] private float _contestedPileAmount = 25f;
+        [SerializeField] private float _contestedPileAmount = 10f;
 
         [Tooltip("Full world X,Z footprint of each contested island at 100% fill. Mid-sized: big enough to fight around, small enough to leave a lane between it and the centre island.")]
         [SerializeField] private Vector2 _contestedPileFootprint = new Vector2(3f, 3f);
@@ -295,7 +295,7 @@ namespace CluckWars.Gameplay
                 new Vector3(t, h, _planeSize));
         }
 
-        private void CreateWall(string name, Vector3 localPosition, Vector3 size)
+        private GameObject CreateWall(string name, Vector3 localPosition, Vector3 size)
         {
             var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
             wall.name = name;
@@ -315,6 +315,8 @@ namespace CluckWars.Gameplay
                 var mr = wall.GetComponent<MeshRenderer>();
                 if (mr != null) mr.sharedMaterial = _wallMaterial;
             }
+
+            return wall;
         }
 
         // ---- Interior terrain + NavMesh ----------------------------------------
@@ -402,8 +404,18 @@ namespace CluckWars.Gameplay
         /// </summary>
         private void BuildInteriorObstacles()
         {
-            // Fixed order, biggest keep-clear first: Tall props claim their space while
-            // the map is still empty, so they don't get squeezed out by cheap crates.
+            bool online = _selection != null && _selection.Mode != SessionMode.Solo;
+            string sessionName = online ? _selection.SessionName : null;
+            int seed = online ? SessionNameSeed(sessionName) : new System.Random().Next();
+
+            float half = _planeSize * 0.5f;
+            float centerKeepClear = FootprintRadius(_centerPileFootprint);
+            float baseKeepClear = 4f;
+
+            // Generate pinwheel wall segments
+            var segments = PinwheelLayout.Build(half, _standardObstacleCount, seed, centerKeepClear, baseKeepClear);
+
+            // ObstacleSpecs for the three classes to reuse shared materials and tints
             var specs = new[]
             {
                 new ObstacleSpec(ObstacleClass.Tall, _tallObstacleCount,
@@ -417,62 +429,56 @@ namespace CluckWars.Gameplay
                     _lowObstacleHeight, _lowObstacleClearanceScale, _lowObstacleColor),
             };
 
-            int requested = 0;
-            for (int i = 0; i < specs.Length; i++) requested += Mathf.Max(0, specs[i].Count);
-            if (requested <= 0)
+            for (int i = 0; i < segments.Length; i++)
             {
-                _log?.Info(Source, "Interior terrain disabled — every obstacle count is 0.");
-                return;
+                var seg = segments[i];
+
+                Vector2 a = seg.A;
+                Vector2 b = seg.B;
+                Vector2 delta = b - a;
+                float length = delta.magnitude;
+                Vector2 center2D = a + delta * 0.5f;
+                Vector3 center = new Vector3(center2D.x, 0f, center2D.y);
+
+                // Get spec matching segment class
+                ObstacleSpec spec = GetSpecForClass(seg.Class, specs);
+
+                // Height comes from spec
+                float height = spec.Height;
+                Vector3 size = new Vector3(length, height, _wallThickness);
+
+                // Create wall GameObject using CreateWall
+                string wallName = $"Terrain_{seg.Class}_{i}";
+                GameObject go = CreateWall(wallName, center + Vector3.up * (height * 0.5f), size);
+
+                // Apply rotation
+                float angleRad = Mathf.Atan2(delta.y, delta.x);
+                float yaw = -angleRad * Mathf.Rad2Deg;
+                go.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
+
+                // Add TerrainObstacle tag with ObstacleClass
+                go.AddComponent<TerrainObstacle>().SetClass(seg.Class);
+
+                // Assign URP class material (no per-wall clones)
+                var mr = go.GetComponent<MeshRenderer>();
+                if (mr != null)
+                {
+                    var mat = EnsureClassMaterial(spec, mr.sharedMaterial);
+                    if (mat != null) mr.sharedMaterial = mat;
+                }
             }
 
-            bool online = _selection != null && _selection.Mode != SessionMode.Solo;
-            string sessionName = online ? _selection.SessionName : null;
-            var rng = online
-                ? new System.Random(SessionNameSeed(sessionName))
-                : new System.Random();
+            string seedNote = online ? $"session '{sessionName}' (seed {seed})" : $"solo-random (seed {seed})";
+            _log?.Info(Source, $"Interior terrain: placed {segments.Length} pinwheel obstacles. Seed={seedNote}.");
+        }
 
-            // Keep-clear objectives: centre island, corner bases/spawns, nominal (pre-jitter)
-            // island positions. Each island carries its own footprint radius so the clearance
-            // is measured from the island's edge, not its centre. Pile jitter is ±1.5 and
-            // _interiorWallClearance covers it.
-            var objectives = new List<Objective>
-            {
-                new Objective(Vector3.zero, FootprintRadius(_centerPileFootprint)),
-            };
-            float personalRadius = FootprintRadius(_personalPileFootprint);
-            float contestedRadius = FootprintRadius(_contestedPileFootprint);
-            for (int i = 0; i < _corners.Length; i++)
-            {
-                objectives.Add(new Objective(_spawnPoints[i], 0f));
-                objectives.Add(new Objective(Vector3.Lerp(_corners[i], Vector3.zero, _personalPileInset), personalRadius));
-                objectives.Add(new Objective((_corners[i] + _corners[(i + 1) % _corners.Length]) * 0.5f * _contestedEdgeInset, contestedRadius));
-            }
-
-            var placed = new List<PlacedObstacle>(requested);
-            var breakdown = new System.Text.StringBuilder();
-            int total = 0;
+        private ObstacleSpec GetSpecForClass(ObstacleClass cls, ObstacleSpec[] specs)
+        {
             for (int i = 0; i < specs.Length; i++)
             {
-                int made = PlaceObstacleClass(specs[i], rng, objectives, placed);
-                total += made;
-                if (i > 0) breakdown.Append(", ");
-                breakdown.Append($"{made}/{specs[i].Count} {specs[i].Class}");
+                if (specs[i].Class == cls) return specs[i];
             }
-
-            string seedNote = online ? $"session '{sessionName}'" : "solo-random";
-            if (total < requested)
-            {
-                // Under-placement is not fatal, but it silently thins the map — the whole
-                // point of the density bump — so it must be visible, not swallowed.
-                _log?.Warn(Source, $"Interior terrain: placed only {total}/{requested} obstacles " +
-                    $"({breakdown}) within the attempt budget ({_obstaclePlacementAttempts}/obstacle). " +
-                    $"Lower the counts, or reduce _interiorWallClearance / _obstacleSpacing. Seed={seedNote}.");
-            }
-            else
-            {
-                _log?.Info(Source, $"Interior terrain: placed {total}/{requested} obstacles " +
-                    $"({breakdown}). Seed={seedNote}.");
-            }
+            return specs[1]; // fallback to Standard
         }
 
         /// <summary>
@@ -777,6 +783,10 @@ namespace CluckWars.Gameplay
             // Master-spawned NetworkObjects replicate, so plain Random is fine —
             // no cross-peer seeding needed.
 
+            var loggedCoords = new System.Text.StringBuilder();
+            loggedCoords.AppendLine("--- ORACLE PILE COORDINATES ---");
+            loggedCoords.AppendLine($"Center: (0.00, 0.00) | Food: {_centerPileAmount:0.00}");
+
             // Center pile — bigger Amount + bigger visual. Never moves, and (ADR 0003
             // Decision 2b) never fully drains: the outer piles are consumed away over the
             // match, so the centre is what the endgame converges on.
@@ -787,6 +797,7 @@ namespace CluckWars.Gameplay
             {
                 var pos = Vector3.Lerp(_corners[i], Vector3.zero, _personalPileInset) + JitterXZ();
                 SpawnPile(runner, pilePrefab, pos, _personalPileAmount, _personalPileFootprint);
+                loggedCoords.AppendLine($"Personal {i}: ({pos.x:F2}, {pos.z:F2}) | Food: {_personalPileAmount:0.00}");
             }
 
             // Contested islands — between each pair of adjacent corners, pulled
@@ -796,7 +807,10 @@ namespace CluckWars.Gameplay
                 var mid = (_corners[i] + _corners[(i + 1) % _corners.Length]) * 0.5f;
                 var pos = mid * _contestedEdgeInset + JitterXZ();
                 SpawnPile(runner, pilePrefab, pos, _contestedPileAmount, _contestedPileFootprint);
+                loggedCoords.AppendLine($"Contested {i}: ({pos.x:F2}, {pos.z:F2}) | Food: {_contestedPileAmount:0.00}");
             }
+            loggedCoords.AppendLine("-------------------------------");
+            _log?.Info(Source, loggedCoords.ToString());
 
             _log?.Info(Source, $"Spawned GDD layout: center ({_centerPileAmount}" +
                 $"{(_centerPileIsPermanent ? ", permanent" : "")}, " +

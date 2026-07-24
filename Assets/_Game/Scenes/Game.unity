@@ -566,12 +566,13 @@ MonoBehaviour:
   _obstacleEdgeMargin: 1.5
   _obstaclePlacementAttempts: 40
   _baseCornerDistance: 12
-  _centerPileAmount: 60
+  _centerPileAmount: 20
   _centerPileFootprint: {x: 7, y: 4}
-  _personalPileAmount: 4
+  _centerPileIsPermanent: 0
+  _personalPileAmount: 5
   _personalPileFootprint: {x: 2.2, y: 2.2}
   _personalPileInset: 0.35
-  _contestedPileAmount: 25
+  _contestedPileAmount: 10
   _contestedPileFootprint: {x: 3, y: 3}
   _contestedEdgeInset: 0.8
   _pilePositionJitter: 1.5

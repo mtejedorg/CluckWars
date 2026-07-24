@@ -153,11 +153,11 @@ namespace CluckWars.Tests
             // If Available were computed from Amount instead, the centre pile would
             // be an infinite food source parked at its floor.
             float floorFrac = FoodPileMath.FloorFraction(true, PermFloorFrac);
-            float floor = FoodPileMath.DrainFloor(60f, floorFrac);
+            float floor = FoodPileMath.DrainFloor(20f, floorFrac);
 
-            Assert.AreEqual(36f, floor, 1e-4f, "60% floor of a 60-food centre pile is 36.");
-            Assert.AreEqual(0f, FoodPileMath.Available(floor, 60f, floorFrac), 1e-4f);
-            Assert.AreEqual(24f, FoodPileMath.Available(60f, 60f, floorFrac), 1e-4f);
+            Assert.AreEqual(12f, floor, 1e-4f, "60% floor of a 20-food centre pile is 12.");
+            Assert.AreEqual(0f, FoodPileMath.Available(floor, 20f, floorFrac), 1e-4f);
+            Assert.AreEqual(8f, FoodPileMath.Available(20f, 20f, floorFrac), 1e-4f);
         }
 
         [Test]
@@ -166,7 +166,7 @@ namespace CluckWars.Tests
             // "never empties, never stops blocking" — the late game always has one
             // contested arena. Step 0 would deactivate the blocker.
             float floorFrac = FoodPileMath.FloorFraction(true, PermFloorFrac);
-            int step = FoodPileMath.FootprintStep(FoodPileMath.DrainFloor(60f, floorFrac), 60f, floorFrac, Steps);
+            int step = FoodPileMath.FootprintStep(FoodPileMath.DrainFloor(20f, floorFrac), 20f, floorFrac, Steps);
 
             Assert.AreEqual(1, step,
                 "A permanent pile sitting at its floor must be at the smallest non-empty step, " +
@@ -179,11 +179,11 @@ namespace CluckWars.Tests
             // Its size is meant to read as contest intensity. Normalising over
             // [0, max] instead of [floor, max] would pin it to the top two buckets.
             float floorFrac = FoodPileMath.FloorFraction(true, PermFloorFrac);
-            float floor = FoodPileMath.DrainFloor(60f, floorFrac);
+            float floor = FoodPileMath.DrainFloor(20f, floorFrac);
 
             var seen = Enumerable.Range(0, 241)
-                .Select(i => floor + (60f - floor) * i / 240f)
-                .Select(a => FoodPileMath.FootprintStep(a, 60f, floorFrac, Steps))
+                .Select(i => floor + (20f - floor) * i / 240f)
+                .Select(a => FoodPileMath.FootprintStep(a, 20f, floorFrac, Steps))
                 .Distinct()
                 .OrderBy(x => x)
                 .ToList();
@@ -529,6 +529,21 @@ namespace CluckWars.Tests
                 $"Personal pile carries {personalAmount} food, but the smallest cargo capacity in the " +
                 $"roster is {smallestCargo} — that class (or any larger-cargo class) can fill up from " +
                 "the 'safe' pile alone, which defeats the point of it being weak.");
+        }
+
+        [Test]
+        public void MapPiles_MatchesTieredBudgetTotaling80()
+        {
+            float personal = SceneFloat("_personalPileAmount");
+            float contested = SceneFloat("_contestedPileAmount");
+            float center = SceneFloat("_centerPileAmount");
+
+            Assert.AreEqual(5f, personal, "Personal pile amount default must be 5.");
+            Assert.AreEqual(10f, contested, "Contested pile amount default must be 10.");
+            Assert.AreEqual(20f, center, "Center pile amount default must be 20.");
+
+            float total = (4 * personal) + (4 * contested) + center;
+            Assert.AreEqual(80f, total, "Total food in the map budget must equal 80.");
         }
 
         [Test]
