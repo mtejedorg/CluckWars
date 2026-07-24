@@ -100,7 +100,7 @@ namespace CluckWars.Gameplay
         [SerializeField] private Color _tallObstacleColor = new Color(0.37f, 0.38f, 0.41f, 1f);
 
         [Header("Interior terrain — shared placement rules")]
-        [Tooltip("Walkable gap kept between every objective (centre pile, corner bases/spawns, nominal island positions) and the nearest obstacle SURFACE — not its centre. 2.2 is over two chicken diameters. Measured to the surface because a bounding-circle test refuses to let any long wall near an objective and the map then physically cannot hold the ADR's density. Scaled per class.")]
+        [Tooltip("Walkable gap kept between every objective (food islands, corner bases/spawns) and the nearest obstacle SURFACE — not its centre. 2.2 is over two chicken diameters. Measured surface-to-surface at both ends: the obstacle contributes its real footprint rather than a bounding circle (or no long wall could ever go near an objective), and an island contributes its own footprint radius (or terrain would be placed inside the 7×4 centre island). Scaled per class.")]
         [Min(1f)]
         [SerializeField] private float _interiorWallClearance = 2.2f;
         [Tooltip("Minimum gap between two obstacles' footprints (not their centres). Must stay wider than a chicken (radius 0.5) or obstacles fuse into impassable clumps. Scaled per class.")]
@@ -123,16 +123,23 @@ namespace CluckWars.Gameplay
         [Min(5f)]
         [SerializeField] private float _centerPileAmount = 60f;
 
-        [Tooltip("Center pile mesh scale multiplier — makes it visually bigger without changing gameplay rules beyond the food count. NOTE: this also scales the pile's blocker collider, and 1.5 already sits close to the CollectRadius bound (see FoodPile._blockerRadius). Don't raise it without re-deriving that margin.")]
-        [Min(0.5f)]
-        [SerializeField] private float _centerPileVisualScale = 1.5f;
+        [Tooltip("Full world X,Z footprint of the centre island at 100% fill. A chicken is 1.0 wide, so 7×4 is seven chickens by four — a landmark you route around, not a prop. Safe to grow: FoodPile measures collection from the pile SURFACE, so a bigger island can no longer break collecting from it. Do keep the lanes to the contested piles open (currently 4.6 units at 7×4).")]
+        [SerializeField] private Vector2 _centerPileFootprint = new Vector2(7f, 4f);
 
         [Tooltip("Make the center pile permanent (ADR 0003 Decision 2b): it can never be drained below its floor and slowly regenerates, so it stays a solid obstacle and the one contested resource of the late game. Floor and regen rate are tuned on the FoodPile prefab.")]
         [SerializeField] private bool _centerPileIsPermanent = true;
 
-        [Tooltip("Food in each player's personal island — small, relatively safe early game (GDD §3: 15).")]
+        [Tooltip("Food in each player's personal island. Deliberately safe but WEAK: nobody " +
+            "contests it, but it must stay below the lowest ChickenStatsSO.CargoCapacity in " +
+            "the roster (Speedy, 6) so even the smallest carrier can't fill up from one visit. " +
+            "The personal pile is a trickle, not a farm — real yield means going out to a " +
+            "contested pile or the centre island. Pinned by EconomyAndPilesTests. GDD §3's old " +
+            "value (15) predates cargo capacities and let every class fill up in one trip.")]
         [Min(0f)]
-        [SerializeField] private float _personalPileAmount = 15f;
+        [SerializeField] private float _personalPileAmount = 4f;
+
+        [Tooltip("Full world X,Z footprint of each personal island at 100% fill. Smallest of the three: it sits in front of a base and must not wall its owner in.")]
+        [SerializeField] private Vector2 _personalPileFootprint = new Vector2(2.2f, 2.2f);
 
         [Tooltip("Personal island position = Lerp(corner, center, inset). 0.35 puts it a few units in front of the base, toward the action.")]
         [Range(0.2f, 0.6f)]
@@ -141,6 +148,9 @@ namespace CluckWars.Gameplay
         [Tooltip("Food in each contested island between adjacent player pairs — designed to provoke early fights (GDD §3: 25).")]
         [Min(0f)]
         [SerializeField] private float _contestedPileAmount = 25f;
+
+        [Tooltip("Full world X,Z footprint of each contested island at 100% fill. Mid-sized: big enough to fight around, small enough to leave a lane between it and the centre island.")]
+        [SerializeField] private Vector2 _contestedPileFootprint = new Vector2(3f, 3f);
 
         [Tooltip("Contested island position = edge midpoint scaled toward center. 0.8 keeps it between the two neighbours but inside the walls.")]
         [Range(0.4f, 1f)]
@@ -345,6 +355,27 @@ namespace CluckWars.Gameplay
             }
         }
 
+        /// <summary>
+        /// Something terrain must not crowd, plus the radius it occupies itself. Spawns and
+        /// bases are points; food islands are not — the centre island is 7×4, so treating it
+        /// as a point would let a crate be placed 2.2 m from the origin, i.e. buried inside
+        /// the island and sealing the lanes around it.
+        /// </summary>
+        private readonly struct Objective
+        {
+            public readonly Vector3 Position;
+            public readonly float Radius;
+            public Objective(Vector3 position, float radius)
+            {
+                Position = position;
+                Radius = radius;
+            }
+        }
+
+        /// <summary>Circumscribed radius of a pile footprint — the same convention <see cref="PlacedObstacle"/> uses.</summary>
+        private static float FootprintRadius(Vector2 size) =>
+            0.5f * Mathf.Sqrt(size.x * size.x + size.y * size.y);
+
         private static readonly int SColorId     = Shader.PropertyToID("_Color");
         private static readonly int SBaseColorId = Shader.PropertyToID("_BaseColor");
 
@@ -400,14 +431,21 @@ namespace CluckWars.Gameplay
                 ? new System.Random(SessionNameSeed(sessionName))
                 : new System.Random();
 
-            // Keep-clear points: center pile, corner bases/spawns, nominal (pre-jitter)
-            // island positions. Pile jitter is ±1.5 and _interiorWallClearance covers it.
-            var objectives = new List<Vector3> { Vector3.zero };
+            // Keep-clear objectives: centre island, corner bases/spawns, nominal (pre-jitter)
+            // island positions. Each island carries its own footprint radius so the clearance
+            // is measured from the island's edge, not its centre. Pile jitter is ±1.5 and
+            // _interiorWallClearance covers it.
+            var objectives = new List<Objective>
+            {
+                new Objective(Vector3.zero, FootprintRadius(_centerPileFootprint)),
+            };
+            float personalRadius = FootprintRadius(_personalPileFootprint);
+            float contestedRadius = FootprintRadius(_contestedPileFootprint);
             for (int i = 0; i < _corners.Length; i++)
             {
-                objectives.Add(_spawnPoints[i]);
-                objectives.Add(Vector3.Lerp(_corners[i], Vector3.zero, _personalPileInset));
-                objectives.Add((_corners[i] + _corners[(i + 1) % _corners.Length]) * 0.5f * _contestedEdgeInset);
+                objectives.Add(new Objective(_spawnPoints[i], 0f));
+                objectives.Add(new Objective(Vector3.Lerp(_corners[i], Vector3.zero, _personalPileInset), personalRadius));
+                objectives.Add(new Objective((_corners[i] + _corners[(i + 1) % _corners.Length]) * 0.5f * _contestedEdgeInset, contestedRadius));
             }
 
             var placed = new List<PlacedObstacle>(requested);
@@ -446,7 +484,7 @@ namespace CluckWars.Gameplay
         /// rotated-bounds test against the boundary walls.
         /// </summary>
         private int PlaceObstacleClass(in ObstacleSpec spec, System.Random rng,
-                                       List<Vector3> objectives, List<PlacedObstacle> placed)
+                                       List<Objective> objectives, List<PlacedObstacle> placed)
         {
             if (spec.Count <= 0) return 0;   // count 0 cleanly disables the class
 
@@ -468,7 +506,7 @@ namespace CluckWars.Gameplay
                 float yaw   = (float)rng.NextDouble() * 180f;
 
                 var center = new Vector3(x, 0f, z);
-                float footprintRadius = 0.5f * Mathf.Sqrt(width * width + depth * depth);
+                float footprintRadius = FootprintRadius(new Vector2(width, depth));
 
                 if (!FitsInsideBoundary(center, width, depth, yaw)) continue;
 
@@ -480,7 +518,10 @@ namespace CluckWars.Gameplay
                 // and what actually determines whether an objective stays approachable.
                 bool blocked = false;
                 for (int i = 0; i < objectives.Count && !blocked; i++)
-                    if (DistanceToBox(objectives[i], center, yaw, width, depth) < objectiveKeepOut) blocked = true;
+                {
+                    float surface = DistanceToBox(objectives[i].Position, center, yaw, width, depth);
+                    if (surface - objectives[i].Radius < objectiveKeepOut) blocked = true;
+                }
                 if (blocked) continue;
 
                 // Footprint-to-footprint gap: a long wall and a crate need the same
@@ -584,12 +625,27 @@ namespace CluckWars.Gameplay
                     "terrain will render untinted and the three classes won't be distinguishable.");
                 return null;
             }
+            bool templateIsGroundFallback = _wallMaterial == null && template == _groundMaterial;
 
             var mat = new Material(template)
             {
                 name = $"TerrainObstacle_{spec.Class}",
                 hideFlags = HideFlags.DontSave,
             };
+
+            // The ground-fallback path clones _groundMaterial, which carries the grass
+            // albedo texture — a flat colour multiplied over a grass texture still reads
+            // as "grass texture", not as a distinct tinted block. Obstacles are meant to be
+            // differentiated by colour alone (Low/Standard/Tall), so strip the base map when
+            // that's the template in play. Only that path: a deliberately assigned
+            // _wallMaterial is left untouched, since its texture may be an intentional
+            // design choice, not a borrowed ground fallback.
+            if (templateIsGroundFallback)
+            {
+                if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", null);
+                if (mat.HasProperty("_MainTex")) mat.SetTexture("_MainTex", null);
+            }
+
             // URP Lit exposes _BaseColor; keep _Color set too for any Built-in-style
             // material someone drops into _wallMaterial.
             if (mat.HasProperty(SBaseColorId)) mat.SetColor(SBaseColorId, spec.Tint);
@@ -724,13 +780,13 @@ namespace CluckWars.Gameplay
             // Center pile — bigger Amount + bigger visual. Never moves, and (ADR 0003
             // Decision 2b) never fully drains: the outer piles are consumed away over the
             // match, so the centre is what the endgame converges on.
-            SpawnPile(runner, pilePrefab, Vector3.zero, _centerPileAmount, _centerPileVisualScale, _centerPileIsPermanent);
+            SpawnPile(runner, pilePrefab, Vector3.zero, _centerPileAmount, _centerPileFootprint, _centerPileIsPermanent);
 
             // Personal islands — one in front of each base, on the base→center line.
             for (int i = 0; i < _corners.Length; i++)
             {
                 var pos = Vector3.Lerp(_corners[i], Vector3.zero, _personalPileInset) + JitterXZ();
-                SpawnPile(runner, pilePrefab, pos, _personalPileAmount);
+                SpawnPile(runner, pilePrefab, pos, _personalPileAmount, _personalPileFootprint);
             }
 
             // Contested islands — between each pair of adjacent corners, pulled
@@ -739,12 +795,14 @@ namespace CluckWars.Gameplay
             {
                 var mid = (_corners[i] + _corners[(i + 1) % _corners.Length]) * 0.5f;
                 var pos = mid * _contestedEdgeInset + JitterXZ();
-                SpawnPile(runner, pilePrefab, pos, _contestedPileAmount);
+                SpawnPile(runner, pilePrefab, pos, _contestedPileAmount, _contestedPileFootprint);
             }
 
             _log?.Info(Source, $"Spawned GDD layout: center ({_centerPileAmount}" +
-                $"{(_centerPileIsPermanent ? ", permanent" : "")}) + " +
-                $"4 personal ({_personalPileAmount}) + 4 contested ({_contestedPileAmount}) piles. " +
+                $"{(_centerPileIsPermanent ? ", permanent" : "")}, " +
+                $"{_centerPileFootprint.x:0.#}×{_centerPileFootprint.y:0.#}) + " +
+                $"4 personal ({_personalPileAmount}, {_personalPileFootprint.x:0.#}×{_personalPileFootprint.y:0.#}) + " +
+                $"4 contested ({_contestedPileAmount}, {_contestedPileFootprint.x:0.#}×{_contestedPileFootprint.y:0.#}) piles. " +
                 $"Starting food = {_centerPileAmount + 4f * (_personalPileAmount + _contestedPileAmount):0}" +
                 $"{(_centerPileIsPermanent ? " (+ centre regen)" : "")}.");
         }
@@ -761,7 +819,7 @@ namespace CluckWars.Gameplay
         /// <c>[Networked]</c> property is replicated from tick zero, before <c>Spawned()</c>
         /// runs on any peer and sizes the pile's footprint.
         /// </summary>
-        private NetworkObject SpawnPile(NetworkRunner runner, NetworkObject pilePrefab, Vector3 pos, float amount, float scale = 1f, bool permanent = false)
+        private NetworkObject SpawnPile(NetworkRunner runner, NetworkObject pilePrefab, Vector3 pos, float amount, Vector2 footprint, bool permanent = false)
         {
             return runner.Spawn(
                 pilePrefab,
@@ -775,7 +833,7 @@ namespace CluckWars.Gameplay
                         // Silently skipping here would ship a centre pile that drains to
                         // zero with no visible cause — say so instead.
                         _log?.Warn(Source, $"Pile prefab '{pilePrefab.name}' has no FoodPile component; " +
-                            "amount, visual scale and the permanent flag were not applied.");
+                            "amount, footprint and the permanent flag were not applied.");
                         return;
                     }
 
@@ -784,7 +842,7 @@ namespace CluckWars.Gameplay
                         pile.Amount = amount;
                         pile.MaxAmount = amount;
                     }
-                    pile.VisualScale = scale;
+                    pile.FootprintSize = footprint;
                     pile.IsPermanent = permanent;
                 });
         }

@@ -44,9 +44,13 @@ namespace CluckWars.Gameplay
         [Min(0.05f)]
         [SerializeField] private float _thinkInterval = 0.3f;
 
-        [Tooltip("Distance at which the bot considers itself 'arrived' at a target.")]
+        [Tooltip("Distance at which the bot considers itself 'arrived' at a target. Not used for piles — see _pileStandoff.")]
         [Min(0.1f)]
         [SerializeField] private float _arrivalRadius = 1.5f;
+
+        [Tooltip("How far past a pile's surface the bot aims when collecting. Piles are solid, so aiming at the centre grinds the bot into the blocker forever; aiming a little OUTSIDE the surface gives it a reachable point on walkable ground. Must stay above the NavMesh agent radius (0.5) so the point isn't inside the pile's carve, and inside FoodPile._collectReach so standing there actually collects.")]
+        [Min(0.1f)]
+        [SerializeField] private float _pileStandoff = 0.7f;
 
         [Tooltip("Cargo fraction [0,1] at which the bot turns around to deposit.")]
         [Range(0f, 1f)]
@@ -98,6 +102,14 @@ namespace CluckWars.Gameplay
         private Vector3    _moveTarget;
         private PlayerBase _homeBase;
         private float      _nextThinkTime;
+
+        /// <summary>
+        /// The pile the bot is currently walking to, or null. Arrival at a pile is
+        /// "am I in its collect range", not "am I within <see cref="_arrivalRadius"/> of a
+        /// point" — a fixed radius against a standoff point would let the bot stop up to
+        /// <c>_arrivalRadius</c> short of a big island and stand there collecting nothing.
+        /// </summary>
+        private FoodPile _pileGoal;
 
         // ---- NavMesh path following (walls + solid piles are obstacles) ------
         private NavMeshPath _navPath;
@@ -159,6 +171,10 @@ namespace CluckWars.Gameplay
         private void Think()
         {
             _prevState = _state;
+
+            // Any decision below that isn't "go collect from that pile" invalidates the
+            // pile arrival rule; the collect branch re-arms it.
+            _pileGoal = null;
 
             // Perceive the nearest rival once per think tick (cheap scan).
             _perceivedRival      = FindNearestRival(out _perceivedRivalDist, out _perceivedRivalCargo, requireCargo: false);
@@ -248,32 +264,38 @@ namespace CluckWars.Gameplay
             // Priority 4: COLLECT — nearest non-empty pile OR ground pickup,
             // whichever is closer. Pickups matter most right after a hunt: the
             // stunned victim's dropped cargo is usually at the bot's feet.
-            var pile   = FindNearestPile(out float pileSqr);
-            var pickup = FindNearestPickup(out float pickupSqr);
-            if (pickup != null && (pile == null || pickupSqr < pileSqr))
+            var selfPos = _controller.transform.position;
+            var pile   = FindNearestPile(out float pileDist);
+            var pickup = FindNearestPickup(out float pickupDist);
+            if (pickup != null && (pile == null || pickupDist < pileDist))
             {
                 _state      = BotState.CollectFood;
                 _moveTarget = pickup.transform.position;
                 if (_state != _prevState)
-                    _log?.Debug(Source, $"→ CollectFood (ground pickup, dist={Mathf.Sqrt(pickupSqr):0.0}).");
+                    _log?.Debug(Source, $"→ CollectFood (ground pickup, dist={pickupDist:0.0}).");
                 return;
             }
             if (pile != null)
             {
                 _state      = BotState.CollectFood;
-                _moveTarget = pile.transform.position;
+                // Steer to the pile's rim, not its centre: the centre of a stocked pile is
+                // inside a solid blocker, and on a 7×4 island that is 3.5 m of wall the bot
+                // would grind against forever without ever collecting.
+                _pileGoal   = pile;
+                _moveTarget = pile.SurfaceApproachPoint(selfPos, _pileStandoff);
 
                 // If a rival is contesting the same pile (and we're close enough for
-                // the ability to actually land), try to displace them.
+                // the ability to actually land), try to displace them. Contest is measured
+                // to the pile's SURFACE — a centre-distance threshold is never satisfied
+                // once the pile is wider than the threshold itself.
                 if (_perceivedRival != null && _perceivedRivalDist <= _abilityRange)
                 {
-                    float rivalToPile = (_perceivedRival.transform.position - pile.transform.position).magnitude;
-                    if (rivalToPile < _arrivalRadius * 2.5f)
+                    if (pile.DistanceToSurface(_perceivedRival.transform.position) < _arrivalRadius)
                         ReactWithAbility(new[] { BotRole.Control }, alwaysFireIfReady: false);
                 }
 
                 if (_state != _prevState)
-                    _log?.Debug(Source, $"→ CollectFood (pile '{pile.name}').");
+                    _log?.Debug(Source, $"→ CollectFood (pile '{pile.name}', surface dist={pileDist:0.0}).");
                 return;
             }
 
@@ -313,7 +335,7 @@ namespace CluckWars.Gameplay
             var toTarget = _moveTarget - selfPos;
             toTarget.y = 0f;
 
-            if (toTarget.sqrMagnitude <= _arrivalRadius * _arrivalRadius)
+            if (HasArrived(selfPos, toTarget))
             {
                 _controller.BotTick(Vector2.zero, Runner.DeltaTime);
                 return;
@@ -330,19 +352,49 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// The next NavMesh path corner to steer toward. Recomputes the path when
-        /// <see cref="_moveTarget"/> drifts more than a metre from the last
-        /// computed target (piles are static, chased chickens move). Targets on
-        /// carved ground (a solid pile's center) snap to the nearest edge via
-        /// <c>SamplePosition</c>, which is exactly the collectable rim. Falls back
-        /// to direct steering when sampling or pathing fails — CharacterController
-        /// sliding still handles glancing contacts.
+        /// Has the bot reached what it was walking to? For a pile the answer is the only
+        /// one that matters — "am I in collect range of its surface". A radius test against
+        /// the standoff point would let the bot stop up to <see cref="_arrivalRadius"/>
+        /// short and stand next to an island collecting nothing.
         /// </summary>
+        private bool HasArrived(Vector3 selfPos, Vector3 toTarget)
+        {
+            if (_pileGoal != null && _pileGoal.Object != null && _pileGoal.Object.IsValid)
+                return _pileGoal.IsWithinCollectRange(selfPos);
+
+            return toTarget.sqrMagnitude <= _arrivalRadius * _arrivalRadius;
+        }
+
+        /// <summary>
+        /// The next NavMesh path corner to steer toward. Recomputes the path when
+        /// <see cref="_moveTarget"/> drifts past a threshold from the last computed
+        /// target. Falls back to direct steering when sampling or pathing fails —
+        /// CharacterController sliding still handles glancing contacts.
+        /// </summary>
+        /// <remarks>
+        /// The threshold is tight while <see cref="_pileGoal"/> is set and loose otherwise.
+        /// This used to be a flat 1 m, back when a pile target was <c>pile.transform.position</c>
+        /// — genuinely fixed, so any distance test worked. It is now
+        /// <see cref="FoodPile.SurfaceApproachPoint"/>, recomputed fresh every Think() tick
+        /// from the bot's current position AND the pile's current footprint. Both of those
+        /// drift by less than a metre per tick almost always — most of all as a pile drains
+        /// and its footprint shrinks, which pulls the correct standoff point inward in small
+        /// steps. A 1 m gate silently never re-fires against drift that small: the bot keeps
+        /// following a path aimed at a footprint that no longer exists, arrives at a point
+        /// that used to be the rim and no longer is, and sits there — just outside
+        /// <see cref="FoodPile.IsWithinCollectRange"/> forever, never being told the target
+        /// moved because it never moved "enough". Verified live 2026-07-24: three bots frozen
+        /// this way, each parked 1.2–1.9 m from a pile whose footprint had shrunk out from
+        /// under a stale path. A moving rival (the other <see cref="_moveTarget"/> source) has
+        /// no such problem — it covers a metre in a fraction of a Think() interval, so the
+        /// loose threshold never starves it.
+        /// </remarks>
         private Vector3 ResolveSteerPoint(Vector3 selfPos)
         {
             if (_navPath == null) _navPath = new NavMeshPath();
 
-            if ((_moveTarget - _lastPathTarget).sqrMagnitude > 1f)
+            float repathThresholdSqr = _pileGoal != null ? 0.04f : 1f; // 0.2 m vs 1 m
+            if ((_moveTarget - _lastPathTarget).sqrMagnitude > repathThresholdSqr)
             {
                 _lastPathTarget = _moveTarget;
                 bool ok = NavMesh.SamplePosition(selfPos, out var fromHit, 2f, NavMesh.AllAreas)
@@ -410,29 +462,37 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Finds the nearest pile that still has food a chicken can actually take.
+        /// Finds the nearest pile that still has food a chicken can actually take, ranked by
+        /// distance to its SURFACE (<paramref name="bestDistanceOut"/>) so the choice stays
+        /// honest across wildly different pile sizes — by centre distance a bot standing on
+        /// the 7×4 island's rim would rate a small pile 3 m away as closer.
         /// Not <c>IsEmpty</c>: the permanent centre pile (ADR 0003 Decision 2b) is never
         /// empty, so a bot would otherwise park on its floor and collect nothing forever.
         /// </summary>
-        private FoodPile FindNearestPile(out float bestSqrOut)
+        private FoodPile FindNearestPile(out float bestDistanceOut)
         {
             var piles   = FoodPile.ActivePiles;
             var selfPos = _controller.transform.position;
-            FoodPile best    = null;
-            float    bestSqr = float.MaxValue;
+            FoodPile best     = null;
+            float    bestDist = float.MaxValue;
             for (int i = 0; i < piles.Count; i++)
             {
                 var p = piles[i];
-                if (p == null || !p.HasCollectableFood) continue;
-                float sqr = (p.transform.position - selfPos).sqrMagnitude;
-                if (sqr < bestSqr) { bestSqr = sqr; best = p; }
+                if (p == null || p.Object == null || !p.Object.IsValid) continue;
+                if (!p.HasCollectableFood) continue;
+                float dist = p.DistanceToSurface(selfPos);
+                if (dist < bestDist) { bestDist = dist; best = p; }
             }
-            bestSqrOut = bestSqr;
+            bestDistanceOut = bestDist;
             return best;
         }
 
-        /// <summary>Finds the nearest non-empty ground pickup (death-dropped cargo).</summary>
-        private FoodPickup FindNearestPickup(out float bestSqrOut)
+        /// <summary>
+        /// Finds the nearest non-empty ground pickup (death-dropped cargo). Returns a plain
+        /// distance, not a squared one, so it is directly comparable with the pile's surface
+        /// distance in <see cref="Think"/>.
+        /// </summary>
+        private FoodPickup FindNearestPickup(out float bestDistanceOut)
         {
             var pickups = FoodPickup.ActivePickups;
             var selfPos = _controller.transform.position;
@@ -446,7 +506,7 @@ namespace CluckWars.Gameplay
                 float sqr = (p.transform.position - selfPos).sqrMagnitude;
                 if (sqr < bestSqr) { bestSqr = sqr; best = p; }
             }
-            bestSqrOut = bestSqr;
+            bestDistanceOut = best != null ? Mathf.Sqrt(bestSqr) : float.MaxValue;
             return best;
         }
 
