@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.PeckAbilitySO
   DisplayName: Peck
   ShortLabel: PCK
+  Description: Steals cargo from all rivals within 2m with minor knockback.
   AccentColor: {r: 1, g: 0.3, b: 0.1, a: 1}
   Category: 0
   TerrainTraversal: 0

@@ -10,7 +10,7 @@ namespace CluckWars.Visuals
     /// </summary>
     /// <remarks>
     /// Pure local visual: every state is *observed* from replicated properties
-    /// (<c>ChickenCombat.IsStunned</c>, <c>ChickenController.Rooted</c>, the slow
+    /// (<c>ChickenCombat.IsRemoved</c>, <c>ChickenController.Rooted</c>, the slow
     /// multiplier / aura / pile flags) and nothing here is written or RPC'd, per
     /// the "animation + VFX are local" rule. The player identity ring
     /// (<see cref="ChickenWorldBars"/>) stays visible underneath every overlay, as
@@ -118,7 +118,7 @@ namespace CluckWars.Visuals
             var obj = _controller.Object;
             bool live = obj != null && obj.IsValid;
 
-            bool stunned = live && _combat != null && _combat.IsStunned;
+            bool stunned = live && _combat != null && _combat.IsRemoved;
             // A stunned chicken is already fully told by the stars + the nameplate's
             // skull; don't stack the movement-state blobs on top of it.
             bool rooted  = live && !stunned && _controller.Rooted;

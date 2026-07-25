@@ -4,14 +4,21 @@ using UnityEngine;
 namespace CluckWars.Abilities
 {
     [CreateAssetMenu(fileName = "CluckShock",
-        menuName = "Cluck Wars/Ability/Damage/Cluck Shock", order = 6)]
+        menuName = "Cluck Wars/Ability/Control/Cluck Shock", order = 6)]
     public sealed class CluckShockAbilitySO : AbilityBaseSO
     {
+        public CluckShockAbilitySO()
+        {
+            Category = AbilityCategory.Control;
+            SlotKind = AbilitySlotKind.Character;
+            AllowedClasses = ChickenClassFlags.Fatty;
+        }
+
         [Tooltip("Shock radius around the caster.")]
         [Min(0.5f)] public float ShockRadius = 2.5f;
 
-        [Tooltip("Base damage placeholder.")]
-        [Min(1f)] public float ShockDamage = 35f;
+        [Tooltip("Knockback impulse (world-units/sec) pushing rivals away.")]
+        [Min(1f)] public float KnockbackForce = 12f;
 
         protected override string DefaultIcon => "⚡";
 
@@ -20,7 +27,21 @@ namespace CluckWars.Abilities
 
         public override void OnActivate(AbilityContext ctx)
         {
-            // TODO(ability-plan): convert to steal/stun
+            var caster = ctx.Controller;
+            var center = caster.transform.position;
+            var hits = Physics.OverlapSphere(center, ShockRadius, SearchMask, QueryTriggerInteraction.Ignore);
+
+            for (int i = 0; i < hits.Length; i++)
+            {
+                var targetCtrl = hits[i].GetComponentInParent<ChickenController>();
+                if (targetCtrl == null || targetCtrl == caster) continue;
+                if (targetCtrl.Combat != null && targetCtrl.Combat.IsDead) continue;
+
+                var dir = (targetCtrl.transform.position - center);
+                dir.y = 0f;
+                if (dir.sqrMagnitude < 0.001f) dir = caster.transform.forward;
+                targetCtrl.RPC_ApplyKnockback(dir.normalized * KnockbackForce);
+            }
         }
 
         public override void OnDeactivate(AbilityContext ctx) { }

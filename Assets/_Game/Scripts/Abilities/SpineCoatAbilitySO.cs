@@ -4,19 +4,30 @@ using UnityEngine;
 namespace CluckWars.Abilities
 {
     [CreateAssetMenu(fileName = "SpineCoat",
-        menuName = "Cluck Wars/Ability/Spine Coat", order = 3)]
+        menuName = "Cluck Wars/Ability/Defense/Spine Coat", order = 3)]
     public sealed class SpineCoatAbilitySO : AbilityBaseSO
     {
-        [Tooltip("Knockback impulse (world-units/sec) pushed onto the attacker on reflect. 0 = no knockback.")]
-        [Min(0f)] public float ReflectKnockback = 8f;
+        public SpineCoatAbilitySO()
+        {
+            Category = AbilityCategory.Defense;
+            SlotKind = AbilitySlotKind.Character;
+            AllowedClasses = ChickenClassFlags.Warrior;
+        }
+
+        [Tooltip("How much cargo to steal back on contact.")]
+        [Min(1f)] public float StealBackAmount = 4f;
 
         protected override string DefaultIcon => "🦔";
 
         public override void OnActivate(AbilityContext ctx)
         {
-            // TODO(ability-plan): convert to steal/stun (Task 7 hooks steal-back)
+            ctx.Controller.StealBackActive = true;
+            ctx.Controller.StealBackAmount = StealBackAmount;
         }
 
-        public override void OnDeactivate(AbilityContext ctx) { }
+        public override void OnDeactivate(AbilityContext ctx)
+        {
+            ctx.Controller.StealBackActive = false;
+        }
     }
 }

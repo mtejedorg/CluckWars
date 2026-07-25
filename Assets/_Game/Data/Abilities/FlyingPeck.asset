@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.RollTrampleAbilitySO
   DisplayName: Flying Peck
   ShortLabel: FP
+  Description: Vaulting dash forward that steals cargo on contact.
   AccentColor: {r: 1, g: 0.55, b: 0.2, a: 1}
   Category: 0
   TerrainTraversal: 1

@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.RollPushAbilitySO
   DisplayName: Roll & Push
   ShortLabel: RPH
+  Description: Rolls forward at double speed, shoving chickens out of the path. No damage.
   AccentColor: {r: 0.2, g: 0.85, b: 0.35, a: 1}
   Category: 1
   TerrainTraversal: 2

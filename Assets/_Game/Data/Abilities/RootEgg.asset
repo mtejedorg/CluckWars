@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.RootEggAbilitySO
   DisplayName: Root Egg
   ShortLabel: REG
+  Description: Drops an egg that roots the first chicken to step on it for 2s.
   AccentColor: {r: 0.65, g: 0.45, b: 0.1, a: 1}
   Category: 1
   TerrainTraversal: 0

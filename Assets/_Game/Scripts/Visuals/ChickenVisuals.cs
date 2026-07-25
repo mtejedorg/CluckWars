@@ -58,7 +58,7 @@ namespace CluckWars.Visuals
             float raw = _controller.VisualOpacity;
             float effective = raw > 0f ? raw : 1f;
 
-            bool isStunned  = _combat != null && _combat.IsStunned;
+            bool isStunned  = _combat != null && _combat.IsRemoved;
             bool stunChanged = isStunned != _isDeadState;
 
             // Repaint when opacity changes (Invisibility ability) OR stun state flips.

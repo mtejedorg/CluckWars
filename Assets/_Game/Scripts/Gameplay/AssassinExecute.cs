@@ -33,6 +33,8 @@ namespace CluckWars.Gameplay
         [Networked] public TickTimer WindowTimer { get; private set; }
         [Networked] public bool KillReady { get; private set; }
 
+        public int SlotIndex { get; set; } = 0;
+
         private ChickenController _controller;
         private ChickenCombat _combat;
         private ChickenCargo _cargo;
@@ -83,7 +85,7 @@ namespace CluckWars.Gameplay
                 {
                     var target = _overlapBuffer[i].GetComponentInParent<ChickenController>();
                     if (target == null || target == _controller) continue;
-                    if (target.Combat != null && target.Combat.IsStunned) continue;
+                    if (target.Combat != null && target.Combat.IsRemoved) continue;
 
                     // Check if rival (different home corner or input authority)
                     if (target.HomeCornerIndex == _controller.HomeCornerIndex && _controller.HomeCornerIndex >= 0) continue;
@@ -138,7 +140,7 @@ namespace CluckWars.Gameplay
 
                     if (_abilities != null)
                     {
-                        _abilities.TriggerCooldown(2, SuccessCooldown);
+                        _abilities.TriggerCooldown(SlotIndex, SuccessCooldown);
                     }
                     return true;
                 }
@@ -155,7 +157,7 @@ namespace CluckWars.Gameplay
             if (MarkedTarget == NetworkBehaviourId.None) return;
 
             if (!Runner.TryFindBehaviour(MarkedTarget, out ChickenController target)
-                || target.Combat == null || target.Combat.IsStunned)
+                || target.Combat == null || target.Combat.IsRemoved)
             {
                 _log?.Info(Source, "Mark fizzled: target lost or removed.");
                 FizzleMark();
@@ -209,7 +211,7 @@ namespace CluckWars.Gameplay
             {
                 var thirdParty = _isolationBuffer[i].GetComponentInParent<ChickenController>();
                 if (thirdParty == null || thirdParty == target || thirdParty == _controller) continue;
-                if (thirdParty.Combat != null && thirdParty.Combat.IsStunned) continue;
+                if (thirdParty.Combat != null && thirdParty.Combat.IsRemoved) continue;
 
                 // Another live chicken is near the target -> not isolated!
                 return false;
@@ -222,7 +224,7 @@ namespace CluckWars.Gameplay
             ResetMark();
             if (_abilities != null)
             {
-                _abilities.TriggerCooldown(2, FailCooldown);
+                _abilities.TriggerCooldown(SlotIndex, FailCooldown);
             }
         }
 

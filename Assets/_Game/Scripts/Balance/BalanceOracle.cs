@@ -32,7 +32,7 @@ namespace CluckWars.Balance
                 for (int i = 0; i < remaining.Length; i++)
                     if (remaining[i] > Epsilon) { anyFood = true; break; }
 
-                bool full = carrying >= capacity - Epsilon;
+                bool full = carrying >= capacity - Epsilon || carrying >= (winTarget - banked) - Epsilon;
 
                 // Decide: deposit, or collect.
                 if (full || (!anyFood && carrying > Epsilon))

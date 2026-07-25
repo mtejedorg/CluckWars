@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8df485b91b2e624baa9de3c89269b98, type: 3}
+  m_Name: Shadowstep
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.ShadowstepAbilitySO
+  DisplayName: Shadowstep
+  ShortLabel: STEP
+  Description: Short blink dash phasing over walls along facing direction.
+  AccentColor: {r: 0.4, g: 0.2, b: 0.9, a: 1}
+  Category: 3
+  TerrainTraversal: 3
+  SlotKind: 1
+  AllowedClasses: 8
+  BotRole: 0
+  Duration: 0.4
+  Cooldown: 6
+  AbilityAnimationClip: {fileID: 0}
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256
+  SpeedMultiplier: 3

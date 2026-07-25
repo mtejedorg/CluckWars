@@ -137,7 +137,7 @@ namespace CluckWars.Gameplay
                     var chicken = _overlapHits[i].GetComponentInParent<ChickenController>();
                     if (chicken == null) continue;
                     if (chicken.Id == OwnerChicken) continue; // zones never affect their caster
-                    if (chicken.Combat != null && chicken.Combat.IsStunned) continue;
+                    if (chicken.Combat != null && chicken.Combat.IsRemoved) continue;
 
                     chicken.RPC_ApplyRoot(RootDuration);
                     _log?.Debug(Source, $"Root applied to {chicken.name}.");

@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SpeedBurstAbilitySO
   DisplayName: Speed Burst
   ShortLabel: SPD
+  Description: 2.5x movement speed for a short sprint.
   AccentColor: {r: 0.30, g: 0.85, b: 0.95, a: 1}
   Category: 3
   TerrainTraversal: 0

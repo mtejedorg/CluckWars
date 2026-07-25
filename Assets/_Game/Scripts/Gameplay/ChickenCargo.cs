@@ -61,7 +61,7 @@ namespace CluckWars.Gameplay
             get
             {
                 if (Cargo <= 0f && BountyBag <= 0f) return false;
-                if (_combat != null && _combat.IsStunned) return false;
+                if (_combat != null && _combat.IsRemoved) return false;
                 return FindNearestBaseInRange() != null;
             }
         }

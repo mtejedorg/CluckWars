@@ -18,5 +18,5 @@ MonoBehaviour:
   MoveSpeed: 7.5
   TurnSpeed: 720
   CargoCapacity: 14
-  CollectionRate: 2.4
+  CollectionRate: 2.6
   Scale: 1

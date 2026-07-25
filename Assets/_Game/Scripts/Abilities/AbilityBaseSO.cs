@@ -9,7 +9,7 @@ namespace CluckWars.Abilities
     /// </summary>
     public enum AbilityCategory : byte
     {
-        Damage  = 0,
+        Steal   = 0,
         Control = 1,
         Defense = 2,
         Utility = 3,
@@ -75,6 +75,9 @@ namespace CluckWars.Abilities
         public string DisplayName;
         [Tooltip("Short label drawn on the ability button (≤ 4 chars works best).")]
         public string ShortLabel;
+        [Tooltip("One-line effect text for the character-select preview and the ability pick cards. " +
+                 "Say what the ability does to the player, not how it is implemented.")]
+        [TextArea(2, 4)] public string Description;
         [Tooltip("Icon glyph (emoji) drawn on the hex ability button — design v3 (cluckwars-tokens-v3). " +
                  "Leave blank to fall back to the subclass DefaultIcon.")]
         public string Icon;
@@ -136,7 +139,7 @@ namespace CluckWars.Abilities
         {
             BotRole.Auto => Category switch
             {
-                AbilityCategory.Damage  => BotRole.Offense,
+                AbilityCategory.Steal   => BotRole.Steal,
                 AbilityCategory.Defense => BotRole.Defense,
                 AbilityCategory.Control => BotRole.Control,
                 _                       => BotRole.Escape, // Utility → Escape

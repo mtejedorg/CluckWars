@@ -270,19 +270,23 @@ Every aggressive action has a cost (cooldown) and a window (the effect duration)
 
 Each ability carries an icon glyph (stored on `AbilityBaseSO.Icon`, surfaced via `ResolveIcon()`) shown on the hex button and the character-select cards. Full accent-color + icon reference: ART.md §3.
 
-#### Damage — deal HP; can stun if target HP reaches zero
+#### Steal — steal cargo directly from rivals
 
 | Icon | Ability | Description | Cooldown |
 |---|---|---|---|
-| 🪽 | Flying Peck | Dash forward, HP damage on contact | Short |
-| ⚡ | Cluck Shock | AoE HP burst around self | Medium |
-| 🐦 | Peck | Instant short-range HP hit + minor knockback | Short |
+| 🐦 | Peck | AoE steal from nearby rivals with minor knockback | Short |
+| 🪽 | Flying Peck | Vaulting dash forward that steals cargo on contact | Short |
+| 🤏 | Sneaky Steal | Instant targeted steal from nearby rival | Short |
 
-#### Control — no HP damage; disrupt movement or actions
+#### Control — disrupt movement, stun, or push
 
 | Icon | Ability | Description | Cooldown |
 |---|---|---|---|
-| 🌀 | Roll & Push | Roll forward, push target away — no damage | Short |
+| 🎯 | Mark/Kill | Assassin Signature: Mark an isolated rival, arming execute on stun | Short |
+| 🗡️ | Ambush | Assassin: Precision 1.0s stun in small AoE | Medium |
+| 💥 | Wing Slam | Warrior: Heavy 1.5s stun in medium AoE | Medium |
+| ⚡ | Cluck Shock | Fatty: Knockback shockwave shoving nearby rivals away | Short |
+| 🌀 | Roll & Push | Fatty: Roll forward, push target away | Short |
 | 🪤 | Feather Trap | Throw feather cloud to a location; slows anyone walking through | Medium |
 | 💨 | Feather Aura | Emit feather cloud around self, slows nearby chickens | Medium |
 | 🌱 | Root Egg | Place egg that roots the first chicken that steps on it | Medium |
@@ -292,22 +296,22 @@ is thrown for *others* — the owner walks through their own feather cloud
 unslowed, and a Root Egg placed at the caster's feet does not root the caster
 (decided 2026-07, WS2-2).
 
-#### Defense — protect self or cargo
+#### Defense — protect self, cargo, or punish contact
 
 | Icon | Ability | Description | Cooldown |
 |---|---|---|---|
 | 🥚 | Egg Shell | Invulnerable egg form, immobile while active | Short |
 | 🐢 | Turtle Mode | Near-zero speed, greatly increased resistance | Short |
-| 🦔 | Spine Coat | Damages + knockbacks any chicken that contacts you | Medium |
+| 🦔 | Spine Coat | Punishes contact by stealing cargo back + knockback | Medium |
 
-#### Utility — non-combat advantage
+#### Utility — movement, stealth, phase, decoys
 
 | Icon | Ability | Description | Cooldown |
 |---|---|---|---|
 | 💨 | Speed Burst | Short movement speed boost | Short |
+| 👤 | Shadowstep | Assassin: Short blink dash phasing over walls along facing direction | Short |
 | 👻 | Invisibility | Temporarily invisible to other players | Medium |
 | 👥 | Doppelganger | Spawn decoy copy of yourself | Medium |
-| 🤏 | Sneaky Steal | Instantly steal small cargo from nearby rival, no HP interaction | Short |
 
 ### 7.3 Cooldown Tiers
 

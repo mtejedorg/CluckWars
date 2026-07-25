@@ -163,7 +163,7 @@ namespace CluckWars.Visuals
 
             RefreshRing(live);
 
-            bool stunned = _combat != null && _combat.IsStunned;
+            bool stunned = _combat != null && _combat.IsRemoved;
             bool show    = live && !stunned;
             if (_barRoot.gameObject.activeSelf != show)
                 _barRoot.gameObject.SetActive(show);

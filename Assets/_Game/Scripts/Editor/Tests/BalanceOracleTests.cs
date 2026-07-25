@@ -39,8 +39,8 @@ namespace CluckWars.Tests
 
             // Pinned Capacities: Speedy 10, Fatty 35, Warrior 14, Assassin 10
             var speedy = new OracleChicken { MoveSpeed = 9.0f, CargoCapacity = 10, CollectionRate = 3.00f, DepositRate = 9.0f };
-            var fatty   = new OracleChicken { MoveSpeed = 7.5f, CargoCapacity = 35, CollectionRate = 4.60f, DepositRate = 9.0f };
-            var warrior = new OracleChicken { MoveSpeed = 7.5f, CargoCapacity = 14, CollectionRate = 2.40f, DepositRate = 9.0f };
+            var fatty   = new OracleChicken { MoveSpeed = 7.5f, CargoCapacity = 35, CollectionRate = 3.20f, DepositRate = 9.0f };
+            var warrior = new OracleChicken { MoveSpeed = 7.5f, CargoCapacity = 14, CollectionRate = 2.60f, DepositRate = 9.0f };
             var assassin= new OracleChicken { MoveSpeed = 9.0f, CargoCapacity = 10, CollectionRate = 1.70f, DepositRate = 9.0f };
 
             var speedyRes   = BalanceOracle.Simulate(map, speedy, 40f);

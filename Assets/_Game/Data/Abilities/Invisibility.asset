@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.InvisibilityAbilitySO
   DisplayName: Invisibility
   ShortLabel: INV
+  Description: Fades you to a ghostly outline for 4s.
   AccentColor: {r: 0.55, g: 0.85, b: 0.85, a: 1}
   Category: 3
   TerrainTraversal: 0

@@ -14,8 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SneakyStealAbilitySO
   DisplayName: Sneaky Steal
   ShortLabel: STL
+  Description: Yanks 6 food from the nearest carrier within 3m.
   AccentColor: {r: 0.92, g: 0.35, b: 0.75, a: 1}
-  Category: 3
+  Category: 0
   TerrainTraversal: 0
   SlotKind: 1
   AllowedClasses: 8

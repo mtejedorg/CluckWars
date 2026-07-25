@@ -105,7 +105,7 @@ namespace CluckWars.Tests
             // pins the intended mapping so that stays a deliberate choice.
             var expected = new (AbilityCategory cat, BotRole role)[]
             {
-                (AbilityCategory.Damage,  BotRole.Offense),
+                (AbilityCategory.Steal,   BotRole.Steal),
                 (AbilityCategory.Control, BotRole.Control),
                 (AbilityCategory.Defense, BotRole.Defense),
                 (AbilityCategory.Utility, BotRole.Escape),

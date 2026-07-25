@@ -110,6 +110,36 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void EveryAbility_HasADescription_ForThePickerAndPreview()
+        {
+            // MenuUiController used to hold a hard-coded PassiveDescriptions dictionary
+            // keyed by DisplayName because the SO had no description field; a rename of
+            // the asset silently emptied the preview. The text is authored on the SO
+            // now, and blank is the one state that reproduces the old symptom — the
+            // character-select preview and the pick card both render an empty line.
+            foreach (var a in AllAssets())
+            {
+                Assert.IsFalse(string.IsNullOrWhiteSpace(a.Description),
+                    $"{a.name}: Description is blank. Character-select shows nothing for it — " +
+                    "the player has to equip the ability and find out in a match what it does.");
+
+                // The cap's original rationale (wrapping on the pick card) is gone —
+                // descriptions moved to the shared #AbilityDetail strip, which is
+                // ~930 px wide at 34 px and fits ~100 chars in two lines.
+                //
+                // Note this is now an EDITORIAL cap, not a layout one: the strip is
+                // min-height + flex-shrink:0, so a third line makes it grow rather
+                // than clip, and removing six per-card description boxes freed far
+                // more room than the strip costs. It stays because a rambling
+                // description is a copy problem — one sentence, one mechanic.
+                Assert.LessOrEqual(a.Description.Length, 110,
+                    $"{a.name}: Description is {a.Description.Length} chars. Keep it to one " +
+                    "sentence — the ability detail strip is sized for two lines, and past that " +
+                    "it grows into the READY button's space.");
+            }
+        }
+
+        [Test]
         public void EveryAbility_HasADistinctShortLabel()
         {
             var dupes = AllAssets()
@@ -168,6 +198,26 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void AbilityCategory_HasNoDamage_HasSteal_DerivesBotRoleSteal()
+        {
+            var names = Enum.GetNames(typeof(AbilityCategory));
+            Assert.IsFalse(names.Contains("Damage"), "AbilityCategory must not contain Damage.");
+            Assert.IsTrue(names.Contains("Steal"), "AbilityCategory must contain Steal.");
+
+            var probe = ScriptableObject.CreateInstance<SneakyStealAbilitySO>();
+            try
+            {
+                probe.Category = AbilityCategory.Steal;
+                probe.BotRole = BotRole.Auto;
+                Assert.AreEqual(BotRole.Steal, probe.ResolveBotRole(), "Steal-category ability must derive BotRole.Steal.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(probe);
+            }
+        }
+
+        [Test]
         public void EveryAbility_HasACategoryTheCharacterSelectPickerRenders()
         {
             // MenuUiController groups the ability grid by a fixed Cats[] array. An
@@ -215,6 +265,9 @@ namespace CluckWars.Tests
                 nameof(RollPushAbilitySO),
                 nameof(RollTrampleAbilitySO),
                 nameof(SneakyStealAbilitySO),
+                nameof(AmbushAbilitySO),
+                nameof(WingSlamAbilitySO),
+                nameof(MarkKillAbilitySO),
             };
 
             var checkedAny = false;

@@ -41,16 +41,21 @@ namespace CluckWars.UI
         // ---- Runtime state ----------------------------------------------------
         private VisualElement _root;
         private VisualElement _mainMenu, _charSelect, _lobby;
-        private int  _pickerSlot;
         private bool _isBusy;
 
         private readonly Dictionary<ChickenClass, VisualElement> _classChips = new();
-        private VisualElement _previewChicken, _previewGlow, _previewDisc, _slotRow, _abilityGrid;
-        private Label _previewName, _previewQuote, _previewPassive, _previewDesc, _equippedLabel;
+        private VisualElement _previewChicken, _previewGlow, _previewDisc;
+        // The two flat pick rows that replaced the slot-hex row + scrolling grid.
+        private VisualElement _commonCards, _classCards;
+        private Label _commonHint, _commonCount, _classHint, _classCount;
+        // Shared "what does this do" strip — the description's only home. Cards
+        // carry icon + name + category/CD; the last-tapped ability's text lands
+        // here at full reading size. Null until a card is tapped.
+        private VisualElement _abilityDetail;
+        private Label _abilityDetailName, _abilityDetailText;
+        private AbilityBaseSO _focusedAbility;
+        private Label _previewName, _previewQuote, _previewDesc;
         private Button _readyBtn;
-        private readonly List<VisualElement> _slotHexes = new();
-        // Icon USS class currently applied to each slot's sprite element (for swap).
-        private readonly List<string> _slotAppliedIcon = new();
         // .cw-chicken--<class> currently on the big preview figure (for swap).
         private string _previewChickenClass;
 
@@ -64,28 +69,30 @@ namespace CluckWars.UI
         {
             public string Name, Role, PassiveName, PassiveDesc;
             public Color Tint;
-            public int Slots;
             public int[] Stats; // cargo, rate, hp, resist, speed (1..5)
         }
 
         private static readonly Dictionary<ChickenClass, ClassMeta> Meta = new()
         {
-            [ChickenClass.Warrior]  = new ClassMeta { Name = "WARRIOR CHICKEN",  Role = "All-Rounder",  Tint = UiGfx.Hex32("C04030"), Slots = 2, PassiveName = "MIGHTY",     PassiveDesc = "+25% outgoing ability damage.",  Stats = new[]{3,3,4,3,3} },
-            [ChickenClass.Speedy]   = new ClassMeta { Name = "SPEEDY CHICKEN",   Role = "Hit & Run",    Tint = UiGfx.Hex32("E85A2A"), Slots = 2, PassiveName = "SLIPPERY",  PassiveDesc = "Reduced control-effect duration.", Stats = new[]{2,3,2,1,5} },
-            [ChickenClass.Fatty]    = new ClassMeta { Name = "FATTY CHICKEN",    Role = "Bulk Carrier", Tint = UiGfx.Hex32("F5D75A"), Slots = 2, PassiveName = "IMMOVABLE", PassiveDesc = "Greatly reduced knockback.",       Stats = new[]{5,5,5,5,2} },
-            [ChickenClass.Assassin] = new ClassMeta { Name = "ASSASSIN CHICKEN", Role = "Disruptor",    Tint = UiGfx.Hex32("7B68EE"), Slots = 3, PassiveName = "COMBO",     PassiveDesc = "Equips 3 abilities instead of 2.", Stats = new[]{2,2,2,2,4} },
+            [ChickenClass.Warrior]  = new ClassMeta { Name = "WARRIOR CHICKEN",  Role = "All-Rounder",  Tint = UiGfx.Hex32("C04030"), PassiveName = "MIGHTY",     PassiveDesc = "+25% outgoing ability damage.",  Stats = new[]{3,3,4,3,3} },
+            [ChickenClass.Speedy]   = new ClassMeta { Name = "SPEEDY CHICKEN",   Role = "Hit & Run",    Tint = UiGfx.Hex32("E85A2A"), PassiveName = "SLIPPERY",  PassiveDesc = "Reduced control-effect duration.", Stats = new[]{2,3,2,1,5} },
+            [ChickenClass.Fatty]    = new ClassMeta { Name = "FATTY CHICKEN",    Role = "Bulk Carrier", Tint = UiGfx.Hex32("F5D75A"), PassiveName = "IMMOVABLE", PassiveDesc = "Greatly reduced knockback.",       Stats = new[]{5,5,5,5,2} },
+            [ChickenClass.Assassin] = new ClassMeta { Name = "ASSASSIN CHICKEN", Role = "Disruptor",    Tint = UiGfx.Hex32("7B68EE"), PassiveName = "COMBO",     PassiveDesc = "Equips 3 abilities instead of 2.", Stats = new[]{2,2,2,2,4} },
         };
 
         private static readonly string[] StatRowNames = { "StatCargo", "StatRate", "StatHp", "StatResist", "StatSpeed" };
         private static readonly string[] ChipNames    = { "ClassWarrior", "ClassSpeedy", "ClassFatty", "ClassAssassin" };
 
-        private sealed class CatMeta { public string Label, Blurb; public Color Color; }
-        private static readonly (AbilityCategory cat, CatMeta meta)[] Cats =
+        // Ability categories. These used to be section headers in a scrolling
+        // grid; with 3 cards per row that produced headers holding one card each,
+        // so the category now rides on the card itself as a colored tag.
+        private sealed class CatMeta { public string Label; public Color Color; }
+        private static readonly Dictionary<AbilityCategory, CatMeta> Cats = new()
         {
-            (AbilityCategory.Damage,  new CatMeta { Label = "DAMAGE",  Blurb = "Deals HP — can stun at 0",  Color = UiGfx.Hex32("FF5722") }),
-            (AbilityCategory.Control, new CatMeta { Label = "CONTROL", Blurb = "No HP — disrupts movement", Color = UiGfx.Hex32("9C27B0") }),
-            (AbilityCategory.Defense, new CatMeta { Label = "DEFENSE", Blurb = "Protect self or cargo",     Color = UiGfx.Hex32("4CAF50") }),
-            (AbilityCategory.Utility, new CatMeta { Label = "UTILITY", Blurb = "Non-combat advantage",      Color = UiGfx.Hex32("00BCD4") }),
+            [AbilityCategory.Steal]   = new CatMeta { Label = "STEAL",   Color = UiGfx.Hex32("FF5722") },
+            [AbilityCategory.Control] = new CatMeta { Label = "CONTROL", Color = UiGfx.Hex32("9C27B0") },
+            [AbilityCategory.Defense] = new CatMeta { Label = "DEFENSE", Color = UiGfx.Hex32("4CAF50") },
+            [AbilityCategory.Utility] = new CatMeta { Label = "UTILITY", Color = UiGfx.Hex32("00BCD4") },
         };
 
         // ======================================================================
@@ -208,6 +215,10 @@ namespace CluckWars.UI
             Bind<Button>(_mainMenu, "SoloBtn", b => b.clicked += () => ChooseMode(SessionMode.Solo));
             Bind<Button>(_mainMenu, "HostBtn", b => b.clicked += () => ChooseMode(SessionMode.Host));
             Bind<Button>(_mainMenu, "JoinBtn", b => b.clicked += () => ChooseMode(SessionMode.Join));
+
+            // Build stamp — a tester reporting a bug from a device otherwise has no
+            // way to say which build produced it.
+            Bind<Label>(_mainMenu, "BuildStamp", l => l.text = $"v{Application.version}");
         }
 
         private void ChooseMode(SessionMode mode)
@@ -243,13 +254,18 @@ namespace CluckWars.UI
             _previewDisc    = _charSelect.Q<VisualElement>("PreviewDisc");
             _previewName    = _charSelect.Q<Label>("PreviewName");
             _previewQuote   = _charSelect.Q<Label>("PreviewQuote");
-            _previewPassive = _charSelect.Q<Label>("PreviewPassive");
             _previewDesc    = _charSelect.Q<Label>("PreviewDesc");
             _passiveOpt1    = _charSelect.Q<Button>("PassiveOpt1");
             _passiveOpt2    = _charSelect.Q<Button>("PassiveOpt2");
-            _slotRow        = _charSelect.Q<VisualElement>("SlotRow");
-            _abilityGrid    = _charSelect.Q<VisualElement>("AbilityGrid");
-            _equippedLabel  = _charSelect.Q<Label>("EquippedLabel");
+            _commonCards    = _charSelect.Q<VisualElement>("CommonCards");
+            _classCards     = _charSelect.Q<VisualElement>("ClassCards");
+            _commonHint     = _charSelect.Q<Label>("CommonHint");
+            _commonCount    = _charSelect.Q<Label>("CommonCount");
+            _classHint      = _charSelect.Q<Label>("ClassHint");
+            _classCount     = _charSelect.Q<Label>("ClassCount");
+            _abilityDetail     = _charSelect.Q<VisualElement>("AbilityDetail");
+            _abilityDetailName = _charSelect.Q<Label>("AbilityDetailName");
+            _abilityDetailText = _charSelect.Q<Label>("AbilityDetailText");
             _readyBtn       = _charSelect.Q<Button>("ReadyBtn");
             if (_readyBtn != null) _readyBtn.clicked += OnReady;
 
@@ -267,16 +283,18 @@ namespace CluckWars.UI
         {
             if (_selection == null) return;
             _selection.SelectedClass = cls;
-            _pickerSlot = 0;
+            // The focused ability may be Character-slot and off-pool for the new
+            // class, so the strip would keep explaining something no longer on
+            // screen. Reset to the prompt.
+            _focusedAbility = null;
             _selection.Ability0 = null;
             _selection.Ability1 = null;
             _selection.Ability2 = null;
 
-            var passives = _abilityRegistry?.GetPassivesForClass(cls).ToList();
-            if (passives != null && passives.Count > 0)
-            {
-                _selection.Passive = passives[0];
-            }
+            // GetDefaultPassiveForClass, not passives[0] — the latter is registry
+            // authoring order, which made Warrior open on Bracer and Speedy on
+            // Second Wind, i.e. both classes defaulted to the alternative fork.
+            _selection.Passive = _abilityRegistry?.GetDefaultPassiveForClass(cls);
 
             RefreshCharacterSelect();
         }
@@ -285,15 +303,15 @@ namespace CluckWars.UI
         {
             if (_selection == null || passive == null) return;
             _selection.Passive = passive;
-            if (!(passive is ComboPassiveSO))
-            {
-                _selection.Ability2 = null;
-                if (_pickerSlot >= 2) _pickerSlot = 0;
-            }
+            // Dropping COMBO closes the second CLASS pick — clear it so the row's
+            // "n/m" counter and the READY gate can never claim a slot the loadout
+            // no longer has.
+            if (!(passive is ComboPassiveSO)) _selection.Ability2 = null;
             RefreshCharacterSelect();
         }
 
         private ChickenClass Cls => _selection?.SelectedClass ?? ChickenClass.Warrior;
+        /// <summary>Total active-ability slots the current loadout fills: 1 Common + 1 Character, +1 under COMBO.</summary>
         private int ActiveSlotsForClass => (_selection?.Passive is ComboPassiveSO) ? 3 : 2;
 
         private Color TintOf(ChickenClass cls)
@@ -333,7 +351,10 @@ namespace CluckWars.UI
                 SetBorder(_previewDisc, Fade(tint, 0.55f));
                 _previewDisc.style.backgroundColor = Fade(tint, 0.10f); // subtle class-tinted platform
             }
-            if (_previewName != null)    { _previewName.text = m.Name; _previewName.style.color = TintOf(cls); }
+            // Raw class tint as text on the near-black screen bg is too dark to read
+            // — Warrior's #C04030 lands at 2.5:1, under the 3:1 large-text minimum.
+            // Lighten for type only; the disc border and glow keep the pure tint.
+            if (_previewName != null)    { _previewName.text = m.Name; _previewName.style.color = Lighten(TintOf(cls), 0.35f); }
             if (_previewQuote != null)
             {
                 if (_classRegistry != null && _classRegistry.TryGet(cls, out var entry) && !string.IsNullOrEmpty(entry.LoreQuote))
@@ -342,7 +363,13 @@ namespace CluckWars.UI
                     _previewQuote.text = "";
             }
 
-            var passives = _abilityRegistry?.GetPassivesForClass(cls).ToList();
+            // Signature first, alternative second — registry order would put Bracer
+            // ahead of Mighty and Second Wind ahead of Slippery, reading as if the
+            // alternative were the class's identity. OrderByDescending is stable, so
+            // the two entries keep their relative authoring order within each group.
+            var passives = _abilityRegistry?.GetPassivesForClass(cls)
+                                            .OrderByDescending(p => p.IsSignature)
+                                            .ToList();
             if (passives != null && passives.Count >= 2)
             {
                 var p1 = passives[0];
@@ -372,21 +399,53 @@ namespace CluckWars.UI
             }
 
             var curPassive = _selection?.Passive;
-            if (_previewPassive != null && curPassive != null)
+            if (_previewDesc != null)
             {
-                _previewPassive.text = $"PASSIVE · {curPassive.DisplayName.ToUpper()}";
-                _previewPassive.style.backgroundColor = TintOf(cls);
-                _previewPassive.style.color = UiGfx.TextPrimary;
-            }
-            if (_previewDesc != null && curPassive != null)
-            {
-                _previewDesc.text = curPassive.ShortLabel;
+                // Never ShortLabel — that is the ≤4-char HUD abbreviation, so the
+                // preview used to explain Bracer as "BRCR". Description is authored
+                // on the SO; DataIntegrityTests fails the build if one is blank.
+                _previewDesc.text = curPassive != null ? curPassive.Description : string.Empty;
             }
 
             RefreshStats(cls);
-            RebuildSlots(cls);
-            RebuildAbilityGrid();
+            RebuildPickRows(cls);
+            RefreshAbilityDetail();
             RefreshEquippedState();
+        }
+
+        /// <summary>
+        /// Paints the shared detail strip from <see cref="_focusedAbility"/>. Until
+        /// a card is tapped it shows a prompt rather than an ability, so the strip
+        /// never renders as an empty box the player has to interpret.
+        /// </summary>
+        private void RefreshAbilityDetail()
+        {
+            if (_abilityDetailText == null) return;
+
+            var ab = _focusedAbility;
+            if (ab == null)
+            {
+                if (_abilityDetailName != null)
+                {
+                    _abilityDetailName.text = string.Empty;
+                    _abilityDetailName.style.display = DisplayStyle.None;
+                }
+                _abilityDetailText.text = "Tap an ability to see what it does.";
+                _abilityDetailText.style.color = UiGfx.TextSecondary;
+                if (_abilityDetail != null) SetBorder(_abilityDetail, UiGfx.CardBorder);
+                return;
+            }
+
+            if (_abilityDetailName != null)
+            {
+                string label = !string.IsNullOrEmpty(ab.DisplayName) ? ab.DisplayName : ab.name;
+                _abilityDetailName.text = label.ToUpperInvariant();
+                _abilityDetailName.style.color = ab.AccentColor;
+                _abilityDetailName.style.display = DisplayStyle.Flex;
+            }
+            _abilityDetailText.text = ab.Description;
+            _abilityDetailText.style.color = UiGfx.TextPrimary;
+            if (_abilityDetail != null) SetBorder(_abilityDetail, Fade(ab.AccentColor, 0.6f));
         }
 
         private void RefreshStats(ChickenClass cls)
@@ -402,91 +461,182 @@ namespace CluckWars.UI
                 {
                     bool on = p < stats[i];
                     pips[p].EnableInClassList("cw-pip--on", on);
-                    pips[p].style.backgroundColor = on ? tint : new Color(20f / 255f, 12f / 255f, 6f / 255f, 0.7f);
+                    // The unfilled track has to be visible or the rating has no
+                    // denominator — "3 pips" reads as the whole scale otherwise.
+                    // The old near-black rgba(20,12,6,.7) vanished on the panel.
+                    pips[p].style.backgroundColor = on ? tint : new Color(1f, 0.96f, 0.88f, 0.20f);
                 }
             }
         }
 
-        // ---- Slots ------------------------------------------------------------
-        private void RebuildSlots(ChickenClass cls)
+        // ======================================================================
+        //  LOADOUT PICK ROWS
+        // ----------------------------------------------------------------------
+        //  ADR 0003 left each class seeing 3 Common + 3 Character abilities. The
+        //  previous UI — a slot-hex row plus a ScrollView of 23%-wide cards under
+        //  category headers — was built for the full 14-ability pool and rendered
+        //  those three cards as up to three headers holding ONE card each, in a
+        //  view that never scrolled, behind a two-step "tap a slot, then tap a
+        //  card" interaction.
+        //
+        //  It is now two flat rows, both fully visible, selection direct:
+        //
+        //      (1) COMMON  pick 1 of 3  -> Ability0
+        //      (2) CLASS   pick 1 of 3  -> Ability1
+        //                  pick 2 of 3  -> Ability1 + Ability2   (Assassin COMBO)
+        //
+        //  COMBO therefore widens the CLASS row rather than unlocking a third
+        //  slot fed from the same three options, so the dimmed padlock hex is
+        //  gone. Ability0/1/2 and every ISessionSelectionService write are
+        //  unchanged, so the spawner and the touch HUD's 1/2/3 hex mapping keep
+        //  working exactly as before.
+        // ======================================================================
+
+        /// <summary>Character-ability picks the loadout currently allows: 2 under COMBO, else 1.</summary>
+        private int ClassPicksAllowed => (_selection?.Passive is ComboPassiveSO) ? 2 : 1;
+
+        private void RebuildPickRows(ChickenClass cls)
         {
-            if (_slotRow == null) return;
-            _slotRow.Clear();
-            _slotHexes.Clear();
-            _slotAppliedIcon.Clear();
-            int slots = ActiveSlotsForClass;
-            if (_pickerSlot >= slots) _pickerSlot = 0;
-
-            for (int i = 0; i < slots; i++)
+            var all = _abilityRegistry?.All;
+            if (all == null)
             {
-                int idx = i;
-                var col = new VisualElement();
-                col.style.alignItems = Align.Center;
-                col.style.marginLeft = 14; col.style.marginRight = 14;
-
-                string capText = i switch
-                {
-                    0 => "S1 · COMMON",
-                    1 => "S2 · CLASS",
-                    2 => "★ S3 · CLASS",
-                    _ => $"S{i + 1}",
-                };
-                var caption = new Label(capText);
-                caption.AddToClassList("cw-slot-caption");
-                caption.style.marginBottom = 4;
-
-                var hex = new VisualElement();
-                hex.AddToClassList("cw-hex");
-                // Exported ability-icon sprite (shown when filled) + "+" placeholder
-                // (shown when empty); RefreshSlotVisuals toggles between them.
-                var sprite = new VisualElement();
-                sprite.AddToClassList("cw-hex__sprite");
-                sprite.style.display = DisplayStyle.None;
-                var icon = new Label("+");
-                icon.AddToClassList("cw-hex__icon");
-                hex.Add(sprite);
-                hex.Add(icon);
-
-                col.Add(caption); col.Add(hex);
-                col.RegisterCallback<ClickEvent>(_ => SelectPickerSlot(idx));
-                _slotRow.Add(col);
-                _slotHexes.Add(hex);
-                _slotAppliedIcon.Add(null);
+                FillMissingRegistryNote(_commonCards);
+                FillMissingRegistryNote(_classCards);
+                return;
             }
 
-            // Non-Assassin / non-Combo loadouts show a dimmed, locked slot-3 hex (design §ColumnC).
-            if (slots == 2)
+            var pool = all.Where(a => a != null && !(a is PassiveAbilitySO)).ToList();
+
+            var flag = cls switch
             {
-                var lockCol = new VisualElement();
-                lockCol.style.alignItems = Align.Center;
-                lockCol.style.marginLeft = 14; lockCol.style.marginRight = 14;
-                lockCol.style.opacity = 0.35f;
+                ChickenClass.Warrior  => ChickenClassFlags.Warrior,
+                ChickenClass.Speedy   => ChickenClassFlags.Speedy,
+                ChickenClass.Fatty    => ChickenClassFlags.Fatty,
+                ChickenClass.Assassin => ChickenClassFlags.Assassin,
+                _ => ChickenClassFlags.None,
+            };
 
-                var lockCap = new Label("COMBO");
-                lockCap.AddToClassList("cw-slot-caption");
-                lockCap.style.marginBottom = 4;
+            var common    = pool.Where(a => a.SlotKind == AbilitySlotKind.Common).ToList();
+            var character = pool.Where(a => a.SlotKind == AbilitySlotKind.Character
+                                            && (a.AllowedClasses & flag) != 0).ToList();
 
-                var lockHex = new VisualElement();
-                lockHex.AddToClassList("cw-hex");
-                lockHex.style.unityBackgroundImageTintColor = HexEmptyTint;
-                var lockIcon = new Label("🔒");
-                lockIcon.AddToClassList("cw-hex__icon");
-                var ef = UiGfx.EmojiFont();
-                if (ef != null) lockIcon.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(ef));
-                lockHex.Add(lockIcon);
+            FillRow(_commonCards, common);
+            FillRow(_classCards,  character);
 
-                lockCol.Add(lockCap); lockCol.Add(lockHex);
-                _slotRow.Add(lockCol);
+            if (_commonHint != null) _commonHint.text = "any chicken can take these";
+            if (_classHint != null)
+            {
+                string clsName = Meta[cls].Name.Replace(" CHICKEN", string.Empty);
+                _classHint.text = ClassPicksAllowed > 1
+                    ? $"{clsName} only · COMBO lets you take two"
+                    : $"{clsName} only";
             }
-
-            RefreshSlotVisuals();
         }
 
-        private void SelectPickerSlot(int slot)
+        private void FillRow(VisualElement host, List<AbilityBaseSO> abilities)
         {
-            _pickerSlot = slot;
-            RefreshSlotVisuals();
-            RebuildAbilityGrid();
+            if (host == null) return;
+            host.Clear();
+            if (abilities.Count == 0)
+            {
+                FillMissingRegistryNote(host);
+                return;
+            }
+            foreach (var ab in abilities) host.Add(MakeAbilityCard(ab));
+        }
+
+        private static void FillMissingRegistryNote(VisualElement host)
+        {
+            if (host == null) return;
+            host.Clear();
+            var note = new Label("No abilities in registry.\nAssign AbilityRegistrySO in ProjectInstaller.");
+            note.AddToClassList("cw-body");
+            host.Add(note);
+        }
+
+        private VisualElement MakeAbilityCard(AbilityBaseSO ab)
+        {
+            var card = new VisualElement();
+            card.AddToClassList("cw-ability-card");
+
+            // Exported design icon sprite; fall back to the emoji glyph only for an
+            // ability with no sprite mapping (shouldn't happen for shipped abilities).
+            string iconCls = AbilityIconStyle.ClassFor(ab);
+            if (!string.IsNullOrEmpty(iconCls))
+            {
+                var s = new VisualElement();
+                s.AddToClassList("cw-ability-card__sprite");
+                s.AddToClassList(iconCls);
+                card.Add(s);
+            }
+            else
+            {
+                var lbl = new Label(ab.ResolveIcon());
+                lbl.AddToClassList("cw-ability-card__icon");
+                var ef = UiGfx.EmojiFont();
+                if (ef != null) lbl.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(ef));
+                lbl.style.color = ab.AccentColor;
+                card.Add(lbl);
+            }
+
+            string label = !string.IsNullOrEmpty(ab.DisplayName) ? ab.DisplayName : ab.name;
+            var name = new Label(label.ToUpperInvariant());
+            name.AddToClassList("cw-ability-card__name");
+            card.Add(name);
+
+            // The description does NOT live on the card — see #AbilityDetail below.
+            // Six cards each carrying their own wrapped description needed ~137px of
+            // a 263px card and left nothing for the icon, which flexbox then
+            // collapsed to zero height. One shared strip shows the tapped ability's
+            // text once, at the full 34px reading size, instead of six times at 24.
+
+            // Category + cooldown share ONE footer row. They used to be two stacked
+            // full-width rows; at ~43px each that cost 86px of a 263px card, which
+            // is what squeezed the icon to zero once descriptions arrived. Side by
+            // side they cost 43px and both stay as text, so the category is not
+            // reduced to a colour the way a bare accent stripe would.
+            var footer = new VisualElement();
+            footer.AddToClassList("cw-card-footer");
+
+            if (Cats.TryGetValue(ab.Category, out var cat))
+            {
+                var tag = new Label(cat.Label);
+                tag.AddToClassList("cw-cat-tag");
+                tag.style.backgroundColor = Fade(cat.Color, 0.85f);
+                tag.style.color = InkOn(cat.Color);
+                footer.Add(tag);
+            }
+
+            bool shortCd = ab.Cooldown <= 6f;
+            var badge = new Label(shortCd ? "SHORT" : "MED");
+            badge.AddToClassList("cw-cd-badge");
+            badge.AddToClassList(shortCd ? "cw-cd-badge--short" : "cw-cd-badge--med");
+            footer.Add(badge);
+            card.Add(footer);
+
+            int slot = SlotOf(ab);
+            if (slot >= 0)
+            {
+                SetBorder(card, ab.AccentColor);
+                card.style.backgroundColor = Fade(ab.AccentColor, 0.20f);
+                card.AddToClassList("cw-ability-card--picked");
+
+                // Numbered badge = the in-match button that fires it, matching the
+                // touch HUD hex badges. Also the non-color half of the selected
+                // state, so the pick reads without relying on the accent border.
+                var slotBadge = new Label((slot + 1).ToString());
+                slotBadge.AddToClassList("cw-ability-badge");
+                slotBadge.style.backgroundColor = ab.AccentColor;
+                slotBadge.style.color = InkOn(ab.AccentColor);
+                card.Add(slotBadge);
+            }
+
+            // One tap does both jobs: equips/unequips AND reveals what the ability
+            // does in the detail strip. Deliberately NOT a long-press — that has no
+            // affordance on a touch screen, and a player who never discovers the
+            // gesture is back to "equip it and find out in a match".
+            card.RegisterCallback<ClickEvent>(_ => { _focusedAbility = ab; TogglePick(ab); });
+            return card;
         }
 
         private AbilityBaseSO GetEquipped(int slot) => slot switch
@@ -505,209 +655,82 @@ namespace CluckWars.UI
             else if (slot == 2) _selection.Ability2 = ab;
         }
 
-        private void RefreshSlotVisuals()
-        {
-            for (int i = 0; i < _slotHexes.Count; i++)
-            {
-                var hex = _slotHexes[i];
-                var ab = GetEquipped(i);
-                var plus   = hex.Q<Label>(className: "cw-hex__icon");
-                var sprite = hex.Q<VisualElement>(className: "cw-hex__sprite");
-                bool active = i == _pickerSlot;
-
-                // Swap the exported icon sprite class on change.
-                if (sprite != null)
-                {
-                    if (!string.IsNullOrEmpty(_slotAppliedIcon[i]))
-                        sprite.RemoveFromClassList(_slotAppliedIcon[i]);
-                    string cls = AbilityIconStyle.ClassFor(ab);
-                    _slotAppliedIcon[i] = cls;
-                    if (!string.IsNullOrEmpty(cls))
-                    {
-                        sprite.AddToClassList(cls);
-                        sprite.style.display = DisplayStyle.Flex;
-                    }
-                    else sprite.style.display = DisplayStyle.None;
-                }
-
-                if (ab != null)
-                {
-                    hex.style.unityBackgroundImageTintColor = ab.AccentColor;
-                    if (plus != null) plus.style.display = DisplayStyle.None; // sprite carries it
-                }
-                else
-                {
-                    hex.style.unityBackgroundImageTintColor = HexEmptyTint;
-                    if (plus != null)
-                    {
-                        plus.style.display = DisplayStyle.Flex;
-                        plus.text = "+";
-                        plus.style.color = UiGfx.Gold;
-                    }
-                }
-                hex.EnableInClassList("cw-hex--active", active);
-            }
-        }
-
-        // ---- Ability grid -----------------------------------------------------
-        private void RebuildAbilityGrid()
-        {
-            if (_abilityGrid == null) return;
-            _abilityGrid.Clear();
-
-            var all  = _abilityRegistry?.All;
-            var pool = (all == null ? Enumerable.Empty<AbilityBaseSO>() : all.Where(a => a != null && !(a is PassiveAbilitySO))).ToList();
-            if (pool.Count == 0)
-            {
-                var note = new Label("No abilities in registry.\nAssign AbilityRegistrySO in ProjectInstaller.");
-                note.AddToClassList("cw-body");
-                _abilityGrid.Add(note);
-                return;
-            }
-
-            var flag = Cls switch
-            {
-                ChickenClass.Warrior  => ChickenClassFlags.Warrior,
-                ChickenClass.Speedy   => ChickenClassFlags.Speedy,
-                ChickenClass.Fatty    => ChickenClassFlags.Fatty,
-                ChickenClass.Assassin => ChickenClassFlags.Assassin,
-                _ => ChickenClassFlags.None,
-            };
-
-            if (_pickerSlot == 0)
-            {
-                pool = pool.Where(a => a.SlotKind == AbilitySlotKind.Common).ToList();
-            }
-            else
-            {
-                pool = pool.Where(a => a.SlotKind == AbilitySlotKind.Character && (a.AllowedClasses & flag) != 0).ToList();
-            }
-
-            foreach (var (cat, cm) in Cats)
-            {
-                var list = pool.Where(a => a.Category == cat).ToList();
-                if (list.Count == 0) continue;
-
-                var header = new VisualElement();
-                header.AddToClassList("cw-category-header");
-                header.style.borderLeftColor = cm.Color;
-                header.style.backgroundColor = Fade(cm.Color, 0.18f); // faint category tint (design)
-                var hl = new Label(cm.Label); hl.AddToClassList("cw-category-header__label");
-                var hb = new Label(cm.Blurb); hb.AddToClassList("cw-category-header__blurb");
-                header.Add(hl); header.Add(hb);
-                _abilityGrid.Add(header);
-
-                var grid = new VisualElement();
-                grid.AddToClassList("cw-ability-grid");
-                foreach (var ab in list) grid.Add(MakeAbilityCard(ab));
-                _abilityGrid.Add(grid);
-            }
-        }
-
-        private VisualElement MakeAbilityCard(AbilityBaseSO ab)
-        {
-            var card = new VisualElement();
-            card.AddToClassList("cw-ability-card");
-
-            // Exported design icon sprite; fall back to the emoji glyph only for an
-            // ability with no sprite mapping (shouldn't happen for shipped abilities).
-            VisualElement icon;
-            string iconCls = AbilityIconStyle.ClassFor(ab);
-            if (!string.IsNullOrEmpty(iconCls))
-            {
-                var s = new VisualElement();
-                s.AddToClassList("cw-ability-card__sprite");
-                s.AddToClassList(iconCls);
-                icon = s;
-            }
-            else
-            {
-                var lbl = new Label(ab.ResolveIcon());
-                lbl.AddToClassList("cw-ability-card__icon");
-                var ef = UiGfx.EmojiFont();
-                if (ef != null) lbl.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(ef));
-                lbl.style.color = ab.AccentColor;
-                icon = lbl;
-            }
-
-            // Readable full name on the card (cards are wide enough); fall back to asset name.
-            string label = !string.IsNullOrEmpty(ab.DisplayName) ? ab.DisplayName : ab.name;
-            var name = new Label(label.ToUpperInvariant());
-            name.AddToClassList("cw-ability-card__name");
-
-            bool shortCd = ab.Cooldown <= 6f;
-            var badge = new Label(shortCd ? "SHORT" : "MED");
-            badge.AddToClassList("cw-cd-badge");
-            badge.AddToClassList(shortCd ? "cw-cd-badge--short" : "cw-cd-badge--med");
-
-            card.Add(icon); card.Add(name); card.Add(badge);
-
-            int slot = SlotOf(ab);
-            if (slot >= 0)
-            {
-                SetBorder(card, ab.AccentColor);
-                card.style.backgroundColor = Fade(ab.AccentColor, 0.20f);
-
-                // Numbered slot badge (design §ColumnC) — shows which slot it fills.
-                var slotBadge = new Label((slot + 1).ToString());
-                slotBadge.AddToClassList("cw-ability-badge");
-                slotBadge.style.backgroundColor = ab.AccentColor;
-                card.Add(slotBadge);
-            }
-
-            card.RegisterCallback<ClickEvent>(_ => EquipInSelectedSlot(ab));
-            return card;
-        }
-
         private int SlotOf(AbilityBaseSO ab)
         {
-            int slots = ActiveSlotsForClass;
-            for (int i = 0; i < slots; i++) if (GetEquipped(i) == ab) return i;
+            if (ab == null) return -1;
+            for (int i = 0; i < 3; i++) if (GetEquipped(i) == ab) return i;
             return -1;
         }
 
-        private void EquipInSelectedSlot(AbilityBaseSO ab)
+        /// <summary>
+        /// Tap a card to pick it, tap it again to drop it. A Common tap always
+        /// replaces slot 0. A Class tap fills the first free class slot; when the
+        /// row is already full it replaces the oldest pick (slot 1), which keeps
+        /// a full row responsive instead of silently ignoring the tap.
+        /// </summary>
+        private void TogglePick(AbilityBaseSO ab)
         {
-            if (_selection == null) return;
-            int existing = SlotOf(ab);
+            if (_selection == null || ab == null) return;
 
-            if (existing == _pickerSlot)              // tap equipped-in-active → unequip
+            if (ab.SlotKind == AbilitySlotKind.Common)
             {
-                SetEquipped(_pickerSlot, null);
-            }
-            else if (existing >= 0)                   // dedup: swap between slots
-            {
-                var cur = GetEquipped(_pickerSlot);
-                SetEquipped(existing, cur);
-                SetEquipped(_pickerSlot, ab);
+                SetEquipped(0, GetEquipped(0) == ab ? null : ab);
             }
             else
             {
-                SetEquipped(_pickerSlot, ab);
+                int existing = SlotOf(ab);
+                if (existing >= 0)
+                {
+                    SetEquipped(existing, null);
+                    // Keep the class picks packed into slot 1 first, so slot 2 is
+                    // never occupied while slot 1 is empty (the touch HUD maps
+                    // slot 2 to the third hex, which COMBO alone is allowed).
+                    if (existing == 1) { SetEquipped(1, GetEquipped(2)); SetEquipped(2, null); }
+                }
+                else if (GetEquipped(1) == null)
+                {
+                    SetEquipped(1, ab);
+                }
+                else if (ClassPicksAllowed > 1 && GetEquipped(2) == null)
+                {
+                    SetEquipped(2, ab);
+                }
+                else if (ClassPicksAllowed > 1)
+                {
+                    // Both class slots full — drop the oldest, shift down, append.
+                    SetEquipped(1, GetEquipped(2));
+                    SetEquipped(2, ab);
+                }
+                else
+                {
+                    SetEquipped(1, ab);   // single-pick row — straight replace
+                }
             }
 
-            // advance picker to next empty slot
-            int slots = ActiveSlotsForClass;
-            for (int i = 0; i < slots; i++)
-                if (GetEquipped(i) == null) { _pickerSlot = i; break; }
-
-            RefreshSlotVisuals();
-            RebuildAbilityGrid();
+            RebuildPickRows(Cls);
+            RefreshAbilityDetail();
             RefreshEquippedState();
         }
 
         private void RefreshEquippedState()
         {
-            int slots = ActiveSlotsForClass;
-            int n = 0;
-            for (int i = 0; i < slots; i++) if (GetEquipped(i) != null) n++;
-            bool hasPassive = _selection?.Passive != null;
-            if (_equippedLabel != null) _equippedLabel.text = $"EQUIPPED · {n}/{slots}";
+            int classPicked = 0;
+            if (GetEquipped(1) != null) classPicked++;
+            if (GetEquipped(2) != null) classPicked++;
+            int classNeeded = ClassPicksAllowed;
+            int commonPicked = GetEquipped(0) != null ? 1 : 0;
 
-            bool ready = n >= slots && hasPassive;
+            if (_commonCount != null) _commonCount.text = $"{commonPicked}/1";
+            if (_classCount  != null) _classCount.text  = $"{classPicked}/{classNeeded}";
+
+            int missing = (1 - commonPicked) + Mathf.Max(0, classNeeded - classPicked);
+            bool ready  = missing == 0 && _selection?.Passive != null;
+
             if (_readyBtn != null)
             {
-                _readyBtn.text = ready ? "READY ▶" : $"PICK {slots - n} MORE";
+                _readyBtn.text = ready
+                    ? "READY ▶"
+                    : (missing == 1 ? "PICK 1 MORE ABILITY" : $"PICK {missing} MORE ABILITIES");
                 _readyBtn.SetEnabled(ready);
                 _readyBtn.EnableInClassList("cw-btn--green", ready);
                 _readyBtn.EnableInClassList("cw-btn--neutral", !ready);
@@ -831,7 +854,7 @@ namespace CluckWars.UI
             // Slot 0 — you.
             var mine = new List<AbilityBaseSO>();
             for (int i = 0; i < 3; i++) { var a = GetEquipped(i); if (a != null) mine.Add(a); }
-            grid.Add(MakeLobbyCard(0, Cls, "You", isHost, false, ready: true, abilities: mine, empty: false));
+            grid.Add(MakeLobbyCard(0, Cls, "You", isHost, false, ready: true, abilities: mine, empty: false, slots: ActiveSlotsForClass));
 
             // Slots 1-3 — solo fills CPU bots; host/join show open seats.
             for (int i = 1; i < 4; i++)
@@ -839,11 +862,11 @@ namespace CluckWars.UI
                 if (isSolo)
                 {
                     var bc = BotClasses[i - 1];
-                    grid.Add(MakeLobbyCard(i, bc, BotNames[i - 1], false, true, ready: true, abilities: SampleBotAbilities(i), empty: false));
+                    grid.Add(MakeLobbyCard(i, bc, BotNames[i - 1], false, true, ready: true, abilities: SampleBotAbilities(i), empty: false, slots: 2));
                 }
                 else
                 {
-                    grid.Add(MakeLobbyCard(i, ChickenClass.Warrior, null, false, false, ready: false, abilities: null, empty: true));
+                    grid.Add(MakeLobbyCard(i, ChickenClass.Warrior, null, false, false, ready: false, abilities: null, empty: true, slots: 2));
                 }
             }
         }
@@ -860,7 +883,7 @@ namespace CluckWars.UI
             return list;
         }
 
-        private VisualElement MakeLobbyCard(int idx, ChickenClass cls, string name, bool isHost, bool cpu, bool ready, List<AbilityBaseSO> abilities, bool empty)
+        private VisualElement MakeLobbyCard(int idx, ChickenClass cls, string name, bool isHost, bool cpu, bool ready, List<AbilityBaseSO> abilities, bool empty, int slots)
         {
             var color = PlayerColors[Mathf.Clamp(idx, 0, 3)];
 
@@ -912,7 +935,7 @@ namespace CluckWars.UI
                 var tag = new Label("CPU");
                 tag.AddToClassList("cw-player-host");
                 tag.style.backgroundColor = color;
-                tag.style.color = UiGfx.TextPrimary;
+                tag.style.color = InkOn(color);
                 nameRow.Add(tag);
             }
             mid.Add(nameRow);
@@ -924,7 +947,7 @@ namespace CluckWars.UI
 
             var chips = new VisualElement();
             chips.AddToClassList("cw-player-chips");
-            for (int i = 0; i < m.Slots; i++)
+            for (int i = 0; i < slots; i++)
             {
                 AbilityBaseSO ab = (abilities != null && i < abilities.Count) ? abilities[i] : null;
                 chips.Add(MakeMiniHex(ab));
@@ -1011,6 +1034,40 @@ namespace CluckWars.UI
         private static string KeyOf(ChickenClass cls) => cls.ToString().ToLowerInvariant();
 
         private static Color Fade(Color c, float a) => new Color(c.r, c.g, c.b, a);
+
+        /// <summary>Blend a colour <paramref name="t"/> of the way toward white, for use as text on the dark screen bg.</summary>
+        private static Color Lighten(Color c, float t) =>
+            new Color(Mathf.Lerp(c.r, 1f, t), Mathf.Lerp(c.g, 1f, t), Mathf.Lerp(c.b, 1f, t), 1f);
+
+        /// <summary>WCAG 2.1 relative luminance of an sRGB colour (alpha ignored).</summary>
+        private static float Luminance(Color c)
+        {
+            static float Lin(float v) => v <= 0.03928f ? v / 12.92f : Mathf.Pow((v + 0.055f) / 1.055f, 2.4f);
+            return 0.2126f * Lin(c.r) + 0.7152f * Lin(c.g) + 0.0722f * Lin(c.b);
+        }
+
+        /// <summary>
+        /// Ink colour to draw on top of <paramref name="bg"/> — whichever of the cream and
+        /// dark-brown text colours actually contrasts with it.
+        /// <para>
+        /// Required because ability accent colours span the whole luminance range: Egg Shell
+        /// is <c>(0.92, 0.94, 1.00)</c>, i.e. near-white, so the fixed cream label made its
+        /// numbered slot badge unreadable, while Root Egg's dark brown needs the cream.
+        /// Anything that fills an element with an authored accent and then writes text on it
+        /// must go through this rather than assuming a fixed ink.
+        /// </para>
+        /// </summary>
+        private static Color InkOn(Color bg)
+        {
+            float bgL = Luminance(bg);
+            float Ratio(Color fg)
+            {
+                float a = Luminance(fg), b = bgL;
+                if (a < b) (a, b) = (b, a);
+                return (a + 0.05f) / (b + 0.05f);
+            }
+            return Ratio(UiGfx.TextPrimary) >= Ratio(UiGfx.TextDark) ? UiGfx.TextPrimary : UiGfx.TextDark;
+        }
 
         private static void SetBorder(VisualElement ve, Color c)
         {

@@ -37,7 +37,7 @@ namespace CluckWars.Abilities
             // so "looks slowed" and "counts as slowed" can't drift apart.
             bool controlled = target.Rooted
                               || target.SlowMultiplier < 0.92f
-                              || (target.Combat != null && target.Combat.IsStunned);
+                              || (target.Combat != null && target.Combat.IsRemoved);
             return controlled ? amount * 1.30f : amount;
         }
 }

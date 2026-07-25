@@ -133,6 +133,8 @@ namespace CluckWars.Gameplay
         /// <summary>Spine Coat steal-back active hook.</summary>
         [Networked] public bool StealBackActive { get; set; }
         public float StealBackAmount { get; set; } = 4f;
+        public const float StealBackKnockback = 8f;
+        private readonly System.Collections.Generic.Dictionary<NetworkBehaviourId, TickTimer> _stealBackCooldowns = new();
 
         /// <summary>
         /// Replicated slow/root state, set on the StateAuthority each tick. Read by
@@ -334,7 +336,7 @@ namespace CluckWars.Gameplay
             var gm = GameManager.Instance;
             if (gm == null || !gm.IsMatchRunning) return;
 
-            if (_combat != null && _combat.IsStunned) return;
+            if (_combat != null && _combat.IsRemoved) return;
             if (!ControlRules.CanMove(CurrentControlState)) return;
 
             if (GetInput<PlayerNetworkInput>(out var input))
@@ -529,18 +531,23 @@ namespace CluckWars.Gameplay
 
                 if (StealBackActive && other.Cargo != null && Cargo != null)
                 {
-                    float attackerFreeSpace = Cargo.Capacity - Cargo.Cargo;
-                    float defenderCargo = other.Cargo.Cargo;
-                    float stolen = StealMath.Clamp(StealBackAmount, attackerFreeSpace, defenderCargo);
-                    if (stolen > 0f)
+                    if (!_stealBackCooldowns.TryGetValue(other.Id, out var cd) || cd.Expired(Runner))
                     {
-                        other.Cargo.RPC_DrainStolen(stolen);
-                        Cargo.Cargo += stolen;
+                        _stealBackCooldowns[other.Id] = TickTimer.CreateFromSeconds(Runner, 1.0f);
+
+                        float attackerFreeSpace = Cargo.Capacity - Cargo.Cargo;
+                        float defenderCargo = other.Cargo.Cargo;
+                        float stolen = StealMath.Clamp(StealBackAmount, attackerFreeSpace, defenderCargo);
+                        if (stolen > 0f)
+                        {
+                            other.Cargo.RPC_DrainStolen(stolen);
+                            Cargo.Cargo += stolen;
+                        }
+                        var dir = (other.transform.position - transform.position);
+                        dir.y = 0f;
+                        if (dir.sqrMagnitude < 0.001f) dir = transform.forward;
+                        other.RPC_ApplyKnockback(dir.normalized * StealBackKnockback);
                     }
-                    var dir = (other.transform.position - transform.position);
-                    dir.y = 0f;
-                    if (dir.sqrMagnitude < 0.001f) dir = transform.forward;
-                    other.RPC_ApplyKnockback(dir.normalized * 8f);
                 }
 
                 ApplySlow(SlowSource.Collision, CollisionSlowFactor);

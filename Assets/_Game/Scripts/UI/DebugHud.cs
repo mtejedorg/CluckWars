@@ -194,7 +194,7 @@ namespace CluckWars.UI
             {
                 sb.Append("Class: ").AppendLine(localCtrl.Class.ToString());
                 sb.Append("State: ").Append(localCtrl.CurrentControlState.ToString())
-                  .Append(localCtrl.Combat != null && localCtrl.Combat.IsStunned ? "  REMOVED" : "").AppendLine();
+                  .Append(localCtrl.Combat != null && localCtrl.Combat.IsRemoved ? "  REMOVED" : "").AppendLine();
                 if (localCtrl.Cargo != null)
                 {
                     sb.Append("Cargo: ").Append(Mathf.FloorToInt(localCtrl.Cargo.Cargo))

@@ -84,7 +84,7 @@ namespace CluckWars.Visuals
             // Priority: stun > root > slow (most-incapacitating wins the ring colour).
             // All three read replicated state, so the ring is correct on every peer.
             var flags    = _controller.ControlFlags;
-            bool stunned = _combat != null && _combat.IsStunned;
+            bool stunned = _combat != null && _combat.IsRemoved;
             bool rooted  = (flags & ControlVfx.Rooted) != 0;
             bool slowed  = (flags & ControlVfx.Slowed) != 0;
 

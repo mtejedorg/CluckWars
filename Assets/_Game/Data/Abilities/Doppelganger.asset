@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.DoppelgangerAbilitySO
   DisplayName: Doppelganger
   ShortLabel: DOP
+  Description: Spawns a decoy copy beside you to soak up enemy attacks.
   AccentColor: {r: 0.65, g: 0.40, b: 0.85, a: 1}
   Category: 3
   TerrainTraversal: 3

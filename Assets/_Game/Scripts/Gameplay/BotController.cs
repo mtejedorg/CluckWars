@@ -155,7 +155,7 @@ namespace CluckWars.Gameplay
             var gm = GameManager.Instance;
             if (gm == null || !gm.IsMatchRunning) return;
 
-            if (_combat != null && _combat.IsStunned) return;
+            if (_combat != null && _combat.IsRemoved) return;
 
             if (Runner.SimulationTime >= _nextThinkTime)
             {
@@ -440,7 +440,7 @@ namespace CluckWars.Gameplay
                 var c = all[i];
                 if (c == null || c == _controller) continue;
                 if (c.IsDecoy) continue;
-                if (c.Combat != null && c.Combat.IsStunned) continue;
+                if (c.Combat != null && c.Combat.IsRemoved) continue;
 
                 float sqr = (c.transform.position - selfPos).sqrMagnitude;
                 if (sqr >= bestSqr) continue;

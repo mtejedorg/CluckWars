@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.EggShellAbilitySO
   DisplayName: Egg Shell
   ShortLabel: EGG
+  Description: Seals you in an egg - immune to damage, but you cannot move.
   AccentColor: {r: 0.92, g: 0.94, b: 1.00, a: 1}
   Category: 2
   TerrainTraversal: 0

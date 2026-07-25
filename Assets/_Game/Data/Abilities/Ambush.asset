@@ -9,23 +9,23 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6, type: 3}
-  m_Name: CluckShock
-  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.CluckShockAbilitySO
-  DisplayName: Cluck Shock
-  ShortLabel: CSK
-  Description: Knockback shockwave shoving nearby rivals away.
-  AccentColor: {r: 1, g: 0.9, b: 0.1, a: 1}
+  m_Script: {fileID: 11500000, guid: f27dc5871e3535c4881d3493d13e683c, type: 3}
+  m_Name: Ambush
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.AmbushAbilitySO
+  DisplayName: Ambush
+  ShortLabel: AMB
+  Description: Stuns nearby rivals for 1 second.
+  AccentColor: {r: 0.8, g: 0.1, b: 0.8, a: 1}
   Category: 1
   TerrainTraversal: 0
   SlotKind: 1
-  AllowedClasses: 4
+  AllowedClasses: 8
   BotRole: 0
-  Duration: 0.5
-  Cooldown: 7
+  Duration: 1
+  Cooldown: 10
   AbilityAnimationClip: {fileID: 0}
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
-  ShockRadius: 2.5
-  ShockDamage: 35
+  StunRadius: 2
+  StunDuration: 1

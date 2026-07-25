@@ -25,7 +25,7 @@ namespace CluckWars.Gameplay
         [Min(0f)]
         [SerializeField] private float _stunDuration = 2f;
 
-        [Networked] public bool IsStunned { get; set; }
+        [Networked] public bool IsRemoved { get; set; }
         [Networked] private TickTimer StunTimer { get; set; }
 
         private ChickenController _controller;
@@ -47,7 +47,7 @@ namespace CluckWars.Gameplay
         /// </summary>
         public event Action<NetworkBehaviourId> OnDeathAuthority;
 
-        public bool IsDead => IsStunned;
+        public bool IsDead => IsRemoved;
 
         [Inject]
         public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg)
@@ -69,7 +69,7 @@ namespace CluckWars.Gameplay
             _animator = GetComponent<ChickenAnimator>();
             _detector = GetChangeDetector(ChangeDetector.Source.SimulationState);
 
-            _stunReader = GetPropertyReader<bool>(nameof(IsStunned));
+            _stunReader = GetPropertyReader<bool>(nameof(IsRemoved));
 
             _log?.Debug(Source, $"Spawned. HasStateAuthority={HasStateAuthority}.");
         }
@@ -86,7 +86,7 @@ namespace CluckWars.Gameplay
             var stats = _controller.Stats;
             if (stats == null) return;
 
-            if (IsStunned)
+            if (IsRemoved)
             {
                 if (StunTimer.Expired(Runner))
                     Respawn(stats);
@@ -100,7 +100,7 @@ namespace CluckWars.Gameplay
             {
                 switch (changedProperty)
                 {
-                    case nameof(IsStunned):
+                    case nameof(IsRemoved):
                     {
                         var (_, cur) = _stunReader.Read(previous, current);
                         _animator?.SetStunned(cur);
@@ -128,9 +128,9 @@ namespace CluckWars.Gameplay
         public void ExecuteRemoval(NetworkBehaviourId assassinId, float duration = 2.0f)
         {
             if (!HasStateAuthority) return;
-            if (IsStunned) return;
+            if (IsRemoved) return;
 
-            IsStunned = true;
+            IsRemoved = true;
             StunTimer = TickTimer.CreateFromSeconds(Runner, duration > 0f ? duration : _stunDuration);
             CreditKillToAttacker(assassinId);
             OnDeathAuthority?.Invoke(assassinId);
@@ -155,14 +155,14 @@ namespace CluckWars.Gameplay
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_ResetForNewMatch()
         {
-            IsStunned = false;
+            IsRemoved = false;
             StunTimer = default;
             _log?.Debug(Source, "Reset combat for new match.");
         }
 
         private void Respawn(ChickenStatsSO stats)
         {
-            IsStunned = false;
+            IsRemoved = false;
             StunTimer = default;
         }
     }

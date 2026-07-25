@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7fbe34a95d6543041840d22fdb9d6bc0, type: 3}
+  m_Name: WingSlam
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.WingSlamAbilitySO
+  DisplayName: Wing Slam
+  ShortLabel: SLAM
+  Description: Slams the ground, stunning nearby rivals for 1.5 seconds.
+  AccentColor: {r: 0.9, g: 0.4, b: 0.1, a: 1}
+  Category: 1
+  TerrainTraversal: 0
+  SlotKind: 1
+  AllowedClasses: 1
+  BotRole: 0
+  Duration: 1.5
+  Cooldown: 12
+  AbilityAnimationClip: {fileID: 0}
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256
+  StunRadius: 2.5
+  StunDuration: 1.5

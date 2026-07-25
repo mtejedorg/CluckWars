@@ -88,7 +88,7 @@ namespace CluckWars.Visuals
         {
             if (_combat == null) return;
 
-            bool isStunned = _combat.IsStunned;
+            bool isStunned = _combat.IsRemoved;
 
             // ── Death → stun begin ───────────────────────────────────────────
             if (isStunned && !_wasStunned)
@@ -129,10 +129,10 @@ namespace CluckWars.Visuals
                         if (_controller != null && _controller.HasInputAuthority &&
                             MatchCamera.Instance != null)
                         {
-                            bool damage = ability.Category == AbilityCategory.Damage;
+                            bool steal = ability.Category == AbilityCategory.Steal;
                             MatchCamera.Instance.ApplyShake(
-                                damage ? 0.18f : 0.06f,
-                                damage ? 0.22f : 0.12f);
+                                steal ? 0.18f : 0.06f,
+                                steal ? 0.22f : 0.12f);
                         }
                     }
                 }

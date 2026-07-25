@@ -13,7 +13,7 @@ namespace CluckWars.Abilities
         {
             DisplayName = "Mighty";
             ShortLabel = "MGHT";
-            Category = AbilityCategory.Damage;
+            Category = AbilityCategory.Steal;
             SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Warrior;
         }

@@ -135,7 +135,7 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            if (_combat != null && _combat.IsStunned)
+            if (_combat != null && _combat.IsRemoved)
             {
                 if (ActiveSlot != InvalidSlot) Deactivate();
                 return;
@@ -217,7 +217,7 @@ namespace CluckWars.Gameplay
             if (!HasStateAuthority) return false;
             var gm = GameManager.Instance;
             if (gm == null || !gm.IsMatchRunning) return false;
-            if (_combat != null && _combat.IsStunned) return false;
+            if (_combat != null && _combat.IsRemoved) return false;
             if (ActiveSlot != InvalidSlot) return false;
             if (!IsReady(slot)) return false;
             TryActivate(slot);

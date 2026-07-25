@@ -87,7 +87,7 @@ namespace CluckWars.Visuals
             if (_text == null || _controller == null) return;
 
             // ── Death skull ──────────────────────────────────────────────────
-            bool isNowStunned = _combat != null && _combat.IsStunned;
+            bool isNowStunned = _combat != null && _combat.IsRemoved;
             if (isNowStunned != _wasStunned)
             {
                 _wasStunned = isNowStunned;
