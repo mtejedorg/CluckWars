@@ -12,10 +12,11 @@ namespace CluckWars.Gameplay
     public sealed class MatchConfigSO : ScriptableObject
     {
         [Header("Match")]
-        [Min(30f)] public float MatchDurationSeconds = 180f;
-        [Min(1)] public int FoodTargetToWin = 110;
+        [Min(30f)] public float MatchDurationSeconds = 45f;
+        [Min(1)] public int FoodTargetToWin = 40;
+        [Min(0)] public int SpoilerBounty = 15;
         [Min(0f)] public float DeathStunSeconds = 5f;
-        [Min(0.5f)] public float DepositRatePerSecond = 6f;
+        [Min(0.5f)] public float DepositRatePerSecond = 9f;
 
         [Header("Networking")]
         // Tick rate lives in NetworkProjectConfig.fusion (Fusion 2 ignores per-session values here)

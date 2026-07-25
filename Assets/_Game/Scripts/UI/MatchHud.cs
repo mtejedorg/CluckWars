@@ -152,18 +152,6 @@ namespace CluckWars.UI
         {
             if (_hitFlash == null) return;
 
-            if (_localCombat != null)
-            {
-                float hp = _localCombat.HP;
-                if (!float.IsNaN(_lastLocalHp) && hp < _lastLocalHp - 0.01f)
-                    _hitFlashAlpha = _hitFlashPeakAlpha;
-                _lastLocalHp = hp;
-            }
-            else
-            {
-                _lastLocalHp = float.NaN;
-            }
-
             if (_hitFlashAlpha > 0f)
             {
                 float fadePerSec = _hitFlashFadeSeconds > 0f
@@ -265,7 +253,11 @@ namespace CluckWars.UI
             rt.anchorMin = new Vector2(0.5f, 0.5f);
             rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(600f, 80f);
+            // Sized for the mobile contract (see CluckWarsTheme.uss header): this
+            // Canvas uses the same ScaleWithScreenSize 1920x1080 @0.5 as the UI
+            // Toolkit panel, so 1 dp ~= 2.35 px here too. 600x80 with 24px type
+            // rendered at 10 sp in a 34 dp strip.
+            rt.sizeDelta = new Vector2(1150f, 150f);
             rt.anchoredPosition = new Vector2(0f, 150f);
 
             AddBackground(_eventBannerPanel, new Color(DtPanelBg.r, DtPanelBg.g, DtPanelBg.b, 0.95f));
@@ -278,7 +270,7 @@ namespace CluckWars.UI
             lineRT.anchoredPosition = Vector2.zero;
             lineGO.AddComponent<Image>().color = DtGold;
 
-            _eventBannerText = AddText(_eventBannerPanel.transform, "Label", "", 24, TextAnchor.MiddleCenter, FontStyle.Bold);
+            _eventBannerText = AddText(_eventBannerPanel.transform, "Label", "", 44, TextAnchor.MiddleCenter, FontStyle.Bold);
             _eventBannerText.color = DtGold;
             var tRT = _eventBannerText.rectTransform;
             tRT.anchorMin = Vector2.zero;

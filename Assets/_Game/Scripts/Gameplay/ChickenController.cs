@@ -37,6 +37,7 @@ namespace CluckWars.Gameplay
         None   = 0,
         Slowed = 1 << 0,
         Rooted = 1 << 1,
+        Stunned = 1 << 2,
     }
 
     /// <summary>
@@ -118,21 +119,6 @@ namespace CluckWars.Gameplay
         /// <summary>While true, <c>ChickenMovement</c> ignores planar input but keeps gravity.</summary>
         public bool MovementLocked { get; set; }
 
-        /// <summary>While true, <c>ChickenCombat.RPC_ApplyDamage</c> drops incoming damage.</summary>
-        public bool DamageImmune { get; set; }
-
-        /// <summary>0 = full damage, 1 = no damage taken.</summary>
-        public float DamageResistance { get; set; }
-
-        /// <summary>When true, incoming damage is sent back to the attacker instead of applied here.</summary>
-        public bool ReflectDamage { get; set; }
-
-        /// <summary>
-        /// Knockback impulse (world-units/sec) applied to the attacker when Spine Coat
-        /// reflects damage. Set by <c>SpineCoatAbilitySO</c>; 0 when inactive.
-        /// </summary>
-        public float SpineCoatKnockbackStrength { get; set; }
-
         /// <summary>
         /// 0 = invisible, 1 = fully opaque. Networked so the fade is visible to every player.
         /// </summary>
@@ -143,6 +129,10 @@ namespace CluckWars.Gameplay
 
         /// <summary>True for AI-controlled bots spawned in solo mode.</summary>
         [Networked] public bool IsBot { get; set; }
+
+        /// <summary>Spine Coat steal-back active hook.</summary>
+        [Networked] public bool StealBackActive { get; set; }
+        public float StealBackAmount { get; set; } = 4f;
 
         /// <summary>
         /// Replicated slow/root state, set on the StateAuthority each tick. Read by
@@ -194,6 +184,17 @@ namespace CluckWars.Gameplay
         /// can still be cast while rooted. Gravity still runs.
         /// </summary>
         public bool Rooted { get; set; }
+
+        /// <summary>
+        /// True while general control stun is active. Blocks movement, casting, and collecting.
+        /// </summary>
+        [Networked] public bool IsStunned { get; private set; }
+        [Networked] private TickTimer StunTimer { get; set; }
+
+        /// <summary>
+        /// Resolved control state following the severity ladder (Stunned > Rooted > Slowed > Free).
+        /// </summary>
+        public ControlState CurrentControlState => IsStunned ? ControlState.Stunned : (Rooted ? ControlState.Rooted : (SlowMultiplier < 0.99f ? ControlState.Slowed : ControlState.Free));
 
         /// <summary>
         /// External velocity impulse (units per second) applied by knockback effects.
@@ -309,6 +310,12 @@ namespace CluckWars.Gameplay
             // Placed-zone slow (Feather Trap).
             CheckAbilityZoneSlow();
 
+            // General stun timer expiry
+            if (IsStunned && StunTimer.Expired(Runner))
+            {
+                IsStunned = false;
+            }
+
             // Root timer: RPC_ApplyRoot sets _rootUntil; Rooted persists until it elapses.
             if (Runner.SimulationTime < _rootUntil) Rooted = true;
 
@@ -317,6 +324,7 @@ namespace CluckWars.Gameplay
             var vfx = ControlVfx.None;
             if (SlowMultiplier < 0.92f) vfx |= ControlVfx.Slowed;
             if (Rooted)                 vfx |= ControlVfx.Rooted;
+            if (IsStunned)              vfx |= ControlVfx.Stunned;
             if (ControlFlags != vfx)    ControlFlags = vfx;
 
             // Bots exit here — BotController.BotTick handles their movement with
@@ -327,6 +335,7 @@ namespace CluckWars.Gameplay
             if (gm == null || !gm.IsMatchRunning) return;
 
             if (_combat != null && _combat.IsStunned) return;
+            if (!ControlRules.CanMove(CurrentControlState)) return;
 
             if (GetInput<PlayerNetworkInput>(out var input))
             {
@@ -381,39 +390,6 @@ namespace CluckWars.Gameplay
             ExternalDisplacement = impulse;
             // Fire the networked one-shot so every peer plays the shockwave locally.
             if (impulse.sqrMagnitude > 1f) KnockbackEventId++;
-        }
-
-        /// <summary>
-        /// Scales an outgoing damage amount by this chicken's passive.
-        /// <see cref="ChickenPassive.Tough"/> (Warrior) grants a bonus.
-        /// Call before <see cref="ChickenCombat.RPC_ApplyDamage"/> when the
-        /// damage source is this chicken's ability.
-        /// </summary>
-        public float ApplyOutgoingDamage(float rawAmount) => ApplyOutgoingDamage(rawAmount, null);
-
-        /// <summary>
-        /// Target-aware overload. Pass the victim when it is known so passives that care
-        /// about the target's control state (Opportunist) can read it; the parameterless
-        /// overload stays valid for callers that have no single resolved target.
-        /// </summary>
-        public float ApplyOutgoingDamage(float rawAmount, ChickenController target)
-        {
-            float amount = rawAmount;
-            if (IsPassiveActive(ChickenPassive.Tough))
-                amount *= ToughDamageBonus;
-
-            // Slotted-passive hook (ADR 0003). Signature passives run through the enum path
-            // above and deliberately do not override this, so nothing applies twice.
-            var p = _abilities != null ? _abilities.Passive : null;
-            if (p != null) amount = p.ModifyOutgoingDamage(amount, this, target);
-            return amount;
-        }
-
-        /// <summary>Applies slotted-passive incoming-damage modifiers. Called by <see cref="ChickenCombat"/>.</summary>
-        public float ApplyIncomingDamage(float rawAmount)
-        {
-            var p = _abilities != null ? _abilities.Passive : null;
-            return p != null ? p.ModifyIncomingDamage(rawAmount, this) : rawAmount;
         }
 
         /// <summary>Applies slotted-passive control-duration modifiers (slow/root).</summary>
@@ -471,6 +447,20 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
+        /// Stuns this chicken for <paramref name="seconds"/> seconds — blocks movement,
+        /// casting, and collecting. Respects <see cref="ChickenPassive.Slippery"/>.
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_ApplyStun(float seconds)
+        {
+            if (IsPassiveActive(ChickenPassive.Slippery)) seconds *= SlipperyDurationReduction;
+            seconds = ApplyPassiveControlDuration(seconds);
+            IsStunned = true;
+            StunTimer = TickTimer.CreateFromSeconds(Runner, seconds);
+            _log?.Debug(Source, $"RPC_ApplyStun: stunned for {seconds:0.0}s.");
+        }
+
+        /// <summary>
         /// Roots this chicken for <paramref name="duration"/> seconds — movement
         /// blocked, abilities still castable (GDD §6.4). Respects
         /// <see cref="ChickenPassive.Slippery"/>.
@@ -496,6 +486,8 @@ namespace CluckWars.Gameplay
             _abilitySlowFactor   = 1f;
             _rootUntil           = double.MinValue;
             Rooted               = false;
+            IsStunned            = false;
+            StunTimer            = TickTimer.None;
             AuraSlowActive       = false;
             ExternalDisplacement = Vector3.zero;
             UnderdogSurgeActive  = false;
@@ -534,6 +526,23 @@ namespace CluckWars.Gameplay
                 if (other == null || other == this) continue;
                 // Ignore dead chickens (stunned / falling through respawn).
                 if (other.Combat != null && other.Combat.IsDead) continue;
+
+                if (StealBackActive && other.Cargo != null && Cargo != null)
+                {
+                    float attackerFreeSpace = Cargo.Capacity - Cargo.Cargo;
+                    float defenderCargo = other.Cargo.Cargo;
+                    float stolen = StealMath.Clamp(StealBackAmount, attackerFreeSpace, defenderCargo);
+                    if (stolen > 0f)
+                    {
+                        other.Cargo.RPC_DrainStolen(stolen);
+                        Cargo.Cargo += stolen;
+                    }
+                    var dir = (other.transform.position - transform.position);
+                    dir.y = 0f;
+                    if (dir.sqrMagnitude < 0.001f) dir = transform.forward;
+                    other.RPC_ApplyKnockback(dir.normalized * 8f);
+                }
+
                 ApplySlow(SlowSource.Collision, CollisionSlowFactor);
                 break; // One other chicken is enough to trigger the slow.
             }

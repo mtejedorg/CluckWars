@@ -247,11 +247,7 @@ namespace CluckWars.Gameplay
                             ctrl.HomeCornerIndex = cornerIdx;
                         }
 
-                        // Proxy HP hardening: replicate full HP from tick zero so
-                        // proxies never see a transient HP=0 / IsDead=true frame.
-                        // ChickenCombat's lazy first-tick init remains the fallback.
-                        var combat = networkObject.GetComponent<ChickenCombat>();
-                        if (combat != null && botMaxHp > 0f) combat.HP = botMaxHp;
+
 
                         // Bots go through the SAME sanitiser as players. Preset filtering alone
                         // was not enough: a preset whose class flavor allowed Fatty still handed
@@ -493,12 +489,7 @@ namespace CluckWars.Gameplay
                         controller.HomeCornerIndex = homeCorner;
                     }
 
-                    // Proxy HP hardening: replicate full HP from tick zero so
-                    // proxies never see a transient HP=0 / IsDead=true frame.
-                    // ChickenCombat's lazy first-tick init remains the fallback.
-                    float maxHp = ResolveMaxHp(chosenClass);
-                    var combat = networkObject.GetComponent<ChickenCombat>();
-                    if (combat != null && maxHp > 0f) combat.HP = maxHp;
+
 
                     // Apply player-chosen abilities, sanitised against the class pools so an
                     // off-class or malformed selection can never reach the world (ADR 0003

@@ -143,6 +143,10 @@ namespace CluckWars.Gameplay
 
             if (!GetInput<PlayerNetworkInput>(out var input)) return;
 
+            // Stunned chickens cannot cast abilities (spec §3.1).
+            if (_controller != null && !ControlRules.CanCast(_controller.CurrentControlState))
+                return;
+
             // No double-cast: ignore presses while another ability is active.
             if (ActiveSlot != InvalidSlot)
             {
@@ -177,6 +181,15 @@ namespace CluckWars.Gameplay
         }
 
         public bool IsReady(int slot) => GetSlot(slot) != null && CooldownRemaining(slot) <= 0f;
+
+        public void TriggerCooldown(int slot, float duration)
+        {
+            if (!HasStateAuthority) return;
+            var timer = TickTimer.CreateFromSeconds(Runner, duration);
+            if (slot == 0) Cooldown0 = timer;
+            else if (slot == 1) Cooldown1 = timer;
+            else if (slot == 2) Cooldown2 = timer;
+        }
 
         /// <summary>
         /// Number of ability slots available to this chicken.

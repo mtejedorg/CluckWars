@@ -176,14 +176,9 @@ namespace CluckWars.Visuals
 
         private void RefreshHp()
         {
-            if (_hpFill == null || _combat == null) return;
-
-            var stats = _controller.Stats;
-            float max = stats != null ? stats.MaxHP : 0f;
-            float frac = max > 0f ? Mathf.Clamp01(_combat.HP / max) : 0f;
-
-            UpdateFill(_hpFill, frac, _hpHeight * 0.78f);
-            _hpFill.color = HpColor(frac);
+            if (_hpFill == null) return;
+            UpdateFill(_hpFill, 0f, _hpHeight * 0.78f);
+            _hpFill.enabled = false;
         }
 
         private void RefreshCargo()

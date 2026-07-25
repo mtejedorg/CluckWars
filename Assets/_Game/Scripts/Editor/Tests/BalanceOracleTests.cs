@@ -12,9 +12,53 @@ namespace CluckWars.Tests
     /// </summary>
     public sealed class BalanceOracleTests
     {
-        // One pile that is exactly one full load, one round trip.
-        // base(0,0) -> pile(10,0) food 10; speed 10, cap 10, rate 10, deposit 10, W 10.
-        // out 1s + collect 1s + back 1s + deposit 1s = 4.0s, 1 trip.
+        private static OracleMap Task8OracleMap()
+        {
+            return new OracleMap
+            {
+                BasePos = new Vector2(11f, 11f),
+                Piles = new[]
+                {
+                    new OraclePile { Pos = new Vector2(8.93f, 8.37f),   Food = 5f },  // Personal0
+                    new OraclePile { Pos = new Vector2(8.68f, -0.26f),  Food = 10f }, // Contested3
+                    new OraclePile { Pos = new Vector2(0.00f, 0.00f),   Food = 20f }, // Center
+                    new OraclePile { Pos = new Vector2(-1.05f, 9.88f),  Food = 10f }, // Contested0
+                    new OraclePile { Pos = new Vector2(7.80f, -8.54f),  Food = 5f },  // Personal3
+                    new OraclePile { Pos = new Vector2(-8.14f, 8.76f),  Food = 5f },  // Personal1
+                    new OraclePile { Pos = new Vector2(-8.94f, 0.43f),  Food = 10f }, // Contested1
+                    new OraclePile { Pos = new Vector2(-7.77f, -7.45f), Food = 5f },  // Personal2
+                    new OraclePile { Pos = new Vector2(0.73f, -10.08f), Food = 10f }  // Contested2
+                }
+            };
+        }
+
+        [Test]
+        public void Task8_RealMap_StatResolvePassesAllClasses()
+        {
+            var map = Task8OracleMap();
+
+            // Pinned Capacities: Speedy 10, Fatty 35, Warrior 14, Assassin 10
+            var speedy = new OracleChicken { MoveSpeed = 9.0f, CargoCapacity = 10, CollectionRate = 3.00f, DepositRate = 9.0f };
+            var fatty   = new OracleChicken { MoveSpeed = 7.5f, CargoCapacity = 35, CollectionRate = 4.60f, DepositRate = 9.0f };
+            var warrior = new OracleChicken { MoveSpeed = 7.5f, CargoCapacity = 14, CollectionRate = 2.40f, DepositRate = 9.0f };
+            var assassin= new OracleChicken { MoveSpeed = 9.0f, CargoCapacity = 10, CollectionRate = 1.70f, DepositRate = 9.0f };
+
+            var speedyRes   = BalanceOracle.Simulate(map, speedy, 40f);
+            var fattyRes    = BalanceOracle.Simulate(map, fatty, 40f);
+            var warriorRes  = BalanceOracle.Simulate(map, warrior, 40f);
+            var assassinRes = BalanceOracle.Simulate(map, assassin, 40f);
+
+            var speedyTarget   = System.Array.Find(SctTargets.All, t => t.ClassName == "Speedy");
+            var fattyTarget    = System.Array.Find(SctTargets.All, t => t.ClassName == "Fatty");
+            var warriorTarget  = System.Array.Find(SctTargets.All, t => t.ClassName == "Warrior");
+            var assassinTarget = System.Array.Find(SctTargets.All, t => t.ClassName == "Assassin");
+
+            Assert.IsTrue(SctTargets.Within(speedyRes, speedyTarget),     $"Speedy failed: {speedyRes.SctSeconds:0.1}s, {speedyRes.Trips} trips");
+            Assert.IsTrue(SctTargets.Within(fattyRes, fattyTarget),       $"Fatty failed: {fattyRes.SctSeconds:0.1}s, {fattyRes.Trips} trips");
+            Assert.IsTrue(SctTargets.Within(warriorRes, warriorTarget),   $"Warrior failed: {warriorRes.SctSeconds:0.1}s, {warriorRes.Trips} trips");
+            Assert.IsTrue(SctTargets.Within(assassinRes, assassinTarget), $"Assassin failed: {assassinRes.SctSeconds:0.1}s, {assassinRes.Trips} trips");
+        }
+
         [Test]
         public void Simulate_SingleFullLoad_OneTrip()
         {
@@ -35,9 +79,6 @@ namespace CluckWars.Tests
             Assert.AreEqual(1, result.Trips);
         }
 
-        // One 20-food pile, capacity 10 -> two identical round trips.
-        // base(0,0) -> pile(10,0) food 20; speed 10, cap 10, rate 10, deposit 10, W 20.
-        // trip1 4.0s (bank 10) + trip2 4.0s (bank 20) = 8.0s, 2 trips.
         [Test]
         public void Simulate_CapacityForcesTwoTrips()
         {
@@ -58,10 +99,6 @@ namespace CluckWars.Tests
             Assert.AreEqual(2, result.Trips);
         }
 
-        // Two piles; the near one must be farmed first. Proves greedy-nearest ordering.
-        // base(0,0); A(5,0) food 5; B(20,0) food 5; speed 5, cap 10, rate 5, deposit 5, W 10.
-        // ->A 1s, collect 1s (carry 5, not full); ->B dist15 =3s, collect 1s (carry 10 full);
-        // back from (20,0) 4s; deposit 10 -> 2s. total 12.0s, 1 trip.
         [Test]
         public void Simulate_GreedyPicksNearestPileFirst()
         {
@@ -86,9 +123,6 @@ namespace CluckWars.Tests
             Assert.AreEqual(1, result.Trips);
         }
 
-        // Carrying 15 but only 10 needed to win — SCT must count deposit time for 10, not 15.
-        // base(0,0) -> pile(10,0) food 15; speed 10, cap 15, rate 10, deposit 10, W 10.
-        // out 1s + collect 15 (1.5s) + back 1s + deposit 10-of-15 (1.0s) = 4.5s, 1 trip.
         [Test]
         public void Simulate_WinCrossesMidDeposit_CountsOnlyNeeded()
         {
@@ -109,8 +143,6 @@ namespace CluckWars.Tests
             Assert.AreEqual(1, result.Trips);
         }
 
-        // Map holds less food than the win target — the chicken can never bank W.
-        // base(0,0) -> pile(10,0) food 5; W 10. Collects 5, deposits 5, then no food & empty.
         [Test]
         public void Simulate_NotEnoughFood_ReportsUnreachable()
         {
@@ -127,26 +159,6 @@ namespace CluckWars.Tests
             var result = BalanceOracle.Simulate(map, chicken, winTarget: 10f);
 
             Assert.IsFalse(result.ReachedTarget, "Target exceeds total map food; must be unreachable.");
-        }
-
-        // --- Task 6: SCT target goalposts (spec §1) ------------------------------
-
-        // A self-consistent PROVISIONAL fixture: one base at origin, nine piles laid on a
-        // line so distances are hand-checkable. Total food = 40 (= W). Replace with the
-        // shipped map coordinates once the map plan lands.
-        private static OracleMap CanonicalFixture()
-        {
-            return new OracleMap
-            {
-                BasePos = new Vector2(0f, 0f),
-                Piles = new[]
-                {
-                    new OraclePile { Pos = new Vector2(4f, 0f),  Food = 5f },  // T1 doorstep
-                    new OraclePile { Pos = new Vector2(8f, 0f),  Food = 10f }, // T2
-                    new OraclePile { Pos = new Vector2(12f, 0f), Food = 10f }, // T2
-                    new OraclePile { Pos = new Vector2(16f, 0f), Food = 15f }, // T3-ish
-                }
-            };
         }
 
         [Test]
@@ -178,8 +190,6 @@ namespace CluckWars.Tests
                 "Not reaching the target must fail regardless of seconds.");
         }
 
-        // Demonstrates solving: candidate stats tuned to hit a 30s / 2-trip target on the
-        // provisional fixture (W=40, cap 20 -> ceil(40/20)=2 trips). Proves the harness end to end.
         [Test]
         public void CanonicalFixture_CandidateStatsHitTarget()
         {
@@ -193,6 +203,21 @@ namespace CluckWars.Tests
 
             Assert.IsTrue(result.ReachedTarget);
             Assert.AreEqual(2, result.Trips, "cap 20 over W 40 must be exactly 2 trips.");
+        }
+
+        private static OracleMap CanonicalFixture()
+        {
+            return new OracleMap
+            {
+                BasePos = new Vector2(0f, 0f),
+                Piles = new[]
+                {
+                    new OraclePile { Pos = new Vector2(4f, 0f),  Food = 5f },
+                    new OraclePile { Pos = new Vector2(8f, 0f),  Food = 10f },
+                    new OraclePile { Pos = new Vector2(12f, 0f), Food = 10f },
+                    new OraclePile { Pos = new Vector2(16f, 0f), Food = 15f },
+                }
+            };
         }
     }
 }

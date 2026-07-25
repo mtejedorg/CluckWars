@@ -72,9 +72,31 @@ namespace CluckWars.UI
             }
         }
 
+        /// <summary>
+        /// IMGUI draws in raw screen pixels with a ~12px default font and has no
+        /// equivalent of the PanelSettings/CanvasScaler scaling the rest of the UI
+        /// uses. On a 422 ppi phone that renders this whole overlay at about 4.5 dp
+        /// — illegible, which matters because docs/TESTING.md makes F1 the on-device
+        /// diagnostic path. Scale the GUI matrix by pixel density instead, so the
+        /// rects below stay in the desktop coordinate space they were authored in.
+        /// Capped at 3x: uncapped, a Pixel 9 would take 4.4x and the panel would
+        /// swallow two thirds of the screen.
+        /// </summary>
+        private static float HudScale =>
+            Screen.dpi > 1f ? Mathf.Clamp(Screen.dpi / 96f, 1f, 3f) : 1f;
+
         private void OnGUI()
         {
             const int pad = 12;
+
+            float scale = HudScale;
+            var prevMatrix = GUI.matrix;
+            if (!Mathf.Approximately(scale, 1f))
+                GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(scale, scale, 1f));
+
+            // Logical (pre-scale) screen size — right-anchored rects must be placed
+            // in the scaled space, not in raw pixels.
+            float logicalWidth = Screen.width / scale;
 
             if (_visible)
             {
@@ -94,7 +116,7 @@ namespace CluckWars.UI
             {
                 const int width  = 480;
                 const int height = 22 * 24;
-                int x = Screen.width - width - pad;
+                float x = logicalWidth - width - pad;
                 int y = 110;
 
                 _balanceSb.Clear();
@@ -103,6 +125,8 @@ namespace CluckWars.UI
                 GUI.Box(new Rect(x, y, width, height), "Balance (F2)");
                 GUI.Label(new Rect(x + 10, y + 24, width - 20, height - 32), _balanceSb.ToString());
             }
+
+            GUI.matrix = prevMatrix;
         }
 
         private void BuildReport(StringBuilder sb)
@@ -169,11 +193,8 @@ namespace CluckWars.UI
             else
             {
                 sb.Append("Class: ").AppendLine(localCtrl.Class.ToString());
-                if (localCtrl.Combat != null)
-                {
-                    sb.Append("HP: ").Append(localCtrl.Combat.HP.ToString("0"))
-                      .Append(localCtrl.Combat.IsStunned ? "  STUNNED" : "").AppendLine();
-                }
+                sb.Append("State: ").Append(localCtrl.CurrentControlState.ToString())
+                  .Append(localCtrl.Combat != null && localCtrl.Combat.IsStunned ? "  REMOVED" : "").AppendLine();
                 if (localCtrl.Cargo != null)
                 {
                     sb.Append("Cargo: ").Append(Mathf.FloorToInt(localCtrl.Cargo.Cargo))

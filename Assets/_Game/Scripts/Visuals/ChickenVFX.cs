@@ -88,12 +88,7 @@ namespace CluckWars.Visuals
         {
             if (_combat == null) return;
 
-            float hp        = _combat.HP;
-            bool  isStunned = _combat.IsStunned;
-
-            // ── Hit sparks: HP decreased while alive ──────────────────────────
-            if (!float.IsNaN(_lastHp) && hp < _lastHp - 0.01f && !isStunned)
-                _hitPS?.Play();
+            bool isStunned = _combat.IsStunned;
 
             // ── Death → stun begin ───────────────────────────────────────────
             if (isStunned && !_wasStunned)
@@ -106,7 +101,6 @@ namespace CluckWars.Visuals
             if (!isStunned && _wasStunned)
                 _stunPS?.Stop(true, ParticleSystemStopBehavior.StopEmitting);
 
-            _lastHp    = hp;
             _wasStunned = isStunned;
 
             // ── Ability activation: AccentColor burst on slot activation ─────────

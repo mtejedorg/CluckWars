@@ -12,8 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 715ee8b39ade8de4da1a7d15e9ca98b4, type: 3}
   m_Name: MatchConfig
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.MatchConfigSO
-  MatchDurationSeconds: 180
-  FoodTargetToWin: 110
+  MatchDurationSeconds: 45
+  FoodTargetToWin: 40
+  SpoilerBounty: 15
   DeathStunSeconds: 5
-  DepositRatePerSecond: 6
+  DepositRatePerSecond: 9
   TickRate: 30

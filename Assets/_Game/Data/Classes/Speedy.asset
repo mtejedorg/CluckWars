@@ -17,6 +17,6 @@ MonoBehaviour:
   MaxHP: 80
   MoveSpeed: 9
   TurnSpeed: 720
-  CargoCapacity: 6
-  CollectionRate: 2
+  CargoCapacity: 10
+  CollectionRate: 3
   Scale: 0.85

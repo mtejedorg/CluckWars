@@ -29,7 +29,7 @@ namespace CluckWars.Gameplay
 
         public static readonly System.Collections.Generic.List<ChickenCargo> ActiveCargos = new System.Collections.Generic.List<ChickenCargo>();
 
-        [Tooltip("Generous broadphase radius for finding piles/bases. Per-target ranges (FoodPile.CollectRadius / PlayerBase.DepositRadius) gate the actual interaction.")]
+        [Tooltip("Generous broadphase radius for finding piles/bases. Per-target ranges (FoodPile.IsWithinCollectRange / PlayerBase.DepositRadius) gate the actual interaction.")]
         [Min(0.5f)]
         [SerializeField] private float _searchRadius = 5f;
 
@@ -40,7 +40,7 @@ namespace CluckWars.Gameplay
         [SerializeField] private NetworkObject _foodPickupPrefab;
 
         [Networked] public float Cargo { get; set; }
-
+        [Networked] public float BountyBag { get; set; }
         public float Capacity => _controller != null && _controller.Stats != null ? _controller.Stats.CargoCapacity : 0f;
         public float Fraction => Capacity > 0f ? Mathf.Clamp01(Cargo / Capacity) : 0f;
         public bool IsFull => Cargo >= Capacity;
@@ -60,7 +60,7 @@ namespace CluckWars.Gameplay
         {
             get
             {
-                if (Cargo <= 0f) return false;
+                if (Cargo <= 0f && BountyBag <= 0f) return false;
                 if (_combat != null && _combat.IsStunned) return false;
                 return FindNearestBaseInRange() != null;
             }
@@ -202,15 +202,16 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            // Stunned chickens can't collect or deposit.
-            if (_combat != null && _combat.IsStunned)
+            // Stunned / Rooted chickens can't collect (spec §3.1).
+            if (_controller != null && !ControlRules.CanCollect(_controller.CurrentControlState))
             {
-                FlushAll();
-                return;
+                FlushPileDrain();
             }
-
-            TryCollectFromNearbyPile(stats);
-            TryCollectFromNearbyPickup(stats);
+            else
+            {
+                TryCollectFromNearbyPile(stats);
+                TryCollectFromNearbyPickup(stats);
+            }
             TryDepositAtNearbyBase();
         }
 
@@ -367,7 +368,7 @@ namespace CluckWars.Gameplay
                 _activeBaseTarget = playerBase;
             }
 
-            if (Cargo <= 0f)
+            if (Cargo <= 0f && BountyBag <= 0f)
             {
                 FlushBaseDeposit();
                 return;
@@ -379,25 +380,34 @@ namespace CluckWars.Gameplay
             }
 
             float rate = _matchConfig != null ? _matchConfig.DepositRatePerSecond : 6f;
-            float transfer = Mathf.Min(Cargo, rate * Runner.DeltaTime);
+            float desiredTransfer = rate * Runner.DeltaTime;
+
+            float transferFromBounty = Mathf.Min(BountyBag, desiredTransfer);
+            BountyBag -= transferFromBounty;
+            float remainingDesired = desiredTransfer - transferFromBounty;
+
+            float transferFromCargo = Mathf.Min(Cargo, remainingDesired);
+            Cargo -= transferFromCargo;
+
+            float transfer = transferFromBounty + transferFromCargo;
             if (transfer <= 0f)
             {
                 FlushBaseDeposit();
                 return;
             }
 
-            Cargo -= transfer;
             _pendingBaseFood += transfer;
             _baseDepositTicks++;
 
             int ticksToFlush = Mathf.RoundToInt(0.25f * Runner.TickRate);
-            if (_baseDepositTicks >= ticksToFlush || Cargo <= 0f)
+            if (_baseDepositTicks >= ticksToFlush || (Cargo <= 0f && BountyBag <= 0f))
             {
-                bool isDone = (Cargo <= 0f);
+                bool isDone = (Cargo <= 0f && BountyBag <= 0f);
                 FlushBaseDeposit();
                 if (isDone)
                 {
                     Cargo = 0f;
+                    BountyBag = 0f;
                     _audio?.PlaySFX(_audioReg != null ? _audioReg.Deposit : null);
                     _log?.Debug(Source, $"Deposited complete at {playerBase.name}.");
                 }
@@ -405,12 +415,14 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Squared horizontal (XZ) distance. Collection/pickup/deposit proximity is a
-        /// ground-plane test: a chicken's pivot floats ~1 unit above pile/base pivots
-        /// (capsule centre), so a full 3D distance pushes an in-range chicken outside the
-        /// tuned radius and the interaction silently never fires. Playtest evidence: bots
-        /// parked ~1.45 horizontal from a 1.6-radius pile, but 3D distance was ~1.8 → no
-        /// pile ever drained, no one could score. Comparing XZ only fixes it robustly.
+        /// Squared horizontal (XZ) distance. Pickup/deposit proximity is a ground-plane
+        /// test: a chicken's pivot floats ~1 unit above pickup/base pivots (capsule
+        /// centre), so a full 3D distance pushes an in-range chicken outside the tuned
+        /// radius and the interaction silently never fires. Playtest evidence: bots parked
+        /// ~1.45 horizontal from a 1.6-radius pile, but 3D distance was ~1.8 → no pile ever
+        /// drained, no one could score. Comparing XZ only fixes it robustly. Pile
+        /// collection no longer comes through here at all — <c>FoodPile.DistanceToSurface</c>
+        /// is XZ by construction.
         /// </summary>
         private static float HorizontalSqr(Vector3 a, Vector3 b)
         {
@@ -419,22 +431,32 @@ namespace CluckWars.Gameplay
             return dx * dx + dz * dz;
         }
 
+        /// <summary>
+        /// Nearest pile whose SURFACE this chicken is close enough to drain. Ranking is by
+        /// surface distance too: against a 7×4 island, centre distance would rate a chicken
+        /// standing on the island's rim as further away than a small pile several metres off.
+        /// </summary>
         private FoodPile FindNearestPileInRange()
         {
             int hitCount = Physics.OverlapSphereNonAlloc(transform.position, _searchRadius, _overlapHits, _searchMask, QueryTriggerInteraction.Collide);
+            var selfPos = transform.position;
             FoodPile best = null;
-            float bestSqr = float.MaxValue;
+            float bestDistance = float.MaxValue;
             for (int i = 0; i < hitCount; i++)
             {
                 var col = _overlapHits[i];
                 var pile = col.GetComponentInParent<FoodPile>();
                 if (pile == null) continue;
-                float sqr = HorizontalSqr(pile.transform.position, transform.position);
-                float r = pile.CollectRadius;
-                if (sqr > r * r) continue;
-                if (sqr < bestSqr)
+                // Physics can hand back a pile whose NetworkObject isn't live yet; the
+                // surface test reads [Networked] Amount / FootprintSize, which throws
+                // on an unspawned object.
+                if (pile.Object == null || !pile.Object.IsValid) continue;
+                if (!pile.IsWithinCollectRange(selfPos)) continue;
+
+                float distance = pile.DistanceToSurface(selfPos);
+                if (distance < bestDistance)
                 {
-                    bestSqr = sqr;
+                    bestDistance = distance;
                     best = pile;
                 }
             }
@@ -621,6 +643,21 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
+        /// Assassin execute cargo transfer: moves ALL cargo to the assassin's bounty bag.
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_TransferAllToBountyBag(NetworkBehaviourId assassinId)
+        {
+            float amountToTransfer = Cargo;
+            Cargo = 0f;
+            if (Runner.TryFindBehaviour(assassinId, out ChickenCargo assassinCargo))
+            {
+                assassinCargo.BountyBag += amountToTransfer;
+                _log?.Info(Source, $"Execute: transferred {amountToTransfer:0.0} cargo to assassin {assassinId} bounty bag.");
+            }
+        }
+
+        /// <summary>
         /// Reset cargo state for a new round. Called by <c>GameManager.RestartMatch</c>
         /// from the master client; routes to each chicken's StateAuthority.
         /// </summary>
@@ -639,7 +676,8 @@ namespace CluckWars.Gameplay
             _baseDepositTicks = 0;
 
             Cargo = 0f;
-            _log?.Debug(Source, "Reset for new match: Cargo=0.");
+            BountyBag = 0f;
+            _log?.Debug(Source, "Reset for new match: Cargo=0, BountyBag=0.");
         }
     }
 }

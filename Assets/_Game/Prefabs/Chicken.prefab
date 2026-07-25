@@ -31,6 +31,7 @@ GameObject:
   - component: {fileID: 3984440509192767271}
   - component: {fileID: 9089316586229822183}
   - component: {fileID: 4310573928164825946}
+  - component: {fileID: 9876543210987654321}
   m_Layer: 8
   m_Name: Chicken
   m_TagString: Untagged
@@ -468,3 +469,16 @@ MonoBehaviour:
   SyncParent: 0
   _autoAOIOverride: 1
   DisableSharedModeInterpolation: 0
+--- !u!114 &9876543210987654321
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc2eaaac93e74394c994e7a0e6f6a463, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.AssassinExecute
+
