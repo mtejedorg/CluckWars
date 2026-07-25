@@ -1,446 +1,398 @@
-# Game Design Document v0.3
+# Game Design Document v0.4
 
-**Version:** 0.3  
-**Date:** May 2026  
-**Status:** Draft  
-**Changelog v0.3:** Removed basic attack; redesigned ability system (2 slots all classes, 3 for Assassin, no class restrictions); renamed Section 6 to Interaction & Control System; added Slow Sources and Control States; full ability pool redesign into 4 categories; added class passives; updated controls and TBD items.  
-**Changelog v0.2:** Added visual direction (2.5D), food pile visuals, animation states
+**Version:** 0.4
+**Date:** July 2026
+**Status:** Redesign implemented (control + steal, axiom-driven balance)
+
+**Changelog v0.4 — the core redesign.** Deleted HP and damage entirely; combat is now
+**control + steal**. Introduced the **Solo Clear Time (SCT) axiom** — every stat is
+*derived* from a per-class clear-time target, not hand-tuned. Win target 150→**40**, match
+3-min→**45 s**. Tiered map food budget (**80 = 2× win**) with pinwheel walls. New Assassin
+**Mark/Kill execute** (the only hard removal). Ability pool split into **Steal / Control /
+Defense / Utility** with a **Common + Character** class-gated model. Targeting collapsed to
+**self-centred or directional** (one exception: Mark/Kill). Full rationale in
+`docs/superpowers/specs/2026-07-24-cluck-wars-core-redesign-design.md` and
+`…/2026-07-25-ability-pool-rewrite-design.md`.
+
+*Earlier: v0.3 removed the basic attack; v0.2 added the 2.5D visual direction. See git
+history for the pre-0.4 document.*
 
 ---
 
 ## 1. Overview
 
-**Game Title:** Cluck Wars  
-**Genre:** Competitive multiplayer arena — fast-paced resource collection  
-**Platform:** Multiplatform — Mobile (primary), PC, Tablet  
-**Players:** 4 players, free-for-all (no teams)  
-**Perspective:** Isometric top-down — 2.5D with real 3D meshes, orthographic camera  
-**Session Length:** ~5–10 minutes per match  
-**Target Audience:** Casual to mid-core competitive players, mobile-first
+**Game Title:** Cluck Wars
+**Genre:** Competitive multiplayer arena — fast, chaotic resource collection
+**Platform:** Multiplatform — Mobile (primary), PC, Tablet
+**Players:** 4, free-for-all (no teams)
+**Perspective:** Isometric top-down — 2.5D real 3D meshes, orthographic camera
+**Session Length:** **~45 seconds per match** (target 45; hard cap on rage-quit value)
+**Target Audience:** Casual to mid-core, mobile-first
 
-**Elevator Pitch:**  
-Four chickens enter a farm. Only the fattest leaves. Cluck Wars is a fast-paced 4-player free-for-all where players collect food, defend their stash, and sabotage rivals using character classes and short-burst abilities. Easy to learn, deep to master.
+**Elevator Pitch:**
+Four chickens, one farm, forty-five seconds. Collect food, bank it at your base, and rob
+everyone else blind before the clock runs out. No health bars, no grinding a rival down —
+every fight is about *taking their food and buying time*. Easy to learn, chaotic to master,
+over before anyone can rage-quit.
+
+**Why 45 seconds.** A mobile FFA lives or dies on session length. At 45 s a loss costs
+nothing, a comeback is always one steal away, and the game is inherently replayable. Every
+system below is tuned against this number.
 
 ---
 
 ## 2. Core Game Loop
 
 ```
-SELECT character & abilities → SPAWN at base edge → MOVE to food pile
-→ STAND on pile to collect cargo (cargo rate / sec) [chickens are slowed while on pile]
-→ CARRY food back to base → DEPOSIT food at base
-→ REPEAT until time runs out or target is reached
-                    ↕
-     USE ABILITIES to disrupt, protect, control or steal
+PICK class + passive + abilities → SPAWN at your base corner → farm the tiered piles
+→ CARRY food home → DEPOSIT at base → REPEAT
+                         ↕
+   STEAL from loaded rivals · CONTROL them (slow/root/stun) · DEFEND your haul
 ```
 
-**Core Strategic Principle:** Every aggressive interaction costs a cooldown. Cooldown management is the primary skill.
+**Win condition**
+- First to bank **40 food** at base wins immediately, OR
+- Most food banked when the **45 s** timer expires (tie-break: food → kills → lower corner
+  index).
 
-**Win Condition:**
-- First player to reach **150 food units** stored at base wins immediately, OR
-- Player with the **most food stored at base** when the **3-minute timer** expires wins.
+**No death.** There is no HP and no damage. A chicken is never "killed" except by the
+Assassin's execute (§6.4), which removes it for ~2 s and respawns it empty. Every other
+interaction is a **steal** or a **control effect** — you take food or buy time, you never
+grind someone down.
 
-*(150 units and 3 minutes are placeholder values — subject to balancing)*
+### 2.1 The Solo Clear Time (SCT) axiom — the balance backbone
 
-**On Death:**
-- Chicken is **stunned in place for 5 seconds** — cannot move, use abilities, collect, or be attacked.
-- All **carried cargo is dropped** around the fallen chicken's position and becomes freely collectable by any player walking over it.
-- After stun expires, chicken respawns at their base edge with zero cargo.
+> A **naked** chicken (no abilities, no passive), **alone** on the full map, farming
+> greedily, banks the win target in a fixed **time** via a fixed number of **base trips**.
+
+Every stat is a *dependent variable* solved against SCT — we don't pick `MoveSpeed` because
+9 feels nice, we pick it because Speedy must clear in 30 s. This is verified automatically
+by the **Balance Oracle** (a pure-C# simulator, `Assets/_Game/Scripts/Balance/`) which
+runs the greedy policy on the real pile coordinates and asserts each class lands within
+±1.5 s of its target.
+
+| Class | SCT | Trips | Strategy |
+|---|---|---|---|
+| **Speedy** | 30 s | 4 | Throughput — many small loads, roams wide |
+| **Fatty** | 30 s | 2 | Payload — one huge sweep, barely returns |
+| **Warrior** | 35 s | 3 | The ability class — mid stats, leans on his kit |
+| **Assassin** | 40 s | 4 | Denial — never actually farms; robs and executes |
+
+`WinTarget = 40 · TotalMapFood = 80 (= 2× win) · trips = ceil(WinTarget / CargoCapacity)`.
+
+At 2× supply, two players *could* max out by pure farming — so combat's job is to **buy
+time**, and **steal** is the only mechanic that converts a won fight directly into food.
 
 ---
 
-## 3. Map Design & Visuals
+## 3. Map Design
 
-**Layout:**
-- Fixed square/hex arena with isometric top-down view.
-- Map **shape and food island positions are randomized** each match within defined constraints.
-- The following elements are always fixed:
+**Layout:** square arena, 4 base corners, isometric top-down. Pile positions jitter each
+match (seeded from the session code so all peers agree); the centre never moves.
 
-| Element | Position | Notes |
+### 3.1 Tiered food budget (total = 80 = 2× win)
+
+| Tier | Count | Food each | Σ | Role |
+|---|---|---|---|---|
+| **T1 — doorstep** | 4 (one per base) | 5 | 20 | Fatty's top-up; safe-ish; invadeable |
+| **T2 — contested** | 4 (between bases) | 10 | 40 | Fight for it or rush it |
+| **T3 — centre** | 1 | 20 | 20 | Fight for it |
+
+**Piles do not respawn or regenerate** — banked food leaves circulation, so the pot
+visibly shrinks and the late game gets desperate on its own. Fatty's winning route (a
+35-cargo sweep of centre + two contested piles) is forced *through* the contested ring — he
+cannot win without walking past everyone.
+
+### 3.2 Walls & terrain traversal (the mobility triangle)
+
+Interior walls are laid out as a **pinwheel** (radial wedges, seeded), built on three
+**obstacle classes** — Low / Standard / Tall. Walls block movement, not sight. Chases
+become *routing* plays, not raw speed races, via three mobility currencies (ADR 0003):
+
+| Verb | Cost | Crosses |
 |---|---|---|
-| Central Food Pile | Center of map | Large, high risk, high reward |
-| Player Bases | 4 edges of map | Cannot be attacked or stolen from |
-| Personal Island | Near each base | Small, relatively safe early game |
-| Contested Islands | Between each pair of adjacent players | Designed to provoke early fights |
+| **Run** — raw `MoveSpeed` | free | nothing |
+| **Vault** (e.g. Flying Peck) | ability cooldown | Low + Standard |
+| **Barge** (e.g. Roll & Push) | ability cooldown | Low |
+| **Blink** (e.g. Shadowstep, Doppelganger) | ability cooldown | every class of wall |
 
-**Food piles do not respawn.** Once depleted, they are gone for the match. This creates increasing scarcity over time, forcing players to transition from farming to fighting as the match progresses.
+Boundary walls are never crossable — arena containment is structural. A stocked pile is
+solid (blocks like a wall); a depleted stub is walkable.
 
-**Interior walls (v0.3.3):** a handful of low, visible wall segments are scattered across the arena each match (seeded from the session code so all peers agree; randomized within keep-clear constraints around the center pile, bases, and islands). Walls block movement but not sight — the isometric camera sees over them. Purpose: chases and escapes become *routing* plays (cutting corners, juking around cover, knocking rivals into walls) instead of pure speed races.
+### 3.3 Pile visuals
 
-**Piles are solid while stocked (v0.3.3):** a stocked food pile cannot be walked through — it blocks like a wall and carves the bot NavMesh. Collection is unchanged (stand at the pile's edge). A depleted pile stub becomes walkable again. Together with interior walls this gives slower classes real counterplay against faster chasers.
-
-**Food Distribution Philosophy:**  
-Players must constantly evaluate three strategic options:
-1. **Secure** — farm their personal island safely but with low yield.
-2. **Contest** — fight over the high-value central pile.
-3. **Invade** — target rivals who are carrying cargo or whose personal island is undefended.
-
-Placeholder food values per pile *(subject to heavy testing)*:
-
-| Pile | Food Units | Notes |
-|---|---|---|
-| Central pile | 60 units | Shared, most contested |
-| Personal island | 15 units per player | One per player |
-| Contested island | 25 units | One between each pair of players |
-
-### Food Pile Visuals
-
-Food piles visually reflect their remaining food percentage in real time, giving players instant strategic reads without needing to check numbers:
-
-- **Scale** — pile physically shrinks as food depletes. Full pile is at 100% scale; empty pile is a remnant stub.
-- **Color shift** — pile transitions from vibrant warm tones (full) to desaturated/dull (depleted).
-- **Future** — mesh swap at threshold values may be added post-demo.
-
-Visual state is driven locally on each client by the `[Networked]` food amount — no additional sync needed.
+Piles shrink and desaturate as they deplete, driven locally by the `[Networked]` food
+amount — instant strategic read, no extra sync.
 
 ---
 
 ## 4. Visual Direction
 
-### Rendering
-- **2.5D** — real 3D meshes on an isometric orthographic camera. No perspective distortion.
-- Characters use chunky, exaggerated proportions — large head, round body, tiny limbs. Reference: Hei Hei (Moana).
-- Map uses darker, desaturated tones to maximize character readability and reduce visual noise.
-- Characters use warm, saturated cartoon colors to pop against the map.
+- **2.5D** — real 3D meshes on an isometric orthographic camera, no perspective distortion.
+- Chunky, exaggerated proportions (large head, round body, tiny limbs; ref: Hei Hei).
+- Dark, desaturated map; warm, saturated chickens that pop.
+- **Facing:** two base directions (left/right), vertical handled by mirroring; direction
+  snaps instantly; idle after 2 s stationary.
 
-### Character Facing & Animation
-
-Characters have two base facing directions (left, right). Vertical movement is handled by mirroring:
-
-| Movement direction | Facing | Vertical mirror |
-|---|---|---|
-| Right / Down-right / Up-right | Face right | Down = default, Up = vertical flip |
-| Left / Down-left / Up-left | Face left | Down = default, Up = vertical flip |
-
-**Direction snaps instantly** — no lerp or transition. On stop, last direction is held. After 2 seconds stationary, idle animation triggers.
-
-### Animation States
-
-| State | Trigger | Notes |
-|---|---|---|
-| Walk | Moving | Base locomotion |
-| Idle | Stationary > 2 seconds | Subtle loop |
-| Collecting | Standing on food pile with cargo filling | Distinct from idle — signals intent |
-| Ability Cast | Ability button pressed | Defined per AbilitySO — 2–3 shared clips reused |
-| Hit | Receiving damage | Brief hit reaction |
-| Stunned | Death stun active (5 seconds) | Held until stun expires |
-
-Ability animations are defined in the `AbilitySO` asset — each ability references one of the shared animation clips. Adding a new ability does not require a new animation unless explicitly needed.
+**Animation states:** Walk · Idle · Collecting · Ability Cast (2–3 shared clips, per
+`AbilityBaseSO`) · **Stunned/Removed** (control-stun or execute removal). *There is no Hit
+state — damage no longer exists.* Control states each have an on-character overlay (💫 stun,
+🐌 slow, 🌱 root, 💨 knockback); full spec in `ART.md §6.10`.
 
 ---
 
 ## 5. Character Classes
 
-Each player selects one class before the match. Classes define the stat spread and passive ability. All abilities are available to all classes — selection happens during character selection, with no class-based restrictions.
+Each player picks one class, one **passive** (from that class's pool), and their abilities.
+Classes differ by stat spread, passive pool, and **class-gated ability access** (§7).
 
-### Core Stats
+### 5.1 Core stats
 
-| Stat | Description |
+| Stat | Meaning |
 |---|---|
-| Cargo Capacity | Maximum food units the chicken can carry at once |
-| Cargo Rate | Food units collected per second while standing on a pile |
-| HP | Total hit points before being stunned |
-| Resistance | Damage reduction — affects how long the chicken survives hits |
-| Speed | Movement speed across the map |
+| **Cargo Capacity** | Food carried before a forced return (also caps how much you can *steal* in one go) |
+| **Collection Rate** | Food/sec while standing on a pile |
+| **Move Speed** | Across-map speed |
 
-### 5.1 Fatty Chicken 🐔
+There is **no HP and no Resistance** — durability is expressed through *control resistance*
+(via passives) and *defensive abilities*, not a health bar.
 
-*"Slow and steady wins the race — if it survives long enough."*
+### 5.2 The roster (stats are Oracle-solved to hit §2.1 targets)
 
-| Stat | Value |
-|---|---|
-| Cargo Capacity | ⭐⭐⭐⭐⭐ |
-| Cargo Rate | ⭐⭐⭐⭐⭐ |
-| HP | ⭐⭐⭐⭐ |
-| Resistance | ⭐⭐⭐⭐ |
-| Speed | ⭐⭐ |
+| Class | Move | Cargo | Collect | SCT | Fantasy |
+|---|---|---|---|---|---|
+| **Fatty** 🐔 | 7.5 | 35 | 3.2 | 30 s / 2 trips | *"Slow, but it all fits in the beak."* |
+| **Speedy** 🐤 | 9.0 | 10 | 3.0 | 30 s / 4 trips | *"If you can't catch me, you can't rob me."* |
+| **Warrior** ⚔️ | 7.5 | 14 | 2.6 | 35 s / 3 trips | *"The farm is a battlefield."* |
+| **Assassin** 🗡️ | 9.0 | 10 | 1.7 | 40 s / 4 trips | *"Blink and your food is gone."* |
 
-**Passive — Immovable:** Greatly reduced knockback distance from push abilities.
+**The load-bearing detail:** Speedy and Assassin share Move Speed (9.0) and cargo (10) but
+clear in 30 s vs 40 s — the entire gap is **Collection Rate** (3.0 vs 1.7). The Assassin is
+a fast chicken who is *genuinely bad at farming*; that is the mechanical reason he denies
+instead of collects.
 
-**Role:** Bulk carrier. Best at maximizing food per trip. Dominant on uncontested piles, but slow enough that rivals can intercept it en route to base.
+### 5.3 Passives (design — reimplementation pending)
 
-### 5.2 Speedy Chicken 🐤
+Each class has a **pool**; the player picks one. *These pools are the v0.4 design intent;
+the passive system in code still carries the pre-0.4 set and is scheduled for a follow-up
+pass — treat this table as the target, not the shipped state.*
 
-*"If you can't catch me, you can't kill me."*
+| Class | Passive | Effect |
+|---|---|---|
+| **Speedy** | Slippery | Control **duration** reduced (also shortens the Assassin's arm window on you) |
+| | Featherfoot | Immune to pile-slow — raid a contested pile at full speed |
+| | Drop & Go | Instant deposit (removes the trip-count tax) |
+| **Fatty** | Hoarder | Capacity ≥ win target → banks a full win in one trip |
+| | Bulwark | Control effects reduced |
+| **Warrior** | Relentless | Lower cooldowns — abilities more often |
+| | Bully | Stronger abilities → bigger steals, + cargo to hold them |
+| **Assassin** | Spoiler | If the timer expires with **no** winner, bank **+15** food, then normal resolution |
+| | Thief | Steal-focused |
 
-| Stat | Value |
-|---|---|
-| Cargo Capacity | ⭐⭐⭐ |
-| Cargo Rate | ⭐⭐⭐ |
-| HP | ⭐⭐ |
-| Resistance | ⭐ |
-| Speed | ⭐⭐⭐⭐⭐ |
-
-**Passive — Slippery:** Control abilities (slow, root, knockback) have reduced duration. Damage stuns apply normally.
-
-**Role:** Hit-and-run collector. Must avoid prolonged fights — dies fast if caught. Thrives on chaos, excels at snatching dropped cargo after fights.
-
-### 5.3 Warrior Chicken ⚔️
-
-*"The farm is a battlefield."*
-
-| Stat | Value |
-|---|---|
-| Cargo Capacity | ⭐⭐⭐ |
-| Cargo Rate | ⭐⭐⭐ |
-| HP | ⭐⭐⭐ |
-| Resistance | ⭐⭐⭐ |
-| Speed | ⭐⭐⭐ |
-
-**Passive — Mighty:** All damage abilities deal +25% outgoing ability damage to targets.
-
-**Role:** All-rounder. Excels at contesting piles and eliminating threats. No glaring weakness but no dominant strength — wins through consistent play and good decision-making.
-
-### 5.4 Assassin Chicken 🗡️
-
-*"Blink and your food is gone."*
-
-| Stat | Value |
-|---|---|
-| Cargo Capacity | ⭐⭐⭐ |
-| Cargo Rate | ⭐⭐ |
-| HP | ⭐⭐ |
-| Resistance | ⭐⭐ |
-| Speed | ⭐⭐⭐⭐⭐ |
-
-**Passive — Combo:** Equips **3 abilities** instead of 2. No other stat advantage.
-
-**Role:** Disruptor. Moderate cargo capacity and highest movement speed allows the Assassin to win by denying others, chasing loaded rivals, and stealing cargo. The extra ability slot amplifies cooldown management as the core skill expression.
+Passives sit **outside the naked SCT** (the axiom is measured with none equipped), so
+cargo-changing passives (Hoarder, Bully) are legal.
 
 ---
 
 ## 6. Interaction & Control System
 
-There is no basic attack. All chicken-to-chicken interaction is fully ability-driven. The outcome of every encounter is determined by:
+All chicken-to-chicken interaction is **control + steal**. No basic attack, no HP, no
+damage. Encounters are decided by ability choice, cooldown management, and positioning —
+catching a *loaded* rival mid-route beats winning a fair fight.
 
-- **Ability choice** — what you equipped, what your opponent equipped, and who has cooldowns available.
-- **Cooldown management** — the primary skill expression. Every aggressive use costs a cooldown. A chicken with no cooldowns available is vulnerable.
-- **Positioning** — catching a loaded rival mid-route is often more valuable than winning a direct confrontation.
-- **Class passives** — modify how control states interact with each class (see Section 5).
+### 6.1 Casting & authority
 
-### 6.1 Collision Behavior
+- **Targeted, never skill-shot. Abilities cannot be dodged — only counterplayed.**
+  Counterplay happens *before* the button (positioning, saving a defensive ability), not as
+  a twitch reaction. No projectile to lag-compensate.
+- **The caster's word is not final** — a cast is a *request*; the target's authority
+  validates range / cooldown / legality with tolerance before it applies (anti-cheat).
+- **Targeting is self-centred or directional.** Self buffs, AoE-around-self, and
+  drop-at-feet zones need no aim; dashes auto-snap to the first target in the lane. The
+  **only** single-target ability in the game is the Assassin's Mark/Kill.
 
-When two chickens are in physical contact, a **collision slow** applies to both. This is a **passive friction effect** — no damage, no knockback, no ability required. It makes contested piles and chokepoints naturally slower and more dangerous for loaded carriers.
+### 6.2 Steal — the natural cap
 
-### 6.2 Pile Slow
+```
+stolen = min(abilityStealValue, attackerFreeSpace, defenderCargo)   // never negative
+```
 
-All chickens are **slowed while standing on any food pile**. This is a separate slow source from collision slow, applied equally to all classes regardless of passives (Speedy's Slippery passive does not reduce pile slow — subject to balancing).
+Cargo transfers **directly** attacker←→victim — nothing ever drops on the floor. The
+formula self-regulates: a **loaded thief cannot steal** (no free space), so theft is a
+rhythm (steal → bank → return), not a drain. Fatty's 35 cargo can only leave in ≤10–14
+bites, so he *bleeds* under pressure instead of popping, and his defensive abilities are
+what he's actually playing.
 
-### 6.3 Slow Sources (3 distinct types)
+### 6.3 Control ladder
 
-| Source | Trigger | Notes |
+| State | Move | Cast abilities | Collect | Source |
+|---|---|---|---|---|
+| **Slowed** | reduced | ✅ | ✅ | collision / pile / slow abilities |
+| **Rooted** | ❌ | ✅ | ❌ | trap abilities |
+| **Stunned** | ❌ | **❌** | ❌ | stun abilities (Ambush, Wing Slam) |
+
+Stun is the only state that locks *casting* — which is exactly why it's the qualifier for
+the Assassin execute. Stun duration is authored per-ability (Assassin Ambush 1.0 s, Warrior
+Wing Slam 1.5 s). **Slow sources** (collision, pile, ability) are tagged separately so
+passives like Slippery can target one without the others.
+
+### 6.4 The Assassin execute (the only hard removal)
+
+**One locked signature slot, one button, two presses.** This is why the Assassin's Combo
+gives a 3rd slot — one is spent on Mark/Kill, two are his to build with.
+
+| Stage | Condition | Counterplay |
 |---|---|---|
-| Collision slow | Passive — two chickens in contact | No damage, no knockback |
-| Pile slow | Passive — standing on any food pile | Applies to all classes equally |
-| Ability slow | Applied by specific abilities (Feather Trap, Feather Aura, etc.) | Affected by Speedy's Slippery passive |
+| **Mark** | Press → soft-locks the nearest **isolated** rival (no chicken within **8 m**), in facing. Visible to the target. | Stay near others — in an FFA, safety = approaching an enemy |
+| **Arm** | **2.0 s** pass with the mark alive | Break isolation or leave range → mark fizzles |
+| **Qualify** | The marked target enters a **Stun** (his own Ambush, or *any* stun — e.g. a Warrior's Wing Slam) → button lights up **KILL** | Don't get stunned; hold a defence |
+| **Kill** | Press again while target is stunned **and the Assassin is not himself stunned** | **A third party can stun the Assassin to deny the kill** — stun the hunter to save the prey |
 
-These sources are tagged separately in code to allow passive abilities to cover specific sources without affecting others.
-
-### 6.4 Control States
-
-| State | Source | Effect | Drops Cargo? |
-|---|---|---|---|
-| Stunned | HP reaches zero from damage abilities | Full incapacitation, 5 seconds, drops all cargo, respawn at base | ✅ Yes |
-| Slowed | Collision / pile / slow abilities | Reduced movement speed | ❌ No |
-| Knocked Back | Push abilities | Involuntary displacement, interrupts collection | ❌ No |
-| Rooted | Trap abilities | Cannot move, can still use abilities | ❌ No |
-
-**Stun is the only state that drops cargo.** All other control states disrupt without rewarding the aggressor directly — the reward is the window of opportunity they create.
-
-Each state has a distinct **on-character visual overlay** (stars/💀 for stun, blue tint + 🐌 for slow, motion lines + 💨 for knockback, vines + 🌱 for root) so the state reads at a glance in the isometric view. Full visual spec: ART.md §6.10.
-
-### 6.5 Design Intent
-
-Every aggressive action has a cost (cooldown) and a window (the effect duration). Skilled play is about converting that window into a real advantage — pushing a carrier off route, rooting them while collecting their pile, or timing a damage ability to stun a fully-loaded rival.
-
-**Secondary opportunities:** When an ability exchange stuns a chicken, its dropped cargo becomes freely collectable by any player. A third party watching two players clash and collecting the dropped cargo is an intended and encouraged dynamic.
+On success the victim's **entire cargo transfers to the Assassin as a capacity-exempt
+"bounty bag"** (he becomes a courier of a stolen win) and the victim is removed ~2 s, then
+respawns empty. On failure Mark/Kill takes a **reduced cooldown**, so he re-marks fast.
+Stun lives in exactly two classes (Assassin + Warrior), which is what makes the deny/enable
+counterplay reachable.
 
 ---
 
 ## 7. Abilities System
 
 ### 7.1 Rules
-- Each class equips **2 abilities** during character selection (pre-match).
-- **Assassin** equips **3 abilities** (Combo passive — see Section 5.4).
-- **All abilities are available to all classes** — no class-based restrictions.
-- Each ability has a **cooldown** defined by tier (see 7.3).
-- **All abilities must be balanced against each other** — the monetization model must never create a pay-to-win dynamic. This is a non-negotiable design principle.
 
-### 7.2 Ability Pool
+- Loadout = **1 mandatory class passive + 1 Common ability + 2 Character abilities.** The
+  **Assassin** gets **+1 Character** (Combo), one of which is the **locked Mark/Kill**.
+- **Common** abilities are open to every class; **Character** abilities are gated by a
+  per-class mask (`AbilityBaseSO.SlotKind` + `AllowedClasses`).
+- Every ability is balanced against the others — monetization must never be pay-to-win.
 
-Each ability carries an icon glyph (stored on `AbilityBaseSO.Icon`, surfaced via `ResolveIcon()`) shown on the hex button and the character-select cards. Full accent-color + icon reference: ART.md §3.
+### 7.2 The pool
 
-#### Steal — steal cargo directly from rivals
+| Category | Ability | Class(es) | Targeting | Effect |
+|---|---|---|---|---|
+| **Common** | Peck 🐦 | all | AoE-self | Steal a little from nearby rivals + minor knockback |
+| | Egg Shell 🥚 | all | self | Invulnerable egg, immobile while active |
+| | Speed Burst 💨 | all | self | Short speed boost |
+| **Speedy** | Feather Aura 💨 | Speedy | AoE-self | Slow nearby rivals |
+| | Feather Trap 🪤 | Speedy | zone-at-feet | Slow zone left behind |
+| | Invisibility 👻 | Speedy + Assassin | self | Temporarily invisible |
+| **Fatty** | Roll & Push 🌀 | Fatty | directional (Barge) | Barge forward, knockback |
+| | Root Egg 🌱 | Fatty | zone-at-feet | Roots the first rival to step on it |
+| | Cluck Shock ⚡ | Fatty | AoE-self | Knockback shockwave — shove the swarm off |
+| | Turtle Mode 🐢 | Fatty | self | Near-zero speed, heavy control resistance |
+| **Warrior** | Flying Peck 🪽 | Warrior | directional (Vault) | Vault-dash, steal on contact |
+| | Wing Slam 💥 | Warrior | AoE-self | 1.5 s stun |
+| | Spine Coat 🦔 | Warrior | self-aura | Steal back + knockback anyone who touches you |
+| **Assassin** | Mark/Kill 🎯 🔒 | Assassin | single-target | The execute (§6.4) — locked signature slot |
+| | Ambush 🗡️ | Assassin | AoE-self | 1.0 s stun (sets up his own execute) |
+| | Sneaky Steal 🤏 | Assassin | AoE-self | Baseline rob |
+| | Shadowstep 👤 | Assassin | directional (Blink) | Short blink dash over walls |
+| | Doppelganger 👥 | Assassin | self (Blink) | Decoy copy |
 
-| Icon | Ability | Description | Cooldown |
-|---|---|---|---|
-| 🐦 | Peck | AoE steal from nearby rivals with minor knockback | Short |
-| 🪽 | Flying Peck | Vaulting dash forward that steals cargo on contact | Short |
-| 🤏 | Sneaky Steal | Instant targeted steal from nearby rival | Short |
+Zones (Feather Trap, Root Egg) drop **at the caster's feet** and never affect their own
+caster — "lay it as you flee."
 
-#### Control — disrupt movement, stun, or push
-
-| Icon | Ability | Description | Cooldown |
-|---|---|---|---|
-| 🎯 | Mark/Kill | Assassin Signature: Mark an isolated rival, arming execute on stun | Short |
-| 🗡️ | Ambush | Assassin: Precision 1.0s stun in small AoE | Medium |
-| 💥 | Wing Slam | Warrior: Heavy 1.5s stun in medium AoE | Medium |
-| ⚡ | Cluck Shock | Fatty: Knockback shockwave shoving nearby rivals away | Short |
-| 🌀 | Roll & Push | Fatty: Roll forward, push target away | Short |
-| 🪤 | Feather Trap | Throw feather cloud to a location; slows anyone walking through | Medium |
-| 💨 | Feather Aura | Emit feather cloud around self, slows nearby chickens | Medium |
-| 🌱 | Root Egg | Place egg that roots the first chicken that steps on it | Medium |
-
-Placed zones (Feather Trap, Root Egg) never affect their own caster: the trap
-is thrown for *others* — the owner walks through their own feather cloud
-unslowed, and a Root Egg placed at the caster's feet does not root the caster
-(decided 2026-07, WS2-2).
-
-#### Defense — protect self, cargo, or punish contact
-
-| Icon | Ability | Description | Cooldown |
-|---|---|---|---|
-| 🥚 | Egg Shell | Invulnerable egg form, immobile while active | Short |
-| 🐢 | Turtle Mode | Near-zero speed, greatly increased resistance | Short |
-| 🦔 | Spine Coat | Punishes contact by stealing cargo back + knockback | Medium |
-
-#### Utility — movement, stealth, phase, decoys
-
-| Icon | Ability | Description | Cooldown |
-|---|---|---|---|
-| 💨 | Speed Burst | Short movement speed boost | Short |
-| 👤 | Shadowstep | Assassin: Short blink dash phasing over walls along facing direction | Short |
-| 👻 | Invisibility | Temporarily invisible to other players | Medium |
-| 👥 | Doppelganger | Spawn decoy copy of yourself | Medium |
-
-### 7.3 Cooldown Tiers
+### 7.3 Cooldown tiers
 
 | Tier | Range |
 |---|---|
-| Short | 3–6 seconds *(exact values TBD per ability)* |
-| Medium | 8–12 seconds *(exact values TBD per ability)* |
+| Short | 3–6 s |
+| Medium | 8–12 s |
 
-*Balance pass required before any ability is made available for purchase.*
+Exact per-ability values (steal amounts, stun/slow durations, radii, cooldowns) are tuned
+against the Oracle and playtests.
 
 ---
 
 ## 8. Progression & Monetization
 
-### 8.1 Player Accounts
-- Accounts are **required** and **cross-platform** — progress, currency, and unlocks sync across mobile, PC, and tablet.
-- Account tracks: match history, in-game currency balance, unlocked characters, unlocked abilities, owned cosmetics.
-
-### 8.2 In-Game Economy
-- Every match awards **in-game currency** based on performance *(earn formula TBD — likely based on food collected, rivals stunned, and final placement)*.
-- Currency unlocks characters and abilities **slowly over time**.
-- Real money purchases allow **faster access** to the same content — not exclusive content.
-
-### 8.3 Monetization Pillars
+Accounts are required and cross-platform. Matches award currency (formula TBD — food
+banked, rivals robbed, placement) that unlocks classes and abilities slowly; real money
+buys **faster access to the same content**, never exclusives.
 
 | Pillar | Model | Pay-to-Win? |
 |---|---|---|
-| Characters | Free base roster + earnable/purchasable | No — all classes balanced |
-| Abilities | Free base pool + earnable/purchasable | No — all abilities balanced by design |
-| Chicken Skins | Paid / seasonal / earnable | No — purely cosmetic |
-| Map Skins | Paid / seasonal | No — purely cosmetic |
-| Seasonal Battle Pass | Paid, thematic content per season | No — cosmetics only |
-| Free Rotation | Rotating free characters & abilities | — |
+| Classes | Free base roster + earnable/purchasable | No — Oracle-balanced |
+| Abilities | Free base pool + earnable/purchasable | No — balanced by design |
+| Chicken / Map skins | Paid / seasonal / earnable | No — cosmetic |
+| Seasonal Battle Pass | Paid, thematic | No — cosmetic |
+| Free Rotation | Rotating free classes & abilities | — |
 
-### 8.4 Free Rotation
-A subset of locked characters and abilities will be available **for free on a rotating basis**, lowering the barrier for new players and letting them try content before purchasing.
+The **Common/Character** split does not create pay-to-win: Character abilities are class
+identity, not power tiers, and every ability is balanced against every other.
 
 ---
 
 ## 9. Cosmetics & Skins
 
-Skins are the primary long-term monetization vehicle and are **purely cosmetic** — they never affect gameplay or stats.
-
-**Skin types:**
-- **Chicken skins** — visual reskin of any class
-- **Map skins** — thematic reskin of the arena (terrain, props, lighting mood)
-
-**Acquisition methods:**
-- Direct purchase with real money
-- Earned via seasonal content / battle pass
-- Potentially earnable slowly via in-game currency *(TBD)*
-
-**Seasonal content** is scoped as a post-launch feature contingent on demo success. Each season would introduce a new skin set, a thematic battle pass, and potentially a new map skin.
+Purely cosmetic, never affecting stats. Chicken skins (reskin any class) and map skins
+(terrain/props/lighting mood). Acquired via purchase, battle pass, or slow currency.
+Seasonal content is post-demo, contingent on success.
 
 ---
 
 ## 10. Controls & UX
 
-- **Designed mobile-first** — all inputs must work on touchscreen without compromise.
-- **Movement:** Virtual joystick (left thumb).
-- **Abilities:** Two dedicated ability buttons in the right thumb area. Assassin has three.
-- **Collecting food:** Passive and automatic — stand on a pile and cargo fills at Cargo Rate per second. No button needed.
-- **Cooldown readability:** Ability buttons use a radial fill indicator and are greyed out while on cooldown. Clear visual state is a UI requirement.
-- UI must be **minimal and readable** at small screen sizes.
-- Character silhouettes must be **instantly readable** in isometric view — class identity must be clear at a glance.
-- Ability buttons must feel **responsive and satisfying** — core to the mobile experience.
+- **Mobile-first**, all inputs work on touchscreen.
+- **Movement:** left-thumb virtual joystick (also sets facing, which aims directional
+  abilities and the Mark soft-lock).
+- **Abilities:** right-thumb buttons — 2 for most classes, 3 for Assassin. The Mark/Kill
+  button is **two-press**: first press marks, and it re-labels to **KILL** when the target
+  qualifies.
+- **Collecting:** passive — stand on a pile, cargo fills at Collection Rate.
+- **Cooldowns:** radial fill + grey-out. Ability buttons must feel responsive.
+- Class silhouettes must read instantly in the isometric view.
 
 ---
 
-## 11. Open Questions & TBD Items
+## 11. Open items & deferred
 
-| # | Item | Priority |
+| # | Item | Status |
 |---|---|---|
-| 1 | Food target value (placeholder: 150 units) | High |
-| 2 | Match timer (placeholder: 3 min) | High |
-| 3 | Ability cooldown values per ability (short: 3–6s, medium: 8–12s) | High |
-| 4 | Cargo Rate values per class | High |
-| 5 | In-game currency earn formula | High |
-| 6 | Pile slow magnitude | High |
-| 7 | Collision slow magnitude | High |
-| 8 | Map randomization rules and constraints | Medium |
-| 9 | Exact food distribution per pile | Medium |
-| 10 | Seasonal content scope and cadence | Low |
+| 1 | Per-ability values (steal/stun/slow/cooldown/radius) | Tuning against Oracle + playtest |
+| 2 | **Passive pools reimplementation** (§5.3) | Designed, not yet in code |
+| 3 | **Last-15 s endgame rule** | Deferred until base loop is fun; 3 candidates parked (Open Bases / center-collapse / Golden Egg) |
+| 4 | Currency earn formula | TBD |
+| 5 | Pile-slow / collision-slow magnitudes | Tuning |
+| 6 | Task 8 Oracle test loads real SOs (not hardcoded stats) | Follow-up |
+| 7 | Human playtest — "is it actually fun?" | **The open question the whole redesign exists to answer** |
+
+**Parked future content:** **King of the Hill** — a future *class* (a zone-tax squatter who
+"owns" a pile and taxes rivals farming it). **Spoiler v2** — an *earned* bounty (+N per
+steal/execute landed) replacing the flat +15, so stalling is strictly worse than hunting.
 
 ---
 
 ## 12. Flavor System — Franchise Architecture
 
-The **Flavor System** is an architectural decision, not an in-game feature. The game engine and core mechanics are designed to be **reskinned and redeployed as separate games**, each targeting a different theme and potentially a different audience or ruleset variant.
+The engine is built to be **reskinned into separate games** sharing one codebase. Core
+loop, stats, ability system, and progression are theme-agnostic; any flavor-specific
+variation is a configurable layer, never a code fork.
 
-Each flavor is a **standalone game** built on the same codebase, sharing mechanics, systems, and infrastructure with minimal rework.
-
-| Flavor | Game Title (TBD) | Setting | Mechanic Variants |
-|---|---|---|---|
-| The Farm *(launch)* | Cluck Wars | Countryside grange, chickens | Base version |
-| Plunder Coop *(planned)* | TBD | Pirate ships & sea | 4v4 variant, similar mechanics |
-| Cluck Station *(planned)* | TBD | Outer space | TBD |
-
-**Design principle:** Core loop, stats, ability system, and progression must be engineered to be **theme-agnostic** from day one. Any flavor-specific mechanic variation must be a configurable layer, not a code fork.
+| Flavor | Title | Setting |
+|---|---|---|
+| The Farm *(launch)* | Cluck Wars | Countryside grange, chickens |
+| Plunder Coop *(planned)* | TBD | Pirate ships & sea |
+| Cluck Station *(planned)* | TBD | Outer space |
 
 ---
 
-## 13. Annex: Implementation Discrepancies & Additions
+## 13. Implementation status (v0.4)
 
-This annex catalogs features and logic currently present in the codebase that are either undocumented in the main GDD or deviate from the documented spec. These discrepancies will be evaluated for formal inclusion in the next GDD version.
+Reflects the four committed v0.4 plans (`docs/superpowers/plans/`).
 
-### 13.1 AI Bots (Solo Mode)
-The codebase includes a fully functional AI bot system (`BotController.cs`) for solo or offline play, which is not covered in the multiplayer-focused core GDD.
-- **Bot FSM:** Bots operate on a 5-tier priority system evaluated every 0.3 seconds:
-  1. **Flee:** If loaded with cargo and a rival is nearby, rush to base and use Defensive/Escape/Control abilities.
-  2. **Deposit:** If cargo exceeds a return threshold, head back to base.
-  3. **Hunt:** If a rival is loaded and in range, chase and attack with Steal/Offense/Control abilities.
-  4. **Collect:** Walk to the nearest food pile (using Control abilities if contested).
-  5. **Idle:** Do nothing if no actions are available.
-- **Class Personalities:** Bots modify their behavior based on their chosen class. For example, Warrior bots hunt aggressively, Fatty bots play cautiously and deposit early, Assassin bots opportunistically hunt loaded rivals, and Speedy bots do hit-and-runs.
+- **Balance Oracle** — shipped. Pure-C# SCT simulator + target harness (`Assets/_Game/
+  Scripts/Balance/`), EditMode-tested.
+- **Map & walls** — shipped. Tiered 80-food budget, pinwheel walls on `ObstacleClass`,
+  centre pile no longer permanent/regenerating (fixed supply).
+- **Combat** — shipped. HP/damage pipeline deleted; `ControlState`/`ControlRules` ladder;
+  `StealMath` cap; `RPC_ApplyStun`; `AssassinExecute` (Mark/Kill, bounty bag);
+  `MatchConfig` W=40 / 45 s / Spoiler +15 / DepositRate 9; class stats Oracle-solved.
+- **Ability pool** — shipped. Steal/Control/Defense/Utility categories; ex-damage abilities
+  converted to steal; new Ambush / Wing Slam / Shadowstep / Mark/Kill; roster masks;
+  Spine Coat steal-back rate-gated.
 
-### 13.2 "Slippery" Passive Discrepancy — RESOLVED (2026-07)
-According to Section 5.2, the Speedy Chicken's "Slippery" passive reduces the *duration* of control abilities. The code previously also reduced the *magnitude* of slows by 50% (`SlipperySlowRetention`), an undocumented double-dip. Resolved in the WS1 balance pass: the magnitude branch in `ChickenController.ApplySlow` was removed; the passive is now duration-only (`SlipperyDurationReduction` in `RPC_ApplyAbilitySlow` / `RPC_ApplyRoot`), matching §5.2.
-
-### 13.3 Base Assignment Tie-breaker — RESOLVED (2026-07)
-Section 2 states that the player with the most food stored at their base wins when the timer expires. In the code, if multiple players are tied with the exact same amount of food, the `GameManager` resolves the tie deterministically: first by food, then by kills, then by lower corner index.
-
-### 13.4 Assassin Balance Rescue — IMPLEMENTED (2026-07)
-The Assassin class was tuned to be more competitive:
-- **MoveSpeed:** Increased from 8 to 9.
-- **CargoCapacity:** Increased from 5 to 8.
-- **Sneaky Steal Ability:** Cooldown decreased from 6 to 5 seconds; StealAmount increased from 4 to 6.
-
-### 13.5 Comeback Events & Kill Bounty — IMPLEMENTED (2026-07)
-To make final minutes and combat more dynamic:
-- **Comeback Events:** At 60 seconds remaining, one of four events is rolled: Golden Pile (spawns 25-food pile near center), Underdog Surge (buffs speed/rate of last place player), Leader Bounty (spawns +8 food around leader on death), or Restock (refills piles by 10 food).
-- **Kill Bounty:** Spawns +5 food pickups between killer and victim (60% bias to killer) on any non-decoy kill.
+**Known gaps:** passive pools (§5.3) still carry the pre-0.4 set; endgame rule deferred;
+the Oracle re-solve rests on the simulator's model refinement (bank a winning load without
+overfilling) and has not been re-verified in a live human playtest — **that playtest is the
+next step.**
