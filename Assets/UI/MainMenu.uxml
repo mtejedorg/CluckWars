@@ -1,19 +1,71 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <!-- Cluck Wars — main menu (2026-07-24 redesign).
+
+         The previous version was a text screen for a game about chickens: title,
+         subtitle and three identical pills in a ~250px band, with ~430px of dead
+         black above and ~350px below, while every art atom the project ships
+         (4 chicken sprites, RadialGlow, GlossOverlay) went unused.
+
+         Three changes:
+
+         1. CAST BAND. The four chickens are the product. Showing them says
+            "4-player, pick a chicken" faster than the subtitle does, costs no new
+            art, and fills the void that made the old screen feel unfinished.
+         2. ONE PRIMARY ACTION. SOLO is the instant-play path and the one a
+            playtester takes almost every time, so it is a wide gold button on its
+            own row; HOST/JOIN drop to a secondary pair beneath it. Previously all
+            three were the same pill and the eye had no entry point.
+         3. A PAINTED BACKDROP. A generated farmyard-arena plate (Flux, via the
+            assetforge skill) replaces the flat #0e0804 void, knocked back behind
+            a flat contrast scrim so the type stays legible over it.
+
+         Sizes follow the mobile contract at the top of CluckWarsTheme.uss. -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
 
-    <ui:VisualElement name="MainMenuPage" class="cw-screen cw-page" style="align-items: center; justify-content: center;">
+    <ui:VisualElement name="MainMenuPage" class="cw-screen cw-page cw-menu">
 
-        <ui:VisualElement style="align-items: center; margin-bottom: 36px;">
-            <ui:Label text="CLUCK WARS" class="cw-title cw-accent" style="font-size: 72px; letter-spacing: 4px;" />
-            <ui:Label text="4-PLAYER FARMYARD FREE-FOR-ALL" class="cw-body" style="font-size: 18px; letter-spacing: 2px; margin-top: 4px;" />
+        <!-- Contrast scrim over the painted backdrop (the plate itself is on
+             .cw-menu). picking-mode Ignore so it never eats a button tap. -->
+        <ui:VisualElement class="cw-menu-scrim" picking-mode="Ignore" />
+
+        <!-- ── Title ── -->
+        <ui:VisualElement class="cw-menu-titleblock" picking-mode="Ignore">
+            <ui:Label text="CLUCK WARS" class="cw-title cw-accent cw-menu-title" />
+            <ui:Label text="4-PLAYER FARMYARD FREE-FOR-ALL" class="cw-body cw-menu-subtitle" />
         </ui:VisualElement>
 
-        <ui:VisualElement name="ModeRow" class="cw-mode-row" style="align-items: center; justify-content: center;">
-            <ui:Button name="SoloBtn" text="SOLO" class="cw-btn cw-btn--gold" style="min-width: 220px; margin-left: 8px; margin-right: 8px; margin-bottom: 8px; font-size: 26px;" />
-            <ui:Button name="HostBtn" text="HOST" class="cw-btn cw-btn--green" style="min-width: 220px; margin-left: 8px; margin-right: 8px; margin-bottom: 8px; font-size: 26px;" />
-            <ui:Button name="JoinBtn" text="JOIN" class="cw-btn cw-btn--neutral" style="min-width: 220px; margin-left: 8px; margin-right: 8px; margin-bottom: 8px; font-size: 26px;" />
+        <!-- ── Cast band: the four playable chickens ── -->
+        <ui:VisualElement name="CastBand" class="cw-menu-cast" picking-mode="Ignore">
+            <ui:VisualElement class="cw-menu-cast__item">
+                <ui:VisualElement class="cw-chicken cw-chicken--warrior cw-menu-cast__art" />
+                <ui:Label text="WARRIOR" class="cw-menu-cast__name cw-menu-cast__name--warrior" />
+            </ui:VisualElement>
+            <ui:VisualElement class="cw-menu-cast__item">
+                <ui:VisualElement class="cw-chicken cw-chicken--speedy cw-menu-cast__art" />
+                <ui:Label text="SPEEDY" class="cw-menu-cast__name cw-menu-cast__name--speedy" />
+            </ui:VisualElement>
+            <ui:VisualElement class="cw-menu-cast__item">
+                <ui:VisualElement class="cw-chicken cw-chicken--fatty cw-menu-cast__art" />
+                <ui:Label text="FATTY" class="cw-menu-cast__name cw-menu-cast__name--fatty" />
+            </ui:VisualElement>
+            <ui:VisualElement class="cw-menu-cast__item">
+                <ui:VisualElement class="cw-chicken cw-chicken--assassin cw-menu-cast__art" />
+                <ui:Label text="ASSASSIN" class="cw-menu-cast__name cw-menu-cast__name--assassin" />
+            </ui:VisualElement>
         </ui:VisualElement>
 
-        <ui:Label name="MainMenuHint" text="Pick a mode to choose your chicken." class="cw-body" style="margin-top: 16px; min-height: 22px;" />
+        <!-- ── Actions: one primary, two secondary ── -->
+        <ui:VisualElement class="cw-menu-actions">
+            <ui:Button name="SoloBtn" text="▶  PLAY SOLO" class="cw-btn cw-btn--gold cw-menu-primary" />
+            <ui:VisualElement name="ModeRow" class="cw-mode-row cw-menu-secondary-row">
+                <ui:Button name="HostBtn" text="HOST GAME" class="cw-btn cw-btn--green cw-menu-secondary" />
+                <ui:Button name="JoinBtn" text="JOIN GAME" class="cw-btn cw-btn--neutral cw-menu-secondary" />
+            </ui:VisualElement>
+            <ui:Label name="MainMenuHint" text="Solo runs a full match against 3 CPU chickens." class="cw-body cw-menu-hint" />
+        </ui:VisualElement>
+
+        <!-- Build stamp — during a test session you otherwise cannot tell which
+             build is on the device. Filled by MenuUiController. -->
+        <ui:Label name="BuildStamp" text="" class="cw-menu-build" picking-mode="Ignore" />
     </ui:VisualElement>
 </ui:UXML>

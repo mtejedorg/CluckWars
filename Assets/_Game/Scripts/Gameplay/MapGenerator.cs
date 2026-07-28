@@ -59,7 +59,7 @@ namespace CluckWars.Gameplay
 
         [Header("Interior terrain — Standard (wall segments; ADR 0003 Decision 5)")]
         [Tooltip("Number of Standard wall segments. 0 cleanly disables the class. Interior terrain is LOCAL geometry that blocks movement, so online layouts are seeded from the session name — every peer builds the identical map.")]
-        [Range(0, 16)]
+        [Range(0, 20)]
         [SerializeField] private int _standardObstacleCount = 8;
         [Tooltip("Min (x) / max (y) length of a Standard wall segment. Depth is _wallThickness.")]
         [SerializeField] private Vector2 _interiorWallLengthRange = new Vector2(3f, 6f);
@@ -295,13 +295,29 @@ namespace CluckWars.Gameplay
                 new Vector3(t, h, _planeSize));
         }
 
-        private GameObject CreateWall(string name, Vector3 localPosition, Vector3 size)
+        /// <summary>Creates a wall/obstacle cube collider, optionally rendered.</summary>
+        /// <param name="forceVisible">
+        /// Skips the <see cref="_wallsVisible"/> gate entirely. Boundary walls
+        /// (<see cref="BuildBoundaryWalls"/>) leave this false so the "invisible
+        /// horizon" behaviour is untouched. Interior/pinwheel terrain
+        /// (<see cref="BuildInteriorObstacles"/>) passes true — that geometry is
+        /// gameplay-critical and must always render, regardless of the boundary's
+        /// debug-visibility toggle. The caller assigns the per-class tinted
+        /// material immediately after this returns, so no material handling
+        /// happens on the forced-visible path.
+        /// </param>
+        private GameObject CreateWall(string name, Vector3 localPosition, Vector3 size, bool forceVisible = false)
         {
             var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
             wall.name = name;
             wall.transform.SetParent(transform, worldPositionStays: false);
             wall.transform.localPosition = localPosition;
             wall.transform.localScale = size;
+
+            if (forceVisible)
+            {
+                return wall;
+            }
 
             if (!_wallsVisible)
             {
@@ -411,9 +427,12 @@ namespace CluckWars.Gameplay
             float half = _planeSize * 0.5f;
             float centerKeepClear = FootprintRadius(_centerPileFootprint);
             float baseKeepClear = 4f;
+            var keepClearDiscs = ComputeBaseAndPileKeepClearDiscs(baseKeepClear);
 
-            // Generate pinwheel wall segments
-            var segments = PinwheelLayout.Build(half, _standardObstacleCount, seed, centerKeepClear, baseKeepClear);
+            // Generate pinwheel wall segments. armThickness = _wallThickness — every
+            // segment gets built with that same physical thickness below regardless of
+            // its ObstacleClass, so the hub-plaza math needs to know it up front.
+            var segments = PinwheelLayout.Build(half, _standardObstacleCount, seed, centerKeepClear, _wallThickness, keepClearDiscs);
 
             // ObstacleSpecs for the three classes to reuse shared materials and tints
             var specs = new[]
@@ -443,13 +462,22 @@ namespace CluckWars.Gameplay
                 // Get spec matching segment class
                 ObstacleSpec spec = GetSpecForClass(seg.Class, specs);
 
-                // Height comes from spec
+                // Height comes from spec. Thickness is _wallThickness for every arm
+                // regardless of class — deliberately NOT forced thicker for visual bulk:
+                // PinwheelLayout.Build's hub-plaza radius scales with whatever thickness is
+                // passed in, so an artificially bold wall (e.g. a hardcoded 1.4 floor, tried
+                // and reverted 2026-07-27) silently eats into the corridor clearance it
+                // guarantees near the centre. If the pinwheel needs to read bolder, raise
+                // _wallThickness itself so the clearance math accounts for it.
                 float height = spec.Height;
-                Vector3 size = new Vector3(length, height, _wallThickness);
+                float wedgeThickness = _wallThickness;
+                Vector3 size = new Vector3(length, height, wedgeThickness);
 
-                // Create wall GameObject using CreateWall
+                // Create wall GameObject using CreateWall. forceVisible: true — interior
+                // terrain must always render (see CreateWall's forceVisible doc), unlike
+                // the boundary walls which stay gated on _wallsVisible.
                 string wallName = $"Terrain_{seg.Class}_{i}";
-                GameObject go = CreateWall(wallName, center + Vector3.up * (height * 0.5f), size);
+                GameObject go = CreateWall(wallName, center + Vector3.up * (height * 0.5f), size, forceVisible: true);
 
                 // Apply rotation
                 float angleRad = Mathf.Atan2(delta.y, delta.x);
@@ -472,6 +500,42 @@ namespace CluckWars.Gameplay
             _log?.Info(Source, $"Interior terrain: placed {segments.Length} pinwheel obstacles. Seed={seedNote}.");
         }
 
+        /// <summary>
+        /// No-build discs the pinwheel arms must be pushed clear of, beyond the centre
+        /// pile: the four bases (real corner positions — previously
+        /// <c>PinwheelLayout.Build</c> guessed its own approximate base positions
+        /// internally, which only matched the real ones by coincidence at the default
+        /// arena size) plus every personal and contested food pile.
+        /// </summary>
+        /// <remarks>
+        /// Piles get their per-match XZ jitter (<see cref="JitterXZ"/>) only once
+        /// <see cref="SpawnFoodPiles"/> runs, which is after interior terrain is built —
+        /// so this uses each pile's NOMINAL (pre-jitter) position and inflates its radius
+        /// by <see cref="_pilePositionJitter"/> to cover every position the pile could
+        /// actually land at, plus <see cref="PinwheelLayout.PileArmBuffer"/> so a stocked
+        /// pile can never end up flush against an arm.
+        /// </remarks>
+        private KeepClearDisc[] ComputeBaseAndPileKeepClearDiscs(float baseKeepClear)
+        {
+            float personalRadius = FootprintRadius(_personalPileFootprint) + _pilePositionJitter + PinwheelLayout.PileArmBuffer;
+            float contestedRadius = FootprintRadius(_contestedPileFootprint) + _pilePositionJitter + PinwheelLayout.PileArmBuffer;
+
+            var discs = new KeepClearDisc[_corners.Length * 3]; // base + personal + contested per corner
+            int idx = 0;
+            for (int i = 0; i < _corners.Length; i++)
+            {
+                discs[idx++] = new KeepClearDisc(new Vector2(_corners[i].x, _corners[i].z), baseKeepClear);
+
+                var personalNominal = Vector3.Lerp(_corners[i], Vector3.zero, _personalPileInset);
+                discs[idx++] = new KeepClearDisc(new Vector2(personalNominal.x, personalNominal.z), personalRadius);
+
+                var mid = (_corners[i] + _corners[(i + 1) % _corners.Length]) * 0.5f;
+                var contestedNominal = mid * _contestedEdgeInset;
+                discs[idx++] = new KeepClearDisc(new Vector2(contestedNominal.x, contestedNominal.z), contestedRadius);
+            }
+            return discs;
+        }
+
         private ObstacleSpec GetSpecForClass(ObstacleClass cls, ObstacleSpec[] specs)
         {
             for (int i = 0; i < specs.Length; i++)
@@ -489,6 +553,19 @@ namespace CluckWars.Gameplay
         /// (ADR 0003 Decision 6). Containment is then enforced by an exact
         /// rotated-bounds test against the boundary walls.
         /// </summary>
+        /// <remarks>
+        /// DEAD CODE as of the pinwheel rewrite (commit 6b27390): <see cref="BuildInteriorObstacles"/>
+        /// now builds interior terrain from <c>PinwheelLayout.Build</c> and no longer calls this
+        /// method — verified with a project-wide grep, only the declaration below matches. Left in
+        /// place (not deleted) because <see cref="_interiorWallClearance"/>, <see cref="_obstacleSpacing"/>,
+        /// <see cref="_obstacleEdgeMargin"/> and <see cref="_obstaclePlacementAttempts"/> are still
+        /// serialized inspector fields on every scene's MapGenerator component, and this is the only
+        /// consumer of them plus <see cref="DistanceToBox"/>/<see cref="FitsInsideBoundary"/>/
+        /// <see cref="PlacedObstacle"/>/<see cref="Objective"/>. Removing it cleanly means also
+        /// removing those four fields (touching scene YAML beyond this bug's scope) — flagging here
+        /// instead so a future pass can decide whether to fully retire the rejection-sampling path
+        /// or keep it as a fallback placement strategy.
+        /// </remarks>
         private int PlaceObstacleClass(in ObstacleSpec spec, System.Random rng,
                                        List<Objective> objectives, List<PlacedObstacle> placed)
         {

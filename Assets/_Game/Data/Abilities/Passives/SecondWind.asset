@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SecondWindPassiveSO
   DisplayName: Second Wind
   ShortLabel: WIND
+  Description: Control effects last 30% less time.
   Icon: 
   AccentColor: {r: 0.95, g: 0.45, b: 0.15, a: 1}
   Category: 3

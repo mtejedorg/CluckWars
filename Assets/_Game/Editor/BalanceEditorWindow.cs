@@ -99,7 +99,6 @@ namespace CluckWars.Editor
             EditorGUILayout.BeginHorizontal();
             ColHeader("Class",   wName);
             ColHeader("Passive", wPassive);
-            ColHeader("MaxHP",   wF);
             ColHeader("MoveSpd", wF);
             ColHeader("Turn°",   wF);
             ColHeader("Cap",     wI);
@@ -117,7 +116,6 @@ namespace CluckWars.Editor
 
                 EditorGUILayout.LabelField(s.DisplayName, GUILayout.Width(wName));
                 s.Passive        = (ChickenPassive)EditorGUILayout.EnumPopup(s.Passive, GUILayout.Width(wPassive));
-                s.MaxHP          = FloatField(s.MaxHP,          wF, minVal: 1f);
                 s.MoveSpeed      = FloatField(s.MoveSpeed,      wF, minVal: 0f);
                 s.TurnSpeed      = FloatField(s.TurnSpeed,      wF, minVal: 0f);
                 s.CargoCapacity  = IntField(s.CargoCapacity,    wI, minVal: 1);

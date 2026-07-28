@@ -41,6 +41,8 @@ namespace CluckWars.UI
         public static readonly Color GreenBorder   = Hex32("1a6a1a");
         public static readonly Color TextPrimary   = Hex32("fef5e0");
         public static readonly Color TextSecondary = Hex32("c4a060");
+        /// <summary>Dark ink for text drawn on a light fill (gold buttons, code tiles, light accent badges).</summary>
+        public static readonly Color TextDark      = Hex32("1a0e04");
         public static readonly Color ScreenBg      = Hex32("0e0804");
 
         /// <summary>Parse a 6-hex-digit color (no '#').</summary>

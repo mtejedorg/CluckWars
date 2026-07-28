@@ -69,18 +69,18 @@ namespace CluckWars.UI
         {
             public string Name, Role, PassiveName, PassiveDesc;
             public Color Tint;
-            public int[] Stats; // cargo, rate, hp, resist, speed (1..5)
+            public int[] Stats; // cargo, rate, speed (1..5) — HP/Resist removed in v0.4 (no health)
         }
 
         private static readonly Dictionary<ChickenClass, ClassMeta> Meta = new()
         {
-            [ChickenClass.Warrior]  = new ClassMeta { Name = "WARRIOR CHICKEN",  Role = "All-Rounder",  Tint = UiGfx.Hex32("C04030"), PassiveName = "MIGHTY",     PassiveDesc = "+25% outgoing ability damage.",  Stats = new[]{3,3,4,3,3} },
-            [ChickenClass.Speedy]   = new ClassMeta { Name = "SPEEDY CHICKEN",   Role = "Hit & Run",    Tint = UiGfx.Hex32("E85A2A"), PassiveName = "SLIPPERY",  PassiveDesc = "Reduced control-effect duration.", Stats = new[]{2,3,2,1,5} },
-            [ChickenClass.Fatty]    = new ClassMeta { Name = "FATTY CHICKEN",    Role = "Bulk Carrier", Tint = UiGfx.Hex32("F5D75A"), PassiveName = "IMMOVABLE", PassiveDesc = "Greatly reduced knockback.",       Stats = new[]{5,5,5,5,2} },
-            [ChickenClass.Assassin] = new ClassMeta { Name = "ASSASSIN CHICKEN", Role = "Disruptor",    Tint = UiGfx.Hex32("7B68EE"), PassiveName = "COMBO",     PassiveDesc = "Equips 3 abilities instead of 2.", Stats = new[]{2,2,2,2,4} },
+            [ChickenClass.Warrior]  = new ClassMeta { Name = "WARRIOR CHICKEN",  Role = "All-Rounder",  Tint = UiGfx.Hex32("C04030"), PassiveName = "MIGHTY",     PassiveDesc = "+25% outgoing ability damage.",  Stats = new[]{3,3,3} },
+            [ChickenClass.Speedy]   = new ClassMeta { Name = "SPEEDY CHICKEN",   Role = "Hit & Run",    Tint = UiGfx.Hex32("E85A2A"), PassiveName = "SLIPPERY",  PassiveDesc = "Reduced control-effect duration.", Stats = new[]{2,3,5} },
+            [ChickenClass.Fatty]    = new ClassMeta { Name = "FATTY CHICKEN",    Role = "Bulk Carrier", Tint = UiGfx.Hex32("F5D75A"), PassiveName = "IMMOVABLE", PassiveDesc = "Greatly reduced knockback.",       Stats = new[]{5,5,2} },
+            [ChickenClass.Assassin] = new ClassMeta { Name = "ASSASSIN CHICKEN", Role = "Disruptor",    Tint = UiGfx.Hex32("7B68EE"), PassiveName = "COMBO",     PassiveDesc = "Equips 3 abilities instead of 2.", Stats = new[]{2,2,4} },
         };
 
-        private static readonly string[] StatRowNames = { "StatCargo", "StatRate", "StatHp", "StatResist", "StatSpeed" };
+        private static readonly string[] StatRowNames = { "StatCargo", "StatRate", "StatSpeed" };
         private static readonly string[] ChipNames    = { "ClassWarrior", "ClassSpeedy", "ClassFatty", "ClassAssassin" };
 
         // Ability categories. These used to be section headers in a scrolling
@@ -311,7 +311,13 @@ namespace CluckWars.UI
         }
 
         private ChickenClass Cls => _selection?.SelectedClass ?? ChickenClass.Warrior;
-        /// <summary>Total active-ability slots the current loadout fills: 1 Common + 1 Character, +1 under COMBO.</summary>
+        /// <summary>
+        /// Total active-ability slots the loadout has to fill: 2 normally, 3 under
+        /// COMBO. As of the "Common is optional" directive (design override of GDD
+        /// §7.1-7.2, reaffirmed) this is purely a slot COUNT — any legal ability,
+        /// Common or Character, may land in any of the N slots, freely mixed. There
+        /// is no longer a "slot 0 is reserved for Common" rule.
+        /// </summary>
         private int ActiveSlotsForClass => (_selection?.Passive is ComboPassiveSO) ? 3 : 2;
 
         private Color TintOf(ChickenClass cls)
@@ -472,27 +478,30 @@ namespace CluckWars.UI
         // ======================================================================
         //  LOADOUT PICK ROWS
         // ----------------------------------------------------------------------
-        //  ADR 0003 left each class seeing 3 Common + 3 Character abilities. The
-        //  previous UI — a slot-hex row plus a ScrollView of 23%-wide cards under
-        //  category headers — was built for the full 14-ability pool and rendered
-        //  those three cards as up to three headers holding ONE card each, in a
-        //  view that never scrolled, behind a two-step "tap a slot, then tap a
-        //  card" interaction.
+        //  Two flat rows, both fully visible, selection direct:
         //
-        //  It is now two flat rows, both fully visible, selection direct:
+        //      COMMON  — any chicken can take these (pool of 3)
+        //      CLASS   — legal only for the selected class (pool of 3)
         //
-        //      (1) COMMON  pick 1 of 3  -> Ability0
-        //      (2) CLASS   pick 1 of 3  -> Ability1
-        //                  pick 2 of 3  -> Ability1 + Ability2   (Assassin COMBO)
+        //  Design override of GDD §7.1-7.2 (explained once, reaffirmed by the
+        //  user — not re-litigated here): Common is OPTIONAL, not a mandatory
+        //  1st slot. Ability0/Ability1/Ability2 are now purely positional
+        //  bookkeeping for N total active-ability slots (N = ActiveSlotsForClass:
+        //  2 normally, 3 under Assassin's COMBO). Any legal ability from EITHER
+        //  row can land in ANY open slot, freely mixed — 0 Common + N Character,
+        //  N Common + 0 Character (bounded by the 3-ability Common pool), or any
+        //  mix in between are all equally valid. There is no per-category
+        //  minimum; only the total count (== N) gates READY.
         //
-        //  COMBO therefore widens the CLASS row rather than unlocking a third
-        //  slot fed from the same three options, so the dimmed padlock hex is
-        //  gone. Ability0/1/2 and every ISessionSelectionService write are
-        //  unchanged, so the spawner and the touch HUD's 1/2/3 hex mapping keep
-        //  working exactly as before.
+        //  The two rows stay as a discoverability grouping — legality/category
+        //  is still visually separated — but tapping a card in either row now
+        //  fills the next open slot among all N, not a category-fixed slot.
+        //  Ability0/1/2 and every ISessionSelectionService write are unchanged,
+        //  so the spawner and the touch HUD's 1/2/3 hex mapping keep working
+        //  exactly as before.
         // ======================================================================
 
-        /// <summary>Character-ability picks the loadout currently allows: 2 under COMBO, else 1.</summary>
+        /// <summary>Character-ability picks legal for the class: 2 under COMBO, else 1. Used only to size the CLASS pool's hint text — NOT a per-row minimum (see ActiveSlotsForClass).</summary>
         private int ClassPicksAllowed => (_selection?.Passive is ComboPassiveSO) ? 2 : 1;
 
         private void RebuildPickRows(ChickenClass cls)
@@ -523,13 +532,17 @@ namespace CluckWars.UI
             FillRow(_commonCards, common);
             FillRow(_classCards,  character);
 
-            if (_commonHint != null) _commonHint.text = "any chicken can take these";
+            if (_commonHint != null) _commonHint.text = "optional · any chicken can take these";
             if (_classHint != null)
             {
+                // "optional · " dropped from the COMBO variant — it already runs
+                // right up against the row width budget (measured live: 927px of
+                // content in a 902px head with "1 EQUIPPED" showing) and clipped.
+                // The non-combo variant has room to spare.
                 string clsName = Meta[cls].Name.Replace(" CHICKEN", string.Empty);
                 _classHint.text = ClassPicksAllowed > 1
                     ? $"{clsName} only · COMBO lets you take two"
-                    : $"{clsName} only";
+                    : $"optional · {clsName} only";
             }
         }
 
@@ -663,47 +676,47 @@ namespace CluckWars.UI
         }
 
         /// <summary>
-        /// Tap a card to pick it, tap it again to drop it. A Common tap always
-        /// replaces slot 0. A Class tap fills the first free class slot; when the
-        /// row is already full it replaces the oldest pick (slot 1), which keeps
-        /// a full row responsive instead of silently ignoring the tap.
+        /// Tap an unequipped, legal card (Common or Character — category no
+        /// longer matters) to pick it, tap an equipped card again to drop it.
+        /// Picking fills the first open slot among all N active slots
+        /// (<see cref="ActiveSlotsForClass"/>), regardless of which row the card
+        /// came from; when all N are already full it drops the oldest pick,
+        /// shifts the rest down, and appends — same "never silently ignore the
+        /// tap" behaviour the old Class-row-full case had, just generalized.
+        /// Dropping compacts the remaining picks so a slot is never empty while
+        /// a higher-indexed slot is occupied (the touch HUD maps slots 1/2/3 to
+        /// its three hexes positionally, and COMBO alone unlocks the third).
         /// </summary>
         private void TogglePick(AbilityBaseSO ab)
         {
             if (_selection == null || ab == null) return;
 
-            if (ab.SlotKind == AbilitySlotKind.Common)
+            int n = ActiveSlotsForClass;
+            int existing = SlotOf(ab);
+
+            if (existing >= 0)
             {
-                SetEquipped(0, GetEquipped(0) == ab ? null : ab);
+                // Unequip: shift everything above it down one, clear the tail.
+                for (int i = existing; i < n - 1; i++) SetEquipped(i, GetEquipped(i + 1));
+                SetEquipped(n - 1, null);
             }
             else
             {
-                int existing = SlotOf(ab);
-                if (existing >= 0)
+                int freeSlot = -1;
+                for (int i = 0; i < n; i++)
                 {
-                    SetEquipped(existing, null);
-                    // Keep the class picks packed into slot 1 first, so slot 2 is
-                    // never occupied while slot 1 is empty (the touch HUD maps
-                    // slot 2 to the third hex, which COMBO alone is allowed).
-                    if (existing == 1) { SetEquipped(1, GetEquipped(2)); SetEquipped(2, null); }
+                    if (GetEquipped(i) == null) { freeSlot = i; break; }
                 }
-                else if (GetEquipped(1) == null)
+
+                if (freeSlot >= 0)
                 {
-                    SetEquipped(1, ab);
-                }
-                else if (ClassPicksAllowed > 1 && GetEquipped(2) == null)
-                {
-                    SetEquipped(2, ab);
-                }
-                else if (ClassPicksAllowed > 1)
-                {
-                    // Both class slots full — drop the oldest, shift down, append.
-                    SetEquipped(1, GetEquipped(2));
-                    SetEquipped(2, ab);
+                    SetEquipped(freeSlot, ab);
                 }
                 else
                 {
-                    SetEquipped(1, ab);   // single-pick row — straight replace
+                    // All N slots full — drop the oldest, shift down, append.
+                    for (int i = 0; i < n - 1; i++) SetEquipped(i, GetEquipped(i + 1));
+                    SetEquipped(n - 1, ab);
                 }
             }
 
@@ -712,18 +725,32 @@ namespace CluckWars.UI
             RefreshEquippedState();
         }
 
+        /// <summary>
+        /// READY gates on total distinct equipped abilities == N + a Passive —
+        /// there is no per-category (Common vs Class) minimum any more. The two
+        /// row counters are read-outs of "how many of this row's pool are
+        /// currently equipped", not a "/1" or "/N" requirement — Common is
+        /// entirely optional, per the design override of GDD §7.1-7.2.
+        /// </summary>
         private void RefreshEquippedState()
         {
-            int classPicked = 0;
-            if (GetEquipped(1) != null) classPicked++;
-            if (GetEquipped(2) != null) classPicked++;
-            int classNeeded = ClassPicksAllowed;
-            int commonPicked = GetEquipped(0) != null ? 1 : 0;
+            int n = ActiveSlotsForClass;
+            int totalPicked = 0, commonPicked = 0, classPicked = 0;
+            for (int i = 0; i < n; i++)
+            {
+                var eq = GetEquipped(i);
+                if (eq == null) continue;
+                totalPicked++;
+                if (eq.SlotKind == AbilitySlotKind.Common) commonPicked++;
+                else classPicked++;
+            }
 
-            if (_commonCount != null) _commonCount.text = $"{commonPicked}/1";
-            if (_classCount  != null) _classCount.text  = $"{classPicked}/{classNeeded}";
+            // No implied floor: "0 equipped" reads as "optional, none taken yet",
+            // not as a missing requirement.
+            if (_commonCount != null) _commonCount.text = $"{commonPicked} EQUIPPED";
+            if (_classCount  != null) _classCount.text  = $"{classPicked} EQUIPPED";
 
-            int missing = (1 - commonPicked) + Mathf.Max(0, classNeeded - classPicked);
+            int missing = Mathf.Max(0, n - totalPicked);
             bool ready  = missing == 0 && _selection?.Passive != null;
 
             if (_readyBtn != null)

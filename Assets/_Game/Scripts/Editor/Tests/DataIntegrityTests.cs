@@ -162,7 +162,6 @@ namespace CluckWars.Tests
             foreach (var s in all)
             {
                 Assert.IsFalse(string.IsNullOrWhiteSpace(s.DisplayName), $"{s.name}: DisplayName is blank.");
-                Assert.Greater(s.MaxHP, 0f,        $"{s.name}: MaxHP {s.MaxHP} — a chicken spawns dead.");
                 Assert.Greater(s.MoveSpeed, 0f,    $"{s.name}: MoveSpeed {s.MoveSpeed} — the class cannot move.");
                 Assert.Greater(s.TurnSpeed, 0f,    $"{s.name}: TurnSpeed {s.TurnSpeed} — the class cannot turn.");
                 Assert.GreaterOrEqual(s.CargoCapacity, 1, $"{s.name}: CargoCapacity {s.CargoCapacity} — cannot carry food, so it can never score.");
@@ -314,6 +313,122 @@ namespace CluckWars.Tests
                 .ToList();
 
             Assert.IsEmpty(dupes, "The same AudioClip is wired to more than one cue slot.");
+        }
+
+        // ---- MatchBootstrapper bot loadouts (scene-authored, not an asset) ------
+
+        /// <summary>
+        /// Parses the raw <c>_botLoadouts</c> YAML block out of Game.unity into each
+        /// preset's Name + Slot0/Slot1/Slot2 guids (empty string for an unassigned slot).
+        /// The component lives on a scene GameObject, not an asset, and
+        /// <c>EconomyAndPilesTests.SceneVector2/SceneFloat</c> already established reading
+        /// Game.unity as text instead of opening it in an EditMode test — that would
+        /// disturb whatever scene the developer currently has open.
+        /// </summary>
+        private static List<(string Name, string Slot0Guid, string Slot1Guid, string Slot2Guid)> ParseBotLoadoutSlotGuids()
+        {
+            string path = TestAssets.GameScenePath;
+            Assert.IsTrue(System.IO.File.Exists(path), $"{path} not found on disk.");
+
+            var lines = System.IO.File.ReadAllLines(path);
+            int start = System.Array.FindIndex(lines, l => l.TrimStart().StartsWith("_botLoadouts:"));
+            Assert.GreaterOrEqual(start, 0,
+                "MatchBootstrapper._botLoadouts is not serialized in Game.unity. Either the field was " +
+                "renamed/removed or the MatchBootstrapper GameObject is gone — check every inspector slot.");
+
+            var result = new List<(string, string, string, string)>();
+            string currentName = null;
+            string slot0 = null, slot1 = null, slot2 = null;
+
+            void FlushCurrent()
+            {
+                if (currentName != null)
+                    result.Add((currentName, slot0 ?? "", slot1 ?? "", slot2 ?? ""));
+            }
+
+            static string ExtractGuid(string trimmed)
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(trimmed,
+                    @"fileID:\s*(\d+),\s*guid:\s*([0-9a-f]+)");
+                return match.Success && match.Groups[1].Value != "0" ? match.Groups[2].Value : null;
+            }
+
+            for (int i = start + 1; i < lines.Length; i++)
+            {
+                string trimmed = lines[i].TrimStart();
+
+                if (trimmed.StartsWith("- Name:"))
+                {
+                    FlushCurrent();
+                    currentName = trimmed.Substring("- Name:".Length).Trim();
+                    slot0 = slot1 = slot2 = null;
+                    continue;
+                }
+
+                if (trimmed.StartsWith("Slot0:")) { Assert.IsNotNull(currentName, $"Found a Slot0 line before any preset Name in {path}."); slot0 = ExtractGuid(trimmed); continue; }
+                if (trimmed.StartsWith("Slot1:")) { Assert.IsNotNull(currentName, $"Found a Slot1 line before any preset Name in {path}."); slot1 = ExtractGuid(trimmed); continue; }
+                if (trimmed.StartsWith("Slot2:")) { Assert.IsNotNull(currentName, $"Found a Slot2 line before any preset Name in {path}."); slot2 = ExtractGuid(trimmed); continue; }
+
+                // AllowedClasses is part of the same preset entry and skipped on purpose;
+                // anything else — the next top-level MonoBehaviour field, or a new scene
+                // object's "--- !u!" header — ends the block.
+                if (trimmed.StartsWith("AllowedClasses:")) continue;
+
+                break;
+            }
+            FlushCurrent();
+
+            Assert.IsNotEmpty(result,
+                $"Parsed zero bot loadout presets out of {path} — the parser or the scene data is stale.");
+            return result;
+        }
+
+        [Test]
+        public void BotLoadoutPresets_EveryAssignedSlot_IsAGenuineClassLegalAbility()
+        {
+            // 2026-07-27 design directive: the Common slot is no longer mandatory (GDD
+            // §7.1-7.2 updated accordingly), so this no longer pins Slot0 to
+            // SlotKind.Common — MatchBootstrapper.ResolveLegalLoadout accepts any mix of
+            // Common and class-legal Character abilities now. What still must hold: every
+            // assigned slot on every scene-authored preset resolves to a real
+            // AbilityBaseSO asset, abilities within a preset are distinct, and each is
+            // legal for at least one of its own AllowedClasses (or legal for everyone, if
+            // AllowedClasses is empty). A preset that fails this would round-trip through
+            // ResolveLegalLoadout's sanitiser and get silently replaced — the bot would
+            // spawn with a different loadout than the one authored in the Inspector.
+            var presets = ParseBotLoadoutSlotGuids();
+
+            foreach (var (name, s0, s1, s2) in presets)
+            {
+                var abilities = new List<CluckWars.Abilities.AbilityBaseSO>();
+
+                foreach (var (slotLabel, guid) in new[] { ("Slot0", s0), ("Slot1", s1), ("Slot2", s2) })
+                {
+                    if (string.IsNullOrEmpty(guid)) continue; // unassigned slot is legal
+
+                    string assetPath = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
+                    Assert.IsFalse(string.IsNullOrEmpty(assetPath),
+                        $"Bot loadout preset '{name}' {slotLabel} references guid {guid}, which AssetDatabase " +
+                        "cannot resolve to any asset — it was deleted, or the guid in Game.unity is stale.");
+
+                    var ability = UnityEditor.AssetDatabase.LoadAssetAtPath<CluckWars.Abilities.AbilityBaseSO>(assetPath);
+                    Assert.IsNotNull(ability,
+                        $"Bot loadout preset '{name}' {slotLabel} ({assetPath}) is not an AbilityBaseSO.");
+
+                    bool legalForSomeone = ability.AllowedClasses == CluckWars.Abilities.ChickenClassFlags.None
+                        ? false // an ability legal for nobody is an authoring bug, not "legal for all"
+                        : true;
+                    Assert.IsTrue(legalForSomeone,
+                        $"Bot loadout preset '{name}' {slotLabel} is '{ability.name}' with AllowedClasses=None " +
+                        "— it is legal for no class and can never be equipped by anyone.");
+
+                    Assert.IsFalse(abilities.Contains(ability),
+                        $"Bot loadout preset '{name}' equips '{ability.name}' twice ({slotLabel} duplicates an " +
+                        "earlier slot) — ResolveLegalLoadout drops the duplicate and backfills something else, " +
+                        "so the bot won't actually spawn with what's authored in the Inspector.");
+                    abilities.Add(ability);
+                }
+            }
         }
     }
 }

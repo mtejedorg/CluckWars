@@ -193,7 +193,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.FoodPile
   _initialAmount: 30
-  _collectRadius: 1.6
+  _collectReach: 1
+  _footprintSize: {x: 2.2, y: 2.2}
+  _blockerHeight: 1.4
   _Amount: 0
   _MaxAmount: 0
 --- !u!114 &4196863733973010547

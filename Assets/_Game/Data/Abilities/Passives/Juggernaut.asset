@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.JuggernautPassiveSO
   DisplayName: Juggernaut
   ShortLabel: JUGG
+  Description: Barge shoves rival chickens aside, not just terrain.
   Icon: 
   AccentColor: {r: 0.85, g: 0.75, b: 0.25, a: 1}
   Category: 2

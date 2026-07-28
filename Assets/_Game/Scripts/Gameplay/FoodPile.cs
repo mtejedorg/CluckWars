@@ -68,14 +68,29 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Uniform root scale for a given step. The top step is exactly 1 (the authored size),
-        /// which is what keeps the blocker-vs-<c>CollectRadius</c> margin valid by construction.
+        /// Footprint multiplier for a given step. The top step is exactly 1, i.e. the
+        /// authored full footprint; lower steps shrink it toward <paramref name="minFootprintScale"/>.
         /// </summary>
         public static float FootprintScale(int step, int steps, float minFootprintScale)
         {
             int s = ClampSteps(steps);
             float u = (Mathf.Clamp(step, 1, s) - 1f) / (s - 1f);
             return Mathf.Lerp(Mathf.Clamp01(minFootprintScale), 1f, u);
+        }
+
+        /// <summary>
+        /// Shortest XZ distance from a point to the surface of an axis-aligned box.
+        /// 0 when the point is inside the footprint. This is what makes collection
+        /// <i>surface-relative</i> and therefore size-independent: a chicken pressed
+        /// against a pile is always ~0.58 away (capsule radius 0.5 + controller skin
+        /// 0.08) no matter how big the pile is, so growing a pile can never push a
+        /// touching chicken out of range the way a centre-distance test did.
+        /// </summary>
+        public static float DistanceToBoxSurfaceXZ(float px, float pz, float cx, float cz, float halfX, float halfZ)
+        {
+            float dx = Mathf.Max(0f, Mathf.Abs(px - cx) - Mathf.Max(0f, halfX));
+            float dz = Mathf.Max(0f, Mathf.Abs(pz - cz) - Mathf.Max(0f, halfZ));
+            return Mathf.Sqrt(dx * dx + dz * dz);
         }
     }
 
@@ -88,10 +103,20 @@ namespace CluckWars.Gameplay
     /// <para>
     /// ADR 0003 Decision 2 — a pile is a resource AND an obstacle. Its physical footprint
     /// is a <i>stepped</i> function of <c>Amount / MaxAmount</c>: draining a pile shrinks
-    /// its root scale, which shrinks the mesh, the blocker capsule and the NavMesh carve
+    /// its root scale, which shrinks the mesh, the blocker box and the NavMesh carve
     /// together, so emptying a pile is a permanent edit to the map. The stepping is
     /// deliberately coarse — a carving <see cref="NavMeshObstacle"/> re-carves the NavMesh
     /// on every size change, and per-tick re-carving thrashes bot pathfinding.
+    /// </para>
+    /// <para>
+    /// Piles are sized in world units by <see cref="FootprintSize"/> (X,Z) and
+    /// <c>_blockerHeight</c> (Y), so an island can be wide and flat — the centre island is
+    /// 7×4, i.e. seven chickens by four. Everything that asks "is this chicken at the pile"
+    /// measures to the pile's SURFACE via <see cref="DistanceToSurface"/>, never to its
+    /// centre. That is deliberate and load-bearing: the centre-distance test it replaced
+    /// coupled the blocker size to a fixed collect radius, and every time a pile grew past
+    /// that bound collection silently stopped working (the 2026-06-01 game-breaker). A
+    /// surface-relative reach is constant at any pile size, so the coupling is gone.
     /// </para>
     /// <para>
     /// ADR 0003 Decision 2b — a pile flagged <see cref="IsPermanent"/> (the centre pile)
@@ -116,17 +141,16 @@ namespace CluckWars.Gameplay
         [Min(0f)]
         [SerializeField] private float _initialAmount = 30f;
 
-        [Tooltip("How close a chicken must be (chicken position to pile position) to drain.")]
-        [Min(0f)]
-        [SerializeField] private float _collectRadius = 1.6f;
+        [Tooltip("How far PAST the pile's SURFACE a chicken may stand and still collect — not a distance to the pile's centre. A chicken pressed against a pile sits 0.58 away (capsule radius 0.5 + controller skin 0.08) whatever the pile's size, so this margin is size-independent: making a pile bigger can never break collection.")]
+        [Min(0.1f)]
+        [SerializeField] private float _collectReach = 1.0f;
 
         [Header("Blocking — stocked piles are solid, so chases route around them")]
-        [Tooltip("Solid collider radius at FULL size. Must stay < CollectRadius minus the chicken capsule radius (0.5) and skin width (0.08) so collection still triggers from the edge. The center pile's 1.5× root scale scales this too — keep the margin.")]
-        [Min(0.2f)]
-        [SerializeField] private float _blockerRadius = 0.65f;
-        [Tooltip("Solid collider height. Above the NavMesh step height (0.75) so bots path around, not over.")]
+        [Tooltip("Full world-space X,Z footprint at 100% fill, in world units (a chicken is 1.0 wide). Non-uniform on purpose: the centre island is wide and flat, not a tower. Used as the fallback when the spawner doesn't stamp FootprintSize via onBeforeSpawned.")]
+        [SerializeField] private Vector2 _footprintSize = new Vector2(2.2f, 2.2f);
+        [Tooltip("Solid collider / mesh height in world units. NOT scaled by fill — a draining pile shrinks in XZ but stays tall enough to remain terrain. Must stay above the NavMesh step height (0.75) or bots walk straight over piles.")]
         [Min(0.8f)]
-        [SerializeField] private float _blockerHeight = 1.2f;
+        [SerializeField] private float _blockerHeight = 1.4f;
 
         [Header("Footprint stepping (ADR 0003 Decision 2) — the pile shrinks as it drains")]
         [Tooltip("How many discrete footprint sizes exist between the smallest non-empty pile and a full one. Quantised on purpose: the blocker carries a carving NavMeshObstacle, and re-sizing it continuously re-carves the NavMesh and thrashes bot pathfinding.")]
@@ -150,15 +174,20 @@ namespace CluckWars.Gameplay
 
         [Networked] public float Amount { get; set; }
         [Networked] public float MaxAmount { get; set; }
-        [Networked] public float VisualScale { get; set; }
+
+        /// <summary>
+        /// Full world-space X,Z footprint at 100% fill, stamped by the spawner via
+        /// <c>onBeforeSpawned</c> so every peer sizes the pile identically from tick zero.
+        /// Zero means "not stamped" and falls back to the prefab's <see cref="_footprintSize"/>,
+        /// so scene-placed piles and any older spawn path keep working.
+        /// </summary>
+        [Networked] public Vector2 FootprintSize { get; set; }
 
         /// <summary>
         /// Set by the spawner via <c>onBeforeSpawned</c> so it is valid from tick zero.
         /// A permanent pile clamps drains at <see cref="DrainFloor"/> and regenerates.
         /// </summary>
         [Networked] public bool IsPermanent { get; set; }
-
-        public float CollectRadius => _collectRadius;
 
         /// <summary>True when the pile has no food left at all — it stops blocking and stops slowing.</summary>
         public bool IsEmpty => Amount <= 0f;
@@ -182,6 +211,94 @@ namespace CluckWars.Gameplay
 
         /// <summary>True when there is food left to collect (as opposed to left standing).</summary>
         public bool HasCollectableFood => Available > 0f;
+
+        /// <summary>Authored full footprint: the networked stamp, or the prefab default when unstamped.</summary>
+        private Vector2 FullFootprint
+        {
+            get
+            {
+                var stamped = FootprintSize;
+                return stamped.x > 0f && stamped.y > 0f ? stamped : _footprintSize;
+            }
+        }
+
+        /// <summary>
+        /// The pile's world X,Z size right now — the full footprint shrunk to its current
+        /// fill step. This is the single source of truth for the root scale, the blocker
+        /// and every distance test, so the collider a chicken bumps into and the shape
+        /// collection is measured against can never disagree.
+        /// </summary>
+        public Vector2 CurrentFootprint => FootprintAtStep(FootprintStep());
+
+        /// <summary>
+        /// Shortest XZ distance from <paramref name="worldPos"/> to the pile's surface.
+        /// 0 when the position is inside the footprint.
+        /// </summary>
+        public float DistanceToSurface(Vector3 worldPos)
+        {
+            var size = CurrentFootprint;
+            var centre = transform.position;
+            return FoodPileMath.DistanceToBoxSurfaceXZ(
+                worldPos.x, worldPos.z, centre.x, centre.z, size.x * 0.5f, size.y * 0.5f);
+        }
+
+        /// <summary>
+        /// True when a chicken standing at <paramref name="worldPos"/> is close enough to
+        /// the pile's SURFACE to drain it. Replaces the old centre-distance test, which
+        /// silently stopped firing as soon as a pile grew wider than its collect radius.
+        /// </summary>
+        public bool IsWithinCollectRange(Vector3 worldPos) => DistanceToSurface(worldPos) <= _collectReach;
+
+        /// <summary>
+        /// The point a mover should walk to in order to reach this pile: the spot on the
+        /// pile's surface nearest <paramref name="from"/>, pushed <paramref name="standoff"/>
+        /// outward so the target sits on walkable ground instead of inside the solid blocker.
+        /// Never returns NaN and never returns the pile's centre — a mover already inside or
+        /// exactly on the footprint is sent out through its nearest face.
+        /// </summary>
+        public Vector3 SurfaceApproachPoint(Vector3 from, float standoff)
+        {
+            var centre = transform.position;
+            var size = CurrentFootprint;
+            float halfX = Mathf.Max(size.x * 0.5f, 0.001f);
+            float halfZ = Mathf.Max(size.y * 0.5f, 0.001f);
+
+            float dx = from.x - centre.x;
+            float dz = from.z - centre.z;
+
+            // Nearest point of the footprint, in pile-local XZ.
+            float nx = Mathf.Clamp(dx, -halfX, halfX);
+            float nz = Mathf.Clamp(dz, -halfZ, halfZ);
+
+            // Outward direction = the part of the offset that pokes past the box. It is
+            // exactly zero when 'from' is inside the footprint, which is the degenerate
+            // case: there is nothing to normalise, so pick the nearest face instead. The
+            // >= tie-break is deterministic, so a bot standing dead-centre on a square
+            // island still gets one stable answer rather than oscillating.
+            float ox = dx - nx;
+            float oz = dz - nz;
+            float outLength = Mathf.Sqrt(ox * ox + oz * oz);
+            if (outLength > 1e-4f)
+            {
+                ox /= outLength;
+                oz /= outLength;
+            }
+            else if (halfX - Mathf.Abs(dx) <= halfZ - Mathf.Abs(dz))
+            {
+                ox = dx >= 0f ? 1f : -1f;
+                oz = 0f;
+                nx = ox * halfX;
+            }
+            else
+            {
+                ox = 0f;
+                oz = dz >= 0f ? 1f : -1f;
+                nz = oz * halfZ;
+            }
+
+            float push = Mathf.Max(0f, standoff);
+            return new Vector3(centre.x + nx + ox * push, centre.y, centre.z + nz + oz * push);
+        }
 
         private ILogService _log;
         private GameObject _blocker;
@@ -207,7 +324,9 @@ namespace CluckWars.Gameplay
                     Amount = _initialAmount;
                     MaxAmount = _initialAmount;
                 }
-                _log?.Debug(Source, $"{name}: Spawned. Amount={Amount}/{MaxAmount}. Permanent={IsPermanent} (floor={DrainFloor:0.0}, regen={_permanentRegenPerSecond}/s).");
+                _log?.Debug(Source, $"{name}: Spawned. Amount={Amount}/{MaxAmount}. " +
+                    $"Footprint={FullFootprint.x:0.0}×{FullFootprint.y:0.0} at full. " +
+                    $"Permanent={IsPermanent} (floor={DrainFloor:0.0}, regen={_permanentRegenPerSecond}/s).");
             }
 
             // Fusion pools NetworkObjects — clear the cached step so the footprint is
@@ -235,10 +354,13 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Solid capsule + NavMesh carve, built in code so the prefab needs no
-        /// re-authoring. Local on every peer — Amount is networked, so all peers
-        /// agree on whether the pile blocks. Radius/height are authored at FULL size;
-        /// the root transform's scale is what shrinks them (see <see cref="ApplyFootprint"/>).
+        /// Solid box + NavMesh carve, built in code so the prefab needs no re-authoring.
+        /// Local on every peer — Amount is networked, so all peers agree on whether the
+        /// pile blocks. Both shapes are authored as a UNIT box and get their world size
+        /// purely from the root's non-uniform scale (see <see cref="ApplyFootprint"/>);
+        /// a capsule could not do this, because Unity snaps a non-uniformly scaled
+        /// CapsuleCollider to its larger lateral axis and a 7×4 island would come out round.
+        /// Centre y = 0.5 puts the box's base on the ground plane.
         /// </summary>
         private void CreateBlocker()
         {
@@ -247,16 +369,16 @@ namespace CluckWars.Gameplay
             _blocker.transform.SetParent(transform, worldPositionStays: false);
             _blocker.transform.localPosition = Vector3.zero;
 
-            var cap = _blocker.AddComponent<CapsuleCollider>();
-            cap.radius = _blockerRadius;
-            cap.height = _blockerHeight;
-            cap.center = Vector3.up * (_blockerHeight * 0.5f);
+            var unitCentre = new Vector3(0f, 0.5f, 0f);
+
+            var box = _blocker.AddComponent<BoxCollider>();
+            box.size = Vector3.one;
+            box.center = unitCentre;
 
             var carve = _blocker.AddComponent<NavMeshObstacle>();
-            carve.shape = NavMeshObstacleShape.Capsule;
-            carve.radius = _blockerRadius;
-            carve.height = _blockerHeight;
-            carve.center = cap.center;
+            carve.shape = NavMeshObstacleShape.Box;
+            carve.size = Vector3.one;
+            carve.center = unitCentre;
             carve.carving = true;
         }
 
@@ -275,9 +397,17 @@ namespace CluckWars.Gameplay
         private int FootprintStep() =>
             FoodPileMath.FootprintStep(Amount, MaxAmount, FloorFraction, _footprintSteps);
 
-        /// <summary>Uniform root scale for a given step. The top step is exactly the authored size.</summary>
+        /// <summary>Footprint multiplier for a given step. The top step is exactly the authored size.</summary>
         private float FootprintScale(int step) =>
             FoodPileMath.FootprintScale(step, _footprintSteps, _minFootprintScale);
+
+        /// <summary>World X,Z size of the pile at a given fill step.</summary>
+        private Vector2 FootprintAtStep(int step)
+        {
+            float s = FootprintScale(step);
+            var full = FullFootprint;
+            return new Vector2(full.x * s, full.y * s);
+        }
 
         /// <summary>
         /// Local, driven entirely by the networked <see cref="Amount"/> — every peer computes
@@ -285,14 +415,19 @@ namespace CluckWars.Gameplay
         /// the root scale drives the carving NavMeshObstacle, and re-carving per frame would
         /// thrash <c>NavMesh.CalculatePath</c> for the bots.
         /// </summary>
+        /// <remarks>
+        /// The scale is NON-uniform: X and Z carry the footprint, Y carries the fixed
+        /// blocker height. Draining a pile therefore shrinks its footprint without also
+        /// flattening (or, for the centre island, without turning it into a tower).
+        /// </remarks>
         private void ApplyFootprint()
         {
             int step = FootprintStep();
             if (step == _appliedFootprintStep) return;
             _appliedFootprintStep = step;
 
-            float baseScale = VisualScale <= 0f ? 1f : VisualScale;
-            transform.localScale = Vector3.one * (baseScale * FootprintScale(step));
+            var size = FootprintAtStep(step);
+            transform.localScale = new Vector3(size.x, _blockerHeight, size.y);
 
             // Empty piles stop blocking (the leftover stub is walkable, and the
             // NavMesh un-carves); refilled piles (match restart) turn solid again.
@@ -304,7 +439,7 @@ namespace CluckWars.Gameplay
             if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
             {
                 _log.Verbose(Source, $"{name}: footprint step {step}/{Steps} " +
-                    $"(scale {transform.localScale.x:0.00}, blocking={shouldBlock}) at {Amount:0.0}/{MaxAmount}.");
+                    $"({size.x:0.00}×{size.y:0.00} world, blocking={shouldBlock}) at {Amount:0.0}/{MaxAmount}.");
             }
         }
 

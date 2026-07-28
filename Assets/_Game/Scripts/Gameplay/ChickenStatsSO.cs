@@ -23,9 +23,6 @@ namespace CluckWars.Gameplay
         [Tooltip("This class's unique passive mechanic (GDD v0.3 §5.2). Set in the Inspector after recompile.")]
         public ChickenPassive Passive = ChickenPassive.None;
 
-        [Header("Health")]
-        [Min(1f)] public float MaxHP = 100f;
-
         [Header("Movement")]
         [Min(0f)] public float MoveSpeed = 4f;
         [Min(0f)] public float TurnSpeed = 720f; // deg/sec

@@ -8,6 +8,17 @@
    Palette values mirror Assets/UI/Styles/CluckWarsTokens.uss (--cw-*).
    USS-valid only: NO text-shadow / box-shadow / gap / linear-gradient — depth
    comes from baked sprite gloss + flat fills, matching CluckWarsTheme.uss.
+
+   2026-07-23 Android pass: every px length below was scaled 1.9x (border
+   widths 1.7x). The font floor was first set at 26px on a "glanceable HUD"
+   rationale, then corrected to 34px (14 sp) the same day: these are
+   full-screen modals the player STOPS and READS (final standings, lobby
+   settings, session-end reason), i.e. body copy. Only a handful of true
+   eyebrow labels and transient countdowns sit at 30px. See the mobile sizing
+   contract at the top of CluckWarsTheme.uss — on this 1920x1080 canvas
+   1 dp ~= 2.35 px, so the original 8-18 px type rendered at 3-8 sp on a
+   phone. Panels are % width with a px max-width cap, so the caps scaled too
+   and now clamp against the % rule instead of the pixel value.
    ============================================================================ */
 
 /* ---- Overlay scaffolding -------------------------------------------------- */
@@ -27,7 +38,7 @@
    ============================================================================ */
 .cw-bg-particle {
     position: absolute;
-    width: 24px; height: 24px;
+    width: 46px; height: 46px;
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/PlayerDotGlossy.png");
     -unity-background-image-tint-color: rgba(245, 200, 66, 0.15);
     -unity-background-scale-mode: scale-to-fit;
@@ -40,55 +51,55 @@
 .cw-bg-particle--6 { left: 70%; bottom: 15%; scale: 1.1 1.1; opacity: 0.9; }
 
 .cw-me-panel {
-    width: 94%; max-width: 1180px; max-height: 90%;
+    width: 94%; max-width: 2242px; max-height: 90%;
     flex-direction: row; align-items: stretch;
-    padding-top: 16px; padding-bottom: 16px; padding-left: 18px; padding-right: 18px;
+    padding-top: 30px; padding-bottom: 30px; padding-left: 34px; padding-right: 34px;
     background-color: rgb(42, 26, 12);
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/PanelFrame.png");
     -unity-background-scale-mode: stretch-to-fill;
-    border-top-left-radius: 16px; border-top-right-radius: 16px;
-    border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;
+    border-top-left-radius: 30px; border-top-right-radius: 30px;
+    border-bottom-left-radius: 30px; border-bottom-right-radius: 30px;
 }
 
 /* -- Left hero -- */
 .cw-me-hero {
-    width: 300px; flex-shrink: 0;
+    width: 570px; flex-shrink: 0;
     align-items: center; justify-content: center;
-    padding-top: 6px; padding-bottom: 6px; padding-left: 8px; padding-right: 8px;
+    padding-top: 11px; padding-bottom: 11px; padding-left: 15px; padding-right: 15px;
 }
 .cw-me-crown {
-    width: 46px; height: 46px; margin-bottom: 4px;
+    width: 87px; height: 87px; margin-bottom: 8px;
     background-image: url("project://database/Assets/_Game/Art/UI/Icons/Crown.png");
     -unity-background-scale-mode: scale-to-fit;
 }
 .cw-me-ribbon {
-    min-width: 210px;
+    min-width: 399px;
     align-items: center; justify-content: center;
-    padding-top: 9px; padding-bottom: 11px; padding-left: 30px; padding-right: 30px;
+    padding-top: 17px; padding-bottom: 21px; padding-left: 57px; padding-right: 57px;
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/Ribbon.png");
     -unity-background-scale-mode: stretch-to-fill;
     -unity-background-image-tint-color: rgb(232, 117, 26);  /* default P1; C# sets winner color */
 }
-.cw-me-ribbon--gold    { -unity-background-image-tint-color: rgb(212, 160, 32); min-width: 200px; }
+.cw-me-ribbon--gold    { -unity-background-image-tint-color: rgb(212, 160, 32); min-width: 380px; }
 .cw-me-ribbon--subdued { -unity-background-image-tint-color: rgb(74, 48, 24); }
 .cw-me-ribbon__label {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 26px; letter-spacing: 2px; color: rgb(254, 245, 224);
+    font-size: 49px; letter-spacing: 4px; color: rgb(254, 245, 224);
     -unity-text-align: middle-center; white-space: nowrap;
 }
 
 .cw-me-chickenwrap {
-    width: 120px; height: 120px; margin-top: 6px;
+    width: 228px; height: 228px; margin-top: 11px;
     align-items: center; justify-content: center;
 }
 .cw-me-winglow {
-    position: absolute; width: 150px; height: 150px;
+    position: absolute; width: 285px; height: 285px;
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/RadialGlow.png");
     -unity-background-scale-mode: stretch-to-fill;
     -unity-background-image-tint-color: rgba(232, 117, 26, 0.45);  /* C# → winner color */
 }
 .cw-me-winchicken {
-    width: 96px; height: 96px;
+    width: 182px; height: 182px;
     -unity-background-scale-mode: scale-to-fit;
     /* class figure set in C# via a .cw-chicken--<class> modifier */
 }
@@ -101,76 +112,80 @@
 .cw-chicken--fatty    { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_fatty.png"); }
 .cw-chicken--assassin { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_assassin.png"); }
 .cw-me-winring {
-    position: absolute; bottom: 4px;
-    width: 74px; height: 20px;
-    border-top-left-radius: 37px; border-top-right-radius: 37px;
-    border-bottom-left-radius: 37px; border-bottom-right-radius: 37px;
-    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    position: absolute; bottom: 8px;
+    width: 141px; height: 38px;
+    border-top-left-radius: 70px; border-top-right-radius: 70px;
+    border-bottom-left-radius: 70px; border-bottom-right-radius: 70px;
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
     border-left-color: rgb(232, 117, 26); border-right-color: rgb(232, 117, 26);
     border-top-color: rgb(232, 117, 26); border-bottom-color: rgb(232, 117, 26);  /* C# → winner color */
 }
 .cw-me-winname {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 22px; letter-spacing: 1px; color: rgb(254, 245, 224);
-    -unity-text-align: middle-center; white-space: nowrap; margin-top: 6px;
+    font-size: 42px; letter-spacing: 2px; color: rgb(254, 245, 224);
+    -unity-text-align: middle-center; white-space: nowrap; margin-top: 11px;
 }
 .cw-me-winsub {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 11px; letter-spacing: 1px; color: rgb(232, 117, 26);  /* C# → winner color */
-    -unity-text-align: middle-center; white-space: nowrap; margin-top: 1px;
+    font-size: 30px; letter-spacing: 2px; color: rgb(232, 117, 26);  /* C# → winner color */
+    -unity-text-align: middle-center; white-space: nowrap; margin-top: 2px;
 }
-.cw-me-winfoodrow { flex-direction: row; align-items: center; margin-top: 8px; }
+.cw-me-winfoodrow { flex-direction: row; align-items: center; margin-top: 15px; }
 .cw-me-foodicon {
-    width: 20px; height: 20px; margin-right: 6px;
+    width: 38px; height: 38px; margin-right: 11px;
     background-image: url("project://database/Assets/_Game/Art/UI/Icons/FoodIcon.png");
     -unity-background-scale-mode: scale-to-fit;
 }
 .cw-me-winscore {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 34px; letter-spacing: 1px; color: rgb(245, 200, 66);
+    font-size: 65px; letter-spacing: 2px; color: rgb(245, 200, 66);
     -unity-text-align: middle-center;
 }
 .cw-me-winscore__unit {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 11px; color: rgb(196, 160, 96); margin-left: 5px; margin-bottom: 3px;
+    font-size: 30px; color: rgb(196, 160, 96); margin-left: 10px; margin-bottom: 6px;
     -unity-text-align: lower-left;
 }
 
 .cw-me-divider {
-    width: 1px; flex-shrink: 0; margin-top: 14px; margin-bottom: 14px;
-    margin-left: 6px; margin-right: 12px;
+    width: 2px; flex-shrink: 0; margin-top: 27px; margin-bottom: 27px;
+    margin-left: 11px; margin-right: 23px;
     background-color: rgba(138, 106, 58, 0.4);
 }
 
 /* -- Right standings -- */
 .cw-me-right { flex-grow: 1; min-width: 0; }
-.cw-me-head { flex-direction: row; align-items: center; margin-bottom: 8px; }
+.cw-me-head { flex-direction: row; align-items: center; margin-bottom: 15px; }
 .cw-me-head__title {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 15px; letter-spacing: 1px; color: rgb(245, 200, 66); margin-right: 8px;
+    font-size: 34px; letter-spacing: 2px; color: rgb(245, 200, 66); margin-right: 15px;
 }
-.cw-me-head__rule { flex-grow: 1; height: 1px; background-color: rgba(245, 200, 66, 0.4); }
+.cw-me-head__rule { flex-grow: 1; height: 2px; background-color: rgba(245, 200, 66, 0.4); }
 .cw-me-head__note {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 10px; color: rgb(196, 160, 96); margin-left: 8px;
+    font-size: 30px; color: rgb(196, 160, 96); margin-left: 15px;
 }
-.cw-me-rows { flex-grow: 1; }
+/* Content-sized, NOT flex-grow. With flex-grow the rows expanded to fill the
+   column and pushed "Next match in Ns…" onto the panel's bottom border, which
+   is exactly what happened once the rows got taller at the 34px floor. Sizing
+   to content lets the restart line follow the last row with its own margin. */
+.cw-me-rows { flex-grow: 0; flex-shrink: 0; }
 
 /* rows built in C# */
 .cw-me-row {
     flex-direction: row; align-items: center;
-    padding-top: 6px; padding-bottom: 6px; padding-left: 10px; padding-right: 10px;
-    margin-bottom: 6px;
+    padding-top: 11px; padding-bottom: 11px; padding-left: 19px; padding-right: 19px;
+    margin-bottom: 11px;
     background-color: rgb(48, 32, 18);
-    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
     border-left-color: rgb(58, 40, 22); border-right-color: rgb(58, 40, 22);
     border-top-color: rgb(58, 40, 22); border-bottom-color: rgb(58, 40, 22);
-    border-top-left-radius: 9px; border-top-right-radius: 9px;
-    border-bottom-left-radius: 9px; border-bottom-right-radius: 9px;
+    border-top-left-radius: 17px; border-top-right-radius: 17px;
+    border-bottom-left-radius: 17px; border-bottom-right-radius: 17px;
 }
 /* .cw-me-row--winner: border/tint set in C# to winner color */
 .cw-me-medal {
-    width: 28px; height: 28px; flex-shrink: 0; margin-right: 9px;
+    width: 53px; height: 53px; flex-shrink: 0; margin-right: 17px;
     -unity-background-scale-mode: scale-to-fit;
     /* rank sprite applied via cw-me-medal--1/2/3 from C#; 4th uses cw-me-dot */
 }
@@ -178,28 +193,31 @@
 .cw-me-medal--2 { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Medal_2.png"); }
 .cw-me-medal--3 { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Medal_3.png"); }
 .cw-me-dot {
-    width: 26px; height: 26px; flex-shrink: 0; margin-right: 9px;
+    width: 49px; height: 49px; flex-shrink: 0; margin-right: 17px;
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/PlayerDotGlossy.png");
     -unity-background-scale-mode: scale-to-fit;
     /* tint set in C# to player color */
 }
-.cw-me-rowmid { width: 70px; flex-shrink: 0; margin-right: 8px; }
+/* Width follows the longest class name at the new 34px type — "ASSASSIN" in
+   Nunito-Bold is ~152px, so the old 133px clipped it (nowrap, so it truncated
+   rather than wrapped). */
+.cw-me-rowmid { width: 200px; flex-shrink: 0; margin-right: 15px; }
 .cw-me-rowname {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 13px; color: rgb(254, 245, 224); white-space: nowrap;
+    font-size: 34px; color: rgb(254, 245, 224); white-space: nowrap;
 }
 .cw-me-rowpn {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 8px; letter-spacing: 0.5px; margin-top: 1px; white-space: nowrap;
+    font-size: 34px; letter-spacing: 1px; margin-top: 2px; white-space: nowrap;
     /* color set in C# to player color */
 }
 .cw-me-bartrough {
-    flex-grow: 1; height: 9px; min-width: 0; margin-left: 4px; margin-right: 10px;
+    flex-grow: 1; height: 17px; min-width: 0; margin-left: 8px; margin-right: 19px;
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/BarTrough.png");
     -unity-background-scale-mode: stretch-to-fill;
     overflow: hidden;
-    border-top-left-radius: 4px; border-top-right-radius: 4px;
-    border-bottom-left-radius: 4px; border-bottom-right-radius: 4px;
+    border-top-left-radius: 8px; border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
 }
 .cw-me-barfill {
     height: 100%; width: 0;
@@ -209,139 +227,140 @@
 }
 .cw-me-rowfood { flex-direction: row; align-items: center; flex-shrink: 0; }
 .cw-me-rowfoodicon {
-    width: 13px; height: 13px; margin-right: 4px;
+    width: 25px; height: 25px; margin-right: 8px;
     background-image: url("project://database/Assets/_Game/Art/UI/Icons/FoodIcon.png");
     -unity-background-scale-mode: scale-to-fit;
 }
 .cw-me-rowscore {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 17px; color: rgb(254, 245, 224); width: 40px; -unity-text-align: middle-right;
+    font-size: 34px; color: rgb(254, 245, 224); width: 76px; -unity-text-align: middle-right;
 }
 .cw-me-rowstats {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 9px; color: rgb(196, 160, 96); width: 78px; -unity-text-align: middle-right;
-    white-space: nowrap; margin-left: 8px;
+    font-size: 34px; color: rgb(196, 160, 96); width: 148px; -unity-text-align: middle-right;
+    white-space: nowrap; margin-left: 15px;
 }
 .cw-me-restart {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 13px; letter-spacing: 1px; color: rgb(196, 160, 96);
-    -unity-text-align: middle-center; margin-top: 6px; min-height: 20px;
+    font-size: 34px; letter-spacing: 2px; color: rgb(196, 160, 96);
+    -unity-text-align: middle-center; margin-top: 18px; min-height: 44px;
+    flex-shrink: 0;
 }
 
 /* ============================================================================
    MATCH LOBBY  (rail + 2×2 grid) — same visual language as menu lobby
    ============================================================================ */
 .cw-lob-panel {
-    width: 96%; max-width: 1280px; max-height: 92%; flex-grow: 0;
+    width: 96%; max-width: 2432px; max-height: 92%; flex-grow: 0;
     flex-direction: row; align-items: stretch;
     background-color: rgb(42, 26, 12);
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/PanelFrame.png");
     -unity-background-scale-mode: stretch-to-fill;
-    border-top-left-radius: 16px; border-top-right-radius: 16px;
-    border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;
+    border-top-left-radius: 30px; border-top-right-radius: 30px;
+    border-bottom-left-radius: 30px; border-bottom-right-radius: 30px;
 }
 .cw-lob-rail {
-    width: 300px; flex-shrink: 0;
-    padding-top: 14px; padding-bottom: 14px; padding-left: 16px; padding-right: 16px;
-    border-right-width: 1px; border-right-color: rgba(138, 106, 58, 0.4);
+    width: 570px; flex-shrink: 0;
+    padding-top: 27px; padding-bottom: 27px; padding-left: 30px; padding-right: 30px;
+    border-right-width: 2px; border-right-color: rgba(138, 106, 58, 0.4);
 }
 .cw-lob-card {
-    margin-top: 9px;
-    padding-top: 9px; padding-bottom: 9px; padding-left: 11px; padding-right: 11px;
+    margin-top: 17px;
+    padding-top: 17px; padding-bottom: 17px; padding-left: 21px; padding-right: 21px;
     background-color: rgb(46, 30, 18);
-    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
     border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
     border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
-    border-top-left-radius: 10px; border-top-right-radius: 10px;
-    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+    border-top-left-radius: 19px; border-top-right-radius: 19px;
+    border-bottom-left-radius: 19px; border-bottom-right-radius: 19px;
 }
 .cw-lob-card__label {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 10px; letter-spacing: 1px; color: rgb(196, 160, 96);
+    font-size: 30px; letter-spacing: 2px; color: rgb(196, 160, 96);
 }
 .cw-lob-card__head {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 14px; letter-spacing: 1px; color: rgb(245, 200, 66); margin-bottom: 4px;
+    font-size: 34px; letter-spacing: 2px; color: rgb(245, 200, 66); margin-bottom: 8px;
 }
-.cw-code-tiles { flex-direction: row; flex-wrap: wrap; margin-top: 6px; }
+.cw-code-tiles { flex-direction: row; flex-wrap: wrap; margin-top: 11px; }
 .cw-code-tile {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 22px; color: rgb(26, 14, 4); -unity-text-align: middle-center;
+    font-size: 42px; color: rgb(26, 14, 4); -unity-text-align: middle-center;
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/CodeTile.png");
     -unity-background-scale-mode: stretch-to-fill;
-    min-width: 30px;
-    padding-top: 2px; padding-bottom: 2px; padding-left: 8px; padding-right: 8px;
-    margin-right: 4px; margin-bottom: 4px;
+    min-width: 57px;
+    padding-top: 4px; padding-bottom: 4px; padding-left: 15px; padding-right: 15px;
+    margin-right: 8px; margin-bottom: 8px;
 }
-.cw-lob-btnrow { flex-direction: row; margin-top: 8px; }
+.cw-lob-btnrow { flex-direction: row; margin-top: 15px; }
 .cw-mini-btn {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    flex-grow: 1; flex-basis: 0;
-    font-size: 13px; letter-spacing: 1px; color: rgb(254, 245, 224);
+    flex-grow: 1; flex-basis: 0; min-height: 116px;   /* 48 dp touch floor */
+    font-size: 34px; letter-spacing: 2px; color: rgb(254, 245, 224);
     -unity-text-align: middle-center;
     background-color: rgb(58, 40, 22);
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/ButtonGrayscale.png");
     -unity-background-scale-mode: stretch-to-fill;
     -unity-background-image-tint-color: rgb(58, 40, 22);
     border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
-    border-top-left-radius: 6px; border-top-right-radius: 6px;
-    border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
-    padding-top: 5px; padding-bottom: 5px;
-    margin-right: 6px;
+    border-top-left-radius: 11px; border-top-right-radius: 11px;
+    border-bottom-left-radius: 11px; border-bottom-right-radius: 11px;
+    padding-top: 10px; padding-bottom: 10px;
+    margin-right: 11px;
 }
 .cw-mini-btn--gold {
     color: rgb(26, 14, 4);
     -unity-background-image-tint-color: rgb(212, 160, 32);
 }
-.cw-setting-row { flex-direction: row; justify-content: space-between; margin-top: 3px; }
+.cw-setting-row { flex-direction: row; justify-content: space-between; margin-top: 6px; }
 .cw-setting-k {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 12px; letter-spacing: 0.5px; color: rgb(196, 160, 96);
+    font-size: 34px; letter-spacing: 1px; color: rgb(196, 160, 96);
 }
 .cw-setting-v {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 12px; color: rgb(254, 245, 224);
+    font-size: 34px; color: rgb(254, 245, 224);
 }
 .cw-status-pill {
-    flex-direction: row; align-items: center; margin-top: 10px;
-    padding-top: 6px; padding-bottom: 6px; padding-left: 10px; padding-right: 10px;
+    flex-direction: row; align-items: center; margin-top: 19px;
+    padding-top: 11px; padding-bottom: 11px; padding-left: 19px; padding-right: 19px;
     background-color: rgba(245, 200, 66, 0.06);
-    border-left-width: 1px; border-right-width: 1px; border-top-width: 1px; border-bottom-width: 1px;
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
     border-left-color: rgba(245, 200, 66, 0.25); border-right-color: rgba(245, 200, 66, 0.25);
     border-top-color: rgba(245, 200, 66, 0.25); border-bottom-color: rgba(245, 200, 66, 0.25);
-    border-top-left-radius: 6px; border-top-right-radius: 6px;
-    border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
+    border-top-left-radius: 11px; border-top-right-radius: 11px;
+    border-bottom-left-radius: 11px; border-bottom-right-radius: 11px;
 }
 .cw-status-dot {
-    width: 9px; height: 9px; margin-right: 8px;
-    border-top-left-radius: 5px; border-top-right-radius: 5px;
-    border-bottom-left-radius: 5px; border-bottom-right-radius: 5px;
+    width: 17px; height: 17px; margin-right: 15px;
+    border-top-left-radius: 10px; border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
     background-color: rgb(245, 200, 66);
 }
 .cw-status-count {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 13px; color: rgb(254, 245, 224); margin-right: 6px;
+    font-size: 34px; color: rgb(254, 245, 224); margin-right: 11px;
 }
 .cw-status-text {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 12px; color: rgb(245, 200, 66); flex-grow: 1; -unity-text-align: middle-right;
+    font-size: 34px; color: rgb(245, 200, 66); flex-grow: 1; -unity-text-align: middle-right;
 }
-.cw-lob-start { letter-spacing: 2px; margin-top: 8px; }
+.cw-lob-start { letter-spacing: 4px; margin-top: 15px; }
 .cw-lob-hint {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 11px; color: rgb(196, 160, 96); -unity-text-align: middle-center;
-    white-space: normal; margin-top: 6px; min-height: 14px;
+    font-size: 34px; color: rgb(196, 160, 96); -unity-text-align: middle-center;
+    white-space: normal; margin-top: 11px; min-height: 27px;
 }
 .cw-lob-right {
     flex-grow: 1; min-width: 0;
-    padding-top: 14px; padding-bottom: 14px; padding-left: 16px; padding-right: 16px;
+    padding-top: 27px; padding-bottom: 27px; padding-left: 30px; padding-right: 30px;
 }
-.cw-players-head { flex-direction: row; align-items: center; margin-bottom: 8px; }
+.cw-players-head { flex-direction: row; align-items: center; margin-bottom: 15px; }
 .cw-players-title {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 14px; letter-spacing: 1px; color: rgb(245, 200, 66); margin-right: 8px;
+    font-size: 34px; letter-spacing: 2px; color: rgb(245, 200, 66); margin-right: 15px;
 }
-.cw-players-divider { flex-grow: 1; height: 1px; background-color: rgba(245, 200, 66, 0.4); }
+.cw-players-divider { flex-grow: 1; height: 2px; background-color: rgba(245, 200, 66, 0.4); }
 .cw-player-grid {
     flex-grow: 1; flex-direction: row; flex-wrap: wrap;
     justify-content: space-between; align-content: space-between;
@@ -351,13 +370,13 @@
 .cw-player-card {
     width: 49%; height: 48%;
     flex-direction: row; align-items: center;
-    padding-top: 8px; padding-bottom: 8px; padding-left: 10px; padding-right: 10px;
+    padding-top: 15px; padding-bottom: 15px; padding-left: 19px; padding-right: 19px;
     background-color: rgb(48, 32, 18);
-    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
     border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
     border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
-    border-top-left-radius: 10px; border-top-right-radius: 10px;
-    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+    border-top-left-radius: 19px; border-top-right-radius: 19px;
+    border-bottom-left-radius: 19px; border-bottom-right-radius: 19px;
     overflow: hidden;
 }
 .cw-player-card--empty {
@@ -366,82 +385,83 @@
     border-left-color: rgba(138, 106, 58, 0.55); border-right-color: rgba(138, 106, 58, 0.55);
     border-top-color: rgba(138, 106, 58, 0.55); border-bottom-color: rgba(138, 106, 58, 0.55);
 }
-.cw-player-accent { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+.cw-player-accent { position: absolute; left: 0; top: 0; bottom: 0; width: 8px; }
 .cw-player-art {
-    width: 52px; height: 52px; flex-shrink: 0; margin-right: 9px;
+    width: 99px; height: 99px; flex-shrink: 0; margin-right: 17px;
     -unity-background-scale-mode: scale-to-fit;
 }
 .cw-player-mid { flex-grow: 1; min-width: 0; }
 .cw-player-namerow { flex-direction: row; align-items: center; }
 .cw-player-name {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 15px; color: rgb(254, 245, 224); white-space: nowrap; margin-right: 5px;
+    font-size: 34px; color: rgb(254, 245, 224); white-space: nowrap; margin-right: 10px;
 }
 .cw-player-pn {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 9px; margin-right: 5px;
+    font-size: 34px; margin-right: 10px;
 }
 .cw-player-host {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 8px; letter-spacing: 0.5px; color: rgb(26, 14, 4);
+    font-size: 34px; letter-spacing: 1px; color: rgb(26, 14, 4);
     background-color: rgb(245, 200, 66);
-    padding-top: 1px; padding-bottom: 1px; padding-left: 5px; padding-right: 5px;
-    border-top-left-radius: 3px; border-top-right-radius: 3px;
-    border-bottom-left-radius: 3px; border-bottom-right-radius: 3px;
+    padding-top: 2px; padding-bottom: 2px; padding-left: 10px; padding-right: 10px;
+    border-top-left-radius: 6px; border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
 }
 .cw-player-class {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 10px; color: rgb(196, 160, 96); white-space: nowrap; margin-top: 2px;
+    font-size: 34px; color: rgb(196, 160, 96); white-space: nowrap; margin-top: 4px;
 }
-.cw-player-chips { flex-direction: row; margin-top: 5px; }
+.cw-player-chips { flex-direction: row; margin-top: 10px; }
 .cw-mini-hex {
-    width: 24px; height: 28px; margin-right: 4px;
+    width: 46px; height: 53px; margin-right: 8px;
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/HexGlossy.png");
     -unity-background-scale-mode: scale-to-fit;
     align-items: center; justify-content: center;
 }
 .cw-mini-hex--empty { -unity-background-image-tint-color: rgba(60, 44, 26, 0.8); }
 .cw-mini-hex__icon {
-    width: 16px; height: 16px; -unity-background-scale-mode: scale-to-fit;
+    width: 30px; height: 30px; -unity-background-scale-mode: scale-to-fit;
 }
 .cw-player-state {
-    flex-shrink: 0; margin-left: 6px;
-    padding-top: 4px; padding-bottom: 4px; padding-left: 9px; padding-right: 9px;
+    flex-shrink: 0; margin-left: 11px;
+    padding-top: 8px; padding-bottom: 8px; padding-left: 17px; padding-right: 17px;
     -unity-text-align: middle-center;
-    border-top-left-radius: 6px; border-top-right-radius: 6px;
-    border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
+    border-top-left-radius: 11px; border-top-right-radius: 11px;
+    border-bottom-left-radius: 11px; border-bottom-right-radius: 11px;
 }
 .cw-player-state--ready {
     background-color: rgb(51, 163, 50);
-    border-left-width: 1px; border-right-width: 1px; border-top-width: 1px; border-bottom-width: 1px;
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
     border-left-color: rgb(74, 230, 106); border-right-color: rgb(74, 230, 106);
     border-top-color: rgb(74, 230, 106); border-bottom-color: rgb(74, 230, 106);
 }
 .cw-player-state--picking {
     background-color: rgba(40, 30, 20, 0.6);
-    border-left-width: 1px; border-right-width: 1px; border-top-width: 1px; border-bottom-width: 1px;
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
     border-left-color: rgb(138, 106, 58); border-right-color: rgb(138, 106, 58);
     border-top-color: rgb(138, 106, 58); border-bottom-color: rgb(138, 106, 58);
 }
 .cw-player-state__label {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 11px; letter-spacing: 0.5px; color: rgb(254, 245, 224);
+    font-size: 34px; letter-spacing: 1px; color: rgb(254, 245, 224);
 }
 .cw-player-empty-label {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 11px; letter-spacing: 1px; color: rgb(196, 160, 96);
+    font-size: 34px; letter-spacing: 2px; color: rgb(196, 160, 96);
 }
 
 /* ---- Shared buttons (green start) ----------------------------------------- */
 .cw-btn {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 18px; color: rgb(254, 245, 224); -unity-text-align: middle-center;
+    min-height: 116px; min-width: 116px;   /* 48 dp touch floor */
+    font-size: 34px; color: rgb(254, 245, 224); -unity-text-align: middle-center;
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/ButtonGrayscale.png");
     -unity-background-scale-mode: stretch-to-fill;
     border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
-    border-top-left-radius: 10px; border-top-right-radius: 10px;
-    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
-    padding-top: 12px; padding-bottom: 12px; padding-left: 22px; padding-right: 22px;
+    border-top-left-radius: 19px; border-top-right-radius: 19px;
+    border-bottom-left-radius: 19px; border-bottom-right-radius: 19px;
+    padding-top: 23px; padding-bottom: 23px; padding-left: 42px; padding-right: 42px;
     transition-property: scale; transition-duration: 0.1s;
 }
 .cw-btn:hover  { scale: 1.02 1.02; }
@@ -452,40 +472,40 @@
    SESSION END  (small panel)
    ============================================================================ */
 .cw-se-panel {
-    width: 620px; max-width: 88%;
+    width: 1178px; max-width: 88%;
     align-items: center; justify-content: center;
-    padding-top: 26px; padding-bottom: 26px; padding-left: 30px; padding-right: 30px;
+    padding-top: 49px; padding-bottom: 49px; padding-left: 57px; padding-right: 57px;
     background-color: rgb(42, 26, 12);
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/PanelFrame.png");
     -unity-background-scale-mode: stretch-to-fill;
-    border-top-left-radius: 16px; border-top-right-radius: 16px;
-    border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;
+    border-top-left-radius: 30px; border-top-right-radius: 30px;
+    border-bottom-left-radius: 30px; border-bottom-right-radius: 30px;
 }
 .cw-se-title {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 38px; letter-spacing: 2px; color: rgb(245, 200, 66); -unity-text-align: middle-center;
+    font-size: 72px; letter-spacing: 4px; color: rgb(245, 200, 66); -unity-text-align: middle-center;
 }
 .cw-se-reason {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 16px; color: rgb(254, 245, 224); -unity-text-align: middle-center; margin-top: 14px;
+    font-size: 34px; color: rgb(254, 245, 224); -unity-text-align: middle-center; margin-top: 27px;
 }
 .cw-se-countdown {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 15px; color: rgb(196, 160, 96); -unity-text-align: middle-center; margin-top: 8px;
+    font-size: 30px; color: rgb(196, 160, 96); -unity-text-align: middle-center; margin-top: 15px;
 }
 
 /* ============================================================================
    INTRO COUNTDOWN  (topmost, non-interactive)
    ============================================================================ */
 .cw-intro-glow {
-    position: absolute; width: 560px; height: 560px;
+    position: absolute; width: 1064px; height: 1064px;
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/RadialGlow.png");
     -unity-background-scale-mode: stretch-to-fill;
     -unity-background-image-tint-color: rgba(245, 200, 66, 0.5);
 }
 .cw-intro-number {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 180px; color: rgb(245, 200, 66); -unity-text-align: middle-center;
+    font-size: 342px; color: rgb(245, 200, 66); -unity-text-align: middle-center;
 }
 /* The GET READY ribbon sits below the number */
 .cw-overlay--introdim .cw-me-ribbon--subdued { position: absolute; bottom: 22%; }

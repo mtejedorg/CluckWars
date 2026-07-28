@@ -234,7 +234,7 @@ namespace CluckWars.UI
         {
             // ── Classes ─────────────────────────────────────────────────────────
             sb.AppendLine("[Classes]");
-            sb.AppendLine("Name          HP    Spd  Turn  Passive       Cap  Rate");
+            sb.AppendLine("Name          Spd  Turn  Passive       Cap  Rate");
 
             if (_classRegistry != null)
             {
@@ -244,7 +244,6 @@ namespace CluckWars.UI
                     var s = entry.Stats;
                     if (s == null) continue;
                     sb.Append(s.DisplayName.PadRight(13))
-                      .Append(s.MaxHP.ToString("0").PadLeft(5))
                       .Append(s.MoveSpeed.ToString("0.0").PadLeft(6))
                       .Append(s.TurnSpeed.ToString("0").PadLeft(6))
                       .Append(("  " + s.Passive).PadRight(14))

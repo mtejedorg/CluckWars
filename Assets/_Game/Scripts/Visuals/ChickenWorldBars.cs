@@ -48,7 +48,6 @@ namespace CluckWars.Visuals
         private ChickenCargo      _cargo;
 
         private Transform      _barRoot;
-        private SpriteRenderer _hpFill;
         private SpriteRenderer _cargoTrough;
         private SpriteRenderer _cargoFill;
         private TextMesh       _cargoText;
@@ -77,10 +76,8 @@ namespace CluckWars.Visuals
             root.transform.localPosition = _barOffset;
             _barRoot = root.transform;
 
-            float cargoY = -(_hpHeight * 0.5f + CargoHeight * 0.5f + 0.03f);
-
-            MakeTrough(_barRoot, "HpTrough", Vector3.zero, _hpHeight);
-            _hpFill = MakeFill(_barRoot, "HpFill", 0f, _hpHeight * 0.78f);
+            // v0.4: HP deleted. Only the cargo bar remains; it now sits at the bar root centre.
+            float cargoY = 0f;
 
             _cargoTrough = MakeTrough(_barRoot, "CargoTrough", new Vector3(0f, cargoY, 0f), CargoHeight);
             _cargoFill   = MakeFill(_barRoot, "CargoFill", cargoY, CargoHeight * 0.78f);
@@ -169,16 +166,8 @@ namespace CluckWars.Visuals
                 _barRoot.gameObject.SetActive(show);
             if (!show) return;
 
-            RefreshHp();
             RefreshCargo();
             Billboard();
-        }
-
-        private void RefreshHp()
-        {
-            if (_hpFill == null) return;
-            UpdateFill(_hpFill, 0f, _hpHeight * 0.78f);
-            _hpFill.enabled = false;
         }
 
         private void RefreshCargo()

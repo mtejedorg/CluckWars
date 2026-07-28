@@ -165,7 +165,16 @@ namespace CluckWars.UI
             RefreshMatchEnd(gm);
             RefreshLobby(gm, poll);
             RefreshIntro(gm);
+
+            // The top bar recedes behind ANY full-screen modal, not just the intro.
+            // Previously only RefreshIntro drove this, so during MATCH END the live
+            // leaderboard sat at full brightness on top of the dimmed arena, directly
+            // competing with the FINAL STANDINGS panel showing the same four scores.
+            SetTopBarDimmed(IsShown(_introOverlay) || IsShown(_matchEndOverlay) || IsShown(_lobbyOverlay));
         }
+
+        private static bool IsShown(VisualElement ve) =>
+            ve != null && ve.style.display.value == DisplayStyle.Flex;
 
         // ---- Binding -----------------------------------------------------------
         private void EnsureBound()
@@ -575,13 +584,15 @@ namespace CluckWars.UI
         // ========================================================================
         private void RefreshIntro(GameManager gm)
         {
-            if (gm == null) { SetShown(_introOverlay, false); SetTopBarDimmed(false); return; }
+            // Visibility only — the top-bar dim is decided once in Update() across
+            // all three modals, so this method must not touch it or it would clear
+            // a dim the match-end / lobby overlay still needs.
+            if (gm == null) { SetShown(_introOverlay, false); return; }
 
             if (gm.IsIntroActive)
             {
                 if (_introNumber != null) _introNumber.text = Mathf.CeilToInt(gm.IntroRemaining).ToString();
                 SetShown(_introOverlay, true);
-                SetTopBarDimmed(true);
                 _goExpiresAtUnscaledTime = Time.unscaledTime + GoFlourishDuration;
                 return;
             }
@@ -590,19 +601,18 @@ namespace CluckWars.UI
             {
                 if (_introNumber != null) _introNumber.text = "GO!";
                 SetShown(_introOverlay, true);
-                SetTopBarDimmed(true);
             }
             else
             {
                 SetShown(_introOverlay, false);
-                SetTopBarDimmed(false);
             }
         }
 
         /// <summary>
         /// ART.md §6.5: the top bar (a separate UIDocument/controller,
         /// <see cref="MatchHudController"/>) stays visible at 40% opacity behind
-        /// the intro countdown overlay rather than being hidden outright.
+        /// a full-screen overlay rather than being hidden outright. Driven from
+        /// <see cref="Update"/> for the intro, match-end and lobby modals alike.
         /// </summary>
         private static void SetTopBarDimmed(bool dimmed) => MatchHudController.Instance?.SetIntroDimmed(dimmed);
 

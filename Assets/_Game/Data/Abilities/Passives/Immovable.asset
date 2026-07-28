@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.ImmovablePassiveSO
   DisplayName: Immovable
   ShortLabel: IMMV
+  Description: Greatly reduced knockback.
   Icon: 
   AccentColor: {r: 0.95, g: 0.85, b: 0.35, a: 1}
   Category: 2

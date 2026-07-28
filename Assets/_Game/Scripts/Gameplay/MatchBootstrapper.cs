@@ -81,16 +81,6 @@ namespace CluckWars.Gameplay
             _log = log;
         }
 
-        /// <summary>
-        /// MaxHP for a class via the registry, or 0 when unresolvable (leaves
-        /// ChickenCombat's lazy first-tick init as the fallback).
-        /// </summary>
-        private float ResolveMaxHp(ChickenClass cls)
-        {
-            if (_classRegistry != null && _classRegistry.TryGet(cls, out var entry) && entry.Stats != null)
-                return entry.Stats.MaxHP;
-            return 0f;
-        }
 
         private NetworkObject ResolveChickenPrefab()
         {
@@ -230,8 +220,6 @@ namespace CluckWars.Gameplay
                     _log?.Warn(Source, $"No bot loadout preset available for {botClass} — bot " +
                         "will run ability-less. Author rows on MatchBootstrapper._botLoadouts.");
 
-                float botMaxHp = ResolveMaxHp(botClass);
-
                 runner.Spawn(
                     chickenPrefab,
                     pos,
@@ -328,44 +316,80 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Sanitises a chosen loadout into a legal one for <paramref name="cls"/>:
-        /// <b>1 Common + 2 Character</b> actives plus a class-legal passive
-        /// (ADR 0003 Decision 3). Anything off-class, duplicated or missing is replaced from
-        /// the class pools rather than being passed through.
+        /// Sanitises a chosen loadout into a legal one for <paramref name="cls"/>: up to
+        /// <b>N</b> distinct, class-legal active abilities (N = 2, or 3 under the Assassin's
+        /// Combo passive — see <see cref="AbilityController.EquippedSlotCount"/>) plus a
+        /// class-legal passive.
         /// </summary>
         /// <remarks>
-        /// Enforced here, at the single spawn chokepoint, rather than trusting the picker UI —
-        /// a live match on 2026-07-22 spawned a Warrior holding two Common abilities and a
-        /// non-signature inert passive, because nothing validated the selection on the way in.
-        /// Bots go through <see cref="PresetIsClassLegal"/> for the same reason.
+        /// <b>2026-07-27 design directive (overrides GDD §7.1-7.2's old "1 mandatory Common +
+        /// 2 Character" rule):</b> the Common slot is now optional — a player may equip any
+        /// mix of Common and class-legal Character abilities, including zero Common ones.
+        /// "Common" only means "legal for every class"; it no longer reserves a slot.
+        /// <para>
+        /// Still enforced here, at the single spawn chokepoint, rather than trusting the
+        /// picker UI — a live match on 2026-07-22 spawned a Warrior holding two Common
+        /// abilities and a non-signature inert passive, because nothing validated the
+        /// selection on the way in. Bots go through <see cref="PresetIsClassLegal"/> for the
+        /// same reason.
+        /// </para>
         /// </remarks>
         private void ResolveLegalLoadout(ChickenClass cls,
             PassiveAbilitySO chosenPassive, AbilityBaseSO a0, AbilityBaseSO a1, AbilityBaseSO a2,
             out PassiveAbilitySO passive, out AbilityBaseSO slot0, out AbilityBaseSO slot1, out AbilityBaseSO slot2)
         {
             passive = chosenPassive; slot0 = a0; slot1 = a1; slot2 = a2;
-            if (_abilityRegistry == null) return;
+            if (_abilityRegistry == null)
+            {
+                _log?.Warn(Source, $"ResolveLegalLoadout: no AbilityRegistrySO bound — passing {cls}'s " +
+                    "selection through unsanitised. Assign AbilityRegistrySO in ProjectInstaller.");
+                return;
+            }
 
             // Passive must exist and be legal for this class; else fall back to the signature.
             if (passive == null || !AbilityRegistrySO.IsAllowedFor(passive, cls))
                 passive = _abilityRegistry.GetDefaultPassiveForClass(cls);
 
-            var chosen = new[] { a0, a1, a2 };
-            var common = chosen.FirstOrDefault(a => a != null && a.SlotKind == AbilitySlotKind.Common);
-            var chars  = chosen.Where(a => a != null
-                                        && a.SlotKind == AbilitySlotKind.Character
-                                        && AbilityRegistrySO.IsAllowedFor(a, cls))
-                               .Distinct().ToList();
+            // Active slot budget mirrors AbilityController.EquippedSlotCount: Combo grants a
+            // 3rd slot, every other class gets 2.
+            int activeSlots = passive is ComboPassiveSO ? 3 : 2;
 
-            // Backfill anything the selection failed to supply.
-            _abilityRegistry.ComposeDefaultLoadout(cls, out var defCommon, out var defC0, out var defC1);
-            common ??= defCommon;
-            foreach (var fill in new[] { defC0, defC1 })
-                if (chars.Count < 2 && fill != null && !chars.Contains(fill)) chars.Add(fill);
+            // Sanitise: keep only genuine, class-legal, distinct picks, in the order supplied.
+            // A Common ability is legal for anyone; a Character ability must be on this
+            // class's pool. No requirement that any pick be Common.
+            var picked = new System.Collections.Generic.List<AbilityBaseSO>(activeSlots);
+            foreach (var a in new[] { a0, a1, a2 })
+            {
+                if (picked.Count >= activeSlots) break;
+                if (a == null || picked.Contains(a)) continue;
+                bool legal = a.SlotKind == AbilitySlotKind.Common
+                    || (a.SlotKind == AbilitySlotKind.Character && AbilityRegistrySO.IsAllowedFor(a, cls));
+                if (legal) picked.Add(a);
+            }
 
-            slot0 = common;
-            slot1 = chars.Count > 0 ? chars[0] : null;
-            slot2 = chars.Count > 1 ? chars[1] : null;
+            // Backfill ONLY what sanitising left missing, from the combined legal pool
+            // (Common ∪ class-legal Character) — not specifically forcing a Common.
+            if (picked.Count < activeSlots)
+            {
+                var fillPool = _abilityRegistry.CommonAbilities.Concat(_abilityRegistry.GetCharacterAbilitiesForClass(cls));
+                foreach (var fill in fillPool)
+                {
+                    if (picked.Count >= activeSlots) break;
+                    if (fill == null || picked.Contains(fill)) continue;
+                    picked.Add(fill);
+                }
+            }
+
+            if (picked.Count < activeSlots)
+            {
+                _log?.Warn(Source, $"ResolveLegalLoadout: only resolved {picked.Count}/{activeSlots} legal " +
+                    $"abilities for {cls} after sanitising + backfill — AbilityRegistrySO has too few Common/" +
+                    $"{cls} Character entries. This bot/player will spawn under-equipped.");
+            }
+
+            slot0 = picked.Count > 0 ? picked[0] : null;
+            slot1 = picked.Count > 1 ? picked[1] : null;
+            slot2 = picked.Count > 2 ? picked[2] : null;
         }
 
         /// <summary>
@@ -492,8 +516,9 @@ namespace CluckWars.Gameplay
 
 
                     // Apply player-chosen abilities, sanitised against the class pools so an
-                    // off-class or malformed selection can never reach the world (ADR 0003
-                    // Decision 3: 1 Common + 2 Character, plus a mandatory class passive).
+                    // off-class or malformed selection can never reach the world: up to N
+                    // freely-chosen legal abilities (Common optional, per the 2026-07-27
+                    // design directive superseding GDD §7.1-7.2) plus a mandatory class passive.
                     if (_selection != null)
                     {
                         var abilityCtrl = networkObject.GetComponent<AbilityController>();

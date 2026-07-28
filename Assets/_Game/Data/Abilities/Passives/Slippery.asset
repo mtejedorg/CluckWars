@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SlipperyPassiveSO
   DisplayName: Slippery
   ShortLabel: SLIP
+  Description: Reduced control-effect duration.
   Icon: 
   AccentColor: {r: 0.9, g: 0.35, b: 0.15, a: 1}
   Category: 3

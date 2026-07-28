@@ -1,10 +1,30 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <!-- Cluck Wars — character select (2026-07-23 Android pass).
+
+         Two changes from the Stage-3 layout:
+
+         1. The ability picker is no longer [slot-hex row] + [scrolling grid of
+            23%-wide cards under category headers]. ADR 0003 cut the visible pool
+            to 3 Common + 3 Character per class, so that grid rendered as up to
+            three headers with ONE card each and never scrolled. It is now two
+            flat rows of three big cards, filled by MenuUiController at bind time
+            (#CommonCards / #ClassCards). Selection is direct — no "pick a slot,
+            then pick an ability" indirection, and the dimmed COMBO padlock hex
+            is gone: COMBO now reads as "pick 2" on the CLASS row.
+
+         2. Every size respects the mobile contract at the top of
+            CluckWarsTheme.uss (1 dp ~= 2.35 px on this 1920x1080 canvas).
+            Inline styles here are layout only; type/target sizing lives in USS.
+
+         Dropped deliberately: the SkinSlots strip (DEFAULT + two padlocks) was
+         non-functional decoration and cost ~140 px of the preview column that
+         the legible passive/stat block needs. Re-add it when skins are real. -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
 
     <ui:VisualElement name="CharacterSelectPage" class="cw-screen cw-page">
 
         <!-- Header ribbon (+ home button, absolutely placed top-left) -->
-        <ui:VisualElement style="align-items: center; justify-content: center; padding-top: 12px; padding-bottom: 8px; flex-shrink: 0;">
+        <ui:VisualElement style="align-items: center; justify-content: center; padding-top: 20px; padding-bottom: 12px; flex-shrink: 0;">
             <ui:Button name="HomeBtn" text="◀ HOME" class="cw-home-btn" />
             <ui:VisualElement class="cw-ribbon">
                 <ui:Label text="CHOOSE YOUR CHICKEN" class="cw-title" />
@@ -12,7 +32,7 @@
         </ui:VisualElement>
 
         <!-- Body -->
-        <ui:VisualElement name="Body" class="cw-cs-body" style="padding-left: 12px; padding-right: 12px; padding-bottom: 8px;">
+        <ui:VisualElement name="Body" class="cw-cs-body" style="padding-left: 24px; padding-right: 24px; padding-bottom: 16px;">
 
             <!-- Column A: class chips (chicken art assigned by controller) -->
             <ui:VisualElement name="ClassList" class="cw-cs-classes">
@@ -52,27 +72,26 @@
 
             <!-- Column B: preview (chicken sprite + disc tint assigned by controller) -->
             <ui:VisualElement name="Preview" class="cw-cs-preview" style="align-items: center;">
-                <ui:VisualElement style="width: 100%; height: 160px; align-items: center; justify-content: center;">
-                    <ui:VisualElement name="PreviewGlow" class="cw-radial-glow" style="width: 190px; height: 190px;" />
+                <ui:VisualElement style="width: 100%; height: 280px; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <ui:VisualElement name="PreviewGlow" class="cw-radial-glow" style="width: 330px; height: 330px;" />
                     <ui:VisualElement name="PreviewDisc" class="cw-preview-disc">
-                        <ui:VisualElement name="PreviewChicken" class="cw-chicken" style="width: 122px; height: 122px;" />
+                        <ui:VisualElement name="PreviewChicken" class="cw-chicken" style="width: 210px; height: 210px;" />
                     </ui:VisualElement>
                 </ui:VisualElement>
-                <ui:Label name="PreviewName" text="WARRIOR CHICKEN" class="cw-heading" style="font-size: 18px;" />
-                <ui:Label name="PreviewQuote" text="&quot;Mighty of wing, short of temper.&quot;" class="cw-body" style="font-style: italic; color: rgba(255, 255, 255, 0.6); margin-top: 2px; margin-bottom: 6px; font-size: 13px;" />
-                <ui:VisualElement name="SkinSlots" style="flex-direction: row; margin-bottom: 8px; align-items: center;">
-                    <ui:Label text="DEFAULT" class="cw-slot-pill" style="margin: 0; background-color: rgb(192, 64, 48);" />
-                    <ui:Label text="🔒" class="cw-slot-pill cw-emoji-text" style="margin: 0; margin-left: 4px; opacity: 0.5;" />
-                    <ui:Label text="🔒" class="cw-slot-pill cw-emoji-text" style="margin: 0; margin-left: 4px; opacity: 0.5;" />
-                </ui:VisualElement>
-                <ui:VisualElement name="PassiveOptionRow" style="flex-direction: row; margin-top: 4px; margin-bottom: 4px; align-items: center;">
-                    <ui:Button name="PassiveOpt1" text="MIGHTY" class="cw-slot-pill cw-btn" style="margin: 2px; font-size: 11px;" />
-                    <ui:Button name="PassiveOpt2" text="BRACER" class="cw-slot-pill cw-btn" style="margin: 2px; font-size: 11px;" />
-                </ui:VisualElement>
-                <ui:Label name="PreviewPassive" text="PASSIVE · MIGHTY" class="cw-slot-pill" style="margin-top: 0px; margin-bottom: 4px; font-size: 11px;" />
-                <ui:Label name="PreviewDesc" text="+25% outgoing ability damage." class="cw-body" style="-unity-text-align: middle-center; font-size: 12px;" />
 
-                <ui:VisualElement name="StatList" class="cw-stat-grid" style="width: 100%; margin-top: 10px; padding-left: 4px; padding-right: 4px;">
+                <ui:Label name="PreviewName" text="WARRIOR CHICKEN" class="cw-heading" style="font-size: 42px;" />
+                <ui:Label name="PreviewQuote" text="&quot;Mighty of wing, short of temper.&quot;" class="cw-body" style="-unity-font-style: italic; color: rgba(255, 255, 255, 0.72); margin-top: 4px; margin-bottom: 12px; font-size: 30px; -unity-text-align: middle-center;" />
+
+                <!-- Passive fork. Two mutually exclusive options; the chosen one
+                     also decides whether the CLASS pick row asks for 1 or 2. -->
+                <ui:Label text="PASSIVE" class="cw-slot-caption" style="margin-bottom: 6px;" />
+                <ui:VisualElement name="PassiveOptionRow" style="flex-direction: row; align-items: stretch; width: 100%;">
+                    <ui:Button name="PassiveOpt1" text="MIGHTY" class="cw-btn" style="flex-grow: 1; flex-basis: 0; margin-right: 6px; padding-left: 8px; padding-right: 8px; font-size: 30px;" />
+                    <ui:Button name="PassiveOpt2" text="BRACER" class="cw-btn" style="flex-grow: 1; flex-basis: 0; margin-left: 6px; padding-left: 8px; padding-right: 8px; font-size: 30px;" />
+                </ui:VisualElement>
+                <ui:Label name="PreviewDesc" text="+25% outgoing ability damage." class="cw-body" style="-unity-text-align: middle-center; font-size: 30px; margin-top: 8px;" />
+
+                <ui:VisualElement name="StatList" class="cw-stat-grid" style="width: 100%; margin-top: 16px;">
                     <ui:VisualElement name="StatCargo" class="cw-stat-row">
                         <ui:Label text="CARGO" class="cw-stat-label" />
                         <ui:VisualElement class="cw-stat-pips">
@@ -81,18 +100,6 @@
                     </ui:VisualElement>
                     <ui:VisualElement name="StatRate" class="cw-stat-row">
                         <ui:Label text="RATE" class="cw-stat-label" />
-                        <ui:VisualElement class="cw-stat-pips">
-                            <ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" />
-                        </ui:VisualElement>
-                    </ui:VisualElement>
-                    <ui:VisualElement name="StatHp" class="cw-stat-row">
-                        <ui:Label text="HP" class="cw-stat-label" />
-                        <ui:VisualElement class="cw-stat-pips">
-                            <ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" />
-                        </ui:VisualElement>
-                    </ui:VisualElement>
-                    <ui:VisualElement name="StatResist" class="cw-stat-row">
-                        <ui:Label text="RESIST" class="cw-stat-label" />
                         <ui:VisualElement class="cw-stat-pips">
                             <ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" />
                         </ui:VisualElement>
@@ -106,18 +113,46 @@
                 </ui:VisualElement>
             </ui:VisualElement>
 
-            <!-- Column C: detail (slots + grid + ready) -->
+            <!-- Column C: the loadout — two flat pick rows + ready.
+                 Card children are created by MenuUiController.RebuildPickRows. -->
             <ui:VisualElement name="Detail" class="cw-cs-detail">
-                <ui:VisualElement class="cw-well" style="padding-top: 18px; padding-bottom: 10px; padding-left: 8px; padding-right: 8px; margin-bottom: 8px; position: relative;">
-                    <ui:Label name="EquippedLabel" text="EQUIPPED · 0/2" class="cw-equipped-tab" />
-                    <ui:VisualElement name="SlotRow" style="flex-direction: row; justify-content: center; align-items: flex-start;" />
+
+                <ui:VisualElement name="CommonRow" class="cw-pick-row cw-well" style="padding: 14px;">
+                    <ui:VisualElement class="cw-pick-row__head">
+                        <ui:Label text="COMMON" class="cw-pick-row__title" />
+                        <ui:Label name="CommonHint" text="optional · any chicken can take these" class="cw-pick-row__hint" />
+                        <ui:VisualElement class="cw-pick-row__rule" />
+                        <ui:Label name="CommonCount" text="0 EQUIPPED" class="cw-pick-row__count" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="CommonCards" class="cw-pick-cards" />
                 </ui:VisualElement>
 
-                <ui:ScrollView name="AbilityGrid" class="cw-well" style="flex-grow: 1; padding-left: 6px; padding-right: 6px; padding-top: 4px; padding-bottom: 4px; margin-bottom: 8px;" />
+                <ui:VisualElement name="ClassRow" class="cw-pick-row cw-well" style="padding: 14px;">
+                    <ui:VisualElement class="cw-pick-row__head">
+                        <ui:Label text="CLASS" class="cw-pick-row__title" />
+                        <ui:Label name="ClassHint" text="Warrior only" class="cw-pick-row__hint" />
+                        <ui:VisualElement class="cw-pick-row__rule" />
+                        <ui:Label name="ClassCount" text="0 EQUIPPED" class="cw-pick-row__count" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="ClassCards" class="cw-pick-cards" />
+                </ui:VisualElement>
 
-                <ui:Button name="ReadyBtn" text="PICK 2 ABILITIES" class="cw-btn cw-btn--neutral" style="flex-shrink: 0; letter-spacing: 3px;" />
+                <ui:VisualElement style="flex-grow: 1; min-height: 8px;" />
+
+                <!-- Shared ability detail. The description's only home: six cards
+                     each carrying their own wrapped copy needed ~137px of a 263px
+                     card and starved the icon to zero height. Tapping any card
+                     fills this strip (MenuUiController.RefreshAbilityDetail) at the
+                     full 34px reading size instead of 24px six times over. -->
+                <ui:VisualElement name="AbilityDetail" class="cw-ability-detail">
+                    <ui:Label name="AbilityDetailName" text="" class="cw-ability-detail__name" />
+                    <ui:Label name="AbilityDetailText" text="Tap an ability to see what it does." class="cw-ability-detail__text" />
+                </ui:VisualElement>
+
+                <ui:Button name="ReadyBtn" text="PICK ABILITIES" class="cw-btn cw-btn--neutral" style="flex-shrink: 0; letter-spacing: 3px;" />
             </ui:VisualElement>
         </ui:VisualElement>
-        <ui:Label name="ConsoleHints" text="←→ Select · A Confirm · LB/RB Tab" class="cw-body cw-console-hints" style="position: absolute; bottom: 8px; left: 16px; opacity: 0.6; display: none; font-size: 14px;" />
+
+        <ui:Label name="ConsoleHints" text="←→ Select · A Confirm · LB/RB Tab" class="cw-body cw-console-hints" style="position: absolute; bottom: 12px; left: 24px; opacity: 0.6; display: none;" />
     </ui:VisualElement>
 </ui:UXML>

@@ -2,12 +2,20 @@
    Cluck Wars : match top-bar HUD (Stage 2a + Stage A UI rebuild)
    Consumed by Assets/UI/MatchTopBar.uxml + MatchHudController.cs.
    Design source: docs/ART.md 6.3 + Design CWMatchHUDv3L
+
+   2026-07-23 Android pass: every size below is ~1.9x the Stage-2a sheet.
+   See the mobile sizing contract at the top of CluckWarsTheme.uss — on this
+   1920x1080 canvas 1 dp ~= 2.35 px, so the old 14-18 px HUD type rendered at
+   6-8 sp on a phone. The leaderboard is glanceable rather than body copy, so
+   it sits at 26-34 px (11-14 sp) instead of the menu ramp; that is the
+   deliberate floor for a HUD that must not eat the arena. The strip grew
+   180 -> 300 px, which is the cost of a readable scoreboard.
    ============================================================================ */
 
 /* ---- Full-width transparent top strip (dark to clear fade) ---------------- */
 .cw-topbar {
     position: absolute; left: 0; top: 0; right: 0;
-    height: 180px; /* increased to accommodate panel */
+    height: 330px;
     background-image: url("project://database/Assets/_Game/Art/UI/Backgrounds/HudTopGradient.png");
     -unity-background-scale-mode: stretch-to-fill;
 }
@@ -23,7 +31,7 @@
     flex-direction: row;
     justify-content: space-between;
     align-items: flex-start;
-    padding-top: 16px; padding-left: 16px; padding-right: 16px;
+    padding-top: 20px; padding-left: 20px; padding-right: 20px;
     width: 100%;
 }
 
@@ -37,21 +45,21 @@
 
 .cw-lb-panel {
     background-color: rgba(20, 14, 8, 0.85);
-    border-radius: 8px;
-    padding: 6px;
+    border-radius: 14px;
+    padding: 10px;
     /* Optional border for the whole panel */
-    border-left-width: 1px; border-right-width: 1px; border-top-width: 1px; border-bottom-width: 1px;
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
     border-color: rgba(60, 45, 30, 0.8);
 }
 
 .cw-lb-row {
     flex-direction: row;
     align-items: center;
-    height: 32px;
-    padding-left: 6px; padding-right: 8px;
-    margin-bottom: 4px;
-    border-radius: 4px;
-    border-left-width: 3px;
+    height: 64px;
+    padding-left: 10px; padding-right: 14px;
+    margin-bottom: 6px;
+    border-radius: 8px;
+    border-left-width: 5px;
     border-left-color: transparent; /* Updated by controller for local player */
 }
 
@@ -62,32 +70,32 @@
 
 .cw-lb-ord {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.7);
-    width: 28px;
+    font-size: 30px;
+    color: rgba(255, 255, 255, 0.85);
+    width: 62px;
     -unity-text-align: middle-left;
 }
 
 .cw-lb-dot {
-    width: 18px; height: 18px; flex-shrink: 0; margin-right: 6px;
+    width: 34px; height: 34px; flex-shrink: 0; margin-right: 10px;
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/PlayerDotGlossy.png");
     -unity-background-scale-mode: scale-to-fit;
 }
 
 .cw-lb-name {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 16px;
-    width: 26px;
+    font-size: 34px;
+    width: 62px;
     -unity-text-align: middle-left;
 }
 
 /* Progress bar (food / target) */
 .cw-lb-bar-trough {
-    width: 100px;
-    height: 8px;
+    width: 190px;
+    height: 15px;
     background-color: rgba(0, 0, 0, 0.6);
-    border-radius: 4px;
-    margin-left: 8px; margin-right: 12px;
+    border-radius: 8px;
+    margin-left: 14px; margin-right: 20px;
     overflow: hidden;
 }
 
@@ -95,26 +103,26 @@
     height: 100%;
     width: 0%; /* Driven by code */
     background-color: white; /* Tinted by code */
-    border-radius: 4px;
+    border-radius: 8px;
 }
 
 .cw-lb-score {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 18px;
+    font-size: 34px;
     color: rgb(245, 200, 66); /* Gold */
     -unity-text-align: middle-right;
-    width: 40px;
+    width: 76px;
 }
 
 .cw-target-badge {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 14px;
+    font-size: 32px;
     color: rgb(245, 200, 66);
     background-color: rgba(20, 14, 8, 0.85);
-    padding: 4px 12px;
-    margin-top: 6px;
-    border-radius: 12px;
-    border-width: 1px;
+    padding: 7px 22px;
+    margin-top: 10px;
+    border-radius: 22px;
+    border-width: 2px;
     border-color: rgba(245, 200, 66, 0.5);
     align-self: center;
 }
@@ -130,19 +138,19 @@
 
 .cw-timer {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 28px; letter-spacing: 3px;
+    font-size: 52px; letter-spacing: 4px;
     color: rgb(254, 245, 224);
     -unity-text-align: middle-center; white-space: nowrap;
     flex-shrink: 0;
-    padding-top: 5px; padding-bottom: 7px; padding-left: 22px; padding-right: 22px;
+    padding-top: 9px; padding-bottom: 13px; padding-left: 38px; padding-right: 38px;
     
     /* Dark gradient background: USS doesn't have linear-gradient yet, use solid or sprite */
     background-color: rgb(24, 18, 12);
     
     /* gold border with a top-highlight / bottom-shade bevel for the emboss */
-    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
     border-top-color: rgb(245, 200, 66); border-left-color: rgb(212, 160, 32);
     border-right-color: rgb(212, 160, 32); border-bottom-color: rgb(150, 110, 20);
-    border-top-left-radius: 10px; border-top-right-radius: 10px;
-    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+    border-top-left-radius: 18px; border-top-right-radius: 18px;
+    border-bottom-left-radius: 18px; border-bottom-right-radius: 18px;
 }

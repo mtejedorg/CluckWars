@@ -8,6 +8,11 @@
                             via -unity-background-image-tint-color
      Icons/Icon_*.png     : 14 ability icons, swapped via .cw-hex-icon--* classes
    Reference resolution 1920x1080 (shared PanelSettings ScaleWithScreenSize).
+   Sizing contract: see the header of Assets/UI/Styles/CluckWarsTheme.uss.
+   The HIT TARGETS here were always phone-correct (150px hex = 64 dp, joystick
+   base 280px = 119 dp). The TEXT was not: the short label was 15px (6.4 sp)
+   and the slot badge 20px (8.5 sp), the two smallest strings in the app. Both
+   were raised 2026-07-23; anything added inside a hex must clear 26px.
    Positions mirror the shipped UGUI tunables (ART 6.7 reference table):
      A1 center (-170,170)  A2 center (-210,360)  A3 center (-410,270) from BR
      joystick center (220,220) from BL, base 280, knob 128, maxRadius 108.
@@ -81,17 +86,22 @@
 /* --- Layer 7 : ability icon (design-exported sprite, swapped per-ability) -- */
 .cw-hex-icon {
     width: 64px; height: 64px;
-    margin-bottom: 14px;              /* nudge up : short label sits below */
+    margin-bottom: 26px;              /* nudge up : short label sits below */
     -unity-background-scale-mode: scale-to-fit;
     /* background-image set by a .cw-hex-icon--* class at runtime */
 }
 
 /* --- Layer 7 : short label under the icon --------------------------------- */
+/* 2026-07-23 Android pass: was 15px = 6.4 sp, the smallest type in the app.
+   The hit targets in this sheet were always fine (150px hex = 64 dp), but its
+   TEXT was authored at desktop scale like the menu sheet. 28px = 12 sp is the
+   ceiling here — the label has to live inside a 150px hex under a 64px icon,
+   so the icon's margin-bottom grew to 26px to keep them from overlapping. */
 .cw-hex-label {
     position: absolute;
-    bottom: 30px; left: 0; right: 0;
+    bottom: 16px; left: 0; right: 0;
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 15px; letter-spacing: 0.5px;
+    font-size: 28px; letter-spacing: 0.5px;
     color: rgb(254, 245, 224);
     -unity-text-align: middle-center; white-space: nowrap;
 }
@@ -110,14 +120,14 @@
 /* --- Layer 8 : slot-index badge (top-left circle) ------------------------- */
 .cw-hex-badge {
     position: absolute;
-    top: 20px; left: 20px;
-    width: 38px; height: 38px;
+    top: 14px; left: 14px;
+    width: 54px; height: 54px;
     background-color: rgba(26, 14, 4, 0.95);
     border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
     border-top-color: rgba(255,255,255,0.25); border-left-color: rgba(255,255,255,0.15);
     border-right-color: rgba(0,0,0,0.35); border-bottom-color: rgba(0,0,0,0.45);
-    border-top-left-radius: 19px; border-top-right-radius: 19px;
-    border-bottom-left-radius: 19px; border-bottom-right-radius: 19px;
+    border-top-left-radius: 27px; border-top-right-radius: 27px;
+    border-bottom-left-radius: 27px; border-bottom-right-radius: 27px;
     justify-content: center; align-items: center;
 }
 /* slot 3 : gold-filled Combo privilege (Assassin) */
@@ -128,7 +138,7 @@
 }
 .cw-hex-badge-text {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 20px;
+    font-size: 34px;
     color: rgb(254, 245, 224);
     -unity-text-align: middle-center;
 }

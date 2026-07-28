@@ -19,6 +19,584 @@ All tags pushed to origin.
 
 ---
 
+## 🔧 Common ability slot made OPTIONAL (2026-07-27) — gameplay-logic side done, not committed
+
+**User design directive, final and reaffirmed — overrides GDD §7.1-7.2's old "1 mandatory
+Common + 2 Character" rule**: *"common abilities are there so that chickens can equip them
+if players want, but should not be forced to do so (at least for now)."* This directly
+supersedes the "confirmed still correct" note in the bot-loadout bugfix entry above (written
+earlier the same day, before the directive) — that note described the OLD mandatory rule.
+
+Split across two parallel agents: `senior-dev` (this entry) owns gameplay-logic; a companion
+task owns the UI picker (`Assets/UI/CharacterSelect.uxml` + `MenuUiController.cs`) —
+**not yet done as of this commit**, so `MenuUiController.cs` on disk still enforces the old
+"Ability0 = Common, Ability1/2 = Character" picker contract. `ResolveLegalLoadout` was
+written to the *new* contract (any mix, positional) ahead of that UI landing, since it's the
+single sanitising chokepoint both bots and players go through — it accepts whatever the
+picker sends today too, just without forcing a Common into slot0 anymore.
+
+**`MatchBootstrapper.ResolveLegalLoadout`** (`Assets/_Game/Scripts/Gameplay/MatchBootstrapper.cs`,
+~line 330): no longer buckets candidates by `SlotKind` and force-fills a Common. New
+behavior — accepts up to **N** distinct, class-legal picks from `a0/a1/a2` in the order
+given (N = 2 normally, N = 3 when the resolved passive is `ComboPassiveSO`, mirroring
+`AbilityController.EquippedSlotCount`); a pick is legal if it's `SlotKind.Common` (open to
+everyone) or `SlotKind.Character` and `AbilityRegistrySO.IsAllowedFor(ability, cls)`.
+Illegal/duplicate/off-class picks are dropped, not kept. Only if sanitising leaves fewer
+than N legal picks does it backfill from the combined legal pool
+(`CommonAbilities ∪ GetCharacterAbilitiesForClass(cls)`) — no longer specifically reaching
+for a Common. If backfill still can't reach N (registry too sparse for that class), it
+`_log.Warn`s instead of silently returning fewer slots. Output `slot0/1/2` are now purely
+positional (first/second/third of the resolved set) — no longer "slot0 is reserved for
+Common." `AbilityRegistrySO.ComposeDefaultLoadout` is untouched (still a reasonable "sane
+default" fallback for `TryPickBotLoadout` when no preset is eligible) and is no longer
+called from `ResolveLegalLoadout`.
+
+**Bots**: `TryPickBotLoadout` / `PresetIsClassLegal` untouched — they never enforced a
+mandatory Common, only per-slot class legality. The six scene-authored presets on
+`Game.unity` (Bruiser/Skirmisher/Tank/Trickster/Thief/Trapper, re-authored last session)
+each already carry a genuine Common in `Slot0` plus legal Character abilities, so they pass
+straight through unchanged — no bot behavior regression.
+
+**Test**: `DataIntegrityTests.BotLoadoutPresets_Slot0_IsAlwaysAGenuineCommonAbility` (which
+asserted the now-dead "Slot0 must be Common" rule) replaced with
+`BotLoadoutPresets_EveryAssignedSlot_IsAGenuineClassLegalAbility` — parses all three slots
+per scene preset (extended `ParseBotLoadoutSlotGuids`, was Slot0-only) and asserts every
+assigned slot resolves to a real, class-legal, distinct `AbilityBaseSO` asset. No longer
+pins any slot to a specific `SlotKind`.
+
+**`docs/GDD.md` §7.1** updated: "N freely-chosen active abilities (N=2, N=3 under Assassin
+Combo), Common optional" — explicitly flagged as "the current stance, at least for now,"
+per the user's own phrasing, so a future reader knows it's revisitable, not permanent design
+law. §7.2's pool table is unaffected (categories/abilities didn't change).
+
+**Verified:** EditMode **141/141** (includes the rewritten test).
+**Not committed** — changes left in the working tree per instruction.
+**Outstanding for Maestro / the companion UI task**: once `MenuUiController`'s picker moves
+to the free-pick model described above, no additional prefab-wiring is needed —
+`ResolveLegalLoadout` already accepts that shape. Worth a live Editor playtest once both
+sides land, to confirm a 0-Common loadout equips and fires correctly end-to-end.
+
+---
+
+## 🐛 Two Editor-scene bugs fixed (2026-07-27) — not committed, awaiting review
+
+Found while playtesting `Game.unity` in the Editor. Both root-caused and fixed by
+`senior-dev`, reviewed by `code-architect` (diff review + independent Unity MCP
+verification — test run + live scene read, not just the agent's self-report).
+**Changes are unstaged/staged only — not committed, per the session's instruction.**
+
+**1. Pinwheel/interior walls had no visible mesh in Game view.** `MapGenerator.CreateWall()`
+(`Assets/_Game/Scripts/Gameplay/MapGenerator.cs`) has always disabled the `MeshRenderer`
+on every wall it builds when `_wallsVisible` is false (default, and what's serialized on
+`Game.unity`'s `MapGenerator` — a Phase 7b choice, presumably deliberate for the boundary
+walls' "collider-only open horizon" look). Commit `6b27390` (pinwheel walls) then built the
+new interior terrain wedges through that **same** `CreateWall()` helper, so every Low /
+Standard / Tall obstacle silently inherited the boundary's invisibility too — the per-class
+tinted material assignment right after `CreateWall()` returns was already moot, since the
+renderer was off before it could apply. Scene-view gizmos showed the colliders; Game view
+showed nothing. Not a regression from this session's uncommitted edits (`_wallsVisible` was
+untouched by them) — a latent bug since 6b27390.
+
+Fix: `CreateWall()` gained a `forceVisible` parameter that skips the `_wallsVisible` gate
+entirely; `BuildInteriorObstacles()` now passes `forceVisible: true`, boundary walls still
+pass `false` (unchanged behavior). The old rejection-sampling `PlaceObstacleClass()` method
+was confirmed dead (no call sites) and left in place with a `<remarks>` flag rather than
+deleted — removing it cleanly would also mean retiring four still-serialized inspector
+fields, out of scope for this fix.
+
+**2. Every bot spawned with the identical "Common" ability, regardless of preset.** This
+read like a design restriction ("chickens forced into a common ability") but the GDD v0.4
+(§7.1–7.2) explicitly mandates 1 mandatory Common ability (freely chosen from 3: Peck / Egg
+Shell / Speed Burst) + 2 Character abilities per chicken — confirmed still correct and
+untouched for **human** players (`MenuUiController`'s pick-row UI, `SessionSelectionService`,
+`AbilityRegistrySO` — all left alone). The actual bug was stale **bot preset** data:
+`MatchBootstrapper._botLoadouts` (six presets authored on `Game.unity`'s `MatchBootstrapper`
+back on 2026-05-21) was never reconciled after commit `921308d` reassigned `SlotKind` across
+the ability roster. Every preset's `Slot0` — positionally meant to hold the Common pick —
+actually referenced a **Character**-kind ability (FlyingPeck / SpineCoat / SneakySteal /
+FeatherTrap). `ResolveLegalLoadout` buckets by each ability's real `SlotKind`, not by array
+position, so it never found a genuine Common ability in any preset and backfilled every
+single bot with `AbilityRegistrySO.ComposeDefaultLoadout`'s same default (EggShell, first
+Common entry in registry order) — every bot in a solo match looked identical on that slot.
+
+Fix: re-authored all six presets so `Slot0` is a real Common ability (rotated across
+EggShell / Peck / Speed Burst) and `Slot1`/`Slot2` are real Character abilities legal for
+the preset's class (also tightened each preset's `AllowedClasses` — bot-AI flavor only, per
+the existing doc comment — to match its abilities' actual class gating, since several were
+previously inconsistent and would have silently self-excluded from `eligible` at roll time).
+Verified live via Unity MCP by opening `Game.unity` and reading `MatchBootstrapper`'s
+deserialized `_botLoadouts` directly — every preset resolves to the intended ability types.
+Added `DataIntegrityTests.BotLoadoutPresets_Slot0_IsAlwaysAGenuineCommonAbility` (parses
+`Game.unity` as text, same convention as `EconomyAndPilesTests.SceneVector2/SceneFloat`) so
+the next ability-roster reshuffle fails the suite instead of silently flattening bot variety
+again.
+
+**Verified:** EditMode **141/141** (re-run independently, not just trusted from the agent).
+**Not verified:** live play-mode look at the interior terrain rendering, or a bot-variety
+check in an actual solo match — both are quick Editor checks worth doing before this is
+committed.
+
+---
+
+## 🎨 Main-menu redesign (2026-07-24) — SHIPPED (Editor-verified)
+
+Maestro: *"This menu is still horrible, even for a prototype."* Correct. The old
+screen was **a text screen for a game about chickens** — title, subtitle and three
+identical pills in a ~250px band, with ~430px of dead black above and ~350px below,
+while every art atom the project ships went unused.
+
+**What changed**
+
+1. **Cast band.** The four chickens now appear on the menu, using the same Stage-0
+   sprites the character select uses (no new art). It says "4-player, pick a
+   chicken" faster than the subtitle does and fills the void.
+2. **One primary action.** SOLO is a wide gold button on its own row (618×149);
+   HOST/JOIN drop to a secondary pair (308×116). Previously all three were the same
+   pill and the eye had no entry point — SOLO is the path a playtester takes almost
+   every time.
+3. **Lit backdrop.** A `RadialGlow` pool behind the title/cast. It must **overflow
+   the canvas on every side** — the first attempt at 1500×1100 put the atom's own
+   elliptical edge on-screen and read as a brown smudge. Final: 2400×1500 at alpha
+   0.15, centred high so the light pools behind the title and falls off to dark at
+   the bottom, which makes the gold buttons pop.
+4. **Subtitle lightened** to `#e2c898`. The `.cw-body` tan was chosen against flat
+   `#0e0804`; the glow lifts the backdrop enough to erode its contrast.
+5. **Build stamp** bottom-left (`v{Application.version}`). A tester reporting a bug
+   from a device otherwise cannot say which build produced it.
+
+**Verified live:** all three buttons clear the 48 dp touch floor · cast band renders
+4 items · bottom-most content at y=1013 of 1080 (no overflow) · every button still
+routes to character select · EditMode **116/116**.
+
+> **Note on the stale screenshot.** The report came with a screenshot showing the
+> buttons stacked vertically. That was a pre-domain-reload capture — measured live,
+> `.cw-mode-row` was already resolving to `flex-direction: Row`. The redesign stands
+> on its own merits; there was no landscape/portrait bug.
+
+### ⚠ ComfyUI: root-caused, worked around — 2D art generation is available again
+
+**Update (same day):** the blocker is understood and there is a **zero-modification
+workaround** — launch ComfyUI with **`--disable-all-custom-nodes`** for 2D work. Verified:
+SDXL *and* Flux both generate. The menu backdrop now shipping
+(`Assets/_Game/Art/UI/Backgrounds/MenuBackground.png`, Flux) was produced that way.
+Full write-up: `docs/diagnostics/2026-07-24-comfyui-sdpa-patch.md`.
+
+Also corrected there: SDXL is **not** unaffected. I initially guessed it might survive
+because its CLIP encoders could run fp16 — tested, and it fails identically. Every
+ComfyUI text encoder funnels through the same hardcoded `dtype=torch.float32`, so the
+breakage is model-agnostic.
+
+The original symptom write-up follows.
+
+Maestro offered ComfyUI for temporary art, and a generated farmyard backdrop was the
+intended finish. **It cannot currently generate anything.** Every Flux job dies in
+`CLIPTextEncode`:
+
+```
+AssertionError: Input tensors must be in dtype of torch.float16 or torch.bfloat16
+  sageattention/core.py:725 in sageattn_qk_int8_pv_fp8_cuda
+```
+
+**Root cause — full write-up in `docs/diagnostics/2026-07-24-comfyui-sdpa-patch.md`.**
+`ComfyUI-3D-Pack`'s TRELLIS backend replaces torch's SDPA with `sageattn`
+**as a side effect of a capability probe**
+(`Stable3DGen/trellis/backend_config.py:51`, inside `_try_import_sageattention()`),
+which `get_available_backends()` calls unconditionally at import time. Every model in
+the process then uses sage — including Flux's T5 encoder, which ComfyUI runs at a
+hardcoded `dtype=torch.float32` (`comfy/sd1_clip.py:279`). Sage's fp8 kernel asserts
+fp16/bf16, so text encoding cannot run.
+
+Three fixes attempted, all failed: `--use-pytorch-cross-attention` (ComfyUI honoured
+it — the log says "Using pytorch attention" — but the flag only picks which *wrapper*
+is called, and that wrapper calls the patched torch function), `--fp16-text-enc`
+(governs weight dtype, not the hardcoded compute dtype), and `ATTN_BACKEND` (ruled out
+by reading: the probe runs regardless of selected backend). This is **not**
+prompt-specific and **not** specific to backgrounds — it breaks `image`, `brainstorm`,
+`model` and `polish` for every prompt.
+
+> **Correction to my first pass:** I initially blamed
+> `comfy/ldm/modules/attention.py:25`. That is wrong — that line only imports
+> `sageattn` into a module namespace, and ComfyUI core never patches torch. Verified
+> empirically: importing `comfy.ldm.modules.attention` leaves `F.scaled_dot_product_attention`
+> as the builtin. I had also concluded "no custom nodes" from an empty
+> `ComfyUI\custom_nodes` — the ~50 real ones live in `my_config\custom_nodes`.
+
+**Not fixed here, deliberately:** the one-line fix is in a third-party custom node
+inside an install whose launcher is labelled "golden stable environment". That is
+Maestro's call, not a side-effect of a menu task. **The launcher `.bat`,
+`config.json` and all custom-node code were not edited, and ComfyUI was left stopped,
+exactly as found.**
+
+Consequence: the menu backdrop is the CSS glow described above rather than painted
+art. It is a real improvement over flat black, but a generated farmyard plate would
+be better and is the obvious next step once ComfyUI runs.
+
+---
+
+## 🔎 Review of the ability-Description change (2026-07-24) — SHIPPED (Editor-verified)
+
+Reviewed the other session's `AbilityBaseSO.Description` work and reworked where the
+text renders.
+
+### What that session got right
+
+The field itself is the correct fix. `MenuUiController` previously held a hard-coded
+`PassiveDescriptions` dictionary **keyed by `DisplayName`**, so renaming an asset
+silently emptied the preview; and the pick cards showed name + category + cooldown,
+which tells you how an ability is *filed*, never what it *does*. Description is now
+authored on the SO, all 22 assets are filled in, and a test fails the build on blank.
+The preview binding correctly avoids `ShortLabel` (the ≤4-char HUD abbreviation —
+it used to explain Bracer as "BRCR").
+
+### The regression it introduced: the card icons silently vanished
+
+Rendering the description **on each of six cards** at 24px broke two things.
+
+1. **24px = 10.2 sp**, under the contract's floor, justified in a test comment that
+   measured the squeeze correctly but concluded "shrink the text" rather than
+   "the text is in the wrong place".
+2. **Every pick card lost its ability icon.** A card is a flex column; `height` is
+   only a hint, so when the children overflowed, flexbox shrank what it could. The
+   sprite has no text to floor it, so it collapsed to **h=0**. Measured, not
+   inferred — the per-child dump read `cw-ability-card__sprite h=0.0` on all six
+   cards, and the icons are visibly gone comparing screenshots.
+
+The tell was that card height was *identical* (291px) at 24px, at 30px, and with the
+copy hand-shortened: the description was never driving the layout, it was eating the
+icon's space.
+
+### The fix — one shared detail strip (Maestro's call)
+
+Descriptions are **off the cards**. A new `#AbilityDetail` strip sits above READY and
+shows the last-tapped ability's name + description at the full **34px**:
+
+- Six cards do not each need a copy — only the one being considered does.
+- Costs ~110px, replaces ~275px of per-card description boxes: **net room gained**.
+- Cards get the 96px icon back, plus `flex-shrink: 0` so the next thing added to a
+  card overflows loudly instead of silently eating the artwork again.
+- Category + cooldown moved into one **footer row** (`.cw-card-footer`) instead of
+  two stacked full-width rows, saving ~43px while keeping both as text.
+
+**Reveal is a plain tap, not a long-press.** Long-press has no affordance on a touch
+screen; a player who never discovers it is back to "equip it and find out in a
+match". Tap already equips, so one gesture does both, and the strip shows a prompt
+until something is tapped rather than rendering as an empty box.
+
+The 80-char test cap was rewritten: its rationale (wrapping on the card) no longer
+exists, and the strip is `min-height` + `flex-shrink: 0`, so it *grows* rather than
+clips. Cap relaxed to 110 and re-labelled as an editorial limit, not a layout one.
+
+### Verified live (play mode, measured — not eyeballed)
+
+| Check | Result |
+|---|---|
+| Card icons restored | **94.7 px** on every card (were **0.0**) |
+| Detail strip type | name + text both **34 px**, 2.2 lines for the 75-char worst case |
+| READY touch target | **116 px** = the 48 dp floor, 19 px of slack below it |
+| Every pick card | ≥116 px in both axes |
+| Tap → equip + reveal | one gesture does both; slot badge and `n/m` counters follow |
+| Class switch clears focus | Fatty TURTLE MODE → switch to Speedy → strip returns to the prompt, `_focusedAbility` null |
+| Assassin COMBO | CLASS row asks 2/2, slots 2 and 3 assigned, READY gated on the Common pick |
+| EditMode suite | **116/116** |
+
+### Open
+
+1. `PreviewDesc` (the passive description in the preview column) is still **30px**.
+   By the contract it is load-bearing text and belongs at 34, but the preview column
+   is the densest on the screen (art + name + quote + passive fork + stats) and
+   raising it risks pushing the stats grid — the same failure mode as the icon
+   collapse. Measure the preview column before changing it.
+2. Nothing here has been seen on the **Pixel 9**; every number above is Editor.
+
+---
+
+## 📱 Android UI pass 2 — the remaining surfaces (2026-07-23) — SHIPPED (Editor-verified)
+
+Second sweep, covering everything the first pass rescaled but never *saw*: the
+in-game HUD, the four in-match overlays, the touch controls and the two
+non-UI-Toolkit surfaces. Method: dump `resolvedStyle.fontSize` for every live
+`Label` in play mode and compare against the contract, rather than reading USS.
+**Still Editor-only — nothing checked on the Pixel 9.**
+
+### The touch controls were the worst offender, and I had said they were fine
+
+`TouchControls.uss` was excluded from pass 1 on the grounds that it was
+"already correctly sized for a phone". That was true of its **hit targets**
+(150 px hex = 64 dp, joystick base 280 px = 119 dp) and false of its **type**:
+
+| Element | Was | Now |
+|---|---|---|
+| `.cw-hex-label` (ability short name) | **15 px = 6.4 sp** | 28 px |
+| `.cw-hex-badge-text` (slot 1/2/3) | **20 px = 8.5 sp** | 34 px (badge 38→54 px) |
+
+Those were the two smallest strings in the game. The icon's `margin-bottom`
+grew 14→26 px so the bigger label still clears it inside the 150 px hex.
+The header of `CluckWarsTheme.uss` has been corrected and now lists every
+surface the contract governs.
+
+### The overlay floor was set on the wrong rationale
+
+Pass 1 floored `MatchOverlays.uss` at 26 px calling it "glanceable HUD". It
+isn't — match-end standings, lobby settings and the session-end reason are
+**full-screen modals the player stops and reads**, i.e. body copy. Floor
+corrected to **34 px (14 sp)**, with only true eyebrow labels and transient
+countdowns left at 30 px. 26 rules raised.
+
+`.cw-me-rowmid` also had to go 133→200 px: "ASSASSIN" in Nunito-Bold at 34 px
+is ~152 px and the rule is `nowrap`, so it truncated silently.
+
+`MatchTopBar.uss` (genuinely glanceable, so a lower bar is defensible) went
+ordinal 26→30, player name 30→34, target badge 28→32, row 58→64, strip
+300→330 px.
+
+### Two surfaces that no scaler reaches
+
+- **`MatchHud.cs`** — UGUI, but its CanvasScaler is the *same*
+  ScaleWithScreenSize 1920×1080 @0.5, so the contract applies unchanged. The
+  final-minute event banner was 24 px type (10 sp) in a 600×80 panel (34 dp):
+  now 44 px in 1150×150.
+- **`DebugHud.cs`** — IMGUI, which has **no scaler at all** and draws in raw
+  screen pixels with a ~12 px font. On a 422 ppi phone that is ~4.5 dp, which
+  matters because `docs/TESTING.md` makes F1 the on-device diagnostic path. Now
+  scales `GUI.matrix` by `Screen.dpi / 96`, clamped to 3× (uncapped a Pixel 9
+  takes 4.4× and the panel eats two thirds of the screen). Rects keep their
+  authored desktop coordinates; the right-anchored Balance panel is placed in
+  the scaled space.
+
+### Real bug: the top bar competed with its own results screen
+
+`SetTopBarDimmed` was only ever called from `RefreshIntro`, so during **MATCH
+END** the live leaderboard stayed at full brightness on top of the dimmed arena,
+showing the same four scores as the FINAL STANDINGS panel two inches away.
+`RefreshIntro` also cleared the dim every frame, so a fix local to
+`RefreshMatchEnd` would have been overwritten. The dim is now decided **once per
+`Update`** across intro + match-end + lobby, and `RefreshIntro` only owns
+visibility. Verified live.
+
+### Correction to my own finding
+
+I first reported "Next match in Ns… is clipped by the panel border" from a
+screenshot. Measured, it is **33 px inside** the panel — the read was an eyeball
+error on a 456 px-tall capture. `.cw-me-rows` still moved `flex-grow` 1→0 so the
+line follows the last row instead of being pinned to the column bottom, but that
+is robustness against row-count changes, **not** a bug fix.
+
+### Known, not fixed (needs a design call)
+
+The `MatchHud` UGUI canvas draws **above** the UI Toolkit overlays, so a
+final-minute event banner can appear on top of the match-end panel. The window
+is narrow — the banner lasts 3 s and fires at the 60 s mark — so it only
+collides if someone hits the food target within 3 s of the event. Left alone
+rather than guessing at the intended precedence.
+
+**Verified:** compile clean · EditMode **116/116** · live play-mode capture of
+the in-game HUD, intro countdown, touch controls and the match-end modal.
+
+---
+
+## 📱 Android UI pass — loadout IA + mobile sizing (2026-07-23) — SHIPPED (Editor-verified)
+
+On `develop`. **Not pushed. Verified live in Editor play mode; NOT yet seen on the
+Pixel 9** — that is the one check left, and the whole point of the change.
+
+Two problems, one commit. Maestro's report: *"now that chickens have less abilities to
+choose from, the current UI has no sense. Also, buttons and text are too small for
+android, which is the main target."* Both are real and both are measured below.
+
+### 1. The ability picker was built for a pool that no longer exists
+
+ADR 0003 cut what a chicken can actually see to **3 Common + 3 Character**. Measured
+from the assets:
+
+| Slot | Pool | Split across categories |
+|---|---|---|
+| Common (any class) | Peck · Egg Shell · Speed Burst | Damage / Defense / Utility — **1 card per header** |
+| Warrior | Cluck Shock · Flying Peck · Spine Coat | 2 Damage + 1 Defense |
+| Speedy | Feather Aura · Feather Trap · Invisibility | 2 Control + 1 Utility |
+| Fatty | Roll & Push · Root Egg · Turtle Mode | 2 Control + 1 Defense |
+| Assassin | Doppelganger · Sneaky Steal · Invisibility | 3 Utility |
+
+The old UI was a `ScrollView` of **23 %-wide** cards (4 per row) grouped under category
+headers — correct when all 14 abilities were listed at once. With three items it drew up
+to **three headers holding one card each**, ~70 % of every row empty, in a scroll view
+that never scrolled, behind a **two-step interaction** (tap a slot hex, then tap a card)
+to choose between three things.
+
+**Replaced with two flat rows, always fully visible, selection direct:**
+
+```
+① COMMON  any chicken can take these        0/1    -> Ability0
+② CLASS   ASSASSIN only · COMBO lets…       0/2    -> Ability1 (+ Ability2)
+```
+
+- **COMBO now widens the CLASS row to "pick 2 of 3"** instead of unlocking a third slot
+  fed from the same three options. The dimmed padlock hex is gone.
+- Category survives as a **colored tag on each card** — where 4 labels over 3 items
+  belongs. Numbered badges (1/2/3) still map to the in-match touch hexes.
+- `Ability0/1/2` and every `ISessionSelectionService` write are **unchanged**, so the
+  spawner, `MatchBootstrapper.ResolveLegalLoadout` and the touch HUD are untouched.
+- Slot packing is enforced: `Ability2` is never filled while `Ability1` is empty, and
+  dropping COMBO clears `Ability2`. Verified by driving all 8 transitions live.
+
+### 2. Everything was ~⅓ of the Android minimum — the numbers
+
+`Assets/Resources/PanelSettings` is `ScaleWithScreenSize`, ref **1920×1080**,
+MatchWidthOrHeight **0.5**, so `scale = sqrt((W/1920)·(H/1080))`. Because phone ppi
+rises with resolution, `scale·160/ppi` lands in a tight band on every handset:
+
+| Device | Res (landscape) | ppi | scale | dp per px |
+|---|---|---|---|---|
+| Pixel 9 | 2424×1080 | 422 | 1.124 | 0.426 |
+| 1344p flagship | 2992×1344 | 486 | 1.392 | 0.458 |
+| budget 720p | 1600×720 | 270 | 0.745 | 0.441 |
+
+**⇒ 1 dp ≈ 2.35 USS px on this canvas.** Derived floors, now honoured everywhere:
+touch target 48 dp = **116 px** · body/button 16 sp = **38 px** · readable 14 sp =
+**34 px** (hard floor) · caption 12 sp = **30 px**.
+
+The old sheet used **9–20 px type and ~40–70 px controls**, i.e. **4–9 sp text and
+17–30 dp targets**. Rescaled: `CluckWarsTheme.uss` (rewritten), `MatchTopBar.uss`
+(~1.9×, strip 180→300 px), `MatchOverlays.uss` (1.9×, borders 1.7×, font floor 26 px),
+plus the three menu UXMLs.
+
+> **⚠ Do NOT "fix" the desktop by shrinking type.** The menu now renders chunky on a
+> 1920×1080 monitor. That is deliberate — the phone is the target. And do **not** shrink
+> the PanelSettings reference resolution as a shortcut: `TouchControls.uss` shares the
+> panel and is *already correctly sized for a phone* (150 px hex = 64 dp), so a global
+> change fixes the menu and breaks the HUD. The contract is written at the top of
+> `CluckWarsTheme.uss`; re-derive the table before touching it.
+
+### Four defects the bigger UI exposed (all fixed)
+
+1. **Every class opened on its *alternative* passive.** `SelectClass` used
+   `GetPassivesForClass(cls)[0]` — registry authoring order — so Warrior defaulted to
+   **Bracer** and Speedy to **Second Wind**. Now uses `GetDefaultPassiveForClass`
+   (signature-first), and the two fork buttons are ordered signature-first.
+   *The registry already had the right API since 2026-07-22; the menu just never called it.*
+2. **The passive preview showed `ShortLabel`** — the ≤4-char HUD abbreviation — so
+   picking Bracer explained itself as **"BRCR"**. `AbilityBaseSO` has **no description
+   field**, so a `PassiveDescriptions` lookup now lives in `MenuUiController` next to the
+   existing per-class metadata. **The cleaner fix is a serialized `Description` on the
+   SO; delete the dictionary when that lands.**
+3. **Class name unreadable.** Raw class tint as text on `#0e0804` — Warrior `#C04030`
+   measures **2.5:1**, under the 3:1 large-text floor. Now lightened 35 % for type only
+   (→ 7.0:1); disc border and glow keep the pure tint.
+4. **Text on authored accent fills could be invisible.** Egg Shell's `AccentColor` is
+   `(0.92, 0.94, 1.00)` — near-white — so its cream slot badge vanished. New
+   `MenuUiController.InkOn(Color)` picks cream or dark ink by real WCAG luminance ratio.
+   **Anything that fills an element with an authored accent and writes text on it must
+   go through `InkOn`** — accents span the whole luminance range.
+
+Also: unfilled stat pips were `rgba(20,12,6,.7)` (invisible on the panel), so a rating
+had no denominator — now `rgba(254,245,224,.2)`.
+
+### Dropped deliberately
+
+The `SkinSlots` strip (DEFAULT + two 🔒) — non-functional decoration costing ~140 px of
+the preview column the legible passive/stat block needs. Re-add when skins are real.
+
+### Verification
+
+Compile clean · **EditMode 115/115** · live Editor play-mode walkthrough of Main Menu →
+Character Select for Warrior and Assassin, including the full COMBO pick-2-of-3
+transition table. Contrast was checked by calculation, not by eye — the theme's body/
+secondary/gold-on-dark pairs were already 5.7–12.9:1 and were left alone.
+
+**Still unverified:** anything on the actual Pixel 9. Aspect in the Editor was 1.78,
+not the phone's 2.24, and no finger has touched a real target yet.
+
+---
+
+## 🏝 Island-sized food piles + surface-relative collection (2026-07-23) — SHIPPED (untested)
+
+On `develop`. **Not pushed, not playtested.** Maestro's playtest ask: the centre pile
+should read as a big island. Three things broke the moment piles got big, and all three
+are fixed here.
+
+**New pile dimensions** (world units; a chicken is 1.0 wide, so these are chicken-widths):
+
+| Pile | Full footprint (X × Z) | At smallest non-empty step (×0.45) | Height |
+|---|---|---|---|
+| Centre island | **7.0 × 4.0** | 3.15 × 1.80 | 1.4 |
+| Contested (×4) | **3.0 × 3.0** | 1.35 × 1.35 | 1.4 |
+| Personal (×4) | **2.2 × 2.2** | 0.99 × 0.99 | 1.4 |
+
+The centre went from a 0.975-radius blocker (≈2 chickens across) to 7 × 4 — 3.5× wider.
+
+**1. Collection is now surface-relative — the whole class of bug is gone.**
+`FoodPile.CollectRadius` (a world-space *centre* distance) is **deleted**. It is replaced
+by `_collectReach` (default **1.0**), measured from the pile's **surface**:
+`IsWithinCollectRange(pos)` ⇔ `DistanceToSurface(pos) ≤ _collectReach`. A chicken pressed
+against any pile is exactly `0.5` (capsule) `+ 0.08` (controller skin) `= 0.58` from the
+surface, **whatever the pile's size**, so the margin is a constant `1.0 − 0.58 = 0.42`
+at 7×4, at 2.2×2.2, and at a hypothetical 40×25. The old fragile coupling —
+"`_blockerRadius` must stay under `CollectRadius` minus the chicken capsule", which went
+negative twice and caused the 2026-06-01 "collection silently stopped working"
+game-breaker — **no longer exists**. Under the old rule a chicken touching a 3.5-radius
+island would have sat 4.08 from the centre vs a 1.6 radius: every match would have ended
+0-0-0-0.
+
+**2. Bots steer to the rim, not the centre.** `BotController` targeted
+`pile.transform.position`, which is *inside* a solid island. It now uses
+`FoodPile.SurfaceApproachPoint(from, standoff)` with `_pileStandoff` 0.7 (above the 0.5
+NavMesh agent radius so the point is on walkable ground, below `_collectReach` so standing
+there collects). Degenerate case — bot inside or exactly on the footprint, where there is
+no outward direction to normalise — exits through the **nearest face** with a deterministic
+`>=` tie-break; it can never return NaN, a zero vector, or the pile's centre. Two more
+centre-distance tests were found and fixed the same way: pile **ranking** in
+`FindNearestPile` (by centre distance, a bot on the island's rim rated a pile 3 m away as
+closer) and the **rival-contests-this-pile** ability trigger (threshold 3.75 vs an island
+half-diagonal of 4.03 — it could never fire). Bot **arrival** at a pile is no longer a
+radius around the standoff point (which would let it stop up to `_arrivalRadius` = 1.5
+short and stand there collecting nothing) — it is now literally `IsWithinCollectRange`.
+
+**3. The blocker is a box, and root scale is non-uniform.** A 7×4 rectangle was impossible
+before: uniform `localScale` scaled Y too (3.5× → a 4-unit tower), and Unity snaps a
+non-uniformly scaled `CapsuleCollider` to its larger lateral axis. `CreateBlocker()` now
+builds a **unit `BoxCollider` + `NavMeshObstacleShape.Box`** (size 1, centre `(0, 0.5, 0)`
+so it sits on the ground) and `ApplyFootprint()` sets
+`localScale = (fullX × step, _blockerHeight, fullZ × step)`. Height is **1.4**, above the
+NavMesh step height 0.75, and is **not** scaled by fill — a draining pile shrinks in XZ
+but stays terrain. The step early-out (NavMesh re-carve thrash) and the `step > 0` blocking
+rule are unchanged.
+
+**Also changed**
+
+- `[Networked] Vector2 FootprintSize`, stamped by `MapGenerator` via `onBeforeSpawned`
+  (valid from tick zero, same pattern as `IsPermanent`). Falls back to the prefab's
+  serialized `_footprintSize` (2.2 × 2.2) when zero, so any spawn path that doesn't stamp
+  it still works.
+- `[Networked] float VisualScale` and `MapGenerator._centerPileVisualScale` are **deleted**
+  — `FootprintSize` fully subsumes them.
+- `MapGenerator`'s interior-terrain rejection sampler treated every objective as a *point*.
+  With a 7×4 island that would have allowed a crate 2.2 m from the origin — i.e. buried
+  inside the island. Objectives now carry their own footprint radius and the clearance is
+  measured surface-to-surface at both ends. **Watch for the "placed only N/17 obstacles"
+  warning in the log** — the keep-out area grew a lot, and the honest fix if it fires is
+  lowering the obstacle counts, not shrinking the islands.
+
+**Lane check (verified, don't re-derive):** bases at (±12, ±12) on a 30×30 plane, contested
+piles at r 9.6, personal at r 11.03. Narrowest lane between the centre island and a
+contested pile is **4.6 units** — over four chicken-widths, comfortably passable.
+
+**⚠ Maestro prefab wiring:** none required. `FoodPile.prefab` and `Game.unity` were
+re-serialized in place with the new field names (`_collectReach: 1`,
+`_footprintSize: {2.2, 2.2}`, `_blockerHeight: 1.4`, `_centerPileFootprint: {7, 4}`,
+`_contestedPileFootprint: {3, 3}`, `_personalPileFootprint: {2.2, 2.2}`). The stale
+`_collectRadius` / `_centerPileVisualScale` keys are gone.
+
+**Open / needs playtest**
+
+1. `FoodPileVisuals` lerps the mesh child between `_emptyScale` 0.3 and `_fullScale` 1 on
+   top of the stepped root scale, and the mesh child sits at local y 0.25 — so at full the
+   mound spans world y −0.35 … 1.05 while the blocker spans 0 … 1.4. The mesh sinks
+   slightly and is shorter than the collider. Pre-existing, cosmetic, and deliberately not
+   touched here; fix it when the placeholder mound is replaced with real art.
+2. Interior-terrain density after the objective keep-out change (see the warning above).
+3. Bot pacing around a 7-wide obstacle — routing distance to the centre went up materially.
+
+---
+
 ## 🧱 ADR 0003 Slice 1b — terrain vocabulary (2026-07-22) — SHIPPED (untested)
 
 On `develop`. **Not pushed, not playtested.** Slices 2–4 untouched. Geometry only —
@@ -172,6 +750,11 @@ closest approach 1.555, **margin 0.045**. The centre's margin is thin but is *un
 what already ships* — not a regression, but it wants widening (drop
 `_centerPileVisualScale` to ~1.4, or raise `_collectRadius`) before the blocker is ever
 allowed to grow.
+
+> **SUPERSEDED 2026-07-23** — see the island-sized-piles entry at the top. `CollectRadius`,
+> `_blockerRadius` and `_centerPileVisualScale` no longer exist; collection is measured from
+> the pile surface, so this margin is a constant 0.42 at every pile size and the coupling
+> this paragraph warns about is gone.
 
 **⚠ No Maestro prefab wiring required** — the new fields are code defaults on
 `FoodPile.prefab` and `MapGenerator`, and `IsPermanent` is set at spawn, not authored.
@@ -813,7 +1396,9 @@ non-traversable so routing/juking matters. Implemented + verified live:
   fresh each match. All tunables serialized.
 - **Solid piles** (`FoodPile.CreateBlocker`): code-built child capsule
   (r=0.65 — under CollectRadius minus the chicken capsule, so edge collection
-  still works) + `NavMeshObstacle` carve. Deactivates when the pile empties
+  still works — *superseded 2026-07-23: unit `BoxCollider` sized by the root's
+  non-uniform scale; collection is surface-relative and no longer coupled to the
+  blocker size*) + `NavMeshObstacle` carve. Deactivates when the pile empties
   (stub walkable, mesh un-carves); reactivates on match-restart refill.
 - **Bot pathfinding** (`BotController.ResolveSteerPoint`): runtime NavMesh
   baked in `MapGenerator.BuildNavMesh` (NavMeshSurface, physics colliders, so

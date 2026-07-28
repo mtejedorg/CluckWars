@@ -260,10 +260,16 @@ counterplay reachable.
 
 ### 7.1 Rules
 
-- Loadout = **1 mandatory class passive + 1 Common ability + 2 Character abilities.** The
-  **Assassin** gets **+1 Character** (Combo), one of which is the **locked Mark/Kill**.
+- Loadout = **1 mandatory class passive + N freely-chosen active abilities**, where **N = 2**
+  normally and **N = 3** for the **Assassin** under the **Combo** passive (one of the 3 is the
+  **locked Mark/Kill**).
 - **Common** abilities are open to every class; **Character** abilities are gated by a
   per-class mask (`AbilityBaseSO.SlotKind` + `AllowedClasses`).
+- **The Common slot is optional, not mandatory** — a player may fill their N active slots
+  with any mix of Common and class-legal Character abilities, including zero Common ones
+  (bounded only by the pool actually having 3 Common abilities to pick from). This is a
+  **deliberate, explicit design reversal of an earlier "1 mandatory Common" rule** (2026-07-27
+  directive) — **the current stance, at least for now**, and may be revisited later.
 - Every ability is balanced against the others — monetization must never be pay-to-win.
 
 ### 7.2 The pool

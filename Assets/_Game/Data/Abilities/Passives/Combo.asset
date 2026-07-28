@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.ComboPassiveSO
   DisplayName: Combo
   ShortLabel: CMBO
+  Description: Equips a third ability instead of two.
   Icon: 
   AccentColor: {r: 0.5, g: 0.4, b: 0.9, a: 1}
   Category: 3

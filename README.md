@@ -2,13 +2,13 @@
 
 Fast-paced 4-player multiplayer arena game. Collect food, fight rivals, survive.
 
-**Status:** Pre-production (GDD, TDD, Art Direction v0.1 complete)
+**Status:** Pre-production (v0.4 control+steal redesign in progress; GDD, TDD, Art Direction live)
 
 ---
 
 ## Quick Links
 
-- **[Game Design Document (GDD v0.2)](./docs/GDD.md)** — Core mechanics, classes, abilities, win conditions
+- **[Game Design Document (GDD v0.4)](./docs/GDD.md)** — Control+steal model, class strategies via SCT axioms, tiered map, abilities
 - **[Technical Design Document (TDD v0.1)](./docs/TDD.md)** — Fusion 2, Zenject, UGS, architecture
 - **[Art Direction (v0.1)](./docs/ART.md)** — Visual style, characters, UI, colors
 - **[Development Roadmap](./docs/ROADMAP.md)** — Milestones from bootstrap to demo
@@ -27,7 +27,7 @@ Four chickens enter a farm. Only the fattest leaves. Cluck Wars is a fast-paced 
 4. Stand on pile to collect cargo (passive, no button)
 5. Return to base to deposit food
 6. Fight/steal/disrupt rivals along the way
-7. First to 150 food units OR most food at 3 minutes wins
+7. First to 40 food units OR most food at 45 seconds wins
 
 ### Platforms
 - **Windows** (primary dev target)
@@ -44,27 +44,43 @@ Four chickens enter a farm. Only the fattest leaves. Cluck Wars is a fast-paced 
 
 ## Character Classes
 
-| Class | Cargo | Speed | Attack | Role |
-|---|---|---|---|---|
-| **Fatty Chicken** | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐ | Bulk carrier, dominates uncontested piles |
-| **Speedy Chicken** | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | Hit-and-run, thrives on chaos |
-| **Warrior Chicken** | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ | All-rounder, contests piles well |
-| **Assassin Chicken** | ⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | Disruptor, equips 2 abilities |
+| Class | Cargo | Speed | Role |
+|---|---|---|---|
+| **Fatty Chicken** | ⭐⭐⭐⭐⭐ | ⭐⭐ | Bulk carrier, clears contested piles in 2 trips |
+| **Speedy Chicken** | ⭐⭐ | ⭐⭐⭐⭐⭐ | Hit-and-run, clears piles in 4 quick trips |
+| **Warrior Chicken** | ⭐⭐⭐ | ⭐⭐⭐ | All-rounder, contests piles with control abilities |
+| **Assassin Chicken** | ⭐⭐ | ⭐⭐⭐⭐ | Disruptor with Mark/Kill execute; equips 3 abilities (Combo passive) |
 
 ---
 
 ## Abilities Pool
 
-- **Speed Burst** — Greatly increases movement speed (1-2 sec)
-- **Egg Shell** — Become invulnerable inside an egg, immobile (1-2 sec)
-- **Roll & Trample** — Roll forward, stun chickens in path (1-2 sec)
-- **Doppelganger** — Create brief decoy copy (1-2 sec)
-- **Invisibility** — Become invisible to other players (1-2 sec)
-- **Spine Coat** — Contact deals damage to attacker (1-2 sec)
-- **Turtle Mode** — Near-zero speed, greatly increased resistance (1-2 sec)
-- **Sneaky Steal** — Steal cargo without fighting, nearby rival (instant)
+**Steal** (direct food transfer; clamped by free space & defender cargo):
+- **Peck** — AoE steal around self
+- **Flying Peck** — Vault-dash steal on first contact
+- **Sneaky Steal** — Steal from nearby rival (instant, common)
 
-All abilities balanced by design — no pay-to-win mechanics.
+**Control** (disruption via slowed/rooted/stunned ladder):
+- **Cluck Shock** — AoE knockback around self
+- **Ambush** — AoE stun around self (Assassin)
+- **Wing Slam** — AoE stun with larger radius (Warrior)
+- **Shadowstep** — Blink dash (Assassin)
+
+**Defense** (damage reduction / steal-back):
+- **Spine Coat** — Steal-back + knockback on contact
+- **Turtle Mode** — Reduced move, increased knockback resistance
+- **Egg Shell** — Temporary immobility, no contact damage
+
+**Utility** (mobility, perception):
+- **Speed Burst** — Greatly increases movement speed
+- **Doppelganger** — Create brief decoy copy
+- **Invisibility** — Become invisible to other players
+- **Feather Trap** — Drop a control zone (Common)
+
+**Signature** (class-exclusive, one-per-chicken):
+- **Mark/Kill** — Assassin execute: mark isolated target, two-press sequence for full cargo steal + removal
+
+All abilities balanced by Solo Clear Time axiom — no pay-to-win.
 
 ---
 
@@ -118,13 +134,26 @@ The demo is complete when:
 
 ---
 
-## Next Steps
+## Current Phase (v0.4 Control+Steal)
 
-1. **Bootstrap** — Zenject installer, networking interface, game bootstrap
-2. **Chicken prototype** — Walking, basic animation, cargo collection
-3. **Combat** — Attack system, stun on death
-4. **Abilities** — Ability system, first 2 abilities
-5. **Multiplayer test** — 4 players on LAN
+**Shipped:**
+- ✅ Control ladder (Slowed/Rooted/Stunned) replaces HP/damage
+- ✅ Steal economy with natural clamping (free space + defender cargo)
+- ✅ Tiered 80-food map with pinwheel walls
+- ✅ Assassin Mark/Kill execute (full cargo steal + removal)
+- ✅ SCT Oracle simulator for axiom-driven balance
+- ✅ Class stats solved to match target trip counts
+- ✅ Ability categories (Steal/Control/Defense/Utility)
+
+**In Progress:**
+- 🔧 Map wall rendering (pinwheel interior geometry)
+- 🔧 Bot AI improvement (movement oscillation)
+- 🔧 Pile feedback accuracy (visual sync with actual food)
+
+**Next:**
+- Passive ability pool redesign (Mighty, Slippery, Immovable, Combo)
+- Mobile controls & HUD layout
+- LAN stress test (4 players, 45-second match stability)
 
 ---
 

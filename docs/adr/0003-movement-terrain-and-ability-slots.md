@@ -396,6 +396,15 @@ Most of Decision 2 is already plumbed:
 The change is to make radius and scale **stepped** in `Amount/MaxAmount` rather than binary.
 `Amount` is networked, so all peers agree with no new state.
 
+> **SUPERSEDED 2026-07-23 — the collection-radius coupling below no longer exists.**
+> `CollectRadius`, `_blockerRadius` and `_centerPileVisualScale` were deleted when piles
+> became island-sized. `FoodPile` is now sized by `[Networked] Vector2 FootprintSize` +
+> `_blockerHeight` (non-uniform root scale, unit `BoxCollider`), and collection is measured
+> from the pile's **surface** (`_collectReach` 1.0) rather than its centre. A chicken
+> touching a pile is 0.58 from the surface at *any* size, so the margin is a constant 0.42
+> and cannot be broken by growing a pile. Keep the rest of this section for the NavMesh
+> churn and stepping rationale, which still hold. See `docs/STATE.md` (2026-07-23).
+
 ⚠ **The collection-radius coupling.** `_blockerRadius` is deliberately held *under*
 `CollectRadius` minus the chicken capsule + skin width, so edge collection still works.
 Note the blocker is a **child** of the pile root and `CollectRadius` is a raw, unscaled

@@ -11,9 +11,12 @@
             <!-- ─ LEFT RAIL: ribbon + invite + settings + status + start ─ -->
             <ui:VisualElement name="LobbyRail" class="cw-lobby-rail">
 
-                <ui:VisualElement style="align-items: flex-start; margin-bottom: 4px;">
+                <!-- Ribbon title is stepped down from the sheet's 52 px: the rail
+                     is 640 px wide and the Ribbon atom's fixed 92 px tails eat
+                     192 px of it, so a full-size title would clip. -->
+                <ui:VisualElement style="align-items: flex-start; margin-bottom: 8px;">
                     <ui:VisualElement class="cw-ribbon">
-                        <ui:Label text="MATCH LOBBY" class="cw-title" />
+                        <ui:Label text="MATCH LOBBY" class="cw-title" style="font-size: 40px;" />
                     </ui:VisualElement>
                 </ui:VisualElement>
 
@@ -30,7 +33,7 @@
                 <!-- Join code entry (join mode) -->
                 <ui:VisualElement name="JoinCard" class="cw-card cw-lobby-card cw-hidden">
                     <ui:Label text="ENTER JOIN CODE" class="cw-lobby-cardlabel" />
-                    <ui:TextField name="LobbyJoinField" class="cw-input" style="margin-top: 6px;" />
+                    <ui:TextField name="LobbyJoinField" class="cw-input" style="margin-top: 12px;" />
                 </ui:VisualElement>
 
                 <!-- Match settings -->

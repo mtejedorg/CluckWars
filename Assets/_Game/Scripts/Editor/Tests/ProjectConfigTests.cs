@@ -98,7 +98,7 @@ namespace CluckWars.Tests
                 "completely because there are no remote chickens in solo.");
             Require<CharacterController>("ChickenMovement drives this; without it the chicken cannot move.");
             Require<ChickenController>("Owns Class, stats resolution and the control-state flags.");
-            Require<ChickenCombat>("Owns HP and the damage RPC target.");
+            Require<ChickenCombat>("Owns the execute removal/respawn state machine.");
             Require<ChickenCargo>("Owns collection and deposit — no scoring without it.");
             Require<AbilityController>("Owns activation, duration and cooldown for all three slots.");
             Require<ChickenMatchStats>("Kills / FoodDeposited on the match-end scoreboard.");
