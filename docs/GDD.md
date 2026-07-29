@@ -100,6 +100,13 @@ Every client **rotates the arena so its own base sits at the bottom of the scree
 players therefore see an identical relative layout — no starting corner is easier to read
 than another, and the arena renders as a diamond with your corner nearest the camera.
 
+> **Movement input must be camera-relative.** Today `ChickenMovement.Tick` applies input in
+> raw world space (`new Vector3(input.x, 0, input.y)`), which only works because every
+> client shares one fixed 45° yaw. Per-player rotation makes that a bug: each player's
+> "up" would map to a different screen direction. Input must be rotated by the local
+> camera yaw before it reaches movement. **This is a hard prerequisite of per-player
+> rotation, not an optional polish item.**
+
 | Feature | Radius from centre | Notes |
 |---|---|---|
 | Centre pile | 0 | span **12 m**, never moves |
@@ -153,12 +160,15 @@ matter.
 
 Eight radial walls sit on the boundaries of eight 45° sectors, alternating **base sector**
 (centred on a corner) and **neutral sector** (centred on an edge midpoint). Walls are
-**12 m long × 0.5 m thick**, and each has exactly **one opening, at one end**:
+**0.5 m thick**, and each has exactly **one opening, at one end**:
 
-| | Spans | Opening |
-|---|---|---|
-| **Outer-gap wall** (4) | r 10 → 17.6 | 3 m at the **rim** |
-| **Inner-gap wall** (4) | r 12 → boundary | 3 m at the **hub** |
+| | Spans | Length | Opening |
+|---|---|---|---|
+| **Outer-gap wall** (4) | r 10 → 17.6 | 7.6 m | 3 m at the **rim** |
+| **Inner-gap wall** (4) | r 12 → 20.6 (boundary) | 8.6 m | 3 m at the **hub** |
+
+Wall directions sit 22.5° off each diagonal, so on a square of half-extent 19 m the
+boundary along a wall's bearing is at r = 19 / cos 22.5° = **20.6 m**.
 
 The pattern is 4-fold symmetric, so **every player's sector is identical**: an outer-gap
 wall on one side, an inner-gap wall on the other. Combined with per-player rotation this
