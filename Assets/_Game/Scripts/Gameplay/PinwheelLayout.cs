@@ -58,65 +58,44 @@ namespace CluckWars.Gameplay
     {
         // ---- Measured chicken footprint -----------------------------------------------
         // Source: Assets/_Game/Prefabs/Chicken.prefab, CharacterController component
-        // (m_Radius: 0.5, m_SkinWidth: 0.08). Verified directly against the prefab
-        // 2026-07-27 — matches the figure already load-bearing in FoodPile.cs's
-        // collect-reach comment ("capsule radius 0.5 + controller skin 0.08").
-        public const float ChickenControllerRadius = 0.5f;
+        // (m_Radius: 0.4, m_SkinWidth: 0.08). Rescaled per GDD 3.3 (⌀0.8 m × 1.6 m tall).
+        public const float ChickenControllerRadius = 0.4f;
         public const float ChickenControllerSkinWidth = 0.08f;
 
         /// <summary>Effective collision radius — the CharacterController pushes back at this distance.</summary>
-        public const float ChickenRadius = ChickenControllerRadius + ChickenControllerSkinWidth; // 0.58
-        public const float ChickenDiameter = ChickenRadius * 2f; // 1.16
+        public const float ChickenRadius = ChickenControllerRadius + ChickenControllerSkinWidth; // 0.48
+        public const float ChickenDiameter = ChickenRadius * 2f; // 0.96
 
         /// <summary>
         /// Extra room, beyond two chicken-widths, so two chickens passing each other don't
-        /// scrape shoulders or clip the walls — covers CharacterController skin slop and
-        /// ordinary steering imprecision (bot pathing, joystick drift).
+        /// scrape shoulders or clip the walls.
         /// </summary>
         public const float PassingMargin = 0.4f;
 
-        /// <summary>
-        /// Minimum walkable width for any pinwheel corridor. Cluck Wars is a 4-player FFA
-        /// built around chasing and stealing — a lane that only barely admits one chicken
-        /// single-file at a pinch point is a design failure, not just a rough edge. Sized
-        /// for two chickens to pass abreast: two diameters plus <see cref="PassingMargin"/>.
-        /// </summary>
-        public const float MinCorridorWidth = ChickenDiameter * 2f + PassingMargin; // 2.72m
+        /// <summary>Nominal body diameter, excluding skin width — the ⌀0.8 m of GDD 3.3.</summary>
+        public const float ChickenBodyDiameter = ChickenControllerRadius * 2f; // 0.8
 
         /// <summary>
-        /// Extra clearance kept between a food pile's surface and the nearest arm, so a
-        /// stocked (solid) pile can never physically fuse with a wall. Deliberately smaller
-        /// than <see cref="MinCorridorWidth"/> — a pile is meant to be routed AROUND (using
-        /// the open ground the pinwheel already leaves elsewhere), not to have a full
-        /// two-abreast lane reserved on every side of it. One chicken-width is enough to
-        /// guarantee "never sealed" in practice — verified empirically by the map
-        /// reachability/clearance regression tests, not just asserted by this margin's
-        /// existence.
+        /// Minimum walkable width for any pinwheel corridor: 2 × chicken ⌀ + passing margin
+        /// = 2.0 m per GDD 3.3. Kept DERIVED rather than hardcoded so a future chicken
+        /// rescale carries through here automatically — a stale literal is exactly the
+        /// staleness class of bug that produced the 2026-07-27 hub-pinch regression.
         /// </summary>
-        public const float PileArmBuffer = ChickenDiameter;
+        public const float MinCorridorWidth = ChickenBodyDiameter * 2f + PassingMargin; // 2.0
 
-        // Matches the per-arm jitter applied below: each arm's angle can drift up to this
-        // fraction of the nominal angle step, in either direction.
+        /// <summary>
+        /// Extra clearance kept between a food pile's surface and the nearest arm.
+        /// </summary>
+        public const float PileArmBuffer = ChickenDiameter; // 0.96
+
         private const float JitterFraction = 0.15f;
 
-        /// <param name="arenaHalfSize">Half the square arena's side length.</param>
-        /// <param name="wedges">Number of pinwheel arms.</param>
+        /// <param name="arenaHalfSize">Half the square arena's side length (19 m for 38 m arena).</param>
+        /// <param name="wedges">Number of pinwheel arms (8 for v0.5 layout).</param>
         /// <param name="seed">RNG seed — identical on every peer for online matches.</param>
-        /// <param name="centerKeepClear">
-        /// Radius of the centre food pile's footprint. Arms are kept at least this far
-        /// (+ a small margin) from the origin regardless of the hub-plaza calculation below,
-        /// so a pile bigger than the plaza itself is still respected.
-        /// </param>
-        /// <param name="armThickness">
-        /// Physical thickness every arm will be built with (<c>MapGenerator</c> applies this
-        /// uniformly regardless of the segment's <see cref="ObstacleClass"/>). Required here
-        /// because the hub-plaza radius is a function of it — a thicker arm needs a bigger
-        /// plaza to leave the same corridor width.
-        /// </param>
-        /// <param name="extraKeepClearDiscs">
-        /// Additional no-build discs (bases, food piles) an arm must be pushed clear of.
-        /// May be null.
-        /// </param>
+        /// <param name="centerKeepClear">Radius of the centre food pile's footprint.</param>
+        /// <param name="armThickness">Physical thickness of arms (0.5 m).</param>
+        /// <param name="extraKeepClearDiscs">Additional no-build discs (bases, food piles).</param>
         public static WallSegment[] Build(
             float arenaHalfSize,
             int wedges,
@@ -131,40 +110,46 @@ namespace CluckWars.Gameplay
             var rng = new System.Random(seed);
             float angleStep = 2f * Mathf.PI / wedges;
 
-            // Worst-case angular gap between two adjacent arms: each arm's angle can jitter
-            // toward its neighbour by up to JitterFraction of the step, so two neighbours can
-            // close the nominal gap between them by up to 2 * JitterFraction of the step.
-            // With a single wedge there is no neighbour to pinch against.
-            float minGapAngle = wedges > 1 ? angleStep * (1f - 2f * JitterFraction) : 0f;
-
-            // Radius at which two arms separated by minGapAngle, each armThickness wide,
-            // leave MinCorridorWidth of clear walking space between their surfaces.
-            // Derived from the chord length between two same-radius points on the two arms'
-            // centrelines, 2 * r * sin(minGapAngle / 2): solve
-            //     2r * sin(θ/2) - armThickness == MinCorridorWidth
-            // for r. The chord distance is a safe (slightly conservative) lower bound on the
-            // true surface gap: each arm's thickness is measured perpendicular to ITS OWN
-            // length, not to the chord, so the real encroachment on the chord is
-            // <= armThickness. Chord length grows monotonically with r for a fixed angle, so
-            // guaranteeing the corridor at this radius guarantees it for the rest of both
-            // arms' length too — the pinch, if any, is always at the innermost point.
-            float halfGap = minGapAngle * 0.5f;
-            float sinHalfGap = Mathf.Sin(halfGap);
-            float hubPlazaRadius = sinHalfGap > 0.0001f
-                ? (MinCorridorWidth + armThickness) / (2f * sinHalfGap)
-                : 0f;
-
+            // 8-sector radial wall topology (GDD 3.4 & ag_spec Phase 1):
+            // 8 radial walls sit on 45° sector boundaries (22.5°, 67.5°, 112.5°, ...).
+            // Alternating openings:
+            // - 4 Outer-gap walls (i % 2 == 0): span radius 10.0 m to 17.6 m (length 7.6 m, 3 m opening at outer rim).
+            // - 4 Inner-gap walls (i % 2 == 1): span radius 12.0 m to boundary 20.6 m (length 8.6 m, 3 m opening at inner hub).
             for (int i = 0; i < wedges; i++)
             {
-                float baseAngle = i * angleStep;
-                float jitter = (float)(rng.NextDouble() * 2.0 - 1.0) * angleStep * JitterFraction;
+                // Wall bearings sit at 22.5° off each diagonal/axis
+                float baseAngle = (i * 45f + 22.5f) * Mathf.Deg2Rad;
+                float jitter = (wedges != 8) ? (float)(rng.NextDouble() * 2.0 - 1.0) * angleStep * JitterFraction : 0f;
                 float angle = baseAngle + jitter;
                 Vector2 dir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
 
-                float startDist = 0f;
-                float endDist = arenaHalfSize - 1f; // stay inside the perimeter wall
+                float startDist;
+                float endDist;
 
-                ClipAgainstDisc(dir, Vector2.zero, centerKeepClear + 0.2f, ref startDist, ref endDist);
+                if (wedges == 8)
+                {
+                    // Boundary along a 22.5° bearing on a square of half-extent 19 m is r = 19 / cos 22.5° = 20.5647 m (20.6 m).
+                    float boundaryRadius = arenaHalfSize / Mathf.Cos(22.5f * Mathf.Deg2Rad);
+
+                    if (i % 2 == 0)
+                    {
+                        // Outer-gap wall: r 10 m -> 17.6 m (length 7.6 m, 3 m opening at rim)
+                        startDist = 10.0f;
+                        endDist = 17.6f;
+                    }
+                    else
+                    {
+                        // Inner-gap wall: r 12 m -> boundary (20.6 m) (length 8.6 m, 3 m opening at hub)
+                        startDist = 12.0f;
+                        endDist = boundaryRadius;
+                    }
+                }
+                else
+                {
+                    startDist = 10.0f;
+                    endDist = arenaHalfSize - 1.0f;
+                }
+
                 if (extraKeepClearDiscs != null)
                 {
                     for (int d = 0; d < extraKeepClearDiscs.Length; d++)
@@ -174,49 +159,24 @@ namespace CluckWars.Gameplay
                     }
                 }
 
-                // Enforce the hub plaza floor regardless of what the disc clipping produced —
-                // this is what actually fixes the convergence pinch.
-                startDist = Mathf.Max(startDist, hubPlazaRadius);
-
                 if (startDist >= endDist)
                 {
-                    // No room for a corridor-compliant arm in this direction. Collapse to a
-                    // zero-length segment (MapGenerator then builds a wall with zero extent
-                    // along its own length — effectively nothing) rather than the old
-                    // behaviour of forcing a short stub that violated the very clearance this
-                    // method exists to guarantee.
                     startDist = endDist = Mathf.Max(0f, endDist);
                 }
 
                 Vector2 posA = dir * startDist;
                 Vector2 posB = dir * endDist;
 
-                // Assign ObstacleClass in a seeded pattern: alternate Low, Standard, and
-                // occasional Tall.
-                double rVal = rng.NextDouble();
-                ObstacleClass cls;
-                if (rVal < 0.4) cls = ObstacleClass.Low;
-                else if (rVal < 0.8) cls = ObstacleClass.Standard;
-                else cls = ObstacleClass.Tall;
-
-                segments[i] = new WallSegment(posA, posB, cls);
+                segments[i] = new WallSegment(posA, posB, ObstacleClass.Standard);
             }
 
             return segments;
         }
 
-        /// <summary>
-        /// Ray/disc clip along <paramref name="dir"/> from the origin: if the disc centred at
-        /// <paramref name="discCenter"/> with <paramref name="discRadius"/> overlaps
-        /// [<paramref name="startDist"/>, <paramref name="endDist"/>], shortens the segment
-        /// from whichever end the disc encroaches on.
-        /// </summary>
         private static void ClipAgainstDisc(Vector2 dir, Vector2 discCenter, float discRadius, ref float startDist, ref float endDist)
         {
             if (discRadius <= 0f) return;
 
-            // Ray: P(t) = t * dir. Intersection with the circle centred at discCenter:
-            // |t*dir - discCenter|^2 = discRadius^2  =>  t^2 - 2*t*(dir.discCenter) + |discCenter|^2 - discRadius^2 = 0
             float dot = Vector2.Dot(dir, discCenter);
             float c = discCenter.sqrMagnitude - discRadius * discRadius;
             float disc = dot * dot - c;
@@ -225,17 +185,15 @@ namespace CluckWars.Gameplay
             float sqrtDisc = Mathf.Sqrt(disc);
             float t1 = dot - sqrtDisc;
             float t2 = dot + sqrtDisc;
-            if (t2 <= 0f) return; // disc is entirely behind the ray origin
+            if (t2 <= 0f) return;
 
             float entry = Mathf.Max(0f, t1);
             if (entry > startDist && entry < endDist)
             {
-                // Disc sits partway along the segment — stop the arm before it.
                 endDist = entry;
             }
             else if (entry <= startDist && t2 >= startDist)
             {
-                // Disc covers the segment's current start — push the start out past it.
                 startDist = t2;
             }
         }

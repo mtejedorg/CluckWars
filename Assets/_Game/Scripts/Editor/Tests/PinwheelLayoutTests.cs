@@ -47,7 +47,7 @@ namespace CluckWars.Tests
             // A disc sitting right where an arm would otherwise start must push that
             // arm's inner end out past the disc's far edge.
             var discs = new[] { new KeepClearDisc(new Vector2(6f, 0f), 2f) };
-            var segs = PinwheelLayout.Build(15f, 8, seed: 3, centerKeepClear: 3f, armThickness: 0.5f, extraKeepClearDiscs: discs);
+            var segs = PinwheelLayout.Build(19f, 8, seed: 3, centerKeepClear: 3f, armThickness: 0.5f, extraKeepClearDiscs: discs);
 
             foreach (var s in segs)
             {
@@ -60,6 +60,34 @@ namespace CluckWars.Tests
                     float distToDisc = Vector2.Distance(p, discs[0].Center);
                     Assert.GreaterOrEqual(distToDisc, discs[0].Radius - 0.01f,
                         $"segment sample point {p} intrudes into keep-clear disc at {discs[0].Center} r={discs[0].Radius}");
+                }
+            }
+        }
+
+        [Test] public void Build_8SectorRadialTopology_AlternatesOuterAndInnerGaps()
+        {
+            var segs = PinwheelLayout.Build(19f, 8, seed: 42, centerKeepClear: 3f, armThickness: 0.5f);
+            Assert.AreEqual(8, segs.Length);
+
+            for (int i = 0; i < 8; i++)
+            {
+                float rStart = segs[i].A.magnitude;
+                float rEnd = segs[i].B.magnitude;
+                float length = rEnd - rStart;
+
+                if (i % 2 == 0)
+                {
+                    // Outer-gap wall: r 10m -> 17.6m (length 7.6m)
+                    Assert.AreEqual(10.0f, rStart, 0.1f, $"Outer-gap wall {i} start radius");
+                    Assert.AreEqual(17.6f, rEnd, 0.1f, $"Outer-gap wall {i} end radius");
+                    Assert.AreEqual(7.6f, length, 0.1f, $"Outer-gap wall {i} length");
+                }
+                else
+                {
+                    // Inner-gap wall: r 12m -> 20.6m (length 8.6m)
+                    Assert.AreEqual(12.0f, rStart, 0.1f, $"Inner-gap wall {i} start radius");
+                    Assert.AreEqual(20.56f, rEnd, 0.2f, $"Inner-gap wall {i} end radius");
+                    Assert.AreEqual(8.56f, length, 0.2f, $"Inner-gap wall {i} length");
                 }
             }
         }

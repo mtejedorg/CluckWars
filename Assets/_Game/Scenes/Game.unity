@@ -297,7 +297,7 @@ MonoBehaviour:
   _pitch: 30
   _focusPoint: {x: 0, y: 0, z: 0}
   _distance: 30
-  _orthoSize: 5
+  _orthoSize: 5.6
   _followLocalChicken: 1
   _followSmoothTime: 0.15
   _localChickenSearchInterval: 0.5
@@ -542,7 +542,7 @@ MonoBehaviour:
   _basePrefab: {fileID: 0}
   _foodPilePrefab: {fileID: 0}
   _groundMaterial: {fileID: 2100000, guid: 1bc3c7d5c8e686b428e56c26a09f6332, type: 2}
-  _planeSize: 30
+  _planeSize: 38
   _wallHeight: 5
   _wallThickness: 0.5
   _wallsVisible: 0
@@ -565,16 +565,16 @@ MonoBehaviour:
   _obstacleSpacing: 1.5
   _obstacleEdgeMargin: 1.5
   _obstaclePlacementAttempts: 40
-  _baseCornerDistance: 12
+  _baseCornerDistance: 19
   _centerPileAmount: 20
-  _centerPileFootprint: {x: 7, y: 4}
+  _centerPileFootprint: {x: 12, y: 10}
   _centerPileIsPermanent: 0
   _personalPileAmount: 5
-  _personalPileFootprint: {x: 2.2, y: 2.2}
-  _personalPileInset: 0.35
+  _personalPileFootprint: {x: 5.5, y: 4.6}
+  _personalPileInset: 0.3673
   _contestedPileAmount: 10
-  _contestedPileFootprint: {x: 3, y: 3}
-  _contestedEdgeInset: 0.8
+  _contestedPileFootprint: {x: 6.5, y: 5.4}
+  _contestedEdgeInset: 0.7895
   _pilePositionJitter: 1.5
 --- !u!1 &1280783553
 GameObject:

@@ -43,7 +43,7 @@ namespace CluckWars.Gameplay
         [SerializeField] private Material _groundMaterial;
         [Tooltip("World-space side length of the square ground plane.")]
         [Min(5f)]
-        [SerializeField] private float _planeSize = 30f;
+        [SerializeField] private float _planeSize = 38f;
 
         [Header("Boundary walls (local colliders on every peer)")]
         [Tooltip("Height of the perimeter walls. Way taller than the chicken to keep them in even at 2× Speed Burst.")]
@@ -116,45 +116,40 @@ namespace CluckWars.Gameplay
         [Header("Bases")]
         [Tooltip("How far each corner base sits from the center.")]
         [Min(2f)]
-        [SerializeField] private float _baseCornerDistance = 12f;
+        [SerializeField] private float _baseCornerDistance = 19f;
 
         [Header("Food piles (GDD §3: center + personal + contested islands)")]
-        [Tooltip("Initial food in the central pile — large, high risk, high reward (GDD §3: 60).")]
+        [Tooltip("Initial food in the central pile — large, high risk, high reward (GDD §3: 20).")]
         [Min(5f)]
         [SerializeField] private float _centerPileAmount = 20f;
 
-        [Tooltip("Full world X,Z footprint of the centre island at 100% fill. A chicken is 1.0 wide, so 7×4 is seven chickens by four — a landmark you route around, not a prop. Safe to grow: FoodPile measures collection from the pile SURFACE, so a bigger island can no longer break collecting from it. Do keep the lanes to the contested piles open (currently 4.6 units at 7×4).")]
-        [SerializeField] private Vector2 _centerPileFootprint = new Vector2(7f, 4f);
+        [Tooltip("Full world X,Z footprint of the centre island at 100% fill (GDD 3.8: 12x10 ellipse).")]
+        [SerializeField] private Vector2 _centerPileFootprint = new Vector2(12f, 10f);
 
         [Tooltip("Make the center pile permanent (ADR 0003 Decision 2b): it can never be drained below its floor and slowly regenerates, so it stays a solid obstacle and the one contested resource of the late game. Floor and regen rate are tuned on the FoodPile prefab.")]
         [SerializeField] private bool _centerPileIsPermanent = false;
 
-        [Tooltip("Food in each player's personal island. Deliberately safe but WEAK: nobody " +
-            "contests it, but it must stay below the lowest ChickenStatsSO.CargoCapacity in " +
-            "the roster (Speedy, 6) so even the smallest carrier can't fill up from one visit. " +
-            "The personal pile is a trickle, not a farm — real yield means going out to a " +
-            "contested pile or the centre island. Pinned by EconomyAndPilesTests. GDD §3's old " +
-            "value (15) predates cargo capacities and let every class fill up in one trip.")]
+        [Tooltip("Food in each player's personal doorstep island (T1 = 5 food).")]
         [Min(0f)]
         [SerializeField] private float _personalPileAmount = 5f;
 
-        [Tooltip("Full world X,Z footprint of each personal island at 100% fill. Smallest of the three: it sits in front of a base and must not wall its owner in.")]
-        [SerializeField] private Vector2 _personalPileFootprint = new Vector2(2.2f, 2.2f);
+        [Tooltip("Full world X,Z footprint of each personal island at 100% fill (GDD 3.8: 5.5x4.6 near-circular ellipse).")]
+        [SerializeField] private Vector2 _personalPileFootprint = new Vector2(5.5f, 4.6f);
 
         [Tooltip("Personal island position = Lerp(corner, center, inset). 0.35 puts it a few units in front of the base, toward the action.")]
         [Range(0.2f, 0.6f)]
-        [SerializeField] private float _personalPileInset = 0.35f;
+        [SerializeField] private float _personalPileInset = 0.3673f;
 
-        [Tooltip("Food in each contested island between adjacent player pairs — designed to provoke early fights (GDD §3: 25).")]
+        [Tooltip("Food in each contested island between adjacent player pairs (T2 = 10 food).")]
         [Min(0f)]
         [SerializeField] private float _contestedPileAmount = 10f;
 
-        [Tooltip("Full world X,Z footprint of each contested island at 100% fill. Mid-sized: big enough to fight around, small enough to leave a lane between it and the centre island.")]
-        [SerializeField] private Vector2 _contestedPileFootprint = new Vector2(3f, 3f);
+        [Tooltip("Full world X,Z footprint of each contested island at 100% fill (GDD 3.8: 6.5x5.4 near-circular ellipse).")]
+        [SerializeField] private Vector2 _contestedPileFootprint = new Vector2(6.5f, 5.4f);
 
         [Tooltip("Contested island position = edge midpoint scaled toward center. 0.8 keeps it between the two neighbours but inside the walls.")]
         [Range(0.4f, 1f)]
-        [SerializeField] private float _contestedEdgeInset = 0.8f;
+        [SerializeField] private float _contestedEdgeInset = 0.7895f;
 
         [Tooltip("Random XZ jitter applied to personal + contested island positions each match (GDD §3: positions randomized within constraints). Center pile never moves.")]
         [Min(0f)]
@@ -869,20 +864,19 @@ namespace CluckWars.Gameplay
             // match, so the centre is what the endgame converges on.
             SpawnPile(runner, pilePrefab, Vector3.zero, _centerPileAmount, _centerPileFootprint, _centerPileIsPermanent);
 
-            // Personal islands — one in front of each base, on the base→center line.
+            // Personal doorstep islands — 4 piles at radius 17 m on corner diagonals.
             for (int i = 0; i < _corners.Length; i++)
             {
-                var pos = Vector3.Lerp(_corners[i], Vector3.zero, _personalPileInset) + JitterXZ();
+                var pos = _corners[i].normalized * 17f + JitterXZ();
                 SpawnPile(runner, pilePrefab, pos, _personalPileAmount, _personalPileFootprint);
                 loggedCoords.AppendLine($"Personal {i}: ({pos.x:F2}, {pos.z:F2}) | Food: {_personalPileAmount:0.00}");
             }
 
-            // Contested islands — between each pair of adjacent corners, pulled
-            // slightly toward the center so they sit inside the walls.
+            // Contested islands — 4 piles at radius 15 m on edge midpoints.
             for (int i = 0; i < _corners.Length; i++)
             {
                 var mid = (_corners[i] + _corners[(i + 1) % _corners.Length]) * 0.5f;
-                var pos = mid * _contestedEdgeInset + JitterXZ();
+                var pos = mid.normalized * 15f + JitterXZ();
                 SpawnPile(runner, pilePrefab, pos, _contestedPileAmount, _contestedPileFootprint);
                 loggedCoords.AppendLine($"Contested {i}: ({pos.x:F2}, {pos.z:F2}) | Food: {_contestedPileAmount:0.00}");
             }

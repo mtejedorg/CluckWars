@@ -36,9 +36,9 @@ namespace CluckWars.Visuals
         [Min(1f)]
         [SerializeField] private float _distance = 30f;
 
-        [Tooltip("Half the vertical view height in world units. Smaller = more zoomed in. 8 reads cleanly around a single chicken; bump to ~18 for full-map view.")]
+        [Tooltip("Half the vertical view height in world units. Smaller = more zoomed in. 5.6 per GDD v0.5.")]
         [Min(1f)]
-        [SerializeField] private float _orthoSize = 8f;
+        [SerializeField] private float _orthoSize = 5.6f;
 
         [Header("Follow")]
         [Tooltip("If true, the camera smooth-follows whichever chicken has HasInputAuthority on this peer.")]
@@ -70,6 +70,9 @@ namespace CluckWars.Visuals
         private float _shakeRemaining;
         private float _shakeDuration;
         private float _shakePeak;
+
+        /// <summary>Current camera yaw angle in degrees.</summary>
+        public float CurrentYaw => _yaw;
 
         /// <summary>
         /// Scene-wide singleton set in <c>Awake</c>. Abilities and combat use this
@@ -109,6 +112,28 @@ namespace CluckWars.Visuals
             var target = _followLocalChicken
                 ? ResolveLocalChickenPosition()
                 : _focusPoint;
+
+            // Per-player corner rotation (GDD v0.5 Section 3.1 & Phase 4):
+            // Rotate camera by local chicken's HomeCornerIndex so home corner sits at bottom of screen.
+            if (_localChicken != null && _localChicken.HomeCornerIndex >= 0 && _localChicken.HomeCornerIndex < 4)
+            {
+                int cornerIdx = _localChicken.HomeCornerIndex;
+                Vector2 cornerPos = cornerIdx switch
+                {
+                    0 => new Vector2(19f, 19f),
+                    1 => new Vector2(-19f, 19f),
+                    2 => new Vector2(-19f, -19f),
+                    3 => new Vector2(19f, -19f),
+                    _ => Vector2.zero,
+                };
+                if (cornerPos != Vector2.zero)
+                {
+                    // Bearing from base toward centre (-c.x, -c.z)
+                    float targetYaw = Mathf.Atan2(-cornerPos.x, -cornerPos.y) * Mathf.Rad2Deg;
+                    if (targetYaw < 0f) targetYaw += 360f;
+                    _yaw = Mathf.LerpAngle(_yaw, targetYaw, Time.deltaTime * 5f);
+                }
+            }
 
             _currentFocus = Vector3.SmoothDamp(_currentFocus, target, ref _focusVelocity, _followSmoothTime);
             ApplyTransform(_currentFocus);

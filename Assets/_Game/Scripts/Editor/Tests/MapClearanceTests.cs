@@ -14,18 +14,18 @@ namespace CluckWars.Tests
     /// </summary>
     public sealed class MapClearanceTests
     {
-        // Mirrors Game.unity's MapGenerator field values (post 2026-07-27 revert).
-        private const float ArenaHalfSize = 15f;      // _planeSize 30 / 2
+        // Mirrors Game.unity's MapGenerator field values (v0.5 spec).
+        private const float ArenaHalfSize = 19f;      // _planeSize 38 / 2
         private const float WallThickness = 0.5f;
         private const int StandardObstacleCount = 8;
-        private const float BaseCornerDistance = 12f;
+        private const float BaseCornerDistance = 19f;
         private const float BaseKeepClear = 4f;
         private const float SpawnInsetFraction = 0.15f; // MapGenerator.BaseInsetFraction
-        private static readonly Vector2 CenterPileFootprint = new Vector2(7f, 4f);
-        private static readonly Vector2 PersonalPileFootprint = new Vector2(2.2f, 2.2f);
-        private static readonly Vector2 ContestedPileFootprint = new Vector2(3f, 3f);
-        private const float PersonalPileInset = 0.35f;
-        private const float ContestedEdgeInset = 0.8f;
+        private static readonly Vector2 CenterPileFootprint = new Vector2(12f, 10f);
+        private static readonly Vector2 PersonalPileFootprint = new Vector2(5.5f, 4.6f);
+        private static readonly Vector2 ContestedPileFootprint = new Vector2(6.5f, 5.4f);
+        private const float PersonalPileInset = 0.3673f;
+        private const float ContestedEdgeInset = 0.7895f;
         private const float PilePositionJitter = 1.5f;
 
         private static float FootprintRadius(Vector2 size) => 0.5f * Mathf.Sqrt(size.x * size.x + size.y * size.y);
@@ -55,10 +55,10 @@ namespace CluckWars.Tests
             for (int i = 0; i < corners.Length; i++)
             {
                 discs.Add(new KeepClearDisc(corners[i], BaseKeepClear));
-                Vector2 personal = Vector2.Lerp(corners[i], Vector2.zero, PersonalPileInset);
+                Vector2 personal = corners[i].normalized * 17f;
                 discs.Add(new KeepClearDisc(personal, personalRadius));
                 Vector2 mid = (corners[i] + corners[(i + 1) % corners.Length]) * 0.5f;
-                Vector2 contested = mid * ContestedEdgeInset;
+                Vector2 contested = mid.normalized * 15f;
                 discs.Add(new KeepClearDisc(contested, contestedRadius));
             }
             return discs.ToArray();
@@ -160,10 +160,10 @@ namespace CluckWars.Tests
             };
             for (int i = 0; i < corners.Length; i++)
             {
-                Vector2 personal = Vector2.Lerp(corners[i], Vector2.zero, PersonalPileInset);
+                Vector2 personal = corners[i].normalized * 17f;
                 pileBoxes.Add(new Box { Center = personal, Width = PersonalPileFootprint.x, Depth = PersonalPileFootprint.y, YawRad = 0f });
                 Vector2 mid = (corners[i] + corners[(i + 1) % corners.Length]) * 0.5f;
-                Vector2 contested = mid * ContestedEdgeInset;
+                Vector2 contested = mid.normalized * 15f;
                 pileBoxes.Add(new Box { Center = contested, Width = ContestedPileFootprint.x, Depth = ContestedPileFootprint.y, YawRad = 0f });
             }
 

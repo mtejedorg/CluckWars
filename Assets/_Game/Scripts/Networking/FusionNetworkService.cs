@@ -140,6 +140,18 @@ namespace CluckWars.Networking
             if (_inputProvider == null) return;
 
             var movement = _inputProvider.GetMovement();
+            var worldMovement = movement;
+            if (CluckWars.Visuals.MatchCamera.Instance != null && movement.sqrMagnitude > 0.0001f)
+            {
+                float yawRad = CluckWars.Visuals.MatchCamera.Instance.CurrentYaw * Mathf.Deg2Rad;
+                float cosY = Mathf.Cos(yawRad);
+                float sinY = Mathf.Sin(yawRad);
+                worldMovement = new Vector2(
+                    movement.x * cosY + movement.y * sinY,
+                    -movement.x * sinY + movement.y * cosY
+                );
+            }
+
             var buttons = new NetworkButtons();
             // Consume the latch OR a same-frame live press (covers either Update/OnInput
             // ordering), then clear so each press activates exactly once.
@@ -150,7 +162,7 @@ namespace CluckWars.Networking
 
             input.Set(new PlayerNetworkInput
             {
-                Movement = movement,
+                Movement = worldMovement,
                 Buttons = buttons,
             });
 

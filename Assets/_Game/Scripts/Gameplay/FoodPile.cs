@@ -70,12 +70,14 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Footprint multiplier for a given step. The top step is exactly 1, i.e. the
         /// authored full footprint; lower steps shrink it toward <paramref name="minFootprintScale"/>.
+        /// Accepts <paramref name="fillExponent"/> k (default 1.0; 0.4 for late-collapsing curve per GDD 3.6).
         /// </summary>
-        public static float FootprintScale(int step, int steps, float minFootprintScale)
+        public static float FootprintScale(int step, int steps, float minFootprintScale, float fillExponent = 1f)
         {
             int s = ClampSteps(steps);
             float u = (Mathf.Clamp(step, 1, s) - 1f) / (s - 1f);
-            return Mathf.Lerp(Mathf.Clamp01(minFootprintScale), 1f, u);
+            float uExp = fillExponent != 1f ? Mathf.Pow(u, fillExponent) : u;
+            return Mathf.Lerp(Mathf.Clamp01(minFootprintScale), 1f, uExp);
         }
 
         /// <summary>
@@ -99,39 +101,6 @@ namespace CluckWars.Gameplay
     /// via <see cref="RPC_Drain"/> from any client. Visual feedback is local
     /// (<c>FoodPileVisuals</c>) and reacts to networked-state changes.
     /// </summary>
-    /// <remarks>
-    /// <para>
-    /// ADR 0003 Decision 2 — a pile is a resource AND an obstacle. Its physical footprint
-    /// is a <i>stepped</i> function of <c>Amount / MaxAmount</c>: draining a pile shrinks
-    /// its root scale, which shrinks the mesh, the blocker box and the NavMesh carve
-    /// together, so emptying a pile is a permanent edit to the map. The stepping is
-    /// deliberately coarse — a carving <see cref="NavMeshObstacle"/> re-carves the NavMesh
-    /// on every size change, and per-tick re-carving thrashes bot pathfinding.
-    /// </para>
-    /// <para>
-    /// Piles are sized in world units by <see cref="FootprintSize"/> (X,Z) and
-    /// <c>_blockerHeight</c> (Y), so an island can be wide and flat — the centre island is
-    /// 7×4, i.e. seven chickens by four. Everything that asks "is this chicken at the pile"
-    /// measures to the pile's SURFACE via <see cref="DistanceToSurface"/>, never to its
-    /// centre. That is deliberate and load-bearing: the centre-distance test it replaced
-    /// coupled the blocker size to a fixed collect radius, and every time a pile grew past
-    /// that bound collection silently stopped working (the 2026-06-01 game-breaker). A
-    /// surface-relative reach is constant at any pile size, so the coupling is gone.
-    /// </para>
-    /// <para>
-    /// ADR 0003 Decision 2b — a pile flagged <see cref="IsPermanent"/> (the centre pile)
-    /// cannot be drained below a floor and slowly regenerates toward <see cref="MaxAmount"/>.
-    /// It therefore never empties and never stops blocking: the late game always has one
-    /// contested arena. The flag is networked and stamped by the spawner via
-    /// <c>onBeforeSpawned</c> — centre and outer piles share one prefab, so it can't be a
-    /// SerializeField.
-    /// </para>
-    /// <para>
-    /// Scene-placed (baked NetworkObject); the master client becomes StateAuthority on
-    /// session start. Spawn is left to the runner's scene-load path — no MatchBootstrapper
-    /// changes needed for Phase 4.
-    /// </para>
-    /// </remarks>
     [RequireComponent(typeof(NetworkObject))]
     public sealed class FoodPile : NetworkBehaviour
     {
@@ -139,27 +108,31 @@ namespace CluckWars.Gameplay
 
         [Tooltip("Amount of food the pile starts with and will be visually scaled against.")]
         [Min(0f)]
-        [SerializeField] private float _initialAmount = 30f;
+        [SerializeField] private float _initialAmount = 5f;
 
-        [Tooltip("How far PAST the pile's SURFACE a chicken may stand and still collect — not a distance to the pile's centre. A chicken pressed against a pile sits 0.58 away (capsule radius 0.5 + controller skin 0.08) whatever the pile's size, so this margin is size-independent: making a pile bigger can never break collection.")]
+        [Tooltip("How far PAST the pile's SURFACE a chicken may stand and still collect — not a distance to the pile's centre.")]
         [Min(0.1f)]
         [SerializeField] private float _collectReach = 1.0f;
 
         [Header("Blocking — stocked piles are solid, so chases route around them")]
-        [Tooltip("Full world-space X,Z footprint at 100% fill, in world units (a chicken is 1.0 wide). Non-uniform on purpose: the centre island is wide and flat, not a tower. Used as the fallback when the spawner doesn't stamp FootprintSize via onBeforeSpawned.")]
-        [SerializeField] private Vector2 _footprintSize = new Vector2(2.2f, 2.2f);
-        [Tooltip("Solid collider / mesh height in world units. NOT scaled by fill — a draining pile shrinks in XZ but stays tall enough to remain terrain. Must stay above the NavMesh step height (0.75) or bots walk straight over piles.")]
+        [Tooltip("Full world-space X,Z footprint at 100% fill, in world units (GDD 3.8: 5.5x4.6 near-circular ellipse default for T1).")]
+        [SerializeField] private Vector2 _footprintSize = new Vector2(5.5f, 4.6f);
+        [Tooltip("Solid collider / mesh height in world units.")]
         [Min(0.8f)]
         [SerializeField] private float _blockerHeight = 1.4f;
 
         [Header("Footprint stepping (ADR 0003 Decision 2) — the pile shrinks as it drains")]
-        [Tooltip("How many discrete footprint sizes exist between the smallest non-empty pile and a full one. Quantised on purpose: the blocker carries a carving NavMeshObstacle, and re-sizing it continuously re-carves the NavMesh and thrashes bot pathfinding.")]
+        [Tooltip("How many discrete footprint sizes exist between the smallest non-empty pile and a full one. Quantised on purpose to prevent NavMesh re-carve thrash.")]
         [Range(2, 8)]
         [SerializeField] private int _footprintSteps = 4;
 
-        [Tooltip("Footprint scale of the smallest non-empty step, as a fraction of full size. The blocker is a child of the pile root, so this scales the mesh, the collider AND the NavMesh carve together. 1 = never shrinks (old behaviour).")]
+        [Tooltip("Footprint scale of the smallest non-empty step, as a fraction of full size.")]
         [Range(0.2f, 1f)]
         [SerializeField] private float _minFootprintScale = 0.45f;
+
+        [Tooltip("Exponent for non-linear shrink curve (width = maxWidth * fill^k). Default k = 0.4 so the pile holds its footprint longer and collapses late (GDD 3.6).")]
+        [Range(0.1f, 2f)]
+        [SerializeField] private float _shrinkExponent = 0.4f;
 
         [Header("Permanent pile (ADR 0003 Decision 2b) — only applies when IsPermanent")]
         [Tooltip("Drain floor as a fraction of MaxAmount. A permanent pile never goes below this, so it stays a solid obstacle all match. Ignored on ordinary piles.")]
@@ -399,7 +372,7 @@ namespace CluckWars.Gameplay
 
         /// <summary>Footprint multiplier for a given step. The top step is exactly the authored size.</summary>
         private float FootprintScale(int step) =>
-            FoodPileMath.FootprintScale(step, _footprintSteps, _minFootprintScale);
+            FoodPileMath.FootprintScale(step, _footprintSteps, _minFootprintScale, _shrinkExponent);
 
         /// <summary>World X,Z size of the pile at a given fill step.</summary>
         private Vector2 FootprintAtStep(int step)

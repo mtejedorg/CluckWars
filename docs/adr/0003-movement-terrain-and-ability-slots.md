@@ -1,6 +1,7 @@
 # ADR 0003 — Movement, Terrain, and the Ability-Slot Model
 
-**Status:** Accepted (design) · **Date:** 2026-07-21 · **Author:** Maestro + Claude
+**Status:** Partially Superseded (Decisions 1 and 5 superseded by v0.5 map redesign in GDD Section 3) · **Date:** 2026-07-21 · **Author:** Maestro + Claude
+**Note (2026-07-29):** Decisions 1 (Low/Standard/Tall mobility triangle) and 5 (30m pinwheel wall layout) are **SUPERSEDED** by the locked Cluck Wars v0.5 map redesign specified in `docs/GDD.md` Section 3 (38 × 38 m square arena, 8-sector radial wall topology, and length-based teleport jump traversal).
 **Supersedes:** the flat global ability pool (all 14 abilities equippable by all classes)
 
 ---

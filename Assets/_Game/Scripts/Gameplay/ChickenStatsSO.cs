@@ -24,7 +24,7 @@ namespace CluckWars.Gameplay
         public ChickenPassive Passive = ChickenPassive.None;
 
         [Header("Movement")]
-        [Min(0f)] public float MoveSpeed = 4f;
+        [Min(0f)] public float MoveSpeed = 9f;
         [Min(0f)] public float TurnSpeed = 720f; // deg/sec
 
         [Header("Cargo")]

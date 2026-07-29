@@ -17,7 +17,8 @@ MonoBehaviour:
   Description: Short blink dash phasing over walls along facing direction.
   AccentColor: {r: 0.4, g: 0.2, b: 0.9, a: 1}
   Category: 3
-  TerrainTraversal: 3
+  TerrainTraversal: 0
+  JumpTier: 0
   SlotKind: 1
   AllowedClasses: 8
   BotRole: 0

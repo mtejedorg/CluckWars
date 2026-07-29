@@ -18,6 +18,7 @@ MonoBehaviour:
   AccentColor: {r: 1, g: 0.55, b: 0.2, a: 1}
   Category: 0
   TerrainTraversal: 1
+  JumpTier: 1
   SlotKind: 1
   AllowedClasses: 1
   BotRole: 0

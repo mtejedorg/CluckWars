@@ -87,8 +87,11 @@ namespace CluckWars.Abilities
         public AbilityCategory Category = AbilityCategory.Utility;
 
         [Header("ADR 0003 Classification")]
-        [Tooltip("Terrain traversal capability granted to the caster while this ability is active (ADR 0003 Decision 1).")]
+        [Tooltip("Terrain traversal capability granted to the caster while this ability is active (ADR 0003 Decision 1). Deprecated in v0.5 in favor of JumpTier.")]
         public TerrainTraversal TerrainTraversal = TerrainTraversal.None;
+
+        [Tooltip("Jump length tier for teleport jump traversal abilities (Short=5m, Normal=10m, Big=18m; GDD v0.5 §3.5).")]
+        public JumpLengthTier JumpTier = JumpLengthTier.None;
 
         [Tooltip("Pool classification: Common (shared) vs Character (class pool) per ADR 0003 Decision 3.")]
         public AbilitySlotKind SlotKind = AbilitySlotKind.Common;

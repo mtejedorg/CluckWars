@@ -93,6 +93,51 @@ namespace CluckWars.Gameplay
         /// <summary>True once the ability window closed but the caster is still inside geometry.</summary>
         public bool IsUnsticking => _tier != TerrainTraversal.None && !_windowOpen;
 
+        /// <summary>
+        /// Executes length-based teleport jump resolution via <see cref="JumpResolver"/>.
+        /// </summary>
+        public JumpResult ExecuteJump(JumpLengthTier jumpTier, Vector3 origin, Vector3 direction, float arenaHalfSize = 19.0f)
+        {
+            float nominalDist = JumpResolver.GetNominalDistance(jumpTier);
+            if (nominalDist <= 0f)
+            {
+                return new JumpResult { LandingPoint = origin, Cleared = true, TargetDistance = 0f, EffectiveDistance = 0f };
+            }
+
+            return JumpResolver.Resolve(
+                origin,
+                direction,
+                nominalDist,
+                arenaHalfSize,
+                JumpResolver.BodyClearance,
+                isPointBlocked: (point, radius) =>
+                {
+                    Vector3 queryPos = new Vector3(point.x, 0.5f, point.z);
+                    int hits = Physics.OverlapSphereNonAlloc(queryPos, radius, ScanHits, Physics.AllLayers, QueryTriggerInteraction.Ignore);
+                    for (int i = 0; i < hits; i++)
+                    {
+                        var col = ScanHits[i];
+                        if (col == null || col == _cc) continue;
+                        if (!col.isTrigger) return true;
+                    }
+                    return false;
+                },
+                nearFaceDistance: (Vector3 orig, Vector3 dir, float maxDist, float clearance, out float hitDist) =>
+                {
+                    Vector3 queryOrig = new Vector3(orig.x, 0.5f, orig.z);
+                    if (Physics.Raycast(queryOrig, dir, out RaycastHit hit, maxDist + clearance, Physics.AllLayers, QueryTriggerInteraction.Ignore))
+                    {
+                        if (hit.collider != _cc)
+                        {
+                            hitDist = hit.distance;
+                            return true;
+                        }
+                    }
+                    hitDist = maxDist;
+                    return false;
+                });
+        }
+
         // ---- Window lifecycle --------------------------------------------------
 
         /// <summary>
