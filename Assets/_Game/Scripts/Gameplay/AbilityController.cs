@@ -329,6 +329,19 @@ namespace CluckWars.Gameplay
                 _controller.Traversal?.Begin(ability.TerrainTraversal);
             }
 
+            // Length-based teleport jump (GDD 3.5). Runs before OnActivate so an ability
+            // that also deals damage resolves it from where it LANDS, not where it left.
+            // Safe to move the transform here: FixedUpdateNetwork gates on
+            // HasStateAuthority, and BotTryActivate re-checks it.
+            if (ability.JumpTier != JumpLengthTier.None && _controller != null &&
+                _controller.Traversal != null)
+            {
+                var t = _controller.transform;
+                var jump = _controller.Traversal.ExecuteJump(
+                    ability.JumpTier, t.position, t.forward, MapGenerator.ArenaHalfSize);
+                _controller.Traversal.ApplyJump(jump);
+            }
+
             ability.OnActivate(_ctx);
             _animator?.TriggerAbilityCast();
             _audio?.PlaySFX(_audioReg != null ? _audioReg.AbilityActivate : null);

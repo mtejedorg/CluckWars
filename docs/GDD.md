@@ -165,10 +165,33 @@ Eight radial walls sit on the boundaries of eight 45° sectors, alternating **ba
 | | Spans | Length | Opening |
 |---|---|---|---|
 | **Outer-gap wall** (4) | r 10 → 17.6 | 7.6 m | 3 m at the **rim** |
-| **Inner-gap wall** (4) | r 12 → 20.6 (boundary) | 8.6 m | 3 m at the **hub** |
+| **Inner-gap wall** (4) | r 13 → 20.6 (boundary) | 7.6 m | 3 m at the **hub** |
 
 Wall directions sit 22.5° off each diagonal, so on a square of half-extent 19 m the
 boundary along a wall's bearing is at r = 19 / cos 22.5° = **20.6 m**.
+
+Nothing here is hardcoded: the hub plaza is `max(10, centreKeepClear + MinCorridorWidth)`
+so a growing centre pile can never seal the hub, and each wall's outer end is measured
+against the boundary along *its own* bearing. Both wall types come out the same 7.6 m
+length, which is a consequence of the derivation rather than a tuned value.
+
+**Walls are deterministic — they do not jitter.** Piles sit at sector centres and walls on
+sector boundaries, which is the widest separation this topology allows; at the contested
+pile's radius that is 5.74 m against a 5.59 m keep-clear disc, leaving only **~0.15 m of
+slack**. Measured: any wall jitter swings a wall into a pile's disc and gets clipped away —
+at the previous setting 27 % of walls collapsed entirely and the rest shrank from 7.6 m to
+1–3 m, destroying the two-lap topology. Match-to-match variety therefore comes from **pile
+jitter only** (±0.4 m), and a fixed wall layout also makes the map learnable.
+
+Two consequences worth keeping in mind if this is ever revisited:
+
+- Should jitter ever return, it must repeat with **4-fold period** — a 90° rotation maps
+  each wall onto another, so those must share a value or the four players' sectors differ,
+  which is a fairness bug in an FFA, not a cosmetic one.
+- Pile keep-clear discs scale with pile footprint + jitter, so **growing a pile eats the
+  walls**. `PinwheelLayoutTests.Build_WallsSurvivePileKeepClearDiscs_AtRealV05Sizes` guards
+  this; clearance tests alone cannot, because clipping shortens a wall without ever
+  violating corridor clearance.
 
 The pattern is 4-fold symmetric, so **every player's sector is identical**: an outer-gap
 wall on one side, an inner-gap wall on the other. Combined with per-player rotation this

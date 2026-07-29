@@ -138,6 +138,39 @@ namespace CluckWars.Gameplay
                 });
         }
 
+        /// <summary>
+        /// Teleports the caster to a resolved jump landing point (GDD 3.5 — jumps are
+        /// teleports, not arcs).
+        /// </summary>
+        /// <remarks>
+        /// The <see cref="CharacterController"/> must be disabled across the move:
+        /// writing <c>transform.position</c> while it is enabled is silently overwritten
+        /// by its own internal collision state on the next simulation step, so the
+        /// chicken would snap back. Disabling, moving, then re-enabling is the sanctioned
+        /// Unity idiom for teleporting a controller.
+        ///
+        /// Call sites must already hold state authority — see
+        /// <c>AbilityController.TryActivate</c>, which is gated by
+        /// <c>FixedUpdateNetwork</c>'s <c>HasStateAuthority</c> check. The move
+        /// replicates through <c>NetworkTransform</c>; no RPC is needed or wanted.
+        /// </remarks>
+        public void ApplyJump(in JumpResult result)
+        {
+            if (_cc == null || _transform == null) return;
+
+            bool wasEnabled = _cc.enabled;
+            _cc.enabled = false;
+            // Preserve the caster's own Y — the resolver works purely in XZ and must not
+            // drag the chicken through the floor or launch it off a slope.
+            _transform.position = new Vector3(
+                result.LandingPoint.x, _transform.position.y, result.LandingPoint.z);
+            _cc.enabled = wasEnabled;
+
+            _log?.Debug(Source,
+                $"Jump {(result.Cleared ? "cleared" : "BLOCKED")} — travelled " +
+                $"{result.EffectiveDistance:0.00}m of {result.TargetDistance:0.00}m.");
+        }
+
         // ---- Window lifecycle --------------------------------------------------
 
         /// <summary>

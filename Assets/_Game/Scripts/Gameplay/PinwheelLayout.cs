@@ -88,7 +88,30 @@ namespace CluckWars.Gameplay
         /// </summary>
         public const float PileArmBuffer = ChickenDiameter; // 0.96
 
-        private const float JitterFraction = 0.15f;
+        /// <summary>
+        /// Walkable plaza radius around the centre pile (GDD 3.1). Used as a floor: the
+        /// plaza always leaves at least <see cref="MinCorridorWidth"/> of ring between the
+        /// centre pile's footprint and the innermost wall, so growing the centre pile can
+        /// never seal the hub.
+        /// </summary>
+        public const float HubPlazaRadius = 10f;
+
+        /// <summary>Width of the single opening each wall carries (GDD 3.4).</summary>
+        public const float OpeningWidth = 3f;
+
+        /// <summary>
+        /// Angular jitter applied to wall bearings, as a fraction of the sector step.
+        /// <b>Deliberately zero.</b> Piles sit at sector centres and walls on sector
+        /// boundaries — the maximum separation the topology allows — and at the contested
+        /// pile's radius that is only 5.74 m against a 5.59 m keep-clear disc, i.e. ~0.15 m
+        /// of slack. Measured: any wall jitter swings a wall into the pile disc, which
+        /// clips it away; at the old 0.15 the inner walls were shredded from 7.6 m down to
+        /// 2.7 m and 27% of all walls collapsed entirely. Match-to-match variety comes from
+        /// pile jitter instead; deterministic walls also make the map learnable.
+        /// If this is ever raised, re-run the wall-length sweep — the tests alone will not
+        /// catch it, because clipping shortens walls without violating clearance.
+        /// </summary>
+        private const float JitterFraction = 0f;
 
         /// <param name="arenaHalfSize">Half the square arena's side length (19 m for 38 m arena).</param>
         /// <param name="wedges">Number of pinwheel arms (8 for v0.5 layout).</param>
@@ -110,44 +133,54 @@ namespace CluckWars.Gameplay
             var rng = new System.Random(seed);
             float angleStep = 2f * Mathf.PI / wedges;
 
-            // 8-sector radial wall topology (GDD 3.4 & ag_spec Phase 1):
-            // 8 radial walls sit on 45° sector boundaries (22.5°, 67.5°, 112.5°, ...).
-            // Alternating openings:
-            // - 4 Outer-gap walls (i % 2 == 0): span radius 10.0 m to 17.6 m (length 7.6 m, 3 m opening at outer rim).
-            // - 4 Inner-gap walls (i % 2 == 1): span radius 12.0 m to boundary 20.6 m (length 8.6 m, 3 m opening at inner hub).
+            // Radial wall topology (GDD 3.4). Walls sit on sector BOUNDARIES — offset half
+            // a step from the sector centres — and alternate which end carries their single
+            // opening: even indices open at the rim (the safe lap), odd indices open at the
+            // hub (the risky lap). With a wedge count divisible by 4 this is 4-fold
+            // symmetric, so every player's sector is identical.
+            //
+            // Everything below is DERIVED from arenaHalfSize / centerKeepClear rather than
+            // hardcoded. An earlier revision special-cased wedges == 8 with literal radii
+            // and a fixed 45° bearing, which silently produced OVERLAPPING walls for any
+            // other count (at 13 wedges, wall 0 and wall 8 landed on the same bearing) and
+            // ignored centerKeepClear entirely.
+            float hubPlaza = Mathf.Max(HubPlazaRadius, centerKeepClear + MinCorridorWidth);
+
+            // Jitter must repeat with 4-FOLD PERIOD, not vary per wall. A 90° rotation maps
+            // wall i onto wall i + wedges/4, so those must share a jitter value or the four
+            // players' sectors stop being identical — which is a fairness bug in a 4-player
+            // FFA, not a cosmetic one. Only `period` independent values are drawn; every
+            // quadrant then reuses them.
+            int period = (wedges % 4 == 0) ? wedges / 4 : wedges;
+            var jitters = new float[period];
+            for (int j = 0; j < period; j++)
+                jitters[j] = (float)(rng.NextDouble() * 2.0 - 1.0) * angleStep * JitterFraction;
+
             for (int i = 0; i < wedges; i++)
             {
-                // Wall bearings sit at 22.5° off each diagonal/axis
-                float baseAngle = (i * 45f + 22.5f) * Mathf.Deg2Rad;
-                float jitter = (wedges != 8) ? (float)(rng.NextDouble() * 2.0 - 1.0) * angleStep * JitterFraction : 0f;
+                // Half-step offset puts the wall on the boundary between two sectors.
+                float baseAngle = (i + 0.5f) * angleStep;
+                float jitter = jitters[i % period];
                 float angle = baseAngle + jitter;
                 Vector2 dir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
 
+                // Distance to the square boundary along this bearing.
+                float boundaryRadius = arenaHalfSize /
+                    Mathf.Max(Mathf.Abs(dir.x), Mathf.Abs(dir.y));
+
                 float startDist;
                 float endDist;
-
-                if (wedges == 8)
+                if (i % 2 == 0)
                 {
-                    // Boundary along a 22.5° bearing on a square of half-extent 19 m is r = 19 / cos 22.5° = 20.5647 m (20.6 m).
-                    float boundaryRadius = arenaHalfSize / Mathf.Cos(22.5f * Mathf.Deg2Rad);
-
-                    if (i % 2 == 0)
-                    {
-                        // Outer-gap wall: r 10 m -> 17.6 m (length 7.6 m, 3 m opening at rim)
-                        startDist = 10.0f;
-                        endDist = 17.6f;
-                    }
-                    else
-                    {
-                        // Inner-gap wall: r 12 m -> boundary (20.6 m) (length 8.6 m, 3 m opening at hub)
-                        startDist = 12.0f;
-                        endDist = boundaryRadius;
-                    }
+                    // Rim opening: wall stops OpeningWidth short of the boundary.
+                    startDist = hubPlaza;
+                    endDist   = boundaryRadius - OpeningWidth;
                 }
                 else
                 {
-                    startDist = 10.0f;
-                    endDist = arenaHalfSize - 1.0f;
+                    // Hub opening: wall starts OpeningWidth beyond the plaza edge.
+                    startDist = hubPlaza + OpeningWidth;
+                    endDist   = boundaryRadius;
                 }
 
                 if (extraKeepClearDiscs != null)

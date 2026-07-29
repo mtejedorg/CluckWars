@@ -151,9 +151,9 @@ namespace CluckWars.Gameplay
         [Range(0.4f, 1f)]
         [SerializeField] private float _contestedEdgeInset = 0.7895f;
 
-        [Tooltip("Random XZ jitter applied to personal + contested island positions each match (GDD §3: positions randomized within constraints). Center pile never moves.")]
+        [Tooltip("Random XZ jitter applied to personal + contested island positions each match (GDD §3: positions randomized within constraints). Center pile never moves. Kept small — the keep-clear disc must cover every jittered position, and piles now sit only 22.5° off the wall bearings, so a large jitter erases the walls entirely.")]
         [Min(0f)]
-        [SerializeField] private float _pilePositionJitter = 1.5f;
+        [SerializeField] private float _pilePositionJitter = 0.4f;
 
         private INetworkService _network;
         private PrefabRegistrySO _prefabRegistry;
@@ -186,8 +186,17 @@ namespace CluckWars.Gameplay
             return _foodPilePrefab;
         }
 
+        /// <summary>
+        /// Half the arena's side length, published once the map is generated so
+        /// systems that need arena bounds (notably <see cref="JumpResolver"/>, which
+        /// must reject landings outside the play area) don't have to hardcode it.
+        /// Falls back to the serialized default before <see cref="Awake"/> runs.
+        /// </summary>
+        public static float ArenaHalfSize { get; private set; } = 19f;
+
         private void Awake()
         {
+            ArenaHalfSize = _planeSize * 0.5f;
             ComputeSpawnPoints();
             BuildPlane();
             BuildBoundaryWalls();

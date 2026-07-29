@@ -575,7 +575,7 @@ MonoBehaviour:
   _contestedPileAmount: 10
   _contestedPileFootprint: {x: 6.5, y: 5.4}
   _contestedEdgeInset: 0.7895
-  _pilePositionJitter: 1.5
+  _pilePositionJitter: 0.4
 --- !u!1 &1280783553
 GameObject:
   m_ObjectHideFlags: 0

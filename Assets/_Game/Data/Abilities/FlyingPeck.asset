@@ -17,7 +17,7 @@ MonoBehaviour:
   Description: Vaulting dash forward that steals cargo on contact.
   AccentColor: {r: 1, g: 0.55, b: 0.2, a: 1}
   Category: 0
-  TerrainTraversal: 1
+  TerrainTraversal: 0
   JumpTier: 1
   SlotKind: 1
   AllowedClasses: 1
