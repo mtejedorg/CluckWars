@@ -87,42 +87,160 @@ time**, and **steal** is the only mechanic that converts a won fight directly in
 
 ## 3. Map Design
 
-**Layout:** square arena, 4 base corners, isometric top-down. Pile positions jitter each
-match (seeded from the session code so all peers agree); the centre never moves.
+> **v0.5 — locked 2026-07-29.** This section supersedes the earlier 30 m pinwheel arena
+> and **replaces ADR 0003's Low/Standard/Tall mobility triangle** with length-based jump
+> traversal (§3.5). ADR 0003 Decisions 1 and 5 should be marked superseded.
 
-### 3.1 Tiered food budget (total = 80 = 2× win)
+### 3.1 Arena geometry
+
+**Square arena, 38 × 38 m** (53.7 m corner to corner), isometric top-down. Four bases,
+one per **corner**. Four edges, each the route from one base to a neighbour.
+
+Every client **rotates the arena so its own base sits at the bottom of the screen**. All
+players therefore see an identical relative layout — no starting corner is easier to read
+than another, and the arena renders as a diamond with your corner nearest the camera.
+
+| Feature | Radius from centre | Notes |
+|---|---|---|
+| Centre pile | 0 | span **12 m**, never moves |
+| Hub plaza edge | 10 | walkable ring around the centre pile |
+| **T2 — contested** | 15 | at the four **edge midpoints** |
+| **T1 — doorstep** | 17 | on your corner diagonal |
+| Base mouth | ~25 | 3 m opening |
+| Corner (base apex) | 26.9 | base wraps the corner |
+| Edge midpoint (boundary) | 19 | |
+
+The **boundary is a hybrid** — straight along each base frontage, curving through the
+corners — and is delimited by **props** rather than a uniform wall, so the arena reads as
+a place rather than a box. Prop placement is art-tunable without touching the generator.
+
+Pile positions jitter each match (seeded from the session code so all peers agree); the
+centre never moves.
+
+### 3.2 Tiered food budget (total = 80 = 2× win)
 
 | Tier | Count | Food each | Σ | Role |
 |---|---|---|---|---|
-| **T1 — doorstep** | 4 (one per base) | 5 | 20 | Fatty's top-up; safe-ish; invadeable |
-| **T2 — contested** | 4 (between bases) | 10 | 40 | Fight for it or rush it |
-| **T3 — centre** | 1 | 20 | 20 | Fight for it |
+| **T1 — doorstep** | 4 (one per base) | 5 | 20 | Safe income, ~8 m off your mouth |
+| **T2 — contested** | 4 (edge midpoints) | 10 | 40 | Equidistant from two bases — contested arrival is the default |
+| **T3 — centre** | 1 | 20 | 20 | The prize, and the wall protecting it (§3.6) |
 
 **Piles do not respawn or regenerate** — banked food leaves circulation, so the pot
 visibly shrinks and the late game gets desperate on its own. Fatty's winning route (a
 35-cargo sweep of centre + two contested piles) is forced *through* the contested ring — he
 cannot win without walking past everyone.
 
-### 3.2 Walls & terrain traversal (the mobility triangle)
+### 3.3 Scale package
 
-Interior walls are laid out as a **pinwheel** (radial wedges, seeded), built on three
-**obstacle classes** — Low / Standard / Tall. Walls block movement, not sight. Chases
-become *routing* plays, not raw speed races, via three mobility currencies (ADR 0003):
+Every spatial constant derives from these. **Jump distances are defined as a share of
+screen width**, so they rescale automatically if the camera changes and never need
+re-tuning against the map.
 
-| Verb | Cost | Crosses |
+| | Value | Derivation |
 |---|---|---|
-| **Run** — raw `MoveSpeed` | free | nothing |
-| **Vault** (e.g. Flying Peck) | ability cooldown | Low + Standard |
-| **Barge** (e.g. Roll & Push) | ability cooldown | Low |
-| **Blink** (e.g. Shadowstep, Doppelganger) | ability cooldown | every class of wall |
+| Chicken | **⌀0.8 m × 1.6 m** | 4.0 % of screen width |
+| Move speed | **9.0 / 10.5** | base / fast classes |
+| Camera | orthographic, **orthoSize 5.6**, 45° yaw, 30° pitch | |
+| Ground visible | **19.9 m across × 22.4 m deep** | `3.56·o` × `4·o` — deeper than wide, because 30° pitch stretches the vertical axis 2× |
+| Min corridor | **2.0 m** | `2 × chicken ⌀ + 0.4` |
+| Wall opening | **3.0 m** | |
 
-Boundary walls are never crossable — arena containment is structural. A stocked pile is
-solid (blocks like a wall); a depleted stub is walkable.
+The arena is ~1.9 screens edge-to-edge and ~2.7 corner-to-corner: **you never see the
+whole map**. That information gap is deliberate — it is what makes routing and ambush
+matter.
 
-### 3.3 Pile visuals
+### 3.4 Sector & wall topology — the two laps
 
-Piles shrink and desaturate as they deplete, driven locally by the `[Networked]` food
-amount — instant strategic read, no extra sync.
+Eight radial walls sit on the boundaries of eight 45° sectors, alternating **base sector**
+(centred on a corner) and **neutral sector** (centred on an edge midpoint). Walls are
+**12 m long × 0.5 m thick**, and each has exactly **one opening, at one end**:
+
+| | Spans | Opening |
+|---|---|---|
+| **Outer-gap wall** (4) | r 10 → 17.6 | 3 m at the **rim** |
+| **Inner-gap wall** (4) | r 12 → boundary | 3 m at the **hub** |
+
+The pattern is 4-fold symmetric, so **every player's sector is identical**: an outer-gap
+wall on one side, an inner-gap wall on the other. Combined with per-player rotation this
+becomes a universal, learnable rule:
+
+- **Left → the safe lap.** Out to the rim, along the edge, past a T2 pile, to a neighbour.
+- **Right → the risky lap.** In past the hub plaza and the centre pile.
+
+Inner walls terminate exactly where a base's frontage ends, so wall and base meet at a
+seam rather than colliding.
+
+Boundary props are never crossable — arena containment is structural.
+
+### 3.5 Traversal by jump length
+
+**All jumps are teleports.** There are no obstacle height classes. Whether a jump clears
+something depends only on **length versus the obstacle's span along the jump direction**.
+
+- **Resolution:** the landing point must be clear of colliders and inside the arena. For
+  convex obstacles this is exactly equivalent to "did I span it?", so no swept-volume test
+  is needed — cast to the landing point and validate it.
+- **Span needed** = obstacle width + **0.8 m** (0.4 m body clearance each side).
+- **Tolerance:** if the landing point is blocked but clearing needs only slightly more,
+  extend the jump. Allowance = `max(12 %, 0.4 m)`, **capped at 0.8 m absolute** so long
+  jumps don't quietly gain reach. Balance against *effective* length, not nominal.
+- **Failure:** travel as far as possible and **stop flush against the near face** — you
+  slam into it rather than failing in place. **Cooldown is still spent.**
+
+| Obstacle | Span | Needs | short **5 m** | normal **10 m** | big **18 m** *(future)* |
+|---|---|---|---|---|---|
+| Wall, square on | 0.5 m | 1.3 m | ✅ | ✅ | ✅ |
+| Wall, oblique 20° | 1.5 m | 2.3 m | ✅ | ✅ | ✅ |
+| T1 pile | 5.5 m | 6.3 m | ❌ | ✅ | ✅ |
+| T2 pile | 6.5 m | 7.3 m | ❌ | ✅ | ✅ |
+| Centre pile, full | 12 m | 12.8 m | ❌ | ❌ | ✅ |
+
+This yields a clean ladder — **5 m is the gap-closer** (every wall, no pile), **10 m is the
+pile-vaulter**, and only a big jump crosses a full centre pile.
+
+Two behaviours emerge for free and are intended: crossing a near-circular pile **near its
+edge is a shorter chord** than through its middle, and a wall taken **obliquely costs more**
+than square on. Both are invisible to the player, so a **landing-point indicator is
+required** — a ghost marker that reads red when the jump will fall short.
+
+### 3.6 The ring becomes a circle
+
+The centre pile's footprint already shrinks with its remaining food. Since span is the only
+thing gating traversal, **the map opens itself in stages, with no extra systems**:
+
+| Centre pile | Crossable by | Feel |
+|---|---|---|
+| 12 m (full) | big jump only | a fortress |
+| 9 m (75 %) | normal jump | the siege breaks |
+| 6 m (50 %) | normal jump; still blocks 5 m | contested crossing |
+| 4 m (25 %) | everything | wide open |
+
+Late-game acceleration for free: the prize everyone is fighting over is also the wall
+protecting it, so the arena dissolves exactly as the match converges. **How fast it opens
+is a balance-critical tuning curve** on the pile's shrink rate — not cosmetic. A linear
+footprint would end the fortress phase at ~75 % remaining, which is likely too early.
+
+### 3.7 Sightline contract
+
+These relationships are the reason the arena is 38 m and not larger. Any change to arena
+size, pile radii, pile spans or `orthoSize` **must re-check all four**:
+
+| | Holds because |
+|---|---|
+| Centre **hidden** from base | 19 m to its near edge vs 11.2 m view depth |
+| Centre **clips into view** from T1 | 11.0 m vs 11.2 m — deliberately marginal |
+| Centre **visible** from T2 | 9 m |
+| T2 **not** visible from the base mouth | picked up a few steps out along the edge |
+
+The second is sensitive to the centre pile's size, and the whole set is sensitive to
+**aspect ratio** — Unity's `orthographicSize` is vertical, so a wider device widens the
+view. If these must hold across devices, pin the camera to a **horizontal** extent instead.
+
+### 3.8 Pile visuals
+
+Piles are **near-circular ellipses** (~1.2 : 1). They shrink and desaturate as they
+deplete, driven locally by the `[Networked]` food amount — instant strategic read, no extra
+sync. Shrinking is also load-bearing for traversal (§3.6), not merely cosmetic.
 
 ---
 
