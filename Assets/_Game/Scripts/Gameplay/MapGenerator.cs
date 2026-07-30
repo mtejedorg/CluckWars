@@ -217,7 +217,17 @@ namespace CluckWars.Gameplay
         /// runtime by <see cref="HandleRunnerReady"/> and are deliberately excluded, since
         /// baking them would break Fusion's spawn ownership.
         /// </summary>
-        public void BuildStaticGeometry(Transform root = null)
+        /// <summary>
+        /// Radial distance of the four doorstep (T1) piles, on the corner diagonals.
+        /// Shared by the runtime spawn and the baked zone markers so a marker can never
+        /// drift away from the pile it represents.
+        /// </summary>
+        public const float PersonalPileRadius = 17f;
+
+        /// <summary>Radial distance of the four contested (T2) piles, on the edge midpoints.</summary>
+        public const float ContestedPileRadius = 15f;
+
+        public void BuildStaticGeometry(Transform root = null, Material pileZoneMaterial = null)
         {
             _geometryRoot = root;
             ArenaHalfSize = _planeSize * 0.5f;
@@ -225,7 +235,62 @@ namespace CluckWars.Gameplay
             BuildPlane();
             BuildBoundaryWalls();
             BuildInteriorObstacles();
+            BuildPileZoneMarkers(pileZoneMaterial);
             _geometryRoot = null;
+        }
+
+        /// <summary>
+        /// Flat brown discs marking where each food pile will spawn — the map reads as if
+        /// every pile were fully depleted. Purely decorative: the real piles are
+        /// <c>NetworkObject</c>s spawned at runtime on top of these, and as a pile drains
+        /// and shrinks its marker is progressively revealed underneath.
+        /// </summary>
+        /// <remarks>
+        /// <b>Deliberately collider-free.</b> A collider here would be read as solid terrain
+        /// by three separate systems: <c>CharacterController</c> movement, the NavMesh bake
+        /// (which collects PhysicsColliders, so bots would path around empty ground), and
+        /// <see cref="JumpResolver"/>'s overlap test, which treats any non-trigger collider
+        /// as blocking and would make every pile zone reject a landing.
+        ///
+        /// Markers sit at the piles' NOMINAL positions. Piles jitter ±_pilePositionJitter
+        /// each match, so a spawned pile is offset from its marker by up to that much —
+        /// intended, since the marker denotes the zone rather than the exact footprint.
+        /// </remarks>
+        private void BuildPileZoneMarkers(Material material)
+        {
+            if (_corners == null) return;
+
+            AddPileZoneMarker("PileZone_Center", Vector3.zero, _centerPileFootprint, material);
+
+            for (int i = 0; i < _corners.Length; i++)
+            {
+                AddPileZoneMarker($"PileZone_Personal{i}",
+                    _corners[i].normalized * PersonalPileRadius, _personalPileFootprint, material);
+            }
+
+            for (int i = 0; i < _corners.Length; i++)
+            {
+                var mid = (_corners[i] + _corners[(i + 1) % _corners.Length]) * 0.5f;
+                AddPileZoneMarker($"PileZone_Contested{i}",
+                    mid.normalized * ContestedPileRadius, _contestedPileFootprint, material);
+            }
+        }
+
+        private void AddPileZoneMarker(string name, Vector3 position, Vector2 footprint, Material material)
+        {
+            var marker = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            marker.name = name;
+            marker.transform.SetParent(GeometryRoot, worldPositionStays: false);
+
+            // A Unity cylinder is 2 units tall, so a Y scale of 0.01 gives a 2 cm slab.
+            // Lifted 1 cm so it rests ON the ground (top at y=0) rather than z-fighting it.
+            marker.transform.localScale = new Vector3(footprint.x, 0.01f, footprint.y);
+            marker.transform.localPosition = new Vector3(position.x, 0.01f, position.z);
+
+            var collider = marker.GetComponent<Collider>();
+            if (collider != null) DestroyImmediate(collider);
+
+            if (material != null) marker.GetComponent<Renderer>().sharedMaterial = material;
         }
 
         private void Awake()
@@ -967,7 +1032,7 @@ namespace CluckWars.Gameplay
             // Personal doorstep islands — 4 piles at radius 17 m on corner diagonals.
             for (int i = 0; i < _corners.Length; i++)
             {
-                var pos = _corners[i].normalized * 17f + JitterXZ();
+                var pos = _corners[i].normalized * PersonalPileRadius + JitterXZ();
                 SpawnPile(runner, pilePrefab, pos, _personalPileAmount, _personalPileFootprint);
                 loggedCoords.AppendLine($"Personal {i}: ({pos.x:F2}, {pos.z:F2}) | Food: {_personalPileAmount:0.00}");
             }
@@ -976,7 +1041,7 @@ namespace CluckWars.Gameplay
             for (int i = 0; i < _corners.Length; i++)
             {
                 var mid = (_corners[i] + _corners[(i + 1) % _corners.Length]) * 0.5f;
-                var pos = mid.normalized * 15f + JitterXZ();
+                var pos = mid.normalized * ContestedPileRadius + JitterXZ();
                 SpawnPile(runner, pilePrefab, pos, _contestedPileAmount, _contestedPileFootprint);
                 loggedCoords.AppendLine($"Contested {i}: ({pos.x:F2}, {pos.z:F2}) | Food: {_contestedPileAmount:0.00}");
             }

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using CluckWars.Gameplay;
@@ -34,6 +35,8 @@ namespace CluckWars.EditorTools
         private const string MapScenePath  = "Assets/_Game/Scenes/Map.unity";
         private const string GameScenePath = "Assets/_Game/Scenes/Game.unity";
         private const string GeometryRootName = "GeneratedMapGeometry";
+        private const string MaterialsFolder = "Assets/_Game/Art/Materials";
+        private const string PileZoneMaterialPath = MaterialsFolder + "/PileZone.mat";
 
         [MenuItem("Cluck Wars/Map/Bake Map Scene", priority = 20)]
         public static void BakeMapScene()
@@ -61,7 +64,7 @@ namespace CluckWars.EditorTools
 
             // Build detached, so nothing is parented under the runtime component.
             var root = new GameObject(GeometryRootName);
-            generator.BuildStaticGeometry(root.transform);
+            generator.BuildStaticGeometry(root.transform, EnsurePileZoneMaterial());
 
             int built = root.transform.childCount;
             if (built == 0)
@@ -91,12 +94,22 @@ namespace CluckWars.EditorTools
 
             var mapScene = EditorSceneManager.OpenScene(MapScenePath, OpenSceneMode.Additive);
 
-            // Strip everything the clone brought across — we want its settings, not its
-            // contents. The geometry root is added afterwards.
+            // Strip the clone's contents but KEEP its lights. Deleting everything left the
+            // map scene with no Directional Light, so the baked geometry rendered almost
+            // black under ambient alone — the scene looked broken while every scripted
+            // check still passed.
             foreach (var go in mapScene.GetRootGameObjects())
+            {
+                if (go.GetComponentInChildren<Light>(true) != null) continue;
                 Object.DestroyImmediate(go);
+            }
 
             SceneManager.MoveGameObjectToScene(root, mapScene);
+
+            // Materials generated at runtime carry HideFlags.DontSave, which is right for
+            // play but means they are NOT written into a saved scene — the walls came back
+            // magenta. Persist them as assets and re-point the renderers before saving.
+            PersistGeneratedMaterials(root);
 
             // NavMesh is baked here rather than at runtime: the geometry is static, so
             // paying for a bake every launch is waste, and a baked surface also lets the
@@ -134,6 +147,98 @@ namespace CluckWars.EditorTools
             }
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
             EditorSceneManager.OpenScene(MapScenePath, OpenSceneMode.Single);
+        }
+
+        /// <summary>
+        /// Replaces every in-memory material under <paramref name="root"/> with a saved
+        /// asset equivalent.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="MapGenerator"/> builds its obstacle tints at runtime via
+        /// <c>new Material(...)</c> with <c>HideFlags.DontSave</c> — correct for play,
+        /// where they must not leak into the project, but a saved scene cannot reference
+        /// them, so the walls reloaded with no material and rendered magenta. Assets are
+        /// reused across bakes at a stable path so repeated bakes don't litter the project
+        /// with PileZone 1.mat, PileZone 2.mat, …
+        /// </remarks>
+        private static void PersistGeneratedMaterials(GameObject root)
+        {
+            var remapped = new Dictionary<Material, Material>();
+
+            foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
+            {
+                var source = renderer.sharedMaterial;
+                if (source == null || EditorUtility.IsPersistent(source)) continue;
+
+                if (!remapped.TryGetValue(source, out var saved))
+                {
+                    string safeName = string.Concat(source.name.Split(Path.GetInvalidFileNameChars()));
+                    if (string.IsNullOrWhiteSpace(safeName)) safeName = "GeneratedMapMaterial";
+                    string path = $"{MaterialsFolder}/{safeName}.mat";
+
+                    Directory.CreateDirectory(MaterialsFolder);
+                    saved = AssetDatabase.LoadAssetAtPath<Material>(path);
+                    if (saved == null)
+                    {
+                        saved = new Material(source) { name = safeName };
+                        AssetDatabase.CreateAsset(saved, path);
+                    }
+                    else
+                    {
+                        // Reuse the existing asset so references elsewhere survive, but
+                        // refresh it from the freshly generated material.
+                        saved.shader = source.shader;
+                        saved.CopyPropertiesFromMaterial(source);
+                        EditorUtility.SetDirty(saved);
+                    }
+                    remapped[source] = saved;
+                }
+
+                renderer.sharedMaterial = saved;
+            }
+
+            if (remapped.Count > 0)
+            {
+                AssetDatabase.SaveAssets();
+                Debug.Log($"[MapSceneBaker] Persisted {remapped.Count} generated material(s) to " +
+                          $"{MaterialsFolder} so the baked scene keeps them.");
+            }
+        }
+
+        /// <summary>
+        /// Loads (or creates) the shared material for the depleted-pile zone markers.
+        /// This must be a real ASSET, not a runtime <c>new Material(...)</c>: materials
+        /// created in memory are not serialized into a saved scene, so the markers would
+        /// come back with a missing material — magenta — the next time the map scene was
+        /// opened.
+        /// </summary>
+        private static Material EnsurePileZoneMaterial()
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<Material>(PileZoneMaterialPath);
+            if (existing != null) return existing;
+
+            // URP Lit explicitly: the project is URP-only, and the primitive default is
+            // a Built-in shader that renders magenta here (docs/CONVENTIONS.md).
+            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null)
+            {
+                Debug.LogWarning("[MapSceneBaker] URP/Lit shader not found — pile zone markers " +
+                                 "will use the primitive default and may render magenta.");
+                return null;
+            }
+
+            var mat = new Material(shader) { name = "PileZone" };
+            // Dry, dark earth — reads as an emptied pile rather than as terrain.
+            var brown = new Color(0.34f, 0.25f, 0.17f, 1f);
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", brown);
+            if (mat.HasProperty("_Color")) mat.SetColor("_Color", brown);
+            // Flat and matte: a glossy dirt patch would pull the eye away from the chickens.
+            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.05f);
+
+            Directory.CreateDirectory(Path.GetDirectoryName(PileZoneMaterialPath)!);
+            AssetDatabase.CreateAsset(mat, PileZoneMaterialPath);
+            AssetDatabase.SaveAssets();
+            return mat;
         }
 
         /// <summary>
