@@ -6,6 +6,7 @@ using Fusion;
 using Unity.AI.Navigation;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.SceneManagement;
 using Zenject;
 
 namespace CluckWars.Gameplay
@@ -194,17 +195,107 @@ namespace CluckWars.Gameplay
         /// </summary>
         public static float ArenaHalfSize { get; private set; } = 19f;
 
-        private void Awake()
+        [Header("Baked map scene")]
+        [Tooltip("When true (the v0.5 default) the arena's static geometry is NOT generated at runtime — it is loaded from the baked map scene below, so it can be opened, inspected and hand-tuned in the Editor. Untick to fall back to the procedural path (used by the baker itself and by any future randomised map).")]
+        [SerializeField] private bool _useBakedGeometry = true;
+
+        [Tooltip("Name of the additively-loaded scene holding the baked arena geometry. Must be present in Build Settings.")]
+        [SerializeField] private string _bakedMapSceneName = "Map";
+
+        /// <summary>
+        /// Parent for all generated static geometry. Defaults to this transform; the
+        /// Editor baker points it at a detached root so the geometry can be moved into
+        /// the map scene instead of living under the runtime component.
+        /// </summary>
+        private Transform _geometryRoot;
+
+        private Transform GeometryRoot => _geometryRoot != null ? _geometryRoot : transform;
+
+        /// <summary>
+        /// Builds the arena's STATIC geometry — ground, boundary, interior walls. Contains
+        /// nothing networked; bases and food piles are <c>NetworkObject</c>s spawned at
+        /// runtime by <see cref="HandleRunnerReady"/> and are deliberately excluded, since
+        /// baking them would break Fusion's spawn ownership.
+        /// </summary>
+        public void BuildStaticGeometry(Transform root = null)
         {
+            _geometryRoot = root;
             ArenaHalfSize = _planeSize * 0.5f;
             ComputeSpawnPoints();
             BuildPlane();
             BuildBoundaryWalls();
             BuildInteriorObstacles();
-            BuildNavMesh();
+            _geometryRoot = null;
+        }
+
+        private void Awake()
+        {
+            ArenaHalfSize = _planeSize * 0.5f;
+            ComputeSpawnPoints();
+
+            if (_useBakedGeometry)
+            {
+                EnsureBakedMapLoaded();
+            }
+            else
+            {
+                BuildPlane();
+                BuildBoundaryWalls();
+                BuildInteriorObstacles();
+                BuildNavMesh();
+            }
 
             if (_network != null) _network.OnRunnerReady += HandleRunnerReady;
             else _log?.Warn(Source, "INetworkService not injected; bases/piles won't spawn.");
+        }
+
+        /// <summary>
+        /// Additively loads the baked map scene if it isn't already present. Uses the
+        /// SYNCHRONOUS overload deliberately: the geometry and its NavMesh must exist
+        /// before chickens spawn, and an async load would let the first frames run on an
+        /// empty arena. The scene carries no <c>NetworkObject</c>s, so Fusion's
+        /// <c>NetworkSceneManagerDefault</c> neither syncs nor unloads it — every peer
+        /// loads its own identical copy locally.
+        /// </summary>
+        private void EnsureBakedMapLoaded()
+        {
+            var existing = SceneManager.GetSceneByName(_bakedMapSceneName);
+            if (existing.IsValid() && existing.isLoaded)
+            {
+                _log?.Debug(Source, $"Baked map scene '{_bakedMapSceneName}' already loaded.");
+                return;
+            }
+
+            if (!IsSceneInBuildSettings(_bakedMapSceneName))
+            {
+                // Failing loudly here beats a silently empty arena: with no ground the
+                // chickens fall forever and every diagnosis starts from the wrong end.
+                _log?.Error(Source,
+                    $"Baked map scene '{_bakedMapSceneName}' is not in Build Settings — the arena will be EMPTY. " +
+                    "Add it via Cluck Wars/Map/Bake Map Scene, or untick Use Baked Geometry to generate procedurally.");
+                return;
+            }
+
+            SceneManager.LoadScene(_bakedMapSceneName, LoadSceneMode.Additive);
+            _log?.Info(Source, $"Loaded baked map scene '{_bakedMapSceneName}'.");
+        }
+
+        /// <summary>
+        /// Scans the actual build list by index. Preferred over
+        /// <c>Application.CanStreamedLevelBeLoaded</c>, which was observed returning false
+        /// in the Editor for a scene that IS registered — it does not reliably reflect a
+        /// freshly-edited build settings list, and a false negative here would skip the
+        /// load and leave the arena empty.
+        /// </summary>
+        private static bool IsSceneInBuildSettings(string sceneName)
+        {
+            int count = SceneManager.sceneCountInBuildSettings;
+            for (int i = 0; i < count; i++)
+            {
+                string path = SceneUtility.GetScenePathByBuildIndex(i);
+                if (System.IO.Path.GetFileNameWithoutExtension(path) == sceneName) return true;
+            }
+            return false;
         }
 
         private void OnDestroy()
@@ -261,7 +352,7 @@ namespace CluckWars.Gameplay
             // This prevents CharacterControllers from tunneling through on slower mobile devices.
             var plane = GameObject.CreatePrimitive(PrimitiveType.Cube);
             plane.name = "GeneratedGround";
-            plane.transform.SetParent(transform, worldPositionStays: false);
+            plane.transform.SetParent(GeometryRoot, worldPositionStays: false);
             plane.transform.localScale = new Vector3(_planeSize, 1f, _planeSize);
             plane.transform.localPosition = new Vector3(0f, -0.5f, 0f);
 
@@ -314,7 +405,7 @@ namespace CluckWars.Gameplay
         {
             var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
             wall.name = name;
-            wall.transform.SetParent(transform, worldPositionStays: false);
+            wall.transform.SetParent(GeometryRoot, worldPositionStays: false);
             wall.transform.localPosition = localPosition;
             wall.transform.localScale = size;
 
@@ -622,7 +713,7 @@ namespace CluckWars.Gameplay
 
                 var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 go.name = $"Terrain_{spec.Class}_{made}";
-                go.transform.SetParent(transform, worldPositionStays: false);
+                go.transform.SetParent(GeometryRoot, worldPositionStays: false);
                 go.transform.localPosition = center + Vector3.up * (spec.Height * 0.5f);
                 go.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
                 go.transform.localScale = new Vector3(width, spec.Height, depth);

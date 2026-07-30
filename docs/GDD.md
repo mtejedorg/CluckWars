@@ -124,6 +124,17 @@ a place rather than a box. Prop placement is art-tunable without touching the ge
 Pile positions jitter each match (seeded from the session code so all peers agree); the
 centre never moves.
 
+**The arena is a baked scene, not runtime geometry.** Because the layout is now fixed
+(§3.4), the ground, boundary and walls live in `Assets/_Game/Scenes/Map.unity`, loaded
+additively at startup — so the level can be opened, inspected and hand-tuned like any
+other asset instead of existing only while the game runs. `Cluck Wars/Map/Bake Map Scene`
+regenerates it from `MapGenerator`'s authored tuning; `Cluck Wars/Map/Open Map Scene`
+just opens it. Untick **Use Baked Geometry** on `MapGenerator` to fall back to generating
+procedurally at runtime, which is what a future randomised map would use.
+
+Only *static* geometry is baked. Player bases and food piles stay runtime `Runner.Spawn`s —
+they are `NetworkObject`s and Fusion must own their spawning.
+
 ### 3.2 Tiered food budget (total = 80 = 2× win)
 
 | Tier | Count | Food each | Σ | Role |

@@ -39,17 +39,39 @@ namespace CluckWars.Tests
         // ---- Build settings -----------------------------------------------------
 
         [Test]
-        public void BuildSettings_StartAtBootstrap_ThenGame()
+        public void BuildSettings_StartAtBootstrap_ThenGame_ThenBakedMap()
         {
             var enabled = EditorBuildSettings.scenes.Where(s => s.enabled).ToList();
 
-            Assert.AreEqual(2, enabled.Count,
-                $"Expected exactly Bootstrap + Game in Build Settings, found {enabled.Count}: " +
+            Assert.AreEqual(3, enabled.Count,
+                $"Expected Bootstrap + Game + Map in Build Settings, found {enabled.Count}: " +
                 string.Join(", ", enabled.Select(s => s.path)));
             Assert.AreEqual(TestAssets.BootstrapScenePath, enabled[0].path,
                 "Bootstrap must be build index 0. Otherwise the player starts straight in the Game " +
                 "scene with no class selection (CONVENTIONS.md).");
             Assert.AreEqual(TestAssets.GameScenePath, enabled[1].path);
+        }
+
+        /// <summary>
+        /// v0.5 bakes the arena into its own scene, additively loaded at runtime by
+        /// <c>MapGenerator.EnsureBakedMapLoaded</c>. If it drops out of Build Settings the
+        /// load silently no-ops and the match runs on an EMPTY arena — chickens fall
+        /// through the world — so this is worth pinning separately from the ordering test.
+        /// </summary>
+        [Test]
+        public void BuildSettings_ContainsBakedMapScene()
+        {
+            const string mapPath = "Assets/_Game/Scenes/Map.unity";
+
+            Assert.IsTrue(System.IO.File.Exists(mapPath),
+                $"{mapPath} is missing. Regenerate it via Cluck Wars/Map/Bake Map Scene.");
+
+            var entry = EditorBuildSettings.scenes.FirstOrDefault(s => s.path == mapPath);
+            Assert.IsNotNull(entry,
+                $"{mapPath} is not in Build Settings — the runtime additive load will fail and the " +
+                "arena will have no ground or walls.");
+            Assert.IsTrue(entry.enabled, $"{mapPath} is in Build Settings but DISABLED, which fails " +
+                "exactly like being absent.");
         }
 
         [Test]
