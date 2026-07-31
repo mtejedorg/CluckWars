@@ -227,7 +227,17 @@ namespace CluckWars.Gameplay
         /// <summary>Radial distance of the four contested (T2) piles, on the edge midpoints.</summary>
         public const float ContestedPileRadius = 15f;
 
-        public void BuildStaticGeometry(Transform root = null, Material pileZoneMaterial = null)
+        [Tooltip("Radius of the baked base-zone shadow. MUST mirror PlayerBase._depositRadius on the prefab — the shadow is meaningless if it doesn't match the actual deposit zone. Pinned by DataIntegrityTests.")]
+        [Min(0.5f)]
+        [SerializeField] private float _baseZoneRadius = 2.5f;
+
+        /// <summary>Radius the baked base shadows are drawn at. See <c>PlayerBase.DepositRadius</c>.</summary>
+        public float BaseZoneRadius => _baseZoneRadius;
+
+        public void BuildStaticGeometry(
+            Transform root = null,
+            Material pileZoneMaterial = null,
+            Material baseZoneMaterial = null)
         {
             _geometryRoot = root;
             ArenaHalfSize = _planeSize * 0.5f;
@@ -236,7 +246,35 @@ namespace CluckWars.Gameplay
             BuildBoundaryWalls();
             BuildInteriorObstacles();
             BuildPileZoneMarkers(pileZoneMaterial);
+            BuildBaseZoneMarkers(baseZoneMaterial);
             _geometryRoot = null;
+        }
+
+        /// <summary>
+        /// Flat dark discs marking each player base's deposit zone. Bases are
+        /// <c>NetworkObject</c>s spawned at runtime, so without these the baked map gives
+        /// no hint of where a quarter of the arena's meaning lives.
+        /// </summary>
+        /// <remarks>
+        /// Drawn as CIRCLES, not ellipses like the pile zones: a base's deposit trigger is
+        /// a radius check (<c>PlayerBase.DepositRadius</c>), so a circle is the honest
+        /// shape. Collider-free for the same reason as the pile markers — see
+        /// <see cref="BuildPileZoneMarkers"/>.
+        ///
+        /// Positioned at <c>_spawnPoints</c>, which is exactly where
+        /// <see cref="SpawnBases"/> puts them, so shadow and base coincide by construction
+        /// rather than by a copied coordinate.
+        /// </remarks>
+        private void BuildBaseZoneMarkers(Material material)
+        {
+            if (_spawnPoints == null) return;
+
+            float diameter = _baseZoneRadius * 2f;
+            for (int i = 0; i < _spawnPoints.Length; i++)
+            {
+                AddZoneMarker($"BaseZone_{i}", _spawnPoints[i],
+                    new Vector2(diameter, diameter), material);
+            }
         }
 
         /// <summary>
@@ -260,23 +298,27 @@ namespace CluckWars.Gameplay
         {
             if (_corners == null) return;
 
-            AddPileZoneMarker("PileZone_Center", Vector3.zero, _centerPileFootprint, material);
+            AddZoneMarker("PileZone_Center", Vector3.zero, _centerPileFootprint, material);
 
             for (int i = 0; i < _corners.Length; i++)
             {
-                AddPileZoneMarker($"PileZone_Personal{i}",
+                AddZoneMarker($"PileZone_Personal{i}",
                     _corners[i].normalized * PersonalPileRadius, _personalPileFootprint, material);
             }
 
             for (int i = 0; i < _corners.Length; i++)
             {
                 var mid = (_corners[i] + _corners[(i + 1) % _corners.Length]) * 0.5f;
-                AddPileZoneMarker($"PileZone_Contested{i}",
+                AddZoneMarker($"PileZone_Contested{i}",
                     mid.normalized * ContestedPileRadius, _contestedPileFootprint, material);
             }
         }
 
-        private void AddPileZoneMarker(string name, Vector3 position, Vector2 footprint, Material material)
+        /// <summary>
+        /// Creates one flat, collider-free zone decal. Shared by the pile and base
+        /// markers — see their callers for why colliders are omitted.
+        /// </summary>
+        private void AddZoneMarker(string name, Vector3 position, Vector2 footprint, Material material)
         {
             var marker = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             marker.name = name;

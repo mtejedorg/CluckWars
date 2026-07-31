@@ -37,6 +37,7 @@ namespace CluckWars.EditorTools
         private const string GeometryRootName = "GeneratedMapGeometry";
         private const string MaterialsFolder = "Assets/_Game/Art/Materials";
         private const string PileZoneMaterialPath = MaterialsFolder + "/PileZone.mat";
+        private const string BaseZoneMaterialPath = MaterialsFolder + "/BaseZone.mat";
 
         [MenuItem("Cluck Wars/Map/Bake Map Scene", priority = 20)]
         public static void BakeMapScene()
@@ -64,7 +65,12 @@ namespace CluckWars.EditorTools
 
             // Build detached, so nothing is parented under the runtime component.
             var root = new GameObject(GeometryRootName);
-            generator.BuildStaticGeometry(root.transform, EnsurePileZoneMaterial());
+            generator.BuildStaticGeometry(
+                root.transform,
+                EnsureZoneMaterial(PileZoneMaterialPath, "PileZone",
+                    new Color(0.34f, 0.25f, 0.17f, 1f)),   // dry earth — an emptied pile
+                EnsureZoneMaterial(BaseZoneMaterialPath, "BaseZone",
+                    new Color(0.16f, 0.16f, 0.19f, 1f)));  // cool shadow — reads as cast, not painted
 
             int built = root.transform.childCount;
             if (built == 0)
@@ -206,15 +212,15 @@ namespace CluckWars.EditorTools
         }
 
         /// <summary>
-        /// Loads (or creates) the shared material for the depleted-pile zone markers.
+        /// Loads (or creates) a flat matte zone-marker material.
         /// This must be a real ASSET, not a runtime <c>new Material(...)</c>: materials
         /// created in memory are not serialized into a saved scene, so the markers would
         /// come back with a missing material — magenta — the next time the map scene was
-        /// opened.
+        /// opened. Reused across bakes so repeated bakes don't multiply assets.
         /// </summary>
-        private static Material EnsurePileZoneMaterial()
+        private static Material EnsureZoneMaterial(string path, string name, Color tint)
         {
-            var existing = AssetDatabase.LoadAssetAtPath<Material>(PileZoneMaterialPath);
+            var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (existing != null) return existing;
 
             // URP Lit explicitly: the project is URP-only, and the primitive default is
@@ -222,21 +228,19 @@ namespace CluckWars.EditorTools
             var shader = Shader.Find("Universal Render Pipeline/Lit");
             if (shader == null)
             {
-                Debug.LogWarning("[MapSceneBaker] URP/Lit shader not found — pile zone markers " +
+                Debug.LogWarning($"[MapSceneBaker] URP/Lit shader not found — '{name}' markers " +
                                  "will use the primitive default and may render magenta.");
                 return null;
             }
 
-            var mat = new Material(shader) { name = "PileZone" };
-            // Dry, dark earth — reads as an emptied pile rather than as terrain.
-            var brown = new Color(0.34f, 0.25f, 0.17f, 1f);
-            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", brown);
-            if (mat.HasProperty("_Color")) mat.SetColor("_Color", brown);
-            // Flat and matte: a glossy dirt patch would pull the eye away from the chickens.
+            var mat = new Material(shader) { name = name };
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", tint);
+            if (mat.HasProperty("_Color")) mat.SetColor("_Color", tint);
+            // Flat and matte: a glossy patch would pull the eye away from the chickens.
             if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.05f);
 
-            Directory.CreateDirectory(Path.GetDirectoryName(PileZoneMaterialPath)!);
-            AssetDatabase.CreateAsset(mat, PileZoneMaterialPath);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            AssetDatabase.CreateAsset(mat, path);
             AssetDatabase.SaveAssets();
             return mat;
         }

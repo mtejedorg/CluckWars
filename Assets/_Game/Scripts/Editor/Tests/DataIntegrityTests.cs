@@ -430,5 +430,40 @@ namespace CluckWars.Tests
                 }
             }
         }
+
+        /// <summary>
+        /// The baked map draws a "shadow" under each base at
+        /// <c>MapGenerator._baseZoneRadius</c>, but the zone chickens actually deposit in
+        /// is <c>PlayerBase._depositRadius</c> on the prefab. They are authored in two
+        /// different places, so nothing but this test stops them drifting — and a shadow
+        /// that lies about where you can deposit is worse than no shadow at all.
+        /// </summary>
+        [Test]
+        public void BaseZoneShadowRadius_MatchesPlayerBaseDepositRadius()
+        {
+            var basePrefab = TestAssets.Load<GameObject>(TestAssets.PlayerBasePrefabPath);
+            Assert.IsNotNull(basePrefab, $"Missing {TestAssets.PlayerBasePrefabPath}.");
+
+            var playerBase = basePrefab.GetComponent<PlayerBase>();
+            Assert.IsNotNull(playerBase, "PlayerBase component missing from the prefab.");
+            float depositRadius = TestAssets.PrivateField<float>(playerBase, "_depositRadius");
+
+            var mapGenPrefab = new GameObject("TempMapGen");
+            try
+            {
+                var generator = mapGenPrefab.AddComponent<MapGenerator>();
+                float shadowRadius = generator.BaseZoneRadius;
+
+                Assert.AreEqual(depositRadius, shadowRadius, 0.001f,
+                    $"MapGenerator._baseZoneRadius ({shadowRadius}) disagrees with " +
+                    $"PlayerBase._depositRadius ({depositRadius}). The baked base shadow would " +
+                    "show a deposit zone that is the wrong size. Update whichever is stale and " +
+                    "re-run Cluck Wars/Map/Bake Map Scene.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(mapGenPrefab);
+            }
+        }
     }
 }
