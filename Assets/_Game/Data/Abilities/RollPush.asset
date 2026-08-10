@@ -28,7 +28,7 @@ MonoBehaviour:
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
-  ForwardOffset: 1.2
-  PushRadius: 1.8
+  ForwardOffset: 4
+  PushRadius: 1.05
   PushStrength: 10
   RollSpeedMultiplier: 2

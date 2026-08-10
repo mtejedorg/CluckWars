@@ -25,18 +25,18 @@ namespace CluckWars.Abilities
         public override float IndicatorRange => ShockRadius;
         public override bool RequiresEnemyInRange => true;
 
+        public override AbilityAimShape AimShape => AbilityAimShape.SelfCircle;
+        public override float AimRadius => ShockRadius;
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;
             var center = caster.transform.position;
-            var hits = Physics.OverlapSphere(center, ShockRadius, SearchMask, QueryTriggerInteraction.Ignore);
 
-            for (int i = 0; i < hits.Length; i++)
+            GatherTargets(caster, _scratch);
+            for (int i = 0; i < _scratch.Count; i++)
             {
-                var targetCtrl = hits[i].GetComponentInParent<ChickenController>();
-                if (targetCtrl == null || targetCtrl == caster) continue;
-                if (targetCtrl.Combat != null && targetCtrl.Combat.IsDead) continue;
-
+                var targetCtrl = _scratch[i];
                 var dir = (targetCtrl.transform.position - center);
                 dir.y = 0f;
                 if (dir.sqrMagnitude < 0.001f) dir = caster.transform.forward;

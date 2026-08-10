@@ -29,6 +29,9 @@ namespace CluckWars.Abilities
 
         protected override string DefaultIcon => "💨";
 
+        public override AbilityAimShape AimShape => AbilityAimShape.Aura;
+        public override float AimRadius => AuraRadius;
+
         public override void OnActivate(AbilityContext ctx)
         {
             var c = ctx.Controller;

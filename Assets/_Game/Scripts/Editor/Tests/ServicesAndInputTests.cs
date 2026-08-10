@@ -162,13 +162,16 @@ namespace CluckWars.Tests
         private sealed class FakeInput : IInputProvider
         {
             public Vector2 Movement;
-            public bool A1, A2, A3;
-            public int A1Reads, A2Reads, A3Reads;
+            public bool A1, A2, A3, Cancel;
+            public bool[] Held = new bool[3];
+            public int A1Reads, A2Reads, A3Reads, CancelReads;
 
             public Vector2 GetMovement() => Movement;
             public bool GetAbility1Pressed() { A1Reads++; return A1; }
             public bool GetAbility2Pressed() { A2Reads++; return A2; }
             public bool GetAbility3Pressed() { A3Reads++; return A3; }
+            public bool GetAbilityHeld(int slot) => slot >= 0 && slot < 3 && Held[slot];
+            public bool GetAbilityCancelPressed() { CancelReads++; return Cancel; }
         }
 
         [Test]
@@ -237,6 +240,34 @@ namespace CluckWars.Tests
             Assert.AreEqual(1, second.A3Reads, "The second provider's ability-3 latch was never read.");
         }
 
+        // ---- v0.6 hold-to-aim: GetAbilityHeld / GetAbilityCancelPressed ----------
+
+        [Test]
+        public void Composite_AbilityHeld_OrsAcrossProviders_PerSlot()
+        {
+            var keyboard = new FakeInput { Held = new[] { false, true, false } };
+            var touch    = new FakeInput { Held = new[] { true, false, false } };
+
+            var composite = new CompositeInputProvider(keyboard, touch);
+
+            Assert.IsTrue(composite.GetAbilityHeld(0), "Touch is holding slot 0.");
+            Assert.IsTrue(composite.GetAbilityHeld(1), "Keyboard is holding slot 1.");
+            Assert.IsFalse(composite.GetAbilityHeld(2), "Nobody is holding slot 2.");
+        }
+
+        [Test]
+        public void Composite_AbilityCancel_OrsAcrossProviders_AndConsumesEveryLatch()
+        {
+            var first  = new FakeInput { Cancel = true };
+            var second = new FakeInput { Cancel = false };
+
+            var composite = new CompositeInputProvider(first, second);
+
+            Assert.IsTrue(composite.GetAbilityCancelPressed());
+            Assert.AreEqual(1, second.CancelReads,
+                "The second provider's cancel latch was never read — same one-shot leak risk as the ability presses.");
+        }
+
         [Test]
         public void Keyboard_WithNoDeviceAttached_IsInertRatherThanThrowing()
         {
@@ -251,7 +282,35 @@ namespace CluckWars.Tests
                 kb.GetAbility1Pressed();
                 kb.GetAbility2Pressed();
                 kb.GetAbility3Pressed();
+                kb.GetAbilityHeld(0);
+                kb.GetAbilityHeld(1);
+                kb.GetAbilityHeld(2);
+                kb.GetAbilityCancelPressed();
             });
+        }
+
+        [Test]
+        public void Keyboard_WithNoDeviceAttached_ReportsNoHoldsAndNoCancel()
+        {
+            // Distinguishes "inert" from merely "doesn't crash" — a null Keyboard.current
+            // must resolve to false everywhere, not throw AND not silently report true.
+            var kb = new KeyboardInputProvider();
+
+            Assert.IsFalse(kb.GetAbilityHeld(0));
+            Assert.IsFalse(kb.GetAbilityHeld(1));
+            Assert.IsFalse(kb.GetAbilityHeld(2));
+            Assert.IsFalse(kb.GetAbilityCancelPressed());
+        }
+
+        [Test]
+        public void Keyboard_AbilityHeld_OutOfRangeSlot_ReturnsFalse_NotThrow()
+        {
+            // AbilityController's slot indices are always 0..2, but a defensive caller
+            // (or a future slot-count change) must not crash the whole input tick.
+            var kb = new KeyboardInputProvider();
+            Assert.DoesNotThrow(() => kb.GetAbilityHeld(3));
+            Assert.IsFalse(kb.GetAbilityHeld(3));
+            Assert.IsFalse(kb.GetAbilityHeld(-1));
         }
     }
 }

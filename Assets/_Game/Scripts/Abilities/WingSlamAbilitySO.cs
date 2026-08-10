@@ -21,5 +21,14 @@ namespace CluckWars.Abilities
         }
 
         protected override string DefaultIcon => "💥";
+
+        /// <summary>
+        /// Directional, aimable per FEEDBACK.md §4: a 120° forward cone instead of the
+        /// SelfCircle Ambush keeps. Same <c>StunRadius</c> (2.5 m) and therefore the same
+        /// AimRadius — this is a shape change, not a reach change, and the area drop is the
+        /// price of being able to slam a specific direction.
+        /// </summary>
+        public override AbilityAimShape AimShape => AbilityAimShape.Cone;
+        public override float AimConeAngle => 120f;
     }
 }

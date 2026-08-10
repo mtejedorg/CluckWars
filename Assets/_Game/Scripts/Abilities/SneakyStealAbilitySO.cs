@@ -28,9 +28,15 @@ namespace CluckWars.Abilities
         public override float IndicatorRange => StealRange;
         public override bool RequiresEnemyInRange => true;
 
-        /// <summary>Usable only when a rival *carrying cargo* is in steal range.</summary>
-        public override bool IsUsable(Gameplay.ChickenController caster)
-            => HasEnemyInRange(caster, StealRange, requireCargo: true);
+        public override AbilityAimShape AimShape => AbilityAimShape.SingleTarget;
+        public override float AimRadius => StealRange;
+
+        /// <summary>Only a cargo-carrier is a valid steal target.</summary>
+        protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)
+        {
+            var cargo = candidate.Cargo;
+            return cargo != null && cargo.Cargo > 0f;
+        }
 
         public override void OnActivate(AbilityContext ctx)
         {
@@ -41,22 +47,11 @@ namespace CluckWars.Abilities
             float spaceLeft = thiefCargo.Capacity - thiefCargo.Cargo;
             if (spaceLeft <= 0f) return;
 
-            // Find nearest enemy chicken with cargo on board.
-            var hits = Physics.OverlapSphere(thief.transform.position, StealRange, SearchMask, QueryTriggerInteraction.Ignore);
-            ChickenCargo target = null;
-            float bestSqr = float.MaxValue;
-            for (int i = 0; i < hits.Length; i++)
-            {
-                var other = hits[i].GetComponentInParent<ChickenCargo>();
-                if (other == null || other == thiefCargo) continue;
-                if (other.Cargo <= 0f) continue;
-                float sqr = (other.transform.position - thief.transform.position).sqrMagnitude;
-                if (sqr < bestSqr)
-                {
-                    bestSqr = sqr;
-                    target = other;
-                }
-            }
+            // Nearest enemy chicken with cargo on board — GatherTargets sorts ascending
+            // by distance, so index 0 is always "nearest valid target".
+            GatherTargets(thief, _scratch);
+            if (_scratch.Count == 0) return;
+            var target = _scratch[0].Cargo;
             if (target == null) return;
 
             // Optimistic credit: take the smaller of (StealAmount, victim's cargo, our free space).

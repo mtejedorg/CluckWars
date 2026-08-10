@@ -19,5 +19,22 @@ namespace CluckWars.Input
         bool GetAbility2Pressed();
         /// <summary>Ability slot 3. Assassin (Combo passive) only; returns false for every other class.</summary>
         bool GetAbility3Pressed();
+
+        /// <summary>
+        /// True while ability slot 0..2's button/key is currently held down (v0.6
+        /// hold-to-aim, FEEDBACK.md §2). Level-triggered, unlike the edge-triggered
+        /// <c>GetAbilityXPressed</c> calls above — safe to read every frame/tick with
+        /// no consumption semantics.
+        /// </summary>
+        bool GetAbilityHeld(int slot);
+
+        /// <summary>
+        /// Edge-triggered: true for one frame when the hold-cancel gesture fires
+        /// (desktop Esc; touch drag-off-the-button, surfaced via
+        /// <c>TouchControlsController.ConsumeAbilityCancelled</c>). One flag covers
+        /// every slot — only one hold can be charging at a time. Same one-shot /
+        /// must-be-read-every-tick contract as <c>GetAbilityXPressed</c>.
+        /// </summary>
+        bool GetAbilityCancelPressed();
     }
 }

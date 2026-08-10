@@ -27,6 +27,6 @@ MonoBehaviour:
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
-  PeckRange: 2
+  PeckRange: 2.4
   PeckDamage: 28
   KnockbackStrength: 6

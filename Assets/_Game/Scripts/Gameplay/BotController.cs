@@ -422,9 +422,19 @@ namespace CluckWars.Gameplay
         // ---- Perception helpers (run inside throttled Think) ----------------
 
         /// <summary>
-        /// Finds the nearest living, non-decoy rival. Sets <paramref name="dist"/>
-        /// and <paramref name="cargoFraction"/>.
+        /// Finds the nearest living rival. Sets <paramref name="dist"/> and
+        /// <paramref name="cargoFraction"/>.
         /// </summary>
+        /// <remarks>
+        /// <b>Decoys are included on purpose.</b> A bot that could see through a
+        /// Doppelganger made the ability inert in a solo match, which is most of the testing
+        /// this game gets. Bots are now baitable — the whole point of the decoy.
+        ///
+        /// The <paramref name="requireCargo"/> paths still skip decoys naturally rather than
+        /// by rule: the decoy prefab ships with <c>ChickenCargo</c> stripped, so its cargo
+        /// fraction is 0 and a bot hunting a carrier passes it over. A bot looking for
+        /// something to hit will happily commit to one.
+        /// </remarks>
         private ChickenController FindNearestRival(
             out float dist, out float cargoFraction, bool requireCargo)
         {
@@ -439,7 +449,6 @@ namespace CluckWars.Gameplay
             {
                 var c = all[i];
                 if (c == null || c == _controller) continue;
-                if (c.IsDecoy) continue;
                 if (c.Combat != null && c.Combat.IsRemoved) continue;
 
                 float sqr = (c.transform.position - selfPos).sqrMagnitude;

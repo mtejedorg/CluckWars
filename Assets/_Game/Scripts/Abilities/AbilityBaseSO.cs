@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using CluckWars.Gameplay;
 using UnityEngine;
 
@@ -115,7 +116,10 @@ namespace CluckWars.Abilities
         public AnimationClip AbilityAnimationClip;
 
         [Header("Physics Scans")]
-        [Tooltip("Layer mask for physics scans inside the ability (Stage G).")]
+        [Tooltip("Legacy layer mask from the Stage G Physics.OverlapSphere scans. No longer used to find " +
+                 "chicken targets — every ability's OnActivate now scans ChickenController.ActiveControllers " +
+                 "via GatherTargets (see AbilityAimTests' 'no stray scans' regression lock). Kept in case a " +
+                 "future ability needs a real physics query (e.g. line-of-sight); not currently read.")]
         public LayerMask SearchMask = 256; // 1 << 8 (Chickens layer)
 
         /// <summary>
@@ -170,42 +174,298 @@ namespace CluckWars.Abilities
 
         /// <summary>
         /// Can this ability do something right now (cooldown aside)? Default: yes.
-        /// Range-gated abilities override via <see cref="RequiresEnemyInRange"/> /
-        /// <see cref="HasEnemyInRange"/>; Sneaky Steal additionally requires the
-        /// target to carry cargo.
+        /// Range-gated abilities override <see cref="RequiresEnemyInRange"/>, which
+        /// routes this through <see cref="HasAnyTarget"/> — the same predicate the
+        /// preview and <see cref="OnActivate"/> use, so the grey-out can never
+        /// disagree with what actually fires. Mark Kill is the one ability that still
+        /// overrides <see cref="IsUsable"/> itself, for its post-mark "kill ready"
+        /// state, which has nothing to do with the aim shape.
         /// </summary>
         public virtual bool IsUsable(Gameplay.ChickenController caster)
         {
-            if (!RequiresEnemyInRange || IndicatorRange <= 0f) return true;
-            return HasEnemyInRange(caster, IndicatorRange);
+            if (!RequiresEnemyInRange) return true;
+            return HasAnyTarget(caster);
+        }
+
+        // ---- Aim descriptor (FEEDBACK.md §4 / §8) ------------------------------
+        // One declarative shape per ability, used by every consumer that needs to
+        // agree on "what does this ability cover": the hold-to-aim preview, the
+        // target threat-overlay, the usability gate above, and OnActivate itself via
+        // GatherTargets/HasAnyTarget below. Defaults are chosen so an ability that
+        // doesn't override anything is inert (AimShape.None) rather than silently
+        // wrong — see AbilityAimTests' completeness check.
+
+        /// <summary>Landing-ring radius drawn for <see cref="AbilityAimShape.Jump"/> abilities. Not a per-ability tunable — the ring is cosmetic, the jump length is what <see cref="AimForwardOffset"/> describes.</summary>
+        public const float JumpLandingRadius = 1.0f;
+
+        /// <summary>
+        /// The shape this ability's area occupies. Default is <c>None</c> (no area,
+        /// self-buff) so every ability that actually scans for a target must opt in
+        /// explicitly — see the per-ability table in FEEDBACK.md §4. Deliberately
+        /// NOT derived from <see cref="JumpTier"/>: Doppelganger sets JumpTier=Big
+        /// for its decoy-spawn teleport but is a pure self-buff with no target area
+        /// (AffectsSelf below), so an implicit "JumpTier != None ⇒ Jump" default
+        /// would have silently mis-classified it as an offensive ability.
+        /// </summary>
+        public virtual AbilityAimShape AimShape => AbilityAimShape.None;
+
+        /// <summary>Radius of the circle/cone/landing ring. Falls back to <see cref="IndicatorRange"/> so most abilities need only one override.</summary>
+        public virtual float AimRadius => IndicatorRange;
+
+        /// <summary>
+        /// How far along the caster's forward the shape's <i>defining point</i> sits, in
+        /// metres. Read two ways depending on <see cref="AimShape"/>, and both are
+        /// deliberate — one serialized field serves both rather than adding a second one to
+        /// every SO plus an asset migration:
+        /// <list type="bullet">
+        ///   <item><see cref="AbilityAimShape.ForwardCircle"/> / <see cref="AbilityAimShape.Jump"/>:
+        ///   the <b>centre</b> of the circle. The shape is detached from the caster once the
+        ///   offset exceeds the radius.</item>
+        ///   <item><see cref="AbilityAimShape.Capsule"/>: the <b>far end of the axis</b>. The
+        ///   shape always touches the caster, because the near cap is centred on them.</item>
+        /// </list>
+        /// Under both readings total forward reach is <c>AimForwardOffset + AimRadius</c>.
+        /// Ignored by the caster-centred shapes.
+        /// </summary>
+        public virtual float AimForwardOffset => 0f;
+
+        /// <summary>Full arc in degrees for <see cref="AbilityAimShape.Cone"/>. 360 degenerates to a full circle.</summary>
+        public virtual float AimConeAngle => 360f;
+
+        /// <summary>
+        /// Must this ability's aim shape be resolved from the caster's pose <i>before</i>
+        /// their teleport jump rather than after it?
+        ///
+        /// <c>AbilityController.TryActivate</c> normally jumps first and resolves after,
+        /// which is right for a shape anchored on the caster: an ability that blinks and
+        /// then detonates should detonate where it landed. A <see cref="AbilityAimShape.Capsule"/>
+        /// is the opposite case — it describes the lane the caster sweeps <i>through</i>, so
+        /// its origin is the take-off point. Flying Peck is the ability this exists for:
+        /// with <c>JumpTier: Short</c> its lane was resolving 5 m past the press point, so it
+        /// flew over everything the player aimed at while the telegraph drew the lane at the
+        /// live position.
+        ///
+        /// Keyed off the shape, never off an ability's name, so a future capsule ability
+        /// inherits the correct ordering without anyone remembering to special-case it.
+        /// </summary>
+        public bool ResolvesBeforeJump => AimShape == AbilityAimShape.Capsule;
+
+        /// <summary>
+        /// Is the pose this cast was aimed from already gone, and unrecoverable, by the time
+        /// a peer observes the cast event? True only for an ability that resolves before its
+        /// own teleport (<see cref="ResolvesBeforeJump"/>) <i>and</i> actually teleports —
+        /// Flying Peck, today the only one.
+        ///
+        /// The take-off pose is not replicated (this stage adds no networked state and no
+        /// RPCs), and every observer runs after the jump has landed, so anything that tries
+        /// to re-derive the cast's footprint locally would draw or spark it a full jump
+        /// length off. Two consumers opt out on this rather than each restating the rule:
+        /// <c>HitFeedback.ConfirmHits</c> (skips per-victim sparks, keeps the caster's punch)
+        /// and <c>AbilityRangeIndicator.ObserveCast</c> (falls back to a caster self-ring
+        /// instead of drawing a mislocated lane).
+        /// </summary>
+        public bool CastPoseIsUnreconstructable => ResolvesBeforeJump && JumpTier != JumpLengthTier.None;
+
+        /// <summary>
+        /// Does aiming this ability mean aiming a <i>direction</i>? True for every shape
+        /// whose footprint moves when the caster turns, which is what
+        /// <c>ChickenController.IsAimRotating</c> uses to convert the movement stick into
+        /// facing during a hold (FEEDBACK.md §2.3).
+        /// </summary>
+        /// <remarks>
+        /// Written as an exclusion list rather than an inclusion list on purpose: this used
+        /// to be three hard-coded shape comparisons inside <c>ChickenController</c>, so
+        /// adding <see cref="AbilityAimShape.Capsule"/> would have silently taken aim-rotate
+        /// away from the two most directional abilities in the game. Inverting it makes a
+        /// newly added shape directional by default — a harmless wrong answer (you can turn
+        /// while aiming a circle) instead of a broken one.
+        /// </remarks>
+        public bool IsDirectionalAim => AimShape switch
+        {
+            AbilityAimShape.None         => false, // nothing to aim
+            AbilityAimShape.SelfCircle   => false, // caster-centred, rotation-invariant
+            AbilityAimShape.Aura         => false,
+            AbilityAimShape.SingleTarget => false, // resolves by distance, not by facing
+            _                            => true,  // Cone, ForwardCircle, Jump, Capsule, …
+        };
+
+        /// <summary>
+        /// True for abilities that <i>place</i> something (an <c>AbilityZone</c>) instead of
+        /// resolving a hit at the instant of the cast. Their aim shape is real — it is the
+        /// zone's footprint, and the telegraph draws it correctly — but nobody is hit when
+        /// the button is released; the hit happens later, in <c>AbilityZone</c>'s own tick.
+        /// Feather Trap and Root Egg. See <see cref="ReportsCastHits"/> for why this needs
+        /// to be declared rather than inferred.
+        /// </summary>
+        public virtual bool PlacesZone => false;
+
+        /// <summary>
+        /// Is <c>AbilityController.LastCastHitCount</c> a meaningful hit-vs-whiff verdict for
+        /// this ability? False in exactly two cases, unified into one predicate so no
+        /// consumer has to restate them (and so a future ability cannot join the wrong
+        /// bucket by omission):
+        /// <list type="bullet">
+        ///   <item><b>Self-buffs.</b> <see cref="GatherTargets"/> only returns candidates
+        ///   inside an aim shape, and <see cref="AbilityAimShape.None"/> has no shape, so a
+        ///   self-buff always reports 0.</item>
+        ///   <item><b>Placed zones</b> (<see cref="PlacesZone"/>). Root Egg spawns at the
+        ///   caster's own feet with <see cref="AffectsSelf"/> false, so on open ground it
+        ///   reports 0 on <i>every single cast</i> — a perfectly placed trap was being
+        ///   whiff-styled every time.</item>
+        /// </list>
+        /// Every whiff-vs-hit consumer gates on this: <c>HitFeedback.ObserveOwnCast</c> and
+        /// <c>AbilityRangeIndicator.ObserveCast</c>'s grey cast ring (FEEDBACK.md §3.3).
+        /// A placed zone gets its confirmation later instead, when the zone actually fires
+        /// (<c>AbilityZone.Render</c> → <c>HitFeedback.NotifyZoneTriggered</c>).
+        /// </summary>
+        public bool ReportsCastHits => AimShape != AbilityAimShape.None && !PlacesZone;
+
+        /// <summary>Does this ability's area mark rival chickens?</summary>
+        public virtual bool AffectsEnemies => true;
+
+        /// <summary>Does this ability's area mark the caster themselves (self-buffs)?</summary>
+        public virtual bool AffectsSelf => false;
+
+        /// <summary>
+        /// Per-ability condition beyond geometry (cargo requirement, immunity,
+        /// already-stunned). Called only after the geometric test passes.
+        /// </summary>
+        protected virtual bool ExtraTargetFilter(Gameplay.ChickenController caster, Gameplay.ChickenController candidate) => true;
+
+        /// <summary>
+        /// Geometry only: is <paramref name="candidate"/> inside this ability's aim
+        /// shape right now? True even for a candidate that <see cref="WouldAffect"/>
+        /// will go on to reject via <see cref="ExtraTargetFilter"/> — the telegraph
+        /// (Stage 3) uses that gap to draw the grey "in the area but no effect"
+        /// overlay (FEEDBACK.md §2.2) instead of a valid-target one.
+        /// </summary>
+        public bool IsInAimShape(Gameplay.ChickenController caster, Gameplay.ChickenController candidate)
+        {
+            if (caster == null || candidate == null) return false;
+            return AbilityAim.InShape(AimShape, caster.transform.position, caster.transform.forward,
+                candidate.transform.position, AimRadius, AimForwardOffset, AimConeAngle);
         }
 
         /// <summary>
-        /// Any live, non-decoy rival within <paramref name="range"/> of the caster?
-        /// Scans the static controller registry (≤4 chickens) — cheap enough for
-        /// per-frame HUD polling. Distance is 3D squared, matching the
-        /// OverlapSphere checks the abilities themselves use on activation.
+        /// Per-candidate <b>eligibility</b>: in-shape AND alive AND on the right side
+        /// (<see cref="AffectsSelf"/>/<see cref="AffectsEnemies"/>) AND passes
+        /// <see cref="ExtraTargetFilter"/>. It must always imply
+        /// <see cref="IsInAimShape"/>, never the reverse — that invariant is EditMode-locked
+        /// and is what lets the telegraph's grey "in the area, no effect" overlay be the
+        /// exact gap between the two.
+        ///
+        /// <b>Eligibility is not selection.</b> For a shape that hits everything it covers
+        /// the two coincide, but a <see cref="AbilityAimShape.SingleTarget"/> ability has
+        /// several eligible candidates and hits one. <see cref="GatherTargets"/> owns that
+        /// resolution step; ask it, not this, for "who actually gets hit".
+        ///
+        /// <b>Decoys are legitimate targets</b> (Maestro's call — an ability that phased
+        /// through a Doppelganger would have no reason to exist). The attacker commits, pays
+        /// the cooldown and gets nothing of value; the decoy cannot score, carry, deposit,
+        /// credit a kill or change a player count, which is enforced at those systems rather
+        /// than by refusing to aim at it. As a bonus this removes a latent hazard: targeting
+        /// legality no longer depends on whether <c>Doppelganger.Spawned</c> happened to run
+        /// before <c>ChickenController.Spawned</c> on a given peer.
         /// </summary>
-        protected static bool HasEnemyInRange(Gameplay.ChickenController caster, float range, bool requireCargo = false)
+        public bool WouldAffect(Gameplay.ChickenController caster, Gameplay.ChickenController candidate)
+        {
+            if (caster == null || candidate == null) return false;
+
+            bool isSelf = candidate == caster;
+            if (isSelf && !AffectsSelf) return false;
+            if (!isSelf && !AffectsEnemies) return false;
+
+            if (candidate.Combat != null && candidate.Combat.IsDead) return false;
+
+            if (!IsInAimShape(caster, candidate)) return false;
+
+            return ExtraTargetFilter(caster, candidate);
+        }
+
+        /// <summary>
+        /// Zero-allocation scratch buffer for <see cref="GatherTargets"/> calls made
+        /// from inside <see cref="OnActivate"/>. Safe as a shared static because Unity
+        /// runs single-threaded and every <c>OnActivate</c> call fully consumes the
+        /// buffer synchronously before returning — no ability holds a reference to it
+        /// across activations.
+        /// </summary>
+        [System.NonSerialized] protected static readonly List<Gameplay.ChickenController> _scratch = new List<Gameplay.ChickenController>(4);
+
+        /// <summary>
+        /// <b>Resolution:</b> fills <paramref name="buffer"/> with the chickens this ability
+        /// will actually hit if it fires right now, in ascending distance order from the
+        /// shape's centre (<see cref="AbilityAim.ShapeCenter"/>).
+        ///
+        /// This is the ONLY target scan in the codebase. <see cref="OnActivate"/>,
+        /// <c>AbilityController.TryActivate</c>'s hit count, the hold-to-aim telegraph's
+        /// valid-target marks and <c>HitFeedback.ConfirmHits</c> all consume this one call,
+        /// so what the player sees marked is exactly what gets hit.
+        ///
+        /// <b>Eligibility (<see cref="WouldAffect"/>) is filtered here; selection is decided
+        /// here too.</b> A <see cref="AbilityAimShape.SingleTarget"/> ability is eligible
+        /// against every carrier in range but only ever robs one of them, so the buffer is
+        /// truncated to the nearest — otherwise the telegraph lit up three rivals for a cast
+        /// that took from one.
+        ///
+        /// Iterates <see cref="Gameplay.ChickenController.ActiveControllers"/> (≤4 entries)
+        /// and insertion-sorts — cheap enough to not need <see cref="System.Linq"/>, which
+        /// would allocate.
+        /// </summary>
+        public int GatherTargets(Gameplay.ChickenController caster, List<Gameplay.ChickenController> buffer)
+        {
+            buffer.Clear();
+            if (caster == null) return 0;
+
+            var all = Gameplay.ChickenController.ActiveControllers;
+            Vector3 center = AbilityAim.ShapeCenter(AimShape, caster.transform.position, caster.transform.forward, AimForwardOffset);
+
+            for (int i = 0; i < all.Count; i++)
+            {
+                var candidate = all[i];
+                if (candidate == null || !WouldAffect(caster, candidate)) continue;
+
+                float distSqr = PlanarSqrDistance(center, candidate.transform.position);
+                int insertAt = buffer.Count;
+                for (int j = 0; j < buffer.Count; j++)
+                {
+                    if (PlanarSqrDistance(center, buffer[j].transform.position) > distSqr) { insertAt = j; break; }
+                }
+                buffer.Insert(insertAt, candidate);
+            }
+
+            // Single-target abilities resolve to exactly the nearest eligible candidate. Done
+            // after the sort rather than by tracking a running minimum so there is one
+            // ordering rule for every shape, and so index 0 keeps meaning "nearest" for the
+            // OnActivate implementations that already rely on it.
+            if (AimShape == AbilityAimShape.SingleTarget && buffer.Count > 1)
+                buffer.RemoveRange(1, buffer.Count - 1);
+
+            return buffer.Count;
+        }
+
+        /// <summary>
+        /// Is there any <i>eligible</i> candidate right now? Early-outs on the first hit, no
+        /// buffer — cheap enough for per-frame HUD polling (<see cref="IsUsable"/>,
+        /// <c>AbilityRangeIndicator</c>). Deliberately eligibility and not resolution: a
+        /// single-target ability with three carriers in range is just as usable as one with
+        /// a single carrier, so the grey-out only ever needs to know "any".
+        /// </summary>
+        public bool HasAnyTarget(Gameplay.ChickenController caster)
         {
             if (caster == null) return false;
             var all = Gameplay.ChickenController.ActiveControllers;
-            var selfPos = caster.transform.position;
-            float rangeSqr = range * range;
             for (int i = 0; i < all.Count; i++)
             {
-                var c = all[i];
-                if (c == null || c == caster || c.IsDecoy) continue;
-                if (c.Combat == null || c.Combat.IsDead) continue;
-                if ((c.transform.position - selfPos).sqrMagnitude > rangeSqr) continue;
-                if (requireCargo)
-                {
-                    var cargo = c.GetComponent<Gameplay.ChickenCargo>();
-                    if (cargo == null || cargo.Cargo <= 0f) continue;
-                }
-                return true;
+                if (all[i] != null && WouldAffect(caster, all[i])) return true;
             }
             return false;
+        }
+
+        private static float PlanarSqrDistance(Vector3 a, Vector3 b)
+        {
+            float dx = a.x - b.x;
+            float dz = a.z - b.z;
+            return dx * dx + dz * dz;
         }
 
         public abstract void OnActivate(AbilityContext ctx);

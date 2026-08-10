@@ -8,9 +8,12 @@ namespace CluckWars.Input
     /// has the larger magnitude; held / pressed booleans OR across all providers.
     /// </summary>
     /// <remarks>
-    /// Edge-triggered <c>GetAbilityXPressed</c> calls all underlying providers each
-    /// tick — be aware they may have one-shot semantics that consume the press, so
-    /// don't read them more than once per simulation tick.
+    /// Edge-triggered <c>GetAbilityXPressed</c> / <c>GetAbilityCancelPressed</c> calls
+    /// all underlying providers each tick — be aware they may have one-shot semantics
+    /// that consume the press, so don't read them more than once per simulation tick.
+    /// <c>GetAbilityHeld</c> is level-triggered, not edge-triggered, so — unlike the
+    /// press getters — it is safe to read repeatedly within the same tick; it has no
+    /// latch to consume.
     /// </remarks>
     public sealed class CompositeInputProvider : IInputProvider
     {
@@ -60,6 +63,29 @@ namespace CluckWars.Input
             bool any = false;
             for (int i = 0; i < _providers.Length; i++)
                 any |= _providers[i].GetAbility3Pressed();
+            return any;
+        }
+
+        /// <summary>
+        /// Level-triggered (see the interface doc) — reading every provider every
+        /// tick has no consumption side effect here, unlike the edge-triggered
+        /// getters, but every provider is still read for consistency with them.
+        /// </summary>
+        public bool GetAbilityHeld(int slot)
+        {
+            bool any = false;
+            for (int i = 0; i < _providers.Length; i++)
+                any |= _providers[i].GetAbilityHeld(slot);
+            return any;
+        }
+
+        public bool GetAbilityCancelPressed()
+        {
+            // Edge-triggered — read all so each provider's latch is consumed once
+            // this tick, same contract as the AbilityXPressed getters above.
+            bool any = false;
+            for (int i = 0; i < _providers.Length; i++)
+                any |= _providers[i].GetAbilityCancelPressed();
             return any;
         }
     }

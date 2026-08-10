@@ -33,6 +33,19 @@ namespace CluckWars.Abilities
 
         protected override string DefaultIcon => "🌱";
 
+        // Placed zone, not a direct hit — no GatherTargets loop in OnActivate, same
+        // as Feather Trap. The egg spawns at the caster's own feet (offset 0); the
+        // descriptor describes that placement rather than inventing a tuned offset.
+        public override AbilityAimShape AimShape => AbilityAimShape.ForwardCircle;
+        public override float AimRadius => EggRadius;
+        public override float AimForwardOffset => 0f;
+
+        // The cast never hits anyone — the egg does, later, in AbilityZone's own tick. With
+        // AimForwardOffset 0 and AffectsSelf false the caster is the only chicken inside the
+        // shape at cast time and is excluded, so LastCastHitCount is 0 on EVERY cast on open
+        // ground. Without this the whiff styling fired on every correctly-placed egg.
+        public override bool PlacesZone => true;
+
         public override void OnActivate(AbilityContext ctx)
         {
             if (ctx.Runner == null || ctx.PrefabRegistry == null || ctx.PrefabRegistry.AbilityZone == null)

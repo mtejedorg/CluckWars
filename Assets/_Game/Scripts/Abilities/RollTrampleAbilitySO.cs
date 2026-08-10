@@ -14,11 +14,13 @@ namespace CluckWars.Abilities
             AllowedClasses = ChickenClassFlags.Warrior;
         }
 
-        [Tooltip("How far in front of the caster the sweep is centered.")]
-        [Min(0.5f)] public float ForwardOffset = 1.6f;
+        [Tooltip("Length of the peck lane, measured forward from the caster's PRE-jump " +
+                 "position. With a Capsule aim shape this is the axis length, not a detached " +
+                 "centre — total forward reach is ForwardOffset + SweepRadius.")]
+        [Min(0.5f)] public float ForwardOffset = 5.0f;
 
-        [Tooltip("Sweep radius around the offset point. Generous — catches chickens slightly off-line.")]
-        [Min(0.5f)] public float SweepRadius = 1.8f;
+        [Tooltip("Half-width of the peck lane. Generous — catches chickens slightly off-line.")]
+        [Min(0.5f)] public float SweepRadius = 1.15f;
 
         [Tooltip("Amount of cargo to steal on contact.")]
         [Min(1f)] public float StealAmount = 8f;
@@ -28,8 +30,24 @@ namespace CluckWars.Abilities
         public override float IndicatorRange => ForwardOffset + SweepRadius;
         public override bool RequiresEnemyInRange => true;
 
-        public override bool IsUsable(ChickenController caster)
-            => HasEnemyInRange(caster, ForwardOffset + SweepRadius, requireCargo: true);
+        /// <summary>
+        /// The lane the peck sweeps through on its way past. Being a Capsule also decides
+        /// <i>when</i> the shape resolves: <c>AbilityController.TryActivate</c> runs the
+        /// target scan BEFORE this ability's teleport jump, not after (see
+        /// <see cref="AbilityBaseSO.ResolvesBeforeJump"/>). Without that, a JumpTier of Short
+        /// put the hit lane 5 m past the press point — the ability flew over everything it
+        /// was aimed at and hit whatever happened to be at the far end.
+        /// </summary>
+        public override AbilityAimShape AimShape => AbilityAimShape.Capsule;
+        public override float AimRadius => SweepRadius;
+        public override float AimForwardOffset => ForwardOffset;
+
+        /// <summary>Only a cargo-carrier is a valid Trample target.</summary>
+        protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)
+        {
+            var cargo = candidate.Cargo;
+            return cargo != null && cargo.Cargo > 0f;
+        }
 
         public override void OnActivate(AbilityContext ctx)
         {
@@ -37,26 +55,20 @@ namespace CluckWars.Abilities
             var thiefCargo = thief.Cargo;
             if (thiefCargo == null) return;
 
-            var center = thief.transform.position + thief.transform.forward * ForwardOffset;
-            var hits = Physics.OverlapSphere(center, SweepRadius, SearchMask, QueryTriggerInteraction.Ignore);
-            for (int i = 0; i < hits.Length; i++)
-            {
-                var targetCtrl = hits[i].GetComponentInParent<ChickenController>();
-                if (targetCtrl == null || targetCtrl == thief) continue;
-                if (targetCtrl.Combat != null && targetCtrl.Combat.IsDead) continue;
+            // Steals on contact with the nearest rival in the sweep — GatherTargets
+            // sorts ascending, so index 0 is that rival.
+            GatherTargets(thief, _scratch);
+            if (_scratch.Count == 0) return;
 
-                var targetCargo = targetCtrl.Cargo;
-                if (targetCargo != null && targetCargo.Cargo > 0f)
-                {
-                    float freeSpace = thiefCargo.Capacity - thiefCargo.Cargo;
-                    float stolen = StealMath.Clamp(StealAmount, freeSpace, targetCargo.Cargo);
-                    if (stolen > 0f)
-                    {
-                        thiefCargo.Cargo += stolen;
-                        targetCargo.RPC_DrainStolen(stolen);
-                        break; // Steals on contact with first rival in lane
-                    }
-                }
+            var targetCargo = _scratch[0].Cargo;
+            if (targetCargo == null) return;
+
+            float freeSpace = thiefCargo.Capacity - thiefCargo.Cargo;
+            float stolen = StealMath.Clamp(StealAmount, freeSpace, targetCargo.Cargo);
+            if (stolen > 0f)
+            {
+                thiefCargo.Cargo += stolen;
+                targetCargo.RPC_DrainStolen(stolen);
             }
         }
 

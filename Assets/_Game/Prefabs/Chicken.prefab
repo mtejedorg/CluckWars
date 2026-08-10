@@ -9,8 +9,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3591435138704705113}
-  - component: {fileID: 8274745271886356421}
-  - component: {fileID: 3622267716882121235}
   - component: {fileID: 6841360084465813395}
   - component: {fileID: 8810401778881765308}
   - component: {fileID: 6032245462738825523}
@@ -25,13 +23,15 @@ GameObject:
   - component: {fileID: 7617149068659373758}
   - component: {fileID: 7853284419870734786}
   - component: {fileID: 7224469946525777145}
-  - component: {fileID: 8123582145153776448}
   - component: {fileID: 3315600165271083367}
   - component: {fileID: 1575773519577157392}
   - component: {fileID: 3984440509192767271}
   - component: {fileID: 9089316586229822183}
   - component: {fileID: 4310573928164825946}
-  - component: {fileID: 9876543210987654321}
+  - component: {fileID: 1141551753915111554}
+  - component: {fileID: 3035928202790050528}
+  - component: {fileID: 2264545675894003394}
+  - component: {fileID: 7606116696970456605}
   m_Layer: 8
   m_Name: Chicken
   m_TagString: Untagged
@@ -54,63 +54,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!33 &8274745271886356421
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7475174928668115606}
-  m_Mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
---- !u!23 &3622267716882121235
-MeshRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7475174928668115606}
-  m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 0
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_MaskInteraction: 0
-  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!136 &6841360084465813395
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -158,6 +101,7 @@ MonoBehaviour:
   - {fileID: 7617149068659373758}
   - {fileID: 7853284419870734786}
   - {fileID: 4310573928164825946}
+  - {fileID: 7606116696970456605}
   ForceRemoteRenderTimeframe: 0
 --- !u!143 &6032245462738825523
 CharacterController:
@@ -200,6 +144,7 @@ MonoBehaviour:
   _Class: 0
   _VisualOpacity: 0
   _IsBot: 0
+  _StealBackActive: 0
   _ControlFlags: 0
   _KnockbackEventId: 0
   _HomeCornerIndex: -1
@@ -210,6 +155,7 @@ MonoBehaviour:
   _AuraSlowActive: 0
   _AuraSlowRadius: 0
   _AuraSlowFactor: 0
+  _IsStunned: 0
 --- !u!95 &5731265523250509895
 Animator:
   serializedVersion: 7
@@ -272,8 +218,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenCombat
   _stunDuration: 5
-  _HP: 0
-  _IsStunned: 0
+  _IsRemoved: 0
 --- !u!114 &-4654369670535789821
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -292,6 +237,7 @@ MonoBehaviour:
     m_Bits: 512
   _foodPickupPrefab: {fileID: 8362016333457472506, guid: a8794a9118fa75e44946e9a0fb7d9a54, type: 3}
   _Cargo: 0
+  _BountyBag: 0
 --- !u!114 &101601932164880250
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -304,10 +250,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8c2f9a4b1e6d4b7e89a3d5c0f1b8e2a4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.AbilityController
+  _passive: {fileID: 0}
   _slot0: {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
   _slot1: {fileID: 11400000, guid: 0d5566bf334a1c44a9711ea9b34a4ac6, type: 2}
   _slot2: {fileID: 11400000, guid: 141d6483e4594575ae36717f9dd3b056, type: 2}
   _ActiveSlot: 0
+  _ChargingSlot: 0
+  _LastCastHitCount: 0
+  _LastCastEventId: 0
 --- !u!114 &9204612626180569764
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -351,6 +301,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.BotController
   _thinkInterval: 0.3
   _arrivalRadius: 1.5
+  _pileStandoff: 0.7
   _returnThreshold: 0.7
   _protectCargoThreshold: 0.4
   _dangerRadius: 5
@@ -381,19 +332,6 @@ MonoBehaviour:
   _stunHeadOffset: 1.75
   _depositCount: 12
   _depositColor: {r: 0.96, g: 0.78, b: 0.26, a: 1}
---- !u!114 &8123582145153776448
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7475174928668115606}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bfdedfdc7a1eeb543adbecff26074434, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.PlaceholderModel
-  _kind: 0
 --- !u!114 &3315600165271083367
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -419,6 +357,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c118f81fa1dc2de40885ea232fbc15dc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ControlStateVFX
+  _windupGlowDiameter: 1.35
 --- !u!114 &3984440509192767271
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -469,7 +408,7 @@ MonoBehaviour:
   SyncParent: 0
   _autoAOIOverride: 1
   DisableSharedModeInterpolation: 0
---- !u!114 &9876543210987654321
+--- !u!114 &1141551753915111554
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -478,7 +417,43 @@ MonoBehaviour:
   m_GameObject: {fileID: 7475174928668115606}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bc2eaaac93e74394c994e7a0e6f6a463, type: 3}
+  m_Script: {fileID: 11500000, guid: 1e03842b881806c4bb6ff873b48458d3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.AssassinExecute
-
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ChickenStatusBadges
+--- !u!114 &3035928202790050528
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 35f1c13aba60238439439716ea57f897, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.TargetHighlight
+--- !u!114 &2264545675894003394
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3cddaa19f9bac6c4fa03822782019da4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.AbilityTelegraph
+--- !u!114 &7606116696970456605
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bdfb23a59379d9646b4464b616fe4c67, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.HitFeedback
+  _enableHitStop: 1

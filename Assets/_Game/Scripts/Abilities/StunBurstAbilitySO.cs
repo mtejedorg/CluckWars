@@ -24,19 +24,23 @@ namespace CluckWars.Abilities
         public override float IndicatorRange => StunRadius;
         public override bool RequiresEnemyInRange => true;
 
+        // Ambush is a plain circle around the caster and now says so directly, instead of
+        // declaring a Cone and leaning on the 360°-degenerates-to-a-circle rule to undo it.
+        // (That rule stays in AbilityAim, and stays tested — it is defence-in-depth against
+        // a hand-authored 360 in an asset, not something an ability should be routed
+        // through on purpose.) Wing Slam overrides both AimShape and AimConeAngle for its
+        // real directional cone; AimRadius stays here so both subclasses mirror StunRadius.
+        public override AbilityAimShape AimShape => AbilityAimShape.SelfCircle;
+        public override float AimRadius => StunRadius;
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;
-            var center = caster.transform.position;
-            var hits = Physics.OverlapSphere(center, StunRadius, SearchMask, QueryTriggerInteraction.Ignore);
 
-            for (int i = 0; i < hits.Length; i++)
+            GatherTargets(caster, _scratch);
+            for (int i = 0; i < _scratch.Count; i++)
             {
-                var targetCtrl = hits[i].GetComponentInParent<ChickenController>();
-                if (targetCtrl == null || targetCtrl == caster) continue;
-                if (targetCtrl.Combat != null && targetCtrl.Combat.IsDead) continue;
-
-                targetCtrl.RPC_ApplyStun(StunDuration);
+                _scratch[i].RPC_ApplyStun(StunDuration);
             }
         }
 

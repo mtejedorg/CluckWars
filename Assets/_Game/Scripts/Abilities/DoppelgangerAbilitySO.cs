@@ -35,6 +35,15 @@ namespace CluckWars.Abilities
 
         protected override string DefaultIcon => "👥";
 
+        // Self-buff, no target area — marks the caster's own ring instead (FEEDBACK.md
+        // §2.2). Stated explicitly (rather than relying on the inherited default)
+        // because the asset also carries a JumpTier (its short Blink hop) — a future
+        // reader skimming JumpTier=Big should not have to wonder whether that implies
+        // an offensive Jump shape; it does not.
+        public override AbilityAimShape AimShape => AbilityAimShape.None;
+        public override bool AffectsSelf => true;
+        public override bool AffectsEnemies => false;
+
         public override void OnActivate(AbilityContext ctx)
         {
             if (_decoyPrefab == null) return;

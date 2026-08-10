@@ -19,6 +19,640 @@ All tags pushed to origin.
 
 ---
 
+## Headline numbers (read this before quoting a figure from a session entry below)
+
+| | |
+|---|---|
+| **EditMode suite** | **268 / 268 passing**, 0 failed, ~3.3 s (observed 2026-08-07 via `tests-run`) |
+| Trajectory this feature | 178 (pre-feedback baseline) → 196 (Stage 1) → 223 (Stage 2) → 246 (Stage 5) → 266 (chicken models) → **268 (texture + tint guardrails)** |
+| Compile state | Clean. Console errors are MCP negotiation / `script-execute` noise only — no C# errors. |
+| Branch | `develop`, **uncommitted** |
+
+⚠️ Session entries below are a **historical log** and quote the test count that was
+correct *at the time they were written* (116, 141, 196, 223…). They are not stale bugs to
+be corrected — this table is the only current figure.
+
+---
+
+## 🎨 Chicken art quality pass — textures bound, Warrior regenerated, tri budget levelled (2026-08-07) — verified in Play Mode, not committed
+
+Three-part follow-up to the model wiring below. Everything is in the working tree; **nothing
+committed**.
+
+### 1. Baked albedo atlases are now actually on the models
+
+The atlases were never lost — every rigged `.fbx` embeds a valid 1024² PNG (exported with
+`path_mode="COPY", embed_textures=True`). The failure was purely Unity-side: the importer's own
+`Material_0` comes through with `_BaseMap` unset, so the chickens rendered untextured while the
+texture sat inside the file.
+
+- Atlases extracted to real project assets: `Assets/Generated/Textures/{class}_chicken_albedo.png`.
+- Four URP/Lit materials in `Assets/_Game/Art/Materials/Chicken_{Warrior,Speedy,Fatty,Assassin}.mat`,
+  each binding its class atlas to `_BaseMap`, `_BaseColor` left **white**.
+- Bound via the **`.fbx` importer's `externalObjects` remap** (`(Material, Material_0)` → the class
+  `.mat`), not by touching the renderer at runtime. The remap lives in the `.meta`.
+
+⚠️ **The remap is a silent-failure surface.** A re-import, a `.meta` conflict, or a "clean up
+unused materials" pass drops it and the chickens go back to untextured grey with nothing logged.
+`DataIntegrityTests.ClassRegistry_EveryModel_ResolvesToATexturedInstancedMaterial` now asserts the
+whole chain (URP/Lit shader, non-null `_BaseMap`, white `_BaseColor`) so the suite catches it.
+
+### 2. Tint no longer double-applies over the texture
+
+URP/Lit computes albedo as `_BaseMap × _BaseColor`, and each atlas is *already* the class hue —
+so the old full-strength flat tint multiplied the class colour into itself and turned a maroon
+bird into dark mud. But the tint also carries player-identity readability at ortho-iso distance,
+so it could not simply be dropped.
+
+Resolution: `ChickenClassRegistrySO.Entry` gained **`TintStrength`** (authored at **0.25** on all
+four entries) and `ChickenVisuals.ApplyTint(Color, float)` lerps `white → TintColor` by it. The
+blend happens **inside** `ApplyTint`, and the *effective* colour lands in `_currentTint`, so the
+dead-state grey lerp, the opacity multiply, and `HitFeedback`'s flash hand-back via `BodyColor`
+all keep working unchanged and none of them needs to know a strength exists. The renderer scan
+stays scoped to the model subtree — nameplates/health bars are still excluded.
+
+`DataIntegrityTests.ClassRegistry_EveryEntry_HasAnAuthoredTintStrength` pins the band to
+`0 < strength ≤ 0.6`: 0 silently loses the class hue cue entirely, near-1 washes the art out.
+
+### 3. Warrior mesh regenerated — root cause was its source concept image
+
+Warrior was markedly cruder than the rest (4 514 tris vs 10 392 / 12 917 / 15 190) and read
+in-game as a flat wide red mass. **Cause confirmed, not guessed:** `Assets/AIConcepts/warrior_chicken.png`
+was an img2img "relight" pass at denoise 0.35, and came out visibly blurry *and* with human arms
+and clawed hands — violating the approved non-human style spec. TRELLIS reconstructs detail from
+image detail, so the soft input produced a structurally simple mesh: **114 loose islands vs
+195–253** for the other three.
+
+Fix: regenerated the concept as a **direct Flux txt2img** in the approved unified style (6 variants
+generated, all visually checked for the human-arms failure mode, best one kept), then re-ran the
+mesh stage. The new raw mesh came back with **368 islands** — the lead was correct.
+
+| | old | new |
+|---|---|---|
+| Concept | blurry img2img relight, human arms + hands | sharp txt2img, folded bird wings |
+| Raw TRELLIS islands | 114 | 368 |
+| Rigged tris | 4 514 | 11 000 |
+| Mesh bbox | 2.88 × 2.36 × 1.60 (abnormally wide) | 1.66 × 1.20 × 1.60 (in line with the cast) |
+
+The old concept, mesh, rig and atlas are backed up under the session scratchpad in case the new
+Warrior is ever rejected.
+
+⚠️ **The Warrior atlas was re-extracted.** The new mesh has a new UV layout, so the old
+`warrior_chicken_albedo.png` no longer matched. It was overwritten **at the same path** to preserve
+its GUID (`55252fe6…`), which is what keeps `Chicken_Warrior.mat`'s binding intact. Regenerating any
+other class's mesh needs the same treatment.
+
+### 4. Tri budget levelled
+
+`blender_cleanup.py --tris` defaults to 22 000, which is why none of the originals were ever
+decimated. All four were re-cleaned at `--tris 11000` (Assassin left alone, already under it).
+
+| | before | after |
+|---|---|---|
+| Warrior | 4 514 | 11 000 |
+| Speedy | 12 917 | 11 000 |
+| Fatty | 15 190 | 10 999 |
+| Assassin | 10 392 | 10 392 |
+| **Total cast** | **43 013** | **43 391** |
+
+Same total budget, evenly distributed, with Warrior no longer the weak link. Decimation was
+verified non-destructive by rendering before/after — Speedy and Fatty are visually unchanged, and
+their embedded atlases came out **byte-identical**, so their material bindings were untouched.
+
+**Honest note on the budget:** 43 k tris across the four-chicken cast was never the Android
+bottleneck — 4 skinned meshes is 4 draw calls, and mid-range 2021+ GPUs eat this. The pass was
+worth doing for *consistency*, not for frame time. If Android perf work is needed later, look at
+draw calls, overdraw and fill rate first, not this number. **No LOD groups exist yet.**
+
+**Also fixed:** `fatty_chicken_rigged` has only 21 of 22 vertex groups (`LeftToeBase` carries no
+weights). This was checked against the pre-decimation backup and is **pre-existing** — a property
+of the auto-rigger's nearest-bone skinning on Fatty's geometry, not a decimation regression. Moot
+while no skeletal clips exist; would matter if a toe-curl animation is ever authored.
+
+**Verification:** 268/268 EditMode. Play Mode solo run — all four classes render textured, upright,
+feet on ground, correct per-class model and hue. Console clean of model/material errors (the
+`CharacterController.Move called on inactive controller` and `Not inside a Renderpass` entries in
+the log are artifacts of the inspection scripts used to stage screenshots, not gameplay).
+
+⚠️ `Assets/Generated/` is **entirely untracked**, including the `.meta` files carrying the Generic
+rig setting *and* the `externalObjects` material remap. Committing the `.fbx` files without their
+`.meta` files resets the rig to Humanoid (models sink through the floor) **and** drops the texture
+binding. Commit them together.
+
+---
+
+## 🐔 Per-class chicken models wired in (2026-08-07) — verified in Play Mode, not committed
+
+The four generated rigs (`Assets/Generated/{warrior,speedy,fatty,assassin}_chicken_rigged.fbx`)
+now replace the placeholder capsule. Approach: `ChickenClassRegistrySO.Entry` gained
+`ModelPrefab` + `ModelAvatar`, and `ChickenController.Spawned` instantiates the model as a
+child of the chicken root. No new `[Networked]` state and no new RPCs — every peer builds its
+own model locally from the already-replicated `Class`.
+
+**What changed**
+
+- `ChickenClassRegistrySO` — `Entry.ModelPrefab` (GameObject) + `Entry.ModelAvatar` (Avatar).
+- `ChickenController` — `AttachClassModel` / `BindAvatar`; the "no registry entry" case now
+  logs an `Error` instead of silently rendering nothing.
+- `ChickenVisuals.SetModelRoot(Transform)` — re-scans the tint renderers **scoped to the model
+  subtree**. A whole-hierarchy re-scan would sweep the nameplate / world-bar / badge TextMeshes
+  into the tint set and the hit flash.
+- `HitFeedback.RefreshBodyRenderers()` — same problem, called explicitly because `Spawned`
+  order between sibling `NetworkBehaviour`s is not guaranteed.
+- `Chicken.prefab` — `PlaceholderModel`, `MeshFilter`, `MeshRenderer` removed from the root
+  (28 → 25 components). `Doppelganger.prefab` inherited the removal. `PlaceholderModel.cs` and
+  `PlaceholderMeshFactory.cs` stay — `FoodPile.prefab` and `PlayerBase.prefab` still use them.
+- `ChickenClassRegistry.asset` — all four entries populated.
+- `DataIntegrityTests.ClassRegistry_EveryEntry_HasItsModelAndGenericAvatar` added.
+
+**⚠️ The rigs must be imported Generic, NOT Humanoid.** This is the trap in this work.
+Unity maps these Mixamo-named skeletons to Humanoid with zero complaints (`isValid &&
+isHuman`, all 22 bones), so Humanoid looks correct. It is not: humanoid retargeting rebuilds
+the pose in human muscle space every frame. Measured live — it stretched the chicken from
+1.60 m to 1.75 m, splayed the limbs, and put the feet **1.04 m below** the CharacterController
+capsule, i.e. sunk through the floor. With Generic the model spans the capsule exactly
+(feet at ground, `footVsGround = 0.0000` on all four classes). All four `.fbx` files are now
+`animationType = Generic, avatarSetup = CreateFromThisModel`. The EditMode test above asserts
+`!isHuman` so a re-import can't quietly reintroduce it.
+
+**Vertical offset:** model child sits at `localPosition.y = -0.8`, derived at runtime as
+`characterController.center.y - characterController.height * 0.5f`. The meshes are authored
+with the origin exactly at the feet and a height of exactly 1.6 m — the same as the capsule —
+so the model fills the capsule precisely. Nothing is hardcoded.
+
+> **Correction (2026-08-09).** The pre-rebuild claim that the models were "normalised to
+> exactly 1.6 m" was **measured on the wrong axis**: the old cleanup script assumed Z-up and
+> normalised front-to-back *depth*, while the true heights had drifted to Speedy 2.292 /
+> Fatty 1.846 / Warrior 1.657 / Assassin 0.994. The rebuilt rigs are now genuinely 1.600 tall.
+> Re-verified independently from the FBX vertex data: mesh-local `Z[0.000 .. 1.600]` on all
+> four, and each node carries the Blender `Lcl Rotation = (−90, 0, 0)` Z-up→Y-up conversion,
+> so mesh-local +Z is world +Y — i.e. **height 1.600 with feet exactly at the origin**. Depth
+> (world Z) is what legitimately varies per class: Warrior 1.545, Speedy 1.117, Fatty 1.387,
+> Assassin 2.576. When re-checking this, measure the axis *after* the −90° node rotation —
+> that is precisely the mistake that produced the original wrong number.
+
+**Known state, out of scope, still open:**
+
+- **Skeletal AnimationClips now exist and own articulation** (2026-08-09; supersedes the
+  earlier "no clips exist and by design none are needed" entry). The rigs were rebuilt with an
+  18-bone bird skeleton (Root, Hips, Spine, Chest, Neck, Head, Beak, Tail, Wing/WingTip L+R,
+  Thigh/Shin/Foot L+R) and **smooth inverse-distance skinning over the 3 nearest bones**,
+  replacing the nearest-bone skinning that tore. Hard-pose bbox change is now only
+  −3.7% / −1.1% / +4.6% (the old rig blew up +26% on a milder pose), so the mesh survives posing.
+  Each `.fbx` carries five clips — `Idle` (60f loop), `Walk` (24f loop), `Cast` (20f),
+  `Hit` (14f), `Stunned` (48f loop).
+
+  **The split now in force:**
+  - **Clips own articulation** — legs, wings, neck, spine, tail, and every reaction beat.
+  - **`ChickenAnimator` owns only what a fixed-length in-place clip cannot express**: the
+    forward lean (a function of live speed) and the banking roll (a function of live yaw rate),
+    plus rest-pose anchoring. It writes **no vertical position offset and no scale at all** on
+    the skeletal path.
+  - **Retired:** the locomotion hop, and the procedural idle bob / cast crouch / hit squash /
+    stun sag — all superseded by the clips.
+  - **Fallback:** if the avatar or any of the five clips fails to bind, `ChickenAnimator`
+    reverts to the full legacy procedural set, so a broken re-import degrades to a moving
+    chicken rather than a frozen one.
+
+  Wiring: five empty placeholder clips in `Assets/_Game/Art/Animations/Placeholders/` sit in the
+  shared `Chicken.controller`'s five Motion slots and act as the **override keys**; at spawn
+  `ChickenController` builds a per-class `AnimatorOverrideController` (cached, four instances
+  total) from the clips referenced on `ChickenClassRegistrySO.Entry.Clips`. The clips must be
+  referenced from the registry rather than discovered from the model, because they are sibling
+  sub-assets of the `.fbx` that nothing in the spawned hierarchy points at — enumerating them
+  needs `AssetDatabase`, which does not exist in a player build.
+  Re-run **`Cluck Wars/Animation/Wire Skeletal Clips`** after any rig re-export.
+
+  Verified from the FBX data (2026-08-09): every curve targets the armature child
+  (`*_chicken_rig`) or a bone below it — **no clip keys the model root**, so the clips and
+  `ChickenAnimator`'s model-root write never collide and no pivot GameObject is needed.
+  The Walk cycle is a genuine out-of-phase stride: `ThighL` peaks at 0.750 s and `ThighR` at
+  0.250 s of a 1.0 s loop (52° amplitude), shins 20.8° on the opposite phase.
+
+  > **OUTSTANDING — the code landed, the ASSETS have not been authored yet.** The Unity Editor
+  > was hung throughout this session (main thread spinning, `Editor.log` frozen, MCP bridge
+  > unreachable), so none of the Editor-side steps could be executed or verified. The C# was
+  > type-checked offline via `dotnet build` (runtime + editor + tests, 0 errors), but **nothing
+  > was run in Unity**. Remaining, in order:
+  >
+  > 1. Restart the Unity Editor (it is hung; a restart is required, not just a refresh).
+  > 2. Run **`Cluck Wars/Animation/Wire Skeletal Clips`** — creates the five placeholder clips,
+  >    assigns them to the controller's Motion slots, **fixes Loop Time on all four .fbx
+  >    importers**, and populates all four registry entries.
+  >
+  >    On the loop flags: all four rigs import with `clipAnimations: []`, so Unity generates the
+  >    clips from the takes with `loopTime` defaulting to **false**. Idle, Walk and Stunned would
+  >    each play once and hold the last frame — an idle chicken that animates for two seconds and
+  >    then freezes, i.e. the exact symptom this work exists to remove. Loop Time is *importer*
+  >    state, not clip state, so it cannot be fixed on the clip asset. The tool now seeds from
+  >    `defaultClipAnimations` (inheriting the real take names and frame ranges), sets the flags,
+  >    and reimports. It touches the Animation tab only — `animationType`, `avatarSetup` and the
+  >    `externalObjects` material remap are left alone. **Re-run after every rig re-export.**
+  > 3. Run the EditMode suite. Baseline before this change was **268/268**; six tests were added
+  >    (`ClassRegistry_EveryEntry_HasFiveClipsFromItsOwnFbx`, `ClassClips_HaveTheExpectedLoopFlags`,
+  >    `ClassClips_DoNotKeyTheModelRootTransform`,
+  >    `ChickenController_EveryState_HasAMotionMatchingItsOverrideKey`,
+  >    `PlaceholderClips_ExistAndCarryTheExpectedLoopFlags`,
+  >    `ChickenController_Parameters_MatchTheNamesAndTypesHashedInCode`) → expect **274**.
+  >    `ClassClips_HaveTheExpectedLoopFlags` is now the regression guard for step 2's importer fix
+  >    rather than a manual chore: if it fails, step 2 did not take (check its `problems` output for
+  >    an unmatched take name).
+  > 4. Playtest a solo match and confirm chickens stand upright, walk with visible leg movement,
+  >    idle when still, and react on hit/cast/stun. **Not yet done.**
+  >
+  > No prefab wiring is required: `Chicken.prefab` already carries the Animator with
+  > `Chicken.controller`, and `Doppelganger.prefab` inherits it as a variant. The stale
+  > `_animator:` entry on `Chicken.prefab` is now genuinely dead — `ChickenAnimator` resolves the
+  > Animator via `GetComponent` in `Awake` and has no serialized `_animator` field.
+- ~~**The FBX materials carry no textures.**~~ **This was wrong.** The baked atlases *did*
+  survive export — every rigged `.fbx` embeds a valid 1024² albedo. They were simply never
+  surfaced onto a usable material. **Resolved** — see the art-quality pass entry above.
+- ~~Tri counts are uneven: Warrior 4 514, Assassin 10 392, Speedy 12 917, Fatty 15 190.~~
+  **Resolved** — levelled to ~11 k each, see the art-quality pass entry above. **No LOD groups
+  exist yet** — still open, though the budget is not currently the Android bottleneck.
+- `fatty_chicken_rigged` maps 21 of 22 bones (`LeftToeBase` carries no skin weights). Confirmed
+  pre-existing and independent of the Generic/Humanoid question and of the decimation pass.
+
+**No Maestro prefab-wiring steps outstanding** — the registry asset and `Chicken.prefab` were
+both edited through the MCP and verified by re-reading them back.
+
+---
+
+## 🎯 Casting model rework + placed-zone whiff fix (2026-08-02) — code-complete, **UNVERIFIED**, not committed
+
+Two fixes on top of the Stage 1–5 feedback system. **The Unity MCP was disconnected for
+this session, so nothing here was compiled or run.** Treat every claim below as unverified
+until Maestro runs the checks in "What Maestro must run".
+
+### 1. Casting model: no tap window, always fire on release
+
+Maestro's decision, verbatim: *"I want no window, I want a fire on release. If user holds,
+there is feedback, if not there is speed."* This **replaces** the previous tap-vs-hold
+design; there is no longer any tap/hold branch for *firing*.
+
+The bug: `AbilityHoldStateMachine.Decide` called `BeginCharge` on the first tick the hold
+bit read true, so every human tap entered aim-hold — movement stutter, a one-tick telegraph
+flash, and a wind-up glow that fired on every press and was therefore worthless as a
+"they're charging" tell. `FeedbackTuning.TapHoldThresholdSeconds` (0.12 s) was **never read
+by any executing code**.
+
+The fix: a **pending-hold** state that lives only in `AbilityController` as StateAuthority
+scratch (`_pendingHoldSlot` / `_pendingHoldSeconds` — not networked, no new RPC). A hold
+enters pending first and is promoted to the networked `ChargingSlot` only after clearing the
+threshold. Because the telegraph, the target marks, the wind-up glow and
+`ChickenController.IsAimRotating()` all already key off `ChargingSlot`, **all four gate
+themselves for free — none of those three consumers were touched.**
+
+- Release always fires, from either side of the threshold.
+- Under the threshold: no telegraph, no marks, no glow, **no aim-rotate movement lock**.
+- At/above it: the full aim package, and the movement cost that pays for it.
+- At 32 Hz the boundary lands on the 4th accumulating tick (4 × 0.03125 = 0.125 s ≥ 0.12).
+
+`FeedbackTuning.TapHoldThresholdSeconds`' doc comment was rewritten, not deleted: its old
+warning ("must be clocked off local raw input, never the replicated hold bit, or Shared
+Mode latency inflates the felt threshold to ~170 ms") was correct *for the old model*, where
+a tap had to wait out a window before committing. Under the new model the cast fires on
+release with unchanged latency and the threshold only measures a *duration*, which is
+preserved under a constant input delay — so tick-accumulated measurement is now the right
+clock. The corrected reasoning is in the file.
+
+### 2. Placed zones no longer report a false whiff
+
+`AbilityController.TryActivate` snapshots `LastCastHitCount` at cast time, but Root Egg and
+Feather Trap *place a zone* — the hit happens later, in `AbilityZone`. Root Egg spawns at the
+caster's feet (`AimForwardOffset = 0`, `AffectsSelf = false`), so on open ground the count
+was 0 on **every** cast and both `HitFeedback.ObserveOwnCast` and `AbilityRangeIndicator`'s
+grey cast ring whiff-styled a perfect placement. They dodged the existing `AimShape.None`
+exemption because they declare a real `ForwardCircle`.
+
+- **2a** — new `AbilityBaseSO.PlacesZone` (virtual, true on the two zone abilities) and the
+  derived `ReportsCastHits => AimShape != None && !PlacesZone`. Both whiff consumers now
+  gate on that one predicate; an EditMode test pins the exact membership of both buckets.
+- **2b** — `AbilityZone.Render()` now derives the trigger moment locally on every peer (root:
+  a `ChangeDetector` on the `[Networked] Consumed` false→true edge, with a `Despawned`
+  fallback for the frame where two ticks run back to back; slow: a rising-edge occupancy scan
+  over `ActiveControllers`) and calls the new plain-local `HitFeedback.NotifyZoneTriggered()`
+  on the caster. **No new RPC, no new networked state.** The victim's side was already fully
+  covered by `HitFeedback.ObserveControlStates` (`ROOT`/`SLOW` text + flash + shake), so
+  nothing was duplicated there.
+- **2c** — `AbilityZone`'s root trigger converted off `Physics.OverlapSphereNonAlloc` to the
+  `ChickenController.ActiveControllers` registry with a planar-XZ test, and
+  `AbilityAimTests.NoAbilityScript_CallsPhysicsOverlapDirectly` widened to cover
+  `Gameplay/AbilityZone.cs` (deliberately *not* all of `Gameplay/`).
+
+### ⚖️ Balance / feel changes to eyeball in a live session
+
+1. **Quick casts no longer slow you down.** Sub-threshold taps skip the aim-rotate movement
+   lock entirely. This is the intended win, but it is a real mobility buff to tap-heavy play.
+2. **The wind-up glow is now a genuine tell.** It only appears on deliberate holds, so
+   opponents can finally read "they're charging something".
+3. **Root Egg's trigger area shrank slightly.** It now measures to a chicken's transform
+   pivot instead of the nearest point on its capsule — roughly one collider radius harder to
+   set off. The drawn ring is now the truth, which is the point, but it is a real nerf.
+4. Root Egg / Feather Trap now flash their **accent** cast ring instead of the grey whiff
+   ring, and the caster gets a micro-shake when the zone actually catches someone.
+
+### 🔧 Maestro — hand-wiring
+
+**None.** No new prefab components, Inspector fields, SOs or scene changes. `NotifyZoneTriggered`
+is resolved via `GetComponent<HitFeedback>()` on the already-wired Chicken prefab; if that
+component is ever missing the zone logs a `Warn` rather than failing silently.
+
+### What Maestro must run (nothing below was executed)
+
+1. `Assets → Refresh` / let Unity recompile — **compile status is UNVERIFIED**.
+   `AbilityHoldStateMachine.Decide`'s signature changed (3 new parameters + a new
+   `ChargeAction.BeginPendingHold`); the only production caller and the test suite were both
+   updated, but this has not been compiled.
+2. EditMode suite. Baseline before this work was **246/246**. This change is expected to add
+   roughly **+10** tests (8 in `AbilityActivationRulesTests`, 2 in `AbilityAimTests`) and
+   rename two; the resulting number has **not been observed** — do not quote one until it is.
+3. Live feel check: tap an ability and confirm zero movement stutter and no telegraph flash;
+   hold past ~0.13 s and confirm the telegraph, marks, glow and aim-rotate all engage.
+4. Live check: cast Root Egg on open ground → accent ring, not grey. Walk a rival onto it →
+   caster feels a micro-shake, victim gets the `ROOT` beat.
+
+---
+
+## 🎯 Ability-feedback system Stage 1 — aim descriptor + single-truth targeting (2026-08-01) — code-complete, not committed
+
+Implements `docs/FEEDBACK.md` §4/§8 Stage 1: one declarative `AbilityAimShape` per
+ability, feeding a single `AbilityBaseSO.GatherTargets`/`HasAnyTarget` scan that the
+usability gate and every `OnActivate` now share. No visual change in this stage —
+pure architecture + tests, laying the ground for the hold-to-aim preview (Stage 2+).
+
+**New files**
+- `Assets/_Game/Scripts/Abilities/AbilityAim.cs` — `AbilityAimShape` enum +
+  `AbilityAim` static class (pure, MonoBehaviour-free geometry; planar/XZ distance
+  and angle tests only, mirrors `FoodPileMath`'s shape for EditMode testability).
+- `Assets/_Game/Scripts/Editor/Tests/AbilityAimTests.cs` — 18 new tests: pure
+  geometry per shape, descriptor↔tuned-field parity over the real `.asset` files,
+  completeness (every offensive ability declares a real `AimShape`), the
+  `WouldAffect ⇒ IsInAimShape` invariant, and a "no ability calls
+  `Physics.Overlap*` directly" regression lock.
+
+**`AbilityBaseSO` additions** — `AimShape`, `AimRadius`, `AimForwardOffset`,
+`AimConeAngle`, `AffectsEnemies`, `AffectsSelf` (all virtuals, no asset
+re-authoring needed), `ExtraTargetFilter` (protected hook for cargo/immunity
+conditions), `IsInAimShape` (geometry only — Stage 3's telegraph uses the gap
+between this and `WouldAffect` to draw the grey "in the area but no effect"
+overlay), `WouldAffect` (the full predicate: in-shape AND alive AND not a decoy
+AND on the right side AND passes `ExtraTargetFilter`), `GatherTargets`
+(the one target scan in the codebase — zero-allocation, insertion-sorted by
+distance, ≤4 entries) and `HasAnyTarget` (early-out version for per-frame
+polling). `IsUsable`'s default now routes through `HasAnyTarget` instead of the
+deleted `HasEnemyInRange`.
+
+**Every ability's `OnActivate` refactored** to consume `GatherTargets` — no
+`Physics.Overlap*` call remains anywhere under `Assets/_Game/Scripts/Abilities/`.
+`FeatherTrapAbilitySO`/`RootEggAbilitySO` keep no scan loop (they place a zone;
+the descriptor exists only so the future preview can draw the right footprint).
+`MarkKillAbilitySO.IsUsable` keeps its bespoke override (post-mark "kill ready"
+state) but its pre-mark range check now routes through `HasAnyTarget`.
+
+**Deliberate behaviour changes** (all required by "preview must equal hit" —
+flagged for `mechanics-designer`/`qa-reviewer` review, no tuned values touched):
+1. **Wing Slam is now a 120° forward cone** instead of a 360° circle at the same
+   2.5 m radius (Ambush is untouched — still a full circle, verified by a test
+   asserting 360°-cone containment equals `SelfCircle` containment).
+2. ~~**Doppelganger decoys are no longer valid ability targets.**~~ **REVERSED
+   2026-08-02** — see the targeting/shape session entry at the top of this file.
+   Maestro's call: *"Make them valid, if not ability loses its meaning."* The
+   `IsDecoy` guard was removed from `WouldAffect`. The consistency worry recorded
+   here was unfounded and backwards: `Doppelganger.Spawned()` sets `IsDecoy` on
+   every peer, and making decoys *valid* removes the hazard entirely, because
+   targeting legality no longer depends on `Doppelganger.Spawned()` winning the
+   race against `ChickenController.Spawned()`.
+3. **Target scans moved from `Physics.OverlapSphere` (collider bounds) to the
+   `ChickenController.ActiveControllers` registry (transform pivots)** —
+   `SearchMask` no longer gates chicken targeting (field kept, doc'd as
+   vestigial, still exercised by `AbilitySystemTests.PhysicsScanningAbilities_SearchTheChickensLayer`
+   in case anything is ever routed through it again).
+4. **Distance is now planar (XZ) everywhere**, was 3D `sqrMagnitude`.
+5. **Peck's knockback now requires the target to be carrying cargo** (previously
+   knocked back any target in range, cargo or not — steal-only cargo>0 gating was
+   already there; knockback wasn't). Consistent with the "immune/no-effect" target
+   telegraph the whole stage exists to make truthful, but is a step further than
+   the spec's four called-out changes, so flagging it explicitly.
+6. **Roll Trample now steals from the *nearest* rival in the sweep**, not
+   whichever rival the old `Physics.OverlapSphere` happened to return first
+   (undefined order). Same spirit ("first rival in lane"), now well-defined.
+
+**Passives out of scope, by design.** `PassiveAbilitySO` subclasses (Bracer,
+Combo, Immovable, Juggernaut, Mighty, Opportunist, Second Wind, Slippery) are
+allow-listed by base type in the completeness test rather than named individually
+— they're a different subsystem (`ModifyOutgoingDamage`/`ModifyIncomingDamage`/
+`OnTraversalTick`, never `OnActivate` target scans) that Stage 1's spec didn't
+touch.
+
+**Verification**: EditMode suite 178 → **196** (18 new, 0 failed, 0 regressions —
+the two `ChickenClassRegistry.asset` tests `docs/STATE.md` previously called
+known-red are confirmed green, consistent with `code-architect`'s independent
+re-run). Compiles clean, no new console warnings (verified via Unity MCP
+`assets-refresh` + `console-get-logs`).
+
+**Nothing for Maestro to wire by hand** — this stage is code-only, no scene or
+prefab changes, no new inspector slots.
+
+**Late-pass correction (verification sweep):** `AbilityBaseSO.AimShape`'s default
+briefly derived from `JumpTier` (`JumpTier != None ? Jump : None`) instead of the
+spec's plain `None`. That would have silently mis-classified `DoppelgangerAbilitySO`
+as an offensive `Jump`-shape ability — its asset carries `JumpTier: Big` for the
+decoy-spawn hop, but Doppelganger is a pure self-buff with no target area, and
+nothing overrode `AimShape` for it. Reverted the default to a literal `None`
+(`ShadowstepAbilitySO` already declared `Jump` explicitly, so nothing else depended
+on the derived default); `DoppelgangerAbilitySO` keeps its own explicit
+`AimShape => None` override for a future reader's benefit. Also fixed three stale
+enum-member doc comments in `AbilityAim.cs` that still attributed `Jump` to Ambush
+and `SelfCircle` to Stun Burst/Sneaky Steal from an earlier draft. Re-verified:
+196/196 EditMode tests green after the fix, `console-get-logs` clean.
+
+---
+
+## 🎯 Ability-feedback system Stage 2 — hold-to-aim input + all remaining networked state (2026-08-01) — code-complete, not committed
+
+Implements `docs/FEEDBACK.md` §2/§6/§8 Stage 2: press-to-fire becomes hold-to-aim,
+release-to-fire; owns **every** networked-state addition the whole feature needs, so
+Stages 3–5 are pure local presentation from here on. Builds on Stage 1's aim
+descriptor (`AimShape`/`GatherTargets`/`WouldAffect`) — no re-litigation.
+
+**New files**
+- `Assets/_Game/Scripts/Gameplay/AbilityActivationRules.cs` — the pure decision
+  layer factored out of `AbilityController` specifically for EditMode testability:
+  `AbilityRefusal` enum + `AbilityRefusalRules.Evaluate` (the §6 precedence table:
+  SlotUnavailable → Cooldown → Stunned → OtherAbilityActive → NoTarget), and
+  `ChargeAction`/`ChargeDecision`/`AbilityHoldStateMachine.Decide` (the full
+  hold/release/cancel/sub-tick-tap state machine as a pure function of booleans —
+  no Fusion, no ability assets).
+- `Assets/_Game/Scripts/Editor/Tests/AbilityActivationRulesTests.cs` — 23 new
+  tests covering the refusal precedence table and every edge of the hold state
+  machine (stunned mid-hold, match-stop mid-hold, cancel bit, drag-off, sub-tick
+  tap, multi-slot-held priority, the 0/1-based `ChargingSlot` encoding round-trip).
+
+**New networked state (complete list for the whole feature, per spec)**
+- `AbilityController.ChargingSlot` (`byte`, 1B) — 0 = none, 1..3 = slot+1. Drives
+  the opponent-visible wind-up tell (§2.4); Stage 3/4 read it, don't add to it.
+- `AbilityController.LastCastHitCount` (`byte`, 1B) — targets hit by the most
+  recent cast, written via `AbilityBaseSO.GatherTargets` **before** the event id
+  bumps, so a peer reacting to the id always reads a consistent count. **Gap for
+  Stage 4**: AimShape.None self-buffs always report 0 here (no aim shape to gather
+  from) — must be treated as exempt from "whiff" styling, not literally 0 hits.
+- `AbilityController.LastCastEventId` (`byte`, 1B) — bumped every activation,
+  wraps at 255, one-shot signal (same pattern as `ChickenController.KnockbackEventId`).
+- `ChickenController.RootTimer` (`TickTimer`, ~4B) — promoted from a plain
+  StateAuthority-only `double _rootUntil` so `RootRemaining` can read a countdown
+  on every peer, not just the owner. `StunRemaining` needed no new field (`StunTimer`
+  was already `[Networked]`); `SlowMultiplier` deliberately gets no timer — see the
+  doc comment on the property for why (no fixed end time to count down to).
+- **No new RPCs.** Three new `PlayerNetworkInput.Buttons` bits
+  (`AbilityHold1/2/3`, live/level-triggered, no byte-size change — same
+  `NetworkButtons`) + one (`AbilityCancel`, edge-triggered).
+
+> ⚠️ **Superseded 2026-08-02** by "Casting model rework" at the top of this file. The
+> firing rule below (fire on release, always) still holds and was never the problem — but
+> the *state machine summary* is stale: a rising hold now goes to `BeginPendingHold`, not
+> straight to `BeginCharge`, and `TapHoldThresholdSeconds` is now genuinely consumed. Read
+> the newer entry for current behaviour.
+
+**Firing rule (the spec's one real ambiguity, resolved).** Fire on release,
+*always* — tap or hold. The 120 ms `FeedbackTuning.TapHoldThresholdSeconds`
+governs only whether the telegraph draws, never when the cast happens; adding a
+hold-delay to firing would reintroduce the exact input lag §2 forbids. A
+**sub-tick tap** (press+release both landing between simulation ticks, so the hold
+bit was never observed) fires immediately rather than waiting for a hold that will
+never arrive — this preserves the existing "half of taps did nothing" bugfix in
+`FusionNetworkService`.
+
+**State machine summary** (`AbilityHoldStateMachine.Decide`, StateAuthority-side,
+one call per `FixedUpdateNetwork`): hold rises + slot chargeable → `BeginCharge`;
+hold rises on a dead slot (cooldown/unavailable) + a same-tick press → `RefuseAttempt`
+(routes to `TryActivate` so the refusal still logs once, never silent); hold falls
+on the charging slot → `Fire`; press with no hold observed → `Fire` (sub-tick tap);
+cancel bit, or caster becomes uncastable (stunned), or another ability activates
+mid-hold → `Cancel` (clears `ChargingSlot`, never burns cooldown). Match-stop /
+chicken-removed paths also clear `ChargingSlot` directly in `FixedUpdateNetwork`
+(same "cancel, no cooldown" contract). `AbilityController.EvaluateRefusal(slot)`
+(pure query, HUD-pollable) and `TryActivate`'s own gate both route through the
+same `AbilityRefusalRules.Evaluate` table, so they can never disagree.
+
+**Input plumbing.** `IInputProvider` gained `GetAbilityHeld(int)` (level-triggered)
+and `GetAbilityCancelPressed()` (edge-triggered, same one-shot contract as the
+existing `GetAbilityXPressed`), implemented in all three providers.
+`TouchControlsController` now captures the pointer per-hex on down (mirroring the
+joystick's existing pattern) and tracks per-slot hold + a drag-off cancel
+(`FeedbackTuning.DragCancelDistancePx`, measured via a `PointerMoveEvent`
+registration — not in the spec's literal event list but required to measure the
+distance at all; `PointerLeaveEvent` is registered per spec but intentionally a
+no-op, since the hex's own bounds are smaller than the drag threshold and firing
+on leave would make that constant meaningless). `PointerCaptureOutEvent` (capture
+lost abnormally) is treated as a cancel, not a release-to-fire.
+
+**Aim rotation while charging (§2.3).** `ChickenMovement.Tick` gained an
+`aimRotateOnly` parameter: while charging a directional ability (Cone /
+ForwardCircle / Jump), the stick still steers facing but planar translation is
+suppressed; gravity/knockback keep running unchanged. `ChickenController` decides
+via a new private `IsAimRotating()` reading `AbilityController.ChargingAbility`.
+Bots are unaffected (`IsBot` already returns before this code path).
+
+**Verification**: EditMode suite 196 → **223** (27 new: 23 in the new
+`AbilityActivationRulesTests`, 4 extending `ServicesAndInputTests`' `FakeInput`/
+`KeyboardInputProvider` coverage for the two new `IInputProvider` methods). 0
+failed, 0 regressions. Compiles clean (`assets-refresh` + `console-get-logs`
+show only pre-existing, unrelated noise — a stale placeholder FileID in
+`Chicken.prefab` and MCP hub-connection retries, neither touched by this stage).
+
+**Nothing for Maestro to wire by hand.** Checked specifically whether
+`TouchControls.uxml` needs a `picking-mode` change for the new pointer events —
+it doesn't; the hexes were already `picking-mode: Position` (only `Ignore` on
+purely cosmetic children), which is what made the existing `PointerDownEvent`
+work in the first place and is sufficient for `PointerMove/Up/Leave/CaptureOut` too.
+
+---
+
+## 🎯 Ability-feedback Stages 3–5 — telegraph, impact, aftermath, HUD (2026-08-01) — code-complete, not committed
+
+Closes `docs/FEEDBACK.md`. Per-case status for all 30 §7 cases is now marked **in
+FEEDBACK.md §7** — 24 implemented, 5 partial, 1 deferred, each with a reason. Nothing
+was silently dropped.
+
+**Stages 3–4 (telegraph + impact) — new files**
+`Assets/_Game/Scripts/Visuals/`: `AbilityTelegraph.cs` (hold-to-aim ground preview +
+`TelegraphShapes`, the geometry builder now shared with the cast flash),
+`AbilityZoneVisuals.cs` (zone edge ring at exactly `AbilityZone.TriggerRadius`, drains on
+expiry), `TargetHighlight.cs` (the §2.2 valid / immune / not-in-shape threat overlay),
+`HitFeedback.cs` (victim flash, impact vector, victim shake tier, screen-edge direction
+arc, caster hit-confirm, execute burst + hit-stop), `FloatingCombatText.cs` (pooled
+world-space popups), `ChickenStatusBadges.cs` (the §5.1 badge stack), `FeedbackTuning.cs`
+(the single source of truth for every timing/magnitude/colour in the system).
+**Modified**: `AbilityRangeIndicator`, `ChickenStateOverlays`, `ChickenVFX`,
+`ChickenVisuals`, `ControlStateVFX`, `ChickenCargo`, `ChickenCombat`.
+
+**Stage 5 (HUD) — this session.** All of it landed in the **existing** `TouchControlsHud`
+UIDocument, deliberately: §5.2's whole point is showing a status *where it bites*, and the
+ability buttons and move stick both live there. Consequence — **zero new scene wiring**.
+
+- `Assets/UI/TouchControls.uxml` / `Assets/UI/Styles/TouchControls.uss` — status strip,
+  refusal states, joystick consequence marking. 34 new named elements, all
+  `picking-mode="Ignore"` so nothing steals touches.
+- `Assets/_Game/Scripts/UI/HudFeedbackStyle.cs` (**new**) — the pure gameplay→USS mapping
+  layer, no Unity types, fully EditMode-testable.
+- `Assets/_Game/Scripts/Editor/Tests/HudFeedbackStyleTests.cs` (**new**) — 23 tests.
+- `Assets/_Game/Scripts/Input/TouchControlsController.cs` — drives it all.
+- `ChickenStatusBadges.cs` — 3 lines: its glyph consts now **alias**
+  `HudFeedbackStyle`'s at compile time, so the world badges and the HUD strip cannot
+  drift into two vocabularies for one state.
+
+**No tenth hex layer.** ART §6.6's **layer 9** generalises from "cooldown seconds" to
+"state indicator". `AbilityRefusalRules.Evaluate`'s precedence makes the five refusals
+mutually exclusive, so the hex centre never arbitrates between two marks. Separation is
+carried on three orthogonal channels — hue, shape, and clip direction — full table in
+**ART.md §6.13**.
+
+**Docs written this session** (Maestro asked that every element be *specified*, not just
+implemented): **ART.md §6.11** (telegraph shapes, the `TargetHighlight` colour triple,
+hit/whiff, shake tiers), **§6.12** (drain rings, badge stack, canonical colours, the glyph
+font situation), **§6.13** (hex refusal states extending the 9-layer model);
+**GDD.md §10.1–§10.3** (hold-to-aim, the ~120 ms tap window, drag-off cancel, what each
+control state prevents, why a button refuses); **FEEDBACK.md §7** (all 30 cases marked)
+and **§5.4** (the slow-countdown deferral and its reasoning).
+
+**Verification**: EditMode **223 → 246** (23 new, 0 failed, 0 regressions). Re-run
+independently by `code-architect` after the HUD landed — **246/246, 2.88 s** — not
+trusted from the implementing agent's self-report. `console-get-logs` shows no C# errors.
+
+**Two font findings worth acting on**
+- ⃠ (U+20E0) and ✕ (U+2715) are absent from **both** `LilitaOne-Regular.ttf` and
+  `NotoEmoji-Regular.ttf`, and TMP's global fallback list is empty — they would have drawn
+  tofu on *every* platform. Both are shipped as USS-drawn shapes; reversible in one line
+  via `HudFeedbackStyle.UseDrawnRefusalMarks`.
+- ⚡ ⛓ 🐌 are absent from LilitaOne but present in NotoEmoji — they carry the
+  `cw-glyph-font` class.
+- ⚠️ **Pre-existing, untouched:** the slot-3 Combo **★ (U+2605)** is in neither font and is
+  currently surviving on OS fallback. Verify on the Pixel 9.
+
+**⚠️ Outstanding for Maestro — `Chicken.prefab` wiring.** Verified directly against
+`Assets/_Game/Prefabs/Chicken.prefab` by GUID: `ChickenNameplate`, `ChickenWorldBars`,
+`ControlStateVFX`, `ChickenStateOverlays`, `ChickenVFX` and `AbilityRangeIndicator` are
+present, but **four Stage 3/4/5a components are not and must be added by hand**:
+
+| Component | Type | Note |
+|---|---|---|
+| `ChickenStatusBadges` | MonoBehaviour | The §5.1 badge stack. Until it's on, the HUD strip has no world-space counterpart to match. |
+| `TargetHighlight` | MonoBehaviour | On **every** chicken — it's how a caster sees who they'll hit. |
+| `AbilityTelegraph` | MonoBehaviour | Self-gates to the local player; safe on every chicken. |
+| `HitFeedback` | **NetworkBehaviour** | ⚠️ Adding this changes the prefab's `NetworkBehaviour` list — save the prefab so Fusion re-bakes the `NetworkObject`, and re-run a connected test afterwards. |
+
+None need Inspector fields set (`HitFeedback`'s only knob, `_enableHitStop`, defaults
+true). `FloatingCombatText` deliberately needs **no** wiring — it lazily creates its single
+pool object on first use.
+
+**Also outstanding: the audio pass.** Four §7 cases (9, 10, 16, 29) ship their visual half
+and are blocked only on clips — `AudioRegistrySO` has no hit-confirm, whiff-swish,
+execute-stinger or denied-click field. That's one `audio-designer` task. Case 16 also wants
+a kill-feed line (undesigned HUD surface). Case 20's vignette is the only unstarted visual.
+
+---
+
 ## 🔧 Common ability slot made OPTIONAL (2026-07-27) — gameplay-logic side done, not committed
 
 **User design directive, final and reaffirmed — overrides GDD §7.1-7.2's old "1 mandatory
