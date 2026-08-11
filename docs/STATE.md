@@ -50,7 +50,15 @@ deferred indefinitely. `Map.unity` instantiates prefabs, not raw FBX assets.
 **Idle clip rewritten with a peck.** Old amplitudes (head 3°, tail 2.5°) measured 2.2%
 vertical excursion against Walk's 6.0% and read as a frozen bird. Now head 9°, neck 6°,
 tail 8°, plus an asymmetric peck (fast dip, hold, slower rise) at frames 40–62 of a
-72-frame loop — measured **22% excursion**. Deliberately **no** procedural whole-body bob
+72-frame loop — measured **11.7% excursion**.
+
+⚠️ **The peck's Neck rotation must stay negative**, matching the breathing cycle and Walk.
+The neck pivot sits inside the torso, so a *positive* neck rotation swings the head into
+the chest: at `Neck +34` the head and beak disappear inside the body and only the comb
+still protrudes. The first version of this shipped that way. It measured a *better*
+22% excursion and the head bone height read as plausibly lowered — the numbers all looked
+like a deeper peck while the head was simply invisible. Only rendering the frame and
+checking the head was actually present caught it. Deliberately **no** procedural whole-body bob
 was added: `ChickenAnimator.ApplySkeletalOffsets` writes rest position and scale
 unchanged, which is what makes feet-on-ground structural, and the live `_idleBobHeight` is
 scoped to the `ApplyLegacyProcedural` fallback on purpose. A chicken idle reads through
