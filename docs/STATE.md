@@ -6,6 +6,64 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## Mobile cost pass + prop prefabs + idle peck (latest)
+
+A planned "texture bake" pass was **cut after measurement**, and two better wins
+replaced it. Recorded here because the reasoning is easy to lose.
+
+**The number that mattered was vertices, not triangles.** `prep_prop.py` was calling
+`shade_flat()`, which shares no normals between faces, so the exporter splits a vertex
+per triangle. Measured on `wall_segment` at 4,000 tris: flat = **11,174 verts** (2.79
+v/t), auto-smooth 35° = 6,649 (1.66), smooth = 4,679 (1.17). The whole map was
+**712,222 verts** for 257k triangles. Auto-smooth is visually identical to flat here and
+took the scene to **415,118 verts (-42%)** with the triangle count unchanged. Vertices
+are what the mobile vertex pipeline and the static batcher actually pay for.
+
+The flat-shading rationale in that script had also gone stale: it blamed black shading
+wedges on smoothed normals, but commit `23a38ad` established those were **UV collapse
+from over-decimation**, and flat-vs-smooth renders were identical. Diagnosis fixed.
+
+**Texture bake: attempted, does not work here, do not retry as-is.** Cycles
+selected-to-active bake onto a hard-decimated low-poly was spiked on `wall_segment`. The
+bake runs and transfers colour, but the result is still broken at 700 tris. Root cause is
+**shell count, not UVs**: TRELLIS emits these props as 100–370 disconnected shells, so a
+700-triangle budget is under two triangles per shell and whole shells collapse to slivers
+however the texture is authored. A voxel remesh (`--voxel` in `bake_prop.py`) fuses shells
+and is the only route that could make heavy decimation viable — untested beyond a first
+pass. `bake_prop.py` is kept for that, not for production use.
+
+**Other wins, both cheap:**
+- `Mobile_RPAsset` `m_ShadowDistance` **50 → 26**. The arena is 38m, so every prop sat
+  inside the shadow frustum and rendered twice per frame. Ground clutter (piles, barrel,
+  crate, hay, trough, nest) now has shadow casting **off**; only walls, coops and silos
+  cast. 46 of 80 renderers cast, down from all of them.
+- Prop textures: Android override **ASTC_6x6 + mipmaps + streaming**, max size 512 for
+  wall/coop/silo and 256 for small clutter. Editor texture memory **52.0 MB → 14.0 MB**.
+
+**Prop prefabs** now exist at `Assets/_Game/Prefabs/Props/Prop_*.prefab`. Each carries the
+−90° X axis correction, the base-on-origin offset, static flags, shadow-casting mode and
+(for coop/silo) a collider. Prop FBXs still export without Blender's Z-up→Y-up conversion
+— the chicken rigs convert correctly because they carry an armature — but that correction
+is now authored **once per prop** instead of at every call site, so fixing it at export is
+deferred indefinitely. `Map.unity` instantiates prefabs, not raw FBX assets.
+
+**Idle clip rewritten with a peck.** Old amplitudes (head 3°, tail 2.5°) measured 2.2%
+vertical excursion against Walk's 6.0% and read as a frozen bird. Now head 9°, neck 6°,
+tail 8°, plus an asymmetric peck (fast dip, hold, slower rise) at frames 40–62 of a
+72-frame loop — measured **22% excursion**. Deliberately **no** procedural whole-body bob
+was added: `ChickenAnimator.ApplySkeletalOffsets` writes rest position and scale
+unchanged, which is what makes feet-on-ground structural, and the live `_idleBobHeight` is
+scoped to the `ApplyLegacyProcedural` fallback on purpose. A chicken idle reads through
+head/neck articulation, not through the body rising on planted feet.
+
+**Verification:** EditMode **274/274** (268 baseline + 6 skeletal-animation tests — note
+the `268/268` further down this file is historical, not current). All four rigs re-imported
+Generic, `isHuman=False`, 5 clips, loop flags correct (Idle/Stunned/Walk loop; Cast/Hit
+one-shot), and **textures still bound** after re-export — that remap is the documented
+silent-failure surface, so check it explicitly on any future re-export.
+
+---
+
 ## Latest tag
 
 `v0.3.1-alpha` — Debug logging, deposit fix, cargo feedback, base tinting. Pinned at commit `7fe855e`.
@@ -134,7 +192,7 @@ feet on ground, correct per-class model and hue. Console clean of model/material
 `CharacterController.Move called on inactive controller` and `Not inside a Renderpass` entries in
 the log are artifacts of the inspection scripts used to stage screenshots, not gameplay).
 
-⚠️ `Assets/Generated/` is **entirely untracked**, including the `.meta` files carrying the Generic
+⚠️ *(Superseded: `Assets/Generated/` was committed in `13a8804`.)* `Assets/Generated/` was **entirely untracked**, including the `.meta` files carrying the Generic
 rig setting *and* the `externalObjects` material remap. Committing the `.fbx` files without their
 `.meta` files resets the rig to Humanoid (models sink through the floor) **and** drops the texture
 binding. Commit them together.
