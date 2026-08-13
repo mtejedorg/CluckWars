@@ -15,7 +15,7 @@ MonoBehaviour:
   DisplayName: Fatty
   Passive: 1
   MaxHP: 120
-  MoveSpeed: 9
+  MoveSpeed: 7.5
   TurnSpeed: 720
   CargoCapacity: 35
   CollectionRate: 3.2

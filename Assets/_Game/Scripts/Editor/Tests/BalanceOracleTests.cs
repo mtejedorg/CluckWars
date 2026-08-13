@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using UnityEngine;
 using CluckWars.Balance;
+using CluckWars.Gameplay;
 
 namespace CluckWars.Tests
 {
@@ -32,31 +33,88 @@ namespace CluckWars.Tests
             };
         }
 
+        /// <summary>
+        /// The SCT axiom, asserted against the <b>shipped</b> <see cref="ChickenStatsSO"/> and
+        /// <see cref="MatchConfigSO"/> assets rather than against literals.
+        /// </summary>
+        /// <remarks>
+        /// ⚠️ <b>This test previously hardcoded its inputs</b> — four <c>OracleChicken</c>
+        /// literals carrying the design values — which made it assert "the spec satisfies the
+        /// spec" and left it structurally blind to the assets that actually ship. Move speeds
+        /// drifted to 9/9/10.5/10.5 against a solved 7.5/7.5/9.0/9.0 (Fatty −1.8 s and Warrior
+        /// −1.9 s, both outside tolerance) and this test stayed green throughout, because
+        /// nothing here ever opened a <c>.asset</c> file. Found 2026-08-13 only because a
+        /// playtest reported "chickens move too fast".
+        ///
+        /// <b>Never reintroduce literal stats here.</b> A test that restates its inputs cannot
+        /// detect drift in the thing it is supposed to be guarding.
+        /// </remarks>
         [Test]
-        public void Task8_RealMap_StatResolvePassesAllClasses()
+        public void RealMap_ShippedClassAssets_SatisfyTheSctAxiom()
         {
             var map = Task8OracleMap();
+            var config = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
+            var stats = TestAssets.LoadAllIn<ChickenStatsSO>(TestAssets.ClassesDir);
 
-            // Pinned Capacities: Speedy 10, Fatty 35, Warrior 14, Assassin 10
-            var speedy = new OracleChicken { MoveSpeed = 9.0f, CargoCapacity = 10, CollectionRate = 3.00f, DepositRate = 9.0f };
-            var fatty   = new OracleChicken { MoveSpeed = 7.5f, CargoCapacity = 35, CollectionRate = 3.20f, DepositRate = 9.0f };
-            var warrior = new OracleChicken { MoveSpeed = 7.5f, CargoCapacity = 14, CollectionRate = 2.60f, DepositRate = 9.0f };
-            var assassin= new OracleChicken { MoveSpeed = 9.0f, CargoCapacity = 10, CollectionRate = 1.70f, DepositRate = 9.0f };
+            Assert.AreEqual(SctTargets.All.Length, stats.Count,
+                $"Expected one ChickenStatsSO per SCT target in {TestAssets.ClassesDir}, found {stats.Count}.");
 
-            var speedyRes   = BalanceOracle.Simulate(map, speedy, 40f);
-            var fattyRes    = BalanceOracle.Simulate(map, fatty, 40f);
-            var warriorRes  = BalanceOracle.Simulate(map, warrior, 40f);
-            var assassinRes = BalanceOracle.Simulate(map, assassin, 40f);
+            foreach (var target in SctTargets.All)
+            {
+                var s = stats.Find(x => x.DisplayName == target.ClassName);
+                Assert.IsNotNull(s,
+                    $"No ChickenStatsSO with DisplayName '{target.ClassName}'. SctTargets and the class " +
+                    "assets are keyed by DisplayName — a rename on either side must be made on both.");
 
-            var speedyTarget   = System.Array.Find(SctTargets.All, t => t.ClassName == "Speedy");
-            var fattyTarget    = System.Array.Find(SctTargets.All, t => t.ClassName == "Fatty");
-            var warriorTarget  = System.Array.Find(SctTargets.All, t => t.ClassName == "Warrior");
-            var assassinTarget = System.Array.Find(SctTargets.All, t => t.ClassName == "Assassin");
+                var chicken = new OracleChicken
+                {
+                    MoveSpeed      = s.MoveSpeed,
+                    CargoCapacity  = s.CargoCapacity,
+                    CollectionRate = s.CollectionRate,
+                    DepositRate    = config.DepositRatePerSecond,
+                };
 
-            Assert.IsTrue(SctTargets.Within(speedyRes, speedyTarget),     $"Speedy failed: {speedyRes.SctSeconds:0.1}s, {speedyRes.Trips} trips");
-            Assert.IsTrue(SctTargets.Within(fattyRes, fattyTarget),       $"Fatty failed: {fattyRes.SctSeconds:0.1}s, {fattyRes.Trips} trips");
-            Assert.IsTrue(SctTargets.Within(warriorRes, warriorTarget),   $"Warrior failed: {warriorRes.SctSeconds:0.1}s, {warriorRes.Trips} trips");
-            Assert.IsTrue(SctTargets.Within(assassinRes, assassinTarget), $"Assassin failed: {assassinRes.SctSeconds:0.1}s, {assassinRes.Trips} trips");
+                var result = BalanceOracle.Simulate(map, chicken, config.FoodTargetToWin);
+
+                Assert.IsTrue(SctTargets.Within(result, target),
+                    $"{target.ClassName} misses its SCT target: got {result.SctSeconds:0.0}s / {result.Trips} trips, " +
+                    $"want {target.Seconds}s / {target.Trips} trips (±{SctTargets.DefaultToleranceSeconds}s). " +
+                    $"Shipped stats: move {s.MoveSpeed}, cap {s.CargoCapacity}, collect {s.CollectionRate}, " +
+                    $"deposit {config.DepositRatePerSecond}, W {config.FoodTargetToWin}. " +
+                    "Stats are solved AGAINST this axiom — re-solve them, do not relax the target.");
+            }
+        }
+
+        /// <summary>
+        /// The Oracle fixture's pile layout must stay in step with <see cref="MapGenerator"/>'s
+        /// authored food amounts, or the axiom is solved against a map that is not the one
+        /// being played. Guards the other half of the drift surface: §<see
+        /// cref="RealMap_ShippedClassAssets_SatisfyTheSctAxiom"/> pins the chickens, this pins
+        /// the map they farm.
+        /// </summary>
+        /// <remarks>
+        /// Reads the values out of <c>Game.unity</c>'s YAML rather than off a MapGenerator
+        /// instance, for two reasons. MapGenerator's <c>Awake</c> builds the plane, the walls,
+        /// the obstacles and a NavMesh, so instantiating one in an EditMode test is a heavy
+        /// side effect. More importantly the scene <b>overrides</b> the C# field initializers,
+        /// so reading the code defaults would assert against numbers the game never uses.
+        /// </remarks>
+        [Test]
+        public void OracleFixture_PileFood_MatchesTheAuthoredMap()
+        {
+            float centre    = TestAssets.SceneFloat("_centerPileAmount");
+            float personal  = TestAssets.SceneFloat("_personalPileAmount");
+            float contested = TestAssets.SceneFloat("_contestedPileAmount");
+
+            float expected = centre + 4f * personal + 4f * contested;
+            float actual = 0f;
+            foreach (var p in Task8OracleMap().Piles) actual += p.Food;
+
+            Assert.AreEqual(expected, actual, 0.01f,
+                $"The Oracle fixture holds {actual} food but Game.unity authors {expected} " +
+                $"(centre {centre} + 4x personal {personal} + 4x contested {contested}). " +
+                "Every SCT number is solved on this map — update Task8OracleMap to match, " +
+                "then re-solve the class stats against the new supply.");
         }
 
         [Test]

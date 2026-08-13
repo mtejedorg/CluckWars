@@ -124,8 +124,8 @@ namespace CluckWars.Gameplay
         [Min(5f)]
         [SerializeField] private float _centerPileAmount = 20f;
 
-        [Tooltip("Full world X,Z footprint of the centre island at 100% fill (GDD 3.8: 12x10 ellipse).")]
-        [SerializeField] private Vector2 _centerPileFootprint = new Vector2(12f, 10f);
+        [Tooltip("Full world X,Z footprint of the centre island at 100% fill. Shrunk 35% from the original 12x10: piles are solid NavMesh-carving blockers, and at the old sizes they covered 25% of the 38x38 arena floor, which left chases nowhere to happen. See the 2026-08-13 Peck/four-slot spec.")]
+        [SerializeField] private Vector2 _centerPileFootprint = new Vector2(7.8f, 6.5f);
 
         [Tooltip("Make the center pile permanent (ADR 0003 Decision 2b): it can never be drained below its floor and slowly regenerates, so it stays a solid obstacle and the one contested resource of the late game. Floor and regen rate are tuned on the FoodPile prefab.")]
         [SerializeField] private bool _centerPileIsPermanent = false;
@@ -134,8 +134,8 @@ namespace CluckWars.Gameplay
         [Min(0f)]
         [SerializeField] private float _personalPileAmount = 5f;
 
-        [Tooltip("Full world X,Z footprint of each personal island at 100% fill (GDD 3.8: 5.5x4.6 near-circular ellipse).")]
-        [SerializeField] private Vector2 _personalPileFootprint = new Vector2(5.5f, 4.6f);
+        [Tooltip("Full world X,Z footprint of each personal island at 100% fill. Shrunk 35% from the original 5.5x4.6 — see _centerPileFootprint.")]
+        [SerializeField] private Vector2 _personalPileFootprint = new Vector2(3.6f, 3.0f);
 
         [Tooltip("Personal island position = Lerp(corner, center, inset). 0.35 puts it a few units in front of the base, toward the action.")]
         [Range(0.2f, 0.6f)]
@@ -145,8 +145,8 @@ namespace CluckWars.Gameplay
         [Min(0f)]
         [SerializeField] private float _contestedPileAmount = 10f;
 
-        [Tooltip("Full world X,Z footprint of each contested island at 100% fill (GDD 3.8: 6.5x5.4 near-circular ellipse).")]
-        [SerializeField] private Vector2 _contestedPileFootprint = new Vector2(6.5f, 5.4f);
+        [Tooltip("Full world X,Z footprint of each contested island at 100% fill. Shrunk 35% from the original 6.5x5.4 — see _centerPileFootprint.")]
+        [SerializeField] private Vector2 _contestedPileFootprint = new Vector2(4.2f, 3.5f);
 
         [Tooltip("Contested island position = edge midpoint scaled toward center. 0.8 keeps it between the two neighbours but inside the walls.")]
         [Range(0.4f, 1f)]

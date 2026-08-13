@@ -64,6 +64,69 @@ namespace CluckWars.Tests
         }
 
         /// <summary>
+        /// Reads a serialized scalar field off the <see cref="MapGenerator"/> in
+        /// <c>Game.unity</c>, straight from the scene YAML.
+        /// </summary>
+        /// <remarks>
+        /// The component lives in a scene, not on a prefab, so there is no asset to load —
+        /// and opening the scene from an EditMode test would disturb whatever the developer
+        /// has open. Reading the YAML also catches <b>scene-level overrides</b>, which is the
+        /// point: MapGenerator's C# field initializers are routinely overridden in
+        /// <c>Game.unity</c>, so a test that read the code defaults would be asserting against
+        /// values the game never uses. (Verified 2026-08-13: the pile footprints were
+        /// overridden in-scene, so editing the C# defaults alone changed nothing at runtime.)
+        /// </remarks>
+        public static float SceneFloat(string fieldName)
+        {
+            string path = GameScenePath;
+            Assert.IsTrue(System.IO.File.Exists(path), $"{path} not found on disk.");
+
+            string key = fieldName + ":";
+            foreach (var line in System.IO.File.ReadLines(path))
+            {
+                int idx = line.IndexOf(key, System.StringComparison.Ordinal);
+                if (idx < 0) continue;
+
+                var raw = line.Substring(idx + key.Length).Trim();
+                var culture = System.Globalization.CultureInfo.InvariantCulture;
+                if (float.TryParse(raw, System.Globalization.NumberStyles.Float, culture, out var value))
+                    return value;
+            }
+
+            Assert.Fail($"MapGenerator.{fieldName} is not serialized in {path}. Either the MapGenerator was " +
+                        "removed from the scene or the field was renamed — check every inspector slot too.");
+            return 0f;
+        }
+
+        /// <summary>Same approach as <see cref="SceneFloat"/>, for a serialized <c>Vector2</c>.</summary>
+        public static Vector2 SceneVector2(string fieldName)
+        {
+            string path = GameScenePath;
+            Assert.IsTrue(System.IO.File.Exists(path), $"{path} not found on disk.");
+
+            string key = fieldName + ":";
+            foreach (var line in System.IO.File.ReadLines(path))
+            {
+                int idx = line.IndexOf(key, System.StringComparison.Ordinal);
+                if (idx < 0) continue;
+
+                var raw = line.Substring(idx + key.Length).Trim();          // "{x: 7, y: 4}"
+                var match = System.Text.RegularExpressions.Regex.Match(raw,
+                    @"x:\s*(-?[\d.eE+]+),\s*y:\s*(-?[\d.eE+]+)");
+                Assert.IsTrue(match.Success, $"Could not parse '{fieldName}: {raw}' in {path} as a Vector2.");
+
+                var culture = System.Globalization.CultureInfo.InvariantCulture;
+                return new Vector2(
+                    float.Parse(match.Groups[1].Value, culture),
+                    float.Parse(match.Groups[2].Value, culture));
+            }
+
+            Assert.Fail($"MapGenerator.{fieldName} is not serialized in {path}. Either the MapGenerator was " +
+                        "removed from the scene or the field was renamed — check every inspector slot too.");
+            return Vector2.zero;
+        }
+
+        /// <summary>
         /// Reads a private serialized field off a live component instance. Used to
         /// assert against tunables that have no public accessor (FoodPile's blocker
         /// radius, MapGenerator's pile amounts). Reflection sees the value Unity

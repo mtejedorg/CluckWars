@@ -8,7 +8,7 @@ should rarely need edits.
 
 ## Project at a glance
 
-**Cluck Wars** is a fast-paced 4-player free-for-all arena game. Players pick a chicken class, collect food from piles, deposit it at their base, sabotage rivals. First to 150 food units (or most at 3 minutes) wins.
+**Cluck Wars** is a fast-paced 4-player free-for-all arena game. Players pick a chicken class, collect food from piles, deposit it at their base, sabotage rivals. First to bank 40 food units (or most banked when the 45-second timer expires) wins — the authority is `MatchConfig.asset`, not this line.
 
 - **Engine:** Unity 6000.3 LTS · **Pipeline:** URP
 - **Networking:** Photon Fusion 2 — Shared Mode for demo (LAN/cloud-relay), Server Mode post-funding
