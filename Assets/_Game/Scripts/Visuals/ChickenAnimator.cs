@@ -53,6 +53,7 @@ namespace CluckWars.Visuals
         // ---- Animator parameter IDs (hashed once; this is a per-frame path) ----
         private static readonly int SpeedHash       = Animator.StringToHash("Speed");
         private static readonly int AbilityCastHash = Animator.StringToHash("AbilityCast");
+        private static readonly int PeckHash        = Animator.StringToHash("Peck");
         private static readonly int HitHash         = Animator.StringToHash("Hit");
         private static readonly int StunnedHash     = Animator.StringToHash("Stunned");
 
@@ -418,6 +419,20 @@ namespace CluckWars.Visuals
         /// <summary>
         /// Fires the Cast state. Called by <see cref="AbilityController"/> when a slot fires.
         /// </summary>
+        /// <summary>
+        /// Fires the Peck state — the foraging beat, distinct from a generic cast. Called by
+        /// <see cref="AbilityController"/> when the ability that fired is Peck.
+        /// </summary>
+        /// <remarks>
+        /// The clip is 0.4s, matching <c>PeckAbilitySO.Duration</c>, so the animation and the
+        /// movement lock start and end together. If they ever diverge the chicken either
+        /// snaps out of a half-played peck or stands frozen after the animation finished.
+        /// </remarks>
+        public void TriggerPeck()
+        {
+            if (AnimatorReady) _animator.SetTrigger(PeckHash);
+        }
+
         public void TriggerAbilityCast()
         {
             if (AnimatorReady) _animator.SetTrigger(AbilityCastHash);

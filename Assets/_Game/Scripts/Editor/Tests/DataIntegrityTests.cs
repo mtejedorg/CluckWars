@@ -763,25 +763,34 @@ namespace CluckWars.Tests
         private const string ControllerPath  = "Assets/_Game/Art/Animations/Chicken.controller";
         private const string PlaceholderDir  = "Assets/_Game/Art/Animations/Placeholders";
 
-        /// <summary>The five state names, which are ALSO the override keys used in code.</summary>
-        private static readonly string[] StateNames = { "Idle", "Walk", "Cast", "Hit", "Stunned" };
+        /// <summary>The six state names, which are ALSO the override keys used in code.</summary>
+        private static readonly string[] StateNames = { "Idle", "Walk", "Cast", "Hit", "Stunned", "Peck" };
+
+        /// <summary>
+        /// States whose clip is generated rather than exported from the rig. Peck is derived
+        /// from each class's own Idle take, so it lives under Art/Animations/Generated and the
+        /// same-.fbx identity check below cannot apply to it.
+        /// </summary>
+        private static readonly HashSet<string> GeneratedStates = new() { "Peck" };
+
+        private const string GeneratedClipDir = "Assets/_Game/Art/Animations/Generated";
 
         /// <summary>Idle/Walk/Stunned are held; Cast/Hit are one-shot reactions.</summary>
         private static readonly Dictionary<string, bool> ShouldLoop = new()
         {
             { "Idle", true }, { "Walk", true }, { "Stunned", true },
-            { "Cast", false }, { "Hit", false },
+            { "Cast", false }, { "Hit", false }, { "Peck", false },
         };
 
         private static (string State, AnimationClip Clip)[] ClipsOf(ChickenClassRegistrySO.Entry e) =>
             new[]
             {
                 ("Idle", e.Clips.Idle), ("Walk", e.Clips.Walk), ("Cast", e.Clips.Cast),
-                ("Hit", e.Clips.Hit),   ("Stunned", e.Clips.Stunned),
+                ("Hit", e.Clips.Hit),   ("Stunned", e.Clips.Stunned), ("Peck", e.Clips.Peck),
             };
 
         [Test]
-        public void ClassRegistry_EveryEntry_HasFiveClipsFromItsOwnFbx()
+        public void ClassRegistry_EveryEntry_HasAllSixClipsFromTheRightSource()
         {
             // Cross-class drift is the specific failure this guards. A clip from another class's
             // .fbx references bone paths that do not exist on this skeleton, so it binds to
@@ -800,9 +809,22 @@ namespace CluckWars.Tests
                 foreach (var (state, clip) in ClipsOf(entry))
                 {
                     Assert.IsNotNull(clip,
-                        $"{cls}'s registry entry has no '{state}' AnimationClip. All five are " +
+                        $"{cls}'s registry entry has no '{state}' AnimationClip. All six are " +
                         "required — ChickenController treats a partial set as no set and falls back " +
                         "to procedural motion. Run 'Cluck Wars/Animation/Wire Skeletal Clips'.");
+
+                    if (GeneratedStates.Contains(state))
+                    {
+                        // Generated from this class's own Idle, so it carries this rig's bone
+                        // paths. The filename prefix is the only thing tying it to the class, so
+                        // that is what gets checked — a mis-wired generated clip binds to nothing
+                        // and the chicken pecks by standing perfectly still.
+                        string expected = $"{GeneratedClipDir}/{cls.ToString().ToLowerInvariant()}_{state}.anim";
+                        Assert.AreEqual(expected, AssetDatabase.GetAssetPath(clip),
+                            $"{cls}'s '{state}' clip is '{AssetDatabase.GetAssetPath(clip)}', not the "
+                            + $"generated clip for this class at '{expected}'.");
+                        continue;
+                    }
 
                     Assert.AreEqual(fbxPath, AssetDatabase.GetAssetPath(clip),
                         $"{cls}'s '{state}' clip ('{clip.name}') comes from " +
@@ -810,6 +832,57 @@ namespace CluckWars.Tests
                         $"'{fbxPath}'. A clip from another class's rig binds to no bones and the " +
                         "chicken silently freezes. Re-run 'Cluck Wars/Animation/Wire Skeletal Clips'.");
                 }
+            }
+        }
+
+        [Test]
+        public void PeckClip_ActuallyDipsTheHead_AndNeverRotatesTheNeckPositive()
+        {
+            // Two failures this guards, both of which a "does the clip exist" check misses.
+            //
+            // 1. An EMPTY clip. The generator derives Peck by resampling the Idle take's peck
+            //    beat; point it at the wrong frame window and it produces a perfectly valid
+            //    0.4s clip of the chicken standing still. Nothing errors — foraging just
+            //    stops having an animation.
+            //
+            // 2. A peck that buries the head INSIDE the torso. docs/STATE.md records this
+            //    shipping once: the neck pivot sits inside the body, so a POSITIVE neck
+            //    rotation swings the head into the chest until only the comb shows. It
+            //    measured a BETTER vertical excursion (22% vs 11.7%) and a lower head bone
+            //    than the correct version, because driving the head into the torso genuinely
+            //    does lower it. Every numeric check preferred the broken pose. The rule that
+            //    actually separates them is the SIGN.
+            var reg = TestAssets.Load<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
+
+            foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
+            {
+                Assert.IsTrue(reg.TryGet(cls, out var entry), $"No entry for {cls}.");
+                var clip = entry.Clips.Peck;
+                Assert.IsNotNull(clip, $"{cls} has no Peck clip.");
+
+                var neck = AnimationUtility.GetCurveBindings(clip).FirstOrDefault(
+                    b => b.path.EndsWith("Neck") && b.propertyName == "m_LocalRotation.x");
+                Assert.IsFalse(string.IsNullOrEmpty(neck.path),
+                    $"{cls}'s Peck clip has no Neck rotation curve at all, so it cannot be a peck.");
+
+                var curve = AnimationUtility.GetEditorCurve(clip, neck);
+                float min = float.MaxValue, max = float.MinValue;
+                for (int i = 0; i <= 32; i++)
+                {
+                    float v = curve.Evaluate(clip.length * i / 32f);
+                    min = Mathf.Min(min, v);
+                    max = Mathf.Max(max, v);
+                }
+
+                Assert.Less(min, -0.05f,
+                    $"{cls}'s Peck barely moves the neck (min {min:0.000}). The clip exists but the " +
+                    "chicken is standing still — check the frame window the generator samples from Idle.");
+
+                Assert.LessOrEqual(max, 0.02f,
+                    $"{cls}'s Peck rotates the neck POSITIVE (max {max:0.000}). The neck pivot is inside " +
+                    "the torso, so that swings the head into the chest and only the comb stays visible. " +
+                    "This exact pose shipped once and beat every numeric check — do not 'fix' this test " +
+                    "by widening the bound.");
             }
         }
 

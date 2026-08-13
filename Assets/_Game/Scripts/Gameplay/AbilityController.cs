@@ -596,7 +596,12 @@ namespace CluckWars.Gameplay
             // resolved and applied its lane from the take-off pose, so it may travel.
             if (ability.ResolvesBeforeJump) ExecuteJumpIfAny(ability);
 
-            _animator?.TriggerAbilityCast();
+            // Peck gets its own animation beat. Everything else shares the generic Cast
+            // state — per-ability clips were never wired (AbilityBaseSO.AbilityAnimationClip
+            // has been declared and unread since Phase 6), and foraging is the one action
+            // frequent enough that reusing a combat cast would read as a bug.
+            if (ability is Abilities.PeckAbilitySO) _animator?.TriggerPeck();
+            else _animator?.TriggerAbilityCast();
             _audio?.PlaySFX(_audioReg != null ? _audioReg.AbilityActivate : null);
             LastCastEventId++; // wraps at 255 by design (byte overflow) — a one-shot signal, not a counter
             _log?.Info(Source, $"Activated slot {slot} ({ability.DisplayName}) for {ability.Duration:0.00}s, " +

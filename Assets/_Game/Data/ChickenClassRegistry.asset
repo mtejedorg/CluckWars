@@ -26,6 +26,7 @@ MonoBehaviour:
       Cast: {fileID: 5104607688794737005, guid: 486f713d011aa684b9f233152c855b6a, type: 3}
       Hit: {fileID: -6879581152906094953, guid: 486f713d011aa684b9f233152c855b6a, type: 3}
       Stunned: {fileID: -7390162552896710762, guid: 486f713d011aa684b9f233152c855b6a, type: 3}
+      Peck: {fileID: 7400000, guid: d5a86c78e0a00f94590c2839dc387ae8, type: 2}
   - Class: 1
     Stats: {fileID: 11400000, guid: b9f7fbede9b28ae489bdefabd9b4a8ba, type: 2}
     TintColor: {r: 0.9098039, g: 0.3529412, b: 0.1647059, a: 1}
@@ -39,6 +40,7 @@ MonoBehaviour:
       Cast: {fileID: -4434629196361901766, guid: 55c382f4abcf5234ea01cb6abec3db0a, type: 3}
       Hit: {fileID: 5600662734154523673, guid: 55c382f4abcf5234ea01cb6abec3db0a, type: 3}
       Stunned: {fileID: 6698135827750195933, guid: 55c382f4abcf5234ea01cb6abec3db0a, type: 3}
+      Peck: {fileID: 7400000, guid: b9061a39be0be78479567938075741c3, type: 2}
   - Class: 2
     Stats: {fileID: 11400000, guid: cb8b4aa3fcd58054daff2e725896035b, type: 2}
     TintColor: {r: 0.9607843, g: 0.8431373, b: 0.3529412, a: 1}
@@ -52,6 +54,7 @@ MonoBehaviour:
       Cast: {fileID: -1260666949006198636, guid: e50a32da5c9fdeb43bd81e18521c0afb, type: 3}
       Hit: {fileID: -6334875250079141160, guid: e50a32da5c9fdeb43bd81e18521c0afb, type: 3}
       Stunned: {fileID: 6154100851174394069, guid: e50a32da5c9fdeb43bd81e18521c0afb, type: 3}
+      Peck: {fileID: 7400000, guid: f1a8acc2692875a4a8d838705fafeacb, type: 2}
   - Class: 3
     Stats: {fileID: 11400000, guid: 05f659d445a74b74e815b51607b9363d, type: 2}
     TintColor: {r: 0.4823529, g: 0.4078431, b: 0.9333333, a: 1}
@@ -65,3 +68,4 @@ MonoBehaviour:
       Cast: {fileID: 4717719981044518318, guid: 4a1913c14c63b674481f62493c187cc8, type: 3}
       Hit: {fileID: -4778664701210301699, guid: 4a1913c14c63b674481f62493c187cc8, type: 3}
       Stunned: {fileID: -5366867447961804561, guid: 4a1913c14c63b674481f62493c187cc8, type: 3}
+      Peck: {fileID: 7400000, guid: 8bb2107694cd55544bbd1b452960cb73, type: 2}

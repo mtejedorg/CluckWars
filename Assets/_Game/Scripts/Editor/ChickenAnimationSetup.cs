@@ -44,7 +44,17 @@ namespace CluckWars.EditorTools
             ("Cast",    false),
             ("Hit",     false),
             ("Stunned", true),
+            ("Peck",    false),
         };
+
+        /// <summary>
+        /// States whose clip does NOT come from the rig's .fbx. Peck is generated from the
+        /// Idle take rather than exported, so the importer pass must not demand a matching
+        /// take and the registry pass must look somewhere else for it.
+        /// </summary>
+        private static readonly HashSet<string> GeneratedStates = new() { "Peck" };
+
+        private const string GeneratedDir = "Assets/_Game/Art/Animations/Generated";
 
         private static readonly Dictionary<string, bool> LoopByState =
             States.ToDictionary(s => s.State, s => s.Loop);
@@ -225,6 +235,7 @@ namespace CluckWars.EditorTools
 
                 foreach (var (state, _) in States)
                 {
+                    if (GeneratedStates.Contains(state)) continue; // not an .fbx take; owns its own loop flag
                     if (!matched.Contains(state))
                     {
                         problems.Add($"{label}: '{fbxPath}' has no animation take matching " +
@@ -334,6 +345,21 @@ namespace CluckWars.EditorTools
                 foreach (var (state, _) in States)
                 {
                     var slot = clips.FindPropertyRelative(state);
+
+                    if (GeneratedStates.Contains(state))
+                    {
+                        // Generated, not exported. Regenerate with the "Generate Peck Clips"
+                        // menu item if this is missing — it is derived from the Idle take.
+                        // `label` is the enum display name ("Warrior"), which is exactly the
+                        // prefix the generator uses for its filenames.
+                        string genPath = $"{GeneratedDir}/{label.ToLowerInvariant()}_{state}.anim";
+                        var generated = AssetDatabase.LoadAssetAtPath<AnimationClip>(genPath);
+                        slot.objectReferenceValue = generated;
+                        if (generated == null)
+                            problems.Add($"{label}: no generated '{state}' clip at '{genPath}'.");
+                        continue;
+                    }
+
                     if (byState.TryGetValue(state, out var clip))
                     {
                         slot.objectReferenceValue = clip;

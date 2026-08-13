@@ -53,11 +53,21 @@ namespace CluckWars.Gameplay
             public AnimationClip Hit;
             public AnimationClip Stunned;
 
+            /// <summary>
+            /// The foraging peck. Unlike the other five this is NOT a take inside the rig's
+            /// .fbx — it is derived from the Idle clip's own peck beat (frames 39-60 of its
+            /// 60-frame loop), resampled to 0.4s and made one-shot, and saved under
+            /// Art/Animations/Generated. Deriving it avoided re-exporting all four rigs,
+            /// which is the documented silent-failure surface for the .fbx material remap.
+            /// </summary>
+            public AnimationClip Peck;
+
             /// <summary>True only when all five slots are populated. A partial set is treated as
             /// no set at all: overriding three of five states leaves the others on the empty
             /// placeholder, which reads as a chicken that freezes on those beats.</summary>
             public bool IsComplete =>
-                Idle != null && Walk != null && Cast != null && Hit != null && Stunned != null;
+                Idle != null && Walk != null && Cast != null && Hit != null && Stunned != null
+                && Peck != null;
 
             /// <summary>Names the first missing slot, for error messages. Null when complete.</summary>
             public string FirstMissing =>
@@ -102,10 +112,11 @@ namespace CluckWars.Gameplay
                      "through the floor. Measured 2026-08-07 — see DataIntegrityTests.")]
             public Avatar ModelAvatar;
 
-            [Tooltip("The five skeletal AnimationClips for this class, taken from the SAME .fbx as " +
-                     "ModelPrefab. They override the placeholder motions on the shared " +
-                     "Chicken.controller at spawn. All five are required — a partial set is " +
-                     "rejected and the chicken falls back to procedural motion.")]
+            [Tooltip("The six skeletal AnimationClips for this class. Five come from the SAME " +
+                     ".fbx as ModelPrefab; Peck is generated from Idle into Art/Animations/Generated. " +
+                     "They override the placeholder motions on the shared Chicken.controller at " +
+                     "spawn. All six are required — a partial set is rejected and the chicken falls " +
+                     "back to procedural motion.")]
             public ClassClips Clips;
         }
 
