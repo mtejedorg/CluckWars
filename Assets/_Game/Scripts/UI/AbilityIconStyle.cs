@@ -34,6 +34,7 @@ namespace CluckWars.UI
             { "RollTrampleAbilitySO", "cw-hex-icon--dive-bomb" },
             { "CluckShockAbilitySO",  "cw-hex-icon--cluck" },
             { "SnatchAbilitySO",      "cw-hex-icon--snatch" },
+            { "PeckAbilitySO",        "cw-hex-icon--peck" },   // foraging; art not yet exported
             { "RollPushAbilitySO",    "cw-hex-icon--roll" },
             { "FeatherTrapAbilitySO", "cw-hex-icon--trap" },
             { "FeatherAuraAbilitySO", "cw-hex-icon--aura" },

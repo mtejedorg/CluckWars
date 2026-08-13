@@ -87,10 +87,6 @@ namespace CluckWars.Gameplay
         private bool _subscribedToDeath;
 
         // Accumulators for batched RPCs (Stage D)
-        private FoodPile _activePileTarget;
-        private float _pendingPileDrain;
-        private int _pileDrainTicks;
-
         private FoodPickup _activePickupTarget;
         private float _pendingPickupDrain;
         private int _pickupDrainTicks;
@@ -199,20 +195,6 @@ namespace CluckWars.Gameplay
             }
         }
 
-        public void FlushPileDrain()
-        {
-            if (_pendingPileDrain > 0f)
-            {
-                if (_activePileTarget != null && _activePileTarget.Object != null && _activePileTarget.Object.IsValid)
-                {
-                    _activePileTarget.RPC_Drain(_pendingPileDrain);
-                }
-                _pendingPileDrain = 0f;
-            }
-            _activePileTarget = null;
-            _pileDrainTicks = 0;
-        }
-
         public void FlushPickupDrain()
         {
             if (_pendingPickupDrain > 0f)
@@ -244,7 +226,6 @@ namespace CluckWars.Gameplay
 
         public void FlushAll()
         {
-            FlushPileDrain();
             FlushPickupDrain();
             FlushBaseDeposit();
         }
@@ -260,94 +241,35 @@ namespace CluckWars.Gameplay
                 return;
             }
 
+            // Pile food is no longer drained here at all — PeckAbilitySO takes it, one
+            // press at a time. What remains is the pile-slow flag, which is about STANDING
+            // on a pile rather than about collecting from it, so it is updated every tick
+            // regardless of control state.
+            UpdatePileSlow();
+
             // Stunned / Rooted chickens can't collect (spec §3.1).
-            if (_controller != null && !ControlRules.CanCollect(_controller.CurrentControlState))
+            if (_controller == null || ControlRules.CanCollect(_controller.CurrentControlState))
             {
-                FlushPileDrain();
-            }
-            else
-            {
-                TryCollectFromNearbyPile(stats);
                 TryCollectFromNearbyPickup(stats);
             }
             TryDepositAtNearbyBase();
         }
 
-        private void TryCollectFromNearbyPile(ChickenStatsSO stats)
+        /// <summary>
+        /// Maintains <see cref="IsPileSlow"/> — the GDD §6.2 movement penalty for standing
+        /// on a pile. This is all that survives of the old automatic collection: the drain
+        /// itself moved to <c>PeckAbilitySO</c>, but the slow was never about collecting,
+        /// only about being on the pile, so it still runs every tick.
+        /// </summary>
+        /// <remarks>
+        /// Previously the flag was only written inside the collection path, so a stunned
+        /// chicken kept whatever value it had when the stun landed. It is now written
+        /// unconditionally, which is both simpler and correct.
+        /// </remarks>
+        private void UpdatePileSlow()
         {
             var pile = FindNearestPileInRange();
-
-            // IsPileSlow is true whenever the chicken is within a pile's collect
-            // radius, regardless of cargo capacity. ChickenController reads this flag
-            // the NEXT tick to apply the pile-slow source (GDD §6.2).
-            IsPileSlow = (pile != null && !pile.IsEmpty);
-
-            if (pile == null)
-            {
-                FlushPileDrain();
-                return;
-            }
-
-            if (pile != _activePileTarget)
-            {
-                FlushPileDrain();
-                _activePileTarget = pile;
-            }
-
-            if (Cargo >= stats.CargoCapacity)
-            {
-                if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
-                {
-                    _log.Verbose(Source, $"TryCollect: cargo full ({Cargo:0.0}/{stats.CargoCapacity}).");
-                }
-                FlushPileDrain();
-                return;
-            }
-
-            // HasCollectableFood, not IsEmpty: the centre pile is permanent (ADR 0003
-            // Decision 2b) and still holds its floor, but that floor is terrain, not food.
-            if (!pile.HasCollectableFood)
-            {
-                if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
-                {
-                    _log.Verbose(Source, $"TryCollect: nearest pile '{pile.name}' has nothing collectable.");
-                }
-                FlushPileDrain();
-                return;
-            }
-
-            float spaceLeft = stats.CargoCapacity - Cargo;
-            float collectionRate = stats.CollectionRate;
-            if (_controller != null && _controller.UnderdogSurgeActive)
-            {
-                collectionRate *= 1.5f;
-            }
-            float desired = collectionRate * Runner.DeltaTime;
-
-            // pile.Available, not pile.Amount — a permanent pile's floor is not takeable,
-            // and crediting cargo against it would make the centre an infinite food source.
-            float availableInPile = Mathf.Max(0f, pile.Available - _pendingPileDrain);
-            float takeable = Mathf.Min(desired, spaceLeft, availableInPile);
-            if (takeable <= 0f)
-            {
-                FlushPileDrain();
-                return;
-            }
-
-            Cargo += takeable;
-            _pendingPileDrain += takeable;
-            _pileDrainTicks++;
-
-            int ticksToFlush = Mathf.RoundToInt(0.25f * Runner.TickRate);
-            if (_pileDrainTicks >= ticksToFlush)
-            {
-                FlushPileDrain();
-            }
-
-            if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
-            {
-                _log.Verbose(Source, $"Collected {takeable:0.000} from '{pile.name}'. Cargo={Cargo:0.0}/{stats.CargoCapacity}.");
-            }
+            IsPileSlow = pile != null && !pile.IsEmpty;
         }
 
         private void TryCollectFromNearbyPickup(ChickenStatsSO stats)
@@ -723,13 +645,10 @@ namespace CluckWars.Gameplay
         public void RPC_ResetForNewMatch()
         {
             // Drop any pending drains/deposits because a new round starts
-            _pendingPileDrain = 0f;
             _pendingPickupDrain = 0f;
             _pendingBaseFood = 0f;
-            _activePileTarget = null;
             _activePickupTarget = null;
             _activeBaseTarget = null;
-            _pileDrainTicks = 0;
             _pickupDrainTicks = 0;
             _baseDepositTicks = 0;
 

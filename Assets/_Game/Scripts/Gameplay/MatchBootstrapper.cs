@@ -250,8 +250,9 @@ namespace CluckWars.Gameplay
                                 haveLoadout ? loadout.Slot0 : null,
                                 haveLoadout ? loadout.Slot1 : null,
                                 haveLoadout ? loadout.Slot2 : null,
-                                out var botPassive, out var b0, out var b1, out var b2);
-                            abilities.SetSlots(botPassive, b0, b1, b2);
+                                haveLoadout ? loadout.Slot3 : null,
+                                out var botPassive, out var b0, out var b1, out var b2, out var b3);
+                            abilities.SetSlots(botPassive, b0, b1, b2, b3);
                         }
                     });
 
@@ -316,29 +317,37 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Sanitises a chosen loadout into a legal one for <paramref name="cls"/>: up to
-        /// <b>N</b> distinct, class-legal active abilities (N = 2, or 3 under the Assassin's
-        /// Combo passive — see <see cref="AbilityController.EquippedSlotCount"/>) plus a
-        /// class-legal passive.
+        /// Sanitises a chosen loadout into a legal one for <paramref name="cls"/>:
+        /// <see cref="AbilityController.SlotCount"/> distinct, class-legal active abilities
+        /// plus a class-legal passive, with Peck forced present (or forced absent) according
+        /// to whether the class can forage at all.
         /// </summary>
         /// <remarks>
-        /// <b>2026-07-27 design directive (overrides GDD §7.1-7.2's old "1 mandatory Common +
-        /// 2 Character" rule):</b> the Common slot is now optional — a player may equip any
-        /// mix of Common and class-legal Character abilities, including zero Common ones.
-        /// "Common" only means "legal for every class"; it no longer reserves a slot.
+        /// <b>The Peck invariant is the important part.</b> Food only enters a chicken through
+        /// Peck now, so a Warrior/Speedy/Fatty that spawns without it cannot score for the
+        /// whole match — and nothing would log an error, because an unequipped ability is a
+        /// perfectly ordinary state. Conversely the Assassin must never receive it: not being
+        /// able to farm is the mechanical basis of the class being a predator.
         /// <para>
-        /// Still enforced here, at the single spawn chokepoint, rather than trusting the
-        /// picker UI — a live match on 2026-07-22 spawned a Warrior holding two Common
-        /// abilities and a non-signature inert passive, because nothing validated the
-        /// selection on the way in. Bots go through <see cref="PresetIsClassLegal"/> for the
-        /// same reason.
+        /// Both directions are enforced <b>here</b>, at the single spawn chokepoint both bots
+        /// and players pass through, rather than in the picker UI. That is the lesson of the
+        /// 2026-07-22 live match that spawned a Warrior holding two Common abilities and an
+        /// inert passive because nothing validated the selection on the way in.
+        /// </para>
+        /// <para>
+        /// ⚠️ Legality is now <c>IsAllowedFor</c> for EVERY ability, Common included. The old
+        /// rule treated any Common ability as legal for everyone and only consulted
+        /// <c>AllowedClasses</c> for Character ones. That was harmless while every Common was
+        /// flagged All, and became a bug the moment Peck shipped as a Common ability
+        /// restricted to three classes: the backfill would have handed it to the Assassin.
         /// </para>
         /// </remarks>
         private void ResolveLegalLoadout(ChickenClass cls,
-            PassiveAbilitySO chosenPassive, AbilityBaseSO a0, AbilityBaseSO a1, AbilityBaseSO a2,
-            out PassiveAbilitySO passive, out AbilityBaseSO slot0, out AbilityBaseSO slot1, out AbilityBaseSO slot2)
+            PassiveAbilitySO chosenPassive, AbilityBaseSO a0, AbilityBaseSO a1, AbilityBaseSO a2, AbilityBaseSO a3,
+            out PassiveAbilitySO passive, out AbilityBaseSO slot0, out AbilityBaseSO slot1,
+            out AbilityBaseSO slot2, out AbilityBaseSO slot3)
         {
-            passive = chosenPassive; slot0 = a0; slot1 = a1; slot2 = a2;
+            passive = chosenPassive; slot0 = a0; slot1 = a1; slot2 = a2; slot3 = a3;
             if (_abilityRegistry == null)
             {
                 _log?.Warn(Source, $"ResolveLegalLoadout: no AbilityRegistrySO bound — passing {cls}'s " +
@@ -350,32 +359,47 @@ namespace CluckWars.Gameplay
             if (passive == null || !AbilityRegistrySO.IsAllowedFor(passive, cls))
                 passive = _abilityRegistry.GetDefaultPassiveForClass(cls);
 
-            // Active slot budget mirrors AbilityController.EquippedSlotCount: Combo grants a
-            // 3rd slot, every other class gets 2.
-            int activeSlots = passive is ComboPassiveSO ? 3 : 2;
+            int activeSlots = AbilityController.SlotCount;
 
-            // Sanitise: keep only genuine, class-legal, distinct picks, in the order supplied.
-            // A Common ability is legal for anyone; a Character ability must be on this
-            // class's pool. No requirement that any pick be Common.
+            var peck = _abilityRegistry.ActiveAbilities.FirstOrDefault(a => a is Abilities.PeckAbilitySO);
+            bool canForage = peck != null && AbilityRegistrySO.IsAllowedFor(peck, cls);
+
+            // Sanitise: genuine, class-legal, distinct picks, in the order supplied. Order is
+            // preserved because Peck's button position is the player's to choose.
             var picked = new System.Collections.Generic.List<AbilityBaseSO>(activeSlots);
-            foreach (var a in new[] { a0, a1, a2 })
+            foreach (var a in new[] { a0, a1, a2, a3 })
             {
                 if (picked.Count >= activeSlots) break;
                 if (a == null || picked.Contains(a)) continue;
-                bool legal = a.SlotKind == AbilitySlotKind.Common
-                    || (a.SlotKind == AbilitySlotKind.Character && AbilityRegistrySO.IsAllowedFor(a, cls));
-                if (legal) picked.Add(a);
+                if (!AbilityRegistrySO.IsAllowedFor(a, cls)) continue;
+                picked.Add(a);
             }
 
-            // Backfill ONLY what sanitising left missing, from the combined legal pool
-            // (Common ∪ class-legal Character) — not specifically forcing a Common.
+            if (canForage && !picked.Contains(peck))
+            {
+                // Forced in at slot 0. The picker normally places it wherever the player
+                // wants and this never fires; it is the safety net for bot presets and any
+                // malformed selection, so a predictable position beats a clever one.
+                if (picked.Count >= activeSlots) picked.RemoveAt(picked.Count - 1);
+                picked.Insert(0, peck);
+                _log?.Debug(Source, $"ResolveLegalLoadout: {cls} had no Peck equipped — forced into slot 0.");
+            }
+            else if (!canForage && peck != null && picked.Remove(peck))
+            {
+                // Belt and braces: IsAllowedFor above already rejects it, so reaching here
+                // means the flags and this rule disagree. Worth a line in the log.
+                _log?.Warn(Source, $"ResolveLegalLoadout: stripped Peck from {cls}, which cannot forage.");
+            }
+
+            // Backfill ONLY what sanitising left missing, from everything legal for this class.
             if (picked.Count < activeSlots)
             {
-                var fillPool = _abilityRegistry.CommonAbilities.Concat(_abilityRegistry.GetCharacterAbilitiesForClass(cls));
+                var fillPool = _abilityRegistry.ActiveAbilities
+                    .Where(a => a != null && AbilityRegistrySO.IsAllowedFor(a, cls));
                 foreach (var fill in fillPool)
                 {
                     if (picked.Count >= activeSlots) break;
-                    if (fill == null || picked.Contains(fill)) continue;
+                    if (picked.Contains(fill)) continue;
                     picked.Add(fill);
                 }
             }
@@ -383,13 +407,14 @@ namespace CluckWars.Gameplay
             if (picked.Count < activeSlots)
             {
                 _log?.Warn(Source, $"ResolveLegalLoadout: only resolved {picked.Count}/{activeSlots} legal " +
-                    $"abilities for {cls} after sanitising + backfill — AbilityRegistrySO has too few Common/" +
-                    $"{cls} Character entries. This bot/player will spawn under-equipped.");
+                    $"abilities for {cls} after sanitising + backfill — AbilityRegistrySO has too few entries " +
+                    $"legal for {cls}. This bot/player will spawn under-equipped.");
             }
 
             slot0 = picked.Count > 0 ? picked[0] : null;
             slot1 = picked.Count > 1 ? picked[1] : null;
             slot2 = picked.Count > 2 ? picked[2] : null;
+            slot3 = picked.Count > 3 ? picked[3] : null;
         }
 
         /// <summary>
@@ -400,7 +425,8 @@ namespace CluckWars.Gameplay
         /// </summary>
         private static bool PresetIsClassLegal(in BotLoadoutPreset p, ChickenClass cls)
         {
-            return SlotIsLegal(p.Slot0, cls) && SlotIsLegal(p.Slot1, cls) && SlotIsLegal(p.Slot2, cls);
+            return SlotIsLegal(p.Slot0, cls) && SlotIsLegal(p.Slot1, cls)
+                && SlotIsLegal(p.Slot2, cls) && SlotIsLegal(p.Slot3, cls);
 
             static bool SlotIsLegal(AbilityBaseSO a, ChickenClass c) =>
                 a == null || AbilityRegistrySO.IsAllowedFor(a, c);
@@ -438,8 +464,13 @@ namespace CluckWars.Gameplay
             [Tooltip("Slot-1 ability (typically Defense or Escape).")]
             public AbilityBaseSO Slot1;
 
-            [Tooltip("Slot-2 ability — only equipped on Assassin bots (Combo 3rd slot). Optional.")]
+            [Tooltip("Slot-2 ability. Optional.")]
             public AbilityBaseSO Slot2;
+
+            [Tooltip("Slot-3 ability. Optional. Note ResolveLegalLoadout forces Peck into the "
+                + "loadout of any class that can forage, so a preset that leaves this empty "
+                + "still ends up with four abilities.")]
+            public AbilityBaseSO Slot3;
 
             [Tooltip("Classes allowed to roll this preset. Empty = all classes. Bot-AI flavor " +
                 "only — does NOT affect player ability selection (GDD §7.1).")]
@@ -523,9 +554,10 @@ namespace CluckWars.Gameplay
                     {
                         var abilityCtrl = networkObject.GetComponent<AbilityController>();
                         ResolveLegalLoadout(chosenClass,
-                            _selection.Passive, _selection.Ability0, _selection.Ability1, _selection.Ability2,
-                            out var passive, out var s0, out var s1, out var s2);
-                        abilityCtrl?.SetSlots(passive, s0, s1, s2);
+                            _selection.Passive, _selection.Ability0, _selection.Ability1,
+                            _selection.Ability2, _selection.Ability3,
+                            out var passive, out var s0, out var s1, out var s2, out var s3);
+                        abilityCtrl?.SetSlots(passive, s0, s1, s2, s3);
                     }
                 });
         }

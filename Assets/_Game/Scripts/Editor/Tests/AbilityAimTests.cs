@@ -629,6 +629,11 @@ namespace CluckWars.Tests
                 nameof(SpineCoatAbilitySO),
                 nameof(EggShellAbilitySO),
                 nameof(DoppelgangerAbilitySO),
+                // Peck is not a self-buff, but it belongs here for the same reason: its
+                // target is a FoodPile, and the aim-shape system describes areas that
+                // contain CHICKENS. There is no rival to preview, mark, or whiff against,
+                // so AimShape.None is the honest answer rather than a missing override.
+                nameof(PeckAbilitySO),
             };
 
             var offenders = new List<string>();
@@ -680,6 +685,10 @@ namespace CluckWars.Tests
                 // Placed zones.
                 nameof(FeatherTrapAbilitySO),
                 nameof(RootEggAbilitySO),
+                // Peck resolves against a pile, never a chicken, so GatherTargets is
+                // always 0 for it. Whiff styling would mark every successful forage as a
+                // miss - the same failure Root Egg had before it was exempted.
+                nameof(PeckAbilitySO),
             };
 
             var wronglyExempt = new List<string>();

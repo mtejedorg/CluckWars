@@ -320,9 +320,10 @@ namespace CluckWars.Gameplay
         public float CooldownProgress01(int slot)
         {
             var ability = GetSlot(slot);
-            if (ability == null || ability.Cooldown <= 0f) return 1f;
+            float cd = ability != null ? ability.ResolveCooldown(_controller) : 0f;
+            if (ability == null || cd <= 0f) return 1f;
             var remaining = CooldownRemaining(slot);
-            return 1f - Mathf.Clamp01(remaining / ability.Cooldown);
+            return 1f - Mathf.Clamp01(remaining / cd);
         }
 
         public bool IsReady(int slot) => GetSlot(slot) != null && CooldownRemaining(slot) <= 0f;
@@ -534,7 +535,7 @@ namespace CluckWars.Gameplay
 
             ActiveSlot = slot;
             ActivationTimer = TickTimer.CreateFromSeconds(Runner, ability.Duration);
-            SetCooldown(slot, TickTimer.CreateFromSeconds(Runner, ability.Cooldown));
+            SetCooldown(slot, TickTimer.CreateFromSeconds(Runner, ability.ResolveCooldown(_controller)));
             // Refresh context fields that abilities need for NetworkObject spawning.
             _ctx.Runner         = Runner;
             _ctx.PrefabRegistry = _prefabRegistry;
@@ -581,7 +582,7 @@ namespace CluckWars.Gameplay
             _audio?.PlaySFX(_audioReg != null ? _audioReg.AbilityActivate : null);
             LastCastEventId++; // wraps at 255 by design (byte overflow) — a one-shot signal, not a counter
             _log?.Info(Source, $"Activated slot {slot} ({ability.DisplayName}) for {ability.Duration:0.00}s, " +
-                $"CD {ability.Cooldown:0.00}s, hits={hitCount}.");
+                $"CD {ability.ResolveCooldown(_controller):0.00}s, hits={hitCount}.");
         }
 
         /// <summary>

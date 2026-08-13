@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b033925ab8aaa404ab5a972549c9c954, type: 3}
+  m_Name: Peck
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.PeckAbilitySO
+  DisplayName: Peck
+  ShortLabel: PECK
+  Description: Take a beakful of food from the pile you are standing at.
+  Icon: 
+  AccentColor: {r: 0.96, g: 0.8, b: 0.3, a: 1}
+  Category: 3
+  TerrainTraversal: 0
+  JumpTier: 0
+  SlotKind: 0
+  AllowedClasses: 7
+  BotRole: 6
+  Duration: 0.4
+  Cooldown: 0.8
+  AbilityAnimationClip: {fileID: 0}
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256

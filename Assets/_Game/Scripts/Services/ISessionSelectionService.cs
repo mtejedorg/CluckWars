@@ -43,6 +43,9 @@ namespace CluckWars.Services
         /// <summary>Ability the local player wants equipped in slot 2. Assassin (Combo passive) only. Null = use prefab default.</summary>
         AbilityBaseSO Ability2 { get; set; }
 
+        /// <summary>Fourth ability slot, added with v0.7's four-slot loadouts.</summary>
+        AbilityBaseSO Ability3 { get; set; }
+
         event Action<ChickenClass> OnSelectionChanged;
     }
 }

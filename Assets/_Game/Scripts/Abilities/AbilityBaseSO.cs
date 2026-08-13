@@ -55,6 +55,7 @@ namespace CluckWars.Abilities
         Control = 3, // displace or pin a rival
         Escape  = 4, // dash / blur away from danger
         Steal   = 5, // snatch cargo from a rival
+        Forage  = 6, // take food from a pile (Peck). Appended - BotRole is byte-serialised in .asset files.
     }
 
     /// <summary>
@@ -112,7 +113,10 @@ namespace CluckWars.Abilities
         [Min(0f)] public float Cooldown = 8f;
 
         [Header("Animation")]
-        [Tooltip("Optional clip override. Phase 6 doesn't drive animations from abilities — slot reserved for Phase 9 polish.")]
+        [Tooltip("UNUSED. Reserved since Phase 6 and still never read by anything — every ability " +
+                 "triggers the shared 'Cast' animator state via ChickenAnimator.TriggerAbilityCast. " +
+                 "Wiring per-ability clips means adding states to Chicken.controller and clips to " +
+                 "ChickenClassRegistrySO.ClassClips; until then this field is decoration.")]
         public AnimationClip AbilityAnimationClip;
 
         [Header("Physics Scans")]
@@ -186,6 +190,19 @@ namespace CluckWars.Abilities
             if (!RequiresEnemyInRange) return true;
             return HasAnyTarget(caster);
         }
+
+        /// <summary>
+        /// This ability's cooldown for a specific caster. Defaults to the authored
+        /// <see cref="Cooldown"/>; Peck overrides it because foraging cadence is a
+        /// per-class stat solved against the SCT axiom, not an ability-wide constant.
+        /// </summary>
+        /// <remarks>
+        /// Every cooldown read goes through here — <c>AbilityController.TryActivate</c> when
+        /// it starts the timer AND <c>CooldownProgress01</c> when it draws the radial fill.
+        /// Reading the raw field in one place and this in the other would draw a hex whose
+        /// sweep finishes at a different moment than the ability actually becomes ready.
+        /// </remarks>
+        public virtual float ResolveCooldown(Gameplay.ChickenController caster) => Cooldown;
 
         // ---- Aim descriptor (FEEDBACK.md §4 / §8) ------------------------------
         // One declarative shape per ability, used by every consumer that needs to

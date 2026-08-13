@@ -354,6 +354,10 @@ namespace CluckWars.Tests
         /// </remarks>
         private static readonly HashSet<string> IconsNotYetAuthored = new()
         {
+            // Peck (foraging) is new in v0.7 and has no exported sprite yet. Icon_Peck.png
+            // exists but belongs to Snatch, which was the ability called "Peck" until the
+            // 2026-08-13 rename. The emoji fallback carries the button until art lands.
+            "cw-hex-icon--peck",
             "cw-hex-icon--ambush",
             "cw-hex-icon--wing-slam",
             "cw-hex-icon--shadowstep",

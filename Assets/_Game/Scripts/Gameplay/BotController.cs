@@ -327,6 +327,32 @@ namespace CluckWars.Gameplay
             }
         }
 
+        /// <summary>
+        /// Fires the bot's Forage-role ability (Peck) when it is parked at a pile it can
+        /// actually drain. Routed through <see cref="AbilityController.BotTryActivate"/>
+        /// like every other bot cast, so cooldown, stun, and the one-ability-at-a-time rule
+        /// are enforced identically for bots and players.
+        /// </summary>
+        /// <remarks>
+        /// Deliberately silent when it cannot fire. The common cases — cooldown still
+        /// running, cargo full, pile drained by someone else — are all ordinary and happen
+        /// many times a second; logging them would bury the console.
+        ///
+        /// The Assassin has no Peck (it is not in that ability's AllowedClasses), so
+        /// <see cref="AbilityController.TryGetReadySlotForRole"/> simply finds nothing and
+        /// this is a no-op for that class. That is correct rather than accidental: an
+        /// Assassin bot should be hunting, not standing at a pile.
+        /// </remarks>
+        private void TryPeckAtPile()
+        {
+            if (_abilities == null) return;
+            if (_state != BotState.CollectFood) return;
+            if (_pileGoal == null || _pileGoal.Object == null || !_pileGoal.Object.IsValid) return;
+
+            if (_abilities.TryGetReadySlotForRole(BotRole.Forage, out int slot))
+                _abilities.BotTryActivate(slot);
+        }
+
         // ---- Navigation ----------------------------------------------------
 
         private void Navigate()
@@ -337,6 +363,12 @@ namespace CluckWars.Gameplay
 
             if (HasArrived(selfPos, toTarget))
             {
+                // Standing still on the goal. If that goal is a pile, this is where the bot
+                // has to actually PECK — pile food used to drain automatically just for
+                // being in range, so before v0.7 arriving was the whole job. Without this
+                // the bot walks to a pile and stands there for the rest of the match with
+                // an empty beak, and nothing logs an error because nothing is wrong.
+                TryPeckAtPile();
                 _controller.BotTick(Vector2.zero, Runner.DeltaTime);
                 return;
             }

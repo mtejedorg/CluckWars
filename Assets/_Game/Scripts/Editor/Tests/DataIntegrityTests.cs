@@ -5,6 +5,7 @@ using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
+using CluckWars.Abilities;
 using CluckWars.Audio;
 using CluckWars.Gameplay;
 
@@ -299,8 +300,22 @@ namespace CluckWars.Tests
             // PeckAmount/PeckCooldown are what the Balance Oracle now solves SCT against, so
             // an unauthored class silently falls back to the C# defaults (3 per 1.0s) and
             // lands on someone else's clear time without anything going red.
+            //
+            // Only classes that can actually peck are checked, and "can peck" is read off
+            // Peck's own AllowedClasses rather than hardcoded here — one source of truth, so
+            // opening or closing foraging to a class updates this test for free.
+            var peck = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir)
+                .Find(a => a is PeckAbilitySO);
+            Assert.IsNotNull(peck, "No PeckAbilitySO asset found — foraging is unequippable.");
+
             foreach (var s in TestAssets.LoadAllIn<ChickenStatsSO>(TestAssets.ClassesDir))
             {
+                if (!System.Enum.TryParse<ChickenClass>(s.DisplayName, out var cls) ||
+                    !AbilityRegistrySO.IsAllowedFor(peck, cls))
+                {
+                    continue; // cannot forage; its peck stats are unused by design
+                }
+
                 Assert.Greater(s.PeckAmount, 0f,
                     $"{s.name}: PeckAmount {s.PeckAmount} — a press would take no food, so the " +
                     "class can never fill its cargo and the Oracle reports it unreachable.");
@@ -317,6 +332,80 @@ namespace CluckWars.Tests
                     $"{s.name}: PeckAmount {s.PeckAmount} exceeds CargoCapacity {s.CargoCapacity}, " +
                     "so a single press always overfills and the class fills in one press regardless " +
                     "of its cooldown.");
+            }
+        }
+
+        // ---- The Peck invariant -------------------------------------------------
+
+        /// <summary>
+        /// Drives the real <c>MatchBootstrapper.ResolveLegalLoadout</c> — the single spawn
+        /// chokepoint both bots and players pass through — and asserts the one rule the whole
+        /// food economy rests on: every class that CAN forage always ends up holding Peck, and
+        /// the Assassin never does.
+        /// </summary>
+        /// <remarks>
+        /// Worth reaching through reflection for. A forager that spawns without Peck cannot
+        /// score for the entire match, and nothing anywhere logs an error, because "this
+        /// ability is not equipped" is a completely ordinary state. It is the exact shape of
+        /// bug that only shows up as "why did nobody score" three playtests later.
+        ///
+        /// The bootstrapper is added to an INACTIVE GameObject so Unity never runs its Awake.
+        /// </remarks>
+        [Test]
+        public void ResolveLegalLoadout_AlwaysEquipsPeck_ForForagers_AndNeverForTheAssassin()
+        {
+            var reg = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
+            var peck = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir).Find(a => a is PeckAbilitySO);
+            Assert.IsNotNull(peck, "No PeckAbilitySO asset — nothing can collect food.");
+
+            var go = new GameObject(nameof(ResolveLegalLoadout_AlwaysEquipsPeck_ForForagers_AndNeverForTheAssassin));
+            go.SetActive(false); // keeps Awake from running
+            try
+            {
+                var boot = go.AddComponent<MatchBootstrapper>();
+                var regField = typeof(MatchBootstrapper).GetField("_abilityRegistry",
+                    BindingFlags.NonPublic | BindingFlags.Instance);
+                Assert.IsNotNull(regField, "MatchBootstrapper._abilityRegistry was renamed — update this test.");
+                regField.SetValue(boot, reg);
+
+                var method = typeof(MatchBootstrapper).GetMethod("ResolveLegalLoadout",
+                    BindingFlags.NonPublic | BindingFlags.Instance);
+                Assert.IsNotNull(method, "MatchBootstrapper.ResolveLegalLoadout was renamed — update this test.");
+
+                foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
+                {
+                    // Deliberately hostile input: nothing chosen at all. This is what a bot
+                    // with no preset, or a player who never opened the picker, sends in.
+                    var args = new object[] { cls, null, null, null, null, null, null, null, null, null, null };
+                    method.Invoke(boot, args);
+
+                    var resolved = new[] { args[7], args[8], args[9], args[10] };
+                    int peckCount = 0;
+                    foreach (var slot in resolved) if (ReferenceEquals(slot, peck)) peckCount++;
+
+                    bool canForage = AbilityRegistrySO.IsAllowedFor(peck, cls);
+                    if (canForage)
+                    {
+                        Assert.AreEqual(1, peckCount,
+                            $"{cls} can forage but resolved {peckCount} Peck(s) from an empty selection. " +
+                            "Exactly one is required: zero means the class can never collect food and " +
+                            "will score nothing all match, and two wastes a slot on a duplicate.");
+                    }
+                    else
+                    {
+                        Assert.AreEqual(0, peckCount,
+                            $"{cls} cannot forage, but ResolveLegalLoadout handed it Peck. Not being able " +
+                            "to farm is the mechanical basis of the class being a predator.");
+                    }
+
+                    // Whatever the class, the loadout must be full — an empty slot is a dead button.
+                    foreach (var slot in resolved)
+                        Assert.IsNotNull(slot, $"{cls} resolved a null ability slot from an empty selection.");
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
             }
         }
 

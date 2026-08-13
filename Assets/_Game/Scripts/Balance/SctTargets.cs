@@ -22,8 +22,34 @@ namespace CluckWars.Balance
             new SctTarget { ClassName = "Speedy",   Seconds = 30f, Trips = 4 },
             new SctTarget { ClassName = "Fatty",    Seconds = 30f, Trips = 2 },
             new SctTarget { ClassName = "Warrior",  Seconds = 35f, Trips = 3 },
-            new SctTarget { ClassName = "Assassin", Seconds = 40f, Trips = 4 },
         };
+
+        /// <summary>
+        /// Classes the SCT axiom does <b>not</b> govern, and why.
+        /// </summary>
+        /// <remarks>
+        /// The axiom is "a naked chicken, alone on the full map, farming greedily, banks the
+        /// win target". The Assassin cannot forage at all — Peck's <c>AllowedClasses</c>
+        /// excludes it — so there is no farming run to measure and its old 40 s / 4-trip
+        /// target described something that can no longer happen. It is governed instead by
+        /// the Predation axiom (see the 2026-08-13 Peck/four-slot spec §7.2): given rivals
+        /// carrying C food every T seconds, an Assassin banks the win target in X, where each
+        /// execute yields C plus a flat execute bounty.
+        /// <para>
+        /// This is a list rather than a bool on <see cref="SctTarget"/> so that a class is
+        /// either governed or explicitly excused — never silently absent from both, which is
+        /// how a class ends up with no balance guard at all.
+        /// </para>
+        /// </remarks>
+        public static readonly string[] Exempt = { "Assassin" };
+
+        /// <summary>True when <paramref name="className"/> is excused from the SCT axiom.</summary>
+        public static bool IsExempt(string className)
+        {
+            for (int i = 0; i < Exempt.Length; i++)
+                if (Exempt[i] == className) return true;
+            return false;
+        }
 
         /// <summary>True iff the result reached the target, matched the trip count exactly,
         /// and landed within <paramref name="toleranceSeconds"/> of the target time.</summary>

@@ -61,8 +61,16 @@ namespace CluckWars.Tests
             var config = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
             var stats = TestAssets.LoadAllIn<ChickenStatsSO>(TestAssets.ClassesDir);
 
-            Assert.AreEqual(SctTargets.All.Length, stats.Count,
-                $"Expected one ChickenStatsSO per SCT target in {TestAssets.ClassesDir}, found {stats.Count}.");
+            // Every class must be either governed by a target or explicitly excused. A class
+            // in neither list has no balance guard at all, which is exactly how the Assassin
+            // would have slipped through when Peck stopped applying to it.
+            foreach (var s in stats)
+            {
+                bool governed = System.Array.Exists(SctTargets.All, x => x.ClassName == s.DisplayName);
+                Assert.IsTrue(governed || SctTargets.IsExempt(s.DisplayName),
+                    $"{s.DisplayName} is in neither SctTargets.All nor SctTargets.Exempt, so nothing " +
+                    "checks its stats. Add a target, or excuse it and say why in Exempt's doc comment.");
+            }
 
             foreach (var target in SctTargets.All)
             {
@@ -279,7 +287,10 @@ namespace CluckWars.Tests
         [Test]
         public void SctTargets_TableMatchesSpec()
         {
-            Assert.AreEqual(4, SctTargets.All.Length);
+            Assert.AreEqual(3, SctTargets.All.Length,
+                "Three farming classes are governed by SCT; the Assassin is excused via SctTargets.Exempt.");
+            Assert.IsTrue(SctTargets.IsExempt("Assassin"),
+                "The Assassin cannot forage, so it must stay excused from the SCT axiom.");
             var speedy = System.Array.Find(SctTargets.All, t => t.ClassName == "Speedy");
             Assert.AreEqual(30f, speedy.Seconds, 0.001f);
             Assert.AreEqual(4, speedy.Trips);
