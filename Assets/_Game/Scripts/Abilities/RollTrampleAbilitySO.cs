@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace CluckWars.Abilities
 {
-    [CreateAssetMenu(fileName = "FlyingPeck", menuName = "Cluck Wars/Ability/Steal/Flying Peck", order = 5)]
+    [CreateAssetMenu(fileName = "DiveBomb", menuName = "Cluck Wars/Ability/Steal/Dive Bomb", order = 5)]
     public sealed class RollTrampleAbilitySO : AbilityBaseSO
     {
         public RollTrampleAbilitySO()

@@ -99,9 +99,9 @@
     --cw-cat-utility: #00BCD4;
 
     /* -- Ability accent colors (tokens-v3, CW_ABILITIES_V3) -- */
-    --cw-ability-fly-peck: #FF7043;
+    --cw-ability-dive-bomb: #FF7043;
     --cw-ability-cluck: #FF5722;
-    --cw-ability-peck: #E64A19;
+    --cw-ability-snatch: #E64A19;
     --cw-ability-roll: #AB47BC;
     --cw-ability-trap: #9C27B0;
     --cw-ability-aura: #8E24AA;

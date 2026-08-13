@@ -13,19 +13,27 @@ namespace CluckWars.UI
     /// </summary>
     /// <remarks>
     /// Keyed by concrete type name — stable and authoring-independent, so it is
-    /// robust vs. ShortLabel / DisplayName drift ("Flying Peck" is still the
-    /// <c>RollTrampleAbilitySO</c> type, renamed in v0.3 with the same asset GUID).
+    /// robust vs. ShortLabel / DisplayName drift ("Dive Bomb" is still the
+    /// <c>RollTrampleAbilitySO</c> type, renamed twice now with the same asset GUID).
     /// The matching <c>.cw-hex-icon--*</c> rules are defined in every stylesheet
     /// that shows ability icons (Assets/UI/Styles/TouchControls.uss and
-    /// CluckWarsTheme.uss).
+    /// CluckWarsTheme.uss) — <c>AbilitySystemTests</c> asserts both that every type
+    /// has an entry here AND that every entry resolves to a rule that actually
+    /// exists in both stylesheets, because a key with no matching rule renders a
+    /// blank hex and logs nothing.
+    /// <para>
+    /// The <c>Icon_*.png</c> filenames still carry the pre-rename names (Icon_Peck,
+    /// Icon_FlyingPeck). The art is unchanged, so the sprites were deliberately NOT
+    /// renamed — that would churn texture GUIDs for no visual gain.
+    /// </para>
     /// </remarks>
     public static class AbilityIconStyle
     {
         private static readonly Dictionary<string, string> ByType = new()
         {
-            { "RollTrampleAbilitySO", "cw-hex-icon--fly-peck" },
+            { "RollTrampleAbilitySO", "cw-hex-icon--dive-bomb" },
             { "CluckShockAbilitySO",  "cw-hex-icon--cluck" },
-            { "PeckAbilitySO",        "cw-hex-icon--peck" },
+            { "SnatchAbilitySO",      "cw-hex-icon--snatch" },
             { "RollPushAbilitySO",    "cw-hex-icon--roll" },
             { "FeatherTrapAbilitySO", "cw-hex-icon--trap" },
             { "FeatherAuraAbilitySO", "cw-hex-icon--aura" },

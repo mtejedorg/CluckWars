@@ -402,7 +402,7 @@ namespace CluckWars.Tests
                     case CluckShockAbilitySO x: Assert.AreEqual(x.ShockRadius, x.AimRadius, tol, $"{a.name}: AimRadius must mirror ShockRadius."); break;
                     // Covers Ambush and Wing Slam too — both are StunBurstAbilitySO subclasses.
                     case StunBurstAbilitySO x: Assert.AreEqual(x.StunRadius, x.AimRadius, tol, $"{a.name}: AimRadius must mirror StunRadius."); break;
-                    case PeckAbilitySO x: Assert.AreEqual(x.PeckRange, x.AimRadius, tol, $"{a.name}: AimRadius must mirror PeckRange."); break;
+                    case SnatchAbilitySO x: Assert.AreEqual(x.SnatchRange, x.AimRadius, tol, $"{a.name}: AimRadius must mirror SnatchRange."); break;
                     case SneakyStealAbilitySO x: Assert.AreEqual(x.StealRange, x.AimRadius, tol, $"{a.name}: AimRadius must mirror StealRange."); break;
                     case RollPushAbilitySO x: Assert.AreEqual(x.PushRadius, x.AimRadius, tol, $"{a.name}: AimRadius must mirror PushRadius."); break;
                     case RollTrampleAbilitySO x: Assert.AreEqual(x.SweepRadius, x.AimRadius, tol, $"{a.name}: AimRadius must mirror SweepRadius."); break;

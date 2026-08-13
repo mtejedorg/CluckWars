@@ -117,7 +117,7 @@ namespace CluckWars.Tests
 
             foreach (var (cat, role) in expected)
             {
-                var probe = UnityEngine.ScriptableObject.CreateInstance<PeckAbilitySO>();
+                var probe = UnityEngine.ScriptableObject.CreateInstance<SnatchAbilitySO>();
                 try
                 {
                     probe.Category = cat;
@@ -133,7 +133,7 @@ namespace CluckWars.Tests
         {
             // Sneaky Steal relies on this: Category is Utility (which Auto would turn
             // into Escape) but it is authored BotRole.Steal.
-            var probe = UnityEngine.ScriptableObject.CreateInstance<PeckAbilitySO>();
+            var probe = UnityEngine.ScriptableObject.CreateInstance<SnatchAbilitySO>();
             try
             {
                 probe.Category = AbilityCategory.Utility;

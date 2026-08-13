@@ -264,7 +264,7 @@ namespace CluckWars.Tests
             const int chickensLayer = 8;
             var scanners = new HashSet<string>
             {
-                nameof(PeckAbilitySO),
+                nameof(SnatchAbilitySO),
                 nameof(CluckShockAbilitySO),
                 nameof(RollPushAbilitySO),
                 nameof(RollTrampleAbilitySO),
@@ -337,6 +337,79 @@ namespace CluckWars.Tests
             }
 
             Assert.IsEmpty(dupes, "Two ability types share one icon USS class — they draw the same sprite.");
+        }
+
+        /// <summary>
+        /// Ability types whose <see cref="AbilityIconStyle"/> entry has <b>no</b>
+        /// <c>.cw-hex-icon--*</c> rule in the stylesheets, so they currently render a blank
+        /// hex on every screen. Pre-existing debt, recorded 2026-08-13 rather than hidden:
+        /// the four actives and all eight passives below have never had an exported
+        /// <c>Icon_*.png</c>.
+        /// </summary>
+        /// <remarks>
+        /// This is an allow-list, not an excuse. It exists so the test can lock in today's
+        /// state and fail on any <i>new</i> miss — including the far more likely failure of
+        /// renaming a USS class on one side only. Delete entries from here as the icons get
+        /// authored; never add one to make a red test go green.
+        /// </remarks>
+        private static readonly HashSet<string> IconsNotYetAuthored = new()
+        {
+            "cw-hex-icon--ambush",
+            "cw-hex-icon--wing-slam",
+            "cw-hex-icon--shadowstep",
+            "cw-hex-icon--mark-kill",
+            "cw-hex-icon--mighty",
+            "cw-hex-icon--bracer",
+            "cw-hex-icon--slippery",
+            "cw-hex-icon--wind",
+            "cw-hex-icon--immovable",
+            "cw-hex-icon--juggernaut",
+            "cw-hex-icon--combo",
+            "cw-hex-icon--opportunist",
+        };
+
+        [Test]
+        public void AbilityIconStyle_EveryMappedClass_HasARuleInEveryStylesheet()
+        {
+            // AbilityIconStyle_CoversEveryConcreteAbilityType only proves a type has a KEY.
+            // Nothing proved the USS class that key points at actually exists — and a class
+            // with no rule paints nothing and logs nothing. That is exactly the failure mode
+            // a rename produces when only one side is updated.
+            var sheets = new Dictionary<string, string>();
+            foreach (var path in TestAssets.AbilityIconStylesheets)
+            {
+                Assert.IsTrue(System.IO.File.Exists(path), $"Stylesheet not found: {path}");
+                sheets[path] = System.IO.File.ReadAllText(path);
+            }
+
+            var problems = new List<string>();
+            foreach (var type in ConcreteAbilityTypes())
+            {
+                var probe = (AbilityBaseSO)ScriptableObject.CreateInstance(type);
+                string cls;
+                try { cls = AbilityIconStyle.ClassFor(probe); }
+                finally { UnityEngine.Object.DestroyImmediate(probe); }
+
+                if (cls == null || IconsNotYetAuthored.Contains(cls)) continue;
+
+                // Must match the WHOLE selector, not a prefix of it. A plain Contains()
+                // check reports success for '.cw-hex-icon--snatchXX' when looking for
+                // '.cw-hex-icon--snatch' — verified: the first version of this test passed
+                // against a deliberately broken stylesheet. The negative lookahead pins the
+                // selector's end to a non-identifier character.
+                foreach (var kv in sheets)
+                {
+                    var pattern = System.Text.RegularExpressions.Regex.Escape("." + cls) + @"(?![A-Za-z0-9_-])";
+                    if (!System.Text.RegularExpressions.Regex.IsMatch(kv.Value, pattern))
+                        problems.Add($"{type.Name} -> '{cls}' has no rule in {kv.Key}");
+                }
+            }
+
+            Assert.IsEmpty(problems,
+                "An AbilityIconStyle entry points at a USS class that does not exist, so the hex " +
+                "renders blank with nothing logged. Either add the rule (and its Icon_*.png) or, " +
+                "if the icon genuinely is not authored yet, add it to IconsNotYetAuthored with a reason.\n" +
+                string.Join("\n", problems));
         }
 
         [Test]

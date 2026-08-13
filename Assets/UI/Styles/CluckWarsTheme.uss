@@ -817,9 +817,9 @@
    These rules only set background-image — the element carries its own size via
    .cw-hex__sprite / .cw-ability-card__sprite / .cw-mini-hex__sprite.
    ============================================================================ */
-.cw-hex-icon--fly-peck { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_FlyingPeck.png"); }
+.cw-hex-icon--dive-bomb {  background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_FlyingPeck.png"); }
 .cw-hex-icon--cluck    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_CluckShock.png"); }
-.cw-hex-icon--peck     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_Peck.png"); }
+.cw-hex-icon--snatch    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_Peck.png"); }
 .cw-hex-icon--roll     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_RollAndPush.png"); }
 .cw-hex-icon--trap     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_FeatherTrap.png"); }
 .cw-hex-icon--aura     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_FeatherAura.png"); }

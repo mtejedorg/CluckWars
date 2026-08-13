@@ -41,6 +41,18 @@ namespace CluckWars.Tests
         public const string BootstrapScenePath = "Assets/_Game/Scenes/Bootstrap.unity";
         public const string GameScenePath      = "Assets/_Game/Scenes/Game.unity";
 
+        /// <summary>
+        /// Every stylesheet that paints ability icons. A <c>.cw-hex-icon--*</c> rule must
+        /// exist in <b>all</b> of them: the touch HUD and the menu front-end load different
+        /// sheets, so a rule present in only one paints an icon on one screen and a blank
+        /// hex on the other.
+        /// </summary>
+        public static readonly string[] AbilityIconStylesheets =
+        {
+            "Assets/UI/Styles/TouchControls.uss",
+            "Assets/UI/Styles/CluckWarsTheme.uss",
+        };
+
         /// <summary>Load a required asset, failing the test (not throwing an NRE) when it is missing.</summary>
         public static T Load<T>(string path) where T : Object
         {

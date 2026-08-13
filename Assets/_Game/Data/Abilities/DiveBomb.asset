@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9c2f4a7d8b1e463c8de0f1a3b5c7d2e8, type: 3}
-  m_Name: FlyingPeck
+  m_Name: DiveBomb
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.RollTrampleAbilitySO
-  DisplayName: Flying Peck
-  ShortLabel: FP
-  Description: Vaulting dash forward that steals cargo on contact.
+  DisplayName: Dive Bomb
+  ShortLabel: DVB
+  Description: Hurls itself forward in a diving lunge, robbing cargo on contact.
   AccentColor: {r: 1, g: 0.55, b: 0.2, a: 1}
   Category: 0
   TerrainTraversal: 0
