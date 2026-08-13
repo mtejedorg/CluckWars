@@ -9,18 +9,19 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a33d698bfb2f4a31899f28159ae6d18a, type: 3}
-  m_Name: SecondWind
-  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SecondWindPassiveSO
-  DisplayName: Second Wind
-  ShortLabel: WIND
-  Description: Control effects last 30% less time.
+  m_Script: {fileID: 11500000, guid: bcf81c42c95f7984f9a832218b307b2e, type: 3}
+  m_Name: Bulwark
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.BulwarkPassiveSO
+  DisplayName: Bulwark
+  ShortLabel: BULW
+  Description: Shrugs off control effects and most knockback.
   Icon: 
-  AccentColor: {r: 0.95, g: 0.45, b: 0.15, a: 1}
+  AccentColor: {r: 0.62, g: 0.66, b: 0.72, a: 1}
   Category: 3
   TerrainTraversal: 0
+  JumpTier: 0
   SlotKind: 1
-  AllowedClasses: 2
+  AllowedClasses: 4
   BotRole: 0
   Duration: 0.05
   Cooldown: 0
@@ -28,3 +29,5 @@ MonoBehaviour:
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  DurationMultiplier: 0.65
+  KnockbackMultiplier: 0.25

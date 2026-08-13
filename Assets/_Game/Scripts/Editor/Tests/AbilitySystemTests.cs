@@ -362,14 +362,17 @@ namespace CluckWars.Tests
             "cw-hex-icon--wing-slam",
             "cw-hex-icon--shadowstep",
             "cw-hex-icon--mark-kill",
-            "cw-hex-icon--mighty",
-            "cw-hex-icon--bracer",
+            // Every class specialization. The v0.7 pass replaced the damage-era passives
+            // wholesale, and none of the nine have exported sprites yet.
             "cw-hex-icon--slippery",
-            "cw-hex-icon--wind",
-            "cw-hex-icon--immovable",
-            "cw-hex-icon--juggernaut",
-            "cw-hex-icon--combo",
-            "cw-hex-icon--opportunist",
+            "cw-hex-icon--featherfoot",
+            "cw-hex-icon--dropandgo",
+            "cw-hex-icon--hoarder",
+            "cw-hex-icon--bulwark",
+            "cw-hex-icon--relentless",
+            "cw-hex-icon--bully",
+            "cw-hex-icon--spoiler",
+            "cw-hex-icon--thief",
         };
 
         [Test]

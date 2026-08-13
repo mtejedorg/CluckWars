@@ -246,7 +246,7 @@ namespace CluckWars.UI
                     sb.Append(s.DisplayName.PadRight(13))
                       .Append(s.MoveSpeed.ToString("0.0").PadLeft(6))
                       .Append(s.TurnSpeed.ToString("0").PadLeft(6))
-                      .Append(("  " + s.Passive).PadRight(14))
+                      .Append("  -".PadRight(14)) // specialization is on the equipped PassiveAbilitySO now, not on stats
                       .Append(s.CargoCapacity.ToString().PadLeft(5))
                       .Append(s.CollectionRate.ToString("0.0").PadLeft(6))
                       .AppendLine();

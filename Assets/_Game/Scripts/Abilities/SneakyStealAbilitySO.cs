@@ -55,7 +55,7 @@ namespace CluckWars.Abilities
             if (target == null) return;
 
             // Optimistic credit: take the smaller of (StealAmount, victim's cargo, our free space).
-            float take = Mathf.Min(StealAmount, target.Cargo, spaceLeft);
+            float take = Mathf.Min(ResolveStealAmount(StealAmount, thief), target.Cargo, spaceLeft);
             if (take <= 0f) return;
 
             thiefCargo.Cargo += take;

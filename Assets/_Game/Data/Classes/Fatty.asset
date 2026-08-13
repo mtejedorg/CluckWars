@@ -13,7 +13,6 @@ MonoBehaviour:
   m_Name: Fatty
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenStatsSO
   DisplayName: Fatty
-  Passive: 1
   MaxHP: 120
   MoveSpeed: 7.5
   TurnSpeed: 720

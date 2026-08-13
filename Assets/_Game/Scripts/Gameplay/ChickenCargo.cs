@@ -42,7 +42,28 @@ namespace CluckWars.Gameplay
 
         [Networked] public float Cargo { get; set; }
         [Networked] public float BountyBag { get; set; }
-        public float Capacity => _controller != null && _controller.Stats != null ? _controller.Stats.CargoCapacity : 0f;
+        /// <summary>
+        /// Cargo the chicken can hold, after its class specialization has had a say.
+        /// Hoarder raises it to a full win's worth; Bully adds enough to hold a bigger steal.
+        /// </summary>
+        public float Capacity
+        {
+            get
+            {
+                if (_controller == null || _controller.Stats == null) return 0f;
+                float capacity = _controller.Stats.CargoCapacity;
+                var passive = _controller.Passive;
+                return passive != null ? passive.ModifyCargoCapacity(capacity, _controller) : capacity;
+            }
+        }
+
+        /// <summary>Deposit rate after the specialization's say (Drop &amp; Go).</summary>
+        private float ResolveDepositRate()
+        {
+            float rate = _matchConfig != null ? _matchConfig.DepositRatePerSecond : 6f;
+            var passive = _controller != null ? _controller.Passive : null;
+            return passive != null ? passive.ModifyDepositRate(rate, _controller) : rate;
+        }
         public float Fraction => Capacity > 0f ? Mathf.Clamp01(Cargo / Capacity) : 0f;
         public bool IsFull => Cargo >= Capacity;
 
@@ -359,8 +380,7 @@ namespace CluckWars.Gameplay
                 _log?.Warn(Source, $"Assert: base '{playerBase.name}' is claimed by {playerBase.Owner} but player {Object.InputAuthority} is depositing into it.");
             }
 
-            float rate = _matchConfig != null ? _matchConfig.DepositRatePerSecond : 6f;
-            float desiredTransfer = rate * Runner.DeltaTime;
+            float desiredTransfer = ResolveDepositRate() * Runner.DeltaTime;
 
             float transferFromBounty = Mathf.Min(BountyBag, desiredTransfer);
             BountyBag -= transferFromBounty;

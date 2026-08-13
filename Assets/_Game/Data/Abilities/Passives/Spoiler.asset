@@ -9,18 +9,19 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3ff8ebbc84a94fd6af71fe0e1e947513, type: 3}
-  m_Name: Juggernaut
-  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.JuggernautPassiveSO
-  DisplayName: Juggernaut
-  ShortLabel: JUGG
-  Description: Barge shoves rival chickens aside, not just terrain.
+  m_Script: {fileID: 11500000, guid: 1607ba97cdb2daa409055a6e00e3e527, type: 3}
+  m_Name: Spoiler
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SpoilerPassiveSO
+  DisplayName: Spoiler
+  ShortLabel: SPOI
+  Description: Banks bonus food if the timer ends with no winner.
   Icon: 
-  AccentColor: {r: 0.85, g: 0.75, b: 0.25, a: 1}
-  Category: 2
+  AccentColor: {r: 0.55, g: 0.42, b: 0.85, a: 1}
+  Category: 3
   TerrainTraversal: 0
+  JumpTier: 0
   SlotKind: 1
-  AllowedClasses: 4
+  AllowedClasses: 8
   BotRole: 0
   Duration: 0.05
   Cooldown: 0
@@ -28,3 +29,4 @@ MonoBehaviour:
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  BonusFood: 15

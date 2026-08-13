@@ -93,12 +93,15 @@ namespace CluckWars.Editor
             DrawRule();
 
             // Column widths
-            const float wName = 90, wPassive = 90, wF = 52, wI = 42;
+            const float wName = 90, wF = 52, wI = 42;
 
             // Header row
             EditorGUILayout.BeginHorizontal();
             ColHeader("Class",   wName);
-            ColHeader("Passive", wPassive);
+            // The Passive column is gone: the class specialization now lives on the equipped
+            // PassiveAbilitySO asset, not as an enum on the stats, so there is nothing to edit here.
+            ColHeader("Peck", wF);
+            ColHeader("PkCD", wF);
             ColHeader("MoveSpd", wF);
             ColHeader("Turn°",   wF);
             ColHeader("Cap",     wI);
@@ -115,11 +118,12 @@ namespace CluckWars.Editor
                 EditorGUILayout.BeginHorizontal();
 
                 EditorGUILayout.LabelField(s.DisplayName, GUILayout.Width(wName));
-                s.Passive        = (ChickenPassive)EditorGUILayout.EnumPopup(s.Passive, GUILayout.Width(wPassive));
                 s.MoveSpeed      = FloatField(s.MoveSpeed,      wF, minVal: 0f);
                 s.TurnSpeed      = FloatField(s.TurnSpeed,      wF, minVal: 0f);
                 s.CargoCapacity  = IntField(s.CargoCapacity,    wI, minVal: 1);
                 s.CollectionRate = FloatField(s.CollectionRate, wF, minVal: 0f);
+                s.PeckAmount     = FloatField(s.PeckAmount,     wF, minVal: 0.1f);
+                s.PeckCooldown   = FloatField(s.PeckCooldown,   wF, minVal: 0.05f);
                 s.Scale          = FloatField(s.Scale,          wF, minVal: 0.1f);
 
                 EditorGUILayout.EndHorizontal();

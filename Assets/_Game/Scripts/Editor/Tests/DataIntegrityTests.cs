@@ -60,26 +60,34 @@ namespace CluckWars.Tests
         [Test]
         public void ClassRegistry_EveryEntry_HasTheClassPassive_TheGddAssigns()
         {
-            // GDD v0.3 §5.2. The passive drives real mechanics (ChickenController's
-            // Tough damage bonus, Immovable knockback reduction, Slippery control
-            // resistance, and the Combo 3rd-slot gate) — a mis-authored Passive
-            // silently gives a class the wrong kit with no error anywhere.
-            var expected = new Dictionary<ChickenClass, ChickenPassive>
+            // Each class's DEFAULT specialization, per the core-redesign spec §5. Resolved
+            // through AbilityRegistrySO.GetDefaultPassiveForClass, which is what the picker
+            // and the spawner both call — so this pins the real default rather than a
+            // parallel declaration of it.
+            //
+            // Replaced the old ChickenStatsSO.Passive enum check. That enum was a second
+            // description of the same fact, and by the time it was deleted two of its four
+            // members were inert: Tough scaled damage in a game with no damage, and Combo
+            // granted a third ability slot that every class now has.
+            var expected = new Dictionary<ChickenClass, string>
             {
-                { ChickenClass.Warrior,  ChickenPassive.Tough },
-                { ChickenClass.Speedy,   ChickenPassive.Slippery },
-                { ChickenClass.Fatty,    ChickenPassive.Immovable },
-                { ChickenClass.Assassin, ChickenPassive.Combo },
+                { ChickenClass.Warrior,  "Relentless" },
+                { ChickenClass.Speedy,   "Slippery" },
+                { ChickenClass.Fatty,    "Hoarder" },
+                { ChickenClass.Assassin, "Spoiler" },
             };
 
-            var reg = TestAssets.Load<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
+            var abilityReg = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
             foreach (var kv in expected)
             {
-                Assert.IsTrue(reg.TryGet(kv.Key, out var entry), $"No entry for {kv.Key}.");
-                Assert.IsNotNull(entry.Stats, $"{kv.Key} has no stats asset.");
-                Assert.AreEqual(kv.Value, entry.Stats.Passive,
-                    $"{kv.Key} should have the {kv.Value} passive (GDD §5.2) but its stats asset " +
-                    $"'{entry.Stats.name}' says {entry.Stats.Passive}.");
+                var def = abilityReg.GetDefaultPassiveForClass(kv.Key);
+                Assert.IsNotNull(def,
+                    $"{kv.Key} resolves no default specialization. GetDefaultPassiveForClass prefers the " +
+                    "entry flagged IsSignature; if none is flagged for this class it falls back to registry " +
+                    "AUTHORING ORDER, which is how Warrior once defaulted to an inert alternative.");
+                Assert.AreEqual(kv.Value, def.DisplayName,
+                    $"{kv.Key}'s default specialization should be {kv.Value} but resolves to " +
+                    $"'{def.DisplayName}'. Check which asset carries IsSignature for this class.");
             }
         }
 
@@ -288,9 +296,6 @@ namespace CluckWars.Tests
                 Assert.GreaterOrEqual(s.CargoCapacity, 1, $"{s.name}: CargoCapacity {s.CargoCapacity} — cannot carry food, so it can never score.");
                 Assert.Greater(s.CollectionRate, 0f, $"{s.name}: CollectionRate {s.CollectionRate} — cannot collect food, so it can never score.");
                 Assert.Greater(s.Scale, 0f,        $"{s.name}: Scale {s.Scale} — the mesh collapses to a point.");
-                Assert.AreNotEqual(ChickenPassive.None, s.Passive,
-                    $"{s.name}: Passive is None. Every playable class has a passive (GDD §5.2); " +
-                    "None means the class ships with a missing mechanic and the UI shows no passive copy.");
             }
         }
 
@@ -410,13 +415,61 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void ClassStats_EveryPassive_IsUsedByExactlyOneClass()
+        public void Hoarder_CarriesAtLeastAFullWin_AndSpoilerMatchesTheMatchConfig()
         {
-            var all = TestAssets.LoadAllIn<ChickenStatsSO>(TestAssets.ClassesDir);
-            var dupes = all.GroupBy(s => s.Passive).Where(g => g.Count() > 1).ToList();
+            var config = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
+            var passives = TestAssets.LoadAllIn<PassiveAbilitySO>(TestAssets.AbilitiesDir + "/Passives");
 
-            Assert.IsEmpty(dupes.Select(g => $"{g.Key} on [{string.Join(", ", g.Select(s => s.name))}]").ToList(),
-                "Two classes share a passive — the classes are no longer differentiated.");
+            var hoarder = passives.OfType<HoarderPassiveSO>().FirstOrDefault();
+            Assert.IsNotNull(hoarder, "No Hoarder asset — Fatty's signature specialization is missing.");
+            Assert.GreaterOrEqual(hoarder.MinimumCapacity, config.FoodTargetToWin,
+                $"Hoarder raises capacity to {hoarder.MinimumCapacity} but the win target is " +
+                $"{config.FoodTargetToWin}. The entire point of the passive is banking a win in ONE trip; " +
+                "one unit short and the Fatty walks home, deposits, and has to go out again — the fantasy " +
+                "fails silently, because a two-trip Fatty looks exactly like a Fatty without the passive.");
+
+            var spoiler = passives.OfType<SpoilerPassiveSO>().FirstOrDefault();
+            Assert.IsNotNull(spoiler, "No Spoiler asset — Assassin's signature specialization is missing.");
+            Assert.AreEqual(config.SpoilerBounty, spoiler.BonusFood,
+                $"Spoiler pays {spoiler.BonusFood} but MatchConfig.SpoilerBounty is {config.SpoilerBounty}. " +
+                "Two numbers describing one payout will drift; MatchConfig is the authority.");
+            Assert.Less(spoiler.BonusFood, config.FoodTargetToWin,
+                $"Spoiler's {spoiler.BonusFood} is at or above the {config.FoodTargetToWin} win target, so an " +
+                "Assassin could win from ZERO banked food by stalling the match out. The design sizes it to " +
+                "beat a typical stalemate leader, never to win from nothing.");
+        }
+
+        [Test]
+        public void Specializations_AreExclusiveToOneClass_AndEveryClassHasAFork()
+        {
+            // A specialization shared by two classes stops differentiating them, and a class
+            // with only one has no fork to choose from — the pick screen shows a single
+            // option and the "choose your build" step is theatre.
+            var reg = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
+
+            var shared = reg.Passives
+                .Where(p => p != null)
+                .Where(p => CountBits((byte)p.AllowedClasses) > 1)
+                .Select(p => $"{p.DisplayName} (allowed: {p.AllowedClasses})")
+                .ToList();
+            Assert.IsEmpty(shared,
+                "These specializations are legal for more than one class, so the classes they " +
+                "overlap on are no longer differentiated by their pick.");
+
+            foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
+            {
+                int count = reg.GetPassivesForClass(cls).Count();
+                Assert.GreaterOrEqual(count, 2,
+                    $"{cls} has {count} specialization(s). Every class needs a real fork — one " +
+                    "option is not a choice, and zero means the class ships with no passive at all.");
+            }
+        }
+
+        private static int CountBits(byte b)
+        {
+            int n = 0;
+            while (b != 0) { n += b & 1; b >>= 1; }
+            return n;
         }
 
         // ---- MatchConfigSO ------------------------------------------------------

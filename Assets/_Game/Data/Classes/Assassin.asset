@@ -13,7 +13,6 @@ MonoBehaviour:
   m_Name: Assassin
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenStatsSO
   DisplayName: Assassin
-  Passive: 4
   MaxHP: 70
   MoveSpeed: 9
   TurnSpeed: 720

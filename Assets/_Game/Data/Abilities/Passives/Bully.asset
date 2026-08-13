@@ -9,18 +9,19 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 63c3725175304e94af646959b56a0000, type: 3}
-  m_Name: Combo
-  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.ComboPassiveSO
-  DisplayName: Combo
-  ShortLabel: CMBO
-  Description: Equips a third ability instead of two.
+  m_Script: {fileID: 11500000, guid: 11eb74218599a7148a7b363bdc75b93c, type: 3}
+  m_Name: Bully
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.BullyPassiveSO
+  DisplayName: Bully
+  ShortLabel: BULY
+  Description: Steals more per hit, and can carry what it takes.
   Icon: 
-  AccentColor: {r: 0.5, g: 0.4, b: 0.9, a: 1}
+  AccentColor: {r: 0.86, g: 0.3, b: 0.3, a: 1}
   Category: 3
   TerrainTraversal: 0
+  JumpTier: 0
   SlotKind: 1
-  AllowedClasses: 8
+  AllowedClasses: 1
   BotRole: 0
   Duration: 0.05
   Cooldown: 0
@@ -28,3 +29,5 @@ MonoBehaviour:
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  StealMultiplier: 1.4
+  BonusCapacity: 6

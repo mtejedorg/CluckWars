@@ -19,10 +19,6 @@ namespace CluckWars.Gameplay
         [Header("Identity")]
         public string DisplayName = "Warrior";
 
-        [Header("Passive")]
-        [Tooltip("This class's unique passive mechanic (GDD v0.3 §5.2). Set in the Inspector after recompile.")]
-        public ChickenPassive Passive = ChickenPassive.None;
-
         [Header("Movement")]
         [Min(0f)] public float MoveSpeed = 9f;
         [Min(0f)] public float TurnSpeed = 720f; // deg/sec

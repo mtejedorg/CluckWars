@@ -13,7 +13,6 @@ MonoBehaviour:
   m_Name: Warrior
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenStatsSO
   DisplayName: Warrior
-  Passive: 3
   MaxHP: 100
   MoveSpeed: 7.5
   TurnSpeed: 720

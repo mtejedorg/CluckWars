@@ -50,14 +50,17 @@ namespace CluckWars.UI
             { "WingSlamAbilitySO",    "cw-hex-icon--wing-slam" },
             { "ShadowstepAbilitySO",  "cw-hex-icon--shadowstep" },
             { "MarkKillAbilitySO",    "cw-hex-icon--mark-kill" },
-            { "MightyPassiveSO",      "cw-hex-icon--mighty" },
-            { "BracerPassiveSO",      "cw-hex-icon--bracer" },
+            // Class specializations. None have exported sprites yet - all are listed in
+            // AbilitySystemTests.IconsNotYetAuthored and carry their emoji fallback.
             { "SlipperyPassiveSO",    "cw-hex-icon--slippery" },
-            { "SecondWindPassiveSO",  "cw-hex-icon--wind" },
-            { "ImmovablePassiveSO",   "cw-hex-icon--immovable" },
-            { "JuggernautPassiveSO",  "cw-hex-icon--juggernaut" },
-            { "ComboPassiveSO",       "cw-hex-icon--combo" },
-            { "OpportunistPassiveSO", "cw-hex-icon--opportunist" },
+            { "FeatherfootPassiveSO", "cw-hex-icon--featherfoot" },
+            { "DropAndGoPassiveSO",   "cw-hex-icon--dropandgo" },
+            { "HoarderPassiveSO",     "cw-hex-icon--hoarder" },
+            { "BulwarkPassiveSO",     "cw-hex-icon--bulwark" },
+            { "RelentlessPassiveSO",  "cw-hex-icon--relentless" },
+            { "BullyPassiveSO",       "cw-hex-icon--bully" },
+            { "SpoilerPassiveSO",     "cw-hex-icon--spoiler" },
+            { "ThiefPassiveSO",       "cw-hex-icon--thief" },
         };
 
         /// <summary>

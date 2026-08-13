@@ -320,7 +320,7 @@ namespace CluckWars.Gameplay
         public float CooldownProgress01(int slot)
         {
             var ability = GetSlot(slot);
-            float cd = ability != null ? ability.ResolveCooldown(_controller) : 0f;
+            float cd = ResolveCooldownFor(ability);
             if (ability == null || cd <= 0f) return 1f;
             var remaining = CooldownRemaining(slot);
             return 1f - Mathf.Clamp01(remaining / cd);
@@ -439,6 +439,24 @@ namespace CluckWars.Gameplay
 
         // ---- Internals ---------------------------------------------------------
 
+        /// <summary>
+        /// The cooldown this chicken actually pays for <paramref name="ability"/>: the
+        /// ability's own per-caster value, then the class specialization's say (Relentless).
+        /// </summary>
+        /// <remarks>
+        /// Every cooldown read in this class goes through here — the timer that starts the
+        /// lockout and the radial fill that draws it. Applying the passive in one but not the
+        /// other would draw a hex whose sweep finishes at a different moment than the ability
+        /// is actually ready, which reads as an unresponsive button.
+        /// </remarks>
+        private float ResolveCooldownFor(AbilityBaseSO ability)
+        {
+            if (ability == null) return 0f;
+            float seconds = ability.ResolveCooldown(_controller);
+            var passive = _controller != null ? _controller.Passive : null;
+            return passive != null ? passive.ModifyCooldown(seconds, ability, _controller) : seconds;
+        }
+
         private AbilityBaseSO GetSlot(int slot) => slot switch
         {
             0 => _slot0,
@@ -535,7 +553,7 @@ namespace CluckWars.Gameplay
 
             ActiveSlot = slot;
             ActivationTimer = TickTimer.CreateFromSeconds(Runner, ability.Duration);
-            SetCooldown(slot, TickTimer.CreateFromSeconds(Runner, ability.ResolveCooldown(_controller)));
+            SetCooldown(slot, TickTimer.CreateFromSeconds(Runner, ResolveCooldownFor(ability)));
             // Refresh context fields that abilities need for NetworkObject spawning.
             _ctx.Runner         = Runner;
             _ctx.PrefabRegistry = _prefabRegistry;
@@ -582,7 +600,7 @@ namespace CluckWars.Gameplay
             _audio?.PlaySFX(_audioReg != null ? _audioReg.AbilityActivate : null);
             LastCastEventId++; // wraps at 255 by design (byte overflow) — a one-shot signal, not a counter
             _log?.Info(Source, $"Activated slot {slot} ({ability.DisplayName}) for {ability.Duration:0.00}s, " +
-                $"CD {ability.ResolveCooldown(_controller):0.00}s, hits={hitCount}.");
+                $"CD {ResolveCooldownFor(ability):0.00}s, hits={hitCount}.");
         }
 
         /// <summary>

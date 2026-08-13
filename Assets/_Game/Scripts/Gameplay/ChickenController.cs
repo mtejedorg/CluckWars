@@ -66,8 +66,6 @@ namespace CluckWars.Gameplay
         private const float CollisionSlowRadius      = 1.2f;  // metres — two chickens touching
         private const float CollisionSlowFactor      = 0.75f; // GDD TBD #7
         private const float PileSlowFactor           = 0.80f; // GDD TBD #6
-        private const float SlipperyDurationReduction = 0.40f; // control-state durations 60% shorter for Slippery (duration-only per GDD §5.2)
-        private const float ImmovableKnockbackFactor = 0.15f; // knockback heavily reduced for Immovable
         private const float ToughDamageBonus         = 1.25f; // 25% bonus outgoing damage for Tough
         private const float AuraSlowSearchRadius     = 10f;   // broadphase for CheckAuraSlow
 
@@ -265,7 +263,8 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            _log?.Info(Source, $"Stats resolved: '{_activeStats.DisplayName}', moveSpeed={_activeStats.MoveSpeed}, passive={_activeStats.Passive}.");
+            _log?.Info(Source, $"Stats resolved: '{_activeStats.DisplayName}', moveSpeed={_activeStats.MoveSpeed}, " +
+                $"specialization={(Passive != null ? Passive.DisplayName : "(none)")}.");
             _movement = new ChickenMovement(_characterController, this);
             _traversal = new ChickenTraversal(_characterController, _log);
 
@@ -530,7 +529,12 @@ namespace CluckWars.Gameplay
 
             // Pile slow: ChickenCargo sets IsPileSlow on the previous tick (1-tick
             // lag is imperceptible; piles don't move).
-            if (_cargo != null && _cargo.IsPileSlow)
+            // Featherfoot ignores this entirely. The slow matters far more since foraging
+            // became Peck: a chicken now STANDS on a pile for seconds pressing the button,
+            // where before it only brushed past.
+            var pileSlowPassive = Passive;
+            bool ignoresPileSlow = pileSlowPassive != null && pileSlowPassive.IgnoresPileSlow(this);
+            if (_cargo != null && _cargo.IsPileSlow && !ignoresPileSlow)
                 ApplySlow(SlowSource.Pile, PileSlowFactor);
 
             // Ability slow timer (RPC_ApplyAbilitySlow — zones, aura, etc.).
@@ -597,22 +601,19 @@ namespace CluckWars.Gameplay
 
         // ---- Passive hooks ---------------------------------------------------
 
-        public bool IsPassiveActive(ChickenPassive enumPassive)
-        {
-            if (_abilities != null && _abilities.Passive != null)
-            {
-                var p = _abilities.Passive;
-                return enumPassive switch
-                {
-                    ChickenPassive.Tough     => p is Abilities.MightyPassiveSO,
-                    ChickenPassive.Slippery  => p is Abilities.SlipperyPassiveSO,
-                    ChickenPassive.Immovable => p is Abilities.ImmovablePassiveSO,
-                    ChickenPassive.Combo     => p is Abilities.ComboPassiveSO,
-                    _ => false,
-                };
-            }
-            return Stats != null && Stats.Passive == enumPassive;
-        }
+        /// <summary>
+        /// This chicken's equipped class specialization, or null. Every passive effect goes
+        /// through a typed hook on it — see <see cref="Abilities.PassiveAbilitySO"/>.
+        /// </summary>
+        /// <remarks>
+        /// This replaced <c>IsPassiveActive(ChickenPassive)</c>, a parallel enum path that
+        /// mapped an enum member to a <c>p is XPassiveSO</c> check. Two systems described the
+        /// same thing, and by the time it was removed only two of its four members still did
+        /// anything — Tough scaled damage in a game with no damage, and Combo granted a third
+        /// ability slot that every class now has.
+        /// </remarks>
+        public Abilities.PassiveAbilitySO Passive =>
+            _abilities != null ? _abilities.Passive : null;
 
         /// <summary>
         /// Applies a speed penalty from a tagged source. Multiple sources stack
@@ -631,14 +632,14 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Sets an external displacement impulse on this chicken (integrated and
         /// decayed by <see cref="ChickenMovement"/>).
-        /// Respects the <see cref="ChickenPassive.Immovable"/> passive which
-        /// drastically reduces the impulse for Fatty.
+        /// Scaled by the equipped specialization's <c>ModifyKnockback</c> (Bulwark
+        /// inherits the old Immovable passive's role here).
         /// Must be called on the StateAuthority.
         /// </summary>
         public void ApplyKnockback(Vector3 impulse)
         {
-            if (IsPassiveActive(ChickenPassive.Immovable))
-                impulse *= ImmovableKnockbackFactor;
+            var p = Passive;
+            if (p != null) impulse *= Mathf.Max(0f, p.ModifyKnockback(1f, this));
             ExternalDisplacement = impulse;
             // Fire the networked one-shot so every peer plays the shockwave locally.
             if (impulse.sqrMagnitude > 1f) KnockbackEventId++;
@@ -675,7 +676,7 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Applies an external displacement (knockback) impulse. Routes to the
         /// chicken's StateAuthority; integrated + decayed by <see cref="ChickenMovement"/>.
-        /// Respects <see cref="ChickenPassive.Immovable"/>.
+        /// Knockback is scaled by the specialization (Bulwark).
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_ApplyKnockback(Vector3 impulse)
@@ -685,13 +686,12 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Applies a timed ability slow. Respects <see cref="ChickenPassive.Slippery"/>
-        /// — duration is reduced for Speedy.
+        /// Applies a timed ability slow, shortened by the equipped specialization's
+        /// <c>ModifyControlDuration</c> (Slippery, Bulwark).
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_ApplyAbilitySlow(float duration, float factor)
         {
-            if (IsPassiveActive(ChickenPassive.Slippery)) duration *= SlipperyDurationReduction;
             duration = ApplyPassiveControlDuration(duration);
             _abilitySlowUntil  = Runner.SimulationTime + duration;
             _abilitySlowFactor = factor;
@@ -700,12 +700,11 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// Stuns this chicken for <paramref name="seconds"/> seconds — blocks movement,
-        /// casting, and collecting. Respects <see cref="ChickenPassive.Slippery"/>.
+        /// casting, and collecting. Shortened by <c>ModifyControlDuration</c>.
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_ApplyStun(float seconds)
         {
-            if (IsPassiveActive(ChickenPassive.Slippery)) seconds *= SlipperyDurationReduction;
             seconds = ApplyPassiveControlDuration(seconds);
             IsStunned = true;
             StunTimer = TickTimer.CreateFromSeconds(Runner, seconds);
@@ -714,13 +713,12 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// Roots this chicken for <paramref name="duration"/> seconds — movement
-        /// blocked, abilities still castable (GDD §6.4). Respects
-        /// <see cref="ChickenPassive.Slippery"/>.
+        /// blocked, abilities still castable (GDD §6.4). Shortened by
+        /// <c>ModifyControlDuration</c>.
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_ApplyRoot(float duration)
         {
-            if (IsPassiveActive(ChickenPassive.Slippery)) duration *= SlipperyDurationReduction;
             duration = ApplyPassiveControlDuration(duration);
             RootTimer = TickTimer.CreateFromSeconds(Runner, duration);
             _log?.Debug(Source, $"RPC_ApplyRoot: rooted for {duration:0.0}s.");

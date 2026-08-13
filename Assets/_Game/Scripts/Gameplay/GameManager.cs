@@ -400,6 +400,11 @@ namespace CluckWars.Gameplay
 
         private void EndOnTimerExpiry()
         {
+            // Spoiler pays out BEFORE the winner is picked. That ordering is the mechanic:
+            // the bonus exists to let an Assassin steal a stalemate, so it has to be banked
+            // while "most banked wins" is still being decided, not bolted on afterwards.
+            AwardMatchEndBonuses();
+
             var bases = PlayerBase.ActiveBases;
             PlayerBase bestBase = null;
             for (int i = 0; i < bases.Count; i++)
@@ -436,6 +441,63 @@ namespace CluckWars.Gameplay
             int winnerCorner = bestBase != null ? bestBase.CornerIndex : -1;
             float bestTotal = bestBase != null ? bestBase.FoodTotal : 0f;
             EndMatch(winner, winnerCorner, bestTotal, reason: "timer expired");
+        }
+
+        /// <summary>
+        /// Banks each chicken's <c>MatchEndBonusFood</c> into its home base. Only Spoiler
+        /// returns anything today.
+        /// </summary>
+        /// <remarks>
+        /// Reached only from <see cref="EndOnTimerExpiry"/>, never from the food-target win.
+        /// That is deliberate and is the whole guard on the mechanic: the bonus is for a match
+        /// that ended with <b>nobody</b> reaching the target, so paying it out when someone
+        /// clearly won would let an Assassin steal a match it never contested.
+        /// <para>
+        /// Runs on the state authority only — <see cref="EndOnTimerExpiry"/> is already inside
+        /// the authority-gated tick, and <c>PlayerBase.RPC_AddFood</c> routes to each base's
+        /// own authority from there.
+        /// </para>
+        /// </remarks>
+        private void AwardMatchEndBonuses()
+        {
+            var chickens = ChickenController.ActiveControllers;
+            for (int i = 0; i < chickens.Count; i++)
+            {
+                var chicken = chickens[i];
+                if (chicken == null || chicken.IsDecoy) continue;
+
+                var passive = chicken.Passive;
+                if (passive == null) continue;
+
+                int bonus = passive.MatchEndBonusFood(chicken);
+                if (bonus <= 0) continue;
+
+                var home = FindBaseForCorner(chicken.HomeCornerIndex);
+                if (home == null)
+                {
+                    _log?.Warn(Source, $"{passive.DisplayName} bonus of {bonus} was earned but corner " +
+                        $"{chicken.HomeCornerIndex} has no base to bank it into — the bonus is lost.");
+                    continue;
+                }
+
+                home.RPC_AddFood(bonus);
+                _log?.Info(Source, $"{passive.DisplayName}: banked +{bonus} into corner {home.CornerIndex} " +
+                    "because the timer expired with no winner.");
+            }
+        }
+
+        /// <summary>The claimed base sitting on <paramref name="cornerIndex"/>, or null.</summary>
+        private static PlayerBase FindBaseForCorner(int cornerIndex)
+        {
+            if (cornerIndex < 0) return null;
+            var bases = PlayerBase.ActiveBases;
+            for (int i = 0; i < bases.Count; i++)
+            {
+                var b = bases[i];
+                if (b != null && b.Object != null && b.Object.IsValid && b.CornerIndex == cornerIndex)
+                    return b;
+            }
+            return null;
         }
 
         private int GetKillsForCorner(int cornerIndex)

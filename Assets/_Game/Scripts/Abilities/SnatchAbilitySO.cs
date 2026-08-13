@@ -67,7 +67,7 @@ namespace CluckWars.Abilities
                 var targetCargo = targetCtrl.Cargo; // ExtraTargetFilter already guaranteed Cargo > 0
 
                 float freeSpace = thiefCargo.Capacity - thiefCargo.Cargo;
-                float stolen = StealMath.Clamp(StealAmount, freeSpace, targetCargo.Cargo);
+                float stolen = StealMath.Clamp(ResolveStealAmount(StealAmount, thief), freeSpace, targetCargo.Cargo);
                 if (stolen > 0f)
                 {
                     thiefCargo.Cargo += stolen;

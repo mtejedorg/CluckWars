@@ -9,18 +9,19 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4c17d7b5d78d46ec9db4a8d82a75d7f0, type: 3}
-  m_Name: Mighty
-  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.MightyPassiveSO
-  DisplayName: Mighty
-  ShortLabel: MGHT
-  Description: '+25% outgoing ability damage.'
+  m_Script: {fileID: 11500000, guid: b20eac0a84018e34290533af619410cf, type: 3}
+  m_Name: Hoarder
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.HoarderPassiveSO
+  DisplayName: Hoarder
+  ShortLabel: HRDR
+  Description: Carries a full win's worth of food in one trip.
   Icon: 
-  AccentColor: {r: 0.75, g: 0.25, b: 0.2, a: 1}
-  Category: 0
+  AccentColor: {r: 0.96, g: 0.72, b: 0.25, a: 1}
+  Category: 3
   TerrainTraversal: 0
+  JumpTier: 0
   SlotKind: 1
-  AllowedClasses: 1
+  AllowedClasses: 4
   BotRole: 0
   Duration: 0.05
   Cooldown: 0
@@ -28,3 +29,4 @@ MonoBehaviour:
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  MinimumCapacity: 40

@@ -21,8 +21,7 @@ namespace CluckWars.Tests
     ///   and every stamped <c>[Networked]</c> value.
     /// * <c>[Networked]</c> enums default to 0 (CONVENTIONS.md "[Networked] defaults"),
     ///   so the zero member of every networked enum has to be the correct pre-init
-    ///   state — <c>MatchState.WaitingForPlayers</c>, <c>MatchEventKind.None</c>,
-    ///   <c>ChickenPassive.None</c>.
+    ///   state — <c>MatchState.WaitingForPlayers</c>, <c>MatchEventKind.None</c>.
     /// * Every per-class or per-category switch must cover the whole enum. A new class
     ///   or category compiles fine and then falls through to a placeholder at runtime.
     /// </remarks>
@@ -37,7 +36,6 @@ namespace CluckWars.Tests
             // SO. Widening the backing type silently grows the replicated payload.
             Assert.AreEqual(typeof(byte), Enum.GetUnderlyingType(typeof(ChickenClass)),
                 "ChickenClass must stay byte-backed — see CONVENTIONS.md.");
-            Assert.AreEqual(typeof(byte), Enum.GetUnderlyingType(typeof(ChickenPassive)));
             Assert.AreEqual(typeof(byte), Enum.GetUnderlyingType(typeof(AbilityCategory)));
             Assert.AreEqual(typeof(byte), Enum.GetUnderlyingType(typeof(BotRole)));
             Assert.AreEqual(typeof(byte), Enum.GetUnderlyingType(typeof(MatchEventKind)));
@@ -78,8 +76,6 @@ namespace CluckWars.Tests
                 "If 0 were Active or Ended, every peer would render a live or finished match for a frame.");
             Assert.AreEqual(0, (byte)MatchEventKind.None,
                 "MatchEventKind is [Networked]; 0 must mean 'no comeback event running'.");
-            Assert.AreEqual(0, (byte)ChickenPassive.None,
-                "A stats asset with no authored Passive deserialises to 0 — that has to mean 'no passive'.");
             Assert.AreEqual(0, (byte)BotRole.Auto,
                 "An ability asset authored before BotRole existed deserialises to 0, which must be the " +
                 "'derive from Category' behaviour rather than a concrete role.");

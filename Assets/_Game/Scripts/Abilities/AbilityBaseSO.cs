@@ -204,6 +204,18 @@ namespace CluckWars.Abilities
         /// </remarks>
         public virtual float ResolveCooldown(Gameplay.ChickenController caster) => Cooldown;
 
+        /// <summary>
+        /// How much cargo <paramref name="caster"/> actually takes for a nominal
+        /// <paramref name="baseAmount"/>, after its class specialization has had a say
+        /// (Bully, Thief). The single chokepoint every stealing ability calls, so a passive
+        /// that scales steals cannot apply to some of them and miss others.
+        /// </summary>
+        protected static float ResolveStealAmount(float baseAmount, Gameplay.ChickenController caster)
+        {
+            var passive = caster != null ? caster.Passive : null;
+            return passive != null ? passive.ModifyStealAmount(baseAmount, caster) : baseAmount;
+        }
+
         // ---- Aim descriptor (FEEDBACK.md §4 / §8) ------------------------------
         // One declarative shape per ability, used by every consumer that needs to
         // agree on "what does this ability cover": the hold-to-aim preview, the
