@@ -10,7 +10,31 @@
          Styles: Assets/UI/Styles/TouchControls.uss
          Picking: the root is Ignore (taps outside controls fall through); only
          the joystick base + the 3 hexes are interactive (picking-mode Position).
-         Cooldown is a bottom-up clip (ART 6.6 layer 6), NOT a radial fill. -->
+         Cooldown is a bottom-up clip (ART 6.6 layer 6), NOT a radial fill.
+
+         v0.6 Stage 5 (FEEDBACK.md 5.2 + 6, cases 17-19 / 24-29) adds, without a
+         tenth ART-6.6 layer and without a second UIDocument:
+           - per hex, an ActiveDrain* clip : layer 6 again, but anchored TOP and
+             accent-tinted, i.e. the deliberate opposite of the bottom-up black
+             cooldown clip, so "an ability is RUNNING" can never be misread as
+             "an ability is COOLING". Shown on the active slot only.
+           - per hex, a StateGlyph* group : layer 9 again. Layer 9 generalises
+             from "cooldown seconds" to "state indicator" and carries whichever
+             refusal won; the reasons are mutually exclusive by
+             AbilityRefusalRules.Evaluate, so the centre never arbitrates. The
+             marks are DRAWN (ring + rotated bars), not typed - neither U+20E0
+             nor U+2715 exists in LilitaOne or NotoEmoji and TMP Settings has no
+             fallback list, so both would have been tofu. See
+             HudFeedbackStyle.UseDrawnRefusalMarks.
+           - on the joystick, a JoyStateGlyph + JoySlowLabel. Both picking-mode
+             Ignore so they can never steal a touch : the stick stays draggable
+             in every control state, the GAME blocks the movement, the HUD only
+             says so.
+           - a StatusStrip stacked directly above the joystick base. FEEDBACK.md
+             5.2 said "below the cargo readout"; that readout moved to world
+             space on the chicken (ChickenWorldBars, ART 6.3 "the game area is
+             sacred") and no longer exists in the HUD. Re-sited here so the strip
+             reads in the SAME GLANCE as the move stick it constrains. -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTokens.uss" />
     <ui:Style src="project://database/Assets/UI/Styles/TouchControls.uss" />
 
@@ -19,6 +43,39 @@
         <!-- ===== LEFT : virtual joystick ===== -->
         <ui:VisualElement name="JoystickBase" class="cw-joy-base">
             <ui:VisualElement name="JoystickKnob" class="cw-joy-knob" picking-mode="Ignore" />
+            <!-- Control-consequence marks. Text is written by the controller from
+                 HudFeedbackStyle so the shackle here is byte-identical to the one
+                 ChickenStatusBadges puts over the chicken's head. -->
+            <ui:Label name="JoyStateGlyph" text="" class="cw-joy-glyph cw-glyph-font" picking-mode="Ignore" />
+            <ui:Label name="JoySlowLabel" text="" class="cw-joy-slow" picking-mode="Ignore" />
+        </ui:VisualElement>
+
+        <!-- ===== LEFT : status strip (stacked above the joystick, grows upward) ===== -->
+        <ui:VisualElement name="StatusStrip" class="cw-status-strip" picking-mode="Ignore">
+            <ui:VisualElement name="StatusRow0" class="cw-status-row" picking-mode="Ignore">
+                <ui:Label name="StatusGlyph0" text="" class="cw-status-glyph cw-glyph-font" picking-mode="Ignore" />
+                <ui:Label name="StatusName0" text="" class="cw-status-name" picking-mode="Ignore" />
+                <ui:Label name="StatusValue0" text="" class="cw-status-value" picking-mode="Ignore" />
+                <ui:VisualElement name="StatusBar0" class="cw-status-bar" picking-mode="Ignore">
+                    <ui:VisualElement name="StatusBarFill0" class="cw-status-bar-fill" picking-mode="Ignore" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="StatusRow1" class="cw-status-row" picking-mode="Ignore">
+                <ui:Label name="StatusGlyph1" text="" class="cw-status-glyph cw-glyph-font" picking-mode="Ignore" />
+                <ui:Label name="StatusName1" text="" class="cw-status-name" picking-mode="Ignore" />
+                <ui:Label name="StatusValue1" text="" class="cw-status-value" picking-mode="Ignore" />
+                <ui:VisualElement name="StatusBar1" class="cw-status-bar" picking-mode="Ignore">
+                    <ui:VisualElement name="StatusBarFill1" class="cw-status-bar-fill" picking-mode="Ignore" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="StatusRow2" class="cw-status-row" picking-mode="Ignore">
+                <ui:Label name="StatusGlyph2" text="" class="cw-status-glyph cw-glyph-font" picking-mode="Ignore" />
+                <ui:Label name="StatusName2" text="" class="cw-status-name" picking-mode="Ignore" />
+                <ui:Label name="StatusValue2" text="" class="cw-status-value" picking-mode="Ignore" />
+                <ui:VisualElement name="StatusBar2" class="cw-status-bar" picking-mode="Ignore">
+                    <ui:VisualElement name="StatusBarFill2" class="cw-status-bar-fill" picking-mode="Ignore" />
+                </ui:VisualElement>
+            </ui:VisualElement>
         </ui:VisualElement>
 
         <!-- ===== RIGHT : hex ability cluster (MOBA arc) ===== -->
@@ -28,9 +85,17 @@
             <ui:VisualElement name="Cooldown1" class="cw-hex-cd" picking-mode="Ignore">
                 <ui:VisualElement class="cw-hex-cd-fill" picking-mode="Ignore" />
             </ui:VisualElement>
+            <ui:VisualElement name="ActiveDrain1" class="cw-hex-drain" picking-mode="Ignore">
+                <ui:VisualElement name="ActiveDrainFill1" class="cw-hex-drain-fill" picking-mode="Ignore" />
+            </ui:VisualElement>
             <ui:VisualElement name="Icon1" class="cw-hex-icon" picking-mode="Ignore" />
             <ui:Label name="Label1" text="" class="cw-hex-label" picking-mode="Ignore" />
             <ui:Label name="CooldownNum1" text="" class="cw-hex-cdnum" picking-mode="Ignore" />
+            <ui:VisualElement name="StateGlyph1" class="cw-hex-state" picking-mode="Ignore">
+                <ui:VisualElement name="StateRing1" class="cw-hex-state-ring" picking-mode="Ignore" />
+                <ui:VisualElement name="StateBarA1" class="cw-hex-state-bar cw-hex-state-bar--a" picking-mode="Ignore" />
+                <ui:VisualElement name="StateBarB1" class="cw-hex-state-bar cw-hex-state-bar--b" picking-mode="Ignore" />
+            </ui:VisualElement>
             <ui:VisualElement name="Badge1" class="cw-hex-badge" picking-mode="Ignore">
                 <ui:Label name="BadgeText1" text="1" class="cw-hex-badge-text" picking-mode="Ignore" />
             </ui:VisualElement>
@@ -41,9 +106,17 @@
             <ui:VisualElement name="Cooldown2" class="cw-hex-cd" picking-mode="Ignore">
                 <ui:VisualElement class="cw-hex-cd-fill" picking-mode="Ignore" />
             </ui:VisualElement>
+            <ui:VisualElement name="ActiveDrain2" class="cw-hex-drain" picking-mode="Ignore">
+                <ui:VisualElement name="ActiveDrainFill2" class="cw-hex-drain-fill" picking-mode="Ignore" />
+            </ui:VisualElement>
             <ui:VisualElement name="Icon2" class="cw-hex-icon" picking-mode="Ignore" />
             <ui:Label name="Label2" text="" class="cw-hex-label" picking-mode="Ignore" />
             <ui:Label name="CooldownNum2" text="" class="cw-hex-cdnum" picking-mode="Ignore" />
+            <ui:VisualElement name="StateGlyph2" class="cw-hex-state" picking-mode="Ignore">
+                <ui:VisualElement name="StateRing2" class="cw-hex-state-ring" picking-mode="Ignore" />
+                <ui:VisualElement name="StateBarA2" class="cw-hex-state-bar cw-hex-state-bar--a" picking-mode="Ignore" />
+                <ui:VisualElement name="StateBarB2" class="cw-hex-state-bar cw-hex-state-bar--b" picking-mode="Ignore" />
+            </ui:VisualElement>
             <ui:VisualElement name="Badge2" class="cw-hex-badge" picking-mode="Ignore">
                 <ui:Label name="BadgeText2" text="2" class="cw-hex-badge-text" picking-mode="Ignore" />
             </ui:VisualElement>
@@ -54,9 +127,17 @@
             <ui:VisualElement name="Cooldown3" class="cw-hex-cd" picking-mode="Ignore">
                 <ui:VisualElement class="cw-hex-cd-fill" picking-mode="Ignore" />
             </ui:VisualElement>
+            <ui:VisualElement name="ActiveDrain3" class="cw-hex-drain" picking-mode="Ignore">
+                <ui:VisualElement name="ActiveDrainFill3" class="cw-hex-drain-fill" picking-mode="Ignore" />
+            </ui:VisualElement>
             <ui:VisualElement name="Icon3" class="cw-hex-icon" picking-mode="Ignore" />
             <ui:Label name="Label3" text="" class="cw-hex-label" picking-mode="Ignore" />
             <ui:Label name="CooldownNum3" text="" class="cw-hex-cdnum" picking-mode="Ignore" />
+            <ui:VisualElement name="StateGlyph3" class="cw-hex-state" picking-mode="Ignore">
+                <ui:VisualElement name="StateRing3" class="cw-hex-state-ring" picking-mode="Ignore" />
+                <ui:VisualElement name="StateBarA3" class="cw-hex-state-bar cw-hex-state-bar--a" picking-mode="Ignore" />
+                <ui:VisualElement name="StateBarB3" class="cw-hex-state-bar cw-hex-state-bar--b" picking-mode="Ignore" />
+            </ui:VisualElement>
             <ui:VisualElement name="Badge3" class="cw-hex-badge cw-hex-badge--combo" picking-mode="Ignore">
                 <ui:Label name="BadgeText3" text="★" class="cw-hex-badge-text cw-hex-badge-text--combo" picking-mode="Ignore" />
             </ui:VisualElement>

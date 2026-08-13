@@ -1,3 +1,4 @@
+using CluckWars.Abilities;
 using CluckWars.Logging;
 using CluckWars.Networking;
 using CluckWars.Visuals;
@@ -88,6 +89,10 @@ namespace CluckWars.Gameplay
         private AbilityController _abilities;
         private ILogService _log;
 
+        // True once the class's avatar AND all five clips are bound, i.e. the Animator is really
+        // driving the skeleton. Drives ChickenAnimator's two-path split — see SetSkeletalActive.
+        private bool _skeletalAnimationActive;
+
         public ChickenTraversal Traversal => _traversal;
 
         // Slow accumulation — reset to None/1 at top of each FixedUpdateNetwork.
@@ -96,9 +101,6 @@ namespace CluckWars.Gameplay
         // Timer-based ability slow (StateAuthority-side; set by RPC_ApplyAbilitySlow).
         private double _abilitySlowUntil  = double.MinValue;
         private float  _abilitySlowFactor = 1f;
-
-        // Timer-based root (StateAuthority-side; set by RPC_ApplyRoot).
-        private double _rootUntil = double.MinValue;
 
         /// <summary>The chicken's archetype. Replicated; set by the spawner via <c>OnBeforeSpawned</c>.</summary>
         [Networked] public ChickenClass Class { get; set; } = ChickenClass.Warrior;
@@ -179,6 +181,17 @@ namespace CluckWars.Gameplay
         /// and then re-populated by <see cref="ApplySlow"/> calls.
         /// Read by <see cref="ChickenMovement"/>.
         /// </summary>
+        /// <remarks>
+        /// v0.6 (FEEDBACK.md §5.2, case 18/19): unlike <see cref="StunRemaining"/> and
+        /// <see cref="RootRemaining"/> below, Slow deliberately has NO countdown timer.
+        /// It is re-derived from scratch every tick from whichever sources are currently
+        /// touching this chicken (collision, pile, ability zone/aura — see
+        /// <see cref="ApplySlow"/>) and has no fixed end time to count down to; two
+        /// overlapping slow sources with different remaining durations would make any
+        /// single "time left" number meaningless anyway. Stage 5's HUD shows the
+        /// *magnitude* instead (a <c>×0.45</c>-style label read straight off this field).
+        /// Don't "fix" this by inventing a slow-end timer — there isn't one to invent.
+        /// </remarks>
         public float SlowMultiplier { get; set; } = 1f;
 
         /// <summary>
@@ -192,6 +205,24 @@ namespace CluckWars.Gameplay
         /// </summary>
         [Networked] public bool IsStunned { get; private set; }
         [Networked] private TickTimer StunTimer { get; set; }
+
+        /// <summary>Seconds of stun remaining, for the Aftermath countdown (FEEDBACK.md
+        /// §5.1, case 18). 0 when not stunned/expired — every peer can read this, not
+        /// just the StateAuthority, since <see cref="StunTimer"/> is <c>[Networked]</c>.</summary>
+        public float StunRemaining => StunTimer.ExpiredOrNotRunning(Runner) ? 0f : (StunTimer.RemainingTime(Runner) ?? 0f);
+
+        /// <summary>
+        /// Timer-based root, set by <see cref="RPC_ApplyRoot"/>. Promoted from a plain
+        /// StateAuthority-only <c>double</c> to a <c>[Networked] TickTimer</c> (v0.6,
+        /// ~4 bytes) so <see cref="RootRemaining"/> below can read a countdown on every
+        /// peer, the same way <see cref="StunTimer"/> already does — a remote peer
+        /// couldn't show "how long is that rival rooted" otherwise.
+        /// </summary>
+        [Networked] private TickTimer RootTimer { get; set; }
+
+        /// <summary>Seconds of root remaining, for the Aftermath countdown (FEEDBACK.md
+        /// §5.1, case 18). 0 when not rooted/expired.</summary>
+        public float RootRemaining => RootTimer.ExpiredOrNotRunning(Runner) ? 0f : (RootTimer.RemainingTime(Runner) ?? 0f);
 
         /// <summary>
         /// Resolved control state following the severity ladder (Stunned > Rooted > Slowed > Free).
@@ -245,13 +276,213 @@ namespace CluckWars.Gameplay
 
             if (_registry != null && _registry.TryGet(Class, out var entry))
             {
+                var modelRoot = AttachClassModel(entry);
+
                 var visuals = GetComponent<ChickenVisuals>();
                 if (visuals != null)
                 {
-                    visuals.ApplyTint(entry.TintColor);
-                    _log?.Debug(Source, $"Applied tint {entry.TintColor} for class {Class}.");
+                    // Order matters: point the tint at the model before colouring it. The model
+                    // did not exist when ChickenVisuals.Awake built its renderer list.
+                    visuals.SetModelRoot(modelRoot);
+                    visuals.ApplyTint(entry.TintColor, entry.TintStrength);
+                    _log?.Debug(Source, $"Applied tint {entry.TintColor} at strength {entry.TintStrength:0.##} for class {Class}.");
+                }
+
+                // Hand the same model root to the animator helper, and tell it whether the
+                // skeletal path came up. Without the model root it has nothing to offset;
+                // without the skeletal flag it cannot know which of its two paths to run.
+                var animator = GetComponent<ChickenAnimator>();
+                if (animator != null)
+                {
+                    animator.SetModelRoot(modelRoot);
+                    animator.SetSkeletalActive(_skeletalAnimationActive);
                 }
             }
+            else
+            {
+                _log?.Error(Source, $"{name}: no ChickenClassRegistry entry for class '{Class}' " +
+                                    $"(registryBound={_registry != null}). This chicken spawns with no " +
+                                    "model and no class tint — populate ChickenClassRegistry.asset.");
+            }
+        }
+
+        /// <summary>
+        /// Instantiates the class's model under this chicken and binds it to the root
+        /// <see cref="Animator"/>. Local presentation only — nothing here is networked, so
+        /// every peer builds its own copy from the replicated <see cref="Class"/>.
+        /// </summary>
+        /// <returns>The attached model's root, or null if the class has no model to attach.</returns>
+        private Transform AttachClassModel(in ChickenClassRegistrySO.Entry entry)
+        {
+            if (entry.ModelPrefab == null)
+            {
+                _log?.Error(Source, $"{name}: class '{Class}' has no ModelPrefab in ChickenClassRegistry. " +
+                                    "The chicken will be invisible — assign it on the registry asset.");
+                return null;
+            }
+
+            var model = Instantiate(entry.ModelPrefab, transform);
+            // Strip the "(Clone)" suffix: the Avatar resolves its skeleton by transform name
+            // from the Animator down, and the model root is the first name it looks for.
+            model.name = entry.ModelPrefab.name;
+
+            // The imported .fbx carries its own Animator. Two Animators in one hierarchy fight
+            // over the same skeleton, and the nested one wins for the subtree it sits on — so
+            // disable it in the same frame rather than waiting for Destroy to be reaped.
+            var nestedAnimator = model.GetComponent<Animator>();
+            if (nestedAnimator != null)
+            {
+                nestedAnimator.enabled = false;
+                Destroy(nestedAnimator);
+            }
+
+            // The models are authored with their origin at the feet, so dropping the model root
+            // to the bottom of the capsule puts the feet on the ground. The pivot sits at the
+            // capsule's mid-height (center is zero), i.e. half the height above ground contact —
+            // parenting at localPosition zero would leave every chicken hovering by that much.
+            float groundLocalY = _characterController.center.y - _characterController.height * 0.5f;
+            model.transform.localPosition = new Vector3(0f, groundLocalY, 0f);
+            model.transform.localRotation = Quaternion.identity;
+
+            // Caches its renderer set in Spawned, which may already have run — and could not have
+            // included the model in any case, since the model only exists now.
+            GetComponent<HitFeedback>()?.RefreshBodyRenderers();
+
+            _skeletalAnimationActive = BindSkeletalAnimation(entry);
+
+            _log?.Debug(Source, $"Attached model '{model.name}' at localY={groundLocalY:0.###}, " +
+                                $"skeletal={_skeletalAnimationActive}.");
+            return model.transform;
+        }
+
+        /// <summary>
+        /// Binds the class's skeleton and its five clips to the root <see cref="Animator"/>, so the
+        /// shared <c>Chicken.controller</c> drives the model that was just parented under us.
+        /// </summary>
+        /// <returns>
+        /// True only when the skeletal path is fully live — avatar bound AND all five clips
+        /// applied. False means the caller must fall back to procedural motion; the reason has
+        /// already been logged as an Error/Warning here.
+        /// </returns>
+        /// <remarks>
+        /// Order matters: avatar first (it defines the skeleton the clips resolve against), then
+        /// the controller, then a single <c>Rebind()</c>. Rebinding before the controller is set
+        /// would resolve the rig against the placeholder motions and have to be redone.
+        /// </remarks>
+        private bool BindSkeletalAnimation(in ChickenClassRegistrySO.Entry entry)
+        {
+            var animator = GetComponent<Animator>();
+            if (!BindAvatar(entry, animator)) return false;
+
+            if (!entry.Clips.IsComplete)
+            {
+                _log?.Error(Source, $"{name}: class '{Class}' is missing the " +
+                                    $"'{entry.Clips.FirstMissing}' AnimationClip (and possibly others) " +
+                                    "in ChickenClassRegistry. Skeletal animation is OFF for this class — " +
+                                    "it falls back to procedural motion. Assign all five clips from " +
+                                    $"the same .fbx as its ModelPrefab.");
+                return false;
+            }
+
+            var baseController = animator.runtimeAnimatorController;
+            if (baseController == null)
+            {
+                _log?.Error(Source, $"{name}: the root Animator has no RuntimeAnimatorController, so " +
+                                    "the class clips have no states to override. Re-assign " +
+                                    "Chicken.controller on Chicken.prefab. Falling back to procedural motion.");
+                return false;
+            }
+
+            animator.runtimeAnimatorController = GetOrBuildOverride(Class, baseController, entry);
+            animator.Rebind();
+            return true;
+        }
+
+        /// <summary>
+        /// Per-class <see cref="AnimatorOverrideController"/> cache. One instance is shared by every
+        /// chicken of a class (four total), rather than one per spawn — a fresh override controller
+        /// per chicken would allocate and duplicate the whole state machine on every respawn.
+        /// </summary>
+        /// <remarks>
+        /// Rebuilt on miss, so a domain reload (which clears statics) or a destroyed asset simply
+        /// regenerates it rather than handing out a stale reference. The base-controller identity is
+        /// re-checked too: if the prefab is ever re-pointed at a different controller, a cached
+        /// override built on the old one must not be reused.
+        /// </remarks>
+        private static readonly System.Collections.Generic.Dictionary<ChickenClass, AnimatorOverrideController>
+            _overrideControllers = new();
+
+        // Override keys — the names of the placeholder clips sitting in Chicken.controller's five
+        // Motion slots. AnimatorOverrideController keys by the ORIGINAL clip, so these must match
+        // the placeholder asset names exactly. DataIntegrityTests pins both ends of that contract.
+        private const string ClipKeyIdle    = "Idle";
+        private const string ClipKeyWalk    = "Walk";
+        private const string ClipKeyCast    = "Cast";
+        private const string ClipKeyHit     = "Hit";
+        private const string ClipKeyStunned = "Stunned";
+
+        private static AnimatorOverrideController GetOrBuildOverride(
+            ChickenClass cls,
+            RuntimeAnimatorController baseController,
+            in ChickenClassRegistrySO.Entry entry)
+        {
+            if (_overrideControllers.TryGetValue(cls, out var cached) &&
+                cached != null && cached.runtimeAnimatorController == baseController)
+            {
+                return cached;
+            }
+
+            var overrideController = new AnimatorOverrideController(baseController)
+            {
+                name = $"{baseController.name}_{cls}",
+                [ClipKeyIdle]    = entry.Clips.Idle,
+                [ClipKeyWalk]    = entry.Clips.Walk,
+                [ClipKeyCast]    = entry.Clips.Cast,
+                [ClipKeyHit]     = entry.Clips.Hit,
+                [ClipKeyStunned] = entry.Clips.Stunned,
+            };
+
+            _overrideControllers[cls] = overrideController;
+            return overrideController;
+        }
+
+        /// <summary>
+        /// Hands the class's <see cref="Avatar"/> to the root <see cref="Animator"/>.
+        /// </summary>
+        /// <returns>True when the avatar was accepted and assigned.</returns>
+        private bool BindAvatar(in ChickenClassRegistrySO.Entry entry, Animator animator)
+        {
+            if (animator == null)
+            {
+                _log?.Warn(Source, $"{name}: no Animator on the chicken root, so the class model " +
+                                   "can never be animated. Re-add it to Chicken.prefab.");
+                return false;
+            }
+
+            if (entry.ModelAvatar == null)
+            {
+                _log?.Warn(Source, $"{name}: class '{Class}' has a ModelPrefab but no ModelAvatar. " +
+                                   "The model renders but the Animator cannot drive its skeleton.");
+                return false;
+            }
+
+            // The avatar must be Generic. A Humanoid avatar maps cleanly (all 22 Mixamo-named bones
+            // resolve, isValid && isHuman) but then rebuilds the pose in human muscle space every
+            // frame: measured live, that stretched the model from 1.60m to 1.75m, splayed the limbs
+            // and dropped the feet 1.04m below the capsule. Refusing it keeps the chicken looking
+            // right — the Error and the failing EditMode test are what get the import fixed.
+            if (entry.ModelAvatar.isHuman)
+            {
+                _log?.Error(Source, $"{name}: class '{Class}' has a Humanoid ModelAvatar " +
+                                    $"('{entry.ModelAvatar.name}'), which deforms the chicken rig and " +
+                                    "sinks it through the floor. Leaving the Animator unbound — " +
+                                    "re-import the .fbx with Rig ▸ Animation Type = Generic.");
+                return false;
+            }
+
+            // The caller Rebind()s once, after the override controller is in place.
+            animator.avatar = entry.ModelAvatar;
+            return true;
         }
 
         public override void Despawned(NetworkRunner runner, bool hasState)
@@ -318,8 +549,8 @@ namespace CluckWars.Gameplay
                 IsStunned = false;
             }
 
-            // Root timer: RPC_ApplyRoot sets _rootUntil; Rooted persists until it elapses.
-            if (Runner.SimulationTime < _rootUntil) Rooted = true;
+            // Root timer: RPC_ApplyRoot sets RootTimer; Rooted persists until it elapses.
+            if (!RootTimer.ExpiredOrNotRunning(Runner)) Rooted = true;
 
             // Publish the compact control-state for remote VFX. Particles stay local
             // on each peer; this replicated flag is the only thing that crosses.
@@ -341,8 +572,27 @@ namespace CluckWars.Gameplay
 
             if (GetInput<PlayerNetworkInput>(out var input))
             {
-                _movement.Tick(input.Movement, Runner.DeltaTime);
+                _movement.Tick(input.Movement, Runner.DeltaTime, IsAimRotating());
             }
+        }
+
+        /// <summary>
+        /// v0.6 hold-to-aim (FEEDBACK.md §2.3): true while this chicken is charging an
+        /// ability whose footprint moves when they turn — the movement stick should rotate
+        /// the caster's facing instead of translating them. Reads
+        /// <see cref="AbilityController.ChargingAbility"/>, so it only ever fires here on
+        /// the StateAuthority path above (bots never reach this — <c>IsBot</c> already
+        /// returned earlier — and non-directional shapes fall through to normal movement).
+        ///
+        /// The shape membership itself lives on <see cref="AbilityBaseSO.IsDirectionalAim"/>
+        /// rather than being restated here: it used to be a hard-coded list of three shapes,
+        /// which a fourth (Capsule) would have quietly failed to join.
+        /// </summary>
+        private bool IsAimRotating()
+        {
+            if (_abilities == null || _abilities.ChargingSlot == 0) return false;
+            var ability = _abilities.ChargingAbility;
+            return ability != null && ability.IsDirectionalAim;
         }
 
         // ---- Passive hooks ---------------------------------------------------
@@ -472,7 +722,7 @@ namespace CluckWars.Gameplay
         {
             if (IsPassiveActive(ChickenPassive.Slippery)) duration *= SlipperyDurationReduction;
             duration = ApplyPassiveControlDuration(duration);
-            _rootUntil = Runner.SimulationTime + duration;
+            RootTimer = TickTimer.CreateFromSeconds(Runner, duration);
             _log?.Debug(Source, $"RPC_ApplyRoot: rooted for {duration:0.0}s.");
         }
 
@@ -486,7 +736,7 @@ namespace CluckWars.Gameplay
             _traversal?.Abort();
             _abilitySlowUntil    = double.MinValue;
             _abilitySlowFactor   = 1f;
-            _rootUntil           = double.MinValue;
+            RootTimer            = TickTimer.None;
             Rooted               = false;
             IsStunned            = false;
             StunTimer            = TickTimer.None;

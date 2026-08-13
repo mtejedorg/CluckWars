@@ -107,7 +107,8 @@ ChickenController (NetworkBehaviour)
 ├── ChickenCombat                      [Networked] HP / IsStunned / StunTimer / AttackTimer / AttackEpoch
 ├── ChickenCargo                       [Networked] Cargo; collect/deposit/death-drop/steal
 ├── AbilityController                  [Networked] ActiveSlot / ActivationTimer / Cooldown0 / Cooldown1
-├── ChickenAnimator                    Local; Speed/Attack/Hit/Stunned animator params
+├── ChickenAnimator                    Local; Speed/AbilityCast/Hit/Stunned animator params
+│                                      + procedural lean/bank on the model child
 ├── ChickenVisuals                     Local; MaterialPropertyBlock tint + alpha
 └── ChickenNameplate                   Local; TextMesh "P1 Warrior" billboarded
 ```

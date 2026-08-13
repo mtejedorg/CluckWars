@@ -254,9 +254,13 @@ namespace CluckWars.Tests
         [Test]
         public void PhysicsScanningAbilities_SearchTheChickensLayer()
         {
-            // These five run Physics.OverlapSphere against SearchMask. Chicken.prefab
-            // sits on layer 8 (Chickens); a mask that excludes it makes the ability a
-            // no-op that still plays its VFX and burns its cooldown.
+            // As of the AbilityAim descriptor (FEEDBACK.md §4/§8), these eight no
+            // longer call Physics.OverlapSphere — every OnActivate target scan routes
+            // through AbilityBaseSO.GatherTargets against the ActiveControllers
+            // registry instead, so SearchMask no longer gates chicken targeting.
+            // The field is kept (it may still be read elsewhere / re-wired later) and
+            // this test keeps guarding it so a stale mask doesn't quietly resurface
+            // if a future change routes anything through it again.
             const int chickensLayer = 8;
             var scanners = new HashSet<string>
             {

@@ -6,6 +6,16 @@
 
 > **Phase R is code-complete.** Part A, Part B, and the full Phase R-Bot AI (including BOT-3's randomized preset loadout) are shipped in code. The only outstanding items are non-code: **Maestro authors the `_botLoadouts` preset rows** in the Game-scene inspector, plus the **BOT-8** hysteresis/balance tuning (bundled into the Dedicated test session). See [Phase R-Bot](#phase-r-bot-ability-driven-bot-ai).
 
+> **Ability-feedback system (v0.6) is code-complete.** All five stages of `docs/FEEDBACK.md`
+> are implemented — aim descriptor, hold-to-aim input, telegraph, impact, aftermath + HUD.
+> EditMode **246/246**. Per-case status for all 30 §7 cases is marked in FEEDBACK.md §7:
+> **24 implemented, 5 partial, 1 deferred.** Outstanding is non-code: Maestro adds four
+> components to `Chicken.prefab` (`ChickenStatusBadges`, `TargetHighlight`,
+> `AbilityTelegraph`, `HitFeedback` — see `docs/STATE.md`), plus an `audio-designer` pass
+> for four missing SFX clips, which is the sole blocker on cases 9/10/16/29. The one
+> unstarted visual is case 20's screen-edge vignette. Visual language is specified in
+> `docs/ART.md` §6.11–§6.13; player-facing rules in `docs/GDD.md` §10.1–§10.3.
+
 For current-state details: `docs/STATE.md`. For architecture: `docs/ARCHITECTURE.md`. For build + diagnostic flows: `docs/TESTING.md`. For the design itself: `docs/GDD.md` (now v0.3).
 
 ---

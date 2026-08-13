@@ -28,11 +28,13 @@ namespace CluckWars.Abilities
             AllowedClasses = ChickenClassFlags.Fatty;
         }
 
-        [Tooltip("How far ahead the push sweep is centered.")]
-        [Min(0.5f)] public float ForwardOffset = 1.2f;
+        [Tooltip("Length of the push lane, measured forward from the caster. With a Capsule " +
+                 "aim shape this is the axis length, not a detached centre — total forward " +
+                 "reach is ForwardOffset + PushRadius.")]
+        [Min(0.5f)] public float ForwardOffset = 4.0f;
 
-        [Tooltip("Radius of the push sweep.")]
-        [Min(0.5f)] public float PushRadius = 1.8f;
+        [Tooltip("Half-width of the push lane (the capsule's sweep radius).")]
+        [Min(0.5f)] public float PushRadius = 1.05f;
 
         [Tooltip("Knockback impulse strength (world-units/sec).")]
         [Min(1f)] public float PushStrength = 10f;
@@ -42,6 +44,19 @@ namespace CluckWars.Abilities
 
         protected override string DefaultIcon => "🌀";
 
+        public override float IndicatorRange => ForwardOffset + PushRadius;
+
+        /// <summary>
+        /// A swept lane, not a detached disc. The old ForwardCircle centred 1.2 m ahead with
+        /// a 1.8 m radius left a dead spot for anything closer than that — you could whiff a
+        /// barge on a chicken standing on your toes. The capsule's near cap covers
+        /// point-blank (and slightly behind), and the long thin axis matches what a roll
+        /// actually does: plough a line, not detonate a circle.
+        /// </summary>
+        public override AbilityAimShape AimShape => AbilityAimShape.Capsule;
+        public override float AimRadius => PushRadius;
+        public override float AimForwardOffset => ForwardOffset;
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;
@@ -49,16 +64,11 @@ namespace CluckWars.Abilities
             // Caster rolls faster.
             caster.MoveSpeedMultiplier = RollSpeedMultiplier;
 
-            // Push all chickens in the forward cone.
-            var center = caster.transform.position + caster.transform.forward * ForwardOffset;
-            var hits = Physics.OverlapSphere(center, PushRadius, SearchMask, QueryTriggerInteraction.Ignore);
-
-            for (int i = 0; i < hits.Length; i++)
+            // Push everyone in the forward sweep.
+            GatherTargets(caster, _scratch);
+            for (int i = 0; i < _scratch.Count; i++)
             {
-                var targetCtrl = hits[i].GetComponentInParent<ChickenController>();
-                if (targetCtrl == null || targetCtrl == caster) continue;
-                if (targetCtrl.Combat != null && targetCtrl.Combat.IsDead) continue;
-
+                var targetCtrl = _scratch[i];
                 var dir = (targetCtrl.transform.position - caster.transform.position);
                 dir.y = 0f;
                 if (dir.sqrMagnitude < 0.001f) dir = caster.transform.forward;

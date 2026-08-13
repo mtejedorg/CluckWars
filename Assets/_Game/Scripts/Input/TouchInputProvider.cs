@@ -33,5 +33,29 @@ namespace CluckWars.Input
             var hud = TouchControlsController.Instance;
             return hud != null && hud.Ability3Pressed;
         }
+
+        public bool GetAbilityHeld(int slot)
+        {
+            var hud = TouchControlsController.Instance;
+            return hud != null && hud.IsAbilityHeld(slot);
+        }
+
+        /// <summary>
+        /// One flag covers all three slots: at most one hex can be mid-hold at a
+        /// time, so ORing (and thereby consuming) every slot's cancel latch here is
+        /// equivalent to — and simpler than — threading a slot index through
+        /// <see cref="IInputProvider.GetAbilityCancelPressed"/>.
+        /// </summary>
+        public bool GetAbilityCancelPressed()
+        {
+            var hud = TouchControlsController.Instance;
+            if (hud == null) return false;
+
+            bool any = false;
+            any |= hud.ConsumeAbilityCancelled(0);
+            any |= hud.ConsumeAbilityCancelled(1);
+            any |= hud.ConsumeAbilityCancelled(2);
+            return any;
+        }
     }
 }

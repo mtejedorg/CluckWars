@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using UnityEditor;
+using UnityEditor.Animations;
 using UnityEngine;
 using CluckWars.Audio;
 using CluckWars.Gameplay;
@@ -147,6 +149,124 @@ namespace CluckWars.Tests
                 Assert.IsTrue(reg.TryGet(cls, out var entry), $"No entry for {cls}.");
                 Assert.IsFalse(string.IsNullOrWhiteSpace(entry.LoreQuote),
                     $"{cls} has no LoreQuote — character-select renders an empty line for it.");
+            }
+        }
+
+        [Test]
+        public void ClassRegistry_EveryEntry_HasItsModelAndGenericAvatar()
+        {
+            // ChickenController.AttachClassModel instantiates ModelPrefab under the chicken
+            // root and hands ModelAvatar to the root Animator. A null ModelPrefab spawns an
+            // invisible chicken — there is no placeholder capsule to fall back on any more.
+            //
+            // The avatar must be GENERIC. Unity maps these rigs to Humanoid without complaint
+            // (Mixamo-standard bone names, all 22 resolve, isValid && isHuman), which makes
+            // Humanoid look like the right answer. It is not: humanoid retargeting rebuilds the
+            // pose in human muscle space every frame. Measured live on 2026-08-07, that stretched
+            // the chicken from 1.60m to 1.75m, splayed the limbs, and put the feet 1.04m BELOW the
+            // CharacterController capsule — the chicken renders as a heap sunk through the floor.
+            // With a Generic avatar the model spans the capsule exactly and its feet sit exactly
+            // on the ground. This test is the tripwire for anyone re-importing these .fbx files.
+            var reg = TestAssets.Load<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
+
+            foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
+            {
+                Assert.IsTrue(reg.TryGet(cls, out var entry), $"No entry for {cls}.");
+
+                Assert.IsNotNull(entry.ModelPrefab,
+                    $"{cls}'s registry entry has no ModelPrefab — chickens of this class spawn invisible.");
+                Assert.IsNotNull(entry.ModelPrefab.GetComponentInChildren<SkinnedMeshRenderer>(true),
+                    $"{cls}'s ModelPrefab '{entry.ModelPrefab.name}' has no SkinnedMeshRenderer, so there " +
+                    "is nothing for ChickenVisuals to tint or HitFeedback to flash.");
+
+                Assert.IsNotNull(entry.ModelAvatar,
+                    $"{cls}'s registry entry has no ModelAvatar — the root Animator cannot bind the rig.");
+                Assert.IsTrue(entry.ModelAvatar.isValid,
+                    $"{cls}'s ModelAvatar '{entry.ModelAvatar.name}' is invalid — re-import the .fbx with " +
+                    "Rig ▸ Animation Type = Generic, Avatar Definition = Create From This Model.");
+                Assert.IsFalse(entry.ModelAvatar.isHuman,
+                    $"{cls}'s ModelAvatar '{entry.ModelAvatar.name}' is Humanoid. Humanoid retargeting " +
+                    "deforms the chicken rig and sinks it ~1m through the floor (see comment above). " +
+                    "Re-import the .fbx with Rig ▸ Animation Type = Generic.");
+            }
+        }
+
+        [Test]
+        public void ClassRegistry_EveryEntry_HasAnAuthoredTintStrength()
+        {
+            // TintStrength was added to Entry after the asset was authored, so it deserialized
+            // to 0 on every existing entry until the values were filled in. 0 is a *silent*
+            // failure mode: the chickens still render, they just quietly lose the class hue cue
+            // entirely, and nothing else in the game complains. The other end is just as bad —
+            // near 1 multiplies the class tint into the model's baked albedo atlas (URP/Lit
+            // computes _BaseMap x _BaseColor) and every class collapses toward flat mud.
+            // This test pins the authored band so a reset field or a re-import cannot regress
+            // the models to untinted-or-washed-out without the suite saying so.
+            var reg = TestAssets.Load<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
+
+            foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
+            {
+                Assert.IsTrue(reg.TryGet(cls, out var entry), $"No entry for {cls}.");
+
+                Assert.Greater(entry.TintStrength, 0f,
+                    $"{cls}'s TintStrength is {entry.TintStrength}. Zero means no class wash at all — " +
+                    "the usual cause is the field being added/reset and left at its default. " +
+                    "Author it on ChickenClassRegistry.asset (~0.25).");
+                Assert.LessOrEqual(entry.TintStrength, 0.6f,
+                    $"{cls}'s TintStrength is {entry.TintStrength}, which washes out the model's baked " +
+                    "albedo atlas — the tint and the texture are near-identical in hue, so multiplying " +
+                    "them at this strength turns the class art to mud. Keep it at or below 0.6.");
+            }
+        }
+
+        [Test]
+        public void ClassRegistry_EveryModel_ResolvesToATexturedInstancedMaterial()
+        {
+            // The albedo atlas ships EMBEDDED inside each .fbx and is never surfaced to a usable
+            // material on its own — the importer's own material (Material_0) comes through with
+            // _BaseMap unset, which is why the chickens rendered untextured for so long. The fix
+            // is a material remap in the .fbx importer's externalObjects map pointing at a real
+            // URP/Lit material under Assets/_Game/Art/Materials/. That remap lives in the .meta,
+            // so a re-import, a meta conflict, or a "clean up unused materials" pass can drop it
+            // silently and the chickens go back to untextured grey with nothing logged.
+            //
+            // _BaseColor must stay white: ChickenVisuals pushes the class tint through a
+            // MaterialPropertyBlock, and URP/Lit multiplies _BaseMap x _BaseColor — a non-white
+            // base would double-apply the tint on top of the already-class-coloured atlas.
+            var reg = TestAssets.Load<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
+
+            foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
+            {
+                Assert.IsTrue(reg.TryGet(cls, out var entry), $"No entry for {cls}.");
+                Assert.IsNotNull(entry.ModelPrefab, $"{cls} has no ModelPrefab.");
+
+                var smr = entry.ModelPrefab.GetComponentInChildren<SkinnedMeshRenderer>(true);
+                Assert.IsNotNull(smr, $"{cls}'s ModelPrefab has no SkinnedMeshRenderer.");
+
+                var mat = smr.sharedMaterial;
+                Assert.IsNotNull(mat,
+                    $"{cls}'s model renderer has no material — it renders as magenta/grey.");
+
+                Assert.IsTrue(mat.HasProperty("_BaseMap"),
+                    $"{cls}'s material '{mat.name}' has no _BaseMap property (shader is " +
+                    $"'{(mat.shader != null ? mat.shader.name : "null")}'). URP/Lit is required.");
+                Assert.IsNotNull(mat.GetTexture("_BaseMap"),
+                    $"{cls}'s material '{mat.name}' has no _BaseMap texture, so the chicken renders " +
+                    "untextured. The .fbx importer material remap has probably been dropped — " +
+                    "re-point (Material, Material_0) at the class material in " +
+                    "Assets/_Game/Art/Materials/.");
+
+                var baseColor = mat.GetColor("_BaseColor");
+                Assert.AreEqual(Color.white, baseColor,
+                    $"{cls}'s material '{mat.name}' has _BaseColor {baseColor}, not white. " +
+                    "ChickenVisuals applies the class tint per-instance via a MaterialPropertyBlock; " +
+                    "a non-white base multiplies the tint in twice.");
+
+                Assert.IsTrue(mat.enableInstancing,
+                    $"{cls}'s material '{mat.name}' has GPU instancing disabled. ChickenVisuals " +
+                    "documents itself as instancing-friendly precisely because it uses a " +
+                    "MaterialPropertyBlock instead of per-chicken material copies — that claim only " +
+                    "pays off if the material opts in.");
             }
         }
 
@@ -463,6 +583,204 @@ namespace CluckWars.Tests
             finally
             {
                 Object.DestroyImmediate(mapGenPrefab);
+            }
+        }
+
+        // ---- Skeletal animation wiring ----------------------------------------
+        // The clips are bound at spawn through a runtime AnimatorOverrideController built in
+        // ChickenController.BindSkeletalAnimation. Nearly every way that wiring can be wrong is
+        // SILENT — an unresolved override key or a cross-class clip binds to nothing and the
+        // chicken simply stands in bind pose. These tests are the tripwires.
+
+        private const string ControllerPath  = "Assets/_Game/Art/Animations/Chicken.controller";
+        private const string PlaceholderDir  = "Assets/_Game/Art/Animations/Placeholders";
+
+        /// <summary>The five state names, which are ALSO the override keys used in code.</summary>
+        private static readonly string[] StateNames = { "Idle", "Walk", "Cast", "Hit", "Stunned" };
+
+        /// <summary>Idle/Walk/Stunned are held; Cast/Hit are one-shot reactions.</summary>
+        private static readonly Dictionary<string, bool> ShouldLoop = new()
+        {
+            { "Idle", true }, { "Walk", true }, { "Stunned", true },
+            { "Cast", false }, { "Hit", false },
+        };
+
+        private static (string State, AnimationClip Clip)[] ClipsOf(ChickenClassRegistrySO.Entry e) =>
+            new[]
+            {
+                ("Idle", e.Clips.Idle), ("Walk", e.Clips.Walk), ("Cast", e.Clips.Cast),
+                ("Hit", e.Clips.Hit),   ("Stunned", e.Clips.Stunned),
+            };
+
+        [Test]
+        public void ClassRegistry_EveryEntry_HasFiveClipsFromItsOwnFbx()
+        {
+            // Cross-class drift is the specific failure this guards. A clip from another class's
+            // .fbx references bone paths that do not exist on this skeleton, so it binds to
+            // nothing: the chicken freezes rather than erroring. Same-file identity is the only
+            // cheap check that catches it, and it is exactly the shape of the bot-loadout
+            // staleness bug this project already shipped once.
+            var reg = TestAssets.Load<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
+
+            foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
+            {
+                Assert.IsTrue(reg.TryGet(cls, out var entry), $"No entry for {cls}.");
+                Assert.IsNotNull(entry.ModelPrefab, $"{cls} has no ModelPrefab.");
+
+                string fbxPath = AssetDatabase.GetAssetPath(entry.ModelPrefab);
+
+                foreach (var (state, clip) in ClipsOf(entry))
+                {
+                    Assert.IsNotNull(clip,
+                        $"{cls}'s registry entry has no '{state}' AnimationClip. All five are " +
+                        "required — ChickenController treats a partial set as no set and falls back " +
+                        "to procedural motion. Run 'Cluck Wars/Animation/Wire Skeletal Clips'.");
+
+                    Assert.AreEqual(fbxPath, AssetDatabase.GetAssetPath(clip),
+                        $"{cls}'s '{state}' clip ('{clip.name}') comes from " +
+                        $"'{AssetDatabase.GetAssetPath(clip)}' but its ModelPrefab comes from " +
+                        $"'{fbxPath}'. A clip from another class's rig binds to no bones and the " +
+                        "chicken silently freezes. Re-run 'Cluck Wars/Animation/Wire Skeletal Clips'.");
+                }
+            }
+        }
+
+        [Test]
+        public void ClassClips_HaveTheExpectedLoopFlags()
+        {
+            // The override replaces the placeholder outright, so it is the CLASS clip's loop flag
+            // that governs at runtime. A non-looping Idle plays once and leaves the chicken frozen
+            // for the rest of the match; a looping Hit never releases the state.
+            var reg = TestAssets.Load<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
+
+            foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
+            {
+                Assert.IsTrue(reg.TryGet(cls, out var entry), $"No entry for {cls}.");
+                foreach (var (state, clip) in ClipsOf(entry))
+                {
+                    if (clip == null) continue; // reported by the completeness test above
+                    Assert.AreEqual(ShouldLoop[state], clip.isLooping,
+                        $"{cls}'s '{state}' clip ('{clip.name}') has isLooping={clip.isLooping}, " +
+                        $"expected {ShouldLoop[state]}. Fix it on the .fbx importer's Animation tab " +
+                        "(Loop Time), not in code.");
+                }
+            }
+        }
+
+        [Test]
+        public void ClassClips_DoNotKeyTheModelRootTransform()
+        {
+            // ChickenAnimator writes the model root's own local TRS every LateUpdate; the Animator
+            // evaluates before LateUpdate. If a clip also keyed the model root (binding path ""),
+            // ChickenAnimator would silently overwrite that curve every frame — the clip would
+            // "mostly work" with something subtly wrong. Verified 2026-08-09: every curve targets
+            // the armature child ('*_chicken_rig') or a bone below it, so the two never collide.
+            // This test keeps that true across future re-exports.
+            var reg = TestAssets.Load<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
+
+            foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
+            {
+                Assert.IsTrue(reg.TryGet(cls, out var entry), $"No entry for {cls}.");
+                foreach (var (state, clip) in ClipsOf(entry))
+                {
+                    if (clip == null) continue;
+                    var rootBound = AnimationUtility.GetCurveBindings(clip)
+                        .Where(b => string.IsNullOrEmpty(b.path))
+                        .Select(b => b.propertyName)
+                        .Distinct()
+                        .ToList();
+
+                    Assert.IsEmpty(rootBound,
+                        $"{cls}'s '{state}' clip keys the model ROOT transform " +
+                        $"({string.Join(", ", rootBound)}). ChickenAnimator also writes that " +
+                        "transform in LateUpdate and would silently overwrite the clip every frame. " +
+                        "Either re-export with the motion on the armature child, or interpose an " +
+                        "animation-neutral pivot for ChickenAnimator to write instead.");
+                }
+            }
+        }
+
+        [Test]
+        public void ChickenController_EveryState_HasAMotionMatchingItsOverrideKey()
+        {
+            // AnimatorOverrideController keys by the ORIGINAL clip sitting in each Motion slot.
+            // A null slot means there is nothing to key against and the override silently resolves
+            // to nothing; a renamed placeholder means the same. Both produce a bind-pose chicken.
+            var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
+            Assert.IsNotNull(controller, $"No AnimatorController at '{ControllerPath}'.");
+
+            var motionByState = controller.layers
+                .SelectMany(l => l.stateMachine.states)
+                .ToDictionary(s => s.state.name, s => s.state.motion);
+
+            foreach (var state in StateNames)
+            {
+                Assert.IsTrue(motionByState.ContainsKey(state),
+                    $"Chicken.controller has no state named '{state}'.");
+
+                var motion = motionByState[state];
+                Assert.IsNotNull(motion,
+                    $"Chicken.controller's '{state}' state has a null Motion. The override " +
+                    "controller has no key to bind the per-class clip to, so the class clip is " +
+                    "silently ignored. Run 'Cluck Wars/Animation/Wire Skeletal Clips'.");
+
+                Assert.AreEqual(state, motion.name,
+                    $"Chicken.controller's '{state}' state holds a motion named '{motion.name}'. " +
+                    "ChickenController keys its overrides by these names, so they must match the " +
+                    "state names exactly.");
+            }
+        }
+
+        [Test]
+        public void PlaceholderClips_ExistAndCarryTheExpectedLoopFlags()
+        {
+            // The placeholders are both the override keys and the graceful fallback: an empty clip
+            // evaluates to the bind pose, so an un-overridden state is a still chicken, not an
+            // exception. They must stay empty — a placeholder with curves would leak into any
+            // class whose clip failed to bind.
+            foreach (var state in StateNames)
+            {
+                string path = $"{PlaceholderDir}/{state}.anim";
+                var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(path);
+                Assert.IsNotNull(clip,
+                    $"No placeholder clip at '{path}'. Run 'Cluck Wars/Animation/Wire Skeletal Clips'.");
+
+                Assert.AreEqual(ShouldLoop[state], clip.isLooping,
+                    $"Placeholder '{state}' has isLooping={clip.isLooping}, expected {ShouldLoop[state]}.");
+
+                Assert.IsEmpty(AnimationUtility.GetCurveBindings(clip),
+                    $"Placeholder '{state}' has animation curves. Placeholders must stay empty so " +
+                    "that a state whose class clip failed to bind rests in bind pose.");
+            }
+        }
+
+        [Test]
+        public void ChickenController_Parameters_MatchTheNamesAndTypesHashedInCode()
+        {
+            // ChickenAnimator caches these as Animator.StringToHash constants. A rename on the
+            // controller does not break the build — Unity just logs a per-call warning and the
+            // parameter never moves. Pin both ends of the contract here.
+            var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
+            Assert.IsNotNull(controller, $"No AnimatorController at '{ControllerPath}'.");
+
+            var expected = new Dictionary<string, AnimatorControllerParameterType>
+            {
+                { "Speed",       AnimatorControllerParameterType.Float   },
+                { "AbilityCast", AnimatorControllerParameterType.Trigger },
+                { "Hit",         AnimatorControllerParameterType.Trigger },
+                { "Stunned",     AnimatorControllerParameterType.Bool    },
+            };
+
+            var actual = controller.parameters.ToDictionary(p => p.name, p => p.type);
+
+            foreach (var (name, type) in expected)
+            {
+                Assert.IsTrue(actual.ContainsKey(name),
+                    $"Chicken.controller has no '{name}' parameter, but ChickenAnimator hashes and " +
+                    $"writes it every frame. Present: [{string.Join(", ", actual.Keys)}].");
+                Assert.AreEqual(type, actual[name],
+                    $"Chicken.controller's '{name}' is a {actual[name]}, but ChickenAnimator drives " +
+                    $"it as a {type}.");
             }
         }
     }

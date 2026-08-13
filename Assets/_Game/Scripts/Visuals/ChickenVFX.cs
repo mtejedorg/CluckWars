@@ -120,19 +120,24 @@ namespace CluckWars.Visuals
                             _abilityPS.Play();
                         }
 
-                        // Attacker-side punch (local player only): a light shake on any
-                        // cast, a stronger one when a Damage ability fires. Damage
-                        // abilities are range-gated and AbilityController refuses to
-                        // activate them with no target in range — so a Damage cast that
-                        // got here necessarily CONNECTED. That makes "I landed a hit"
-                        // detectable locally with zero extra networking.
+                        // FEEDBACK.md §3.1's "Always" caster micro-shake: fires on EVERY
+                        // cast, hit or whiff, local player only. Stage 4's HitFeedback
+                        // issues the same shake again on a *landed* cast (§3.2's
+                        // hit-confirm); both now read the identical FeedbackTuning
+                        // constants and MatchCamera.ApplyShake is max-wins, so the overlap
+                        // is a no-op rather than a double punch. The literals that used to
+                        // sit here (0.18/0.22, 0.06/0.12) were the source those constants
+                        // were derived from — reading them back from FeedbackTuning is what
+                        // makes a future re-tune actually take effect on both call sites.
                         if (_controller != null && _controller.HasInputAuthority &&
                             MatchCamera.Instance != null)
                         {
                             bool steal = ability.Category == AbilityCategory.Steal;
                             MatchCamera.Instance.ApplyShake(
-                                steal ? 0.18f : 0.06f,
-                                steal ? 0.22f : 0.12f);
+                                steal ? FeedbackTuning.CasterStealShakeMagnitude
+                                      : FeedbackTuning.CasterMicroShakeMagnitude,
+                                steal ? FeedbackTuning.CasterStealShakeDurationSeconds
+                                      : FeedbackTuning.CasterMicroShakeDurationSeconds);
                         }
                     }
                 }

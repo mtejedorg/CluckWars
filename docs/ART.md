@@ -446,6 +446,196 @@ Control states attach to the affected chicken **in world space** — never to a 
 
 Nameplate badge: rounded pill in the player's color (dark red while stunned), holding the state icon + `P#`. All overlays are local, driven by observed `[Networked]` state — never networked themselves.
 
+### 6.11 Ability Feedback — Telegraph & Impact (v0.6)
+
+The visual language of the Telegraph → Impact → Aftermath system. Design intent lives in
+`docs/FEEDBACK.md`; this section is the **look**.
+
+**Every number below is referenced by name, never restated.** All timings, alphas,
+magnitudes and semantic colours are `public const` / `static readonly` in
+`Assets/_Game/Scripts/Visuals/FeedbackTuning.cs`, which is the single source of truth and
+carries the rationale for each value. Restating them here would create a second copy to
+drift. If a value looks wrong on device, change it in `FeedbackTuning` — nothing reads a
+literal.
+
+#### Telegraph shapes (the ground preview)
+
+One geometry builder, `TelegraphShapes`, serves **both** the hold-to-aim preview
+(`AbilityTelegraph`) and the impact cast flash (`AbilityRangeIndicator`), so the shape you
+aimed and the shape that fired are the same polyline. Drawn as a closed `LineRenderer`
+outline on the ground plane, in the ability's `AccentColor` at
+`FeedbackTuning.TelegraphPreviewAlpha`.
+
+| `AbilityAimShape` | Drawn as | Abilities |
+|---|---|---|
+| `None` | Self-ring at the caster's feet, radius `FeedbackTuning.SelfRingRadius` (0.62 — deliberately the status ring's radius, so "the chicken's own footprint" stays one idea). No target marking; the caster's own ring is the mark. | Speed Burst, Turtle Mode, Invisibility, Spine Coat, Egg Shell, Doppelganger |
+| `SelfCircle` | Circle centred on the caster at `AimRadius`. | Cluck Shock, Stun Burst, Peck, Sneaky Steal |
+| `ForwardCircle` | Circle offset `AimForwardOffset` metres along flattened facing, plus a thin **stalk** connecting caster to circle so the offset reads as deliberate rather than as a detached decal. | Feather Trap, Roll Push, Roll Trample, Root Egg |
+| `Cone` | Forward arc of `AimConeAngle` degrees, closed back through the caster — a wedge, not an arc segment. | Wing Slam |
+| `Aura` | Circle that follows the caster while the ability is active (not just while aiming). | Feather Aura |
+| `Jump` | Landing ring at the destination plus the same stalk as `ForwardCircle`, reading as an arc to a place. | Shadowstep, Ambush |
+| `SingleTarget` | Range circle; the marking on the chosen target carries the information. | Mark Kill |
+
+Any ability declaring a shape but resolving to a non-positive `AimRadius` degrades to a
+self-ring rather than a zero-size line — an unfinished ability looks unfinished, never
+invisible.
+
+#### `TargetHighlight` — the colour triple
+
+Three states, each coded by **at least two** channels per §1.3 of FEEDBACK.md, so all
+three survive greyscale and colour-blind reads:
+
+| Mark | Colour | Bracket | Motion | Extra | Means |
+|---|---|---|---|---|---|
+| **Valid** | the *casting ability's own* `AccentColor` — never a colour of its own, so the bracket always matches the ground decal it belongs to | **solid**, alpha `FeedbackTuning.ValidTargetBracketAlpha` | **pulsing** at `FeedbackTuning.ValidTargetPulseHz` | — | Will be hit. `WouldAffect` says yes. |
+| **Immune / no-effect** | `FeedbackTuning.NeutralNoEffectColor` (neutral grey) | **dashed** | **static** | small ⃠ glyph | Inside the shape, but the ability does nothing — Spine Coat reflect, Turtle Mode, already-stunned for a stun, a `requireCargo` ability against an empty-handed rival. |
+| **Not in shape** | — | hidden | — | — | Outside the aim shape entirely. Drawn as nothing, not as a third colour. |
+
+`NeutralNoEffectColor` is deliberately shared with the §6 "no valid target" refusal state
+on the hex button: the same grey means "nothing will happen here" in both the world and
+the HUD, so it is one word in the player's vocabulary, not two.
+
+The illegal-cast wash (`FeedbackTuning.IllegalCastTintColor`, a red-biased grey) is a
+**fourth, distinct** colour and must not be confused with the neutral grey. Neutral grey
+says "there was never a valid target here"; the red-grey wash says "this *stopped* being
+legal" — two different refusal stories that must not look identical. The preview lerps
+into it over `PreviewIllegalDesaturateSeconds`.
+
+`TargetHighlight` is **strictly additive** — its own sprites, never the body material —
+specifically so it cannot fight the hit-flash, which does own body colour. Same discipline
+as `ChickenStateOverlays`.
+
+#### Hit and whiff
+
+| | Treatment |
+|---|---|
+| **Hit** | Victim white body flash for `VictimHitFlashDurationSeconds` peaking at `VictimHitFlashPeakIntensity` (deliberately not 1.0 — a fully white chicken loses its player-identity colour at the exact moment a bystander needs to track *who* got hit). White hit-spark at each victim. `ImpactMotionLineCount` lines of `ImpactMotionLineLength`, fanned `ImpactMotionLineFanDegrees` either side of the incoming bearing, living `ImpactMotionLineLifetimeSeconds` — deliberately *outliving* the flash, so "hit" and "from there" land as two beats. |
+| **Whiff** | Cast ring desaturated by `WhiffRingSaturationMultiplier` and dimmed by `WhiffRingAlphaMultiplier`. **Not silent and not invisible** — a whiff that looks like a hit is the single worst failure in this system. Not fully greyscale, so a whiffed Steal and a whiffed Root Egg still carry a faint hue difference. `AimShape.None` self-buffs are exempt and always report as hits — a self-buff has no one to miss. |
+| **Shake tiers** | Three, and the ratios are the point: `CasterMicroShakeMagnitude` (0.06) → `VictimHitShakeMagnitude` (0.12) → `DeathShakeMagnitude` (0.35). Roughly 2× then 3×, which keeps caster-punch, took-a-hit and knockout distinguishable without any one of them being disruptive at 30 fps. Every shake is gated on `HasInputAuthority` — peers never feel each other's. |
+| **Execute** | Feather burst, death shake, and a hit-stop at `ExecuteHitStopTimeScale` for `ExecuteHitStopDurationSeconds`. Deliberately a heavy slow, **not** a full freeze: 0.08 s at timescale 0 on a 30 fps Android target is ~2.4 frames and reads as a dropped frame rather than as intent. |
+
+Floating combat text (`FloatingCombatText`) spawns at `FloatingTextSpawnHeight`, rises
+`FloatingTextRiseDistance`, holds fully opaque for `FloatingTextHoldFraction` of
+`FloatingTextLifetimeSeconds` then fades. Pooled at `FloatingTextLivePeerCap`, never
+grown; when full it recycles the **oldest**, because a fresh number is always worth more
+than one already most of the way through its fade.
+
+### 6.12 Status badges and drain rings (v0.6)
+
+**Three drain rings, one mechanism.** The status arc (§5.1), the self-buff ring (case 30)
+and the placed-zone ring (case 23) all use the same `DrainRing`: a dim full-circle
+*track* at `FeedbackTuning.DrainRingTrackAlphaMultiplier` of the bright draining *arc*.
+The contrast is what makes "how much is left" out-read "how much there was" — without the
+track, a nearly-drained ring reads as an unrelated sliver instead of as "almost out". Arc
+geometry regenerates at `StatusArcDrainUpdateHz`, not per frame.
+
+Radii are deliberately distinct so they stack rather than fight:
+
+| Ring | Radius | Why |
+|---|---|---|
+| Status ring (stun/root/slow) | `SelfRingRadius` 0.62 | Established first; owns "the chicken's own footprint". |
+| Self-buff expiry ring | `SelfBuffRingRadius` 0.80 | 0.18 further out, so a buffed-**and**-slowed chicken shows two concentric rings instead of one ring flickering between two colours. |
+| Placed-zone ring | `AbilityZone.TriggerRadius` | Not an artist's approximation — the *same accessor gameplay overlaps against*, so the drawn edge **is** the trigger. |
+
+Zone rings take the canonical colour of the state they inflict, so a Feather Trap's edge
+is the same cyan as the slow ring it will put on you. An unhandled future `ZoneEffect`
+falls through to `CanonicalKnockColor` (white) — visible but unstyled, so a new zone type
+ships looking unfinished rather than shipping invisible.
+
+**Canonical control-state colours** — `FeedbackTuning.CanonicalStunColor` /
+`CanonicalRootColor` / `CanonicalSlowColor` are now the single source for stun/root/slow
+everywhere (rings, badges, zones, HUD strip, stick tint). Root is a *grass* green with its
+blue channel near zero, not the Okabe-Ito "bluish-green" #009E73 — that value is almost
+exactly **P4 Forest Teal**, and a rooted P4 chicken reading as "extra teal" is the one
+collision this system cannot afford. Slow is likewise kept lighter and more cyan than P2
+Ocean Blue. Per §1.3 colour is never the only channel: each pairs with shape (orbiting
+stars / static shackle / trailing streaks).
+
+**Badge stack** — this extends §6.10 rather than replacing it. §6.10's nameplate glyphs
+(🌱 root, 🐌 slow, inline in `ChickenNameplate`'s label) stay exactly as they are: the
+always-on, zero-cost "this chicken is not free" marker attached to the name. The v0.6
+addition is the layer §6.10 never had — a **stack**, up to `StatusBadgeMaxRows` (3) rows,
+one per *simultaneously active* status, each carrying its own quantity. A rooted-and-slowed
+chicken shows one §6.10 nameplate glyph and two badge rows.
+
+The stack occupies a tight vertical band, and the constants are an invariant, not
+preferences: cargo bar 1.16 → nameplate 1.70 → **badges `StatusBadgeStackBaseHeight` 1.78
++ `StatusBadgeRowSpacing` 0.11 × 2 = 2.00** → floating text floor
+`FloatingTextSpawnHeight` 2.05. Three rows exactly fill the gap. Badges are authored
+smaller than the nameplate to make that fit. Countdown text updates at
+`BadgeCountdownTextUpdateHz`, never per frame — UI text writes trigger layout.
+
+Glyphs: ⚡ stun, ⛓ root, 🐌 slow. These are **shared verbatim** between the world-space
+badges and the HUD strip — `ChickenStatusBadges` aliases `HudFeedbackStyle`'s consts at
+compile time, so the two surfaces cannot drift into speaking different languages for the
+same state. None of the three exist in `LilitaOne-Regular.ttf` (225 codepoints) and TMP's
+global fallback list is empty, so any element showing one **must** carry the
+`cw-glyph-font` class (NotoEmoji, monochrome and therefore tintable).
+
+### 6.13 Hex refusal states — extending §6.6's nine layers
+
+The four distinguishable refusal reasons add **no tenth layer**. Instead, §6.6's **layer 9**
+generalises from "the cooldown seconds" to "**the state indicator**". This works because
+`AbilityRefusalRules.Evaluate` makes the reasons mutually exclusive by precedence
+(SlotUnavailable > Cooldown > Stunned > OtherAbilityActive > NoTarget), so the centre of
+the hex never has to arbitrate between two marks.
+
+| Refusal | Layers 2–4 (border / fill) | Layer 6 (clip) | Layer 7 (icon) | Layer 9 (centre) |
+|---|---|---|---|---|
+| *(ready)* | accent, alpha `HexAlphaReady` | — | full | hidden |
+| **Cooldown** | accent, alpha `HexAlphaCooldown` | **black, bottom-up** | dimmed | **seconds integer** |
+| **No target** | `NeutralNoEffectColor`, alpha `HexAlphaNoTarget` | — | dimmed | **⃠** in `NeutralNoEffectColor` |
+| **Stunned** | `IllegalCastTintColor` wash, on **every** hex at once | — | dimmed | **✕** in `RefusalStunnedCrossColor` |
+| **Other ability active** | accent, alpha `HexAlphaOtherActive` (the dimmest tier) | on the *running* slot only: **accent, top-down** | dimmed | hidden |
+| **Slot unavailable** | `display: none` | — | — | — |
+
+Three orthogonal channels do the separating, so no two states can collapse into each
+other: **hue** (accent / neutral grey / red-grey wash), **shape** (nothing / number /
+circle-slash / cross), and **clip direction** (none / black-from-bottom /
+accent-from-top).
+
+Two deliberate choices worth keeping:
+
+- **The top-down accent drain is the mirror of the bottom-up black cooldown clip** in both
+  direction and colour. This is necessary, not decorative: an ability burns its cooldown
+  at activation, so the running slot is *also* cooling, and the two clips routinely
+  coexist on the same hex. Opposite direction + opposite colour is what keeps "this is
+  running" and "this is cooling" readable simultaneously. Driven from `ActiveRemaining01`.
+- **`OtherAbilityActive` gets no centre mark.** Its signal is the drain on the *other*
+  slot — the one actually running. Stamping a mark on every suppressed hex would say
+  "four things are wrong" when one thing is happening.
+
+`HexAlphaOtherActive` (0.35) is dimmer than `HexAlphaCooldown` (0.45) on purpose: if they
+matched, a suppressed cluster would read as "everything went on cooldown at once", which
+is the wrong story.
+
+**Refusal marks are USS-drawn shapes, not characters.** ⃠ (U+20E0) and ✕ (U+2715) are
+absent from *both* `LilitaOne-Regular.ttf` and `NotoEmoji-Regular.ttf`, and TMP's global
+fallback list is empty, so both would have drawn tofu on every platform — not just
+Android. ⃠ is drawn as a bordered circle plus a rotated bar; ✕ as two rotated bars. The
+decision is reversible in one line via `HudFeedbackStyle.UseDrawnRefusalMarks`, kept
+`static readonly` so both branches stay live code.
+
+> ⚠️ **Known font gap, pre-existing:** the slot-3 Combo badge's **★ (U+2605)** is also
+> absent from both fonts. It currently survives on OS-level font fallback, which is
+> exactly the thing that varies on Android. Verify on the Pixel 9.
+
+**Denied-press bump** (case 29): a refused press is never absorbed silently. The hex
+shakes horizontally with a decaying oscillation — `DeniedPressBumpAmplitudePx` over
+`DeniedPressBumpDurationSeconds` at `DeniedPressBumpOscillations` cycles, driven by
+`unscaledDeltaTime` so the execute hit-stop can't stretch it past the press that caused
+it. The amplitude was raised from the spec's 4 px (≈1.7 dp on this canvas — likely
+invisible under a resting thumb) to 10 px and is flagged as a live-session number to
+eyeball, not a confident final value.
+
+**HUD status strip placement** — the strip sits **bottom-left, stacked directly above the
+joystick** (`bottom: 380px`, clearing the joystick's 360px top edge by 20 px, growing
+upward). This deviates from FEEDBACK.md §5.2's "below the cargo readout", which is stale:
+the cargo readout moved to world space on the chicken (`ChickenWorldBars`, §6.3 — "the
+game area is sacred") and no longer exists in the HUD. Siting it by the joystick puts the
+constraint and the control it constrains in one glance. It lives in the existing
+`TouchControls` UIDocument — no new UIDocument, no new PanelSettings.
+
 ---
 
 ## 7. Visual Effects (VFX)

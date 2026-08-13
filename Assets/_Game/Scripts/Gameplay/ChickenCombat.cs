@@ -109,8 +109,16 @@ namespace CluckWars.Gameplay
                             _log?.Info(Source, "Execute removal begin.");
                             _audio?.PlaySFX(_audioReg != null ? _audioReg.Stun : null);
                             OnDeath?.Invoke();
+                            // FEEDBACK.md §3.4's death shake. Stays the SINGLE call site for
+                            // it — Stage 4's HitFeedback deliberately does not re-issue it,
+                            // it only layers the feather burst and hit-stop on top of this
+                            // same OnDeath moment. The literals (0.35 / 0.45) that used to
+                            // sit here are what FeedbackTuning.DeathShake* were derived
+                            // from; reading them back keeps a re-tune effective.
                             if (HasInputAuthority)
-                                CluckWars.Visuals.MatchCamera.Instance?.ApplyShake(0.35f, 0.45f);
+                                CluckWars.Visuals.MatchCamera.Instance?.ApplyShake(
+                                    CluckWars.Visuals.FeedbackTuning.DeathShakeMagnitude,
+                                    CluckWars.Visuals.FeedbackTuning.DeathShakeDurationSeconds);
                         }
                         else
                         {

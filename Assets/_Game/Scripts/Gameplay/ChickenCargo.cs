@@ -1,5 +1,6 @@
 using CluckWars.Audio;
 using CluckWars.Logging;
+using CluckWars.Visuals;
 using Fusion;
 using UnityEngine;
 using Zenject;
@@ -68,7 +69,17 @@ namespace CluckWars.Gameplay
 
         private ChickenController _controller;
         private ChickenCombat _combat;
+        private HitFeedback _hitFeedback;
         private ILogService _log;
+
+        // ---- Local cargo-delta observation (FEEDBACK.md §3.2, case 12) --------
+        // Lives here rather than in a separate component precisely because Fusion's
+        // ChangeDetector/PropertyReader pair only resolves for the behaviour that DECLARES
+        // the [Networked] property — a detector rooted on a sibling would read nothing for
+        // Cargo. Strictly observation: nothing below writes networked state, and the whole
+        // block runs in Render() on every peer, so no RPC and no extra bytes on the wire.
+        private ChangeDetector _cargoDetector;
+        private PropertyReader<float> _cargoReader;
         private IAudioService _audio;
         private AudioRegistrySO _audioReg;
         private PrefabRegistrySO _prefabRegistry;
@@ -121,6 +132,10 @@ namespace CluckWars.Gameplay
 
             _controller = GetComponent<ChickenController>();
             _combat = GetComponent<ChickenCombat>();
+            _hitFeedback = GetComponent<HitFeedback>();
+
+            _cargoDetector = GetChangeDetector(ChangeDetector.Source.SimulationState);
+            _cargoReader = GetPropertyReader<float>(nameof(Cargo));
 
             if (_combat != null && !_subscribedToDeath)
             {
@@ -138,6 +153,49 @@ namespace CluckWars.Gameplay
             {
                 _combat.OnDeathAuthority -= HandleDeath;
                 _subscribedToDeath = false;
+            }
+        }
+
+        /// <summary>
+        /// Local-only: turns the replicated <see cref="Cargo"/> value into the §3.2
+        /// <c>-5 🌽</c> / <c>+5 🌽</c> floating numbers, and feeds a *loss* into
+        /// <see cref="HitFeedback"/> as one more victim-hit trigger (case 12 is a hit as
+        /// much as a knockback is — someone just took your food).
+        /// </summary>
+        /// <remarks>
+        /// The delta is read out of the change detector's previous/current buffers rather
+        /// than from a cached field, so it is exactly the change Fusion applied, with no
+        /// chance of drifting out of sync with the replicated value.
+        ///
+        /// Only discrete, meaningful changes surface: continuous collection and deposit
+        /// drain move Cargo by a fraction per frame and are filtered by
+        /// <see cref="FeedbackTuning.FloatingTextCargoDeltaThreshold"/> — see that constant
+        /// for why a single threshold cleanly separates the two. Deposits deliberately get
+        /// no popup: the base's own deposit burst and the score readout already tell that
+        /// story, and a stream of <c>-1 🌽</c> at your own base would be noise, not feedback.
+        /// </remarks>
+        public override void Render()
+        {
+            // PropertyReader<T> is a struct (no null state) — the detector is the only
+            // thing that can be missing, and only before Spawned has run.
+            if (_cargoDetector == null) return;
+            if (_controller != null && _controller.IsDecoy) return;
+
+            foreach (var changed in _cargoDetector.DetectChanges(this, out var previous, out var current))
+            {
+                if (changed != nameof(Cargo)) continue;
+
+                var (before, after) = _cargoReader.Read(previous, current);
+                float delta = after - before;
+                if (Mathf.Abs(delta) < FeedbackTuning.FloatingTextCargoDeltaThreshold) continue;
+
+                // A drain into a base is not a loss to anyone — it is the point of the game.
+                if (delta < 0f && IsDepositing) continue;
+
+                FloatingCombatText.SpawnCargoDelta(
+                    transform.position + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight, delta);
+
+                if (delta < 0f) _hitFeedback?.NotifyCargoLoss(-delta);
             }
         }
 

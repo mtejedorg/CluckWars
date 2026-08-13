@@ -57,7 +57,9 @@ namespace CluckWars.Abilities
             for (int i = 0; i < all.Count; i++)
             {
                 var other = all[i];
-                if (other == null || other == self || other.IsDecoy) continue;
+                // Decoys are shovable like any other body — a Barge that ploughed straight
+                // through a Doppelganger would be a free way to identify one.
+                if (other == null || other == self) continue;
                 if (other.Combat == null || other.Combat.IsDead) continue;
 
                 Vector3 delta = other.transform.position - origin;

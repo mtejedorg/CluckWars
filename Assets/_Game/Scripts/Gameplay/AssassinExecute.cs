@@ -25,9 +25,6 @@ namespace CluckWars.Gameplay
         public const float FailCooldown = 5.0f;
         public const float SuccessCooldown = 15.0f;
 
-        // Layer 8 = Chickens. Named so the two overlap queries below don't repeat a bare 1<<8.
-        private const int ChickenLayerMask = 1 << 8;
-
         [Networked] public NetworkBehaviourId MarkedTarget { get; private set; }
         [Networked] public TickTimer ArmTimer { get; private set; }
         [Networked] public TickTimer WindowTimer { get; private set; }
@@ -40,12 +37,6 @@ namespace CluckWars.Gameplay
         private ChickenCargo _cargo;
         private AbilityController _abilities;
         private ILogService _log;
-
-        // Two distinct buffers: the candidate search iterates _overlapBuffer while calling
-        // IsTargetIsolated() per candidate, and IsTargetIsolated() runs its OWN overlap query.
-        // Sharing one buffer would clobber the candidate list mid-iteration.
-        private static readonly Collider[] _overlapBuffer = new Collider[16];
-        private static readonly Collider[] _isolationBuffer = new Collider[16];
 
         [Inject]
         public void Construct(ILogService log)
@@ -69,49 +60,39 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Press triggered by the Mark/Kill ability button slot.
         /// </summary>
-        public bool Press()
+        /// <param name="preResolvedTarget">
+        /// The chicken to mark, already resolved by <c>MarkKillAbilitySO.OnActivate</c>
+        /// through the shared <c>GatherTargets</c> scan. Ignored (and unnecessary) on a Kill
+        /// press, which reads <see cref="MarkedTarget"/> instead.
+        /// </param>
+        public bool Press(ChickenController preResolvedTarget = null)
         {
             if (!HasStateAuthority) return false;
             if (_controller == null || !ControlRules.CanCast(_controller.CurrentControlState)) return false;
 
             if (MarkedTarget == NetworkBehaviourId.None)
             {
-                // ---- Phase 1: Mark Candidate Search --------------------------------
-                ChickenController bestCandidate = null;
-                float bestSqr = MaxMarkRange * MaxMarkRange;
-
-                int hits = Physics.OverlapSphereNonAlloc(transform.position, MaxMarkRange, _overlapBuffer, ChickenLayerMask, QueryTriggerInteraction.Ignore);
-                for (int i = 0; i < hits; i++)
-                {
-                    var target = _overlapBuffer[i].GetComponentInParent<ChickenController>();
-                    if (target == null || target == _controller) continue;
-                    if (target.Combat != null && target.Combat.IsRemoved) continue;
-
-                    // Check if rival (different home corner or input authority)
-                    if (target.HomeCornerIndex == _controller.HomeCornerIndex && _controller.HomeCornerIndex >= 0) continue;
-
-                    // Check isolation around candidate
-                    if (!IsTargetIsolated(target)) continue;
-
-                    float sqr = (target.transform.position - transform.position).sqrMagnitude;
-                    if (sqr < bestSqr)
-                    {
-                        bestSqr = sqr;
-                        bestCandidate = target;
-                    }
-                }
-
-                if (bestCandidate == null)
+                // ---- Phase 1: Mark ------------------------------------------------
+                // The candidate comes from MarkKillAbilitySO, whose SingleTarget aim shape
+                // resolves to exactly the nearest eligible rival and whose ExtraTargetFilter
+                // applies the very isolation + rival rules this method used to re-implement
+                // with its own Physics.OverlapSphere (in 3D, against a preview that was
+                // planar and had no isolation rule at all — so the preview could mark a
+                // target the press then refused).
+                //
+                // There is deliberately NO fallback scan: a second implementation of those
+                // rules is exactly how the two drifted apart in the first place.
+                if (preResolvedTarget == null)
                 {
                     _log?.Verbose(Source, "Press: no isolated rival candidate in range.");
                     return false;
                 }
 
-                MarkedTarget = bestCandidate.Id;
+                MarkedTarget = preResolvedTarget.Id;
                 ArmTimer = TickTimer.CreateFromSeconds(Runner, ArmDuration);
                 WindowTimer = TickTimer.CreateFromSeconds(Runner, WindowDuration);
                 KillReady = false;
-                _log?.Info(Source, $"Marked target {bestCandidate.name} (Arming 2s).");
+                _log?.Info(Source, $"Marked target {preResolvedTarget.name} (Arming {ArmDuration:0.0}s).");
                 return true;
             }
             else
@@ -164,8 +145,10 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            // Check distance
-            float dist = Vector3.Distance(transform.position, target.transform.position);
+            // Check distance. Planar XZ, matching AbilityAim / MarkKillAbilitySO's aim shape:
+            // a 3D measure here could fizzle a mark for a height difference the preview never
+            // showed and the flat arena does not have.
+            float dist = PlanarDistance(transform.position, target.transform.position);
             if (dist > MaxMarkRange)
             {
                 _log?.Info(Source, $"Mark fizzled: target exceeded range ({dist:0.1}m > {MaxMarkRange}m).");
@@ -203,20 +186,54 @@ namespace CluckWars.Gameplay
             }
         }
 
-        public bool IsTargetIsolated(ChickenController target)
+        /// <summary>
+        /// Is <paramref name="target"/> alone enough to be executed — no third live chicken
+        /// within <see cref="IsolationRadius"/> of it? This is the crowd counterplay, and it
+        /// is the rule the Mark/Kill preview never knew about.
+        /// </summary>
+        /// <param name="excludeCaster">
+        /// The assassin, who does not break their own victim's isolation.
+        /// </param>
+        /// <remarks>
+        /// <b>Static, and iterating the registry.</b> Static so
+        /// <c>MarkKillAbilitySO.ExtraTargetFilter</c> can apply the identical rule without a
+        /// <c>GetComponent&lt;AssassinExecute&gt;</c> on every candidate on every HUD poll —
+        /// and registry-based (≤4 entries, planar XZ) rather than a physics query so the
+        /// preview, the usability grey-out and the fizzle check all measure the same thing.
+        /// The old <c>Physics.OverlapSphereNonAlloc</c> version needed two separate collider
+        /// buffers just to avoid clobbering itself mid-iteration; that whole hazard is gone.
+        /// </remarks>
+        public static bool IsIsolated(ChickenController target, ChickenController excludeCaster)
         {
-            int hits = Physics.OverlapSphereNonAlloc(target.transform.position, IsolationRadius, _isolationBuffer, ChickenLayerMask, QueryTriggerInteraction.Ignore);
+            if (target == null) return false;
 
-            for (int i = 0; i < hits; i++)
+            float radiusSqr = IsolationRadius * IsolationRadius;
+            Vector3 center = target.transform.position;
+
+            var all = ChickenController.ActiveControllers;
+            for (int i = 0; i < all.Count; i++)
             {
-                var thirdParty = _isolationBuffer[i].GetComponentInParent<ChickenController>();
-                if (thirdParty == null || thirdParty == target || thirdParty == _controller) continue;
+                var thirdParty = all[i];
+                if (thirdParty == null || thirdParty == target || thirdParty == excludeCaster) continue;
                 if (thirdParty.Combat != null && thirdParty.Combat.IsRemoved) continue;
 
                 // Another live chicken is near the target -> not isolated!
-                return false;
+                if (PlanarSqrDistance(center, thirdParty.transform.position) <= radiusSqr) return false;
             }
             return true;
+        }
+
+        /// <summary>Instance view of <see cref="IsIsolated"/> for this assassin's own call
+        /// sites, which always exclude themselves.</summary>
+        public bool IsTargetIsolated(ChickenController target) => IsIsolated(target, _controller);
+
+        private static float PlanarDistance(Vector3 a, Vector3 b) => Mathf.Sqrt(PlanarSqrDistance(a, b));
+
+        private static float PlanarSqrDistance(Vector3 a, Vector3 b)
+        {
+            float dx = a.x - b.x;
+            float dz = a.z - b.z;
+            return dx * dx + dz * dz;
         }
 
         private void FizzleMark()

@@ -508,8 +508,98 @@ Seasonal content is post-demo, contingent on success.
   button is **two-press**: first press marks, and it re-labels to **KILL** when the target
   qualifies.
 - **Collecting:** passive — stand on a pile, cargo fills at Collection Rate.
-- **Cooldowns:** radial fill + grey-out. Ability buttons must feel responsive.
+- **Cooldowns:** bottom-up clip + seconds remaining. Ability buttons must feel responsive.
 - Class silhouettes must read instantly in the isometric view.
+
+### 10.1 Casting: hold to aim, release to fire (v0.6)
+
+Abilities changed from **press-to-fire** to **hold-to-aim, release-to-fire**. The rule that
+matters is short: **an ability always fires on release, never on press.**
+
+**There is no tap window and no branch.** Every cast fires on release, full stop. Nothing
+waits out a threshold before committing, and no press is ever swallowed. Holding does
+**not** charge power; there is no minimum hold and no damage ramp.
+
+**What the hold buys you, and what it costs.** `FeedbackTuning.TapHoldThresholdSeconds`
+(~120 ms) is not a fire-path decision — it is a **cost/feedback ramp**:
+
+| | Below the threshold (a quick tap) | Past it (a deliberate hold) |
+|---|---|---|
+| **Ground telegraph** | none | your true area, drawn |
+| **Target marks** | none | every chicken in the area classified |
+| **Wind-up glow rivals can see** | none | ramps up at your feet |
+| **Movement** | **full speed** | the stick rotates your aim instead of moving you |
+
+So the trade is explicit: *tap for speed, hold for information.* A player who wants to
+keep moving taps and gives up the preview; a player who wants to aim holds and pays for it
+in mobility. Both fire on release, with identical latency.
+
+This also makes the wind-up glow mean something. It used to fire on every press, so rivals
+learned to ignore it; now it only appears when someone is genuinely committing to an aim,
+which is what makes "he's charging something, disengage" a real read.
+
+> **Superseded (v0.6.1).** This section previously said the threshold "only ever changes
+> what gets drawn, never when the cast happens", and carried a warning that the 120 ms had
+> to be clocked off the local raw input timestamp rather than the replicated hold bit,
+> because Shared Mode's ~50 ms of input latency would otherwise inflate the effective
+> threshold to ~170 ms and feel laggy. Both are retired. The first is now too narrow — the
+> threshold governs the *movement cost* as well as the drawing. The second assumed a tap
+> had to **wait out** the window before committing to fire, which is exactly the design
+> Maestro removed: a cast fires on release with unchanged latency, and the threshold
+> measures a *duration*, which is preserved under a constant input delay. The charge state
+> is therefore clocked in whole simulation ticks (4 ticks at 32 Hz = 125 ms).
+
+**While holding:**
+
+| | |
+|---|---|
+| **You see** | The ability's true area on the ground, and every chicken inside it marked — accent + solid + pulsing for "will be hit", grey + dashed + ⃠ for "in the area but immune / no-op". What you see marked is exactly what gets hit; the preview and the real scan run through the same `WouldAffect` predicate. |
+| **Rivals see** | Only a growing glow at your feet — a wind-up tell, not your area. This asymmetry is deliberate: it preserves counterplay ("he's charging something, disengage") without turning the arena into a solved puzzle. |
+| **Aiming** | Once past the threshold, directional abilities (cone / forward-offset / swept capsule / jump) let the movement stick **rotate your aim** instead of moving you. Caster-centred shapes (self-circle, aura, single-target) are rotation-invariant, so they keep normal movement even on a long hold — there is nothing to aim. |
+| **If it goes illegal** | If you get stunned mid-hold, or the last valid target walks out, the preview washes to red-grey and the button shows why. Releasing then **cancels without burning the cooldown**. |
+
+**Cancelling a held ability** — drag your thumb off the button (past
+`FeedbackTuning.DragCancelDistancePx`, ≈55 dp) on touch, or press **Esc** on desktop.
+Losing pointer capture to an OS gesture also counts as a cancel, never as a fire — an
+involuntary loss of tracking is not a deliberate "let go to cast".
+
+### 10.2 What each control state prevents, and how you're told
+
+The control ladder is §6.3's; this is how the game *communicates* it. The rule is that a
+state is shown **where it bites** — on the control it disables — not only as an abstract
+badge somewhere.
+
+| State | Move | Cast | Collect | How the HUD says so |
+|---|---|---|---|---|
+| **Free** | ✅ | ✅ | ✅ | Nothing marked. |
+| **Slowed** | reduced | ✅ | ✅ | Stick tints cyan with a **`×0.45`** magnitude label. Ability buttons untouched — casting is unaffected, and greying them would say the opposite of the truth. |
+| **Rooted** | ❌ | ✅ | ❌ | Stick greys out and shows a **⛓** shackle. Ability buttons stay normal — **you can still cast while rooted**, and that is a real tactical option the UI must not hide. |
+| **Stunned** | ❌ | **❌** | ❌ | **Every** ability hex takes a red wash and a **✕**; the stick greys. Stun is the only state that locks casting — which is exactly why it's the qualifier for the Assassin execute (§6.4). |
+
+Alongside the controls, a **status strip** above the joystick lists every currently active
+status — stun, root and slow are independent and can all be on at once, so the strip shows
+the whole set, not just the most severe one. Each row carries its own quantity.
+
+**Stun and root count down; slow shows a magnitude instead.** Stun and root have real
+deadlines, so `⚡1.4s` and `⛓2.0s` are facts and both get draining bars. Slow does not
+have a deadline at all — it is recomputed every tick from whatever is currently touching
+you (zones, auras, piles, collisions), so a slow row shows **`×0.45`** rather than a
+countdown. That is also the more useful number: when the honest answer to "how long?" is
+"until you move", "how much slower am I?" is what changes your decision.
+
+### 10.3 Why a button refuses
+
+A dead button always says why, and the four reasons are told apart at a glance:
+
+| Reason | What you see |
+|---|---|
+| **On cooldown** | Button darkens from the bottom up, with the **seconds remaining** in the centre. |
+| **No valid target in range** | Colour drains to grey and a **⃠** appears. |
+| **Stunned — can't cast** | Red wash and a **✕**, on all buttons at once. |
+| **Another ability is running** | The whole cluster dims; the **running** ability's button keeps full colour and drains from the top down. |
+| **Slot not available for your class** | The button isn't rendered at all. |
+
+Pressing a refused button **shakes it and clicks** — a press is never silently swallowed.
 
 ---
 

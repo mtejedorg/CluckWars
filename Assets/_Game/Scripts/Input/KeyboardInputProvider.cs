@@ -47,5 +47,24 @@ namespace CluckWars.Input
             var kb = Keyboard.current;
             return kb != null && kb.rKey.wasPressedThisFrame;
         }
+
+        public bool GetAbilityHeld(int slot)
+        {
+            var kb = Keyboard.current;
+            if (kb == null) return false;
+            return slot switch
+            {
+                0 => kb.qKey.isPressed,
+                1 => kb.eKey.isPressed,
+                2 => kb.rKey.isPressed,
+                _ => false,
+            };
+        }
+
+        public bool GetAbilityCancelPressed()
+        {
+            var kb = Keyboard.current;
+            return kb != null && kb.escapeKey.wasPressedThisFrame;
+        }
     }
 }

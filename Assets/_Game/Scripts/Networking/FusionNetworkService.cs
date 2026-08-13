@@ -39,7 +39,7 @@ namespace CluckWars.Networking
         // read it and got silently dropped (≈half of taps "did nothing"). We OR
         // every render frame's press into these latches and consume them in
         // OnInput, so no press is ever lost regardless of frame/tick alignment.
-        private bool _pendingAbility1, _pendingAbility2, _pendingAbility3;
+        private bool _pendingAbility1, _pendingAbility2, _pendingAbility3, _pendingAbilityCancel;
 
         public bool IsRunning => _runner != null && _runner.IsRunning;
         public NetworkRunner Runner => _runner;
@@ -127,12 +127,14 @@ namespace CluckWars.Networking
                 _pendingAbility1 = false;
                 _pendingAbility2 = false;
                 _pendingAbility3 = false;
+                _pendingAbilityCancel = false;
                 return;
             }
 
             if (_inputProvider.GetAbility1Pressed()) _pendingAbility1 = true;
             if (_inputProvider.GetAbility2Pressed()) _pendingAbility2 = true;
             if (_inputProvider.GetAbility3Pressed()) _pendingAbility3 = true;
+            if (_inputProvider.GetAbilityCancelPressed()) _pendingAbilityCancel = true;
         }
 
         void INetworkRunnerCallbacks.OnInput(NetworkRunner runner, NetworkInput input)
@@ -158,7 +160,14 @@ namespace CluckWars.Networking
             if (_pendingAbility1 || _inputProvider.GetAbility1Pressed()) buttons.Set((int)InputButton.Ability1, true);
             if (_pendingAbility2 || _inputProvider.GetAbility2Pressed()) buttons.Set((int)InputButton.Ability2, true);
             if (_pendingAbility3 || _inputProvider.GetAbility3Pressed()) buttons.Set((int)InputButton.Ability3, true);
-            _pendingAbility1 = _pendingAbility2 = _pendingAbility3 = false;
+            if (_pendingAbilityCancel || _inputProvider.GetAbilityCancelPressed()) buttons.Set((int)InputButton.AbilityCancel, true);
+            _pendingAbility1 = _pendingAbility2 = _pendingAbility3 = _pendingAbilityCancel = false;
+
+            // Hold state is level-triggered and read live every tick — no latch, since a
+            // hold spans many ticks by definition (unlike the one-shot presses above).
+            if (_inputProvider.GetAbilityHeld(0)) buttons.Set((int)InputButton.AbilityHold1, true);
+            if (_inputProvider.GetAbilityHeld(1)) buttons.Set((int)InputButton.AbilityHold2, true);
+            if (_inputProvider.GetAbilityHeld(2)) buttons.Set((int)InputButton.AbilityHold3, true);
 
             input.Set(new PlayerNetworkInput
             {
