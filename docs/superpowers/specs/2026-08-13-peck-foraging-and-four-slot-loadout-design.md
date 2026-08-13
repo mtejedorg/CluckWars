@@ -1,7 +1,9 @@
 # Peck foraging, four-slot loadouts, and the balance correction
 
 **Date:** 2026-08-13
-**Status:** Design approved, not implemented
+**Status:** **IMPLEMENTED 2026-08-13** — all seven stages committed on `develop`
+(`82b675a`..`d56a80d`), EditMode 285/285. Nothing has been run in Play Mode yet;
+see `docs/STATE.md` for the outstanding live-session checks.
 **Supersedes:** GDD §5.2 move-speed row (drift correction), GDD §7.1–7.2 slot counts,
 ADR 0003 Decision 3's "1 Common + 2 Character" loadout shape
 

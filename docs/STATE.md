@@ -6,7 +6,73 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
-## Mobile cost pass + prop prefabs + idle peck (latest)
+## Peck foraging, four slots, specializations (2026-08-13) — latest, committed on `develop`
+
+Spec: `docs/superpowers/specs/2026-08-13-peck-foraging-and-four-slot-loadout-design.md`.
+Thirteen commits from `82b675a` to `d56a80d`. **EditMode 274 → 285, all green.**
+
+**The headline is a bug, not a feature.** The playtest complaint "chickens move too
+fast" was a **regression**: shipped `ChickenStatsSO` move speeds had drifted +17–20%
+above the Oracle-solved values (9/9/10.5/10.5 against a solved 7.5/7.5/9.0/9.0),
+putting Fatty at −1.8 s and Warrior at −1.9 s, both **outside** the ±1.5 s SCT
+tolerance. Two of four classes were violating the axiom.
+
+⚠️ **The suite could not see it, and that is the durable lesson.** `BalanceOracleTests`
+hardcoded the design numbers as `OracleChicken` literals, so it asserted "the spec
+satisfies the spec" and never opened a `.asset` file. It now loads the real assets, and
+was verified load-bearing by reintroducing the drift. **Never restate a test's inputs as
+literals when the test exists to guard authored data.**
+
+**What changed, in dependency order:**
+
+| Area | Change |
+|---|---|
+| Balance | Speeds reverted to spec. Pile footprints −35% (25% → 10.6% of arena floor) |
+| Renames | `Peck` → **Snatch**, `Flying Peck` → **Dive Bomb**, freeing the Peck name |
+| Oracle | Collection is now `ceil(food / PeckAmount) × PeckCooldown`, not `food / rate` |
+| Gameplay | **Peck** replaces automatic pile drain. 3 food/press, per-class cooldown, 0.4 s movement lock |
+| Slots | **Four ability buttons for every class.** Peck force-equipped except on Assassin |
+| Passives | The **nine designed specializations** replace the damage-era roster |
+| Assassin | Execute pays a flat **ExecuteBounty** on top of stolen cargo; SCT-exempt |
+| Cleanup | The whole `FoodPickup` subsystem deleted — nothing spawned it any more |
+| Pools | Nine abilities widened; every class now chooses from 8–11 |
+| Animation | A real **Peck clip**, derived from the Idle take's own peck beat |
+
+**Traps found and closed along the way — each was silent:**
+
+- `Game.unity` **overrides** `MapGenerator`'s C# field initializers. Editing the code
+  defaults alone changed nothing at runtime. Always edit the scene too.
+- `ResolveLegalLoadout` treated **any** `Common` ability as legal for every class,
+  consulting `AllowedClasses` only for `Character` ones. Harmless until Peck shipped as
+  a class-restricted Common — the backfill would have handed it to the Assassin.
+- **Bots would have starved.** `BotController.CollectFood` only ever *walked to* the
+  pile; collection was the automatic drain. `BotRole.Forage` + `TryPeckAtPile` fixed it.
+- Three shipped passives (Mighty, Bracer, Opportunist) modified **damage**, in a game
+  with no damage. Warrior's entire fork — including its signature — was inert.
+- `AbilityIconStyle` maps 26 types but only **14** USS rules exist; the rest render
+  blank hexes. Listed in `AbilitySystemTests.IconsNotYetAuthored`. **Needs `artist-2d`.**
+
+**Verified `NetworkButtons` is `Int32`-backed** (bit 31 round-trips), so 9 of 32 input
+bits are in use. This was the spec's one blocking unknown.
+
+### ⚠️ Not yet verified — none of this has run in Play Mode
+
+The EditMode suite covers data and rules; it cannot tell you how the game *feels*.
+Outstanding for a live session:
+
+1. **Does pecking feel right?** 0.4 s lock, cooldowns 0.75/0.78/0.91. Fatty is pinned
+   ~9.6 s to fill 35 cargo — that pinned window is the whole point, and it is a guess.
+2. **The 4th hex is placed for CLEARANCE, not ergonomics.** The original three came from
+   shipped UGUI tunables (ART §6.7); `a4` has no such reference. **Needs `ui-designer`
+   on a real Pixel 9.**
+3. **Assassin viability.** `ExecuteBounty = 5` matches the magnitude of the ground drops
+   it replaced, but the Predation axiom still has no real C and T.
+4. **`Drop & Go`** is recorded as ~27% of Speedy's SCT and wants a stat re-solve.
+5. **`LeaderExecuteBountyMultiplier = 2`** is an unsolved first guess.
+
+---
+
+## Mobile cost pass + prop prefabs + idle peck
 
 A planned "texture bake" pass was **cut after measurement**, and two better wins
 replaced it. Recorded here because the reasoning is easy to lose.
