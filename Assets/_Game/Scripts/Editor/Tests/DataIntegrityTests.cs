@@ -294,6 +294,33 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void ClassStats_EveryClass_HasAuthoredPeckValues()
+        {
+            // PeckAmount/PeckCooldown are what the Balance Oracle now solves SCT against, so
+            // an unauthored class silently falls back to the C# defaults (3 per 1.0s) and
+            // lands on someone else's clear time without anything going red.
+            foreach (var s in TestAssets.LoadAllIn<ChickenStatsSO>(TestAssets.ClassesDir))
+            {
+                Assert.Greater(s.PeckAmount, 0f,
+                    $"{s.name}: PeckAmount {s.PeckAmount} — a press would take no food, so the " +
+                    "class can never fill its cargo and the Oracle reports it unreachable.");
+                Assert.Greater(s.PeckCooldown, 0f,
+                    $"{s.name}: PeckCooldown {s.PeckCooldown} — a zero cooldown makes foraging " +
+                    "instantaneous and collapses SCT to pure travel time.");
+
+                // Sanity band, not a balance rule: the Oracle owns the exact value. These
+                // bounds only catch an order-of-magnitude authoring slip (a stray 30 or 0.03).
+                Assert.LessOrEqual(s.PeckCooldown, 5f,
+                    $"{s.name}: PeckCooldown {s.PeckCooldown}s is longer than any solved value " +
+                    "has ever been — check for a misplaced decimal.");
+                Assert.LessOrEqual(s.PeckAmount, s.CargoCapacity,
+                    $"{s.name}: PeckAmount {s.PeckAmount} exceeds CargoCapacity {s.CargoCapacity}, " +
+                    "so a single press always overfills and the class fills in one press regardless " +
+                    "of its cooldown.");
+            }
+        }
+
+        [Test]
         public void ClassStats_EveryPassive_IsUsedByExactlyOneClass()
         {
             var all = TestAssets.LoadAllIn<ChickenStatsSO>(TestAssets.ClassesDir);

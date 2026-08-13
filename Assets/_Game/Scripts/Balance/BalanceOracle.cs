@@ -75,7 +75,18 @@ namespace CluckWars.Balance
 
                     float space = capacity - carrying;
                     float take = Mathf.Min(space, remaining[nearest]);
-                    time += take / chicken.CollectionRate;
+
+                    // Discrete, not continuous: food comes out of a pile one Peck press at a
+                    // time. A press that only partly fills (the pile ran dry, or the chicken
+                    // ran out of room) still costs a full cooldown, so the count is a CEILING.
+                    // The epsilon stops an exact multiple — take 6, amount 3 — from rounding
+                    // up to 3 presses on a float that landed a hair above 2.0.
+                    if (chicken.PeckAmount <= 0f || chicken.PeckCooldown < 0f)
+                        return new OracleResult { SctSeconds = time, Trips = trips, ReachedTarget = false };
+
+                    int pecks = Mathf.Max(1, Mathf.CeilToInt(take / chicken.PeckAmount - Epsilon));
+                    time += pecks * chicken.PeckCooldown;
+
                     carrying += take;
                     remaining[nearest] -= take;
                     continue;

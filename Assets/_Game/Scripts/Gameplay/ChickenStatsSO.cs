@@ -29,7 +29,27 @@ namespace CluckWars.Gameplay
 
         [Header("Cargo")]
         [Min(1)] public int CargoCapacity = 10;
-        [Min(0f)] public float CollectionRate = 1f; // food per second
+
+        [Tooltip("DEPRECATED — automatic pile drain, food per second. Still read by ChickenCargo " +
+                 "until Peck replaces it; the Balance Oracle already ignores it in favour of " +
+                 "PeckAmount/PeckCooldown. Delete both this field and ChickenCargo's automatic " +
+                 "collection together, or the two will disagree about how fast a class farms.")]
+        [Min(0f)] public float CollectionRate = 1f;
+
+        [Header("Peck (foraging)")]
+        [Tooltip("Food taken from a pile per Peck press. Authored per class from day one even " +
+                 "though all four currently share a value: with a uniform amount, per-class " +
+                 "COOLDOWN is the only lever, and it barely separates Speedy from Fatty " +
+                 "(their solved cooldowns land within 0.01s). Amount is the lever that would " +
+                 "actually differentiate them.")]
+        [Min(0.1f)] public float PeckAmount = 3f;
+
+        [Tooltip("Seconds between Peck presses. Solved against this class's SCT target — do NOT " +
+                 "hand-tune it; change SctTargets and re-solve. Note a partial press still costs " +
+                 "a full cooldown, so the effective rate (amount/cooldown) sits ~20-30% above the " +
+                 "old CollectionRate for the same clear time. That gap is quantisation waste, " +
+                 "not a buff.")]
+        [Min(0.05f)] public float PeckCooldown = 1f;
 
         [Header("Visuals")]
         [Tooltip("Uniform scale applied to the chicken's transform at spawn.")]

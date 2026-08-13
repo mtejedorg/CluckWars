@@ -19,4 +19,6 @@ MonoBehaviour:
   TurnSpeed: 720
   CargoCapacity: 14
   CollectionRate: 2.6
+  PeckAmount: 3
+  PeckCooldown: 0.91
   Scale: 1

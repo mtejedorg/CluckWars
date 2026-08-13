@@ -8,8 +8,13 @@ namespace CluckWars.Tests
     /// <summary>
     /// EditMode tests for the Balance Oracle (spec: docs/superpowers/specs/
     /// 2026-07-24-cluck-wars-core-redesign-design.md §7). Pure-C# simulation, so every
-    /// case here is hand-computable: travel = distance / speed, collect = units / rate,
-    /// deposit = units / depositRate.
+    /// case here is hand-computable: travel = distance / speed,
+    /// collect = ceil(food / PeckAmount) * PeckCooldown, deposit = units / depositRate.
+    /// <para>
+    /// The collect term used to be <c>units / CollectionRate</c>. It changed when food
+    /// stopped draining automatically and started coming out one Peck press at a time
+    /// (spec: 2026-08-13-peck-foraging-and-four-slot-loadout-design.md §7.1).
+    /// </para>
     /// </summary>
     public sealed class BalanceOracleTests
     {
@@ -68,10 +73,11 @@ namespace CluckWars.Tests
 
                 var chicken = new OracleChicken
                 {
-                    MoveSpeed      = s.MoveSpeed,
-                    CargoCapacity  = s.CargoCapacity,
-                    CollectionRate = s.CollectionRate,
-                    DepositRate    = config.DepositRatePerSecond,
+                    MoveSpeed     = s.MoveSpeed,
+                    CargoCapacity = s.CargoCapacity,
+                    PeckAmount    = s.PeckAmount,
+                    PeckCooldown  = s.PeckCooldown,
+                    DepositRate   = config.DepositRatePerSecond,
                 };
 
                 var result = BalanceOracle.Simulate(map, chicken, config.FoodTargetToWin);
@@ -79,7 +85,8 @@ namespace CluckWars.Tests
                 Assert.IsTrue(SctTargets.Within(result, target),
                     $"{target.ClassName} misses its SCT target: got {result.SctSeconds:0.0}s / {result.Trips} trips, " +
                     $"want {target.Seconds}s / {target.Trips} trips (±{SctTargets.DefaultToleranceSeconds}s). " +
-                    $"Shipped stats: move {s.MoveSpeed}, cap {s.CargoCapacity}, collect {s.CollectionRate}, " +
+                    $"Shipped stats: move {s.MoveSpeed}, cap {s.CargoCapacity}, " +
+                    $"peck {s.PeckAmount} per {s.PeckCooldown}s, " +
                     $"deposit {config.DepositRatePerSecond}, W {config.FoodTargetToWin}. " +
                     "Stats are solved AGAINST this axiom — re-solve them, do not relax the target.");
             }
@@ -127,7 +134,7 @@ namespace CluckWars.Tests
             };
             var chicken = new OracleChicken
             {
-                MoveSpeed = 10f, CargoCapacity = 10, CollectionRate = 10f, DepositRate = 10f
+                MoveSpeed = 10f, CargoCapacity = 10, PeckAmount = 10f, PeckCooldown = 1f, DepositRate = 10f
             };
 
             var result = BalanceOracle.Simulate(map, chicken, winTarget: 10f);
@@ -147,7 +154,7 @@ namespace CluckWars.Tests
             };
             var chicken = new OracleChicken
             {
-                MoveSpeed = 10f, CargoCapacity = 10, CollectionRate = 10f, DepositRate = 10f
+                MoveSpeed = 10f, CargoCapacity = 10, PeckAmount = 10f, PeckCooldown = 1f, DepositRate = 10f
             };
 
             var result = BalanceOracle.Simulate(map, chicken, winTarget: 20f);
@@ -171,7 +178,7 @@ namespace CluckWars.Tests
             };
             var chicken = new OracleChicken
             {
-                MoveSpeed = 5f, CargoCapacity = 10, CollectionRate = 5f, DepositRate = 5f
+                MoveSpeed = 5f, CargoCapacity = 10, PeckAmount = 5f, PeckCooldown = 1f, DepositRate = 5f
             };
 
             var result = BalanceOracle.Simulate(map, chicken, winTarget: 10f);
@@ -191,7 +198,7 @@ namespace CluckWars.Tests
             };
             var chicken = new OracleChicken
             {
-                MoveSpeed = 10f, CargoCapacity = 15, CollectionRate = 10f, DepositRate = 10f
+                MoveSpeed = 10f, CargoCapacity = 15, PeckAmount = 15f, PeckCooldown = 1.5f, DepositRate = 10f
             };
 
             var result = BalanceOracle.Simulate(map, chicken, winTarget: 10f);
@@ -211,12 +218,62 @@ namespace CluckWars.Tests
             };
             var chicken = new OracleChicken
             {
-                MoveSpeed = 10f, CargoCapacity = 10, CollectionRate = 10f, DepositRate = 10f
+                MoveSpeed = 10f, CargoCapacity = 10, PeckAmount = 10f, PeckCooldown = 1f, DepositRate = 10f
             };
 
             var result = BalanceOracle.Simulate(map, chicken, winTarget: 10f);
 
             Assert.IsFalse(result.ReachedTarget, "Target exceeds total map food; must be unreachable.");
+        }
+
+        [Test]
+        public void Simulate_PartialPeck_StillCostsAFullCooldown()
+        {
+            // THE defining difference from the old continuous model, and the reason the
+            // Oracle had to be reworked at all: taking 5 food at 3-per-press is TWO presses,
+            // not 5/3 of one. You pay for six food's worth of time and walk away with five.
+            var map = new OracleMap
+            {
+                BasePos = new Vector2(0f, 0f),
+                Piles = new[] { new OraclePile { Pos = new Vector2(10f, 0f), Food = 5f } }
+            };
+            var chicken = new OracleChicken
+            {
+                MoveSpeed = 10f, CargoCapacity = 10, PeckAmount = 3f, PeckCooldown = 1f, DepositRate = 10f
+            };
+
+            var result = BalanceOracle.Simulate(map, chicken, winTarget: 5f);
+
+            // travel 1.0 + ceil(5/3) = 2 presses x 1.0 + return 1.0 + deposit 5/10 = 0.5
+            Assert.IsTrue(result.ReachedTarget);
+            Assert.AreEqual(4.5f, result.SctSeconds, 0.01f,
+                "A continuous model would have charged 5/3 = 1.67s of collection and reported " +
+                "4.17s. If this reads 4.17 the quantisation was lost.");
+            Assert.AreEqual(1, result.Trips);
+        }
+
+        [Test]
+        public void Simulate_ExactMultiple_DoesNotChargeAnExtraPeck()
+        {
+            // Guards the epsilon inside the ceiling. 6 food at 3-per-press is exactly two
+            // presses; without the epsilon a float landing a hair above 2.0 charges a third,
+            // which would quietly inflate every class's SCT by a cooldown per pile.
+            var map = new OracleMap
+            {
+                BasePos = new Vector2(0f, 0f),
+                Piles = new[] { new OraclePile { Pos = new Vector2(10f, 0f), Food = 6f } }
+            };
+            var chicken = new OracleChicken
+            {
+                MoveSpeed = 10f, CargoCapacity = 10, PeckAmount = 3f, PeckCooldown = 1f, DepositRate = 10f
+            };
+
+            var result = BalanceOracle.Simulate(map, chicken, winTarget: 6f);
+
+            // travel 1.0 + exactly 2 presses x 1.0 + return 1.0 + deposit 6/10 = 0.6
+            Assert.IsTrue(result.ReachedTarget);
+            Assert.AreEqual(4.6f, result.SctSeconds, 0.01f,
+                "6 food at 3 per press must be 2 presses, not 3.");
         }
 
         [Test]
@@ -254,7 +311,7 @@ namespace CluckWars.Tests
             var map = CanonicalFixture();
             var chicken = new OracleChicken
             {
-                MoveSpeed = 4.2f, CargoCapacity = 20, CollectionRate = 3.0f, DepositRate = 6.0f
+                MoveSpeed = 4.2f, CargoCapacity = 20, PeckAmount = 3f, PeckCooldown = 1f, DepositRate = 6.0f
             };
 
             var result = BalanceOracle.Simulate(map, chicken, winTarget: 40f);
