@@ -295,7 +295,6 @@
     background-color: rgba(0, 0, 0, 0.4);
     color: rgb(196, 160, 96);
 }
-.cw-slot-pill--star { background-color: rgb(245, 200, 66); color: rgb(26, 14, 4); }
 
 /* ---- Chicken preview ------------------------------------------------------ */
 /* Class figures are the Stage-0 design-exported sprites (Assets/_Game/Art/UI/

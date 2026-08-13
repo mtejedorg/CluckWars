@@ -290,11 +290,17 @@ namespace CluckWars.UI
             _selection.Ability0 = null;
             _selection.Ability1 = null;
             _selection.Ability2 = null;
+            _selection.Ability3 = null;
 
             // GetDefaultPassiveForClass, not passives[0] — the latter is registry
             // authoring order, which made Warrior open on Bracer and Speedy on
             // Second Wind, i.e. both classes defaulted to the alternative fork.
             _selection.Passive = _abilityRegistry?.GetDefaultPassiveForClass(cls);
+
+            // Seed the mandatory Peck so the picker shows the same loadout the spawner
+            // would build. Without this the player composes four abilities, hits READY,
+            // and MatchBootstrapper silently swaps one out for Peck — a UI that lied.
+            SeedMandatoryPeck();
 
             RefreshCharacterSelect();
         }
@@ -303,10 +309,8 @@ namespace CluckWars.UI
         {
             if (_selection == null || passive == null) return;
             _selection.Passive = passive;
-            // Dropping COMBO closes the second CLASS pick — clear it so the row's
-            // "n/m" counter and the READY gate can never claim a slot the loadout
-            // no longer has.
-            if (!(passive is ComboPassiveSO)) _selection.Ability2 = null;
+            // Passives no longer change the slot count — every class has four buttons as
+            // of v0.7, which is what retired COMBO's old job of granting a third.
             RefreshCharacterSelect();
         }
 
@@ -318,7 +322,7 @@ namespace CluckWars.UI
         /// Common or Character, may land in any of the N slots, freely mixed. There
         /// is no longer a "slot 0 is reserved for Common" rule.
         /// </summary>
-        private int ActiveSlotsForClass => (_selection?.Passive is ComboPassiveSO) ? 3 : 2;
+        private int ActiveSlotsForClass => AbilityController.SlotCount;
 
         private Color TintOf(ChickenClass cls)
         {
@@ -501,8 +505,10 @@ namespace CluckWars.UI
         //  exactly as before.
         // ======================================================================
 
-        /// <summary>Character-ability picks legal for the class: 2 under COMBO, else 1. Used only to size the CLASS pool's hint text — NOT a per-row minimum (see ActiveSlotsForClass).</summary>
-        private int ClassPicksAllowed => (_selection?.Passive is ComboPassiveSO) ? 2 : 1;
+        /// <summary>Rough hint for the CLASS pool's counter text: how many Character picks a
+        /// loadout typically has room for once Peck has taken its slot. Not a rule and not a
+        /// per-row minimum — any legal ability can fill any open slot (see ActiveSlotsForClass).</summary>
+        private int ClassPicksAllowed => Mathf.Max(1, ActiveSlotsForClass - (ClassCanForage ? 2 : 1));
 
         private void RebuildPickRows(ChickenClass cls)
         {
@@ -652,11 +658,28 @@ namespace CluckWars.UI
             return card;
         }
 
+        /// <summary>The Peck (foraging) ability asset, or null if the registry has none.</summary>
+        private AbilityBaseSO PeckAbility =>
+            _abilityRegistry?.ActiveAbilities.FirstOrDefault(a => a is PeckAbilitySO);
+
+        /// <summary>True when the selected class may forage. Read off Peck's own AllowedClasses
+        /// rather than naming classes here, so the picker and MatchBootstrapper's sanitiser can
+        /// never disagree about who gets a mandatory Peck.</summary>
+        private bool ClassCanForage
+        {
+            get
+            {
+                var peck = PeckAbility;
+                return peck != null && AbilityRegistrySO.IsAllowedFor(peck, Cls);
+            }
+        }
+
         private AbilityBaseSO GetEquipped(int slot) => slot switch
         {
             0 => _selection?.Ability0,
             1 => _selection?.Ability1,
             2 => _selection?.Ability2,
+            3 => _selection?.Ability3,
             _ => null,
         };
 
@@ -666,12 +689,13 @@ namespace CluckWars.UI
             if (slot == 0) _selection.Ability0 = ab;
             else if (slot == 1) _selection.Ability1 = ab;
             else if (slot == 2) _selection.Ability2 = ab;
+            else if (slot == 3) _selection.Ability3 = ab;
         }
 
         private int SlotOf(AbilityBaseSO ab)
         {
             if (ab == null) return -1;
-            for (int i = 0; i < 3; i++) if (GetEquipped(i) == ab) return i;
+            for (int i = 0; i < ActiveSlotsForClass; i++) if (GetEquipped(i) == ab) return i;
             return -1;
         }
 
@@ -687,6 +711,34 @@ namespace CluckWars.UI
         /// a higher-indexed slot is occupied (the touch HUD maps slots 1/2/3 to
         /// its three hexes positionally, and COMBO alone unlocks the third).
         /// </summary>
+        /// <summary>
+        /// Ensures the mandatory Peck is equipped for a foraging class, and absent for one
+        /// that cannot forage. Mirrors <c>MatchBootstrapper.ResolveLegalLoadout</c>'s rule so
+        /// what the player composes is what actually spawns.
+        /// </summary>
+        private void SeedMandatoryPeck()
+        {
+            var peck = PeckAbility;
+            if (peck == null || _selection == null) return;
+
+            int n = ActiveSlotsForClass;
+            int at = SlotOf(peck);
+
+            if (!ClassCanForage)
+            {
+                if (at >= 0) SetEquipped(at, null);
+                return;
+            }
+
+            if (at >= 0) return; // already placed; leave the player's choice alone
+
+            for (int i = 0; i < n; i++)
+            {
+                if (GetEquipped(i) == null) { SetEquipped(i, peck); return; }
+            }
+            SetEquipped(0, peck); // no room: Peck outranks whatever was there
+        }
+
         private void TogglePick(AbilityBaseSO ab)
         {
             if (_selection == null || ab == null) return;
@@ -694,11 +746,31 @@ namespace CluckWars.UI
             int n = ActiveSlotsForClass;
             int existing = SlotOf(ab);
 
+            // Peck is not optional for a class that can forage — dropping it would mean
+            // being unable to collect food for the whole match. So a tap on the equipped
+            // Peck card MOVES it to the next button instead of removing it, swapping with
+            // whatever sat there. That is what makes its position player-assignable
+            // without a drag-and-drop affordance, and the numbered badge on the card is
+            // already the readout of which button it will fire from.
+            if (existing >= 0 && ab is PeckAbilitySO)
+            {
+                int to = (existing + 1) % n;
+                var displaced = GetEquipped(to);
+                SetEquipped(to, ab);
+                SetEquipped(existing, displaced);
+
+                RebuildPickRows(Cls);
+                RefreshAbilityDetail();
+                RefreshEquippedState();
+                return;
+            }
+
             if (existing >= 0)
             {
-                // Unequip: shift everything above it down one, clear the tail.
-                for (int i = existing; i < n - 1; i++) SetEquipped(i, GetEquipped(i + 1));
-                SetEquipped(n - 1, null);
+                // Unequip: clear just this slot. It deliberately does NOT compact the rest
+                // down any more — compaction would drag Peck out of the button the player
+                // deliberately placed it on every time they swapped a neighbouring pick.
+                SetEquipped(existing, null);
             }
             else
             {

@@ -42,7 +42,7 @@
                         <ui:Label text="WARRIOR" class="cw-class-chip__name" />
                         <ui:Label text="All-Rounder" class="cw-class-chip__role" />
                     </ui:VisualElement>
-                    <ui:Label text="x2" class="cw-slot-pill" />
+                    <ui:Label text="x4" class="cw-slot-pill" />
                 </ui:VisualElement>
                 <ui:VisualElement name="ClassSpeedy" class="cw-class-chip">
                     <ui:VisualElement name="ClassSpeedyArt" class="cw-class-chip__art" />
@@ -50,7 +50,7 @@
                         <ui:Label text="SPEEDY" class="cw-class-chip__name" />
                         <ui:Label text="Hit &amp; Run" class="cw-class-chip__role" />
                     </ui:VisualElement>
-                    <ui:Label text="x2" class="cw-slot-pill" />
+                    <ui:Label text="x4" class="cw-slot-pill" />
                 </ui:VisualElement>
                 <ui:VisualElement name="ClassFatty" class="cw-class-chip">
                     <ui:VisualElement name="ClassFattyArt" class="cw-class-chip__art" />
@@ -58,7 +58,7 @@
                         <ui:Label text="FATTY" class="cw-class-chip__name" />
                         <ui:Label text="Bulk Carrier" class="cw-class-chip__role" />
                     </ui:VisualElement>
-                    <ui:Label text="x2" class="cw-slot-pill" />
+                    <ui:Label text="x4" class="cw-slot-pill" />
                 </ui:VisualElement>
                 <ui:VisualElement name="ClassAssassin" class="cw-class-chip">
                     <ui:VisualElement name="ClassAssassinArt" class="cw-class-chip__art" />
@@ -66,7 +66,7 @@
                         <ui:Label text="ASSASSIN" class="cw-class-chip__name" />
                         <ui:Label text="Disruptor" class="cw-class-chip__role" />
                     </ui:VisualElement>
-                    <ui:Label text="★3" class="cw-slot-pill cw-slot-pill--star" />
+                    <ui:Label text="x4" class="cw-slot-pill" />
                 </ui:VisualElement>
             </ui:VisualElement>
 
