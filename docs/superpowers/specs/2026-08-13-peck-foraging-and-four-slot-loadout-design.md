@@ -32,7 +32,7 @@ ability buttons instead of two (three for Assassin).
 | D6 | Peck's button position is **player-assignable** in the loadout screen |
 | D7 | The existing Common ability "Peck" is renamed **Snatch**; "Flying Peck" becomes **Dive Bomb** |
 | D8 | The **Combo** passive is retired; GDD §5.3's *Spoiler* and *Thief* are implemented instead |
-| D9 | Kill-bounty `FoodPickup` drops are **removed entirely**; the pickup subsystem becomes dead code and is deleted |
+| D9 | Kill-bounty `FoodPickup` **floor drops** are removed, replaced by an **execute bounty paid straight into the Assassin's bounty bag** on top of the stolen cargo. Nothing ever lands on the ground, so the pickup subsystem still becomes dead code and is deleted |
 | D10 | Assassin is **exempt from the SCT axiom**; a parallel **Predation axiom** governs it |
 | D11 | Ability pool expansion sequences **widen-AllowedClasses first**, then new Commons, then bespoke class abilities |
 
@@ -298,15 +298,31 @@ In its place, a two-parameter **Predation axiom**:
 > Given rivals carrying **C** food encountered every **T** seconds, a naked Assassin banks
 > the win target in **X** seconds.
 
-Because D9 removes the kill bounty, **the Assassin has no income floor**: Snatch, Sneaky
-Steal and Execute all require the victim to already be carrying, so an execute on an
-empty-handed rival pays exactly zero. The axiom must therefore be stated conditionally on
-C and T rather than as a single wall-clock number, and C and T need to be chosen from
-observed playtest values, not invented.
+**D9 gives the axiom a floor** (Maestro's call, 2026-08-13). A successful execute pays the
+Assassin **twice**:
 
-**This is the least-settled part of the design** and is the first thing to revisit after a
-playtest. If the Assassin proves unplayable, the cheapest reversal is restoring a small
-Assassin-only kill bounty — note that reversal before deleting the pickup code (§8).
+1. the victim's entire cargo, transferred to the bounty bag — existing behaviour; and
+2. a flat **execute bounty**, also straight into the bounty bag — new.
+
+Both are direct transfers. Nothing touches the ground, so an execute can no longer be
+vultured by a bystander who happens to walk past the corpse, and — the point — **an execute
+on an empty-handed rival still pays**. That converts the Assassin's income from purely
+opportunistic to *guaranteed-per-kill plus opportunistic*, which is what makes the class
+playable in the opening seconds when nobody is carrying yet.
+
+The axiom becomes: given rivals carrying **C** food encountered every **T** seconds, a naked
+Assassin banks the win target in **X** seconds, where the per-execute yield is
+`C + ExecuteBounty` rather than `C`.
+
+**Sizing.** `MatchConfigSO` gains `ExecuteBounty`, proposed at **5** — the same magnitude as
+the 5 × 1-food floor drops it replaces, so the change is a *routing* change rather than a
+buff. Against a 40-food win target that is 12.5% of a win per kill, and `SuccessCooldown` is
+15 s, which caps a 45 s match at ~3 executes (~15 food) before stolen cargo. Treat 5 as a
+starting value to be solved once the Predation axiom has real C and T from a playtest.
+
+⚠️ **Open:** the existing `LeaderBountyActive` path spawned 8 extra pickups for executing
+the match leader — a comeback valve. It should survive as a **multiplier on the execute
+bounty** rather than as floor drops, but the multiplier is unchosen. Flagged, not decided.
 
 `ChickenStatsSO.CollectionRate` for Assassin (1.7) becomes meaningless and is removed with
 the rest. GDD §5.2 calls that 1.7 *"the load-bearing detail"* separating Assassin from
@@ -320,8 +336,8 @@ exists.
 Execute transfers all cargo to the bounty bag (`AssassinExecute.cs:112`) *before*
 `ExecuteRemoval` fires (`:116`), so `ChickenCargo.HandleDeath`'s `dropped = Cargo` branch
 is **always zero**. The 5-pickup kill bounty and 8-pickup leader bounty are therefore the
-only remaining spawners of `FoodPickup`. D9 removes them, which makes the whole subsystem
-unreachable:
+only remaining spawners of `FoodPickup`. D9 converts both into direct bounty-bag payments
+(§7.2), which makes the whole subsystem unreachable:
 
 - `Gameplay/FoodPickup.cs` and `FoodPickup.prefab`
 - `PrefabRegistrySO.FoodPickup`
@@ -335,7 +351,9 @@ that event retains any other consumer (`AbilityController.HandleOwnerDeath` does
 and must stay).
 
 **Do this as a separate commit from the gameplay change**, so a revert of the Assassin
-economy doesn't have to resurrect deleted files.
+economy doesn't have to resurrect deleted files. Sequence it *after* the execute bounty
+lands and has been played, not before — deleting the pickup code is the step that makes the
+old behaviour expensive to restore.
 
 ---
 
@@ -431,7 +449,12 @@ was responsible for — which is information we want *before* committing to the 
 
 - **`NetworkButtons` capacity** — blocking, verify first (§6.5).
 - **Predation axiom's C and T** — needs playtest data (§7.2).
-- **Assassin viability with no income floor** — the biggest design risk here (§7.2).
+- ~~**Assassin viability with no income floor**~~ — **resolved 2026-08-13** by the execute
+  bounty (§7.2). What remains is sizing it: `ExecuteBounty` is proposed at 5 on the
+  reasoning that it should match the magnitude of the floor drops it replaces, but that is a
+  starting value, not a solved one.
+- **Leader-bounty multiplier** — the comeback valve for executing the match leader needs a
+  value once it moves off floor drops (§7.2).
 - **`ChickenPassive` enum renumbering** vs Fusion byte-serialisation (§6.4).
 - **Assassin execute may not work cross-authority** — spotted during this design,
   tracked separately; `ExecuteRemoval` is a plain method guarded by `HasStateAuthority`
