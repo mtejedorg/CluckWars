@@ -129,7 +129,9 @@ namespace CluckWars.Gameplay
                     }
                     if (target.Combat != null)
                     {
-                        target.Combat.ExecuteRemoval(Id, 2.0f);
+                        // RPC, not a direct call: the victim is usually owned by another
+                        // peer, and ExecuteRemoval is authority-local.
+                        target.Combat.RPC_ExecuteRemoval(Id, 2.0f);
                     }
 
                     // The execute bounty. Every other Assassin income route - Snatch, Sneaky

@@ -57,7 +57,7 @@ namespace CluckWars.Abilities
         // twice for anyone who reads the code and assumes the other one is the real one.
 
         /// <summary>Scale the duration of an incoming control effect (slow / root / stun).
-        /// Chokepoint: <c>ChickenController.ResolveControlSeconds</c>.</summary>
+        /// Chokepoint: <c>ChickenController.ApplyPassiveControlDuration</c>.</summary>
         public virtual float ModifyControlDuration(float seconds, ChickenController self) => seconds;
 
         /// <summary>Scale an incoming knockback impulse.
@@ -89,7 +89,7 @@ namespace CluckWars.Abilities
         public virtual float ModifyDepositRate(float perSecond, ChickenController self) => perSecond;
 
         /// <summary>True if this chicken ignores the GDD §6.2 pile-slow.
-        /// Chokepoint: <c>ChickenController.IsPileSlowed</c>.</summary>
+        /// Chokepoint: the pile-slow branch of <c>ChickenController.FixedUpdateNetwork</c>.</summary>
         public virtual bool IgnoresPileSlow(ChickenController self) => false;
 
         /// <summary>

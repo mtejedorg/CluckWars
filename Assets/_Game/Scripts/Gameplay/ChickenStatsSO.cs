@@ -8,7 +8,10 @@ namespace CluckWars.Gameplay
     /// <remarks>
     /// v0.3: <c>Attack</c>, <c>AttackRange</c>, <c>AttackCooldown</c> removed (basic attack
     /// deleted). <c>AvailableAbilities</c> / <c>Allows()</c> removed — all abilities are
-    /// available to all classes (GDD §7.1). <c>Passive</c> field added.
+    /// available to all classes (GDD §7.1).
+    /// v0.7: <c>Passive</c> removed — the class specialization is the equipped
+    /// <c>PassiveAbilitySO</c> now, not an enum here. <c>CollectionRate</c> removed —
+    /// foraging is <c>PeckAmount</c> / <c>PeckCooldown</c>.
     /// </remarks>
     [CreateAssetMenu(
         fileName = "ChickenStats",

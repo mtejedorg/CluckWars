@@ -326,7 +326,7 @@ namespace CluckWars.Input
             }
 
             _bound = true;
-            _log?.Info(Source, "Bound UITK touch controls: joystick + 3 hex ability buttons + status strip.");
+            _log?.Info(Source, $"Bound UITK touch controls: joystick + {SlotCount} hex ability buttons + status strip.");
         }
 
         // ---- Joystick pointer handling ----------------------------------------
@@ -445,7 +445,11 @@ namespace CluckWars.Input
         {
             // Clear the press edges after the frame so callers (and the network
             // latch) read each tap exactly once — matches HoldButton timing.
-            _pressed[0] = _pressed[1] = _pressed[2] = false;
+            // Loop, never an unrolled list: this line was the ONE hardcoded 3 left after the
+            // four-slot generalisation, and it meant _pressed[3] was set on the first tap of
+            // the fourth hex and never cleared — GetAbility4Pressed() then reported a press
+            // on every tick for the rest of the session.
+            for (int i = 0; i < SlotCount; i++) _pressed[i] = false;
         }
 
         // ---- Per-frame visual refresh -----------------------------------------
@@ -972,8 +976,20 @@ namespace CluckWars.Input
                     : string.Empty;
         }
 
-        private static AbilityBaseSO SlotAbility(AbilityController abilities, int slot) =>
-            slot == 0 ? abilities.Slot0 : (slot == 1 ? abilities.Slot1 : abilities.Slot2);
+        /// <summary>
+        /// The ability in <paramref name="slot"/>, or null. A <c>switch</c> with an explicit
+        /// default rather than a chained ternary: the ternary's trailing else silently mapped
+        /// slot 3 onto Slot2, so the fourth hex drew the third ability's icon, label and
+        /// cooldown constant while its timer and refusal state came from the real slot 3.
+        /// </summary>
+        private static AbilityBaseSO SlotAbility(AbilityController abilities, int slot) => slot switch
+        {
+            0 => abilities.Slot0,
+            1 => abilities.Slot1,
+            2 => abilities.Slot2,
+            3 => abilities.Slot3,
+            _ => null,
+        };
 
         private static ChickenController FindLocalChicken()
         {

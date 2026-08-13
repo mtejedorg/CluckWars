@@ -182,6 +182,11 @@ namespace CluckWars.Gameplay
             if (chargingSlot != 0)
             {
                 int slot = chargingSlot - 1;
+                // chargingSlot is a NETWORKED byte that persists across ticks, so unlike
+                // pendingSlot it can outlive the array it indexes — a loadout that shrank,
+                // or a peer on a different build. Cancel rather than index past the end.
+                if (slot >= slotCount) return ChargeDecision.Cancel;
+
                 return hold[slot] ? ChargeDecision.None : new ChargeDecision(ChargeAction.Fire, slot);
             }
 

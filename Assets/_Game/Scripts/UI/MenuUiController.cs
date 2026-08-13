@@ -316,11 +316,10 @@ namespace CluckWars.UI
 
         private ChickenClass Cls => _selection?.SelectedClass ?? ChickenClass.Warrior;
         /// <summary>
-        /// Total active-ability slots the loadout has to fill: 2 normally, 3 under
-        /// COMBO. As of the "Common is optional" directive (design override of GDD
-        /// §7.1-7.2, reaffirmed) this is purely a slot COUNT — any legal ability,
-        /// Common or Character, may land in any of the N slots, freely mixed. There
-        /// is no longer a "slot 0 is reserved for Common" rule.
+        /// Total active-ability slots the loadout has to fill — four for every class as
+        /// of v0.7, which retired COMBO's old job of granting a third. Purely a slot
+        /// COUNT: any class-legal ability, Common or Character, may land in any slot.
+        /// Peck is the one forced occupant, and only for classes that can forage.
         /// </summary>
         private int ActiveSlotsForClass => AbilityController.SlotCount;
 
@@ -531,7 +530,13 @@ namespace CluckWars.UI
                 _ => ChickenClassFlags.None,
             };
 
-            var common    = pool.Where(a => a.SlotKind == AbilitySlotKind.Common).ToList();
+            // BOTH rows filter on AllowedClasses. The Common row used not to, on the
+            // assumption that "Common" means "legal for everyone" — true until Peck shipped
+            // as a Common restricted to the three foraging classes. Without this filter an
+            // Assassin could equip Peck, reach READY at 4/4, and have MatchBootstrapper
+            // silently strip it and backfill something else at spawn: a picker that lied.
+            var common    = pool.Where(a => a.SlotKind == AbilitySlotKind.Common
+                                            && (a.AllowedClasses & flag) != 0).ToList();
             var character = pool.Where(a => a.SlotKind == AbilitySlotKind.Character
                                             && (a.AllowedClasses & flag) != 0).ToList();
 
@@ -952,7 +957,7 @@ namespace CluckWars.UI
 
             // Slot 0 — you.
             var mine = new List<AbilityBaseSO>();
-            for (int i = 0; i < 3; i++) { var a = GetEquipped(i); if (a != null) mine.Add(a); }
+            for (int i = 0; i < ActiveSlotsForClass; i++) { var a = GetEquipped(i); if (a != null) mine.Add(a); }
             grid.Add(MakeLobbyCard(0, Cls, "You", isHost, false, ready: true, abilities: mine, empty: false, slots: ActiveSlotsForClass));
 
             // Slots 1-3 — solo fills CPU bots; host/join show open seats.

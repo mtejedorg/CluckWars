@@ -299,6 +299,52 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void Peck_ResolvesTheForageBotRole_OrEveryBotStopsFarming()
+        {
+            // PROVEN GAP, closed here. A reviewer commented out `BotRole = BotRole.Forage` in
+            // PeckAbilitySO's constructor and the entire suite still passed 285/285.
+            //
+            // The reason it is silent is the fallback: ResolveBotRole maps an unset BotRole
+            // (Auto) through Category, and Peck's Utility category lands on Escape — a
+            // legitimate-looking concrete role, not an obvious "unset" sentinel. So
+            // BotController.TryPeckAtPile's TryGetReadySlotForRole(BotRole.Forage) matches
+            // nothing, every bot walks to a pile and stands there for the whole match with an
+            // empty beak, and not one line is logged. That is the exact failure the Peck
+            // commit was written to prevent, reachable by deleting one line.
+            var peck = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir).Find(a => a is PeckAbilitySO);
+            Assert.IsNotNull(peck, "No PeckAbilitySO asset — nothing can collect food.");
+
+            Assert.AreEqual(BotRole.Forage, peck.ResolveBotRole(),
+                $"Peck resolves BotRole '{peck.ResolveBotRole()}', not Forage. BotController only ever " +
+                "fires Peck via TryGetReadySlotForRole(BotRole.Forage), so bots will silently never " +
+                "forage again — they will path to a pile and idle there until the match ends.");
+        }
+
+        [Test]
+        public void ExecuteBounty_PaysAFloor_AndTheLeaderMultiplierCanOnlyIncreaseIt()
+        {
+            // The Assassin's income FLOOR. Every other route it has (Snatch, Sneaky Steal, the
+            // cargo transfer) needs the victim to already be carrying, so if this is authored
+            // to 0 an execute on an empty-handed rival pays nothing and the class can be
+            // starved out — the risk the whole bounty exists to remove. Nothing pinned it.
+            var config = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
+
+            Assert.Greater(config.ExecuteBounty, 0,
+                "ExecuteBounty is 0, so an execute on an empty-handed rival pays the Assassin " +
+                "nothing. That is the starvation case the bounty was added to prevent.");
+
+            Assert.Less(config.ExecuteBounty, config.FoodTargetToWin,
+                $"ExecuteBounty {config.ExecuteBounty} is at or above the {config.FoodTargetToWin} win " +
+                "target, so a single execute would win the match outright.");
+
+            Assert.GreaterOrEqual(config.LeaderExecuteBountyMultiplier, 1f,
+                $"LeaderExecuteBountyMultiplier is {config.LeaderExecuteBountyMultiplier}. Below 1 it " +
+                "SHRINKS the payout for killing the match leader, inverting the comeback valve it " +
+                "exists to be. AssassinExecute.ResolveExecuteBounty clamps with Mathf.Max(1f, ...) so " +
+                "this would not misbehave at runtime — but the authored value would be lying about intent.");
+        }
+
+        [Test]
         public void ClassStats_EveryClass_HasAuthoredPeckValues()
         {
             // PeckAmount/PeckCooldown are what the Balance Oracle now solves SCT against, so

@@ -131,8 +131,18 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Triggers execute removal on this chicken (called on StateAuthority by AssassinExecute).
+        /// Triggers execute removal on this chicken. <b>Call <see cref="RPC_ExecuteRemoval"/>
+        /// instead</b> unless you already hold this chicken's StateAuthority.
         /// </summary>
+        /// <remarks>
+        /// ⚠️ This is authority-local and returns silently when called from anywhere else.
+        /// <c>AssassinExecute</c> used to call it directly, which meant that against a victim
+        /// owned by another peer — i.e. every real PvP execute — the removal did nothing while
+        /// the sibling <c>RPC_TransferAllToBountyBag</c> succeeded: the Assassin took 100% of
+        /// the victim's cargo and the victim walked away unharmed, uncredited and unstunned.
+        /// Solo testing never caught it because bots share the host's authority, so the guard
+        /// below incidentally passed.
+        /// </remarks>
         public void ExecuteRemoval(NetworkBehaviourId assassinId, float duration = 2.0f)
         {
             if (!HasStateAuthority) return;
@@ -142,6 +152,23 @@ namespace CluckWars.Gameplay
             StunTimer = TickTimer.CreateFromSeconds(Runner, duration > 0f ? duration : _stunDuration);
             CreditKillToAttacker(assassinId);
             OnDeathAuthority?.Invoke(assassinId);
+        }
+
+        /// <summary>
+        /// Cross-authority entry point for the Assassin's execute. Routes to this chicken's
+        /// own StateAuthority, which is the only peer that may write <see cref="IsRemoved"/>.
+        /// </summary>
+        /// <remarks>
+        /// Mirrors the <c>RPC_TransferAllToBountyBag</c> / <c>RPC_DrainStolen</c> pattern that
+        /// every other cross-authority write in this codebase already uses. Both halves of an
+        /// execute now travel the same way — previously the cargo transfer was an RPC and the
+        /// removal was a plain call, so they disagreed about who could apply them and the
+        /// removal silently lost.
+        /// </remarks>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_ExecuteRemoval(NetworkBehaviourId assassinId, float duration)
+        {
+            ExecuteRemoval(assassinId, duration);
         }
 
         private void CreditKillToAttacker(NetworkBehaviourId attackerId)

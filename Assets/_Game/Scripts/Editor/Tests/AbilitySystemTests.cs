@@ -292,6 +292,33 @@ namespace CluckWars.Tests
                 "No physics-scanning ability assets were found — the scanner type list is stale.");
         }
 
+        [Test]
+        public void EveryCommonAbility_IsLegalForEveryClass_OrThePickerMustFilterIt()
+        {
+            // The picker's Common row shows abilities to every class. That was safe while
+            // "Common" implied AllowedClasses = All — and became a live bug when Peck shipped
+            // as a Common restricted to the three foraging classes: an Assassin could equip
+            // it, reach READY at 4/4, and MatchBootstrapper would silently strip it and
+            // backfill something else at spawn.
+            //
+            // Both sides are now fixed (the picker filters on AllowedClasses too), so this
+            // test does NOT demand that every Common be universal. It demands the weaker,
+            // true invariant: every Common must be legal for at least one class, and the
+            // restricted ones must be genuinely restricted rather than accidentally so.
+            var reg = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
+
+            foreach (var a in reg.ActiveAbilities.Where(x => x != null && x.SlotKind == AbilitySlotKind.Common))
+            {
+                bool anyClassCanEquip = System.Enum.GetValues(typeof(ChickenClass))
+                    .Cast<ChickenClass>()
+                    .Any(c => AbilityRegistrySO.IsAllowedFor(a, c));
+
+                Assert.IsTrue(anyClassCanEquip,
+                    $"Common ability '{a.DisplayName}' has AllowedClasses = {a.AllowedClasses}, so no " +
+                    "class can equip it. It will render in no picker row and never spawn.");
+            }
+        }
+
         // ---- Loadout depth ------------------------------------------------------
 
         [Test]

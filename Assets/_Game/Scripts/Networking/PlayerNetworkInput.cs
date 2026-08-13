@@ -22,7 +22,7 @@ namespace CluckWars.Networking
         // Attack removed in v0.3 — all combat is ability-driven.
         Ability1 = 0,
         Ability2 = 1,
-        Ability3 = 2, // Assassin (Combo passive) only.
+        Ability3 = 2,
 
         // v0.6 hold-to-aim (FEEDBACK.md §2, Stage 2). AbilityN above stays the
         // latched press edge (tap / sub-tick-tap fallback); the three bits below

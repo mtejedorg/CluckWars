@@ -478,7 +478,7 @@ namespace CluckWars.Tests
         /// same CEILING the Balance Oracle does: a partial press still costs a full cooldown.
         /// </summary>
         private static float PureCollectSeconds(ChickenStatsSO s, float food) =>
-            Mathf.Ceil(food / s.PeckAmount) * s.PeckCooldown;
+            Mathf.Max(1, Mathf.CeilToInt(food / s.PeckAmount - 1e-4f)) * s.PeckCooldown;
 
         /// <summary>
         /// Whether this class can forage at all, read off Peck's own AllowedClasses so the
