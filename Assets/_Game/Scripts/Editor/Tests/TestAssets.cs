@@ -35,7 +35,6 @@ namespace CluckWars.Tests
         public const string ChickenPrefabPath      = PrefabsDir + "/Chicken.prefab";
         public const string DoppelgangerPrefabPath = PrefabsDir + "/Doppelganger.prefab";
         public const string FoodPilePrefabPath     = PrefabsDir + "/FoodPile.prefab";
-        public const string FoodPickupPrefabPath   = PrefabsDir + "/FoodPickup.prefab";
         public const string PlayerBasePrefabPath   = PrefabsDir + "/PlayerBase.prefab";
 
         public const string BootstrapScenePath = "Assets/_Game/Scenes/Bootstrap.unity";

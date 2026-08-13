@@ -190,7 +190,6 @@ namespace CluckWars.Tests
             TestAssets.Load<GameObject>(prefabPath).GetComponentsInChildren<Collider>(true);
 
         [TestCase(TestAssets.FoodPilePrefabPath)]
-        [TestCase(TestAssets.FoodPickupPrefabPath)]
         [TestCase(TestAssets.PlayerBasePrefabPath)]
         public void InteractablePrefabs_PutEveryColliderOnTheInteractablesLayer(string prefabPath)
         {

@@ -261,20 +261,12 @@ namespace CluckWars.Gameplay
                 }
             }
 
-            // Priority 4: COLLECT — nearest non-empty pile OR ground pickup,
+            // Priority 4: COLLECT — nearest non-empty pile. Ground pickups are gone:
+            // nothing drops food on the floor any more, so a pile is the only target.
             // whichever is closer. Pickups matter most right after a hunt: the
             // stunned victim's dropped cargo is usually at the bot's feet.
             var selfPos = _controller.transform.position;
             var pile   = FindNearestPile(out float pileDist);
-            var pickup = FindNearestPickup(out float pickupDist);
-            if (pickup != null && (pile == null || pickupDist < pileDist))
-            {
-                _state      = BotState.CollectFood;
-                _moveTarget = pickup.transform.position;
-                if (_state != _prevState)
-                    _log?.Debug(Source, $"→ CollectFood (ground pickup, dist={pickupDist:0.0}).");
-                return;
-            }
             if (pile != null)
             {
                 _state      = BotState.CollectFood;
@@ -525,29 +517,6 @@ namespace CluckWars.Gameplay
                 if (dist < bestDist) { bestDist = dist; best = p; }
             }
             bestDistanceOut = bestDist;
-            return best;
-        }
-
-        /// <summary>
-        /// Finds the nearest non-empty ground pickup (death-dropped cargo). Returns a plain
-        /// distance, not a squared one, so it is directly comparable with the pile's surface
-        /// distance in <see cref="Think"/>.
-        /// </summary>
-        private FoodPickup FindNearestPickup(out float bestDistanceOut)
-        {
-            var pickups = FoodPickup.ActivePickups;
-            var selfPos = _controller.transform.position;
-            FoodPickup best    = null;
-            float      bestSqr = float.MaxValue;
-            for (int i = 0; i < pickups.Count; i++)
-            {
-                var p = pickups[i];
-                if (p == null || p.IsEmpty) continue;
-                if (p.Object == null || !p.Object.IsValid) continue;
-                float sqr = (p.transform.position - selfPos).sqrMagnitude;
-                if (sqr < bestSqr) { bestSqr = sqr; best = p; }
-            }
-            bestDistanceOut = best != null ? Mathf.Sqrt(bestSqr) : float.MaxValue;
             return best;
         }
 

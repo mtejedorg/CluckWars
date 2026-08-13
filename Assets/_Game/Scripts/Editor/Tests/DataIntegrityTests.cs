@@ -294,7 +294,6 @@ namespace CluckWars.Tests
                 Assert.Greater(s.MoveSpeed, 0f,    $"{s.name}: MoveSpeed {s.MoveSpeed} — the class cannot move.");
                 Assert.Greater(s.TurnSpeed, 0f,    $"{s.name}: TurnSpeed {s.TurnSpeed} — the class cannot turn.");
                 Assert.GreaterOrEqual(s.CargoCapacity, 1, $"{s.name}: CargoCapacity {s.CargoCapacity} — cannot carry food, so it can never score.");
-                Assert.Greater(s.CollectionRate, 0f, $"{s.name}: CollectionRate {s.CollectionRate} — cannot collect food, so it can never score.");
                 Assert.Greater(s.Scale, 0f,        $"{s.name}: Scale {s.Scale} — the mesh collapses to a point.");
             }
         }

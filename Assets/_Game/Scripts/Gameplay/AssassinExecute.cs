@@ -32,6 +32,22 @@ namespace CluckWars.Gameplay
 
         public int SlotIndex { get; set; } = 0;
 
+        /// <summary>
+        /// Flat food this execute pays on top of the victim's cargo, doubled (by default)
+        /// when the victim was the match leader — the comeback valve that used to arrive as
+        /// eight food scattered on the ground.
+        /// </summary>
+        private float ResolveExecuteBounty(ChickenController victim)
+        {
+            var config = GameManager.Instance != null ? GameManager.Instance.Config : null;
+            if (config == null) return 0f;
+
+            float bounty = config.ExecuteBounty;
+            if (victim != null && victim.LeaderBountyActive)
+                bounty *= Mathf.Max(1f, config.LeaderExecuteBountyMultiplier);
+            return bounty;
+        }
+
         private ChickenController _controller;
         private ChickenCombat _combat;
         private ChickenCargo _cargo;
@@ -116,7 +132,23 @@ namespace CluckWars.Gameplay
                         target.Combat.ExecuteRemoval(Id, 2.0f);
                     }
 
-                    _log?.Info(Source, $"Kill Executed! Cargo transferred to bounty bag, {target.name} removed.");
+                    // The execute bounty. Every other Assassin income route - Snatch, Sneaky
+                    // Steal, and the cargo transfer just above - requires the victim to
+                    // already be carrying, so without this an execute on an empty-handed
+                    // rival pays exactly nothing and the class can be starved out early.
+                    //
+                    // Paid straight into the bounty bag rather than dropped on the ground, so
+                    // it cannot be vultured by a bystander who happens to walk past. Written
+                    // directly because Press() is already gated on this Assassin's own
+                    // StateAuthority.
+                    float bounty = ResolveExecuteBounty(target);
+                    if (bounty > 0f && _cargo != null)
+                    {
+                        _cargo.BountyBag += bounty;
+                    }
+
+                    _log?.Info(Source, $"Kill Executed! Cargo transferred to bounty bag (+{bounty:0.#} " +
+                        $"execute bounty), {target.name} removed.");
                     ResetMark();
 
                     if (_abilities != null)

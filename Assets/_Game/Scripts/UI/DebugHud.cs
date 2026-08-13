@@ -224,8 +224,6 @@ namespace CluckWars.UI
                   .Append(": owner=").Append(b.Owner.IsRealPlayer ? "P" + (b.Owner.PlayerId + 1) : "—")
                   .Append("  food=").AppendLine(Mathf.FloorToInt(b.FoodTotal).ToString());
             }
-            var pickups = FindObjectsByType<FoodPickup>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            sb.Append("Pickups: ").AppendLine(pickups.Length.ToString());
         }
 
         // ---- Balance report (F2) -------------------------------------------------
@@ -248,7 +246,8 @@ namespace CluckWars.UI
                       .Append(s.TurnSpeed.ToString("0").PadLeft(6))
                       .Append("  -".PadRight(14)) // specialization is on the equipped PassiveAbilitySO now, not on stats
                       .Append(s.CargoCapacity.ToString().PadLeft(5))
-                      .Append(s.CollectionRate.ToString("0.0").PadLeft(6))
+                      .Append(s.PeckAmount.ToString("0.#").PadLeft(6))
+                      .Append(s.PeckCooldown.ToString("0.00").PadLeft(6))
                       .AppendLine();
                 }
             }

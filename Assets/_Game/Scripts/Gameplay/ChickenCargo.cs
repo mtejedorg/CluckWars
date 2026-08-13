@@ -15,12 +15,15 @@ namespace CluckWars.Gameplay
     /// optimistically — pile clamps to its actual stock so any over-request is harmless.
     /// </summary>
     /// <remarks>
-    /// Cargo is a <c>float</c> so a 1 unit/sec collection rate accumulates smoothly across
-    /// 32 Hz ticks (each tick adds ~0.031). The HUD floors it for display.
-    /// On death, the StateAuthority spawns a <see cref="FoodPickup"/> NetworkObject
-    /// at the chicken's position carrying the cargo amount, then zeros local Cargo.
-    /// Any chicken (including the dropper, after stun ends) can pick it up by walking
-    /// over it.
+    /// Cargo is a <c>float</c> so partial units accumulate smoothly across 32 Hz ticks.
+    /// The HUD floors it for display.
+    /// <para>
+    /// Nothing drops food on the ground any more. The only "death" in the game is the
+    /// Assassin's execute, which transfers the victim's cargo straight into the killer's
+    /// bounty bag and pays a flat execute bounty on top — see <c>AssassinExecute</c>. The
+    /// old <c>FoodPickup</c> subsystem that this class used to spawn and collect from was
+    /// deleted along with that change.
+    /// </para>
     /// </remarks>
     [RequireComponent(typeof(ChickenController))]
     [RequireComponent(typeof(NetworkObject))]
@@ -36,9 +39,6 @@ namespace CluckWars.Gameplay
 
         [Tooltip("Layers searched for piles and bases. Default = Everything; tighten once a Pickup layer is authored.")]
         [SerializeField] private LayerMask _searchMask = ~0;
-
-        [Tooltip("Legacy per-component override. If null, PrefabRegistry.FoodPickup is used. If both are null, cargo is silently lost on death.")]
-        [SerializeField] private NetworkObject _foodPickupPrefab;
 
         [Networked] public float Cargo { get; set; }
         [Networked] public float BountyBag { get; set; }
@@ -105,13 +105,8 @@ namespace CluckWars.Gameplay
         private AudioRegistrySO _audioReg;
         private PrefabRegistrySO _prefabRegistry;
         private MatchConfigSO _matchConfig;
-        private bool _subscribedToDeath;
 
         // Accumulators for batched RPCs (Stage D)
-        private FoodPickup _activePickupTarget;
-        private float _pendingPickupDrain;
-        private int _pickupDrainTicks;
-
         private PlayerBase _activeBaseTarget;
         private float _pendingBaseFood;
         private int _baseDepositTicks;
@@ -127,12 +122,6 @@ namespace CluckWars.Gameplay
             _audioReg = audioReg;
             _prefabRegistry = prefabRegistry;
             _matchConfig = matchConfig;
-        }
-
-        private NetworkObject ResolveFoodPickupPrefab()
-        {
-            if (_prefabRegistry != null && _prefabRegistry.FoodPickup != null) return _prefabRegistry.FoodPickup;
-            return _foodPickupPrefab;
         }
 
         public override void Spawned()
@@ -154,23 +143,12 @@ namespace CluckWars.Gameplay
             _cargoDetector = GetChangeDetector(ChangeDetector.Source.SimulationState);
             _cargoReader = GetPropertyReader<float>(nameof(Cargo));
 
-            if (_combat != null && !_subscribedToDeath)
-            {
-                _combat.OnDeathAuthority += HandleDeath;
-                _subscribedToDeath = true;
-            }
-
             _log?.Debug(Source, $"Spawned. HasStateAuthority={HasStateAuthority}.");
         }
 
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
             ActiveCargos.Remove(this);
-            if (_combat != null && _subscribedToDeath)
-            {
-                _combat.OnDeathAuthority -= HandleDeath;
-                _subscribedToDeath = false;
-            }
         }
 
         /// <summary>
@@ -216,20 +194,6 @@ namespace CluckWars.Gameplay
             }
         }
 
-        public void FlushPickupDrain()
-        {
-            if (_pendingPickupDrain > 0f)
-            {
-                if (_activePickupTarget != null && _activePickupTarget.Object != null && _activePickupTarget.Object.IsValid)
-                {
-                    _activePickupTarget.RPC_Drain(_pendingPickupDrain);
-                }
-                _pendingPickupDrain = 0f;
-            }
-            _activePickupTarget = null;
-            _pickupDrainTicks = 0;
-        }
-
         public void FlushBaseDeposit()
         {
             if (_pendingBaseFood > 0f)
@@ -247,7 +211,6 @@ namespace CluckWars.Gameplay
 
         public void FlushAll()
         {
-            FlushPickupDrain();
             FlushBaseDeposit();
         }
 
@@ -268,11 +231,6 @@ namespace CluckWars.Gameplay
             // regardless of control state.
             UpdatePileSlow();
 
-            // Stunned / Rooted chickens can't collect (spec §3.1).
-            if (_controller == null || ControlRules.CanCollect(_controller.CurrentControlState))
-            {
-                TryCollectFromNearbyPickup(stats);
-            }
             TryDepositAtNearbyBase();
         }
 
@@ -291,59 +249,6 @@ namespace CluckWars.Gameplay
         {
             var pile = FindNearestPileInRange();
             IsPileSlow = pile != null && !pile.IsEmpty;
-        }
-
-        private void TryCollectFromNearbyPickup(ChickenStatsSO stats)
-        {
-            var pickup = FindNearestPickupInRange();
-            if (pickup == null)
-            {
-                FlushPickupDrain();
-                return;
-            }
-
-            if (pickup != _activePickupTarget)
-            {
-                FlushPickupDrain();
-                _activePickupTarget = pickup;
-            }
-
-            if (Cargo >= stats.CargoCapacity)
-            {
-                FlushPickupDrain();
-                return;
-            }
-
-            if (pickup.IsEmpty)
-            {
-                FlushPickupDrain();
-                return;
-            }
-
-            float spaceLeft = stats.CargoCapacity - Cargo;
-            float availableInPickup = Mathf.Max(0f, pickup.Amount - _pendingPickupDrain);
-            float takeable = Mathf.Min(availableInPickup, spaceLeft);
-            if (takeable <= 0f)
-            {
-                FlushPickupDrain();
-                return;
-            }
-
-            Cargo += takeable;
-            _pendingPickupDrain += takeable;
-            _pickupDrainTicks++;
-
-            int ticksToFlush = Mathf.RoundToInt(0.25f * Runner.TickRate);
-            if (_pickupDrainTicks >= ticksToFlush)
-            {
-                FlushPickupDrain();
-            }
-
-            _audio?.PlaySFX(_audioReg != null ? _audioReg.Pickup : null);
-            if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
-            {
-                _log.Verbose(Source, $"Picked up {takeable:0.00} from {pickup.name}.");
-            }
         }
 
         private void TryDepositAtNearbyBase()
@@ -463,33 +368,6 @@ namespace CluckWars.Gameplay
             return best;
         }
 
-        private FoodPickup FindNearestPickupInRange()
-        {
-            int hitCount = Physics.OverlapSphereNonAlloc(transform.position, _searchRadius, _overlapHits, _searchMask, QueryTriggerInteraction.Collide);
-            FoodPickup best = null;
-            float bestSqr = float.MaxValue;
-            for (int i = 0; i < hitCount; i++)
-            {
-                var col = _overlapHits[i];
-                var pickup = col.GetComponentInParent<FoodPickup>();
-                if (pickup == null) continue;
-                // Physics can hand back a pickup whose NetworkObject isn't live
-                // (just despawned by RestartMatch, or not yet Spawned) — touching
-                // its [Networked] Amount then throws InvalidOperationException.
-                if (pickup.Object == null || !pickup.Object.IsValid) continue;
-                if (pickup.IsEmpty) continue;
-                float sqr = HorizontalSqr(pickup.transform.position, transform.position);
-                float r = pickup.PickupRadius;
-                if (sqr > r * r) continue;
-                if (sqr < bestSqr)
-                {
-                    bestSqr = sqr;
-                    best = pickup;
-                }
-            }
-            return best;
-        }
-
         private PlayerBase FindNearestBaseInRange()
         {
             // Deposit gate is the chicken's home corner, not InputAuthority — bots all
@@ -511,119 +389,6 @@ namespace CluckWars.Gameplay
                 if (sqr < bestSqr) { bestSqr = sqr; best = b; }
             }
             return best;
-        }
-
-        private void HandleDeath(NetworkBehaviourId attackerId)
-        {
-            // Subscribed to OnDeathAuthority — fires synchronously on the
-            // StateAuthority inside RPC_ApplyDamage, so the guard below is
-            // redundant, but kept as cheap insurance.
-            if (!HasStateAuthority) return;
-            
-            // Flush any pending collection/deposit before processing death drop.
-            FlushAll();
-            
-            if (_controller != null && _controller.IsDecoy) return;
-
-            Vector3 victimPos = transform.position;
-
-            float dropped = Cargo;
-            if (dropped > 0f)
-            {
-                Cargo = 0f;
-                var pickupPrefab = ResolveFoodPickupPrefab();
-                if (pickupPrefab != null)
-                {
-                    // Slight forward offset so the pickup doesn't spawn dead-center on the
-                    // stunned chicken's collider; helps the dropping chicken not auto-collect
-                    // it the instant stun ends.
-                    var dropPosition = victimPos + transform.forward * 0.4f;
-                    Runner.Spawn(
-                        pickupPrefab,
-                        dropPosition,
-                        Quaternion.identity,
-                        Object.StateAuthority,
-                        onBeforeSpawned: (_, networkObject) =>
-                        {
-                            var pickup = networkObject.GetComponent<FoodPickup>();
-                            if (pickup != null)
-                            {
-                                pickup.Amount = dropped;
-                                pickup.MaxAmount = dropped;
-                            }
-                        });
-                    _log?.Info(Source, $"Death drop: spawned FoodPickup with {dropped:0.00} food at {dropPosition}.");
-                }
-            }
-
-            var pPrefab = ResolveFoodPickupPrefab();
-            if (pPrefab != null)
-            {
-                // Kill Bounty (IP3): +5 food in pickups
-                bool hasKiller = false;
-                Vector3 killerPos = victimPos;
-                if (attackerId != NetworkBehaviourId.None && attackerId != (_combat != null ? _combat.Id : NetworkBehaviourId.None))
-                {
-                    if (Runner.TryFindBehaviour(attackerId, out ChickenCombat attackerCombat))
-                    {
-                        killerPos = attackerCombat.transform.position;
-                        hasKiller = true;
-                    }
-                }
-
-                if (hasKiller)
-                {
-                    Vector3 toKiller = killerPos - victimPos;
-                    float dist = toKiller.magnitude;
-                    Vector3 dir = dist > 0.1f ? toKiller.normalized : transform.forward;
-                    for (int i = 0; i < 5; i++)
-                    {
-                        float t = 0.5f + (i / 4f) * 0.3f; // 0.5 to 0.8
-                        Vector3 spawnPos = victimPos + dir * (dist * t);
-                        spawnPos += new Vector3(Random.Range(-0.1f, 0.1f), 0f, Random.Range(-0.1f, 0.1f));
-                        SpawnSinglePickup(pPrefab, spawnPos, 1f);
-                    }
-                }
-                else
-                {
-                    // No killer / self-kill
-                    for (int i = 0; i < 5; i++)
-                    {
-                        float angle = i * 72f * Mathf.Deg2Rad;
-                        Vector3 offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 0.6f;
-                        SpawnSinglePickup(pPrefab, victimPos + offset, 1f);
-                    }
-                }
-
-                // Leader Bounty (IP2): +8 food in pickups
-                if (_controller != null && _controller.LeaderBountyActive)
-                {
-                    for (int i = 0; i < 8; i++)
-                    {
-                        float angle = i * 45f * Mathf.Deg2Rad;
-                        Vector3 offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 0.8f;
-                        SpawnSinglePickup(pPrefab, victimPos + offset, 1f);
-                    }
-                }
-            }
-        }
-
-        private void SpawnSinglePickup(NetworkObject prefab, Vector3 position, float amount)
-        {
-            Runner.Spawn(
-                prefab,
-                position,
-                Quaternion.identity,
-                Object.StateAuthority,
-                onBeforeSpawned: (_, networkObject) =>
-                {
-                    var pickup = networkObject.GetComponent<FoodPickup>();
-                    if (pickup != null)
-                    {
-                        pickup.Amount = amount;
-                        pickup.MaxAmount = amount;
-                    }
-                });
         }
 
         /// <summary>
@@ -665,11 +430,8 @@ namespace CluckWars.Gameplay
         public void RPC_ResetForNewMatch()
         {
             // Drop any pending drains/deposits because a new round starts
-            _pendingPickupDrain = 0f;
             _pendingBaseFood = 0f;
-            _activePickupTarget = null;
             _activeBaseTarget = null;
-            _pickupDrainTicks = 0;
             _baseDepositTicks = 0;
 
             Cargo = 0f;

@@ -121,7 +121,6 @@ namespace CluckWars.Editor
                 s.MoveSpeed      = FloatField(s.MoveSpeed,      wF, minVal: 0f);
                 s.TurnSpeed      = FloatField(s.TurnSpeed,      wF, minVal: 0f);
                 s.CargoCapacity  = IntField(s.CargoCapacity,    wI, minVal: 1);
-                s.CollectionRate = FloatField(s.CollectionRate, wF, minVal: 0f);
                 s.PeckAmount     = FloatField(s.PeckAmount,     wF, minVal: 0.1f);
                 s.PeckCooldown   = FloatField(s.PeckCooldown,   wF, minVal: 0.05f);
                 s.Scale          = FloatField(s.Scale,          wF, minVal: 0.1f);

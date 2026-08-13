@@ -26,12 +26,6 @@ namespace CluckWars.Gameplay
         [Header("Cargo")]
         [Min(1)] public int CargoCapacity = 10;
 
-        [Tooltip("DEPRECATED — automatic pile drain, food per second. Still read by ChickenCargo " +
-                 "until Peck replaces it; the Balance Oracle already ignores it in favour of " +
-                 "PeckAmount/PeckCooldown. Delete both this field and ChickenCargo's automatic " +
-                 "collection together, or the two will disagree about how fast a class farms.")]
-        [Min(0f)] public float CollectionRate = 1f;
-
         [Header("Peck (foraging)")]
         [Tooltip("Food taken from a pile per Peck press. Authored per class from day one even " +
                  "though all four currently share a value: with a uniform amount, per-class " +

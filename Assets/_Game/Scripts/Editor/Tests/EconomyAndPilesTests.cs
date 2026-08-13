@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
+using CluckWars.Abilities;
 using CluckWars.Gameplay;
 
 namespace CluckWars.Tests
@@ -440,12 +441,14 @@ namespace CluckWars.Tests
 
             foreach (var s in stats)
             {
-                float pureCollectSeconds = cfg.FoodTargetToWin / s.CollectionRate;
+                if (!CanForage(s)) continue; // the Assassin never farms; it is SCT-exempt
+
+                float pureCollectSeconds = PureCollectSeconds(s, cfg.FoodTargetToWin);
                 Assert.Less(pureCollectSeconds, cfg.MatchDurationSeconds,
-                    $"{s.name}: collecting {cfg.FoodTargetToWin} food at {s.CollectionRate}/s takes " +
-                    $"{pureCollectSeconds:0}s of pure standing-on-a-pile time, but a match is only " +
-                    $"{cfg.MatchDurationSeconds:0}s. Travel and contest are on top of that, so the " +
-                    "food-target win condition is dead for this class.");
+                    $"{s.name}: taking {cfg.FoodTargetToWin} food at {s.PeckAmount} per " +
+                    $"{s.PeckCooldown}s press costs {pureCollectSeconds:0}s of pure standing-at-a-pile " +
+                    $"time, but a match is only {cfg.MatchDurationSeconds:0}s. Travel and contest are on " +
+                    "top of that, so the food-target win condition is dead for this class.");
             }
         }
 
@@ -460,11 +463,34 @@ namespace CluckWars.Tests
 
             foreach (var s in TestAssets.LoadAllIn<ChickenStatsSO>(TestAssets.ClassesDir))
             {
-                float fraction = (cfg.FoodTargetToWin / s.CollectionRate) / cfg.MatchDurationSeconds;
+                if (!CanForage(s)) continue;
+
+                float fraction = PureCollectSeconds(s, cfg.FoodTargetToWin) / cfg.MatchDurationSeconds;
                 Assert.Less(fraction, 0.7f,
-                    $"{s.name} spends {fraction:P0} of the match just standing on piles before travel is " +
-                    "even counted. Either lower FoodTargetToWin or raise CollectionRate.");
+                    $"{s.name} spends {fraction:P0} of the match just standing at piles before travel is " +
+                    "even counted. Either lower FoodTargetToWin or shorten the peck cooldown — and if you " +
+                    "change either, re-solve against the SCT targets rather than nudging until this passes.");
             }
+        }
+
+        /// <summary>
+        /// Seconds of pure pecking to take <paramref name="food"/>, ignoring travel. Uses the
+        /// same CEILING the Balance Oracle does: a partial press still costs a full cooldown.
+        /// </summary>
+        private static float PureCollectSeconds(ChickenStatsSO s, float food) =>
+            Mathf.Ceil(food / s.PeckAmount) * s.PeckCooldown;
+
+        /// <summary>
+        /// Whether this class can forage at all, read off Peck's own AllowedClasses so the
+        /// answer cannot drift from the ability asset.
+        /// </summary>
+        private static bool CanForage(ChickenStatsSO s)
+        {
+            var peck = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir)
+                .Find(a => a is PeckAbilitySO);
+            return peck != null
+                && System.Enum.TryParse<ChickenClass>(s.DisplayName, out var cls)
+                && AbilityRegistrySO.IsAllowedFor(peck, cls);
         }
 
         [Test]

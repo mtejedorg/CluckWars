@@ -26,7 +26,6 @@ namespace CluckWars.Gameplay
 
         [Header("World")]
         public NetworkObject FoodPile;
-        public NetworkObject FoodPickup;
         public NetworkObject PlayerBase;
 
         [Header("Match")]

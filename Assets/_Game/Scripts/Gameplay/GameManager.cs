@@ -49,25 +49,17 @@ namespace CluckWars.Gameplay
         [SerializeField] private float _introSeconds = 3f;
 
         private MatchConfigSO _config;
+
+        /// <summary>The live match tunables, for the few systems outside this class that need
+        /// them (AssassinExecute's bounty). Null before Zenject injection completes.</summary>
+        public MatchConfigSO Config => _config;
         private ILogService _log;
         private IAudioService _audio;
         private AudioRegistrySO _audioReg;
         private PrefabRegistrySO _prefabRegistry;
         private float _winCheckIntervalSeconds = 0.25f;
         private float _nextWinCheckTime;
-        private int _pickupsSpawnedCount;
-        private int _pickupsCollectedCount;
         private NetworkObject _eventPile;
-
-        public static void RegisterPickupSpawned()
-        {
-            if (Instance != null) Instance._pickupsSpawnedCount++;
-        }
-
-        public static void RegisterPickupCollected()
-        {
-            if (Instance != null) Instance._pickupsCollectedCount++;
-        }
 
         public float MatchDurationSeconds => _config != null ? _config.MatchDurationSeconds : 180f;
         public int FoodTargetToWin => _config != null ? _config.FoodTargetToWin : 110;
@@ -372,8 +364,6 @@ namespace CluckWars.Gameplay
             WinnerPlayer = PlayerRef.None;
             WinnerCorner = -1;
             WinnerFoodTotal = 0f;
-            _pickupsSpawnedCount = 0;
-            _pickupsCollectedCount = 0;
             _audio?.PlaySFX(_audioReg != null ? _audioReg.MatchStart : null);
             if (_audioReg != null && _audioReg.MatchMusic != null)
             {
@@ -545,7 +535,6 @@ namespace CluckWars.Gameplay
                 sb.AppendLine($"Match Length: {elapsedSeconds:0.0}s");
                 sb.AppendLine($"Winner Corner: {winnerCorner} (Food: {winnerTotal:0.0})");
                 sb.AppendLine($"Event Fired: {ActiveEvent}");
-                sb.AppendLine($"Pickups: Spawned={_pickupsSpawnedCount}, Collected={_pickupsCollectedCount}");
                 sb.AppendLine("Players Stats:");
                 var statsList = ChickenMatchStats.ActiveStats;
                 for (int i = 0; i < statsList.Count; i++)
@@ -603,16 +592,6 @@ namespace CluckWars.Gameplay
                     Runner.Despawn(_eventPile);
                 }
                 _eventPile = null;
-            }
-
-            // Loose ground-dropped pickups don't belong in the fresh match — kill them.
-            var pickups = FoodPickup.ActivePickups;
-            // Iterate backwards when despawning to avoid list modification issues
-            for (int i = pickups.Count - 1; i >= 0; i--)
-            {
-                var pk = pickups[i];
-                if (pk != null && pk.Object != null && pk.Object.IsValid)
-                    Runner.Despawn(pk.Object);
             }
 
             // Chickens are owned by each player — cross-authority writes go via RPC.
@@ -681,8 +660,6 @@ namespace CluckWars.Gameplay
             RestartCountdown = default;
             _nextWinCheckTime = 0f;
             ActiveEvent = MatchEventKind.None;
-            _pickupsSpawnedCount = 0;
-            _pickupsCollectedCount = 0;
         }
 
         private void TriggerFinalMinuteEvent()
