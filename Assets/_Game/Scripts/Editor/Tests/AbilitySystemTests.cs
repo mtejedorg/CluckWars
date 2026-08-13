@@ -292,6 +292,41 @@ namespace CluckWars.Tests
                 "No physics-scanning ability assets were found — the scanner type list is stale.");
         }
 
+        // ---- Loadout depth ------------------------------------------------------
+
+        [Test]
+        public void EveryClass_HasEnoughLegalAbilities_ForTheLoadoutToBeAChoice()
+        {
+            // Four buttons only produce variety if there is something to choose BETWEEN.
+            // Before the v0.7 widening, Warrior and Speedy had six legal abilities each and
+            // needed three free picks - and three of those six were the same Commons every
+            // class carries, so both classes effectively had a fixed build. Going to four
+            // slots made that WORSE, not better, until the pools grew.
+            var reg = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
+            var peck = reg.ActiveAbilities.FirstOrDefault(a => a is PeckAbilitySO);
+
+            foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
+            {
+                var legal = reg.ActiveAbilities
+                    .Where(a => a != null && AbilityRegistrySO.IsAllowedFor(a, cls))
+                    .ToList();
+
+                // Peck is force-equipped, so it is not one of the picks a player weighs.
+                bool forages = peck != null && AbilityRegistrySO.IsAllowedFor(peck, cls);
+                int freePicks = AbilityController.SlotCount - (forages ? 1 : 0);
+                int choosable = legal.Count - (forages ? 1 : 0);
+
+                Assert.GreaterOrEqual(choosable, freePicks,
+                    $"{cls} has only {choosable} choosable abilities for {freePicks} free slots — it " +
+                    "cannot even fill its loadout, so ResolveLegalLoadout will spawn it under-equipped.");
+
+                Assert.GreaterOrEqual(choosable, freePicks + 4,
+                    $"{cls} chooses {freePicks} from {choosable}. That is a near-fixed build: widen an " +
+                    "existing ability's AllowedClasses or author a new one. A loadout screen that only " +
+                    "has one sensible answer is not a loadout screen.");
+            }
+        }
+
         // ---- Icon mapping -------------------------------------------------------
 
         [Test]

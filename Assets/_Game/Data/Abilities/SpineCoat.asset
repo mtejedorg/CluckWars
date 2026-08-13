@@ -19,7 +19,7 @@ MonoBehaviour:
   Category: 2
   TerrainTraversal: 0
   SlotKind: 1
-  AllowedClasses: 1
+  AllowedClasses: 5
   Duration: 2.0
   Cooldown: 8
   AbilityAnimationClip: {fileID: 0}

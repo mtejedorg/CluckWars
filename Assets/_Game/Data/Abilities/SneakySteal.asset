@@ -19,7 +19,7 @@ MonoBehaviour:
   Category: 0
   TerrainTraversal: 0
   SlotKind: 1
-  AllowedClasses: 8
+  AllowedClasses: 9
   BotRole: 5
   Duration: 0.5
   Cooldown: 5
