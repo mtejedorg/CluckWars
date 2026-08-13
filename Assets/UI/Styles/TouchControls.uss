@@ -14,7 +14,8 @@
    and the slot badge 20px (8.5 sp), the two smallest strings in the app. Both
    were raised 2026-07-23; anything added inside a hex must clear 26px.
    Positions mirror the shipped UGUI tunables (ART 6.7 reference table):
-     A1 center (-170,170)  A2 center (-210,360)  A3 center (-410,270) from BR
+     A1 center (-170,170)  A2 center (-210,360)  A3 center (-410,270)
+     A4 center (-390,460) from BR  (a4 is v0.7, no UGUI reference)
      joystick center (220,220) from BL, base 280, knob 128, maxRadius 108.
    USS-valid only: NO gradient / box-shadow / text-shadow / gap : depth comes
    from the baked glossy sprites + flat fills + beveled borders, exactly as the
@@ -102,7 +103,13 @@
 /* MOBA arc positions (element edge offsets derived from the center anchors) */
 .cw-hex--a1 { right: 95px;  bottom: 95px;  }   /* center (-170,170) */
 .cw-hex--a2 { right: 135px; bottom: 285px; }   /* center (-210,360) */
-.cw-hex--a3 { right: 335px; bottom: 195px; }   /* center (-410,270) : Assassin */
+.cw-hex--a3 { right: 335px; bottom: 195px; }   /* center (-410,270) */
+.cw-hex--a4 { right: 315px; bottom: 385px; }   /* center (-390,460) : v0.7 fourth slot */
+/* a4 continues the arc up and left. Placed for clearance, not yet ergonomics:
+   centre-to-centre it sits 191px from a3, 206px from a2 and 364px from a1, all
+   clear of the 150px hex width. The FOUR-hex arc as a whole wants a proper
+   ui-designer pass on a real Pixel 9 - the original three were derived from the
+   shipped UGUI tunables (ART 6.7) and this one has no such reference. */
 
 /* --- Layer 6 : cooldown clip (dark overlay rising from the bottom) --------- */
 /* The wrapper's height % = remaining/total; overflow hidden crops the fill's
@@ -266,20 +273,11 @@
     border-bottom-left-radius: 27px; border-bottom-right-radius: 27px;
     justify-content: center; align-items: center;
 }
-/* slot 3 : gold-filled Combo privilege (Assassin) */
-.cw-hex-badge--combo {
-    background-color: rgb(245, 200, 66);
-    border-top-color: rgb(255, 224, 140); border-left-color: rgb(212, 160, 32);
-    border-right-color: rgb(212, 160, 32); border-bottom-color: rgb(150, 110, 20);
-}
 .cw-hex-badge-text {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 34px;
     color: rgb(254, 245, 224);
     -unity-text-align: middle-center;
-}
-.cw-hex-badge-text--combo {
-    color: rgb(26, 14, 4);            /* dark star on gold */
 }
 
 /* ============================================================================

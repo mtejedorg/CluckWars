@@ -122,7 +122,9 @@
             </ui:VisualElement>
         </ui:VisualElement>
 
-        <!-- Slot 3 : Assassin Combo (gold star badge). Hidden unless slot 2 equipped. -->
+        <!-- Slot 3 : available to every class since v0.7's four-slot loadouts. The gold
+             star badge is gone with the Combo passive that justified it - and U+2605 was
+             in neither shipped font, surviving only on OS fallback. -->
         <ui:VisualElement name="Ability3" class="cw-hex cw-hex--a3">
             <ui:VisualElement name="Cooldown3" class="cw-hex-cd" picking-mode="Ignore">
                 <ui:VisualElement class="cw-hex-cd-fill" picking-mode="Ignore" />
@@ -138,8 +140,30 @@
                 <ui:VisualElement name="StateBarA3" class="cw-hex-state-bar cw-hex-state-bar--a" picking-mode="Ignore" />
                 <ui:VisualElement name="StateBarB3" class="cw-hex-state-bar cw-hex-state-bar--b" picking-mode="Ignore" />
             </ui:VisualElement>
-            <ui:VisualElement name="Badge3" class="cw-hex-badge cw-hex-badge--combo" picking-mode="Ignore">
-                <ui:Label name="BadgeText3" text="★" class="cw-hex-badge-text cw-hex-badge-text--combo" picking-mode="Ignore" />
+            <ui:VisualElement name="Badge3" class="cw-hex-badge" picking-mode="Ignore">
+                <ui:Label name="BadgeText3" text="3" class="cw-hex-badge-text" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Slot 4 : added with v0.7's four-slot loadouts. On every class except Assassin
+             this is where Peck (foraging) most often sits, but the player assigns it. -->
+        <ui:VisualElement name="Ability4" class="cw-hex cw-hex--a4">
+            <ui:VisualElement name="Cooldown4" class="cw-hex-cd" picking-mode="Ignore">
+                <ui:VisualElement class="cw-hex-cd-fill" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="ActiveDrain4" class="cw-hex-drain" picking-mode="Ignore">
+                <ui:VisualElement name="ActiveDrainFill4" class="cw-hex-drain-fill" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="Icon4" class="cw-hex-icon" picking-mode="Ignore" />
+            <ui:Label name="Label4" text="" class="cw-hex-label" picking-mode="Ignore" />
+            <ui:Label name="CooldownNum4" text="" class="cw-hex-cdnum" picking-mode="Ignore" />
+            <ui:VisualElement name="StateGlyph4" class="cw-hex-state" picking-mode="Ignore">
+                <ui:VisualElement name="StateRing4" class="cw-hex-state-ring" picking-mode="Ignore" />
+                <ui:VisualElement name="StateBarA4" class="cw-hex-state-bar cw-hex-state-bar--a" picking-mode="Ignore" />
+                <ui:VisualElement name="StateBarB4" class="cw-hex-state-bar cw-hex-state-bar--b" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="Badge4" class="cw-hex-badge" picking-mode="Ignore">
+                <ui:Label name="BadgeText4" text="4" class="cw-hex-badge-text" picking-mode="Ignore" />
             </ui:VisualElement>
         </ui:VisualElement>
 

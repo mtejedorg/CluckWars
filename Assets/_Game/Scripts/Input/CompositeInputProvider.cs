@@ -66,6 +66,14 @@ namespace CluckWars.Input
             return any;
         }
 
+        public bool GetAbility4Pressed()
+        {
+            bool any = false;
+            for (int i = 0; i < _providers.Length; i++)
+                any |= _providers[i].GetAbility4Pressed();
+            return any;
+        }
+
         /// <summary>
         /// Level-triggered (see the interface doc) — reading every provider every
         /// tick has no consumption side effect here, unlike the edge-triggered

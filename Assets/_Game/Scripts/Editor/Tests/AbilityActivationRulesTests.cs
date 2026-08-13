@@ -107,6 +107,48 @@ namespace CluckWars.Tests
                 chargingSlot, pendingSlot, pendingHeldSeconds, Threshold,
                 canCast, otherAbilityActive, cancelPressed, hold, press, canBeginCharge);
 
+        // ---- Slot count is defined by the caller's arrays, not by a constant -----
+
+        [Test]
+        public void Decide_FourthSlot_IsReachable_WhenTheCallerPassesFourSlots()
+        {
+            // The state machine used to carry `private const int SlotCount = 3`, so growing
+            // the loadout would have silently made slot 3 unpressable — the hold bit would
+            // be set and simply never looked at. The count now comes from hold.Length.
+            var hold  = new[] { false, false, false, true };
+            var press = new[] { false, false, false, false };
+            var can   = new[] { true, true, true, true };
+
+            var d = Decide(0, true, false, false, hold, press, can);
+
+            Assert.AreEqual(ChargeAction.BeginPendingHold, d.Action);
+            Assert.AreEqual(3, d.Slot, "Slot 3 must be reachable once four slots are passed in.");
+        }
+
+        [Test]
+        public void Decide_StillWorks_WithThreeSlots_SoTheCountIsNotBakedIn()
+        {
+            // The mirror of the test above: passing three slots must still behave exactly as
+            // it did before, or the array-length derivation has quietly become a 4-only path.
+            var d = Decide(0, true, false, false, new[] { false, false, true }, NoPress, AllCanBegin);
+
+            Assert.AreEqual(ChargeAction.BeginPendingHold, d.Action);
+            Assert.AreEqual(2, d.Slot);
+        }
+
+        [Test]
+        public void Decide_RaggedArrays_RefuseTheTick_RatherThanIndexPastTheEnd()
+        {
+            // hold says four slots, press and canBeginCharge say three. Reading hold[3] and
+            // then press[3] would throw; worse, a partial read could fire an ability the
+            // player never pressed. The caller owns all three arrays and sizes them together,
+            // so a mismatch is a bug — refuse the tick and stay silent rather than guess.
+            var d = Decide(0, true, false, false,
+                new[] { false, false, false, true }, NoPress, AllCanBegin);
+
+            Assert.AreEqual(ChargeAction.None, d.Action);
+        }
+
         [Test]
         public void Decide_Idle_NothingHeldOrPressed_ReturnsNone()
         {

@@ -129,9 +129,8 @@ namespace CluckWars.Gameplay
         /// dependency-free.</summary>
         public const int NoPendingSlot = -1;
 
-        private const int SlotCount = 3;
 
-        /// <param name="chargingSlot">Current <c>AbilityController.ChargingSlot</c> encoding: 0 = none, 1..3 = slot+1.</param>
+        /// <param name="chargingSlot">Current <c>AbilityController.ChargingSlot</c> encoding: 0 = none, 1..N = slot+1.</param>
         /// <param name="pendingSlot">Slot whose hold is being clocked but has not yet earned a
         /// charge, or <see cref="NoPendingSlot"/>. Caller-owned local scratch — never networked.</param>
         /// <param name="pendingHeldSeconds">How long <paramref name="pendingSlot"/> has been held,
@@ -142,9 +141,11 @@ namespace CluckWars.Gameplay
         /// <param name="canCast">False while stunned (<c>ControlRules.CanCast</c>).</param>
         /// <param name="otherAbilityActive">True while a different ability is already mid-duration (no double-cast).</param>
         /// <param name="cancelPressed">This tick's edge-triggered cancel bit (Esc / touch drag-off).</param>
-        /// <param name="hold">Length-3: this tick's live hold bit per slot.</param>
-        /// <param name="press">Length-3: this tick's latched press-edge bit per slot.</param>
-        /// <param name="canBeginCharge">Length-3: true if the slot is available for this
+        /// <param name="hold">One live hold bit per slot. Its LENGTH defines how many slots
+        /// exist — the count is deliberately not a constant in here, so growing the loadout
+        /// (2 slots -> 3 -> 4) needs no edit to this file and cannot leave a stale 3 behind.</param>
+        /// <param name="press">Same length as <paramref name="hold"/>: this tick's latched press-edge bit per slot.</param>
+        /// <param name="canBeginCharge">Same length as <paramref name="hold"/>: true if the slot is available for this
         /// class AND off cooldown. Deliberately excludes target-in-range — a target may
         /// walk into the shape mid-hold, which is the entire point of aiming, so
         /// "no target yet" must never block a hold from starting.</param>
@@ -153,7 +154,17 @@ namespace CluckWars.Gameplay
             bool canCast, bool otherAbilityActive, bool cancelPressed,
             bool[] hold, bool[] press, bool[] canBeginCharge)
         {
-            bool pendingLive = pendingSlot >= 0 && pendingSlot < SlotCount;
+            int slotCount = hold != null ? hold.Length : 0;
+            if (press == null || canBeginCharge == null ||
+                press.Length != slotCount || canBeginCharge.Length != slotCount)
+            {
+                // Ragged inputs would index past the end of one array while reading a live
+                // bit from another — a crash at best, a phantom cast at worst. Refuse the
+                // tick instead; the caller owns all three arrays and sizes them together.
+                return ChargeDecision.None;
+            }
+
+            bool pendingLive = pendingSlot >= 0 && pendingSlot < slotCount;
 
             // 1. Caster can no longer complete a cast: clear BOTH pre-fire states without
             // firing/burning cooldown. An already-ACTIVE ability (mid-duration) is a
@@ -192,12 +203,11 @@ namespace CluckWars.Gameplay
                 return ChargeDecision.None; // still inside the ramp — keep clocking.
             }
 
-            // 5. Idle. First slot (priority 1 > 2 > 3, matching the pre-hold-to-aim
-            // behaviour) whose hold bit is set claims the tick, whether or not it can
-            // actually begin charging — this preserves "one live gesture at a time" the
-            // same way the old press-only code let Ability1 shadow Ability2/3 on a
+            // 5. Idle. Lowest-numbered slot whose hold bit is set claims the tick, whether
+            // or not it can actually begin charging — this preserves "one live gesture at a
+            // time" the same way the old press-only code let Ability1 shadow the rest on a
             // same-tick press collision.
-            for (int slot = 0; slot < SlotCount; slot++)
+            for (int slot = 0; slot < slotCount; slot++)
             {
                 if (hold[slot])
                 {

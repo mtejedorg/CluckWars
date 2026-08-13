@@ -10,11 +10,10 @@ using Zenject;
 namespace CluckWars.Gameplay
 {
     /// <summary>
-    /// Networked ability slot manager on the chicken. Holds up to three equipped
-    /// <see cref="AbilityBaseSO"/>s (slots 0 and 1 used by every class; slot 2
-    /// only available to chickens with the <see cref="ChickenPassive.Combo"/> passive
-    /// — i.e., Assassin), drives activation from the Fusion input buffer, and owns
-    /// the per-slot cooldown timers.
+    /// Networked ability slot manager on the chicken. Holds <see cref="SlotCount"/>
+    /// equipped <see cref="AbilityBaseSO"/>s — as of v0.7 every class gets all four,
+    /// which retires the Combo passive's old job of granting a third — drives activation
+    /// from the Fusion input buffer, and owns the per-slot cooldown timers.
     /// </summary>
     /// <remarks>
     /// Exactly one ability can be active at a time — pressing another slot is ignored
@@ -33,6 +32,12 @@ namespace CluckWars.Gameplay
         private const string Source = "Ability";
         public const int InvalidSlot = -1;
 
+        /// <summary>
+        /// Ability buttons every chicken has. Four as of v0.7: one is Peck on every class
+        /// except Assassin, which cannot forage and spends all four on its kit.
+        /// </summary>
+        public const int SlotCount = 4;
+
         [Tooltip("Equipped class passive ability. Mandatory; if unassigned, falls back to class default.")]
         [SerializeField] private PassiveAbilitySO _passive;
 
@@ -42,14 +47,18 @@ namespace CluckWars.Gameplay
         [Tooltip("Equipped ability for slot 1. Used by every class.")]
         [SerializeField] private AbilityBaseSO _slot1;
 
-        [Tooltip("Equipped ability for slot 2. Assassin (Combo passive) only; leave null for other classes.")]
+        [Tooltip("Equipped ability for slot 2. Available to every class as of v0.7.")]
         [SerializeField] private AbilityBaseSO _slot2;
+
+        [Tooltip("Equipped ability for slot 3. Available to every class as of v0.7.")]
+        [SerializeField] private AbilityBaseSO _slot3;
 
         [Networked] public int ActiveSlot { get; set; }
         [Networked] private TickTimer ActivationTimer { get; set; }
         [Networked] private TickTimer Cooldown0 { get; set; }
         [Networked] private TickTimer Cooldown1 { get; set; }
         [Networked] private TickTimer Cooldown2 { get; set; }
+        [Networked] private TickTimer Cooldown3 { get; set; }
 
         /// <summary>
         /// Hold-to-aim charge state (FEEDBACK.md §2, Stage 2). 0 = nothing charging;
@@ -79,6 +88,7 @@ namespace CluckWars.Gameplay
         public AbilityBaseSO Slot0 => _slot0;
         public AbilityBaseSO Slot1 => _slot1;
         public AbilityBaseSO Slot2 => _slot2;
+        public AbilityBaseSO Slot3 => _slot3;
 
         public AbilityBaseSO ActiveAbility => GetSlot(ActiveSlot);
 
@@ -117,9 +127,9 @@ namespace CluckWars.Gameplay
         // ---- Hold/release/cancel state machine scratch (StateAuthority-side only,
         // not networked — re-derived from the input buffer every tick). Reused instance
         // arrays instead of locals so FixedUpdateNetwork (32 Hz) doesn't allocate.
-        private readonly bool[] _holdBits = new bool[3];
-        private readonly bool[] _pressBits = new bool[3];
-        private readonly bool[] _canBeginCharge = new bool[3];
+        private readonly bool[] _holdBits = new bool[SlotCount];
+        private readonly bool[] _pressBits = new bool[SlotCount];
+        private readonly bool[] _canBeginCharge = new bool[SlotCount];
 
         // ---- Pending-hold scratch (StateAuthority-side only, NOT networked) ----
         //
@@ -193,7 +203,8 @@ namespace CluckWars.Gameplay
             _log?.Debug(Source, $"Spawned. Passive={(_passive != null ? _passive.name : "(none)")}, " +
                 $"Slot0={(Slot0 != null ? Slot0.name : "(none)")}, " +
                 $"Slot1={(Slot1 != null ? Slot1.name : "(none)")}, " +
-                $"Slot2={(Slot2 != null ? Slot2.name : "(none)")}.");
+                $"Slot2={(Slot2 != null ? Slot2.name : "(none)")}, " +
+                $"Slot3={(Slot3 != null ? Slot3.name : "(none)")}.");
         }
 
         public override void Despawned(NetworkRunner runner, bool hasState)
@@ -239,14 +250,17 @@ namespace CluckWars.Gameplay
             _holdBits[0]  = input.Buttons.IsSet((int)InputButton.AbilityHold1);
             _holdBits[1]  = input.Buttons.IsSet((int)InputButton.AbilityHold2);
             _holdBits[2]  = input.Buttons.IsSet((int)InputButton.AbilityHold3);
+            _holdBits[3]  = input.Buttons.IsSet((int)InputButton.AbilityHold4);
             _pressBits[0] = input.Buttons.IsSet((int)InputButton.Ability1);
             _pressBits[1] = input.Buttons.IsSet((int)InputButton.Ability2);
             _pressBits[2] = input.Buttons.IsSet((int)InputButton.Ability3);
+            _pressBits[3] = input.Buttons.IsSet((int)InputButton.Ability4);
             bool cancelPressed = input.Buttons.IsSet((int)InputButton.AbilityCancel);
 
             _canBeginCharge[0] = CanBeginCharge(0);
             _canBeginCharge[1] = CanBeginCharge(1);
             _canBeginCharge[2] = CanBeginCharge(2);
+            _canBeginCharge[3] = CanBeginCharge(3);
 
             // Clock a live pending hold BEFORE deciding, so the tick on which it crosses
             // the threshold is the tick it gets promoted — not the one after.
@@ -290,9 +304,9 @@ namespace CluckWars.Gameplay
 
         private static bool AnyAbilityInputSet(PlayerNetworkInput input) =>
             input.Buttons.IsSet((int)InputButton.Ability1) || input.Buttons.IsSet((int)InputButton.Ability2) ||
-            input.Buttons.IsSet((int)InputButton.Ability3) ||
+            input.Buttons.IsSet((int)InputButton.Ability3) || input.Buttons.IsSet((int)InputButton.Ability4) ||
             input.Buttons.IsSet((int)InputButton.AbilityHold1) || input.Buttons.IsSet((int)InputButton.AbilityHold2) ||
-            input.Buttons.IsSet((int)InputButton.AbilityHold3);
+            input.Buttons.IsSet((int)InputButton.AbilityHold3) || input.Buttons.IsSet((int)InputButton.AbilityHold4);
 
         // ---- Public read-only helpers (used by the HUD / debug overlays) -------
 
@@ -348,22 +362,20 @@ namespace CluckWars.Gameplay
             if (slot == 0) Cooldown0 = timer;
             else if (slot == 1) Cooldown1 = timer;
             else if (slot == 2) Cooldown2 = timer;
+            else if (slot == 3) Cooldown3 = timer;
         }
 
         /// <summary>
-        /// Number of ability slots available to this chicken.
-        /// Assassins (Combo passive) get 3; all other classes get 2.
+        /// Number of ability slots available to this chicken — <see cref="SlotCount"/> for
+        /// every class as of v0.7.
         /// </summary>
-        public int EquippedSlotCount
-        {
-            get
-            {
-                if (_passive != null && _passive is ComboPassiveSO) return 3;
-                if (_controller != null && _controller.IsPassiveActive(ChickenPassive.Combo)) return 3;
-                var stats = _controller != null ? _controller.Stats : null;
-                return (stats != null && stats.Passive == ChickenPassive.Combo) ? 3 : 2;
-            }
-        }
+        /// <remarks>
+        /// This used to return 3 for the Combo passive and 2 otherwise, which was Combo's
+        /// entire mechanical purpose. Giving every class four buttons retires that job.
+        /// Combo itself is removed with the class-specialization pass, where GDD §5.3's
+        /// Spoiler and Thief take over the Assassin's passive fork.
+        /// </remarks>
+        public int EquippedSlotCount => SlotCount;
 
         /// <summary>
         /// Bot-only activation API. Mirrors the exact gates from the player input
@@ -408,17 +420,20 @@ namespace CluckWars.Gameplay
         /// callback so every peer already has the chosen abilities on first <c>Spawned</c>
         /// read. Null arguments leave the existing (prefab-default) value unchanged.
         /// </summary>
-        public void SetSlots(PassiveAbilitySO passive, AbilityBaseSO slot0, AbilityBaseSO slot1, AbilityBaseSO slot2 = null)
+        public void SetSlots(PassiveAbilitySO passive, AbilityBaseSO slot0, AbilityBaseSO slot1,
+            AbilityBaseSO slot2 = null, AbilityBaseSO slot3 = null)
         {
             if (passive != null) _passive = passive;
             if (slot0 != null) _slot0 = slot0;
             if (slot1 != null) _slot1 = slot1;
             if (slot2 != null) _slot2 = slot2;
+            if (slot3 != null) _slot3 = slot3;
         }
 
-        public void SetSlots(AbilityBaseSO slot0, AbilityBaseSO slot1, AbilityBaseSO slot2 = null)
+        public void SetSlots(AbilityBaseSO slot0, AbilityBaseSO slot1,
+            AbilityBaseSO slot2 = null, AbilityBaseSO slot3 = null)
         {
-            SetSlots(null, slot0, slot1, slot2);
+            SetSlots(null, slot0, slot1, slot2, slot3);
         }
 
         // ---- Internals ---------------------------------------------------------
@@ -428,6 +443,7 @@ namespace CluckWars.Gameplay
             0 => _slot0,
             1 => _slot1,
             2 => _slot2,
+            3 => _slot3,
             _ => null,
         };
 
@@ -436,6 +452,7 @@ namespace CluckWars.Gameplay
             0 => Cooldown0,
             1 => Cooldown1,
             2 => Cooldown2,
+            3 => Cooldown3,
             _ => default,
         };
 
@@ -444,6 +461,7 @@ namespace CluckWars.Gameplay
             if (slot == 0)      Cooldown0 = timer;
             else if (slot == 1) Cooldown1 = timer;
             else if (slot == 2) Cooldown2 = timer;
+            else if (slot == 3) Cooldown3 = timer;
         }
 
         /// <summary>
@@ -456,7 +474,7 @@ namespace CluckWars.Gameplay
         /// </summary>
         private AbilityRefusal EvaluateRefusalInternal(int slot, out AbilityBaseSO ability)
         {
-            bool slotUnavailable = slot == 2 && EquippedSlotCount < 3;
+            bool slotUnavailable = slot < 0 || slot >= EquippedSlotCount;
             ability = slotUnavailable ? null : GetSlot(slot);
             slotUnavailable |= ability == null;
 
@@ -479,7 +497,7 @@ namespace CluckWars.Gameplay
         /// </summary>
         private bool CanBeginCharge(int slot)
         {
-            if (slot == 2 && EquippedSlotCount < 3) return false;
+            if (slot < 0 || slot >= EquippedSlotCount) return false;
             if (GetSlot(slot) == null) return false;
             return GetCooldown(slot).ExpiredOrNotRunning(Runner);
         }

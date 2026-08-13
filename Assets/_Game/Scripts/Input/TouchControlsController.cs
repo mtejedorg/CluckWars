@@ -124,17 +124,21 @@ namespace CluckWars.Input
             public VisualElement StateBarA;  // ⃠ slash, and one arm of the ✕
             public VisualElement StateBarB;  // the other arm of the ✕
         }
-        private readonly HexSlot[]        _slots           = new HexSlot[3];
-        private readonly AbilityBaseSO[]  _appliedSlots    = new AbilityBaseSO[3];
-        private readonly string[]         _appliedIconCls  = new string[3];
+        /// <summary>Mirrors <see cref="Gameplay.AbilityController.SlotCount"/> so the hex
+        /// cluster and the gameplay slot count cannot drift apart.</summary>
+        private const int SlotCount = Gameplay.AbilityController.SlotCount;
+
+        private readonly HexSlot[]        _slots           = new HexSlot[SlotCount];
+        private readonly AbilityBaseSO[]  _appliedSlots    = new AbilityBaseSO[SlotCount];
+        private readonly string[]         _appliedIconCls  = new string[SlotCount];
 
         // Refusal state, cached so class/colour writes only happen on a real change.
-        private readonly AbilityRefusal[] _appliedRefusal    = new AbilityRefusal[3];
-        private readonly string[]         _appliedRefusalCls = new string[3];
-        private readonly int[]            _appliedCdSeconds  = new int[3];
+        private readonly AbilityRefusal[] _appliedRefusal    = new AbilityRefusal[SlotCount];
+        private readonly string[]         _appliedRefusalCls = new string[SlotCount];
+        private readonly int[]            _appliedCdSeconds  = new int[SlotCount];
 
         // Denied-press bump timers (§6). -1 = idle.
-        private readonly float[] _bumpTimer = new float[3];
+        private readonly float[] _bumpTimer = new float[SlotCount];
 
         // ---- Status strip refs -------------------------------------------------
         private struct StatusRowRefs
@@ -179,14 +183,14 @@ namespace CluckWars.Input
         private bool  _textGateOpen;
 
         // Edge-triggered press flags (one-frame, cleared in LateUpdate).
-        private readonly bool[] _pressed = new bool[3];
+        private readonly bool[] _pressed = new bool[SlotCount];
 
         // v0.6 hold-to-aim: level-triggered per-slot hold state + which pointer owns it.
-        private readonly bool[] _held          = new bool[3];
-        private readonly int[]  _heldPointerId = new int[3] { -1, -1, -1 };
+        private readonly bool[] _held          = new bool[SlotCount];
+        private readonly int[]  _heldPointerId = new int[SlotCount] { -1, -1, -1, -1 };
         // One-shot "this hold was dragged off, don't let it fire" flag — consumed by
         // TouchInputProvider.GetAbilityCancelPressed via ConsumeAbilityCancelled.
-        private readonly bool[] _cancelled     = new bool[3];
+        private readonly bool[] _cancelled     = new bool[SlotCount];
 
         // ---- Runtime state -----------------------------------------------------
         private Vector2           _movement;
@@ -198,17 +202,18 @@ namespace CluckWars.Input
         public bool    Ability1Pressed => _pressed[0];
         public bool    Ability2Pressed => _pressed[1];
         public bool    Ability3Pressed => _pressed[2];
+        public bool    Ability4Pressed => _pressed[3];
 
         /// <summary>Level-triggered: true while slot's hex is held down and the hold
         /// hasn't been drag-cancelled. Safe to read every frame.</summary>
-        public bool IsAbilityHeld(int slot) => slot >= 0 && slot < 3 && _held[slot];
+        public bool IsAbilityHeld(int slot) => slot >= 0 && slot < SlotCount && _held[slot];
 
         /// <summary>Returns (and clears) whether <paramref name="slot"/>'s hold was
         /// just drag-cancelled — the "released to fire" vs "dragged off to cancel"
         /// distinction <see cref="TouchInputProvider"/> needs (see class remarks).</summary>
         public bool ConsumeAbilityCancelled(int slot)
         {
-            if (slot < 0 || slot >= 3 || !_cancelled[slot]) return false;
+            if (slot < 0 || slot >= SlotCount || !_cancelled[slot]) return false;
             _cancelled[slot] = false;
             return true;
         }
@@ -235,7 +240,7 @@ namespace CluckWars.Input
             _appliedRowKind     = new HudStatusKind[rows];
             _appliedRowQuantity = new int[rows];
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < SlotCount; i++)
             {
                 _appliedRefusal[i]   = UnsetRefusal;
                 _appliedCdSeconds[i] = int.MinValue;
@@ -288,7 +293,7 @@ namespace CluckWars.Input
                 _appliedRowQuantity[i] = int.MinValue;
             }
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < SlotCount; i++)
             {
                 int n = i + 1;
                 var hex = _root.Q<VisualElement>($"Ability{n}");
@@ -471,7 +476,7 @@ namespace CluckWars.Input
 
             PollDeniedPress(abilities);
 
-            for (int slot = 0; slot < 3; slot++)
+            for (int slot = 0; slot < SlotCount; slot++)
                 RefreshSlot(slot, abilities);
 
             RefreshControlConsequences();
@@ -695,12 +700,12 @@ namespace CluckWars.Input
         private void PollDeniedPress(AbilityController abilities)
         {
             if (abilities != null && abilities.TryConsumeDeniedPress(out int denied)
-                && denied >= 0 && denied < 3)
+                && denied >= 0 && denied < SlotCount)
             {
                 _bumpTimer[denied] = 0f;
             }
 
-            for (int slot = 0; slot < 3; slot++) UpdateBump(slot);
+            for (int slot = 0; slot < SlotCount; slot++) UpdateBump(slot);
         }
 
         /// <summary>

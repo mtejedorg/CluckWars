@@ -17,11 +17,12 @@ namespace CluckWars.Input
         Vector2 GetMovement();
         bool GetAbility1Pressed();
         bool GetAbility2Pressed();
-        /// <summary>Ability slot 3. Assassin (Combo passive) only; returns false for every other class.</summary>
         bool GetAbility3Pressed();
+        /// <summary>Ability slot 4. Available to every class as of v0.7's four-slot loadouts.</summary>
+        bool GetAbility4Pressed();
 
         /// <summary>
-        /// True while ability slot 0..2's button/key is currently held down (v0.6
+        /// True while ability slot 0..3's button/key is currently held down (v0.6
         /// hold-to-aim, FEEDBACK.md §2). Level-triggered, unlike the edge-triggered
         /// <c>GetAbilityXPressed</c> calls above — safe to read every frame/tick with
         /// no consumption semantics.

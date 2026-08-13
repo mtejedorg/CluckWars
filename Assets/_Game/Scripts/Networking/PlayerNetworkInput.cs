@@ -36,5 +36,15 @@ namespace CluckWars.Networking
         /// surfaced through <c>TouchControlsController.ConsumeAbilityCancelled</c>).
         /// One bit is enough — only one slot can be charging at a time.</summary>
         AbilityCancel = 6,
+
+        // v0.7 four-slot loadouts. Appended, NOT slotted in beside their siblings, because
+        // renumbering AbilityCancel would silently remap every in-flight input the moment
+        // two builds of different versions met on the wire.
+        //
+        // Capacity is not a concern: NetworkButtons is backed by a System.Int32, verified
+        // 2026-08-13 by probing the compiled Fusion assembly (bit 31 round-trips), so 9 of
+        // 32 bits are in use.
+        Ability4     = 7,
+        AbilityHold4 = 8,
     }
 }

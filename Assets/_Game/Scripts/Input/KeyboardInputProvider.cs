@@ -4,7 +4,8 @@ using UnityEngine.InputSystem;
 namespace CluckWars.Input
 {
     /// <summary>
-    /// Standalone-Windows input. WASD = movement, Q = Ability1, E = Ability2, R = Ability3.
+    /// Standalone-Windows input. WASD = movement, Q/E/R/F = Ability1..4.
+    /// F keeps the whole ability cluster under the left hand alongside WASD.
     /// Uses Unity Input System (already shipped in Packages/manifest.json).
     /// </summary>
     /// <remarks>
@@ -48,6 +49,12 @@ namespace CluckWars.Input
             return kb != null && kb.rKey.wasPressedThisFrame;
         }
 
+        public bool GetAbility4Pressed()
+        {
+            var kb = Keyboard.current;
+            return kb != null && kb.fKey.wasPressedThisFrame;
+        }
+
         public bool GetAbilityHeld(int slot)
         {
             var kb = Keyboard.current;
@@ -57,6 +64,7 @@ namespace CluckWars.Input
                 0 => kb.qKey.isPressed,
                 1 => kb.eKey.isPressed,
                 2 => kb.rKey.isPressed,
+                3 => kb.fKey.isPressed,
                 _ => false,
             };
         }
