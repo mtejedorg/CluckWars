@@ -14,21 +14,33 @@ namespace CluckWars.Tests
     /// </summary>
     public sealed class MapClearanceTests
     {
-        // Mirrors Game.unity's MapGenerator field values (v0.5 spec).
-        private const float ArenaHalfSize = 19f;      // _planeSize 38 / 2
-        private const float WallThickness = 0.5f;
-        private const int StandardObstacleCount = 8;
-        private const float BaseCornerDistance = 19f;
-        private const float BaseKeepClear = 4f;
-        private const float SpawnInsetFraction = 0.15f; // MapGenerator.BaseInsetFraction
-        private static readonly Vector2 CenterPileFootprint = new Vector2(12f, 10f);
-        private static readonly Vector2 PersonalPileFootprint = new Vector2(5.5f, 4.6f);
-        private static readonly Vector2 ContestedPileFootprint = new Vector2(6.5f, 5.4f);
-        private const float PersonalPileInset = 0.3673f;
-        private const float ContestedEdgeInset = 0.7895f;
-        private const float PilePositionJitter = 1.5f;
+        // ---- The map under test, READ from Game.unity ---------------------------------
+        //
+        // These were hand-mirrored literals until 2026-08-14, and by then most of them were
+        // wrong: the centre footprint still said 12x10 against a shipped 7.8x6.5, and the
+        // pile jitter said 1.5 against a shipped 0.4. The test was rigorously proving a map
+        // nobody plays. Reading the scene is what makes it load-bearing — and it is the same
+        // source MapGenerator itself uses, so the two cannot drift again.
+        private static float ArenaHalfSize => TestAssets.SceneFloat("_planeSize") * 0.5f;
+        private static float WallThickness => TestAssets.SceneFloat("_wallThickness");
+        private static int StandardObstacleCount => Mathf.RoundToInt(TestAssets.SceneFloat("_standardObstacleCount"));
+        private static float BaseCornerDistance => TestAssets.SceneFloat("_baseCornerDistance");
+        private static Vector2 CenterPileFootprint => TestAssets.SceneVector2("_centerPileFootprint");
+        private static Vector2 PersonalPileFootprint => TestAssets.SceneVector2("_personalPileFootprint");
+        private static Vector2 ContestedPileFootprint => TestAssets.SceneVector2("_contestedPileFootprint");
+        private static float PersonalPileInset => TestAssets.SceneFloat("_personalPileInset");
+        private static float ContestedEdgeInset => TestAssets.SceneFloat("_contestedEdgeInset");
+        private static float PilePositionJitter => TestAssets.SceneFloat("_pilePositionJitter");
+
+        // The two values MapGenerator hardcodes rather than serializing, so there is no
+        // scene entry to read. Still mirrors — keep them in step by hand.
+        private const float BaseKeepClear = 4f;          // MapGenerator.ComputeBaseAndPileKeepClearDiscs
+        private const float SpawnInsetFraction = 0.15f;  // MapGenerator.BaseInsetFraction
 
         private static float FootprintRadius(Vector2 size) => 0.5f * Mathf.Sqrt(size.x * size.x + size.y * size.y);
+
+        private static Vector2 Flat(Vector3 v) => new Vector2(v.x, v.z);
+        private static Vector3 Raise(Vector2 v) => new Vector3(v.x, 0f, v.y);
 
         private struct Box
         {
@@ -38,13 +50,25 @@ namespace CluckWars.Tests
             public float YawRad; // rotation of local X away from world +X
         }
 
-        private static Vector2[] Corners() => new[]
+        private static Vector2[] Corners()
         {
-            new Vector2(BaseCornerDistance, BaseCornerDistance),
-            new Vector2(-BaseCornerDistance, BaseCornerDistance),
-            new Vector2(-BaseCornerDistance, -BaseCornerDistance),
-            new Vector2(BaseCornerDistance, -BaseCornerDistance),
-        };
+            float d = BaseCornerDistance;
+            return new[]
+            {
+                new Vector2(+d, +d),
+                new Vector2(-d, +d),
+                new Vector2(-d, -d),
+                new Vector2(+d, -d),
+            };
+        }
+
+        /// <summary>Nominal (pre-jitter) doorstep-pile position — the generator's own formula.</summary>
+        private static Vector2 PersonalPile(Vector2 corner) =>
+            Flat(MapGenerator.PersonalPileNominal(Raise(corner), PersonalPileInset));
+
+        /// <summary>Nominal (pre-jitter) contested-pile position — the generator's own formula.</summary>
+        private static Vector2 ContestedPile(Vector2 cornerA, Vector2 cornerB) =>
+            Flat(MapGenerator.ContestedPileNominal(Raise(cornerA), Raise(cornerB), ContestedEdgeInset));
 
         /// <summary>Mirrors MapGenerator.ComputeBaseAndPileKeepClearDiscs.</summary>
         private static KeepClearDisc[] KeepClearDiscs(Vector2[] corners)
@@ -55,11 +79,8 @@ namespace CluckWars.Tests
             for (int i = 0; i < corners.Length; i++)
             {
                 discs.Add(new KeepClearDisc(corners[i], BaseKeepClear));
-                Vector2 personal = corners[i].normalized * 17f;
-                discs.Add(new KeepClearDisc(personal, personalRadius));
-                Vector2 mid = (corners[i] + corners[(i + 1) % corners.Length]) * 0.5f;
-                Vector2 contested = mid.normalized * 15f;
-                discs.Add(new KeepClearDisc(contested, contestedRadius));
+                discs.Add(new KeepClearDisc(PersonalPile(corners[i]), personalRadius));
+                discs.Add(new KeepClearDisc(ContestedPile(corners[i], corners[(i + 1) % corners.Length]), contestedRadius));
             }
             return discs.ToArray();
         }
@@ -107,10 +128,11 @@ namespace CluckWars.Tests
             var corners = Corners();
             var discs = KeepClearDiscs(corners);
             float centerKeepClear = FootprintRadius(CenterPileFootprint);
+            float arenaHalfSize = ArenaHalfSize;   // hoisted: the accessor re-reads Game.unity
 
             for (int seed = 0; seed < 25; seed++)
             {
-                var segs = PinwheelLayout.Build(ArenaHalfSize, wedges, seed, centerKeepClear, armThickness, discs);
+                var segs = PinwheelLayout.Build(arenaHalfSize, wedges, seed, centerKeepClear, armThickness, discs);
 
                 for (int i = 0; i < segs.Length; i++)
                 {
@@ -160,26 +182,29 @@ namespace CluckWars.Tests
             };
             for (int i = 0; i < corners.Length; i++)
             {
-                Vector2 personal = corners[i].normalized * 17f;
-                pileBoxes.Add(new Box { Center = personal, Width = PersonalPileFootprint.x, Depth = PersonalPileFootprint.y, YawRad = 0f });
-                Vector2 mid = (corners[i] + corners[(i + 1) % corners.Length]) * 0.5f;
-                Vector2 contested = mid.normalized * 15f;
-                pileBoxes.Add(new Box { Center = contested, Width = ContestedPileFootprint.x, Depth = ContestedPileFootprint.y, YawRad = 0f });
+                pileBoxes.Add(new Box { Center = PersonalPile(corners[i]), Width = PersonalPileFootprint.x, Depth = PersonalPileFootprint.y, YawRad = 0f });
+                pileBoxes.Add(new Box { Center = ContestedPile(corners[i], corners[(i + 1) % corners.Length]), Width = ContestedPileFootprint.x, Depth = ContestedPileFootprint.y, YawRad = 0f });
             }
 
             int[] seeds = { 0, 1, 2, 17, 12345 };
             const float cell = 0.5f;
-            int dim = Mathf.CeilToInt((ArenaHalfSize * 2f) / cell) + 1;
+
+            // Hoisted out of the flood fill: every one of these accessors re-reads
+            // Game.unity's YAML, and Walkable/GridToWorld run once per grid cell.
+            float arenaHalfSize = ArenaHalfSize;
+            float wallThickness = WallThickness;
+            int standardObstacleCount = StandardObstacleCount;
+            int dim = Mathf.CeilToInt((arenaHalfSize * 2f) / cell) + 1;
 
             foreach (int seed in seeds)
             {
-                var segs = PinwheelLayout.Build(ArenaHalfSize, StandardObstacleCount, seed, centerKeepClear, WallThickness, discs);
+                var segs = PinwheelLayout.Build(arenaHalfSize, standardObstacleCount, seed, centerKeepClear, wallThickness, discs);
                 var allBoxes = new List<Box>(pileBoxes);
-                allBoxes.AddRange(BuildWallBoxes(segs, WallThickness));
+                allBoxes.AddRange(BuildWallBoxes(segs, wallThickness));
 
                 bool Walkable(Vector2 p)
                 {
-                    if (Mathf.Abs(p.x) > ArenaHalfSize - 0.5f || Mathf.Abs(p.y) > ArenaHalfSize - 0.5f) return false;
+                    if (Mathf.Abs(p.x) > arenaHalfSize - 0.5f || Mathf.Abs(p.y) > arenaHalfSize - 0.5f) return false;
                     foreach (var box in allBoxes)
                     {
                         if (DistanceToBoxSurface(p, box) < PinwheelLayout.ChickenRadius) return false;
@@ -187,10 +212,10 @@ namespace CluckWars.Tests
                     return true;
                 }
 
-                Vector2 GridToWorld(int gx, int gy) => new Vector2(-ArenaHalfSize + gx * cell, -ArenaHalfSize + gy * cell);
+                Vector2 GridToWorld(int gx, int gy) => new Vector2(-arenaHalfSize + gx * cell, -arenaHalfSize + gy * cell);
                 (int gx, int gy) WorldToGrid(Vector2 p) => (
-                    Mathf.Clamp(Mathf.RoundToInt((p.x + ArenaHalfSize) / cell), 0, dim - 1),
-                    Mathf.Clamp(Mathf.RoundToInt((p.y + ArenaHalfSize) / cell), 0, dim - 1));
+                    Mathf.Clamp(Mathf.RoundToInt((p.x + arenaHalfSize) / cell), 0, dim - 1),
+                    Mathf.Clamp(Mathf.RoundToInt((p.y + arenaHalfSize) / cell), 0, dim - 1));
 
                 var visited = new bool[dim, dim];
                 var start = WorldToGrid(Vector2.Lerp(corners[0], Vector2.zero, SpawnInsetFraction));
@@ -229,8 +254,9 @@ namespace CluckWars.Tests
                     return false;
                 }
 
-                // The centre pile is a PERMANENT solid 7×4 blocker centred on the origin, so
-                // (0,0) itself is never walkable by construction — asserting on it would always
+                // The centre pile is a solid blocker centred on the origin (its authored
+                // footprint, whatever Game.unity currently says), so (0,0) itself is never
+                // walkable by construction — asserting on it would always
                 // fail regardless of layout quality. What actually matters for gameplay is that
                 // a chicken can WALK UP TO the centre pile to collect from it, so we assert its
                 // approach ring is reachable instead.

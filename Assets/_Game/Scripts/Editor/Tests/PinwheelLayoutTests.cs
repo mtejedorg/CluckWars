@@ -7,10 +7,21 @@ namespace CluckWars.Tests
 {
     public sealed class PinwheelLayoutTests
     {
+        /// <summary>
+        /// The SHIPPED arena's half-size, read from <c>Game.unity</c>. Every case in this
+        /// file used to hardcode 15f or 19f; after the x1.35 rescale (2026-08-14) those
+        /// literals described an arena that no longer exists, and — worse — an arena small
+        /// enough that the enlarged <see cref="PinwheelLayout.HubPlazaRadius"/> collapses
+        /// every arm to zero length, which several of these assertions would have passed
+        /// vacuously.
+        /// </summary>
+        private static float ArenaHalfSize => TestAssets.SceneFloat("_planeSize") * 0.5f;
+
         [Test] public void Build_IsDeterministicForSeed()
         {
-            var a = PinwheelLayout.Build(15f, 8, seed: 42, centerKeepClear: 3f, armThickness: 0.5f);
-            var b = PinwheelLayout.Build(15f, 8, seed: 42, centerKeepClear: 3f, armThickness: 0.5f);
+            float half = ArenaHalfSize;
+            var a = PinwheelLayout.Build(half, 8, seed: 42, centerKeepClear: 3f, armThickness: 0.5f);
+            var b = PinwheelLayout.Build(half, 8, seed: 42, centerKeepClear: 3f, armThickness: 0.5f);
             Assert.AreEqual(a.Length, b.Length);
             for (int i = 0; i < a.Length; i++)
             {
@@ -22,13 +33,13 @@ namespace CluckWars.Tests
 
         [Test] public void Build_ProducesOneSegmentPerWedge()
         {
-            var segs = PinwheelLayout.Build(15f, 8, seed: 1, centerKeepClear: 3f, armThickness: 0.5f);
+            var segs = PinwheelLayout.Build(ArenaHalfSize, 8, seed: 1, centerKeepClear: 3f, armThickness: 0.5f);
             Assert.AreEqual(8, segs.Length);
         }
 
         [Test] public void Build_KeepsSegmentsOutOfCenterDisc()
         {
-            var segs = PinwheelLayout.Build(15f, 8, seed: 7, centerKeepClear: 3f, armThickness: 0.5f);
+            var segs = PinwheelLayout.Build(ArenaHalfSize, 8, seed: 7, centerKeepClear: 3f, armThickness: 0.5f);
             foreach (var s in segs)
             {
                 // Neither endpoint may sit inside the center keep-clear disc.
@@ -39,16 +50,28 @@ namespace CluckWars.Tests
 
         [Test] public void Build_ZeroWedgesReturnsEmptyArray()
         {
-            var segs = PinwheelLayout.Build(15f, 0, seed: 1, centerKeepClear: 3f, armThickness: 0.5f);
+            var segs = PinwheelLayout.Build(ArenaHalfSize, 0, seed: 1, centerKeepClear: 3f, armThickness: 0.5f);
             Assert.AreEqual(0, segs.Length);
         }
 
         [Test] public void Build_HonorsExtraKeepClearDiscs()
         {
-            // A disc sitting right where an arm would otherwise start must push that
-            // arm's inner end out past the disc's far edge.
-            var discs = new[] { new KeepClearDisc(new Vector2(6f, 0f), 2f) };
-            var segs = PinwheelLayout.Build(19f, 8, seed: 3, centerKeepClear: 3f, armThickness: 0.5f, extraKeepClearDiscs: discs);
+            float half = ArenaHalfSize;
+
+            // The disc is placed ON a real arm, part-way along its span. That placement is
+            // the whole test: the previous version put it at r = 6, inside the hub plaza
+            // where no arm has ever been built, so "no sample point intrudes" was true by
+            // construction and the clipping code could have been deleted without failing.
+            var unclipped = PinwheelLayout.Build(half, 8, seed: 3, centerKeepClear: 3f, armThickness: 0.5f);
+            Vector2 armDir = unclipped[0].B.normalized;
+            float armMid = Mathf.Lerp(unclipped[0].A.magnitude, unclipped[0].B.magnitude, 0.5f);
+
+            var discs = new[] { new KeepClearDisc(armDir * armMid, 2f) };
+            var segs = PinwheelLayout.Build(half, 8, seed: 3, centerKeepClear: 3f, armThickness: 0.5f, extraKeepClearDiscs: discs);
+
+            // The mechanism must actually fire — otherwise the loop below proves nothing.
+            Assert.Less((segs[0].B - segs[0].A).magnitude, (unclipped[0].B - unclipped[0].A).magnitude - 0.5f,
+                "arm 0 runs straight through the keep-clear disc and was not clipped at all");
 
             foreach (var s in segs)
             {
@@ -77,7 +100,7 @@ namespace CluckWars.Tests
         /// </summary>
         [Test] public void Build_AlternatesRimAndHubOpenings()
         {
-            const float half = 19f;
+            float half = ArenaHalfSize;
             var segs = PinwheelLayout.Build(half, 8, seed: 42, centerKeepClear: 3f, armThickness: 0.5f);
             Assert.AreEqual(8, segs.Length);
 
@@ -114,7 +137,7 @@ namespace CluckWars.Tests
         [Test] public void Build_IsFourFoldSymmetric_SoEverySectorIsIdentical(
             [Values(0, 1, 7, 42, 12345)] int seed)
         {
-            const float half = 19f;
+            float half = ArenaHalfSize;
             var segs = PinwheelLayout.Build(half, 8, seed, centerKeepClear: 3f, armThickness: 0.5f);
 
             for (int i = 0; i < 8; i++)
@@ -145,31 +168,54 @@ namespace CluckWars.Tests
         /// </summary>
         [Test] public void Build_WallsSurvivePileKeepClearDiscs_AtRealV05Sizes()
         {
-            const float half = 19f;
-            const float pileJitter = 0.4f;   // MapGenerator._pilePositionJitter
-            var centreFp    = new Vector2(12f, 10f);
-            var personalFp  = new Vector2(5.5f, 4.6f);
-            var contestedFp = new Vector2(6.5f, 5.4f);
+            // Every input is READ from Game.unity, not restated. The previous version
+            // hardcoded a 12x10 centre pile and 1.5 m corners against a shipped 7.8x6.5 and
+            // 19 m — so "at real v0.5 sizes" had stopped being true some time before the
+            // x1.35 rescale, and the test was guarding a map nobody plays.
+            float half = ArenaHalfSize;
+            float cornerDistance = TestAssets.SceneFloat("_baseCornerDistance");
+            float pileJitter = TestAssets.SceneFloat("_pilePositionJitter");
+            float personalInset = TestAssets.SceneFloat("_personalPileInset");
+            float contestedInset = TestAssets.SceneFloat("_contestedEdgeInset");
+            var centreFp    = TestAssets.SceneVector2("_centerPileFootprint");
+            var personalFp  = TestAssets.SceneVector2("_personalPileFootprint");
+            var contestedFp = TestAssets.SceneVector2("_contestedPileFootprint");
 
             float FpRadius(Vector2 s) => 0.5f * Mathf.Sqrt(s.x * s.x + s.y * s.y);
             float centreKeepClear = FpRadius(centreFp);
 
             var corners = new[]
             {
-                new Vector2(19f, 19f), new Vector2(-19f, 19f),
-                new Vector2(-19f, -19f), new Vector2(19f, -19f),
+                new Vector3(+cornerDistance, 0f, +cornerDistance),
+                new Vector3(-cornerDistance, 0f, +cornerDistance),
+                new Vector3(-cornerDistance, 0f, -cornerDistance),
+                new Vector3(+cornerDistance, 0f, -cornerDistance),
             };
 
             var discs = new List<KeepClearDisc>();
             for (int i = 0; i < corners.Length; i++)
             {
-                discs.Add(new KeepClearDisc(corners[i], 4f));
-                discs.Add(new KeepClearDisc(corners[i].normalized * 17f,
+                discs.Add(new KeepClearDisc(new Vector2(corners[i].x, corners[i].z), 4f));
+
+                var personal = MapGenerator.PersonalPileNominal(corners[i], personalInset);
+                discs.Add(new KeepClearDisc(new Vector2(personal.x, personal.z),
                     FpRadius(personalFp) + pileJitter + PinwheelLayout.PileArmBuffer));
-                Vector2 mid = (corners[i] + corners[(i + 1) % corners.Length]) * 0.5f;
-                discs.Add(new KeepClearDisc(mid.normalized * 15f,
+
+                var contested = MapGenerator.ContestedPileNominal(
+                    corners[i], corners[(i + 1) % corners.Length], contestedInset);
+                discs.Add(new KeepClearDisc(new Vector2(contested.x, contested.z),
                     FpRadius(contestedFp) + pileJitter + PinwheelLayout.PileArmBuffer));
             }
+
+            // The designed arm is 0.398 x arenaHalfSize (10.21 m at 25.65, and it was
+            // 7.57 m at the old 19 — an exact x1.35, which is what confirms HubPlazaRadius
+            // and OpeningWidth were scaled consistently with the arena). The floor is 86% of
+            // that, EXACTLY the headroom the old absolute 6.5 m bound gave against its
+            // 7.57 m arm — this tolerance was carried over, not widened. Expressed as a
+            // fraction so the next arena resize cannot leave it stale.
+            const float designedArmFraction = 0.398f;
+            const float clippingHeadroom = 0.86f;
+            float minAcceptable = half * designedArmFraction * clippingHeadroom;
 
             for (int seed = 0; seed < 40; seed++)
             {
@@ -177,10 +223,11 @@ namespace CluckWars.Tests
                 for (int i = 0; i < segs.Length; i++)
                 {
                     float len = (segs[i].B - segs[i].A).magnitude;
-                    Assert.Greater(len, 6.5f,
+                    Assert.Greater(len, minAcceptable,
                         $"seed={seed}: wall {i} was clipped to {len:0.00} m by a pile keep-clear " +
-                        "disc — the designed length is ~7.6 m. Check pile footprints, " +
-                        "_pilePositionJitter and PinwheelLayout.JitterFraction.");
+                        $"disc — the designed length is ~{half * designedArmFraction:0.00} m in this " +
+                        $"{half * 2f:0.0} m arena. Check pile footprints, _pilePositionJitter and " +
+                        "PinwheelLayout.JitterFraction.");
                 }
             }
         }
@@ -194,7 +241,7 @@ namespace CluckWars.Tests
         [Test] public void Build_NeverProducesTwoWallsOnTheSameBearing(
             [Values(4, 6, 8, 10, 13, 16)] int wedges)
         {
-            var segs = PinwheelLayout.Build(19f, wedges, seed: 3, centerKeepClear: 3f, armThickness: 0.5f);
+            var segs = PinwheelLayout.Build(ArenaHalfSize, wedges, seed: 3, centerKeepClear: 3f, armThickness: 0.5f);
 
             for (int i = 0; i < segs.Length; i++)
             for (int j = i + 1; j < segs.Length; j++)

@@ -7,7 +7,18 @@ namespace CluckWars.Tests
 {
     public sealed class JumpResolverTests
     {
-        private const float ArenaHalfSize = 19.0f;
+        /// <summary>
+        /// The SHIPPED arena's half-size, read from <c>Game.unity</c> rather than restated.
+        /// Was a literal 19.0f, which quietly encoded a 38 m arena and would have kept
+        /// testing the old square after the x1.35 rescale on 2026-08-14.
+        /// </summary>
+        /// <remarks>
+        /// None of these cases actually approach the boundary — the furthest landing is
+        /// ~18.8 m — so the arena size is a backdrop here, not the thing under test. It is
+        /// read from the scene anyway so that a future arena change cannot leave a stale
+        /// number sitting in a test file, which is how this project has been bitten before.
+        /// </remarks>
+        private static float ArenaHalfSize => TestAssets.SceneFloat("_planeSize") * 0.5f;
         private const float BodyClearance = 0.4f;
 
         [Test]
@@ -19,8 +30,11 @@ namespace CluckWars.Tests
 
             var res = JumpResolver.Resolve(Vector3.zero, Vector3.forward, JumpResolver.ShortDistance, ArenaHalfSize, BodyClearance, isBlocked);
 
-            Assert.IsTrue(res.Cleared, "5m jump must clear 0.5m wall (needs 1.3m)");
-            Assert.AreEqual(5.0f, res.LandingPoint.z, 0.01f);
+            Assert.IsTrue(res.Cleared, "A Short jump must clear a 0.5m wall (needs 1.3m)");
+            // Derived, never a literal. This asserted a hardcoded 5.0 and would have gone
+            // red for the right reason but the wrong cause when the tiers were rescaled
+            // x1.35 on 2026-08-14 — the landing is "wherever Short reaches", not "5 m".
+            Assert.AreEqual(JumpResolver.ShortDistance, res.LandingPoint.z, 0.01f);
         }
 
         [Test]
@@ -81,8 +95,8 @@ namespace CluckWars.Tests
             // Full 12m Centre pile (needs 12.8m, blocked z = 0.6m to 13.4m): 18m clears!
             Func<Vector3, float, bool> isBlockedCentre = (p, r) => p.z >= 0.6f && p.z <= 13.4f;
             var res = JumpResolver.Resolve(Vector3.zero, Vector3.forward, JumpResolver.BigDistance, ArenaHalfSize, BodyClearance, isBlockedCentre);
-            Assert.IsTrue(res.Cleared, "18m jump clears full 12m centre pile (needs 12.8m)");
-            Assert.AreEqual(18.0f, res.LandingPoint.z, 0.01f);
+            Assert.IsTrue(res.Cleared, "A Big jump clears the full 12m centre pile (needs 12.8m)");
+            Assert.AreEqual(JumpResolver.BigDistance, res.LandingPoint.z, 0.01f);
         }
 
         [Test]

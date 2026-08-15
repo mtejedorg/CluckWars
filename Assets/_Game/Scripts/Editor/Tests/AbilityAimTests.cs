@@ -718,6 +718,120 @@ namespace CluckWars.Tests
                 "did become a self-buff or a placed zone, add it to this test's expected-exempt set.");
         }
 
+        // ---- Target gating (AbilityBaseSO.RequiresEnemyInRange) --------------
+
+        [Test]
+        public void TargetGatedAbilities_AreExactlyTheOnesWithNothingToDoWithoutOne()
+        {
+            // Maestro, playtest item 5 (2026-08-14): "gapcloser abilities should always work,
+            // no matter if there is an enemy in range (MOST of them at least)." The hedge is
+            // the point — this is not a blanket exemption, so the exact membership of both
+            // buckets is pinned here rather than left to whoever edits an ability next.
+            //
+            // The rule: an ability is gated only if a cast with nobody in range would
+            // literally do nothing. If the cast is worth making on its own — because it moves
+            // the caster, buffs them, or places something — it must NOT be gated, or the
+            // button goes dead exactly when the player wants it most.
+            var expectedGated = new HashSet<string>
+            {
+                // Pure "do something TO a rival" abilities. No rival, no effect at all.
+                nameof(SnatchAbilitySO),        // steals cargo off a specific victim
+                nameof(SneakyStealAbilitySO),   // ditto, from behind
+                nameof(MarkKillAbilitySO),      // marks a specific victim
+                nameof(CluckShockAbilitySO),    // AoE burst; firing into empty air does nothing
+                // Stun bursts are AoE-around-SELF (StunBurstAbilitySO: AimShape.SelfCircle).
+                // They are NOT gap-closers despite sitting near them in the pools — they move
+                // the caster nowhere, so an empty-radius cast is a wasted cooldown, not a
+                // traversal. Both subclasses inherit the gate from the shared base.
+                nameof(AmbushAbilitySO),
+                nameof(WingSlamAbilitySO),
+            };
+
+            var wronglyGated = new List<string>();
+            var wronglyFree = new List<string>();
+
+            foreach (var type in ConcreteAbilityTypes())
+            {
+                if (typeof(PassiveAbilitySO).IsAssignableFrom(type)) continue;
+
+                var probe = (AbilityBaseSO)ScriptableObject.CreateInstance(type);
+                try
+                {
+                    bool shouldBeGated = expectedGated.Contains(type.Name);
+                    if (shouldBeGated && !probe.RequiresEnemyInRange) wronglyFree.Add(type.Name);
+                    if (!shouldBeGated && probe.RequiresEnemyInRange) wronglyGated.Add(type.Name);
+                }
+                finally { UnityEngine.Object.DestroyImmediate(probe); }
+            }
+
+            Assert.IsEmpty(wronglyGated,
+                "These abilities refuse to fire with no enemy in range, but a cast is worth " +
+                "making on its own (it moves, buffs or places something). That is the dead-button " +
+                "bug from playtest item 5 — Dive Bomb was the original offender, and its gate was " +
+                "even stricter than most: a rival in the lane who was also CARRYING CARGO.");
+            Assert.IsEmpty(wronglyFree,
+                "These abilities do literally nothing without a rival in range, so they must stay " +
+                "gated — otherwise the cast burns its cooldown on a guaranteed no-op and the HUD " +
+                "cannot warn the player. If one genuinely gained a self-effect, remove it from this set.");
+        }
+
+        [Test]
+        public void MobilityAbilities_FireWithNoTargetInRange()
+        {
+            // The specific abilities Maestro's note is about, asserted by NAME as well as by
+            // the bucket rule above. The set test would still pass if someone re-gated one of
+            // these AND added it to expectedGated in the same edit; this one would not.
+            foreach (var type in new[]
+                     {
+                         typeof(RollTrampleAbilitySO),   // Dive Bomb - Vault + Short jump
+                         typeof(ShadowstepAbilitySO),    // blink
+                         typeof(SpeedBurstAbilitySO),    // self mobility buff
+                     })
+            {
+                var probe = (AbilityBaseSO)ScriptableObject.CreateInstance(type);
+                try
+                {
+                    Assert.IsFalse(probe.RequiresEnemyInRange,
+                        $"{type.Name} moves the caster and must fire with an empty lane.");
+                    Assert.IsTrue(probe.IsUsable(null),
+                        $"{type.Name}.IsUsable must not refuse when there is no target to find.");
+                }
+                finally { UnityEngine.Object.DestroyImmediate(probe); }
+            }
+        }
+
+        [Test]
+        public void ZeroHitsIsAWhiff_ExemptsGapClosersButKeepsTheirHitConfirm()
+        {
+            // The knock-on that makes the fix above safe. Dive Bomb declares a real Capsule
+            // and genuinely robs whoever it sweeps through, so ReportsCastHits must stay TRUE
+            // (a landed dive still earns its sparks). But since it now fires with an empty
+            // lane, a zero hit count is no longer evidence of a miss — reading it as one would
+            // grey-ring the player for doing exactly what they asked. Same bug class as the
+            // placed-zone false whiff fixed 2026-08-02, arriving from the opposite direction.
+            var dive = (AbilityBaseSO)ScriptableObject.CreateInstance<RollTrampleAbilitySO>();
+            try
+            {
+                Assert.IsTrue(dive.ReportsCastHits,
+                    "Dive Bomb resolves a real hit at cast time; a landed dive must still " +
+                    "produce hit-confirm sparks.");
+                Assert.IsFalse(dive.ZeroHitsIsAWhiff,
+                    "Dive Bomb fires on purpose with nobody in the lane, so zero hits is not a " +
+                    "miss and must not be whiff-styled by AbilityRangeIndicator.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(dive); }
+
+            // The narrowing must not leak: a genuinely target-gated ability keeps its whiff.
+            var shock = (AbilityBaseSO)ScriptableObject.CreateInstance<CluckShockAbilitySO>();
+            try
+            {
+                Assert.IsTrue(shock.ZeroHitsIsAWhiff,
+                    "Cluck Shock is target-gated, so zero hits genuinely is a miss and must " +
+                    "still be styled as one.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(shock); }
+        }
+
         [Test]
         public void PlacedZoneAbilities_DeclarePlacesZone()
         {

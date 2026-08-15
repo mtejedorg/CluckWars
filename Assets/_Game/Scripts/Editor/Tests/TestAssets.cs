@@ -41,6 +41,19 @@ namespace CluckWars.Tests
         public const string GameScenePath      = "Assets/_Game/Scenes/Game.unity";
 
         /// <summary>
+        /// The Zenject project-scope prefab. Auto-loaded from <c>Resources/</c> by name, and
+        /// its ProjectInstaller carries the inspector slots for every shared SO — so a move
+        /// or an emptied slot breaks the game at runtime, not just this test.
+        /// </summary>
+        public const string ProjectContextPrefabPath = "Assets/_Game/Resources/ProjectContext.prefab";
+
+        public const string UiRoot        = "Assets/UI";
+        public const string LobbyUxmlPath = UiRoot + "/Lobby.uxml";
+
+        /// <summary>The in-match waiting room. Carries a second copy of the MATCH SETTINGS card.</summary>
+        public const string MatchOverlaysUxmlPath = UiRoot + "/MatchOverlays.uxml";
+
+        /// <summary>
         /// Every stylesheet that paints ability icons. A <c>.cw-hex-icon--*</c> rule must
         /// exist in <b>all</b> of them: the touch HUD and the menu front-end load different
         /// sheets, so a rule present in only one paints an icon on one screen and a blank
