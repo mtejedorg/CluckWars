@@ -37,6 +37,11 @@ namespace CluckWars.Installers
                  "Populates the global ability pool for the character-select screen (GDD v0.3 §7.1).")]
         [SerializeField] private AbilityRegistrySO _abilityRegistry;
 
+        [Tooltip("Drop the MatchConfig asset here. This is the ONLY serialized reference to it in " +
+                 "the project — the Bootstrap menu lobby and the Game-scene match systems both read " +
+                 "it from this one slot, so the advertised rules and the played rules cannot drift.")]
+        [SerializeField] private MatchConfigSO _matchConfig;
+
         public override void InstallBindings()
         {
             // Logger bound first so other bindings can complain through it during install if they need to.
@@ -137,6 +142,23 @@ namespace CluckWars.Installers
                     "[ProjectInstaller] AbilityRegistry not assigned. " +
                     "Character-select ability picker will show no abilities. " +
                     "Create an AbilityRegistry asset and assign it here.");
+            }
+
+            // MatchConfig: project-scoped rather than scene-scoped, because the Bootstrap
+            // menu lobby advertises the same duration/goal the Game scene enforces. An
+            // empty instance still carries the SO's field initialisers, so consumers never
+            // null-check — but a silently-defaulted match config means the match runs on
+            // numbers nobody authored, so the null slot is loud.
+            var matchConfig = _matchConfig != null
+                ? _matchConfig
+                : ScriptableObject.CreateInstance<MatchConfigSO>();
+            Container.Bind<MatchConfigSO>().FromInstance(matchConfig).AsSingle();
+            if (_matchConfig == null)
+            {
+                Debug.LogWarning(
+                    "[ProjectInstaller] MatchConfig not assigned — falling back to the SO's " +
+                    "built-in defaults. Match duration, food target and MaxPlayers are NOT " +
+                    "coming from MatchConfig.asset. Assign it here.");
             }
         }
     }

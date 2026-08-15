@@ -27,7 +27,7 @@ namespace CluckWars.UI
     /// (<see cref="PlayerBase.ActiveBases"/>, <see cref="ChickenController.ActiveControllers"/>,
     /// <see cref="ChickenMatchStats.ActiveStats"/>) — no direct Fusion/UGS calls
     /// beyond what MatchHud already did. Per CONVENTIONS IP-fix1 the self-inject
-    /// falls back to the SceneContext first (MatchConfigSO is scene-scoped).
+    /// falls back to the SceneContext first (INetworkService is scene-scoped).
     /// </remarks>
     [RequireComponent(typeof(UIDocument))]
     public sealed class MatchOverlaysController : MonoBehaviour
@@ -110,7 +110,7 @@ namespace CluckWars.UI
         {
             if (_network == null)
             {
-                // MatchConfigSO is bound in GameInstaller (scene scope), so inject
+                // INetworkService is bound in GameInstaller (scene scope), so inject
                 // from the SceneContext first and fall back to ProjectContext
                 // (CONVENTIONS IP-fix1).
                 var sceneCtx = FindFirstObjectByType<SceneContext>();
@@ -420,9 +420,9 @@ namespace CluckWars.UI
 
             // Settings.
             if (_lobbySettingTime != null && _matchConfig != null)
-                _lobbySettingTime.text = FormatTime(_matchConfig.MatchDurationSeconds);
+                _lobbySettingTime.text = MatchSettingsText.Time(_matchConfig.MatchDurationSeconds);
             if (_lobbySettingGoal != null && _matchConfig != null)
-                _lobbySettingGoal.text = $"{_matchConfig.FoodTargetToWin} food";
+                _lobbySettingGoal.text = MatchSettingsText.Goal(_matchConfig.FoodTargetToWin);
 
             // Status pill.
             if (_lobbyStatusCount != null) _lobbyStatusCount.text = $"{playerCount}/{maxPlayers}";
@@ -700,13 +700,6 @@ namespace CluckWars.UI
             ChickenClass.Assassin => "Combo",
             _                     => "—",
         };
-
-        private static string FormatTime(float seconds)
-        {
-            int mm = Mathf.Max(0, Mathf.FloorToInt(seconds / 60f));
-            int ss = Mathf.Max(0, Mathf.FloorToInt(seconds - mm * 60f));
-            return $"{mm}:{ss:00}";
-        }
 
         private static Color Fade(Color c, float a) => new Color(c.r, c.g, c.b, a);
 

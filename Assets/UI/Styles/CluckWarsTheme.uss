@@ -390,6 +390,33 @@
    freely mixed, no per-category minimum. Category survives as a colored tag
    on each card, which is where 4 labels for 3 items belongs.
    ============================================================================ */
+/* Scroll container for the two pick rows.
+
+   `min-height: 0` is the whole trick and must not be removed. A flex item's
+   default `min-height: auto` is its CONTENT height, so without this the
+   ScrollView refuses to shrink below the full height of both pick rows, never
+   scrolls, and overflows its parent exactly as the unscrolled markup did — the
+   bug looks completely unfixed while the ScrollView is plainly present in the
+   hierarchy. This is the single most common UI Toolkit scrolling mistake.
+
+   The pools were widened to 8-11 abilities across 4 slots (21ddaa8); at three
+   32%-wide cards per row that is up to four wrapped rows, which does not fit
+   the column on a phone in landscape and never will. Scrolling is the answer,
+   not shrinking the cards below a thumb-sized target. */
+.cw-pick-scroll { flex-grow: 1; min-height: 0; }
+
+/* The rows wrap; they must never scroll sideways. A horizontal scroller here
+   would also steal the drag that the vertical one needs. */
+.cw-pick-scroll .unity-scroll-view__horizontal-scroller { display: none; }
+.cw-pick-scroll .unity-scroll-view__content-viewport { overflow: hidden; }
+
+/* Leave room for the vertical scroller so the right-hand card in each row — and
+   the right-aligned "N EQUIPPED" counter in each row header — is not tucked
+   underneath it. Measured: 6px was not enough and clipped the counter's last
+   character; Unity's default vertical scroller is ~13px plus its own margins,
+   so this is that plus a little air. */
+.cw-pick-scroll .unity-scroll-view__content-container { padding-right: 20px; }
+
 .cw-pick-row { margin-bottom: 18px; }
 .cw-pick-row__head { flex-direction: row; align-items: center; margin-bottom: 10px; }
 .cw-pick-row__title {
@@ -530,6 +557,76 @@
     border-top-color: rgb(26, 14, 4); border-bottom-color: rgb(26, 14, 4);
     border-top-left-radius: 24px; border-top-right-radius: 24px;
     border-bottom-left-radius: 24px; border-bottom-right-radius: 24px;
+}
+
+/* ============================================================================
+   DISPLAY OPTION ROW  (character select, above READY)
+   ----------------------------------------------------------------------------
+   One horizontal band: [checkbox + label] then a wrapping hint, laid out like
+   .cw-pick-row__head (title then hint) so the option reads as part of the
+   loadout column rather than a bolted-on settings widget.
+
+   The whole Toggle is the touch target — BaseBoolField puts a Clickable on the
+   field root, so its 116px min-height IS the 48 dp floor; the 52px checkmark
+   box is only the visual. Do not shrink the Toggle to the box size.
+
+   The checked state is carried by the BOX FILL (dark -> gold), not only by the
+   glyph: the checkmark image comes from the default runtime theme, and if that
+   ever fails to resolve, a glyph-only design would render ON and OFF
+   identically. Fill + border + tint means the state survives a missing sprite.
+   ============================================================================ */
+.cw-opt-row {
+    flex-shrink: 0;
+    flex-direction: row; align-items: center;
+    margin-bottom: 12px;
+    padding-left: 20px; padding-right: 20px;
+}
+
+.cw-opt-toggle {
+    flex-shrink: 0;
+    min-height: 116px;                        /* 48 dp touch floor */
+    /* Kill the BaseField margins so the row's own padding is the only inset. */
+    margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 20px;
+}
+/* Vertical centering ONLY. A Toggle is a BaseField, i.e. flex-direction: row —
+   `justify-content` here centers HORIZONTALLY, and the theme pairs
+   `flex-grow: 1` with `flex-basis: 0` on the input, so overriding grow to 0
+   collapses the input to zero width and the checkmark and its label spill out
+   of it (measured: label shrank to 2px, i.e. the caption vanished). Leave the
+   theme's grow/basis alone and let the input size the field to its content. */
+.cw-opt-toggle .unity-toggle__input { align-items: center; }
+
+.cw-opt-toggle .unity-toggle__checkmark {
+    width: 52px; height: 52px;
+    margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 16px;
+    background-color: rgb(26, 14, 8);
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
+    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
+    border-top-left-radius: 10px; border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+    -unity-background-image-tint-color: rgba(0, 0, 0, 0);
+}
+.cw-opt-toggle:checked .unity-toggle__checkmark {
+    background-color: rgb(245, 200, 66);      /* #f5c842 accent */
+    border-left-color: rgb(245, 200, 66); border-right-color: rgb(245, 200, 66);
+    border-top-color: rgb(245, 200, 66); border-bottom-color: rgb(245, 200, 66);
+    -unity-background-image-tint-color: rgb(26, 14, 4);
+}
+
+.cw-opt-toggle .unity-toggle__text {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 34px; letter-spacing: 1px; color: rgb(254, 245, 224);
+    white-space: nowrap; flex-shrink: 0;
+    margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 0;
+}
+
+/* Wraps — unlike .cw-pick-row__hint, which is nowrap because its row has a
+   flexible rule element to absorb the slack. This one has to fit the column. */
+.cw-opt-hint {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 30px; color: rgb(196, 160, 96);
+    white-space: normal; flex-grow: 1; flex-shrink: 1;
 }
 
 /* ---- Inset well + text input --------------------------------------------- */
@@ -796,7 +893,29 @@
 .layout--landscape .cw-cs-preview { width: 430px; flex-shrink: 0; margin-left: 18px; margin-right: 18px; }
 .layout--portrait  .cw-cs-preview { width: 100%; margin-top: 14px; }
 
-.cw-cs-detail { flex-grow: 1; min-width: 0; }
+/* `min-height: 0` for the same reason as `.cw-pick-scroll`, one level up. In
+   landscape this column is a CROSS-axis item so its height comes from the row's
+   stretch and content-based auto-min-height never applies — which is why the
+   ScrollView fix alone was enough for the layout that was tested. In portrait
+   `.cw-cs-body` flips to a column and this becomes a MAIN-axis item, where
+   `min-height: auto` resolves to content height and the same overflow-onto-the-
+   sibling-below bug can resurface against AbilityDetail / ReadyBtn. The app is
+   landscape-locked today (`allowedAutorotateToPortrait: 0`), so this is a guard
+   rather than a live fix — but it is one line and removes the open question. */
+.cw-cs-detail { flex-grow: 1; min-width: 0; min-height: 0; }
+
+/* The display-option row is landscape-only, and that is a measurement, not taste.
+   Portrait gives this column ~323px for AbilityDetail (96, unshrinkable) + READY
+   (117, unshrinkable) + the ScrollView, so the ScrollView is already down to ~95px
+   — less than one 128px card row, i.e. the pick rows are effectively invisible
+   there before anything is added. Adding a 116px row has nothing left to take
+   from: measured at 968x1615, the ScrollView collapses to 0 and READY is pushed
+   32px past the column, exactly the paint-over-the-page bug the ScrollView was
+   introduced to end. The app is landscape-locked (`allowedAutorotateToPortrait: 0`)
+   so nothing ships behind this rule; if portrait is ever made real, this column
+   needs a rethink and this option needs a home in it — do not just delete the
+   rule and assume it fits. */
+.layout--portrait .cw-opt-row { display: none; }
 
 .layout--portrait  .cw-mode-row { flex-direction: column; align-items: stretch; }
 .layout--landscape .cw-mode-row { flex-direction: row; justify-content: center; }

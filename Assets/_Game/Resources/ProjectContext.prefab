@@ -80,3 +80,4 @@ MonoBehaviour:
   _prefabRegistry: {fileID: 11400000, guid: 98b68981e7a09644188bef851cbd9a3f, type: 2}
   _colorScheme: {fileID: 11400000, guid: c62b6e72c58ec2f4db3259d464391bab, type: 2}
   _abilityRegistry: {fileID: 11400000, guid: 0a608378f96412943a62f875f18497c3, type: 2}
+  _matchConfig: {fileID: 11400000, guid: 3af469376147c9a45aa293777ed50fc6, type: 2}

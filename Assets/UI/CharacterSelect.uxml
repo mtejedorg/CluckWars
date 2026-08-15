@@ -117,27 +117,38 @@
                  Card children are created by MenuUiController.RebuildPickRows. -->
             <ui:VisualElement name="Detail" class="cw-cs-detail">
 
-                <ui:VisualElement name="CommonRow" class="cw-pick-row cw-well" style="padding: 14px;">
-                    <ui:VisualElement class="cw-pick-row__head">
-                        <ui:Label text="COMMON" class="cw-pick-row__title" />
-                        <ui:Label name="CommonHint" text="optional · any chicken can take these" class="cw-pick-row__hint" />
-                        <ui:VisualElement class="cw-pick-row__rule" />
-                        <ui:Label name="CommonCount" text="0 EQUIPPED" class="cw-pick-row__count" />
-                    </ui:VisualElement>
-                    <ui:VisualElement name="CommonCards" class="cw-pick-cards" />
-                </ui:VisualElement>
+                <!-- The two pick rows live in a ScrollView, and that is load-bearing.
+                     This column was authored for "up to 3 Common + 3 Character" (see the
+                     file header) — six cards, two rows of three. Commit 21ddaa8 widened
+                     the pools to 8-11 abilities across 4 slots, which is more content than
+                     the column is tall. Flex children shrink by default but their CONTENT
+                     does not, so the rows were being squeezed while their cards spilled
+                     over everything below: the wrapped Common row painted across the CLASS
+                     header, and the cards painted across AbilityDetail. Scrolling the
+                     overflow is the fix; the row markup itself was never wrong. -->
+                <ui:ScrollView name="PickScroll" mode="Vertical" class="cw-pick-scroll">
 
-                <ui:VisualElement name="ClassRow" class="cw-pick-row cw-well" style="padding: 14px;">
-                    <ui:VisualElement class="cw-pick-row__head">
-                        <ui:Label text="CLASS" class="cw-pick-row__title" />
-                        <ui:Label name="ClassHint" text="Warrior only" class="cw-pick-row__hint" />
-                        <ui:VisualElement class="cw-pick-row__rule" />
-                        <ui:Label name="ClassCount" text="0 EQUIPPED" class="cw-pick-row__count" />
+                    <ui:VisualElement name="CommonRow" class="cw-pick-row cw-well" style="padding: 14px;">
+                        <ui:VisualElement class="cw-pick-row__head">
+                            <ui:Label text="COMMON" class="cw-pick-row__title" />
+                            <ui:Label name="CommonHint" text="optional · any chicken can take these" class="cw-pick-row__hint" />
+                            <ui:VisualElement class="cw-pick-row__rule" />
+                            <ui:Label name="CommonCount" text="0 EQUIPPED" class="cw-pick-row__count" />
+                        </ui:VisualElement>
+                        <ui:VisualElement name="CommonCards" class="cw-pick-cards" />
                     </ui:VisualElement>
-                    <ui:VisualElement name="ClassCards" class="cw-pick-cards" />
-                </ui:VisualElement>
 
-                <ui:VisualElement style="flex-grow: 1; min-height: 8px;" />
+                    <ui:VisualElement name="ClassRow" class="cw-pick-row cw-well" style="padding: 14px;">
+                        <ui:VisualElement class="cw-pick-row__head">
+                            <ui:Label text="CLASS" class="cw-pick-row__title" />
+                            <ui:Label name="ClassHint" text="Warrior only" class="cw-pick-row__hint" />
+                            <ui:VisualElement class="cw-pick-row__rule" />
+                            <ui:Label name="ClassCount" text="0 EQUIPPED" class="cw-pick-row__count" />
+                        </ui:VisualElement>
+                        <ui:VisualElement name="ClassCards" class="cw-pick-cards" />
+                    </ui:VisualElement>
+
+                </ui:ScrollView>
 
                 <!-- Shared ability detail. The description's only home: six cards
                      each carrying their own wrapped copy needed ~137px of a 263px
@@ -147,6 +158,26 @@
                 <ui:VisualElement name="AbilityDetail" class="cw-ability-detail">
                     <ui:Label name="AbilityDetailName" text="" class="cw-ability-detail__name" />
                     <ui:Label name="AbilityDetailText" text="Tap an ability to see what it does." class="cw-ability-detail__text" />
+                </ui:VisualElement>
+
+                <!-- Display options. This project has no settings screen (MainMenu is
+                     Solo/Host/Join and nothing else) and is not getting one for a single
+                     boolean, so the option lives on the screen it is about: these are the
+                     very four abilities whose reach the in-match overlay draws, so "show me
+                     what these reach" is both most meaningful and most discoverable here.
+
+                     It sits OUTSIDE #PickScroll deliberately — inside, it would be below
+                     the fold for any class whose pool wraps (Assassin's CLASS row is 6
+                     cards) and a setting nobody scrolls to is a setting nobody finds. The
+                     cost is ~128px of fixed height taken off the ScrollView, which is what
+                     the ScrollView is for.
+
+                     One row, not a stacked label+helper pair: the helper reads as the row's
+                     hint exactly like #CommonHint reads as COMMON's, and stacking would
+                     have cost a second 116px band this column does not have. -->
+                <ui:VisualElement name="OptionsRow" class="cw-opt-row">
+                    <ui:Toggle name="RangeGuidesToggle" text="Ability Range Guides" class="cw-opt-toggle" />
+                    <ui:Label name="RangeGuidesHint" text="Show a faint outline of what each equipped ability can reach." class="cw-opt-hint" />
                 </ui:VisualElement>
 
                 <ui:Button name="ReadyBtn" text="PICK ABILITIES" class="cw-btn cw-btn--neutral" style="flex-shrink: 0; letter-spacing: 3px;" />

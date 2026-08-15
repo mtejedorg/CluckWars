@@ -43,10 +43,10 @@
                         <ui:Label text="ARENA" class="cw-setting-k" /><ui:Label text="Sunny Farm" class="cw-setting-v" />
                     </ui:VisualElement>
                     <ui:VisualElement class="cw-setting-row">
-                        <ui:Label text="TIME" class="cw-setting-k" /><ui:Label name="SetTime" text="3:00" class="cw-setting-v" />
+                        <ui:Label text="TIME" class="cw-setting-k" /><ui:Label name="SetTime" text="0:45" class="cw-setting-v" />
                     </ui:VisualElement>
                     <ui:VisualElement class="cw-setting-row">
-                        <ui:Label text="GOAL" class="cw-setting-k" /><ui:Label name="SetGoal" text="150 food" class="cw-setting-v" />
+                        <ui:Label text="GOAL" class="cw-setting-k" /><ui:Label name="SetGoal" text="40 food" class="cw-setting-v" />
                     </ui:VisualElement>
                     <ui:VisualElement class="cw-setting-row">
                         <ui:Label text="MODE" class="cw-setting-k" /><ui:Label name="SetMode" text="Free-for-all" class="cw-setting-v" />

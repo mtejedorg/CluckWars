@@ -6,6 +6,7 @@ using CluckWars.Bootstrap;
 using CluckWars.Gameplay;
 using CluckWars.Logging;
 using CluckWars.Services;
+using CluckWars.Settings;
 using UnityEngine;
 using UnityEngine.UIElements;
 using Zenject;
@@ -37,6 +38,7 @@ namespace CluckWars.UI
         private SceneLoader              _sceneLoader;
         private ChickenClassRegistrySO   _classRegistry;
         private AbilityRegistrySO        _abilityRegistry;
+        private MatchConfigSO            _matchConfig;
 
         // ---- Runtime state ----------------------------------------------------
         private VisualElement _root;
@@ -103,7 +105,8 @@ namespace CluckWars.UI
             IUGSService ugs,
             [InjectOptional] SceneLoader sceneLoader,
             [InjectOptional] ChickenClassRegistrySO classRegistry,
-            [InjectOptional] AbilityRegistrySO abilityRegistry)
+            [InjectOptional] AbilityRegistrySO abilityRegistry,
+            [InjectOptional] MatchConfigSO matchConfig)
         {
             _selection       = selection;
             _log             = log;
@@ -111,6 +114,7 @@ namespace CluckWars.UI
             _sceneLoader     = sceneLoader;
             _classRegistry   = classRegistry;
             _abilityRegistry = abilityRegistry;
+            _matchConfig     = matchConfig;
         }
 
         private void Awake()
@@ -277,6 +281,35 @@ namespace CluckWars.UI
             }
 
             Bind<Button>(_charSelect, "HomeBtn", b => b.clicked += ShowMainMenu);
+            BindRangeGuidesToggle();
+        }
+
+        /// <summary>
+        /// Wires #RangeGuidesToggle to <see cref="PlayerPreferences.AbilityRangeGuidesEnabled"/>.
+        /// </summary>
+        /// <remarks>
+        /// Initialised FROM the preference rather than from the UXML, because the preference
+        /// defaults to true when unwritten and the control must agree with what the player is
+        /// about to see in the match. <c>SetValueWithoutNotify</c>, not <c>value</c>: the seed
+        /// is not a player choice, and letting it raise a ChangeEvent would echo the stored
+        /// value straight back to <c>PlayerPrefs</c> on every visit to this screen, turning
+        /// "never chosen, defaulting to on" into "explicitly chosen".
+        ///
+        /// Bound once in <see cref="BuildCharacterSelect"/>, not per refresh — the control is
+        /// static markup, and a second RegisterValueChangedCallback on the same Toggle would
+        /// run the setter twice per click.
+        /// </remarks>
+        private void BindRangeGuidesToggle()
+        {
+            Bind<Toggle>(_charSelect, "RangeGuidesToggle", t =>
+            {
+                t.SetValueWithoutNotify(PlayerPreferences.AbilityRangeGuidesEnabled);
+                t.RegisterValueChangedCallback(evt =>
+                {
+                    PlayerPreferences.AbilityRangeGuidesEnabled = evt.newValue;
+                    _log?.Info(Source, $"Ability range guides {(evt.newValue ? "enabled" : "disabled")}.");
+                });
+            });
         }
 
         private void SelectClass(ChickenClass cls)
@@ -887,6 +920,7 @@ namespace CluckWars.UI
 
             BuildPlayerGrid(isSolo, isHost);
             UpdateLobbyStatus(isSolo, isHost, isJoin);
+            RefreshMatchSettings();
 
             // Host pre-creates the UGS lobby so its join code populates the tiles before START.
             if (isHost)
@@ -906,6 +940,29 @@ namespace CluckWars.UI
                     if (status != null) { status.style.color = UiGfx.Hex32("ff786e"); status.text = "Could not create lobby."; }
                 }
             }
+        }
+
+        /// <summary>
+        /// Paints the TIME / GOAL rows of the MATCH SETTINGS card from the live
+        /// <see cref="MatchConfigSO"/>, so the lobby advertises the rules the match will
+        /// actually enforce. (ARENA and MODE stay authored: there is no map registry and
+        /// FFA is the only mode, so there is nothing to bind them to.)
+        /// </summary>
+        private void RefreshMatchSettings()
+        {
+            if (_matchConfig == null)
+            {
+                // Only reachable when nothing installed the project container (EditMode /
+                // headless). Leave the authored UXML text — an EditMode test pins it to
+                // these same values, so it is right rather than merely stale.
+                _log?.Debug(Source, "MatchConfig not injected; lobby settings keep their authored text.");
+                return;
+            }
+
+            var time = _lobby.Q<Label>("SetTime");
+            var goal = _lobby.Q<Label>("SetGoal");
+            if (time != null) time.text = MatchSettingsText.Time(_matchConfig.MatchDurationSeconds);
+            if (goal != null) goal.text = MatchSettingsText.Goal(_matchConfig.FoodTargetToWin);
         }
 
         private void UpdateLobbyStatus(bool isSolo, bool isHost, bool isJoin)
