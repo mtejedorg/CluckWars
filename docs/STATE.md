@@ -6,7 +6,627 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
-## Peck foraging, four slots, specializations (2026-08-13) — latest, committed on `develop`
+## ✅ Ability Range Guides — always-on reach overlay (2026-08-15) — FEATURE
+
+**EditMode 314 → 327, all green** (re-run independently at signoff: 327/327, 3.29 s).
+Nothing committed. Enabled by default.
+
+Maestro asked for a tool that shows the range/shape of every equipped ability on the map at
+all times — **additive to** the press-to-preview / release-to-launch aim mechanic, not a
+replacement. `AbilityTelegraph` is untouched.
+
+### What it is
+
+New `Assets/_Game/Scripts/Visuals/AbilitySlotOverlay.cs` — four always-on `LineRenderer`
+outlines, one per equipped slot, each drawing that ability's **real** `AbilityAimShape`
+geometry through the existing `TelegraphShapes` writer. Because the telegraph, the cast flash
+and this overlay all share that one writer, the three can never disagree about a shape.
+
+State is encoded in **alpha only**; stroke width is flat across every tier
+(`AmbientSlotOutlineWidth = 0.035`, the thinnest persistent cue in the game).
+
+| Tier | Alpha | Meaning |
+|---|---|---|
+| Hot | 0.34 | a rival is actually inside the shape (`WouldAffect`, non-self candidates) |
+| Ready | 0.22 | usable, nothing in range |
+| Cooldown | 0.09 | **recedes, does not vanish** — mid-fight is the worst moment to lose the spatial reference |
+| Suppressed | 0.06 | one slot is being aimed; the other three drop back as a group |
+
+Each constant is tied *proportionally* to an existing HUD constant (cooldown mirrors
+`HexAlphaCooldown`/`HexAlphaReady`; suppressed mirrors `HexAlphaOtherActive`), so the world
+and the HUD tell the same story about the same slot. All four sit well under
+`TelegraphPreviewAlpha` (0.75).
+
+**While a slot is being aimed, that slot's ambient outline hides completely** rather than
+fading underneath — the telegraph is already drawing identical geometry, and a faint duplicate
+would show as a double-stroke fringe around the real preview. The sharp aim preview is always
+the single brightest thing on screen.
+
+**The hot scan is rate-limited to `FeedbackTuning.TargetScanPollHz` (10 Hz) while geometry
+stays per-frame** — the same split `AbilityTelegraph.UpdateMarks` already makes. The retired
+range ring evaluated `IsUsable` per-frame for up to three slots; four permanent slots at that
+rate would have been 4x a cost the project already judged too high for *one* ability on a 2021
+mid-range Android.
+
+### `AimShape.None` draws nothing — a deliberate divergence from the telegraph
+
+`TelegraphShapes.Resolve` degrades `None` into a caster self-ring at `SelfRingRadius`. That is
+right for the telegraph (a self-buff being aimed needs an "armed" pulse, and it lasts only as
+long as the hold) and **wrong here for a concrete reason**: `SelfRingRadius` (0.62) is exactly
+`ControlStateVFX`'s stun/root/slow status-ring radius. Reusing it would paint a permanent
+duplicate status ring at, say, a Spine Coat Warrior's feet for the whole match, and collide
+head-on with the real status ring the instant they were actually stunned — the one moment that
+ring has to be unambiguous.
+
+So `None` short-circuits **before** `Resolve` is consulted, and a declared shape that resolves
+to a non-positive radius is dropped for the same reason. Pinned by
+`TheNoneCase_DivergesFromTheTelegraphOnPurpose`. **Do not "fix" this into consistency.**
+
+Verified live: a Warrior's Peck and Egg Shell (both `None`) correctly drew nothing, while
+Cluck Shock (`SelfCircle` r4.50) and Dive Bomb (`Capsule` r2.05, offset 5.00) drew.
+
+### Local player only — the leak that would have been worse than the bug
+
+Gated on `HasInputAuthority`. Leaking one live aim is bad; leaking a rival's **entire permanent
+reach map** would solve the arena. Verified live in a 4-chicken solo match:
+
+```
+[Fatty]    inputAuth=False  enabledLines=0
+[Speedy]   inputAuth=False  enabledLines=0
+[Warrior]  inputAuth=True   enabledLines=2   alphas=[-, 0.220, -, 0.220]
+[Assassin] inputAuth=False  enabledLines=0
+```
+
+### Two gates, both honoured, neither implying the other
+
+- `FeedbackTuning.AbilitySlotOverlayEnabled` — developer kill switch, checked in `Awake`
+  **before anything is allocated**. `static readonly`, not `const`, or every guard reading it
+  becomes a CS0162 warning (the `RivalIndicatorsEnabled` precedent).
+- `PlayerPreferences.AbilityRangeGuidesEnabled` — the player's own toggle, re-read every frame
+  so a mid-match flip takes effect live.
+
+New `Assets/_Game/Scripts/Settings/PlayerPreferences.cs` (PlayerPrefs-backed, cached because
+the consumer reads it per-frame, write-through so cache and disk cannot disagree,
+`[RuntimeInitializeOnLoadMethod]` cache reset for domain-reload-disabled play).
+
+### Retired: the old single-ring range indicator
+
+`AbilityRangeIndicator.UpdateRangeRing` only ever drew **one** ring, for the single "best"
+ability chosen by a tie-break. Its ready/in-range brightening is now the per-slot hot tier —
+a strict improvement, since all four slots can independently show "target in range" where
+previously only one could.
+
+`AbilityController.GetSlot(int)` was made **public**; it had been silently reimplemented
+elsewhere, and that duplication was root-caused and removed rather than worked around. Pinned
+by `AbilityController_ExposesGetSlotPublicly_SoNoConsumerReimplementsTheMapping`.
+
+### Toggle UI
+
+"Ability Range Guides" toggle in `CharacterSelect.uxml`, **column C, between the ability-detail
+strip and the READY button** — deliberately *not* inside the scrolling ability-pick list, which
+scrolls out of view for big pools (Assassin renders 6 cards). New `.cw-opt-row` /
+`.cw-opt-toggle` / `.cw-opt-hint` in `CluckWarsTheme.uss`; `MenuUiController.BindRangeGuidesToggle()`
+is binding only.
+
+**A real portrait regression was caught and fixed during this pass**: the new row pushed the
+READY button 32 px past the column bottom on the Android target. The row is now landscape-only
+(`.layout--portrait .cw-opt-row { display: none; }`) — portrait has no spare room at all (its
+ScrollView is ~95 px for 128 px cards). Post-fix portrait measurements are byte-identical to the
+no-row baseline.
+
+`SetValueWithoutNotify` seeds the control, **not** `value`: letting the seed raise a
+ChangeEvent would echo the stored value back to `PlayerPrefs` on every visit, silently turning
+"never chosen, defaulting to on" into "explicitly chosen".
+
+### Two design risks investigated and closed (not guessed at)
+
+1. **Wing Slam (cone r4.5) and Cluck Shock (circle r4.5) share an identical radius.** Feared
+   illegible — coincident arcs separated by hue alone. Checked on a real top-down capture: the
+   cone's straight radial edges read clearly against the circle's curve. That is a **shape** cue,
+   satisfying the project's "never rely on hue alone" rule. No escalation needed.
+2. **Feather Trap's ambient circle has no connecting stalk** (the charging preview does get one
+   for offset shapes). Measured: offset 4.5, radius 3.6 → a **0.9 m gap**, so the circle's near
+   edge sits essentially at the player's feet and reads as attached, not floating. No stalk. If
+   a live look ever disagrees, the fix is a second per-slot line — **not** widening the stroke.
+
+### Verification performed at signoff (not inherited from prior reports)
+
+- EditMode **327/327** green, re-run independently.
+- Live Play Mode solo match: 4 chickens, overlay gating confirmed **in both directions** —
+  pref off → total enabled lines across all chickens **0**; pref back on → local player returns
+  to 2, rivals stay at 0. This is a genuine render-gating check, not just a PlayerPrefs write.
+- `keyPresent=False` on a fresh profile confirmed: **the ON-default does not write the key.**
+- Console clean — zero Errors, zero Exceptions across the session.
+- Prefab wiring verified by reading `Chicken.prefab` YAML on disk (script GUID
+  `9e3d40b7a1cf52f4ab08d6e274513c9a`), not Editor memory. `Doppelganger.prefab` inherits it.
+
+### 📱 Open follow-up — Pixel 9 legibility check on the 0.22 / 0.035 stroke
+
+**Decision: ship it, but this is NOT closed, and the reason is narrow and specific.**
+
+The *rendering-path* worry is resolved by measurement. Both RP assets run **MSAA = 1x (off)**,
+and the Editor Game View already renders through `Mobile_RPAsset` at **renderScale 0.80** — so
+the capture is not flattered by any setting the device lacks. Stroke geometry:
+
+| | face-on | foreshortened (30° pitch) |
+|---|---|---|
+| Editor Game View 809x455 | 1.42 px | **0.71 px** |
+| Pixel 9 2424x1080 | 3.38 px | **1.69 px** |
+
+The device gets **~2.4x more pixel coverage** than the capture in which the outlines are
+already legible. So the overlay will not structurally disappear on device.
+
+What a capture **cannot** settle is perceptual contrast at physical size: 3.38 px on a 422 ppi
+panel is ~0.16 mm, roughly 2 arcmin at arm's length, at 22% alpha over bright sunlit grass —
+and low-contrast detail is the first thing lost to ambient-light washout on a phone. Per this
+project's own `art-metrics-that-passed-while-broken` lesson, a number that looks fine is not a
+look in hand.
+
+**Why it does not block:** the risk is one-directional (too faint, never too loud) and the fix
+is a one-constant alpha bump in `FeedbackTuning` with no structural consequence. Bump
+`AmbientSlotOutlineAlphaReady` and let the other three tiers follow their documented
+proportions — **do not widen the stroke**, since flat width across tiers is load-bearing.
+
+### 📋 Deferred follow-ups — tracked, deliberately not done here
+
+- **Peck's reach is still untaught.** Its real range is *pile-relative*, not caster-relative
+  (`FoodPile.IsWithinCollectRange`), so it has no caster-centred shape to draw and correctly
+  renders nothing. Teaching it needs a **pile-side** visual — a separate feature, not a tweak
+  to this one.
+- **Two pre-existing rough edges left untouched, for consistency with existing code. Both are
+  tracked as their own task chips, not lost:**
+  - `AbilityTelegraph.BuildLineMaterial()` (line 217) **silently returns `null`** when no shader
+    resolves — magenta fallback, nothing logged — and does `new Material(sh)` per call, leaking
+    one Material per component instance. Shared by six visual components.
+  - `RivalIndicator.Awake` (line 116) gates self-injection on `ProjectContext.HasInstance`,
+    which `docs/CONVENTIONS.md` explicitly forbids — and its own comment on line 115 claims
+    "not gated on HasInstance" while the code directly below it is.
+
+### Editor housekeeping
+
+The stray custom Game View size **`Pixel9 (2424x1080)`** added during verification has been
+**removed and persisted**. The earlier removal attempt reported success but did not stick
+because `GameViewSizes` is a `ScriptableSingleton` that only flushes on domain reload or quit;
+calling `Save(true)` after `RemoveCustomSize` fixes it. Standalone is back to one custom size,
+the pre-existing `Vertical Android (10:16 Aspect)`, which was matched **by name, never by
+index** so the portrait size could not be deleted by mistake.
+
+The `PlayerPrefs` key written during toggle testing was deleted afterwards, restoring the
+pristine "never chosen" state the ON-default depends on.
+
+---
+
+## ✅ Lobby advertised the wrong rules (2026-08-15) — BUGFIX
+
+**EditMode 309 → 314, all green.** Nothing committed.
+
+The menu lobby's MATCH SETTINGS card claimed **"TIME 3:00 / GOAL 150 food"** while
+`MatchConfig.asset` says 45 s / 40 food and the in-match HUD correctly showed "FIRST TO 40".
+The `SetTime` / `SetGoal` labels carried `name` attributes suggesting an intended binding, but
+`grep` over `Assets/_Game/Scripts/` found no code touching them — the placeholder copy shipped.
+
+- **`MatchConfigSO` moved from `GameInstaller` (Game-scene scope) up to `ProjectInstaller`.**
+  `MenuUiController` lives in Bootstrap.unity and resolves from `ProjectContext`, so it had no
+  access path to the config at all. The binding is now project-wide and `GameInstaller` no
+  longer binds it; scene containers inherit, so `GameManager`, `ChickenCargo`,
+  `FusionNetworkService`, `MatchHudController` and `MatchOverlaysController` resolve unchanged.
+- **There is now exactly ONE serialized reference to `MatchConfig.asset` in the project** —
+  the `_matchConfig` slot on `ProjectContext.prefab`. The orphaned key left behind on
+  `GameInstaller` in `Game.unity` was deleted too, so `grep` for the asset GUID returns one
+  file. Two references to one config asset is the shape that produced this bug; don't add a
+  second (a `[SerializeField]` on a controller counts).
+- **New `MatchSettingsText` (`Assets/_Game/Scripts/UI/MatchSettingsText.cs`)** — two pure
+  static formatters (`Time`, `Goal`). `MatchOverlaysController` had its own private
+  `FormatTime` doing the same job for the in-match waiting room; it now shares this one rather
+  than the project carrying a third copy. **Seconds truncate, they do not round** — that
+  matches the live countdown in `MatchHudController`, and rounding would let the lobby
+  advertise "0:46" for a match the HUD starts at "00:45".
+- **Authored UXML defaults corrected** in both `Lobby.uxml` and `MatchOverlays.uxml`
+  (`3:00` → `0:45`, `150 food` → `40 food`). The runtime binding is the real fix; the authored
+  text is what flashes on screen for a frame before the controller runs, and what a reader of
+  the file believes the rules are. `MatchOverlays.uxml` already had a working binding but the
+  same stale placeholders.
+- **ARENA and MODE deliberately left alone.** No map-name SO, no level/map registry, and
+  "Sunny Farm" appears nowhere but these two UXML files; `SessionMode` is Solo/Host/Join (a
+  networking mode, not a match mode) and FFA is the only mode. Inventing a map-naming system
+  or a mode enum would be scope creep — revisit when a second arena or mode actually exists.
+- **`LobbyMatchSettingsTests.cs` (5 tests)** pins the formatters, both UXMLs, and the prefab
+  slot. Every expectation is **derived from the loaded `MatchConfig.asset`**, never from the
+  literals `"0:45"` / `"40 food"` — the BalanceOracle hardcoded-inputs trap. Guard verified to
+  actually bite: reintroducing `"3:00"` in `Lobby.uxml` fails the run with the intended message.
+
+### Outstanding Maestro prefab-wiring steps
+**None.** `ProjectContext.prefab`'s `_matchConfig` slot was wired via MCP and verified by
+reading it back from disk (`sameAsset=True`), and an EditMode test now guards it. If that test
+ever fails, re-drag `Assets/_Game/Data/MatchConfig.asset` onto the ProjectInstaller's
+**Match Config** slot on `Assets/_Game/Resources/ProjectContext.prefab` — an empty slot is
+silent at runtime (ProjectInstaller falls back to a default instance and warns).
+
+---
+
+## ✅ Playtest items 2–5 complete (2026-08-15) — rival indicators, ability-select, reach, gap-closers
+
+**EditMode 294 → 308, all green.** Closes the five-item playtest list; item 1 (arena/speed
+rescale) is the entry below. Nothing committed.
+
+### Item 2 — rival indicators (PROVISIONAL)
+Class-tinted ground ring under an on-screen rival, class-tinted chevron pinned to the view
+edge for an off-screen one, exactly one lit at a time. `RivalIndicator` (new, one per chicken
+on `Chicken.prefab`, inherited by `Doppelganger.prefab`) + `ScreenEdgeProjection` (new, pure
+maths split out so it is EditMode-testable without a live `Camera`).
+
+- **Kill switch: `FeedbackTuning.RivalIndicatorsEnabled`.** Maestro said "will remove later if
+  it doesn't work", so `Awake` honours it before allocating anything. `static readonly`, not
+  `const`, or every guard reading it becomes a CS0162 unreachable-code warning.
+- **`MinVisibleOpacity` stops the feature cancelling Invisibility** — that ability is expressed
+  purely as a fall in `VisualOpacity`, so an indicator ignoring it would paint a bright arrow
+  on the exact chicken the ability exists to hide.
+- **Rival = `!HasInputAuthority`.** A decoy shares input authority with its caster, so your own
+  decoy is excluded and an *enemy* decoy gets a full indicator — deliberate, since skipping
+  decoys would hand every player a free tell for spotting the fake.
+- **The top edge is inset further than the other three** (`RivalChevronTopHudInset = 0.17`).
+  Measured in a live match: with the player in a corner all three chevrons clamped to y = 0.955
+  and two landed under the scoreboard/timer — the feature was invisible in precisely the case it
+  exists for. Raising the *uniform* margin instead would push side/bottom chevrons far enough
+  inboard to read as floating in the play field.
+- Verified live: 4 chickens → exactly 3 chevrons, local player none, distinct class tints,
+  `isVisible=True`, URP `2D/Sprite-Unlit-Default`.
+
+### Item 3 — ability-select screen
+Not a re-skin: the column was authored for "up to 3 Common + 3 Character" (six cards, two rows
+of three) per the UXML's own header, and `21ddaa8` widened the pools to 8–11 across 4 slots — a
+live Warrior now renders **10** cards. `.cw-cs-detail` is `flex-grow: 1` with no `min-height: 0`
+and no clipping, so rows were squeezed while their card content overflowed and painted over
+what was below (wrapped PECK across the CLASS header; cards across `AbilityDetail`).
+
+Fix is a `ScrollView` around the two pick rows. **`min-height: 0` on `.cw-pick-scroll` is
+load-bearing** — a flex item's default `min-height: auto` is its content height, so without it
+the ScrollView never shrinks, never scrolls, and the bug looks entirely unfixed while the
+ScrollView is plainly in the hierarchy. `MenuUiController` needed no change (`Q<>` searches the
+whole subtree). Content-container gutter is 20px: 6px clipped the right-aligned "N EQUIPPED".
+
+### Item 4 — ability reach x1.8
+Maestro said "**still** too low", so parity was not enough. Speeds went x1.35 with the arena,
+which shrank every engagement window ~26%; x1.35 only breaks even. Anchor: at ~22 m/s head-on
+closing and 30 fps (Android target) a target should stay in range **≥ 6 frames**, i.e. ≥ ~4.4 m
+for a single-target melee grab — Snatch 2.4 → 4.3 is x1.8, so x1.8 was applied to reach fields
+(both the `.asset` value **and** the C# default, since assets override defaults at runtime).
+
+Deliberate exceptions:
+- **Dive Bomb `ForwardOffset` stays 5.0** — it mirrors `JumpResolver.ShortDistance` so the lane
+  covers the dive path. Its reach gain came from `SweepRadius` 1.15 → 2.05 instead.
+- **`JumpResolver` tiers NOT scaled.** They are *obstacle*-registered — the ladder is defined by
+  which pile each tier clears — and pile footprints were pinned at absolute size. Scaling them
+  x1.35 turned **4 tests red at once**, every one a "this tier must FAIL to clear that obstacle"
+  assertion: the traversal design collapsing into "every tier clears everything". If the saved
+  x1.35 pile footprints are ever enabled, scale the tiers **in the same commit**.
+- **Mark Kill / `AssassinExecute` untouched** — already 8 m, the longest reach in the game.
+- **SCT-neutral:** `BalanceOracle` reads no ability reach, and Peck has no reach field at all
+  (it uses `FoodPile.IsWithinCollectRange`). No Oracle re-solve needed.
+
+### Item 5 — gap-closers fire with no target
+An audit, not a new abstraction: `RequiresEnemyInRange` already existed and already routed
+through `IsUsable` → `HasAnyTarget`. **Only Dive Bomb was flipped.** Its gate was not merely "a
+rival in the lane" but — via `ExtraTargetFilter` — "a rival in the lane *carrying cargo*", so
+its Vault + Short jump was unusable for travel or escape.
+
+**Ambush and Wing Slam were NOT flipped**, correcting an earlier brief that called them
+gap-closers: `StunBurstAbilitySO` is AoE-around-self (`AimShape.SelfCircle`) and moves the
+caster nowhere, so they are the Cluck Shock case. Still gated: Snatch, Sneaky Steal, Mark Kill,
+Cluck Shock, Ambush, Wing Slam.
+
+New `ZeroHitsIsAWhiff => ReportsCastHits && RequiresEnemyInRange` fixes the knock-on: Dive Bomb
+keeps `ReportsCastHits` true (a landed dive still earns hit-confirm sparks) but is exempt from
+the grey whiff ring, so firing into an empty lane on purpose is not styled as a miss — the
+2026-08-02 placed-zone false-whiff bug arriving from the opposite direction. `HitFeedback`
+deliberately still uses `ReportsCastHits`, because `MarkImmuneTargets` only labels chickens
+actually inside the aim shape and so does nothing on a targetless dive.
+
+### Multi-agent review pass (4 reviewers) — findings applied, EditMode 308 → 309
+
+- **[blocking] The rival chevron cancelled Invisibility.** `MinVisibleOpacity` was 0.05 on the
+  reasoning that alpha is multiplied by opacity anyway — but `InvisibilityAbilitySO.Opacity`
+  ships at **0.2**, above that cutoff, so a cloaked rival still drew a full chevron at ~0.17
+  alpha, sorted above all arena geometry. Off-screen that chevron is the *only* signal of their
+  direction, i.e. exactly what the ability exists to deny. Threshold is now **0.9** ("any fade
+  at all means don't mark them"), and a test asserts it as a *relationship* against
+  `InvisibilityAbilitySO.Opacity` so re-tuning the ability cannot silently reopen the hole.
+- **[correction to my own comment] `JumpResolver`'s new comment overstated its evidence.** It
+  claimed `JumpResolverTests` asserts the live tier gates. Those tests use illustrative spans
+  (5.5 / 6.5 / 12 m); the **shipped** footprints are 3.6 / 4.2 / 7.8 m, shrunk 2026-08-13. So
+  against real geometry a 5 m Short already clears a personal pile and the ladder is largely
+  collapsed **today**. The hold on scaling the tiers is therefore *conservative* (traversal
+  balance is Maestro's call), not proven by those four failures. Comment rewritten to say so,
+  with the two things to settle when it is revisited.
+- **`MarkImmuneTargets` mislabelled a bystander.** It gated on the geometric `IsInAimShape`,
+  so once Dive Bomb could fire without a target, a **cargo-less** rival standing in the lane —
+  rejected by `ExtraTargetFilter`, not by any immunity — got an "IMMUNE" tag. Switched to
+  `WouldAffect`, which applies the same eligibility predicate the cast used. Genuine immunities
+  (Turtle Mode, Spine Coat) are applied at effect time, *not* inside `WouldAffect`, so they
+  still label correctly; so do decoys.
+- **Per-frame `GetComponent<Camera>()`** ran once per chicken per frame. `MatchCamera` already
+  cached it privately; it now exposes `Camera` and `RivalIndicator` reads that.
+- **No `OnDisable`** — the chevron lives unparented and is only updated from `LateUpdate`, so
+  `enabled = false` would have frozen a ghost on screen forever. Added `OnDisable => Hide()`.
+- **A failed FIRST bake stranded a raw `Game.unity` clone** at `Map.unity`. Since
+  `File.Exists` is what routes the next bake to the "reopen existing" branch, that stray file
+  would have been silently adopted as a real map. Added `DiscardStrayClone`, which only ever
+  fires when *this* run created the file.
+- **`TryMeasureFenceLine` trusted the first `Wall_N_*` it found.** The factor for all 121 props
+  comes from that one read; it now checks every post agrees and refuses loudly if they don't.
+- **`.cw-cs-detail` gained `min-height: 0`** as a guard: in landscape it is a cross-axis item
+  so the ScrollView fix alone sufficed, but portrait would flip it to a main-axis item and
+  could resurface the same overflow one level up. App is landscape-locked today.
+- Stale comment fixed in `WingSlamAbilitySO` ("Same StunRadius (2.5 m)" → 4.5).
+
+Reviewers confirmed clean: asset↔C# default agreement across every ability pair, the
+gap-closer classification, `ZeroHitsIsAWhiff` wiring, decoy authority reasoning, static sprite
+caching under domain-reload-disabled play, `MapSceneBaker`'s early-return paths,
+`MapPropsRescaler` idempotence (algebraically, not just by comment), no weakened test
+tolerances, and `MenuUiController` needing no change.
+
+**Noted, not acted on:** ability aim shapes have no line-of-sight occlusion, so a ~10 m-diameter
+self-centred AoE can now reach through a wall into an adjacent corridor. Pre-existing (no
+occlusion check was added or removed), but amplified by the x1.8 pass.
+
+### Found while testing, NOT fixed (out of scope, chips raised)
+- **The lobby lies about the match rules.** `Lobby.uxml` declares `SetTime` ("3:00") and
+  `SetGoal` ("150 food") but *no C# ever populates them* — they ship as placeholders while
+  `MatchConfig` is 45 s / 40 food. The in-match HUD correctly shows "FIRST TO 40" / 00:45.
+- **Bots show 2 ability icons to the player's 4** in the lobby. Either the scene-baked presets
+  are half-empty (a balance bug) or the card renders before `ResolveLegalLoadout` forces Peck in
+  (cosmetic). Possible recurrence of the 2026-07-27 bot-loadout staleness bug after `21ddaa8`.
+
+---
+
+## ✅ Map baked + dressing rescaled (2026-08-14, later) — the two outstanding steps below are now DONE
+
+**EditMode 289 → 294, all green** (+5 `MapPropsRescalerTests`). `Map.unity` is now baked at
+51.3 m with its hand-authored dressing re-fitted. The entry below is otherwise still accurate;
+these are the corrections and results.
+
+**The bake was destructive and had to be fixed first.** `MapSceneBaker` used to
+`AssetDatabase.DeleteAsset(Map.unity)` and re-clone from `Game.unity`, then delete every root
+without a `Light` — which silently destroyed `MapProps` (121 hand-placed children) and
+`MapSurroundings` (47), neither of which any script regenerates. It now reopens the existing
+scene and replaces **only** `GeneratedMapGeometry`, and logs the roots it preserved. Verified:
+`Preserved hand-authored roots: Directional Light (0), MapProps (121), MapSurroundings (47)`.
+
+**⚠️ A hard-limit error propagated through the whole rescale spec — do not reuse the old numbers.**
+`docs/superpowers/specs/2026-08-14-map-props-rescale-policy.md` correctly states that
+`MapGenerator` centres each boundary wall at `half + t*0.5` so its **inner face is exactly
+`half`** — then used the wall *centres* (19.25, and 25.99 = 19.25 x 1.35) everywhere downstream.
+The real hard limits are **19.0** and **25.65**. Consequences:
+
+| | spec said | actually |
+|---|---|---|
+| Authored fence standoff | 0.405 | **0.155** |
+| Pure-x1.35 standoff | 0.635 | **0.295** |
+| Fence line `F` | 25.34 | **25.25** |
+
+The spec's headline argument — a "walkable pocket" behind the fence — **does not hold**: a
+chicken is 0.96 m wide, so neither 0.295 nor 0.635 could ever hold one. The real (smaller)
+regression is body overhang past the visible fence, 0.155 → 0.295 m. The fix was still worth
+making, because `_wallsVisible = false` and `CreateWall` drops the renderer, so **this fence is
+the only visible boundary** and its registration to the invisible collider is load-bearing.
+
+**The fence rule is now derived, not tabulated.** `MapPropsRescaler.SolveFenceLayout(planeSize)`
+returns line/posts/spacing from two invariants: an **absolute** standoff (a clearance against a
+fixed-size panel, same call as `_pilePositionJitter`), and **covered extent = 2F** so end-panel
+edges land on the perpendicular run's centre plane and corners seal by construction.
+
+- Fed **38 m** it returns line **18.60**, **10 posts** — exactly what was hand-placed. That
+  round-trip is pinned by `MapPropsRescalerTests` and is the check that it *describes* the
+  authored fence rather than merely fitting some arena.
+- At **51.3 m**: line **25.250**, **13 posts/side**, spacing **3.8758**, overlap 0.114.
+- Overlap is kept **small on purpose**: `Prop_wall_segment.prefab` sets `m_LocalScale.x = 0.35`
+  (mesh squashed ~3x along its run), so overlap doubles ~3x its length in coplanar plank faces
+  and z-fights. 0.114 beats the authored 0.27; one more post would give 0.41.
+
+**The "136 vs 121 census discrepancy" was not a discrepancy.** 121 is `MapProps`' root child
+count; 136 is the count after recursing into the `FenceDressing` container (121 − 1 + 16). Both
+numbers were right, describing different things. **FenceDressing and the Silos were left on the
+plain x1.35 transform**, not the spec's mixed transform — that recommendation rested on the
+inflated standoff numbers above. Scarecrow standoff drifts 1.6 → 2.4 m; eyeball it and revisit
+if it reads wrong.
+
+**Verified, measured after the run:** ground 51.30, hard limit 25.650; all four fence sides
+13 posts at line ±25.250, span ±23.255, outer edge 25.250 = F exactly; factor derived
+**x1.3500**; grass apron unmoved at 260 m. Top-down Scene View confirms a continuous fence with
+sealed corners, bases at the corners, piles distributed, and **no dressing stranded inboard**.
+
+⚠️ **Pre-existing, not a regression:** `InnerProp_1_a` sits at **26.123** vs the 25.650 hard
+limit. Dividing by the exact 1.35 gives 19.35 against the old 19.0 limit — it was already
+0.35 m outside the boundary before this work, and the rescale preserved that relationship.
+
+**Item 3 (ability-select rework) now has a real diagnosis** from Play Mode, which is what it
+was waiting on. Three concrete layout failures, not vague clutter:
+1. The **PECK tile overlaps the CLASS section header** band.
+2. The hint/description text (*"Tap an ability to see what it does"*) is drawn **on top of**
+   the bottom ability row.
+3. That bottom row (Spine Coat / Turtle Mode / Wing Slam) is **clipped by the panel edge**,
+   with no scroll container.
+
+Icons are in better shape than feared — `shell`, `snatch`, `burst`, `peck`, `cluck`,
+`dive-bomb`, `steal` all resolve. Cards are `.cw-ability-card` at 290x185.
+
+**Note for whoever automates this screen:** the ability card click is a **toggle**, and
+selecting one **rebuilds the card list**, detaching any `VisualElement` references captured
+before the click. Re-query every pass and click distinct indices.
+
+---
+
+## ⚖️ Arena + move speeds scaled x1.35 (2026-08-14) — **uncommitted**, ~~two steps outstanding~~ (both done, see above)
+
+Playtest feedback 1 of 5. Maestro: *"speed is good compared with the map size, but it feels
+slow."* Arena **38 m → 51.3 m**, every `MoveSpeed` **x1.35**. Travel time is
+`distance / speed`, so scaling both leaves the SCT axiom **bit-identical** — the felt speed
+increase comes entirely from the camera, which frames the chicken, not the arena.
+
+**EditMode 288 → 289, all green** (+1: `OracleFixture_Scale_TracksTheAuthoredArena`).
+
+| | before | after |
+|---|---|---|
+| `_planeSize` | 38 | 51.3 |
+| `_baseCornerDistance` | 19 | 25.65 |
+| `MoveSpeed` Warrior / Fatty | 7.5 | 10.125 |
+| `MoveSpeed` Speedy / Assassin | 9 | 12.15 |
+| `HubPlazaRadius` / `OpeningWidth` | 10 / 3 | 13.5 / 4.05 |
+| Pinwheel arm length (derived) | 7.565 | 10.213 (exactly x1.35) |
+
+SCT deltas are **unchanged to three decimals**: Speedy −0.078 s, Fatty +0.080 s,
+Warrior −0.081 s, against a ±1.5 s tolerance. That invariance is the proof the rescale
+was neutral, and it only holds because the Oracle's map fixture was scaled **with** the
+arena — scaling one side alone moves every class 3–5 s, i.e. straight out of tolerance.
+
+### The bug this uncovered: pile positions existed twice, under two parameterisations
+
+`MapGenerator` spawned piles at `corner.normalized * PersonalPileRadius` (a hardcoded
+**17 m**) while the pinwheel keep-clear discs used `Lerp(corner, 0, _personalPileInset)`.
+Those agree **only at a 19 m corner distance** — 19 × (1−0.3673) × √2 = 17.00 — a
+coincidence of the then-current arena size, not a relationship. Scaling the arena would
+have moved the keep-clear discs to 22.95 m and left the piles at 17 m, so the generator
+would have built wall segments straight through the piles they exist to avoid. **Neither
+`_personalPileInset` nor `_contestedEdgeInset` was ever consumed by the spawn path** — the
+brief's assumption that pile positions "scale automatically" was false.
+
+Fixed by collapsing both to one shared formula: `MapGenerator.PersonalPileNominal` /
+`ContestedPileNominal`, now called by the spawn, the baked zone markers, the keep-clear
+discs **and** the EditMode clearance tests. The two consts are gone. Verified live: the new
+formula reproduces 22.9509 m and 20.2507 m — exactly 17 × 1.35 and 15 × 1.35.
+
+### Tests were guarding a map nobody plays
+
+Three test fixtures hand-mirrored scene values as literals and had already gone stale
+*before* this task — the same anti-pattern as the 2026-08-13 speed drift:
+
+- `MapClearanceTests` used centre pile **12×10** (shipped: 7.8×6.5) and jitter **1.5**
+  (shipped: 0.4).
+- `PinwheelLayoutTests.Build_WallsSurvivePileKeepClearDiscs_AtRealV05Sizes` — same stale
+  footprints, despite "AtRealV05Sizes" in its name.
+- `Build_HonorsExtraKeepClearDiscs` placed its disc at r = 6, **inside the hub plaza where
+  no arm is ever built**, so it passed vacuously; the clipping code could have been deleted
+  without failing it.
+
+All three now read `Game.unity` through `TestAssets`, and the vacuous one asserts the
+clipping actually fires. `JumpResolverTests` and `PinwheelLayoutTests` read the arena from
+the scene instead of a literal 19/15.
+
+⚠️ **`_pilePositionJitter` was deliberately NOT scaled** — it is a pile-local quantity and
+piles keep their absolute size; scaling it would inflate the keep-clear discs and clip walls
+for nothing.
+
+### 🔧 Maestro — two steps outstanding, both blocked on the Editor
+
+The Unity MCP bridge dropped mid-session (`McpManagerClientHub`: *"auto-reconnect disabled
+for endpoint /hub/mcp-server"*).
+
+⚠️ **The Editor is HUNG, and a restart is required — focusing it is not enough.** This was
+diagnosed after the fact, so the "focus Unity and let it recompile" advice first written
+here was wrong; it is corrected rather than deleted because it is the intuitive thing to try
+and it does not work. Evidence gathered by `code-architect`:
+
+- `kAutoRefresh = 1` and `kAutoRefreshMode = 1` — auto-refresh is **enabled**, not the cause.
+- A `.cs` file was modified on disk, then Unity was driven through a genuine
+  minimize → restore focus-change cycle via `SetForegroundWindow`. (An earlier plain
+  `SetForegroundWindow` was a no-op: Unity was *already* the foreground window, so it
+  generated no focus-*gained* event at all — worth knowing before re-diagnosing this.)
+- `Editor.log` did not gain a single line across **41 minutes**, and the process reports
+  `Responding: True` the whole time — the Win32 message pump is alive while the Editor's
+  own update loop is stuck.
+
+That is the **exact signature recorded in the 2026-08-09 entry below** ("main thread
+spinning, `Editor.log` frozen, MCP bridge unreachable"), whose remedy is the same:
+**restart the Unity Editor.** All work is safely on disk — nothing is held only in Editor
+memory — so the restart is non-destructive. After restarting:
+
+1. **`Cluck Wars/Map/Bake Map Scene`** — `Map.unity` is still baked at **38 m** and is what
+   `_useBakedGeometry = true` actually loads. Until this is re-run the game builds the OLD
+   arena while every speed is 35% faster, which is the *worst* of both. The baker also
+   re-bakes the NavMesh, so bot pathing is covered by the same step.
+2. **Play Mode check + `screenshot-game-view`** — no visual verification was possible.
+
+Everything else was verified: compile (live symbol read through `script-execute`), EditMode
+289/289, and the `Game.unity` write read back from both memory and disk.
+
+Unrelated working-tree noise: `Bootstrap.unity` gained a `UniversalAdditionalCameraData`
+component on its Main Camera. That is URP auto-attaching a component it always adds on
+demand; it was written out because the scene had to be saved before `tests-run` would
+accept it (the runner refuses to run with any dirty scene). Behaviourally inert.
+
+### 📋 This is playtest item 1 of 5 — items 2–5 are NOT started
+
+Maestro's playtest produced five items. Only this one was attempted; the Editor hang
+stopped the rest before any code was written, because **every one of them has a
+verification step that needs the Editor**, and this project's own history
+(`art-metrics-that-passed-while-broken`, and the "code-complete, UNVERIFIED" entries
+further down this file) is the argument against writing four more items blind.
+
+| # | Item | Why it is gated |
+|---|---|---|
+| 2 | Rival indicators — screen-edge chevrons + on-screen ground rings | Local presentation only; needs a Play Mode + `screenshot-game-view` check to judge "nice design". Reuse `HitFeedback`'s existing screen-edge projection maths; single kill switch in `FeedbackTuning` (Maestro: *"will remove later if it doesn't work"*) |
+| 3 | Rework the ability-selection screen | Must be **diagnosed against a real screenshot before redesigning**. Also fixes the known blank-hex defect: `AbilityIconStyle` maps **26** ability types but only **14** USS rules exist (`AbilitySystemTests.IconsNotYetAuthored`) — needs `artist-2d` for the missing icons, not a re-skin around blank tiles |
+| 4 | Ability range "still too low" | Must be **re-solved on top of this rescale**, and a range that felt short at 38 m and is only scaled to 51.3 m will feel *identical* — the ask is explicitly more than proportional. Oracle re-run needed for anything touching Assassin's `ExecuteBounty` |
+| 5 | Gap-closers must fire with no enemy in range | Fix declaratively (a virtual `RequiresTarget` on `AbilityBaseSO`, in the spirit of the existing `PlacesZone` / `ReportsCastHits` pair) — **not** scattered `IsUsable` overrides. Maestro hedged *"most of them at least"*, so each mobility ability gets an individual call, with both buckets pinned in an EditMode test. Watch the knock-on: `AbilityRangeIndicator`'s grey whiff ring and `HitFeedback.ObserveOwnCast` key off hit counts, so a gap-closer that legitimately hits nothing must not get whiff-styled — same bug class as the placed-zone false whiff fixed 2026-08-02 |
+
+### Camera: `_orthoSize` deliberately NOT changed — it is the whole mechanism
+
+The brief expected a pull-back. **Do not apply one without a play test.** `MatchCamera`
+follows the local chicken at `_orthoSize = 5.6` — a ~11.2 m tall window that **never framed
+the 38 m arena**. Scaling it by 1.35 would exactly cancel the screen-relative motion
+increase and make the entire change a perceptual no-op (CONVENTIONS.md: "the closer
+`_orthoSize` is, the less screen-relative motion you'll see"). The real cost is reaction
+time: threats now enter that fixed window 35% faster. That is a `ux-designer` call.
+
+Its four hardcoded `(±19, ±19)` corners were replaced with unit directions — only the
+*bearing* was ever used, so the arena half-size was encoded there for no reason.
+
+### `Mobile_RPAsset.m_ShadowDistance` re-derived — stays at 26
+
+**The driver is the camera, not the arena, so the rescale does not change it.** From
+`_distance = 30`, `_pitch = 30°`, `_orthoSize = 5.6`: the visible ground spans view depth
+**20.30 → 39.70 m**, containing no arena term at all.
+
+The old rationale ("the arena is 38 m, so every prop sat inside the shadow frustum") was
+about total *caster count* within the shadow radius, not framing — and that argument
+**improves** with a bigger arena: props spread over 51.3 m instead of 38 m put roughly
+(38/51.3)² ≈ **55%** as many casters inside any fixed radius. Cost goes down, not up.
+
+⚠️ **Pre-existing, unrelated finding:** 26 m covers only **29%** of the visible frame
+height, so ~71% of the Android frame renders with no main-light shadows. The camera-derived
+requirement is ~**42**. PC (50) covers it fully, which is why this was never seen. **Not
+changed here** — it is a mobile frame-time tradeoff for `render-pipeline-artist`, not part
+of a rescale.
+
+### Flagged for `mechanics-designer`
+
+- **Knockback impulses scaled x1.35** (Cluck Shock 12→16.2, Roll Push 10→13.5, Snatch
+  6→8.1, Spine Coat 8→10.8). These are world-units/sec *added on top of* the victim's own
+  movement; holding them while every `MoveSpeed` rose 35% would have silently turned a shove
+  into a nudge the victim walks out of. Ability *multipliers* (Speed Burst, Shadowstep,
+  Turtle, Roll) needed nothing — they scale for free.
+- **Jump tiers held** at 5 / 10 / 18 m. The rule applied throughout: **velocities scale
+  (they are speeds), distances hold (they are sized against obstacles that did not grow)**.
+  Piles keep their absolute footprint, so a jump still clears exactly what it used to — but
+  a jump is now worth 35% less as *map traversal*. Deliberate; wants a play test.
+- **Piles drop from ~10.6% to ~5.8% of the floor.** Maestro asked to hold their size
+  ("save the value just in case") — the x1.35 values are recorded in a comment on each
+  field: centre **10.53×8.78**, contested **5.67×4.73**, personal **4.86×4.05**. May read
+  sparse; that is a `level-designer` eyeball.
+
+### ⚠️ Pre-existing drift found, deliberately NOT fixed
+
+The Oracle fixture's absolute coordinates are **smaller than the arena the game builds**:
+base at r = 21.0 vs a real spawn at r = 30.8, doorstep piles at r = 16.5 vs a real 22.9. It
+predates the current `_baseCornerDistance` and was never re-derived. Correcting it would
+lengthen every trip and force a **full re-solve of all three classes' speeds** — a balance
+change, not a rescale, so it is out of scope. `OracleFixture_Scale_TracksTheAuthoredArena`
+now pins the fixture-to-arena *ratio* (0.6442) so the two cannot drift further apart
+silently. Worth scheduling.
+
+---
+
+## Peck foraging, four slots, specializations (2026-08-13) — committed on `develop`
 
 Spec: `docs/superpowers/specs/2026-08-13-peck-foraging-and-four-slot-loadout-design.md`.
 Thirteen commits from `82b675a` to `d56a80d`. **EditMode 274 → 285, all green.**
@@ -155,8 +775,8 @@ All tags pushed to origin.
 
 | | |
 |---|---|
-| **EditMode suite** | **268 / 268 passing**, 0 failed, ~3.3 s (observed 2026-08-07 via `tests-run`) |
-| Trajectory this feature | 178 (pre-feedback baseline) → 196 (Stage 1) → 223 (Stage 2) → 246 (Stage 5) → 266 (chicken models) → **268 (texture + tint guardrails)** |
+| **EditMode suite** | **327 / 327 passing**, 0 failed, ~3.3 s (observed 2026-08-15 via `tests-run`) |
+| Trajectory | 178 (pre-feedback baseline) → 196 → 223 → 246 → 266 → 268 (texture + tint guardrails) → 274 (skeletal anim) → 285 (Peck / four-slot) → 289 (arena x1.35) → 294 (map rescale) → 309 (playtest items 2–5) → 314 (lobby match settings) → **327 (ability range guides)** |
 | Compile state | Clean. Console errors are MCP negotiation / `script-execute` noise only — no C# errors. |
 | Branch | `develop`, **uncommitted** |
 

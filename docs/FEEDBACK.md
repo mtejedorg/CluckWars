@@ -287,13 +287,28 @@ identical to the player. Each gets its own signal on the button:
 | Refusal | Current | New |
 |---|---|---|
 | On cooldown | radial fill (exists) | + remaining seconds as text |
-| No valid target in range | greyed | grey + ⃠ glyph + "no target" pip; world range ring pulses |
+| No valid target in range | greyed | grey + ⃠ glyph + "no target" pip; the slot's own ambient reach outline sits at its dim ready tier (see note below) |
 | Stunned | nothing | red cross over all buttons + shake on press |
 | Another ability active | nothing | buttons dim, active ability's button shows a duration ring |
 | Slot 2 without Combo | nothing | button not rendered at all |
 
 Plus a **denied-press bump**: pressing a refused button plays a short muted click
 and shakes the button 4 px. Never absorb an input silently.
+
+> **The single "world range ring" this table used to reference no longer exists (2026-08-15).**
+> `AbilityRangeIndicator` used to draw one coarse circle at the widest ready range-gated
+> ability's `IndicatorRange`, brightening when a target entered it. It has been retired in
+> favour of `AbilitySlotOverlay`, which draws **every** equipped slot's real aim shape
+> permanently, and folds the old brightening in as a per-slot readiness tier
+> (suppressed → cooldown → ready → hot, where "hot" means a rival is actually inside *that
+> slot's* shape). So the refusal above is now expressed per-slot rather than by one shared
+> ring, and two range-gated abilities can light up independently instead of a tie-break
+> picking one winner. `AbilityRangeIndicator` still owns the §3.1 cast flash and its stalk.
+>
+> Note also that **§4's descriptor table is stale for Peck**: `PeckAbilitySO.AimShape` is
+> `None`, because Peck targets a *food pile*, not a chicken — its reach lives in
+> `FoodPile.IsWithinCollectRange` as a band around each pile's surface. It is therefore not
+> caster-centred and the ambient overlay deliberately draws nothing for it.
 
 ---
 
