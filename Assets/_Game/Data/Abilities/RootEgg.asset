@@ -26,4 +26,4 @@ MonoBehaviour:
   AbilityAnimationClip: {fileID: 0}
   EggLifetime: 8
   RootDuration: 2
-  EggRadius: 0.8
+  EggRadius: 1.45

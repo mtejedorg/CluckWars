@@ -25,10 +25,10 @@ namespace CluckWars.Abilities
     public sealed class FeatherTrapAbilitySO : AbilityBaseSO
     {
         [Tooltip("Distance in front of the caster where the zone center is placed.")]
-        [Min(0f)] public float ForwardOffset = 2.5f;
+        [Min(0f)] public float ForwardOffset = 4.5f;
 
         [Tooltip("Trigger radius of the slow zone.")]
-        [Min(0.5f)] public float ZoneRadius = 2.0f;
+        [Min(0.5f)] public float ZoneRadius = 3.6f;
 
         [Tooltip("How long the feather cloud persists (seconds) before auto-despawning.")]
         [Min(0.5f)] public float ZoneDuration = 5.0f;

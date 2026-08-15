@@ -29,7 +29,7 @@ namespace CluckWars.Abilities
         [Min(0.1f)] public float RootDuration = 2.0f;
 
         [Tooltip("Trigger radius within which a chicken activates the root.")]
-        [Min(0.3f)] public float EggRadius = 0.8f;
+        [Min(0.3f)] public float EggRadius = 1.45f;
 
         protected override string DefaultIcon => "🌱";
 

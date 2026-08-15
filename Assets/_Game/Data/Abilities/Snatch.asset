@@ -27,6 +27,6 @@ MonoBehaviour:
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
-  SnatchRange: 2.4
+  SnatchRange: 4.3
   PeckDamage: 28
-  KnockbackStrength: 6
+  KnockbackStrength: 8.1

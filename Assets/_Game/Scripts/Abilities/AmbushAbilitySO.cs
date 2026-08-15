@@ -14,7 +14,7 @@ namespace CluckWars.Abilities
             ShortLabel = "AMB";
             Description = "Stuns nearby rivals for 1 second.";
             AllowedClasses = ChickenClassFlags.Assassin;
-            StunRadius = 2.0f;
+            StunRadius = 3.6f;
             StunDuration = 1.0f;
             Duration = 1.0f;
             Cooldown = 10f;

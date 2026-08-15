@@ -22,7 +22,7 @@ namespace CluckWars.Abilities
     public sealed class FeatherAuraAbilitySO : AbilityBaseSO
     {
         [Tooltip("Radius of the slow aura around the caster.")]
-        [Min(0.5f)] public float AuraRadius = 3.0f;
+        [Min(0.5f)] public float AuraRadius = 5.4f;
 
         [Tooltip("Speed multiplier applied to chickens inside the aura (< 1 = slower).")]
         [Range(0.1f, 0.9f)] public float AuraSlowFactor = 0.55f;

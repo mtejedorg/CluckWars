@@ -18,7 +18,7 @@ namespace CluckWars.Abilities
     public sealed class SneakyStealAbilitySO : AbilityBaseSO
     {
         [Tooltip("How close an enemy chicken needs to be to steal from. Generous so it feels reliable.")]
-        [Min(0.5f)] public float StealRange = 3f;
+        [Min(0.5f)] public float StealRange = 5.4f;
 
         [Tooltip("How much cargo to steal. Capped to the victim's actual cargo and the thief's free space.")]
         [Min(1f)] public float StealAmount = 6f;

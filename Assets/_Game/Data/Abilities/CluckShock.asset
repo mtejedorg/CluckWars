@@ -27,5 +27,5 @@ MonoBehaviour:
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
-  ShockRadius: 2.5
+  ShockRadius: 4.5
   ShockDamage: 35

@@ -27,5 +27,5 @@ MonoBehaviour:
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
-  StunRadius: 2
+  StunRadius: 3.6
   StunDuration: 1

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenStatsSO
   DisplayName: Assassin
   MaxHP: 70
-  MoveSpeed: 9
+  MoveSpeed: 12.15
   TurnSpeed: 720
   CargoCapacity: 10
   Scale: 0.9

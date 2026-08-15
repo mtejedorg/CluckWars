@@ -16,11 +16,16 @@ namespace CluckWars.Abilities
 
         [Tooltip("Length of the peck lane, measured forward from the caster's PRE-jump " +
                  "position. With a Capsule aim shape this is the axis length, not a detached " +
-                 "centre — total forward reach is ForwardOffset + SweepRadius.")]
+                 "centre — total forward reach is ForwardOffset + SweepRadius. Mirrors " +
+                 "JumpResolver.ShortDistance so the lane covers exactly the dive path — keep " +
+                 "the two equal.")]
         [Min(0.5f)] public float ForwardOffset = 5.0f;
 
-        [Tooltip("Half-width of the peck lane. Generous — catches chickens slightly off-line.")]
-        [Min(0.5f)] public float SweepRadius = 1.15f;
+        [Tooltip("Half-width of the peck lane. Generous — catches chickens slightly off-line. " +
+                 "Widened 1.15 -> 2.05 (x1.8) in the 2026-08-14 reach pass: the lane LENGTH is " +
+                 "pinned to the jump tier and could not grow, so width is where this ability's " +
+                 "'too hard to actually connect' complaint had to be answered.")]
+        [Min(0.5f)] public float SweepRadius = 2.05f;
 
         [Tooltip("Amount of cargo to steal on contact.")]
         [Min(1f)] public float StealAmount = 8f;
@@ -28,7 +33,27 @@ namespace CluckWars.Abilities
         protected override string DefaultIcon => "🪽";
 
         public override float IndicatorRange => ForwardOffset + SweepRadius;
-        public override bool RequiresEnemyInRange => true;
+
+        /// <summary>
+        /// <b>False: the dive is worth making on its own.</b> Maestro, playtest item 5
+        /// (2026-08-14): *"gapcloser abilities should always work, no matter if there is an
+        /// enemy in range."*
+        /// </summary>
+        /// <remarks>
+        /// This ability was the worst offender of the family, because its gate was not
+        /// merely "a rival in the lane" but — via <see cref="ExtraTargetFilter"/> — "a rival
+        /// in the lane <i>who is currently carrying cargo</i>". A Warrior could therefore be
+        /// staring straight down an empty lane, or at a rival who had just banked, and the
+        /// button would refuse: it granted <see cref="TerrainTraversal.Vault"/> and a Short
+        /// jump that the player could not use to travel, chase or escape with.
+        ///
+        /// Turning this off does not weaken the steal — <see cref="ExtraTargetFilter"/> is
+        /// unchanged, so a dive through a cargo-less rival still robs nobody. It only stops
+        /// the mobility half of the ability from being held hostage to the steal half.
+        /// See <see cref="ZeroHitsIsAWhiff"/> for why a targetless dive must not then be
+        /// styled as a miss.
+        /// </remarks>
+        public override bool RequiresEnemyInRange => false;
 
         /// <summary>
         /// The lane the peck sweeps through on its way past. Being a Capsule also decides

@@ -21,13 +21,13 @@ namespace CluckWars.Abilities
         }
 
         [Tooltip("Maximum distance to the target, along the 140° forward arc.")]
-        [Min(0.5f)] public float SnatchRange = 2.4f;
+        [Min(0.5f)] public float SnatchRange = 4.3f;
 
         [Tooltip("Amount of cargo to steal per hit target.")]
         [Min(1f)] public float StealAmount = 5f;
 
-        [Tooltip("Knockback impulse strength (world-units/sec) applied to the hit target.")]
-        [Min(0f)] public float KnockbackStrength = 6f;
+        [Tooltip("Knockback impulse strength (world-units/sec) applied to the hit target. Scaled 6 -> 8.1 (x1.35) with the 2026-08-14 arena/move-speed rescale — see CluckShockAbilitySO.KnockbackForce.")]
+        [Min(0f)] public float KnockbackStrength = 8.1f;
 
         protected override string DefaultIcon => "🐦";
 

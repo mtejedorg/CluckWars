@@ -31,13 +31,13 @@ namespace CluckWars.Abilities
         [Tooltip("Length of the push lane, measured forward from the caster. With a Capsule " +
                  "aim shape this is the axis length, not a detached centre — total forward " +
                  "reach is ForwardOffset + PushRadius.")]
-        [Min(0.5f)] public float ForwardOffset = 4.0f;
+        [Min(0.5f)] public float ForwardOffset = 7.2f;
 
         [Tooltip("Half-width of the push lane (the capsule's sweep radius).")]
-        [Min(0.5f)] public float PushRadius = 1.05f;
+        [Min(0.5f)] public float PushRadius = 1.9f;
 
-        [Tooltip("Knockback impulse strength (world-units/sec).")]
-        [Min(1f)] public float PushStrength = 10f;
+        [Tooltip("Knockback impulse strength (world-units/sec). Scaled 10 -> 13.5 (x1.35) with the 2026-08-14 arena/move-speed rescale — see CluckShockAbilitySO.KnockbackForce.")]
+        [Min(1f)] public float PushStrength = 13.5f;
 
         [Tooltip("Speed multiplier applied to the caster while rolling.")]
         [Range(1f, 4f)] public float RollSpeedMultiplier = 2.0f;

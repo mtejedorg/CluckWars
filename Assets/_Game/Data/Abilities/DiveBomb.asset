@@ -26,5 +26,5 @@ MonoBehaviour:
   Cooldown: 6
   AbilityAnimationClip: {fileID: 0}
   ForwardOffset: 5
-  SweepRadius: 1.15
+  SweepRadius: 2.05
   TrampleDamage: 50

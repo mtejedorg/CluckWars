@@ -27,5 +27,5 @@ MonoBehaviour:
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
-  StealRange: 3
+  StealRange: 5.4
   StealAmount: 6

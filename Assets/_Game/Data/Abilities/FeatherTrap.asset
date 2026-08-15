@@ -24,7 +24,7 @@ MonoBehaviour:
   Duration: 0.3
   Cooldown: 7
   AbilityAnimationClip: {fileID: 0}
-  ForwardOffset: 2.5
-  ZoneRadius: 2
+  ForwardOffset: 4.5
+  ZoneRadius: 3.6
   ZoneDuration: 5
   SlowFactor: 0.45

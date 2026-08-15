@@ -170,9 +170,21 @@ namespace CluckWars.Abilities
 
         /// <summary>
         /// True when activating without an enemy inside <see cref="IndicatorRange"/>
-        /// would do nothing (Peck, Sneaky Steal, Cluck Shock). The HUD greys the
-        /// button out and <c>AbilityController.TryActivate</c> refuses the cast so
-        /// the cooldown isn't burned on a guaranteed whiff.
+        /// would do nothing (Snatch, Sneaky Steal, Cluck Shock, Mark/Kill, the stun
+        /// bursts). The HUD greys the button out and <c>AbilityController.TryActivate</c>
+        /// refuses the cast so the cooldown isn't burned on a guaranteed whiff.
+        ///
+        /// <b>False for every ability whose cast is worth making on its own.</b> That is
+        /// the whole mobility family — a gap-closer moves the caster whether or not anyone
+        /// is standing in the lane, so gating it on a target turns a traversal tool into a
+        /// button that does nothing when you most want it (Maestro, playtest item 5,
+        /// 2026-08-14). It is also false for Peck, which resolves against a
+        /// <c>FoodPile</c> and not a chicken at all, and overrides <see cref="IsUsable"/>
+        /// with its own pile-and-cargo-space test instead.
+        ///
+        /// The two buckets are pinned in <c>AbilityAimTests</c> — see
+        /// <c>MobilityAbilities_FireWithNoTargetInRange</c> and
+        /// <c>TargetGatedAbilities_AreExactlyTheOnesWithNothingToDoWithoutOne</c>.
         /// </summary>
         public virtual bool RequiresEnemyInRange => false;
 
@@ -348,6 +360,28 @@ namespace CluckWars.Abilities
         /// (<c>AbilityZone.Render</c> → <c>HitFeedback.NotifyZoneTriggered</c>).
         /// </summary>
         public bool ReportsCastHits => AimShape != AbilityAimShape.None && !PlacesZone;
+
+        /// <summary>
+        /// Is a cast-time hit count of <b>zero</b> a miss for this ability? The narrower
+        /// half of <see cref="ReportsCastHits"/>, and the only thing the grey whiff ring
+        /// should ever gate on.
+        ///
+        /// The two questions come apart for gap-closers. Dive Bomb declares a real
+        /// <see cref="AbilityAimShape.Capsule"/> and genuinely robs whoever it sweeps
+        /// through, so <see cref="ReportsCastHits"/> is true and must stay true — a landed
+        /// dive still earns its hit-confirm sparks. But since playtest item 5 it also fires
+        /// with nobody in the lane, because the dive itself is the point. Reading that as a
+        /// whiff would grey-ring the player for doing exactly what they asked for: the same
+        /// bug class as the placed-zone false whiff fixed on 2026-08-02, arriving from the
+        /// other direction.
+        ///
+        /// Derived from <see cref="RequiresEnemyInRange"/> rather than declared separately,
+        /// so the two can never disagree. An ability that refuses to fire without a target
+        /// can only reach zero hits by having genuinely lost one between the gate and the
+        /// scan — a real miss. An ability that is allowed to fire without one cannot be
+        /// missing when it reports zero; that is its normal case.
+        /// </summary>
+        public bool ZeroHitsIsAWhiff => ReportsCastHits && RequiresEnemyInRange;
 
         /// <summary>Does this ability's area mark rival chickens?</summary>
         public virtual bool AffectsEnemies => true;

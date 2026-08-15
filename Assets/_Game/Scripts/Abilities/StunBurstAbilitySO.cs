@@ -16,7 +16,7 @@ namespace CluckWars.Abilities
         }
 
         [Tooltip("Stun radius around the caster.")]
-        [Min(0.5f)] public float StunRadius = 2.0f;
+        [Min(0.5f)] public float StunRadius = 3.6f;
 
         [Tooltip("Stun duration applied to hit rivals.")]
         [Min(0.1f)] public float StunDuration = 1.0f;
