@@ -9,7 +9,7 @@ namespace CluckWars.Gameplay
     public enum JumpLengthTier : byte
     {
         None   = 0,
-        Short  = 1, // 5 m (Flying Peck)
+        Short  = 1, // 5 m (Dive Bomb)
         Normal = 2, // 10 m
         Big    = 3, // 18 m (Doppelganger)
     }
@@ -45,6 +45,29 @@ namespace CluckWars.Gameplay
     /// </summary>
     public static class JumpResolver
     {
+        // DELIBERATELY NOT SCALED with the 38 m -> 51.3 m arena rescale of 2026-08-14.
+        //
+        // These tiers are OBSTACLE-registered by intent, not arena-registered: the ladder is
+        // meant to be defined by which obstacle each rung can cross, and the pile footprints
+        // were deliberately held at ABSOLUTE size in the same rescale (Maestro: "don't
+        // increase the Pile size for now"). Scaling the jumps while the obstacles stood
+        // still would move one half of a relationship.
+        //
+        // BE PRECISE ABOUT THE EVIDENCE. Scaling these x1.35 does turn four JumpResolverTests
+        // red, but those tests pin the RESOLVER MATH against illustrative obstacle spans
+        // (5.5 / 6.5 / 12 m), NOT against the piles the game actually builds. The shipped
+        // footprints are 3.6 / 4.2 / 7.8 m, shrunk on 2026-08-13 — so against real geometry a
+        // 5 m Short already clears a personal pile and the ladder is substantially collapsed
+        // today. Do not read those four failures as proof the live gates were protected.
+        //
+        // So this is a CONSERVATIVE hold, not a proof: changing jump reach is a traversal
+        // balance decision (it changes which terrain each class can ignore), and it belongs
+        // to Maestro rather than to a mechanical x1.35 pass. Two things to settle together
+        // when it is revisited:
+        //   * re-point JumpResolverTests at the live footprints (TestAssets.SceneVector2, the
+        //     way MapClearanceTests now does) so the gates are asserted against the real map;
+        //   * if the saved x1.35 pile footprints are switched back on (see
+        //     MapGenerator._centerPileFootprint), scale these in the SAME commit.
         public const float ShortDistance  = 5.0f;
         public const float NormalDistance = 10.0f;
         public const float BigDistance    = 18.0f;
@@ -82,11 +105,19 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Resolves a teleport jump.
         /// </summary>
+        /// <param name="arenaHalfSize">
+        /// Half the arena's side length — landings outside it are rejected. <b>Required.</b>
+        /// It used to default to a literal 19.0f, which went stale the moment the arena was
+        /// rescaled (x1.35 on 2026-08-14) and would have silently confined every jump to the
+        /// old, smaller square. A C# default must be a compile-time constant, so it cannot
+        /// track <see cref="MapGenerator.ArenaHalfSize"/>; forcing callers to pass the live
+        /// value is the only way this cannot rot again.
+        /// </param>
         public static JumpResult Resolve(
             Vector3 origin,
             Vector3 direction,
             float nominalDistance,
-            float arenaHalfSize = 19.0f,
+            float arenaHalfSize,
             float bodyClearance = BodyClearance,
             Func<Vector3, float, bool> isPointBlocked = null,
             NearFaceQuery nearFaceDistance = null)

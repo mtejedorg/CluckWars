@@ -250,7 +250,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 5
+  orthographic size: 5.6
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -466,34 +466,46 @@ MonoBehaviour:
   _soloBotsToSpawn: 3
   _botLoadouts:
   - Name: Bruiser
+    Passive: {fileID: 0}
     Slot0: {fileID: 11400000, guid: 0d5566bf334a1c44a9711ea9b34a4ac6, type: 2}
     Slot1: {fileID: 11400000, guid: 4c1a8e7b3d2f495d8a01c5e7b2f9d4b1, type: 2}
     Slot2: {fileID: 0}
+    Slot3: {fileID: 0}
     AllowedClasses: 00
   - Name: Skirmisher
+    Passive: {fileID: 0}
     Slot0: {fileID: 11400000, guid: 4c026dfa11fd40cd9914aa8fb37090b6, type: 2}
     Slot1: {fileID: 11400000, guid: f2c3f98e23f645109023f309da56e7e3, type: 2}
     Slot2: {fileID: 0}
+    Slot3: {fileID: 0}
     AllowedClasses: 01
   - Name: Tank
+    Passive: {fileID: 0}
     Slot0: {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
     Slot1: {fileID: 11400000, guid: 5f7b2c8a4d3e495d8a01c5e7b2f9d4e7, type: 2}
     Slot2: {fileID: 0}
+    Slot3: {fileID: 0}
     AllowedClasses: 02
   - Name: Trickster
+    Passive: {fileID: 0}
     Slot0: {fileID: 11400000, guid: 0d5566bf334a1c44a9711ea9b34a4ac6, type: 2}
     Slot1: {fileID: 11400000, guid: 02f818d76a9212941bda628e88c11b76, type: 2}
     Slot2: {fileID: 11400000, guid: d5cbb7478daa2d94eb14fc2015dba412, type: 2}
+    Slot3: {fileID: 0}
     AllowedClasses: 03
   - Name: Thief
+    Passive: {fileID: 0}
     Slot0: {fileID: 11400000, guid: 4c026dfa11fd40cd9914aa8fb37090b6, type: 2}
     Slot1: {fileID: 11400000, guid: 7a1d8c4b3e2f495d8a01c5e7b2f9d4f9, type: 2}
     Slot2: {fileID: 11400000, guid: f44c970f195417d4e806f462794db2cc, type: 2}
+    Slot3: {fileID: 0}
     AllowedClasses: 03
   - Name: Trapper
+    Passive: {fileID: 0}
     Slot0: {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
     Slot1: {fileID: 11400000, guid: 141d6483e4594575ae36717f9dd3b056, type: 2}
     Slot2: {fileID: 0}
+    Slot3: {fileID: 0}
     AllowedClasses: 01
 --- !u!1 &1048915988
 GameObject:
@@ -542,13 +554,13 @@ MonoBehaviour:
   _basePrefab: {fileID: 0}
   _foodPilePrefab: {fileID: 0}
   _groundMaterial: {fileID: 2100000, guid: 1bc3c7d5c8e686b428e56c26a09f6332, type: 2}
-  _planeSize: 38
+  _planeSize: 51.3
   _wallHeight: 5
   _wallThickness: 0.5
   _wallsVisible: 0
   _wallMaterial: {fileID: 0}
   _standardObstacleCount: 8
-  _interiorWallLengthRange: {x: 3, y: 6}
+  _interiorWallLengthRange: {x: 4.05, y: 8.1}
   _interiorWallHeight: 1.1
   _interiorWallColor: {r: 0.45, g: 0.36, b: 0.26, a: 1}
   _lowObstacleCount: 6
@@ -563,9 +575,9 @@ MonoBehaviour:
   _tallObstacleColor: {r: 0.37, g: 0.38, b: 0.41, a: 1}
   _interiorWallClearance: 2.2
   _obstacleSpacing: 1.5
-  _obstacleEdgeMargin: 1.5
+  _obstacleEdgeMargin: 2.025
   _obstaclePlacementAttempts: 40
-  _baseCornerDistance: 19
+  _baseCornerDistance: 25.65
   _centerPileAmount: 20
   _centerPileFootprint: {x: 7.8, y: 6.5}
   _centerPileIsPermanent: 0
@@ -576,6 +588,9 @@ MonoBehaviour:
   _contestedPileFootprint: {x: 4.2, y: 3.5}
   _contestedEdgeInset: 0.7895
   _pilePositionJitter: 0.4
+  _useBakedGeometry: 1
+  _bakedMapSceneName: Map
+  _baseZoneRadius: 2.5
 --- !u!1 &1280783553
 GameObject:
   m_ObjectHideFlags: 0
@@ -887,7 +902,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5d36823f6224921438efe5160bf579f8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Zenject.Asteroids.GameInstaller
-  _matchConfig: {fileID: 11400000, guid: 3af469376147c9a45aa293777ed50fc6, type: 2}
 --- !u!114 &2090406289
 MonoBehaviour:
   m_ObjectHideFlags: 0

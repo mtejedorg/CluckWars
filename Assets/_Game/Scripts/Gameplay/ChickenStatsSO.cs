@@ -23,7 +23,11 @@ namespace CluckWars.Gameplay
         public string DisplayName = "Warrior";
 
         [Header("Movement")]
-        [Min(0f)] public float MoveSpeed = 9f;
+        [Tooltip("World-units/sec. Solved against this class's SCT target — do NOT hand-tune " +
+                 "it; change SctTargets and re-solve against BalanceOracle. Scaled x1.35 on " +
+                 "2026-08-14 alongside the arena, which leaves every travel term " +
+                 "(distance / speed) and therefore every SCT unchanged.")]
+        [Min(0f)] public float MoveSpeed = 12.15f;
         [Min(0f)] public float TurnSpeed = 720f; // deg/sec
 
         [Header("Cargo")]

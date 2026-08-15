@@ -457,7 +457,20 @@ namespace CluckWars.Gameplay
             return passive != null ? passive.ModifyCooldown(seconds, ability, _controller) : seconds;
         }
 
-        private AbilityBaseSO GetSlot(int slot) => slot switch
+        /// <summary>
+        /// The ability equipped in <paramref name="slot"/>, or null for an empty or
+        /// out-of-range slot. The single slot-index → ability mapping in the codebase.
+        /// </summary>
+        /// <remarks>
+        /// <b>Public on purpose, and it must stay public.</b> This was private, so
+        /// <c>AbilityRangeIndicator</c> reimplemented the mapping as a local
+        /// <c>SlotAbility(int)</c> ternary over slots 0/1/2 — and when the roster went to
+        /// four slots (<see cref="SlotCount"/>), the copy went stale and slot 3's range was
+        /// never drawn at all. Any consumer that needs "what is in slot N" calls this and
+        /// iterates <c>0..SlotCount-1</c>; nobody re-derives it and nobody writes a literal
+        /// slot count.
+        /// </remarks>
+        public AbilityBaseSO GetSlot(int slot) => slot switch
         {
             0 => _slot0,
             1 => _slot1,

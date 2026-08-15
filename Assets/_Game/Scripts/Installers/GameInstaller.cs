@@ -1,6 +1,4 @@
-using CluckWars.Gameplay;
 using CluckWars.Networking;
-using UnityEngine;
 using Zenject;
 
 namespace CluckWars.Installers
@@ -11,13 +9,11 @@ namespace CluckWars.Installers
     /// </summary>
     public sealed class GameInstaller : MonoInstaller<GameInstaller>
     {
-        [Header("Match")]
-        [SerializeField] private MatchConfigSO _matchConfig;
-
         public override void InstallBindings()
         {
-            // Match-level config asset, single instance, accessible to any consumer.
-            Container.Bind<MatchConfigSO>().FromInstance(_matchConfig).AsSingle();
+            // MatchConfigSO is deliberately NOT bound here. It moved to ProjectInstaller
+            // so the Bootstrap menu lobby can advertise the same rules the match enforces
+            // from the one asset reference. This container inherits it.
 
             // Spin up the network service on its own GameObject. Zenject injects the
             // IInputProvider on construction; the component then sits idle until

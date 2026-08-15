@@ -133,7 +133,12 @@ namespace CluckWars.Gameplay
         /// <summary>Spine Coat steal-back active hook.</summary>
         [Networked] public bool StealBackActive { get; set; }
         public float StealBackAmount { get; set; } = 4f;
-        public const float StealBackKnockback = 8f;
+        /// <summary>
+        /// Spine Coat's shove-back impulse, world-units/sec. Scaled 8 -> 10.8 (x1.35) with
+        /// the 2026-08-14 arena/move-speed rescale, for the same reason as the ability
+        /// knockbacks — see <c>CluckShockAbilitySO.KnockbackForce</c>.
+        /// </summary>
+        public const float StealBackKnockback = 10.8f;
         private readonly System.Collections.Generic.Dictionary<NetworkBehaviourId, TickTimer> _stealBackCooldowns = new();
 
         /// <summary>

@@ -32,6 +32,8 @@ GameObject:
   - component: {fileID: 3035928202790050528}
   - component: {fileID: 2264545675894003394}
   - component: {fileID: 7606116696970456605}
+  - component: {fileID: 778592323106949538}
+  - component: {fileID: 1825375558777686298}
   m_Layer: 8
   m_Name: Chicken
   m_TagString: Untagged
@@ -190,8 +192,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bdda1bef27a3a204395ad26483f8c558, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ChickenAnimator
-  _animator: {fileID: 5731265523250509895}
   _speedSmoothing: 12
+  _leanMaxDegrees: 12
+  _bankMaxDegrees: 10
+  _bankReferenceTurnRate: 220
+  _hopFrequencyRange: {x: 1.1, y: 2.6}
+  _hopHeight: 0.16
+  _hopSquashStretch: 0.14
+  _idleBobHeight: 0.045
+  _idleBobFrequency: 0.75
+  _idleBreathAmount: 0.03
+  _hitDuration: 0.26
+  _hitSquashDepth: 0.22
+  _hitRecoilDegrees: 16
+  _castDuration: 0.42
+  _castAnticipationFraction: 0.35
+  _castCrouchDepth: 0.18
+  _castPopHeight: 0.2
+  _stunBlendSeconds: 0.18
+  _stunSagDepth: 0.16
+  _stunSwayDegrees: 13
+  _stunSwayFrequency: 1.35
 --- !u!114 &3349953020513663677
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -235,7 +256,6 @@ MonoBehaviour:
   _searchMask:
     serializedVersion: 2
     m_Bits: 512
-  _foodPickupPrefab: {fileID: 8362016333457472506, guid: a8794a9118fa75e44946e9a0fb7d9a54, type: 3}
   _Cargo: 0
   _BountyBag: 0
 --- !u!114 &101601932164880250
@@ -254,6 +274,7 @@ MonoBehaviour:
   _slot0: {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
   _slot1: {fileID: 11400000, guid: 0d5566bf334a1c44a9711ea9b34a4ac6, type: 2}
   _slot2: {fileID: 11400000, guid: 141d6483e4594575ae36717f9dd3b056, type: 2}
+  _slot3: {fileID: 0}
   _ActiveSlot: 0
   _ChargingSlot: 0
   _LastCastHitCount: 0
@@ -457,3 +478,27 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.HitFeedback
   _enableHitStop: 1
+--- !u!114 &778592323106949538
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f791d42276f63d40bea6c4eb0a1dbb6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.RivalIndicator
+--- !u!114 &1825375558777686298
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e3d40b7a1cf52f4ab08d6e274513c9a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.AbilitySlotOverlay

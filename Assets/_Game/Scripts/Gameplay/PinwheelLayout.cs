@@ -93,11 +93,20 @@ namespace CluckWars.Gameplay
         /// plaza always leaves at least <see cref="MinCorridorWidth"/> of ring between the
         /// centre pile's footprint and the innermost wall, so growing the centre pile can
         /// never seal the hub.
+        /// <para>
+        /// Scaled 10 -> 13.5 (x1.35) with the arena on 2026-08-14. This is ARENA geometry,
+        /// not chicken geometry: it must keep the same share of the map, unlike
+        /// <see cref="MinCorridorWidth"/> and friends above, which are derived from the
+        /// chicken's footprint and are deliberately left alone — the chicken did not grow.
+        /// </para>
         /// </summary>
-        public const float HubPlazaRadius = 10f;
+        public const float HubPlazaRadius = 13.5f;
 
-        /// <summary>Width of the single opening each wall carries (GDD 3.4).</summary>
-        public const float OpeningWidth = 3f;
+        /// <summary>
+        /// Width of the single opening each wall carries (GDD 3.4). Scaled 3 -> 4.05 (x1.35)
+        /// with the arena — it is a fraction of a wall's length, not a chicken clearance.
+        /// </summary>
+        public const float OpeningWidth = 4.05f;
 
         /// <summary>
         /// Angular jitter applied to wall bearings, as a fraction of the sector step.
@@ -113,7 +122,7 @@ namespace CluckWars.Gameplay
         /// </summary>
         private const float JitterFraction = 0f;
 
-        /// <param name="arenaHalfSize">Half the square arena's side length (19 m for 38 m arena).</param>
+        /// <param name="arenaHalfSize">Half the square arena's side length (25.65 m for the 51.3 m arena).</param>
         /// <param name="wedges">Number of pinwheel arms (8 for v0.5 layout).</param>
         /// <param name="seed">RNG seed — identical on every peer for online matches.</param>
         /// <param name="centerKeepClear">Radius of the centre food pile's footprint.</param>

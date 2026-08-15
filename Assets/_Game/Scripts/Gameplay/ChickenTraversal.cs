@@ -96,7 +96,11 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Executes length-based teleport jump resolution via <see cref="JumpResolver"/>.
         /// </summary>
-        public JumpResult ExecuteJump(JumpLengthTier jumpTier, Vector3 origin, Vector3 direction, float arenaHalfSize = 19.0f)
+        /// <param name="arenaHalfSize">
+        /// Required — pass <see cref="MapGenerator.ArenaHalfSize"/>. See
+        /// <see cref="JumpResolver.Resolve"/> for why this no longer carries a default.
+        /// </param>
+        public JumpResult ExecuteJump(JumpLengthTier jumpTier, Vector3 origin, Vector3 direction, float arenaHalfSize)
         {
             float nominalDist = JumpResolver.GetNominalDistance(jumpTier);
             if (nominalDist <= 0f)

@@ -126,9 +126,10 @@ namespace CluckWars.Gameplay
         {
             if (_log == null)
             {
-                // GameManager needs MatchConfigSO which is bound in GameInstaller (scene scope),
-                // not in ProjectContext. Use the SceneContext child container so both
-                // scene-level and project-level bindings are available.
+                // Inject from the SceneContext child container when there is one, so both
+                // scene-level bindings (INetworkService) and project-level ones
+                // (MatchConfigSO, ILogService) resolve. ProjectContext alone is the
+                // fallback for the no-SceneContext case.
                 var sceneCtx = FindFirstObjectByType<SceneContext>();
                 if (sceneCtx != null)
                     sceneCtx.Container.Inject(this);

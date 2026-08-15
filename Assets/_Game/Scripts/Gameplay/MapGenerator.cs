@@ -42,9 +42,9 @@ namespace CluckWars.Gameplay
 
         [Header("Ground plane (local visual on every peer)")]
         [SerializeField] private Material _groundMaterial;
-        [Tooltip("World-space side length of the square ground plane.")]
+        [Tooltip("World-space side length of the square ground plane. Scaled 38 -> 51.3 (x1.35) on 2026-08-14: travel TIME is held constant by scaling every move speed by the same factor, so the arena reads faster without changing the SCT axiom. Game.unity OVERRIDES this initializer — editing it here alone changes nothing at runtime.")]
         [Min(5f)]
-        [SerializeField] private float _planeSize = 38f;
+        [SerializeField] private float _planeSize = 51.3f;
 
         [Header("Boundary walls (local colliders on every peer)")]
         [Tooltip("Height of the perimeter walls. Way taller than the chicken to keep them in even at 2× Speed Burst.")]
@@ -62,8 +62,8 @@ namespace CluckWars.Gameplay
         [Tooltip("Number of Standard wall segments. 0 cleanly disables the class. Interior terrain is LOCAL geometry that blocks movement, so online layouts are seeded from the session name — every peer builds the identical map.")]
         [Range(0, 20)]
         [SerializeField] private int _standardObstacleCount = 8;
-        [Tooltip("Min (x) / max (y) length of a Standard wall segment. Depth is _wallThickness.")]
-        [SerializeField] private Vector2 _interiorWallLengthRange = new Vector2(3f, 6f);
+        [Tooltip("Min (x) / max (y) length of a Standard wall segment. Depth is _wallThickness. Scaled (3,6) -> (4.05,8.1) with the arena. NOTE: only the dead rejection-sampling path reads this — the live pinwheel path takes each arm's length from its own geometry. Kept in step so the fallback stays coherent at the current arena size.")]
+        [SerializeField] private Vector2 _interiorWallLengthRange = new Vector2(4.05f, 8.1f);
         [Tooltip("Standard obstacle height. Low enough to see over in the iso view; must stay above the NavMesh step height (0.75) so bots can't path over.")]
         [Min(0.8f)]
         [SerializeField] private float _interiorWallHeight = 1.1f;
@@ -107,24 +107,24 @@ namespace CluckWars.Gameplay
         [Tooltip("Minimum gap between two obstacles' footprints (not their centres). Must stay wider than a chicken (radius 0.5) or obstacles fuse into impassable clumps. Scaled per class.")]
         [Min(0.5f)]
         [SerializeField] private float _obstacleSpacing = 1.5f;
-        [Tooltip("Margin between the sampling square and the boundary walls. Obstacles are sampled in SQUARE space (not a polar annulus) so they reach the dead corners behind the bases — ADR 0003 Decision 6.")]
+        [Tooltip("Margin between the sampling square and the boundary walls. Obstacles are sampled in SQUARE space (not a polar annulus) so they reach the dead corners behind the bases — ADR 0003 Decision 6. Scaled 1.5 -> 2.025 with the arena; like _interiorWallLengthRange this is read only by the dead rejection-sampling path.")]
         [Min(0.5f)]
-        [SerializeField] private float _obstacleEdgeMargin = 1.5f;
+        [SerializeField] private float _obstacleEdgeMargin = 2.025f;
         [Tooltip("Rejection-sampling attempt budget per requested obstacle. Placement is best-effort: if the map can't fit the requested density the generator places fewer and logs it rather than relaxing clearances.")]
         [Range(4, 80)]
         [SerializeField] private int _obstaclePlacementAttempts = 40;
 
         [Header("Bases")]
-        [Tooltip("How far each corner base sits from the center.")]
+        [Tooltip("How far each corner base sits from the center. Scaled 19 -> 25.65 (x1.35) with _planeSize, so the bases stay in the same relative spot. Game.unity OVERRIDES this initializer.")]
         [Min(2f)]
-        [SerializeField] private float _baseCornerDistance = 19f;
+        [SerializeField] private float _baseCornerDistance = 25.65f;
 
         [Header("Food piles (GDD §3: center + personal + contested islands)")]
         [Tooltip("Initial food in the central pile — large, high risk, high reward (GDD §3: 20).")]
         [Min(5f)]
         [SerializeField] private float _centerPileAmount = 20f;
 
-        [Tooltip("Full world X,Z footprint of the centre island at 100% fill. Shrunk 35% from the original 12x10: piles are solid NavMesh-carving blockers, and at the old sizes they covered 25% of the 38x38 arena floor, which left chases nowhere to happen. See the 2026-08-13 Peck/four-slot spec.")]
+        [Tooltip("Full world X,Z footprint of the centre island at 100% fill. Shrunk 35% from the original 12x10: piles are solid NavMesh-carving blockers, and at the old sizes they covered 25% of the 38x38 arena floor, which left chases nowhere to happen. See the 2026-08-13 Peck/four-slot spec. HELD at its absolute size through the 2026-08-14 x1.35 arena rescale (Maestro: 'don't increase the Pile size for now, but save the value just in case') — the x1.35 value is 10.53 x 8.78.")]
         [SerializeField] private Vector2 _centerPileFootprint = new Vector2(7.8f, 6.5f);
 
         [Tooltip("Make the center pile permanent (ADR 0003 Decision 2b): it can never be drained below its floor and slowly regenerates, so it stays a solid obstacle and the one contested resource of the late game. Floor and regen rate are tuned on the FoodPile prefab.")]
@@ -134,7 +134,7 @@ namespace CluckWars.Gameplay
         [Min(0f)]
         [SerializeField] private float _personalPileAmount = 5f;
 
-        [Tooltip("Full world X,Z footprint of each personal island at 100% fill. Shrunk 35% from the original 5.5x4.6 — see _centerPileFootprint.")]
+        [Tooltip("Full world X,Z footprint of each personal island at 100% fill. Shrunk 35% from the original 5.5x4.6 — see _centerPileFootprint. HELD through the 2026-08-14 x1.35 arena rescale; the x1.35 value is 4.86 x 4.05.")]
         [SerializeField] private Vector2 _personalPileFootprint = new Vector2(3.6f, 3.0f);
 
         [Tooltip("Personal island position = Lerp(corner, center, inset). 0.35 puts it a few units in front of the base, toward the action.")]
@@ -145,14 +145,14 @@ namespace CluckWars.Gameplay
         [Min(0f)]
         [SerializeField] private float _contestedPileAmount = 10f;
 
-        [Tooltip("Full world X,Z footprint of each contested island at 100% fill. Shrunk 35% from the original 6.5x5.4 — see _centerPileFootprint.")]
+        [Tooltip("Full world X,Z footprint of each contested island at 100% fill. Shrunk 35% from the original 6.5x5.4 — see _centerPileFootprint. HELD through the 2026-08-14 x1.35 arena rescale; the x1.35 value is 5.67 x 4.73.")]
         [SerializeField] private Vector2 _contestedPileFootprint = new Vector2(4.2f, 3.5f);
 
         [Tooltip("Contested island position = edge midpoint scaled toward center. 0.8 keeps it between the two neighbours but inside the walls.")]
         [Range(0.4f, 1f)]
         [SerializeField] private float _contestedEdgeInset = 0.7895f;
 
-        [Tooltip("Random XZ jitter applied to personal + contested island positions each match (GDD §3: positions randomized within constraints). Center pile never moves. Kept small — the keep-clear disc must cover every jittered position, and piles now sit only 22.5° off the wall bearings, so a large jitter erases the walls entirely.")]
+        [Tooltip("Random XZ jitter applied to personal + contested island positions each match (GDD §3: positions randomized within constraints). Center pile never moves. Kept small — the keep-clear disc must cover every jittered position, and piles now sit only 22.5° off the wall bearings, so a large jitter erases the walls entirely. Deliberately NOT scaled by the 2026-08-14 x1.35 arena rescale: this is a pile-local quantity and the piles keep their absolute size, so scaling it would inflate the keep-clear discs and clip the walls for no gain.")]
         [Min(0f)]
         [SerializeField] private float _pilePositionJitter = 0.4f;
 
@@ -193,7 +193,7 @@ namespace CluckWars.Gameplay
         /// must reject landings outside the play area) don't have to hardcode it.
         /// Falls back to the serialized default before <see cref="Awake"/> runs.
         /// </summary>
-        public static float ArenaHalfSize { get; private set; } = 19f;
+        public static float ArenaHalfSize { get; private set; } = 25.65f;
 
         [Header("Baked map scene")]
         [Tooltip("When true (the v0.5 default) the arena's static geometry is NOT generated at runtime — it is loaded from the baked map scene below, so it can be opened, inspected and hand-tuned in the Editor. Untick to fall back to the procedural path (used by the baker itself and by any future randomised map).")]
@@ -218,14 +218,30 @@ namespace CluckWars.Gameplay
         /// baking them would break Fusion's spawn ownership.
         /// </summary>
         /// <summary>
-        /// Radial distance of the four doorstep (T1) piles, on the corner diagonals.
-        /// Shared by the runtime spawn and the baked zone markers so a marker can never
-        /// drift away from the pile it represents.
+        /// Nominal (pre-jitter) position of a doorstep (T1) pile: a fraction
+        /// <paramref name="inset"/> of the way from its corner toward the centre.
         /// </summary>
-        public const float PersonalPileRadius = 17f;
+        /// <remarks>
+        /// <b>Static and shared on purpose.</b> Until 2026-08-14 the pile positions existed
+        /// TWICE in this file under two different parameterisations: the spawn and the zone
+        /// markers used <c>corner.normalized * PersonalPileRadius</c> with a hardcoded 17 m,
+        /// while the pinwheel keep-clear discs used <c>Lerp(corner, 0, _personalPileInset)</c>.
+        /// They agreed only because 19 m corners at inset 0.3673 happen to land on r = 17 —
+        /// a coincidence of the then-current arena size. Scaling the arena would have moved
+        /// the keep-clear discs while leaving the piles behind, so terrain would have been
+        /// built on top of the piles it is supposed to avoid. One formula now, called from
+        /// the spawn, the markers, the keep-clear discs and the EditMode clearance tests.
+        /// </remarks>
+        public static Vector3 PersonalPileNominal(Vector3 corner, float inset) =>
+            Vector3.Lerp(corner, Vector3.zero, inset);
 
-        /// <summary>Radial distance of the four contested (T2) piles, on the edge midpoints.</summary>
-        public const float ContestedPileRadius = 15f;
+        /// <summary>
+        /// Nominal (pre-jitter) position of a contested (T2) pile: the midpoint of the edge
+        /// between two adjacent corners, pulled toward the centre by <paramref name="inset"/>.
+        /// See <see cref="PersonalPileNominal"/> for why this is shared.
+        /// </summary>
+        public static Vector3 ContestedPileNominal(Vector3 cornerA, Vector3 cornerB, float inset) =>
+            (cornerA + cornerB) * 0.5f * inset;
 
         [Tooltip("Radius of the baked base-zone shadow. MUST mirror PlayerBase._depositRadius on the prefab — the shadow is meaningless if it doesn't match the actual deposit zone. Pinned by DataIntegrityTests.")]
         [Min(0.5f)]
@@ -303,14 +319,14 @@ namespace CluckWars.Gameplay
             for (int i = 0; i < _corners.Length; i++)
             {
                 AddZoneMarker($"PileZone_Personal{i}",
-                    _corners[i].normalized * PersonalPileRadius, _personalPileFootprint, material);
+                    PersonalPileNominal(_corners[i], _personalPileInset), _personalPileFootprint, material);
             }
 
             for (int i = 0; i < _corners.Length; i++)
             {
-                var mid = (_corners[i] + _corners[(i + 1) % _corners.Length]) * 0.5f;
                 AddZoneMarker($"PileZone_Contested{i}",
-                    mid.normalized * ContestedPileRadius, _contestedPileFootprint, material);
+                    ContestedPileNominal(_corners[i], _corners[(i + 1) % _corners.Length], _contestedEdgeInset),
+                    _contestedPileFootprint, material);
             }
         }
 
@@ -728,11 +744,10 @@ namespace CluckWars.Gameplay
             {
                 discs[idx++] = new KeepClearDisc(new Vector2(_corners[i].x, _corners[i].z), baseKeepClear);
 
-                var personalNominal = Vector3.Lerp(_corners[i], Vector3.zero, _personalPileInset);
+                var personalNominal = PersonalPileNominal(_corners[i], _personalPileInset);
                 discs[idx++] = new KeepClearDisc(new Vector2(personalNominal.x, personalNominal.z), personalRadius);
 
-                var mid = (_corners[i] + _corners[(i + 1) % _corners.Length]) * 0.5f;
-                var contestedNominal = mid * _contestedEdgeInset;
+                var contestedNominal = ContestedPileNominal(_corners[i], _corners[(i + 1) % _corners.Length], _contestedEdgeInset);
                 discs[idx++] = new KeepClearDisc(new Vector2(contestedNominal.x, contestedNominal.z), contestedRadius);
             }
             return discs;
@@ -1071,19 +1086,19 @@ namespace CluckWars.Gameplay
             // match, so the centre is what the endgame converges on.
             SpawnPile(runner, pilePrefab, Vector3.zero, _centerPileAmount, _centerPileFootprint, _centerPileIsPermanent);
 
-            // Personal doorstep islands — 4 piles at radius 17 m on corner diagonals.
+            // Personal doorstep islands — 4 piles on the corner diagonals.
             for (int i = 0; i < _corners.Length; i++)
             {
-                var pos = _corners[i].normalized * PersonalPileRadius + JitterXZ();
+                var pos = PersonalPileNominal(_corners[i], _personalPileInset) + JitterXZ();
                 SpawnPile(runner, pilePrefab, pos, _personalPileAmount, _personalPileFootprint);
                 loggedCoords.AppendLine($"Personal {i}: ({pos.x:F2}, {pos.z:F2}) | Food: {_personalPileAmount:0.00}");
             }
 
-            // Contested islands — 4 piles at radius 15 m on edge midpoints.
+            // Contested islands — 4 piles on the edge midpoints.
             for (int i = 0; i < _corners.Length; i++)
             {
-                var mid = (_corners[i] + _corners[(i + 1) % _corners.Length]) * 0.5f;
-                var pos = mid.normalized * ContestedPileRadius + JitterXZ();
+                var pos = ContestedPileNominal(_corners[i], _corners[(i + 1) % _corners.Length], _contestedEdgeInset)
+                          + JitterXZ();
                 SpawnPile(runner, pilePrefab, pos, _contestedPileAmount, _contestedPileFootprint);
                 loggedCoords.AppendLine($"Contested {i}: ({pos.x:F2}, {pos.z:F2}) | Food: {_contestedPileAmount:0.00}");
             }
