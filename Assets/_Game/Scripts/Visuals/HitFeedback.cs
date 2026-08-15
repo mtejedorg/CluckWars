@@ -518,7 +518,19 @@ namespace CluckWars.Visuals
                 if (o == null || !o.IsValid) continue;
                 if (candidate.Combat != null && candidate.Combat.IsDead) continue;
 
-                if (!ability.IsInAimShape(_controller, candidate)) continue;
+                // WouldAffect, not IsInAimShape. The geometric test alone labels anyone
+                // standing in the shape, including chickens the ability was never eligible
+                // to hit. That became reachable when Dive Bomb stopped requiring a target
+                // (2026-08-15): it can now be cast down a lane holding a CARGO-LESS rival,
+                // whom ExtraTargetFilter rejects — so the old test printed "IMMUNE" over a
+                // chicken whose real problem was having nothing worth stealing. WouldAffect
+                // applies the same eligibility predicate the cast itself used.
+                //
+                // This does not weaken the label where it belongs: immunities (Turtle Mode,
+                // Spine Coat) are applied when the effect lands, NOT inside WouldAffect, so
+                // a genuinely immune target still passes here and still gets labelled. Same
+                // for decoys, which are deliberately legitimate targets.
+                if (!ability.WouldAffect(_controller, candidate)) continue;
 
                 FloatingCombatText.Spawn(
                     candidate.transform.position + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight,

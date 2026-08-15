@@ -644,6 +644,221 @@ namespace CluckWars.Visuals
         public static readonly Color RefusalStunnedCrossColor = new Color(1.00f, 0.46f, 0.40f, 1f);
 
         // ================================================================
+        // Rival indicators — provisional (playtest note 2 of 5, 2026-08-14)
+        // ================================================================
+        //
+        // Maestro: "rivals are hard to keep track of during a match" — an on-ground
+        // class-tinted ring under every visible rival, and a chevron at the view edge
+        // pointing at every rival that has left the frame. Drawn entirely by
+        // RivalIndicator from state that is already replicated; no networking of any kind.
+        //
+        // THIS FEATURE IS EXPLICITLY PROVISIONAL. Maestro: "will remove later if it
+        // doesn't work." RivalIndicatorsEnabled below is the single kill switch — see its
+        // own remarks for exactly what flipping it does.
+
+        /// <summary>
+        /// <b>The kill switch for the whole rival-indicator feature.</b> Set to false and
+        /// every part of it stops existing at runtime: <c>RivalIndicator.Awake</c> disables
+        /// itself before building any geometry, so there are no LineRenderers, no
+        /// per-frame work, and nothing left on screen — not a hidden object, not an empty
+        /// child. Nothing else in the game reads any of the <c>Rival*</c> constants below,
+        /// so turning this off is the complete removal short of deleting the files.
+        ///
+        /// <b>Deliberately <c>static readonly</c>, not <c>const</c>.</b> A <c>const bool</c>
+        /// is folded at compile time, which turns every guard that reads it into an
+        /// unreachable-code warning (CS0162) in whichever position it is currently set to.
+        /// The <c>static readonly Color</c> fields elsewhere in this file establish the
+        /// same pattern.
+        ///
+        /// If the answer after the playtest is "remove it": delete
+        /// <c>RivalIndicator.cs</c>, this section, and the component off Chicken.prefab.
+        /// <c>ScreenEdgeProjection</c> stays — FEEDBACK.md §3.2 case 13's screen-edge
+        /// damage arc is its other consumer.
+        /// </summary>
+        public static readonly bool RivalIndicatorsEnabled = true;
+
+        /// <summary>
+        /// Radius of the class-tinted ground ring under an on-screen rival. Third and
+        /// outermost of three concentric rings a single chicken can wear, and sized
+        /// against the other two rather than picked in isolation:
+        /// <see cref="SelfRingRadius"/> (0.62, the §5.1 control-state ring) inside
+        /// <see cref="SelfBuffRingRadius"/> (0.80, the case-30 buff ring) inside this one.
+        /// A rival can legitimately be stunned and buffed while you are tracking them, so
+        /// all three can be lit at once and must read as three rings rather than as one
+        /// ring changing its mind. Chicken-relative, not arena-relative: the arena rescaled
+        /// x1.35 on 2026-08-14 and the chickens did not, so this number was correct before
+        /// that change and stays correct after it.
+        /// </summary>
+        public const float RivalRingRadius = 0.98f;
+
+        /// <summary>Ring stroke width. Deliberately thinner than the §5.1 status ring's
+        /// bright arc (0.11) — a persistent "this is a rival" marker sitting under every
+        /// opponent for the whole match must not out-shout the transient control states
+        /// drawn inside it.</summary>
+        public const float RivalRingWidth = 0.055f;
+
+        /// <summary>
+        /// Ring alpha before the rival's own <c>VisualOpacity</c> is multiplied in. 0.5
+        /// keeps it clearly a ground decal rather than a solid painted circle; the class
+        /// hue is what carries the identity, and hue survives a low alpha far better than
+        /// a shape does.
+        /// </summary>
+        public const float RivalRingAlpha = 0.5f;
+
+        /// <summary>
+        /// How far inside the frame the off-screen chevron is drawn, in viewport units.
+        /// Note this does <i>not</i> decide who counts as off screen — see
+        /// <see cref="ScreenEdgeProjection.ClampToEdge"/> for why that is judged against
+        /// the full unit rect. It only stops the chevron's own geometry from being half
+        /// clipped by the frame it is pinned to, so it is a hair over half the chevron's
+        /// size (<see cref="RivalChevronSizeFraction"/>).
+        /// </summary>
+        public const float RivalChevronViewportMargin = 0.045f;
+
+        /// <summary>
+        /// Extra inset on the TOP edge only, on top of
+        /// <see cref="RivalChevronViewportMargin"/>. The match HUD owns that strip — the
+        /// scoreboard top-left, the timer top-right — and a chevron pinned to y ≈ 0.955
+        /// lands underneath them.
+        /// </summary>
+        /// <remarks>
+        /// Not a guess. Measured in a live solo match on 2026-08-15: with the local player
+        /// in a corner (the ordinary case at the start of a round) all three rival chevrons
+        /// clamped to y = 0.955, and two of them sat under HUD panels — the feature was
+        /// invisible in precisely the situation it was built for.
+        ///
+        /// 0.17 clears the scoreboard's measured height. Applied to the top edge alone via
+        /// <see cref="RivalChevronSafeArea"/>: raising the uniform margin instead would push
+        /// the side and bottom chevrons far enough inboard to read as floating in the play
+        /// field rather than pinned to the frame.
+        /// </remarks>
+        public const float RivalChevronTopHudInset = 0.17f;
+
+        /// <summary>
+        /// The viewport band an off-screen rival chevron may be drawn in — uniform on three
+        /// edges, inset further at the top to clear the HUD. Consumed by
+        /// <c>ScreenEdgeProjection.TryProject</c>'s <c>Rect</c> overload.
+        /// </summary>
+        public static readonly Rect RivalChevronSafeArea = Rect.MinMaxRect(
+            RivalChevronViewportMargin,
+            RivalChevronViewportMargin,
+            1f - RivalChevronViewportMargin,
+            1f - RivalChevronTopHudInset);
+
+        /// <summary>
+        /// Chevron size as a fraction of the viewport's height. A fraction rather than a
+        /// world-space length on purpose: it makes the chevron a constant share of the
+        /// screen on every device and at every <c>MatchCamera._orthoSize</c>, and immune to
+        /// arena rescales. 0.07 of the vertical is roughly the size of a chicken at the
+        /// current framing — big enough to catch peripherally on a phone, small enough that
+        /// three of them at once (the 4-player ceiling) do not crowd the frame.
+        /// </summary>
+        public const float RivalChevronSizeFraction = 0.07f;
+
+        /// <summary>Chevron stroke width, as a fraction of its own size, so the arrow keeps
+        /// its proportions at any framing instead of turning into a hairline when the camera
+        /// pulls back.</summary>
+        public const float RivalChevronWidthRatio = 0.22f;
+
+        /// <summary>Chevron alpha before the rival's <c>VisualOpacity</c> is multiplied in.
+        /// Higher than <see cref="RivalRingAlpha"/> because the chevron has to win against
+        /// whatever arena content happens to be behind that edge of the screen, and unlike
+        /// the ring it has no world context to sit in.</summary>
+        public const float RivalChevronAlpha = 0.85f;
+
+        /// <summary>
+        /// How far past the camera's near clip plane the chevron geometry is placed, in
+        /// world units. Its only job is to clear the near plane and sit in front of all
+        /// arena geometry so an edge indicator is never occluded by the wall it is pointing
+        /// past. Not a framing quantity — the chevron's apparent size comes entirely from
+        /// <see cref="RivalChevronSizeFraction"/>, which under the orthographic match camera
+        /// is independent of depth.
+        /// </summary>
+        public const float RivalChevronDepthOffset = 0.5f;
+
+        // ================================================================
+        // Always-on ability reach overlay — AbilitySlotOverlay
+        // ================================================================
+        //
+        // Maestro: a new player cannot tell what any ability reaches until they are already
+        // aiming it. AbilitySlotOverlay draws the ground outline of EVERY equipped slot at
+        // once, all match, as a persistent low-fidelity reference. It is additive to the
+        // press-to-aim telegraph (FEEDBACK.md §2), which is unchanged.
+        //
+        // The governing constraint for every number below: this is on screen 100% of the
+        // match, on up to four shapes at once, for the whole match. Anything that competes
+        // with a transient cue wins by DURATION rather than by design intent, so the ambient
+        // tier is deliberately the quietest thing in the feedback system. Only alpha encodes
+        // state; the stroke width never changes. The grammar the rest of this file already
+        // uses is thickness = "how sharp/immediate", alpha = "how ready".
+
+        /// <summary>
+        /// <b>The kill switch for the whole always-on reach overlay.</b> Set to false and
+        /// <c>AbilitySlotOverlay.Awake</c> disables itself before allocating anything — no
+        /// LineRenderers, no per-frame work, nothing left on screen. Same tier and same
+        /// contract as <see cref="RivalIndicatorsEnabled"/>.
+        ///
+        /// <b>Deliberately <c>static readonly</c>, not <c>const</c>.</b> A <c>const bool</c>
+        /// folds at compile time and turns the guard that reads it into a CS0162
+        /// unreachable-code warning — see <see cref="RivalIndicatorsEnabled"/>'s own remarks.
+        ///
+        /// This is the DEVELOPER switch. The player's own runtime choice is a separate gate,
+        /// <c>CluckWars.Settings.PlayerPreferences.AbilityRangeGuidesEnabled</c>; both are
+        /// honoured independently and neither implies the other.
+        /// </summary>
+        public static readonly bool AbilitySlotOverlayEnabled = true;
+
+        /// <summary>
+        /// Stroke width of an ambient slot outline — the thinnest in the whole feedback
+        /// system, and deliberately so. Compare <see cref="RivalRingWidth"/> (0.055, itself
+        /// already chosen to stay under the transient status ring) and the telegraph /
+        /// cast-flash outlines at 0.11. Flat across every alpha tier: width is not a state
+        /// channel here.
+        /// </summary>
+        public const float AmbientSlotOutlineWidth = 0.035f;
+
+        /// <summary>
+        /// Alpha for a ready slot with nothing in its shape — the resting tier. Sits near the
+        /// old <c>AbilityRangeIndicator</c> range ring's dim 0.16, but that was ONE ring for
+        /// the whole kit; this is per-shape, with up to three others sharing the frame at
+        /// lower tiers, so the net weight of "whole kit, ambient" stays under where the single
+        /// ring sat.
+        /// </summary>
+        public const float AmbientSlotOutlineAlphaReady = 0.22f;
+
+        /// <summary>
+        /// Alpha for a slot on cooldown. ~40% of <see cref="AmbientSlotOutlineAlphaReady"/>,
+        /// mirroring the <i>proportional</i> relationship <see cref="HexAlphaCooldown"/> (0.45)
+        /// bears to <see cref="HexAlphaReady"/> (1.00) on the HUD hex, so the world and the
+        /// HUD tell the same story about the same slot.
+        ///
+        /// It recedes; it does not vanish. Mid-fight is the worst possible moment to lose the
+        /// spatial reference for an ability you are waiting on.
+        /// </summary>
+        public const float AmbientSlotOutlineAlphaCooldown = 0.09f;
+
+        /// <summary>
+        /// Alpha for a ready slot that currently has a rival standing inside its shape — the
+        /// brightened tier, which folds in the job the retired range ring used to do. ~1.5x
+        /// <see cref="AmbientSlotOutlineAlphaReady"/>, and still well under
+        /// <see cref="TelegraphPreviewAlpha"/> (0.75) so an ambient outline can never be
+        /// mistaken for a live aim preview. At most one or two slots are hot at once, so the
+        /// brightest shape on screen is almost always the most decision-relevant one.
+        /// </summary>
+        public const float AmbientSlotOutlineAlphaHot = 0.34f;
+
+        /// <summary>
+        /// Alpha for the three NON-charging slots while one slot is being aimed. A ~65% cut
+        /// from <see cref="AmbientSlotOutlineAlphaReady"/>, the same proportional move
+        /// <see cref="HexAlphaOtherActive"/> (0.35 from 1.00) makes on the HUD, and for the
+        /// same reason: holding them steady would read as "everything went on cooldown at
+        /// once", which is the wrong story. Clamped below
+        /// <see cref="AmbientSlotOutlineAlphaCooldown"/> so "suppressed by an active aim"
+        /// never reads louder than "on cooldown".
+        /// </summary>
+        public const float AmbientSlotOutlineAlphaSuppressed = 0.06f;
+
+        // ================================================================
         // Colours — canonical control-state set
         // ================================================================
         //

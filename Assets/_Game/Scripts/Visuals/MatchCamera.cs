@@ -80,6 +80,15 @@ namespace CluckWars.Visuals
         /// </summary>
         public static MatchCamera Instance { get; private set; }
 
+        /// <summary>
+        /// The match <see cref="UnityEngine.Camera"/>, already cached. Exposed so per-frame
+        /// consumers (<see cref="RivalIndicator"/>) do not each repeat the
+        /// <c>GetComponent&lt;Camera&gt;()</c> this class has done once in <c>Awake</c> —
+        /// that lookup was running once per chicken per frame against a 30fps mid-range
+        /// Android budget.
+        /// </summary>
+        public Camera Camera => _camera;
+
         private void Awake()
         {
             Instance = this;
@@ -118,18 +127,24 @@ namespace CluckWars.Visuals
             if (_localChicken != null && _localChicken.HomeCornerIndex >= 0 && _localChicken.HomeCornerIndex < 4)
             {
                 int cornerIdx = _localChicken.HomeCornerIndex;
-                Vector2 cornerPos = cornerIdx switch
+
+                // Only the BEARING from this corner toward the centre is used below, and a
+                // bearing is scale-invariant — so these are unit directions rather than real
+                // corner coordinates. They used to be literal (±19, ±19), which silently
+                // encoded the arena's half-size in the camera and would have gone stale the
+                // moment the arena was resized (it was, x1.35, on 2026-08-14). Signs only.
+                Vector2 cornerDir = cornerIdx switch
                 {
-                    0 => new Vector2(19f, 19f),
-                    1 => new Vector2(-19f, 19f),
-                    2 => new Vector2(-19f, -19f),
-                    3 => new Vector2(19f, -19f),
+                    0 => new Vector2(+1f, +1f),
+                    1 => new Vector2(-1f, +1f),
+                    2 => new Vector2(-1f, -1f),
+                    3 => new Vector2(+1f, -1f),
                     _ => Vector2.zero,
                 };
-                if (cornerPos != Vector2.zero)
+                if (cornerDir != Vector2.zero)
                 {
                     // Bearing from base toward centre (-c.x, -c.z)
-                    float targetYaw = Mathf.Atan2(-cornerPos.x, -cornerPos.y) * Mathf.Rad2Deg;
+                    float targetYaw = Mathf.Atan2(-cornerDir.x, -cornerDir.y) * Mathf.Rad2Deg;
                     if (targetYaw < 0f) targetYaw += 360f;
                     _yaw = Mathf.LerpAngle(_yaw, targetYaw, Time.deltaTime * 5f);
                 }
