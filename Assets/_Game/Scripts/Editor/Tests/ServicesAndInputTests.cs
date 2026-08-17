@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using CluckWars.Audio;
 using CluckWars.Gameplay;
 using CluckWars.Input;
@@ -307,12 +308,78 @@ namespace CluckWars.Tests
         [Test]
         public void Keyboard_AbilityHeld_OutOfRangeSlot_ReturnsFalse_NotThrow()
         {
-            // AbilityController's slot indices are always 0..2, but a defensive caller
-            // (or a future slot-count change) must not crash the whole input tick.
+            // Slot indices are 0..3 since every class gained a fourth slot (b3bf52f); this
+            // test used to call 3 "out of range", which stopped being true then and only
+            // kept passing because Keyboard.current is null in an EditMode run. The genuinely
+            // out-of-range indices are 4 and -1, and they must be inert rather than throwing:
+            // this runs on every simulation tick, so an exception kills the whole input path.
             var kb = new KeyboardInputProvider();
-            Assert.DoesNotThrow(() => kb.GetAbilityHeld(3));
-            Assert.IsFalse(kb.GetAbilityHeld(3));
+            Assert.DoesNotThrow(() => kb.GetAbilityHeld(4));
+            Assert.IsFalse(kb.GetAbilityHeld(4));
             Assert.IsFalse(kb.GetAbilityHeld(-1));
+        }
+
+        // ---- Ability key bindings (Maestro, 2026-08-15) -------------------------
+        // Asserted against the Key-enum table rather than by pressing keys, because
+        // Keyboard.current is null in EditMode — an enum table is what makes this
+        // mapping verifiable at all.
+
+        [Test]
+        public void Keyboard_EveryAbilitySlot_HasALetterADigitAndAnArrow()
+        {
+            var table = KeyboardInputProvider.AbilityKeys;
+
+            Assert.AreEqual(4, table.Length,
+                "One row per ability slot; every class has had four slots since b3bf52f.");
+
+            var expected = new[]
+            {
+                new[] { Key.Q, Key.Digit1, Key.UpArrow },
+                new[] { Key.E, Key.Digit2, Key.RightArrow },
+                new[] { Key.R, Key.Digit3, Key.DownArrow },
+                new[] { Key.F, Key.Digit4, Key.LeftArrow },
+            };
+
+            for (int slot = 0; slot < expected.Length; slot++)
+            {
+                CollectionAssert.AreEqual(expected[slot], table[slot],
+                    $"Slot {slot} bindings changed. Digits must match the number printed on " +
+                    "the HUD hex, and the arrows run clockwise from Up in the same order.");
+            }
+        }
+
+        [Test]
+        public void Keyboard_NoKeyDrivesTwoDifferentAbilities()
+        {
+            // A key appearing in two rows would fire both abilities from one press — and
+            // would look like a gameplay bug ("why did Peck go off too?"), not an input one.
+            var seen = new Dictionary<Key, int>();
+
+            var table = KeyboardInputProvider.AbilityKeys;
+            for (int slot = 0; slot < table.Length; slot++)
+            {
+                foreach (var key in table[slot])
+                {
+                    Assert.IsFalse(seen.TryGetValue(key, out int firstSlot),
+                        $"{key} is bound to both slot {firstSlot} and slot {slot}.");
+                    seen[key] = slot;
+                }
+            }
+        }
+
+        [Test]
+        public void Keyboard_NoAbilityKeyCollidesWithMovement()
+        {
+            // WASD is the left hand and must stay purely movement. A collision here would
+            // make walking fire an ability every time the key went down.
+            var movement = new HashSet<Key>(KeyboardInputProvider.MovementKeys);
+
+            foreach (var row in KeyboardInputProvider.AbilityKeys)
+            foreach (var key in row)
+            {
+                Assert.IsFalse(movement.Contains(key),
+                    $"{key} is both a movement key and an ability key.");
+            }
         }
     }
 }
