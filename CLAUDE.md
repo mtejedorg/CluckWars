@@ -14,7 +14,7 @@ should rarely need edits.
 - **Networking:** Photon Fusion 2 — Shared Mode for demo (LAN/cloud-relay), Server Mode post-funding
 - **DI:** Zenject (Extenject) · **Backend:** UGS behind `IUGSService` (`NullUGSService` in demo)
 - **Architecture:** MonoBehaviour — no ECS/DOTS
-- **Platforms:** Windows (primary dev), Android (mobile target), iOS (post-demo)
+- **Platforms:** Windows (primary dev), Android (mobile target), iOS (Xcode-export supported, off by default — no Mac to finish it; `Build/Enable iOS Export` to turn on)
 - **Target FPS:** 60 Windows, 30 stable on mid-range Android (2021+)
 
 ---
