@@ -9,8 +9,8 @@ using UnityEngine;
 namespace CluckWars.EditorTools
 {
     /// <summary>
-    /// One-button Windows + Android + iOS build menu under
-    /// <c>Cluck Wars / Build / …</c>. Reads the scene list from
+    /// One-button Windows + Android build menu under <c>Cluck Wars / Build / …</c>,
+    /// plus an opt-in iOS export. Reads the scene list from
     /// <c>EditorBuildSettings</c>, applies per-platform player settings
     /// before kicking the build off, and drops output into <c>Builds/</c>
     /// (gitignored).
@@ -23,7 +23,11 @@ namespace CluckWars.EditorTools
     /// iOS produces an <b>Xcode project directory</b>, not a signed .ipa —
     /// turning that into an installable build needs a Mac with Xcode, which
     /// this Windows workstation is not. Everything Mac-side (signing,
-    /// provisioning, xcodebuild) is deliberately out of scope here.
+    /// provisioning, xcodebuild) is deliberately out of scope here. Since
+    /// there's no Mac to finish the job on, iOS is greyed out by default
+    /// (toggle via <c>Build/Enable iOS Export</c>) and <c>Build/All</c> never
+    /// includes it — an iOS export nobody can act on shouldn't hold up or
+    /// clutter a routine Windows+Android build.
     /// </remarks>
     public static class CluckWarsBuildMenu
     {
@@ -33,6 +37,8 @@ namespace CluckWars.EditorTools
         private const string IosSubdir       = "iOS";
         private const string WindowsFileName = "CluckWars.exe";
         private const string LogTag          = "[Build]";
+        private const string EnableIosMenuPath = "Cluck Wars/Build/Enable iOS Export (needs a Mac)";
+        private const string EnableIosPrefKey  = "CluckWars.Build.EnableIos";
 
         /// <summary>Reverse-DNS bundle id applied to iOS builds.</summary>
         /// <remarks>
@@ -69,38 +75,75 @@ namespace CluckWars.EditorTools
         public static void BuildAndroid() => DoAndroid();
 
         [MenuItem("Cluck Wars/Build/iOS", priority = 3)]
-        public static void BuildIos() => DoIos();
+        public static void BuildIos()
+        {
+            // Belt-and-braces: the validate function below greys this item out
+            // when disabled, but guard the entry point too in case it's ever
+            // invoked another way (script-execute, a remapped shortcut).
+            if (!IsIosEnabled())
+            {
+                Debug.LogError($"{LogTag} iOS build is disabled. Enable it via " +
+                                $"\"{EnableIosMenuPath}\" first — remember the output still " +
+                                "needs a Mac with Xcode to become an installable app.");
+                return;
+            }
+            DoIos();
+        }
+
+        [MenuItem("Cluck Wars/Build/iOS", true)]
+        public static bool ValidateBuildIos() => IsIosEnabled();
+
+        [MenuItem(EnableIosMenuPath, priority = 6)]
+        public static void ToggleIosEnabled()
+        {
+            var enabled = !IsIosEnabled();
+            EditorPrefs.SetBool(EnableIosPrefKey, enabled);
+            Debug.Log(enabled
+                ? $"{LogTag} iOS build enabled. Output is still an Xcode project export, not an " +
+                  "installable app — finishing it needs a Mac with Xcode."
+                : $"{LogTag} iOS build disabled — Build/iOS is greyed out and Build/All will skip it.");
+        }
+
+        [MenuItem(EnableIosMenuPath, true)]
+        public static bool ValidateToggleIosEnabled()
+        {
+            Menu.SetChecked(EnableIosMenuPath, IsIosEnabled());
+            return true;
+        }
 
         [MenuItem("Cluck Wars/Build/All %#b", priority = 4)]
         public static void BuildAll()
         {
-            // Validate once up front rather than letting all three targets fail
-            // with the same scene-list error.
+            // Validate once up front rather than letting all targets fail with
+            // the same scene-list error.
             if (!ValidateScenes()) return;
 
-            bool windows = false, android = false, ios = false;
+            // iOS is deliberately never part of Build All, regardless of the
+            // Enable iOS Export toggle — an export nobody on this machine can
+            // finish (no Mac) shouldn't hold up or clutter a routine build.
+            bool windows = false, android = false;
             try
             {
-                // A failed target does not abort the rest: the three toolchains
+                // A failed target does not abort the rest: the two toolchains
                 // fail independently, and before a test session it's more useful
-                // to learn all three verdicts at once than just the first.
+                // to learn both verdicts at once than just the first.
                 windows = DoWindows();
                 android = DoAndroid();
-                ios     = DoIos();
             }
             finally
             {
                 // Must happen even if a build threw. Leaving the Editor on the
-                // Android or iOS target causes the domain-reload stall that
-                // breaks Play Mode and the MCP bridge.
+                // Android target causes the domain-reload stall that breaks
+                // Play Mode and the MCP bridge.
                 RestoreWindowsTarget();
             }
 
-            var summary = $"{LogTag} Build All — Windows: {Verdict(windows)}, " +
-                          $"Android: {Verdict(android)}, iOS: {Verdict(ios)}";
-            if (windows && android && ios) Debug.Log(summary);
+            var summary = $"{LogTag} Build All — Windows: {Verdict(windows)}, Android: {Verdict(android)}";
+            if (windows && android) Debug.Log(summary);
             else Debug.LogError(summary + "  One or more targets did not succeed; see the errors above.");
         }
+
+        private static bool IsIosEnabled() => EditorPrefs.GetBool(EnableIosPrefKey, false);
 
         [MenuItem("Cluck Wars/Build/Reveal Builds Folder", priority = 20)]
         public static void RevealBuilds()
