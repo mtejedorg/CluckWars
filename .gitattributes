@@ -38,6 +38,24 @@
 *.meta          text eol=lf
 *.controller    text eol=lf
 *.anim          text eol=lf
+
+# Map.unity is BINARY, unlike every other scene in the project.
+#
+# The project is ForceText (m_SerializationMode: 2), so scenes are normally YAML
+# and the eol=lf rule above is right for them. Map.unity is the exception: it was
+# created by MapSceneBaker via a path that writes Unity's binary format, and it
+# stubbornly stays binary (ForceReserializeAssets, a dirty re-save and a forced
+# reimport were all tried - see the remarks in MapSceneBaker).
+#
+# Left under `text eol=lf` git applies CRLF->LF normalisation to a binary blob and
+# SILENTLY STRIPS any 0d 0a byte pair on commit, corrupting the baked map. It has
+# not bitten yet purely by luck: the current 239,800-byte file happens to contain
+# zero such pairs (verified 2026-08-17). Every re-bake rewrites this blob and
+# rerolls that dice.
+#
+# Marking it binary is simply the truth about the file. If it is ever converted to
+# real YAML, delete this line so it picks up the *.unity rule again.
+Assets/_Game/Scenes/Map.unity binary
 *.mat           text eol=lf
 *.physicMaterial    text eol=lf
 *.physicsMaterial2D text eol=lf
