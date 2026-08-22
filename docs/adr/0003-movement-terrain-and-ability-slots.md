@@ -306,6 +306,31 @@ and treat the ratio as hostile.
 
 ## Decision 5 — Terrain vocabulary: three obstacle classes
 
+> ## ⛔ SUPERSEDED by `docs/GDD.md` §3.5 (locked 2026-07-29)
+>
+> **The height table below is wrong under the current design and must not be implemented
+> from.** GDD §3.5 states it plainly: *"All jumps are teleports. There are no obstacle
+> height classes."* Traversal is gated **purely by an obstacle's footprint span along the
+> jump direction** — span vs. the 5 / 10 / 18 m jump tiers — and by nothing else. Height is
+> now only a **pathing floor**: every obstacle must clear the NavMesh step height (0.75) so
+> bots cannot walk over terrain. That is a bot constraint, not a traversal class.
+>
+> The header of this ADR has said "Decisions 1 and 5 superseded" since 2026-07-29, but the
+> **table itself was never marked**, so it kept reading as live guidance. That cost a full
+> analysis pass on 2026-08-19, which had to re-derive from GDD §3.5 that the Low/Standard/
+> Tall ladder no longer exists. It is marked now.
+>
+> **Still live from this decision:** obstacles are permanent, local, session-seeded geometry;
+> discrimination is by an explicit tag rather than inferred from height; boundary walls are
+> never traversable. **Dead:** the three height classes, and the Run/Vault/Barge/Blink column
+> set that discriminates between them.
+>
+> **Code that still encodes the dead model** (2026-08-19 audit): `ObstacleClass`,
+> `TerrainTraversal`, and `TraversalRules.Clears` — all still live and consumed by
+> `ChickenTraversal.IsClearable`. The shipped map now tags **every** obstacle
+> `ObstacleClass.Standard`, so the enum discriminates nothing in practice. See
+> `docs/STATE.md` (2026-08-19) for the scoped recommendation to collapse it.
+
 **The problem this fixes.** Every interior obstacle today is the same thing: a 1.1-high wall
 segment. With one obstacle type, Vault either clears *everything* or *nothing* — "ignore all
 terrain" is a toggle, not an ability, and Vault/Barge become indistinguishable. **Traversal
@@ -361,6 +386,13 @@ Reasons to keep it:
 annulus* over a *square* plane, bounded at `r ≤ planeSize/2 − 2`. The square's corners sit at
 `r ≈ planeSize × 0.707/2`, outside that bound — so **the corner regions behind the bases are
 both dead space and wall-free**. Decision 5's placement should deliberately reach into them.
+
+> ⚠ **Stale premise (measured 2026-08-19).** The corner pockets are **not usable**. Between
+> a base's keep-clear disc and the arena corner there is ~1.4 m — under `MinCorridorWidth`
+> (2.0), i.e. a chicken cannot get in. Anything placed there is invisible clutter that only
+> spends the density budget. `SectorScatter` excludes them *structurally* (nothing satisfies
+> both the disc rule and the boundary rule there) and
+> `SectorScatterTests.Build_PlacesNothingInTheUnusableCornerPockets` asserts it.
 
 **Revisit after playtest**, with data. If the square still feels flat once Decisions 2 and 5
 are in, the cheapest next experiment is an **octagon** (chamfer the corners: 8 boundary walls,

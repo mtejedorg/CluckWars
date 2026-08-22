@@ -171,7 +171,13 @@ matter.
 
 Eight radial walls sit on the boundaries of eight 45° sectors, alternating **base sector**
 (centred on a corner) and **neutral sector** (centred on an edge midpoint). Walls are
-**0.5 m thick**, and each has exactly **one opening, at one end**:
+**0.7 m thick** (0.5 until 2026-08-19), and each has exactly **one opening, at one end**:
+
+> **The radii in the table below are the pre-rescale 38 m arena's.** The shipped arena is
+> 51.3 m since 2026-08-14; the *derivation* is unchanged, so the live figures are the same
+> formulas at `arenaHalfSize = 25.65`: hub plaza **10**, opening **3**, both wall types
+> **14.76 m** long, **118.1 m** of interior wall in total. Do not read the absolute numbers
+> here as current — read the relationships.
 
 | | Spans | Length | Opening |
 |---|---|---|---|
@@ -187,12 +193,23 @@ against the boundary along *its own* bearing. Both wall types come out the same 
 length, which is a consequence of the derivation rather than a tuned value.
 
 **Walls are deterministic — they do not jitter.** Piles sit at sector centres and walls on
-sector boundaries, which is the widest separation this topology allows; at the contested
-pile's radius that is 5.74 m against a 5.59 m keep-clear disc, leaving only **~0.15 m of
-slack**. Measured: any wall jitter swings a wall into a pile's disc and gets clipped away —
-at the previous setting 27 % of walls collapsed entirely and the rest shrank from 7.6 m to
-1–3 m, destroying the two-lap topology. Match-to-match variety therefore comes from **pile
-jitter only** (±0.4 m), and a fixed wall layout also makes the map learnable.
+sector boundaries, which is the widest separation this topology allows: at the contested
+pile's radius (20.2507 m) the wall LINE passes 7.7496 m from the pile centre against a
+4.0936 m keep-clear disc, leaving **+3.656 m of slack**.
+
+> ⚠ **Corrected 2026-08-19.** This paragraph previously claimed *~0.15 m of slack*, and so
+> did `PinwheelLayout.JitterFraction`'s comment. That figure was computed against the
+> **pre-shrink** contested footprint (6.5 × 5.4, disc 5.585) at the **pre-rescale** radius
+> (15 m, separation 5.740) — a map that stopped shipping on 2026-08-13. Against what
+> actually ships the margin is **24× larger**. The historical measurement below (27 % of
+> walls collapsing under jitter) was taken on that same superseded map and should be
+> re-measured before it is relied on again.
+
+Measured at the time: any wall jitter swung a wall into a pile's disc and got clipped away —
+27 % of walls collapsed entirely and the rest shrank from 7.6 m to 1–3 m, destroying the
+two-lap topology. Match-to-match variety therefore comes from **pile jitter only**
+(±0.4 m), and — now the primary reason — a fixed wall layout makes the map **learnable**,
+which the two-lap rule above depends on.
 
 Two consequences worth keeping in mind if this is ever revisited:
 
@@ -203,6 +220,26 @@ Two consequences worth keeping in mind if this is ever revisited:
   walls**. `PinwheelLayoutTests.Build_WallsSurvivePileKeepClearDiscs_AtRealV05Sizes` guards
   this; clearance tests alone cannot, because clipping shortens a wall without ever
   violating corridor clearance.
+
+**Eight wedges is a proven global optimum, not a round number.** Wall bearings are
+`(i + 0.5)·360/W`; every pile and base sits on a multiple of 45° (piles at sector centres,
+bases on the corner diagonals). The offset between a wall and the nearest objective is
+therefore a pure function of `W`. The binding constraint is the contested pile: its
+keep-clear disc is 4.0936 m at r = 20.2507, so a wall must sit at least
+`asin(4.0936 / 20.2507)` = **11.665°** off the objective bearing or it gets clipped away.
+
+| W | Best offset from a 45° multiple | Verdict |
+|---|---|---|
+| **8** | **22.500°** — the maximum the topology allows | ✅ clears the requirement by 10.8° |
+| 12 | 0.000° — four arms land **exactly** on the corner diagonals | ❌ |
+| 16 | 11.250° | ❌ misses by 0.415° |
+| 20 | 0.000° — four arms land **exactly** on the corner diagonals | ❌ |
+
+So **wedge count is not a density lever**: raising `W` adds arms that the objectives then
+delete. Interior wall LENGTH is tuned through the hub plaza and opening width; interior
+DENSITY is added with scatter cover (`SectorScatter`). Pinned by
+`PinwheelLayoutTests.WedgeCount_Eight_IsTheGlobalOptimumForObjectiveBearingOffset`, which
+fails with the reason in the message rather than letting a plausible-looking map ship.
 
 The pattern is 4-fold symmetric, so **every player's sector is identical**: an outer-gap
 wall on one side, an inner-gap wall on the other. Combined with per-player rotation this
@@ -323,15 +360,36 @@ There is **no HP and no Resistance** — durability is expressed through *contro
 
 | Class | Move | Cargo | Collect | SCT | Fantasy |
 |---|---|---|---|---|---|
-| **Fatty** 🐔 | 7.5 | 35 | 3.2 | 30 s / 2 trips | *"Slow, but it all fits in the beak."* |
-| **Speedy** 🐤 | 9.0 | 10 | 3.0 | 30 s / 4 trips | *"If you can't catch me, you can't rob me."* |
-| **Warrior** ⚔️ | 7.5 | 14 | 2.6 | 35 s / 3 trips | *"The farm is a battlefield."* |
-| **Assassin** 🗡️ | 9.0 | 10 | 1.7 | 40 s / 4 trips | *"Blink and your food is gone."* |
+| **Fatty** 🐔 | 10.125 | 35 | 3.2 | 30 s / 2 trips | *"Slow, but it all fits in the beak."* |
+| **Speedy** 🐤 | 12.15 | 10 | 3.0 | 30 s / 4 trips | *"If you can't catch me, you can't rob me."* |
+| **Warrior** ⚔️ | 10.125 | 14 | 2.6 | 35 s / 3 trips | *"The farm is a battlefield."* |
+| **Assassin** 🗡️ | 12.15 | 10 | 1.7 | 40 s / 4 trips | *"Blink and your food is gone."* |
 
-**The load-bearing detail:** Speedy and Assassin share Move Speed (9.0) and cargo (10) but
+> **Move speeds are the x1.35 values** from the 2026-08-14 arena rescale (38 m -> 51.3 m).
+> Arena and speed scaled together, so SCT is unchanged — travel time is `distance / speed`
+> and both moved by the same factor. The table above previously still listed the pre-rescale
+> 7.5 / 9.0; the authority is `Assets/_Game/Data/Classes/*.asset`, solved against
+> `BalanceOracle`, never this table.
+
+**The load-bearing detail:** Speedy and Assassin share Move Speed (12.15) and cargo (10) but
 clear in 30 s vs 40 s — the entire gap is **Collection Rate** (3.0 vs 1.7). The Assassin is
 a fast chicken who is *genuinely bad at farming*; that is the mechanical reason he denies
 instead of collects.
+
+**Speedy never gets terrain traversal.** Not a jump, not a Blink, not a Vault — Maestro,
+2026-08-21: *"Speedy can use control on other chickens and escape just by having more speed.
+Speedy with a jump feels unfair."* Speedy already answers two currencies by itself: **escape**
+(highest Move Speed in the roster, and Speed Burst multiplies it further) and **denial** (three
+Control abilities — Root Egg, Feather Trap, Feather Aura). Traversal would be a third with
+nothing traded for it, and the map would stop constraining the fastest chicken in the game.
+
+The line is *"no ignoring terrain"*, not *"no mobility"* — Speed Burst is deliberately legal,
+because a pure ground-speed multiplier deepens Speedy's identity instead of bypassing the
+geometry. Enforced by `DataIntegrityTests.Speedy_HasNoTerrainTraversalAbilityAvailableToIt`,
+which sweeps the whole roster, because this rule had already been broken once: `Shadowstep.asset`
+serialized `AllowedClasses: 10` (Speedy + Assassin) against a constructor, a class docstring and
+§7.2 below that all said Assassin — giving Speedy a 14.58 m Blink that crossed every obstacle
+class, further than the Big jump.
 
 ### 5.3 Passives (design — reimplementation pending)
 
