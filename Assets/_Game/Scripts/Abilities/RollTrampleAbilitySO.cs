@@ -19,7 +19,7 @@ namespace CluckWars.Abilities
                  "centre — total forward reach is ForwardOffset + SweepRadius. Mirrors " +
                  "JumpResolver.ShortDistance so the lane covers exactly the dive path — keep " +
                  "the two equal.")]
-        [Min(0.5f)] public float ForwardOffset = 5.0f;
+        [Min(0.5f)] public float ForwardOffset = 3.25f;
 
         [Tooltip("Half-width of the peck lane. Generous — catches chickens slightly off-line. " +
                  "Widened 1.15 -> 2.05 (x1.8) in the 2026-08-14 reach pass: the lane LENGTH is " +

@@ -11,7 +11,7 @@ namespace CluckWars.Abilities
         {
             Category = AbilityCategory.Control;
             SlotKind = AbilitySlotKind.Character;
-            AllowedClasses = ChickenClassFlags.Fatty;
+            AllowedClasses = ChickenClassFlags.Warrior;
         }
 
         [Tooltip("Shock radius around the caster.")]

@@ -11,7 +11,7 @@ namespace CluckWars.Abilities
         {
             Category = AbilityCategory.Defense;
             SlotKind = AbilitySlotKind.Character;
-            AllowedClasses = ChickenClassFlags.Warrior;
+            AllowedClasses = ChickenClassFlags.Fatty;
         }
 
         [Tooltip("How much cargo to steal back on contact.")]
