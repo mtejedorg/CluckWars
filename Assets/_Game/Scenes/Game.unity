@@ -556,27 +556,18 @@ MonoBehaviour:
   _groundMaterial: {fileID: 2100000, guid: 1bc3c7d5c8e686b428e56c26a09f6332, type: 2}
   _planeSize: 51.3
   _wallHeight: 5
-  _wallThickness: 0.5
+  _wallThickness: 0.7
   _wallsVisible: 0
   _wallMaterial: {fileID: 0}
   _standardObstacleCount: 8
-  _interiorWallLengthRange: {x: 4.05, y: 8.1}
-  _interiorWallHeight: 1.1
+  _interiorWallHeight: 1.4
   _interiorWallColor: {r: 0.45, g: 0.36, b: 0.26, a: 1}
-  _lowObstacleCount: 6
-  _lowObstacleFootprintRange: {x: 1.2, y: 2.2}
-  _lowObstacleHeight: 0.9
-  _lowObstacleClearanceScale: 0.8
-  _lowObstacleColor: {r: 0.54, g: 0.43, b: 0.3, a: 1}
-  _tallObstacleCount: 3
-  _tallObstacleFootprintRange: {x: 1.6, y: 2.4}
-  _tallObstacleHeight: 2.5
-  _tallObstacleClearanceScale: 1.5
-  _tallObstacleColor: {r: 0.37, g: 0.38, b: 0.41, a: 1}
-  _interiorWallClearance: 2.2
-  _obstacleSpacing: 1.5
-  _obstacleEdgeMargin: 2.025
-  _obstaclePlacementAttempts: 40
+  _coverPerSector: 1
+  _coverSpanRange: {x: 1.2, y: 2.2}
+  _barrierPerSector: 0
+  _barrierSpanRange: {x: 4.6, y: 6.4}
+  _scatterClearance: 2
+  _obstaclePlacementAttempts: 80
   _baseCornerDistance: 25.65
   _centerPileAmount: 20
   _centerPileFootprint: {x: 7.8, y: 6.5}

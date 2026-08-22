@@ -50,69 +50,44 @@ namespace CluckWars.Gameplay
         [Tooltip("Height of the perimeter walls. Way taller than the chicken to keep them in even at 2× Speed Burst.")]
         [Min(1f)]
         [SerializeField] private float _wallHeight = 5f;
-        [Tooltip("Wall thickness. Thin walls + fast chickens can tunnel; 0.5m is safe.")]
+        [Tooltip("Thickness of every wall — boundary and interior alike. Thin walls + fast chickens can tunnel. Raised 0.5 -> 0.7 on 2026-08-19 so the pinwheel reads as masonry rather than a line on the floor at the enlarged arena size. SAFE TO CHANGE: BuildBoundaryWalls centres each boundary wall at half + t*0.5, so its INNER FACE stays at exactly ±_planeSize/2 regardless of thickness — the fence line and MapPropsRescaler.SolveFenceLayout are unaffected. It IS consumed by PinwheelLayout.SolveHubPlazaRadius, which is the point: a thicker arm now correctly pushes the hub plaza out instead of silently eating the corridor. Game.unity OVERRIDES this initializer.")]
         [Min(0.05f)]
-        [SerializeField] private float _wallThickness = 0.5f;
+        [SerializeField] private float _wallThickness = 0.7f;
         [Tooltip("Render the walls. Off by default (invisible boundary); flip on for debugging.")]
         [SerializeField] private bool _wallsVisible = false;
         [Tooltip("Optional material for the walls when _wallsVisible is true.")]
         [SerializeField] private Material _wallMaterial;
 
-        [Header("Interior terrain — Standard (wall segments; ADR 0003 Decision 5)")]
-        [Tooltip("Number of Standard wall segments. 0 cleanly disables the class. Interior terrain is LOCAL geometry that blocks movement, so online layouts are seeded from the session name — every peer builds the identical map.")]
+        [Header("Interior terrain — pinwheel arms (GDD §3.4)")]
+        [Tooltip("Number of pinwheel arms. LOCKED AT 8 and provably optimal — see PinwheelLayout's bearing-alignment table. This is NOT a density lever: W=12 and W=20 land four arms EXACTLY on the corner diagonals, and W=16's best offset (11.25°) misses the contested pile's required 11.665° by 0.415°, so extra arms get clipped away by the very objectives they exist to route around. Add density with the scatter fields below instead. 0 cleanly disables interior walls. Interior terrain is LOCAL geometry that blocks movement, so online layouts are seeded from the session name — every peer builds the identical map.")]
         [Range(0, 20)]
         [SerializeField] private int _standardObstacleCount = 8;
-        [Tooltip("Min (x) / max (y) length of a Standard wall segment. Depth is _wallThickness. Scaled (3,6) -> (4.05,8.1) with the arena. NOTE: only the dead rejection-sampling path reads this — the live pinwheel path takes each arm's length from its own geometry. Kept in step so the fallback stays coherent at the current arena size.")]
-        [SerializeField] private Vector2 _interiorWallLengthRange = new Vector2(4.05f, 8.1f);
-        [Tooltip("Standard obstacle height. Low enough to see over in the iso view; must stay above the NavMesh step height (0.75) so bots can't path over.")]
+        [Tooltip("Height of EVERY piece of interior terrain — arms and scatter alike. There are no height classes (GDD §3.5, locked: 'All jumps are teleports. There are no obstacle height classes.'); traversal is gated purely by footprint span. This single value is a PATHING FLOOR, not a traversal class: it must stay above the NavMesh step height (0.75) or bots walk over terrain and it stops being terrain. Raised 1.1 -> 1.40 on 2026-08-19 — 1.40 is the measured hard ceiling at which a player standing flush against a wall can still see their own chicken. Game.unity OVERRIDES this initializer.")]
         [Min(0.8f)]
-        [SerializeField] private float _interiorWallHeight = 1.1f;
-        [Tooltip("Tint for Standard obstacles. Desaturated per ART.md — map stays muted so chickens pop.")]
+        [SerializeField] private float _interiorWallHeight = 1.40f;
+        [Tooltip("Tint for interior terrain. Desaturated per ART.md — the map stays muted so chickens pop. In practice this is the SCATTER's colour: the pinwheel arms are collider-only (hand-placed wall_segment art in MapProps is what you actually see), so they never consult it.")]
         [SerializeField] private Color _interiorWallColor = new Color(0.45f, 0.36f, 0.26f, 1f);
 
-        [Header("Interior terrain — Low (crates / fences; Barge-able in Slice 2)")]
-        [Tooltip("Number of Low obstacles. 0 cleanly disables the class.")]
-        [Range(0, 16)]
-        [SerializeField] private int _lowObstacleCount = 6;
-        [Tooltip("Min (x) / max (y) footprint side of a Low obstacle. Width and depth are drawn independently, so crates come out slightly rectangular.")]
-        [SerializeField] private Vector2 _lowObstacleFootprintRange = new Vector2(1.2f, 2.2f);
-        [Tooltip("Low obstacle height. MUST stay above the NavMesh step height (0.75) or bots walk straight over it and it stops being terrain — 0.9 is deliberate. Low is distinguished from Standard by being Barge-able, NOT by being shorter to walk over.")]
-        [Min(0.8f)]
-        [SerializeField] private float _lowObstacleHeight = 0.9f;
-        [Tooltip("Clearance multiplier for Low obstacles — cheap cover, so they may pack tighter than a wall segment.")]
-        [Range(0.25f, 3f)]
-        [SerializeField] private float _lowObstacleClearanceScale = 0.8f;
-        [Tooltip("Tint for Low obstacles. Lighter crate wood, still muted.")]
-        [SerializeField] private Color _lowObstacleColor = new Color(0.54f, 0.43f, 0.30f, 1f);
-
-        [Header("Interior terrain — Tall (rocks / silos; Blink-only in Slice 2)")]
-        [Tooltip("Number of Tall obstacles. 0 cleanly disables the class. Keep this low — Tall is a hard wall nothing but Blink answers.")]
+        [Header("Interior terrain — scatter cover (SectorScatter; span-gated, 4-fold symmetric)")]
+        [Tooltip("Small crates per 90° SECTOR — total placed is 4x this, one per player, identical by construction. Span stays under JumpResolver.ShortDistance - 0.8, so every jump tier clears one square-on: these break sightlines and running lines, they do not gate traversal. 0 cleanly disables the role.")]
         [Range(0, 8)]
-        [SerializeField] private int _tallObstacleCount = 3;
-        [Tooltip("Min (x) / max (y) footprint side of a Tall obstacle.")]
-        [SerializeField] private Vector2 _tallObstacleFootprintRange = new Vector2(1.6f, 2.4f);
-        [Tooltip("Tall obstacle height. Reads as a rock / silo — tall enough to be unmistakably un-vaultable at a glance.")]
-        [Min(0.8f)]
-        [SerializeField] private float _tallObstacleHeight = 2.5f;
-        [Tooltip("Clearance multiplier for Tall obstacles. >1 on purpose: a Tall prop nothing but Blink can cross must never sit close enough to another obstacle or an objective to seal a lane. 1.5 is the measured ceiling — above ~1.6 no point on a 30m map is far enough from all 13 objectives and Tall silently stops placing.")]
-        [Range(0.25f, 3f)]
-        [SerializeField] private float _tallObstacleClearanceScale = 1.5f;
-        [Tooltip("Tint for Tall obstacles. Cool grey stone — reads as 'not wood, not crossable'.")]
-        [SerializeField] private Color _tallObstacleColor = new Color(0.37f, 0.38f, 0.41f, 1f);
+        [SerializeField] private int _coverPerSector = 1;
+        [Tooltip("Min (x) / max (y) footprint side of a crate. Width and depth are drawn independently, so crates come out slightly rectangular.")]
+        [SerializeField] private Vector2 _coverSpanRange = new Vector2(1.2f, 2.2f);
+
+        [Tooltip("Short wall stubs per 90° SECTOR — total placed is 4x this. Span is drawn ABOVE JumpResolver.ShortDistance - 0.8 (4.2 m), so a Short 5 m jump cannot cross one square-on while a Normal 10 m always can — the only span-derived traversal gate the map would have. ⚠ SHIPPED AT 0 ON PURPOSE: measured, one stub per sector costs 13% of free-run length and lands the arena 16% TIGHTER than the 38 m reference (ArenaDensityMetricTests). The role is implemented and tested; it is off because the arena is already at the reference density with cover alone, not because it does not work. Turning it on is a deliberate density AND traversal-balance decision for Maestro.")]
+        [Range(0, 4)]
+        [SerializeField] private int _barrierPerSector = 0;
+        [Tooltip("Min (x) / max (y) SPAN of a wall stub. The lower bound must stay above SectorScatter.MinBarrierSpan (4.2 m) or the role collapses into Cover and the distinction becomes decorative — pinned by SectorScatterTests. Depth is _wallThickness, so a stub reads as the same masonry as an arm.")]
+        [SerializeField] private Vector2 _barrierSpanRange = new Vector2(4.6f, 6.4f);
 
         [Header("Interior terrain — shared placement rules")]
-        [Tooltip("Walkable gap kept between every objective (food islands, corner bases/spawns) and the nearest obstacle SURFACE — not its centre. 2.2 is over two chicken diameters. Measured surface-to-surface at both ends: the obstacle contributes its real footprint rather than a bounding circle (or no long wall could ever go near an objective), and an island contributes its own footprint radius (or terrain would be placed inside the 7×4 centre island). Scaled per class.")]
-        [Min(1f)]
-        [SerializeField] private float _interiorWallClearance = 2.2f;
-        [Tooltip("Minimum gap between two obstacles' footprints (not their centres). Must stay wider than a chicken (radius 0.5) or obstacles fuse into impassable clumps. Scaled per class.")]
-        [Min(0.5f)]
-        [SerializeField] private float _obstacleSpacing = 1.5f;
-        [Tooltip("Margin between the sampling square and the boundary walls. Obstacles are sampled in SQUARE space (not a polar annulus) so they reach the dead corners behind the bases — ADR 0003 Decision 6. Scaled 1.5 -> 2.025 with the arena; like _interiorWallLengthRange this is read only by the dead rejection-sampling path.")]
-        [Min(0.5f)]
-        [SerializeField] private float _obstacleEdgeMargin = 2.025f;
-        [Tooltip("Rejection-sampling attempt budget per requested obstacle. Placement is best-effort: if the map can't fit the requested density the generator places fewer and logs it rather than relaxing clearances.")]
-        [Range(4, 80)]
-        [SerializeField] private int _obstaclePlacementAttempts = 40;
+        [Tooltip("Walkable lane kept between a scatter footprint's SURFACE and everything else — the boundary, the pinwheel arms, every base/pile keep-clear disc, and every other scatter item. Must never drop below PinwheelLayout.MinCorridorWidth (2.0) or scatter can pinch a corridor shut; pinned by SectorScatterTests.")]
+        [Min(PinwheelLayout.MinCorridorWidth)]
+        [SerializeField] private float _scatterClearance = PinwheelLayout.MinCorridorWidth;
+        [Tooltip("Rejection-sampling attempt budget per requested obstacle. Placement is best-effort: if the map can't fit the requested density the generator places fewer and LOGS IT rather than relaxing clearances. Read that log line after raising any count. Raised 40 -> 80 on 2026-08-19: at 40 a wall stub failed to place in 4 of 5 seeds — a silent density shortfall, not a full arena. At 80 every seed places the full authored count.")]
+        [Range(4, 120)]
+        [SerializeField] private int _obstaclePlacementAttempts = 80;
 
         [Header("Bases")]
         [Tooltip("How far each corner base sits from the center. Scaled 19 -> 25.65 (x1.35) with _planeSize, so the bases stay in the same relative spot. Game.unity OVERRIDES this initializer.")]
@@ -429,7 +404,24 @@ namespace CluckWars.Gameplay
 
         // ---- Local plane + spawn points ---------------------------------------
 
-        private const float BaseInsetFraction = 0.15f;
+        /// <summary>
+        /// How far each base/spawn is pulled in from its raw corner. Public because the
+        /// EditMode clearance tests used to mirror it as a private literal, which is the
+        /// same "one thing under two parameterisations" that caused the 2026-08-14 pile bug.
+        /// </summary>
+        public const float BaseInsetFraction = 0.15f;
+
+        /// <summary>Radius of a base's no-build disc. Mirrored nowhere — read this.</summary>
+        public const float BaseKeepClearRadius = 4f;
+
+        /// <summary>
+        /// Where a base and its player's spawn actually sit: a fraction
+        /// <see cref="BaseInsetFraction"/> of the way from the corner toward the centre.
+        /// One formula, called by <see cref="ComputeSpawnPoints"/>, by the keep-clear discs
+        /// and by the tests — see <see cref="PersonalPileNominal"/> for why that matters.
+        /// </summary>
+        public static Vector3 SpawnPointNominal(Vector3 corner) =>
+            Vector3.Lerp(corner, Vector3.zero, BaseInsetFraction);
 
         private Vector3[] _corners; // raw corner positions; bases + spawn points both derive from these.
 
@@ -465,7 +457,7 @@ namespace CluckWars.Gameplay
             _spawnPoints = new Vector3[_corners.Length];
             for (int i = 0; i < _corners.Length; i++)
             {
-                _spawnPoints[i] = Vector3.Lerp(_corners[i], Vector3.zero, BaseInsetFraction);
+                _spawnPoints[i] = SpawnPointNominal(_corners[i]);
             }
         }
 
@@ -504,27 +496,36 @@ namespace CluckWars.Gameplay
             //         │   South    │
             //         └────────────┘  -Z
             CreateWall("Wall_North", new Vector3(0f, h * 0.5f, +half + t * 0.5f),
-                new Vector3(_planeSize + 2f * t, h, t));
+                new Vector3(_planeSize + 2f * t, h, t), render: _wallsVisible);
             CreateWall("Wall_South", new Vector3(0f, h * 0.5f, -half - t * 0.5f),
-                new Vector3(_planeSize + 2f * t, h, t));
+                new Vector3(_planeSize + 2f * t, h, t), render: _wallsVisible);
             CreateWall("Wall_East", new Vector3(+half + t * 0.5f, h * 0.5f, 0f),
-                new Vector3(t, h, _planeSize));
+                new Vector3(t, h, _planeSize), render: _wallsVisible);
             CreateWall("Wall_West", new Vector3(-half - t * 0.5f, h * 0.5f, 0f),
-                new Vector3(t, h, _planeSize));
+                new Vector3(t, h, _planeSize), render: _wallsVisible);
         }
 
-        /// <summary>Creates a wall/obstacle cube collider, optionally rendered.</summary>
-        /// <param name="forceVisible">
-        /// Skips the <see cref="_wallsVisible"/> gate entirely. Boundary walls
-        /// (<see cref="BuildBoundaryWalls"/>) leave this false so the "invisible
-        /// horizon" behaviour is untouched. Interior/pinwheel terrain
-        /// (<see cref="BuildInteriorObstacles"/>) passes true — that geometry is
-        /// gameplay-critical and must always render, regardless of the boundary's
-        /// debug-visibility toggle. The caller assigns the per-class tinted
-        /// material immediately after this returns, so no material handling
-        /// happens on the forced-visible path.
+        /// <summary>Creates a wall/obstacle cube collider, rendered or collider-only.</summary>
+        /// <param name="render">
+        /// <b>Whether this box is drawn. The BoxCollider is kept either way</b> — that is
+        /// what blocks the chicken's CharacterController, and dropping the renderer is
+        /// exactly how the invisible boundary has always worked.
+        /// <list type="bullet">
+        ///   <item><b>Boundary walls</b> pass <see cref="_wallsVisible"/> (false by default):
+        ///         the hand-placed fence in <c>MapProps</c> IS the visible boundary.</item>
+        ///   <item><b>Pinwheel arms</b> pass <c>false</c> for the same reason. Each arm bearing
+        ///         carries four hand-placed <c>wall_segment</c> props (<c>InnerWall_N_0..3</c>).
+        ///         Until 2026-08-19 the generator also drew an untextured grey slab on top of
+        ///         them, which won the depth test and reduced the finished art to a pair of
+        ///         visible post-tops — the walls read as unbuilt geometry. Same defect the
+        ///         boundary had already solved; same fix.</item>
+        ///   <item><b>Scatter cover</b> passes <c>true</c>. It has no hand-placed art, so if the
+        ///         generator does not draw it, nothing does.</item>
+        /// </list>
+        /// The caller assigns the tinted material after this returns, so no material handling
+        /// happens on the rendered path here.
         /// </param>
-        private GameObject CreateWall(string name, Vector3 localPosition, Vector3 size, bool forceVisible = false)
+        private GameObject CreateWall(string name, Vector3 localPosition, Vector3 size, bool render)
         {
             var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
             wall.name = name;
@@ -532,22 +533,10 @@ namespace CluckWars.Gameplay
             wall.transform.localPosition = localPosition;
             wall.transform.localScale = size;
 
-            if (forceVisible)
+            if (!render)
             {
-                return wall;
-            }
-
-            if (!_wallsVisible)
-            {
-                // Drop the renderer so the wall is invisible. Keep the BoxCollider
-                // — that's what blocks the chicken's CharacterController.
                 var mr = wall.GetComponent<MeshRenderer>();
                 if (mr != null) mr.enabled = false;
-            }
-            else if (_wallMaterial != null)
-            {
-                var mr = wall.GetComponent<MeshRenderer>();
-                if (mr != null) mr.sharedMaterial = _wallMaterial;
             }
 
             return wall;
@@ -555,87 +544,38 @@ namespace CluckWars.Gameplay
 
         // ---- Interior terrain + NavMesh ----------------------------------------
 
-        /// <summary>Per-class placement recipe, assembled from the serialized fields.</summary>
-        private readonly struct ObstacleSpec
-        {
-            public readonly ObstacleClass Class;
-            public readonly int Count;
-            public readonly Vector2 WidthRange;   // local X extent
-            public readonly Vector2 DepthRange;   // local Z extent
-            public readonly float Height;
-            public readonly float ClearanceScale;
-            public readonly Color Tint;
-
-            public ObstacleSpec(ObstacleClass cls, int count, Vector2 widthRange, Vector2 depthRange,
-                                float height, float clearanceScale, Color tint)
-            {
-                Class = cls;
-                Count = count;
-                WidthRange = widthRange;
-                DepthRange = depthRange;
-                Height = height;
-                ClearanceScale = clearanceScale;
-                Tint = tint;
-            }
-        }
-
-        /// <summary>An already-placed obstacle, remembered so later obstacles keep clear of it.</summary>
-        private readonly struct PlacedObstacle
-        {
-            public readonly Vector3 Position;
-            public readonly float FootprintRadius;
-            public PlacedObstacle(Vector3 position, float footprintRadius)
-            {
-                Position = position;
-                FootprintRadius = footprintRadius;
-            }
-        }
-
-        /// <summary>
-        /// Something terrain must not crowd, plus the radius it occupies itself. Spawns and
-        /// bases are points; food islands are not — the centre island is 7×4, so treating it
-        /// as a point would let a crate be placed 2.2 m from the origin, i.e. buried inside
-        /// the island and sealing the lanes around it.
-        /// </summary>
-        private readonly struct Objective
-        {
-            public readonly Vector3 Position;
-            public readonly float Radius;
-            public Objective(Vector3 position, float radius)
-            {
-                Position = position;
-                Radius = radius;
-            }
-        }
-
-        /// <summary>Circumscribed radius of a pile footprint — the same convention <see cref="PlacedObstacle"/> uses.</summary>
+        /// <summary>Circumscribed radius of a pile footprint.</summary>
         private static float FootprintRadius(Vector2 size) =>
             0.5f * Mathf.Sqrt(size.x * size.x + size.y * size.y);
 
         private static readonly int SColorId     = Shader.PropertyToID("_Color");
         private static readonly int SBaseColorId = Shader.PropertyToID("_BaseColor");
 
-        /// <summary>One shared material per <see cref="ObstacleClass"/>, created on first use.</summary>
-        private Material[] _obstacleMaterials;
+        /// <summary>
+        /// The one shared terrain material, created on first use. This was an array indexed
+        /// by <see cref="ObstacleClass"/> until 2026-08-19; the shipped map has only ever
+        /// contained a single class, so two of its three slots were never filled.
+        /// </summary>
+        private Material _terrainMaterial;
 
         /// <summary>
-        /// Builds the interior terrain vocabulary (ADR 0003 Decision 5): Low crates,
-        /// Standard wall segments and Tall rocks, each tagged with a
-        /// <see cref="TerrainObstacle"/> that Slice 2's Vault / Barge / Blink query.
-        /// Terrain is LOCAL geometry on every peer, so online layouts are seeded from
-        /// the session name (same determinism trick as MatchBootstrapper's corner
-        /// permutation); solo just rolls a fresh layout each match.
-        ///
-        /// Classes are processed in a FIXED order (Tall → Standard → Low) and every
-        /// attempt draws its full sample from the RNG before any rejection test runs,
-        /// so the RNG stream advances identically on every peer. Nothing here may
-        /// branch on peer-local state or the maps desync.
-        ///
-        /// Rejection sampling keeps every obstacle clear of the center pile, the corner
-        /// bases/spawns and the nominal island positions so no objective is ever sealed
-        /// off. Placement is best-effort: when the map cannot fit the requested density
-        /// the generator places fewer and says so, rather than relaxing the clearances.
+        /// Builds the arena's permanent interior terrain: the eight pinwheel arms of
+        /// GDD 3.4, plus <see cref="SectorScatter"/>'s 4-fold-symmetric cover.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Terrain is LOCAL geometry on every peer, so online layouts are seeded from the
+        /// session name (same determinism trick as MatchBootstrapper's corner permutation);
+        /// solo just rolls a fresh layout each match. Arms are built before scatter, and
+        /// scatter draws its full sample before any rejection test, so the RNG stream
+        /// advances identically on every peer. Nothing here may branch on peer-local state
+        /// or the maps desync.
+        /// </para>
+        /// <para>
+        /// <b>Arms are collider-only; scatter renders.</b> See <see cref="CreateWall"/>'s
+        /// <c>render</c> parameter for why.
+        /// </para>
+        /// </remarks>
         private void BuildInteriorObstacles()
         {
             bool online = _selection != null && _selection.Mode != SessionMode.Solo;
@@ -644,96 +584,120 @@ namespace CluckWars.Gameplay
 
             float half = _planeSize * 0.5f;
             float centerKeepClear = FootprintRadius(_centerPileFootprint);
-            float baseKeepClear = 4f;
-            var keepClearDiscs = ComputeBaseAndPileKeepClearDiscs(baseKeepClear);
+            var keepClearDiscs = ComputeBaseAndPileKeepClearDiscs();
 
-            // Generate pinwheel wall segments. armThickness = _wallThickness — every
-            // segment gets built with that same physical thickness below regardless of
-            // its ObstacleClass, so the hub-plaza math needs to know it up front.
-            var segments = PinwheelLayout.Build(half, _standardObstacleCount, seed, centerKeepClear, _wallThickness, keepClearDiscs);
+            // _wallThickness is genuinely consumed by SolveHubPlazaRadius: it sets both the
+            // ring around the centre pile and the radius at which adjacent arms stop
+            // pinching, BOTH measured surface-to-surface. Until 2026-08-19 the parameter was
+            // accepted and never read while a comment here asserted the opposite, so a
+            // thicker arm silently ate the clearance the plaza exists to guarantee.
+            var segments = PinwheelLayout.Build(
+                half, _standardObstacleCount, seed, centerKeepClear, _wallThickness, keepClearDiscs);
 
-            // ObstacleSpecs for the three classes to reuse shared materials and tints
-            var specs = new[]
-            {
-                new ObstacleSpec(ObstacleClass.Tall, _tallObstacleCount,
-                    _tallObstacleFootprintRange, _tallObstacleFootprintRange,
-                    _tallObstacleHeight, _tallObstacleClearanceScale, _tallObstacleColor),
-                new ObstacleSpec(ObstacleClass.Standard, _standardObstacleCount,
-                    _interiorWallLengthRange, new Vector2(_wallThickness, _wallThickness),
-                    _interiorWallHeight, 1f, _interiorWallColor),
-                new ObstacleSpec(ObstacleClass.Low, _lowObstacleCount,
-                    _lowObstacleFootprintRange, _lowObstacleFootprintRange,
-                    _lowObstacleHeight, _lowObstacleClearanceScale, _lowObstacleColor),
-            };
-
+            int armsBuilt = 0;
             for (int i = 0; i < segments.Length; i++)
             {
                 var seg = segments[i];
+                if (seg.A == seg.B) continue;   // clipped to nothing - don't build a husk
 
-                Vector2 a = seg.A;
-                Vector2 b = seg.B;
-                Vector2 delta = b - a;
-                float length = delta.magnitude;
-                Vector2 center2D = a + delta * 0.5f;
-                Vector3 center = new Vector3(center2D.x, 0f, center2D.y);
+                Vector2 delta = seg.B - seg.A;
+                Vector2 center2D = seg.A + delta * 0.5f;
 
-                // Get spec matching segment class
-                ObstacleSpec spec = GetSpecForClass(seg.Class, specs);
+                var go = CreateWall(
+                    $"Terrain_{seg.Class}_{i}",
+                    new Vector3(center2D.x, _interiorWallHeight * 0.5f, center2D.y),
+                    new Vector3(delta.magnitude, _interiorWallHeight, _wallThickness),
+                    render: false);
 
-                // Height comes from spec. Thickness is _wallThickness for every arm
-                // regardless of class — deliberately NOT forced thicker for visual bulk:
-                // PinwheelLayout.Build's hub-plaza radius scales with whatever thickness is
-                // passed in, so an artificially bold wall (e.g. a hardcoded 1.4 floor, tried
-                // and reverted 2026-07-27) silently eats into the corridor clearance it
-                // guarantees near the centre. If the pinwheel needs to read bolder, raise
-                // _wallThickness itself so the clearance math accounts for it.
-                float height = spec.Height;
-                float wedgeThickness = _wallThickness;
-                Vector3 size = new Vector3(length, height, wedgeThickness);
-
-                // Create wall GameObject using CreateWall. forceVisible: true — interior
-                // terrain must always render (see CreateWall's forceVisible doc), unlike
-                // the boundary walls which stay gated on _wallsVisible.
-                string wallName = $"Terrain_{seg.Class}_{i}";
-                GameObject go = CreateWall(wallName, center + Vector3.up * (height * 0.5f), size, forceVisible: true);
-
-                // Apply rotation
-                float angleRad = Mathf.Atan2(delta.y, delta.x);
-                float yaw = -angleRad * Mathf.Rad2Deg;
-                go.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
-
-                // Add TerrainObstacle tag with ObstacleClass
+                go.transform.localRotation = Quaternion.Euler(0f, -Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg, 0f);
                 go.AddComponent<TerrainObstacle>().SetClass(seg.Class);
+                armsBuilt++;
+            }
 
-                // Assign URP class material (no per-wall clones)
+            var scatter = SectorScatter.Build(
+                half, seed, BuildScatterSettings(), segments, _wallThickness, centerKeepClear, keepClearDiscs);
+
+            foreach (var box in scatter.Boxes)
+            {
+                var go = CreateWall(
+                    $"Terrain_{box.Role}_{ScatterName(box)}",
+                    new Vector3(box.Center.x, _interiorWallHeight * 0.5f, box.Center.y),
+                    new Vector3(box.Span, _interiorWallHeight, box.Depth),
+                    render: true);
+
+                go.transform.localRotation = Quaternion.Euler(0f, -box.YawDegrees, 0f);
+
+                // Every piece of shipped terrain is tagged Standard. Traversal is gated by
+                // SPAN (GDD 3.5), not by a class, so inventing a second tag here would
+                // encode a distinction the design has deleted.
+                go.AddComponent<TerrainObstacle>().SetClass(ObstacleClass.Standard);
+
                 var mr = go.GetComponent<MeshRenderer>();
                 if (mr != null)
                 {
-                    var mat = EnsureClassMaterial(spec, mr.sharedMaterial);
+                    var mat = EnsureTerrainMaterial(mr.sharedMaterial);
                     if (mat != null) mr.sharedMaterial = mat;
                 }
             }
 
             string seedNote = online ? $"session '{sessionName}' (seed {seed})" : $"solo-random (seed {seed})";
-            _log?.Info(Source, $"Interior terrain: placed {segments.Length} pinwheel obstacles. Seed={seedNote}.");
+            _log?.Info(Source,
+                $"Interior terrain: {armsBuilt}/{segments.Length} pinwheel arms (collider-only) + " +
+                $"{scatter.Boxes.Length} scatter obstacles " +
+                $"({scatter.CoverPlacedPerSector} cover + {scatter.BarrierPlacedPerSector} barrier per sector, x4). " +
+                $"Seed={seedNote}.");
+
+            if (scatter.UnderPlaced)
+            {
+                // Best-effort placement that silently under-delivers is exactly how a density
+                // change looks like it landed while nothing actually moved. Say so.
+                _log?.Warn(Source,
+                    $"Scatter under-placed: asked for {scatter.CoverRequestedPerSector} cover + " +
+                    $"{scatter.BarrierRequestedPerSector} barrier per sector, fitted " +
+                    $"{scatter.CoverPlacedPerSector} + {scatter.BarrierPlacedPerSector}. " +
+                    "The arena cannot hold that density at the current clearance - lower the counts, " +
+                    "or raise _obstaclePlacementAttempts if you believe the budget is the limit. " +
+                    "Clearances were NOT relaxed.");
+            }
         }
 
         /// <summary>
-        /// No-build discs the pinwheel arms must be pushed clear of, beyond the centre
-        /// pile: the four bases (real corner positions — previously
-        /// <c>PinwheelLayout.Build</c> guessed its own approximate base positions
-        /// internally, which only matched the real ones by coincidence at the default
-        /// arena size) plus every personal and contested food pile.
+        /// Stable per-object name suffix - the XZ position, so a diff of the baked scene is
+        /// readable and an object keeps its identity across re-bakes of the same seed.
+        /// </summary>
+        private static string ScatterName(in ScatterBox box) =>
+            $"{box.Center.x:0.0}_{box.Center.y:0.0}".Replace('-', 'n').Replace('.', 'p');
+
+        private ScatterSettings BuildScatterSettings() => new ScatterSettings(
+            _coverPerSector, _coverSpanRange,
+            _barrierPerSector, _barrierSpanRange, _wallThickness,
+            _scatterClearance, _obstaclePlacementAttempts);
+
+        /// <summary>
+        /// No-build discs the interior terrain must be pushed clear of, beyond the centre
+        /// pile: the four bases plus every personal and contested food pile.
         /// </summary>
         /// <remarks>
+        /// <para>
+        /// <b>Base discs are centred on the SPAWN POINT, not the raw corner</b> (fixed
+        /// 2026-08-19). They used to sit on <c>_corners[i]</c> - 36.274 m out - while the
+        /// base itself spawns at <see cref="SpawnPointNominal"/>, 30.833 m out: a 5.44 m
+        /// error, and the exact "one thing under two parameterisations" class of bug that
+        /// produced the 2026-08-14 pile-position failure. It was benign only because the
+        /// arms clear either position by ~11.8 m perpendicular; scatter cover is placed far
+        /// closer to the bases, so it stops being benign. Pinned by
+        /// <c>MapClearanceTests.BaseKeepClearDiscs_AreCentredOnTheBases_NotTheRawCorners</c>.
+        /// </para>
+        /// <para>
         /// Piles get their per-match XZ jitter (<see cref="JitterXZ"/>) only once
-        /// <see cref="SpawnFoodPiles"/> runs, which is after interior terrain is built —
-        /// so this uses each pile's NOMINAL (pre-jitter) position and inflates its radius
-        /// by <see cref="_pilePositionJitter"/> to cover every position the pile could
-        /// actually land at, plus <see cref="PinwheelLayout.PileArmBuffer"/> so a stocked
-        /// pile can never end up flush against an arm.
+        /// <see cref="SpawnFoodPiles"/> runs, which is after interior terrain is built - so
+        /// this uses each pile's NOMINAL (pre-jitter) position and inflates its radius by
+        /// <see cref="_pilePositionJitter"/> to cover every position the pile could actually
+        /// land at, plus <see cref="PinwheelLayout.PileArmBuffer"/> so a stocked pile can
+        /// never end up flush against terrain.
+        /// </para>
         /// </remarks>
-        private KeepClearDisc[] ComputeBaseAndPileKeepClearDiscs(float baseKeepClear)
+        private KeepClearDisc[] ComputeBaseAndPileKeepClearDiscs()
         {
             float personalRadius = FootprintRadius(_personalPileFootprint) + _pilePositionJitter + PinwheelLayout.PileArmBuffer;
             float contestedRadius = FootprintRadius(_contestedPileFootprint) + _pilePositionJitter + PinwheelLayout.PileArmBuffer;
@@ -742,7 +706,8 @@ namespace CluckWars.Gameplay
             int idx = 0;
             for (int i = 0; i < _corners.Length; i++)
             {
-                discs[idx++] = new KeepClearDisc(new Vector2(_corners[i].x, _corners[i].z), baseKeepClear);
+                var baseNominal = SpawnPointNominal(_corners[i]);
+                discs[idx++] = new KeepClearDisc(new Vector2(baseNominal.x, baseNominal.z), BaseKeepClearRadius);
 
                 var personalNominal = PersonalPileNominal(_corners[i], _personalPileInset);
                 discs[idx++] = new KeepClearDisc(new Vector2(personalNominal.x, personalNominal.z), personalRadius);
@@ -753,164 +718,16 @@ namespace CluckWars.Gameplay
             return discs;
         }
 
-        private ObstacleSpec GetSpecForClass(ObstacleClass cls, ObstacleSpec[] specs)
-        {
-            for (int i = 0; i < specs.Length; i++)
-            {
-                if (specs[i].Class == cls) return specs[i];
-            }
-            return specs[1]; // fallback to Standard
-        }
-
         /// <summary>
-        /// Rejection-samples <paramref name="spec"/>.Count obstacles into the arena.
-        /// Returns how many actually fit. Positions are sampled in SQUARE space rather
-        /// than the old polar annulus — a square's corners sit outside any radial bound,
-        /// so the regions behind the bases used to be both dead space and obstacle-free
-        /// (ADR 0003 Decision 6). Containment is then enforced by an exact
-        /// rotated-bounds test against the boundary walls.
-        /// </summary>
-        /// <remarks>
-        /// DEAD CODE as of the pinwheel rewrite (commit 6b27390): <see cref="BuildInteriorObstacles"/>
-        /// now builds interior terrain from <c>PinwheelLayout.Build</c> and no longer calls this
-        /// method — verified with a project-wide grep, only the declaration below matches. Left in
-        /// place (not deleted) because <see cref="_interiorWallClearance"/>, <see cref="_obstacleSpacing"/>,
-        /// <see cref="_obstacleEdgeMargin"/> and <see cref="_obstaclePlacementAttempts"/> are still
-        /// serialized inspector fields on every scene's MapGenerator component, and this is the only
-        /// consumer of them plus <see cref="DistanceToBox"/>/<see cref="FitsInsideBoundary"/>/
-        /// <see cref="PlacedObstacle"/>/<see cref="Objective"/>. Removing it cleanly means also
-        /// removing those four fields (touching scene YAML beyond this bug's scope) — flagging here
-        /// instead so a future pass can decide whether to fully retire the rejection-sampling path
-        /// or keep it as a fallback placement strategy.
-        /// </remarks>
-        private int PlaceObstacleClass(in ObstacleSpec spec, System.Random rng,
-                                       List<Objective> objectives, List<PlacedObstacle> placed)
-        {
-            if (spec.Count <= 0) return 0;   // count 0 cleanly disables the class
-
-            float half = _planeSize * 0.5f;
-            float objectiveKeepOut = _interiorWallClearance * spec.ClearanceScale;
-            float gap = _obstacleSpacing * spec.ClearanceScale;
-            int budget = spec.Count * _obstaclePlacementAttempts;
-            int made = 0;
-
-            for (int attempt = 0; attempt < budget && made < spec.Count; attempt++)
-            {
-                // Draw the complete sample BEFORE any rejection test: the RNG stream must
-                // advance by exactly five draws per attempt on every peer, or two clients
-                // sharing a seed walk different sequences and build different maps.
-                float width = Mathf.Lerp(spec.WidthRange.x, spec.WidthRange.y, (float)rng.NextDouble());
-                float depth = Mathf.Lerp(spec.DepthRange.x, spec.DepthRange.y, (float)rng.NextDouble());
-                float x     = Mathf.Lerp(-half, half, (float)rng.NextDouble());
-                float z     = Mathf.Lerp(-half, half, (float)rng.NextDouble());
-                float yaw   = (float)rng.NextDouble() * 180f;
-
-                var center = new Vector3(x, 0f, z);
-                float footprintRadius = FootprintRadius(new Vector2(width, depth));
-
-                if (!FitsInsideBoundary(center, width, depth, yaw)) continue;
-
-                // Clearance is measured to the obstacle's SURFACE, not to its bounding
-                // circle. That matters: a 6×0.5 wall's bounding circle is 3 m, so a
-                // radius test would refuse to let any long wall within 6 m of an
-                // objective and the map physically cannot hold the target density.
-                // Surface distance is both the honest reading of "keep-clear radius"
-                // and what actually determines whether an objective stays approachable.
-                bool blocked = false;
-                for (int i = 0; i < objectives.Count && !blocked; i++)
-                {
-                    float surface = DistanceToBox(objectives[i].Position, center, yaw, width, depth);
-                    if (surface - objectives[i].Radius < objectiveKeepOut) blocked = true;
-                }
-                if (blocked) continue;
-
-                // Footprint-to-footprint gap: a long wall and a crate need the same
-                // walkable lane between them regardless of their sizes.
-                for (int i = 0; i < placed.Count && !blocked; i++)
-                {
-                    float surface = DistanceToBox(placed[i].Position, center, yaw, width, depth);
-                    if (surface - placed[i].FootprintRadius < gap) blocked = true;
-                }
-                if (blocked) continue;
-
-                var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                go.name = $"Terrain_{spec.Class}_{made}";
-                go.transform.SetParent(GeometryRoot, worldPositionStays: false);
-                go.transform.localPosition = center + Vector3.up * (spec.Height * 0.5f);
-                go.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
-                go.transform.localScale = new Vector3(width, spec.Height, depth);
-
-                // The tag Slice 2's Vault / Barge / Blink read. Discrimination is by
-                // class, never inferred from spec.Height.
-                go.AddComponent<TerrainObstacle>().SetClass(spec.Class);
-
-                var mr = go.GetComponent<MeshRenderer>();
-                if (mr != null)
-                {
-                    var mat = EnsureClassMaterial(spec, mr.sharedMaterial);
-                    if (mat != null) mr.sharedMaterial = mat;
-                }
-
-                placed.Add(new PlacedObstacle(center, footprintRadius));
-                made++;
-            }
-
-            return made;
-        }
-
-        /// <summary>
-        /// Shortest distance on the XZ plane from <paramref name="point"/> to the surface
-        /// of a yaw-rotated box. 0 when the point is inside the box. Pure float maths with
-        /// no branching on state, so every peer computes the same answer.
-        /// </summary>
-        private static float DistanceToBox(Vector3 point, Vector3 center, float yawDegrees, float width, float depth)
-        {
-            float rad = yawDegrees * Mathf.Deg2Rad;
-            float c = Mathf.Cos(rad), s = Mathf.Sin(rad);
-            float dx = point.x - center.x, dz = point.z - center.z;
-
-            // World → box-local (yaw only; obstacles never pitch or roll).
-            float lx = dx * c - dz * s;
-            float lz = dx * s + dz * c;
-
-            float ox = Mathf.Max(Mathf.Abs(lx) - width * 0.5f, 0f);
-            float oz = Mathf.Max(Mathf.Abs(lz) - depth * 0.5f, 0f);
-            return Mathf.Sqrt(ox * ox + oz * oz);
-        }
-
-        /// <summary>
-        /// True when the yaw-rotated box fits strictly inside the boundary walls with
-        /// <c>_obstacleEdgeMargin</c> to spare. Uses the exact axis-aligned extents of
-        /// the rotated box, so a long wall angled into a corner is accepted or rejected
-        /// on its real footprint rather than a conservative bounding circle.
-        /// </summary>
-        private bool FitsInsideBoundary(Vector3 center, float width, float depth, float yawDegrees)
-        {
-            float rad = yawDegrees * Mathf.Deg2Rad;
-            float c = Mathf.Abs(Mathf.Cos(rad));
-            float s = Mathf.Abs(Mathf.Sin(rad));
-            float hx = 0.5f * (c * width + s * depth);
-            float hz = 0.5f * (s * width + c * depth);
-
-            // The boundary walls' inner faces sit exactly at ±_planeSize/2.
-            float limit = _planeSize * 0.5f - _obstacleEdgeMargin;
-            return Mathf.Abs(center.x) + hx <= limit
-                && Mathf.Abs(center.z) + hz <= limit;
-        }
-
-        /// <summary>
-        /// Returns the one shared material for this obstacle class, creating it on first
-        /// use from <c>_wallMaterial</c> (or the primitive's own default) and tinting it.
+        /// Returns the one shared terrain material, creating it on first use from
+        /// <c>_wallMaterial</c> (or the ground material) and tinting it.
         /// Deliberately NOT <c>mr.material</c>: that clones a material per object, which
-        /// at ~17 obstacles costs 17 instances, breaks batching and adds GC churn on the
-        /// Android target. Three shared materials keep the whole terrain set batchable.
+        /// breaks batching and adds GC churn on the Android target. One shared material
+        /// keeps the whole scatter set batchable.
         /// </summary>
-        private Material EnsureClassMaterial(in ObstacleSpec spec, Material primitiveDefault)
+        private Material EnsureTerrainMaterial(Material primitiveDefault)
         {
-            _obstacleMaterials ??= new Material[(int)ObstacleClass.Tall + 1];
-
-            int idx = (int)spec.Class;
-            if (_obstacleMaterials[idx] != null) return _obstacleMaterials[idx];
+            if (_terrainMaterial != null) return _terrainMaterial;
 
             // Use _groundMaterial as a URP-compatible fallback if _wallMaterial is null,
             // to avoid pulling in the built-in Standard shader primitiveDefault.
@@ -918,28 +735,27 @@ namespace CluckWars.Gameplay
                            (_groundMaterial != null ? _groundMaterial : primitiveDefault);
             if (template == null)
             {
-                // Untinted grey terrain is a readability bug (players can't tell Low from
-                // Tall), so surface it instead of shipping a silently colourless map.
-                _log?.Warn(Source, $"No material template for {spec.Class} obstacles " +
-                    "(_wallMaterial unassigned and the primitive has no default material) — " +
-                    "terrain will render untinted and the three classes won't be distinguishable.");
+                // Untinted grey terrain against grey ground is a readability bug, so surface
+                // it instead of shipping a silently colourless map.
+                _log?.Warn(Source, "No material template for interior terrain " +
+                    "(_wallMaterial unassigned and the primitive has no default material) - " +
+                    "scatter cover will render untinted and will not read as terrain.");
                 return null;
             }
             bool templateIsGroundFallback = _wallMaterial == null && template == _groundMaterial;
 
             var mat = new Material(template)
             {
-                name = $"TerrainObstacle_{spec.Class}",
+                name = "TerrainObstacle",
                 hideFlags = HideFlags.DontSave,
             };
 
             // The ground-fallback path clones _groundMaterial, which carries the grass
-            // albedo texture — a flat colour multiplied over a grass texture still reads
-            // as "grass texture", not as a distinct tinted block. Obstacles are meant to be
-            // differentiated by colour alone (Low/Standard/Tall), so strip the base map when
-            // that's the template in play. Only that path: a deliberately assigned
-            // _wallMaterial is left untouched, since its texture may be an intentional
-            // design choice, not a borrowed ground fallback.
+            // albedo texture - a flat colour multiplied over a grass texture still reads
+            // as "grass texture", not as a distinct tinted block. Scatter is meant to read
+            // as built terrain, so strip the base map when that's the template in play.
+            // Only that path: a deliberately assigned _wallMaterial is left untouched, since
+            // its texture may be an intentional design choice, not a borrowed fallback.
             if (templateIsGroundFallback)
             {
                 if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", null);
@@ -948,21 +764,18 @@ namespace CluckWars.Gameplay
 
             // URP Lit exposes _BaseColor; keep _Color set too for any Built-in-style
             // material someone drops into _wallMaterial.
-            if (mat.HasProperty(SBaseColorId)) mat.SetColor(SBaseColorId, spec.Tint);
-            if (mat.HasProperty(SColorId)) mat.SetColor(SColorId, spec.Tint);
+            if (mat.HasProperty(SBaseColorId)) mat.SetColor(SBaseColorId, _interiorWallColor);
+            if (mat.HasProperty(SColorId)) mat.SetColor(SColorId, _interiorWallColor);
 
-            _obstacleMaterials[idx] = mat;
+            _terrainMaterial = mat;
             return mat;
         }
 
         private void DestroyObstacleMaterials()
         {
-            if (_obstacleMaterials == null) return;
-            for (int i = 0; i < _obstacleMaterials.Length; i++)
-            {
-                if (_obstacleMaterials[i] != null) Destroy(_obstacleMaterials[i]);
-                _obstacleMaterials[i] = null;
-            }
+            if (_terrainMaterial == null) return;
+            Destroy(_terrainMaterial);
+            _terrainMaterial = null;
         }
 
         /// <summary>
