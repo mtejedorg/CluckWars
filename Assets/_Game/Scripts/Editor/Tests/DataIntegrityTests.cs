@@ -1070,5 +1070,132 @@ namespace CluckWars.Tests
                     $"it as a {type}.");
             }
         }
+
+        // ---- Serialized data vs the C# defaults it is supposed to carry ---------
+
+        /// <summary>
+        /// An ability whose C# constructor declares a traversal tier must SERIALIZE that
+        /// tier. Serialized data always wins over a constructor default, so an asset saved
+        /// before the field existed keeps <c>None</c> for ever and the ability silently
+        /// grants nothing.
+        /// </summary>
+        /// <remarks>
+        /// Found live on 2026-08-19: <c>Doppelganger.asset</c> and <c>Shadowstep.asset</c>
+        /// both serialized <c>TerrainTraversal: 0</c> while
+        /// <c>DoppelgangerAbilitySO</c>/<c>ShadowstepAbilitySO</c> set <c>Blink</c> in their
+        /// constructors — so the Assassin's entire Blink kit was inert, and
+        /// <c>AbilityController</c> never called <c>ChickenTraversal.Begin</c> for either.
+        /// <c>RollPush.asset</c> had it right (<c>Barge</c> = 2), which is why the drift was
+        /// invisible: the feature demonstrably worked, on one ability.
+        ///
+        /// Compares against a FRESH <c>CreateInstance</c> of the same type, so the test needs
+        /// no table of expected values and cannot go stale when an ability is added.
+        /// </remarks>
+        [Test]
+        public void AbilityAssets_SerializeTheTraversalTierTheirConstructorDeclares()
+        {
+            foreach (var asset in TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir))
+            {
+                var fresh = ScriptableObject.CreateInstance(asset.GetType()) as AbilityBaseSO;
+                Assert.IsNotNull(fresh, $"could not instantiate {asset.GetType().Name}");
+
+                var declared = fresh.TerrainTraversal;
+                Object.DestroyImmediate(fresh);
+
+                if (declared == TerrainTraversal.None) continue;
+
+                Assert.AreEqual(declared, asset.TerrainTraversal,
+                    $"{asset.name}.asset serializes TerrainTraversal={asset.TerrainTraversal} but " +
+                    $"{asset.GetType().Name}'s constructor declares {declared}. The serialized value " +
+                    "wins at runtime, so this ability grants NO traversal in play. Fix the asset.");
+            }
+        }
+
+        /// <summary>
+        /// Per-class traversal policy. Maestro, 2026-08-21: <i>"per design, Speedy should never
+        /// have jumps, or at least only a strongly limited one"</i> — because <i>"Speedy can use
+        /// control on other chickens and escape just by having more speed. Speedy with a jump
+        /// feels unfair."</i>
+        /// </summary>
+        /// <remarks>
+        /// <b>The argument is about how many currencies one class holds at once.</b> Speedy
+        /// already answers two of them on its own:
+        /// <list type="bullet">
+        ///   <item><b>Escape</b> — the highest base MoveSpeed in the roster, and Speed Burst
+        ///   multiplies it further. It does not need to cross terrain to break a chase; it just
+        ///   outruns you on the same path.</item>
+        ///   <item><b>Denial</b> — three Control abilities (Root Egg, Feather Trap, Feather
+        ///   Aura). It can stop the chicken chasing it, not merely leave.</item>
+        /// </list>
+        /// Traversal is the third. A class that outruns you, roots you, AND ignores the geometry
+        /// you have to path around is not a fast class — it is a class with no counterplay, and
+        /// the map stops constraining the one chicken it most needs to constrain. Every other
+        /// class trades something for its traversal; Speedy would pay nothing.
+        ///
+        /// Speed Burst deliberately stays: it is a pure ground-speed multiplier with
+        /// <c>TerrainTraversal.None</c>, so it deepens Speedy's identity instead of breaching
+        /// this rule. The line is not "no mobility" — it is "no ignoring terrain."
+        ///
+        /// This test exists because the rule was already broken and nothing caught it.
+        /// <c>Shadowstep.asset</c> serialized <c>AllowedClasses: 10</c> (Speedy + Assassin) while
+        /// <c>ShadowstepAbilitySO</c>'s own constructor and class docstring both say Assassin —
+        /// asset drift from the pool-widening pass (21ddaa8), and the asset wins at runtime. The
+        /// effect was not marginal: Shadowstep is a <c>Blink</c>, the tier that crosses EVERY
+        /// obstacle class, and its reach is <c>MoveSpeed x SpeedMultiplier x Duration</c> =
+        /// 12.15 x 3.0 x 0.4 = <b>14.58 m</b> for Speedy, further than the Big jump's 11.7 m.
+        /// Speedy held the strongest traversal in the game while also being the fastest and
+        /// carrying three Control abilities.
+        ///
+        /// Asserted over the whole roster rather than as a Shadowstep special case, so a future
+        /// ability that hands Speedy traversal fails here rather than in a playtest.
+        /// </remarks>
+        [Test]
+        public void Speedy_HasNoTerrainTraversalAbilityAvailableToIt()
+        {
+            var offenders = new System.Collections.Generic.List<string>();
+
+            foreach (var asset in TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir))
+            {
+                bool speedyMayTake = (asset.AllowedClasses & ChickenClassFlags.Speedy) != 0;
+                if (!speedyMayTake) continue;
+                if (asset.TerrainTraversal == TerrainTraversal.None) continue;
+
+                offenders.Add($"{asset.name} grants {asset.TerrainTraversal} and is available to " +
+                              $"Speedy (AllowedClasses={(int)asset.AllowedClasses})");
+            }
+
+            Assert.IsEmpty(offenders,
+                "Speedy must not be able to equip terrain traversal:" + System.Environment.NewLine +
+                "  " + string.Join(System.Environment.NewLine + "  ", offenders) + System.Environment.NewLine +
+                "Speedy already holds ESCAPE (highest MoveSpeed, plus Speed Burst) and DENIAL " +
+                "(three Control abilities). Traversal would be the third currency with nothing " +
+                "traded for it, and the map would stop constraining the fastest chicken in the " +
+                "game. Either drop Speedy from that ability's AllowedClasses, or give the " +
+                "ability TerrainTraversal.None. A pure speed multiplier is fine - Speed Burst " +
+                "is deliberately allowed; the line is 'no ignoring terrain', not 'no mobility'.");
+        }
+
+        /// <summary>
+        /// Dropping Shadowstep from Speedy must not starve its loadout: every class needs enough
+        /// legal abilities to fill four slots and still have a choice.
+        /// </summary>
+        [Test]
+        public void EveryClass_CanStillFillFourSlotsWithRoomToChoose()
+        {
+            foreach (ChickenClassFlags cls in new[]
+            {
+                ChickenClassFlags.Warrior, ChickenClassFlags.Speedy,
+                ChickenClassFlags.Fatty, ChickenClassFlags.Assassin,
+            })
+            {
+                int available = 0;
+                foreach (var asset in TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir))
+                    if ((asset.AllowedClasses & cls) != 0) available++;
+
+                Assert.GreaterOrEqual(available, 5,
+                    $"{cls} can only take {available} abilities. Four fill the slots, so fewer " +
+                    "than five means the loadout screen offers no actual decision.");
+            }
+        }
     }
 }

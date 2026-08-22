@@ -21,117 +21,182 @@ namespace CluckWars.Tests
         private static float ArenaHalfSize => TestAssets.SceneFloat("_planeSize") * 0.5f;
         private const float BodyClearance = 0.4f;
 
+        /// <summary>
+        /// A Short jump clears a wall square-on. The wall is placed RELATIVE to the tier's
+        /// reach, not at a fixed z — the previous version pinned it to a range calibrated for
+        /// a 5 m Short and started failing the moment the tiers were rescaled, reporting a
+        /// resolver bug where there was only a stale fixture.
+        /// </summary>
         [Test]
-        public void ShortJump5m_ClearsSquareOnWall_0_5m()
+        public void ShortJump_ClearsASquareOnWall()
         {
-            // Wall square-on at z = 2.0m to 2.5m (thickness 0.5m).
-            // Span needed = 0.5 + 0.8 = 1.3m (blocked from z = 1.6m to 2.9m).
-            Func<Vector3, float, bool> isBlocked = (p, r) => p.z >= 1.6f - r && p.z <= 2.9f + r;
+            float thickness = ShippedMap.WallThickness;
+            float nearFace = 0.25f * JumpResolver.ShortDistance;
+            float farFace = nearFace + thickness;
 
-            var res = JumpResolver.Resolve(Vector3.zero, Vector3.forward, JumpResolver.ShortDistance, ArenaHalfSize, BodyClearance, isBlocked);
+            Func<Vector3, float, bool> isBlocked = (p, r) => p.z >= nearFace - r && p.z <= farFace + r;
 
-            Assert.IsTrue(res.Cleared, "A Short jump must clear a 0.5m wall (needs 1.3m)");
-            // Derived, never a literal. This asserted a hardcoded 5.0 and would have gone
-            // red for the right reason but the wrong cause when the tiers were rescaled
-            // x1.35 on 2026-08-14 — the landing is "wherever Short reaches", not "5 m".
-            Assert.AreEqual(JumpResolver.ShortDistance, res.LandingPoint.z, 0.01f);
+            var res = JumpResolver.Resolve(Vector3.zero, Vector3.forward,
+                JumpResolver.ShortDistance, ArenaHalfSize, BodyClearance, isBlocked);
+
+            Assert.IsTrue(res.Cleared,
+                $"A Short jump ({JumpResolver.ShortDistance:0.00} m) must clear a " +
+                $"{thickness:0.00} m wall whose far edge plus clearance sits at " +
+                $"{farFace + BodyClearance:0.00} m.");
+            Assert.AreEqual(JumpResolver.ShortDistance, res.LandingPoint.z, 0.01f,
+                "It should land at its nominal distance, not need the tolerance extension — " +
+                "a wall is the obstacle this tier exists to cross comfortably.");
         }
 
+        /// <summary>
+        /// Same wall at 20 degrees, which lengthens the span the jump must cross to
+        /// <c>thickness / sin(20 deg)</c>. Still comfortably inside a Short jump.
+        /// </summary>
         [Test]
-        public void ShortJump5m_ClearsObliqueWall_20Deg()
+        public void ShortJump_ClearsAnObliqueWall_20Deg()
         {
-            // 20° oblique wall. Needed span ~2.3m (blocked from z = 1.6m to 3.9m).
-            Func<Vector3, float, bool> isBlocked = (p, r) => p.z >= 1.6f - r && p.z <= 3.9f + r;
+            float thickness = ShippedMap.WallThickness;
+            float obliqueSpan = thickness / Mathf.Sin(20f * Mathf.Deg2Rad);
+            float nearFace = 0.1f * JumpResolver.ShortDistance;
+            float farFace = nearFace + obliqueSpan;
 
-            var res = JumpResolver.Resolve(Vector3.zero, Vector3.forward, JumpResolver.ShortDistance, ArenaHalfSize, BodyClearance, isBlocked);
+            Func<Vector3, float, bool> isBlocked = (p, r) => p.z >= nearFace - r && p.z <= farFace + r;
 
-            Assert.IsTrue(res.Cleared, "5m jump must clear 20° oblique wall (needs 2.3m)");
+            var res = JumpResolver.Resolve(Vector3.zero, Vector3.forward,
+                JumpResolver.ShortDistance, ArenaHalfSize, BodyClearance, isBlocked);
+
+            Assert.IsTrue(res.Cleared,
+                $"A Short jump ({JumpResolver.ShortDistance:0.00} m) must clear a wall taken at " +
+                $"20 deg, span {obliqueSpan:0.00} m, far edge plus clearance at " +
+                $"{farFace + BodyClearance:0.00} m. Obliqueness is the worst case for crossing a " +
+                "wall, and the Short tier's whole job is that walls are never a barrier.");
         }
 
+        /// <summary>
+        /// The traversal ladder of GDD 3.6 — "the map opens itself in stages" — asserted
+        /// against the pile footprints the game ACTUALLY builds.
+        /// </summary>
+        /// <remarks>
+        /// This replaces three tests that hardcoded 5.5 / 6.5 / 12 m spans. Those numbers were
+        /// the pre-2026-08-13 footprints; the piles were shrunk 35% and the literals were not,
+        /// so the tests kept passing while the real ladder silently collapsed — every tier was
+        /// clearing what the tier above it was meant to gate. Maestro reported it as "the jump
+        /// is still too high" on 2026-08-20.
+        ///
+        /// Reading the live footprints via <see cref="ShippedMap"/> means the gates are a
+        /// RELATIONSHIP between tiers and obstacles. Rescale either side alone and this goes
+        /// red, which is precisely what the literals failed to do.
+        /// </remarks>
         [Test]
-        public void ShortJump5m_FailsT1Pile_5_5m_AndStopsFlush()
+        public void TraversalLadder_HoldsAgainstTheShippedPileFootprints()
         {
-            // T1 pile 5.5m footprint (blocked from z = 0.6m to 6.9m; needed span 6.3m).
-            Func<Vector3, float, bool> isBlocked = (p, r) => p.z >= 0.6f && p.z <= 6.9f;
+            // Worst case is the pile's LONG axis: the widest span a jump can be asked to cross.
+            float t1     = Mathf.Max(ShippedMap.PersonalPileFootprint.x,  ShippedMap.PersonalPileFootprint.y);
+            float t2     = Mathf.Max(ShippedMap.ContestedPileFootprint.x, ShippedMap.ContestedPileFootprint.y);
+            float centre = Mathf.Max(ShippedMap.CentrePileFootprint.x,    ShippedMap.CentrePileFootprint.y);
+            float arm    = ShippedMap.WallThickness;
 
-            // Near face of the pile sits 1.0 m along the ray; the jump must stop flush
-            // at 1.0 - 0.4 (body clearance) = 0.6 m.
-            NearFaceQuery nearFace =
-                (Vector3 orig, Vector3 dir, float maxDist, float clearance, out float hitDist) =>
-                {
-                    hitDist = 1.0f;
-                    return true;
-                };
-
-            var res = JumpResolver.Resolve(Vector3.zero, Vector3.forward, JumpResolver.ShortDistance,
-                ArenaHalfSize, BodyClearance, isBlocked, nearFace);
-
-            Assert.IsFalse(res.Cleared, "5m jump must fail a 5.5m T1 pile (needs 6.3m)");
-            Assert.AreEqual(0.6f, res.LandingPoint.z, 0.01f, "Failed jump must stop flush at near face (1.0m - 0.4m body clearance = 0.6m)");
-        }
-
-        [Test]
-        public void NormalJump10m_ClearsT1AndT2_FailsCentrePile12m()
-        {
-            // T1 pile 5.5m footprint (needs 6.3m): 10m clears!
-            Func<Vector3, float, bool> isBlockedT1 = (p, r) => p.z >= 0.6f && p.z <= 6.9f;
-            var resT1 = JumpResolver.Resolve(Vector3.zero, Vector3.forward, JumpResolver.NormalDistance, ArenaHalfSize, BodyClearance, isBlockedT1);
-            Assert.IsTrue(resT1.Cleared, "10m jump clears T1 (6.3m)");
-
-            // T2 pile 6.5m footprint (needs 7.3m): 10m clears!
-            Func<Vector3, float, bool> isBlockedT2 = (p, r) => p.z >= 0.6f && p.z <= 7.9f;
-            var resT2 = JumpResolver.Resolve(Vector3.zero, Vector3.forward, JumpResolver.NormalDistance, ArenaHalfSize, BodyClearance, isBlockedT2);
-            Assert.IsTrue(resT2.Cleared, "10m jump clears T2 (7.3m)");
-
-            // Full 12m Centre pile (needs 12.8m, blocked z = 0.6m to 13.4m): 10m fails!
-            Func<Vector3, float, bool> isBlockedCentre = (p, r) => p.z >= 0.6f && p.z <= 13.4f;
-            var resCentre = JumpResolver.Resolve(Vector3.zero, Vector3.forward, JumpResolver.NormalDistance, ArenaHalfSize, BodyClearance, isBlockedCentre);
-            Assert.IsFalse(resCentre.Cleared, "10m jump fails full 12m centre pile (needs 12.8m)");
-        }
-
-        [Test]
-        public void BigJump18m_ClearsFullCentrePile12m()
-        {
-            // Full 12m Centre pile (needs 12.8m, blocked z = 0.6m to 13.4m): 18m clears!
-            Func<Vector3, float, bool> isBlockedCentre = (p, r) => p.z >= 0.6f && p.z <= 13.4f;
-            var res = JumpResolver.Resolve(Vector3.zero, Vector3.forward, JumpResolver.BigDistance, ArenaHalfSize, BodyClearance, isBlockedCentre);
-            Assert.IsTrue(res.Cleared, "A Big jump clears the full 12m centre pile (needs 12.8m)");
-            Assert.AreEqual(JumpResolver.BigDistance, res.LandingPoint.z, 0.01f);
-        }
-
-        [Test]
-        public void Tolerance_ShortBy0_4mSucceeds_ShortBy1_2mFails()
-        {
-            // 5m jump: max extension is max(0.6m, 0.4m) capped at 0.8m -> 0.6m.
-            // Obstacle ends at 5.3m (nominal 5.0m is short by 0.3m).
-            Func<Vector3, float, bool> isBlockedShort = (p, r) => p.z >= 1.0f && p.z <= 5.3f;
-            var resSucceed = JumpResolver.Resolve(Vector3.zero, Vector3.forward, JumpResolver.ShortDistance, ArenaHalfSize, BodyClearance, isBlockedShort);
-            Assert.IsTrue(resSucceed.Cleared, "Jump short by 0.3m/0.4m succeeds via tolerance extension");
-
-            // 10m jump: max extension capped at 0.8m absolute.
-            // Obstacle ends at 11.2m (nominal 10.0m is short by 1.2m).
-            Func<Vector3, float, bool> isBlockedLong = (p, r) => p.z >= 1.0f && p.z <= 11.2f;
-            var resFail = JumpResolver.Resolve(Vector3.zero, Vector3.forward, JumpResolver.NormalDistance, ArenaHalfSize, BodyClearance, isBlockedLong);
-            Assert.IsFalse(resFail.Cleared, "Jump short by 1.2m fails (0.8m absolute cap)");
-        }
-
-        [Test]
-        public void ChordNearRoundPileEdge_ClearsWhenThroughMiddleFails()
-        {
-            // Round pile centered at (0, 3) with radius 3m.
-            // Through middle (x=0): blocked z from 0 to 6 (needs 6.8m) -> 5m fails!
-            Func<Vector3, float, bool> isBlockedMiddle = (p, r) =>
+            // (tier, span, must clear?) — the whole ladder in one table.
+            var cases = new (string tier, float dist, string obstacle, float span, bool expected)[]
             {
-                float dx = p.x, dz = p.z - 3.0f;
-                return (dx * dx + dz * dz) <= (3.0f + r) * (3.0f + r);
+                ("Short",  JumpResolver.ShortDistance,  "an arm",         arm,    true),
+                ("Short",  JumpResolver.ShortDistance,  "the T1 pile",    t1,     false),
+                ("Short",  JumpResolver.ShortDistance,  "the T2 pile",    t2,     false),
+                ("Short",  JumpResolver.ShortDistance,  "the centre pile", centre, false),
+
+                ("Normal", JumpResolver.NormalDistance, "an arm",         arm,    true),
+                ("Normal", JumpResolver.NormalDistance, "the T1 pile",    t1,     true),
+                ("Normal", JumpResolver.NormalDistance, "the T2 pile",    t2,     true),
+                ("Normal", JumpResolver.NormalDistance, "the centre pile", centre, false),
+
+                ("Big",    JumpResolver.BigDistance,    "the T1 pile",    t1,     true),
+                ("Big",    JumpResolver.BigDistance,    "the T2 pile",    t2,     true),
+                ("Big",    JumpResolver.BigDistance,    "the centre pile", centre, true),
             };
 
-            var resMiddle = JumpResolver.Resolve(new Vector3(0, 0, 0), Vector3.forward, JumpResolver.ShortDistance, ArenaHalfSize, BodyClearance, isBlockedMiddle);
-            Assert.IsFalse(resMiddle.Cleared, "5m jump through middle of 6m round pile fails");
+            var wrong = new System.Collections.Generic.List<string>();
+            foreach (var c in cases)
+            {
+                // Obstacle straddling the ray, near face 1 m out, so the jump must cross its
+                // full span plus a body clearance each side.
+                float near = 1.0f, far = near + c.span;
+                Func<Vector3, float, bool> blocked =
+                    (pt, r) => pt.z >= near - r && pt.z <= far + r;
 
-            // Chord line near edge (x = 2.6m): chord length through circle is much smaller (~3m).
-            var resEdge = JumpResolver.Resolve(new Vector3(2.6f, 0, 0), Vector3.forward, JumpResolver.ShortDistance, ArenaHalfSize, BodyClearance, isBlockedMiddle);
-            Assert.IsTrue(resEdge.Cleared, "5m jump along chord near round pile's edge clears");
+                var res = JumpResolver.Resolve(Vector3.zero, Vector3.forward, c.dist,
+                                               ArenaHalfSize, BodyClearance, blocked);
+
+                if (res.Cleared != c.expected)
+                    wrong.Add($"{c.tier} ({c.dist:0.00} m) {(res.Cleared ? "CLEARS" : "fails")} " +
+                              $"{c.obstacle} (span {c.span:0.00}, needs {c.span + 2f * BodyClearance:0.00}) " +
+                              $"— expected {(c.expected ? "to clear" : "to fail")}");
+            }
+
+            Assert.IsEmpty(wrong,
+                "The traversal ladder does not match GDD 3.6:" + Environment.NewLine + "  " +
+                string.Join(Environment.NewLine + "  ", wrong) + Environment.NewLine +
+                "Short crosses walls only; Normal adds T1/T2; Big adds the centre pile. " +
+                "If a pile footprint moved, rescale the jump tiers in the SAME commit - the " +
+                "ladder is a relationship between the two, not two independent numbers.");
+        }
+
+        [Test]
+        public void Tolerance_ExtendsInsideTheWindow_ButNotBeyondIt()
+        {
+            // Derived from the tier under test, not pinned to a tier's current value: an
+            // obstacle ending just INSIDE the tolerance window must be cleared by the
+            // extension, and one ending just outside it must not.
+            float shortExt = JumpResolver.GetMaxExtension(JumpResolver.ShortDistance);
+            float justInside = JumpResolver.ShortDistance + shortExt * 0.5f;
+            Func<Vector3, float, bool> isBlockedShort = (p, r) => p.z >= 1.0f && p.z <= justInside;
+            var resSucceed = JumpResolver.Resolve(Vector3.zero, Vector3.forward, JumpResolver.ShortDistance, ArenaHalfSize, BodyClearance, isBlockedShort);
+            Assert.IsTrue(resSucceed.Cleared,
+                $"An obstacle ending {shortExt * 0.5f:0.00} m past nominal is inside the " +
+                $"{shortExt:0.00} m tolerance window and must be cleared.");
+
+            float normalExt = JumpResolver.GetMaxExtension(JumpResolver.NormalDistance);
+            float justOutside = JumpResolver.NormalDistance + normalExt + 0.4f;
+            Func<Vector3, float, bool> isBlockedLong = (p, r) => p.z >= 1.0f && p.z <= justOutside;
+            var resFail = JumpResolver.Resolve(Vector3.zero, Vector3.forward, JumpResolver.NormalDistance, ArenaHalfSize, BodyClearance, isBlockedLong);
+            Assert.IsFalse(resFail.Cleared,
+                $"An obstacle ending 0.40 m beyond the {normalExt:0.00} m tolerance window must NOT be cleared.");
+        }
+
+        [Test]
+        public void ChordNearRoundObstacleEdge_ClearsWhenThroughMiddleFails()
+        {
+            // Geometry derived from the tier's own reach, not a fixed 6 m pile. The old
+            // version hardcoded a radius that happened to straddle a 5 m Short jump; when the
+            // tiers were rescaled it asserted something that is simply not true any more.
+            //
+            // Laid out so the arithmetic is obvious: the obstacle's far edge sits at 1.2x the
+            // jump's reach through the middle (must fail), and at 0.85x along a chord offset
+            // far enough off-axis (must clear). Both hold for any tier value.
+            float reach = JumpResolver.ShortDistance + JumpResolver.GetMaxExtension(JumpResolver.ShortDistance);
+            float centreZ = 0.5f * reach;
+            float effectiveRadius = 0.7f * reach;              // radius + body clearance
+            float radius = effectiveRadius - BodyClearance;
+            float chordOffset = Mathf.Sqrt(effectiveRadius * effectiveRadius
+                                           - 0.35f * reach * 0.35f * reach);
+
+            Func<Vector3, float, bool> isBlocked = (p, r) =>
+            {
+                float dx = p.x, dz = p.z - centreZ;
+                return (dx * dx + dz * dz) <= (radius + r) * (radius + r);
+            };
+
+            var resMiddle = JumpResolver.Resolve(Vector3.zero, Vector3.forward,
+                JumpResolver.ShortDistance, ArenaHalfSize, BodyClearance, isBlocked);
+            Assert.IsFalse(resMiddle.Cleared,
+                $"Through the middle the far edge is at {centreZ + effectiveRadius:0.00} m against " +
+                $"a reach of {reach:0.00} m, so the jump must fail.");
+
+            var resEdge = JumpResolver.Resolve(new Vector3(chordOffset, 0f, 0f), Vector3.forward,
+                JumpResolver.ShortDistance, ArenaHalfSize, BodyClearance, isBlocked);
+            Assert.IsTrue(resEdge.Cleared,
+                $"Along a chord {chordOffset:0.00} m off-axis the obstacle is only " +
+                $"{2f * 0.35f * reach:0.00} m deep, well inside the same {reach:0.00} m reach — " +
+                "clipping a round obstacle's edge must remain a way through.");
         }
     }
 }

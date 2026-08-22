@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 using CluckWars.Gameplay;
@@ -15,7 +14,7 @@ namespace CluckWars.Tests
         /// every arm to zero length, which several of these assertions would have passed
         /// vacuously.
         /// </summary>
-        private static float ArenaHalfSize => TestAssets.SceneFloat("_planeSize") * 0.5f;
+        private static float ArenaHalfSize => ShippedMap.HalfSize;
 
         [Test] public void Build_IsDeterministicForSeed()
         {
@@ -104,8 +103,7 @@ namespace CluckWars.Tests
             var segs = PinwheelLayout.Build(half, 8, seed: 42, centerKeepClear: 3f, armThickness: 0.5f);
             Assert.AreEqual(8, segs.Length);
 
-            float hubPlaza = Mathf.Max(PinwheelLayout.HubPlazaRadius,
-                                       3f + PinwheelLayout.MinCorridorWidth);
+            float hubPlaza = PinwheelLayout.SolveHubPlazaRadius(3f, 0.5f, 8);
 
             for (int i = 0; i < 8; i++)
             {
@@ -163,73 +161,147 @@ namespace CluckWars.Tests
         /// Walls must survive the food piles' keep-clear discs at their REAL v0.5 sizes.
         /// This is the gap that let a broken map ship: pile discs clip walls without ever
         /// violating a corridor-clearance assertion, so the clearance tests stayed green
-        /// while 27% of walls collapsed to nothing and the rest shrank to 1–3 m. Only a
+        /// while 27% of walls collapsed to nothing and the rest shrank to 1-3 m. Only a
         /// direct length check catches it.
         /// </summary>
+        /// <remarks>
+        /// The acceptable length is now DERIVED from the layout constants rather than pinned
+        /// to a magic fraction of the arena. The previous version used 0.398 x half, which
+        /// described the mis-scaled arm of 2026-08-14; after the 2026-08-19 revert the arms
+        /// are 0.5756 x half, and the old bound would have passed with 40% of the arm missing.
+        /// A fraction that has to be re-derived by hand every time the map changes is exactly
+        /// the staleness this suite keeps getting caught by.
+        /// </remarks>
         [Test] public void Build_WallsSurvivePileKeepClearDiscs_AtRealV05Sizes()
         {
-            // Every input is READ from Game.unity, not restated. The previous version
-            // hardcoded a 12x10 centre pile and 1.5 m corners against a shipped 7.8x6.5 and
-            // 19 m — so "at real v0.5 sizes" had stopped being true some time before the
-            // x1.35 rescale, and the test was guarding a map nobody plays.
-            float half = ArenaHalfSize;
-            float cornerDistance = TestAssets.SceneFloat("_baseCornerDistance");
-            float pileJitter = TestAssets.SceneFloat("_pilePositionJitter");
-            float personalInset = TestAssets.SceneFloat("_personalPileInset");
-            float contestedInset = TestAssets.SceneFloat("_contestedEdgeInset");
-            var centreFp    = TestAssets.SceneVector2("_centerPileFootprint");
-            var personalFp  = TestAssets.SceneVector2("_personalPileFootprint");
-            var contestedFp = TestAssets.SceneVector2("_contestedPileFootprint");
+            float half = ShippedMap.HalfSize;
+            float thickness = ShippedMap.WallThickness;
+            float centreKeepClear = ShippedMap.CentreKeepClear;
+            var discs = ShippedMap.KeepClearDiscs();
 
-            float FpRadius(Vector2 s) => 0.5f * Mathf.Sqrt(s.x * s.x + s.y * s.y);
-            float centreKeepClear = FpRadius(centreFp);
+            // Both wall types come out the same length, and it is a consequence of the
+            // derivation rather than a tuned value (GDD 3.4): boundary distance along the
+            // 22.5-degree bearing, less one opening, less the hub plaza.
+            float hubPlaza = PinwheelLayout.SolveHubPlazaRadius(centreKeepClear, thickness, 8);
+            float boundaryAlongBearing = half / Mathf.Cos(Mathf.PI / 8f);
+            float designedLength = boundaryAlongBearing - PinwheelLayout.OpeningWidth - hubPlaza;
 
-            var corners = new[]
-            {
-                new Vector3(+cornerDistance, 0f, +cornerDistance),
-                new Vector3(-cornerDistance, 0f, +cornerDistance),
-                new Vector3(-cornerDistance, 0f, -cornerDistance),
-                new Vector3(+cornerDistance, 0f, -cornerDistance),
-            };
-
-            var discs = new List<KeepClearDisc>();
-            for (int i = 0; i < corners.Length; i++)
-            {
-                discs.Add(new KeepClearDisc(new Vector2(corners[i].x, corners[i].z), 4f));
-
-                var personal = MapGenerator.PersonalPileNominal(corners[i], personalInset);
-                discs.Add(new KeepClearDisc(new Vector2(personal.x, personal.z),
-                    FpRadius(personalFp) + pileJitter + PinwheelLayout.PileArmBuffer));
-
-                var contested = MapGenerator.ContestedPileNominal(
-                    corners[i], corners[(i + 1) % corners.Length], contestedInset);
-                discs.Add(new KeepClearDisc(new Vector2(contested.x, contested.z),
-                    FpRadius(contestedFp) + pileJitter + PinwheelLayout.PileArmBuffer));
-            }
-
-            // The designed arm is 0.398 x arenaHalfSize (10.21 m at 25.65, and it was
-            // 7.57 m at the old 19 — an exact x1.35, which is what confirms HubPlazaRadius
-            // and OpeningWidth were scaled consistently with the arena). The floor is 86% of
-            // that, EXACTLY the headroom the old absolute 6.5 m bound gave against its
-            // 7.57 m arm — this tolerance was carried over, not widened. Expressed as a
-            // fraction so the next arena resize cannot leave it stale.
-            const float designedArmFraction = 0.398f;
-            const float clippingHeadroom = 0.86f;
-            float minAcceptable = half * designedArmFraction * clippingHeadroom;
+            // 86% of the designed length: EXACTLY the headroom the original absolute 6.5 m
+            // bound gave against its 7.57 m arm. Carried over, never widened.
+            float minAcceptable = designedLength * 0.86f;
 
             for (int seed = 0; seed < 40; seed++)
             {
-                var segs = PinwheelLayout.Build(half, 8, seed, centreKeepClear, 0.5f, discs.ToArray());
+                var segs = PinwheelLayout.Build(half, 8, seed, centreKeepClear, thickness, discs);
                 for (int i = 0; i < segs.Length; i++)
                 {
                     float len = (segs[i].B - segs[i].A).magnitude;
                     Assert.Greater(len, minAcceptable,
                         $"seed={seed}: wall {i} was clipped to {len:0.00} m by a pile keep-clear " +
-                        $"disc — the designed length is ~{half * designedArmFraction:0.00} m in this " +
+                        $"disc - the designed length is {designedLength:0.00} m in this " +
                         $"{half * 2f:0.0} m arena. Check pile footprints, _pilePositionJitter and " +
                         "PinwheelLayout.JitterFraction.");
                 }
             }
+        }
+
+        /// <summary>
+        /// The hub plaza must actually CONSUME the arm thickness. Until 2026-08-19
+        /// <c>armThickness</c> was a parameter of <c>Build</c> that the body never read, while
+        /// a comment in <c>MapGenerator.BuildInteriorObstacles</c> asserted that "the hub-plaza
+        /// radius scales with whatever thickness is passed in". It did not — so raising
+        /// <c>_wallThickness</c> (which this pass does, 0.5 -> 0.7) silently ate into the
+        /// corridor clearance the plaza exists to guarantee.
+        /// </summary>
+        [Test] public void SolveHubPlazaRadius_GrowsWithArmThickness()
+        {
+            // Chosen so the centre-pile term binds rather than the flat HubPlazaRadius floor,
+            // which by construction cannot respond to thickness.
+            const float bigCentrePile = 12f;
+            float thin  = PinwheelLayout.SolveHubPlazaRadius(bigCentrePile, 0.5f, 8);
+            float thick = PinwheelLayout.SolveHubPlazaRadius(bigCentrePile, 1.4f, 8);
+
+            Assert.Greater(thick, thin,
+                "a thicker arm must push the hub plaza OUT — otherwise its extra half-thickness " +
+                "is taken out of the walkable ring around the centre pile.");
+            Assert.AreEqual(0.45f, thick - thin, 0.0001f,
+                "the plaza should grow by exactly half the extra thickness (surface-to-surface).");
+        }
+
+        /// <summary>
+        /// At high wedge counts the binding constraint stops being the centre pile and becomes
+        /// the arms pinching each other. Guards the third term of the solve, which nothing else
+        /// exercises at the shipped W=8.
+        /// </summary>
+        [Test] public void SolveHubPlazaRadius_PushesOutWhenAdjacentArmsWouldPinch()
+        {
+            float plaza = PinwheelLayout.SolveHubPlazaRadius(centerKeepClear: 3f, armThickness: 1.4f, wedges: 20);
+            float gapAtPlaza = 2f * plaza * Mathf.Sin(Mathf.PI / 20f) - 1.4f;
+
+            Assert.GreaterOrEqual(gapAtPlaza, PinwheelLayout.MinCorridorWidth - 0.001f,
+                "two adjacent arms pinch below MinCorridorWidth at the plaza edge");
+        }
+
+        /// <summary>
+        /// <b>W = 8 is a proven global optimum, not a tuning choice.</b> Wall bearings are
+        /// <c>(i + 0.5)·360/W</c>; every pile and base sits on a multiple of 45 degrees. The
+        /// contested pile needs the nearest wall at least <c>asin(4.0936 / 20.2507)</c> =
+        /// 11.665 degrees off its bearing or the wall is clipped away. Only W = 8 reaches the
+        /// maximum possible 22.5-degree offset; W = 12 and W = 20 land four arms EXACTLY on the
+        /// corner diagonals, and W = 16's best (11.25) misses the requirement by 0.415.
+        /// <para>
+        /// This test exists so that someone reaching for wedge count as a density lever gets a
+        /// red bar with the reason in it, rather than a plausible-looking map whose new arms
+        /// have been quietly deleted by the objectives they were meant to route around.
+        /// </para>
+        /// </summary>
+        [Test] public void WedgeCount_Eight_IsTheGlobalOptimumForObjectiveBearingOffset()
+        {
+            // asin(contested disc radius / contested pile radius), from the shipped scene.
+            float contestedRadius = Vector2.Distance(Vector2.zero, ContestedPileFlat());
+            float contestedDisc = ShippedMap.FootprintRadius(ShippedMap.ContestedPileFootprint)
+                                  + ShippedMap.PilePositionJitter + PinwheelLayout.PileArmBuffer;
+            float requiredDegrees = Mathf.Asin(contestedDisc / contestedRadius) * Mathf.Rad2Deg;
+
+            Assert.AreEqual(11.665f, requiredDegrees, 0.02f,
+                "the required bearing offset moved — re-derive the wedge-count table in " +
+                "PinwheelLayout's class remarks before trusting it.");
+
+            var offsets = new System.Collections.Generic.Dictionary<int, float>();
+            foreach (int w in new[] { 8, 12, 16, 20 }) offsets[w] = MinOffsetFrom45Multiples(w);
+
+            Assert.AreEqual(22.5f, offsets[8], 0.001f, "W=8 should reach the maximum 22.5 offset");
+            Assert.AreEqual(0f, offsets[12], 0.001f, "W=12 should land arms exactly on the diagonals");
+            Assert.AreEqual(11.25f, offsets[16], 0.001f, "W=16's best offset should be 11.25");
+            Assert.AreEqual(0f, offsets[20], 0.001f, "W=20 should land arms exactly on the diagonals");
+
+            foreach (var kv in offsets)
+            {
+                if (kv.Key == 8) continue;
+                Assert.Less(kv.Value, requiredDegrees,
+                    $"W={kv.Key} reaches {kv.Value:0.###} degrees, which would clear the required " +
+                    $"{requiredDegrees:0.###} — the optimality claim in PinwheelLayout's remarks is stale.");
+            }
+        }
+
+        private static Vector2 ContestedPileFlat()
+        {
+            var corners = ShippedMap.Corners();
+            var p = MapGenerator.ContestedPileNominal(corners[0], corners[1], ShippedMap.ContestedEdgeInset);
+            return new Vector2(p.x, p.z);
+        }
+
+        /// <summary>Smallest angular distance from any wall bearing to any 45-degree multiple.</summary>
+        private static float MinOffsetFrom45Multiples(int wedges)
+        {
+            float worst = float.MaxValue;
+            for (int i = 0; i < wedges; i++)
+            {
+                float bearing = (i + 0.5f) * 360f / wedges;
+                float nearest = Mathf.Round(bearing / 45f) * 45f;
+                worst = Mathf.Min(worst, Mathf.Abs(Mathf.DeltaAngle(bearing, nearest)));
+            }
+            return worst;
         }
 
         /// <summary>
