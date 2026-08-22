@@ -6,6 +6,48 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ⚠️ Roster mid-migration — suite is RED by design (2026-08-23)
+
+**EditMode 391/392. The one failure is expected and must NOT be silenced.**
+`AbilitySystemTests.EveryClass_HasEnoughLegalAbilities_ForTheLoadoutToBeAChoice`
+reports *"Warrior chooses 3 from 6"* against a floor of 7.
+
+Maestro reversed the `21ddaa8` pool-widening: a Character ability now belongs to
+**exactly one class**, sharing only via `Common` slot. That shrank every pool, and the
+compensating half — nine new abilities specced in
+`docs/design/class-essence-and-signatures.md` §4 — **is not built yet**. The red test is
+the signal that the migration is half-done. Committed red deliberately (`fe5d756`) rather
+than left dirty.
+
+**Next commit's job:** author those abilities, return to green.
+
+### Shipped this session (committed)
+| | |
+|---|---|
+| `896853f` | Arena density: hub/opening constants reverted, `SectorScatter` revived with provable 4-fold symmetry, arms de-rendered so the hand-placed art *is* the wall, fence 0.49 → 0.95 m |
+| `037db7d` | `ClampInsideArena` (arithmetic containment, not collider-trusting) + jump tiers ×0.65 restoring the GDD §3.6 ladder |
+| `63dcc83` | Tests re-pointed at the shipped scene via `ShippedMap`; Balance Editor gains class assignment + roster-integrity panel |
+| `bdc8f26` | `docs/design/class-essence-and-signatures.md` — essences, 8 specializations, Speedy concepts |
+| `fe5d756` | **(red)** one class per Character ability |
+
+### Four asset-vs-constructor bugs found and fixed
+`DiveBomb`, `Shadowstep`, `Doppelganger` all serialized `TerrainTraversal: 0` against
+constructors declaring Vault/Blink — **the Assassin's entire Blink kit and the Warrior's
+gap-closer were inert**. `Shadowstep` was also Speedy-legal in its asset against three
+sources saying Assassin, handing Speedy a 14.58 m Blink (longer than the Big jump).
+Guarded now by `AbilityAssets_SerializeTheTraversalTierTheirConstructorDeclares`.
+
+### Known-stale, not fixed
+- `MenuUiController.cs:79-82` still describes the damage-era passives ("MIGHTY +25%
+  outgoing ability damage", "COMBO — equips 3 abilities instead of 2"), removed in `62219fc`.
+- Speedy has **three** passives but the UI offers **two** (`PassiveOpt1/2`) — one is
+  unreachable. Blocks wiring signatures to specializations.
+- Speedy concepts in `Assets/AIConcepts/` came out in 3/4 profile, not the shipped
+  front-facing style. Regenerate with the `image` op — its T-pose injection *is* the house
+  convention.
+
+---
+
 ## ✅ Ability Range Guides — always-on reach overlay (2026-08-15) — FEATURE
 
 **EditMode 314 → 327, all green** (re-run independently at signoff: 327/327, 3.29 s).
