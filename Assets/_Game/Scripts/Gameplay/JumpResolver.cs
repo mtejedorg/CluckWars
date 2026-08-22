@@ -9,9 +9,9 @@ namespace CluckWars.Gameplay
     public enum JumpLengthTier : byte
     {
         None   = 0,
-        Short  = 1, // 5 m (Dive Bomb)
-        Normal = 2, // 10 m
-        Big    = 3, // 18 m (Doppelganger)
+        Short  = 1, // 3.25 m (Dive Bomb) - crosses walls, no pile
+        Normal = 2, // 6.5 m  - crosses T1/T2, not the centre pile
+        Big    = 3, // 11.7 m (Doppelganger) - crosses everything
     }
 
     /// <summary>
@@ -45,35 +45,55 @@ namespace CluckWars.Gameplay
     /// </summary>
     public static class JumpResolver
     {
-        // DELIBERATELY NOT SCALED with the 38 m -> 51.3 m arena rescale of 2026-08-14.
+        // RESCALED x0.65 on 2026-08-20 to restore the traversal ladder. Was 5 / 10 / 18.
         //
-        // These tiers are OBSTACLE-registered by intent, not arena-registered: the ladder is
-        // meant to be defined by which obstacle each rung can cross, and the pile footprints
-        // were deliberately held at ABSOLUTE size in the same rescale (Maestro: "don't
-        // increase the Pile size for now"). Scaling the jumps while the obstacles stood
-        // still would move one half of a relationship.
+        // These tiers are OBSTACLE-registered: the ladder's whole definition is which obstacle
+        // each rung can cross (GDD 3.6 - "the map opens itself in stages"). The pile footprints
+        // shrank 35% on 2026-08-13 and these did not follow, so the ladder had silently
+        // collapsed - measured against the SHIPPED footprints (3.6x3.0 / 4.2x3.5 / 7.8x6.5) and
+        // the real clearing rule (span + 2*BodyClearance, plus GetMaxExtension):
         //
-        // BE PRECISE ABOUT THE EVIDENCE. Scaling these x1.35 does turn four JumpResolverTests
-        // red, but those tests pin the RESOLVER MATH against illustrative obstacle spans
-        // (5.5 / 6.5 / 12 m), NOT against the piles the game actually builds. The shipped
-        // footprints are 3.6 / 4.2 / 7.8 m, shrunk on 2026-08-13 — so against real geometry a
-        // 5 m Short already clears a personal pile and the ladder is substantially collapsed
-        // today. Do not read those four failures as proof the live gates were protected.
+        //   tier        arm 1.50   T1 4.40   T2 5.00   centre 8.60
+        //   Short  5.0     yes       YES       YES         no      <- should fail both piles
+        //   Normal 10.0    yes       yes       yes         YES     <- should fail the centre
+        //   Big    18.0    yes       yes       yes         yes
         //
-        // So this is a CONSERVATIVE hold, not a proof: changing jump reach is a traversal
-        // balance decision (it changes which terrain each class can ignore), and it belongs
-        // to Maestro rather than to a mechanical x1.35 pass. Two things to settle together
-        // when it is revisited:
-        //   * re-point JumpResolverTests at the live footprints (TestAssets.SceneVector2, the
-        //     way MapClearanceTests now does) so the gates are asserted against the real map;
-        //   * if the saved x1.35 pile footprints are switched back on (see
-        //     MapGenerator._centerPileFootprint), scale these in the SAME commit.
-        public const float ShortDistance  = 5.0f;
-        public const float NormalDistance = 10.0f;
-        public const float BigDistance    = 18.0f;
+        // Short was crossing both small piles and Normal was crossing the centre pile on its
+        // short axis, so every tier did what the tier above it was supposed to. Maestro,
+        // 2026-08-20: "the jump is still too high."
+        //
+        //   tier        arm 1.50   T1 4.40   T2 5.00   centre 8.60
+        //   Short  3.25    yes        no        no         no
+        //   Normal 6.5     yes       yes       yes         no
+        //   Big    11.7    yes       yes       yes        yes
+        //
+        // x0.65 is the piles' own shrink factor, so this restores the RELATIONSHIPS rather than
+        // inventing new distances - the ladder is a property of tier-vs-obstacle, and only one
+        // half of it had moved.
+        //
+        // If the saved x1.35 pile footprints are ever switched back on (see
+        // MapGenerator._centerPileFootprint), rescale these in the SAME commit.
+        // JumpResolverTests asserts these gates against the LIVE footprints, not literals.
+        public const float ShortDistance  = 3.25f;
+        public const float NormalDistance = 6.5f;
+        public const float BigDistance    = 11.7f;
 
-        /// <summary>0.4 m body clearance each side (span needed = obstacle width + 0.8 m).</summary>
-        public const float BodyClearance        = 0.4f;
+        /// <summary>
+        /// Body clearance each side of a jump corridor (span needed = obstacle width + 0.8 m).
+        /// </summary>
+        /// <remarks>
+        /// Derived, not a literal. This is the CharacterController's own radius WITHOUT skin
+        /// width, so it is deliberately 0.08 m more permissive than
+        /// <see cref="PinwheelLayout.ChickenRadius"/>, which <c>ChickenMovement.ClampInsideArena</c>
+        /// uses as the arena limit. A jump may therefore land fractionally closer to a wall than
+        /// the clamp allows and be nudged out on the next tick — harmless, and the clamp is the
+        /// one that is right, because skin width is where the body actually stops.
+        ///
+        /// Pointing both at <see cref="PinwheelLayout.ChickenControllerRadius"/> keeps them one
+        /// quantity with two definitions rather than two literals that agree by coincidence —
+        /// the failure mode that produced the pile-position bug on 2026-08-14.
+        /// </remarks>
+        public const float BodyClearance        = PinwheelLayout.ChickenControllerRadius;
         public const float MaxAbsoluteTolerance = 0.8f;
         public const float MinToleranceFraction = 0.4f;
         public const float ToleranceFraction    = 0.12f;

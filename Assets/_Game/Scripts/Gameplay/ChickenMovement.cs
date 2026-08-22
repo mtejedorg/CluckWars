@@ -95,6 +95,8 @@ namespace CluckWars.Gameplay
 
             _controller.Move(displacement * deltaTime);
 
+            ClampInsideArena();
+
             // Face movement direction — or, while aim-rotating, the raw stick direction
             // (planar is deliberately zeroed above in that case, so read the input directly).
             // Skip while locked, rooted (aim-rotating is never both true — see the
@@ -109,5 +111,78 @@ namespace CluckWars.Gameplay
                     stats.TurnSpeed * deltaTime);
             }
         }
+
+        /// <summary>
+        /// Hard geometric guarantee that a chicken is inside the arena, applied every tick
+        /// after the <see cref="CharacterController"/> has moved.
+        /// </summary>
+        /// <remarks>
+        /// <b>This deliberately does not trust the boundary colliders.</b> Maestro, 2026-08-19:
+        /// a chicken was found wedged in the edge wall at match start. A <c>CharacterController</c>
+        /// against a thin <c>BoxCollider</c> can tunnel or wedge for reasons that are not bugs in
+        /// this code — a <c>deltaTime</c> spike, a knockback landing on the same tick as a wall
+        /// contact, or depenetration resolving along the wrong axis in a corner where two walls
+        /// meet. Clamping is arithmetic, not a physics query, so it cannot fail to apply.
+        ///
+        /// <b>Two correction paths, and the split is load-bearing.</b> The obvious implementation
+        /// — disable the controller, write <c>transform.position</c>, re-enable — is what
+        /// <see cref="Gameplay.ChickenController.RPC_TeleportTo"/> and <c>ChickenTraversal</c> use,
+        /// but those fire ONCE on an event. This runs every tick, and a player holding into a
+        /// corner makes it fire on consecutive ticks indefinitely. Toggling <c>enabled</c>
+        /// invalidates the controller's cached ground state, so <c>isGrounded</c> at the top of
+        /// <see cref="Tick"/> can read false while the chicken is plainly standing on the floor —
+        /// which sends gravity down the accumulating branch instead of the pegged -2, building a
+        /// downward velocity every tick until the body is fast enough to tunnel the ground. That
+        /// would have re-created the very failure class this method exists to prevent, on the Y
+        /// axis, under exactly the corner-pocket condition that was reported.
+        ///
+        /// So the ordinary case routes through <see cref="CharacterController.Move"/>, which
+        /// preserves grounded and collision state. Only a correction too large to be an ordinary
+        /// overshoot — a body genuinely outside the wall, where <c>Move</c> would be refused by
+        /// the surface it is trying to come back through — falls back to the teleport idiom.
+        ///
+        /// The limit is the wall's INNER FACE pulled in by <see cref="PinwheelLayout.ChickenRadius"/>,
+        /// which INCLUDES skin width, so the body rests against the surface rather than sinking
+        /// into it. <c>JumpResolver.BodyClearance</c> is the same radius WITHOUT skin width, so a
+        /// legal jump may land ~0.08 m closer than this allows and get nudged out on the next
+        /// tick. That is this method doing its job, not the two disagreeing: both now derive from
+        /// <see cref="PinwheelLayout.ChickenControllerRadius"/>.
+        ///
+        /// Y is untouched — vertical movement is gravity and jump arcs, which the arena bounds
+        /// have nothing to say about.
+        /// </remarks>
+        /// <summary>
+        /// Largest clamp correction still treated as an ordinary overshoot and applied through
+        /// <see cref="CharacterController.Move"/>. Above this the body is assumed to be genuinely
+        /// outside the arena rather than merely pressed against its edge. One chicken diameter:
+        /// anything smaller cannot have carried the body past a wall it was already touching.
+        /// </summary>
+        private const float MaxMoveCorrection = PinwheelLayout.ChickenDiameter;
+
+        private void ClampInsideArena()
+        {
+            var p = _transform.position;
+            var clamped = PinwheelLayout.ClampIntoArena(p, MapGenerator.ArenaHalfSize);
+            if (clamped == p) return;
+
+            float cx = clamped.x;
+            float cz = clamped.z;
+            var correction = new Vector3(cx - p.x, 0f, cz - p.z);
+
+            if (correction.sqrMagnitude <= MaxMoveCorrection * MaxMoveCorrection)
+            {
+                // Ordinary overshoot. Move() keeps the controller's ground state intact, which
+                // the gravity gate depends on — see the remarks above.
+                _controller.Move(correction);
+                return;
+            }
+
+            // Genuinely outside. Move() would have to push back through the wall it escaped
+            // past and would be refused, so bypass the controller for this one write.
+            _controller.enabled = false;
+            _transform.position = new Vector3(cx, p.y, cz);
+            _controller.enabled = true;
+        }
+
     }
 }
