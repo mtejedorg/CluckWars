@@ -6,47 +6,55 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
-## ⚠️ Roster mid-migration — suite is RED by design (2026-08-23)
+## ✅ Roster migration COMPLETE (2026-08-23) — 394/394 green
 
-**EditMode 391/392. The one failure is expected and must NOT be silenced.**
-`AbilitySystemTests.EveryClass_HasEnoughLegalAbilities_ForTheLoadoutToBeAChoice`
-reports *"Warrior chooses 3 from 6"* against a floor of 7.
+The red from `fe5d756` is cleared. `docs/design/class-essence-and-signatures.md` is built
+apart from three Peck variants that need a `BalanceOracle` solve.
 
-Maestro reversed the `21ddaa8` pool-widening: a Character ability now belongs to
-**exactly one class**, sharing only via `Common` slot. That shrank every pool, and the
-compensating half — nine new abilities specced in
-`docs/design/class-essence-and-signatures.md` §4 — **is not built yet**. The red test is
-the signal that the migration is half-done. Committed red deliberately (`fe5d756`) rather
-than left dirty.
+**Class identity is now structural, not conventional.** Zero shared Character abilities; the
+Common pool is just Egg Shell and Peck. Snatch went to the Assassin (theft is its only income)
+and Speed Burst to Speedy (it is *defined* as fastest) — both were class essences hiding in the
+shared pool.
 
-**Next commit's job:** author those abilities, return to green.
+| Class | Own | Common | Specializations | Signature |
+|---|---|---|---|---|
+| Warrior | 6 | 2 | Bully / Relentless | Scrap / Headbutt |
+| Speedy | 6 | 2 | Slippery / Featherfoot | ⏳ Peck variants |
+| Fatty | 7 | 2 | Hoarder / Bulwark | ⏳ Peck variant / Ground Quake |
+| Assassin | 8 | 1 | Spoiler (Reaper) / Thief (Burglar) | Mark-Kill / Sneaky Steal |
 
-### Shipped this session (committed)
-| | |
-|---|---|
-| `896853f` | Arena density: hub/opening constants reverted, `SectorScatter` revived with provable 4-fold symmetry, arms de-rendered so the hand-placed art *is* the wall, fence 0.49 → 0.95 m |
-| `037db7d` | `ClampInsideArena` (arithmetic containment, not collider-trusting) + jump tiers ×0.65 restoring the GDD §3.6 ladder |
-| `63dcc83` | Tests re-pointed at the shipped scene via `ShippedMap`; Balance Editor gains class assignment + roster-integrity panel |
-| `bdc8f26` | `docs/design/class-essence-and-signatures.md` — essences, 8 specializations, Speedy concepts |
-| `fe5d756` | **(red)** one class per Character ability |
+**Eleven new abilities:** Headbutt, Scrap, Ruffle (Warrior); Dust Kick, Feint, Quick Drop
+(Speedy); Belly Flop, Ground Quake, Immovable (Fatty); Smoke Roost (Assassin).
 
-### Four asset-vs-constructor bugs found and fixed
-`DiveBomb`, `Shadowstep`, `Doppelganger` all serialized `TerrainTraversal: 0` against
-constructors declaring Vault/Blink — **the Assassin's entire Blink kit and the Warrior's
-gap-closer were inert**. `Shadowstep` was also Speedy-legal in its asset against three
-sources saying Assassin, handing Speedy a 14.58 m Blink (longer than the Big jump).
-Guarded now by `AbilityAssets_SerializeTheTraversalTierTheirConstructorDeclares`.
+**Specializations now force-equip a signature** (`7406193`), generalising the mechanism that
+already forced Peck. Warrior/Bully and Warrior/Relentless resolve to genuinely different
+loadouts — the specialization is finally mechanically load-bearing. A Peck-variant signature
+*replaces* Peck; anything else costs a slot.
 
-### Known-stale, not fixed
-- `MenuUiController.cs:79-82` still describes the damage-era passives ("MIGHTY +25%
-  outgoing ability damage", "COMBO — equips 3 abilities instead of 2"), removed in `62219fc`.
-- Speedy has **three** passives but the UI offers **two** (`PassiveOpt1/2`) — one is
-  unreachable. Blocks wiring signatures to specializations.
-- Speedy concepts in `Assets/AIConcepts/` came out in 3/4 profile, not the shipped
-  front-facing style. Regenerate with the `image` op — its T-pose injection *is* the house
-  convention.
+### Two pieces of new controller state
+- `DepositRateMultiplier` — an ability-facing lever on banking speed. Banking had exactly one
+  hook (`ModifyDepositRate`, passive-only), so Quick Drop could not exist without it.
+- `ControlImmuneTimer` / `IsControlImmune` — a real immunity window, enforced at
+  `ApplyPassiveControlDuration` **and** `ApplyKnockback`. Immunity rather than resistance is
+  the point: Bulwark already *scales* control duration and a scale never reaches zero, so a
+  resistance-shaped Immovable would just be a bigger Bulwark.
+
+### Still open
+- **Three Peck-variant signatures** (Slippery, Featherfoot, Hoarder) — `PeckAmount` and
+  `PeckCooldown` feed SCT directly, so these get solved against `BalanceOracle`, never
+  hand-tuned. Null is legal meanwhile.
+- **Per-class Peck differentiation barely exists**: `PeckAmount` is 3 for all three foragers
+  and cooldowns differ by 0.14 s. The variants assume an axis that is not there yet.
+- **Forced-slot asymmetry**: a forager with a non-Peck signature spends 2 of 4 slots on forced
+  picks; the Assassin gets 3 free. Resolves for Speedy and Fatty/Hauler once their Peck
+  variants land, leaving only Warrior at two.
+- **Speedy concepts** came out in 3/4 profile against the shipped front-facing style —
+  regenerate with the `image` op, whose T-pose injection *is* the house convention.
+- **Immovable and Smoke Roost have never run in a live match** — both are new controller
+  state, so they want a Play Mode pass.
 
 ---
+
 
 ## ✅ Ability Range Guides — always-on reach overlay (2026-08-15) — FEATURE
 
