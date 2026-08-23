@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1c264cc5f47203c468550fbb864d9af5, type: 3}
+  m_Name: Feint
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.FeintAbilitySO
+  DisplayName: Feint
+  ShortLabel: JUKE
+  Description: A hard sidestep. Walls still stop you.
+  Icon: 
+  AccentColor: {r: 0.36, g: 0.72, b: 0.8, a: 1}
+  Category: 3
+  TerrainTraversal: 0
+  JumpTier: 0
+  SlotKind: 1
+  AllowedClasses: 2
+  BotRole: 4
+  Duration: 0.2
+  Cooldown: 5
+  AbilityAnimationClip: {fileID: 0}
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256
+  SidestepImpulse: 11

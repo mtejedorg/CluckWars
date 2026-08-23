@@ -50,6 +50,16 @@ namespace CluckWars.UI
             { "WingSlamAbilitySO",    "cw-hex-icon--wing-slam" },
             { "ShadowstepAbilitySO",  "cw-hex-icon--shadowstep" },
             { "MarkKillAbilitySO",    "cw-hex-icon--mark-kill" },
+            // Roster expansion of 2026-08-23 (docs/design/class-essence-and-signatures.md
+            // section 4). No sprites exported yet - all seven are listed in
+            // AbilitySystemTests.IconsNotYetAuthored and carry their emoji fallback.
+            { "HeadbuttAbilitySO",       "cw-hex-icon--headbutt" },
+            { "ScrapAbilitySO",          "cw-hex-icon--scrap" },
+            { "RuffleAbilitySO",         "cw-hex-icon--ruffle" },
+            { "DustKickAbilitySO",       "cw-hex-icon--dust-kick" },
+            { "FeintAbilitySO",          "cw-hex-icon--feint" },
+            { "GroundQuakeAbilitySO",    "cw-hex-icon--ground-quake" },
+            { "BellyFlopAbilitySO",      "cw-hex-icon--belly-flop" },
             // Class specializations. None have exported sprites yet - all are listed in
             // AbilitySystemTests.IconsNotYetAuthored and carry their emoji fallback.
             { "SlipperyPassiveSO",    "cw-hex-icon--slippery" },

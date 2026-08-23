@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f17e40bd540d3f43ac3184880a6acdc, type: 3}
+  m_Name: Ruffle
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.RuffleAbilitySO
+  DisplayName: Ruffle
+  ShortLabel: RUFF
+  Description: A short burst of pace. Enough to close a gap or leave one.
+  Icon: 
+  AccentColor: {r: 0.85, g: 0.62, b: 0.28, a: 1}
+  Category: 3
+  TerrainTraversal: 0
+  JumpTier: 0
+  SlotKind: 1
+  AllowedClasses: 1
+  BotRole: 4
+  Duration: 2.5
+  Cooldown: 5
+  AbilityAnimationClip: {fileID: 0}
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256
+  SpeedMultiplier: 1.5

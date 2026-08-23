@@ -424,6 +424,15 @@ namespace CluckWars.Tests
             "cw-hex-icon--wing-slam",
             "cw-hex-icon--shadowstep",
             "cw-hex-icon--mark-kill",
+            // The seven abilities added on 2026-08-23 to pay for the one-class-per-ability
+            // revert. Emoji fallback until art lands.
+            "cw-hex-icon--headbutt",
+            "cw-hex-icon--scrap",
+            "cw-hex-icon--ruffle",
+            "cw-hex-icon--dust-kick",
+            "cw-hex-icon--feint",
+            "cw-hex-icon--ground-quake",
+            "cw-hex-icon--belly-flop",
             // Every class specialization. The v0.7 pass replaced the damage-era passives
             // wholesale, and none of the nine have exported sprites yet.
             "cw-hex-icon--slippery",

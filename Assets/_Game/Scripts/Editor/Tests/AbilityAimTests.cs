@@ -629,6 +629,10 @@ namespace CluckWars.Tests
                 nameof(SpineCoatAbilitySO),
                 nameof(EggShellAbilitySO),
                 nameof(DoppelgangerAbilitySO),
+                // Ruffle is a pace buff and Feint a lateral hop — neither describes an area
+                // containing rivals, so AimShape.None is the honest answer.
+                nameof(RuffleAbilitySO),
+                nameof(FeintAbilitySO),
                 // Peck is not a self-buff, but it belongs here for the same reason: its
                 // target is a FoodPile, and the aim-shape system describes areas that
                 // contain CHICKENS. There is no rival to preview, mark, or whiff against,
@@ -682,6 +686,8 @@ namespace CluckWars.Tests
                 nameof(SpineCoatAbilitySO),
                 nameof(EggShellAbilitySO),
                 nameof(DoppelgangerAbilitySO),
+                nameof(RuffleAbilitySO),
+                nameof(FeintAbilitySO),
                 // Placed zones.
                 nameof(FeatherTrapAbilitySO),
                 nameof(RootEggAbilitySO),
@@ -745,6 +751,13 @@ namespace CluckWars.Tests
                 // traversal. Both subclasses inherit the gate from the shared base.
                 nameof(AmbushAbilitySO),
                 nameof(WingSlamAbilitySO),
+                // Warrior/Fatty additions, gated for the same reason as their stronger
+                // counterparts: a shove, a grab or a stomp with nobody in reach spends the
+                // cooldown and produces literally nothing. None of them relocates the caster,
+                // so gating cannot create the dead-button bug that Dive Bomb had.
+                nameof(HeadbuttAbilitySO),      // shove + stagger; empty air does nothing
+                nameof(ScrapAbilitySO),         // steals off a specific carrier
+                nameof(GroundQuakeAbilitySO),   // AoE root around self
             };
 
             var wronglyGated = new List<string>();

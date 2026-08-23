@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e3cfd50d96602ae46ab8b034c85684b6, type: 3}
+  m_Name: DustKick
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.DustKickAbilitySO
+  DisplayName: Dust Kick
+  ShortLabel: DUST
+  Description: Kicks dust backwards, slowing whoever is chasing you.
+  Icon: 
+  AccentColor: {r: 0.72, g: 0.66, b: 0.48, a: 1}
+  Category: 1
+  TerrainTraversal: 0
+  JumpTier: 0
+  SlotKind: 1
+  AllowedClasses: 2
+  BotRole: 4
+  Duration: 0.3
+  Cooldown: 6
+  AbilityAnimationClip: {fileID: 0}
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256
+  Reach: 4.5
+  RearArcAngle: 75
+  SlowFactor: 0.55
+  SlowSeconds: 2.5

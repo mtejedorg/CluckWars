@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "com.ivanmurzak.unity.mcp": "0.88.0",
+    "com.ivanmurzak.unity.mcp": "0.89.0",
     "com.unity.ai.assistant": "2.9.0-pre.1",
     "com.unity.ai.navigation": "2.0.12",
     "com.unity.collab-proxy": "2.12.4",
@@ -51,7 +51,10 @@
     "com.unity.modules.video": "1.0.0",
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
-    "com.unity.modules.xr": "1.0.0"
+    "com.unity.modules.xr": "1.0.0",
+    "com.ivanmurzak.unity.mcp.animation": "1.2.32",
+    "com.ivanmurzak.unity.mcp.inputsystem": "1.0.16",
+    "com.ivanmurzak.unity.mcp.navigation": "1.0.17"
   },
   "scopedRegistries": [
     {
@@ -59,7 +62,9 @@
       "url": "https://package.openupm.com",
       "scopes": [
         "com.ivanmurzak.unity.mcp",
-        "extensions.unity.playerprefsex"
+        "extensions.unity.playerprefsex",
+        "com.ivanmurzak",
+        "extensions.unity"
       ]
     }
   ]

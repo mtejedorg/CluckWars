@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c6594dab2cd3cb4c80df6e4bcf4edfe, type: 3}
+  m_Name: Headbutt
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.HeadbuttAbilitySO
+  DisplayName: Headbutt
+  ShortLabel: BUTT
+  Description: Short forward shove that staggers whoever it catches.
+  Icon: 
+  AccentColor: {r: 0.75, g: 0.3, b: 0.22, a: 1}
+  Category: 1
+  TerrainTraversal: 0
+  JumpTier: 0
+  SlotKind: 1
+  AllowedClasses: 1
+  BotRole: 3
+  Duration: 0.25
+  Cooldown: 4
+  AbilityAnimationClip: {fileID: 0}
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256
+  Reach: 3.6
+  ConeAngle: 70
+  KnockbackForce: 7.5
+  StaggerSeconds: 0.35
