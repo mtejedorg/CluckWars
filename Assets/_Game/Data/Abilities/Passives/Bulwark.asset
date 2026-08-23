@@ -29,5 +29,6 @@ MonoBehaviour:
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  SignatureAbility: {fileID: 11400000, guid: 2a92897e8ee4ea6489a6800817e583b6, type: 2}
   DurationMultiplier: 0.65
   KnockbackMultiplier: 0.25

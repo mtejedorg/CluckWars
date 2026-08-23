@@ -29,4 +29,5 @@ MonoBehaviour:
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  SignatureAbility: {fileID: 11400000, guid: 585145f2a83ab174d85f6128aa98f927, type: 2}
   BonusFood: 15

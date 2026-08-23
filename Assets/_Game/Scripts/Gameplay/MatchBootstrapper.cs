@@ -375,7 +375,32 @@ namespace CluckWars.Gameplay
                 picked.Add(a);
             }
 
-            if (canForage && !picked.Contains(peck))
+            // The chosen specialization's signature, if it declared one. Resolved BEFORE Peck
+            // so a Peck-variant signature can stand in for the plain Peck rather than fighting
+            // it for a slot — see PassiveAbilitySO.SignatureAbility.
+            var signature = passive != null ? passive.SignatureAbility : null;
+            if (signature != null && !AbilityRegistrySO.IsAllowedFor(signature, cls))
+            {
+                _log?.Warn(Source, $"ResolveLegalLoadout: {passive.name}'s signature " +
+                    $"'{signature.name}' is not legal for {cls} — ignoring it. The " +
+                    "specialization will grant only its passive effect.");
+                signature = null;
+            }
+
+            bool signatureIsPeckVariant = signature is Abilities.PeckAbilitySO;
+            if (signatureIsPeckVariant && peck != null && picked.Remove(peck))
+                _log?.Debug(Source, $"ResolveLegalLoadout: {cls}'s signature is a Peck variant — " +
+                    "the plain Peck stands down rather than taking a second slot.");
+
+            if (signature != null && !picked.Contains(signature))
+            {
+                if (picked.Count >= activeSlots) picked.RemoveAt(picked.Count - 1);
+                picked.Insert(0, signature);
+                _log?.Debug(Source, $"ResolveLegalLoadout: forced {cls}'s signature '{signature.name}' into slot 0.");
+            }
+
+            // A Peck-variant signature already covers foraging, so do not re-force plain Peck.
+            if (canForage && !signatureIsPeckVariant && !picked.Contains(peck))
             {
                 // Forced in at slot 0. The picker normally places it wherever the player
                 // wants and this never fires; it is the safety net for bot presets and any

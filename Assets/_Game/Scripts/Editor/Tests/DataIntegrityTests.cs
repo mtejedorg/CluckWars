@@ -1214,6 +1214,53 @@ namespace CluckWars.Tests
         }
 
         /// <summary>
+        /// A specialization's signature must be equippable by the class that specialization
+        /// belongs to, or it silently grants nothing.
+        /// </summary>
+        /// <remarks>
+        /// <c>ResolveLegalLoadout</c> runs every forced ability through <c>IsAllowedFor</c>
+        /// before equipping it. A signature pointing at another class's ability is therefore
+        /// not a crash — it is a specialization that quietly does half of what it advertises,
+        /// which is exactly the failure mode that let three abilities ship with
+        /// <c>TerrainTraversal: 0</c> and nobody notice.
+        ///
+        /// Null is legal: a specialization may grant only its passive effect. Three currently
+        /// do, because their signatures are Peck variants that must be solved against
+        /// BalanceOracle before they can be authored.
+        /// </remarks>
+        [Test]
+        public void SignatureAbilities_AreLegalForTheirOwnClass()
+        {
+            var offenders = new System.Collections.Generic.List<string>();
+
+            foreach (var passive in TestAssets.LoadAllIn<PassiveAbilitySO>(TestAssets.AbilitiesDir))
+            {
+                var sig = passive.SignatureAbility;
+                if (sig == null) continue; // passive-only specialization; legal.
+
+                // The signature must be equippable by every class the passive serves.
+                foreach (ChickenClassFlags cls in new[]
+                {
+                    ChickenClassFlags.Warrior, ChickenClassFlags.Speedy,
+                    ChickenClassFlags.Fatty,   ChickenClassFlags.Assassin,
+                })
+                {
+                    if ((passive.AllowedClasses & cls) == 0) continue;
+                    if ((sig.AllowedClasses & cls) != 0) continue;
+
+                    offenders.Add($"{passive.name} serves {cls} but its signature " +
+                                  $"'{sig.name}' is only for {sig.AllowedClasses}");
+                }
+            }
+
+            Assert.IsEmpty(offenders,
+                "A specialization's signature is force-equipped through IsAllowedFor, so an " +
+                "illegal one is dropped and the specialization grants only half of what it " +
+                "advertises:" + System.Environment.NewLine + "  " +
+                string.Join(System.Environment.NewLine + "  ", offenders));
+        }
+
+        /// <summary>
         /// Dropping Shadowstep from Speedy must not starve its loadout: every class needs enough
         /// legal abilities to fill four slots and still have a choice.
         /// </summary>

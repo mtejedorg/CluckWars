@@ -29,5 +29,6 @@ MonoBehaviour:
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  SignatureAbility: {fileID: 11400000, guid: e9f69599cf314074cae2f9c2464aa28c, type: 2}
   StealMultiplier: 1.4
   BonusCapacity: 6
