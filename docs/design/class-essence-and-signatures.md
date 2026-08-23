@@ -1,10 +1,21 @@
 # Class essence, specializations and signature abilities
 
-**Status: proposed, not implemented.** Agreed with Maestro in conversation on 2026-08-21.
-Nothing in this document has been built yet. It exists so the intent stops living only in
-chat — every drift bug this month (Shadowstep shared with Speedy, `TerrainTraversal: 0` on
-three abilities, stale pile spans in `JumpResolverTests`) came from a design decision that
-was never written down next to the thing it governed.
+**Status: BUILT, except the three Peck variants.** Agreed 2026-08-21, implemented 2026-08-23.
+Suite at 394/394.
+
+| Part | State |
+|---|---|
+| §1 one class per Character ability | **done** — `fe5d756`, zero shared |
+| §4 nine new abilities | **done** — `a03ea01`, `529e95d` |
+| §3 signature mechanism | **done** — `7406193` |
+| §3 signature assignments | **5 of 8** — three await a `BalanceOracle` solve |
+| §5 Snatch / Speed Burst out of Common | **done** — `Common` is now Egg Shell + Peck only |
+| Visual identity (per-spec models/colours) | **not done** — concepts need regenerating |
+
+This document exists so the intent stops living only in chat — every drift bug this month
+(Shadowstep shared with Speedy, `TerrainTraversal: 0` on three abilities, stale pile spans in
+`JumpResolverTests`) came from a design decision that was never written down next to the thing
+it governed.
 
 ---
 
@@ -104,7 +115,7 @@ as the agile chicken, and in other as the anxious chicken."*
 | | **The Agile** | **The Anxious** |
 |---|---|---|
 | Passive | **Slippery** — control effects wear off 40% faster | **Featherfoot** — immune to pile-slow |
-| Signature | **Peck: empty-beak rush** — cooldown scales with how empty the cargo is | **Peck: burst-fed** — pecking amplified while Speed Burst is active |
+| Signature | ⏳ **Peck: empty-beak rush** — cooldown scales with how empty the cargo is | ⏳ **Peck: burst-fed** — pecking amplified while Speed Burst is active |
 | Fantasy | Poised, unpinnable. Slips the grab, never panics. | Jittery, never stops moving. Raids at full speed and bolts. |
 | Plays like | Duel-survivor. Walks into contested space and out again. | Smash-and-grab. Highest ceiling, no composure. |
 
@@ -130,7 +141,7 @@ That is **Hoarder**, already shipped. The second is defined here.
 | | **The Hauler** | **The Boulder** |
 |---|---|---|
 | Passive | **Hoarder** — carries at least a full win's worth | **Bulwark** — shorter control, 75% less knockback |
-| Signature | **Peck: heavy beakful** — long cooldown, much larger amount | **Ground Quake** — stomp roots everyone in radius |
+| Signature | ⏳ **Peck: heavy beakful** — long cooldown, much larger amount | ✅ **Ground Quake** — stomp roots everyone in radius |
 | Fantasy | One perfect trip: fill once, walk home once, win. | The immovable object. Nothing moves him, he moves you. |
 | Axis | Economy | Control |
 
@@ -154,7 +165,7 @@ Relentless the **frequency** axis.
 | | **The Brute** (thief) | **The Relentless** (fighter) |
 |---|---|---|
 | Passive | **Bully** — steals bigger, plus the cargo room to hold it | **Relentless** — abilities come back faster |
-| Signature | **Scrap** — steals a small amount on contact | **Headbutt** — short shove + brief stagger, low cooldown |
+| Signature | ✅ **Scrap** — steals a small amount on contact | ✅ **Headbutt** — short shove + brief stagger, low cooldown |
 | Fantasy | Takes what it wants, by weight. | Never stops swinging. Attrition by volume. |
 | Axis | Magnitude | Frequency |
 
@@ -179,7 +190,7 @@ Named by Maestro 2026-08-23: **Reaper** and **Burglar**.
 | | **The Reaper** | **The Burglar** |
 |---|---|---|
 | Passive | **Spoiler** — banks a bonus if the timer expires with no winner | **Thief** — every steal takes 1.6x more |
-| Signature | **Mark/Kill** — isolate, arm, execute | **strongest steal ability**, unavailable to the Reaper |
+| Signature | ✅ **Mark/Kill** — isolate, arm, execute | ✅ **Sneaky Steal** — unavailable to the Reaper |
 | Fantasy | Patient. Wins the game nobody else finished. | Pure predation. Never farms, only takes. |
 
 ---
@@ -245,23 +256,30 @@ green because a test pinned literals instead of loading the real assets.
 already pecks nearly as fast as Speedy and carries the same per beakful. The differentiation
 this design assumes mostly does not exist yet.
 
-**Speedy has three passives but the UI offers two.** `MenuUiController` exposes `PassiveOpt1`
-and `PassiveOpt2`; Speedy has Drop-and-Go, Featherfoot **and** Slippery, so one is currently
-unreachable. Resolve before wiring signatures to specializations.
+~~**Speedy has three passives but the UI offers two.**~~ **Resolved** (`552b015`): Drop-and-Go
+was retired as a passive and re-authored as the `QuickDrop` ability. Every class now has
+exactly two specializations.
 
-**Stale UI copy.** `MenuUiController.cs:79-82` still describes the damage-era passives
-("MIGHTY +25% outgoing ability damage", "COMBO — equips 3 abilities instead of 2"). Those were
-removed in `62219fc` and every class has 4 slots now.
+~~**Stale UI copy.**~~ **Resolved** (`552b015`): the damage-era passive names were removed. The
+lobby card shows the class `Role` instead, which is stable across both specializations — a
+per-class passive name is right for at most one of a class's two builds.
 
-**Pool sizes after the revert** (actives only; passives excluded):
+**Forced-slot asymmetry, for Maestro's eye.** A forager whose signature is NOT a Peck variant
+now spends two of four slots on forced picks (Peck + signature), leaving two free choices. The
+Assassin, which cannot forage, gets three. That is a real difference in expressiveness between
+classes and it lands once the three Peck-variant signatures exist — at which point Speedy and
+Fatty/Hauler get three free slots and only Warrior stays at two.
 
-| Class | Own | + Common | Total |
-|---|---|---|---|
-| Warrior | 3 | 4 | 7 |
-| Speedy | 2 | 4 | 6 |
-| Fatty | 4 | 4 | 8 |
-| Assassin | 6 | 3 | 9 |
+**Pool sizes as shipped** (actives only; passives excluded):
 
-`AbilitySystemTests.EveryClass_HasEnoughLegalAbilities_ForTheLoadoutToBeAChoice` currently
-fails on Warrior. Moving Snatch and Speed Burst out of Common makes this *tighter*, not
-looser — the new abilities in §4 are what pay for it.
+| Class | Own | + Common | Total | Specializations |
+|---|---|---|---|---|
+| Warrior | 6 | 2 | 8 | Bully / Relentless |
+| Speedy | 6 | 2 | 8 | Slippery / Featherfoot |
+| Fatty | 7 | 2 | 9 | Hoarder / Bulwark |
+| Assassin | 8 | 1 | 9 | Spoiler / Thief |
+
+**§5 is done.** The Common pool is now **Egg Shell** (All) and **Peck** (foragers only) —
+nothing else. Snatch went to the Assassin because an AoE cargo steal *is* the class's core, and
+Speed Burst to Speedy because a universal 2.5x sprint erases the one thing that class owns
+outright. Every class stayed above the ≥7 floor.

@@ -15,12 +15,18 @@ MonoBehaviour:
   DisplayName: Speed Burst
   ShortLabel: SPD
   Description: 2.5x movement speed for a short sprint.
-  AccentColor: {r: 0.30, g: 0.85, b: 0.95, a: 1}
+  Icon: 
+  AccentColor: {r: 0.3, g: 0.85, b: 0.95, a: 1}
   Category: 3
   TerrainTraversal: 0
-  SlotKind: 0
-  AllowedClasses: 15
+  JumpTier: 0
+  SlotKind: 1
+  AllowedClasses: 2
+  BotRole: 0
   Duration: 1.5
   Cooldown: 6
   AbilityAnimationClip: {fileID: 0}
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256
   SpeedMultiplier: 2.5
