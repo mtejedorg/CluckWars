@@ -57,12 +57,26 @@ namespace CluckWars.Gameplay
             }
         }
 
-        /// <summary>Deposit rate after the specialization's say (Drop &amp; Go).</summary>
+        /// <summary>
+        /// Deposit rate after both the specialization's say and any active ability's.
+        /// </summary>
+        /// <remarks>
+        /// The single chokepoint for banking speed. Two independent levers feed it and they
+        /// stack multiplicatively: a PASSIVE (via <c>ModifyDepositRate</c>) and an ABILITY (via
+        /// <see cref="ChickenController.DepositRateMultiplier"/>). Keeping both here means
+        /// neither can silently shadow the other, and the SCT-sensitive number stays readable
+        /// in one place.
+        /// </remarks>
         private float ResolveDepositRate()
         {
             float rate = _matchConfig != null ? _matchConfig.DepositRatePerSecond : 6f;
+
             var passive = _controller != null ? _controller.Passive : null;
-            return passive != null ? passive.ModifyDepositRate(rate, _controller) : rate;
+            if (passive != null) rate = passive.ModifyDepositRate(rate, _controller);
+
+            if (_controller != null) rate *= Mathf.Max(0f, _controller.DepositRateMultiplier);
+
+            return rate;
         }
         public float Fraction => Capacity > 0f ? Mathf.Clamp01(Cargo / Capacity) : 0f;
         public bool IsFull => Cargo >= Capacity;

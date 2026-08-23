@@ -437,7 +437,7 @@ namespace CluckWars.Tests
             // wholesale, and none of the nine have exported sprites yet.
             "cw-hex-icon--slippery",
             "cw-hex-icon--featherfoot",
-            "cw-hex-icon--dropandgo",
+            "cw-hex-icon--quick-drop",
             "cw-hex-icon--hoarder",
             "cw-hex-icon--bulwark",
             "cw-hex-icon--relentless",

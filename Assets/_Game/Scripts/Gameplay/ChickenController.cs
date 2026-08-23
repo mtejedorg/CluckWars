@@ -116,6 +116,23 @@ namespace CluckWars.Gameplay
         /// <summary>Multiplier applied to <c>Stats.MoveSpeed</c> by active abilities. 1 = no buff.</summary>
         public float MoveSpeedMultiplier { get; set; } = 1f;
 
+        /// <summary>
+        /// Multiplier on banking speed, driven by an ABILITY rather than a passive.
+        /// 1 = normal.
+        /// </summary>
+        /// <remarks>
+        /// Mirrors <see cref="MoveSpeedMultiplier"/>: set in an ability's <c>OnActivate</c>,
+        /// reset in <c>OnDeactivate</c>. It exists because banking speed previously had exactly
+        /// one lever — <c>PassiveAbilitySO.ModifyDepositRate</c> — and a passive is free, whereas
+        /// Drop and Go was measured at roughly <b>27% of Speedy's SCT</b>. Maestro's call on
+        /// 2026-08-23 was to make that tempo cost a slot and a cooldown instead, which needs a
+        /// route an ability can actually reach.
+        ///
+        /// Consumed alongside the passive hook in <c>ChickenCargo.ResolveDepositRate</c>, so the
+        /// two stack multiplicatively and neither silently overrides the other.
+        /// </remarks>
+        public float DepositRateMultiplier { get; set; } = 1f;
+
         /// <summary>While true, <c>ChickenMovement</c> ignores planar input but keeps gravity.</summary>
         public bool MovementLocked { get; set; }
 

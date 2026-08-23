@@ -69,17 +69,23 @@ namespace CluckWars.UI
 
         private sealed class ClassMeta
         {
-            public string Name, Role, PassiveName, PassiveDesc;
+            // PassiveName/PassiveDesc were removed on 2026-08-23. They still carried the
+            // damage-era passives deleted in 62219fc ("MIGHTY: +25% outgoing ability damage",
+            // "COMBO: equips 3 abilities instead of 2") and were rendering on the lobby card.
+            // Beyond being stale, a per-CLASS passive name is now structurally wrong: the
+            // passive comes from the chosen specialization, so any single hardcoded name is
+            // right for at most one of a class's two builds. Role is stable across both.
+            public string Name, Role;
             public Color Tint;
             public int[] Stats; // cargo, rate, speed (1..5) — HP/Resist removed in v0.4 (no health)
         }
 
         private static readonly Dictionary<ChickenClass, ClassMeta> Meta = new()
         {
-            [ChickenClass.Warrior]  = new ClassMeta { Name = "WARRIOR CHICKEN",  Role = "All-Rounder",  Tint = UiGfx.Hex32("C04030"), PassiveName = "MIGHTY",     PassiveDesc = "+25% outgoing ability damage.",  Stats = new[]{3,3,3} },
-            [ChickenClass.Speedy]   = new ClassMeta { Name = "SPEEDY CHICKEN",   Role = "Hit & Run",    Tint = UiGfx.Hex32("E85A2A"), PassiveName = "SLIPPERY",  PassiveDesc = "Reduced control-effect duration.", Stats = new[]{2,3,5} },
-            [ChickenClass.Fatty]    = new ClassMeta { Name = "FATTY CHICKEN",    Role = "Bulk Carrier", Tint = UiGfx.Hex32("F5D75A"), PassiveName = "IMMOVABLE", PassiveDesc = "Greatly reduced knockback.",       Stats = new[]{5,5,2} },
-            [ChickenClass.Assassin] = new ClassMeta { Name = "ASSASSIN CHICKEN", Role = "Disruptor",    Tint = UiGfx.Hex32("7B68EE"), PassiveName = "COMBO",     PassiveDesc = "Equips 3 abilities instead of 2.", Stats = new[]{2,2,4} },
+            [ChickenClass.Warrior]  = new ClassMeta { Name = "WARRIOR CHICKEN",  Role = "All-Rounder",  Tint = UiGfx.Hex32("C04030"),  Stats = new[]{3,3,3} },
+            [ChickenClass.Speedy]   = new ClassMeta { Name = "SPEEDY CHICKEN",   Role = "Hit & Run",    Tint = UiGfx.Hex32("E85A2A"), Stats = new[]{2,3,5} },
+            [ChickenClass.Fatty]    = new ClassMeta { Name = "FATTY CHICKEN",    Role = "Bulk Carrier", Tint = UiGfx.Hex32("F5D75A"),       Stats = new[]{5,5,2} },
+            [ChickenClass.Assassin] = new ClassMeta { Name = "ASSASSIN CHICKEN", Role = "Disruptor",    Tint = UiGfx.Hex32("7B68EE"), Stats = new[]{2,2,4} },
         };
 
         private static readonly string[] StatRowNames = { "StatCargo", "StatRate", "StatSpeed" };
@@ -1102,7 +1108,7 @@ namespace CluckWars.UI
             mid.Add(nameRow);
 
             var m = Meta[cls];
-            var clsLine = new Label($"{m.Name.Replace(" CHICKEN", string.Empty)} · {m.PassiveName}");
+            var clsLine = new Label($"{m.Name.Replace(" CHICKEN", string.Empty)} · {m.Role}");
             clsLine.AddToClassList("cw-player-class");
             mid.Add(clsLine);
 

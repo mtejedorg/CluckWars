@@ -64,7 +64,7 @@ namespace CluckWars.UI
             // AbilitySystemTests.IconsNotYetAuthored and carry their emoji fallback.
             { "SlipperyPassiveSO",    "cw-hex-icon--slippery" },
             { "FeatherfootPassiveSO", "cw-hex-icon--featherfoot" },
-            { "DropAndGoPassiveSO",   "cw-hex-icon--dropandgo" },
+            { "QuickDropAbilitySO",   "cw-hex-icon--quick-drop" },
             { "HoarderPassiveSO",     "cw-hex-icon--hoarder" },
             { "BulwarkPassiveSO",     "cw-hex-icon--bulwark" },
             { "RelentlessPassiveSO",  "cw-hex-icon--relentless" },

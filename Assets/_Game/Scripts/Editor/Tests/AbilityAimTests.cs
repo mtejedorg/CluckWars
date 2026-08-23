@@ -633,6 +633,7 @@ namespace CluckWars.Tests
                 // containing rivals, so AimShape.None is the honest answer.
                 nameof(RuffleAbilitySO),
                 nameof(FeintAbilitySO),
+                nameof(QuickDropAbilitySO),
                 // Peck is not a self-buff, but it belongs here for the same reason: its
                 // target is a FoodPile, and the aim-shape system describes areas that
                 // contain CHICKENS. There is no rival to preview, mark, or whiff against,
@@ -688,6 +689,7 @@ namespace CluckWars.Tests
                 nameof(DoppelgangerAbilitySO),
                 nameof(RuffleAbilitySO),
                 nameof(FeintAbilitySO),
+                nameof(QuickDropAbilitySO),
                 // Placed zones.
                 nameof(FeatherTrapAbilitySO),
                 nameof(RootEggAbilitySO),
