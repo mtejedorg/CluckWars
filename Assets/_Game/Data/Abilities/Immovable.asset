@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 946fc1753a7e2c54ca6e07de0f2dafba, type: 3}
+  m_Name: Immovable
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.ImmovableAbilitySO
+  DisplayName: Immovable
+  ShortLabel: WALL
+  Description: Plants himself. Nothing stuns, roots, slows or shoves him.
+  Icon: 
+  AccentColor: {r: 0.58, g: 0.52, b: 0.45, a: 1}
+  Category: 2
+  TerrainTraversal: 0
+  JumpTier: 0
+  SlotKind: 1
+  AllowedClasses: 4
+  BotRole: 2
+  Duration: 3
+  Cooldown: 12
+  AbilityAnimationClip: {fileID: 0}
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256

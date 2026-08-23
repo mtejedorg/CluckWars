@@ -438,6 +438,8 @@ namespace CluckWars.Tests
             "cw-hex-icon--slippery",
             "cw-hex-icon--featherfoot",
             "cw-hex-icon--quick-drop",
+            "cw-hex-icon--immovable",
+            "cw-hex-icon--smoke-roost",
             "cw-hex-icon--hoarder",
             "cw-hex-icon--bulwark",
             "cw-hex-icon--relentless",

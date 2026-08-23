@@ -65,6 +65,8 @@ namespace CluckWars.UI
             { "SlipperyPassiveSO",    "cw-hex-icon--slippery" },
             { "FeatherfootPassiveSO", "cw-hex-icon--featherfoot" },
             { "QuickDropAbilitySO",   "cw-hex-icon--quick-drop" },
+            { "ImmovableAbilitySO",      "cw-hex-icon--immovable" },
+            { "SmokeRoostAbilitySO",     "cw-hex-icon--smoke-roost" },
             { "HoarderPassiveSO",     "cw-hex-icon--hoarder" },
             { "BulwarkPassiveSO",     "cw-hex-icon--bulwark" },
             { "RelentlessPassiveSO",  "cw-hex-icon--relentless" },

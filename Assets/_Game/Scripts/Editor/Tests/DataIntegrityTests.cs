@@ -1176,6 +1176,44 @@ namespace CluckWars.Tests
         }
 
         /// <summary>
+        /// Immovable must be immunity, not resistance — otherwise it is a worse Bulwark.
+        /// </summary>
+        /// <remarks>
+        /// Bulwark (Fatty's own passive) already shortens incoming control by SCALING its
+        /// duration, and a scale can approach zero but never reach it. If Immovable were built
+        /// the same way it would duplicate a passive the same class already has, and Fatty's
+        /// "unstoppable force" essence would have no mechanical expression anywhere.
+        ///
+        /// So this pins the two chokepoints rather than the ability: every slow, stun and root
+        /// funnels through ChickenController.ApplyPassiveControlDuration, and every shove
+        /// through ApplyKnockback. Both must consult IsControlImmune, or a control effect added
+        /// later silently bypasses the window.
+        /// </remarks>
+        [Test]
+        public void ControlImmunity_IsEnforcedAtBothChokepoints_NotPerAbility()
+        {
+            string src = System.IO.File.ReadAllText(
+                "Assets/_Game/Scripts/Gameplay/ChickenController.cs");
+
+            StringAssert.Contains("IsControlImmune", src,
+                "ChickenController must expose an immunity window for Immovable to grant.");
+
+            int durIdx = src.IndexOf("private float ApplyPassiveControlDuration");
+            Assert.Greater(durIdx, 0, "ApplyPassiveControlDuration not found.");
+            string durBody = src.Substring(durIdx, System.Math.Min(400, src.Length - durIdx));
+            StringAssert.Contains("IsControlImmune", durBody,
+                "Slow/stun/root funnel through ApplyPassiveControlDuration — it must return 0 " +
+                "while immune, or Immovable only stops knockback.");
+
+            int kbIdx = src.IndexOf("public void ApplyKnockback");
+            Assert.Greater(kbIdx, 0, "ApplyKnockback not found.");
+            string kbBody = src.Substring(kbIdx, System.Math.Min(400, src.Length - kbIdx));
+            StringAssert.Contains("IsControlImmune", kbBody,
+                "ApplyKnockback must drop the impulse while immune. Scaling by the passive is " +
+                "not enough — a scale never reaches zero.");
+        }
+
+        /// <summary>
         /// Dropping Shadowstep from Speedy must not starve its loadout: every class needs enough
         /// legal abilities to fill four slots and still have a choice.
         /// </summary>

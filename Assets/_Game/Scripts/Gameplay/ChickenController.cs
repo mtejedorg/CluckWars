@@ -240,6 +240,38 @@ namespace CluckWars.Gameplay
         /// </summary>
         [Networked] private TickTimer RootTimer { get; set; }
 
+        /// <summary>
+        /// While running, this chicken ignores incoming stun, root, ability-slow and
+        /// knockback outright. Driven by an ability (Immovable), not a passive.
+        /// </summary>
+        /// <remarks>
+        /// <b>Immunity, not resistance — and that distinction is the design.</b> Passives
+        /// already shorten control (Slippery, Bulwark) by scaling duration through
+        /// <see cref="ApplyPassiveControlDuration"/>. Scaling can never reach zero, so a
+        /// resistance-shaped Immovable would just be a bigger Bulwark. Fatty's essence is the
+        /// "unstoppable force", which only reads if there is a window where control simply
+        /// does not land.
+        ///
+        /// <c>[Networked]</c> and a <c>TickTimer</c> for the same reason
+        /// <see cref="StunTimer"/> is: every peer must agree on whether a hit landed, or the
+        /// victim and the attacker disagree about what just happened.
+        ///
+        /// Deliberately does NOT clear control already applied — walking into a stomp and then
+        /// pressing the button is too strong. It stops the NEXT one.
+        /// </remarks>
+        [Networked] private TickTimer ControlImmuneTimer { get; set; }
+
+        /// <summary>True while a control-immunity window is open. Readable on every peer.</summary>
+        public bool IsControlImmune =>
+            Runner != null && !ControlImmuneTimer.ExpiredOrNotRunning(Runner);
+
+        /// <summary>Opens a control-immunity window of <paramref name="seconds"/>.</summary>
+        public void GrantControlImmunity(float seconds)
+        {
+            if (Runner == null || seconds <= 0f) return;
+            ControlImmuneTimer = TickTimer.CreateFromSeconds(Runner, seconds);
+        }
+
         /// <summary>Seconds of root remaining, for the Aftermath countdown (FEEDBACK.md
         /// §5.1, case 18). 0 when not rooted/expired.</summary>
         public float RootRemaining => RootTimer.ExpiredOrNotRunning(Runner) ? 0f : (RootTimer.RemainingTime(Runner) ?? 0f);
@@ -660,6 +692,10 @@ namespace CluckWars.Gameplay
         /// </summary>
         public void ApplyKnockback(Vector3 impulse)
         {
+            // Immovable: the shove does not land at all. Checked before the passive scale,
+            // because scaling can only ever approach zero and never reach it.
+            if (IsControlImmune) return;
+
             var p = Passive;
             if (p != null) impulse *= Mathf.Max(0f, p.ModifyKnockback(1f, this));
             ExternalDisplacement = impulse;
@@ -667,9 +703,20 @@ namespace CluckWars.Gameplay
             if (impulse.sqrMagnitude > 1f) KnockbackEventId++;
         }
 
-        /// <summary>Applies slotted-passive control-duration modifiers (slow/root).</summary>
+        /// <summary>
+        /// Applies slotted-passive control-duration modifiers (slow/root), and enforces the
+        /// Immovable immunity window.
+        /// </summary>
+        /// <remarks>
+        /// Every incoming control effect — ability-slow, stun and root — funnels through this
+        /// one method, so returning 0 here is the whole of the immunity. Putting the check at
+        /// the chokepoint rather than in each RPC means a control effect added later is immune
+        /// by default instead of silently bypassing Immovable.
+        /// </remarks>
         private float ApplyPassiveControlDuration(float seconds)
         {
+            if (IsControlImmune) return 0f;
+
             var p = _abilities != null ? _abilities.Passive : null;
             return p != null ? p.ModifyControlDuration(seconds, this) : seconds;
         }

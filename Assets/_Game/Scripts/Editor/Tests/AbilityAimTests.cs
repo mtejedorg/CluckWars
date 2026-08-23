@@ -634,6 +634,7 @@ namespace CluckWars.Tests
                 nameof(RuffleAbilitySO),
                 nameof(FeintAbilitySO),
                 nameof(QuickDropAbilitySO),
+                nameof(ImmovableAbilitySO),
                 // Peck is not a self-buff, but it belongs here for the same reason: its
                 // target is a FoodPile, and the aim-shape system describes areas that
                 // contain CHICKENS. There is no rival to preview, mark, or whiff against,
@@ -690,7 +691,9 @@ namespace CluckWars.Tests
                 nameof(RuffleAbilitySO),
                 nameof(FeintAbilitySO),
                 nameof(QuickDropAbilitySO),
+                nameof(ImmovableAbilitySO),
                 // Placed zones.
+                nameof(SmokeRoostAbilitySO),
                 nameof(FeatherTrapAbilitySO),
                 nameof(RootEggAbilitySO),
                 // Peck resolves against a pile, never a chicken, so GatherTargets is
