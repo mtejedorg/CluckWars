@@ -391,28 +391,43 @@ serialized `AllowedClasses: 10` (Speedy + Assassin) against a constructor, a cla
 §7.2 below that all said Assassin — giving Speedy a 14.58 m Blink that crossed every obstacle
 class, further than the Big jump.
 
-### 5.3 Passives (design — reimplementation pending)
+### 5.3 Specializations — SHIPPED, this is the current mechanic
 
-Each class has a **pool**; the player picks one. *These pools are the v0.4 design intent;
-the passive system in code still carries the pre-0.4 set and is scheduled for a follow-up
-pass — treat this table as the target, not the shipped state.*
+**Status: built.** Every class offers exactly **two specializations**, chosen once at
+character select. Each specialization grants a permanent passive AND, for five of the
+eight, force-equips a **signature ability** into one of the four active slots — see
+§7.1 for the slot math this drives. Full design rationale, essences and rejected
+alternatives live in `docs/design/class-essence-and-signatures.md`; this table is the
+current, shipped state.
 
-| Class | Passive | Effect |
-|---|---|---|
-| **Speedy** | Slippery | Control **duration** reduced (also shortens the Assassin's arm window on you) |
-| | Featherfoot | Immune to pile-slow — raid a contested pile at full speed |
-| | Drop & Go | Instant deposit (removes the trip-count tax) |
-| **Fatty** | Hoarder | Capacity ≥ win target → banks a full win in one trip |
-| | Bulwark | Control effects reduced |
-| **Warrior** | Relentless | Lower cooldowns — abilities more often |
-| | Bully | Stronger abilities → bigger steals, + cargo to hold them |
-| **Assassin** | Spoiler | If the timer expires with **no** winner, bank **+15** food, then normal resolution |
-| | Thief | Steal-focused |
+| Class | Specialization | Passive | Signature (forced) |
+|---|---|---|---|
+| **Warrior** | The Brute (Bully) | Steals bigger, + cargo room to hold it | **Scrap** (steal on contact) |
+| | The Relentless | Abilities return faster | **Headbutt** (shove + stagger, low cd) |
+| **Speedy** | The Agile (Slippery) | Control effects wear off 40% faster | ⏳ *pending — a Peck variant* |
+| | The Anxious (Featherfoot) | Immune to the pile-slow | ⏳ *pending — a Peck variant* |
+| **Fatty** | The Hauler (Hoarder) | Carries at least a full win's worth | ⏳ *pending — a Peck variant* |
+| | The Boulder (Bulwark) | Shorter control, 75% less knockback | **Ground Quake** (stomp roots the area) |
+| **Assassin** | The Reaper (Spoiler) | Banks a bonus if the clock expires with no winner | **Mark/Kill** (the execute, §6.4) |
+| | The Burglar (Thief) | Every steal takes 1.6x more | **Sneaky Steal** |
 
-Passives sit **outside the naked SCT** (the axiom is measured with none equipped), so
-cargo-changing passives (Hoarder, Bully) are legal.
+**Three signatures are still pending a `BalanceOracle` solve, not a design gap.**
+Slippery/Featherfoot/Hoarder each want a Peck *variant* (empty-beak rush, burst-fed,
+heavy-beakful) as their signature — `PeckAmount`/`PeckCooldown` feed Solo Clear Time
+directly, so these get solved against the Oracle rather than hand-tuned. Until they
+land, those three specializations grant their passive only.
 
----
+**Why Bully/Relentless and Reaper/Burglar are each amplified only by their own passive:**
+Bully makes Scrap's theft worth taking (bigger steal + room to carry it); Relentless
+makes Headbutt genuinely spammable. Neither signature is impressive under the *other*
+passive on purpose — that asymmetry is what makes the specialization choice read as a
+build, not a stat tweak.
+
+**Visual identity (per-specialization colour/model) is designed, not shipped.**
+`docs/design/class-essence-and-signatures.md` §"Visual identity" specifies Speedy's
+Agile/Anxious split concretely (upright-and-still vs. crouched-and-ruffled); concept
+art exists but needs regenerating in the shipped front-facing house style before
+`artist-3d`/`shader-artist` can build it.
 
 ## 6. Interaction & Control System
 
@@ -458,8 +473,10 @@ passives like Slippery can target one without the others.
 
 ### 6.4 The Assassin execute (the only hard removal)
 
-**One locked signature slot, one button, two presses.** This is why the Assassin's Combo
-gives a 3rd slot — one is spent on Mark/Kill, two are his to build with.
+**One button, two presses.** Mark/Kill is the **Reaper** specialization's forced
+signature (§5.3/§7.1) — choosing Reaper equips it automatically in one of the four
+active slots, leaving three to build with. The Burglar specialization does not carry
+it at all, and cannot execute.
 
 | Stage | Condition | Counterplay |
 |---|---|---|
@@ -480,40 +497,80 @@ counterplay reachable.
 
 ### 7.1 Rules
 
-- Loadout = **1 mandatory class passive + N freely-chosen active abilities**, where **N = 2**
-  normally and **N = 3** for the **Assassin** under the **Combo** passive (one of the 3 is the
-  **locked Mark/Kill**).
-- **Common** abilities are open to every class; **Character** abilities are gated by a
-  per-class mask (`AbilityBaseSO.SlotKind` + `AllowedClasses`).
-- **The Common slot is optional, not mandatory** — a player may fill their N active slots
-  with any mix of Common and class-legal Character abilities, including zero Common ones
-  (bounded only by the pool actually having 3 Common abilities to pick from). This is a
-  **deliberate, explicit design reversal of an earlier "1 mandatory Common" rule** (2026-07-27
-  directive) — **the current stance, at least for now**, and may be revisited later.
+- **Loadout = 1 mandatory specialization (its passive) + 4 active ability slots, always
+  4, for every class.** There is no separate "passive slot" outside the specialization
+  choice — no class has 5 buttons.
+- Two of the four active slots are **forced**, not freely chosen, by two independent rules:
+  1. **Peck is force-equipped for every class that can forage** (Warrior, Speedy, Fatty —
+     `AllowedClasses` on `Peck.asset` excludes the Assassin outright, GDD §2). The
+     Assassin never gets it under any circumstance.
+  2. **The chosen specialization's signature ability, if it has one, is force-equipped**
+     (§5.3). If that signature is itself a Peck *variant*, it **replaces** plain Peck
+     rather than taking a second slot — a forager never loses two slots to two different
+     versions of the same job. A non-Peck signature (Scrap, Headbutt, Ground Quake,
+     Mark/Kill, Sneaky Steal) costs a slot on top of Peck.
+  This is why slot pressure differs by class today: a forager whose specialization has
+  **no** signature yet (all three pending Peck variants, §5.3) only loses 1 of 4 slots
+  and picks 3; a forager whose specialization has a non-Peck signature loses 2 and picks
+  2; the Assassin, which never has Peck to lose, picks 3 either way.
+- **Common** abilities are open to every class that is allowed to equip them; **Character**
+  abilities are gated by a per-class mask (`AbilityBaseSO.SlotKind` + `AllowedClasses`).
+  **The Common pool is now exactly two abilities: Egg Shell (every class) and Peck
+  (Warrior/Speedy/Fatty).** It used to also hold Speed Burst and Snatch — both turned out
+  to be class essences hiding in the shared pool (Speed Burst is Speedy's whole "fastest
+  in the game" claim; Snatch is an AoE steal, which is the Assassin's entire income) and
+  were moved to their own class. **A Character ability belongs to exactly one class, full
+  stop** — sharing is expressed only by the Common slot now, never by a wider
+  `AllowedClasses` mask on a Character ability (`docs/design/class-essence-and-signatures.md`
+  §1). `BalanceEditorWindow`'s roster-integrity panel reports any violation live.
 - Every ability is balanced against the others — monetization must never be pay-to-win.
 
-### 7.2 The pool
+### 7.2 The pool — 29 abilities, one class each (except Common)
 
-| Category | Ability | Class(es) | Targeting | Effect |
-|---|---|---|---|---|
-| **Common** | Peck 🐦 | all | AoE-self | Steal a little from nearby rivals + minor knockback |
-| | Egg Shell 🥚 | all | self | Invulnerable egg, immobile while active |
-| | Speed Burst 💨 | all | self | Short speed boost |
-| **Speedy** | Feather Aura 💨 | Speedy | AoE-self | Slow nearby rivals |
-| | Feather Trap 🪤 | Speedy | zone-at-feet | Slow zone left behind |
-| | Invisibility 👻 | Speedy + Assassin | self | Temporarily invisible |
-| **Fatty** | Roll & Push 🌀 | Fatty | directional (Barge) | Barge forward, knockback |
-| | Root Egg 🌱 | Fatty | zone-at-feet | Roots the first rival to step on it |
-| | Cluck Shock ⚡ | Fatty | AoE-self | Knockback shockwave — shove the swarm off |
-| | Turtle Mode 🐢 | Fatty | self | Near-zero speed, heavy control resistance |
-| **Warrior** | Flying Peck 🪽 | Warrior | directional (Vault) | Vault-dash, steal on contact |
-| | Wing Slam 💥 | Warrior | AoE-self | 1.5 s stun |
-| | Spine Coat 🦔 | Warrior | self-aura | Steal back + knockback anyone who touches you |
-| **Assassin** | Mark/Kill 🎯 🔒 | Assassin | single-target | The execute (§6.4) — locked signature slot |
-| | Ambush 🗡️ | Assassin | AoE-self | 1.0 s stun (sets up his own execute) |
-| | Sneaky Steal 🤏 | Assassin | AoE-self | Baseline rob |
-| | Shadowstep 👤 | Assassin | directional (Blink) | Short blink dash over walls |
-| | Doppelganger 👥 | Assassin | self (Blink) | Decoy copy |
+Rebuilt 2026-08-23/24: abilities used to be shared across classes to widen loadout
+pools, which cost the thing that makes a 4-player FFA readable — you could not tell
+what a chicken was by what it did (`docs/design/class-essence-and-signatures.md` §1).
+**A Character ability now belongs to exactly one class.** Cooldowns below are the
+shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
+
+| | Ability | Cooldown | Effect |
+|---|---|---|---|
+| **Common** | Peck 🐦 | 0.8 s | Take a beakful from the pile you're standing on. Forced for every forager (§7.1). |
+| | Egg Shell 🥚 | 8 s | Seals you in an egg — invulnerable, immobile. |
+| **Warrior** | Cluck Shock ⚡ | 7 s | Knockback shockwave, shoves the swarm off. |
+| | Dive Bomb 🪽 | 6 s | Diving lunge, robs cargo on contact. |
+| | Headbutt 🐏 *(Relentless signature)* | 4 s | Short shove + brief stagger — deliberately weaker than Cluck Shock; the shortest cooldown pays for it. |
+| | Ruffle 💨 | 5 s | Short pace burst — deliberately weaker than Speed Burst; no traversal, ground only. |
+| | Scrap 🪝 *(Bully signature)* | 5 s | Grabs cargo off the nearest carrier — deliberately weaker than Sneaky Steal. |
+| | Wing Slam 💥 | 12 s | Ground slam, 1.5 s stun. ⚠️ Longest cooldown in the game, on the class whose essence is spamming — flagged for re-tuning, see §11. |
+| **Speedy** | Dust Kick 🌫️ | 6 s | Kicks dust **backwards** — the one cone in the game that fires away from facing, so fleeing is the play. |
+| | Feather Aura 💨 | 7 s | Slows every rival within 3 m for the cloud's lifetime. |
+| | Feather Trap 🪤 | 7 s | Feather cloud thrown ahead; crossing it slows for 5 s. |
+| | Feint ↔️ | 5 s | Hard sidestep, delivered as a knockback impulse — walls still stop it, unlike a blink. |
+| | Quick Drop 💰 | 12 s | Dumps the whole beakful at the base in one motion. Retired as a passive (was worth ~27% of Speedy's SCT for free); now an ability, so the tempo costs a slot. |
+| | Speed Burst 💨 *(moved from Common)* | 6 s | 2.5x movement speed. Speedy-only now — a universal sprint erased the "fastest in the game" claim. |
+| **Fatty** | Belly Flop 🫃 | 10 s | Launches his mass forward, lands with an AoE stun — the justified jump: long telegraph, shortest jump tier, payoff on landing not travel. |
+| | Ground Quake 🌋 *(Bulwark signature)* | 9 s | Stomp roots everyone nearby — reachable pre-emptively while guarding, not just as a Retreat reflex. |
+| | Immovable 🧱 | 12 s | Immunity (not resistance) to stun/root/slow/knockback for the duration. Does not clear control already on him — spent in anticipation, not as an escape. |
+| | Roll & Push 🌀 | 3 s | Rolls forward at double speed, shoves chickens from the path. |
+| | Root Egg 🌱 | 7 s | Drops an egg; the first chicken to step on it roots for 2 s. |
+| | Spine Coat 🦔 | 8 s | Steals cargo back from and knocks away anyone who hits you. |
+| | Turtle Mode 🐢 | 8 s | Heavy control resistance at quarter speed. |
+| **Assassin** | Ambush 🗡️ | 10 s | AoE stun — sets up his own execute. |
+| | Doppelganger 👥 | 11 s | Decoy copy that soaks attacks. |
+| | Invisibility 👻 | 8 s | Fades to a ghostly outline for 4 s (Assassin-only now — was also Speedy). |
+| | Mark/Kill 🎯 *(Reaper signature)* | 5 s | The execute — see §6.4. |
+| | Shadowstep 👤 | 6 s | Short blink dash, phases over walls (Assassin-only — was briefly also Speedy by asset drift, corrected; Speedy is permanently denied all terrain traversal, §5.2). |
+| | Smoke Roost 🌁 | 11 s | Cloud at his own feet — he fades, everyone else in it slows. Pairs with Mark/Kill's isolate-and-execute. |
+| | Snatch 🤏 *(moved from Common)* | 3 s | Robs cargo from every rival in a forward arc. Assassin-only now — a universal AoE steal is exactly the Assassin's core, and diluted the class. |
+| | Sneaky Steal 🤏 *(Thief signature)* | 5 s | Yanks cargo from the nearest carrier within 3 m. |
+
+**Known stale flavor text, not yet corrected:** Turtle Mode's and Roll & Push's
+descriptions still say "damage" (`Assets/_Game/Data/Abilities/*.asset`), left over from
+the pre-0.4 combat model this GDD's §5.1/§6 explicitly retired ("no HP, no Resistance,
+no damage"). The mechanics are correct (control resistance / no-op shove); only the
+copy needs a pass — see `docs/design/class-essence-and-signatures.md` for narrative
+follow-ups.
 
 Zones (Feather Trap, Root Egg) drop **at the caster's feet** and never affect their own
 caster — "lay it as you flee."
@@ -562,9 +619,10 @@ Seasonal content is post-demo, contingent on success.
 - **Mobile-first**, all inputs work on touchscreen.
 - **Movement:** left-thumb virtual joystick (also sets facing, which aims directional
   abilities and the Mark soft-lock).
-- **Abilities:** right-thumb buttons — 2 for most classes, 3 for Assassin. The Mark/Kill
-  button is **two-press**: first press marks, and it re-labels to **KILL** when the target
-  qualifies.
+- **Abilities:** right-thumb buttons — **4 for every class** (§7.1). 1-2 are forced by
+  foraging/your specialization's signature; the rest are freely chosen. The Mark/Kill
+  button (Reaper only) is **two-press**: first press marks, and it re-labels to **KILL**
+  when the target qualifies.
 - **Collecting:** passive — stand on a pile, cargo fills at Collection Rate.
 - **Cooldowns:** bottom-up clip + seconds remaining. Ability buttons must feel responsive.
 - Class silhouettes must read instantly in the isometric view.
@@ -666,7 +724,9 @@ Pressing a refused button **shakes it and clicks** — a press is never silently
 | # | Item | Status |
 |---|---|---|
 | 1 | Per-ability values (steal/stun/slow/cooldown/radius) | Tuning against Oracle + playtest |
-| 2 | **Passive pools reimplementation** (§5.3) | Designed, not yet in code |
+| 2 | ~~Passive pools reimplementation~~ **Specializations** (§5.3) | **Shipped.** 5 of 8 signatures assigned; 3 await a `BalanceOracle` solve (Peck variants) |
+| 2a | Wing Slam's cd 12 contradicts Warrior's "spams abilities" essence | Flagged, needs re-tuning |
+| 2b | Specialization visual identity (per-spec colour/model) | Designed (§5.3), concepts need regenerating in the shipped house style |
 | 3 | **Last-15 s endgame rule** | Deferred until base loop is fun; 3 candidates parked (Open Bases / center-collapse / Golden Egg) |
 | 4 | Currency earn formula | TBD |
 | 5 | Pile-slow / collision-slow magnitudes | Tuning |
