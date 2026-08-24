@@ -1029,7 +1029,7 @@ namespace CluckWars.UI
                 if (isSolo)
                 {
                     var bc = BotClasses[i - 1];
-                    grid.Add(MakeLobbyCard(i, bc, BotNames[i - 1], false, true, ready: true, abilities: SampleBotAbilities(i), empty: false, slots: 2));
+                    grid.Add(MakeLobbyCard(i, bc, BotNames[i - 1], false, true, ready: true, abilities: SampleBotAbilities(bc, i), empty: false, slots: ActiveSlotsForClass));
                 }
                 else
                 {
@@ -1038,15 +1038,44 @@ namespace CluckWars.UI
             }
         }
 
-        private List<AbilityBaseSO> SampleBotAbilities(int seed)
+        /// <summary>
+        /// Cosmetic loadout preview for a lobby-only CPU card. NOT what the bot actually spawns
+        /// with — that is a randomly-rolled preset resolved by
+        /// <c>MatchBootstrapper.ResolveLegalLoadout</c> once <c>Game.unity</c> loads, and this
+        /// screen (<c>Bootstrap.unity</c>) has no access to that component or its scene-baked
+        /// presets to preview exactly. What it must still get right is the shape of a real
+        /// loadout: <see cref="ActiveSlotsForClass"/> abilities, every one legal for
+        /// <paramref name="cls"/>, Peck present iff the class can forage.
+        /// </summary>
+        /// <remarks>
+        /// Previously indexed into <c>_abilityRegistry.All</c> unfiltered by class and capped
+        /// at a hardcoded 2 — so a bot preview could show another class's ability, and every
+        /// bot card read as carrying half the abilities the human player's card showed for the
+        /// same four slots. Verified live 2026-08-23: a solo lobby with Warrior (4 icons) next
+        /// to Speedy/Fatty/Assassin bots (2 icons each).
+        /// </remarks>
+        private List<AbilityBaseSO> SampleBotAbilities(ChickenClass cls, int seed)
         {
-            var list = new List<AbilityBaseSO>();
-            var pool = _abilityRegistry?.All;
-            if (pool == null) return list;
-            var valid = pool.Where(a => a != null).ToList();
-            if (valid.Count == 0) return list;
-            list.Add(valid[(seed * 2) % valid.Count]);
-            list.Add(valid[(seed * 2 + 1) % valid.Count]);
+            var list = new List<AbilityBaseSO>(ActiveSlotsForClass);
+            if (_abilityRegistry == null) return list;
+
+            var peck = PeckAbility;
+            if (peck != null && AbilityRegistrySO.IsAllowedFor(peck, cls))
+                list.Add(peck);
+
+            // Class pool first, Common as backfill — mirrors ResolveLegalLoadout's own
+            // priority order (a real loadout is never short on Character slots while Common
+            // sits unused). Rotated by seed so DashFox/BrunoB/PeckNoir don't all show the
+            // same three abilities from the front of each list.
+            var pool = _abilityRegistry.GetCharacterAbilitiesForClass(cls)
+                .Concat(_abilityRegistry.CommonAbilities.Where(a => a != peck))
+                .ToList();
+
+            for (int i = 0; i < pool.Count && list.Count < ActiveSlotsForClass; i++)
+            {
+                var a = pool[(seed + i) % pool.Count];
+                if (!list.Contains(a)) list.Add(a);
+            }
             return list;
         }
 
