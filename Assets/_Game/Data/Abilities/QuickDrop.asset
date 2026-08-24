@@ -22,7 +22,7 @@ MonoBehaviour:
   JumpTier: 0
   SlotKind: 1
   AllowedClasses: 2
-  BotRole: 6
+  BotRole: 7
   Duration: 2
   Cooldown: 12
   AbilityAnimationClip: {fileID: 0}

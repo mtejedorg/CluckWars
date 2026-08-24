@@ -416,6 +416,21 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
+        /// The cooldown <paramref name="slot"/> will actually charge this chicken if fired
+        /// now — the ability's per-caster value with the class specialization applied
+        /// (Relentless). 0 for an empty slot.
+        /// </summary>
+        /// <remarks>
+        /// Exposed for <c>BotTactics.ScoreCastCandidate</c>, which breaks ties inside one
+        /// <see cref="BotRole"/> by preferring the cheaper tool. It has to be the
+        /// <i>resolved</i> value rather than <c>AbilityBaseSO.Cooldown</c>: a Relentless
+        /// Warrior's Wing Slam is materially cheaper than the authored number, and ranking
+        /// on the raw field would have the bot avoid the very ability its specialization
+        /// exists to make spammable.
+        /// </remarks>
+        public float ResolvedCooldownFor(int slot) => ResolveCooldownFor(GetSlot(slot));
+
+        /// <summary>
         /// Assigns ability assets before <see cref="Spawned"/> runs.
         /// Called by <see cref="MatchBootstrapper"/> inside the <c>onBeforeSpawned</c>
         /// callback so every peer already has the chosen abilities on first <c>Spawned</c>

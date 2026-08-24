@@ -34,7 +34,14 @@ namespace CluckWars.Abilities
             Category = AbilityCategory.Utility;
             SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Speedy;
-            BotRole = BotRole.Forage;
+            // Bank, NOT Forage. It was Forage until 2026-08-23 and that quietly cost the
+            // Speedy bot its entire income: BotController fires the Forage role while parked
+            // at a pile, and TryGetReadySlotForRole returned the FIRST matching slot — so a
+            // Speedy holding both Quick Drop and Peck burned a 12 s deposit-rate cooldown at
+            // the pile, did nothing, and never pecked at all when Quick Drop sat in the lower
+            // slot. Bank is fired at the base, which is the only place this ability does
+            // anything.
+            BotRole = BotRole.Bank;
             Duration = 2f;
             Cooldown = 12f;
         }

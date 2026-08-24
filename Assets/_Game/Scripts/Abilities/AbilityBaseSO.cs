@@ -56,6 +56,7 @@ namespace CluckWars.Abilities
         Escape  = 4, // dash / blur away from danger
         Steal   = 5, // snatch cargo from a rival
         Forage  = 6, // take food from a pile (Peck). Appended - BotRole is byte-serialised in .asset files.
+        Bank    = 7, // accelerate the deposit at your own base (Quick Drop). Appended, same reason.
     }
 
     /// <summary>

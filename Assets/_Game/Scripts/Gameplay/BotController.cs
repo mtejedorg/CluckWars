@@ -9,26 +9,41 @@ namespace CluckWars.Gameplay
 {
     /// <summary>
     /// Ability-driven bot AI for solo mode. Runs only on the master client
-    /// (StateAuthority). Implements the Phase R-Bot design from ROADMAP.md:
-    /// a 5-tier decision priority that keeps the proven farm loop as its backbone
-    /// and layers Flee / Hunt states + ability use on top.
+    /// (StateAuthority). The FSM keeps the proven farm loop as its backbone and layers
+    /// per-class strategy, aimed casting and clock awareness on top.
     /// </summary>
     /// <remarks>
     /// <b>Decision priority (evaluated each throttled think tick):</b>
     /// <list type="number">
-    ///   <item><b>Flee</b> — loaded + rival nearby → rush to base, fire Defense/Escape/Control.</item>
-    ///   <item><b>Deposit</b> — cargo fraction ≥ <c>_returnThreshold</c> → return to base.</item>
-    ///   <item><b>Hunt</b> — rival loaded, in range → chase and fire Steal/Offense/Control.</item>
-    ///   <item><b>Collect</b> — walk to nearest pile; if rival contests, fire Control.</item>
+    ///   <item><b>Bank or lose it</b> — holding cargo with only just enough time to walk home.</item>
+    ///   <item><b>Retreat</b> — loaded + rival nearby → run home, casting the strategy's retreat plan.</item>
+    ///   <item><b>Deposit</b> — cargo ≥ the phase-adjusted return threshold → bank it.</item>
+    ///   <item><b>Hunt / Stalk</b> — the highest-<i>value</i> rival in reach, not the nearest one.</item>
+    ///   <item><b>Guard</b> — a Bunker whose own base is being approached goes home and holds it.</item>
+    ///   <item><b>Collect</b> — the cheapest pile by round-trip cost; contest it if a rival is on it.</item>
     ///   <item><b>Idle</b> — nothing to do.</item>
     /// </list>
     ///
-    /// Per-class personality is tuned via <c>switch (_controller.Class)</c> in
-    /// <see cref="Spawned"/> — no separate code paths, just different numbers.
+    /// <b>Per-class behaviour lives in <see cref="BotTactics"/>, not here.</b> This class
+    /// never switches on <see cref="ChickenClass"/>; it reads one <see cref="BotProfile"/>
+    /// at spawn and asks <see cref="BotTactics"/> for every judgement call. That split is
+    /// what makes bot decisions EditMode-testable — see <c>BotTacticsTests</c>.
     ///
-    /// All expensive lookups (<c>FindObjectsByType</c>, <c>OverlapSphere</c>) stay
-    /// inside <c>Think()</c>, which runs at the throttled <c>_thinkInterval</c>
-    /// cadence (default 0.3s). Per-tick cost is only <c>Navigate()</c> steering.
+    /// <b>Three things changed on 2026-08-23 that are worth knowing before editing:</b>
+    /// <list type="bullet">
+    ///   <item><b>Bots aim.</b> A cast that is in reach but off-axis no longer fires into
+    ///   empty space; the bot spends the tick turning (<see cref="ChickenController.BotFace"/>)
+    ///   and fires on the next one. Before this every Cone and Capsule ability in the game
+    ///   was a coin flip on whatever heading the navmesh left behind.</item>
+    ///   <item><b>Reach is per-ability.</b> The old flat <c>_abilityRange = 4</c> was wrong
+    ///   for most of the roster in both directions.</item>
+    ///   <item><b>Casts are planned, not first-match.</b> A plan is a role preference list;
+    ///   inside one role the cheaper cooldown wins, so a Warrior stops opening every
+    ///   skirmish with its 12-second ability.</item>
+    /// </list>
+    ///
+    /// All expensive lookups stay inside <c>Think()</c>, which runs at the profile's
+    /// throttled cadence. Per-tick cost is only <c>Navigate()</c> steering.
     /// </remarks>
     [RequireComponent(typeof(ChickenController))]
     [RequireComponent(typeof(NetworkObject))]
@@ -36,13 +51,16 @@ namespace CluckWars.Gameplay
     {
         private const string Source = "Bot";
 
-        private enum BotState { Idle, CollectFood, ReturnToBase, Flee, Hunt }
+        /// <summary>
+        /// Shortest remaining leg that justifies spending a mobility cooldown to travel it.
+        /// Roughly one Speed Burst's worth of gain on the shipped arena; below it the burst
+        /// expires before it has saved anything.
+        /// </summary>
+        private const float MinSprintWorthDistance = 6f;
 
-        // ---- Serialized tunables (Warrior / baseline defaults) ----------------
+        private enum BotState { Idle, CollectFood, ReturnToBase, Flee, Hunt, Stalk, Guard, Search }
 
-        [Tooltip("Seconds between FSM re-evaluations. Lower = smarter, costlier.")]
-        [Min(0.05f)]
-        [SerializeField] private float _thinkInterval = 0.3f;
+        // ---- Serialized tunables (geometry only — behaviour comes from BotProfile) ----
 
         [Tooltip("Distance at which the bot considers itself 'arrived' at a target. Not used for piles — see _pileStandoff.")]
         [Min(0.1f)]
@@ -52,40 +70,13 @@ namespace CluckWars.Gameplay
         [Min(0.1f)]
         [SerializeField] private float _pileStandoff = 0.7f;
 
-        [Tooltip("Cargo fraction [0,1] at which the bot turns around to deposit.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float _returnThreshold = 0.70f;
-
-        [Tooltip("Cargo fraction at which the bot starts Flee (protect the haul).")]
-        [Range(0f, 1f)]
-        [SerializeField] private float _protectCargoThreshold = 0.40f;
-
-        [Tooltip("Radius within which a rival triggers the Flee state.")]
-        [Min(0f)]
-        [SerializeField] private float _dangerRadius = 5.0f;
-
-        [Tooltip("Radius within which the bot will try to Hunt a loaded rival.")]
-        [Min(0f)]
-        [SerializeField] private float _huntRadius = 8.0f;
-
-        [Tooltip("Rival cargo fraction required before the bot decides to Hunt.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float _huntCargoThreshold = 0.30f;
-
-        [Tooltip("Distance from the rival at which the bot fires an ability during Hunt.")]
-        [Min(0f)]
-        [SerializeField] private float _abilityRange = 4.0f;
-
-        [Tooltip("Aggressive classes pick fights with rivals even when the rival carries no cargo (creates skirmishes / pressure). Off = only hunt loaded rivals.")]
-        [SerializeField] private bool _engageUnloaded = false;
-
-        [Tooltip("Radius within which an _engageUnloaded bot will chase an unloaded rival to pressure them. Tighter than _huntRadius so they don't chase from across the map.")]
-        [Min(0f)]
-        [SerializeField] private float _engageRadius = 6.0f;
-
         [Tooltip("Hysteresis: radii grow by this factor while the matching state is active, so a rival hovering on the boundary can't flip the FSM every think tick (BOT-8).")]
         [Min(1f)]
         [SerializeField] private float _stateExitRadiusFactor = 1.35f;
+
+        [Tooltip("How far a stalking Predator keeps from its mark while waiting for a steal to come off cooldown, as a fraction of that ability's reach. Below 1 so it stays inside the pounce window; well above 0 so it isn't just standing on them being obvious.")]
+        [Range(0.3f, 1.2f)]
+        [SerializeField] private float _stalkStandoffFraction = 0.80f;
 
         // ---- Component references -------------------------------------------
 
@@ -95,6 +86,10 @@ namespace CluckWars.Gameplay
         private AbilityController _abilities;
         private ILogService       _log;
 
+        // ---- Strategy -------------------------------------------------------
+
+        private BotProfile _profile;
+
         // ---- FSM state ------------------------------------------------------
 
         private BotState   _state       = BotState.Idle;
@@ -102,6 +97,15 @@ namespace CluckWars.Gameplay
         private Vector3    _moveTarget;
         private PlayerBase _homeBase;
         private float      _nextThinkTime;
+
+        /// <summary>
+        /// Where the bot must be pointing before its chosen cast will land, or null when
+        /// nothing is waiting on facing. Set by <see cref="TryCast"/> when an ability is
+        /// ready and in reach but off-axis; consumed by <see cref="Navigate"/>, which
+        /// spends the tick turning instead of translating. Cleared at the top of every
+        /// <see cref="Think"/> so a stale intent can never freeze the bot in place.
+        /// </summary>
+        private Vector3? _faceIntent;
 
         /// <summary>
         /// The pile the bot is currently walking to, or null. Arrival at a pile is
@@ -116,10 +120,19 @@ namespace CluckWars.Gameplay
         private Vector3     _lastPathTarget = new Vector3(float.MinValue, 0f, float.MinValue);
         private int         _navCorner = -1;
 
-        // ---- Perceived rival (cached per think tick, used by ReactWithAbility) --
-        private ChickenController _perceivedRival;
-        private float             _perceivedRivalDist;
-        private float             _perceivedRivalCargo;
+        // ---- Perception (cached per think tick) -----------------------------
+
+        /// <summary>Nearest living rival, whatever they are carrying. Drives the danger check.</summary>
+        private ChickenController _nearestRival;
+        private float             _nearestRivalDist;
+
+        /// <summary>Highest-<see cref="BotTactics.TargetPriority"/> rival, or null. Drives Hunt.</summary>
+        private ChickenController _preyTarget;
+        private float             _preyDist;
+        private float             _preyCargo;
+
+        private MatchPhase _phase   = MatchPhase.Opening;
+        private bool       _leading;
 
         // ---- Injection ------------------------------------------------------
 
@@ -140,8 +153,20 @@ namespace CluckWars.Gameplay
             _cargo      = GetComponent<ChickenCargo>();
             _abilities  = GetComponent<AbilityController>();
 
+            _profile = BotTactics.ProfileFor(_controller != null ? _controller.Class : ChickenClass.Warrior);
+
+            // Stagger the first think so four bots spawned on the same tick do not all run
+            // their (allocating, O(chickens x bases)) perception pass on the same frame for
+            // the rest of the match. Keyed off the corner index rather than Random so a
+            // replayed match staggers identically.
+            int corner = _controller != null ? Mathf.Max(0, _controller.HomeCornerIndex) : 0;
+            _nextThinkTime = (float)Runner.SimulationTime + corner * (_profile.ThinkInterval * 0.25f);
+
             if (HasStateAuthority && _controller != null && _controller.IsBot)
-                ApplyClassPersonality();
+                _log?.Debug(Source, $"{_controller.Class} → {_profile.Strategy}: " +
+                    $"hunt={_profile.HuntRadius:0.0}, engage={_profile.EngageRadius:0.0}, " +
+                    $"guard={_profile.GuardRadius:0.0}, return={_profile.ReturnThreshold:P0}, " +
+                    $"roundTripBias={_profile.RoundTripBias:0.00}, leaderFocus={_profile.LeaderFocus:0.00}.");
 
             _log?.Debug(Source, $"Spawned. HasStateAuthority={HasStateAuthority}, " +
                 $"IsBot={(_controller != null ? _controller.IsBot.ToString() : "n/a")}.");
@@ -159,7 +184,7 @@ namespace CluckWars.Gameplay
 
             if (Runner.SimulationTime >= _nextThinkTime)
             {
-                _nextThinkTime = (float)Runner.SimulationTime + _thinkInterval;
+                _nextThinkTime = (float)Runner.SimulationTime + _profile.ThinkInterval;
                 Think();
             }
 
@@ -173,117 +198,155 @@ namespace CluckWars.Gameplay
             _prevState = _state;
 
             // Any decision below that isn't "go collect from that pile" invalidates the
-            // pile arrival rule; the collect branch re-arms it.
-            _pileGoal = null;
+            // pile arrival rule; the collect branch re-arms it. Same for the aim intent —
+            // it describes one specific pending cast and must not outlive the decision
+            // that produced it, or the bot stands turning toward a rival that left.
+            _pileGoal   = null;
+            _faceIntent = null;
 
-            // Perceive the nearest rival once per think tick (cheap scan).
-            _perceivedRival      = FindNearestRival(out _perceivedRivalDist, out _perceivedRivalCargo, requireCargo: false);
+            // Resolve home BEFORE perceiving: Perceive's leading check reads _homeBase, and
+            // on the very first think it would otherwise be null and report "not leading".
+            var homePos = GetHomeBasePosition();
 
+            Perceive();
+
+            float cargo         = _cargo != null ? _cargo.Cargo : 0f;
             float cargoFraction = _cargo != null ? _cargo.Fraction : 0f;
+            float distHome      = PlanarDistance(_controller.transform.position, homePos);
 
-            // Latch ReturnToBase until all cargo is deposited (IP1)
-            if (_state == BotState.ReturnToBase && _cargo != null && _cargo.Cargo > 0f)
+            // Priority 0: BANK OR LOSE IT. Cargo in the beak scores nothing when the timer
+            // expires, and on a 45 s match the window to walk home is small. This outranks
+            // everything, including a fight the bot is winning.
+            if (BotTactics.MustBankNow(cargo, distHome, EstimateMoveSpeed(),
+                                       MatchTimeRemaining(), EstimateDepositSeconds(cargo)))
             {
-                _moveTarget = GetHomeBasePosition();
+                EnterReturnToBase(homePos, "clock");
                 return;
             }
 
-            // Hysteresis (BOT-8): while already fleeing/hunting, the trigger radius
-            // grows so a rival hovering on the boundary can't flip the state every
-            // 0.3s think. Entering still uses the base radius.
-            float dangerR = _state == BotState.Flee ? _dangerRadius * _stateExitRadiusFactor : _dangerRadius;
-            float huntR   = _state == BotState.Hunt ? _huntRadius   * _stateExitRadiusFactor : _huntRadius;
+            // Latch ReturnToBase until all cargo is deposited (IP1). Fire the Bank plan
+            // once actually on the base — a deposit accelerator is worthless anywhere else,
+            // which is exactly why Quick Drop is BotRole.Bank and not Forage.
+            if (_state == BotState.ReturnToBase && cargo > 0f)
+            {
+                _moveTarget = homePos;
+                if (distHome <= HomeDepositRadius())
+                    TryCast(BotSituation.Banking, null);
+                else
+                    TryGuardOverlay();
+                return;
+            }
 
-            // Priority 1: FLEE — loaded + rival within danger radius.
-            if (cargoFraction >= _protectCargoThreshold &&
-                _perceivedRival != null && _perceivedRivalDist <= dangerR)
+            // Hysteresis (BOT-8): while already fleeing/hunting, the trigger radius grows so
+            // a rival hovering on the boundary can't flip the state every think tick.
+            float dangerR = _state == BotState.Flee ? _profile.DangerRadius * _stateExitRadiusFactor
+                                                    : _profile.DangerRadius;
+
+            // Priority 1: RETREAT — loaded, and something is close enough to take it.
+            if (cargoFraction >= _profile.ProtectCargoThreshold &&
+                _nearestRival != null && _nearestRivalDist <= dangerR)
             {
                 _state      = BotState.Flee;
-                _moveTarget = GetHomeBasePosition();
-                ReactWithAbility(new[] { BotRole.Defense, BotRole.Escape, BotRole.Control },
-                    alwaysFireIfReady: true);
+                _moveTarget = homePos;
+                TryCast(BotSituation.Retreating, _nearestRival);
 
                 if (_state != _prevState)
-                    _log?.Debug(Source, $"→ Flee (cargo={cargoFraction:P0}, rival dist={_perceivedRivalDist:0.0}).");
+                    _log?.Debug(Source, $"→ Flee (cargo={cargoFraction:P0}, rival dist={_nearestRivalDist:0.0}).");
                 return;
             }
 
-            // Priority 2: DEPOSIT — cargo full enough to bank.
-            if (cargoFraction >= _returnThreshold)
+            // Priority 2: DEPOSIT — enough banked-in-beak to be worth the walk. The
+            // threshold moves with the clock and the scoreboard: a leader in the endgame
+            // banks early and stops being a target, a trailing bot holds a bigger load.
+            if (cargoFraction >= BotTactics.ReturnThreshold(_profile, _phase, _leading))
             {
-                _state      = BotState.ReturnToBase;
-                _moveTarget = GetHomeBasePosition();
-                if (_state != _prevState)
-                    _log?.Debug(Source, $"→ ReturnToBase (cargo={cargoFraction:P0}).");
+                EnterReturnToBase(homePos, $"cargo={cargoFraction:P0}");
                 return;
             }
 
-            // Priority 3: HUNT — a loaded rival anywhere in hunt radius, OR (aggressive
-            // class) ANY rival inside the tighter engage radius even unloaded → pick a
-            // fight. The latter is what makes the player feel pressured instead of left
-            // to farm in peace. The nearest rival may be empty while a loaded one stands
-            // a little further away — re-scan with requireCargo before giving up.
-            if (_huntRadius > 0f || _engageUnloaded)
+            // Priority 3: HUNT / STALK — the most VALUABLE rival in reach, which is very
+            // often not the nearest one. Empty-handed rivals are only worth attacking
+            // inside the tighter engage radius, and only for strategies that skirmish.
+            if (_preyTarget != null && TryEngage())
+                return;
+
+            // Priority 4: GUARD — a Bunker whose own base is being approached goes home and
+            // holds it. This is the only state that treats territory as worth defending;
+            // for every other strategy the base is just a drop-off.
+            if (_profile.Strategy == BotStrategy.Bunker && _profile.GuardRadius > 0f &&
+                _nearestRival != null &&
+                PlanarDistance(_nearestRival.transform.position, homePos) <= _profile.GuardRadius)
             {
-                var target     = _perceivedRival;
-                var targetDist = _perceivedRivalDist;
-                var targetCargo = _perceivedRivalCargo;
-                if (target == null || targetCargo < _huntCargoThreshold)
-                    target = FindNearestRival(out targetDist, out targetCargo, requireCargo: true);
+                _state      = BotState.Guard;
+                _moveTarget = homePos;
+                TryCast(BotSituation.Guarding, _nearestRival);
 
-                bool loadedHunt = target != null && targetDist <= huntR && targetCargo >= _huntCargoThreshold;
+                if (_state != _prevState)
+                    _log?.Debug(Source, "→ Guard (rival closing on own base).");
+                return;
+            }
 
-                // Aggressive engage: chase the nearest rival (loaded or not) when close.
-                bool aggroEngage = false;
-                if (!loadedHunt && _engageUnloaded && _perceivedRival != null)
+            // Priority 5: SEARCH — Predator-only. Cannot forage at all (Peck excludes it,
+            // GDD 2 / class-essence-and-signatures.md 2: "the only class that cannot forage
+            // ... it eats what others carried"), so having no prey in HuntRadius must NOT
+            // fall through to the forager's pile-collection priority below. Maestro,
+            // 2026-08-24: "between kills, the assassin will search for new targets and chase
+            // other chickens to steal cargo from" — walk toward whatever rival is nearest
+            // (tracked unconditionally every tick, no radius cap, see the perception loop)
+            // until it enters HuntRadius, at which point Priority 3 above takes over and
+            // TargetPriority's leaderFocus-weighted scoring resumes doing the actual
+            // target-choosing. This priority only ever has to close distance, never choose
+            // between rivals, which is why it can use the cheap unscored _nearestRival
+            // instead of re-running TargetPriority past preyRadius.
+            if (_profile.Strategy == BotStrategy.Predator)
+            {
+                if (_nearestRival != null)
                 {
-                    float engageR = _state == BotState.Hunt ? _engageRadius * _stateExitRadiusFactor : _engageRadius;
-                    if (_perceivedRivalDist <= engageR)
-                    {
-                        target = _perceivedRival; targetDist = _perceivedRivalDist; targetCargo = _perceivedRivalCargo;
-                        aggroEngage = true;
-                    }
-                }
-
-                if (loadedHunt || aggroEngage)
-                {
-                    _state      = BotState.Hunt;
-                    _moveTarget = target.transform.position;
-                    if (targetDist <= _abilityRange)
-                        ReactWithAbility(aggroEngage
-                                ? new[] { BotRole.Offense, BotRole.Control, BotRole.Steal }   // empty target: hurt/pin
-                                : new[] { BotRole.Steal, BotRole.Offense, BotRole.Control },  // loaded target: rob first
-                            alwaysFireIfReady: false);
+                    _state      = BotState.Search;
+                    _moveTarget = _nearestRival.transform.position;
 
                     if (_state != _prevState)
-                        _log?.Debug(Source, $"→ Hunt rival at dist={targetDist:0.0}, cargo={targetCargo:P0}.");
+                        _log?.Debug(Source, $"→ Search (nearest rival {_nearestRivalDist:0.0}m, " +
+                            $"outside hunt band {_profile.HuntRadius:0.0}m).");
                     return;
                 }
+
+                // Nobody left alive to hunt (last-chicken-standing edge case). Nothing a
+                // Predator can legally do — it must not wander to a pile it cannot use.
+                _state = BotState.Idle;
+                if (_state != _prevState)
+                    _log?.Debug(Source, "→ Idle (Predator, no rival anywhere to search for).");
+                return;
             }
 
-            // Priority 4: COLLECT — nearest non-empty pile. Ground pickups are gone:
-            // nothing drops food on the floor any more, so a pile is the only target.
-            // whichever is closer. Pickups matter most right after a hunt: the
-            // stunned victim's dropped cargo is usually at the bot's feet.
-            var selfPos = _controller.transform.position;
-            var pile   = FindNearestPile(out float pileDist);
+            // Priority 6: COLLECT — the cheapest pile by round-trip cost. Ground pickups are
+            // gone: nothing drops food on the floor any more, so a pile is the only target.
+            var pile = SelectPile(homePos, out float pileDist);
             if (pile != null)
             {
-                _state      = BotState.CollectFood;
+                _state = BotState.CollectFood;
                 // Steer to the pile's rim, not its centre: the centre of a stocked pile is
-                // inside a solid blocker, and on a 7×4 island that is 3.5 m of wall the bot
+                // inside a solid blocker, and on a 7x4 island that is 3.5 m of wall the bot
                 // would grind against forever without ever collecting.
                 _pileGoal   = pile;
-                _moveTarget = pile.SurfaceApproachPoint(selfPos, _pileStandoff);
+                _moveTarget = pile.SurfaceApproachPoint(_controller.transform.position, _pileStandoff);
 
-                // If a rival is contesting the same pile (and we're close enough for
-                // the ability to actually land), try to displace them. Contest is measured
-                // to the pile's SURFACE — a centre-distance threshold is never satisfied
-                // once the pile is wider than the threshold itself.
-                if (_perceivedRival != null && _perceivedRivalDist <= _abilityRange)
+                // A rival on the pile we want is a Contest — measured to the pile's SURFACE,
+                // because a centre-distance threshold is never satisfied once the pile is
+                // wider than the threshold itself.
+                bool contested = _nearestRival != null &&
+                                 pile.DistanceToSurface(_nearestRival.transform.position) < _arrivalRadius;
+
+                if (contested)
                 {
-                    if (pile.DistanceToSurface(_perceivedRival.transform.position) < _arrivalRadius)
-                        ReactWithAbility(new[] { BotRole.Control }, alwaysFireIfReady: false);
+                    TryCast(BotSituation.Contesting, _nearestRival);
+                }
+                else if (!TryGuardOverlay() && pileDist >= MinSprintWorthDistance)
+                {
+                    // Only sprint when there is actually road left to cover. A Runner that
+                    // fires Speed Burst two metres from the pile it is already standing next
+                    // to spends the cooldown for nothing and has none left for the haul home.
+                    TryCast(BotSituation.Transiting, null);
                 }
 
                 if (_state != _prevState)
@@ -291,32 +354,206 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            // Priority 5: IDLE.
+            // Priority 7: IDLE.
             _state = BotState.Idle;
             if (_state != _prevState)
                 _log?.Debug(Source, "→ Idle (no piles found).");
         }
 
-        // ---- Ability reaction -----------------------------------------------
+        private void EnterReturnToBase(Vector3 homePos, string why)
+        {
+            _state      = BotState.ReturnToBase;
+            _moveTarget = homePos;
+            if (_state != _prevState)
+                _log?.Debug(Source, $"→ ReturnToBase ({why}).");
+        }
 
         /// <summary>
-        /// Tries each <paramref name="rolePreferences"/> in order; fires the first
-        /// ready slot that matches. Does nothing if no match or ability already active.
+        /// Commits to the chosen prey when it is worth attacking, returning true if the FSM
+        /// settled into Hunt or Stalk this tick.
         /// </summary>
-        private void ReactWithAbility(BotRole[] rolePreferences, bool alwaysFireIfReady)
+        /// <remarks>
+        /// <b>Stalk is the Predator's answer to a problem every other bot still has:</b>
+        /// what to do while standing next to a rival with the steal on cooldown. Walking
+        /// onto them and waiting is how a bot gets Cluck Shocked for free. A stalking
+        /// Assassin instead holds at a fraction of its steal's reach — inside the pounce
+        /// window, outside most retaliation — until the ability comes back.
+        /// </remarks>
+        private bool TryEngage()
         {
-            if (_abilities == null) return;
-            foreach (var role in rolePreferences)
+            bool loaded  = _preyCargo >= _profile.HuntCargoThreshold;
+            bool hunting = _state == BotState.Hunt || _state == BotState.Stalk;
+            float exit   = hunting ? _stateExitRadiusFactor : 1f;
+
+            bool inHuntBand   = loaded && _preyDist <= _profile.HuntRadius * exit;
+            bool inEngageBand = !loaded && _profile.EngageRadius > 0f &&
+                                _preyDist <= _profile.EngageRadius * exit;
+
+            if (!inHuntBand && !inEngageBand) return false;
+
+            // Cast first: the answer decides whether this is a Hunt (close and commit) or a
+            // Stalk (hold the pounce distance while the tool recharges).
+            bool fired    = TryCast(BotSituation.Engaging, _preyTarget);
+            float standoff = _profile.Strategy == BotStrategy.Predator && !fired
+                ? StalkStandoff()
+                : 0f;
+
+            _state = standoff > 0f ? BotState.Stalk : BotState.Hunt;
+
+            var preyPos = _preyTarget.transform.position;
+            if (standoff > 0f && _preyDist > 0.01f)
             {
-                if (_abilities.TryGetReadySlotForRole(role, out int slot))
-                {
-                    if (_abilities.BotTryActivate(slot))
-                    {
-                        _log?.Debug(Source, $"ReactWithAbility: fired slot {slot} (role={role}).");
-                        return;
-                    }
-                }
+                var away = (_controller.transform.position - preyPos);
+                away.y = 0f;
+                _moveTarget = preyPos + away.normalized * standoff;
             }
+            else
+            {
+                _moveTarget = preyPos;
+            }
+
+            if (_state != _prevState)
+                _log?.Debug(Source, $"→ {_state} prey dist={_preyDist:0.0}, cargo={_preyCargo:P0}.");
+            return true;
+        }
+
+        /// <summary>
+        /// Distance a stalking Predator holds: a fraction of the reach of the longest steal
+        /// tool it owns, so the pounce is one step away. 0 when it owns no steal at all, in
+        /// which case there is nothing to wait for and it should just commit.
+        /// </summary>
+        private float StalkStandoff()
+        {
+            if (_abilities == null) return 0f;
+            float best = 0f;
+            for (int i = 0; i < _abilities.EquippedSlotCount; i++)
+            {
+                var ability = _abilities.GetSlot(i);
+                if (ability == null || ability.ResolveBotRole() != BotRole.Steal) continue;
+                float reach = BotTactics.EffectiveReach(ability);
+                if (!float.IsPositiveInfinity(reach) && reach > best) best = reach;
+            }
+            return best * _stalkStandoffFraction;
+        }
+
+        /// <summary>
+        /// A Guarding strategy punishes anything that comes near whatever it is doing,
+        /// without abandoning it. Returns true if a cast fired.
+        /// </summary>
+        /// <remarks>
+        /// This overlay is why the Fatty has a control kit at all. Its profile deliberately
+        /// never chases (<c>HuntRadius = 0</c>), and with only the old Hunt path to reach
+        /// them, Belly Flop, Ground Quake and Roll Push were unreachable for the entire
+        /// class — authored, registered, balance-tuned and impossible for a bot to fire.
+        /// </remarks>
+        private bool TryGuardOverlay()
+        {
+            if (_profile.GuardRadius <= 0f) return false;
+            if (_nearestRival == null || _nearestRivalDist > _profile.GuardRadius) return false;
+            return TryCast(BotSituation.Guarding, _nearestRival);
+        }
+
+        // ---- Casting --------------------------------------------------------
+
+        /// <summary>
+        /// Picks and fires the best ability for <paramref name="situation"/> against
+        /// <paramref name="target"/>. Returns true only when something actually fired.
+        /// </summary>
+        /// <remarks>
+        /// The gates, in the order they are applied and why each one exists:
+        /// <list type="number">
+        ///   <item><b>In the plan.</b> <see cref="BotTactics.CastPlan"/> decides which roles
+        ///   are appropriate here; anything else is skipped rather than fired "because it
+        ///   was ready".</item>
+        ///   <item><b>Usable.</b> <see cref="AbilityBaseSO.IsUsable"/> is the same gate the
+        ///   player's button grey-out uses, so a bot cannot burn a cooldown on a cast the
+        ///   HUD would have refused.</item>
+        ///   <item><b>In reach.</b> Per-ability, from the declared aim shape, at
+        ///   <see cref="BotTactics.CommitReachFraction"/> so the target does not stroll out
+        ///   of the shape during the wind-up.</item>
+        ///   <item><b>Aimed.</b> Off-axis does not cancel the cast — it records a
+        ///   <see cref="_faceIntent"/> so <see cref="Navigate"/> turns this tick and the
+        ///   next think fires it pointed the right way.</item>
+        ///   <item><b>Actually lands.</b> For an ability that declares it does nothing
+        ///   without a target (<see cref="AbilityBaseSO.RequiresEnemyInRange"/>), the final
+        ///   confirmation is <see cref="AbilityBaseSO.WouldAffect"/> — the identical
+        ///   predicate the telegraph and <c>OnActivate</c> use, so the bot cannot disagree
+        ///   with the game about whether a hit was possible.</item>
+        /// </list>
+        /// </remarks>
+        private bool TryCast(BotSituation situation, ChickenController target)
+        {
+            if (_abilities == null) return false;
+
+            var plan = BotTactics.CastPlan(_profile.Strategy, situation,
+                                           targetIsLoaded: _preyCargo > 0f && target == _preyTarget);
+            if (plan.Length == 0) return false;
+
+            var  selfPos    = _controller.transform.position;
+            var  forward    = _controller.transform.forward;
+            bool haveTarget = target != null;
+            var  toTarget   = haveTarget ? target.transform.position - selfPos : Vector3.zero;
+            float targetDist = haveTarget ? PlanarDistance(selfPos, target.transform.position) : 0f;
+
+            int   bestSlot  = AbilityController.InvalidSlot;
+            float bestScore = float.MaxValue;
+
+            for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
+            {
+                var ability = _abilities.GetSlot(slot);
+                if (ability == null || !_abilities.IsReady(slot)) continue;
+
+                int priority = IndexInPlan(plan, ability.ResolveBotRole());
+                if (priority < 0) continue;
+
+                if (!ability.IsUsable(_controller)) continue;
+
+                float reach = BotTactics.EffectiveReach(ability);
+                if (!float.IsPositiveInfinity(reach))
+                {
+                    // A reach-having ability with nobody to point it at is a whiff by
+                    // construction — unless it places a zone, which is worth dropping on the
+                    // ground the bot is standing on (a trap behind a fleeing chicken is the
+                    // whole point of the ability).
+                    if (!haveTarget && !ability.PlacesZone) continue;
+                    if (haveTarget && targetDist > reach * BotTactics.CommitReachFraction) continue;
+                }
+
+                float score = BotTactics.ScoreCastCandidate(priority, _abilities.ResolvedCooldownFor(slot));
+                if (score < bestScore) { bestScore = score; bestSlot = slot; }
+            }
+
+            if (bestSlot == AbilityController.InvalidSlot) return false;
+
+            var chosen = _abilities.GetSlot(bestSlot);
+
+            if (haveTarget && chosen.IsDirectionalAim &&
+                !BotTactics.IsAimedWellEnough(chosen, forward, toTarget))
+            {
+                // In reach, wrong way round. Turn now, fire next think — cancelling here is
+                // what used to make a bot walk in circles next to a rival it never hit.
+                _faceIntent = target.transform.position;
+                return false;
+            }
+
+            if (chosen.RequiresEnemyInRange && (!haveTarget || !chosen.WouldAffect(_controller, target)))
+            {
+                if (haveTarget) _faceIntent = target.transform.position;
+                return false;
+            }
+
+            if (!_abilities.BotTryActivate(bestSlot)) return false;
+
+            _log?.Debug(Source, $"Cast slot {bestSlot} ('{chosen.name}', role={chosen.ResolveBotRole()}) " +
+                $"for {situation}.");
+            return true;
+        }
+
+        private static int IndexInPlan(BotRole[] plan, BotRole role)
+        {
+            for (int i = 0; i < plan.Length; i++)
+                if (plan[i] == role) return i;
+            return -1;
         }
 
         /// <summary>
@@ -334,6 +571,11 @@ namespace CluckWars.Gameplay
         /// <see cref="AbilityController.TryGetReadySlotForRole"/> simply finds nothing and
         /// this is a no-op for that class. That is correct rather than accidental: an
         /// Assassin bot should be hunting, not standing at a pile.
+        ///
+        /// Forage is a role of exactly one ability again. Quick Drop wore it until
+        /// 2026-08-23, which meant a Speedy bot standing at a pile would fire a 12-second
+        /// deposit-rate buff into the dirt and — when Quick Drop held the lower slot index —
+        /// never peck at all.
         /// </remarks>
         private void TryPeckAtPile()
         {
@@ -350,6 +592,16 @@ namespace CluckWars.Gameplay
         private void Navigate()
         {
             var selfPos  = _controller.transform.position;
+
+            // A pending cast that only needs a turn outranks walking. Spending one think
+            // interval turning (720 deg/s covers any angle in well under that) converts a
+            // guaranteed whiff into a hit.
+            if (_faceIntent.HasValue)
+            {
+                _controller.BotFace(_faceIntent.Value - selfPos, Runner.DeltaTime);
+                return;
+            }
+
             var toTarget = _moveTarget - selfPos;
             toTarget.y = 0f;
 
@@ -443,31 +695,38 @@ namespace CluckWars.Gameplay
             return corners[Mathf.Min(_navCorner, corners.Length - 1)];
         }
 
-        // ---- Perception helpers (run inside throttled Think) ----------------
+        // ---- Perception (runs inside the throttled Think) -------------------
 
         /// <summary>
-        /// Finds the nearest living rival. Sets <paramref name="dist"/> and
-        /// <paramref name="cargoFraction"/>.
+        /// One pass over the rival set that answers both questions the FSM asks: who is
+        /// closest (danger), and who is worth attacking (value). Also refreshes the match
+        /// phase and whether this bot is currently leading.
         /// </summary>
         /// <remarks>
         /// <b>Decoys are included on purpose.</b> A bot that could see through a
         /// Doppelganger made the ability inert in a solo match, which is most of the testing
-        /// this game gets. Bots are now baitable — the whole point of the decoy.
-        ///
-        /// The <paramref name="requireCargo"/> paths still skip decoys naturally rather than
-        /// by rule: the decoy prefab ships with <c>ChickenCargo</c> stripped, so its cargo
-        /// fraction is 0 and a bot hunting a carrier passes it over. A bot looking for
-        /// something to hit will happily commit to one.
+        /// this game gets. Bots are now baitable — the whole point of the decoy. The decoy
+        /// prefab ships with <c>ChickenCargo</c> stripped, so its cargo fraction is 0 and it
+        /// scores poorly as prey while still reading as a threat, which is the right split.
         /// </remarks>
-        private ChickenController FindNearestRival(
-            out float dist, out float cargoFraction, bool requireCargo)
+        private void Perceive()
         {
-            var all = ChickenController.ActiveControllers;
+            var gm      = GameManager.Instance;
             var selfPos = _controller.transform.position;
+            var all     = ChickenController.ActiveControllers;
 
-            ChickenController best = null;
-            float bestSqr = float.MaxValue;
-            float bestCargo = 0f;
+            _nearestRival     = null;
+            _nearestRivalDist = float.MaxValue;
+            _preyTarget       = null;
+            _preyDist         = float.MaxValue;
+            _preyCargo        = 0f;
+
+            float winTarget = gm != null ? Mathf.Max(1, gm.FoodTargetToWin) : 40f;
+            float bestPriority = 0f;
+
+            // The radius prey is scored against: the hunt band for a chaser, else the engage
+            // band. Guarding-only strategies score nobody as prey and rely on the overlay.
+            float preyRadius = Mathf.Max(_profile.HuntRadius, _profile.EngageRadius);
 
             for (int i = 0; i < all.Count; i++)
             {
@@ -475,48 +734,109 @@ namespace CluckWars.Gameplay
                 if (c == null || c == _controller) continue;
                 if (c.Combat != null && c.Combat.IsRemoved) continue;
 
-                float sqr = (c.transform.position - selfPos).sqrMagnitude;
-                if (sqr >= bestSqr) continue;
+                float dist = PlanarDistance(selfPos, c.transform.position);
 
-                float frac = 0f;
-                var cargo = c.GetComponent<ChickenCargo>();
-                if (cargo != null) frac = cargo.Fraction;
+                if (dist < _nearestRivalDist)
+                {
+                    _nearestRivalDist = dist;
+                    _nearestRival     = c;
+                }
 
-                if (requireCargo && frac <= 0f) continue;
+                if (preyRadius <= 0f) continue;
 
-                bestSqr   = sqr;
-                best      = c;
-                bestCargo = frac;
+                var   rivalCargo = c.Cargo;
+                float frac       = rivalCargo != null ? rivalCargo.Fraction : 0f;
+                float banked     = BankedShareFor(c, winTarget);
+
+                float priority = BotTactics.TargetPriority(dist, frac, banked, preyRadius, _profile.LeaderFocus);
+                if (priority > bestPriority)
+                {
+                    bestPriority = priority;
+                    _preyTarget  = c;
+                    _preyDist    = dist;
+                    _preyCargo   = frac;
+                }
             }
 
-            dist          = best != null ? Mathf.Sqrt(bestSqr) : float.MaxValue;
-            cargoFraction = bestCargo;
-            return best;
+            if (_nearestRival == null) _nearestRivalDist = float.MaxValue;
+
+            _phase   = gm != null ? BotTactics.ResolvePhase(gm.TimeRemaining, gm.MatchDurationSeconds)
+                                  : MatchPhase.Mid;
+            _leading = IsLeading();
         }
 
         /// <summary>
-        /// Finds the nearest pile that still has food a chicken can actually take, ranked by
-        /// distance to its SURFACE (<paramref name="bestDistanceOut"/>) so the choice stays
-        /// honest across wildly different pile sizes — by centre distance a bot standing on
-        /// the 7×4 island's rim would rate a small pile 3 m away as closer.
-        /// Not <c>IsEmpty</c>: the permanent centre pile (ADR 0003 Decision 2b) is never
-        /// empty, so a bot would otherwise park on its floor and collect nothing forever.
+        /// A chicken's banked score as a fraction of the win target, clamped to [0,1].
+        /// Resolved through <see cref="PlayerBase.CornerIndex"/> because a bot's base is
+        /// identified by corner, not by <c>PlayerRef</c> — every bot shares
+        /// <c>PlayerRef.None</c>.
         /// </summary>
-        private FoodPile FindNearestPile(out float bestDistanceOut)
+        private static float BankedShareFor(ChickenController chicken, float winTarget)
         {
-            var piles   = FoodPile.ActivePiles;
-            var selfPos = _controller.transform.position;
+            if (chicken == null || chicken.HomeCornerIndex < 0) return 0f;
+            var bases = PlayerBase.ActiveBases;
+            for (int i = 0; i < bases.Count; i++)
+            {
+                var b = bases[i];
+                if (b == null || b.CornerIndex != chicken.HomeCornerIndex) continue;
+                return Mathf.Clamp01(b.FoodTotal / winTarget);
+            }
+            return 0f;
+        }
+
+        /// <summary>Is this bot's base currently at or above every other claimed base?</summary>
+        private bool IsLeading()
+        {
+            if (_homeBase == null) return false;
+            float mine  = _homeBase.FoodTotal;
+            var   bases = PlayerBase.ActiveBases;
+            for (int i = 0; i < bases.Count; i++)
+            {
+                var b = bases[i];
+                if (b == null || b == _homeBase || !b.IsClaimed) continue;
+                if (b.FoodTotal > mine) return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// The cheapest pile to work, by <see cref="BotTactics.PileCost"/> — travel out plus
+        /// the class's weighting of the walk home, discounted by how much is actually in it.
+        /// </summary>
+        /// <remarks>
+        /// Ranked by distance to the pile's SURFACE so the choice stays honest across wildly
+        /// different pile sizes: by centre distance a bot standing on the 7x4 island's rim
+        /// would rate a small pile 3 m away as closer.
+        ///
+        /// Filtered on <c>HasCollectableFood</c>, not <c>IsEmpty</c>: the permanent centre
+        /// pile (ADR 0003 Decision 2b) is never empty, so a bot would otherwise park on its
+        /// floor and collect nothing forever.
+        /// </remarks>
+        private FoodPile SelectPile(Vector3 homePos, out float bestSurfaceDist)
+        {
+            var      piles    = FoodPile.ActivePiles;
+            var      selfPos  = _controller.transform.position;
             FoodPile best     = null;
-            float    bestDist = float.MaxValue;
+            float    bestCost = float.MaxValue;
+            bestSurfaceDist   = float.MaxValue;
+
             for (int i = 0; i < piles.Count; i++)
             {
                 var p = piles[i];
                 if (p == null || p.Object == null || !p.Object.IsValid) continue;
                 if (!p.HasCollectableFood) continue;
-                float dist = p.DistanceToSurface(selfPos);
-                if (dist < bestDist) { bestDist = dist; best = p; }
+
+                float toPile = p.DistanceToSurface(selfPos);
+                float toHome = PlanarDistance(p.transform.position, homePos);
+                float cost   = BotTactics.PileCost(toPile, toHome, p.Available, _profile.RoundTripBias);
+
+                if (cost < bestCost)
+                {
+                    bestCost        = cost;
+                    best            = p;
+                    bestSurfaceDist = toPile;
+                }
             }
-            bestDistanceOut = bestDist;
             return best;
         }
 
@@ -558,65 +878,47 @@ namespace CluckWars.Gameplay
             return _homeBase != null ? _homeBase.transform.position : _controller.transform.position;
         }
 
-        // ---- Per-class personality ----------------------------------------
+        private float HomeDepositRadius() =>
+            _homeBase != null ? _homeBase.DepositRadius : _arrivalRadius;
+
+        private float MatchTimeRemaining()
+        {
+            var gm = GameManager.Instance;
+            return gm != null ? gm.TimeRemaining : float.MaxValue;
+        }
 
         /// <summary>
-        /// Overwrites tuning fields from a per-class defaults table.
-        /// Serialized values serve as Warrior / baseline; this narrows or widens
-        /// them per class. No code-path branches — only numbers differ.
+        /// Current effective ground speed, used only to estimate the walk home. Includes the
+        /// live slow multiplier deliberately: a bot bogged down in a Feather Trap needs to
+        /// start for home earlier than a free one, and the whole point of the estimate is to
+        /// be right about arrival time rather than about the stat sheet.
         /// </summary>
-        private void ApplyClassPersonality()
+        private float EstimateMoveSpeed()
         {
-            if (_controller == null) return;
-            switch (_controller.Class)
-            {
-                case ChickenClass.Warrior:
-                    // Aggressive bruiser: picks fights with anyone nearby, loaded or not.
-                    _huntRadius            = 10f;
-                    _huntCargoThreshold    = 0.15f;
-                    _protectCargoThreshold = 0.50f;
-                    _dangerRadius          = 5.0f;
-                    _engageUnloaded        = true;
-                    _engageRadius          = 8.5f;
-                    break;
+            var stats = _controller != null ? _controller.Stats : null;
+            if (stats == null) return 0f;
+            return stats.MoveSpeed * Mathf.Max(0.15f, _controller.SlowMultiplier);
+        }
 
-                case ChickenClass.Assassin:
-                    // Opportunist disruptor: harasses unloaded rivals, robs loaded ones,
-                    // flees early (squishy).
-                    _huntRadius            = 8.0f;
-                    _huntCargoThreshold    = 0.20f;
-                    _protectCargoThreshold = 0.30f;
-                    _dangerRadius          = 6.0f;
-                    _engageUnloaded        = true;
-                    _engageRadius          = 6.5f;
-                    break;
+        /// <summary>
+        /// Seconds the deposit itself will take. Read from <c>MatchConfig</c> rather than
+        /// from <c>ChickenCargo</c>'s own resolved rate, which is private — an overestimate
+        /// is the safe direction here, and this ignores the passive and Quick Drop
+        /// multipliers that can only make the real deposit faster.
+        /// </summary>
+        private float EstimateDepositSeconds(float cargo)
+        {
+            var gm     = GameManager.Instance;
+            var config = gm != null ? gm.Config : null;
+            float rate = config != null ? Mathf.Max(0.5f, config.DepositRatePerSecond) : 9f;
+            return cargo / rate;
+        }
 
-                case ChickenClass.Fatty:
-                    // Cautious turtle: never hunts (huntRadius = 0), deposits early,
-                    // never picks fights — the farming foil to the aggressive classes.
-                    _huntRadius            = 0f;
-                    _huntCargoThreshold    = 1f;
-                    _protectCargoThreshold = 0.25f;
-                    _dangerRadius          = 7.0f;
-                    _returnThreshold       = 0.50f;
-                    _engageUnloaded        = false;
-                    break;
-
-                case ChickenClass.Speedy:
-                    // Hit-and-run harasser: darts in to peck a nearby rival, then flees
-                    // very early when it picks anything up.
-                    _huntRadius            = 5.0f;
-                    _huntCargoThreshold    = 0.40f;
-                    _protectCargoThreshold = 0.20f;
-                    _dangerRadius          = 8.0f;
-                    _engageUnloaded        = true;
-                    _engageRadius          = 6.0f;
-                    break;
-            }
-            _log?.Debug(Source, $"Personality for {_controller.Class}: " +
-                $"hunt={_huntRadius:0.0}, huntThresh={_huntCargoThreshold:P0}, " +
-                $"protect={_protectCargoThreshold:P0}, danger={_dangerRadius:0.0}, " +
-                $"engageUnloaded={_engageUnloaded}, engageR={_engageRadius:0.0}.");
+        private static float PlanarDistance(Vector3 a, Vector3 b)
+        {
+            float dx = a.x - b.x;
+            float dz = a.z - b.z;
+            return Mathf.Sqrt(dx * dx + dz * dz);
         }
     }
 }

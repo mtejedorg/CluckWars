@@ -825,6 +825,29 @@ namespace CluckWars.Gameplay
             _movement.Tick(movement, deltaTime);
         }
 
+        /// <summary>
+        /// Turn a bot toward <paramref name="worldDir"/> without translating it — the same
+        /// facing-only motion a human gets while holding a directional ability to aim it
+        /// (FEEDBACK.md §2.3), reached through the identical <c>aimRotateOnly</c> path so
+        /// bots and players turn at the same <c>Stats.TurnSpeed</c>.
+        /// </summary>
+        /// <remarks>
+        /// Bots had no way to aim at all before this. <see cref="BotTick"/> rotates as a
+        /// side effect of moving, so a bot standing still — parked at a pile, or already
+        /// inside a rival's face — kept whatever heading the navmesh last left it on and
+        /// fired every Cone and Capsule ability into empty space. Gravity and knockback
+        /// still run inside <c>ChickenMovement.Tick</c>, so a bot spending a tick turning
+        /// does not float or stop being pushed.
+        /// </remarks>
+        public void BotFace(Vector3 worldDir, float deltaTime)
+        {
+            if (!HasStateAuthority || _movement == null) return;
+            worldDir.y = 0f;
+            if (worldDir.sqrMagnitude < 0.0001f) { BotTick(Vector2.zero, deltaTime); return; }
+            worldDir.Normalize();
+            _movement.Tick(new Vector2(worldDir.x, worldDir.z), deltaTime, aimRotateOnly: true);
+        }
+
         // ---- Private helpers -------------------------------------------------
 
         /// <summary>

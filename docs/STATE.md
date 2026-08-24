@@ -6,6 +6,117 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Bot AI rebuild (2026-08-23) — 432/432 green
+
+Maestro: "bots are now super stupid — improve the AI knowing the newest ability changes and
+game mechanics; create different strategies for each class."
+
+EditMode **432/432, 11.2 s** (394 → 432; 38 new tests in `BotTacticsTests.cs`). Two of the new
+tests failed on the first run and both were right — see "What the new tests caught" below.
+
+### Why the bots looked stupid — four causes, all now fixed
+
+1. **They never aimed.** `BotTick` only rotates as a side effect of *moving*, so a bot standing
+   still kept whatever heading the navmesh left it on. Every Cone and Capsule ability in the
+   game — Headbutt, Wing Slam, Snatch, Roll Push, Roll Trample — fired at a random direction.
+   New `ChickenController.BotFace` routes bots through the same `aimRotateOnly` path a human
+   gets while holding a directional ability. A cast that is in reach but off-axis now records a
+   `_faceIntent`, spends one think tick turning, and fires aimed.
+2. **One flat 4 m range for the whole roster.** Root Egg reaches 1.45 m and was fired from 4 m
+   every time; Roll Push (9.1 m) and Mark Kill (8.0 m) were never fired until the target was
+   inside half their reach. Reach is now derived per-ability from the declared `AimShape`
+   (`BotTactics.EffectiveReach`), and the final gate for a target-gated ability is
+   `AbilityBaseSO.WouldAffect` — the same predicate the telegraph and `OnActivate` use.
+3. **First-match casting.** `TryGetReadySlotForRole` returned the first ready slot, so a
+   Warrior opened every skirmish with a 12 s Wing Slam when a 4 s Headbutt did the same job.
+   Casts are now *planned*: a role-preference list per strategy per situation, with the cheaper
+   resolved cooldown winning inside a role.
+4. **No clock.** Bots would start a fresh trip to the far pile with four seconds left and
+   finish the match holding a full load worth zero. `BotTactics.MustBankNow` outranks
+   everything, and the return threshold now moves with match phase and the scoreboard.
+
+### Two live bugs found and fixed on the way
+
+- **Quick Drop was `BotRole.Forage`** — and `TryPeckAtPile` fires the Forage role while parked
+  at a pile, taking the first ready match. A Speedy bot holding both burned a 12 s deposit-rate
+  buff into the dirt and, whenever Quick Drop held the lower slot index, **never pecked at
+  all**. Zero income, nothing logged. New `BotRole.Bank = 7` (appended — byte-serialised);
+  fired only while standing on the base. **The `.asset` file had `BotRole: 6` serialized, which
+  shadows the C# constructor — `QuickDrop.asset` was edited too.** That shadowing is the trap:
+  changing a constructor default does nothing to an existing asset.
+- **The Fatty could never fire an offensive ability.** Its personality was `huntRadius = 0` +
+  `engageUnloaded = false`, and Hunt was the only path to an offensive cast — so Belly Flop,
+  Ground Quake and Roll Push were authored, registered, balance-tuned, class-gated to Fatty,
+  and unreachable by any Fatty bot for the whole match. Fixed by the guard overlay below.
+
+### Four strategies, one per class
+
+Per-class behaviour moved out of `BotController` entirely into `BotTactics.ProfileFor` —
+`BotController` no longer switches on `ChickenClass` at all. That split is what makes bot
+judgement EditMode-testable; it used to live inside `FixedUpdateNetwork` and was only
+observable by watching a match.
+
+| Class | Strategy | The read |
+|---|---|---|
+| Warrior | **Brawler** | Taxes the map. Banks late (85%) because a big beakful is the bait. Hunts anyone out to 11 m, guards the pile it works. Cornered while loaded, it **turns and fights** instead of running. |
+| Speedy | **Runner** | The only class that plans a *route*: pile choice is a full round-trip cost, so a further pile on the way home beats a close one behind enemy lines. Banks at 45%. Sprints to *travel*, not only to panic. Refuses every fight. |
+| Fatty | **Bunker** | Never chases, but is not passive — `GuardRadius = 7` punishes anything that walks near the pile it works or its own base, which is the mechanism that makes its control kit reachable. Banks in single 90% hauls. Turtles rather than flees. |
+| Assassin | **Predator** | Cannot forage at all, so 100% of income is theft + bounty. Picks targets **by value, not proximity** — weights the scoreboard hardest, and will cross the map for a loaded leader over an empty neighbour underfoot. New **Stalk** state: holds at 80% of its steal's reach while the tool recharges rather than standing on the victim getting Cluck Shocked. |
+
+### New / changed files
+
+- **NEW** `Scripts/Gameplay/BotTactics.cs` — pure, MonoBehaviour-free decision logic (same
+  split as `AbilityAim` / `FoodPileMath`). Strategy table, cast plans, reach, aim tolerance,
+  pile cost, target priority, match phase, the bank-or-lose rule.
+- **NEW** `Scripts/Editor/Tests/BotTacticsTests.cs`.
+- `Scripts/Gameplay/BotController.cs` — rewritten around the above; new Stalk and Guard states.
+- `Scripts/Gameplay/ChickenController.cs` — `BotFace`.
+- `Scripts/Gameplay/AbilityController.cs` — `ResolvedCooldownFor(slot)`.
+- `Scripts/Abilities/AbilityBaseSO.cs` — `BotRole.Bank = 7`.
+- `Scripts/Abilities/QuickDropAbilitySO.cs` + `Data/Abilities/QuickDrop.asset`.
+
+### What the new tests caught (both failures were real)
+
+- **The Speedy had no offensive path either** — the same bug as the Fatty, one class over. It
+  owns Feather Trap *and* Feather Aura, both `BotRole.Control`. The first version of the
+  reachability check OR-ed three radii together, which called the Speedy dead-kitted (it has
+  none of them) while it actually reaches those abilities through Retreating and Contesting.
+  Fixed by modelling reachability honestly: `BotTactics.ReachableSituations` enumerates the
+  situations a profile can enter, and the test walks their plans looking for an offensive role.
+- **The Warrior's `RoundTripBias` contradicted its own doc comment.** Shipped at 0.25 under a
+  comment reading "does not care about the walk home". Any nonzero weight lets a large enough
+  base-distance spread beat the proximity term, and on a 51.3 m arena those spreads are
+  routine: a pile 5 m away but 26 m from base lost to one 8 m away and 4 m from base, sending
+  the Brawler to the quiet corner. Fixed to **0** (concurrent session's call, and the right
+  one).
+
+  Recorded because the first diagnosis of this red — mine — was wrong, and wrong in the
+  expensive direction: I read it as a fixture that failed to discriminate and *widened the
+  fixture* until 0.25 passed, which deletes the assertion rather than the bug. The fixture
+  discriminated fine (crossover at exactly 3/22 = 0.136); the shipped value was simply on the
+  wrong side of it. The original tight fixture is restored, and the claim is now also pinned
+  as a property — `TheBrawler_TakesTheNearerPile_AtEveryBaseDistance` sweeps the return leg
+  across the arena instead of sampling one pair, so no fixture nudge can satisfy it. **When a
+  numeric test goes red, check which side of the crossover the shipped value sits on before
+  concluding the fixture is at fault.**
+
+### Still open
+
+- **Nothing has run in a live match.** All of it wants a Play Mode pass, especially the aim
+  gate (does a bot actually land a Headbutt now?) and the Predator's Stalk standoff.
+- **Warrior `RoundTripBias = 0`** matches its documented intent and is pinned by two tests, but
+  has still never been watched in a match. At 0 it ties the Assassin — for whom the field is
+  vestigial, since that class never forages — so pile selection differs three ways across the
+  four classes, not four. Fine as designed; confirm in a playtest.
+- `BotRole.Offense` is resolved by exactly one shipped ability (Belly Flop). Every other
+  offensive ability lands on Control or Steal via its Category. The plans use Offense as a
+  fallback, so this is not broken — but the role is nearly vestigial and worth a look.
+- The Warrior/Bunker `GuardRadius` values and the Predator's `LeaderFocus` are hand-picked, not
+  solved. They do not feed SCT, so `BalanceOracle` has no opinion — but they change how hard
+  bots pressure a human and should get a playtest calibration.
+
+---
+
 ## ✅ Roster migration COMPLETE (2026-08-23) — 394/394 green
 
 The red from `fe5d756` is cleared. `docs/design/class-essence-and-signatures.md` is built
