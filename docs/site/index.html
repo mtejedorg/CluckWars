@@ -390,6 +390,42 @@ td.n,th.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-spac
 .tech li b{color:var(--text);font-weight:800}
 .tech li code{font-family:var(--f-mono);font-size:.76rem;color:var(--gold-deep)}
 
+/* ---------- AI in development ---------- */
+.aiflow{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:9px;align-items:stretch}
+.aistep{position:relative;background:linear-gradient(180deg,var(--card1),var(--card2));
+  border:1px solid var(--card-border);border-radius:11px;padding:12px 13px;box-shadow:var(--shadow-card)}
+.aistep .k{font-family:var(--f-mono);font-size:.63rem;letter-spacing:.11em;color:var(--gold-dark);text-transform:uppercase}
+.aistep h4{color:var(--gold);margin:3px 0 4px}
+.aistep p{font-size:.79rem;color:var(--text-dim);line-height:1.42}
+.aistep.loopback{border-color:#7b68ee;background:linear-gradient(180deg,rgba(45,32,72,.6),rgba(20,14,34,.75))}
+.aistep.loopback h4{color:var(--assassin-lt)}
+.aistep.loopback .k{color:#8c7ce0}
+
+.agentwrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:12px}
+.agentgroup{background:rgba(12,7,3,.45);border:1px solid rgba(106,74,40,.55);border-radius:11px;padding:13px 14px}
+.agentgroup h4{color:var(--ag);font-size:.85rem;margin-bottom:3px}
+.agentgroup .gd{font-size:.74rem;color:var(--text-mute);margin-bottom:9px;line-height:1.4}
+.agentchips{display:flex;flex-wrap:wrap;gap:5px}
+.agentchip{font-family:var(--f-mono);font-size:.71rem;padding:3px 8px;border-radius:6px;
+  background:rgba(0,0,0,.35);border:1px solid var(--ag);color:var(--ag);white-space:nowrap}
+
+.rulelist{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:11px}
+.rule{background:linear-gradient(180deg,var(--card1),var(--card2));border:1px solid var(--card-border);
+  border-left:3px solid var(--gold-deep);border-radius:11px;padding:13px 15px;box-shadow:var(--shadow-card)}
+.rule h4{color:var(--gold);margin-bottom:5px}
+.rule p{font-size:.81rem;color:var(--text-dim);line-height:1.45}
+.rule p em{color:#e8d7b6;font-style:normal;font-weight:700}
+.rule code{font-family:var(--f-mono);font-size:.75rem;color:var(--gold-deep)}
+
+.lesson{background:linear-gradient(180deg,rgba(58,34,16,.5),rgba(20,12,5,.8));
+  border:1px solid var(--card-border);border-top:2px solid #ff9a5c;border-radius:11px;padding:14px 16px}
+.lesson .cause{font-family:var(--f-mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:#ff9a5c}
+.lesson h4{margin:4px 0 6px;color:var(--text)}
+.lesson p{font-size:.82rem;color:var(--text-dim);line-height:1.5}
+.lesson .took{margin-top:8px;padding-top:8px;border-top:1px solid rgba(106,74,40,.5);
+  font-size:.79rem;color:#e8d7b6}
+.lesson .took b{color:var(--gold);font-weight:800}
+
 /* ---------- jump ladder ---------- */
 .ladder{display:grid;gap:9px}
 .rung{display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px;align-items:center}
@@ -483,7 +519,8 @@ footer b{color:var(--text-dim)}
     <a href="#traversal"><i>10</i>Traversal</a>
     <a href="#controls"><i>11</i>Casting Feel</a>
     <a href="#tech"><i>12</i>Technology</a>
-    <a href="#notes"><i>13</i>Design Notes</a>
+    <a href="#ai"><i>13</i>AI in the Build</a>
+    <a href="#notes"><i>14</i>Design Notes</a>
   </div>
   <div class="railfoot">
     Every number on this page is read from the shipped
@@ -1084,10 +1121,225 @@ footer b{color:var(--text-dim)}
   </div>
 </section>
 
-<!-- ============ 13 NOTES ============ -->
+<!-- ============ 13 AI IN DEVELOPMENT ============ -->
+<section id="ai">
+  <div class="shead">
+    <p class="eyebrow">13 &mdash; How it gets built</p>
+    <h2>AI does most of the typing. The rules decide whether that works.</h2>
+    <p class="lede">
+      Cluck Wars is built by a one-person studio running a roster of specialized agents.
+      That only holds together because the project is organised around a single assumption:
+      <b>an agent will confidently do the wrong thing unless the right thing is written down
+      next to the code it governs, and checked by something that runs.</b>
+    </p>
+  </div>
+
+  <div class="stack">
+
+    <!-- ORGANIZATION -->
+    <div class="panel stack">
+      <div>
+        <p class="eyebrow" style="margin-bottom:4px">Organization</p>
+        <h3>One orchestrator, fifteen specialists, and a mandatory review</h3>
+        <p class="dim" style="font-size:.89rem;margin-top:7px;max-width:70ch">
+          Work does not go straight to an implementer. Every non-trivial request enters through
+          an architecture-owning agent that decomposes it, routes it, and then reviews what
+          comes back. No agent marks its own work done.
+        </p>
+      </div>
+
+      <div class="aiflow">
+        <div class="aistep"><span class="k">Step 1</span><h4>Request</h4><p>A task in plain language, from the one human on the project.</p></div>
+        <div class="aistep"><span class="k">Step 2</span><h4>Triage</h4><p>The architect reads current state and recent history, decides scope, and picks the specialist. It never implements multi-file changes itself.</p></div>
+        <div class="aistep"><span class="k">Step 3</span><h4>Execute</h4><p>One specialist owns the change, working to a written spec rather than the original prompt.</p></div>
+        <div class="aistep loopback"><span class="k">Step 4</span><h4>Review</h4><p>The architect, or a dedicated review agent for networking-heavy diffs, checks the result against the conventions. Failures go back to step 3.</p></div>
+        <div class="aistep"><span class="k">Step 5</span><h4>Record</h4><p>State doc updated, decision written down, one concern per commit.</p></div>
+      </div>
+
+      <div class="agentwrap">
+        <div class="agentgroup" style="--ag:#f5c842">
+          <h4>Orchestration</h4>
+          <p class="gd">Owns structure and signoff. The default entry point.</p>
+          <div class="agentchips"><span class="agentchip">code-architect</span></div>
+        </div>
+        <div class="agentgroup" style="--ag:#f09888">
+          <h4>Engineering</h4>
+          <p class="gd">Implementation, deep review, and test scenarios.</p>
+          <div class="agentchips">
+            <span class="agentchip">senior-dev</span><span class="agentchip">qa-reviewer</span><span class="agentchip">tester</span>
+          </div>
+        </div>
+        <div class="agentgroup" style="--ag:#c063d8">
+          <h4>Design</h4>
+          <p class="gd">Mechanics, balance, map pacing, feel, and copy.</p>
+          <div class="agentchips">
+            <span class="agentchip">mechanics-designer</span><span class="agentchip">level-designer</span><span class="agentchip">ux-designer</span><span class="agentchip">narrative-designer</span>
+          </div>
+        </div>
+        <div class="agentgroup" style="--ag:#35cfe2">
+          <h4>Art, audio &amp; rendering</h4>
+          <p class="gd">Everything visible or audible, split by discipline rather than by asset type.</p>
+          <div class="agentchips">
+            <span class="agentchip">artist-2d</span><span class="agentchip">artist-3d</span><span class="agentchip">vfx-artist</span><span class="agentchip">shader-artist</span><span class="agentchip">render-pipeline-artist</span><span class="agentchip">ui-designer</span><span class="agentchip">audio-designer</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="note why">
+        <b>Why split art into five agents instead of one.</b> A render-pipeline problem and a
+        ShaderGraph problem look identical in a bug report &mdash; &ldquo;the game looks washed
+        out&rdquo; &mdash; and have completely different fixes. Narrow agents fail visibly
+        instead of confidently guessing outside their competence, which is the failure mode
+        that actually costs time.
+      </div>
+    </div>
+
+    <!-- RULES -->
+    <div class="panel stack">
+      <div>
+        <p class="eyebrow" style="margin-bottom:4px">Rules</p>
+        <h3>Constraints written where the agent will trip over them</h3>
+        <p class="dim" style="font-size:.89rem;margin-top:7px;max-width:70ch">
+          A convention that lives only in a chat log is not a convention. These are checked
+          into the repo next to the code, and the load-bearing ones are also tests.
+        </p>
+      </div>
+
+      <div class="rulelist">
+        <div class="rule">
+          <h4>Everything external sits behind an interface</h4>
+          <p>Gameplay code never touches the networking library, the backend, or the input
+          system directly. <em>The reason is agentic:</em> an agent reaching for the concrete
+          API is an easy thing to spot in review, whereas subtly wrong lifecycle usage is not.</p>
+        </div>
+        <div class="rule">
+          <h4>Authority gates are non-negotiable</h4>
+          <p>Every networked update early-returns unless it owns the state; every
+          cross-authority write goes through an RPC. Stated once, repeated in the specialist's
+          own instructions, and enforced in review.</p>
+        </div>
+        <div class="rule">
+          <h4>The silent-failure sorting rule</h4>
+          <p>Settled after four byte-identical silent guards were found across the placed-zone
+          abilities. <em>Ask whether the null could be produced by a legal game state.</em>
+          Unassigned field or missing component &rarr; a wiring bug that must be logged loudly.
+          Nobody in range, cargo full, nothing to steal &rarr; the game working, and it must
+          stay silent. A sweep that logs every early return is worse than the bug.</p>
+        </div>
+        <div class="rule">
+          <h4>Design decisions are tests</h4>
+          <p>Speedy's traversal ban, the eight-wedge optimum, the wall clearances and the
+          traversal matrix are all pinned by tests that fail with the <em>reason</em> in the
+          message. A rule an agent can read but not violate is worth more than one it merely
+          agrees with.</p>
+        </div>
+        <div class="rule">
+          <h4>Write the decision next to the thing it governs</h4>
+          <p>Adopted after a month in which every drift bug traced to intent that lived only in
+          chat. If a class may never receive traversal abilities, that sentence belongs in the
+          class document <em>and</em> in a test &mdash; not in a conversation nobody will read again.</p>
+        </div>
+        <div class="rule">
+          <h4>One concern per commit, and the body explains why</h4>
+          <p>Agents happily produce &ldquo;fix bug + add feature + refactor&rdquo; mega-commits.
+          The subject says what changed; the body says why, because the why is the part no
+          future agent can reconstruct from the diff. Agent contributions carry co-author
+          attribution.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TECHNOLOGY -->
+    <div class="panel stack">
+      <div>
+        <p class="eyebrow" style="margin-bottom:4px">Technologies</p>
+        <h3>What the agents actually drive</h3>
+      </div>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Layer</th><th>Tooling</th><th>What it does here</th></tr></thead>
+          <tbody>
+            <tr><td><b>Orchestration</b></td><td class="dim">Claude Code, project-scoped agent definitions</td><td class="dim">The roster above, plus a routing table checked into the repo so the entry point is the same every session.</td></tr>
+            <tr><td><b>Engine control</b></td><td class="dim">An MCP bridge into the Unity Editor</td><td class="dim">Roughly a hundred tools: scene inspection, asset queries, component and prefab editing, screenshots, arbitrary C# execution, and running the EditMode suite. Agents change the project through the Editor's own API rather than by hand-editing YAML.</td></tr>
+            <tr><td><b>Long-running implementation</b></td><td class="dim">A second agent CLI, driven through a wrapper skill</td><td class="dim">Autonomous implement-test-fix loops for anything touching three or more files. The wrapper keeps architecture review and knowledge upkeep on the Claude side; only execution is delegated.</td></tr>
+            <tr><td><b>2D &amp; 3D generation</b></td><td class="dim">Local ComfyUI (Flux, SDXL + ControlNet, image-to-mesh) and a Blender bridge</td><td class="dim">Concept art, icons, T-pose refinement, mesh generation, rigging and skinning. Runs locally, so iteration is free and nothing leaves the machine.</td></tr>
+            <tr><td><b>Project memory</b></td><td class="dim">A knowledge store for decisions, and a graph extractor for structure</td><td class="dim">Rationale and history live in the memory store; the code stays the only source of truth for code. Where the two disagree, the file wins.</td></tr>
+            <tr><td><b>Verification</b></td><td class="dim">EditMode test suite, live roster-integrity panel, multi-client test scripts</td><td class="dim">Currently 531 tests. The integrity panel reports data violations while authoring, which is the only point at which they are cheap to fix.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- LESSONS -->
+    <div class="stack">
+      <div>
+        <p class="eyebrow" style="margin-bottom:4px">What went wrong, and what it changed</p>
+        <h3>Four failures that every check in place passed</h3>
+        <p class="dim" style="font-size:.89rem;margin-top:7px;max-width:72ch">
+          These are the ones worth publishing. Each was invisible to the tooling that existed
+          at the time, and each changed a rule rather than just a line of code.
+        </p>
+      </div>
+
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(292px,1fr))">
+        <div class="lesson">
+          <span class="cause">Missing reference, not a code path</span>
+          <h4>Two abilities rendered nothing at all</h4>
+          <p>The component that draws a zone's edge ring was never added to the zone prefab, so
+          a 3.6&nbsp;m, 5-second slow cloud had no tell whatsoever &mdash; you learned where a
+          trap was by already being slowed inside it. The feedback doc had both cases marked
+          shipped. No test could catch it: an unassigned prefab reference is not a code path.</p>
+          <p class="took"><b>Changed:</b> prefab wiring became something review checks explicitly, and the silent-failure rule got its "wiring bug" branch.</p>
+        </div>
+
+        <div class="lesson">
+          <span class="cause">Confident, plausible, and wrong</span>
+          <h4>Every wing animation in the game was a no-op</h4>
+          <p>A docblock claimed wings animate on one axis and that this was
+          &ldquo;measured off the shipped clips, not guessed&rdquo;. It was the roll axis &mdash;
+          rotating it leaves the wingtip exactly where it started. Five of eight cast
+          archetypes were mutually indistinguishable. Every per-frame assertion passed, because
+          <em>a wing that never moves cannot violate a relationship.</em></p>
+          <p class="took"><b>Changed:</b> assertions now test features and relationships that would break if the motion stopped, not bounding boxes that survive it.</p>
+        </div>
+
+        <div class="lesson">
+          <span class="cause">Data drifted away from intent</span>
+          <h4>A class silently gained a forbidden ability</h4>
+          <p>An asset serialized a class mask granting Speedy a blink that crossed every
+          obstacle in the game &mdash; against a constructor, a class docstring and a design
+          section that all said otherwise. The intent existed in three places. None of them
+          were the asset.</p>
+          <p class="took"><b>Changed:</b> a test now sweeps the whole roster for it, and the rule that produced it is written in the design doc it governs.</p>
+        </div>
+
+        <div class="lesson">
+          <span class="cause">The test agreed with itself</span>
+          <h4>A balance drift stayed green for weeks</h4>
+          <p>The harness that verifies every class hits its clear-time target was feeding the
+          simulator hardcoded stats instead of loading the shipped assets. A 20% speed change
+          landed and the suite never noticed, because it was checking the numbers in the test
+          against the numbers in the test.</p>
+          <p class="took"><b>Changed:</b> balance tests read the real assets. A test that does not touch shipped data is not verifying shipped behaviour.</p>
+        </div>
+      </div>
+
+      <div class="note warn" style="margin-top:2px">
+        <b>The through-line.</b> None of these were reasoning failures &mdash; they were
+        <em>verification</em> failures. In every case the agent produced something plausible,
+        the checks in place agreed, and the gap only closed when a rule was written somewhere a
+        machine could enforce it. That is the actual lesson of building this way: the model is
+        rarely the bottleneck, and the harness around it almost always is.
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ 14 NOTES ============ -->
 <section id="notes">
   <div class="shead">
-    <p class="eyebrow">13 &mdash; Design notes</p>
+    <p class="eyebrow">14 &mdash; Design notes</p>
     <h2>Decisions worth defending</h2>
     <p class="lede">A compendium of mechanics is only half the story. These are the calls that
       shaped them, including the ones that were wrong the first time.</p>

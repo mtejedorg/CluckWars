@@ -57,6 +57,25 @@ docs or gameplay assets change.** Recorded in `CLAUDE.md` (quick-start step 6) a
    contract, and 3–4 concrete pieces of evidence that the ability list follows from it —
    including where it *fails* (Wing Slam's 12 s cooldown on the spam class).
 
+### Added later the same day — §13 "AI in the build"
+
+Maestro: *"create a section to describe the usage of AI in the development, organization,
+rules and technologies used."* Sourced from `.claude/agents/` (15 specialists), the routing
+table in `.claude/CLAUDE.md`, `.mcp.json`, `docs/CONVENTIONS.md` and
+`docs/ANTIGRAVITY_CLI_GUIDE.md` — not written from memory.
+
+Four blocks: **organization** (the 5-step triage → execute → review → record loop, and the
+roster grouped by discipline), **rules** (interfaces, authority gates, the silent-failure
+sorting rule, design-decisions-are-tests, write-the-decision-next-to-the-code, commit
+hygiene), **technologies** (orchestration, the Editor MCP bridge, the delegated
+implementation CLI, local ComfyUI/Blender generation, the memory store, verification), and
+**four published failures** — the unattached zone visuals, the inert wing axis, the
+Shadowstep class-mask drift, and the balance harness that fed itself hardcoded stats.
+
+The section's thesis, and the reason it is worth publishing: *none of those four were
+reasoning failures — they were verification failures.* The model was rarely the bottleneck;
+the harness around it was. Section renumbering: Design Notes 13 → 14.
+
 ### Data discrepancies found while building (docs vs. shipped assets)
 
 - **Foraging rate.** GDD's Collect column (3.2 / 3.0 / 2.6 / 1.7) is a stale solve. Shipped
