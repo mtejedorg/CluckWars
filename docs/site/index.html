@@ -1,0 +1,2012 @@
+<title>The Cluck Wars Compendium</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+/* ============================================================
+   Cluck Wars Compendium
+   Palette + type inherited from docs/ART.md 6.1-6.2 (the game's
+   own UI system). Committed single-theme: this page IS the game's
+   screen, so every colour is painted explicitly and nothing is
+   left to the host ground.
+   ============================================================ */
+:root{
+  --ground:#0b0704;
+  --panel-i1:#422b15; --panel-i2:#26170a;
+  --card1:#3a2816; --card2:#241809;
+  --card-border:#6a4a28;
+  --gold:#f5c842; --gold-deep:#d4a020; --gold-dark:#b88a14;
+  --text:#fef5e0; --text-dim:#c4a060; --text-mute:#8d7448;
+  --rule:#4a3520;
+
+  --steal:#ff7043; --control:#c063d8; --defense:#5ec463; --utility:#35cfe2;
+
+  --warrior:#c04030; --warrior-lt:#f09888;
+  --speedy:#e85a2a;  --speedy-lt:#ffb088;
+  --fatty:#f5d75a;   --fatty-lt:#fff3b0;
+  --assassin:#7b68ee;--assassin-lt:#c4b8ff;
+
+  --shadow-panel:inset 0 1px 0 rgba(255,220,140,.28), inset 0 -1px 0 rgba(0,0,0,.45), 0 6px 20px rgba(0,0,0,.6);
+  --shadow-card:inset 0 1px 0 rgba(255,220,140,.14), 0 3px 10px rgba(0,0,0,.45);
+  --ts:0 2px 4px rgba(0,0,0,.6);
+
+  --f-display:"Lilita One", "Arial Black", system-ui, sans-serif;
+  --f-body:"Nunito", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "Consolas", monospace;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+
+body{
+  margin:0;
+  background:
+    radial-gradient(ellipse 120% 70% at 50% -10%, #33210d 0%, transparent 60%),
+    radial-gradient(ellipse 90% 60% at 50% 110%, #1c1207 0%, transparent 55%),
+    var(--ground);
+  background-attachment:fixed;
+  color:var(--text);
+  font-family:var(--f-body);
+  font-size:15.5px;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---------- type ---------- */
+h1,h2,h3,h4{font-family:var(--f-display);font-weight:400;text-wrap:balance;text-shadow:var(--ts);margin:0;letter-spacing:.01em}
+h1{font-size:clamp(2.6rem,7vw,4.6rem);line-height:.95}
+h2{font-size:clamp(1.6rem,3.4vw,2.3rem);line-height:1.05}
+h3{font-size:1.18rem;line-height:1.2}
+h4{font-size:.95rem;line-height:1.25}
+p{margin:0}
+a{color:var(--gold);text-decoration-color:rgba(245,200,66,.35);text-underline-offset:3px}
+
+.eyebrow{
+  font-family:var(--f-display);font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--text-mute);text-shadow:none;
+}
+.lede{font-size:1.06rem;color:#e6d5b4;max-width:64ch}
+.dim{color:var(--text-dim)}
+.mute{color:var(--text-mute)}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;color:var(--gold);font-weight:700}
+small{font-size:.8rem}
+
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-columns:236px minmax(0,1fr);max-width:1440px;margin:0 auto}
+
+.rail{
+  position:sticky;top:0;align-self:start;height:100vh;
+  padding:26px 18px 22px 24px;
+  border-right:1px solid var(--rule);
+  display:flex;flex-direction:column;gap:16px;
+  background:linear-gradient(180deg, rgba(58,34,16,.35), rgba(11,7,4,.1));
+}
+.brand{display:flex;flex-direction:column;gap:1px}
+.brand b{font-family:var(--f-display);font-size:1.26rem;letter-spacing:.01em;
+  background:linear-gradient(180deg,#fff0c0,var(--gold) 45%,var(--gold-dark));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.7))}
+.brand span{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text-mute)}
+
+.nav{display:flex;flex-direction:column;gap:1px;overflow-y:auto;margin:0 -6px;padding:0 6px;flex:1}
+.nav a{
+  display:flex;align-items:baseline;gap:9px;
+  padding:5px 9px;border-radius:7px;
+  font-size:.83rem;font-weight:700;color:var(--text-dim);
+  text-decoration:none;border:1px solid transparent;transition:background .15s,color .15s,border-color .15s
+}
+.nav a i{font-style:normal;font-family:var(--f-mono);font-size:.66rem;color:var(--text-mute);min-width:1.2em}
+.nav a:hover{background:rgba(245,200,66,.07);color:var(--text)}
+.nav a.on{background:linear-gradient(180deg,#3f2a12,#2a1a0a);border-color:var(--card-border);color:var(--gold)}
+.nav a.on i{color:var(--gold-deep)}
+
+.railfoot{font-size:.7rem;color:var(--text-mute);line-height:1.5;border-top:1px solid var(--rule);padding-top:11px}
+
+main{padding:0 clamp(20px,4vw,56px) 120px;min-width:0}
+section{padding-top:76px;scroll-margin-top:16px}
+.shead{display:flex;flex-direction:column;gap:9px;margin-bottom:24px;max-width:72ch}
+
+/* ---------- panels & cards ---------- */
+.panel{
+  background:linear-gradient(180deg,var(--panel-i1),var(--panel-i2));
+  border:1px solid var(--card-border);border-radius:14px;
+  box-shadow:var(--shadow-panel);padding:22px
+}
+.card{
+  background:linear-gradient(180deg,var(--card1),var(--card2));
+  border:1px solid var(--card-border);border-radius:12px;
+  box-shadow:var(--shadow-card);padding:16px
+}
+.grid{display:grid;gap:14px}
+.stack{display:flex;flex-direction:column;gap:14px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+
+/* ---------- hero ---------- */
+.hero{padding-top:58px;display:flex;flex-direction:column;gap:20px}
+.hero h1{
+  background:linear-gradient(178deg,#fff6d8 8%,var(--gold) 48%,#c08a10 96%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 3px 0 #6b4a08) drop-shadow(0 7px 16px rgba(0,0,0,.75));
+  text-shadow:none;max-width:13ch
+}
+.pitch{font-size:1.1rem;max-width:60ch;color:#efdcb8}
+.pitch b{color:var(--gold);font-weight:800}
+
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(126px,1fr));gap:10px;margin-top:2px}
+.fact{
+  background:linear-gradient(180deg,rgba(90,58,26,.5),rgba(26,16,8,.75));
+  border:1px solid var(--card-border);border-radius:11px;padding:11px 13px;
+  box-shadow:var(--shadow-card)
+}
+.fact b{display:block;font-family:var(--f-mono);font-weight:700;font-size:1.45rem;line-height:1.1;color:var(--gold);font-variant-numeric:tabular-nums}
+.fact span{display:block;font-size:.68rem;letter-spacing:.11em;text-transform:uppercase;color:var(--text-mute);margin-top:3px}
+.fact em{display:block;font-style:normal;font-size:.73rem;color:var(--text-dim);margin-top:5px;line-height:1.35}
+
+/* ---------- controls ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{
+  font-family:var(--f-body);font-weight:700;font-size:.78rem;
+  padding:5px 11px;border-radius:999px;cursor:pointer;
+  background:linear-gradient(180deg,#3a2816,#241809);
+  border:1px solid var(--card-border);color:var(--text-dim);
+  transition:background .15s,color .15s,border-color .15s,box-shadow .15s;line-height:1.35
+}
+.chip:hover{color:var(--text);border-color:#8a6a3a}
+.chip[aria-pressed="true"]{
+  background:linear-gradient(180deg,var(--gold),var(--gold-deep) 60%,var(--gold-dark));
+  border-color:#8a6410;color:#241606;
+  box-shadow:0 0 14px rgba(245,200,66,.3), inset 0 1px 0 rgba(255,255,255,.5)
+}
+.chip[aria-pressed="true"][data-tint]{
+  background:linear-gradient(180deg,var(--tint),var(--tint));
+  border-color:rgba(0,0,0,.35);color:#150d04;
+  box-shadow:0 0 14px var(--tint), inset 0 1px 0 rgba(255,255,255,.4)
+}
+
+input[type="search"]{
+  background:#1c1208;border:1px solid var(--card-border);border-radius:9px;
+  color:var(--text);padding:7px 12px;font-size:.86rem;min-width:180px;font-family:var(--f-body)
+}
+input[type="search"]::placeholder{color:var(--text-mute)}
+input[type="range"]{-webkit-appearance:none;appearance:none;background:transparent;width:100%;height:22px;cursor:pointer}
+input[type="range"]::-webkit-slider-runnable-track{height:7px;border-radius:99px;background:#1a1008;box-shadow:inset 0 2px 4px rgba(0,0,0,.7);border:1px solid #3d2a14}
+input[type="range"]::-moz-range-track{height:7px;border-radius:99px;background:#1a1008;border:1px solid #3d2a14}
+input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;margin-top:-6px;border-radius:50%;
+  background:linear-gradient(180deg,#fff0c0,var(--gold-deep));border:1px solid #7a5808;box-shadow:0 2px 5px rgba(0,0,0,.6)}
+input[type="range"]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:linear-gradient(180deg,#fff0c0,var(--gold-deep));border:1px solid #7a5808}
+
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:6px}
+
+/* ---------- tables ---------- */
+.tw{overflow-x:auto;border-radius:11px;border:1px solid var(--card-border);background:rgba(20,12,5,.5)}
+table{border-collapse:collapse;width:100%;font-size:.855rem;min-width:440px}
+th,td{padding:9px 13px;text-align:left;border-bottom:1px solid rgba(106,74,40,.45);vertical-align:top}
+thead th{
+  font-family:var(--f-display);font-weight:400;font-size:.74rem;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--gold-deep);background:rgba(58,40,22,.6);white-space:nowrap
+}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:rgba(245,200,66,.045)}
+td.n,th.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ---------- badges ---------- */
+.tag{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:.66rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+  padding:2.5px 8px;border-radius:6px;white-space:nowrap;
+  border:1px solid currentColor;line-height:1.55
+}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:currentColor;box-shadow:0 0 7px currentColor}
+
+/* ---------- callouts ---------- */
+.note{
+  border-left:3px solid var(--gold-deep);
+  background:linear-gradient(90deg,rgba(245,200,66,.09),rgba(245,200,66,.02));
+  padding:12px 16px;border-radius:0 10px 10px 0;font-size:.9rem;color:#e8d7b6
+}
+.note b{color:var(--gold)}
+.note.warn{border-left-color:#e07a3a;background:linear-gradient(90deg,rgba(224,122,58,.12),rgba(224,122,58,.02))}
+.note.warn b{color:#ff9a5c}
+.note.why{border-left-color:#7b68ee;background:linear-gradient(90deg,rgba(123,104,238,.13),rgba(123,104,238,.02))}
+.note.why b{color:var(--assassin-lt)}
+
+/* ---------- core loop diagram ---------- */
+.loop{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;counter-reset:step}
+.step{
+  position:relative;background:linear-gradient(180deg,var(--card1),var(--card2));
+  border:1px solid var(--card-border);border-radius:12px;padding:14px 14px 13px;
+  box-shadow:var(--shadow-card)
+}
+.step::before{
+  counter-increment:step;content:counter(step);
+  font-family:var(--f-mono);font-size:.7rem;font-weight:700;color:var(--gold-dark);
+  position:absolute;top:9px;right:11px
+}
+.step h4{color:var(--gold);margin-bottom:4px}
+.step p{font-size:.82rem;color:var(--text-dim);line-height:1.45}
+.loopside{
+  margin-top:12px;border:1px dashed rgba(192,99,216,.45);border-radius:12px;
+  padding:13px 16px;background:rgba(192,99,216,.06)
+}
+.loopside h4{color:var(--control);margin-bottom:4px}
+.loopside p{font-size:.87rem;color:#e0cfae}
+
+/* ---------- roster ---------- */
+.rosterpick{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px}
+.cbtn{
+  text-align:left;cursor:pointer;padding:13px 14px;border-radius:12px;
+  background:linear-gradient(180deg,var(--card1),var(--card2));
+  border:1px solid var(--card-border);box-shadow:var(--shadow-card);
+  color:var(--text);font-family:var(--f-body);transition:transform .16s,box-shadow .16s,border-color .16s
+}
+.cbtn:hover{transform:translateY(-2px);border-color:var(--cc)}
+.cbtn[aria-pressed="true"]{border-color:var(--cc);box-shadow:0 0 18px var(--ccg), var(--shadow-card);transform:translateY(-2px)}
+.cbtn .cn{font-family:var(--f-display);font-size:1.24rem;color:var(--cc);display:block;line-height:1.1;text-shadow:0 0 12px var(--ccg)}
+.cbtn .cf{display:block;font-size:.76rem;color:var(--text-mute);margin-top:3px;line-height:1.4}
+.cbtn .cs{display:flex;gap:11px;margin-top:9px;font-family:var(--f-mono);font-size:.72rem;color:var(--text-dim)}
+
+.detail{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-top:16px}
+.quote{font-size:1.02rem;font-style:italic;color:var(--cc);line-height:1.5;text-shadow:0 0 16px var(--ccg)}
+
+.bars{display:flex;flex-direction:column;gap:11px}
+.bar b{display:flex;justify-content:space-between;font-family:var(--f-body);font-size:.78rem;font-weight:700;color:var(--text-dim);margin-bottom:4px}
+.bar b span{font-family:var(--f-mono);color:var(--text)}
+.track{height:9px;border-radius:99px;background:#1a1008;border:1px solid #3d2a14;box-shadow:inset 0 2px 4px rgba(0,0,0,.7);overflow:hidden}
+.fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--cc),color-mix(in srgb,var(--cc) 55%,#fff));
+  box-shadow:0 0 10px var(--ccg);transition:width .5s cubic-bezier(.22,.9,.3,1)}
+
+.essence{
+  border:1px solid var(--cc);border-radius:14px;padding:20px 22px;
+  background:linear-gradient(180deg, color-mix(in srgb, var(--cc) 12%, #2a1a0c), rgba(20,12,5,.85));
+  box-shadow:0 0 26px var(--ccg), var(--shadow-card)
+}
+.ess-q{font-family:var(--f-display);font-size:clamp(1.1rem,2.1vw,1.4rem);line-height:1.3;
+  color:var(--cc);text-shadow:0 0 18px var(--ccg);max-width:44ch;text-wrap:balance}
+.ess-c{margin-top:11px;font-size:.92rem;color:#ecdcbc;max-width:68ch;line-height:1.55}
+.ess-c b{color:var(--gold)}
+.ess-proof{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:11px;margin-top:16px}
+.ess-proof > div{background:rgba(12,7,3,.5);border:1px solid rgba(106,74,40,.55);
+  border-left:2px solid var(--cc);border-radius:9px;padding:11px 13px}
+.ess-proof h4{color:var(--cc);font-size:.88rem;margin-bottom:4px}
+.ess-proof p{font-size:.8rem;color:var(--text-dim);line-height:1.45}
+
+.speclist{display:grid;gap:11px}
+.spec{border:1px solid var(--card-border);border-radius:11px;padding:13px 14px;background:rgba(20,12,5,.45)}
+.spec h4{color:var(--cc);margin-bottom:3px}
+.spec .pv{font-size:.85rem;color:#e2d0ae}
+.spec .sig{margin-top:8px;font-size:.78rem;color:var(--text-dim);display:flex;gap:7px;align-items:baseline;flex-wrap:wrap}
+.spec .sig b{color:var(--gold);font-weight:800}
+
+/* ---------- ability codex ---------- */
+.filters{display:flex;flex-direction:column;gap:11px;margin-bottom:18px}
+.fgroup{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.fgroup > .lbl{font-size:.68rem;letter-spacing:.13em;text-transform:uppercase;color:var(--text-mute);font-weight:800;min-width:56px}
+
+.acount{font-family:var(--f-mono);font-size:.78rem;color:var(--text-mute)}
+
+.codex{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:11px}
+.ab{
+  position:relative;text-align:left;cursor:pointer;
+  background:linear-gradient(180deg,var(--card1),var(--card2));
+  border:1px solid var(--card-border);border-left:3px solid var(--ac);
+  border-radius:11px;padding:12px 13px;box-shadow:var(--shadow-card);
+  color:var(--text);font-family:var(--f-body);
+  transition:transform .14s,box-shadow .14s,border-color .14s;display:flex;flex-direction:column;gap:6px
+}
+.ab:hover{transform:translateY(-2px);box-shadow:0 0 16px rgba(0,0,0,.6), 0 0 0 1px var(--ac)}
+.ab[aria-expanded="true"]{box-shadow:0 0 18px var(--acg);border-color:var(--ac)}
+.ab .an{font-family:var(--f-display);font-size:1rem;line-height:1.15;color:var(--text)}
+.ab .ameta{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.ab .ad{font-size:.79rem;color:var(--text-dim);line-height:1.4}
+.ab .acd{position:absolute;top:11px;right:12px;font-family:var(--f-mono);font-size:.74rem;font-weight:700;color:var(--gold-deep)}
+.ab .an{padding-right:44px}
+.forced{position:absolute;bottom:11px;right:12px;font-size:.6rem;letter-spacing:.1em;color:var(--gold-dark);font-weight:800}
+
+.drawer{margin-top:14px}
+.drawer[hidden]{display:none}
+.dhead{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.dhead h3{color:var(--ac);text-shadow:0 0 16px var(--acg)}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:9px}
+.kv div{background:rgba(20,12,5,.55);border:1px solid rgba(106,74,40,.5);border-radius:9px;padding:8px 11px}
+.kv dt{font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-mute);font-weight:800}
+.kv dd{margin:2px 0 0;font-family:var(--f-mono);font-size:.94rem;color:var(--gold);font-variant-numeric:tabular-nums}
+
+/* ---------- loadout builder ---------- */
+.build{display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);gap:16px}
+.slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.slot{
+  aspect-ratio:1;border-radius:12px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:3px;padding:6px;text-align:center;
+  border:1px dashed rgba(138,106,58,.6);background:rgba(20,12,5,.5);
+  font-size:.66rem;color:var(--text-mute);line-height:1.25;position:relative
+}
+.slot.filled{border-style:solid;border-color:var(--sc);background:linear-gradient(180deg,rgba(58,40,22,.9),rgba(26,16,8,.95));box-shadow:0 0 14px var(--scg), var(--shadow-card)}
+.slot .sl{font-family:var(--f-display);font-size:.8rem;color:var(--text);line-height:1.1}
+.slot .lock{position:absolute;top:5px;right:7px;font-size:.55rem;letter-spacing:.08em;color:var(--gold-dark);font-weight:800}
+.slot button.rm{position:absolute;top:3px;right:4px;background:none;border:0;color:var(--text-mute);cursor:pointer;font-size:.9rem;line-height:1;padding:2px 4px}
+.slot button.rm:hover{color:#ff9a5c}
+
+.pool{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:8px;max-height:340px;overflow-y:auto;padding-right:4px}
+.pick{
+  text-align:left;cursor:pointer;padding:8px 10px;border-radius:9px;font-family:var(--f-body);
+  background:linear-gradient(180deg,var(--card1),var(--card2));
+  border:1px solid var(--card-border);border-left:3px solid var(--ac);color:var(--text);
+  font-size:.8rem;line-height:1.3;transition:border-color .14s,transform .14s
+}
+.pick:hover:not(:disabled){transform:translateX(2px);border-color:var(--ac)}
+.pick:disabled{opacity:.35;cursor:not-allowed}
+.pick b{display:block;font-weight:800}
+.pick span{font-family:var(--f-mono);font-size:.7rem;color:var(--text-mute)}
+.pick[aria-pressed="true"]{border-color:var(--ac);box-shadow:0 0 12px var(--acg)}
+
+.slotmath{font-size:.86rem;color:#e4d3b2;line-height:1.55}
+.slotmath b{color:var(--gold)}
+
+/* ---------- arena map ---------- */
+.maprow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,300px);gap:18px;align-items:start}
+.mapwrap{background:radial-gradient(ellipse at 50% 45%, #1a2a10, #0a1208 62%, #050804);
+  border:1px solid var(--card-border);border-radius:14px;box-shadow:var(--shadow-panel);padding:10px;overflow:hidden}
+#arenaMap{width:100%;height:auto;display:block;transition:transform .6s cubic-bezier(.5,.05,.2,1)}
+#arenaMap.iso{transform:rotate(45deg) scale(.72)}
+.legend{display:flex;flex-direction:column;gap:9px}
+.lgi{display:flex;gap:9px;align-items:flex-start;font-size:.8rem;color:var(--text-dim);line-height:1.4}
+.lgi .sw{width:13px;height:13px;border-radius:4px;flex:0 0 auto;margin-top:2px;border:1px solid rgba(0,0,0,.5)}
+.lgi b{color:var(--text);font-weight:800;display:block}
+#mapinfo{min-height:3.2em;font-size:.84rem;color:#e4d3b2;line-height:1.45;
+  border-top:1px solid var(--rule);padding-top:11px}
+#mapinfo b{color:var(--gold)}
+
+.hot{cursor:pointer}
+.hot:hover .hl{opacity:1}
+.hl{opacity:0;transition:opacity .16s}
+
+/* ---------- open problem callout ---------- */
+.openprob{
+  margin-top:18px;border:1px solid #a85f2a;border-left:4px solid #ff9a5c;border-radius:14px;
+  padding:20px 22px;background:linear-gradient(180deg,rgba(120,58,20,.28),rgba(26,14,6,.85));
+  box-shadow:0 0 24px rgba(224,122,58,.14), var(--shadow-card);
+  display:flex;flex-direction:column;gap:11px
+}
+.openprob h3{color:#ff9a5c;text-shadow:0 0 16px rgba(255,154,92,.3)}
+.openprob > p{font-size:.9rem;color:#ecd9bd;max-width:76ch;line-height:1.6}
+.openprob > p b{color:#ffb680}
+.levers{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:3px}
+.levers > div{background:rgba(12,7,3,.5);border:1px solid rgba(168,95,42,.45);border-radius:9px;padding:11px 13px}
+.levers h4{color:var(--gold);font-size:.85rem;margin-bottom:4px}
+.levers p{font-size:.78rem;color:var(--text-dim);line-height:1.45}
+.why-parked{font-size:.86rem;color:var(--text-dim);border-top:1px solid rgba(168,95,42,.4);padding-top:11px;max-width:76ch}
+.why-parked b{color:#ff9a5c}
+
+/* ---------- tech stack ---------- */
+.stackgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:12px}
+.tech{background:linear-gradient(180deg,var(--card1),var(--card2));border:1px solid var(--card-border);
+  border-top:2px solid var(--tc);border-radius:12px;padding:15px 16px;box-shadow:var(--shadow-card)}
+.tech .th{display:flex;align-items:baseline;justify-content:space-between;gap:9px;margin-bottom:9px}
+.tech h4{color:var(--tc)}
+.tech .badge{font-family:var(--f-mono);font-size:.68rem;color:var(--text-mute);white-space:nowrap}
+.tech ul{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:7px}
+.tech li{font-size:.82rem;color:var(--text-dim);line-height:1.45;padding-left:13px;position:relative}
+.tech li::before{content:'';position:absolute;left:0;top:.55em;width:5px;height:5px;border-radius:50%;
+  background:var(--tc);opacity:.75}
+.tech li b{color:var(--text);font-weight:800}
+.tech li code{font-family:var(--f-mono);font-size:.76rem;color:var(--gold-deep)}
+
+/* ---------- jump ladder ---------- */
+.ladder{display:grid;gap:9px}
+.rung{display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px;align-items:center}
+.rung .rn{font-family:var(--f-display);font-size:.92rem;color:var(--text);line-height:1.15}
+.rung .rn small{display:block;font-family:var(--f-mono);font-size:.72rem;color:var(--gold-deep)}
+.rbar{height:24px;border-radius:7px;background:#1a1008;border:1px solid #3d2a14;position:relative;overflow:hidden;box-shadow:inset 0 2px 5px rgba(0,0,0,.7)}
+.rbar .rf{position:absolute;left:0;top:0;bottom:0;display:flex;align-items:center;padding:0 9px;
+  background:linear-gradient(90deg,var(--gold-dark),var(--gold));
+  box-shadow:0 0 12px rgba(245,200,66,.4);transition:width .5s cubic-bezier(.22,.9,.3,1)}
+.rbar .rlab{font-family:var(--f-mono);font-size:.71rem;font-weight:700;color:#150d04;
+  text-shadow:none;white-space:nowrap}
+.rnote{font-size:.79rem;color:var(--text-dim);margin-top:4px;line-height:1.35}
+
+.gate{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px}
+.gcell{border-radius:9px;padding:9px 10px;border:1px solid var(--card-border);background:rgba(20,12,5,.5);font-size:.78rem}
+.gcell b{display:block;font-size:.82rem;color:var(--text)}
+.gcell .verdict{font-family:var(--f-mono);font-weight:700;font-size:.9rem;margin-top:4px}
+.yes{color:#5ec463} .no{color:#ff7043}
+
+/* ---------- steal calculator ---------- */
+.calc{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;align-items:end}
+.field label{display:flex;justify-content:space-between;font-size:.78rem;font-weight:700;color:var(--text-dim);margin-bottom:2px}
+.field label span{font-family:var(--f-mono);color:var(--gold)}
+.result{
+  margin-top:16px;border:1px solid var(--card-border);border-radius:12px;padding:14px 16px;
+  background:linear-gradient(180deg,rgba(90,58,26,.4),rgba(26,16,8,.7));
+  display:flex;flex-wrap:wrap;gap:14px;align-items:baseline;justify-content:space-between
+}
+.result .big{font-family:var(--f-mono);font-size:2rem;font-weight:700;color:var(--gold);line-height:1;
+  text-shadow:0 0 18px rgba(245,200,66,.4)}
+.result .exp{font-size:.83rem;color:var(--text-dim);font-family:var(--f-mono)}
+.result .exp em{font-style:normal;color:var(--gold);font-weight:700}
+.result .verd{font-size:.86rem;color:#e6d5b4;max-width:44ch}
+
+/* ---------- execute flow ---------- */
+.flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.fstage{border:1px solid rgba(123,104,238,.4);border-radius:12px;padding:13px 14px;
+  background:linear-gradient(180deg,rgba(45,32,72,.55),rgba(20,14,34,.7))}
+.fstage h4{color:var(--assassin-lt);margin-bottom:5px}
+.fstage h4 small{font-family:var(--f-mono);color:#8c7ce0;font-size:.7rem;display:block;letter-spacing:.1em}
+.fstage p{font-size:.8rem;color:#d8cdf0;line-height:1.45}
+.fstage .cp{margin-top:8px;font-size:.76rem;color:#9bb98f;border-top:1px solid rgba(123,104,238,.3);padding-top:7px}
+.fstage .cp b{color:#5ec463;font-weight:800;letter-spacing:.06em;font-size:.66rem;text-transform:uppercase;display:block}
+
+/* ---------- footer ---------- */
+footer{margin-top:90px;border-top:1px solid var(--rule);padding-top:22px;
+  font-size:.8rem;color:var(--text-mute);line-height:1.6;display:flex;flex-wrap:wrap;gap:18px;justify-content:space-between}
+footer b{color:var(--text-dim)}
+
+/* ---------- responsive ---------- */
+@media (max-width:1080px){
+  .detail,.build,.maprow{grid-template-columns:minmax(0,1fr)}
+  .maprow{gap:14px}
+}
+@media (max-width:860px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .rail{position:sticky;top:0;height:auto;z-index:20;border-right:0;border-bottom:1px solid var(--rule);
+    padding:12px 16px;flex-direction:row;align-items:center;gap:14px;
+    background:linear-gradient(180deg,#2a1a0c,#160e05);backdrop-filter:blur(6px)}
+  .brand span,.railfoot{display:none}
+  .nav{flex-direction:row;overflow-x:auto;gap:4px;padding-bottom:2px;scrollbar-width:none}
+  .nav::-webkit-scrollbar{display:none}
+  .nav a{white-space:nowrap;padding:5px 10px}
+  .nav a i{display:none}
+  main{padding-left:16px;padding-right:16px}
+  section{padding-top:56px}
+  .slots{grid-template-columns:repeat(2,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+</style>
+
+<div class="shell">
+
+<nav class="rail" aria-label="Sections">
+  <div class="brand">
+    <b>CLUCK WARS</b>
+    <span>Mechanics Compendium</span>
+  </div>
+  <div class="nav" id="nav">
+    <a href="#overview"><i>01</i>Overview</a>
+    <a href="#loop"><i>02</i>The Loop</a>
+    <a href="#balance"><i>03</i>The SCT Axiom</a>
+    <a href="#roster"><i>04</i>Roster</a>
+    <a href="#abilities"><i>05</i>Ability Codex</a>
+    <a href="#loadout"><i>06</i>Loadout Rules</a>
+    <a href="#interactions"><i>07</i>Steal &amp; Control</a>
+    <a href="#execute"><i>08</i>The Execute</a>
+    <a href="#arena"><i>09</i>The Arena</a>
+    <a href="#traversal"><i>10</i>Traversal</a>
+    <a href="#controls"><i>11</i>Casting Feel</a>
+    <a href="#tech"><i>12</i>Technology</a>
+    <a href="#notes"><i>13</i>Design Notes</a>
+  </div>
+  <div class="railfoot">
+    Every number on this page is read from the shipped
+    <span class="mono">.asset</span> files, not from prose.
+  </div>
+</nav>
+
+<main>
+
+<!-- ============ 01 OVERVIEW ============ -->
+<section id="overview" class="hero">
+  <p class="eyebrow">Unity 6 &middot; URP &middot; Photon Fusion 2 &middot; 4-player free-for-all</p>
+  <h1>Forty-five seconds on the farm.</h1>
+  <p class="pitch">
+    Four chickens, one farm, forty-five seconds. Collect food, bank it at your base, and rob
+    everyone else blind before the clock runs out. <b>No health bars, no grinding a rival
+    down</b> &mdash; every fight is about taking their food and buying time.
+  </p>
+
+  <div class="facts">
+    <div class="fact"><b>45s</b><span>Match length</span><em>A loss costs nothing. A comeback is one steal away.</em></div>
+    <div class="fact"><b>40</b><span>Food to win</span><em>Or most banked when the clock expires.</em></div>
+    <div class="fact"><b>80</b><span>Food on the map</span><em>Exactly 2&times; the win target. It never respawns.</em></div>
+    <div class="fact"><b>4</b><span>Classes</span><em>Two specializations each &mdash; eight builds.</em></div>
+    <div class="fact"><b>29</b><span>Abilities</span><em>Plus 8 passives. Each belongs to one class.</em></div>
+    <div class="fact"><b>0</b><span>Hit points</span><em>Damage was deleted in v0.4. Combat is control + steal.</em></div>
+  </div>
+
+  <div class="note" style="margin-top:8px">
+    <b>How to read this page.</b> Cluck Wars is balanced from an axiom, not from taste &mdash;
+    stats are <em>solved</em>, never hand-tuned. Wherever a number appears here it is the value
+    that actually ships in <span class="mono">Assets/_Game/Data/</span>. Where the design
+    document and the data disagree, the data wins and the gap is flagged.
+  </div>
+</section>
+
+<!-- ============ 02 LOOP ============ -->
+<section id="loop">
+  <div class="shead">
+    <p class="eyebrow">02 &mdash; Core loop</p>
+    <h2>Farm, carry, bank, repeat &mdash; while three rivals try to stop you</h2>
+    <p class="lede">The loop is deliberately short enough to run four or five times in a match.
+      Everything interesting happens in the gap between picking food up and getting it home.</p>
+  </div>
+
+  <div class="panel">
+    <div class="loop">
+      <div class="step"><h4>Pick</h4><p>One class, one specialization, and the ability slots that choice leaves free.</p></div>
+      <div class="step"><h4>Spawn</h4><p>At your own corner base. Every client rotates the arena so your corner sits at the bottom of the screen.</p></div>
+      <div class="step"><h4>Farm</h4><p>Stand on a pile and Peck. Piles are tiered: 5 at your doorstep, 10 contested, 20 in the centre.</p></div>
+      <div class="step"><h4>Carry</h4><p>Cargo is capped per class. Standing on a pile slows you to <span class="mono">&times;0.80</span>; collisions slow you to <span class="mono">&times;0.75</span>.</p></div>
+      <div class="step"><h4>Bank</h4><p>Deposit at your base at <span class="mono">9 food/sec</span>. Banked food is safe &mdash; and permanently out of circulation.</p></div>
+    </div>
+
+    <div class="loopside">
+      <h4>&#8635; The side loop that decides matches</h4>
+      <p>At 2&times; supply, two players could theoretically max out by pure farming. So combat's
+      job is to <b>buy time</b>, and <b>steal</b> is the only mechanic that converts a won fight
+      directly into food. Catching a <em>loaded</em> rival mid-route beats winning a fair fight.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 03 BALANCE ============ -->
+<section id="balance">
+  <div class="shead">
+    <p class="eyebrow">03 &mdash; The balance backbone</p>
+    <h2>Solo Clear Time: every stat is a dependent variable</h2>
+    <p class="lede">
+      A <em>naked</em> chicken &mdash; no abilities, no passive, alone on the full map, farming
+      greedily &mdash; banks the win target in a fixed time, over a fixed number of base trips.
+      Move speed isn't 12.15 because it feels nice. It's 12.15 because Speedy must clear in 30&nbsp;seconds.
+    </p>
+  </div>
+
+  <div class="stack">
+    <div class="tw">
+      <table>
+        <thead><tr><th>Class</th><th class="n">SCT target</th><th class="n">Trips</th><th class="n">Move</th><th class="n">Cargo</th><th>Strategy</th></tr></thead>
+        <tbody id="sctbody"></tbody>
+      </table>
+    </div>
+
+    <div class="note why">
+      <b>The load-bearing detail.</b> Speedy and Assassin share the exact same move speed
+      (<span class="mono">12.15</span>) and the exact same cargo (<span class="mono">10</span>) &mdash;
+      yet one clears in 30s and the other in 40s. The entire gap is foraging rate. The Assassin
+      is a fast chicken who is <em>genuinely bad at farming</em>, and that is the mechanical
+      reason he denies instead of collects.
+    </div>
+
+    <div class="note warn">
+      <b>Verified, not asserted.</b> A pure-C# simulator (<span class="mono">BalanceOracle</span>)
+      runs the greedy farming policy against the real pile coordinates and asserts each class lands
+      within &plusmn;1.5s of its target. Trips are <span class="mono">ceil(40 / CargoCapacity)</span>
+      &mdash; which is why Fatty's 35 cargo buys him two trips and Speedy's 10 buys four.
+    </div>
+  </div>
+</section>
+
+<!-- ============ 04 ROSTER ============ -->
+<section id="roster">
+  <div class="shead">
+    <p class="eyebrow">04 &mdash; The roster</p>
+    <h2>Four archetypes, eight builds</h2>
+    <p class="lede">Classes differ by stat spread, specialization pool, and class-gated ability
+      access. Pick one to see its shipped numbers, its two specializations, and what each one
+      forces into your loadout.</p>
+  </div>
+
+  <div class="rosterpick" id="rosterpick"></div>
+  <div class="detail" id="rosterdetail"></div>
+</section>
+
+<!-- ============ 05 ABILITIES ============ -->
+<section id="abilities">
+  <div class="shead">
+    <p class="eyebrow">05 &mdash; The pool</p>
+    <h2>Ability codex</h2>
+    <p class="lede">
+      29 abilities and 8 passives. Since the 2026-08 rebuild, <b>a Character ability belongs to
+      exactly one class</b> &mdash; sharing is expressed only through the two-item Common pool.
+      Abilities used to be shared to widen loadouts, which cost the thing that makes a
+      4-player FFA readable: you could no longer tell what a chicken <em>was</em> by what it did.
+    </p>
+  </div>
+
+  <div class="filters">
+    <div class="fgroup"><span class="lbl">Class</span><div class="chips" id="fclass"></div></div>
+    <div class="fgroup"><span class="lbl">Role</span><div class="chips" id="fcat"></div></div>
+    <div class="fgroup"><span class="lbl">Kind</span><div class="chips" id="fkind"></div></div>
+    <div class="fgroup">
+      <span class="lbl">Find</span>
+      <input type="search" id="fsearch" placeholder="Name or effect&hellip;" aria-label="Search abilities">
+      <span class="acount" id="acount"></span>
+    </div>
+  </div>
+
+  <div class="codex" id="codex"></div>
+  <div class="panel drawer" id="drawer" hidden></div>
+</section>
+
+<!-- ============ 06 LOADOUT ============ -->
+<section id="loadout">
+  <div class="shead">
+    <p class="eyebrow">06 &mdash; Slot rules</p>
+    <h2>Two slots are decided for you. The rest are yours.</h2>
+    <p class="lede">
+      Every class gets exactly four active slots &mdash; no class has five buttons. Two of
+      them are determined rather than chosen: one answers to your <b>class</b>, one to your
+      <b>specialization</b>. Everything left over you pick freely.
+    </p>
+  </div>
+
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(250px,1fr));margin-bottom:16px">
+    <div class="card" style="border-left:3px solid var(--gold)">
+      <p class="eyebrow" style="margin-bottom:5px">Determined by class</p>
+      <h4 style="color:var(--gold);margin-bottom:6px">The forager slot</h4>
+      <p style="font-size:.85rem;color:var(--text-dim)">Warrior, Speedy and Fatty each carry
+        their own class's Peck &mdash; the amount and cooldown are authored per class, so this
+        is already a per-class variant rather than one shared button.
+        <b style="color:var(--assassin-lt)">The Assassin has no forager at all</b>, which is
+        the mechanical reason it cannot farm.</p>
+    </div>
+    <div class="card" style="border-left:3px solid var(--assassin)">
+      <p class="eyebrow" style="margin-bottom:5px">Determined by specialization</p>
+      <h4 style="color:var(--assassin-lt);margin-bottom:6px">The signature slot</h4>
+      <p style="font-size:.85rem;color:var(--text-dim)">Every specialization grants exactly one
+        signature ability, equipped automatically. This is what makes the specialization choice
+        read as a build rather than a stat tweak &mdash; you are choosing a button, not a
+        modifier.</p>
+    </div>
+    <div class="card" style="border-left:3px solid var(--defense)">
+      <p class="eyebrow" style="margin-bottom:5px">Chosen by you</p>
+      <h4 style="color:var(--defense);margin-bottom:6px">The rest</h4>
+      <p style="font-size:.85rem;color:var(--text-dim)">A forager always picks <b>2</b>; the
+        Assassin, having no forager slot to spend, always picks <b>3</b>. Free picks come from
+        that class's own pool plus the two Common abilities. Slot pressure never depends on
+        which specialization you took.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="row" style="margin-bottom:14px">
+      <div class="chips" id="bclass"></div>
+      <span class="mute">&rarr;</span>
+      <div class="chips" id="bspec"></div>
+    </div>
+
+    <div class="build">
+      <div class="stack">
+        <div class="slots" id="bslots"></div>
+        <p class="slotmath" id="bmath"></p>
+      </div>
+      <div class="stack">
+        <p class="eyebrow">Free picks &mdash; this class's legal pool</p>
+        <div class="pool" id="bpool"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note warn" style="margin-top:14px">
+    <b>Three specializations have no signature assigned yet.</b> The Agile, the Anxious and
+    the Hauler currently grant their passive only &mdash; the one place where
+    &ldquo;every specialization determines a signature&rdquo; is not yet literally true.
+    They were previously earmarked for Peck <em>variants</em>, but that plan was retired on
+    2026-09-04: under this model the forager slot answers to the <em>class</em>, so a
+    specialization cannot grant one. The per-class foraging variation those variants wanted
+    already exists in each class's authored Peck values. They need ordinary abilities instead.
+  </div>
+</section>
+
+<!-- ============ 07 INTERACTIONS ============ -->
+<section id="interactions">
+  <div class="shead">
+    <p class="eyebrow">07 &mdash; Chicken versus chicken</p>
+    <h2>Steal and control are the whole combat system</h2>
+    <p class="lede">There is no basic attack, no HP and no damage. Encounters are decided by
+      ability choice, cooldown management and positioning.</p>
+  </div>
+
+  <div class="stack">
+
+    <div class="panel">
+      <p class="eyebrow" style="margin-bottom:10px">The control ladder</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>State</th><th>Move</th><th>Cast</th><th>Collect</th><th>How the HUD says so</th></tr></thead>
+          <tbody>
+            <tr><td><span class="tag" style="color:#9d8a63">Free</span></td><td class="yes">yes</td><td class="yes">yes</td><td class="yes">yes</td><td class="dim">Nothing marked.</td></tr>
+            <tr><td><span class="tag" style="color:var(--utility)">Slowed</span></td><td class="dim">reduced</td><td class="yes">yes</td><td class="yes">yes</td><td class="dim">Stick tints cyan with a <span class="mono">&times;0.45</span> magnitude label. Ability buttons untouched &mdash; greying them would say the opposite of the truth.</td></tr>
+            <tr><td><span class="tag" style="color:var(--control)">Rooted</span></td><td class="no">no</td><td class="yes">yes</td><td class="no">no</td><td class="dim">Stick greys out with a shackle. Buttons stay normal &mdash; <b>you can still cast while rooted</b>, and that is a real tactical option the UI must not hide.</td></tr>
+            <tr><td><span class="tag" style="color:#ff5252">Stunned</span></td><td class="no">no</td><td class="no">no</td><td class="no">no</td><td class="dim">Every ability hex takes a red wash and an X. Stun is the only state that locks casting.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note why" style="margin-top:12px">
+        <b>Why stun is special.</b> Because it is the only state that locks <em>casting</em>, it is
+        the qualifier for the Assassin's execute. Stun exists in exactly two classes &mdash; Assassin
+        and Warrior &mdash; which is what makes the deny/enable counterplay reachable.
+        Slow, root and stun are independent and can all be active at once.
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="eyebrow" style="margin-bottom:4px">The steal formula</p>
+      <h3 style="margin-bottom:12px">A loaded thief cannot steal</h3>
+      <p class="mono" style="font-size:.9rem;color:var(--gold);margin-bottom:16px">
+        stolen = min(abilityStealValue, attackerFreeSpace, defenderCargo)
+      </p>
+      <div class="calc">
+        <div class="field">
+          <label for="s1">Ability steal value <span id="s1v">6</span></label>
+          <input type="range" id="s1" min="1" max="12" value="6">
+        </div>
+        <div class="field">
+          <label for="s2">Your free cargo space <span id="s2v">4</span></label>
+          <input type="range" id="s2" min="0" max="35" value="4">
+        </div>
+        <div class="field">
+          <label for="s3">Their carried cargo <span id="s3v">18</span></label>
+          <input type="range" id="s3" min="0" max="35" value="18">
+        </div>
+      </div>
+      <div class="result">
+        <div><span class="big" id="sout">4</span> <span class="dim" style="font-size:.8rem">food transferred</span></div>
+        <div class="exp" id="sexp"></div>
+        <div class="verd" id="sverd"></div>
+      </div>
+      <div class="note" style="margin-top:14px">
+        <b>Cargo transfers directly, attacker to victim.</b> Nothing ever drops on the floor. The
+        formula self-regulates: a full thief steals zero, so theft is a rhythm &mdash; steal, bank,
+        return &mdash; not a drain. And Fatty's 35 cargo can only leave in bites of 3 to 6, so under
+        pressure he <em>bleeds</em> instead of popping. His defensive abilities are what he is actually playing.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 08 EXECUTE ============ -->
+<section id="execute">
+  <div class="shead">
+    <p class="eyebrow">08 &mdash; The only hard removal</p>
+    <h2>Mark / Kill: one button, two presses</h2>
+    <p class="lede">
+      A chicken is never killed &mdash; except by this. It is the Reaper specialization's forced
+      signature, so choosing Reaper equips it automatically. The Burglar does not carry it at all
+      and can never execute.
+    </p>
+  </div>
+
+  <div class="flow">
+    <div class="fstage">
+      <h4>Mark<small>PRESS 1</small></h4>
+      <p>Soft-locks the nearest <b>isolated</b> rival in facing &mdash; no chicken within 8&nbsp;m. Visible to the target.</p>
+      <div class="cp"><b>Counterplay</b>Stay near others. In an FFA, safety means approaching an enemy.</div>
+    </div>
+    <div class="fstage">
+      <h4>Arm<small>2.0 SECONDS</small></h4>
+      <p>The mark must survive two full seconds before it becomes live.</p>
+      <div class="cp"><b>Counterplay</b>Break isolation or leave range and the mark fizzles.</div>
+    </div>
+    <div class="fstage">
+      <h4>Qualify<small>TARGET STUNNED</small></h4>
+      <p>The marked target enters a stun &mdash; his own Ambush, or <em>any</em> stun, including a Warrior's Wing Slam. The button relabels to <b>KILL</b>.</p>
+      <div class="cp"><b>Counterplay</b>Don't get stunned. Hold a defensive ability.</div>
+    </div>
+    <div class="fstage">
+      <h4>Kill<small>PRESS 2</small></h4>
+      <p>Fires only while the target is stunned <em>and the Assassin is not himself stunned</em>.</p>
+      <div class="cp"><b>Counterplay</b>A third party can stun the Assassin to deny it. Stun the hunter to save the prey.</div>
+    </div>
+  </div>
+
+  <div class="note why" style="margin-top:14px">
+    <b>On success</b> the victim's entire cargo transfers to the Assassin as a
+    <em>capacity-exempt bounty bag</em> &mdash; he becomes a courier carrying a stolen win, far past
+    his own 10-cargo limit. The victim is removed for about two seconds and respawns empty.
+    <b>On failure</b> Mark/Kill takes a reduced cooldown, so he re-marks fast.
+  </div>
+</section>
+
+<!-- ============ 09 ARENA ============ -->
+<section id="arena">
+  <div class="shead">
+    <p class="eyebrow">09 &mdash; The arena</p>
+    <h2>A 51.3&nbsp;m square you can never see all of</h2>
+    <p class="lede">
+      Four bases, one per corner. Eight radial walls on the boundaries of eight 45&deg; sectors.
+      Nine food piles in three tiers. The arena is about 1.9 screens edge-to-edge &mdash; that
+      information gap is deliberate, and it is what makes routing and ambush matter.
+    </p>
+  </div>
+
+  <div class="maprow">
+    <div class="mapwrap">
+      <svg id="arenaMap" viewBox="-31 -31 62 62" role="img" aria-label="Top-down diagram of the Cluck Wars arena"></svg>
+    </div>
+
+    <div class="stack">
+      <div class="chips" id="maplayers"></div>
+      <div class="legend" id="maplegend"></div>
+      <p id="mapinfo">Hover or tap any pile, base or wall for its shipped values.</p>
+    </div>
+  </div>
+
+  <div class="openprob">
+    <p class="eyebrow" style="margin-bottom:6px">Open problem &mdash; known, accepted for now, must be solved</p>
+    <h3>The arena is too big for four players in forty-five seconds</h3>
+    <p>
+      In play, four chickens on a 51.3&nbsp;m square rarely run into each other. Routes are long
+      enough that a whole match can pass in parallel &mdash; everyone farms, everyone banks, and
+      the encounter the entire v0.4 redesign exists to produce never happens.
+      <b>The control-and-steal systems go unexercised</b>, which means the part of the game we
+      spent the redesign on is the part players see least.
+    </p>
+    <p>
+      This is a density problem, not a layout problem. The topology on the map above &mdash; two
+      laps, eight wedges, tiered piles &mdash; is sound and measured. There is simply too much
+      floor per chicken per second.
+    </p>
+    <div class="levers">
+      <div><h4>Shrink the arena</h4><p>Cheapest, but every spatial constant derives from arena half-size, and the last rescale held clear time constant by moving speeds with it. Shrinking alone shortens clear time unless speeds come down too.</p></div>
+      <div><h4>Pull the objectives inward</h4><p>Reduce the contested and doorstep radii so routes overlap sooner, without touching arena size or the sightline contract.</p></div>
+      <div><h4>Raise the player count</h4><p>The arena may simply be sized for six to eight. Changes the free-for-all maths and the win target, so it is the most expensive option.</p></div>
+      <div><h4>Funnel traffic with geometry</h4><p>More interior structure forcing shared corridors. The scatter system already implements a barrier role — it ships at zero.</p></div>
+    </div>
+    <p class="why-parked">
+      <b>Why it is parked.</b> We do not yet know whether the encounter <em>rate</em> is wrong or
+      the <em>readability</em> of encounters is wrong, and guessing costs a re-solve of every
+      derived constant. This is the first question a human playtest has to answer.
+    </p>
+  </div>
+
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(272px,1fr));margin-top:16px">
+    <div class="card">
+      <h4 style="color:var(--gold);margin-bottom:6px">The two laps</h4>
+      <p style="font-size:.85rem;color:var(--text-dim)">
+        The pattern is 4-fold symmetric, so <b>every player's sector is identical</b>: an
+        outer-gap wall on one side, an inner-gap wall on the other. Combined with per-player
+        rotation that becomes one universal, learnable rule &mdash;
+        <b style="color:var(--defense)">left is the safe lap</b> (out to the rim, along the edge,
+        past a contested pile) and <b style="color:var(--steal)">right is the risky lap</b>
+        (in past the hub plaza and the centre pile).
+      </p>
+    </div>
+    <div class="card">
+      <h4 style="color:var(--gold);margin-bottom:6px">Why exactly eight wedges</h4>
+      <p style="font-size:.85rem;color:var(--text-dim)">
+        Not a round number &mdash; a proven optimum. Every pile and base sits on a multiple of
+        45&deg;, so the offset between a wall and the nearest objective is a pure function of the
+        wedge count. A wall closer than <span class="mono">11.665&deg;</span> to an objective gets
+        clipped away by its keep-clear disc. W=8 gives <span class="mono">22.5&deg;</span> &mdash;
+        the maximum the topology allows. W=12 and W=20 land four arms <em>exactly</em> on the
+        corner diagonals; W=16 misses by 0.415&deg;. Raising the count adds arms that the
+        objectives then delete.
+      </p>
+    </div>
+    <div class="card">
+      <h4 style="color:var(--gold);margin-bottom:6px">Piles never respawn</h4>
+      <p style="font-size:.85rem;color:var(--text-dim)">
+        Banked food leaves circulation permanently, so the pot visibly shrinks and the late game
+        gets desperate on its own &mdash; no endgame rule required. Fatty's winning route (a
+        35-cargo sweep of centre plus two contested piles) is forced <em>through</em> the
+        contested ring: he cannot win without walking past everyone.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 10 TRAVERSAL ============ -->
+<section id="traversal">
+  <div class="shead">
+    <p class="eyebrow">10 &mdash; Getting over things</p>
+    <h2>All jumps are teleports</h2>
+    <p class="lede">
+      There are no obstacle height classes. Whether a jump clears something depends only on its
+      <b>length versus the obstacle's span along the jump direction</b>, plus 0.8&nbsp;m of body
+      clearance. Three tiers ship. Pick one.
+    </p>
+  </div>
+
+  <div class="panel stack">
+    <div class="chips" id="jumppick"></div>
+    <div class="ladder" id="jumpladder"></div>
+
+    <div>
+      <p class="eyebrow" style="margin-bottom:8px">What this tier clears, square on</p>
+      <div class="gate" id="jumpgate"></div>
+    </div>
+
+    <div class="note warn">
+      <b>Failure is not a no-op.</b> If the landing point is blocked, you travel as far as you
+      can and stop flush against the near face &mdash; you slam into it rather than failing in
+      place. <b>The cooldown is still spent.</b> A small tolerance
+      (<span class="mono">max(12%, 0.4&nbsp;m)</span>, hard-capped at 0.8&nbsp;m) extends a jump
+      that falls only slightly short, so long jumps can't quietly gain reach.
+    </div>
+  </div>
+
+  <div class="panel stack" style="margin-top:14px">
+    <div>
+      <p class="eyebrow" style="margin-bottom:4px">Emergent late game</p>
+      <h3>The ring becomes a circle</h3>
+      <p class="dim" style="font-size:.9rem;margin-top:6px;max-width:64ch">
+        The centre pile's footprint shrinks with its remaining food. Since span is the only thing
+        gating traversal, <b>the map opens itself in stages with no extra systems</b> &mdash; the
+        prize everyone is fighting over is also the wall protecting it, so the arena dissolves
+        exactly as the match converges.
+      </p>
+    </div>
+
+    <div class="field" style="max-width:420px">
+      <label for="pilefill">Centre pile remaining <span id="pilefillv">100%</span></label>
+      <input type="range" id="pilefill" min="10" max="100" value="100" step="5">
+    </div>
+
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))" id="pilestate"></div>
+
+    <div class="note why">
+      <b>Balance-critical, not cosmetic.</b> How fast it opens is a tuning curve on the pile's
+      shrink rate. A linear footprint would end the fortress phase at around 75% remaining, which
+      is likely far too early.
+    </div>
+  </div>
+</section>
+
+<!-- ============ 11 CONTROLS ============ -->
+<section id="controls">
+  <div class="shead">
+    <p class="eyebrow">11 &mdash; Game feel</p>
+    <h2>Hold to aim, release to fire</h2>
+    <p class="lede">
+      The rule that matters is short: <b>an ability always fires on release, never on press.</b>
+      There is no tap window and no branch. Holding does not charge power. What the hold buys you
+      is information &mdash; and it costs you mobility.
+    </p>
+  </div>
+
+  <div class="stack">
+    <div class="tw">
+      <table>
+        <thead><tr><th></th><th>Quick tap <span class="mute mono" style="font-weight:400">&lt; 120 ms</span></th><th>Deliberate hold <span class="mute mono" style="font-weight:400">&ge; 120 ms</span></th></tr></thead>
+        <tbody>
+          <tr><td><b>Ground telegraph</b></td><td class="dim">none</td><td>Your true area, drawn</td></tr>
+          <tr><td><b>Target marks</b></td><td class="dim">none</td><td>Every chicken in the area classified &mdash; will-be-hit vs. immune</td></tr>
+          <tr><td><b>Wind-up glow rivals see</b></td><td class="dim">none</td><td>Ramps up at your feet</td></tr>
+          <tr><td><b>Movement</b></td><td class="yes">Full speed</td><td class="no">The stick rotates your aim instead of moving you</td></tr>
+          <tr><td><b>Latency to fire</b></td><td>On release</td><td>On release &mdash; identical</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note why">
+      <b>The asymmetry is the point.</b> You see your true area; rivals see only a growing glow at
+      your feet &mdash; a wind-up tell, not your shape. That preserves the read
+      (&ldquo;he's charging something, disengage&rdquo;) without turning the arena into a solved
+      puzzle. And because the glow now only appears when someone is genuinely committing to an
+      aim, it means something again &mdash; it used to fire on every press, so rivals learned to
+      ignore it.
+    </div>
+
+    <div class="panel">
+      <p class="eyebrow" style="margin-bottom:10px">Why a button refuses &mdash; four reasons, told apart at a glance</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Reason</th><th>What you see</th></tr></thead>
+          <tbody>
+            <tr><td><b>On cooldown</b></td><td class="dim">Darkens from the bottom up, seconds remaining in the centre.</td></tr>
+            <tr><td><b>No valid target in range</b></td><td class="dim">Colour drains to grey, a no-entry glyph appears.</td></tr>
+            <tr><td><b>Stunned</b></td><td class="dim">Red wash and an X, on all buttons at once.</td></tr>
+            <tr><td><b>Another ability is running</b></td><td class="dim">The cluster dims; the running ability keeps full colour and drains from the top down.</td></tr>
+            <tr><td><b>Slot not available to your class</b></td><td class="dim">The button isn't rendered at all.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="dim" style="font-size:.85rem;margin-top:11px">
+        Pressing a refused button <b style="color:var(--gold)">shakes it and clicks</b>. A press is
+        never silently swallowed. Cancelling a held ability &mdash; dragging past ~55&nbsp;dp, or
+        Esc on desktop &mdash; releases <em>without</em> burning the cooldown; losing pointer
+        capture to an OS gesture counts as a cancel, never a fire.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 12 TECHNOLOGY ============ -->
+<section id="tech">
+  <div class="shead">
+    <p class="eyebrow">12 &mdash; Technology</p>
+    <h2>What it is built on, and why</h2>
+    <p class="lede">
+      A mobile-first networked action game has two hard constraints: it must simulate
+      identically on every peer, and it must hold frame rate on a five-year-old Android phone.
+      Nearly every choice below is downstream of one of those two.
+    </p>
+  </div>
+
+  <div class="stackgrid">
+
+    <div class="tech" style="--tc:#f5c842">
+      <div class="th"><h4>Engine &amp; rendering</h4><span class="badge">Unity 6000.3 LTS</span></div>
+      <ul>
+        <li><b>Universal Render Pipeline.</b> Mobile-tier lighting and post with a single pass budget. URP materials only — a Built-in RP shader silently breaks the build target.</li>
+        <li><b>MonoBehaviour, not ECS/DOTS.</b> Deliberate: four chickens and nine piles never stress the object model, and DOTS would cost far more in networking complexity than it returns.</li>
+        <li><b>2.5D.</b> Real 3D meshes on an orthographic isometric camera — no perspective distortion, so silhouettes stay readable at any position on screen.</li>
+        <li><b>Targets.</b> 60 fps Windows, a stable 30 on mid-range Android from 2021 onward.</li>
+      </ul>
+    </div>
+
+    <div class="tech" style="--tc:#35cfe2">
+      <div class="th"><h4>Networking</h4><span class="badge">Photon Fusion 2 · Shared Mode</span></div>
+      <ul>
+        <li><b>Shared Mode for the demo.</b> Each peer holds state authority over its own chicken; the master client owns scene objects — food piles, bases, the match manager.</li>
+        <li><b>Every cross-authority write is an RPC.</b> <code>[Rpc(RpcSources.All, RpcTargets.StateAuthority)]</code>, with the target validating range, cooldown and legality before applying. The caster's word is never final.</li>
+        <li><b>Simulation runs at a 30 Hz tick.</b> Prediction for the local player is automatic; snapshots reconcile silently behind it.</li>
+        <li><b>Forward-compatible with Server Mode.</b> Every state write is already gated on state authority, so moving authority server-side post-funding changes the host, not the shape of the code.</li>
+      </ul>
+    </div>
+
+    <div class="tech" style="--tc:#c063d8">
+      <div class="th"><h4>Architecture</h4><span class="badge">Zenject · interface-first</span></div>
+      <ul>
+        <li><b>Two DI scopes.</b> An app-wide container that survives scene loads, and a scene container for match-lifetime bindings.</li>
+        <li><b>Everything external sits behind an interface</b> — networking, backend, audio, input, logging. Gameplay code never touches Fusion, Unity Gaming Services or the Input System directly, which is what makes the demo runnable with null implementations.</li>
+        <li><b>Self-injection for networked objects.</b> Fusion spawns outside the DI graph, so networked behaviours inject themselves on spawn rather than being constructed by the container.</li>
+        <li><b>Data lives in ScriptableObjects.</b> Classes, abilities, match config, palette and prefab registries are all authored assets — which is why this page can be generated from them.</li>
+      </ul>
+    </div>
+
+    <div class="tech" style="--tc:#5ec463">
+      <div class="th"><h4>Balance &amp; testing</h4><span class="badge">EditMode suite</span></div>
+      <ul>
+        <li><b>The Balance Oracle.</b> A pure-C# simulator with no Unity types, running the greedy farming policy against the real pile coordinates. Class stats are solved against it, never hand-tuned.</li>
+        <li><b>Design rules are tests.</b> Speedy's traversal ban, the eight-wedge optimum, the wall-versus-pile clearances and the traversal matrix are all pinned by EditMode tests that fail with the reason in the message.</li>
+        <li><b>Roster integrity is checked live</b> in an editor window, so an ability drifting to a second class is caught while authoring rather than in review.</li>
+      </ul>
+    </div>
+
+    <div class="tech" style="--tc:#ff7043">
+      <div class="th"><h4>Platforms &amp; UI</h4><span class="badge">Windows · Android · iOS</span></div>
+      <ul>
+        <li><b>Mobile-first input.</b> Left-thumb virtual joystick sets both movement and facing; four right-thumb ability buttons. Everything works on a touchscreen first, desktop second.</li>
+        <li><b>UI Toolkit only for menus.</b> UXML and USS, no procedural UGUI — the older AI-generated prefab paths were deleted outright rather than left as a second way to do the same thing.</li>
+        <li><b>Windows is primary dev, Android is the target.</b> iOS ships as an Xcode export, off by default.</li>
+      </ul>
+    </div>
+
+    <div class="tech" style="--tc:#c4a060">
+      <div class="th"><h4>Backend &amp; tooling</h4><span class="badge">UGS · MCP bridge</span></div>
+      <ul>
+        <li><b>Unity Gaming Services behind one interface</b> for auth, lobbies and relay, with a null implementation so the demo runs with no backend at all.</li>
+        <li><b>An MCP bridge into the Editor.</b> Agents inspect scenes, query assets, edit components, take screenshots and run the test suite directly — which is how the data on this page was read.</li>
+        <li><b>In-game diagnostics.</b> A debug HUD on F1, structured log sources, and device logs over adb.</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ 13 NOTES ============ -->
+<section id="notes">
+  <div class="shead">
+    <p class="eyebrow">13 &mdash; Design notes</p>
+    <h2>Decisions worth defending</h2>
+    <p class="lede">A compendium of mechanics is only half the story. These are the calls that
+      shaped them, including the ones that were wrong the first time.</p>
+  </div>
+
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+
+    <div class="card">
+      <p class="eyebrow" style="margin-bottom:6px">Constraint</p>
+      <h4 style="color:var(--speedy-lt);margin-bottom:7px">Speedy never gets terrain traversal</h4>
+      <p style="font-size:.85rem;color:var(--text-dim)">Not a jump, not a blink, not a vault.
+        Speedy already answers two currencies alone: escape (highest move speed, multiplied
+        further by Speed Burst) and denial (three control abilities). Traversal would be a third
+        with nothing traded for it, and the map would stop constraining the fastest chicken in
+        the game. The line is <em>no ignoring terrain</em>, not <em>no mobility</em> &mdash; which
+        is why Speed Burst is deliberately legal.</p>
+      <p style="font-size:.8rem;color:var(--text-mute);margin-top:8px;border-top:1px solid var(--rule);padding-top:7px">
+        This rule had already been broken once by asset drift: Shadowstep serialized a class mask
+        including Speedy against a constructor, a docstring and the design doc that all said
+        Assassin. An EditMode test now sweeps the whole roster for it.</p>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow" style="margin-bottom:6px">Correction</p>
+      <h4 style="color:var(--gold);margin-bottom:7px">A margin that was 24&times; larger than believed</h4>
+      <p style="font-size:.85rem;color:var(--text-dim)">The wall layout was documented as surviving
+        pile keep-clear discs by about 0.15&nbsp;m &mdash; terrifyingly tight. That figure had been
+        computed against a pre-shrink pile footprint at a pre-rescale radius: a map that stopped
+        shipping months earlier. Measured against what actually ships, the margin is
+        <span class="mono">+3.656&nbsp;m</span>. The lesson isn't the number, it's that a derived
+        constant outlived the geometry it was derived from and nothing caught it.</p>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow" style="margin-bottom:6px">Consolidation</p>
+      <h4 style="color:var(--assassin-lt);margin-bottom:7px">Abilities stopped being shared</h4>
+      <p style="font-size:.85rem;color:var(--text-dim)">Speed Burst and Snatch used to live in the
+        Common pool. Both turned out to be class essences hiding in shared clothing &mdash; a
+        universal sprint erases Speedy's whole &ldquo;fastest in the game&rdquo; claim, and a
+        universal AoE steal <em>is</em> the Assassin's entire income. Widening loadouts had cost
+        readability. The Common pool is now exactly two abilities.</p>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow" style="margin-bottom:6px">Deliberate weakness</p>
+      <h4 style="color:var(--warrior-lt);margin-bottom:7px">Some abilities are worse on purpose</h4>
+      <p style="font-size:.85rem;color:var(--text-dim)">Headbutt is deliberately weaker than Cluck
+        Shock &mdash; the shortest cooldown in the Warrior kit pays for it. Ruffle is deliberately
+        weaker than Speed Burst. Scrap is deliberately weaker than Sneaky Steal. Each pairing is a
+        class identity statement, not a balance oversight: the weaker version is the one whose
+        class doesn't own that fantasy.</p>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow" style="margin-bottom:6px">Known gap</p>
+      <h4 style="color:#ff9a5c;margin-bottom:7px">Simplifying the slot rules retired a plan</h4>
+      <p style="font-size:.85rem;color:var(--text-dim)">The old model let slot pressure vary by
+        specialization, and nobody could hold it in their head. Restating it as
+        <em>class decides the forager, specialization decides the signature</em> fixed the
+        confusion &mdash; and killed the plan for the three unassigned signatures in the same
+        move, since they were all going to be Peck variants and a specialization can no longer
+        grant a forager. The variation those variants wanted turned out to already exist, in
+        each class's own authored Peck values. Three specializations now need ordinary
+        abilities instead.</p>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow" style="margin-bottom:6px">Flagged</p>
+      <h4 style="color:#ff9a5c;margin-bottom:7px">Wing Slam contradicts its own class</h4>
+      <p style="font-size:.85rem;color:var(--text-dim)">At a 12-second cooldown it is the longest in
+        the game &mdash; sitting on the class whose essence is spamming abilities. It is flagged
+        for re-tuning rather than quietly left alone. Similarly, Turtle Mode and Roll &amp; Push
+        still carry flavour text mentioning &ldquo;damage&rdquo;, left over from the pre-v0.4
+        combat model. The mechanics are correct; only the copy is stale. Both are marked in the
+        codex above.</p>
+    </div>
+
+  </div>
+</section>
+
+<footer>
+  <div>
+    <b>The Cluck Wars Compendium</b><br>
+    Generated from the shipped project data &mdash; class and ability ScriptableObjects,
+    <span class="mono">MatchConfig</span>, <span class="mono">PinwheelLayout</span>,
+    <span class="mono">JumpResolver</span> &mdash; cross-read against the GDD.
+  </div>
+  <div style="text-align:right">
+    Unity 6000.3 LTS &middot; URP &middot; Photon Fusion 2 Shared Mode<br>
+    Zenject &middot; Windows &amp; Android &middot; 4-player free-for-all
+  </div>
+</footer>
+
+</main>
+</div>
+
+<script>
+/* ============================================================
+   DATA — transcribed from the shipped project files.
+   Classes  : Assets/_Game/Data/Classes/*.asset
+   Abilities: Assets/_Game/Data/Abilities/ + Abilities/Passives/
+   Match    : Assets/_Game/Data/MatchConfig.asset
+   Geometry : Gameplay/MapGenerator.cs + PinwheelLayout.cs
+   Jumps    : Gameplay/JumpResolver.cs
+   ============================================================ */
+
+const CATS = [
+  {id:0, name:'Steal',   col:'#ff7043'},
+  {id:1, name:'Control', col:'#c063d8'},
+  {id:2, name:'Defense', col:'#5ec463'},
+  {id:3, name:'Utility', col:'#35cfe2'}
+];
+
+const CLASSES = [
+  { id:'warrior', name:'Warrior', col:'#c04030', lt:'#f09888', glow:'rgba(192,64,48,.45)',
+    move:10.125, cargo:14, peckAmt:3, peckCd:0.91, scale:1.0, sct:35, trips:3,
+    strategy:'The ability class — mid stats, leans on his kit',
+    fantasy:'The farm is a battlefield.',
+    essence:'The bruiser. Good for all, expert in nothing. Spams abilities.',
+    contract:'Short cooldowns, broad coverage, and every effect deliberately weaker than the specialist’s version. “Expert in nothing” is a number, not flavour text.',
+    proof:[
+      ['He covers every role','Steal, control and utility all appear in his six abilities. No other class spans the board.'],
+      ['Every tool is the weaker copy','Scrap takes 3 food where the Assassin’s Sneaky Steal takes 6. Ruffle gives ×1.5 speed where Speed Burst gives ×2.5. Headbutt shoves less than Cluck Shock.'],
+      ['He pays for it in cooldown','Headbutt at 4 s and Snatch-class pressure at 5 s let him press buttons constantly — being second-best at everything is only playable if you get more turns.']
+    ],
+    violation:'Wing Slam sits at a 12 s cooldown — the longest in the game, on the class whose entire identity is spamming. The kit contradicts the essence here, and it is flagged for re-tuning.' },
+  { id:'speedy', name:'Speedy', col:'#e85a2a', lt:'#ffb088', glow:'rgba(232,90,42,.45)',
+    move:12.15, cargo:10, peckAmt:3, peckCd:0.77, scale:0.85, sct:30, trips:4,
+    strategy:'Throughput — many small loads, roams wide',
+    fantasy:'If you cannot catch me, you cannot rob me.',
+    essence:'The fastest one. Pick all the grain you can in the shortest time. Tools for escaping and slowing others — but never jumping obstacles, because it would be unfair.',
+    contract:'Tempo and denial-of-pursuit. Terrain traversal is permanently forbidden — the map has to keep constraining the fastest chicken in the game.',
+    proof:[
+      ['Not one of his six abilities crosses terrain','No jump, no blink, no vault — enforced by an EditMode test that sweeps the whole roster, because this rule had already been broken once by asset drift.'],
+      ['Half his kit is a slow','Dust Kick, Feather Aura and Feather Trap all reduce someone else’s speed. If he cannot outrun you, he makes you slower instead.'],
+      ['His only cone fires backwards','Dust Kick is the one ability in the game aimed away from facing. Fleeing is the play, so the tool points behind him.'],
+      ['Speed Burst is legal precisely because it is not traversal','A pure ground multiplier deepens the identity; a jump would bypass the geometry that balances him.']
+    ] },
+  { id:'fatty', name:'Fatty', col:'#f5d75a', lt:'#fff3b0', glow:'rgba(245,215,90,.4)',
+    move:10.125, cargo:35, peckAmt:3, peckCd:0.78, scale:1.35, sct:30, trips:2,
+    strategy:'Payload — one huge sweep, barely returns',
+    fantasy:'Slow, but it all fits in the beak.',
+    essence:'The slow but unstoppable force that carries no matter what. Jumps must be justified in the narrative, given the big size and low agility. His toolbox is opportunity and control.',
+    contract:'Area denial, punish, and cargo resilience. Any leap has to read as launched mass, not agility — slow wind-up, big telegraph, heavy landing, punishable if read.',
+    proof:[
+      ['Four of his seven abilities are control','Belly Flop, Ground Quake, Roll & Push and Root Egg all pin, root or shove. He does not chase you; he decides where you may stand.'],
+      ['Three are pure resilience','Immovable, Turtle Mode and Spine Coat exist because 35 cargo can only leave in bites of 3 to 6. Under pressure he bleeds rather than pops, so surviving the bleed is the game.'],
+      ['His one jump is the shortest tier in the game','Belly Flop travels 3.25 m with a long telegraph and pays off on the landing, not the travel. That is launched mass, not agility.'],
+      ['Even his dash is a shove','Roll & Push barges through low obstacles and deals nothing. Mass moving through things is the whole animation.']
+    ] },
+  { id:'assassin', name:'Assassin', col:'#7b68ee', lt:'#c4b8ff', glow:'rgba(123,104,238,.45)',
+    move:12.15, cargo:10, peckAmt:null, peckCd:null, scale:0.9, sct:40, trips:4,
+    strategy:'Denial — never actually farms; robs and executes',
+    fantasy:'Blink and your food is gone.',
+    essence:'The sneaky one. Stealing from others, isolating them, catching them, and killing from the shadows.',
+    contract:'Every tool needs a victim. Setup then payoff, binary outcomes, a high skill ceiling — and the only class that cannot forage, because it eats what others carried.',
+    proof:[
+      ['He has no forage button at all','Peck’s class mask excludes him outright. This is not a slow farmer — it is a chicken whose only income is other chickens.'],
+      ['His kit chains into itself','Smoke Roost manufactures the isolation Mark/Kill requires; Ambush supplies the stun that arms it. Setup, then payoff, in one hand.'],
+      ['Every approach tool is concealment, not speed','Invisibility, Shadowstep and Doppelganger get him next to a victim without being read. He shares Speedy’s move speed and spends it completely differently.'],
+      ['He owns the only hard removal in the game','Mark/Kill is also the only single-target ability. Everything else in Cluck Wars is self-centred or directional.']
+    ] }
+];
+
+const A = (o) => o;
+const ABILITIES = [
+  /* ---- COMMON ---- */
+  A({id:'peck', name:'Peck', short:'PECK', cls:['warrior','speedy','fatty'], cat:3, kind:0, cd:0.8, dur:0.4,
+     accent:'#f5cc4d', desc:'Take a beakful of food from the pile you are standing at.',
+     stats:[['Food per press','3'],['Cooldown','per class, 0.77–0.91 s']],
+     note:'Foraging IS Peck — there is no passive collection. The Assassin is excluded from this ability outright, which is exactly why he cannot farm.'}),
+  A({id:'eggshell', name:'Egg Shell', short:'EGG', cls:['warrior','speedy','fatty','assassin'], cat:2, kind:0, cd:8, dur:2.0,
+     accent:'#ebf0ff', desc:'Seals you in an egg — immune to damage, but you cannot move.',
+     stats:[['Duration','2.0 s'],['Cooldown','8 s']]}),
+
+  /* ---- WARRIOR ---- */
+  A({id:'cluckshock', name:'Cluck Shock', short:'CSK', cls:['warrior'], cat:1, kind:1, cd:7, dur:0.5,
+     accent:'#ffe61a', desc:'Knockback shockwave shoving nearby rivals away.',
+     stats:[['Shock radius','4.5 m'],['Duration','0.5 s'],['Cooldown','7 s']]}),
+  A({id:'divebomb', name:'Dive Bomb', short:'DVB', cls:['warrior'], cat:0, kind:1, cd:6, dur:0.6, jump:'Short',
+     accent:'#ff8c33', desc:'Hurls itself forward in a diving lunge, robbing cargo on contact.',
+     stats:[['Forward offset','3.25 m'],['Sweep radius','2.05 m'],['Jump tier','Short (3.25 m)'],['Cooldown','6 s']]}),
+  A({id:'headbutt', name:'Headbutt', short:'BUTT', cls:['warrior'], cat:1, kind:1, cd:4, dur:0.25,
+     accent:'#bf4d38', desc:'Short forward shove that staggers whoever it catches.', sig:'The Relentless',
+     stats:[['Reach','3.6 m'],['Cone','70°'],['Knockback','7.5'],['Stagger','0.35 s'],['Cooldown','4 s']],
+     note:'Deliberately weaker than Cluck Shock — the shortest cooldown in the Warrior kit is what pays for it.'}),
+  A({id:'ruffle', name:'Ruffle', short:'RUFF', cls:['warrior'], cat:3, kind:1, cd:5, dur:2.5,
+     accent:'#d99e47', desc:'A short burst of pace. Enough to close a gap or leave one.',
+     stats:[['Speed','×1.5'],['Duration','2.5 s'],['Cooldown','5 s']],
+     note:'Deliberately weaker than Speed Burst: no traversal, ground only.'}),
+  A({id:'scrap', name:'Scrap', short:'SCRP', cls:['warrior'], cat:0, kind:1, cd:5, dur:0.3,
+     accent:'#cc7333', desc:'Grabs a beakful of cargo off the nearest carrier.', sig:'The Brute',
+     stats:[['Range','3.8 m'],['Steal','3 food'],['Cooldown','5 s']],
+     note:'Deliberately weaker than Sneaky Steal. The Bully passive is what makes it worth taking.'}),
+  A({id:'wingslam', name:'Wing Slam', short:'SLAM', cls:['warrior'], cat:1, kind:1, cd:12, dur:1.5,
+     accent:'#e6661a', desc:'Slams the ground, stunning nearby rivals for 1.5 seconds.',
+     stats:[['Stun radius','4.5 m'],['Stun','1.5 s'],['Cooldown','12 s']],
+     flag:'Longest cooldown in the game, on the class whose essence is spamming abilities. Flagged for re-tuning.'}),
+
+  /* ---- SPEEDY ---- */
+  A({id:'dustkick', name:'Dust Kick', short:'DUST', cls:['speedy'], cat:1, kind:1, cd:6, dur:0.3,
+     accent:'#b8a87a', desc:'Kicks dust backwards, slowing whoever is chasing you.',
+     stats:[['Reach','4.5 m'],['Rear arc','75°'],['Slow','×0.55'],['Slow lasts','2.5 s'],['Cooldown','6 s']],
+     note:'The one cone in the game that fires away from facing — so fleeing is the play.'}),
+  A({id:'featheraura', name:'Feather Aura', short:'FAU', cls:['speedy'], cat:1, kind:1, cd:7, dur:3,
+     accent:'#994de6', desc:'Slows every chicken within range for as long as the cloud lasts.',
+     stats:[['Aura radius','5.4 m'],['Slow','×0.55'],['Duration','3 s'],['Cooldown','7 s']]}),
+  A({id:'feathertrap', name:'Feather Trap', short:'FTR', cls:['speedy'], cat:1, kind:1, cd:7, dur:0.3,
+     accent:'#33b399', desc:'Throws a feather cloud ahead — chickens crossing it are slowed for 5 s.',
+     stats:[['Forward offset','4.5 m'],['Zone radius','3.6 m'],['Zone lasts','5 s'],['Slow','×0.45'],['Cooldown','7 s']],
+     note:'Zones drop at the caster’s feet and never affect their own caster — lay it as you flee.'}),
+  A({id:'feint', name:'Feint', short:'JUKE', cls:['speedy'], cat:3, kind:1, cd:5, dur:0.2,
+     accent:'#5cb8cc', desc:'A hard sidestep. Walls still stop you.',
+     stats:[['Sidestep impulse','11'],['Duration','0.2 s'],['Cooldown','5 s']],
+     note:'Delivered as a knockback impulse, not a blink — which is why walls still stop it.'}),
+  A({id:'quickdrop', name:'Quick Drop', short:'DROP', cls:['speedy'], cat:3, kind:1, cd:12, dur:2,
+     accent:'#f2d159', desc:'Dumps your whole beakful into the base in one motion.',
+     stats:[['Deposit rate','×4'],['Duration','2 s'],['Cooldown','12 s']],
+     note:'Retired as a passive — it was worth about 27% of Speedy’s Solo Clear Time for free. Now the tempo costs a slot.'}),
+  A({id:'speedburst', name:'Speed Burst', short:'SPD', cls:['speedy'], cat:3, kind:1, cd:6, dur:1.5,
+     accent:'#4dd9f2', desc:'2.5× movement speed for a short sprint.',
+     stats:[['Speed','×2.5'],['Duration','1.5 s'],['Cooldown','6 s']],
+     note:'Moved out of the Common pool: a universal sprint erased Speedy’s "fastest in the game" claim.'}),
+
+  /* ---- FATTY ---- */
+  A({id:'bellyflop', name:'Belly Flop', short:'FLOP', cls:['fatty'], cat:1, kind:1, cd:10, dur:0.7, jump:'Short',
+     accent:'#e6b84d', desc:'Launches his whole mass forward and lands hard.',
+     stats:[['Impact radius','4 m'],['Stun','1.4 s'],['Knockback','6'],['Jump tier','Short (3.25 m)'],['Cooldown','10 s']],
+     note:'The justified jump: long telegraph, shortest tier, payoff on landing rather than travel.'}),
+  A({id:'groundquake', name:'Ground Quake', short:'QUAK', cls:['fatty'], cat:1, kind:1, cd:9, dur:0.4,
+     accent:'#9e663d', desc:'A stomp that pins everyone standing nearby.', sig:'The Boulder',
+     stats:[['Quake radius','4.5 m'],['Root','1.8 s'],['Cooldown','9 s']],
+     note:'Reachable pre-emptively while guarding, not only as a retreat reflex.'}),
+  A({id:'immovable', name:'Immovable', short:'WALL', cls:['fatty'], cat:2, kind:1, cd:12, dur:3,
+     accent:'#948573', desc:'Plants himself. Nothing stuns, roots, slows or shoves him.',
+     stats:[['Duration','3 s'],['Cooldown','12 s']],
+     note:'Immunity, not resistance — but it does not clear control already on him. Spent in anticipation, never as an escape.'}),
+  A({id:'rollpush', name:'Roll & Push', short:'RPH', cls:['fatty'], cat:1, kind:1, cd:3, dur:0.8, barge:true,
+     accent:'#33d959', desc:'Rolls forward at double speed, shoving chickens out of the path. No damage.',
+     stats:[['Forward offset','7.2 m'],['Push radius','1.9 m'],['Push strength','13.5'],['Speed','×2'],['Cooldown','3 s']],
+     stale:true}),
+  A({id:'rootegg', name:'Root Egg', short:'REG', cls:['fatty'], cat:1, kind:1, cd:7, dur:0.3,
+     accent:'#a6731a', desc:'Drops an egg that roots the first chicken to step on it for 2 s.',
+     stats:[['Egg lifetime','8 s'],['Root','2 s'],['Egg radius','1.45 m'],['Cooldown','7 s']]}),
+  A({id:'spinecoat', name:'Spine Coat', short:'SPN', cls:['fatty'], cat:2, kind:1, cd:8, dur:2.0,
+     accent:'#8ba633', desc:'Punishes contact by stealing cargo back and knocking attackers away.',
+     stats:[['Duration','2.0 s'],['Cooldown','8 s']],
+     note:'The steal-back is rate-gated, so a scrum cannot drain a whole lobby in one activation.'}),
+  A({id:'turtlemode', name:'Turtle Mode', short:'TRT', cls:['fatty'], cat:2, kind:1, cd:8, dur:2.0,
+     accent:'#8c6b40', desc:'Absorbs 80% of incoming damage at quarter movement speed.',
+     stats:[['Damage resistance','80%'],['Speed','×0.25'],['Duration','2.0 s'],['Cooldown','8 s']],
+     stale:true}),
+
+  /* ---- ASSASSIN ---- */
+  A({id:'ambush', name:'Ambush', short:'AMB', cls:['assassin'], cat:1, kind:1, cd:10, dur:1,
+     accent:'#cc1acc', desc:'Stuns nearby rivals for 1 second.',
+     stats:[['Stun radius','3.6 m'],['Stun','1 s'],['Cooldown','10 s']],
+     note:'Sets up his own execute — this is how the Assassin qualifies a mark without help.'}),
+  A({id:'doppelganger', name:'Doppelganger', short:'DOP', cls:['assassin'], cat:3, kind:1, cd:11, dur:1.5, jump:'Big', blink:true,
+     accent:'#a666d9', desc:'Spawns a decoy copy beside you to soak up enemy attacks.',
+     stats:[['Decoy lifetime','4 s'],['Side offset','1.2 m'],['Jump tier','Big (11.7 m)'],['Cooldown','11 s']]}),
+  A({id:'invisibility', name:'Invisibility', short:'INV', cls:['assassin'], cat:3, kind:1, cd:8, dur:4.0,
+     accent:'#8cd9d9', desc:'Fades you to a ghostly outline for 4 s.',
+     stats:[['Opacity','0.2'],['Duration','4.0 s'],['Cooldown','8 s']]}),
+  A({id:'markkill', name:'Mark / Kill', short:'EXEC', cls:['assassin'], cat:1, kind:1, cd:5, dur:0.1,
+     accent:'#e61a33', desc:'Marks an isolated rival, arming a fatal execute once stunned.', sig:'The Reaper',
+     stats:[['Isolation','no rival within 8 m'],['Arm time','2.0 s'],['Cooldown','5 s']],
+     note:'The only single-target ability in the game, and the only hard removal. Everything else is self-centred or directional.'}),
+  A({id:'shadowstep', name:'Shadowstep', short:'STEP', cls:['assassin'], cat:3, kind:1, cd:6, dur:0.4, blink:true,
+     accent:'#6633e6', desc:'Short blink dash phasing over walls along facing direction.',
+     stats:[['Speed','×3'],['Duration','0.4 s'],['Cooldown','6 s']],
+     note:'Was briefly also Speedy by asset drift. Corrected — Speedy is permanently denied all terrain traversal.'}),
+  A({id:'smokeroost', name:'Smoke Roost', short:'SMOK', cls:['assassin'], cat:1, kind:1, cd:11, dur:3.5,
+     accent:'#736b94', desc:'Drops a choking cloud at his feet. He fades; everyone else stumbles.',
+     stats:[['Zone radius','4 m'],['Zone lasts','5.5 s'],['Slow','×0.55'],['Opacity','0.2'],['Cooldown','11 s']],
+     note:'Pairs with Mark/Kill: it manufactures the isolation the execute needs.'}),
+  A({id:'snatch', name:'Snatch', short:'SNC', cls:['assassin'], cat:0, kind:1, cd:3, dur:0.3,
+     accent:'#ff4d1a', desc:'Robs cargo from every rival in a forward arc and shoves them back.',
+     stats:[['Range','4.3 m'],['Steal','5 food'],['Knockback','8.1'],['Cooldown','3 s']],
+     note:'Moved out of the Common pool: a universal AoE steal is the Assassin’s entire income, and sharing it diluted the class.'}),
+  A({id:'sneakysteal', name:'Sneaky Steal', short:'STL', cls:['assassin'], cat:0, kind:1, cd:5, dur:0.5,
+     accent:'#eb59bf', desc:'Yanks food from the nearest carrier in range.', sig:'The Burglar',
+     stats:[['Range','5.4 m'],['Steal','6 food'],['Cooldown','5 s']]})
+];
+
+const PASSIVES = [
+  {id:'bully', name:'Bully', spec:'The Brute', cls:'warrior', accent:'#db4d4d', sig:'scrap',
+   desc:'Steals more per hit, and can carry what it takes.',
+   stats:[['Steal multiplier','×1.4'],['Bonus cargo','+6']]},
+  {id:'relentless', name:'Relentless', spec:'The Relentless', cls:'warrior', accent:'#f27340', sig:'headbutt',
+   desc:'Combat abilities come back 25% faster.',
+   stats:[['Cooldown multiplier','×0.75']]},
+  {id:'slippery', name:'Slippery', spec:'The Agile', cls:'speedy', accent:'#59c7f2', sig:null,
+   desc:'Slows, roots and stuns wear off far faster.',
+   stats:[['Control duration','×0.6']]},
+  {id:'featherfoot', name:'Featherfoot', spec:'The Anxious', cls:'speedy', accent:'#8ce0b3', sig:null,
+   desc:'Immune to the pile slow — raid a pile at full speed.',
+   stats:[['Pile slow','ignored']]},
+  {id:'hoarder', name:'Hoarder', spec:'The Hauler', cls:'fatty', accent:'#f5b840', sig:null,
+   desc:'Carries a full win’s worth of food in one trip.',
+   stats:[['Minimum capacity','40']]},
+  {id:'bulwark', name:'Bulwark', spec:'The Boulder', cls:'fatty', accent:'#9ea8b8', sig:'groundquake',
+   desc:'Shrugs off control effects and most knockback.',
+   stats:[['Control duration','×0.65'],['Knockback','×0.25']]},
+  {id:'spoiler', name:'Spoiler', spec:'The Reaper', cls:'assassin', accent:'#8c6bd9', sig:'markkill',
+   desc:'Banks bonus food if the timer ends with no winner.',
+   stats:[['Bonus food','+15']]},
+  {id:'thief', name:'Thief', spec:'The Burglar', cls:'assassin', accent:'#7359b3', sig:'sneakysteal',
+   desc:'Every steal takes noticeably more cargo.',
+   stats:[['Steal multiplier','×1.6']]}
+];
+
+const JUMPS = [
+  {id:'Short',  d:3.25, note:'The gap-closer. Dive Bomb and Belly Flop.'},
+  {id:'Normal', d:6.5,  note:'The pile-vaulter. Crosses a doorstep or contested pile.'},
+  {id:'Big',    d:11.7, note:'Crosses everything, including a full centre pile. Doppelganger.'}
+];
+const CLEARANCE = 0.8;
+const OBSTACLES = [
+  {n:'Interior wall',      span:0.7, sub:'0.7 m masonry'},
+  {n:'Scatter crate',      span:2.2, sub:'widest shipped, 1.2–2.2 m'},
+  {n:'Doorstep pile (T1)', span:3.6, sub:'5 food'},
+  {n:'Contested pile (T2)',span:4.2, sub:'10 food'},
+  {n:'Centre pile, full',  span:7.8, sub:'20 food'}
+];
+
+const $  = (s,r)=> (r||document).querySelector(s);
+const $$ = (s,r)=> Array.from((r||document).querySelectorAll(s));
+const el = (t,c,h)=>{const n=document.createElement(t); if(c)n.className=c; if(h!=null)n.innerHTML=h; return n;};
+const cls = id => CLASSES.find(c=>c.id===id);
+const cat = i  => CATS[i];
+const abil= id => ABILITIES.find(a=>a.id===id);
+const fmt = n  => Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/,'');
+
+/* ============================================================ 03 — SCT TABLE */
+(function(){
+  const b = $('#sctbody'); if(!b) return;
+  CLASSES.forEach(c=>{
+    const tr = el('tr');
+    tr.innerHTML =
+      `<td><b style="color:${c.lt}">${c.name}</b></td>`+
+      `<td class="n">${c.sct} s</td>`+
+      `<td class="n">${c.trips}</td>`+
+      `<td class="n">${c.move}</td>`+
+      `<td class="n">${c.cargo}</td>`+
+      `<td class="dim">${c.strategy}</td>`;
+    b.appendChild(tr);
+  });
+})();
+
+/* ============================================================ 04 — ROSTER */
+(function(){
+  const pick = $('#rosterpick'), det = $('#rosterdetail'); if(!pick) return;
+  const MAX = {move:12.15, cargo:35, rate:3.90, scale:1.35};
+
+  CLASSES.forEach(c=>{
+    const b = el('button','cbtn');
+    b.type='button'; b.setAttribute('aria-pressed', c.id==='warrior');
+    b.style.setProperty('--cc', c.lt); b.style.setProperty('--ccg', c.glow);
+    const rate = c.peckAmt ? (c.peckAmt/c.peckCd).toFixed(2) : '—';
+    b.innerHTML =
+      `<span class="cn">${c.name}</span>`+
+      `<span class="cf">${c.strategy}</span>`+
+      `<span class="cs"><span>${c.move} spd</span><span>${c.cargo} cargo</span><span>${rate} f/s</span></span>`;
+    b.addEventListener('click', ()=>{
+      $$('.cbtn',pick).forEach(x=>x.setAttribute('aria-pressed','false'));
+      b.setAttribute('aria-pressed','true'); render(c);
+    });
+    pick.appendChild(b);
+  });
+
+  function bar(label, val, max, disp){
+    return `<div class="bar"><b>${label}<span>${disp}</span></b>`+
+           `<div class="track"><div class="fill" style="width:${Math.round(val/max*100)}%"></div></div></div>`;
+  }
+
+  function render(c){
+    det.style.setProperty('--cc', c.lt); det.style.setProperty('--ccg', c.glow);
+    const rate = c.peckAmt ? (c.peckAmt/c.peckCd) : 0;
+    const specs = PASSIVES.filter(p=>p.cls===c.id);
+    const pool  = ABILITIES.filter(a=>a.cls.includes(c.id));
+
+    det.innerHTML =
+      `<div class="essence" style="grid-column:1/-1">
+         <p class="eyebrow" style="margin-bottom:6px">The essence — and why the kit follows from it</p>
+         <p class="ess-q">&ldquo;${c.essence}&rdquo;</p>
+         <p class="ess-c"><b>The contract:</b> ${c.contract}</p>
+         <div class="ess-proof">
+           ${c.proof.map(p=>`<div><h4>${p[0]}</h4><p>${p[1]}</p></div>`).join('')}
+         </div>
+         ${c.violation ? `<div class="note warn" style="margin-top:12px;font-size:.85rem"><b>Where the kit breaks its own contract.</b> ${c.violation}</div>`:''}
+       </div>
+       <div class="card stack">
+         <p class="quote">&ldquo;${c.fantasy}&rdquo;</p>
+         <div class="bars">
+           ${bar('Move speed', c.move, MAX.move, c.move)}
+           ${bar('Cargo capacity', c.cargo, MAX.cargo, c.cargo)}
+           ${bar('Foraging rate', rate, MAX.rate, c.peckAmt ? rate.toFixed(2)+' food/s' : 'cannot forage')}
+           ${bar('Body scale', c.scale, MAX.scale, '×'+c.scale)}
+         </div>
+         <div class="kv">
+           <div><dt>Solo clear time</dt><dd>${c.sct} s</dd></div>
+           <div><dt>Base trips</dt><dd>${c.trips}</dd></div>
+           <div><dt>Peck cooldown</dt><dd>${c.peckCd ? c.peckCd+' s' : 'n/a'}</dd></div>
+           <div><dt>Ability pool</dt><dd>${pool.length}</dd></div>
+         </div>
+         ${c.id==='assassin' ? `<div class="note warn" style="font-size:.83rem"><b>He genuinely cannot farm.</b> Foraging is Peck, and Peck's class mask excludes the Assassin outright. His 40-second clear time is not a slow forager — it is a chicken with no forage button at all, whose income has to be robbery.</div>`:''}
+       </div>
+       <div class="card stack">
+         <p class="eyebrow">Specializations — pick one at character select</p>
+         <div class="speclist">
+           ${specs.map(p=>`
+             <div class="spec">
+               <h4>${p.spec}</h4>
+               <p class="pv">${p.desc}</p>
+               <div class="row" style="gap:6px;margin-top:7px">
+                 ${p.stats.map(s=>`<span class="tag" style="color:${p.accent}">${s[0]} ${s[1]}</span>`).join('')}
+               </div>
+               <p class="sig">${ p.sig
+                  ? `Signature: <b>${abil(p.sig).name}</b> <span class="mute">— equipped automatically, fills one of your four slots</span>`
+                  : `<span style="color:#ff9a5c;font-weight:800">Signature not assigned yet</span> <span class="mute">— grants its passive only</span>`}</p>
+             </div>`).join('')}
+         </div>
+       </div>`;
+  }
+  render(CLASSES[0]);
+})();
+
+/* ============================================================ 05 — CODEX */
+(function(){
+  const grid=$('#codex'), drawer=$('#drawer'); if(!grid) return;
+  const state={cls:'all', cat:'all', kind:'all', q:''};
+
+  function mkchips(host, items, key){
+    items.forEach(it=>{
+      const c = el('button','chip', it.label);
+      c.type='button'; c.setAttribute('aria-pressed', it.v===state[key]);
+      if(it.tint){ c.dataset.tint='1'; c.style.setProperty('--tint', it.tint); }
+      c.addEventListener('click', ()=>{
+        state[key]=it.v;
+        $$('.chip',host).forEach(x=>x.setAttribute('aria-pressed','false'));
+        c.setAttribute('aria-pressed','true'); draw();
+      });
+      host.appendChild(c);
+    });
+  }
+
+  mkchips($('#fclass'), [{label:'All',v:'all'}].concat(
+    CLASSES.map(c=>({label:c.name, v:c.id, tint:c.lt}))), 'cls');
+  mkchips($('#fcat'), [{label:'All',v:'all'}].concat(
+    CATS.map(c=>({label:c.name, v:String(c.id), tint:c.col}))), 'cat');
+  mkchips($('#fkind'), [
+    {label:'All',v:'all'},{label:'Common',v:'0'},{label:'Character',v:'1'},{label:'Passive',v:'p'},
+    {label:'Signature',v:'sig'},{label:'Traversal',v:'trav'}], 'kind');
+
+  $('#fsearch').addEventListener('input', e=>{ state.q=e.target.value.toLowerCase().trim(); draw(); });
+
+  function matches(a, isP){
+    if(state.cls!=='all'){ const ok = isP ? a.cls===state.cls : a.cls.includes(state.cls); if(!ok) return false; }
+    if(state.cat!=='all' && (isP || String(a.cat)!==state.cat)) return false;
+    if(state.kind==='0' && (isP || a.kind!==0)) return false;
+    if(state.kind==='1' && (isP || a.kind!==1)) return false;
+    if(state.kind==='p'   && !isP) return false;
+    if(state.kind==='sig' && !(isP ? a.sig : a.sig)) return false;
+    if(state.kind==='trav'&& (isP || !(a.jump||a.blink||a.barge))) return false;
+    if(state.q){
+      const hay = ((a.name||'')+' '+(a.desc||'')+' '+(a.short||'')+' '+(a.spec||'')+' '+(a.note||'')).toLowerCase();
+      if(!hay.includes(state.q)) return false;
+    }
+    return true;
+  }
+
+  function card(a, isP){
+    const b = el('button','ab'); b.type='button'; b.setAttribute('aria-expanded','false');
+    b.style.setProperty('--ac', a.accent);
+    b.style.setProperty('--acg', a.accent+'55');
+    const owners = isP ? [cls(a.cls)] : a.cls.map(cls);
+    const catTag = isP
+      ? `<span class="tag" style="color:#9d8a63">Passive</span>`
+      : `<span class="tag" style="color:${cat(a.cat).col}"><span class="dot"></span>${cat(a.cat).name}</span>`;
+    b.innerHTML =
+      `${isP?'':`<span class="acd">${a.cd}s</span>`}`+
+      `<span class="an">${a.name}</span>`+
+      `<span class="ameta">${catTag}`+
+        owners.map(o=>`<span class="tag" style="color:${o.lt}">${o.name}</span>`).join('')+
+        (!isP && a.kind===0 ? `<span class="tag" style="color:var(--gold-deep)">Common</span>`:'')+
+      `</span>`+
+      `<span class="ad">${a.desc}</span>`+
+      ((isP?a.sig:a.sig) ? `<span class="forced">SIGNATURE</span>`:'');
+    b.addEventListener('click', ()=>{
+      $$('.ab',grid).forEach(x=>x.setAttribute('aria-expanded','false'));
+      b.setAttribute('aria-expanded','true'); open(a, isP);
+    });
+    return b;
+  }
+
+  function open(a, isP){
+    drawer.hidden=false;
+    drawer.style.setProperty('--ac', a.accent);
+    drawer.style.setProperty('--acg', a.accent+'55');
+    const owners = isP ? [cls(a.cls)] : a.cls.map(cls);
+    const stats = a.stats||[];
+    drawer.innerHTML =
+      `<div class="dhead">
+         <div><h3>${a.name}</h3>
+           <p class="dim" style="font-size:.9rem;max-width:60ch;margin-top:5px">${a.desc}</p></div>
+         <div class="row" style="gap:6px">
+           ${isP ? `<span class="tag" style="color:#9d8a63">Passive</span>`
+                 : `<span class="tag" style="color:${cat(a.cat).col}"><span class="dot"></span>${cat(a.cat).name}</span>`}
+           ${owners.map(o=>`<span class="tag" style="color:${o.lt}">${o.name}</span>`).join('')}
+           ${!isP && a.short ? `<span class="tag mono" style="color:var(--text-mute)">${a.short}</span>`:''}
+         </div>
+       </div>
+       <div class="kv">${stats.map(s=>`<div><dt>${s[0]}</dt><dd>${s[1]}</dd></div>`).join('')}</div>
+       ${isP && a.sig ? `<p class="dim" style="font-size:.86rem;margin-top:12px">Specialization <b style="color:${a.accent}">${a.spec}</b> forces <b style="color:var(--gold)">${abil(a.sig).name}</b> into one of your four active slots.</p>`:''}
+       ${isP && !a.sig ? `<div class="note warn" style="margin-top:12px"><b>No signature assigned yet.</b> Specialization <b>${a.spec}</b> grants this passive only. It was earmarked for a Peck variant, but that plan was retired on 2026-09-04 — the forager slot now answers to the class, so a specialization cannot grant one. It needs an ordinary ability instead.</div>`:''}
+       ${!isP && a.sig ? `<div class="note" style="margin-top:12px"><b>Forced signature</b> of the <b>${a.sig}</b> specialization — choosing it equips this automatically.</div>`:''}
+       ${a.note ? `<div class="note why" style="margin-top:12px">${a.note}</div>`:''}
+       ${a.flag ? `<div class="note warn" style="margin-top:12px"><b>Flagged for re-tuning.</b> ${a.flag}</div>`:''}
+       ${a.stale ? `<div class="note warn" style="margin-top:12px"><b>Stale flavour text.</b> This description still mentions damage, left over from the pre-v0.4 combat model. The mechanic is correct — control resistance and a no-op shove — only the copy needs a pass.</div>`:''}
+       ${a.blink ? `<div class="note" style="margin-top:12px"><b>Blink traversal.</b> Crosses every obstacle class. Boundary props are never crossable — arena containment is structural, not a rule that could be relaxed.</div>`:''}
+       ${a.barge ? `<div class="note" style="margin-top:12px"><b>Barge traversal.</b> Plows through low obstacles only.</div>`:''}`;
+  }
+
+  function draw(){
+    grid.innerHTML='';
+    let n=0;
+    ABILITIES.filter(a=>matches(a,false)).forEach(a=>{ grid.appendChild(card(a,false)); n++; });
+    PASSIVES.filter(p=>matches(p,true)).forEach(p=>{ grid.appendChild(card(p,true)); n++; });
+    $('#acount').textContent = n + (n===1?' entry':' entries');
+    if(!n) grid.innerHTML = `<p class="mute" style="grid-column:1/-1">Nothing matches those filters.</p>`;
+    drawer.hidden = true;
+  }
+  draw();
+})();
+
+/* ============================================================ 06 — LOADOUT BUILDER */
+(function(){
+  const cHost=$('#bclass'), sHost=$('#bspec'), slots=$('#bslots'),
+        pool=$('#bpool'), math=$('#bmath'); if(!slots) return;
+  let curCls='warrior', curSpec=PASSIVES.find(p=>p.cls==='warrior'), chosen=[];
+
+  CLASSES.forEach(c=>{
+    const b=el('button','chip',c.name); b.type='button'; b.dataset.tint='1';
+    b.style.setProperty('--tint', c.lt);
+    b.setAttribute('aria-pressed', c.id===curCls);
+    b.addEventListener('click', ()=>{
+      curCls=c.id; chosen=[];
+      curSpec=PASSIVES.find(p=>p.cls===c.id);
+      $$('.chip',cHost).forEach(x=>x.setAttribute('aria-pressed','false'));
+      b.setAttribute('aria-pressed','true'); specs(); render();
+    });
+    cHost.appendChild(b);
+  });
+
+  function specs(){
+    sHost.innerHTML='';
+    PASSIVES.filter(p=>p.cls===curCls).forEach(p=>{
+      const b=el('button','chip',p.spec); b.type='button';
+      b.setAttribute('aria-pressed', p.id===curSpec.id);
+      b.addEventListener('click', ()=>{
+        curSpec=p; chosen=[];
+        $$('.chip',sHost).forEach(x=>x.setAttribute('aria-pressed','false'));
+        b.setAttribute('aria-pressed','true'); render();
+      });
+      sHost.appendChild(b);
+    });
+  }
+
+  /* Determined slots: one from the class (the forager), one from the specialization
+     (the signature). Everything else is a free pick. Uniform across every build —
+     foragers get 2 free, the Assassin 3. */
+  function forcedList(){
+    const f=[];
+    if(curCls!=='assassin') f.push({a:abil('peck'), why:'CLASS', role:'Forager'});
+    f.push(curSpec.sig
+      ? {a:abil(curSpec.sig), why:'SPEC', role:'Signature'}
+      : {a:null, why:'SPEC', role:'Signature', pending:true});
+    return f;
+  }
+
+  function render(){
+    const forced=forcedList(), free=4-forced.length;
+    const c=cls(curCls);
+
+    slots.innerHTML='';
+    forced.forEach(f=>{
+      if(f.pending){
+        const d=el('div','slot');
+        d.style.borderColor='#8a5a2a';
+        d.innerHTML=`<span class="lock" style="color:#ff9a5c">${f.why}</span>`+
+                    `<span class="sl" style="color:#ff9a5c">Signature</span><span>not assigned yet</span>`;
+        slots.appendChild(d); return;
+      }
+      const d=el('div','slot filled');
+      d.style.setProperty('--sc', f.a.accent);
+      d.style.setProperty('--scg', f.a.accent+'44');
+      /* The forager's cooldown is authored per class — show that class's value,
+         since it is the reason this slot belongs to the class at all. */
+      const cd = (f.a.id==='peck') ? cls(curCls).peckCd : f.a.cd;
+      d.innerHTML=`<span class="lock">${f.why}</span><span class="sl">${f.a.name}</span><span>${cd}s</span>`;
+      slots.appendChild(d);
+    });
+    for(let i=0;i<free;i++){
+      const pickd = chosen[i] ? abil(chosen[i]) : null;
+      const d=el('div', 'slot'+(pickd?' filled':''));
+      if(pickd){
+        d.style.setProperty('--sc', pickd.accent);
+        d.style.setProperty('--scg', pickd.accent+'44');
+        d.innerHTML=`<span class="sl">${pickd.name}</span><span>${pickd.cd}s</span>`;
+        const rm=el('button','rm','×'); rm.type='button';
+        rm.setAttribute('aria-label','Remove '+pickd.name);
+        rm.addEventListener('click',()=>{ chosen.splice(i,1); render(); });
+        d.appendChild(rm);
+      } else {
+        d.innerHTML=`<span>Free pick<br>${i+1} of ${free}</span>`;
+      }
+      slots.appendChild(d);
+    }
+
+    const sigTxt = curSpec.sig
+      ? `<b>${abil(curSpec.sig).name}</b>`
+      : `<b style="color:#ff9a5c">nothing yet — unassigned</b>`;
+    math.innerHTML =
+      `<b style="color:${c.lt}">${c.name} / ${curSpec.spec}</b> — ` +
+      (curCls==='assassin'
+        ? `no forager slot, because the Assassin cannot farm. Its specialization grants ${sigTxt}, leaving you <b>3</b> free picks`
+        : `its class grants the forager <b>Peck</b> at ${c.peckCd}s, its specialization grants ${sigTxt}, leaving you <b>2</b> free picks`) +
+      ` from ${legal().length} legal abilities.`;
+
+    pool.innerHTML='';
+    legal().forEach(a=>{
+      const b=el('button','pick'); b.type='button';
+      b.style.setProperty('--ac', a.accent);
+      b.style.setProperty('--acg', a.accent+'55');
+      const on = chosen.includes(a.id);
+      b.setAttribute('aria-pressed', on);
+      b.disabled = !on && chosen.length>=free;
+      b.innerHTML=`<b>${a.name}</b><span>${cat(a.cat).name} · ${a.cd}s</span>`;
+      b.addEventListener('click',()=>{
+        const i=chosen.indexOf(a.id);
+        if(i>=0) chosen.splice(i,1); else if(chosen.length<free) chosen.push(a.id);
+        render();
+      });
+      pool.appendChild(b);
+    });
+  }
+
+  function legal(){
+    const forcedIds = forcedList().filter(f=>f.a).map(f=>f.a.id);
+    return ABILITIES.filter(a=>a.cls.includes(curCls) && !forcedIds.includes(a.id));
+  }
+
+  specs(); render();
+})();
+
+/* ============================================================ 07 — STEAL CALCULATOR */
+(function(){
+  const s1=$('#s1'), s2=$('#s2'), s3=$('#s3'); if(!s1) return;
+  function go(){
+    const v1=+s1.value, v2=+s2.value, v3=+s3.value;
+    $('#s1v').textContent=v1; $('#s2v').textContent=v2; $('#s3v').textContent=v3;
+    const out=Math.max(0, Math.min(v1,v2,v3));
+    $('#sout').textContent=out;
+    const binding = out===v2 ? 'your free space' : (out===v3 ? 'their cargo' : 'the ability');
+    $('#sexp').innerHTML = `min(<em>${v1}</em>, <em>${v2}</em>, <em>${v3}</em>) = <em>${out}</em>`;
+    $('#sverd').innerHTML = out===0
+      ? (v2===0 ? 'You are full. <b style="color:#ff9a5c">A loaded thief steals nothing</b> — bank first.'
+                : 'They are carrying nothing. There is nothing to take.')
+      : `The binding constraint is <b style="color:var(--gold)">${binding}</b>.`;
+  }
+  [s1,s2,s3].forEach(s=>s.addEventListener('input',go)); go();
+})();
+
+/* ============================================================ 09 — ARENA MAP */
+(function(){
+  const svg=$('#arenaMap'); if(!svg) return;
+  const NS='http://www.w3.org/2000/svg';
+  const HALF=25.65, HUB=10, OPEN=3, WALL_T=0.7, BASE_R=25.65;
+  const D=BASE_R/Math.SQRT2;                 // base centre on the diagonal: 18.137
+  const T1=D*(1-0.3673);                     // doorstep pile: 11.475 per axis
+  const T2=HALF*0.7895;                      // contested pile radius: 20.251
+  const rad=d=>d*Math.PI/180;
+  const bnd=deg=>{const a=rad(deg); return HALF/Math.max(Math.abs(Math.cos(a)),Math.abs(Math.sin(a)));};
+  const mk=(t,at)=>{const n=document.createElementNS(NS,t); for(const k in at) n.setAttribute(k,at[k]); return n;};
+
+  const layers={};
+  ['ground','hub','laps','walls','piles','bases','scale'].forEach(k=>{
+    layers[k]=mk('g',{id:'L-'+k}); svg.appendChild(layers[k]);
+  });
+
+  const info=$('#mapinfo');
+  const DEFAULT_INFO='Hover or tap any pile, base or wall for its shipped values.';
+  function hot(node, html){
+    node.classList.add('hot');
+    const set=()=>{ info.innerHTML=html; };
+    node.addEventListener('mouseenter',set);
+    node.addEventListener('focus',set);
+    node.addEventListener('click',set);
+    node.setAttribute('tabindex','0');
+    node.addEventListener('mouseleave',()=>{ info.innerHTML=DEFAULT_INFO; });
+  }
+
+  /* --- ground + boundary --- */
+  layers.ground.appendChild(mk('rect',{x:-HALF,y:-HALF,width:HALF*2,height:HALF*2,rx:1.4,
+    fill:'#14200c', stroke:'#3d5228','stroke-width':.5}));
+  layers.ground.appendChild(mk('rect',{x:-HALF,y:-HALF,width:HALF*2,height:HALF*2,rx:1.4,
+    fill:'none', stroke:'#6b8a44','stroke-width':.9,'stroke-dasharray':'2.4 1.4',opacity:.85}));
+
+  /* --- hub plaza --- */
+  layers.hub.appendChild(mk('circle',{cx:0,cy:0,r:HUB,fill:'rgba(245,200,66,.05)',
+    stroke:'#f5c842','stroke-width':.28,'stroke-dasharray':'1.6 1.6',opacity:.75}));
+  const hubLbl=mk('text',{x:0,y:-HUB-0.9,'text-anchor':'middle',fill:'#8d7448',
+    'font-size':'1.5','font-family':'JetBrains Mono, monospace'});
+  hubLbl.textContent='hub plaza r10'; layers.hub.appendChild(hubLbl);
+
+  /* --- pinwheel walls --- */
+  for(let i=0;i<8;i++){
+    const deg=22.5+i*45, a=rad(deg), b=bnd(deg), outer=(i%2===0);
+    const r0 = outer ? HUB : HUB+OPEN;
+    const r1 = outer ? b-OPEN : b;
+    const x0=Math.cos(a)*r0, y0=-Math.sin(a)*r0, x1=Math.cos(a)*r1, y1=-Math.sin(a)*r1;
+    const g=mk('g',{});
+    g.appendChild(mk('line',{x1:x0,y1:y0,x2:x1,y2:y1,stroke:'#7a6242','stroke-width':WALL_T,'stroke-linecap':'butt'}));
+    const h=mk('line',{x1:x0,y1:y0,x2:x1,y2:y1,stroke:'#f5c842','stroke-width':WALL_T+.5,
+      opacity:0,'stroke-linecap':'butt'}); h.classList.add('hl');
+    g.appendChild(h);
+    hot(g, `<b>${outer?'Outer-gap wall':'Inner-gap wall'}</b> at ${deg}° — spans r${r0.toFixed(1)} to r${r1.toFixed(1)}, `+
+            `length <b>${(r1-r0).toFixed(2)} m</b>, 0.7 m thick. Its single 3 m opening sits at the `+
+            `<b>${outer?'rim':'hub'}</b>. All eight arms come out the same length — a consequence of the derivation, not a tuned value.`);
+    layers.walls.appendChild(g);
+  }
+
+  /* --- piles --- */
+  function pile(x,y,rx,ry,food,label,tier,detail){
+    const g=mk('g',{});
+    g.appendChild(mk('ellipse',{cx:x,cy:y,rx:rx,ry:ry,fill:'#f5c842',opacity:.9,stroke:'#8a6410','stroke-width':.25}));
+    g.appendChild(mk('ellipse',{cx:x,cy:y-ry*.25,rx:rx*.62,ry:ry*.5,fill:'#fff0b8',opacity:.55}));
+    const h=mk('ellipse',{cx:x,cy:y,rx:rx+1,ry:ry+1,fill:'none',stroke:'#fff0b8','stroke-width':.5,opacity:0});
+    h.classList.add('hl'); g.appendChild(h);
+    const t=mk('text',{x:x,y:y+ry+2.2,'text-anchor':'middle',fill:'#f5c842','font-size':'1.7',
+      'font-weight':'700','font-family':'JetBrains Mono, monospace'});
+    t.textContent=label; g.appendChild(t);
+    hot(g, detail);
+    layers.piles.appendChild(g);
+  }
+  pile(0,0,3.9,3.25,20,'20','T3',
+    `<b>Centre pile — T3, 20 food.</b> Footprint 7.8 × 6.5 m at full. It never moves and never respawns. `+
+    `It is simultaneously the biggest prize and the wall protecting it: as it depletes its footprint shrinks, `+
+    `so the arena opens itself exactly as the match converges.`);
+  [[1,1],[1,-1],[-1,-1],[-1,1]].forEach(([sx,sy])=>{
+    pile(sx*T1, -sy*T1, 1.8, 1.5, 5, '5', 'T1',
+      `<b>Doorstep pile — T1, 5 food.</b> One per base, footprint 3.6 × 3.0 m, sitting about 8 m off your `+
+      `base mouth at r${(T1*Math.SQRT2).toFixed(1)}. Safe income. Position jitters ±0.4 m each match, seeded `+
+      `from the session code so every peer agrees.`);
+  });
+  [[T2,0],[0,T2],[-T2,0],[0,-T2]].forEach(([x,y])=>{
+    pile(x,-y,2.1,1.75,10,'10','T2',
+      `<b>Contested pile — T2, 10 food.</b> Four of them, on the edge midpoints at r${T2.toFixed(2)}, `+
+      `footprint 4.2 × 3.5 m. Equidistant from two bases, so a contested arrival is the default, not the exception. `+
+      `Fatty's winning route is forced straight through this ring.`);
+  });
+
+  /* --- bases --- */
+  const PC=['#e8751a','#1a7fc4','#c4286f','#0d9e7a'];
+  [[1,1],[-1,1],[-1,-1],[1,-1]].forEach(([sx,sy],i)=>{
+    const x=sx*D, y=-sy*D, g=mk('g',{});
+    g.appendChild(mk('rect',{x:x-3.2,y:y-3.2,width:6.4,height:6.4,rx:1.1,
+      fill:PC[i],opacity:.28,stroke:PC[i],'stroke-width':.6}));
+    g.appendChild(mk('circle',{cx:x,cy:y,r:1.5,fill:PC[i],opacity:.9}));
+    const h=mk('rect',{x:x-4.1,y:y-4.1,width:8.2,height:8.2,rx:1.4,fill:'none',
+      stroke:PC[i],'stroke-width':.55,opacity:0}); h.classList.add('hl'); g.appendChild(h);
+    hot(g, `<b>Base ${i+1}</b> at r${BASE_R} on the corner diagonal, with a 3 m mouth. Deposit rate is `+
+           `<b>9 food/sec</b>, so a full 35-cargo Fatty banks in under four seconds. Every client rotates the `+
+           `arena so its own base sits at the bottom of the screen — all four players see an identical relative layout.`);
+    layers.bases.appendChild(g);
+  });
+
+  /* --- the two laps, drawn from the bottom-right base --- */
+  const lapSafe=mk('path',{d:`M ${D} ${D} C 24 14, 25.6 6, ${T2} 0`,fill:'none',
+    stroke:'#5ec463','stroke-width':.7,'stroke-dasharray':'2 1.4',opacity:.9,'stroke-linecap':'round'});
+  const lapRisk=mk('path',{d:`M ${D} ${D} C 13.5 13.5, 8 8, 3.6 3.0`,fill:'none',
+    stroke:'#ff7043','stroke-width':.7,'stroke-dasharray':'2 1.4',opacity:.9,'stroke-linecap':'round'});
+  layers.laps.appendChild(lapSafe); layers.laps.appendChild(lapRisk);
+  hot(lapSafe, `<b style="color:#5ec463">The safe lap.</b> Turn left out of your base: out to the rim, along the edge, past a contested pile, to a neighbour. Longer, but it never crosses the hub.`);
+  hot(lapRisk, `<b style="color:#ff7043">The risky lap.</b> Turn right: in past the hub plaza and the centre pile. Shorter and richer, and everyone else is there.`);
+
+  /* --- scale bar --- */
+  const sg=layers.scale;
+  sg.appendChild(mk('line',{x1:-HALF,y1:HALF+3,x2:HALF,y2:HALF+3,stroke:'#8d7448','stroke-width':.22}));
+  sg.appendChild(mk('line',{x1:-HALF,y1:HALF+2.2,x2:-HALF,y2:HALF+3.8,stroke:'#8d7448','stroke-width':.22}));
+  sg.appendChild(mk('line',{x1:HALF,y1:HALF+2.2,x2:HALF,y2:HALF+3.8,stroke:'#8d7448','stroke-width':.22}));
+  const st=mk('text',{x:0,y:HALF+5.4,'text-anchor':'middle',fill:'#8d7448','font-size':'1.7',
+    'font-family':'JetBrains Mono, monospace'}); st.textContent='51.3 m'; sg.appendChild(st);
+
+  /* --- layer toggles --- */
+  const TOG=[
+    {k:'piles', label:'Food piles', on:true},
+    {k:'walls', label:'Pinwheel walls', on:true},
+    {k:'bases', label:'Bases', on:true},
+    {k:'hub',   label:'Hub plaza', on:true},
+    {k:'laps',  label:'The two laps', on:true},
+    {k:'iso',   label:'Player view', on:false}
+  ];
+  const host=$('#maplayers');
+  TOG.forEach(t=>{
+    const b=el('button','chip',t.label); b.type='button';
+    b.setAttribute('aria-pressed', t.on);
+    if(t.k!=='iso' && !t.on) layers[t.k].style.display='none';
+    b.addEventListener('click',()=>{
+      t.on=!t.on; b.setAttribute('aria-pressed', t.on);
+      if(t.k==='iso') svg.classList.toggle('iso', t.on);
+      else layers[t.k].style.display = t.on?'':'none';
+    });
+    host.appendChild(b);
+  });
+
+  /* --- legend --- */
+  const LEG=[
+    ['#f5c842','Food piles','9 total, 80 food, three tiers. They never respawn.'],
+    ['#7a6242','Pinwheel walls','8 arms, 14.76 m each, one 3 m opening apiece — 118 m of interior wall.'],
+    ['#e8751a','Bases','One per corner at r25.65. Banking is 9 food/sec.'],
+    ['#5ec463','Safe lap','Left: rim, edge, contested pile.'],
+    ['#ff7043','Risky lap','Right: hub plaza and the centre.']
+  ];
+  const lg=$('#maplegend');
+  LEG.forEach(([c,t,d])=>{
+    const r=el('div','lgi');
+    r.innerHTML=`<span class="sw" style="background:${c}"></span><span><b>${t}</b>${d}</span>`;
+    lg.appendChild(r);
+  });
+})();
+
+/* ============================================================ 10 — TRAVERSAL */
+(function(){
+  const pickHost=$('#jumppick'), ladder=$('#jumpladder'), gate=$('#jumpgate'); if(!ladder) return;
+  let cur=JUMPS[1];
+  const SCALE=13; // metres shown across a full bar
+
+  JUMPS.forEach(j=>{
+    const b=el('button','chip',`${j.id} — ${j.d} m`); b.type='button';
+    b.setAttribute('aria-pressed', j.id===cur.id);
+    b.addEventListener('click',()=>{
+      cur=j; $$('.chip',pickHost).forEach(x=>x.setAttribute('aria-pressed','false'));
+      b.setAttribute('aria-pressed','true'); draw();
+    });
+    pickHost.appendChild(b);
+  });
+
+  function draw(){
+    ladder.innerHTML='';
+    JUMPS.forEach(j=>{
+      const on=j.id===cur.id;
+      const r=el('div','rung');
+      r.innerHTML=
+        `<div class="rn" style="${on?'':'opacity:.45'}">${j.id}<small>${j.d} m</small></div>`+
+        `<div><div class="rbar"><div class="rf" style="width:${Math.min(100,j.d/SCALE*100)}%;${on?'':'opacity:.3'}">`+
+        `<span class="rlab">${j.d} m</span></div></div>`+
+        `<div class="rnote" style="${on?'':'opacity:.5'}">${j.note}</div></div>`;
+      ladder.appendChild(r);
+    });
+
+    gate.innerHTML='';
+    OBSTACLES.forEach(o=>{
+      const need=o.span+CLEARANCE, ok=cur.d>=need;
+      const c=el('div','gcell');
+      c.innerHTML=`<b>${o.n}</b><span class="mute" style="font-size:.72rem">${o.sub}</span>`+
+        `<div class="verdict ${ok?'yes':'no'}">${ok?'CLEARS':'BLOCKED'}</div>`+
+        `<span class="mono mute" style="font-size:.7rem">needs ${need.toFixed(1)} m</span>`;
+      gate.appendChild(c);
+    });
+  }
+  draw();
+})();
+
+/* ============================================================ 10b — CENTRE PILE OPENS */
+(function(){
+  const s=$('#pilefill'), out=$('#pilestate'); if(!s) return;
+  const FULL=7.8;
+  function go(){
+    const pct=+s.value, span=FULL*pct/100, need=span+CLEARANCE;
+    $('#pilefillv').textContent=pct+'%';
+    const crossers=JUMPS.filter(j=>j.d>=need);
+    let phase, col;
+    if(crossers.length===0){ phase='Sealed'; col='#ff7043'; }
+    else if(crossers.length===1){ phase='A fortress'; col='#ff9a5c'; }
+    else if(crossers.length===2){ phase='The siege breaks'; col='#f5c842'; }
+    else { phase='Wide open'; col='#5ec463'; }
+
+    out.innerHTML=
+      `<div class="gcell"><b>Footprint</b><div class="verdict" style="color:var(--gold)">${span.toFixed(2)} m</div>`+
+        `<span class="mono mute" style="font-size:.7rem">needs ${need.toFixed(2)} m to cross</span></div>`+
+      `<div class="gcell"><b>Food left</b><div class="verdict" style="color:var(--gold)">${Math.round(20*pct/100)}</div>`+
+        `<span class="mono mute" style="font-size:.7rem">of 20</span></div>`+
+      JUMPS.map(j=>{
+        const ok=j.d>=need;
+        return `<div class="gcell"><b>${j.id} jump</b><span class="mute" style="font-size:.72rem">${j.d} m</span>`+
+               `<div class="verdict ${ok?'yes':'no'}">${ok?'CROSSES':'BLOCKED'}</div></div>`;
+      }).join('')+
+      `<div class="gcell" style="border-color:${col}"><b>Phase</b>`+
+        `<div class="verdict" style="color:${col}">${phase}</div>`+
+        `<span class="mute" style="font-size:.7rem">${crossers.length} of 3 tiers cross</span></div>`;
+  }
+  s.addEventListener('input',go); go();
+})();
+
+/* ============================================================ NAV SCROLLSPY */
+(function(){
+  const links=$$('#nav a');
+  const map=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+  const secs=$$('main section').filter(s=>map.has(s.id));
+  if(!secs.length) return;
+  const io=new IntersectionObserver(es=>{
+    es.forEach(e=>{
+      if(!e.isIntersecting) return;
+      links.forEach(l=>l.classList.remove('on'));
+      const l=map.get(e.target.id); if(l) l.classList.add('on');
+    });
+  },{rootMargin:'-12% 0px -70% 0px', threshold:0});
+  secs.forEach(s=>io.observe(s));
+})();
+</script>

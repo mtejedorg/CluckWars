@@ -323,6 +323,34 @@ Piles are **near-circular ellipses** (~1.2 : 1). They shrink and desaturate as t
 deplete, driven locally by the `[Networked]` food amount — instant strategic read, no extra
 sync. Shrinking is also load-bearing for traversal (§3.6), not merely cosmetic.
 
+### 3.9 ⚠️ Open problem: the arena is too big for four players in 45 seconds
+
+**Status: known, deliberately not fixed yet, must be solved before the map is called done.**
+
+Observed in play: four chickens on a 51.3 m square rarely run into each other. Routes are
+long enough that a whole match can pass in parallel — everyone farms, everyone banks, and
+the encounter that the entire v0.4 redesign exists to produce never happens. **The
+control-and-steal systems go unexercised**, which means the part of the game we spent the
+redesign on is the part players see least.
+
+This is a density problem, not a layout problem. The topology (two laps, eight wedges,
+tiered piles) is sound and measured; there is simply too much floor per chicken per second.
+
+Levers, in rough order of cheapness — **none chosen yet, and this needs a playtest, not a
+spreadsheet**:
+
+| Lever | Note |
+|---|---|
+| Shrink the arena | Cheapest, but every spatial constant derives from `arenaHalfSize`, and the 2026-08-14 rescale held SCT constant by moving speeds with it. Shrinking alone *shortens* SCT unless speeds come down too |
+| Pull the objectives inward | Reduce the contested/doorstep radii so routes overlap sooner, without touching arena size or the sightline contract (§3.7) |
+| Raise player count | The arena may simply be sized for 6–8. Changes the FFA maths and the win target, so it is the most expensive option |
+| Shorten routes with geometry | More interior structure funnelling traffic through shared corridors — `SectorScatter`'s barrier role already exists and ships at 0 |
+
+**Why it is parked.** The honest answer is that we do not yet know whether the encounter
+rate is wrong or the *readability* of encounters is wrong, and guessing costs a re-solve of
+every derived constant. This is the first thing a human playtest (§11 item 7) has to
+answer.
+
 ---
 
 ## 4. Visual Direction
@@ -411,11 +439,17 @@ current, shipped state.
 | **Assassin** | The Reaper (Spoiler) | Banks a bonus if the clock expires with no winner | **Mark/Kill** (the execute, §6.4) |
 | | The Burglar (Thief) | Every steal takes 1.6x more | **Sneaky Steal** |
 
-**Three signatures are still pending a `BalanceOracle` solve, not a design gap.**
-Slippery/Featherfoot/Hoarder each want a Peck *variant* (empty-beak rush, burst-fed,
-heavy-beakful) as their signature — `PeckAmount`/`PeckCooldown` feed Solo Clear Time
-directly, so these get solved against the Oracle rather than hand-tuned. Until they
-land, those three specializations grant their passive only.
+**Three signatures are still unassigned — and the plan for them changed on 2026-09-04.**
+Slippery / Featherfoot / Hoarder previously each wanted a Peck *variant* (empty-beak rush,
+burst-fed, heavy-beakful) as their signature. §7.1's simplified slot model retires that
+approach: the forager slot is now determined by **class**, so a specialization cannot
+grant a Peck. The per-class foraging variation those variants were reaching for already
+exists as each class's authored `PeckAmount` / `PeckCooldown`.
+
+Those three specializations therefore need **ordinary signature abilities** — control,
+economy or escape tools that read as that specialization's fantasy. Until they land, the
+three grant their passive only, which is the one remaining place where §7.1's "every
+specialization determines a signature" is not yet literally true. Tracked as §11 item 2.
 
 **Why Bully/Relentless and Reaper/Burglar are each amplified only by their own passive:**
 Bully makes Scrap's theft worth taking (bigger steal + room to carry it); Relentless
@@ -495,24 +529,41 @@ counterplay reachable.
 
 ## 7. Abilities System
 
-### 7.1 Rules
+### 7.1 Rules — two slots are determined for you, the rest you pick
 
-- **Loadout = 1 mandatory specialization (its passive) + 4 active ability slots, always
-  4, for every class.** There is no separate "passive slot" outside the specialization
-  choice — no class has 5 buttons.
-- Two of the four active slots are **forced**, not freely chosen, by two independent rules:
-  1. **Peck is force-equipped for every class that can forage** (Warrior, Speedy, Fatty —
-     `AllowedClasses` on `Peck.asset` excludes the Assassin outright, GDD §2). The
-     Assassin never gets it under any circumstance.
-  2. **The chosen specialization's signature ability, if it has one, is force-equipped**
-     (§5.3). If that signature is itself a Peck *variant*, it **replaces** plain Peck
-     rather than taking a second slot — a forager never loses two slots to two different
-     versions of the same job. A non-Peck signature (Scrap, Headbutt, Ground Quake,
-     Mark/Kill, Sneaky Steal) costs a slot on top of Peck.
-  This is why slot pressure differs by class today: a forager whose specialization has
-  **no** signature yet (all three pending Peck variants, §5.3) only loses 1 of 4 slots
-  and picks 3; a forager whose specialization has a non-Peck signature loses 2 and picks
-  2; the Assassin, which never has Peck to lose, picks 3 either way.
+> **Simplified 2026-09-04 (Maestro).** The old wording made slot pressure vary by
+> specialization, which nobody could hold in their head. The model below is uniform: one
+> slot answers to your **class**, one to your **specialization**, and the remainder is
+> yours. Nothing about the four-slot total changed — only the rule that fills it.
+
+**Loadout = 1 mandatory specialization (its passive) + 4 active ability slots, always 4,
+for every class.** There is no separate "passive slot" outside the specialization choice —
+no class has 5 buttons.
+
+Exactly two things are determined rather than chosen:
+
+| Slot | Determined by | Rule |
+|---|---|---|
+| **Forager** | Your **class** | Warrior, Speedy and Fatty each get their class's Peck. `PeckAmount` / `PeckCooldown` are authored per class, so the forager is already a per-class variant, not one shared button. **The Assassin has no forager at all** — `AllowedClasses` on `Peck.asset` excludes it outright, and that is the mechanical reason it cannot farm. |
+| **Signature** | Your **specialization** | Every specialization grants exactly one signature ability, force-equipped (§5.3). |
+
+Everything left over is **freely chosen** from the abilities that class may legally equip
+(its Character pool plus the Common pool):
+
+| Class | Determined | Free picks |
+|---|---|---|
+| Warrior / Speedy / Fatty | forager + signature | **2** |
+| Assassin | signature only | **3** |
+
+That is the whole rule. A forager always picks 2; the Assassin always picks 3. Slot
+pressure no longer depends on which specialization you took.
+
+**Consequence — the three pending Peck-variant signatures are superseded.** §5.3 parked
+Slippery / Featherfoot / Hoarder on "signature pending, wants a Peck variant". Under this
+model a Peck variant cannot be a signature: the forager slot answers to the *class*, so a
+spec-granted Peck would be a second forager. Per-class foraging variation already lives
+where it belongs — in each class's `PeckAmount` / `PeckCooldown`. Those three
+specializations therefore need **ordinary signature abilities** assigned (see §11 item 2).
 - **Common** abilities are open to every class that is allowed to equip them; **Character**
   abilities are gated by a per-class mask (`AbilityBaseSO.SlotKind` + `AllowedClasses`).
   **The Common pool is now exactly two abilities: Egg Shell (every class) and Peck
@@ -724,7 +775,8 @@ Pressing a refused button **shakes it and clicks** — a press is never silently
 | # | Item | Status |
 |---|---|---|
 | 1 | Per-ability values (steal/stun/slow/cooldown/radius) | Tuning against Oracle + playtest |
-| 2 | ~~Passive pools reimplementation~~ **Specializations** (§5.3) | **Shipped.** 5 of 8 signatures assigned; 3 await a `BalanceOracle` solve (Peck variants) |
+| 2 | ~~Passive pools reimplementation~~ **Specializations** (§5.3) | **Shipped.** 5 of 8 signatures assigned. The other 3 (Slippery / Featherfoot / Hoarder) need **ordinary** signature abilities — the Peck-variant plan was retired by §7.1's simplified slot model on 2026-09-04 |
+| 2c | **The arena is too big for 4 players in 45 s — you barely see combat** | ⚠️ **Known, accepted for now, must be solved.** Observed in play: four chickens on a 51.3 m square rarely meet, so the control-and-steal systems that the whole v0.4 redesign exists to serve go unexercised. The map reads as a place, but a place built for more players than it has. See §3.9 |
 | 2a | Wing Slam's cd 12 contradicts Warrior's "spams abilities" essence | Flagged, needs re-tuning |
 | 2b | Specialization visual identity (per-spec colour/model) | Designed (§5.3), concepts need regenerating in the shipped house style |
 | 3 | **Last-15 s endgame rule** | Deferred until base loop is fun; 3 candidates parked (Open Bases / center-collapse / Golden Egg) |

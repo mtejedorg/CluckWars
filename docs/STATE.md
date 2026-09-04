@@ -6,6 +6,352 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Mechanics compendium site + slot-model simplification (2026-09-04)
+
+Maestro: *"Documentation, even in Notion, is now huge and hard to read and explain to
+people. I want an interactive site showing all the mechanics."* Then, after reading it:
+four corrections, three of which are **design changes**, not site copy.
+
+### Shipped — `docs/site/index.html`
+
+A single self-contained HTML file (no build step, ~114 KB) covering 13 sections: overview,
+core loop, the SCT axiom, roster, a filterable 37-entry ability codex, loadout rules,
+steal/control, the execute, an interactive SVG arena, jump traversal, casting feel, the
+technology stack, and design notes. Five real interactives (roster comparator, codex with
+detail drawer, loadout builder that enforces the real slot rules, layered arena map,
+steal + jump + centre-pile solvers).
+
+Visual identity is inherited from `ART.md` §6.1–6.2 rather than invented. **Every number is
+read from the shipped `.asset` files and gameplay constants, never from GDD prose** — which
+is how the discrepancies below surfaced.
+
+**Standing instruction: this site is a living document and must be updated whenever the
+docs or gameplay assets change.** Recorded in `CLAUDE.md` (quick-start step 6) and
+`memory/mechanics-compendium-site.md`. Published Artifact:
+`https://claude.ai/code/artifact/05381fe1-607a-4096-ac2d-2901c026f036`.
+
+### Design changes made this session
+
+1. **Slot model simplified (GDD §7.1 rewritten).** The old rule made slot pressure vary by
+   specialization and was genuinely hard to hold in your head. Now uniform: the **class**
+   determines the forager slot (none for the Assassin), the **specialization** determines
+   the signature slot, and the player picks the rest — **2** for a forager, **3** for the
+   Assassin, always.
+
+2. **The three pending Peck-variant signatures are retired** (GDD §5.3,
+   `class-essence-and-signatures.md` §3). Direct consequence of #1: a specialization cannot
+   grant a forager, because the forager answers to the class. The per-class foraging
+   variation those variants were reaching for **already exists** as each class's authored
+   `PeckAmount` / `PeckCooldown`. The Agile, the Anxious and the Hauler now need *ordinary*
+   signature abilities — the fantasies in the design doc are still the right brief.
+
+3. **Arena density flagged as an open problem** (new GDD §3.9, §11 item 2c). Four chickens
+   on a 51.3 m square in 45 s rarely meet, so the control-and-steal systems the whole v0.4
+   redesign exists to serve go unexercised. Accepted for now, **must be solved**. Four
+   levers documented (shrink arena / pull objectives inward / raise player count / funnel
+   with geometry); none chosen, because we do not yet know whether the encounter *rate* or
+   the *readability* of encounters is what is wrong. First question for a human playtest.
+
+4. **Class essences surfaced as the cause of each kit** (site §04, sourced from
+   `class-essence-and-signatures.md` §2). Each class now shows its essence, its mechanical
+   contract, and 3–4 concrete pieces of evidence that the ability list follows from it —
+   including where it *fails* (Wing Slam's 12 s cooldown on the spam class).
+
+### Data discrepancies found while building (docs vs. shipped assets)
+
+- **Foraging rate.** GDD's Collect column (3.2 / 3.0 / 2.6 / 1.7) is a stale solve. Shipped
+  is `PeckAmount / PeckCooldown` → 3.30 (Warrior) / 3.90 (Speedy) / 3.85 (Fatty). There is
+  **no passive collection** — GDD §10's "stand on a pile, cargo fills" is wrong; foraging
+  *is* Peck. The Assassin therefore has no forage mechanism whatsoever.
+- **Centre-pile opening.** Computed from the shipped 7.8 m footprint (not the GDD's
+  pre-shrink 12 m table), the fortress phase ends at **~72 %** remaining and the map is
+  fully open by **~31 %** — independently confirming GDD §3.6's worry that a linear
+  footprint opens the arena too early.
+- `ARCHITECTURE.md` still documents HP, damage and a procedural UGUI Bootstrap menu — all
+  retired. Not corrected this session; flagged here.
+
+### Bugs fixed in the site itself
+
+- Section `#arena` and its `<svg id="arena">` collided, so the map drew into the section
+  instead of the SVG.
+- `/**/` inside a JS header comment closed the comment early and killed the whole script.
+
+> ⚠️ **Preview-pane note:** the in-app browser's screenshot capture returns solid black for
+> parts of this page while the DOM renders correctly. Verify with `getComputedStyle` /
+> DOM queries, not screenshots.
+
+---
+
+## ✅ Ability feedback audit + fixes (2026-08-27/28) — 531/531 green
+
+Maestro: "review the ability feedback with the review routine and /user-testing, focus on
+complex abilities like Dive Bomb and Feather Trap, follow the Notion design but also find
+gaps that need solving or redesigning." Then: "fix whatever you detected."
+
+Suite went **451 → 524** across the session (+73 tests). Dive Bomb travel/landing is still
+in flight at time of writing; everything else below is landed.
+
+### The two findings that mattered most — both invisible to every check that existed
+
+1. **`AbilityZoneVisuals` was attached to nothing.** The component that draws a zone's edge
+   ring and expiry drain was never added to `AbilityZone.prefab`, so **Feather Trap and Root
+   Egg rendered nothing at all** — a 3.6 m, 5 s slow cloud with no tell whatsoever. You
+   learned where a trap was by already being slowed inside it. `FEEDBACK.md` cases 22 and 23
+   were marked ✅ shipped; both were false. No test could catch it: a missing prefab
+   reference is not a code path. Same failure class as the bot-loadout staleness bug.
+
+2. **The wing axis was documented wrong, and every wing animation in the game was a no-op.**
+   `CastArchetypeClipGenerator`'s docblock claimed wings use local Y mirrored, and claimed it
+   was "measured off the shipped clips, not guessed". Y is the wing's *roll* axis — the child
+   bone sits on it, so `WingL Y+40` and `Y−40` both leave the wingtip at its exact bind
+   position. Real motion is X (elevation) and Z (sweep); Neck/Head Z is likewise inert.
+   Consequence: **5 of 8 cast archetypes were mutually indistinguishable**, because the design
+   leans on wings for silhouette separation. Nothing detected it — no error, no warning, and
+   every per-frame feature assertion passed, because *a wing that never moves cannot violate a
+   relationship.* The original author correctly saw that shipped clips put values on Y; they
+   never checked whether those values did anything.
+
+### Landed
+
+- **Zone visuals** on `AbilityZone.prefab`. Feather Trap and Root Egg now render.
+- **Attribution + Drag/Snare split.** New `HitAttribution`; `ControlVfx.Snared = 1 << 3`
+  (Drag = `Slowed && !Snared`, so no consumer re-derives). Drag = pile 0.80 / collision 0.75,
+  no enemy agency, no deadline; Snare = ability slows, enemy agency, zone-sourced ones carry a
+  real deadline. Differentiated on **presence and motion, not hue** (Snare keeps a pulsing
+  ring; Drag drops the ring, keeps static streaks) so it survives greyscale and sound-off.
+  **`AbilityZone` pushes the zone's own position, not the owner's** — avoids the §1.6
+  information leak *and* is the truthful proximate cause; standing inside the trap makes
+  `TryBearing` decline rather than spin an arrow.
+- **Cast archetypes wired.** 8-archetype enum + `None` on `AbilityBaseSO.CastMotion`, all
+  **37** ability assets populated (not 29 — 8 passives live in `Abilities/Passives/` and had
+  silently defaulted to `Lunge`, the zero value: the Quick Drop `BotRole` bug's exact shape).
+  32 clips regenerated against *measured* axes. `ChickenAnimator` routes through 8 `Cast_*`
+  states with per-class clips via `AnimatorOverrideController`. Dead `AbilityAnimationClip`
+  field removed (declared Phase 6, never read).
+- **`CanActivate` pre-commitment gate.** Refuses the press before `ActiveSlot` /
+  `ActivationTimer` / `SetCooldown`, so a wiring bug no longer burns a full cast and cooldown.
+  Bots now retry instead of going quiet for 11 s.
+- **4 silent guards + 3 `onBeforeSpawned` leaks surfaced.** The 4th (Smoke Roost) ran *after*
+  `caster.VisualOpacity`, so the player faded convincingly while no cloud spawned. The leaks
+  abandoned an already-spawned `NetworkObject` whose `LifetimeTimer` was never set — inert
+  networked objects persisting the whole match.
+- **`ChickenVFX`** migrated off the known-broken `ActiveSlot` edge-detect to `LastCastEventId`.
+- **Reduced-motion preference** (`PlayerPreferences.ReducedMotionEnabled`), honoured by
+  `MatchCamera`. Required, not optional — see the panel note below.
+- **Assassin ground penetration** (15 cm on Lunge) traced to forward *body pitch* driving its
+  long chest plumes down — not tail or wing plumes, which was the initial hypothesis.
+  Generator now bakes the skinned mesh and bisects a per-class clamp against a floor plane.
+  *Bones are not geometry, and only geometry can clip.*
+- **Doc drift** corrected in `FEEDBACK.md` / `ART.md` (stale radii and offsets post reach-scaling,
+  missing `Capsule` row, §6.10 still describing HP/damage-triggered stun).
+- **`CONVENTIONS.md`** gained the silent-failure sorting rule, plus a pre-commitment rank above
+  its corollaries now that `CanActivate` exists.
+
+### Synthetic panel (5 segments × 10 personas — simulated, not real research)
+
+Report: https://claude.ai/code/artifact/1b2d287e-29c1-41fa-a1fc-1d1d3b6aadf7
+
+Two splits changed decisions rather than confirming them:
+- **The vestibular persona prefers the teleport** and is glad the landing impact is absent —
+  the inverse of the competitive consensus. This is why the arc is gated on reduced-motion
+  rather than shipped unconditionally.
+- **Casual mobile flipped "did my throw land?"** from split/deprioritise to a near-universal
+  want. Android is a committed shipping target, not a fringe segment.
+
+### Open
+
+- **Dive Bomb travel + landing impact — landed and verified.** 531/531 green
+  (524 + 7 in `JumpTravelFeedbackTests.cs`), run after the MCP reconnected.
+
+  Catch-up formulation, *not* a scripted arc: `Chicken.prefab` has
+  `DisableSharedModeInterpolation: 0`, so remote peers already see the teleport as a slide and
+  an arc on top would double the travel and read as lag. `[Networked] byte JumpEventId`
+  discriminates from `RPC_TeleportTo` at round reset (`GameManager.cs:658`), which would
+  otherwise look like the chicken skating home. `UpdateKnockback` was renamed to
+  `UpdateImpactShockwave` (doc references in `AbilityRangeIndicator.cs` and `HitFeedback.cs`
+  retargeted). Reduced motion gates both halves; the *knockback* ring is deliberately left
+  ungated — a ground ring is not the screen movement the preference exists for, and that line
+  is this beat's ruling, not a general rule that all ground rings gate.
+- **Spine Coat attribution gap — confirmed from source, scoped, not deferred.** Its steal and
+  knockback fire from `CheckCollisionSlow`; its only `LastCastEventId` bump is at *arming* time,
+  far outside the 0.25 s window. So its victim gets flash, squash, shake and cargo text but
+  **no motion lines and no bearing arc** — the one impact that hits from a direction and
+  refuses to say which. Awaiting a cost call from Maestro. See `FEEDBACK.md` §7.2 note B.
+
+  **Cost scoped (not built): low — ships in a normal session, does not need its own pass.**
+  Neither obvious fix works: `CheckCollisionSlow` runs behind `HasStateAuthority` on the
+  *thief's* peer, and `NotifyCargoLoss` knows the amount but never the thief. The fix is a
+  third push point at `ChickenCargo.RPC_DrainStolen` (line 477), which already receives and
+  validates `thiefId` — store it as `[Networked] NetworkBehaviourId` plus a bumped one-shot
+  byte, bumped only *after* the drain succeeds. ~30–40 lines in one file, ~5 bytes per
+  chicken, no call site moves. It also covers Snatch / Sneaky Steal / Scrap / Thief, which
+  would then receive `NotifyAttacker` twice per steal — absorbed by construction, since
+  `RecordAttribution` clears `_impactPending` on the first claim and plays no second beat.
+  **Add a `HitAttribution` test pinning that double-record no-op first** — the whole cost
+  estimate rests on that property and nothing currently asserts it.
+- **Two playtest obligations** in `FEEDBACK.md` §7.2: pile-drag now has no onset event (do
+  **not** solve by re-adding the Drag text — that suppression is what makes Snare text mean
+  something), and the hitbox-mismatch read on the Dive Bomb arc.
+- **`ChickenVFX.LateUpdate` has no `Object == null || !Object.IsValid` guard**, unlike its
+  siblings. Not a regression — the old code had the same exposure. Filed, not fixed.
+- **`~40 juice constants` still outside `FeedbackTuning`** (ring geometry, particle tuning,
+  per-effect lifetimes). Colour, shake and text are centralised; geometry is not.
+- **Committing:** `Chicken.controller` and `ChickenClassRegistry.asset` need care — animator
+  **transition order is load-bearing**. The generic `Cast` fallback tests only the trigger, so
+  any merge that reorders it ahead of the archetypes makes all 8 play the same clip *while
+  appearing to work.*
+
+## ✅ RPC hardening + per-tick physics removal (2026-08-25, continued 2026-08-29) — 531/531 green
+
+Three fixes from `code-architect`'s architecture review, plus a fourth (§4) that finished the
+`RpcSources.All` sweep on 2026-08-29. **Not yet reviewed or committed.**
+
+**Baseline note:** the suite was **429** before this work, not the 432 recorded below — a
+concurrent session's in-flight `MenuUiController.GetPassiveInfo` refactor had already changed
+`ContractsAndEnumsTests` / `CoreLogicTests`. 429 + 22 new = **451/451, 11.7 s**. Nothing was
+red before or after. `MenuUiController.cs`, `ContractsAndEnumsTests.cs` and `CoreLogicTests.cs`
+are modified in the working tree by that other session — **not part of this change.**
+
+### 1. `RPC_AddFood` and `RPC_TeleportTo` trusted every caller (CRITICAL)
+
+Both are `RpcSources.All`. `PlayerBase.RPC_AddFood` guarded only `amount > 0`, so any connected
+client could call `someBase.RPC_AddFood(9999)` and win instantly; `ChickenController.RPC_TeleportTo`
+had no sender check at all, so any peer could teleport any chicken anywhere.
+
+- **New `BaseDepositRules`** (`Scripts/Gameplay/BaseDepositRules.cs`) — pure static predicates
+  (amount bound, planar proximity, corner allegiance), testable with no live `NetworkRunner`,
+  the same split `StealMath` / `BotTactics` / `AbilityAim` use.
+- **The amount bound is derived, not invented:** `DepositRatePerSecond × FlushSeconds ×
+  MaxDepositRateMultiplier` = 9 × 0.25 × 8 = **18**, comfortably under the 40 win target. The
+  0.25 s flush window is now one shared constant (`ChickenCargo` reads it too) so sender and
+  receiver cannot drift apart, and `MaxDepositRateMultiplier` is pinned to
+  `QuickDropAbilitySO.DepositRateMultiplier`'s `[Range]` ceiling by a test.
+- **Trusted / untrusted split:** `GameManager.AwardMatchEndBonuses` runs on the authority and
+  banks into a possibly-distant home base, so it now uses the new `PlayerBase.AddFoodAuthoritative`
+  (direct write, asserts `HasStateAuthority`). Leaving it on the RPC would have silently eaten
+  the Spoiler bonus once the proximity check landed.
+- **Bot attribution — the trap, and it is NOT what the spec assumed.** See "Design deviations".
+
+### 2. `CheckCollisionSlow` ran a physics query every tick
+
+`Physics.OverlapSphereNonAlloc` + `GetComponentInParent` per chicken per tick — the last
+`Physics.Overlap` in the per-tick path. Now iterates the capped 4-entry `ActiveControllers` list
+like `CheckAuraSlow` directly below it. `ChickenController.cs` was added to the
+`AbilityAimTests.NoAbilityScript_CallsPhysicsOverlapDirectly` lock. `_overlapHits` removed.
+
+**Balance note:** range is now measured to the other chicken's transform pivot rather than to its
+capsule surface, so contact registers roughly one collider radius (~0.48 m) later. Same shift, same
+reasoning, `AbilityZone` documented when it made this move. `CollisionSlowRadius` is 1.2 m against
+a 0.96 m body diameter, so "two chickens touching" is now literally what the constant says.
+Decoys are deliberately still included — they sit on the Chickens layer and the old query found them.
+
+### 3. `_verticalVelocity` was not rollback-safe
+
+Was a plain `private float` on `ChickenMovement` (a pure C# class, so it cannot carry
+`[Networked]`), ticked every `FixedUpdateNetwork` and therefore outside predicted state: each
+resim re-integrated gravity on a value rollback never restored. Now
+`[Networked] ChickenController.VerticalVelocity`, read/written through `_owner` exactly like
+`ExternalDisplacement`. The `isGrounded` / `ClampInsideArena` interaction was left untouched.
+
+### 4. `RPC_DrainStolen` trusted every caller (CRITICAL) — 2026-08-29
+
+The last `RpcSources.All` hole from `adr/0002` §5. `ChickenCargo.RPC_DrainStolen` guarded only
+`amount <= 0 || Cargo <= 0`, so any peer could call `someChicken.Cargo.RPC_DrainStolen(9999)` and
+empty any rival from anywhere, bypassing the steal mechanic entirely.
+
+*(The other RPC that §5 lists, `ChickenCombat.RPC_ApplyDamage`, no longer exists — it went in the
+13 Aug combat rewrite. The ADR is stale on that point; nothing to do.)*
+
+- **New `StealRules`** (`Scripts/Gameplay/StealRules.cs`) — the same pure-static split as
+  `BaseDepositRules`: amount bound, reach bound, planar proximity, drift margin, no Fusion types,
+  fully EditMode-testable.
+- **The receiver cannot infer the thief, so the RPC now names it.** The call lands on the
+  *victim*; `info.Source` is a `PlayerRef`, and every bot shares `PlayerRef.None`, so a
+  sender-only rule cannot tell one bot thief from another. Signature is now
+  `RPC_DrainStolen(float amount, NetworkBehaviourId thiefId, RpcInfo info = default)`, resolved
+  through `Runner.TryFindBehaviour` — the mechanism `RPC_TransferAllToBountyBag` in the same file
+  already used. Attribution then mirrors `PlayerBase.TryResolveDepositor` exactly:
+  `info.IsInvokeLocal ? HasStateAuthority : InputAuthority == info.Source`. **Not**
+  `Object.StateAuthority`, which reports `[Player:None]` in `GameMode.Single` — same trap as §1.
+- **Both bounds derive from `AbilityRegistrySO.All`, never authored here.** Amount = max
+  `NominalStealAmount` × max passive `MaxStealMultiplier` = 8 (Dive Bomb) × 1.6 (Thief) =
+  **12.8**. Deliberately the product of two independent maxima rather than a legal pairing: Dive
+  Bomb is Warrior-only and Thief is Assassin-only, so 11.2 is the real ceiling, but teaching a
+  security bound about loadout legality would couple it to balance rules. An unresolved registry
+  logs an `Error` and skips the magnitude/range checks rather than rejecting every steal —
+  same graceful degradation as `PlayerBase`'s missing-`MatchConfigSO` path.
+- **The range check is NOT uniform, and a naive one silently breaks Dive Bomb.**
+  `RollTrampleAbilitySO` is `AimShape.Capsule`, so `ResolvesBeforeJump` is true: the lane is
+  scanned from the take-off pose, `OnActivate` sends the RPC, and only *then* does the chicken
+  teleport up to `JumpResolver.ShortDistance` further on. Measured against plain authored reach,
+  every real Dive Bomb steal would have been rejected — with zero red tests, the same failure
+  shape as §1's `AwardMatchEndBonuses`. `StealRules.Reach` adds the jump allowance keyed off the
+  existing `AbilityBaseSO.CastPoseIsUnreconstructable`, so a future gap-closing steal inherits it
+  without anyone remembering to special-case it.
+- **There are five callers, not the four the spec assumed.** Spine Coat's steal-back fires from
+  `ChickenController.CheckCollisionSlow` on contact, not from any ability's `OnActivate`, and has
+  `AimShape.None` so it contributes no reach. It now declares `NominalStealAmount` so the amount
+  bound stays honest, and `StealRulesTests` greps the caller set so the list cannot drift again.
+- **Drift margin covers knockback, not just walk speed** — Snatch shoves the very target it robs,
+  in the same loop, so `DriftSpeed` folds `ExternalDisplacement` in on top of `MoveSpeed`.
+
+**Test count, and a repeat of §1's baseline lesson:** `senior-dev` reported **476/476**, measured
+against the 451 baseline this section originally recorded. That baseline was already stale — the
+2026-08-27/28 ability-feedback session had taken the suite to 531. Re-run unfiltered by
+`code-architect` after the fact: **531/531 green, 11.6 s, zero failures**, with the new coverage
+present and passing (`StealRulesTests` 23, plus 2 `RpcDrainStolen` cases in `RpcHardeningTests`).
+Trust a number you measured yourself; concurrent uncommitted sessions move this target constantly.
+
+`ChickenMovement` now holds **no** mutable instance fields at all; a test enforces that, since
+anything it carries across ticks is invisible to rollback by construction.
+
+### Live verification (solo run, Game.unity, 2 rounds)
+
+EditMode cannot exercise `RpcInfo`, and a wrong attribution rule would silently stop **all**
+scoring. Verified in play mode instead: bots banked 25 food across two rounds,
+**0 `rejected RPC_AddFood`**, **0 `rejected RPC_TeleportTo`**, 4 `Teleported to` on round restart,
+`Spoiler: banked +15 into corner 2` through the authoritative path, and `VerticalVelocity` pegged
+at the grounded −2 on every chicken including after teleports.
+
+### Design deviations from the review spec (both verified live)
+
+1. **Bot attribution does not use `info.Source`.** The spec proposed "a bot chicken when
+   `info.Source` is the match authority". Measured in solo: **`Object.StateAuthority` reports
+   `[Player:None]` for every object**, while `HasStateAuthority` is `true` — so a `Source`
+   comparison would have rejected the human player's own deposits. The rule used instead is
+   `info.IsInvokeLocal ? chicken.Object.HasStateAuthority : chicken.Object.InputAuthority == info.Source`.
+   A remote peer cannot forge `IsInvokeLocal`, so this is strictly stronger *and* it needs no
+   `GameManager` handle. Bots and the master's own chicken both fall out of the local-invoke branch.
+2. **`RPC_TeleportTo` keeps the `GameManager.Instance.Object.StateAuthority` handle**, but short-
+   circuits on `info.IsInvokeLocal` first — which is what actually carries solo mode, given the
+   `[Player:None]` finding above. Accepting local invokes grants nothing: a peer holding a
+   chicken's state authority can write `transform.position` directly anyway.
+
+### Still open
+
+- **Shared-mode multi-peer pass not run.** The remote branch (`InputAuthority == info.Source`,
+  and the `GameManager.Object.StateAuthority` comparison) has only been reasoned about, not
+  measured. Worth a `tools/run-clients.ps1` 2-client round before this ships.
+- **`ChickenCargo.RPC_DrainStolen` (`ChickenCargo.cs:417`) has the identical trust-every-caller
+  bug and was NOT touched by this pass.** Same `RpcSources.All` + `amount <= 0f` guard shape as
+  the two fixed above; any peer can drain any chicken's cargo from anywhere. It's the shared
+  backbone of four abilities — `SnatchAbilitySO`, `ScrapAbilitySO`, `RollTrampleAbilitySO`,
+  `SneakyStealAbilitySO` — so a fix needs to account for all four call sites, not just one. A
+  task chip was filed for this alongside `ChickenCombat.RPC_ApplyDamage`, but **that second
+  target no longer exists** — it was removed in the 13 Aug combat rewrite (see
+  `PassiveAbilitySO.cs:24-29`); the chip is working from stale info and should be corrected to
+  `RPC_DrainStolen` only when picked up.
+- `docs/adr/0002` item 4 also lists `_abilitySlowUntil`, `_rootUntil`, `_activeSlowSources`.
+  Checked, not left ambiguous: `_rootUntil` no longer exists (already promoted to
+  `[Networked] TickTimer RootTimer` in v0.6 — the ADR is stale on this one).
+  `_activeSlowSources`/`SlowMultiplier` are per-tick scratch reset at the top of every FUN, not
+  the same desync-under-rollback bug. Only `_abilitySlowUntil`/`_abilitySlowFactor`
+  (`ChickenController.cs`) genuinely needs the same `[Networked] TickTimer` promotion
+  `RootTimer` already got — the one item from this ADR line that's still real and unfixed.
+- No Maestro prefab wiring is needed for any of this.
+
+---
+
 ## ✅ Bot AI rebuild (2026-08-23) — 432/432 green
 
 Maestro: "bots are now super stupid — improve the AI knowing the newest ability changes and

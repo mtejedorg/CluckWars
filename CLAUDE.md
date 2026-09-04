@@ -29,6 +29,7 @@ should rarely need edits.
 | **How do I build / run / diagnose?** Build menu shortcuts, debug HUD (F1), adb logcat commands, source-tag reference, diagnostic flows per bug type. | `docs/TESTING.md` |
 | **What's the plan, what's shipped, what's next?** Per-phase status, dedicated test session work list. | `docs/ROADMAP.md` |
 | **Why does the design look like this?** GDD / TDD / ART. | `docs/GDD.md` / `docs/TDD.md` / `docs/ART.md` |
+| **How do I show the game to a human?** Interactive mechanics site — classes, abilities, arena, traversal, tech stack. Doubles as portfolio. | `docs/site/index.html` — **keep in sync, see below** |
 | **How does the open-source Unity MCP work?** MCP architecture, UI Toolkit rules, asset structure, and Claude integration. | `docs/UNITY_MCP_GUIDE.md` |
 | **Why this engine / other big choices?** Architecture decision records (e.g. Unity vs Godot). | `docs/adr/` |
 
@@ -43,6 +44,7 @@ When you begin a session:
 3. If the user asks for a change in a system you haven't touched before, check `docs/ARCHITECTURE.md` for how it's wired.
 4. Before making nontrivial changes, skim `docs/CONVENTIONS.md` — the project has a few hard-won rules (self-injection pattern, RPC patterns, `LogLevel`-name collision with Fusion, `ChickenClass : byte` quirk, etc.).
 5. After making changes, **update `docs/STATE.md`** so the next agent doesn't lose context. ROADMAP entries get ticked too when phases complete.
+6. **If you changed the design docs or any gameplay `.asset` value, update `docs/site/index.html` too.** Standing instruction from Maestro (2026-09-04): the compendium is a living document, not a snapshot. It is one self-contained HTML file with no build step. Its numbers must be read from the shipped `.asset` files and gameplay constants, **never** from GDD prose — the GDD carries known-stale figures. Republish it to the same Artifact URL (see `memory/mechanics-compendium-site.md`).
 
 ---
 

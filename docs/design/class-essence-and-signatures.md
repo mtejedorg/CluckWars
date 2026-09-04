@@ -8,7 +8,7 @@ Suite at 394/394.
 | §1 one class per Character ability | **done** — `fe5d756`, zero shared |
 | §4 nine new abilities | **done** — `a03ea01`, `529e95d` |
 | §3 signature mechanism | **done** — `7406193` |
-| §3 signature assignments | **5 of 8** — three await a `BalanceOracle` solve |
+| §3 signature assignments | **5 of 8** — three need ordinary abilities assigned (Peck-variant plan retired 2026-09-04, see §3) |
 | §5 Snatch / Speed Burst out of Common | **done** — `Common` is now Egg Shell + Peck only |
 | Visual identity (per-spec models/colours) | **not done** — concepts need regenerating |
 
@@ -79,6 +79,17 @@ not agility** — slow wind-up, big telegraph, heavy landing, punishable if read
 ---
 
 ## 3. Specializations grant a signature ability
+
+> **Superseded in part, 2026-09-04.** The slot model is now stated uniformly in GDD §7.1:
+> the **class** determines the forager slot (none for the Assassin), the **specialization**
+> determines the signature slot, and the player picks the remaining **2** (foragers) or
+> **3** (Assassin). The consequence for this document is that the three ⏳ **Peck-variant
+> signatures proposed below — empty-beak rush, burst-fed, heavy beakful — are retired.** A
+> specialization cannot grant a forager, because the forager answers to the class. The
+> per-class foraging variation those variants wanted already exists as each class's
+> authored `PeckAmount` / `PeckCooldown`. The Agile, the Anxious and the Hauler need
+> **ordinary** signature abilities instead; the fantasies described for them below are
+> still the right brief, only the mechanism changes.
 
 Today `ResolveLegalLoadout` force-equips **Peck** for every forager and never for the
 Assassin. That mechanism generalizes.
