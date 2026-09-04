@@ -6,6 +6,64 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Mark/Kill was inert in the shipped game — fixed (2026-09-04)
+
+Found by the new Ability Lab on its first full-registry sweep. The Assassin's locked
+signature had **never worked**: every press logged an Error, consumed the cast and started
+the cooldown, and marked nothing.
+
+### Root cause
+
+`MarkKillAbilitySO` resolves its state machine off the caster
+(`caster.GetComponent<AssassinExecute>()`, in both `OnActivate` and `IsUsable`), but
+`AssassinExecute` was on **no prefab and no scene**, and nothing added it at runtime — the
+component's guid appeared nowhere in the project outside its own `.meta`. The class was
+written, tested against, and referenced by name in five other files; it was simply never
+attached to anything.
+
+### Fix
+
+`AssassinExecute` added to `Assets/_Game/Prefabs/Chicken.prefab` via the Editor, so Fusion's
+baker rebuilt `NetworkObject.NetworkedBehaviours` (8 → 9 entries). `Doppelganger.prefab` is a
+variant and inherited it automatically, rebaking to 9 as well — harmless on a decoy, which
+never casts (`IsDecoy` gates `AbilityController`), and it keeps the variant's networked
+layout aligned with its base.
+
+**No `.asset` value changed**, so `docs/site/index.html` needed no update.
+
+Saving the prefab also made Unity re-serialize it against scripts that had already landed:
+stale `BotController` fields dropped (`_thinkInterval`, `_dangerRadius`, `_huntRadius`,
+… — all removed by `e2e4d5a`'s per-class personalities), and `_stalkStandoffFraction: 0.8`
+plus new `[Networked]` fields on `ChickenController` / `ChickenCargo` written out. Every one
+matches its C# default; no behaviour changed.
+
+### Live verification (Ability Lab, Play Mode)
+
+Assassin + Mark/Kill in slot 0, one dummy at 4.00m and isolated: `IsUsable = True`,
+`BotTryActivate(0) = True`, `MarkedTarget` → a real id resolving back to the intended
+target, arm timer running, no Error logged.
+
+### The regression guard — and why the existing one missed this
+
+`ProjectConfigTests.ChickenPrefab_HasEveryComponentTheGameplayLoopResolves` asserts exactly
+this class of fact, and sat green through the whole bug: it is a hand-written `Require<T>`
+list, and nobody added a line for `AssassinExecute`.
+
+The new gate is source-derived instead —
+`AbilityWiringGateTests.EveryComponentAbilitiesResolveOnTheCaster_IsOnTheChickenPrefab`
+scans `Assets/_Game/Scripts/Abilities/*.cs` for `caster.GetComponent<T>()`, and requires
+each `T` on `Chicken.prefab` (and, when it is a `NetworkBehaviour`, inside
+`NetworkedBehaviours` — the quieter half of the same bug, where `GetComponent` succeeds but
+no `[Networked]` state replicates). It keys on the **receiver**, so
+`networkObject.GetComponent<T>()` on a just-spawned prefab is correctly ignored. An ability
+that reaches for a new component on the caster is covered the moment it is written, with no
+list to update.
+
+Proven to bite: with `AssassinExecute` temporarily removed, the test fails with the
+add-it-to-the-prefab message; restored, the whole EditMode suite passes.
+
+---
+
 ## ✅ Mechanics compendium site + slot-model simplification (2026-09-04)
 
 Maestro: *"Documentation, even in Notion, is now huge and hard to read and explain to

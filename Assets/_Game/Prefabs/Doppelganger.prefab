@@ -58,7 +58,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8810401778881765308, guid: 715ce6f3a16e16c4daaced5f3b81b068, type: 3}
       propertyPath: NetworkedBehaviours.Array.size
-      value: 8
+      value: 9
       objectReference: {fileID: 0}
     - target: {fileID: 8810401778881765308, guid: 715ce6f3a16e16c4daaced5f3b81b068, type: 3}
       propertyPath: 'NetworkedBehaviours.Array.data[2]'
@@ -82,6 +82,10 @@ PrefabInstance:
       objectReference: {fileID: 2144029178904967566}
     - target: {fileID: 8810401778881765308, guid: 715ce6f3a16e16c4daaced5f3b81b068, type: 3}
       propertyPath: 'NetworkedBehaviours.Array.data[7]'
+      value: 
+      objectReference: {fileID: 4428922042542391028}
+    - target: {fileID: 8810401778881765308, guid: 715ce6f3a16e16c4daaced5f3b81b068, type: 3}
+      propertyPath: 'NetworkedBehaviours.Array.data[8]'
       value: 
       objectReference: {fileID: 5724610512170082405}
     m_RemovedComponents:
@@ -144,6 +148,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d3258e9f2e07b7d41a8480f1201fddc7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenMatchStats
+--- !u!114 &4428922042542391028 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5276517656185694567, guid: 715ce6f3a16e16c4daaced5f3b81b068, type: 3}
+  m_PrefabInstance: {fileID: 8380994380187867027}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1437319008701371653}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc2eaaac93e74394c994e7a0e6f6a463, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.AssassinExecute
 --- !u!114 &5736875493823057097 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 4310573928164825946, guid: 715ce6f3a16e16c4daaced5f3b81b068, type: 3}

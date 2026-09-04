@@ -34,6 +34,7 @@ GameObject:
   - component: {fileID: 7606116696970456605}
   - component: {fileID: 778592323106949538}
   - component: {fileID: 1825375558777686298}
+  - component: {fileID: 5276517656185694567}
   m_Layer: 8
   m_Name: Chicken
   m_TagString: Untagged
@@ -104,6 +105,7 @@ MonoBehaviour:
   - {fileID: 7853284419870734786}
   - {fileID: 4310573928164825946}
   - {fileID: 7606116696970456605}
+  - {fileID: 5276517656185694567}
   ForceRemoteRenderTimeframe: 0
 --- !u!143 &6032245462738825523
 CharacterController:
@@ -149,6 +151,8 @@ MonoBehaviour:
   _StealBackActive: 0
   _ControlFlags: 0
   _KnockbackEventId: 0
+  _SelfImpulseEventId: 0
+  _JumpEventId: 0
   _HomeCornerIndex: -1
   _UnderdogSurgeActive:
     _value: 0
@@ -158,6 +162,7 @@ MonoBehaviour:
   _AuraSlowRadius: 0
   _AuraSlowFactor: 0
   _IsStunned: 0
+  _VerticalVelocity: 0
 --- !u!95 &5731265523250509895
 Animator:
   serializedVersion: 7
@@ -258,6 +263,11 @@ MonoBehaviour:
     m_Bits: 512
   _Cargo: 0
   _BountyBag: 0
+  _LastThiefId:
+    Object:
+      Raw: 0
+    Behaviour: 0
+  _StealEventId: 0
 --- !u!114 &101601932164880250
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -320,18 +330,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 255bff1c293ecab46be11c8de994dd46, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.BotController
-  _thinkInterval: 0.3
   _arrivalRadius: 1.5
   _pileStandoff: 0.7
-  _returnThreshold: 0.7
-  _protectCargoThreshold: 0.4
-  _dangerRadius: 5
-  _huntRadius: 8
-  _huntCargoThreshold: 0.3
-  _abilityRange: 4
-  _engageUnloaded: 0
-  _engageRadius: 6
   _stateExitRadiusFactor: 1.35
+  _stalkStandoffFraction: 0.8
 --- !u!114 &7224469946525777145
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -502,3 +504,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9e3d40b7a1cf52f4ab08d6e274513c9a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.AbilitySlotOverlay
+--- !u!114 &5276517656185694567
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc2eaaac93e74394c994e7a0e6f6a463, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.AssassinExecute
+  _MarkedTarget:
+    Object:
+      Raw: 0
+    Behaviour: 0
+  _KillReady: 0
