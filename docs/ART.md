@@ -435,11 +435,18 @@ Navigation: Left stick moves. D-pad navigates menus. A confirms, B backs (in men
 
 ### 6.10 Control-State Overlays (on-character)
 
+> **Reconciled 2026-08-26.** This section was authored against the pre-redesign combat
+> model and still described stun as triggered by "HP reaches 0 (damage ability)" for 5 s,
+> with the victim dropping all cargo. There is no HP, no damage and no basic attack — all
+> chicken-to-chicken interaction is control + steal, and nothing drops cargo on stun. The
+> table below now matches shipped code. §6.12 extends this section with the v0.6 badge
+> stack and drain rings; where the two overlap, §6.12 is the newer treatment.
+
 Control states attach to the affected chicken **in world space** — never to a HUD panel — so "who is what" reads instantly mid-effect. The player identity ring stays visible underneath every overlay. (Wireframe: `cluckwars-hud-v3` `CWStateChicken` / `CWControlStatesSheet`.)
 
 | State | Trigger | Duration | Visual |
 |---|---|---|---|
-| **Stunned** | HP reaches 0 (damage ability) | 5 s | Cartoon stars circle overhead; body tilts + desaturates; nameplate turns red with a 💀. Drops all cargo at feet (gameplay consequence — show crumbled food sprites). |
+| **Stunned** | A stun ability (Wing Slam 1.5 s, Ambush 1.0 s) | 1.0–1.5 s, authored per ability | Cartoon stars circle overhead; body tilts + desaturates; nameplate turns red. Blocks movement, casting and collection — see `ControlRules`. |
 | **Slowed** | Collision / pile / slow ability | 1–4 s (ability-dependent) | Subtle blue tint blob + fading speed-trail behind the chicken; 🐌 on the nameplate. Speedy resists via Slippery. |
 | **Knocked back** | Push abilities (Roll & Push, Spine Coat, Peck) | Instant | Motion lines + ghost trail in the travel direction; no persistent overlay; 💨 flash on the nameplate. Fatty resists via Immovable. |
 | **Rooted** | Root Egg trap | 2–3 s | Vines/roots wrap the legs; 🌱 on the nameplate. Can still cast abilities while rooted. |
@@ -470,7 +477,8 @@ outline on the ground plane, in the ability's `AccentColor` at
 |---|---|---|
 | `None` | Self-ring at the caster's feet, radius `FeedbackTuning.SelfRingRadius` (0.62 — deliberately the status ring's radius, so "the chicken's own footprint" stays one idea). No target marking; the caster's own ring is the mark. | Speed Burst, Turtle Mode, Invisibility, Spine Coat, Egg Shell, Doppelganger |
 | `SelfCircle` | Circle centred on the caster at `AimRadius`. | Cluck Shock, Stun Burst, Peck, Sneaky Steal |
-| `ForwardCircle` | Circle offset `AimForwardOffset` metres along flattened facing, plus a thin **stalk** connecting caster to circle so the offset reads as deliberate rather than as a detached decal. | Feather Trap, Roll Push, Roll Trample, Root Egg |
+| `ForwardCircle` | Circle offset `AimForwardOffset` metres along flattened facing, plus a thin **stalk** connecting caster to circle so the offset reads as deliberate rather than as a detached decal. | Feather Trap, Root Egg |
+| `Capsule` | Swept lane: every point within `AimRadius` of the segment from the caster to `AimForwardOffset` metres ahead. Both caps round, so the near cap reaches slightly *behind* the caster — that is the point of the shape. Drawn as the lane outline, not as a circle. | Dive Bomb (`RollTrampleAbilitySO`), Roll Push |
 | `Cone` | Forward arc of `AimConeAngle` degrees, closed back through the caster — a wedge, not an arc segment. | Wing Slam |
 | `Aura` | Circle that follows the caster while the ability is active (not just while aiming). | Feather Aura |
 | `Jump` | Landing ring at the destination plus the same stalk as `ForwardCircle`, reading as an arc to a place. | Shadowstep, Ambush |

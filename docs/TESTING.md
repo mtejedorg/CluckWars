@@ -280,6 +280,108 @@ Read-only. No debug commands. Drop the component on any GameObject in `Game.unit
 
 ---
 
+## Ability Lab (dev scene)
+
+An isolated scene for judging how an ability **feels** — no match clock, no bots hunting
+you, no food economy. Cast it, watch it land on a dummy, read the numbers.
+
+**Launch, in the Editor:** `Cluck Wars / Test / Ability Lab` — opens
+`Assets/_Game/Scenes/AbilityLab.unity` and enters play mode in one click. Opening the scene
+and pressing Play works too.
+
+**Launch, in a build (Windows or Android):** turn on **Developer Mode**, then tap
+**ABILITY LAB** on the main menu. The toggle is on the Character Select options row, beside
+Ability Range Guides. It is stored in `PlayerPrefs`, so it survives relaunches — you set it
+once per device, not once per session. With it off there is no route to the lab at all.
+
+> **The options row is hidden in portrait** (`.layout--portrait .cw-opt-row { display: none }`
+> in `CluckWarsTheme.uss` — the column has no room for it). Hold the phone **landscape** to
+> reach the Developer Mode toggle.
+
+### The controls (UI Toolkit) and the readout (IMGUI)
+
+The lab is deliberately split across two UI stacks, and it is not a style choice:
+**IMGUI receives no input in a player build.** This project runs `activeInputHandler: 1`
+("Input System Package"), and the Input System "cannot generate input for IMGUI"
+(`KnownLimitations.md`); with that setting "the `OnGUI` methods in your player code won't
+receive any input events" (`UISupport.md`). Editor GUI is exempt, which is why this was
+invisible while the lab was Editor-only. **Drawing still works** — only input is missing —
+so the read-only telemetry stayed in IMGUI and everything you can touch moved to UI Toolkit.
+
+**Toolbar (top right, always visible):**
+
+| Button | Does |
+|---|---|
+| `LAB` | Opens / closes the control sheet |
+| `RESET` | Resets every dummy right now |
+| `TELE` | Shows / hides the telemetry readout |
+| `MENU` | Shuts the runner down and returns to the main menu |
+
+**Keyboard still works on Windows:** `F3` toggles the telemetry, `T` resets the dummies.
+(`F1` / `F2` are still `DebugHud` / balance.) Neither exists on a phone, hence the toolbar.
+
+**Control sheet (`LAB`):** class buttons (respawn), an ignore-legality toggle, a slot
+selector (Passive / 0 / 1 / 2 / 3) and the list of everything equippable — tapping an entry
+equips it immediately and clears that slot's cooldown. Below that: Frozen / Patrol toggles,
+a reset-interval slider, a zero-cooldown toggle, and a time-scale slider down to 0.1x —
+slow-mo is what makes windup and recovery readable.
+
+**Telemetry (IMGUI, left, read-only):**
+
+- **Ability Lab — cast**: press→cast latency in ms, the measured length of the last active
+  window, the last cast's slot / name / hit count, and per-slot cooldown plus live refusal
+  reason (`None`, `Cooldown`, `NoTarget`, `Stunned`, …).
+- **Dummy state**: countdown to the next automatic reset, the dummy's current control state
+  (stun / root / slow multiplier) and its cargo.
+
+**Movement and casting go through the real input path.** The scene carries the same
+`TouchControls` UIDocument as `Game.unity`, so the joystick and the four ability hexes drive
+`AbilityController` exactly as they do in a match — judging feel through a different input
+path than the real game would defeat the point of the tool.
+
+### Things worth knowing
+
+- **Loadout swaps are live; class swaps respawn.** `AbilityController`'s slots are plain
+  serialized fields, so swapping abilities keeps your camera, the dummies' positions and any
+  charge state. `ChickenController` resolves its stats once in `Spawned` and nothing watches
+  `Class`, so changing class rebuilds the chicken instead of half-swapping it.
+- **Ignore legality** offers every ability to every class. That is the point of the lab —
+  the lobby refuses these combinations on purpose.
+- **The lab does not force Peck or the signature.** A real match spawn does, so a chicken can
+  always score; the lab honours exactly the four abilities you picked.
+- **Press→cast latency is measured through `IInputProvider`,** so the number is real on both
+  platforms. It used to sample `Keyboard.current` directly, which read as `—` on a phone —
+  no keyboard, so no press was ever stamped. It watches the rising edge of
+  `GetAbilityHeld(slot)` rather than calling `GetAbilityNPressed()`, because the press
+  getters are one-shot: reading them here would consume the latch and swallow the cast that
+  `FusionNetworkService` was about to send.
+- **`hits=0` is not always a whiff.** Self-buffs (`AimShape.None`) and placed zones (Feather
+  Trap, Root Egg, Smoke Roost) legitimately report no hits at cast time — the panel says
+  `(n/a)` for those and `WHIFF` only where a zero really means one.
+- **A GameManager is running,** despite there being no match. Ability input, movement and
+  casting all hard-gate on `GameManager.IsMatchRunning`; the lab spawns one and holds its
+  timer open. **No `PlayerBase` is spawned**, so banking has no destination and nothing can
+  win or score. One food pile *is* spawned — Peck refuses without a pile in range — so the
+  absent base, not the absent pile, is what keeps the match inert.
+- **Solo only.** The lab pins `SessionMode.Solo`; the dummy patrol and the held match timer
+  both rely on there being exactly one peer.
+
+The scene is in Build Settings **last and ENABLED** (changed 2026-09-04), so it ships in
+Windows and Android builds — a phone has no Editor menu to launch a scene from, so the lab
+could not otherwise exist there. Its runtime scripts are no longer fenced behind
+`#if UNITY_EDITOR`; only `AbilityLabMenu.cs` and `AbilityLabTests.cs` remain in `Editor/`.
+
+Being last keeps Bootstrap = 0 / Game = 1 / Map = 2 unshifted, which
+`ProjectConfigTests.BuildSettings_StartAtBootstrap_ThenGame_ThenBakedMap_ThenAbilityLab`
+pins exactly — it asserts the full four-scene list in order, not "3 or more".
+
+**What keeps players out is `PlayerPreferences.DeveloperModeEnabled`, not the build.** It
+defaults to off, and `MenuUiController.OpenAbilityLab` refuses even if the row is somehow
+shown. Because the lab now ships, it is held to shipped-code standards: `ILogService` only,
+self-injection, and no `Debug.Log`.
+
+---
+
 ## Reading device logs
 
 ### Android

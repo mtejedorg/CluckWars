@@ -6,6 +6,91 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Ability Lab now ships, gated behind Developer Mode (2026-09-04) — 562/562 green
+
+The lab was Editor-only. Maestro wants to judge ability feel **on the Pixel 9**, where there
+is no Editor menu to launch a scene from, so it now ships in Windows and Android builds and
+is reached from the main menu when Developer Mode is on.
+
+### The finding that shaped the whole change: IMGUI is dead in player builds
+
+The lab's controls were `GUILayout` widgets in `AbilityLabHud.OnGUI`. **Every one of them
+would have done nothing in a build — Windows as well as Android.**
+
+`ProjectSettings.activeInputHandler` is `1` ("Input System Package", old Input Manager off).
+The Input System package's own docs are explicit:
+
+- `KnownLimitations.md`: "The Input System cannot generate input for IMGUI."
+- `UISupport.md`: with that setting "the `OnGUI` methods in your player code won't receive
+  any input events" — and "Editor GUI code is unaffected", which is exactly why nobody
+  noticed while the lab was Editor-only.
+
+Only **input** is missing; **drawing still works**. So the split is:
+
+- **Read-only telemetry stayed in IMGUI** (`AbilityLabHud`) — a per-frame text dump of live
+  networked state is what immediate mode is good at, and it renders fine on device.
+- **Everything interactive moved to UI Toolkit** — new `AbilityLabPanel` +
+  `Assets/UI/AbilityLab.uxml` + `Assets/UI/Styles/AbilityLab.uss`, which is the stack the
+  rest of the game's UI already uses and the only one that receives pointer input.
+
+### Also fixed on the way
+
+- **Latency was unmeasurable on a phone.** `SampleAbilityPresses` read `Keyboard.current`,
+  so with no keyboard attached no press was ever stamped and press→cast read `—` — the one
+  number the device test exists to produce. It now watches the rising edge of
+  `IInputProvider.GetAbilityHeld(slot)`. Deliberately **not** `GetAbilityNPressed()`: those
+  are one-shot, and reading them here would consume the latch and swallow casts out from
+  under `FusionNetworkService`.
+- **No EventSystem in the lab scene.** No scene in the project has one; each UI Toolkit
+  controller creates one at runtime, and the one `MenuUiController` makes dies with the
+  scene load. Without it both the lab panel *and* the touch joystick would have been inert
+  in a build. `AbilityLabPanel.EnsureEventSystem` follows the existing idiom.
+- **Leaving the lab has to shut the runner down.** `FusionNetworkService.StartAsync` refuses
+  while a runner is live, so a MENU that only loaded the scene would leave PLAY SOLO silently
+  doing nothing.
+
+### What changed
+
+- Un-fenced all four `Assets/_Game/Scripts/AbilityLab/*.cs` (`AbilityLabMenu.cs` and
+  `AbilityLabTests.cs` stay in `Editor/`).
+- `PlayerPreferences.DeveloperModeEnabled` (`CluckWars.DeveloperMode`), default **off**,
+  cached and honoured by `ResetCache()` like its two neighbours.
+- `AbilityLab.unity` enabled in Build Settings, **last** so Bootstrap/Game/Map indices hold.
+- `#DevRow` / `#AbilityLabBtn` on `MainMenu.uxml`, shown only when the gate is on and
+  re-read on every `ShowMainMenu()`; `#DeveloperModeToggle` on the Character Select options
+  row next to Ability Range Guides.
+- `AbilityLab.unity` gained `TouchControlsHud` (order 95) and `AbilityLabUI` (order 96),
+  wired the same way `Game.unity` does it — so the lab is driven through the **real** cast
+  path, not a substitute one.
+
+### Tests
+
+`ProjectConfigTests.BuildSettings_StartAtBootstrap_ThenGame_ThenBakedMap` →
+`…_ThenAbilityLab`, extended to pin the **exact four-scene list in order** rather than
+loosened to "3 or more" — the ordering invariant is the reason it exists. Plus a new
+`AbilityLabShips_SoDeveloperModeMustDefaultOff` next to it, and `DeveloperModeTests`
+(4 tests, modelled on `ReducedMotionTests` including its restore-the-developer's-PlayerPrefs
+discipline). 557 → 562.
+
+### Verified in Play Mode (not on device)
+
+Sheet binds all controls; ignore-legality flips the pool 8 ↔ 29 for Warrior; both sliders
+drive `Time.timeScale` and `DummyResetSeconds` with labels tracking; Patrol writes through
+to the dummies; MENU shuts down and lands on Bootstrap; the gated button shows/hides with
+the preference and `OpenAbilityLab` refuses when it is off.
+
+### Open
+
+- **Not exercised on the Pixel 9** — no device access this session. The IMGUI verdict is
+  from the package docs plus `activeInputHandler`, not from a device run.
+- **The options row is `display: none` in portrait** (`CluckWarsTheme.uss`), so the
+  Developer Mode toggle is landscape-only. That USS comment also claims the app is
+  landscape-locked, which `ProjectSettings` contradicts (`allowedAutorotateToPortrait: 1`,
+  `defaultScreenOrientation: 4`). One of the two should be made true — Maestro's call.
+- **Reduced Motion still has no UI control** anywhere.
+
+---
+
 ## ✅ Mark/Kill was inert in the shipped game — fixed (2026-09-04)
 
 Found by the new Ability Lab on its first full-registry sweep. The Assassin's locked
@@ -61,6 +146,63 @@ list to update.
 
 Proven to bite: with `AssassinExecute` temporarily removed, the test fails with the
 add-it-to-the-prefab message; restored, the whole EditMode suite passes.
+
+---
+
+## ✅ Ability Lab dev scene (2026-09-04)
+
+Maestro: *"Create an ability test scene… let me use the ability to check feedback,
+responsiveness, and also spawn a dummy chicken to receive the effects (reset each X
+seconds)… expand it so that I can launch with a full set of abilities."*
+
+### Shipped
+
+`Assets/_Game/Scenes/AbilityLab.unity` — opens and Plays directly, no Bootstrap handoff.
+A flat plane sized to `MapGenerator.ArenaHalfSize`, one player chicken on the mark, up to
+three dummies at authored distances, one food pile, and an IMGUI panel (F3).
+
+New scripts under `Assets/_Game/Scripts/AbilityLab/` (all `#if UNITY_EDITOR`):
+`AbilityLabBootstrapper`, `AbilityLabDummy`, `AbilityLabHud`, `AbilityLabLoadout`.
+Editor entry point `Cluck Wars / Test / Ability Lab` (`AbilityLabMenu.cs`).
+
+- **Instrumentation:** press→cast latency (ms), measured active-window length, per-slot
+  cooldown + live refusal reason, `LastCastHitCount` with a real whiff/`n/a` distinction
+  driven by `AbilityBaseSO.ReportsCastHits`.
+- **Dummies:** reset on a live-editable timer (default 5s) or on `T`; freeze / patrol
+  toggles; restocked with cargo each reset.
+- **Loadout:** passive + all four slots hot-swap live; class swap respawns; ignore-legality
+  toggle. QoL: zero-cooldown toggle, time scale down to 0.1x.
+
+**Verified:** all 29 active abilities cast and all 8 passives equip (37/37), including the
+three zone abilities. EditMode suite **556/556**, 10 of them new (`AbilityLabTests`).
+
+### Three spec assumptions the code overturned
+
+1. **"No GameManager"** was impossible. `FusionNetworkService.Update` blanks every latched
+   ability press, and both `ChickenController` and `AbilityController` return early in
+   `FixedUpdateNetwork`, while `GameManager.Instance` is null — no manager means no input,
+   no movement and no casting. The lab spawns one and holds `MatchTimer` open. With no
+   `PlayerBase` in the scene there is still nothing to win.
+2. **"Spawn the dummy without `BotController`"** was impossible — it is baked onto
+   `Chicken.prefab`. It self-gates on `IsBot`, so the dummy spawns with `IsBot = false`
+   (the opposite of the brief's `IsBot = true`, which would have handed it the full AI).
+3. **Class could not be hot-swapped.** `ChickenController` resolves its `ChickenStatsSO`
+   once in `Spawned` and nothing watches `Class`, so a live write gives one class's stats
+   with another's silhouette. Class respawns; the loadout still hot-swaps.
+
+No shipped gameplay code or `.asset` value was modified. `SetSlots`' null-ignoring
+semantics were left alone — the lab always supplies four non-null abilities, so no new
+`AbilityController` setter was needed.
+
+Build Settings: added **last and disabled**, so `Bootstrap = 0 / Game = 1 / Map = 2` are
+unchanged and it never ships. `ProjectConfigTests` already enforces exactly three *enabled*
+scenes, which is what makes "disabled" the only correct choice.
+
+**Outstanding Maestro wiring:** none required — the scene is self-wiring. Optional: author
+a launch loadout on the `AbilityLab` GameObject's `AbilityLabBootstrapper` (class, passive,
+four slots, dummy count/distances) to have it start on a specific kit.
+
+Usage: `docs/TESTING.md` → "Ability Lab (dev scene)".
 
 ---
 

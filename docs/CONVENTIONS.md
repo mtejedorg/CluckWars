@@ -139,6 +139,76 @@ runner.Spawn(prefab, pos, rot, player,
 
 ---
 
+## Error surfacing — the silent-failure sorting rule
+
+Settled 2026-08-26, after four byte-identical silent guards were found across the
+placed-zone abilities. The point of this section is not "log more": a sweep that
+surfaces every early return is worse than the bug, because it buries real errors under
+per-cast noise until nobody reads the log at all.
+
+### The rule
+
+**Ask whether the null could ever be produced by a legal game state.**
+
+- **Only reachable via an unassigned serialized field or a missing prefab component**
+  → **wiring bug.** It never self-heals, it is invisible on device, and no amount of
+  playing will fix it. It must reach `ILogService.Error`, and the message must name
+  *which* reference is null and *what the player just lost* — someone will read that
+  line in an `adb logcat` with no debugger attached.
+- **Reachable in a correctly-built game** — nobody in range, cargo full, nothing to
+  steal, `victim == null`, `spaceLeft <= 0f` → **legitimate no-op.** It must stay
+  silent. This is the game working.
+
+### The better option, when the caller offers one
+
+**Move the guard ahead of the side effect entirely.** Where the call site provides a
+pre-commitment gate, refusing the press outranks surfacing the failure afterwards: nothing
+is half-applied, no cooldown is charged, and there is no misleading evidence to explain.
+`AbilityBaseSO.CanActivate(AbilityContext)` is that gate — it runs inside
+`AbilityController.TryActivate` before `ActiveSlot`, `ActivationTimer` or `SetCooldown` are
+touched, and the three zone abilities use it. Reach for this first; the corollaries below
+rank what to do when you cannot.
+
+Note the ordering constraint it carries: the `_ctx.Runner` / `_ctx.PrefabRegistry` refresh
+must happen *before* `CanActivate`, not merely before `OnActivate`, because the zone
+abilities' overrides read exactly those two fields.
+
+### Two corollaries that make it a priority order, not a binary
+
+1. **A guard that trips after a side effect has already been applied ranks higher.**
+   Smoke Roost *used to* set `caster.VisualOpacity` before its zone guard, so on a wiring
+   bug the player visibly faded and nothing else happened — the ability didn't just fail,
+   it produced convincing evidence that it had worked. That is the case this rule was
+   written from. It no longer exists in the code: the check moved ahead of the fade into
+   `CanActivate`. The rule stands for the next method that does the same thing.
+2. **A guard that trips after a `Spawn` has already committed ranks higher still,
+   because that one leaks.** A `return` inside `onBeforeSpawned` abandons an already-
+   spawned `NetworkObject` whose `LifetimeTimer` was never set: an inert networked
+   object that persists for the entire match. That is a resource bug with a networked
+   footprint, not a missing tell.
+
+### Two things not to do about it
+
+- **Don't roll back the side effect to make the failure tidy.** The worked example is
+  historical (see above), but the reasoning is the live part: Smoke Roost's fade was a
+  genuinely successful half of a two-half ability (he fades; everyone in the cloud slows),
+  and `OnDeactivate` restored it on schedule. Reverting it would have deleted working
+  behaviour and left the ability doing nothing instead of half. Where you cannot gate
+  ahead of the side effect, the `Error` line is the fix for the misleading feedback; a
+  rollback is not.
+- **Don't despawn from inside `onBeforeSpawned`.** That callback runs mid-`Spawn` and
+  despawning there is not safe. Surfacing really is the whole fix available at that
+  point.
+
+### How a ScriptableObject reaches the logger
+
+SOs have no injected `ILogService` and **must not** acquire one through a service
+locator. The logger arrives on `AbilityContext.Log`, set by `AbilityController` from its
+own injected `_log` — the same channel `Runner` and `PrefabRegistry` already use. Ability
+code calls `ctx.Log?.Error(...)`.
+
+---
+
 ## Footguns (real bugs we hit)
 
 ### `LogLevel` collides with `Fusion.LogLevel`

@@ -223,8 +223,8 @@ Per-ability mapping (**v0.6.1** — changed values marked ⚠ are live balance c
 | Sneaky Steal | SingleTarget | 3.0 | — | requires cargo; ⚠ now marks only the one it robs |
 | Mark Kill | SingleTarget | 8.0 | — | ⚠ preview now applies isolation + rival rules |
 | Roll Push | ⚠ Capsule | ⚠ 1.05 | ⚠ 4.0 | ⚠ was ForwardCircle r1.8 @1.2; area 10.18 → 11.86 m² (+17%) |
-| Flying Peck (Roll Trample) | ⚠ Capsule | ⚠ 1.15 | ⚠ 5.0 | ⚠ was ForwardCircle r1.8 @1.6; area 10.18 → 15.66 m² (+54%), max reach 8.4 → 6.15 m |
-| Feather Trap | ForwardCircle | 2.0 | 2.5 | placed zone, persists 5 s |
+| Dive Bomb (`RollTrampleAbilitySO`) | Capsule | 2.05 | 3.25 | shipped values, see the reach note below |
+| Feather Trap | ForwardCircle | 3.6 | 4.5 | placed zone, persists 5 s; shipped values |
 | Root Egg | ForwardCircle | 0.8 | 0 | placed zone, at the caster's feet |
 | Feather Aura | Aura | 3.0 | — | follows caster while active |
 | Shadowstep | Jump | landing | tier length | ⚠ `AffectsEnemies = false` — pure mobility, was reporting phantom enemy hits |
@@ -372,6 +372,82 @@ denied-click clip, and adding them is `audio-designer`'s call plus four new clip
 Every one of those cases ships its visual half today. Case 16 additionally wants a
 kill-feed line, which is an undesigned HUD surface. Case 18 is a design decision, not
 debt (§5.4). Case 20 is the only genuinely unstarted item.
+
+### 7.2 Open playtest questions — answerable only with eyes on the game
+
+Two claims this system currently rests on cannot be settled by reading the code. Both
+are recorded here so the next playtest has a specific thing to watch for rather than a
+general "does it feel good".
+
+**A. Pile-drag onset has no event marker.** (Relates to cases 17–19, and to the
+Drag/Snare split.)
+
+Since the Drag/Snare split, a pile drag is conveyed *only* by persistent state: the
+`ChickenStateOverlays` streak blob (held still for a Drag, breathing for a Snare) and the
+`TouchControlsController` joystick tint with its `×0.45` label. The floating `SLOW nn%`
+text that used to mark the *moment* it began is deliberately gone — a Drag is
+`SlowSource.Pile` or `SlowSource.Collision`, ambient friction with nobody to blame and no
+deadline, and a one-shot popup for a continuous cause is a lie about its shape.
+
+That is correct for a persistent cause. What is unverified is whether a first-time player
+can still answer **"why did I suddenly slow down?"** at the instant it happens. The
+overlays are subtle by design, and low-vision and colour-deficient players lean hardest on
+exactly this ambient channel — it is the one cue with no text and no shape change to fall
+back on. If it reads as unexplained sluggishness rather than as *weight*, that is the
+finding.
+
+**Ruled out upstream — do not "fix" it by re-adding the Drag text.** Suppressing the
+popup for Drag is precisely what makes the Snare popup mean something: a floating
+`SLOW 45%` now reliably says *an enemy did this to you*. Restoring it for Drag would
+restore the ambiguity the split was built to remove. If the playtest confirms the
+problem, the fix has to come from a different channel (a stronger onset transition on the
+existing streaks, an audio tell, a one-shot on the stick tint) — not from the text.
+
+**B. Knockback attribution — confirmed gap, Spine Coat.** (Relates to cases 13 and 14.)
+
+`HitFeedback` learns an attacker's identity from exactly two callers, both derived from
+already-replicated state: `ConfirmHits` (a landed direct cast, pushing the caster's
+position) and `AbilityZone` (a trap catching someone, pushing the zone's position).
+`ChickenController.ApplyKnockback` is deliberately *not* a third — it is authority-only
+and its impulse is not replicated, so pushing from there would light the direction arc on
+one peer.
+
+The design rests on a claim recorded in `HitFeedback.NotifyCargoLoss`: that *"every
+cast-driven steal already routes through `ConfirmHits` on every peer, and this impact
+lands inside that window"* — i.e. a knockback always accompanies a cast closely enough to
+fall inside `FeedbackTuning.HitAttributionWindowSeconds` (0.25 s).
+
+**Spine Coat breaks that claim, and it can be shown from the source.** Its
+`OnActivate` only arms `ChickenController.StealBackActive`; the steal and the knockback
+fire later, from `ChickenController.CheckCollisionSlow`, on whoever walks into the
+wearer. That path calls `other.Cargo.RPC_DrainStolen(...)` and
+`other.RPC_ApplyKnockback(...)` — and bumps no `LastCastEventId`, because
+`LastCastEventId` is written in exactly one place, `AbilityController.TryActivate`. The
+only bump Spine Coat ever produces is at *arming* time, seconds before contact and far
+outside a 0.25 s window.
+
+So a chicken shoved and robbed by a Spine Coat wearer gets the flash, the squash, the
+shake and the cargo-loss text, but **no motion lines and no screen-edge direction arc** —
+the one impact in the game that hits you from a direction and refuses to say which. It is
+also the impact where knowing the direction matters most, because the counter-play is to
+stop walking into that chicken.
+
+What is still open is **how much it matters**, not whether it happens: whether players
+notice the missing direction, or whether contact range is close enough that they already
+know who hit them. The candidate fix is a third attribution push point for Spine Coat on
+the `AbilityZone` pattern — a plain local call off replicated state, no RPC.
+
+**Disposition: scoped, not deferred to the playtest.** Because the gap is provable from
+source rather than suspected, the decision is a cost/scope call for Maestro, not something
+the playtest has to establish. The playtest informs severity; it is not a precondition for
+fixing. Do not silently downgrade this back to "wait and see".
+
+The comment that made it invisible — `NotifyCargoLoss`'s claim that every cast-driven
+steal already routes through `ConfirmHits` — **has already been corrected**, in the same
+pass that confirmed this gap. That correction stands whether or not the gap itself is
+fixed: it was load-bearing for the design decision, so leaving it would have guaranteed
+the next reader re-derived the same wrong conclusion.
+
 
 ### 5.4 Why slow has no countdown (accepted deferral, case 18)
 
