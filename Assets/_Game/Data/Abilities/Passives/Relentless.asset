@@ -25,9 +25,10 @@ MonoBehaviour:
   BotRole: 0
   Duration: 0.05
   Cooldown: 0
-  SearchMask:
   CastMotion: 8
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  _unlockKey: passive.relentless
   SignatureAbility: {fileID: 11400000, guid: 592cf309ec40b0546833d005b73c5a92, type: 2}
   CooldownMultiplier: 0.75

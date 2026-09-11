@@ -25,10 +25,11 @@ MonoBehaviour:
   BotRole: 4
   Duration: 3.5
   Cooldown: 11
-  SearchMask:
   CastMotion: 4
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  _unlockKey: ability.smoke_roost
   ZoneRadius: 4
   ZoneDuration: 5.5
   SlowFactor: 0.55

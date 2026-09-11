@@ -25,8 +25,9 @@ MonoBehaviour:
   BotRole: 0
   Duration: 1.5
   Cooldown: 6
-  SearchMask:
   CastMotion: 6
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  _unlockKey: ability.speed_burst
   SpeedMultiplier: 2.5

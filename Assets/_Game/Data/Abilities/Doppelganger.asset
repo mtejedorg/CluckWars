@@ -15,15 +15,21 @@ MonoBehaviour:
   DisplayName: Doppelganger
   ShortLabel: DOP
   Description: Spawns a decoy copy beside you to soak up enemy attacks.
-  AccentColor: {r: 0.65, g: 0.40, b: 0.85, a: 1}
+  Icon: 
+  AccentColor: {r: 0.65, g: 0.4, b: 0.85, a: 1}
   Category: 3
   TerrainTraversal: 3
   JumpTier: 3
   SlotKind: 1
   AllowedClasses: 8
+  BotRole: 0
   Duration: 1.5
   Cooldown: 11
   CastMotion: 4
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256
+  _unlockKey: ability.doppelganger
   _decoyPrefab: {fileID: 1012061175775692847, guid: dadc0068bfdc302458b5991aeceb8669, type: 3}
   DecoyLifetimeSeconds: 4
   SideOffset: 1.2

@@ -25,10 +25,11 @@ MonoBehaviour:
   BotRole: 1
   Duration: 0.7
   Cooldown: 10
-  SearchMask:
   CastMotion: 0
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  _unlockKey: ability.belly_flop
   ImpactRadius: 4
   StunSeconds: 1.4
   KnockbackForce: 6

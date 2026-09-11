@@ -15,11 +15,18 @@ MonoBehaviour:
   DisplayName: Egg Shell
   ShortLabel: EGG
   Description: Seals you in an egg for 2s - you cannot walk or turn.
-  AccentColor: {r: 0.92, g: 0.94, b: 1.00, a: 1}
+  Icon: 
+  AccentColor: {r: 0.92, g: 0.94, b: 1, a: 1}
   Category: 2
   TerrainTraversal: 0
+  JumpTier: 0
   SlotKind: 0
   AllowedClasses: 15
-  Duration: 2.0
+  BotRole: 0
+  Duration: 2
   Cooldown: 8
   CastMotion: 5
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256
+  _unlockKey: ability.egg_shell

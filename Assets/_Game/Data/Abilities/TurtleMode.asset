@@ -15,13 +15,19 @@ MonoBehaviour:
   DisplayName: Turtle Mode
   ShortLabel: TRT
   Description: Shuffles along at a turtle crawl - quarter speed for 2s.
+  Icon: 
   AccentColor: {r: 0.55, g: 0.42, b: 0.25, a: 1}
   Category: 2
   TerrainTraversal: 0
+  JumpTier: 0
   SlotKind: 1
   AllowedClasses: 4
-  Duration: 2.0
+  BotRole: 0
+  Duration: 2
   Cooldown: 8
   CastMotion: 5
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256
+  _unlockKey: ability.turtle_mode
   SpeedMultiplier: 0.25
-  DamageResistance: 0.8

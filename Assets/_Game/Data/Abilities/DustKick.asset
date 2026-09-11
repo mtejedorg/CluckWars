@@ -25,10 +25,11 @@ MonoBehaviour:
   BotRole: 4
   Duration: 0.3
   Cooldown: 6
-  SearchMask:
   CastMotion: 4
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  _unlockKey: ability.dust_kick
   Reach: 4.5
   RearArcAngle: 75
   SlowFactor: 0.55

@@ -15,15 +15,18 @@ MonoBehaviour:
   DisplayName: Mark/Kill
   ShortLabel: EXEC
   Description: Marks an isolated rival, arming a fatal execute once stunned.
+  Icon: 
   AccentColor: {r: 0.9, g: 0.1, b: 0.2, a: 1}
   Category: 1
   TerrainTraversal: 0
+  JumpTier: 0
   SlotKind: 1
   AllowedClasses: 8
   BotRole: 0
   Duration: 0.1
   Cooldown: 5
-  SearchMask:
   CastMotion: 3
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  _unlockKey: ability.mark_kill

@@ -15,17 +15,20 @@ MonoBehaviour:
   DisplayName: Wing Slam
   ShortLabel: SLAM
   Description: Slams the ground, stunning nearby rivals for 1.5 seconds.
+  Icon: 
   AccentColor: {r: 0.9, g: 0.4, b: 0.1, a: 1}
   Category: 1
   TerrainTraversal: 0
+  JumpTier: 0
   SlotKind: 1
   AllowedClasses: 1
   BotRole: 0
   Duration: 1.5
   Cooldown: 12
-  SearchMask:
   CastMotion: 1
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  _unlockKey: ability.wing_slam
   StunRadius: 4.5
   StunDuration: 1.5

@@ -25,6 +25,8 @@ MonoBehaviour:
   BotRole: 6
   Duration: 0.4
   Cooldown: 0.8
+  CastMotion: 0
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  _unlockKey: ability.peck

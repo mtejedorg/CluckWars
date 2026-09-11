@@ -25,9 +25,10 @@ MonoBehaviour:
   BotRole: 3
   Duration: 0.4
   Cooldown: 9
-  SearchMask:
   CastMotion: 1
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  _unlockKey: ability.ground_quake
   QuakeRadius: 4.5
   RootSeconds: 1.8

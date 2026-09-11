@@ -32,6 +32,37 @@ left both as "no-op stubs for plan 4"; nothing replaced them. Turtle Mode is onl
 and steals all land through both, so as shipped each is a pure self-penalty. GDD §7.2 still
 states the intent (control resistance / invulnerability). Restoring an effect is a
 `mechanics-designer` call, solved against the Oracle — not a copy fix.
+## ✅ Progression Slice 0 — contract & stable unlock keys (2026-09-11) — 570/570 green
+
+First slice of the progression pitch milestone (`docs/superpowers/plans/2026-09-11-progression-pitch-milestone.md`),
+on `feature/progression`. **Zero behaviour change, no emit sites** (those are slice 1). The only gameplay files
+touched are `AbilityBaseSO` (one serialized field + editor-only helpers) and `ProjectInstaller` (one binding).
+
+- **Contract** (`Scripts/Progression/`): `IMatchEventSink` (six verbs — `RoundStarted`, `ResourceBanked`,
+  `ResourceStolen`, `OpponentDisabled`, `AbilityResolved`, `RoundEnded`); `NullMatchEventSink`, bound in
+  `ProjectInstaller` and silent by design (nobody listening is a legal state); `RoundTypes` (`RoundRuleset`,
+  `RoundStandingEntry`, `RoundStandings`, JsonUtility-shaped); `UnlockKeyTable`, the single gameplay→progression
+  translation point. Progression's API vocabulary is generic — no food/chicken/cluck.
+- **Key scheme:** abilities `ability.<snake>`, passives `passive.<snake>`, roles `class.warrior|speedy|fatty|assassin`.
+  Ability keys live in `AbilityBaseSO._unlockKey` (read via `UnlockKey`): derived from the asset name **once**,
+  editor-only, never overwritten, never derived at runtime. Role keys are a hand-written switch — never
+  `ToString()`/`nameof`, so renaming an enum member cannot change a saved key.
+- **Populated:** all 37 ability assets (29 + 8 passives). `AbilityBaseSO.OnValidate` filled them in memory on the
+  first domain reload; *Cluck Wars/Progression/Assign Missing Unlock Keys* (`Editor/UnlockKeyAssigner.cs`) saved them
+  and reports duplicates. Re-run it after adding an ability asset.
+- **The .asset diffs are bigger than one line; the values are not.** Unity re-serialized all 37 (fields previously
+  absent now written at their initializer, `2.0`→`2`, dead stale fields dropped, the never-authored Peck `CastMotion` written as `0`,
+  i.e. Lunge, which Peck never reads). Verified by loading each HEAD version in Unity and diffing `EditorJsonUtility`
+  output: 37/37 identical apart from `_unlockKey`. From now on the previously-absent fields are explicit in the
+  assets (e.g. CluckShock `KnockbackForce` 16.2, DiveBomb `StealAmount` 8, SpineCoat `StealBackAmount` 4), so editing
+  their C# field initializers no longer changes these abilities — tune the `.asset` instead.
+- **Manifest:** `Editor/Tests/UnlockKeyManifest.json` (key → path) is **hand-curated, never regenerated**; the menu
+  never writes it. `UnlockKeyTests` fails on drift. Asset renamed/moved → update its `Path`, **never the key**.
+  Key changed → revert it (a changed key costs players their unlocks). New asset → run the menu, add an entry.
+  Duplicated with Ctrl+D → the copy carries the key; clear it on the copy and re-run the menu.
+- **Tests:** +8 — `UnlockKeyTests` (6), `RoundTypesTests` (2). **No Maestro prefab-wiring steps.**
+
+---
 
 ## ✅ Ability Lab now ships, gated behind Developer Mode (2026-09-04) — 562/562 green
 
