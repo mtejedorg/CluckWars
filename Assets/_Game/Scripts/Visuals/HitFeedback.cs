@@ -41,19 +41,22 @@ namespace CluckWars.Visuals
     /// one material per chicken per hit) and hands the channel straight back to
     /// <see cref="ChickenVisuals"/> when it ends.
     ///
-    /// <b>Local only, no new networking.</b> Every trigger is derived from state that is
+    /// <b>Local only, and never an RPC.</b> Every trigger is derived from state that is
     /// already replicated — <c>ChickenController.KnockbackEventId</c>,
     /// <c>ControlFlags</c>/<c>IsStunned</c>/<c>Rooted</c>, <c>ChickenCombat.IsRemoved</c>,
     /// <c>AbilityController.LastCastEventId</c>/<c>LastCastHitCount</c>, and (via
-    /// <see cref="ChickenCargo"/>) <c>Cargo</c>. No RPCs, no new <c>[Networked]</c>
-    /// properties.
+    /// <see cref="ChickenCargo"/>) <c>Cargo</c> plus the <c>StealEventId</c>/<c>LastThiefId</c>
+    /// pair. That pair is the one place this system asked for state of its own, and it exists
+    /// because a steal's <i>attacker</i> is knowable on one peer only (the victim's
+    /// StateAuthority, inside <c>RPC_DrainStolen</c>) unless it is replicated — see
+    /// <see cref="NotifyCargoLoss"/>. Nothing here is ever RPC'd.
     ///
     /// <b>Why edge-polling and not a ChangeDetector here.</b> Fusion's
     /// <c>ChangeDetector.DetectChanges</c> diffs the networked properties <i>of the
     /// behaviour it is handed</i>. This component declares none of its own — every
     /// property it watches lives on a sibling behaviour — so a detector rooted here would
     /// report nothing at all. Instead it uses the pattern already established for exactly
-    /// this case by <c>ControlStateVFX.UpdateKnockback</c> and
+    /// this case by <c>ControlStateVFX.ObserveKnockbackEdge</c> and
     /// <c>AbilityRangeIndicator.ObserveCast</c>: read the replicated one-shot in
     /// <see cref="Render"/>, seed the baseline on first observation so a late joiner never
     /// false-fires, and act only on a change. Where the property <i>does</i> live on the
@@ -84,23 +87,6 @@ namespace CluckWars.Visuals
         /// <summary>Motion-line stroke width. Thinner than the telegraph outline (0.11) —
         /// this is a transient streak, not a persistent area.</summary>
         private const float MotionLineWidth = 0.055f;
-
-        /// <summary>
-        /// How far a rival can be and still be considered the source of a hit. Beyond this
-        /// the hit almost certainly came from a placed zone (Feather Trap / Root Egg) with
-        /// no rival attached, and pointing an arrow at the nearest bystander would be worse
-        /// than pointing at nothing. Comfortably wider than the largest ability radius
-        /// (Feather Aura at 3.0 + Roll offsets) plus a knockback's worth of travel.
-        /// </summary>
-        private const float AttackerSearchRadius = 12f;
-
-        /// <summary>
-        /// Squared-distance multiplier applied to a rival that is currently mid-ability
-        /// when picking the likely attacker. A chicken actually resolving an ability is a
-        /// far better candidate than a marginally closer bystander; 0.25 means a caster
-        /// wins against a bystander up to 2x closer.
-        /// </summary>
-        private const float MidCastAttackerBias = 0.25f;
 
         /// <summary>Particles in the caster's white hit-confirm spark (§3.2).</summary>
         private const int HitSparkCount = 10;
@@ -140,9 +126,14 @@ namespace CluckWars.Visuals
         ///
         /// Contract notes for the subscriber:
         /// <list type="bullet">
-        ///   <item>It is <b>not</b> raised when no attacker could be resolved (a zone tick,
-        ///   a pile slow, a rival further than <see cref="AttackerSearchRadius"/>). No
-        ///   event means "no bearing to show", never "no hit".</item>
+        ///   <item><b>Attribution is pushed, never guessed.</b> It is raised only when
+        ///   something that actually knew the attacker named one — see
+        ///   <see cref="NotifyAttacker"/> and <see cref="HitAttribution"/>. No event means
+        ///   either "nobody named an attacker" (a pile drag, a cargo drain with no cast on
+        ///   this peer, a Flying Peck whose cast pose no longer exists) or "the two were
+        ///   closer together than <see cref="FeedbackTuning.HitAttributionMinSeparation"/>,
+        ///   so the bearing would have been noise". It never means "no hit" — the flash,
+        ///   squash and shake still played.</item>
         ///   <item>It can fire more than once in the same frame (knockback + stun land
         ///   together). Subscribers should be idempotent or refresh a single arc.</item>
         ///   <item>The position is a world-space point, not a direction — the camera yaws
@@ -201,9 +192,20 @@ namespace CluckWars.Visuals
         private bool _controlInitialized;
         private bool _wasStunned;
         private bool _wasRooted;
-        private bool _wasSlowed;
+        // No _wasSlowed: the plain Slowed bit no longer has an edge anyone acts on. Only the
+        // Snared edge is an impact — see ObserveControlStates.
+        private bool _wasSnared;
 
         private bool _subscribedToDeath;
+
+        // ---- Attacker attribution ---------------------------------------------
+
+        /// <summary>
+        /// The push-only rule that decides whether an impact may claim a direction. Replaced
+        /// a nearest-live-rival proximity scan; see <see cref="HitAttribution"/>'s remarks for
+        /// why that scan had to go and why both observation orders have to work.
+        /// </summary>
+        private HitAttribution _attribution;
 
         // Reused across cast events so a 32 Hz stream of activations never allocates.
         private readonly System.Collections.Generic.List<ChickenController> _castTargets = new(4);
@@ -222,6 +224,7 @@ namespace CluckWars.Visuals
             _animator   = GetComponent<ChickenAnimator>();
 
             _propertyBlock = new MaterialPropertyBlock();
+            _attribution   = new HitAttribution(FeedbackTuning.HitAttributionWindowSeconds);
 
             BuildMotionLines();
             BuildParticles();
@@ -250,6 +253,11 @@ namespace CluckWars.Visuals
             _knockInitialized   = false;
             _castInitialized    = false;
             _controlInitialized = false;
+
+            // Fusion pools NetworkObjects, so a recycled chicken would otherwise inherit the
+            // previous occupant's named attacker or its dangling pending impact and light a
+            // bearing for a hit that happened to somebody else.
+            _attribution = new HitAttribution(FeedbackTuning.HitAttributionWindowSeconds);
 
             _log?.Debug(Source, $"Spawned. HasInputAuthority={HasInputAuthority}, hitStop={_enableHitStop}.");
         }
@@ -322,6 +330,14 @@ namespace CluckWars.Visuals
         /// an impulse lands and replicates to every peer, so this fires everywhere without
         /// an RPC. <see cref="ControlStateVFX"/> draws the ground shockwave off the same
         /// byte; this drives the body flash, the direction lines and the victim's shake.
+        ///
+        /// <b>Only impulses somebody else caused.</b> A chicken that displaces itself (Feint's
+        /// sidestep) bumps <c>ChickenController.SelfImpulseEventId</c> instead, which nothing
+        /// here reads — see <c>ChickenController.ImpulseOrigin</c>. Everything this method
+        /// triggers is the vocabulary of <i>being hit</i>, and a dodge that played it looked
+        /// to its own caster like an attack from off-screen: flash, recoil, victim-tier shake,
+        /// and — because a self-inflicted impulse has no attacker to attribute — no direction
+        /// lines to explain any of it.
         /// </summary>
         private void ObserveKnockback()
         {
@@ -343,19 +359,25 @@ namespace CluckWars.Visuals
         /// counts as an impact — a state that is merely still running is the Aftermath
         /// beat's job (<see cref="ControlStateVFX"/> and Stage 5's HUD), not an impact.
         /// </summary>
+        /// <remarks>
+        /// <b>Drag is not an impact; Snare is.</b> <c>ControlVfx.Slowed</c> covers both, so
+        /// this reads the <c>Snared</c> bit alongside it and treats only the Snare edge as a
+        /// hit — see <see cref="ControlVfx"/> for what separates the two. Standing on a food
+        /// pile is friction, not an attack.
+        /// </remarks>
         private void ObserveControlStates()
         {
             var flags = _controller.ControlFlags;
             bool stunned = _controller.IsStunned || (flags & ControlVfx.Stunned) != 0;
             bool rooted  = _controller.Rooted    || (flags & ControlVfx.Rooted)  != 0;
-            bool slowed  = (flags & ControlVfx.Slowed) != 0;
+            bool snared  = (flags & ControlVfx.Snared) != 0;
 
             if (!_controlInitialized)
             {
                 _controlInitialized = true;
                 _wasStunned = stunned;
                 _wasRooted  = rooted;
-                _wasSlowed  = slowed;
+                _wasSnared  = snared;
                 return;
             }
 
@@ -379,15 +401,28 @@ namespace CluckWars.Visuals
                 anyEntered = true;
                 if (showText) SpawnControlText("ROOT", _controller.RootRemaining, FeedbackTuning.CanonicalRootColor);
             }
-            if (slowed && !_wasSlowed)
+            // Snare edge: an enemy did this, so it is a real impact and keeps the full
+            // treatment. Edge-derived from _wasSnared rather than from _wasSlowed on purpose —
+            // that is what makes a Drag ESCALATING into a Snare (pile-slowed, then trapped)
+            // still fire, even though `slowed` never had a rising edge of its own.
+            if (snared && !_wasSnared)
             {
                 anyEntered = true;
                 if (showText) SpawnSlowText();
             }
 
+            // Drag edge (Slowed without Snared: a food pile, or brushing another chicken) is
+            // DELIBERATELY silent — no impact, no flash, no shake, no motion lines, and no
+            // floating text. This is a considered removal, not an oversight: nobody attacked
+            // you, so there is no impact to report and no direction to point at, and "SLOW 80%"
+            // over your head every single time you step onto a pile is noise on the one action
+            // the whole game is built around. The state is still fully told — the trailing
+            // streaks (ChickenStateOverlays) and the joystick tint (TouchControlsController)
+            // both read Slowed, not Snared. Do not "restore" this.
+
             _wasStunned = stunned;
             _wasRooted  = rooted;
-            _wasSlowed  = slowed;
+            _wasSnared  = snared;
 
             if (anyEntered) TriggerVictimHit();
         }
@@ -461,15 +496,52 @@ namespace CluckWars.Visuals
             // feel the cargo loss through NotifyCargoLoss regardless.
             bool canReDeriveTargets = !ability.CastPoseIsUnreconstructable;
 
+            // ...which is also why the attacker attribution is pushed from here and not from
+            // the Flying Peck branch: the same re-derived target set that earns each victim a
+            // spark is the evidence that names this caster as their attacker, and where the
+            // set cannot be re-derived there is nothing to name. Declining is the whole point
+            // of CastPoseIsUnreconstructable — a Flying Peck victim gets flash + squash +
+            // shake and no direction, rather than an arrow at a landing point nobody hit them
+            // from. This runs on every peer off the replicated cast event, so no RPC.
             if (canReDeriveTargets)
             {
+                Vector3 casterPos = _controller.transform.position;
                 int found = ability.GatherTargets(_controller, _castTargets);
                 int sparks = Mathf.Min(found, hitCount);
                 for (int i = 0; i < sparks; i++)
                 {
                     var victim = _castTargets[i];
                     if (victim == null || victim == _controller) continue;
-                    victim.GetComponent<HitFeedback>()?.PlayHitSpark();
+
+                    // §3.2 case 15, and the only place it can be caught for a cast that
+                    // landed on somebody. A control-immune rival (Immovable) is deliberately
+                    // still gathered and still counted — see AbilityBaseSO.IsEffectNullified
+                    // for why dropping them from the scan was not an option — so hitCount is
+                    // non-zero and MarkImmuneTargets below, which only runs on a zero-hit
+                    // cast, never sees them. Before this, the ability whose entire payoff is
+                    // "that did nothing to me" produced nothing observable for either player:
+                    // ApplyKnockback returns before bumping KnockbackEventId while immune, so
+                    // there was no edge, no flash, and no text.
+                    //
+                    // Grey IMMUNE and nothing else. No spark: there is no impact to confirm.
+                    // No NotifyAttacker: attribution exists to draw the victim's direction
+                    // lines, and a hit that did not land has no direction worth pointing at.
+                    // Same colour and word §2.2's grey bracket just used, so "nothing will
+                    // happen" and "nothing happened" are the same sentence twice.
+                    if (ability.IsEffectNullified(_controller, victim))
+                    {
+                        FloatingCombatText.Spawn(
+                            victim.transform.position + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight,
+                            "IMMUNE",
+                            FeedbackTuning.NeutralNoEffectColor);
+                        continue;
+                    }
+
+                    var victimFeedback = victim.GetComponent<HitFeedback>();
+                    if (victimFeedback == null) continue;
+
+                    victimFeedback.PlayHitSpark();
+                    victimFeedback.NotifyAttacker(casterPos);
                 }
             }
 
@@ -494,14 +566,31 @@ namespace CluckWars.Visuals
         }
 
         /// <summary>
-        /// §3.2 case 15, restricted on purpose. A chicken that is inside the aim shape but
-        /// was not affected is the "blocked / immune" case — but that gap also opens for a
-        /// target the cast <i>did</i> hit (a stun ability's <c>ExtraTargetFilter</c> rejects
-        /// an already-stunned chicken, and the cast is what just stunned them). Labelling
-        /// only when the whole cast landed nothing removes that false positive completely:
-        /// zero hits plus somebody standing in the shape can only mean they were immune.
-        /// A whiff with an empty shape stays silent here — Stage 3's grey cast ring already
-        /// tells that story (§3.3).
+        /// §3.2 case 15's <i>zero-hit</i> half, and only that half.
+        ///
+        /// <b>The restriction to zero hits is right; the reason this comment used to give for
+        /// it was not.</b> It claimed the gap between the shape and eligibility also opens for
+        /// a target the cast did hit — "a stun ability's <c>ExtraTargetFilter</c> rejects an
+        /// already-stunned chicken, and the cast is what just stunned them". No stun ability
+        /// has ever overridden <c>ExtraTargetFilter</c>. <c>StunBurstAbilitySO</c>, the base
+        /// for Ambush and Wing Slam, does not; the only overrides in the whole pool are Dust
+        /// Kick's rear arc, Mark/Kill's isolation rules, and four <c>Cargo &gt; 0</c> checks.
+        /// The false positive is real, but it is the cargo one the <c>WouldAffect</c> comment
+        /// below actually documents: a cast that robs two rivals while a third stands in the
+        /// shape holding nothing would print IMMUNE over a chicken whose problem was being
+        /// empty-handed, not immune.
+        ///
+        /// <b>Genuine immunity no longer arrives here at all.</b> A control-immune target is
+        /// gathered and counted like anyone else, so a cast that reaches one reports a
+        /// non-zero <c>LastCastHitCount</c> and is labelled at the point of arrival instead —
+        /// see <see cref="ConfirmHits"/>. What is left for this method is the narrow residual:
+        /// a cast whose own scan selected nobody, observed on a peer whose local re-derivation
+        /// now finds an eligible candidate standing in the shape. That is a disagreement
+        /// between the replicated count and a local re-scan (a rival stepping in, or
+        /// interpolation on a remote peer), which makes it the weakest evidence in the system
+        /// — hence zero hits <i>and</i> a present candidate, both, before it will say anything.
+        /// A whiff with an empty shape stays silent — Stage 3's grey cast ring already tells
+        /// that story (§3.3).
         /// </summary>
         private void MarkImmuneTargets(AbilityBaseSO ability)
         {
@@ -547,6 +636,32 @@ namespace CluckWars.Visuals
         /// transfer, or a death drop. A plain local method call, not an RPC: the cargo
         /// value is already replicated, so every peer's <see cref="ChickenCargo"/> reaches
         /// the same conclusion independently.
+        ///
+        /// <b>Still not an attribution source, and the reason is unchanged.</b> A cargo drop
+        /// knows an amount, never a thief. <c>ChickenCargo.RPC_DrainStolen</c> does name one,
+        /// but it executes only on the victim's StateAuthority, so a push from inside it would
+        /// light the direction on exactly one peer.
+        ///
+        /// <b>What that argument never established is that every steal is covered elsewhere.</b>
+        /// This comment used to go on to claim that every cast-driven steal routes through
+        /// <see cref="ConfirmHits"/> on every peer, so the impact always lands inside that
+        /// window — and because that false reassurance was propping up the decision above, it is
+        /// what kept the gap invisible. <c>SpineCoatAbilitySO.OnActivate</c> only arms
+        /// <c>ChickenController.StealBackActive</c>; the steal and its knockback fire later,
+        /// from <c>ChickenController.CheckCollisionSlow</c>, which bumps no
+        /// <c>LastCastEventId</c> — that is written in exactly one place,
+        /// <c>AbilityController.TryActivate</c>, at <i>arming</i> time, seconds before contact
+        /// and far outside <see cref="FeedbackTuning.HitAttributionWindowSeconds"/>. So a
+        /// chicken shoved and robbed by a Spine Coat wearer got the flash, the shake and the
+        /// cargo text, and no direction at all.
+        ///
+        /// <b>That gap is now closed, but not from here.</b> <see cref="ChickenCargo"/> writes
+        /// the validated thief into replicated state inside the drain and observes the resulting
+        /// edge in its own <c>Render</c>, so the attribution reaches
+        /// <see cref="NotifyAttacker"/> on <i>every</i> peer — see
+        /// <c>ChickenCargo.NameTheThief</c>. The peer-count argument that rules this method out
+        /// as a push point is exactly what forced that shape, so do not "simplify" the two back
+        /// together: an amount and an attacker are different facts, learned different ways.
         /// </summary>
         public void NotifyCargoLoss(float amount)
         {
@@ -571,11 +686,14 @@ namespace CluckWars.Visuals
         /// for it), so a trap that worked perfectly would otherwise give its caster no
         /// confirmation at all — the §3.3 whiff ring was actively lying about it.
         ///
-        /// Deliberately caster-side only. The victim's half is already fully covered by
-        /// <see cref="ObserveControlStates"/>: entering root or slow raises a rising edge
-        /// there, which plays the flash, the impact lines, the victim shake and the
-        /// <c>ROOT 2.0s</c> / <c>SLOW 45%</c> text. Adding a spark here would be a second
-        /// channel for one event, which is how a re-tune silently stops working.
+        /// Deliberately caster-side only, and unrelated to the victim's attribution.
+        /// The victim's impact half is covered by <see cref="ObserveControlStates"/>: entering
+        /// root or <i>snare</i> raises a rising edge there, which plays the flash, the victim
+        /// shake and the <c>ROOT 2.0s</c> / <c>SLOW 45%</c> text. What that edge cannot supply
+        /// is a <i>direction</i>, which is why <see cref="AbilityZone"/> separately pushes the
+        /// zone's own position to each caught victim's <see cref="NotifyAttacker"/>. Two
+        /// different facts, two different calls; adding a spark here would be a second channel
+        /// for one event, which is how a re-tune silently stops working.
         /// </summary>
         public void NotifyZoneTriggered()
         {
@@ -595,10 +713,17 @@ namespace CluckWars.Visuals
         }
 
         /// <summary>
-        /// The victim-side impact beat: flash, direction lines, shake, and the Stage 5
-        /// bearing hook. Safe to call several times in one frame (a knockback and a stun
-        /// usually land together) — the flash simply restarts and <c>ApplyShake</c> is
-        /// max-wins.
+        /// The victim-side impact beat: flash, squash, shake — and, <i>only if somebody named
+        /// an attacker</i>, the directional beat on top. Safe to call several times in one
+        /// frame (a knockback and a stun usually land together): the flash simply restarts,
+        /// <c>ApplyShake</c> is max-wins, and one attribution deliberately serves every impact
+        /// inside its window rather than being consumed by the first.
+        ///
+        /// <b>An unattributed hit gets no lines at all</b>, where it used to get a fan
+        /// pointing along <c>transform.forward</c>. That fallback was a direction with no
+        /// meaning; the lines encode "it came from there" and nothing else, so when there is
+        /// no "there" the honest output is silence. The flash, the squash and the shake still
+        /// report the hit itself, which did happen.
         ///
         /// The flash and the direction lines are <i>on-body</i> world-space visuals that
         /// every peer sees at the victim's own position, so a decoy plays them like any
@@ -617,21 +742,79 @@ namespace CluckWars.Visuals
             // late joiner never replays a hit that already happened.
             _animator?.TriggerHit();
 
-            bool haveAttacker = TryResolveAttacker(out var attackerPos);
-            Vector3 direction = haveAttacker
-                ? PlanarDirection(transform.position - attackerPos)
-                : PlanarDirection(transform.forward);
-
-            StartMotionLines(direction);
-
             if (_controller.HasInputAuthority && !_controller.IsDecoy)
             {
                 MatchCamera.Instance?.ApplyShake(
                     FeedbackTuning.VictimHitShakeMagnitude,
                     FeedbackTuning.VictimHitShakeDurationSeconds);
-
-                if (haveAttacker) RaiseLocalPlayerHit(attackerPos);
             }
+
+            if (_attribution.TryClaimAtImpact(AttributionNow, out var attackerPos))
+                PlayDirectionalBeat(attackerPos);
+        }
+
+        /// <summary>
+        /// The clock the attribution window runs on. <c>Time.unscaledTime</c>, not
+        /// <c>Time.time</c>: this is a purely local presentation window observed from
+        /// <see cref="Render"/>/<c>LateUpdate</c> on one peer, and <see cref="HitStopDriver"/>
+        /// writes the process-global <c>Time.timeScale</c> on an execute — a window that
+        /// silently froze mid-hit-stop would be a needless surprise.
+        /// </summary>
+        private static float AttributionNow => Time.unscaledTime;
+
+        /// <summary>
+        /// The directional half of the impact beat — the §3.2 motion lines and the
+        /// screen-edge bearing arc. Only ever reached with a <b>named</b> attacker;
+        /// there is no fallback direction, because an unattributed hit genuinely has none
+        /// and the lines encode nothing else.
+        /// </summary>
+        private void PlayDirectionalBeat(Vector3 attackerPos)
+        {
+            // Declines when the attacker is standing inside the victim's own footprint:
+            // normalising a near-zero vector would manufacture a bearing, which is the exact
+            // failure mode HitAttribution exists to prevent, arriving through the geometry
+            // instead of through a search.
+            if (!HitAttribution.TryBearing(
+                    transform.position, attackerPos,
+                    FeedbackTuning.HitAttributionMinSeparation, out var direction))
+                return;
+
+            StartMotionLines(direction);
+
+            if (_controller.HasInputAuthority && !_controller.IsDecoy)
+                RaiseLocalPlayerHit(attackerPos);
+        }
+
+        /// <summary>
+        /// Something that actually knows who the attacker was says so — the <b>only</b> way
+        /// this component ever learns an attacker's identity. Called locally on every peer from
+        /// the three places that hold real evidence: <see cref="ConfirmHits"/> (a landed direct
+        /// cast, pushing the caster's position), <see cref="AbilityZone"/> (a placed trap
+        /// catching someone, pushing the <i>zone's</i> position), and
+        /// <c>ChickenCargo.NameTheThief</c> (a drain that landed, pushing the position of the
+        /// thief its RPC already validated). All three derive from already-replicated state, so
+        /// every peer reaches the same conclusion independently — the same no-RPC pattern as
+        /// <see cref="NotifyCargoLoss"/> and <see cref="NotifyZoneTriggered"/>.
+        /// </summary>
+        /// <remarks>
+        /// Plays the direction immediately when it retro-claims an impact that already
+        /// flashed without one; otherwise it just arms the window for an impact still to
+        /// come. Either order works, and both happen — see <see cref="HitAttribution"/>.
+        /// <para>
+        /// <b>Being called twice for one event is expected and free.</b> Snatch, Sneaky Steal
+        /// and Scrap each push once from <see cref="ConfirmHits"/> and once from the drain, on
+        /// the same peer in the same frame. The first claims the pending impact and clears it,
+        /// so the second plays nothing — while still re-arming the window for the knockback edge
+        /// that may follow a frame later. <c>HitAttributionTests</c> pins both halves; the two
+        /// call sites deliberately do not know about each other.
+        /// </para>
+        /// </remarks>
+        public void NotifyAttacker(Vector3 attackerWorldPos)
+        {
+            if (_controller == null || _controller.IsDecoy) return;
+
+            if (_attribution.RecordAttribution(attackerWorldPos, AttributionNow, out var claimed))
+                PlayDirectionalBeat(claimed);
         }
 
         private void RaiseLocalPlayerHit(Vector3 attackerPos)
@@ -650,60 +833,13 @@ namespace CluckWars.Visuals
             }
         }
 
-        /// <summary>
-        /// Best attacker this peer can name from replicated state alone.
-        ///
-        /// <b>Why not the victim's own motion.</b> The obvious source for "which way was I
-        /// pushed" is <c>ChickenController.ExternalDisplacement</c> — but it is a plain
-        /// property written only on the StateAuthority, so it reads zero on every other
-        /// peer. Sampling the transform delta instead does not work either: the impulse is
-        /// applied on the authority in the same tick the event byte flips, so on the frame
-        /// this observes the hit the displacement has not replicated yet and the delta is
-        /// still ~zero. Both would need new networked state, which this stage may not add.
-        ///
-        /// <b>So: bearing from the likeliest rival.</b> Positions are replicated on every
-        /// peer, so the nearest live, non-decoy rival within
-        /// <see cref="AttackerSearchRadius"/> is computable identically everywhere, with a
-        /// bias toward one that is currently mid-ability. In a 4-player arena where every
-        /// ability's reach is under ~3 m this is right nearly always, and when it is not
-        /// (a placed zone with its owner long gone) the radius cut makes it decline to
-        /// answer rather than lie.
-        /// </summary>
-        private bool TryResolveAttacker(out Vector3 attackerPos)
-        {
-            attackerPos = default;
-
-            var all = ChickenController.ActiveControllers;
-            Vector3 self = transform.position;
-            ChickenController best = null;
-            float bestScore = AttackerSearchRadius * AttackerSearchRadius;
-
-            for (int i = 0; i < all.Count; i++)
-            {
-                var candidate = all[i];
-                if (candidate == null || candidate == _controller) continue;
-                if (candidate.IsDecoy) continue;
-
-                var o = candidate.Object;
-                if (o == null || !o.IsValid) continue;
-                if (candidate.Combat != null && candidate.Combat.IsDead) continue;
-
-                Vector3 p = candidate.transform.position;
-                float dx = p.x - self.x, dz = p.z - self.z;
-                float score = dx * dx + dz * dz;
-                if (score > AttackerSearchRadius * AttackerSearchRadius) continue;
-
-                var abilities = candidate.Abilities;
-                if (abilities != null && abilities.ActiveSlot != AbilityController.InvalidSlot)
-                    score *= MidCastAttackerBias;
-
-                if (score < bestScore) { bestScore = score; best = candidate; }
-            }
-
-            if (best == null) return false;
-            attackerPos = best.transform.position;
-            return true;
-        }
+        // A TryResolveAttacker() used to sit here: a nearest-live-rival scan inside a 12 m
+        // radius, which at MapGenerator.ArenaHalfSize = 25.65 is ~17% of the arena. It named
+        // an attacker on no evidence, so walking into a Feather Trap drew the bearing arc at
+        // whichever bystander happened to be closest while the player who laid the trap went
+        // unimplicated. Do not reintroduce a proximity scan — read HitAttribution's remarks
+        // for why manufactured blame is worse than no feedback in a free-for-all, and use
+        // NotifyAttacker from a caller that actually holds the evidence.
 
         // ---- Body flash -------------------------------------------------------
 
@@ -1089,12 +1225,6 @@ namespace CluckWars.Visuals
         }
 
         // ---- Small math helpers -----------------------------------------------
-
-        private static Vector3 PlanarDirection(Vector3 v)
-        {
-            v.y = 0f;
-            return v.sqrMagnitude < 0.0001f ? Vector3.forward : v.normalized;
-        }
 
         /// <summary>Rotates a planar vector around +Y without building a quaternion —
         /// same helper <c>TelegraphShapes</c> keeps private for its cone arc.</summary>

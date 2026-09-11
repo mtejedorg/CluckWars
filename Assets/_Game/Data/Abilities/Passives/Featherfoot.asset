@@ -25,7 +25,7 @@ MonoBehaviour:
   BotRole: 0
   Duration: 0.05
   Cooldown: 0
-  AbilityAnimationClip: {fileID: 0}
   SearchMask:
+  CastMotion: 8
     serializedVersion: 2
     m_Bits: 256

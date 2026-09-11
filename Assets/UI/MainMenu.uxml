@@ -62,6 +62,20 @@
                 <ui:Button name="JoinBtn" text="JOIN GAME" class="cw-btn cw-btn--neutral cw-menu-secondary" />
             </ui:VisualElement>
             <ui:Label name="MainMenuHint" text="Solo runs a full match against 3 CPU chickens." class="cw-body cw-menu-hint" />
+
+            <!-- Developer tools. Hidden unless PlayerPreferences.DeveloperModeEnabled,
+                 which defaults to OFF and is set from the Developer Mode toggle on the
+                 Character Select options row.
+
+                 This is the ONLY route into AbilityLab.unity, which is enabled in Build
+                 Settings so it can be launched on a phone — there is no Editor menu on a
+                 device. MenuUiController re-reads the preference every time the main menu
+                 is shown, so turning the gate off hides this again without a relaunch.
+                 Display is driven from C#; do not give it a display rule in USS or the two
+                 will fight. -->
+            <ui:VisualElement name="DevRow" class="cw-menu-secondary-row" style="display: none;">
+                <ui:Button name="AbilityLabBtn" text="ABILITY LAB" class="cw-btn cw-btn--neutral cw-menu-secondary" />
+            </ui:VisualElement>
         </ui:VisualElement>
 
         <!-- Build stamp — during a test session you otherwise cannot tell which

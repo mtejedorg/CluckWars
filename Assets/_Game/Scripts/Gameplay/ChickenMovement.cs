@@ -18,6 +18,13 @@ namespace CluckWars.Gameplay
     /// sources), <c>Rooted</c> (blocks planar motion but allows ability casts, unlike
     /// <c>MovementLocked</c>), and <c>ExternalDisplacement</c> (knockback impulse,
     /// decayed to zero exponentially each tick).
+    ///
+    /// This class holds no per-tick simulation state of its own. Everything it integrates
+    /// across ticks — <c>ExternalDisplacement</c>, <c>VerticalVelocity</c> — lives on the
+    /// owning <see cref="ChickenController"/> as <c>[Networked]</c> or owner-held state and is
+    /// read and written back through <c>_owner</c>, because a plain field here would sit
+    /// outside Fusion's predicted state and drift under resimulation. Keep it that way: if a
+    /// new accumulator is needed, it belongs on the controller, not in a field here.
     /// </remarks>
     public sealed class ChickenMovement
     {
@@ -29,8 +36,6 @@ namespace CluckWars.Gameplay
         // Tune during the Part B balance pass. A value of 8 means the impulse
         // falls to ~1% of its initial value in about 0.58 seconds.
         private const float KnockbackDecayRate = 8f;
-
-        private float _verticalVelocity;
 
         public ChickenMovement(CharacterController controller, ChickenController owner)
         {
@@ -65,10 +70,12 @@ namespace CluckWars.Gameplay
             }
 
             // Gravity always runs so we stay grounded — even while locked or rooted.
-            if (_controller.isGrounded && _verticalVelocity < 0f)
-                _verticalVelocity = -2f;
+            // The accumulator lives on the owner as [Networked] state so resimulation
+            // restores it; see ChickenController.VerticalVelocity for why that matters.
+            if (_controller.isGrounded && _owner.VerticalVelocity < 0f)
+                _owner.VerticalVelocity = -2f;
             else
-                _verticalVelocity += Physics.gravity.y * deltaTime;
+                _owner.VerticalVelocity += Physics.gravity.y * deltaTime;
 
             float speedMult = _owner.MoveSpeedMultiplier;
             if (_owner.UnderdogSurgeActive)
@@ -82,7 +89,7 @@ namespace CluckWars.Gameplay
                 * Mathf.Max(0f, _owner.SlowMultiplier);
 
             var displacement = planar * speed;
-            displacement.y = _verticalVelocity;
+            displacement.y = _owner.VerticalVelocity;
 
             // External displacement (knockback / push) is a velocity in world-units/sec.
             // Applied additively, decays exponentially toward zero.

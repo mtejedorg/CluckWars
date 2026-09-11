@@ -54,7 +54,14 @@ namespace CluckWars.Abilities
             right.y = 0f;
             if (right.sqrMagnitude < 0.0001f) return;
 
-            caster.RPC_ApplyKnockback(right.normalized * SidestepImpulse);
+            // RPC_ApplySelfImpulse, not RPC_ApplyKnockback — same impulse, same physics, same
+            // wall-stops-it delivery the remarks above insist on. What changes is that peers
+            // observe it on SelfImpulseEventId instead of KnockbackEventId, so HitFeedback and
+            // ControlStateVFX do not fire the victim beat on it. On the knockback byte, Speedy's
+            // own dodge played the white body flash, the recoil and the victim-tier camera
+            // shake with no attacker to attribute it to — flash + recoil + big shake + no
+            // direction is exactly how the game says "you were hit from off-screen".
+            caster.RPC_ApplySelfImpulse(right.normalized * SidestepImpulse);
         }
 
         public override void OnDeactivate(AbilityContext ctx) { }

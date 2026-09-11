@@ -35,6 +35,8 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Control/Smoke Roost", order = 7)]
     public sealed class SmokeRoostAbilitySO : AbilityBaseSO
     {
+        private const string Source = "SmokeRoost";
+
         public SmokeRoostAbilitySO()
         {
             Category = AbilityCategory.Control;
@@ -70,15 +72,26 @@ namespace CluckWars.Abilities
         public override float AimRadius => ZoneRadius;
         public override bool AffectsSelf => true;
 
+        // Unassigned wiring, not a gameplay state — CanSpawnZone logs which reference is
+        // missing. Sits in CanActivate rather than at the top of OnActivate so the refusal
+        // lands before the cast and its cooldown are committed.
+        public override bool CanActivate(AbilityContext ctx) => ctx.CanSpawnZone(Source, "Smoke Roost");
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;
 
+            // NOTE for anyone chasing docs/CONVENTIONS.md, "Error surfacing — the silent-failure
+            // sorting rule": its "don't roll back a successful side effect" clause was argued
+            // partly from this method, which used to fade first and check the zone wiring second,
+            // and so deliberately left the fade applied on a failed cast. That case no longer
+            // exists — the check moved ahead of the fade into CanActivate, so on missing wiring
+            // the ability is refused before any opacity is touched. The fade-then-spawn order
+            // below is now purely how the ability reads; nothing in the error handling rests
+            // on it.
+
             // Half one: he fades. Cheap, and independent of the zone spawning at all.
             caster.VisualOpacity = Opacity;
-
-            if (ctx.Runner == null || ctx.PrefabRegistry == null || ctx.PrefabRegistry.AbilityZone == null)
-                return;
 
             // Half two: the cloud. Captured into locals — a closure over 'this' can go stale
             // if the SO is unloaded (same reason Feather Trap does it).
@@ -86,6 +99,9 @@ namespace CluckWars.Abilities
             float capSlowFactor = SlowFactor;
             float capRadius     = ZoneRadius;
             var   capOwner      = caster.Id;
+            // Captured like the rest so the abandoned-spawn report below closes over the logger
+            // rather than over ctx.
+            var   capLog        = ctx.Log;
 
             var pos = caster.transform.position;
 
@@ -97,7 +113,14 @@ namespace CluckWars.Abilities
                 onBeforeSpawned: (runner, networkObject) =>
                 {
                     var zone = networkObject.GetComponent<AbilityZone>();
-                    if (zone == null) return;
+                    if (zone == null)
+                    {
+                        capLog?.Error(Source, "Smoke Roost leaked a zone: the prefab wired to "
+                            + "PrefabRegistrySO.AbilityZone has no AbilityZone component, so its lifetime "
+                            + "timer was never set. The NetworkObject has ALREADY spawned and will now "
+                            + "persist for the rest of the match doing nothing — fix the prefab.");
+                        return;
+                    }
                     zone.Effect          = ZoneEffect.Slow;
                     zone.OwnerChicken    = capOwner;
                     zone.SlowFactor      = capSlowFactor;

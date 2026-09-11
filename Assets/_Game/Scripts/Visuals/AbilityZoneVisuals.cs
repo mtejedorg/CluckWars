@@ -77,6 +77,15 @@ namespace CluckWars.Visuals
         /// own spawn.</summary>
         private float _observedMaxLifetime;
 
+        /// <summary>The zone instance <see cref="_observedMaxLifetime"/> was measured
+        /// against. <c>AbilityZone.Spawned</c> re-arms its own per-spawn flags on the
+        /// assumption the instance may be reused, and this field must not be the one that
+        /// disagrees: a max carried over from a longer previous zone would make every
+        /// subsequent ring start part-drained and never reach full. Keyed off the
+        /// replicated object id rather than <see cref="Awake"/>, so it is correct whether
+        /// the runner's object provider pools instances or instantiates fresh ones.</summary>
+        private NetworkId _observedZoneId;
+
         private void Awake()
         {
             _zone = GetComponent<AbilityZone>();
@@ -96,6 +105,16 @@ namespace CluckWars.Visuals
             {
                 _ring.Hide();
                 return;
+            }
+
+            // A different zone is now living on this instance — start its drain from
+            // scratch. Hide() also drops the built-fraction sentinel, so the first frame
+            // of the new zone cannot flash the previous one's arc.
+            if (obj.Id != _observedZoneId)
+            {
+                _observedZoneId      = obj.Id;
+                _observedMaxLifetime = 0f;
+                _ring.Hide();
             }
 
             // Consumed zones are despawned by their authority on the next tick; hide

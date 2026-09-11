@@ -28,6 +28,11 @@ namespace CluckWars.Abilities
         public override AbilityAimShape AimShape => AbilityAimShape.SelfCircle;
         public override float AimRadius => ShockRadius;
 
+        // FEEDBACK.md §2.2 / §3.2 case 15. Knockback and nothing else, so an Immovable rival is shoved by nothing at all.
+        // See AbilityBaseSO.TargetEffectIsPurelyControl for why this is declared
+        // rather than inferred from Category, and why a mixed ability stays false.
+        public override bool TargetEffectIsPurelyControl => true;
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;

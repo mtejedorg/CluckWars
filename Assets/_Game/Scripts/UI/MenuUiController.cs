@@ -206,7 +206,7 @@ namespace CluckWars.UI
         }
 
         // ---- Navigation -------------------------------------------------------
-        private void ShowMainMenu()        { SetPage(_mainMenu); }
+        private void ShowMainMenu()        { SetPage(_mainMenu); RefreshDevRow(); }
         private void ShowCharacterSelect() { SetPage(_charSelect); RefreshCharacterSelect(); }
         private void ShowLobby()           { SetPage(_lobby); RefreshLobby(); }
 
@@ -225,10 +225,65 @@ namespace CluckWars.UI
             Bind<Button>(_mainMenu, "SoloBtn", b => b.clicked += () => ChooseMode(SessionMode.Solo));
             Bind<Button>(_mainMenu, "HostBtn", b => b.clicked += () => ChooseMode(SessionMode.Host));
             Bind<Button>(_mainMenu, "JoinBtn", b => b.clicked += () => ChooseMode(SessionMode.Join));
+            Bind<Button>(_mainMenu, "AbilityLabBtn", b => b.clicked += OpenAbilityLab);
 
             // Build stamp — a tester reporting a bug from a device otherwise has no
             // way to say which build produced it.
             Bind<Label>(_mainMenu, "BuildStamp", l => l.text = $"v{Application.version}");
+        }
+
+        /// <summary>
+        /// Shows or hides <c>#DevRow</c> to match
+        /// <see cref="PlayerPreferences.DeveloperModeEnabled"/>.
+        /// </summary>
+        /// <remarks>
+        /// Called from <see cref="ShowMainMenu"/> rather than once from
+        /// <see cref="BuildMainMenu"/>, because the toggle that sets the preference lives on
+        /// the Character Select screen — i.e. the player is always somewhere else when they
+        /// change it. Binding once would mean the button only appeared on the next launch,
+        /// which on a phone is a reinstall-and-relaunch cycle to discover a feature that is
+        /// already there.
+        /// </remarks>
+        private void RefreshDevRow()
+        {
+            Bind<VisualElement>(_mainMenu, "DevRow", r =>
+                r.style.display = PlayerPreferences.DeveloperModeEnabled
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None);
+        }
+
+        /// <summary>
+        /// Build-Settings name of the lab scene. Enabled in Build Settings since 2026-09-04 so
+        /// it exists on a device; reaching it is gated on Developer Mode, not on the build.
+        /// </summary>
+        private const string AbilityLabSceneName = "AbilityLab";
+
+        /// <summary>
+        /// Loads <c>AbilityLab.unity</c>, the developer ability-feel scene.
+        /// </summary>
+        /// <remarks>
+        /// <c>SceneManager</c> directly rather than <c>SceneLoader</c>: that component exists
+        /// to run the Bootstrap → Game handoff and carries a serialized "next scene", so
+        /// pointing it at the lab would mean mutating the menu's own flow to take a detour.
+        /// The lab is a leaf — it loads, and its MENU button loads Bootstrap back.
+        ///
+        /// No <c>ISessionSelectionService</c> write here. <c>AbilityLabBootstrapper.Start</c>
+        /// pins the mode to Solo itself, deliberately, rather than inheriting whatever the
+        /// menu last left behind — its dummy patrol and held match timer are only sound on a
+        /// single peer.
+        /// </remarks>
+        private void OpenAbilityLab()
+        {
+            if (!PlayerPreferences.DeveloperModeEnabled)
+            {
+                // Not reachable through the UI — the row is hidden. Refuse anyway rather than
+                // trust that, so the gate holds even if a later change shows the row wrongly.
+                _log?.Warn(Source, "Ability Lab requested with Developer Mode off. Ignoring.");
+                return;
+            }
+
+            _log?.Info(Source, "Opening the Ability Lab.");
+            UnityEngine.SceneManagement.SceneManager.LoadScene(AbilityLabSceneName);
         }
 
         private void ChooseMode(SessionMode mode)
@@ -288,6 +343,38 @@ namespace CluckWars.UI
 
             Bind<Button>(_charSelect, "HomeBtn", b => b.clicked += ShowMainMenu);
             BindRangeGuidesToggle();
+            BindDeveloperModeToggle();
+        }
+
+        /// <summary>
+        /// Wires #DeveloperModeToggle to <see cref="PlayerPreferences.DeveloperModeEnabled"/>,
+        /// which is what reveals the Ability Lab entry on the main menu.
+        /// </summary>
+        /// <remarks>
+        /// Seeded with <c>SetValueWithoutNotify</c> for the same reason as the range-guides
+        /// toggle above: the seed is not a player choice, and letting it raise a ChangeEvent
+        /// would echo the stored value back to <c>PlayerPrefs</c> on every visit to this
+        /// screen. Here that would also write the developer-mode key on the machine of every
+        /// player who ever opened Character Select, turning "never chosen" into "explicitly
+        /// chosen off" — harmless in effect, but it makes the pref file lie about what the
+        /// player has actually touched.
+        ///
+        /// Nothing is refreshed here on toggle: the only thing this preference controls is
+        /// #DevRow on the main menu, and <see cref="ShowMainMenu"/> re-reads it on the way
+        /// back. Doing it there rather than here also covers the preference being changed by
+        /// any other route.
+        /// </remarks>
+        private void BindDeveloperModeToggle()
+        {
+            Bind<Toggle>(_charSelect, "DeveloperModeToggle", t =>
+            {
+                t.SetValueWithoutNotify(PlayerPreferences.DeveloperModeEnabled);
+                t.RegisterValueChangedCallback(evt =>
+                {
+                    PlayerPreferences.DeveloperModeEnabled = evt.newValue;
+                    _log?.Info(Source, $"Developer mode {(evt.newValue ? "enabled" : "disabled")}.");
+                });
+            });
         }
 
         /// <summary>
@@ -1276,15 +1363,5 @@ namespace CluckWars.UI
             var e = root?.Q<T>(name);
             if (e != null) act(e);
         }
-
-        /// <summary>Ported from the old CharacterSelectController for parity.</summary>
-        public static (string name, string desc, string subRole) GetPassiveInfo(ChickenClass cls) => cls switch
-        {
-            ChickenClass.Warrior  => ("MIGHTY",     "+25% outgoing ability damage.", "All-Rounder"),
-            ChickenClass.Speedy   => ("SLIPPERY",  "Reduced control-effect duration.", "Hit & Run"),
-            ChickenClass.Fatty    => ("IMMOVABLE", "Greatly reduced knockback.", "Bulk Carrier"),
-            ChickenClass.Assassin => ("COMBO",     "Equips 3 abilities instead of 2.", "Disruptor"),
-            _                     => ("—",         "", ""),
-        };
     }
 }

@@ -23,8 +23,8 @@ MonoBehaviour:
   BotRole: 5
   Duration: 0.5
   Cooldown: 5
-  AbilityAnimationClip: {fileID: 0}
   SearchMask:
+  CastMotion: 3
     serializedVersion: 2
     m_Bits: 256
   StealRange: 5.4

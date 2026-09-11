@@ -96,6 +96,12 @@ namespace CluckWars.Abilities
             // lock cannot outlive the peck.
             chicken.MovementLocked = true;
 
+            // The lock above sits BEFORE this guard on purpose, for the `pile == null` half:
+            // the pile drained between IsUsable and activation, and the player is still
+            // committed for Duration. That commitment is the balance mechanic documented at
+            // the top of this file — do not "fix" the ordering by moving the lock below,
+            // that deletes it. (The `cargo == null` half is only technically behind the lock;
+            // a cargo-less chicken is a decoy, and decoys never cast.)
             var cargo = chicken.Cargo;
             var pile = FindPile(chicken);
             if (cargo == null || pile == null) return;

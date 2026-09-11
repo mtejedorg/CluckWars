@@ -80,36 +80,6 @@ namespace CluckWars.Tests
             Assert.IsEmpty(dupes, "Two UiGfx theme tokens resolve to the same colour.");
         }
 
-        // ---- MenuUiController.GetPassiveInfo — per-class passive metadata ------
-
-        [Test]
-        public void GetPassiveInfo_ReturnsAName_ForEveryRealClass()
-        {
-            foreach (ChickenClass cls in new[]
-                     { ChickenClass.Warrior, ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin })
-            {
-                var info = MenuUiController.GetPassiveInfo(cls);
-                Assert.IsNotEmpty(info.name, $"{cls} should have a passive name.");
-                Assert.AreNotEqual("—", info.name, $"{cls} fell through to the unknown-class arm.");
-            }
-        }
-
-        [Test]
-        public void GetPassiveInfo_AssassinPassive_IsCombo()
-        {
-            // The Combo passive is what gates the Assassin's 3rd ability slot — pin it so a
-            // rename can't silently desync the slot-picker gate from the passive copy.
-            var info = MenuUiController.GetPassiveInfo(ChickenClass.Assassin);
-            Assert.AreEqual("COMBO", info.name);
-        }
-
-        [Test]
-        public void GetPassiveInfo_UnknownClass_FallsThroughToDash()
-        {
-            var info = MenuUiController.GetPassiveInfo((ChickenClass)200);
-            Assert.AreEqual("—", info.name);
-        }
-
         // ---- ChickenClassRegistrySO — lookup + documented Warrior fallback ----
 
         private static ChickenClassRegistrySO MakeRegistry(params ChickenClass[] classes)

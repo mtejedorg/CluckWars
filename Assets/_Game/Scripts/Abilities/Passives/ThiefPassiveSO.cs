@@ -26,5 +26,7 @@ namespace CluckWars.Abilities
 
         public override float ModifyStealAmount(float amount, ChickenController self) =>
             amount * StealMultiplier;
+
+        public override float MaxStealMultiplier => StealMultiplier;
     }
 }

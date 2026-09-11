@@ -57,6 +57,11 @@ namespace CluckWars.Abilities
         public override float AimRadius => PushRadius;
         public override float AimForwardOffset => ForwardOffset;
 
+        // FEEDBACK.md §2.2 / §3.2 case 15. The only thing a target receives is the shove; the roll speed-up is the caster's own.
+        // See AbilityBaseSO.TargetEffectIsPurelyControl for why this is declared
+        // rather than inferred from Category, and why a mixed ability stays false.
+        public override bool TargetEffectIsPurelyControl => true;
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;

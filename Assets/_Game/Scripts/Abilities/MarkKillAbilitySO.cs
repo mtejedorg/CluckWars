@@ -10,6 +10,8 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "MarkKill", menuName = "Cluck Wars/Ability/Control/Mark Kill", order = 12)]
     public sealed class MarkKillAbilitySO : AbilityBaseSO
     {
+        private const string Source = "MarkKill";
+
         public MarkKillAbilitySO()
         {
             DisplayName = "Mark/Kill";
@@ -87,13 +89,23 @@ namespace CluckWars.Abilities
 
         public override void OnActivate(AbilityContext ctx)
         {
+            // Both bail-outs below are wiring errors, not gameplay states, and the press has
+            // already cost the player a cast and its cooldown — so they get logged rather than
+            // eaten. The logger arrives through AbilityContext because ability SOs are assets
+            // Zenject cannot inject; read AbilityContext.Log.
             var caster = ctx.Controller;
-            var exec = caster != null ? caster.GetComponent<AssassinExecute>() : null;
+            if (caster == null)
+            {
+                ctx.Log?.Error(Source, "Mark/Kill cast lost: the ability context has no caster " +
+                    "ChickenController. The cast and its cooldown were consumed with nothing marked.");
+                return;
+            }
+
+            var exec = caster.GetComponent<AssassinExecute>();
             if (exec == null)
             {
-                // TODO(logging): SOs have no injected ILogService; surface this once
-                // there is one. A Mark/Kill equipped on a chicken with no AssassinExecute
-                // is a prefab-wiring error, not a gameplay state.
+                ctx.Log?.Error(Source, "Mark/Kill cast lost: the caster has no AssassinExecute component — " +
+                    "add it to the chicken prefab. The cast and its cooldown were consumed with nothing marked.");
                 return;
             }
 

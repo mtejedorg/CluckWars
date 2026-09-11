@@ -70,6 +70,11 @@ namespace CluckWars.Abilities
         public override AbilityAimShape AimShape => AbilityAimShape.SelfCircle;
         public override float AimRadius => ImpactRadius;
 
+        // FEEDBACK.md §2.2 / §3.2 case 15. Stun plus knockback — both refused by Immovable, nothing left over.
+        // See AbilityBaseSO.TargetEffectIsPurelyControl for why this is declared
+        // rather than inferred from Category, and why a mixed ability stays false.
+        public override bool TargetEffectIsPurelyControl => true;
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;

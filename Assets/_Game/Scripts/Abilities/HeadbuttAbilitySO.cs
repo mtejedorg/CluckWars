@@ -55,6 +55,11 @@ namespace CluckWars.Abilities
         public override float AimRadius => Reach;
         public override float AimConeAngle => ConeAngle;
 
+        // FEEDBACK.md §2.2 / §3.2 case 15. Knockback plus a stagger stun — both refused by Immovable, nothing left over.
+        // See AbilityBaseSO.TargetEffectIsPurelyControl for why this is declared
+        // rather than inferred from Category, and why a mixed ability stays false.
+        public override bool TargetEffectIsPurelyControl => true;
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;

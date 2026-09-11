@@ -212,6 +212,12 @@ namespace CluckWars.Gameplay
                 chicken.RPC_ApplyRoot(RootDuration);
                 _log?.Debug(Source, $"Root applied to {chicken.name}.");
 
+                // No hit-attribution push here, deliberately: this method is behind
+                // FixedUpdateNetwork's HasStateAuthority gate, so it runs on the zone owner's
+                // peer alone and the victim's HitFeedback is a remote proxy there. The push
+                // belongs on the every-peer Render path — see NotifyCaughtVictims, driven off
+                // the Consumed flip below.
+
                 // Root Egg: consumed on first trigger. Every peer watches this flip in
                 // Render() and confirms the cast to the caster — see ObserveRootConsumed.
                 Consumed = true;
@@ -256,6 +262,7 @@ namespace CluckWars.Gameplay
         {
             if (_rootConfirmSent) return;
             _rootConfirmSent = true;
+            NotifyCaughtVictims();
             NotifyOwnerZoneTriggered(runner);
         }
 
@@ -267,8 +274,65 @@ namespace CluckWars.Gameplay
         private void ObserveSlowZoneEntry()
         {
             bool occupied = AnyRivalInside();
-            if (occupied && !_slowZoneOccupied) NotifyOwnerZoneTriggered(Runner);
+            if (occupied && !_slowZoneOccupied)
+            {
+                NotifyCaughtVictims();
+                NotifyOwnerZoneTriggered(Runner);
+            }
             _slowZoneOccupied = occupied;
+        }
+
+        /// <summary>
+        /// Tells everyone this zone just caught <i>where the hit came from</i>, so their §3.2
+        /// impact beat has a direction instead of pointing nowhere. Runs from
+        /// <see cref="Render"/> (and <see cref="Despawned"/>) on <b>every</b> peer off already
+        /// replicated state, so no RPC and no new networked property — the same reasoning
+        /// <see cref="NotifyOwnerZoneTriggered"/> uses for the caster's half.
+        /// </summary>
+        /// <remarks>
+        /// <b>It pushes the ZONE's position, never the owner's — and no, pointing at the
+        /// caster is not the fix.</b> That is the tempting change and it is wrong twice over,
+        /// so if you arrived here thinking you had found a bug, you have not:
+        /// <list type="number">
+        ///   <item><b>It would leak.</b> The trap-layer may be halfway across the arena by
+        ///   now; an arrow at their live position hands the victim free intel about where an
+        ///   opponent currently is, which is exactly the information asymmetry FEEDBACK.md
+        ///   §1.6 exists to protect. The whole point of a placed trap is that it acts while
+        ///   its owner is elsewhere.</item>
+        ///   <item><b>It would be less true.</b> The zone <i>is</i> the proximate cause — the
+        ///   trap is the thing that hit you, and the victim's honest question is "what did I
+        ///   walk into", not "who laid it". The truthful answer and the non-leaking answer
+        ///   happen to be the same answer, which is why this is a comfortable choice rather
+        ///   than a compromise.</item>
+        /// </list>
+        /// It also structurally cannot implicate a bystander, which was the original bug (see
+        /// <c>HitAttribution</c>'s remarks).
+        /// <para>
+        /// <b>The degenerate case is intended.</b> A victim standing on top of the zone centre
+        /// is closer to it than <c>FeedbackTuning.HitAttributionMinSeparation</c>, so
+        /// <c>HitAttribution.TryBearing</c> declines and no direction is drawn at all. That is
+        /// correct and it is not worth "fixing": an arrow that swung around as the victim
+        /// shuffled about the centre of a trap would be noise animated to look like
+        /// information. Clip the edge instead and the bearing points back at the trap, which
+        /// is both stable and useful.
+        /// </para>
+        /// </remarks>
+        private void NotifyCaughtVictims()
+        {
+            float radiusSqr = TriggerRadius * TriggerRadius;
+            Vector3 center = transform.position;
+
+            var all = ChickenController.ActiveControllers;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var chicken = all[i];
+                if (!IsCaught(chicken, center, radiusSqr)) continue;
+
+                // Same lookup NotifyOwnerZoneTriggered uses. A missing component is already
+                // reported loudly there once per zone; staying quiet here avoids one warning
+                // per victim per frame for the same prefab fault.
+                chicken.GetComponent<HitFeedback>()?.NotifyAttacker(center);
+            }
         }
 
         /// <summary>Same registry + planar-XZ test as <see cref="TryTriggerRoot"/>, so the
@@ -276,25 +340,30 @@ namespace CluckWars.Gameplay
         /// no <c>Physics.Overlap</c>.</summary>
         private bool AnyRivalInside()
         {
-            float radius = TriggerRadius;
-            float radiusSqr = radius * radius;
+            float radiusSqr = TriggerRadius * TriggerRadius;
             Vector3 center = transform.position;
 
             var all = ChickenController.ActiveControllers;
             for (int i = 0; i < all.Count; i++)
-            {
-                var chicken = all[i];
-                if (chicken == null) continue;
-                if (chicken.Id == OwnerChicken) continue;
-                if (chicken.IsDecoy) continue; // a phantom is not a catch
-                if (chicken.Combat != null && chicken.Combat.IsRemoved) continue;
+                if (IsCaught(all[i], center, radiusSqr)) return true;
 
-                var obj = chicken.Object;
-                if (obj == null || !obj.IsValid) continue;
-
-                if (PlanarSqrDistance(center, chicken.transform.position) <= radiusSqr) return true;
-            }
             return false;
+        }
+
+        /// <summary>The single "does this chicken count as caught" predicate, shared by the
+        /// occupancy edge and the victim attribution so the two can never disagree about who
+        /// was in the cloud.</summary>
+        private bool IsCaught(ChickenController chicken, Vector3 center, float radiusSqr)
+        {
+            if (chicken == null) return false;
+            if (chicken.Id == OwnerChicken) return false;
+            if (chicken.IsDecoy) return false; // a phantom is not a catch
+            if (chicken.Combat != null && chicken.Combat.IsRemoved) return false;
+
+            var obj = chicken.Object;
+            if (obj == null || !obj.IsValid) return false;
+
+            return PlanarSqrDistance(center, chicken.transform.position) <= radiusSqr;
         }
 
         /// <summary>

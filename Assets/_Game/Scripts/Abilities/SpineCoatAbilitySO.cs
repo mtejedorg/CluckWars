@@ -19,6 +19,21 @@ namespace CluckWars.Abilities
 
         protected override string DefaultIcon => "🦔";
 
+        /// <summary>
+        /// <inheritdoc cref="AbilityBaseSO.NominalStealAmount"/>
+        /// </summary>
+        /// <remarks>
+        /// Spine Coat steals without an aim shape and without an <c>OnActivate</c> hit: it arms
+        /// <c>ChickenController.StealBackAmount</c> and the drain fires later, from
+        /// <c>CheckCollisionSlow</c>, on whoever walks into the wearer. Declaring the amount
+        /// anyway is what keeps the receiver's bound honest — it is a real
+        /// <c>RPC_DrainStolen</c> caller, just not one that resolves a target itself. Its reach
+        /// contributes nothing to <c>StealRules.MaxReach</c> because
+        /// <see cref="AbilityAimShape.None"/> has no radius, which is correct: contact range is
+        /// far inside the pool's longest reach.
+        /// </remarks>
+        public override float NominalStealAmount => StealBackAmount;
+
         // Self-buff, no target area — marks the caster's own ring instead (FEEDBACK.md §2.2).
         public override AbilityAimShape AimShape => AbilityAimShape.None;
         public override bool AffectsSelf => true;

@@ -23,7 +23,7 @@ MonoBehaviour:
   AllowedClasses: 8
   Duration: 1.5
   Cooldown: 11
-  AbilityAnimationClip: {fileID: 0}
+  CastMotion: 4
   _decoyPrefab: {fileID: 1012061175775692847, guid: dadc0068bfdc302458b5991aeceb8669, type: 3}
   DecoyLifetimeSeconds: 4
   SideOffset: 1.2

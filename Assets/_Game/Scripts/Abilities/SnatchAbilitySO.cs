@@ -47,6 +47,8 @@ namespace CluckWars.Abilities
         public override float AimRadius => SnatchRange;
         public override float AimConeAngle => 140f;
 
+        public override float NominalStealAmount => StealAmount;
+
         /// <summary>Only a cargo-carrier is a valid Snatch target — an empty-handed rival in range now gets the "immune / no-effect" telegraph instead of a knockback that used to land anyway.</summary>
         protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)
         {
@@ -71,7 +73,7 @@ namespace CluckWars.Abilities
                 if (stolen > 0f)
                 {
                     thiefCargo.Cargo += stolen;
-                    targetCargo.RPC_DrainStolen(stolen);
+                    targetCargo.RPC_DrainStolen(stolen, thief.Id);
                 }
 
                 if (KnockbackStrength > 0f)

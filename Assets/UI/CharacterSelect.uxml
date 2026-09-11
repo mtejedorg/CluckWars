@@ -180,6 +180,24 @@
                     <ui:Label name="RangeGuidesHint" text="Show a faint outline of what each equipped ability can reach." class="cw-opt-hint" />
                 </ui:VisualElement>
 
+                <!-- Developer Mode. Second row rather than sharing OptionsRow above: that row
+                     is flex-direction: row and already pairs one 48 dp toggle with a wrapping
+                     hint, so a second pair in it would halve both and push the hints to three
+                     lines each in this column's width.
+
+                     Reveals #DevRow on the main menu, which is the only route into the Ability
+                     Lab. Defaults OFF and persists in PlayerPrefs, so a tester turns it on once
+                     per device rather than once per launch.
+
+                     NOTE: .cw-opt-row is display:none in portrait (see CluckWarsTheme.uss —
+                     the column has no room for a 116px row there), so this control, like the
+                     range-guides one above it, can only be reached with the device held
+                     landscape. -->
+                <ui:VisualElement name="DevOptionsRow" class="cw-opt-row">
+                    <ui:Toggle name="DeveloperModeToggle" text="Developer Mode" class="cw-opt-toggle" />
+                    <ui:Label name="DeveloperModeHint" text="Show the Ability Lab and other developer tools on the main menu." class="cw-opt-hint" />
+                </ui:VisualElement>
+
                 <ui:Button name="ReadyBtn" text="PICK ABILITIES" class="cw-btn cw-btn--neutral" style="flex-shrink: 0; letter-spacing: 3px;" />
             </ui:VisualElement>
         </ui:VisualElement>

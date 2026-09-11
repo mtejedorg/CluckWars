@@ -950,13 +950,17 @@ namespace CluckWars.Tests
         ///   Both now route through <c>ChickenController.ActiveControllers</c>, and
         ///   <c>MarkKillAbilitySO.ExtraTargetFilter</c> applies the identical rules via the
         ///   shared static <c>AssassinExecute.IsIsolated</c>.</item>
+        ///   <item><c>ChickenController.cs</c>, whose <c>CheckCollisionSlow</c> was the last
+        ///   chicken-vs-chicken scan still running a broadphase query — plus a
+        ///   <c>GetComponentInParent</c> per hit — every tick, per chicken, to rediscover the
+        ///   four-entry list the class itself owns. It now iterates
+        ///   <c>ActiveControllers</c> like <c>CheckAuraSlow</c> two methods below it.</item>
         /// </list>
         ///
-        /// NOT widened to all of <c>Gameplay/</c> on purpose. <c>ChickenCargo</c> (food
-        /// piles, bases), <c>ChickenController</c> (body collision) and
-        /// <c>ChickenTraversal</c> query real colliders for non-chicken-targeting reasons and
-        /// are legitimately outside this contract. Blanket-failing them would turn this lock
-        /// into noise.
+        /// NOT widened to all of <c>Gameplay/</c> on purpose. <c>ChickenCargo</c> (food piles,
+        /// bases) and <c>ChickenTraversal</c> query real colliders for non-chicken-targeting
+        /// reasons and are legitimately outside this contract. Blanket-failing them would turn
+        /// this lock into noise.
         /// </summary>
         [Test]
         public void NoAbilityScript_CallsPhysicsOverlapDirectly()
@@ -966,6 +970,7 @@ namespace CluckWars.Tests
             {
                 "Assets/_Game/Scripts/Gameplay/AbilityZone.cs",
                 "Assets/_Game/Scripts/Gameplay/AssassinExecute.cs",
+                "Assets/_Game/Scripts/Gameplay/ChickenController.cs",
             };
 
             Assert.IsTrue(Directory.Exists(abilitiesDir), $"{abilitiesDir} not found on disk.");

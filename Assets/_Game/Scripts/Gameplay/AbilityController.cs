@@ -180,6 +180,13 @@ namespace CluckWars.Gameplay
             _combat = GetComponent<ChickenCombat>();
             _animator = GetComponent<ChickenAnimator>();
             _ctx = new AbilityContext(_controller);
+            // Ability SOs are assets, so Zenject cannot inject them and this project rules
+            // out a service locator — the context is how they reach the logger. Assigned
+            // here rather than at the per-activation refresh in TryActivate: _log is already
+            // resolved (Construct, or the self-inject at the top of Spawned) and never
+            // changes afterwards, and doing it before the passive's OnActivate below is what
+            // makes the passive path logger-safe as well.
+            _ctx.Log = _log;
 
             if (HasStateAuthority)
             {
@@ -579,12 +586,27 @@ namespace CluckWars.Gameplay
                 return;
             }
 
+            // Refresh context fields that abilities need for NetworkObject spawning. This has
+            // to happen before CanActivate, not merely before OnActivate: the zone abilities'
+            // CanActivate reads exactly these two fields (via AbilityContext.CanSpawnZone), so
+            // refreshing afterwards would have the gate judge a stale context and refuse every
+            // first cast.
+            _ctx.Runner         = Runner;
+            _ctx.PrefabRegistry = _prefabRegistry;
+
+            if (!ability.CanActivate(_ctx))
+            {
+                // No log line here on purpose. CanActivate's contract is that the override has
+                // already logged an Error naming the exact missing reference; a second line
+                // would just be noise pointing at the same bug.
+                _deniedPressPending = true;
+                _deniedPressSlot = slot;
+                return;
+            }
+
             ActiveSlot = slot;
             ActivationTimer = TickTimer.CreateFromSeconds(Runner, ability.Duration);
             SetCooldown(slot, TickTimer.CreateFromSeconds(Runner, ResolveCooldownFor(ability)));
-            // Refresh context fields that abilities need for NetworkObject spawning.
-            _ctx.Runner         = Runner;
-            _ctx.PrefabRegistry = _prefabRegistry;
 
             if (ability.TerrainTraversal != TerrainTraversal.None && _controller != null)
             {
@@ -624,12 +646,30 @@ namespace CluckWars.Gameplay
             // resolved and applied its lane from the take-off pose, so it may travel.
             if (ability.ResolvesBeforeJump) ExecuteJumpIfAny(ability);
 
-            // Peck gets its own animation beat. Everything else shares the generic Cast
-            // state — per-ability clips were never wired (AbilityBaseSO.AbilityAnimationClip
-            // has been declared and unread since Phase 6), and foraging is the one action
-            // frequent enough that reusing a combat cast would read as a bug.
-            if (ability is Abilities.PeckAbilitySO) _animator?.TriggerPeck();
-            else _animator?.TriggerAbilityCast();
+            // Peck keeps its own animation beat, and deliberately does not route through
+            // CastArchetype: foraging is frequent enough that reusing a combat cast reads as a bug.
+            // Everything else declares one of the eight archetypes on its asset, which selects the
+            // matching animator state; the casting class's own clip is bound to that state by the
+            // AnimatorOverrideController built at spawn.
+            if (ability is Abilities.PeckAbilitySO)
+            {
+                _animator?.TriggerPeck();
+            }
+            else
+            {
+                if (ability.CastMotion == Abilities.CastArchetype.None)
+                {
+                    // None marks an ability that is never cast -- what the eight specializations
+                    // carry. Reaching an activation with it means a passive has been routed through
+                    // the active path, or an ability asset was authored without an archetype. Either
+                    // is a wiring bug, and the cast silently playing nothing is exactly how it would
+                    // otherwise go unnoticed.
+                    _log?.Warn(Source, $"'{ability.DisplayName}' activated with CastArchetype.None, " +
+                        "which marks an ability that is never cast. No cast animation will play. " +
+                        "Give it an archetype, or keep it off the activation path.");
+                }
+                _animator?.TriggerAbilityCast(ability.CastMotion);
+            }
             _audio?.PlaySFX(_audioReg != null ? _audioReg.AbilityActivate : null);
             LastCastEventId++; // wraps at 255 by design (byte overflow) — a one-shot signal, not a counter
             _log?.Info(Source, $"Activated slot {slot} ({ability.DisplayName}) for {ability.Duration:0.00}s, " +
@@ -641,6 +681,13 @@ namespace CluckWars.Gameplay
         /// extraction from <see cref="TryActivate"/> so the two orderings above can share one
         /// implementation instead of duplicating the resolve+apply pair.
         /// </summary>
+        /// <remarks>
+        /// Also the sole publisher of <c>ChickenController.JumpEventId</c>, which is what tells
+        /// every peer's local visuals that this particular position discontinuity was a jump and
+        /// not a round-reset teleport. Bumped only when the resolver actually moved the chicken:
+        /// a jump that resolves to zero distance (pressed flat against a wall) is not a travel,
+        /// and firing a landing impact for it would announce a movement that did not happen.
+        /// </remarks>
         private void ExecuteJumpIfAny(AbilityBaseSO ability)
         {
             if (ability.JumpTier == JumpLengthTier.None) return;
@@ -650,6 +697,8 @@ namespace CluckWars.Gameplay
             var jump = _controller.Traversal.ExecuteJump(
                 ability.JumpTier, t.position, t.forward, MapGenerator.ArenaHalfSize);
             _controller.Traversal.ApplyJump(jump);
+
+            if (jump.EffectiveDistance > 0f) _controller.JumpEventId++;
         }
 
         private void Deactivate()

@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Settings;
 using UnityEngine;
 
 namespace CluckWars.Visuals
@@ -174,9 +175,36 @@ namespace CluckWars.Visuals
         /// Trigger a positional shake impulse on the camera. If a stronger or longer
         /// shake is already running it wins; otherwise the new values override.
         /// Safe to call from any peer — guards internally so only the local camera shakes.
+        /// No-ops entirely when the player has turned on
+        /// <see cref="PlayerPreferences.ReducedMotionEnabled"/>.
         /// </summary>
+        /// <remarks>
+        /// <b>Full suppression, not attenuation.</b> A scaled-down shake is still shake: the
+        /// vestibular response this preference exists to avoid is triggered by unrequested
+        /// camera movement, not by its amplitude, so "quieter" would keep the symptom and only
+        /// remove the effect. Attenuating would also be dishonest about what the toggle does,
+        /// and would leave a magnitude for a future re-tune of <c>FeedbackTuning</c> to creep
+        /// back up.
+        ///
+        /// <b>Nothing gameplay-critical is lost.</b> Every shake in the game is a redundant
+        /// emphasis layer over a cue that is already carried some other way, and none is the
+        /// sole signal for anything: the death shake (<c>ChickenCombat</c>) rides on the stun
+        /// animation, the stun SFX and the replicated <c>IsRemoved</c> state; the caster
+        /// micro-shake (<c>ChickenVFX</c>) rides on the ability particle burst in the ability's
+        /// accent colour; the hit-confirm shakes (<c>HitFeedback</c>) ride on the hit spark,
+        /// the hit flash and the floating damage text. A player with this on is told everything
+        /// a player with it off is told.
+        ///
+        /// Gated HERE rather than at the call sites on purpose. This is the one chokepoint all
+        /// three of those pass through, so a shake added later is covered by default instead of
+        /// by remembering — the failure mode of per-call-site gating is a new shake that quietly
+        /// ignores the preference. The read is a cached static field after its first touch, so
+        /// it costs nothing at the per-cast rate this is called at.
+        /// </remarks>
         public void ApplyShake(float magnitude, float duration)
         {
+            if (PlayerPreferences.ReducedMotionEnabled) return;
+
             if (magnitude > _shakePeak)
             {
                 _shakePeak      = magnitude;
@@ -192,8 +220,9 @@ namespace CluckWars.Visuals
         private Vector3 ResolveLocalChickenPosition()
         {
             // Lost / never had reference? Throttled re-scan for the local
-            // chicken. ChickenController.HasInputAuthority disambiguates from
-            // remote-player chickens that also live in the scene.
+            // chicken. HasInputAuthority disambiguates from remote-player chickens
+            // that also live in the scene; !IsDecoy disambiguates from this player's
+            // own Doppelganger decoy, which shares that same InputAuthority.
             if (_localChicken == null || _localChicken.Object == null || !_localChicken.Object.IsValid)
             {
                 if (Time.unscaledTime >= _nextLocalChickenSearchTime)
@@ -213,7 +242,12 @@ namespace CluckWars.Visuals
             {
                 var c = all[i];
                 if (c == null || c.Object == null || !c.Object.IsValid) continue;
-                if (c.HasInputAuthority) return c;
+                // !IsDecoy as well: a Doppelganger decoy shares its caster's InputAuthority,
+                // so it is an equally valid answer here — and FindObjectsByType is unordered,
+                // so it can win. Once latched, the rescan above only re-runs when the
+                // reference goes null, which meant the camera followed the decoy for its
+                // whole lifetime instead of the player.
+                if (c.HasInputAuthority && !c.IsDecoy) return c;
             }
             return null;
         }

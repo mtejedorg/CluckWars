@@ -24,7 +24,9 @@ namespace CluckWars.Visuals
     ///   no colour at all.</item>
     ///   <item><b>Slow</b> — cyan blob + trailing streaks dragging behind the chicken.
     ///   Motion, but a <i>drag</i> rather than an orbit, and pointed along the direction
-    ///   of travel so it reads as resistance rather than as decoration.</item>
+    ///   of travel so it reads as resistance rather than as decoration. Split one level
+    ///   further: the blob <i>pulses</i> for a Snare and is <i>held still</i> for a Drag —
+    ///   see <see cref="LateUpdate"/>.</item>
     /// </list>
     ///
     /// <b>Colours are canonical.</b> This file used to define its own slow/cyan and
@@ -76,6 +78,20 @@ namespace CluckWars.Visuals
         /// would fall back to colour alone.</summary>
         private const float StreakRestingAlpha = 0.35f;
 
+        /// <summary>Ground diameter of the cyan slow blob, and the base the pulse scales.</summary>
+        private const float SlowBlobDiameter = 1.05f;
+
+        /// <summary>
+        /// The slow blob's resting scale, as a fraction of <see cref="SlowBlobDiameter"/>.
+        /// A <i>Drag</i> sits here and never moves; a <i>Snare</i> breathes symmetrically
+        /// around it by <see cref="SlowBlobPulseSwing"/>, so the two read as "still" versus
+        /// "alive" rather than as two different sizes. Unchanged from the single pulse this
+        /// split replaced — the Snare's motion is exactly the old behaviour.
+        /// </summary>
+        private const float SlowBlobCalmScale         = 0.85f;
+        private const float SlowBlobPulseSwing        = 0.15f;
+        private const float SlowBlobPulseRadPerSecond = 4f;
+
         // Canonical hues (FeedbackTuning), local alphas preserved from the original
         // literals so the blobs stay as soft as they have always been.
         private static readonly Color SlowColor    = WithAlpha(FeedbackTuning.CanonicalSlowColor, 0.42f);
@@ -110,7 +126,7 @@ namespace CluckWars.Visuals
             _cargo      = GetComponent<ChickenCargo>();
 
             BuildStars();
-            _slowBlob    = BuildFlatSprite("SlowBlob",    DiscSprite(),    1.05f, SlowColor,    sortingOrder: 2, y: 0.03f);
+            _slowBlob    = BuildFlatSprite("SlowBlob",    DiscSprite(),    SlowBlobDiameter, SlowColor, sortingOrder: 2, y: 0.03f);
             _rootBlob    = BuildFlatSprite("RootBlob",    DiscSprite(),    0.74f, RootColor,    sortingOrder: 3, y: 0.03f);
             _rootShackle = BuildFlatSprite("RootShackle", ShackleSprite(), 0.92f, ShackleColor, sortingOrder: 4, y: 0.035f);
             BuildStreaks();
@@ -216,6 +232,7 @@ namespace CluckWars.Visuals
             // skull; don't stack the movement-state blobs on top of it.
             bool rooted  = live && !stunned && (flags & ControlVfx.Rooted) != 0;
             bool slowed  = live && !stunned && !rooted && IsSlowed(flags);
+            bool snared  = slowed && IsSnared(flags);
 
             SetActive(_starRoot != null ? _starRoot.gameObject : null, stunned);
             SetActive(_rootBlob != null ? _rootBlob.gameObject : null, rooted);
@@ -232,9 +249,23 @@ namespace CluckWars.Visuals
 
             if (slowed && _slowBlob != null)
             {
-                // Gentle pulse so "slowed" reads as an active, temporary drag.
-                float p = 0.85f + 0.15f * Mathf.Sin(Time.time * 4f);
-                _slowBlob.transform.localScale = Vector3.one * (1.05f * p);
+                // The blob and the streaks are the shared "you are slowed" channel and stay on
+                // for BOTH kinds of slow — what separates them is the pulse. A Snare (an enemy
+                // did this: trap, aura, dust) breathes; a Drag (a food pile, brushing another
+                // chicken) is held perfectly still.
+                //
+                // Presence-and-motion, never hue: both keep the same canonical cyan, so the
+                // distinction survives greyscale and a muted TV. This is the same reasoning
+                // already written down a few lines above for the root shackle — "its stillness
+                // is the §1.3 shape channel against stun's orbit; animating it would delete the
+                // very thing that distinguishes the two states in greyscale" — applied one
+                // level down, inside slow. Do not give Drag its own colour, and do not
+                // "restore" the pulse to every slow.
+                float p = snared
+                    ? SlowBlobCalmScale + SlowBlobPulseSwing *
+                      Mathf.Sin(Time.time * SlowBlobPulseRadPerSecond)
+                    : SlowBlobCalmScale;
+                _slowBlob.transform.localScale = Vector3.one * (SlowBlobDiameter * p);
             }
 
             TrackMovement();
@@ -311,6 +342,31 @@ namespace CluckWars.Visuals
             if (_controller.SlowMultiplier < 0.999f) return true;
             if (_controller.AuraSlowActive) return true;
             return _cargo != null && _cargo.IsPileSlow;
+        }
+
+        /// <summary>
+        /// Snared = the slow has enemy agency behind it (a trap, an aura, a Dust Kick), as
+        /// opposed to a Drag from a food pile or from brushing another chicken. Drives the
+        /// blob's pulse only — see <see cref="LateUpdate"/>; both kinds keep the blob and the
+        /// streaks.
+        /// </summary>
+        /// <remarks>
+        /// The replicated <c>Snared</c> bit is the real source and works on every peer.
+        /// <c>AuraSlowActive</c> is added as the same kind of one-frame-early local fallback
+        /// <see cref="IsSlowed"/> keeps, and it qualifies because an aura is unambiguously
+        /// enemy agency.
+        /// <para>
+        /// There is deliberately <b>no</b> local fallback for a zone-sourced snare. The only
+        /// way to get one would be to scan <c>AbilityZone.ActiveZones</c> every frame on every
+        /// chicken, duplicating <c>ChickenController.CheckAbilityZoneSlow</c> so that a pulse
+        /// could start one frame sooner. The replicated flag arrives a frame later and a
+        /// breathing blob does not care — this is a pulse, not a hit reaction.
+        /// </para>
+        /// </remarks>
+        private bool IsSnared(ControlVfx flags)
+        {
+            if ((flags & ControlVfx.Snared) != 0) return true;
+            return _controller.AuraSlowActive;
         }
 
         private static void SetActive(GameObject go, bool on)

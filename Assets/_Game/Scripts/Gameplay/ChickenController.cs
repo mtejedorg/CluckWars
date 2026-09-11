@@ -5,8 +5,6 @@ using CluckWars.Visuals;
 using Fusion;
 using UnityEngine;
 using Zenject;
-// CluckWars.Logging.LogLevel collides with Fusion.LogLevel; alias to ours.
-using LogLevel = CluckWars.Logging.LogLevel;
 
 namespace CluckWars.Gameplay
 {
@@ -32,6 +30,28 @@ namespace CluckWars.Gameplay
     /// moves differently, which every peer sees) — only this minimal trigger
     /// crosses the wire so the *particles/rings stay local* on each client.
     /// </summary>
+    /// <remarks>
+    /// <b><see cref="Slowed"/> and <see cref="Snared"/> are one state split in two, not two
+    /// states.</b> <see cref="Slowed"/> means "slowed at all"; <see cref="Snared"/> adds "at
+    /// least one contributing source has enemy agency" — i.e. <see cref="SlowSource.Ability"/>
+    /// (Feather Trap, Feather Aura, Dust Kick, Smoke Roost). A slow with no
+    /// <see cref="Snared"/> bit is <i>Drag</i>: <see cref="SlowSource.Pile"/> or
+    /// <see cref="SlowSource.Collision"/>, ambient friction with nobody to blame and no
+    /// deadline.
+    /// <para>
+    /// <b><see cref="Snared"/> is only ever set alongside <see cref="Slowed"/></b> — see the
+    /// single publish site in <see cref="ChickenController.FixedUpdateNetwork"/>. Consumers
+    /// may therefore test one bit without re-deriving the other, and "Drag" is exactly
+    /// <c>Slowed &amp;&amp; !Snared</c>. <c>SlowSourceTests</c> pins both halves.
+    /// </para>
+    /// <para>
+    /// A fourth bit in a byte that used three costs zero bandwidth, which is why the
+    /// distinction crosses the wire at all rather than being re-derived per peer:
+    /// <c>_activeSlowSources</c> is StateAuthority-side only, so no remote peer could work
+    /// out on its own whether the rival it is looking at was trapped or is just standing on
+    /// a food pile.
+    /// </para>
+    /// </remarks>
     [System.Flags]
     public enum ControlVfx : byte
     {
@@ -39,6 +59,39 @@ namespace CluckWars.Gameplay
         Slowed = 1 << 0,
         Rooted = 1 << 1,
         Stunned = 1 << 2,
+
+        /// <summary>Slowed by a source with enemy agency (<see cref="SlowSource.Ability"/>).
+        /// Never set without <see cref="Slowed"/>.</summary>
+        Snared = 1 << 3,
+    }
+
+    /// <summary>
+    /// Where a displacement impulse came from. The impulse itself is applied identically
+    /// either way — this decides nothing about physics, only which replicated one-shot the
+    /// impact fires on, and therefore which story the feedback system tells about it.
+    /// </summary>
+    /// <remarks>
+    /// <b>Named for the concept, not for Feint.</b> Feint is the only self-applied impulse in
+    /// the game today, but the thing that needed separating is "I moved myself" from "somebody
+    /// moved me", and the next dodge or recoil-shove belongs on the same signal rather than on
+    /// a second bespoke one.
+    ///
+    /// <b>Why it exists.</b> Every peer reads <see cref="ChickenController.KnockbackEventId"/>
+    /// as a landed hit: <c>HitFeedback.ObserveKnockback</c> plays the white body flash, the
+    /// animator's recoil and the victim-tier camera shake FEEDBACK.md §3.1 reserves for being
+    /// hit, and <c>ControlStateVFX.ObserveKnockbackEdge</c> draws the ground shockwave off the
+    /// same byte. Nothing attributes a self-applied impulse, so no direction lines follow it —
+    /// and flash plus recoil plus a big shake with no attacker is the exact signature of being
+    /// hit from off-screen. Speedy's own dodge was speaking the game's loudest "I am under
+    /// attack" cue, to its caster and to every bystander.
+    /// </remarks>
+    public enum ImpulseOrigin : byte
+    {
+        /// <summary>Somebody did this to you. Fires <see cref="ChickenController.KnockbackEventId"/>.</summary>
+        Hit = 0,
+
+        /// <summary>You did this to yourself. Fires <see cref="ChickenController.SelfImpulseEventId"/>.</summary>
+        SelfApplied = 1,
     }
 
     /// <summary>
@@ -66,13 +119,24 @@ namespace CluckWars.Gameplay
         private const float CollisionSlowRadius      = 1.2f;  // metres — two chickens touching
         private const float CollisionSlowFactor      = 0.75f; // GDD TBD #7
         private const float PileSlowFactor           = 0.80f; // GDD TBD #6
+
+        /// <summary>
+        /// <see cref="SlowMultiplier"/> below which the replicated <see cref="ControlVfx.Slowed"/>
+        /// bit is raised — i.e. the point at which a slow becomes visible to peers at all.
+        /// Named rather than inlined so the single publish site and
+        /// <c>SlowSourceTests</c> read the same number instead of restating a literal.
+        /// </summary>
+        /// <remarks>
+        /// Every shipping slow source is authored well below this (0.80 pile, 0.75 collision,
+        /// 0.45–0.55 abilities), so the band between here and 1.0 is currently unreachable.
+        /// That is exactly why it needs a test: a source authored <i>inside</i> that band
+        /// would be a real slow that no remote peer can see. See <see cref="ApplySlow"/>.
+        /// </remarks>
+        public const float SlowVfxFlagThreshold = 0.92f;
         private const float ToughDamageBonus         = 1.25f; // 25% bonus outgoing damage for Tough
         private const float AuraSlowSearchRadius     = 10f;   // broadphase for CheckAuraSlow
 
         public static readonly System.Collections.Generic.List<ChickenController> ActiveControllers = new System.Collections.Generic.List<ChickenController>();
-
-        // Static array for broadphase overlaps to prevent per-tick allocation
-        private static readonly Collider[] _overlapHits = new Collider[32];
 
         [Tooltip("Fallback used only if the class registry is missing or has no entry for this chicken's class.")]
         [SerializeField] private ChickenStatsSO _fallbackStats;
@@ -90,6 +154,12 @@ namespace CluckWars.Gameplay
         // True once the class's avatar AND all five clips are bound, i.e. the Animator is really
         // driving the skeleton. Drives ChickenAnimator's two-path split — see SetSkeletalActive.
         private bool _skeletalAnimationActive;
+
+        // Edge latch for the missing-ChickenMovement report in FixedUpdateNetwork. Local, not
+        // networked: the condition and the log are both StateAuthority-side. Reset when
+        // _movement comes back, so a genuinely intermittent failure reports each occurrence
+        // instead of only the first.
+        private bool _movementMissingReported;
 
         public ChickenTraversal Traversal => _traversal;
 
@@ -171,6 +241,50 @@ namespace CluckWars.Gameplay
         /// knockback shockwave once. Wraps at 255 (only the change matters).
         /// </summary>
         [Networked] public byte KnockbackEventId { get; set; }
+
+        /// <summary>
+        /// Bumped on the StateAuthority each time this chicken applies a displacement impulse
+        /// to <i>itself</i> (<see cref="ImpulseOrigin.SelfApplied"/> — Feint's sidestep). Same
+        /// one-shot pattern as <see cref="KnockbackEventId"/>, and deliberately a separate
+        /// counter rather than a flag beside it.
+        /// </summary>
+        /// <remarks>
+        /// <b>A separate counter, not a companion flag.</b> A "was that one self-inflicted"
+        /// bool sitting next to <see cref="KnockbackEventId"/> would be read at whatever tick
+        /// the observing peer happens to render, which is not necessarily the tick that bumped
+        /// the id — two impulses landing between two rendered frames would classify one of
+        /// them by the other's flag. Two counters cannot desynchronise like that: an observer
+        /// watching one byte simply never sees the other's edge, which is precisely the
+        /// behaviour wanted here.
+        ///
+        /// <b>Nothing observes it yet, and that is the point.</b> Feint's presentation is its
+        /// ability accent burst and the caster micro-shake, both fired off the cast event —
+        /// what it needed was for the victim beat to stop firing, which it gets by this edge
+        /// landing on a byte <c>HitFeedback</c> and <c>ControlStateVFX</c> do not read. A
+        /// future dodge puff belongs here; a victim flash never does.
+        /// </remarks>
+        [Networked] public byte SelfImpulseEventId { get; set; }
+
+        /// <summary>
+        /// Bumped on the StateAuthority each time a length-based teleport jump actually
+        /// moves this chicken (<c>AbilityController.ExecuteJumpIfAny</c>). A one-shot
+        /// networked "event" on the <see cref="KnockbackEventId"/> pattern — peers watch
+        /// for the change and play the local travel catch-up and landing shockwave once.
+        /// Wraps at 255 (only the change matters).
+        /// </summary>
+        /// <remarks>
+        /// <b>This exists to be a discriminator, not a notification.</b> The mesh catch-up
+        /// it drives is measured from a position discontinuity, and a jump is not the only
+        /// thing that produces one: <see cref="RPC_TeleportTo"/> fires on every chicken at
+        /// every round reset (<c>GameManager.RestartMatch</c>). A catch-up applied there
+        /// would ease the model back across the whole arena toward the corner it was
+        /// standing in a moment ago — a chicken skating home over 0.18 s, at a round
+        /// boundary, which is exactly the instant nobody is looking closely enough to
+        /// report it. Consumers therefore key on this id changing rather than on the
+        /// discontinuity itself, and <see cref="RPC_TeleportTo"/> deliberately does not
+        /// bump it.
+        /// </remarks>
+        [Networked] public byte JumpEventId { get; set; }
 
         /// <summary>
         /// Corner (0..3) this chicken spawned at — its match identity. Drives base
@@ -287,6 +401,25 @@ namespace CluckWars.Gameplay
         /// Set via <see cref="ApplyKnockback"/> to respect the Immovable passive.
         /// </summary>
         public Vector3 ExternalDisplacement { get; set; }
+
+        /// <summary>
+        /// Vertical velocity in world-units per second: gravity accumulation, and the -2 peg
+        /// that holds a grounded chicken against the floor. Integrated by
+        /// <see cref="ChickenMovement"/> on the state authority every tick.
+        /// </summary>
+        /// <remarks>
+        /// <b><c>[Networked]</c> for rollback safety — do not demote this to a plain field.</b>
+        /// It lives on the controller rather than inside <see cref="ChickenMovement"/> (a pure
+        /// C# class, which cannot carry <c>[Networked]</c>) precisely so Fusion snapshots it.
+        /// As a plain field it sat outside predicted state: every resimulated tick re-integrated
+        /// gravity on top of a value the rollback never restored, so the accumulating branch
+        /// drifted further down with each resim — the same runaway-descent failure mode
+        /// <c>ChickenMovement.ClampInsideArena</c> documents for the <c>isGrounded</c> path,
+        /// arrived at from the other direction. Written back through <c>_owner</c> the same way
+        /// <see cref="ExternalDisplacement"/> is. Listed as item 4 of
+        /// <c>docs/adr/0002-server-mode-migration-plan.md</c>.
+        /// </remarks>
+        [Networked] public float VerticalVelocity { get; set; }
 
         [Inject]
         public void Construct(ChickenClassRegistrySO registry, ILogService log)
@@ -495,6 +628,20 @@ namespace CluckWars.Gameplay
                 [ClipKeyStunned] = entry.Clips.Stunned,
             };
 
+            // The eight cast archetypes. Keyed by the placeholder clip name sitting in each
+            // Cast_* state's Motion slot, exactly as the five above are.
+            //
+            // These have to be per-state rather than one Cast state whose clip is swapped at cast
+            // time: this override controller is cached PER CLASS and shared by every chicken of
+            // that class, so writing a clip into it mid-match would retarget every same-class
+            // chicken's cast at once -- including ones already mid-animation.
+            for (int i = 0; i < ChickenClassRegistrySO.ClassClips.CastArchetypeCount; i++)
+            {
+                var clip = entry.Clips.CastFor((Abilities.CastArchetype)i);
+                if (clip != null)
+                    overrideController["Cast_" + (Abilities.CastArchetype)i] = clip;
+            }
+
             _overrideControllers[cls] = overrideController;
             return overrideController;
         }
@@ -546,13 +693,29 @@ namespace CluckWars.Gameplay
 
         public override void FixedUpdateNetwork()
         {
+            if (!HasStateAuthority) return;
+
+            // The gate opens the method (CONVENTIONS.md), and the diagnostic below is not
+            // weakened by sitting under it. _movement is built in Spawned from _activeStats,
+            // and the ChickenStatsSO resolution footgun this log exists to surface is a
+            // StateAuthority-side condition: the authority owns the simulation and is the peer
+            // where unresolved stats actually stop the chicken moving. Proxies were never the
+            // audience — on them this reported a problem they could not have and could not fix,
+            // 32 times a second, at the Verbose level that is on by default in dev.
             if (_movement == null)
             {
-                if (_log != null && _log.IsEnabled(LogLevel.Verbose))
-                    _log.Verbose(Source, "FixedUpdateNetwork: _movement is null (stats unresolved?). Skipping tick.");
+                // Once per transition into the broken state, not once per tick. A stuck
+                // condition that reprints every tick is how a log stops being read at all.
+                if (!_movementMissingReported)
+                {
+                    _movementMissingReported = true;
+                    _log?.Warn(Source, $"{name}: FixedUpdateNetwork has no ChickenMovement — " +
+                        "stats never resolved in Spawned, so this chicken cannot move. Check " +
+                        "that ChickenClassRegistrySO has an entry for its Class.");
+                }
                 return;
             }
-            if (!HasStateAuthority) return;
+            _movementMissingReported = false;
 
             if (_traversal != null)
             {
@@ -612,8 +775,18 @@ namespace CluckWars.Gameplay
 
             // Publish the compact control-state for remote VFX. Particles stay local
             // on each peer; this replicated flag is the only thing that crosses.
+            //
+            // The Snared bit is set ONLY inside the Slowed branch — that nesting is the whole
+            // enforcement of the "Snared implies Slowed" invariant ControlVfx documents, and
+            // this is the only place either bit is written. _activeSlowSources is
+            // StateAuthority-side and reset at the top of this method, so it describes exactly
+            // the sources that produced the SlowMultiplier being tested here.
             var vfx = ControlVfx.None;
-            if (SlowMultiplier < 0.92f) vfx |= ControlVfx.Slowed;
+            if (SlowMultiplier < SlowVfxFlagThreshold)
+            {
+                vfx |= ControlVfx.Slowed;
+                if ((_activeSlowSources & SlowSource.Ability) != 0) vfx |= ControlVfx.Snared;
+            }
             if (Rooted)                 vfx |= ControlVfx.Rooted;
             if (IsStunned)              vfx |= ControlVfx.Stunned;
             if (ControlFlags != vfx)    ControlFlags = vfx;
@@ -670,13 +843,31 @@ namespace CluckWars.Gameplay
             _abilities != null ? _abilities.Passive : null;
 
         /// <summary>
-        /// Applies a speed penalty from a tagged source. Multiple sources stack
-        /// multiplicatively (the minimum multiplier wins). Slippery does NOT
-        /// reduce slow magnitude — per GDD §5.2 the passive is duration-only
-        /// (handled in <see cref="RPC_ApplyAbilitySlow"/> / <see cref="RPC_ApplyRoot"/>).
+        /// Applies a speed penalty from a tagged source. Slippery does NOT reduce slow
+        /// magnitude — per GDD §5.2 the passive is duration-only (handled in
+        /// <see cref="RPC_ApplyAbilitySlow"/> / <see cref="RPC_ApplyRoot"/>).
         /// Call <em>after</em> resetting <c>SlowMultiplier = 1f</c> at the top of
         /// each tick.
         /// </summary>
+        /// <remarks>
+        /// <b>Composition invariant: slow composes by <see cref="Mathf.Min"/>, never by a
+        /// product.</b> <see cref="SlowMultiplier"/> is therefore always <i>exactly one</i>
+        /// authored factor — the harshest source currently touching this chicken — and can
+        /// never land somewhere between two of them. Two overlapping slows do not stack.
+        /// <para>
+        /// That is why the several thresholds that read <see cref="SlowMultiplier"/> —
+        /// <see cref="SlowVfxFlagThreshold"/> (0.92, the replicated VFX bit),
+        /// <see cref="CurrentControlState"/>'s 0.99 gameplay ladder,
+        /// <c>ChickenNameplate</c>'s and <c>ChickenStateOverlays.IsSlowed</c>'s 0.999 — cannot
+        /// currently disagree: every shipping factor is ≤ 0.80, comfortably below all of them,
+        /// so the band between 0.92 and 1.0 is unreachable. The trap is that a source authored
+        /// <i>inside</i> that band would be a genuine slow that silently stops raising
+        /// <see cref="ControlVfx.Slowed"/> and so becomes invisible on every remote peer, with
+        /// nothing failing. <c>SlowSourceTests</c> exists to make that a red test instead —
+        /// it pins both the compile-time factors here and each ability's <c>[Range]</c>
+        /// ceiling against <see cref="SlowVfxFlagThreshold"/>.
+        /// </para>
+        /// </remarks>
         public void ApplySlow(SlowSource source, float factor)
         {
             _activeSlowSources |= source;
@@ -689,8 +880,23 @@ namespace CluckWars.Gameplay
         /// Scaled by the equipped specialization's <c>ModifyKnockback</c> (Bulwark
         /// inherits the old Immovable passive's role here).
         /// Must be called on the StateAuthority.
+        ///
+        /// <paramref name="origin"/> changes no physics whatsoever — only which replicated
+        /// one-shot the impact fires on, and so whether peers read it as a hit or as a dodge.
+        /// See <see cref="ImpulseOrigin"/>.
         /// </summary>
-        public void ApplyKnockback(Vector3 impulse)
+        /// <remarks>
+        /// <b>Deliberately not a hit-attribution push point.</b> This runs on the
+        /// StateAuthority only and the impulse itself is never replicated, so the caller's
+        /// identity is not available on the peer that has to draw the victim's direction cue.
+        /// It does not need to be: a knockback in practice always accompanies a cast, and
+        /// <c>HitFeedback.ConfirmHits</c> names the attacker on <i>every</i> peer inside
+        /// <c>FeedbackTuning.HitAttributionWindowSeconds</c> — the knockback edge that
+        /// <c>HitFeedback.ObserveKnockback</c> sees a frame or two later then claims it. That
+        /// jitter between the two halves of one hit is precisely what the window exists for;
+        /// see <see cref="Visuals.HitAttribution"/>. Do not add a push here.
+        /// </remarks>
+        public void ApplyKnockback(Vector3 impulse, ImpulseOrigin origin = ImpulseOrigin.Hit)
         {
             // Immovable: the shove does not land at all. Checked before the passive scale,
             // because scaling can only ever approach zero and never reach it.
@@ -699,8 +905,18 @@ namespace CluckWars.Gameplay
             var p = Passive;
             if (p != null) impulse *= Mathf.Max(0f, p.ModifyKnockback(1f, this));
             ExternalDisplacement = impulse;
-            // Fire the networked one-shot so every peer plays the shockwave locally.
-            if (impulse.sqrMagnitude > 1f) KnockbackEventId++;
+
+            // Fire the networked one-shot so every peer plays the impact locally — on the
+            // counter that matches where the impulse came from. Everything above this line is
+            // origin-blind on purpose: a dodge is resolved by the CharacterController against
+            // real geometry, scaled by the same passive, decayed by the same ChickenMovement,
+            // and refused by the same immunity as a shove. The ONLY thing an origin changes
+            // is which byte moves, and therefore which story the feedback system tells.
+            if (impulse.sqrMagnitude > 1f)
+            {
+                if (origin == ImpulseOrigin.SelfApplied) SelfImpulseEventId++;
+                else                                     KnockbackEventId++;
+            }
         }
 
         /// <summary>
@@ -723,9 +939,27 @@ namespace CluckWars.Gameplay
 
         // ---- Networking helpers ----------------------------------------------
 
+        /// <summary>
+        /// Places this chicken at <paramref name="position"/>. The only legitimate caller is
+        /// <c>GameManager.RestartMatch</c>, putting everyone back on their corner for a new round.
+        /// </summary>
+        /// <remarks>
+        /// <b>Sender-restricted, and it cannot become a direct call.</b> In Shared Mode each
+        /// chicken's state authority is its own owning client, not the master, so the match
+        /// authority genuinely has to reach it by RPC — which means <c>RpcSources.All</c> and a
+        /// receiver-side check on who sent it, rather than the direct-write split
+        /// <c>PlayerBase.AddFoodAuthoritative</c> could use. Without the check any peer could
+        /// teleport any chicken anywhere, at any time.
+        /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_TeleportTo(Vector3 position)
+        public void RPC_TeleportTo(Vector3 position, RpcInfo info = default)
         {
+            if (!IsFromMatchAuthority(info, out string rejection))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_TeleportTo({position}) from {info.Source} — {rejection}");
+                return;
+            }
+
             _traversal?.Abort();
             if (_characterController != null)
             {
@@ -740,6 +974,39 @@ namespace CluckWars.Gameplay
             _log?.Debug(Source, $"Teleported to {position}.");
         }
 
+        /// <summary>
+        /// True when <paramref name="info"/> came from the peer that runs the match — the state
+        /// authority of the one <see cref="GameManager"/>, which is a replicated
+        /// <c>PlayerRef</c> every peer can read off <c>Object.StateAuthority</c>.
+        /// </summary>
+        /// <remarks>
+        /// A local invocation is accepted outright. That covers solo play and the master moving
+        /// its own chicken, and it grants nothing: a peer that already holds a chicken's state
+        /// authority can write <c>transform.position</c> directly, so there is no privilege here
+        /// for it to escalate to. What the check stops is a <em>remote</em> peer reaching into a
+        /// chicken it does not own, and <c>IsInvokeLocal</c> is false for everything off the wire.
+        /// </remarks>
+        private bool IsFromMatchAuthority(in RpcInfo info, out string rejection)
+        {
+            rejection = null;
+            if (info.IsInvokeLocal) return true;
+
+            var gm = GameManager.Instance;
+            if (gm == null || gm.Object == null || !gm.Object.IsValid)
+            {
+                rejection = "there is no live GameManager to resolve the match authority against.";
+                return false;
+            }
+
+            if (info.Source != gm.Object.StateAuthority)
+            {
+                rejection = $"only the match authority ({gm.Object.StateAuthority}) may place chickens.";
+                return false;
+            }
+
+            return true;
+        }
+
         // ---- v0.3 Interaction primitive RPCs (B1) — all route to StateAuthority ----
 
         /// <summary>
@@ -752,6 +1019,31 @@ namespace CluckWars.Gameplay
         {
             ApplyKnockback(impulse); // already scales by Immovable passive
             _log?.Debug(Source, $"RPC_ApplyKnockback: impulse={impulse:F2}.");
+        }
+
+        /// <summary>
+        /// Applies a displacement impulse this chicken is inflicting on <b>itself</b> — a
+        /// dodge, not a shove. Physically identical to <see cref="RPC_ApplyKnockback"/> in
+        /// every respect; the difference is that peers observe it on
+        /// <see cref="SelfImpulseEventId"/>, which the victim-impact systems do not read.
+        /// </summary>
+        /// <remarks>
+        /// <b>Still an impulse, and that is load-bearing.</b> Feint shoves rather than
+        /// teleports so a wall stops the sidestep exactly as it stops running — Speedy is
+        /// specifically denied terrain-skipping (see <c>FeintAbilitySO</c>). Delivering this
+        /// as a teleport to dodge the feedback problem would have handed that back; the fix
+        /// separates presentation from transport and leaves the transport alone.
+        ///
+        /// A separate RPC rather than an <see cref="ImpulseOrigin"/> parameter on the existing
+        /// one: the two are different acts with different meanings at the call site, and a
+        /// sender that wants to shove someone should not be one enum value away from telling
+        /// their victim it was self-inflicted.
+        /// </remarks>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_ApplySelfImpulse(Vector3 impulse)
+        {
+            ApplyKnockback(impulse, ImpulseOrigin.SelfApplied);
+            _log?.Debug(Source, $"RPC_ApplySelfImpulse: impulse={impulse:F2}.");
         }
 
         /// <summary>
@@ -856,18 +1148,42 @@ namespace CluckWars.Gameplay
         /// the authority — avoids relying on OnTriggerStay which is unreliable for
         /// networked state (CONVENTIONS.md).
         /// </summary>
+        /// <remarks>
+        /// Iterates the capped four-entry <see cref="ActiveControllers"/> list with a distance
+        /// test, exactly like <see cref="CheckAuraSlow"/> below and <c>AbilityZone</c>. This was
+        /// the last <c>Physics.OverlapSphere</c> in the per-tick path: it ran a broadphase query
+        /// plus a <c>GetComponentInParent</c> per chicken per tick to rediscover a list the class
+        /// already keeps. Locked by <c>AbilityAimTests.NoAbilityScript_CallsPhysicsOverlapDirectly</c>.
+        ///
+        /// <b>Balance note:</b> the range is now measured to the other chicken's transform pivot
+        /// rather than to the nearest point on its capsule, so contact registers roughly one
+        /// collider radius later than it used to — the same shift, and the same reasoning,
+        /// <c>AbilityZone</c> documented when it made this move. <see cref="CollisionSlowRadius"/>
+        /// is 1.2 m against a 0.96 m body diameter, so "two chickens touching" is now what the
+        /// constant literally says it is.
+        ///
+        /// Decoys are deliberately NOT skipped. They sit on the Chickens layer and the old query
+        /// found them, so a Doppelganger has always slowed whoever walks into it — that is the
+        /// point of a decoy. It carries no <c>ChickenCargo</c>, so the steal-back block below
+        /// falls through on its own null check.
+        /// </remarks>
         private void CheckCollisionSlow()
         {
-            int hitCount = Physics.OverlapSphereNonAlloc(
-                transform.position, CollisionSlowRadius, _overlapHits, 1 << 8,
-                QueryTriggerInteraction.Ignore);
-
-            for (int i = 0; i < hitCount; i++)
+            for (int i = 0; i < ActiveControllers.Count; i++)
             {
-                var other = _overlapHits[i].GetComponentInParent<ChickenController>();
+                var other = ActiveControllers[i];
                 if (other == null || other == this) continue;
+                // Physics could hand back a chicken whose NetworkObject isn't live yet; the
+                // steal-back block below reads [Networked] Cargo, which throws on an
+                // unspawned object. Same guard ChickenCargo's pile scan carries.
+                if (other.Object == null || !other.Object.IsValid) continue;
                 // Ignore dead chickens (stunned / falling through respawn).
                 if (other.Combat != null && other.Combat.IsDead) continue;
+                if ((other.transform.position - transform.position).sqrMagnitude >
+                    CollisionSlowRadius * CollisionSlowRadius)
+                {
+                    continue;
+                }
 
                 if (StealBackActive && other.Cargo != null && Cargo != null)
                 {
@@ -880,7 +1196,12 @@ namespace CluckWars.Gameplay
                         float stolen = StealMath.Clamp(StealBackAmount, attackerFreeSpace, defenderCargo);
                         if (stolen > 0f)
                         {
-                            other.Cargo.RPC_DrainStolen(stolen);
+                            // Spine Coat is a steal too, so it names its thief like every other
+                            // caller — see ChickenCargo.RPC_DrainStolen. This one is trivially
+                            // in range (CollisionSlowRadius) and the receiver's bound comes off
+                            // SpineCoatAbilitySO.NominalStealAmount, which is the same authored
+                            // number StealBackAmount was set from.
+                            other.Cargo.RPC_DrainStolen(stolen, Id);
                             Cargo.Cargo += stolen;
                         }
                         var dir = (other.transform.position - transform.position);

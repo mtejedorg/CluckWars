@@ -46,6 +46,8 @@ namespace CluckWars.Abilities
         public override AbilityAimShape AimShape => AbilityAimShape.SingleTarget;
         public override float AimRadius => ScrapRange;
 
+        public override float NominalStealAmount => StealAmount;
+
         /// <summary>Only a cargo-carrier is worth grabbing at.</summary>
         protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)
         {
@@ -73,7 +75,7 @@ namespace CluckWars.Abilities
             if (take <= 0f) return;
 
             thiefCargo.Cargo += take;
-            victim.RPC_DrainStolen(take);
+            victim.RPC_DrainStolen(take, thief.Id);
         }
 
         public override void OnDeactivate(AbilityContext ctx) { }

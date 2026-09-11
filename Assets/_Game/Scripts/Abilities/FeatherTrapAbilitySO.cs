@@ -24,6 +24,8 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Control/Feather Trap", order = 9)]
     public sealed class FeatherTrapAbilitySO : AbilityBaseSO
     {
+        private const string Source = "FeatherTrap";
+
         [Tooltip("Distance in front of the caster where the zone center is placed.")]
         [Min(0f)] public float ForwardOffset = 4.5f;
 
@@ -50,15 +52,15 @@ namespace CluckWars.Abilities
         // hit/whiff styling must skip it entirely. See AbilityBaseSO.ReportsCastHits.
         public override bool PlacesZone => true;
 
+        // Unassigned wiring, not a gameplay state — CanSpawnZone logs which reference is
+        // missing. Sits in CanActivate rather than at the top of OnActivate so the refusal
+        // lands before the cast and its cooldown are committed. The logger reaches an ability
+        // through AbilityContext because SOs are assets Zenject cannot inject; read
+        // AbilityContext.Log before reaching for anything shorter.
+        public override bool CanActivate(AbilityContext ctx) => ctx.CanSpawnZone(Source, "Feather Trap");
+
         public override void OnActivate(AbilityContext ctx)
         {
-            if (ctx.Runner == null || ctx.PrefabRegistry == null || ctx.PrefabRegistry.AbilityZone == null)
-            {
-                // TODO(logging): SOs have no injected ILogService; surface this once
-                // AbilityContext exposes the caster's logger. Do NOT add a service locator.
-                return;
-            }
-
             var caster = ctx.Controller;
             var pos    = caster.transform.position + caster.transform.forward * ForwardOffset;
             pos.y      = caster.transform.position.y; // keep on ground plane
@@ -69,6 +71,9 @@ namespace CluckWars.Abilities
             float capSlowFactor = SlowFactor;
             float capRadius     = ZoneRadius;
             var   capOwner      = caster.Id;
+            // Captured like the rest so the abandoned-spawn report below closes over the logger
+            // rather than over ctx.
+            var   capLog        = ctx.Log;
 
             ctx.Runner.Spawn(
                 ctx.PrefabRegistry.AbilityZone,
@@ -78,7 +83,14 @@ namespace CluckWars.Abilities
                 onBeforeSpawned: (runner, networkObject) =>
                 {
                     var zone = networkObject.GetComponent<AbilityZone>();
-                    if (zone == null) return;
+                    if (zone == null)
+                    {
+                        capLog?.Error(Source, "Feather Trap leaked a zone: the prefab wired to "
+                            + "PrefabRegistrySO.AbilityZone has no AbilityZone component, so its lifetime "
+                            + "timer was never set. The NetworkObject has ALREADY spawned and will now "
+                            + "persist for the rest of the match doing nothing — fix the prefab.");
+                        return;
+                    }
                     zone.Effect          = ZoneEffect.Slow;
                     zone.OwnerChicken    = capOwner;
                     zone.SlowFactor      = capSlowFactor;

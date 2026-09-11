@@ -278,6 +278,34 @@ namespace CluckWars.Visuals
         public const float ImpactMotionLineLifetimeSeconds = 0.18f;
 
         /// <summary>
+        /// How long a named attacker stays claimable by a victim impact, and how long an
+        /// impact that played without a direction stays claimable by a late attribution
+        /// (<see cref="HitAttribution"/>). Both halves of one hit are observed from
+        /// replicated state, but from <i>different</i> objects with different authorities —
+        /// the victim's own knockback/control/cargo change versus the attacker's cast event
+        /// — so either can be seen first with a few frames of jitter between them.
+        /// <para>
+        /// 0.25 s is deliberately just over one <see cref="ScreenEdgeArcLifetimeSeconds"/>
+        /// fifth and comfortably longer than
+        /// <see cref="ImpactMotionLineLifetimeSeconds"/> (0.18 s), so a late attribution can
+        /// still light the direction cue while the flash it belongs to is a live memory,
+        /// while staying far shorter than any cooldown — a second, unrelated hit cannot
+        /// inherit the previous attacker's bearing.
+        /// </para>
+        /// </summary>
+        public const float HitAttributionWindowSeconds = 0.25f;
+
+        /// <summary>
+        /// Minimum planar distance between attacker and victim for a bearing to mean
+        /// anything (<see cref="HitAttribution.TryBearing"/>). Below this the arrow would be
+        /// pointing at a chicken standing inside the victim's own footprint — the direction
+        /// is noise, and drawing it would be a guess dressed as information. Set just under
+        /// <c>ControlStateVFX.RingRadius</c> (0.62), i.e. "closer than the victim's own
+        /// status ring", so contact-range shoves decline rather than spin the arc.
+        /// </summary>
+        public const float HitAttributionMinSeparation = 0.35f;
+
+        /// <summary>
         /// Total floating-combat-text lifetime. Confirmed at the spec's 0.9 s — long
         /// enough to read a two-character number in a 4-player brawl without
         /// squinting, short enough that in a fast exchange the text from the last
@@ -943,8 +971,8 @@ namespace CluckWars.Visuals
         /// <summary>
         /// Pulse rate for the valid-target bracket while a hold is active. 2.5 Hz —
         /// fast enough to read as "live/armed," slower than
-        /// <see cref="ControlStateVfxPulseHzReference"/> (the existing 9 rad/s ≈
-        /// 1.4 Hz status-ring pulse, see below) would suggest is "urgent," since a
+        /// <see cref="ControlStateRingPulseHz"/> (the 9 rad/s ≈ 1.4 Hz status-ring
+        /// pulse, see below) would suggest is "urgent," since a
         /// valid-target mark is informative, not alarming — it shouldn't compete
         /// visually with an actual active stun/root/slow ring pulsing nearby on a
         /// different chicken.
@@ -952,12 +980,97 @@ namespace CluckWars.Visuals
         public const float ValidTargetPulseHz = 2.5f;
 
         /// <summary>
-        /// Reference only, not a new tunable: <c>ControlStateVFX.UpdateStatusRing</c>
-        /// pulses via <c>Sin(Time.time * 9f)</c>, i.e. 9 rad/s ≈ 1.43 Hz. Recorded
-        /// here so <see cref="ValidTargetPulseHz"/>'s "distinct from the status
-        /// ring pulse" rationale has the actual number next to it instead of an
-        /// unverifiable claim.
+        /// Pulse rate of <c>ControlStateVFX</c>'s status ring — the "this effect is
+        /// still running" breathing on an active stun/root/slow ring. 9 rad/s ≈ 1.43 Hz,
+        /// expressed in Hz here (like every other rate in this file) and converted back
+        /// to rad/s at the one call site.
         /// </summary>
-        public const float ControlStateVfxPulseHzReference = 9f / (2f * Mathf.PI);
+        /// <remarks>
+        /// <b>This used to be a "reference only" constant that documented a literal it did
+        /// not drive.</b> <c>ControlStateVFX.UpdateStatusRing</c> hardcoded
+        /// <c>Sin(Time.time * 9f)</c>, so re-tuning this number changed the rationale on
+        /// <see cref="ValidTargetPulseHz"/> and nothing else — the exact failure §6.11's
+        /// "nothing reads a literal" rule exists to prevent. It is now the single source of
+        /// the ring's rate, so the comparison <see cref="ValidTargetPulseHz"/> makes against
+        /// it stays true by construction.
+        /// </remarks>
+        public const float ControlStateRingPulseHz = 9f / (2f * Mathf.PI);
+
+        /// <summary>
+        /// Resting alpha the status ring pulses around. 0.55 keeps the ring clearly present
+        /// at the bottom of its swing — a control effect you are still suffering must never
+        /// look like it is fading out — while sitting below the near-opaque
+        /// <see cref="ValidTargetBracketAlpha"/> so an active-effect ring reads softer than
+        /// a "this one is about to be hit" bracket.
+        /// </summary>
+        public const float ControlStateRingPulseAlphaBase = 0.55f;
+
+        /// <summary>
+        /// Alpha swing either side of <see cref="ControlStateRingPulseAlphaBase"/>, giving a
+        /// 0.30–0.80 range. Deliberately never reaches 1.0: the ring is Aftermath-beat
+        /// information (§3) sharing the ground plane with telegraphs and range guides, so it
+        /// breathes rather than flashes.
+        /// </summary>
+        public const float ControlStateRingPulseAlphaAmplitude = 0.25f;
+
+        // ================================================================
+        // Jump travel + landing — FEEDBACK.md §7.2
+        // ================================================================
+
+        /// <summary>
+        /// How long the mesh takes to catch up to the pivot after a length-based teleport
+        /// jump (<c>ChickenAnimator</c>), and — deliberately the same number — how long
+        /// <c>ControlStateVFX</c> holds the landing shockwave back before firing it.
+        /// </summary>
+        /// <remarks>
+        /// <b>The two readings are tied on purpose and must stay one constant.</b> A jump
+        /// moves the collision pivot instantly; the mesh lags behind and eases in, so the
+        /// body visually arrives one settle later than the pivot does. Firing the ground
+        /// ring on the jump edge would expand it under a chicken that has not landed yet,
+        /// which reads as the ring belonging to something else. Splitting these into two
+        /// numbers is how they drift apart.
+        ///
+        /// 0.18 s is short enough that the lag never reads as input latency — the pivot,
+        /// which is what collision and every ability resolve against, moved on the cast
+        /// tick regardless — and long enough that a 3.25 m Short jump is a visible travel
+        /// rather than a one-frame pop.
+        /// </remarks>
+        public const float JumpTravelSettleSeconds = 0.18f;
+
+        /// <summary>
+        /// Peak upward lift of the mesh at the midpoint of a full-length jump travel, in
+        /// the model root's local units. Non-negative by construction (a half-sine over the
+        /// travel), which is what keeps <c>ChickenAnimator</c>'s feet-on-ground invariant
+        /// intact in the only direction that matters — nothing here can sink a chicken.
+        /// </summary>
+        public const float JumpTravelArcHeight = 0.55f;
+
+        /// <summary>
+        /// Travel distance that earns a full-strength arc. Read from
+        /// <see cref="Gameplay.JumpResolver.ShortDistance"/> rather than copied, so the
+        /// shortest jump in the game is the one that scores 1.0 and the arc cannot silently
+        /// decouple from the traversal ladder the way the tiers themselves once did.
+        /// </summary>
+        /// <remarks>
+        /// The scale is squared at the call site, giving a dead zone for free. That dead
+        /// zone is load-bearing: on a remote peer <c>NetworkTransform</c> interpolation has
+        /// already slid the pivot, so the measured residual is a fraction of a metre and the
+        /// arc must come out to nothing. Squaring turns a 0.15 linear scale into 0.02 —
+        /// about a centimetre of lift, i.e. none.
+        /// </remarks>
+        public const float JumpTravelFullArcDistance = Gameplay.JumpResolver.ShortDistance;
+
+        /// <summary>
+        /// Hard ceiling on the measured travel residual, in metres. Sits just above the Big
+        /// tier's 11.7 m so no legitimate jump is ever clipped.
+        /// </summary>
+        /// <remarks>
+        /// A safety rail, not a tuning knob. The residual is measured as "where the mesh was
+        /// last frame minus where it is now", so anything that moves the pivot on the same
+        /// frame as a jump edge — a resimulation snap, a spawn — lands in it. Without the
+        /// clamp such a frame would fling the mesh an arbitrary distance from its own
+        /// collider and ease back over the next 0.18 s, which reads as the model detaching.
+        /// </remarks>
+        public const float JumpTravelMaxResidual = 14f;
     }
 }

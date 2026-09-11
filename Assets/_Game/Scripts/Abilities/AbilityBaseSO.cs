@@ -114,11 +114,11 @@ namespace CluckWars.Abilities
         [Min(0f)] public float Cooldown = 8f;
 
         [Header("Animation")]
-        [Tooltip("UNUSED. Reserved since Phase 6 and still never read by anything — every ability " +
-                 "triggers the shared 'Cast' animator state via ChickenAnimator.TriggerAbilityCast. " +
-                 "Wiring per-ability clips means adding states to Chicken.controller and clips to " +
-                 "ChickenClassRegistrySO.ClassClips; until then this field is decoration.")]
-        public AnimationClip AbilityAnimationClip;
+        [Tooltip("The body action this cast reads as. Routed by ChickenAnimator.TriggerAbilityCast " +
+                 "to the matching animator state, which an AnimatorOverrideController has filled " +
+                 "with the casting class's own clip. Peck is deliberately absent - it keeps its own " +
+                 "dedicated state and trigger.")]
+        public CastArchetype CastMotion = CastArchetype.Lunge;
 
         [Header("Physics Scans")]
         [Tooltip("Legacy layer mask from the Stage G Physics.OverlapSphere scans. No longer used to find " +
@@ -228,6 +228,25 @@ namespace CluckWars.Abilities
             var passive = caster != null ? caster.Passive : null;
             return passive != null ? passive.ModifyStealAmount(baseAmount, caster) : baseAmount;
         }
+
+        /// <summary>
+        /// Cargo this ability takes off a rival per hit, before <see cref="ResolveStealAmount"/>
+        /// applies the caster's passive. 0 for every ability that does not steal.
+        /// </summary>
+        /// <remarks>
+        /// <b>Declared, not inferred from <see cref="AbilityCategory.Steal"/>.</b> Category is a
+        /// picker label (GDD §7.2) that a designer can retag without touching behaviour, and the
+        /// thing that actually matters here is "does this call
+        /// <c>ChickenCargo.RPC_DrainStolen</c>" — which only the ability itself knows.
+        /// <para>
+        /// The receiver-side bound on <c>RPC_DrainStolen</c> is the maximum of this across the
+        /// shipped <c>AbilityRegistrySO</c> (see <c>StealRules.MaxSingleSteal</c>), so a new
+        /// steal ability that forgets to override it contributes nothing to the bound and gets
+        /// its steals rejected. <c>StealRulesTests</c> pins every ability whose source calls the
+        /// RPC against this override so the omission turns the suite red instead of shipping.
+        /// </para>
+        /// </remarks>
+        public virtual float NominalStealAmount => 0f;
 
         // ---- Aim descriptor (FEEDBACK.md §4 / §8) ------------------------------
         // One declarative shape per ability, used by every consumer that needs to
@@ -391,10 +410,79 @@ namespace CluckWars.Abilities
         public virtual bool AffectsSelf => false;
 
         /// <summary>
-        /// Per-ability condition beyond geometry (cargo requirement, immunity,
-        /// already-stunned). Called only after the geometric test passes.
+        /// Per-ability <b>eligibility</b> condition beyond geometry. Called only after the
+        /// geometric test passes, and only from <see cref="WouldAffect"/>.
         /// </summary>
+        /// <remarks>
+        /// <b>What actually overrides this today</b> — a cargo requirement (Snatch, Sneaky
+        /// Steal, Scrap, Roll Trample all reject an empty-handed rival), Dust Kick's rear-arc
+        /// restriction, and Mark/Kill's isolation + rival rules. That is the complete list.
+        ///
+        /// <b>Immunity is deliberately NOT one of them, and must not become one.</b> A control
+        /// -immune chicken (Immovable) is still <i>eligible</i>: it is gathered, it counts
+        /// toward <c>AbilityController.LastCastHitCount</c>, and it keeps
+        /// <see cref="RequiresEnemyInRange"/> satisfiable. Filtering it out here would make an
+        /// ability refuse to fire because the only rival nearby is Immovable, and would
+        /// whiff-style a cast that genuinely reached someone. The "it landed on nothing"
+        /// half is <see cref="IsEffectNullified"/> instead — see there for the split.
+        /// </remarks>
         protected virtual bool ExtraTargetFilter(Gameplay.ChickenController caster, Gameplay.ChickenController candidate) => true;
+
+        /// <summary>
+        /// Is <i>everything</i> this ability does to a target a control effect — knockback,
+        /// stun, root or ability-slow — with nothing else left over? Declared per ability,
+        /// never inferred.
+        /// </summary>
+        /// <remarks>
+        /// <b>Declared, because nothing already authored answers it.</b>
+        /// <see cref="AbilityCategory.Control"/> is the obvious candidate and is wrong in both
+        /// directions: Mark/Kill is categorised Control but applies an execute mark, which no
+        /// immunity stops; Roll Push is pure knockback and declares no category at all.
+        /// Category is a design-pool label, not a statement about what lands on a victim.
+        ///
+        /// <b>Mixed abilities are false, on purpose.</b> Snatch shoves <i>and</i> robs. Against
+        /// an Immovable rival the shove is dropped and the theft goes through untouched, so
+        /// "IMMUNE" over their head would be a lie — Immovable's counterplay <i>is</i> cargo
+        /// (see <c>ImmovableAbilitySO</c>). Only an ability with nothing left over after the
+        /// control is removed may set this true.
+        ///
+        /// <b>Placed zones are false too</b>, for a different reason: a zone's slow and root
+        /// reach the victim through <c>ChickenController.CheckAbilityZoneSlow</c> /
+        /// <c>CheckAuraSlow</c>, which call <c>ApplySlow</c> directly rather than routing
+        /// through <c>ApplyPassiveControlDuration</c> — so immunity does not stop them, and
+        /// claiming it would grey out a bracket for an effect that lands.
+        /// </remarks>
+        public virtual bool TargetEffectIsPurelyControl => false;
+
+        /// <summary>
+        /// <b>Eligible, but the effect will land on nothing.</b> The third state between
+        /// "outside the shape" and "will be hit": <paramref name="candidate"/> is gathered,
+        /// counted and telegraphed exactly as before, and every effect this ability would
+        /// deliver to them is refused at <c>ChickenController</c>'s immunity chokepoints.
+        /// </summary>
+        /// <remarks>
+        /// <b>Why this is not folded into <see cref="ExtraTargetFilter"/>.</b> Eligibility and
+        /// effect are different questions and the codebase needs both answers. Dropping an
+        /// immune target out of <see cref="GatherTargets"/> would silently change two things
+        /// that have nothing to do with feedback: <see cref="RequiresEnemyInRange"/> usability
+        /// (an ability refusing to fire because the only rival in range is Immovable) and
+        /// <c>LastCastHitCount</c> (a cast that reached someone being styled as a whiff via
+        /// <see cref="ZeroHitsIsAWhiff"/>). Keeping the target eligible and marking it
+        /// unaffected changes the feedback and only the feedback.
+        ///
+        /// Two consumers, and they are the two halves of the same story — FEEDBACK.md §2.2's
+        /// grey ⃠ bracket (<c>AbilityTelegraph.UpdateMarks</c>, "nothing will happen") and
+        /// §3.2 case 15's grey <c>IMMUNE</c> text (<c>HitFeedback.ConfirmHits</c>, "nothing
+        /// happened"). Both run on every peer off already-replicated state; no RPC, no new
+        /// networked field. <c>IsControlImmune</c> is readable everywhere for exactly this
+        /// reason.
+        /// </remarks>
+        public bool IsEffectNullified(Gameplay.ChickenController caster, Gameplay.ChickenController candidate)
+        {
+            if (!TargetEffectIsPurelyControl) return false;
+            if (candidate == null || candidate == caster) return false;
+            return candidate.IsControlImmune;
+        }
 
         /// <summary>
         /// Geometry only: is <paramref name="candidate"/> inside this ability's aim
@@ -422,6 +510,12 @@ namespace CluckWars.Abilities
         /// the two coincide, but a <see cref="AbilityAimShape.SingleTarget"/> ability has
         /// several eligible candidates and hits one. <see cref="GatherTargets"/> owns that
         /// resolution step; ask it, not this, for "who actually gets hit".
+        ///
+        /// <b>Eligibility is not effect either.</b> A control-immune target is eligible and
+        /// gets hit; the hit simply does nothing. Ask <see cref="IsEffectNullified"/>, not
+        /// this, for "will it accomplish anything" — that is what the grey ⃠ bracket and the
+        /// <c>IMMUNE</c> text are about, and folding it in here would change usability and
+        /// whiff styling as a side effect.
         ///
         /// <b>Decoys are legitimate targets</b> (Maestro's call — an ability that phased
         /// through a Doppelganger would have no reason to exist). The attacker commits, pays
@@ -531,6 +625,32 @@ namespace CluckWars.Abilities
             float dz = a.z - b.z;
             return dx * dx + dz * dz;
         }
+
+        /// <summary>
+        /// Pre-commitment gate: is this ability wired up well enough to run at all? Checked
+        /// once per press, immediately before <c>AbilityController.TryActivate</c> commits
+        /// <c>ActiveSlot</c>, the activation timer and the cooldown — so a false here costs
+        /// the player nothing.
+        /// </summary>
+        /// <remarks>
+        /// <b>Not the same question as <see cref="IsUsable"/>.</b> <c>IsUsable</c> asks
+        /// "would this ability accomplish anything right now" — a gameplay question, polled
+        /// continuously, which is why it feeds the HUD grey-out. <c>CanActivate</c> asks "is
+        /// this ability wired up well enough to run at all" — a wiring question, and a false
+        /// is a genuine bug (an unassigned prefab, a missing registry) that the player should
+        /// not be charged a cast and a cooldown for.
+        ///
+        /// It deliberately does <b>not</b> reach the HUD. Routing a wiring failure into the
+        /// grey-out would trade a silent failure for a button that is dead forever with no
+        /// explanation — quieter, not better. A press that refuses and logs why is the louder
+        /// of the two, which is the one this project wants.
+        ///
+        /// An override is expected to have <b>already logged the reason</b> before returning
+        /// false — that is <see cref="AbilityContext.CanSpawnZone"/>'s contract — so the
+        /// caller only has to return. Returning false silently would reintroduce exactly the
+        /// failure this gate exists to surface.
+        /// </remarks>
+        public virtual bool CanActivate(AbilityContext ctx) => true;
 
         public abstract void OnActivate(AbilityContext ctx);
         public abstract void OnDeactivate(AbilityContext ctx);

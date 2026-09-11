@@ -445,8 +445,10 @@ namespace CluckWars.Gameplay
         /// clearly won would let an Assassin steal a match it never contested.
         /// <para>
         /// Runs on the state authority only — <see cref="EndOnTimerExpiry"/> is already inside
-        /// the authority-gated tick, and <c>PlayerBase.RPC_AddFood</c> routes to each base's
-        /// own authority from there.
+        /// the authority-gated tick, and the bases were spawned by that same peer, so the bonus
+        /// goes in through <c>PlayerBase.AddFoodAuthoritative</c> rather than the client-facing
+        /// <c>RPC_AddFood</c>. It has to: that RPC now requires a depositor standing at the base,
+        /// and this bonus is banked into a home base the chicken may be nowhere near.
         /// </para>
         /// </remarks>
         private void AwardMatchEndBonuses()
@@ -471,7 +473,14 @@ namespace CluckWars.Gameplay
                     continue;
                 }
 
-                home.RPC_AddFood(bonus);
+                if (!home.AddFoodAuthoritative(bonus))
+                {
+                    _log?.Warn(Source, $"{passive.DisplayName} bonus of {bonus} was earned but corner " +
+                        $"{home.CornerIndex}'s base refused the authoritative write — the bonus is lost. " +
+                        "See the PlayerBase warning above for why.");
+                    continue;
+                }
+
                 _log?.Info(Source, $"{passive.DisplayName}: banked +{bonus} into corner {home.CornerIndex} " +
                     "because the timer expired with no winner.");
             }

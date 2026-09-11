@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Settings;
 using UnityEngine;
 
 namespace CluckWars.Visuals
@@ -29,12 +30,26 @@ namespace CluckWars.Visuals
     /// effect that assigns <c>localPosition</c>/<c>localRotation</c>/<c>localScale</c> directly —
     /// the moment two effects each assign, they fight and the last one silently wins.
     ///
-    /// <b>The feet-on-ground invariant.</b> On the skeletal path this component contributes only
-    /// non-negative Y <i>position</i> offsets and <i>no vertical scale at all</i>, so it can never
-    /// sink the model below the grounded rest pose that <c>ChickenController.AttachClassModel</c>
-    /// computed. Vertical articulation is the clips' business, and the clips are authored with the
-    /// rig's feet at the origin. That makes the invariant structural rather than something to
-    /// remember: there is no code path here that can lower a chicken.
+    /// <b>The feet-on-ground invariant.</b> Every Y <i>position</i> offset this component
+    /// contributes is non-negative, and the skeletal path applies <i>no vertical scale at all</i>,
+    /// so it can never sink the model below the grounded rest pose that
+    /// <c>ChickenController.AttachClassModel</c> computed. Vertical articulation is the clips'
+    /// business, and the clips are authored with the rig's feet at the origin. The "never lower"
+    /// half of the invariant is therefore structural rather than something to remember: there is
+    /// no code path here that can push the model down.
+    ///
+    /// The invariant is a <i>steady-state</i> one, and one bounded exception now proves it. At
+    /// rest the model sits exactly on <c>_restPosition</c>, and every transient provably returns
+    /// there, because <c>_restPosition</c> is captured once at <see cref="SetModelRoot"/> and
+    /// nothing rewrites it. The exception is the jump travel catch-up (see
+    /// <see cref="ObserveJumpTravel"/>): for at most
+    /// <see cref="FeedbackTuning.JumpTravelSettleSeconds"/> after a teleport jump the model is
+    /// deliberately displaced <i>horizontally</i> from its own collider and lifted <i>up</i> along
+    /// a half-sine, then eases back to rest on a timer that terminates by construction. Feet still
+    /// never go below the ground plane; what is momentarily untrue is that the model is centred on
+    /// its pivot. Anything that assumes model position equals collider position must therefore
+    /// read the collider, not the mesh — which is what every gameplay system already does, since
+    /// the pivot is the only thing abilities and collision ever resolve against.
     ///
     /// <b>Root vs model.</b> Only the child model transform is touched. The networked root is
     /// driven by Fusion; animating it would fight the network transform and read as jitter. The
@@ -53,6 +68,7 @@ namespace CluckWars.Visuals
         // ---- Animator parameter IDs (hashed once; this is a per-frame path) ----
         private static readonly int SpeedHash       = Animator.StringToHash("Speed");
         private static readonly int AbilityCastHash = Animator.StringToHash("AbilityCast");
+        private static readonly int CastArchetypeHash = Animator.StringToHash("CastArchetype");
         private static readonly int PeckHash        = Animator.StringToHash("Peck");
         private static readonly int HitHash         = Animator.StringToHash("Hit");
         private static readonly int StunnedHash     = Animator.StringToHash("Stunned");
@@ -183,6 +199,23 @@ namespace CluckWars.Visuals
         private bool  _stunned;
         private float _stunBlend;
 
+        // ---- Jump travel catch-up (see ObserveJumpTravel) ----
+        // The model's world position at the END of the previous LateUpdate, i.e. after that
+        // frame's single write. Measuring against the model rather than the pivot is what makes
+        // the effect self-scaling across peers: on the authority the model was left where the
+        // pivot used to be, on a proxy NetworkTransform has already slid it most of the way.
+        private Vector3 _previousModelWorldPosition;
+        private bool    _modelWorldPositionSeeded;
+
+        // The full displacement to lead in from, in the model root's PARENT space (so it is
+        // directly addable to _restPosition). Horizontal only — vertical is the arc's business.
+        private Vector3 _travelAnchor;
+        private float   _travelElapsed = -1f;  // < 0 = no travel in flight
+        private float   _travelArcScale;       // 0..1, squared distance ratio; 0 = no visible arc
+
+        private byte _lastJumpEventId;
+        private bool _jumpEventSeeded;
+
         /// <summary>
         /// True when the Animator is genuinely able to accept parameter writes. Unity logs a
         /// warning per call for a parameter set on an animator with no controller, which at
@@ -227,6 +260,15 @@ namespace CluckWars.Visuals
             _restPosition = modelRoot.localPosition;
             _restRotation = modelRoot.localRotation;
             _restScale    = modelRoot.localScale;
+
+            // Drop any travel in flight and re-seed the trackers against the new model. A
+            // carried-over anchor would be measured from a model that no longer exists, and a
+            // carried-over event id would swallow the first real jump of the new life.
+            _travelAnchor             = Vector3.zero;
+            _travelElapsed            = -1f;
+            _travelArcScale           = 0f;
+            _modelWorldPositionSeeded = false;
+            _jumpEventSeeded          = false;
         }
 
         /// <summary>
@@ -255,8 +297,146 @@ namespace CluckWars.Visuals
             UpdateYawRate(dt);
             PushAnimatorParameters();
 
+            // Both must run BEFORE the write: the observer measures the model against where the
+            // write left it last frame, and the write below is about to move it.
+            //
+            // Advance first, arm second, and not the other way round. A travel armed this frame
+            // must render at t=0 — its full lead-in — before any time is charged against it.
+            // Ticking first would spend one frame's dt on it immediately, so the model would
+            // appear already a quarter of the way home on the frame it was supposed to lag
+            // furthest behind, which shows up as a partial snap at the take-off point.
+            AdvanceJumpTravel(dt);
+            ObserveJumpTravel();
+
             if (_skeletalActive) ApplySkeletalOffsets();
             else                 ApplyLegacyProcedural(dt);
+
+            // Recorded AFTER the write, so next frame measures against the pose actually shown.
+            _previousModelWorldPosition = _modelRoot.position;
+            _modelWorldPositionSeeded   = true;
+        }
+
+        /// <summary>
+        /// Watches the replicated <c>ChickenController.JumpEventId</c> and, on a change, arms the
+        /// travel catch-up: the model is pinned back to the world position it occupied last frame
+        /// and then eases forward onto the pivot over
+        /// <see cref="FeedbackTuning.JumpTravelSettleSeconds"/>.
+        /// </summary>
+        /// <remarks>
+        /// <b>Catch-up, not a scripted arc — and the difference is not cosmetic.</b> A jump is a
+        /// teleport (<c>ChickenTraversal.ApplyJump</c>, GDD 3.5), but only the state authority
+        /// sees it as one: <c>Chicken.prefab</c>'s <c>NetworkTransform</c> has
+        /// <c>DisableSharedModeInterpolation</c> off, so on every remote peer the pivot is already
+        /// interpolated into a slide. Laying an authored arc on top would double the travel there
+        /// — the pivot sliding while the model offsets away from it — and the result reads as lag,
+        /// not weight. Measuring the residual instead makes the effect self-correcting by
+        /// construction: a full lead-in exactly where the pivot snapped, near-nothing where it had
+        /// already slid, and nothing at all if it did not move.
+        ///
+        /// <b>Why it keys on the event id rather than on the discontinuity.</b> See the remarks on
+        /// <c>ChickenController.JumpEventId</c>: <c>RPC_TeleportTo</c> moves every chicken at every
+        /// round reset, and a catch-up there would send the model skating across the arena.
+        ///
+        /// The id is seeded on first observation so a late joiner inheriting a non-zero id does
+        /// not fire a phantom travel on its first frame — the same baseline-seeding pattern
+        /// <c>ControlStateVFX</c> uses for the knockback shockwave.
+        /// </remarks>
+        private void ObserveJumpTravel()
+        {
+            // [Networked] properties throw when read off a despawned object, and this component
+            // outlives Spawned/Despawned ordering by a frame or two at both ends.
+            var obj = _controller.Object;
+            if (obj == null || !obj.IsValid) return;
+
+            byte id = _controller.JumpEventId;
+            if (!_jumpEventSeeded)
+            {
+                _jumpEventSeeded = true;
+                _lastJumpEventId = id;
+                return;
+            }
+            if (id == _lastJumpEventId) return;
+            _lastJumpEventId = id;
+
+            // Nothing to measure against on the very first frame after a (re)bind.
+            if (!_modelWorldPositionSeeded) return;
+
+            // Honoured here rather than at the write, so a player with this on gets the shipped
+            // teleport untouched — no lead-in, no lift, not even a one-frame partial. The
+            // accessibility panel's vestibular readers actively prefer the snap; this effect is
+            // emphasis on a movement they already initiated, never the signal for it.
+            if (PlayerPreferences.ReducedMotionEnabled) return;
+
+            Vector3 residual = _previousModelWorldPosition - _modelRoot.position;
+            // Horizontal only. A jump preserves the caster's Y (ChickenTraversal.ApplyJump), so
+            // any vertical difference measured here is this component's own idle bob or hop from
+            // last frame — folding that in would double-count it against the arc, which owns
+            // vertical outright. See CurrentTravelOffset.
+            residual.y = 0f;
+
+            float distance = residual.magnitude;
+            if (distance <= Mathf.Epsilon) return;
+
+            if (distance > FeedbackTuning.JumpTravelMaxResidual)
+            {
+                residual *= FeedbackTuning.JumpTravelMaxResidual / distance;
+                distance  = FeedbackTuning.JumpTravelMaxResidual;
+            }
+
+            var parent = _modelRoot.parent;
+            _travelAnchor  = parent != null ? parent.InverseTransformVector(residual) : residual;
+            _travelElapsed = 0f;
+
+            // Squared so the ramp has a dead zone: a proxy peer whose pivot was interpolated
+            // measures a residual of centimetres, and that must buy no arc at all.
+            float ratio = Mathf.Clamp01(distance / FeedbackTuning.JumpTravelFullArcDistance);
+            _travelArcScale = ratio * ratio;
+        }
+
+        /// <summary>
+        /// Advances the armed travel's clock and disarms it once the settle has elapsed. Shaping
+        /// is <see cref="CurrentTravelOffset"/>'s job and the transform is the write's — this
+        /// touches neither.
+        /// </summary>
+        private void AdvanceJumpTravel(float dt)
+        {
+            if (_travelElapsed < 0f) return;
+
+            _travelElapsed += dt;
+            if (_travelElapsed >= FeedbackTuning.JumpTravelSettleSeconds)
+            {
+                // Terminates on a timer rather than by decaying toward zero, so the model
+                // provably returns to _restPosition instead of asymptotically approaching it.
+                _travelElapsed  = -1f;
+                _travelAnchor   = Vector3.zero;
+                _travelArcScale = 0f;
+            }
+        }
+
+        /// <summary>
+        /// This frame's travel displacement, in the model root's parent space, as an offset from
+        /// <c>_restPosition</c>. <see cref="Vector3.zero"/> whenever no travel is in flight.
+        /// </summary>
+        /// <remarks>
+        /// Horizontal component: a cubic ease-out on the residual. Front-loading the decay is
+        /// what makes the lead-in read as anticipation rather than as lag — the model covers most
+        /// of the gap in the first third of the settle and is essentially arrived well before the
+        /// timer expires, so the tail is a settle, not a chase.
+        ///
+        /// Vertical component: a half-sine, hence non-negative for the whole travel. This is the
+        /// bounded exception to the feet-on-ground invariant documented on the class, and it is
+        /// bounded in the safe direction — the model can only ever be lifted.
+        /// </remarks>
+        private Vector3 CurrentTravelOffset()
+        {
+            if (_travelElapsed < 0f) return Vector3.zero;
+
+            float t    = Mathf.Clamp01(_travelElapsed / FeedbackTuning.JumpTravelSettleSeconds);
+            float ease = 1f - t;
+            ease = ease * ease * ease;
+
+            float lift = FeedbackTuning.JumpTravelArcHeight * _travelArcScale * Mathf.Sin(t * Mathf.PI);
+            return _travelAnchor * ease + Vector3.up * lift;
         }
 
         /// <summary>
@@ -273,10 +453,23 @@ namespace CluckWars.Visuals
         }
 
         /// <summary>
-        /// The skeletal path. Lean and bank only — the clips own everything else. Contributes no
-        /// vertical position offset and no scale at all, which is what makes the feet-on-ground
-        /// invariant structural here.
+        /// The skeletal path. Lean, bank, and the jump travel catch-up — the clips own everything
+        /// else. Contributes no scale at all, and no position offset whatsoever at rest.
         /// </summary>
+        /// <remarks>
+        /// <b>The vertical claim here is narrower than it used to be.</b> This method previously
+        /// documented itself as contributing "no vertical position offset", which was the whole
+        /// of why the feet-on-ground invariant was structural on this path. That is no longer
+        /// literally true: <see cref="CurrentTravelOffset"/> lifts the model along a half-sine for
+        /// up to <see cref="FeedbackTuning.JumpTravelSettleSeconds"/> after a teleport jump. What
+        /// still holds, and is what the invariant actually needs, is that the lift is
+        /// <i>non-negative</i> and that it returns: the travel is driven by a timer that expires,
+        /// and <c>_restPosition</c> is captured once at <see cref="SetModelRoot"/> and never
+        /// rewritten, so the offset is provably transient. Nothing on this path can lower a
+        /// chicken, and at rest the model still sits exactly on the pose
+        /// <c>ChickenController.AttachClassModel</c> computed. See the class remarks for the
+        /// horizontal half of the same exception.
+        /// </remarks>
         private void ApplySkeletalOffsets()
         {
             // ChickenMovement already rotates the ROOT to face the movement direction
@@ -287,7 +480,7 @@ namespace CluckWars.Visuals
             float roll  = -_bankMaxDegrees * _smoothedYawRate01;
 
             // ---- The single write ----
-            _modelRoot.localPosition = _restPosition;
+            _modelRoot.localPosition = _restPosition + CurrentTravelOffset();
             _modelRoot.localRotation = _restRotation * Quaternion.Euler(pitch, 0f, roll);
             _modelRoot.localScale    = _restScale;
         }
@@ -367,7 +560,10 @@ namespace CluckWars.Visuals
             scaleY = Mathf.Clamp(scaleY, 0.55f, 1.5f);
             float scaleXZ = 1f / Mathf.Sqrt(scaleY); // volume-preserving
 
-            _modelRoot.localPosition = _restPosition + Vector3.up * riseY;
+            // The travel offset is shared with the skeletal path rather than re-derived: it is a
+            // correction for a networking artefact, not a piece of the procedural fallback, and
+            // the degraded mode should travel the same way the real one does.
+            _modelRoot.localPosition = _restPosition + Vector3.up * riseY + CurrentTravelOffset();
             _modelRoot.localRotation = _restRotation * Quaternion.Euler(pitch, 0f, roll);
             _modelRoot.localScale    = new Vector3(
                 _restScale.x * scaleXZ,
@@ -433,9 +629,29 @@ namespace CluckWars.Visuals
             if (AnimatorReady) _animator.SetTrigger(PeckHash);
         }
 
-        public void TriggerAbilityCast()
+        /// <param name="archetype">
+        /// The body action to play. Selects one of the eight <c>Cast_*</c> states via the
+        /// <c>CastArchetype</c> int parameter; the class's own clip is already bound to that state
+        /// by the <see cref="AnimatorOverrideController"/> built at spawn.
+        /// </param>
+        /// <remarks>
+        /// The int is written BEFORE the trigger. Both feed the same Any State transition, and a
+        /// trigger is consumed by the first evaluation after it is set — setting the trigger first
+        /// lets that evaluation run against the previous archetype, so an ability would occasionally
+        /// play its predecessor's motion. Ordering it this way is not a style preference.
+        /// </remarks>
+        public void TriggerAbilityCast(Abilities.CastArchetype archetype = Abilities.CastArchetype.Lunge)
         {
-            if (AnimatorReady) _animator.SetTrigger(AbilityCastHash);
+            if (!AnimatorReady) return;
+
+            // None is not a motion -- it marks an ability that is never cast -- so there is no
+            // state to enter and nothing sensible to play. Reporting that is AbilityController's
+            // job: it has the logger and it knows what an ability is, while nothing under Visuals
+            // takes an ILogService. This just declines.
+            if (archetype == Abilities.CastArchetype.None) return;
+
+            _animator.SetInteger(CastArchetypeHash, (int)archetype);
+            _animator.SetTrigger(AbilityCastHash);
             if (!_skeletalActive) _castTimer = _castDuration;
         }
 

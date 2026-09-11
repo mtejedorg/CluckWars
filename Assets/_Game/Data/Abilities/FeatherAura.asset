@@ -23,6 +23,6 @@ MonoBehaviour:
   BotRole: 0
   Duration: 3
   Cooldown: 7
-  AbilityAnimationClip: {fileID: 0}
+  CastMotion: 2
   AuraRadius: 5.4
   AuraSlowFactor: 0.55

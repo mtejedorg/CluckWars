@@ -24,7 +24,7 @@ MonoBehaviour:
   BotRole: 0
   Duration: 0.6
   Cooldown: 6
-  AbilityAnimationClip: {fileID: 0}
+  CastMotion: 0
   ForwardOffset: 3.25
   SweepRadius: 2.05
   TrampleDamage: 50

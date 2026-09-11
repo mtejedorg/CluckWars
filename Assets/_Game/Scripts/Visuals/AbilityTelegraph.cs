@@ -13,11 +13,16 @@ namespace CluckWars.Visuals
     {
         /// <summary>Not inside the charging ability's aim shape — draw nothing.</summary>
         None = 0,
-        /// <summary>Inside the shape AND <c>WouldAffect</c> — this chicken will be hit.</summary>
+        /// <summary>Inside the shape, selected by <c>GatherTargets</c>, and the effect will
+        /// actually land — this chicken will be hit, and it will matter.</summary>
         Valid = 1,
-        /// <summary>Inside the shape but <c>WouldAffect</c> says no (immune, reflecting,
-        /// already stunned, no cargo to steal). The gap between <c>IsInAimShape</c> and
-        /// <c>WouldAffect</c>, exactly.</summary>
+        /// <summary>Inside the shape, but nothing will come of it. Two ways to land here, and
+        /// the bracket deliberately does not distinguish them because the player's question is
+        /// the same either way: <c>GatherTargets</c> did not select this chicken (no cargo to
+        /// steal, wrong arc, not the nearest single target), or it did and
+        /// <c>AbilityBaseSO.IsEffectNullified</c> says the effect is refused on arrival
+        /// (Immovable). The second case is why this is no longer simply the gap between
+        /// <c>IsInAimShape</c> and eligibility.</summary>
         NoEffect = 2,
     }
 
@@ -544,8 +549,17 @@ namespace CluckWars.Visuals
                 // all, which is the difference between "no mark" and the grey "no effect" one.
                 if (!ability.IsInAimShape(_controller, candidate)) continue;
 
+                // Selected by the scan AND the effect survives arrival. The second half is
+                // the only thing GatherTargets cannot answer: a control-immune rival
+                // (Immovable) is deliberately still gathered and still counted — dropping it
+                // from the scan would change whether the ability is usable at all and whether
+                // the cast styles as a whiff — so without this the telegraph drew the accent
+                // "will be hit" bracket over a chicken the cast was about to bounce off.
+                // See AbilityBaseSO.IsEffectNullified for the eligible-vs-affected split.
+                bool willLand = WillBeHit(candidate) && !ability.IsEffectNullified(_controller, candidate);
+
                 _marked[_markedCount]    = candidate;
-                _markKinds[_markedCount] = WillBeHit(candidate) ? TargetMark.Valid : TargetMark.NoEffect;
+                _markKinds[_markedCount] = willLand ? TargetMark.Valid : TargetMark.NoEffect;
                 _markedCount++;
             }
 

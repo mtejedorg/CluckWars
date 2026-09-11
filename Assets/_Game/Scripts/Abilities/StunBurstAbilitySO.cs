@@ -33,6 +33,14 @@ namespace CluckWars.Abilities
         public override AbilityAimShape AimShape => AbilityAimShape.SelfCircle;
         public override float AimRadius => StunRadius;
 
+        // FEEDBACK.md §2.2 / §3.2 case 15. The stun is the entire target effect for both
+        // subclasses, and it funnels through ChickenController.ApplyPassiveControlDuration —
+        // so against a control-immune rival this burst does nothing whatsoever, and both the
+        // telegraph bracket and the impact beat now say so. Declared on the base rather than
+        // on Ambush and Wing Slam separately: a third stun burst inherits the honest answer.
+        // See AbilityBaseSO.TargetEffectIsPurelyControl for why it is declared, not inferred.
+        public override bool TargetEffectIsPurelyControl => true;
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;

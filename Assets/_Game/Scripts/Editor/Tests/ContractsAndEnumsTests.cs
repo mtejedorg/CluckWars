@@ -139,33 +139,6 @@ namespace CluckWars.Tests
             finally { UnityEngine.Object.DestroyImmediate(probe); }
         }
 
-        [Test]
-        public void GetPassiveInfo_CoversEveryDeclaredChickenClass()
-        {
-            // The existing CoreLogicTests version hard-codes the four classes; this
-            // one iterates the enum, so adding a fifth class fails here instead of
-            // shipping a character-select card with a "—" passive.
-            foreach (ChickenClass cls in Enum.GetValues(typeof(ChickenClass)))
-            {
-                var info = MenuUiController.GetPassiveInfo(cls);
-                Assert.AreNotEqual("—", info.name,
-                    $"{cls} falls through MenuUiController.GetPassiveInfo to the unknown-class arm.");
-                Assert.IsFalse(string.IsNullOrWhiteSpace(info.desc), $"{cls} has no passive description.");
-                Assert.IsFalse(string.IsNullOrWhiteSpace(info.subRole), $"{cls} has no sub-role label.");
-            }
-        }
-
-        [Test]
-        public void GetPassiveInfo_NamesAreDistinct_AcrossClasses()
-        {
-            var names = Enum.GetValues(typeof(ChickenClass)).Cast<ChickenClass>()
-                .Select(c => MenuUiController.GetPassiveInfo(c).name)
-                .ToList();
-
-            CollectionAssert.AllItemsAreUnique(names,
-                "Two classes advertise the same passive name in character-select.");
-        }
-
         // ---- Cross-class determinism contract ----------------------------------
 
         [Test]
@@ -209,19 +182,6 @@ namespace CluckWars.Tests
                 "The hash must be deterministic — string.GetHashCode is not, which is why this exists.");
             Assert.AreNotEqual(Seed("ABC123"), Seed("ABC124"),
                 "Adjacent join codes must produce different layouts, or every room looks the same.");
-        }
-
-        [Test]
-        public void OnlyAssassin_AdvertisesAThirdAbilitySlot()
-        {
-            // The Combo passive is what gates ability slot 3 (input, HUD hex 3 and
-            // the character-select picker all key off it). Exactly one class may have it.
-            var comboClasses = Enum.GetValues(typeof(ChickenClass)).Cast<ChickenClass>()
-                .Where(c => MenuUiController.GetPassiveInfo(c).name == "COMBO")
-                .ToList();
-
-            CollectionAssert.AreEqual(new[] { ChickenClass.Assassin }, comboClasses,
-                "The COMBO passive gates the third ability slot; exactly one class may carry it.");
         }
     }
 }

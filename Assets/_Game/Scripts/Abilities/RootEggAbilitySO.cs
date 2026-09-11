@@ -22,6 +22,8 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Control/Root Egg", order = 11)]
     public sealed class RootEggAbilitySO : AbilityBaseSO
     {
+        private const string Source = "RootEgg";
+
         [Tooltip("Seconds before the egg despawns if no chicken triggers it.")]
         [Min(0.5f)] public float EggLifetime = 8.0f;
 
@@ -46,21 +48,24 @@ namespace CluckWars.Abilities
         // ground. Without this the whiff styling fired on every correctly-placed egg.
         public override bool PlacesZone => true;
 
+        // Unassigned wiring, not a gameplay state — CanSpawnZone logs which reference is
+        // missing. Sits in CanActivate rather than at the top of OnActivate so the refusal
+        // lands before the cast and its cooldown are committed. The logger reaches an ability
+        // through AbilityContext because SOs are assets Zenject cannot inject; read
+        // AbilityContext.Log before reaching for anything shorter.
+        public override bool CanActivate(AbilityContext ctx) => ctx.CanSpawnZone(Source, "Root Egg");
+
         public override void OnActivate(AbilityContext ctx)
         {
-            if (ctx.Runner == null || ctx.PrefabRegistry == null || ctx.PrefabRegistry.AbilityZone == null)
-            {
-                // TODO(logging): SOs have no injected ILogService; surface this once
-                // AbilityContext exposes the caster's logger. Do NOT add a service locator.
-                return;
-            }
-
             var pos = ctx.Controller.transform.position;
 
             float capLifetime      = EggLifetime;
             float capRootDuration  = RootDuration;
             float capRadius        = EggRadius;
             var   capOwner         = ctx.Controller.Id;
+            // Captured like the rest so the abandoned-spawn report below closes over the logger
+            // rather than over ctx.
+            var   capLog           = ctx.Log;
 
             ctx.Runner.Spawn(
                 ctx.PrefabRegistry.AbilityZone,
@@ -70,7 +75,14 @@ namespace CluckWars.Abilities
                 onBeforeSpawned: (runner, networkObject) =>
                 {
                     var zone = networkObject.GetComponent<AbilityZone>();
-                    if (zone == null) return;
+                    if (zone == null)
+                    {
+                        capLog?.Error(Source, "Root Egg leaked a zone: the prefab wired to "
+                            + "PrefabRegistrySO.AbilityZone has no AbilityZone component, so its lifetime "
+                            + "timer was never set. The NetworkObject has ALREADY spawned and will now "
+                            + "persist for the rest of the match doing nothing — fix the prefab.");
+                        return;
+                    }
                     zone.Effect          = ZoneEffect.Root;
                     zone.OwnerChicken    = capOwner;
                     zone.RootDuration    = capRootDuration;

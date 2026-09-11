@@ -42,6 +42,34 @@ namespace CluckWars.Gameplay
 
         [Networked] public float Cargo { get; set; }
         [Networked] public float BountyBag { get; set; }
+
+        /// <summary>
+        /// The chicken that last successfully robbed this one, and a one-shot event id bumped
+        /// alongside it. Together they are the <i>only</i> way a victim's §3.2 direction cue
+        /// can learn who a steal came from.
+        /// </summary>
+        /// <remarks>
+        /// <b>Why replicated state and not the drain call itself.</b>
+        /// <see cref="RPC_DrainStolen"/> already knows the thief — it validates the id — but it
+        /// executes on the victim's StateAuthority alone, so pushing the attribution from inside
+        /// it would light the bearing on exactly one peer. Writing the answer into replicated
+        /// state instead lets every peer observe the same edge in <see cref="Render"/> and reach
+        /// the same conclusion locally, which is the project's rule for animation and VFX: no
+        /// RPC, no second channel.
+        /// <para>
+        /// The event id exists because <see cref="LastThiefId"/> alone has no edge — robbed twice
+        /// by the same chicken, the id never changes and the second theft would go unattributed.
+        /// Same one-shot-byte pattern as <c>ChickenController.KnockbackEventId</c>, wrapping at
+        /// 255 because only the change matters. Both are <c>private set</c>: a forged thief is
+        /// exactly the manufactured blame <c>HitAttribution</c> exists to prevent, so the writer
+        /// stays inside the validated drain path.
+        /// </para>
+        /// </remarks>
+        [Networked] public NetworkBehaviourId LastThiefId { get; private set; }
+
+        /// <inheritdoc cref="LastThiefId"/>
+        [Networked] public byte StealEventId { get; private set; }
+
         /// <summary>
         /// Cargo the chicken can hold, after its class specialization has had a say.
         /// Hoarder raises it to a full win's worth; Bully adds enough to hold a bigger steal.
@@ -111,14 +139,23 @@ namespace CluckWars.Gameplay
         // Lives here rather than in a separate component precisely because Fusion's
         // ChangeDetector/PropertyReader pair only resolves for the behaviour that DECLARES
         // the [Networked] property — a detector rooted on a sibling would read nothing for
-        // Cargo. Strictly observation: nothing below writes networked state, and the whole
-        // block runs in Render() on every peer, so no RPC and no extra bytes on the wire.
+        // Cargo, or for the StealEventId edge that rides the same detector. Strictly
+        // observation: nothing in Render() writes networked state, and the whole block runs
+        // on every peer, so no RPC and no VFX crossing the wire.
         private ChangeDetector _cargoDetector;
         private PropertyReader<float> _cargoReader;
         private IAudioService _audio;
         private AudioRegistrySO _audioReg;
         private PrefabRegistrySO _prefabRegistry;
         private MatchConfigSO _matchConfig;
+        private AbilityRegistrySO _abilityRegistry;
+
+        // Receiver-side bounds for RPC_DrainStolen, derived once from the shipped ability pool
+        // (see ResolveStealBounds). Cached because the derivation walks the whole registry and
+        // the RPC can fire several times in one tick — Snatch robs every carrier in its arc.
+        private float _maxSingleSteal;
+        private float _maxStealReach;
+        private bool  _stealBoundsResolved;
 
         // Accumulators for batched RPCs (Stage D)
         private PlayerBase _activeBaseTarget;
@@ -129,13 +166,14 @@ namespace CluckWars.Gameplay
         private static readonly Collider[] _overlapHits = new Collider[32];
 
         [Inject]
-        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry, MatchConfigSO matchConfig)
+        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry, MatchConfigSO matchConfig, AbilityRegistrySO abilityRegistry)
         {
             _log = log;
             _audio = audio;
             _audioReg = audioReg;
             _prefabRegistry = prefabRegistry;
             _matchConfig = matchConfig;
+            _abilityRegistry = abilityRegistry;
         }
 
         public override void Spawned()
@@ -157,6 +195,8 @@ namespace CluckWars.Gameplay
             _cargoDetector = GetChangeDetector(ChangeDetector.Source.SimulationState);
             _cargoReader = GetPropertyReader<float>(nameof(Cargo));
 
+            ResolveStealBounds();
+
             _log?.Debug(Source, $"Spawned. HasStateAuthority={HasStateAuthority}.");
         }
 
@@ -166,10 +206,15 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Local-only: turns the replicated <see cref="Cargo"/> value into the §3.2
-        /// <c>-5 🌽</c> / <c>+5 🌽</c> floating numbers, and feeds a *loss* into
-        /// <see cref="HitFeedback"/> as one more victim-hit trigger (case 12 is a hit as
-        /// much as a knockback is — someone just took your food).
+        /// Local-only, on every peer. Two things come off one change detector:
+        /// <list type="bullet">
+        ///   <item>the replicated <see cref="Cargo"/> value turned into the §3.2
+        ///   <c>-5 🌽</c> / <c>+5 🌽</c> floating numbers, with a *loss* fed into
+        ///   <see cref="HitFeedback"/> as one more victim-hit trigger (case 12 is a hit as much
+        ///   as a knockback is — someone just took your food);</item>
+        ///   <item>the <see cref="StealEventId"/> edge turned into the attacker attribution
+        ///   that gives that hit a <i>direction</i> — see <see cref="NameTheThief"/>.</item>
+        /// </list>
         /// </summary>
         /// <remarks>
         /// The delta is read out of the change detector's previous/current buffers rather
@@ -192,6 +237,21 @@ namespace CluckWars.Gameplay
 
             foreach (var changed in _cargoDetector.DetectChanges(this, out var previous, out var current))
             {
+                // Two independent branches over one detector, and they must STAY independent.
+                // Fusion can report Cargo and StealEventId in either order inside a single
+                // batch, and both orders already work:
+                //   * Cargo first  — NotifyCargoLoss plays a directionless impact, which the
+                //                    attribution below then retro-claims.
+                //   * Event first  — the window is armed, and the impact claims it on arrival.
+                // That is precisely what HitAttribution's window exists for, so do not add an
+                // ordering dependency between the two (no hoisting one out of the loop, no
+                // deferring one until the other has run).
+                if (changed == nameof(StealEventId))
+                {
+                    NameTheThief();
+                    continue;
+                }
+
                 if (changed != nameof(Cargo)) continue;
 
                 var (before, after) = _cargoReader.Read(previous, current);
@@ -206,6 +266,70 @@ namespace CluckWars.Gameplay
 
                 if (delta < 0f) _hitFeedback?.NotifyCargoLoss(-delta);
             }
+        }
+
+        /// <summary>
+        /// The third attacker-attribution push point, and the one that closes the Spine Coat
+        /// gap: a successful drain named a thief, so the victim's impact beat can finally say
+        /// which direction it came from. A plain local call on every peer — same no-RPC shape
+        /// as <see cref="HitFeedback.NotifyCargoLoss"/> and
+        /// <see cref="HitFeedback.NotifyZoneTriggered"/>.
+        /// </summary>
+        /// <remarks>
+        /// <b>Baseline seeding is the ChangeDetector's, and adding a polling-style one on top
+        /// would be a bug.</b> Fusion pools <c>NetworkObject</c>s, so a recycled chicken can
+        /// inherit a non-zero <see cref="StealEventId"/>, and a late joiner starts from whatever
+        /// the id happens to be — neither may play a beat for somebody else's theft. The
+        /// detector already answers that: <c>GetChangeDetector</c> snapshots current state when
+        /// <see cref="Spawned"/> builds it, so an inherited value <i>is</i> the baseline and no
+        /// change is reported for it. That is the same guarantee the <c>Cargo</c> branch above
+        /// has always relied on — a recycled chicken does not pop a <c>+30 🌽</c>.
+        /// <c>ControlStateVFX.ObserveKnockbackEdge</c> and <c>AbilityRangeIndicator.ObserveCast</c>
+        /// need an explicit <c>_initialized</c> flag only because they <i>poll</i> a sibling's
+        /// property and have no baseline of their own. Bolting one on here would be worse than
+        /// redundant: the first observation a detector ever reports is by definition a real
+        /// change, so an "ignore the first" flag would swallow the first genuine steal of every
+        /// match.
+        /// <para>
+        /// <b>No <c>onBeforeSpawned</c> reset either, deliberately.</b> The two existing
+        /// one-shots on this pattern — <c>ChickenController.KnockbackEventId</c> and
+        /// <c>JumpEventId</c> — are never reset by any spawner, for the reason above: the value
+        /// does not matter, only the change does. A reset would also have to be stamped by both
+        /// of <c>MatchBootstrapper</c>'s chicken-spawn call sites, coupling match bootstrap to a
+        /// presentation detail it has no business knowing. And a <i>mid-match</i> reset would be
+        /// actively harmful: writing 0 over a non-zero id is itself an edge, which every peer
+        /// would observe as a steal that never happened. Not resetting is the safer of the two
+        /// options, not merely the cheaper one — which is why <see cref="RPC_ResetForNewMatch"/>
+        /// leaves both properties alone.
+        /// </para>
+        /// <para>
+        /// <b>A thief that does not resolve is a legitimate no-op and stays silent</b>
+        /// (CONVENTIONS.md, "Error surfacing — the silent-failure sorting rule"). On a remote
+        /// peer the thief's proxy may not be spawned yet, or may already have despawned, and
+        /// both are reachable in a correctly built game rather than symptoms of a wiring fault.
+        /// The consequence is proportionate too — the victim still gets the flash, the squash,
+        /// the shake and the <c>-4 🌽</c>; only the direction is withheld, which is exactly what
+        /// <see cref="HitFeedback.NotifyAttacker"/> is designed to do when nobody can be named.
+        /// Logging here would put a line on a per-steal path for a non-event.
+        /// </para>
+        /// <para>
+        /// Decoys need no handling on either side. The victim's is covered twice over —
+        /// <see cref="Render"/> returns early on <c>IsDecoy</c> and <c>NotifyAttacker</c> guards
+        /// it again — and the thief's cannot arise, because <see cref="TryResolveThief"/> rejects
+        /// a decoy thief before anything is ever written to <see cref="LastThiefId"/>. A guard
+        /// here would be unreachable code claiming to defend something.
+        /// </para>
+        /// </remarks>
+        private void NameTheThief()
+        {
+            if (_hitFeedback == null || Runner == null) return;
+
+            // Same mechanism TryResolveThief and RPC_TransferAllToBountyBag use, resolving to
+            // the ChickenController because that is what carries the position.
+            if (!Runner.TryFindBehaviour(LastThiefId, out ChickenController thief)) return;
+            if (thief == null || thief.Object == null || !thief.Object.IsValid) return;
+
+            _hitFeedback.NotifyAttacker(thief.transform.position);
         }
 
         public void FlushBaseDeposit()
@@ -318,7 +442,9 @@ namespace CluckWars.Gameplay
             _pendingBaseFood += transfer;
             _baseDepositTicks++;
 
-            int ticksToFlush = Mathf.RoundToInt(0.25f * Runner.TickRate);
+            // The batch window is shared with PlayerBase's receiver-side bound — see
+            // BaseDepositRules.FlushSeconds for why the two must not drift apart.
+            int ticksToFlush = Mathf.RoundToInt(BaseDepositRules.FlushSeconds * Runner.TickRate);
             if (_baseDepositTicks >= ticksToFlush || (Cargo <= 0f && BountyBag <= 0f))
             {
                 bool isDone = (Cargo <= 0f && BountyBag <= 0f);
@@ -406,19 +532,214 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Asks this chicken's StateAuthority to remove up to <paramref name="amount"/>
-        /// from its <see cref="Cargo"/>. The thief credits its own cargo optimistically
-        /// before calling this RPC; the victim's authority clamps to whatever's
-        /// actually there, so any over-request is harmless. Used by Sneaky Steal.
+        /// Derives the receiver-side bounds <see cref="RPC_DrainStolen"/> validates against from
+        /// the shipped ability pool, once per spawn.
         /// </summary>
-        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_DrainStolen(float amount)
+        /// <remarks>
+        /// Leaving <see cref="_stealBoundsResolved"/> false is graceful degradation, not a
+        /// silent pass: the magnitude and range checks are skipped so a missing binding cannot
+        /// reject every legitimate steal in the match, the failure is logged as an Error, and
+        /// the attribution check — which needs no authored data — still stands on its own. Same
+        /// shape as <c>PlayerBase</c>'s missing-<c>MatchConfigSO</c> path.
+        /// </remarks>
+        private void ResolveStealBounds()
         {
-            if (amount <= 0f || Cargo <= 0f) return;
+            if (_abilityRegistry != null)
+            {
+                _maxSingleSteal = StealRules.MaxSingleSteal(_abilityRegistry.All);
+                _maxStealReach  = StealRules.MaxReach(_abilityRegistry.All);
+            }
+
+            _stealBoundsResolved = _maxSingleSteal > 0f && _maxStealReach > 0f;
+            if (_stealBoundsResolved) return;
+
+            _log?.Error(Source, $"{name}: no steal bounds could be derived from the AbilityRegistry " +
+                $"(maxAmount={_maxSingleSteal:0.00}, maxReach={_maxStealReach:0.00}), so RPC_DrainStolen " +
+                "cannot check how much a caller asks for or how far away the thief is standing. " +
+                "Check that ProjectInstaller._abilityRegistry is assigned and that every steal " +
+                "ability is listed in its All array.");
+        }
+
+        /// <summary>
+        /// The untrusted steal path: a thief's ability asking this chicken's authority to hand
+        /// over <paramref name="amount"/> of its <see cref="Cargo"/>. Five callers: Snatch,
+        /// Scrap, Sneaky Steal and Dive Bomb cast at a target they resolved through an aim
+        /// shape, and Spine Coat arrives by <i>contact</i> instead — it arms
+        /// <c>ChickenController.StealBackAmount</c> and the drain fires later from
+        /// <c>CheckCollisionSlow</c>, with no aim shape and so no reach of its own. The thief
+        /// credits its own cargo optimistically first; this side clamps to whatever is actually
+        /// there, so an over-request from a real ability is harmless.
+        /// </summary>
+        /// <remarks>
+        /// <c>RpcSources.All</c> means <em>any</em> peer can call this on <em>any</em> chicken,
+        /// so everything it is handed is a claim to be checked, not a fact.
+        /// <para>
+        /// <b><paramref name="thiefId"/> exists because the receiver cannot infer the thief.</b>
+        /// <paramref name="info"/> carries a <c>PlayerRef</c>, and every bot shares
+        /// <c>PlayerRef.None</c> (<c>MatchBootstrapper.TrySpawnBots</c>), so a sender-only rule
+        /// could not tell one bot thief from another — or from no one. Naming the thief turns
+        /// the question into one the receiver can answer: is the caller entitled to act for that
+        /// chicken, and was that chicken close enough to reach this one. Same
+        /// <c>Runner.TryFindBehaviour</c> mechanism <see cref="RPC_TransferAllToBountyBag"/>
+        /// already uses; it resolves to the <c>ChickenController</c> rather than the thief's
+        /// <c>ChickenCargo</c> because every fact the rules need — authority, decoy status,
+        /// position, move speed — is on the controller.
+        /// </para>
+        /// </remarks>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_DrainStolen(float amount, NetworkBehaviourId thiefId, RpcInfo info = default)
+        {
+            if (!IsPlausibleAmount(amount, out string amountRejection))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_DrainStolen({amount:0.00}) from {info.Source} — {amountRejection}");
+                return;
+            }
+
+            if (!TryResolveThief(thiefId, info, out var thief, out string thiefRejection))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_DrainStolen({amount:0.00}) from {info.Source} — {thiefRejection}");
+                return;
+            }
+
+            if (Cargo <= 0f)
+            {
+                // Not an attack: the victim banked or lost the load between the thief's scan and
+                // this tick. The thief's optimistic self-credit is corrected by its own clamp
+                // against the cargo it saw, so nothing is created out of nothing here.
+                _log?.Debug(Source, $"{thief.name} stole from an empty load — nothing to drain.");
+                return;
+            }
+
             var actual = Mathf.Min(amount, Cargo);
             Cargo -= actual;
             if (Cargo < 0f) Cargo = 0f;
-            _log?.Debug(Source, $"Stolen: -{actual:0.00} → Cargo={Cargo:0.0}.");
+
+            // Name the thief for the victim's §3.2 direction cue — see LastThiefId, and
+            // NameTheThief for the observation half. Written only HERE, after the drain has
+            // actually landed: a rejected steal and a steal against an empty load both return
+            // above without touching these, because neither is an impact and neither may name
+            // anybody. Both properties go out in this one tick, so every peer sees the id and
+            // the name it points at in the same snapshot.
+            LastThiefId = thiefId;
+            StealEventId++;
+
+            _log?.Debug(Source, $"Stolen: -{actual:0.00} by {thief.name} → Cargo={Cargo:0.0}.");
+        }
+
+        /// <summary>Magnitude check, with the reason so the caller can log it.</summary>
+        private bool IsPlausibleAmount(float amount, out string rejection)
+        {
+            if (amount <= 0f)
+            {
+                rejection = "the amount is not positive.";
+                return false;
+            }
+
+            // Without a resolved bound there is no honest maximum to derive, so the magnitude
+            // check is skipped rather than guessed at. Spawned() has already logged that as an
+            // Error, and the thief checks below still stand on their own.
+            if (!_stealBoundsResolved)
+            {
+                rejection = null;
+                return true;
+            }
+
+            if (!StealRules.IsPlausibleAmount(amount, _maxSingleSteal))
+            {
+                rejection = $"it exceeds the largest steal any ability in the pool can land ({_maxSingleSteal:0.00}).";
+                return false;
+            }
+
+            rejection = null;
+            return true;
+        }
+
+        /// <summary>
+        /// Turns <paramref name="thiefId"/> into the chicken the RPC's sender is entitled to
+        /// steal with, and checks it was close enough to do so.
+        /// </summary>
+        /// <remarks>
+        /// <b>Attribution mirrors <c>PlayerBase.TryResolveDepositor</c>, and for the same
+        /// reason.</b> Bots are simulated by the master and carry <c>PlayerRef.None</c> input
+        /// authority, so their steals arrive as a <em>local</em> invocation on that peer rather
+        /// than stamped with an identity. On a local invoke, accept a thief this peer already
+        /// simulates; on a message off the wire, require the thief's input authority to be the
+        /// sender. A remote peer cannot forge <c>IsInvokeLocal</c>.
+        /// <para>
+        /// <c>Object.StateAuthority</c> is deliberately NOT used: it reports
+        /// <c>[Player:None]</c> in <c>GameMode.Single</c>, which is precisely the wrong answer
+        /// in the mode bots live in (docs/STATE.md, "Design deviations").
+        /// </para>
+        /// </remarks>
+        private bool TryResolveThief(NetworkBehaviourId thiefId, in RpcInfo info,
+            out ChickenController thief, out string rejection)
+        {
+            thief = null;
+
+            if (Runner == null || !Runner.TryFindBehaviour(thiefId, out ChickenController resolved) ||
+                resolved == null || resolved.Object == null || !resolved.Object.IsValid)
+            {
+                rejection = $"no live chicken resolves from thief id {thiefId}.";
+                return false;
+            }
+
+            if (resolved == _controller)
+            {
+                rejection = "the named thief is this chicken — a steal from yourself is not a steal.";
+                return false;
+            }
+
+            // Matches PlayerBase's exclusion: a Doppelganger decoy carries no cargo and cannot
+            // bank, so it has no business moving food around either.
+            if (resolved.IsDecoy)
+            {
+                rejection = $"{resolved.name} is a Doppelganger decoy, which steals nothing.";
+                return false;
+            }
+
+            bool attributable = info.IsInvokeLocal
+                ? resolved.Object.HasStateAuthority
+                : resolved.Object.InputAuthority == info.Source;
+            if (!attributable)
+            {
+                rejection = $"{resolved.name} is not a chicken {info.Source} is entitled to act for.";
+                return false;
+            }
+
+            if (_stealBoundsResolved)
+            {
+                // A local invocation has no wire time; asking for a remote player's RTT would be
+                // meaningless (and Source may be None).
+                float latency = info.IsInvokeLocal ? 0f : (float)Runner.GetPlayerRtt(info.Source);
+                float margin = StealRules.RangeMargin(DriftSpeed(resolved) + DriftSpeed(_controller), latency);
+
+                if (!StealRules.IsWithinStealRange(
+                        resolved.transform.position, transform.position, _maxStealReach, margin))
+                {
+                    float distance = Mathf.Sqrt(HorizontalSqr(resolved.transform.position, transform.position));
+                    rejection = $"{resolved.name} is {distance:0.0} m away, past the longest steal reach in " +
+                                $"the pool ({_maxStealReach:0.00} m) plus {margin:0.00} m of drift.";
+                    return false;
+                }
+            }
+
+            thief = resolved;
+            rejection = null;
+            return true;
+        }
+
+        /// <summary>
+        /// How fast <paramref name="chicken"/> can be separating from the other end of a steal:
+        /// its own top walking speed plus any knockback impulse still in flight. Knockback is
+        /// not a rounding error here — Snatch shoves at 8.1 u/s against move speeds around 12 —
+        /// and a chicken shoved by an earlier hit that then gets robbed must not be rejected for
+        /// having travelled while the message was in the air.
+        /// </summary>
+        private static float DriftSpeed(ChickenController chicken)
+        {
+            if (chicken == null) return 0f;
+            float walk = chicken.Stats != null ? chicken.Stats.MoveSpeed : 0f;
+            return walk + chicken.ExternalDisplacement.magnitude;
         }
 
         /// <summary>

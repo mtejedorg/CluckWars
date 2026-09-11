@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Settings;
 using UnityEngine;
 
 namespace CluckWars.Visuals
@@ -14,9 +15,14 @@ namespace CluckWars.Visuals
     ///   <item><b>Stunned</b> → pulsing yellow ring (on top of the existing stun orbit),
     ///   draining over the stun's remaining time (FEEDBACK.md §5.1, case 18).</item>
     ///   <item><b>Rooted</b> → green ring, likewise draining.</item>
-    ///   <item><b>Slowed</b> → cyan ring, full and undrained — see
-    ///   <see cref="UpdateStatusRing"/> for why slow deliberately has no arc.</item>
+    ///   <item><b>Snared</b> → cyan ring, full and undrained — see
+    ///   <see cref="UpdateStatusRing"/> for why slow deliberately has no arc, and for why
+    ///   the ring answers to <c>ControlVfx.Snared</c> rather than to plain
+    ///   <c>ControlVfx.Slowed</c>. A pile or collision <i>Drag</i> gets no ring.</item>
     ///   <item><b>Knocked back</b> → white shockwave burst at the moment of impact.</item>
+    ///   <item><b>Landed a teleport jump</b> → the same shockwave, held back by one
+    ///   <see cref="FeedbackTuning.JumpTravelSettleSeconds"/> so it fires under the model
+    ///   rather than ahead of it. See <see cref="ObserveJumpLandingEdge"/>.</item>
     ///   <item><b>Charging</b> → wind-up glow at the feet in the charging ability's
     ///   accent colour, growing with hold time (FEEDBACK.md §2.4).</item>
     ///   <item><b>Buff active</b> → a second, wider ring at the caster's feet in the
@@ -28,7 +34,8 @@ namespace CluckWars.Visuals
     /// Driven entirely by <b>replicated</b> state so it's correct on every peer:
     /// <c>ChickenController.ControlFlags</c> (Slowed/Rooted/Stunned),
     /// <c>StunRemaining</c>/<c>RootRemaining</c> (both <c>[Networked] TickTimer</c>-backed),
-    /// <c>KnockbackEventId</c> (the one-shot knockback event), the already-networked
+    /// <c>KnockbackEventId</c> and <c>JumpEventId</c> (the two one-shot impact events),
+    /// the already-networked
     /// <c>IsStunned</c>, and <c>AbilityController.ChargingSlot</c>/<c>ActiveSlot</c>.
     /// The particles / LineRenderers / sprites themselves are 100% local — only those
     /// compact triggers cross the wire. Same LineRenderer pattern as
@@ -80,7 +87,7 @@ namespace CluckWars.Visuals
 
         private DrainRing    _statusRing;  // §5.1 status ring + depleting arc
         private DrainRing    _buffRing;    // §5 case 30 "my buff is expiring"
-        private LineRenderer _knockFlash;  // one-shot knockback shockwave
+        private LineRenderer _knockFlash;  // one-shot ground shockwave (knockback + jump landing)
         private SpriteRenderer _windupGlow; // §2.4 caster wind-up tell (all peers)
 
         private Vector3[] _dirs;
@@ -90,6 +97,10 @@ namespace CluckWars.Visuals
         private const float KnockDuration = 0.3f;
         private byte  _lastKnockEventId;
         private bool  _knockInitialized;
+
+        private byte  _lastJumpEventId;
+        private bool  _jumpInitialized;
+        private float _jumpImpactDelay;  // counts down; <= 0 = nothing pending
 
         private float _windupTimer;
         private byte  _lastChargingSlot;
@@ -127,7 +138,7 @@ namespace CluckWars.Visuals
             if (_controller == null) return;
             UpdateStatusRing();
             UpdateBuffRing();
-            UpdateKnockback();
+            UpdateImpactShockwave();
             UpdateWindupGlow();
         }
 
@@ -161,6 +172,23 @@ namespace CluckWars.Visuals
         /// lie. Slow keeps a full, undrained ring plus its §1.3 shape coding (trailing
         /// streaks, <see cref="ChickenStateOverlays"/>). This is a carried-forward design
         /// decision: do not "fix" it by inventing a slow deadline, there isn't one.</para>
+        ///
+        /// <para><b>Why the ring is the Snare's and not every slow's.</b> Slow arrives from
+        /// two unrelated situations that used to look identical: a <i>Drag</i> (standing on a
+        /// food pile, brushing another chicken — ambient friction, nobody's doing, no
+        /// deadline) and a <i>Snare</i> (a Feather Trap, an aura, a Dust Kick — an enemy did
+        /// this to you on purpose). A player who cannot tell those apart cannot tell whether
+        /// to keep collecting or to run, which is the entire decision the state should be
+        /// informing. <c>ControlVfx.Snared</c> now separates them, so the ring — the loudest,
+        /// most "something is being done to me" channel available here — is given to the
+        /// Snare, and a Drag falls through to <c>Hide()</c>.</para>
+        ///
+        /// <para>The differentiator is deliberately <b>presence and motion, never hue</b>: ring
+        /// versus no ring, pulsing blob versus still blob (<see cref="ChickenStateOverlays"/>),
+        /// with both states keeping the same canonical cyan and the same trailing streaks. A
+        /// second slow colour would be unreadable in greyscale and unreachable with the sound
+        /// off, which is the accessibility constraint (§1.3) that drove the split in the first
+        /// place. Do not re-code this as two colours.</para>
         /// </summary>
         private void UpdateStatusRing()
         {
@@ -176,7 +204,8 @@ namespace CluckWars.Visuals
             bool removed = _combat != null && _combat.IsRemoved;
             bool stunned = removed || (flags & ControlVfx.Stunned) != 0;
             bool rooted  = (flags & ControlVfx.Rooted) != 0;
-            bool slowed  = (flags & ControlVfx.Slowed) != 0;
+            // Snared, not Slowed — a Drag deliberately gets no ring. See the remarks above.
+            bool snared  = (flags & ControlVfx.Snared) != 0;
 
             Color c;
             float fraction;
@@ -193,7 +222,7 @@ namespace CluckWars.Visuals
             {
                 c = RootColor; drain = rootDrains; fraction = rootFrac;
             }
-            else if (slowed)
+            else if (snared)
             {
                 c = SlowColor; drain = false; fraction = 1f; // no deadline — see remarks
             }
@@ -207,7 +236,11 @@ namespace CluckWars.Visuals
             // per-frame: it is one Sin() and a colour write, not geometry (the arc's
             // vertices are the expensive part and those are gated to
             // FeedbackTuning.StatusArcDrainUpdateHz inside DrainRing).
-            c.a = 0.55f + 0.25f * Mathf.Sin(Time.time * 9f);
+            // Rate and swing both live in FeedbackTuning (§6.11 — nothing reads a literal).
+            // The constant is stored in Hz like every other rate there; Sin wants rad/s.
+            c.a = FeedbackTuning.ControlStateRingPulseAlphaBase
+                + FeedbackTuning.ControlStateRingPulseAlphaAmplitude
+                  * Mathf.Sin(Time.time * FeedbackTuning.ControlStateRingPulseHz * 2f * Mathf.PI);
 
             Vector3 center = _controller.transform.position;
             center.y = GroundY;
@@ -274,21 +307,40 @@ namespace CluckWars.Visuals
             _buffRing.Show(center, FeedbackTuning.SelfBuffRingRadius, c, fraction, drain: true);
         }
 
-        private void UpdateKnockback()
+        /// <summary>
+        /// Drives the one-shot ground shockwave — an expanding white ring at the chicken's feet —
+        /// from the two replicated events that deserve one: a knockback impulse landing, and a
+        /// length-based teleport jump touching down.
+        /// </summary>
+        /// <remarks>
+        /// <b>One primitive, two triggers.</b> The ring already existed for knockback; Dive Bomb
+        /// and its siblings apply no knockback to the caster, so a jump landing used to produce no
+        /// ground event at all. Reusing this rather than authoring a second expanding ring keeps
+        /// the two impacts reading as the same physical language, and means they cannot drift
+        /// apart in radius, easing or duration. The single <see cref="_knockTimer"/> is also what
+        /// makes them safe to overlap: a chicken knocked back on the frame it lands restarts one
+        /// ring instead of stacking two on top of each other.
+        ///
+        /// <b>The jump ring is delayed by a settle; the knockback ring is not.</b>
+        /// <c>ChickenAnimator</c> eases the model onto its pivot over
+        /// <see cref="FeedbackTuning.JumpTravelSettleSeconds"/> after a jump, so the body visually
+        /// arrives that much later than the collider does. Firing on the event edge would expand
+        /// the ring under a chicken still in the air. A knockback has no such lead-in — the victim
+        /// is already standing where the impulse hit them — so it stays immediate.
+        /// </remarks>
+        private void UpdateImpactShockwave()
         {
-            // Replicated one-shot: a changed KnockbackEventId means a knockback was
-            // applied (on any peer). Fire the shockwave once. Seed the baseline on the
-            // first frame so a non-zero starting id (late join) doesn't false-trigger.
-            byte id = _controller.KnockbackEventId;
-            if (!_knockInitialized)
+            ObserveKnockbackEdge();
+            ObserveJumpLandingEdge();
+
+            if (_jumpImpactDelay > 0f)
             {
-                _knockInitialized = true;
-                _lastKnockEventId = id;
-            }
-            else if (id != _lastKnockEventId)
-            {
-                _lastKnockEventId = id;
-                _knockTimer = 0f;
+                _jumpImpactDelay -= Time.deltaTime;
+                if (_jumpImpactDelay <= 0f)
+                {
+                    _jumpImpactDelay = 0f;
+                    _knockTimer = 0f;
+                }
             }
 
             if (_knockTimer < 0f) return;
@@ -308,6 +360,77 @@ namespace CluckWars.Visuals
             _knockFlash.startColor = _knockFlash.endColor = c;
             WriteCircle(_knockFlash, _flashBuf, transform.position, radius);
             if (!_knockFlash.enabled) _knockFlash.enabled = true;
+        }
+
+        /// <summary>
+        /// Replicated one-shot: a changed <c>KnockbackEventId</c> means a knockback was applied
+        /// (on any peer). Fires the shockwave immediately. The baseline is seeded on the first
+        /// frame so a non-zero starting id (late join) doesn't false-trigger.
+        /// </summary>
+        /// <remarks>
+        /// <b>A self-applied impulse deliberately does not reach here.</b> The ground shockwave
+        /// is the bystander's read that <i>somebody hit that chicken</i>, and Feint's sidestep
+        /// is the same impulse with the opposite meaning — so it fires
+        /// <c>ChickenController.SelfImpulseEventId</c> instead and this observer never sees an
+        /// edge for it. Nothing is filtered here and nothing needs to be: the separation is the
+        /// choice of counter at the source (<c>ChickenController.ImpulseOrigin</c>), which is
+        /// what keeps it impossible to half-apply. Do not "unify" the two bytes — a dodge that
+        /// rings like a hit is the bug this split exists to fix.
+        /// </remarks>
+        private void ObserveKnockbackEdge()
+        {
+            byte id = _controller.KnockbackEventId;
+            if (!_knockInitialized)
+            {
+                _knockInitialized = true;
+                _lastKnockEventId = id;
+                return;
+            }
+            if (id == _lastKnockEventId) return;
+
+            _lastKnockEventId = id;
+            _knockTimer = 0f;
+        }
+
+        /// <summary>
+        /// Replicated one-shot: a changed <c>ChickenController.JumpEventId</c> means a teleport
+        /// jump moved this chicken. Arms the delayed landing ring. Seeded on first observation for
+        /// the same reason as the knockback edge.
+        /// </summary>
+        /// <remarks>
+        /// <b>Suppressed under reduced motion, and that is a ruling rather than a rule.</b> A
+        /// ground ring is world-space VFX, not the screen movement
+        /// <c>PlayerPreferences.ReducedMotionEnabled</c> was introduced for — which is exactly why
+        /// the knockback ring above is <i>not</i> gated, and must not start being gated by
+        /// analogy with this one. The difference is what each ring is for. The knockback ring is
+        /// the only local marker that an impulse the player did not cause has landed on them. This
+        /// one is emphasis on a movement the player just initiated themselves, arriving alongside
+        /// the model's own lead-in, and the accessibility panel's motion-sensitive readers said
+        /// plainly that they prefer the jump without it. Adding emphasis they did not ask for, to
+        /// an event they already know about, is the regression this check exists to avoid.
+        ///
+        /// The edge is consumed either way. Returning before the compare would leave a stale id
+        /// behind, and the next jump after the preference was toggled off would then see two
+        /// changes at once — or, worse, none.
+        /// </remarks>
+        private void ObserveJumpLandingEdge()
+        {
+            var obj = _controller.Object;
+            if (obj == null || !obj.IsValid) return;
+
+            byte id = _controller.JumpEventId;
+            if (!_jumpInitialized)
+            {
+                _jumpInitialized = true;
+                _lastJumpEventId = id;
+                return;
+            }
+            if (id == _lastJumpEventId) return;
+
+            _lastJumpEventId = id;
+            if (PlayerPreferences.ReducedMotionEnabled) return;
+
+            _jumpImpactDelay = FeedbackTuning.JumpTravelSettleSeconds;
         }
 
         // ---- §2.4 caster wind-up tell (visible on ALL peers) ------------------

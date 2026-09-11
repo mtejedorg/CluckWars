@@ -115,7 +115,11 @@ namespace CluckWars.Gameplay
                             // same OnDeath moment. The literals (0.35 / 0.45) that used to
                             // sit here are what FeedbackTuning.DeathShake* were derived
                             // from; reading them back keeps a re-tune effective.
-                            if (HasInputAuthority)
+                            // !IsDecoy as well as HasInputAuthority: a decoy shares its
+                            // caster's InputAuthority, so HasInputAuthority is TRUE on the
+                            // decoy on the caster's own peer. Without the second term,
+                            // killing a decoy shook the caster's camera as if they had died.
+                            if (HasInputAuthority && _controller != null && !_controller.IsDecoy)
                                 CluckWars.Visuals.MatchCamera.Instance?.ApplyShake(
                                     CluckWars.Visuals.FeedbackTuning.DeathShakeMagnitude,
                                     CluckWars.Visuals.FeedbackTuning.DeathShakeDurationSeconds);

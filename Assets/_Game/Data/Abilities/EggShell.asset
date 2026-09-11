@@ -22,4 +22,4 @@ MonoBehaviour:
   AllowedClasses: 15
   Duration: 2.0
   Cooldown: 8
-  AbilityAnimationClip: {fileID: 0}
+  CastMotion: 5

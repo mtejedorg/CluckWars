@@ -25,8 +25,8 @@ MonoBehaviour:
   BotRole: 0
   Duration: 0.05
   Cooldown: 0
-  AbilityAnimationClip: {fileID: 0}
   SearchMask:
+  CastMotion: 8
     serializedVersion: 2
     m_Bits: 256
   SignatureAbility: {fileID: 11400000, guid: 592cf309ec40b0546833d005b73c5a92, type: 2}

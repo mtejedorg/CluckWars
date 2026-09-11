@@ -67,6 +67,17 @@ namespace CluckWars.Abilities
         public override float AimRadius => SweepRadius;
         public override float AimForwardOffset => ForwardOffset;
 
+        /// <summary>
+        /// <inheritdoc cref="AbilityBaseSO.NominalStealAmount"/>
+        /// </summary>
+        /// <remarks>
+        /// This is the biggest steal in the pool, so it is what
+        /// <c>StealRules.MaxSingleSteal</c> resolves to today. Note the asset does not serialize
+        /// <see cref="StealAmount"/> at all — the value that ships is this class's initializer,
+        /// which is exactly why the bound is read off the loaded SO and never off the YAML.
+        /// </remarks>
+        public override float NominalStealAmount => StealAmount;
+
         /// <summary>Only a cargo-carrier is a valid Trample target.</summary>
         protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)
         {
@@ -93,7 +104,11 @@ namespace CluckWars.Abilities
             if (stolen > 0f)
             {
                 thiefCargo.Cargo += stolen;
-                targetCargo.RPC_DrainStolen(stolen);
+                // The jump has NOT happened yet — AbilityController.TryActivate defers it until
+                // after OnActivate for a Capsule shape. By the time the victim's authority
+                // applies this the thief will be a jump further on, which is what
+                // StealRules.Reach's CastPoseIsUnreconstructable allowance pays for.
+                targetCargo.RPC_DrainStolen(stolen, thief.Id);
             }
         }
 

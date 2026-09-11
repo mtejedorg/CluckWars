@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 6186989543064900895}
   - component: {fileID: 4556190765318720881}
   - component: {fileID: 5656799864035164451}
+  - component: {fileID: 435331314971009959}
   m_Layer: 0
   m_Name: AbilityZone
   m_TagString: Untagged
@@ -96,3 +97,15 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 1.5
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &435331314971009959
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5968028607102430058}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b640c8208d8f50d4fb045ab41e258f7b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.AbilityZoneVisuals

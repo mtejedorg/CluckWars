@@ -23,7 +23,7 @@ MonoBehaviour:
   BotRole: 0
   Duration: 0.3
   Cooldown: 7
-  AbilityAnimationClip: {fileID: 0}
+  CastMotion: 4
   EggLifetime: 8
   RootDuration: 2
   EggRadius: 1.45

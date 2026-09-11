@@ -110,6 +110,25 @@ namespace CluckWars.Abilities
         /// Chokepoint: <c>AbilityBaseSO.ResolveStealAmount</c>, which every stealing ability calls.</summary>
         public virtual float ModifyStealAmount(float amount, ChickenController self) => amount;
 
+        /// <summary>
+        /// The largest factor <see cref="ModifyStealAmount"/> can ever multiply a steal by.
+        /// 1 for a passive that does not scale steals.
+        /// </summary>
+        /// <remarks>
+        /// The receiver-side bound on <c>ChickenCargo.RPC_DrainStolen</c> is derived from this
+        /// (<c>StealRules.MaxSingleSteal</c>), and the receiver has no caster to hand
+        /// <see cref="ModifyStealAmount"/> — the RPC arrives on the <i>victim</i>. Declaring the
+        /// ceiling separately is what lets the bound be read off the shipped registry without
+        /// inventing a chicken to probe the hook with.
+        /// <para>
+        /// It is a ceiling and not the value itself so a future passive whose multiplier varies
+        /// with match state (a comeback scaler, say) can still state its worst case.
+        /// <c>StealRulesTests</c> pins every passive that overrides
+        /// <see cref="ModifyStealAmount"/> against this override.
+        /// </para>
+        /// </remarks>
+        public virtual float MaxStealMultiplier => 1f;
+
         /// <summary>Scale how fast this chicken banks cargo at its base.
         /// Chokepoint: <c>ChickenCargo.ResolveDepositRate</c>.</summary>
         public virtual float ModifyDepositRate(float perSecond, ChickenController self) => perSecond;

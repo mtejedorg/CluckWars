@@ -67,7 +67,7 @@ namespace CluckWars.Visuals
         private AbilityAimShape _flashShape = AbilityAimShape.None;
         private float _flashRadius, _flashOffset, _flashConeAngle = 360f;
 
-        // Replicated one-shot observation (same pattern as ControlStateVFX.UpdateKnockback).
+        // Replicated one-shot observation (same pattern as ControlStateVFX.ObserveKnockbackEdge).
         private byte _lastCastEventId;
         private bool _castInitialized;
 
@@ -122,7 +122,7 @@ namespace CluckWars.Visuals
         /// casts of the <i>same</i> slot (the slot never returned to Invalid in between, so
         /// the second cast drew nothing). Baseline is seeded on first observation so a late
         /// joiner inheriting a non-zero id doesn't flash a cast that already happened —
-        /// same guard <c>ControlStateVFX.UpdateKnockback</c> uses for knockbacks.
+        /// same guard <c>ControlStateVFX.ObserveKnockbackEdge</c> uses for knockbacks.
         /// </summary>
         private void ObserveCast()
         {

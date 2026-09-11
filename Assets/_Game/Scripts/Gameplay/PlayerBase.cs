@@ -6,13 +6,25 @@ using Zenject;
 namespace CluckWars.Gameplay
 {
     /// <summary>
-    /// A networked deposit zone. Chickens within <see cref="DepositRadius"/> dump their
-    /// cargo into <see cref="FoodTotal"/> via <see cref="RPC_AddFood"/>. State authority
-    /// owns the running total — Phase 7 will read this for win-condition checks.
+    /// One player's networked deposit zone, pinned to a corner of the arena. Chickens whose
+    /// <c>HomeCornerIndex</c> matches this base's <see cref="CornerIndex"/> and who are inside
+    /// <see cref="DepositRadius"/> bank their cargo into <see cref="FoodTotal"/>; the state
+    /// authority owns the running total and <c>GameManager</c> reads it for the win condition.
     /// </summary>
     /// <remarks>
-    /// Phase 4 ships a single shared base for solo testing. Per-player ownership and
-    /// proper allegiance checks land alongside the win condition in Phase 7.
+    /// Four bases exist, one per corner, spawned by the master client in
+    /// <c>MapGenerator.SpawnBases</c> with <see cref="CornerIndex"/> stamped via
+    /// <c>onBeforeSpawned</c>. A base is in play once a human owns it (<see cref="Owner"/>,
+    /// assigned by <c>GameManager.AssignBasesToPlayers</c>) or a bot claims it
+    /// (<see cref="BotClaimed"/>) — see <see cref="IsClaimed"/>.
+    /// <para>
+    /// <b>Two ways in, and the difference is trust.</b> <see cref="RPC_AddFood"/> is the
+    /// untrusted client-facing path — any peer can call it, so it validates the sender against
+    /// <see cref="BaseDepositRules"/> before crediting anything. <see cref="AddFoodAuthoritative"/>
+    /// is the direct write for code already running on this base's state authority, which has no
+    /// proximity semantics to validate. Don't route trusted awards through the RPC: they would
+    /// have to fake a depositor standing at the base to get past its checks.
+    /// </para>
     /// </remarks>
     [RequireComponent(typeof(NetworkObject))]
     public sealed class PlayerBase : NetworkBehaviour
@@ -68,6 +80,7 @@ namespace CluckWars.Gameplay
         private static readonly int SBaseColorId = Shader.PropertyToID("_BaseColor");
 
         private ILogService _log;
+        private MatchConfigSO _matchConfig;
 
         // Tracks the last owner we tinted for — drives the LateUpdate poll.
         // _tintInitialized stays false until the NetworkObject is live so the
@@ -77,13 +90,27 @@ namespace CluckWars.Gameplay
         private bool      _lastBotClaimedForTint;
         private bool      _tintInitialized;
 
+        // MatchConfigSO is bound in ProjectInstaller (project scope, see GameInstaller's note),
+        // so the plain ProjectContext self-inject below resolves both parameters.
         [Inject]
-        public void Construct(ILogService log) => _log = log;
+        public void Construct(ILogService log, MatchConfigSO matchConfig)
+        {
+            _log = log;
+            _matchConfig = matchConfig;
+        }
 
         public override void Spawned()
         {
             ActiveBases.Add(this);
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
+
+            if (_matchConfig == null)
+            {
+                _log?.Error(Source, $"{name}: no MatchConfigSO resolved, so RPC_AddFood cannot bound " +
+                    "the deposit amount and will accept any size a client sends. Check that " +
+                    "ProjectInstaller._matchConfig is assigned.");
+            }
+
             _log?.Debug(Source, $"{name}: Spawned. HasStateAuthority={HasStateAuthority}, " +
                 $"Owner={Owner}, CornerIndex={CornerIndex}.");
         }
@@ -141,12 +168,151 @@ namespace CluckWars.Gameplay
             }
         }
 
-        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_AddFood(float amount)
+        /// <summary>
+        /// Credits <paramref name="amount"/> directly, for callers already running on this
+        /// base's state authority — today only <c>GameManager.AwardMatchEndBonuses</c>, which
+        /// banks a passive's match-end bonus into a possibly-distant home base from inside its
+        /// own authority-gated tick.
+        /// </summary>
+        /// <remarks>
+        /// Bases are spawned by the master client (<c>MapGenerator.SpawnBases</c>) and
+        /// <c>GameManager</c> runs its authority tick on that same peer, so the direct write is
+        /// legal. It exists because such an award has no proximity or allegiance semantics to
+        /// check — routing it through <see cref="RPC_AddFood"/> would mean inventing a depositor
+        /// standing at the base just to satisfy validation the award was never subject to.
+        /// </remarks>
+        /// <returns>False when this peer is not the authority and the award was dropped.</returns>
+        public bool AddFoodAuthoritative(float amount)
         {
-            if (amount <= 0f) return;
+            if (amount <= 0f) return false;
+
+            if (!HasStateAuthority)
+            {
+                _log?.Warn(Source, $"{name}: AddFoodAuthoritative({amount:0.00}) ignored — this peer " +
+                    "does not hold the base's state authority, so the award is lost. It should only " +
+                    "be called from authority-gated code on the peer that spawned the bases.");
+                return false;
+            }
+
             FoodTotal += amount;
-            _log?.Debug(Source, $"{name}: +{amount:0.00} → FoodTotal={FoodTotal:0.0}.");
+            _log?.Debug(Source, $"{name}: +{amount:0.00} (authoritative) → FoodTotal={FoodTotal:0.0}.");
+            return true;
+        }
+
+        /// <summary>
+        /// The untrusted deposit path: a chicken's <c>ChickenCargo.FlushBaseDeposit</c> asking this
+        /// base's authority to bank a batched cargo flush.
+        /// </summary>
+        /// <remarks>
+        /// <c>RpcSources.All</c> means *any* peer can call this on *any* base, so everything it is
+        /// handed is a claim to be checked, not a fact. <paramref name="info"/> is filled in by
+        /// Fusion (existing call sites pass nothing) and carries the sender —
+        /// <see cref="TryResolveDepositor"/> turns that into the chicken the caller is entitled to
+        /// speak for, and refuses to credit anything without one.
+        /// </remarks>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_AddFood(float amount, RpcInfo info = default)
+        {
+            if (!IsPlausibleAmount(amount, out string amountRejection))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_AddFood({amount:0.00}) from {info.Source} — {amountRejection}");
+                return;
+            }
+
+            if (!TryResolveDepositor(info, out var depositor))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_AddFood({amount:0.00}) from {info.Source} — " +
+                    $"no chicken that caller is entitled to speak for is standing at corner " +
+                    $"{CornerIndex} with a matching HomeCornerIndex.");
+                return;
+            }
+
+            FoodTotal += amount;
+            _log?.Debug(Source, $"{name}: +{amount:0.00} from {depositor.name} → FoodTotal={FoodTotal:0.0}.");
+        }
+
+        /// <summary>
+        /// Magnitude check, with the reason a rejection happened so the caller can log it.
+        /// </summary>
+        private bool IsPlausibleAmount(float amount, out string rejection)
+        {
+            if (amount <= 0f)
+            {
+                rejection = "the amount is not positive.";
+                return false;
+            }
+
+            // Without a MatchConfigSO there is no honest bound to derive, so the magnitude check
+            // is skipped rather than guessed at. Spawned() has already logged that as an Error,
+            // and the depositor checks below still stand on their own.
+            if (_matchConfig == null)
+            {
+                rejection = null;
+                return true;
+            }
+
+            float max = BaseDepositRules.MaxSingleDeposit(_matchConfig.DepositRatePerSecond);
+            if (amount > max)
+            {
+                rejection = $"it exceeds the largest possible single deposit flush ({max:0.00}).";
+                return false;
+            }
+
+            rejection = null;
+            return true;
+        }
+
+        /// <summary>
+        /// Finds the chicken the RPC's sender is entitled to deposit with: one parked at this
+        /// base, stamped to this base's corner, and attributable to the caller.
+        /// </summary>
+        /// <remarks>
+        /// <b>Bots are why attribution is not just an InputAuthority comparison.</b> Bot chickens
+        /// spawn with <c>PlayerRef.None</c> input authority and are simulated by the master
+        /// (<c>MatchBootstrapper.TrySpawnBots</c>), so a bot's deposit does not arrive stamped with
+        /// the bot's own identity. It arrives as a <em>local</em> invocation on the master, because
+        /// the master is both the bot's state authority and this base's. That is the signal used:
+        /// on a local invoke, accept any chicken this peer already simulates (which covers bots and
+        /// the master's own chicken alike); on a message from the wire, require the chicken's input
+        /// authority to be the sender. A remote peer can never forge <c>IsInvokeLocal</c>, so a
+        /// compromised master still cannot bank food into a base it is not standing at.
+        /// </remarks>
+        private bool TryResolveDepositor(in RpcInfo info, out ChickenController depositor)
+        {
+            depositor = null;
+
+            // A local invocation has no wire time; asking for a remote player's RTT would be
+            // meaningless (and Source may be None).
+            float latency = info.IsInvokeLocal || Runner == null
+                ? 0f
+                : (float)Runner.GetPlayerRtt(info.Source);
+
+            var all = ChickenController.ActiveControllers;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var chicken = all[i];
+                if (chicken == null || chicken.Object == null || !chicken.Object.IsValid) continue;
+                if (chicken.IsDecoy) continue; // a phantom carries no cargo and banks nothing
+                if (!BaseDepositRules.IsAllegianceMatch(chicken.HomeCornerIndex, CornerIndex)) continue;
+
+                bool attributable = info.IsInvokeLocal
+                    ? chicken.Object.HasStateAuthority
+                    : chicken.Object.InputAuthority == info.Source;
+                if (!attributable) continue;
+
+                float moveSpeed = chicken.Stats != null ? chicken.Stats.MoveSpeed : 0f;
+                if (!BaseDepositRules.IsWithinDepositRange(
+                        transform.position, chicken.transform.position, DepositRadius,
+                        BaseDepositRules.RangeMargin(moveSpeed, latency)))
+                {
+                    continue;
+                }
+
+                depositor = chicken;
+                return true;
+            }
+
+            return false;
         }
     }
 }

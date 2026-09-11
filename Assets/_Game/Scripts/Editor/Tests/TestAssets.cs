@@ -39,6 +39,15 @@ namespace CluckWars.Tests
 
         public const string BootstrapScenePath = "Assets/_Game/Scenes/Bootstrap.unity";
         public const string GameScenePath      = "Assets/_Game/Scenes/Game.unity";
+        public const string MapScenePath       = "Assets/_Game/Scenes/Map.unity";
+
+        /// <summary>
+        /// The Ability Lab dev scene. In Build Settings and ENABLED since 2026-09-04, so it
+        /// can be launched on a phone — there is no Editor menu on a device. Reaching it is
+        /// gated at runtime on <c>PlayerPreferences.DeveloperModeEnabled</c>, not by being
+        /// absent from the build.
+        /// </summary>
+        public const string AbilityLabScenePath = "Assets/_Game/Scenes/AbilityLab.unity";
 
         /// <summary>
         /// The Zenject project-scope prefab. Auto-loaded from <c>Resources/</c> by name, and

@@ -25,8 +25,8 @@ MonoBehaviour:
   BotRole: 3
   Duration: 0.4
   Cooldown: 9
-  AbilityAnimationClip: {fileID: 0}
   SearchMask:
+  CastMotion: 1
     serializedVersion: 2
     m_Bits: 256
   QuakeRadius: 4.5

@@ -64,7 +64,20 @@ namespace CluckWars.Visuals
         private float _lastCargo = float.NaN;
         private bool  _wasStunned;
         private bool  _wasCargoFull;
-        private int   _lastActiveSlot = AbilityController.InvalidSlot;
+
+        // ── Replicated one-shot cast baseline (see ObserveCastEvent) ────────────
+        // HitFeedback and AbilityRangeIndicator reset their equivalent "_castInitialized"
+        // flags in Spawned() because they are NetworkBehaviours and Spawned() is the
+        // documented point at which [Networked] properties become safe to read. ChickenVFX
+        // is a plain MonoBehaviour with no Spawned hook, and Fusion instantiates a fresh
+        // GameObject per chicken spawn (no INetworkObjectProvider/pool is registered
+        // anywhere in this project), so Awake runs exactly once per spawn — the field's
+        // default (false) already IS that seed; there is nothing to reset it from. The
+        // first LateUpdate call after Awake is what actually captures the baseline id (see
+        // ObserveCastEvent), by which point AbilityController.Spawned() has already run.
+        private bool  _castInitialized;
+        private byte  _lastCastEventId;
+        private AbilityBaseSO _lastChargingAbility;
 
         // ---- Unity lifecycle --------------------------------------------------
 
@@ -103,46 +116,20 @@ namespace CluckWars.Visuals
 
             _wasStunned = isStunned;
 
-            // ── Ability activation: AccentColor burst on slot activation ─────────
-            if (_abilities != null)
-            {
-                int activeSlot = _abilities.ActiveSlot;
-                if (activeSlot != AbilityController.InvalidSlot &&
-                    _lastActiveSlot == AbilityController.InvalidSlot)
-                {
-                    var ability = _abilities.ActiveAbility;
-                    if (ability != null)
-                    {
-                        if (_abilityPS != null)
-                        {
-                            var main = _abilityPS.main;
-                            main.startColor = new ParticleSystem.MinMaxGradient(ability.AccentColor);
-                            _abilityPS.Play();
-                        }
-
-                        // FEEDBACK.md §3.1's "Always" caster micro-shake: fires on EVERY
-                        // cast, hit or whiff, local player only. Stage 4's HitFeedback
-                        // issues the same shake again on a *landed* cast (§3.2's
-                        // hit-confirm); both now read the identical FeedbackTuning
-                        // constants and MatchCamera.ApplyShake is max-wins, so the overlap
-                        // is a no-op rather than a double punch. The literals that used to
-                        // sit here (0.18/0.22, 0.06/0.12) were the source those constants
-                        // were derived from — reading them back from FeedbackTuning is what
-                        // makes a future re-tune actually take effect on both call sites.
-                        if (_controller != null && _controller.HasInputAuthority &&
-                            MatchCamera.Instance != null)
-                        {
-                            bool steal = ability.Category == AbilityCategory.Steal;
-                            MatchCamera.Instance.ApplyShake(
-                                steal ? FeedbackTuning.CasterStealShakeMagnitude
-                                      : FeedbackTuning.CasterMicroShakeMagnitude,
-                                steal ? FeedbackTuning.CasterStealShakeDurationSeconds
-                                      : FeedbackTuning.CasterMicroShakeDurationSeconds);
-                        }
-                    }
-                }
-                _lastActiveSlot = activeSlot;
-            }
+            // ── Ability activation: AccentColor burst + caster micro-shake on cast ───
+            // Detection used to be a rising-edge test on ActiveSlot (Invalid → non-Invalid
+            // → ... → Invalid). That was broken three ways: (1) a short ability can set and
+            // clear ActiveSlot inside a single tick, so LateUpdate never observes the
+            // non-Invalid value and the burst/shake silently never plays; (2) back-to-back
+            // casts of two different slots produce no Invalid frame in between, so the
+            // second cast is silent too; (3) there was no baseline seeding, so a peer that
+            // first renders a chicken mid-ability (a late joiner) replayed a burst for a
+            // cast that had already happened. HitFeedback.ObserveOwnCast and
+            // AbilityRangeIndicator.ObserveCast hit the exact same three failures and were
+            // both fixed by keying off the replicated one-shot LastCastEventId instead of a
+            // slot transition — this does the same. Do not revert to an ActiveSlot
+            // edge-detect; it will silently reintroduce all three bugs.
+            if (_abilities != null) ObserveCastEvent();
 
             // ── Food deposit + cargo-full ring ────────────────────────────────
             // [Networked] Cargo replicates to every peer so both effects fire
@@ -164,6 +151,73 @@ namespace CluckWars.Visuals
 
                 _lastCargo    = cargo;
                 _wasCargoFull = isCargoFull;
+            }
+        }
+
+        /// <summary>
+        /// Fires the AccentColor burst and the caster micro-shake off the replicated
+        /// <c>LastCastEventId</c> one-shot. Baseline-seeded exactly like
+        /// <c>HitFeedback.ObserveOwnCast</c> and <c>AbilityRangeIndicator.ObserveCast</c>,
+        /// whose burst/flash halves of the same event this deliberately does not duplicate.
+        /// </summary>
+        private void ObserveCastEvent()
+        {
+            // TryActivate clears ChargingSlot in the same tick it fires, and a very short
+            // ability's ActiveSlot may already have expired by the time this observes the
+            // event — so remember what was last aimed, same as HitFeedback/AbilityRangeIndicator.
+            if (_abilities.ChargingSlot != 0)
+            {
+                var charging = _abilities.ChargingAbility;
+                if (charging != null) _lastChargingAbility = charging;
+            }
+
+            byte id = _abilities.LastCastEventId;
+            if (!_castInitialized)
+            {
+                // Seed from whatever id is already replicated so a late-joining peer never
+                // plays a burst/shake for a cast that happened before it connected.
+                _castInitialized = true;
+                _lastCastEventId = id;
+                return;
+            }
+            if (id == _lastCastEventId) return;
+            _lastCastEventId = id;
+
+            var ability = _abilities.ActiveAbility ?? _lastChargingAbility;
+
+            // The burst needs AccentColor, so an unresolved ability means no burst.
+            if (ability != null && _abilityPS != null)
+            {
+                var main = _abilityPS.main;
+                main.startColor = new ParticleSystem.MinMaxGradient(ability.AccentColor);
+                _abilityPS.Play();
+            }
+
+            // FEEDBACK.md §3.1's "Always" caster micro-shake: fires on EVERY cast, hit or
+            // whiff, local player only. Stage 4's HitFeedback issues the same shake again
+            // on a *landed* cast (§3.2's hit-confirm); both now read the identical
+            // FeedbackTuning constants, and both are now keyed off this same
+            // LastCastEventId, so MatchCamera.ApplyShake's max-wins makes the overlap a
+            // no-op rather than a double punch. The literals that used to sit here
+            // (0.18/0.22, 0.06/0.12) were the source those constants were derived from —
+            // reading them back from FeedbackTuning is what makes a future re-tune actually
+            // take effect on both call sites.
+            //
+            // Deliberately NOT gated on ability != null: unlike the burst, the shake does
+            // not depend on AccentColor, and §3.1 wants it on every cast without exception.
+            // Only the steal-flavoured magnitude needs the ability's Category, which is
+            // unknowable in the rare case neither ActiveAbility nor the remembered charging
+            // ability resolved (effectively: a late joiner whose very first observed cast
+            // had no charging phase left to remember). Falling back to the base magnitude
+            // there is a closer match to "always shake" than skipping it outright.
+            if (_controller != null && _controller.HasInputAuthority && MatchCamera.Instance != null)
+            {
+                bool steal = ability != null && ability.Category == AbilityCategory.Steal;
+                MatchCamera.Instance.ApplyShake(
+                    steal ? FeedbackTuning.CasterStealShakeMagnitude
+                          : FeedbackTuning.CasterMicroShakeMagnitude,
+                    steal ? FeedbackTuning.CasterStealShakeDurationSeconds
+                          : FeedbackTuning.CasterMicroShakeDurationSeconds);
             }
         }
 
