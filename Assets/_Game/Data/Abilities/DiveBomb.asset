@@ -28,3 +28,4 @@ MonoBehaviour:
   ForwardOffset: 3.25
   SweepRadius: 2.05
   TrampleDamage: 50
+  _unlockKey: ability.dive_bomb

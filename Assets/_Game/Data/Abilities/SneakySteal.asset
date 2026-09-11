@@ -31,3 +31,4 @@ MonoBehaviour:
   StealAmount: 6
   PeckSlotPreEquippedBy: 0
   SignaturePreEquippedBy: 128
+  _unlockKey: ability.sneaky_steal

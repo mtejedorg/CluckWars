@@ -25,10 +25,11 @@ MonoBehaviour:
   BotRole: 3
   Duration: 0.25
   Cooldown: 4
-  SearchMask:
   CastMotion: 0
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  _unlockKey: ability.headbutt
   Reach: 3.6
   ConeAngle: 70
   KnockbackForce: 7.5

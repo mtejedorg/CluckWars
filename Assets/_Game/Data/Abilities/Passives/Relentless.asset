@@ -31,3 +31,4 @@ MonoBehaviour:
     m_Bits: 256
   CooldownMultiplier: 0.75
   Subclass: 1
+  _unlockKey: passive.relentless

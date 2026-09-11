@@ -29,3 +29,4 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 256
   SpeedMultiplier: 3
+  _unlockKey: ability.shadowstep
