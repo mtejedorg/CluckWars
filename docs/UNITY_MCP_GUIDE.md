@@ -5,6 +5,32 @@ You are managing a Unity 6000.3.14f1 project using an open-source MCP server (`I
 
 ---
 
+### 2026-08-25 — Unity's first-party CLI "MCP mode": evaluated, DEFERRED
+
+Unity is deprecating the Beta in-Editor MCP server (`com.unity.ai.assistant`, the `.unity/relay`
+path this project already abandoned) in favour of a terminal-native **Unity CLI** with an MCP mode
+(`unity pipeline install` / `unity mcp configure claude` / `unity skill install claude`). Confirmed
+free — no Pro/AI subscription, unlike the old in-Editor server. Requires Unity 6.0 LTS+; we are on
+6000.3, so compatible.
+
+**Decision: do NOT migrate now. Stay on `ai-game-developer` (`IvanMurzak/Unity-MCP`).** Reasons:
+its headline win (Roslyn eval without a domain reload) is already what `script-execute` gives us;
+its ~140 typed tools (inputsystem, navigation, profiler, animator, prefab staging, four screenshot
+modes) are a long tail the new CLI would have us re-author as custom commands; and the project has
+Play Mode verification debt outstanding (bot AI rebuild, Immovable / Smoke Roost, Pixel 9
+legibility) that a tooling swap would contaminate.
+
+**Revisit when any of these fires:**
+1. `ai-game-developer` breaks or stalls on a Unity upgrade — then the CLI is the fallback, not a
+   luxury, and this evaluation flips.
+2. The CLI leaves preview **and** publishes a tool inventory we can diff against `unity-tool-list`.
+3. We need to drive a **runtime Player build** (Android/Pixel 9) rather than the Editor —
+   `ai-game-developer` is Editor-bound and this is the one capability the CLI genuinely adds.
+
+Do not re-run this evaluation from scratch without one of those triggers.
+
+---
+
 ## 1. The UI Architecture (Strict Rules)
 
 Do NOT generate `uGUI` Canvas-based UI or serialized YAML Prefabs for interfaces. You must exclusively use **UI Toolkit**.
