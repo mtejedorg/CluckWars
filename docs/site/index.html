@@ -1411,10 +1411,18 @@ footer b{color:var(--text-dim)}
       <h4 style="color:#ff9a5c;margin-bottom:7px">Wing Slam contradicts its own class</h4>
       <p style="font-size:.85rem;color:var(--text-dim)">At a 12-second cooldown it is the longest in
         the game &mdash; sitting on the class whose essence is spamming abilities. It is flagged
-        for re-tuning rather than quietly left alone. Similarly, Turtle Mode and Roll &amp; Push
-        still carry flavour text mentioning &ldquo;damage&rdquo;, left over from the pre-v0.4
-        combat model. The mechanics are correct; only the copy is stale. Both are marked in the
-        codex above.</p>
+        for re-tuning rather than quietly left alone.</p>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow" style="margin-bottom:6px">Flagged</p>
+      <h4 style="color:#ff9a5c;margin-bottom:7px">Turtle Mode and Egg Shell protect nothing</h4>
+      <p style="font-size:.85rem;color:var(--text-dim)">When v0.4 deleted HP, both lost their
+        defensive half and nothing replaced it. As shipped, Turtle Mode is only a quarter-speed
+        crawl and Egg Shell only locks movement &mdash; stuns, roots, shoves and steals all still
+        land. Their descriptions (and Roll &amp; Push&rsquo;s old &ldquo;No damage.&rdquo;) were
+        rewritten on 2026-09-12 to say what the code does. The GDD still intends control
+        resistance and invulnerability; restoring those is a design call, not a copy fix.</p>
     </div>
 
   </div>
@@ -1512,7 +1520,7 @@ const ABILITIES = [
      stats:[['Food per press','3'],['Cooldown','per class, 0.77–0.91 s']],
      note:'Foraging IS Peck — there is no passive collection. The Assassin is excluded from this ability outright, which is exactly why he cannot farm.'}),
   A({id:'eggshell', name:'Egg Shell', short:'EGG', cls:['warrior','speedy','fatty','assassin'], cat:2, kind:0, cd:8, dur:2.0,
-     accent:'#ebf0ff', desc:'Seals you in an egg — immune to damage, but you cannot move.',
+     accent:'#ebf0ff', desc:'Seals you in an egg for 2 s — you cannot walk or turn.',
      stats:[['Duration','2.0 s'],['Cooldown','8 s']]}),
 
   /* ---- WARRIOR ---- */
@@ -1578,9 +1586,8 @@ const ABILITIES = [
      stats:[['Duration','3 s'],['Cooldown','12 s']],
      note:'Immunity, not resistance — but it does not clear control already on him. Spent in anticipation, never as an escape.'}),
   A({id:'rollpush', name:'Roll & Push', short:'RPH', cls:['fatty'], cat:1, kind:1, cd:3, dur:0.8, barge:true,
-     accent:'#33d959', desc:'Rolls forward at double speed, shoving chickens out of the path. No damage.',
-     stats:[['Forward offset','7.2 m'],['Push radius','1.9 m'],['Push strength','13.5'],['Speed','×2'],['Cooldown','3 s']],
-     stale:true}),
+     accent:'#33d959', desc:'Rolls forward at double speed, shoving chickens out of the path.',
+     stats:[['Forward offset','7.2 m'],['Push radius','1.9 m'],['Push strength','13.5'],['Speed','×2'],['Cooldown','3 s']]}),
   A({id:'rootegg', name:'Root Egg', short:'REG', cls:['fatty'], cat:1, kind:1, cd:7, dur:0.3,
      accent:'#a6731a', desc:'Drops an egg that roots the first chicken to step on it for 2 s.',
      stats:[['Egg lifetime','8 s'],['Root','2 s'],['Egg radius','1.45 m'],['Cooldown','7 s']]}),
@@ -1589,9 +1596,8 @@ const ABILITIES = [
      stats:[['Duration','2.0 s'],['Cooldown','8 s']],
      note:'The steal-back is rate-gated, so a scrum cannot drain a whole lobby in one activation.'}),
   A({id:'turtlemode', name:'Turtle Mode', short:'TRT', cls:['fatty'], cat:2, kind:1, cd:8, dur:2.0,
-     accent:'#8c6b40', desc:'Absorbs 80% of incoming damage at quarter movement speed.',
-     stats:[['Damage resistance','80%'],['Speed','×0.25'],['Duration','2.0 s'],['Cooldown','8 s']],
-     stale:true}),
+     accent:'#8c6b40', desc:'Shuffles along at a turtle crawl — quarter speed for 2 s.',
+     stats:[['Speed','×0.25'],['Duration','2.0 s'],['Cooldown','8 s']]}),
 
   /* ---- ASSASSIN ---- */
   A({id:'ambush', name:'Ambush', short:'AMB', cls:['assassin'], cat:1, kind:1, cd:10, dur:1,

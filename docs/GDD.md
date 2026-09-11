@@ -616,12 +616,16 @@ shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 | | Snatch 🤏 *(moved from Common)* | 3 s | Robs cargo from every rival in a forward arc. Assassin-only now — a universal AoE steal is exactly the Assassin's core, and diluted the class. |
 | | Sneaky Steal 🤏 *(Thief signature)* | 5 s | Yanks cargo from the nearest carrier within 3 m. |
 
-**Known stale flavor text, not yet corrected:** Turtle Mode's and Roll & Push's
-descriptions still say "damage" (`Assets/_Game/Data/Abilities/*.asset`), left over from
-the pre-0.4 combat model this GDD's §5.1/§6 explicitly retired ("no HP, no Resistance,
-no damage"). The mechanics are correct (control resistance / no-op shove); only the
-copy needs a pass — see `docs/design/class-essence-and-signatures.md` for narrative
-follow-ups.
+**Turtle Mode and Egg Shell are unimplemented on their defensive half.** The Effect
+column above states their design intent, not what ships. The HP-removal commit (`468bf1d`)
+deleted their `DamageResistance` / `DamageImmune` and left both as "no-op stubs for plan 4";
+no control resistance or invulnerability was ever added. In code, Turtle Mode only sets
+quarter move speed (`TurtleModeAbilitySO`) and Egg Shell only locks movement
+(`EggShellAbilitySO`) — stuns, roots, knockback and steals all land through both. Their
+in-game descriptions (`Assets/_Game/Data/Abilities/*.asset`) were rewritten 2026-09-12 to
+describe what ships, and Roll & Push's leftover "No damage." was dropped in the same pass.
+Restoring a real defensive effect is an open design decision, to be solved against the
+Oracle rather than hand-tuned.
 
 Zones (Feather Trap, Root Egg) drop **at the caster's feet** and never affect their own
 caster — "lay it as you flee."

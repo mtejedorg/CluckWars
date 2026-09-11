@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.TurtleModeAbilitySO
   DisplayName: Turtle Mode
   ShortLabel: TRT
-  Description: Absorbs 80% of incoming damage at quarter movement speed.
+  Description: Shuffles along at a turtle crawl - quarter speed for 2s.
   AccentColor: {r: 0.55, g: 0.42, b: 0.25, a: 1}
   Category: 2
   TerrainTraversal: 0

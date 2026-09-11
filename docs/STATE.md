@@ -6,6 +6,33 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✏️ Ability descriptions no longer mention damage (2026-09-12) — copy only
+
+Three `Description` strings still described the pre-v0.4 HP model. Rewritten (via
+`narrative-designer`) to say what the shipped code does. No gameplay, cooldown or balance
+field was touched.
+
+| Asset | Was | Now |
+|---|---|---|
+| `TurtleMode` | Absorbs 80% of incoming damage at quarter movement speed. | Shuffles along at a turtle crawl - quarter speed for 2s. |
+| `EggShell` | Seals you in an egg - immune to damage, but you cannot move. | Seals you in an egg for 2s - you cannot walk or turn. |
+| `RollPush` | …out of the path. No damage. | …out of the path. |
+
+Swept every other ability and passive: the only remaining hits are Featherfoot's "Immune to
+pile slow" (real) and Mark/Kill's "fatal execute" (the execute is a real removal, not HP).
+`docs/site/index.html` quotes all three and was updated to match, along with removing
+Turtle Mode's "Damage resistance 80%" stat row and the `stale` flags.
+
+### ⚠️ Open design gap this surfaced: Turtle Mode and Egg Shell protect nothing
+
+The copy could not honestly keep a defensive clause because **there is no defensive
+effect in code.** `468bf1d` (HP removal) deleted `DamageResistance` / `DamageImmune` and
+left both as "no-op stubs for plan 4"; nothing replaced them. Turtle Mode is only
+`MoveSpeedMultiplier = 0.25`; Egg Shell is only `MovementLocked`. Stuns, roots, knockback
+and steals all land through both, so as shipped each is a pure self-penalty. GDD §7.2 still
+states the intent (control resistance / invulnerability). Restoring an effect is a
+`mechanics-designer` call, solved against the Oracle — not a copy fix.
+
 ## ✅ Ability Lab now ships, gated behind Developer Mode (2026-09-04) — 562/562 green
 
 The lab was Editor-only. Maestro wants to judge ability feel **on the Pixel 9**, where there
