@@ -32,3 +32,4 @@ MonoBehaviour:
   DurationMultiplier: 0.65
   KnockbackMultiplier: 0.25
   Subclass: 6
+  _unlockKey: passive.bulwark

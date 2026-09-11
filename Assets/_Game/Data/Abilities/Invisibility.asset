@@ -24,3 +24,4 @@ MonoBehaviour:
   Cooldown: 8
   CastMotion: 6
   Opacity: 0.2
+  _unlockKey: ability.invisibility

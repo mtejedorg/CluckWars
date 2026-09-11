@@ -32,3 +32,4 @@ MonoBehaviour:
   StealMultiplier: 1.4
   BonusCapacity: 2
   Subclass: 2
+  _unlockKey: passive.bully

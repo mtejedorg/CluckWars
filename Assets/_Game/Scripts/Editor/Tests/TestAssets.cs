@@ -56,6 +56,9 @@ namespace CluckWars.Tests
         /// </summary>
         public const string ProjectContextPrefabPath = "Assets/_Game/Resources/ProjectContext.prefab";
 
+        /// <summary>Hand-curated key → asset-path record of every shipped unlock key. Never regenerated; see UnlockKeyTests.</summary>
+        public const string UnlockKeyManifestPath = "Assets/_Game/Scripts/Editor/Tests/UnlockKeyManifest.json";
+
         public const string UiRoot        = "Assets/UI";
         public const string LobbyUxmlPath = UiRoot + "/Lobby.uxml";
 

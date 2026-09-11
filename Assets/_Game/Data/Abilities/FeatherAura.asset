@@ -27,3 +27,4 @@ MonoBehaviour:
   AreaKind: 2
   AuraRadius: 5.4
   AuraSlowFactor: 0.55
+  _unlockKey: ability.feather_aura

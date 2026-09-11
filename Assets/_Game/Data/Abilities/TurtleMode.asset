@@ -24,3 +24,4 @@ MonoBehaviour:
   Cooldown: 10
   CastMotion: 5
   SpeedMultiplier: 0.5
+  _unlockKey: ability.turtle_mode

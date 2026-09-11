@@ -29,3 +29,4 @@ MonoBehaviour:
   ZoneRadius: 3.6
   ZoneDuration: 5
   SlowFactor: 0.45
+  _unlockKey: ability.feather_trap

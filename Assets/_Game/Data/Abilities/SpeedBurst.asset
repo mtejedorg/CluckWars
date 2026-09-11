@@ -30,3 +30,4 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 256
   SpeedMultiplier: 1.5
+  _unlockKey: ability.speed_burst
