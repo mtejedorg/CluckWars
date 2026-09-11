@@ -1,0 +1,286 @@
+/* ============================================================================
+   Cluck Wars — Ability Lab control surface
+   Paired with Assets/UI/AbilityLab.uxml. Tokens: CluckWarsTokens.uss.
+
+   This is a DEVELOPER tool that ships inside the player build (gated on
+   PlayerPreferences.DeveloperModeEnabled). It deliberately does NOT inherit
+   CluckWarsTheme.uss: the theme is the player-facing farmyard skin, tuned for
+   menu pages that own the whole screen, and pulling it in here would drag ~900
+   lines of page layout in for four button styles. It borrows the theme's COLOR
+   tokens so the lab still looks like it belongs to this game, and nothing else.
+
+   SIZING follows the mobile contract at the top of CluckWarsTheme.uss:
+   PanelSettings is ScaleWithScreenSize at reference 1920x1080, MatchWidthOrHeight
+   0.5, so on every handset in the table there 1 dp ~= 2.35 USS px. The 48 dp
+   Android touch floor is therefore 113 px, and every interactive rule below is
+   at least 112 px in its smaller dimension. Do not shrink these to fit more in;
+   scroll instead — that is what the ScrollView is for.
+   ============================================================================ */
+
+/* Full-screen, but transparent to input: taps that miss the toolbar and the
+   sheet must reach the TouchControls document below (which drives the chicken)
+   and the game itself. Set in UXML as picking-mode="Ignore"; repeated here so a
+   future edit that drops the attribute is still safe. */
+.cw-lab-root {
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+}
+
+/* ---- Toolbar -------------------------------------------------------------
+   Top-right, clear of the joystick (bottom-left) and the ability arc
+   (bottom-right). Horizontal so it stays one row deep on a phone. */
+.cw-lab-toolbar {
+    position: absolute;
+    top: 24px; right: 24px;
+    flex-direction: row;
+}
+
+.cw-lab-tbtn {
+    min-width: 150px; min-height: 112px;        /* 48 dp touch floor */
+    margin-left: 12px;
+    padding-left: 0; padding-right: 0;
+    font-size: 30px; letter-spacing: 2px;
+    color: rgb(254, 245, 224);
+    background-color: rgba(42, 26, 12, 0.92);
+    border-left-width: 3px; border-right-width: 3px;
+    border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(138, 106, 58); border-right-color: rgb(138, 106, 58);
+    border-top-color: rgb(138, 106, 58); border-bottom-color: rgb(138, 106, 58);
+    border-top-left-radius: 10px; border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+}
+.cw-lab-tbtn:hover  { background-color: rgba(74, 48, 24, 0.95); }
+.cw-lab-tbtn:active { background-color: rgb(245, 200, 66); color: rgb(26, 14, 4); }
+
+.cw-lab-tbtn--gold {
+    background-color: rgb(212, 160, 32);
+    color: rgb(26, 14, 4);
+    border-left-color: rgb(138, 106, 16); border-right-color: rgb(138, 106, 16);
+    border-top-color: rgb(138, 106, 16); border-bottom-color: rgb(138, 106, 16);
+}
+.cw-lab-tbtn--danger {
+    background-color: rgb(200, 48, 48);
+    border-left-color: rgb(122, 26, 26); border-right-color: rgb(122, 26, 26);
+    border-top-color: rgb(122, 26, 26); border-bottom-color: rgb(122, 26, 26);
+}
+
+/* State classes toggled from AbilityLabPanel. Named --on rather than using
+   :checked because these are Buttons, not Toggles — a Button has no checked
+   pseudo-state, so the "sheet is open" / "telemetry is on" state has to be
+   carried by a class or it cannot be shown at all. */
+.cw-lab-tbtn--on {
+    background-color: rgb(245, 200, 66);
+    color: rgb(26, 14, 4);
+}
+
+/* ---- Sheet ---------------------------------------------------------------
+   Right-hand side, full height minus the toolbar. Fixed width rather than a
+   percentage: the controls inside are text at a fixed size, and a percentage
+   would squeeze them off a narrow handset while wasting space on a tablet. */
+.cw-lab-sheet {
+    position: absolute;
+    top: 150px; right: 24px; bottom: 24px;
+    width: 640px;
+    background-color: rgba(26, 16, 8, 0.96);
+    border-left-width: 3px; border-right-width: 3px;
+    border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(138, 106, 58); border-right-color: rgb(138, 106, 58);
+    border-top-color: rgb(138, 106, 58); border-bottom-color: rgb(138, 106, 58);
+    border-top-left-radius: 14px; border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
+    display: none;                              /* opened by AbilityLabPanel */
+}
+.cw-lab-sheet--open { display: flex; }
+
+.cw-lab-sheet__head {
+    flex-direction: row; align-items: center;
+    padding-left: 20px; padding-right: 12px;
+    padding-top: 10px; padding-bottom: 10px;
+    border-bottom-width: 2px; border-bottom-color: rgb(106, 74, 40);
+}
+
+.cw-lab-title {
+    flex-grow: 1;
+    font-size: 34px; letter-spacing: 3px;
+    color: rgb(245, 200, 66);
+}
+
+.cw-lab-close {
+    min-width: 112px; min-height: 112px;        /* 48 dp touch floor */
+    font-size: 34px;
+    color: rgb(254, 245, 224);
+    background-color: rgba(74, 48, 24, 0.9);
+    border-left-width: 2px; border-right-width: 2px;
+    border-top-width: 2px; border-bottom-width: 2px;
+    border-left-color: rgb(138, 106, 58); border-right-color: rgb(138, 106, 58);
+    border-top-color: rgb(138, 106, 58); border-bottom-color: rgb(138, 106, 58);
+    border-top-left-radius: 8px; border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
+}
+.cw-lab-close:active { background-color: rgb(245, 200, 66); color: rgb(26, 14, 4); }
+
+.cw-lab-scroll { flex-grow: 1; }
+
+/* ---- Sections ------------------------------------------------------------ */
+.cw-lab-section {
+    font-size: 26px; letter-spacing: 2px;
+    color: rgb(196, 160, 96);
+    margin-top: 18px; margin-bottom: 6px;
+    padding-left: 20px;
+}
+
+.cw-lab-value {
+    font-size: 28px;
+    color: rgb(254, 245, 224);
+    padding-left: 20px;
+    margin-top: 8px;
+}
+
+/* The widest row is ASSIGN TO at five chips. Budget, measured: the sheet is
+   640px, this row's padding takes 24, leaving 616; five chips at the 112px
+   touch floor plus 3px margins a side is 5*112 + 10*3 = 590. It fits, with
+   26px of slack that flex-grow distributes.
+
+   Do not widen the padding or the margins back to 16/4 — that came to 600 into
+   600, which rounded over and wrapped the fifth chip ("3") onto its own
+   full-width line. Still tappable, but it read as a separate control rather
+   than the fifth of five. wrap is kept as the safety net: a row that overflows
+   a fixed-width sheet would push its last chip off-screen where it cannot be
+   tapped at all, which is strictly worse than an ugly second line. */
+.cw-lab-row {
+    flex-direction: row; flex-wrap: wrap;
+    padding-left: 12px; padding-right: 12px;
+}
+
+.cw-lab-chip {
+    min-width: 112px; min-height: 112px;        /* 48 dp touch floor */
+    flex-grow: 1;
+    margin-top: 4px; margin-bottom: 4px;
+    margin-left: 3px; margin-right: 3px;
+    padding-left: 6px; padding-right: 6px;
+    font-size: 26px; letter-spacing: 1px;
+    color: rgb(254, 245, 224);
+    background-color: rgb(58, 40, 22);
+    border-left-width: 2px; border-right-width: 2px;
+    border-top-width: 2px; border-bottom-width: 2px;
+    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
+    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
+    border-top-left-radius: 10px; border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+}
+.cw-lab-chip:active { background-color: rgb(122, 88, 44); }
+
+/* Selection is carried by FILL + BORDER + TEXT COLOR together, not by one of
+   them. Same reasoning as the theme's .cw-opt-toggle:checked rule: a state
+   shown by a single channel disappears if that channel fails to resolve, and
+   here "which slot am I assigning to" being unreadable makes the picker
+   actively misleading rather than merely plain. */
+.cw-lab-chip--sel {
+    background-color: rgb(245, 200, 66);
+    color: rgb(26, 14, 4);
+    border-left-color: rgb(255, 224, 102); border-right-color: rgb(255, 224, 102);
+    border-top-color: rgb(255, 224, 102); border-bottom-color: rgb(255, 224, 102);
+}
+
+/* ---- Toggles ------------------------------------------------------------- */
+.cw-lab-toggle {
+    min-height: 112px;                          /* 48 dp touch floor */
+    margin-top: 0; margin-bottom: 0;
+    margin-left: 20px; margin-right: 20px;
+}
+/* Vertical centering only — see the note on .cw-opt-toggle in CluckWarsTheme.uss:
+   a Toggle is a BaseField (flex-direction: row), so justify-content here would
+   center horizontally, and overriding the theme's flex-grow collapses the input
+   to zero width and hides the caption. */
+.cw-lab-toggle .unity-toggle__input { align-items: center; }
+
+.cw-lab-toggle .unity-toggle__checkmark {
+    width: 48px; height: 48px;
+    margin-left: 0; margin-right: 16px;
+    background-color: rgb(26, 14, 8);
+    border-left-width: 3px; border-right-width: 3px;
+    border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
+    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
+    border-top-left-radius: 8px; border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
+    -unity-background-image-tint-color: rgba(0, 0, 0, 0);
+}
+/* Checked state is the BOX FILL, not only the glyph — the checkmark image comes
+   from the default runtime theme, and a glyph-only design renders ON and OFF
+   identically if that ever fails to resolve. */
+.cw-lab-toggle:checked .unity-toggle__checkmark {
+    background-color: rgb(245, 200, 66);
+    border-left-color: rgb(245, 200, 66); border-right-color: rgb(245, 200, 66);
+    border-top-color: rgb(245, 200, 66); border-bottom-color: rgb(245, 200, 66);
+    -unity-background-image-tint-color: rgb(26, 14, 4);
+}
+
+.cw-lab-toggle .unity-toggle__text {
+    font-size: 30px;
+    color: rgb(254, 245, 224);
+    white-space: nowrap; flex-shrink: 0;
+    margin-left: 0;
+}
+
+/* ---- Sliders -------------------------------------------------------------
+   The dragger is the touch target, so it carries the 48 dp floor on both axes;
+   the tracker is only as tall as it needs to be to be seen. */
+.cw-lab-slider {
+    min-height: 112px;
+    margin-left: 20px; margin-right: 20px;
+}
+.cw-lab-slider .unity-base-slider__dragger {
+    width: 56px; height: 56px;
+    margin-top: -28px;
+    background-color: rgb(245, 200, 66);
+    border-left-width: 0; border-right-width: 0;
+    border-top-width: 0; border-bottom-width: 0;
+    border-top-left-radius: 28px; border-top-right-radius: 28px;
+    border-bottom-left-radius: 28px; border-bottom-right-radius: 28px;
+}
+.cw-lab-slider .unity-base-slider__tracker {
+    height: 10px;
+    background-color: rgb(58, 40, 22);
+    border-left-width: 0; border-right-width: 0;
+    border-top-width: 0; border-bottom-width: 0;
+    border-top-left-radius: 5px; border-top-right-radius: 5px;
+    border-bottom-left-radius: 5px; border-bottom-right-radius: 5px;
+}
+
+/* ---- Ability list -------------------------------------------------------- */
+.cw-lab-list {
+    padding-left: 20px; padding-right: 20px;
+    margin-top: 8px;
+}
+
+.cw-lab-item {
+    min-height: 112px;                          /* 48 dp touch floor */
+    margin-top: 4px; margin-bottom: 4px;
+    padding-left: 16px; padding-right: 16px;
+    font-size: 28px;
+    -unity-text-align: middle-left;
+    color: rgb(254, 245, 224);
+    background-color: rgb(48, 32, 18);
+    border-left-width: 2px; border-right-width: 2px;
+    border-top-width: 2px; border-bottom-width: 2px;
+    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
+    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
+    border-top-left-radius: 8px; border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
+}
+.cw-lab-item:active { background-color: rgb(122, 88, 44); }
+
+.cw-lab-item--equipped {
+    background-color: rgb(92, 70, 20);
+    border-left-color: rgb(245, 200, 66); border-right-color: rgb(245, 200, 66);
+    border-top-color: rgb(245, 200, 66); border-bottom-color: rgb(245, 200, 66);
+    color: rgb(245, 200, 66);
+}
+
+.cw-lab-empty {
+    font-size: 26px;
+    color: rgb(196, 160, 96);
+    white-space: normal;
+    padding-top: 12px; padding-bottom: 12px;
+}

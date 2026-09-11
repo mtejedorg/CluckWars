@@ -38,18 +38,87 @@ namespace CluckWars.Tests
     {
         // ---- Build settings -----------------------------------------------------
 
+        /// <summary>
+        /// Pins the exact enabled-scene list, in order.
+        /// </summary>
+        /// <remarks>
+        /// <b>2026-09-04: extended from three scenes to four, deliberately.</b> The Ability Lab
+        /// used to be listed but disabled, on the reasoning that a dev scene must never ship.
+        /// It now ships, because Maestro tests ability feel on the Pixel 9 and a device has no
+        /// Editor menu to launch a scene from — so the scene has to be in the build for the
+        /// tool to exist at all there. What keeps players out is
+        /// <c>PlayerPreferences.DeveloperModeEnabled</c>, which gates the only route in
+        /// (<c>#AbilityLabBtn</c> on the main menu) and defaults to off.
+        ///
+        /// <b>This test stayed exact rather than becoming "3 or more".</b> The invariant it
+        /// was written for is the ORDER — Bootstrap at index 0 — and a loosened count would
+        /// still pass while a fourth scene quietly displaced Map, or while someone enabled a
+        /// scratch scene and shipped it. An exact list means adding a scene to the build is a
+        /// decision someone has to come here and write down, which is what caught this one.
+        /// </remarks>
         [Test]
-        public void BuildSettings_StartAtBootstrap_ThenGame_ThenBakedMap()
+        public void BuildSettings_StartAtBootstrap_ThenGame_ThenBakedMap_ThenAbilityLab()
         {
             var enabled = EditorBuildSettings.scenes.Where(s => s.enabled).ToList();
 
-            Assert.AreEqual(3, enabled.Count,
-                $"Expected Bootstrap + Game + Map in Build Settings, found {enabled.Count}: " +
-                string.Join(", ", enabled.Select(s => s.path)));
+            var expected = new[]
+            {
+                TestAssets.BootstrapScenePath,
+                TestAssets.GameScenePath,
+                TestAssets.MapScenePath,
+                TestAssets.AbilityLabScenePath,
+            };
+
+            Assert.AreEqual(expected.Length, enabled.Count,
+                $"Expected Bootstrap + Game + Map + AbilityLab in Build Settings, found " +
+                $"{enabled.Count}: " + string.Join(", ", enabled.Select(s => s.path)));
+
             Assert.AreEqual(TestAssets.BootstrapScenePath, enabled[0].path,
                 "Bootstrap must be build index 0. Otherwise the player starts straight in the Game " +
                 "scene with no class selection (CONVENTIONS.md).");
             Assert.AreEqual(TestAssets.GameScenePath, enabled[1].path);
+            Assert.AreEqual(TestAssets.MapScenePath, enabled[2].path);
+
+            // Last on purpose: it is the only entry nothing loads by index, so it is the only
+            // one whose position is free to move. Keeping it pinned here anyway means the
+            // three above cannot be reordered underneath it without failing.
+            Assert.AreEqual(TestAssets.AbilityLabScenePath, enabled[3].path,
+                "The Ability Lab must stay LAST. Anything ahead of Map shifts the indices the " +
+                "shipped scenes are loaded by.");
+        }
+
+        /// <summary>
+        /// The lab ships, so the thing keeping players out is a runtime preference rather
+        /// than the compiler. That preference must default to OFF.
+        /// </summary>
+        /// <remarks>
+        /// Asserted here, next to the Build Settings change that made it load-bearing, rather
+        /// than only in <c>DeveloperModeTests</c>: the two facts are only dangerous together,
+        /// and a reader who changes one should trip over the other.
+        /// </remarks>
+        [Test]
+        public void AbilityLabShips_SoDeveloperModeMustDefaultOff()
+        {
+            bool had  = PlayerPrefs.HasKey(Settings.PlayerPreferences.DeveloperModeKey);
+            int saved = PlayerPrefs.GetInt(Settings.PlayerPreferences.DeveloperModeKey, 0);
+            try
+            {
+                PlayerPrefs.DeleteKey(Settings.PlayerPreferences.DeveloperModeKey);
+                Settings.PlayerPreferences.ResetCache();
+
+                Assert.IsFalse(Settings.PlayerPreferences.DeveloperModeEnabled,
+                    "AbilityLab.unity is enabled in Build Settings, so it is in every player " +
+                    "build. Developer Mode is the only thing hiding the route to it, and it " +
+                    "just defaulted ON — every player would find a scene full of practice " +
+                    "dummies on the main menu.");
+            }
+            finally
+            {
+                if (had) PlayerPrefs.SetInt(Settings.PlayerPreferences.DeveloperModeKey, saved);
+                else PlayerPrefs.DeleteKey(Settings.PlayerPreferences.DeveloperModeKey);
+                PlayerPrefs.Save();
+                Settings.PlayerPreferences.ResetCache();
+            }
         }
 
         /// <summary>

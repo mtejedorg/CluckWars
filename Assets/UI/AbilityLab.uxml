@@ -1,0 +1,100 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <!-- Cluck Wars — Ability Lab control surface (2026-09-04).
+
+         WHY THIS EXISTS AS UI TOOLKIT AND NOT IMGUI.
+         The lab's controls were GUILayout widgets inside AbilityLabHud.OnGUI.
+         That works in the Editor and nowhere else: this project runs
+         activeInputHandler = 1 ("Input System Package"), and the Input System
+         "cannot generate input for IMGUI" (its own KnownLimitations.md), so
+         "the OnGUI methods in your player code won't receive any input events"
+         (UISupport.md). Editor GUI is explicitly exempt, which is why nobody
+         noticed while the lab was Editor-only. Every control below was dead in
+         any player build, Windows as well as Android.
+
+         Only INPUT is missing from player IMGUI, not drawing — so the read-only
+         telemetry stayed in AbilityLabHud.OnGUI, where immediate mode over live
+         networked state is genuinely the cheaper option. Everything you can
+         touch is here. Do not migrate controls back.
+
+         PICKING. The root is Ignore so taps fall through to the game and to the
+         TouchControls document underneath (which is what actually drives the
+         chicken). Only the toolbar and the sheet are interactive, and the sheet
+         is closed by default so the play area starts unobstructed.
+
+         SIZING. Follows the mobile contract at the top of CluckWarsTheme.uss:
+         1 dp ~= 2.35 USS px on this canvas, so the 48 dp touch floor is 113 px.
+         Every button and row below is >= 112 px tall. -->
+    <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTokens.uss" />
+    <ui:Style src="project://database/Assets/UI/Styles/AbilityLab.uss" />
+
+    <ui:VisualElement name="LabRoot" class="cw-lab-root" picking-mode="Ignore">
+
+        <!-- ── Always-on toolbar. The only thing visible when the sheet is shut,
+             and the lab's entire touch surface at rest. MENU is here rather than
+             inside the sheet because "get me out" must never be behind a
+             disclosure — on a phone there is no stop-play-mode button. ── -->
+        <ui:VisualElement name="LabToolbar" class="cw-lab-toolbar">
+            <ui:Button name="SheetBtn"     text="LAB"   class="cw-lab-tbtn cw-lab-tbtn--gold" />
+            <ui:Button name="ResetBtn"     text="RESET" class="cw-lab-tbtn" />
+            <ui:Button name="TelemetryBtn" text="TELE"  class="cw-lab-tbtn" />
+            <ui:Button name="MenuBtn"      text="MENU"  class="cw-lab-tbtn cw-lab-tbtn--danger" />
+        </ui:VisualElement>
+
+        <!-- ── The sheet. Hidden until SheetBtn is tapped. ── -->
+        <ui:VisualElement name="LabSheet" class="cw-lab-sheet">
+
+            <ui:VisualElement class="cw-lab-sheet__head">
+                <ui:Label text="ABILITY LAB" class="cw-lab-title" />
+                <ui:Button name="CloseBtn" text="X" class="cw-lab-close" />
+            </ui:VisualElement>
+
+            <ui:ScrollView name="LabScroll" class="cw-lab-scroll">
+
+                <!-- CLASS. A respawn, not a hot-swap — see
+                     AbilityLabBootstrapper.RespawnPlayerAs for why the body has
+                     to be rebuilt. Order matches the ChickenClass enum (0..3);
+                     AbilityLabPanel maps by index. -->
+                <ui:Label text="CLASS  (respawns the chicken)" class="cw-lab-section" />
+                <ui:VisualElement name="ClassRow" class="cw-lab-row">
+                    <ui:Button name="ClassWarrior"  text="WARRIOR"  class="cw-lab-chip" />
+                    <ui:Button name="ClassSpeedy"   text="SPEEDY"   class="cw-lab-chip" />
+                    <ui:Button name="ClassFatty"    text="FATTY"    class="cw-lab-chip" />
+                    <ui:Button name="ClassAssassin" text="ASSASSIN" class="cw-lab-chip" />
+                </ui:VisualElement>
+
+                <!-- LOADOUT. Pick what the next tap assigns to, then pick the
+                     ability. The list below is rebuilt from AbilityRegistrySO. -->
+                <ui:Label text="ASSIGN TO" class="cw-lab-section" />
+                <ui:VisualElement name="TargetRow" class="cw-lab-row">
+                    <ui:Button name="TargetPassive" text="PASV" class="cw-lab-chip" />
+                    <ui:Button name="TargetSlot0"   text="0"    class="cw-lab-chip" />
+                    <ui:Button name="TargetSlot1"   text="1"    class="cw-lab-chip" />
+                    <ui:Button name="TargetSlot2"   text="2"    class="cw-lab-chip" />
+                    <ui:Button name="TargetSlot3"   text="3"    class="cw-lab-chip" />
+                </ui:VisualElement>
+
+                <ui:Toggle name="IgnoreLegalityToggle" text="Ignore class legality" class="cw-lab-toggle" />
+
+                <!-- Populated by AbilityLabPanel.RebuildAbilityList(). Empty in
+                     the authored document on purpose: the contents depend on the
+                     spawned class and the legality toggle, so any placeholder
+                     here would be wrong the moment either changed. -->
+                <ui:VisualElement name="AbilityList" class="cw-lab-list" />
+
+                <!-- DUMMIES -->
+                <ui:Label text="DUMMIES" class="cw-lab-section" />
+                <ui:Toggle name="FrozenToggle" text="Frozen" class="cw-lab-toggle" />
+                <ui:Toggle name="PatrolToggle" text="Patrol" class="cw-lab-toggle" />
+                <ui:Label name="ResetIntervalLabel" text="Reset every 5.0s" class="cw-lab-value" />
+                <ui:Slider name="ResetIntervalSlider" low-value="1" high-value="30" value="5" class="cw-lab-slider" />
+
+                <!-- TIME -->
+                <ui:Label text="TIME &amp; COOLDOWNS" class="cw-lab-section" />
+                <ui:Toggle name="ZeroCooldownsToggle" text="Zero cooldowns" class="cw-lab-toggle" />
+                <ui:Label name="TimeScaleLabel" text="Time scale 1.00x" class="cw-lab-value" />
+                <ui:Slider name="TimeScaleSlider" low-value="0.1" high-value="1" value="1" class="cw-lab-slider" />
+
+            </ui:ScrollView>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>
