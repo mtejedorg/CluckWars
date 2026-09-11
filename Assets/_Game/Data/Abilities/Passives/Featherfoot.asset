@@ -30,3 +30,4 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 256
   Subclass: 4
+  _unlockKey: passive.featherfoot

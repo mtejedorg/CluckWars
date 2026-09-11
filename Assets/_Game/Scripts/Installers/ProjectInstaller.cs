@@ -3,6 +3,7 @@ using CluckWars.Diagnostics;
 using CluckWars.Gameplay;
 using CluckWars.Input;
 using CluckWars.Logging;
+using CluckWars.Progression;
 using CluckWars.Services;
 using CluckWars.Settings;
 using CluckWars.UI;
@@ -126,6 +127,10 @@ namespace CluckWars.Installers
 
             // Cross-scene mutable state for menu → match handoff.
             Container.Bind<ISessionSelectionService>().To<SessionSelectionService>().AsSingle();
+
+            // Progression: nobody listens yet — a legal state, so the Null sink is silent by design
+            // (CONVENTIONS.md silent-failure sorting rule). Slice 2 rebinds this to the real tracker.
+            Container.Bind<IMatchEventSink>().To<NullMatchEventSink>().AsSingle();
 
             // Static data assets — bound by instance so the same SO ships to every consumer.
             if (_chickenClassRegistry != null)

@@ -29,3 +29,4 @@ MonoBehaviour:
     m_Bits: 256
   StunRadius: 3.6
   StunDuration: 1
+  _unlockKey: ability.ambush

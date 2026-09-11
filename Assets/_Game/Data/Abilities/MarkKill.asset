@@ -29,3 +29,4 @@ MonoBehaviour:
     m_Bits: 256
   PeckSlotPreEquippedBy: 64
   SignaturePreEquippedBy: 0
+  _unlockKey: ability.mark_kill
