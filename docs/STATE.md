@@ -6,6 +6,140 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Progression Slice 1 — announcement sites (2026-09-11/12) — 635/635 green
+
+Second slice of the progression pitch milestone, on `feature/progression`. Gameplay now **announces** every
+round event to `IMatchEventSink`. **Zero runtime behaviour change:** the bound sink is
+`GuardedMatchEventSink` wrapping `NullMatchEventSink`, and `ChickenCargo.ReceiveStolen` performs exactly the
+raw `Cargo +=` it replaced. No gameplay value changed, so `docs/site/index.html` is untouched. qa-reviewer's
+deep review ("changes required, no blockers") was resolved in a fix pass on 2026-09-12 — see below.
+
+| Event | Site | Runs on |
+|---|---|---|
+| `RoundStarted` / `RoundEnded` | `GameManager.LateUpdate` → `RoundAnnouncer.Tick(State, TimeRemaining)` — a **poll**, never a ChangeDetector | every peer, no authority gate |
+| `ResourceBanked` | `ChickenCargo.FlushBaseDeposit`, once per batched flush that was actually sent (`RPC_AddDeposit` branch), emitted **after** the flush state is reset, with the amount captured first | depositor's state authority |
+| `ResourceStolen` | new `ChickenCargo.ReceiveStolen(amount, victim)` — called by Snatch, Sneaky Steal, Scrap, Roll Trample (credit **then** drain) and Spine Coat's steal-back in `ChickenController.CheckCollisionSlow` (drain **then** credit; the defender is the thief) | thief's state authority |
+| `OpponentDisabled` | `ChickenMatchStats.RPC_CreditKill`, after `Kills++` (RPC signature unchanged) | attacker's state authority |
+| `AbilityResolved` | `AbilityController.TryActivate`, beside `LastCastEventId++`; `connected = hitCount > 0` | caster's state authority |
+
+- **New runtime (`Gameplay/`):** `MatchActorId` (the only actor-id derivation), `RoundEdgeDetector` (pure
+  `MatchState` → Started/Ended edges), `RoundStandingsBuilder` (pure ranking), `RoundSnapshotSelector` (pure
+  picking rules over plain tuples: one row per claimed base, decoys never own a base or count as local,
+  orphaned bases keep a `None` row), `RoundAnnouncer` (pure; owns the detector, the captured ruleset and the
+  last Active `TimeRemaining`) and `IRoundSnapshotSource`, which `GameManager` implements as an explicit
+  interface implementation. Passing an interface rather than delegates is what keeps the per-frame tick free of
+  delegate allocations. Standings and ruleset are captured **once, on the edge**.
+- **New runtime (`Progression/`):** `GuardedMatchEventSink` — the decorator `ProjectInstaller` always binds
+  around the real sink. It catches every exception from the inner sink, logs one `Error` per event kind (the
+  first failure, with the exception) and then only counts (`FailureCount(Verb)`), so a broken sink can never
+  half-apply a steal or put an Error on every deposit.
+- **Injection:** `ChickenCargo`, `AbilityController` and `GameManager` gained the sink in `Construct`, and
+  their existing self-inject resolves it. `ChickenMatchStats` had no injection; it now has `Construct` + a
+  ProjectContext self-inject at the top of `Spawned`. The four steal ability SOs gained **no** injection. Each
+  of the four components logs **one** `Error` in `Spawned` if the sink is still null after injection (never per
+  emit); `GameManager` then leaves its `RoundAnnouncer` null instead of throwing, so the match still starts.
+- **Resimulation / `Runner.IsForward` (observation, scoped to `FixedUpdateNetwork`).** Per the Fusion docs
+  (`Simulation.IsResimulation`), resimulation happens on a client doing prediction when a newer StateAuthority
+  snapshot arrives; the state authority itself is not rolled back. The three tick-driven emits run inside a
+  `HasStateAuthority`-gated `FixedUpdateNetwork`, so we do not expect any of them to run in a resimulation in
+  Single, Shared or Host/Server mode as the code stands. `IsForward` guards those three emits anyway (free, and
+  protects against a future prediction change); the credit/deposit logic is never guarded. `RPC_CreditKill`
+  needs no guard: RPCs are not re-invoked during resims (`RpcLocalInvokeResult.NotInvokableDuringResim`).
+  Observed in the solo play-mode run: `IsForward` read `true` in `GameMode.Single` and every bot and human
+  tick-driven event arrived.
+- **Tests:** +65 (570 → 635, unfiltered EditMode, re-run 2026-09-12 after the fix pass). `MatchEventSinkTests` —
+  the edge detector incl. an exhaustive 5,460-sequence oracle for the "no Ended without Started" invariant;
+  standings tie rule, `Mathf.Approximately` tie, input-order independence, orphaned `None` rows; the snapshot
+  selector (decoy exclusion per corner in either list order, local = `isLocal && !isDecoy`, no local → `None`,
+  orphan rows); the announcer (ruleset only on Started, duration, snapshot exactly once, restart, late join);
+  the guard (a throwing inner sink never throws and logs exactly one Error per kind; a healthy one gets every
+  call unchanged); one source-level pin per emit site (`ResourceBanked` only when sent and after the flush
+  reset; `AbilityResolved` after both `LastCastEventId++` and `ability.OnActivate(`); `ReceiveStolen`'s first
+  statement is the unconditional credit; all five steal sites pass the drained **amount** and the drained
+  **victim** on the original side of the drain; no `GetChangeDetector(` in `GameManager`; and **the sink binding
+  actually resolves** — the shipped `ProjectContext.prefab` installer runs `InstallBindings()` into a fresh
+  `DiContainer` and `Resolve<IMatchEventSink>()` returns a single `GuardedMatchEventSink` wrapping
+  `NullMatchEventSink` (the test restores the installer's previous `Container` and the `AudioRegistry` clip slots
+  `ProceduralAudioBank.FillMissing` fills in memory — verified afterwards: asset not dirty, all 14 slots null).
+  `ProgressionBoundaryTests` — contract surface (default-deny, non-blind), no `.Cargo +=` outside
+  `ReceiveStolen` (allowlist `PeckAbilitySO`, rot-checked; `ChickenCargo.cs` exempt as the owner), progression
+  vocabulary, plus `SourceScan` self-tests (block comments, expression-bodied members). The scans are **code
+  lines only**, with `/* */` state tracked across lines: slice 0's docs legitimately cite gameplay provenance.
+  Progression may import `CluckWars.Logging` and `CluckWars.Services` (infrastructure); every other
+  `CluckWars.*` namespace is denied.
+- **Verified in play mode — a real solo round, no shipped debug path.** Entered play on `Bootstrap.unity`;
+  before the Game scene loaded, `script-execute` rebound `IMatchEventSink` on the live ProjectContext container
+  to an in-memory probe logging through `ILogService.Info` (source `SinkProbe`). Started solo through the menu's
+  own `ChooseMode(Solo)` → `OnReady` → `OnStartMatch`. The human's cast went through the **real input path**:
+  `TouchControlsController._held[3]` set, then cleared → `FusionNetworkService.OnInput` → `TryActivate` in FUN
+  (`LastCastEventId` 0 → 1). Captured across rounds 1–4 (actor ids: 1038 Speedy bot, 1039 Fatty bot,
+  1040 Assassin bot, 1042 Warrior human):
+  ```
+  20:44:59.52 AbilityResolved actor=1042 key=ability.egg_shell connected=False   <- human, real TryActivate
+  20:45:00.03 AbilityResolved actor=1040 key=ability.mark_kill connected=True
+  20:45:19.53 AbilityResolved actor=1038 key=ability.speed_burst connected=False
+  20:45:19.78 RoundEnded local=1042 duration=44,97 entries=[1040:class.assassin:P1:15,0; 1038:class.speedy:P2:5,0;
+              1039:class.fatty:P3:0,0; 1042:class.warrior:P3:0,0]
+  20:45:25.78 RoundStarted target=40 duration=45 maxActors=4                      <- restart, exactly 6 s later
+  20:45:29.46 AbilityResolved actor=1039 key=ability.peck connected=False
+  20:45:31.09 ResourceBanked actor=1038 amount=2,25
+  ```
+  Every `RoundEnded` named the human (1042) with four entries; the 0/0 tie shared P3. No steal or kill happened
+  in the captured rounds, so those two emits are covered by the source pins, not by this run. No new console
+  errors or warnings. The only errors were three MCP-plugin `Mobile_RPAsset.asset` load errors and one AI Toolkit
+  account warning, both Editor noise unrelated to this change. Side observation: the three bots played three
+  consecutive rounds identically, down to the banked amounts — expect identical journal lines in slice 2's
+  solo testing. This run predates the 2026-09-12 fix pass (guard binding, deposit-emit reorder, orphan rows,
+  extracted selector); those changes are covered by the unit tests above and were not re-run in play mode.
+- **No Maestro prefab-wiring steps.**
+
+### What slice 2 needs to know
+
+- **Actor ids** are `MatchActorId.Of(...)` — the `NetworkId` raw value, `unchecked` to `int` (may be negative);
+  `MatchActorId.None` (0) means "no actor". Unique per session only: bucket per round, never persist.
+- **Bot events arrive.** In solo the player's peer simulates the three bots; bucket every actor, and take the
+  human's bucket from `RoundEnded.localActorId` (resolved with `HasInputAuthority && !IsDecoy`).
+- **Order within one steal cast** is `ResourceStolen` (inside `OnActivate`) then `AbilityResolved`.
+- **`ResourceStolen` is the thief's optimistic credit** — the victim's `RPC_DrainStolen` can still refuse it
+  (`StealRules`), so it is not what the victim lost.
+- **`ResourceBanked` is the flush attempt** — `PlayerBase.RPC_AddFood` can still refuse it. Rewards based on what
+  was banked should read the totals in `RoundEnded`'s standings, not sum this event.
+- **The Spoiler match-end bonus** (`GameManager.AwardMatchEndBonuses` → `AddFoodAuthoritative`) lands in the
+  standings' `ResourceTotal` but is **not** announced as `ResourceBanked`, so per-actor banked sums will not equal
+  standings totals (seen live: the Assassin placed P1 on 15 with nothing banked).
+- **`connected = false` means "unknown"** for families where `AbilityBaseSO.ReportsCastHits` is false (self-buffs,
+  placed zones, Peck). Zone control abilities (Root Egg, Feather Trap) never read as connected — this matters for
+  the "Land N control abilities" weekly goal.
+- **The Ability Lab** holds `GameManager` Active forever: the lab emits `RoundStarted` and casts, never `RoundEnded`.
+- **An orphaned base** (claimed, no live chicken — a player who left) **keeps its standings row** with
+  `ActorId = MatchActorId.None` and `RoleKey = null` (plus a `Debug` line), so everyone else's placement still
+  counts what it banked. **A `None` entry is never an actor bucket** — skip it when awarding.
+- **Shared P1 vs. the announced winner.** Standings use competition ranking with `Mathf.Approximately` ties, so two
+  actors can both be P1 while `GameManager.EndOnTimerExpiry` names exactly one winner (its ties break on kills,
+  then corner). `Entries[0]` is not necessarily that winner — don't derive "won the round" from array position.
+- **Assassin execute — Maestro's ruling (2026-09-12), not implemented yet:** the execute **counts as a steal**
+  for the cargo actually transferred from the victim, **excluding** the extra `ExecuteBounty`. Today the transfer
+  goes victim → assassin's `BountyBag` (`ChickenCargo` ~:800, `RPC_TransferAllToBountyBag`) and is **not
+  announced**, and the `.Cargo +=` scan does not cover `BountyBag +=`. Before wiring it, slice 2 must confirm
+  **which peer runs the BountyBag transfer**: the assassin's own peer has to emit the `ResourceStolen`, or the
+  assassin never gets credit.
+- **A stalled remote Shared peer can merge two rounds.** If a remote peer stalls for longer than the 6 s restart
+  delay it can observe Active → Active and miss that round's Ended/Started pair. Solo is unaffected. Possible fix:
+  treat a change of `MatchTimer`'s target tick while Active as a new round.
+- **An abandoned round** produces a `RoundStarted` with no `RoundEnded`, and a `RoundEnded`'s `localActorId` can be
+  `MatchActorId.None` (no local non-decoy chicken on this peer).
+- **Remote peers** capture standings from their latest snapshot at the Ended edge, and Shared mode does not
+  guarantee cross-object atomicity between `State` and the bases' `FoodTotal`. Solo is unaffected.
+- **An abandoned session** (GameManager despawned mid-round) emits no `RoundEnded`; a new session gets a fresh
+  `RoundAnnouncer`, so a late joiner still gets `RoundStarted`.
+- **The sink must not throw** (in `IMatchEventSink`'s contract). The guard already exists: bind the tracker as
+  `GuardedMatchEventSink(tracker)` in `ProjectInstaller`, exactly where `NullMatchEventSink` sits today, and update
+  the binding test's `Inner` assertion. Every call is inline, mid-effect (e.g. just before the victim's drain RPC).
+- The boundary is in `docs/CONVENTIONS.md` → "Gameplay → progression boundary"; `UI/` is exempt from the
+  contract-surface scan for slice 2/3's consumers.
+
+---
+
 ## ✏️ Ability descriptions no longer mention damage (2026-09-12) — copy only
 
 Three `Description` strings still described the pre-v0.4 HP model. Rewritten (via

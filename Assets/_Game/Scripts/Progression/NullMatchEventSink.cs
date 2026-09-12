@@ -6,8 +6,8 @@ namespace CluckWars.Progression
     /// <remarks>
     /// A Null implementation is legitimate here, not a swallowed failure: "nobody is listening"
     /// is a legal state, so under the silent-failure sorting rule (<c>docs/CONVENTIONS.md</c>) it
-    /// stays silent. Slice 2 rebinds <see cref="IMatchEventSink"/> to the real tracker in
-    /// <c>ProjectInstaller</c>.
+    /// stays silent. <c>ProjectInstaller</c> binds it inside a <see cref="GuardedMatchEventSink"/>;
+    /// slice 2 replaces it there with the real tracker.
     /// </remarks>
     public sealed class NullMatchEventSink : IMatchEventSink
     {

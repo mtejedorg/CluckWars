@@ -79,9 +79,15 @@ namespace CluckWars.Installers
             // Cross-scene mutable state for menu → match handoff.
             Container.Bind<ISessionSelectionService>().To<SessionSelectionService>().AsSingle();
 
-            // Progression: nobody listens yet — a legal state, so the Null sink is silent by design
-            // (CONVENTIONS.md silent-failure sorting rule). Slice 2 rebinds this to the real tracker.
-            Container.Bind<IMatchEventSink>().To<NullMatchEventSink>().AsSingle();
+            // Progression: nobody listens yet — a legal state, so the inner sink is the silent Null one
+            // (CONVENTIONS.md silent-failure sorting rule); slice 2 swaps in the real tracker. Always
+            // behind GuardedMatchEventSink: every announcement is an inline call in the middle of a
+            // gameplay effect, so nothing a sink throws may reach the caller. ILogService is bound
+            // above and resolved lazily, when the sink is first resolved.
+            Container.Bind<IMatchEventSink>()
+                .FromMethod(ctx => new GuardedMatchEventSink(
+                    new NullMatchEventSink(), ctx.Container.Resolve<ILogService>()))
+                .AsSingle();
 
             // Static data assets — bound by instance so the same SO ships to every consumer.
             if (_chickenClassRegistry != null)

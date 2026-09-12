@@ -1202,7 +1202,9 @@ namespace CluckWars.Gameplay
                             // SpineCoatAbilitySO.NominalStealAmount, which is the same authored
                             // number StealBackAmount was set from.
                             other.Cargo.RPC_DrainStolen(stolen, Id);
-                            Cargo.Cargo += stolen;
+                            // The defender is the thief here, so the "victim" is the attacker.
+                            // Drain-then-credit is this site's historical order; keep it.
+                            Cargo.ReceiveStolen(stolen, other);
                         }
                         var dir = (other.transform.position - transform.position);
                         dir.y = 0f;

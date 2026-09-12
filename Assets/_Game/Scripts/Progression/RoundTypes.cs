@@ -7,7 +7,7 @@ namespace CluckWars.Progression
 {
     /// <summary>The rules a round is played under, captured once when it starts.</summary>
     /// <remarks>
-    /// Slice 1 captures this from <c>MatchConfigSO</c> at round start
+    /// <c>GameManager</c> captures this from <c>MatchConfigSO</c> on the round's Started edge
     /// (<c>FoodTargetToWin</c>, <c>MatchDurationSeconds</c>, <c>MaxPlayers</c>).
     /// </remarks>
     [Serializable]
@@ -27,10 +27,17 @@ namespace CluckWars.Progression
     [Serializable]
     public struct RoundStandingEntry
     {
-        /// <summary>Opaque actor identity, the same value the sink's events carried.</summary>
+        /// <summary>
+        /// Opaque actor identity, the same value the sink's events carried. May be
+        /// <c>MatchActorId.None</c> (0) for a claimed base whose actor left mid-round: such an entry
+        /// still ranks by its total, but it is never an actor's bucket.
+        /// </summary>
         public int ActorId;
 
-        /// <summary>The actor's role key from <see cref="UnlockKeyTable"/>, so per-role records need no extra event.</summary>
+        /// <summary>
+        /// The actor's role key from <see cref="UnlockKeyTable"/>, so per-role records need no extra
+        /// event. Null when <see cref="ActorId"/> is <c>MatchActorId.None</c>.
+        /// </summary>
         public string RoleKey;
 
         /// <summary>1-based finishing position; tied actors share the better placement.</summary>
