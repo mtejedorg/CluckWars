@@ -209,6 +209,50 @@ code calls `ctx.Log?.Error(...)`.
 
 ---
 
+## Gameplay → progression boundary
+
+Settled 2026-09-11 (progression slice 1). Gameplay *announces* what happened in a round to
+`IMatchEventSink`; it never asks progression anything back. There is no `.asmdef` under
+`Assets/_Game`, so the compiler cannot enforce the boundary — the tests below do.
+
+- **Contract surface.** Outside `Scripts/Progression/`, code may name only `IMatchEventSink`,
+  `RoundRuleset`, `RoundStandings`, `RoundStandingEntry` and `UnlockKeyTable` from
+  `CluckWars.Progression` — today and after slice 2 adds the tracker. The exceptions are
+  `Installers/` (the composition root binds the concrete sink), `UI/` (slice 2/3's progression
+  consumers) and `Editor/`. Every other folder, including a new one, is scanned.
+- **Progression speaks generically.** Code in `Progression/` says actor/resource/round/ability key,
+  never food/chicken/cluck, and imports no gameplay namespace. `UnlockKeyTable` is the one
+  translation point allowed to name a gameplay type.
+- **Actor ids** come only from `MatchActorId.Of(...)` (the `NetworkId` raw value;
+  `MatchActorId.None` = 0 = no actor). Emit sites never filter by actor — in solo the player's peer
+  simulates the bots, so bot events reach the sink too.
+- **`ChickenCargo.ReceiveStolen(amount, victim)` is the only steal credit.** Never write
+  `thiefCargo.Cargo += x` on a steal path; that credits silently and progression never hears of the
+  steal. Foraging (`PeckAbilitySO`) is the one allowlisted direct write. `ChickenCargo.cs` itself is
+  exempt from the `.Cargo +=` scan: it owns `Cargo` and declares `ReceiveStolen`, and its own writes
+  (deposit drains, round resets, the credit inside `ReceiveStolen`) are not steal credits by another
+  path. The bounty bag (`BountyBag +=`, the Assassin execute) is not covered by this scan.
+- **Emits are local calls, never RPCs.** The tick-driven ones (`ResourceBanked`, `ResourceStolen`,
+  `AbilityResolved`) are guarded by `Runner.IsForward`; the round edges are polled in
+  `GameManager.LateUpdate`, **never** via a `ChangeDetector` (see `PlayerBase.LateUpdate` for why
+  that is unreliable in `GameMode.Single`).
+- **A sink must not throw** — every call is inline, mid-effect. Callers may rely on the bound sink
+  never throwing: `ProjectInstaller` always binds `IMatchEventSink` as
+  `GuardedMatchEventSink(inner)` (`NullMatchEventSink` today, the tracker from slice 2). The guard
+  catches everything, logs one `Error` per event kind and then only counts, so a broken sink can never
+  half-apply a steal or bury the log. Only `Installers/` may name the guard or the inner sink.
+- **Wiring faults are loud once, never per emit.** Each emitting component logs one `Error` in
+  `Spawned` if the sink is still null after injection; `GameManager` then leaves its round announcer
+  null rather than throwing, so the match still starts.
+
+Enforced by `ProgressionBoundaryTests` (contract surface, no direct steal credit, progression
+vocabulary, scanner self-tests incl. block comments and expression-bodied members) and
+`MatchEventSinkTests` (one pin per emit site, the five steal sites' amount, victim and credit/drain
+order, no `GetChangeDetector(` in `GameManager`, the guard, the snapshot selector, and the sink binding
+resolves to the guard wrapping `NullMatchEventSink`).
+
+---
+
 ## Footguns (real bugs we hit)
 
 ### `LogLevel` collides with `Fusion.LogLevel`
