@@ -27,10 +27,9 @@ namespace CluckWars.Tests
         private const string ProgressionDir = SourceScan.ScriptsRoot + "/Progression";
 
         /// <summary>
-        /// The only <c>CluckWars.Progression</c> types code outside <c>Progression/</c> may name.
-        /// Everything else in the namespace — <c>NullMatchEventSink</c>, <c>GuardedMatchEventSink</c>,
-        /// from slice 2 the tracker, journal and service — is internal to progression, whatever its
-        /// C# visibility.
+        /// The only <c>CluckWars.Progression</c> types gameplay code may name. Everything else in the
+        /// namespace — the sinks, the tracker, the journal, the service — is internal to progression,
+        /// whatever its C# visibility. <c>UI/</c> has its own, slightly wider list (<see cref="UiSurface"/>).
         /// </summary>
         private static readonly string[] ContractSurface =
         {
@@ -42,11 +41,81 @@ namespace CluckWars.Tests
         };
 
         /// <summary>
-        /// Folders exempt from the contract-surface scan: progression itself, the composition root
-        /// (it names the concrete sinks), the UI (slice 2/3's progression consumers) and editor code.
-        /// Default-deny: any other folder, including one added later, is scanned automatically.
+        /// Folders exempt from the gameplay contract-surface scan: progression itself, the composition
+        /// root (it names the tracker, journal and service), the UI (scanned against its own, wider
+        /// <see cref="UiSurface"/> below) and editor code. Default-deny: any other folder, including one
+        /// added later, is scanned automatically.
         /// </summary>
         private static readonly string[] ExemptFolders = { "Progression", "Installers", "UI" };
+
+        // ---- 1b. The UI's surface --------------------------------------------------
+
+        private const string UiDir = SourceScan.ScriptsRoot + "/UI";
+
+        /// <summary>
+        /// What <c>UI/</c> may name from <c>CluckWars.Progression</c>: the contract surface plus the read
+        /// side of <see cref="IProgressionService"/>. UI reads progression only through that interface; it
+        /// never names the tracker, the service's concrete type, the journal or the ledger.
+        /// </summary>
+        private static readonly string[] UiSurface = ContractSurface.Concat(new[]
+        {
+            nameof(IProgressionService),
+            nameof(ProgressionProfile),
+            nameof(RoundAward),
+            nameof(ProgressionFault),
+            nameof(ProgressionFaultKind),
+        }).ToArray();
+
+        [Test]
+        public void UiCode_NamesOnlyTheProgressionReadSurface()
+        {
+            var progressionTypeNames = ProgressionTypeNames();
+            foreach (var allowed in UiSurface)
+            {
+                CollectionAssert.Contains(progressionTypeNames, allowed,
+                    $"UI surface type '{allowed}' no longer exists in CluckWars.Progression. Update UiSurface deliberately.");
+            }
+
+            var disallowed = progressionTypeNames.Except(UiSurface).ToList();
+            CollectionAssert.Contains(disallowed, nameof(MatchTracker), "The UI deny list lost MatchTracker — the sweep has gone blind.");
+            CollectionAssert.Contains(disallowed, nameof(ProgressionService),
+                "ProgressionService (the concrete type) must stay off the UI surface: UI reads IProgressionService.");
+
+            var files = SourceScan.FilesUnder(UiDir).ToList();
+            const string consumer = UiDir + "/MatchOverlaysController.cs";
+            Assert.IsTrue(files.Contains(consumer), $"{consumer} is not in the UI scan; the file enumeration changed.");
+            Assert.IsTrue(SourceScan.CodeLines(consumer).Any(l => Regex.IsMatch(l.Code, $@"\b{nameof(IProgressionService)}\b")),
+                $"{consumer} has no code line naming {nameof(IProgressionService)}; the UI scan would be checking nothing.");
+
+            var patterns = disallowed.Select(n => (Name: n, Rx: new Regex($@"\b{Regex.Escape(n)}\b"))).ToList();
+            var violations = new List<string>();
+            foreach (var path in files)
+            {
+                foreach (var (number, code) in SourceScan.CodeLines(path))
+                {
+                    foreach (var (name, rx) in patterns)
+                    {
+                        if (rx.IsMatch(code)) violations.Add($"{path}:{number} names {name}: {code}");
+                    }
+                }
+            }
+
+            Assert.IsEmpty(violations,
+                "UI code may name only the progression contract surface plus IProgressionService's read side (" +
+                string.Join(", ", UiSurface) + "). Violations:\n" + string.Join("\n", violations));
+        }
+
+        /// <summary>Every top-level type name in <c>CluckWars.Progression</c>, as the default-deny sweeps see them.</summary>
+        private static List<string> ProgressionTypeNames() =>
+            typeof(IMatchEventSink).Assembly.GetTypes()
+                .Where(t => t.Namespace != null &&
+                            (t.Namespace == "CluckWars.Progression" || t.Namespace.StartsWith("CluckWars.Progression.")))
+                .Where(t => !t.IsNested)
+                .Select(t => t.Name)
+                .Where(n => !n.Contains("<"))
+                .Select(n => n.Split('`')[0])
+                .Distinct()
+                .ToList();
 
         private static readonly string[] SinkConsumers =
         {
@@ -168,6 +237,63 @@ namespace CluckWars.Tests
                 Assert.IsTrue(SourceScan.CodeLines(path).Any(l => DirectCargoWrite.IsMatch(l.Code)),
                     $"Allowlisted {file} no longer writes '.Cargo +='. Remove it from the allowlist so the " +
                     "exemption cannot cover a future steal.");
+            }
+        }
+
+        private static readonly Regex DirectBountyWrite = new Regex(@"\bBountyBag\s*\+=");
+
+        /// <summary>
+        /// Files allowed to pay into the bounty bag directly, each with the <b>one</b> write it may make.
+        /// <c>AssassinExecute</c> pays the flat <c>ExecuteBounty</c> — income, not a steal, so it is
+        /// deliberately never announced. Pinned to that exact statement so the exemption cannot cover a
+        /// second write (say, a victim's cargo) added to the same file later.
+        /// </summary>
+        private static readonly (string File, Regex OnlyWrite)[] DirectBountyWriteAllowlist =
+        {
+            ("AssassinExecute.cs", new Regex(@"^_cargo\.BountyBag\s*\+=\s*bounty\s*;$")),
+        };
+
+        [Test]
+        public void NoStealPath_WritesTheBountyBagDirectly()
+        {
+            var violations = new List<string>();
+            foreach (var path in SourceScan.AllRuntimeScripts())
+            {
+                // ChickenCargo owns BountyBag; its write is the execute's cargo transfer
+                // (RPC_TransferAllToBountyBag), which ChickenCargo.AnnounceExecuteSteal announces.
+                if (path.EndsWith("/ChickenCargo.cs")) continue;
+                var allowed = DirectBountyWriteAllowlist.FirstOrDefault(a => a.File == Path.GetFileName(path));
+
+                foreach (var (number, code) in SourceScan.CodeLines(path))
+                {
+                    if (!DirectBountyWrite.IsMatch(code)) continue;
+                    if (allowed.OnlyWrite != null && allowed.OnlyWrite.IsMatch(code)) continue;
+                    violations.Add($"{path}:{number}: {code}");
+                }
+            }
+
+            Assert.IsEmpty(violations,
+                "Cargo taken from a rival must not reach a bounty bag by a new path: the execute's transfer lives in " +
+                "ChickenCargo.RPC_TransferAllToBountyBag and is announced by ChickenCargo.AnnounceExecuteSteal. A raw " +
+                "'BountyBag +=' elsewhere credits silently. If it is income rather than a steal (like the execute " +
+                "bounty), add the file and its one statement to the allowlist here with a reason. Violations:\n" +
+                string.Join("\n", violations));
+        }
+
+        [Test]
+        public void DirectBountyWriteAllowlist_HasNotRotted_AndCoversExactlyOneWrite()
+        {
+            foreach (var (file, onlyWrite) in DirectBountyWriteAllowlist)
+            {
+                var path = SourceScan.AllRuntimeScripts().SingleOrDefault(p => Path.GetFileName(p) == file);
+                Assert.IsNotNull(path, $"Allowlisted {file} no longer exists. Remove it from the allowlist.");
+
+                var writes = SourceScan.CodeLines(path).Where(l => DirectBountyWrite.IsMatch(l.Code)).ToList();
+                Assert.AreEqual(1, writes.Count,
+                    $"Allowlisted {file} must write 'BountyBag +=' exactly once (found {writes.Count}): " +
+                    string.Join(" | ", writes.Select(w => w.Code)));
+                StringAssert.IsMatch(onlyWrite.ToString(), writes[0].Code,
+                    $"{file}'s one bounty-bag write must be the allowlisted statement (the execute bounty), not another credit.");
             }
         }
 

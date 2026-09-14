@@ -1,13 +1,13 @@
 namespace CluckWars.Progression
 {
     /// <summary>
-    /// The sink bound while nothing consumes match events. Every method is an intentional no-op.
+    /// A sink that ignores every match event. Every method is an intentional no-op.
     /// </summary>
     /// <remarks>
-    /// A Null implementation is legitimate here, not a swallowed failure: "nobody is listening"
-    /// is a legal state, so under the silent-failure sorting rule (<c>docs/CONVENTIONS.md</c>) it
-    /// stays silent. <c>ProjectInstaller</c> binds it inside a <see cref="GuardedMatchEventSink"/>;
-    /// slice 2 replaces it there with the real tracker.
+    /// A Null implementation is legitimate, not a swallowed failure: "nobody is listening" is a legal
+    /// state, so under the silent-failure sorting rule (<c>docs/CONVENTIONS.md</c>) it stays silent. It is
+    /// no longer bound at runtime — <c>ProjectInstaller</c> binds the <see cref="MatchTracker"/> inside a
+    /// <see cref="GuardedMatchEventSink"/> — and stays for tests and as the inner sink of guard tests.
     /// </remarks>
     public sealed class NullMatchEventSink : IMatchEventSink
     {
