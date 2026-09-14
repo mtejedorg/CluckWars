@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using CluckWars.Audio;
 using CluckWars.Gameplay;
 using CluckWars.Input;
@@ -43,6 +46,11 @@ namespace CluckWars.Installers
                  "it from this one slot, so the advertised rules and the played rules cannot drift.")]
         [SerializeField] private MatchConfigSO _matchConfig;
 
+        [Tooltip("Drop the ProgressionConfig asset here (Assets/_Game/Data/Progression). The Grain " +
+                 "earn constants. The balance is re-derived from it on every load, so it must be the " +
+                 "authored asset, not the SO's code defaults.")]
+        [SerializeField] private ProgressionConfigSO _progressionConfig;
+
         public override void InstallBindings()
         {
             // Logger bound first so other bindings can complain through it during install if they need to.
@@ -79,15 +87,53 @@ namespace CluckWars.Installers
             // Cross-scene mutable state for menu → match handoff.
             Container.Bind<ISessionSelectionService>().To<SessionSelectionService>().AsSingle();
 
-            // Progression: nobody listens yet — a legal state, so the inner sink is the silent Null one
-            // (CONVENTIONS.md silent-failure sorting rule); slice 2 swaps in the real tracker. Always
-            // behind GuardedMatchEventSink: every announcement is an inline call in the middle of a
-            // gameplay effect, so nothing a sink throws may reach the caller. ILogService is bound
-            // above and resolved lazily, when the sink is first resolved.
+            // Progression. The MatchTracker is the real sink, always behind GuardedMatchEventSink:
+            // every announcement is an inline call in the middle of a gameplay effect, so nothing a
+            // sink throws may reach the caller. Every binding here is a lazy FromMethod — nothing is
+            // constructed, and no file is touched, at install time.
+            Container.Bind<MatchTracker>()
+                .FromMethod(ctx => new MatchTracker(ctx.Container.Resolve<ILogService>()))
+                .AsSingle();
             Container.Bind<IMatchEventSink>()
                 .FromMethod(ctx => new GuardedMatchEventSink(
-                    new NullMatchEventSink(), ctx.Container.Resolve<ILogService>()))
+                    ctx.Container.Resolve<MatchTracker>(), ctx.Container.Resolve<ILogService>()))
                 .AsSingle();
+
+            // The balance is re-derived from this asset on every load, so a silently-defaulted
+            // config would change every past round's Grain: the null slot is loud.
+            var progressionConfig = _progressionConfig != null
+                ? _progressionConfig
+                : ScriptableObject.CreateInstance<ProgressionConfigSO>();
+            Container.Bind<ProgressionConfigSO>().FromInstance(progressionConfig).AsSingle();
+            if (_progressionConfig == null)
+            {
+                Debug.LogWarning(
+                    "[ProjectInstaller] ProgressionConfig not assigned — falling back to the SO's " +
+                    "built-in defaults. Every round's Grain, and so the balance, is NOT coming from " +
+                    "Data/Progression/ProgressionConfig.asset. Assign it here.");
+            }
+
+            // The journal directory, resolved here as a path only (JournalStore does no I/O until it is
+            // loaded). `-progressionDir <path>` points it elsewhere, so tools/run-clients.ps1 gives each
+            // local client its own journal and test rounds never reach the real one.
+            string journalDirectory = ResolveProgressionDirectory(
+                Environment.GetCommandLineArgs(), Application.persistentDataPath, out string journalDirectoryWarning);
+            if (journalDirectoryWarning != null) Debug.LogWarning("[ProjectInstaller] " + journalDirectoryWarning);
+            Container.Bind<JournalStore>()
+                .FromMethod(_ => new JournalStore(journalDirectory))
+                .AsSingle();
+
+            // NonLazy: the service must exist, and be subscribed to the tracker, before the first
+            // round can end. Its constructor does no I/O; the project kernel's Initialize() loads the
+            // journal at startup (a bare container that never initializes it never touches a file).
+            Container.BindInterfacesAndSelfTo<ProgressionService>()
+                .FromMethod(ctx => new ProgressionService(
+                    ctx.Container.Resolve<ILogService>(),
+                    ctx.Container.Resolve<MatchTracker>(),
+                    ctx.Container.Resolve<ProgressionConfigSO>(),
+                    ctx.Container.Resolve<JournalStore>()))
+                .AsSingle()
+                .NonLazy();
 
             // Static data assets — bound by instance so the same SO ships to every consumer.
             if (_chickenClassRegistry != null)
@@ -171,6 +217,51 @@ namespace CluckWars.Installers
                     "built-in defaults. Match duration, food target and MaxPlayers are NOT " +
                     "coming from MatchConfig.asset. Assign it here.");
             }
+        }
+
+        /// <summary>
+        /// The command-line switch that moves the progression journal. <c>tools/run-clients.ps1</c> gives each
+        /// local client its own, so test rounds never reach the real journal and clients never share a file.
+        /// </summary>
+        public const string ProgressionDirSwitch = "-progressionDir";
+
+        /// <summary>
+        /// The progression journal's directory: the value after <see cref="ProgressionDirSwitch"/> when the
+        /// command line has one (a relative path resolves against the working directory), else
+        /// <c>persistentDataPath/progression</c>. Pure: no file is touched.
+        /// </summary>
+        /// <param name="warning">Why a present switch was ignored, or null.</param>
+        public static string ResolveProgressionDirectory(IReadOnlyList<string> commandLine, string persistentDataPath,
+            out string warning)
+        {
+            warning = null;
+            string fallback = Path.Combine(persistentDataPath ?? string.Empty, "progression");
+            if (commandLine == null) return fallback;
+
+            for (int i = 0; i < commandLine.Count; i++)
+            {
+                if (!string.Equals(commandLine[i], ProgressionDirSwitch, StringComparison.OrdinalIgnoreCase)) continue;
+
+                string value = i + 1 < commandLine.Count ? commandLine[i + 1] : null;
+                if (string.IsNullOrWhiteSpace(value) || value.StartsWith("-", StringComparison.Ordinal))
+                {
+                    warning = $"{ProgressionDirSwitch} was given without a directory; the journal stays at {fallback}.";
+                    return fallback;
+                }
+
+                try
+                {
+                    return Path.GetFullPath(value);
+                }
+                catch (Exception e)
+                {
+                    warning = $"{ProgressionDirSwitch} '{value}' is not a usable path ({e.GetType().Name}: {e.Message}); " +
+                              $"the journal stays at {fallback}.";
+                    return fallback;
+                }
+            }
+
+            return fallback;
         }
     }
 }

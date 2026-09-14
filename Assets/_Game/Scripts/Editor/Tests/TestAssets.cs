@@ -31,6 +31,7 @@ namespace CluckWars.Tests
         public const string ColorSchemePath          = DataRoot + "/ColorScheme.asset";
         public const string PrefabRegistryPath       = DataRoot + "/PrefabRegistry.asset";
         public const string AudioRegistryPath        = DataRoot + "/AudioRegistry.asset";
+        public const string ProgressionConfigPath    = DataRoot + "/Progression/ProgressionConfig.asset";
 
         public const string ChickenPrefabPath      = PrefabsDir + "/Chicken.prefab";
         public const string DoppelgangerPrefabPath = PrefabsDir + "/Doppelganger.prefab";

@@ -125,6 +125,20 @@ namespace CluckWars.Gameplay
                     // Target execute
                     if (target.Cargo != null)
                     {
+                        // Progression counts the execute as a steal of the victim's cargo, never of
+                        // the bounty below. Read BEFORE the RPC: in solo it invokes locally and
+                        // synchronously and zeroes it. Announced here, on this assassin's
+                        // authority, because the transfer body runs on the victim's authority.
+                        float victimCargo = target.Cargo.Cargo;
+                        if (_cargo != null) _cargo.AnnounceExecuteSteal(victimCargo, target);
+                        else
+                        {
+                            // Wiring bug (the Chicken prefab always carries a ChickenCargo). Executes are
+                            // rare, so once per execute is not noise.
+                            _log?.Error(Source, $"{name}: AssassinExecute found no ChickenCargo on its own chicken, so " +
+                                $"this execute's steal of {victimCargo:0.#} is not announced to progression and its " +
+                                "execute bounty cannot be paid. Check the Chicken prefab.");
+                        }
                         target.Cargo.RPC_TransferAllToBountyBag(Id);
                     }
                     if (target.Combat != null)

@@ -1,7 +1,9 @@
 using System.Collections.Generic;
+using System.Globalization;
 using CluckWars.Gameplay;
 using CluckWars.Logging;
 using CluckWars.Networking;
+using CluckWars.Progression;
 using CluckWars.Services;
 using Fusion;
 using UnityEngine;
@@ -59,6 +61,7 @@ namespace CluckWars.UI
         private ColorSchemeSO            _colors;      // injected for DI parity with MatchHud
         private MatchConfigSO            _matchConfig;
         private ISessionSelectionService _selection;
+        private IProgressionService      _progression;
 
         // ---- UI element refs (queried once, on bind) ---------------------------
         private VisualElement _root;
@@ -66,7 +69,9 @@ namespace CluckWars.UI
 
         private VisualElement _matchEndOverlay, _lobbyOverlay, _sessionEndOverlay, _introOverlay;
 
-        private Label         _meRibbon, _meWinSub, _meWinName, _meWinScore, _meTargetNote, _meRestart;
+        private Label         _meRibbon, _meWinSub, _meWinName, _meWinScore, _meTargetNote, _meRestart, _meGrain;
+        // The round whose award _meGrain's text was built for, so the text is built once per award.
+        private string        _meGrainRoundId;
         private VisualElement _meWinChicken, _meWinGlow, _meWinRing, _meRows;
         // .cw-chicken--<class> currently on the win-screen hero art (for swap).
         private string        _meWinChickenClass;
@@ -96,13 +101,15 @@ namespace CluckWars.UI
             ILogService              log,
             ColorSchemeSO            colors,
             MatchConfigSO            matchConfig,
-            ISessionSelectionService selection)
+            ISessionSelectionService selection,
+            IProgressionService      progression)
         {
             _network     = network;
             _log         = log;
             _colors      = colors;
             _matchConfig = matchConfig;
             _selection   = selection;
+            _progression = progression;
         }
 
         // ---- Unity lifecycle ---------------------------------------------------
@@ -119,6 +126,16 @@ namespace CluckWars.UI
             }
 
             if (_network != null) _network.OnShutdown += HandleShutdown;
+            if (_progression == null)
+            {
+                // IProgressionService is always bound project-wide, so a null here is a wiring bug.
+                _log?.Error(Source, "IProgressionService was not injected, so the results panel will never show " +
+                    "the round's Grain. Check the progression bindings in ProjectInstaller.");
+            }
+
+            // An award that exists before this panel does belongs to an earlier session's round: joining a
+            // session already on its results screen fires no RoundStarted, so the service has not cleared it.
+            _staleGrainRoundId = _progression?.LatestAward?.RoundId;
             EnsureEventSystem();
         }
 
@@ -198,7 +215,13 @@ namespace CluckWars.UI
             _meWinScore   = _root.Q<Label>("MeWinScore");
             _meTargetNote = _root.Q<Label>("MeTargetNote");
             _meRestart    = _root.Q<Label>("MeRestart");
+            _meGrain      = _root.Q<Label>("MeGrain");
             _meRows       = _root.Q<VisualElement>("MeRows");
+            if (_meGrain == null)
+            {
+                _log?.Error(Source, "MatchOverlays.uxml has no Label named 'MeGrain', so the results panel will " +
+                    "never show the round's Grain. Restore the element (see ResultsGrainLineTests).");
+            }
 
             _codeTiles        = _root.Q<VisualElement>("CodeTiles");
             _lobbyGrid        = _root.Q<VisualElement>("LobbyGrid");
@@ -245,6 +268,7 @@ namespace CluckWars.UI
         {
             bool show = gm != null && gm.State == MatchState.Ended;
             SetShown(_matchEndOverlay, show);
+            RefreshGrainLine(show);
             if (!show) { _matchEndPopulated = false; return; }
 
             // Scores freeze once the match ends, so build the hero + rows once on
@@ -263,6 +287,60 @@ namespace CluckWars.UI
                     : "Starting next match…";
             }
         }
+
+        /// <summary>
+        /// The one progression line on the results panel. The panel opens here in <c>Update</c>, before
+        /// <c>GameManager.LateUpdate</c> announces <c>RoundEnded</c> that frame, so the award arrives a
+        /// frame after the panel: until then the line is simply absent (no spinner, no placeholder).
+        /// </summary>
+        private void RefreshGrainLine(bool panelShown)
+        {
+            if (_meGrain == null) return;
+
+            bool show = ShowsGrainLine(panelShown, _progression, _staleGrainRoundId, out var award);
+            if (show && award.RoundId != _meGrainRoundId)
+            {
+                _meGrain.text = GrainLineText(award.Grain);
+                _meGrainRoundId = award.RoundId; // built once per award, not per frame
+            }
+            SetShown(_meGrain, show);
+        }
+
+        // The round whose award already existed when this panel was created (captured in Awake): never shown.
+        private string _staleGrainRoundId;
+
+        /// <summary>
+        /// Whether the results panel shows "+N Grain": the panel is up, progression is loaded and has
+        /// recorded a round since this panel was created, and the award is positive.
+        /// </summary>
+        /// <param name="staleRoundId">
+        /// The award that existed when the panel was created. The service clears <c>LatestAward</c> when a
+        /// round opens, but a player who joins a session already on its results screen hears no round open,
+        /// so the previous session's award would otherwise show here.
+        /// </param>
+        /// <remarks>
+        /// <c>RoundAward.Grain</c> is the balance delta. If the device clock went backwards the new
+        /// round can take an earlier round's rested slot, so the delta can be zero or negative; the
+        /// line is then hidden rather than rendered as "+-N". The journal and balance stay exact.
+        /// </remarks>
+        public static bool ShowsGrainLine(bool panelShown, IProgressionService progression, string staleRoundId,
+            out RoundAward award)
+        {
+            award = default;
+            if (!panelShown || progression == null || !progression.IsReady) return false;
+
+            var latest = progression.LatestAward;
+            if (!latest.HasValue || latest.Value.Grain <= 0) return false;
+            if (staleRoundId != null && string.Equals(latest.Value.RoundId, staleRoundId, System.StringComparison.Ordinal))
+                return false;
+
+            award = latest.Value;
+            return true;
+        }
+
+        /// <summary>"+37 Grain". Invariant digits, no separators, no icon (LilitaOne has ~225 glyphs).</summary>
+        public static string GrainLineText(int grain) =>
+            "+" + grain.ToString(CultureInfo.InvariantCulture) + " Grain";
 
         private void PopulateMatchEnd(GameManager gm)
         {

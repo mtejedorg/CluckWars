@@ -64,7 +64,13 @@
                     <!-- Controller fills with up to 4 .cw-me-row rows -->
                     <ui:VisualElement name="MeRows" class="cw-me-rows" />
 
-                    <ui:Label name="MeRestart" text="Next match in 5s…" class="cw-me-restart" />
+                    <!-- Footer: the round's Grain beside the restart countdown, in one row so the
+                         panel is no taller than before. MeGrain stays hidden until progression has
+                         recorded the round (a frame after the panel opens); never a placeholder. -->
+                    <ui:VisualElement name="MeFooter" class="cw-me-footer">
+                        <ui:Label name="MeGrain" text="+0 Grain" class="cw-me-head__title cw-me-grain" style="display: none;" />
+                        <ui:Label name="MeRestart" text="Next match in 5s…" class="cw-me-restart" />
+                    </ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>

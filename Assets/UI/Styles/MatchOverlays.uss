@@ -247,6 +247,24 @@
     flex-shrink: 0;
 }
 
+/* Footer row: "+N Grain" beside the restart countdown. One row, not a third stacked
+   line, so the Grain line adds no height: the row carries the restart line's old top
+   margin and the Grain label (48px) is shorter than the restart label, so the panel is
+   the same height with the line shown or hidden (measured in play mode, 2026-09-13).
+   A stacked line made the whole panel one line taller. */
+.cw-me-footer {
+    flex-direction: row; justify-content: center; align-items: center;
+    margin-top: 18px; flex-shrink: 0;
+}
+.cw-me-footer > .cw-me-restart { margin-top: 0; }
+
+/* "+N Grain" — the one progression line. Type comes from .cw-me-head__title
+   (LilitaOne, gold). Text only: no icon, no new glyphs. */
+.cw-me-grain {
+    -unity-text-align: middle-center; margin-right: 30px;
+    flex-shrink: 0;
+}
+
 /* ============================================================================
    MATCH LOBBY  (rail + 2×2 grid) — same visual language as menu lobby
    ============================================================================ */

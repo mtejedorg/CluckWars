@@ -892,16 +892,110 @@ namespace CluckWars.Tests
                 Assert.IsNotNull(guard,
                     $"ProjectInstaller must bind IMatchEventSink behind GuardedMatchEventSink (got {sink?.GetType().Name}). " +
                     "Every announcement is an inline call mid-effect, so nothing a sink throws may reach gameplay.");
-                Assert.IsInstanceOf<NullMatchEventSink>(guard.Inner,
-                    "Until slice 2 swaps in the tracker, the guard must wrap NullMatchEventSink.");
+                var tracker = guard.Inner as MatchTracker;
+                Assert.IsNotNull(tracker,
+                    $"Since slice 2 the guard must wrap the MatchTracker (got {guard.Inner?.GetType().Name}).");
                 Assert.AreSame(sink, container.Resolve<IMatchEventSink>(),
                     "The sink must be a single instance: every consumer has to talk to the same tracker.");
+                Assert.AreSame(tracker, container.Resolve<MatchTracker>(),
+                    "The tracker inside the guard must be the one bound MatchTracker.");
+
+                // The progression service: one instance, listening to that same tracker, and never
+                // initialized here — a bare container runs no IInitializable, so the real journal under
+                // persistentDataPath is not touched.
+                var service = container.Resolve<IProgressionService>();
+                Assert.IsInstanceOf<ProgressionService>(service);
+                Assert.AreSame(service, container.Resolve<IProgressionService>(), "IProgressionService must be a single instance.");
+                Assert.AreSame(service, container.Resolve<ProgressionService>(),
+                    "BindInterfacesAndSelfTo must yield one instance for the interface and the concrete type.");
+                Assert.IsInstanceOf<IInitializable>(service,
+                    "The project kernel loads the journal through IInitializable; without it progression never becomes ready.");
+                Assert.AreSame(tracker, TestAssets.PrivateField<MatchTracker>(service, "_tracker"),
+                    "The service must listen to the tracker the sink feeds, or no round is ever recorded.");
+                Assert.IsFalse(service.IsReady, "Resolving the service must not load the journal; only Initialize() does.");
+                Assert.AreEqual(
+                    System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.persistentDataPath, "progression", JournalStore.FileName)),
+                    System.IO.Path.GetFullPath(((ProgressionService)service).JournalPath),
+                    "The journal lives at persistentDataPath/progression/journal.jsonl.");
             }
             finally
             {
                 containerProperty.SetValue(installer, previousContainer);
                 restoreAudio();
             }
+        }
+
+        // ==== The Assassin execute: the sixth steal site ===================================
+
+        private const string AssassinExecutePath = GameplayDir + "/AssassinExecute.cs";
+
+        /// <summary>AnnounceExecuteSteal(amount, victim) with simple arguments.</summary>
+        private static readonly Regex ExecuteAnnounceCall = new Regex(@"\bAnnounceExecuteSteal\(\s*(\w+)\s*,\s*(\w+)\s*\)");
+
+        /// <summary>
+        /// Maestro's ruling (2026-09-12): the execute counts as a steal of the cargo actually transferred,
+        /// excluding <c>ExecuteBounty</c>. The transfer RPC runs on the <b>victim's</b> authority, so the
+        /// announcement must come from <c>Press</c>, on the assassin's — with the victim's cargo read
+        /// <b>before</b> the RPC, which in solo invokes locally and synchronously and zeroes it.
+        /// </summary>
+        [Test]
+        public void StealSite_AssassinExecute_AnnouncesTheCapturedVictimCargo_BeforeTheTransfer_NeverTheBounty()
+        {
+            const string Where = "AssassinExecute.Press";
+            var body = SourceScan.MethodBody(AssassinExecutePath, "bool Press(");
+            int announce = SourceScan.IndexOf(body, "AnnounceExecuteSteal(", Where);
+            int transfer = SourceScan.IndexOf(body, "RPC_TransferAllToBountyBag(", Where);
+
+            Assert.Less(announce, transfer,
+                $"{Where} must announce before RPC_TransferAllToBountyBag: in solo the RPC runs synchronously and zeroes the victim's cargo.");
+
+            var call = ExecuteAnnounceCall.Match(body[announce].Code);
+            Assert.IsTrue(call.Success, $"{Where}: expected AnnounceExecuteSteal(amount, victim) with simple arguments, got: {body[announce].Code}");
+            string amount = call.Groups[1].Value;
+            Assert.AreEqual("target", call.Groups[2].Value, $"{Where}: the announced victim must be the executed target.");
+            StringAssert.DoesNotMatch("(?i)bounty", body[announce].Code, $"{Where}: ExecuteBounty is income, never a steal.");
+            StringAssert.IsMatch(@"\b_cargo\.AnnounceExecuteSteal\(", body[announce].Code,
+                $"{Where}: the assassin's own ChickenCargo announces, on the assassin's authority.");
+            StringAssert.DoesNotContain("?.AnnounceExecuteSteal", body[announce].Code,
+                $"{Where}: a missing ChickenCargo is a wiring Error (silent-failure rule), not a silent '?.' skip.");
+            int missingCargo = body.FindIndex(announce, l => l.Code.Contains("_log?.Error(") && l.Code.Contains("ChickenCargo"));
+            Assert.IsTrue(missingCargo > announce && missingCargo < transfer,
+                $"{Where}: when the assassin has no ChickenCargo, an Error naming it must be logged before the transfer.");
+
+            int capture = body.FindIndex(l => Regex.IsMatch(l.Code, $@"^float\s+{Regex.Escape(amount)}\s*=\s*target\.Cargo\.Cargo\s*;$"));
+            Assert.GreaterOrEqual(capture, 0, $"{Where}: '{amount}' must be a local read from target.Cargo.Cargo (the victim's replicated cargo).");
+            Assert.Less(capture, announce, $"{Where}: the victim's cargo must be read before it is announced.");
+            for (int i = capture + 1; i <= transfer; i++)
+            {
+                StringAssert.DoesNotMatch($@"\b{Regex.Escape(amount)}\s*([-+*/]?=)(?!=)", body[i].Code,
+                    $"{Where}: '{amount}' must not be reassigned between the read and the transfer.");
+            }
+            Assert.IsFalse(body.Any(l => Regex.IsMatch(l.Code, $@"\b{Regex.Escape(amount)}\b") && Regex.IsMatch(l.Code, @"(?i)bounty")),
+                $"{Where}: the bounty must never flow into the announced amount.");
+        }
+
+        [Test]
+        public void AnnounceExecuteSteal_AnnouncesOnlyAPositiveAmount_OnForwardTicks_AndWritesNoCargo()
+        {
+            const string Where = "ChickenCargo.AnnounceExecuteSteal";
+            var body = SourceScan.MethodBody(ChickenCargoPath, "void AnnounceExecuteSteal(");
+            Assert.IsTrue(body.Any(l => l.Code.Contains("ResourceStolen(")), $"{Where} must announce ResourceStolen.");
+            Assert.IsTrue(body.Any(l => l.Code.Contains("Runner.IsForward")), $"{Where} must be guarded by Runner.IsForward, like ReceiveStolen.");
+            Assert.IsTrue(body.Any(l => Regex.IsMatch(l.Code, @"\bamount\s*>\s*0f")),
+                $"{Where}: an execute on an empty-handed rival robs nothing and must not be announced.");
+            Assert.IsFalse(body.Any(l => Regex.IsMatch(l.Code, @"\b(Cargo|BountyBag)\s*[-+]?=(?!=)")),
+                $"{Where} is announce-only: the transfer is RPC_TransferAllToBountyBag on the victim's authority.");
+        }
+
+        [Test]
+        public void AnnounceExecuteSteal_IsCalledOnlyByTheExecute()
+        {
+            var callers = SourceScan.AllRuntimeScripts()
+                .Where(p => !p.EndsWith("/ChickenCargo.cs"))
+                .Where(p => SourceScan.CodeLines(p).Any(l => l.Code.Contains("AnnounceExecuteSteal(")))
+                .ToArray();
+            CollectionAssert.AreEquivalent(new[] { AssassinExecutePath }, callers,
+                "AnnounceExecuteSteal credits a steal without moving cargo; only the Assassin execute may call it.");
         }
 
         [TestCase(typeof(ChickenCargo))]
@@ -924,7 +1018,7 @@ namespace CluckWars.Tests
         /// Records which <see cref="AudioClip"/> slots on <paramref name="registry"/> are empty, and
         /// returns an action that empties them again, destroying whatever was generated into them.
         /// </summary>
-        private static Action SnapshotEmptyClipSlots(ScriptableObject registry)
+        internal static Action SnapshotEmptyClipSlots(ScriptableObject registry)
         {
             Assert.IsNotNull(registry, "ProjectInstaller._audioRegistry is empty on ProjectContext.prefab.");
 

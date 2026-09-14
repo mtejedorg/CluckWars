@@ -6,6 +6,167 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Progression Slice 2 — tracker, journal, Grain (2026-09-13, fix pass 2026-09-14) — 709/709 green
+
+Third slice of the progression pitch milestone, on `feature/progression` (uncommitted, awaiting code-architect +
+qa-reviewer). **First slice with a player-visible change:** every finished round is recorded to a local journal
+and earns Grain, shown as one "+N Grain" line on the results panel. No gameplay value changed; the only
+gameplay-code change is the Assassin execute's steal **announcement** (no cargo write). GDD §8/§11 and
+`docs/site/index.html` are deliberately untouched — one combined pass after slice 4.
+
+- **`Progression/` (new):** `MatchTracker` — the real `IMatchEventSink`: counters per actor (not event lists; the
+  Ability Lab never ends a round), the local bucket named only by `RoundEnded`, raises `RoundOpened` /
+  `OutcomeReady` and contains its subscribers' exceptions (first one `Error`, then counted). `RoundOutcome` —
+  facts only, no currency field. `ProgressionRules.Evaluate` — pure, total, `EvaluationStatus` separates "earned 0"
+  from "could not evaluate"; `FloorEpsilon` + float widening via round-trip decimal. `ProgressionCalendar` — the
+  one local-day helper. `ProgressionLedger.Fold` — dedupes by `RoundId` (differing duplicates → ordinal-smallest
+  serialization), walks in (instant, `RoundId`) order, re-derives every figure from the config. `JournalStore` —
+  JSON Lines at `persistentDataPath/progression/journal.jsonl`, append + flush, torn-tail repair / `.torn`
+  preservation, malformed middle lines skipped + reported, never throws. `IProgressionService` +
+  `ProgressionService` — no Null implementation (`IsReady = false` hides UI); no I/O until `Initialize()`; refolds
+  the whole journal per append; **appends and flushes before** `LatestAward` / `OnProfileChanged` →
+  `OnRoundAwarded`; clears `LatestAward` on `RoundOpened`.
+- **Config:** `ProgressionConfigSO` + `Assets/_Game/Data/Progression/ProgressionConfig.asset` (GUID `a4f1ebed…`):
+  Participation 20, PerBank 0.40, PerSteal 1.20, StealCap 12, PlacementGrain [14, 8, 5, 3], RestedMultiplier 1.5,
+  RestedRounds 3, DailyTaskBonus 15 (unused until slice 4). The code defaults mirror the asset (tested).
+- **Bindings (`ProjectInstaller`):** `MatchTracker` single; `IMatchEventSink` = `GuardedMatchEventSink(tracker)`
+  where the Null sink was; `_progressionConfig` slot (null → default instance + loud `Debug.LogWarning`), assigned on
+  `ProjectContext.prefab`; `JournalStore` (path string only); `BindInterfacesAndSelfTo<ProgressionService>` single +
+  `NonLazy`, all via lazy `FromMethod`. `NullMatchEventSink` stays for tests.
+- **UI:** `MatchOverlays.uxml` gains `MeFooter` (a row holding `MeGrain` + the existing `MeRestart`);
+  `MatchOverlaysController` injects `IProgressionService`. The line shows iff the panel is shown && `IsReady` &&
+  `LatestAward` present && **`Grain > 0`** (`ShowsGrainLine`); otherwise `display:none` — no spinner, no
+  placeholder. The award lands one frame after the panel opens (the panel opens in `Update`, `RoundEnded` fires in
+  `GameManager.LateUpdate`). **Why `> 0`:** `RoundAward.Grain` is the balance delta; if the device clock went
+  backwards the new round can take an earlier round's rested slot, so the delta can differ from the round's own
+  Grain and even be ≤ 0 — the line then hides rather than render "+-N" (journal and balance stay exact). Text only,
+  LilitaOne via `.cw-me-head__title`. **One-row footer, so the line adds no height:** the first build stacked it
+  as a third line, which made the whole panel one line taller. Measured live at 1575×886 with the footer: the panel
+  is 812 units tall with the Grain line shown **and** with it detached (footer 858–915, `MeGrain` 48 tall inside the
+  55-tall restart row). **Pre-existing, not slice 2:** at this Game-view size "Next match in Ns…" already sits on the
+  stretched `PanelFrame.png`'s bottom edge (the footer ends exactly at the panel's 30px inner padding, where the frame
+  art draws its border) — visible in a screenshot with `MeGrain` detached. Left for ui-designer.
+- **Accepted deviation:** a round that cannot be evaluated (e.g. placement past the table) **is journaled** (facts —
+  a config fix credits it on a later load), with a `Warn` + `OnFault(NotEvaluable)`, and earns/shows nothing.
+- **Tests: +56 (635 → 691, unfiltered EditMode).** `ProgressionTests.cs`: Evaluate vs an independent `decimal`
+  restatement over every placement × bank × steal × rested of the **loaded asset**; totality (null/NaN/±∞/negative,
+  unknown schema, placement 0 and Length+1, broken configs, a destroyed config); rested boundary exactly at
+  `RestedRounds`; steal cap; the floor epsilon; config structure (`PlacementGrain.Length ≥ MatchConfig.MaxPlayers`,
+  non-increasing, ≥ 0, multiplier ≥ 1) + slot resolves to the real asset + code defaults mirror it; fold
+  deterministic under 7 shuffle seeds, duplicates once, differing duplicates order-independent, rested per local day
+  of the given zone; tracker (bots never land, distinct rivals excluding None/self, abandoned round discarded, `None`
+  local = Debug only, standings-not-banked incl. a Spoiler-style case, execute = transferred cargo, throwing
+  subscribers). `ProgressionPersistenceTests.cs`: journal round-trip of every field **under es-ES**, torn tail
+  dropped/preserved/truncated then appendable, repaired newline, malformed middle lines, BOM, failed append; service
+  (journal on disk before either event fires — checked by rereading the file inside the handlers; award = balance
+  delta = Evaluate of its line; **clock skew** award = delta = own − displaced rested bonus, reload agrees; write
+  failure → Error + fault, no award, balance unchanged; unreadable journal → off for the session; `LatestAward`
+  cleared on RoundOpened; not-evaluable journaled; reload = sum of awards; torn journal loads + faults; throwing UI
+  subscriber contained) — all in temp directories; the Grain-line rule and UXML placement. `MatchEventSinkTests`:
+  binding resolves to guard(`MatchTracker`), one `IProgressionService` listening to that tracker, not initialized;
+  the execute pins below. `ProgressionBoundaryTests`: the bounty-bag scan + rot check.
+- **Assassin execute = a steal of the transferred cargo, excluding `ExecuteBounty` (Maestro, 2026-09-12).**
+  `AssassinExecute.Press` runs on the **assassin's** state authority (reached from `AbilityController.TryActivate`
+  in FUN). It reads the victim's replicated `Cargo` into a local **before** `RPC_TransferAllToBountyBag` (in solo
+  that RPC invokes locally and synchronously and zeroes it), calls `_cargo.AnnounceExecuteSteal(victimCargo, target)`
+  (announce-only, `Runner.IsForward`-guarded, only when > 0), then sends the RPC unchanged. The RPC body runs on the
+  **victim's** authority, so an emit there would reach the wrong peer's sink in Shared PvP. Pinned: announce
+  precedes the RPC, is passed the captured local (never `bounty`), only the execute calls it, and it writes no cargo.
+- **Finding 1 — the execute's transfer and kill credit never resolve, even in solo (pre-existing, NOT fixed).**
+  `Press` passes its own `Id` (the **AssassinExecute** behaviour's `NetworkBehaviourId`) to
+  `RPC_TransferAllToBountyBag`, which does `Runner.TryFindBehaviour(assassinId, out ChickenCargo)`, and to
+  `RPC_ExecuteRemoval` → `CreditKillToAttacker` → `TryFindBehaviour(attackerId, out ChickenCombat)`. Checked live in
+  `GameMode.Single` on all four chickens: `TryFindBehaviour<ChickenCargo>` = **false**, `<ChickenCombat>` =
+  **false**, `<NetworkBehaviour>` = true (returns the `AssassinExecute`). So the victim's cargo is zeroed and never
+  reaches the bounty bag, and an execute never increments `Kills` (so no `OpponentDisabled` either). The announced
+  steal therefore credits cargo the assassin does not actually receive today — it matches what the victim lost.
+  Likely fix (gameplay, for a later pass): pass `_cargo.Id` / `_combat.Id`, or resolve `NetworkBehaviour` and
+  `GetComponent`.
+- **Finding 2 — Shared-mode proxy write (NOT fixed, not verified live).** In Shared PvP the transfer body runs on the
+  victim's peer and writes `assassinCargo.BountyBag += …` on a **proxy** of the assassin. Evidence: the woven
+  `ChickenCargo.set_BountyBag` IL is `if (Ptr == null) throw …; *(float*)(Ptr + 4) = value;` — no authority check,
+  just a write to that peer's local copy of the object's state; Fusion replicates an object's state from its state
+  authority (release note: networked backing fields are "read only for clients without state authority"), so the
+  write is never sent and is overwritten by the assassin's next update. Same bug class as the `ExecuteRemoval` note
+  in `ChickenCombat.cs`. Not observed in a real Shared session (no multi-client run this slice; Photon's online docs
+  sat behind a bot check). A fix would credit the bounty bag on the assassin's own authority (as `ReceiveStolen` does
+  for the other steals) and leave only the drain to the victim's RPC.
+- **Verified in play mode — real solo rounds, no debug path.** Journal did not exist before the session
+  (`C:/Users/MARCO/AppData/LocalLow/DefaultCompany/CluckWars/progression/journal.jsonl`). Bootstrap → menu
+  `ChooseMode(Solo)` → `OnReady` → `OnStartMatch`; the human stayed idle. Game view 1575×886 (landscape, free
+  aspect — no Pixel 9 preset in this Editor). Service log: `Journal loaded … 0 line(s) … (4.1 ms)`; appends 4 ms.
+  ```
+  round 1  13:06:24Z  P4 banked 0 → +34 Grain (rested)   balance 34
+  round 2  13:07:18Z  P4 banked 0 → +34 Grain (rested)   balance 68    (screenshot: "+34 Grain")
+  round 3  13:08:12Z  P4 banked 0 → +34 Grain (rested)   balance 102
+  round 4  13:09:06Z  P4 banked 0 → +23 Grain            balance 125   (screenshot: "+23 Grain")
+  ```
+  `Evaluate` of each journal line with its prior-rounds-today gives 34/34/34/23 (= floor((20 + 3) × 1.5) and 20 + 3),
+  sum 125. First line on disk:
+  `{"SchemaVersion":1,"RoundId":"f2d239fce1b74edd802b6e025847278f","EndedAtUtc":"2026-09-13T13:06:24.9578563Z","Ruleset":{"ResourceTargetToWin":40.0,"RoundDurationSeconds":45.0,"MaxActors":4},"DurationSeconds":44.96875,"RoleKey":"class.warrior","Placement":4,"BankedTotal":0.0,"StolenTotal":0.0,"RivalsRobbed":0,"OpponentsDisabled":0,"Abilities":[]}`
+  — the other three are identical apart from id and time (the bots replay rounds exactly; the idle human's
+  `Abilities` is empty). **Reload:** exited play mode and re-entered; before any round the service reported
+  `IsReady`, balance **125**, 4 rounds — exactly the sum of the four awards (34 + 34 + 34 + 23). Round 5 (13:15:26Z,
+  the day's 5th round) then paid **+23 Grain**, balance 148, and `Evaluate(prior 4)` of its line is 23 (screenshot:
+  "+23 Grain" beside "Next match in 5s…" in the one-row footer). A third session (the layout measurement above)
+  recorded round 6 (+23, balance 171), so this machine's journal now holds **6 test rounds**, all idle P4 Warrior.
+  No new console errors or warnings (only the known `Mobile_RPAsset.asset` load errors and MCP/AI Toolkit noise).
+- **No Maestro prefab-wiring steps** — the config slot was assigned on `ProjectContext.prefab` via SerializedObject.
+- **Fix pass after qa-reviewer (2026-09-14, "changes required") — 691 → 709 (+18), 709/709 green.**
+  - **Stale award (M1):** a player who quits during results and joins a session already on its results screen
+    hears no `RoundStarted`, so the previous award was still `LatestAward`. `MatchOverlaysController` now captures
+    the award id that exists when it is created and `ShowsGrainLine(panel, service, staleRoundId, out award)` never
+    shows it.
+  - **Rested day stamped (M2):** `RoundOutcome.LocalDay` (`yyyy-MM-dd`) is stamped by `MatchTracker` in the device's
+    zone at round end (zone read lazily at the first `BuildOutcome`, UTC + one Warn if unreadable); the fold groups
+    by it, falling back to the zone day of `EndedAtUtc` for older lines (this machine's 6 dev lines). No schema bump.
+  - **`-progressionDir <path>`** (pure `ProjectInstaller.ResolveProgressionDirectory`, resolved at install);
+    `tools/run-clients.ps1` passes `Builds/Windows/progression/clientN` per client.
+  - **Journal hardening:** `Append` writes a newline first if the file does not end with one; it serializes once,
+    refuses a line that would not read back, and returns the parsed record, which the service folds (memory equals
+    disk); `Load` treats a directory at the journal path as a failure, not a first run; schema acceptance is
+    `1..CurrentSchemaVersion` in both the loader and `Evaluate`; the service reads `TimeZoneInfo.Local` in
+    `Initialize()` (UTC + Warn on failure), never in its constructor.
+  - **Smaller:** a missing-from-ledger award says so (was printing the default `Ok`); repeated `NotReady` rounds log at
+    Debug after the first Warn; a null `_cargo` in `AssassinExecute.Press` is now a wiring `Error` naming
+    `ChickenCargo`; stale slice-era comments corrected (`NullMatchEventSink`, `GuardedMatchEventSink`, the boundary
+    tests, `IProgressionService.LatestAward`).
+  - **Tests:** UI allowlist scan (default-deny, non-blind); the bounty allowlist pinned to exactly one
+    `_cargo.BountyBag += bounty`; clock-skew preconditions asserted, not branched on; no-I/O-before-Initialize
+    seeded with a torn journal and also resolved through the installer's own bindings; the one-row footer pinned
+    (UXML parentage + USS `flex-direction: row`); portable directory-at-path failures instead of Windows file locks;
+    LocalDay stamping/fold/fallback; `-progressionDir` parser; pre-append newline guard; memory-equals-disk with
+    awkward floats.
+  - **Smoke run (solo, 2026-09-14):** at load the service reported balance 171 over the 6 older, unstamped dev lines
+    (the fallback path, unchanged from 2026-09-13); the next round was written with `"LocalDay":"2026-09-14"`, paid
+    +34 (rested: the first round of a new day), balance 205. The dev journal now holds 7 test rounds.
+
+### What slices 3 and 4 need to know
+
+- **Root Egg and Feather Trap always report `connected = false`** (`ReportsCastHits` is false for placed zones), so
+  a "Land N control abilities" goal cannot count them from `AbilityTally.Connected`; count casts or add a signal.
+- **Reuse `ProgressionCalendar`** for any day logic (the daily task, "today"). Never define a second local day.
+- **Wins = placement 1** (`ProgressionProfile.Wins`); a shared first place counts for everyone in it, which can
+  differ from the round's announced winner.
+- **The wallet re-derives from config.** Changing `ProgressionConfig.asset` changes past balances. Spending must be
+  journaled as its own facts before the first thing is purchasable.
+- **Not-evaluable rounds are journaled but earn nothing** and count toward no total; a config fix credits them later.
+- **`RoundAward.Grain` is the balance delta**, not necessarily `Evaluate(outcome).Grain` (clock skew); UI hides ≤ 0.
+- **The execute's steal credit is announced but the cargo never reaches the assassin today** (finding 1), and executes
+  never announce `OpponentDisabled`. Goals counting kills or steals will under/over-count executes until fixed.
+- **The GDD §8/§11 rewrite and the compendium (`docs/site/index.html`) sync happen in one combined pass after slice 4.**
+- `IProgressionService` is project-scoped and synchronous; UI reads `IsReady` first and never blocks on it. New
+  progression types are auto-denied to gameplay by the boundary scan; UI may name only the read surface
+  (`IProgressionService`, `ProgressionProfile`, `RoundAward`, `ProgressionFault`, `ProgressionFaultKind`).
+- **Days come from `RoundOutcome.LocalDay`** (stamped at round end, `yyyy-MM-dd`), falling back to the zone day of
+  `EndedAtUtc` only for older lines. A daily task must group by the same stamp through `ProgressionCalendar.DayOfRound`.
+- **Deferred from the slice 2 review (not done):**
+  - **#8 — make `ProgressionConfigSO`'s fields read-only** (serialized private fields + getters). `MatchConfigSO` uses
+    the same public-field pattern, so do both together.
+  - **#17 — time the round-end refold on the Pixel 9.** The service refolds the whole journal on every append
+    (4 ms in the Editor with a handful of lines); measure with a few hundred lines on device before it matters.
+  - **#18 — the compendium (`docs/site/index.html`) deferral to after slice 4 is pending Maestro's sign-off.**
+
 ## ✅ Progression Slice 1 — announcement sites (2026-09-11/12) — 635/635 green
 
 Second slice of the progression pitch milestone, on `feature/progression`. Gameplay now **announces** every

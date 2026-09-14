@@ -619,6 +619,46 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
+        /// Announces an Assassin execute as a steal by this chicken (the assassin) of
+        /// <paramref name="amount"/> from <paramref name="victim"/>. <b>Announce only — no cargo is
+        /// written here.</b> The transfer itself is <see cref="RPC_TransferAllToBountyBag"/> on the
+        /// victim.
+        /// </summary>
+        /// <remarks>
+        /// Called by <c>AssassinExecute.Press</c> on the <b>assassin's</b> state authority, with the
+        /// victim's replicated <see cref="Cargo"/> read <i>before</i> the transfer RPC is sent (in solo
+        /// that RPC invokes locally and synchronously, zeroing it). It cannot live inside the RPC: the
+        /// RPC body runs on the victim's authority, which in Shared PvP is another peer, and an
+        /// announcement there would reach that peer's sink and credit nobody on the assassin's device.
+        /// <para>
+        /// Maestro's ruling (2026-09-12): the execute counts as a steal of the victim's cargo only. The
+        /// flat <c>ExecuteBounty</c> the assassin is also paid is income, not a steal, and never reaches
+        /// this method.
+        /// </para>
+        /// <para>
+        /// Same semantics as every other <c>ResourceStolen</c>: the thief's optimistic credit. Exact in
+        /// solo; in Shared mode it is the assassin peer's latest snapshot of the victim's cargo, which
+        /// can differ from what the victim's authority actually transfers. An execute on an
+        /// empty-handed rival robs nothing, so a non-positive amount is not announced (a kill is a
+        /// separate announcement). Forward ticks only — see <see cref="ReceiveStolen"/>.
+        /// </para>
+        /// <para>
+        /// <b>Known gap, not fixed here (2026-09-13):</b> <c>AssassinExecute.Press</c> passes its own
+        /// <c>Id</c> to <see cref="RPC_TransferAllToBountyBag"/> and <c>RPC_ExecuteRemoval</c>, which
+        /// resolve it as <c>ChickenCargo</c> / <c>ChickenCombat</c>; <c>Runner.TryFindBehaviour&lt;T&gt;</c>
+        /// refuses that (verified in play mode), so the victim's cargo is zeroed without reaching the
+        /// bounty bag and the execute's kill is never credited. See docs/STATE.md, progression slice 2.
+        /// </para>
+        /// </remarks>
+        public void AnnounceExecuteSteal(float amount, ChickenController victim)
+        {
+            if (!(amount > 0f)) return;
+
+            if (Runner.IsForward)
+                _matchEvents?.ResourceStolen(MatchActorId.Of(Object), MatchActorId.Of(victim), amount);
+        }
+
+        /// <summary>
         /// The untrusted steal path: a thief's ability asking this chicken's authority to hand
         /// over <paramref name="amount"/> of its <see cref="Cargo"/>. Five callers: Snatch,
         /// Scrap, Sneaky Steal and Dive Bomb cast at a target they resolved through an aim

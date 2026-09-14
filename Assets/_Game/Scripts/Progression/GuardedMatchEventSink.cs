@@ -10,9 +10,8 @@ namespace CluckWars.Progression
     /// <remarks>
     /// Every announcement is an inline call made in the middle of a gameplay effect — a steal
     /// announces just before the victim's drain RPC — so an exception escaping the sink would leave
-    /// that effect half-applied. <c>ProjectInstaller</c> binds the sink as guard(inner):
-    /// <see cref="NullMatchEventSink"/> today, the real tracker from slice 2. Callers may therefore
-    /// rely on the bound sink never throwing.
+    /// that effect half-applied. <c>ProjectInstaller</c> binds the sink as guard(<see cref="MatchTracker"/>).
+    /// Callers may therefore rely on the bound sink never throwing.
     /// <para>
     /// <b>One Error per kind, then counting.</b> The first failure of each event kind is logged as an
     /// Error naming the verb and carrying the exception — what a reader of a device log with no
