@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d7b001dc0da3c594283a52383e6d0869, type: 3}
+  m_Name: ProgressionConfig
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Progression.ProgressionConfigSO
+  Participation: 20
+  PerBank: 0.4
+  PerSteal: 1.2
+  StealCap: 12
+  PlacementGrain: 0e000000080000000500000003000000
+  RestedMultiplier: 1.5
+  RestedRounds: 3
+  DailyTaskBonus: 15

@@ -6,7 +6,10 @@
   Emulators are not viable on this machine (Hyper-V + ES 3.1 conflict — see
   docs/TESTING.md "Known gotchas"), so multiplayer testing is done with multiple
   windowed Windows builds. Each instance gets its own log file under
-  Builds/Windows/logs/ so per-client logs never interleave.
+  Builds/Windows/logs/ so per-client logs never interleave, and its own progression
+  journal under Builds/Windows/progression/clientN/ (the -progressionDir switch), so
+  test rounds never reach the real journal in persistentDataPath and clients never
+  append to the same file.
 
   Build first: Ctrl+Shift+W in the Editor (Cluck Wars / Build / Windows).
 
@@ -39,13 +42,16 @@ New-Item -ItemType Directory -Force $logDir | Out-Null
 
 for ($i = 1; $i -le $Count; $i++) {
     $log = Join-Path $logDir "client$i.log"
+    # Own progression journal per client (ProjectInstaller's -progressionDir switch).
+    $journalDir = Join-Path (Split-Path $ExePath) "progression\client$i"
     Start-Process $ExePath -ArgumentList @(
         '-screen-fullscreen', '0',
         '-screen-width', $Width,
         '-screen-height', $Height,
-        '-logFile', "`"$log`""
+        '-logFile', "`"$log`"",
+        '-progressionDir', "`"$journalDir`""
     )
-    Write-Host "Client $i launched → log: $log"
+    Write-Host "Client $i launched → log: $log · journal: $journalDir"
     Start-Sleep -Milliseconds 700   # stagger so Photon/UGS init doesn't race
 }
 

@@ -436,6 +436,10 @@
 .cw-me-pod--1 .cw-chicken--fatty    { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Hero_fatty_cheer.png"); }
 .cw-me-pod--1 .cw-chicken--assassin { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Hero_assassin_cheer.png"); }
 
+/* "+N Grain": the one progression line, centred above the post-match actions. Type comes from
+   .cw-me-head__title (LilitaOne, gold). Text only. */
+.cw-me-grain { -unity-text-align: middle-center; margin-top: 12px; flex-shrink: 0; }
+
 /* ============================================================================
    IN-MATCH WAITING ROOM  (multiplayer only; round 2, finding 2)
    ============================================================================ */
