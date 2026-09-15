@@ -4109,6 +4109,38 @@ ca39dfb Spawn: random starting edge per session
 
 ---
 
+## 🐛 Fixed — game rendering all-pink (Hidden/InternalErrorShader) (2026-09-15)
+
+**Root cause:** `Assets/Settings/Mobile_RPAsset.asset` (the URP Render Pipeline Asset for
+the "Mobile" quality tier) was silently zeroed out — same byte count (4650), every byte
+`0x00` — in commit `22642fe` ("Add iOS build & refactor keyboard input + textures",
+2026-08-17), whose message notes "Update URP/project graphics settings binaries" among a
+batch of texture-importer changes. The corruption has sat committed on every branch since;
+it went unnoticed because the Editor defaults to the "PC" quality tier
+(`QualitySettings.m_CurrentQuality: 1`), so nothing surfaced it until someone switched the
+Quality dropdown to Mobile (or ran an Android build) — at which point
+`QualitySettings.renderPipeline` resolved to null for that tier, Unity fell back to the
+Built-in Render Pipeline, and every URP material on screen rendered
+`Hidden/InternalErrorShader` (solid pink). All 27 gameplay materials and every shader
+reference were verified intact (guid `933532a4fcc9baf4fa0491de14d08ed7` = URP's
+`Shaders/Lit.shader`, correctly resolved in `Library/PackageCache`) — this was purely a
+corrupted pipeline asset, not a broken material or shader reference.
+
+**Fix:** restored `Mobile_RPAsset.asset` byte-for-byte from the last known-good commit
+(`82b675a`, immediately before the corruption), verified its referenced renderer data
+(`Mobile_Renderer.asset`, guid `65bc7dbf…`) still exists on disk.
+
+**Guardrail added:** `ProjectConfigTests.EveryQualityLevel_ResolvesToANonNullRenderPipelineAsset`
+(`Assets/_Game/Scripts/Editor/Tests/ProjectConfigTests.cs`) iterates every declared Quality
+Level, switches to it, and asserts `QualitySettings.renderPipeline` is non-null and is a
+real `RenderPipelineAsset` instance — this is the check the existing
+`EveryGameMaterial_UsesAUrpShader` test could not provide, since it only inspects material
+shader assignments (which were never touched) and not the pipeline asset resolving them.
+See `docs/CONVENTIONS.md` ▸ Footguns for the recurring-pattern note (this project has now
+had URP/ProjectSettings assets self-corrupt or drift twice — see commit `9a0b965`).
+
+---
+
 ## Branch / push status
 
 - All work on `develop`.

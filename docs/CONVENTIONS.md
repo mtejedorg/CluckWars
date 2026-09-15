@@ -280,6 +280,33 @@ Two related footguns hit in `MapGenerator.BuildPlane` (fixed 2026-07-23, commit 
 - **Ground tunneling**: a `PrimitiveType.Plane` is a flat, paper-thin `MeshCollider`. On Android's lower/more variable framerate, a `CharacterController`'s per-step movement can tunnel straight through it — chickens fell forever. Fix: use `PrimitiveType.Cube` scaled thin (e.g. `(_planeSize, 1, _planeSize)`) for a real `BoxCollider`, same pattern `CreateWall` already uses for the arena walls. Any new runtime-generated ground/floor geometry should default to Cube, not Plane.
 - **Magenta materials**: `GameObject.CreatePrimitive`'s default material uses the Built-in RP Standard shader, which URP can't render (shows magenta). Any material fallback chain must bottom out in a real project material (e.g. `_groundMaterial`) — never let it fall through to the primitive's own default.
 
+### URP pipeline assets can silently corrupt without a compile or import error
+
+`Assets/Settings/Mobile_RPAsset.asset` (the Render Pipeline Asset for the "Mobile" quality
+tier) was found zeroed out — same byte count, every byte `0x00` — in commit `22642fe`
+("Add iOS build…", 2026-08-17), and stayed that way, committed, for a month (fixed
+2026-09-15, see `docs/STATE.md`). Nobody noticed because the Editor defaults to the "PC"
+quality tier; the corruption only surfaces the moment something switches to the Mobile
+tier (an Android build, or the Quality dropdown), at which point `QualitySettings
+.renderPipeline` resolves to null for that tier, Unity falls back to the Built-in RP, and
+**every** URP material on screen renders `Hidden/InternalErrorShader` (solid pink) — even
+though every material and shader reference is completely intact.
+
+This is the second time a `.asset`/`ProjectSettings` file in the URP chain has drifted or
+broken outside of an intentional edit — see commit `9a0b965` ("incidental URP/
+ProjectSettings churn") for the first, milder case (Editor auto-touching
+`DefaultVolumeProfile.asset` / `UniversalRenderPipelineGlobalSettings.asset` on ordinary
+use). Treat any diff touching `Assets/Settings/*RPAsset*.asset`,
+`*UniversalRenderPipelineGlobalSettings.asset`, or `ProjectSettings/GraphicsSettings.asset`
+/ `QualitySettings.asset` as worth a second look, especially if it shows as a same-size
+binary diff (`git show --stat`) rather than a readable YAML change.
+
+**Guardrail**: `ProjectConfigTests.EveryQualityLevel_ResolvesToANonNullRenderPipelineAsset`
+(`Assets/_Game/Scripts/Editor/Tests/ProjectConfigTests.cs`) fails if any declared Quality
+Level's `QualitySettings.renderPipeline` is null or not a real `RenderPipelineAsset`. Run
+the EditMode suite after any change that touches the files above, not just after
+gameplay-code changes.
+
 ---
 
 ## Asset / prefab GUID stability

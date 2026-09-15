@@ -317,6 +317,52 @@ namespace CluckWars.Tests
                 "(CONVENTIONS.md: URP materials only).");
         }
 
+        /// <summary>
+        /// Guards the pipeline ASSETS themselves, not the materials that point at them.
+        /// </summary>
+        /// <remarks>
+        /// 2026-09-15: <c>Assets/Settings/Mobile_RPAsset.asset</c> was silently zeroed out —
+        /// same byte count, every byte 0x00 — by whatever wrote "Update URP/project graphics
+        /// settings binaries" in commit 22642fe, and stayed broken for weeks. Nobody noticed
+        /// because the Editor defaults to the PC quality tier (<c>m_CurrentQuality: 1</c>);
+        /// the corruption only surfaced once someone switched the Quality dropdown to Mobile
+        /// (or ran an Android build), at which point that tier's <c>QualitySettings.renderPipeline</c>
+        /// resolved to null, Unity fell back to the Built-in RP, and every URP material on
+        /// screen rendered <c>Hidden/InternalErrorShader</c> — the game "went all pink".
+        ///
+        /// <see cref="EveryGameMaterial_UsesAUrpShader"/> above did NOT catch this: the
+        /// materials were never touched, only the pipeline asset resolving them was
+        /// corrupted, and a corrupted .asset deserializes to a quiet null rather than an
+        /// import error or a compile failure.
+        /// </remarks>
+        [Test]
+        public void EveryQualityLevel_ResolvesToANonNullRenderPipelineAsset()
+        {
+            int original = QualitySettings.GetQualityLevel();
+            try
+            {
+                for (int i = 0; i < QualitySettings.names.Length; i++)
+                {
+                    QualitySettings.SetQualityLevel(i, applyExpensiveChanges: false);
+                    var rp = QualitySettings.renderPipeline;
+
+                    Assert.IsNotNull(rp,
+                        $"Quality level '{QualitySettings.names[i]}' has no Render Pipeline Asset " +
+                        "override, or its asset failed to deserialize (check for a corrupted / " +
+                        "zero-byte .asset file under Assets/Settings/). Every renderer under this " +
+                        "tier falls back to the Built-in RP and every URP material renders " +
+                        "Hidden/InternalErrorShader pink.");
+                    Assert.IsInstanceOf<UnityEngine.Rendering.RenderPipelineAsset>(rp,
+                        $"Quality level '{QualitySettings.names[i]}''s render pipeline reference is " +
+                        "not a RenderPipelineAsset — the asset is present but corrupted.");
+                }
+            }
+            finally
+            {
+                QualitySettings.SetQualityLevel(original, applyExpensiveChanges: false);
+            }
+        }
+
         // ---- Folder + naming conventions ---------------------------------------
 
         [Test]
