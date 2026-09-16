@@ -103,7 +103,7 @@ namespace CluckWars.Abilities
             float stolen = StealMath.Clamp(ResolveStealAmount(StealAmount, thief), freeSpace, targetCargo.Cargo);
             if (stolen > 0f)
             {
-                thiefCargo.Cargo += stolen;
+                thiefCargo.ReceiveStolen(stolen, _scratch[0]);
                 // The jump has NOT happened yet — AbilityController.TryActivate defers it until
                 // after OnActivate for a Capsule shape. By the time the victim's authority
                 // applies this the thief will be a jump further on, which is what

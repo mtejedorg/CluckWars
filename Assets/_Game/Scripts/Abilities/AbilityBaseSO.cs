@@ -127,6 +127,92 @@ namespace CluckWars.Abilities
                  "future ability needs a real physics query (e.g. line-of-sight); not currently read.")]
         public LayerMask SearchMask = 256; // 1 << 8 (Chickens layer)
 
+        [Header("Progression")]
+        [Tooltip("Stable id for unlocks and save data. Filled once from the asset name, never overwritten — " +
+                 "renaming the asset must NOT change it. Don't edit by hand; see Cluck Wars/Progression/Assign Missing Unlock Keys.")]
+        [SerializeField] private string _unlockKey;
+
+        /// <summary>Stable unlock/save key, e.g. "ability.headbutt". Never derived at runtime.</summary>
+        public string UnlockKey => _unlockKey;
+
+#if UNITY_EDITOR
+        // Key derivation is editor-only on purpose: runtime code only ever READS UnlockKey, so a
+        // renamed asset can never re-derive a different key on a player's device.
+
+        /// <summary>
+        /// The key a fresh asset gets from its name: <c>"MarkKill"</c> → <c>"ability.mark_kill"</c>,
+        /// a passive's <c>"Bully"</c> → <c>"passive.bully"</c>. Null when the name leaves nothing usable.
+        /// </summary>
+        public static string DeriveUnlockKey(string assetName, bool isPassive)
+        {
+            if (string.IsNullOrWhiteSpace(assetName)) return null;
+
+            // Word boundaries: lower/digit→Upper ("MarkKill") and the end of an acronym
+            // ("HTTPServer" → "HTTP_Server"). Spaces and hyphens are separators too.
+            var split = new System.Text.StringBuilder(assetName.Length + 8);
+            for (int i = 0; i < assetName.Length; i++)
+            {
+                char c = assetName[i];
+                if (i > 0 && char.IsUpper(c))
+                {
+                    char prev = assetName[i - 1];
+                    bool nextIsLower = i + 1 < assetName.Length && char.IsLower(assetName[i + 1]);
+                    if (char.IsLower(prev) || char.IsDigit(prev) || (char.IsUpper(prev) && nextIsLower))
+                        split.Append('_');
+                }
+                split.Append(c == ' ' || c == '-' ? '_' : c);
+            }
+
+            // Lower-case, keep [a-z0-9_] only, collapse runs of '_', trim '_' from both ends.
+            var snake = new System.Text.StringBuilder(split.Length);
+            foreach (char c in split.ToString().ToLowerInvariant())
+            {
+                bool keep = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
+                if (!keep) continue;
+                if (c == '_' && snake.Length > 0 && snake[snake.Length - 1] == '_') continue;
+                snake.Append(c);
+            }
+
+            string body = snake.ToString().Trim('_');
+            if (body.Length == 0) return null;
+            return (isPassive ? "passive." : "ability.") + body;
+        }
+
+        /// <summary>
+        /// Fill-once: derives <see cref="UnlockKey"/> from the asset name if, and only if, it is
+        /// empty. Returns true when it assigned one. Never overwrites, so a rename keeps the key.
+        /// Does not mark the asset dirty; callers do.
+        /// </summary>
+        public bool AssignUnlockKeyIfMissing()
+        {
+            if (!string.IsNullOrEmpty(_unlockKey)) return false;
+
+            string derived = DeriveUnlockKey(name, isPassive: this is PassiveAbilitySO);
+            if (derived == null) return false;
+
+            _unlockKey = derived;
+            return true;
+        }
+
+#endif
+
+        /// <summary>
+        /// Gives a newly saved asset its key. Protected virtual so a subclass that declares its own
+        /// OnValidate gets CS0114 instead of silently hiding this one. An override must call base,
+        /// and needs no <c>#if UNITY_EDITOR</c> of its own: the method exists in every build (empty
+        /// in a player, where Unity never calls it); only its body is editor-only.
+        /// </summary>
+        protected virtual void OnValidate()
+        {
+#if UNITY_EDITOR
+            // Non-persistent instances are skipped: a CreateAssetMenu asset is still in memory
+            // under a default name ("New Headbutt Ability SO") until it is saved, and tests
+            // build throwaway instances. Only a real asset's name is worth a permanent key.
+            if (!UnityEditor.EditorUtility.IsPersistent(this)) return;
+            if (AssignUnlockKeyIfMissing()) UnityEditor.EditorUtility.SetDirty(this);
+#endif
+        }
+
         /// <summary>
         /// Per-subclass default icon glyph (design v3, cluckwars-tokens-v3).
         /// Used by <see cref="ResolveIcon"/> when the serialized <see cref="Icon"/>

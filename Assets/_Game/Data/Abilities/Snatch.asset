@@ -25,10 +25,11 @@ MonoBehaviour:
   BotRole: 0
   Duration: 0.3
   Cooldown: 3
-  SearchMask:
   CastMotion: 3
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  _unlockKey: ability.snatch
   SnatchRange: 4.3
   StealAmount: 5
   KnockbackStrength: 8.1

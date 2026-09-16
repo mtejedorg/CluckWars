@@ -2,10 +2,12 @@ using CluckWars.Abilities;
 using CluckWars.Audio;
 using CluckWars.Logging;
 using CluckWars.Networking;
+using CluckWars.Progression;
 using CluckWars.Visuals;
 using Fusion;
 using UnityEngine;
 using Zenject;
+using LogLevel = CluckWars.Logging.LogLevel;
 
 namespace CluckWars.Gameplay
 {
@@ -122,6 +124,7 @@ namespace CluckWars.Gameplay
         private IAudioService _audio;
         private AudioRegistrySO _audioReg;
         private PrefabRegistrySO _prefabRegistry;
+        private IMatchEventSink _matchEvents;
         private bool _initialized;
 
         // ---- Hold/release/cancel state machine scratch (StateAuthority-side only,
@@ -164,17 +167,24 @@ namespace CluckWars.Gameplay
         private int _deniedPressSlot;
 
         [Inject]
-        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry)
+        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry, IMatchEventSink matchEvents)
         {
             _log = log;
             _audio = audio;
             _audioReg = audioReg;
             _prefabRegistry = prefabRegistry;
+            _matchEvents = matchEvents;
         }
 
         public override void Spawned()
         {
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
+
+            if (_matchEvents == null)
+            {
+                _log?.Error(Source, $"{name}: IMatchEventSink was not injected, so this chicken's casts will not be " +
+                    "announced to progression. Check the IMatchEventSink binding in ProjectInstaller.");
+            }
 
             _controller = GetComponent<ChickenController>();
             _combat = GetComponent<ChickenCombat>();
@@ -672,6 +682,14 @@ namespace CluckWars.Gameplay
             }
             _audio?.PlaySFX(_audioReg != null ? _audioReg.AbilityActivate : null);
             LastCastEventId++; // wraps at 255 by design (byte overflow) — a one-shot signal, not a counter
+
+            // connected = hitCount > 0 is a verdict only where ability.ReportsCastHits is true.
+            // Self-buffs and placed zones (Root Egg, Feather Trap) always count 0 at cast time,
+            // so for them false means "unknown", not "missed". UnlockKey is passed through as-is.
+            // Forward ticks only — see ChickenCargo.ReceiveStolen.
+            if (Runner.IsForward)
+                _matchEvents?.AbilityResolved(MatchActorId.Of(Object), ability.UnlockKey, hitCount > 0);
+
             _log?.Info(Source, $"Activated slot {slot} ({ability.DisplayName}) for {ability.Duration:0.00}s, " +
                 $"CD {ResolveCooldownFor(ability):0.00}s, hits={hitCount}.");
         }

@@ -25,8 +25,9 @@ MonoBehaviour:
   BotRole: 7
   Duration: 2
   Cooldown: 12
-  SearchMask:
   CastMotion: 1
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  _unlockKey: ability.quick_drop
   DepositRateMultiplier: 4

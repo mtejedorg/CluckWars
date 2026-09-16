@@ -209,6 +209,135 @@ code calls `ctx.Log?.Error(...)`.
 
 ---
 
+## Gameplay → progression boundary
+
+Settled 2026-09-11 (progression slice 1). Gameplay *announces* what happened in a round to
+`IMatchEventSink`; it never asks progression anything back. There is no `.asmdef` under
+`Assets/_Game`, so the compiler cannot enforce the boundary — the tests below do.
+
+- **Contract surface.** Outside `Scripts/Progression/`, code may name only `IMatchEventSink`,
+  `RoundRuleset`, `RoundStandings`, `RoundStandingEntry` and `UnlockKeyTable` from
+  `CluckWars.Progression`. The exceptions are `Installers/` (the composition root binds the tracker,
+  journal and service), `UI/` and `Editor/`. Every other folder, including a new one, is scanned, and the
+  sweep is default-deny: every new progression type is automatically off-limits to gameplay.
+- **`UI/` has its own, slightly wider list:** the contract surface plus `IProgressionService`,
+  `ProgressionProfile`, `RoundAward`, `ProgressionFault`, `ProgressionFaultKind`, `ProgressionIdentity`
+  and `NameplateSlot` (progression slice 3) — the read side of the service. Every display model the UI
+  actually reads (nameplate, per-role mastery, a record's standing, the banner catalogue, the career
+  summary) is a type **nested inside** `ProgressionIdentity`, which is why slice 3's read surface grew
+  by only those two names rather than one per view — the boundary scan only ever sees top-level types.
+  UI never names `MatchTracker`, `ProgressionService` (the concrete type), `RecordDefinitionSO`,
+  `RecordEngine`, `IdentityFold`, `NameplateComposer`, `NameGenerator`, `ProfileEvent` or any other
+  progression type; the same default-deny sweep enforces it.
+- **Progression speaks generically.** Code in `Progression/` says actor/resource/round/ability key,
+  never food/chicken/cluck, and imports no gameplay namespace. `UnlockKeyTable` is the one
+  translation point allowed to name a gameplay type.
+- **Actor ids** come only from `MatchActorId.Of(...)` (the `NetworkId` raw value;
+  `MatchActorId.None` = 0 = no actor). Emit sites never filter by actor — in solo the player's peer
+  simulates the bots, so bot events reach the sink too.
+- **`ChickenCargo.ReceiveStolen(amount, victim)` is the only steal credit.** Never write
+  `thiefCargo.Cargo += x` on a steal path; that credits silently and progression never hears of the
+  steal. Foraging (`PeckAbilitySO`) is the one allowlisted direct write. `ChickenCargo.cs` itself is
+  exempt from the `.Cargo +=` scan: it owns `Cargo` and declares `ReceiveStolen`, and its own writes
+  (deposit drains, round resets, the credit inside `ReceiveStolen`) are not steal credits by another
+  path.
+- **The bounty bag is scanned too.** `BountyBag +=` is forbidden outside `ChickenCargo.cs` (its
+  owner, whose `RPC_TransferAllToBountyBag` is the execute's cargo transfer). `AssassinExecute.cs` is
+  the one allowlisted file: it pays the flat `ExecuteBounty`, which is income, not a steal, and is
+  never announced (Maestro's ruling, 2026-09-12). The execute's steal is announced by
+  `ChickenCargo.AnnounceExecuteSteal(victimCargo, victim)` — announce-only, no cargo write — called
+  from `AssassinExecute.Press` on the **assassin's** authority, with the victim's `Cargo` read
+  **before** the transfer RPC (in solo that RPC invokes locally and synchronously and zeroes it). It
+  cannot be announced inside the RPC: that body runs on the victim's authority, which in Shared PvP is
+  another peer, whose sink would credit nobody on the assassin's device.
+- **Emits are local calls, never RPCs.** The tick-driven ones (`ResourceBanked`, `ResourceStolen`,
+  `AbilityResolved`) are guarded by `Runner.IsForward`; the round edges are polled in
+  `GameManager.LateUpdate`, **never** via a `ChangeDetector` (see `PlayerBase.LateUpdate` for why
+  that is unreliable in `GameMode.Single`).
+- **A sink must not throw** — every call is inline, mid-effect. Callers may rely on the bound sink
+  never throwing: `ProjectInstaller` always binds `IMatchEventSink` as
+  `GuardedMatchEventSink(MatchTracker)`, the one project-scoped `MatchTracker`, which
+  `ProgressionService` also subscribes to. The guard catches everything, logs one `Error` per event
+  kind and then only counts, so a broken sink can never half-apply a steal or bury the log. The
+  tracker additionally contains its own subscribers' exceptions. Only `Installers/` may name the
+  guard, the tracker or the service's concrete type. `NullMatchEventSink` stays in the repo for tests.
+- **Wiring faults are loud once, never per emit.** Each emitting component logs one `Error` in
+  `Spawned` if the sink is still null after injection; `GameManager` then leaves its round announcer
+  null rather than throwing, so the match still starts.
+
+Enforced by `ProgressionBoundaryTests` (contract surface, no direct steal credit, no direct bounty-bag
+write outside the allowlist, both allowlists rot-checked, progression vocabulary, scanner self-tests
+incl. block comments and expression-bodied members) and `MatchEventSinkTests` (one pin per emit site,
+the five `ReceiveStolen` steal sites' amount, victim and credit/drain order, the execute as the sixth
+steal site, no `GetChangeDetector(` in `GameManager`, the guard, the snapshot selector, and the sink
+binding resolves to the guard wrapping the `MatchTracker` the `ProgressionService` listens to).
+
+### Progression persistence
+
+Settled 2026-09-13 (progression slice 2); extended 2026-09-15 (slice 3, two-kinds-of-line). The rules
+for anything that writes or reads the progression journal.
+
+- **JSON Lines via `JsonUtility`, two kinds of line, one file.** UTF-8 without a BOM, at
+  `persistentDataPath/progression/journal.jsonl`. Append-only. No new package: there is no Cloud Save
+  and no Newtonsoft in the project. A line is either a `RoundOutcome` — **no `Kind` field at all**, so
+  every line slice 2 ever wrote still reads back byte-identical — or a `ProfileEvent`, which carries
+  `"Kind":"profile"`. `JournalStore` reads a small `{Kind}` envelope first and dispatches; a non-empty
+  `Kind` this build does not recognize is one skipped, reported line, never fatal — a downgraded build
+  must survive a newer build's lines. Both types stay `JsonUtility`-shaped (`[Serializable]`, public
+  fields, arrays not dictionaries): anything `JsonUtility` cannot see vanishes silently.
+  `JournalLoadResult.Records` (round outcomes) and `.ProfileEvents` are separate lists, so the round
+  fold's input — and its `NotEvaluable` counting — is exactly what it was before profile lines existed.
+- **One journal per process.** The `-progressionDir <path>` command-line switch
+  (`ProjectInstaller.ResolveProgressionDirectory`, resolved at install, no I/O) moves the journal;
+  `tools/run-clients.ps1` gives each local client `Builds/Windows/progression/clientN`, so test rounds
+  never reach the real journal and two processes never append to one file.
+- **Memory equals disk.** `JournalStore.Append` serializes the outcome once, writes exactly that string,
+  and returns the record parsed back from it; the service folds that record, never the in-memory
+  object. An outcome that would not read back is refused, not written. `Append(ProfileEvent)` (slice 3)
+  is the same method under a different overload — same refuse-if-unreadable guard, same
+  parsed-back-and-returned result, same newline handling.
+- **Every record starts on its own line.** Before writing, `Append` adds a newline if the file does not
+  end with one, so a partial line from an earlier failed append stays one malformed line instead of
+  swallowing the next round.
+- **Schema acceptance is `1..RoundOutcome.CurrentSchemaVersion`** (`RoundOutcome.IsReadableSchema`), in
+  both the loader and `ProgressionRules.Evaluate`. Below 1 is not a record; above is a newer build's.
+- **The rested day is stamped, not re-derived.** `MatchTracker` stamps `RoundOutcome.LocalDay`
+  (`yyyy-MM-dd`, `ProgressionCalendar.FormatDay`) in the device's zone when the round ends, and the fold
+  groups rounds by that stamp, so moving the device to another zone cannot change past balances. Lines
+  without a usable stamp (written before it existed) fall back to their instant's day in the current
+  zone. `TimeZoneInfo.Local` is read lazily (tracker: first round end; service: `Initialize()`), never in a
+  constructor, and falls back to UTC with one warning.
+- **Invariant culture for every hand-formatted number or timestamp.** Timestamps are ISO-8601
+  round-trip (`"o"`, UTC) via `ProgressionCalendar.FormatUtc` / `TryParseUtc`. This machine is
+  es-ES, where `44.97f.ToString()` is `44,97`. `JsonUtility` itself is culture-independent; the
+  journal round-trip test runs under es-ES.
+- **Facts only; the wallet is derived.** The journal stores what happened (placement, banked total
+  from the standings, stolen total, tallies), never a currency amount. Grain, the balance and every
+  stat are refolded from the journal against the current `ProgressionConfig.asset`
+  (`ProgressionLedger.Fold`, deterministic and order-independent). A config change therefore changes
+  past balances: that is intended while Grain is only earned, and the first slice that lets the player
+  spend Grain must journal spending as facts of its own.
+- **Write before show.** A round's line is appended and flushed to disk *before* `OnProfileChanged`,
+  `OnRoundAwarded` or `LatestAward` can describe it. A failed write is an `Error` + `OnFault`, no award
+  and no balance change. Nothing may show a number the journal does not back. The same rule governs
+  every profile event (slice 3): `TryRerollName` / `TrySelectNameplatePart` append and flush the
+  `ProfileEvent` *before* `Identity` refolds and `OnIdentityChanged` raises; a failed write is
+  `Error` + `OnFault(WriteFailed)`, returns `false`, and `Identity` is untouched.
+- **A round that cannot be evaluated is still journaled** (it is facts; a config fix credits it on a
+  later load) but earns nothing and counts toward no total; it is reported as a `Warn` + `OnFault`.
+- **Recover, never lose.** A torn final line that is a complete record gets its newline written; any
+  other torn tail is moved to `journal.jsonl.torn` and cut; malformed middle lines are skipped and
+  reported, never rewritten. `JournalStore` never throws, it reports in its results.
+- **The award is the balance delta.** `RoundAward.Grain` is what the balance moved. If the device
+  clock went backwards it can differ from the round's own Grain (even be ≤ 0), so UI shows the
+  "+N Grain" line only when it is positive.
+- **One day definition.** `ProgressionCalendar` is the only "local calendar day" in progression; the
+  rested bonus uses it and later slices must reuse it.
+- **No I/O at construction or install.** `JournalStore` and `ProgressionService` take a directory and
+  touch no file until `Initialize()`; tests always use a temporary directory, never the real journal.
+
+---
+
 ## Footguns (real bugs we hit)
 
 ### `LogLevel` collides with `Fusion.LogLevel`

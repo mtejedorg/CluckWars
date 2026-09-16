@@ -152,6 +152,7 @@ MonoBehaviour:
   _mainMenuUxml: {fileID: 9197481963319205126, guid: 763d1b3ce9d8df942b0079eb733916ca, type: 3}
   _characterSelectUxml: {fileID: 9197481963319205126, guid: 03f67009a2b4bbb42b0f2d1b958aeb9c, type: 3}
   _lobbyUxml: {fileID: 9197481963319205126, guid: c008545b5cda90d4e811978197fdd458, type: 3}
+  _profileUxml: {fileID: 9197481963319205126, guid: 97a8a847fb0e935458a6afab659755ab, type: 3}
 --- !u!114 &381346043
 MonoBehaviour:
   m_ObjectHideFlags: 0

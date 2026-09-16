@@ -15,12 +15,19 @@ MonoBehaviour:
   DisplayName: Invisibility
   ShortLabel: INV
   Description: Fades you to a ghostly outline for 4s.
+  Icon: 
   AccentColor: {r: 0.55, g: 0.85, b: 0.85, a: 1}
   Category: 3
   TerrainTraversal: 0
+  JumpTier: 0
   SlotKind: 1
   AllowedClasses: 8
-  Duration: 4.0
+  BotRole: 0
+  Duration: 4
   Cooldown: 8
   CastMotion: 6
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256
+  _unlockKey: ability.invisibility
   Opacity: 0.2

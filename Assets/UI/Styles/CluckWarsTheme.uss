@@ -187,9 +187,48 @@
    16:9, but a phone's safe area is not, and stretching a painted background
    is instantly visible where the fence lines skew. */
 .cw-menu {
-    align-items: center; justify-content: center;
+    align-items: center; justify-content: flex-start;
     background-image: url("project://database/Assets/_Game/Art/UI/Backgrounds/MenuBackground.png");
     -unity-background-scale-mode: scale-and-crop;
+}
+
+/* The centered "hero" block (title, cast, actions, build stamp), everything
+   the old single justify-content:center on .cw-menu used to center directly.
+   Split out in slice 3 (progression) so the identity header row can sit
+   ABOVE this block, pinned to the page's own top edge, without the whole
+   group re-centering around it and pushing the header off the top of the
+   screen — which is what happens when a row is added to a group that is
+   itself vertically centered as one unit. */
+.cw-menu-hero {
+    flex-grow: 1;
+    width: 100%;
+    align-items: center; justify-content: center;
+    /* Bug fix (slice 3 follow-up, 2026-09-15): at wide/short aspects
+       (confirmed at 2160x1080, the Pixel 9 landscape proxy) the identity
+       strip pill covered the "S" in WARS.
+
+       Root cause: this block's stacked content (title + cast band + actions
+       + hint, everything with flex-shrink:0) was tuned to ~exactly fill a
+       1080-tall reference canvas with zero spare room — true even before
+       #MenuHeaderRow existed. Once the header row's height is subtracted
+       from the page, this box has LESS room than the content needs, and
+       justify-content:center overflows the excess symmetrically above *and*
+       below the box's own bounds. "Above" is exactly where the header row
+       (and the identity strip inside it) lives, so at 2160x1080 the title
+       rendered ~87px above this box's top, on top of the strip.
+
+       Two-part fix:
+       1. Trimmed vertical spacing in .cw-menu-cast, .cw-menu-cast__art,
+          .cw-menu-primary, .cw-menu-secondary-row and .cw-menu-hint (each
+          marked below) so the stacked content is short enough to fit this
+          box's available height even at 2160x1080, with a small margin —
+          no more overflow in the normal case.
+       2. overflow:hidden here as a backstop: if any future content change
+          reintroduces a few px of overflow, it clips silently against this
+          box's own bounds instead of bleeding into the header row above.
+       Verified via screenshot at both 1575x886 and 2160x1080 — no overlap,
+       no visible clipping of "CLUCK WARS" or any control. */
+    overflow: hidden;
 }
 
 /* Contrast scrim. A painted plate cannot guarantee the contrast the type needs
@@ -207,20 +246,28 @@
 /* Lighter than the .cw-body tan: that tone was chosen against the flat #0e0804
    screen, and the glow lifts the backdrop enough here to erode its contrast. */
 .cw-menu-subtitle {
-    font-size: 34px; letter-spacing: 4px; margin-top: 6px;
+    /* margin-top trimmed 6px -> 2px as part of the header-row overlap fix
+       below .cw-menu-hero — see that rule's comment for why. */
+    font-size: 34px; letter-spacing: 4px; margin-top: 2px;
     color: rgb(226, 200, 152);
 }
 
 /* ---- Cast band ------------------------------------------------------------
    The four playable chickens, which are the actual product. Sprites are the
-   same Stage-0 exports the character select uses, so this costs no new art. */
+   same Stage-0 exports the character select uses, so this costs no new art.
+
+   margin-top/margin-bottom (44/48 -> 12/12) and __art (200 -> 150) trimmed as
+   part of the header-row overlap fix — see .cw-menu-hero's comment. Chickens
+   stay clearly the visual centerpiece at 150px; this reclaims vertical
+   budget without touching font sizes or the primary CTA's prominence more
+   than necessary. */
 .cw-menu-cast {
     flex-direction: row; align-items: flex-end; justify-content: center;
     flex-shrink: 0;
-    margin-top: 44px; margin-bottom: 48px;
+    margin-top: 12px; margin-bottom: 12px;
 }
 .cw-menu-cast__item { align-items: center; margin-left: 26px; margin-right: 26px; }
-.cw-menu-cast__art  { width: 200px; height: 200px; }
+.cw-menu-cast__art  { width: 150px; height: 150px; }
 .cw-menu-cast__name {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 30px; letter-spacing: 2px; margin-top: 10px;
@@ -239,18 +286,23 @@
    One primary, two secondary. Three identical pills gave the eye no entry
    point; SOLO is the instant-play path a playtester takes almost every time. */
 .cw-menu-actions { align-items: center; flex-shrink: 0; }
+/* min-height trimmed 148 -> 126 as part of the header-row overlap fix (see
+   .cw-menu-hero) — still comfortably above the 48dp touch-target floor at
+   this UI's scale, and still the tallest, widest control on the page. */
 .cw-menu-primary {
-    min-width: 620px; min-height: 148px;
+    min-width: 620px; min-height: 126px;
     font-size: 58px; letter-spacing: 4px;
 }
-.cw-menu-secondary-row { flex-direction: row; justify-content: center; margin-top: 20px; }
+/* margin-top trimmed 20 -> 10 as part of the header-row overlap fix. */
+.cw-menu-secondary-row { flex-direction: row; justify-content: center; margin-top: 10px; }
 .cw-menu-secondary {
     min-width: 300px;
     font-size: 40px; letter-spacing: 2px;
     margin-left: 12px; margin-right: 12px;
 }
+/* margin-top trimmed 26 -> 12 as part of the header-row overlap fix. */
 .cw-menu-hint {
-    font-size: 30px; margin-top: 26px;
+    font-size: 30px; margin-top: 12px;
     -unity-text-align: middle-center;
     color: rgba(196, 160, 96, 0.85);
 }
@@ -294,6 +346,81 @@
     border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
     background-color: rgba(0, 0, 0, 0.4);
     color: rgb(196, 160, 96);
+}
+
+/* ---- Ramp lock (progression slice 4) --------------------------------------
+   A locked class/ability is still rendered — never hidden from the row/list —
+   just dimmed and marked with a lock glyph, per the "still a card, visibly
+   locked" rule.
+
+   V2 fix (code-architect visual review, 2026-09-16): the first pass dimmed
+   via `opacity` on the CHIP/CARD ROOT. In UI Toolkit, element `opacity` is a
+   whole-subtree compositing multiply — every descendant renders through it,
+   with no CSS escape hatch. That took the lock glyph down with everything
+   else (a tiny, low-contrast padlock, worse than the text around it) AND
+   blended the card's own warm-brown background toward the near-black page
+   background underneath, which is what actually broke the class-name
+   legibility — text contrast is measured against that now-much-darker
+   background, not the nominal color.
+
+   Fix: dim specific descendants individually instead of the root, so the
+   lock glyph (and the name label) can opt out entirely. The root keeps a
+   solid, only slightly darker background — never opacity — so it stays a
+   stable, predictable surface for whatever text sits on it. Reads as "not
+   yet available", not "broken/missing text". */
+.cw-class-chip--locked { background-color: rgb(40, 28, 16); }
+.cw-class-chip--locked:hover { scale: 1 1; }
+.cw-class-chip--locked .cw-class-chip__art { opacity: 0.42; }
+.cw-class-chip--locked .cw-class-chip__name { color: rgba(254, 245, 224, 0.65); }
+.cw-class-chip--locked .cw-class-chip__role { color: rgba(196, 160, 96, 0.6); }
+.cw-class-chip--locked .cw-slot-pill { opacity: 0.5; }
+/* The lock glyph itself is never dimmed (full opacity, own badge background)
+   so it reads clearly regardless of how dark the chip underneath it is —
+   font-size raised past the mobile contract's 30px caption floor since this
+   is a meaningful state indicator, not decoration.
+
+   Badge background is the accent gold, not a dark tint: measured live, the
+   🔒 U+1F512 glyph does not come from either game font (LilitaOne/Nunito are
+   Latin-only) — Unity falls back to its own outline-style glyph, rendered as
+   a dark navy silhouette. That silhouette was the actual invisibility bug:
+   dark-on-near-black was never going to read regardless of dimming/size. A
+   light, on-brand background behind a dark glyph is the fix; text `color`
+   does not recolor this fallback glyph, so the background is the only lever
+   that works. */
+.cw-chip-lock {
+    font-size: 38px; margin-left: 8px; flex-shrink: 0; -unity-text-align: middle-center;
+    width: 56px; height: 56px;
+    background-color: rgb(245, 200, 66);
+    border-top-left-radius: 28px; border-top-right-radius: 28px;
+    border-bottom-left-radius: 28px; border-bottom-right-radius: 28px;
+}
+
+/* Same fix, same reasoning, applied to ability cards — this path was never
+   screenshotted live in slice 4 (the dev profile had already cleared every
+   Common/Class ability) but shares the exact CSS pattern above and the exact
+   defect. */
+.cw-ability-card--locked { background-color: rgb(38, 26, 15); }
+.cw-ability-card--locked:hover { scale: 1 1; }
+.cw-ability-card--locked .cw-ability-card__icon,
+.cw-ability-card--locked .cw-ability-card__sprite { opacity: 0.4; }
+.cw-ability-card--locked .cw-ability-card__name { color: rgba(254, 245, 224, 0.6); }
+.cw-ability-card--locked .cw-card-footer { opacity: 0.55; }
+.cw-ability-card__lock {
+    position: absolute; top: 8px; right: 8px;
+    width: 38px; height: 38px;
+    font-size: 26px; -unity-text-align: middle-center;
+    background-color: rgb(245, 200, 66);
+    border-top-left-radius: 19px; border-top-right-radius: 19px;
+    border-bottom-left-radius: 19px; border-bottom-right-radius: 19px;
+}
+
+/* Refusal feedback: a locked card/chip briefly flashes a warm-red border when
+   pressed, so "nothing happened" reads as "that press was refused" rather
+   than as an unresponsive control. Toggled on/off in C# via the UI Toolkit
+   scheduler — see MenuUiController.RefuseLocked. */
+.cw-locked--shake {
+    border-left-color: rgb(214, 88, 70); border-right-color: rgb(214, 88, 70);
+    border-top-color: rgb(214, 88, 70); border-bottom-color: rgb(214, 88, 70);
 }
 
 /* ---- Chicken preview ------------------------------------------------------ */
@@ -406,7 +533,24 @@
 .cw-pick-scroll { flex-grow: 1; min-height: 0; }
 
 /* The rows wrap; they must never scroll sideways. A horizontal scroller here
-   would also steal the drag that the vertical one needs. */
+   would also steal the drag that the vertical one needs.
+
+   This USS rule alone does NOT suppress it — ScrollView's own runtime code
+   writes an inline `display` style onto the horizontal Scroller every time it
+   recomputes scroll state (default `horizontalScrollerVisibility` is `Auto`,
+   which shows the scroller whenever it judges content wider than the
+   viewport, and an intermediate Yoga wrap measurement can trip that even
+   though the wrapped result never actually needs it). Inline style always
+   wins over a USS class selector, so with only this rule the scroller kept
+   appearing anyway — confirmed live: `horizontalScrollerVisibility` read back
+   as `Auto` and the Scroller's `resolvedStyle.display` as `Flex` despite this
+   rule matching it correctly. `horizontal-scroller-visibility="Hidden"` on
+   the `<ui:ScrollView>` tag itself (CharacterSelect.uxml) is the actual fix —
+   it stops ScrollView from ever allocating/showing the scroller instead of
+   trying to paint over its decision — and is what fixed the wide-aspect
+   picker (COMMON/CLASS pool cards sliced mid-pill, a bogus horizontal
+   scrollbar eating vertical room the CLASS row needed). Kept here too as a
+   harmless belt-and-suspenders in case that attribute is ever dropped. */
 .cw-pick-scroll .unity-scroll-view__horizontal-scroller { display: none; }
 .cw-pick-scroll .unity-scroll-view__content-viewport { overflow: hidden; }
 

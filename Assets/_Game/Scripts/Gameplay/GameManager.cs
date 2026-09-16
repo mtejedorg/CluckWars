@@ -1,5 +1,6 @@
 using CluckWars.Audio;
 using CluckWars.Logging;
+using CluckWars.Progression;
 using Fusion;
 using UnityEngine;
 using Zenject;
@@ -25,7 +26,7 @@ namespace CluckWars.Gameplay
     /// their deposits.
     /// </remarks>
     [RequireComponent(typeof(NetworkObject))]
-    public sealed class GameManager : NetworkBehaviour
+    public sealed class GameManager : NetworkBehaviour, IRoundSnapshotSource
     {
         private const string Source = "GameManager";
 
@@ -57,6 +58,8 @@ namespace CluckWars.Gameplay
         private IAudioService _audio;
         private AudioRegistrySO _audioReg;
         private PrefabRegistrySO _prefabRegistry;
+        private IMatchEventSink _matchEvents;
+        private RoundAnnouncer _roundAnnouncer;
         private float _winCheckIntervalSeconds = 0.25f;
         private float _nextWinCheckTime;
         private NetworkObject _eventPile;
@@ -113,13 +116,14 @@ namespace CluckWars.Gameplay
         }
 
         [Inject]
-        public void Construct(MatchConfigSO config, ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry)
+        public void Construct(MatchConfigSO config, ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry, IMatchEventSink matchEvents)
         {
             _config = config;
             _log = log;
             _audio = audio;
             _audioReg = audioReg;
             _prefabRegistry = prefabRegistry;
+            _matchEvents = matchEvents;
         }
 
         public override void Spawned()
@@ -135,6 +139,20 @@ namespace CluckWars.Gameplay
                     sceneCtx.Container.Inject(this);
                 else
                     ProjectContext.Instance.Container.Inject(this);
+            }
+
+            // Fresh per session, so a new session re-applies the first-observation rule
+            // (a late joiner walking into an Active round still gets RoundStarted). Spawned must never
+            // throw over a missing sink — the match has to start regardless — so without one the
+            // announcer stays null (LateUpdate no-ops) and the wiring bug is reported once.
+            if (_matchEvents != null)
+            {
+                _roundAnnouncer = new RoundAnnouncer(_matchEvents, this);
+            }
+            else
+            {
+                _log?.Error(Source, "IMatchEventSink was not injected, so round start/end will not be announced " +
+                    "to progression this session. Check the IMatchEventSink binding in ProjectInstaller.");
             }
 
             Instance = this;
@@ -162,6 +180,77 @@ namespace CluckWars.Gameplay
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
             if (Instance == this) Instance = null;
+
+            // An abandoned session emits no RoundEnded: nobody finished that round.
+            _roundAnnouncer = null;
+        }
+
+        /// <summary>
+        /// Announces round start/end to the <see cref="IMatchEventSink"/>, on every peer, by
+        /// polling <see cref="State"/>. No authority gate: every peer's progression hears its
+        /// own round.
+        /// </summary>
+        /// <remarks>
+        /// <b>A poll, never a ChangeDetector.</b> Solo runs <c>GameMode.Single</c>, where
+        /// <c>DetectChanges</c> can silently skip a locally-written networked property (see
+        /// <c>PlayerBase.LateUpdate</c>). A missed Ended edge would be a silently lost reward, and
+        /// only in solo. Runs outside the simulation loop and reads replicated state, so it needs
+        /// no <c>Runner.IsForward</c> guard.
+        /// </remarks>
+        private void LateUpdate()
+        {
+            if (Object == null || !Object.IsValid || _roundAnnouncer == null) return;
+            _roundAnnouncer.Tick(State, TimeRemaining);
+        }
+
+        RoundRuleset IRoundSnapshotSource.CaptureRuleset() => new RoundRuleset
+        {
+            ResourceTargetToWin  = (float)FoodTargetToWin,
+            RoundDurationSeconds = MatchDurationSeconds,
+            MaxActors            = _config != null ? _config.MaxPlayers : 4,
+        };
+
+        /// <remarks>
+        /// Called once, on the Ended edge — before <see cref="RestartMatch"/> zeroes
+        /// <c>FoodTotal</c> after the restart delay. This only gathers live values; which actor owns
+        /// each claimed base and which actor is local is decided by <see cref="RoundSnapshotSelector"/>.
+        /// One row per claimed base, bots included, the total including the Spoiler match-end bonus.
+        /// On a remote peer this reads its latest snapshot, and Shared mode does not promise
+        /// cross-object atomicity between <see cref="State"/> and the bases' totals; solo is unaffected.
+        /// </remarks>
+        (RoundStandings standings, int localActorId) IRoundSnapshotSource.CaptureEndSnapshot()
+        {
+            var bases = PlayerBase.ActiveBases;
+            var claimed = new System.Collections.Generic.List<(int corner, float total)>(bases.Count);
+            for (int i = 0; i < bases.Count; i++)
+            {
+                var b = bases[i];
+                if (b == null || b.Object == null || !b.Object.IsValid || !b.IsClaimed) continue;
+                claimed.Add((b.CornerIndex, b.FoodTotal));
+            }
+
+            var chickens = ChickenController.ActiveControllers;
+            var live = new System.Collections.Generic.List<(int corner, bool isDecoy, bool isLocal, int actorId, string roleKey)>(chickens.Count);
+            for (int i = 0; i < chickens.Count; i++)
+            {
+                var c = chickens[i];
+                if (c == null || c.Object == null || !c.Object.IsValid) continue;
+                // A decoy never owns a row, so it needs no role key.
+                string roleKey = c.IsDecoy ? null : UnlockKeyTable.RoleKey(c.Class);
+                live.Add((c.HomeCornerIndex, c.IsDecoy, c.HasInputAuthority, MatchActorId.Of(c), roleKey));
+            }
+
+            var (rows, localActorId) = RoundSnapshotSelector.Select(claimed, live);
+
+            for (int i = 0; i < rows.Count; i++)
+            {
+                if (rows[i].actorId != MatchActorId.None) continue;
+                // A player who left mid-round: a legal state, so Debug, not a warning. The base keeps
+                // its row (no actor, no role) so everyone else's placement still counts it.
+                _log?.Debug(Source, $"Round standings: a claimed base (total {rows[i].total:0.0}) has no live chicken — kept with no actor.");
+            }
+
+            return (RoundStandingsBuilder.Build(rows), localActorId);
         }
 
         /// <summary>

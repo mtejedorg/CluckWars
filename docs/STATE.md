@@ -6,6 +6,614 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Progression Slice 4 — ramp, weekly goals & daily task (2026-09-16) — 771 → 809/809 green
+
+**Final slice of the progression pitch milestone**, committed on `feature/progression`. A fresh
+profile walks a 4-step onboarding ramp (bank 10 → Headbutt lands twice or bank 20 → steal 5 → one
+round as each of Fatty/Speedy/Assassin, gating and revealing class chips + ability cards as it
+clears), then gets three weekly goals (rotating by ISO week, refresh date shown, never a ticking
+countdown) plus a daily task (one single-round template, shown before the day's first round, open
+all day so a bad first round never burns it, hidden while the ramp is running). Gameplay code is
+untouched except one read-only adapter (below); only `Assets/_Game/Scripts/Editor/Tests/*`,
+`Progression/`, `Installers/`, `UI/`, and data assets changed.
+
+- **Ramp is data-driven, never scene-baked.** 4 `RampStepSO` assets under
+  `Assets/_Game/Data/Progression/Ramp/` (FirstCluck, GettingRobbed, YourLoadout, OtherChickens).
+  `RampController` folds the same canonical round list slice 3 introduced
+  (`ProgressionLedger.EvaluableRounds`); step 4's three class grants are sequential — Fatty unlocks
+  on entering step 4, Speedy after a round played as Fatty, Assassin after a round as Speedy, the
+  ramp completes after a round as Assassin — and `reachedStep` is capped at the table's own length by
+  construction, so it can never advance past step 4. No `[Networked]`/RPC anywhere in ramp code
+  (tested) — ramp state is a local read of the journal, same as everything else in progression.
+- **Ability-name correction against the live registry, not the old plan text.** The plan's step 1
+  said "grant Peck" written before the `Peck → Snatch` rename; verified from the shipped assets that
+  `ability.snatch` is Assassin-only (`AllowedClasses 8`) while `ability.peck` is a Common ability
+  legal for Warrior — granting Snatch to a step-1 Warrior would produce an unequippable loadout, so
+  the plan's original "Peck" stands. (`Flying Peck → Dive Bomb` did happen and is used as-is at
+  step 3.) Warrior's full pool after step 3 covers all four `AbilityCategory` values on real data,
+  not by adjusting the data to fit.
+- **A new boundary port, not a boundary violation.** `Progression/*.cs` still cannot import
+  `CluckWars.Abilities`/`CluckWars.Gameplay` (the vocabulary scan). New `IAbilityCategoryIndex`
+  lives in `Progression/` and imports neither; `UnlockKeyTable` gains pinned, hand-written
+  `AbilityCategoryKey(AbilityCategory)` rows (same doctrine as `RoleKey` — never `ToString()`); the
+  one implementation, `Installers/AbilityCategoryIndex.cs`, lives in the composition root (already
+  exempt from the scan) and walks `AbilityRegistrySO.All`, mapping each ability's unlock key to its
+  category key.
+- **Goal/daily Grain is a second derived term, never journaled as a number.**
+  `ProgressionLedger`'s round math is untouched (unedited — its tests still pass as written).
+  `UnlocksFold.ComputeBonusGrain` folds the same `EvaluableRounds` list a second time and surfaces
+  the total as its own `ProgressionProfile` property, so no existing number changes meaning.
+- **5 weekly goal templates shipped, none cut** (`Assets/_Game/Data/Progression/Goals/`): Bank
+  {100|150|200}, Rob {10|15} rivals, finish a round with more stolen than banked, land {15|25}
+  control abilities, play {20|30} rounds. The "land control abilities" template was the one at risk —
+  `AbilityTally.Connected` is a documented lower bound (self-buffs/placed zones never report
+  connected) — but traced by hand through `AbilityController.cs` and confirmed Headbutt, Cluck Shock
+  and Wing Slam are all real target-scanning abilities (non-`None` aim shape, not a placed zone), so
+  they do report `hitCount > 0` and the template is sound on real facts, not shipped on faith.
+- **Exactly one new UI allowlist entry**, the same nesting trick slice 3 used: new top-level
+  `ProgressionUnlocks` (nesting `RampStepView`, `GoalView`, `DailyTaskView`), reached via
+  `IProgressionService.Unlocks` + `OnUnlocksChanged`. **Deliberate deviation from slice 3's
+  handoff note**, which suggested nesting new display facts inside `ProgressionIdentity` — ramp,
+  goals and the daily task are a different concern from identity, so a second top-level type keeps
+  them separated rather than overloading identity with unrelated state. Still exactly one allowlist
+  entry, same cost either way. (One property was named `DailyTask` at first and collided textually
+  with the top-level `CluckWars.Progression.DailyTask` type under the UI regex scan — renamed to
+  `TodaysTask` rather than loosen the scan.)
+- **`MenuUiController`:** locked-state gating lives in `MakeAbilityCard` (not the row-filter), plus
+  class-chip gating and a refusal flash on a blocked press — never a silent no-op. Gating reads
+  `_progression.IsReady && !_progression.Unlocks.Ramp.IsComplete`; before the journal loads or once
+  the ramp is done, everything reads unlocked rather than flash-locking the picker (the legitimate
+  no-op case, not a bug hidden behind a null-guard — see
+  `memory/silent-failure-vs-legitimate-noop.md`).
+- **Two visual bugs found in review, both fixed, both unrelated to the new lock badges themselves:**
+  (1) at the wide Pixel-9 aspect (2424×1080) the ability-pick panel showed a stray horizontal
+  scrollbar and clipped cards mid-pill — root cause was Unity's own `ScrollView` writing an inline
+  `display` style that silently beat the USS rule meant to suppress it; fixed by setting
+  `horizontal-scroller-visibility="Hidden"` on the `ScrollView` element itself. (2) the lock padlock
+  was nearly invisible — `opacity` on the whole locked card/chip root dimmed the emoji-fallback glyph
+  and the name text equally and darkened the background toward black; fixed by dimming only specific
+  descendants and giving the lock badge its own solid gold background for contrast. Verified live at
+  both 1575×886 and the exact 2424×1080 Pixel-9 aspect.
+- **Still open, not touched here (pre-existing, slice 3):** the mastery ring drawn over a class
+  name's last two characters (`WARRIOR`→`OR`, `SPEEDY`→`DY`, `ASSASSIN`→`SI`) at both aspects —
+  needs a `ui-designer` pass, reported not fixed.
+- **Egg Shell dependency: still not landed.** `fix/egg-shell-defence`
+  (`C:/Users/MARCO/Documents/GitHub/CluckWars-eggshell`) sits at `1fba816`, an ancestor of `develop`,
+  zero commits ahead — the ability still only reads "Seals you in an egg for 2s - you cannot walk or
+  turn," no stated defensive effect. Ramp step 2 grants it anyway per Maestro's 2026-09-12 ruling
+  (grant Egg Shell once it defends; the fix is separate, gameplay-side work, reported not fixed here).
+- **Two gameplay-side findings remain open from slice 2, still unfixed** (Assassin execute's
+  cargo/kill-credit resolution and the Shared-mode proxy `BountyBag` write) — reported only, out of
+  this slice's scope, tracked as their own background task.
+- **`ProjectSettings/QualitySettings.asset`** picked up incidental `serializedVersion: 4→5` /
+  `meshLodThreshold` churn from this Unity 6000.3.14f1 session (both render-pipeline asset GUIDs
+  verified byte-for-byte preserved — the opposite of the 2026-09-15 `Mobile_RPAsset` zeroing class).
+  Committed alongside this slice as routine engine-version housekeeping, not progression work.
+- Tests: `ProgressionRampGoalsTests.cs` — no-baked-reference structural checks, live-registry
+  resolution, order-independence, sequential step-4 unlocks, never-past-last-step, `GoalRotation`,
+  the daily task surviving a failed first round, `UnlocksFold` covering a returning profile still
+  losing, a ramp-networking regression lock, plus `RampAssetTests`/`GoalAssetTests`. EditMode
+  771 → 809, all green (independently re-run twice by qa-reviewer, matching senior-dev's count both
+  times).
+
+### What comes after the pitch milestone
+
+Slices 0–4 are all committed. Per Maestro's 2026-09-14 ruling, the next piece of work is **one
+combined pass**: the GDD §8/§11 rewrite plus `docs/site/index.html` compendium sync, reading numbers
+from the shipped `.asset` files, not GDD prose. Also outstanding from this and earlier slices,
+carried forward rather than repeated here: the mastery-ring/class-name overlap, the Egg Shell
+defensive-effect fix, and the two Assassin-execute gameplay bugs.
+
+## ✅ Progression Slice 3 — identity (2026-09-14/15) — 709 → 771/771 green
+
+Fourth slice of the progression pitch milestone, committed on `feature/progression` as `fbef3ca`.
+**Second player-visible slice:** a generated, re-rollable username
+(`SwiftBeak#2213`-shaped, no free text anywhere), a nameplate (name + earned title + always-present
+role emblem showing mastery + banner), a Profile page listing every record earned or not, mastery per
+class (display only — grants no stat), and a career summary (lifetime/per-role totals, recent-20
+placements, personal bests). Gameplay code is untouched; only `Assets/_Game/Scripts/Editor/Tests/*`,
+`Progression/`, `UI/`, and data assets changed.
+
+- **One journal, typed lines.** Round lines are byte-identical to slice 2's (no `Kind` field at all —
+  tested against a raw slice-2-shaped line). A profile line carries `"Kind":"profile"`.
+  `JournalStore` reads a small `{Kind}` envelope first and dispatches; an unrecognized non-empty `Kind`
+  is one skipped/reported line, never fatal (a downgraded build survives a newer build's lines).
+  `JournalLoadResult` gains `ProfileEvents` alongside the unchanged `Records`, so `ProgressionLedger`'s
+  round fold and its `NotEvaluable` counting are untouched. `JournalStore.Append(ProfileEvent)` mirrors
+  `Append(RoundOutcome)`: refuses a line that would not read back, writes with the same newline guard,
+  flushes, and returns the event as the line reads back (memory equals disk). Torn-tail repair/drop
+  works for either kind.
+- **`Progression/` (new):** `ProfileEvent` — facts only (`Kind`, `SchemaVersion`, `EventId`, `AtUtc`,
+  `Type` ∈ {name, title, emblem, banner}, `Value`); `IsDisplayableName` gates a name to ASCII
+  letters + `#` + 4 digits, ≤ 24 chars. `NameGenerator` — pure, seeded `System.Random`; ~40×37 vetted
+  farmyard word pairs (no gameplay vocabulary — the progression vocabulary scan forbids
+  food/chicken/cluck in `Progression/*.cs`, so the words are barn/coop/harvest-themed, not
+  chicken-themed); a re-roll is never the current name (nudges the discriminator on the
+  astronomically-unlikely miss rather than trusting the retry loop). `MasteryRules` — points = evaluable
+  rounds played as a role; level = thresholds reached; pure, total, no exception on a missing/empty
+  table. `RecordDefinitionSO` — fill-once `record.*` key (same pattern as `AbilityBaseSO.UnlockKey`),
+  `Scope` (SingleRound: an AND of `RecordCondition`s over `RecordMetric` × `RecordComparison` × value,
+  optional `RoleKey` filter; Career: `WinWithEveryRole` or `MasteryLevelOnAnyRole`), `Problem()` reports
+  what's wrong with a definition instead of throwing. `RecordEngine.Evaluate` — pure, total,
+  re-evaluates the ledger's canonical rounds every fold (so a record added later credits play already
+  on disk); never throws for a null/destroyed/duplicate-keyed/conditionless definition — reports it
+  `IsValid = false` instead. `NameplateComposer` — the emblem is **always present** (selected role if
+  played, else most-played, else `UnlockKeyTable.RoleKeys[0]`); a title/banner not earned/owned is
+  dropped rather than shown. `ProgressionIdentity` — the UI-facing snapshot, with every display type
+  (`Nameplate`, `RoleMastery`, `RecordView`, `BannerView`, `Career`) nested inside it so the boundary
+  scan's UI allowlist costs exactly one entry, not five. `IdentityFold.Build` — the one place rounds
+  (mastery/records/career) and profile events (the nameplate's choices) meet; every problem it hits
+  (mis-authored record, unreadable name, unknown event type) is collected and logged once, never
+  thrown.
+- **`ProgressionLedger` gains `EvaluableRounds`** — the deduped, canonical-order, evaluable
+  `RoundOutcome`s the round-figures walk already produced. Records/mastery/career are pure functions of
+  exactly this list, so a career total and the matching `ProgressionProfile` total are the same number
+  by construction (tested).
+- **`UnlockKeyTable` gains `RoleKeys`** (the roster in tie-break order) and `RoleOrder`. The one file
+  gameplay-boundary rules still let name a gameplay type.
+- **`ProgressionConfigSO` gains:** `MasteryRoundThresholds` (int[10], default
+  `{1,3,6,10,15,21,28,36,45,55}`, tested strictly increasing), `Banners` (`BannerDefinition[]`:
+  `barnwood` Starter, `harvest`/`midnight` Earned off `record.full_coop`/`record.highway_hen`; the
+  `Purchasable` enum value exists and ships on **nothing** — no banner, title or emblem can ever be
+  bought, which is a tested invariant, not an absence of a store yet), `Records`
+  (`RecordDefinitionSO[]`, code default `Array.Empty<>()` since a field initialiser cannot name an
+  asset — the "code defaults mirror the asset" test now exempts asset-reference array fields by name,
+  asserting the exempt set is exactly `{Records}`; a separate test checks the asset carries the real 8).
+- **8 records shipped** at `Assets/_Game/Data/Progression/Records/` (asset GUIDs start `acf1add…`,
+  `6e5d99b…`, `b387990…`, `c4746ad…`, `4508863…`, `fd5ec2f…`, `e2045a5…`, `8540f10…`), listed on
+  `ProgressionConfig.asset` (GUID unchanged, `a4f1ebed…`): Full Coop (bank ≥ 40), Featherweight Hauler
+  (bank ≥ 30 as Speedy), Three-Time Thief (rivals ≥ 3), Highway Hen (steal ≥ 20), Empty Beak (stolen >
+  banked), The Unbanked (win, 0 < banked < 15 — the `> 0` stops a four-way scoreless tie counting),
+  Whole Flock (win with every class, career), Devoted (mastery 10 on any class, career).
+- **Deliberately excluded — the journal lacks the facts (Maestro's call, not this pass's to add):**
+  "never robbed" (in Shared PvP a steal *from* the local player is announced on the **thief's** peer per
+  slice 1's boundary, so the victim's own peer never hears it — crediting it would be a false positive),
+  "deny an execute" and "rob the round's leader" (no signal for either), "win with all eight
+  specializations" (the journal has no specialization field, only the class role key). None of these
+  add facts to `RoundOutcome` or touch `MatchTracker` — out of scope for a meta-layer slice.
+- **`IProgressionService` gains** `Identity`, `OnIdentityChanged`, `TryRerollName()`,
+  `TrySelectNameplatePart(NameplateSlot, string)`. Every command is write-before-show: the
+  `ProfileEvent` is appended and flushed, *then* `Identity` refolds and `OnIdentityChanged` raises; a
+  failed write is `Error` + `OnFault(WriteFailed)`, returns `false`, and `Identity` is untouched. Picking
+  an unowned part is a `Warn` + `false` + no write (the UI never offers it, but the service refuses it
+  anyway). After a successful `Load`, a profile with no readable name event gets one generated and
+  written before it can be shown (`EnsureName`); a write failure there leaves no name (the UI hides the
+  line) and reports the fault, never invents one in memory. `Identity` refolds on load, on every
+  recorded round, and on every profile event.
+- **UI allowlist** (`ProgressionBoundaryTests.UiSurface`) extended by exactly two entries:
+  `ProgressionIdentity`, `NameplateSlot` — every display model the UI actually reads is nested inside
+  `ProgressionIdentity`, invisible to the top-level-type boundary scan. The scan now also hard-requires
+  `ProfileController.cs` as a second pinned `IProgressionService` consumer (the boundary self-test would
+  otherwise go blind if that consumer moved).
+- **UI (new):** `Assets/UI/Profile.uxml` + `Assets/_Game/Scripts/UI/ProfileController.cs` — plain C#
+  (not a `MonoBehaviour`), constructed by `MenuUiController` with the page root; nameplate preview
+  (emblem = USS ring + mastery digits, banner = USS class swap, no glyphs anywhere), a re-roll button, 3
+  pickers (unearned parts shown locked via USS state — never a padlock character — and simply do
+  nothing when tapped, since the service would refuse them anyway), a records list that shows earned
+  **and unearned** entries with All/Foraging/Thievery/Denial/Mastery/While-Losing filters, and a career
+  section (lifetime stats, per-role table, recent-20-placement pip strip, personal bests). No free-text
+  entry anywhere (tested).
+- **UI (edited):** `MenuUiController` — `SetPage`'s three-way if-chain is now one list every page is
+  added to once; gained `ShowProfile`, the `IProgressionService` injection, the main-menu identity strip
+  refresh, and per-class-chip mastery rings in `RefreshCharacterSelect`, all unsubscribed in a new
+  `OnDisable` (the service outlives the menu across scene loads — without this the dead menu's element
+  tree would leak and later get called into). `MainMenu.uxml` gains an identity strip (compact
+  nameplate + Grain) and a Profile button. `CharacterSelect.uxml` gains a mastery ring element inside
+  each class chip. `Bootstrap.unity`'s `MenuUiController._profileUxml` slot assigned + scene saved.
+- **CluckWarsTheme.uss layout bug found and fixed mid-slice:** the identity strip, first tried as
+  `position: absolute; top: 28px; right: 28px;`, overlapped the 128px centered `CLUCK WARS` title —
+  because `.cw-menu`'s single `justify-content: center` centers **every** direct child of the page as
+  one group, so adding a row at the top pushed the whole group up and clipped it against the screen's
+  top edge instead of adding space above it. Fixed by splitting the centered content into its own
+  `.cw-menu-hero` wrapper (title/cast/actions/build-stamp), with the identity row as a fixed, non-
+  centered header above it. Re-verified by screenshot at both aspects tested.
+- **Glyph discipline (D9).** LilitaOne is imported as a **dynamic** font, so
+  `Font.HasCharacter` is not a coverage oracle here — it returns `true` for a check mark, a star, an
+  arrow, even a lone surrogate (verified live). The glyph test therefore checks every new on-screen
+  string (UXML text, `ProfileController` literals, every shipped record's name/description/title, every
+  generator word, every banner name) against printable ASCII only, and separately asserts
+  `Font.HasCharacter('') == true` so the test starts failing loudly the day Unity makes
+  `HasCharacter` mean something, rather than silently staying a weaker check than it looks. Rings, pips,
+  locks and the earned marker are all USS shapes (`Assets/UI/Styles/Profile.uss`), never characters.
+- **Tests: +62 (709 → 771, unfiltered EditMode).** New: `ProgressionIdentityTests.cs`
+  (`RecordEngineTests` — same history in any order gives identical standings incl. the earning round;
+  never mutates its input; a record defined after the fact credits the earliest qualifying round; a
+  role filter only counts that role; every condition must hold on one round; the four-way-scoreless-tie
+  guard; `WinWithEveryRole` names the completing round; `MasteryLevelOnAnyRole` counts per role, not
+  pooled; a broken definition is reported, never fatal, next to good ones; progress is shown only for a
+  reach-N shape. `MasteryRulesTests`. `NameGeneratorTests` — shape, the whole word-list product is
+  ASCII and under the length limit, a re-roll never repeats, same seed → same names.
+  `NameplateTests` — last event per type wins under any read order; a repeated `EventId` folds once; an
+  unknown `Type` is ignored + reported; an undrawable name is ignored + reported; a title drops the
+  moment its record is unearned; the emblem invariant (always present, falls back to most-played);
+  every combination of history × events × a catalogue where **every** banner is Purchasable still
+  yields a plate with an unbuyable part; a banner is owned only once its unlock record is.
+  `CareerSummaryTests` — career totals equal the ledger's totals (by construction); recent-20 is
+  newest-last; personal bests are the true per-field max; every roster role is listed even unplayed;
+  a role key from a retired roster is still counted, after the roster's own. `RecordAssetTests` — the
+  config slot resolves to exactly the 8 real assets in order; every key matches `record.*` and is
+  unique; every definition is evaluable and names a title; a role-filtered record's `RoleKey` is a real
+  roster key; every Earned banner's `UnlockRecordKey` ships. `ProgressionProfileJournalTests.cs` —
+  `ProfileJournalTests` (round-trip under es-ES; round + profile lines share the file and load into
+  their own lists; a slice-2-shaped round line reads identically; a torn profile tail repairs/drops the
+  same way a round's does; an unknown `Kind` is skipped + reported, not fatal; a malformed
+  id/instant/schema profile line is skipped; an event that would not read back is refused, never
+  written). `ProgressionIdentityServiceTests` — first load generates exactly one name, a reload
+  generates none; a re-roll is on disk (re-read inside the `OnIdentityChanged` handler) before any
+  subscriber sees it; a failed write changes nothing and is reported; an unowned part is refused and
+  writes nothing; an owned part is worn and written; playing a round moves records/mastery, not just
+  the balance; commands before load are refused and touch no file; a journal that cannot load leaves
+  `Identity` empty, never invented. `ProfilePageTests.cs` — `ProfileGlyphTests` (the printable-ASCII
+  glyph scan + its own `HasCharacter`-is-unreliable self-check; new UXML text is plain ASCII; no
+  `TextField`/`TextInput` anywhere on the page; rings/pips/locks are USS selectors with real
+  border-radius/border-width, not characters; every banner's `UssClass` exists in the stylesheet; the
+  page and the main-menu/character-select additions carry every element name their controllers bind).
+  `ProgressionBoundaryTests`/`ProgressionTests` edits above.
+- **Verified in play mode — real dev journal, real Editor Play, no debug path.**
+  - `TryRerollName()` + `TrySelectNameplatePart(Emblem, "class.warrior")` called live: both returned
+    `true`; `GoldenStable#0771` → `MightyPaddock#1396`; both landed on disk immediately as the next two
+    journal lines with correct `Kind`/`EventId`/`Type`/`Value`. A full Stop → Start of Play mode (a real
+    reload, not a re-fold) confirmed both choices persisted and did **not** regenerate a duplicate name
+    event.
+  - A newly-defined record crediting already-earned play, demonstrated against real local data: copied
+    the real dev journal to a temp dir (never touched), folded it against the shipped config, evaluated
+    one throwaway runtime `RecordDefinitionSO` (`record.demo_never_shipped`, "bank ≥ 3 as Warrior" — not
+    in the shipped 8) directly through `RecordEngine.Evaluate` → earned, naming the one real round with
+    `BankedTotal = 3.0`. Temp dir deleted after; nothing shipped.
+  - Played one real solo round to completion (`ChooseMode(Solo)` → `OnReady` → `OnStartMatch`, idled
+    ~35s): journal grew by one round line; the live `IProgressionService` (read off
+    `MatchOverlaysController` post-scene-load) showed `Profile.RoundsPlayed` 8 → 9, `GrainBalance`
+    241 → 278, `Identity.Summary.Rounds` 8 → 9, and the Warrior role's `Rounds` 8 → 9 (mastery correctly
+    held at level 3 — the level-4 threshold is 10 rounds). The dev journal now holds 9 rounds + 3
+    profile events (12 lines); adding lines is expected and fine.
+  - Screenshots: `slice3-mainmenu-landscape.png`, `slice3-profile-landscape.png`,
+    `slice3-profile-career-landscape.png`, `slice3-charselect-landscape.png` (1575×886, free aspect,
+    post-overlap-fix) and a Pixel-9-aspect pass — `slice3-mainmenu-pixel9.png`,
+    `slice3-charselect-pixel9.png`, `slice3-profile-pixel9.png` — at 2160×1080. The Pixel 9's exact
+    2424×1080 could not be forced: a correctly-valued custom `GameViewSize` entry was added and
+    selected (verified 2424×1080 in the `GameViewSizes` group itself), but the actual render clamped to
+    2160×1080 regardless of window size (tried a 1620px-wide docked panel, a 2460px and a 3200px
+    floating window — same 2160×1080 every time), so the wider 2:1 aspect was used as the closest
+    achievable proxy.
+  - Console clean at every check (only the pre-existing `Mobile_RPAsset.asset`/MCP-noise warnings from
+    slice 2). Editor confirmed out of Play mode at hand-off.
+- **Self-caused incident, no lasting damage:** an early live-play reflection probe called
+  `Zenject.ProjectContext.Instance` directly from `script-execute`, outside the normal injection path;
+  it threw `"Tried to create multiple instances of ProjectContext!"` and left one live
+  `MenuUiController`'s injected fields null. A scene scan confirmed no duplicate `ProjectContext` was
+  actually left behind (count stayed 1 throughout); fixed with a clean Stop → Start of Play mode. Root
+  cause avoided going forward: read an already-injected service off a live component's own field
+  instead of touching `ProjectContext.Instance` from external script.
+- **Deviations from spec, restated:** the four excluded records above; the career summary's
+  specialization split omitted (no fact in the journal); the D9 glyph oracle fallback (`HasCharacter`
+  unusable on this dynamic font → printable-ASCII allowlist); the Pixel-9 aspect proxy (2160×1080, not
+  the literal 2424×1080).
+- **No new gameplay-side issue found this slice.** Slice 2's findings 1 (execute cargo/kill credit
+  never resolves via `TryFindBehaviour`, even in solo) and 2 (Shared-mode proxy write on the bounty
+  bag) remain open and unfixed — reported, not touched, per this slice's scope too.
+
+### What slice 4 needs to know
+
+- **`IdentityFold.Build`, `RecordEngine.Evaluate` and `NameplateComposer.Compose` are all pure and
+  total** — a daily task or any slice-4 read can call them directly against a ledger's
+  `EvaluableRounds` without going through the service, the way the play-mode demo above did.
+- **`ProgressionLedger.EvaluableRounds` is the one list to fold anything else over.** Don't re-derive a
+  second canonical-order walk of the journal; career, records and mastery all being pure functions of
+  this exact list is what keeps them numerically consistent with `ProgressionProfile` by construction.
+- **A daily task's "did X today" still goes through `ProgressionCalendar`** — nothing in slice 3 defined
+  a second day boundary.
+- **The `Purchasable` `BannerSource` ships on nothing.** The first slice that adds a store must both
+  wire spending as its own journaled facts (per slice 2's note) and re-run
+  `EveryPlate_HoldsAPartThatCouldNotHaveBeenBought` — it already covers "every banner is Purchasable" as
+  a synthetic catalogue, so a real store shipping alongside it stays honest.
+- **Profile events fold last-writer-wins per `Type`, by (`AtUtc` instant, `EventId` ordinal).** Any new
+  `ProfileEventTypes` entry should follow the same convention rather than inventing a second dedupe
+  rule; `ProfileEventTypes.IsKnown` is the one gate.
+- **UI still only reads `IProgressionService`.** A new display fact belongs as a new nested type on
+  `ProgressionIdentity` (cheap: one entry on the boundary allowlist covers everything nested inside),
+  never as a new top-level `CluckWars.Progression` type named from `UI/`.
+- **The excluded records are a design opportunity, not a dead end.** "Never robbed", "deny an execute"
+  and "rob the leader" would all become possible if `RoundOutcome`/`MatchTracker` grew the right fact —
+  that is gameplay-adjacent work outside a meta-layer slice's scope, worth a mechanics-designer pass.
+- **The GDD §8/§11 rewrite and the compendium (`docs/site/index.html`) sync are still deferred to one
+  combined pass after slice 4** (Maestro's ruling stands, restated here so it isn't missed a second
+  time).
+
+## ✅ Progression Slice 2 — tracker, journal, Grain (2026-09-13, fix pass 2026-09-14) — 709/709 green
+
+Third slice of the progression pitch milestone, on `feature/progression` (uncommitted, awaiting code-architect +
+qa-reviewer). **First slice with a player-visible change:** every finished round is recorded to a local journal
+and earns Grain, shown as one "+N Grain" line on the results panel. No gameplay value changed; the only
+gameplay-code change is the Assassin execute's steal **announcement** (no cargo write). GDD §8/§11 and
+`docs/site/index.html` are deliberately untouched — one combined pass after slice 4.
+
+- **`Progression/` (new):** `MatchTracker` — the real `IMatchEventSink`: counters per actor (not event lists; the
+  Ability Lab never ends a round), the local bucket named only by `RoundEnded`, raises `RoundOpened` /
+  `OutcomeReady` and contains its subscribers' exceptions (first one `Error`, then counted). `RoundOutcome` —
+  facts only, no currency field. `ProgressionRules.Evaluate` — pure, total, `EvaluationStatus` separates "earned 0"
+  from "could not evaluate"; `FloorEpsilon` + float widening via round-trip decimal. `ProgressionCalendar` — the
+  one local-day helper. `ProgressionLedger.Fold` — dedupes by `RoundId` (differing duplicates → ordinal-smallest
+  serialization), walks in (instant, `RoundId`) order, re-derives every figure from the config. `JournalStore` —
+  JSON Lines at `persistentDataPath/progression/journal.jsonl`, append + flush, torn-tail repair / `.torn`
+  preservation, malformed middle lines skipped + reported, never throws. `IProgressionService` +
+  `ProgressionService` — no Null implementation (`IsReady = false` hides UI); no I/O until `Initialize()`; refolds
+  the whole journal per append; **appends and flushes before** `LatestAward` / `OnProfileChanged` →
+  `OnRoundAwarded`; clears `LatestAward` on `RoundOpened`.
+- **Config:** `ProgressionConfigSO` + `Assets/_Game/Data/Progression/ProgressionConfig.asset` (GUID `a4f1ebed…`):
+  Participation 20, PerBank 0.40, PerSteal 1.20, StealCap 12, PlacementGrain [14, 8, 5, 3], RestedMultiplier 1.5,
+  RestedRounds 3, DailyTaskBonus 15 (unused until slice 4). The code defaults mirror the asset (tested).
+- **Bindings (`ProjectInstaller`):** `MatchTracker` single; `IMatchEventSink` = `GuardedMatchEventSink(tracker)`
+  where the Null sink was; `_progressionConfig` slot (null → default instance + loud `Debug.LogWarning`), assigned on
+  `ProjectContext.prefab`; `JournalStore` (path string only); `BindInterfacesAndSelfTo<ProgressionService>` single +
+  `NonLazy`, all via lazy `FromMethod`. `NullMatchEventSink` stays for tests.
+- **UI:** `MatchOverlays.uxml` gains `MeFooter` (a row holding `MeGrain` + the existing `MeRestart`);
+  `MatchOverlaysController` injects `IProgressionService`. The line shows iff the panel is shown && `IsReady` &&
+  `LatestAward` present && **`Grain > 0`** (`ShowsGrainLine`); otherwise `display:none` — no spinner, no
+  placeholder. The award lands one frame after the panel opens (the panel opens in `Update`, `RoundEnded` fires in
+  `GameManager.LateUpdate`). **Why `> 0`:** `RoundAward.Grain` is the balance delta; if the device clock went
+  backwards the new round can take an earlier round's rested slot, so the delta can differ from the round's own
+  Grain and even be ≤ 0 — the line then hides rather than render "+-N" (journal and balance stay exact). Text only,
+  LilitaOne via `.cw-me-head__title`. **One-row footer, so the line adds no height:** the first build stacked it
+  as a third line, which made the whole panel one line taller. Measured live at 1575×886 with the footer: the panel
+  is 812 units tall with the Grain line shown **and** with it detached (footer 858–915, `MeGrain` 48 tall inside the
+  55-tall restart row). **Pre-existing, not slice 2:** at this Game-view size "Next match in Ns…" already sits on the
+  stretched `PanelFrame.png`'s bottom edge (the footer ends exactly at the panel's 30px inner padding, where the frame
+  art draws its border) — visible in a screenshot with `MeGrain` detached. Left for ui-designer.
+- **Accepted deviation:** a round that cannot be evaluated (e.g. placement past the table) **is journaled** (facts —
+  a config fix credits it on a later load), with a `Warn` + `OnFault(NotEvaluable)`, and earns/shows nothing.
+- **Tests: +56 (635 → 691, unfiltered EditMode).** `ProgressionTests.cs`: Evaluate vs an independent `decimal`
+  restatement over every placement × bank × steal × rested of the **loaded asset**; totality (null/NaN/±∞/negative,
+  unknown schema, placement 0 and Length+1, broken configs, a destroyed config); rested boundary exactly at
+  `RestedRounds`; steal cap; the floor epsilon; config structure (`PlacementGrain.Length ≥ MatchConfig.MaxPlayers`,
+  non-increasing, ≥ 0, multiplier ≥ 1) + slot resolves to the real asset + code defaults mirror it; fold
+  deterministic under 7 shuffle seeds, duplicates once, differing duplicates order-independent, rested per local day
+  of the given zone; tracker (bots never land, distinct rivals excluding None/self, abandoned round discarded, `None`
+  local = Debug only, standings-not-banked incl. a Spoiler-style case, execute = transferred cargo, throwing
+  subscribers). `ProgressionPersistenceTests.cs`: journal round-trip of every field **under es-ES**, torn tail
+  dropped/preserved/truncated then appendable, repaired newline, malformed middle lines, BOM, failed append; service
+  (journal on disk before either event fires — checked by rereading the file inside the handlers; award = balance
+  delta = Evaluate of its line; **clock skew** award = delta = own − displaced rested bonus, reload agrees; write
+  failure → Error + fault, no award, balance unchanged; unreadable journal → off for the session; `LatestAward`
+  cleared on RoundOpened; not-evaluable journaled; reload = sum of awards; torn journal loads + faults; throwing UI
+  subscriber contained) — all in temp directories; the Grain-line rule and UXML placement. `MatchEventSinkTests`:
+  binding resolves to guard(`MatchTracker`), one `IProgressionService` listening to that tracker, not initialized;
+  the execute pins below. `ProgressionBoundaryTests`: the bounty-bag scan + rot check.
+- **Assassin execute = a steal of the transferred cargo, excluding `ExecuteBounty` (Maestro, 2026-09-12).**
+  `AssassinExecute.Press` runs on the **assassin's** state authority (reached from `AbilityController.TryActivate`
+  in FUN). It reads the victim's replicated `Cargo` into a local **before** `RPC_TransferAllToBountyBag` (in solo
+  that RPC invokes locally and synchronously and zeroes it), calls `_cargo.AnnounceExecuteSteal(victimCargo, target)`
+  (announce-only, `Runner.IsForward`-guarded, only when > 0), then sends the RPC unchanged. The RPC body runs on the
+  **victim's** authority, so an emit there would reach the wrong peer's sink in Shared PvP. Pinned: announce
+  precedes the RPC, is passed the captured local (never `bounty`), only the execute calls it, and it writes no cargo.
+- **Finding 1 — the execute's transfer and kill credit never resolve, even in solo (pre-existing, NOT fixed).**
+  `Press` passes its own `Id` (the **AssassinExecute** behaviour's `NetworkBehaviourId`) to
+  `RPC_TransferAllToBountyBag`, which does `Runner.TryFindBehaviour(assassinId, out ChickenCargo)`, and to
+  `RPC_ExecuteRemoval` → `CreditKillToAttacker` → `TryFindBehaviour(attackerId, out ChickenCombat)`. Checked live in
+  `GameMode.Single` on all four chickens: `TryFindBehaviour<ChickenCargo>` = **false**, `<ChickenCombat>` =
+  **false**, `<NetworkBehaviour>` = true (returns the `AssassinExecute`). So the victim's cargo is zeroed and never
+  reaches the bounty bag, and an execute never increments `Kills` (so no `OpponentDisabled` either). The announced
+  steal therefore credits cargo the assassin does not actually receive today — it matches what the victim lost.
+  Likely fix (gameplay, for a later pass): pass `_cargo.Id` / `_combat.Id`, or resolve `NetworkBehaviour` and
+  `GetComponent`.
+- **Finding 2 — Shared-mode proxy write (NOT fixed, not verified live).** In Shared PvP the transfer body runs on the
+  victim's peer and writes `assassinCargo.BountyBag += …` on a **proxy** of the assassin. Evidence: the woven
+  `ChickenCargo.set_BountyBag` IL is `if (Ptr == null) throw …; *(float*)(Ptr + 4) = value;` — no authority check,
+  just a write to that peer's local copy of the object's state; Fusion replicates an object's state from its state
+  authority (release note: networked backing fields are "read only for clients without state authority"), so the
+  write is never sent and is overwritten by the assassin's next update. Same bug class as the `ExecuteRemoval` note
+  in `ChickenCombat.cs`. Not observed in a real Shared session (no multi-client run this slice; Photon's online docs
+  sat behind a bot check). A fix would credit the bounty bag on the assassin's own authority (as `ReceiveStolen` does
+  for the other steals) and leave only the drain to the victim's RPC.
+- **Verified in play mode — real solo rounds, no debug path.** Journal did not exist before the session
+  (`C:/Users/MARCO/AppData/LocalLow/DefaultCompany/CluckWars/progression/journal.jsonl`). Bootstrap → menu
+  `ChooseMode(Solo)` → `OnReady` → `OnStartMatch`; the human stayed idle. Game view 1575×886 (landscape, free
+  aspect — no Pixel 9 preset in this Editor). Service log: `Journal loaded … 0 line(s) … (4.1 ms)`; appends 4 ms.
+  ```
+  round 1  13:06:24Z  P4 banked 0 → +34 Grain (rested)   balance 34
+  round 2  13:07:18Z  P4 banked 0 → +34 Grain (rested)   balance 68    (screenshot: "+34 Grain")
+  round 3  13:08:12Z  P4 banked 0 → +34 Grain (rested)   balance 102
+  round 4  13:09:06Z  P4 banked 0 → +23 Grain            balance 125   (screenshot: "+23 Grain")
+  ```
+  `Evaluate` of each journal line with its prior-rounds-today gives 34/34/34/23 (= floor((20 + 3) × 1.5) and 20 + 3),
+  sum 125. First line on disk:
+  `{"SchemaVersion":1,"RoundId":"f2d239fce1b74edd802b6e025847278f","EndedAtUtc":"2026-09-13T13:06:24.9578563Z","Ruleset":{"ResourceTargetToWin":40.0,"RoundDurationSeconds":45.0,"MaxActors":4},"DurationSeconds":44.96875,"RoleKey":"class.warrior","Placement":4,"BankedTotal":0.0,"StolenTotal":0.0,"RivalsRobbed":0,"OpponentsDisabled":0,"Abilities":[]}`
+  — the other three are identical apart from id and time (the bots replay rounds exactly; the idle human's
+  `Abilities` is empty). **Reload:** exited play mode and re-entered; before any round the service reported
+  `IsReady`, balance **125**, 4 rounds — exactly the sum of the four awards (34 + 34 + 34 + 23). Round 5 (13:15:26Z,
+  the day's 5th round) then paid **+23 Grain**, balance 148, and `Evaluate(prior 4)` of its line is 23 (screenshot:
+  "+23 Grain" beside "Next match in 5s…" in the one-row footer). A third session (the layout measurement above)
+  recorded round 6 (+23, balance 171), so this machine's journal now holds **6 test rounds**, all idle P4 Warrior.
+  No new console errors or warnings (only the known `Mobile_RPAsset.asset` load errors and MCP/AI Toolkit noise).
+- **No Maestro prefab-wiring steps** — the config slot was assigned on `ProjectContext.prefab` via SerializedObject.
+- **Fix pass after qa-reviewer (2026-09-14, "changes required") — 691 → 709 (+18), 709/709 green.**
+  - **Stale award (M1):** a player who quits during results and joins a session already on its results screen
+    hears no `RoundStarted`, so the previous award was still `LatestAward`. `MatchOverlaysController` now captures
+    the award id that exists when it is created and `ShowsGrainLine(panel, service, staleRoundId, out award)` never
+    shows it.
+  - **Rested day stamped (M2):** `RoundOutcome.LocalDay` (`yyyy-MM-dd`) is stamped by `MatchTracker` in the device's
+    zone at round end (zone read lazily at the first `BuildOutcome`, UTC + one Warn if unreadable); the fold groups
+    by it, falling back to the zone day of `EndedAtUtc` for older lines (this machine's 6 dev lines). No schema bump.
+  - **`-progressionDir <path>`** (pure `ProjectInstaller.ResolveProgressionDirectory`, resolved at install);
+    `tools/run-clients.ps1` passes `Builds/Windows/progression/clientN` per client.
+  - **Journal hardening:** `Append` writes a newline first if the file does not end with one; it serializes once,
+    refuses a line that would not read back, and returns the parsed record, which the service folds (memory equals
+    disk); `Load` treats a directory at the journal path as a failure, not a first run; schema acceptance is
+    `1..CurrentSchemaVersion` in both the loader and `Evaluate`; the service reads `TimeZoneInfo.Local` in
+    `Initialize()` (UTC + Warn on failure), never in its constructor.
+  - **Smaller:** a missing-from-ledger award says so (was printing the default `Ok`); repeated `NotReady` rounds log at
+    Debug after the first Warn; a null `_cargo` in `AssassinExecute.Press` is now a wiring `Error` naming
+    `ChickenCargo`; stale slice-era comments corrected (`NullMatchEventSink`, `GuardedMatchEventSink`, the boundary
+    tests, `IProgressionService.LatestAward`).
+  - **Tests:** UI allowlist scan (default-deny, non-blind); the bounty allowlist pinned to exactly one
+    `_cargo.BountyBag += bounty`; clock-skew preconditions asserted, not branched on; no-I/O-before-Initialize
+    seeded with a torn journal and also resolved through the installer's own bindings; the one-row footer pinned
+    (UXML parentage + USS `flex-direction: row`); portable directory-at-path failures instead of Windows file locks;
+    LocalDay stamping/fold/fallback; `-progressionDir` parser; pre-append newline guard; memory-equals-disk with
+    awkward floats.
+  - **Smoke run (solo, 2026-09-14):** at load the service reported balance 171 over the 6 older, unstamped dev lines
+    (the fallback path, unchanged from 2026-09-13); the next round was written with `"LocalDay":"2026-09-14"`, paid
+    +34 (rested: the first round of a new day), balance 205. The dev journal now holds 7 test rounds.
+
+### What slices 3 and 4 need to know
+
+- **Root Egg and Feather Trap always report `connected = false`** (`ReportsCastHits` is false for placed zones), so
+  a "Land N control abilities" goal cannot count them from `AbilityTally.Connected`; count casts or add a signal.
+- **Reuse `ProgressionCalendar`** for any day logic (the daily task, "today"). Never define a second local day.
+- **Wins = placement 1** (`ProgressionProfile.Wins`); a shared first place counts for everyone in it, which can
+  differ from the round's announced winner.
+- **The wallet re-derives from config.** Changing `ProgressionConfig.asset` changes past balances. Spending must be
+  journaled as its own facts before the first thing is purchasable.
+- **Not-evaluable rounds are journaled but earn nothing** and count toward no total; a config fix credits them later.
+- **`RoundAward.Grain` is the balance delta**, not necessarily `Evaluate(outcome).Grain` (clock skew); UI hides ≤ 0.
+- **The execute's steal credit is announced but the cargo never reaches the assassin today** (finding 1), and executes
+  never announce `OpponentDisabled`. Goals counting kills or steals will under/over-count executes until fixed.
+- **The GDD §8/§11 rewrite and the compendium (`docs/site/index.html`) sync happen in one combined pass after slice 4.**
+- `IProgressionService` is project-scoped and synchronous; UI reads `IsReady` first and never blocks on it. New
+  progression types are auto-denied to gameplay by the boundary scan; UI may name only the read surface
+  (`IProgressionService`, `ProgressionProfile`, `RoundAward`, `ProgressionFault`, `ProgressionFaultKind`).
+- **Days come from `RoundOutcome.LocalDay`** (stamped at round end, `yyyy-MM-dd`), falling back to the zone day of
+  `EndedAtUtc` only for older lines. A daily task must group by the same stamp through `ProgressionCalendar.DayOfRound`.
+- **Deferred from the slice 2 review (not done):**
+  - **#8 — make `ProgressionConfigSO`'s fields read-only** (serialized private fields + getters). `MatchConfigSO` uses
+    the same public-field pattern, so do both together.
+  - **#17 — time the round-end refold on the Pixel 9.** The service refolds the whole journal on every append
+    (4 ms in the Editor with a handful of lines); measure with a few hundred lines on device before it matters.
+  - **#18 — the compendium (`docs/site/index.html`) deferral to after slice 4 is pending Maestro's sign-off.**
+
+## ✅ Progression Slice 1 — announcement sites (2026-09-11/12) — 635/635 green
+
+Second slice of the progression pitch milestone, on `feature/progression`. Gameplay now **announces** every
+round event to `IMatchEventSink`. **Zero runtime behaviour change:** the bound sink is
+`GuardedMatchEventSink` wrapping `NullMatchEventSink`, and `ChickenCargo.ReceiveStolen` performs exactly the
+raw `Cargo +=` it replaced. No gameplay value changed, so `docs/site/index.html` is untouched. qa-reviewer's
+deep review ("changes required, no blockers") was resolved in a fix pass on 2026-09-12 — see below.
+
+| Event | Site | Runs on |
+|---|---|---|
+| `RoundStarted` / `RoundEnded` | `GameManager.LateUpdate` → `RoundAnnouncer.Tick(State, TimeRemaining)` — a **poll**, never a ChangeDetector | every peer, no authority gate |
+| `ResourceBanked` | `ChickenCargo.FlushBaseDeposit`, once per batched flush that was actually sent (`RPC_AddDeposit` branch), emitted **after** the flush state is reset, with the amount captured first | depositor's state authority |
+| `ResourceStolen` | new `ChickenCargo.ReceiveStolen(amount, victim)` — called by Snatch, Sneaky Steal, Scrap, Roll Trample (credit **then** drain) and Spine Coat's steal-back in `ChickenController.CheckCollisionSlow` (drain **then** credit; the defender is the thief) | thief's state authority |
+| `OpponentDisabled` | `ChickenMatchStats.RPC_CreditKill`, after `Kills++` (RPC signature unchanged) | attacker's state authority |
+| `AbilityResolved` | `AbilityController.TryActivate`, beside `LastCastEventId++`; `connected = hitCount > 0` | caster's state authority |
+
+- **New runtime (`Gameplay/`):** `MatchActorId` (the only actor-id derivation), `RoundEdgeDetector` (pure
+  `MatchState` → Started/Ended edges), `RoundStandingsBuilder` (pure ranking), `RoundSnapshotSelector` (pure
+  picking rules over plain tuples: one row per claimed base, decoys never own a base or count as local,
+  orphaned bases keep a `None` row), `RoundAnnouncer` (pure; owns the detector, the captured ruleset and the
+  last Active `TimeRemaining`) and `IRoundSnapshotSource`, which `GameManager` implements as an explicit
+  interface implementation. Passing an interface rather than delegates is what keeps the per-frame tick free of
+  delegate allocations. Standings and ruleset are captured **once, on the edge**.
+- **New runtime (`Progression/`):** `GuardedMatchEventSink` — the decorator `ProjectInstaller` always binds
+  around the real sink. It catches every exception from the inner sink, logs one `Error` per event kind (the
+  first failure, with the exception) and then only counts (`FailureCount(Verb)`), so a broken sink can never
+  half-apply a steal or put an Error on every deposit.
+- **Injection:** `ChickenCargo`, `AbilityController` and `GameManager` gained the sink in `Construct`, and
+  their existing self-inject resolves it. `ChickenMatchStats` had no injection; it now has `Construct` + a
+  ProjectContext self-inject at the top of `Spawned`. The four steal ability SOs gained **no** injection. Each
+  of the four components logs **one** `Error` in `Spawned` if the sink is still null after injection (never per
+  emit); `GameManager` then leaves its `RoundAnnouncer` null instead of throwing, so the match still starts.
+- **Resimulation / `Runner.IsForward` (observation, scoped to `FixedUpdateNetwork`).** Per the Fusion docs
+  (`Simulation.IsResimulation`), resimulation happens on a client doing prediction when a newer StateAuthority
+  snapshot arrives; the state authority itself is not rolled back. The three tick-driven emits run inside a
+  `HasStateAuthority`-gated `FixedUpdateNetwork`, so we do not expect any of them to run in a resimulation in
+  Single, Shared or Host/Server mode as the code stands. `IsForward` guards those three emits anyway (free, and
+  protects against a future prediction change); the credit/deposit logic is never guarded. `RPC_CreditKill`
+  needs no guard: RPCs are not re-invoked during resims (`RpcLocalInvokeResult.NotInvokableDuringResim`).
+  Observed in the solo play-mode run: `IsForward` read `true` in `GameMode.Single` and every bot and human
+  tick-driven event arrived.
+- **Tests:** +65 (570 → 635, unfiltered EditMode, re-run 2026-09-12 after the fix pass). `MatchEventSinkTests` —
+  the edge detector incl. an exhaustive 5,460-sequence oracle for the "no Ended without Started" invariant;
+  standings tie rule, `Mathf.Approximately` tie, input-order independence, orphaned `None` rows; the snapshot
+  selector (decoy exclusion per corner in either list order, local = `isLocal && !isDecoy`, no local → `None`,
+  orphan rows); the announcer (ruleset only on Started, duration, snapshot exactly once, restart, late join);
+  the guard (a throwing inner sink never throws and logs exactly one Error per kind; a healthy one gets every
+  call unchanged); one source-level pin per emit site (`ResourceBanked` only when sent and after the flush
+  reset; `AbilityResolved` after both `LastCastEventId++` and `ability.OnActivate(`); `ReceiveStolen`'s first
+  statement is the unconditional credit; all five steal sites pass the drained **amount** and the drained
+  **victim** on the original side of the drain; no `GetChangeDetector(` in `GameManager`; and **the sink binding
+  actually resolves** — the shipped `ProjectContext.prefab` installer runs `InstallBindings()` into a fresh
+  `DiContainer` and `Resolve<IMatchEventSink>()` returns a single `GuardedMatchEventSink` wrapping
+  `NullMatchEventSink` (the test restores the installer's previous `Container` and the `AudioRegistry` clip slots
+  `ProceduralAudioBank.FillMissing` fills in memory — verified afterwards: asset not dirty, all 14 slots null).
+  `ProgressionBoundaryTests` — contract surface (default-deny, non-blind), no `.Cargo +=` outside
+  `ReceiveStolen` (allowlist `PeckAbilitySO`, rot-checked; `ChickenCargo.cs` exempt as the owner), progression
+  vocabulary, plus `SourceScan` self-tests (block comments, expression-bodied members). The scans are **code
+  lines only**, with `/* */` state tracked across lines: slice 0's docs legitimately cite gameplay provenance.
+  Progression may import `CluckWars.Logging` and `CluckWars.Services` (infrastructure); every other
+  `CluckWars.*` namespace is denied.
+- **Verified in play mode — a real solo round, no shipped debug path.** Entered play on `Bootstrap.unity`;
+  before the Game scene loaded, `script-execute` rebound `IMatchEventSink` on the live ProjectContext container
+  to an in-memory probe logging through `ILogService.Info` (source `SinkProbe`). Started solo through the menu's
+  own `ChooseMode(Solo)` → `OnReady` → `OnStartMatch`. The human's cast went through the **real input path**:
+  `TouchControlsController._held[3]` set, then cleared → `FusionNetworkService.OnInput` → `TryActivate` in FUN
+  (`LastCastEventId` 0 → 1). Captured across rounds 1–4 (actor ids: 1038 Speedy bot, 1039 Fatty bot,
+  1040 Assassin bot, 1042 Warrior human):
+  ```
+  20:44:59.52 AbilityResolved actor=1042 key=ability.egg_shell connected=False   <- human, real TryActivate
+  20:45:00.03 AbilityResolved actor=1040 key=ability.mark_kill connected=True
+  20:45:19.53 AbilityResolved actor=1038 key=ability.speed_burst connected=False
+  20:45:19.78 RoundEnded local=1042 duration=44,97 entries=[1040:class.assassin:P1:15,0; 1038:class.speedy:P2:5,0;
+              1039:class.fatty:P3:0,0; 1042:class.warrior:P3:0,0]
+  20:45:25.78 RoundStarted target=40 duration=45 maxActors=4                      <- restart, exactly 6 s later
+  20:45:29.46 AbilityResolved actor=1039 key=ability.peck connected=False
+  20:45:31.09 ResourceBanked actor=1038 amount=2,25
+  ```
+  Every `RoundEnded` named the human (1042) with four entries; the 0/0 tie shared P3. No steal or kill happened
+  in the captured rounds, so those two emits are covered by the source pins, not by this run. No new console
+  errors or warnings. The only errors were three MCP-plugin `Mobile_RPAsset.asset` load errors and one AI Toolkit
+  account warning, both Editor noise unrelated to this change. Side observation: the three bots played three
+  consecutive rounds identically, down to the banked amounts — expect identical journal lines in slice 2's
+  solo testing. This run predates the 2026-09-12 fix pass (guard binding, deposit-emit reorder, orphan rows,
+  extracted selector); those changes are covered by the unit tests above and were not re-run in play mode.
+- **No Maestro prefab-wiring steps.**
+
+### What slice 2 needs to know
+
+- **Actor ids** are `MatchActorId.Of(...)` — the `NetworkId` raw value, `unchecked` to `int` (may be negative);
+  `MatchActorId.None` (0) means "no actor". Unique per session only: bucket per round, never persist.
+- **Bot events arrive.** In solo the player's peer simulates the three bots; bucket every actor, and take the
+  human's bucket from `RoundEnded.localActorId` (resolved with `HasInputAuthority && !IsDecoy`).
+- **Order within one steal cast** is `ResourceStolen` (inside `OnActivate`) then `AbilityResolved`.
+- **`ResourceStolen` is the thief's optimistic credit** — the victim's `RPC_DrainStolen` can still refuse it
+  (`StealRules`), so it is not what the victim lost.
+- **`ResourceBanked` is the flush attempt** — `PlayerBase.RPC_AddFood` can still refuse it. Rewards based on what
+  was banked should read the totals in `RoundEnded`'s standings, not sum this event.
+- **The Spoiler match-end bonus** (`GameManager.AwardMatchEndBonuses` → `AddFoodAuthoritative`) lands in the
+  standings' `ResourceTotal` but is **not** announced as `ResourceBanked`, so per-actor banked sums will not equal
+  standings totals (seen live: the Assassin placed P1 on 15 with nothing banked).
+- **`connected = false` means "unknown"** for families where `AbilityBaseSO.ReportsCastHits` is false (self-buffs,
+  placed zones, Peck). Zone control abilities (Root Egg, Feather Trap) never read as connected — this matters for
+  the "Land N control abilities" weekly goal.
+- **The Ability Lab** holds `GameManager` Active forever: the lab emits `RoundStarted` and casts, never `RoundEnded`.
+- **An orphaned base** (claimed, no live chicken — a player who left) **keeps its standings row** with
+  `ActorId = MatchActorId.None` and `RoleKey = null` (plus a `Debug` line), so everyone else's placement still
+  counts what it banked. **A `None` entry is never an actor bucket** — skip it when awarding.
+- **Shared P1 vs. the announced winner.** Standings use competition ranking with `Mathf.Approximately` ties, so two
+  actors can both be P1 while `GameManager.EndOnTimerExpiry` names exactly one winner (its ties break on kills,
+  then corner). `Entries[0]` is not necessarily that winner — don't derive "won the round" from array position.
+- **Assassin execute — Maestro's ruling (2026-09-12), not implemented yet:** the execute **counts as a steal**
+  for the cargo actually transferred from the victim, **excluding** the extra `ExecuteBounty`. Today the transfer
+  goes victim → assassin's `BountyBag` (`ChickenCargo` ~:800, `RPC_TransferAllToBountyBag`) and is **not
+  announced**, and the `.Cargo +=` scan does not cover `BountyBag +=`. Before wiring it, slice 2 must confirm
+  **which peer runs the BountyBag transfer**: the assassin's own peer has to emit the `ResourceStolen`, or the
+  assassin never gets credit.
+- **A stalled remote Shared peer can merge two rounds.** If a remote peer stalls for longer than the 6 s restart
+  delay it can observe Active → Active and miss that round's Ended/Started pair. Solo is unaffected. Possible fix:
+  treat a change of `MatchTimer`'s target tick while Active as a new round.
+- **An abandoned round** produces a `RoundStarted` with no `RoundEnded`, and a `RoundEnded`'s `localActorId` can be
+  `MatchActorId.None` (no local non-decoy chicken on this peer).
+- **Remote peers** capture standings from their latest snapshot at the Ended edge, and Shared mode does not
+  guarantee cross-object atomicity between `State` and the bases' `FoodTotal`. Solo is unaffected.
+- **An abandoned session** (GameManager despawned mid-round) emits no `RoundEnded`; a new session gets a fresh
+  `RoundAnnouncer`, so a late joiner still gets `RoundStarted`.
+- **The sink must not throw** (in `IMatchEventSink`'s contract). The guard already exists: bind the tracker as
+  `GuardedMatchEventSink(tracker)` in `ProjectInstaller`, exactly where `NullMatchEventSink` sits today, and update
+  the binding test's `Inner` assertion. Every call is inline, mid-effect (e.g. just before the victim's drain RPC).
+- The boundary is in `docs/CONVENTIONS.md` → "Gameplay → progression boundary"; `UI/` is exempt from the
+  contract-surface scan for slice 2/3's consumers.
+
+---
+
 ## ✏️ Ability descriptions no longer mention damage (2026-09-12) — copy only
 
 Three `Description` strings still described the pre-v0.4 HP model. Rewritten (via
@@ -32,6 +640,37 @@ left both as "no-op stubs for plan 4"; nothing replaced them. Turtle Mode is onl
 and steals all land through both, so as shipped each is a pure self-penalty. GDD §7.2 still
 states the intent (control resistance / invulnerability). Restoring an effect is a
 `mechanics-designer` call, solved against the Oracle — not a copy fix.
+## ✅ Progression Slice 0 — contract & stable unlock keys (2026-09-11) — 570/570 green
+
+First slice of the progression pitch milestone (`docs/superpowers/plans/2026-09-11-progression-pitch-milestone.md`),
+on `feature/progression`. **Zero behaviour change, no emit sites** (those are slice 1). The only gameplay files
+touched are `AbilityBaseSO` (one serialized field + editor-only helpers) and `ProjectInstaller` (one binding).
+
+- **Contract** (`Scripts/Progression/`): `IMatchEventSink` (six verbs — `RoundStarted`, `ResourceBanked`,
+  `ResourceStolen`, `OpponentDisabled`, `AbilityResolved`, `RoundEnded`); `NullMatchEventSink`, bound in
+  `ProjectInstaller` and silent by design (nobody listening is a legal state); `RoundTypes` (`RoundRuleset`,
+  `RoundStandingEntry`, `RoundStandings`, JsonUtility-shaped); `UnlockKeyTable`, the single gameplay→progression
+  translation point. Progression's API vocabulary is generic — no food/chicken/cluck.
+- **Key scheme:** abilities `ability.<snake>`, passives `passive.<snake>`, roles `class.warrior|speedy|fatty|assassin`.
+  Ability keys live in `AbilityBaseSO._unlockKey` (read via `UnlockKey`): derived from the asset name **once**,
+  editor-only, never overwritten, never derived at runtime. Role keys are a hand-written switch — never
+  `ToString()`/`nameof`, so renaming an enum member cannot change a saved key.
+- **Populated:** all 37 ability assets (29 + 8 passives). `AbilityBaseSO.OnValidate` filled them in memory on the
+  first domain reload; *Cluck Wars/Progression/Assign Missing Unlock Keys* (`Editor/UnlockKeyAssigner.cs`) saved them
+  and reports duplicates. Re-run it after adding an ability asset.
+- **The .asset diffs are bigger than one line; the values are not.** Unity re-serialized all 37 (fields previously
+  absent now written at their initializer, `2.0`→`2`, dead stale fields dropped, the never-authored Peck `CastMotion` written as `0`,
+  i.e. Lunge, which Peck never reads). Verified by loading each HEAD version in Unity and diffing `EditorJsonUtility`
+  output: 37/37 identical apart from `_unlockKey`. From now on the previously-absent fields are explicit in the
+  assets (e.g. CluckShock `KnockbackForce` 16.2, DiveBomb `StealAmount` 8, SpineCoat `StealBackAmount` 4), so editing
+  their C# field initializers no longer changes these abilities — tune the `.asset` instead.
+- **Manifest:** `Editor/Tests/UnlockKeyManifest.json` (key → path) is **hand-curated, never regenerated**; the menu
+  never writes it. `UnlockKeyTests` fails on drift. Asset renamed/moved → update its `Path`, **never the key**.
+  Key changed → revert it (a changed key costs players their unlocks). New asset → run the menu, add an entry.
+  Duplicated with Ctrl+D → the copy carries the key; clear it on the copy and re-run the menu.
+- **Tests:** +8 — `UnlockKeyTests` (6), `RoundTypesTests` (2). **No Maestro prefab-wiring steps.**
+
+---
 
 ## ✅ Ability Lab now ships, gated behind Developer Mode (2026-09-04) — 562/562 green
 

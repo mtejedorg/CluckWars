@@ -72,7 +72,7 @@ namespace CluckWars.Abilities
                 float stolen = StealMath.Clamp(ResolveStealAmount(StealAmount, thief), freeSpace, targetCargo.Cargo);
                 if (stolen > 0f)
                 {
-                    thiefCargo.Cargo += stolen;
+                    thiefCargo.ReceiveStolen(stolen, targetCtrl);
                     targetCargo.RPC_DrainStolen(stolen, thief.Id);
                 }
 

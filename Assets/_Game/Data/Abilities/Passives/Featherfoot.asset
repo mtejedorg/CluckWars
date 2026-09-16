@@ -25,7 +25,9 @@ MonoBehaviour:
   BotRole: 0
   Duration: 0.05
   Cooldown: 0
-  SearchMask:
   CastMotion: 8
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  _unlockKey: passive.featherfoot
+  SignatureAbility: {fileID: 0}

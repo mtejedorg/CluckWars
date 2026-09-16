@@ -15,17 +15,20 @@ MonoBehaviour:
   DisplayName: Cluck Shock
   ShortLabel: CSK
   Description: Knockback shockwave shoving nearby rivals away.
+  Icon: 
   AccentColor: {r: 1, g: 0.9, b: 0.1, a: 1}
   Category: 1
   TerrainTraversal: 0
+  JumpTier: 0
   SlotKind: 1
   AllowedClasses: 1
   BotRole: 0
   Duration: 0.5
   Cooldown: 7
-  SearchMask:
   CastMotion: 2
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  _unlockKey: ability.cluck_shock
   ShockRadius: 4.5
-  ShockDamage: 35
+  KnockbackForce: 16.2

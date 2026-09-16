@@ -60,7 +60,7 @@ namespace CluckWars.Abilities
             float take = Mathf.Min(ResolveStealAmount(StealAmount, thief), target.Cargo, spaceLeft);
             if (take <= 0f) return;
 
-            thiefCargo.Cargo += take;
+            thiefCargo.ReceiveStolen(take, _scratch[0]);
             target.RPC_DrainStolen(take, thief.Id);
         }
 

@@ -31,6 +31,7 @@ namespace CluckWars.Tests
         public const string ColorSchemePath          = DataRoot + "/ColorScheme.asset";
         public const string PrefabRegistryPath       = DataRoot + "/PrefabRegistry.asset";
         public const string AudioRegistryPath        = DataRoot + "/AudioRegistry.asset";
+        public const string ProgressionConfigPath    = DataRoot + "/Progression/ProgressionConfig.asset";
 
         public const string ChickenPrefabPath      = PrefabsDir + "/Chicken.prefab";
         public const string DoppelgangerPrefabPath = PrefabsDir + "/Doppelganger.prefab";
@@ -55,6 +56,9 @@ namespace CluckWars.Tests
         /// or an emptied slot breaks the game at runtime, not just this test.
         /// </summary>
         public const string ProjectContextPrefabPath = "Assets/_Game/Resources/ProjectContext.prefab";
+
+        /// <summary>Hand-curated key → asset-path record of every shipped unlock key. Never regenerated; see UnlockKeyTests.</summary>
+        public const string UnlockKeyManifestPath = "Assets/_Game/Scripts/Editor/Tests/UnlockKeyManifest.json";
 
         public const string UiRoot        = "Assets/UI";
         public const string LobbyUxmlPath = UiRoot + "/Lobby.uxml";

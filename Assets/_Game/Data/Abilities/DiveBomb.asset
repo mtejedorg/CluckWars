@@ -15,6 +15,7 @@ MonoBehaviour:
   DisplayName: Dive Bomb
   ShortLabel: DVB
   Description: Hurls itself forward in a diving lunge, robbing cargo on contact.
+  Icon: 
   AccentColor: {r: 1, g: 0.55, b: 0.2, a: 1}
   Category: 0
   TerrainTraversal: 1
@@ -25,6 +26,10 @@ MonoBehaviour:
   Duration: 0.6
   Cooldown: 6
   CastMotion: 0
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256
+  _unlockKey: ability.dive_bomb
   ForwardOffset: 3.25
   SweepRadius: 2.05
-  TrampleDamage: 50
+  StealAmount: 8

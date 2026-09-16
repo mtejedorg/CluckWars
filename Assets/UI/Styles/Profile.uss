@@ -1,0 +1,231 @@
+/* ============================================================================
+   Cluck Wars — profile page (progression slice 3, "Identity")
+   Paired with Assets/UI/Profile.uxml. Tokens: CluckWarsTokens.uss (--cw-*).
+
+   USS-valid only, same rules as CluckWarsTheme.uss: NO text-shadow / box-shadow
+   / inherit / gap / linear-gradient. Sizes follow that sheet's mobile contract
+   (1 dp ~= 2.35 px; 34 px type floor, 116 px touch floor).
+
+   NO GLYPHS. LilitaOne carries ~225 characters, so there are no check marks,
+   stars, padlocks or arrows anywhere on this page: the emblem ring, the mastery
+   digits, the recent-form pips and the "locked" state of an unearned pick are
+   all borders, radii and fills drawn here.
+   ============================================================================ */
+
+/* ---- Page scaffolding ----------------------------------------------------- */
+.cw-profile-body { flex-grow: 1; flex-direction: row; align-items: stretch; }
+
+.cw-profile-col { flex-direction: column; }
+.cw-profile-col--left  { width: 38%; margin-right: 20px; }
+.cw-profile-col--right { flex-grow: 1; }
+
+.cw-profile-section {
+    margin-bottom: 18px;
+    padding-top: 16px; padding-bottom: 16px; padding-left: 18px; padding-right: 18px;
+}
+
+.cw-profile-caption {
+    font-size: 30px;
+    letter-spacing: 2px;
+    color: rgb(196, 160, 96);
+    margin-bottom: 10px;
+}
+
+.cw-profile-empty {
+    font-size: 38px;
+    color: rgb(196, 160, 96);
+    -unity-text-align: middle-center;
+    flex-grow: 1;
+    padding-top: 120px;
+}
+
+/* ---- The nameplate -------------------------------------------------------- */
+/* The plate itself is the banner: the banner modifier below repaints it. */
+.cw-plate {
+    flex-direction: row;
+    align-items: center;
+    min-height: 168px;
+    padding-top: 16px; padding-bottom: 16px; padding-left: 18px; padding-right: 18px;
+    background-color: rgb(58, 34, 16);
+    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
+    border-left-color: rgb(138, 106, 58); border-right-color: rgb(138, 106, 58);
+    border-top-color: rgb(138, 106, 58); border-bottom-color: rgb(138, 106, 58);
+    border-top-left-radius: 22px; border-top-right-radius: 22px;
+    border-bottom-left-radius: 22px; border-bottom-right-radius: 22px;
+    overflow: hidden;
+}
+
+/* Banner variants. Authored here, named by ProgressionConfig.asset's catalogue;
+   a banner the player does not own is never applied (NameplateComposer). */
+.cw-plate--barnwood { background-color: rgb(58, 34, 16); border-left-color: rgb(138, 106, 58); border-right-color: rgb(138, 106, 58); border-top-color: rgb(138, 106, 58); border-bottom-color: rgb(138, 106, 58); }
+.cw-plate--harvest  { background-color: rgb(92, 60, 18); border-left-color: rgb(235, 182, 60);  border-right-color: rgb(235, 182, 60);  border-top-color: rgb(235, 182, 60);  border-bottom-color: rgb(235, 182, 60); }
+.cw-plate--midnight { background-color: rgb(22, 20, 44); border-left-color: rgb(123, 104, 238); border-right-color: rgb(123, 104, 238); border-top-color: rgb(123, 104, 238); border-bottom-color: rgb(123, 104, 238); }
+
+.cw-plate__text { flex-grow: 1; flex-direction: column; justify-content: center; }
+
+.cw-plate__name {
+    font-size: 48px;
+    color: rgb(254, 245, 224);
+    white-space: nowrap;
+    -unity-text-align: middle-left;
+}
+
+.cw-plate__title {
+    font-size: 32px;
+    color: rgb(245, 200, 66);
+    letter-spacing: 1px;
+    white-space: nowrap;
+    -unity-text-align: middle-left;
+}
+
+/* ---- The emblem ring ------------------------------------------------------ */
+/* A ring in the role's tint with the mastery level inside it. The border colour
+   is pushed from C# (the class tint); everything else is here. */
+.cw-emblem {
+    width: 116px; height: 116px;
+    flex-shrink: 0;
+    margin-right: 18px;
+    align-items: center; justify-content: center;
+    background-color: rgba(0, 0, 0, 0.45);
+    border-left-width: 7px; border-right-width: 7px; border-top-width: 7px; border-bottom-width: 7px;
+    border-left-color: rgb(196, 160, 96); border-right-color: rgb(196, 160, 96);
+    border-top-color: rgb(196, 160, 96); border-bottom-color: rgb(196, 160, 96);
+    border-top-left-radius: 58px; border-top-right-radius: 58px;
+    border-bottom-left-radius: 58px; border-bottom-right-radius: 58px;
+}
+
+.cw-emblem__level {
+    font-size: 46px;
+    color: rgb(254, 245, 224);
+    -unity-text-align: middle-center;
+}
+
+/* The small version that rides on a class chip and on the main-menu strip. */
+.cw-emblem--small { width: 72px; height: 72px; margin-right: 0; border-left-width: 5px; border-right-width: 5px; border-top-width: 5px; border-bottom-width: 5px; border-top-left-radius: 36px; border-top-right-radius: 36px; border-bottom-left-radius: 36px; border-bottom-right-radius: 36px; }
+.cw-emblem--small .cw-emblem__level { font-size: 32px; }
+
+/* ---- Pickers -------------------------------------------------------------- */
+.cw-pick-row { flex-direction: row; flex-wrap: wrap; align-items: center; }
+
+.cw-pick {
+    font-size: 30px;
+    min-height: 74px; min-width: 74px;
+    margin-right: 10px; margin-bottom: 10px;
+    padding-top: 8px; padding-bottom: 12px; padding-left: 20px; padding-right: 20px;
+    color: rgb(254, 245, 224);
+    background-color: rgb(58, 40, 22);
+    background-image: none;
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
+    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
+    border-top-left-radius: 14px; border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
+}
+
+.cw-pick--on {
+    background-color: rgb(92, 60, 18);
+    border-left-color: rgb(245, 200, 66); border-right-color: rgb(245, 200, 66);
+    border-top-color: rgb(245, 200, 66); border-bottom-color: rgb(245, 200, 66);
+    color: rgb(245, 200, 66);
+}
+
+/* Locked: a dashed-looking sunken chip, never a padlock glyph. Kept above 4.5:1
+   so the player can still read what they have not got yet. */
+.cw-pick--locked {
+    background-color: rgb(34, 24, 14);
+    border-left-color: rgb(74, 52, 28); border-right-color: rgb(74, 52, 28);
+    border-top-color: rgb(74, 52, 28); border-bottom-color: rgb(74, 52, 28);
+    color: rgb(150, 126, 90);
+}
+
+/* ---- Records -------------------------------------------------------------- */
+.cw-record {
+    flex-direction: column;
+    margin-bottom: 12px;
+    padding-top: 14px; padding-bottom: 14px; padding-left: 18px; padding-right: 18px;
+    background-color: rgb(34, 24, 14);
+    border-left-width: 6px; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
+    border-left-color: rgb(74, 52, 28);
+    border-top-left-radius: 10px; border-bottom-left-radius: 10px;
+    border-top-right-radius: 10px; border-bottom-right-radius: 10px;
+}
+
+/* Earned reads as lit from the left edge, with no glyph doing the work. */
+.cw-record--earned {
+    background-color: rgb(58, 40, 22);
+    border-left-color: rgb(245, 200, 66);
+}
+
+.cw-record__head { flex-direction: row; align-items: center; justify-content: space-between; }
+.cw-record__name { font-size: 36px; color: rgb(254, 245, 224); flex-grow: 1; -unity-text-align: middle-left; }
+.cw-record--earned .cw-record__name { color: rgb(245, 200, 66); }
+.cw-record__meta { font-size: 28px; color: rgb(196, 160, 96); -unity-text-align: middle-right; flex-shrink: 0; }
+.cw-record__desc { font-size: 30px; color: rgb(212, 190, 158); white-space: normal; margin-top: 4px; }
+
+/* Progress: a filled track, sized from C#. */
+.cw-record__track {
+    height: 12px;
+    margin-top: 10px;
+    background-color: rgb(26, 16, 8);
+    border-top-left-radius: 6px; border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
+    overflow: hidden;
+}
+.cw-record__fill { height: 12px; width: 0; background-color: rgb(196, 160, 96); }
+
+/* ---- Career --------------------------------------------------------------- */
+.cw-career-grid { flex-direction: row; flex-wrap: wrap; }
+
+.cw-career-stat {
+    width: 33%;
+    flex-direction: column;
+    margin-bottom: 14px;
+}
+.cw-career-stat__value { font-size: 44px; color: rgb(254, 245, 224); -unity-text-align: middle-left; }
+.cw-career-stat__label { font-size: 26px; color: rgb(196, 160, 96); letter-spacing: 1px; -unity-text-align: middle-left; }
+
+/* Recent form: one pip per round, carrying its placement as a digit. */
+.cw-form-strip { flex-direction: row; flex-wrap: wrap; align-items: center; }
+
+.cw-form-pip {
+    width: 44px; height: 44px;
+    margin-right: 8px; margin-bottom: 8px;
+    align-items: center; justify-content: center;
+    background-color: rgb(34, 24, 14);
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(74, 52, 28); border-right-color: rgb(74, 52, 28);
+    border-top-color: rgb(74, 52, 28); border-bottom-color: rgb(74, 52, 28);
+    border-top-left-radius: 22px; border-top-right-radius: 22px;
+    border-bottom-left-radius: 22px; border-bottom-right-radius: 22px;
+}
+.cw-form-pip--won {
+    background-color: rgb(92, 60, 18);
+    border-left-color: rgb(245, 200, 66); border-right-color: rgb(245, 200, 66);
+    border-top-color: rgb(245, 200, 66); border-bottom-color: rgb(245, 200, 66);
+}
+.cw-form-pip__place { font-size: 26px; color: rgb(212, 190, 158); -unity-text-align: middle-center; }
+.cw-form-pip--won .cw-form-pip__place { color: rgb(245, 200, 66); }
+
+/* ---- Main-menu identity strip --------------------------------------------- */
+/* A normal-flow element inside MainMenu.uxml's #MenuHeaderRow (right-aligned
+   by that row's justify-content), not absolutely positioned — see the comment
+   on #MenuHeaderRow for why: the 128px centered title can span most of the
+   canvas width, and pinning this to a fixed corner put it on top of the title
+   instead of beside it. */
+.cw-id-strip {
+    flex-direction: row; align-items: center;
+    flex-shrink: 0;
+    padding-top: 10px; padding-bottom: 10px; padding-left: 14px; padding-right: 20px;
+    background-color: rgba(8, 4, 2, 0.72);
+    border-top-left-radius: 18px; border-top-right-radius: 18px;
+    border-bottom-left-radius: 18px; border-bottom-right-radius: 18px;
+}
+.cw-id-strip__text { flex-direction: column; justify-content: center; margin-left: 14px; }
+.cw-id-strip__name { font-size: 36px; color: rgb(254, 245, 224); -unity-text-align: middle-left; white-space: nowrap; }
+.cw-id-strip__title { font-size: 26px; color: rgb(245, 200, 66); -unity-text-align: middle-left; white-space: nowrap; }
+.cw-id-strip__grain { font-size: 32px; color: rgb(196, 160, 96); margin-left: 24px; -unity-text-align: middle-right; }
+
+/* ---- Class-chip mastery ring ---------------------------------------------- */
+/* Sits between the chip's name column and its slot pill. Hidden when the
+   journal has not loaded; display is driven from C#, so it gets no rule here. */
+.cw-chip-mastery { flex-direction: row; align-items: center; margin-right: 12px; flex-shrink: 0; }

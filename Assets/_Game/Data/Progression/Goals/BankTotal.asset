@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d8a9e96070d4c8546bffc390f5d3fb14, type: 3}
+  m_Name: BankTotal
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Progression.GoalTemplateSO
+  _key: goal.bank_total
+  DisplayNameFormat: Bank {0}
+  DescriptionFormat: Bank {0} total this week.
+  Metric: 0
+  Tiers:
+  - Threshold: 100
+    GrainReward: 40
+  - Threshold: 150
+    GrainReward: 60
+  - Threshold: 200
+    GrainReward: 85
