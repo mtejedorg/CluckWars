@@ -342,7 +342,8 @@ namespace CluckWars.Tests
             Assert.IsFalse(result.Succeeded, "A directory sits where the journal file should be; the write cannot land.");
             Assert.IsNotNull(result.Error);
 
-            Assert.IsFalse(_store.Append(null).Succeeded, "A null outcome is refused in the result, not thrown.");
+            Assert.IsFalse(_store.Append((RoundOutcome)null).Succeeded, "A null outcome is refused in the result, not thrown.");
+            Assert.IsFalse(_store.Append((ProfileEvent)null).Succeeded, "A null profile event is refused in the result, not thrown.");
         }
 
         [Test]
@@ -995,10 +996,19 @@ namespace CluckWars.Tests
         {
             public bool IsReady { get; set; }
             public ProgressionProfile Profile => ProgressionProfile.Empty;
+            public ProgressionIdentity Identity => ProgressionIdentity.Empty;
             public RoundAward? LatestAward { get; set; }
             public event Action<ProgressionProfile> OnProfileChanged { add { } remove { } }
+            public event Action<ProgressionIdentity> OnIdentityChanged { add { } remove { } }
             public event Action<RoundAward> OnRoundAwarded { add { } remove { } }
             public event Action<ProgressionFault> OnFault { add { } remove { } }
+
+            // This fake exists for the results panel's Grain line, which reads nothing else. A command
+            // reaching it is a test wiring mistake, so it fails loudly rather than reporting success.
+            public bool TryRerollName() => throw new NotSupportedException("The results-panel fake takes no commands.");
+
+            public bool TrySelectNameplatePart(NameplateSlot slot, string key) =>
+                throw new NotSupportedException("The results-panel fake takes no commands.");
         }
 
         private static bool Shows(IProgressionService p, string stale = null, bool panel = true) =>

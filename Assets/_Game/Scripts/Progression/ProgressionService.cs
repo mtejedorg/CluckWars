@@ -40,6 +40,14 @@ namespace CluckWars.Progression
         private readonly ProgressionConfigSO _config;
         private readonly JournalStore _store;
         private readonly List<JournalRecord> _records = new List<JournalRecord>();
+        private readonly List<ProfileEvent> _profileEvents = new List<ProfileEvent>();
+
+        /// <summary>Problems already logged, so a refold does not repeat them every round.</summary>
+        private readonly HashSet<string> _reportedProblems = new HashSet<string>(StringComparer.Ordinal);
+
+        private readonly Func<DateTime> _utcNow;
+        private readonly Func<string> _newEventId;
+        private readonly System.Random _random;
 
         private TimeZoneInfo _zone;
         private ProgressionLedger _ledger = ProgressionLedger.Empty;
@@ -50,14 +58,20 @@ namespace CluckWars.Progression
         /// Whose calendar days bound the rested bonus for journal lines without a stamped day. Null means
         /// the device's zone, read in <see cref="Initialize"/> (never here).
         /// </param>
+        /// <param name="utcNow">The clock profile events are stamped with; null means <c>DateTime.UtcNow</c>.</param>
+        /// <param name="newEventId">Makes a profile event's id; null means a fresh GUID.</param>
+        /// <param name="random">Drives <see cref="NameGenerator"/>; null means an unseeded one.</param>
         public ProgressionService(ILogService log, MatchTracker tracker, ProgressionConfigSO config, JournalStore store,
-            TimeZoneInfo zone = null)
+            TimeZoneInfo zone = null, Func<DateTime> utcNow = null, Func<string> newEventId = null, System.Random random = null)
         {
             _log = log ?? throw new ArgumentNullException(nameof(log));
             _tracker = tracker ?? throw new ArgumentNullException(nameof(tracker));
             _config = config != null ? config : throw new ArgumentNullException(nameof(config));
             _store = store ?? throw new ArgumentNullException(nameof(store));
             _zone = zone;
+            _utcNow = utcNow ?? (() => DateTime.UtcNow);
+            _newEventId = newEventId ?? (() => Guid.NewGuid().ToString("N"));
+            _random = random ?? new System.Random();
 
             _tracker.RoundOpened += HandleRoundOpened;
             _tracker.OutcomeReady += HandleOutcome;
@@ -65,12 +79,14 @@ namespace CluckWars.Progression
 
         public bool IsReady { get; private set; }
         public ProgressionProfile Profile { get; private set; } = ProgressionProfile.Empty;
+        public ProgressionIdentity Identity { get; private set; } = ProgressionIdentity.Empty;
         public RoundAward? LatestAward { get; private set; }
 
         /// <summary>Where the journal lives, for diagnostics.</summary>
         public string JournalPath => _store.JournalPath;
 
         public event Action<ProgressionProfile> OnProfileChanged;
+        public event Action<ProgressionIdentity> OnIdentityChanged;
         public event Action<RoundAward> OnRoundAwarded;
         public event Action<ProgressionFault> OnFault;
 
@@ -155,6 +171,7 @@ namespace CluckWars.Progression
             }
 
             _records.AddRange(load.Records);
+            _profileEvents.AddRange(load.ProfileEvents);
             var ledger = ProgressionLedger.Fold(_records, _config, _zone);
 
             if (ledger.ConflictingRoundIds.Count > 0)
@@ -174,12 +191,36 @@ namespace CluckWars.Progression
             _ledger = ledger;
             Profile = ProfileOf(ledger);
             IsReady = true;
+            RefreshIdentity();
 
-            _log.Info(Source, $"Journal loaded from {_store.JournalPath}: {load.Records.Count} line(s), " +
-                $"{ledger.RoundsPlayed} round(s), {ledger.GrainBalance} Grain, {ledger.Wins} win(s) " +
+            _log.Info(Source, $"Journal loaded from {_store.JournalPath}: {load.Records.Count} round line(s), " +
+                $"{load.ProfileEvents.Count} profile line(s), {ledger.RoundsPlayed} round(s), " +
+                $"{ledger.GrainBalance} Grain, {ledger.Wins} win(s) " +
                 $"({clock.Elapsed.TotalMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)} ms).");
 
             Raise(OnProfileChanged, Profile, nameof(OnProfileChanged));
+            Raise(OnIdentityChanged, Identity, nameof(OnIdentityChanged));
+
+            EnsureName();
+        }
+
+        /// <summary>
+        /// Gives a player with no readable name one, writing it before anything shows it.
+        /// </summary>
+        /// <remarks>
+        /// Done at load rather than on the first visit to the profile page, so a name exists everywhere
+        /// it might be drawn. If the write fails there is simply no name — the name line hides, the
+        /// fault is reported, and the next launch tries again; nothing invents one in memory.
+        /// </remarks>
+        private void EnsureName()
+        {
+            if (Identity.Plate.HasName) return;
+
+            string name = NameGenerator.Next(_random);
+            if (AppendProfile(ProfileEventTypes.Name, name))
+            {
+                _log.Info(Source, $"No name in the journal, so one was generated and written: {name}.");
+            }
         }
 
         // ---- Tracker handoff -----------------------------------------------------------
@@ -244,12 +285,107 @@ namespace CluckWars.Progression
             long delta = next.GrainBalance - previous.GrainBalance;
             Profile = ProfileOf(next);
             LatestAward = new RoundAward(outcome.RoundId, (int)delta, award.Rested);
+            RefreshIdentity();
 
             _log.Info(Source, $"Round {outcome.RoundId}: +{delta} Grain{(award.Rested ? " (rested)" : string.Empty)}, " +
                 $"placement {outcome.Placement}; balance {next.GrainBalance}.");
 
             Raise(OnProfileChanged, Profile, nameof(OnProfileChanged));
+            Raise(OnIdentityChanged, Identity, nameof(OnIdentityChanged));
             Raise(OnRoundAwarded, LatestAward.Value, nameof(OnRoundAwarded));
+        }
+
+        // ---- Identity ------------------------------------------------------------------
+
+        public bool TryRerollName()
+        {
+            if (!ReadyFor("roll a new name")) return false;
+
+            string next = NameGenerator.Next(_random, Identity.Plate.Name);
+            return AppendProfile(ProfileEventTypes.Name, next);
+        }
+
+        public bool TrySelectNameplatePart(NameplateSlot slot, string key)
+        {
+            if (!ReadyFor($"choose a {slot}")) return false;
+
+            key = key ?? string.Empty;
+            if (key.Length > 0 && !Owns(slot, key))
+            {
+                // Not reachable through the UI — unowned parts are not selectable — so refusing here is
+                // about the journal never recording a choice the player could not have made.
+                _log.Warn(Source, $"'{key}' is not a {slot} this player has, so it was not worn and nothing was written.");
+                return false;
+            }
+
+            return AppendProfile(ProfileEventTypes.Of(slot), key);
+        }
+
+        private bool Owns(NameplateSlot slot, string key) => slot switch
+        {
+            NameplateSlot.Title => NameplateComposer.OwnsTitle(key, Identity.Records),
+            NameplateSlot.Emblem => NameplateComposer.OwnsEmblem(key, Identity.Roles),
+            NameplateSlot.Banner => NameplateComposer.OwnsBanner(key, Identity.Banners),
+
+            // A slot added to the enum and not here: refused, never granted by default.
+            _ => false,
+        };
+
+        private bool ReadyFor(string what)
+        {
+            if (IsReady) return true;
+
+            Fault(ProgressionFaultKind.NotReady, LogLevel.Warn,
+                $"The journal is not loaded, so the player cannot {what}. Nothing was written.", null);
+            return false;
+        }
+
+        /// <summary>
+        /// Writes one profile event, then refolds and announces the identity it produced.
+        /// </summary>
+        /// <remarks>
+        /// Write before show, exactly like a round: on a failed write there is no change to
+        /// <see cref="Identity"/> at all, because the journal is the only thing that says who the
+        /// player is.
+        /// </remarks>
+        private bool AppendProfile(string type, string value)
+        {
+            var profileEvent = ProfileEvent.Of(type, value, _newEventId(), _utcNow());
+            var append = _store.Append(profileEvent);
+            _log.Debug(Source, $"Journal append for profile event {profileEvent.EventId} ({type}): " +
+                $"{append.Milliseconds.ToString("0.0", CultureInfo.InvariantCulture)} ms, ok={append.Succeeded}.");
+
+            if (!append.Succeeded)
+            {
+                Fault(ProgressionFaultKind.WriteFailed, LogLevel.Error,
+                    $"Could not write the '{type}' choice to {_store.JournalPath}: {append.Error?.GetType().Name}: " +
+                    $"{append.Error?.Message} Nothing changed.", append.Error);
+                return false;
+            }
+
+            // Fold the event as the line reads back, not the object that was serialized, so what is
+            // shown is what a reload computes.
+            _profileEvents.Add(append.Event);
+            RefreshIdentity();
+            Raise(OnIdentityChanged, Identity, nameof(OnIdentityChanged));
+            return true;
+        }
+
+        /// <summary>
+        /// Rebuilds <see cref="Identity"/> from the ledger's canonical rounds and the journal's profile
+        /// events. Raises nothing — the caller decides when the change is announced.
+        /// </summary>
+        private void RefreshIdentity()
+        {
+            var problems = new List<string>();
+            Identity = IdentityFold.Build(_ledger.EvaluableRounds, _profileEvents, _config, _zone, problems);
+
+            // Every refold meets the same mis-authored asset, so each problem is logged once per
+            // session rather than once per round.
+            foreach (string problem in problems)
+            {
+                if (_reportedProblems.Add(problem)) _log.Warn(Source, problem);
+            }
         }
 
         // ---- Helpers -------------------------------------------------------------------

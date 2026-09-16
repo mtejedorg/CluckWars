@@ -1,7 +1,45 @@
+using System;
 using UnityEngine;
 
 namespace CluckWars.Progression
 {
+    /// <summary>How a banner can come to be owned.</summary>
+    /// <remarks>
+    /// <see cref="Purchasable"/> ships with no banner using it and there is no store: the value exists
+    /// so "at least one part of a nameplate can never be bought" is a property the tests can actually
+    /// check, rather than one that is true only because nothing is for sale yet.
+    /// </remarks>
+    public enum BannerSource
+    {
+        /// <summary>Owned from the first launch.</summary>
+        Starter,
+
+        /// <summary>Owned once <see cref="BannerDefinition.UnlockRecordKey"/> is earned.</summary>
+        Earned,
+
+        /// <summary>Would have to be bought. Nothing in this build can own one.</summary>
+        Purchasable,
+    }
+
+    /// <summary>One banner: the plate the nameplate is drawn on.</summary>
+    [Serializable]
+    public struct BannerDefinition
+    {
+        [Tooltip("Stable key, e.g. banner.barnwood. Never change one that has shipped.")]
+        public string Key;
+
+        [Tooltip("What the picker calls it.")]
+        public string DisplayName;
+
+        [Tooltip("The USS class that paints it, e.g. cw-plate--barnwood.")]
+        public string UssClass;
+
+        public BannerSource Source;
+
+        [Tooltip("Earned banners only: the record key that unlocks it.")]
+        public string UnlockRecordKey;
+    }
+
     /// <summary>
     /// The Grain earn constants. One asset, <c>Assets/_Game/Data/Progression/ProgressionConfig.asset</c>,
     /// bound project-wide by <c>ProjectInstaller</c> from its one inspector slot.
@@ -46,5 +84,30 @@ namespace CluckWars.Progression
         [Header("Daily task")]
         [Tooltip("Grain for the daily task. Unused until slice 4 adds the task; nothing reads it yet.")]
         [Min(0)] public int DailyTaskBonus = 15;
+
+        [Header("Identity")]
+        [Tooltip("Evaluable rounds played as a role for each mastery level. Strictly increasing; element 0 is level 1.")]
+        public int[] MasteryRoundThresholds = { 1, 3, 6, 10, 15, 21, 28, 36, 45, 55 };
+
+        [Tooltip("The banner catalogue, in picker order.")]
+        public BannerDefinition[] Banners =
+        {
+            new BannerDefinition { Key = "banner.barnwood", DisplayName = "Barnwood", UssClass = "cw-plate--barnwood", Source = BannerSource.Starter, UnlockRecordKey = "" },
+            new BannerDefinition { Key = "banner.harvest",  DisplayName = "Harvest",  UssClass = "cw-plate--harvest",  Source = BannerSource.Earned,  UnlockRecordKey = "record.full_coop" },
+            new BannerDefinition { Key = "banner.midnight", DisplayName = "Midnight", UssClass = "cw-plate--midnight", Source = BannerSource.Earned,  UnlockRecordKey = "record.highway_hen" },
+        };
+
+        /// <summary>
+        /// Every record this build defines. Assets live in
+        /// <c>Assets/_Game/Data/Progression/Records/</c> and are listed here in display order.
+        /// </summary>
+        /// <remarks>
+        /// The code default is deliberately empty: asset references cannot be written as a field
+        /// initialiser, so the "code defaults mirror the asset" test exempts this one field (and says
+        /// so) while <c>RecordAssetTests</c> checks the shipped list separately. A build whose slot is
+        /// empty shows an empty records page — never a wrong one.
+        /// </remarks>
+        [Tooltip("Every record, in display order. Assets live in Assets/_Game/Data/Progression/Records/.")]
+        public RecordDefinitionSO[] Records = Array.Empty<RecordDefinitionSO>();
     }
 }
