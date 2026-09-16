@@ -39,6 +39,7 @@ namespace CluckWars.Progression
         private readonly MatchTracker _tracker;
         private readonly ProgressionConfigSO _config;
         private readonly JournalStore _store;
+        private readonly IAbilityCategoryIndex _categoryIndex;
         private readonly List<JournalRecord> _records = new List<JournalRecord>();
         private readonly List<ProfileEvent> _profileEvents = new List<ProfileEvent>();
 
@@ -61,13 +62,20 @@ namespace CluckWars.Progression
         /// <param name="utcNow">The clock profile events are stamped with; null means <c>DateTime.UtcNow</c>.</param>
         /// <param name="newEventId">Makes a profile event's id; null means a fresh GUID.</param>
         /// <param name="random">Drives <see cref="NameGenerator"/>; null means an unseeded one.</param>
+        /// <param name="categoryIndex">
+        /// Resolves an ability key to its category for the "land N control abilities" goal template.
+        /// Null is tolerated (that one metric then contributes nothing, never throws) so every
+        /// pre-slice-4 test construction of this service keeps compiling unchanged.
+        /// </param>
         public ProgressionService(ILogService log, MatchTracker tracker, ProgressionConfigSO config, JournalStore store,
-            TimeZoneInfo zone = null, Func<DateTime> utcNow = null, Func<string> newEventId = null, System.Random random = null)
+            TimeZoneInfo zone = null, Func<DateTime> utcNow = null, Func<string> newEventId = null, System.Random random = null,
+            IAbilityCategoryIndex categoryIndex = null)
         {
             _log = log ?? throw new ArgumentNullException(nameof(log));
             _tracker = tracker ?? throw new ArgumentNullException(nameof(tracker));
             _config = config != null ? config : throw new ArgumentNullException(nameof(config));
             _store = store ?? throw new ArgumentNullException(nameof(store));
+            _categoryIndex = categoryIndex;
             _zone = zone;
             _utcNow = utcNow ?? (() => DateTime.UtcNow);
             _newEventId = newEventId ?? (() => Guid.NewGuid().ToString("N"));
@@ -80,6 +88,7 @@ namespace CluckWars.Progression
         public bool IsReady { get; private set; }
         public ProgressionProfile Profile { get; private set; } = ProgressionProfile.Empty;
         public ProgressionIdentity Identity { get; private set; } = ProgressionIdentity.Empty;
+        public ProgressionUnlocks Unlocks { get; private set; } = ProgressionUnlocks.Empty;
         public RoundAward? LatestAward { get; private set; }
 
         /// <summary>Where the journal lives, for diagnostics.</summary>
@@ -87,6 +96,7 @@ namespace CluckWars.Progression
 
         public event Action<ProgressionProfile> OnProfileChanged;
         public event Action<ProgressionIdentity> OnIdentityChanged;
+        public event Action<ProgressionUnlocks> OnUnlocksChanged;
         public event Action<RoundAward> OnRoundAwarded;
         public event Action<ProgressionFault> OnFault;
 
@@ -189,9 +199,10 @@ namespace CluckWars.Progression
             }
 
             _ledger = ledger;
-            Profile = ProfileOf(ledger);
             IsReady = true;
             RefreshIdentity();
+            RefreshUnlocks();
+            Profile = ProfileOf(ledger);
 
             _log.Info(Source, $"Journal loaded from {_store.JournalPath}: {load.Records.Count} round line(s), " +
                 $"{load.ProfileEvents.Count} profile line(s), {ledger.RoundsPlayed} round(s), " +
@@ -200,6 +211,7 @@ namespace CluckWars.Progression
 
             Raise(OnProfileChanged, Profile, nameof(OnProfileChanged));
             Raise(OnIdentityChanged, Identity, nameof(OnIdentityChanged));
+            Raise(OnUnlocksChanged, Unlocks, nameof(OnUnlocksChanged));
 
             EnsureName();
         }
@@ -283,15 +295,17 @@ namespace CluckWars.Progression
             }
 
             long delta = next.GrainBalance - previous.GrainBalance;
-            Profile = ProfileOf(next);
             LatestAward = new RoundAward(outcome.RoundId, (int)delta, award.Rested);
             RefreshIdentity();
+            RefreshUnlocks();
+            Profile = ProfileOf(next);
 
             _log.Info(Source, $"Round {outcome.RoundId}: +{delta} Grain{(award.Rested ? " (rested)" : string.Empty)}, " +
                 $"placement {outcome.Placement}; balance {next.GrainBalance}.");
 
             Raise(OnProfileChanged, Profile, nameof(OnProfileChanged));
             Raise(OnIdentityChanged, Identity, nameof(OnIdentityChanged));
+            Raise(OnUnlocksChanged, Unlocks, nameof(OnUnlocksChanged));
             Raise(OnRoundAwarded, LatestAward.Value, nameof(OnRoundAwarded));
         }
 
@@ -388,10 +402,27 @@ namespace CluckWars.Progression
             }
         }
 
+        /// <summary>
+        /// Rebuilds <see cref="Unlocks"/> from the ledger's canonical rounds: the ramp, this week's
+        /// three goals and today's task. Raises nothing — the caller decides when to announce it, same
+        /// pattern as <see cref="RefreshIdentity"/>.
+        /// </summary>
+        private void RefreshUnlocks()
+        {
+            var problems = new List<string>();
+            Unlocks = UnlocksFold.Build(_ledger.EvaluableRounds, _config, _categoryIndex, _zone, _utcNow(), problems);
+
+            foreach (string problem in problems)
+            {
+                if (_reportedProblems.Add(problem)) _log.Warn(Source, problem);
+            }
+        }
+
         // ---- Helpers -------------------------------------------------------------------
 
-        private static ProgressionProfile ProfileOf(ProgressionLedger ledger) =>
-            new ProgressionProfile(ledger.GrainBalance, ledger.RoundsPlayed, ledger.Wins, ledger.TotalBanked, ledger.TotalStolen);
+        private ProgressionProfile ProfileOf(ProgressionLedger ledger) =>
+            new ProgressionProfile(ledger.GrainBalance, ledger.RoundsPlayed, ledger.Wins, ledger.TotalBanked, ledger.TotalStolen,
+                UnlocksFold.ComputeBonusGrain(ledger.EvaluableRounds, _config, _categoryIndex, _zone));
 
         /// <summary>Faults are always logged: <see cref="OnFault"/> may have no subscriber yet (loading runs at startup).</summary>
         private void Fault(ProgressionFaultKind kind, LogLevel level, string message, Exception exception)

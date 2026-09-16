@@ -66,6 +66,14 @@
                     </ui:VisualElement>
                 </ui:VisualElement>
 
+                <!-- Today's task (progression slice 4). Hidden while the ramp is running, or when progression has
+                     not loaded; MenuUiController.RefreshDailyTaskCard toggles it. -->
+                <ui:VisualElement name="DailyTaskCard" class="cw-raised cw-lobby-card cw-hidden">
+                    <ui:Label text="TODAY'S TASK" class="cw-lobby-cardlabel" />
+                    <ui:Label name="DailyTaskName" text="" class="cw-lobby-cardlabel" />
+                    <ui:Label name="DailyTaskDesc" text="" class="cw-setting-v" style="white-space: normal; -unity-text-align: upper-left;" />
+                </ui:VisualElement>
+
             </ui:VisualElement>
 
             <!-- Centre of the PAGE, under the open gate (round-2 finding 10: the side columns are equal, see
