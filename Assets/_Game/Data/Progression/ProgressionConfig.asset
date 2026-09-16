@@ -46,3 +46,14 @@ MonoBehaviour:
   - {fileID: 11400000, guid: fd5ec2ff15a6a6247b649edeb7df4aff, type: 2}
   - {fileID: 11400000, guid: e2045a5b92c25aa4f91f7317bbbd958c, type: 2}
   - {fileID: 11400000, guid: 8540f10e9d790a342b1b1e0b5e13635d, type: 2}
+  RampSteps:
+  - {fileID: 11400000, guid: de6ef99080239bb419b5ddd90534efb3, type: 2}
+  - {fileID: 11400000, guid: ae4a1cae73532e84794ef4ec2f3785bd, type: 2}
+  - {fileID: 11400000, guid: 80fb7fcdf200fac4fb91233b7449a582, type: 2}
+  - {fileID: 11400000, guid: b5b57ec8d2dd34c40913728f14b61580, type: 2}
+  GoalTemplates:
+  - {fileID: 11400000, guid: 8c31dce8e40fdb1479f2c64f79ebd917, type: 2}
+  - {fileID: 11400000, guid: 5784e146b08a9dc43992858a8c2d82f0, type: 2}
+  - {fileID: 11400000, guid: f930990426c8e944ba1becddd613d97d, type: 2}
+  - {fileID: 11400000, guid: 14380d718426a0d4ea5e890c8dfe06af, type: 2}
+  - {fileID: 11400000, guid: 30342808e8e6f984689eceaa7701c20b, type: 2}
