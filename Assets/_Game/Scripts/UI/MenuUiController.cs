@@ -61,6 +61,8 @@ namespace CluckWars.UI
         private readonly Dictionary<ChickenClass, (VisualElement Ring, Label Level)> _chipMastery = new();
 
         private readonly Dictionary<ChickenClass, VisualElement> _classChips = new();
+        /// <summary>Per class chip: the lock badge added by the ramp gate (progression slice 4). Empty entries mean the class is not gated by the ramp.</summary>
+        private readonly Dictionary<ChickenClass, VisualElement> _chipLocks = new();
         private VisualElement _previewChicken, _previewGlow, _previewDisc;
         // The two flat pick rows that replaced the slot-hex row + scrolling grid.
         private VisualElement _commonCards, _classCards;
@@ -468,13 +470,21 @@ namespace CluckWars.UI
         {
             _classChips.Clear();
             _chipMastery.Clear();
+            _chipLocks.Clear();
             for (int i = 0; i < Order.Length; i++)
             {
                 var cls = Order[i];
                 var chip = _charSelect.Q<VisualElement>(ChipNames[i]);
                 if (chip == null) continue;
                 _classChips[cls] = chip;
-                chip.RegisterCallback<ClickEvent>(_ => SelectClass(cls));
+                chip.RegisterCallback<ClickEvent>(_ =>
+                {
+                    if (IsClassLocked(cls)) RefuseLocked(chip, ClassLockedMessage(cls));
+                    else SelectClass(cls);
+                });
+
+                var lockBadge = chip.Q<VisualElement>(ChipNames[i] + "Lock");
+                if (lockBadge != null) _chipLocks[cls] = lockBadge;
 
                 // Class chip art — exported design chicken sprite (Stage-3). Chips
                 // are fixed per class, so the modifier is applied once here.
@@ -622,6 +632,60 @@ namespace CluckWars.UI
         /// </summary>
         private int ActiveSlotsForClass => AbilityController.SlotCount;
 
+        // ---- Ramp gating (progression slice 4) --------------------------------
+        // The ramp hides/shows what already ships — it never changes an ability's numbers or a
+        // class's stats. "Not ready" (journal not yet loaded, or no progression bound) fails open:
+        // everything reads as unlocked rather than flash-locking the picker before data arrives.
+
+        private bool RampGatesAnything => _progression != null && _progression.IsReady && !_progression.Unlocks.Ramp.IsComplete;
+
+        private bool IsClassLocked(ChickenClass cls) =>
+            RampGatesAnything && !_progression.Unlocks.Ramp.IsRoleUnlocked(UnlockKeyTable.RoleKey(cls));
+
+        private bool IsAbilityLocked(AbilityBaseSO ab) =>
+            ab != null && RampGatesAnything && !_progression.Unlocks.Ramp.IsAbilityUnlocked(ab.UnlockKey);
+
+        private string ClassLockedMessage(ChickenClass cls)
+        {
+            var ramp = _progression.Unlocks.Ramp;
+            string step = string.IsNullOrEmpty(ramp.StepName) ? $"ramp step {ramp.StepNumber}" : ramp.StepName;
+            return $"{Meta[cls].Name} unlocks later on the ramp ({step}: {ramp.ObjectiveText}).";
+        }
+
+        private string AbilityLockedMessage(AbilityBaseSO ab)
+        {
+            var ramp = _progression.Unlocks.Ramp;
+            string step = string.IsNullOrEmpty(ramp.StepName) ? $"ramp step {ramp.StepNumber}" : ramp.StepName;
+            string label = !string.IsNullOrEmpty(ab.DisplayName) ? ab.DisplayName : ab.name;
+            return $"{label} unlocks at {step} ({ramp.ObjectiveText}).";
+        }
+
+        /// <summary>
+        /// A locked card/chip was pressed: refuse it with visible feedback instead of silently doing
+        /// nothing. The shared ability-detail strip carries the message (there is no separate toast in
+        /// this UI), and the pressed element gets a brief shake so the refusal reads as a response to
+        /// THIS press, not a random label change.
+        /// </summary>
+        private void RefuseLocked(VisualElement pressed, string message)
+        {
+            if (_abilityDetailName != null)
+            {
+                _abilityDetailName.text = "LOCKED";
+                _abilityDetailName.style.color = UiGfx.TextSecondary;
+                _abilityDetailName.style.display = DisplayStyle.Flex;
+            }
+            if (_abilityDetailText != null)
+            {
+                _abilityDetailText.text = message;
+                _abilityDetailText.style.color = UiGfx.TextSecondary;
+            }
+            if (_abilityDetail != null) SetBorder(_abilityDetail, UiGfx.CardBorder);
+
+            if (pressed == null) return;
+            pressed.AddToClassList("cw-locked--shake");
+            pressed.schedule.Execute(() => pressed.RemoveFromClassList("cw-locked--shake")).ExecuteLater(220);
+        }
+
         private Color TintOf(ChickenClass cls)
         {
             if (_classRegistry != null && _classRegistry.TryGet(cls, out var e) && e.TintColor.a > 0f)
@@ -639,11 +703,17 @@ namespace CluckWars.UI
             foreach (var kv in _classChips)
             {
                 bool sel = kv.Key == cls;
+                bool locked = IsClassLocked(kv.Key);
                 kv.Value.EnableInClassList("cw-card--selected", sel);
+                kv.Value.EnableInClassList("cw-class-chip--locked", locked);
                 SetBorder(kv.Value, sel ? TintOf(kv.Key) : UiGfx.CardBorder);
                 // Selected chip carries a faint class-color wash (design active chip),
-                // not just a tinted border.
+                // not just a tinted border. A locked chip stays visible but reads as inert —
+                // same "still a card, visibly locked" treatment as the ability cards below.
                 kv.Value.style.backgroundColor = sel ? Fade(TintOf(kv.Key), 0.22f) : UiGfx.CardTop;
+
+                if (_chipLocks.TryGetValue(kv.Key, out var badge) && badge != null)
+                    badge.style.display = locked ? DisplayStyle.Flex : DisplayStyle.None;
             }
 
             if (_previewChicken != null)
@@ -884,6 +954,20 @@ namespace CluckWars.UI
             var card = new VisualElement();
             card.AddToClassList("cw-ability-card");
 
+            // Ramp gating (progression slice 4): a locked ability is still a real card in the row —
+            // RebuildPickRows' pool filter is unchanged — it just cannot be picked yet. Dimmed rather
+            // than hidden, so the player can see what is coming.
+            bool locked = IsAbilityLocked(ab);
+            if (locked)
+            {
+                card.AddToClassList("cw-ability-card--locked");
+                var lockBadge = new Label("🔒");
+                lockBadge.AddToClassList("cw-ability-card__lock");
+                var ef2 = UiGfx.EmojiFont();
+                if (ef2 != null) lockBadge.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(ef2));
+                card.Add(lockBadge);
+            }
+
             // Exported design icon sprite; fall back to the emoji glyph only for an
             // ability with no sprite mapping (shouldn't happen for shipped abilities).
             string iconCls = AbilityIconStyle.ClassFor(ab);
@@ -960,7 +1044,12 @@ namespace CluckWars.UI
             // does in the detail strip. Deliberately NOT a long-press — that has no
             // affordance on a touch screen, and a player who never discovers the
             // gesture is back to "equip it and find out in a match".
-            card.RegisterCallback<ClickEvent>(_ => { _focusedAbility = ab; TogglePick(ab); });
+            // A locked card refuses the press instead: no equip, no cooldown, no silent no-op.
+            card.RegisterCallback<ClickEvent>(_ =>
+            {
+                if (IsAbilityLocked(ab)) RefuseLocked(card, AbilityLockedMessage(ab));
+                else { _focusedAbility = ab; TogglePick(ab); }
+            });
             return card;
         }
 
@@ -1189,6 +1278,7 @@ namespace CluckWars.UI
             BuildPlayerGrid(isSolo, isHost);
             UpdateLobbyStatus(isSolo, isHost, isJoin);
             RefreshMatchSettings();
+            RefreshDailyTaskCard();
 
             // Host pre-creates the UGS lobby so its join code populates the tiles before START.
             if (isHost)
@@ -1231,6 +1321,34 @@ namespace CluckWars.UI
             var goal = _lobby.Q<Label>("SetGoal");
             if (time != null) time.text = MatchSettingsText.Time(_matchConfig.MatchDurationSeconds);
             if (goal != null) goal.text = MatchSettingsText.Goal(_matchConfig.FoodTargetToWin);
+        }
+
+        /// <summary>
+        /// Shows the day's task (progression slice 4) — before the day's first round, open all day.
+        /// Hidden entirely while the ramp is still running (the plan's own words), and while
+        /// progression has not loaded (fails open: no card rather than a wrong or stale one).
+        /// </summary>
+        private void RefreshDailyTaskCard()
+        {
+            var card = _lobby.Q<VisualElement>("DailyTaskCard");
+            if (card == null) return;
+
+            var task = _progression != null && _progression.IsReady ? _progression.Unlocks.TodaysTask : null;
+            if (task == null)
+            {
+                card.AddToClassList("cw-hidden");
+                return;
+            }
+
+            card.RemoveFromClassList("cw-hidden");
+            var name = _lobby.Q<Label>("DailyTaskName");
+            var desc = _lobby.Q<Label>("DailyTaskDesc");
+            if (name != null)
+            {
+                name.text = task.Completed ? $"✓ {task.DisplayName}" : task.DisplayName;
+                name.style.color = task.Completed ? UiGfx.GreenTop : UiGfx.TextPrimary;
+            }
+            if (desc != null) desc.text = task.Description;
         }
 
         private void UpdateLobbyStatus(bool isSolo, bool isHost, bool isJoin)

@@ -997,9 +997,11 @@ namespace CluckWars.Tests
             public bool IsReady { get; set; }
             public ProgressionProfile Profile => ProgressionProfile.Empty;
             public ProgressionIdentity Identity => ProgressionIdentity.Empty;
+            public ProgressionUnlocks Unlocks => ProgressionUnlocks.Empty;
             public RoundAward? LatestAward { get; set; }
             public event Action<ProgressionProfile> OnProfileChanged { add { } remove { } }
             public event Action<ProgressionIdentity> OnIdentityChanged { add { } remove { } }
+            public event Action<ProgressionUnlocks> OnUnlocksChanged { add { } remove { } }
             public event Action<RoundAward> OnRoundAwarded { add { } remove { } }
             public event Action<ProgressionFault> OnFault { add { } remove { } }
 

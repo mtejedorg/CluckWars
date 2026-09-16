@@ -336,10 +336,12 @@ namespace CluckWars.Tests
                 Assert.IsNotEmpty(fields);
 
                 var exempt = fields.Where(IsAssetReferenceCatalogue).Select(f => f.Name).ToList();
-                CollectionAssert.AreEqual(new[] { nameof(ProgressionConfigSO.Records) }, exempt,
+                CollectionAssert.AreEqual(
+                    new[] { nameof(ProgressionConfigSO.Records), nameof(ProgressionConfigSO.RampSteps), nameof(ProgressionConfigSO.GoalTemplates) },
+                    exempt,
                     "Only a catalogue of asset references may skip this check — a field initialiser cannot name an " +
-                    "asset, so its code default is necessarily empty. RecordAssetTests checks that list instead. A " +
-                    "new exemption here must be deliberate.");
+                    "asset, so its code default is necessarily empty. RecordAssetTests/RampAssetTests/GoalAssetTests " +
+                    "check those lists instead. A new exemption here must be deliberate.");
 
                 foreach (var field in fields)
                 {

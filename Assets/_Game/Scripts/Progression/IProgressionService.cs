@@ -32,6 +32,12 @@ namespace CluckWars.Progression
         /// </summary>
         ProgressionIdentity Identity { get; }
 
+        /// <summary>
+        /// Where the new-player ramp stands, and this week's three goals plus today's task once it has
+        /// finished. <see cref="ProgressionUnlocks.Empty"/> until loaded.
+        /// </summary>
+        ProgressionUnlocks Unlocks { get; }
+
         /// <summary>The totals changed (after a load or a recorded round).</summary>
         event Action<ProgressionProfile> OnProfileChanged;
 
@@ -40,6 +46,12 @@ namespace CluckWars.Progression
         /// play) and after any profile event.
         /// </summary>
         event Action<ProgressionIdentity> OnIdentityChanged;
+
+        /// <summary>
+        /// <see cref="Unlocks"/> changed: after a load and after a recorded round (a step may clear, or
+        /// a goal's progress moves).
+        /// </summary>
+        event Action<ProgressionUnlocks> OnUnlocksChanged;
 
         /// <summary>A round's Grain was written to the journal. Raised after <see cref="OnProfileChanged"/>.</summary>
         event Action<RoundAward> OnRoundAwarded;
@@ -75,15 +87,17 @@ namespace CluckWars.Progression
     /// <summary>An immutable snapshot of the player's progression totals.</summary>
     public sealed class ProgressionProfile
     {
-        public static readonly ProgressionProfile Empty = new ProgressionProfile(0, 0, 0, 0, 0);
+        public static readonly ProgressionProfile Empty = new ProgressionProfile(0, 0, 0, 0, 0, 0);
 
-        public ProgressionProfile(long grainBalance, int roundsPlayed, int wins, double totalBanked, double totalStolen)
+        public ProgressionProfile(long grainBalance, int roundsPlayed, int wins, double totalBanked, double totalStolen,
+            long bonusGrain)
         {
             GrainBalance = grainBalance;
             RoundsPlayed = roundsPlayed;
             Wins = wins;
             TotalBanked = totalBanked;
             TotalStolen = totalStolen;
+            BonusGrain = bonusGrain;
         }
 
         public long GrainBalance { get; }
@@ -97,6 +111,13 @@ namespace CluckWars.Progression
 
         public double TotalBanked { get; }
         public double TotalStolen { get; }
+
+        /// <summary>
+        /// Grain every completed weekly goal and daily task has ever paid, lifetime — derived fresh
+        /// from the same rounds every fold (decision D6), never journaled as its own amount. Separate
+        /// from <see cref="GrainBalance"/> on purpose: no existing number changes meaning.
+        /// </summary>
+        public long BonusGrain { get; }
     }
 
     /// <summary>The Grain one round earned. <see cref="Grain"/> is exactly the balance delta it caused.</summary>

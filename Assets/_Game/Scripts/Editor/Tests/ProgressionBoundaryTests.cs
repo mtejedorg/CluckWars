@@ -63,6 +63,10 @@ namespace CluckWars.Tests
         /// which appears in the two command signatures. Everything else identity is built from —
         /// <c>RecordDefinitionSO</c>, <c>RecordEngine</c>, <c>IdentityFold</c>, <c>NameGenerator</c>,
         /// <c>NameplateComposer</c>, <c>ProfileEvent</c> — stays off the UI's surface.
+        /// Slice 4 added exactly one: <see cref="ProgressionUnlocks"/>, the same nesting trick —
+        /// <c>RampStepView</c>, <c>GoalView</c> and <c>DailyTaskView</c> live inside it, so
+        /// <c>RampController</c>, <c>RampStepSO</c>, <c>GoalTemplateSO</c>, <c>GoalRotation</c>,
+        /// <c>DailyTask</c>, <c>UnlocksFold</c> and <c>IAbilityCategoryIndex</c> stay off the surface.
         /// </remarks>
         private static readonly string[] UiSurface = ContractSurface.Concat(new[]
         {
@@ -73,6 +77,7 @@ namespace CluckWars.Tests
             nameof(RoundAward),
             nameof(ProgressionFault),
             nameof(ProgressionFaultKind),
+            nameof(ProgressionUnlocks),
         }).ToArray();
 
         [Test]

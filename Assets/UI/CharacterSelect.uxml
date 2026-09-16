@@ -46,6 +46,7 @@
                     <ui:VisualElement name="ClassWarriorMastery" class="cw-emblem cw-emblem--small cw-chip-mastery" style="display: none;">
                         <ui:Label name="ClassWarriorMasteryLevel" text="0" class="cw-emblem__level" />
                     </ui:VisualElement>
+                    <ui:Label name="ClassWarriorLock" text="🔒" class="cw-chip-lock cw-emoji-text" style="display: none;" />
                     <ui:Label text="x4" class="cw-slot-pill" />
                 </ui:VisualElement>
                 <ui:VisualElement name="ClassSpeedy" class="cw-class-chip">
@@ -57,6 +58,7 @@
                     <ui:VisualElement name="ClassSpeedyMastery" class="cw-emblem cw-emblem--small cw-chip-mastery" style="display: none;">
                         <ui:Label name="ClassSpeedyMasteryLevel" text="0" class="cw-emblem__level" />
                     </ui:VisualElement>
+                    <ui:Label name="ClassSpeedyLock" text="🔒" class="cw-chip-lock cw-emoji-text" style="display: none;" />
                     <ui:Label text="x4" class="cw-slot-pill" />
                 </ui:VisualElement>
                 <ui:VisualElement name="ClassFatty" class="cw-class-chip">
@@ -68,6 +70,7 @@
                     <ui:VisualElement name="ClassFattyMastery" class="cw-emblem cw-emblem--small cw-chip-mastery" style="display: none;">
                         <ui:Label name="ClassFattyMasteryLevel" text="0" class="cw-emblem__level" />
                     </ui:VisualElement>
+                    <ui:Label name="ClassFattyLock" text="🔒" class="cw-chip-lock cw-emoji-text" style="display: none;" />
                     <ui:Label text="x4" class="cw-slot-pill" />
                 </ui:VisualElement>
                 <ui:VisualElement name="ClassAssassin" class="cw-class-chip">
@@ -79,6 +82,7 @@
                     <ui:VisualElement name="ClassAssassinMastery" class="cw-emblem cw-emblem--small cw-chip-mastery" style="display: none;">
                         <ui:Label name="ClassAssassinMasteryLevel" text="0" class="cw-emblem__level" />
                     </ui:VisualElement>
+                    <ui:Label name="ClassAssassinLock" text="🔒" class="cw-chip-lock cw-emoji-text" style="display: none;" />
                     <ui:Label text="x4" class="cw-slot-pill" />
                 </ui:VisualElement>
             </ui:VisualElement>
@@ -139,7 +143,7 @@
                      over everything below: the wrapped Common row painted across the CLASS
                      header, and the cards painted across AbilityDetail. Scrolling the
                      overflow is the fix; the row markup itself was never wrong. -->
-                <ui:ScrollView name="PickScroll" mode="Vertical" class="cw-pick-scroll">
+                <ui:ScrollView name="PickScroll" mode="Vertical" horizontal-scroller-visibility="Hidden" class="cw-pick-scroll">
 
                     <ui:VisualElement name="CommonRow" class="cw-pick-row cw-well" style="padding: 14px;">
                         <ui:VisualElement class="cw-pick-row__head">

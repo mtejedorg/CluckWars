@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using CluckWars.Abilities;
 using CluckWars.Gameplay;
 
 namespace CluckWars.Progression
@@ -10,6 +11,39 @@ namespace CluckWars.Progression
     /// </summary>
     public static class UnlockKeyTable
     {
+        // ---- Ability categories (progression slice 4) -----------------------------------
+        // AbilityCategory is a GDD §7.2 picker label (CluckWars.Abilities), not a progression
+        // concept, so it is translated here exactly like RoleKey below rather than named anywhere
+        // under Progression/. Ramp and goal evaluation (RampController, GoalRotation's control-
+        // ability metric) compare against these stable strings, never the enum.
+
+        public const string CategorySteal = "category.steal";
+        public const string CategoryControl = "category.control";
+        public const string CategoryDefense = "category.defense";
+        public const string CategoryUtility = "category.utility";
+
+        /// <summary>Every category key, in <see cref="AbilityCategory"/>'s declared order.</summary>
+        public static readonly IReadOnlyList<string> CategoryKeys = new[]
+        {
+            CategorySteal, CategoryControl, CategoryDefense, CategoryUtility,
+        };
+
+        /// <summary>
+        /// The stable key for <paramref name="category"/>. Written out row by row, never
+        /// <c>ToString()</c> — the same promise <see cref="RoleKey"/> makes for the class enum.
+        /// </summary>
+        public static string AbilityCategoryKey(AbilityCategory category) => category switch
+        {
+            AbilityCategory.Steal   => CategorySteal,
+            AbilityCategory.Control => CategoryControl,
+            AbilityCategory.Defense => CategoryDefense,
+            AbilityCategory.Utility => CategoryUtility,
+
+            // Only reachable when a category was added to the enum and not here: loud, not silent.
+            _ => throw new ArgumentOutOfRangeException("category",
+                     $"Category value {(byte)category} has no key. Add a row to UnlockKeyTable.AbilityCategoryKey."),
+        };
+
         /// <summary>
         /// Every role key, in the one order progression breaks ties by (the roster's own order). The
         /// emblem falls back to "the most played role, ties broken by this order", and a career record

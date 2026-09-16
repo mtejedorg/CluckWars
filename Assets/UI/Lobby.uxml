@@ -53,6 +53,14 @@
                     </ui:VisualElement>
                 </ui:VisualElement>
 
+                <!-- Today's task (progression slice 4). Hidden while the ramp is running, or when
+                     progression has not loaded — MenuUiController.RefreshDailyTaskCard toggles it. -->
+                <ui:VisualElement name="DailyTaskCard" class="cw-card cw-lobby-card cw-hidden">
+                    <ui:Label text="TODAY'S TASK" class="cw-lobby-cardhead" />
+                    <ui:Label name="DailyTaskName" text="" class="cw-lobby-cardlabel" />
+                    <ui:Label name="DailyTaskDesc" text="" class="cw-setting-v" style="white-space: normal; -unity-text-align: upper-left;" />
+                </ui:VisualElement>
+
                 <!-- Status -->
                 <ui:VisualElement name="StatusPill" class="cw-status-pill">
                     <ui:VisualElement name="StatusDot" class="cw-status-dot" />

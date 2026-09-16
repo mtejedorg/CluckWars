@@ -123,6 +123,13 @@ namespace CluckWars.Installers
                 .FromMethod(_ => new JournalStore(journalDirectory))
                 .AsSingle();
 
+            // The port to the live ability categorization (D4): Progression/ cannot import
+            // CluckWars.Abilities, so this adapter — the only implementation — walks
+            // AbilityRegistrySO.All here in the composition root and hands back stable category keys.
+            Container.Bind<IAbilityCategoryIndex>()
+                .FromMethod(ctx => new AbilityCategoryIndex(ctx.Container.Resolve<AbilityRegistrySO>()))
+                .AsSingle();
+
             // NonLazy: the service must exist, and be subscribed to the tracker, before the first
             // round can end. Its constructor does no I/O; the project kernel's Initialize() loads the
             // journal at startup (a bare container that never initializes it never touches a file).
@@ -131,7 +138,8 @@ namespace CluckWars.Installers
                     ctx.Container.Resolve<ILogService>(),
                     ctx.Container.Resolve<MatchTracker>(),
                     ctx.Container.Resolve<ProgressionConfigSO>(),
-                    ctx.Container.Resolve<JournalStore>()))
+                    ctx.Container.Resolve<JournalStore>(),
+                    categoryIndex: ctx.Container.Resolve<IAbilityCategoryIndex>()))
                 .AsSingle()
                 .NonLazy();
 

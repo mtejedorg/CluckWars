@@ -195,6 +195,38 @@ namespace CluckWars.Progression
         public static DateTime DayOfRound(string stampedDay, DateTime endedUtc, TimeZoneInfo zone) =>
             TryParseDay(stampedDay, out var day) ? day : LocalDay(endedUtc, zone);
 
+        /// <summary>
+        /// The Monday (midnight, <c>Kind.Unspecified</c>) of the ISO-8601 week <paramref name="day"/>
+        /// falls in. ISO weeks run Monday–Sunday, so a Sunday belongs to the week that started the
+        /// Monday before it, not the Monday after.
+        /// </summary>
+        public static DateTime IsoWeekStart(DateTime day)
+        {
+            day = day.Date;
+            // DayOfWeek.Sunday is 0; ISO wants Monday=1..Sunday=7 so the offset back to Monday is
+            // never negative for a Sunday.
+            int iso = (int)day.DayOfWeek == 0 ? 7 : (int)day.DayOfWeek;
+            return day.AddDays(1 - iso);
+        }
+
+        /// <summary>
+        /// A stable, human-legible key for the ISO week <paramref name="day"/> falls in, e.g.
+        /// <c>"2026-W38"</c>. <see cref="GoalRotation"/> seeds the weekly goal selection from this —
+        /// never a ticking countdown, so two devices (or a reload) agree on the week's three goals
+        /// without any of them being stored.
+        /// </summary>
+        public static string IsoWeekKey(DateTime day)
+        {
+            var monday = IsoWeekStart(day);
+            // ISO 8601: the week containing the year's first Thursday is week 1, and Jan 4 always
+            // falls in week 1 — so the ISO year is the Thursday's year, and the week number is the
+            // whole number of Mondays between this week's Monday and week 1's Monday.
+            int isoYear = monday.AddDays(3).Year;
+            var week1Monday = IsoWeekStart(new DateTime(isoYear, 1, 4));
+            int weekNumber = (int)Math.Floor((monday - week1Monday).TotalDays / 7.0) + 1;
+            return isoYear.ToString(CultureInfo.InvariantCulture) + "-W" + weekNumber.ToString("00", CultureInfo.InvariantCulture);
+        }
+
         private static DateTime AsUtc(DateTime instant) =>
             instant.Kind == DateTimeKind.Unspecified
                 ? DateTime.SpecifyKind(instant, DateTimeKind.Utc)

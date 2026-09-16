@@ -348,6 +348,81 @@
     color: rgb(196, 160, 96);
 }
 
+/* ---- Ramp lock (progression slice 4) --------------------------------------
+   A locked class/ability is still rendered — never hidden from the row/list —
+   just dimmed and marked with a lock glyph, per the "still a card, visibly
+   locked" rule.
+
+   V2 fix (code-architect visual review, 2026-09-16): the first pass dimmed
+   via `opacity` on the CHIP/CARD ROOT. In UI Toolkit, element `opacity` is a
+   whole-subtree compositing multiply — every descendant renders through it,
+   with no CSS escape hatch. That took the lock glyph down with everything
+   else (a tiny, low-contrast padlock, worse than the text around it) AND
+   blended the card's own warm-brown background toward the near-black page
+   background underneath, which is what actually broke the class-name
+   legibility — text contrast is measured against that now-much-darker
+   background, not the nominal color.
+
+   Fix: dim specific descendants individually instead of the root, so the
+   lock glyph (and the name label) can opt out entirely. The root keeps a
+   solid, only slightly darker background — never opacity — so it stays a
+   stable, predictable surface for whatever text sits on it. Reads as "not
+   yet available", not "broken/missing text". */
+.cw-class-chip--locked { background-color: rgb(40, 28, 16); }
+.cw-class-chip--locked:hover { scale: 1 1; }
+.cw-class-chip--locked .cw-class-chip__art { opacity: 0.42; }
+.cw-class-chip--locked .cw-class-chip__name { color: rgba(254, 245, 224, 0.65); }
+.cw-class-chip--locked .cw-class-chip__role { color: rgba(196, 160, 96, 0.6); }
+.cw-class-chip--locked .cw-slot-pill { opacity: 0.5; }
+/* The lock glyph itself is never dimmed (full opacity, own badge background)
+   so it reads clearly regardless of how dark the chip underneath it is —
+   font-size raised past the mobile contract's 30px caption floor since this
+   is a meaningful state indicator, not decoration.
+
+   Badge background is the accent gold, not a dark tint: measured live, the
+   🔒 U+1F512 glyph does not come from either game font (LilitaOne/Nunito are
+   Latin-only) — Unity falls back to its own outline-style glyph, rendered as
+   a dark navy silhouette. That silhouette was the actual invisibility bug:
+   dark-on-near-black was never going to read regardless of dimming/size. A
+   light, on-brand background behind a dark glyph is the fix; text `color`
+   does not recolor this fallback glyph, so the background is the only lever
+   that works. */
+.cw-chip-lock {
+    font-size: 38px; margin-left: 8px; flex-shrink: 0; -unity-text-align: middle-center;
+    width: 56px; height: 56px;
+    background-color: rgb(245, 200, 66);
+    border-top-left-radius: 28px; border-top-right-radius: 28px;
+    border-bottom-left-radius: 28px; border-bottom-right-radius: 28px;
+}
+
+/* Same fix, same reasoning, applied to ability cards — this path was never
+   screenshotted live in slice 4 (the dev profile had already cleared every
+   Common/Class ability) but shares the exact CSS pattern above and the exact
+   defect. */
+.cw-ability-card--locked { background-color: rgb(38, 26, 15); }
+.cw-ability-card--locked:hover { scale: 1 1; }
+.cw-ability-card--locked .cw-ability-card__icon,
+.cw-ability-card--locked .cw-ability-card__sprite { opacity: 0.4; }
+.cw-ability-card--locked .cw-ability-card__name { color: rgba(254, 245, 224, 0.6); }
+.cw-ability-card--locked .cw-card-footer { opacity: 0.55; }
+.cw-ability-card__lock {
+    position: absolute; top: 8px; right: 8px;
+    width: 38px; height: 38px;
+    font-size: 26px; -unity-text-align: middle-center;
+    background-color: rgb(245, 200, 66);
+    border-top-left-radius: 19px; border-top-right-radius: 19px;
+    border-bottom-left-radius: 19px; border-bottom-right-radius: 19px;
+}
+
+/* Refusal feedback: a locked card/chip briefly flashes a warm-red border when
+   pressed, so "nothing happened" reads as "that press was refused" rather
+   than as an unresponsive control. Toggled on/off in C# via the UI Toolkit
+   scheduler — see MenuUiController.RefuseLocked. */
+.cw-locked--shake {
+    border-left-color: rgb(214, 88, 70); border-right-color: rgb(214, 88, 70);
+    border-top-color: rgb(214, 88, 70); border-bottom-color: rgb(214, 88, 70);
+}
+
 /* ---- Chicken preview ------------------------------------------------------ */
 /* Class figures are the Stage-0 design-exported sprites (Assets/_Game/Art/UI/
    Chickens/), applied by adding a .cw-chicken--<class> modifier in C#. These
@@ -458,7 +533,24 @@
 .cw-pick-scroll { flex-grow: 1; min-height: 0; }
 
 /* The rows wrap; they must never scroll sideways. A horizontal scroller here
-   would also steal the drag that the vertical one needs. */
+   would also steal the drag that the vertical one needs.
+
+   This USS rule alone does NOT suppress it — ScrollView's own runtime code
+   writes an inline `display` style onto the horizontal Scroller every time it
+   recomputes scroll state (default `horizontalScrollerVisibility` is `Auto`,
+   which shows the scroller whenever it judges content wider than the
+   viewport, and an intermediate Yoga wrap measurement can trip that even
+   though the wrapped result never actually needs it). Inline style always
+   wins over a USS class selector, so with only this rule the scroller kept
+   appearing anyway — confirmed live: `horizontalScrollerVisibility` read back
+   as `Auto` and the Scroller's `resolvedStyle.display` as `Flex` despite this
+   rule matching it correctly. `horizontal-scroller-visibility="Hidden"` on
+   the `<ui:ScrollView>` tag itself (CharacterSelect.uxml) is the actual fix —
+   it stops ScrollView from ever allocating/showing the scroller instead of
+   trying to paint over its decision — and is what fixed the wide-aspect
+   picker (COMMON/CLASS pool cards sliced mid-pill, a bogus horizontal
+   scrollbar eating vertical room the CLASS row needed). Kept here too as a
+   harmless belt-and-suspenders in case that attribute is ever dropped. */
 .cw-pick-scroll .unity-scroll-view__horizontal-scroller { display: none; }
 .cw-pick-scroll .unity-scroll-view__content-viewport { overflow: hidden; }
 

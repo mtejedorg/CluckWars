@@ -178,7 +178,12 @@ namespace CluckWars.Progression
             return true;
         }
 
-        private static float MetricOf(RoundOutcome round, RecordMetric metric) => metric switch
+        /// <summary>
+        /// Internal, not private: <see cref="DailyTask"/> reuses this exact switch to evaluate its
+        /// single-round <see cref="RecordCondition"/>s against the same facts, rather than
+        /// restating the metric list a second time.
+        /// </summary>
+        internal static float MetricOf(RoundOutcome round, RecordMetric metric) => metric switch
         {
             RecordMetric.BankedTotal => round.BankedTotal,
             RecordMetric.StolenTotal => round.StolenTotal,

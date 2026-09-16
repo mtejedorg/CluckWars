@@ -82,7 +82,7 @@ namespace CluckWars.Progression
         [Min(0)] public int RestedRounds = 3;
 
         [Header("Daily task")]
-        [Tooltip("Grain for the daily task. Unused until slice 4 adds the task; nothing reads it yet.")]
+        [Tooltip("Grain for the daily task, read by UnlocksFold.ComputeBonusGrain.")]
         [Min(0)] public int DailyTaskBonus = 15;
 
         [Header("Identity")]
@@ -109,5 +109,22 @@ namespace CluckWars.Progression
         /// </remarks>
         [Tooltip("Every record, in display order. Assets live in Assets/_Game/Data/Progression/Records/.")]
         public RecordDefinitionSO[] Records = Array.Empty<RecordDefinitionSO>();
+
+        /// <summary>
+        /// The four fixed ramp steps, in order. Assets live in
+        /// <c>Assets/_Game/Data/Progression/Ramp/</c>. Same empty-code-default exemption as
+        /// <see cref="Records"/> (asset refs cannot be field initialisers); <c>RampAssetTests</c>
+        /// checks the shipped array separately.
+        /// </summary>
+        [Tooltip("The 4 fixed ramp steps, in order. Assets live in Assets/_Game/Data/Progression/Ramp/.")]
+        public RampStepSO[] RampSteps = Array.Empty<RampStepSO>();
+
+        /// <summary>
+        /// Every weekly goal template. Assets live in <c>Assets/_Game/Data/Progression/Goals/</c>.
+        /// <see cref="GoalRotation"/> picks three of these (and one tier each) per ISO week. Same
+        /// empty-code-default exemption as <see cref="Records"/>.
+        /// </summary>
+        [Tooltip("Every weekly goal template. Assets live in Assets/_Game/Data/Progression/Goals/.")]
+        public GoalTemplateSO[] GoalTemplates = Array.Empty<GoalTemplateSO>();
     }
 }

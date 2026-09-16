@@ -6,10 +6,108 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Progression Slice 4 — ramp, weekly goals & daily task (2026-09-16) — 771 → 809/809 green
+
+**Final slice of the progression pitch milestone**, committed on `feature/progression`. A fresh
+profile walks a 4-step onboarding ramp (bank 10 → Headbutt lands twice or bank 20 → steal 5 → one
+round as each of Fatty/Speedy/Assassin, gating and revealing class chips + ability cards as it
+clears), then gets three weekly goals (rotating by ISO week, refresh date shown, never a ticking
+countdown) plus a daily task (one single-round template, shown before the day's first round, open
+all day so a bad first round never burns it, hidden while the ramp is running). Gameplay code is
+untouched except one read-only adapter (below); only `Assets/_Game/Scripts/Editor/Tests/*`,
+`Progression/`, `Installers/`, `UI/`, and data assets changed.
+
+- **Ramp is data-driven, never scene-baked.** 4 `RampStepSO` assets under
+  `Assets/_Game/Data/Progression/Ramp/` (FirstCluck, GettingRobbed, YourLoadout, OtherChickens).
+  `RampController` folds the same canonical round list slice 3 introduced
+  (`ProgressionLedger.EvaluableRounds`); step 4's three class grants are sequential — Fatty unlocks
+  on entering step 4, Speedy after a round played as Fatty, Assassin after a round as Speedy, the
+  ramp completes after a round as Assassin — and `reachedStep` is capped at the table's own length by
+  construction, so it can never advance past step 4. No `[Networked]`/RPC anywhere in ramp code
+  (tested) — ramp state is a local read of the journal, same as everything else in progression.
+- **Ability-name correction against the live registry, not the old plan text.** The plan's step 1
+  said "grant Peck" written before the `Peck → Snatch` rename; verified from the shipped assets that
+  `ability.snatch` is Assassin-only (`AllowedClasses 8`) while `ability.peck` is a Common ability
+  legal for Warrior — granting Snatch to a step-1 Warrior would produce an unequippable loadout, so
+  the plan's original "Peck" stands. (`Flying Peck → Dive Bomb` did happen and is used as-is at
+  step 3.) Warrior's full pool after step 3 covers all four `AbilityCategory` values on real data,
+  not by adjusting the data to fit.
+- **A new boundary port, not a boundary violation.** `Progression/*.cs` still cannot import
+  `CluckWars.Abilities`/`CluckWars.Gameplay` (the vocabulary scan). New `IAbilityCategoryIndex`
+  lives in `Progression/` and imports neither; `UnlockKeyTable` gains pinned, hand-written
+  `AbilityCategoryKey(AbilityCategory)` rows (same doctrine as `RoleKey` — never `ToString()`); the
+  one implementation, `Installers/AbilityCategoryIndex.cs`, lives in the composition root (already
+  exempt from the scan) and walks `AbilityRegistrySO.All`, mapping each ability's unlock key to its
+  category key.
+- **Goal/daily Grain is a second derived term, never journaled as a number.**
+  `ProgressionLedger`'s round math is untouched (unedited — its tests still pass as written).
+  `UnlocksFold.ComputeBonusGrain` folds the same `EvaluableRounds` list a second time and surfaces
+  the total as its own `ProgressionProfile` property, so no existing number changes meaning.
+- **5 weekly goal templates shipped, none cut** (`Assets/_Game/Data/Progression/Goals/`): Bank
+  {100|150|200}, Rob {10|15} rivals, finish a round with more stolen than banked, land {15|25}
+  control abilities, play {20|30} rounds. The "land control abilities" template was the one at risk —
+  `AbilityTally.Connected` is a documented lower bound (self-buffs/placed zones never report
+  connected) — but traced by hand through `AbilityController.cs` and confirmed Headbutt, Cluck Shock
+  and Wing Slam are all real target-scanning abilities (non-`None` aim shape, not a placed zone), so
+  they do report `hitCount > 0` and the template is sound on real facts, not shipped on faith.
+- **Exactly one new UI allowlist entry**, the same nesting trick slice 3 used: new top-level
+  `ProgressionUnlocks` (nesting `RampStepView`, `GoalView`, `DailyTaskView`), reached via
+  `IProgressionService.Unlocks` + `OnUnlocksChanged`. **Deliberate deviation from slice 3's
+  handoff note**, which suggested nesting new display facts inside `ProgressionIdentity` — ramp,
+  goals and the daily task are a different concern from identity, so a second top-level type keeps
+  them separated rather than overloading identity with unrelated state. Still exactly one allowlist
+  entry, same cost either way. (One property was named `DailyTask` at first and collided textually
+  with the top-level `CluckWars.Progression.DailyTask` type under the UI regex scan — renamed to
+  `TodaysTask` rather than loosen the scan.)
+- **`MenuUiController`:** locked-state gating lives in `MakeAbilityCard` (not the row-filter), plus
+  class-chip gating and a refusal flash on a blocked press — never a silent no-op. Gating reads
+  `_progression.IsReady && !_progression.Unlocks.Ramp.IsComplete`; before the journal loads or once
+  the ramp is done, everything reads unlocked rather than flash-locking the picker (the legitimate
+  no-op case, not a bug hidden behind a null-guard — see
+  `memory/silent-failure-vs-legitimate-noop.md`).
+- **Two visual bugs found in review, both fixed, both unrelated to the new lock badges themselves:**
+  (1) at the wide Pixel-9 aspect (2424×1080) the ability-pick panel showed a stray horizontal
+  scrollbar and clipped cards mid-pill — root cause was Unity's own `ScrollView` writing an inline
+  `display` style that silently beat the USS rule meant to suppress it; fixed by setting
+  `horizontal-scroller-visibility="Hidden"` on the `ScrollView` element itself. (2) the lock padlock
+  was nearly invisible — `opacity` on the whole locked card/chip root dimmed the emoji-fallback glyph
+  and the name text equally and darkened the background toward black; fixed by dimming only specific
+  descendants and giving the lock badge its own solid gold background for contrast. Verified live at
+  both 1575×886 and the exact 2424×1080 Pixel-9 aspect.
+- **Still open, not touched here (pre-existing, slice 3):** the mastery ring drawn over a class
+  name's last two characters (`WARRIOR`→`OR`, `SPEEDY`→`DY`, `ASSASSIN`→`SI`) at both aspects —
+  needs a `ui-designer` pass, reported not fixed.
+- **Egg Shell dependency: still not landed.** `fix/egg-shell-defence`
+  (`C:/Users/MARCO/Documents/GitHub/CluckWars-eggshell`) sits at `1fba816`, an ancestor of `develop`,
+  zero commits ahead — the ability still only reads "Seals you in an egg for 2s - you cannot walk or
+  turn," no stated defensive effect. Ramp step 2 grants it anyway per Maestro's 2026-09-12 ruling
+  (grant Egg Shell once it defends; the fix is separate, gameplay-side work, reported not fixed here).
+- **Two gameplay-side findings remain open from slice 2, still unfixed** (Assassin execute's
+  cargo/kill-credit resolution and the Shared-mode proxy `BountyBag` write) — reported only, out of
+  this slice's scope, tracked as their own background task.
+- **`ProjectSettings/QualitySettings.asset`** picked up incidental `serializedVersion: 4→5` /
+  `meshLodThreshold` churn from this Unity 6000.3.14f1 session (both render-pipeline asset GUIDs
+  verified byte-for-byte preserved — the opposite of the 2026-09-15 `Mobile_RPAsset` zeroing class).
+  Committed alongside this slice as routine engine-version housekeeping, not progression work.
+- Tests: `ProgressionRampGoalsTests.cs` — no-baked-reference structural checks, live-registry
+  resolution, order-independence, sequential step-4 unlocks, never-past-last-step, `GoalRotation`,
+  the daily task surviving a failed first round, `UnlocksFold` covering a returning profile still
+  losing, a ramp-networking regression lock, plus `RampAssetTests`/`GoalAssetTests`. EditMode
+  771 → 809, all green (independently re-run twice by qa-reviewer, matching senior-dev's count both
+  times).
+
+### What comes after the pitch milestone
+
+Slices 0–4 are all committed. Per Maestro's 2026-09-14 ruling, the next piece of work is **one
+combined pass**: the GDD §8/§11 rewrite plus `docs/site/index.html` compendium sync, reading numbers
+from the shipped `.asset` files, not GDD prose. Also outstanding from this and earlier slices,
+carried forward rather than repeated here: the mastery-ring/class-name overlap, the Egg Shell
+defensive-effect fix, and the two Assassin-execute gameplay bugs.
+
 ## ✅ Progression Slice 3 — identity (2026-09-14/15) — 709 → 771/771 green
 
-Fourth slice of the progression pitch milestone, on `feature/progression` (uncommitted, awaiting
-code-architect + qa-reviewer). **Second player-visible slice:** a generated, re-rollable username
+Fourth slice of the progression pitch milestone, committed on `feature/progression` as `fbef3ca`.
+**Second player-visible slice:** a generated, re-rollable username
 (`SwiftBeak#2213`-shaped, no free text anywhere), a nameplate (name + earned title + always-present
 role emblem showing mastery + banner), a Profile page listing every record earned or not, mastery per
 class (display only — grants no stat), and a career summary (lifetime/per-role totals, recent-20
