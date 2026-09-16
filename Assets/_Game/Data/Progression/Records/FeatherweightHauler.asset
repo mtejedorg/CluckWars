@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e078e75349f9e9348aaa3eaf9a5b32d2, type: 3}
+  m_Name: FeatherweightHauler
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Progression.RecordDefinitionSO
+  _key: record.featherweight_hauler
+  DisplayName: Featherweight Hauler
+  Description: Bank 30 in a single round as Speedy.
+  Title: Featherweight Hauler
+  Group: 0
+  AchievableWhileLosing: 1
+  Scope: 0
+  Conditions:
+  - Metric: 0
+    Comparison: 0
+    Value: 30
+  RoleKey: class.speedy
+  CareerKind: 0
+  CareerValue: 0

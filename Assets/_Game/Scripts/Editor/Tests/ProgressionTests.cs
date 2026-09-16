@@ -35,7 +35,9 @@ namespace CluckWars.Tests
         public static ProgressionConfigSO Config() =>
             TestAssets.Load<ProgressionConfigSO>(TestAssets.ProgressionConfigPath);
 
-        public static RoundOutcome Outcome(string id, DateTime utc, int placement = 1, float banked = 0f, float stolen = 0f) =>
+        /// <param name="roleKey">Defaults to a key no roster role has, so slice 2's tests keep meaning what they meant.</param>
+        public static RoundOutcome Outcome(string id, DateTime utc, int placement = 1, float banked = 0f, float stolen = 0f,
+            string roleKey = "role.test", int rivalsRobbed = 0, int opponentsDisabled = 0) =>
             new RoundOutcome
             {
                 SchemaVersion = RoundOutcome.CurrentSchemaVersion,
@@ -43,15 +45,18 @@ namespace CluckWars.Tests
                 EndedAtUtc = ProgressionCalendar.FormatUtc(utc),
                 Ruleset = Ruleset,
                 DurationSeconds = 45f,
-                RoleKey = "role.test",
+                RoleKey = roleKey,
                 Placement = placement,
                 BankedTotal = banked,
                 StolenTotal = stolen,
+                RivalsRobbed = rivalsRobbed,
+                OpponentsDisabled = opponentsDisabled,
                 Abilities = Array.Empty<AbilityTally>(),
             };
 
-        public static JournalRecord Rec(string id, DateTime utc, int placement = 1, float banked = 0f, float stolen = 0f) =>
-            JournalRecord.Of(Outcome(id, utc, placement, banked, stolen));
+        public static JournalRecord Rec(string id, DateTime utc, int placement = 1, float banked = 0f, float stolen = 0f,
+            string roleKey = "role.test", int rivalsRobbed = 0, int opponentsDisabled = 0) =>
+            JournalRecord.Of(Outcome(id, utc, placement, banked, stolen, roleKey, rivalsRobbed, opponentsDisabled));
 
         public static RoundStandings Standings(params (int Actor, int Placement, float Total)[] rows) =>
             new RoundStandings
@@ -329,10 +334,19 @@ namespace CluckWars.Tests
             {
                 var fields = typeof(ProgressionConfigSO).GetFields(BindingFlags.Instance | BindingFlags.Public);
                 Assert.IsNotEmpty(fields);
+
+                var exempt = fields.Where(IsAssetReferenceCatalogue).Select(f => f.Name).ToList();
+                CollectionAssert.AreEqual(new[] { nameof(ProgressionConfigSO.Records) }, exempt,
+                    "Only a catalogue of asset references may skip this check — a field initialiser cannot name an " +
+                    "asset, so its code default is necessarily empty. RecordAssetTests checks that list instead. A " +
+                    "new exemption here must be deliberate.");
+
                 foreach (var field in fields)
                 {
+                    if (IsAssetReferenceCatalogue(field)) continue;
+
                     object a = field.GetValue(asset), d = field.GetValue(defaults);
-                    if (a is int[] arrayA && d is int[] arrayD)
+                    if (a is Array arrayA && d is Array arrayD)
                         CollectionAssert.AreEqual(arrayA, arrayD, $"ProgressionConfigSO.{field.Name}: code default differs from the asset.");
                     else
                         Assert.AreEqual(a, d, $"ProgressionConfigSO.{field.Name}: code default differs from the asset.");
@@ -343,6 +357,10 @@ namespace CluckWars.Tests
                 Object.DestroyImmediate(defaults);
             }
         }
+
+        /// <summary>An array of Unity assets — a catalogue no field initialiser could ever mirror.</summary>
+        private static bool IsAssetReferenceCatalogue(FieldInfo field) =>
+            field.FieldType.IsArray && typeof(Object).IsAssignableFrom(field.FieldType.GetElementType());
 
         [Test]
         public void ProjectContextPrefab_ProgressionConfigSlot_ResolvesToTheRealAsset()

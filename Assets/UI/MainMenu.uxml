@@ -21,65 +21,107 @@
 
          Sizes follow the mobile contract at the top of CluckWarsTheme.uss. -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
+    <ui:Style src="project://database/Assets/UI/Styles/Profile.uss" />
 
     <ui:VisualElement name="MainMenuPage" class="cw-screen cw-page cw-menu">
+
+        <!-- ── Identity header row (progression slice 3) ──
+             A normal-flow row above the title, not an absolutely-positioned
+             overlay: CLUCK WARS is centered at 128px and can span most of the
+             canvas width (see the mobile contract note above), so anything
+             pinned to the top-right corner sits on top of it. A full-width row
+             that the strip right-aligns inside pushes the title down instead of
+             covering it, at every aspect this page is tested at.
+
+             The strip itself is hidden entirely while the journal has not
+             loaded — a nameplate with no journal behind it would be a number
+             nobody can back. Display is driven from C#
+             (MenuUiController.RefreshIdentityStrip); do not give it a display
+             rule in USS or the two will fight.
+
+             The emblem is a USS ring with the mastery level inside it: LilitaOne
+             has no badge, star or shield glyph to use instead. -->
+        <ui:VisualElement name="MenuHeaderRow" style="width: 100%; flex-direction: row; justify-content: flex-end; flex-shrink: 0; padding-top: 20px; padding-right: 20px;">
+            <ui:VisualElement name="IdentityStrip" class="cw-id-strip" style="display: none;">
+                <ui:VisualElement name="IdentityEmblem" class="cw-emblem cw-emblem--small">
+                    <ui:Label name="IdentityEmblemLevel" text="0" class="cw-emblem__level" />
+                </ui:VisualElement>
+                <ui:VisualElement class="cw-id-strip__text">
+                    <ui:Label name="IdentityName" text="" class="cw-id-strip__name" />
+                    <ui:Label name="IdentityTitle" text="" class="cw-id-strip__title" />
+                </ui:VisualElement>
+                <ui:Label name="IdentityGrain" text="" class="cw-id-strip__grain" />
+            </ui:VisualElement>
+        </ui:VisualElement>
 
         <!-- Contrast scrim over the painted backdrop (the plate itself is on
              .cw-menu). picking-mode Ignore so it never eats a button tap. -->
         <ui:VisualElement class="cw-menu-scrim" picking-mode="Ignore" />
 
-        <!-- ── Title ── -->
-        <ui:VisualElement class="cw-menu-titleblock" picking-mode="Ignore">
-            <ui:Label text="CLUCK WARS" class="cw-title cw-accent cw-menu-title" />
-            <ui:Label text="4-PLAYER FARMYARD FREE-FOR-ALL" class="cw-body cw-menu-subtitle" />
+        <!-- The centered hero block: title, cast, actions, build stamp. Split
+             from #MenuHeaderRow (progression slice 3) so this group keeps
+             centering itself the way it always did, while the header row
+             above it is a fixed-height addition to the top of the page rather
+             than a new member of the centered group — see .cw-menu-hero's
+             comment in CluckWarsTheme.uss for why that distinction matters. -->
+        <ui:VisualElement name="MenuHero" class="cw-menu-hero">
+
+            <!-- ── Title ── -->
+            <ui:VisualElement class="cw-menu-titleblock" picking-mode="Ignore">
+                <ui:Label text="CLUCK WARS" class="cw-title cw-accent cw-menu-title" />
+                <ui:Label text="4-PLAYER FARMYARD FREE-FOR-ALL" class="cw-body cw-menu-subtitle" />
+            </ui:VisualElement>
+
+            <!-- ── Cast band: the four playable chickens ── -->
+            <ui:VisualElement name="CastBand" class="cw-menu-cast" picking-mode="Ignore">
+                <ui:VisualElement class="cw-menu-cast__item">
+                    <ui:VisualElement class="cw-chicken cw-chicken--warrior cw-menu-cast__art" />
+                    <ui:Label text="WARRIOR" class="cw-menu-cast__name cw-menu-cast__name--warrior" />
+                </ui:VisualElement>
+                <ui:VisualElement class="cw-menu-cast__item">
+                    <ui:VisualElement class="cw-chicken cw-chicken--speedy cw-menu-cast__art" />
+                    <ui:Label text="SPEEDY" class="cw-menu-cast__name cw-menu-cast__name--speedy" />
+                </ui:VisualElement>
+                <ui:VisualElement class="cw-menu-cast__item">
+                    <ui:VisualElement class="cw-chicken cw-chicken--fatty cw-menu-cast__art" />
+                    <ui:Label text="FATTY" class="cw-menu-cast__name cw-menu-cast__name--fatty" />
+                </ui:VisualElement>
+                <ui:VisualElement class="cw-menu-cast__item">
+                    <ui:VisualElement class="cw-chicken cw-chicken--assassin cw-menu-cast__art" />
+                    <ui:Label text="ASSASSIN" class="cw-menu-cast__name cw-menu-cast__name--assassin" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <!-- ── Actions: one primary, two secondary ── -->
+            <ui:VisualElement class="cw-menu-actions">
+                <ui:Button name="SoloBtn" text="▶  PLAY SOLO" class="cw-btn cw-btn--gold cw-menu-primary" />
+                <ui:VisualElement name="ModeRow" class="cw-mode-row cw-menu-secondary-row">
+                    <ui:Button name="HostBtn" text="HOST GAME" class="cw-btn cw-btn--green cw-menu-secondary" />
+                    <ui:Button name="JoinBtn" text="JOIN GAME" class="cw-btn cw-btn--neutral cw-menu-secondary" />
+                </ui:VisualElement>
+                <ui:VisualElement name="ProfileRow" class="cw-mode-row cw-menu-secondary-row">
+                    <ui:Button name="ProfileBtn" text="PROFILE" class="cw-btn cw-btn--neutral cw-menu-secondary" />
+                </ui:VisualElement>
+                <ui:Label name="MainMenuHint" text="Solo runs a full match against 3 CPU chickens." class="cw-body cw-menu-hint" />
+
+                <!-- Developer tools. Hidden unless PlayerPreferences.DeveloperModeEnabled,
+                     which defaults to OFF and is set from the Developer Mode toggle on the
+                     Character Select options row.
+
+                     This is the ONLY route into AbilityLab.unity, which is enabled in Build
+                     Settings so it can be launched on a phone — there is no Editor menu on a
+                     device. MenuUiController re-reads the preference every time the main menu
+                     is shown, so turning the gate off hides this again without a relaunch.
+                     Display is driven from C#; do not give it a display rule in USS or the two
+                     will fight. -->
+                <ui:VisualElement name="DevRow" class="cw-menu-secondary-row" style="display: none;">
+                    <ui:Button name="AbilityLabBtn" text="ABILITY LAB" class="cw-btn cw-btn--neutral cw-menu-secondary" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <!-- Build stamp — during a test session you otherwise cannot tell which
+                 build is on the device. Filled by MenuUiController. -->
+            <ui:Label name="BuildStamp" text="" class="cw-menu-build" picking-mode="Ignore" />
         </ui:VisualElement>
-
-        <!-- ── Cast band: the four playable chickens ── -->
-        <ui:VisualElement name="CastBand" class="cw-menu-cast" picking-mode="Ignore">
-            <ui:VisualElement class="cw-menu-cast__item">
-                <ui:VisualElement class="cw-chicken cw-chicken--warrior cw-menu-cast__art" />
-                <ui:Label text="WARRIOR" class="cw-menu-cast__name cw-menu-cast__name--warrior" />
-            </ui:VisualElement>
-            <ui:VisualElement class="cw-menu-cast__item">
-                <ui:VisualElement class="cw-chicken cw-chicken--speedy cw-menu-cast__art" />
-                <ui:Label text="SPEEDY" class="cw-menu-cast__name cw-menu-cast__name--speedy" />
-            </ui:VisualElement>
-            <ui:VisualElement class="cw-menu-cast__item">
-                <ui:VisualElement class="cw-chicken cw-chicken--fatty cw-menu-cast__art" />
-                <ui:Label text="FATTY" class="cw-menu-cast__name cw-menu-cast__name--fatty" />
-            </ui:VisualElement>
-            <ui:VisualElement class="cw-menu-cast__item">
-                <ui:VisualElement class="cw-chicken cw-chicken--assassin cw-menu-cast__art" />
-                <ui:Label text="ASSASSIN" class="cw-menu-cast__name cw-menu-cast__name--assassin" />
-            </ui:VisualElement>
-        </ui:VisualElement>
-
-        <!-- ── Actions: one primary, two secondary ── -->
-        <ui:VisualElement class="cw-menu-actions">
-            <ui:Button name="SoloBtn" text="▶  PLAY SOLO" class="cw-btn cw-btn--gold cw-menu-primary" />
-            <ui:VisualElement name="ModeRow" class="cw-mode-row cw-menu-secondary-row">
-                <ui:Button name="HostBtn" text="HOST GAME" class="cw-btn cw-btn--green cw-menu-secondary" />
-                <ui:Button name="JoinBtn" text="JOIN GAME" class="cw-btn cw-btn--neutral cw-menu-secondary" />
-            </ui:VisualElement>
-            <ui:Label name="MainMenuHint" text="Solo runs a full match against 3 CPU chickens." class="cw-body cw-menu-hint" />
-
-            <!-- Developer tools. Hidden unless PlayerPreferences.DeveloperModeEnabled,
-                 which defaults to OFF and is set from the Developer Mode toggle on the
-                 Character Select options row.
-
-                 This is the ONLY route into AbilityLab.unity, which is enabled in Build
-                 Settings so it can be launched on a phone — there is no Editor menu on a
-                 device. MenuUiController re-reads the preference every time the main menu
-                 is shown, so turning the gate off hides this again without a relaunch.
-                 Display is driven from C#; do not give it a display rule in USS or the two
-                 will fight. -->
-            <ui:VisualElement name="DevRow" class="cw-menu-secondary-row" style="display: none;">
-                <ui:Button name="AbilityLabBtn" text="ABILITY LAB" class="cw-btn cw-btn--neutral cw-menu-secondary" />
-            </ui:VisualElement>
-        </ui:VisualElement>
-
-        <!-- Build stamp — during a test session you otherwise cannot tell which
-             build is on the device. Filled by MenuUiController. -->
-        <ui:Label name="BuildStamp" text="" class="cw-menu-build" picking-mode="Ignore" />
     </ui:VisualElement>
 </ui:UXML>

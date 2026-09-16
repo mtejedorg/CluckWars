@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using CluckWars.Abilities;
 using CluckWars.Bootstrap;
 using CluckWars.Gameplay;
 using CluckWars.Logging;
+using CluckWars.Progression;
 using CluckWars.Services;
 using CluckWars.Settings;
 using UnityEngine;
@@ -30,6 +32,7 @@ namespace CluckWars.UI
         [SerializeField] private VisualTreeAsset _mainMenuUxml;
         [SerializeField] private VisualTreeAsset _characterSelectUxml;
         [SerializeField] private VisualTreeAsset _lobbyUxml;
+        [SerializeField] private VisualTreeAsset _profileUxml;
 
         // ---- Injected services ------------------------------------------------
         private ISessionSelectionService _selection;
@@ -39,11 +42,23 @@ namespace CluckWars.UI
         private ChickenClassRegistrySO   _classRegistry;
         private AbilityRegistrySO        _abilityRegistry;
         private MatchConfigSO            _matchConfig;
+        private IProgressionService      _progression;
 
         // ---- Runtime state ----------------------------------------------------
         private VisualElement _root;
-        private VisualElement _mainMenu, _charSelect, _lobby;
+        private VisualElement _mainMenu, _charSelect, _lobby, _profile;
+        private ProfileController _profileController;
         private bool _isBusy;
+
+        /// <summary>The menu's pages, in no particular order; <see cref="SetPage"/> walks it.</summary>
+        private readonly List<VisualElement> _pages = new();
+
+        /// <summary>The main menu's compact nameplate and Grain readout. Hidden until progression loads.</summary>
+        private VisualElement _idStrip, _idStripEmblem;
+        private Label _idStripEmblemLevel, _idStripName, _idStripTitle, _idStripGrain;
+
+        /// <summary>Per class chip: the mastery ring and its level digit, added under the chip at build time.</summary>
+        private readonly Dictionary<ChickenClass, (VisualElement Ring, Label Level)> _chipMastery = new();
 
         private readonly Dictionary<ChickenClass, VisualElement> _classChips = new();
         private VisualElement _previewChicken, _previewGlow, _previewDisc;
@@ -112,8 +127,10 @@ namespace CluckWars.UI
             [InjectOptional] SceneLoader sceneLoader,
             [InjectOptional] ChickenClassRegistrySO classRegistry,
             [InjectOptional] AbilityRegistrySO abilityRegistry,
-            [InjectOptional] MatchConfigSO matchConfig)
+            [InjectOptional] MatchConfigSO matchConfig,
+            IProgressionService progression)
         {
+            _progression     = progression;
             _selection       = selection;
             _log             = log;
             _ugs             = ugs;
@@ -148,6 +165,18 @@ namespace CluckWars.UI
                 typeof(UnityEngine.InputSystem.UI.InputSystemUIInputModule));
         }
 
+        /// <summary>
+        /// Drops the identity subscriptions. Without this the service — which lives for the whole
+        /// project, across scene loads — would hold a dead menu and its element tree alive, and call
+        /// into it after the Bootstrap scene is gone.
+        /// </summary>
+        private void OnDisable()
+        {
+            if (_progression != null) _progression.OnIdentityChanged -= OnIdentityChanged;
+            _profileController?.Dispose();
+            _profileController = null;
+        }
+
         private void OnEnable()
         {
             var doc = GetComponent<UIDocument>();
@@ -167,13 +196,16 @@ namespace CluckWars.UI
             var f = UiGfx.ChunkyFont();
             if (f != null) _root.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(f));
 
+            _pages.Clear();
             _mainMenu   = ClonePage(_mainMenuUxml);
             _charSelect = ClonePage(_characterSelectUxml);
             _lobby      = ClonePage(_lobbyUxml);
+            _profile    = ClonePage(_profileUxml);
 
             BuildMainMenu();
             BuildCharacterSelect();
             BuildLobby();
+            BuildProfile();
 
             _root.RegisterCallback<GeometryChangedEvent>(OnRootGeometry);
             UpdateLayout(_root.resolvedStyle.width, _root.resolvedStyle.height);
@@ -186,11 +218,13 @@ namespace CluckWars.UI
 
         private VisualElement ClonePage(VisualTreeAsset vta)
         {
-            if (vta == null) return new VisualElement();
-            var ve = vta.Instantiate();
+            // An unassigned template still gets a page object, so navigation to it is a blank screen
+            // rather than a NullReferenceException in the middle of the menu.
+            var ve = vta == null ? new VisualElement() : vta.Instantiate();
             ve.style.flexGrow = 1;
             ve.style.display = DisplayStyle.None;
-            _root.Add(ve);
+            if (vta != null) _root.Add(ve);
+            _pages.Add(ve);
             return ve;
         }
 
@@ -206,15 +240,21 @@ namespace CluckWars.UI
         }
 
         // ---- Navigation -------------------------------------------------------
-        private void ShowMainMenu()        { SetPage(_mainMenu); RefreshDevRow(); }
+        private void ShowMainMenu()        { SetPage(_mainMenu); RefreshDevRow(); RefreshIdentityStrip(); }
         private void ShowCharacterSelect() { SetPage(_charSelect); RefreshCharacterSelect(); }
         private void ShowLobby()           { SetPage(_lobby); RefreshLobby(); }
+        private void ShowProfile()         { SetPage(_profile); _profileController?.Refresh(); }
 
+        /// <summary>
+        /// Shows exactly one page. Iterates <see cref="_pages"/> rather than naming each one, so a page
+        /// added later cannot be left visible under the new one by a forgotten line.
+        /// </summary>
         private void SetPage(VisualElement page)
         {
-            if (_mainMenu   != null) _mainMenu.style.display   = page == _mainMenu   ? DisplayStyle.Flex : DisplayStyle.None;
-            if (_charSelect != null) _charSelect.style.display = page == _charSelect ? DisplayStyle.Flex : DisplayStyle.None;
-            if (_lobby      != null) _lobby.style.display      = page == _lobby      ? DisplayStyle.Flex : DisplayStyle.None;
+            foreach (var candidate in _pages)
+            {
+                if (candidate != null) candidate.style.display = candidate == page ? DisplayStyle.Flex : DisplayStyle.None;
+            }
         }
 
         // ======================================================================
@@ -226,10 +266,137 @@ namespace CluckWars.UI
             Bind<Button>(_mainMenu, "HostBtn", b => b.clicked += () => ChooseMode(SessionMode.Host));
             Bind<Button>(_mainMenu, "JoinBtn", b => b.clicked += () => ChooseMode(SessionMode.Join));
             Bind<Button>(_mainMenu, "AbilityLabBtn", b => b.clicked += OpenAbilityLab);
+            Bind<Button>(_mainMenu, "ProfileBtn", b => b.clicked += ShowProfile);
+
+            _idStrip            = _mainMenu.Q<VisualElement>("IdentityStrip");
+            _idStripEmblem      = _mainMenu.Q<VisualElement>("IdentityEmblem");
+            _idStripEmblemLevel = _mainMenu.Q<Label>("IdentityEmblemLevel");
+            _idStripName        = _mainMenu.Q<Label>("IdentityName");
+            _idStripTitle       = _mainMenu.Q<Label>("IdentityTitle");
+            _idStripGrain       = _mainMenu.Q<Label>("IdentityGrain");
 
             // Build stamp — a tester reporting a bug from a device otherwise has no
             // way to say which build produced it.
             Bind<Label>(_mainMenu, "BuildStamp", l => l.text = $"v{Application.version}");
+        }
+
+        // ======================================================================
+        //  PROFILE
+        // ======================================================================
+
+        /// <summary>
+        /// Builds the profile page and starts listening for identity changes.
+        /// </summary>
+        /// <remarks>
+        /// The listener lives here rather than only on the page, because two other surfaces move with
+        /// the identity: the main menu's strip and the class chips' mastery rings. Both are on pages
+        /// the player may be standing on when a round's records land.
+        /// </remarks>
+        private void BuildProfile()
+        {
+            _profileController?.Dispose();
+            _profileController = new ProfileController(_profile, _progression, _log, RoleLabel, RoleTint);
+
+            Bind<Button>(_profile, "ProfileBackBtn", b => b.clicked += ShowMainMenu);
+
+            if (_progression == null)
+            {
+                // Bound project-wide, so a null is a wiring bug. Said once, here, rather than by every
+                // surface that reads it.
+                _log?.Error(Source, "IProgressionService was not injected, so the profile page, the main menu's " +
+                    "nameplate strip and the class mastery rings all stay hidden.");
+                return;
+            }
+
+            _progression.OnIdentityChanged += OnIdentityChanged;
+        }
+
+        private void OnIdentityChanged(ProgressionIdentity identity)
+        {
+            RefreshIdentityStrip();
+            RefreshClassMastery();
+        }
+
+        /// <summary>The main menu's compact nameplate plus the Grain balance. Hidden until the journal loads.</summary>
+        private void RefreshIdentityStrip()
+        {
+            bool ready = _progression != null && _progression.IsReady;
+            if (_idStrip != null) _idStrip.style.display = ready ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!ready) return;
+
+            var plate = _progression.Identity.Plate;
+
+            if (_idStripName != null)
+            {
+                _idStripName.text = plate.Name ?? string.Empty;
+                _idStripName.style.display = plate.HasName ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+
+            if (_idStripTitle != null)
+            {
+                _idStripTitle.text = plate.TitleText ?? string.Empty;
+                _idStripTitle.style.display = string.IsNullOrEmpty(plate.TitleText) ? DisplayStyle.None : DisplayStyle.Flex;
+            }
+
+            if (_idStripEmblem != null && !string.IsNullOrEmpty(plate.EmblemRoleKey))
+                SetBorder(_idStripEmblem, RoleTint(plate.EmblemRoleKey));
+            if (_idStripEmblemLevel != null)
+                _idStripEmblemLevel.text = plate.EmblemMasteryLevel.ToString(CultureInfo.InvariantCulture);
+            if (_idStripGrain != null)
+                _idStripGrain.text = _progression.Profile.GrainBalance.ToString(CultureInfo.InvariantCulture) + " GRAIN";
+        }
+
+        /// <summary>The mastery ring on each class chip. Hidden until the journal loads.</summary>
+        private void RefreshClassMastery()
+        {
+            bool ready = _progression != null && _progression.IsReady;
+            foreach (var pair in _chipMastery)
+            {
+                var (ring, level) = pair.Value;
+                if (ring == null) continue;
+
+                ring.style.display = ready ? DisplayStyle.Flex : DisplayStyle.None;
+                if (!ready) continue;
+
+                SetBorder(ring, TintOf(pair.Key));
+                if (level != null) level.text = MasteryOf(pair.Key).ToString(CultureInfo.InvariantCulture);
+            }
+        }
+
+        private int MasteryOf(ChickenClass cls)
+        {
+            if (_progression == null) return 0;
+
+            string key = UnlockKeyTable.RoleKey(cls);
+            foreach (var role in _progression.Identity.Roles)
+            {
+                if (string.Equals(role.RoleKey, key, StringComparison.Ordinal)) return role.Level;
+            }
+
+            return 0;
+        }
+
+        /// <summary>The display name of a progression role key — the menu owns the roster's vocabulary.</summary>
+        private static string RoleLabel(string roleKey)
+        {
+            foreach (var cls in Order)
+            {
+                if (string.Equals(UnlockKeyTable.RoleKey(cls), roleKey, StringComparison.Ordinal)) return cls.ToString();
+            }
+
+            // A key from an older build's roster: shown as it was saved rather than dropped, so play
+            // the player actually did stays visible.
+            return roleKey;
+        }
+
+        private Color RoleTint(string roleKey)
+        {
+            foreach (var cls in Order)
+            {
+                if (string.Equals(UnlockKeyTable.RoleKey(cls), roleKey, StringComparison.Ordinal)) return TintOf(cls);
+            }
+
+            return UiGfx.TextSecondary;
         }
 
         /// <summary>
@@ -300,6 +467,7 @@ namespace CluckWars.UI
         private void BuildCharacterSelect()
         {
             _classChips.Clear();
+            _chipMastery.Clear();
             for (int i = 0; i < Order.Length; i++)
             {
                 var cls = Order[i];
@@ -312,6 +480,11 @@ namespace CluckWars.UI
                 // are fixed per class, so the modifier is applied once here.
                 var art = chip.Q<VisualElement>(ChipNames[i] + "Art");
                 if (art != null) art.AddToClassList("cw-chicken--" + KeyOf(cls));
+
+                // Mastery ring: the chip's own element from the UXML, tinted and filled
+                // per refresh. Chips are fixed per class, so it is located once here.
+                var ring = chip.Q<VisualElement>(ChipNames[i] + "Mastery");
+                if (ring != null) _chipMastery[cls] = (ring, ring.Q<Label>(ChipNames[i] + "MasteryLevel"));
             }
 
             _previewChicken = _charSelect.Q<VisualElement>("PreviewChicken");
@@ -460,6 +633,8 @@ namespace CluckWars.UI
         {
             var cls = Cls;
             var m = Meta[cls];
+
+            RefreshClassMastery();
 
             foreach (var kv in _classChips)
             {

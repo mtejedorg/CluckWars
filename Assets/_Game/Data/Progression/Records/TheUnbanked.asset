@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e078e75349f9e9348aaa3eaf9a5b32d2, type: 3}
+  m_Name: TheUnbanked
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Progression.RecordDefinitionSO
+  _key: record.the_unbanked
+  DisplayName: The Unbanked
+  Description: Win a round banking under 15.
+  Title: The Unbanked
+  Group: 2
+  AchievableWhileLosing: 0
+  Scope: 0
+  Conditions:
+  - Metric: 4
+    Comparison: 4
+    Value: 1
+  - Metric: 0
+    Comparison: 1
+    Value: 0
+  - Metric: 0
+    Comparison: 2
+    Value: 15
+  RoleKey: 
+  CareerKind: 0
+  CareerValue: 0

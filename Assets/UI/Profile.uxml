@@ -1,0 +1,104 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <!-- Cluck Wars — profile (progression slice 3, "Identity").
+
+         What the page is for: the player's nameplate, what they have done, and
+         what they have not done yet. The unearned records ARE the content — a
+         list of only the earned ones would be a receipt, not a reason to play.
+
+         Three rules this markup obeys:
+
+         1. NO FREE TEXT. There is no TextField anywhere. The name is generated
+            and re-rolled (Maestro's ruling, 2026-09-14); a typed name is the one
+            string that would later have to be shown to other players, and a
+            local build has no moderation.
+         2. NO GLYPHS. LilitaOne carries ~225 characters, so nothing here uses a
+            check, star, padlock or arrow. Rings, pips, locked pickers and the
+            earned marker are USS shapes (Assets/UI/Styles/Profile.uss).
+         3. NOTHING IS AUTHORED TWICE. Every list — pickers, records, filters,
+            the recent-form strip — is an empty container filled by
+            ProfileController from IProgressionService.Identity.
+
+         Sizes follow the mobile contract at the top of CluckWarsTheme.uss. -->
+    <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTokens.uss" />
+    <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
+    <ui:Style src="project://database/Assets/UI/Styles/Profile.uss" />
+
+    <ui:VisualElement name="ProfilePage" class="cw-screen cw-page">
+
+        <!-- Header ribbon (+ back button, absolutely placed top-left) -->
+        <ui:VisualElement style="align-items: center; justify-content: center; padding-top: 20px; padding-bottom: 12px; flex-shrink: 0;">
+            <ui:Button name="ProfileBackBtn" text="BACK" class="cw-home-btn" />
+            <ui:VisualElement class="cw-ribbon">
+                <ui:Label text="PROFILE" class="cw-title" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Shown instead of everything below while the journal has not loaded.
+             Neutral, not an apology: nothing the player did is lost. -->
+        <ui:Label name="ProfileNotReady" text="Your profile is not available right now." class="cw-profile-empty" />
+
+        <ui:VisualElement name="ProfileContent" class="cw-profile-body" style="padding-left: 28px; padding-right: 28px; padding-bottom: 20px;">
+
+            <!-- ── Column A: the nameplate and its pickers ── -->
+            <ui:VisualElement class="cw-profile-col cw-profile-col--left">
+                <ui:ScrollView name="ProfileLeftScroll" style="flex-grow: 1;">
+
+                    <ui:VisualElement name="PlatePreview" class="cw-plate">
+                        <ui:VisualElement name="PlateEmblem" class="cw-emblem">
+                            <ui:Label name="PlateEmblemLevel" text="0" class="cw-emblem__level" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="cw-plate__text">
+                            <ui:Label name="PlateName" text="" class="cw-plate__name" />
+                            <ui:Label name="PlateTitle" text="" class="cw-plate__title" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+
+                    <ui:Button name="RerollNameBtn" text="NEW NAME" class="cw-btn cw-btn--neutral" style="margin-top: 14px; font-size: 34px; min-height: 96px;" />
+                    <ui:Label name="RerollHint" text="Names are given, not chosen. Roll again for another." class="cw-body" style="font-size: 28px; margin-top: 6px; white-space: normal;" />
+
+                    <ui:VisualElement class="cw-profile-section">
+                        <ui:Label text="TITLE" class="cw-profile-caption" />
+                        <ui:VisualElement name="TitleChoices" class="cw-pick-row" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement class="cw-profile-section">
+                        <ui:Label text="EMBLEM" class="cw-profile-caption" />
+                        <ui:VisualElement name="EmblemChoices" class="cw-pick-row" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement class="cw-profile-section">
+                        <ui:Label text="BANNER" class="cw-profile-caption" />
+                        <ui:VisualElement name="BannerChoices" class="cw-pick-row" />
+                    </ui:VisualElement>
+
+                </ui:ScrollView>
+            </ui:VisualElement>
+
+            <!-- ── Column B: records, then career ── -->
+            <ui:VisualElement class="cw-profile-col cw-profile-col--right">
+                <ui:ScrollView name="ProfileRightScroll" style="flex-grow: 1;">
+
+                    <ui:Label text="RECORDS" class="cw-profile-caption" />
+                    <ui:VisualElement name="RecordFilters" class="cw-pick-row" />
+                    <ui:VisualElement name="RecordList" />
+                    <ui:Label name="RecordsEmpty" text="No records are defined in this build." class="cw-body" style="font-size: 30px;" />
+
+                    <ui:Label text="CAREER" class="cw-profile-caption" style="margin-top: 24px;" />
+                    <ui:VisualElement name="CareerGrid" class="cw-career-grid" />
+
+                    <ui:Label text="RECENT ROUNDS" class="cw-profile-caption" style="margin-top: 8px;" />
+                    <ui:VisualElement name="RecentStrip" class="cw-form-strip" />
+                    <ui:Label name="RecentEmpty" text="Play a round and it shows up here." class="cw-body" style="font-size: 28px;" />
+
+                    <ui:Label text="PERSONAL BESTS" class="cw-profile-caption" style="margin-top: 16px;" />
+                    <ui:VisualElement name="BestGrid" class="cw-career-grid" />
+
+                    <ui:Label text="BY CLASS" class="cw-profile-caption" style="margin-top: 8px;" />
+                    <ui:VisualElement name="RoleList" />
+
+                </ui:ScrollView>
+            </ui:VisualElement>
+
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

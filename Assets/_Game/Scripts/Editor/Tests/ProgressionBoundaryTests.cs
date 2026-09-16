@@ -57,10 +57,19 @@ namespace CluckWars.Tests
         /// side of <see cref="IProgressionService"/>. UI reads progression only through that interface; it
         /// never names the tracker, the service's concrete type, the journal or the ledger.
         /// </summary>
+        /// <remarks>
+        /// Slice 3 added exactly two: <see cref="ProgressionIdentity"/> (whose display models are
+        /// nested inside it on purpose, so they cost nothing here) and <see cref="NameplateSlot"/>,
+        /// which appears in the two command signatures. Everything else identity is built from —
+        /// <c>RecordDefinitionSO</c>, <c>RecordEngine</c>, <c>IdentityFold</c>, <c>NameGenerator</c>,
+        /// <c>NameplateComposer</c>, <c>ProfileEvent</c> — stays off the UI's surface.
+        /// </remarks>
         private static readonly string[] UiSurface = ContractSurface.Concat(new[]
         {
             nameof(IProgressionService),
             nameof(ProgressionProfile),
+            nameof(ProgressionIdentity),
+            nameof(NameplateSlot),
             nameof(RoundAward),
             nameof(ProgressionFault),
             nameof(ProgressionFaultKind),
@@ -82,10 +91,12 @@ namespace CluckWars.Tests
                 "ProgressionService (the concrete type) must stay off the UI surface: UI reads IProgressionService.");
 
             var files = SourceScan.FilesUnder(UiDir).ToList();
-            const string consumer = UiDir + "/MatchOverlaysController.cs";
-            Assert.IsTrue(files.Contains(consumer), $"{consumer} is not in the UI scan; the file enumeration changed.");
-            Assert.IsTrue(SourceScan.CodeLines(consumer).Any(l => Regex.IsMatch(l.Code, $@"\b{nameof(IProgressionService)}\b")),
-                $"{consumer} has no code line naming {nameof(IProgressionService)}; the UI scan would be checking nothing.");
+            foreach (string consumer in new[] { UiDir + "/MatchOverlaysController.cs", UiDir + "/ProfileController.cs" })
+            {
+                Assert.IsTrue(files.Contains(consumer), $"{consumer} is not in the UI scan; the file enumeration changed.");
+                Assert.IsTrue(SourceScan.CodeLines(consumer).Any(l => Regex.IsMatch(l.Code, $@"\b{nameof(IProgressionService)}\b")),
+                    $"{consumer} has no code line naming {nameof(IProgressionService)}; the UI scan would be checking nothing.");
+            }
 
             var patterns = disallowed.Select(n => (Name: n, Rx: new Regex($@"\b{Regex.Escape(n)}\b"))).ToList();
             var violations = new List<string>();

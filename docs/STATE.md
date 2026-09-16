@@ -6,6 +6,221 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Progression Slice 3 — identity (2026-09-14/15) — 709 → 771/771 green
+
+Fourth slice of the progression pitch milestone, on `feature/progression` (uncommitted, awaiting
+code-architect + qa-reviewer). **Second player-visible slice:** a generated, re-rollable username
+(`SwiftBeak#2213`-shaped, no free text anywhere), a nameplate (name + earned title + always-present
+role emblem showing mastery + banner), a Profile page listing every record earned or not, mastery per
+class (display only — grants no stat), and a career summary (lifetime/per-role totals, recent-20
+placements, personal bests). Gameplay code is untouched; only `Assets/_Game/Scripts/Editor/Tests/*`,
+`Progression/`, `UI/`, and data assets changed.
+
+- **One journal, typed lines.** Round lines are byte-identical to slice 2's (no `Kind` field at all —
+  tested against a raw slice-2-shaped line). A profile line carries `"Kind":"profile"`.
+  `JournalStore` reads a small `{Kind}` envelope first and dispatches; an unrecognized non-empty `Kind`
+  is one skipped/reported line, never fatal (a downgraded build survives a newer build's lines).
+  `JournalLoadResult` gains `ProfileEvents` alongside the unchanged `Records`, so `ProgressionLedger`'s
+  round fold and its `NotEvaluable` counting are untouched. `JournalStore.Append(ProfileEvent)` mirrors
+  `Append(RoundOutcome)`: refuses a line that would not read back, writes with the same newline guard,
+  flushes, and returns the event as the line reads back (memory equals disk). Torn-tail repair/drop
+  works for either kind.
+- **`Progression/` (new):** `ProfileEvent` — facts only (`Kind`, `SchemaVersion`, `EventId`, `AtUtc`,
+  `Type` ∈ {name, title, emblem, banner}, `Value`); `IsDisplayableName` gates a name to ASCII
+  letters + `#` + 4 digits, ≤ 24 chars. `NameGenerator` — pure, seeded `System.Random`; ~40×37 vetted
+  farmyard word pairs (no gameplay vocabulary — the progression vocabulary scan forbids
+  food/chicken/cluck in `Progression/*.cs`, so the words are barn/coop/harvest-themed, not
+  chicken-themed); a re-roll is never the current name (nudges the discriminator on the
+  astronomically-unlikely miss rather than trusting the retry loop). `MasteryRules` — points = evaluable
+  rounds played as a role; level = thresholds reached; pure, total, no exception on a missing/empty
+  table. `RecordDefinitionSO` — fill-once `record.*` key (same pattern as `AbilityBaseSO.UnlockKey`),
+  `Scope` (SingleRound: an AND of `RecordCondition`s over `RecordMetric` × `RecordComparison` × value,
+  optional `RoleKey` filter; Career: `WinWithEveryRole` or `MasteryLevelOnAnyRole`), `Problem()` reports
+  what's wrong with a definition instead of throwing. `RecordEngine.Evaluate` — pure, total,
+  re-evaluates the ledger's canonical rounds every fold (so a record added later credits play already
+  on disk); never throws for a null/destroyed/duplicate-keyed/conditionless definition — reports it
+  `IsValid = false` instead. `NameplateComposer` — the emblem is **always present** (selected role if
+  played, else most-played, else `UnlockKeyTable.RoleKeys[0]`); a title/banner not earned/owned is
+  dropped rather than shown. `ProgressionIdentity` — the UI-facing snapshot, with every display type
+  (`Nameplate`, `RoleMastery`, `RecordView`, `BannerView`, `Career`) nested inside it so the boundary
+  scan's UI allowlist costs exactly one entry, not five. `IdentityFold.Build` — the one place rounds
+  (mastery/records/career) and profile events (the nameplate's choices) meet; every problem it hits
+  (mis-authored record, unreadable name, unknown event type) is collected and logged once, never
+  thrown.
+- **`ProgressionLedger` gains `EvaluableRounds`** — the deduped, canonical-order, evaluable
+  `RoundOutcome`s the round-figures walk already produced. Records/mastery/career are pure functions of
+  exactly this list, so a career total and the matching `ProgressionProfile` total are the same number
+  by construction (tested).
+- **`UnlockKeyTable` gains `RoleKeys`** (the roster in tie-break order) and `RoleOrder`. The one file
+  gameplay-boundary rules still let name a gameplay type.
+- **`ProgressionConfigSO` gains:** `MasteryRoundThresholds` (int[10], default
+  `{1,3,6,10,15,21,28,36,45,55}`, tested strictly increasing), `Banners` (`BannerDefinition[]`:
+  `barnwood` Starter, `harvest`/`midnight` Earned off `record.full_coop`/`record.highway_hen`; the
+  `Purchasable` enum value exists and ships on **nothing** — no banner, title or emblem can ever be
+  bought, which is a tested invariant, not an absence of a store yet), `Records`
+  (`RecordDefinitionSO[]`, code default `Array.Empty<>()` since a field initialiser cannot name an
+  asset — the "code defaults mirror the asset" test now exempts asset-reference array fields by name,
+  asserting the exempt set is exactly `{Records}`; a separate test checks the asset carries the real 8).
+- **8 records shipped** at `Assets/_Game/Data/Progression/Records/` (asset GUIDs start `acf1add…`,
+  `6e5d99b…`, `b387990…`, `c4746ad…`, `4508863…`, `fd5ec2f…`, `e2045a5…`, `8540f10…`), listed on
+  `ProgressionConfig.asset` (GUID unchanged, `a4f1ebed…`): Full Coop (bank ≥ 40), Featherweight Hauler
+  (bank ≥ 30 as Speedy), Three-Time Thief (rivals ≥ 3), Highway Hen (steal ≥ 20), Empty Beak (stolen >
+  banked), The Unbanked (win, 0 < banked < 15 — the `> 0` stops a four-way scoreless tie counting),
+  Whole Flock (win with every class, career), Devoted (mastery 10 on any class, career).
+- **Deliberately excluded — the journal lacks the facts (Maestro's call, not this pass's to add):**
+  "never robbed" (in Shared PvP a steal *from* the local player is announced on the **thief's** peer per
+  slice 1's boundary, so the victim's own peer never hears it — crediting it would be a false positive),
+  "deny an execute" and "rob the round's leader" (no signal for either), "win with all eight
+  specializations" (the journal has no specialization field, only the class role key). None of these
+  add facts to `RoundOutcome` or touch `MatchTracker` — out of scope for a meta-layer slice.
+- **`IProgressionService` gains** `Identity`, `OnIdentityChanged`, `TryRerollName()`,
+  `TrySelectNameplatePart(NameplateSlot, string)`. Every command is write-before-show: the
+  `ProfileEvent` is appended and flushed, *then* `Identity` refolds and `OnIdentityChanged` raises; a
+  failed write is `Error` + `OnFault(WriteFailed)`, returns `false`, and `Identity` is untouched. Picking
+  an unowned part is a `Warn` + `false` + no write (the UI never offers it, but the service refuses it
+  anyway). After a successful `Load`, a profile with no readable name event gets one generated and
+  written before it can be shown (`EnsureName`); a write failure there leaves no name (the UI hides the
+  line) and reports the fault, never invents one in memory. `Identity` refolds on load, on every
+  recorded round, and on every profile event.
+- **UI allowlist** (`ProgressionBoundaryTests.UiSurface`) extended by exactly two entries:
+  `ProgressionIdentity`, `NameplateSlot` — every display model the UI actually reads is nested inside
+  `ProgressionIdentity`, invisible to the top-level-type boundary scan. The scan now also hard-requires
+  `ProfileController.cs` as a second pinned `IProgressionService` consumer (the boundary self-test would
+  otherwise go blind if that consumer moved).
+- **UI (new):** `Assets/UI/Profile.uxml` + `Assets/_Game/Scripts/UI/ProfileController.cs` — plain C#
+  (not a `MonoBehaviour`), constructed by `MenuUiController` with the page root; nameplate preview
+  (emblem = USS ring + mastery digits, banner = USS class swap, no glyphs anywhere), a re-roll button, 3
+  pickers (unearned parts shown locked via USS state — never a padlock character — and simply do
+  nothing when tapped, since the service would refuse them anyway), a records list that shows earned
+  **and unearned** entries with All/Foraging/Thievery/Denial/Mastery/While-Losing filters, and a career
+  section (lifetime stats, per-role table, recent-20-placement pip strip, personal bests). No free-text
+  entry anywhere (tested).
+- **UI (edited):** `MenuUiController` — `SetPage`'s three-way if-chain is now one list every page is
+  added to once; gained `ShowProfile`, the `IProgressionService` injection, the main-menu identity strip
+  refresh, and per-class-chip mastery rings in `RefreshCharacterSelect`, all unsubscribed in a new
+  `OnDisable` (the service outlives the menu across scene loads — without this the dead menu's element
+  tree would leak and later get called into). `MainMenu.uxml` gains an identity strip (compact
+  nameplate + Grain) and a Profile button. `CharacterSelect.uxml` gains a mastery ring element inside
+  each class chip. `Bootstrap.unity`'s `MenuUiController._profileUxml` slot assigned + scene saved.
+- **CluckWarsTheme.uss layout bug found and fixed mid-slice:** the identity strip, first tried as
+  `position: absolute; top: 28px; right: 28px;`, overlapped the 128px centered `CLUCK WARS` title —
+  because `.cw-menu`'s single `justify-content: center` centers **every** direct child of the page as
+  one group, so adding a row at the top pushed the whole group up and clipped it against the screen's
+  top edge instead of adding space above it. Fixed by splitting the centered content into its own
+  `.cw-menu-hero` wrapper (title/cast/actions/build-stamp), with the identity row as a fixed, non-
+  centered header above it. Re-verified by screenshot at both aspects tested.
+- **Glyph discipline (D9).** LilitaOne is imported as a **dynamic** font, so
+  `Font.HasCharacter` is not a coverage oracle here — it returns `true` for a check mark, a star, an
+  arrow, even a lone surrogate (verified live). The glyph test therefore checks every new on-screen
+  string (UXML text, `ProfileController` literals, every shipped record's name/description/title, every
+  generator word, every banner name) against printable ASCII only, and separately asserts
+  `Font.HasCharacter('') == true` so the test starts failing loudly the day Unity makes
+  `HasCharacter` mean something, rather than silently staying a weaker check than it looks. Rings, pips,
+  locks and the earned marker are all USS shapes (`Assets/UI/Styles/Profile.uss`), never characters.
+- **Tests: +62 (709 → 771, unfiltered EditMode).** New: `ProgressionIdentityTests.cs`
+  (`RecordEngineTests` — same history in any order gives identical standings incl. the earning round;
+  never mutates its input; a record defined after the fact credits the earliest qualifying round; a
+  role filter only counts that role; every condition must hold on one round; the four-way-scoreless-tie
+  guard; `WinWithEveryRole` names the completing round; `MasteryLevelOnAnyRole` counts per role, not
+  pooled; a broken definition is reported, never fatal, next to good ones; progress is shown only for a
+  reach-N shape. `MasteryRulesTests`. `NameGeneratorTests` — shape, the whole word-list product is
+  ASCII and under the length limit, a re-roll never repeats, same seed → same names.
+  `NameplateTests` — last event per type wins under any read order; a repeated `EventId` folds once; an
+  unknown `Type` is ignored + reported; an undrawable name is ignored + reported; a title drops the
+  moment its record is unearned; the emblem invariant (always present, falls back to most-played);
+  every combination of history × events × a catalogue where **every** banner is Purchasable still
+  yields a plate with an unbuyable part; a banner is owned only once its unlock record is.
+  `CareerSummaryTests` — career totals equal the ledger's totals (by construction); recent-20 is
+  newest-last; personal bests are the true per-field max; every roster role is listed even unplayed;
+  a role key from a retired roster is still counted, after the roster's own. `RecordAssetTests` — the
+  config slot resolves to exactly the 8 real assets in order; every key matches `record.*` and is
+  unique; every definition is evaluable and names a title; a role-filtered record's `RoleKey` is a real
+  roster key; every Earned banner's `UnlockRecordKey` ships. `ProgressionProfileJournalTests.cs` —
+  `ProfileJournalTests` (round-trip under es-ES; round + profile lines share the file and load into
+  their own lists; a slice-2-shaped round line reads identically; a torn profile tail repairs/drops the
+  same way a round's does; an unknown `Kind` is skipped + reported, not fatal; a malformed
+  id/instant/schema profile line is skipped; an event that would not read back is refused, never
+  written). `ProgressionIdentityServiceTests` — first load generates exactly one name, a reload
+  generates none; a re-roll is on disk (re-read inside the `OnIdentityChanged` handler) before any
+  subscriber sees it; a failed write changes nothing and is reported; an unowned part is refused and
+  writes nothing; an owned part is worn and written; playing a round moves records/mastery, not just
+  the balance; commands before load are refused and touch no file; a journal that cannot load leaves
+  `Identity` empty, never invented. `ProfilePageTests.cs` — `ProfileGlyphTests` (the printable-ASCII
+  glyph scan + its own `HasCharacter`-is-unreliable self-check; new UXML text is plain ASCII; no
+  `TextField`/`TextInput` anywhere on the page; rings/pips/locks are USS selectors with real
+  border-radius/border-width, not characters; every banner's `UssClass` exists in the stylesheet; the
+  page and the main-menu/character-select additions carry every element name their controllers bind).
+  `ProgressionBoundaryTests`/`ProgressionTests` edits above.
+- **Verified in play mode — real dev journal, real Editor Play, no debug path.**
+  - `TryRerollName()` + `TrySelectNameplatePart(Emblem, "class.warrior")` called live: both returned
+    `true`; `GoldenStable#0771` → `MightyPaddock#1396`; both landed on disk immediately as the next two
+    journal lines with correct `Kind`/`EventId`/`Type`/`Value`. A full Stop → Start of Play mode (a real
+    reload, not a re-fold) confirmed both choices persisted and did **not** regenerate a duplicate name
+    event.
+  - A newly-defined record crediting already-earned play, demonstrated against real local data: copied
+    the real dev journal to a temp dir (never touched), folded it against the shipped config, evaluated
+    one throwaway runtime `RecordDefinitionSO` (`record.demo_never_shipped`, "bank ≥ 3 as Warrior" — not
+    in the shipped 8) directly through `RecordEngine.Evaluate` → earned, naming the one real round with
+    `BankedTotal = 3.0`. Temp dir deleted after; nothing shipped.
+  - Played one real solo round to completion (`ChooseMode(Solo)` → `OnReady` → `OnStartMatch`, idled
+    ~35s): journal grew by one round line; the live `IProgressionService` (read off
+    `MatchOverlaysController` post-scene-load) showed `Profile.RoundsPlayed` 8 → 9, `GrainBalance`
+    241 → 278, `Identity.Summary.Rounds` 8 → 9, and the Warrior role's `Rounds` 8 → 9 (mastery correctly
+    held at level 3 — the level-4 threshold is 10 rounds). The dev journal now holds 9 rounds + 3
+    profile events (12 lines); adding lines is expected and fine.
+  - Screenshots: `slice3-mainmenu-landscape.png`, `slice3-profile-landscape.png`,
+    `slice3-profile-career-landscape.png`, `slice3-charselect-landscape.png` (1575×886, free aspect,
+    post-overlap-fix) and a Pixel-9-aspect pass — `slice3-mainmenu-pixel9.png`,
+    `slice3-charselect-pixel9.png`, `slice3-profile-pixel9.png` — at 2160×1080. The Pixel 9's exact
+    2424×1080 could not be forced: a correctly-valued custom `GameViewSize` entry was added and
+    selected (verified 2424×1080 in the `GameViewSizes` group itself), but the actual render clamped to
+    2160×1080 regardless of window size (tried a 1620px-wide docked panel, a 2460px and a 3200px
+    floating window — same 2160×1080 every time), so the wider 2:1 aspect was used as the closest
+    achievable proxy.
+  - Console clean at every check (only the pre-existing `Mobile_RPAsset.asset`/MCP-noise warnings from
+    slice 2). Editor confirmed out of Play mode at hand-off.
+- **Self-caused incident, no lasting damage:** an early live-play reflection probe called
+  `Zenject.ProjectContext.Instance` directly from `script-execute`, outside the normal injection path;
+  it threw `"Tried to create multiple instances of ProjectContext!"` and left one live
+  `MenuUiController`'s injected fields null. A scene scan confirmed no duplicate `ProjectContext` was
+  actually left behind (count stayed 1 throughout); fixed with a clean Stop → Start of Play mode. Root
+  cause avoided going forward: read an already-injected service off a live component's own field
+  instead of touching `ProjectContext.Instance` from external script.
+- **Deviations from spec, restated:** the four excluded records above; the career summary's
+  specialization split omitted (no fact in the journal); the D9 glyph oracle fallback (`HasCharacter`
+  unusable on this dynamic font → printable-ASCII allowlist); the Pixel-9 aspect proxy (2160×1080, not
+  the literal 2424×1080).
+- **No new gameplay-side issue found this slice.** Slice 2's findings 1 (execute cargo/kill credit
+  never resolves via `TryFindBehaviour`, even in solo) and 2 (Shared-mode proxy write on the bounty
+  bag) remain open and unfixed — reported, not touched, per this slice's scope too.
+
+### What slice 4 needs to know
+
+- **`IdentityFold.Build`, `RecordEngine.Evaluate` and `NameplateComposer.Compose` are all pure and
+  total** — a daily task or any slice-4 read can call them directly against a ledger's
+  `EvaluableRounds` without going through the service, the way the play-mode demo above did.
+- **`ProgressionLedger.EvaluableRounds` is the one list to fold anything else over.** Don't re-derive a
+  second canonical-order walk of the journal; career, records and mastery all being pure functions of
+  this exact list is what keeps them numerically consistent with `ProgressionProfile` by construction.
+- **A daily task's "did X today" still goes through `ProgressionCalendar`** — nothing in slice 3 defined
+  a second day boundary.
+- **The `Purchasable` `BannerSource` ships on nothing.** The first slice that adds a store must both
+  wire spending as its own journaled facts (per slice 2's note) and re-run
+  `EveryPlate_HoldsAPartThatCouldNotHaveBeenBought` — it already covers "every banner is Purchasable" as
+  a synthetic catalogue, so a real store shipping alongside it stays honest.
+- **Profile events fold last-writer-wins per `Type`, by (`AtUtc` instant, `EventId` ordinal).** Any new
+  `ProfileEventTypes` entry should follow the same convention rather than inventing a second dedupe
+  rule; `ProfileEventTypes.IsKnown` is the one gate.
+- **UI still only reads `IProgressionService`.** A new display fact belongs as a new nested type on
+  `ProgressionIdentity` (cheap: one entry on the boundary allowlist covers everything nested inside),
+  never as a new top-level `CluckWars.Progression` type named from `UI/`.
+- **The excluded records are a design opportunity, not a dead end.** "Never robbed", "deny an execute"
+  and "rob the leader" would all become possible if `RoundOutcome`/`MatchTracker` grew the right fact —
+  that is gameplay-adjacent work outside a meta-layer slice's scope, worth a mechanics-designer pass.
+- **The GDD §8/§11 rewrite and the compendium (`docs/site/index.html`) sync are still deferred to one
+  combined pass after slice 4** (Maestro's ruling stands, restated here so it isn't missed a second
+  time).
+
 ## ✅ Progression Slice 2 — tracker, journal, Grain (2026-09-13, fix pass 2026-09-14) — 709/709 green
 
 Third slice of the progression pitch milestone, on `feature/progression` (uncommitted, awaiting code-architect +

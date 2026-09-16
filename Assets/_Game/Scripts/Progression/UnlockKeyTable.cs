@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using CluckWars.Gameplay;
 
 namespace CluckWars.Progression
@@ -9,6 +10,36 @@ namespace CluckWars.Progression
     /// </summary>
     public static class UnlockKeyTable
     {
+        /// <summary>
+        /// Every role key, in the one order progression breaks ties by (the roster's own order). The
+        /// emblem falls back to "the most played role, ties broken by this order", and a career record
+        /// that asks for "every role" asks for exactly these.
+        /// </summary>
+        /// <remarks>
+        /// Written out rather than derived from <c>Enum.GetValues</c> for the same reason
+        /// <see cref="RoleKey"/> is: a saved key is a promise, and reordering an enum must not silently
+        /// reorder or drop one. <c>UnlockKeyTests.RoleKeys_CoverEveryRoleInRosterOrder</c> keeps the two
+        /// in step.
+        /// </remarks>
+        public static readonly IReadOnlyList<string> RoleKeys = new[]
+        {
+            "class.warrior",
+            "class.speedy",
+            "class.fatty",
+            "class.assassin",
+        };
+
+        /// <summary>Where <paramref name="roleKey"/> sits in <see cref="RoleKeys"/>; <c>int.MaxValue</c> for an unknown key, so it sorts last.</summary>
+        public static int RoleOrder(string roleKey)
+        {
+            for (int i = 0; i < RoleKeys.Count; i++)
+            {
+                if (string.Equals(RoleKeys[i], roleKey, StringComparison.Ordinal)) return i;
+            }
+
+            return int.MaxValue;
+        }
+
         /// <summary>The stable unlock/save key for <paramref name="role"/>, e.g. <c>"class.warrior"</c>.</summary>
         /// <exception cref="ArgumentOutOfRangeException">The role has no row in this table.</exception>
         /// <remarks>
