@@ -26,8 +26,20 @@ namespace CluckWars.Progression
         /// </summary>
         RoundAward? LatestAward { get; }
 
+        /// <summary>
+        /// Who the player is: nameplate, mastery, records and career.
+        /// <see cref="ProgressionIdentity.Empty"/> until loaded.
+        /// </summary>
+        ProgressionIdentity Identity { get; }
+
         /// <summary>The totals changed (after a load or a recorded round).</summary>
         event Action<ProgressionProfile> OnProfileChanged;
+
+        /// <summary>
+        /// The identity changed: after a load, after a recorded round (records and mastery move with
+        /// play) and after any profile event.
+        /// </summary>
+        event Action<ProgressionIdentity> OnIdentityChanged;
 
         /// <summary>A round's Grain was written to the journal. Raised after <see cref="OnProfileChanged"/>.</summary>
         event Action<RoundAward> OnRoundAwarded;
@@ -37,6 +49,27 @@ namespace CluckWars.Progression
         /// subscribed yet when it happens (loading runs at startup).
         /// </summary>
         event Action<ProgressionFault> OnFault;
+
+        /// <summary>
+        /// Rolls a new display name and writes it to the journal. Returns false, changing nothing, when
+        /// the journal is not loaded or the write failed (an <c>Error</c> and <c>OnFault</c> say which).
+        /// </summary>
+        /// <remarks>
+        /// Names are generated, never typed: there is no free-text entry anywhere in the game. The new
+        /// name is never the current one, so the button always visibly does something.
+        /// </remarks>
+        bool TryRerollName();
+
+        /// <summary>
+        /// Wears <paramref name="key"/> in <paramref name="slot"/>, or clears the slot when it is empty.
+        /// Returns false, writing nothing, for a part the player does not own, or when the journal is
+        /// not loaded or the write failed.
+        /// </summary>
+        /// <remarks>
+        /// Written and flushed before <see cref="Identity"/> changes, exactly as a round's award is: a
+        /// nameplate the journal does not back is one the next launch would take away.
+        /// </remarks>
+        bool TrySelectNameplatePart(NameplateSlot slot, string key);
     }
 
     /// <summary>An immutable snapshot of the player's progression totals.</summary>

@@ -26,7 +26,20 @@ namespace CluckWars.Progression
         public static readonly ProgressionLedger Empty = new ProgressionLedger(new Dictionary<string, GrainAward>(StringComparer.Ordinal))
         {
             ConflictingRoundIds = Array.Empty<string>(),
+            EvaluableRounds = Array.Empty<RoundOutcome>(),
         };
+
+        /// <summary>
+        /// The deduplicated, evaluable rounds in the ledger's canonical order — the same walk that
+        /// produced every figure below.
+        /// </summary>
+        /// <remarks>
+        /// Records, mastery and the career summary are pure functions of exactly this list
+        /// (<see cref="IdentityFold"/>), which is what makes a career total and the matching
+        /// <c>ProgressionProfile</c> total the same number by construction rather than by agreement.
+        /// The outcomes are the ones the journal lines read back as, so they are never mutated.
+        /// </remarks>
+        public IReadOnlyList<RoundOutcome> EvaluableRounds { get; private set; } = Array.Empty<RoundOutcome>();
 
         /// <summary>Sum of every evaluable round's Grain.</summary>
         public long GrainBalance { get; private set; }
@@ -68,6 +81,7 @@ namespace CluckWars.Progression
             if (records == null)
             {
                 ledger.ConflictingRoundIds = Array.Empty<string>();
+                ledger.EvaluableRounds = Array.Empty<RoundOutcome>();
                 return ledger;
             }
 
@@ -121,6 +135,7 @@ namespace CluckWars.Progression
             //    day stamped on the round when it has one (so a later zone change cannot move it), else
             //    the day of its instant in `zone` (lines written before the stamp existed).
             var roundsPerDay = new Dictionary<DateTime, int>();
+            var evaluable = new List<RoundOutcome>(ordered.Count);
             foreach (var (utc, record) in ordered)
             {
                 var outcome = record.Outcome;
@@ -136,6 +151,7 @@ namespace CluckWars.Progression
                 }
 
                 roundsPerDay[day] = prior + 1;
+                evaluable.Add(outcome);
                 ledger.GrainBalance += award.Grain;
                 ledger.RoundsPlayed++;
                 if (outcome.Placement == 1) ledger.Wins++;
@@ -143,6 +159,7 @@ namespace CluckWars.Progression
                 ledger.TotalStolen += outcome.StolenTotal;
             }
 
+            ledger.EvaluableRounds = evaluable;
             return ledger;
         }
     }
