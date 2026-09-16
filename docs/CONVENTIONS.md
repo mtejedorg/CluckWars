@@ -221,8 +221,13 @@ Settled 2026-09-11 (progression slice 1). Gameplay *announces* what happened in 
   journal and service), `UI/` and `Editor/`. Every other folder, including a new one, is scanned, and the
   sweep is default-deny: every new progression type is automatically off-limits to gameplay.
 - **`UI/` has its own, slightly wider list:** the contract surface plus `IProgressionService`,
-  `ProgressionProfile`, `RoundAward`, `ProgressionFault` and `ProgressionFaultKind` — the read side of the
-  service. UI never names `MatchTracker`, `ProgressionService` (the concrete type) or any other
+  `ProgressionProfile`, `RoundAward`, `ProgressionFault`, `ProgressionFaultKind`, `ProgressionIdentity`
+  and `NameplateSlot` (progression slice 3) — the read side of the service. Every display model the UI
+  actually reads (nameplate, per-role mastery, a record's standing, the banner catalogue, the career
+  summary) is a type **nested inside** `ProgressionIdentity`, which is why slice 3's read surface grew
+  by only those two names rather than one per view — the boundary scan only ever sees top-level types.
+  UI never names `MatchTracker`, `ProgressionService` (the concrete type), `RecordDefinitionSO`,
+  `RecordEngine`, `IdentityFold`, `NameplateComposer`, `NameGenerator`, `ProfileEvent` or any other
   progression type; the same default-deny sweep enforces it.
 - **Progression speaks generically.** Code in `Progression/` says actor/resource/round/ability key,
   never food/chicken/cluck, and imports no gameplay namespace. `UnlockKeyTable` is the one
@@ -269,20 +274,28 @@ binding resolves to the guard wrapping the `MatchTracker` the `ProgressionServic
 
 ### Progression persistence
 
-Settled 2026-09-13 (progression slice 2). The rules for anything that writes or reads the
-progression journal.
+Settled 2026-09-13 (progression slice 2); extended 2026-09-15 (slice 3, two-kinds-of-line). The rules
+for anything that writes or reads the progression journal.
 
-- **JSON Lines via `JsonUtility`.** One `RoundOutcome` per line, UTF-8 without a BOM, at
+- **JSON Lines via `JsonUtility`, two kinds of line, one file.** UTF-8 without a BOM, at
   `persistentDataPath/progression/journal.jsonl`. Append-only. No new package: there is no Cloud Save
-  and no Newtonsoft in the project. `RoundOutcome` stays `JsonUtility`-shaped (`[Serializable]`,
-  public fields, arrays not dictionaries): anything `JsonUtility` cannot see vanishes silently.
+  and no Newtonsoft in the project. A line is either a `RoundOutcome` — **no `Kind` field at all**, so
+  every line slice 2 ever wrote still reads back byte-identical — or a `ProfileEvent`, which carries
+  `"Kind":"profile"`. `JournalStore` reads a small `{Kind}` envelope first and dispatches; a non-empty
+  `Kind` this build does not recognize is one skipped, reported line, never fatal — a downgraded build
+  must survive a newer build's lines. Both types stay `JsonUtility`-shaped (`[Serializable]`, public
+  fields, arrays not dictionaries): anything `JsonUtility` cannot see vanishes silently.
+  `JournalLoadResult.Records` (round outcomes) and `.ProfileEvents` are separate lists, so the round
+  fold's input — and its `NotEvaluable` counting — is exactly what it was before profile lines existed.
 - **One journal per process.** The `-progressionDir <path>` command-line switch
   (`ProjectInstaller.ResolveProgressionDirectory`, resolved at install, no I/O) moves the journal;
   `tools/run-clients.ps1` gives each local client `Builds/Windows/progression/clientN`, so test rounds
   never reach the real journal and two processes never append to one file.
 - **Memory equals disk.** `JournalStore.Append` serializes the outcome once, writes exactly that string,
   and returns the record parsed back from it; the service folds that record, never the in-memory
-  object. An outcome that would not read back is refused, not written.
+  object. An outcome that would not read back is refused, not written. `Append(ProfileEvent)` (slice 3)
+  is the same method under a different overload — same refuse-if-unreadable guard, same
+  parsed-back-and-returned result, same newline handling.
 - **Every record starts on its own line.** Before writing, `Append` adds a newline if the file does not
   end with one, so a partial line from an earlier failed append stays one malformed line instead of
   swallowing the next round.
@@ -306,7 +319,10 @@ progression journal.
   spend Grain must journal spending as facts of its own.
 - **Write before show.** A round's line is appended and flushed to disk *before* `OnProfileChanged`,
   `OnRoundAwarded` or `LatestAward` can describe it. A failed write is an `Error` + `OnFault`, no award
-  and no balance change. Nothing may show a number the journal does not back.
+  and no balance change. Nothing may show a number the journal does not back. The same rule governs
+  every profile event (slice 3): `TryRerollName` / `TrySelectNameplatePart` append and flush the
+  `ProfileEvent` *before* `Identity` refolds and `OnIdentityChanged` raises; a failed write is
+  `Error` + `OnFault(WriteFailed)`, returns `false`, and `Identity` is untouched.
 - **A round that cannot be evaluated is still journaled** (it is facts; a config fix credits it on a
   later load) but earns nothing and counts toward no total; it is reported as a `Warn` + `OnFault`.
 - **Recover, never lose.** A torn final line that is a complete record gets its newline written; any

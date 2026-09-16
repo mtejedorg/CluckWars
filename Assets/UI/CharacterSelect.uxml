@@ -15,6 +15,7 @@
 
          Sizes follow the MOBILE SIZING CONTRACT at the top of CluckWarsTheme.uss. -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
+    <ui:Style src="project://database/Assets/UI/Styles/Profile.uss" />
 
     <ui:VisualElement name="CharacterSelectPage" class="cw-screen cw-page">
         <ui:VisualElement class="cw-page-header">
