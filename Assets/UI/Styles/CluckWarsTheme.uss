@@ -144,6 +144,22 @@
    #fef5e0 over the brown face drops under 4.5:1. Dim the face, keep the label. */
 .cw-btn:disabled { opacity: 1; -unity-background-image-tint-color: rgb(96, 76, 52); color: rgb(188, 172, 148); }
 
+/* Focus ring — D-pad/keyboard navigation must have a visible indicator that
+   is not color alone (same accessibility rule as every selected/picked state
+   in this file). A bright border that appears only on focus is additive: none
+   of these classes show a border normally (.cw-btn's is baked into its atom,
+   0-width by default; the new Step 1/2 controls are borderless or tan by
+   default), so this never fights their resting look. Added alongside the new
+   Step 1/2 controls (.cw-slot-box, .cw-spec-pill) that introduced this file's
+   first Buttons the player can reach by D-pad without a mouse hovering them
+   first; extended to the shared .cw-btn/.cw-home-btn atoms too since they had
+   no focus indicator at all before this pass. */
+.cw-btn:focus, .cw-home-btn:focus, .cw-slot-box:focus, .cw-spec-pill:focus {
+    border-left-width: 5px; border-right-width: 5px; border-top-width: 5px; border-bottom-width: 5px;
+    border-left-color: rgb(254, 245, 224); border-right-color: rgb(254, 245, 224);
+    border-top-color: rgb(254, 245, 224); border-bottom-color: rgb(254, 245, 224);
+}
+
 /* Home/back button — absolutely placed at a header's top-left, leaves the
    centered ribbon undisturbed. */
 .cw-home-btn {
@@ -264,12 +280,17 @@
     color: rgba(196, 160, 96, 0.45);
 }
 
-/* ---- Class chip ----------------------------------------------------------- */
-/* One of only four, and the primary decision on the screen — sized as a big
-   card (142 px ~= 60 dp tall) rather than a list row. */
+/* ---- Class chip (Step 1 "Choose Your Chicken" card) ----------------------- */
+/* One of only four, and the primary decision in the flow — 2026-09 split grew
+   this from a flat 142px list row into a column card: it now also carries the
+   pre-filled-slot tag and both specialization pills (one-tap class+spec select,
+   Maestro's requirement), so it needs the vertical room. .cw-class-chip is
+   scoped to Assets/UI/CharacterSelectClass.uxml only as of this split — the old
+   Step-2 ClassList that shared this class is gone (see CharacterSelect.uxml) —
+   so resizing it here does not touch the loadout screen. */
 .cw-class-chip {
-    flex-direction: row; align-items: center;
-    min-height: 142px;
+    flex-direction: column; align-items: stretch;
+    min-height: 210px;
     background-color: rgb(58, 40, 22);
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/GlossOverlay.png");
     -unity-background-scale-mode: stretch-to-fill;
@@ -279,13 +300,20 @@
     border-top-left-radius: 16px; border-top-right-radius: 16px;
     border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;
     padding-top: 12px; padding-bottom: 12px; padding-left: 16px; padding-right: 16px;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
     transition-property: scale; transition-duration: 0.12s;
 }
-.cw-class-chip:hover { scale: 1.02 1.02; }
-.cw-class-chip__art { width: 112px; height: 112px; -unity-background-scale-mode: scale-to-fit; flex-shrink: 0; margin-right: 16px; }
-.cw-class-chip__name { font-size: 44px; white-space: nowrap; -unity-text-align: middle-left; }
-.cw-class-chip__role { font-size: 30px; color: rgb(196, 160, 96); white-space: nowrap; -unity-text-align: middle-left; }
+.cw-class-chip:hover { scale: 1.01 1.01; }
+/* The 4 cards split the classes column's height evenly rather than each taking
+   a fixed px — .layout--landscape .cw-cs-classes below floors the column at
+   470px wide but its height comes from the page, which varies with header/ribbon
+   size, so flex-grow keeps all 4 cards equal and full-height instead of leaving
+   a gap or overflowing by a few px per card. min-height above is the floor. */
+.layout--landscape .cw-cs-classes .cw-class-chip { flex-grow: 1; flex-basis: 0; }
+.cw-class-chip__toprow { flex-direction: row; align-items: center; margin-bottom: 10px; }
+.cw-class-chip__art { width: 76px; height: 76px; -unity-background-scale-mode: scale-to-fit; flex-shrink: 0; margin-right: 14px; }
+.cw-class-chip__name { font-size: 36px; white-space: nowrap; -unity-text-align: middle-left; }
+.cw-class-chip__role { font-size: 26px; color: rgb(196, 160, 96); white-space: nowrap; -unity-text-align: middle-left; }
 .cw-slot-pill {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
     font-size: 30px;
@@ -295,6 +323,108 @@
     background-color: rgba(0, 0, 0, 0.4);
     color: rgb(196, 160, 96);
 }
+
+/* Pre-filled-slot badge. NOT wired by MenuUiController — no query for it exists
+   anywhere in the controller — so its text is hardcoded per class directly in
+   CharacterSelectClass.uxml (present on Warrior/Speedy/Fatty, omitted on
+   Assassin per Peck.asset's AllowedClasses). Phrasing is deliberately explicit
+   that it COSTS a slot ("1 SLOT: PECK"), not a free bonus — a player who reads
+   this as a bonus and then finds only 3 slots left to fill has been misled. */
+.cw-prefilled-tag {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 24px; letter-spacing: 0.5px;
+    flex-shrink: 0;
+    padding-top: 6px; padding-bottom: 6px; padding-left: 14px; padding-right: 14px;
+    border-top-left-radius: 10px; border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+    background-color: rgba(245, 200, 66, 0.16);
+    color: rgb(245, 200, 66);
+    -unity-text-align: middle-center; white-space: nowrap;
+}
+
+/* ---- Specialization pills (Step 1) -----------------------------------------
+   SpecOptA/SpecOptB. Directly tappable — Maestro's explicit requirement was
+   one tap selects class AND specialization together, never a two-step
+   "select the card, then pick a passive" flow (see
+   MenuUiController.BindSpecPill/SelectClassAndPassive). Effect text is shown
+   ALWAYS, not revealed only after selection — that visibility is the entire
+   point of moving specializations onto the card instead of a name-only pill
+   the old PassiveOptionRow used. min-height matches the 48dp touch floor like
+   every other tappable control in this file, because this is a Button, not
+   decoration. */
+.cw-spec-pill-row { flex-direction: row; align-items: stretch; flex-grow: 1; }
+.cw-spec-pill {
+    flex-grow: 1; flex-basis: 0;
+    min-height: 116px;
+    align-items: flex-start; justify-content: center;
+    background-color: rgb(48, 32, 17);
+    background-image: none;                 /* Button atoms default to ButtonGrayscale — this is a card, not a pill button */
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
+    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
+    border-top-left-radius: 14px; border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
+    padding-top: 8px; padding-bottom: 8px; padding-left: 14px; padding-right: 14px;
+    margin-right: 5px; margin-left: 5px;
+    transition-property: scale; transition-duration: 0.1s;
+}
+.cw-spec-pill:hover { scale: 1.02 1.02; }
+.cw-spec-pill:active { scale: 0.98 0.98; }
+/* Selected state must not be color-only (deuteranope guard, same rule as
+   .cw-ability-card--picked below): scale + a widened border together, not a
+   bare color swap. */
+.cw-spec-pill--selected {
+    scale: 1.03 1.03;
+    background-color: rgba(245, 200, 66, 0.18);
+    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
+    border-left-color: rgb(245, 200, 66); border-right-color: rgb(245, 200, 66);
+    border-top-color: rgb(245, 200, 66); border-bottom-color: rgb(245, 200, 66);
+}
+.cw-spec-pill__name {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 28px; letter-spacing: 1px; color: rgb(254, 245, 224);
+    white-space: nowrap;
+}
+/* The effect line — 30px, the caption floor, not the 34px reading floor: two
+   pills side by side in a 470px column leaves ~205px of width each, and this
+   text is genuinely informative (it is the whole reason the brief asked for
+   "more info in the card"), so it gets the bigger of the two secondary sizes
+   this file uses elsewhere (.cw-pick-row__hint, .cw-stat-label) rather than
+   the 24-26px tertiary size .cw-cat-tag/.cw-cd-badge use. */
+.cw-spec-pill__desc {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 30px; color: rgb(196, 160, 96);
+    white-space: normal; margin-top: 4px; flex-shrink: 1;
+}
+.cw-spec-pill__signature {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 24px; letter-spacing: 0.5px; color: rgb(245, 200, 66);
+    white-space: normal; margin-top: 4px;
+}
+
+/* ---- Strong/weak role callouts (Step 1 preview panel) ---------------------
+   Replaces the old numeric CARGO/RATE/SPEED stat-pip grid — Maestro rejected
+   showing a fake numeric stat since nothing like it survived the GDD §2 combat
+   rewrite (see MenuUiController.RefreshRoleCallouts). The label text itself
+   ("STRONG: …" / "WEAK: …") is computed and written by the controller; the
+   "+"/"−" glyphs beside each line are static siblings the controller never
+   touches, so the strong/weak read never depends on color alone even though
+   the controller doesn't split its own string into a separate colored prefix. */
+.cw-role-list { width: 100%; margin-top: 4px; }
+.cw-role-row { flex-direction: row; align-items: center; margin-bottom: 8px; }
+.cw-role-glyph {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 34px; width: 40px; flex-shrink: 0;
+    -unity-text-align: middle-center; margin-right: 8px;
+}
+.cw-role-glyph--pos { color: rgb(124, 217, 154); }
+.cw-role-glyph--neg { color: rgb(232, 118, 108); }
+.cw-role-callout {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 32px; white-space: normal; flex-shrink: 1;
+}
+.cw-role-callout--strong { color: rgb(124, 217, 154); }
+.cw-role-callout--weak   { color: rgb(232, 118, 108); }
 
 /* ---- Chicken preview ------------------------------------------------------ */
 /* Class figures are the Stage-0 design-exported sprites (Assets/_Game/Art/UI/
@@ -368,6 +498,52 @@
     font-size: 30px; letter-spacing: 1px; color: rgb(196, 160, 96); -unity-text-align: middle-center;
 }
 
+/* ---- Loadout slot boxes (Step 2, 2026-09 rework) ---------------------------
+   #SlotBox0-3, one per active-ability slot — v0.7 made this uniform (4 slots
+   for every class; COMBO no longer grants Assassin a 3rd). Replaces the old
+   .cw-hex slot row: same job (show what is equipped and which slot the next
+   tap acts on) but square, in a plain left-to-right row, and — unlike the hex,
+   which only ever showed empty/filled — carrying a third ARMED state for the
+   slot-arming machine (MenuUiController._armedSlot).
+
+   Deliberately EMPTY of any base look here beyond size/shape: border color and
+   background color for both the empty and filled states are set directly in
+   C# (RefreshSlotBoxes -> SetBorder/style.backgroundColor), same pattern
+   .cw-ability-card already uses for its picked state, so this class only needs
+   to zero out the runtime Button's default chrome and hold the shape/spacing. */
+.cw-slot-box-row { flex-direction: row; align-items: center; margin-bottom: 16px; flex-shrink: 0; }
+.cw-slot-box {
+    flex-grow: 1; flex-basis: 0;
+    min-height: 150px;                        /* comfortably over the 116px/48dp floor */
+    align-items: center; justify-content: center;
+    background-color: rgba(0, 0, 0, 0);       /* clear the default runtime-Button grey, see .cw-btn */
+    background-image: none;
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-top-left-radius: 14px; border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
+    margin-left: 6px; margin-right: 6px;
+    padding-top: 8px; padding-bottom: 8px; padding-left: 6px; padding-right: 6px;
+    transition-property: scale, border-left-width, border-right-width, border-top-width, border-bottom-width;
+    transition-duration: 0.12s;
+}
+/* Empty is dimmed, not just differently bordered — a slot with nothing in it
+   should read as visually quieter than one that is filled, on top of the
+   "EMPTY" label RefreshSlotBoxes adds as the non-color-only cue. */
+.cw-slot-box--empty { opacity: 0.75; }
+.cw-slot-box__empty-label {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 26px; letter-spacing: 1px; color: rgb(196, 160, 96);
+}
+/* Armed = the slot the next ability-card tap will act on. A border-width bump
+   plus a scale bump, not a color swap alone — this box's border color is
+   already whatever SetBorder set it to (accent or neutral tan), so ARMED has
+   to read through shape/size, exactly like .cw-ability-card--picked's scale
+   bump reads through shape rather than relying on its own accent border. */
+.cw-slot-box--armed {
+    scale: 1.05 1.05;
+    border-left-width: 6px; border-right-width: 6px; border-top-width: 6px; border-bottom-width: 6px;
+}
+
 /* ============================================================================
    LOADOUT PICK ROWS  (replaced the scrolling categorized ability grid)
    ----------------------------------------------------------------------------
@@ -405,8 +581,9 @@
    not shrinking the cards below a thumb-sized target. */
 .cw-pick-scroll { flex-grow: 1; min-height: 0; }
 
-/* The rows wrap; they must never scroll sideways. A horizontal scroller here
-   would also steal the drag that the vertical one needs. */
+/* The OUTER scroll (wraps CommonRow + ClassRow together) must only ever scroll
+   vertically — a horizontal scroller here would fight the drag the new INNER
+   horizontal scrollers (.cw-pick-scroll--h below) need for their own cards. */
 .cw-pick-scroll .unity-scroll-view__horizontal-scroller { display: none; }
 .cw-pick-scroll .unity-scroll-view__content-viewport { overflow: hidden; }
 
@@ -416,6 +593,24 @@
    character; Unity's default vertical scroller is ~13px plus its own margins,
    so this is that plus a little air. */
 .cw-pick-scroll .unity-scroll-view__content-container { padding-right: 20px; }
+
+/* ---- INNER horizontal scroller (2026-09 rework) ---------------------------
+   #CommonScroll / #ClassScroll — one per pick row, wraps #CommonCards /
+   #ClassCards. This is the actual fix for the documented overlap bug (see
+   .cw-pick-cards below): the old fix was a wrapping flex grid inside a
+   VERTICAL scroller, which worked for 3-card pools but broke again the moment
+   a pool got wide enough to wrap into a second row (Assassin's 6-card CLASS
+   pool, then the 8-11 widened pools of commit 21ddaa8) — a wrapped row can
+   always paint into whatever sits below it if the column runs out of height
+   first. A row that scrolls SIDEWAYS instead has no such case: it can hold an
+   arbitrary number of cards at their full touch-target size without ever
+   growing taller than one row. */
+.cw-pick-scroll--h { flex-shrink: 0; }
+.cw-pick-scroll--h .unity-scroll-view__vertical-scroller { display: none; }
+.cw-pick-scroll--h .unity-scroll-view__content-viewport { overflow: hidden; }
+/* Room for the horizontal scroller under the cards, mirroring the vertical
+   scroller's own right-padding above — same measurement, rotated 90°. */
+.cw-pick-scroll--h .unity-scroll-view__content-container { padding-bottom: 18px; }
 
 .cw-pick-row { margin-bottom: 18px; }
 .cw-pick-row__head { flex-direction: row; align-items: center; margin-bottom: 10px; }
@@ -434,17 +629,25 @@
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
     font-size: 30px; color: rgb(254, 245, 224); white-space: nowrap;
 }
-/* Exactly three cards per row; space-between spreads them without per-card
-   margins (USS has no :last-child to strip a trailing margin). */
-/* flex-wrap is load-bearing: the Assassin's CLASS pool is 6 cards (Doppelganger,
-   Invisibility, Sneaky Steal, Ambush, Shadowstep, Mark/Kill). At width:32% they
-   overflow a single non-wrapping row and the nowrap names collapse into each
-   other ("DOPPELGANGANVISIBILI…"). Wrapping flows 6 cards into 2 rows of 3;
-   classes with 3 stay on one row. row-gap spaces the wrapped rows. */
-.cw-pick-cards { flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
+/* Row that scrolls sideways instead of wrapping — see the .cw-pick-scroll--h
+   comment above for why. flex-wrap: nowrap here is the other half of that fix:
+   this class used to be width:32% + flex-wrap:wrap (see git history), which is
+   exactly the layout that let Assassin's 6-card CLASS pool (Doppelganger,
+   Invisibility, Sneaky Steal, Ambush, Shadowstep, Mark/Kill) — and later the
+   8-11 card pools of commit 21ddaa8 — overflow the column and paint over
+   whatever sat below it. justify-content: flex-start, not space-between: a
+   scrolling row must not stretch its gaps to fill the viewport, or a 2-card
+   pool would render one card at each edge with a canyon between them. */
+.cw-pick-cards { flex-direction: row; flex-wrap: nowrap; justify-content: flex-start; }
 
+/* Fixed width + flex-shrink: 0, not the old width:32% — a percentage width
+   inside a ScrollView's content container sizes against the SCROLLED content
+   width (which has no fixed bound), not the visible viewport, so it no longer
+   means anything useful once .cw-pick-cards stopped wrapping. This class is
+   scoped to #CommonCards/#ClassCards only (MenuUiController.MakeAbilityCard is
+   its only producer), so widening it here cannot affect anything else. */
 .cw-ability-card {
-    width: 32%; min-height: 128px; margin-bottom: 8px;
+    width: 300px; min-height: 128px; flex-shrink: 0; margin-right: 16px;
     align-items: center; justify-content: flex-start;
     padding-top: 10px; padding-bottom: 10px; padding-left: 8px; padding-right: 8px;
     background-color: rgb(48, 32, 17);
@@ -881,11 +1084,16 @@
 
 .layout--portrait  .cw-cs-classes { flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
 .layout--portrait  .cw-cs-classes .cw-class-chip { width: 49%; }
-/* Landscape = the v3 design's 3-column layout (class list + preview are
-   fixed-width, the loadout fills the rest). Column widths are the mobile-scaled
-   originals: the 1920x1080 canvas IS the phone, so these are physical budgets,
-   not desktop ones. 470 (classes) + 430 + 36 (preview + margins) + 48 (page
-   padding) leaves ~936 for the pick rows — 3 cards at ~291 px (124 dp) each. */
+/* .cw-cs-body/.cw-cs-classes/.cw-cs-preview were the v3 design's 3-column
+   single-screen layout (class list + preview fixed-width, loadout fills the
+   rest). The 2026-09 class/loadout split retired the 3rd column: these three
+   classes now belong to Step 1 (Assets/UI/CharacterSelectClass.uxml) only —
+   classes + preview, 2 columns — while Step 2 (this file) uses `.cw-cs-detail`
+   standalone below, with no `.cw-cs-body` row wrapping it at all, and gets the
+   width the old loadout column never had (previously ~936px after the other
+   two columns and page padding; now up to ~1872px, which is exactly why its
+   pick-row cards could move from width:32%-and-wrap to a fixed 300px scroll —
+   see .cw-ability-card in the LOADOUT PICK ROWS section). */
 .layout--landscape .cw-cs-body { width: 100%; max-width: 1920px; margin-left: auto; margin-right: auto; }
 .layout--landscape .cw-cs-classes { flex-direction: column; width: 470px; flex-shrink: 0; }
 .layout--landscape .cw-cs-classes .cw-class-chip { width: auto; }
@@ -893,15 +1101,16 @@
 .layout--landscape .cw-cs-preview { width: 430px; flex-shrink: 0; margin-left: 18px; margin-right: 18px; }
 .layout--portrait  .cw-cs-preview { width: 100%; margin-top: 14px; }
 
-/* `min-height: 0` for the same reason as `.cw-pick-scroll`, one level up. In
-   landscape this column is a CROSS-axis item so its height comes from the row's
-   stretch and content-based auto-min-height never applies — which is why the
-   ScrollView fix alone was enough for the layout that was tested. In portrait
-   `.cw-cs-body` flips to a column and this becomes a MAIN-axis item, where
-   `min-height: auto` resolves to content height and the same overflow-onto-the-
-   sibling-below bug can resurface against AbilityDetail / ReadyBtn. The app is
-   landscape-locked today (`allowedAutorotateToPortrait: 0`), so this is a guard
-   rather than a live fix — but it is one line and removes the open question. */
+/* `min-height: 0` for the same reason as `.cw-pick-scroll`, one level up.
+   Unlike .cw-cs-preview above, `.cw-cs-detail` is no longer ever a CROSS-axis
+   item — since the split it is Step 2's ENTIRE body, with no `.cw-cs-body` row
+   wrapping it in either orientation, so it is always a MAIN-axis (vertical)
+   column item and `min-height: auto` would always resolve to content height.
+   This line is what lets #PickScroll actually shrink to the space left after
+   the slot-box row, AbilityDetail, the option rows and READY, instead of
+   overflowing onto them — not just a landscape/portrait guard the way it was
+   before the split, when this column only ever hit the MAIN-axis case in the
+   portrait mode the app doesn't ship. */
 .cw-cs-detail { flex-grow: 1; min-width: 0; min-height: 0; }
 
 /* The display-option row is landscape-only, and that is a measurement, not taste.

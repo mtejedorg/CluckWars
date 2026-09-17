@@ -1,0 +1,212 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <!-- Cluck Wars — character select STEP 1 "Choose Your Chicken" (2026-09 split).
+
+         Character select used to be one screen: class pick + passive fork + stat
+         preview + two ability pick rows + detail strip + toggles + ready button,
+         all fighting for the same ~1080px of vertical space. It is now two
+         screens — this one decides WHO (class + specialization), the reworked
+         Assets/UI/CharacterSelect.uxml decides WHAT (the four ability slots).
+
+         Binding contract (MenuUiController.BuildClassSelect/RefreshClassSelect —
+         read that method before changing names here, it queries by these exact
+         names/classes):
+           - HomeBtn, NextBtn                                    (page-level)
+           - ClassWarrior / ClassSpeedy / ClassFatty / ClassAssassin  (chip roots,
+             matches the ChipNames array — do not rename)
+           - <ChipName>Art (e.g. ClassWarriorArt)                (per chip)
+           - SpecOptA / SpecOptB per chip, each carrying children found by
+             CLASS NAME (not element name, since the pair repeats per chip):
+             .cw-spec-pill__name / .cw-spec-pill__desc / .cw-spec-pill__signature
+           - PreviewChicken, PreviewGlow, PreviewDisc, PreviewName, PreviewQuote,
+             RoleCalloutStrong, RoleCalloutWeak                   (page-level, ONE
+             each — this is a single shared preview panel that repaints for
+             whichever class is currently selected, same idea as the old Column B,
+             not a per-card duplicate)
+
+         Deliberate deviation from the original UI-build task brief: the brief
+         asked for the strong/weak callout to live INSIDE each of the four cards.
+         The controller that ships alongside this file (already written — see the
+         header comment on MenuUiController.cs) queries RoleCalloutStrong/Weak as
+         ONE global pair and repaints it from Meta[cls].Stats on selection, mirroring
+         the single preview panel the old 3-column screen used. Four duplicate-named
+         copies would only let the FIRST one in document order ever update (UQuery-
+         by-name returns the first match), leaving the other three permanently wrong.
+         So this file keeps one shared preview column instead — see #Preview below.
+         Same reasoning killed the per-class narrative strong/weak copy the brief
+         asked for: RefreshRoleCallouts overwrites RoleCalloutStrong/Weak with a
+         computed "STRONG: CARGO/RATE"-style string, not narrative prose, so any
+         flavor text authored here would be replaced before a player ever sees it.
+         The "+"/"−" glyphs the brief wanted ARE preserved despite that: they are
+         static siblings the controller never touches (see .cw-role-glyph below),
+         not part of the label the controller overwrites.
+
+         PreFilledTag is NOT wired by the controller at all (no query for it
+         anywhere in MenuUiController) — it is deliberately hardcoded per chip
+         here. Peck.asset AllowedClasses=7 (Warrior|Speedy|Fatty, see
+         AbilityBaseSO.ChickenClassFlags), so Warrior/Speedy/Fatty carry the tag
+         and Assassin does not — verified against the asset, not assumed from the
+         class flavor text.
+
+         Sizes follow the MOBILE SIZING CONTRACT at the top of CluckWarsTheme.uss. -->
+    <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
+
+    <ui:VisualElement name="CharacterSelectClassPage" class="cw-screen cw-page">
+
+        <!-- Header ribbon (+ home button, absolutely placed top-left) — same
+             pattern as the old single-screen CharacterSelect.uxml. -->
+        <ui:VisualElement style="align-items: center; justify-content: center; padding-top: 20px; padding-bottom: 12px; flex-shrink: 0;">
+            <ui:Button name="HomeBtn" text="◀ HOME" class="cw-home-btn" />
+            <ui:VisualElement class="cw-ribbon">
+                <ui:Label text="CHOOSE YOUR CHICKEN" class="cw-title" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Body: classes list (left) + shared preview panel (right). Reuses the
+             .cw-cs-body/.cw-cs-classes/.cw-cs-preview responsive classes that the
+             OLD CharacterSelect.uxml owned — that file dropped its class list and
+             preview column in the Step-2 rework below, so this screen inherits
+             them clean rather than inventing parallel layout classes. -->
+        <ui:VisualElement name="Body" class="cw-cs-body" style="padding-left: 24px; padding-right: 24px; padding-bottom: 8px;">
+
+            <ui:VisualElement name="ClassList" class="cw-cs-classes">
+
+                <ui:VisualElement name="ClassWarrior" class="cw-class-chip">
+                    <ui:VisualElement class="cw-class-chip__toprow">
+                        <ui:VisualElement name="ClassWarriorArt" class="cw-class-chip__art" />
+                        <ui:VisualElement style="flex-grow: 1; min-width: 0;">
+                            <ui:Label text="WARRIOR" class="cw-class-chip__name" />
+                            <ui:Label text="All-Rounder" class="cw-class-chip__role" />
+                        </ui:VisualElement>
+                        <ui:Label name="PreFilledTag" text="1 SLOT: PECK" class="cw-prefilled-tag" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="cw-spec-pill-row">
+                        <ui:Button name="SpecOptA" class="cw-spec-pill">
+                            <ui:Label text="SPEC A" class="cw-spec-pill__name" />
+                            <ui:Label text="Effect shown here." class="cw-spec-pill__desc" />
+                            <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
+                        </ui:Button>
+                        <ui:Button name="SpecOptB" class="cw-spec-pill">
+                            <ui:Label text="SPEC B" class="cw-spec-pill__name" />
+                            <ui:Label text="Effect shown here." class="cw-spec-pill__desc" />
+                            <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
+                        </ui:Button>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <ui:VisualElement name="ClassSpeedy" class="cw-class-chip">
+                    <ui:VisualElement class="cw-class-chip__toprow">
+                        <ui:VisualElement name="ClassSpeedyArt" class="cw-class-chip__art" />
+                        <ui:VisualElement style="flex-grow: 1; min-width: 0;">
+                            <ui:Label text="SPEEDY" class="cw-class-chip__name" />
+                            <ui:Label text="Hit &amp; Run" class="cw-class-chip__role" />
+                        </ui:VisualElement>
+                        <ui:Label name="PreFilledTag" text="1 SLOT: PECK" class="cw-prefilled-tag" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="cw-spec-pill-row">
+                        <ui:Button name="SpecOptA" class="cw-spec-pill">
+                            <ui:Label text="SPEC A" class="cw-spec-pill__name" />
+                            <ui:Label text="Effect shown here." class="cw-spec-pill__desc" />
+                            <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
+                        </ui:Button>
+                        <ui:Button name="SpecOptB" class="cw-spec-pill">
+                            <ui:Label text="SPEC B" class="cw-spec-pill__name" />
+                            <ui:Label text="Effect shown here." class="cw-spec-pill__desc" />
+                            <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
+                        </ui:Button>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <ui:VisualElement name="ClassFatty" class="cw-class-chip">
+                    <ui:VisualElement class="cw-class-chip__toprow">
+                        <ui:VisualElement name="ClassFattyArt" class="cw-class-chip__art" />
+                        <ui:VisualElement style="flex-grow: 1; min-width: 0;">
+                            <ui:Label text="FATTY" class="cw-class-chip__name" />
+                            <ui:Label text="Bulk Carrier" class="cw-class-chip__role" />
+                        </ui:VisualElement>
+                        <ui:Label name="PreFilledTag" text="1 SLOT: PECK" class="cw-prefilled-tag" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="cw-spec-pill-row">
+                        <ui:Button name="SpecOptA" class="cw-spec-pill">
+                            <ui:Label text="SPEC A" class="cw-spec-pill__name" />
+                            <ui:Label text="Effect shown here." class="cw-spec-pill__desc" />
+                            <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
+                        </ui:Button>
+                        <ui:Button name="SpecOptB" class="cw-spec-pill">
+                            <ui:Label text="SPEC B" class="cw-spec-pill__name" />
+                            <ui:Label text="Effect shown here." class="cw-spec-pill__desc" />
+                            <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
+                        </ui:Button>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- No PreFilledTag: Peck.asset AllowedClasses (7 = Warrior|Speedy|Fatty)
+                     excludes Assassin — it cannot forage, so there is nothing to flag. -->
+                <ui:VisualElement name="ClassAssassin" class="cw-class-chip">
+                    <ui:VisualElement class="cw-class-chip__toprow">
+                        <ui:VisualElement name="ClassAssassinArt" class="cw-class-chip__art" />
+                        <ui:VisualElement style="flex-grow: 1; min-width: 0;">
+                            <ui:Label text="ASSASSIN" class="cw-class-chip__name" />
+                            <ui:Label text="Disruptor" class="cw-class-chip__role" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="cw-spec-pill-row">
+                        <ui:Button name="SpecOptA" class="cw-spec-pill">
+                            <ui:Label text="SPEC A" class="cw-spec-pill__name" />
+                            <ui:Label text="Effect shown here." class="cw-spec-pill__desc" />
+                            <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
+                        </ui:Button>
+                        <ui:Button name="SpecOptB" class="cw-spec-pill">
+                            <ui:Label text="SPEC B" class="cw-spec-pill__name" />
+                            <ui:Label text="Effect shown here." class="cw-spec-pill__desc" />
+                            <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
+                        </ui:Button>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+            </ui:VisualElement>
+
+            <!-- Shared preview: chicken art + name/quote + strong/weak callouts for
+                 whichever class is currently selected. Same atoms as the old Column B
+                 (PreviewGlow/PreviewDisc/PreviewChicken/PreviewName/PreviewQuote);
+                 PassiveOptionRow and the numeric stat-pip grid are gone — the
+                 specialization pick moved onto the chip cards (one-tap, see
+                 SpecOptA/B above) and the pips were rejected in favor of a plain
+                 strong/weak read (see RefreshRoleCallouts in MenuUiController.cs;
+                 there is no HP/damage stat left post GDD §2 combat rewrite). -->
+            <ui:VisualElement name="Preview" class="cw-cs-preview" style="align-items: center;">
+                <ui:VisualElement style="width: 100%; height: 280px; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <ui:VisualElement name="PreviewGlow" class="cw-radial-glow" style="width: 330px; height: 330px;" />
+                    <ui:VisualElement name="PreviewDisc" class="cw-preview-disc">
+                        <ui:VisualElement name="PreviewChicken" class="cw-chicken" style="width: 210px; height: 210px;" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <ui:Label name="PreviewName" text="WARRIOR CHICKEN" class="cw-heading" style="font-size: 42px;" />
+                <ui:Label name="PreviewQuote" text="" class="cw-body" style="-unity-font-style: italic; color: rgba(255, 255, 255, 0.72); margin-top: 4px; margin-bottom: 16px; font-size: 30px; -unity-text-align: middle-center;" />
+
+                <ui:VisualElement name="RoleCallouts" class="cw-role-list">
+                    <ui:VisualElement class="cw-role-row">
+                        <ui:Label text="+" class="cw-role-glyph cw-role-glyph--pos" />
+                        <ui:Label name="RoleCalloutStrong" text="STRONG: —" class="cw-role-callout cw-role-callout--strong" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="cw-role-row">
+                        <ui:Label text="−" class="cw-role-glyph cw-role-glyph--neg" />
+                        <ui:Label name="RoleCalloutWeak" text="WEAK: —" class="cw-role-callout cw-role-callout--weak" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+        </ui:VisualElement>
+
+        <!-- NextBtn is intentionally never disabled by USS/UXML here — read
+             MenuUiController.BuildClassSelect's comment on the NextBtn binding:
+             BuildAll always seeds a default SelectedClass before this screen can
+             be shown, so there is no reachable state where Step 1 has nothing
+             chosen. Gating this button would need a controller-side SetEnabled
+             call that the shipped controller deliberately does not make. -->
+        <ui:VisualElement style="align-items: center; padding-top: 4px; padding-bottom: 20px; flex-shrink: 0;">
+            <ui:Button name="NextBtn" text="NEXT: LOADOUT ▶" class="cw-btn cw-btn--gold" style="min-width: 480px; letter-spacing: 2px;" />
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+</ui:UXML>
