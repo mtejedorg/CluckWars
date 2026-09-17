@@ -14,13 +14,23 @@ using Zenject;
 namespace CluckWars.UI
 {
     /// <summary>
-    /// UI Toolkit menu front-end: Main Menu → Character Select → Lobby → Game.
+    /// UI Toolkit menu front-end: Main Menu → Class Select → Loadout → Lobby → Game.
     /// Replaces the procedural-UGUI CharacterSelectController. Visuals live in
     /// Assets/UI/*.uxml + Assets/UI/Styles/CluckWarsTheme.uss; this controller
     /// only binds data and drives navigation. All selections are written back to
     /// <see cref="ISessionSelectionService"/> exactly as the old controller did,
     /// so the spawner (Game scene) keeps working unchanged.
     /// </summary>
+    /// <remarks>
+    /// Character select used to be one screen (class pick + passive fork + stat
+    /// preview + two ability pick rows + detail strip + toggles + ready button).
+    /// Split 2026-09 into two steps: Class Select (pick class + specialization)
+    /// and Loadout (pick abilities into four explicit slots). The old
+    /// "tap a card, it auto-fills the first open slot, and drops the oldest pick
+    /// when full" behaviour made the in-match button an ability landed on
+    /// unpredictable; it is replaced by an explicit slot-arming state machine
+    /// (see <see cref="_armedSlot"/>) that never compacts.
+    /// </remarks>
     [RequireComponent(typeof(UIDocument))]
     public sealed class MenuUiController : MonoBehaviour
     {
@@ -28,6 +38,10 @@ namespace CluckWars.UI
 
         [Header("Page templates (assigned in scene)")]
         [SerializeField] private VisualTreeAsset _mainMenuUxml;
+        [SerializeField] private VisualTreeAsset _classSelectUxml;
+        // Field name kept as "_characterSelectUxml" (was the whole old character-select
+        // screen) to avoid re-pointing the scene reference; it now instantiates Step 2
+        // "Loadout" (Assets/UI/CharacterSelect.uxml, reworked in place).
         [SerializeField] private VisualTreeAsset _characterSelectUxml;
         [SerializeField] private VisualTreeAsset _lobbyUxml;
 
@@ -42,11 +56,24 @@ namespace CluckWars.UI
 
         // ---- Runtime state ----------------------------------------------------
         private VisualElement _root;
-        private VisualElement _mainMenu, _charSelect, _lobby;
+        private VisualElement _mainMenu, _classSelect, _loadout, _lobby;
         private bool _isBusy;
 
         private readonly Dictionary<ChickenClass, VisualElement> _classChips = new();
+        // (pill element, the passive it selects) for every SpecOptA/SpecOptB across
+        // all four chips — populated once in BuildClassSelect, used by
+        // RefreshClassSelect to toggle the selected-highlight class.
+        private readonly List<(VisualElement Pill, PassiveAbilitySO Passive)> _specPills = new();
+        // #PreFilledTag per class chip — populated once in BuildClassSelect, repainted by
+        // RefreshPreFilledTags. A dictionary rather than a per-chip Q<Label> lookup on every
+        // refresh, matching the _classChips caching pattern.
+        private readonly Dictionary<ChickenClass, Label> _preFilledTags = new();
         private VisualElement _previewChicken, _previewGlow, _previewDisc;
+        private Label _previewName, _previewQuote;
+        private Label _roleCalloutStrong, _roleCalloutWeak;
+        // .cw-chicken--<class> currently on the big preview figure (for swap).
+        private string _previewChickenClass;
+
         // The two flat pick rows that replaced the slot-hex row + scrolling grid.
         private VisualElement _commonCards, _classCards;
         private Label _commonHint, _commonCount, _classHint, _classCount;
@@ -56,10 +83,14 @@ namespace CluckWars.UI
         private VisualElement _abilityDetail;
         private Label _abilityDetailName, _abilityDetailText;
         private AbilityBaseSO _focusedAbility;
-        private Label _previewName, _previewQuote, _previewDesc;
         private Button _readyBtn;
-        // .cw-chicken--<class> currently on the big preview figure (for swap).
-        private string _previewChickenClass;
+
+        // The four physical slot boxes on the Loadout screen (SlotBox0..3). The
+        // ARMED slot is the one the next ability-card tap will act on — see the
+        // state machine on OnAbilityCardTapped/AutoArmFirstEmpty. Always a valid
+        // index into 0..3 once BuildLoadout has run.
+        private VisualElement[] _slotBoxes = new VisualElement[4];
+        private int _armedSlot;
 
         // Dim neutral tint for an empty ability hex (no equipped accent).
         private static readonly Color HexEmptyTint = new Color(0.45f, 0.38f, 0.28f, 0.7f);
@@ -88,8 +119,27 @@ namespace CluckWars.UI
             [ChickenClass.Assassin] = new ClassMeta { Name = "ASSASSIN CHICKEN", Role = "Disruptor",    Tint = UiGfx.Hex32("7B68EE"), Stats = new[]{2,2,4} },
         };
 
-        private static readonly string[] StatRowNames = { "StatCargo", "StatRate", "StatSpeed" };
-        private static readonly string[] ChipNames    = { "ClassWarrior", "ClassSpeedy", "ClassFatty", "ClassAssassin" };
+        private static readonly string[] ChipNames  = { "ClassWarrior", "ClassSpeedy", "ClassFatty", "ClassAssassin" };
+
+        /// <summary>Authored copy for RoleCalloutStrong/RoleCalloutWeak, narrative-designer pass
+        /// (2026-09-17), cross-checked against <see cref="Meta"/>'s real cargo/rate/speed spread
+        /// so nothing here reads a strength the numbers don't actually back. Replaces the old
+        /// numeric stat-pip row and the placeholder "STRONG: X/Y" computed text — Maestro
+        /// rejected numeric HP/damage-style pips since no such stat exists post GDD §2 combat
+        /// rewrite, and the placeholder wasn't real copy.</summary>
+        private sealed class RoleCallout { public string Strong; public string Weak; }
+        private static readonly Dictionary<ChickenClass, RoleCallout> RoleCallouts = new()
+        {
+            // Warrior — {3,3,3}: flat spread, nothing to call out as strong OR weak, so this
+            // is the one class with a single-line callout instead of a strong/weak pair.
+            [ChickenClass.Warrior]  = new RoleCallout { Strong = "No weak spot. No big edge, either." },
+            // Speedy — {cargo 2, rate 3, speed 5}: fastest, lightest carrier.
+            [ChickenClass.Speedy]   = new RoleCallout { Strong = "Fastest bird in the yard.",       Weak = "Can't carry much at a time." },
+            // Fatty — {cargo 5, rate 5, speed 2}: biggest hauler, slowest mover.
+            [ChickenClass.Fatty]    = new RoleCallout { Strong = "Hauls the most, fastest hands.",  Weak = "Slowest waddle in the coop." },
+            // Assassin — {cargo 2, rate 2, speed 4}: fast, but thin on cargo and hands.
+            [ChickenClass.Assassin] = new RoleCallout { Strong = "Blink and it's gone.",            Weak = "Light load, slow hands." },
+        };
 
         // Ability categories. These used to be section headers in a scrolling
         // grid; with 3 cards per row that produced headers holding one card each,
@@ -167,12 +217,14 @@ namespace CluckWars.UI
             var f = UiGfx.ChunkyFont();
             if (f != null) _root.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(f));
 
-            _mainMenu   = ClonePage(_mainMenuUxml);
-            _charSelect = ClonePage(_characterSelectUxml);
-            _lobby      = ClonePage(_lobbyUxml);
+            _mainMenu    = ClonePage(_mainMenuUxml);
+            _classSelect = ClonePage(_classSelectUxml);
+            _loadout     = ClonePage(_characterSelectUxml);
+            _lobby       = ClonePage(_lobbyUxml);
 
             BuildMainMenu();
-            BuildCharacterSelect();
+            BuildClassSelect();
+            BuildLoadout();
             BuildLobby();
 
             _root.RegisterCallback<GeometryChangedEvent>(OnRootGeometry);
@@ -205,16 +257,27 @@ namespace CluckWars.UI
             _root.EnableInClassList("layout--portrait", !landscape);
         }
 
+        /// <summary>Applies the emoji font to every element tagged .cw-emoji-text under <paramref name="root"/>.</summary>
+        private static void ApplyEmojiFont(VisualElement root)
+        {
+            var ef = UiGfx.EmojiFont();
+            if (ef == null || root == null) return;
+            var emojis = root.Query<Label>(className: "cw-emoji-text").ToList();
+            foreach (var e in emojis) e.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(ef));
+        }
+
         // ---- Navigation -------------------------------------------------------
-        private void ShowMainMenu()        { SetPage(_mainMenu); RefreshDevRow(); }
-        private void ShowCharacterSelect() { SetPage(_charSelect); RefreshCharacterSelect(); }
-        private void ShowLobby()           { SetPage(_lobby); RefreshLobby(); }
+        private void ShowMainMenu()    { SetPage(_mainMenu); RefreshDevRow(); }
+        private void ShowClassSelect() { SetPage(_classSelect); RefreshClassSelect(); }
+        private void ShowLoadout()     { SetPage(_loadout); RefreshLoadout(); }
+        private void ShowLobby()       { SetPage(_lobby); RefreshLobby(); }
 
         private void SetPage(VisualElement page)
         {
-            if (_mainMenu   != null) _mainMenu.style.display   = page == _mainMenu   ? DisplayStyle.Flex : DisplayStyle.None;
-            if (_charSelect != null) _charSelect.style.display = page == _charSelect ? DisplayStyle.Flex : DisplayStyle.None;
-            if (_lobby      != null) _lobby.style.display      = page == _lobby      ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_mainMenu    != null) _mainMenu.style.display    = page == _mainMenu    ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_classSelect != null) _classSelect.style.display = page == _classSelect ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_loadout     != null) _loadout.style.display     = page == _loadout     ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_lobby       != null) _lobby.style.display       = page == _lobby       ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         // ======================================================================
@@ -239,10 +302,9 @@ namespace CluckWars.UI
         /// <remarks>
         /// Called from <see cref="ShowMainMenu"/> rather than once from
         /// <see cref="BuildMainMenu"/>, because the toggle that sets the preference lives on
-        /// the Character Select screen — i.e. the player is always somewhere else when they
-        /// change it. Binding once would mean the button only appeared on the next launch,
-        /// which on a phone is a reinstall-and-relaunch cycle to discover a feature that is
-        /// already there.
+        /// the Loadout screen — i.e. the player is always somewhere else when they change it.
+        /// Binding once would mean the button only appeared on the next launch, which on a
+        /// phone is a reinstall-and-relaunch cycle to discover a feature that is already there.
         /// </remarks>
         private void RefreshDevRow()
         {
@@ -289,155 +351,138 @@ namespace CluckWars.UI
         private void ChooseMode(SessionMode mode)
         {
             if (_selection != null) _selection.Mode = mode;
-            ShowCharacterSelect();
+            ShowClassSelect();
         }
 
         // ======================================================================
-        //  CHARACTER SELECT
+        //  STEP 1 — CLASS SELECT ("Choose Your Chicken")
         // ======================================================================
-        private Button _passiveOpt1, _passiveOpt2;
-
-        private void BuildCharacterSelect()
+        private void BuildClassSelect()
         {
             _classChips.Clear();
+            _specPills.Clear();
+            _preFilledTags.Clear();
+
             for (int i = 0; i < Order.Length; i++)
             {
                 var cls = Order[i];
-                var chip = _charSelect.Q<VisualElement>(ChipNames[i]);
+                var chip = _classSelect.Q<VisualElement>(ChipNames[i]);
                 if (chip == null) continue;
                 _classChips[cls] = chip;
-                chip.RegisterCallback<ClickEvent>(_ => SelectClass(cls));
+
+                var preFilled = chip.Q<Label>("PreFilledTag");
+                if (preFilled != null) _preFilledTags[cls] = preFilled;
 
                 // Class chip art — exported design chicken sprite (Stage-3). Chips
                 // are fixed per class, so the modifier is applied once here.
                 var art = chip.Q<VisualElement>(ChipNames[i] + "Art");
                 if (art != null) art.AddToClassList("cw-chicken--" + KeyOf(cls));
+
+                // Signature first, alternative second — registry order would put Bracer
+                // ahead of Mighty and Second Wind ahead of Slippery, reading as if the
+                // alternative were the class's identity.
+                var passives = _abilityRegistry?.GetPassivesForClass(cls)
+                                                .OrderByDescending(p => p.IsSignature)
+                                                .ToList();
+                if (passives != null && passives.Count >= 2)
+                {
+                    BindSpecPill(chip.Q<VisualElement>("SpecOptA"), cls, passives[0]);
+                    BindSpecPill(chip.Q<VisualElement>("SpecOptB"), cls, passives[1]);
+                }
+
+                // Deliberately no click handler on the chip root itself: Maestro's
+                // one-tap requirement means class + specialization are chosen together
+                // by tapping a pill (below), so the chip body has no separate
+                // "class only" action any more.
             }
 
-            _previewChicken = _charSelect.Q<VisualElement>("PreviewChicken");
-            _previewGlow    = _charSelect.Q<VisualElement>("PreviewGlow");
-            _previewDisc    = _charSelect.Q<VisualElement>("PreviewDisc");
-            _previewName    = _charSelect.Q<Label>("PreviewName");
-            _previewQuote   = _charSelect.Q<Label>("PreviewQuote");
-            _previewDesc    = _charSelect.Q<Label>("PreviewDesc");
-            _passiveOpt1    = _charSelect.Q<Button>("PassiveOpt1");
-            _passiveOpt2    = _charSelect.Q<Button>("PassiveOpt2");
-            _commonCards    = _charSelect.Q<VisualElement>("CommonCards");
-            _classCards     = _charSelect.Q<VisualElement>("ClassCards");
-            _commonHint     = _charSelect.Q<Label>("CommonHint");
-            _commonCount    = _charSelect.Q<Label>("CommonCount");
-            _classHint      = _charSelect.Q<Label>("ClassHint");
-            _classCount     = _charSelect.Q<Label>("ClassCount");
-            _abilityDetail     = _charSelect.Q<VisualElement>("AbilityDetail");
-            _abilityDetailName = _charSelect.Q<Label>("AbilityDetailName");
-            _abilityDetailText = _charSelect.Q<Label>("AbilityDetailText");
-            _readyBtn       = _charSelect.Q<Button>("ReadyBtn");
-            if (_readyBtn != null) _readyBtn.clicked += OnReady;
+            _previewChicken    = _classSelect.Q<VisualElement>("PreviewChicken");
+            _previewGlow       = _classSelect.Q<VisualElement>("PreviewGlow");
+            _previewDisc       = _classSelect.Q<VisualElement>("PreviewDisc");
+            _previewName       = _classSelect.Q<Label>("PreviewName");
+            _previewQuote      = _classSelect.Q<Label>("PreviewQuote");
+            _roleCalloutStrong = _classSelect.Q<Label>("RoleCalloutStrong");
+            _roleCalloutWeak   = _classSelect.Q<Label>("RoleCalloutWeak");
 
-            var ef = UiGfx.EmojiFont();
-            if (ef != null)
-            {
-                var emojis = _charSelect.Query<Label>(className: "cw-emoji-text").ToList();
-                foreach (var e in emojis) e.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(ef));
-            }
+            ApplyEmojiFont(_classSelect);
 
-            Bind<Button>(_charSelect, "HomeBtn", b => b.clicked += ShowMainMenu);
-            BindRangeGuidesToggle();
-            BindDeveloperModeToggle();
+            Bind<Button>(_classSelect, "HomeBtn", b => b.clicked += ShowMainMenu);
+            // Always enabled — BuildAll already seeds a default SelectedClass, so
+            // there is never a state where Step 1 has nothing chosen yet.
+            Bind<Button>(_classSelect, "NextBtn", b => b.clicked += ShowLoadout);
         }
 
         /// <summary>
-        /// Wires #DeveloperModeToggle to <see cref="PlayerPreferences.DeveloperModeEnabled"/>,
-        /// which is what reveals the Ability Lab entry on the main menu.
+        /// Wires one SpecOptA/SpecOptB pill: fills its name/description/signature-line
+        /// children by CSS class (the pill names repeat across all four chips, so these
+        /// are queried per-chip, not globally) and registers the one-tap
+        /// class+specialization select.
         /// </summary>
-        /// <remarks>
-        /// Seeded with <c>SetValueWithoutNotify</c> for the same reason as the range-guides
-        /// toggle above: the seed is not a player choice, and letting it raise a ChangeEvent
-        /// would echo the stored value back to <c>PlayerPrefs</c> on every visit to this
-        /// screen. Here that would also write the developer-mode key on the machine of every
-        /// player who ever opened Character Select, turning "never chosen" into "explicitly
-        /// chosen off" — harmless in effect, but it makes the pref file lie about what the
-        /// player has actually touched.
-        ///
-        /// Nothing is refreshed here on toggle: the only thing this preference controls is
-        /// #DevRow on the main menu, and <see cref="ShowMainMenu"/> re-reads it on the way
-        /// back. Doing it there rather than here also covers the preference being changed by
-        /// any other route.
-        /// </remarks>
-        private void BindDeveloperModeToggle()
+        private void BindSpecPill(VisualElement pill, ChickenClass cls, PassiveAbilitySO passive)
         {
-            Bind<Toggle>(_charSelect, "DeveloperModeToggle", t =>
+            if (pill == null || passive == null) return;
+
+            var nameLbl = pill.Q<Label>(className: "cw-spec-pill__name");
+            var descLbl = pill.Q<Label>(className: "cw-spec-pill__desc");
+            var sigLbl  = pill.Q<Label>(className: "cw-spec-pill__signature");
+
+            if (nameLbl != null) nameLbl.text = passive.DisplayName.ToUpperInvariant();
+            // Never ShortLabel — that is the ≤4-char HUD abbreviation.
+            if (descLbl != null) descLbl.text = passive.Description;
+
+            if (sigLbl != null)
             {
-                t.SetValueWithoutNotify(PlayerPreferences.DeveloperModeEnabled);
-                t.RegisterValueChangedCallback(evt =>
-                {
-                    PlayerPreferences.DeveloperModeEnabled = evt.newValue;
-                    _log?.Info(Source, $"Developer mode {(evt.newValue ? "enabled" : "disabled")}.");
-                });
+                // Accurate language: this occupies one of the four ability slots, it is
+                // never a free bonus.
+                string label = ForcedAbilityLabel(cls, passive);
+                string sig = label != null ? $"Starts with {label} equipped" : null;
+                sigLbl.text = sig ?? string.Empty;
+                sigLbl.style.display = sig != null ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+
+            pill.RegisterCallback<ClickEvent>(evt =>
+            {
+                // Without this the click would bubble to the (handler-less) chip root
+                // too; StopPropagation just makes that explicit rather than relying on
+                // there being nothing to run.
+                evt.StopPropagation();
+                SelectClassAndPassive(cls, passive);
             });
+
+            _specPills.Add((pill, passive));
         }
 
         /// <summary>
-        /// Wires #RangeGuidesToggle to <see cref="PlayerPreferences.AbilityRangeGuidesEnabled"/>.
+        /// Selects a class and its specialization (passive) in one tap — Maestro's hard
+        /// requirement, replacing the old two-step SelectClass/SelectPassive. Old picks
+        /// only get cleared when the CLASS actually changes; re-selecting the same
+        /// class's other pill must not wipe an in-progress loadout.
         /// </summary>
-        /// <remarks>
-        /// Initialised FROM the preference rather than from the UXML, because the preference
-        /// defaults to true when unwritten and the control must agree with what the player is
-        /// about to see in the match. <c>SetValueWithoutNotify</c>, not <c>value</c>: the seed
-        /// is not a player choice, and letting it raise a ChangeEvent would echo the stored
-        /// value straight back to <c>PlayerPrefs</c> on every visit to this screen, turning
-        /// "never chosen, defaulting to on" into "explicitly chosen".
-        ///
-        /// Bound once in <see cref="BuildCharacterSelect"/>, not per refresh — the control is
-        /// static markup, and a second RegisterValueChangedCallback on the same Toggle would
-        /// run the setter twice per click.
-        /// </remarks>
-        private void BindRangeGuidesToggle()
-        {
-            Bind<Toggle>(_charSelect, "RangeGuidesToggle", t =>
-            {
-                t.SetValueWithoutNotify(PlayerPreferences.AbilityRangeGuidesEnabled);
-                t.RegisterValueChangedCallback(evt =>
-                {
-                    PlayerPreferences.AbilityRangeGuidesEnabled = evt.newValue;
-                    _log?.Info(Source, $"Ability range guides {(evt.newValue ? "enabled" : "disabled")}.");
-                });
-            });
-        }
-
-        private void SelectClass(ChickenClass cls)
+        private void SelectClassAndPassive(ChickenClass cls, PassiveAbilitySO passive)
         {
             if (_selection == null) return;
+
+            if (cls != _selection.SelectedClass)
+            {
+                // Old picks may be illegal for the new class.
+                _focusedAbility = null;
+                _selection.Ability0 = null;
+                _selection.Ability1 = null;
+                _selection.Ability2 = null;
+                _selection.Ability3 = null;
+            }
+
             _selection.SelectedClass = cls;
-            // The focused ability may be Character-slot and off-pool for the new
-            // class, so the strip would keep explaining something no longer on
-            // screen. Reset to the prompt.
-            _focusedAbility = null;
-            _selection.Ability0 = null;
-            _selection.Ability1 = null;
-            _selection.Ability2 = null;
-            _selection.Ability3 = null;
-
-            // GetDefaultPassiveForClass, not passives[0] — the latter is registry
-            // authoring order, which made Warrior open on Bracer and Speedy on
-            // Second Wind, i.e. both classes defaulted to the alternative fork.
-            _selection.Passive = _abilityRegistry?.GetDefaultPassiveForClass(cls);
-
-            // Seed the mandatory Peck so the picker shows the same loadout the spawner
-            // would build. Without this the player composes four abilities, hits READY,
-            // and MatchBootstrapper silently swaps one out for Peck — a UI that lied.
-            SeedMandatoryPeck();
-
-            RefreshCharacterSelect();
-        }
-
-        private void SelectPassive(PassiveAbilitySO passive)
-        {
-            if (_selection == null || passive == null) return;
             _selection.Passive = passive;
-            // Passives no longer change the slot count — every class has four buttons as
-            // of v0.7, which is what retired COMBO's old job of granting a third.
-            RefreshCharacterSelect();
+
+            // Seed the mandatory Peck and/or this specialization's signature ability so the
+            // picker shows the same loadout the spawner would build. Without this the player
+            // composes four abilities, hits READY, and MatchBootstrapper silently swaps one
+            // out — a UI that lied.
+            SeedForcedAbilities();
+            AutoArmFirstEmpty();
+
+            RefreshClassSelect();
         }
 
         private ChickenClass Cls => _selection?.SelectedClass ?? ChickenClass.Warrior;
@@ -445,7 +490,8 @@ namespace CluckWars.UI
         /// Total active-ability slots the loadout has to fill — four for every class as
         /// of v0.7, which retired COMBO's old job of granting a third. Purely a slot
         /// COUNT: any class-legal ability, Common or Character, may land in any slot.
-        /// Peck is the one forced occupant, and only for classes that can forage.
+        /// Peck and/or the chosen specialization's signature are the only forced
+        /// occupants — see <see cref="SeedForcedAbilities"/>.
         /// </summary>
         private int ActiveSlotsForClass => AbilityController.SlotCount;
 
@@ -456,7 +502,7 @@ namespace CluckWars.UI
             return Meta[cls].Tint;
         }
 
-        private void RefreshCharacterSelect()
+        private void RefreshClassSelect()
         {
             var cls = Cls;
             var m = Meta[cls];
@@ -470,6 +516,9 @@ namespace CluckWars.UI
                 // not just a tinted border.
                 kv.Value.style.backgroundColor = sel ? Fade(TintOf(kv.Key), 0.22f) : UiGfx.CardTop;
             }
+
+            foreach (var (pill, passive) in _specPills)
+                pill.EnableInClassList("cw-spec-pill--selected", _selection?.Passive == passive);
 
             if (_previewChicken != null)
             {
@@ -489,7 +538,7 @@ namespace CluckWars.UI
             // Raw class tint as text on the near-black screen bg is too dark to read
             // — Warrior's #C04030 lands at 2.5:1, under the 3:1 large-text minimum.
             // Lighten for type only; the disc border and glow keep the pure tint.
-            if (_previewName != null)    { _previewName.text = m.Name; _previewName.style.color = Lighten(TintOf(cls), 0.35f); }
+            if (_previewName != null) { _previewName.text = m.Name; _previewName.style.color = Lighten(TintOf(cls), 0.35f); }
             if (_previewQuote != null)
             {
                 if (_classRegistry != null && _classRegistry.TryGet(cls, out var entry) && !string.IsNullOrEmpty(entry.LoreQuote))
@@ -498,54 +547,61 @@ namespace CluckWars.UI
                     _previewQuote.text = "";
             }
 
-            // Signature first, alternative second — registry order would put Bracer
-            // ahead of Mighty and Second Wind ahead of Slippery, reading as if the
-            // alternative were the class's identity. OrderByDescending is stable, so
-            // the two entries keep their relative authoring order within each group.
-            var passives = _abilityRegistry?.GetPassivesForClass(cls)
-                                            .OrderByDescending(p => p.IsSignature)
-                                            .ToList();
-            if (passives != null && passives.Count >= 2)
+            RefreshRoleCallouts(cls);
+            RefreshPreFilledTags();
+        }
+
+        /// <summary>
+        /// Paints every class chip's #PreFilledTag from whichever ability
+        /// <see cref="ForcedAbilityLabel"/> reports for it — the selected class's actual chosen
+        /// passive, or the other three classes' default (signature) passive as a preview of
+        /// what tapping in would force. Hidden for a class with nothing forced, so the tag
+        /// never renders as an empty pill.
+        /// </summary>
+        private void RefreshPreFilledTags()
+        {
+            var cls = Cls;
+            foreach (var (c, tag) in _preFilledTags)
             {
-                var p1 = passives[0];
-                var p2 = passives[1];
+                var passive = c == cls ? _selection?.Passive : DefaultPassiveFor(c);
+                string label = ForcedAbilityLabel(c, passive);
 
-                if (_selection != null && (_selection.Passive == null || (_selection.Passive != p1 && _selection.Passive != p2)))
+                if (label != null)
                 {
-                    _selection.Passive = p1;
+                    // Real language: it occupies one of the four active slots, never a
+                    // free bonus on top of them — see PassiveAbilitySO.SignatureAbility.
+                    tag.text = $"One slot pre-filled: {label}";
+                    tag.style.display = DisplayStyle.Flex;
                 }
-
-                if (_passiveOpt1 != null)
+                else
                 {
-                    _passiveOpt1.text = p1.DisplayName.ToUpper();
-                    _passiveOpt1.clickable = new Clickable(() => SelectPassive(p1));
-                    bool sel1 = _selection?.Passive == p1;
-                    _passiveOpt1.EnableInClassList("cw-btn--green", sel1);
-                    _passiveOpt1.EnableInClassList("cw-btn--neutral", !sel1);
-                }
-                if (_passiveOpt2 != null)
-                {
-                    _passiveOpt2.text = p2.DisplayName.ToUpper();
-                    _passiveOpt2.clickable = new Clickable(() => SelectPassive(p2));
-                    bool sel2 = _selection?.Passive == p2;
-                    _passiveOpt2.EnableInClassList("cw-btn--green", sel2);
-                    _passiveOpt2.EnableInClassList("cw-btn--neutral", !sel2);
+                    tag.text = string.Empty;
+                    tag.style.display = DisplayStyle.None;
                 }
             }
+        }
 
-            var curPassive = _selection?.Passive;
-            if (_previewDesc != null)
+        /// <summary>
+        /// Paints RoleCalloutStrong/RoleCalloutWeak from the authored <see cref="RoleCallouts"/>
+        /// copy. A class with no Weak line (Warrior — flat {3,3,3}) collapses to a single
+        /// strong-slot callout rather than showing an empty second line.
+        /// </summary>
+        private void RefreshRoleCallouts(ChickenClass cls)
+        {
+            if (_roleCalloutStrong == null && _roleCalloutWeak == null) return;
+            if (!RoleCallouts.TryGetValue(cls, out var callout)) return;
+
+            if (_roleCalloutStrong != null)
             {
-                // Never ShortLabel — that is the ≤4-char HUD abbreviation, so the
-                // preview used to explain Bracer as "BRCR". Description is authored
-                // on the SO; DataIntegrityTests fails the build if one is blank.
-                _previewDesc.text = curPassive != null ? curPassive.Description : string.Empty;
+                _roleCalloutStrong.text = callout.Strong;
+                _roleCalloutStrong.style.display = DisplayStyle.Flex;
             }
-
-            RefreshStats(cls);
-            RebuildPickRows(cls);
-            RefreshAbilityDetail();
-            RefreshEquippedState();
+            if (_roleCalloutWeak != null)
+            {
+                bool hasWeak = !string.IsNullOrEmpty(callout.Weak);
+                _roleCalloutWeak.text = callout.Weak ?? string.Empty;
+                _roleCalloutWeak.style.display = hasWeak ? DisplayStyle.Flex : DisplayStyle.None;
+            }
         }
 
         /// <summary>
@@ -583,24 +639,258 @@ namespace CluckWars.UI
             if (_abilityDetail != null) SetBorder(_abilityDetail, Fade(ab.AccentColor, 0.6f));
         }
 
-        private void RefreshStats(ChickenClass cls)
+        // ======================================================================
+        //  STEP 2 — LOADOUT ("Build Your Loadout")
+        // ======================================================================
+        private void BuildLoadout()
         {
-            var stats = Meta[cls].Stats;
-            var tint  = TintOf(cls);
-            for (int i = 0; i < StatRowNames.Length; i++)
+            _commonCards    = _loadout.Q<VisualElement>("CommonCards");
+            _classCards     = _loadout.Q<VisualElement>("ClassCards");
+            _commonHint     = _loadout.Q<Label>("CommonHint");
+            _commonCount    = _loadout.Q<Label>("CommonCount");
+            _classHint      = _loadout.Q<Label>("ClassHint");
+            _classCount     = _loadout.Q<Label>("ClassCount");
+            _abilityDetail     = _loadout.Q<VisualElement>("AbilityDetail");
+            _abilityDetailName = _loadout.Q<Label>("AbilityDetailName");
+            _abilityDetailText = _loadout.Q<Label>("AbilityDetailText");
+            _readyBtn       = _loadout.Q<Button>("ReadyBtn");
+            if (_readyBtn != null) _readyBtn.clicked += OnReady;
+
+            _slotBoxes = new VisualElement[4];
+            for (int i = 0; i < _slotBoxes.Length; i++)
             {
-                var row = _charSelect.Q<VisualElement>(StatRowNames[i]);
-                if (row == null) continue;
-                var pips = row.Query(className: "cw-pip").ToList();
-                for (int p = 0; p < pips.Count; p++)
+                var box = _loadout.Q<VisualElement>("SlotBox" + i);
+                _slotBoxes[i] = box;
+                if (box == null) continue;
+                int captured = i; // closures capture by reference — copy the loop var
+                box.RegisterCallback<ClickEvent>(_ => OnSlotBoxTapped(captured));
+            }
+
+            ApplyEmojiFont(_loadout);
+
+            Bind<Button>(_loadout, "BackBtn", b => b.clicked += ShowClassSelect);
+            BindRangeGuidesToggle();
+            BindDeveloperModeToggle();
+        }
+
+        /// <summary>
+        /// Wires #DeveloperModeToggle to <see cref="PlayerPreferences.DeveloperModeEnabled"/>,
+        /// which is what reveals the Ability Lab entry on the main menu.
+        /// </summary>
+        /// <remarks>
+        /// Seeded with <c>SetValueWithoutNotify</c> for the same reason as the range-guides
+        /// toggle below: the seed is not a player choice, and letting it raise a ChangeEvent
+        /// would echo the stored value back to <c>PlayerPrefs</c> on every visit to this
+        /// screen. Here that would also write the developer-mode key on the machine of every
+        /// player who ever opened the Loadout screen, turning "never chosen" into "explicitly
+        /// chosen off" — harmless in effect, but it makes the pref file lie about what the
+        /// player has actually touched.
+        ///
+        /// Nothing is refreshed here on toggle: the only thing this preference controls is
+        /// #DevRow on the main menu, and <see cref="ShowMainMenu"/> re-reads it on the way
+        /// back. Doing it there rather than here also covers the preference being changed by
+        /// any other route.
+        /// </remarks>
+        private void BindDeveloperModeToggle()
+        {
+            Bind<Toggle>(_loadout, "DeveloperModeToggle", t =>
+            {
+                t.SetValueWithoutNotify(PlayerPreferences.DeveloperModeEnabled);
+                t.RegisterValueChangedCallback(evt =>
                 {
-                    bool on = p < stats[i];
-                    pips[p].EnableInClassList("cw-pip--on", on);
-                    // The unfilled track has to be visible or the rating has no
-                    // denominator — "3 pips" reads as the whole scale otherwise.
-                    // The old near-black rgba(20,12,6,.7) vanished on the panel.
-                    pips[p].style.backgroundColor = on ? tint : new Color(1f, 0.96f, 0.88f, 0.20f);
+                    PlayerPreferences.DeveloperModeEnabled = evt.newValue;
+                    _log?.Info(Source, $"Developer mode {(evt.newValue ? "enabled" : "disabled")}.");
+                });
+            });
+        }
+
+        /// <summary>
+        /// Wires #RangeGuidesToggle to <see cref="PlayerPreferences.AbilityRangeGuidesEnabled"/>.
+        /// </summary>
+        /// <remarks>
+        /// Initialised FROM the preference rather than from the UXML, because the preference
+        /// defaults to true when unwritten and the control must agree with what the player is
+        /// about to see in the match. <c>SetValueWithoutNotify</c>, not <c>value</c>: the seed
+        /// is not a player choice, and letting it raise a ChangeEvent would echo the stored
+        /// value straight back to <c>PlayerPrefs</c> on every visit to this screen, turning
+        /// "never chosen, defaulting to on" into "explicitly chosen".
+        ///
+        /// Bound once in <see cref="BuildLoadout"/>, not per refresh — the control is
+        /// static markup, and a second RegisterValueChangedCallback on the same Toggle would
+        /// run the setter twice per click.
+        /// </remarks>
+        private void BindRangeGuidesToggle()
+        {
+            Bind<Toggle>(_loadout, "RangeGuidesToggle", t =>
+            {
+                t.SetValueWithoutNotify(PlayerPreferences.AbilityRangeGuidesEnabled);
+                t.RegisterValueChangedCallback(evt =>
+                {
+                    PlayerPreferences.AbilityRangeGuidesEnabled = evt.newValue;
+                    _log?.Info(Source, $"Ability range guides {(evt.newValue ? "enabled" : "disabled")}.");
+                });
+            });
+        }
+
+        /// <summary>
+        /// Entering Step 2 (or returning to it) always re-arms the first empty slot before
+        /// anything else refreshes, so there is never a moment where the screen is visible
+        /// but no slot is a visible tap target.
+        /// </summary>
+        private void RefreshLoadout()
+        {
+            AutoArmFirstEmpty();
+            RebuildPickRows(Cls);
+            RefreshAbilityDetail();
+            RefreshEquippedState();
+            RefreshSlotBoxes();
+        }
+
+        // ----------------------------------------------------------------------
+        //  Slot-arming state machine — the actual fix for "feels like a lottery".
+        // ----------------------------------------------------------------------
+        //  _armedSlot is the slot the next ability-card tap acts on. Tapping a
+        //  slot box just re-arms; tapping an ability card resolves against
+        //  whichever slot is currently armed. Nothing ever compacts — a slot
+        //  that goes empty stays empty until the player deliberately fills it.
+        // ----------------------------------------------------------------------
+
+        /// <summary>
+        /// Arms the lowest-indexed empty slot, or slot 0 if every slot is full. Called on
+        /// every entry to Step 2 and after any pick that fills a slot, so there is always a
+        /// visible target for the next tap without the player having to manually re-arm.
+        /// </summary>
+        private void AutoArmFirstEmpty()
+        {
+            int n = ActiveSlotsForClass;
+            for (int i = 0; i < n; i++)
+            {
+                if (GetEquipped(i) == null) { _armedSlot = i; return; }
+            }
+
+            if (n <= 0)
+            {
+                // Unreachable today — ActiveSlotsForClass is AbilityController.SlotCount, a
+                // compile-time constant > 0 — but if that ever stops being true there is no
+                // valid slot to arm. Log rather than leave _armedSlot pointing at nothing.
+                _log?.Warn(Source, "AutoArmFirstEmpty: ActiveSlotsForClass <= 0, defaulting to slot 0.");
+            }
+            _armedSlot = 0;
+        }
+
+        /// <summary>Tapping a slot box (filled or empty) only re-arms it — no equip/unequip.</summary>
+        private void OnSlotBoxTapped(int index)
+        {
+            _armedSlot = index;
+            RefreshSlotBoxes();
+        }
+
+        /// <summary>
+        /// One tap on an ability card does one of three things depending on where
+        /// <paramref name="ab"/> currently sits relative to <see cref="_armedSlot"/>:
+        /// <list type="bullet">
+        /// <item>already IN the armed slot → clear it (armed slot stays armed, now empty)</item>
+        /// <item>equipped in some OTHER slot → swap it into the armed slot</item>
+        /// <item>not equipped anywhere → place it in the armed slot, then auto-advance
+        /// arming to the next open slot as a convenience</item>
+        /// </list>
+        /// This subsumes the old Peck-only "tap to move" special case — every ability now
+        /// moves the same way — and there is no "all full, drop the oldest" branch any more:
+        /// every case resolves into exactly one of the four slots without needing to make
+        /// room by shifting.
+        /// </summary>
+        private void OnAbilityCardTapped(AbilityBaseSO ab)
+        {
+            if (_selection == null || ab == null) return;
+
+            _focusedAbility = ab;
+            RefreshAbilityDetail();
+
+            int existing = SlotOf(ab);
+
+            if (existing == _armedSlot)
+            {
+                // Case A — tap the ability sitting in the armed slot to clear it.
+                SetEquipped(_armedSlot, null);
+            }
+            else if (existing >= 0)
+            {
+                // Case B — ab is equipped elsewhere; swap it into the armed slot.
+                var displaced = GetEquipped(_armedSlot);
+                SetEquipped(existing, displaced);
+                SetEquipped(_armedSlot, ab);
+            }
+            else
+            {
+                // Case C — ab is unequipped; place it in the armed slot (whatever was
+                // there returns to being pickable), then auto-advance for the next tap.
+                SetEquipped(_armedSlot, ab);
+                AutoArmFirstEmpty();
+            }
+
+            RebuildPickRows(Cls);
+            RefreshSlotBoxes();
+            RefreshEquippedState();
+        }
+
+        /// <summary>Redraws all four slot boxes: equipped ability (icon/name/numbered badge)
+        /// or an empty state, plus the armed-slot highlight.</summary>
+        private void RefreshSlotBoxes()
+        {
+            for (int i = 0; i < _slotBoxes.Length; i++)
+            {
+                var box = _slotBoxes[i];
+                if (box == null) continue;
+
+                box.EnableInClassList("cw-slot-box--armed", i == _armedSlot);
+
+                var ab = GetEquipped(i);
+                box.Clear();
+                box.EnableInClassList("cw-slot-box--empty", ab == null);
+
+                if (ab == null)
+                {
+                    SetBorder(box, UiGfx.CardBorder);
+                    box.style.backgroundColor = UiGfx.CardTop;
+                    var empty = new Label("EMPTY");
+                    empty.AddToClassList("cw-slot-box__empty-label");
+                    box.Add(empty);
+                    continue;
                 }
+
+                SetBorder(box, ab.AccentColor);
+                box.style.backgroundColor = Fade(ab.AccentColor, 0.20f);
+
+                string iconCls = AbilityIconStyle.ClassFor(ab);
+                if (!string.IsNullOrEmpty(iconCls))
+                {
+                    var sprite = new VisualElement();
+                    sprite.AddToClassList("cw-ability-card__sprite");
+                    sprite.AddToClassList(iconCls);
+                    box.Add(sprite);
+                }
+                else
+                {
+                    var icon = new Label(ab.ResolveIcon());
+                    icon.AddToClassList("cw-ability-card__icon");
+                    var ef = UiGfx.EmojiFont();
+                    if (ef != null) icon.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(ef));
+                    icon.style.color = ab.AccentColor;
+                    box.Add(icon);
+                }
+
+                string label = !string.IsNullOrEmpty(ab.DisplayName) ? ab.DisplayName : ab.name;
+                var name = new Label(label.ToUpperInvariant());
+                name.AddToClassList("cw-ability-card__name");
+                box.Add(name);
+
+                // Numbered badge = the in-match button that fires it. Always accurate now
+                // — nothing compacts, so a slot's index never silently changes under it.
+                var badge = new Label((i + 1).ToString());
+                badge.AddToClassList("cw-ability-badge");
+                badge.style.backgroundColor = ab.AccentColor;
+                badge.style.color = InkOn(ab.AccentColor);
+                box.Add(badge);
             }
         }
 
@@ -614,20 +904,17 @@ namespace CluckWars.UI
         //
         //  Design override of GDD §7.1-7.2 (explained once, reaffirmed by the
         //  user — not re-litigated here): Common is OPTIONAL, not a mandatory
-        //  1st slot. Ability0/Ability1/Ability2 are now purely positional
-        //  bookkeeping for N total active-ability slots (N = ActiveSlotsForClass:
-        //  2 normally, 3 under Assassin's COMBO). Any legal ability from EITHER
-        //  row can land in ANY open slot, freely mixed — 0 Common + N Character,
-        //  N Common + 0 Character (bounded by the 3-ability Common pool), or any
-        //  mix in between are all equally valid. There is no per-category
-        //  minimum; only the total count (== N) gates READY.
+        //  1st slot. Ability0/Ability1/Ability2/Ability3 are purely positional
+        //  bookkeeping for the four active-ability slots. Any legal ability
+        //  from EITHER row can land in ANY slot, freely mixed — 0 Common + 4
+        //  Character, 3 Common + 1 Character (bounded by the pool sizes), or
+        //  any mix in between are all equally valid. There is no per-category
+        //  minimum; only the total count (== 4) gates READY.
         //
         //  The two rows stay as a discoverability grouping — legality/category
-        //  is still visually separated — but tapping a card in either row now
-        //  fills the next open slot among all N, not a category-fixed slot.
-        //  Ability0/1/2 and every ISessionSelectionService write are unchanged,
-        //  so the spawner and the touch HUD's 1/2/3 hex mapping keep working
-        //  exactly as before.
+        //  is still visually separated — but which physical slot a tap lands in
+        //  is governed entirely by the slot-arming state machine above, not by
+        //  which row the card came from.
         // ======================================================================
 
         /// <summary>Rough hint for the CLASS pool's counter text: how many Character picks a
@@ -646,15 +933,7 @@ namespace CluckWars.UI
             }
 
             var pool = all.Where(a => a != null && !(a is PassiveAbilitySO)).ToList();
-
-            var flag = cls switch
-            {
-                ChickenClass.Warrior  => ChickenClassFlags.Warrior,
-                ChickenClass.Speedy   => ChickenClassFlags.Speedy,
-                ChickenClass.Fatty    => ChickenClassFlags.Fatty,
-                ChickenClass.Assassin => ChickenClassFlags.Assassin,
-                _ => ChickenClassFlags.None,
-            };
+            var flag = AbilityRegistrySO.FlagOf(cls);
 
             // BOTH rows filter on AllowedClasses. The Common row used not to, on the
             // assumption that "Common" means "legal for everyone" — true until Peck shipped
@@ -781,11 +1060,11 @@ namespace CluckWars.UI
                 card.Add(slotBadge);
             }
 
-            // One tap does both jobs: equips/unequips AND reveals what the ability
-            // does in the detail strip. Deliberately NOT a long-press — that has no
-            // affordance on a touch screen, and a player who never discovers the
-            // gesture is back to "equip it and find out in a match".
-            card.RegisterCallback<ClickEvent>(_ => { _focusedAbility = ab; TogglePick(ab); });
+            // One tap does both jobs: equips/unequips/swaps into the armed slot AND
+            // reveals what the ability does in the detail strip. Deliberately NOT a
+            // long-press — that has no affordance on a touch screen, and a player who
+            // never discovers the gesture is back to "equip it and find out in a match".
+            card.RegisterCallback<ClickEvent>(_ => OnAbilityCardTapped(ab));
             return card;
         }
 
@@ -793,16 +1072,41 @@ namespace CluckWars.UI
         private AbilityBaseSO PeckAbility =>
             _abilityRegistry?.ActiveAbilities.FirstOrDefault(a => a is PeckAbilitySO);
 
-        /// <summary>True when the selected class may forage. Read off Peck's own AllowedClasses
-        /// rather than naming classes here, so the picker and MatchBootstrapper's sanitiser can
-        /// never disagree about who gets a mandatory Peck.</summary>
-        private bool ClassCanForage
+        /// <summary>True when <paramref name="cls"/> may forage. Read off Peck's own
+        /// AllowedClasses rather than naming classes here, so the picker, the spec-pill
+        /// signature line, and MatchBootstrapper's sanitiser can never disagree about who
+        /// gets a mandatory Peck.</summary>
+        private bool CanForage(ChickenClass cls)
         {
-            get
-            {
-                var peck = PeckAbility;
-                return peck != null && AbilityRegistrySO.IsAllowedFor(peck, Cls);
-            }
+            var peck = PeckAbility;
+            return peck != null && AbilityRegistrySO.IsAllowedFor(peck, cls);
+        }
+
+        /// <summary>True when the currently selected class may forage.</summary>
+        private bool ClassCanForage => CanForage(Cls);
+
+        /// <summary>The class's default (signature) specialization, or null if the registry has
+        /// none for it. Used to preview a not-yet-selected class chip's PreFilledTag.</summary>
+        private PassiveAbilitySO DefaultPassiveFor(ChickenClass cls) => _abilityRegistry?.GetDefaultPassiveForClass(cls);
+
+        /// <summary>
+        /// The display name of whichever ability <paramref name="passive"/> force-equips for
+        /// <paramref name="cls"/> — its own <see cref="PassiveAbilitySO.SignatureAbility"/> when
+        /// it has one legal for the class, else Peck for a class that can forage, else null when
+        /// nothing is forced. Shared by the spec-pill "Starts with X equipped" line and
+        /// PreFilledTag so the two can never disagree with each other or with
+        /// <see cref="SeedForcedAbilities"/>.
+        /// </summary>
+        private string ForcedAbilityLabel(ChickenClass cls, PassiveAbilitySO passive)
+        {
+            if (passive == null) return null;
+
+            var signature = passive.SignatureAbility;
+            if (signature != null && AbilityRegistrySO.IsAllowedFor(signature, cls))
+                return signature.DisplayName;
+
+            if (!CanForage(cls)) return null;
+            return PeckAbility?.DisplayName ?? "Peck";
         }
 
         private AbilityBaseSO GetEquipped(int slot) => slot switch
@@ -831,105 +1135,70 @@ namespace CluckWars.UI
         }
 
         /// <summary>
-        /// Tap an unequipped, legal card (Common or Character — category no
-        /// longer matters) to pick it, tap an equipped card again to drop it.
-        /// Picking fills the first open slot among all N active slots
-        /// (<see cref="ActiveSlotsForClass"/>), regardless of which row the card
-        /// came from; when all N are already full it drops the oldest pick,
-        /// shifts the rest down, and appends — same "never silently ignore the
-        /// tap" behaviour the old Class-row-full case had, just generalized.
-        /// Dropping compacts the remaining picks so a slot is never empty while
-        /// a higher-indexed slot is occupied (the touch HUD maps slots 1/2/3 to
-        /// its three hexes positionally, and COMBO alone unlocks the third).
+        /// Ensures both of the game's forced abilities are equipped exactly where
+        /// <c>MatchBootstrapper.ResolveLegalLoadout</c> would force them: the mandatory Peck for
+        /// a foraging class, and the current specialization's <see cref="PassiveAbilitySO.SignatureAbility"/>
+        /// if it has one legal for this class. So what the player composes is what actually
+        /// spawns — without this the player could compose four abilities, hit READY, and have
+        /// the spawner silently swap one out, a UI that lied.
         /// </summary>
-        /// <summary>
-        /// Ensures the mandatory Peck is equipped for a foraging class, and absent for one
-        /// that cannot forage. Mirrors <c>MatchBootstrapper.ResolveLegalLoadout</c>'s rule so
-        /// what the player composes is what actually spawns.
-        /// </summary>
-        private void SeedMandatoryPeck()
+        /// <remarks>
+        /// <b>Deterministic slots, not "the next open slot".</b> Peck (when forced) always lands
+        /// in slot 0, and a non-Peck-variant signature (when both apply) in slot 1 — mirroring
+        /// ResolveLegalLoadout's own forced-insert order, where Peck is inserted after the
+        /// signature and pushes it along. Determinism is what lets the spec-pill's
+        /// "Starts with X equipped" line and PreFilledTag name a specific slot truthfully.
+        /// <para>
+        /// A signature that IS itself a Peck variant replaces the plain Peck rather than joining
+        /// it, so a forager doesn't burn two of four slots on forced picks for one mechanic (see
+        /// <see cref="PassiveAbilitySO.SignatureAbility"/>) — the stray plain Peck is released in
+        /// that case, and also when the class cannot forage at all.
+        /// </para>
+        /// <para>
+        /// Only forces an ability that is not <i>already</i> equipped somewhere. No special-case
+        /// movement logic is needed once placed — the generic swap in
+        /// <see cref="OnAbilityCardTapped"/> covers moving a forced ability the player later
+        /// drags elsewhere, and this must not snap it back.
+        /// </para>
+        /// </remarks>
+        private void SeedForcedAbilities()
         {
+            if (_selection == null) return;
+
             var peck = PeckAbility;
-            if (peck == null || _selection == null) return;
+            var passive = _selection.Passive;
+            var signature = passive?.SignatureAbility;
+            // Illegal-for-this-class signatures are pinned out by DataIntegrityTests at the
+            // asset level, but a picker that trusted that blindly would silently force an
+            // ability the sanitiser would reject.
+            if (signature != null && !AbilityRegistrySO.IsAllowedFor(signature, Cls))
+                signature = null;
 
-            int n = ActiveSlotsForClass;
-            int at = SlotOf(peck);
+            bool signatureIsPeckVariant = signature is PeckAbilitySO;
+            bool wantPeck = ClassCanForage && !signatureIsPeckVariant && peck != null;
 
-            if (!ClassCanForage)
+            // Release a plain Peck that no longer belongs — class can't forage, or the
+            // signature itself stands in for it.
+            if (!wantPeck && peck != null && peck != signature)
             {
+                int at = SlotOf(peck);
                 if (at >= 0) SetEquipped(at, null);
-                return;
             }
 
-            if (at >= 0) return; // already placed; leave the player's choice alone
-
-            for (int i = 0; i < n; i++)
+            if (wantPeck)
             {
-                if (GetEquipped(i) == null) { SetEquipped(i, peck); return; }
+                if (SlotOf(peck) < 0) SetEquipped(0, peck); // no room: Peck outranks whatever was there
+                if (signature != null && SlotOf(signature) < 0)
+                    SetEquipped(GetEquipped(0) == peck ? 1 : 0, signature); // no room: the signature outranks whatever was there
             }
-            SetEquipped(0, peck); // no room: Peck outranks whatever was there
-        }
-
-        private void TogglePick(AbilityBaseSO ab)
-        {
-            if (_selection == null || ab == null) return;
-
-            int n = ActiveSlotsForClass;
-            int existing = SlotOf(ab);
-
-            // Peck is not optional for a class that can forage — dropping it would mean
-            // being unable to collect food for the whole match. So a tap on the equipped
-            // Peck card MOVES it to the next button instead of removing it, swapping with
-            // whatever sat there. That is what makes its position player-assignable
-            // without a drag-and-drop affordance, and the numbered badge on the card is
-            // already the readout of which button it will fire from.
-            if (existing >= 0 && ab is PeckAbilitySO)
+            else if (signature != null && SlotOf(signature) < 0)
             {
-                int to = (existing + 1) % n;
-                var displaced = GetEquipped(to);
-                SetEquipped(to, ab);
-                SetEquipped(existing, displaced);
-
-                RebuildPickRows(Cls);
-                RefreshAbilityDetail();
-                RefreshEquippedState();
-                return;
+                SetEquipped(0, signature); // no room: the signature outranks whatever was there
             }
-
-            if (existing >= 0)
-            {
-                // Unequip: clear just this slot. It deliberately does NOT compact the rest
-                // down any more — compaction would drag Peck out of the button the player
-                // deliberately placed it on every time they swapped a neighbouring pick.
-                SetEquipped(existing, null);
-            }
-            else
-            {
-                int freeSlot = -1;
-                for (int i = 0; i < n; i++)
-                {
-                    if (GetEquipped(i) == null) { freeSlot = i; break; }
-                }
-
-                if (freeSlot >= 0)
-                {
-                    SetEquipped(freeSlot, ab);
-                }
-                else
-                {
-                    // All N slots full — drop the oldest, shift down, append.
-                    for (int i = 0; i < n - 1; i++) SetEquipped(i, GetEquipped(i + 1));
-                    SetEquipped(n - 1, ab);
-                }
-            }
-
-            RebuildPickRows(Cls);
-            RefreshAbilityDetail();
-            RefreshEquippedState();
         }
 
         /// <summary>
-        /// READY gates on total distinct equipped abilities == N + a Passive —
+        /// READY gates on total distinct equipped abilities == 4 + a Passive —
         /// there is no per-category (Common vs Class) minimum any more. The two
         /// row counters are read-outs of "how many of this row's pool are
         /// currently equipped", not a "/1" or "/N" requirement — Common is
@@ -990,7 +1259,7 @@ namespace CluckWars.UI
 
         private void BuildLobby()
         {
-            Bind<Button>(_lobby, "BackBtn",  b => b.clicked += ShowCharacterSelect);
+            Bind<Button>(_lobby, "BackBtn",  b => b.clicked += ShowLoadout);
             Bind<Button>(_lobby, "StartBtn", b => b.clicked += OnStartMatch);
             Bind<Button>(_lobby, "CopyBtn",  b => b.clicked += CopyJoinCode);
             Bind<Button>(_lobby, "ShareBtn", b => b.clicked += CopyJoinCode);

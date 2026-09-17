@@ -1,205 +1,152 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
-    <!-- Cluck Wars — character select (2026-07-23 Android pass).
+    <!-- Cluck Wars — character select STEP 2 "Build Your Loadout" (2026-09 rework).
 
-         Two changes from the Stage-3 layout:
+         This used to be the WHOLE character-select screen (class pick + passive
+         fork + stat preview + two ability pick rows + detail strip + toggles +
+         ready button). Class + specialization moved to the new Assets/UI/
+         CharacterSelectClass.uxml ("Step 1"); this screen is now ability slots
+         only, which is also the actual fix for the historical overlap bug (see
+         the CommonScroll/ClassScroll comment below) — the three-column layout
+         that used to squeeze this content into ~936px is gone, so the pick rows
+         get the full page width.
 
-         1. The ability picker is no longer [slot-hex row] + [scrolling grid of
-            23%-wide cards under category headers]. ADR 0003 cut the visible pool
-            to 3 Common + 3 Character per class, so that grid rendered as up to
-            three headers with ONE card each and never scrolled. It is now two
-            flat rows of three big cards, filled by MenuUiController at bind time
-            (#CommonCards / #ClassCards). Selection is direct — no "pick a slot,
-            then pick an ability" indirection, and the dimmed COMBO padlock hex
-            is gone: COMBO now reads as "pick 2" on the CLASS row.
+         Root name CharacterSelectPage is UNCHANGED so any other reference to it
+         (scene wiring, MenuUiController's serialized field, which keeps the old
+         name "_characterSelectUxml" precisely so the scene reference didn't need
+         re-pointing) keeps working.
 
-         2. Every size respects the mobile contract at the top of
-            CluckWarsTheme.uss (1 dp ~= 2.35 px on this 1920x1080 canvas).
-            Inline styles here are layout only; type/target sizing lives in USS.
+         Binding contract (MenuUiController.BuildLoadout/RefreshLoadout/
+         RefreshSlotBoxes — read those before renaming anything here):
+           - BackBtn                                    (goes to Step 1, keeps picks)
+           - SlotBox0 / SlotBox1 / SlotBox2 / SlotBox3   (exactly 4, one per
+             active-ability slot — v0.7 made this uniform across all classes)
+           - CommonCards, ClassCards                     (unchanged names — the
+             containers RebuildPickRows/FillRow populate; only their wrapper
+             changed, from a wrapping flex grid to a horizontal ScrollView)
+           - CommonHint, CommonCount, ClassHint, ClassCount   (unchanged)
+           - AbilityDetail, AbilityDetailName, AbilityDetailText   (unchanged)
+           - RangeGuidesToggle, DeveloperModeToggle       (unchanged — kept even
+             though the task brief for this screen didn't call them out, because
+             MenuUiController.BuildLoadout still binds both; dropping them would
+             silently remove the only route to the Ability Lab and the range-
+             guide preference from the UI, which nobody asked for)
+           - ReadyBtn                                     (unchanged)
 
-         Dropped deliberately: the SkinSlots strip (DEFAULT + two padlocks) was
-         non-functional decoration and cost ~140 px of the preview column that
-         the legible passive/stat block needs. Re-add it when skins are real. -->
+         SlotBoxN is deliberately EMPTY markup — RefreshSlotBoxes() does
+         box.Clear() and rebuilds its children (icon/sprite, name, numbered
+         badge, or the "EMPTY" label) from C# every time, exactly like
+         MakeAbilityCard already did for pick-row cards. Anything static placed
+         inside a SlotBoxN here would be destroyed the first time the screen is
+         shown and never be seen.
+
+         The chicken preview column from the old 3-column layout (art/name/quote)
+         is dropped, not shrunk — Step 1 already shows the chicken, and this
+         column's actual content (four slots + up to 11 ability cards across two
+         rows) needs the width more than a redundant portrait does.
+
+         Sizes follow the MOBILE SIZING CONTRACT at the top of CluckWarsTheme.uss. -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
 
     <ui:VisualElement name="CharacterSelectPage" class="cw-screen cw-page">
 
-        <!-- Header ribbon (+ home button, absolutely placed top-left) -->
+        <!-- Header ribbon (+ back button, absolutely placed top-left). BackBtn
+             reuses HomeBtn's visual (.cw-home-btn) but wires to ShowClassSelect,
+             not ShowMainMenu — it must not discard the class/specialization/
+             ability picks the way leaving via HomeBtn on Step 1 would. -->
         <ui:VisualElement style="align-items: center; justify-content: center; padding-top: 20px; padding-bottom: 12px; flex-shrink: 0;">
-            <ui:Button name="HomeBtn" text="◀ HOME" class="cw-home-btn" />
+            <ui:Button name="BackBtn" text="◀ BACK" class="cw-home-btn" />
             <ui:VisualElement class="cw-ribbon">
-                <ui:Label text="CHOOSE YOUR CHICKEN" class="cw-title" />
+                <ui:Label text="BUILD YOUR LOADOUT" class="cw-title" />
             </ui:VisualElement>
         </ui:VisualElement>
 
-        <!-- Body -->
-        <ui:VisualElement name="Body" class="cw-cs-body" style="padding-left: 24px; padding-right: 24px; padding-bottom: 16px;">
+        <ui:VisualElement name="Body" class="cw-cs-detail" style="padding-left: 24px; padding-right: 24px; padding-bottom: 16px;">
 
-            <!-- Column A: class chips (chicken art assigned by controller) -->
-            <ui:VisualElement name="ClassList" class="cw-cs-classes">
-                <ui:VisualElement name="ClassWarrior" class="cw-class-chip">
-                    <ui:VisualElement name="ClassWarriorArt" class="cw-class-chip__art" />
-                    <ui:VisualElement style="flex-grow: 1;">
-                        <ui:Label text="WARRIOR" class="cw-class-chip__name" />
-                        <ui:Label text="All-Rounder" class="cw-class-chip__role" />
-                    </ui:VisualElement>
-                    <ui:Label text="x4" class="cw-slot-pill" />
-                </ui:VisualElement>
-                <ui:VisualElement name="ClassSpeedy" class="cw-class-chip">
-                    <ui:VisualElement name="ClassSpeedyArt" class="cw-class-chip__art" />
-                    <ui:VisualElement style="flex-grow: 1;">
-                        <ui:Label text="SPEEDY" class="cw-class-chip__name" />
-                        <ui:Label text="Hit &amp; Run" class="cw-class-chip__role" />
-                    </ui:VisualElement>
-                    <ui:Label text="x4" class="cw-slot-pill" />
-                </ui:VisualElement>
-                <ui:VisualElement name="ClassFatty" class="cw-class-chip">
-                    <ui:VisualElement name="ClassFattyArt" class="cw-class-chip__art" />
-                    <ui:VisualElement style="flex-grow: 1;">
-                        <ui:Label text="FATTY" class="cw-class-chip__name" />
-                        <ui:Label text="Bulk Carrier" class="cw-class-chip__role" />
-                    </ui:VisualElement>
-                    <ui:Label text="x4" class="cw-slot-pill" />
-                </ui:VisualElement>
-                <ui:VisualElement name="ClassAssassin" class="cw-class-chip">
-                    <ui:VisualElement name="ClassAssassinArt" class="cw-class-chip__art" />
-                    <ui:VisualElement style="flex-grow: 1;">
-                        <ui:Label text="ASSASSIN" class="cw-class-chip__name" />
-                        <ui:Label text="Disruptor" class="cw-class-chip__role" />
-                    </ui:VisualElement>
-                    <ui:Label text="x4" class="cw-slot-pill" />
-                </ui:VisualElement>
+            <!-- Slot boxes — every class now has 4 uniform active-ability slots
+                 (v0.7; COMBO used to grant Assassin a 3rd, retired). This row is
+                 the slot-arming state machine's only visible control surface:
+                 tapping a box arms it (OnSlotBoxTapped), tapping an ability card
+                 fills whichever box is armed (OnAbilityCardTapped). Sits above
+                 #PickScroll, fixed, so it is never scrolled out of view — the
+                 player always has to see which slot the next tap will act on. -->
+            <ui:VisualElement name="SlotBoxRow" class="cw-slot-box-row">
+                <ui:Button name="SlotBox0" class="cw-slot-box" />
+                <ui:Button name="SlotBox1" class="cw-slot-box" />
+                <ui:Button name="SlotBox2" class="cw-slot-box" />
+                <ui:Button name="SlotBox3" class="cw-slot-box" />
             </ui:VisualElement>
 
-            <!-- Column B: preview (chicken sprite + disc tint assigned by controller) -->
-            <ui:VisualElement name="Preview" class="cw-cs-preview" style="align-items: center;">
-                <ui:VisualElement style="width: 100%; height: 280px; align-items: center; justify-content: center; flex-shrink: 0;">
-                    <ui:VisualElement name="PreviewGlow" class="cw-radial-glow" style="width: 330px; height: 330px;" />
-                    <ui:VisualElement name="PreviewDisc" class="cw-preview-disc">
-                        <ui:VisualElement name="PreviewChicken" class="cw-chicken" style="width: 210px; height: 210px;" />
+            <!-- The two pick rows live in a ScrollView — same load-bearing
+                 `min-height: 0` trick as the old #PickScroll (see
+                 .cw-pick-scroll in CluckWarsTheme.uss for why removing it
+                 silently un-fixes the scroll). Kept as a vertical safety net
+                 around the two rows even though each row no longer wraps
+                 internally, in case a future pool/copy change makes the two
+                 rows together taller than the column again. -->
+            <ui:ScrollView name="PickScroll" mode="Vertical" class="cw-pick-scroll">
+
+                <ui:VisualElement name="CommonRow" class="cw-pick-row cw-well" style="padding: 14px;">
+                    <ui:VisualElement class="cw-pick-row__head">
+                        <ui:Label text="COMMON" class="cw-pick-row__title" />
+                        <ui:Label name="CommonHint" text="optional · any chicken can take these" class="cw-pick-row__hint" />
+                        <ui:VisualElement class="cw-pick-row__rule" />
+                        <ui:Label name="CommonCount" text="0 EQUIPPED" class="cw-pick-row__count" />
                     </ui:VisualElement>
-                </ui:VisualElement>
-
-                <ui:Label name="PreviewName" text="WARRIOR CHICKEN" class="cw-heading" style="font-size: 42px;" />
-                <ui:Label name="PreviewQuote" text="&quot;Mighty of wing, short of temper.&quot;" class="cw-body" style="-unity-font-style: italic; color: rgba(255, 255, 255, 0.72); margin-top: 4px; margin-bottom: 12px; font-size: 30px; -unity-text-align: middle-center;" />
-
-                <!-- Passive fork. Two mutually exclusive options; the chosen one
-                     also decides whether the CLASS pick row asks for 1 or 2. -->
-                <ui:Label text="PASSIVE" class="cw-slot-caption" style="margin-bottom: 6px;" />
-                <ui:VisualElement name="PassiveOptionRow" style="flex-direction: row; align-items: stretch; width: 100%;">
-                    <ui:Button name="PassiveOpt1" text="MIGHTY" class="cw-btn" style="flex-grow: 1; flex-basis: 0; margin-right: 6px; padding-left: 8px; padding-right: 8px; font-size: 30px;" />
-                    <ui:Button name="PassiveOpt2" text="BRACER" class="cw-btn" style="flex-grow: 1; flex-basis: 0; margin-left: 6px; padding-left: 8px; padding-right: 8px; font-size: 30px;" />
-                </ui:VisualElement>
-                <ui:Label name="PreviewDesc" text="+25% outgoing ability damage." class="cw-body" style="-unity-text-align: middle-center; font-size: 30px; margin-top: 8px;" />
-
-                <ui:VisualElement name="StatList" class="cw-stat-grid" style="width: 100%; margin-top: 16px;">
-                    <ui:VisualElement name="StatCargo" class="cw-stat-row">
-                        <ui:Label text="CARGO" class="cw-stat-label" />
-                        <ui:VisualElement class="cw-stat-pips">
-                            <ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" />
-                        </ui:VisualElement>
-                    </ui:VisualElement>
-                    <ui:VisualElement name="StatRate" class="cw-stat-row">
-                        <ui:Label text="RATE" class="cw-stat-label" />
-                        <ui:VisualElement class="cw-stat-pips">
-                            <ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" />
-                        </ui:VisualElement>
-                    </ui:VisualElement>
-                    <ui:VisualElement name="StatSpeed" class="cw-stat-row">
-                        <ui:Label text="SPEED" class="cw-stat-label" />
-                        <ui:VisualElement class="cw-stat-pips">
-                            <ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" /><ui:VisualElement class="cw-pip" />
-                        </ui:VisualElement>
-                    </ui:VisualElement>
-                </ui:VisualElement>
-            </ui:VisualElement>
-
-            <!-- Column C: the loadout — two flat pick rows + ready.
-                 Card children are created by MenuUiController.RebuildPickRows. -->
-            <ui:VisualElement name="Detail" class="cw-cs-detail">
-
-                <!-- The two pick rows live in a ScrollView, and that is load-bearing.
-                     This column was authored for "up to 3 Common + 3 Character" (see the
-                     file header) — six cards, two rows of three. Commit 21ddaa8 widened
-                     the pools to 8-11 abilities across 4 slots, which is more content than
-                     the column is tall. Flex children shrink by default but their CONTENT
-                     does not, so the rows were being squeezed while their cards spilled
-                     over everything below: the wrapped Common row painted across the CLASS
-                     header, and the cards painted across AbilityDetail. Scrolling the
-                     overflow is the fix; the row markup itself was never wrong. -->
-                <ui:ScrollView name="PickScroll" mode="Vertical" class="cw-pick-scroll">
-
-                    <ui:VisualElement name="CommonRow" class="cw-pick-row cw-well" style="padding: 14px;">
-                        <ui:VisualElement class="cw-pick-row__head">
-                            <ui:Label text="COMMON" class="cw-pick-row__title" />
-                            <ui:Label name="CommonHint" text="optional · any chicken can take these" class="cw-pick-row__hint" />
-                            <ui:VisualElement class="cw-pick-row__rule" />
-                            <ui:Label name="CommonCount" text="0 EQUIPPED" class="cw-pick-row__count" />
-                        </ui:VisualElement>
+                    <!-- HORIZONTAL scroll, not a wrapping grid — the actual fix for
+                         the documented overlap bug (see .cw-pick-cards below): a
+                         row that scrolls sideways has no wrap-collision case
+                         regardless of how many cards the pool holds, so Assassin's
+                         6-card CLASS pool (vs. 3 for the other three classes) can
+                         never again paint over ClassRow/AbilityDetail the way the
+                         unscrolled wrapping grid did before ADR 0003, and the way
+                         the vertical-wrap version did again after pools widened to
+                         8-11 (commit 21ddaa8). #CommonCards/#ClassCards are
+                         unchanged names — MenuUiController.FillRow just Clears()
+                         and Adds() into whichever VisualElement it finds by that
+                         name, so nesting it one level deeper inside a ScrollView
+                         is transparent to the controller. -->
+                    <ui:ScrollView name="CommonScroll" mode="Horizontal" class="cw-pick-scroll--h">
                         <ui:VisualElement name="CommonCards" class="cw-pick-cards" />
-                    </ui:VisualElement>
+                    </ui:ScrollView>
+                </ui:VisualElement>
 
-                    <ui:VisualElement name="ClassRow" class="cw-pick-row cw-well" style="padding: 14px;">
-                        <ui:VisualElement class="cw-pick-row__head">
-                            <ui:Label text="CLASS" class="cw-pick-row__title" />
-                            <ui:Label name="ClassHint" text="Warrior only" class="cw-pick-row__hint" />
-                            <ui:VisualElement class="cw-pick-row__rule" />
-                            <ui:Label name="ClassCount" text="0 EQUIPPED" class="cw-pick-row__count" />
-                        </ui:VisualElement>
+                <ui:VisualElement name="ClassRow" class="cw-pick-row cw-well" style="padding: 14px;">
+                    <ui:VisualElement class="cw-pick-row__head">
+                        <ui:Label text="CLASS" class="cw-pick-row__title" />
+                        <ui:Label name="ClassHint" text="Warrior only" class="cw-pick-row__hint" />
+                        <ui:VisualElement class="cw-pick-row__rule" />
+                        <ui:Label name="ClassCount" text="0 EQUIPPED" class="cw-pick-row__count" />
+                    </ui:VisualElement>
+                    <ui:ScrollView name="ClassScroll" mode="Horizontal" class="cw-pick-scroll--h">
                         <ui:VisualElement name="ClassCards" class="cw-pick-cards" />
-                    </ui:VisualElement>
-
-                </ui:ScrollView>
-
-                <!-- Shared ability detail. The description's only home: six cards
-                     each carrying their own wrapped copy needed ~137px of a 263px
-                     card and starved the icon to zero height. Tapping any card
-                     fills this strip (MenuUiController.RefreshAbilityDetail) at the
-                     full 34px reading size instead of 24px six times over. -->
-                <ui:VisualElement name="AbilityDetail" class="cw-ability-detail">
-                    <ui:Label name="AbilityDetailName" text="" class="cw-ability-detail__name" />
-                    <ui:Label name="AbilityDetailText" text="Tap an ability to see what it does." class="cw-ability-detail__text" />
+                    </ui:ScrollView>
                 </ui:VisualElement>
 
-                <!-- Display options. This project has no settings screen (MainMenu is
-                     Solo/Host/Join and nothing else) and is not getting one for a single
-                     boolean, so the option lives on the screen it is about: these are the
-                     very four abilities whose reach the in-match overlay draws, so "show me
-                     what these reach" is both most meaningful and most discoverable here.
+            </ui:ScrollView>
 
-                     It sits OUTSIDE #PickScroll deliberately — inside, it would be below
-                     the fold for any class whose pool wraps (Assassin's CLASS row is 6
-                     cards) and a setting nobody scrolls to is a setting nobody finds. The
-                     cost is ~128px of fixed height taken off the ScrollView, which is what
-                     the ScrollView is for.
-
-                     One row, not a stacked label+helper pair: the helper reads as the row's
-                     hint exactly like #CommonHint reads as COMMON's, and stacking would
-                     have cost a second 116px band this column does not have. -->
-                <ui:VisualElement name="OptionsRow" class="cw-opt-row">
-                    <ui:Toggle name="RangeGuidesToggle" text="Ability Range Guides" class="cw-opt-toggle" />
-                    <ui:Label name="RangeGuidesHint" text="Show a faint outline of what each equipped ability can reach." class="cw-opt-hint" />
-                </ui:VisualElement>
-
-                <!-- Developer Mode. Second row rather than sharing OptionsRow above: that row
-                     is flex-direction: row and already pairs one 48 dp toggle with a wrapping
-                     hint, so a second pair in it would halve both and push the hints to three
-                     lines each in this column's width.
-
-                     Reveals #DevRow on the main menu, which is the only route into the Ability
-                     Lab. Defaults OFF and persists in PlayerPrefs, so a tester turns it on once
-                     per device rather than once per launch.
-
-                     NOTE: .cw-opt-row is display:none in portrait (see CluckWarsTheme.uss —
-                     the column has no room for a 116px row there), so this control, like the
-                     range-guides one above it, can only be reached with the device held
-                     landscape. -->
-                <ui:VisualElement name="DevOptionsRow" class="cw-opt-row">
-                    <ui:Toggle name="DeveloperModeToggle" text="Developer Mode" class="cw-opt-toggle" />
-                    <ui:Label name="DeveloperModeHint" text="Show the Ability Lab and other developer tools on the main menu." class="cw-opt-hint" />
-                </ui:VisualElement>
-
-                <ui:Button name="ReadyBtn" text="PICK ABILITIES" class="cw-btn cw-btn--neutral" style="flex-shrink: 0; letter-spacing: 3px;" />
+            <!-- Shared ability detail — unchanged semantics/classes from the old
+                 single screen (see CluckWarsTheme.uss .cw-ability-detail for why
+                 this exists instead of a per-card description). -->
+            <ui:VisualElement name="AbilityDetail" class="cw-ability-detail">
+                <ui:Label name="AbilityDetailName" text="" class="cw-ability-detail__name" />
+                <ui:Label name="AbilityDetailText" text="Tap an ability to see what it does." class="cw-ability-detail__text" />
             </ui:VisualElement>
+
+            <!-- Display options — unchanged from the old single screen (see
+                 CluckWarsTheme.uss's "DISPLAY OPTION ROW" block for the full
+                 reasoning: no settings screen exists, both toggles live on the
+                 screen they are about, and .cw-opt-row is landscape-only). -->
+            <ui:VisualElement name="OptionsRow" class="cw-opt-row">
+                <ui:Toggle name="RangeGuidesToggle" text="Ability Range Guides" class="cw-opt-toggle" />
+                <ui:Label name="RangeGuidesHint" text="Show a faint outline of what each equipped ability can reach." class="cw-opt-hint" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="DevOptionsRow" class="cw-opt-row">
+                <ui:Toggle name="DeveloperModeToggle" text="Developer Mode" class="cw-opt-toggle" />
+                <ui:Label name="DeveloperModeHint" text="Show the Ability Lab and other developer tools on the main menu." class="cw-opt-hint" />
+            </ui:VisualElement>
+
+            <ui:Button name="ReadyBtn" text="PICK ABILITIES" class="cw-btn cw-btn--neutral" style="flex-shrink: 0; letter-spacing: 3px;" />
         </ui:VisualElement>
 
         <ui:Label name="ConsoleHints" text="←→ Select · A Confirm · LB/RB Tab" class="cw-body cw-console-hints" style="position: absolute; bottom: 12px; left: 24px; opacity: 0.6; display: none;" />
