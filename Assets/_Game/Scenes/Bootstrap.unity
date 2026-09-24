@@ -150,6 +150,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.UI.MenuUiController
   _mainMenuUxml: {fileID: 9197481963319205126, guid: 763d1b3ce9d8df942b0079eb733916ca, type: 3}
+  _classSelectUxml: {fileID: 9197481963319205126, guid: 98f0963e626934046b944c5732749df0, type: 3}
   _characterSelectUxml: {fileID: 9197481963319205126, guid: 03f67009a2b4bbb42b0f2d1b958aeb9c, type: 3}
   _lobbyUxml: {fileID: 9197481963319205126, guid: c008545b5cda90d4e811978197fdd458, type: 3}
 --- !u!114 &381346043
