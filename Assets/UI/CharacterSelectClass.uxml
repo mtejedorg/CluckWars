@@ -40,12 +40,14 @@
          static siblings the controller never touches (see .cw-role-glyph below),
          not part of the label the controller overwrites.
 
-         PreFilledTag is NOT wired by the controller at all (no query for it
-         anywhere in MenuUiController) — it is deliberately hardcoded per chip
-         here. Peck.asset AllowedClasses=7 (Warrior|Speedy|Fatty, see
-         AbilityBaseSO.ChickenClassFlags), so Warrior/Speedy/Fatty carry the tag
-         and Assassin does not — verified against the asset, not assumed from the
-         class flavor text.
+         PreFilledTag (per chip) IS wired: BuildClassSelect collects it and
+         RefreshPreFilledTags overwrites the placeholder text below with
+         "One slot pre-filled: <Ability>". Peck.asset AllowedClasses=7
+         (Warrior|Speedy|Fatty, see AbilityBaseSO.ChickenClassFlags), so
+         Warrior/Speedy/Fatty carry the tag and Assassin does not — verified
+         against the asset, not assumed from the class flavor text.
+         Landscape lays the four chips out as a 2x2 grid; the width/height
+         budget lives beside the .cw-cs-classes rules in CluckWarsTheme.uss.
 
          Sizes follow the MOBILE SIZING CONTRACT at the top of CluckWarsTheme.uss. -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
@@ -73,7 +75,7 @@
                 <ui:VisualElement name="ClassWarrior" class="cw-class-chip">
                     <ui:VisualElement class="cw-class-chip__toprow">
                         <ui:VisualElement name="ClassWarriorArt" class="cw-class-chip__art" />
-                        <ui:VisualElement style="flex-grow: 1; min-width: 0;">
+                        <ui:VisualElement class="cw-class-chip__titles">
                             <ui:Label text="WARRIOR" class="cw-class-chip__name" />
                             <ui:Label text="All-Rounder" class="cw-class-chip__role" />
                         </ui:VisualElement>
@@ -96,7 +98,7 @@
                 <ui:VisualElement name="ClassSpeedy" class="cw-class-chip">
                     <ui:VisualElement class="cw-class-chip__toprow">
                         <ui:VisualElement name="ClassSpeedyArt" class="cw-class-chip__art" />
-                        <ui:VisualElement style="flex-grow: 1; min-width: 0;">
+                        <ui:VisualElement class="cw-class-chip__titles">
                             <ui:Label text="SPEEDY" class="cw-class-chip__name" />
                             <ui:Label text="Hit &amp; Run" class="cw-class-chip__role" />
                         </ui:VisualElement>
@@ -119,7 +121,7 @@
                 <ui:VisualElement name="ClassFatty" class="cw-class-chip">
                     <ui:VisualElement class="cw-class-chip__toprow">
                         <ui:VisualElement name="ClassFattyArt" class="cw-class-chip__art" />
-                        <ui:VisualElement style="flex-grow: 1; min-width: 0;">
+                        <ui:VisualElement class="cw-class-chip__titles">
                             <ui:Label text="FATTY" class="cw-class-chip__name" />
                             <ui:Label text="Bulk Carrier" class="cw-class-chip__role" />
                         </ui:VisualElement>
@@ -144,7 +146,7 @@
                 <ui:VisualElement name="ClassAssassin" class="cw-class-chip">
                     <ui:VisualElement class="cw-class-chip__toprow">
                         <ui:VisualElement name="ClassAssassinArt" class="cw-class-chip__art" />
-                        <ui:VisualElement style="flex-grow: 1; min-width: 0;">
+                        <ui:VisualElement class="cw-class-chip__titles">
                             <ui:Label text="ASSASSIN" class="cw-class-chip__name" />
                             <ui:Label text="Disruptor" class="cw-class-chip__role" />
                         </ui:VisualElement>
