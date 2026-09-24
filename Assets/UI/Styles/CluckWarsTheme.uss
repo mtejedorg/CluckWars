@@ -299,21 +299,24 @@
     border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
     border-top-left-radius: 16px; border-top-right-radius: 16px;
     border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;
-    padding-top: 12px; padding-bottom: 12px; padding-left: 16px; padding-right: 16px;
-    margin-bottom: 12px;
+    padding-top: 10px; padding-bottom: 10px; padding-left: 16px; padding-right: 16px;
+    margin-bottom: 10px;
     transition-property: scale; transition-duration: 0.12s;
 }
 .cw-class-chip:hover { scale: 1.01 1.01; }
-/* The 4 cards split the classes column's height evenly rather than each taking
-   a fixed px — .layout--landscape .cw-cs-classes below floors the column at
-   470px wide but its height comes from the page, which varies with header/ribbon
-   size, so flex-grow keeps all 4 cards equal and full-height instead of leaving
-   a gap or overflowing by a few px per card. min-height above is the floor. */
-.layout--landscape .cw-cs-classes .cw-class-chip { flex-grow: 1; flex-basis: 0; }
-.cw-class-chip__toprow { flex-direction: row; align-items: center; margin-bottom: 10px; }
+/* Landscape layout of the 4 cards is a 2x2 grid — see the .cw-cs-classes rules
+   in the Responsive block at the bottom of this file for the width/height
+   budget. Card height is content-driven (every label below is flex-shrink:0 and
+   padding/margin-zeroed so its box equals its measured text), and the grid's
+   align-content:stretch hands any leftover column height to the two rows. */
+.cw-class-chip__toprow { flex-direction: row; align-items: center; margin-bottom: 8px; flex-shrink: 0; }
 .cw-class-chip__art { width: 76px; height: 76px; -unity-background-scale-mode: scale-to-fit; flex-shrink: 0; margin-right: 14px; }
-.cw-class-chip__name { font-size: 36px; white-space: nowrap; -unity-text-align: middle-left; }
-.cw-class-chip__role { font-size: 26px; color: rgb(196, 160, 96); white-space: nowrap; -unity-text-align: middle-left; }
+/* Name/role column. flex-shrink:0 so it can never be squeezed below its own
+   text (it used to collapse to ~4px and paint WARRIOR over the tag); the
+   pre-filled tag beside it is the element that yields instead. */
+.cw-class-chip__titles { flex-grow: 1; flex-shrink: 0; }
+.cw-class-chip__name { font-size: 36px; white-space: nowrap; -unity-text-align: middle-left; margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 0; padding-top: 0; padding-bottom: 0; padding-left: 0; padding-right: 0; flex-shrink: 0; }
+.cw-class-chip__role { font-size: 26px; color: rgb(196, 160, 96); white-space: nowrap; -unity-text-align: middle-left; margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 0; padding-top: 0; padding-bottom: 0; padding-left: 0; padding-right: 0; flex-shrink: 0; }
 .cw-slot-pill {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
     font-size: 30px;
@@ -324,22 +327,23 @@
     color: rgb(196, 160, 96);
 }
 
-/* Pre-filled-slot badge. NOT wired by MenuUiController — no query for it exists
-   anywhere in the controller — so its text is hardcoded per class directly in
-   CharacterSelectClass.uxml (present on Warrior/Speedy/Fatty, omitted on
-   Assassin per Peck.asset's AllowedClasses). Phrasing is deliberately explicit
-   that it COSTS a slot ("1 SLOT: PECK"), not a free bonus — a player who reads
-   this as a bonus and then finds only 3 slots left to fill has been misled. */
+/* Pre-filled-slot badge. The UXML text is only a placeholder — the controller
+   overwrites it with "One slot pre-filled: <Ability>" (MenuUiController.
+   RefreshPreFilledTags), ~310-360px at this size depending on the ability.
+   Omitted on Assassin per Peck.asset's AllowedClasses. It is the flexible item
+   in the top row: flex-shrink:1 + min-width:0 + white-space:normal let it wrap
+   to a second line when a long ability name meets a narrow card, instead of
+   squeezing the name/role column (.cw-class-chip__titles) to nothing. */
 .cw-prefilled-tag {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
     font-size: 24px; letter-spacing: 0.5px;
-    flex-shrink: 0;
+    flex-shrink: 1; min-width: 0; margin-left: 12px;
     padding-top: 6px; padding-bottom: 6px; padding-left: 14px; padding-right: 14px;
     border-top-left-radius: 10px; border-top-right-radius: 10px;
     border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
     background-color: rgba(245, 200, 66, 0.16);
     color: rgb(245, 200, 66);
-    -unity-text-align: middle-center; white-space: nowrap;
+    -unity-text-align: middle-center; white-space: normal;
 }
 
 /* ---- Specialization pills (Step 1) -----------------------------------------
@@ -356,7 +360,11 @@
 .cw-spec-pill {
     flex-grow: 1; flex-basis: 0;
     min-height: 116px;
-    align-items: flex-start; justify-content: center;
+    /* Top-aligned, stretched children: with justify-content:center, any text
+       taller than the pill spilled out above AND below it (the name label sat
+       at y=-15 over the top row). Stretch gives every label the full content
+       width so its measured wrap height is deterministic. */
+    align-items: stretch; justify-content: flex-start;
     background-color: rgb(48, 32, 17);
     background-image: none;                 /* Button atoms default to ButtonGrayscale — this is a card, not a pill button */
     border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
@@ -364,9 +372,20 @@
     border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
     border-top-left-radius: 14px; border-top-right-radius: 14px;
     border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
-    padding-top: 8px; padding-bottom: 8px; padding-left: 14px; padding-right: 14px;
+    padding-top: 8px; padding-bottom: 8px; padding-left: 12px; padding-right: 12px;
     margin-right: 5px; margin-left: 5px;
     transition-property: scale; transition-duration: 0.1s;
+}
+/* Every text child of a pill: never flex-shrunk below its text (the default
+   flex-shrink:1 laid the desc out 7px tall and let it overflow onto the
+   signature), and Unity's default Label margin/padding (~13px per label) zeroed
+   so the pill's height budget is exactly the text. Text alignment is set
+   explicitly because Button's default middle-center would otherwise inherit. */
+.cw-spec-pill__name, .cw-spec-pill__desc, .cw-spec-pill__signature {
+    flex-shrink: 0;
+    margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 0;
+    padding-top: 0; padding-bottom: 0; padding-left: 0; padding-right: 0;
+    -unity-text-align: upper-left;
 }
 .cw-spec-pill:hover { scale: 1.02 1.02; }
 .cw-spec-pill:active { scale: 0.98 0.98; }
@@ -386,20 +405,21 @@
     white-space: nowrap;
 }
 /* The effect line — 30px, the caption floor, not the 34px reading floor: two
-   pills side by side in a 470px column leaves ~205px of width each, and this
-   text is genuinely informative (it is the whole reason the brief asked for
-   "more info in the card"), so it gets the bigger of the two secondary sizes
-   this file uses elsewhere (.cw-pick-row__hint, .cw-stat-label) rather than
-   the 24-26px tertiary size .cw-cat-tag/.cw-cd-badge use. */
+   pills side by side in a half-width (2x2 grid) card leave ~290px of text
+   width each at the 1920x1080 reference (~340px on a Pixel 9), i.e. 2-3 lines,
+   and this text is genuinely informative (it is the whole reason the brief
+   asked for "more info in the card"), so it gets the bigger of the two
+   secondary sizes this file uses elsewhere (.cw-pick-row__hint,
+   .cw-stat-label) rather than the 24-26px tertiary size .cw-cat-tag/.cw-cd-badge use. */
 .cw-spec-pill__desc {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
     font-size: 30px; color: rgb(196, 160, 96);
-    white-space: normal; margin-top: 4px; flex-shrink: 1;
+    white-space: normal; margin-top: 2px;
 }
 .cw-spec-pill__signature {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
     font-size: 24px; letter-spacing: 0.5px; color: rgb(245, 200, 66);
-    white-space: normal; margin-top: 4px;
+    white-space: normal; margin-top: 2px;
 }
 
 /* ---- Strong/weak role callouts (Step 1 preview panel) ---------------------
@@ -1094,9 +1114,39 @@
    two columns and page padding; now up to ~1872px, which is exactly why its
    pick-row cards could move from width:32%-and-wrap to a fixed 300px scroll —
    see .cw-ability-card in the LOADOUT PICK ROWS section). */
-.layout--landscape .cw-cs-body { width: 100%; max-width: 1920px; margin-left: auto; margin-right: auto; }
-.layout--landscape .cw-cs-classes { flex-direction: column; width: 470px; flex-shrink: 0; }
-.layout--landscape .cw-cs-classes .cw-class-chip { width: auto; }
+/* max-width 2240, not 1920: every 20:9 phone in the contract table lands on a
+   ~2150x961 canvas (Pixel 9 2156x961), i.e. ~120px SHORTER than the 1080
+   reference. A 1920 cap threw away the ~236px of extra width that the Step 1
+   2x2 grid converts back into height (wider pills -> fewer desc lines); with
+   the cap the bottom card row overflowed the Pixel 9 body by ~73px (measured).
+   2240 still stops a 21:9 monitor (~2226 canvas) from stretching further. */
+.layout--landscape .cw-cs-body { width: 100%; max-width: 2240px; margin-left: auto; margin-right: auto; }
+/* Step 1 class list, landscape: a 2x2 grid that takes ALL the body width the
+   fixed preview column leaves (it used to be a 470px single column with ~950px
+   of empty body to its right, and 4 stacked cards needing ~450px each against
+   ~197px). Budget, measured with MeasureTextSize (desc 42px/line, signature
+   34px/line, pill name 33px, card name+role 73px):
+     width   1920 ref: body 1872 - preview 430 - margins 36 = 1406 -> card 49%
+             = 689 -> pill text width ~290 -> desc <=3 lines, signature <=2
+     height  card = border 6 + padding 20 + toprow 76 + 8 + pill (text <=241
+             + padding 16 + border 6-8) ~= 365; 2 rows + 2x10 margin ~= 750
+             <= 789 available in a 1920x1080 window.
+     Pixel 9 canvas ~2156x961 -> list 1641 x 669 (needs the 2240 max-width on
+             .cw-cs-body above): pill text width ~345 -> desc 2-3 lines,
+             signature 1-2; natural rows ~295 + ~333 + 20 ~= 648 <= 669.
+             That ~20px is the whole margin: a longer passive description
+             that adds a desc line in the bottom row (+42) will overflow on
+             phones. Re-run the ClassList layout probe after copy changes, and
+             wrap #ClassList in a ScrollView if it ever stops fitting.
+   Rows are content-sized; align-content:stretch gives any spare height to the
+   two rows so the grid still fills the column. flex-grow/flex-basis:0 on the
+   chips must NOT come back: basis 0 would let all 4 fit one wrap line. */
+.layout--landscape .cw-cs-classes {
+    flex-direction: row; flex-wrap: wrap;
+    justify-content: space-between; align-content: stretch;
+    flex-grow: 1; flex-shrink: 1; min-width: 0;
+}
+.layout--landscape .cw-cs-classes .cw-class-chip { width: 49%; flex-grow: 0; flex-shrink: 0; }
 
 .layout--landscape .cw-cs-preview { width: 430px; flex-shrink: 0; margin-left: 18px; margin-right: 18px; }
 .layout--portrait  .cw-cs-preview { width: 100%; margin-top: 14px; }
