@@ -6,6 +6,42 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ⚠️ Unity MCP bridge down + local build cache corrupted (2026-09-25) — no source errors found, but Unity-side verification blocked
+
+Asked to fix compile errors and test the game on `claude/cluck-wars-menu-ui-a62862` and
+`develop`. The `ai-game-developer` MCP bridge (`http://localhost:21325/...`) refused every
+connection even though the Unity Editor process was running. Root cause traced via
+`%LOCALAPPDATA%\Unity\Editor\Editor.log` (the live Editor's own log — read directly since the
+bridge itself was unreachable):
+
+- The Editor's `InitialRefreshV2(ForceSynchronousImport)` on this launch triggered a full
+  ~8-minute reimport (this is the same session where the `com.ivanmurzak.unity.mcp` package
+  auto-updated 0.90.0 → 0.93.0 — see the `chore(mcp)` commit on this branch).
+- Mid-reimport, Unity's Tundra/Bee script compiler hit a corrupted intermediate artifact —
+  `Library/Bee/artifacts/mvdfrm/UnityEditor.TestRunner.ref.dll_....mvfrm` — throwing
+  `System.BadImageFormatException` and failing the Tundra build twice (`ExitCode: 3`,
+  `--continue-on-failure`). `Library/ScriptAssemblies/UnityEditor.TestRunner.dll` on disk is
+  now literally all zero bytes.
+- This cascaded: `UnityEngine.UI.dll` — a dependency compiled from package source, not a core
+  engine module — never got produced either, and **`Assembly-CSharp.dll` (our own game code)
+  never compiled at all** in this session. Confirmed by running `dotnet build
+  Assembly-CSharp.csproj` standalone: all 74 resulting `error CS0234`/`CS0246` are in
+  `Assets/Photon/Fusion/Runtime/**` (third-party) and are 100% explained by the missing
+  `Library\ScriptAssemblies\UnityEngine.UI.dll` reference — **zero errors anywhere under
+  `Assets/_Game/**`.** This is a local build-cache corruption, not a source-code regression,
+  and it's why the MCP bridge was unreachable (the Editor never finished a clean compile).
+
+**No fix applied** — the standard remedy (close the Editor, delete `Library/Bee`, reopen so
+Tundra does a clean rebuild) means killing Maestro's live Editor process, which this session
+had no way to confirm was safe to do (unsaved scene/Play Mode state unknown) and no way to
+relaunch/drive interactively afterward. Flagged for Maestro rather than done unilaterally.
+Git hygiene for both branches was still completed and pushed — see commit `chore(mcp): Unity
+MCP 0.90.0 -> 0.93.0` on `claude/cluck-wars-menu-ui-a62862`. **Next agent: don't trust "no MCP
+errors" as a green signal by itself — check `Library/ScriptAssemblies/Assembly-CSharp.dll`
+actually exists and is non-trivial in size before believing a compile succeeded.**
+
+---
+
 ## ✏️ Ability descriptions no longer mention damage (2026-09-12) — copy only
 
 Three `Description` strings still described the pre-v0.4 HP model. Rewritten (via
