@@ -1,8 +1,8 @@
 {
   "dependencies": {
-    "com.ivanmurzak.unity.mcp": "0.90.0",
+    "com.ivanmurzak.unity.mcp": "0.93.0",
     "com.ivanmurzak.unity.mcp.animation": "1.2.32",
-    "com.ivanmurzak.unity.mcp.inputsystem": "1.0.16",
+    "com.ivanmurzak.unity.mcp.inputsystem": "1.0.17",
     "com.ivanmurzak.unity.mcp.navigation": "1.0.17",
     "com.unity.ai.assistant": "2.9.0-pre.1",
     "com.unity.ai.navigation": "2.0.12",
