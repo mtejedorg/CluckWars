@@ -6,6 +6,37 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Project opens again — three stacked causes fixed (2026-10-04)
+
+Project would not open (Package Manager error, then compile errors, then Safe Mode). Reproduced
+headless with `Unity.exe -batchmode -projectPath … -logFile …` and fixed in this order. Result:
+fresh `Library`, **0 package errors, 0 compile errors, EditMode 563/563**. Supersedes the 09-25
+note below, whose "corrupt cache" diagnosis was right but incomplete.
+
+1. **`com.ivanmurzak.unity.mcp` 0.93.0 fails Unity's sha512 integrity check** (every attempt, same
+   hash; a plain download verifies fine). Pinned to **0.93.2** (healthy; 0.93.1 also exists).
+2. **MCP add-ons were version-skewed against core.** The 0.90→0.93.0 bump left `animation`/
+   `inputsystem`/`navigation` on 1.2.32/1.0.17/1.0.17 (built for core 0.88). Now **1.2.34 / 1.0.19 /
+   1.0.19** (each pins core 0.93.2). They must move in lockstep with core.
+3. **Stale `UNITY_MCP_DEPS_4` gate defines → deadlock.** Core 0.93.x gates its assemblies on
+   `UNITY_MCP_DEPS_6`; the add-ons are gated only on `UNITY_MCP_READY`. With old defines the core is
+   skipped, the add-ons still compile against it → 222 CS0246/CS0234 errors → compile fails → the
+   resolver never runs → Safe Mode (the failure upstream documents in `NuGetConfig.cs`). Broken by
+   removing the stale defines, running the core's own "Force Resolve NuGet DLLs" (restores McpPlugin
+   8.4.0 → **8.6.0**), then `RecompileGate.EnsureReadyDefine()` (sets `UNITY_MCP_READY;UNITY_MCP_DEPS_6`
+   on all 19 groups). All committed, so a fresh clone is consistent.
+
+**Local machine cache (not in git):** `%LOCALAPPDATA%\Unity\Caches\bee` — Unity's *shared* compile
+cache, outside `Library` — held **201 zero-filled artifacts**, so `[CacheHit]` restored dead DLLs
+(`BadImageFormatException` on a different assembly each run, surviving `Library` wipes). Quarantined
+as `Caches\bee.corrupt-20261004` (safe to delete). If `BadImageFormatException` ever reappears, check
+this folder first, not just `Library/Bee`.
+
+**Lesson for next time:** after any MCP package bump, bump all four `com.ivanmurzak.unity.mcp*`
+together and confirm `ProjectSettings` defines match the core's `NuGetConfig.DependencyGenerationDefine`.
+
+---
+
 ## ⚠️ Unity MCP bridge down + local build cache corrupted (2026-09-25) — no source errors found, but Unity-side verification blocked
 
 Asked to fix compile errors and test the game on `claude/cluck-wars-menu-ui-a62862` and
