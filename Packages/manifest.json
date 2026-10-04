@@ -1,9 +1,9 @@
 {
   "dependencies": {
-    "com.ivanmurzak.unity.mcp": "0.93.0",
-    "com.ivanmurzak.unity.mcp.animation": "1.2.32",
-    "com.ivanmurzak.unity.mcp.inputsystem": "1.0.17",
-    "com.ivanmurzak.unity.mcp.navigation": "1.0.17",
+    "com.ivanmurzak.unity.mcp": "0.93.2",
+    "com.ivanmurzak.unity.mcp.animation": "1.2.34",
+    "com.ivanmurzak.unity.mcp.inputsystem": "1.0.19",
+    "com.ivanmurzak.unity.mcp.navigation": "1.0.19",
     "com.unity.ai.assistant": "2.9.0-pre.1",
     "com.unity.ai.navigation": "2.0.12",
     "com.unity.collab-proxy": "2.12.4",
