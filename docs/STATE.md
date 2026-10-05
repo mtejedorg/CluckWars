@@ -6,6 +6,30 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ No more blue screen on Play (2026-10-05)
+
+Pressing Play showed a bright blue sky for several seconds before the menu appeared. The
+Bootstrap scene's `Main Camera` cleared to the **default skybox** (Unity default blue), so
+anything that delayed the first UI paint showed sky. Changed it to `SolidColor` `#0e0804`
+(the `.cw-screen` base colour in `CluckWarsTheme.uss`), so the gap is now the menu's own
+background. Scene-only change (`m_ClearFlags 1→2`, `m_BackGroundColor`). The `Game` scene
+camera was already solid dark navy `(0.10, 0.12, 0.16)`, so the match start was never affected.
+
+**The delay itself is Editor-only and not game code.** Measured on a warm Editor: Play press →
+Bootstrap scene running ≈ **6–7 s** (≈2 s domain reload + ≈4 s asset-pipeline refresh per Play;
+the Editor.log shows `Reloading assemblies for play mode`). A cold first Play after opening the
+project is ≈20 s. `ProjectInstaller` does nothing blocking, and `MenuUiController` builds the menu
+one frame after `OnEnable`, so a built player has no such gap. `EditorSettings` has Enter Play
+Mode Options enabled with **no flags** (full domain reload on every Play); turning on *Reload
+Domain = off* would remove ~2 s but needs an audit of static state (Zenject, Fusion), so it was
+deliberately not changed.
+
+**Verification gotcha:** `tests-run` (EditMode) can leave the Editor on an **empty Untitled scene**.
+Any Play check after it tests nothing (no camera, black Game view). Re-open `Bootstrap.unity`
+first. Game View captures also go black when the Editor app is unfocused.
+
+---
+
 ## ✅ Project opens again — three stacked causes fixed (2026-10-04)
 
 Project would not open (Package Manager error, then compile errors, then Safe Mode). Reproduced
