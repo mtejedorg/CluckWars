@@ -6,6 +6,28 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Menu: skipping the specialization pills no longer dead-ends READY (2026-10-05)
+
+Found while re-testing `develop` after the redesign merge. `NextBtn` on Choose Your Chicken is
+never gated (a class is always selected), but only the *class* was seeded: `Passive` stayed null
+until a pill was tapped. A player who pressed Next without tapping a pill reached the loadout
+with every slot full and a permanently disabled READY reading **"PICK 0 MORE ABILITIES"**
+(`ready = missing == 0 && _selection.Passive != null` in `RefreshEquippedState`). The existing
+"seed Warrior" line was also a no-op (`default(ChickenClass)` is Warrior).
+
+Fix (`MenuUiController.BuildAll`): when no Passive is selected, seed the current class with
+`AbilityRegistrySO.GetDefaultPassiveForClass` via the normal `SelectClassAndPassive` path, so the
+default pill shows as selected and forced abilities are seeded. That default is already guarded by
+`DataIntegrityTests`. Verified live: default pill = RELENTLESS, Next → fill loadout → **READY ▶
+enabled** → Lobby, no errors; EditMode 563/563.
+
+**Test-harness gotcha (extends the note below):** after an MCP EditMode run the Editor can end on
+the empty Untitled scene *or* on `AbilityLab` (the Ability Lab tests open it), and that scene change
+can land *after* `tests-run` returns, overriding an immediate `scene-open`. Reopen `Bootstrap`,
+wait a few seconds, and confirm with `scene-list-opened` before any Play check.
+
+---
+
 ## ✅ No more blue screen on Play (2026-10-05)
 
 Pressing Play showed a bright blue sky for several seconds before the menu appeared. The

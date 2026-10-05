@@ -230,8 +230,15 @@ namespace CluckWars.UI
             _root.RegisterCallback<GeometryChangedEvent>(OnRootGeometry);
             UpdateLayout(_root.resolvedStyle.width, _root.resolvedStyle.height);
 
-            if (_selection != null && _selection.SelectedClass == default)
-                _selection.SelectedClass = ChickenClass.Warrior;
+            // Next on the class screen is never gated (a class is always selected), so a
+            // specialization must be too — otherwise a player who skips the pills reaches the
+            // loadout with every slot full, no Passive, and a permanently disabled READY.
+            if (_selection != null && _selection.Passive == null)
+            {
+                var cls = _selection.SelectedClass;
+                var def = _abilityRegistry?.GetDefaultPassiveForClass(cls);
+                if (def != null) SelectClassAndPassive(cls, def);
+            }
 
             ShowMainMenu();
         }
