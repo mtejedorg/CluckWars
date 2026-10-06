@@ -51,9 +51,10 @@
 .cw-bg-particle--6 { left: 70%; bottom: 15%; scale: 1.1 1.1; opacity: 0.9; }
 
 .cw-me-panel {
-    width: 94%; max-width: 2242px; max-height: 90%;
+    width: 94%; max-width: 2242px; max-height: 94%;
     flex-direction: row; align-items: stretch;
-    padding-top: 30px; padding-bottom: 30px; padding-left: 34px; padding-right: 34px;
+    /* padding-top clears the frame image's top trim (~60px inset) so FINAL STANDINGS / the target note never touch it. */
+    padding-top: 64px; padding-bottom: 36px; padding-left: 34px; padding-right: 34px;
     background-color: rgb(42, 26, 12);
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/PanelFrame.png");
     -unity-background-scale-mode: stretch-to-fill;
@@ -155,7 +156,7 @@
 
 /* -- Right standings -- */
 .cw-me-right { flex-grow: 1; min-width: 0; }
-.cw-me-head { flex-direction: row; align-items: center; margin-bottom: 15px; }
+.cw-me-head { flex-direction: row; align-items: center; margin-bottom: 12px; flex-shrink: 0; }
 .cw-me-head__title {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 34px; letter-spacing: 2px; color: rgb(245, 200, 66); margin-right: 15px;
@@ -174,8 +175,8 @@
 /* rows built in C# */
 .cw-me-row {
     flex-direction: row; align-items: center;
-    padding-top: 11px; padding-bottom: 11px; padding-left: 19px; padding-right: 19px;
-    margin-bottom: 11px;
+    padding-top: 7px; padding-bottom: 7px; padding-left: 19px; padding-right: 19px;
+    margin-bottom: 9px;
     background-color: rgb(48, 32, 18);
     border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
     border-left-color: rgb(58, 40, 22); border-right-color: rgb(58, 40, 22);

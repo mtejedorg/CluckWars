@@ -135,6 +135,7 @@ namespace CluckWars.Localization
         public const string LobbyCountUnknown = "lobby.count.unknown";
         public const string LobbyStatusSolo = "lobby.status.solo";
         public const string LobbyStatusWaiting = "lobby.status.waiting";
+        public const string LobbyHintSolo = "lobby.hint.solo";
         public const string LobbyStatusEnterCode = "lobby.status.enterCode";
         [UiArgs("n")] public const string LobbyWaitingFor = "lobby.waitingFor";
         [UiArgs("n")] public const string LobbyPlayerTag = "lobby.playerTag";

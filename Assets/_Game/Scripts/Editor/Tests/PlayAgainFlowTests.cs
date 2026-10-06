@@ -337,12 +337,97 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void SelectionService_OpenLobbyOnMenuLoad_IsOffUntilTheOverlaySetsIt()
+        public void PostMatchIntent_ClearsTheOneShotFlag_EvenWithAnInvalidSetup()
         {
-            var svc = new SessionSelectionService();
-            Assert.IsFalse(svc.OpenLobbyOnMenuLoad);
-            svc.OpenLobbyOnMenuLoad = true;
-            Assert.IsTrue(svc.OpenLobbyOnMenuLoad);
+            // BACK TO LOBBY with no valid stored setup: the flag is still consumed (otherwise every
+            // later menu load would re-trigger it) and the player lands on the main menu in Solo.
+            var intent = MatchFlowRules.DecidePostMatchIntent(true, false, SessionMode.Host);
+            Assert.IsTrue(intent.ClearFlag);
+            Assert.AreEqual(MenuLanding.MainMenu, intent.Landing);
+            Assert.AreEqual(SessionMode.Solo, intent.Mode, "the mode must not be read from an invalid setup");
+        }
+
+        [TestCase(SessionMode.Solo, MenuLanding.Lobby)]
+        [TestCase(SessionMode.Host, MenuLanding.Lobby)]
+        [TestCase(SessionMode.Join, MenuLanding.MainMenu)]
+        public void PostMatchIntent_WithAValidSetup_ConsumesTheFlagAndLandsPerMode(SessionMode mode, MenuLanding expected)
+        {
+            var intent = MatchFlowRules.DecidePostMatchIntent(true, true, mode);
+            Assert.IsTrue(intent.ClearFlag);
+            Assert.AreEqual(expected, intent.Landing);
+            Assert.AreEqual(mode, intent.Mode);
+        }
+
+        [Test]
+        public void PostMatchIntent_WithoutTheFlag_DoesNothing()
+        {
+            var intent = MatchFlowRules.DecidePostMatchIntent(false, true, SessionMode.Host);
+            Assert.IsFalse(intent.ClearFlag);
+            Assert.AreEqual(MenuLanding.MainMenu, intent.Landing);
+        }
+
+        [Test]
+        public void SelectionService_OpenLobbyOnMenuLoad_StartsOff()
+        {
+            Assert.IsFalse(new SessionSelectionService().OpenLobbyOnMenuLoad);
+        }
+
+        // ---- Round reset values + dirty-world detection ---------------------------------------------
+
+        [Test]
+        public void RoundResetFields_AreTheWaitingRoom_WithTimersClearedAndNoWinner()
+        {
+            var f = RoundResetFields.Fresh;
+            Assert.AreEqual(MatchState.WaitingForPlayers, f.State);
+            Assert.IsFalse(f.IntroTimer.IsRunning, "intro timer cleared");
+            Assert.IsFalse(f.MatchTimer.IsRunning, "match timer cleared");
+            Assert.AreEqual(Fusion.PlayerRef.None, f.WinnerPlayer);
+            Assert.AreEqual(-1, f.WinnerCorner);
+            Assert.AreEqual(0f, f.WinnerFoodTotal);
+            Assert.AreEqual(MatchEventKind.None, f.ActiveEvent);
+        }
+
+        [Test]
+        public void IsWorldDirty_FalseForAFreshWorld_TrueForEachKindOfLeftoverState()
+        {
+            Assert.IsFalse(MatchFlowRules.IsWorldDirty(new WorldDirt(0f, false, false)));
+            Assert.IsTrue(MatchFlowRules.IsWorldDirty(new WorldDirt(3f, false, false)), "banked food");
+            Assert.IsTrue(MatchFlowRules.IsWorldDirty(new WorldDirt(0f, true, false)), "drained pile");
+            Assert.IsTrue(MatchFlowRules.IsWorldDirty(new WorldDirt(0f, false, true)), "golden pile from a previous host");
+        }
+
+        // ---- LastSetup empty loadout ----------------------------------------------------------------
+
+        [Test]
+        public void LastSetup_EmptyAbilities_RoundTripsAsAnEmptyArray_NotOneEmptyName()
+        {
+            PlayerPreferences.LastSetup = new LastSetupRecord { Class = 1, Subclass = 3, Abilities = new string[0], Mode = 0 };
+            PlayerPreferences.ResetCache();
+            var back = PlayerPreferences.LastSetup;
+            Assert.IsNotNull(back);
+            Assert.AreEqual(0, back.Abilities.Length);
+            Assert.AreEqual(0, PlayerPreferences.DecodeAbilities("").Length);
+            CollectionAssert.AreEqual(new[] { "A", "B" }, PlayerPreferences.DecodeAbilities("A|B"));
+        }
+
+        // ---- Hand-written legal loadout -------------------------------------------------------------
+
+        [Test]
+        public void Resolver_AcceptsAHandWrittenLegalLoadout_ForAKnownPerk()
+        {
+            // Not built through PreEquippedLoadout.Resolve, so a regression in that helper cannot
+            // make the fixture and the resolver agree on a wrong answer. Warrior / Relentless per the
+            // shipped data: Peck.PeckSlotPreEquippedBy and Headbutt.SignaturePreEquippedBy name
+            // Relentless, plus one Warrior ability (CluckShock) and one shared one (EggShell).
+            var reg = Registry();
+            var names = new[] { "Peck", "Headbutt", "CluckShock", "EggShell" };
+            var rec = new LastSetupRecord
+            {
+                Class = (int)ChickenClass.Warrior, Subclass = (int)ChickenSubclass.Warrior_Relentless,
+                Abilities = names, Mode = (int)SessionMode.Solo,
+            };
+            Assert.IsTrue(Resolve(rec, reg, out var r, out var problem), problem);
+            CollectionAssert.AreEqual(names, r.Slots.Select(a => a.name).ToArray());
         }
     }
 }

@@ -252,6 +252,11 @@ namespace CluckWars.Settings
 
         private const char AbilitySeparator = '|';
 
+        /// <summary>Inverse of the <c>string.Join</c> in the setter. "" is an empty loadout, not one
+        /// empty name (<c>"".Split</c> would return <c>[""]</c>). Public so a test pins it.</summary>
+        public static string[] DecodeAbilities(string stored) =>
+            string.IsNullOrEmpty(stored) ? System.Array.Empty<string>() : stored.Split(AbilitySeparator);
+
         private static LastSetupRecord _lastSetup;
         private static bool _lastSetupLoaded;
 
@@ -272,8 +277,7 @@ namespace CluckWars.Settings
                         {
                             Class     = PlayerPrefs.GetInt(LastSetupClassKey, 0),
                             Subclass  = PlayerPrefs.GetInt(LastSetupSubclassKey, 0),
-                            Abilities = PlayerPrefs.GetString(LastSetupAbilitiesKey, string.Empty)
-                                                   .Split(AbilitySeparator),
+                            Abilities = DecodeAbilities(PlayerPrefs.GetString(LastSetupAbilitiesKey, string.Empty)),
                             Mode      = PlayerPrefs.GetInt(LastSetupModeKey, 0),
                         }
                         : null;

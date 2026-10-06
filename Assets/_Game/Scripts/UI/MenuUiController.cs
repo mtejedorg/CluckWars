@@ -741,11 +741,11 @@ namespace CluckWars.UI
         private void ConsumePostMatchIntent()
         {
             if (_selection == null || !_selection.OpenLobbyOnMenuLoad) return;
-            _selection.OpenLobbyOnMenuLoad = false;
 
             bool valid = TryGetLastSetup(out var setup);
-            if (MatchFlowRules.LandingAfterMatch(setup.Mode, valid) == MenuLanding.Lobby)
-                OpenLobbyWithLastSetup(setup.Mode);
+            var intent = MatchFlowRules.DecidePostMatchIntent(true, valid, valid ? setup.Mode : SessionMode.Solo);
+            if (intent.ClearFlag) _selection.OpenLobbyOnMenuLoad = false;
+            if (intent.Landing == MenuLanding.Lobby) OpenLobbyWithLastSetup(intent.Mode);
         }
 
         private void ChooseMode(SessionMode mode)

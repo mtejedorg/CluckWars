@@ -53,6 +53,8 @@ EditMode **668/668** (new: `PlayAgainFlowTests`, a MatchEnd-panel UXML test). De
 - Post-match panel strings now go through `UiText` (`postmatch.*` keys); lobby/session-end/intro overlays still literal.
 - **Open:** ui-designer restyle of the PLAY AGAIN row (phone 2424x1080 is tight: title clips, solo hint off-screen); post-match
   buttons sit flush on the panel's bottom frame; a joiner's BACK TO LOBBY leaves a live UGS lobby unhandled (as before).
+- **Review fixes (EditMode 686/686):** a GameManager spawning over a dirty world (host change: prefab flags 393217 include `DestroyWhenStateAuthorityLeaves`) now resets it first (`MatchFlowRules.IsWorldDirty`); the golden pile is found via new `[Networked] FoodPile.IsEvent`; BACK TO LOBBY has a 5 s shutdown timeout and logs; solo waiting room hides the invite card; post-match header clears the frame trim.
+- **Caveat:** music/SFX only play on the master (pre-existing, out of scope). **Rebuild PC and Pixel 9 builds together: networked state layout changed (`FoodPile.IsEvent`).**
 
 ---
 

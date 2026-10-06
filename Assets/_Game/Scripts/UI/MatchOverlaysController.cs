@@ -89,6 +89,7 @@ namespace CluckWars.UI
         // True once BACK TO LOBBY has started leaving on purpose; suppresses the "Session ended" overlay
         // that the runner shutdown would otherwise raise through HandleShutdown.
         private bool            _leavingToLobby;
+        private const int       ShutdownTimeoutMs = 5000;
 
         // Intro "GO!" flourish — lingers briefly after the countdown hits zero.
         private float       _goExpiresAtUnscaledTime;
@@ -289,7 +290,7 @@ namespace CluckWars.UI
         /// Bootstrap, which opens on THE COOP via <see cref="ISessionSelectionService.OpenLobbyOnMenuLoad"/>
         /// (a joiner lands on the main menu - decided on the menu side from the stored mode).
         /// </summary>
-        private async void OnBackToLobby()
+        private void OnBackToLobby()
         {
             if (_leavingToLobby) return; // a double tap would otherwise start two scene loads
             _leavingToLobby = true;
@@ -299,14 +300,38 @@ namespace CluckWars.UI
             if (_selection != null) _selection.OpenLobbyOnMenuLoad = true;
             else _log?.Error(Source, "No ISessionSelectionService injected: BACK TO LOBBY will open the main menu instead of THE COOP.");
 
-            try
+            // async void would swallow anything thrown after the first await; LeaveToLobbyAsync
+            // catches and logs everything itself, and the continuation surfaces a fault of its own.
+            LeaveToLobbyAsync().ContinueWith(
+                t => _log?.Error(Source, $"BACK TO LOBBY flow faulted: {t.Exception}"),
+                System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted
+                | System.Threading.Tasks.TaskContinuationOptions.ExecuteSynchronously);
+        }
+
+        private async System.Threading.Tasks.Task LeaveToLobbyAsync()
+        {
+            if (_network == null)
             {
-                if (_network != null) await _network.ShutdownAsync();
+                _log?.Error(Source, "No INetworkService injected: BACK TO LOBBY cannot shut the session down, loading the menu anyway.");
             }
-            catch (System.Exception e)
+            else
             {
-                _log?.Error(Source, $"Shutting the runner down for BACK TO LOBBY failed: {e}. " +
-                    "Loading the menu anyway - but the next session may refuse to start; relaunch the app if so.");
+                try
+                {
+                    var shutdown = _network.ShutdownAsync();
+                    var done = await System.Threading.Tasks.Task.WhenAny(
+                        shutdown, System.Threading.Tasks.Task.Delay(ShutdownTimeoutMs));
+                    if (done != shutdown)
+                        _log?.Error(Source, $"Runner shutdown for BACK TO LOBBY did not finish in {ShutdownTimeoutMs} ms. " +
+                            "Loading the menu anyway - the next session may refuse to start; relaunch the app if so.");
+                    else
+                        await shutdown; // observe a fault from the shutdown itself
+                }
+                catch (System.Exception e)
+                {
+                    _log?.Error(Source, $"Shutting the runner down for BACK TO LOBBY failed: {e}. " +
+                        "Loading the menu anyway - but the next session may refuse to start; relaunch the app if so.");
+                }
             }
 
             _log?.Info(Source, $"Match end: BACK TO LOBBY → loading '{_bootstrapSceneName}'.");
@@ -464,9 +489,12 @@ namespace CluckWars.UI
             if (runner != null) foreach (var _ in runner.ActivePlayers) playerCount++;
             int maxPlayers = _matchConfig != null ? _matchConfig.MaxPlayers : 4;
 
-            // Invite code (host only).
-            SetShown(_lobbyInviteCard, isHost);
-            if (isHost) SetCodeTiles(_selection?.SessionName);
+            bool solo = runner != null && runner.GameMode == GameMode.Single;
+
+            // Invite code: only a hosted session has anyone to invite, so never in solo.
+            bool showInvite = isHost && !solo;
+            SetShown(_lobbyInviteCard, showInvite);
+            if (showInvite) SetCodeTiles(_selection?.SessionName);
 
             // Settings.
             if (_lobbySettingTime != null && _matchConfig != null)
@@ -476,14 +504,16 @@ namespace CluckWars.UI
 
             // Status pill.
             if (_lobbyStatusCount != null) _lobbyStatusCount.text = $"{playerCount}/{maxPlayers}";
-            if (_lobbyStatusText  != null) _lobbyStatusText.text  = isHost ? "Waiting…" : "Waiting for host…";
+            if (_lobbyStatusText  != null)
+                _lobbyStatusText.text = solo ? UiText.Get(UiKeys.LobbyStatusSolo)
+                    : isHost ? "Waiting…" : "Waiting for host…";
 
             // Start button + hint (host only).
             SetShown(_lobbyStartBtn, isHost);
             if (_lobbyHint != null)
             {
-                _lobbyHint.text = isHost
-                    ? "Start whenever ready — no minimum players required."
+                _lobbyHint.text = solo ? UiText.Get(UiKeys.LobbyHintSolo)
+                    : isHost ? "Start whenever ready — no minimum players required."
                     : "Waiting for host to start the match…";
             }
 

@@ -54,7 +54,6 @@ namespace CluckWars.Gameplay
         private PrefabRegistrySO _prefabRegistry;
         private float _winCheckIntervalSeconds = 0.25f;
         private float _nextWinCheckTime;
-        private NetworkObject _eventPile;
 
         public float MatchDurationSeconds => _config != null ? _config.MatchDurationSeconds : 180f;
         public int FoodTargetToWin => _config != null ? _config.FoodTargetToWin : 110;
@@ -137,6 +136,15 @@ namespace CluckWars.Gameplay
             //   Joiners sit in the lobby until then.
             if (HasStateAuthority)
             {
+                // GameManager is a master-client object that is destroyed when its authority
+                // leaves. A host change while a match was running or ended respawns it on the new
+                // master over a world the old round dirtied; clean it before arming the lobby.
+                if (MatchFlowRules.IsWorldDirty(ScanWorldDirt()))
+                {
+                    _log?.Info(Source, "Spawned over a dirty world (host change mid-round?) — resetting before arming the lobby.");
+                    ResetWorldForNewRound();
+                }
+
                 if (Runner != null && Runner.GameMode == GameMode.Single)
                 {
                     StartMatch();
@@ -565,9 +573,30 @@ namespace CluckWars.Gameplay
             ResetWorldForNewRound();
         }
 
+        /// <summary>Reads the live bases and piles into the pure <see cref="WorldDirt"/> the
+        /// reset decision is made on.</summary>
+        private static WorldDirt ScanWorldDirt()
+        {
+            float maxBaseFood = 0f;
+            var bases = PlayerBase.ActiveBases;
+            for (int i = 0; i < bases.Count; i++)
+                if (bases[i] != null && bases[i].FoodTotal > maxBaseFood) maxBaseFood = bases[i].FoodTotal;
+
+            bool pileBelowMax = false, eventPile = false;
+            var piles = FoodPile.ActivePiles;
+            for (int i = 0; i < piles.Count; i++)
+            {
+                var p = piles[i];
+                if (p == null) continue;
+                if (p.IsEvent) eventPile = true;
+                else if (p.Amount < p.MaxAmount) pileBelowMax = true;
+            }
+            return new WorldDirt(maxBaseFood, pileBelowMax, eventPile);
+        }
+
         /// <summary>
-        /// Resets every networked entity master can touch (bases, piles, loose pickups)
-        /// and RPCs each chicken's authority to clear its own combat / cargo state.
+        /// Resets every networked entity master can touch (bases, food piles, the golden event
+        /// pile) and RPCs each chicken's authority to clear its own combat / cargo state.
         /// State then returns to <see cref="MatchState.WaitingForPlayers"/> with all timers
         /// and winner fields cleared; <see cref="StartMatch"/> arms them again on START.
         /// </summary>
@@ -583,25 +612,25 @@ namespace CluckWars.Gameplay
                 if (bases[i] != null) bases[i].FoodTotal = 0f;
             }
 
+            // Event piles (the final-minute golden pile) are despawned, found through the
+            // networked FoodPile.IsEvent flag so a pile spawned by a previous host is caught too.
+            // Despawn removes from ActivePiles, so collect first.
             var piles = FoodPile.ActivePiles;
+            var eventPiles = new System.Collections.Generic.List<NetworkObject>();
             for (int i = 0; i < piles.Count; i++)
             {
                 var p = piles[i];
                 if (p == null) continue;
+                if (p.IsEvent)
+                {
+                    if (p.Object != null && p.Object.IsValid) eventPiles.Add(p.Object);
+                    continue;
+                }
                 // Refill to whatever capacity was set at spawn (per-instance via
                 // onBeforeSpawned for center vs satellite piles).
                 p.Amount = p.MaxAmount;
             }
-
-            // Despawn the golden pile if it was spawned in the current round
-            if (_eventPile != null)
-            {
-                if (_eventPile.IsValid)
-                {
-                    Runner.Despawn(_eventPile);
-                }
-                _eventPile = null;
-            }
+            foreach (var no in eventPiles) Runner.Despawn(no);
 
             // Chickens are owned by each player — cross-authority writes go via RPC.
             // Calling these on every chicken routes to that chicken's state authority.
@@ -661,14 +690,15 @@ namespace CluckWars.Gameplay
             // Back to the waiting room. The timers are cleared (not re-armed): StartMatch
             // creates the intro + match timers when the host presses START, so each round
             // opens identically to the first one.
-            State = MatchFlowRules.PlayAgainState;
-            IntroTimer = default;
-            MatchTimer = default;
-            WinnerPlayer = PlayerRef.None;
-            WinnerCorner = -1;
-            WinnerFoodTotal = 0f;
+            var fresh = RoundResetFields.Fresh;
+            State = fresh.State;
+            IntroTimer = fresh.IntroTimer;
+            MatchTimer = fresh.MatchTimer;
+            WinnerPlayer = fresh.WinnerPlayer;
+            WinnerCorner = fresh.WinnerCorner;
+            WinnerFoodTotal = fresh.WinnerFoodTotal;
             _nextWinCheckTime = 0f;
-            ActiveEvent = MatchEventKind.None;
+            ActiveEvent = fresh.ActiveEvent;
         }
 
         private void TriggerFinalMinuteEvent()
@@ -727,7 +757,7 @@ namespace CluckWars.Gameplay
                 _log?.Warn(Source, "GoldenPile event: Failed to find non-overlapping position after 8 attempts. Spawning at last candidate.");
             }
 
-            _eventPile = Runner.Spawn(
+            Runner.Spawn(
                 _prefabRegistry.FoodPile,
                 pos,
                 Quaternion.identity,
@@ -738,6 +768,7 @@ namespace CluckWars.Gameplay
                     {
                         pile.Amount = 25f;
                         pile.MaxAmount = 25f;
+                        pile.IsEvent = true;
                     }
                 });
 

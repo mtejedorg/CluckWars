@@ -162,6 +162,13 @@ namespace CluckWars.Gameplay
         /// </summary>
         [Networked] public bool IsPermanent { get; set; }
 
+        /// <summary>
+        /// Set by the spawner via <c>onBeforeSpawned</c> on the final-minute golden pile. Networked
+        /// (not a field on <see cref="GameManager"/>) so the round reset can find and despawn the
+        /// pile even after a host change, when the new GameManager never knew it existed.
+        /// </summary>
+        [Networked] public bool IsEvent { get; set; }
+
         /// <summary>True when the pile has no food left at all — it stops blocking and stops slowing.</summary>
         public bool IsEmpty => Amount <= 0f;
 
