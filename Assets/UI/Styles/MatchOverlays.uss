@@ -29,14 +29,19 @@
     position: absolute; left: 0; top: 0; right: 0; bottom: 0;
     align-items: center; justify-content: center;
 }
-.cw-overlay--dim      { background-color: rgba(8, 4, 2, 0.88); }   /* --cw-overlay-bg */
+.cw-overlay--dim      { background-color: rgba(8, 4, 2, 0.94); }   /* --cw-overlay-bg */
+/* Match end is opaque: at 0.88-0.97 the arena and touch HUD still read through around the panel. */
+.cw-overlay--opaque   { background-color: rgb(8, 4, 2); }
 .cw-overlay--introdim { background-color: rgba(0, 0, 0, 0.45); }
 .cw-flex-spacer { flex-grow: 1; }
 
 /* ============================================================================
    MATCH END  (landscape hero + standings)
    ============================================================================ */
+/* Hidden (Phase 2 review): on the opaque scrim these faint gold dots read as dark smudges
+   (one sits top-centre). Phase 3 replaces them with the Fx sparkle/feather sprites. */
 .cw-bg-particle {
+    display: none;
     position: absolute;
     width: 46px; height: 46px;
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/PlayerDotGlossy.png");
@@ -53,8 +58,9 @@
 .cw-me-panel {
     width: 94%; max-width: 2242px; max-height: 94%;
     flex-direction: row; align-items: stretch;
-    /* padding-top clears the frame image's top trim (~60px inset) so FINAL STANDINGS / the target note never touch it. */
-    padding-top: 64px; padding-bottom: 36px; padding-left: 34px; padding-right: 34px;
+    /* padding clears the PanelFrame trim (~60px inset) on every side, so FINAL STANDINGS, the
+       target note and the KO column never touch it (they did at 2424x1080 and 2048x1536). */
+    padding-top: 64px; padding-bottom: 52px; padding-left: 64px; padding-right: 72px;
     background-color: rgb(42, 26, 12);
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/PanelFrame.png");
     -unity-background-scale-mode: stretch-to-fill;
@@ -105,21 +111,35 @@
     /* class figure set in C# via a .cw-chicken--<class> modifier */
 }
 
-/* Class figures — Stage-0 design-exported sprites (shared with the menu
-   char-select). Applied by adding a .cw-chicken--<class> modifier in C# to the
+/* Class figures — 1024 px renders of the real models (Hero_<cls>_idle.png, shared with the
+   menus). Applied by adding a .cw-chicken--<class> modifier in C# to the
    win-screen hero art + the per-player leaderboard rows. Retired UiGfx.Chicken(). */
-.cw-chicken--warrior  { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_warrior.png"); }
-.cw-chicken--speedy   { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_speedy.png"); }
-.cw-chicken--fatty    { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_fatty.png"); }
-.cw-chicken--assassin { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_assassin.png"); }
+.cw-chicken--warrior  { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Hero_warrior_idle.png"); }
+.cw-chicken--speedy   { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Hero_speedy_idle.png"); }
+.cw-chicken--fatty    { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Hero_fatty_idle.png"); }
+.cw-chicken--assassin { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Hero_assassin_idle.png"); }
+/* Phase 2: the winner gets the "cheer" render (Flare clip, head back, chest out). */
+.cw-me-winchicken.cw-chicken--warrior  { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Hero_warrior_cheer.png"); }
+.cw-me-winchicken.cw-chicken--speedy   { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Hero_speedy_cheer.png"); }
+.cw-me-winchicken.cw-chicken--fatty    { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Hero_fatty_cheer.png"); }
+.cw-me-winchicken.cw-chicken--assassin { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Hero_assassin_cheer.png"); }
+.cw-me-rosette {
+    position: absolute; right: -6px; top: -4px;
+    width: 92px; height: 92px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Badge_Rosette.png");
+    -unity-background-scale-mode: scale-to-fit;
+    rotate: 12deg;
+    /* tint = winner colour, set in C# */
+}
+/* Phase 2: the winner stands on the same tinted ring as the lobby seats (Frames/Pedestal_Ring,
+   white art, tinted with the winner colour in C#); listed before the chicken in the UXML so the
+   feet stand on it. */
 .cw-me-winring {
-    position: absolute; bottom: 8px;
-    width: 141px; height: 38px;
-    border-top-left-radius: 70px; border-top-right-radius: 70px;
-    border-bottom-left-radius: 70px; border-bottom-right-radius: 70px;
-    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
-    border-left-color: rgb(232, 117, 26); border-right-color: rgb(232, 117, 26);
-    border-top-color: rgb(232, 117, 26); border-bottom-color: rgb(232, 117, 26);  /* C# → winner color */
+    position: absolute; bottom: 0;
+    width: 190px; height: 48px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Pedestal_Ring.png");
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: rgb(232, 117, 26);  /* C# → winner color */
 }
 .cw-me-winname {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
@@ -175,8 +195,8 @@
 /* rows built in C# */
 .cw-me-row {
     flex-direction: row; align-items: center;
-    padding-top: 7px; padding-bottom: 7px; padding-left: 19px; padding-right: 19px;
-    margin-bottom: 9px;
+    padding-top: 3px; padding-bottom: 3px; padding-left: 19px; padding-right: 19px;
+    margin-bottom: 7px;
     background-color: rgb(48, 32, 18);
     border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
     border-left-color: rgb(58, 40, 22); border-right-color: rgb(58, 40, 22);
@@ -193,6 +213,22 @@
 .cw-me-medal--1 { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Medal_1.png"); }
 .cw-me-medal--2 { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Medal_2.png"); }
 .cw-me-medal--3 { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Medal_3.png"); }
+/* 4th place and below: a plain ink number badge in the medal slot (same footprint). */
+.cw-me-place {
+    align-items: center; justify-content: center;
+    width: 48px; height: 48px; margin-left: 2px; margin-right: 20px;
+    background-color: rgb(26, 14, 4);
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(138, 106, 58); border-right-color: rgb(138, 106, 58);
+    border-top-color: rgb(138, 106, 58); border-bottom-color: rgb(138, 106, 58);
+    border-top-left-radius: 24px; border-top-right-radius: 24px;
+    border-bottom-left-radius: 24px; border-bottom-right-radius: 24px;
+}
+.cw-me-place__num {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 30px; color: rgb(254, 245, 224); -unity-text-align: middle-center;
+    padding-left: 0; padding-right: 0; padding-top: 0; padding-bottom: 2px; margin-left: 0; margin-right: 0;
+}
 .cw-me-dot {
     width: 49px; height: 49px; flex-shrink: 0; margin-right: 17px;
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/PlayerDotGlossy.png");
@@ -238,8 +274,8 @@
 }
 .cw-me-rowstats {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 34px; color: rgb(196, 160, 96); width: 148px; -unity-text-align: middle-right;
-    white-space: nowrap; margin-left: 15px;
+    font-size: 34px; color: rgb(196, 160, 96); min-width: 120px; -unity-text-align: middle-right;
+    white-space: nowrap; margin-left: 15px; flex-shrink: 0;
 }
 /* Post-match actions: PLAY AGAIN (green) + BACK TO LOBBY (wood), side by side. */
 /* margin-bottom keeps the buttons off the PanelFrame's painted bottom rail (~40 px of trim
@@ -473,10 +509,25 @@
 }
 .cw-btn:hover  { scale: 1.02 1.02; }
 .cw-btn:active { scale: 0.97 0.97; }
-.cw-btn--green { -unity-background-image-tint-color: rgb(51, 163, 50); }
-.cw-btn--wood { -unity-background-image-tint-color: rgb(171, 111, 57); }
+/* Phase 2: same painted art as the menus - green CTA plank, wood plank panel (see CluckWarsTheme.uss). */
+.cw-btn--green {
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Frame_CtaPlank.png");
+    -unity-slice-left: 48; -unity-slice-right: 48; -unity-slice-top: 36; -unity-slice-bottom: 40;
+    -unity-slice-scale: 1px;
+    -unity-background-image-tint-color: rgb(255, 255, 255);
+    border-top-left-radius: 0; border-top-right-radius: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+    /* centred on the plank face: the 3D lip adds a little at the bottom, so only 2 px more there */
+    padding-top: 22px; padding-bottom: 24px;
+}
+.cw-btn--wood {
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Frame_WoodPanel.png");
+    -unity-slice-left: 40; -unity-slice-right: 40; -unity-slice-top: 40; -unity-slice-bottom: 40;
+    -unity-slice-scale: 0.6px;
+    -unity-background-image-tint-color: rgb(255, 255, 255);
+    border-top-left-radius: 0; border-top-right-radius: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+}
 /* A disabled button must still read as text: dim the face, keep the outlined label. */
-.cw-btn:disabled { opacity: 1; -unity-background-image-tint-color: rgb(118, 98, 76); color: rgb(236, 226, 206); }
+.cw-btn:disabled { opacity: 1; -unity-background-image-tint-color: rgb(150, 140, 128); color: rgb(236, 226, 206); }
 
 /* ============================================================================
    SESSION END  (small panel)

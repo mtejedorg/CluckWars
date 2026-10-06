@@ -6,6 +6,59 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Menu UI overhaul — Phase 2: art (2026-10-07)
+
+EditMode **690/690** (new `AbilityIconArtTests` x6; the two `IconsNotYetAuthored`-based icon tests retired).
+Captures: `python tools/ui_capture/capture_menu.py <dir>` + `capture_postmatch.py <dir>`; hero renders:
+`python tools/ui_capture/render_heroes.py <dir>` (runs `hero_render.cs.txt` via script-execute in a preview scene).
+
+- **Ability icons (37).** `AbilityIconStyle.ByType` -> `Icons/Abilities/Icon_<TypeName>.png` (`SpriteFileFor`); every
+  entry is authored, so `SpriteAuthored` / `SpriteClassFor` / `AuthoredSpriteClasses` are gone and `ClassFor` is the one
+  path. `Monogram` stays only as a logged-once safety net for a type with no entry. Rules regenerated in BOTH
+  `CluckWarsTheme.uss` and `TouchControls.uss`. Menus paint the cream silhouette on the HUD's own hex (`.cw-icon-disc`,
+  HexGlossy tinted with `AccentColor`); lobby mini-hexes are their own hex. HUD hexes: icon 64 -> 88 px and the
+  ShortLabel is now fallback-only (hidden when a sprite exists); cooldown seconds got an ink outline. Perk badges on
+  PICK YOUR BIRD now carry their perk icon.
+- **Emoji path retired.** `AbilityBaseSO.Icon` / `DefaultIcon` / `ResolveIcon` (no runtime consumer) and all 37
+  overrides removed; `glyph.gear` / `glyph.lock` (Noto Emoji) replaced by `Icons/Glyph_Gear.png` / `Glyph_Lock.png`;
+  `state.ready` lost its ✓ (a gold `Badge_Rosette` sits in the READY pill). The `.asset` files still carry an empty
+  `Icon:` line until Unity re-serialises them (harmless). The 14 legacy `Art/UI/Icons/Icon_*.png` are now referenced
+  by nothing (GUID grep) — left on disk, delete on Maestro's say-so.
+- **Tests.** New `AbilityIconArtTests`: every concrete type + every registry/asset ability (incl. perks) has an entry;
+  every entry's PNG exists; no orphan PNG; classes unique; every class has a rule in both sheets whose url is ITS file;
+  icons import <= 512 px on every platform. `IconsNotYetAuthored` and the two tests built on it are removed.
+- **Import settings live in code.** `UiSpriteImportSettings` (re-stamps everything under `Art/UI/` on import, so
+  hand-edited `.meta` values never stuck) now encodes the Frames MANIFEST: icons max 256 on all platforms, `Bg_*` max
+  4096 compressed + Android ASTC 6x6, Frames CompressedHQ with 9-slice borders, `Tex_WoodTile` Repeat. `GetVersion()`
+  bumped to 2, which makes Unity re-import every `Art/UI` texture once.
+- **Backdrops.** `MenuUiController.BackdropFor` returns a USS scene class (`.cw-backdrop--main/class/loadout/lobby`
+  -> `Bg_*.png`, scale-and-crop) + tint; the `Resources.Load` path is gone (textures stay in Art/UI under the
+  postprocessor). The tint layer carries `Atoms/Vignette.png`; text that sits directly on the art (subtitle, cast
+  names, solo hint, HOUSE RULES) is on an ink plate `.cw-art-plate`: measured against the brightest pixel of every
+  `Bg_*` (pure white) cream is 8.2:1 and the light class names 4.1-8.0:1. PICK YOUR BIRD keeps the class wash.
+- **Frames.** `Frame_CtaPlank` = every green CTA (menus + post-match PLAY AGAIN); `Frame_WoodPanel` = wood buttons
+  (HOME/BACK, gear, HOST/JOIN, share/copy, BACK TO LOBBY), the settings sheet and the GEAR UP deck groups;
+  `Frame_Ribbon` = screen titles (fixed 104 px, 3-slice 168 at 0.65); `Card_Cream` = `.cw-raised` + filled slots,
+  `Card_CreamSelected` = filled + armed slot (drop-in); `Pedestal_HayBale` under the hero; `Pedestal_Ring` under each
+  lobby chicken, tinted with the player colour. Wiring table in `Art/UI/Frames/MANIFEST.md`.
+- **Post-match (Phase 1 review).** KO column shows `{n} KO` (`postmatch.kos`; the old `K0` read as "KO"); every row has
+  a placement marker (Medal_1-3, then an ink number badge — no second dot); winner rosette (`#MeWinRosette`, winner
+  colour) and the winner stands on a tinted `Pedestal_Ring` in the cheer pose; match-end scrim now opaque (`.cw-overlay--opaque`; the in-session lobby keeps 0.94), the decorative `.cw-bg-particle` dots are hidden (they read as smudges; Phase 3 Fx replaces them), PLAY AGAIN's label is centred on the plank (22/24 padding), and the live top bar is HIDDEN under match-end / lobby (`MatchHudController.SetHiddenByModal`,
+  `.cw-topbar--hidden`) instead of dimmed; panel side padding 34 -> 64/72. Row/hero literals -> UiText (`lobby.playerTag`,
+  `class.*.short`, new `postmatch.winSub`, `postmatch.noWinner`).
+- **Main menu / settings.** Subtitle + solo hint on ink plates; settings scrim 0.62 -> 0.88.
+- **PICK YOUR BIRD tiles.** On wide layouts (16:9, 20:9) the four class tiles are a 2x2 grid of near-square tiles, so each
+  chicken fills its tile; 4:3 (`layout--narrow`) keeps the single row of four.
+- **Hero renders.** `Art/UI/Chickens/Hero_<cls>_idle|cheer.png` (1024 px, transparent) rendered from the real models
+  with the in-match class tint, 3/4 view, auto-cropped (square, feet 5% above the bottom). There is no cheer clip, so
+  "cheer" = the Flare cast clip at t=0.6 (head back, chest out). Idle is now every `.cw-chicken--*` portrait (menus +
+  post-match rows); the post-match winner shows the cheer. The old 512 px `Chicken_*.png` are referenced by nothing
+  (GUID grep) — left on disk.
+- **Open:** post-match buttons sit ~20 px above the frame's bottom trim on 20:9; `Tex_WoodTile` and `Fx/*` not wired (no natural surface yet / Phase 3); the in-session lobby overlay
+  (`MatchOverlays.uxml` LobbyOverlay) still has literals (out of scope); STARTER chips use the padlock, not a rosette.
+
+---
+
 ## ✅ Menu UI overhaul — Phase 1 Stage B: structure (2026-10-06)
 
 EditMode **677/677** (new: `LoadoutSlotModelTests` x8, `UiTextTests.ShippedCsv_UsesPerkStarterMovesVocabulary_NeverEquippedOrPreFilled`).

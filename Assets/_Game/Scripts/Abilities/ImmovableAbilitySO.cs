@@ -40,8 +40,6 @@ namespace CluckWars.Abilities
             Cooldown = 12f;
         }
 
-        protected override string DefaultIcon => "🧱";
-
         // Self-only: nothing is aimed at, so the indicator marks the caster's own ring.
         public override AbilityAimShape AimShape => AbilityAimShape.None;
         public override bool AffectsSelf => true;

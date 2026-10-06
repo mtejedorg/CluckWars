@@ -29,7 +29,6 @@ namespace CluckWars.Abilities
         }
 
         public override bool IsSignature => true;
-        protected override string DefaultIcon => "\U0001F4E6";
 
         public override float ModifyCargoCapacity(float capacity, ChickenController self) =>
             Mathf.Max(capacity, MinimumCapacity);

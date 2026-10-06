@@ -74,8 +74,6 @@ namespace CluckWars.Localization
         public const string CalloutAssassinWeak = "callout.assassin.weak";
         public const string GlyphPlus = "glyph.plus";
         public const string GlyphMinus = "glyph.minus";
-        public const string GlyphGear = "glyph.gear";
-        public const string GlyphLock = "glyph.lock";
 
         // ---- Perks (templated from each passive's own fields) ----
         [UiArgs("pct")] public const string PerkRelentlessLine = "perk.relentless.line";
@@ -164,6 +162,9 @@ namespace CluckWars.Localization
         [UiArgs("n")] public const string PostmatchTargetReached = "postmatch.target.reached";
         [UiArgs("n")] public const string PostmatchTargetTimeout = "postmatch.target.timeout";
         public const string PostmatchHostOnly = "postmatch.hostOnly";
+        [UiArgs("n")] public const string PostmatchKos = "postmatch.kos";
+        [UiArgs("cls", "n")] public const string PostmatchWinSub = "postmatch.winSub";
+        public const string PostmatchNoWinner = "postmatch.noWinner";
 
     }
 }

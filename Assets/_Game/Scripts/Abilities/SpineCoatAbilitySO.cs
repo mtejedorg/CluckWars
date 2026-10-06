@@ -16,8 +16,6 @@ namespace CluckWars.Abilities
         [Tooltip("How much cargo to steal back on contact.")]
         [Min(1f)] public float StealBackAmount = 4f;
 
-        protected override string DefaultIcon => "🦔";
-
         /// <summary>
         /// <inheritdoc cref="AbilityBaseSO.NominalStealAmount"/>
         /// </summary>

@@ -4,27 +4,22 @@ using CluckWars.Abilities;
 namespace CluckWars.UI
 {
     /// <summary>
-    /// Single source of truth mapping an ability's concrete ScriptableObject type
-    /// to the USS class that paints its exported <c>Icon_*.png</c> sprite (Stage-0
-    /// design export). Both the in-game touch HUD (<see cref="Input.TouchControlsController"/>)
-    /// and the menu front-end (<see cref="MenuUiController"/> character-select +
-    /// lobby) paint ability icons from these classes, so the mapping lives here
-    /// once instead of being duplicated per screen.
+    /// Single source of truth mapping an ability's concrete ScriptableObject type to the USS
+    /// class that paints its icon sprite. Both the in-game touch HUD
+    /// (<see cref="Input.TouchControlsController"/>) and the menu front-end
+    /// (<see cref="MenuUiController"/>) paint ability icons from these classes.
     /// </summary>
     /// <remarks>
-    /// Keyed by concrete type name — stable and authoring-independent, so it is
-    /// robust vs. ShortLabel / DisplayName drift ("Dive Bomb" is still the
-    /// <c>RollTrampleAbilitySO</c> type, renamed twice now with the same asset GUID).
-    /// The matching <c>.cw-hex-icon--*</c> rules are defined in every stylesheet
-    /// that shows ability icons (Assets/UI/Styles/TouchControls.uss and
-    /// CluckWarsTheme.uss) — <c>AbilitySystemTests</c> asserts both that every type
-    /// has an entry here AND that every entry resolves to a rule that actually
-    /// exists in both stylesheets, because a key with no matching rule renders a
-    /// blank hex and logs nothing.
+    /// Keyed by concrete type name — stable and authoring-independent, so it is robust vs.
+    /// ShortLabel / DisplayName drift ("Dive Bomb" is still the <c>RollTrampleAbilitySO</c> type).
     /// <para>
-    /// The <c>Icon_*.png</c> filenames still carry the pre-rename names (Icon_Peck,
-    /// Icon_FlyingPeck). The art is unchanged, so the sprites were deliberately NOT
-    /// renamed — that would churn texture GUIDs for no visual gain.
+    /// Every entry is authored (menu overhaul Phase 2, 2026-10-07): its sprite is
+    /// <c>Assets/_Game/Art/UI/Icons/Abilities/Icon_&lt;TypeName&gt;.png</c> (see
+    /// <see cref="SpriteFileFor"/>) and its <c>.cw-hex-icon--*</c> rule lives in BOTH
+    /// <c>Assets/UI/Styles/CluckWarsTheme.uss</c> and <c>TouchControls.uss</c>.
+    /// <c>AbilityIconArtTests</c> asserts the type -&gt; entry -&gt; file -&gt; rule chain end to
+    /// end, so a new ability without art fails a test instead of drawing a blank hex.
+    /// <see cref="Monogram"/> remains only as a runtime safety net for a type with no entry.
     /// </para>
     /// </remarks>
     public static class AbilityIconStyle
@@ -34,7 +29,7 @@ namespace CluckWars.UI
             { "RollTrampleAbilitySO", "cw-hex-icon--dive-bomb" },
             { "CluckShockAbilitySO",  "cw-hex-icon--cluck" },
             { "SnatchAbilitySO",      "cw-hex-icon--snatch" },
-            { "PeckAbilitySO",        "cw-hex-icon--peck" },   // foraging; art not yet exported
+            { "PeckAbilitySO",        "cw-hex-icon--peck" },
             { "RollPushAbilitySO",    "cw-hex-icon--roll" },
             { "FeatherTrapAbilitySO", "cw-hex-icon--trap" },
             { "FeatherAuraAbilitySO", "cw-hex-icon--aura" },
@@ -50,9 +45,7 @@ namespace CluckWars.UI
             { "WingSlamAbilitySO",    "cw-hex-icon--wing-slam" },
             { "ShadowstepAbilitySO",  "cw-hex-icon--shadowstep" },
             { "MarkKillAbilitySO",    "cw-hex-icon--mark-kill" },
-            // Roster expansion of 2026-08-23 (docs/design/class-essence-and-signatures.md
-            // section 4). No sprites exported yet - all seven are listed in
-            // AbilitySystemTests.IconsNotYetAuthored and carry their emoji fallback.
+            // Roster expansion of 2026-08-23 (docs/design/class-essence-and-signatures.md section 4).
             { "HeadbuttAbilitySO",       "cw-hex-icon--headbutt" },
             { "ScrapAbilitySO",          "cw-hex-icon--scrap" },
             { "RuffleAbilitySO",         "cw-hex-icon--ruffle" },
@@ -60,8 +53,7 @@ namespace CluckWars.UI
             { "FeintAbilitySO",          "cw-hex-icon--feint" },
             { "GroundQuakeAbilitySO",    "cw-hex-icon--ground-quake" },
             { "BellyFlopAbilitySO",      "cw-hex-icon--belly-flop" },
-            // Class specializations. None have exported sprites yet - all are listed in
-            // AbilitySystemTests.IconsNotYetAuthored and carry their emoji fallback.
+            // Class specializations (perks) and their signature moves.
             { "SlipperyPassiveSO",    "cw-hex-icon--slippery" },
             { "FeatherfootPassiveSO", "cw-hex-icon--featherfoot" },
             { "QuickDropAbilitySO",   "cw-hex-icon--quick-drop" },
@@ -75,39 +67,18 @@ namespace CluckWars.UI
             { "ThiefPassiveSO",       "cw-hex-icon--thief" },
         };
 
-        /// <summary>
-        /// The icon classes that actually have an exported sprite AND a matching
-        /// <c>.cw-hex-icon--*</c> rule in <c>CluckWarsTheme.uss</c>. Every other entry in
-        /// <see cref="ByType"/> is a reserved name for art that does not exist yet, and an
-        /// element given one of those classes paints NOTHING — that was the menu's
-        /// "blank hex" bug (Mark/Kill, Peck, the 2026-08-23 roster, every perk).
-        /// <c>AbilitySystemTests</c> keeps this set equal to the rules the stylesheet defines.
-        /// </summary>
-        private static readonly HashSet<string> SpriteAuthored = new()
-        {
-            "cw-hex-icon--dive-bomb", "cw-hex-icon--cluck", "cw-hex-icon--snatch",
-            "cw-hex-icon--roll", "cw-hex-icon--trap", "cw-hex-icon--aura",
-            "cw-hex-icon--root", "cw-hex-icon--shell", "cw-hex-icon--turtle",
-            "cw-hex-icon--spine", "cw-hex-icon--burst", "cw-hex-icon--invis",
-            "cw-hex-icon--doppel", "cw-hex-icon--steal",
-        };
+        /// <summary>Folder holding every ability/perk icon sprite (one per <see cref="ByType"/> key).</summary>
+        public const string IconFolder = "Assets/_Game/Art/UI/Icons/Abilities";
 
-        /// <summary>The icon classes with real sprites (see <see cref="SpriteAuthored"/>).</summary>
-        public static IReadOnlyCollection<string> AuthoredSpriteClasses => SpriteAuthored;
+        /// <summary>Every mapped concrete type name and its USS class (tests walk this).</summary>
+        public static IReadOnlyDictionary<string, string> Entries => ByType;
+
+        /// <summary>Project path of the sprite for <paramref name="typeName"/>: <c>Icon_&lt;TypeName&gt;.png</c>.</summary>
+        public static string SpriteFileFor(string typeName) => $"{IconFolder}/Icon_{typeName}.png";
 
         /// <summary>
-        /// Like <see cref="ClassFor"/>, but only when that class really paints a sprite.
-        /// Menu code uses this so an ability without art falls through to
-        /// <see cref="Monogram"/> instead of rendering an empty hex.
-        /// </summary>
-        public static string SpriteClassFor(AbilityBaseSO ability)
-        {
-            string cls = ClassFor(ability);
-            return cls != null && SpriteAuthored.Contains(cls) ? cls : null;
-        }
-
-        /// <summary>
-        /// Text that always identifies <paramref name="ability"/> when it has no sprite: its
+        /// Safety net only (every mapped type has a sprite): text that identifies an ability whose
+        /// type has no <see cref="ByType"/> entry. Its
         /// authored <see cref="AbilityBaseSO.ShortLabel"/> (the ≤4-character HUD abbreviation),
         /// else the initials of its display name, else its asset name's first two letters.
         /// Never empty for a non-null ability.
@@ -129,9 +100,9 @@ namespace CluckWars.UI
         }
 
         /// <summary>
-        /// USS icon class painting the exported sprite for <paramref name="ability"/>,
-        /// or <c>null</c> when the ability is null or has no exported sprite (the
-        /// caller then hides its icon element and lets a text label carry it).
+        /// USS icon class painting the sprite for <paramref name="ability"/>, or <c>null</c> when
+        /// the ability is null or its type has no entry (the caller logs once and falls back to
+        /// <see cref="Monogram"/>).
         /// </summary>
         public static string ClassFor(AbilityBaseSO ability) =>
             ability != null && ByType.TryGetValue(ability.GetType().Name, out var cls) ? cls : null;

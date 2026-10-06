@@ -54,8 +54,6 @@ namespace CluckWars.Abilities
             Cooldown = 0.8f; // fallback only — ResolveCooldown reads the caster's class stat
         }
 
-        protected override string DefaultIcon => "🌾";
-
         /// <summary>Peck targets a pile, never a chicken, so it declares no aim shape and is
         /// exempt from the whiff/hit styling that keys off one.</summary>
         public override AbilityAimShape AimShape => AbilityAimShape.None;

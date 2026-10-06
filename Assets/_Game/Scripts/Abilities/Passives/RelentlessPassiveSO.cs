@@ -36,7 +36,6 @@ namespace CluckWars.Abilities
         public override string PerkDetailKey => UiKeys.PerkRelentlessDetail;
         public override (string name, object value)[] PerkArgs(MatchConfigSO match) =>
             new (string, object)[] { ("pct", Percent(1f - CooldownMultiplier)) };
-        protected override string DefaultIcon => "\u26A1";
 
         public override float ModifyCooldown(float seconds, AbilityBaseSO ability, ChickenController self)
         {

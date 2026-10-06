@@ -19,6 +19,9 @@ namespace CluckWars.EditorTools
     /// • Atoms / Backgrounds: <c>Uncompressed</c> (RGBA32) — smooth gradients that
     ///   band badly under block compression.
     /// • Icons / Chickens: default <c>Compressed</c> — flat art tolerates it.
+    /// • Icons/Abilities: max 256 on every platform. Backgrounds/Bg_*: max 4096,
+    ///   compressed, ASTC 6x6 on Android. Frames: CompressedHQ, MANIFEST 9-slice borders;
+    ///   Tex_WoodTile wraps Repeat (Art/UI/Frames/MANIFEST.md).
     /// • 9-slice borders (left, bottom, right, top, in final-PNG pixels) are keyed
     ///   per atom so frames stretch without distorting their beveled corners.
     /// </summary>
@@ -40,7 +43,28 @@ namespace CluckWars.EditorTools
             { "Atoms/BarFill",         new Vector4(12, 12, 12, 12) },
             { "Atoms/GlossOverlay",    new Vector4(28, 28, 28, 28) },
             { "Atoms/CodeTile",        new Vector4(40, 40, 40, 40) },
+            // Menu overhaul Phase 2 frames (Art/UI/Frames/MANIFEST.md lists them as L/T/R/B;
+            // here they are L,B,R,T like every row above).
+            { "Frames/Frame_WoodPanel",     new Vector4(40, 40, 40, 40) },
+            { "Frames/Frame_CtaPlank",      new Vector4(48, 40, 48, 36) },
+            { "Frames/Frame_Ribbon",        new Vector4(168, 0, 168, 0) },
+            { "Frames/Card_Cream",          new Vector4(40, 44, 40, 40) },
+            { "Frames/Card_CreamSelected",  new Vector4(40, 44, 40, 40) },
         };
+
+        /// <summary>Ability / perk icons (one per AbilityIconStyle entry): 256 px sources, capped on every platform.</summary>
+        public const string AbilityIconPrefix = "Icons/Abilities/";
+        public const int AbilityIconMaxSize = 256;
+
+        /// <summary>Per-screen backdrops (2880x1440). Compressed (ASTC 6x6 on Android), not RGBA32: 16 MB each otherwise.</summary>
+        public const string BackdropPrefix = "Backgrounds/Bg_";
+        public const int BackdropMaxSize = 4096;
+
+        static readonly string[] PlatformOverrides = { "Standalone", "Android", "iPhone" };
+
+        // Bump whenever the rules above change: Unity then re-imports every texture this
+        // postprocessor touched, so the .meta files follow the code (2 = Phase 2 art rules).
+        public override uint GetVersion() => 2;
 
         void OnPreprocessTexture()
         {
@@ -59,10 +83,34 @@ namespace CluckWars.EditorTools
             ti.spritePixelsPerUnit = 100;
             ti.maxTextureSize = 2048;
 
-            bool uncompressed = key.StartsWith("Atoms/") || key.StartsWith("Backgrounds/");
+            bool backdrop = key.StartsWith(BackdropPrefix);
+            bool uncompressed = key.StartsWith("Atoms/") || (key.StartsWith("Backgrounds/") && !backdrop);
             ti.textureCompression = uncompressed
                 ? TextureImporterCompression.Uncompressed
+                : key.StartsWith("Frames/") ? TextureImporterCompression.CompressedHQ
                 : TextureImporterCompression.Compressed;
+
+            if (key == "Frames/Tex_WoodTile") ti.wrapMode = TextureWrapMode.Repeat;
+
+            if (key.StartsWith(AbilityIconPrefix))
+            {
+                ti.maxTextureSize = AbilityIconMaxSize;
+                foreach (var platform in PlatformOverrides)
+                {
+                    var ps = ti.GetPlatformTextureSettings(platform);
+                    ps.maxTextureSize = AbilityIconMaxSize;   // also caps an existing override
+                    ti.SetPlatformTextureSettings(ps);
+                }
+            }
+            else if (backdrop)
+            {
+                ti.maxTextureSize = BackdropMaxSize;
+                var android = ti.GetPlatformTextureSettings("Android");
+                android.overridden = true;
+                android.maxTextureSize = BackdropMaxSize;
+                android.format = TextureImporterFormat.ASTC_6x6;
+                ti.SetPlatformTextureSettings(android);
+            }
 
             Vector4 border = Borders.TryGetValue(key, out var b) ? b : Vector4.zero;
 

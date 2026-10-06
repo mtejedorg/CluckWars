@@ -27,7 +27,7 @@
 
         <!-- Rule chips: TIME / GOAL / MODE / ARENA. -->
         <ui:VisualElement name="RuleChips" class="cw-rule-chips">
-            <ui:Label text="@lobby.rules" class="cw-rule-chips__head" />
+            <ui:Label text="@lobby.rules" class="cw-art-plate cw-rule-chips__head" />
             <ui:VisualElement class="cw-rule-chip">
                 <ui:Label text="@lobby.setting.time" class="cw-rule-chip__k" /><ui:Label name="SetTime" text="" class="cw-rule-chip__v" />
             </ui:VisualElement>

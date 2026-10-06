@@ -72,9 +72,6 @@ namespace CluckWars.Abilities
         [Tooltip("One-line effect text for the character-select preview and the ability pick cards. " +
                  "Say what the ability does to the player, not how it is implemented.")]
         [TextArea(2, 4)] public string Description;
-        [Tooltip("Icon glyph (emoji) drawn on the hex ability button — design v3 (cluckwars-tokens-v3). " +
-                 "Leave blank to fall back to the subclass DefaultIcon.")]
-        public string Icon;
         [Tooltip("Accent color for VFX / UI highlight. Phase 6 uses it for the cooldown overlay tint.")]
         public Color AccentColor = new Color(0.45f, 0.7f, 1f, 1f);
         [Tooltip("GDD §7.2 category. Used by the character-select ability grid to group abilities.")]
@@ -126,20 +123,6 @@ namespace CluckWars.Abilities
                  "via GatherTargets (see AbilityAimTests' 'no stray scans' regression lock). Kept in case a " +
                  "future ability needs a real physics query (e.g. line-of-sight); not currently read.")]
         public LayerMask SearchMask = 256; // 1 << 8 (Chickens layer)
-
-        /// <summary>
-        /// Per-subclass default icon glyph (design v3, cluckwars-tokens-v3).
-        /// Used by <see cref="ResolveIcon"/> when the serialized <see cref="Icon"/>
-        /// field is left blank, so existing assets pick up the correct glyph
-        /// without re-authoring. Override in each concrete ability.
-        /// </summary>
-        protected virtual string DefaultIcon => "✦";
-
-        /// <summary>
-        /// The icon glyph to draw on the ability button: the authored
-        /// <see cref="Icon"/> if set, otherwise the subclass <see cref="DefaultIcon"/>.
-        /// </summary>
-        public string ResolveIcon() => string.IsNullOrEmpty(Icon) ? DefaultIcon : Icon;
 
         /// <summary>
         /// Returns the effective <see cref="BotRole"/> for this ability.

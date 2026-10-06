@@ -37,8 +37,6 @@ namespace CluckWars.Abilities
         [Tooltip("Cargo taken per grab, before Bully's multiplier. Half of Sneaky Steal's 6.")]
         [Min(1f)] public float StealAmount = 3f;
 
-        protected override string DefaultIcon => "🪝";
-
         public override float IndicatorRange => ScrapRange;
         public override bool RequiresEnemyInRange => true;
 

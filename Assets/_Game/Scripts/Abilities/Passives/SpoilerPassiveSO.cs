@@ -36,7 +36,6 @@ namespace CluckWars.Abilities
         }
 
         public override bool IsSignature => true;
-        protected override string DefaultIcon => "\U0001F5A4";
 
         public override int MatchEndBonusFood(ChickenController self) => BonusFood;
 

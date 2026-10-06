@@ -32,8 +32,6 @@ namespace CluckWars.Abilities
                + "Warrior is never allowed to out-sprint the class built around sprinting.")]
         [Range(1.05f, 2f)] public float SpeedMultiplier = 1.5f;
 
-        protected override string DefaultIcon => "💨";
-
         // Self-buff: nothing to aim at, so the indicator marks the caster's own ring
         // rather than a target area (FEEDBACK.md §2.2).
         public override AbilityAimShape AimShape => AbilityAimShape.None;

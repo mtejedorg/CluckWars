@@ -24,8 +24,6 @@ namespace CluckWars.Abilities
             AllowedClasses = ChickenClassFlags.Fatty;
         }
 
-        protected override string DefaultIcon => "\U0001F6E1";
-
         public override float ModifyControlDuration(float seconds, ChickenController self) =>
             seconds * DurationMultiplier;
 

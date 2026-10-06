@@ -36,8 +36,6 @@ namespace CluckWars.Abilities
                + "is the entire reason this roots instead of shoving.")]
         [Min(0.1f)] public float RootSeconds = 1.8f;
 
-        protected override string DefaultIcon => "🌋";
-
         public override float IndicatorRange => QuakeRadius;
         public override bool RequiresEnemyInRange => true;
 

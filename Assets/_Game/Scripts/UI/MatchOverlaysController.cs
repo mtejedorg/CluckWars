@@ -69,7 +69,7 @@ namespace CluckWars.UI
 
         private Label         _meRibbon, _meWinSub, _meWinName, _meWinScore, _meTargetNote, _meHostNote;
         private Button        _mePlayAgainBtn, _meBackBtn;
-        private VisualElement _meWinChicken, _meWinGlow, _meWinRing, _meRows;
+        private VisualElement _meWinChicken, _meWinGlow, _meWinRing, _meWinRosette, _meRows;
         // .cw-chicken--<class> currently on the win-screen hero art (for swap).
         private string        _meWinChickenClass;
 
@@ -177,7 +177,8 @@ namespace CluckWars.UI
             // Previously only RefreshIntro drove this, so during MATCH END the live
             // leaderboard sat at full brightness on top of the dimmed arena, directly
             // competing with the FINAL STANDINGS panel showing the same four scores.
-            SetTopBarDimmed(IsShown(_introOverlay) || IsShown(_matchEndOverlay) || IsShown(_lobbyOverlay));
+            SetTopBarDimmed(IsShown(_introOverlay));
+            SetTopBarHidden(IsShown(_matchEndOverlay) || IsShown(_lobbyOverlay));
         }
 
         private static bool IsShown(VisualElement ve) =>
@@ -200,6 +201,7 @@ namespace CluckWars.UI
             _meWinChicken = _root.Q<VisualElement>("MeWinChicken");
             _meWinGlow    = _root.Q<VisualElement>("MeWinGlow");
             _meWinRing    = _root.Q<VisualElement>("MeWinRing");
+            _meWinRosette = _root.Q<VisualElement>("MeWinRosette");
             _meWinSub     = _root.Q<Label>("MeWinSub");
             _meWinName    = _root.Q<Label>("MeWinName");
             _meWinScore   = _root.Q<Label>("MeWinScore");
@@ -364,13 +366,21 @@ namespace CluckWars.UI
             }
             if (_meWinGlow != null)
                 _meWinGlow.style.unityBackgroundImageTintColor = Fade(winnerColor, 0.45f);
-            if (_meWinRing != null) SetBorderColor(_meWinRing, winnerColor);
+            if (_meWinRing != null) _meWinRing.style.unityBackgroundImageTintColor = winnerColor;   // Pedestal_Ring art
+            if (_meWinRosette != null)
+            {
+                // Winner rosette (Badge_Rosette, white art) in the winner's player colour.
+                _meWinRosette.style.display = winnerCorner >= 0 ? DisplayStyle.Flex : DisplayStyle.None;
+                _meWinRosette.style.unityBackgroundImageTintColor = winnerColor;
+            }
             if (_meWinName != null)
-                _meWinName.text = winnerCorner >= 0 ? $"P{winnerCorner + 1}" : "—";
+                _meWinName.text = winnerCorner >= 0
+                    ? UiText.Format(UiKeys.LobbyPlayerTag, ("n", winnerCorner + 1))
+                    : UiText.Get(UiKeys.PostmatchNoWinner);
             if (_meWinSub != null)
             {
                 _meWinSub.text = winnerCorner >= 0
-                    ? $"{winnerClass.ToString().ToUpperInvariant()} · P{winnerCorner + 1}"
+                    ? UiText.Format(UiKeys.PostmatchWinSub, ("cls", ClassName(winnerClass)), ("n", winnerCorner + 1))
                     : string.Empty;
                 _meWinSub.style.color = winnerColor;
             }
@@ -413,17 +423,20 @@ namespace CluckWars.UI
                 row.style.backgroundColor = Fade(color, 0.2f);
             }
 
-            // Rank medal (1-3) or player-tinted dot (4th+).
+            // Placement marker: Medal_1..3 for the podium, a plain ink number badge after it
+            // (so every row has one, and it never reads as a second player dot).
             var medal = new VisualElement();
+            medal.AddToClassList("cw-me-medal");
             if (rank < 3)
             {
-                medal.AddToClassList("cw-me-medal");
                 medal.AddToClassList($"cw-me-medal--{rank + 1}");
             }
             else
             {
-                medal.AddToClassList("cw-me-dot");
-                medal.style.unityBackgroundImageTintColor = color;
+                medal.AddToClassList("cw-me-place");
+                var place = new Label((rank + 1).ToString());
+                place.AddToClassList("cw-me-place__num");
+                medal.Add(place);
             }
             row.Add(medal);
 
@@ -436,9 +449,9 @@ namespace CluckWars.UI
             // Name + class.
             var mid = new VisualElement();
             mid.AddToClassList("cw-me-rowmid");
-            var name = new Label($"P{corner + 1}");
+            var name = new Label(UiText.Format(UiKeys.LobbyPlayerTag, ("n", corner + 1)));
             name.AddToClassList("cw-me-rowname");
-            var sub = new Label(ClassForCorner(corner).ToString().ToUpperInvariant());
+            var sub = new Label(ClassName(ClassForCorner(corner)));
             sub.AddToClassList("cw-me-rowpn");
             sub.style.color = color;
             mid.Add(name); mid.Add(sub);
@@ -464,8 +477,9 @@ namespace CluckWars.UI
             food.Add(foodIcon); food.Add(score);
             row.Add(food);
 
-            // Stats — kills only (ChickenMatchStats exposes just Kills).
-            var stats = new Label($"K{kills}");
+            // Stats — knockouts only (ChickenMatchStats exposes just Kills). "{n} KO": the old
+            // "K0" read as the word "KO" with no number.
+            var stats = new Label(UiText.Format(UiKeys.PostmatchKos, ("n", kills)));
             stats.AddToClassList("cw-me-rowstats");
             row.Add(stats);
 
@@ -696,6 +710,12 @@ namespace CluckWars.UI
         /// </summary>
         private static void SetTopBarDimmed(bool dimmed) => MatchHudController.Instance?.SetIntroDimmed(dimmed);
 
+        /// <summary>
+        /// The live top bar is HIDDEN (not dimmed) under the opaque match-end / lobby modals: dimmed,
+        /// its "ENDED" + standings read through the scrim above the panel on 4:3 (Phase 1 review).
+        /// </summary>
+        private static void SetTopBarHidden(bool hidden) => MatchHudController.Instance?.SetHiddenByModal(hidden);
+
         // ========================================================================
         //  Data helpers
         // ========================================================================
@@ -771,6 +791,15 @@ namespace CluckWars.UI
             corner >= 0 ? PlayerColors[corner % PlayerColors.Length] : Color.grey;
 
         private static string KeyOf(ChickenClass cls) => cls.ToString().ToLowerInvariant();
+
+        /// <summary>Player-facing class name from the wording dictionary (class.*.short).</summary>
+        private static string ClassName(ChickenClass cls) => UiText.Get(cls switch
+        {
+            ChickenClass.Speedy   => UiKeys.ClassSpeedyShort,
+            ChickenClass.Fatty    => UiKeys.ClassFattyShort,
+            ChickenClass.Assassin => UiKeys.ClassAssassinShort,
+            _                     => UiKeys.ClassWarriorShort,
+        });
 
         private static string Passive(ChickenClass cls) => cls switch
         {

@@ -97,6 +97,7 @@ namespace CluckWars.Input
 
         // ---- Injected services -------------------------------------------------
         private ILogService   _log;
+        private readonly System.Collections.Generic.HashSet<string> _reportedMissingIcons = new();
         private ColorSchemeSO _colors;
 
         // ---- UI element refs (queried once, on bind) ---------------------------
@@ -948,32 +949,30 @@ namespace CluckWars.Input
         {
             var refs = _slots[slot];
 
-            // Icon sprite via USS class (swap the previously applied one).
+            // Icon sprite via USS class (swap the previously applied one). Every mapped
+            // ability has a sprite (AbilityIconArtTests), so the icon alone identifies it and
+            // the short label is only the safety net for a type with no AbilityIconStyle entry.
+            string cls = CluckWars.UI.AbilityIconStyle.ClassFor(equipped);
+            bool hasSprite = !string.IsNullOrEmpty(cls);
             if (refs.Icon != null)
             {
                 if (!string.IsNullOrEmpty(_appliedIconCls[slot]))
                     refs.Icon.RemoveFromClassList(_appliedIconCls[slot]);
-
-                string cls = CluckWars.UI.AbilityIconStyle.ClassFor(equipped);
-
-                if (!string.IsNullOrEmpty(cls))
-                {
-                    refs.Icon.AddToClassList(cls);
-                    refs.Icon.style.display = DisplayStyle.Flex;
-                }
-                else
-                {
-                    // No sprite mapping — hide the icon so the short label carries it.
-                    refs.Icon.style.display = DisplayStyle.None;
-                }
+                if (hasSprite) refs.Icon.AddToClassList(cls);
+                refs.Icon.style.display = hasSprite ? DisplayStyle.Flex : DisplayStyle.None;
                 _appliedIconCls[slot] = cls;
             }
+            if (equipped != null && !hasSprite && _reportedMissingIcons.Add(equipped.GetType().Name))
+                _log?.Warn(Source, $"Ability '{equipped.name}' ({equipped.GetType().Name}) has no AbilityIconStyle entry; " +
+                                   "its hex shows the short label instead of an icon.");
 
-            // Short label (falls back to DisplayName; the sole content if no icon).
             if (refs.Label != null)
-                refs.Label.text = equipped != null
+            {
+                refs.Label.text = equipped != null && !hasSprite
                     ? (string.IsNullOrEmpty(equipped.ShortLabel) ? equipped.DisplayName : equipped.ShortLabel)
                     : string.Empty;
+                refs.Label.style.display = hasSprite ? DisplayStyle.None : DisplayStyle.Flex;
+            }
         }
 
         /// <summary>

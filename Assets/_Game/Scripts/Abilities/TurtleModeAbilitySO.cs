@@ -8,8 +8,6 @@ namespace CluckWars.Abilities
         [Tooltip("Movement speed scalar while active. 0.25 = quarter speed, slow but still mobile.")]
         [Range(0.05f, 1f)] public float SpeedMultiplier = 0.25f;
 
-        protected override string DefaultIcon => "🐢";
-
         // Self-buff, no target area — marks the caster's own ring instead (FEEDBACK.md §2.2).
         public override AbilityAimShape AimShape => AbilityAimShape.None;
         public override bool AffectsSelf => true;

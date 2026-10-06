@@ -16,8 +16,6 @@ namespace CluckWars.Abilities
         [Tooltip("Alpha while active. 0 = totally invisible (fragile), 0.2 ≈ ghostly outline (readable).")]
         [Range(0f, 1f)] public float Opacity = 0.2f;
 
-        protected override string DefaultIcon => "👻";
-
         // Self-buff, no target area — marks the caster's own ring instead (FEEDBACK.md §2.2).
         public override AbilityAimShape AimShape => AbilityAimShape.None;
         public override bool AffectsSelf => true;

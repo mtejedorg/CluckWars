@@ -60,8 +60,6 @@ namespace CluckWars.Abilities
                + "outline, not a true cloak.")]
         [Range(0f, 1f)] public float Opacity = 0.2f;
 
-        protected override string DefaultIcon => "🌁";
-
         // The cast lands a cloud, not a hit. Chickens are slowed later, by the zone, so
         // cast-time hit/whiff styling must skip it entirely — dropping smoke on empty ground
         // is the normal, correct play. See AbilityBaseSO.ReportsCastHits.

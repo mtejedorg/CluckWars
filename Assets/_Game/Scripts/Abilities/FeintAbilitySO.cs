@@ -38,8 +38,6 @@ namespace CluckWars.Abilities
                + "before decay — enough to leave a grab, not enough to cross a corridor.")]
         [Min(1f)] public float SidestepImpulse = 11f;
 
-        protected override string DefaultIcon => "↔️";
-
         // Self-only: nothing is aimed at, so the indicator marks the caster's own ring.
         public override AbilityAimShape AimShape => AbilityAimShape.None;
         public override bool AffectsSelf => true;

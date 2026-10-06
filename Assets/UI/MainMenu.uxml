@@ -15,9 +15,10 @@
             playtester takes almost every time, so it is the single green CTA on
             its own row; HOST/JOIN are wood secondaries beneath it (stage 2 button
             rule: green = forward, wood = navigation/secondary, gold = selection).
-         3. A PAINTED BACKDROP. Since stage 2 the plate is the shared backdrop
-            MenuUiController puts behind every page (warm "lift" tint per page);
-            text on the art carries an ink outline instead of a dark scrim.
+         3. A PAINTED BACKDROP. The shared backdrop MenuUiController puts behind
+            every page (Phase 2: Bg_MainMenu here). Text that sits directly on the
+            bright art (subtitle, cast names, solo hint) is on an ink plate
+            (.cw-art-plate) so it keeps WCAG-AA contrast over the sky and sun.
 
          Settings (stage 2): the gear at the top-right opens #SettingsSheet, a
          modal over this page with the four PlayerPreferences toggles. It replaced
@@ -31,26 +32,26 @@
         <!-- ── Title ── -->
         <ui:VisualElement class="cw-menu-titleblock" picking-mode="Ignore">
             <ui:Label text="@main.title" class="cw-title cw-accent cw-menu-title" />
-            <ui:Label text="@main.subtitle" class="cw-body cw-on-art cw-menu-subtitle" />
+            <ui:Label text="@main.subtitle" class="cw-body cw-on-art cw-art-plate cw-menu-subtitle" />
         </ui:VisualElement>
 
         <!-- ── Cast band: the four playable chickens ── -->
         <ui:VisualElement name="CastBand" class="cw-menu-cast" picking-mode="Ignore">
             <ui:VisualElement class="cw-menu-cast__item">
                 <ui:VisualElement class="cw-chicken cw-chicken--warrior cw-menu-cast__art" />
-                <ui:Label text="@class.warrior.short" class="cw-menu-cast__name cw-menu-cast__name--warrior" />
+                <ui:Label text="@class.warrior.short" class="cw-art-plate cw-menu-cast__name cw-menu-cast__name--warrior" />
             </ui:VisualElement>
             <ui:VisualElement class="cw-menu-cast__item">
                 <ui:VisualElement class="cw-chicken cw-chicken--speedy cw-menu-cast__art" />
-                <ui:Label text="@class.speedy.short" class="cw-menu-cast__name cw-menu-cast__name--speedy" />
+                <ui:Label text="@class.speedy.short" class="cw-art-plate cw-menu-cast__name cw-menu-cast__name--speedy" />
             </ui:VisualElement>
             <ui:VisualElement class="cw-menu-cast__item">
                 <ui:VisualElement class="cw-chicken cw-chicken--fatty cw-menu-cast__art" />
-                <ui:Label text="@class.fatty.short" class="cw-menu-cast__name cw-menu-cast__name--fatty" />
+                <ui:Label text="@class.fatty.short" class="cw-art-plate cw-menu-cast__name cw-menu-cast__name--fatty" />
             </ui:VisualElement>
             <ui:VisualElement class="cw-menu-cast__item">
                 <ui:VisualElement class="cw-chicken cw-chicken--assassin cw-menu-cast__art" />
-                <ui:Label text="@class.assassin.short" class="cw-menu-cast__name cw-menu-cast__name--assassin" />
+                <ui:Label text="@class.assassin.short" class="cw-art-plate cw-menu-cast__name cw-menu-cast__name--assassin" />
             </ui:VisualElement>
         </ui:VisualElement>
 
@@ -73,7 +74,7 @@
                 <ui:Button name="HostBtn" text="@btn.host" class="cw-btn cw-btn--wood cw-menu-secondary" />
                 <ui:Button name="JoinBtn" text="@btn.join" class="cw-btn cw-btn--wood cw-menu-secondary" />
             </ui:VisualElement>
-            <ui:Label name="MainMenuHint" text="@main.soloHint" class="cw-body cw-on-art cw-menu-hint" />
+            <ui:Label name="MainMenuHint" text="@main.soloHint" class="cw-body cw-on-art cw-art-plate cw-menu-hint" />
 
             <!-- Developer tools. Hidden unless PlayerPreferences.DeveloperModeEnabled,
                  which defaults to OFF and is set from the Dev Mode toggle in the
@@ -95,10 +96,12 @@
              build is on the device. Filled by MenuUiController. -->
         <ui:Label name="BuildStamp" text="" class="cw-menu-build" picking-mode="Ignore" />
 
-        <!-- Settings gear (wood nav button, top-right). The glyph is a dictionary
-             key like every other string; the tooltip is its accessible name
+        <!-- Settings gear (wood nav button, top-right). The gear is a sprite (Icons/Glyph_Gear.png;
+             Phase 2: no emoji glyphs in menus); the tooltip is its accessible name
              (UiText.ResolveTree resolves @keys in tooltips too). -->
-        <ui:Button name="SettingsBtn" text="@glyph.gear" tooltip="@settings.title" class="cw-home-btn cw-gear-btn cw-glyph" />
+        <ui:Button name="SettingsBtn" tooltip="@settings.title" class="cw-home-btn cw-gear-btn">
+            <ui:VisualElement class="cw-gear-btn__icon" picking-mode="Ignore" />
+        </ui:Button>
 
         <!-- Settings sheet (modal). Hidden until SettingsBtn is pressed
              (MenuUiController.OpenSettings). The scrim swallows taps behind the

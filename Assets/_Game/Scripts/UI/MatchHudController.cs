@@ -44,6 +44,7 @@ namespace CluckWars.UI
         private VisualElement _topBarRoot;
         private bool          _bound;
         private bool          _introDimmed;
+        private bool          _hiddenByModal;
 
         private struct LbRow
         {
@@ -120,6 +121,7 @@ namespace CluckWars.UI
 
             _bound = true;
             ApplyIntroDimmed();
+            ApplyHiddenByModal();
         }
 
         /// <summary>
@@ -131,6 +133,23 @@ namespace CluckWars.UI
         {
             _introDimmed = dimmed;
             if (_bound) ApplyIntroDimmed();
+        }
+
+        /// <summary>
+        /// Hides the top bar entirely while an opaque full-screen modal (match end, in-session
+        /// lobby) is up, so its live text never reads through the modal's scrim.
+        /// </summary>
+        public void SetHiddenByModal(bool hidden)
+        {
+            if (_hiddenByModal == hidden) return;
+            _hiddenByModal = hidden;
+            if (_bound) ApplyHiddenByModal();
+        }
+
+        private void ApplyHiddenByModal()
+        {
+            if (_topBarRoot == null) return;
+            _topBarRoot.EnableInClassList("cw-topbar--hidden", _hiddenByModal);
         }
 
         private void ApplyIntroDimmed()

@@ -20,8 +20,6 @@ namespace CluckWars.Abilities
             Cooldown = 12f;
         }
 
-        protected override string DefaultIcon => "💥";
-
         /// <summary>
         /// Directional, aimable per FEEDBACK.md §4: a 120° forward cone instead of the
         /// SelfCircle Ambush keeps. Its own <c>StunRadius</c> (4.5 m) and therefore the same

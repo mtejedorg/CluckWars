@@ -38,8 +38,6 @@ namespace CluckWars.Abilities
         [Tooltip("Speed multiplier applied to chickens inside the zone (< 1 = slower).")]
         [Range(0.1f, 0.9f)] public float SlowFactor = 0.45f;
 
-        protected override string DefaultIcon => "🪤";
-
         // Places a zone rather than hitting targets directly, so OnActivate has no
         // GatherTargets loop — this descriptor exists purely so the hold-to-aim
         // preview (Stage 3) can draw the zone's real footprint before it's thrown.

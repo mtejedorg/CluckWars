@@ -6,7 +6,7 @@
      Atoms/JoystickBase.png, Atoms/JoystickKnob.png  : joystick
      Atoms/HexGlossy.png  : neutral hex, tinted per-ability AccentColor at runtime
                             via -unity-background-image-tint-color
-     Icons/Icon_*.png     : 14 ability icons, swapped via .cw-hex-icon--* classes
+     Icons/Abilities/Icon_<Type>.png : ability icons, swapped via .cw-hex-icon--* classes
    Reference resolution 1920x1080 (shared PanelSettings ScaleWithScreenSize).
    Sizing contract: see the header of Assets/UI/Styles/CluckWarsTheme.uss.
    The HIT TARGETS here were always phone-correct (150px hex = 64 dp, joystick
@@ -156,13 +156,12 @@
 
 /* --- Layer 7 : ability icon (design-exported sprite, swapped per-ability) -- */
 .cw-hex-icon {
-    width: 64px; height: 64px;
-    margin-bottom: 26px;              /* nudge up : short label sits below */
+    width: 88px; height: 88px;        /* the icon alone identifies the move (Phase 2 art) */
     -unity-background-scale-mode: scale-to-fit;
     /* background-image set by a .cw-hex-icon--* class at runtime */
 }
 
-/* --- Layer 7 : short label under the icon --------------------------------- */
+/* --- Layer 7 : short label (fallback only: shown when a type has no icon) --- */
 /* 2026-07-23 Android pass: was 15px = 6.4 sp, the smallest type in the app.
    The hit targets in this sheet were always fine (150px hex = 64 dp), but its
    TEXT was authored at desktop scale like the menu sheet. 28px = 12 sp is the
@@ -184,6 +183,9 @@
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 46px;
     color: rgb(254, 245, 224);
+    /* ink outline: the number sits on top of the cream icon silhouette */
+    -unity-text-outline-width: 4px;
+    -unity-text-outline-color: rgb(42, 26, 12);
     -unity-text-align: middle-center;
     display: none;                    /* controller shows while cooling down */
 }
@@ -378,21 +380,46 @@
 }
 
 /* ============================================================================
-   ABILITY ICON SPRITES  (14 : type-name -> exported Icon_*.png)
-   The controller adds exactly one of these to the .cw-hex-icon element per
-   equipped ability. Keys mirror CW_ABILITIES_V3 ids (Design/cluckwars-tokens-v3).
+   ABILITY ICON SPRITES  (37 : type-name -> Icons/Abilities/Icon_<TypeName>.png)
+   One rule per AbilityIconStyle.ByType entry, kept identical in CluckWarsTheme.uss
+   and TouchControls.uss (AbilityIconArtTests checks every class, file and url).
+   Cream silhouettes with an ink outline on transparent: the coloured hex / accent
+   disc behind them supplies the colour (menu overhaul Phase 2).
    ============================================================================ */
-.cw-hex-icon--dive-bomb {  background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_FlyingPeck.png"); }
-.cw-hex-icon--cluck    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_CluckShock.png"); }
-.cw-hex-icon--snatch    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_Peck.png"); }
-.cw-hex-icon--roll     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_RollAndPush.png"); }
-.cw-hex-icon--trap     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_FeatherTrap.png"); }
-.cw-hex-icon--aura     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_FeatherAura.png"); }
-.cw-hex-icon--root     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_RootEgg.png"); }
-.cw-hex-icon--shell    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_EggShell.png"); }
-.cw-hex-icon--turtle   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_TurtleMode.png"); }
-.cw-hex-icon--spine    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_SpineCoat.png"); }
-.cw-hex-icon--burst    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_SpeedBurst.png"); }
-.cw-hex-icon--invis    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_Invisibility.png"); }
-.cw-hex-icon--doppel   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_Doppelganger.png"); }
-.cw-hex-icon--steal    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_SneakySteal.png"); }
+.cw-hex-icon--dive-bomb    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_RollTrampleAbilitySO.png"); }
+.cw-hex-icon--cluck        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_CluckShockAbilitySO.png"); }
+.cw-hex-icon--snatch       { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SnatchAbilitySO.png"); }
+.cw-hex-icon--peck         { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_PeckAbilitySO.png"); }
+.cw-hex-icon--roll         { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_RollPushAbilitySO.png"); }
+.cw-hex-icon--trap         { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_FeatherTrapAbilitySO.png"); }
+.cw-hex-icon--aura         { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_FeatherAuraAbilitySO.png"); }
+.cw-hex-icon--root         { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_RootEggAbilitySO.png"); }
+.cw-hex-icon--shell        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_EggShellAbilitySO.png"); }
+.cw-hex-icon--turtle       { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_TurtleModeAbilitySO.png"); }
+.cw-hex-icon--spine        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SpineCoatAbilitySO.png"); }
+.cw-hex-icon--burst        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SpeedBurstAbilitySO.png"); }
+.cw-hex-icon--invis        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_InvisibilityAbilitySO.png"); }
+.cw-hex-icon--doppel       { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_DoppelgangerAbilitySO.png"); }
+.cw-hex-icon--steal        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SneakyStealAbilitySO.png"); }
+.cw-hex-icon--ambush       { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_AmbushAbilitySO.png"); }
+.cw-hex-icon--wing-slam    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_WingSlamAbilitySO.png"); }
+.cw-hex-icon--shadowstep   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_ShadowstepAbilitySO.png"); }
+.cw-hex-icon--mark-kill    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_MarkKillAbilitySO.png"); }
+.cw-hex-icon--headbutt     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_HeadbuttAbilitySO.png"); }
+.cw-hex-icon--scrap        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_ScrapAbilitySO.png"); }
+.cw-hex-icon--ruffle       { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_RuffleAbilitySO.png"); }
+.cw-hex-icon--dust-kick    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_DustKickAbilitySO.png"); }
+.cw-hex-icon--feint        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_FeintAbilitySO.png"); }
+.cw-hex-icon--ground-quake { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_GroundQuakeAbilitySO.png"); }
+.cw-hex-icon--belly-flop   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_BellyFlopAbilitySO.png"); }
+.cw-hex-icon--slippery     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SlipperyPassiveSO.png"); }
+.cw-hex-icon--featherfoot  { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_FeatherfootPassiveSO.png"); }
+.cw-hex-icon--quick-drop   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_QuickDropAbilitySO.png"); }
+.cw-hex-icon--immovable    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_ImmovableAbilitySO.png"); }
+.cw-hex-icon--smoke-roost  { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SmokeRoostAbilitySO.png"); }
+.cw-hex-icon--hoarder      { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_HoarderPassiveSO.png"); }
+.cw-hex-icon--bulwark      { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_BulwarkPassiveSO.png"); }
+.cw-hex-icon--relentless   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_RelentlessPassiveSO.png"); }
+.cw-hex-icon--bully        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_BullyPassiveSO.png"); }
+.cw-hex-icon--spoiler      { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SpoilerPassiveSO.png"); }
+.cw-hex-icon--thief        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_ThiefPassiveSO.png"); }

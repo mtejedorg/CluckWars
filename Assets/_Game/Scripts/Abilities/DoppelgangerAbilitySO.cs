@@ -34,8 +34,6 @@ namespace CluckWars.Abilities
         [Tooltip("Lateral offset from the caster where the decoy spawns. Side-step so it isn't sitting on top of the caster.")]
         [Min(0f)] public float SideOffset = 1.2f;
 
-        protected override string DefaultIcon => "👥";
-
         // Self-buff, no target area — marks the caster's own ring instead (FEEDBACK.md
         // §2.2). Stated explicitly (rather than relying on the inherited default)
         // because the asset also carries a JumpTier (its short Blink hop) — a future

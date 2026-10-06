@@ -29,8 +29,6 @@ namespace CluckWars.Abilities
         [Tooltip("Amount of cargo to steal on contact.")]
         [Min(1f)] public float StealAmount = 8f;
 
-        protected override string DefaultIcon => "🪽";
-
         public override float IndicatorRange => ForwardOffset + SweepRadius;
 
         /// <summary>

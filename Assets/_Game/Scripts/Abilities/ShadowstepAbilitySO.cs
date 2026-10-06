@@ -24,8 +24,6 @@ namespace CluckWars.Abilities
         [Tooltip("Speed multiplier applied during the blink dash.")]
         [Range(1.5f, 4f)] public float SpeedMultiplier = 3.0f;
 
-        protected override string DefaultIcon => "👤";
-
         public override AbilityAimShape AimShape => AbilityAimShape.Jump;
         public override float AimRadius => JumpLandingRadius;
         public override float AimForwardOffset => JumpResolver.GetNominalDistance(JumpTier);

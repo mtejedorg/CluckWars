@@ -49,8 +49,6 @@ namespace CluckWars.Abilities
         [Tooltip("How long the slow lasts.")]
         [Min(0.1f)] public float SlowSeconds = 2.5f;
 
-        protected override string DefaultIcon => "🌫️";
-
         public override float IndicatorRange => Reach;
 
         /// <summary>

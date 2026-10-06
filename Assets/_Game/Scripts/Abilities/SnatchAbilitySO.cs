@@ -28,8 +28,6 @@ namespace CluckWars.Abilities
         [Tooltip("Knockback impulse strength (world-units/sec) applied to the hit target. Scaled 6 -> 8.1 (x1.35) with the 2026-08-14 arena/move-speed rescale — see CluckShockAbilitySO.KnockbackForce.")]
         [Min(0f)] public float KnockbackStrength = 8.1f;
 
-        protected override string DefaultIcon => "🐦";
-
         public override float IndicatorRange => SnatchRange;
         public override bool RequiresEnemyInRange => true;
 

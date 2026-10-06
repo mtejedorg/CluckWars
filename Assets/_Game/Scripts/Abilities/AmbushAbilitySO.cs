@@ -20,6 +20,5 @@ namespace CluckWars.Abilities
             Cooldown = 10f;
         }
 
-        protected override string DefaultIcon => "🗡️";
     }
 }

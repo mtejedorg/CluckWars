@@ -33,8 +33,6 @@ namespace CluckWars.Abilities
         [Tooltip("Trigger radius within which a chicken activates the root.")]
         [Min(0.3f)] public float EggRadius = 1.45f;
 
-        protected override string DefaultIcon => "🌱";
-
         // Placed zone, not a direct hit — no GatherTargets loop in OnActivate, same
         // as Feather Trap. The egg spawns at the caster's own feet (offset 0); the
         // descriptor describes that placement rather than inventing a tuned offset.

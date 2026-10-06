@@ -16,7 +16,7 @@
         <!-- ============================================================ -->
         <!--  MATCH END  (CWMatchEndV3L)                                   -->
         <!-- ============================================================ -->
-        <ui:VisualElement name="MatchEndOverlay" class="cw-overlay cw-overlay--dim" style="display: none;">
+        <ui:VisualElement name="MatchEndOverlay" class="cw-overlay cw-overlay--dim cw-overlay--opaque" style="display: none;">
             <!-- Background particles -->
             <ui:VisualElement class="cw-bg-particle cw-bg-particle--1" />
             <ui:VisualElement class="cw-bg-particle cw-bg-particle--2" />
@@ -36,8 +36,10 @@
 
                     <ui:VisualElement name="MeWinChickenWrap" class="cw-me-chickenwrap">
                         <ui:VisualElement name="MeWinGlow" class="cw-me-winglow" />
-                        <ui:VisualElement name="MeWinChicken" class="cw-me-winchicken" />
                         <ui:VisualElement name="MeWinRing" class="cw-me-winring" />
+                        <ui:VisualElement name="MeWinChicken" class="cw-me-winchicken" />
+                        <!-- Winner rosette (Frames/Badge_Rosette, white art tinted the winner's colour in C#). -->
+                        <ui:VisualElement name="MeWinRosette" class="cw-me-rosette" picking-mode="Ignore" />
                     </ui:VisualElement>
 
                     <ui:Label name="MeWinName" text="" class="cw-me-winname" />

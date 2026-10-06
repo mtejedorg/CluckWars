@@ -23,8 +23,6 @@ namespace CluckWars.Abilities
             Cooldown = 5f;
         }
 
-        protected override string DefaultIcon => "🎯";
-
         public override float IndicatorRange => AssassinExecute.MaxMarkRange;
         public override bool RequiresEnemyInRange => true;
 

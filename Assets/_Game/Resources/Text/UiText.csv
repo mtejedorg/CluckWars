@@ -46,8 +46,6 @@ callout.assassin.strong,Blink and it's gone.
 callout.assassin.weak,"Light load, slow beak."
 glyph.plus,+
 glyph.minus,−
-glyph.gear,⚙
-glyph.lock,🔒
 perk.relentless.line,Every move recharges {pct}% faster.
 perk.relentless.detail,Applies to every move except Peck.
 perk.bully.line,"Steal {steal}% more, carry {cap} more."
@@ -113,7 +111,7 @@ lobby.err.join,Could not join that code.
 lobby.joining,Joining…
 tag.host,HOST
 tag.cpu,CPU
-state.ready,✓ READY
+state.ready,READY
 state.picking,PICKING
 lobby.allReady,READY!
 lobby.bot.1,DashFox
@@ -127,3 +125,6 @@ postmatch.ended,MATCH ENDED
 postmatch.target.reached,target {n} · reached
 postmatch.target.timeout,target {n} · timer out
 postmatch.hostOnly,The host picks when to play again.
+postmatch.kos,{n} KO
+postmatch.winSub,{cls} · P{n}
+postmatch.noWinner,—

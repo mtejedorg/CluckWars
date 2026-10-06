@@ -50,8 +50,6 @@ namespace CluckWars.Abilities
                + "discount on every trip. Feeds Solo Clear Time: re-solve, never hand-tune.")]
         [Range(1.1f, 8f)] public float DepositRateMultiplier = 4f;
 
-        protected override string DefaultIcon => "💰";
-
         // Self-only: nothing is aimed at, so the indicator marks the caster's own ring.
         public override AbilityAimShape AimShape => AbilityAimShape.None;
         public override bool AffectsSelf => true;

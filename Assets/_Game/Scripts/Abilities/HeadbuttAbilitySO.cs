@@ -45,8 +45,6 @@ namespace CluckWars.Abilities
         [Tooltip("Stagger applied on contact. A hitch, not a stun — Wing Slam is the real one.")]
         [Range(0.05f, 1f)] public float StaggerSeconds = 0.35f;
 
-        protected override string DefaultIcon => "🐏";
-
         public override float IndicatorRange => Reach;
         public override bool RequiresEnemyInRange => true;
 

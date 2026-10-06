@@ -5,7 +5,6 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "EggShell", menuName = "Cluck Wars/Ability/Egg Shell", order = 1)]
     public sealed class EggShellAbilitySO : AbilityBaseSO
     {
-        protected override string DefaultIcon => "🥚";
 
         // Self-buff, no target area — marks the caster's own ring instead (FEEDBACK.md §2.2).
         public override AbilityAimShape AimShape => AbilityAimShape.None;

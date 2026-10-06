@@ -23,7 +23,6 @@ namespace CluckWars.Abilities
         }
 
         public override bool IsSignature => true;
-        protected override string DefaultIcon => "\U0001F4A8";
 
         public override float ModifyControlDuration(float seconds, ChickenController self) =>
             seconds * DurationMultiplier;

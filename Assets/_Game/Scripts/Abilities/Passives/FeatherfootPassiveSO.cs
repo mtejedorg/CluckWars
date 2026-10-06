@@ -24,8 +24,6 @@ namespace CluckWars.Abilities
             AllowedClasses = ChickenClassFlags.Speedy;
         }
 
-        protected override string DefaultIcon => "\U0001FAB6";
-
         public override bool IgnoresPileSlow(ChickenController self) => true;
 
         public override string PerkLineKey => UiKeys.PerkFeatherfootLine;

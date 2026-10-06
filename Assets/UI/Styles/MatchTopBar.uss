@@ -26,6 +26,10 @@
 .cw-topbar--dimmed {
     opacity: 0.4;
 }
+/* Under the match-end / in-session lobby modals (MatchHudController.SetHiddenByModal). */
+.cw-topbar--hidden {
+    display: none;
+}
 
 .cw-topbar-layout {
     flex-direction: row;

@@ -29,8 +29,6 @@ namespace CluckWars.Abilities
             AllowedClasses = ChickenClassFlags.Warrior;
         }
 
-        protected override string DefaultIcon => "\U0001F4AA";
-
         public override float ModifyStealAmount(float amount, ChickenController self) =>
             amount * StealMultiplier;
 

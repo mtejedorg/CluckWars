@@ -55,8 +55,6 @@ namespace CluckWars.Abilities
                + "that sells the weight.")]
         [Min(0f)] public float KnockbackForce = 6f;
 
-        protected override string DefaultIcon => "🫃";
-
         public override float IndicatorRange => ImpactRadius;
 
         /// <summary>

@@ -11,9 +11,10 @@
            HomeBtn, NextBtn
            ClassWarrior / ClassSpeedy / ClassFatty / ClassAssassin  (tiles; ChipNames order)
            <TileName>Art                                           (tile chicken)
-           Hero, HeroStage, PreviewGlow, PreviewDisc, PreviewChicken, PreviewName, PreviewQuote,
+           Hero, HeroStage, PreviewGlow, PreviewChicken, PreviewName, PreviewQuote  (PreviewDisc = the
+           hay-bale pedestal, pure USS, not queried),
            RoleCalloutStrong, RoleCalloutWeak
-           PerkBadgeA / PerkBadgeB (children by class .cw-perk-badge__name / __line), PerkDetail
+           PerkBadgeA / PerkBadgeB (children by class .cw-perk-badge__icon / __name / __line), PerkDetail
            StarterRow, StarterChip0 / StarterChip1 (children .cw-starter-chip__icon / __name)
 
          Sizes follow the MOBILE SIZING CONTRACT at the top of CluckWarsTheme.uss. -->
@@ -83,11 +84,17 @@
                     <ui:Label text="@label.perk" class="cw-small-head" />
                     <ui:VisualElement class="cw-perk-row">
                         <ui:Button name="PerkBadgeA" class="cw-perk-badge">
-                            <ui:Label text="" class="cw-perk-badge__name" picking-mode="Ignore" />
+                            <ui:VisualElement class="cw-perk-badge__head" picking-mode="Ignore">
+                                <ui:VisualElement class="cw-perk-badge__icon" picking-mode="Ignore" />
+                                <ui:Label text="" class="cw-perk-badge__name" picking-mode="Ignore" />
+                            </ui:VisualElement>
                             <ui:Label text="" class="cw-perk-badge__line" picking-mode="Ignore" />
                         </ui:Button>
                         <ui:Button name="PerkBadgeB" class="cw-perk-badge">
-                            <ui:Label text="" class="cw-perk-badge__name" picking-mode="Ignore" />
+                            <ui:VisualElement class="cw-perk-badge__head" picking-mode="Ignore">
+                                <ui:VisualElement class="cw-perk-badge__icon" picking-mode="Ignore" />
+                                <ui:Label text="" class="cw-perk-badge__name" picking-mode="Ignore" />
+                            </ui:VisualElement>
                             <ui:Label text="" class="cw-perk-badge__line" picking-mode="Ignore" />
                         </ui:Button>
                     </ui:VisualElement>

@@ -33,3 +33,23 @@ Particles live in `../Fx/`: `Fx_Sparkle.png` (64x64), `Fx_Feather_1..3.png` (128
 | `../Fx/*` | Sprite (2D and UI) | Single | 100 | Bilinear | Alpha Is Transparency on, Mip Maps off |
 | `../Icons/Abilities/Icon_*` | Sprite (2D and UI) | Single | 100 | Bilinear | Alpha Is Transparency on, Max Size 256, Mip Maps off |
 | `../Backgrounds/Bg_*` (2880x1440) | Sprite (2D and UI) | Single | 100 | Bilinear | Max Size 4096, Mip Maps off, Compression Normal (ASTC 6x6 on Android) |
+
+The table above is **enforced in code** by `Assets/_Game/Scripts/Editor/UiSpriteImportSettings.cs`
+(9-slice borders, icon max 256 on every platform, backdrop max 4096 + Android ASTC 6x6, Repeat on
+`Tex_WoodTile`). Edit the postprocessor, not the `.meta` files: it re-stamps every texture under
+`Art/UI/` on import, and bumping its `GetVersion()` re-imports them all.
+
+## Where it is wired (Phase 2, 2026-10-07)
+
+| Asset | Used by |
+|---|---|
+| `Frame_WoodPanel` | `.cw-wood-panel` (settings sheet), `.cw-deck-group` (GEAR UP deck), wood buttons `.cw-btn--wood` / `.cw-home-btn` / `.cw-mini-btn` (menus + post-match) |
+| `Frame_CtaPlank` | `.cw-btn--green`: PLAY SOLO, GEAR UP, READY, START MATCH, post-match PLAY AGAIN |
+| `Frame_Ribbon` | `.cw-ribbon`: PICK YOUR BIRD / GEAR UP / THE COOP / SETTINGS titles |
+| `Card_Cream` / `Card_CreamSelected` | `.cw-raised` (hero card, lobby cards, settings body); filled / armed GEAR UP slots |
+| `Pedestal_HayBale` | PICK YOUR BIRD hero (`.cw-hero__platform`) |
+| `Pedestal_Ring` | THE COOP seat pedestals, tinted with the player colour |
+| `Badge_Rosette` | THE COOP READY badge (gold), post-match winner rosette (winner colour) |
+| `Tex_WoodTile`, `../Fx/*` | not wired yet (Fx is Phase 3) |
+| `../Icons/Glyph_Gear`, `../Icons/Glyph_Lock` | settings gear, STARTER padlock (replace the Noto Emoji glyphs) |
+| `../Atoms/Vignette` | ink vignette on the backdrop tint layer |

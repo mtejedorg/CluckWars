@@ -495,7 +495,6 @@ namespace CluckWars.Editor
                 case "DisplayName":
                 case "ShortLabel":
                 case "Description":
-                case "Icon":
                 case "AccentColor":
                 case "Duration":
                 case "Cooldown":

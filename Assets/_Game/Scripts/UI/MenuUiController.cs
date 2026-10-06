@@ -71,7 +71,7 @@ namespace CluckWars.UI
 
         // ---- PICK YOUR BIRD (built once in BuildClassSelect) --------------------
         private readonly Dictionary<ChickenClass, VisualElement> _classTiles = new();
-        private VisualElement _heroStage, _previewChicken, _previewGlow, _previewDisc;
+        private VisualElement _heroStage, _previewChicken, _previewGlow;
         private Label _previewName, _previewQuote, _perkDetail;
         private Label _roleCalloutStrong, _roleCalloutWeak;
         // .cw-chicken--<class> currently on the hero figure (for swap).
@@ -370,31 +370,37 @@ namespace CluckWars.UI
         }
 
         // ---- Backdrop -----------------------------------------------------------
-        /// <summary>How a page wants the shared backdrop: which image, and the lift tint over it.</summary>
+        /// <summary>How a page wants the shared backdrop: which painted scene (a USS modifier class
+        /// on #Backdrop) and the colour of the tint layer over it.</summary>
         private readonly struct BackdropSpec
         {
-            public readonly string Resource; // Resources path of a Texture2D, or null = the default plate
+            public readonly string SceneClass;
             public readonly Color Tint;
-            public BackdropSpec(string resource, Color tint) { Resource = resource; Tint = tint; }
+            public BackdropSpec(string sceneClass, Color tint) { SceneClass = sceneClass; Tint = tint; }
         }
 
-        // Warm golden-hour lift over the dusk plate. Per page so Phase 2 can drop in a
-        // Backgrounds/Bg_* image for a screen by changing one row here (Resource), without
-        // touching any UXML. Null Resource keeps the default plate from .cw-backdrop.
-        private static readonly Color WarmLift = new Color(1f, 0.77f, 0.47f, 0.24f);
-        private static readonly Color WarmLiftBusy = new Color(1f, 0.80f, 0.55f, 0.30f);
+        // Phase 2: one painted golden-hour scene per screen (Art/UI/Backgrounds/Bg_*.png), chosen by
+        // a USS modifier class rather than Resources.Load, so the textures stay in Art/UI (imported
+        // by UiSpriteImportSettings) and the stylesheet is the one place that names them. The tint
+        // layer also carries the vignette (.cw-backdrop-tint); its colour is a light ink scrim that
+        // knocks the bright scenes back behind the cards, or the class wash on PICK YOUR BIRD.
+        private const string SceneMain = "cw-backdrop--main", SceneClass = "cw-backdrop--class",
+                             SceneLoadout = "cw-backdrop--loadout", SceneLobby = "cw-backdrop--lobby";
+        private static readonly Color ScrimMenu = new Color(0.10f, 0.05f, 0.02f, 0.10f);
+        private static readonly Color ScrimBusy = new Color(0.10f, 0.05f, 0.02f, 0.22f);
+        private string _appliedScene;
 
         private BackdropSpec BackdropFor(VisualElement page)
         {
             if (page == _classSelect)
             {
-                // Choose Your Chicken: tinted by the selected class (lightened so the plate
-                // still lifts toward golden hour rather than darkening into the class hue).
+                // PICK YOUR BIRD: washed with the selected class (lightened so it stays sunny).
                 var t = Lighten(TintOf(Cls), 0.25f);
-                return new BackdropSpec(null, new Color(t.r, t.g, t.b, 0.34f));
+                return new BackdropSpec(SceneClass, new Color(t.r, t.g, t.b, 0.30f));
             }
-            if (page == _mainMenu) return new BackdropSpec(null, WarmLift);
-            return new BackdropSpec(null, WarmLiftBusy);
+            if (page == _loadout) return new BackdropSpec(SceneLoadout, ScrimBusy);
+            if (page == _lobby)   return new BackdropSpec(SceneLobby, ScrimBusy);
+            return new BackdropSpec(SceneMain, ScrimMenu);
         }
 
         private VisualElement _currentPage;
@@ -404,15 +410,12 @@ namespace CluckWars.UI
         {
             if (_backdrop == null || _backdropTint == null) return;
             var spec = BackdropFor(_currentPage);
-
-            Texture2D tex = null;
-            if (!string.IsNullOrEmpty(spec.Resource))
+            if (_appliedScene != spec.SceneClass)
             {
-                tex = Resources.Load<Texture2D>(spec.Resource);
-                if (tex == null) _log?.Warn(Source, $"Backdrop '{spec.Resource}' not found in Resources; keeping the default plate.");
+                if (_appliedScene != null) _backdrop.RemoveFromClassList(_appliedScene);
+                _backdrop.AddToClassList(spec.SceneClass);
+                _appliedScene = spec.SceneClass;
             }
-            // StyleKeyword.Null hands the image back to .cw-backdrop (the default plate).
-            _backdrop.style.backgroundImage = tex != null ? new StyleBackground(tex) : new StyleBackground(StyleKeyword.Null);
             _backdropTint.style.backgroundColor = spec.Tint;
         }
 
@@ -758,31 +761,35 @@ namespace CluckWars.UI
         //  ICON VIEW (shared by deck cards, slots, starter chips, lobby hexes)
         // ======================================================================
         /// <summary>
-        /// One ability icon slot, built once: a sprite element and a monogram label that
-        /// <see cref="PaintIcon"/> repaints in place (class swap / text), never re-creating them.
+        /// One ability icon slot, built once: an accent hex (disc), the icon sprite on it, and a
+        /// monogram label (safety net), which <see cref="PaintIcon"/> repaints in place.
         /// </summary>
         private sealed class AbilityIconView
         {
+            public readonly VisualElement Disc;
             public readonly VisualElement Sprite;
             public readonly Label Mono;
             public string SpriteClass;
 
             public AbilityIconView(VisualElement host)
             {
+                Disc = new VisualElement { pickingMode = PickingMode.Ignore };
+                Disc.AddToClassList("cw-icon-disc");
                 Sprite = new VisualElement { pickingMode = PickingMode.Ignore };
                 Sprite.AddToClassList("cw-icon-sprite");
                 Mono = new Label { pickingMode = PickingMode.Ignore };
                 Mono.AddToClassList("cw-ability-mono");
+                host.Add(Disc);
                 host.Add(Sprite);
                 host.Add(Mono);
             }
         }
 
         /// <summary>
-        /// Paints <paramref name="ab"/> into <paramref name="view"/>: its exported sprite when one is
-        /// authored (<see cref="AbilityIconStyle.SpriteClassFor"/>), otherwise its
-        /// <see cref="AbilityIconStyle.Monogram"/> on an accent disc. Never blank; null clears it.
-        /// The first time an ability is drawn without a sprite it is logged once.
+        /// Paints <paramref name="ab"/> into <paramref name="view"/>: its icon sprite
+        /// (<see cref="AbilityIconStyle.ClassFor"/>; every mapped type is authored). A type with no
+        /// mapping falls back to its <see cref="AbilityIconStyle.Monogram"/> on an accent disc and is
+        /// logged once — a safety net, since AbilityIconArtTests fails on any unmapped type.
         /// </summary>
         private void PaintIcon(AbilityIconView view, AbilityBaseSO ab, bool disc = true)
         {
@@ -792,26 +799,32 @@ namespace CluckWars.UI
 
             if (ab == null)
             {
+                view.Disc.style.display = DisplayStyle.None;
                 view.Sprite.style.display = DisplayStyle.None;
                 view.Mono.style.display = DisplayStyle.None;
                 return;
             }
 
-            string iconCls = AbilityIconStyle.SpriteClassFor(ab);
+            var accent = ab.AccentColor;
+            accent.a = 1f;
+            string iconCls = AbilityIconStyle.ClassFor(ab);
             if (!string.IsNullOrEmpty(iconCls))
             {
+                // Cream silhouette on the ability's accent hex (the lobby mini-hex is its own hex).
+                view.Disc.style.display = disc ? DisplayStyle.Flex : DisplayStyle.None;
+                view.Disc.style.unityBackgroundImageTintColor = accent;
                 view.SpriteClass = iconCls;
                 view.Sprite.AddToClassList(iconCls);
+                view.Sprite.EnableInClassList("cw-icon-sprite--on-disc", disc);
                 view.Sprite.style.display = DisplayStyle.Flex;
                 view.Mono.style.display = DisplayStyle.None;
                 return;
             }
 
             if (_reportedMissingIcons.Add(ab))
-                _log?.Warn(Source, $"Ability '{ab.name}' has no authored icon sprite; showing its monogram '{AbilityIconStyle.Monogram(ab)}'.");
+                _log?.Warn(Source, $"Ability '{ab.name}' ({ab.GetType().Name}) has no AbilityIconStyle entry; showing its monogram '{AbilityIconStyle.Monogram(ab)}'.");
 
-            var accent = ab.AccentColor;
-            accent.a = 1f;
+            view.Disc.style.display = DisplayStyle.None;
             view.Sprite.style.display = DisplayStyle.None;
             view.Mono.style.display = DisplayStyle.Flex;
             view.Mono.text = AbilityIconStyle.Monogram(ab);
@@ -829,6 +842,7 @@ namespace CluckWars.UI
         private sealed class PerkBadgeView
         {
             public Button Root;
+            public AbilityIconView Icon;
             public Label Name, Line;
             public PassiveAbilitySO Passive;
         }
@@ -867,7 +881,6 @@ namespace CluckWars.UI
             _heroStage         = _classSelect.Q<VisualElement>("HeroStage");
             _previewChicken    = _classSelect.Q<VisualElement>("PreviewChicken");
             _previewGlow       = _classSelect.Q<VisualElement>("PreviewGlow");
-            _previewDisc       = _classSelect.Q<VisualElement>("PreviewDisc");
             _previewName       = _classSelect.Q<Label>("PreviewName");
             _previewQuote      = _classSelect.Q<Label>("PreviewQuote");
             _roleCalloutStrong = _classSelect.Q<Label>("RoleCalloutStrong");
@@ -884,9 +897,11 @@ namespace CluckWars.UI
                     _log?.Error(Source, $"CharacterSelectClass.uxml has no #{badgeNames[i]}; that perk cannot be picked.");
                     continue;
                 }
+                var perkIconHost = root.Q<VisualElement>(className: "cw-perk-badge__icon");
                 var view = new PerkBadgeView
                 {
                     Root = root,
+                    Icon = perkIconHost != null ? new AbilityIconView(perkIconHost) : null,
                     Name = root.Q<Label>(className: "cw-perk-badge__name"),
                     Line = root.Q<Label>(className: "cw-perk-badge__line"),
                 };
@@ -991,7 +1006,6 @@ namespace CluckWars.UI
             }
             if (_heroStage != null) _heroStage.style.backgroundColor = Fade(Lighten(tint, 0.55f), 1f);
             if (_previewGlow != null) _previewGlow.style.unityBackgroundImageTintColor = Fade(Lighten(tint, 0.3f), 0.9f);
-            if (_previewDisc != null) _previewDisc.style.backgroundColor = tint;
             // Class name without "CHICKEN", ink on cream.
             if (_previewName != null) _previewName.text = ClassShortName(cls);
             if (_previewQuote != null)
@@ -1027,6 +1041,7 @@ namespace CluckWars.UI
                 b.Root.style.display = p != null ? DisplayStyle.Flex : DisplayStyle.None;
                 if (p == null) continue;
                 if (b.Name != null) b.Name.text = p.DisplayName.ToUpperInvariant();
+                PaintIcon(b.Icon, p);
                 // The line is a template filled from the passive's own fields: never a stale number.
                 if (b.Line != null) b.Line.text = p.PerkLine(_matchConfig);
                 b.Root.EnableInClassList("cw-perk-badge--selected", _selection?.Passive == p);
@@ -1170,8 +1185,7 @@ namespace CluckWars.UI
         {
             var tag = new VisualElement { pickingMode = PickingMode.Ignore };
             tag.AddToClassList("cw-starter-tag");
-            var padlock = new Label(UiText.Get(UiKeys.GlyphLock)) { pickingMode = PickingMode.Ignore };
-            padlock.AddToClassList("cw-glyph");
+            var padlock = new VisualElement { pickingMode = PickingMode.Ignore };   // Glyph_Lock sprite (USS)
             padlock.AddToClassList("cw-starter-tag__lock");
             var starter = new Label(UiText.Get(UiKeys.LabelStarter)) { pickingMode = PickingMode.Ignore };
             starter.AddToClassList("cw-starter-tag__text");
@@ -1589,7 +1603,7 @@ namespace CluckWars.UI
             stage.AddToClassList("cw-seat__stage");
             v.Pedestal = new VisualElement { pickingMode = PickingMode.Ignore };
             v.Pedestal.AddToClassList("cw-seat__pedestal");
-            v.Pedestal.style.backgroundColor = color;
+            v.Pedestal.style.unityBackgroundImageTintColor = color;   // Pedestal_Ring is white art
             v.Chicken = new VisualElement { pickingMode = PickingMode.Ignore };
             v.Chicken.AddToClassList("cw-chicken");
             v.Chicken.AddToClassList("cw-seat__chicken");
@@ -1640,6 +1654,9 @@ namespace CluckWars.UI
 
             v.State = new VisualElement();
             v.State.AddToClassList("cw-seat__state");
+            var rosette = new VisualElement { pickingMode = PickingMode.Ignore };
+            rosette.AddToClassList("cw-seat__rosette");
+            v.State.Add(rosette);
             v.StateLabel = new Label();
             v.StateLabel.AddToClassList("cw-seat__state-label");
             v.State.Add(v.StateLabel);

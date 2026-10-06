@@ -129,20 +129,39 @@
 .cw-text-dark { color: rgb(26, 14, 4); }
 
 /* ---- Backdrop (one element behind every page) ------------------------------
-   MenuUiController.BuildAll puts #Backdrop + #BackdropTint behind the page host
-   and swaps image/tint per page (MenuUiController.Backdrops). The image is
-   set here as the default so a page without an entry still has the barn. */
+   MenuUiController puts #Backdrop + #BackdropTint behind the page host and, per
+   page, adds ONE scene modifier class (MenuUiController.BackdropFor). Phase 2:
+   one golden-hour farm, four views (Art/UI/Backgrounds/Bg_*.png, 2880x1440 with a
+   centred 16:9 safe area); scale-and-crop keeps the centre on 4:3 and 20:9. The
+   base rule keeps the old barn plate as the fallback for a page with no scene. */
 .cw-backdrop {
     position: absolute; left: 0; top: 0; right: 0; bottom: 0;
     background-image: url("project://database/Assets/_Game/Art/UI/Backgrounds/MenuBackground.png");
     -unity-background-scale-mode: scale-and-crop;
 }
-/* "Lift": the plate is a dusk render; a warm wash raises it toward golden hour
-   and softens its detail so the cream cards and outlined type read over it.
-   Colour/alpha are set per page in C#; this is only the fallback. */
+.cw-backdrop--main    { background-image: url("project://database/Assets/_Game/Art/UI/Backgrounds/Bg_MainMenu.png"); }
+.cw-backdrop--class   { background-image: url("project://database/Assets/_Game/Art/UI/Backgrounds/Bg_ClassSelect.png"); }
+.cw-backdrop--loadout { background-image: url("project://database/Assets/_Game/Art/UI/Backgrounds/Bg_Loadout.png"); }
+.cw-backdrop--lobby   { background-image: url("project://database/Assets/_Game/Art/UI/Backgrounds/Bg_Lobby.png"); }
+/* Over the scene: an ink vignette (Atoms/Vignette.png, clear centre, ~60% ink in
+   the corners) plus a per-page colour set in C# - a light ink scrim, or the class
+   wash on PICK YOUR BIRD. Text that sits directly on the art does NOT rely on this
+   for contrast: it gets an ink plate (.cw-art-plate) instead. */
 .cw-backdrop-tint {
     position: absolute; left: 0; top: 0; right: 0; bottom: 0;
-    background-color: rgba(255, 196, 120, 0.22);
+    background-color: rgba(26, 13, 4, 0.10);
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/Vignette.png");
+    -unity-background-scale-mode: stretch-to-fill;
+}
+/* Ink plate for text that sits directly on the bright scenes (subtitle, solo hint,
+   cast names, lobby HOUSE RULES). Measured against the brightest pixel of each Bg_*
+   (pure white sun, after the 10% scrim): 78% ink composites to ~#54473a, cream text on
+   it is 8.2:1 and the light class names 4.1-8.0:1 (30 px Lilita = large text, 3:1). */
+.cw-art-plate {
+    background-color: rgba(42, 26, 12, 0.78);
+    border-top-left-radius: 14px; border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
+    padding-left: 18px; padding-right: 18px; padding-top: 2px; padding-bottom: 6px;
 }
 /* Safe-area host: every page lives inside it; MenuUiController.ApplySafeArea
    pads it from Screen.safeArea so nothing lands under a notch or the gesture
@@ -151,11 +170,12 @@
 
 /* ---- Value steps: wood panel / cream card / inset --------------------------
    Wood panel = PanelFrame 9-slice (96 px corners at half scale). */
+/* Phase 2: painted plank panel (Frames/Frame_WoodPanel, 9-slice 40, gold-leaf edge, nails). */
 .cw-wood-panel {
-    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/PanelFrame.png");
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Frame_WoodPanel.png");
     -unity-background-scale-mode: stretch-to-fill;
-    -unity-slice-left: 96; -unity-slice-right: 96; -unity-slice-top: 96; -unity-slice-bottom: 96;
-    -unity-slice-scale: 0.5px;
+    -unity-slice-left: 40; -unity-slice-right: 40; -unity-slice-top: 40; -unity-slice-bottom: 40;
+    -unity-slice-scale: 1px;
     background-color: rgba(0, 0, 0, 0);
 }
 /* Dark wood well = CardBg 9-slice (the pick rows on the loadout). */
@@ -166,14 +186,16 @@
     -unity-slice-scale: 0.5px;
     background-color: rgba(0, 0, 0, 0);
 }
-/* Raised cream card with an ink outline. */
+/* Raised cream card (Phase 2: Frames/Card_Cream 9-slice 40/40/40/44 - ink outline, top
+   highlight, bottom bevel and a soft drop shadow in a 10 px transparent margin). The
+   outline is in the art, so the element carries no border of its own. */
 .cw-raised {
-    background-color: rgb(255, 248, 232);
-    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
-    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
-    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
-    border-top-left-radius: 18px; border-top-right-radius: 18px;
-    border-bottom-left-radius: 18px; border-bottom-right-radius: 18px;
+    background-color: rgba(0, 0, 0, 0);
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Card_Cream.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    -unity-slice-left: 40; -unity-slice-right: 40; -unity-slice-top: 40; -unity-slice-bottom: 44;
+    -unity-slice-scale: 0.75px;
+    border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
 }
 /* Inset well on a cream card. */
 .cw-inset {
@@ -201,13 +223,6 @@
    ink ~16:1, soft brown ~7:1 - both clear 4.5:1. */
 .cw-ink       { color: rgb(42, 26, 12); }
 .cw-ink-soft  { color: rgb(107, 74, 42); }
-
-/* Monochrome glyph font (Noto Emoji) for the few symbols the brand fonts lack:
-   the gear and the padlock. Tinted by `color` like any text. */
-.cw-glyph {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/NotoEmoji-Regular.ttf");
-    -unity-text-align: middle-center;
-}
 
 /* Reduced motion: the root carries .cw-reduced-motion while
    PlayerPreferences.ReducedMotionEnabled is on, which zeroes every hover/press
@@ -277,11 +292,26 @@
      gold    selection / "you" only - never a button.
    Labels are cream with the display ink outline on every face, which is what
    keeps them above 4.5:1 regardless of the face colour. */
-.cw-btn--green   { -unity-background-image-tint-color: rgb(118, 238, 88); }
-.cw-btn--wood, .cw-btn--neutral { -unity-background-image-tint-color: rgb(171, 111, 57); }
+/* Phase 2 art: green = the painted CTA plank (Frames/Frame_CtaPlank, 9-slice 48/36/48/40,
+   untinted); wood = the plank panel (Frames/Frame_WoodPanel, 9-slice 40) at 0.6 so its nails
+   and gold-leaf edge stay small on a button. The plank's 3D lip is at the bottom, so labels sit
+   a little high (padding-bottom > padding-top). */
+.cw-btn--green {
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Frame_CtaPlank.png");
+    -unity-slice-left: 48; -unity-slice-right: 48; -unity-slice-top: 36; -unity-slice-bottom: 40;
+    -unity-slice-scale: 1px;
+    -unity-background-image-tint-color: rgb(255, 255, 255);
+    padding-top: 18px; padding-bottom: 28px;
+}
+.cw-btn--wood, .cw-btn--neutral {
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Frame_WoodPanel.png");
+    -unity-slice-left: 40; -unity-slice-right: 40; -unity-slice-top: 40; -unity-slice-bottom: 40;
+    -unity-slice-scale: 0.6px;
+    -unity-background-image-tint-color: rgb(255, 255, 255);
+}
 /* A disabled primary must still read as text, not as a ghost - 40% opacity on
    cream over the face drops under 4.5:1. Dim the face, keep the outlined label. */
-.cw-btn:disabled { opacity: 1; -unity-background-image-tint-color: rgb(118, 98, 76); color: rgb(236, 226, 206); }
+.cw-btn:disabled { opacity: 1; -unity-background-image-tint-color: rgb(150, 140, 128); color: rgb(236, 226, 206); }
 
 /* Focus ring for D-pad/keyboard navigation on the shared button atoms (their
    border is 0 at rest, so this never fights the resting look). Slot boxes and
@@ -296,33 +326,35 @@
 /* Home/back button — absolutely placed at a header's top-left, leaves the
    centered ribbon undisturbed. */
 .cw-home-btn {
-    position: absolute; left: 28px; top: 28px;
+    position: absolute; left: 28px; top: 10px;   /* the wood plank fills its whole 116 px box (Phase 2) */
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 36px; letter-spacing: 1px; color: rgb(254, 245, 224);
     -unity-text-align: middle-center;
     min-height: 116px; min-width: 200px;
     background-color: rgba(0, 0, 0, 0);
-    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/ButtonGrayscale.png");
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Frame_WoodPanel.png");
     -unity-background-scale-mode: stretch-to-fill;
-    -unity-background-image-tint-color: rgb(171, 111, 57);
+    -unity-slice-left: 40; -unity-slice-right: 40; -unity-slice-top: 40; -unity-slice-bottom: 40;
+    -unity-slice-scale: 0.6px;
     border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
-    padding-top: 16px; padding-bottom: 22px; padding-left: 26px; padding-right: 26px;
+    padding-top: 16px; padding-bottom: 20px; padding-left: 30px; padding-right: 30px;
     transition-property: scale; transition-duration: 0.1s;
 }
 .cw-home-btn:hover  { scale: 1.04 1.04; }
 .cw-home-btn:active { scale: 0.96 0.96; }
 /* Gear (settings) - same wood atom, mirrored to the top-right, square, and the
-   glyph comes from Noto Emoji (.cw-glyph). Accessible name = its tooltip,
+   gear is the Glyph_Gear sprite (no emoji font). Accessible name = its tooltip,
    resolved from settings.title by UiText.ResolveTree. */
 .cw-gear-btn {
     left: auto; right: 28px;
     min-width: 116px; width: 116px; height: 116px;
     padding-left: 0; padding-right: 0; padding-top: 0; padding-bottom: 6px;
-    font-size: 60px;
-    -unity-text-outline-width: 0;
-    /* Re-stated here: .cw-home-btn (later in this file than .cw-glyph) sets Lilita,
-       which has no gear, and the OS colour-emoji fallback would draw it instead. */
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/NotoEmoji-Regular.ttf");
+    align-items: center; justify-content: center;
+}
+.cw-gear-btn__icon {
+    width: 76px; height: 76px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Icons/Glyph_Gear.png");
+    -unity-background-scale-mode: scale-to-fit;
 }
 
 /* ---- Ribbon --------------------------------------------------------------- */
@@ -332,14 +364,20 @@
 /* Painted-wood ribbon (spec: wood for frames and ribbons; gold is selection
    only). Tint = wood #8a5a2e pushed for the ~0.78 grey face. Title is cream
    with the display outline, not ink-on-gold any more. */
+/* Phase 2: Frames/Frame_Ribbon (768x160, horizontal 3-slice 168/0/168/0, untinted wood).
+   Height is fixed at 104 px so the tails scale uniformly (0.65 = 104/160 -> 109 px tails)
+   and only the plank stretches. The plank's text band is y 15-121 of 160 (~10-79 px here),
+   so the label sits above centre: more padding at the bottom than the top. */
 .cw-ribbon {
-    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/Ribbon.png");
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Frame_Ribbon.png");
     -unity-background-scale-mode: stretch-to-fill;
-    -unity-background-image-tint-color: rgb(178, 116, 60);
-    padding-top: 14px; padding-bottom: 20px; padding-left: 96px; padding-right: 96px;
+    -unity-slice-left: 168; -unity-slice-right: 168; -unity-slice-top: 0; -unity-slice-bottom: 0;
+    -unity-slice-scale: 0.65px;
+    height: 104px; flex-shrink: 0;
+    padding-top: 0; padding-bottom: 20px; padding-left: 124px; padding-right: 124px;
     align-items: center; justify-content: center;
 }
-.cw-ribbon .cw-title { color: rgb(254, 245, 224); font-size: 52px; letter-spacing: 3px; -unity-text-outline-width: 5px; text-shadow: 0px 5px 0px rgba(42, 26, 12, 0.85); }
+.cw-ribbon .cw-title { color: rgb(254, 245, 224); font-size: 52px; letter-spacing: 3px; -unity-text-outline-width: 5px; text-shadow: 0px 4px 0px rgba(42, 26, 12, 0.85); padding-top: 0; padding-bottom: 0; margin-top: 0; margin-bottom: 0; }
 
 /* ============================================================================
    MAIN MENU  (2026-07-24 redesign — see Assets/UI/MainMenu.uxml for the why)
@@ -362,7 +400,8 @@
 /* Lighter than the .cw-body tan: that tone was chosen against the flat #0e0804
    screen, and the glow lifts the backdrop enough here to erode its contrast. */
 .cw-menu-subtitle {
-    font-size: 34px; letter-spacing: 4px; margin-top: 6px;
+    font-size: 34px; letter-spacing: 4px; margin-top: 10px;
+    color: rgb(254, 245, 224);
 }
 
 /* ---- Cast band ------------------------------------------------------------
@@ -379,6 +418,7 @@
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 30px; letter-spacing: 2px; margin-top: 10px;
     -unity-text-align: middle-center; white-space: nowrap;
+    padding-left: 14px; padding-right: 14px;
 }
 /* The *light* class variants (--cw-class-*-light in CluckWarsTokens.uss), not the
    base tints. The base tints are tuned to sit on the flat #0e0804 screen; over the
@@ -439,6 +479,7 @@
 .cw-menu-hint {
     font-size: 32px; margin-top: 26px;
     -unity-text-align: middle-center;
+    color: rgb(254, 245, 224);
 }
 
 /* Build stamp. Bottom-left, deliberately quiet — it exists so a tester can say
@@ -503,19 +544,23 @@
    ============================================================================ */
 .cw-pick-body {
     flex-grow: 1; min-height: 0; flex-direction: row;
-    padding-left: 24px; padding-right: 24px; padding-top: 6px; padding-bottom: 4px;
+    /* padding-top keeps the selected tile's lift + glow clear of the HOME plank above it */
+    padding-left: 24px; padding-right: 24px; padding-top: 30px; padding-bottom: 4px;
     width: 100%; max-width: 2240px; align-self: center;
 }
 .layout--narrow .cw-pick-body { flex-direction: column; }
 
-.cw-class-tiles { flex-direction: row; flex-grow: 1; flex-basis: 0; min-width: 0; margin-right: 18px; }
-.layout--narrow .cw-class-tiles { flex-grow: 0; flex-basis: auto; height: 330px; margin-right: 0; margin-bottom: 18px; }
+/* Wide layouts (16:9 desktop, 20:9 phone): the four tiles are a 2x2 grid, so each tile is close to
+   square and its chicken fills most of it. A single row of four made tall, narrow tiles with the
+   chicken small and a dead colour field above it. Narrow (4:3) keeps one row of four. */
+.cw-class-tiles { flex-direction: row; flex-wrap: wrap; align-content: stretch; flex-grow: 1; flex-basis: 0; min-width: 0; margin-right: 18px; }
+.layout--narrow .cw-class-tiles { flex-wrap: nowrap; flex-grow: 0; flex-basis: auto; height: 330px; margin-right: 0; margin-bottom: 18px; }
 
 /* Portrait tile: class fill (lightened tint, set in C#), ink outline, big
    chicken. Selected = gold border + CardGlowFrame + lift, never colour alone. */
 .cw-class-tile {
-    flex-grow: 1; flex-basis: 0; min-width: 0;
-    margin-left: 7px; margin-right: 7px;
+    flex-grow: 1; flex-basis: 40%; min-width: 0;
+    margin-left: 7px; margin-right: 7px; margin-top: 7px; margin-bottom: 7px;
     align-items: center; justify-content: flex-end;
     padding-top: 12px; padding-bottom: 14px; padding-left: 8px; padding-right: 8px;
     border-left-width: 5px; border-right-width: 5px; border-top-width: 5px; border-bottom-width: 5px;
@@ -526,6 +571,7 @@
     background-color: rgb(255, 248, 232);
     transition-property: scale, translate; transition-duration: 0.12s;
 }
+.layout--narrow .cw-class-tile { flex-basis: 0; margin-top: 0; margin-bottom: 0; }
 .cw-class-tile:hover { scale: 1.02 1.02; }
 .cw-class-tile > .cw-glow { display: none; }
 .cw-class-tile--selected > .cw-glow { display: flex; }
@@ -555,9 +601,6 @@
     flex-grow: 1.25; flex-basis: 0; min-width: 0; min-height: 0;
     flex-direction: row; align-items: stretch;
     padding-top: 16px; padding-bottom: 16px; padding-left: 16px; padding-right: 22px;
-    border-top-left-radius: 26px; border-top-right-radius: 26px;
-    border-bottom-left-radius: 26px; border-bottom-right-radius: 26px;
-    border-left-width: 5px; border-right-width: 5px; border-top-width: 5px; border-bottom-width: 5px;
 }
 .layout--narrow .cw-hero { flex-grow: 1; }
 .cw-hero__stage {
@@ -568,16 +611,15 @@
     /* class wash set in C# */
 }
 .cw-hero__glow { width: 320px; height: 320px; top: 15%; }
+/* Phase 2: the hero stands on a hay bale (Frames/Pedestal_HayBale, 512x256; its top face
+   spans source y 40-96, i.e. ~16-38% of the height). The chicken's feet land on that face. */
 .cw-hero__platform {
-    position: absolute; bottom: 40px;
-    width: 230px; height: 70px;
-    border-top-left-radius: 115px; border-top-right-radius: 115px;
-    border-bottom-left-radius: 115px; border-bottom-right-radius: 115px;
-    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
-    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
-    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    position: absolute; bottom: 22px;
+    width: 270px; height: 135px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Pedestal_HayBale.png");
+    -unity-background-scale-mode: scale-to-fit;
 }
-.cw-hero__chicken { width: 310px; height: 310px; margin-bottom: 26px; }
+.cw-hero__chicken { width: 310px; height: 310px; margin-bottom: 64px; }   /* feet on the bale's top face */
 .cw-hero__text { flex-grow: 1; flex-basis: 0; min-width: 0; justify-content: center; }
 .cw-hero__name {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
@@ -637,6 +679,8 @@
     padding-left: 0; padding-right: 0; padding-top: 0; padding-bottom: 0;
     -unity-text-align: upper-left; color: rgb(42, 26, 12);
 }
+.cw-perk-badge__head { flex-direction: row; align-items: center; flex-shrink: 0; }
+.cw-perk-badge__icon { width: 52px; height: 52px; flex-shrink: 0; margin-right: 10px; }
 .cw-perk-badge__name {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 34px; letter-spacing: 1px; white-space: nowrap;
@@ -670,13 +714,15 @@
 }
 
 /* ---- Chicken figures -----------------------------------------------------
-   Class figures are the Stage-0 design-exported sprites, applied by adding a
-   .cw-chicken--<class> modifier (in UXML or C#). */
+   Class figures are 1024 px renders of the real models (Phase 2,
+   Art/UI/Chickens/Hero_<cls>_idle.png, made by tools/ui_capture/render_heroes.py),
+   applied by adding a .cw-chicken--<class> modifier (in UXML or C#). Square,
+   centred, feet ~5% above the bottom edge. */
 .cw-chicken { -unity-background-scale-mode: scale-to-fit; }
-.cw-chicken--warrior  { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_warrior.png"); }
-.cw-chicken--speedy   { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_speedy.png"); }
-.cw-chicken--fatty    { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_fatty.png"); }
-.cw-chicken--assassin { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Chicken_assassin.png"); }
+.cw-chicken--warrior  { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Hero_warrior_idle.png"); }
+.cw-chicken--speedy   { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Hero_speedy_idle.png"); }
+.cw-chicken--fatty    { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Hero_fatty_idle.png"); }
+.cw-chicken--assassin { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Hero_assassin_idle.png"); }
 .cw-radial-glow {
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/RadialGlow.png");
     -unity-background-scale-mode: stretch-to-fill;
@@ -692,6 +738,16 @@
     position: absolute; left: 0; top: 0; right: 0; bottom: 0;
     -unity-background-scale-mode: scale-to-fit;
 }
+/* Phase 2 icons are cream silhouettes with an ink outline; on a cream card they need a
+   colour behind them. The disc is the HUD's own hex (Atoms/HexGlossy) tinted with the
+   ability's accent in C#, so a move looks the same in the menus and on the in-match button.
+   On a lobby mini-hex the hex IS the disc, so PaintIcon(disc: false) hides it. */
+.cw-icon-disc {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/HexGlossy.png");
+    -unity-background-scale-mode: scale-to-fit;
+}
+.cw-icon-sprite--on-disc { left: 17%; top: 17%; right: 17%; bottom: 17%; }
 /* Fallback when an ability has no authored sprite: its monogram on its accent
    disc (text colour picked against the accent in C#). Never blank. */
 .cw-ability-mono {
@@ -744,10 +800,21 @@
     padding-top: 8px; padding-bottom: 8px; padding-left: 26px; padding-right: 12px;
     transition-property: scale, translate; transition-duration: 0.12s;
 }
+/* Filled = Frames/Card_Cream; filled + armed = Frames/Card_CreamSelected (same geometry, gold
+   glow in the margin), so arming a filled slot never shifts its contents. The art carries the
+   outline: border 0 and the 4 px it took goes back into the padding. */
 .cw-slot-box--filled {
-    background-color: rgb(255, 248, 232);
-    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
-    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    background-color: rgba(0, 0, 0, 0);
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Card_Cream.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    -unity-slice-left: 40; -unity-slice-right: 40; -unity-slice-top: 40; -unity-slice-bottom: 44;
+    -unity-slice-scale: 0.7px;
+    border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
+    padding-top: 12px; padding-bottom: 12px; padding-left: 30px; padding-right: 16px;
+}
+.cw-slot-box--filled.cw-slot-box--armed {
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Card_CreamSelected.png");
+    border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
 }
 /* Armed = gold border (selection) + lift + the NEXT caret above it. */
 .cw-slot-box--armed {
@@ -811,7 +878,12 @@
     border-top-left-radius: 10px; border-top-right-radius: 10px;
     border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
 }
-.cw-starter-tag__lock { font-size: 26px; color: rgb(245, 200, 66); margin-right: 6px; padding-left: 0; padding-right: 0; }
+.cw-starter-tag__lock {
+    width: 28px; height: 28px; margin-right: 6px; flex-shrink: 0;
+    background-image: url("project://database/Assets/_Game/Art/UI/Icons/Glyph_Lock.png");
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: rgb(245, 200, 66);   /* cream x gold = gold on the ink pill */
+}
 .cw-starter-tag__text {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 28px; letter-spacing: 1px; color: rgb(254, 245, 224);
@@ -829,16 +901,16 @@
 .cw-deck-group {
     flex-shrink: 1; min-width: 0;
     margin-left: 6px; margin-right: 6px; margin-top: 6px; margin-bottom: 6px;
-    padding-top: 8px; padding-bottom: 14px; padding-left: 10px; padding-right: 10px;
-    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/CardBg.png");
+    padding-top: 20px; padding-bottom: 20px; padding-left: 18px; padding-right: 18px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Frame_WoodPanel.png");
     -unity-background-scale-mode: stretch-to-fill;
-    -unity-slice-left: 56; -unity-slice-right: 56; -unity-slice-top: 56; -unity-slice-bottom: 56;
-    -unity-slice-scale: 0.5px;
+    -unity-slice-left: 40; -unity-slice-right: 40; -unity-slice-top: 40; -unity-slice-bottom: 40;
+    -unity-slice-scale: 0.75px;
 }
 .cw-deck-group__title {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 32px; letter-spacing: 2px; color: rgb(245, 200, 66);
-    white-space: nowrap; margin-bottom: 6px; margin-left: 4px; padding-top: 0;
+    white-space: nowrap; margin-bottom: 6px; margin-left: 12px; padding-top: 0;
 }
 .cw-deck-cards { flex-direction: row; flex-shrink: 1; min-width: 0; }
 
@@ -974,15 +1046,13 @@
     align-items: stretch; justify-content: flex-end;
 }
 .cw-seat__stage { flex-grow: 1; min-height: 120px; align-items: center; justify-content: flex-end; }
+/* Phase 2: Frames/Pedestal_Ring (512x128, white art) tinted with the seat's player colour
+   in C# (-unity-background-image-tint-color). */
 .cw-seat__pedestal {
-    position: absolute; bottom: 4px;
-    width: 76%; height: 70px;
-    border-top-left-radius: 50%; border-top-right-radius: 50%;
-    border-bottom-left-radius: 50%; border-bottom-right-radius: 50%;
-    border-left-width: 5px; border-right-width: 5px; border-top-width: 5px; border-bottom-width: 5px;
-    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
-    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
-    /* fill = player colour, set in C# */
+    position: absolute; bottom: 0;
+    width: 84%; height: 84px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Pedestal_Ring.png");
+    -unity-background-scale-mode: scale-to-fit;
 }
 .cw-seat__chicken { width: 92%; flex-grow: 1; max-height: 300px; margin-bottom: 26px; -unity-background-scale-mode: scale-to-fit; }
 .cw-seat--empty .cw-seat__chicken { display: none; }
@@ -1062,6 +1132,14 @@
     border-bottom-left-radius: 30px; border-bottom-right-radius: 30px;
 }
 .cw-seat__state--picking { background-color: rgb(243, 230, 200); border-left-color: rgba(42, 26, 12, 0.5); border-right-color: rgba(42, 26, 12, 0.5); border-top-color: rgba(42, 26, 12, 0.5); border-bottom-color: rgba(42, 26, 12, 0.5); }
+/* READY = Frames/Badge_Rosette (white art, tinted gold here) + the word; hidden while picking. */
+.cw-seat__rosette {
+    width: 44px; height: 44px; margin-left: -8px; margin-right: 6px; flex-shrink: 0;
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Badge_Rosette.png");
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: rgb(255, 214, 80);
+}
+.cw-seat__state--picking .cw-seat__rosette { display: none; }
 .cw-seat__state-label {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 30px; letter-spacing: 1px; color: rgb(42, 26, 12); padding-left: 0; padding-right: 0;
@@ -1076,11 +1154,15 @@
 .cw-coop-left { flex-direction: row; align-items: center; flex-shrink: 1; min-width: 0; }
 .cw-coop-center { flex-grow: 1; flex-basis: 0; min-width: 0; align-items: center; justify-content: center; }
 .cw-coop-right { flex-shrink: 0; align-items: center; }
+/* Same wood ribbon as the screen titles (Frames/Frame_Ribbon), warmed toward gold. */
 .cw-ready-banner {
-    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/Ribbon.png");
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Frame_Ribbon.png");
     -unity-background-scale-mode: stretch-to-fill;
-    -unity-background-image-tint-color: rgb(255, 214, 80);
-    padding-top: 16px; padding-bottom: 26px; padding-left: 120px; padding-right: 120px;
+    -unity-slice-left: 168; -unity-slice-right: 168; -unity-slice-top: 0; -unity-slice-bottom: 0;
+    -unity-slice-scale: 0.75px;
+    -unity-background-image-tint-color: rgb(255, 226, 150);
+    height: 120px;
+    padding-top: 0; padding-bottom: 24px; padding-left: 140px; padding-right: 140px;
     align-items: center; justify-content: center;
     transition-property: scale, opacity; transition-duration: 0.35s; transition-timing-function: ease-out-back;
 }
@@ -1102,7 +1184,8 @@
    ============================================================================ */
 .cw-sheet-scrim {
     position: absolute; left: 0; top: 0; right: 0; bottom: 0;
-    background-color: rgba(20, 10, 4, 0.62);
+    /* 0.62 let HOST / JOIN read through under the sheet (Phase 1 review): near-opaque now. */
+    background-color: rgba(20, 10, 4, 0.88);
     align-items: center; justify-content: center;
 }
 .cw-sheet {
@@ -1220,9 +1303,10 @@
     font-size: 32px; letter-spacing: 1px; color: rgb(254, 245, 224);
     -unity-text-align: middle-center;
     background-color: rgba(0, 0, 0, 0);
-    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/ButtonGrayscale.png");
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Frame_WoodPanel.png");   /* wood: secondary action */
     -unity-background-scale-mode: stretch-to-fill;
-    -unity-background-image-tint-color: rgb(171, 111, 57);   /* wood: secondary action */
+    -unity-slice-left: 40; -unity-slice-right: 40; -unity-slice-top: 40; -unity-slice-bottom: 40;
+    -unity-slice-scale: 0.6px;
     border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
     padding-top: 12px; padding-bottom: 16px; padding-left: 0; padding-right: 0;
     margin-right: 12px;
@@ -1275,25 +1359,46 @@
 .layout--landscape .cw-mode-row { flex-direction: row; justify-content: center; }
 
 /* ============================================================================
-   ABILITY ICON SPRITES  (14 : type-name -> exported Icon_*.png)
-   Mirrors Assets/UI/Styles/TouchControls.uss so the character-select pick-row
-   cards, slot hexes, and lobby mini-hexes paint the same Stage-0 design icons
-   the touch HUD uses. The class applied to an element comes from the shared
-   CluckWars.UI.AbilityIconStyle map (keyed by concrete ability SO type).
-   These rules only set background-image — the element carries its own size via
-   .cw-hex__sprite / .cw-ability-card__sprite / .cw-mini-hex__sprite.
+   ABILITY ICON SPRITES  (37 : type-name -> Icons/Abilities/Icon_<TypeName>.png)
+   One rule per AbilityIconStyle.ByType entry, kept identical in CluckWarsTheme.uss
+   and TouchControls.uss (AbilityIconArtTests checks every class, file and url).
+   Cream silhouettes with an ink outline on transparent: the coloured hex / accent
+   disc behind them supplies the colour (menu overhaul Phase 2).
    ============================================================================ */
-.cw-hex-icon--dive-bomb {  background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_FlyingPeck.png"); }
-.cw-hex-icon--cluck    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_CluckShock.png"); }
-.cw-hex-icon--snatch    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_Peck.png"); }
-.cw-hex-icon--roll     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_RollAndPush.png"); }
-.cw-hex-icon--trap     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_FeatherTrap.png"); }
-.cw-hex-icon--aura     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_FeatherAura.png"); }
-.cw-hex-icon--root     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_RootEgg.png"); }
-.cw-hex-icon--shell    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_EggShell.png"); }
-.cw-hex-icon--turtle   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_TurtleMode.png"); }
-.cw-hex-icon--spine    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_SpineCoat.png"); }
-.cw-hex-icon--burst    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_SpeedBurst.png"); }
-.cw-hex-icon--invis    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_Invisibility.png"); }
-.cw-hex-icon--doppel   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_Doppelganger.png"); }
-.cw-hex-icon--steal    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Icon_SneakySteal.png"); }
+.cw-hex-icon--dive-bomb    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_RollTrampleAbilitySO.png"); }
+.cw-hex-icon--cluck        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_CluckShockAbilitySO.png"); }
+.cw-hex-icon--snatch       { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SnatchAbilitySO.png"); }
+.cw-hex-icon--peck         { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_PeckAbilitySO.png"); }
+.cw-hex-icon--roll         { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_RollPushAbilitySO.png"); }
+.cw-hex-icon--trap         { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_FeatherTrapAbilitySO.png"); }
+.cw-hex-icon--aura         { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_FeatherAuraAbilitySO.png"); }
+.cw-hex-icon--root         { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_RootEggAbilitySO.png"); }
+.cw-hex-icon--shell        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_EggShellAbilitySO.png"); }
+.cw-hex-icon--turtle       { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_TurtleModeAbilitySO.png"); }
+.cw-hex-icon--spine        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SpineCoatAbilitySO.png"); }
+.cw-hex-icon--burst        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SpeedBurstAbilitySO.png"); }
+.cw-hex-icon--invis        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_InvisibilityAbilitySO.png"); }
+.cw-hex-icon--doppel       { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_DoppelgangerAbilitySO.png"); }
+.cw-hex-icon--steal        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SneakyStealAbilitySO.png"); }
+.cw-hex-icon--ambush       { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_AmbushAbilitySO.png"); }
+.cw-hex-icon--wing-slam    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_WingSlamAbilitySO.png"); }
+.cw-hex-icon--shadowstep   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_ShadowstepAbilitySO.png"); }
+.cw-hex-icon--mark-kill    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_MarkKillAbilitySO.png"); }
+.cw-hex-icon--headbutt     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_HeadbuttAbilitySO.png"); }
+.cw-hex-icon--scrap        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_ScrapAbilitySO.png"); }
+.cw-hex-icon--ruffle       { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_RuffleAbilitySO.png"); }
+.cw-hex-icon--dust-kick    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_DustKickAbilitySO.png"); }
+.cw-hex-icon--feint        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_FeintAbilitySO.png"); }
+.cw-hex-icon--ground-quake { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_GroundQuakeAbilitySO.png"); }
+.cw-hex-icon--belly-flop   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_BellyFlopAbilitySO.png"); }
+.cw-hex-icon--slippery     { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SlipperyPassiveSO.png"); }
+.cw-hex-icon--featherfoot  { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_FeatherfootPassiveSO.png"); }
+.cw-hex-icon--quick-drop   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_QuickDropAbilitySO.png"); }
+.cw-hex-icon--immovable    { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_ImmovableAbilitySO.png"); }
+.cw-hex-icon--smoke-roost  { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SmokeRoostAbilitySO.png"); }
+.cw-hex-icon--hoarder      { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_HoarderPassiveSO.png"); }
+.cw-hex-icon--bulwark      { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_BulwarkPassiveSO.png"); }
+.cw-hex-icon--relentless   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_RelentlessPassiveSO.png"); }
+.cw-hex-icon--bully        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_BullyPassiveSO.png"); }
+.cw-hex-icon--spoiler      { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SpoilerPassiveSO.png"); }
+.cw-hex-icon--thief        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_ThiefPassiveSO.png"); }

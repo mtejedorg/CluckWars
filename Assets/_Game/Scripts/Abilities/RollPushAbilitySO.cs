@@ -41,8 +41,6 @@ namespace CluckWars.Abilities
         [Tooltip("Speed multiplier applied to the caster while rolling.")]
         [Range(1f, 4f)] public float RollSpeedMultiplier = 2.0f;
 
-        protected override string DefaultIcon => "🌀";
-
         public override float IndicatorRange => ForwardOffset + PushRadius;
 
         /// <summary>

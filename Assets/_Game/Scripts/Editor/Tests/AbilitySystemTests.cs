@@ -103,9 +103,6 @@ namespace CluckWars.Tests
                 Assert.LessOrEqual(a.ShortLabel.Length, 4,
                     $"{a.name}: ShortLabel '{a.ShortLabel}' is {a.ShortLabel.Length} chars; the hex button " +
                     "fits about 4 and overflows past that.");
-                Assert.IsFalse(string.IsNullOrEmpty(a.ResolveIcon()),
-                    $"{a.name}: ResolveIcon() returned empty — neither the asset's Icon nor the " +
-                    "subclass DefaultIcon is set.");
             }
         }
 
@@ -396,116 +393,6 @@ namespace CluckWars.Tests
             }
 
             Assert.IsEmpty(dupes, "Two ability types share one icon USS class — they draw the same sprite.");
-        }
-
-        /// <summary>
-        /// Ability types whose <see cref="AbilityIconStyle"/> entry has <b>no</b>
-        /// <c>.cw-hex-icon--*</c> rule in the stylesheets, so they currently render a blank
-        /// hex on every screen. Pre-existing debt, recorded 2026-08-13 rather than hidden:
-        /// the four actives and all eight passives below have never had an exported
-        /// <c>Icon_*.png</c>.
-        /// </summary>
-        /// <remarks>
-        /// This is an allow-list, not an excuse. It exists so the test can lock in today's
-        /// state and fail on any <i>new</i> miss — including the far more likely failure of
-        /// renaming a USS class on one side only. Delete entries from here as the icons get
-        /// authored; never add one to make a red test go green.
-        /// </remarks>
-        private static readonly HashSet<string> IconsNotYetAuthored = new()
-        {
-            // Peck (foraging) is new in v0.7 and has no exported sprite yet. Icon_Peck.png
-            // exists but belongs to Snatch, which was the ability called "Peck" until the
-            // 2026-08-13 rename. The emoji fallback carries the button until art lands.
-            "cw-hex-icon--peck",
-            "cw-hex-icon--ambush",
-            "cw-hex-icon--wing-slam",
-            "cw-hex-icon--shadowstep",
-            "cw-hex-icon--mark-kill",
-            // The seven abilities added on 2026-08-23 to pay for the one-class-per-ability
-            // revert. Emoji fallback until art lands.
-            "cw-hex-icon--headbutt",
-            "cw-hex-icon--scrap",
-            "cw-hex-icon--ruffle",
-            "cw-hex-icon--dust-kick",
-            "cw-hex-icon--feint",
-            "cw-hex-icon--ground-quake",
-            "cw-hex-icon--belly-flop",
-            // Every class specialization. The v0.7 pass replaced the damage-era passives
-            // wholesale, and none of the nine have exported sprites yet.
-            "cw-hex-icon--slippery",
-            "cw-hex-icon--featherfoot",
-            "cw-hex-icon--quick-drop",
-            "cw-hex-icon--immovable",
-            "cw-hex-icon--smoke-roost",
-            "cw-hex-icon--hoarder",
-            "cw-hex-icon--bulwark",
-            "cw-hex-icon--relentless",
-            "cw-hex-icon--bully",
-            "cw-hex-icon--spoiler",
-            "cw-hex-icon--thief",
-        };
-
-        [Test]
-        public void AbilityIconStyle_EveryMappedClass_HasARuleInEveryStylesheet()
-        {
-            // AbilityIconStyle_CoversEveryConcreteAbilityType only proves a type has a KEY.
-            // Nothing proved the USS class that key points at actually exists — and a class
-            // with no rule paints nothing and logs nothing. That is exactly the failure mode
-            // a rename produces when only one side is updated.
-            var sheets = new Dictionary<string, string>();
-            foreach (var path in TestAssets.AbilityIconStylesheets)
-            {
-                Assert.IsTrue(System.IO.File.Exists(path), $"Stylesheet not found: {path}");
-                sheets[path] = System.IO.File.ReadAllText(path);
-            }
-
-            var problems = new List<string>();
-            foreach (var type in ConcreteAbilityTypes())
-            {
-                var probe = (AbilityBaseSO)ScriptableObject.CreateInstance(type);
-                string cls;
-                try { cls = AbilityIconStyle.ClassFor(probe); }
-                finally { UnityEngine.Object.DestroyImmediate(probe); }
-
-                if (cls == null || IconsNotYetAuthored.Contains(cls)) continue;
-
-                // Must match the WHOLE selector, not a prefix of it. A plain Contains()
-                // check reports success for '.cw-hex-icon--snatchXX' when looking for
-                // '.cw-hex-icon--snatch' — verified: the first version of this test passed
-                // against a deliberately broken stylesheet. The negative lookahead pins the
-                // selector's end to a non-identifier character.
-                foreach (var kv in sheets)
-                {
-                    var pattern = System.Text.RegularExpressions.Regex.Escape("." + cls) + @"(?![A-Za-z0-9_-])";
-                    if (!System.Text.RegularExpressions.Regex.IsMatch(kv.Value, pattern))
-                        problems.Add($"{type.Name} -> '{cls}' has no rule in {kv.Key}");
-                }
-            }
-
-            Assert.IsEmpty(problems,
-                "An AbilityIconStyle entry points at a USS class that does not exist, so the hex " +
-                "renders blank with nothing logged. Either add the rule (and its Icon_*.png) or, " +
-                "if the icon genuinely is not authored yet, add it to IconsNotYetAuthored with a reason.\n" +
-                string.Join("\n", problems));
-        }
-
-        [Test]
-        public void AbilityIconStyle_SpriteAuthoredSet_MatchesTheMenuStylesheet()
-        {
-            // SpriteClassFor is the menu's guard against blank hexes: it only hands out a
-            // class that really paints a sprite, so everything else falls through to the
-            // ShortLabel monogram. If this set and the stylesheet drift apart, either an
-            // authored icon is hidden behind a monogram or a blank hex comes back.
-            string css = System.IO.File.ReadAllText("Assets/UI/Styles/CluckWarsTheme.uss");
-            var defined = new HashSet<string>(
-                System.Text.RegularExpressions.Regex.Matches(css, @"\.(cw-hex-icon--[A-Za-z0-9-]+)(?![A-Za-z0-9_-])")
-                    .Select(m => m.Groups[1].Value));
-            var authored = new HashSet<string>(AbilityIconStyle.AuthoredSpriteClasses);
-
-            CollectionAssert.AreEquivalent(defined, authored,
-                "AbilityIconStyle.SpriteAuthored must list exactly the .cw-hex-icon--* rules in CluckWarsTheme.uss.");
-            foreach (var cls in authored)
-                Assert.IsFalse(IconsNotYetAuthored.Contains(cls), $"{cls} is both authored and listed as not yet authored.");
         }
 
         [Test]

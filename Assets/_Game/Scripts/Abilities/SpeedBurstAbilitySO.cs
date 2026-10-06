@@ -13,8 +13,6 @@ namespace CluckWars.Abilities
         [Tooltip("Multiplier applied to MoveSpeed while active. 2.5 ≈ doubled top speed without feeling teleporty.")]
         [Min(1f)] public float SpeedMultiplier = 2.5f;
 
-        protected override string DefaultIcon => "💨";
-
         // Self-buff, no target area — marks the caster's own ring instead (FEEDBACK.md §2.2).
         public override AbilityAimShape AimShape => AbilityAimShape.None;
         public override bool AffectsSelf => true;
