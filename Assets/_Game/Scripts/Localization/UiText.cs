@@ -132,6 +132,9 @@ namespace CluckWars.Localization
                     case Toggle t: t.text = Resolve(t.text); break;
                     case TextElement te: te.text = Resolve(te.text); break;
                 }
+                // A tooltip is the accessible name of an icon-only control (the settings
+                // gear), so it is player-facing text and goes through the table too.
+                if (IsKeyReference(ve.tooltip)) ve.tooltip = Resolve(ve.tooltip);
             });
         }
 

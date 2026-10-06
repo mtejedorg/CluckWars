@@ -6,38 +6,35 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
-## ✅ Menu overhaul, Phase 0 stage 1: wording dictionary, perk templates, font, Performance Mode (2026-10-06)
+## ✅ Menu UI overhaul — Phase 0 "stop looking broken" (2026-10-06)
 
-Data / services / text foundation for `docs/superpowers/specs/2026-10-06-menu-ui-overhaul.md`.
-No restyle yet (stage 2). EditMode **641/641**.
+Spec: `docs/superpowers/specs/2026-10-06-menu-ui-overhaul.md`. EditMode **643/643**. Captures (1920x1080,
+2424x1080, 2048x1536, incl. `01b_settings`) via `python tools/ui_capture/capture_menu.py <dir>`.
 
-- **Wording dictionary.** `Assets/_Game/Resources/Text/UiText.csv` (`key,en`, RFC-4180) loaded by the static
-  `CluckWars.Localization.UiText` (`Get`, `Format(key, ("name", value)...)`, `ResolveTree`). Every key has a
-  compile-time handle in `Localization/UiKeys.cs`; placeholders are declared with `[UiArgs("n")]`. **To add a
-  string:** CSV row + `UiKeys` constant (+ `[UiArgs]`). A missing key renders `#key#`, a missing arg `#name#`,
-  each logged once through the logger `MenuUiController` registers via `UiText.SetLogger`.
-- **UXML text keys.** In the four menu UXML files a label/button/toggle text is `@key` (e.g.
-  `text="@screen.class.title"`) or empty when code fills it. `MenuUiController.ClonePage` calls
-  `UiText.ResolveTree` once per cloned page. `UiTextTests` fails on a literal, an unknown key, an orphan
-  CSV row, a constant with no row, a template/contract mismatch, or a literal `.text =`/`new Label("..")`
-  in `MenuUiController`. `Lobby.uxml` `SetTime`/`SetGoal` are now blank (controller always fills them).
-- **Templated perk lines.** `PassiveAbilitySO.PerkLineKey` / `PerkDetailKey` / `PerkArgs(MatchConfigSO)` /
-  `PerkLine()` / `PerkDetail()`; each of the 8 passives supplies its numbers from its own fields. The class
-  select spec pills show `PerkLine` instead of `Description`. `PerkTextTests` recomputes every expected line
-  from the asset fields. **If a perk's mechanic (not just numbers) changes, rewrite its template.**
-- **Descriptions fixed** on Relentless, Slippery, Bulwark `.asset`s (real numbers, "except Peck"); `docs/site/index.html`
-  and GDD §5.3 updated to match. **Maestro: republish the compendium Artifact.**
-- **Font.** `Nunito-Bold.ttf` is now a static wght-700 instance (GUID kept); new static `Nunito-ExtraBold.ttf`
-  (800). `NunitoFontTests` asserts no `fvar` and `usWeightClass`.
-- **Performance Mode.** `PlayerPreferences.PerformanceModeEnabled` (default ON when `Application.isMobilePlatform`).
-  No UI yet: the Settings sheet is stage 2.
-- **Spec deviations.** Class names/roles: roles are now the spec's Brawler / Hit & Run / Hauler / Saboteur;
-  all four classes have a weak callout (Warrior "Great at nothing."). The loadout row hint "COMBO lets you take two"
-  was dropped (COMBO retired in v0.7); row titles are now `ANY BIRD` / `{CLASS} ONLY`.
-- **Outstanding for stage 2 (ui-designer):** Settings sheet UI (keys `settings.*` exist, gear on main menu,
-  remove both toggles from the loadout), the 9 px STARTER tag, lobby class-line / READY-chip clipping, and
-  `btn.playAgain*` / `label.perk` / `label.starters` keys exist but are not bound yet. `MatchOverlays.uxml`
-  (in-match waiting room) still carries literals; it is outside the four menu pages.
+- **Wording dictionary.** `Resources/Text/UiText.csv` (`key,en`) + static `CluckWars.Localization.UiText`
+  (`Get`, `Format(key, ("name", v))`, `ResolveTree`); every key has a `UiKeys` constant, placeholders declared
+  with `[UiArgs]`. UXML text/tooltips are `@key`, resolved once per cloned page. **To add a string:** CSV row +
+  `UiKeys` constant (+ `[UiArgs]`). Missing key renders `#key#` and is logged once. `UiTextTests` fails on any
+  literal in the four menu UXML files or `MenuUiController`. `MatchOverlays.uxml` still has literals (out of scope).
+- **Perk lines are templates** filled from each passive's fields (`PassiveAbilitySO.PerkLine/PerkDetail`);
+  `PerkTextTests` guards numbers. **If a perk's mechanic (not just numbers) changes, rewrite its template.**
+  Relentless/Slippery/Bulwark `Description`s corrected (asset, GDD, `docs/site/index.html` — **republish the
+  compendium Artifact**).
+- **Font.** `Nunito-Bold.ttf` is a static wght-700 instance (GUID kept); new static `Nunito-ExtraBold.ttf`.
+  `NunitoFontTests` asserts no `fvar` and weight.
+- **Look.** Direction A tokens in `CluckWarsTokens.uss`; Lilita One outline + `text-shadow` verified on 6000.3
+  and the USS ban removed; `PanelFrame`/`CardBg`/`CardGlowFrame` atoms wired; one green CTA per screen
+  (PLAY SOLO / GEAR UP / READY / START MATCH), gold = selection, wood = nav. Barn backdrop + tint layer behind every
+  page (class-tinted on PICK YOUR BIRD); swap per screen in `MenuUiController.BackdropFor`.
+- **Settings sheet** (gear on main menu): Range Guides, Reduced Motion, Performance Mode
+  (`PlayerPreferences.PerformanceModeEnabled`, default ON on mobile), Dev Mode. The loadout toggles are gone;
+  the loadout is one themed vertical ScrollView (no nested scroll) and the phone shows a full card row.
+- **Bugs fixed:** Warrior weak callout, lobby card layout (name/P-tag/CPU, class line, READY chip, 80 px hexes),
+  blank ability icons (`AbilityIconStyle.SpriteClassFor` + `Monogram` fallback, logged once; the `SpriteAuthored`
+  set must grow as Phase 2 icons land — a test keeps it equal to the USS rules), padlock + STARTER at 28 px,
+  safe-area padding from `Screen.safeArea`.
+- **Open:** safe area unverified on the Pixel 9 cutout; lobby READY chips are green status pills (not CTAs);
+  menu selection appears to persist across Play sessions in the Editor (seen once during captures).
 
 ---
 
@@ -413,7 +410,7 @@ the preference and `OpenAbilityLab` refuses when it is off.
   Developer Mode toggle is landscape-only. That USS comment also claims the app is
   landscape-locked, which `ProjectSettings` contradicts (`allowedAutorotateToPortrait: 1`,
   `defaultScreenOrientation: 4`). One of the two should be made true — Maestro's call.
-- **Reduced Motion still has no UI control** anywhere.
+- ~~Reduced Motion still has no UI control~~ — now on the Settings sheet (2026-10-06).
 
 ---
 
@@ -1153,6 +1150,8 @@ elsewhere, and that duplication was root-caused and removed rather than worked a
 by `AbilityController_ExposesGetSlotPublicly_SoNoConsumerReimplementsTheMapping`.
 
 ### Toggle UI
+
+> Superseded 2026-10-06: the toggle moved to the main-menu Settings sheet (menu overhaul Phase 0).
 
 "Ability Range Guides" toggle in `CharacterSelect.uxml`, **column C, between the ability-detail
 strip and the READY button** — deliberately *not* inside the scrolling ability-pick list, which

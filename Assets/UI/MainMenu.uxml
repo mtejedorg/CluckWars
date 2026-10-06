@@ -12,26 +12,26 @@
             "4-player, pick a chicken" faster than the subtitle does, costs no new
             art, and fills the void that made the old screen feel unfinished.
          2. ONE PRIMARY ACTION. SOLO is the instant-play path and the one a
-            playtester takes almost every time, so it is a wide gold button on its
-            own row; HOST/JOIN drop to a secondary pair beneath it. Previously all
-            three were the same pill and the eye had no entry point.
-         3. A PAINTED BACKDROP. A generated farmyard-arena plate (Flux, via the
-            assetforge skill) replaces the flat #0e0804 void, knocked back behind
-            a flat contrast scrim so the type stays legible over it.
+            playtester takes almost every time, so it is the single green CTA on
+            its own row; HOST/JOIN are wood secondaries beneath it (stage 2 button
+            rule: green = forward, wood = navigation/secondary, gold = selection).
+         3. A PAINTED BACKDROP. Since stage 2 the plate is the shared backdrop
+            MenuUiController puts behind every page (warm "lift" tint per page);
+            text on the art carries an ink outline instead of a dark scrim.
+
+         Settings (stage 2): the gear at the top-right opens #SettingsSheet, a
+         modal over this page with the four PlayerPreferences toggles. It replaced
+         the two toggles that used to sit on the loadout screen.
 
          Sizes follow the mobile contract at the top of CluckWarsTheme.uss. -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
 
     <ui:VisualElement name="MainMenuPage" class="cw-screen cw-page cw-menu">
 
-        <!-- Contrast scrim over the painted backdrop (the plate itself is on
-             .cw-menu). picking-mode Ignore so it never eats a button tap. -->
-        <ui:VisualElement class="cw-menu-scrim" picking-mode="Ignore" />
-
         <!-- ── Title ── -->
         <ui:VisualElement class="cw-menu-titleblock" picking-mode="Ignore">
             <ui:Label text="@main.title" class="cw-title cw-accent cw-menu-title" />
-            <ui:Label text="@main.subtitle" class="cw-body cw-menu-subtitle" />
+            <ui:Label text="@main.subtitle" class="cw-body cw-on-art cw-menu-subtitle" />
         </ui:VisualElement>
 
         <!-- ── Cast band: the four playable chickens ── -->
@@ -56,30 +56,82 @@
 
         <!-- ── Actions: one primary, two secondary ── -->
         <ui:VisualElement class="cw-menu-actions">
-            <ui:Button name="SoloBtn" text="@btn.playSolo" class="cw-btn cw-btn--gold cw-menu-primary" />
+            <ui:Button name="SoloBtn" text="@btn.playSolo" class="cw-btn cw-btn--green cw-menu-primary" />
             <ui:VisualElement name="ModeRow" class="cw-mode-row cw-menu-secondary-row">
-                <ui:Button name="HostBtn" text="@btn.host" class="cw-btn cw-btn--green cw-menu-secondary" />
-                <ui:Button name="JoinBtn" text="@btn.join" class="cw-btn cw-btn--neutral cw-menu-secondary" />
+                <ui:Button name="HostBtn" text="@btn.host" class="cw-btn cw-btn--wood cw-menu-secondary" />
+                <ui:Button name="JoinBtn" text="@btn.join" class="cw-btn cw-btn--wood cw-menu-secondary" />
             </ui:VisualElement>
-            <ui:Label name="MainMenuHint" text="@main.soloHint" class="cw-body cw-menu-hint" />
+            <ui:Label name="MainMenuHint" text="@main.soloHint" class="cw-body cw-on-art cw-menu-hint" />
 
             <!-- Developer tools. Hidden unless PlayerPreferences.DeveloperModeEnabled,
-                 which defaults to OFF and is set from the Developer Mode toggle on the
-                 Character Select options row.
+                 which defaults to OFF and is set from the Dev Mode toggle in the
+                 Settings sheet below.
 
                  This is the ONLY route into AbilityLab.unity, which is enabled in Build
                  Settings so it can be launched on a phone — there is no Editor menu on a
                  device. MenuUiController re-reads the preference every time the main menu
-                 is shown, so turning the gate off hides this again without a relaunch.
+                 is shown AND whenever the toggle changes or the sheet closes, so the row
+                 appears or disappears without a relaunch.
                  Display is driven from C#; do not give it a display rule in USS or the two
                  will fight. -->
             <ui:VisualElement name="DevRow" class="cw-menu-secondary-row" style="display: none;">
-                <ui:Button name="AbilityLabBtn" text="@btn.abilityLab" class="cw-btn cw-btn--neutral cw-menu-secondary" />
+                <ui:Button name="AbilityLabBtn" text="@btn.abilityLab" class="cw-btn cw-btn--wood cw-menu-secondary" />
             </ui:VisualElement>
         </ui:VisualElement>
 
         <!-- Build stamp — during a test session you otherwise cannot tell which
              build is on the device. Filled by MenuUiController. -->
         <ui:Label name="BuildStamp" text="" class="cw-menu-build" picking-mode="Ignore" />
+
+        <!-- Settings gear (wood nav button, top-right). The glyph is a dictionary
+             key like every other string; the tooltip is its accessible name
+             (UiText.ResolveTree resolves @keys in tooltips too). -->
+        <ui:Button name="SettingsBtn" text="@glyph.gear" tooltip="@settings.title" class="cw-home-btn cw-gear-btn cw-glyph" />
+
+        <!-- Settings sheet (modal). Hidden until SettingsBtn is pressed
+             (MenuUiController.OpenSettings). The scrim swallows taps behind the
+             sheet; CLOSE or a tap on the scrim closes it. Each row is one whole
+             touch target - MenuUiController.BindSettingRow flips its Toggle on a
+             tap anywhere in the row. Display is driven from C#. -->
+        <ui:VisualElement name="SettingsSheet" class="cw-sheet-scrim" style="display: none;">
+            <ui:VisualElement name="SettingsPanel" class="cw-sheet cw-wood-panel">
+                <ui:VisualElement class="cw-sheet__head">
+                    <ui:VisualElement class="cw-ribbon">
+                        <ui:Label text="@settings.title" class="cw-title" />
+                    </ui:VisualElement>
+                    <ui:Button name="SettingsCloseBtn" text="@settings.close" class="cw-btn cw-btn--wood cw-sheet__close" />
+                </ui:VisualElement>
+                <ui:VisualElement class="cw-sheet__body cw-raised">
+                    <ui:VisualElement name="RangeGuidesRow" class="cw-setting-toggle-row">
+                        <ui:VisualElement class="cw-setting-toggle-row__texts">
+                            <ui:Label text="@settings.rangeGuides" class="cw-setting-toggle-row__name" />
+                            <ui:Label text="@settings.rangeGuides.desc" class="cw-setting-toggle-row__desc" />
+                        </ui:VisualElement>
+                        <ui:Toggle name="RangeGuidesToggle" class="cw-opt-toggle" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="ReducedMotionRow" class="cw-setting-toggle-row">
+                        <ui:VisualElement class="cw-setting-toggle-row__texts">
+                            <ui:Label text="@settings.reducedMotion" class="cw-setting-toggle-row__name" />
+                            <ui:Label text="@settings.reducedMotion.desc" class="cw-setting-toggle-row__desc" />
+                        </ui:VisualElement>
+                        <ui:Toggle name="ReducedMotionToggle" class="cw-opt-toggle" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="PerformanceModeRow" class="cw-setting-toggle-row">
+                        <ui:VisualElement class="cw-setting-toggle-row__texts">
+                            <ui:Label text="@settings.performance" class="cw-setting-toggle-row__name" />
+                            <ui:Label text="@settings.performance.desc" class="cw-setting-toggle-row__desc" />
+                        </ui:VisualElement>
+                        <ui:Toggle name="PerformanceModeToggle" class="cw-opt-toggle" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="DeveloperModeRow" class="cw-setting-toggle-row cw-setting-toggle-row--last">
+                        <ui:VisualElement class="cw-setting-toggle-row__texts">
+                            <ui:Label text="@settings.devMode" class="cw-setting-toggle-row__name" />
+                            <ui:Label text="@settings.devMode.desc" class="cw-setting-toggle-row__desc" />
+                        </ui:VisualElement>
+                        <ui:Toggle name="DeveloperModeToggle" class="cw-opt-toggle" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

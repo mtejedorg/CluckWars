@@ -281,6 +281,8 @@ namespace CluckWars.Tests
             {
                 if (ve is Toggle t) yield return (t.name, t.text);
                 else if (ve is TextElement te) yield return (te.name, te.text);
+                // Tooltips are the accessible names of icon-only buttons: player-facing too.
+                if (!string.IsNullOrEmpty(ve.tooltip)) yield return (ve.name + " (tooltip)", ve.tooltip);
             }
         }
 

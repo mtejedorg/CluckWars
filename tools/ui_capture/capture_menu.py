@@ -6,7 +6,8 @@ Usage (Editor open, Bootstrap.unity loaded and the only open scene, not in Play 
 It enters Play mode, walks Main -> Choose Your Chicken -> Loadout -> Lobby, and for each screen sets the
 menu PanelSettings.targetTexture to a RenderTexture (1920x1080, 2424x1080, 2048x1536), saves a PNG,
 then restores the PanelSettings. Works even when the Editor window is unfocused. Element names it
-drives (SoloBtn, ClassAssassin/SpecOptA, NextBtn, ReadyBtn) must be updated if the UXML renames them.
+drives (SoloBtn, SettingsBtn/SettingsCloseBtn, ClassAssassin/SpecOptA, NextBtn, ReadyBtn, the
+.cw-ability-card class, the PageHost container) must be updated if the UXML/controller renames them.
 """
 import sys, os, json, time
 sys.stdout.reconfigure(encoding="utf-8")
@@ -20,7 +21,7 @@ CS = r"""using UnityEngine; using UnityEngine.UIElements; using System.Linq; usi
 public class Cap {
   static UIDocument Doc() { return Object.FindObjectsByType<UIDocument>(FindObjectsSortMode.None).FirstOrDefault(x => x.rootVisualElement != null && x.rootVisualElement.Q<Button>("SoloBtn") != null); }
   static VisualElement Menu() { var d = Doc(); return d == null ? null : d.rootVisualElement; }
-  public static string Pages() { var r = Menu(); if (r == null) return "NOMENU"; return "pages=[" + string.Join(",", r.Children().Select((c,i)=> c.resolvedStyle.display==DisplayStyle.Flex ? i.ToString() : "-")) + "]"; }
+  public static string Pages() { var r = Menu(); if (r == null) return "NOMENU"; var host = r.Q<VisualElement>("PageHost") ?? r; return "pages=[" + string.Join(",", host.Children().Select((c,i)=> c.resolvedStyle.display==DisplayStyle.Flex ? i.ToString() : "-")) + "]"; }
   public static string Info() { var ps = Doc().panelSettings; return "ps=" + ps.name + " target=" + (ps.targetTexture==null?"null":ps.targetTexture.name) + " clear=" + ps.clearColor + " scaleMode=" + ps.scaleMode + " ref=" + ps.referenceResolution + " match=" + ps.match; }
   public static string Setup(string w, string h) { var ps = Doc().panelSettings; var rt = new RenderTexture(int.Parse(w), int.Parse(h), 24, RenderTextureFormat.ARGB32); rt.name = "AuditRT"; rt.Create();
     ps.targetTexture = rt; ps.clearColor = true; ps.colorClearValue = Color.black; return "rt " + w + "x" + h; }
@@ -75,6 +76,9 @@ for _ in range(60):
 print("menu:", s, "|", cs("Info"))
 time.sleep(1.5)
 print("01 main menu"); snap("01_main_menu")
+print(cs("Press", "SettingsBtn")); time.sleep(0.5)
+print("01b settings sheet"); snap("01b_settings")
+print(cs("Press", "SettingsCloseBtn")); time.sleep(0.3)
 print(cs("Press", "SoloBtn"), cs("Pages")); time.sleep(0.5)
 print("02 class select (default)"); snap("02_class_select_default")
 print(cs("Tap", "ClassAssassin", "SpecOptA")); time.sleep(0.5)

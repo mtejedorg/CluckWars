@@ -73,6 +73,7 @@
             <ui:VisualElement name="ClassList" class="cw-cs-classes">
 
                 <ui:VisualElement name="ClassWarrior" class="cw-class-chip">
+                    <ui:VisualElement class="cw-glow" picking-mode="Ignore" />
                     <ui:VisualElement class="cw-class-chip__toprow">
                         <ui:VisualElement name="ClassWarriorArt" class="cw-class-chip__art" />
                         <ui:VisualElement class="cw-class-chip__titles">
@@ -96,6 +97,7 @@
                 </ui:VisualElement>
 
                 <ui:VisualElement name="ClassSpeedy" class="cw-class-chip">
+                    <ui:VisualElement class="cw-glow" picking-mode="Ignore" />
                     <ui:VisualElement class="cw-class-chip__toprow">
                         <ui:VisualElement name="ClassSpeedyArt" class="cw-class-chip__art" />
                         <ui:VisualElement class="cw-class-chip__titles">
@@ -119,6 +121,7 @@
                 </ui:VisualElement>
 
                 <ui:VisualElement name="ClassFatty" class="cw-class-chip">
+                    <ui:VisualElement class="cw-glow" picking-mode="Ignore" />
                     <ui:VisualElement class="cw-class-chip__toprow">
                         <ui:VisualElement name="ClassFattyArt" class="cw-class-chip__art" />
                         <ui:VisualElement class="cw-class-chip__titles">
@@ -144,6 +147,7 @@
                 <!-- No PreFilledTag: Peck.asset AllowedClasses (7 = Warrior|Speedy|Fatty)
                      excludes Assassin — it cannot forage, so there is nothing to flag. -->
                 <ui:VisualElement name="ClassAssassin" class="cw-class-chip">
+                    <ui:VisualElement class="cw-glow" picking-mode="Ignore" />
                     <ui:VisualElement class="cw-class-chip__toprow">
                         <ui:VisualElement name="ClassAssassinArt" class="cw-class-chip__art" />
                         <ui:VisualElement class="cw-class-chip__titles">
@@ -175,16 +179,18 @@
                  SpecOptA/B above) and the pips were rejected in favor of a plain
                  strong/weak read (see RefreshRoleCallouts in MenuUiController.cs;
                  there is no HP/damage stat left post GDD §2 combat rewrite). -->
-            <ui:VisualElement name="Preview" class="cw-cs-preview" style="align-items: center;">
-                <ui:VisualElement style="width: 100%; height: 280px; align-items: center; justify-content: center; flex-shrink: 0;">
+            <!-- Wood panel (the middle value step; stage 2) so the light preview text
+                 reads without depending on the backdrop behind it. -->
+            <ui:VisualElement name="Preview" class="cw-cs-preview cw-wood-panel" style="align-items: center; padding-top: 18px; padding-bottom: 18px; padding-left: 30px; padding-right: 30px;">
+                <ui:VisualElement style="width: 100%; height: 270px; align-items: center; justify-content: center; flex-shrink: 0;">
                     <ui:VisualElement name="PreviewGlow" class="cw-radial-glow" style="width: 330px; height: 330px;" />
                     <ui:VisualElement name="PreviewDisc" class="cw-preview-disc">
                         <ui:VisualElement name="PreviewChicken" class="cw-chicken" style="width: 210px; height: 210px;" />
                     </ui:VisualElement>
                 </ui:VisualElement>
 
-                <ui:Label name="PreviewName" text="@class.warrior.name" class="cw-heading" style="font-size: 42px;" />
-                <ui:Label name="PreviewQuote" text="" class="cw-body" style="-unity-font-style: italic; color: rgba(255, 255, 255, 0.72); margin-top: 4px; margin-bottom: 16px; font-size: 30px; -unity-text-align: middle-center;" />
+                <ui:Label name="PreviewName" text="@class.warrior.name" class="cw-heading" style="font-size: 36px; letter-spacing: 1px;" />
+                <ui:Label name="PreviewQuote" text="" class="cw-body" style="-unity-font-style: italic; color: rgb(244, 230, 204); margin-top: 4px; margin-bottom: 16px; font-size: 30px; -unity-text-align: middle-center;" />
 
                 <ui:VisualElement name="RoleCallouts" class="cw-role-list">
                     <ui:VisualElement class="cw-role-row">
@@ -207,7 +213,7 @@
              chosen. Gating this button would need a controller-side SetEnabled
              call that the shipped controller deliberately does not make. -->
         <ui:VisualElement style="align-items: center; padding-top: 4px; padding-bottom: 20px; flex-shrink: 0;">
-            <ui:Button name="NextBtn" text="@btn.next" class="cw-btn cw-btn--gold" style="min-width: 480px; letter-spacing: 2px;" />
+            <ui:Button name="NextBtn" text="@btn.next" class="cw-btn cw-btn--green" style="min-width: 480px; letter-spacing: 2px;" />
         </ui:VisualElement>
 
     </ui:VisualElement>

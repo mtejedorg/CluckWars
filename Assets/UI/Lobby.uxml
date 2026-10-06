@@ -3,9 +3,6 @@
 
     <ui:VisualElement name="LobbyPage" class="cw-screen">
 
-        <!-- Ambient corner glow (design §LobbyL) -->
-        <ui:VisualElement class="cw-radial-glow" style="top: -15%; left: -12%; width: 55%; height: 130%; opacity: 0.5;" />
-
         <ui:VisualElement class="cw-lobby-body">
 
             <!-- ─ LEFT RAIL: ribbon + invite + settings + status + start ─ -->
@@ -21,23 +18,23 @@
                 </ui:VisualElement>
 
                 <!-- Invite code (host mode) -->
-                <ui:VisualElement name="InviteCard" class="cw-card cw-lobby-card">
+                <ui:VisualElement name="InviteCard" class="cw-raised cw-lobby-card">
                     <ui:Label text="@lobby.invite.label" class="cw-lobby-cardlabel" />
                     <ui:VisualElement name="CodeTiles" class="cw-code-tiles" />
                     <ui:VisualElement class="cw-lobby-btnrow">
-                        <ui:Button name="ShareBtn" text="@btn.share" class="cw-mini-btn cw-mini-btn--gold" />
+                        <ui:Button name="ShareBtn" text="@btn.share" class="cw-mini-btn" />
                         <ui:Button name="CopyBtn" text="@btn.copy" class="cw-mini-btn" />
                     </ui:VisualElement>
                 </ui:VisualElement>
 
                 <!-- Join code entry (join mode) -->
-                <ui:VisualElement name="JoinCard" class="cw-card cw-lobby-card cw-hidden">
+                <ui:VisualElement name="JoinCard" class="cw-raised cw-lobby-card cw-hidden">
                     <ui:Label text="@lobby.join.label" class="cw-lobby-cardlabel" />
                     <ui:TextField name="LobbyJoinField" class="cw-input" style="margin-top: 12px;" />
                 </ui:VisualElement>
 
                 <!-- Match settings -->
-                <ui:VisualElement class="cw-card cw-lobby-card">
+                <ui:VisualElement class="cw-raised cw-lobby-card">
                     <ui:Label text="@lobby.rules" class="cw-lobby-cardhead" />
                     <ui:VisualElement class="cw-setting-row">
                         <ui:Label text="@lobby.setting.arena" class="cw-setting-k" /><ui:Label text="@lobby.value.arena" class="cw-setting-v" />
@@ -63,7 +60,7 @@
                 <ui:VisualElement style="flex-grow: 1; min-height: 8px;" />
 
                 <ui:Button name="StartBtn" text="@btn.start" class="cw-btn cw-btn--green cw-lobby-start" />
-                <ui:Button name="BackBtn" text="@nav.back" class="cw-lobby-back" />
+                <ui:Button name="BackBtn" text="@nav.back" class="cw-btn cw-btn--wood cw-lobby-back" />
                 <ui:Label name="LobbyStatus" text="" class="cw-lobby-error" />
             </ui:VisualElement>
 

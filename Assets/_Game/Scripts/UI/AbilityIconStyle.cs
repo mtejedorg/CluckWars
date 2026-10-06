@@ -76,6 +76,59 @@ namespace CluckWars.UI
         };
 
         /// <summary>
+        /// The icon classes that actually have an exported sprite AND a matching
+        /// <c>.cw-hex-icon--*</c> rule in <c>CluckWarsTheme.uss</c>. Every other entry in
+        /// <see cref="ByType"/> is a reserved name for art that does not exist yet, and an
+        /// element given one of those classes paints NOTHING — that was the menu's
+        /// "blank hex" bug (Mark/Kill, Peck, the 2026-08-23 roster, every perk).
+        /// <c>AbilitySystemTests</c> keeps this set equal to the rules the stylesheet defines.
+        /// </summary>
+        private static readonly HashSet<string> SpriteAuthored = new()
+        {
+            "cw-hex-icon--dive-bomb", "cw-hex-icon--cluck", "cw-hex-icon--snatch",
+            "cw-hex-icon--roll", "cw-hex-icon--trap", "cw-hex-icon--aura",
+            "cw-hex-icon--root", "cw-hex-icon--shell", "cw-hex-icon--turtle",
+            "cw-hex-icon--spine", "cw-hex-icon--burst", "cw-hex-icon--invis",
+            "cw-hex-icon--doppel", "cw-hex-icon--steal",
+        };
+
+        /// <summary>The icon classes with real sprites (see <see cref="SpriteAuthored"/>).</summary>
+        public static IReadOnlyCollection<string> AuthoredSpriteClasses => SpriteAuthored;
+
+        /// <summary>
+        /// Like <see cref="ClassFor"/>, but only when that class really paints a sprite.
+        /// Menu code uses this so an ability without art falls through to
+        /// <see cref="Monogram"/> instead of rendering an empty hex.
+        /// </summary>
+        public static string SpriteClassFor(AbilityBaseSO ability)
+        {
+            string cls = ClassFor(ability);
+            return cls != null && SpriteAuthored.Contains(cls) ? cls : null;
+        }
+
+        /// <summary>
+        /// Text that always identifies <paramref name="ability"/> when it has no sprite: its
+        /// authored <see cref="AbilityBaseSO.ShortLabel"/> (the ≤4-character HUD abbreviation),
+        /// else the initials of its display name, else its asset name's first two letters.
+        /// Never empty for a non-null ability.
+        /// </summary>
+        public static string Monogram(AbilityBaseSO ability)
+        {
+            if (ability == null) return string.Empty;
+            if (!string.IsNullOrWhiteSpace(ability.ShortLabel)) return ability.ShortLabel.Trim().ToUpperInvariant();
+
+            string src = !string.IsNullOrWhiteSpace(ability.DisplayName) ? ability.DisplayName : ability.name;
+            var sb = new System.Text.StringBuilder(3);
+            foreach (var word in src.Split(new[] { ' ', '/', '-', '_' }, System.StringSplitOptions.RemoveEmptyEntries))
+            {
+                sb.Append(char.ToUpperInvariant(word[0]));
+                if (sb.Length == 3) break;
+            }
+            if (sb.Length == 1 && src.Length > 1) sb.Append(char.ToUpperInvariant(src[1]));
+            return sb.Length > 0 ? sb.ToString() : "?";
+        }
+
+        /// <summary>
         /// USS icon class painting the exported sprite for <paramref name="ability"/>,
         /// or <c>null</c> when the ability is null or has no exported sprite (the
         /// caller then hides its icon element and lets a text label carry it).

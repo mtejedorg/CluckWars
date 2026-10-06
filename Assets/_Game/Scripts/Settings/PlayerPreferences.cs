@@ -9,18 +9,22 @@ namespace CluckWars.Settings
     /// a handful of booleans nobody injects.
     /// </summary>
     /// <remarks>
-    /// <b>The Settings sheet on the main menu hosts these controls</b> (gear button, built in
-    /// stage 2 of the 2026-10 menu overhaul; until then the two toggles that already existed
-    /// still sit on <c>#OptionsRow</c> of the Loadout screen). The user-facing copy lives in the
-    /// wording dictionary (<c>settings.*</c> keys in <c>Resources/Text/UiText.csv</c>), not here:
+    /// <b>Every preference here is a row on the Settings sheet</b>: the gear button at the
+    /// top-right of the main menu opens a modal (<c>#SettingsSheet</c> in
+    /// <c>Assets/UI/MainMenu.uxml</c>, bound by <c>MenuUiController.BuildSettingsSheet</c>) with one
+    /// whole-row toggle per preference, each seeded from the getter with
+    /// <c>SetValueWithoutNotify</c> so opening the sheet never writes a default to disk. The
+    /// sheet is the only settings surface; the Loadout screen no longer carries toggles. The
+    /// user-facing copy lives in the wording dictionary (<c>settings.*</c> keys in
+    /// <c>Resources/Text/UiText.csv</c>), not here:
     /// <list type="bullet">
     ///   <item><see cref="AbilityRangeGuidesEnabled"/>: Range Guides</item>
-    ///   <item><see cref="ReducedMotionEnabled"/>: Reduced Motion</item>
-    ///   <item><see cref="DeveloperModeEnabled"/>: Dev Mode</item>
+    ///   <item><see cref="ReducedMotionEnabled"/>: Reduced Motion (also mirrored onto the menu
+    ///   root as <c>.cw-reduced-motion</c>, which switches off the menus' own transitions)</item>
     ///   <item><see cref="PerformanceModeEnabled"/>: Performance Mode</item>
+    ///   <item><see cref="DeveloperModeEnabled"/>: Dev Mode (shows/hides the main menu's
+    ///   Ability Lab row as soon as it changes)</item>
     /// </list>
-    /// Reduced Motion has no control yet, so until the sheet lands it can only be changed by
-    /// editing PlayerPrefs by hand.
     ///
     /// <b>Cached, because the consumers read these per frame or per hit.</b>
     /// <c>AbilitySlotOverlay.LateUpdate</c> polls its getter once per frame and

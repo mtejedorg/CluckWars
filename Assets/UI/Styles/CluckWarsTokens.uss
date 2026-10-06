@@ -113,4 +113,16 @@
     --cw-ability-invis: #00ACC1;
     --cw-ability-doppel: #0097A7;
     --cw-ability-steal: #00BCD4;
+
+    /* -- Direction A + wood trim (spec 2026-10-06 menu UI overhaul, Visual system) -- */
+    --cw-ink: #2a1a0c;
+    --cw-cream: #fff8e8;
+    --cw-cream-inset: #f3e6c8;
+    --cw-ink-soft: #6b4a2a;
+    --cw-gold: #f5c842;
+    --cw-gold-edge: #d9a521;
+    --cw-cta-1: #7be35c;
+    --cw-cta-2: #36a82c;
+    --cw-wood-1: #8a5a2e;
+    --cw-wood-2: #7a4a22;
 }

@@ -78,6 +78,8 @@ namespace CluckWars.Localization
         public const string CalloutAssassinWeak = "callout.assassin.weak";
         public const string GlyphPlus = "glyph.plus";
         public const string GlyphMinus = "glyph.minus";
+        public const string GlyphGear = "glyph.gear";
+        public const string GlyphLock = "glyph.lock";
 
         // ---- Perks (templated from each passive's own fields) ----
         [UiArgs("pct")] public const string PerkRelentlessLine = "perk.relentless.line";

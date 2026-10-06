@@ -490,6 +490,44 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void AbilityIconStyle_SpriteAuthoredSet_MatchesTheMenuStylesheet()
+        {
+            // SpriteClassFor is the menu's guard against blank hexes: it only hands out a
+            // class that really paints a sprite, so everything else falls through to the
+            // ShortLabel monogram. If this set and the stylesheet drift apart, either an
+            // authored icon is hidden behind a monogram or a blank hex comes back.
+            string css = System.IO.File.ReadAllText("Assets/UI/Styles/CluckWarsTheme.uss");
+            var defined = new HashSet<string>(
+                System.Text.RegularExpressions.Regex.Matches(css, @"\.(cw-hex-icon--[A-Za-z0-9-]+)(?![A-Za-z0-9_-])")
+                    .Select(m => m.Groups[1].Value));
+            var authored = new HashSet<string>(AbilityIconStyle.AuthoredSpriteClasses);
+
+            CollectionAssert.AreEquivalent(defined, authored,
+                "AbilityIconStyle.SpriteAuthored must list exactly the .cw-hex-icon--* rules in CluckWarsTheme.uss.");
+            foreach (var cls in authored)
+                Assert.IsFalse(IconsNotYetAuthored.Contains(cls), $"{cls} is both authored and listed as not yet authored.");
+        }
+
+        [Test]
+        public void AbilityIconStyle_Monogram_IsNeverEmpty()
+        {
+            foreach (var type in ConcreteAbilityTypes())
+            {
+                var probe = (AbilityBaseSO)ScriptableObject.CreateInstance(type);
+                try
+                {
+                    probe.ShortLabel = null;
+                    probe.DisplayName = null;
+                    probe.name = type.Name;
+                    Assert.IsFalse(string.IsNullOrEmpty(AbilityIconStyle.Monogram(probe)), type.Name);
+                    probe.ShortLabel = "pk";
+                    Assert.AreEqual("PK", AbilityIconStyle.Monogram(probe));
+                }
+                finally { UnityEngine.Object.DestroyImmediate(probe); }
+            }
+        }
+
+        [Test]
         public void AbilityIconStyle_ReturnsNull_ForNull()
         {
             // Callers rely on this to decide whether to hide the icon element; an

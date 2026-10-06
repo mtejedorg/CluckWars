@@ -50,6 +50,8 @@ callout.assassin.strong,Blink and it's gone.
 callout.assassin.weak,"Light load, slow beak."
 glyph.plus,+
 glyph.minus,−
+glyph.gear,⚙
+glyph.lock,🔒
 perk.relentless.line,Every move recharges {pct}% faster.
 perk.relentless.detail,Applies to every move except Peck.
 perk.bully.line,"Steal {steal}% more, carry {cap} more."

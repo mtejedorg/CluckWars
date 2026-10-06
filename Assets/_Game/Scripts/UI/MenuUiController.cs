@@ -57,8 +57,16 @@ namespace CluckWars.UI
 
         // ---- Runtime state ----------------------------------------------------
         private VisualElement _root;
+        // Backdrop (image + tint) sits behind every page and bleeds to the screen edges;
+        // the page host holds the pages and carries the safe-area padding.
+        private VisualElement _backdrop, _backdropTint, _pageHost;
         private VisualElement _mainMenu, _classSelect, _loadout, _lobby;
+        private VisualElement _settingsSheet;
         private bool _isBusy;
+        private Rect _appliedSafeArea;
+        private Vector2Int _appliedScreenSize;
+        // Abilities already reported as having no sprite (logged once each, not per refresh).
+        private readonly HashSet<AbilityBaseSO> _reportedMissingIcons = new();
 
         private readonly Dictionary<ChickenClass, VisualElement> _classChips = new();
         // (pill element, the passive it selects) for every SpecOptA/SpecOptB across
@@ -95,6 +103,14 @@ namespace CluckWars.UI
 
         // Dim neutral tint for an empty ability hex (no equipped accent).
         private static readonly Color HexEmptyTint = new Color(0.45f, 0.38f, 0.28f, 0.7f);
+
+        // Direction A surface colours (spec "Visual system"; tokens in CluckWarsTokens.uss).
+        // Only the ones C# has to paint inline, because it also sets a state colour on the
+        // same element — everything static lives in CluckWarsTheme.uss.
+        private static readonly Color Ink        = UiGfx.Hex32("2a1a0c");
+        private static readonly Color Cream      = UiGfx.Hex32("fff8e8");
+        private static readonly Color CreamInset = UiGfx.Hex32("f3e6c8");
+        private static readonly Color InkSoft    = UiGfx.Hex32("6b4a2a");
 
         private static readonly ChickenClass[] Order =
             { ChickenClass.Warrior, ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };
@@ -220,6 +236,27 @@ namespace CluckWars.UI
             var f = UiGfx.ChunkyFont();
             if (f != null) _root.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(f));
 
+            // The page templates link CluckWarsTheme.uss, but the backdrop, page host and the
+            // root-level state classes (.cw-reduced-motion) live ABOVE the templates, where a
+            // template's sheet does not reach. Attach the same sheet(s) to the root once.
+            if (_mainMenuUxml != null)
+                foreach (var sheet in _mainMenuUxml.stylesheets)
+                    if (sheet != null && !_root.styleSheets.Contains(sheet)) _root.styleSheets.Add(sheet);
+
+            // Backdrop first (drawn underneath), then the safe-area page host on top.
+            _backdrop = new VisualElement { name = "Backdrop", pickingMode = PickingMode.Ignore };
+            _backdrop.AddToClassList("cw-backdrop");
+            _backdropTint = new VisualElement { name = "BackdropTint", pickingMode = PickingMode.Ignore };
+            _backdropTint.AddToClassList("cw-backdrop-tint");
+            _pageHost = new VisualElement { name = "PageHost" };
+            _pageHost.AddToClassList("cw-page-host");
+            _pageHost.style.flexGrow = 1;
+            StretchToParent(_backdrop);
+            StretchToParent(_backdropTint);
+            _root.Add(_backdrop);
+            _root.Add(_backdropTint);
+            _root.Add(_pageHost);
+
             _mainMenu    = ClonePage(_mainMenuUxml);
             _classSelect = ClonePage(_classSelectUxml);
             _loadout     = ClonePage(_characterSelectUxml);
@@ -229,6 +266,7 @@ namespace CluckWars.UI
             BuildClassSelect();
             BuildLoadout();
             BuildLobby();
+            ApplyReducedMotion();
 
             _root.RegisterCallback<GeometryChangedEvent>(OnRootGeometry);
             UpdateLayout(_root.resolvedStyle.width, _root.resolvedStyle.height);
@@ -253,13 +291,22 @@ namespace CluckWars.UI
             UiText.ResolveTree(ve);
             ve.style.flexGrow = 1;
             ve.style.display = DisplayStyle.None;
-            _root.Add(ve);
+            _pageHost.Add(ve);
             return ve;
         }
 
+        private static void StretchToParent(VisualElement ve)
+        {
+            ve.style.position = Position.Absolute;
+            ve.style.left = 0; ve.style.top = 0; ve.style.right = 0; ve.style.bottom = 0;
+        }
+
         // ---- Layout -----------------------------------------------------------
-        private void OnRootGeometry(GeometryChangedEvent evt) =>
+        private void OnRootGeometry(GeometryChangedEvent evt)
+        {
             UpdateLayout(evt.newRect.width, evt.newRect.height);
+            ApplySafeArea(force: true);
+        }
 
         private void UpdateLayout(float w, float h)
         {
@@ -268,13 +315,98 @@ namespace CluckWars.UI
             _root.EnableInClassList("layout--portrait", !landscape);
         }
 
-        /// <summary>Applies the emoji font to every element tagged .cw-emoji-text under <paramref name="root"/>.</summary>
-        private static void ApplyEmojiFont(VisualElement root)
+        // A notch or gesture bar can change Screen.safeArea without the panel's geometry
+        // changing (e.g. the system bars toggling), so it is also polled — two struct
+        // compares a frame, no allocation.
+        private void Update() => ApplySafeArea(force: false);
+
+        /// <summary>
+        /// Pads <see cref="_pageHost"/> so no page content sits under a notch, cutout or the
+        /// gesture bar, while the backdrop keeps bleeding to the screen edges.
+        /// </summary>
+        /// <remarks>
+        /// <c>Screen.safeArea</c> is in screen pixels with a bottom-left origin; the panel works
+        /// in its own scaled units with a top-left origin, so each corner goes through
+        /// <see cref="RuntimePanelUtils.ScreenToPanel"/> after flipping Y. When the safe area is
+        /// the whole screen (desktop, Editor, the off-screen capture tool rendering into a
+        /// RenderTexture of a different size than the Game view) the padding is zero rather
+        /// than a conversion of a rect that does not describe this panel.
+        /// </remarks>
+        private void ApplySafeArea(bool force)
         {
-            var ef = UiGfx.EmojiFont();
-            if (ef == null || root == null) return;
-            var emojis = root.Query<Label>(className: "cw-emoji-text").ToList();
-            foreach (var e in emojis) e.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(ef));
+            if (_pageHost == null || _pageHost.panel == null) return;
+
+            var sa = Screen.safeArea;
+            var screen = new Vector2Int(Screen.width, Screen.height);
+            if (!force && sa == _appliedSafeArea && screen == _appliedScreenSize) return;
+            _appliedSafeArea = sa;
+            _appliedScreenSize = screen;
+
+            float left = 0, top = 0, right = 0, bottom = 0;
+            bool fullScreen = sa.xMin <= 0f && sa.yMin <= 0f && sa.xMax >= screen.x && sa.yMax >= screen.y;
+            if (!fullScreen && screen.x > 0 && screen.y > 0)
+            {
+                var panel = _pageHost.panel;
+                Vector2 min = RuntimePanelUtils.ScreenToPanel(panel, new Vector2(sa.xMin, screen.y - sa.yMax));
+                Vector2 max = RuntimePanelUtils.ScreenToPanel(panel, new Vector2(sa.xMax, screen.y - sa.yMin));
+                Vector2 full = RuntimePanelUtils.ScreenToPanel(panel, new Vector2(screen.x, screen.y));
+                left   = Mathf.Max(0f, min.x);
+                top    = Mathf.Max(0f, min.y);
+                right  = Mathf.Max(0f, full.x - max.x);
+                bottom = Mathf.Max(0f, full.y - max.y);
+            }
+
+            _pageHost.style.paddingLeft = left;
+            _pageHost.style.paddingTop = top;
+            _pageHost.style.paddingRight = right;
+            _pageHost.style.paddingBottom = bottom;
+        }
+
+        // ---- Backdrop -----------------------------------------------------------
+        /// <summary>How a page wants the shared backdrop: which image, and the lift tint over it.</summary>
+        private readonly struct BackdropSpec
+        {
+            public readonly string Resource; // Resources path of a Texture2D, or null = the default plate
+            public readonly Color Tint;
+            public BackdropSpec(string resource, Color tint) { Resource = resource; Tint = tint; }
+        }
+
+        // Warm golden-hour lift over the dusk plate. Per page so Phase 2 can drop in a
+        // Backgrounds/Bg_* image for a screen by changing one row here (Resource), without
+        // touching any UXML. Null Resource keeps the default plate from .cw-backdrop.
+        private static readonly Color WarmLift = new Color(1f, 0.77f, 0.47f, 0.24f);
+        private static readonly Color WarmLiftBusy = new Color(1f, 0.80f, 0.55f, 0.30f);
+
+        private BackdropSpec BackdropFor(VisualElement page)
+        {
+            if (page == _classSelect)
+            {
+                // Choose Your Chicken: tinted by the selected class (lightened so the plate
+                // still lifts toward golden hour rather than darkening into the class hue).
+                var t = Lighten(TintOf(Cls), 0.25f);
+                return new BackdropSpec(null, new Color(t.r, t.g, t.b, 0.34f));
+            }
+            if (page == _mainMenu) return new BackdropSpec(null, WarmLift);
+            return new BackdropSpec(null, WarmLiftBusy);
+        }
+
+        private VisualElement _currentPage;
+
+        /// <summary>Applies <see cref="BackdropFor"/> for the current page to the shared backdrop.</summary>
+        private void ApplyBackdrop()
+        {
+            if (_backdrop == null || _backdropTint == null) return;
+            var spec = BackdropFor(_currentPage);
+
+            Texture2D tex = null;
+            if (!string.IsNullOrEmpty(spec.Resource))
+            {
+                tex = Resources.Load<Texture2D>(spec.Resource);
+                if (tex == null) _log?.Warn(Source, $"Backdrop '{spec.Resource}' not found in Resources; keeping the default plate.");
+            }
+            // StyleKeyword.Null hands the image back to .cw-backdrop (the default plate).
+            _backdrop.style.backgroundImage = tex != null ? new StyleBackground(tex) : new StyleBackground(StyleKeyword.Null);
+            _backdropTint.style.backgroundColor = spec.Tint;
         }
 
         // ---- Navigation -------------------------------------------------------
@@ -285,10 +417,13 @@ namespace CluckWars.UI
 
         private void SetPage(VisualElement page)
         {
+            if (page != _mainMenu) CloseSettings();
+            _currentPage = page;
             if (_mainMenu    != null) _mainMenu.style.display    = page == _mainMenu    ? DisplayStyle.Flex : DisplayStyle.None;
             if (_classSelect != null) _classSelect.style.display = page == _classSelect ? DisplayStyle.Flex : DisplayStyle.None;
             if (_loadout     != null) _loadout.style.display     = page == _loadout     ? DisplayStyle.Flex : DisplayStyle.None;
             if (_lobby       != null) _lobby.style.display       = page == _lobby       ? DisplayStyle.Flex : DisplayStyle.None;
+            ApplyBackdrop();
         }
 
         // ======================================================================
@@ -304,18 +439,122 @@ namespace CluckWars.UI
             // Build stamp — a tester reporting a bug from a device otherwise has no
             // way to say which build produced it.
             Bind<Label>(_mainMenu, "BuildStamp", l => l.text = UiText.Format(UiKeys.MainBuild, ("version", Application.version)));
+
+            BuildSettingsSheet();
         }
+
+        // ======================================================================
+        //  SETTINGS SHEET (main menu gear -> modal)
+        // ======================================================================
+        /// <summary>
+        /// Wires the gear, the modal sheet and its four preference rows. The sheet is static
+        /// markup in MainMenu.uxml (#SettingsSheet); this only binds it.
+        /// </summary>
+        private void BuildSettingsSheet()
+        {
+            _settingsSheet = _mainMenu.Q<VisualElement>("SettingsSheet");
+            if (_settingsSheet == null)
+            {
+                _log?.Error(Source, "MainMenu.uxml has no #SettingsSheet; the settings gear will do nothing.");
+                return;
+            }
+
+            Bind<Button>(_mainMenu, "SettingsBtn", b => b.clicked += OpenSettings);
+            Bind<Button>(_settingsSheet, "SettingsCloseBtn", b => b.clicked += CloseSettings);
+            // A tap on the dimmed scrim (outside the panel) closes too; taps inside the panel
+            // bubble up here with a different target and are ignored.
+            _settingsSheet.RegisterCallback<ClickEvent>(evt =>
+            {
+                if (evt.target == _settingsSheet) CloseSettings();
+            });
+
+            BindSettingRow("RangeGuidesRow", "RangeGuidesToggle",
+                () => PlayerPreferences.AbilityRangeGuidesEnabled,
+                v => PlayerPreferences.AbilityRangeGuidesEnabled = v, "Ability range guides");
+            BindSettingRow("ReducedMotionRow", "ReducedMotionToggle",
+                () => PlayerPreferences.ReducedMotionEnabled,
+                v => { PlayerPreferences.ReducedMotionEnabled = v; ApplyReducedMotion(); }, "Reduced motion");
+            BindSettingRow("PerformanceModeRow", "PerformanceModeToggle",
+                () => PlayerPreferences.PerformanceModeEnabled,
+                v => PlayerPreferences.PerformanceModeEnabled = v, "Performance mode");
+            // Dev Mode refreshes #DevRow the moment it changes — the Ability Lab button sits
+            // right behind the sheet, so waiting for the next ShowMainMenu would look broken.
+            BindSettingRow("DeveloperModeRow", "DeveloperModeToggle",
+                () => PlayerPreferences.DeveloperModeEnabled,
+                v => { PlayerPreferences.DeveloperModeEnabled = v; RefreshDevRow(); }, "Developer mode");
+        }
+
+        /// <summary>
+        /// Binds one settings row: seeds its Toggle from the preference and writes changes
+        /// back, and makes the WHOLE row the touch target (a tap on the name or description
+        /// flips the toggle too).
+        /// </summary>
+        /// <remarks>
+        /// Seeded with <c>SetValueWithoutNotify</c>: the seed is not a player choice, and a
+        /// ChangeEvent would echo the stored value straight back to <c>PlayerPrefs</c> on every
+        /// build, turning "never chosen, using the default" into "explicitly chosen" (for Dev
+        /// Mode it would write the key on every player's machine; for Performance Mode it would
+        /// freeze the platform default). Re-seeded on every <see cref="OpenSettings"/> so the
+        /// sheet always shows the stored value, whatever changed it.
+        /// </remarks>
+        private void BindSettingRow(string rowName, string toggleName, Func<bool> get, Action<bool> set, string logName)
+        {
+            var row = _settingsSheet.Q<VisualElement>(rowName);
+            var toggle = _settingsSheet.Q<Toggle>(toggleName);
+            if (row == null || toggle == null)
+            {
+                _log?.Error(Source, $"Settings sheet is missing #{rowName} or #{toggleName}; '{logName}' cannot be changed from the menu.");
+                return;
+            }
+
+            toggle.SetValueWithoutNotify(get());
+            toggle.RegisterValueChangedCallback(evt =>
+            {
+                set(evt.newValue);
+                _log?.Info(Source, $"{logName} {(evt.newValue ? "enabled" : "disabled")}.");
+            });
+            // The Toggle handles taps on itself; anywhere else in the row flips it here.
+            row.RegisterCallback<ClickEvent>(evt =>
+            {
+                if (evt.target is VisualElement t && (t == toggle || toggle.Contains(t))) return;
+                toggle.value = !toggle.value;
+            });
+            _settingToggles.Add((toggle, get));
+        }
+
+        private readonly List<(Toggle Toggle, Func<bool> Get)> _settingToggles = new();
+
+        private void OpenSettings()
+        {
+            if (_settingsSheet == null) return;
+            foreach (var (toggle, get) in _settingToggles) toggle.SetValueWithoutNotify(get());
+            _settingsSheet.style.display = DisplayStyle.Flex;
+        }
+
+        private void CloseSettings()
+        {
+            if (_settingsSheet == null || _settingsSheet.style.display == DisplayStyle.None) return;
+            _settingsSheet.style.display = DisplayStyle.None;
+            RefreshDevRow();
+        }
+
+        /// <summary>
+        /// Mirrors <see cref="PlayerPreferences.ReducedMotionEnabled"/> onto the root as
+        /// <c>.cw-reduced-motion</c>, which zeroes every menu transition and hover/press pop
+        /// (CluckWarsTheme.uss). Any animation added to these menus must be gated the same way.
+        /// </summary>
+        private void ApplyReducedMotion() =>
+            _root?.EnableInClassList("cw-reduced-motion", PlayerPreferences.ReducedMotionEnabled);
 
         /// <summary>
         /// Shows or hides <c>#DevRow</c> to match
         /// <see cref="PlayerPreferences.DeveloperModeEnabled"/>.
         /// </summary>
         /// <remarks>
-        /// Called from <see cref="ShowMainMenu"/> rather than once from
-        /// <see cref="BuildMainMenu"/>, because the toggle that sets the preference lives on
-        /// the Loadout screen — i.e. the player is always somewhere else when they change it.
-        /// Binding once would mean the button only appeared on the next launch, which on a
-        /// phone is a reinstall-and-relaunch cycle to discover a feature that is already there.
+        /// Called from <see cref="ShowMainMenu"/>, when the Dev Mode toggle changes and when the
+        /// settings sheet closes — not once from <see cref="BuildMainMenu"/>. Binding once would
+        /// mean the button only appeared on the next launch, which on a phone is a
+        /// reinstall-and-relaunch cycle to discover a feature that is already there.
         /// </remarks>
         private void RefreshDevRow()
         {
@@ -414,8 +653,6 @@ namespace CluckWars.UI
             _previewQuote      = _classSelect.Q<Label>("PreviewQuote");
             _roleCalloutStrong = _classSelect.Q<Label>("RoleCalloutStrong");
             _roleCalloutWeak   = _classSelect.Q<Label>("RoleCalloutWeak");
-
-            ApplyEmojiFont(_classSelect);
 
             Bind<Button>(_classSelect, "HomeBtn", b => b.clicked += ShowMainMenu);
             // Always enabled — BuildAll already seeds a default SelectedClass, so
@@ -522,10 +759,11 @@ namespace CluckWars.UI
             {
                 bool sel = kv.Key == cls;
                 kv.Value.EnableInClassList("cw-card--selected", sel);
-                SetBorder(kv.Value, sel ? TintOf(kv.Key) : UiGfx.CardBorder);
-                // Selected chip carries a faint class-color wash (design active chip),
-                // not just a tinted border.
-                kv.Value.style.backgroundColor = sel ? Fade(TintOf(kv.Key), 0.22f) : UiGfx.CardTop;
+                // Selected: class-tint border (widened in USS) + the gold CardGlowFrame child
+                // + a faint class wash over the cream, so selection never rests on colour
+                // alone. Unselected: the ink outline every cream card carries.
+                SetBorder(kv.Value, sel ? TintOf(kv.Key) : Ink);
+                kv.Value.style.backgroundColor = sel ? Color.Lerp(Cream, TintOf(kv.Key), 0.16f) : Cream;
             }
 
             foreach (var (pill, passive) in _specPills)
@@ -560,6 +798,8 @@ namespace CluckWars.UI
 
             RefreshRoleCallouts(cls);
             RefreshPreFilledTags();
+            // The backdrop on this page is tinted by the selected class.
+            if (_currentPage == _classSelect) ApplyBackdrop();
         }
 
         /// <summary>
@@ -601,16 +841,21 @@ namespace CluckWars.UI
         private void RefreshRoleCallouts(ChickenClass cls)
         {
             var keys = ClassKeys[cls];
-            if (_roleCalloutStrong != null)
-            {
-                _roleCalloutStrong.text = UiText.Get(keys.Strong);
-                _roleCalloutStrong.style.display = DisplayStyle.Flex;
-            }
-            if (_roleCalloutWeak != null)
-            {
-                _roleCalloutWeak.text = UiText.Get(keys.Weak);
-                _roleCalloutWeak.style.display = DisplayStyle.Flex;
-            }
+            SetCallout(_roleCalloutStrong, UiText.Get(keys.Strong));
+            SetCallout(_roleCalloutWeak, UiText.Get(keys.Weak));
+        }
+
+        /// <summary>
+        /// Fills one callout, hiding its whole row (the +/− glyph included) when the copy is
+        /// blank, so an emptied dictionary row can never leave a dangling glyph behind.
+        /// </summary>
+        private static void SetCallout(Label callout, string text)
+        {
+            if (callout == null) return;
+            bool show = !string.IsNullOrWhiteSpace(text);
+            callout.text = show ? text : string.Empty;
+            var row = callout.parent ?? callout;
+            row.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         /// <summary>
@@ -631,8 +876,8 @@ namespace CluckWars.UI
                     _abilityDetailName.style.display = DisplayStyle.None;
                 }
                 _abilityDetailText.text = UiText.Get(UiKeys.LoadoutDetailEmpty);
-                _abilityDetailText.style.color = UiGfx.TextSecondary;
-                if (_abilityDetail != null) SetBorder(_abilityDetail, UiGfx.CardBorder);
+                _abilityDetailText.style.color = InkSoft;
+                if (_abilityDetail != null) SetBorder(_abilityDetail, Ink);
                 return;
             }
 
@@ -640,12 +885,14 @@ namespace CluckWars.UI
             {
                 string label = !string.IsNullOrEmpty(ab.DisplayName) ? ab.DisplayName : ab.name;
                 _abilityDetailName.text = label.ToUpperInvariant();
-                _abilityDetailName.style.color = ab.AccentColor;
+                // Ink, not the accent: accents span the whole luminance range and several
+                // (Egg Shell, Featherfoot) vanish on cream. The accent goes on the border.
+                _abilityDetailName.style.color = Ink;
                 _abilityDetailName.style.display = DisplayStyle.Flex;
             }
             _abilityDetailText.text = ab.Description;
-            _abilityDetailText.style.color = UiGfx.TextPrimary;
-            if (_abilityDetail != null) SetBorder(_abilityDetail, Fade(ab.AccentColor, 0.6f));
+            _abilityDetailText.style.color = Ink;
+            if (_abilityDetail != null) SetBorder(_abilityDetail, ab.AccentColor);
         }
 
         // ======================================================================
@@ -677,70 +924,7 @@ namespace CluckWars.UI
                 box.RegisterCallback<ClickEvent>(_ => OnSlotBoxTapped(captured));
             }
 
-            ApplyEmojiFont(_loadout);
-
             Bind<Button>(_loadout, "BackBtn", b => b.clicked += ShowClassSelect);
-            BindRangeGuidesToggle();
-            BindDeveloperModeToggle();
-        }
-
-        /// <summary>
-        /// Wires #DeveloperModeToggle to <see cref="PlayerPreferences.DeveloperModeEnabled"/>,
-        /// which is what reveals the Ability Lab entry on the main menu.
-        /// </summary>
-        /// <remarks>
-        /// Seeded with <c>SetValueWithoutNotify</c> for the same reason as the range-guides
-        /// toggle below: the seed is not a player choice, and letting it raise a ChangeEvent
-        /// would echo the stored value back to <c>PlayerPrefs</c> on every visit to this
-        /// screen. Here that would also write the developer-mode key on the machine of every
-        /// player who ever opened the Loadout screen, turning "never chosen" into "explicitly
-        /// chosen off" — harmless in effect, but it makes the pref file lie about what the
-        /// player has actually touched.
-        ///
-        /// Nothing is refreshed here on toggle: the only thing this preference controls is
-        /// #DevRow on the main menu, and <see cref="ShowMainMenu"/> re-reads it on the way
-        /// back. Doing it there rather than here also covers the preference being changed by
-        /// any other route.
-        /// </remarks>
-        private void BindDeveloperModeToggle()
-        {
-            Bind<Toggle>(_loadout, "DeveloperModeToggle", t =>
-            {
-                t.SetValueWithoutNotify(PlayerPreferences.DeveloperModeEnabled);
-                t.RegisterValueChangedCallback(evt =>
-                {
-                    PlayerPreferences.DeveloperModeEnabled = evt.newValue;
-                    _log?.Info(Source, $"Developer mode {(evt.newValue ? "enabled" : "disabled")}.");
-                });
-            });
-        }
-
-        /// <summary>
-        /// Wires #RangeGuidesToggle to <see cref="PlayerPreferences.AbilityRangeGuidesEnabled"/>.
-        /// </summary>
-        /// <remarks>
-        /// Initialised FROM the preference rather than from the UXML, because the preference
-        /// defaults to true when unwritten and the control must agree with what the player is
-        /// about to see in the match. <c>SetValueWithoutNotify</c>, not <c>value</c>: the seed
-        /// is not a player choice, and letting it raise a ChangeEvent would echo the stored
-        /// value straight back to <c>PlayerPrefs</c> on every visit to this screen, turning
-        /// "never chosen, defaulting to on" into "explicitly chosen".
-        ///
-        /// Bound once in <see cref="BuildLoadout"/>, not per refresh — the control is
-        /// static markup, and a second RegisterValueChangedCallback on the same Toggle would
-        /// run the setter twice per click.
-        /// </remarks>
-        private void BindRangeGuidesToggle()
-        {
-            Bind<Toggle>(_loadout, "RangeGuidesToggle", t =>
-            {
-                t.SetValueWithoutNotify(PlayerPreferences.AbilityRangeGuidesEnabled);
-                t.RegisterValueChangedCallback(evt =>
-                {
-                    PlayerPreferences.AbilityRangeGuidesEnabled = evt.newValue;
-                    _log?.Info(Source, $"Ability range guides {(evt.newValue ? "enabled" : "disabled")}.");
-                });
-            });
         }
 
         /// <summary>
@@ -860,7 +1044,8 @@ namespace CluckWars.UI
                 var box = _slotBoxes[i];
                 if (box == null) continue;
 
-                box.EnableInClassList("cw-slot-box--armed", i == _armedSlot && !IsSlotLocked(i));
+                bool armed = i == _armedSlot && !IsSlotLocked(i);
+                box.EnableInClassList("cw-slot-box--armed", armed);
                 box.EnableInClassList("cw-slot-box--locked", IsSlotLocked(i));
 
                 var ab = GetEquipped(i);
@@ -869,34 +1054,19 @@ namespace CluckWars.UI
 
                 if (ab == null)
                 {
-                    SetBorder(box, UiGfx.CardBorder);
-                    box.style.backgroundColor = UiGfx.CardTop;
+                    // Armed = gold (selection) on top of the USS width/scale bump.
+                    SetBorder(box, armed ? UiGfx.Gold : Fade(Ink, 0.45f));
+                    box.style.backgroundColor = CreamInset;
                     var empty = new Label(UiText.Get(UiKeys.SlotEmpty));
                     empty.AddToClassList("cw-slot-box__empty-label");
                     box.Add(empty);
                     continue;
                 }
 
-                SetBorder(box, ab.AccentColor);
-                box.style.backgroundColor = Fade(ab.AccentColor, 0.20f);
+                SetBorder(box, armed ? UiGfx.Gold : ab.AccentColor);
+                box.style.backgroundColor = Color.Lerp(Cream, ab.AccentColor, 0.18f);
 
-                string iconCls = AbilityIconStyle.ClassFor(ab);
-                if (!string.IsNullOrEmpty(iconCls))
-                {
-                    var sprite = new VisualElement();
-                    sprite.AddToClassList("cw-ability-card__sprite");
-                    sprite.AddToClassList(iconCls);
-                    box.Add(sprite);
-                }
-                else
-                {
-                    var icon = new Label(ab.ResolveIcon());
-                    icon.AddToClassList("cw-ability-card__icon");
-                    var ef = UiGfx.EmojiFont();
-                    if (ef != null) icon.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(ef));
-                    icon.style.color = ab.AccentColor;
-                    box.Add(icon);
-                }
+                box.Add(MakeAbilityIcon(ab, "cw-ability-card__sprite"));
 
                 string label = !string.IsNullOrEmpty(ab.DisplayName) ? ab.DisplayName : ab.name;
                 var name = new Label(label.ToUpperInvariant());
@@ -913,13 +1083,17 @@ namespace CluckWars.UI
 
                 if (IsSlotLocked(i))
                 {
-                    // No USS class exists for a locked slot, so a plain inline tag keeps this
-                    // a minimal change rather than a redesign.
-                    var lockTag = new Label(UiText.Get(UiKeys.LabelStarter));
-                    lockTag.pickingMode = PickingMode.Ignore;
-                    lockTag.style.fontSize = 9;
-                    lockTag.style.color = Fade(Color.white, 0.75f);
-                    lockTag.style.unityTextAlign = TextAnchor.MiddleCenter;
+                    // Padlock + STARTER on an ink pill (.cw-starter-tag, >= 26 px). The padlock
+                    // is a Noto Emoji glyph (.cw-glyph), so no new art.
+                    var lockTag = new VisualElement { pickingMode = PickingMode.Ignore };
+                    lockTag.AddToClassList("cw-starter-tag");
+                    var padlock = new Label(UiText.Get(UiKeys.GlyphLock)) { pickingMode = PickingMode.Ignore };
+                    padlock.AddToClassList("cw-glyph");
+                    padlock.AddToClassList("cw-starter-tag__lock");
+                    var starter = new Label(UiText.Get(UiKeys.LabelStarter)) { pickingMode = PickingMode.Ignore };
+                    starter.AddToClassList("cw-starter-tag__text");
+                    lockTag.Add(padlock);
+                    lockTag.Add(starter);
                     box.Add(lockTag);
                 }
             }
@@ -1009,25 +1183,16 @@ namespace CluckWars.UI
             var card = new VisualElement();
             card.AddToClassList("cw-ability-card");
 
-            // Exported design icon sprite; fall back to the emoji glyph only for an
-            // ability with no sprite mapping (shouldn't happen for shipped abilities).
-            string iconCls = AbilityIconStyle.ClassFor(ab);
-            if (!string.IsNullOrEmpty(iconCls))
+            int slot = SlotOf(ab);
+            if (slot >= 0)
             {
-                var s = new VisualElement();
-                s.AddToClassList("cw-ability-card__sprite");
-                s.AddToClassList(iconCls);
-                card.Add(s);
+                // Gold CardGlowFrame = "selected"; first child so it draws under the content.
+                var glow = new VisualElement { pickingMode = PickingMode.Ignore };
+                glow.AddToClassList("cw-glow");
+                card.Add(glow);
             }
-            else
-            {
-                var lbl = new Label(ab.ResolveIcon());
-                lbl.AddToClassList("cw-ability-card__icon");
-                var ef = UiGfx.EmojiFont();
-                if (ef != null) lbl.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(ef));
-                lbl.style.color = ab.AccentColor;
-                card.Add(lbl);
-            }
+
+            card.Add(MakeAbilityIcon(ab, "cw-ability-card__sprite"));
 
             string label = !string.IsNullOrEmpty(ab.DisplayName) ? ab.DisplayName : ab.name;
             var name = new Label(label.ToUpperInvariant());
@@ -1064,11 +1229,10 @@ namespace CluckWars.UI
             footer.Add(badge);
             card.Add(footer);
 
-            int slot = SlotOf(ab);
             if (slot >= 0)
             {
                 SetBorder(card, ab.AccentColor);
-                card.style.backgroundColor = Fade(ab.AccentColor, 0.20f);
+                card.style.backgroundColor = Color.Lerp(Cream, ab.AccentColor, 0.18f);
                 card.AddToClassList("cw-ability-card--picked");
 
                 // Numbered badge = the in-match button that fires it, matching the
@@ -1087,6 +1251,41 @@ namespace CluckWars.UI
             // never discovers the gesture is back to "equip it and find out in a match".
             card.RegisterCallback<ClickEvent>(_ => OnAbilityCardTapped(ab));
             return card;
+        }
+
+        /// <summary>
+        /// The icon for <paramref name="ab"/>: its exported sprite when one is authored
+        /// (<see cref="AbilityIconStyle.SpriteClassFor"/>), otherwise its
+        /// <see cref="AbilityIconStyle.Monogram"/> on an accent disc. Never blank.
+        /// </summary>
+        /// <remarks>
+        /// This closed the blank-hex gap: the old path trusted <see cref="AbilityIconStyle.ClassFor"/>,
+        /// which also returns reserved class names for abilities whose art does not exist yet
+        /// (Peck, Mark/Kill, the 2026-08-23 roster) — an element with such a class paints
+        /// nothing — and the emoji fallback behind it only ran when there was no class at all.
+        /// The first time an ability is drawn without a sprite it is logged once.
+        /// </remarks>
+        private VisualElement MakeAbilityIcon(AbilityBaseSO ab, string spriteClass)
+        {
+            string iconCls = AbilityIconStyle.SpriteClassFor(ab);
+            if (!string.IsNullOrEmpty(iconCls))
+            {
+                var sprite = new VisualElement { pickingMode = PickingMode.Ignore };
+                sprite.AddToClassList(spriteClass);
+                sprite.AddToClassList(iconCls);
+                return sprite;
+            }
+
+            if (ab != null && _reportedMissingIcons.Add(ab))
+                _log?.Warn(Source, $"Ability '{ab.name}' has no authored icon sprite; showing its monogram '{AbilityIconStyle.Monogram(ab)}'.");
+
+            var mono = new Label(AbilityIconStyle.Monogram(ab)) { pickingMode = PickingMode.Ignore };
+            mono.AddToClassList("cw-ability-mono");
+            var accent = ab != null ? ab.AccentColor : HexEmptyTint;
+            accent.a = 1f;
+            mono.style.backgroundColor = accent;
+            mono.style.color = InkOn(accent);
+            return mono;
         }
 
         /// <summary>The Peck (foraging) ability asset, or null if the registry has none.</summary>
@@ -1372,7 +1571,10 @@ namespace CluckWars.UI
             else             { c = UiText.Get(UiKeys.LobbyCountUnknown);                           t = UiText.Get(UiKeys.LobbyStatusEnterCode); dotColor = UiGfx.Gold;             readyish = false; }
 
             if (count != null) count.text = c;
-            if (text  != null) { text.text = t; text.style.color = readyish ? UiGfx.Hex32("7cd99a") : UiGfx.Gold; }
+            // The status line sits on a cream inset: dark green / dark amber clear 4.5:1 there
+            // (the old light green / gold were tuned for a dark pill). The dot keeps the bright
+            // hue - it is a lamp, not text, and carries an ink outline in USS.
+            if (text  != null) { text.text = t; text.style.color = readyish ? UiGfx.Hex32("1e6a1e") : UiGfx.Hex32("6e4800"); }
             if (dot   != null) dot.style.backgroundColor = dotColor;
             if (start != null) start.text = UiText.Get(isJoin ? UiKeys.BtnJoinMatch : UiKeys.BtnStart);
         }
@@ -1484,42 +1686,50 @@ namespace CluckWars.UI
 
             var card = new VisualElement();
             card.AddToClassList("cw-player-card");
-            SetBorder(card, Fade(color, ready ? 0.85f : 0.45f));
-            card.style.unityBackgroundImageTintColor = Fade(color, ready ? 0.18f : 0.07f);
+            // Player colour on the border at full strength; a seat still picking is quieter.
+            SetBorder(card, ready ? color : Color.Lerp(color, CreamInset, 0.45f));
+
+            // "You" is the only gold-glowing card (gold = you / selection).
+            if (idx == 0)
+            {
+                var glow = new VisualElement { pickingMode = PickingMode.Ignore };
+                glow.AddToClassList("cw-glow");
+                card.Add(glow);
+            }
 
             var accent = new VisualElement();
             accent.AddToClassList("cw-player-accent");
             accent.style.backgroundColor = color;
             card.Add(accent);
 
+            // Row 1: chicken + (name / tags, then the class line at full width).
+            var top = new VisualElement();
+            top.AddToClassList("cw-player-top");
+
             var art = new VisualElement();
             art.AddToClassList("cw-player-art");
             art.AddToClassList("cw-chicken--" + KeyOf(cls));
-            card.Add(art);
+            top.Add(art);
 
             var mid = new VisualElement();
             mid.AddToClassList("cw-player-mid");
 
+            // Name gives way (ellipsis) before the P-tag / CPU tag do — they are flex-shrink 0.
             var nameRow = new VisualElement();
             nameRow.AddToClassList("cw-player-namerow");
             var nameLbl = new Label(name);
             nameLbl.AddToClassList("cw-player-name");
             var pn = new Label(UiText.Format(UiKeys.LobbyPlayerTag, ("n", idx + 1)));
             pn.AddToClassList("cw-player-pn");
-            pn.style.color = color;
+            // Player colour as the tag's left stripe: the text stays cream-on-ink (~15:1),
+            // which no Okabe-Ito fill could give it.
+            pn.style.borderLeftColor = color;
             nameRow.Add(nameLbl); nameRow.Add(pn);
-            if (isHost)
+            if (isHost || cpu)
             {
-                var host = new Label(UiText.Get(UiKeys.TagHost));
-                host.AddToClassList("cw-player-host");
-                nameRow.Add(host);
-            }
-            else if (cpu)
-            {
-                var tag = new Label(UiText.Get(UiKeys.TagCpu));
+                var tag = new Label(UiText.Get(isHost ? UiKeys.TagHost : UiKeys.TagCpu));
                 tag.AddToClassList("cw-player-host");
-                tag.style.backgroundColor = color;
-                tag.style.color = InkOn(color);
+                if (isHost) tag.AddToClassList("cw-player-host--host");
                 nameRow.Add(tag);
             }
             mid.Add(nameRow);
@@ -1527,6 +1737,13 @@ namespace CluckWars.UI
             var clsLine = new Label(UiText.Format(UiKeys.LobbyClassLine, ("cls", ClassShortName(cls)), ("role", RoleName(cls))));
             clsLine.AddToClassList("cw-player-class");
             mid.Add(clsLine);
+            top.Add(mid);
+            card.Add(top);
+
+            // Row 2: ability hexes, then the READY chip in its own spot (wraps below the
+            // hexes on a narrow 4:3 card instead of covering the class line).
+            var bottom = new VisualElement();
+            bottom.AddToClassList("cw-player-bottom");
 
             var chips = new VisualElement();
             chips.AddToClassList("cw-player-chips");
@@ -1535,17 +1752,16 @@ namespace CluckWars.UI
                 AbilityBaseSO ab = (abilities != null && i < abilities.Count) ? abilities[i] : null;
                 chips.Add(MakeMiniHex(ab));
             }
-            mid.Add(chips);
-            card.Add(mid);
+            bottom.Add(chips);
 
             var state = new VisualElement();
             state.AddToClassList("cw-player-state");
             state.AddToClassList(ready ? "cw-player-state--ready" : "cw-player-state--picking");
             var sl = new Label(UiText.Get(ready ? UiKeys.StateReady : UiKeys.StatePicking));
             sl.AddToClassList("cw-player-state__label");
-            if (!ready) sl.style.color = UiGfx.Hex32("c4a060");
             state.Add(sl);
-            card.Add(state);
+            bottom.Add(state);
+            card.Add(bottom);
 
             return card;
         }
@@ -1557,23 +1773,11 @@ namespace CluckWars.UI
             if (ab == null) { hex.style.unityBackgroundImageTintColor = HexEmptyTint; return hex; }
             hex.style.unityBackgroundImageTintColor = ab.AccentColor;
 
-            string iconCls = AbilityIconStyle.ClassFor(ab);
-            if (!string.IsNullOrEmpty(iconCls))
-            {
-                var s = new VisualElement();
-                s.AddToClassList("cw-mini-hex__sprite");
-                s.AddToClassList(iconCls);
-                hex.Add(s);
-            }
-            else
-            {
-                var icon = new Label(ab.ResolveIcon());
-                icon.AddToClassList("cw-mini-hex__icon");
-                var ef = UiGfx.EmojiFont();
-                if (ef != null) icon.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(ef));
-                icon.style.color = UiGfx.TextPrimary;
-                hex.Add(icon);
-            }
+            var icon = MakeAbilityIcon(ab, "cw-mini-hex__sprite");
+            // A monogram's accent disc would double up with the hex, which already carries
+            // the accent: keep only its (accent-contrasting) text.
+            if (icon is Label) icon.style.backgroundColor = new Color(0f, 0f, 0f, 0f);
+            hex.Add(icon);
             return hex;
         }
 

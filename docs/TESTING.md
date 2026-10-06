@@ -289,14 +289,11 @@ you, no food economy. Cast it, watch it land on a dummy, read the numbers.
 `Assets/_Game/Scenes/AbilityLab.unity` and enters play mode in one click. Opening the scene
 and pressing Play works too.
 
-**Launch, in a build (Windows or Android):** turn on **Developer Mode**, then tap
-**ABILITY LAB** on the main menu. The toggle is on the Character Select options row, beside
-Ability Range Guides. It is stored in `PlayerPrefs`, so it survives relaunches — you set it
-once per device, not once per session. With it off there is no route to the lab at all.
-
-> **The options row is hidden in portrait** (`.layout--portrait .cw-opt-row { display: none }`
-> in `CluckWarsTheme.uss` — the column has no room for it). Hold the phone **landscape** to
-> reach the Developer Mode toggle.
+**Launch, in a build (Windows or Android):** tap the **gear** at the top-right of the main
+menu, turn on **Dev Mode** in the Settings sheet, then tap **ABILITY LAB** (it appears on the
+main menu as soon as the toggle flips). It is stored in `PlayerPrefs`, so it survives
+relaunches — you set it once per device, not once per session. With it off there is no route
+to the lab at all.
 
 ### The controls (UI Toolkit) and the readout (IMGUI)
 

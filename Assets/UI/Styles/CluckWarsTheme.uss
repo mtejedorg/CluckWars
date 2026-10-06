@@ -1,13 +1,27 @@
 /* ============================================================================
    Cluck Wars — UI Toolkit theme (menu front-end)
-   Tokens from Design/cluckwars-tokens-v3.jsx + Design/docs/ART.md §6.1.
-   USS-valid only: NO text-shadow / box-shadow / inherit / gap / linear-gradient
-   (those silently dropped on the recovery-uxml branch). Gloss/gradient depth
-   comes from the baked Gloss.png sheen over a flat fill; rounded corners are
-   native border-radius + overflow:hidden. Class/ability colors & the chicken
-   sprite are applied in C# at bind time (MenuUiController) over these classes.
-   Fonts are set on the root in C# (UiGfx.ChunkyFont) as a guaranteed fallback;
-   url() font refs below are the primary path.
+   Look: Direction A "Barnyard Toybox" with painted-wood trim (spec
+   docs/superpowers/specs/2026-10-06-menu-ui-overhaul.md, "Visual system").
+   The values below are the tokens in CluckWarsTokens.uss (Direction A block),
+   written out literally because this sheet is attached per page template and
+   a :root custom property is not guaranteed to reach it:
+       ink #2a1a0c   cream #fff8e8 / inset #f3e6c8   gold #f5c842 / edge #d9a521
+       CTA green #7be35c -> #36a82c   wood #8a5a2e / #7a4a22
+   Three value steps: the backdrop (MenuUiController backdrop, tinted per page),
+   wood panels (PanelFrame / CardBg 9-slices), raised cream cards with ink text.
+   Button rule: ONE green CTA per screen (the forward action); gold means
+   selection / "you" only; wood means navigation and frames.
+
+   Display type (Lilita One: titles, buttons, ribbons) carries a thick ink
+   -unity-text-outline plus a hard text-shadow. Both were verified to render on
+   Unity 6000.3 in an off-screen capture on 2026-10-06 (the old "no
+   text-shadow" ban dated from an older branch). Still NOT available: box-shadow,
+   gap, linear-gradient, inherit - depth comes from the baked atoms
+   (ButtonGrayscale bevel, GlossOverlay, PanelFrame/CardBg/CardGlowFrame
+   9-slices) and rounded corners are border-radius + overflow:hidden.
+   Class/ability colors & the chicken sprite are applied in C# at bind time
+   (MenuUiController). Fonts are set on the root in C# (UiGfx.ChunkyFont) as a
+   guaranteed fallback; url() font refs below are the primary path.
 
    ----------------------------------------------------------------------------
    MOBILE SIZING CONTRACT  (2026-07-23 Android pass) — READ BEFORE EDITING
@@ -53,9 +67,11 @@
    ============================================================================ */
 
 /* ---- Screen root + pages -------------------------------------------------- */
+/* Transparent since stage 2: every page sits on the shared backdrop that
+   MenuUiController puts behind all of them (.cw-backdrop below). */
 .cw-screen {
     flex-grow: 1;
-    background-color: rgb(14, 8, 4);          /* #0e0804 design screenBg */
+    background-color: rgba(0, 0, 0, 0);
     overflow: hidden;
     align-items: stretch;
     justify-content: flex-start;
@@ -73,6 +89,31 @@
     -unity-text-align: middle-center;
     white-space: nowrap;
 }
+
+/* Display treatment: thick ink outline + hard drop shadow. Shared by every
+   Lilita One element that sits on art or on a coloured face (titles, ribbons,
+   buttons, cast names, panel headings). Not used for ink text on cream -
+   an ink outline on ink text only thickens it. */
+.cw-title, .cw-heading, .cw-label, .cw-btn, .cw-home-btn, .cw-mini-btn,
+.cw-menu-cast__name, .cw-pick-row__title, .cw-players-title, .cw-sheet__title {
+    -unity-text-outline-width: 4px;
+    -unity-text-outline-color: rgb(42, 26, 12);
+    text-shadow: 0px 5px 0px rgba(42, 26, 12, 0.85);
+}
+/* UI Toolkit draws the outline TMP-style, half of it INSIDE the glyph, so a
+   width that suits 84 px type would eat 30 px type. Measured on 2026-10-06:
+   6 px on titles, 4 px on buttons/headings, 3 px below ~36 px. */
+.cw-title { -unity-text-outline-width: 6px; text-shadow: 0px 8px 0px rgba(42, 26, 12, 0.9); }
+.cw-menu-cast__name, .cw-pick-row__title { -unity-text-outline-width: 3px; text-shadow: 0px 3px 0px rgba(42, 26, 12, 0.85); }
+
+/* Body text that sits directly on the backdrop art (not on a card): a thin
+   ink outline is what keeps it legible over the painted plate. */
+.cw-on-art {
+    color: rgb(254, 245, 224);
+    -unity-text-outline-width: 2px;
+    -unity-text-outline-color: rgb(42, 26, 12);
+    text-shadow: 0px 3px 0px rgba(42, 26, 12, 0.8);
+}
 .cw-title   { font-size: 84px; letter-spacing: 4px; }   /* 36 sp */
 .cw-heading { font-size: 48px; letter-spacing: 2px; }   /* 20 sp */
 .cw-label   { font-size: 40px; }                        /* 17 sp */
@@ -86,6 +127,98 @@
 
 .cw-accent    { color: rgb(245, 200, 66); }  /* #f5c842 */
 .cw-text-dark { color: rgb(26, 14, 4); }
+
+/* ---- Backdrop (one element behind every page) ------------------------------
+   MenuUiController.BuildAll puts #Backdrop + #BackdropTint behind the page host
+   and swaps image/tint per page (MenuUiController.Backdrops). The image is
+   set here as the default so a page without an entry still has the barn. */
+.cw-backdrop {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    background-image: url("project://database/Assets/_Game/Art/UI/Backgrounds/MenuBackground.png");
+    -unity-background-scale-mode: scale-and-crop;
+}
+/* "Lift": the plate is a dusk render; a warm wash raises it toward golden hour
+   and softens its detail so the cream cards and outlined type read over it.
+   Colour/alpha are set per page in C#; this is only the fallback. */
+.cw-backdrop-tint {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    background-color: rgba(255, 196, 120, 0.22);
+}
+/* Safe-area host: every page lives inside it; MenuUiController.ApplySafeArea
+   pads it from Screen.safeArea so nothing lands under a notch or the gesture
+   bar while the backdrop still bleeds to the screen edges. */
+.cw-page-host { flex-grow: 1; }
+
+/* ---- Value steps: wood panel / cream card / inset --------------------------
+   Wood panel = PanelFrame 9-slice (96 px corners at half scale). */
+.cw-wood-panel {
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/PanelFrame.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    -unity-slice-left: 96; -unity-slice-right: 96; -unity-slice-top: 96; -unity-slice-bottom: 96;
+    -unity-slice-scale: 0.5px;
+    background-color: rgba(0, 0, 0, 0);
+}
+/* Dark wood well = CardBg 9-slice (the pick rows on the loadout). */
+.cw-wood-well {
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/CardBg.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    -unity-slice-left: 56; -unity-slice-right: 56; -unity-slice-top: 56; -unity-slice-bottom: 56;
+    -unity-slice-scale: 0.5px;
+    background-color: rgba(0, 0, 0, 0);
+}
+/* Raised cream card with an ink outline. */
+.cw-raised {
+    background-color: rgb(255, 248, 232);
+    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    border-top-left-radius: 18px; border-top-right-radius: 18px;
+    border-bottom-left-radius: 18px; border-bottom-right-radius: 18px;
+}
+/* Inset well on a cream card. */
+.cw-inset {
+    background-color: rgb(243, 230, 200);
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgba(42, 26, 12, 0.35); border-right-color: rgba(42, 26, 12, 0.35);
+    border-top-color: rgba(42, 26, 12, 0.35); border-bottom-color: rgba(42, 26, 12, 0.35);
+    border-top-left-radius: 14px; border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
+}
+/* Selection glow = CardGlowFrame 9-slice as an overlay child that bleeds just
+   outside its card. Hidden unless the parent is selected (class chips) or the
+   controller adds it (picked ability card, your lobby card). The ring sits at
+   52/400 of the source, so at slice-scale 0.6 an inset of -27 puts it ~4 px
+   outside the card's ink border. First child, picking ignored. */
+.cw-glow {
+    position: absolute; left: -27px; top: -27px; right: -27px; bottom: -27px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/CardGlowFrame.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    -unity-slice-left: 72; -unity-slice-right: 72; -unity-slice-top: 72; -unity-slice-bottom: 72;
+    -unity-slice-scale: 0.6px;
+}
+.cw-class-chip > .cw-glow { display: none; }
+.cw-class-chip.cw-card--selected > .cw-glow { display: flex; }
+
+/* Ink text steps for cream surfaces (contrast on #fff8e8 / #f3e6c8):
+   ink ~16:1, soft brown ~7:1 - both clear 4.5:1. */
+.cw-ink       { color: rgb(42, 26, 12); }
+.cw-ink-soft  { color: rgb(107, 74, 42); }
+
+/* Monochrome glyph font (Noto Emoji) for the few symbols the brand fonts lack:
+   the gear and the padlock. Tinted by `color` like any text. */
+.cw-glyph {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/NotoEmoji-Regular.ttf");
+    -unity-text-align: middle-center;
+}
+
+/* Reduced motion: the root carries .cw-reduced-motion while
+   PlayerPreferences.ReducedMotionEnabled is on, which zeroes every hover/press
+   scale transition and selection pop in the menus. */
+.cw-reduced-motion * { transition-duration: 0s; }
+.cw-reduced-motion .cw-btn:hover, .cw-reduced-motion .cw-btn:active,
+.cw-reduced-motion .cw-home-btn:hover, .cw-reduced-motion .cw-home-btn:active,
+.cw-reduced-motion .cw-ability-card:hover, .cw-reduced-motion .cw-spec-pill:hover,
+.cw-reduced-motion .cw-spec-pill:active, .cw-reduced-motion .cw-class-chip:hover { scale: 1 1; }
 
 /* ---- Glossy surfaces ------------------------------------------------------ */
 .cw-panel {
@@ -130,19 +263,27 @@
     background-color: rgba(0, 0, 0, 0);   /* clear the default runtime-Button grey */
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/ButtonGrayscale.png");
     -unity-background-scale-mode: stretch-to-fill;
-    -unity-background-image-tint-color: rgb(150, 112, 66);
+    -unity-background-image-tint-color: rgb(171, 111, 57);
     border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
     padding-top: 20px; padding-bottom: 26px; padding-left: 44px; padding-right: 44px;
     transition-property: scale; transition-duration: 0.10s;
 }
 .cw-btn:hover  { scale: 1.03 1.03; }
 .cw-btn:active { scale: 0.97 0.97; }
-.cw-btn--gold    { -unity-background-image-tint-color: rgb(235, 182, 60); color: rgb(26, 14, 4); }
-.cw-btn--green   { -unity-background-image-tint-color: rgb(70, 190, 70); }
-.cw-btn--neutral { -unity-background-image-tint-color: rgb(150, 112, 66); }
-/* A disabled primary must still read as text, not as a ghost — 40% opacity on
-   #fef5e0 over the brown face drops under 4.5:1. Dim the face, keep the label. */
-.cw-btn:disabled { opacity: 1; -unity-background-image-tint-color: rgb(96, 76, 52); color: rgb(188, 172, 148); }
+/* ONE BUTTON-COLOUR RULE (spec "Visual system"):
+     green   the single forward action on a screen - PLAY SOLO, GEAR UP, READY,
+             START MATCH. Tint is the CTA ramp #7be35c -> #36a82c divided by the
+             atom's ~0.81 grey face so the bevel lands on the ramp.
+     wood    navigation and secondary actions (HOME/BACK, gear, HOST/JOIN,
+             ability lab, share/copy). #8a5a2e pushed the same way.
+     gold    selection / "you" only - never a button.
+   Labels are cream with the display ink outline on every face, which is what
+   keeps them above 4.5:1 regardless of the face colour. */
+.cw-btn--green   { -unity-background-image-tint-color: rgb(118, 238, 88); }
+.cw-btn--wood, .cw-btn--neutral { -unity-background-image-tint-color: rgb(171, 111, 57); }
+/* A disabled primary must still read as text, not as a ghost - 40% opacity on
+   cream over the face drops under 4.5:1. Dim the face, keep the outlined label. */
+.cw-btn:disabled { opacity: 1; -unity-background-image-tint-color: rgb(118, 98, 76); color: rgb(236, 226, 206); }
 
 /* Focus ring — D-pad/keyboard navigation must have a visible indicator that
    is not color alone (same accessibility rule as every selected/picked state
@@ -165,32 +306,48 @@
 .cw-home-btn {
     position: absolute; left: 28px; top: 28px;
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 34px; letter-spacing: 1px; color: rgb(254, 245, 224);
+    font-size: 36px; letter-spacing: 1px; color: rgb(254, 245, 224);
     -unity-text-align: middle-center;
     min-height: 116px; min-width: 200px;
     background-color: rgba(0, 0, 0, 0);
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/ButtonGrayscale.png");
     -unity-background-scale-mode: stretch-to-fill;
-    -unity-background-image-tint-color: rgb(150, 112, 66);
+    -unity-background-image-tint-color: rgb(171, 111, 57);
     border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
     padding-top: 16px; padding-bottom: 22px; padding-left: 26px; padding-right: 26px;
     transition-property: scale; transition-duration: 0.1s;
 }
 .cw-home-btn:hover  { scale: 1.04 1.04; }
 .cw-home-btn:active { scale: 0.96 0.96; }
+/* Gear (settings) - same wood atom, mirrored to the top-right, square, and the
+   glyph comes from Noto Emoji (.cw-glyph). Accessible name = its tooltip,
+   resolved from settings.title by UiText.ResolveTree. */
+.cw-gear-btn {
+    left: auto; right: 28px;
+    min-width: 116px; width: 116px; height: 116px;
+    padding-left: 0; padding-right: 0; padding-top: 0; padding-bottom: 6px;
+    font-size: 60px;
+    -unity-text-outline-width: 0;
+    /* Re-stated here: .cw-home-btn (later in this file than .cw-glyph) sets Lilita,
+       which has no gear, and the OS colour-emoji fallback would draw it instead. */
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/NotoEmoji-Regular.ttf");
+}
 
 /* ---- Ribbon --------------------------------------------------------------- */
 /* The Stage-0 Ribbon atom is a grayscale banner-with-tails (9-slice 92,32),
    tinted gold at runtime — replaces the flat gold bar + Gloss sheen. The 92px
    side borders are the fixed tails, so content padding clears them. */
+/* Painted-wood ribbon (spec: wood for frames and ribbons; gold is selection
+   only). Tint = wood #8a5a2e pushed for the ~0.78 grey face. Title is cream
+   with the display outline, not ink-on-gold any more. */
 .cw-ribbon {
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/Ribbon.png");
     -unity-background-scale-mode: stretch-to-fill;
-    -unity-background-image-tint-color: rgb(212, 160, 32);
+    -unity-background-image-tint-color: rgb(178, 116, 60);
     padding-top: 14px; padding-bottom: 20px; padding-left: 96px; padding-right: 96px;
     align-items: center; justify-content: center;
 }
-.cw-ribbon .cw-title { color: rgb(26, 14, 4); font-size: 52px; letter-spacing: 3px; }
+.cw-ribbon .cw-title { color: rgb(254, 245, 224); font-size: 52px; letter-spacing: 3px; -unity-text-outline-width: 5px; text-shadow: 0px 5px 0px rgba(42, 26, 12, 0.85); }
 
 /* ============================================================================
    MAIN MENU  (2026-07-24 redesign — see Assets/UI/MainMenu.uxml for the why)
@@ -202,21 +359,11 @@
    scale-and-crop, NOT stretch-to-fill: the plate is 16:9 and the canvas is
    16:9, but a phone's safe area is not, and stretching a painted background
    is instantly visible where the fence lines skew. */
-.cw-menu {
-    align-items: center; justify-content: center;
-    background-image: url("project://database/Assets/_Game/Art/UI/Backgrounds/MenuBackground.png");
-    -unity-background-scale-mode: scale-and-crop;
-}
-
-/* Contrast scrim. A painted plate cannot guarantee the contrast the type needs
-   — the generated image has a lit oval exactly where the buttons sit — so the
-   whole thing is knocked back behind a flat wash. This replaced the earlier
-   RadialGlow fake-lighting hack, which existed only because there was no art.
-   Tune THIS, not the artwork, if text legibility regresses. */
-.cw-menu-scrim {
-    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
-    background-color: rgba(8, 4, 2, 0.58);
-}
+/* The plate itself moved to the shared backdrop (.cw-backdrop) in stage 2, and
+   the flat dark scrim that used to knock it back was replaced by the per-page
+   warm lift (.cw-backdrop-tint): legibility now comes from the display outline
+   on every word that sits on the art, not from darkening the art. */
+.cw-menu { align-items: center; justify-content: center; }
 
 .cw-menu-titleblock { align-items: center; flex-shrink: 0; }
 .cw-menu-title    { font-size: 128px; letter-spacing: 8px; }
@@ -224,7 +371,6 @@
    screen, and the glow lifts the backdrop enough here to erode its contrast. */
 .cw-menu-subtitle {
     font-size: 34px; letter-spacing: 4px; margin-top: 6px;
-    color: rgb(226, 200, 152);
 }
 
 /* ---- Cast band ------------------------------------------------------------
@@ -266,9 +412,8 @@
     margin-left: 12px; margin-right: 12px;
 }
 .cw-menu-hint {
-    font-size: 30px; margin-top: 26px;
+    font-size: 32px; margin-top: 26px;
     -unity-text-align: middle-center;
-    color: rgba(196, 160, 96, 0.85);
 }
 
 /* Build stamp. Bottom-left, deliberately quiet — it exists so a tester can say
@@ -277,7 +422,8 @@
     position: absolute; left: 28px; bottom: 20px;
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
     font-size: 26px; letter-spacing: 1px;
-    color: rgba(196, 160, 96, 0.45);
+    color: rgba(254, 245, 224, 0.7);
+    -unity-text-outline-width: 1px; -unity-text-outline-color: rgb(42, 26, 12);
 }
 
 /* ---- Class chip (Step 1 "Choose Your Chicken" card) ----------------------- */
@@ -288,15 +434,17 @@
    scoped to Assets/UI/CharacterSelectClass.uxml only as of this split — the old
    Step-2 ClassList that shared this class is gone (see CharacterSelect.uxml) —
    so resizing it here does not touch the loadout screen. */
+/* Direction A: a raised cream card with an ink outline. The selected chip's
+   border (class tint) and faint class wash are set in C#
+   (MenuUiController.RefreshClassSelect); its CardGlowFrame overlay is the
+   .cw-glow child, shown by .cw-card--selected (see the value-steps block). */
 .cw-class-chip {
     flex-direction: column; align-items: stretch;
     min-height: 210px;
-    background-color: rgb(58, 40, 22);
-    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/GlossOverlay.png");
-    -unity-background-scale-mode: stretch-to-fill;
-    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
-    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
-    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
+    background-color: rgb(255, 248, 232);
+    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
     border-top-left-radius: 16px; border-top-right-radius: 16px;
     border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;
     padding-top: 10px; padding-bottom: 10px; padding-left: 16px; padding-right: 16px;
@@ -304,6 +452,9 @@
     transition-property: scale; transition-duration: 0.12s;
 }
 .cw-class-chip:hover { scale: 1.01 1.01; }
+.cw-class-chip.cw-card--selected {
+    border-left-width: 6px; border-right-width: 6px; border-top-width: 6px; border-bottom-width: 6px;
+}
 /* Landscape layout of the 4 cards is a 2x2 grid — see the .cw-cs-classes rules
    in the Responsive block at the bottom of this file for the width/height
    budget. Card height is content-driven (every label below is flex-shrink:0 and
@@ -315,8 +466,9 @@
    text (it used to collapse to ~4px and paint WARRIOR over the tag); the
    pre-filled tag beside it is the element that yields instead. */
 .cw-class-chip__titles { flex-grow: 1; flex-shrink: 0; }
-.cw-class-chip__name { font-size: 36px; white-space: nowrap; -unity-text-align: middle-left; margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 0; padding-top: 0; padding-bottom: 0; padding-left: 0; padding-right: 0; flex-shrink: 0; }
-.cw-class-chip__role { font-size: 26px; color: rgb(196, 160, 96); white-space: nowrap; -unity-text-align: middle-left; margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 0; padding-top: 0; padding-bottom: 0; padding-left: 0; padding-right: 0; flex-shrink: 0; }
+.cw-class-chip__name { font-size: 36px; color: rgb(42, 26, 12); -unity-text-outline-width: 0; text-shadow: 0px 0px 0px rgba(0, 0, 0, 0); white-space: nowrap; -unity-text-align: middle-left; margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 0; padding-top: 0; padding-bottom: 0; padding-left: 0; padding-right: 0; flex-shrink: 0; }
+/* Role tag: soft brown on cream, ~7:1 (was tan #c4a060 on dark brown). */
+.cw-class-chip__role { font-size: 28px; color: rgb(107, 74, 42); -unity-text-outline-width: 0; text-shadow: 0px 0px 0px rgba(0, 0, 0, 0); white-space: nowrap; -unity-text-align: middle-left; margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 0; padding-top: 0; padding-bottom: 0; padding-left: 0; padding-right: 0; flex-shrink: 0; }
 .cw-slot-pill {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
     font-size: 30px;
@@ -341,8 +493,10 @@
     padding-top: 6px; padding-bottom: 6px; padding-left: 14px; padding-right: 14px;
     border-top-left-radius: 10px; border-top-right-radius: 10px;
     border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
-    background-color: rgba(245, 200, 66, 0.16);
-    color: rgb(245, 200, 66);
+    /* Ink pill, cream text: ~15:1 on any card tint (was gold at 16% over a
+       dark card, which measured under 3:1). */
+    background-color: rgb(42, 26, 12);
+    color: rgb(254, 245, 224);
     -unity-text-align: middle-center; white-space: normal;
 }
 
@@ -365,11 +519,11 @@
        at y=-15 over the top row). Stretch gives every label the full content
        width so its measured wrap height is deterministic. */
     align-items: stretch; justify-content: flex-start;
-    background-color: rgb(48, 32, 17);
+    background-color: rgb(243, 230, 200);   /* inset cream well */
     background-image: none;                 /* Button atoms default to ButtonGrayscale — this is a card, not a pill button */
     border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
-    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
-    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
+    border-left-color: rgba(42, 26, 12, 0.35); border-right-color: rgba(42, 26, 12, 0.35);
+    border-top-color: rgba(42, 26, 12, 0.35); border-bottom-color: rgba(42, 26, 12, 0.35);
     border-top-left-radius: 14px; border-top-right-radius: 14px;
     border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
     padding-top: 8px; padding-bottom: 8px; padding-left: 12px; padding-right: 12px;
@@ -392,16 +546,20 @@
 /* Selected state must not be color-only (deuteranope guard, same rule as
    .cw-ability-card--picked below): scale + a widened border together, not a
    bare color swap. */
+/* Gold = selection. Solid gold fill + ink border, ink text on it (~11:1);
+   the old 18%-gold wash left the gold signature text at ~2:1. */
 .cw-spec-pill--selected {
     scale: 1.03 1.03;
-    background-color: rgba(245, 200, 66, 0.18);
+    background-color: rgb(245, 200, 66);
     border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
-    border-left-color: rgb(245, 200, 66); border-right-color: rgb(245, 200, 66);
-    border-top-color: rgb(245, 200, 66); border-bottom-color: rgb(245, 200, 66);
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
 }
+.cw-spec-pill--selected .cw-spec-pill__desc,
+.cw-spec-pill--selected .cw-spec-pill__signature { color: rgb(42, 26, 12); }
 .cw-spec-pill__name {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 28px; letter-spacing: 1px; color: rgb(254, 245, 224);
+    font-size: 28px; letter-spacing: 1px; color: rgb(42, 26, 12);
     white-space: nowrap;
 }
 /* The effect line — 30px, the caption floor, not the 34px reading floor: two
@@ -413,12 +571,12 @@
    .cw-stat-label) rather than the 24-26px tertiary size .cw-cat-tag/.cw-cd-badge use. */
 .cw-spec-pill__desc {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 30px; color: rgb(196, 160, 96);
+    font-size: 30px; color: rgb(74, 48, 24);
     white-space: normal; margin-top: 2px;
 }
 .cw-spec-pill__signature {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 24px; letter-spacing: 0.5px; color: rgb(245, 200, 66);
+    font-size: 24px; letter-spacing: 0.5px; color: rgb(122, 74, 34);
     white-space: normal; margin-top: 2px;
 }
 
@@ -441,7 +599,7 @@
 .cw-role-glyph--neg { color: rgb(232, 118, 108); }
 .cw-role-callout {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 32px; white-space: normal; flex-shrink: 1;
+    font-size: 30px; white-space: normal; flex-shrink: 1; flex-grow: 1; min-width: 0;
 }
 .cw-role-callout--strong { color: rgb(124, 217, 154); }
 .cw-role-callout--weak   { color: rgb(232, 118, 108); }
@@ -534,11 +692,11 @@
 .cw-slot-box-row { flex-direction: row; align-items: center; margin-bottom: 16px; flex-shrink: 0; }
 .cw-slot-box {
     flex-grow: 1; flex-basis: 0;
-    min-height: 150px;                        /* comfortably over the 116px/48dp floor */
+    min-height: 180px;                        /* comfortably over the 116px/48dp floor; room for the STARTER tag */
     align-items: center; justify-content: center;
     background-color: rgba(0, 0, 0, 0);       /* clear the default runtime-Button grey, see .cw-btn */
     background-image: none;
-    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
     border-top-left-radius: 14px; border-top-right-radius: 14px;
     border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
     margin-left: 6px; margin-right: 6px;
@@ -549,10 +707,27 @@
 /* Empty is dimmed, not just differently bordered — a slot with nothing in it
    should read as visually quieter than one that is filled, on top of the
    "EMPTY" label RefreshSlotBoxes adds as the non-color-only cue. */
-.cw-slot-box--empty { opacity: 0.75; }
+/* No opacity any more: dimming the whole box also dimmed the EMPTY label under
+   4.5:1. Empty reads quieter through the inset fill (set in C#) instead. */
 .cw-slot-box__empty-label {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 26px; letter-spacing: 1px; color: rgb(196, 160, 96);
+    font-size: 30px; letter-spacing: 1px; color: rgb(107, 74, 42);
+}
+/* Locked pre-equip tag: padlock glyph + STARTER, ink pill, >= 26 px (was an
+   inline 9 px label). */
+.cw-starter-tag {
+    flex-direction: row; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 4px;
+    padding-top: 2px; padding-bottom: 4px; padding-left: 12px; padding-right: 14px;
+    background-color: rgb(42, 26, 12);
+    border-top-left-radius: 10px; border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+}
+.cw-starter-tag__lock { font-size: 26px; color: rgb(245, 200, 66); margin-right: 6px; padding-left: 0; padding-right: 0; }
+.cw-starter-tag__text {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 28px; letter-spacing: 1px; color: rgb(254, 245, 224);
+    padding-left: 0; padding-right: 0; margin-left: 0; margin-right: 0;
 }
 /* Armed = the slot the next ability-card tap will act on. A border-width bump
    plus a scale bump, not a color swap alone — this box's border color is
@@ -586,53 +761,57 @@
    freely mixed, no per-category minimum. Category survives as a colored tag
    on each card, which is where 4 labels for 3 items belongs.
    ============================================================================ */
-/* Scroll container for the two pick rows.
+/* Scroll container for the two pick rows - the ONLY scroll container on the
+   loadout screen (stage 2 removed the per-row horizontal ScrollViews; nesting
+   a horizontal scroller in a vertical one fought over every drag on a phone).
 
    `min-height: 0` is the whole trick and must not be removed. A flex item's
    default `min-height: auto` is its CONTENT height, so without this the
    ScrollView refuses to shrink below the full height of both pick rows, never
-   scrolls, and overflows its parent exactly as the unscrolled markup did — the
+   scrolls, and overflows its parent exactly as the unscrolled markup did - the
    bug looks completely unfixed while the ScrollView is plainly present in the
    hierarchy. This is the single most common UI Toolkit scrolling mistake.
 
-   The pools were widened to 8-11 abilities across 4 slots (21ddaa8); at three
-   32%-wide cards per row that is up to four wrapped rows, which does not fit
-   the column on a phone in landscape and never will. Scrolling is the answer,
-   not shrinking the cards below a thumb-sized target. */
+   The rows now WRAP their cards (see .cw-pick-cards): inside a vertical
+   ScrollView a wrapped row simply makes the content taller, so the old
+   "wrapped row paints over whatever sits below" bug cannot recur - that bug
+   only ever happened when the wrapping grid was NOT inside a scroller. */
 .cw-pick-scroll { flex-grow: 1; min-height: 0; }
-
-/* The OUTER scroll (wraps CommonRow + ClassRow together) must only ever scroll
-   vertically — a horizontal scroller here would fight the drag the new INNER
-   horizontal scrollers (.cw-pick-scroll--h below) need for their own cards. */
 .cw-pick-scroll .unity-scroll-view__horizontal-scroller { display: none; }
 .cw-pick-scroll .unity-scroll-view__content-viewport { overflow: hidden; }
+/* Room for the (now 34 px) themed scroller so the right-hand card and the
+   "N EQUIPPED" counter never sit under it. */
+.cw-pick-scroll .unity-scroll-view__content-container { padding-right: 16px; }
 
-/* Leave room for the vertical scroller so the right-hand card in each row — and
-   the right-aligned "N EQUIPPED" counter in each row header — is not tucked
-   underneath it. Measured: 6px was not enough and clipped the counter's last
-   character; Unity's default vertical scroller is ~13px plus its own margins,
-   so this is that plus a little air. */
-.cw-pick-scroll .unity-scroll-view__content-container { padding-right: 20px; }
+/* ---- Themed scrollbar (wood track, gold thumb, no arrow buttons) -----------
+   Thick enough to grab with a thumb (34 px = ~14 dp; the whole column also
+   drag-scrolls, so the bar is the secondary affordance). */
+.cw-scroll .unity-scroller--vertical { width: 34px; margin-left: 6px; }
+.cw-scroll .unity-scroller__low-button,
+.cw-scroll .unity-scroller__high-button { display: none; }
+.cw-scroll .unity-scroller--vertical > .unity-scroller__slider { margin-top: 0; margin-bottom: 0; flex-grow: 1; }
+.cw-scroll .unity-base-slider__tracker {
+    background-color: rgb(122, 74, 34);
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    border-top-left-radius: 17px; border-top-right-radius: 17px;
+    border-bottom-left-radius: 17px; border-bottom-right-radius: 17px;
+}
+.cw-scroll .unity-base-slider__dragger {
+    background-color: rgb(245, 200, 66);
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(217, 165, 33); border-right-color: rgb(217, 165, 33);
+    border-top-color: rgb(217, 165, 33); border-bottom-color: rgb(217, 165, 33);
+    border-top-left-radius: 17px; border-top-right-radius: 17px;
+    border-bottom-left-radius: 17px; border-bottom-right-radius: 17px;
+}
+.cw-scroll .unity-base-slider--vertical .unity-base-slider__dragger { left: 0; width: 34px; margin-left: 0; }
+.cw-scroll .unity-base-slider__dragger-border { display: none; }
 
-/* ---- INNER horizontal scroller (2026-09 rework) ---------------------------
-   #CommonScroll / #ClassScroll — one per pick row, wraps #CommonCards /
-   #ClassCards. This is the actual fix for the documented overlap bug (see
-   .cw-pick-cards below): the old fix was a wrapping flex grid inside a
-   VERTICAL scroller, which worked for 3-card pools but broke again the moment
-   a pool got wide enough to wrap into a second row (Assassin's 6-card CLASS
-   pool, then the 8-11 widened pools of commit 21ddaa8) — a wrapped row can
-   always paint into whatever sits below it if the column runs out of height
-   first. A row that scrolls SIDEWAYS instead has no such case: it can hold an
-   arbitrary number of cards at their full touch-target size without ever
-   growing taller than one row. */
-.cw-pick-scroll--h { flex-shrink: 0; }
-.cw-pick-scroll--h .unity-scroll-view__vertical-scroller { display: none; }
-.cw-pick-scroll--h .unity-scroll-view__content-viewport { overflow: hidden; }
-/* Room for the horizontal scroller under the cards, mirroring the vertical
-   scroller's own right-padding above — same measurement, rotated 90°. */
-.cw-pick-scroll--h .unity-scroll-view__content-container { padding-bottom: 18px; }
-
-.cw-pick-row { margin-bottom: 18px; }
+/* Each pick row is a dark wood well (CardBg 9-slice) - the "panel" value step
+   the cream cards sit on. */
+.cw-pick-row { margin-bottom: 18px; padding-top: 16px; padding-bottom: 6px; padding-left: 18px; padding-right: 18px; }
 .cw-pick-row__head { flex-direction: row; align-items: center; margin-bottom: 10px; }
 .cw-pick-row__title {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
@@ -641,7 +820,7 @@
 }
 .cw-pick-row__hint {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 30px; color: rgb(196, 160, 96); white-space: nowrap;
+    font-size: 30px; color: rgb(232, 206, 158); white-space: nowrap;
 }
 /* Fills the remaining width so the "n / m" counter can sit hard right. */
 .cw-pick-row__rule { flex-grow: 1; height: 2px; background-color: rgba(245, 200, 66, 0.35); margin-left: 16px; margin-right: 16px; }
@@ -649,16 +828,11 @@
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
     font-size: 30px; color: rgb(254, 245, 224); white-space: nowrap;
 }
-/* Row that scrolls sideways instead of wrapping — see the .cw-pick-scroll--h
-   comment above for why. flex-wrap: nowrap here is the other half of that fix:
-   this class used to be width:32% + flex-wrap:wrap (see git history), which is
-   exactly the layout that let Assassin's 6-card CLASS pool (Doppelganger,
-   Invisibility, Sneaky Steal, Ambush, Shadowstep, Mark/Kill) — and later the
-   8-11 card pools of commit 21ddaa8 — overflow the column and paint over
-   whatever sat below it. justify-content: flex-start, not space-between: a
-   scrolling row must not stretch its gaps to fill the viewport, or a 2-card
-   pool would render one card at each edge with a canyon between them. */
-.cw-pick-cards { flex-direction: row; flex-wrap: nowrap; justify-content: flex-start; }
+/* Cards WRAP inside the row since stage 2; the single vertical .cw-pick-scroll
+   around both rows is what keeps a tall pool from painting over anything (see
+   that rule). justify-content: flex-start so a short pool does not spread its
+   cards to the edges. */
+.cw-pick-cards { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; }
 
 /* Fixed width + flex-shrink: 0, not the old width:32% — a percentage width
    inside a ScrollView's content container sizes against the SCROLLED content
@@ -667,13 +841,13 @@
    scoped to #CommonCards/#ClassCards only (MenuUiController.MakeAbilityCard is
    its only producer), so widening it here cannot affect anything else. */
 .cw-ability-card {
-    width: 300px; min-height: 128px; flex-shrink: 0; margin-right: 16px;
+    width: 290px; min-height: 160px; flex-shrink: 0; margin-right: 16px; margin-bottom: 18px;
     align-items: center; justify-content: flex-start;
     padding-top: 10px; padding-bottom: 10px; padding-left: 8px; padding-right: 8px;
-    background-color: rgb(48, 32, 17);
-    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
-    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
-    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
+    background-color: rgb(255, 248, 232);
+    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
     border-top-left-radius: 16px; border-top-right-radius: 16px;
     border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;
     transition-property: scale; transition-duration: 0.1s;
@@ -697,13 +871,36 @@
    but keep flex-shrink:0 so the next thing added to a card fails loudly
    (overflow) instead of silently eating the artwork. */
 .cw-ability-card__sprite {
-    width: 54px; height: 54px; flex-shrink: 0;
+    width: 60px; height: 60px; flex-shrink: 0;
     -unity-background-scale-mode: scale-to-fit;
 }
 .cw-ability-card__name {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 25px; color: rgb(254, 245, 224); -unity-text-align: middle-center;
-    white-space: nowrap; margin-top: 5px; margin-bottom: 5px;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 30px; color: rgb(42, 26, 12); -unity-text-align: middle-center;
+    white-space: nowrap; margin-top: 4px; margin-bottom: 4px;
+}
+/* Fallback when an ability has no authored sprite: its ShortLabel on its own
+   accent disc (MenuUiController.MakeAbilityIcon). Always legible - text colour
+   is picked against the accent (InkOn). Replaces the old emoji path, which
+   rendered nothing when the class had no rule and the glyph was missing. */
+.cw-ability-mono {
+    width: 60px; height: 60px; flex-shrink: 0;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 21px; letter-spacing: 0;
+    -unity-text-align: middle-center;
+    padding-left: 0; padding-right: 0; padding-top: 0; padding-bottom: 0;
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    border-top-left-radius: 30px; border-top-right-radius: 30px;
+    border-bottom-left-radius: 30px; border-bottom-right-radius: 30px;
+}
+/* On a lobby mini-hex the hex itself is the accent disc; only the text shows. */
+.cw-mini-hex .cw-ability-mono {
+    width: auto; height: auto;
+    font-size: 24px;
+    background-color: rgba(0, 0, 0, 0);
+    border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
 }
 /* One-line effect text (AbilityBaseSO.Description). flex-grow keeps the cooldown
    badge on the card's bottom edge, so badges stay aligned across a row whose
@@ -730,21 +927,21 @@
     min-height: 96px;
     margin-bottom: 12px;
     padding-top: 12px; padding-bottom: 12px; padding-left: 20px; padding-right: 20px;
-    background-color: rgba(10, 6, 2, 0.55);
-    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
-    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
-    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
+    background-color: rgb(255, 248, 232);
+    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
     border-top-left-radius: 14px; border-top-right-radius: 14px;
     border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
 }
 .cw-ability-detail__name {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 34px; letter-spacing: 1px; color: rgb(245, 200, 66);
+    font-size: 34px; letter-spacing: 1px; color: rgb(42, 26, 12);
     white-space: nowrap; flex-shrink: 0; margin-right: 16px;
 }
 .cw-ability-detail__text {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 34px; color: rgb(254, 245, 224);
+    font-size: 34px; color: rgb(42, 26, 12);
     white-space: normal; flex-grow: 1; flex-shrink: 1;
 }
 /* Category tag — the taxonomy the old grid spent a full header row on, moved
@@ -764,8 +961,9 @@
     border-top-left-radius: 8px; border-top-right-radius: 8px;
     border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
 }
-.cw-cd-badge--short { background-color: rgba(74, 230, 106, 0.18); color: rgb(124, 217, 154); }
-.cw-cd-badge--med   { background-color: rgba(245, 200, 66, 0.18); color: rgb(245, 200, 66); }
+/* On cream: dark text on a pale wash, both >= 5:1. */
+.cw-cd-badge--short { background-color: rgb(214, 240, 200); color: rgb(30, 96, 30); }
+.cw-cd-badge--med   { background-color: rgb(250, 230, 160); color: rgb(110, 72, 0); }
 
 /* Numbered slot badge on a picked ability card — tells the player which
    in-match button (1/2/3, matching the touch HUD hex badges) will fire it.
@@ -783,73 +981,75 @@
 }
 
 /* ============================================================================
-   DISPLAY OPTION ROW  (character select, above READY)
+   SETTINGS SHEET  (main menu gear -> modal; MainMenu.uxml #SettingsSheet)
    ----------------------------------------------------------------------------
-   One horizontal band: [checkbox + label] then a wrapping hint, laid out like
-   .cw-pick-row__head (title then hint) so the option reads as part of the
-   loadout column rather than a bolted-on settings widget.
+   Replaced the two toggles that used to sit on the loadout screen (#OptionsRow),
+   which cost the phone pick list ~230 px. Four rows, each a whole-row touch
+   target (MenuUiController.BindSettingRow toggles on a tap anywhere in it):
+   name + one-line description on the left, the checkbox on the right.
 
-   The whole Toggle is the touch target — BaseBoolField puts a Clickable on the
-   field root, so its 116px min-height IS the 48 dp floor; the 52px checkmark
-   box is only the visual. Do not shrink the Toggle to the box size.
-
-   The checked state is carried by the BOX FILL (dark -> gold), not only by the
-   glyph: the checkmark image comes from the default runtime theme, and if that
-   ever fails to resolve, a glyph-only design would render ON and OFF
-   identically. Fill + border + tint means the state survives a missing sprite.
+   The checked state is carried by the BOX FILL (cream -> gold) and the ink
+   tick, not only by the glyph: the checkmark image comes from the default
+   runtime theme, and if that ever fails to resolve a glyph-only design would
+   render ON and OFF identically.
    ============================================================================ */
-.cw-opt-row {
-    flex-shrink: 0;
+.cw-sheet-scrim {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    background-color: rgba(20, 10, 4, 0.62);
+    align-items: center; justify-content: center;
+}
+.cw-sheet {
+    width: 1180px; max-width: 94%; max-height: 96%;
+    padding-top: 28px; padding-bottom: 32px; padding-left: 40px; padding-right: 40px;
+    align-items: stretch;
+}
+.cw-sheet__head {
+    flex-direction: row; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-bottom: 20px; min-height: 116px;
+}
+.cw-sheet__close { position: absolute; right: 0; top: 0; left: auto; min-width: 180px; }
+.cw-sheet__body { padding-top: 10px; padding-bottom: 10px; padding-left: 22px; padding-right: 22px; flex-shrink: 1; }
+.cw-setting-toggle-row {
     flex-direction: row; align-items: center;
-    margin-bottom: 12px;
-    padding-left: 20px; padding-right: 20px;
+    min-height: 116px;                        /* 48 dp floor - the whole row is the target */
+    padding-top: 8px; padding-bottom: 8px;
+    border-bottom-width: 2px; border-bottom-color: rgba(42, 26, 12, 0.18);
+}
+.cw-setting-toggle-row--last { border-bottom-width: 0; }
+.cw-setting-toggle-row__texts { flex-grow: 1; flex-shrink: 1; min-width: 0; margin-right: 24px; }
+.cw-setting-toggle-row__name {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 40px; letter-spacing: 1px; color: rgb(42, 26, 12);
+    white-space: nowrap; margin-left: 0; padding-left: 0; padding-top: 0; padding-bottom: 0;
+}
+.cw-setting-toggle-row__desc {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 32px; color: rgb(107, 74, 42);
+    white-space: normal; margin-left: 0; padding-left: 0; padding-top: 0; padding-bottom: 0;
 }
 
 .cw-opt-toggle {
     flex-shrink: 0;
-    min-height: 116px;                        /* 48 dp touch floor */
-    /* Kill the BaseField margins so the row's own padding is the only inset. */
-    margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 20px;
+    margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 0;
 }
-/* Vertical centering ONLY. A Toggle is a BaseField, i.e. flex-direction: row —
-   `justify-content` here centers HORIZONTALLY, and the theme pairs
-   `flex-grow: 1` with `flex-basis: 0` on the input, so overriding grow to 0
-   collapses the input to zero width and the checkmark and its label spill out
-   of it (measured: label shrank to 2px, i.e. the caption vanished). Leave the
-   theme's grow/basis alone and let the input size the field to its content. */
+/* Vertical centering ONLY. A Toggle is a BaseField, i.e. flex-direction: row -
+   the theme pairs `flex-grow: 1` with `flex-basis: 0` on the input, so
+   overriding grow to 0 collapses the input to zero width. Leave grow/basis. */
 .cw-opt-toggle .unity-toggle__input { align-items: center; }
-
 .cw-opt-toggle .unity-toggle__checkmark {
-    width: 52px; height: 52px;
-    margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 16px;
-    background-color: rgb(26, 14, 8);
-    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
-    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
-    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
-    border-top-left-radius: 10px; border-top-right-radius: 10px;
-    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+    width: 72px; height: 72px;
+    margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 0;
+    background-color: rgb(243, 230, 200);
+    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    border-top-left-radius: 14px; border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
     -unity-background-image-tint-color: rgba(0, 0, 0, 0);
 }
 .cw-opt-toggle:checked .unity-toggle__checkmark {
-    background-color: rgb(245, 200, 66);      /* #f5c842 accent */
-    border-left-color: rgb(245, 200, 66); border-right-color: rgb(245, 200, 66);
-    border-top-color: rgb(245, 200, 66); border-bottom-color: rgb(245, 200, 66);
-    -unity-background-image-tint-color: rgb(26, 14, 4);
-}
-
-.cw-opt-toggle .unity-toggle__text {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 34px; letter-spacing: 1px; color: rgb(254, 245, 224);
-    white-space: nowrap; flex-shrink: 0;
-    margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 0;
-}
-
-/* Wraps — unlike .cw-pick-row__hint, which is nowrap because its row has a
-   flexible rule element to absorb the slack. This one has to fit the column. */
-.cw-opt-hint {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 30px; color: rgb(196, 160, 96);
-    white-space: normal; flex-grow: 1; flex-shrink: 1;
+    background-color: rgb(245, 200, 66);      /* gold = selected */
+    -unity-background-image-tint-color: rgb(42, 26, 12);
 }
 
 /* ---- Inset well + text input --------------------------------------------- */
@@ -879,22 +1079,19 @@
 .cw-lobby-rail {
     width: 640px; flex-shrink: 0;
     padding-top: 20px; padding-bottom: 20px; padding-left: 24px; padding-right: 24px;
-    border-right-width: 2px; border-right-color: rgba(138, 106, 58, 0.4);
 }
+/* Rail cards are raised cream (.cw-raised) with ink text since stage 2. */
 .cw-lobby-card {
     padding-top: 16px; padding-bottom: 16px; padding-left: 20px; padding-right: 20px;
     margin-top: 14px;
-    /* Soften the shared Gloss sheen so the rail cards read as dark surfaces
-       (design) instead of a bright grey band across the top. */
-    -unity-background-image-tint-color: rgba(255, 232, 190, 0.32);
 }
 .cw-lobby-cardlabel {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 30px; letter-spacing: 1px; color: rgb(196, 160, 96);
+    font-size: 30px; letter-spacing: 1px; color: rgb(107, 74, 42);
 }
 .cw-lobby-cardhead {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 36px; letter-spacing: 1px; color: rgb(245, 200, 66); margin-bottom: 8px;
+    font-size: 36px; letter-spacing: 1px; color: rgb(42, 26, 12); margin-bottom: 8px;
 }
 
 /* Gold invite-code letter tiles */
@@ -924,34 +1121,33 @@
     background-color: rgba(0, 0, 0, 0);
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/ButtonGrayscale.png");
     -unity-background-scale-mode: stretch-to-fill;
-    -unity-background-image-tint-color: rgb(150, 112, 66);
+    -unity-background-image-tint-color: rgb(171, 111, 57);   /* wood: secondary action */
     border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
     padding-top: 12px; padding-bottom: 16px; padding-left: 0; padding-right: 0;
     margin-right: 12px;
-}
-.cw-mini-btn--gold {
-    -unity-background-image-tint-color: rgb(235, 182, 60); color: rgb(26, 14, 4);
 }
 
 /* Settings rows */
 .cw-setting-row { flex-direction: row; justify-content: space-between; margin-top: 8px; }
 .cw-setting-k {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 32px; letter-spacing: 0.5px; color: rgb(196, 160, 96);
+    font-size: 32px; letter-spacing: 0.5px; color: rgb(107, 74, 42);
 }
 .cw-setting-v {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 32px; color: rgb(254, 245, 224);
+    font-size: 32px; color: rgb(42, 26, 12);
 }
 
 /* Status pill */
+/* Status line: cream inset, dark text (the status colour is set in C# from
+   dark greens/browns that clear 4.5:1 on #f3e6c8). */
 .cw-status-pill {
     flex-direction: row; align-items: center; margin-top: 16px;
     padding-top: 12px; padding-bottom: 12px; padding-left: 18px; padding-right: 18px;
-    background-color: rgba(245, 200, 66, 0.06);
-    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
-    border-left-color: rgba(245, 200, 66, 0.25); border-right-color: rgba(245, 200, 66, 0.25);
-    border-top-color: rgba(245, 200, 66, 0.25); border-bottom-color: rgba(245, 200, 66, 0.25);
+    background-color: rgb(243, 230, 200);
+    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
     border-top-left-radius: 10px; border-top-right-radius: 10px;
     border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
 }
@@ -960,29 +1156,28 @@
     border-top-left-radius: 10px; border-top-right-radius: 10px;
     border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
     background-color: rgb(245, 200, 66);
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
 }
 .cw-status-count {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 34px; color: rgb(254, 245, 224); margin-right: 12px;
+    font-size: 34px; color: rgb(42, 26, 12); margin-right: 12px;
 }
 .cw-status-text {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 30px; color: rgb(245, 200, 66); flex-grow: 1; -unity-text-align: middle-right;
+    font-size: 32px; color: rgb(42, 26, 12); flex-grow: 1; -unity-text-align: middle-right;
 }
 
 .cw-lobby-start { letter-spacing: 2px; }
-.cw-lobby-back {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 34px; color: rgb(196, 160, 96); -unity-text-align: middle-center;
-    min-height: 116px;
-    background-color: rgba(0, 0, 0, 0); background-image: none;
-    border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
-    margin-top: 12px; padding-top: 12px; padding-bottom: 12px;
-}
+/* BACK is a wood navigation button (.cw-btn .cw-btn--wood) since stage 2; this
+   class only spaces it under START. */
+.cw-lobby-back { margin-top: 12px; }
 .cw-lobby-error {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    margin-top: 10px; min-height: 38px; font-size: 30px;
-    color: rgb(255, 120, 110); -unity-text-align: middle-center; white-space: normal;
+    margin-top: 10px; min-height: 38px; font-size: 32px;
+    color: rgb(255, 150, 140); -unity-text-align: middle-center; white-space: normal;
+    -unity-text-outline-width: 2px; -unity-text-outline-color: rgb(42, 26, 12);
 }
 
 /* Right column + player grid */
@@ -993,104 +1188,132 @@
 .cw-players-head { flex-direction: row; align-items: center; margin-bottom: 14px; }
 .cw-players-title {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 36px; letter-spacing: 1px; color: rgb(245, 200, 66); margin-right: 14px;
+    font-size: 40px; letter-spacing: 1px; color: rgb(254, 245, 224); margin-right: 14px;
 }
-.cw-players-divider { flex-grow: 1; height: 2px; background-color: rgba(245, 200, 66, 0.4); }
+.cw-players-divider { flex-grow: 1; height: 4px; background-color: rgba(42, 26, 12, 0.55); }
 
+/* 2x2 grid. align-content is space-between in CSS terms, but Yoga in this
+   Unity does not accept it for align-content (it logged a warning and fell
+   back), so the rows are stretched and each card fills 48% of the height. */
 .cw-player-grid {
     flex-grow: 1; flex-direction: row; flex-wrap: wrap;
-    justify-content: space-between; align-content: space-between;
+    justify-content: space-between; align-content: stretch;
 }
+/* Player card, stage-2 layout (fixes the 4:3 collisions):
+     row 1   [art] [name ......(ellipsis)] [P-tag] [CPU/HOST]
+                   [class . role (full width, ellipsis)]
+     row 2   [ability hexes]                      [READY chip]   <- wraps
+   The READY chip no longer shares a row with the class line, and the name
+   gives way (ellipsis) instead of running into the P-tag. */
 .cw-player-card {
-    width: 49%; height: 48%;
-    flex-direction: row; align-items: center;
-    padding-top: 14px; padding-bottom: 14px; padding-left: 18px; padding-right: 18px;
-    background-color: rgb(48, 32, 18);
-    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/GlossOverlay.png");
-    -unity-background-scale-mode: stretch-to-fill;
-    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
-    /* border + tint set in C# to the player color */
-    border-top-left-radius: 16px; border-top-right-radius: 16px;
-    border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;
-    overflow: hidden;
+    width: 49%; height: 48%; margin-bottom: 2%;
+    flex-direction: column; align-items: stretch; justify-content: center;
+    padding-top: 14px; padding-bottom: 14px; padding-left: 26px; padding-right: 18px;
+    background-color: rgb(255, 248, 232);
+    border-left-width: 5px; border-right-width: 5px; border-top-width: 5px; border-bottom-width: 5px;
+    /* border colour set in C# to the player colour */
+    border-top-left-radius: 18px; border-top-right-radius: 18px;
+    border-bottom-left-radius: 18px; border-bottom-right-radius: 18px;
 }
 .cw-player-card--empty {
-    background-color: rgba(20, 14, 8, 0.3); background-image: none;
+    background-color: rgba(243, 230, 200, 0.78);
     align-items: center; justify-content: center;
-    border-left-color: rgba(138, 106, 58, 0.55); border-right-color: rgba(138, 106, 58, 0.55);
-    border-top-color: rgba(138, 106, 58, 0.55); border-bottom-color: rgba(138, 106, 58, 0.55);
+    border-left-color: rgba(42, 26, 12, 0.45); border-right-color: rgba(42, 26, 12, 0.45);
+    border-top-color: rgba(42, 26, 12, 0.45); border-bottom-color: rgba(42, 26, 12, 0.45);
 }
 .cw-player-accent {
-    position: absolute; left: 0; top: 0; bottom: 0; width: 8px;
+    position: absolute; left: 0; top: 0; bottom: 0; width: 12px;
+    border-top-left-radius: 12px; border-bottom-left-radius: 12px;
     /* color set in C# */
 }
+.cw-player-top { flex-direction: row; align-items: center; flex-shrink: 0; }
 .cw-player-art {
-    width: 104px; height: 104px; flex-shrink: 0; margin-right: 16px;
+    width: 120px; height: 120px; flex-shrink: 0; margin-right: 16px;
     -unity-background-scale-mode: scale-to-fit;
 }
-.cw-player-mid { flex-grow: 1; min-width: 0; }
-.cw-player-namerow { flex-direction: row; align-items: center; }
+.cw-player-mid { flex-grow: 1; flex-shrink: 1; min-width: 0; }
+/* Wraps: on a narrow 4:3 card the P-tag / CPU tag drop under the name rather
+   than the name being elided to "Da...". The name only ellipsises when it is
+   wider than the whole column on its own. */
+.cw-player-namerow { flex-direction: row; flex-wrap: wrap; align-items: center; min-width: 0; }
 .cw-player-name {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 38px; color: rgb(254, 245, 224); white-space: nowrap; margin-right: 10px;
+    font-size: 40px; color: rgb(42, 26, 12);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    flex-shrink: 0; max-width: 100%; margin-right: 14px;
+    padding-left: 0; margin-left: 0;
 }
+/* P-tag: ink pill, cream text, a player-colour stripe on its left edge (set in
+   C#). Player colours sit at ~3.9:1 against either cream or ink, so they mark
+   the tag without carrying its text. */
 .cw-player-pn {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 28px; margin-right: 10px;  /* color set in C# to player color */
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 30px; color: rgb(254, 245, 224); flex-shrink: 0;
+    background-color: rgb(42, 26, 12);
+    border-left-width: 10px;
+    padding-top: 2px; padding-bottom: 4px; padding-left: 10px; padding-right: 12px;
+    margin-right: 10px; margin-top: 2px; margin-bottom: 2px;
+    border-top-left-radius: 8px; border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
 }
+/* HOST / CPU tag: cream inset with an ink border and ink text. */
 .cw-player-host {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 26px; letter-spacing: 0.5px; color: rgb(26, 14, 4);
-    background-color: rgb(245, 200, 66);
-    padding-top: 3px; padding-bottom: 3px; padding-left: 12px; padding-right: 12px;
-    border-top-left-radius: 6px; border-top-right-radius: 6px;
-    border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
+    font-size: 28px; letter-spacing: 0.5px; color: rgb(42, 26, 12); flex-shrink: 0;
+    background-color: rgb(243, 230, 200);
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    padding-top: 0; padding-bottom: 2px; padding-left: 10px; padding-right: 10px;
+    border-top-left-radius: 8px; border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
 }
+.cw-player-host--host { background-color: rgb(245, 200, 66); }
 .cw-player-class {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 30px; color: rgb(196, 160, 96); white-space: nowrap; margin-top: 5px;
+    font-size: 32px; color: rgb(107, 74, 42);
+    white-space: normal;                      /* full class line; wraps on 4:3 rather than eliding */
+    margin-top: 4px; margin-left: 0; padding-left: 0;
 }
-.cw-player-chips { flex-direction: row; margin-top: 10px; }
+.cw-player-bottom {
+    flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    margin-top: 12px; flex-shrink: 0;
+}
+.cw-player-chips { flex-direction: row; flex-shrink: 0; margin-right: 12px; }
 .cw-mini-hex {
-    width: 56px; height: 64px; margin-right: 8px;
+    width: 80px; height: 92px; margin-right: 6px;
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/HexGlossy.png");
     -unity-background-scale-mode: scale-to-fit;
     align-items: center; justify-content: center;
 }
-.cw-mini-hex__icon { font-size: 28px; -unity-text-align: middle-center; }
-/* Exported ability icon sprite on a lobby-card mini-hex (Stage-3). */
+/* Exported ability icon sprite on a lobby-card mini-hex. */
 .cw-mini-hex__sprite {
     position: absolute;
-    width: 36px; height: 36px;
+    width: 54px; height: 54px;
     -unity-background-scale-mode: scale-to-fit;
 }
 
 .cw-player-state {
-    flex-shrink: 0; margin-left: 12px;
-    padding-top: 10px; padding-bottom: 10px; padding-left: 18px; padding-right: 18px;
+    flex-shrink: 0;
+    padding-top: 8px; padding-bottom: 10px; padding-left: 18px; padding-right: 18px;
     -unity-text-align: middle-center;
-    border-top-left-radius: 10px; border-top-right-radius: 10px;
-    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+    border-top-left-radius: 12px; border-top-right-radius: 12px;
+    border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
 }
-.cw-player-state--ready {
-    background-color: rgb(51, 163, 50);
-    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
-    border-left-color: rgb(74, 230, 106); border-right-color: rgb(74, 230, 106);
-    border-top-color: rgb(74, 230, 106); border-bottom-color: rgb(74, 230, 106);
-}
-.cw-player-state--picking {
-    background-color: rgba(40, 30, 20, 0.6);
-    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
-    border-left-color: rgb(138, 106, 58); border-right-color: rgb(138, 106, 58);
-    border-top-color: rgb(138, 106, 58); border-bottom-color: rgb(138, 106, 58);
-}
+.cw-player-state--ready   { background-color: rgb(70, 170, 52); }
+.cw-player-state--picking { background-color: rgb(243, 230, 200); }
 .cw-player-state__label {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 30px; letter-spacing: 0.5px; color: rgb(254, 245, 224);
+    font-size: 32px; letter-spacing: 0.5px; color: rgb(254, 245, 224);
+    -unity-text-outline-width: 3px; -unity-text-outline-color: rgb(42, 26, 12);
 }
+.cw-player-state--picking .cw-player-state__label { color: rgb(42, 26, 12); -unity-text-outline-width: 0; }
 .cw-player-empty-label {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 30px; letter-spacing: 1px; color: rgb(196, 160, 96);
+    font-size: 32px; letter-spacing: 1px; color: rgb(107, 74, 42);
 }
 
 /* ============================================================================
@@ -1157,24 +1380,13 @@
    wrapping it in either orientation, so it is always a MAIN-axis (vertical)
    column item and `min-height: auto` would always resolve to content height.
    This line is what lets #PickScroll actually shrink to the space left after
-   the slot-box row, AbilityDetail, the option rows and READY, instead of
+   the slot-box row, AbilityDetail and READY, instead of
    overflowing onto them — not just a landscape/portrait guard the way it was
    before the split, when this column only ever hit the MAIN-axis case in the
    portrait mode the app doesn't ship. */
 .cw-cs-detail { flex-grow: 1; min-width: 0; min-height: 0; }
 
-/* The display-option row is landscape-only, and that is a measurement, not taste.
-   Portrait gives this column ~323px for AbilityDetail (96, unshrinkable) + READY
-   (117, unshrinkable) + the ScrollView, so the ScrollView is already down to ~95px
-   — less than one 128px card row, i.e. the pick rows are effectively invisible
-   there before anything is added. Adding a 116px row has nothing left to take
-   from: measured at 968x1615, the ScrollView collapses to 0 and READY is pushed
-   32px past the column, exactly the paint-over-the-page bug the ScrollView was
-   introduced to end. The app is landscape-locked (`allowedAutorotateToPortrait: 0`)
-   so nothing ships behind this rule; if portrait is ever made real, this column
-   needs a rethink and this option needs a home in it — do not just delete the
-   rule and assume it fits. */
-.layout--portrait .cw-opt-row { display: none; }
+
 
 .layout--portrait  .cw-mode-row { flex-direction: column; align-items: stretch; }
 .layout--landscape .cw-mode-row { flex-direction: row; justify-content: center; }
@@ -1183,7 +1395,7 @@
 .layout--portrait .cw-lobby-body { flex-direction: column; }
 .layout--portrait .cw-lobby-rail { width: 100%; flex-shrink: 1; border-right-width: 0; }
 .layout--portrait .cw-player-grid { flex-direction: column; flex-wrap: nowrap; }
-.layout--portrait .cw-player-card { width: 100%; height: auto; margin-bottom: 14px; }
+.layout--portrait .cw-player-card { width: 100%; height: auto; margin-bottom: 18px; }
 
 /* ============================================================================
    ABILITY ICON SPRITES  (14 : type-name -> exported Icon_*.png)
