@@ -40,7 +40,6 @@ namespace CluckWars.Abilities
         public SmokeRoostAbilitySO()
         {
             Category = AbilityCategory.Control;
-            SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Assassin;
             BotRole = BotRole.Escape;
             Duration = 3.5f;

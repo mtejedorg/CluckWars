@@ -33,3 +33,5 @@ MonoBehaviour:
   ConeAngle: 70
   KnockbackForce: 7.5
   StaggerSeconds: 0.35
+  PeckSlotPreEquippedBy: 0
+  SignaturePreEquippedBy: 1

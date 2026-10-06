@@ -286,8 +286,8 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            // Priority 5: SEARCH — Predator-only. Cannot forage at all (Peck excludes it,
-            // GDD 2 / class-essence-and-signatures.md 2: "the only class that cannot forage
+            // Priority 5: SEARCH — Predator-only. Cannot forage at all (PreEquippedLoadout.ClassMayForage
+            // is false for it, so it never gets a Peck; GDD 2 / class-essence-and-signatures.md 2: "the only class that cannot forage
             // ... it eats what others carried"), so having no prey in HuntRadius must NOT
             // fall through to the forager's pile-collection priority below. Maestro,
             // 2026-08-24: "between kills, the assassin will search for new targets and chase
@@ -567,7 +567,8 @@ namespace CluckWars.Gameplay
         /// running, cargo full, pile drained by someone else — are all ordinary and happen
         /// many times a second; logging them would bury the console.
         ///
-        /// The Assassin has no Peck (it is not in that ability's AllowedClasses), so
+        /// The Assassin has no Peck (PreEquippedLoadout.ClassMayForage is false for it, so no Peck is
+        /// ever pre-equipped), so
         /// <see cref="AbilityController.TryGetReadySlotForRole"/> simply finds nothing and
         /// this is a no-op for that class. That is correct rather than accidental: an
         /// Assassin bot should be hunting, not standing at a pile.

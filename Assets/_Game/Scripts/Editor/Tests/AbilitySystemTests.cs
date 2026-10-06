@@ -293,29 +293,25 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void EveryCommonAbility_IsLegalForEveryClass_OrThePickerMustFilterIt()
+        public void EveryActiveAbility_IsPickableBySomeClass_OrIsAReferencedPreEquip()
         {
-            // The picker's Common row shows abilities to every class. That was safe while
-            // "Common" implied AllowedClasses = All — and became a live bug when Peck shipped
-            // as a Common restricted to the three foraging classes: an Assassin could equip
-            // it, reach READY at 4/4, and MatchBootstrapper would silently strip it and
-            // backfill something else at spawn.
-            //
-            // Both sides are now fixed (the picker filters on AllowedClasses too), so this
-            // test does NOT demand that every Common be universal. It demands the weaker,
-            // true invariant: every Common must be legal for at least one class, and the
-            // restricted ones must be genuinely restricted rather than accidentally so.
+            // AllowedClasses alone decides picker eligibility (the Common/Character slot kind is
+            // retired). An ability nobody can pick (None) is legal ONLY as pre-equip-only data:
+            // it must be claimed by some subclass in a slot column (PeckSlotPreEquippedBy / SignaturePreEquippedBy),
+            // or it is unreachable dead data.
             var reg = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
 
-            foreach (var a in reg.ActiveAbilities.Where(x => x != null && x.SlotKind == AbilitySlotKind.Common))
+            var unreachable = PreEquippedLoadout.FindUnreachablePreEquipOnly(reg.ActiveAbilities);
+            Assert.IsEmpty(unreachable.Select(a => a.DisplayName).ToList(),
+                "These abilities have AllowedClasses = None (pre-equip-only) but no passive references " +
+                "them in either slot column, so no player can ever obtain them.");
+
+            foreach (var a in reg.ActiveAbilities.Where(x => x != null && !AbilityRegistrySO.IsPreEquipOnly(x)))
             {
                 bool anyClassCanEquip = System.Enum.GetValues(typeof(ChickenClass))
                     .Cast<ChickenClass>()
                     .Any(c => AbilityRegistrySO.IsAllowedFor(a, c));
-
-                Assert.IsTrue(anyClassCanEquip,
-                    $"Common ability '{a.DisplayName}' has AllowedClasses = {a.AllowedClasses}, so no " +
-                    "class can equip it. It will render in no picker row and never spawn.");
+                Assert.IsTrue(anyClassCanEquip, $"'{a.DisplayName}' ({a.AllowedClasses}) is pickable by no class.");
             }
         }
 
@@ -338,10 +334,11 @@ namespace CluckWars.Tests
                     .Where(a => a != null && AbilityRegistrySO.IsAllowedFor(a, cls))
                     .ToList();
 
-                // Peck is force-equipped, so it is not one of the picks a player weighs.
-                bool forages = peck != null && AbilityRegistrySO.IsAllowedFor(peck, cls);
+                // Peck is force-equipped (Peck slot), so it is not one of the picks a player weighs;
+                // and it is None-class, so it is already absent from the hand-pickable list.
+                bool forages = peck != null && PreEquippedLoadout.ClassMayForage(cls);
                 int freePicks = AbilityController.SlotCount - (forages ? 1 : 0);
-                int choosable = legal.Count - (forages ? 1 : 0);
+                int choosable = legal.Count;
 
                 Assert.GreaterOrEqual(choosable, freePicks,
                     $"{cls} has only {choosable} choosable abilities for {freePicks} free slots — it " +

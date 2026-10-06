@@ -22,7 +22,6 @@ namespace CluckWars.Abilities
         public DoppelgangerAbilitySO()
         {
             TerrainTraversal = TerrainTraversal.Blink;
-            SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Assassin;
         }
 

@@ -16,7 +16,6 @@ namespace CluckWars.Abilities
             Description = "Short blink dash phasing over walls along facing direction.";
             Category = AbilityCategory.Utility;
             TerrainTraversal = TerrainTraversal.Blink;
-            SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Assassin;
             Duration = 0.4f;
             Cooldown = 6f;

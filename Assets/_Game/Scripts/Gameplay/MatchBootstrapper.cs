@@ -305,7 +305,7 @@ namespace CluckWars.Gameplay
                             Slot2   = c1,
                             Passive = _abilityRegistry.GetDefaultPassiveForClass(cls),
                         };
-                        _log?.Debug(Source, $"No legal bot preset for {cls} — composed 1 Common + 2 Character from the registry.");
+                        _log?.Debug(Source, $"No legal bot preset for {cls} — composed 1 shared + 2 class abilities from the registry.");
                         return true;
                     }
                 }
@@ -319,8 +319,8 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Sanitises a chosen loadout into a legal one for <paramref name="cls"/>:
         /// <see cref="AbilityController.SlotCount"/> distinct, class-legal active abilities
-        /// plus a class-legal passive, with Peck forced present (or forced absent) according
-        /// to whether the class can forage at all.
+        /// plus a class-legal passive, with the subclass's pre-equips pinned (Peck arrives only
+        /// through the Peck slot, and never for a class that fails <c>ClassMayForage</c>).
         /// </summary>
         /// <remarks>
         /// <b>The Peck invariant is the important part.</b> Food only enters a chicken through
@@ -335,11 +335,11 @@ namespace CluckWars.Gameplay
         /// inert passive because nothing validated the selection on the way in.
         /// </para>
         /// <para>
-        /// ⚠️ Legality is now <c>IsAllowedFor</c> for EVERY ability, Common included. The old
-        /// rule treated any Common ability as legal for everyone and only consulted
-        /// <c>AllowedClasses</c> for Character ones. That was harmless while every Common was
-        /// flagged All, and became a bug the moment Peck shipped as a Common ability
-        /// restricted to three classes: the backfill would have handed it to the Assassin.
+        /// ⚠️ Hand-picked legality is <c>IsAllowedFor</c> for EVERY ability: AllowedClasses means
+        /// "hand-selectable" and None means pre-equip-only. Peck is None-class, so a stray Peck in
+        /// a selection or preset is always dropped here and the ONLY way a chicken gets one is
+        /// the Peck-slot pre-equip (<see cref="PreEquippedLoadout.Resolve"/>). The Assassin rule is
+        /// <see cref="PreEquippedLoadout.ClassMayForage"/>, not any ability's mask.
         /// </para>
         /// </remarks>
         private void ResolveLegalLoadout(ChickenClass cls,
@@ -362,71 +362,94 @@ namespace CluckWars.Gameplay
             int activeSlots = AbilityController.SlotCount;
 
             var peck = _abilityRegistry.ActiveAbilities.FirstOrDefault(a => a is Abilities.PeckAbilitySO);
-            bool canForage = peck != null && AbilityRegistrySO.IsAllowedFor(peck, cls);
 
-            // Sanitise: genuine, class-legal, distinct picks, in the order supplied. Order is
-            // preserved because Peck's button position is the player's to choose.
+            // Sanitise: genuine, class-legal (AllowedClasses, so pre-equip-only None abilities are
+            // dropped too), distinct picks, in the order supplied. The pre-equips are then pinned
+            // to their locked slots below; only the remaining picks keep the player's order.
             var picked = new System.Collections.Generic.List<AbilityBaseSO>(activeSlots);
             foreach (var a in new[] { a0, a1, a2, a3 })
             {
                 if (picked.Count >= activeSlots) break;
                 if (a == null || picked.Contains(a)) continue;
-                if (!AbilityRegistrySO.IsAllowedFor(a, cls)) continue;
+                // Peck is reachable ONLY through the Peck slot, whatever its mask says.
+                if (a is Abilities.PeckAbilitySO || !AbilityRegistrySO.IsAllowedFor(a, cls)) continue;
                 picked.Add(a);
             }
 
-            // The chosen specialization's signature, if it declared one. Resolved BEFORE Peck
-            // so a Peck-variant signature can stand in for the plain Peck rather than fighting
-            // it for a slot — see PassiveAbilitySO.SignatureAbility.
-            var signature = passive != null ? passive.SignatureAbility : null;
-            if (signature != null && !AbilityRegistrySO.IsAllowedFor(signature, cls))
+            // The chosen specialization's two pre-equipped slots — Peck slot + Signature slot —
+            // resolved by the one shared rule, PreEquippedLoadout.Resolve. A forager whose
+            // passive authored no legal Peck-slot ability still gets the plain Peck.
+            var allAbilities = _abilityRegistry.All;
+            PreEquippedLoadout.Resolve(cls, passive, allAbilities, peck, out var peckSlot, out var signature);
+
+            if (passive != null)
             {
-                _log?.Warn(Source, $"ResolveLegalLoadout: {passive.name}'s signature " +
-                    $"'{signature.name}' is not legal for {cls} — ignoring it. The " +
-                    "specialization will grant only its passive effect.");
-                signature = null;
+                // Data problems the resolver papers over deterministically — surface them.
+                foreach (var (slotName, claims) in new[]
+                {
+                    ("Peck", PreEquippedLoadout.PeckSlotClaimants(allAbilities, passive.Subclass)),
+                    ("Signature", PreEquippedLoadout.SignatureClaimants(allAbilities, passive.Subclass)),
+                })
+                {
+                    if (claims.Count > 1)
+                        _log?.Warn(Source, $"ResolveLegalLoadout: {claims.Count} abilities claim {passive.name}'s {slotName} slot " +
+                            $"({string.Join(", ", claims.Select(c => c.name))}) — using '{claims[0].name}'. Fix the slot columns in the Balance Editor.");
+                    if (claims.Count > 0 && !PreEquippedLoadout.IsLegalPreEquip(claims[0], cls))
+                        _log?.Warn(Source, $"ResolveLegalLoadout: {passive.name}'s {slotName}-slot ability '{claims[0].name}' " +
+                            $"is not legal for {cls} (the {cls} cannot forage) — " +
+                            (slotName == "Peck" && peckSlot != null ? "falling back to the plain Peck." : "ignoring it."));
+                    if (slotName == "Signature" && claims.Count > 0 && claims[0] is Abilities.PeckAbilitySO)
+                        _log?.Warn(Source, $"ResolveLegalLoadout: {passive.name}'s Signature slot holds Peck '{claims[0].name}' — " +
+                            "Peck belongs in the Peck slot; ignoring it.");
+                }
             }
 
-            bool signatureIsPeckVariant = signature is Abilities.PeckAbilitySO;
-            if (signatureIsPeckVariant && peck != null && picked.Remove(peck))
-                _log?.Debug(Source, $"ResolveLegalLoadout: {cls}'s signature is a Peck variant — " +
-                    "the plain Peck stands down rather than taking a second slot.");
+            // Pre-equips are NOT filtered by AllowedClasses (an off-class pre-equip is a design
+            // choice), and they are inserted below, after sanitising — so they survive it.
+            // The sanitiser above already dropped every Peck (None-class), so the only Peck that
+            // can reach the loadout is the Peck-slot pre-equip.
 
-            if (signature != null && !picked.Contains(signature))
+            // Pre-equips are LOCKED to deterministic slots — Peck slot 0, signature 1 (or 0 when
+            // there is no Peck slot) — wherever the incoming selection had them. Take any copy out
+            // of the picks first, then insert signature before Peck so Peck ends up in front.
+            // (The picker enforces the same positions; this is the authority for bots, presets and
+            // malformed selections.)
+            if (signature != null) picked.Remove(signature);
+            if (peckSlot != null) picked.Remove(peckSlot);
+
+            if (signature != null)
             {
                 if (picked.Count >= activeSlots) picked.RemoveAt(picked.Count - 1);
                 picked.Insert(0, signature);
-                _log?.Debug(Source, $"ResolveLegalLoadout: forced {cls}'s signature '{signature.name}' into slot 0.");
+                _log?.Debug(Source, $"ResolveLegalLoadout: forced {cls}'s signature '{signature.name}' into its locked slot.");
             }
 
-            // A Peck-variant signature already covers foraging, so do not re-force plain Peck.
-            if (canForage && !signatureIsPeckVariant && !picked.Contains(peck))
+            if (peckSlot != null)
             {
-                // Forced in at slot 0. The picker normally places it wherever the player
-                // wants and this never fires; it is the safety net for bot presets and any
-                // malformed selection, so a predictable position beats a clever one.
                 if (picked.Count >= activeSlots) picked.RemoveAt(picked.Count - 1);
-                picked.Insert(0, peck);
-                _log?.Debug(Source, $"ResolveLegalLoadout: {cls} had no Peck equipped — forced into slot 0.");
-            }
-            else if (!canForage && peck != null && picked.Remove(peck))
-            {
-                // Belt and braces: IsAllowedFor above already rejects it, so reaching here
-                // means the flags and this rule disagree. Worth a line in the log.
-                _log?.Warn(Source, $"ResolveLegalLoadout: stripped Peck from {cls}, which cannot forage.");
+                picked.Insert(0, peckSlot);
+                _log?.Debug(Source, $"ResolveLegalLoadout: forced {cls}'s Peck-slot ability '{peckSlot.name}' into slot 0.");
             }
 
             // Backfill ONLY what sanitising left missing, from everything legal for this class.
             if (picked.Count < activeSlots)
             {
                 var fillPool = _abilityRegistry.ActiveAbilities
-                    .Where(a => a != null && AbilityRegistrySO.IsAllowedFor(a, cls));
+                    .Where(a => a != null && !(a is Abilities.PeckAbilitySO) && AbilityRegistrySO.IsAllowedFor(a, cls));
                 foreach (var fill in fillPool)
                 {
                     if (picked.Count >= activeSlots) break;
                     if (picked.Contains(fill)) continue;
                     picked.Add(fill);
                 }
+            }
+
+            if (!PreEquippedLoadout.ClassMayForage(cls) && picked.RemoveAll(a => a is Abilities.PeckAbilitySO) > 0)
+            {
+                // Belt and braces: the resolver never yields a Peck for a class that cannot
+                // forage and the sanitiser/backfill skip every Peck, so reaching here means a rule
+                // above disagrees with ClassMayForage. Worth a line in the log.
+                _log?.Warn(Source, $"ResolveLegalLoadout: stripped a Peck from {cls}, which cannot forage.");
             }
 
             if (picked.Count < activeSlots)

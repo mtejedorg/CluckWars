@@ -18,7 +18,11 @@ namespace CluckWars.AbilityLab
     /// is genuinely missing.
     /// <para>
     /// The one match rule the lab keeps is class legality, because "does this ability
-    /// feel right on this class" is usually the question being asked — but
+    /// feel right on this class" is usually the question being asked. Legality is
+    /// <c>IsAllowedFor</c> (hand-selectable), plus Peck for any class that
+    /// <see cref="PreEquippedLoadout.ClassMayForage"/>: Peck is None-class (a match forces it
+    /// through the Peck slot), but the lab has no Peck slot, so without this exception the lab
+    /// could never offer Peck to a forager at all. The Assassin never gets it. But
     /// <c>ignoreLegality</c> turns it off, which is the whole point of a lab: trying the
     /// combinations the lobby refuses.
     /// </para>
@@ -31,6 +35,11 @@ namespace CluckWars.AbilityLab
     /// </remarks>
     public static class AbilityLabLoadout
     {
+        /// <summary>The lab's class-legality rule: hand-selectable, or a Peck for a class that may forage.</summary>
+        private static bool IsLegalFor(AbilityBaseSO ability, ChickenClass cls) =>
+            AbilityRegistrySO.IsAllowedFor(ability, cls)
+            || (ability is PeckAbilitySO && PreEquippedLoadout.ClassMayForage(cls));
+
         /// <summary>
         /// Every active (non-passive) ability the lab will offer for <paramref name="cls"/>.
         /// Registry order is preserved so the picker list doesn't reshuffle between frames.
@@ -43,7 +52,7 @@ namespace CluckWars.AbilityLab
             foreach (var ability in registry.ActiveAbilities)
             {
                 if (ability == null) continue;
-                if (!ignoreLegality && !AbilityRegistrySO.IsAllowedFor(ability, cls)) continue;
+                if (!ignoreLegality && !IsLegalFor(ability, cls)) continue;
                 result.Add(ability);
             }
             return result;
@@ -90,7 +99,7 @@ namespace CluckWars.AbilityLab
                 {
                     var pick = picks[i];
                     if (pick == null || chosen.Contains(pick)) continue;
-                    if (!ignoreLegality && !AbilityRegistrySO.IsAllowedFor(pick, cls)) continue;
+                    if (!ignoreLegality && !IsLegalFor(pick, cls)) continue;
                     chosen.Add(pick);
                 }
             }

@@ -23,7 +23,6 @@ namespace CluckWars.Abilities
         public GroundQuakeAbilitySO()
         {
             Category = AbilityCategory.Control;
-            SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Fatty;
             BotRole = BotRole.Control;
             Duration = 0.4f;

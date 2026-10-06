@@ -30,7 +30,6 @@ namespace CluckWars.Abilities
         public DustKickAbilitySO()
         {
             Category = AbilityCategory.Control;
-            SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Speedy;
             BotRole = BotRole.Escape;
             Duration = 0.3f;

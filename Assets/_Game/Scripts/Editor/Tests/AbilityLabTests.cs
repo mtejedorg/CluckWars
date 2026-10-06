@@ -40,9 +40,28 @@ namespace CluckWars.Tests
 
                 foreach (var ability in filtered)
                 {
-                    Assert.IsTrue(AbilityRegistrySO.IsAllowedFor(ability, cls),
-                        $"FilterActives offered '{ability.name}' to {cls}, which cannot equip it.");
+                    // Peck is None-class (never hand-picked in a match); the lab has no Peck slot,
+                    // so it offers Peck to any class that may forage instead.
+                    bool legal = ability is PeckAbilitySO
+                        ? PreEquippedLoadout.ClassMayForage(cls)
+                        : AbilityRegistrySO.IsAllowedFor(ability, cls);
+                    Assert.IsTrue(legal, $"FilterActives offered '{ability.name}' to {cls}, which cannot equip it.");
                 }
+            }
+        }
+
+        [Test]
+        public void FilterActives_OffersPeckToForagers_AndNeverToTheAssassin()
+        {
+            var registry = Registry();
+            var peck = Peck(registry);
+            Assume.That(peck, Is.Not.Null);
+
+            foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
+            {
+                var offered = AbilityLabLoadout.FilterActives(registry, cls, ignoreLegality: false).Contains(peck);
+                Assert.AreEqual(PreEquippedLoadout.ClassMayForage(cls), offered,
+                    $"The lab must offer Peck to {cls} iff it may forage.");
             }
         }
 
@@ -125,7 +144,7 @@ namespace CluckWars.Tests
             var registry = Registry();
             var peck = Peck(registry);
             Assume.That(peck, Is.Not.Null, "Registry has no Peck ability to test class gating with.");
-            Assume.That(AbilityRegistrySO.IsAllowedFor(peck, ChickenClass.Assassin), Is.False,
+            Assume.That(PreEquippedLoadout.ClassMayForage(ChickenClass.Assassin), Is.False,
                 "This test relies on the Assassin being unable to forage.");
 
             var picks = new List<AbilityBaseSO> { peck };
@@ -153,7 +172,7 @@ namespace CluckWars.Tests
             Assume.That(peck, Is.Not.Null);
 
             const ChickenClass cls = ChickenClass.Warrior;
-            Assume.That(AbilityRegistrySO.IsAllowedFor(peck, cls), Is.True,
+            Assume.That(PreEquippedLoadout.ClassMayForage(cls), Is.True,
                 "This test relies on the Warrior being a forager, so a match spawn WOULD force Peck.");
 
             var picks = AbilityLabLoadout.FilterActives(registry, cls, ignoreLegality: false)

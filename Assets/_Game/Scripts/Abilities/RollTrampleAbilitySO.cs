@@ -10,7 +10,6 @@ namespace CluckWars.Abilities
         {
             Category = AbilityCategory.Steal;
             TerrainTraversal = TerrainTraversal.Vault;
-            SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Warrior;
         }
 

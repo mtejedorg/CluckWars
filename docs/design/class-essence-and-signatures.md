@@ -251,7 +251,7 @@ Maestro: *"Don't even trust common ones."* Auditing them against §2:
 | **Snatch** (`All`, cd 3) | "Robs cargo from every rival in a forward arc." That is **theft** — the Assassin's core. A universal AoE steal is *why* the Assassin fantasy reads thin. → **Assassin** |
 | **Speed Burst** (`All`, cd 6) | 2.5x sprint. Speedy is *defined* as the fastest; a universal sprint erases that. → **Speedy** |
 | **Egg Shell** (`All`, cd 8) | Immune but immobile. No class flavour, mechanically trivial. → **genuinely Common** |
-| **Peck** (`Warrior, Speedy, Fatty`) | Common slot but deliberately **not** `All` — the Assassin cannot forage. A real, intended exception: "Common" means *shared pool*, not *universal*. |
+| **Peck** (`None`, superseded 2026-10-06) | No longer hand-picked: `AllowedClasses` now means "selectable in the picker" only, so Peck is None-class and is forced through each forager subclass's **Peck slot** column (`PeckSlotPreEquippedBy`). The Assassin cannot forage by a hard rule (`PreEquippedLoadout.ClassMayForage`), not by a class mask. Each subclass has a Peck slot and a Signature slot (`SignaturePreEquippedBy`), both locked. |
 
 ---
 
@@ -290,7 +290,7 @@ Fatty/Hauler get three free slots and only Warrior stays at two.
 | Fatty | 7 | 2 | 9 | Hoarder / Bulwark |
 | Assassin | 8 | 1 | 9 | Spoiler / Thief |
 
-**§5 is done.** The Common pool is now **Egg Shell** (All) and **Peck** (foragers only) —
+**§5 is done.** (Terminology updated 2026-10-06: the Common/Character slot kind is retired; eligibility is `AllowedClasses` alone, `None` = pre-equip-only, and each subclass has two locked pre-equip slots — see GDD §7.1.) The one shared ability is now **Egg Shell** (All); **Peck** is None-class and pre-equipped by every forager specialization —
 nothing else. Snatch went to the Assassin because an AoE cargo steal *is* the class's core, and
 Speed Burst to Speedy because a universal 2.5x sprint erases the one thing that class owns
 outright. Every class stayed above the ≥7 floor.

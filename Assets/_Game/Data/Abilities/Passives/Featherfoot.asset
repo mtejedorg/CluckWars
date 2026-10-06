@@ -29,3 +29,4 @@ MonoBehaviour:
   CastMotion: 8
     serializedVersion: 2
     m_Bits: 256
+  Subclass: 4

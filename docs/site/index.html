@@ -641,8 +641,8 @@ footer b{color:var(--text-dim)}
     <p class="eyebrow">05 &mdash; The pool</p>
     <h2>Ability codex</h2>
     <p class="lede">
-      29 abilities and 8 passives. Since the 2026-08 rebuild, <b>a Character ability belongs to
-      exactly one class</b> &mdash; sharing is expressed only through the two-item Common pool.
+      29 abilities and 8 passives. Since the 2026-08 rebuild, <b>a class ability belongs to
+      exactly one class</b> &mdash; sharing is expressed only through Egg Shell, the one ability every class may pick. Peck is never picked: every specialization of the three foraging classes starts with it pre-equipped.
       Abilities used to be shared to widen loadouts, which cost the thing that makes a
       4-player FFA readable: you could no longer tell what a chicken <em>was</em> by what it did.
     </p>
@@ -1380,7 +1380,7 @@ footer b{color:var(--text-dim)}
         Common pool. Both turned out to be class essences hiding in shared clothing &mdash; a
         universal sprint erases Speedy's whole &ldquo;fastest in the game&rdquo; claim, and a
         universal AoE steal <em>is</em> the Assassin's entire income. Widening loadouts had cost
-        readability. The Common pool is now exactly two abilities.</p>
+        readability. The Common pool is now just Egg Shell (Peck is no longer picked; foragers start with it pre-equipped).</p>
     </div>
 
     <div class="card">
@@ -1505,7 +1505,7 @@ const CLASSES = [
     essence:'The sneaky one. Stealing from others, isolating them, catching them, and killing from the shadows.',
     contract:'Every tool needs a victim. Setup then payoff, binary outcomes, a high skill ceiling — and the only class that cannot forage, because it eats what others carried.',
     proof:[
-      ['He has no forage button at all','Peck’s class mask excludes him outright. This is not a slow farmer — it is a chicken whose only income is other chickens.'],
+      ['He has no forage button at all','The game never gives him a Peck. This is not a slow farmer — it is a chicken whose only income is other chickens.'],
       ['His kit chains into itself','Smoke Roost manufactures the isolation Mark/Kill requires; Ambush supplies the stun that arms it. Setup, then payoff, in one hand.'],
       ['Every approach tool is concealment, not speed','Invisibility, Shadowstep and Doppelganger get him next to a victim without being read. He shares Speedy’s move speed and spends it completely differently.'],
       ['He owns the only hard removal in the game','Mark/Kill is also the only single-target ability. Everything else in Cluck Wars is self-centred or directional.']
@@ -1752,7 +1752,7 @@ const fmt = n  => Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/,''
            <div><dt>Peck cooldown</dt><dd>${c.peckCd ? c.peckCd+' s' : 'n/a'}</dd></div>
            <div><dt>Ability pool</dt><dd>${pool.length}</dd></div>
          </div>
-         ${c.id==='assassin' ? `<div class="note warn" style="font-size:.83rem"><b>He genuinely cannot farm.</b> Foraging is Peck, and Peck's class mask excludes the Assassin outright. His 40-second clear time is not a slow forager — it is a chicken with no forage button at all, whose income has to be robbery.</div>`:''}
+         ${c.id==='assassin' ? `<div class="note warn" style="font-size:.83rem"><b>He genuinely cannot farm.</b> Foraging is Peck, and the Assassin is never given one. His 40-second clear time is not a slow forager — it is a chicken with no forage button at all, whose income has to be robbery.</div>`:''}
        </div>
        <div class="card stack">
          <p class="eyebrow">Specializations — pick one at character select</p>
@@ -1973,7 +1973,7 @@ const fmt = n  => Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/,''
       `<b style="color:${c.lt}">${c.name} / ${curSpec.spec}</b> — ` +
       (curCls==='assassin'
         ? `no forager slot, because the Assassin cannot farm. Its specialization grants ${sigTxt}, leaving you <b>3</b> free picks`
-        : `its class grants the forager <b>Peck</b> at ${c.peckCd}s, its specialization grants ${sigTxt}, leaving you <b>2</b> free picks`) +
+        : `its specialization pre-equips <b>Peck</b> (${c.peckCd}s cooldown), and grants ${sigTxt}, leaving you <b>2</b> free picks`) +
       ` from ${legal().length} legal abilities.`;
 
     pool.innerHTML='';

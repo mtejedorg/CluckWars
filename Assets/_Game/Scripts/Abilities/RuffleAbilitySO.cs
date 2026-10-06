@@ -22,7 +22,6 @@ namespace CluckWars.Abilities
         public RuffleAbilitySO()
         {
             Category = AbilityCategory.Utility;
-            SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Warrior;
             BotRole = BotRole.Escape;
             Duration = 2.5f;

@@ -31,3 +31,5 @@ MonoBehaviour:
     m_Bits: 256
   QuakeRadius: 4.5
   RootSeconds: 1.8
+  PeckSlotPreEquippedBy: 0
+  SignaturePreEquippedBy: 32

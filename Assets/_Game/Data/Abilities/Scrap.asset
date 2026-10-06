@@ -31,3 +31,5 @@ MonoBehaviour:
     m_Bits: 256
   ScrapRange: 3.8
   StealAmount: 3
+  PeckSlotPreEquippedBy: 0
+  SignaturePreEquippedBy: 2

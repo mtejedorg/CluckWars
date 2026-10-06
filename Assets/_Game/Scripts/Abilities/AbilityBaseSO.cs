@@ -17,17 +17,8 @@ namespace CluckWars.Abilities
     }
 
     /// <summary>
-    /// ADR 0003 Decision 3 pool classification.
-    /// Common abilities sit in a shared pool; Character abilities sit in a per-class pool.
-    /// </summary>
-    public enum AbilitySlotKind : byte
-    {
-        Common    = 0,
-        Character = 1,
-    }
-
-    /// <summary>
-    /// Bitmask of classes allowed to equip a Character-slot ability (ADR 0003 Decision 3).
+    /// Bitmask of classes that may PICK an ability in the loadout picker. All = shared; None = pre-equip-only
+    /// (never pickable; obtainable only as a subclass pre-equip).
     /// Derived from existing <see cref="ChickenClass"/> ordinals (Warrior=0, Speedy=1, Fatty=2, Assassin=3).
     /// </summary>
     [System.Flags]
@@ -96,11 +87,20 @@ namespace CluckWars.Abilities
         [Tooltip("Jump length tier for teleport jump traversal abilities (Short=5m, Normal=10m, Big=18m; GDD v0.5 §3.5).")]
         public JumpLengthTier JumpTier = JumpLengthTier.None;
 
-        [Tooltip("Pool classification: Common (shared) vs Character (class pool) per ADR 0003 Decision 3.")]
-        public AbilitySlotKind SlotKind = AbilitySlotKind.Common;
-
-        [Tooltip("Bitmask of classes allowed to equip this ability when SlotKind is Character. All (15) for Common.")]
+        [Tooltip("Which classes may HAND-SELECT this ability in the loadout picker (and bots/backfill draw from). " +
+                 "That is all this field means. All = shared by everyone. None = never hand-picked: only obtainable " +
+                 "through a pre-equip slot column below. (Peck is None: it is forced via the Peck slot column.)")]
         public ChickenClassFlags AllowedClasses = ChickenClassFlags.All;
+
+        [Header("Pre-equip")]
+        [Tooltip("Subclasses whose PECK SLOT (slot 0, locked) holds this ability: a Peck variant for foragers, " +
+                 "Mark/Kill for the Assassin. None = no subclass. Two abilities claiming one subclass here is " +
+                 "flagged (SlotConflict) rather than silently overwritten. A Peck here is what makes a subclass forage.")]
+        public ChickenSubclassFlags PeckSlotPreEquippedBy = ChickenSubclassFlags.None;
+
+        [Tooltip("Subclasses whose SIGNATURE SLOT (locked) holds this ability. None = no subclass. A Peck may not " +
+                 "be a signature (Peck belongs in the Peck slot), and one ability may not fill both slots of one subclass.")]
+        public ChickenSubclassFlags SignaturePreEquippedBy = ChickenSubclassFlags.None;
 
         [Header("Bot")]
         [Tooltip("How the bot AI classifies and uses this ability. Auto derives the role from Category.")]

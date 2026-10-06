@@ -39,6 +39,43 @@ namespace CluckWars.Tests
             Assert.AreEqual(typeof(byte), Enum.GetUnderlyingType(typeof(AbilityCategory)));
             Assert.AreEqual(typeof(byte), Enum.GetUnderlyingType(typeof(BotRole)));
             Assert.AreEqual(typeof(byte), Enum.GetUnderlyingType(typeof(MatchEventKind)));
+            Assert.AreEqual(typeof(byte), Enum.GetUnderlyingType(typeof(ChickenSubclass)));
+        }
+
+        [Test]
+        public void ChickenSubclassFlags_MirrorsChickenSubclass_MemberForMember()
+        {
+            var subclasses = Enum.GetValues(typeof(ChickenSubclass)).Cast<ChickenSubclass>()
+                .Where(x => x != ChickenSubclass.None).ToList();
+            var flagMembers = Enum.GetValues(typeof(ChickenSubclassFlags)).Cast<ChickenSubclassFlags>()
+                .Where(x => x != ChickenSubclassFlags.None).ToList();
+
+            Assert.AreEqual(typeof(ushort), Enum.GetUnderlyingType(typeof(ChickenSubclassFlags)));
+            CollectionAssert.AreEqual(subclasses.Select(x => x.ToString()).ToList(),
+                flagMembers.Select(x => x.ToString()).ToList(),
+                "ChickenSubclassFlags must have the same member names in the same order as ChickenSubclass (minus None).");
+
+            for (int i = 0; i < subclasses.Count; i++)
+            {
+                Assert.AreEqual((ushort)(1 << ((int)subclasses[i] - 1)), (ushort)flagMembers[i],
+                    $"{subclasses[i]}: flag must equal 1 << (subclass - 1).");
+                Assert.AreEqual(flagMembers[i], subclasses[i].ToFlag());
+            }
+        }
+
+        [Test]
+        public void ChickenSubclass_KeepsItsAuthoredNumbering()
+        {
+            // Passive .asset files serialise the integer, so these are append-only.
+            Assert.AreEqual(0, (byte)ChickenSubclass.None);
+            Assert.AreEqual(1, (byte)ChickenSubclass.Warrior_Relentless);
+            Assert.AreEqual(2, (byte)ChickenSubclass.Warrior_Bully);
+            Assert.AreEqual(3, (byte)ChickenSubclass.Speedy_Slippery);
+            Assert.AreEqual(4, (byte)ChickenSubclass.Speedy_Featherfoot);
+            Assert.AreEqual(5, (byte)ChickenSubclass.Fatty_Hoarder);
+            Assert.AreEqual(6, (byte)ChickenSubclass.Fatty_Bulwark);
+            Assert.AreEqual(7, (byte)ChickenSubclass.Assassin_Spoiler);
+            Assert.AreEqual(8, (byte)ChickenSubclass.Assassin_Thief);
         }
 
         [Test]

@@ -24,7 +24,6 @@ namespace CluckWars.Abilities
         public RollPushAbilitySO()
         {
             TerrainTraversal = TerrainTraversal.Barge;
-            SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Fatty;
         }
 

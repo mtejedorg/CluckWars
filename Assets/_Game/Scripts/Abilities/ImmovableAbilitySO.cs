@@ -34,7 +34,6 @@ namespace CluckWars.Abilities
         public ImmovableAbilitySO()
         {
             Category = AbilityCategory.Defense;
-            SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Fatty;
             BotRole = BotRole.Defense;
             Duration = 3f;

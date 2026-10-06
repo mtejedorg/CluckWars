@@ -43,12 +43,12 @@ namespace CluckWars.Abilities
         public PeckAbilitySO()
         {
             Category = AbilityCategory.Utility;
-            SlotKind = AbilitySlotKind.Common;
-            // Every class EXCEPT Assassin, which cannot forage and spends all four
-            // slots on its kit. This flag is the single source of truth for "can this
-            // class peck" — MatchBootstrapper's loadout sanitiser and the class-stat
-            // authoring test both read it rather than hardcoding the class list.
-            AllowedClasses = ChickenClassFlags.Warrior | ChickenClassFlags.Speedy | ChickenClassFlags.Fatty;
+            // None: Peck is never hand-picked. AllowedClasses only means "selectable in the
+            // loadout picker", and Peck is forced into slot 0 through the Peck-slot pre-equip
+            // column (AbilityBaseSO.PeckSlotPreEquippedBy), which is what makes a subclass
+            // forage. The one hard rule "the Assassin cannot forage" lives in
+            // PreEquippedLoadout.ClassMayForage, not in this mask.
+            AllowedClasses = ChickenClassFlags.None;
             BotRole = BotRole.Forage;
             Duration = 0.4f;
             Cooldown = 0.8f; // fallback only — ResolveCooldown reads the caster's class stat

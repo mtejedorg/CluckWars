@@ -16,7 +16,6 @@ namespace CluckWars.Abilities
         public SnatchAbilitySO()
         {
             Category = AbilityCategory.Steal;
-            SlotKind = AbilitySlotKind.Common;
             AllowedClasses = ChickenClassFlags.All;
         }
 

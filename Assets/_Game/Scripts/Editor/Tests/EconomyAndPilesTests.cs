@@ -481,16 +481,16 @@ namespace CluckWars.Tests
             Mathf.Max(1, Mathf.CeilToInt(food / s.PeckAmount - 1e-4f)) * s.PeckCooldown;
 
         /// <summary>
-        /// Whether this class can forage at all, read off Peck's own AllowedClasses so the
-        /// answer cannot drift from the ability asset.
+        /// Whether this class can forage at all, derived from the shipped Peck-slot data
+        /// (<c>PreEquippedLoadout.ClassForages</c>) so the answer cannot drift from the assets.
         /// </summary>
         private static bool CanForage(ChickenStatsSO s)
         {
-            var peck = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir)
-                .Find(a => a is PeckAbilitySO);
+            var abilities = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir);
+            var peck = abilities.Find(a => a is PeckAbilitySO);
             return peck != null
                 && System.Enum.TryParse<ChickenClass>(s.DisplayName, out var cls)
-                && AbilityRegistrySO.IsAllowedFor(peck, cls);
+                && PreEquippedLoadout.ClassForages(cls, abilities.OfType<PassiveAbilitySO>(), abilities, peck);
         }
 
         [Test]

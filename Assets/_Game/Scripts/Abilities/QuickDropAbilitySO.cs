@@ -32,7 +32,6 @@ namespace CluckWars.Abilities
         public QuickDropAbilitySO()
         {
             Category = AbilityCategory.Utility;
-            SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Speedy;
             // Bank, NOT Forage. It was Forage until 2026-08-23 and that quietly cost the
             // Speedy bot its entire income: BotController fires the Forage role while parked

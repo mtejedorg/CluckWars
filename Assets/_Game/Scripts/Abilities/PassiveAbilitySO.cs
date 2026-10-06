@@ -36,35 +36,23 @@ namespace CluckWars.Abilities
         {
             Duration = 0.05f;
             Cooldown = 0f;
-            SlotKind = AbilitySlotKind.Character;
             Category = AbilityCategory.Utility;
         }
 
         /// <summary>
-        /// An ability this specialization force-equips into one of the four slots. Optional —
-        /// null means the specialization grants only its passive effect.
+        /// Identity of this specialization — the key the Balance Editor and
+        /// <see cref="PreEquippedLoadout"/> validation use. Exactly one passive asset per value.
         /// </summary>
-        /// <remarks>
-        /// <b>This is what makes a specialization a build rather than a stat tweak.</b>
-        /// Maestro, 2026-08-21: *"we should make one ability the 'forced class ability'"*. The
-        /// mechanism already existed for Peck, which <c>MatchBootstrapper.ResolveLegalLoadout</c>
-        /// force-equips for every forager; this generalises it so the CHOSEN specialization
-        /// decides which ability arrives for free.
-        ///
-        /// <b>Two forcing rules, and the second one matters.</b> If the signature is itself a
-        /// <see cref="PeckAbilitySO"/> variant it REPLACES the plain Peck rather than joining
-        /// it — otherwise a forager would burn two of four slots on forced picks and the
-        /// loadout would offer only two real choices. A non-Peck signature on a forager does
-        /// cost a slot, which is deliberate: those specializations trade breadth for a
-        /// guaranteed tool.
-        ///
-        /// <b>Must be legal for the same class as this passive</b>, or the sanitiser drops it
-        /// and the specialization silently grants nothing. Pinned by
-        /// <c>DataIntegrityTests.SignatureAbilities_AreLegalForTheirOwnClass</c>.
-        /// </remarks>
-        [Tooltip("Ability this specialization force-equips. Optional. A Peck variant replaces " +
-                 "the plain Peck; anything else costs a slot.")]
-        public AbilityBaseSO SignatureAbility;
+        [Tooltip("Which subclass this specialization is. Unique across all passives; must match " +
+                 "this passive's single AllowedClasses bit.")]
+        public ChickenSubclass Subclass;
+
+        // The Peck-slot / Signature-slot pre-equips are NOT stored here any more. The ability owns
+        // the assignment (AbilityBaseSO.PeckSlotPreEquippedBy + SignaturePreEquippedBy), resolved by
+        // PreEquippedLoadout.Resolve — so two abilities claiming one slot for a subclass is
+        // visible data, flagged by validation, instead of one field silently overwriting another.
+        // (Maestro, 2026-08-21: "we should make one ability the forced class ability" — this is
+        // that mechanism, generalised to two slots per subclass.)
 
         /// <summary>
         /// True for a class's <b>signature</b> specialization — the one it gets by default.

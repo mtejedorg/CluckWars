@@ -30,3 +30,4 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 256
   DurationMultiplier: 0.6
+  Subclass: 3

@@ -37,7 +37,6 @@ namespace CluckWars.Abilities
         public BellyFlopAbilitySO()
         {
             Category = AbilityCategory.Control;
-            SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Fatty;
             BotRole = BotRole.Offense;
             TerrainTraversal = TerrainTraversal.Vault;

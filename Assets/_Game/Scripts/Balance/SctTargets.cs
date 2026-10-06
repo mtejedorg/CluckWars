@@ -29,8 +29,8 @@ namespace CluckWars.Balance
         /// </summary>
         /// <remarks>
         /// The axiom is "a naked chicken, alone on the full map, farming greedily, banks the
-        /// win target". The Assassin cannot forage at all — Peck's <c>AllowedClasses</c>
-        /// excludes it — so there is no farming run to measure and its old 40 s / 4-trip
+        /// win target". The Assassin cannot forage at all
+        /// (<c>PreEquippedLoadout.ClassMayForage</c> is false for it; a test pins that this list and that rule agree) — so there is no farming run to measure and its old 40 s / 4-trip
         /// target described something that can no longer happen. It is governed instead by
         /// the Predation axiom (see the 2026-08-13 Peck/four-slot spec §7.2): given rivals
         /// carrying C food every T seconds, an Assassin banks the win target in X, where each

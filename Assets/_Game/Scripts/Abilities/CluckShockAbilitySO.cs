@@ -10,7 +10,6 @@ namespace CluckWars.Abilities
         public CluckShockAbilitySO()
         {
             Category = AbilityCategory.Control;
-            SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Warrior;
         }
 

@@ -12,7 +12,6 @@ namespace CluckWars.Abilities
         public StunBurstAbilitySO()
         {
             Category = AbilityCategory.Control;
-            SlotKind = AbilitySlotKind.Character;
         }
 
         [Tooltip("Stun radius around the caster.")]

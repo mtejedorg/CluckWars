@@ -351,17 +351,18 @@ namespace CluckWars.Tests
             // an unauthored class silently falls back to the C# defaults (3 per 1.0s) and
             // lands on someone else's clear time without anything going red.
             //
-            // Only classes that can actually peck are checked, and "can peck" is read off
-            // Peck's own AllowedClasses rather than hardcoded here — one source of truth, so
-            // opening or closing foraging to a class updates this test for free.
-            var peck = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir)
-                .Find(a => a is PeckAbilitySO);
+            // Only classes that can actually peck are checked, and "can peck" is derived from the
+            // shipped Peck-slot data (PreEquippedLoadout.ClassForages) rather than hardcoded here —
+            // one source of truth, so opening or closing foraging to a class updates this test.
+            var abilities = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir);
+            var peck = abilities.Find(a => a is PeckAbilitySO);
             Assert.IsNotNull(peck, "No PeckAbilitySO asset found — foraging is unequippable.");
+            var passives = abilities.OfType<PassiveAbilitySO>().ToList();
 
             foreach (var s in TestAssets.LoadAllIn<ChickenStatsSO>(TestAssets.ClassesDir))
             {
                 if (!System.Enum.TryParse<ChickenClass>(s.DisplayName, out var cls) ||
-                    !AbilityRegistrySO.IsAllowedFor(peck, cls))
+                    !PreEquippedLoadout.ClassForages(cls, passives, abilities, peck))
                 {
                     continue; // cannot forage; its peck stats are unused by design
                 }
@@ -433,7 +434,7 @@ namespace CluckWars.Tests
                     int peckCount = 0;
                     foreach (var slot in resolved) if (ReferenceEquals(slot, peck)) peckCount++;
 
-                    bool canForage = AbilityRegistrySO.IsAllowedFor(peck, cls);
+                    bool canForage = PreEquippedLoadout.ClassMayForage(cls);
                     if (canForage)
                     {
                         Assert.AreEqual(1, peckCount,
@@ -722,8 +723,8 @@ namespace CluckWars.Tests
         {
             // 2026-07-27 design directive: the Common slot is no longer mandatory (GDD
             // §7.1-7.2 updated accordingly), so this no longer pins Slot0 to
-            // SlotKind.Common — MatchBootstrapper.ResolveLegalLoadout accepts any mix of
-            // Common and class-legal Character abilities now. What still must hold: every
+            // a slot kind — MatchBootstrapper.ResolveLegalLoadout accepts any mix of
+            // shared and class-legal abilities now. What still must hold: every
             // assigned slot on every scene-authored preset resolves to a real
             // AbilityBaseSO asset, abilities within a preset are distinct, and each is
             // legal for at least one of its own AllowedClasses (or legal for everyone, if
@@ -1214,50 +1215,113 @@ namespace CluckWars.Tests
         }
 
         /// <summary>
-        /// A specialization's signature must be equippable by the class that specialization
-        /// belongs to, or it silently grants nothing.
+        /// A specialization's two pre-equipped slots must each hold a legal pre-equip
+        /// (<c>PreEquippedLoadout.IsLegalPreEquip</c>: non-passive; a Peck only for a class that
+        /// can forage) and not the same ability twice, or the resolver silently drops one.
+        /// Off-class abilities are allowed (no AllowedClasses filter on pre-equips).
         /// </summary>
         /// <remarks>
-        /// <c>ResolveLegalLoadout</c> runs every forced ability through <c>IsAllowedFor</c>
-        /// before equipping it. A signature pointing at another class's ability is therefore
-        /// not a crash — it is a specialization that quietly does half of what it advertises,
-        /// which is exactly the failure mode that let three abilities ship with
-        /// <c>TerrainTraversal: 0</c> and nobody notice.
+        /// <c>PreEquippedLoadout.Resolve</c> (used by <c>ResolveLegalLoadout</c>) drops an illegal
+        /// authored value. That is not a crash —
+        /// it is a specialization that quietly does half of what it advertises, which is exactly
+        /// the failure mode that let three abilities ship with <c>TerrainTraversal: 0</c>.
         ///
-        /// Null is legal: a specialization may grant only its passive effect. Three currently
-        /// do, because their signatures are Peck variants that must be solved against
-        /// BalanceOracle before they can be authored.
+        /// Null is legal here: five subclasses currently have a gap (pending Maestro's design
+        /// call). Completeness is REPORTED by the Balance Editor's "Pre-equipped completeness"
+        /// panel, not enforced by this test.
         /// </remarks>
         [Test]
-        public void SignatureAbilities_AreLegalForTheirOwnClass()
+        public void PreEquippedAbilities_AreLegalForTheirOwnClass()
         {
+            var abilities = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir);
             var offenders = new System.Collections.Generic.List<string>();
 
-            foreach (var passive in TestAssets.LoadAllIn<PassiveAbilitySO>(TestAssets.AbilitiesDir))
-            {
-                var sig = passive.SignatureAbility;
-                if (sig == null) continue; // passive-only specialization; legal.
-
-                // The signature must be equippable by every class the passive serves.
-                foreach (ChickenClassFlags cls in new[]
-                {
-                    ChickenClassFlags.Warrior, ChickenClassFlags.Speedy,
-                    ChickenClassFlags.Fatty,   ChickenClassFlags.Assassin,
-                })
-                {
-                    if ((passive.AllowedClasses & cls) == 0) continue;
-                    if ((sig.AllowedClasses & cls) != 0) continue;
-
-                    offenders.Add($"{passive.name} serves {cls} but its signature " +
-                                  $"'{sig.name}' is only for {sig.AllowedClasses}");
-                }
-            }
+            foreach (var passive in abilities.OfType<PassiveAbilitySO>())
+                foreach (var issue in PreEquippedLoadout.Validate(passive, abilities))
+                    if (issue.Status == PreEquipStatus.IllegalPeckSlot || issue.Status == PreEquipStatus.IllegalSignature)
+                        offenders.Add(issue.Message);
 
             Assert.IsEmpty(offenders,
-                "A specialization's signature is force-equipped through IsAllowedFor, so an " +
-                "illegal one is dropped and the specialization grants only half of what it " +
-                "advertises:" + System.Environment.NewLine + "  " +
+                "A pre-equip is resolved through PreEquippedLoadout.Resolve, so an illegal one (a Peck claimed by an " +
+                "Assassin subclass, a passive) is dropped and the specialization grants only half of what it advertises:" +
+                System.Environment.NewLine + "  " +
                 string.Join(System.Environment.NewLine + "  ", offenders));
+        }
+
+        /// <summary>No two shipped abilities may claim the same slot for the same subclass.</summary>
+        [Test]
+        public void ShippedPreEquipClaims_HaveNoSlotConflicts()
+        {
+            var abilities = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir);
+            var conflicts = PreEquippedLoadout.ValidateRoster(abilities.OfType<PassiveAbilitySO>(), abilities)
+                .Where(i => i.Status == PreEquipStatus.SlotConflict).Select(i => i.Message).ToList();
+            Assert.IsEmpty(conflicts, string.Join(System.Environment.NewLine, conflicts));
+        }
+
+        /// <summary>
+        /// Every shipped pre-equip-only ability (<c>AllowedClasses == None</c>) must be pre-equipped by
+        /// some subclass in a slot column — otherwise nobody can ever obtain it.
+        /// </summary>
+        [Test]
+        public void EveryShippedNoneClassAbility_IsPreEquippedBySomeSubclass()
+        {
+            var abilities = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir);
+            var dead = PreEquippedLoadout.FindUnreachablePreEquipOnly(abilities).Select(a => a.name).ToList();
+            Assert.IsEmpty(dead,
+                "Pre-equip-only (AllowedClasses = None) abilities claimed in neither slot column: " + string.Join(", ", dead));
+        }
+
+        /// <summary>
+        /// Every shipped passive carries a unique, non-None <see cref="ChickenSubclass"/> that
+        /// matches its class, and every enum value has an asset.
+        /// </summary>
+        [Test]
+        public void EveryPassive_HasAUniqueSubclassMatchingItsClass()
+        {
+            var abilities = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir);
+            var identityIssues = PreEquippedLoadout.ValidateRoster(abilities.OfType<PassiveAbilitySO>(), abilities)
+                .Where(i => i.Status == PreEquipStatus.MissingSubclassId
+                         || i.Status == PreEquipStatus.SubclassClassMismatch
+                         || i.Status == PreEquipStatus.DuplicateSubclass
+                         || i.Status == PreEquipStatus.SubclassHasNoAsset)
+                .Select(i => i.Message)
+                .ToList();
+
+            Assert.IsEmpty(identityIssues,
+                "Subclass identity is broken:" + System.Environment.NewLine + "  " +
+                string.Join(System.Environment.NewLine + "  ", identityIssues));
+        }
+
+        /// <summary>
+        /// The 2026-10-06 migrations (pre-equips moved from the passives onto the abilities, then
+        /// onto two slot columns with a None-class Peck) must not change what any subclass starts with. Table = the pre-migration PeckSlotAbility /
+        /// SignatureAbility of each passive; "-" = empty. Gaps are Maestro's pending design calls.
+        /// </summary>
+        [Test]
+        public void ShippedSubclasses_PreEquipExactlyWhatTheyDidBeforeTheMigration()
+        {
+            var abilities = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir);
+            var plainPeck = abilities.OfType<PeckAbilitySO>().Single();
+            var expected = new (ChickenSubclass sub, string peck, string sig)[]
+            {
+                (ChickenSubclass.Warrior_Relentless,  "Peck",     "Headbutt"),
+                (ChickenSubclass.Warrior_Bully,       "Peck",     "Scrap"),
+                (ChickenSubclass.Speedy_Slippery,    "Peck",     "-"),
+                (ChickenSubclass.Speedy_Featherfoot, "Peck",     "-"),
+                (ChickenSubclass.Fatty_Hoarder,     "Peck",     "-"),
+                (ChickenSubclass.Fatty_Bulwark,     "Peck",     "GroundQuake"),
+                (ChickenSubclass.Assassin_Spoiler,     "MarkKill", "-"),
+                (ChickenSubclass.Assassin_Thief,       "-",        "SneakySteal"),
+            };
+
+            foreach (var (sub, peck, sig) in expected)
+            {
+                var passive = abilities.OfType<PassiveAbilitySO>().Single(p => p.Subclass == sub);
+                PreEquippedLoadout.TryGetSingleClass(passive.AllowedClasses, out var cls);
+                PreEquippedLoadout.Resolve(cls, passive, abilities, plainPeck, out var peckSlot, out var signature);
+                Assert.AreEqual(peck, peckSlot != null ? peckSlot.name : "-", $"{sub} Peck slot");
+                Assert.AreEqual(sig, signature != null ? signature.name : "-", $"{sub} Signature slot");
+            }
         }
 
         /// <summary>
@@ -1280,6 +1344,146 @@ namespace CluckWars.Tests
                 Assert.GreaterOrEqual(available, 5,
                     $"{cls} can only take {available} abilities. Four fill the slots, so fewer " +
                     "than five means the loadout screen offers no actual decision.");
+            }
+        }
+
+        // ---- Peck is None-class; foraging is Peck-slot data (2026-10-06, fifth change) ----
+
+        /// <summary>
+        /// AllowedClasses means "hand-selectable" and nothing else, and nobody hand-picks Peck: every
+        /// shipped PeckAbilitySO must be None-class and the roster validator must not flag one.
+        /// </summary>
+        [Test]
+        public void EveryShippedPeck_IsNoneClass_SoNobodyCanHandPickIt()
+        {
+            var abilities = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir);
+            var pecks = abilities.OfType<PeckAbilitySO>().ToList();
+            Assert.IsNotEmpty(pecks, "No PeckAbilitySO asset — nothing can collect food.");
+
+            foreach (var peck in pecks)
+            {
+                Assert.AreEqual(ChickenClassFlags.None, peck.AllowedClasses,
+                    $"{peck.name}: AllowedClasses must be None — Peck is forced via the Peck slot column, never hand-picked.");
+                foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
+                    Assert.IsFalse(AbilityRegistrySO.IsAllowedFor(peck, cls), $"{peck.name} must not be pickable by {cls}.");
+            }
+
+            var errors = PreEquippedLoadout.ValidateRoster(abilities.OfType<PassiveAbilitySO>(), abilities)
+                .Where(i => i.Status == PreEquipStatus.PeckIsPickable).Select(i => i.Message).ToList();
+            Assert.IsEmpty(errors, string.Join(System.Environment.NewLine, errors));
+        }
+
+        /// <summary>
+        /// Foraging is derived from the Peck-slot data: all six non-Assassin subclasses forage, neither
+        /// Assassin subclass does, and the class-level answer agrees.
+        /// </summary>
+        [Test]
+        public void ShippedSubclasses_ForageExactlyWhenNotAnAssassin()
+        {
+            var abilities = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir);
+            var plainPeck = abilities.OfType<PeckAbilitySO>().Single();
+            var passives = abilities.OfType<PassiveAbilitySO>().ToList();
+
+            foreach (var passive in passives)
+            {
+                PreEquippedLoadout.TryGetSingleClass(passive.AllowedClasses, out var cls);
+                bool forages = PreEquippedLoadout.Forages(cls, passive, abilities, plainPeck);
+                Assert.AreEqual(cls != ChickenClass.Assassin, forages,
+                    $"{passive.Subclass} ({cls}) forages={forages}: only the Assassin subclasses must not.");
+            }
+
+            foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
+                Assert.AreEqual(PreEquippedLoadout.ClassMayForage(cls),
+                    PreEquippedLoadout.ClassForages(cls, passives, abilities, plainPeck),
+                    $"ClassForages disagrees with ClassMayForage for {cls}.");
+        }
+
+        /// <summary>The shipped roster must have no Error-severity pre-equip issue (gaps are Warnings).</summary>
+        [Test]
+        public void ShippedRoster_HasNoPreEquipErrors()
+        {
+            var abilities = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir);
+            var errors = PreEquippedLoadout.ValidateRoster(abilities.OfType<PassiveAbilitySO>(), abilities,
+                    abilities.OfType<PeckAbilitySO>().FirstOrDefault())
+                .Where(i => i.Severity == PreEquipSeverity.Error).Select(i => i.Message).ToList();
+            Assert.IsEmpty(errors, string.Join(System.Environment.NewLine, errors));
+        }
+
+        /// <summary>
+        /// Peck left the picker, so every class must still have enough hand-pickable cards to fill the
+        /// slots that are not locked by pre-equips (Peck slot + Signature for a fully authored subclass).
+        /// </summary>
+        [Test]
+        public void EverySubclass_HasEnoughPickableAbilities_ForItsUnlockedSlots()
+        {
+            var abilities = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir);
+            var plainPeck = abilities.OfType<PeckAbilitySO>().Single();
+            foreach (var passive in abilities.OfType<PassiveAbilitySO>())
+            {
+                PreEquippedLoadout.TryGetSingleClass(passive.AllowedClasses, out var cls);
+                PreEquippedLoadout.Resolve(cls, passive, abilities, plainPeck, out var peckSlot, out var signature);
+                int locked = (peckSlot != null ? 1 : 0) + (signature != null ? 1 : 0);
+                int pickable = abilities.Count(a => !(a is PassiveAbilitySO) && a != peckSlot && a != signature
+                                                    && AbilityRegistrySO.IsAllowedFor(a, cls));
+                Assert.GreaterOrEqual(pickable, AbilityController.SlotCount - locked,
+                    $"{passive.Subclass}: only {pickable} hand-pickable abilities for {AbilityController.SlotCount - locked} unlocked slots.");
+            }
+        }
+
+        /// <summary>
+        /// Drives the real <c>MatchBootstrapper.ResolveLegalLoadout</c> with a hostile selection (a stray
+        /// Peck in every slot) for every shipped specialization: the six foragers spawn with exactly one
+        /// Peck in slot 0, the Assassin subclasses never get one. Peck being None-class means the
+        /// sanitiser drops the stray copies and only the Peck-slot pre-equip survives.
+        /// </summary>
+        [Test]
+        public void ResolveLegalLoadout_StrayPeckInSelection_StillGivesForagersOnePeckInSlot0_AndTheAssassinNone()
+        {
+            var reg = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
+            var peck = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir).Find(a => a is PeckAbilitySO);
+            Assert.IsNotNull(peck);
+
+            var go = new GameObject(nameof(ResolveLegalLoadout_StrayPeckInSelection_StillGivesForagersOnePeckInSlot0_AndTheAssassinNone));
+            go.SetActive(false);
+            try
+            {
+                var boot = go.AddComponent<MatchBootstrapper>();
+                typeof(MatchBootstrapper).GetField("_abilityRegistry", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .SetValue(boot, reg);
+                var method = typeof(MatchBootstrapper).GetMethod("ResolveLegalLoadout", BindingFlags.NonPublic | BindingFlags.Instance);
+                Assert.IsNotNull(method, "MatchBootstrapper.ResolveLegalLoadout was renamed — update this test.");
+
+                // Drift scenario: Peck's mask opened to everyone (the PeckIsPickable Error case),
+                // in memory only and restored in finally, never saved.
+                var originalMask = peck.AllowedClasses;
+                peck.AllowedClasses = ChickenClassFlags.All;
+                try
+                {
+                foreach (var passive in reg.Passives)
+                {
+                    PreEquippedLoadout.TryGetSingleClass(passive.AllowedClasses, out var cls);
+                    var args = new object[] { cls, passive, peck, peck, peck, peck, null, null, null, null, null };
+                    method.Invoke(boot, args);
+
+                    var resolved = new[] { args[7], args[8], args[9], args[10] };
+                    int pecks = resolved.Count(slot => slot is PeckAbilitySO);
+                    if (PreEquippedLoadout.ClassMayForage(cls))
+                    {
+                        Assert.AreEqual(1, pecks, $"{passive.Subclass} must spawn with exactly one Peck.");
+                        Assert.IsInstanceOf<PeckAbilitySO>(args[7], $"{passive.Subclass}: Peck must sit in slot 0.");
+                    }
+                    else
+                    {
+                        Assert.AreEqual(0, pecks, $"{passive.Subclass} ({cls}) must never get a Peck, even with a stray one selected.");
+                    }
+                    foreach (var slot in resolved) Assert.IsNotNull(slot, $"{passive.Subclass} resolved a null slot.");
+                }
+                }
+                finally { peck.AllowedClasses = originalMask; }
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
             }
         }
     }

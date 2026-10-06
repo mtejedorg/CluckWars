@@ -29,3 +29,5 @@ MonoBehaviour:
     m_Bits: 256
   StealRange: 5.4
   StealAmount: 6
+  PeckSlotPreEquippedBy: 0
+  SignaturePreEquippedBy: 128

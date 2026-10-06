@@ -21,10 +21,12 @@ MonoBehaviour:
   TerrainTraversal: 0
   JumpTier: 0
   SlotKind: 0
-  AllowedClasses: 7
+  AllowedClasses: 0
   BotRole: 6
   Duration: 0.4
   Cooldown: 0.8
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  PeckSlotPreEquippedBy: 63
+  SignaturePreEquippedBy: 0

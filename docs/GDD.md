@@ -9,7 +9,7 @@
 *derived* from a per-class clear-time target, not hand-tuned. Win target 150→**40**, match
 3-min→**45 s**. Tiered map food budget (**80 = 2× win**) with pinwheel walls. New Assassin
 **Mark/Kill execute** (the only hard removal). Ability pool split into **Steal / Control /
-Defense / Utility** with a **Common + Character** class-gated model. Targeting collapsed to
+Defense / Utility** with an `AllowedClasses`-gated model (shared / class-only / pre-equip-only). Targeting collapsed to
 **self-centred or directional** (one exception: Mark/Kill). Full rationale in
 `docs/superpowers/specs/2026-07-24-cluck-wars-core-redesign-design.md` and
 `…/2026-07-25-ability-pool-rewrite-design.md`.
@@ -508,9 +508,9 @@ passives like Slippery can target one without the others.
 ### 6.4 The Assassin execute (the only hard removal)
 
 **One button, two presses.** Mark/Kill is the **Reaper** specialization's forced
-signature (§5.3/§7.1) — choosing Reaper equips it automatically in one of the four
-active slots, leaving three to build with. The Burglar specialization does not carry
-it at all, and cannot execute.
+pre-equip (§7.1: its `AllowedClasses` is `None`, so it can only arrive this way) — choosing Reaper equips it automatically,
+locked in slot 0 of the four active slots, leaving three to build with. The Burglar specialization does not carry
+it at all, cannot hand-pick it, and cannot execute.
 
 | Stage | Condition | Counterplay |
 |---|---|---|
@@ -540,15 +540,37 @@ counterplay reachable.
 for every class.** There is no separate "passive slot" outside the specialization choice —
 no class has 5 buttons.
 
-Exactly two things are determined rather than chosen:
+> **Revised 2026-10-06 (Maestro) — the pre-equip model.** Every **subclass** (specialization,
+> `ChickenSubclass`) has **two pre-equipped slots**: a **Peck slot** (a Peck variant for a forager,
+> Mark/Kill for the Reaper) and a **Signature slot**. **The ability owns the assignment**: each ability
+> carries two flag columns, `PeckSlotPreEquippedBy` and `SignaturePreEquippedBy` (each a
+> `ChickenSubclassFlags` set of subclasses), edited in the Balance Editor's Abilities table ("Peck slot" /
+> "Signature slot"). Two abilities claiming the same slot for one subclass is a flagged data error (runtime
+> takes the first in registry order), as is one ability in both slots of a subclass. Either slot may hold **any ability except a Peck on the Assassin**
+> (off-class abilities are allowed; they bypass class identity but nothing breaks at runtime).
+> Pre-equips are **locked**: they sit in a fixed slot (Peck slot 0, signature 1, or 0 with no Peck slot)
+> and the player cannot remove, swap or move them (the Signature slot is locked, and so is the Peck slot). An **empty** Peck slot on a forager falls back to the
+> plain Peck so a forager cannot stop foraging by accident; a non-Peck deliberately placed there means
+> that subclass starts with no Peck. A subclass with an unfilled slot is a pending design gap, reported by
+> the Balance Editor's "Pre-equipped completeness" panel.
+>
+> **`AllowedClasses` (the "Classes" column) means only "hand-selectable in the loadout picker"** — the old
+> Common/Character slot kind is retired. `All` = shared, a single class = that class's own, and
+> **`None` = pre-equip-only**: never in the picker, bot presets or backfill, obtainable only through a slot
+> column. **Peck is None-class** (never hand-picked; forced via the Peck slot column) and so is Mark/Kill
+> (only the Reaper gets it; the Burglar cannot hand-pick it). A subclass **forages iff its resolved Peck slot
+> is a Peck**; the one hard rule is that the **Assassin never forages** (Predation axiom), enforced in code
+> rather than by any ability's class mask.
+
+The two pre-equipped slots per subclass are therefore filled by the specialization, not chosen:
 
 | Slot | Determined by | Rule |
 |---|---|---|
-| **Forager** | Your **class** | Warrior, Speedy and Fatty each get their class's Peck. `PeckAmount` / `PeckCooldown` are authored per class, so the forager is already a per-class variant, not one shared button. **The Assassin has no forager at all** — `AllowedClasses` on `Peck.asset` excludes it outright, and that is the mechanical reason it cannot farm. |
-| **Signature** | Your **specialization** | Every specialization grants exactly one signature ability, force-equipped (§5.3). |
+| **Peck slot** | Your **specialization** | The forager's Peck (variant) — or Mark/Kill for the Reaper. Falls back to the class's plain Peck if left empty. **The Assassin cannot hold a Peck**: a hard rule (`PreEquippedLoadout.ClassMayForage`), not a class mask, and that is the mechanical reason it cannot farm. A Peck is also never a Signature. |
+| **Signature** | Your **specialization** | One further ability, force-equipped. |
 
 Everything left over is **freely chosen** from the abilities that class may legally equip
-(its Character pool plus the Common pool):
+(everything its `AllowedClasses` includes, shared or class-only):
 
 | Class | Determined | Free picks |
 |---|---|---|
@@ -564,29 +586,28 @@ model a Peck variant cannot be a signature: the forager slot answers to the *cla
 spec-granted Peck would be a second forager. Per-class foraging variation already lives
 where it belongs — in each class's `PeckAmount` / `PeckCooldown`. Those three
 specializations therefore need **ordinary signature abilities** assigned (see §11 item 2).
-- **Common** abilities are open to every class that is allowed to equip them; **Character**
-  abilities are gated by a per-class mask (`AbilityBaseSO.SlotKind` + `AllowedClasses`).
-  **The Common pool is now exactly two abilities: Egg Shell (every class) and Peck
-  (Warrior/Speedy/Fatty).** It used to also hold Speed Burst and Snatch — both turned out
+- **Eligibility is `AllowedClasses` flags only** (`AbilityBaseSO.AllowedClasses`; the Common/Character
+  slot kind was retired 2026-10-06). **The one shared ability is Egg Shell (every class). Peck is None-class: never picked,
+  pre-equipped through the Peck slot of every forager specialization.** It used to also hold Speed Burst and Snatch — both turned out
   to be class essences hiding in the shared pool (Speed Burst is Speedy's whole "fastest
   in the game" claim; Snatch is an AoE steal, which is the Assassin's entire income) and
-  were moved to their own class. **A Character ability belongs to exactly one class, full
-  stop** — sharing is expressed only by the Common slot now, never by a wider
-  `AllowedClasses` mask on a Character ability (`docs/design/class-essence-and-signatures.md`
-  §1). `BalanceEditorWindow`'s roster-integrity panel reports any violation live.
+  were moved to their own class. **A class ability belongs to exactly one class, full
+  stop** — never a wider mask (`docs/design/class-essence-and-signatures.md`
+  §1). `BalanceEditorWindow`'s roster-integrity panel reports any violation live, and flags
+  pre-equip-only (`None`) abilities no subclass references.
 - Every ability is balanced against the others — monetization must never be pay-to-win.
 
-### 7.2 The pool — 29 abilities, one class each (except Common)
+### 7.2 The pool — 29 abilities, one class each (except the shared two)
 
 Rebuilt 2026-08-23/24: abilities used to be shared across classes to widen loadout
 pools, which cost the thing that makes a 4-player FFA readable — you could not tell
 what a chicken was by what it did (`docs/design/class-essence-and-signatures.md` §1).
-**A Character ability now belongs to exactly one class.** Cooldowns below are the
+**A class ability now belongs to exactly one class.** Cooldowns below are the
 shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 
 | | Ability | Cooldown | Effect |
 |---|---|---|---|
-| **Common** | Peck 🐦 | 0.8 s | Take a beakful from the pile you're standing on. Forced for every forager (§7.1). |
+| **Shared** | Peck 🐦 | 0.8 s | Take a beakful from the pile you're standing on. Forced for every forager (§7.1). |
 | | Egg Shell 🥚 | 8 s | Seals you in an egg — invulnerable, immobile. |
 | **Warrior** | Cluck Shock ⚡ | 7 s | Knockback shockwave, shoves the swarm off. |
 | | Dive Bomb 🪽 | 6 s | Diving lunge, robs cargo on contact. |
@@ -610,7 +631,7 @@ shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 | **Assassin** | Ambush 🗡️ | 10 s | AoE stun — sets up his own execute. |
 | | Doppelganger 👥 | 11 s | Decoy copy that soaks attacks. |
 | | Invisibility 👻 | 8 s | Fades to a ghostly outline for 4 s (Assassin-only now — was also Speedy). |
-| | Mark/Kill 🎯 *(Reaper signature)* | 5 s | The execute — see §6.4. |
+| | Mark/Kill 🎯 *(Reaper Peck-slot pre-equip; pre-equip-only)* | 5 s | The execute — see §6.4. |
 | | Shadowstep 👤 | 6 s | Short blink dash, phases over walls (Assassin-only — was briefly also Speedy by asset drift, corrected; Speedy is permanently denied all terrain traversal, §5.2). |
 | | Smoke Roost 🌁 | 11 s | Cloud at his own feet — he fades, everyone else in it slows. Pairs with Mark/Kill's isolate-and-execute. |
 | | Snatch 🤏 *(moved from Common)* | 3 s | Robs cargo from every rival in a forward arc. Assassin-only now — a universal AoE steal is exactly the Assassin's core, and diluted the class. |
@@ -656,7 +677,7 @@ buys **faster access to the same content**, never exclusives.
 | Seasonal Battle Pass | Paid, thematic | No — cosmetic |
 | Free Rotation | Rotating free classes & abilities | — |
 
-The **Common/Character** split does not create pay-to-win: Character abilities are class
+The class-gated ability model does not create pay-to-win: class abilities are class
 identity, not power tiers, and every ability is balanced against every other.
 
 ---

@@ -4,7 +4,7 @@ using UnityEngine;
 namespace CluckWars.Abilities
 {
     /// <summary>
-    /// Assassin locked signature ability: Mark/Kill execute (Task 5).
+    /// Mark/Kill execute (Task 5). Pre-equip-only (AllowedClasses = None): Spoiler gets it as its Peck-slot pre-equip.
     /// Thin wrapper delegating activation to AssassinExecute.Press().
     /// </summary>
     [CreateAssetMenu(fileName = "MarkKill", menuName = "Cluck Wars/Ability/Control/Mark Kill", order = 12)]
@@ -18,8 +18,7 @@ namespace CluckWars.Abilities
             ShortLabel = "EXEC";
             Description = "Marks an isolated rival, arming a fatal execute once stunned.";
             Category = AbilityCategory.Control;
-            SlotKind = AbilitySlotKind.Character;
-            AllowedClasses = ChickenClassFlags.Assassin;
+            AllowedClasses = ChickenClassFlags.None; // pre-equip-only: obtainable solely as a subclass pre-equip (Spoiler Peck slot)
             Duration = 0.1f;
             Cooldown = 5f;
         }

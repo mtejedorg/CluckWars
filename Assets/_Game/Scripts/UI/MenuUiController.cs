@@ -575,9 +575,10 @@ namespace CluckWars.UI
 
                 if (label != null)
                 {
-                    // Real language: it occupies one of the four active slots, never a
-                    // free bonus on top of them — see PassiveAbilitySO.SignatureAbility.
-                    tag.text = $"One slot pre-filled: {label}";
+                    // Real language: it occupies active slots, never a free bonus on top of
+                    // them — see AbilityBaseSO.PeckSlotPreEquippedBy / SignaturePreEquippedBy. Two names = two slots.
+                    string slots = label.Contains(" + ") ? "Two slots" : "One slot";
+                    tag.text = $"{slots} pre-filled: {label}";
                     tag.style.display = DisplayStyle.Flex;
                 }
                 else
@@ -782,12 +783,15 @@ namespace CluckWars.UI
                 // valid slot to arm. Log rather than leave _armedSlot pointing at nothing.
                 _log?.Warn(Source, "AutoArmFirstEmpty: ActiveSlotsForClass <= 0, defaulting to slot 0.");
             }
+            // Everything is full: arm the first slot the player may actually change.
             _armedSlot = 0;
+            for (int i = 0; i < n; i++) if (!IsSlotLocked(i)) { _armedSlot = i; break; }
         }
 
-        /// <summary>Tapping a slot box (filled or empty) only re-arms it — no equip/unequip.</summary>
+        /// <summary>Tapping a slot box (filled or empty) only re-arms it — no equip/unequip. Locked pre-equip slots ignore taps.</summary>
         private void OnSlotBoxTapped(int index)
         {
+            if (IsSlotLocked(index)) return; // pre-equipped slots cannot be armed, cleared or swapped
             _armedSlot = index;
             RefreshSlotBoxes();
         }
@@ -812,6 +816,10 @@ namespace CluckWars.UI
 
             _focusedAbility = ab;
             RefreshAbilityDetail();
+
+            // A pre-equipped ability is locked into its slot: tapping its card changes nothing
+            // (the detail strip above is read-only info).
+            if (IsPreEquipped(ab)) return;
 
             int existing = SlotOf(ab);
 
@@ -849,7 +857,8 @@ namespace CluckWars.UI
                 var box = _slotBoxes[i];
                 if (box == null) continue;
 
-                box.EnableInClassList("cw-slot-box--armed", i == _armedSlot);
+                box.EnableInClassList("cw-slot-box--armed", i == _armedSlot && !IsSlotLocked(i));
+                box.EnableInClassList("cw-slot-box--locked", IsSlotLocked(i));
 
                 var ab = GetEquipped(i);
                 box.Clear();
@@ -898,6 +907,18 @@ namespace CluckWars.UI
                 badge.style.backgroundColor = ab.AccentColor;
                 badge.style.color = InkOn(ab.AccentColor);
                 box.Add(badge);
+
+                if (IsSlotLocked(i))
+                {
+                    // No USS class exists for a locked slot, so a plain inline tag keeps this
+                    // a minimal change rather than a redesign.
+                    var lockTag = new Label("PRE-EQUIPPED");
+                    lockTag.pickingMode = PickingMode.Ignore;
+                    lockTag.style.fontSize = 9;
+                    lockTag.style.color = Fade(Color.white, 0.75f);
+                    lockTag.style.unityTextAlign = TextAnchor.MiddleCenter;
+                    box.Add(lockTag);
+                }
             }
         }
 
@@ -942,14 +963,13 @@ namespace CluckWars.UI
             var pool = all.Where(a => a != null && !(a is PassiveAbilitySO)).ToList();
             var flag = AbilityRegistrySO.FlagOf(cls);
 
-            // BOTH rows filter on AllowedClasses. The Common row used not to, on the
-            // assumption that "Common" means "legal for everyone" — true until Peck shipped
-            // as a Common restricted to the three foraging classes. Without this filter an
-            // Assassin could equip Peck, reach READY at 4/4, and have MatchBootstrapper
-            // silently strip it and backfill something else at spawn: a picker that lied.
-            var common    = pool.Where(a => a.SlotKind == AbilitySlotKind.Common
+            // AllowedClasses alone decides eligibility (the Common/Character slot kind is retired):
+            // the SHARED row is everything legal for All, the CLASS row is every other ability this
+            // class may pick. AllowedClasses == None (pre-equip-only, e.g. Mark/Kill) matches no
+            // class flag, so it never appears here — it is only obtainable as a locked pre-equip.
+            var common    = pool.Where(a => AbilityRegistrySO.IsShared(a)
                                             && (a.AllowedClasses & flag) != 0).ToList();
-            var character = pool.Where(a => a.SlotKind == AbilitySlotKind.Character
+            var character = pool.Where(a => !AbilityRegistrySO.IsShared(a)
                                             && (a.AllowedClasses & flag) != 0).ToList();
 
             FillRow(_commonCards, common);
@@ -1079,15 +1099,13 @@ namespace CluckWars.UI
         private AbilityBaseSO PeckAbility =>
             _abilityRegistry?.ActiveAbilities.FirstOrDefault(a => a is PeckAbilitySO);
 
-        /// <summary>True when <paramref name="cls"/> may forage. Read off Peck's own
-        /// AllowedClasses rather than naming classes here, so the picker, the spec-pill
-        /// signature line, and MatchBootstrapper's sanitiser can never disagree about who
-        /// gets a mandatory Peck.</summary>
-        private bool CanForage(ChickenClass cls)
-        {
-            var peck = PeckAbility;
-            return peck != null && AbilityRegistrySO.IsAllowedFor(peck, cls);
-        }
+        /// <summary>True when ANY specialization of <paramref name="cls"/> forages (class-level UI,
+        /// where no specialization is chosen yet). Derived from the Peck-slot data via
+        /// <see cref="PreEquippedLoadout.ClassForages"/>, so the picker and MatchBootstrapper's
+        /// spawner can never disagree about who gets a Peck. Peck's own AllowedClasses is None
+        /// and is not consulted.</summary>
+        private bool CanForage(ChickenClass cls) =>
+            PreEquippedLoadout.ClassForages(cls, _abilityRegistry?.Passives, _abilityRegistry?.All, PeckAbility);
 
         /// <summary>True when the currently selected class may forage.</summary>
         private bool ClassCanForage => CanForage(Cls);
@@ -1097,23 +1115,20 @@ namespace CluckWars.UI
         private PassiveAbilitySO DefaultPassiveFor(ChickenClass cls) => _abilityRegistry?.GetDefaultPassiveForClass(cls);
 
         /// <summary>
-        /// The display name of whichever ability <paramref name="passive"/> force-equips for
-        /// <paramref name="cls"/> — its own <see cref="PassiveAbilitySO.SignatureAbility"/> when
-        /// it has one legal for the class, else Peck for a class that can forage, else null when
-        /// nothing is forced. Shared by the spec-pill "Starts with X equipped" line and
-        /// PreFilledTag so the two can never disagree with each other or with
-        /// <see cref="SeedForcedAbilities"/>.
+        /// The display name(s) of the abilities <paramref name="passive"/> pre-equips for
+        /// <paramref name="cls"/> — its Peck-slot ability then its Signature-slot ability, joined
+        /// with " + " when both exist — or null when nothing is forced. Shared by the spec-pill
+        /// "Starts with X equipped" line and PreFilledTag so the two can never disagree with
+        /// each other or with <see cref="SeedForcedAbilities"/>; all three go through
+        /// <see cref="PreEquippedLoadout.Resolve"/>.
         /// </summary>
         private string ForcedAbilityLabel(ChickenClass cls, PassiveAbilitySO passive)
         {
             if (passive == null) return null;
 
-            var signature = passive.SignatureAbility;
-            if (signature != null && AbilityRegistrySO.IsAllowedFor(signature, cls))
-                return signature.DisplayName;
-
-            if (!CanForage(cls)) return null;
-            return PeckAbility?.DisplayName ?? "Peck";
+            PreEquippedLoadout.Resolve(cls, passive, _abilityRegistry?.All, PeckAbility, out var peckSlot, out var signature);
+            if (peckSlot != null && signature != null) return $"{peckSlot.DisplayName} + {signature.DisplayName}";
+            return (peckSlot ?? signature)?.DisplayName;
         }
 
         private AbilityBaseSO GetEquipped(int slot) => slot switch
@@ -1141,67 +1156,83 @@ namespace CluckWars.UI
             return -1;
         }
 
+        /// <summary>The resolved Peck-slot and Signature-slot pre-equips for the current selection.</summary>
+        private void ResolvePreEquips(out AbilityBaseSO peckSlot, out AbilityBaseSO signature) =>
+            PreEquippedLoadout.Resolve(Cls, _selection?.Passive, _abilityRegistry?.All, PeckAbility, out peckSlot, out signature);
+
+        /// <summary>True when <paramref name="slot"/> holds a locked pre-equip: Peck slot 0, signature
+        /// 1 (or 0 when there is no Peck slot).</summary>
+        private bool IsSlotLocked(int slot)
+        {
+            ResolvePreEquips(out var peckSlot, out var signature);
+            if (peckSlot != null && slot == 0) return true;
+            return signature != null && slot == (peckSlot != null ? 1 : 0);
+        }
+
+        /// <summary>True when <paramref name="ab"/> is the current selection's Peck-slot or Signature-slot pre-equip.</summary>
+        private bool IsPreEquipped(AbilityBaseSO ab)
+        {
+            if (ab == null) return false;
+            ResolvePreEquips(out var peckSlot, out var signature);
+            return ab == peckSlot || ab == signature;
+        }
+
         /// <summary>
-        /// Ensures both of the game's forced abilities are equipped exactly where
-        /// <c>MatchBootstrapper.ResolveLegalLoadout</c> would force them: the mandatory Peck for
-        /// a foraging class, and the current specialization's <see cref="PassiveAbilitySO.SignatureAbility"/>
-        /// if it has one legal for this class. So what the player composes is what actually
+        /// Ensures both of the specialization's pre-equipped abilities are equipped exactly where
+        /// <c>MatchBootstrapper.ResolveLegalLoadout</c> would force them: the Peck-slot ability
+        /// (an ability in the PeckSlotPreEquippedBy column for this subclass, falling back to the plain
+        /// Peck for a forager) and the SignaturePreEquippedBy ability, both via
+        /// <see cref="PreEquippedLoadout.Resolve"/>. So what the player composes is what actually
         /// spawns — without this the player could compose four abilities, hit READY, and have
         /// the spawner silently swap one out, a UI that lied.
         /// </summary>
         /// <remarks>
-        /// <b>Deterministic slots, not "the next open slot".</b> Peck (when forced) always lands
-        /// in slot 0, and a non-Peck-variant signature (when both apply) in slot 1 — mirroring
-        /// ResolveLegalLoadout's own forced-insert order, where Peck is inserted after the
-        /// signature and pushes it along. Determinism is what lets the spec-pill's
-        /// "Starts with X equipped" line and PreFilledTag name a specific slot truthfully.
+        /// <b>Deterministic slots, not "the next open slot".</b> The Peck-slot ability (when
+        /// there is one) always lands in slot 0, and the signature (when both apply) in slot 1 —
+        /// mirroring ResolveLegalLoadout's own forced-insert order, where the Peck-slot ability
+        /// is inserted after the signature and pushes it along. Determinism is what lets the
+        /// spec-pill's "Starts with X equipped" line and PreFilledTag name a specific slot truthfully.
         /// <para>
-        /// A signature that IS itself a Peck variant replaces the plain Peck rather than joining
-        /// it, so a forager doesn't burn two of four slots on forced picks for one mechanic (see
-        /// <see cref="PassiveAbilitySO.SignatureAbility"/>) — the stray plain Peck is released in
-        /// that case, and also when the class cannot forage at all.
+        /// A Peck-slot ability that is a Peck variant replaces the plain Peck rather than joining
+        /// it, so a forager doesn't burn two of four slots on forced picks for one mechanic. Peck is
+        /// None-class (never hand-picked), so a stray Peck in the old selection is released by the
+        /// <c>IsAllowedFor</c> filter below, which also covers a class that cannot forage at all.
         /// </para>
         /// <para>
-        /// Only forces an ability that is not <i>already</i> equipped somewhere. No special-case
-        /// movement logic is needed once placed — the generic swap in
-        /// <see cref="OnAbilityCardTapped"/> covers moving a forced ability the player later
-        /// drags elsewhere, and this must not snap it back.
+        /// <b>Pre-equipped slots are locked</b> (supersedes the old "Peck's button position is the
+        /// player's to choose" rule): the player cannot clear, swap or move them — see
+        /// <see cref="IsSlotLocked"/>. Seeding therefore REBUILDS the layout rather than only
+        /// inserting what is missing: pre-equips first, then the player's other picks in their
+        /// existing order, minus anything the class cannot pick.
         /// </para>
         /// </remarks>
         private void SeedForcedAbilities()
         {
             if (_selection == null) return;
 
-            var peck = PeckAbility;
-            var passive = _selection.Passive;
-            var signature = passive?.SignatureAbility;
-            // Illegal-for-this-class signatures are pinned out by DataIntegrityTests at the
-            // asset level, but a picker that trusted that blindly would silently force an
-            // ability the sanitiser would reject.
-            if (signature != null && !AbilityRegistrySO.IsAllowedFor(signature, Cls))
-                signature = null;
+            PreEquippedLoadout.Resolve(Cls, _selection.Passive, _abilityRegistry?.All, PeckAbility, out var peckSlot, out var signature);
 
-            bool signatureIsPeckVariant = signature is PeckAbilitySO;
-            bool wantPeck = ClassCanForage && !signatureIsPeckVariant && peck != null;
-
-            // Release a plain Peck that no longer belongs — class can't forage, or the
-            // signature itself stands in for it.
-            if (!wantPeck && peck != null && peck != signature)
+            // Everything the player may keep: currently equipped, hand-pickable by this class, and
+            // not a pre-equip. Anything unpickable (a stray Peck, the previous specialization's
+            // pre-equip-only ability) is released — the spawner would strip it.
+            var others = new List<AbilityBaseSO>();
+            for (int i = 0; i < ActiveSlotsForClass; i++)
             {
-                int at = SlotOf(peck);
-                if (at >= 0) SetEquipped(at, null);
+                var eq = GetEquipped(i);
+                if (eq == null || eq == peckSlot || eq == signature || others.Contains(eq)) continue;
+                if (!AbilityRegistrySO.IsAllowedFor(eq, Cls)) continue;
+                others.Add(eq);
             }
 
-            if (wantPeck)
-            {
-                if (SlotOf(peck) < 0) SetEquipped(0, peck); // no room: Peck outranks whatever was there
-                if (signature != null && SlotOf(signature) < 0)
-                    SetEquipped(GetEquipped(0) == peck ? 1 : 0, signature); // no room: the signature outranks whatever was there
-            }
-            else if (signature != null && SlotOf(signature) < 0)
-            {
-                SetEquipped(0, signature); // no room: the signature outranks whatever was there
-            }
+            // Locked layout: Peck slot 0, signature next. Deterministic, so the spec-pill and
+            // PreFilledTag text can name real slots. The player's remaining picks keep their order.
+            var layout = new List<AbilityBaseSO>(ActiveSlotsForClass);
+            if (peckSlot != null) layout.Add(peckSlot);
+            if (signature != null) layout.Add(signature);
+            layout.AddRange(others);
+
+            for (int i = 0; i < ActiveSlotsForClass; i++)
+                SetEquipped(i, i < layout.Count ? layout[i] : null);
         }
 
         /// <summary>
@@ -1220,7 +1251,7 @@ namespace CluckWars.UI
                 var eq = GetEquipped(i);
                 if (eq == null) continue;
                 totalPicked++;
-                if (eq.SlotKind == AbilitySlotKind.Common) commonPicked++;
+                if (AbilityRegistrySO.IsShared(eq)) commonPicked++;
                 else classPicked++;
             }
 
@@ -1423,15 +1454,15 @@ namespace CluckWars.UI
             if (_abilityRegistry == null) return list;
 
             var peck = PeckAbility;
-            if (peck != null && AbilityRegistrySO.IsAllowedFor(peck, cls))
+            if (peck != null && CanForage(cls))
                 list.Add(peck);
 
-            // Class pool first, Common as backfill — mirrors ResolveLegalLoadout's own
+            // Class abilities first, shared as backfill — mirrors ResolveLegalLoadout's own
             // priority order (a real loadout is never short on Character slots while Common
             // sits unused). Rotated by seed so DashFox/BrunoB/PeckNoir don't all show the
             // same three abilities from the front of each list.
-            var pool = _abilityRegistry.GetCharacterAbilitiesForClass(cls)
-                .Concat(_abilityRegistry.CommonAbilities.Where(a => a != peck))
+            var pool = _abilityRegistry.GetClassAbilitiesForClass(cls)
+                .Concat(_abilityRegistry.SharedAbilities.Where(a => a != peck))
                 .ToList();
 
             for (int i = 0; i < pool.Count && list.Count < ActiveSlotsForClass; i++)

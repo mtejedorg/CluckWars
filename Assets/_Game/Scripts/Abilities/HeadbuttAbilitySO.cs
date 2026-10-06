@@ -26,7 +26,6 @@ namespace CluckWars.Abilities
         public HeadbuttAbilitySO()
         {
             Category = AbilityCategory.Control;
-            SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Warrior;
             BotRole = BotRole.Control;
             Duration = 0.25f;

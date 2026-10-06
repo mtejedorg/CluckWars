@@ -10,7 +10,6 @@ namespace CluckWars.Abilities
         public SpineCoatAbilitySO()
         {
             Category = AbilityCategory.Defense;
-            SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Fatty;
         }
 

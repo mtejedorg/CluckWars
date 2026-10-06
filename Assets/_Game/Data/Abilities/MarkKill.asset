@@ -19,7 +19,7 @@ MonoBehaviour:
   Category: 1
   TerrainTraversal: 0
   SlotKind: 1
-  AllowedClasses: 8
+  AllowedClasses: 0
   BotRole: 0
   Duration: 0.1
   Cooldown: 5
@@ -27,3 +27,5 @@ MonoBehaviour:
   CastMotion: 3
     serializedVersion: 2
     m_Bits: 256
+  PeckSlotPreEquippedBy: 64
+  SignaturePreEquippedBy: 0

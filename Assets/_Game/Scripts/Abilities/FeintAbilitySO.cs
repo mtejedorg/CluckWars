@@ -28,7 +28,6 @@ namespace CluckWars.Abilities
         public FeintAbilitySO()
         {
             Category = AbilityCategory.Utility;
-            SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Speedy;
             BotRole = BotRole.Escape;
             Duration = 0.2f;

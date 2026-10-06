@@ -6,6 +6,157 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Subclass model: two pre-equipped slots per specialization (2026-10-06)
+
+Maestro's goal: every subclass (specialization) pre-equips **two** abilities — a **Peck slot**
+(Peck variant for foragers, Mark/Kill for the Assassin) and a **Signature slot** — and the Balance
+Editor edits and audits them.
+
+**Model.**
+- `ChickenSubclass : byte` (`Scripts/Abilities/ChickenSubclass.cs`): `None=0, Warrior_Relentless=1,
+  Warrior_Bully=2, Speedy_Slippery=3, Speedy_Featherfoot=4, Fatty_Hoarder=5, Fatty_Bulwark=6,
+  Assassin_Spoiler=7, Assassin_Thief=8` (class-prefixed since the sixth change; `ChickenSubclassFlags` mirrors it) (append-only, serialised as
+  int in the passive assets; not networked yet). `ClassOf()` extension maps to `ChickenClass` and
+  **throws for `None`** rather than silently returning Warrior.
+- `PassiveAbilitySO` gains `Subclass` and `PeckSlotAbility`. `SignatureAbility` keeps its serialized
+  name and is now strictly the Signature slot (must not be a Peck-slot-kind ability).
+- `PreEquippedLoadout` (`Scripts/Gameplay/`, pure static): `IsPeckSlotKind` / `IsLegalPeckSlot` /
+  `IsLegalSignatureSlot`, `Resolve` (runtime; falls back to the plain Peck for a forager with no
+  legal Peck slot, so a forager can never spawn without foraging), and `Validate` / `ValidateRoster`
+  (authored fields only, no fallback; also flags duplicate ids and enum values with no asset).
+- `MatchBootstrapper.ResolveLegalLoadout`, `MenuUiController.SeedForcedAbilities` and
+  `ForcedAbilityLabel` all use `Resolve` now (previously two hand-mirrored copies). Final slots are
+  unchanged: Peck slot at 0, signature at 1 (or 0 with no Peck slot). Any other Peck-slot-kind
+  ability is released so two never coexist. `ForcedAbilityLabel` returns "Peck + Headbutt" when both
+  exist; the class-chip tag reads "Two slots pre-filled: ..." / "One slot pre-filled: ...".
+- Balance Editor: new **Pre-equipped loadouts** section (Subclass popup, class, Peck-slot and
+  Signature-slot popups limited to legal abilities, illegal current values shown as "illegal") and
+  **Pre-equipped completeness** (per-subclass status, summary HelpBox, summary table), between
+  Roster integrity and the Ability table. Those three fields are hidden from the per-ability
+  expanded block so they are edited in one place.
+
+**Rules relaxed later the same day (Maestro).** The `AllowedClasses` filter is dropped for both
+pre-equip slots. Rationale: it protected nothing at runtime — every class shares `Chicken.prefab`
+(which carries `AssassinExecute`), and no ability has a class-specific component dependency, so an
+off-class pre-equip is a design choice. The one exception is `PeckAbilitySO` (reads per-class peck
+stats; the Assassin cannot forage): a Peck is legal only where `IsAllowedFor` says so.
+- One predicate, `PreEquippedLoadout.IsLegalPreEquip(a, cls)` = non-null, non-passive, and a Peck
+  only for foraging classes. `IsLegalPeckSlot` / `IsLegalSignatureSlot` / `IsPeckSlotKind` are gone.
+- `Resolve`: an EMPTY or illegal Peck slot on a forager falls back to the plain Peck (safety net);
+  a legal non-Peck in the Peck slot means no forced Peck (non-foraging build allowed). The signature
+  is ignored if illegal or identical to the Peck slot (new `DuplicateInSlots` error status).
+- `PreEquipIssue.Severity` (Info/Warning/Error): missing slot = Warning; illegal/duplicate/identity
+  problems = Error; `CannotForage` and `OffClassAbility` = Info notes. Info never counts against
+  "complete" in the Balance Editor; its popups list every non-passive ability (no Peck for the Assassin).
+- Spawner/menu: a second Peck stands down only when the Peck slot is itself a Peck; a voluntary Peck
+  is left alone otherwise. Forced pre-equips are inserted after sanitising, so off-class ones survive;
+  the picker adds them to the card grid so an off-class forced ability can always be re-picked.
+- **Bots without a Forage ability:** `BotController.TryPeckAtPile` is a silent no-op when
+  `TryGetReadySlotForRole(BotRole.Forage)` finds nothing. Nothing in `BotController` checks whether
+  the bot can forage before entering `CollectFood`, so such a bot would walk to a pile and idle there
+  (no crash, no spin, no food). Only reachable if the bot's passive pre-equips a non-Peck in the Peck
+  slot and its preset has no Peck. Not fixed (out of scope); shipped data is unaffected.
+
+**Third change the same day: SlotKind retired, pre-equip-only abilities, locked slots (Maestro).**
+- `AbilitySlotKind` and `AbilityBaseSO.SlotKind` are **removed** from code (contained: nothing
+  networked or registry-serialised). Orphan `SlotKind:` keys remain in the `.asset` YAML — harmless;
+  Unity drops them on the next reserialize, no GUIDs changed. Eligibility is `AllowedClasses` alone.
+  Derived notions: `AbilityRegistrySO.IsShared` (== All), `IsPreEquipOnly` (== None),
+  `SharedAbilities`, `GetClassAbilitiesForClass`; `ComposeDefaultLoadout` keeps its shape (1 shared + 2 class).
+  The picker's two rows are now Shared (All) and Class (anything else pickable); Peck therefore moved
+  from the old Common row to the Class row for the three foragers (same eligibility).
+- **`AllowedClasses == None` = pre-equip-only**: never in the picker, bot presets, sanitiser or backfill
+  (`IsAllowedFor` is false for None); legal as a pre-equip. Migration: **only `MarkKill.asset` set to
+  None** (and the `MarkKillAbilitySO` ctor default). **Behaviour change: Thief can no longer hand-pick
+  Mark/Kill; only Spoiler (Peck-slot pre-equip) gets it.**
+- **Locked pre-equips.** `ResolveLegalLoadout` pins them to Peck slot 0 / signature 1 (or 0 with no Peck
+  slot) wherever the selection had them. `MenuUiController`: `SeedForcedAbilities` rebuilds the layout
+  (pre-equips first, then the player's other pickable picks), `IsSlotLocked` slots ignore taps, a
+  pre-equipped ability's card does nothing (the detail strip still shows), locked slots show a
+  "PRE-EQUIPPED" tag. **This supersedes "Peck's button position is the player's to choose".**
+- Balance Editor: Slot column removed; Roster integrity reworked around `AllowedClasses` (multi-class
+  warning; None listed as pre-equip-only; a None ability no subclass references = warning via
+  `PreEquippedLoadout.FindUnreachablePreEquipOnly`; census counts only what each class can pick).
+- Tests: `AbilitySystemTests.EveryActiveAbility_IsPickableBySomeClass_OrIsAReferencedPreEquip` replaces the
+  SlotKind-based test; `DataIntegrityTests.EveryShippedNoneClassAbility_IsReferencedByASubclass`;
+  `PreEquippedLoadoutTests` cover None-class legality, never-pickable, unreachable detection.
+- Docs: GDD §7.1/7.2/6.4/10 and the class-essence note updated; `docs/site/index.html` had one stale
+  "Common pool" sentence (edited, **needs republishing**); no site claim that Thief can pick Mark/Kill.
+- **Ambiguous, for Maestro:** Headbutt, Scrap, GroundQuake and SneakySteal are signatures AND still
+  pickable (class-only, unchanged) — a locked pre-equip makes the picker card inert for the subclass that
+  owns it, but other subclasses of the class can still hand-pick them. Decide whether any should become
+  None. No ability other than Mark/Kill is reachable only via pre-equip today.
+- Verification: compile clean; EditMode 588 run, 587 pass (only the pre-existing in-memory Fatty SCT
+  failure). Play-mode check of the Spoiler loadout screen was not done.
+
+**Final model (supersedes the passive-owned fields described above): the ABILITY owns the pre-equip.**
+- `AbilityBaseSO.PreEquippedBy : ChickenSubclassFlags` (default None) + `PreEquipSlot : PreEquipSlot`
+  (Peck=0 / Signature=1). `ChickenSubclassFlags : ushort` mirrors `ChickenSubclass` member-for-member
+  (flag == 1 << (subclass - 1); pinned by `ContractsAndEnumsTests`), with `ToFlag()` / `Subclasses()` helpers.
+  `PassiveAbilitySO.PeckSlotAbility` / `SignatureAbility` are **removed**; `Subclass` stays as the identity key.
+- Why: two abilities claiming one slot for one subclass can now exist in the data and be FLAGGED
+  (`SlotConflict`, Error, naming every claimant) instead of one field silently overwriting another.
+  Runtime stays deterministic (first claimant in registry order) and `MatchBootstrapper` logs a warning.
+- `PreEquippedLoadout.Resolve(cls, passive, allAbilities, plainPeck, ...)` / `Validate` / `ValidateRoster`
+  take the ability list. Empty-Peck-slot fallback, "no PeckAbilitySO for a non-forager", None-class support and
+  the locked-slot behaviour are unchanged. `DuplicateInSlots` is gone (one ability has one slot).
+  "Unreachable None-class ability" now means `PreEquippedBy == None`.
+- **Migration:** Peck.asset = Relentless|Bully|Slippery|Featherfoot|Hoarder|Bulwark / Peck; MarkKill = Spoiler / Peck;
+  Headbutt = Relentless, Scrap = Bully, GroundQuake = Bulwark, SneakySteal = Thief (all Signature). The old
+  `SignatureAbility` / `PeckSlotAbility` keys were deleted from the 8 passive YAMLs. Pinned by
+  `DataIntegrityTests.ShippedSubclasses_PreEquipExactlyWhatTheyDidBeforeTheMigration` (all 8 resolve exactly as before).
+- **Balance Editor:** Abilities table has a "Pre-equipped" column (flags field + Peck/Signature popup when set; a warning
+  mark on a Peck claimed by an Assassin subclass). The per-subclass picker section is now a READ-ONLY view (conflicts
+  list every claimant); the completeness panel is unchanged apart from `SlotConflict` being an Error.
+- **Root cause of "can't edit pre-equipped abilities":** the pickers' own logic checked out (every current value is in its
+  option list, no console exceptions, no GUI.enabled leak). The real regression was the Abilities table's class filter:
+  setting `MarkKill.AllowedClasses = None` made it match no class filter, so the pre-equipped ability vanished from the
+  table whenever a class filter was set. Fixed at the source: a row is visible under a class filter if that class can
+  pick it OR a subclass of that class pre-equips it (`VisibleUnderFilter`). The per-subclass picker is gone, so the
+  other candidate (a second edit path) no longer exists.
+
+**Migration (data only, no new design).** Subclass id set on all 8 passives; `PeckSlotAbility = Peck`
+on the six foragers; Spoiler's Mark/Kill moved from `SignatureAbility` to `PeckSlotAbility`; Thief
+has no Peck slot (Assassin cannot forage) and keeps SneakySteal. Every subclass spawns with the same
+forced abilities in the same slots as before.
+
+**Pending Maestro's design call (5 incomplete subclasses, surfaced by the completeness panel):**
+Slippery, Featherfoot, Hoarder, Spoiler have **no Signature**; Thief has **no Peck slot** (no
+Mark/Kill). Not enforced by tests (null is legal) — fill them in the Balance Editor.
+
+**Verification.** Compiles clean via MCP. EditMode: 595 run, 594 pass (final model). The one failure,
+`BalanceOracleTests.RealMap_ShippedClassAssets_SatisfyTheSctAxiom` (Fatty 31.5s vs 30s +/-1.5),
+is **not from this change**: the Editor holds an unsaved, dirty in-memory `Fatty.asset` with
+MoveSpeed 9 (disk and git say 10.125) — Maestro's in-progress Balance Editor edit. Save or revert
+it and re-run. New tests: `PreEquippedLoadoutTests` (15), `DataIntegrityTests`
+(`PreEquippedAbilities_AreLegalForTheirOwnClass` replaces `SignatureAbilities_AreLegalForTheirOwnClass`;
+`EveryPassive_HasAUniqueSubclassMatchingItsClass`), `ContractsAndEnumsTests` (byte backing +
+numbering). Balance Editor opened via script with no console exceptions; shipped roster validated
+via script (exactly the 5 gaps above). Bootstrap reopened. No `docs/site` change (no gameplay values
+changed). Not yet verified: a live Play session of the picker and a Balance Editor visual check.
+
+**Fifth change: Classes = selectable only; Peck None-class; two slot columns (Maestro).**
+*Supersedes the "Final model" bullets above wherever they mention `PreEquippedBy` / `PreEquipSlot`, or Peck's class mask as the "can forage" source.*
+- **Model.** `AllowedClasses` ("Classes") means ONLY "hand-selectable in the picker". Peck is `None` (asset + `PeckAbilitySO` ctor) and is never hand-picked; it arrives through the Peck-slot column.
+  `PreEquippedBy` + `PreEquipSlot` (and the `PreEquipSlot` enum) are gone, replaced by `AbilityBaseSO.PeckSlotPreEquippedBy` and `SignaturePreEquippedBy` (`ChickenSubclassFlags`, default None).
+  `PreEquippedLoadout`: `PeckSlotClaimants` / `SignatureClaimants` replace `Claimants`.
+- **Foraging is data.** Hard rule `PreEquippedLoadout.ClassMayForage(cls) => cls != Assassin` (Predation axiom; a test pins it against `SctTargets.Exempt`). `Forages(cls, passive, all, plainPeck)` = `Resolve`'s Peck slot is a `PeckAbilitySO`;
+  `ClassForages(cls, passives, all, plainPeck)` = any passive of the class forages. `Resolve` keeps the empty-Peck-slot safety net (plain Peck for a `ClassMayForage` class) and now ignores a Peck in the Signature column.
+  `IsLegalPreEquip` uses `ClassMayForage` for Pecks, not `IsAllowedFor`.
+- **Consumers moved off Peck's mask:** `MatchBootstrapper.ResolveLegalLoadout` (sanitiser drops every Peck; after pinning, `!ClassMayForage` strips any `PeckAbilitySO` with a Warn; the old "second Peck stands down" loop was dead and removed; warning loop uses the two claimant lists),
+  `MenuUiController` (`CanForage` = `ClassForages`; `SeedForcedAbilities` stray-Peck line removed, `IsAllowedFor` already drops it; bot lobby preview), `AbilityLabLoadout` (see below), comments in `SctTargets`, `BotController`, `AbilityRegistrySO`, `PassiveAbilitySO`.
+  **Ability Lab (not in the brief):** the lab deliberately does not force anything, so instead of `Resolve` it keeps its free-pick design and its legality rule is `IsAllowedFor || (Peck && ClassMayForage)`: foragers can be offered Peck, the Assassin never.
+- **Validation.** New `PreEquipStatus`: `SameAbilityInBothSlots` (Error), `PeckIsPickable` (Error, ability-level, from `ValidateRoster`). `IllegalPeckSlot` now says the Assassin cannot forage; `IllegalSignature` also covers **a Peck in the Signature column (new rule: Peck belongs in the Peck slot)**.
+  `SlotConflict` per column; `MissingPeckSlot` / `MissingSignature` stay Warnings; `CannotForage` / `OffClassAbility` Info. `FindUnreachablePreEquipOnly` checks both columns.
+- **Balance Editor.** Abilities table: "Peck slot" and "Signature slot" flag columns (undo/dirty like other cells) with red marks for an Assassin Peck in the Peck column, a Peck in the Signature column, and one ability in both columns of a subclass. A Peck's Classes cell is read-only "None" with the tooltip (editable and red if data says otherwise, so it can be fixed). `VisibleUnderFilter` checks both columns. Save All untouched and not clicked.
+- **Migration (YAML by hand, no GUID/.meta changes):** Peck 63/0 and AllowedClasses 0, MarkKill 64/0, Headbutt 0/1, Scrap 0/2, GroundQuake 0/32, SneakySteal 0/128. No `PreEquippedBy:` / `PreEquipSlot:` keys remain under `Assets/`.
+- **Locking.** Peck slot and Signature slot are both locked (unchanged `IsSlotLocked` / `SeedForcedAbilities` / `ResolveLegalLoadout` pinning).
+- **Verification.** Compiles clean. EditMode 612 run, 611 pass; only failure is the known in-memory-Fatty `RealMap_ShippedClassAssets_SatisfyTheSctAxiom`. Roster check via script: 0 Errors; 4 `MissingSignature` (Slippery, Featherfoot, Hoarder, Spoiler) + 1 `MissingPeckSlot` (Thief); all 8 subclasses resolve as before the migration. New tests cover the two columns, both-slots, Peck-in-Signature, Assassin Peck, `PeckIsPickable`, `Forages` / `ClassForages` / `ClassMayForage` (+ SCT agreement), a hostile-selection `ResolveLegalLoadout` run (reflection) for every shipped passive, and picker depth.
+- **Sixth change: class-prefixed subclass enum (Maestro).** Members of `ChickenSubclass` and `ChickenSubclassFlags` renamed `Warrior_Relentless`, `Warrior_Bully`, `Speedy_Slippery`, `Speedy_Featherfoot`, `Fatty_Hoarder`, `Fatty_Bulwark`, `Assassin_Spoiler`, `Assassin_Thief`. Values and bit positions unchanged, so no asset migration (the `.asset` YAML stores ints). Passive asset names, `*PassiveSO` classes and DisplayNames are unchanged. Earlier lines in this entry that use the bare names are prose names.
+- **Docs.** GDD 7.1 and the class-essence note reworded; `docs/site/index.html` wording only (two sentences said "Peck's class mask excludes him"; gameplay claims unchanged) — **needs republishing**.
+
+---
+
 ## ✅ Menu: skipping the specialization pills no longer dead-ends READY (2026-10-05)
 
 Found while re-testing `develop` after the redesign merge. `NextBtn` on Choose Your Chicken is

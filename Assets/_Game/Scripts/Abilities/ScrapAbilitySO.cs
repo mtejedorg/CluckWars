@@ -24,7 +24,6 @@ namespace CluckWars.Abilities
         public ScrapAbilitySO()
         {
             Category = AbilityCategory.Steal;
-            SlotKind = AbilitySlotKind.Character;
             AllowedClasses = ChickenClassFlags.Warrior;
             BotRole = BotRole.Steal;
             Duration = 0.3f;
