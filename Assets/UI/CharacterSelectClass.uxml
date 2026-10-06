@@ -57,9 +57,9 @@
         <!-- Header ribbon (+ home button, absolutely placed top-left) — same
              pattern as the old single-screen CharacterSelect.uxml. -->
         <ui:VisualElement style="align-items: center; justify-content: center; padding-top: 20px; padding-bottom: 12px; flex-shrink: 0;">
-            <ui:Button name="HomeBtn" text="◀ HOME" class="cw-home-btn" />
+            <ui:Button name="HomeBtn" text="@nav.home" class="cw-home-btn" />
             <ui:VisualElement class="cw-ribbon">
-                <ui:Label text="CHOOSE YOUR CHICKEN" class="cw-title" />
+                <ui:Label text="@screen.class.title" class="cw-title" />
             </ui:VisualElement>
         </ui:VisualElement>
 
@@ -76,20 +76,20 @@
                     <ui:VisualElement class="cw-class-chip__toprow">
                         <ui:VisualElement name="ClassWarriorArt" class="cw-class-chip__art" />
                         <ui:VisualElement class="cw-class-chip__titles">
-                            <ui:Label text="WARRIOR" class="cw-class-chip__name" />
-                            <ui:Label text="All-Rounder" class="cw-class-chip__role" />
+                            <ui:Label text="@class.warrior.short" class="cw-class-chip__name" />
+                            <ui:Label text="@role.warrior" class="cw-class-chip__role" />
                         </ui:VisualElement>
-                        <ui:Label name="PreFilledTag" text="1 SLOT: PECK" class="cw-prefilled-tag" />
+                        <ui:Label name="PreFilledTag" text="" class="cw-prefilled-tag" />
                     </ui:VisualElement>
                     <ui:VisualElement class="cw-spec-pill-row">
                         <ui:Button name="SpecOptA" class="cw-spec-pill">
-                            <ui:Label text="SPEC A" class="cw-spec-pill__name" />
-                            <ui:Label text="Effect shown here." class="cw-spec-pill__desc" />
+                            <ui:Label text="" class="cw-spec-pill__name" />
+                            <ui:Label text="" class="cw-spec-pill__desc" />
                             <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
                         </ui:Button>
                         <ui:Button name="SpecOptB" class="cw-spec-pill">
-                            <ui:Label text="SPEC B" class="cw-spec-pill__name" />
-                            <ui:Label text="Effect shown here." class="cw-spec-pill__desc" />
+                            <ui:Label text="" class="cw-spec-pill__name" />
+                            <ui:Label text="" class="cw-spec-pill__desc" />
                             <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
                         </ui:Button>
                     </ui:VisualElement>
@@ -99,20 +99,20 @@
                     <ui:VisualElement class="cw-class-chip__toprow">
                         <ui:VisualElement name="ClassSpeedyArt" class="cw-class-chip__art" />
                         <ui:VisualElement class="cw-class-chip__titles">
-                            <ui:Label text="SPEEDY" class="cw-class-chip__name" />
-                            <ui:Label text="Hit &amp; Run" class="cw-class-chip__role" />
+                            <ui:Label text="@class.speedy.short" class="cw-class-chip__name" />
+                            <ui:Label text="@role.speedy" class="cw-class-chip__role" />
                         </ui:VisualElement>
-                        <ui:Label name="PreFilledTag" text="1 SLOT: PECK" class="cw-prefilled-tag" />
+                        <ui:Label name="PreFilledTag" text="" class="cw-prefilled-tag" />
                     </ui:VisualElement>
                     <ui:VisualElement class="cw-spec-pill-row">
                         <ui:Button name="SpecOptA" class="cw-spec-pill">
-                            <ui:Label text="SPEC A" class="cw-spec-pill__name" />
-                            <ui:Label text="Effect shown here." class="cw-spec-pill__desc" />
+                            <ui:Label text="" class="cw-spec-pill__name" />
+                            <ui:Label text="" class="cw-spec-pill__desc" />
                             <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
                         </ui:Button>
                         <ui:Button name="SpecOptB" class="cw-spec-pill">
-                            <ui:Label text="SPEC B" class="cw-spec-pill__name" />
-                            <ui:Label text="Effect shown here." class="cw-spec-pill__desc" />
+                            <ui:Label text="" class="cw-spec-pill__name" />
+                            <ui:Label text="" class="cw-spec-pill__desc" />
                             <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
                         </ui:Button>
                     </ui:VisualElement>
@@ -122,20 +122,20 @@
                     <ui:VisualElement class="cw-class-chip__toprow">
                         <ui:VisualElement name="ClassFattyArt" class="cw-class-chip__art" />
                         <ui:VisualElement class="cw-class-chip__titles">
-                            <ui:Label text="FATTY" class="cw-class-chip__name" />
-                            <ui:Label text="Bulk Carrier" class="cw-class-chip__role" />
+                            <ui:Label text="@class.fatty.short" class="cw-class-chip__name" />
+                            <ui:Label text="@role.fatty" class="cw-class-chip__role" />
                         </ui:VisualElement>
-                        <ui:Label name="PreFilledTag" text="1 SLOT: PECK" class="cw-prefilled-tag" />
+                        <ui:Label name="PreFilledTag" text="" class="cw-prefilled-tag" />
                     </ui:VisualElement>
                     <ui:VisualElement class="cw-spec-pill-row">
                         <ui:Button name="SpecOptA" class="cw-spec-pill">
-                            <ui:Label text="SPEC A" class="cw-spec-pill__name" />
-                            <ui:Label text="Effect shown here." class="cw-spec-pill__desc" />
+                            <ui:Label text="" class="cw-spec-pill__name" />
+                            <ui:Label text="" class="cw-spec-pill__desc" />
                             <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
                         </ui:Button>
                         <ui:Button name="SpecOptB" class="cw-spec-pill">
-                            <ui:Label text="SPEC B" class="cw-spec-pill__name" />
-                            <ui:Label text="Effect shown here." class="cw-spec-pill__desc" />
+                            <ui:Label text="" class="cw-spec-pill__name" />
+                            <ui:Label text="" class="cw-spec-pill__desc" />
                             <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
                         </ui:Button>
                     </ui:VisualElement>
@@ -147,19 +147,19 @@
                     <ui:VisualElement class="cw-class-chip__toprow">
                         <ui:VisualElement name="ClassAssassinArt" class="cw-class-chip__art" />
                         <ui:VisualElement class="cw-class-chip__titles">
-                            <ui:Label text="ASSASSIN" class="cw-class-chip__name" />
-                            <ui:Label text="Disruptor" class="cw-class-chip__role" />
+                            <ui:Label text="@class.assassin.short" class="cw-class-chip__name" />
+                            <ui:Label text="@role.assassin" class="cw-class-chip__role" />
                         </ui:VisualElement>
                     </ui:VisualElement>
                     <ui:VisualElement class="cw-spec-pill-row">
                         <ui:Button name="SpecOptA" class="cw-spec-pill">
-                            <ui:Label text="SPEC A" class="cw-spec-pill__name" />
-                            <ui:Label text="Effect shown here." class="cw-spec-pill__desc" />
+                            <ui:Label text="" class="cw-spec-pill__name" />
+                            <ui:Label text="" class="cw-spec-pill__desc" />
                             <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
                         </ui:Button>
                         <ui:Button name="SpecOptB" class="cw-spec-pill">
-                            <ui:Label text="SPEC B" class="cw-spec-pill__name" />
-                            <ui:Label text="Effect shown here." class="cw-spec-pill__desc" />
+                            <ui:Label text="" class="cw-spec-pill__name" />
+                            <ui:Label text="" class="cw-spec-pill__desc" />
                             <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
                         </ui:Button>
                     </ui:VisualElement>
@@ -183,17 +183,17 @@
                     </ui:VisualElement>
                 </ui:VisualElement>
 
-                <ui:Label name="PreviewName" text="WARRIOR CHICKEN" class="cw-heading" style="font-size: 42px;" />
+                <ui:Label name="PreviewName" text="@class.warrior.name" class="cw-heading" style="font-size: 42px;" />
                 <ui:Label name="PreviewQuote" text="" class="cw-body" style="-unity-font-style: italic; color: rgba(255, 255, 255, 0.72); margin-top: 4px; margin-bottom: 16px; font-size: 30px; -unity-text-align: middle-center;" />
 
                 <ui:VisualElement name="RoleCallouts" class="cw-role-list">
                     <ui:VisualElement class="cw-role-row">
-                        <ui:Label text="+" class="cw-role-glyph cw-role-glyph--pos" />
-                        <ui:Label name="RoleCalloutStrong" text="STRONG: —" class="cw-role-callout cw-role-callout--strong" />
+                        <ui:Label text="@glyph.plus" class="cw-role-glyph cw-role-glyph--pos" />
+                        <ui:Label name="RoleCalloutStrong" text="" class="cw-role-callout cw-role-callout--strong" />
                     </ui:VisualElement>
                     <ui:VisualElement class="cw-role-row">
-                        <ui:Label text="−" class="cw-role-glyph cw-role-glyph--neg" />
-                        <ui:Label name="RoleCalloutWeak" text="WEAK: —" class="cw-role-callout cw-role-callout--weak" />
+                        <ui:Label text="@glyph.minus" class="cw-role-glyph cw-role-glyph--neg" />
+                        <ui:Label name="RoleCalloutWeak" text="" class="cw-role-callout cw-role-callout--weak" />
                     </ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>
@@ -207,7 +207,7 @@
              chosen. Gating this button would need a controller-side SetEnabled
              call that the shipped controller deliberately does not make. -->
         <ui:VisualElement style="align-items: center; padding-top: 4px; padding-bottom: 20px; flex-shrink: 0;">
-            <ui:Button name="NextBtn" text="NEXT: LOADOUT ▶" class="cw-btn cw-btn--gold" style="min-width: 480px; letter-spacing: 2px;" />
+            <ui:Button name="NextBtn" text="@btn.next" class="cw-btn cw-btn--gold" style="min-width: 480px; letter-spacing: 2px;" />
         </ui:VisualElement>
 
     </ui:VisualElement>

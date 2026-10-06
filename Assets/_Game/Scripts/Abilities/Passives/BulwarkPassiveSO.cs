@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using UnityEngine;
 
 namespace CluckWars.Abilities
@@ -30,5 +31,10 @@ namespace CluckWars.Abilities
 
         public override float ModifyKnockback(float strength, ChickenController self) =>
             strength * KnockbackMultiplier;
+
+        public override string PerkLineKey => UiKeys.PerkBulwarkLine;
+        public override string PerkDetailKey => UiKeys.PerkBulwarkDetail;
+        public override (string name, object value)[] PerkArgs(MatchConfigSO match) =>
+            new (string, object)[] { ("kb", Percent(1f - KnockbackMultiplier)), ("cc", Percent(1f - DurationMultiplier)) };
     }
 }

@@ -61,13 +61,23 @@ namespace CluckWars.Tests
         // ---- Authored UXML ------------------------------------------------------
 
         [Test]
-        public void LobbyUxml_AuthoredSettings_MatchTheLiveConfig()
+        public void LobbyUxml_SettingValues_AreLeftBlankForTheControllerToFill()
         {
-            var cfg = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
+            // The menu lobby's TIME and GOAL values carry NO authored text any more: the wording
+            // moved into the dictionary (lobby.value.goal) and MenuUiController.RefreshMatchSettings
+            // always fills both from the live MatchConfig. An authored number could only go stale.
+            var tree = TestAssets.Load<VisualTreeAsset>(TestAssets.LobbyUxmlPath).CloneTree();
 
-            AssertAuthoredSettings(
-                TestAssets.LobbyUxmlPath, "SetTime", "SetGoal", cfg,
-                "the menu lobby (MenuUiController.RefreshMatchSettings)");
+            foreach (var name in new[] { "SetTime", "SetGoal" })
+            {
+                var label = tree.Q<Label>(name);
+                Assert.IsNotNull(label,
+                    $"{TestAssets.LobbyUxmlPath} has no Label named '{name}'. " +
+                    "MenuUiController.RefreshMatchSettings queries it by name.");
+                Assert.IsEmpty(label.text,
+                    $"'{name}' has authored text '{label.text}'. It is bound at runtime from " +
+                    "MatchConfig; an authored value is a number that can drift from the real rules.");
+            }
         }
 
         [Test]

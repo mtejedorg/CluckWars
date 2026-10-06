@@ -6,23 +6,21 @@ namespace CluckWars.Settings
     /// Persisted, player-facing display options plus the developer-tools gate.
     /// Deliberately tiny: this is the only settings surface the project has, so it is a
     /// flat static class rather than a service, an installer binding and an interface for
-    /// three booleans nobody injects.
+    /// a handful of booleans nobody injects.
     /// </summary>
     /// <remarks>
-    /// <b>There is no dedicated settings screen.</b> The controls live on <c>#OptionsRow</c>
-    /// in the Character Select column, which is as much of one as the project has. The agreed
-    /// user-facing copy, recorded here so the UI and this code cannot drift:
+    /// <b>The Settings sheet on the main menu hosts these controls</b> (gear button, built in
+    /// stage 2 of the 2026-10 menu overhaul; until then the two toggles that already existed
+    /// still sit on <c>#OptionsRow</c> of the Loadout screen). The user-facing copy lives in the
+    /// wording dictionary (<c>settings.*</c> keys in <c>Resources/Text/UiText.csv</c>), not here:
     /// <list type="bullet">
-    ///   <item>Label: <b>"Ability Range Guides"</b><br/>
-    ///   Helper: <i>"Show a faint outline of what each equipped ability can reach."</i></item>
-    ///   <item>Label: <b>"Reduced Motion"</b><br/>
-    ///   Helper: <i>"Turn off camera shake and other screen movement effects."</i></item>
-    ///   <item>Label: <b>"Developer Mode"</b><br/>
-    ///   Helper: <i>"Show the Ability Lab and other developer tools on the main menu."</i></item>
+    ///   <item><see cref="AbilityRangeGuidesEnabled"/>: Range Guides</item>
+    ///   <item><see cref="ReducedMotionEnabled"/>: Reduced Motion</item>
+    ///   <item><see cref="DeveloperModeEnabled"/>: Dev Mode</item>
+    ///   <item><see cref="PerformanceModeEnabled"/>: Performance Mode</item>
     /// </list>
-    /// <b>Status: partially placed.</b> Ability Range Guides and Developer Mode are both
-    /// wired to <c>#OptionsRow</c> on the Character Select screen; Reduced Motion still has
-    /// no control anywhere, so it can only be changed by editing PlayerPrefs by hand.
+    /// Reduced Motion has no control yet, so until the sheet lands it can only be changed by
+    /// editing PlayerPrefs by hand.
     ///
     /// <b>Cached, because the consumers read these per frame or per hit.</b>
     /// <c>AbilitySlotOverlay.LateUpdate</c> polls its getter once per frame and
@@ -193,6 +191,50 @@ namespace CluckWars.Settings
         }
 
         /// <summary>
+        /// <c>PlayerPrefs</c> key for <see cref="PerformanceModeEnabled"/>. Namespaced for the
+        /// same reason as <see cref="AbilityRangeGuidesKey"/>, and public so a test can assert
+        /// against the real key instead of a copy.
+        /// </summary>
+        public const string PerformanceModeKey = "CluckWars.PerformanceMode";
+
+        private static bool _performanceMode;
+        private static bool _performanceModeLoaded;
+
+        /// <summary>
+        /// Show static chicken renders in the menus and skip the live 3D stage?
+        /// <b>Defaults to true on phones and tablets</b> (<c>Application.isMobilePlatform</c>)
+        /// and false on desktop when the key has never been written: a mid-range Android device
+        /// should not pay for a second 3D scene behind a menu, while a desktop can afford it.
+        /// Once the player chooses, their choice wins on every platform.
+        /// </summary>
+        public static bool PerformanceModeEnabled
+        {
+            get
+            {
+                if (!_performanceModeLoaded)
+                {
+                    _performanceMode = PlayerPrefs.GetInt(PerformanceModeKey, DefaultPerformanceMode ? 1 : 0) != 0;
+                    _performanceModeLoaded = true;
+                }
+                return _performanceMode;
+            }
+            set
+            {
+                if (_performanceModeLoaded && _performanceMode == value) return;
+
+                _performanceMode = value;
+                _performanceModeLoaded = true;
+                PlayerPrefs.SetInt(PerformanceModeKey, value ? 1 : 0);
+                // Written immediately rather than left to Unity's own flush on quit: a mobile
+                // player who changes a setting and is then killed by the OS should not lose it.
+                PlayerPrefs.Save();
+            }
+        }
+
+        /// <summary>The value <see cref="PerformanceModeEnabled"/> takes until the player chooses.</summary>
+        public static bool DefaultPerformanceMode => Application.isMobilePlatform;
+
+        /// <summary>
         /// Drops every cache so the next read goes back to <c>PlayerPrefs</c>. Needed because
         /// "Enter Play Mode Options" can suppress the domain reload that would otherwise reset
         /// the statics, which would carry one play session's value into the next — the same
@@ -209,6 +251,7 @@ namespace CluckWars.Settings
             _abilityRangeGuidesLoaded = false;
             _reducedMotionLoaded      = false;
             _developerModeLoaded      = false;
+            _performanceModeLoaded    = false;
         }
     }
 }

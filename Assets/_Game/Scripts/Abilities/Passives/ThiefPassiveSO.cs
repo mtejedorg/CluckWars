@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using UnityEngine;
 
 namespace CluckWars.Abilities
@@ -28,5 +29,9 @@ namespace CluckWars.Abilities
             amount * StealMultiplier;
 
         public override float MaxStealMultiplier => StealMultiplier;
+
+        public override string PerkLineKey => UiKeys.PerkThiefLine;
+        public override (string name, object value)[] PerkArgs(MatchConfigSO match) =>
+            new (string, object)[] { ("steal", Percent(StealMultiplier - 1f)) };
     }
 }

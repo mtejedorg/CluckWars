@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using UnityEngine;
 
 namespace CluckWars.Abilities
@@ -26,5 +27,10 @@ namespace CluckWars.Abilities
 
         public override float ModifyControlDuration(float seconds, ChickenController self) =>
             seconds * DurationMultiplier;
+
+        public override string PerkLineKey => UiKeys.PerkSlipperyLine;
+        public override string PerkDetailKey => UiKeys.PerkSlipperyDetail;
+        public override (string name, object value)[] PerkArgs(MatchConfigSO match) =>
+            new (string, object)[] { ("pct", Percent(1f - DurationMultiplier)) };
     }
 }

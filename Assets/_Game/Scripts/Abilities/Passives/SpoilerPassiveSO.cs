@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using UnityEngine;
 
 namespace CluckWars.Abilities
@@ -38,5 +39,14 @@ namespace CluckWars.Abilities
         protected override string DefaultIcon => "\U0001F5A4";
 
         public override int MatchEndBonusFood(ChickenController self) => BonusFood;
+
+        public override string PerkLineKey => UiKeys.PerkSpoilerLine;
+        public override string PerkDetailKey => UiKeys.PerkSpoilerDetail;
+        // {goal} is the one number this passive does not own: the match's win target.
+        // A null MatchConfig leaves {goal} unsupplied, which UiText renders as #goal# and logs.
+        public override (string name, object value)[] PerkArgs(MatchConfigSO match) =>
+            match != null
+                ? new (string, object)[] { ("food", BonusFood), ("goal", match.FoodTargetToWin) }
+                : new (string, object)[] { ("food", BonusFood) };
     }
 }

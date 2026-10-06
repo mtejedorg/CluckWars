@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using UnityEngine;
 
 namespace CluckWars.UI
@@ -33,7 +34,8 @@ namespace CluckWars.UI
             return $"{mm}:{ss:00}";
         }
 
-        /// <summary>Food target as it reads on the settings card — 40 renders "40 food".</summary>
-        public static string Goal(int foodTargetToWin) => $"{foodTargetToWin} food";
+        /// <summary>Food target as it reads on the settings card — 40 renders "40 food" (wording in <c>lobby.value.goal</c>).</summary>
+        public static string Goal(int foodTargetToWin) =>
+            UiText.Format(UiKeys.LobbyValueGoal, ("n", foodTargetToWin));
     }
 }

@@ -4,6 +4,7 @@ using System.Linq;
 using CluckWars.Abilities;
 using CluckWars.Bootstrap;
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using CluckWars.Logging;
 using CluckWars.Services;
 using CluckWars.Settings;
@@ -76,7 +77,7 @@ namespace CluckWars.UI
 
         // The two flat pick rows that replaced the slot-hex row + scrolling grid.
         private VisualElement _commonCards, _classCards;
-        private Label _commonHint, _commonCount, _classHint, _classCount;
+        private Label _commonTitle, _classTitle, _commonHint, _commonCount, _classHint, _classCount;
         // Shared "what does this do" strip — the description's only home. Cards
         // carry icon + name + category/CD; the last-tapped ability's text lands
         // here at full reading size. Null until a card is tapped.
@@ -106,51 +107,51 @@ namespace CluckWars.UI
             // Beyond being stale, a per-CLASS passive name is now structurally wrong: the
             // passive comes from the chosen specialization, so any single hardcoded name is
             // right for at most one of a class's two builds. Role is stable across both.
-            public string Name, Role;
             public Color Tint;
             public int[] Stats; // cargo, rate, speed (1..5) — HP/Resist removed in v0.4 (no health)
         }
 
         private static readonly Dictionary<ChickenClass, ClassMeta> Meta = new()
         {
-            [ChickenClass.Warrior]  = new ClassMeta { Name = "WARRIOR CHICKEN",  Role = "All-Rounder",  Tint = UiGfx.Hex32("C04030"),  Stats = new[]{3,3,3} },
-            [ChickenClass.Speedy]   = new ClassMeta { Name = "SPEEDY CHICKEN",   Role = "Hit & Run",    Tint = UiGfx.Hex32("E85A2A"), Stats = new[]{2,3,5} },
-            [ChickenClass.Fatty]    = new ClassMeta { Name = "FATTY CHICKEN",    Role = "Bulk Carrier", Tint = UiGfx.Hex32("F5D75A"),       Stats = new[]{5,5,2} },
-            [ChickenClass.Assassin] = new ClassMeta { Name = "ASSASSIN CHICKEN", Role = "Disruptor",    Tint = UiGfx.Hex32("7B68EE"), Stats = new[]{2,2,4} },
+            [ChickenClass.Warrior]  = new ClassMeta { Tint = UiGfx.Hex32("C04030"), Stats = new[]{3,3,3} },
+            [ChickenClass.Speedy]   = new ClassMeta { Tint = UiGfx.Hex32("E85A2A"), Stats = new[]{2,3,5} },
+            [ChickenClass.Fatty]    = new ClassMeta { Tint = UiGfx.Hex32("F5D75A"), Stats = new[]{5,5,2} },
+            [ChickenClass.Assassin] = new ClassMeta { Tint = UiGfx.Hex32("7B68EE"), Stats = new[]{2,2,4} },
         };
+
+        // Class names, roles and callouts are player-facing copy and live in the wording
+        // dictionary; this table only picks the keys.
+        private readonly struct ClassKeySet
+        {
+            public readonly string Full, Short, Role, Strong, Weak;
+            public ClassKeySet(string full, string shortName, string role, string strong, string weak)
+            { Full = full; Short = shortName; Role = role; Strong = strong; Weak = weak; }
+        }
+
+        private static readonly Dictionary<ChickenClass, ClassKeySet> ClassKeys = new()
+        {
+            [ChickenClass.Warrior]  = new ClassKeySet(UiKeys.ClassWarriorName,  UiKeys.ClassWarriorShort,  UiKeys.RoleWarrior,  UiKeys.CalloutWarriorStrong,  UiKeys.CalloutWarriorWeak),
+            [ChickenClass.Speedy]   = new ClassKeySet(UiKeys.ClassSpeedyName,   UiKeys.ClassSpeedyShort,   UiKeys.RoleSpeedy,   UiKeys.CalloutSpeedyStrong,   UiKeys.CalloutSpeedyWeak),
+            [ChickenClass.Fatty]    = new ClassKeySet(UiKeys.ClassFattyName,    UiKeys.ClassFattyShort,    UiKeys.RoleFatty,    UiKeys.CalloutFattyStrong,    UiKeys.CalloutFattyWeak),
+            [ChickenClass.Assassin] = new ClassKeySet(UiKeys.ClassAssassinName, UiKeys.ClassAssassinShort, UiKeys.RoleAssassin, UiKeys.CalloutAssassinStrong, UiKeys.CalloutAssassinWeak),
+        };
+
+        private static string ClassFullName(ChickenClass cls) => UiText.Get(ClassKeys[cls].Full);
+        private static string ClassShortName(ChickenClass cls) => UiText.Get(ClassKeys[cls].Short);
+        private static string RoleName(ChickenClass cls) => UiText.Get(ClassKeys[cls].Role);
 
         private static readonly string[] ChipNames  = { "ClassWarrior", "ClassSpeedy", "ClassFatty", "ClassAssassin" };
-
-        /// <summary>Authored copy for RoleCalloutStrong/RoleCalloutWeak, narrative-designer pass
-        /// (2026-09-17), cross-checked against <see cref="Meta"/>'s real cargo/rate/speed spread
-        /// so nothing here reads a strength the numbers don't actually back. Replaces the old
-        /// numeric stat-pip row and the placeholder "STRONG: X/Y" computed text — Maestro
-        /// rejected numeric HP/damage-style pips since no such stat exists post GDD §2 combat
-        /// rewrite, and the placeholder wasn't real copy.</summary>
-        private sealed class RoleCallout { public string Strong; public string Weak; }
-        private static readonly Dictionary<ChickenClass, RoleCallout> RoleCallouts = new()
-        {
-            // Warrior — {3,3,3}: flat spread, nothing to call out as strong OR weak, so this
-            // is the one class with a single-line callout instead of a strong/weak pair.
-            [ChickenClass.Warrior]  = new RoleCallout { Strong = "No weak spot. No big edge, either." },
-            // Speedy — {cargo 2, rate 3, speed 5}: fastest, lightest carrier.
-            [ChickenClass.Speedy]   = new RoleCallout { Strong = "Fastest bird in the yard.",       Weak = "Can't carry much at a time." },
-            // Fatty — {cargo 5, rate 5, speed 2}: biggest hauler, slowest mover.
-            [ChickenClass.Fatty]    = new RoleCallout { Strong = "Hauls the most, fastest hands.",  Weak = "Slowest waddle in the coop." },
-            // Assassin — {cargo 2, rate 2, speed 4}: fast, but thin on cargo and hands.
-            [ChickenClass.Assassin] = new RoleCallout { Strong = "Blink and it's gone.",            Weak = "Light load, slow hands." },
-        };
 
         // Ability categories. These used to be section headers in a scrolling
         // grid; with 3 cards per row that produced headers holding one card each,
         // so the category now rides on the card itself as a colored tag.
-        private sealed class CatMeta { public string Label; public Color Color; }
+        private sealed class CatMeta { public string LabelKey; public Color Color; }
         private static readonly Dictionary<AbilityCategory, CatMeta> Cats = new()
         {
-            [AbilityCategory.Steal]   = new CatMeta { Label = "STEAL",   Color = UiGfx.Hex32("FF5722") },
-            [AbilityCategory.Control] = new CatMeta { Label = "CONTROL", Color = UiGfx.Hex32("9C27B0") },
-            [AbilityCategory.Defense] = new CatMeta { Label = "DEFENSE", Color = UiGfx.Hex32("4CAF50") },
-            [AbilityCategory.Utility] = new CatMeta { Label = "UTILITY", Color = UiGfx.Hex32("00BCD4") },
+            [AbilityCategory.Steal]   = new CatMeta { LabelKey = UiKeys.CategorySteal, Color = UiGfx.Hex32("FF5722") },
+            [AbilityCategory.Control] = new CatMeta { LabelKey = UiKeys.CategoryControl, Color = UiGfx.Hex32("9C27B0") },
+            [AbilityCategory.Defense] = new CatMeta { LabelKey = UiKeys.CategoryDefense, Color = UiGfx.Hex32("4CAF50") },
+            [AbilityCategory.Utility] = new CatMeta { LabelKey = UiKeys.CategoryUtility, Color = UiGfx.Hex32("00BCD4") },
         };
 
         // ======================================================================
@@ -177,6 +178,8 @@ namespace CluckWars.UI
         {
             if (_selection == null)
                 ProjectContext.Instance.Container.Inject(this);
+
+            UiText.SetLogger(_log);
 
             if (_sceneLoader == null) _sceneLoader = GetComponent<SceneLoader>();
             if (_sceneLoader == null) _sceneLoader = FindFirstObjectByType<SceneLoader>();
@@ -247,6 +250,7 @@ namespace CluckWars.UI
         {
             if (vta == null) return new VisualElement();
             var ve = vta.Instantiate();
+            UiText.ResolveTree(ve);
             ve.style.flexGrow = 1;
             ve.style.display = DisplayStyle.None;
             _root.Add(ve);
@@ -299,7 +303,7 @@ namespace CluckWars.UI
 
             // Build stamp — a tester reporting a bug from a device otherwise has no
             // way to say which build produced it.
-            Bind<Label>(_mainMenu, "BuildStamp", l => l.text = $"v{Application.version}");
+            Bind<Label>(_mainMenu, "BuildStamp", l => l.text = UiText.Format(UiKeys.MainBuild, ("version", Application.version)));
         }
 
         /// <summary>
@@ -434,15 +438,16 @@ namespace CluckWars.UI
             var sigLbl  = pill.Q<Label>(className: "cw-spec-pill__signature");
 
             if (nameLbl != null) nameLbl.text = passive.DisplayName.ToUpperInvariant();
-            // Never ShortLabel — that is the ≤4-char HUD abbreviation.
-            if (descLbl != null) descLbl.text = passive.Description;
+            // Never ShortLabel — that is the ≤4-char HUD abbreviation. The line is a template
+            // filled from the passive's own fields, so it can never quote a stale number.
+            if (descLbl != null) descLbl.text = passive.PerkLine(_matchConfig);
 
             if (sigLbl != null)
             {
                 // Accurate language: this occupies one of the four ability slots, it is
                 // never a free bonus.
                 string label = ForcedAbilityLabel(cls, passive);
-                string sig = label != null ? $"Starts with {label} equipped" : null;
+                string sig = label != null ? UiText.Format(UiKeys.PillStartsWith, ("abilities", label)) : null;
                 sigLbl.text = sig ?? string.Empty;
                 sigLbl.style.display = sig != null ? DisplayStyle.Flex : DisplayStyle.None;
             }
@@ -512,7 +517,6 @@ namespace CluckWars.UI
         private void RefreshClassSelect()
         {
             var cls = Cls;
-            var m = Meta[cls];
 
             foreach (var kv in _classChips)
             {
@@ -545,11 +549,11 @@ namespace CluckWars.UI
             // Raw class tint as text on the near-black screen bg is too dark to read
             // — Warrior's #C04030 lands at 2.5:1, under the 3:1 large-text minimum.
             // Lighten for type only; the disc border and glow keep the pure tint.
-            if (_previewName != null) { _previewName.text = m.Name; _previewName.style.color = Lighten(TintOf(cls), 0.35f); }
+            if (_previewName != null) { _previewName.text = ClassFullName(cls); _previewName.style.color = Lighten(TintOf(cls), 0.35f); }
             if (_previewQuote != null)
             {
                 if (_classRegistry != null && _classRegistry.TryGet(cls, out var entry) && !string.IsNullOrEmpty(entry.LoreQuote))
-                    _previewQuote.text = $"\"{entry.LoreQuote}\"";
+                    _previewQuote.text = UiText.Format(UiKeys.ClassQuote, ("quote", entry.LoreQuote));
                 else
                     _previewQuote.text = "";
             }
@@ -577,8 +581,8 @@ namespace CluckWars.UI
                 {
                     // Real language: it occupies active slots, never a free bonus on top of
                     // them — see AbilityBaseSO.PeckSlotPreEquippedBy / SignaturePreEquippedBy. Two names = two slots.
-                    string slots = label.Contains(" + ") ? "Two slots" : "One slot";
-                    tag.text = $"{slots} pre-filled: {label}";
+                    bool two = label.Contains(" + ");
+                    tag.text = UiText.Format(two ? UiKeys.TagPreFilledTwo : UiKeys.TagPreFilledOne, ("abilities", label));
                     tag.style.display = DisplayStyle.Flex;
                 }
                 else
@@ -590,25 +594,22 @@ namespace CluckWars.UI
         }
 
         /// <summary>
-        /// Paints RoleCalloutStrong/RoleCalloutWeak from the authored <see cref="RoleCallouts"/>
-        /// copy. A class with no Weak line (Warrior — flat {3,3,3}) collapses to a single
-        /// strong-slot callout rather than showing an empty second line.
+        /// Paints RoleCalloutStrong/RoleCalloutWeak from the dictionary's
+        /// <c>callout.&lt;class&gt;.strong/.weak</c> copy. Every class has both lines (Warrior's
+        /// weak line is "Great at nothing.") so the second row is never empty.
         /// </summary>
         private void RefreshRoleCallouts(ChickenClass cls)
         {
-            if (_roleCalloutStrong == null && _roleCalloutWeak == null) return;
-            if (!RoleCallouts.TryGetValue(cls, out var callout)) return;
-
+            var keys = ClassKeys[cls];
             if (_roleCalloutStrong != null)
             {
-                _roleCalloutStrong.text = callout.Strong;
+                _roleCalloutStrong.text = UiText.Get(keys.Strong);
                 _roleCalloutStrong.style.display = DisplayStyle.Flex;
             }
             if (_roleCalloutWeak != null)
             {
-                bool hasWeak = !string.IsNullOrEmpty(callout.Weak);
-                _roleCalloutWeak.text = callout.Weak ?? string.Empty;
-                _roleCalloutWeak.style.display = hasWeak ? DisplayStyle.Flex : DisplayStyle.None;
+                _roleCalloutWeak.text = UiText.Get(keys.Weak);
+                _roleCalloutWeak.style.display = DisplayStyle.Flex;
             }
         }
 
@@ -629,7 +630,7 @@ namespace CluckWars.UI
                     _abilityDetailName.text = string.Empty;
                     _abilityDetailName.style.display = DisplayStyle.None;
                 }
-                _abilityDetailText.text = "Tap an ability to see what it does.";
+                _abilityDetailText.text = UiText.Get(UiKeys.LoadoutDetailEmpty);
                 _abilityDetailText.style.color = UiGfx.TextSecondary;
                 if (_abilityDetail != null) SetBorder(_abilityDetail, UiGfx.CardBorder);
                 return;
@@ -654,6 +655,8 @@ namespace CluckWars.UI
         {
             _commonCards    = _loadout.Q<VisualElement>("CommonCards");
             _classCards     = _loadout.Q<VisualElement>("ClassCards");
+            _commonTitle    = _loadout.Q<Label>("CommonTitle");
+            _classTitle     = _loadout.Q<Label>("ClassTitle");
             _commonHint     = _loadout.Q<Label>("CommonHint");
             _commonCount    = _loadout.Q<Label>("CommonCount");
             _classHint      = _loadout.Q<Label>("ClassHint");
@@ -868,7 +871,7 @@ namespace CluckWars.UI
                 {
                     SetBorder(box, UiGfx.CardBorder);
                     box.style.backgroundColor = UiGfx.CardTop;
-                    var empty = new Label("EMPTY");
+                    var empty = new Label(UiText.Get(UiKeys.SlotEmpty));
                     empty.AddToClassList("cw-slot-box__empty-label");
                     box.Add(empty);
                     continue;
@@ -912,7 +915,7 @@ namespace CluckWars.UI
                 {
                     // No USS class exists for a locked slot, so a plain inline tag keeps this
                     // a minimal change rather than a redesign.
-                    var lockTag = new Label("PRE-EQUIPPED");
+                    var lockTag = new Label(UiText.Get(UiKeys.LabelStarter));
                     lockTag.pickingMode = PickingMode.Ignore;
                     lockTag.style.fontSize = 9;
                     lockTag.style.color = Fade(Color.white, 0.75f);
@@ -945,11 +948,6 @@ namespace CluckWars.UI
         //  which row the card came from.
         // ======================================================================
 
-        /// <summary>Rough hint for the CLASS pool's counter text: how many Character picks a
-        /// loadout typically has room for once Peck has taken its slot. Not a rule and not a
-        /// per-row minimum — any legal ability can fill any open slot (see ActiveSlotsForClass).</summary>
-        private int ClassPicksAllowed => Mathf.Max(1, ActiveSlotsForClass - (ClassCanForage ? 2 : 1));
-
         private void RebuildPickRows(ChickenClass cls)
         {
             var all = _abilityRegistry?.All;
@@ -975,18 +973,14 @@ namespace CluckWars.UI
             FillRow(_commonCards, common);
             FillRow(_classCards,  character);
 
-            if (_commonHint != null) _commonHint.text = "optional · any chicken can take these";
-            if (_classHint != null)
-            {
-                // "optional · " dropped from the COMBO variant — it already runs
-                // right up against the row width budget (measured live: 927px of
-                // content in a 902px head with "1 EQUIPPED" showing) and clipped.
-                // The non-combo variant has room to spare.
-                string clsName = Meta[cls].Name.Replace(" CHICKEN", string.Empty);
-                _classHint.text = ClassPicksAllowed > 1
-                    ? $"{clsName} only · COMBO lets you take two"
-                    : $"optional · {clsName} only";
-            }
+            // Row titles carry the audience ("ANY BIRD" / "WARRIOR ONLY"); the hints just say
+            // the rows are optional. The old "COMBO lets you take two" hint was dropped: COMBO was
+            // retired in v0.7 and the hint was claiming a mechanic that no longer exists.
+            if (_commonTitle != null) _commonTitle.text = UiText.Get(UiKeys.LoadoutRowShared);
+            if (_classTitle != null)
+                _classTitle.text = UiText.Format(UiKeys.LoadoutRowClass, ("cls", ClassShortName(cls)));
+            if (_commonHint != null) _commonHint.text = UiText.Get(UiKeys.LoadoutHintShared);
+            if (_classHint != null) _classHint.text = UiText.Get(UiKeys.LoadoutHintClass);
         }
 
         private void FillRow(VisualElement host, List<AbilityBaseSO> abilities)
@@ -1005,7 +999,7 @@ namespace CluckWars.UI
         {
             if (host == null) return;
             host.Clear();
-            var note = new Label("No abilities in registry.\nAssign AbilityRegistrySO in ProjectInstaller.");
+            var note = new Label(UiText.Get(UiKeys.LoadoutRegistryMissing));
             note.AddToClassList("cw-body");
             host.Add(note);
         }
@@ -1056,7 +1050,7 @@ namespace CluckWars.UI
 
             if (Cats.TryGetValue(ab.Category, out var cat))
             {
-                var tag = new Label(cat.Label);
+                var tag = new Label(UiText.Get(cat.LabelKey));
                 tag.AddToClassList("cw-cat-tag");
                 tag.style.backgroundColor = Fade(cat.Color, 0.85f);
                 tag.style.color = InkOn(cat.Color);
@@ -1064,7 +1058,7 @@ namespace CluckWars.UI
             }
 
             bool shortCd = ab.Cooldown <= 6f;
-            var badge = new Label(shortCd ? "SHORT" : "MED");
+            var badge = new Label(UiText.Get(shortCd ? UiKeys.CooldownShort : UiKeys.CooldownMed));
             badge.AddToClassList("cw-cd-badge");
             badge.AddToClassList(shortCd ? "cw-cd-badge--short" : "cw-cd-badge--med");
             footer.Add(badge);
@@ -1106,9 +1100,6 @@ namespace CluckWars.UI
         /// and is not consulted.</summary>
         private bool CanForage(ChickenClass cls) =>
             PreEquippedLoadout.ClassForages(cls, _abilityRegistry?.Passives, _abilityRegistry?.All, PeckAbility);
-
-        /// <summary>True when the currently selected class may forage.</summary>
-        private bool ClassCanForage => CanForage(Cls);
 
         /// <summary>The class's default (signature) specialization, or null if the registry has
         /// none for it. Used to preview a not-yet-selected class chip's PreFilledTag.</summary>
@@ -1257,8 +1248,8 @@ namespace CluckWars.UI
 
             // No implied floor: "0 equipped" reads as "optional, none taken yet",
             // not as a missing requirement.
-            if (_commonCount != null) _commonCount.text = $"{commonPicked} EQUIPPED";
-            if (_classCount  != null) _classCount.text  = $"{classPicked} EQUIPPED";
+            if (_commonCount != null) _commonCount.text = UiText.Format(UiKeys.LoadoutCount, ("n", commonPicked));
+            if (_classCount  != null) _classCount.text  = UiText.Format(UiKeys.LoadoutCount, ("n", classPicked));
 
             int missing = Mathf.Max(0, n - totalPicked);
             bool ready  = missing == 0 && _selection?.Passive != null;
@@ -1266,8 +1257,10 @@ namespace CluckWars.UI
             if (_readyBtn != null)
             {
                 _readyBtn.text = ready
-                    ? "READY ▶"
-                    : (missing == 1 ? "PICK 1 MORE ABILITY" : $"PICK {missing} MORE ABILITIES");
+                    ? UiText.Get(UiKeys.BtnReady)
+                    : (missing == 1
+                        ? UiText.Get(UiKeys.BtnPickMoreOne)
+                        : UiText.Format(UiKeys.BtnPickMoreMany, ("n", missing)));
                 _readyBtn.SetEnabled(ready);
                 _readyBtn.EnableInClassList("cw-btn--green", ready);
                 _readyBtn.EnableInClassList("cw-btn--neutral", !ready);
@@ -1291,7 +1284,7 @@ namespace CluckWars.UI
         };
         // Sample CPU bots shown in the Solo lobby (you always spawn vs 3 bots).
         private static readonly ChickenClass[] BotClasses = { ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };
-        private static readonly string[]       BotNames   = { "DashFox", "BrunoB", "PeckNoir" };
+        private static readonly string[]       BotNameKeys = { UiKeys.LobbyBot1, UiKeys.LobbyBot2, UiKeys.LobbyBot3 };
 
         private string _joinCode = string.Empty;
 
@@ -1326,7 +1319,7 @@ namespace CluckWars.UI
             if (isHost)
             {
                 _joinCode = string.Empty;
-                SetCodeTiles("·····");
+                SetCodeTiles(UiText.Get(UiKeys.LobbyCodePlaceholder));
                 try
                 {
                     var info = await _ugs.CreateLobbyAsync("CluckWars Match", 4);
@@ -1337,7 +1330,7 @@ namespace CluckWars.UI
                 catch (Exception e)
                 {
                     _log?.Error(Source, $"CreateLobby failed: {e.Message}");
-                    if (status != null) { status.style.color = UiGfx.Hex32("ff786e"); status.text = "Could not create lobby."; }
+                    if (status != null) { status.style.color = UiGfx.Hex32("ff786e"); status.text = UiText.Get(UiKeys.LobbyErrCreate); }
                 }
             }
         }
@@ -1353,9 +1346,9 @@ namespace CluckWars.UI
             if (_matchConfig == null)
             {
                 // Only reachable when nothing installed the project container (EditMode /
-                // headless). Leave the authored UXML text — an EditMode test pins it to
-                // these same values, so it is right rather than merely stale.
-                _log?.Debug(Source, "MatchConfig not injected; lobby settings keep their authored text.");
+                // headless). The TIME / GOAL values carry no authored text (an EditMode test pins
+                // that), so they stay blank rather than advertising rules nobody configured.
+                _log?.Warn(Source, "MatchConfig not injected; lobby TIME and GOAL are blank.");
                 return;
             }
 
@@ -1373,14 +1366,15 @@ namespace CluckWars.UI
             var start = _lobby.Q<Button>("StartBtn");
 
             string c, t; Color dotColor; bool readyish;
-            if (isSolo)      { c = "4/4"; t = "Solo · 3 CPU"; dotColor = UiGfx.Hex32("4ae66a"); readyish = true;  }
-            else if (isHost) { c = "1/4"; t = "Waiting…";     dotColor = UiGfx.Gold;             readyish = false; }
-            else             { c = "—";   t = "Enter code";   dotColor = UiGfx.Gold;             readyish = false; }
+            int seats = 4;
+            if (isSolo)      { c = UiText.Format(UiKeys.LobbyCount, ("n", seats), ("max", seats)); t = UiText.Get(UiKeys.LobbyStatusSolo);      dotColor = UiGfx.Hex32("4ae66a"); readyish = true;  }
+            else if (isHost) { c = UiText.Format(UiKeys.LobbyCount, ("n", 1),     ("max", seats)); t = UiText.Get(UiKeys.LobbyStatusWaiting);   dotColor = UiGfx.Gold;             readyish = false; }
+            else             { c = UiText.Get(UiKeys.LobbyCountUnknown);                           t = UiText.Get(UiKeys.LobbyStatusEnterCode); dotColor = UiGfx.Gold;             readyish = false; }
 
             if (count != null) count.text = c;
             if (text  != null) { text.text = t; text.style.color = readyish ? UiGfx.Hex32("7cd99a") : UiGfx.Gold; }
             if (dot   != null) dot.style.backgroundColor = dotColor;
-            if (start != null) start.text = isJoin ? "JOIN MATCH ▶" : "START MATCH ▶";
+            if (start != null) start.text = UiText.Get(isJoin ? UiKeys.BtnJoinMatch : UiKeys.BtnStart);
         }
 
         private void SetCodeTiles(string code)
@@ -1402,7 +1396,7 @@ namespace CluckWars.UI
             if (string.IsNullOrEmpty(_joinCode)) return;
             GUIUtility.systemCopyBuffer = _joinCode;
             var status = _lobby.Q<Label>("LobbyStatus");
-            if (status != null) { status.style.color = UiGfx.Gold; status.text = $"Copied {_joinCode}."; }
+            if (status != null) { status.style.color = UiGfx.Gold; status.text = UiText.Format(UiKeys.LobbyCopied, ("code", _joinCode)); }
         }
 
         // ---- Player grid (2×2) ------------------------------------------------
@@ -1415,7 +1409,7 @@ namespace CluckWars.UI
             // Slot 0 — you.
             var mine = new List<AbilityBaseSO>();
             for (int i = 0; i < ActiveSlotsForClass; i++) { var a = GetEquipped(i); if (a != null) mine.Add(a); }
-            grid.Add(MakeLobbyCard(0, Cls, "You", isHost, false, ready: true, abilities: mine, empty: false, slots: ActiveSlotsForClass));
+            grid.Add(MakeLobbyCard(0, Cls, UiText.Get(UiKeys.LabelYou), isHost, false, ready: true, abilities: mine, empty: false, slots: ActiveSlotsForClass));
 
             // Slots 1-3 — solo fills CPU bots; host/join show open seats.
             for (int i = 1; i < 4; i++)
@@ -1423,7 +1417,7 @@ namespace CluckWars.UI
                 if (isSolo)
                 {
                     var bc = BotClasses[i - 1];
-                    grid.Add(MakeLobbyCard(i, bc, BotNames[i - 1], false, true, ready: true, abilities: SampleBotAbilities(bc, i), empty: false, slots: ActiveSlotsForClass));
+                    grid.Add(MakeLobbyCard(i, bc, UiText.Get(BotNameKeys[i - 1]), false, true, ready: true, abilities: SampleBotAbilities(bc, i), empty: false, slots: ActiveSlotsForClass));
                 }
                 else
                 {
@@ -1482,7 +1476,7 @@ namespace CluckWars.UI
                 var ec = new VisualElement();
                 ec.AddToClassList("cw-player-card");
                 ec.AddToClassList("cw-player-card--empty");
-                var lbl = new Label($"WAITING FOR P{idx + 1}");
+                var lbl = new Label(UiText.Format(UiKeys.LobbyWaitingFor, ("n", idx + 1)));
                 lbl.AddToClassList("cw-player-empty-label");
                 ec.Add(lbl);
                 return ec;
@@ -1510,19 +1504,19 @@ namespace CluckWars.UI
             nameRow.AddToClassList("cw-player-namerow");
             var nameLbl = new Label(name);
             nameLbl.AddToClassList("cw-player-name");
-            var pn = new Label($"P{idx + 1}");
+            var pn = new Label(UiText.Format(UiKeys.LobbyPlayerTag, ("n", idx + 1)));
             pn.AddToClassList("cw-player-pn");
             pn.style.color = color;
             nameRow.Add(nameLbl); nameRow.Add(pn);
             if (isHost)
             {
-                var host = new Label("HOST");
+                var host = new Label(UiText.Get(UiKeys.TagHost));
                 host.AddToClassList("cw-player-host");
                 nameRow.Add(host);
             }
             else if (cpu)
             {
-                var tag = new Label("CPU");
+                var tag = new Label(UiText.Get(UiKeys.TagCpu));
                 tag.AddToClassList("cw-player-host");
                 tag.style.backgroundColor = color;
                 tag.style.color = InkOn(color);
@@ -1530,8 +1524,7 @@ namespace CluckWars.UI
             }
             mid.Add(nameRow);
 
-            var m = Meta[cls];
-            var clsLine = new Label($"{m.Name.Replace(" CHICKEN", string.Empty)} · {m.Role}");
+            var clsLine = new Label(UiText.Format(UiKeys.LobbyClassLine, ("cls", ClassShortName(cls)), ("role", RoleName(cls))));
             clsLine.AddToClassList("cw-player-class");
             mid.Add(clsLine);
 
@@ -1548,7 +1541,7 @@ namespace CluckWars.UI
             var state = new VisualElement();
             state.AddToClassList("cw-player-state");
             state.AddToClassList(ready ? "cw-player-state--ready" : "cw-player-state--picking");
-            var sl = new Label(ready ? "✓ READY" : "PICKING");
+            var sl = new Label(UiText.Get(ready ? UiKeys.StateReady : UiKeys.StatePicking));
             sl.AddToClassList("cw-player-state__label");
             if (!ready) sl.style.color = UiGfx.Hex32("c4a060");
             state.Add(sl);
@@ -1599,9 +1592,9 @@ namespace CluckWars.UI
                 case SessionMode.Join:
                     var field = _lobby.Q<TextField>("LobbyJoinField");
                     var code = field?.value?.Trim();
-                    if (string.IsNullOrEmpty(code)) { if (status != null) status.text = "Enter a join code first."; return; }
+                    if (string.IsNullOrEmpty(code)) { if (status != null) status.text = UiText.Get(UiKeys.LobbyErrNoCode); return; }
                     _isBusy = true;
-                    if (status != null) status.text = "Joining…";
+                    if (status != null) status.text = UiText.Get(UiKeys.LobbyJoining);
                     try
                     {
                         var info = await _ugs.JoinLobbyByCodeAsync(code);
@@ -1611,7 +1604,7 @@ namespace CluckWars.UI
                     catch (Exception e)
                     {
                         _log?.Error(Source, $"JoinByCode failed: {e.Message}");
-                        if (status != null) status.text = "Could not join that code.";
+                        if (status != null) status.text = UiText.Get(UiKeys.LobbyErrJoin);
                     }
                     _isBusy = false;
                     break;

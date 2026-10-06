@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SlipperyPassiveSO
   DisplayName: Slippery
   ShortLabel: SLIP
-  Description: Slows, roots and stuns wear off far faster.
+  Description: Slows, roots and stuns end 40% sooner.
   Icon: 
   AccentColor: {r: 0.35, g: 0.78, b: 0.95, a: 1}
   Category: 3

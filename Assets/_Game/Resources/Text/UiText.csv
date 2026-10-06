@@ -1,0 +1,127 @@
+key,en
+main.title,CLUCK WARS
+main.subtitle,4-PLAYER FARMYARD FREE-FOR-ALL
+main.soloHint,Solo: you vs 3 bot chickens.
+main.build,v{version}
+btn.playSolo,PLAY SOLO
+btn.host,HOST GAME
+btn.join,JOIN GAME
+btn.abilityLab,ABILITY LAB
+btn.playAgain,PLAY AGAIN
+btn.playAgain.sub,{cls} · {perk}
+btn.backToLobby,BACK TO LOBBY
+nav.home,HOME
+nav.back,BACK
+screen.class.title,PICK YOUR BIRD
+screen.loadout.title,GEAR UP
+screen.lobby.title,THE COOP
+btn.next,GEAR UP ▶
+btn.ready,READY ▶
+btn.pickMore.one,PICK 1 MORE
+btn.pickMore.many,PICK {n} MORE
+btn.start,START MATCH ▶
+btn.joinMatch,JOIN MATCH ▶
+btn.share,SHARE
+btn.copy,COPY
+label.perk,PERK
+label.starters,STARTERS
+label.starter,STARTER
+label.you,You
+class.warrior.short,WARRIOR
+class.speedy.short,SPEEDY
+class.fatty.short,FATTY
+class.assassin.short,ASSASSIN
+class.warrior.name,WARRIOR CHICKEN
+class.speedy.name,SPEEDY CHICKEN
+class.fatty.name,FATTY CHICKEN
+class.assassin.name,ASSASSIN CHICKEN
+role.warrior,Brawler
+role.speedy,Hit & Run
+role.fatty,Hauler
+role.assassin,Saboteur
+class.quote,"""{quote}"""
+callout.warrior.strong,Good at everything.
+callout.warrior.weak,Great at nothing.
+callout.speedy.strong,Fastest bird in the yard.
+callout.speedy.weak,"Tiny beak, tiny haul."
+callout.fatty.strong,"Biggest haul, quickest beak."
+callout.fatty.weak,Slowest waddle in the coop.
+callout.assassin.strong,Blink and it's gone.
+callout.assassin.weak,"Light load, slow beak."
+glyph.plus,+
+glyph.minus,−
+perk.relentless.line,Every move recharges {pct}% faster.
+perk.relentless.detail,Applies to every move except Peck.
+perk.bully.line,"Steal {steal}% more, carry {cap} more."
+perk.thief.line,Every steal grabs {steal}% more.
+perk.slippery.line,Slows and stuns end {pct}% sooner.
+perk.slippery.detail,"Covers slows, roots and stuns."
+perk.bulwark.line,Barely budges when shoved.
+perk.bulwark.detail,"Knockback cut by {kb}%. Slows, roots and stuns end {cc}% sooner."
+perk.hoarder.line,Carry a whole win at once.
+perk.hoarder.detail,Carries at least {cap} food.
+perk.featherfoot.line,Raid piles at full speed.
+perk.featherfoot.detail,Food piles never slow you down.
+perk.spoiler.line,+{food} food if time runs out.
+perk.spoiler.detail,"If nobody reaches {goal} before time's up, you bank {food} bonus food first."
+tag.preFilled.one,One slot pre-filled: {abilities}
+tag.preFilled.two,Two slots pre-filled: {abilities}
+pill.startsWith,Starts with {abilities} equipped
+loadout.row.shared,ANY BIRD
+loadout.row.class,{cls} ONLY
+loadout.hint.shared,optional · any chicken can take these
+loadout.hint.class,optional
+loadout.count,{n} EQUIPPED
+loadout.detail.empty,Tap a move for the details.
+loadout.registryMissing,"No abilities in registry.
+Assign AbilityRegistrySO in ProjectInstaller."
+slot.empty,EMPTY
+hint.console,←→ Select · A Confirm · LB/RB Tab
+category.steal,STEAL
+category.control,CONTROL
+category.defense,DEFENSE
+category.utility,UTILITY
+cooldown.short,SHORT
+cooldown.med,MED
+settings.title,SETTINGS
+settings.close,CLOSE
+settings.rangeGuides,Range Guides
+settings.rangeGuides.desc,Show how far your moves reach.
+settings.devMode,Dev Mode
+settings.devMode.desc,Unlock the Ability Lab.
+settings.performance,Performance Mode
+settings.performance.desc,Static chickens in menus. Saves battery.
+settings.reducedMotion,Reduced Motion
+settings.reducedMotion.desc,Calms camera shake and screen movement.
+lobby.rules,HOUSE RULES
+lobby.flock,THE FLOCK
+lobby.invite.label,INVITE CODE · TAP TO COPY
+lobby.join.label,ENTER JOIN CODE
+lobby.setting.arena,ARENA
+lobby.setting.time,TIME
+lobby.setting.goal,GOAL
+lobby.setting.mode,MODE
+lobby.value.arena,Sunny Farm
+lobby.value.mode,Free-for-all
+lobby.value.goal,{n} food
+lobby.count,{n}/{max}
+lobby.count.unknown,—
+lobby.status.solo,Solo · 3 CPU
+lobby.status.waiting,Waiting…
+lobby.status.enterCode,Enter code
+lobby.waitingFor,WAITING FOR P{n}
+lobby.playerTag,P{n}
+lobby.classLine,{cls} · {role}
+lobby.codePlaceholder,·····
+lobby.copied,Copied {code}.
+lobby.err.create,Could not create lobby.
+lobby.err.noCode,Enter a join code first.
+lobby.err.join,Could not join that code.
+lobby.joining,Joining…
+tag.host,HOST
+tag.cpu,CPU
+state.ready,✓ READY
+state.picking,PICKING
+lobby.bot.1,DashFox
+lobby.bot.2,BrunoB
+lobby.bot.3,PeckNoir

@@ -431,11 +431,11 @@ current, shipped state.
 | Class | Specialization | Passive | Signature (forced) |
 |---|---|---|---|
 | **Warrior** | The Brute (Bully) | Steals bigger, + cargo room to hold it | **Scrap** (steal on contact) |
-| | The Relentless | Abilities return faster | **Headbutt** (shove + stagger, low cd) |
-| **Speedy** | The Agile (Slippery) | Control effects wear off 40% faster | ⏳ *pending — a Peck variant* |
+| | The Relentless | Every move except Peck recharges 25% faster | **Headbutt** (shove + stagger, low cd) |
+| **Speedy** | The Agile (Slippery) | Slows, roots and stuns end 40% sooner | ⏳ *pending — a Peck variant* |
 | | The Anxious (Featherfoot) | Immune to the pile-slow | ⏳ *pending — a Peck variant* |
 | **Fatty** | The Hauler (Hoarder) | Carries at least a full win's worth | ⏳ *pending — a Peck variant* |
-| | The Boulder (Bulwark) | Shorter control, 75% less knockback | **Ground Quake** (stomp roots the area) |
+| | The Boulder (Bulwark) | Knockback cut by 75%; slows, roots and stuns end 35% sooner | **Ground Quake** (stomp roots the area) |
 | **Assassin** | The Reaper (Spoiler) | Banks a bonus if the clock expires with no winner | **Mark/Kill** (the execute, §6.4) |
 | | The Burglar (Thief) | Every steal takes 1.6x more | **Sneaky Steal** |
 

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.BulwarkPassiveSO
   DisplayName: Bulwark
   ShortLabel: BULW
-  Description: Shrugs off control effects and most knockback.
+  Description: Knockback cut by 75%. Slows, roots and stuns end 35% sooner.
   Icon: 
   AccentColor: {r: 0.62, g: 0.66, b: 0.72, a: 1}
   Category: 3

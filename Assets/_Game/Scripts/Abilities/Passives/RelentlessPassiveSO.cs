@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using UnityEngine;
 
 namespace CluckWars.Abilities
@@ -30,6 +31,11 @@ namespace CluckWars.Abilities
         }
 
         public override bool IsSignature => true;
+
+        public override string PerkLineKey => UiKeys.PerkRelentlessLine;
+        public override string PerkDetailKey => UiKeys.PerkRelentlessDetail;
+        public override (string name, object value)[] PerkArgs(MatchConfigSO match) =>
+            new (string, object)[] { ("pct", Percent(1f - CooldownMultiplier)) };
         protected override string DefaultIcon => "\u26A1";
 
         public override float ModifyCooldown(float seconds, AbilityBaseSO ability, ChickenController self)

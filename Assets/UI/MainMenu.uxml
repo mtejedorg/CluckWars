@@ -30,38 +30,38 @@
 
         <!-- ── Title ── -->
         <ui:VisualElement class="cw-menu-titleblock" picking-mode="Ignore">
-            <ui:Label text="CLUCK WARS" class="cw-title cw-accent cw-menu-title" />
-            <ui:Label text="4-PLAYER FARMYARD FREE-FOR-ALL" class="cw-body cw-menu-subtitle" />
+            <ui:Label text="@main.title" class="cw-title cw-accent cw-menu-title" />
+            <ui:Label text="@main.subtitle" class="cw-body cw-menu-subtitle" />
         </ui:VisualElement>
 
         <!-- ── Cast band: the four playable chickens ── -->
         <ui:VisualElement name="CastBand" class="cw-menu-cast" picking-mode="Ignore">
             <ui:VisualElement class="cw-menu-cast__item">
                 <ui:VisualElement class="cw-chicken cw-chicken--warrior cw-menu-cast__art" />
-                <ui:Label text="WARRIOR" class="cw-menu-cast__name cw-menu-cast__name--warrior" />
+                <ui:Label text="@class.warrior.short" class="cw-menu-cast__name cw-menu-cast__name--warrior" />
             </ui:VisualElement>
             <ui:VisualElement class="cw-menu-cast__item">
                 <ui:VisualElement class="cw-chicken cw-chicken--speedy cw-menu-cast__art" />
-                <ui:Label text="SPEEDY" class="cw-menu-cast__name cw-menu-cast__name--speedy" />
+                <ui:Label text="@class.speedy.short" class="cw-menu-cast__name cw-menu-cast__name--speedy" />
             </ui:VisualElement>
             <ui:VisualElement class="cw-menu-cast__item">
                 <ui:VisualElement class="cw-chicken cw-chicken--fatty cw-menu-cast__art" />
-                <ui:Label text="FATTY" class="cw-menu-cast__name cw-menu-cast__name--fatty" />
+                <ui:Label text="@class.fatty.short" class="cw-menu-cast__name cw-menu-cast__name--fatty" />
             </ui:VisualElement>
             <ui:VisualElement class="cw-menu-cast__item">
                 <ui:VisualElement class="cw-chicken cw-chicken--assassin cw-menu-cast__art" />
-                <ui:Label text="ASSASSIN" class="cw-menu-cast__name cw-menu-cast__name--assassin" />
+                <ui:Label text="@class.assassin.short" class="cw-menu-cast__name cw-menu-cast__name--assassin" />
             </ui:VisualElement>
         </ui:VisualElement>
 
         <!-- ── Actions: one primary, two secondary ── -->
         <ui:VisualElement class="cw-menu-actions">
-            <ui:Button name="SoloBtn" text="▶  PLAY SOLO" class="cw-btn cw-btn--gold cw-menu-primary" />
+            <ui:Button name="SoloBtn" text="@btn.playSolo" class="cw-btn cw-btn--gold cw-menu-primary" />
             <ui:VisualElement name="ModeRow" class="cw-mode-row cw-menu-secondary-row">
-                <ui:Button name="HostBtn" text="HOST GAME" class="cw-btn cw-btn--green cw-menu-secondary" />
-                <ui:Button name="JoinBtn" text="JOIN GAME" class="cw-btn cw-btn--neutral cw-menu-secondary" />
+                <ui:Button name="HostBtn" text="@btn.host" class="cw-btn cw-btn--green cw-menu-secondary" />
+                <ui:Button name="JoinBtn" text="@btn.join" class="cw-btn cw-btn--neutral cw-menu-secondary" />
             </ui:VisualElement>
-            <ui:Label name="MainMenuHint" text="Solo runs a full match against 3 CPU chickens." class="cw-body cw-menu-hint" />
+            <ui:Label name="MainMenuHint" text="@main.soloHint" class="cw-body cw-menu-hint" />
 
             <!-- Developer tools. Hidden unless PlayerPreferences.DeveloperModeEnabled,
                  which defaults to OFF and is set from the Developer Mode toggle on the
@@ -74,7 +74,7 @@
                  Display is driven from C#; do not give it a display rule in USS or the two
                  will fight. -->
             <ui:VisualElement name="DevRow" class="cw-menu-secondary-row" style="display: none;">
-                <ui:Button name="AbilityLabBtn" text="ABILITY LAB" class="cw-btn cw-btn--neutral cw-menu-secondary" />
+                <ui:Button name="AbilityLabBtn" text="@btn.abilityLab" class="cw-btn cw-btn--neutral cw-menu-secondary" />
             </ui:VisualElement>
         </ui:VisualElement>
 

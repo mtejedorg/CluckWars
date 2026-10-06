@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.RelentlessPassiveSO
   DisplayName: Relentless
   ShortLabel: RLNT
-  Description: Combat abilities come back 25% faster.
+  Description: Every move except Peck recharges 25% faster.
   Icon: 
   AccentColor: {r: 0.95, g: 0.45, b: 0.25, a: 1}
   Category: 3

@@ -6,6 +6,41 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Menu overhaul, Phase 0 stage 1: wording dictionary, perk templates, font, Performance Mode (2026-10-06)
+
+Data / services / text foundation for `docs/superpowers/specs/2026-10-06-menu-ui-overhaul.md`.
+No restyle yet (stage 2). EditMode **641/641**.
+
+- **Wording dictionary.** `Assets/_Game/Resources/Text/UiText.csv` (`key,en`, RFC-4180) loaded by the static
+  `CluckWars.Localization.UiText` (`Get`, `Format(key, ("name", value)...)`, `ResolveTree`). Every key has a
+  compile-time handle in `Localization/UiKeys.cs`; placeholders are declared with `[UiArgs("n")]`. **To add a
+  string:** CSV row + `UiKeys` constant (+ `[UiArgs]`). A missing key renders `#key#`, a missing arg `#name#`,
+  each logged once through the logger `MenuUiController` registers via `UiText.SetLogger`.
+- **UXML text keys.** In the four menu UXML files a label/button/toggle text is `@key` (e.g.
+  `text="@screen.class.title"`) or empty when code fills it. `MenuUiController.ClonePage` calls
+  `UiText.ResolveTree` once per cloned page. `UiTextTests` fails on a literal, an unknown key, an orphan
+  CSV row, a constant with no row, a template/contract mismatch, or a literal `.text =`/`new Label("..")`
+  in `MenuUiController`. `Lobby.uxml` `SetTime`/`SetGoal` are now blank (controller always fills them).
+- **Templated perk lines.** `PassiveAbilitySO.PerkLineKey` / `PerkDetailKey` / `PerkArgs(MatchConfigSO)` /
+  `PerkLine()` / `PerkDetail()`; each of the 8 passives supplies its numbers from its own fields. The class
+  select spec pills show `PerkLine` instead of `Description`. `PerkTextTests` recomputes every expected line
+  from the asset fields. **If a perk's mechanic (not just numbers) changes, rewrite its template.**
+- **Descriptions fixed** on Relentless, Slippery, Bulwark `.asset`s (real numbers, "except Peck"); `docs/site/index.html`
+  and GDD §5.3 updated to match. **Maestro: republish the compendium Artifact.**
+- **Font.** `Nunito-Bold.ttf` is now a static wght-700 instance (GUID kept); new static `Nunito-ExtraBold.ttf`
+  (800). `NunitoFontTests` asserts no `fvar` and `usWeightClass`.
+- **Performance Mode.** `PlayerPreferences.PerformanceModeEnabled` (default ON when `Application.isMobilePlatform`).
+  No UI yet: the Settings sheet is stage 2.
+- **Spec deviations.** Class names/roles: roles are now the spec's Brawler / Hit & Run / Hauler / Saboteur;
+  all four classes have a weak callout (Warrior "Great at nothing."). The loadout row hint "COMBO lets you take two"
+  was dropped (COMBO retired in v0.7); row titles are now `ANY BIRD` / `{CLASS} ONLY`.
+- **Outstanding for stage 2 (ui-designer):** Settings sheet UI (keys `settings.*` exist, gear on main menu,
+  remove both toggles from the loadout), the 9 px STARTER tag, lobby class-line / READY-chip clipping, and
+  `btn.playAgain*` / `label.perk` / `label.starters` keys exist but are not bound yet. `MatchOverlays.uxml`
+  (in-match waiting room) still carries literals; it is outside the four menu pages.
+
+---
+
 ## ✅ Subclass model: two pre-equipped slots per specialization (2026-10-06)
 
 Maestro's goal: every subclass (specialization) pre-equips **two** abilities — a **Peck slot**

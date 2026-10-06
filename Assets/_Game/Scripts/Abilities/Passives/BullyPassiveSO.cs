@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using UnityEngine;
 
 namespace CluckWars.Abilities
@@ -37,5 +38,9 @@ namespace CluckWars.Abilities
 
         public override float ModifyCargoCapacity(float capacity, ChickenController self) =>
             capacity + BonusCapacity;
+
+        public override string PerkLineKey => UiKeys.PerkBullyLine;
+        public override (string name, object value)[] PerkArgs(MatchConfigSO match) =>
+            new (string, object)[] { ("steal", Percent(StealMultiplier - 1f)), ("cap", Mathf.RoundToInt(BonusCapacity)) };
     }
 }

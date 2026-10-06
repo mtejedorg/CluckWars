@@ -54,9 +54,9 @@
              not ShowMainMenu — it must not discard the class/specialization/
              ability picks the way leaving via HomeBtn on Step 1 would. -->
         <ui:VisualElement style="align-items: center; justify-content: center; padding-top: 20px; padding-bottom: 12px; flex-shrink: 0;">
-            <ui:Button name="BackBtn" text="◀ BACK" class="cw-home-btn" />
+            <ui:Button name="BackBtn" text="@nav.back" class="cw-home-btn" />
             <ui:VisualElement class="cw-ribbon">
-                <ui:Label text="BUILD YOUR LOADOUT" class="cw-title" />
+                <ui:Label text="@screen.loadout.title" class="cw-title" />
             </ui:VisualElement>
         </ui:VisualElement>
 
@@ -87,10 +87,10 @@
 
                 <ui:VisualElement name="CommonRow" class="cw-pick-row cw-well" style="padding: 14px;">
                     <ui:VisualElement class="cw-pick-row__head">
-                        <ui:Label text="COMMON" class="cw-pick-row__title" />
-                        <ui:Label name="CommonHint" text="optional · any chicken can take these" class="cw-pick-row__hint" />
+                        <ui:Label name="CommonTitle" text="@loadout.row.shared" class="cw-pick-row__title" />
+                        <ui:Label name="CommonHint" text="@loadout.hint.shared" class="cw-pick-row__hint" />
                         <ui:VisualElement class="cw-pick-row__rule" />
-                        <ui:Label name="CommonCount" text="0 EQUIPPED" class="cw-pick-row__count" />
+                        <ui:Label name="CommonCount" text="" class="cw-pick-row__count" />
                     </ui:VisualElement>
                     <!-- HORIZONTAL scroll, not a wrapping grid — the actual fix for
                          the documented overlap bug (see .cw-pick-cards below): a
@@ -112,10 +112,10 @@
 
                 <ui:VisualElement name="ClassRow" class="cw-pick-row cw-well" style="padding: 14px;">
                     <ui:VisualElement class="cw-pick-row__head">
-                        <ui:Label text="CLASS" class="cw-pick-row__title" />
-                        <ui:Label name="ClassHint" text="Warrior only" class="cw-pick-row__hint" />
+                        <ui:Label name="ClassTitle" text="" class="cw-pick-row__title" />
+                        <ui:Label name="ClassHint" text="@loadout.hint.class" class="cw-pick-row__hint" />
                         <ui:VisualElement class="cw-pick-row__rule" />
-                        <ui:Label name="ClassCount" text="0 EQUIPPED" class="cw-pick-row__count" />
+                        <ui:Label name="ClassCount" text="" class="cw-pick-row__count" />
                     </ui:VisualElement>
                     <ui:ScrollView name="ClassScroll" mode="Horizontal" class="cw-pick-scroll--h">
                         <ui:VisualElement name="ClassCards" class="cw-pick-cards" />
@@ -129,7 +129,7 @@
                  this exists instead of a per-card description). -->
             <ui:VisualElement name="AbilityDetail" class="cw-ability-detail">
                 <ui:Label name="AbilityDetailName" text="" class="cw-ability-detail__name" />
-                <ui:Label name="AbilityDetailText" text="Tap an ability to see what it does." class="cw-ability-detail__text" />
+                <ui:Label name="AbilityDetailText" text="@loadout.detail.empty" class="cw-ability-detail__text" />
             </ui:VisualElement>
 
             <!-- Display options — unchanged from the old single screen (see
@@ -137,18 +137,18 @@
                  reasoning: no settings screen exists, both toggles live on the
                  screen they are about, and .cw-opt-row is landscape-only). -->
             <ui:VisualElement name="OptionsRow" class="cw-opt-row">
-                <ui:Toggle name="RangeGuidesToggle" text="Ability Range Guides" class="cw-opt-toggle" />
-                <ui:Label name="RangeGuidesHint" text="Show a faint outline of what each equipped ability can reach." class="cw-opt-hint" />
+                <ui:Toggle name="RangeGuidesToggle" text="@settings.rangeGuides" class="cw-opt-toggle" />
+                <ui:Label name="RangeGuidesHint" text="@settings.rangeGuides.desc" class="cw-opt-hint" />
             </ui:VisualElement>
 
             <ui:VisualElement name="DevOptionsRow" class="cw-opt-row">
-                <ui:Toggle name="DeveloperModeToggle" text="Developer Mode" class="cw-opt-toggle" />
-                <ui:Label name="DeveloperModeHint" text="Show the Ability Lab and other developer tools on the main menu." class="cw-opt-hint" />
+                <ui:Toggle name="DeveloperModeToggle" text="@settings.devMode" class="cw-opt-toggle" />
+                <ui:Label name="DeveloperModeHint" text="@settings.devMode.desc" class="cw-opt-hint" />
             </ui:VisualElement>
 
-            <ui:Button name="ReadyBtn" text="PICK ABILITIES" class="cw-btn cw-btn--neutral" style="flex-shrink: 0; letter-spacing: 3px;" />
+            <ui:Button name="ReadyBtn" text="" class="cw-btn cw-btn--neutral" style="flex-shrink: 0; letter-spacing: 3px;" />
         </ui:VisualElement>
 
-        <ui:Label name="ConsoleHints" text="←→ Select · A Confirm · LB/RB Tab" class="cw-body cw-console-hints" style="position: absolute; bottom: 12px; left: 24px; opacity: 0.6; display: none;" />
+        <ui:Label name="ConsoleHints" text="@hint.console" class="cw-body cw-console-hints" style="position: absolute; bottom: 12px; left: 24px; opacity: 0.6; display: none;" />
     </ui:VisualElement>
 </ui:UXML>

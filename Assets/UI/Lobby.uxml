@@ -16,61 +16,61 @@
                      192 px of it, so a full-size title would clip. -->
                 <ui:VisualElement style="align-items: flex-start; margin-bottom: 8px;">
                     <ui:VisualElement class="cw-ribbon">
-                        <ui:Label text="MATCH LOBBY" class="cw-title" style="font-size: 40px;" />
+                        <ui:Label text="@screen.lobby.title" class="cw-title" style="font-size: 40px;" />
                     </ui:VisualElement>
                 </ui:VisualElement>
 
                 <!-- Invite code (host mode) -->
                 <ui:VisualElement name="InviteCard" class="cw-card cw-lobby-card">
-                    <ui:Label text="INVITE CODE · TAP TO COPY" class="cw-lobby-cardlabel" />
+                    <ui:Label text="@lobby.invite.label" class="cw-lobby-cardlabel" />
                     <ui:VisualElement name="CodeTiles" class="cw-code-tiles" />
                     <ui:VisualElement class="cw-lobby-btnrow">
-                        <ui:Button name="ShareBtn" text="SHARE" class="cw-mini-btn cw-mini-btn--gold" />
-                        <ui:Button name="CopyBtn" text="COPY" class="cw-mini-btn" />
+                        <ui:Button name="ShareBtn" text="@btn.share" class="cw-mini-btn cw-mini-btn--gold" />
+                        <ui:Button name="CopyBtn" text="@btn.copy" class="cw-mini-btn" />
                     </ui:VisualElement>
                 </ui:VisualElement>
 
                 <!-- Join code entry (join mode) -->
                 <ui:VisualElement name="JoinCard" class="cw-card cw-lobby-card cw-hidden">
-                    <ui:Label text="ENTER JOIN CODE" class="cw-lobby-cardlabel" />
+                    <ui:Label text="@lobby.join.label" class="cw-lobby-cardlabel" />
                     <ui:TextField name="LobbyJoinField" class="cw-input" style="margin-top: 12px;" />
                 </ui:VisualElement>
 
                 <!-- Match settings -->
                 <ui:VisualElement class="cw-card cw-lobby-card">
-                    <ui:Label text="MATCH SETTINGS" class="cw-lobby-cardhead" />
+                    <ui:Label text="@lobby.rules" class="cw-lobby-cardhead" />
                     <ui:VisualElement class="cw-setting-row">
-                        <ui:Label text="ARENA" class="cw-setting-k" /><ui:Label text="Sunny Farm" class="cw-setting-v" />
+                        <ui:Label text="@lobby.setting.arena" class="cw-setting-k" /><ui:Label text="@lobby.value.arena" class="cw-setting-v" />
                     </ui:VisualElement>
                     <ui:VisualElement class="cw-setting-row">
-                        <ui:Label text="TIME" class="cw-setting-k" /><ui:Label name="SetTime" text="0:45" class="cw-setting-v" />
+                        <ui:Label text="@lobby.setting.time" class="cw-setting-k" /><ui:Label name="SetTime" text="" class="cw-setting-v" />
                     </ui:VisualElement>
                     <ui:VisualElement class="cw-setting-row">
-                        <ui:Label text="GOAL" class="cw-setting-k" /><ui:Label name="SetGoal" text="40 food" class="cw-setting-v" />
+                        <ui:Label text="@lobby.setting.goal" class="cw-setting-k" /><ui:Label name="SetGoal" text="" class="cw-setting-v" />
                     </ui:VisualElement>
                     <ui:VisualElement class="cw-setting-row">
-                        <ui:Label text="MODE" class="cw-setting-k" /><ui:Label name="SetMode" text="Free-for-all" class="cw-setting-v" />
+                        <ui:Label text="@lobby.setting.mode" class="cw-setting-k" /><ui:Label name="SetMode" text="@lobby.value.mode" class="cw-setting-v" />
                     </ui:VisualElement>
                 </ui:VisualElement>
 
                 <!-- Status -->
                 <ui:VisualElement name="StatusPill" class="cw-status-pill">
                     <ui:VisualElement name="StatusDot" class="cw-status-dot" />
-                    <ui:Label name="StatusCount" text="1/4" class="cw-status-count" />
-                    <ui:Label name="StatusText" text="Waiting…" class="cw-status-text" />
+                    <ui:Label name="StatusCount" text="" class="cw-status-count" />
+                    <ui:Label name="StatusText" text="" class="cw-status-text" />
                 </ui:VisualElement>
 
                 <ui:VisualElement style="flex-grow: 1; min-height: 8px;" />
 
-                <ui:Button name="StartBtn" text="START MATCH ▶" class="cw-btn cw-btn--green cw-lobby-start" />
-                <ui:Button name="BackBtn" text="◀ BACK" class="cw-lobby-back" />
+                <ui:Button name="StartBtn" text="@btn.start" class="cw-btn cw-btn--green cw-lobby-start" />
+                <ui:Button name="BackBtn" text="@nav.back" class="cw-lobby-back" />
                 <ui:Label name="LobbyStatus" text="" class="cw-lobby-error" />
             </ui:VisualElement>
 
             <!-- ─ RIGHT: 2×2 player grid ─ -->
             <ui:VisualElement class="cw-lobby-right">
                 <ui:VisualElement class="cw-players-head">
-                    <ui:Label text="PLAYERS" class="cw-players-title" />
+                    <ui:Label text="@lobby.flock" class="cw-players-title" />
                     <ui:VisualElement class="cw-players-divider" />
                 </ui:VisualElement>
                 <ui:VisualElement name="PlayerGrid" class="cw-player-grid" />

@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using UnityEngine;
 
 namespace CluckWars.Abilities
@@ -32,5 +33,10 @@ namespace CluckWars.Abilities
 
         public override float ModifyCargoCapacity(float capacity, ChickenController self) =>
             Mathf.Max(capacity, MinimumCapacity);
+
+        public override string PerkLineKey => UiKeys.PerkHoarderLine;
+        public override string PerkDetailKey => UiKeys.PerkHoarderDetail;
+        public override (string name, object value)[] PerkArgs(MatchConfigSO match) =>
+            new (string, object)[] { ("cap", Mathf.RoundToInt(MinimumCapacity)) };
     }
 }

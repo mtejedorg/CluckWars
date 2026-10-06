@@ -1,4 +1,6 @@
+using System;
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using UnityEngine;
 
 namespace CluckWars.Abilities
@@ -64,6 +66,38 @@ namespace CluckWars.Abilities
         /// the alternative fork.
         /// </remarks>
         public virtual bool IsSignature => false;
+
+        // ---- Player-facing perk text -------------------------------------------------
+        // Each specialization names its one-line summary (and optional longer detail) by
+        // UiKeys key, and supplies the named numbers those templates use FROM ITS OWN
+        // FIELDS. Nothing here is authored prose with a number typed into it, so changing a
+        // value in a .asset changes the text; PerkTextTests fails if the two ever disagree.
+        // If a perk's MECHANIC changes (not just its numbers), rewrite its template.
+
+        /// <summary>UiKeys template for the one-line perk summary, or null if this passive has none.</summary>
+        public virtual string PerkLineKey => null;
+
+        /// <summary>UiKeys template for the longer perk explanation, or null if there is none.</summary>
+        public virtual string PerkDetailKey => null;
+
+        /// <summary>
+        /// The named arguments for <see cref="PerkLineKey"/> and <see cref="PerkDetailKey"/>,
+        /// computed from this passive's fields. <paramref name="match"/> supplies the one value
+        /// a passive does not own (Spoiler's win target); pass the injected MatchConfig.
+        /// </summary>
+        public virtual (string name, object value)[] PerkArgs(MatchConfigSO match) =>
+            Array.Empty<(string, object)>();
+
+        /// <summary>The one-line perk summary. Falls back to <c>Description</c> only for a passive with no template.</summary>
+        public string PerkLine(MatchConfigSO match = null) =>
+            PerkLineKey != null ? UiText.Format(PerkLineKey, PerkArgs(match)) : Description;
+
+        /// <summary>The longer perk explanation. Falls back to <see cref="PerkLine"/> when there is no detail.</summary>
+        public string PerkDetail(MatchConfigSO match = null) =>
+            PerkDetailKey != null ? UiText.Format(PerkDetailKey, PerkArgs(match)) : PerkLine(match);
+
+        /// <summary>Whole-percent rounding for perk numbers (0.25 becomes 25).</summary>
+        protected static int Percent(float fraction) => Mathf.RoundToInt(fraction * 100f);
 
         // ---- Effect hooks -------------------------------------------------------
         // Each hook has exactly ONE production chokepoint, named in its doc comment. If you

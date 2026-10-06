@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using UnityEngine;
 
 namespace CluckWars.Abilities
@@ -26,5 +27,8 @@ namespace CluckWars.Abilities
         protected override string DefaultIcon => "\U0001FAB6";
 
         public override bool IgnoresPileSlow(ChickenController self) => true;
+
+        public override string PerkLineKey => UiKeys.PerkFeatherfootLine;
+        public override string PerkDetailKey => UiKeys.PerkFeatherfootDetail;
     }
 }
