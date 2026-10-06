@@ -31,10 +31,6 @@ class.warrior.short,WARRIOR
 class.speedy.short,SPEEDY
 class.fatty.short,FATTY
 class.assassin.short,ASSASSIN
-class.warrior.name,WARRIOR CHICKEN
-class.speedy.name,SPEEDY CHICKEN
-class.fatty.name,FATTY CHICKEN
-class.assassin.name,ASSASSIN CHICKEN
 role.warrior,Brawler
 role.speedy,Hit & Run
 role.fatty,Hauler
@@ -66,15 +62,10 @@ perk.featherfoot.line,Raid piles at full speed.
 perk.featherfoot.detail,Food piles never slow you down.
 perk.spoiler.line,+{food} food if time runs out.
 perk.spoiler.detail,"If nobody reaches {goal} before time's up, you bank {food} bonus food first."
-tag.preFilled.one,One slot pre-filled: {abilities}
-tag.preFilled.two,Two slots pre-filled: {abilities}
-pill.startsWith,Starts with {abilities} equipped
 loadout.row.shared,ANY BIRD
 loadout.row.class,{cls} ONLY
-loadout.hint.shared,optional · any chicken can take these
-loadout.hint.class,optional
-loadout.count,{n} EQUIPPED
 loadout.detail.empty,Tap a move for the details.
+loadout.next,NEXT
 loadout.registryMissing,"No abilities in registry.
 Assign AbilityRegistrySO in ProjectInstaller."
 slot.empty,EMPTY
@@ -96,7 +87,6 @@ settings.performance.desc,Static chickens in menus. Saves battery.
 settings.reducedMotion,Reduced Motion
 settings.reducedMotion.desc,Calms camera shake and screen movement.
 lobby.rules,HOUSE RULES
-lobby.flock,THE FLOCK
 lobby.invite.label,INVITE CODE · TAP TO COPY
 lobby.join.label,ENTER JOIN CODE
 lobby.setting.arena,ARENA
@@ -124,6 +114,7 @@ tag.host,HOST
 tag.cpu,CPU
 state.ready,✓ READY
 state.picking,PICKING
+lobby.allReady,READY!
 lobby.bot.1,DashFox
 lobby.bot.2,BrunoB
 lobby.bot.3,PeckNoir

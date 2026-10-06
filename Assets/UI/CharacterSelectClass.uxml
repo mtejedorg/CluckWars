@@ -1,220 +1,115 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
-    <!-- Cluck Wars — character select STEP 1 "Choose Your Chicken" (2026-09 split).
+    <!-- Cluck Wars — STEP 1 "PICK YOUR BIRD" (menu overhaul Phase 1, 2026-10-06).
 
-         Character select used to be one screen: class pick + passive fork + stat
-         preview + two ability pick rows + detail strip + toggles + ready button,
-         all fighting for the same ~1080px of vertical space. It is now two
-         screens — this one decides WHO (class + specialization), the reworked
-         Assets/UI/CharacterSelect.uxml decides WHAT (the four ability slots).
+         Four big portrait tiles (class colour fill, big chicken, name + role) and ONE hero
+         area for the selected class: big chicken on a class-tinted stage, class name, quote,
+         strong/weak callouts, two PERK badges (tap = select that perk and show its detail)
+         and the selected perk's STARTERS as icon chips. GEAR UP is the one green CTA.
 
-         Binding contract (MenuUiController.BuildClassSelect/RefreshClassSelect —
-         read that method before changing names here, it queries by these exact
-         names/classes):
-           - HomeBtn, NextBtn                                    (page-level)
-           - ClassWarrior / ClassSpeedy / ClassFatty / ClassAssassin  (chip roots,
-             matches the ChipNames array — do not rename)
-           - <ChipName>Art (e.g. ClassWarriorArt)                (per chip)
-           - SpecOptA / SpecOptB per chip, each carrying children found by
-             CLASS NAME (not element name, since the pair repeats per chip):
-             .cw-spec-pill__name / .cw-spec-pill__desc / .cw-spec-pill__signature
-           - PreviewChicken, PreviewGlow, PreviewDisc, PreviewName, PreviewQuote,
-             RoleCalloutStrong, RoleCalloutWeak                   (page-level, ONE
-             each — this is a single shared preview panel that repaints for
-             whichever class is currently selected, same idea as the old Column B,
-             not a per-card duplicate)
-
-         Deliberate deviation from the original UI-build task brief: the brief
-         asked for the strong/weak callout to live INSIDE each of the four cards.
-         The controller that ships alongside this file (already written — see the
-         header comment on MenuUiController.cs) queries RoleCalloutStrong/Weak as
-         ONE global pair and repaints it from Meta[cls].Stats on selection, mirroring
-         the single preview panel the old 3-column screen used. Four duplicate-named
-         copies would only let the FIRST one in document order ever update (UQuery-
-         by-name returns the first match), leaving the other three permanently wrong.
-         So this file keeps one shared preview column instead — see #Preview below.
-         Same reasoning killed the per-class narrative strong/weak copy the brief
-         asked for: RefreshRoleCallouts overwrites RoleCalloutStrong/Weak with a
-         computed "STRONG: CARGO/RATE"-style string, not narrative prose, so any
-         flavor text authored here would be replaced before a player ever sees it.
-         The "+"/"−" glyphs the brief wanted ARE preserved despite that: they are
-         static siblings the controller never touches (see .cw-role-glyph below),
-         not part of the label the controller overwrites.
-
-         PreFilledTag (per chip) IS wired: BuildClassSelect collects it and
-         RefreshPreFilledTags overwrites the placeholder text below with
-         "One slot pre-filled: <Ability>". Peck.asset AllowedClasses=7
-         (Warrior|Speedy|Fatty, see AbilityBaseSO.ChickenClassFlags), so
-         Warrior/Speedy/Fatty carry the tag and Assassin does not — verified
-         against the asset, not assumed from the class flavor text.
-         Landscape lays the four chips out as a 2x2 grid; the width/height
-         budget lives beside the .cw-cs-classes rules in CluckWarsTheme.uss.
+         Everything here is built ONCE; MenuUiController.RefreshClassSelect only toggles
+         classes and rewrites labels. Binding contract (queried by name):
+           HomeBtn, NextBtn
+           ClassWarrior / ClassSpeedy / ClassFatty / ClassAssassin  (tiles; ChipNames order)
+           <TileName>Art                                           (tile chicken)
+           Hero, HeroStage, PreviewGlow, PreviewDisc, PreviewChicken, PreviewName, PreviewQuote,
+           RoleCalloutStrong, RoleCalloutWeak
+           PerkBadgeA / PerkBadgeB (children by class .cw-perk-badge__name / __line), PerkDetail
+           StarterRow, StarterChip0 / StarterChip1 (children .cw-starter-chip__icon / __name)
 
          Sizes follow the MOBILE SIZING CONTRACT at the top of CluckWarsTheme.uss. -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
 
     <ui:VisualElement name="CharacterSelectClassPage" class="cw-screen cw-page">
 
-        <!-- Header ribbon (+ home button, absolutely placed top-left) — same
-             pattern as the old single-screen CharacterSelect.uxml. -->
-        <ui:VisualElement style="align-items: center; justify-content: center; padding-top: 20px; padding-bottom: 12px; flex-shrink: 0;">
+        <ui:VisualElement class="cw-page-header">
             <ui:Button name="HomeBtn" text="@nav.home" class="cw-home-btn" />
             <ui:VisualElement class="cw-ribbon">
                 <ui:Label text="@screen.class.title" class="cw-title" />
             </ui:VisualElement>
         </ui:VisualElement>
 
-        <!-- Body: classes list (left) + shared preview panel (right). Reuses the
-             .cw-cs-body/.cw-cs-classes/.cw-cs-preview responsive classes that the
-             OLD CharacterSelect.uxml owned — that file dropped its class list and
-             preview column in the Step-2 rework below, so this screen inherits
-             them clean rather than inventing parallel layout classes. -->
-        <ui:VisualElement name="Body" class="cw-cs-body" style="padding-left: 24px; padding-right: 24px; padding-bottom: 8px;">
+        <ui:VisualElement name="Body" class="cw-pick-body">
 
-            <ui:VisualElement name="ClassList" class="cw-cs-classes">
-
-                <ui:VisualElement name="ClassWarrior" class="cw-class-chip">
+            <ui:VisualElement name="ClassList" class="cw-class-tiles">
+                <ui:VisualElement name="ClassWarrior" class="cw-class-tile">
                     <ui:VisualElement class="cw-glow" picking-mode="Ignore" />
-                    <ui:VisualElement class="cw-class-chip__toprow">
-                        <ui:VisualElement name="ClassWarriorArt" class="cw-class-chip__art" />
-                        <ui:VisualElement class="cw-class-chip__titles">
-                            <ui:Label text="@class.warrior.short" class="cw-class-chip__name" />
-                            <ui:Label text="@role.warrior" class="cw-class-chip__role" />
-                        </ui:VisualElement>
-                        <ui:Label name="PreFilledTag" text="" class="cw-prefilled-tag" />
-                    </ui:VisualElement>
-                    <ui:VisualElement class="cw-spec-pill-row">
-                        <ui:Button name="SpecOptA" class="cw-spec-pill">
-                            <ui:Label text="" class="cw-spec-pill__name" />
-                            <ui:Label text="" class="cw-spec-pill__desc" />
-                            <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
-                        </ui:Button>
-                        <ui:Button name="SpecOptB" class="cw-spec-pill">
-                            <ui:Label text="" class="cw-spec-pill__name" />
-                            <ui:Label text="" class="cw-spec-pill__desc" />
-                            <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
-                        </ui:Button>
-                    </ui:VisualElement>
+                    <ui:VisualElement name="ClassWarriorArt" class="cw-chicken cw-class-tile__art" picking-mode="Ignore" />
+                    <ui:Label text="@class.warrior.short" class="cw-class-tile__name" picking-mode="Ignore" />
+                    <ui:Label text="@role.warrior" class="cw-class-tile__role" picking-mode="Ignore" />
                 </ui:VisualElement>
-
-                <ui:VisualElement name="ClassSpeedy" class="cw-class-chip">
+                <ui:VisualElement name="ClassSpeedy" class="cw-class-tile">
                     <ui:VisualElement class="cw-glow" picking-mode="Ignore" />
-                    <ui:VisualElement class="cw-class-chip__toprow">
-                        <ui:VisualElement name="ClassSpeedyArt" class="cw-class-chip__art" />
-                        <ui:VisualElement class="cw-class-chip__titles">
-                            <ui:Label text="@class.speedy.short" class="cw-class-chip__name" />
-                            <ui:Label text="@role.speedy" class="cw-class-chip__role" />
-                        </ui:VisualElement>
-                        <ui:Label name="PreFilledTag" text="" class="cw-prefilled-tag" />
-                    </ui:VisualElement>
-                    <ui:VisualElement class="cw-spec-pill-row">
-                        <ui:Button name="SpecOptA" class="cw-spec-pill">
-                            <ui:Label text="" class="cw-spec-pill__name" />
-                            <ui:Label text="" class="cw-spec-pill__desc" />
-                            <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
-                        </ui:Button>
-                        <ui:Button name="SpecOptB" class="cw-spec-pill">
-                            <ui:Label text="" class="cw-spec-pill__name" />
-                            <ui:Label text="" class="cw-spec-pill__desc" />
-                            <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
-                        </ui:Button>
-                    </ui:VisualElement>
+                    <ui:VisualElement name="ClassSpeedyArt" class="cw-chicken cw-class-tile__art" picking-mode="Ignore" />
+                    <ui:Label text="@class.speedy.short" class="cw-class-tile__name" picking-mode="Ignore" />
+                    <ui:Label text="@role.speedy" class="cw-class-tile__role" picking-mode="Ignore" />
                 </ui:VisualElement>
-
-                <ui:VisualElement name="ClassFatty" class="cw-class-chip">
+                <ui:VisualElement name="ClassFatty" class="cw-class-tile">
                     <ui:VisualElement class="cw-glow" picking-mode="Ignore" />
-                    <ui:VisualElement class="cw-class-chip__toprow">
-                        <ui:VisualElement name="ClassFattyArt" class="cw-class-chip__art" />
-                        <ui:VisualElement class="cw-class-chip__titles">
-                            <ui:Label text="@class.fatty.short" class="cw-class-chip__name" />
-                            <ui:Label text="@role.fatty" class="cw-class-chip__role" />
-                        </ui:VisualElement>
-                        <ui:Label name="PreFilledTag" text="" class="cw-prefilled-tag" />
-                    </ui:VisualElement>
-                    <ui:VisualElement class="cw-spec-pill-row">
-                        <ui:Button name="SpecOptA" class="cw-spec-pill">
-                            <ui:Label text="" class="cw-spec-pill__name" />
-                            <ui:Label text="" class="cw-spec-pill__desc" />
-                            <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
-                        </ui:Button>
-                        <ui:Button name="SpecOptB" class="cw-spec-pill">
-                            <ui:Label text="" class="cw-spec-pill__name" />
-                            <ui:Label text="" class="cw-spec-pill__desc" />
-                            <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
-                        </ui:Button>
-                    </ui:VisualElement>
+                    <ui:VisualElement name="ClassFattyArt" class="cw-chicken cw-class-tile__art" picking-mode="Ignore" />
+                    <ui:Label text="@class.fatty.short" class="cw-class-tile__name" picking-mode="Ignore" />
+                    <ui:Label text="@role.fatty" class="cw-class-tile__role" picking-mode="Ignore" />
                 </ui:VisualElement>
-
-                <!-- No PreFilledTag: Peck.asset AllowedClasses (7 = Warrior|Speedy|Fatty)
-                     excludes Assassin — it cannot forage, so there is nothing to flag. -->
-                <ui:VisualElement name="ClassAssassin" class="cw-class-chip">
+                <ui:VisualElement name="ClassAssassin" class="cw-class-tile">
                     <ui:VisualElement class="cw-glow" picking-mode="Ignore" />
-                    <ui:VisualElement class="cw-class-chip__toprow">
-                        <ui:VisualElement name="ClassAssassinArt" class="cw-class-chip__art" />
-                        <ui:VisualElement class="cw-class-chip__titles">
-                            <ui:Label text="@class.assassin.short" class="cw-class-chip__name" />
-                            <ui:Label text="@role.assassin" class="cw-class-chip__role" />
-                        </ui:VisualElement>
-                    </ui:VisualElement>
-                    <ui:VisualElement class="cw-spec-pill-row">
-                        <ui:Button name="SpecOptA" class="cw-spec-pill">
-                            <ui:Label text="" class="cw-spec-pill__name" />
-                            <ui:Label text="" class="cw-spec-pill__desc" />
-                            <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
-                        </ui:Button>
-                        <ui:Button name="SpecOptB" class="cw-spec-pill">
-                            <ui:Label text="" class="cw-spec-pill__name" />
-                            <ui:Label text="" class="cw-spec-pill__desc" />
-                            <ui:Label text="" class="cw-spec-pill__signature" style="display: none;" />
-                        </ui:Button>
-                    </ui:VisualElement>
-                </ui:VisualElement>
-
-            </ui:VisualElement>
-
-            <!-- Shared preview: chicken art + name/quote + strong/weak callouts for
-                 whichever class is currently selected. Same atoms as the old Column B
-                 (PreviewGlow/PreviewDisc/PreviewChicken/PreviewName/PreviewQuote);
-                 PassiveOptionRow and the numeric stat-pip grid are gone — the
-                 specialization pick moved onto the chip cards (one-tap, see
-                 SpecOptA/B above) and the pips were rejected in favor of a plain
-                 strong/weak read (see RefreshRoleCallouts in MenuUiController.cs;
-                 there is no HP/damage stat left post GDD §2 combat rewrite). -->
-            <!-- Wood panel (the middle value step; stage 2) so the light preview text
-                 reads without depending on the backdrop behind it. -->
-            <ui:VisualElement name="Preview" class="cw-cs-preview cw-wood-panel" style="align-items: center; padding-top: 18px; padding-bottom: 18px; padding-left: 30px; padding-right: 30px;">
-                <ui:VisualElement style="width: 100%; height: 270px; align-items: center; justify-content: center; flex-shrink: 0;">
-                    <ui:VisualElement name="PreviewGlow" class="cw-radial-glow" style="width: 330px; height: 330px;" />
-                    <ui:VisualElement name="PreviewDisc" class="cw-preview-disc">
-                        <ui:VisualElement name="PreviewChicken" class="cw-chicken" style="width: 210px; height: 210px;" />
-                    </ui:VisualElement>
-                </ui:VisualElement>
-
-                <ui:Label name="PreviewName" text="@class.warrior.name" class="cw-heading" style="font-size: 36px; letter-spacing: 1px;" />
-                <ui:Label name="PreviewQuote" text="" class="cw-body" style="-unity-font-style: italic; color: rgb(244, 230, 204); margin-top: 4px; margin-bottom: 16px; font-size: 30px; -unity-text-align: middle-center;" />
-
-                <ui:VisualElement name="RoleCallouts" class="cw-role-list">
-                    <ui:VisualElement class="cw-role-row">
-                        <ui:Label text="@glyph.plus" class="cw-role-glyph cw-role-glyph--pos" />
-                        <ui:Label name="RoleCalloutStrong" text="" class="cw-role-callout cw-role-callout--strong" />
-                    </ui:VisualElement>
-                    <ui:VisualElement class="cw-role-row">
-                        <ui:Label text="@glyph.minus" class="cw-role-glyph cw-role-glyph--neg" />
-                        <ui:Label name="RoleCalloutWeak" text="" class="cw-role-callout cw-role-callout--weak" />
-                    </ui:VisualElement>
+                    <ui:VisualElement name="ClassAssassinArt" class="cw-chicken cw-class-tile__art" picking-mode="Ignore" />
+                    <ui:Label text="@class.assassin.short" class="cw-class-tile__name" picking-mode="Ignore" />
+                    <ui:Label text="@role.assassin" class="cw-class-tile__role" picking-mode="Ignore" />
                 </ui:VisualElement>
             </ui:VisualElement>
 
+            <!-- Hero: cream card. Stage (class-tinted platform + big chicken) beside the text. -->
+            <ui:VisualElement name="Hero" class="cw-hero cw-raised">
+                <ui:VisualElement name="HeroStage" class="cw-hero__stage" picking-mode="Ignore">
+                    <ui:VisualElement name="PreviewGlow" class="cw-radial-glow cw-hero__glow" />
+                    <ui:VisualElement name="PreviewDisc" class="cw-hero__platform" />
+                    <ui:VisualElement name="PreviewChicken" class="cw-chicken cw-hero__chicken" />
+                </ui:VisualElement>
+
+                <ui:VisualElement class="cw-hero__text">
+                    <ui:Label name="PreviewName" text="@class.warrior.short" class="cw-hero__name" />
+                    <ui:Label name="PreviewQuote" text="" class="cw-hero__quote" />
+
+                    <ui:VisualElement name="RoleCallouts" class="cw-role-list">
+                        <ui:VisualElement class="cw-role-row">
+                            <ui:Label text="@glyph.plus" class="cw-role-glyph cw-role-glyph--pos" />
+                            <ui:Label name="RoleCalloutStrong" text="" class="cw-role-callout cw-role-callout--strong" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="cw-role-row">
+                            <ui:Label text="@glyph.minus" class="cw-role-glyph cw-role-glyph--neg" />
+                            <ui:Label name="RoleCalloutWeak" text="" class="cw-role-callout cw-role-callout--weak" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+
+                    <ui:Label text="@label.perk" class="cw-small-head" />
+                    <ui:VisualElement class="cw-perk-row">
+                        <ui:Button name="PerkBadgeA" class="cw-perk-badge">
+                            <ui:Label text="" class="cw-perk-badge__name" picking-mode="Ignore" />
+                            <ui:Label text="" class="cw-perk-badge__line" picking-mode="Ignore" />
+                        </ui:Button>
+                        <ui:Button name="PerkBadgeB" class="cw-perk-badge">
+                            <ui:Label text="" class="cw-perk-badge__name" picking-mode="Ignore" />
+                            <ui:Label text="" class="cw-perk-badge__line" picking-mode="Ignore" />
+                        </ui:Button>
+                    </ui:VisualElement>
+                    <ui:Label name="PerkDetail" text="" class="cw-perk-detail" />
+
+                    <ui:VisualElement name="StarterRow" class="cw-starter-row">
+                        <ui:Label text="@label.starters" class="cw-small-head cw-starter-row__label" />
+                        <ui:VisualElement name="StarterChip0" class="cw-starter-chip">
+                            <ui:VisualElement class="cw-starter-chip__icon" />
+                            <ui:Label text="" class="cw-starter-chip__name" />
+                        </ui:VisualElement>
+                        <ui:VisualElement name="StarterChip1" class="cw-starter-chip">
+                            <ui:VisualElement class="cw-starter-chip__icon" />
+                            <ui:Label text="" class="cw-starter-chip__name" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
         </ui:VisualElement>
 
-        <!-- NextBtn is intentionally never disabled by USS/UXML here — read
-             MenuUiController.BuildClassSelect's comment on the NextBtn binding:
-             BuildAll always seeds a default SelectedClass before this screen can
-             be shown, so there is no reachable state where Step 1 has nothing
-             chosen. Gating this button would need a controller-side SetEnabled
-             call that the shipped controller deliberately does not make. -->
-        <ui:VisualElement style="align-items: center; padding-top: 4px; padding-bottom: 20px; flex-shrink: 0;">
-            <ui:Button name="NextBtn" text="@btn.next" class="cw-btn cw-btn--green" style="min-width: 480px; letter-spacing: 2px;" />
+        <ui:VisualElement class="cw-page-footer">
+            <ui:Button name="NextBtn" text="@btn.next" class="cw-btn cw-btn--green cw-page-cta" />
         </ui:VisualElement>
-
     </ui:VisualElement>
 </ui:UXML>

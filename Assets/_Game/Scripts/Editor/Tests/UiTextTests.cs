@@ -95,6 +95,20 @@ namespace CluckWars.Tests
             Assert.IsEmpty(UiText.Problems, string.Join("\n", UiText.Problems));
         }
 
+        [Test]
+        public void ShippedCsv_UsesPerkStarterMovesVocabulary_NeverEquippedOrPreFilled()
+        {
+            // Menu overhaul vocabulary (Perk / Starter / Moves): the data-model words the audit flagged
+            // must not come back in any player-facing string.
+            var banned = new[] { "pre-filled", "pre-equipped", "equipped" };
+            var hits = UiText.Keys
+                .Where(k => UiText.TryGet(k, out var v) &&
+                            banned.Any(b => v.IndexOf(b, StringComparison.OrdinalIgnoreCase) >= 0))
+                .ToList();
+            Assert.IsEmpty(hits, "UiText.csv values using banned vocabulary (say Starter / Perk / Moves): " +
+                                 string.Join(", ", hits));
+        }
+
         // ---- Missing key / missing arg are loud --------------------------------------------
 
         [Test]

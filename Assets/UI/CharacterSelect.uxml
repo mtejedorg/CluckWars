@@ -1,71 +1,32 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
-    <!-- Cluck Wars — character select STEP 2 "Build Your Loadout" (2026-09 rework).
+    <!-- Cluck Wars — STEP 2 "GEAR UP" (menu overhaul Phase 1, 2026-10-06).
 
-         This used to be the WHOLE character-select screen (class pick + passive
-         fork + stat preview + two ability pick rows + detail strip + toggles +
-         ready button). Class + specialization moved to the new Assets/UI/
-         CharacterSelectClass.uxml ("Step 1"); this screen is now ability slots
-         only, which is also the actual fix for the historical overlap bug (see
-         the CommonScroll/ClassScroll comment below) — the three-column layout
-         that used to squeeze this content into ~936px is gone, so the pick rows
-         get the full page width.
+         Four slot cards on top; the pool below as ONE art-forward card deck in two groups
+         (ANY BIRD, {CLS} ONLY) that sit side by side and wrap to a second line only where the
+         screen is too narrow — no page scroll on any target size. Each card wears its category
+         colour as its frame. Tap a card = show its details in the bottom bar AND equip it into
+         the armed slot; the armed slot carries a NEXT caret; locked starters show the padlock.
 
-         Root name CharacterSelectPage is UNCHANGED so any other reference to it
-         (scene wiring, MenuUiController's serialized field, which keeps the old
-         name "_characterSelectUxml" precisely so the scene reference didn't need
-         re-pointing) keeps working.
-
-         Binding contract (MenuUiController.BuildLoadout/RefreshLoadout/
-         RefreshSlotBoxes — read those before renaming anything here):
-           - BackBtn                                    (goes to Step 1, keeps picks)
-           - SlotBox0 / SlotBox1 / SlotBox2 / SlotBox3   (exactly 4, one per
-             active-ability slot — v0.7 made this uniform across all classes)
-           - CommonCards, ClassCards                     (unchanged names — the
-             containers RebuildPickRows/FillRow populate; since stage 2 they wrap
-             their cards and sit directly in the rows of the ONE #PickScroll)
-           - CommonHint, CommonCount, ClassHint, ClassCount   (unchanged)
-           - AbilityDetail, AbilityDetailName, AbilityDetailText   (unchanged)
-           (RangeGuidesToggle / DeveloperModeToggle moved to the main menu's
-            Settings sheet in stage 2 - they cost the phone pick list ~230 px.)
-           - ReadyBtn                                     (unchanged)
-
-         SlotBoxN is deliberately EMPTY markup — RefreshSlotBoxes() does
-         box.Clear() and rebuilds its children (icon/sprite, name, numbered
-         badge, or the "EMPTY" label) from C# every time, exactly like
-         MakeAbilityCard already did for pick-row cards. Anything static placed
-         inside a SlotBoxN here would be destroyed the first time the screen is
-         shown and never be seen.
-
-         The chicken preview column from the old 3-column layout (art/name/quote)
-         is dropped, not shrunk — Step 1 already shows the chicken, and this
-         column's actual content (four slots + up to 11 ability cards across two
-         rows) needs the width more than a redundant portrait does.
+         Root name CharacterSelectPage is kept so the scene reference (_characterSelectUxml)
+         keeps resolving. Built ONCE (slots) / once per class (cards) by MenuUiController;
+         taps only toggle classes and labels. Binding contract (by name):
+           BackBtn, ReadyBtn, SlotBox0..3, CommonTitle/CommonCards, ClassTitle/ClassCards,
+           AbilityDetail, AbilityDetailName, AbilityDetailCat, AbilityDetailCd, AbilityDetailText
 
          Sizes follow the MOBILE SIZING CONTRACT at the top of CluckWarsTheme.uss. -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
 
     <ui:VisualElement name="CharacterSelectPage" class="cw-screen cw-page">
 
-        <!-- Header ribbon (+ back button, absolutely placed top-left). BackBtn
-             reuses HomeBtn's visual (.cw-home-btn) but wires to ShowClassSelect,
-             not ShowMainMenu — it must not discard the class/specialization/
-             ability picks the way leaving via HomeBtn on Step 1 would. -->
-        <ui:VisualElement style="align-items: center; justify-content: center; padding-top: 20px; padding-bottom: 12px; flex-shrink: 0;">
+        <ui:VisualElement class="cw-page-header">
             <ui:Button name="BackBtn" text="@nav.back" class="cw-home-btn" />
             <ui:VisualElement class="cw-ribbon">
                 <ui:Label text="@screen.loadout.title" class="cw-title" />
             </ui:VisualElement>
         </ui:VisualElement>
 
-        <ui:VisualElement name="Body" class="cw-cs-detail" style="padding-left: 24px; padding-right: 24px; padding-bottom: 16px;">
+        <ui:VisualElement name="Body" class="cw-gear-body">
 
-            <!-- Slot boxes — every class now has 4 uniform active-ability slots
-                 (v0.7; COMBO used to grant Assassin a 3rd, retired). This row is
-                 the slot-arming state machine's only visible control surface:
-                 tapping a box arms it (OnSlotBoxTapped), tapping an ability card
-                 fills whichever box is armed (OnAbilityCardTapped). Sits above
-                 #PickScroll, fixed, so it is never scrolled out of view — the
-                 player always has to see which slot the next tap will act on. -->
             <ui:VisualElement name="SlotBoxRow" class="cw-slot-box-row">
                 <ui:Button name="SlotBox0" class="cw-slot-box" />
                 <ui:Button name="SlotBox1" class="cw-slot-box" />
@@ -73,46 +34,30 @@
                 <ui:Button name="SlotBox3" class="cw-slot-box" />
             </ui:VisualElement>
 
-            <!-- The two pick rows live in ONE vertical ScrollView - the only scroll
-                 container on this screen (stage 2 removed the per-row horizontal
-                 ScrollViews: nested scrollers fought over every drag on a phone).
-                 The rows wrap their cards; inside a scroller a wrapped row only
-                 makes the content taller, so nothing can paint over the detail
-                 strip or READY. `min-height: 0` on .cw-pick-scroll is load-bearing,
-                 see CluckWarsTheme.uss. .cw-scroll themes the scrollbar. -->
-            <ui:ScrollView name="PickScroll" mode="Vertical" horizontal-scroller-visibility="Hidden" class="cw-pick-scroll cw-scroll">
-
-                <ui:VisualElement name="CommonRow" class="cw-pick-row cw-wood-well">
-                    <ui:VisualElement class="cw-pick-row__head">
-                        <ui:Label name="CommonTitle" text="@loadout.row.shared" class="cw-pick-row__title" />
-                        <ui:Label name="CommonHint" text="@loadout.hint.shared" class="cw-pick-row__hint" />
-                        <ui:VisualElement class="cw-pick-row__rule" />
-                        <ui:Label name="CommonCount" text="" class="cw-pick-row__count" />
-                    </ui:VisualElement>
-                    <ui:VisualElement name="CommonCards" class="cw-pick-cards" />
+            <ui:VisualElement name="Deck" class="cw-deck">
+                <ui:VisualElement name="CommonRow" class="cw-deck-group">
+                    <ui:Label name="CommonTitle" text="@loadout.row.shared" class="cw-deck-group__title" />
+                    <ui:VisualElement name="CommonCards" class="cw-deck-cards" />
                 </ui:VisualElement>
-
-                <ui:VisualElement name="ClassRow" class="cw-pick-row cw-wood-well">
-                    <ui:VisualElement class="cw-pick-row__head">
-                        <ui:Label name="ClassTitle" text="" class="cw-pick-row__title" />
-                        <ui:Label name="ClassHint" text="@loadout.hint.class" class="cw-pick-row__hint" />
-                        <ui:VisualElement class="cw-pick-row__rule" />
-                        <ui:Label name="ClassCount" text="" class="cw-pick-row__count" />
-                    </ui:VisualElement>
-                    <ui:VisualElement name="ClassCards" class="cw-pick-cards" />
+                <ui:VisualElement name="ClassRow" class="cw-deck-group">
+                    <ui:Label name="ClassTitle" text="" class="cw-deck-group__title" />
+                    <ui:VisualElement name="ClassCards" class="cw-deck-cards" />
                 </ui:VisualElement>
-
-            </ui:ScrollView>
-
-            <!-- Shared ability detail — unchanged semantics/classes from the old
-                 single screen (see CluckWarsTheme.uss .cw-ability-detail for why
-                 this exists instead of a per-card description). -->
-            <ui:VisualElement name="AbilityDetail" class="cw-ability-detail">
-                <ui:Label name="AbilityDetailName" text="" class="cw-ability-detail__name" />
-                <ui:Label name="AbilityDetailText" text="@loadout.detail.empty" class="cw-ability-detail__text" />
             </ui:VisualElement>
 
-            <ui:Button name="ReadyBtn" text="" class="cw-btn cw-btn--green" style="flex-shrink: 0; letter-spacing: 3px;" />
+            <!-- Bottom bar: the tapped move's details share the row with READY instead of
+                 owning a permanent strip of their own. -->
+            <ui:VisualElement name="BottomBar" class="cw-gear-bottom">
+                <ui:VisualElement name="AbilityDetail" class="cw-ability-detail">
+                    <ui:VisualElement class="cw-ability-detail__head">
+                        <ui:Label name="AbilityDetailName" text="" class="cw-ability-detail__name" />
+                        <ui:Label name="AbilityDetailCat" text="" class="cw-cat-tag" />
+                        <ui:Label name="AbilityDetailCd" text="" class="cw-cd-badge" />
+                    </ui:VisualElement>
+                    <ui:Label name="AbilityDetailText" text="@loadout.detail.empty" class="cw-ability-detail__text" />
+                </ui:VisualElement>
+                <ui:Button name="ReadyBtn" text="" class="cw-btn cw-btn--green cw-gear-ready" />
+            </ui:VisualElement>
         </ui:VisualElement>
 
         <ui:Label name="ConsoleHints" text="@hint.console" class="cw-body cw-on-art cw-console-hints" style="position: absolute; bottom: 12px; left: 24px; opacity: 0.6; display: none;" />

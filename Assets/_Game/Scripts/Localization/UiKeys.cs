@@ -52,15 +52,11 @@ namespace CluckWars.Localization
         public const string LabelStarter = "label.starter";
         public const string LabelYou = "label.you";
 
-        // ---- Classes: short (cast band), full name, role ----
+        // ---- Classes: name (cast band, tiles, hero), role ----
         public const string ClassWarriorShort = "class.warrior.short";
         public const string ClassSpeedyShort = "class.speedy.short";
         public const string ClassFattyShort = "class.fatty.short";
         public const string ClassAssassinShort = "class.assassin.short";
-        public const string ClassWarriorName = "class.warrior.name";
-        public const string ClassSpeedyName = "class.speedy.name";
-        public const string ClassFattyName = "class.fatty.name";
-        public const string ClassAssassinName = "class.assassin.name";
         public const string RoleWarrior = "role.warrior";
         public const string RoleSpeedy = "role.speedy";
         public const string RoleFatty = "role.fatty";
@@ -97,18 +93,11 @@ namespace CluckWars.Localization
         [UiArgs("food")] public const string PerkSpoilerLine = "perk.spoiler.line";
         [UiArgs("goal", "food")] public const string PerkSpoilerDetail = "perk.spoiler.detail";
 
-        // ---- Class select: pre-filled slots and perk pills ----
-        [UiArgs("abilities")] public const string TagPreFilledOne = "tag.preFilled.one";
-        [UiArgs("abilities")] public const string TagPreFilledTwo = "tag.preFilled.two";
-        [UiArgs("abilities")] public const string PillStartsWith = "pill.startsWith";
-
         // ---- Loadout ----
         public const string LoadoutRowShared = "loadout.row.shared";
         [UiArgs("cls")] public const string LoadoutRowClass = "loadout.row.class";
-        public const string LoadoutHintShared = "loadout.hint.shared";
-        public const string LoadoutHintClass = "loadout.hint.class";
-        [UiArgs("n")] public const string LoadoutCount = "loadout.count";
         public const string LoadoutDetailEmpty = "loadout.detail.empty";
+        public const string LoadoutNext = "loadout.next";
         public const string LoadoutRegistryMissing = "loadout.registryMissing";
         public const string SlotEmpty = "slot.empty";
         public const string HintConsole = "hint.console";
@@ -133,7 +122,6 @@ namespace CluckWars.Localization
 
         // ---- Lobby ----
         public const string LobbyRules = "lobby.rules";
-        public const string LobbyFlock = "lobby.flock";
         public const string LobbyInviteLabel = "lobby.invite.label";
         public const string LobbyJoinLabel = "lobby.join.label";
         public const string LobbySettingArena = "lobby.setting.arena";
@@ -161,6 +149,7 @@ namespace CluckWars.Localization
         public const string TagCpu = "tag.cpu";
         public const string StateReady = "state.ready";
         public const string StatePicking = "state.picking";
+        public const string LobbyAllReady = "lobby.allReady";
         public const string LobbyBot1 = "lobby.bot.1";
         public const string LobbyBot2 = "lobby.bot.2";
         public const string LobbyBot3 = "lobby.bot.3";

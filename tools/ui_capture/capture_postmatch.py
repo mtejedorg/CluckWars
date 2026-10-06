@@ -61,7 +61,7 @@ for _ in range(60):
         break
     time.sleep(1)
 time.sleep(0.5)
-print(cs("Press", "NextBtn")); time.sleep(0.5)
+print(cs("Press", "NextBtn")); time.sleep(0.9)  # page transitions settle
 print(cs("Fill")); print(cs("Press", "ReadyBtn")); time.sleep(0.8)
 print(cs("Press", "StartBtn"))
 wait("Active"); time.sleep(5)

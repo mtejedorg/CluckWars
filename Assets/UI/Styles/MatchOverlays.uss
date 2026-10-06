@@ -241,7 +241,9 @@
     white-space: nowrap; margin-left: 15px;
 }
 /* Post-match actions: PLAY AGAIN (green) + BACK TO LOBBY (wood), side by side. */
-.cw-me-actions { flex-direction: row; justify-content: center; margin-top: 18px; flex-shrink: 0; }
+/* margin-bottom keeps the buttons off the PanelFrame's painted bottom rail (~40 px of trim
+   inside the 30 px panel padding); they used to sit flush on it. */
+.cw-me-actions { flex-direction: row; justify-content: center; margin-top: 18px; margin-bottom: 30px; flex-shrink: 0; }
 .cw-me-action { flex-grow: 1; flex-basis: 0; margin-left: 12px; margin-right: 12px; letter-spacing: 2px; }
 .cw-me-restart {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");

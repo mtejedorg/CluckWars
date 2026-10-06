@@ -6,6 +6,33 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Menu UI overhaul — Phase 1 Stage B: structure (2026-10-06)
+
+EditMode **677/677** (new: `LoadoutSlotModelTests` x8, `UiTextTests.ShippedCsv_UsesPerkStarterMovesVocabulary_NeverEquippedOrPreFilled`).
+Captures: `python tools/ui_capture/capture_menu.py <dir>` (now also `01c_main_menu_fresh`, `06b_lobby_join`) + `capture_postmatch.py`.
+
+- **Build once.** `MenuUiController` builds class tiles / perk badges / starter chips (UXML), the four GEAR UP slots and
+  the four lobby seats once, deck cards once per class (`EnsureDeck`); taps only toggle USS classes and labels. Icons go
+  through `AbilityIconView` (one sprite element + one monogram label, repainted in place by `PaintIcon`).
+- **Slot arming is pure:** `UI/LoadoutSlotModel<T>` (armed slot, NEXT caret slot, Placed/Swapped/Cleared/Ignored, locked
+  starters). The selection service stays the source of truth (`SyncSlotModel` before / `WriteSlotModel` after each tap).
+- **PICK YOUR BIRD:** 4 portrait tiles (lightened class fill, big render; tap = class, keeping its perk or taking the
+  signature perk) + one cream hero (stage, name without CHICKEN, quote, callouts, PERK badges A/B = select + `#PerkDetail`
+  (hidden when it would repeat the line), STARTERS icon chips). The old chips / spec pills / pre-filled tags are gone.
+- **GEAR UP:** slots on top (number badge, NEXT caret, padlock STARTER), one deck (ANY BIRD | {CLS} ONLY, category-colour
+  frame + band; the class group wraps under on 4:3), details share the bottom bar with READY. No page scroll at any size.
+- **THE COOP:** lineup of 4 seats (chicken on a player-colour pedestal, nameplate, 4 hexes, gold/ink READY badge), rule
+  chips row, bottom bar (status / invite / join, one-shot `READY!` banner, START). `BackBtn` moved into the header.
+- **Page transitions** (`SetPage`): out 120 ms ease-in, in 200 ms ease-out, slide direction by flow order; instant under
+  Reduced Motion. Root layout classes `layout--short` (panel h < 1100) and `layout--narrow` (aspect < 1.55).
+- Main-menu PLAY AGAIN is one wood plank with the `{cls} · {perk}` sub-line inside; post-match `#MeActions` got 30 px
+  bottom margin. Vocabulary: removed `tag.preFilled.*`, `pill.startsWith`, `loadout.hint.*`, `loadout.count`,
+  `class.*.name`, `lobby.flock`; added `loadout.next`, `lobby.allReady`.
+- **Open:** host-mode lobby (invite card) not captured (it creates a real UGS lobby); post-match panel header/first row
+  still overlap the PanelFrame trim on 2424x1080 (pre-existing); Phase 2 backdrops not wired (by design).
+
+---
+
 ## ✅ Menu UI overhaul — Phase 1 Stage A: replay / flow plumbing (2026-10-06)
 
 EditMode **668/668** (new: `PlayAgainFlowTests`, a MatchEnd-panel UXML test). Decision 5: nothing is automatic.

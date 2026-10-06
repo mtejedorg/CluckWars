@@ -59,10 +59,15 @@
             <ui:Button name="SoloBtn" text="@btn.playSolo" class="cw-btn cw-btn--green cw-menu-primary" />
             <!-- PLAY AGAIN: one tap back to THE COOP with the last class / perk / loadout
                  (never auto-starts). Hidden by MenuUiController when there is no valid last
-                 setup. #PlayAgainSub is filled from btn.playAgain.sub ("{cls} · {perk}"). -->
+                 setup. #PlayAgainSub is filled from btn.playAgain.sub ("{cls} · {perk}").
+                 Phase 1: one wood plank with the sub-line UNDER the label, inside the button,
+                 so the whole two-line block is the touch target and the sub-line reads on
+                 wood (cream + ink outline) rather than on the busy backdrop. -->
             <ui:VisualElement name="PlayAgainRow" class="cw-menu-playagain" style="display: none;">
-                <ui:Button name="PlayAgainBtn" text="@btn.playAgain" class="cw-btn cw-btn--wood cw-menu-secondary" />
-                <ui:Label name="PlayAgainSub" text="" class="cw-body cw-on-art cw-menu-playagain__sub" picking-mode="Ignore" />
+                <ui:Button name="PlayAgainBtn" class="cw-btn cw-btn--wood cw-menu-playagain__btn">
+                    <ui:Label text="@btn.playAgain" class="cw-menu-playagain__label" picking-mode="Ignore" />
+                    <ui:Label name="PlayAgainSub" text="" class="cw-menu-playagain__sub" picking-mode="Ignore" />
+                </ui:Button>
             </ui:VisualElement>
             <ui:VisualElement name="ModeRow" class="cw-mode-row cw-menu-secondary-row">
                 <ui:Button name="HostBtn" text="@btn.host" class="cw-btn cw-btn--wood cw-menu-secondary" />
