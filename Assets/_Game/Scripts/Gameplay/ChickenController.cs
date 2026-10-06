@@ -276,7 +276,7 @@ namespace CluckWars.Gameplay
         /// <b>This exists to be a discriminator, not a notification.</b> The mesh catch-up
         /// it drives is measured from a position discontinuity, and a jump is not the only
         /// thing that produces one: <see cref="RPC_TeleportTo"/> fires on every chicken at
-        /// every round reset (<c>GameManager.RestartMatch</c>). A catch-up applied there
+        /// every round reset (<c>GameManager.ResetWorldForNewRound</c>). A catch-up applied there
         /// would ease the model back across the whole arena toward the corner it was
         /// standing in a moment ago — a chicken skating home over 0.18 s, at a round
         /// boundary, which is exactly the instant nobody is looking closely enough to
@@ -941,7 +941,7 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// Places this chicken at <paramref name="position"/>. The only legitimate caller is
-        /// <c>GameManager.RestartMatch</c>, putting everyone back on their corner for a new round.
+        /// <c>GameManager.ResetWorldForNewRound</c>, putting everyone back on their corner for a new round.
         /// </summary>
         /// <remarks>
         /// <b>Sender-restricted, and it cannot become a direct call.</b> In Shared Mode each

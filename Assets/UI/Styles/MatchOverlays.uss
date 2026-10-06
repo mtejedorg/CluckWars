@@ -240,6 +240,9 @@
     font-size: 34px; color: rgb(196, 160, 96); width: 148px; -unity-text-align: middle-right;
     white-space: nowrap; margin-left: 15px;
 }
+/* Post-match actions: PLAY AGAIN (green) + BACK TO LOBBY (wood), side by side. */
+.cw-me-actions { flex-direction: row; justify-content: center; margin-top: 18px; flex-shrink: 0; }
+.cw-me-action { flex-grow: 1; flex-basis: 0; margin-left: 12px; margin-right: 12px; letter-spacing: 2px; }
 .cw-me-restart {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
     font-size: 34px; letter-spacing: 2px; color: rgb(196, 160, 96);
@@ -455,6 +458,7 @@
 .cw-btn {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     min-height: 116px; min-width: 116px;   /* 48 dp touch floor */
+    background-color: rgba(0, 0, 0, 0);   /* clear the default runtime-Button grey */
     font-size: 34px; color: rgb(254, 245, 224); -unity-text-align: middle-center;
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/ButtonGrayscale.png");
     -unity-background-scale-mode: stretch-to-fill;
@@ -467,6 +471,9 @@
 .cw-btn:hover  { scale: 1.02 1.02; }
 .cw-btn:active { scale: 0.97 0.97; }
 .cw-btn--green { -unity-background-image-tint-color: rgb(51, 163, 50); }
+.cw-btn--wood { -unity-background-image-tint-color: rgb(171, 111, 57); }
+/* A disabled button must still read as text: dim the face, keep the outlined label. */
+.cw-btn:disabled { opacity: 1; -unity-background-image-tint-color: rgb(118, 98, 76); color: rgb(236, 226, 206); }
 
 /* ============================================================================
    SESSION END  (small panel)

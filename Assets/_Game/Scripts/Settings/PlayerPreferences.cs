@@ -26,6 +26,11 @@ namespace CluckWars.Settings
     ///   Ability Lab row as soon as it changes)</item>
     /// </list>
     ///
+    /// <b>The one non-setting here is <see cref="LastSetup"/></b>: the class / perk / loadout / mode
+    /// committed at READY, stored as stable ids (class value, <c>ChickenSubclass</c> byte, ability asset
+    /// names) so the main-menu PLAY AGAIN and the post-match BACK TO LOBBY can reopen THE COOP. It is raw
+    /// and unvalidated; <see cref="LastSetupResolver"/> turns it back into assets or rejects it.
+    ///
     /// <b>Cached, because the consumers read these per frame or per hit.</b>
     /// <c>AbilitySlotOverlay.LateUpdate</c> polls its getter once per frame and
     /// <c>MatchCamera.ApplyShake</c> reads its own on every cast, hit and death, so a
@@ -238,6 +243,67 @@ namespace CluckWars.Settings
         /// <summary>The value <see cref="PerformanceModeEnabled"/> takes until the player chooses.</summary>
         public static bool DefaultPerformanceMode => Application.isMobilePlatform;
 
+        /// <summary><c>PlayerPrefs</c> keys for the last committed setup (see <see cref="LastSetup"/>).
+        /// Namespaced like every key here; public so a test asserts the real ones.</summary>
+        public const string LastSetupClassKey     = "CluckWars.LastSetup.Class";
+        public const string LastSetupSubclassKey  = "CluckWars.LastSetup.Subclass";
+        public const string LastSetupAbilitiesKey = "CluckWars.LastSetup.Abilities";
+        public const string LastSetupModeKey      = "CluckWars.LastSetup.Mode";
+
+        private const char AbilitySeparator = '|';
+
+        private static LastSetupRecord _lastSetup;
+        private static bool _lastSetupLoaded;
+
+        /// <summary>
+        /// The class / perk / loadout / mode last committed from the menu (READY), or null if none
+        /// was ever stored. <b>Raw ids, not validated</b>: the stored ability names may no longer
+        /// exist. Run it through <see cref="LastSetupResolver.TryResolve"/> before trusting it.
+        /// Written through on set, like every other preference; null clears it.
+        /// </summary>
+        public static LastSetupRecord LastSetup
+        {
+            get
+            {
+                if (!_lastSetupLoaded)
+                {
+                    _lastSetup = PlayerPrefs.HasKey(LastSetupClassKey)
+                        ? new LastSetupRecord
+                        {
+                            Class     = PlayerPrefs.GetInt(LastSetupClassKey, 0),
+                            Subclass  = PlayerPrefs.GetInt(LastSetupSubclassKey, 0),
+                            Abilities = PlayerPrefs.GetString(LastSetupAbilitiesKey, string.Empty)
+                                                   .Split(AbilitySeparator),
+                            Mode      = PlayerPrefs.GetInt(LastSetupModeKey, 0),
+                        }
+                        : null;
+                    _lastSetupLoaded = true;
+                }
+                return _lastSetup;
+            }
+            set
+            {
+                _lastSetup = value;
+                _lastSetupLoaded = true;
+                if (value == null)
+                {
+                    PlayerPrefs.DeleteKey(LastSetupClassKey);
+                    PlayerPrefs.DeleteKey(LastSetupSubclassKey);
+                    PlayerPrefs.DeleteKey(LastSetupAbilitiesKey);
+                    PlayerPrefs.DeleteKey(LastSetupModeKey);
+                }
+                else
+                {
+                    PlayerPrefs.SetInt(LastSetupSubclassKey, value.Subclass);
+                    PlayerPrefs.SetString(LastSetupAbilitiesKey, string.Join(AbilitySeparator.ToString(), value.Abilities ?? System.Array.Empty<string>()));
+                    PlayerPrefs.SetInt(LastSetupModeKey, value.Mode);
+                    // The class key doubles as the "a setup exists" marker, so it is written last.
+                    PlayerPrefs.SetInt(LastSetupClassKey, value.Class);
+                }
+                PlayerPrefs.Save();
+            }
+        }
+
         /// <summary>
         /// Drops every cache so the next read goes back to <c>PlayerPrefs</c>. Needed because
         /// "Enter Play Mode Options" can suppress the domain reload that would otherwise reset
@@ -256,6 +322,7 @@ namespace CluckWars.Settings
             _reducedMotionLoaded      = false;
             _developerModeLoaded      = false;
             _performanceModeLoaded    = false;
+            _lastSetupLoaded          = false;
         }
     }
 }

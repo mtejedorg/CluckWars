@@ -6,6 +6,29 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Menu UI overhaul — Phase 1 Stage A: replay / flow plumbing (2026-10-06)
+
+EditMode **668/668** (new: `PlayAgainFlowTests`, a MatchEnd-panel UXML test). Decision 5: nothing is automatic.
+
+- **No auto-restart.** `GameManager.RestartCountdown` / `RestartRemaining` / `_restartDelaySeconds` removed; Ended holds.
+- **PLAY AGAIN (post-match, host/solo only)**: `GameManager.RequestPlayAgain()` -> `ResetWorldForNewRound()` (the old
+  reset body) -> `State = WaitingForPlayers` (`MatchFlowRules.PlayAgainState`), timers/winner cleared; the existing
+  in-session waiting room shows and START (`StartMatchNow`) arms intro + timer. Solo auto-start runs only in `Spawned`,
+  so it never re-fires. Non-host: button disabled + `postmatch.hostOnly` note (no RPC needed).
+- **BACK TO LOBBY (anyone)**: `MatchOverlaysController.OnBackToLobby` sets `ISessionSelectionService.OpenLobbyOnMenuLoad`,
+  `INetworkService.ShutdownAsync()` (own shutdown suppressed from the "Session ended" overlay), loads Bootstrap.
+  `MenuUiController.ConsumePostMatchIntent` reads+clears the flag: Solo/Host reopen THE COOP, Join/no valid setup -> main menu.
+- **Last setup** in `PlayerPreferences.LastSetup` (`LastSetupRecord`: class id, `ChickenSubclass` id, 4 ability asset names, mode),
+  written at READY; `LastSetupResolver.TryResolve` validates on read (unknown ids, wrong class, slot count, duplicates,
+  illegal/Peck picks, missing perk pre-equips) -> "no last setup" + one Warning. Ability identity = asset `name`.
+- **Main-menu PLAY AGAIN** (`#PlayAgainRow`/`#PlayAgainBtn`/`#PlayAgainSub`, hidden without a valid setup) ->
+  `MenuUiController.OpenLobbyWithLastSetup(mode)` (Solo, or Host if last was Host). Never starts a match.
+- Post-match panel strings now go through `UiText` (`postmatch.*` keys); lobby/session-end/intro overlays still literal.
+- **Open:** ui-designer restyle of the PLAY AGAIN row (phone 2424x1080 is tight: title clips, solo hint off-screen); post-match
+  buttons sit flush on the panel's bottom frame; a joiner's BACK TO LOBBY leaves a live UGS lobby unhandled (as before).
+
+---
+
 ## ✅ Menu UI overhaul — Phase 0 "stop looking broken" (2026-10-06)
 
 Spec: `docs/superpowers/specs/2026-10-06-menu-ui-overhaul.md`. EditMode **643/643**. Captures (1920x1080,

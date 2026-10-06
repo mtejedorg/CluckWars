@@ -52,7 +52,7 @@ namespace CluckWars.Gameplay
         public void RPC_AddDeposit(float amount) { FoodDeposited += amount; }
 
         /// <summary>
-        /// Reset stats for a new round. Called by <see cref="GameManager.RestartMatch"/>.
+        /// Reset stats for a new round. Called by <see cref="GameManager.ResetWorldForNewRound"/>.
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_ResetStats()

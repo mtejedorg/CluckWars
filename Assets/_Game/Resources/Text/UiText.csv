@@ -127,3 +127,11 @@ state.picking,PICKING
 lobby.bot.1,DashFox
 lobby.bot.2,BrunoB
 lobby.bot.3,PeckNoir
+postmatch.standings,FINAL STANDINGS
+postmatch.food,FOOD
+postmatch.wins,P{n} WINS!
+postmatch.winsCpu,P{n} (CPU) WINS!
+postmatch.ended,MATCH ENDED
+postmatch.target.reached,target {n} · reached
+postmatch.target.timeout,target {n} · timer out
+postmatch.hostOnly,The host picks when to play again.

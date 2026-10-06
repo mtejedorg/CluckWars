@@ -31,7 +31,7 @@
                 <ui:VisualElement name="MeHero" class="cw-me-hero">
                     <ui:VisualElement name="MeCrown" class="cw-me-crown" />
                     <ui:VisualElement name="MeWinRibbon" class="cw-me-ribbon">
-                        <ui:Label name="MeWinRibbonLabel" text="P1 WINS!" class="cw-me-ribbon__label" />
+                        <ui:Label name="MeWinRibbonLabel" text="" class="cw-me-ribbon__label" />
                     </ui:VisualElement>
 
                     <ui:VisualElement name="MeWinChickenWrap" class="cw-me-chickenwrap">
@@ -40,13 +40,13 @@
                         <ui:VisualElement name="MeWinRing" class="cw-me-winring" />
                     </ui:VisualElement>
 
-                    <ui:Label name="MeWinName" text="YOU" class="cw-me-winname" />
-                    <ui:Label name="MeWinSub" text="WARRIOR · P1" class="cw-me-winsub" />
+                    <ui:Label name="MeWinName" text="" class="cw-me-winname" />
+                    <ui:Label name="MeWinSub" text="" class="cw-me-winsub" />
 
                     <ui:VisualElement name="MeWinFoodRow" class="cw-me-winfoodrow">
                         <ui:VisualElement class="cw-me-foodicon" />
-                        <ui:Label name="MeWinScore" text="152" class="cw-me-winscore" />
-                        <ui:Label text="FOOD" class="cw-me-winscore__unit" />
+                        <ui:Label name="MeWinScore" text="" class="cw-me-winscore" />
+                        <ui:Label text="@postmatch.food" class="cw-me-winscore__unit" />
                     </ui:VisualElement>
                 </ui:VisualElement>
 
@@ -56,15 +56,23 @@
                 <!-- RIGHT: standings -->
                 <ui:VisualElement name="MeRight" class="cw-me-right">
                     <ui:VisualElement class="cw-me-head">
-                        <ui:Label text="FINAL STANDINGS" class="cw-me-head__title" />
+                        <ui:Label text="@postmatch.standings" class="cw-me-head__title" />
                         <ui:VisualElement class="cw-me-head__rule" />
-                        <ui:Label name="MeTargetNote" text="target 150 · reached" class="cw-me-head__note" />
+                        <ui:Label name="MeTargetNote" text="" class="cw-me-head__note" />
                     </ui:VisualElement>
 
                     <!-- Controller fills with up to 4 .cw-me-row rows -->
                     <ui:VisualElement name="MeRows" class="cw-me-rows" />
 
-                    <ui:Label name="MeRestart" text="Next match in 5s…" class="cw-me-restart" />
+                    <!-- Decision 5: nothing restarts on a timer. PLAY AGAIN (green, the one forward
+                         action) re-arms the in-session waiting room; BACK TO LOBBY (wood) leaves the
+                         session and reopens the menu on THE COOP. MatchOverlaysController enables
+                         PLAY AGAIN for the host / solo player only and shows #MeHostNote to everyone else. -->
+                    <ui:VisualElement name="MeActions" class="cw-me-actions">
+                        <ui:Button name="MePlayAgainBtn" text="@btn.playAgain" class="cw-btn cw-btn--green cw-me-action" />
+                        <ui:Button name="MeBackBtn" text="@btn.backToLobby" class="cw-btn cw-btn--wood cw-me-action" />
+                    </ui:VisualElement>
+                    <ui:Label name="MeHostNote" text="@postmatch.hostOnly" class="cw-me-restart" />
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>

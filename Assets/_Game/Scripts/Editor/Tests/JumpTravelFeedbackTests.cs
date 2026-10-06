@@ -85,7 +85,7 @@ namespace CluckWars.Tests
             string controller = ReadSource(ChickenControllerPath);
             Assert.AreEqual(0, CountOf(controller, "JumpEventId++"),
                 "ChickenController now bumps JumpEventId itself. RPC_TeleportTo runs on every " +
-                "chicken at every round reset (GameManager.RestartMatch); a bump there makes the " +
+                "chicken at every round reset (GameManager.ResetWorldForNewRound); a bump there makes the " +
                 "model ease back toward the corner it just left, which reads as the chicken " +
                 "skating across the arena. Only AbilityController.ExecuteJumpIfAny may publish it.");
 

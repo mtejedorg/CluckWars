@@ -282,6 +282,7 @@ namespace CluckWars.UI
             }
 
             ShowMainMenu();
+            ConsumePostMatchIntent();
         }
 
         private VisualElement ClonePage(VisualTreeAsset vta)
@@ -410,7 +411,7 @@ namespace CluckWars.UI
         }
 
         // ---- Navigation -------------------------------------------------------
-        private void ShowMainMenu()    { SetPage(_mainMenu); RefreshDevRow(); }
+        private void ShowMainMenu()    { SetPage(_mainMenu); RefreshDevRow(); RefreshPlayAgain(); }
         private void ShowClassSelect() { SetPage(_classSelect); RefreshClassSelect(); }
         private void ShowLoadout()     { SetPage(_loadout); RefreshLoadout(); }
         private void ShowLobby()       { SetPage(_lobby); RefreshLobby(); }
@@ -435,6 +436,7 @@ namespace CluckWars.UI
             Bind<Button>(_mainMenu, "HostBtn", b => b.clicked += () => ChooseMode(SessionMode.Host));
             Bind<Button>(_mainMenu, "JoinBtn", b => b.clicked += () => ChooseMode(SessionMode.Join));
             Bind<Button>(_mainMenu, "AbilityLabBtn", b => b.clicked += OpenAbilityLab);
+            Bind<Button>(_mainMenu, "PlayAgainBtn", b => b.clicked += OnPlayAgainFromMenu);
 
             // Build stamp — a tester reporting a bug from a device otherwise has no
             // way to say which build produced it.
@@ -596,6 +598,95 @@ namespace CluckWars.UI
 
             _log?.Info(Source, "Opening the Ability Lab.");
             UnityEngine.SceneManagement.SceneManager.LoadScene(AbilityLabSceneName);
+        }
+
+        // ======================================================================
+        //  REPLAY FLOW: last setup, main-menu PLAY AGAIN, post-match BACK TO LOBBY
+        // ======================================================================
+        // Menu overhaul decision 5: never automatic. The last committed setup (class, perk,
+        // loadout, mode) is saved when READY is pressed and validated on every read.
+
+        private string _reportedLastSetupProblem;
+
+        /// <summary>The stored last setup resolved against the live registry, or false (with the
+        /// reason logged once as a Warning) if there is none or it no longer validates.</summary>
+        private bool TryGetLastSetup(out ResolvedLastSetup setup)
+        {
+            setup = default;
+            var record = PlayerPreferences.LastSetup;
+            if (record == null) return false;
+            if (LastSetupResolver.TryResolve(record, _abilityRegistry?.All, out setup, out var problem))
+                return true;
+
+            if (problem != _reportedLastSetupProblem)
+            {
+                _reportedLastSetupProblem = problem;
+                _log?.Warn(Source, $"Stored last setup ignored: {problem}.");
+            }
+            return false;
+        }
+
+        /// <summary>Stores the setup the player just committed (called when READY is pressed).</summary>
+        private void SaveLastSetup()
+        {
+            if (_selection?.Passive == null) return;
+            var slots = new[] { _selection.Ability0, _selection.Ability1, _selection.Ability2, _selection.Ability3 };
+            PlayerPreferences.LastSetup = LastSetupResolver.Record(Cls, _selection.Passive, slots, _selection.Mode);
+        }
+
+        /// <summary>Shows or hides the main-menu PLAY AGAIN row and fills its "{cls} · {perk}" sub-line.</summary>
+        private void RefreshPlayAgain()
+        {
+            bool valid = TryGetLastSetup(out var setup);
+            Bind<VisualElement>(_mainMenu, "PlayAgainRow", r =>
+                r.style.display = valid ? DisplayStyle.Flex : DisplayStyle.None);
+            if (!valid) return;
+            Bind<Label>(_mainMenu, "PlayAgainSub", l => l.text = UiText.Format(UiKeys.BtnPlayAgainSub,
+                ("cls", ClassShortName(setup.Class)), ("perk", setup.Passive.DisplayName.ToUpperInvariant())));
+        }
+
+        private void OnPlayAgainFromMenu()
+        {
+            if (_isBusy || !TryGetLastSetup(out var setup)) return;
+            OpenLobbyWithLastSetup(MatchFlowRules.MainMenuPlayAgainMode(setup.Mode));
+        }
+
+        /// <summary>
+        /// Entry point: restore the last class / perk / loadout into the menu state and open THE
+        /// COOP in <paramref name="mode"/>. Never starts a match. Returns false (staying on the
+        /// current page) when there is no valid last setup. Used by the main-menu PLAY AGAIN and by
+        /// the post-match BACK TO LOBBY handoff (<see cref="ConsumePostMatchIntent"/>).
+        /// </summary>
+        public bool OpenLobbyWithLastSetup(SessionMode mode)
+        {
+            if (_selection == null || !TryGetLastSetup(out var setup)) return false;
+
+            _focusedAbility = null;
+            _selection.Mode = mode;
+            _selection.SelectedClass = setup.Class;
+            _selection.Passive = setup.Passive;
+            _selection.Ability0 = setup.Slots[0];
+            _selection.Ability1 = setup.Slots[1];
+            _selection.Ability2 = setup.Slots[2];
+            _selection.Ability3 = setup.Slots[3];
+            _log?.Info(Source, $"Opening THE COOP with the last setup: {setup.Class} / {setup.Passive.name}, mode {mode}.");
+            ShowLobby();
+            return true;
+        }
+
+        /// <summary>
+        /// Post-match BACK TO LOBBY lands here: <see cref="ISessionSelectionService.OpenLobbyOnMenuLoad"/>
+        /// is set by the match overlay before it loads Bootstrap. Read once, cleared at once.
+        /// Solo and Host reopen THE COOP; a joiner (or an invalid setup) stays on the main menu.
+        /// </summary>
+        private void ConsumePostMatchIntent()
+        {
+            if (_selection == null || !_selection.OpenLobbyOnMenuLoad) return;
+            _selection.OpenLobbyOnMenuLoad = false;
+
+            bool valid = TryGetLastSetup(out var setup);
+            if (MatchFlowRules.LandingAfterMatch(setup.Mode, valid) == MenuLanding.Lobby)
+                OpenLobbyWithLastSetup(setup.Mode);
         }
 
         private void ChooseMode(SessionMode mode)
@@ -1469,6 +1560,7 @@ namespace CluckWars.UI
         private void OnReady()
         {
             if (_isBusy) return;
+            SaveLastSetup();
             ShowLobby();
         }
 

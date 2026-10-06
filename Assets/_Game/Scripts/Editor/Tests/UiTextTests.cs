@@ -180,6 +180,7 @@ namespace CluckWars.Tests
         {
             "Assets/_Game/Scripts/UI/MenuUiController.cs",
             "Assets/_Game/Scripts/UI/MatchSettingsText.cs",
+            "Assets/_Game/Scripts/UI/MatchOverlaysController.cs",
             "Assets/_Game/Scripts/Abilities/PassiveAbilitySO.cs",
         };
 
@@ -298,6 +299,25 @@ namespace CluckWars.Tests
             Assert.IsEmpty(literals,
                 "Player-facing literals in menu UXML. Use text=\"@key\" (key in UiText.csv) or leave it " +
                 "empty when code fills it:\n" + string.Join("\n", literals));
+        }
+
+        [Test]
+        public void MatchOverlays_MatchEndPanel_HasNoLiteralText_AndItsKeysExist()
+        {
+            // Only the post-match panel is converted so far (the lobby / session-end / intro overlays
+            // still carry literals), so the scan is scoped to #MatchEndOverlay.
+            var root = CloneUxml("Assets/UI/MatchOverlays.uxml").Q<VisualElement>("MatchEndOverlay");
+            Assert.IsNotNull(root, "MatchOverlays.uxml lost #MatchEndOverlay.");
+            var bad = new List<string>();
+            foreach (var (name, text) in TextsIn(root))
+            {
+                if (string.IsNullOrEmpty(text)) continue;
+                if (!UiText.IsKeyReference(text)) bad.Add($"[{name}]: literal \"{text}\"");
+                else if (!UiText.HasKey(UiText.KeyOfReference(text))) bad.Add($"[{name}]: unknown key {text}");
+            }
+            Assert.IsEmpty(bad, string.Join("\n", bad));
+            Assert.IsNotNull(root.Q<Button>("MePlayAgainBtn"));
+            Assert.IsNotNull(root.Q<Button>("MeBackBtn"));
         }
 
         [Test]

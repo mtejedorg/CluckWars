@@ -46,6 +46,14 @@ namespace CluckWars.Services
         /// <summary>Fourth ability slot, added with v0.7's four-slot loadouts.</summary>
         AbilityBaseSO Ability3 { get; set; }
 
+        /// <summary>
+        /// One-shot scene-load handoff: set by the post-match BACK TO LOBBY before it loads
+        /// Bootstrap; <c>MenuUiController</c> reads it once on build, clears it, and opens
+        /// straight onto THE COOP with the last setup instead of the main menu. This service is
+        /// ProjectContext-scoped, so it survives the scene load with no static state to reset.
+        /// </summary>
+        bool OpenLobbyOnMenuLoad { get; set; }
+
         event Action<ChickenClass> OnSelectionChanged;
     }
 }

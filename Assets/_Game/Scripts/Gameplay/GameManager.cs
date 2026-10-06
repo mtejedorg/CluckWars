@@ -36,13 +36,8 @@ namespace CluckWars.Gameplay
         /// winner's identity when a bot wins (WinnerPlayer stays None for bots).</summary>
         [Networked] public int WinnerCorner { get; set; } = -1;
         [Networked] public float WinnerFoodTotal { get; set; }
-        [Networked] public TickTimer RestartCountdown { get; set; }
         [Networked] public TickTimer IntroTimer { get; set; }
         [Networked] public MatchEventKind ActiveEvent { get; set; }
-
-        [Tooltip("Seconds after a match ends before the world resets and a new round starts.")]
-        [Min(1f)]
-        [SerializeField] private float _restartDelaySeconds = 6f;
 
         [Tooltip("Pre-match \"3, 2, 1, GO!\" intro window (seconds). Match timer is offset by this so the actual playable duration matches MatchConfigSO.MatchDurationSeconds.")]
         [Min(0f)]
@@ -63,7 +58,6 @@ namespace CluckWars.Gameplay
 
         public float MatchDurationSeconds => _config != null ? _config.MatchDurationSeconds : 180f;
         public int FoodTargetToWin => _config != null ? _config.FoodTargetToWin : 110;
-        public float RestartDelaySeconds => _restartDelaySeconds;
 
         /// <summary>
         /// Static singleton accessor — there's one <see cref="GameManager"/> per
@@ -81,15 +75,12 @@ namespace CluckWars.Gameplay
         /// </summary>
         public bool IsMatchRunning => State == MatchState.Active && !IsIntroActive;
 
-        /// <summary>Seconds remaining until the next match starts, or 0 if not in Ended state.</summary>
-        public float RestartRemaining
-        {
-            get
-            {
-                if (State != MatchState.Ended) return 0f;
-                return RestartCountdown.RemainingTime(Runner) ?? 0f;
-            }
-        }
+        /// <summary>
+        /// True when this peer may press PLAY AGAIN right now: it holds state authority (the
+        /// host / master client, or the solo player) and the round has ended. Drives the
+        /// post-match overlay's button enable state; see <see cref="MatchFlowRules.CanPlayAgain"/>.
+        /// </summary>
+        public bool CanRequestPlayAgain => MatchFlowRules.CanPlayAgain(HasStateAuthority, State);
 
         /// <summary>True while the pre-match intro countdown is running.</summary>
         public bool IsIntroActive => IntroTimer.IsRunning && !IntroTimer.Expired(Runner);
@@ -196,17 +187,8 @@ namespace CluckWars.Gameplay
             // and the upper bound is 4×4 for the demo.
             AssignBasesToPlayers();
 
-            // Match ended — wait out the restart countdown, then reset the world
-            // and start a fresh round.
-            if (State == MatchState.Ended)
-            {
-                if (RestartCountdown.Expired(Runner))
-                {
-                    RestartMatch();
-                }
-                return;
-            }
-
+            // Match ended — hold here until someone acts. Nothing restarts on a timer:
+            // PLAY AGAIN (RequestPlayAgain) re-arms the waiting room, BACK TO LOBBY leaves.
             if (State != MatchState.Active) return;
 
             // No win checks during the intro countdown. Bases are all empty
@@ -527,14 +509,13 @@ namespace CluckWars.Gameplay
             WinnerPlayer = winner;
             WinnerCorner = winnerCorner;
             WinnerFoodTotal = winnerTotal;
-            RestartCountdown = TickTimer.CreateFromSeconds(Runner, _restartDelaySeconds);
             _audio?.StopMusic();
             // MatchVictory if anyone actually won, MatchEnd otherwise (timer expiry with no scorer).
             var endCue = winner.IsRealPlayer
                 ? (_audioReg != null ? _audioReg.MatchVictory : null)
                 : (_audioReg != null ? _audioReg.MatchEnd : null);
             _audio?.PlaySFX(endCue);
-            _log?.Info(Source, $"Match ended ({reason}). Winner={winner}, total={winnerTotal:0.0}. Next round in {_restartDelaySeconds}s.");
+            _log?.Info(Source, $"Match ended ({reason}). Winner={winner}, total={winnerTotal:0.0}. Waiting for Play Again / Back to Lobby.");
 
             // KPI match summary instrumentation (IP7)
             if (HasStateAuthority)
@@ -566,14 +547,32 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
+        /// PLAY AGAIN: stay in the session with the same players, bots and loadouts. Resets
+        /// the world and returns to <see cref="MatchState.WaitingForPlayers"/>, so the
+        /// in-session waiting room shows and the host must press START (<see cref="StartMatchNow"/>).
+        /// Nothing auto-starts, solo included — the solo auto-start in <see cref="Spawned"/>
+        /// runs once at spawn and never again. Ignored unless this peer has state authority and
+        /// the round has ended (<see cref="MatchFlowRules.CanPlayAgain"/>).
+        /// </summary>
+        public void RequestPlayAgain()
+        {
+            if (!MatchFlowRules.CanPlayAgain(HasStateAuthority, State))
+            {
+                _log?.Debug(Source, $"RequestPlayAgain ignored — authority={HasStateAuthority}, state={State}.");
+                return;
+            }
+            _log?.Info(Source, "Play Again accepted — resetting the world and re-arming the waiting room.");
+            ResetWorldForNewRound();
+        }
+
+        /// <summary>
         /// Resets every networked entity master can touch (bases, piles, loose pickups)
         /// and RPCs each chicken's authority to clear its own combat / cargo state.
-        /// State then flips back to <see cref="MatchState.Active"/> with a fresh
-        /// match timer so a new round begins immediately.
+        /// State then returns to <see cref="MatchState.WaitingForPlayers"/> with all timers
+        /// and winner fields cleared; <see cref="StartMatch"/> arms them again on START.
         /// </summary>
-        private void RestartMatch()
+        private void ResetWorldForNewRound()
         {
-            _log?.Info(Source, "Restarting match — resetting world.");
 
             // Master has authority over scene NetworkObjects (bases, piles) — mutate
             // their networked state directly; replication carries the new values to
@@ -638,7 +637,7 @@ namespace CluckWars.Gameplay
             // MatchBootstrapper uses on join is reproduced here.
             var mapGen = FindFirstObjectByType<MapGenerator>();
             var spawnPoints = mapGen != null ? mapGen.SpawnPoints : null;
-            _log?.Debug(Source, $"RestartMatch: {bases.Count} bases, {piles.Count} piles reset. " +
+            _log?.Debug(Source, $"ResetWorldForNewRound: {bases.Count} bases, {piles.Count} piles reset. " +
                 $"spawnPoints={(spawnPoints != null ? spawnPoints.Count.ToString() : "null")}.");
             if (spawnPoints != null && spawnPoints.Count > 0)
             {
@@ -659,15 +658,15 @@ namespace CluckWars.Gameplay
                 }
             }
 
-            // Resume the match — fresh intro countdown + timer, same window as
-            // the initial StartMatch so each round opens identically.
-            State = MatchState.Active;
-            IntroTimer = TickTimer.CreateFromSeconds(Runner, _introSeconds);
-            MatchTimer = TickTimer.CreateFromSeconds(Runner, MatchDurationSeconds + _introSeconds);
+            // Back to the waiting room. The timers are cleared (not re-armed): StartMatch
+            // creates the intro + match timers when the host presses START, so each round
+            // opens identically to the first one.
+            State = MatchFlowRules.PlayAgainState;
+            IntroTimer = default;
+            MatchTimer = default;
             WinnerPlayer = PlayerRef.None;
             WinnerCorner = -1;
             WinnerFoodTotal = 0f;
-            RestartCountdown = default;
             _nextWinCheckTime = 0f;
             ActiveEvent = MatchEventKind.None;
         }

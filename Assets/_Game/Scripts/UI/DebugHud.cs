@@ -168,7 +168,7 @@ namespace CluckWars.UI
                 {
                     sb.Append("Winner: ").AppendLine(gm.WinnerPlayer.ToString());
                     sb.Append("Final: ").Append(gm.WinnerFoodTotal.ToString("0")).AppendLine();
-                    sb.Append("Restart in: ").Append(gm.RestartRemaining.ToString("0.0")).AppendLine("s");
+                    sb.AppendLine("Awaiting: Play Again / Back to Lobby");
                 }
             }
 

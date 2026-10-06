@@ -411,6 +411,10 @@
     font-size: 40px; letter-spacing: 2px;
     margin-left: 12px; margin-right: 12px;
 }
+/* PLAY AGAIN row: a wood button over its "{cls} · {perk}" sub-line. Display is driven
+   from C# (hidden until a valid last setup exists) - no display rule here. */
+.cw-menu-playagain { flex-direction: row; align-items: center; justify-content: center; margin-top: 12px; }
+.cw-menu-playagain__sub { font-size: 28px; margin-left: 12px; -unity-text-align: middle-left; }
 .cw-menu-hint {
     font-size: 32px; margin-top: 26px;
     -unity-text-align: middle-center;

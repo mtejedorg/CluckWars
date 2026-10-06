@@ -758,7 +758,7 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Reset cargo state for a new round. Called by <c>GameManager.RestartMatch</c>
+        /// Reset cargo state for a new round. Called by <c>GameManager.ResetWorldForNewRound</c>
         /// from the master client; routes to each chicken's StateAuthority.
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]

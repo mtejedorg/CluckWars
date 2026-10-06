@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using CluckWars.Logging;
 using CluckWars.Networking;
 using CluckWars.Services;
@@ -66,7 +67,8 @@ namespace CluckWars.UI
 
         private VisualElement _matchEndOverlay, _lobbyOverlay, _sessionEndOverlay, _introOverlay;
 
-        private Label         _meRibbon, _meWinSub, _meWinName, _meWinScore, _meTargetNote, _meRestart;
+        private Label         _meRibbon, _meWinSub, _meWinName, _meWinScore, _meTargetNote, _meHostNote;
+        private Button        _mePlayAgainBtn, _meBackBtn;
         private VisualElement _meWinChicken, _meWinGlow, _meWinRing, _meRows;
         // .cw-chicken--<class> currently on the win-screen hero art (for swap).
         private string        _meWinChickenClass;
@@ -84,6 +86,9 @@ namespace CluckWars.UI
         private ShutdownReason? _shutdownReason;
         private float           _shutdownAtUnscaledTime;
         private bool            _returnTriggered;
+        // True once BACK TO LOBBY has started leaving on purpose; suppresses the "Session ended" overlay
+        // that the runner shutdown would otherwise raise through HandleShutdown.
+        private bool            _leavingToLobby;
 
         // Intro "GO!" flourish — lingers briefly after the countdown hits zero.
         private float       _goExpiresAtUnscaledTime;
@@ -142,6 +147,7 @@ namespace CluckWars.UI
 
         private void HandleShutdown(ShutdownReason reason)
         {
+            if (_leavingToLobby) return; // our own BACK TO LOBBY shutdown, not a dropped session
             _shutdownReason         = reason;
             _shutdownAtUnscaledTime = Time.unscaledTime;
             _log?.Warn(Source, $"Network shutdown: {reason}. Returning to '{_bootstrapSceneName}' in {_disconnectReturnDelay}s.");
@@ -197,7 +203,9 @@ namespace CluckWars.UI
             _meWinName    = _root.Q<Label>("MeWinName");
             _meWinScore   = _root.Q<Label>("MeWinScore");
             _meTargetNote = _root.Q<Label>("MeTargetNote");
-            _meRestart    = _root.Q<Label>("MeRestart");
+            _meHostNote     = _root.Q<Label>("MeHostNote");
+            _mePlayAgainBtn = _root.Q<Button>("MePlayAgainBtn");
+            _meBackBtn      = _root.Q<Button>("MeBackBtn");
             _meRows       = _root.Q<VisualElement>("MeRows");
 
             _codeTiles        = _root.Q<VisualElement>("CodeTiles");
@@ -217,9 +225,15 @@ namespace CluckWars.UI
             _sessionEndCountdown = _root.Q<Label>("SessionEndCountdown");
             _introNumber         = _root.Q<Label>("IntroNumber");
 
+            if (_mePlayAgainBtn != null) _mePlayAgainBtn.clicked += OnPlayAgain;
+            if (_meBackBtn      != null) _meBackBtn.clicked      += OnBackToLobby;
             if (_lobbyStartBtn != null) _lobbyStartBtn.clicked += OnLobbyStart;
             if (_lobbyCopyBtn  != null) _lobbyCopyBtn.clicked  += CopyJoinCode;
             if (_lobbyShareBtn != null) _lobbyShareBtn.clicked += CopyJoinCode;
+
+            // One-time: every @key text in the overlays comes from the wording dictionary.
+            UiText.SetLogger(_log);
+            UiText.ResolveTree(_root);
 
             // Start hidden; state polls flip them on.
             SetShown(_matchEndOverlay, false);
@@ -247,21 +261,56 @@ namespace CluckWars.UI
             SetShown(_matchEndOverlay, show);
             if (!show) { _matchEndPopulated = false; return; }
 
-            // Scores freeze once the match ends, so build the hero + rows once on
-            // entry; only the restart countdown updates each frame.
+            // Scores freeze once the match ends, so build the hero + rows once on entry; only
+            // the action buttons track live state (authority can migrate with the host).
             if (!_matchEndPopulated)
             {
                 PopulateMatchEnd(gm);
                 _matchEndPopulated = true;
             }
 
-            if (_meRestart != null)
+            if (_leavingToLobby) return; // buttons stay disabled while the session shuts down
+            bool canPlayAgain = gm.CanRequestPlayAgain;
+            if (_mePlayAgainBtn != null) _mePlayAgainBtn.SetEnabled(canPlayAgain);
+            SetShown(_meHostNote, !canPlayAgain);
+        }
+
+        /// <summary>PLAY AGAIN: host / solo only. Re-arms the in-session waiting room; never starts a match.</summary>
+        private void OnPlayAgain()
+        {
+            var gm = GameManager.Instance;
+            if (gm == null) return;
+            _log?.Info(Source, "Match end: PLAY AGAIN → GameManager.RequestPlayAgain().");
+            gm.RequestPlayAgain();
+        }
+
+        /// <summary>
+        /// BACK TO LOBBY (any player): leave the session through <see cref="INetworkService"/>, then load
+        /// Bootstrap, which opens on THE COOP via <see cref="ISessionSelectionService.OpenLobbyOnMenuLoad"/>
+        /// (a joiner lands on the main menu - decided on the menu side from the stored mode).
+        /// </summary>
+        private async void OnBackToLobby()
+        {
+            if (_leavingToLobby) return; // a double tap would otherwise start two scene loads
+            _leavingToLobby = true;
+            if (_mePlayAgainBtn != null) _mePlayAgainBtn.SetEnabled(false);
+            if (_meBackBtn      != null) _meBackBtn.SetEnabled(false);
+
+            if (_selection != null) _selection.OpenLobbyOnMenuLoad = true;
+            else _log?.Error(Source, "No ISessionSelectionService injected: BACK TO LOBBY will open the main menu instead of THE COOP.");
+
+            try
             {
-                float restartIn = gm.RestartRemaining;
-                _meRestart.text = restartIn > 0f
-                    ? $"Next match in {Mathf.CeilToInt(restartIn)}s…"
-                    : "Starting next match…";
+                if (_network != null) await _network.ShutdownAsync();
             }
+            catch (System.Exception e)
+            {
+                _log?.Error(Source, $"Shutting the runner down for BACK TO LOBBY failed: {e}. " +
+                    "Loading the menu anyway - but the next session may refuse to start; relaunch the app if so.");
+            }
+
+            _log?.Info(Source, $"Match end: BACK TO LOBBY → loading '{_bootstrapSceneName}'.");
+            SceneManager.LoadScene(_bootstrapSceneName);
         }
 
         private void PopulateMatchEnd(GameManager gm)
@@ -275,8 +324,8 @@ namespace CluckWars.UI
             if (_meRibbon != null)
             {
                 _meRibbon.text = winnerCorner >= 0
-                    ? (winnerReal ? $"P{winnerCorner + 1} WINS!" : $"P{winnerCorner + 1} (CPU) WINS!")
-                    : "MATCH ENDED";
+                    ? UiText.Format(winnerReal ? UiKeys.PostmatchWins : UiKeys.PostmatchWinsCpu, ("n", winnerCorner + 1))
+                    : UiText.Get(UiKeys.PostmatchEnded);
             }
 
             // Winner hero art + tints
@@ -309,7 +358,8 @@ namespace CluckWars.UI
             {
                 int target = _matchConfig != null ? Mathf.Max(1, _matchConfig.FoodTargetToWin) : 150;
                 bool reached = winnerTotal >= target;
-                _meTargetNote.text = $"target {target} · {(reached ? "reached" : "timer out")}";
+                _meTargetNote.text = UiText.Format(
+                    reached ? UiKeys.PostmatchTargetReached : UiKeys.PostmatchTargetTimeout, ("n", target));
             }
 
             // Standings rows

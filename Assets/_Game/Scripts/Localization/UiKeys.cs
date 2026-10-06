@@ -165,5 +165,15 @@ namespace CluckWars.Localization
         public const string LobbyBot2 = "lobby.bot.2";
         public const string LobbyBot3 = "lobby.bot.3";
 
+        // ---- Post-match overlay ----
+        public const string PostmatchStandings = "postmatch.standings";
+        public const string PostmatchFood = "postmatch.food";
+        [UiArgs("n")] public const string PostmatchWins = "postmatch.wins";
+        [UiArgs("n")] public const string PostmatchWinsCpu = "postmatch.winsCpu";
+        public const string PostmatchEnded = "postmatch.ended";
+        [UiArgs("n")] public const string PostmatchTargetReached = "postmatch.target.reached";
+        [UiArgs("n")] public const string PostmatchTargetTimeout = "postmatch.target.timeout";
+        public const string PostmatchHostOnly = "postmatch.hostOnly";
+
     }
 }
