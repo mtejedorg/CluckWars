@@ -65,6 +65,18 @@ namespace CluckWars.UI
         private VisualElement _mainMenu, _classSelect, _loadout, _lobby;
         private VisualElement _settingsSheet;
         private bool _isBusy;
+
+        // ---- Menu juice (Phase 3B): MenuJuice engine, MenuJuicePolicy timings ----
+        // Every effect goes through MenuJuice, which is a no-op under Reduced Motion; the callers
+        // below take the consequence (a sound, a slot appearing) from that no-op instead.
+        private VisualElement _fxLayer;
+        private MenuJuice _juice;
+        private bool _stampPending;          // READY was pressed: stamp + Ready cue when THE COOP is on screen
+        private bool _lobbyAllReady;
+        private int _stampHideId;
+        private readonly MenuJuice.Effect[] _flightFor = new MenuJuice.Effect[AbilityController.SlotCount];
+        private readonly AbilityBaseSO[] _flightAbility = new AbilityBaseSO[AbilityController.SlotCount];
+        private readonly List<VisualElement> _staggerScratch = new();
         private Rect _appliedSafeArea;
         private Vector2Int _appliedScreenSize;
         // Abilities already reported as having no sprite (logged once each, not per refresh).
@@ -236,6 +248,7 @@ namespace CluckWars.UI
         private void BuildAll()
         {
             if (_root == null) return;
+            DisposeJuice();
             _root.Clear();
             _root.style.flexGrow = 1;
 
@@ -263,6 +276,12 @@ namespace CluckWars.UI
             _root.Add(_backdrop);
             _root.Add(_backdropTint);
             _root.Add(_pageHost);
+
+            // Above every page: fly-to-slot ghosts, particles and the 3-2-1 (never takes a tap).
+            _fxLayer = new VisualElement { name = "FxLayer", pickingMode = PickingMode.Ignore };
+            StretchToParent(_fxLayer);
+            _root.Add(_fxLayer);
+            _juice = new MenuJuice(_fxLayer);
 
             _mainMenu    = ClonePage(_mainMenuUxml);
             _classSelect = ClonePage(_classSelectUxml);
@@ -322,9 +341,17 @@ namespace CluckWars.UI
 
         private void LateUpdate() { if (_stage != null) RunOnStage(_stage.Tick); }
 
-        private void OnDisable() => DisposeStage();
+        private void OnDisable() { DisposeStage(); DisposeJuice(); }
 
-        private void OnDestroy() => DisposeStage();
+        private void OnDestroy() { DisposeStage(); DisposeJuice(); }
+
+        /// <summary>Ends every running effect (landing / stamp cues still fire) and the countdown; the next BuildAll makes new ones.</summary>
+        private void DisposeJuice()
+        {
+            _juice?.Dispose();
+            _juice = null;
+            _stampPending = false;
+        }
 
         private VisualElement ClonePage(VisualTreeAsset vta)
         {
@@ -490,6 +517,7 @@ namespace CluckWars.UI
             var previous = _currentPage;
             _currentPage = page;
             ApplyBackdrop();
+            LeavePageJuice(page);
 
             int id = ++_pageTransitionId;
             bool animate = previous != null && previous != page && !PlayerPreferences.ReducedMotionEnabled
@@ -502,6 +530,8 @@ namespace CluckWars.UI
             if (!animate)
             {
                 foreach (var p in Pages()) p.style.display = p == page ? DisplayStyle.Flex : DisplayStyle.None;
+                // One frame later, so the Show* caller's Refresh has painted the page first.
+                page.schedule.Execute(() => OnPageShown(page, id)).ExecuteLater(0);
                 return;
             }
 
@@ -517,6 +547,7 @@ namespace CluckWars.UI
                 previous.style.display = DisplayStyle.None;
                 page.AddToClassList(forward ? "cw-pagewrap--in-fwd" : "cw-pagewrap--in-back");
                 page.style.display = DisplayStyle.Flex;
+                OnPageShown(page, id);
                 // One frame at the offset with no transition, then release: the page animates to rest.
                 page.schedule.Execute(() =>
                 {
@@ -524,6 +555,48 @@ namespace CluckWars.UI
                     page.RemoveFromClassList("cw-pagewrap--in-back");
                 }).ExecuteLater(16);
             }).ExecuteLater(PageOutMs);
+        }
+
+        /// <summary>
+        /// Leaving whatever page was up: icons still in flight land now (their sound and slot update
+        /// happen), the 3-2-1 is cancelled, a pending READY stamp that never got to play fires its cue.
+        /// </summary>
+        private void LeavePageJuice(VisualElement next)
+        {
+            _stampHideId++;
+            _juice?.CancelAll();
+            if (_stampPending && next != _lobby) { _stampPending = false; _audio.Ready(); }
+        }
+
+        /// <summary>The page is on screen: its main items enter staggered, and THE COOP stamps READY if the player just pressed it.</summary>
+        private void OnPageShown(VisualElement page, int transitionId)
+        {
+            bool stamp = _stampPending && page == _lobby;
+            _stampPending = false;
+            if (transitionId != _pageTransitionId || _juice == null)
+            {
+                if (stamp) _audio.Ready();   // superseded before it could play: the cue still fires once
+                return;
+            }
+
+            var items = _staggerScratch;
+            items.Clear();
+            if (page == _classSelect)
+            {
+                foreach (var cls in Order) if (_classTiles.TryGetValue(cls, out var tile)) items.Add(tile);
+            }
+            else if (page == _loadout)
+            {
+                foreach (var v in _slots) if (v != null) items.Add(v.Root);
+                foreach (var c in _deckCards) items.Add(c.Root);
+            }
+            else if (page == _lobby)
+            {
+                foreach (var seat in _seats) if (seat != null) items.Add(seat.Root);
+            }
+            if (items.Count > 0) _juice.Stagger(items);
+
+            if (stamp) PlayReadyStamp();
         }
 
         private static void ClearPageAnim(VisualElement p)
@@ -959,8 +1032,10 @@ namespace CluckWars.UI
                 root.clicked += () =>
                 {
                     if (view.Passive == null) return;
-                    if (view.Passive == _selection?.Passive) _audio.Tap(); else _audio.SelectPerk();
+                    bool changed = view.Passive != _selection?.Passive;
+                    if (changed) _audio.SelectPerk(); else _audio.Tap();
                     SelectClassAndPassive(Cls, view.Passive);
+                    if (changed) _juice?.Pop(view.Root, MenuJuicePolicy.PerkRestScale);
                 };
             }
 
@@ -996,6 +1071,11 @@ namespace CluckWars.UI
             }
             SelectClassAndPassive(cls, passive);
             _audio.SelectClass(cls);
+            if (_classTiles.TryGetValue(cls, out var tile))
+            {
+                _juice?.Pop(tile, MenuJuicePolicy.TileRestScale);
+                _juice?.BurstAt(tile, ParticleKind.Sparkle, 4);
+            }
         }
 
         /// <summary>The class's two perks, signature first (registry order would put the alternative
@@ -1170,7 +1250,7 @@ namespace CluckWars.UI
         private sealed class DeckCardView
         {
             public AbilityBaseSO Ability;
-            public VisualElement Root, Glow, StarterTag;
+            public VisualElement Root, Glow, StarterTag, IconHost;
             public Label Badge;
         }
 
@@ -1312,14 +1392,87 @@ namespace CluckWars.UI
             SyncSlotModel();
             var result = _slotModel.TapCard(ab, IsPreEquipped(ab));
             if (result != CardTapResult.Ignored) WriteSlotModel();
+            bool equipped = result == CardTapResult.Placed || result == CardTapResult.Swapped;
             switch (result)
             {
                 case CardTapResult.Placed:
-                case CardTapResult.Swapped: _audio.Equip(); break;
+                case CardTapResult.Swapped: break;   // Equip plays when the icon lands (LandSlot), or at once without motion
                 case CardTapResult.Cleared: _audio.Clear(); break;
-                default: _audio.Tap(); break; // locked starter: details only
+                default: _audio.Tap(); break;        // locked starter: details only
             }
+
+            // Model writes above are immediate; only the VISUAL of an equip is delayed. A flight whose
+            // slot no longer holds its ability lands now, so nothing is left hovering or out of step.
+            SettleFlights();
+            int target = equipped ? _slotModel.SlotOf(ab) : -1;
+            bool fly = target >= 0 && MenuJuice.Allowed && _juice != null;
+            if (fly)
+            {
+                LandFlight(target);
+                HoldSlotContent(target, true);
+            }
+
             RefreshLoadoutState();
+
+            var card = _deckCards.Find(c => c.Ability == ab);
+            if (card != null && result != CardTapResult.Ignored)
+                _juice?.Pop(card.Root, card.Root.ClassListContains("cw-ability-card--picked") ? MenuJuicePolicy.CardPickedRestScale : 1f);
+
+            if (!equipped) return;
+            if (!fly || !StartFlight(ab, target, card)) { HoldSlotContent(target, false); _audio.Equip(); }
+        }
+
+        // ---- Fly-to-slot ---------------------------------------------------------------
+        /// <summary>Hides (or shows) the new content of a slot while its icon is still in the air.</summary>
+        private void HoldSlotContent(int slot, bool hold)
+        {
+            if (slot < 0 || slot >= _slots.Length || _slots[slot] == null) return;
+            _slots[slot].IconHost.EnableInClassList("cw-fx-hold", hold);
+            _slots[slot].Name.EnableInClassList("cw-fx-hold", hold);
+        }
+
+        private bool StartFlight(AbilityBaseSO ab, int slot, DeckCardView card)
+        {
+            var view = _slots[slot];
+            if (card?.IconHost == null || view == null) return false;
+            var handle = _juice.Fly(card.IconHost, view.IconHost, ghost => PaintGhost(ghost, ab), () => LandSlot(slot));
+            if (handle == null) return false;
+            _flightFor[slot] = handle;
+            _flightAbility[slot] = ab;
+            return true;
+        }
+
+        private void PaintGhost(VisualElement ghost, AbilityBaseSO ab)
+        {
+            if (ghost.userData is not AbilityIconView view)
+            {
+                view = new AbilityIconView(ghost);
+                ghost.userData = view;
+            }
+            PaintIcon(view, ab);
+        }
+
+        /// <summary>The icon arrived: slot content shows with a small pop and sparkles, and the equip thunk plays.</summary>
+        private void LandSlot(int slot)
+        {
+            _flightFor[slot] = null;
+            _flightAbility[slot] = null;
+            HoldSlotContent(slot, false);
+            var view = _slots[slot];
+            if (view != null)
+            {
+                _juice?.Pop(view.IconHost);
+                _juice?.BurstAt(view.IconHost, ParticleKind.Sparkle, 4, 60f);
+            }
+            _audio.Equip();
+        }
+
+        private void LandFlight(int slot) => _juice?.LandNow(_flightFor[slot]);
+
+        private void SettleFlights()
+        {
+            for (int i = 0; i < _flightFor.Length; i++)
+                if (_flightFor[i] != null && _slotModel.Get(i) != _flightAbility[i]) LandFlight(i);
         }
 
         private void RefreshSlotBoxes()
@@ -1416,6 +1569,7 @@ namespace CluckWars.UI
             iconHost.AddToClassList("cw-ability-card__icon");
             PaintIcon(new AbilityIconView(iconHost), ab);
             card.Add(iconHost);
+            v.IconHost = iconHost;
 
             var name = new Label(AbilityLabel(ab)) { pickingMode = PickingMode.Ignore };
             name.AddToClassList("cw-ability-card__name");
@@ -1612,8 +1766,10 @@ namespace CluckWars.UI
         private void OnReady()
         {
             if (_isBusy) return;
-            _audio.Ready();
             SaveLastSetup();
+            // The stamp slams in when THE COOP is on screen (OnPageShown) and the Ready cue lands on
+            // its hit frame (or at once under Reduced Motion). RefreshLobby reads this flag first.
+            _stampPending = true;
             ShowLobby();
         }
 
@@ -1841,11 +1997,14 @@ namespace CluckWars.UI
 
         /// <summary>
         /// Shows the READY! banner when every seat is ready: a one-shot pop-in (scale + fade, USS
-        /// transition) each time it appears; instant under reduced motion. Hidden otherwise.
+        /// transition) each time it appears; instant under reduced motion. Hidden otherwise. When
+        /// the player just pressed READY the stamp (<see cref="PlayReadyStamp"/>) reveals it instead.
         /// </summary>
         private void RevealReadyBanner(bool show)
         {
+            _lobbyAllReady = show;
             if (_readyBanner == null) return;
+            _readyBanner.style.opacity = StyleKeyword.Null;   // a hold-then-fade stamp may have left it at 0
             if (!show)
             {
                 _readyBanner.style.display = DisplayStyle.None;
@@ -1858,9 +2017,55 @@ namespace CluckWars.UI
                 return;
             }
             _readyBanner.AddToClassList("cw-ready-banner--hidden");
+            if (_stampPending) return;   // the stamp reveals it when the page is on screen
             // After the page has slid in, release the hidden state so the transition plays.
             _readyBanner.schedule.Execute(() => _readyBanner.RemoveFromClassList("cw-ready-banner--hidden"))
                         .ExecuteLater(PageOutMs + 260);
+        }
+
+        /// <summary>
+        /// READY pressed -> THE COOP: the READY! ribbon slams in (scale 1.6 -> 1, a slight rotation)
+        /// and stamps. It is the existing banner, not a second element: the ribbon is the biggest
+        /// "READY" on the page, already carries the copy, and a seal-shaped rosette would only
+        /// duplicate the small one on the player's own seat. Solo (every seat ready) it stays, as
+        /// before; with open seats it holds for a moment and fades. The Ready cue, dust and sparkles
+        /// fire on the hit frame. Reduced Motion: no slam, the cue plays at once.
+        /// </summary>
+        private void PlayReadyStamp()
+        {
+            if (_readyBanner == null || _juice == null) { _audio.Ready(); return; }
+            var previousDisplay = _readyBanner.style.display;
+            _readyBanner.style.display = DisplayStyle.Flex;
+            _readyBanner.RemoveFromClassList("cw-ready-banner--hidden");
+            if (!_juice.Stamp(_readyBanner, MenuJuicePolicy.StampStartDelaySeconds, OnStampHit))
+            {
+                _readyBanner.style.display = previousDisplay;
+                _audio.Ready();
+                return;
+            }
+            if (_lobbyAllReady) return;
+
+            int id = ++_stampHideId;
+            long holdMs = (long)((MenuJuicePolicy.StampStartDelaySeconds + MenuJuicePolicy.StampSeconds + MenuJuicePolicy.StampHoldSeconds) * 1000f);
+            _readyBanner.schedule.Execute(() =>
+            {
+                if (id != _stampHideId) return;
+                _readyBanner.style.opacity = 0f;   // fades through the banner's own opacity transition
+                _readyBanner.schedule.Execute(() =>
+                {
+                    if (id != _stampHideId) return;
+                    _readyBanner.style.display = DisplayStyle.None;
+                    _readyBanner.style.opacity = StyleKeyword.Null;
+                }).ExecuteLater(400);
+            }).ExecuteLater(holdMs);
+        }
+
+        private void OnStampHit()
+        {
+            _audio.Ready();
+            if (_readyBanner == null) return;
+            _juice?.BurstAt(_readyBanner, ParticleKind.Dust, 5, 110f);
+            _juice?.BurstAt(_readyBanner, ParticleKind.Sparkle, 5, 150f);
         }
 
         /// <summary>

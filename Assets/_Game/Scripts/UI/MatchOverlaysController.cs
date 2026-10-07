@@ -71,6 +71,11 @@ namespace CluckWars.UI
         private Label         _meRibbon, _meWinSub, _meWinName, _meWinScore, _meTargetNote, _meHostNote;
         private Button        _mePlayAgainBtn, _meBackBtn;
         private VisualElement _meWinChicken, _meWinGlow, _meWinRing, _meWinRosette, _meRows;
+        // Feathers + sparkles over the match-end panel (Phase 3B); null if the UXML has no #MeCelebration.
+        private MatchCelebration _celebration;
+        // Local presentation of the networked intro timer (Phase 3B): tick / GO cues + a slam on the numeral.
+        private MenuJuice _introJuice;
+        private readonly IntroCueTracker _introCues = new();
         // .cw-chicken--<class> currently on the win-screen hero art (for swap).
         private string        _meWinChickenClass;
 
@@ -92,7 +97,7 @@ namespace CluckWars.UI
         private bool            _leavingToLobby;
         private const int       ShutdownTimeoutMs = 5000;
 
-        // Intro "GO!" flourish — lingers briefly after the countdown hits zero.
+        // Intro GO flourish — lingers briefly after the countdown hits zero.
         private float       _goExpiresAtUnscaledTime;
         private const float GoFlourishDuration = 0.6f;
 
@@ -213,6 +218,9 @@ namespace CluckWars.UI
             _mePlayAgainBtn = _root.Q<Button>("MePlayAgainBtn");
             _meBackBtn      = _root.Q<Button>("MeBackBtn");
             _meRows       = _root.Q<VisualElement>("MeRows");
+            var celebrationLayer = _root.Q<VisualElement>("MeCelebration");
+            if (celebrationLayer != null) _celebration = new MatchCelebration(celebrationLayer);
+            else _log?.Error(Source, "MatchOverlays.uxml has no #MeCelebration; the winner celebration will not show.");
 
             _codeTiles        = _root.Q<VisualElement>("CodeTiles");
             _lobbyGrid        = _root.Q<VisualElement>("LobbyGrid");
@@ -230,6 +238,7 @@ namespace CluckWars.UI
             _sessionEndReason    = _root.Q<Label>("SessionEndReason");
             _sessionEndCountdown = _root.Q<Label>("SessionEndCountdown");
             _introNumber         = _root.Q<Label>("IntroNumber");
+            if (_introOverlay != null) _introJuice = new MenuJuice(_introOverlay);
 
             if (_mePlayAgainBtn != null) _mePlayAgainBtn.clicked += OnPlayAgain;
             if (_meBackBtn      != null) _meBackBtn.clicked      += OnBackToLobby;
@@ -265,7 +274,7 @@ namespace CluckWars.UI
         {
             bool show = gm != null && gm.State == MatchState.Ended;
             SetShown(_matchEndOverlay, show);
-            if (!show) { _matchEndPopulated = false; return; }
+            if (!show) { _matchEndPopulated = false; _celebration?.Stop(); return; }
 
             // Scores freeze once the match ends, so build the hero + rows once on entry; only
             // the action buttons track live state (authority can migrate with the host).
@@ -372,6 +381,7 @@ namespace CluckWars.UI
             if (_meWinGlow != null)
                 _meWinGlow.style.unityBackgroundImageTintColor = Fade(winnerColor, 0.45f);
             if (_meWinRing != null) _meWinRing.style.unityBackgroundImageTintColor = winnerColor;   // Pedestal_Ring art
+            if (winnerCorner >= 0) _celebration?.Start(winnerColor);   // no-op under Reduced Motion
             if (_meWinRosette != null)
             {
                 // Winner rosette (Badge_Rosette, white art) in the winner's player colour.
@@ -686,19 +696,31 @@ namespace CluckWars.UI
             // Visibility only — the top-bar dim is decided once in Update() across
             // all three modals, so this method must not touch it or it would clear
             // a dim the match-end / lobby overlay still needs.
-            if (gm == null) { SetShown(_introOverlay, false); return; }
+            if (gm == null) { _introCues.Reset(); SetShown(_introOverlay, false); return; }
+
+            // The timer is networked and untouched; the cues below are this client's own presentation of it.
+            var cue = _introCues.Observe(gm.IsIntroActive, gm.IsIntroActive ? gm.IntroRemaining : 0f, out int number);
 
             if (gm.IsIntroActive)
             {
-                if (_introNumber != null) _introNumber.text = Mathf.CeilToInt(gm.IntroRemaining).ToString();
+                if (_introNumber != null && cue == IntroCueTracker.Cue.Tick) _introNumber.text = number.ToString();
                 SetShown(_introOverlay, true);
                 _goExpiresAtUnscaledTime = Time.unscaledTime + GoFlourishDuration;
+                if (cue == IntroCueTracker.Cue.Tick) { _audio.CountdownTick(number); _introJuice?.Slam(_introNumber); }
                 return;
+            }
+
+            if (cue == IntroCueTracker.Cue.Go)
+            {
+                if (_introNumber != null) _introNumber.text = UiText.Get(UiKeys.CountdownGo);
+                _audio.CountdownGo();
+                _introJuice?.Slam(_introNumber);
             }
 
             if (Time.unscaledTime < _goExpiresAtUnscaledTime)
             {
-                if (_introNumber != null) _introNumber.text = "GO!";
+                if (_introNumber != null && cue != IntroCueTracker.Cue.Go && _introNumber.text != UiText.Get(UiKeys.CountdownGo))
+                    _introNumber.text = UiText.Get(UiKeys.CountdownGo);
                 SetShown(_introOverlay, true);
             }
             else

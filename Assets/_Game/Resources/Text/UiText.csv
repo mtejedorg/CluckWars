@@ -114,6 +114,7 @@ tag.cpu,CPU
 state.ready,READY
 state.picking,PICKING
 lobby.allReady,READY!
+countdown.go,GO!
 lobby.bot.1,DashFox
 lobby.bot.2,BrunoB
 lobby.bot.3,PeckNoir

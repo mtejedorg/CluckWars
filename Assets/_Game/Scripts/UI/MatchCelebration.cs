@@ -1,0 +1,111 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace CluckWars.UI
+{
+    /// <summary>
+    /// The post-match winner celebration: a handful of feathers and sparkles (Art/UI/Fx), lightly
+    /// tinted with the winner's colour, falling slowly down the match-end overlay in a loop. It
+    /// replaces the retired static <c>.cw-bg-particle</c> dots.
+    /// </summary>
+    /// <remarks>
+    /// Nine pooled elements, one 30 Hz scheduled item that runs only between <see cref="Start"/> and
+    /// <see cref="Stop"/> (the overlay being open), translate / rotate / opacity only (no layout).
+    /// Nothing is started under Reduced Motion (<see cref="MenuJuice.Allowed"/>).
+    /// </remarks>
+    public sealed class MatchCelebration
+    {
+        private sealed class Piece
+        {
+            public VisualElement El;
+            public bool Sparkle;
+            public float Left01, Cycle, Phase, SwayAmp, SwayHz, SwayPhase, Spin, MaxAlpha, Scale;
+        }
+
+        private readonly VisualElement _layer;
+        private readonly List<Piece> _pieces = new();
+        private readonly IVisualElementScheduledItem _tick;
+        private float _t0;
+
+        /// <param name="layer">Absolute, full-overlay, non-picking element drawn above the match-end panel.</param>
+        public MatchCelebration(VisualElement layer)
+        {
+            _layer = layer;
+            var rng = new System.Random(7);
+            for (int i = 0; i < MenuJuicePolicy.CelebrationParticles; i++)
+            {
+                bool sparkle = i % 3 == 2;                                  // 6 feathers, 3 sparkles
+                var el = new VisualElement { pickingMode = PickingMode.Ignore };
+                el.AddToClassList("cw-fx-particle");
+                el.AddToClassList(sparkle ? "cw-fx-sparkle" : "cw-fx-feather-" + (1 + i % 3));
+                el.style.display = DisplayStyle.None;
+                layer.Add(el);
+                _pieces.Add(new Piece
+                {
+                    El = el, Sparkle = sparkle,
+                    Left01 = (i + 0.5f) / MenuJuicePolicy.CelebrationParticles,
+                    Cycle = 8f + (float)rng.NextDouble() * 5f,
+                    Phase = (float)rng.NextDouble(),
+                    SwayAmp = 30f + (float)rng.NextDouble() * 40f,
+                    SwayHz = 0.12f + (float)rng.NextDouble() * 0.1f,
+                    SwayPhase = (float)rng.NextDouble(),
+                    Spin = (sparkle ? 40f : 90f) * ((float)rng.NextDouble() < 0.5f ? -1f : 1f),
+                    MaxAlpha = sparkle ? 0.7f : 0.5f,
+                    Scale = sparkle ? 0.9f + (float)rng.NextDouble() * 0.5f : 1f,
+                });
+            }
+            _tick = layer.schedule.Execute(Tick).Every(33);
+            _tick.Pause();
+        }
+
+        /// <summary>Starts the loop, tinted lightly toward <paramref name="winner"/>. No-op under Reduced Motion.</summary>
+        public bool Start(Color winner)
+        {
+            if (!MenuJuice.Allowed) return false;
+            // Mostly cream, a third winner colour: reads as theirs without turning the screen to one hue.
+            var tint = Color.Lerp(new Color(1f, 0.93f, 0.75f, 1f), winner, 0.35f);
+            foreach (var p in _pieces)
+            {
+                p.El.style.unityBackgroundImageTintColor = p.Sparkle ? Color.Lerp(new Color(1f, 0.84f, 0.31f, 1f), winner, 0.2f) : tint;
+                p.El.style.display = DisplayStyle.Flex;
+                p.El.style.opacity = 0f;
+            }
+            _t0 = Time.unscaledTime;
+            _tick.Resume();
+            return true;
+        }
+
+        /// <summary>Stops and hides everything (overlay closed). Safe to call when not running.</summary>
+        public void Stop()
+        {
+            _tick.Pause();
+            foreach (var p in _pieces)
+            {
+                p.El.style.display = DisplayStyle.None;
+                p.El.style.translate = StyleKeyword.Null;
+                p.El.style.rotate = StyleKeyword.Null;
+                p.El.style.scale = StyleKeyword.Null;
+                p.El.style.opacity = StyleKeyword.Null;
+            }
+        }
+
+        private void Tick()
+        {
+            float w = _layer.resolvedStyle.width, h = _layer.resolvedStyle.height;
+            if (float.IsNaN(w) || float.IsNaN(h) || w <= 1f || h <= 1f) return;
+            float t = Time.unscaledTime - _t0;
+            foreach (var p in _pieces)
+            {
+                float fall = MenuJuicePolicy.DriftFall(t, p.Cycle, p.Phase);
+                float x = p.Left01 * w + MenuJuicePolicy.DriftSway(t, p.SwayAmp, p.SwayHz, p.SwayPhase);
+                float y = Mathf.Lerp(-80f, h + 80f, fall);
+                var s = p.Sparkle ? p.Scale * (0.75f + 0.25f * Mathf.Sin(t * 3f + p.Phase * 6.28f)) : p.Scale;
+                p.El.style.translate = new Translate(x, y);
+                p.El.style.rotate = new Rotate(new Angle(p.Spin * t, AngleUnit.Degree));
+                p.El.style.scale = new Scale(new Vector3(s, s, 1f));
+                p.El.style.opacity = MenuJuicePolicy.DriftOpacity(fall, p.MaxAlpha);
+            }
+        }
+    }
+}

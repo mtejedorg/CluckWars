@@ -17,18 +17,14 @@
         <!--  MATCH END  (CWMatchEndV3L)                                   -->
         <!-- ============================================================ -->
         <ui:VisualElement name="MatchEndOverlay" class="cw-overlay cw-overlay--dim cw-overlay--opaque" style="display: none;">
-            <!-- Background particles -->
-            <ui:VisualElement class="cw-bg-particle cw-bg-particle--1" />
-            <ui:VisualElement class="cw-bg-particle cw-bg-particle--2" />
-            <ui:VisualElement class="cw-bg-particle cw-bg-particle--3" />
-            <ui:VisualElement class="cw-bg-particle cw-bg-particle--4" />
-            <ui:VisualElement class="cw-bg-particle cw-bg-particle--5" />
-            <ui:VisualElement class="cw-bg-particle cw-bg-particle--6" />
-
             <ui:VisualElement name="MatchEndPanel" class="cw-me-panel">
 
                 <!-- LEFT: winner hero -->
                 <ui:VisualElement name="MeHero" class="cw-me-hero">
+                    <!-- Winner celebration (feathers + sparkles, Phase 3B): first child of the winner column, so it is
+                         drawn UNDER the crown / ribbon / chicken / food text and never over text. Never takes a tap;
+                         MatchCelebration fills it and runs only while the match-end overlay is open. -->
+                    <ui:VisualElement name="MeCelebration" class="cw-celebration" picking-mode="Ignore" />
                     <ui:VisualElement name="MeCrown" class="cw-me-crown" />
                     <ui:VisualElement name="MeWinRibbon" class="cw-me-ribbon">
                         <ui:Label name="MeWinRibbonLabel" text="" class="cw-me-ribbon__label" />

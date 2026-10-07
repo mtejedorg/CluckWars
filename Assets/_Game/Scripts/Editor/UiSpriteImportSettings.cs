@@ -19,6 +19,7 @@ namespace CluckWars.EditorTools
     /// • Atoms / Backgrounds: <c>Uncompressed</c> (RGBA32) — smooth gradients that
     ///   band badly under block compression.
     /// • Icons / Chickens: default <c>Compressed</c> — flat art tolerates it.
+    /// • Fx: max 128, <c>Uncompressed</c> (soft alpha gradients; they are 64-128 px).
     /// • Icons/Abilities: max 256 on every platform. Backgrounds/Bg_*: max 4096,
     ///   compressed, ASTC 6x6 on Android. Frames: CompressedHQ, MANIFEST 9-slice borders;
     ///   Tex_WoodTile wraps Repeat (Art/UI/Frames/MANIFEST.md).
@@ -60,11 +61,16 @@ namespace CluckWars.EditorTools
         public const string BackdropPrefix = "Backgrounds/Bg_";
         public const int BackdropMaxSize = 4096;
 
+        /// <summary>Menu particles (Fx_Sparkle 64 px, Fx_Feather_* / Fx_Dust 128 px): tiny soft-alpha sprites, capped at 128 and left uncompressed so the gradients do not band (64 KB each).</summary>
+        public const string FxPrefix = "Fx/";
+        public const int FxMaxSize = 128;
+
         static readonly string[] PlatformOverrides = { "Standalone", "Android", "iPhone" };
 
         // Bump whenever the rules above change: Unity then re-imports every texture this
-        // postprocessor touched, so the .meta files follow the code (2 = Phase 2 art rules).
-        public override uint GetVersion() => 2;
+        // postprocessor touched, so the .meta files follow the code (2 = Phase 2 art rules,
+        // 3 = Phase 3B Fx rule).
+        public override uint GetVersion() => 3;
 
         void OnPreprocessTexture()
         {
@@ -92,7 +98,18 @@ namespace CluckWars.EditorTools
 
             if (key == "Frames/Tex_WoodTile") ti.wrapMode = TextureWrapMode.Repeat;
 
-            if (key.StartsWith(AbilityIconPrefix))
+            if (key.StartsWith(FxPrefix))
+            {
+                ti.maxTextureSize = FxMaxSize;
+                ti.textureCompression = TextureImporterCompression.Uncompressed;
+                foreach (var platform in PlatformOverrides)
+                {
+                    var ps = ti.GetPlatformTextureSettings(platform);
+                    ps.maxTextureSize = FxMaxSize;
+                    ti.SetPlatformTextureSettings(ps);
+                }
+            }
+            else if (key.StartsWith(AbilityIconPrefix))
             {
                 ti.maxTextureSize = AbilityIconMaxSize;
                 foreach (var platform in PlatformOverrides)

@@ -38,22 +38,33 @@
 /* ============================================================================
    MATCH END  (landscape hero + standings)
    ============================================================================ */
-/* Hidden (Phase 2 review): on the opaque scrim these faint gold dots read as dark smudges
-   (one sits top-centre). Phase 3 replaces them with the Fx sparkle/feather sprites. */
-.cw-bg-particle {
-    display: none;
-    position: absolute;
-    width: 46px; height: 46px;
-    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/PlayerDotGlossy.png");
-    -unity-background-image-tint-color: rgba(245, 200, 66, 0.15);
+/* Winner celebration (Phase 3B, MatchCelebration): feathers and sparkles from Art/UI/Fx drift down
+   the winner column, behind its crown / ribbon / chicken / text, never taking a tap. C# builds the particles; none under Reduced
+   Motion. Replaces the static background dots (Phase 2 hid them: they read as smudges).
+   The .cw-fx-* particle classes are the same as in CluckWarsTheme.uss (separate sheet). */
+.cw-celebration { position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: hidden; }
+.cw-fx-live.cw-fx-live { transition-duration: 0s; }
+.cw-fx-particle {
+    position: absolute; left: 0; top: 0;
     -unity-background-scale-mode: scale-to-fit;
 }
-.cw-bg-particle--1 { left: 10%; top: 20%; scale: 0.8 0.8; opacity: 0.8; }
-.cw-bg-particle--2 { right: 15%; top: 15%; scale: 1.2 1.2; opacity: 0.6; }
-.cw-bg-particle--3 { left: 25%; bottom: 25%; scale: 0.6 0.6; opacity: 0.7; }
-.cw-bg-particle--4 { right: 20%; bottom: 30%; scale: 1.5 1.5; opacity: 0.4; }
-.cw-bg-particle--5 { left: 50%; top: 10%; scale: 0.9 0.9; opacity: 0.5; }
-.cw-bg-particle--6 { left: 70%; bottom: 15%; scale: 1.1 1.1; opacity: 0.9; }
+.cw-fx-sparkle {
+    width: 56px; height: 56px; margin-left: -28px; margin-top: -28px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Fx/Fx_Sparkle.png");
+    -unity-background-image-tint-color: rgb(255, 214, 80);
+}
+.cw-fx-dust {
+    width: 100px; height: 100px; margin-left: -50px; margin-top: -50px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Fx/Fx_Dust.png");
+    -unity-background-image-tint-color: rgb(255, 248, 232);
+}
+.cw-fx-feather-1, .cw-fx-feather-2, .cw-fx-feather-3 {
+    width: 64px; height: 64px; margin-left: -32px; margin-top: -32px;
+    -unity-background-image-tint-color: rgb(255, 248, 232);
+}
+.cw-fx-feather-1 { background-image: url("project://database/Assets/_Game/Art/UI/Fx/Fx_Feather_1.png"); }
+.cw-fx-feather-2 { background-image: url("project://database/Assets/_Game/Art/UI/Fx/Fx_Feather_2.png"); }
+.cw-fx-feather-3 { background-image: url("project://database/Assets/_Game/Art/UI/Fx/Fx_Feather_3.png"); }
 
 .cw-me-panel {
     width: 94%; max-width: 2242px; max-height: 94%;

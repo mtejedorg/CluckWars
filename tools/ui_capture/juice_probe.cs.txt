@@ -1,0 +1,115 @@
+using UnityEngine; using UnityEngine.UIElements; using System.Linq; using System.Reflection; using System.Collections.Generic; using System.Text; using System.IO;
+using CluckWars.Audio; using CluckWars.UI;
+// Phase 3B probe: per-frame style samples + timed Game-view screenshots + a recording IAudioService.
+// Driven by tools/ui_capture/juice_probe.py through script-execute (className "Rec").
+public class Rec {
+  sealed class RecAudio : IAudioService {
+    public void PlaySFX(AudioClip clip, float volume = 1f, float pitch = 1f, float delaySeconds = 0f) { Lines.Add("      AUDIO t=" + (Time.unscaledTime - Start).ToString("0.000") + " " + (clip == null ? "null" : clip.name) + " pitch=" + pitch.ToString("0.00")); }
+    public void PlayMusic(AudioClip clip, float volume = 1f, bool loop = true, float fadeInSeconds = 0f) { }
+    public void FadeOutMusic(float seconds) { }
+    public void StopMusic() { }
+    public bool IsMusicPlaying(AudioClip clip) { return false; }
+    public void SetMasterVolume(float volume01) { }
+  }
+  // Every script-execute compiles a NEW assembly, so statics are per call: the shared log and clock live in AppDomain data.
+  static List<string> Lines { get { var l = System.AppDomain.CurrentDomain.GetData("rec.lines") as List<string>; if (l == null) { l = new List<string>(); System.AppDomain.CurrentDomain.SetData("rec.lines", l); } return l; } }
+  static float Start { get { var o = System.AppDomain.CurrentDomain.GetData("rec.start"); return o == null ? 0f : (float)o; } set { System.AppDomain.CurrentDomain.SetData("rec.start", value); } }
+  static float Duration; static List<float> Shots = new List<float>(); static int ShotIdx; static string Prefix = "";
+  static string[] Names = new string[0]; static IVisualElementScheduledItem Item; static int Every = 1, Frame;
+  static UIDocument Doc() { return Object.FindObjectsByType<UIDocument>(FindObjectsSortMode.None).FirstOrDefault(x => x.rootVisualElement != null && x.rootVisualElement.Q<Button>("SoloBtn") != null); }
+  static VisualElement Menu() { var d = Doc(); return d == null ? null : d.rootVisualElement; }
+  static MenuUiController Ctl() { return Object.FindFirstObjectByType<MenuUiController>(); }
+  static object Priv(object o, string f) { return o.GetType().GetField(f, BindingFlags.NonPublic | BindingFlags.Instance).GetValue(o); }
+
+  public static string Init() {
+    var cat = ScriptableObject.CreateInstance<UiAudioSO>();
+    foreach (var f in typeof(UiAudioSO).GetFields()) if (f.FieldType == typeof(UiCue)) { var cue = (UiCue)f.GetValue(cat); cue.Clip = AudioClip.Create(f.Name, 64, 1, 8000, false); f.SetValue(cat, cue); }
+    var ctl = Ctl(); var field = typeof(MenuUiController).GetField("_audio", BindingFlags.NonPublic | BindingFlags.Instance);
+    field.SetValue(ctl, new MenuAudio(new RecAudio(), cat, null));
+    return "recording audio installed; allowed=" + MenuJuice.Allowed;
+  }
+  public static string SetReduced(string on) {
+    CluckWars.Settings.PlayerPreferences.ReducedMotionEnabled = on == "1";
+    typeof(MenuUiController).GetMethod("ApplyReducedMotion", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(Ctl(), null);
+    return "reduced=" + CluckWars.Settings.PlayerPreferences.ReducedMotionEnabled + " allowed=" + MenuJuice.Allowed;
+  }
+  public static string ClearReducedPref() {
+    PlayerPrefs.DeleteKey(CluckWars.Settings.PlayerPreferences.ReducedMotionKey); PlayerPrefs.Save(); CluckWars.Settings.PlayerPreferences.ResetCache();
+    typeof(MenuUiController).GetMethod("ApplyReducedMotion", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(Ctl(), null);
+    return "reduced pref cleared -> " + CluckWars.Settings.PlayerPreferences.ReducedMotionEnabled;
+  }
+
+  // names = comma list of element names; shots = comma list of seconds; every = log every Nth frame
+  static void Begin(string names, string dur, string shots, string prefix, string every, string tag) {
+    Lines.Add("=== " + tag);
+    Names = string.IsNullOrEmpty(names) ? new string[0] : names.Split(',');
+    Duration = float.Parse(dur, System.Globalization.CultureInfo.InvariantCulture);
+    Shots = string.IsNullOrEmpty(shots) ? new List<float>() : shots.Split(',').Select(x => float.Parse(x, System.Globalization.CultureInfo.InvariantCulture)).ToList();
+    ShotIdx = 0; Prefix = prefix; Every = int.Parse(every); Frame = 0; Start = Time.unscaledTime;
+    if (Item != null) Item.Pause();
+    Item = Menu().schedule.Execute(Tick).Every(1);
+  }
+  static string F(float v) { return v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture); }
+  static void Tick() {
+    float t = Time.unscaledTime - Start; var r = Menu(); if (r == null) return;
+    if (Frame++ % Every == 0) {
+      var sb = new StringBuilder(); sb.Append(t.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture));
+      foreach (var n in Names) { var el = r.Q<VisualElement>(n); if (el == null) { sb.Append(" | " + n + " ?"); continue; }
+        var rs = el.resolvedStyle; sb.Append(" | " + n + " sc=" + F(rs.scale.value.x) + " ty=" + F(rs.translate.y) + " op=" + F(rs.opacity) + " rot=" + F(rs.rotate.angle.value)); }
+      var ghosts = r.Query<VisualElement>(className: "cw-fly-ghost").ToList().Where(g => g.resolvedStyle.display == DisplayStyle.Flex).ToList();
+      var parts = r.Query<VisualElement>(className: "cw-fx-particle").ToList().Count(g => g.resolvedStyle.display == DisplayStyle.Flex);
+      sb.Append(" | ghosts=" + ghosts.Count); if (ghosts.Count > 0) { var g = ghosts[0]; sb.Append("(tx=" + F(g.resolvedStyle.translate.x) + ",ty=" + F(g.resolvedStyle.translate.y) + ",sc=" + F(g.resolvedStyle.scale.value.x) + ")"); }
+      sb.Append(" parts=" + parts);
+      var holds = new StringBuilder(); for (int i = 0; i < 4; i++) { var b = r.Q<VisualElement>("SlotBox" + i); var ic = b == null ? null : b.Q<VisualElement>(className: "cw-slot-box__icon"); holds.Append(ic != null && ic.ClassListContains("cw-fx-hold") ? "H" : "."); }
+      sb.Append(" hold=" + holds);
+      var cd = r.Q<VisualElement>("CountdownOverlay"); if (cd != null && cd.resolvedStyle.display == DisplayStyle.Flex) { var l = cd.Q<Label>(); sb.Append(" CD='" + l.text + "' sc=" + F(l.resolvedStyle.scale.value.x)); }
+      Lines.Add(sb.ToString());
+    }
+    // one screenshot per frame (two in one frame overwrite each other)
+    if (ShotIdx < Shots.Count && t >= Shots[ShotIdx]) { ScreenCapture.CaptureScreenshot(Prefix + "_" + Shots[ShotIdx].ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + ".png"); Lines.Add("      SHOT " + Shots[ShotIdx] + " (actual t=" + t.ToString("0.000") + ")"); ShotIdx++; }
+    if (t > Duration) { Item.Pause(); Lines.Add("=== end"); }
+  }
+
+  // The Editor stalls ~0.45 s after a bridge call returns; an effect started inside the call would see that jump as one huge frame.
+  // Run every recorded action from the UI scheduler a little later, in ordinary frames.
+  static string Defer(string what, System.Action a) { Menu().schedule.Execute(() => { a(); }).ExecuteLater(1200); return "scheduled " + what; }
+  static void Click(Button b) { var c = typeof(Button).GetField("m_Clickable", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(b);
+    ((System.Action)typeof(Clickable).GetField("clicked", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(c)).Invoke(); }
+  static void ClickEl(VisualElement t) { using (var e = ClickEvent.GetPooled()) { e.target = t; t.SendEvent(e); } }
+
+  public static string Press(string btn, string names, string dur, string shots, string prefix, string every) {
+    var b = Menu().Q<Button>(btn); if (b == null) return "NOBTN " + btn; return Defer("press " + btn, () => { Begin(names, dur, shots, prefix, every, "press " + btn); Click(b); }); }
+  public static string StartThenBack(string names, string dur, string shots, string prefix, string every, string backAfterMs) {
+    var r = Menu(); var start = r.Q<Button>("StartBtn"); var back = r.Q<VisualElement>("LobbyPage").Q<Button>("BackBtn");
+    return Defer("start+back", () => { Begin(names, dur, shots, prefix, every, "START then BACK after " + backAfterMs + " ms"); Click(start);
+      r.schedule.Execute(() => { Lines.Add("      >>> BACK pressed t=" + (Time.unscaledTime - Start).ToString("0.000")); Click(back); }).ExecuteLater(long.Parse(backAfterMs)); }); }
+  public static string StartFull(string names, string dur, string shots, string prefix, string every) {
+    var r = Menu(); var start = r.Q<Button>("StartBtn"); return Defer("start full", () => { Begin(names, dur, shots, prefix, every, "START full run"); Click(start); }); }
+  public static string PressQuiet(string btn) { var b = Menu().Q<Button>(btn); if (b == null) return "NOBTN " + btn; Click(b); return "pressed " + btn; }
+  public static string TapEl(string name, string names, string dur, string shots, string prefix, string every) {
+    var t = Menu().Q<VisualElement>(name); if (t == null) return "NOTGT " + name; return Defer("tap " + name, () => { Begin(names, dur, shots, prefix, every, "tap " + name); ClickEl(t); }); }
+  public static string TapFreeCards(string n, string names, string dur, string shots, string prefix, string every) {
+    return Defer("tap " + n + " free cards", () => { Begin(names, dur, shots, prefix, every, "tap " + n + " free cards"); int taps = 0;
+      for (int i = 0; i < int.Parse(n); i++) { var card = Menu().Query<VisualElement>(className: "cw-ability-card").ToList().FirstOrDefault(c => !c.ClassListContains("cw-ability-card--picked") && !c.ClassListContains("cw-ability-card--locked")); if (card == null) break; ClickEl(card); taps++; }
+      Lines.Add("      taps=" + taps); }); }
+  public static string PressLobbyBack() { var b = Menu().Q<VisualElement>("LobbyPage").Q<Button>("BackBtn"); if (b == null) return "NOBTN"; Click(b); return "pressed lobby BackBtn"; }
+  public static string FillQuiet() { var r = Menu(); int taps = 0;
+    for (int i = 0; i < 14; i++) { var rb = r.Q<Button>("ReadyBtn"); if (rb != null && rb.enabledSelf) break;
+      var card = r.Query<VisualElement>(className: "cw-ability-card").ToList().FirstOrDefault(c => !c.ClassListContains("cw-ability-card--picked")); if (card == null) break; ClickEl(card); taps++; }
+    return "taps=" + taps; }
+  public static string State() {
+    var c = Ctl(); var j = Priv(c, "_juice"); var act = (System.Collections.IList)Priv(j, "_active");
+    var flights = (System.Array)Priv(c, "_flightFor"); int inflight = 0; foreach (var f in flights) if (f != null) inflight++;
+    var cd = Priv(c, "_countdown"); bool running = (bool)cd.GetType().GetProperty("IsRunning").GetValue(cd);
+    var start = Priv(c, "_startBtn") as Button; bool busy = (bool)Priv(c, "_isBusy");
+    var r = Menu(); var ov = r.Q<VisualElement>("CountdownOverlay");
+    int live = r.Query<VisualElement>(className: "cw-fx-live").ToList().Count; int hold = r.Query<VisualElement>(className: "cw-fx-hold").ToList().Count;
+    int ghostsVisible = r.Query<VisualElement>(className: "cw-fly-ghost").ToList().Count(g => g.resolvedStyle.display == DisplayStyle.Flex);
+    return "activeEffects=" + act.Count + " flightsPending=" + inflight + " ghostsVisible=" + ghostsVisible + " liveClass=" + live + " holdClass=" + hold + " countdownRunning=" + running + " startEnabled=" + (start != null && start.enabledSelf) + " isBusy=" + busy + " overlay=" + (ov == null ? "none" : ov.resolvedStyle.display.ToString()); }
+  public static string Slots() { var r = Menu(); var sb = new StringBuilder();
+    for (int i = 0; i < 4; i++) { var b = r.Q<VisualElement>("SlotBox" + i); var n = b.Q<Label>(className: "cw-slot-box__name"); var ic = b.Q<VisualElement>(className: "cw-slot-box__icon"); sb.Append(i + ":" + (n == null ? "?" : n.text) + "[icon=" + ic.resolvedStyle.display + ",op=" + F(ic.resolvedStyle.opacity) + "] "); }
+    return sb.ToString(); }
+  public static string Dump(string path) { File.WriteAllText(path, string.Join("\n", Lines)); var n = Lines.Count; Lines.Clear(); return "wrote " + n + " lines"; }
+  public static string Pages() { var r = Menu(); if (r == null) return "NOMENU"; var host = r.Q<VisualElement>("PageHost") ?? r; return "pages=[" + string.Join(",", host.Children().Select((c, i) => c.resolvedStyle.display == DisplayStyle.Flex ? i.ToString() : "-")) + "]"; }
+  public static string ClearLastSetup() { CluckWars.Settings.PlayerPreferences.LastSetup = null; return "cleared"; }
+}

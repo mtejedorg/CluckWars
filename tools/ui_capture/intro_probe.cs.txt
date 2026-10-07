@@ -1,0 +1,66 @@
+using UnityEngine; using UnityEngine.UIElements; using System.Linq; using System.Reflection; using System.Collections.Generic; using System.Text; using System.IO;
+using CluckWars.Audio; using CluckWars.UI; using CluckWars.Gameplay;
+// Phase 3B review probe: the in-game intro countdown (MatchOverlaysController.RefreshIntro). className "Intro".
+public class Intro {
+  sealed class RecAudio : IAudioService {
+    public void PlaySFX(AudioClip clip, float volume = 1f, float pitch = 1f, float delaySeconds = 0f) { Lines.Add("      AUDIO t=" + (Time.unscaledTime - Start).ToString("0.000") + " " + (clip == null ? "null" : clip.name) + " pitch=" + pitch.ToString("0.00")); }
+    public void PlayMusic(AudioClip clip, float volume = 1f, bool loop = true, float fadeInSeconds = 0f) { }
+    public void FadeOutMusic(float seconds) { }
+    public void StopMusic() { }
+    public bool IsMusicPlaying(AudioClip clip) { return false; }
+    public void SetMasterVolume(float volume01) { }
+  }
+  static List<string> Lines { get { var l = System.AppDomain.CurrentDomain.GetData("intro.lines") as List<string>; if (l == null) { l = new List<string>(); System.AppDomain.CurrentDomain.SetData("intro.lines", l); } return l; } }
+  static float Start { get { var o = System.AppDomain.CurrentDomain.GetData("intro.start"); return o == null ? 0f : (float)o; } set { System.AppDomain.CurrentDomain.SetData("intro.start", value); } }
+  static string Prefix; static float Duration; static string LastText = ""; static bool Shot; static float ShotAt = -1; static IVisualElementScheduledItem Item;
+  static string F(float v) { return v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture); }
+  static UIDocument Doc() { return Object.FindObjectsByType<UIDocument>(FindObjectsSortMode.None).FirstOrDefault(x => x.rootVisualElement != null && x.rootVisualElement.Q<Label>("IntroNumber") != null); }
+
+  static string ArmPrefix, ArmDur;
+  static void Poll() { if (Doc() == null) return; var r = Install(ArmPrefix, ArmDur); if (r == "installed") UnityEditor.EditorApplication.update -= Poll; }
+  // Install the moment the Game scene's overlay document exists (polling from the Bootstrap menu, before START is pressed).
+  // MenuAudio is a project-scoped singleton: swap ITS service + catalogue so every cue from now on is recorded, whenever the overlays bind.
+  public static string Arm(string prefix, string dur) {
+    var ma = Zenject.ProjectContext.Instance.Container.Resolve<MenuAudio>();
+    var cat = ScriptableObject.CreateInstance<UiAudioSO>();
+    foreach (var f in typeof(UiAudioSO).GetFields()) if (f.FieldType == typeof(UiCue)) { var cue = (UiCue)f.GetValue(cat); cue.Clip = AudioClip.Create(f.Name, 64, 1, 8000, false); f.SetValue(cat, cue); }
+    typeof(MenuAudio).GetField("_audio", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(ma, new RecAudio());
+    typeof(MenuAudio).GetField("_catalog", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(ma, cat);
+    Start = Time.unscaledTime; Lines.Add("=== armed (cues recorded from here; t relative to arm)");
+    ArmPrefix = prefix; ArmDur = dur; UnityEditor.EditorApplication.update += Poll; return "armed"; }
+  public static string Ready() { var d = Doc(); return d == null ? "no" : "yes"; }
+  public static string Install(string prefix, string dur) {
+    var d = Doc(); if (d == null) return "NODOC";
+    var ctl = d.GetComponent<MatchOverlaysController>();
+    var cat = ScriptableObject.CreateInstance<UiAudioSO>();
+    foreach (var f in typeof(UiAudioSO).GetFields()) if (f.FieldType == typeof(UiCue)) { var cue = (UiCue)f.GetValue(cat); cue.Clip = AudioClip.Create(f.Name, 64, 1, 8000, false); f.SetValue(cat, cue); }
+    Prefix = prefix; Duration = float.Parse(dur, System.Globalization.CultureInfo.InvariantCulture) + (Time.unscaledTime - Start); Shot = false; ShotAt = -1; LastText = "";
+    Lines.Add("=== intro probe, allowed=" + MenuJuice.Allowed);
+    var root = d.rootVisualElement;
+    Item = root.schedule.Execute(() => {
+      float t = Time.unscaledTime - Start; var n = root.Q<Label>("IntroNumber"); var ov = root.Q<VisualElement>("IntroOverlay");
+      bool shown = ov.resolvedStyle.display == DisplayStyle.Flex;
+      var gm = GameManager.Instance;
+      if (shown) {
+        Lines.Add(t.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) + " | IntroNumber '" + n.text + "' sc=" + F(n.resolvedStyle.scale.value.x) + " | remaining=" + (gm == null ? "?" : F(gm.IntroRemaining)));
+        if (n.text != LastText) { LastText = n.text; if (n.text == "2" && !Shot) ShotAt = t + 0.10f; }
+        if (ShotAt > 0 && !Shot && t >= ShotAt) { Shot = true; ScreenCapture.CaptureScreenshot(Prefix + "_mid_" + n.text + ".png"); Lines.Add("      SHOT (text=" + n.text + " sc=" + F(n.resolvedStyle.scale.value.x) + ")"); }
+      }
+      if (t > Duration) { Item.Pause(); Lines.Add("=== end"); }
+    }).Every(1);
+    return "installed";
+  }
+  public static string SetReduced(string on) { CluckWars.Settings.PlayerPreferences.ReducedMotionEnabled = on == "1"; return "reduced=" + CluckWars.Settings.PlayerPreferences.ReducedMotionEnabled; }
+  public static string ClearReduced() { PlayerPrefs.DeleteKey(CluckWars.Settings.PlayerPreferences.ReducedMotionKey); PlayerPrefs.Save(); CluckWars.Settings.PlayerPreferences.ResetCache(); return "cleared"; }
+  public static string Win() { var b = PlayerBase.ActiveBases.FirstOrDefault(x => x != null && x.IsClaimed); if (b == null) return "no claimed base"; b.FoodTotal = 999f; return "ok"; }
+  public static string State() { var gm = GameManager.Instance; return gm == null ? "nogm" : gm.State + (gm.IsIntroActive ? "+intro" : ""); }
+  public static string Dump(string path) { File.WriteAllText(path, string.Join("\n", Lines)); var n = Lines.Count; Lines.Clear(); return "wrote " + n; }
+  public static string Press(string name) { var r = Object.FindObjectsByType<UIDocument>(FindObjectsSortMode.None).Select(x => x.rootVisualElement).FirstOrDefault(x => x != null && x.Q<Button>(name) != null); if (r == null) return "NOBTN " + name;
+    var b = r.Q<Button>(name); var c = typeof(Button).GetField("m_Clickable", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(b);
+    ((System.Action)typeof(Clickable).GetField("clicked", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(c)).Invoke(); return "clicked " + name; }
+  public static string FillQuiet() { var r = Object.FindObjectsByType<UIDocument>(FindObjectsSortMode.None).Select(x => x.rootVisualElement).First(x => x != null && x.Q<Button>("ReadyBtn") != null); int taps = 0;
+    for (int i = 0; i < 14; i++) { var rb = r.Q<Button>("ReadyBtn"); if (rb != null && rb.enabledSelf) break;
+      var card = r.Query<VisualElement>(className: "cw-ability-card").ToList().FirstOrDefault(c => !c.ClassListContains("cw-ability-card--picked")); if (card == null) break;
+      using (var e = ClickEvent.GetPooled()) { e.target = card; card.SendEvent(e); } taps++; }
+    return "taps=" + taps; }
+}

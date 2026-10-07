@@ -6,6 +6,82 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Menu UI overhaul — Phase 3B: juice (2026-10-07)
+
+EditMode **743/743** (new `MenuJuicePolicyTests` x17, `MenuJuiceGuardTests` x10 incl. the Reduced Motion gate guard). No scene/prefab
+wiring for Maestro.
+
+- **Engine.** `UI/MenuJuice` (plain class, owned by `MenuUiController`, built in `BuildAll` on a `#FxLayer` that sits above the pages and
+  never takes a tap): ONE scheduled item (16 ms), paused whenever nothing runs. Effects write inline scale / translate / opacity /
+  rotate from curves in `UI/MenuJuicePolicy` and clear them when done, so an element always ends exactly where the stylesheet puts it;
+  while driven it carries `.cw-fx-live` (transitions off). Pooled `Effect` records, <= 3 fly ghosts, <= 16 particles; no per-frame
+  allocations. **Reduced Motion is one gate:** `MenuJuice.Allowed` (= `!ReducedMotionEnabled`); every public effect entry point starts with
+  `if (!Allowed) return false/null` and callers take the consequence (sound, slot appearing) from that return. `MenuJuiceGuardTests`
+  fails on an entry point without the gate, on `style.scale/rotate` or `experimental.animation` in the controllers, and checks that
+  the pop's rest scales (1.04 tile, 1.03 perk badge / picked card) equal the USS.
+- **Squash-pop** (1 -> 0.92 -> 1.06 -> 1 x rest scale, 180 ms): class tile (only when the class changes, + 4 sparkles), perk badge (when the
+  perk changes), deck card (any tap that is not Ignored), slot icon on landing.
+- **Fly-to-slot** (`OnAbilityCardTapped` -> `StartFlight` / `LandSlot`): ghost of the card icon (a pooled `AbilityIconView`), 280 ms
+  ease-in-out with a 36 px arc, card -> slot icon, ends at the slot icon's size. Model writes stay immediate; only the slot VISUAL is held
+  (`.cw-fx-hold` on the slot icon + name) until landing; landing = unhide + pop + 4 sparkles + `_audio.Equip()` (moved there).
+  `SettleFlights` lands a flight whose slot no longer holds its ability; leaving the page (`LeavePageJuice` -> `CancelAll`) lands
+  everything; a 4th simultaneous flight lands the oldest early. Reduced Motion: no hold, no ghost, Equip at once.
+- **READY stamp.** It is the existing `#ReadyBanner` ribbon (one element, no stacking; the ribbon is the biggest READY on the page and
+  already carries the copy; a rosette would duplicate the seat's own). `OnReady` sets `_stampPending`; `OnPageShown(lobby)` runs
+  `PlayReadyStamp`: slam 1.6 -> 0.97 (accelerating, rotation -9 -> 0 deg) 0.25 s after THE COOP appears, settle to 1; **the Ready
+  cue, a dust puff (5) and sparkles (5) fire on the hit frame**. Solo (every seat ready) it stays as before; with open seats
+  (Host/Join) it holds 1.4 s and fades. Revisits without READY (post-match "open lobby") keep the old soft pop-in, no sound.
+  Reduced Motion: banner static (as before), Ready cue at once; if the page change is superseded the cue still fires once.
+- **3-2-1 = the juiced in-game intro (review change).** A menu-side countdown was built first and removed: the Game scene already has a
+  networked 3 s pre-match delay (`GameManager.IntroTimer`) shown by `MatchOverlaysController.RefreshIntro`, so menu START plus intro
+  were two countdowns, and for Host the menu GO! did not even start the match (it lands in the in-session lobby). Menu START
+  (Solo/Host) is back to the immediate `LoadMatchScene()` of 3C (fade + sting + `LoadNext`); `MenuCountdown`, `BeginCountdown` & co.
+  and the `_startBtn` plumbing are deleted. `RefreshIntro` now only PRESENTS the networked timer (no timing change):
+  `IntroCueTracker` (pure, in `MenuJuicePolicy.cs`) turns (active, remaining) into `Tick` on each new whole second (3/2/1 ->
+  `MenuAudio.CountdownTick(n)` + `MenuJuice.Slam(IntroNumber)`, scale 1.7 -> 1 over 220 ms) and ONE `Go` when the intro ends, and only if
+  this client saw it running (late joiner after GO: nothing; mid-intro arrival: starts at the current number; `gm` gone: silent reset).
+  GO uses `UiKeys.CountdownGo` (`countdown.go`), the old literal is gone. Works for Solo, Host (in-session START), Join and Play Again
+  (fresh tracker cycle). Reduced Motion: `Slam` returns false, numerals and cues unchanged. `MenuJuice` is built on `#IntroOverlay`;
+  `.cw-fx-live` is duplicated into `MatchOverlays.uss`.
+- **Staggered entries.** `OnPageShown`: class tiles (PICK YOUR BIRD), slots + deck cards (GEAR UP), seats (THE COOP) rise 18 px and
+  fade in, 40 ms apart compressed so the last starts by 220 ms (whole entry < 400 ms, 270 ms from the page appearing). Items are hidden
+  the instant the page shows, and every inline value is cleared at the end, so stills match the static layout (`capture_menu.py`
+  settles 0.9 s). Not applied to the main menu. Nothing runs under Reduced Motion.
+- **Fx sprites** (`Art/UI/Fx`, classes `.cw-fx-*`, repeated in `CluckWarsTheme.uss` and `MatchOverlays.uss` because they are separate
+  sheets; a test pins both): sparkle on class select, equip landing and the stamp hit; dust at the stamp hit; all <= 6 per burst.
+  `UiSpriteImportSettings` gained an `Fx/` rule (max 128 on every platform, Uncompressed; `GetVersion` 3, one re-import).
+- **Post-match celebration.** `UI/MatchCelebration` + `#MeCelebration` (UXML, above the panel, `picking-mode: Ignore`): 6 feathers +
+  3 sparkles fall slowly in a loop (translate/rotate/scale/opacity, 30 Hz item that runs only while the match-end overlay is open),
+  tinted cream with a third of the winner's colour; none under Reduced Motion. **Review change:** `#MeCelebration` is the FIRST child of the winner (left) column `#MeHero`
+  (absolute, stretch, `overflow: hidden`, picking Ignore), so it falls behind the crown / ribbon / chicken / food text and never over text. The hidden `.cw-bg-particle` dots are gone (UXML + USS).
+- **Verification (Play, Editor).** Probe: `python tools/ui_capture/juice_probe.py <dir>` (C# in `juice_probe.cs.txt`): swaps in a
+  recording `IAudioService`, logs per-frame style values + timed `ScreenCapture` frames, three Play sessions (OFF, ON, full 3-2-1).
+  Actions run 1.2 s after the bridge call returns because the Editor stalls ~0.45 s after every script-execute, which would
+  otherwise swallow the first frames. Results: pop 1.04 -> 0.96 -> 1.10 -> 1.04; flight ghost 0 -> (334, -398) px, scale 1 -> 0.75, Equip at
+  0.301 s on the landing frame, slot hold `.H..` -> `....`; 3 same-frame equips: 3 Equip cues, ghosts 0, holds `....`, slots correct
+  (that run used a pool of 2, so one landed early at 0.035 s; the pool is now 3); stamp hit at 0.596 s (Ready cue + 10 particles on the
+  same frame). **In-game intro** (`tools/ui_capture/intro_probe.py`, `--playagain`; `Captures/phase3b/midanim/intro_*`): after Play Again
+  (no scene-load hitch) cues Tick(3) 23.274, Tick(2) 23.715, Tick(1) 24.713, Go 25.715 (the cue lands on the frame the number changes);
+  numeral scale 1.00 -> 1.46 -> 0.96 -> 1.00 per beat (slam 220 ms); GO! same curve. Reduced Motion: scale 1.00 on every sample, the same four
+  cues still fire (22.896 / 23.205 / 24.202 / 25.199). The first match after a scene load only shows 2, 1, GO (the Editor hitch eats the 3:
+  the networked timer is already at 2.0 when the overlay first draws).
+  **Reduced Motion ON:** every tile / slot / banner at final values on the first sampled frame, ghosts 0, particles 0,
+  `activeEffects` 0, sounds still once each (Equip x1 / x3, Ready at 0.060). The selected class tile's lift is instant under RM
+  (1.04 / -6 px on the first sampled frame; it used to glide over ~120 ms).
+- **Captures** (`Captures/phase3b/`, git-ignored via `.git/info/exclude`; earlier phases kept theirs out of the repo too):
+  `static/` (`capture_menu.py`), `live/` (`--live`), `postmatch/` (`capture_postmatch.py`), `midanim/` (`juice_probe.py`: PNG frames
+  + `midanim_log.txt`, `RM_` prefix = Reduced Motion; `intro_probe.py`: `intro_*_mid_1.png` + `intro_log.txt` / `intro_playagain_log.txt`),
+  `postmatch3/` (after the review changes; `postmatch2/` was the celebration-under-panel attempt).
+- **Reduced Motion leak fixed (review).** `.cw-reduced-motion * { transition-duration: 0s }` tied in specificity with single-class rules
+  such as `.cw-class-tile` and lost on order; it is now `.cw-reduced-motion.cw-reduced-motion *` (0,2,0), pinned by a test.
+- **Open / taste calls.** (1) Post-match feathers now fall in the winner column only (570 px wide); see `postmatch3/` and
+  `midanim/postmatch_celebration.png`. (2) Reduced Motion on a first-match intro is fine,
+  but the Editor's scene-load hitch hides the "3" there (a build with a normal load would show it; Play Again shows all four beats).
+  (3) Edge-case cosmetic skips are silent by design (a burst with no free particle; a flight whose target is not laid out lands at once).
+  Not measured: frame time on a device (the juice is UI Toolkit only, no 3D).
+
+---
+
 ## ✅ Menu UI overhaul — Phase 3C: menu audio (2026-10-07)
 
 EditMode **716/716** (new `UiAudioTests` x15). No prefab/scene wiring left for Maestro: `ProjectContext.prefab` already holds

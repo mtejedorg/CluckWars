@@ -227,7 +227,9 @@
 /* Reduced motion: the root carries .cw-reduced-motion while
    PlayerPreferences.ReducedMotionEnabled is on, which zeroes every hover/press
    scale transition and selection pop in the menus. */
-.cw-reduced-motion * { transition-duration: 0s; }
+/* Doubled class: (0,2,0) beats every single-class rule that sets its own duration (.cw-class-tile,
+   .cw-slot-box, .cw-perk-badge, .cw-pagewrap, ...), which a bare .cw-reduced-motion * (0,1,0) lost to by order. */
+.cw-reduced-motion.cw-reduced-motion * { transition-duration: 0s; }
 .cw-reduced-motion .cw-btn:hover, .cw-reduced-motion .cw-btn:active,
 .cw-reduced-motion .cw-home-btn:hover, .cw-reduced-motion .cw-home-btn:active,
 .cw-reduced-motion .cw-ability-card:hover, .cw-reduced-motion .cw-perk-badge:hover,
@@ -527,6 +529,62 @@
 .cw-pagewrap--out-back { translate: 72px 0; }
 .cw-pagewrap--in-fwd  { opacity: 0; translate: 110px 0; transition-duration: 0s; }
 .cw-pagewrap--in-back { opacity: 0; translate: -110px 0; transition-duration: 0s; }
+
+/* ============================================================================
+   MENU JUICE  (Phase 3B; MenuJuice / MenuCountdown, timings in MenuJuicePolicy)
+   ----------------------------------------------------------------------------
+   Effects write inline scale / translate / opacity from C# and clear them when done,
+   so the stylesheet stays the resting state. .cw-fx-live (on an element an effect
+   drives) switches its transitions off so hover / selected transitions never fight
+   the curve; .cw-fx-hold hides a slot's new content until the flying icon lands.
+   Reduced motion: C# never starts an effect, so none of this is ever applied.
+   The Fx particle classes are repeated in MatchOverlays.uss (separate sheet).
+   ============================================================================ */
+.cw-fx-live.cw-fx-live { transition-duration: 0s; }
+.cw-fx-hold { opacity: 0; }
+
+/* Fly-to-slot ghost: an ability icon (disc + sprite fill it) sized and moved from C#. */
+.cw-fly-ghost { position: absolute; left: 0; top: 0; width: 100px; height: 100px; }
+
+/* Particles (Art/UI/Fx, white art tinted here). Anchored top-left at the burst point;
+   the negative margins centre each sprite on it. */
+.cw-fx-particle {
+    position: absolute; left: 0; top: 0;
+    -unity-background-scale-mode: scale-to-fit;
+}
+.cw-fx-sparkle {
+    width: 56px; height: 56px; margin-left: -28px; margin-top: -28px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Fx/Fx_Sparkle.png");
+    -unity-background-image-tint-color: rgb(255, 214, 80);
+}
+.cw-fx-dust {
+    width: 100px; height: 100px; margin-left: -50px; margin-top: -50px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Fx/Fx_Dust.png");
+    -unity-background-image-tint-color: rgb(255, 248, 232);
+}
+.cw-fx-feather-1, .cw-fx-feather-2, .cw-fx-feather-3 {
+    width: 64px; height: 64px; margin-left: -32px; margin-top: -32px;
+    -unity-background-image-tint-color: rgb(255, 248, 232);
+}
+.cw-fx-feather-1 { background-image: url("project://database/Assets/_Game/Art/UI/Fx/Fx_Feather_1.png"); }
+.cw-fx-feather-2 { background-image: url("project://database/Assets/_Game/Art/UI/Fx/Fx_Feather_2.png"); }
+.cw-fx-feather-3 { background-image: url("project://database/Assets/_Game/Art/UI/Fx/Fx_Feather_3.png"); }
+
+/* START MATCH 3-2-1-GO!: full-screen, never takes a tap (BACK still works while it counts). */
+.cw-countdown {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    align-items: center; justify-content: center;
+    background-color: rgba(8, 4, 2, 0.38);
+}
+.cw-countdown__num {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 380px; letter-spacing: 4px; color: rgb(255, 224, 120);
+    -unity-text-outline-width: 14px; -unity-text-outline-color: rgb(42, 26, 12);
+    text-shadow: 0px 14px 0px rgba(42, 26, 12, 0.9);
+    -unity-text-align: middle-center; white-space: nowrap;
+    padding-top: 0; padding-bottom: 0; padding-left: 0; padding-right: 0;
+}
+.cw-countdown__num--go { color: rgb(123, 227, 92); }
 
 /* Small section heads on cream (PERK, STARTERS). */
 .cw-small-head {

@@ -149,6 +149,7 @@ namespace CluckWars.Localization
         public const string StateReady = "state.ready";
         public const string StatePicking = "state.picking";
         public const string LobbyAllReady = "lobby.allReady";
+        public const string CountdownGo = "countdown.go";
         public const string LobbyBot1 = "lobby.bot.1";
         public const string LobbyBot2 = "lobby.bot.2";
         public const string LobbyBot3 = "lobby.bot.3";
