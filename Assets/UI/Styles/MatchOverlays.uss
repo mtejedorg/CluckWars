@@ -175,7 +175,9 @@
 }
 
 /* -- Right standings -- */
-.cw-me-right { flex-grow: 1; min-width: 0; }
+/* padding-bottom: with only the actions' 30 px margin the buttons ended ~20 px above the frame's bottom
+   trim (read as touching it on 20:9); +20 px gives them the hero column's air. */
+.cw-me-right { flex-grow: 1; min-width: 0; padding-bottom: 20px; }
 .cw-me-head { flex-direction: row; align-items: center; margin-bottom: 12px; flex-shrink: 0; }
 .cw-me-head__title {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
@@ -278,8 +280,8 @@
     white-space: nowrap; margin-left: 15px; flex-shrink: 0;
 }
 /* Post-match actions: PLAY AGAIN (green) + BACK TO LOBBY (wood), side by side. */
-/* margin-bottom keeps the buttons off the PanelFrame's painted bottom rail (~40 px of trim
-   inside the 30 px panel padding); they used to sit flush on it. */
+/* margin-bottom keeps the buttons off the PanelFrame's painted bottom rail; the right column's own
+   padding-bottom (.cw-me-right) adds the rest of the clearance, so the host-only note below them gets it too. */
 .cw-me-actions { flex-direction: row; justify-content: center; margin-top: 18px; margin-bottom: 30px; flex-shrink: 0; }
 .cw-me-action { flex-grow: 1; flex-basis: 0; margin-left: 12px; margin-right: 12px; letter-spacing: 2px; }
 .cw-me-restart {

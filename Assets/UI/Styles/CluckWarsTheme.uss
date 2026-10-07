@@ -891,13 +891,17 @@
 }
 
 /* The deck. Groups sit in one line (cards shrink a little on 16:9 rather than
-   scroll); .layout--narrow lets the class group wrap under the shared one. */
+   scroll). On 4:3 (.layout--narrow) the groups stay side by side and the CARDS wrap inside
+   their group (four per line at 290 px): wrapping the class group under the one-card ANY BIRD
+   group left a near-empty band across the middle of the page. */
 .cw-deck {
     flex-grow: 1; min-height: 0;
     flex-direction: row; flex-wrap: nowrap;
     justify-content: center; align-items: center; align-content: center;
 }
-.layout--narrow .cw-deck { flex-wrap: wrap; }
+.layout--narrow .cw-deck-cards { flex-wrap: wrap; justify-content: center; }
+.layout--narrow .cw-ability-card { width: 290px; flex-shrink: 0; margin-top: 6px; margin-bottom: 6px; }
+.layout--narrow #CommonRow { flex-shrink: 0; }   /* the class group absorbs the squeeze, so ANY BIRD never clips its card */
 .cw-deck-group {
     flex-shrink: 1; min-width: 0;
     margin-left: 6px; margin-right: 6px; margin-top: 6px; margin-bottom: 6px;

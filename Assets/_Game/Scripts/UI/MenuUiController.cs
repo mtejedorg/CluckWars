@@ -97,6 +97,15 @@ namespace CluckWars.UI
         private readonly SeatView[] _seats = new SeatView[4];
         private VisualElement _readyBanner;
 
+        // ---- Live 3D chicken stage (Phase 3; only while Performance Mode is OFF) ----------
+        // Slot 0 = the PICK YOUR BIRD hero, 1..4 = the lineup seats. Null = static renders.
+        private const int HeroStageSlot = 0;
+        private MenuChickenStage _stage;
+        private bool _stageFailed;
+        // What each lineup seat shows (null = open seat), kept so the stage can be (re)bound
+        // when Performance Mode turns OFF without the lobby being refreshed.
+        private readonly ChickenClass?[] _seatClasses = new ChickenClass?[4];
+
         // Dim neutral tint for an empty ability hex (no equipped accent).
         private static readonly Color HexEmptyTint = new Color(0.45f, 0.38f, 0.28f, 0.7f);
 
@@ -278,7 +287,14 @@ namespace CluckWars.UI
 
             ShowMainMenu();
             ConsumePostMatchIntent();
+            RefreshStage();
         }
+
+        private void LateUpdate() { if (_stage != null) RunOnStage(_stage.Tick); }
+
+        private void OnDisable() => DisposeStage();
+
+        private void OnDestroy() => DisposeStage();
 
         private VisualElement ClonePage(VisualTreeAsset vta)
         {
@@ -540,7 +556,7 @@ namespace CluckWars.UI
                 v => { PlayerPreferences.ReducedMotionEnabled = v; ApplyReducedMotion(); }, "Reduced motion");
             BindSettingRow("PerformanceModeRow", "PerformanceModeToggle",
                 () => PlayerPreferences.PerformanceModeEnabled,
-                v => PlayerPreferences.PerformanceModeEnabled = v, "Performance mode");
+                v => { PlayerPreferences.PerformanceModeEnabled = v; RefreshStage(); }, "Performance mode");
             // Dev Mode refreshes #DevRow the moment it changes — the Ability Lab button sits
             // right behind the sheet, so waiting for the next ShowMainMenu would look broken.
             BindSettingRow("DeveloperModeRow", "DeveloperModeToggle",
@@ -956,7 +972,8 @@ namespace CluckWars.UI
         {
             if (_selection == null) return;
 
-            if (cls != _selection.SelectedClass)
+            bool classChanged = cls != _selection.SelectedClass;
+            if (classChanged)
             {
                 // Old picks may be illegal for the new class.
                 _focusedAbility = null;
@@ -975,6 +992,7 @@ namespace CluckWars.UI
             _slotModel.AutoArmFirstEmpty();
 
             RefreshClassSelect();
+            if (classChanged) ShowHeroOnStage(hop: true);
         }
 
         private ChickenClass Cls => _selection?.SelectedClass ?? ChickenClass.Warrior;
@@ -1004,6 +1022,7 @@ namespace CluckWars.UI
                 _previewChickenClass = "cw-chicken--" + KeyOf(cls);
                 _previewChicken.AddToClassList(_previewChickenClass);
             }
+            ShowHeroOnStage(hop: false);
             if (_heroStage != null) _heroStage.style.backgroundColor = Fade(Lighten(tint, 0.55f), 1f);
             if (_previewGlow != null) _previewGlow.style.unityBackgroundImageTintColor = Fade(Lighten(tint, 0.3f), 0.9f);
             // Class name without "CHICKEN", ink on cream.
@@ -1678,6 +1697,8 @@ namespace CluckWars.UI
             if (!string.IsNullOrEmpty(v.ChickenCss)) v.Chicken.RemoveFromClassList(v.ChickenCss);
             v.ChickenCss = empty ? null : "cw-chicken--" + KeyOf(cls);
             if (v.ChickenCss != null) v.Chicken.AddToClassList(v.ChickenCss);
+            _seatClasses[idx] = empty ? null : cls;
+            ShowSeatOnStage(idx);
 
             v.NameRow.style.display = empty ? DisplayStyle.None : DisplayStyle.Flex;
             v.ClassLine.style.display = empty ? DisplayStyle.None : DisplayStyle.Flex;
@@ -1912,6 +1933,103 @@ namespace CluckWars.UI
                     _isBusy = false;
                     break;
             }
+        }
+
+        // ======================================================================
+        //  LIVE 3D CHICKEN STAGE (Phase 3, Decision 7)
+        // ======================================================================
+        // Performance Mode OFF: the hero and the lineup seats show the real models, rendered by
+        // MenuChickenStage into RenderTextures painted over the elements' USS background. ON (the
+        // mobile default), or if the stage cannot come up: the static Phase 2 renders, untouched.
+        // GEAR UP has no stage: its page is slots + deck + details with no hero spot.
+
+        /// <summary>
+        /// Brings the stage in line with <see cref="PlayerPreferences.PerformanceModeEnabled"/>:
+        /// creates and binds it (hero + seats) when live, disposes it (static renders) when not.
+        /// Called at build time and whenever the Performance Mode toggle changes.
+        /// </summary>
+        private void RefreshStage()
+        {
+            if (!MenuStagePolicy.WantsLive(PlayerPreferences.PerformanceModeEnabled, _stageFailed))
+            {
+                DisposeStage();
+                return;
+            }
+            if (_stage == null && !TryCreateStage()) return;
+
+            ShowHeroOnStage(hop: false);
+            for (int i = 0; i < _seats.Length; i++) ShowSeatOnStage(i);
+        }
+
+        private bool TryCreateStage()
+        {
+            if (_classRegistry == null)
+            {
+                FailStage("ChickenClassRegistrySO not injected", null);
+                return false;
+            }
+            try
+            {
+                _stage = new MenuChickenStage(_classRegistry, _log, 1 + _seats.Length, PanelPixelsPerPoint);
+                _log?.Info(Source, "Live chicken stage on (Performance Mode off).");
+                return true;
+            }
+            catch (Exception e)
+            {
+                FailStage("the stage could not be created", e);
+                return false;
+            }
+        }
+
+        /// <summary>Stage failure: log once, fall back to the static renders for this session.</summary>
+        private void FailStage(string reason, Exception e)
+        {
+            _stageFailed = true;
+            _log?.Warn(Source, $"Live chicken stage unavailable ({reason}{(e != null ? ": " + e.Message : "")}); showing the static renders.");
+            DisposeStage();
+        }
+
+        private void DisposeStage()
+        {
+            if (_stage == null) return;
+            _stage.Dispose();
+            _stage = null;
+            _log?.Info(Source, "Live chicken stage off.");
+        }
+
+        private void ShowHeroOnStage(bool hop)
+        {
+            if (_stage == null || _previewChicken == null) return;
+            // Edges fade into the hero stage's class wash (same colour RefreshClassSelect paints).
+            var clear = Lighten(TintOf(Cls), 0.55f);
+            RunOnStage(() => _stage.Show(HeroStageSlot, _previewChicken, Cls, hop, sway: false, clear));
+        }
+
+        private void ShowSeatOnStage(int idx)
+        {
+            if (_stage == null || _seats[idx] == null) return;
+            int slot = 1 + idx;
+            var cls = _seatClasses[idx];
+            if (cls == null) { _stage.Clear(slot); return; }
+            // Edges fade into the warm barn tone behind the lineup.
+            RunOnStage(() => _stage.Show(slot, _seats[idx].Chicken, cls.Value, false, sway: true, UiGfx.Hex32("8a5a2e")));
+        }
+
+        private void RunOnStage(Action act)
+        {
+            try { act(); }
+            catch (Exception e) { FailStage("a chicken could not be staged", e); }
+        }
+
+        /// <summary>Screen pixels per panel point: the panel's target width (its RenderTexture when
+        /// one is set, else the screen) over the root's laid-out width.</summary>
+        private float PanelPixelsPerPoint()
+        {
+            float rootW = _root?.layout.width ?? 0f;
+            if (float.IsNaN(rootW) || rootW <= 0f) return 1f;
+            var ps = GetComponent<UIDocument>().panelSettings;
+            float targetW = ps != null && ps.targetTexture != null ? ps.targetTexture.width : Screen.width;
+            return targetW / rootW;
         }
 
         // ======================================================================

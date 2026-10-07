@@ -6,6 +6,43 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Menu UI overhaul — Phase 3 Stage A: live chicken stage (2026-10-07)
+
+EditMode **701/701** (new `MenuStagePolicyTests` x11). Captures: `python tools/ui_capture/capture_menu.py <dir>` now forces
+Performance Mode ON (static renders, all three sizes); `--live` forces it OFF and captures desktop 1920x1080 only
+(`live_*.png`). Both restore the stored preference afterwards.
+
+- **Stage.** `UI/MenuChickenStage` (plain `IDisposable`, owned by `MenuUiController`, no scene wiring): one rig 5 km
+  below the origin, one model + camera + square RenderTexture per slot (slot 0 = PICK YOUR BIRD hero, 1-4 = COOP
+  seats), 50 m apart, 30 m far plane. The texture is painted over the element's USS image
+  (`style.backgroundImage = Background.FromRenderTexture`); clearing the inline style brings the static PNG back.
+  Models/clips/tint come from `ChickenClassRegistrySO` (Idle loop; select hop = the Flare cast clip as cheer + a 6%
+  parabola hop), sampled with `AnimationClip.SampleAnimation` (no Animator). Hero: full turntable (15 deg/s, restarts at
+  the 3/4 view whenever a chicken comes on screen or the class changes); seats sway +-25 deg so the lineup never shows
+  four backs. Reduced Motion: parked at the 3/4 view, no hop (idle stays).
+- **Lighting** = the hero renders' 4-light studio rig. The studio lights are on only while a stage camera renders (URP
+  begin/end camera callbacks), and every other enabled light is off for exactly that window, so the live chicken
+  matches the static PNG (measured identical mean colour to the preview-scene render) and the scene never sees the rig.
+  Transparent clear (alpha 0, coloured as the panel behind so MSAA edges do not fringe), post-processing/shadows off, 4x MSAA.
+- **Lifecycle.** `MenuUiController.RefreshStage()` (build, Performance Mode toggle): `MenuStagePolicy.WantsLive(perf,
+  failed)` -> create + bind hero/seats, else `Dispose()` (destroys rig, releases RTs, restores USS images). Disposed in
+  `OnDisable`/`OnDestroy` (Bootstrap -> Game, Play exit). Cameras run only while their element is displayed and laid out
+  (`ShouldRender`); textures are sized per element (`TextureSide`: shorter side in px, cap 1024, realloc only on >10%
+  change). Any stage exception -> one Warn + static renders for the session. GEAR UP has no stage (no hero spot: slots +
+  deck + details fill the page).
+- **Leak check** (Play, 4x OFF->class->lobby->ON via the real settings toggle): all RenderTextures 17 -> 23/27 -> **17**
+  every cycle, stage RTs 1/5 -> 0, stage root 1 -> 0, enabled lights constant at 1; 17 after leaving Play.
+- **Phase 2 leftovers.** Post-match buttons: `.cw-me-right` padding-bottom 20 (they ended ~20 px off the frame trim);
+  GEAR UP 4:3: groups stay side by side and cards wrap inside their group (290 px, 4 per line, `#CommonRow` doesn't
+  shrink) — the one-card ANY BIRD row used to leave a near-empty band.
+- **Capture tool:** the panel no longer goes back to the Game view between pages (restoring it after the filled GEAR UP
+  shot wedged the Editor main thread twice, before this change too); restored once at the end.
+- **Open:** a long-tailed bird can graze the texture edge side-on during the turntable (framing favours height); hero
+  turntable shows the back for ~1/3 of a turn (spec'd "slow turntable" — say if a sway reads better); frame time not
+  profiled (5 tiny cameras on desktop only); no Pixel 9 check needed (Performance Mode ON by default there).
+
+---
+
 ## ✅ Menu UI overhaul — Phase 2: art (2026-10-07)
 
 EditMode **690/690** (new `AbilityIconArtTests` x6; the two `IconsNotYetAuthored`-based icon tests retired).
