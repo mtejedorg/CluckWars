@@ -6,6 +6,53 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Menu UI overhaul — Phase 3C: menu audio (2026-10-07)
+
+EditMode **716/716** (new `UiAudioTests` x15). No prefab/scene wiring left for Maestro: `ProjectContext.prefab` already holds
+`_uiAudio` -> `Data/UiAudio.asset`.
+
+- **Catalogue.** `Audio/UiAudioSO` (`Data/UiAudio.asset`): one `UiCue {Clip, Volume}` per file in `Audio/UI/` (manifest volumes as
+  defaults) + `CluckFor(ChickenClass)`. Separate from `AudioRegistrySO` (gameplay bank, `ProceduralAudioBank` fills its nulls;
+  its unused `MenuMusic` slot is left alone). Bound in `ProjectInstaller` (`_uiAudio`, empty instance if null) together with
+  `MenuAudio` (`AsSingle`).
+- **`IAudioService`** gained: `PlaySFX(clip, volume, pitch, delaySeconds)` (pitch != 1 or a delay -> 6-voice round-robin pool,
+  so PlayOneShot is never bent), `PlayMusic(..., fadeInSeconds)`, `FadeOutMusic(seconds)`, `IsMusicPlaying(clip)`.
+  `UnityAudioService` fades via a 0..1 multiplier ticked by `AudioTicker` (disabled while idle, unscaled time), master volume
+  respected, a new `PlayMusic` cancels a fade. `NullAudioService` updated; no other implementers existed.
+- **`UI/MenuAudio`** (plain class) is the only thing UI code talks to: `Tap` (+-5% pitch), `Back`, `SelectClass` (select, cluck
+  +0.05 s), `SelectPerk`, `ArmSlot`, `Equip`, `Clear`, `Ready`, `CountdownTick(n)` (pitch 1.00/1.06/1.12), `CountdownGo`,
+  `MatchSting`, `StartMenuMusic` (0.3 s fade-in, skipped if already playing), `StopMenuMusicForMatch` (0.4 s fade-out).
+  Missing catalogue/clip = one Warn per cue via `ILogService` (one for a missing catalogue), then silent. `MenuAudio.Silent()`
+  when injection yields nothing. Test guard: no file under `Scripts/UI` mentions `AudioSource`.
+- **Wiring (MenuUiController).** One trickle-down `ClickEvent` hook on the root plays `Tap` for any enabled Button, or `Back` for
+  buttons registered with `BackCue` (BackBtn x2, HomeBtn, SettingsCloseBtn); `OwnCue` buttons (perk badges, slot boxes,
+  READY, START) are skipped so nothing doubles. Specific cues: class tile -> `SelectClass` (re-tap = `Tap`), perk badge ->
+  `SelectPerk` (same perk = `Tap`), slot box -> `ArmSlot` (only when it newly arms), deck card -> `Equip` (Placed/Swapped) /
+  `Clear` / `Tap` (locked starter), `OnReady` -> `Ready`, settings scrim -> `Back`, settings toggles -> `Tap`.
+  `LoadMatchScene()` (Solo/Host, and Join after the UGS join succeeds) = `StopMenuMusicForMatch` + `MatchSting` + `LoadNext`;
+  it now logs an Error if there is no `SceneLoader` (was a silent no-op). Join also taps on press. Menu loop starts at the end
+  of `BuildAll` (idempotent: page changes and a Play Again return do not restart it). `MatchOverlaysController`: PLAY AGAIN /
+  BACK TO LOBBY -> `Tap` (optional-injected `MenuAudio`).
+- **Esc / Android back:** not handled (an `Esc` handler was drafted and pulled in review: out of scope and it read
+  `Keyboard.current` directly instead of going through `IInputProvider`). Candidate follow-up.
+- **Import** (`Editor/UiAudioImportSettings`, AssetPostprocessor, version 2): SFX = Decompress On Load, ADPCM, preload, Load In
+  Background off. `menu_loop` = Vorbis q0.70, Compressed In Memory, preload. **Loop seam measured** (Standalone override
+  with Decompress On Load, `GetData`, then override removed): decoded 1,536,000 samples = the WAV's exact frame count; no
+  leading/trailing near-zero run; first-5 ms RMS 0.195/0.136 vs source 0.193/0.135 (no priming gap); seam step 0.0013/0.0020
+  (WAV 0.0005/0.0014) against a 99.9th-percentile step of 0.092/0.057. PCM control gave the source values exactly. Vorbis
+  kept. Not listened to by ear; not measured on Android (same FMOD codec). `UiAudioTests` pins sample count == WAV frames.
+- **Verified in Play (Bootstrap):** loop playing from start, vol 0.60, looping; a recording `IAudioService` behind the real
+  controller saw the expected cue for SoloBtn, class tile (new/again), perk badge (hook skipped), Home, Next, slot boxes
+  (armed once, not twice), deck cards, READY (`OnReady`), START (hook skipped), BACK; real service: pitched tap on a pooled voice
+  (0.973, ui_tap, 0.70), cluck on its own voice, `StartMenuMusic` while playing = no restart, `StopMenuMusicForMatch` ends at
+  silence and stops, `StartMenuMusic` after it fades in 0 -> 0.60.
+- **Not done / for Phase 3B:** READY is not a toggle in the current UI (it saves and opens the coop), so there is no
+  un-ready `Back` cue; 3B moves `Equip`/`Ready` to animation land frames and adds the 3-2-1 (`CountdownTick(n)` / `CountdownGo`
+  exist, unused). The manifest's `SFX -> UI` / `Music` mixer groups don't exist (no AudioMixer in the project): sounds
+  go through the service's master volume only. `LoadMatchScene` plays the sting at press, not on a countdown.
+
+---
+
 ## ✅ Menu UI overhaul — Phase 3 Stage A: live chicken stage (2026-10-07)
 
 EditMode **701/701** (new `MenuStagePolicyTests` x11). Captures: `python tools/ui_capture/capture_menu.py <dir>` now forces

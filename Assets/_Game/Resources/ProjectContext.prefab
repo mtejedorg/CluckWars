@@ -77,6 +77,7 @@ MonoBehaviour:
   _logMinLevel: 1
   _chickenClassRegistry: {fileID: 11400000, guid: 1885b7d81a1e4eb47b84e9c58967f601, type: 2}
   _audioRegistry: {fileID: 11400000, guid: 08200a3748d678f409c6cd1c7a53a326, type: 2}
+  _uiAudio: {fileID: 11400000, guid: fc1b47f797ce5f545a363a52699eb690, type: 2}
   _prefabRegistry: {fileID: 11400000, guid: 98b68981e7a09644188bef851cbd9a3f, type: 2}
   _colorScheme: {fileID: 11400000, guid: c62b6e72c58ec2f4db3259d464391bab, type: 2}
   _abilityRegistry: {fileID: 11400000, guid: 0a608378f96412943a62f875f18497c3, type: 2}

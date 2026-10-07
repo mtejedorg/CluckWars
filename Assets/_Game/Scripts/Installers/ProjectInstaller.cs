@@ -3,6 +3,7 @@ using CluckWars.Gameplay;
 using CluckWars.Input;
 using CluckWars.Logging;
 using CluckWars.Services;
+using CluckWars.UI;
 using UnityEngine;
 using Zenject;
 
@@ -26,6 +27,9 @@ namespace CluckWars.Installers
 
         [Tooltip("Drop the AudioRegistry asset here so audio cues resolve. If null, an empty runtime instance is bound and all SFX are silent.")]
         [SerializeField] private AudioRegistrySO _audioRegistry;
+
+        [Tooltip("Drop the UiAudio asset here (menu sound set, Assets/_Game/Data/UiAudio.asset). If null, an empty instance is bound and MenuAudio warns once and stays silent.")]
+        [SerializeField] private UiAudioSO _uiAudio;
 
         [Tooltip("Drop the PrefabRegistry asset here so runtime-spawned NetworkObjects (chicken, base, pile, pickup, GameManager) resolve from one place instead of scattered slots.")]
         [SerializeField] private PrefabRegistrySO _prefabRegistry;
@@ -107,6 +111,12 @@ namespace CluckWars.Installers
                     "[ProjectInstaller] AudioRegistry asset not assigned — using " +
                     "fully procedural SFX bank.");
             }
+
+            // UiAudio: the menu sound set. An empty instance (no clips) keeps the binding valid;
+            // MenuAudio reports the missing clips through ILogService instead of this installer.
+            var uiAudio = _uiAudio != null ? _uiAudio : ScriptableObject.CreateInstance<UiAudioSO>();
+            Container.Bind<UiAudioSO>().FromInstance(uiAudio).AsSingle();
+            Container.Bind<MenuAudio>().AsSingle();
 
             // PrefabRegistry: same shape as AudioRegistry. Empty instance is bound
             // when the asset slot is null so consumers can always inject it; they

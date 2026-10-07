@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f24e9d0477ea36d40abc34877ea45985, type: 3}
+  m_Name: UiAudio
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Audio.UiAudioSO
+  Tap:
+    Clip: {fileID: 8300000, guid: ebd544502102a3f43a98febedc9e042e, type: 3}
+    Volume: 0.7
+  Back:
+    Clip: {fileID: 8300000, guid: 979064041be97a34b9c658d4db905758, type: 3}
+    Volume: 0.7
+  Select:
+    Clip: {fileID: 8300000, guid: 50ecf08689191e24daf86c06143f009b, type: 3}
+    Volume: 0.8
+  CluckWarrior:
+    Clip: {fileID: 8300000, guid: 749fddb3f134d234685ca6efce636873, type: 3}
+    Volume: 0.9
+  CluckSpeedy:
+    Clip: {fileID: 8300000, guid: eb764adc8f8152c429f0118b0de5a0e0, type: 3}
+    Volume: 0.9
+  CluckFatty:
+    Clip: {fileID: 8300000, guid: 6279d0dc6f58951428d75c0a26994cae, type: 3}
+    Volume: 0.9
+  CluckAssassin:
+    Clip: {fileID: 8300000, guid: 947157653a564684185659b6c49972e5, type: 3}
+    Volume: 0.9
+  SlotArm:
+    Clip: {fileID: 8300000, guid: 2a2e14d82023367419cf85c7d54b4cd0, type: 3}
+    Volume: 0.6
+  EquipThunk:
+    Clip: {fileID: 8300000, guid: cac7f9a5b88b356499dca4b80c88ab3d, type: 3}
+    Volume: 0.9
+  ClearPop:
+    Clip: {fileID: 8300000, guid: ef83731042d674f4f97dc37bd75ca4c0, type: 3}
+    Volume: 0.7
+  ReadyStamp:
+    Clip: {fileID: 8300000, guid: d45415dc39febc845945050358c7499e, type: 3}
+    Volume: 1
+  CountdownTick:
+    Clip: {fileID: 8300000, guid: 62ef289d415958d4b8f4994b04d49c5b, type: 3}
+    Volume: 0.8
+  CountdownGo:
+    Clip: {fileID: 8300000, guid: 680a670c9ea37ac41adbf4e99f1e0c16, type: 3}
+    Volume: 1
+  MatchSting:
+    Clip: {fileID: 8300000, guid: a73b98a026f813442858bf6d1616bd9f, type: 3}
+    Volume: 1
+  MenuLoop:
+    Clip: {fileID: 8300000, guid: cdb8385ae4a668642a3eaf8e6485862d, type: 3}
+    Volume: 0.6

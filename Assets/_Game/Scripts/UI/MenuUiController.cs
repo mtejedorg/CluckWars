@@ -55,6 +55,7 @@ namespace CluckWars.UI
         private ChickenClassRegistrySO   _classRegistry;
         private AbilityRegistrySO        _abilityRegistry;
         private MatchConfigSO            _matchConfig;
+        private MenuAudio                _audio = MenuAudio.Silent();
 
         // ---- Runtime state ----------------------------------------------------
         private VisualElement _root;
@@ -183,7 +184,8 @@ namespace CluckWars.UI
             [InjectOptional] SceneLoader sceneLoader,
             [InjectOptional] ChickenClassRegistrySO classRegistry,
             [InjectOptional] AbilityRegistrySO abilityRegistry,
-            [InjectOptional] MatchConfigSO matchConfig)
+            [InjectOptional] MatchConfigSO matchConfig,
+            [InjectOptional] MenuAudio audio)
         {
             _selection       = selection;
             _log             = log;
@@ -192,6 +194,7 @@ namespace CluckWars.UI
             _classRegistry   = classRegistry;
             _abilityRegistry = abilityRegistry;
             _matchConfig     = matchConfig;
+            _audio           = audio ?? MenuAudio.Silent();
         }
 
         private void Awake()
@@ -272,6 +275,11 @@ namespace CluckWars.UI
             BuildLobby();
             ApplyReducedMotion();
 
+            // One trickle-down hook plays the generic button sound; buttons with their own cue are
+            // registered through BackCue / OwnCue while the pages are built above.
+            _root.UnregisterCallback<ClickEvent>(OnRootClick, TrickleDown.TrickleDown);
+            _root.RegisterCallback<ClickEvent>(OnRootClick, TrickleDown.TrickleDown);
+
             _root.RegisterCallback<GeometryChangedEvent>(OnRootGeometry);
             UpdateLayout(_root.resolvedStyle.width, _root.resolvedStyle.height);
 
@@ -288,6 +296,28 @@ namespace CluckWars.UI
             ShowMainMenu();
             ConsumePostMatchIntent();
             RefreshStage();
+            _audio.StartMenuMusic();
+        }
+
+        // ---- Menu audio ---------------------------------------------------------
+        // Buttons get the generic tap from OnRootClick, except those registered below: BACK-type
+        // buttons (softer cue) and buttons whose handler plays a more specific cue itself (so the
+        // tap would double up).
+        private readonly HashSet<VisualElement> _backCueButtons = new();
+        private readonly HashSet<VisualElement> _ownCueButtons = new();
+
+        private void BackCue(Button b) => _backCueButtons.Add(b);
+        private void OwnCue(Button b) => _ownCueButtons.Add(b);
+
+        private void OnRootClick(ClickEvent evt)
+        {
+            for (var ve = evt.target as VisualElement; ve != null; ve = ve.parent)
+            {
+                if (ve is not Button) continue;
+                if (!ve.enabledInHierarchy || _ownCueButtons.Contains(ve)) return;
+                if (_backCueButtons.Contains(ve)) _audio.Back(); else _audio.Tap();
+                return;
+            }
         }
 
         private void LateUpdate() { if (_stage != null) RunOnStage(_stage.Tick); }
@@ -540,12 +570,14 @@ namespace CluckWars.UI
             }
 
             Bind<Button>(_mainMenu, "SettingsBtn", b => b.clicked += OpenSettings);
-            Bind<Button>(_settingsSheet, "SettingsCloseBtn", b => b.clicked += CloseSettings);
+            Bind<Button>(_settingsSheet, "SettingsCloseBtn", b => { b.clicked += CloseSettings; BackCue(b); });
             // A tap on the dimmed scrim (outside the panel) closes too; taps inside the panel
             // bubble up here with a different target and are ignored.
             _settingsSheet.RegisterCallback<ClickEvent>(evt =>
             {
-                if (evt.target == _settingsSheet) CloseSettings();
+                if (evt.target != _settingsSheet) return;
+                _audio.Back();
+                CloseSettings();
             });
 
             BindSettingRow("RangeGuidesRow", "RangeGuidesToggle",
@@ -591,6 +623,7 @@ namespace CluckWars.UI
             toggle.RegisterValueChangedCallback(evt =>
             {
                 set(evt.newValue);
+                _audio.Tap();
                 _log?.Info(Source, $"{logName} {(evt.newValue ? "enabled" : "disabled")}.");
             });
             // The Toggle handles taps on itself; anywhere else in the row flips it here.
@@ -922,7 +955,13 @@ namespace CluckWars.UI
                     Line = root.Q<Label>(className: "cw-perk-badge__line"),
                 };
                 _perkBadges[i] = view;
-                root.clicked += () => { if (view.Passive != null) SelectClassAndPassive(Cls, view.Passive); };
+                OwnCue(root);
+                root.clicked += () =>
+                {
+                    if (view.Passive == null) return;
+                    if (view.Passive == _selection?.Passive) _audio.Tap(); else _audio.SelectPerk();
+                    SelectClassAndPassive(Cls, view.Passive);
+                };
             }
 
             for (int i = 0; i < _starterChips.Length; i++)
@@ -938,7 +977,7 @@ namespace CluckWars.UI
                 };
             }
 
-            Bind<Button>(_classSelect, "HomeBtn", b => b.clicked += ShowMainMenu);
+            Bind<Button>(_classSelect, "HomeBtn", b => { b.clicked += ShowMainMenu; BackCue(b); });
             // Always enabled — BuildAll seeds a default class + perk, so Step 1 always has a pick.
             Bind<Button>(_classSelect, "NextBtn", b => b.clicked += ShowLoadout);
         }
@@ -948,7 +987,7 @@ namespace CluckWars.UI
         private void OnClassTileTapped(ChickenClass cls)
         {
             if (_selection == null) return;
-            if (cls == _selection.SelectedClass && _selection.Passive != null) { RefreshClassSelect(); return; }
+            if (cls == _selection.SelectedClass && _selection.Passive != null) { _audio.Tap(); RefreshClassSelect(); return; }
             var passive = DefaultPassiveFor(cls);
             if (passive == null)
             {
@@ -956,6 +995,7 @@ namespace CluckWars.UI
                 return;
             }
             SelectClassAndPassive(cls, passive);
+            _audio.SelectClass(cls);
         }
 
         /// <summary>The class's two perks, signature first (registry order would put the alternative
@@ -1146,7 +1186,7 @@ namespace CluckWars.UI
             _abilityDetailCat  = _loadout.Q<Label>("AbilityDetailCat");
             _abilityDetailCd   = _loadout.Q<Label>("AbilityDetailCd");
             _readyBtn          = _loadout.Q<Button>("ReadyBtn");
-            if (_readyBtn != null) _readyBtn.clicked += OnReady;
+            if (_readyBtn != null) { _readyBtn.clicked += OnReady; OwnCue(_readyBtn); }
 
             for (int i = 0; i < _slots.Length; i++)
             {
@@ -1158,10 +1198,11 @@ namespace CluckWars.UI
                 }
                 _slots[i] = BuildSlot(box, i);
                 int captured = i;
+                OwnCue(box);
                 box.clicked += () => OnSlotBoxTapped(captured);
             }
 
-            Bind<Button>(_loadout, "BackBtn", b => b.clicked += ShowClassSelect);
+            Bind<Button>(_loadout, "BackBtn", b => { b.clicked += ShowClassSelect; BackCue(b); });
         }
 
         /// <summary>Builds one slot's children once: number, icon, name / EMPTY, STARTER tag, NEXT caret.</summary>
@@ -1254,7 +1295,8 @@ namespace CluckWars.UI
             SyncSlotModel();
             var ab = _slotModel.Get(index);
             if (ab != null) _focusedAbility = ab;
-            _slotModel.ArmSlot(index);
+            bool wasArmed = _slotModel.Armed == index;
+            if (_slotModel.ArmSlot(index) && !wasArmed) _audio.ArmSlot();
             RefreshLoadoutState();
         }
 
@@ -1268,7 +1310,15 @@ namespace CluckWars.UI
             if (_selection == null || ab == null) return;
             _focusedAbility = ab;
             SyncSlotModel();
-            if (_slotModel.TapCard(ab, IsPreEquipped(ab)) != CardTapResult.Ignored) WriteSlotModel();
+            var result = _slotModel.TapCard(ab, IsPreEquipped(ab));
+            if (result != CardTapResult.Ignored) WriteSlotModel();
+            switch (result)
+            {
+                case CardTapResult.Placed:
+                case CardTapResult.Swapped: _audio.Equip(); break;
+                case CardTapResult.Cleared: _audio.Clear(); break;
+                default: _audio.Tap(); break; // locked starter: details only
+            }
             RefreshLoadoutState();
         }
 
@@ -1562,6 +1612,7 @@ namespace CluckWars.UI
         private void OnReady()
         {
             if (_isBusy) return;
+            _audio.Ready();
             SaveLastSetup();
             ShowLobby();
         }
@@ -1591,8 +1642,8 @@ namespace CluckWars.UI
 
         private void BuildLobby()
         {
-            Bind<Button>(_lobby, "BackBtn",  b => b.clicked += ShowLoadout);
-            Bind<Button>(_lobby, "StartBtn", b => b.clicked += OnStartMatch);
+            Bind<Button>(_lobby, "BackBtn",  b => { b.clicked += ShowLoadout; BackCue(b); });
+            Bind<Button>(_lobby, "StartBtn", b => { b.clicked += OnStartMatch; OwnCue(b); });
             Bind<Button>(_lobby, "CopyBtn",  b => b.clicked += CopyJoinCode);
             Bind<Button>(_lobby, "ShareBtn", b => b.clicked += CopyJoinCode);
             _readyBanner = _lobby.Q<VisualElement>("ReadyBanner");
@@ -1901,6 +1952,19 @@ namespace CluckWars.UI
             return list;
         }
 
+        /// <summary>The menu-to-match handoff: fade the menu loop, sting, load the Game scene.</summary>
+        private void LoadMatchScene()
+        {
+            if (_sceneLoader == null)
+            {
+                _log?.Error(Source, "No SceneLoader in the menu scene; the match cannot start.");
+                return;
+            }
+            _audio.StopMenuMusicForMatch();
+            _audio.MatchSting();
+            _sceneLoader.LoadNext();
+        }
+
         private async void OnStartMatch()
         {
             if (_isBusy || _selection == null) return;
@@ -1910,20 +1974,21 @@ namespace CluckWars.UI
             {
                 case SessionMode.Solo:
                 case SessionMode.Host:
-                    _sceneLoader?.LoadNext();
+                    LoadMatchScene();
                     break;
 
                 case SessionMode.Join:
                     var field = _lobby.Q<TextField>("LobbyJoinField");
                     var code = field?.value?.Trim();
-                    if (string.IsNullOrEmpty(code)) { if (status != null) status.text = UiText.Get(UiKeys.LobbyErrNoCode); return; }
+                    if (string.IsNullOrEmpty(code)) { _audio.Tap(); if (status != null) status.text = UiText.Get(UiKeys.LobbyErrNoCode); return; }
+                    _audio.Tap();
                     _isBusy = true;
                     if (status != null) status.text = UiText.Get(UiKeys.LobbyJoining);
                     try
                     {
                         var info = await _ugs.JoinLobbyByCodeAsync(code);
                         _selection.SessionName = info.JoinCode;
-                        _sceneLoader?.LoadNext();
+                        LoadMatchScene();
                     }
                     catch (Exception e)
                     {

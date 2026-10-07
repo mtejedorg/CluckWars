@@ -60,6 +60,7 @@ namespace CluckWars.UI
         private ColorSchemeSO            _colors;      // injected for DI parity with MatchHud
         private MatchConfigSO            _matchConfig;
         private ISessionSelectionService _selection;
+        private MenuAudio                _audio = MenuAudio.Silent();
 
         // ---- UI element refs (queried once, on bind) ---------------------------
         private VisualElement _root;
@@ -102,13 +103,15 @@ namespace CluckWars.UI
             ILogService              log,
             ColorSchemeSO            colors,
             MatchConfigSO            matchConfig,
-            ISessionSelectionService selection)
+            ISessionSelectionService selection,
+            [InjectOptional] MenuAudio   audio)
         {
             _network     = network;
             _log         = log;
             _colors      = colors;
             _matchConfig = matchConfig;
             _selection   = selection;
+            _audio       = audio ?? MenuAudio.Silent();
         }
 
         // ---- Unity lifecycle ---------------------------------------------------
@@ -283,6 +286,7 @@ namespace CluckWars.UI
         {
             var gm = GameManager.Instance;
             if (gm == null) return;
+            _audio.Tap();
             _log?.Info(Source, "Match end: PLAY AGAIN → GameManager.RequestPlayAgain().");
             gm.RequestPlayAgain();
         }
@@ -296,6 +300,7 @@ namespace CluckWars.UI
         {
             if (_leavingToLobby) return; // a double tap would otherwise start two scene loads
             _leavingToLobby = true;
+            _audio.Tap();
             if (_mePlayAgainBtn != null) _mePlayAgainBtn.SetEnabled(false);
             if (_meBackBtn      != null) _meBackBtn.SetEnabled(false);
 
