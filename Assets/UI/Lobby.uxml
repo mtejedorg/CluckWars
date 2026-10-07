@@ -25,9 +25,10 @@
             </ui:VisualElement>
         </ui:VisualElement>
 
-        <!-- Rule chips: TIME / GOAL / MODE / ARENA. -->
+        <!-- Rule chips: TIME / GOAL / MODE / ARENA, on ONE ink plate (the row) so the backdrop's
+             bunting cannot show between them. -->
         <ui:VisualElement name="RuleChips" class="cw-rule-chips">
-            <ui:Label text="@lobby.rules" class="cw-art-plate cw-rule-chips__head" />
+            <ui:Label text="@lobby.rules" class="cw-rule-chips__head" />
             <ui:VisualElement class="cw-rule-chip">
                 <ui:Label text="@lobby.setting.time" class="cw-rule-chip__k" /><ui:Label name="SetTime" text="" class="cw-rule-chip__v" />
             </ui:VisualElement>
@@ -63,17 +64,18 @@
                     </ui:VisualElement>
                 </ui:VisualElement>
 
-                <!-- Join code entry (join mode) -->
-                <ui:VisualElement name="JoinCard" class="cw-raised cw-lobby-card cw-hidden">
-                    <ui:Label text="@lobby.join.label" class="cw-lobby-cardlabel" />
-                    <ui:TextField name="LobbyJoinField" class="cw-input" />
-                </ui:VisualElement>
             </ui:VisualElement>
 
-            <!-- One-shot READY! banner (all seats ready). Display + reveal driven from C#. -->
+            <!-- Centre of the bar, under the open gate: the READY! status (all seats ready; a status
+                 label, not a button - display + reveal driven from C#) or, in join mode, the big
+                 centred code entry (JOIN MATCH stays disabled until the code is complete). -->
             <ui:VisualElement class="cw-coop-center">
                 <ui:VisualElement name="ReadyBanner" class="cw-ready-banner" style="display: none;" picking-mode="Ignore">
                     <ui:Label text="@lobby.allReady" class="cw-title cw-ready-banner__label" />
+                </ui:VisualElement>
+                <ui:VisualElement name="JoinCard" class="cw-raised cw-lobby-card cw-join-card cw-hidden">
+                    <ui:Label text="@lobby.join.label" class="cw-lobby-cardlabel" />
+                    <ui:TextField name="LobbyJoinField" class="cw-input" />
                 </ui:VisualElement>
             </ui:VisualElement>
 

@@ -332,7 +332,9 @@
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 36px; letter-spacing: 1px; color: rgb(254, 245, 224);
     -unity-text-align: middle-center;
-    min-height: 116px; min-width: 200px;
+    /* 124, not the 116 floor: the plank art sits inside transparent bevel margins, and the
+       VISIBLE plank has to clear 48 dp on a Pixel 9 too (re-audit item 18). */
+    min-height: 124px; min-width: 200px;
     background-color: rgba(0, 0, 0, 0);
     background-image: url("project://database/Assets/_Game/Art/UI/Frames/Frame_WoodPanel.png");
     -unity-background-scale-mode: stretch-to-fill;
@@ -349,12 +351,12 @@
    resolved from settings.title by UiText.ResolveTree. */
 .cw-gear-btn {
     left: auto; right: 28px;
-    min-width: 116px; width: 116px; height: 116px;
+    min-width: 124px; width: 124px; height: 124px;
     padding-left: 0; padding-right: 0; padding-top: 0; padding-bottom: 6px;
     align-items: center; justify-content: center;
 }
 .cw-gear-btn__icon {
-    width: 76px; height: 76px;
+    width: 80px; height: 80px;
     background-image: url("project://database/Assets/_Game/Art/UI/Icons/Glyph_Gear.png");
     -unity-background-scale-mode: scale-to-fit;
 }
@@ -449,7 +451,10 @@
    both inside the button (one touch target; the sub-line reads on wood, not on the
    backdrop). Same width as PLAY SOLO, which stays the only green CTA. Display is
    driven from C# (hidden until a valid last setup exists) - no display rule here. */
-.cw-menu-playagain { align-items: center; margin-top: 16px; }
+/* PLAY AGAIN sits ABOVE PLAY SOLO and, while it is shown, is the green primary (Phase 4,
+   re-audit item 17): MenuUiController.RefreshPlayAgain swaps the two buttons' colour classes and
+   demotes PLAY SOLO to a wood plank. */
+.cw-menu-playagain { align-items: center; margin-bottom: 16px; }
 .cw-menu-playagain__btn {
     min-width: 620px; flex-direction: column; align-items: center; justify-content: center;
     /* The wood atom's painted plank sits inside transparent bevel/shadow margins, so the
@@ -478,6 +483,11 @@
 .layout--short .cw-menu-primary { min-height: 132px; }
 .layout--short .cw-menu-secondary-row { margin-top: 14px; }
 .layout--short .cw-menu-hint { margin-top: 12px; }
+/* PLAY SOLO while PLAY AGAIN is the primary: a wood secondary at the HOST / JOIN size.
+   Three classes so it beats .layout--short .cw-menu-primary whatever the order. */
+.cw-menu .cw-menu-primary.cw-menu-primary--demoted { min-height: 116px; font-size: 44px; letter-spacing: 3px; }
+.cw-menu .cw-menu-playagain__btn.cw-btn--green { min-height: 148px; }
+.cw-menu .cw-menu-playagain__btn.cw-btn--green .cw-menu-playagain__label { font-size: 52px; letter-spacing: 4px; }
 .cw-menu-hint {
     font-size: 32px; margin-top: 26px;
     -unity-text-align: middle-center;
@@ -631,14 +641,44 @@
 }
 .layout--narrow .cw-class-tile { flex-basis: 0; margin-top: 0; margin-bottom: 0; }
 .cw-class-tile:hover { scale: 1.02 1.02; }
-.cw-class-tile > .cw-glow { display: none; }
-.cw-class-tile--selected > .cw-glow { display: flex; }
+/* Selected (Phase 4, re-audit items 10 + 19) = scale + gold inner border + an ink ring outside
+   + a corner check badge. No translate lift: the stagger entry's inline translate ended on 0 and
+   the lift then transitioned in afterwards (the "late hop"). Border WIDTH never changes, so the
+   tile's content and its neighbours never shift. The check is drawn in USS (no art). */
 .cw-class-tile--selected {
-    scale: 1.04 1.04; translate: 0 -6px;
-    border-left-width: 8px; border-right-width: 8px; border-top-width: 8px; border-bottom-width: 8px;
+    scale: 1.04 1.04;
     border-left-color: rgb(245, 200, 66); border-right-color: rgb(245, 200, 66);
     border-top-color: rgb(245, 200, 66); border-bottom-color: rgb(245, 200, 66);
 }
+.cw-class-tile__ring {
+    position: absolute; left: -11px; top: -11px; right: -11px; bottom: -11px;
+    border-left-width: 6px; border-right-width: 6px; border-top-width: 6px; border-bottom-width: 6px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    border-top-left-radius: 30px; border-top-right-radius: 30px;
+    border-bottom-left-radius: 30px; border-bottom-right-radius: 30px;
+    display: none;
+}
+.cw-class-tile__check {
+    position: absolute; top: 10px; right: 10px;
+    width: 60px; height: 60px;
+    align-items: center; justify-content: center;
+    background-color: rgb(245, 200, 66);
+    border-left-width: 5px; border-right-width: 5px; border-top-width: 5px; border-bottom-width: 5px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    border-top-left-radius: 30px; border-top-right-radius: 30px;
+    border-bottom-left-radius: 30px; border-bottom-right-radius: 30px;
+    display: none;
+}
+/* The tick: an L of two ink borders, turned 45 degrees. */
+.cw-class-tile__check-mark {
+    width: 16px; height: 28px; margin-top: -6px;
+    rotate: 45deg;
+    border-right-width: 7px; border-bottom-width: 7px;
+    border-right-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+}
+.cw-class-tile--selected > .cw-class-tile__ring, .cw-class-tile--selected > .cw-class-tile__check { display: flex; }
 .cw-class-tile__art { flex-grow: 1; width: 100%; min-height: 100px; -unity-background-scale-mode: scale-to-fit; }
 .cw-class-tile__name {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
@@ -656,29 +696,36 @@
 
 /* Hero: one cream card. Stage on the left, text column on the right. */
 .cw-hero {
-    flex-grow: 1.25; flex-basis: 0; min-width: 0; min-height: 0;
+    flex-grow: 1.5; flex-basis: 0; min-width: 0; min-height: 0;
     flex-direction: row; align-items: stretch;
     padding-top: 16px; padding-bottom: 16px; padding-left: 16px; padding-right: 22px;
 }
 .layout--narrow .cw-hero { flex-grow: 1; }
+/* Phase 4 (re-audit item 10): stage, bale and chicken ~1.4x the Phase 1 size. */
 .cw-hero__stage {
-    width: 330px; flex-shrink: 0; margin-right: 18px;
+    width: 460px; flex-shrink: 0; margin-right: 18px;
     align-items: center; justify-content: flex-end; padding-bottom: 40px;
     border-top-left-radius: 20px; border-top-right-radius: 20px;
     border-bottom-left-radius: 20px; border-bottom-right-radius: 20px;
     /* class wash set in C# */
 }
-.cw-hero__glow { width: 320px; height: 320px; top: 15%; }
+/* Centred on the chicken's chest (~55% up the 434 px figure, whose box starts 138 px above the
+   stage bottom): 138 + 0.55 * 434 - 448 / 2 = ~153. */
+.cw-hero__glow { width: 448px; height: 448px; bottom: 153px; }
 /* Phase 2: the hero stands on a hay bale (Frames/Pedestal_HayBale, 512x256; its top face
    spans source y 40-96, i.e. ~16-38% of the height). The chicken's feet land on that face. */
 .cw-hero__platform {
     position: absolute; bottom: 22px;
-    width: 270px; height: 135px;
+    width: 378px; height: 189px;
     background-image: url("project://database/Assets/_Game/Art/UI/Frames/Pedestal_HayBale.png");
     -unity-background-scale-mode: scale-to-fit;
 }
-.cw-hero__chicken { width: 310px; height: 310px; margin-bottom: 64px; }   /* feet on the bale's top face */
-.cw-hero__text { flex-grow: 1; flex-basis: 0; min-width: 0; justify-content: center; }
+/* Feet on the bale's top face: bale top = 22 + 189 * 0.73 = ~160; feet sit 5% (22 px) above the
+   figure's bottom edge, which starts at padding 40 + margin -> margin 98. */
+.cw-hero__chicken { width: 434px; height: 434px; margin-bottom: 98px; }
+/* Top-aligned (re-audit item 10): centring made the name jump whenever a class's quote / perk
+   text was a line longer or shorter. */
+.cw-hero__text { flex-grow: 1; flex-basis: 0; min-width: 0; justify-content: flex-start; padding-top: 8px; }
 .cw-hero__name {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 60px; letter-spacing: 2px; color: rgb(42, 26, 12);
@@ -837,6 +884,16 @@
    READY. Budget, Pixel 9 canvas 961 tall: header 120 + slots ~170 + deck
    ~360 + bottom ~150 = ~800. No page scroll.
    ============================================================================ */
+/* The chosen bird in the barn doorway (Phase 4, re-audit item 21): under the body (first child of
+   the page), centred on the backdrop's door; the deck panels cover its legs, so it peeks over the
+   counter. Static render (.cw-chicken--<cls>) or the live stage (Performance Mode OFF). */
+.cw-gear-chicken {
+    position: absolute; left: 33%; right: 33%; top: 20%; height: 34%;
+    -unity-background-scale-mode: scale-to-fit;
+}
+/* The live render frames the bird with hop headroom, so it sits smaller in the box: lift it. */
+.cw-gear-chicken--live { top: 14%; }
+.layout--narrow .cw-gear-chicken { display: none; }
 .cw-gear-body {
     flex-grow: 1; min-height: 0; min-width: 0;
     padding-left: 16px; padding-right: 16px; padding-bottom: 14px;
@@ -978,11 +1035,14 @@
 
 /* Art-forward card: category colour as the frame + a category band on top
    (both set in C#), big icon, name. */
+/* Fixed height (Phase 4, re-audit item 8): every card is the same height whether or not it carries
+   a STARTER tag, so the category bands line up across both groups. Side padding keeps a long name
+   off the frame; the band cancels it to stay flush. */
 .cw-ability-card {
-    width: 226px; flex-shrink: 1; min-width: 0; min-height: 262px;
+    width: 226px; flex-shrink: 1; min-width: 0; height: 290px;
     margin-left: 5px; margin-right: 5px;
     align-items: center; justify-content: flex-start;
-    padding-bottom: 10px;
+    padding-bottom: 10px; padding-left: 10px; padding-right: 10px;
     background-color: rgb(255, 248, 232);
     border-left-width: 6px; border-right-width: 6px; border-top-width: 6px; border-bottom-width: 6px;
     border-top-left-radius: 20px; border-top-right-radius: 20px;
@@ -992,13 +1052,14 @@
 .cw-ability-card:hover { scale: 1.03 1.03; }
 .cw-ability-card > .cw-glow { display: none; }
 .cw-ability-card--picked > .cw-glow { display: flex; }
-.cw-ability-card--picked { scale: 1.03 1.03; }
-.cw-ability-card--focused { translate: 0 -12px; }
+/* Picked = the gold glow; focused = an ink frame (colour set in C#, same width, so nothing inside
+   moves). Neither scales nor lifts the card (MenuJuiceGuardTests): the old 1.03 scale + 12 px lift
+   left an equipped card resting at another size and height than its row; the pop now settles at 1. */
 .cw-ability-card__band {
     align-self: stretch; height: 44px; flex-shrink: 0;
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
     font-size: 30px; letter-spacing: 1px; -unity-text-align: middle-left;
-    padding-left: 12px; padding-top: 0; padding-bottom: 2px; margin-left: 0; margin-right: 0; margin-top: 0;
+    padding-left: 12px; padding-top: 0; padding-bottom: 2px; margin-left: -10px; margin-right: -10px; margin-top: 0;
     border-top-left-radius: 13px; border-top-right-radius: 13px;
 }
 .cw-ability-card__icon { width: 112px; height: 112px; flex-shrink: 0; margin-top: 12px; margin-bottom: 6px; }
@@ -1009,6 +1070,8 @@
        shrunk 16:9 / 4:3 card; at -1 px tracking it fits a ~200 px card. */
     white-space: nowrap; padding-left: 0; padding-right: 0; padding-top: 0; margin-left: 0; margin-right: 0;
 }
+/* Only a name that cannot fit the card at 30 px steps down (MenuUiController.FitCardName). */
+.cw-ability-card__name--long { font-size: 26px; }
 .cw-ability-card .cw-starter-tag { margin-top: 6px; }
 /* Slot number on a picked card (which in-match button fires it). Fill is the
    accent, text colour picked against it in C#. */
@@ -1065,13 +1128,19 @@
 /* ============================================================================
    THE COOP  (Lobby.uxml) — lineup on pedestals, rule chips, bottom bar
    ============================================================================ */
+/* One ink plate behind the whole row (Phase 4, re-audit item 11): the backdrop's bunting used to
+   poke through the gaps between the chips on the phone. */
 .cw-rule-chips {
     flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: center;
-    flex-shrink: 0; margin-bottom: 6px; padding-left: 24px; padding-right: 24px;
+    flex-shrink: 0; align-self: center; max-width: 96%; margin-bottom: 6px;
+    padding-left: 16px; padding-right: 16px; padding-top: 6px; padding-bottom: 6px;
+    background-color: rgba(42, 26, 12, 0.82);
+    border-top-left-radius: 40px; border-top-right-radius: 40px;
+    border-bottom-left-radius: 40px; border-bottom-right-radius: 40px;
 }
 .cw-rule-chips__head {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 30px; letter-spacing: 2px; color: rgb(254, 245, 224); margin-right: 10px;
+    font-size: 30px; letter-spacing: 2px; color: rgb(254, 245, 224); margin-right: 8px; margin-left: 10px;
     -unity-text-outline-width: 3px; -unity-text-outline-color: rgb(42, 26, 12);
     text-shadow: 0px 3px 0px rgba(42, 26, 12, 0.85);
 }
@@ -1083,8 +1152,8 @@
     border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
     border-top-left-radius: 26px; border-top-right-radius: 26px;
     border-bottom-left-radius: 26px; border-bottom-right-radius: 26px;
-    padding-top: 2px; padding-bottom: 4px; padding-left: 18px; padding-right: 18px;
-    margin-left: 6px; margin-right: 6px; margin-top: 3px; margin-bottom: 3px;
+    padding-top: 2px; padding-bottom: 4px; padding-left: 14px; padding-right: 14px;
+    margin-left: 5px; margin-right: 5px; margin-top: 3px; margin-bottom: 3px;
 }
 .cw-rule-chip__k {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
@@ -1116,6 +1185,20 @@
     background-image: url("project://database/Assets/_Game/Art/UI/Frames/Pedestal_Ring.png");
     -unity-background-scale-mode: scale-to-fit;
 }
+/* Player plate on the pedestal's front (Phase 4, re-audit item 21): P1..P4 on the seat's player
+   colour (fill + text colour set in C#), so two birds of one class are told apart at a glance. */
+.cw-seat__pedestal-tag {
+    position: absolute; bottom: 8px;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 32px; letter-spacing: 1px; -unity-text-align: middle-center;
+    padding-top: 0; padding-bottom: 2px; padding-left: 16px; padding-right: 16px;
+    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    border-top-left-radius: 14px; border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
+}
+.cw-seat--empty .cw-seat__pedestal-tag { display: none; }
 .cw-seat__chicken { width: 92%; flex-grow: 1; max-height: 300px; margin-bottom: 26px; -unity-background-scale-mode: scale-to-fit; }
 .cw-seat--empty .cw-seat__chicken { display: none; }
 .cw-seat--empty .cw-seat__pedestal { opacity: 0.45; }
@@ -1144,7 +1227,7 @@
 /* P-tag: ink pill, cream text, player-colour stripe on its left edge (C#). */
 .cw-seat__pn {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 30px; color: rgb(254, 245, 224); flex-shrink: 0;
+    font-size: 32px; color: rgb(254, 245, 224); flex-shrink: 0;
     background-color: rgb(42, 26, 12);
     border-left-width: 10px;
     padding-top: 0; padding-bottom: 2px; padding-left: 8px; padding-right: 10px;
@@ -1154,7 +1237,7 @@
 }
 .cw-seat__tag {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 30px; color: rgb(42, 26, 12); flex-shrink: 0;
+    font-size: 32px; color: rgb(42, 26, 12); flex-shrink: 0;
     background-color: rgb(243, 230, 200);
     border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
     border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
@@ -1214,22 +1297,21 @@
 }
 .layout--short .cw-coop-bottom { padding-top: 6px; padding-bottom: 8px; }
 .cw-coop-left { flex-direction: row; align-items: center; flex-shrink: 1; min-width: 0; }
-.cw-coop-center { flex-grow: 1; flex-basis: 0; min-width: 0; align-items: center; justify-content: center; }
+/* Stretched to the bar's height so the absolutely placed READY! status has a box to centre in. */
+.cw-coop-center { flex-grow: 1; flex-basis: 0; min-width: 0; align-self: stretch; align-items: center; justify-content: center; }
 .cw-coop-right { flex-shrink: 0; align-items: center; }
-/* Same wood ribbon as the screen titles (Frames/Frame_Ribbon), warmed toward gold. */
+/* READY! is a status, not a control (Phase 4, re-audit item 11): outlined gold display type with
+   no plank or ribbon behind it, so it can never read as a second button next to START MATCH. */
 .cw-ready-banner {
-    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Frame_Ribbon.png");
-    -unity-background-scale-mode: stretch-to-fill;
-    -unity-slice-left: 168; -unity-slice-right: 168; -unity-slice-top: 0; -unity-slice-bottom: 0;
-    -unity-slice-scale: 0.75px;
-    -unity-background-image-tint-color: rgb(255, 226, 150);
-    height: 120px;
-    padding-top: 0; padding-bottom: 24px; padding-left: 140px; padding-right: 140px;
+    /* Over the centre of the bar, out of flow: showing / hiding it (or the stamp, with the join
+       code card under it) never moves anything else. */
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    padding-top: 0; padding-bottom: 0; padding-left: 24px; padding-right: 24px;
     align-items: center; justify-content: center;
     transition-property: scale, opacity; transition-duration: 0.35s; transition-timing-function: ease-out-back;
 }
 .cw-ready-banner--hidden { scale: 0.4 0.4; opacity: 0; transition-duration: 0s; }
-.cw-ready-banner__label { font-size: 56px; letter-spacing: 3px; }
+.cw-ready-banner__label { font-size: 76px; letter-spacing: 4px; color: rgb(255, 214, 80); }
 
 /* ============================================================================
    SETTINGS SHEET  (main menu gear -> modal; MainMenu.uxml #SettingsSheet)
@@ -1376,7 +1458,14 @@
 .cw-lobby-btnrow { align-items: center; margin-top: 4px; }
 .cw-lobby-btnrow .cw-code-tiles { margin-top: 0; margin-right: 8px; flex-wrap: nowrap; }
 .cw-lobby-btnrow .cw-mini-btn { flex-grow: 0; flex-basis: auto; min-width: 140px; margin-right: 0; margin-left: 10px; }
-.cw-coop-left .cw-input { margin-top: 6px; min-width: 420px; }
+/* Join (Phase 4, re-audit item 9): the code entry is centred in the bottom bar under the open
+   gate, big and centred; JOIN MATCH stays a disabled wood plank until the code is complete. */
+.cw-join-card { align-items: center; padding-top: 6px; padding-bottom: 10px; padding-left: 24px; padding-right: 24px; }
+.cw-join-card .cw-lobby-cardlabel { -unity-text-align: middle-center; }
+.cw-join-card .cw-input { margin-top: 6px; min-width: 560px; }
+.cw-join-card .cw-input .unity-text-field__input, .cw-join-card .cw-input .unity-base-text-field__input {
+    font-size: 64px; letter-spacing: 10px; -unity-text-align: middle-center; padding-left: 0;
+}
 
 /* Status pill */
 /* Status line: cream inset, dark text (the status colour is set in C# from

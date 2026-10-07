@@ -37,5 +37,13 @@ namespace CluckWars.Input
         /// must-be-read-every-tick contract as <c>GetAbilityXPressed</c>.
         /// </summary>
         bool GetAbilityCancelPressed();
+
+        /// <summary>
+        /// Edge-triggered UI back / cancel (desktop Esc; Android's system back button, which the
+        /// Input System reports as the Escape key). Polled by the MENU only - the match never reads
+        /// it, so it cannot steal <see cref="GetAbilityCancelPressed"/>, which shares the Esc key.
+        /// Both read the key's this-frame edge, which nothing consumes.
+        /// </summary>
+        bool GetBackPressed();
     }
 }

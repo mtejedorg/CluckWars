@@ -64,5 +64,9 @@ namespace CluckWars.Input
             any |= hud.ConsumeAbilityCancelled(3);
             return any;
         }
+
+        /// <summary>The on-screen controls have no back button (Android back comes through the
+        /// keyboard provider as Escape).</summary>
+        public bool GetBackPressed() => false;
     }
 }

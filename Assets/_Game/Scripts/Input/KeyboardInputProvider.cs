@@ -76,6 +76,13 @@ namespace CluckWars.Input
             return kb != null && kb.escapeKey.wasPressedThisFrame;
         }
 
+        /// <summary>Esc on desktop; on Android the system back button arrives as the Escape key.</summary>
+        public bool GetBackPressed()
+        {
+            var kb = Keyboard.current;
+            return kb != null && kb.escapeKey.wasPressedThisFrame;
+        }
+
         /// <summary>
         /// The one and only slot-to-key table: <c>AbilityKeys[slot]</c> is every key that
         /// fires that slot.

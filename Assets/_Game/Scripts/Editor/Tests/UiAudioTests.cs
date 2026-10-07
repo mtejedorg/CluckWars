@@ -217,6 +217,19 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void EquipTap_IsTheTapClipAtHalfItsVolume()
+        {
+            var fake = new FakeAudio(); var so = Catalogue();
+            var menu = new MenuAudio(fake, so, new RecordingLog());
+            menu.EquipTap();
+
+            Assert.AreEqual(1, fake.Sfx.Count);
+            Assert.AreEqual(so.Tap.Clip, fake.Sfx[0].Clip);
+            Assert.AreEqual(so.Tap.Volume * MenuAudio.EquipTapVolume, fake.Sfx[0].Volume, 1e-6f);
+            Assert.AreEqual(0.5f, MenuAudio.EquipTapVolume);
+        }
+
+        [Test]
         public void Tap_PlaysTheTapClipWithinFivePercentPitchJitter()
         {
             var fake = new FakeAudio(); var so = Catalogue();

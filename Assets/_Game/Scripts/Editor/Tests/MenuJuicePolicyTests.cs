@@ -65,7 +65,8 @@ namespace CluckWars.Tests
             Assert.AreEqual(0f, MenuJuicePolicy.FlightArc(0f), 1e-5f);
             Assert.AreEqual(0f, MenuJuicePolicy.FlightArc(1f), 1e-5f);
             Assert.AreEqual(MenuJuicePolicy.FlightArcPx, MenuJuicePolicy.FlightArc(0.5f), 1e-4f);
-            Assert.That(MenuJuicePolicy.FlightSeconds, Is.InRange(0.25f, 0.30f));
+            // Phase 4 shortened it to 0.22 s (the touch has its own soft tap now); still a readable arc.
+            Assert.That(MenuJuicePolicy.FlightSeconds, Is.InRange(0.20f, 0.30f));
         }
 
         // ---- Stamp -----------------------------------------------------------------------------

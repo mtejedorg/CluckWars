@@ -1,6 +1,9 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
     <!-- Cluck Wars — STEP 1 "PICK YOUR BIRD" (menu overhaul Phase 1, 2026-10-06).
 
+         Phase 4: a selected tile = scale + gold border + ink ring (.cw-class-tile__ring) + corner
+         check (.cw-class-tile__check, drawn in USS); the hero is ~1.4x and sways (decision 4).
+
          Four big portrait tiles (class colour fill, big chicken, name + role) and ONE hero
          area for the selected class: big chicken on a class-tinted stage, class name, quote,
          strong/weak callouts, two PERK badges (tap = select that perk and show its detail)
@@ -33,28 +36,32 @@
 
             <ui:VisualElement name="ClassList" class="cw-class-tiles">
                 <ui:VisualElement name="ClassWarrior" class="cw-class-tile">
-                    <ui:VisualElement class="cw-glow" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-class-tile__ring" picking-mode="Ignore" />
                     <ui:VisualElement name="ClassWarriorArt" class="cw-chicken cw-class-tile__art" picking-mode="Ignore" />
                     <ui:Label text="@class.warrior.short" class="cw-class-tile__name" picking-mode="Ignore" />
                     <ui:Label text="@role.warrior" class="cw-class-tile__role" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-class-tile__check" picking-mode="Ignore"><ui:VisualElement class="cw-class-tile__check-mark" picking-mode="Ignore" /></ui:VisualElement>
                 </ui:VisualElement>
                 <ui:VisualElement name="ClassSpeedy" class="cw-class-tile">
-                    <ui:VisualElement class="cw-glow" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-class-tile__ring" picking-mode="Ignore" />
                     <ui:VisualElement name="ClassSpeedyArt" class="cw-chicken cw-class-tile__art" picking-mode="Ignore" />
                     <ui:Label text="@class.speedy.short" class="cw-class-tile__name" picking-mode="Ignore" />
                     <ui:Label text="@role.speedy" class="cw-class-tile__role" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-class-tile__check" picking-mode="Ignore"><ui:VisualElement class="cw-class-tile__check-mark" picking-mode="Ignore" /></ui:VisualElement>
                 </ui:VisualElement>
                 <ui:VisualElement name="ClassFatty" class="cw-class-tile">
-                    <ui:VisualElement class="cw-glow" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-class-tile__ring" picking-mode="Ignore" />
                     <ui:VisualElement name="ClassFattyArt" class="cw-chicken cw-class-tile__art" picking-mode="Ignore" />
                     <ui:Label text="@class.fatty.short" class="cw-class-tile__name" picking-mode="Ignore" />
                     <ui:Label text="@role.fatty" class="cw-class-tile__role" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-class-tile__check" picking-mode="Ignore"><ui:VisualElement class="cw-class-tile__check-mark" picking-mode="Ignore" /></ui:VisualElement>
                 </ui:VisualElement>
                 <ui:VisualElement name="ClassAssassin" class="cw-class-tile">
-                    <ui:VisualElement class="cw-glow" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-class-tile__ring" picking-mode="Ignore" />
                     <ui:VisualElement name="ClassAssassinArt" class="cw-chicken cw-class-tile__art" picking-mode="Ignore" />
                     <ui:Label text="@class.assassin.short" class="cw-class-tile__name" picking-mode="Ignore" />
                     <ui:Label text="@role.assassin" class="cw-class-tile__role" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-class-tile__check" picking-mode="Ignore"><ui:VisualElement class="cw-class-tile__check-mark" picking-mode="Ignore" /></ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>
 

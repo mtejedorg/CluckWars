@@ -11,12 +11,16 @@
          keeps resolving. Built ONCE (slots) / once per class (cards) by MenuUiController;
          taps only toggle classes and labels. Binding contract (by name):
            BackBtn, ReadyBtn, SlotBox0..3, CommonTitle/CommonCards, ClassTitle/ClassCards,
-           AbilityDetail, AbilityDetailName, AbilityDetailCat, AbilityDetailCd, AbilityDetailText
+           AbilityDetail, AbilityDetailName, AbilityDetailCat, AbilityDetailCd, AbilityDetailText, GearChicken
 
          Sizes follow the MOBILE SIZING CONTRACT at the top of CluckWarsTheme.uss. -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
 
     <ui:VisualElement name="CharacterSelectPage" class="cw-screen cw-page">
+        <!-- Phase 4 (re-audit item 21): the chosen bird in the barn doorway, under everything
+             else on the page. MenuUiController paints its class (static render) or binds it to
+             the live stage (Performance Mode OFF; it hops when a move is equipped). -->
+        <ui:VisualElement name="GearChicken" class="cw-chicken cw-gear-chicken" picking-mode="Ignore" />
 
         <ui:VisualElement class="cw-page-header">
             <ui:Button name="BackBtn" text="@nav.back" class="cw-home-btn" />

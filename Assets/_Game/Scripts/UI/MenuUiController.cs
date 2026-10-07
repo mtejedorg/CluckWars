@@ -4,6 +4,7 @@ using System.Linq;
 using CluckWars.Abilities;
 using CluckWars.Bootstrap;
 using CluckWars.Gameplay;
+using CluckWars.Input;
 using CluckWars.Localization;
 using CluckWars.Logging;
 using CluckWars.Services;
@@ -14,6 +15,9 @@ using Zenject;
 
 namespace CluckWars.UI
 {
+    /// <summary>Where Esc / Android back takes the menu (<see cref="MenuUiController.MenuBackTarget"/>).</summary>
+    public enum MenuBackStep { None, MainMenu, ClassSelect, Loadout }
+
     /// <summary>
     /// UI Toolkit menu front-end: Main Menu → Class Select → Loadout → Lobby → Game.
     /// Replaces the procedural-UGUI CharacterSelectController. Visuals live in
@@ -56,6 +60,7 @@ namespace CluckWars.UI
         private AbilityRegistrySO        _abilityRegistry;
         private MatchConfigSO            _matchConfig;
         private MenuAudio                _audio = MenuAudio.Silent();
+        private IInputProvider           _input;
 
         // ---- Runtime state ----------------------------------------------------
         private VisualElement _root;
@@ -113,6 +118,10 @@ namespace CluckWars.UI
         // ---- Live 3D chicken stage (Phase 3; only while Performance Mode is OFF) ----------
         // Slot 0 = the PICK YOUR BIRD hero, 1..4 = the lineup seats. Null = static renders.
         private const int HeroStageSlot = 0;
+        // After the four seats: the GEAR UP doorway bird (Phase 4).
+        private const int GearStageSlot = 5;
+        private VisualElement _gearChicken;
+        private string _gearChickenClass;
         private MenuChickenStage _stage;
         private bool _stageFailed;
         // What each lineup seat shows (null = open seat), kept so the stage can be (re)bound
@@ -133,6 +142,13 @@ namespace CluckWars.UI
         private static readonly ChickenClass[] Order =
             { ChickenClass.Warrior, ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };
 
+        /// <summary>
+        /// UI class colours: tile fills, the hero wash and the PICK YOUR BIRD backdrop. UI only
+        /// (Phase 4, re-audit item 10): the chickens' gameplay tint stays in ChickenClassRegistrySO.
+        /// Warrior is a deeper crimson and Speedy a sunnier orange than the registry tints, whose
+        /// lightened tile fills were near-identical (dE00 6.9 -> 23.9 here; every pair >= 14.6, ink
+        /// on every fill >= 6.9:1).
+        /// </summary>
         private sealed class ClassMeta
         {
             // PassiveName/PassiveDesc were removed on 2026-08-23. They still carried the
@@ -147,8 +163,8 @@ namespace CluckWars.UI
 
         private static readonly Dictionary<ChickenClass, ClassMeta> Meta = new()
         {
-            [ChickenClass.Warrior]  = new ClassMeta { Tint = UiGfx.Hex32("C04030"), Stats = new[]{3,3,3} },
-            [ChickenClass.Speedy]   = new ClassMeta { Tint = UiGfx.Hex32("E85A2A"), Stats = new[]{2,3,5} },
+            [ChickenClass.Warrior]  = new ClassMeta { Tint = UiGfx.Hex32("B02A3A"), Stats = new[]{3,3,3} },
+            [ChickenClass.Speedy]   = new ClassMeta { Tint = UiGfx.Hex32("F08A2C"), Stats = new[]{2,3,5} },
             [ChickenClass.Fatty]    = new ClassMeta { Tint = UiGfx.Hex32("F5D75A"), Stats = new[]{5,5,2} },
             [ChickenClass.Assassin] = new ClassMeta { Tint = UiGfx.Hex32("7B68EE"), Stats = new[]{2,2,4} },
         };
@@ -177,14 +193,14 @@ namespace CluckWars.UI
 
         // Ability categories. These used to be section headers in a scrolling
         // grid; with 3 cards per row that produced headers holding one card each,
-        // so the category now rides on the card itself as a colored tag.
-        private sealed class CatMeta { public string LabelKey; public Color Color; }
-        private static readonly Dictionary<AbilityCategory, CatMeta> Cats = new()
+        // so the category now rides on the card itself as a colored tag. The colour of
+        // every category (and so of every ability hex) is AbilityPalette's (Phase 4).
+        private static readonly Dictionary<AbilityCategory, string> CategoryLabelKeys = new()
         {
-            [AbilityCategory.Steal]   = new CatMeta { LabelKey = UiKeys.CategorySteal, Color = UiGfx.Hex32("FF5722") },
-            [AbilityCategory.Control] = new CatMeta { LabelKey = UiKeys.CategoryControl, Color = UiGfx.Hex32("9C27B0") },
-            [AbilityCategory.Defense] = new CatMeta { LabelKey = UiKeys.CategoryDefense, Color = UiGfx.Hex32("4CAF50") },
-            [AbilityCategory.Utility] = new CatMeta { LabelKey = UiKeys.CategoryUtility, Color = UiGfx.Hex32("00BCD4") },
+            [AbilityCategory.Steal]   = UiKeys.CategorySteal,
+            [AbilityCategory.Control] = UiKeys.CategoryControl,
+            [AbilityCategory.Defense] = UiKeys.CategoryDefense,
+            [AbilityCategory.Utility] = UiKeys.CategoryUtility,
         };
 
         // ======================================================================
@@ -197,7 +213,8 @@ namespace CluckWars.UI
             [InjectOptional] ChickenClassRegistrySO classRegistry,
             [InjectOptional] AbilityRegistrySO abilityRegistry,
             [InjectOptional] MatchConfigSO matchConfig,
-            [InjectOptional] MenuAudio audio)
+            [InjectOptional] MenuAudio audio,
+            [InjectOptional] IInputProvider input)
         {
             _selection       = selection;
             _log             = log;
@@ -207,6 +224,7 @@ namespace CluckWars.UI
             _abilityRegistry = abilityRegistry;
             _matchConfig     = matchConfig;
             _audio           = audio ?? MenuAudio.Silent();
+            _input           = input;
         }
 
         private void Awake()
@@ -215,6 +233,8 @@ namespace CluckWars.UI
                 ProjectContext.Instance.Container.Inject(this);
 
             UiText.SetLogger(_log);
+            if (_input == null)
+                _log?.Warn(Source, "IInputProvider not injected; Esc / Android back will not navigate the menu.");
 
             if (_sceneLoader == null) _sceneLoader = GetComponent<SceneLoader>();
             if (_sceneLoader == null) _sceneLoader = FindFirstObjectByType<SceneLoader>();
@@ -398,7 +418,45 @@ namespace CluckWars.UI
         // A notch or gesture bar can change Screen.safeArea without the panel's geometry
         // changing (e.g. the system bars toggling), so it is also polled — two struct
         // compares a frame, no allocation.
-        private void Update() => ApplySafeArea(force: false);
+        private void Update()
+        {
+            ApplySafeArea(force: false);
+            // Menu-only poll: the match never runs this, so the in-match ability cancel (also Esc)
+            // is untouched. Both read the key's wasPressedThisFrame, which nothing consumes.
+            if (_input != null && _input.GetBackPressed()) OnBackPressed();
+        }
+
+        /// <summary>
+        /// Esc / Android back (re-audit item 20): closes the settings sheet if it is open, else does
+        /// what the page's BACK / HOME does, with the back sound. On the main menu it does nothing
+        /// (no quit). Ignored while a join is in flight.
+        /// </summary>
+        private void OnBackPressed()
+        {
+            if (_isBusy || _currentPage == null) return;
+            if (_settingsSheet != null && _settingsSheet.style.display == DisplayStyle.Flex)
+            {
+                _audio.Back();
+                CloseSettings();
+                return;
+            }
+            var step = MenuBackTarget(PageOrder(_currentPage));
+            if (step == MenuBackStep.None) return;
+            _audio.Back();
+            if (step == MenuBackStep.MainMenu) ShowMainMenu();
+            else if (step == MenuBackStep.ClassSelect) ShowClassSelect();
+            else ShowLoadout();
+        }
+
+        /// <summary>Where Esc / back goes from the page at <paramref name="pageOrder"/>
+        /// (0 main, 1 pick, 2 gear up, 3 coop) - the same target as that page's BACK / HOME button.</summary>
+        public static MenuBackStep MenuBackTarget(int pageOrder) => pageOrder switch
+        {
+            1 => MenuBackStep.MainMenu,
+            2 => MenuBackStep.ClassSelect,
+            3 => MenuBackStep.Loadout,
+            _ => MenuBackStep.None,
+        };
 
         /// <summary>
         /// Pads <see cref="_pageHost"/> so no page content sits under a notch, cutout or the
@@ -667,6 +725,31 @@ namespace CluckWars.UI
             BindSettingRow("DeveloperModeRow", "DeveloperModeToggle",
                 () => PlayerPreferences.DeveloperModeEnabled,
                 v => { PlayerPreferences.DeveloperModeEnabled = v; RefreshDevRow(); }, "Developer mode");
+
+            // Release builds have no Dev Mode at all (re-audit item 17): the row goes, and the
+            // Performance row becomes the last one (no divider under it).
+            if (!DevToolsAvailable)
+            {
+                Bind<VisualElement>(_settingsSheet, "DeveloperModeRow", r => r.style.display = DisplayStyle.None);
+                Bind<VisualElement>(_settingsSheet, "PerformanceModeRow", r => r.AddToClassList("cw-setting-toggle-row--last"));
+            }
+        }
+
+        /// <summary>
+        /// Dev Mode (and so the Ability Lab) exists in development builds and the Editor only, or in
+        /// a build compiled with <c>CLUCKWARS_DEV_TOOLS</c>. A release build hides the toggle and
+        /// ignores a Dev Mode preference left over from a development build.
+        /// </summary>
+        private static bool DevToolsAvailable
+        {
+            get
+            {
+#if CLUCKWARS_DEV_TOOLS
+                return true;
+#else
+                return Debug.isDebugBuild;
+#endif
+            }
         }
 
         /// <summary>
@@ -745,7 +828,7 @@ namespace CluckWars.UI
         private void RefreshDevRow()
         {
             Bind<VisualElement>(_mainMenu, "DevRow", r =>
-                r.style.display = PlayerPreferences.DeveloperModeEnabled
+                r.style.display = DevToolsAvailable && PlayerPreferences.DeveloperModeEnabled
                     ? DisplayStyle.Flex
                     : DisplayStyle.None);
         }
@@ -772,7 +855,7 @@ namespace CluckWars.UI
         /// </remarks>
         private void OpenAbilityLab()
         {
-            if (!PlayerPreferences.DeveloperModeEnabled)
+            if (!DevToolsAvailable || !PlayerPreferences.DeveloperModeEnabled)
             {
                 // Not reachable through the UI — the row is hidden. Refuse anyway rather than
                 // trust that, so the gate holds even if a later change shows the row wrongly.
@@ -824,6 +907,18 @@ namespace CluckWars.UI
             bool valid = TryGetLastSetup(out var setup);
             Bind<VisualElement>(_mainMenu, "PlayAgainRow", r =>
                 r.style.display = valid ? DisplayStyle.Flex : DisplayStyle.None);
+            // One green CTA per screen: PLAY AGAIN while it is offered, else PLAY SOLO.
+            Bind<Button>(_mainMenu, "PlayAgainBtn", b =>
+            {
+                b.EnableInClassList("cw-btn--green", valid);
+                b.EnableInClassList("cw-btn--wood", !valid);
+            });
+            Bind<Button>(_mainMenu, "SoloBtn", b =>
+            {
+                b.EnableInClassList("cw-btn--green", !valid);
+                b.EnableInClassList("cw-btn--wood", valid);
+                b.EnableInClassList("cw-menu-primary--demoted", valid);
+            });
             if (!valid) return;
             Bind<Label>(_mainMenu, "PlayAgainSub", l => l.text = UiText.Format(UiKeys.BtnPlayAgainSub,
                 ("cls", ClassShortName(setup.Class)), ("perk", setup.Passive.DisplayName.ToUpperInvariant())));
@@ -927,8 +1022,7 @@ namespace CluckWars.UI
                 return;
             }
 
-            var accent = ab.AccentColor;
-            accent.a = 1f;
+            var accent = AbilityPalette.HexColor(ab);
             string iconCls = AbilityIconStyle.ClassFor(ab);
             if (!string.IsNullOrEmpty(iconCls))
             {
@@ -952,7 +1046,31 @@ namespace CluckWars.UI
             view.Mono.text = AbilityIconStyle.Monogram(ab);
             // On a lobby hex the hex is already the accent disc: text only (contrast vs the accent).
             view.Mono.style.backgroundColor = disc ? accent : new Color(0f, 0f, 0f, 0f);
-            view.Mono.style.color = InkOn(accent);
+            view.Mono.style.color = AbilityPalette.InkOn(accent);
+        }
+
+        private static string CategoryLabel(AbilityCategory cat) =>
+            CategoryLabelKeys.TryGetValue(cat, out var key) ? UiText.Get(key) : string.Empty;
+
+        /// <summary>Deck-card name size (USS .cw-ability-card__name); a name that cannot fit at it
+        /// takes .cw-ability-card__name--long (26 px).</summary>
+        private const float CardNameFontPx = 30f;
+
+        /// <summary>
+        /// Steps a deck-card name down to 26 px only when it does not fit the card's content width at
+        /// 30 px (the sizing contract's caption floor). Single words cannot wrap: at 1920x1080 a card
+        /// is ~182 pt inside, and DOPPELGANGER / INVISIBILITY measure ~208 pt at 30 px. Two-line wrapping
+        /// would overflow the fixed card height on cards carrying a STARTER tag. On wider cards (4:3,
+        /// phone) names that fit stay at 30 px. Re-evaluated whenever the card is laid out.
+        /// </summary>
+        private static void FitCardName(Label name, VisualElement card)
+        {
+            float content = card.contentRect.width;
+            float size = name.resolvedStyle.fontSize;
+            if (float.IsNaN(content) || content <= 0f || size <= 0f) return;
+            float atFull = name.MeasureTextSize(name.text, 0, VisualElement.MeasureMode.Undefined, 0, VisualElement.MeasureMode.Undefined).x
+                           * CardNameFontPx / size;
+            name.EnableInClassList("cw-ability-card__name--long", atFull > content);
         }
 
         private static string AbilityLabel(AbilityBaseSO ab) =>
@@ -1120,12 +1238,7 @@ namespace CluckWars.UI
         /// <summary>Active-ability slots to fill — four for every class.</summary>
         private int ActiveSlotsForClass => AbilityController.SlotCount;
 
-        private Color TintOf(ChickenClass cls)
-        {
-            if (_classRegistry != null && _classRegistry.TryGet(cls, out var e) && e.TintColor.a > 0f)
-                return e.TintColor;
-            return Meta[cls].Tint;
-        }
+        private static Color TintOf(ChickenClass cls) => Meta[cls].Tint;
 
         private void RefreshClassSelect()
         {
@@ -1243,7 +1356,7 @@ namespace CluckWars.UI
             public Button Root;
             public AbilityIconView Icon;
             public VisualElement IconHost;
-            public Label Name, Empty;
+            public Label Name, Empty, CaretLabel;
             public VisualElement StarterTag;
         }
 
@@ -1266,6 +1379,9 @@ namespace CluckWars.UI
             _abilityDetailCat  = _loadout.Q<Label>("AbilityDetailCat");
             _abilityDetailCd   = _loadout.Q<Label>("AbilityDetailCd");
             _readyBtn          = _loadout.Q<Button>("ReadyBtn");
+            _gearChicken       = _loadout.Q<VisualElement>("GearChicken");
+            if (_gearChicken == null)
+                _log?.Error(Source, "CharacterSelect.uxml has no #GearChicken; GEAR UP shows no bird.");
             if (_readyBtn != null) { _readyBtn.clicked += OnReady; OwnCue(_readyBtn); }
 
             for (int i = 0; i < _slots.Length; i++)
@@ -1310,7 +1426,7 @@ namespace CluckWars.UI
             // NEXT caret: word + pointer, shown above the armed slot (not colour-only).
             var caret = new VisualElement { pickingMode = PickingMode.Ignore };
             caret.AddToClassList("cw-next-caret");
-            var caretLabel = new Label(UiText.Get(UiKeys.LoadoutNext)) { pickingMode = PickingMode.Ignore };
+            var caretLabel = v.CaretLabel = new Label(UiText.Get(UiKeys.LoadoutNext)) { pickingMode = PickingMode.Ignore };
             caretLabel.AddToClassList("cw-next-caret__label");
             var tip = new VisualElement { pickingMode = PickingMode.Ignore };
             tip.AddToClassList("cw-next-caret__tip");
@@ -1336,10 +1452,21 @@ namespace CluckWars.UI
         /// <summary>Entering Step 2: make sure the deck matches the class, re-arm, repaint.</summary>
         private void RefreshLoadout()
         {
+            RefreshGearChicken();
             EnsureDeck(Cls);
             SyncSlotModel();
             _slotModel.AutoArmFirstEmpty();
             RefreshLoadoutState();
+        }
+
+        /// <summary>The doorway bird shows the chosen class: the static render, or the live stage.</summary>
+        private void RefreshGearChicken()
+        {
+            if (_gearChicken == null) return;
+            if (!string.IsNullOrEmpty(_gearChickenClass)) _gearChicken.RemoveFromClassList(_gearChickenClass);
+            _gearChickenClass = "cw-chicken--" + KeyOf(Cls);
+            _gearChicken.AddToClassList(_gearChickenClass);
+            ShowGearOnStage(hop: false);
         }
 
         /// <summary>Repaints every GEAR UP surface from the model (no element is created here).</summary>
@@ -1396,7 +1523,7 @@ namespace CluckWars.UI
             switch (result)
             {
                 case CardTapResult.Placed:
-                case CardTapResult.Swapped: break;   // Equip plays when the icon lands (LandSlot), or at once without motion
+                case CardTapResult.Swapped: _audio.EquipTap(); break;   // soft touch now; the thunk plays when the icon lands (LandSlot), or at once without motion
                 case CardTapResult.Cleared: _audio.Clear(); break;
                 default: _audio.Tap(); break;        // locked starter: details only
             }
@@ -1416,10 +1543,10 @@ namespace CluckWars.UI
 
             var card = _deckCards.Find(c => c.Ability == ab);
             if (card != null && result != CardTapResult.Ignored)
-                _juice?.Pop(card.Root, card.Root.ClassListContains("cw-ability-card--picked") ? MenuJuicePolicy.CardPickedRestScale : 1f);
+                _juice?.Pop(card.Root);   // scale-only, settles at 1: picked / focused never move the card
 
             if (!equipped) return;
-            if (!fly || !StartFlight(ab, target, card)) { HoldSlotContent(target, false); _audio.Equip(); }
+            if (!fly || !StartFlight(ab, target, card)) { HoldSlotContent(target, false); _audio.Equip(); ShowGearOnStage(hop: true); }
         }
 
         // ---- Fly-to-slot ---------------------------------------------------------------
@@ -1465,6 +1592,7 @@ namespace CluckWars.UI
                 _juice?.BurstAt(view.IconHost, ParticleKind.Sparkle, 4, 60f);
             }
             _audio.Equip();
+            ShowGearOnStage(hop: true);
         }
 
         private void LandFlight(int slot) => _juice?.LandNow(_flightFor[slot]);
@@ -1495,6 +1623,10 @@ namespace CluckWars.UI
                 v.Name.style.display = ab != null ? DisplayStyle.Flex : DisplayStyle.None;
                 v.Empty.style.display = ab == null ? DisplayStyle.Flex : DisplayStyle.None;
                 v.StarterTag.style.display = locked && ab != null ? DisplayStyle.Flex : DisplayStyle.None;
+                // The caret says what the next card tap does to this slot (LoadoutSlotModel.TapCard):
+                // an empty armed slot is filled (NEXT); a filled one - always the case once the rail
+                // is full - has its move replaced or swapped with the tapped card (TAP TO SWAP).
+                if (i == caret) v.CaretLabel.text = UiText.Get(ab != null ? UiKeys.LoadoutSwap : UiKeys.LoadoutNext);
             }
         }
 
@@ -1557,12 +1689,12 @@ namespace CluckWars.UI
 
             // Category frame: the card border and its top band wear the category colour; the
             // band names it too, so the category never rests on colour alone.
-            var catColor = Cats.TryGetValue(ab.Category, out var cat) ? cat.Color : Ink;
+            var catColor = AbilityPalette.CategoryColor(ab.Category);
             SetBorder(card, catColor);
-            var band = new Label(cat != null ? UiText.Get(cat.LabelKey) : string.Empty) { pickingMode = PickingMode.Ignore };
+            var band = new Label(CategoryLabel(ab.Category)) { pickingMode = PickingMode.Ignore };
             band.AddToClassList("cw-ability-card__band");
             band.style.backgroundColor = catColor;
-            band.style.color = InkOn(catColor);
+            band.style.color = AbilityPalette.InkOn(catColor);
             card.Add(band);
 
             var iconHost = new VisualElement { pickingMode = PickingMode.Ignore };
@@ -1571,8 +1703,12 @@ namespace CluckWars.UI
             card.Add(iconHost);
             v.IconHost = iconHost;
 
-            var name = new Label(AbilityLabel(ab)) { pickingMode = PickingMode.Ignore };
+            var label = AbilityLabel(ab);
+            var name = new Label(label) { pickingMode = PickingMode.Ignore };
             name.AddToClassList("cw-ability-card__name");
+            // A name too wide for the card at 30 px (DOPPELGANGER on a 1920 card) steps down a size
+            // rather than touch the frame.
+            card.RegisterCallback<GeometryChangedEvent>(_ => FitCardName(name, card));
             card.Add(name);
 
             v.StarterTag = MakeStarterTag();
@@ -1581,9 +1717,9 @@ namespace CluckWars.UI
             // Slot number of a picked card = the in-match button that fires it.
             v.Badge = new Label { pickingMode = PickingMode.Ignore };
             v.Badge.AddToClassList("cw-ability-badge");
-            var accent = ab.AccentColor; accent.a = 1f;
-            v.Badge.style.backgroundColor = accent;
-            v.Badge.style.color = InkOn(accent);
+            var hex = AbilityPalette.HexColor(ab);
+            v.Badge.style.backgroundColor = hex;
+            v.Badge.style.color = AbilityPalette.InkOn(hex);
             card.Add(v.Badge);
 
             // One tap does both jobs: equip into the armed slot AND show the details.
@@ -1600,7 +1736,11 @@ namespace CluckWars.UI
                 bool starter = IsPreEquipped(v.Ability);
                 v.Root.EnableInClassList("cw-ability-card--picked", slot >= 0);
                 v.Root.EnableInClassList("cw-ability-card--locked", starter);
-                v.Root.EnableInClassList("cw-ability-card--focused", v.Ability == _focusedAbility);
+                bool focused = v.Ability == _focusedAbility;
+                v.Root.EnableInClassList("cw-ability-card--focused", focused);
+                // Focused = ink frame at the same width (the category stays on the band), so the
+                // card's content never moves when the focus does.
+                SetBorder(v.Root, focused ? Ink : AbilityPalette.CategoryColor(v.Ability.Category));
                 v.Badge.text = slot >= 0 ? (slot + 1).ToString() : string.Empty;
                 v.Badge.style.display = slot >= 0 ? DisplayStyle.Flex : DisplayStyle.None;
                 v.StarterTag.style.display = starter ? DisplayStyle.Flex : DisplayStyle.None;
@@ -1622,14 +1762,13 @@ namespace CluckWars.UI
             }
             if (_abilityDetailCat != null)
             {
-                bool showCat = has && Cats.ContainsKey(ab.Category);
-                _abilityDetailCat.style.display = showCat ? DisplayStyle.Flex : DisplayStyle.None;
-                if (showCat)
+                _abilityDetailCat.style.display = has ? DisplayStyle.Flex : DisplayStyle.None;
+                if (has)
                 {
-                    var cat = Cats[ab.Category];
-                    _abilityDetailCat.text = UiText.Get(cat.LabelKey);
-                    _abilityDetailCat.style.backgroundColor = cat.Color;
-                    _abilityDetailCat.style.color = InkOn(cat.Color);
+                    var catColor = AbilityPalette.CategoryColor(ab.Category);
+                    _abilityDetailCat.text = CategoryLabel(ab.Category);
+                    _abilityDetailCat.style.backgroundColor = catColor;
+                    _abilityDetailCat.style.color = AbilityPalette.InkOn(catColor);
                 }
             }
             if (_abilityDetailCd != null)
@@ -1645,7 +1784,7 @@ namespace CluckWars.UI
             }
             _abilityDetailText.text = has ? ab.Description : UiText.Get(UiKeys.LoadoutDetailEmpty);
             _abilityDetailText.style.color = has ? Ink : InkSoft;
-            if (_abilityDetail != null) SetBorder(_abilityDetail, has && Cats.TryGetValue(ab.Category, out var c) ? c.Color : Ink);
+            if (_abilityDetail != null) SetBorder(_abilityDetail, has ? AbilityPalette.CategoryColor(ab.Category) : Ink);
         }
 
         /// <summary>The Peck (foraging) ability asset, or null if the registry has none.</summary>
@@ -1791,13 +1930,23 @@ namespace CluckWars.UI
         private sealed class SeatView
         {
             public VisualElement Root, Pedestal, Chicken, Plate, NameRow, Hexes, State;
-            public Label Name, Pn, Tag, ClassLine, Waiting, StateLabel;
+            public Label Name, Pn, Tag, ClassLine, Waiting, StateLabel, PedestalTag;
             public readonly List<(VisualElement Hex, AbilityIconView Icon)> HexViews = new();
             public string ChickenCss;
         }
 
         private void BuildLobby()
         {
+            Bind<TextField>(_lobby, "LobbyJoinField", f =>
+            {
+                f.maxLength = JoinCodeMaxLength;
+                f.RegisterValueChangedCallback(evt =>
+                {
+                    string upper = (evt.newValue ?? string.Empty).ToUpperInvariant();
+                    if (upper != evt.newValue) f.SetValueWithoutNotify(upper);
+                    if (_selection != null && _selection.Mode == SessionMode.Join) UpdateLobbyStatus(false, false, true);
+                });
+            });
             Bind<Button>(_lobby, "BackBtn",  b => { b.clicked += ShowLoadout; BackCue(b); });
             Bind<Button>(_lobby, "StartBtn", b => { b.clicked += OnStartMatch; OwnCue(b); });
             Bind<Button>(_lobby, "CopyBtn",  b => b.clicked += CopyJoinCode);
@@ -1833,7 +1982,12 @@ namespace CluckWars.UI
             v.Chicken = new VisualElement { pickingMode = PickingMode.Ignore };
             v.Chicken.AddToClassList("cw-chicken");
             v.Chicken.AddToClassList("cw-seat__chicken");
-            stage.Add(v.Pedestal); stage.Add(v.Chicken);
+            // P# on the pedestal in the player colour: tells two birds of the same class apart.
+            v.PedestalTag = new Label(UiText.Format(UiKeys.LobbyPlayerTag, ("n", idx + 1))) { pickingMode = PickingMode.Ignore };
+            v.PedestalTag.AddToClassList("cw-seat__pedestal-tag");
+            v.PedestalTag.style.backgroundColor = color;
+            v.PedestalTag.style.color = AbilityPalette.InkOn(color);
+            stage.Add(v.Pedestal); stage.Add(v.Chicken); stage.Add(v.PedestalTag);
             v.Root.Add(stage);
 
             v.Plate = new VisualElement();
@@ -1923,7 +2077,7 @@ namespace CluckWars.UI
             {
                 var ab = abilities != null && i < abilities.Count ? abilities[i] : null;
                 var (hex, icon) = v.HexViews[i];
-                hex.style.unityBackgroundImageTintColor = ab != null ? ab.AccentColor : HexEmptyTint;
+                hex.style.unityBackgroundImageTintColor = ab != null ? AbilityPalette.HexColor(ab) : HexEmptyTint;
                 PaintIcon(icon, ab, disc: false);
             }
 
@@ -2060,12 +2214,17 @@ namespace CluckWars.UI
             }).ExecuteLater(holdMs);
         }
 
+        /// <summary>Stamp lands: the Ready cue, and dust + sparkles thrown from the label's bottom
+        /// edge (not its centre), so the hit frame never covers the word.</summary>
         private void OnStampHit()
         {
             _audio.Ready();
-            if (_readyBanner == null) return;
-            _juice?.BurstAt(_readyBanner, ParticleKind.Dust, 5, 110f);
-            _juice?.BurstAt(_readyBanner, ParticleKind.Sparkle, 5, 150f);
+            if (_readyBanner == null || _juice == null) return;
+            var b = _readyBanner.worldBound;
+            if (float.IsNaN(b.x) || float.IsNaN(b.height) || b.width <= 0f) return;   // not laid out: no anchor
+            var foot = new Vector2(b.center.x, b.yMax);
+            _juice.Burst(foot, ParticleKind.Dust, 5, 110f);
+            _juice.Burst(foot, ParticleKind.Sparkle, 5, 150f);
         }
 
         /// <summary>
@@ -2096,16 +2255,39 @@ namespace CluckWars.UI
 
             string c, t; Color dotColor; bool readyish;
             int seats = 4;
-            if (isSolo)      { c = UiText.Format(UiKeys.LobbyCount, ("n", seats), ("max", seats)); t = UiText.Get(UiKeys.LobbyStatusSolo);      dotColor = UiGfx.Hex32("4ae66a"); readyish = true;  }
-            else if (isHost) { c = UiText.Format(UiKeys.LobbyCount, ("n", 1),     ("max", seats)); t = UiText.Get(UiKeys.LobbyStatusWaiting);   dotColor = UiGfx.Gold;             readyish = false; }
-            else             { c = UiText.Get(UiKeys.LobbyCountUnknown);                           t = UiText.Get(UiKeys.LobbyStatusEnterCode); dotColor = UiGfx.Gold;             readyish = false; }
+            bool codeComplete = isJoin && IsJoinCodeComplete(_lobby.Q<TextField>("LobbyJoinField")?.value);
+            if (isSolo)      { c = UiText.Format(UiKeys.LobbyCount, ("n", seats), ("max", seats)); t = UiText.Get(UiKeys.LobbyStatusSolo);    dotColor = UiGfx.Hex32("4ae66a"); readyish = true;  }
+            else if (isHost) { c = UiText.Format(UiKeys.LobbyCount, ("n", 1),     ("max", seats)); t = UiText.Get(UiKeys.LobbyStatusWaiting); dotColor = UiGfx.Gold;             readyish = false; }
+            // Join: the seat count is unknown until the lobby answers, so the pill shows no count
+            // at all (it used to print a bare "-") - just what the player has to do.
+            else             { c = string.Empty; t = UiText.Get(codeComplete ? UiKeys.LobbyStatusCodeReady : UiKeys.LobbyStatusEnterCode); dotColor = codeComplete ? UiGfx.Hex32("4ae66a") : UiGfx.Gold; readyish = codeComplete; }
 
-            if (count != null) count.text = c;
+            if (count != null)
+            {
+                count.text = c;
+                count.style.display = string.IsNullOrEmpty(c) ? DisplayStyle.None : DisplayStyle.Flex;
+            }
             // Dark green / dark amber clear 4.5:1 on the cream inset; the dot is a lamp, not text.
             if (text  != null) { text.text = t; text.style.color = readyish ? UiGfx.Hex32("1e6a1e") : UiGfx.Hex32("6e4800"); }
             if (dot   != null) dot.style.backgroundColor = dotColor;
-            if (start != null) start.text = UiText.Get(isJoin ? UiKeys.BtnJoinMatch : UiKeys.BtnStart);
+            if (start != null)
+            {
+                start.text = UiText.Get(isJoin ? UiKeys.BtnJoinMatch : UiKeys.BtnStart);
+                // JOIN MATCH is a disabled wood plank until there is a whole code to join with.
+                bool enabled = !isJoin || codeComplete;
+                start.SetEnabled(enabled);
+                start.EnableInClassList("cw-btn--green", enabled);
+                start.EnableInClassList("cw-btn--wood", !enabled);
+            }
         }
+
+        /// <summary>UGS lobby codes are 6 characters; the offline host's session name ("cluck-lan") is longer.</summary>
+        public const int JoinCodeMinLength = 6;
+        private const int JoinCodeMaxLength = 16;
+
+        /// <summary>True when <paramref name="code"/> (trimmed) is long enough to be a join code.</summary>
+        public static bool IsJoinCodeComplete(string code) =>
+            !string.IsNullOrWhiteSpace(code) && code.Trim().Length >= JoinCodeMinLength;
 
         private void SetCodeTiles(string code)
         {
@@ -2185,7 +2367,7 @@ namespace CluckWars.UI
                 case SessionMode.Join:
                     var field = _lobby.Q<TextField>("LobbyJoinField");
                     var code = field?.value?.Trim();
-                    if (string.IsNullOrEmpty(code)) { _audio.Tap(); if (status != null) status.text = UiText.Get(UiKeys.LobbyErrNoCode); return; }
+                    if (!IsJoinCodeComplete(code)) { _audio.Tap(); if (status != null) status.text = UiText.Get(UiKeys.LobbyErrNoCode); return; }
                     _audio.Tap();
                     _isBusy = true;
                     if (status != null) status.text = UiText.Get(UiKeys.LobbyJoining);
@@ -2211,7 +2393,8 @@ namespace CluckWars.UI
         // Performance Mode OFF: the hero and the lineup seats show the real models, rendered by
         // MenuChickenStage into RenderTextures painted over the elements' USS background. ON (the
         // mobile default), or if the stage cannot come up: the static Phase 2 renders, untouched.
-        // GEAR UP has no stage: its page is slots + deck + details with no hero spot.
+        // GEAR UP (Phase 4): the chosen bird stands in the barn doorway (#GearChicken) and hops when
+        // a move lands in a slot.
 
         /// <summary>
         /// Brings the stage in line with <see cref="PlayerPreferences.PerformanceModeEnabled"/>:
@@ -2223,12 +2406,15 @@ namespace CluckWars.UI
             if (!MenuStagePolicy.WantsLive(PlayerPreferences.PerformanceModeEnabled, _stageFailed))
             {
                 DisposeStage();
+                _gearChicken?.RemoveFromClassList("cw-gear-chicken--live");
                 return;
             }
             if (_stage == null && !TryCreateStage()) return;
+            _gearChicken?.AddToClassList("cw-gear-chicken--live");
 
             ShowHeroOnStage(hop: false);
             for (int i = 0; i < _seats.Length; i++) ShowSeatOnStage(i);
+            ShowGearOnStage(hop: false);
         }
 
         private bool TryCreateStage()
@@ -2240,7 +2426,7 @@ namespace CluckWars.UI
             }
             try
             {
-                _stage = new MenuChickenStage(_classRegistry, _log, 1 + _seats.Length, PanelPixelsPerPoint);
+                _stage = new MenuChickenStage(_classRegistry, _log, GearStageSlot + 1, PanelPixelsPerPoint);
                 _log?.Info(Source, "Live chicken stage on (Performance Mode off).");
                 return true;
             }
@@ -2255,6 +2441,7 @@ namespace CluckWars.UI
         private void FailStage(string reason, Exception e)
         {
             _stageFailed = true;
+            _gearChicken?.RemoveFromClassList("cw-gear-chicken--live");
             _log?.Warn(Source, $"Live chicken stage unavailable ({reason}{(e != null ? ": " + e.Message : "")}); showing the static renders.");
             DisposeStage();
         }
@@ -2272,7 +2459,16 @@ namespace CluckWars.UI
             if (_stage == null || _previewChicken == null) return;
             // Edges fade into the hero stage's class wash (same colour RefreshClassSelect paints).
             var clear = Lighten(TintOf(Cls), 0.55f);
-            RunOnStage(() => _stage.Show(HeroStageSlot, _previewChicken, Cls, hop, sway: false, clear));
+            // Decision 4 (Phase 4): the hero sways like the Coop seats instead of a full turntable.
+            RunOnStage(() => _stage.Show(HeroStageSlot, _previewChicken, Cls, hop, sway: true, clear));
+        }
+
+        /// <summary>The GEAR UP doorway bird on the live stage; <paramref name="hop"/> = a move was just equipped.</summary>
+        private void ShowGearOnStage(bool hop)
+        {
+            if (_stage == null || _gearChicken == null) return;
+            // Edges fade into the sunlit doorway behind it.
+            RunOnStage(() => _stage.Show(GearStageSlot, _gearChicken, Cls, hop, sway: true, UiGfx.Hex32("e0a050")));
         }
 
         private void ShowSeatOnStage(int idx)
@@ -2312,36 +2508,6 @@ namespace CluckWars.UI
         /// <summary>Blend a colour <paramref name="t"/> of the way toward white, for use as text on the dark screen bg.</summary>
         private static Color Lighten(Color c, float t) =>
             new Color(Mathf.Lerp(c.r, 1f, t), Mathf.Lerp(c.g, 1f, t), Mathf.Lerp(c.b, 1f, t), 1f);
-
-        /// <summary>WCAG 2.1 relative luminance of an sRGB colour (alpha ignored).</summary>
-        private static float Luminance(Color c)
-        {
-            static float Lin(float v) => v <= 0.03928f ? v / 12.92f : Mathf.Pow((v + 0.055f) / 1.055f, 2.4f);
-            return 0.2126f * Lin(c.r) + 0.7152f * Lin(c.g) + 0.0722f * Lin(c.b);
-        }
-
-        /// <summary>
-        /// Ink colour to draw on top of <paramref name="bg"/> — whichever of the cream and
-        /// dark-brown text colours actually contrasts with it.
-        /// <para>
-        /// Required because ability accent colours span the whole luminance range: Egg Shell
-        /// is <c>(0.92, 0.94, 1.00)</c>, i.e. near-white, so the fixed cream label made its
-        /// numbered slot badge unreadable, while Root Egg's dark brown needs the cream.
-        /// Anything that fills an element with an authored accent and then writes text on it
-        /// must go through this rather than assuming a fixed ink.
-        /// </para>
-        /// </summary>
-        private static Color InkOn(Color bg)
-        {
-            float bgL = Luminance(bg);
-            float Ratio(Color fg)
-            {
-                float a = Luminance(fg), b = bgL;
-                if (a < b) (a, b) = (b, a);
-                return (a + 0.05f) / (b + 0.05f);
-            }
-            return Ratio(UiGfx.TextPrimary) >= Ratio(UiGfx.TextDark) ? UiGfx.TextPrimary : UiGfx.TextDark;
-        }
 
         private static void SetBorder(VisualElement ve, Color c)
         {

@@ -1,7 +1,7 @@
 key,en
 main.title,CLUCK WARS
 main.subtitle,4-PLAYER FARMYARD FREE-FOR-ALL
-main.soloHint,Solo: you vs 3 bot chickens.
+main.soloHint,Solo: you vs 3 CPU chickens.
 main.build,v{version}
 btn.playSolo,PLAY SOLO
 btn.host,HOST GAME
@@ -46,7 +46,7 @@ callout.assassin.strong,Blink and it's gone.
 callout.assassin.weak,"Light load, slow beak."
 glyph.plus,+
 glyph.minus,−
-perk.relentless.line,Every move recharges {pct}% faster.
+perk.relentless.line,Moves recharge {pct}% faster.
 perk.relentless.detail,Applies to every move except Peck.
 perk.bully.line,"Steal {steal}% more, carry {cap} more."
 perk.thief.line,Every steal grabs {steal}% more.
@@ -54,7 +54,7 @@ perk.slippery.line,Slows and stuns end {pct}% sooner.
 perk.slippery.detail,"Covers slows, roots and stuns."
 perk.bulwark.line,Barely budges when shoved.
 perk.bulwark.detail,"Knockback cut by {kb}%. Slows, roots and stuns end {cc}% sooner."
-perk.hoarder.line,Carry a whole win at once.
+perk.hoarder.line,Carry {cap} food in one trip.
 perk.hoarder.detail,Carries at least {cap} food.
 perk.featherfoot.line,Raid piles at full speed.
 perk.featherfoot.detail,Food piles never slow you down.
@@ -95,11 +95,10 @@ lobby.value.arena,Sunny Farm
 lobby.value.mode,Free-for-all
 lobby.value.goal,{n} food
 lobby.count,{n}/{max}
-lobby.count.unknown,—
 lobby.status.solo,Solo · 3 CPU
 lobby.status.waiting,Waiting…
-lobby.hint.solo,Press START when you are ready — 3 CPU rivals are waiting.
-lobby.status.enterCode,Enter code
+lobby.hint.solo,Hit START MATCH — 3 CPU rivals are waiting.
+lobby.status.enterCode,Need a code
 lobby.waitingFor,WAITING FOR P{n}
 lobby.playerTag,P{n}
 lobby.classLine,{cls} · {role}
@@ -119,13 +118,26 @@ lobby.bot.1,DashFox
 lobby.bot.2,BrunoB
 lobby.bot.3,PeckNoir
 postmatch.standings,FINAL STANDINGS
-postmatch.food,FOOD
-postmatch.wins,P{n} WINS!
-postmatch.winsCpu,P{n} (CPU) WINS!
+postmatch.wins,{name} WINS!
 postmatch.ended,MATCH ENDED
-postmatch.target.reached,target {n} · reached
-postmatch.target.timeout,target {n} · timer out
+postmatch.target.reached,GOAL {n} · REACHED
+postmatch.target.timeout,GOAL {n} · TIME'S UP
 postmatch.hostOnly,The host picks when to play again.
 postmatch.kos,{n} KO
-postmatch.winSub,{cls} · P{n}
-postmatch.noWinner,—
+postmatch.winSub,{cls}
+postmatch.noWinner,No winner this round.
+
+postmatch.youWin,YOU WIN!
+lobby.players,PLAYERS
+lobby.classPerk,{cls} · {perk}
+lobby.hint.host,Start whenever you like.
+lobby.hint.guest,Waiting for the host…
+session.ended,MATCH OVER
+session.reason,The session closed ({reason}).
+session.returning,Back to the barn in {n}s…
+countdown.getReady,GET READY
+hud.goal,★ FIRST TO {n}
+hud.goal.unknown,★ FIRST TO —
+nameplate.bounty,★ {name} ★
+loadout.swap,TAP TO SWAP
+lobby.status.codeReady,Ready to join

@@ -81,46 +81,31 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void MatchOverlaysUxml_AuthoredSettings_MatchTheLiveConfig()
+        public void MatchOverlaysUxml_SettingValues_AreBlank_AndBoundFromTheLiveConfig()
         {
-            var cfg = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
+            // Phase 4: same rule as the menu lobby above. The in-match waiting room's TIME and GOAL
+            // carry no authored number (an authored one could only go stale); MatchOverlaysController
+            // .RefreshLobby fills both from MatchConfig through MatchSettingsText on the very frame the
+            // overlay opens, so no frame shows the blank.
+            var tree = TestAssets.Load<VisualTreeAsset>(TestAssets.MatchOverlaysUxmlPath).CloneTree();
+            foreach (var name in new[] { "LobbySettingTime", "LobbySettingGoal" })
+            {
+                var label = tree.Q<Label>(name);
+                Assert.IsNotNull(label,
+                    $"{TestAssets.MatchOverlaysUxmlPath} has no Label named '{name}'. " +
+                    "MatchOverlaysController.RefreshLobby queries it by name.");
+                Assert.IsEmpty(label.text,
+                    $"'{name}' has authored text '{label.text}'. It is bound at runtime from " +
+                    "MatchConfig; an authored value is a number that can drift from the real rules.");
+            }
 
-            AssertAuthoredSettings(
-                TestAssets.MatchOverlaysUxmlPath, "LobbySettingTime", "LobbySettingGoal", cfg,
-                "the in-match waiting room (MatchOverlaysController.RefreshLobby)");
-        }
-
-        /// <summary>
-        /// Asserts the text a settings card is authored with equals what the runtime binding
-        /// will overwrite it with. Both must agree: the authored value is what the player
-        /// sees for the frame before the controller runs, and what a reader of the UXML
-        /// believes the rules are.
-        /// </summary>
-        private static void AssertAuthoredSettings(
-            string uxmlPath, string timeLabelName, string goalLabelName,
-            MatchConfigSO cfg, string boundBy)
-        {
-            var uxml = TestAssets.Load<VisualTreeAsset>(uxmlPath);
-            var tree = uxml.CloneTree();
-
-            var time = tree.Q<Label>(timeLabelName);
-            var goal = tree.Q<Label>(goalLabelName);
-
-            Assert.IsNotNull(time,
-                $"{uxmlPath} has no Label named '{timeLabelName}'. {boundBy} queries it by name — " +
-                "renaming or removing it silently leaves the placeholder duration on screen.");
-            Assert.IsNotNull(goal,
-                $"{uxmlPath} has no Label named '{goalLabelName}'. {boundBy} queries it by name — " +
-                "renaming or removing it silently leaves the placeholder goal on screen.");
-
-            Assert.AreEqual(MatchSettingsText.Time(cfg.MatchDurationSeconds), time.text,
-                $"{uxmlPath} advertises TIME '{time.text}' but MatchConfig.asset is " +
-                $"{cfg.MatchDurationSeconds}s. Two numbers describing one match will drift; " +
-                "MatchConfig is the authority. Re-author the UXML text to match it.");
-            Assert.AreEqual(MatchSettingsText.Goal(cfg.FoodTargetToWin), goal.text,
-                $"{uxmlPath} advertises GOAL '{goal.text}' but MatchConfig.asset is " +
-                $"{cfg.FoodTargetToWin} food. The lobby must not promise rules the match " +
-                "will not enforce.");
+            string src = System.IO.File.ReadAllText(System.IO.Path.Combine(
+                System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath),
+                "Assets/_Game/Scripts/UI/MatchOverlaysController.cs"));
+            StringAssert.Contains("_lobbySettingTime.text = MatchSettingsText.Time(_matchConfig.MatchDurationSeconds)", src,
+                "the waiting room's TIME must come from MatchConfig through MatchSettingsText");
+            StringAssert.Contains("_lobbySettingGoal.text = MatchSettingsText.Goal(_matchConfig.FoodTargetToWin)", src,
+                "the waiting room's GOAL must come from MatchConfig through MatchSettingsText");
         }
 
         // ---- The single serialized reference ------------------------------------

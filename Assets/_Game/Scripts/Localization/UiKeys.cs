@@ -84,7 +84,7 @@ namespace CluckWars.Localization
         public const string PerkSlipperyDetail = "perk.slippery.detail";
         public const string PerkBulwarkLine = "perk.bulwark.line";
         [UiArgs("kb", "cc")] public const string PerkBulwarkDetail = "perk.bulwark.detail";
-        public const string PerkHoarderLine = "perk.hoarder.line";
+        [UiArgs("cap")] public const string PerkHoarderLine = "perk.hoarder.line";
         [UiArgs("cap")] public const string PerkHoarderDetail = "perk.hoarder.detail";
         public const string PerkFeatherfootLine = "perk.featherfoot.line";
         public const string PerkFeatherfootDetail = "perk.featherfoot.detail";
@@ -130,7 +130,6 @@ namespace CluckWars.Localization
         public const string LobbyValueMode = "lobby.value.mode";
         [UiArgs("n")] public const string LobbyValueGoal = "lobby.value.goal";
         [UiArgs("n", "max")] public const string LobbyCount = "lobby.count";
-        public const string LobbyCountUnknown = "lobby.count.unknown";
         public const string LobbyStatusSolo = "lobby.status.solo";
         public const string LobbyStatusWaiting = "lobby.status.waiting";
         public const string LobbyHintSolo = "lobby.hint.solo";
@@ -156,16 +155,32 @@ namespace CluckWars.Localization
 
         // ---- Post-match overlay ----
         public const string PostmatchStandings = "postmatch.standings";
-        public const string PostmatchFood = "postmatch.food";
-        [UiArgs("n")] public const string PostmatchWins = "postmatch.wins";
-        [UiArgs("n")] public const string PostmatchWinsCpu = "postmatch.winsCpu";
+        [UiArgs("name")] public const string PostmatchWins = "postmatch.wins";
         public const string PostmatchEnded = "postmatch.ended";
         [UiArgs("n")] public const string PostmatchTargetReached = "postmatch.target.reached";
         [UiArgs("n")] public const string PostmatchTargetTimeout = "postmatch.target.timeout";
         public const string PostmatchHostOnly = "postmatch.hostOnly";
         [UiArgs("n")] public const string PostmatchKos = "postmatch.kos";
-        [UiArgs("cls", "n")] public const string PostmatchWinSub = "postmatch.winSub";
+        [UiArgs("cls")] public const string PostmatchWinSub = "postmatch.winSub";
         public const string PostmatchNoWinner = "postmatch.noWinner";
+
+        // ---- Phase 4 overlays (in-match lobby, session end, intro, HUD goal) ----
+        public const string PostmatchYouWin = "postmatch.youWin";
+        public const string LobbyPlayers = "lobby.players";
+        [UiArgs("cls", "perk")] public const string LobbyClassPerk = "lobby.classPerk";
+        public const string LobbyHintHost = "lobby.hint.host";
+        public const string LobbyHintGuest = "lobby.hint.guest";
+        public const string SessionEnded = "session.ended";
+        [UiArgs("reason")] public const string SessionReason = "session.reason";
+        [UiArgs("n")] public const string SessionReturning = "session.returning";
+        public const string CountdownGetReady = "countdown.getReady";
+        [UiArgs("n")] public const string HudGoal = "hud.goal";
+        public const string HudGoalUnknown = "hud.goal.unknown";
+        [UiArgs("name")] public const string NameplateBounty = "nameplate.bounty";
+
+        // ---- Phase 4 menu (GEAR UP caret, join status) ----
+        public const string LoadoutSwap = "loadout.swap";
+        public const string LobbyStatusCodeReady = "lobby.status.codeReady";
 
     }
 }

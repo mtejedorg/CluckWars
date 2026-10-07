@@ -27,7 +27,7 @@ namespace CluckWars.Tests
             switch (p)
             {
                 case RelentlessPassiveSO r:
-                    return ($"Every move recharges {Pct(1.0 - r.CooldownMultiplier)}% faster.",
+                    return ($"Moves recharge {Pct(1.0 - r.CooldownMultiplier)}% faster.",
                             "Applies to every move except Peck.");
                 case BullyPassiveSO b:
                     string bully = $"Steal {Pct(b.StealMultiplier - 1.0)}% more, carry {(int)Math.Round(b.BonusCapacity, MidpointRounding.AwayFromZero)} more.";
@@ -42,8 +42,8 @@ namespace CluckWars.Tests
                     return ("Barely budges when shoved.",
                             $"Knockback cut by {Pct(1.0 - w.KnockbackMultiplier)}%. Slows, roots and stuns end {Pct(1.0 - w.DurationMultiplier)}% sooner.");
                 case HoarderPassiveSO h:
-                    return ("Carry a whole win at once.",
-                            $"Carries at least {(int)Math.Round(h.MinimumCapacity, MidpointRounding.AwayFromZero)} food.");
+                    int cap = (int)Math.Round(h.MinimumCapacity, MidpointRounding.AwayFromZero);
+                    return ($"Carry {cap} food in one trip.", $"Carries at least {cap} food.");
                 case FeatherfootPassiveSO _:
                     return ("Raid piles at full speed.", "Food piles never slow you down.");
                 case SpoilerPassiveSO sp:
@@ -99,19 +99,24 @@ namespace CluckWars.Tests
             // The point of templating: a balance edit can never leave stale prose behind.
             var relentless = ScriptableObject.CreateInstance<RelentlessPassiveSO>();
             var bulwark = ScriptableObject.CreateInstance<BulwarkPassiveSO>();
+            var hoarder = ScriptableObject.CreateInstance<HoarderPassiveSO>();
             try
             {
                 relentless.CooldownMultiplier = 0.5f;
                 bulwark.DurationMultiplier = 0.5f;
                 bulwark.KnockbackMultiplier = 0.1f;
+                hoarder.MinimumCapacity = 55f;
 
-                Assert.AreEqual("Every move recharges 50% faster.", relentless.PerkLine());
+                Assert.AreEqual("Moves recharge 50% faster.", relentless.PerkLine());
                 Assert.AreEqual("Knockback cut by 90%. Slows, roots and stuns end 50% sooner.", bulwark.PerkDetail());
+                Assert.AreEqual("Carry 55 food in one trip.", hoarder.PerkLine(),
+                    "The Hoarder line must carry {cap} from MinimumCapacity, not a fixed phrase.");
             }
             finally
             {
                 UnityEngine.Object.DestroyImmediate(relentless);
                 UnityEngine.Object.DestroyImmediate(bulwark);
+                UnityEngine.Object.DestroyImmediate(hoarder);
             }
         }
 
@@ -132,8 +137,9 @@ namespace CluckWars.Tests
         public void PassiveDescriptions_ThatQuoteNumbers_QuoteTheCurrentOnes()
         {
             // Relentless, Bulwark and Slippery descriptions were inaccurate ("Combat abilities",
-            // "shrugs off", "far faster"); they now state the real numbers. Pin those numbers to
-            // the fields so a later balance edit cannot leave the asset's own description stale.
+            // "shrugs off", "far faster"); Bully, Thief, Hoarder and Spoiler were vague ("noticeably
+            // more", "bonus food"). They now state the real numbers. Pin those numbers to the fields
+            // so a later balance edit cannot leave the asset's own description stale.
             foreach (var p in ShippedPassives(out _))
             {
                 switch (p)
@@ -148,6 +154,22 @@ namespace CluckWars.Tests
                     case BulwarkPassiveSO w:
                         StringAssert.Contains($"{Pct(1.0 - w.KnockbackMultiplier)}%", w.Description);
                         StringAssert.Contains($"{Pct(1.0 - w.DurationMultiplier)}%", w.Description);
+                        break;
+                    case BullyPassiveSO b:
+                        StringAssert.Contains($"{Pct(b.StealMultiplier - 1.0)}%", b.Description);
+                        StringAssert.Contains($"carry {(int)Math.Round(b.BonusCapacity, MidpointRounding.AwayFromZero)} more", b.Description);
+                        break;
+                    case ThiefPassiveSO t:
+                        StringAssert.Contains($"{Pct(t.StealMultiplier - 1.0)}%", t.Description);
+                        break;
+                    case HoarderPassiveSO h:
+                        StringAssert.Contains($"{(int)Math.Round(h.MinimumCapacity, MidpointRounding.AwayFromZero)} food", h.Description);
+                        break;
+                    case SpoilerPassiveSO sp:
+                        StringAssert.Contains($"{sp.BonusFood} bonus food", sp.Description);
+                        break;
+                    case FeatherfootPassiveSO f:
+                        StringAssert.Contains("never slow", f.Description);
                         break;
                 }
             }

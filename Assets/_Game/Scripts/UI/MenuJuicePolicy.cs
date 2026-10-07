@@ -20,12 +20,13 @@ namespace CluckWars.UI
         public const float PopSquash = 0.92f, PopOvershoot = 1.06f;
 
         /// <summary>
-        /// Rest scale of a selected tile / perk badge / picked card in USS (`.cw-class-tile--selected`,
-        /// `.cw-perk-badge--selected`, `.cw-ability-card--picked`). The pop multiplies it, so it ends
-        /// exactly where the stylesheet puts the element and releasing the inline value does not jump.
-        /// A test pins these to the USS.
+        /// Rest scale of a selected tile / perk badge in USS (`.cw-class-tile--selected`,
+        /// `.cw-perk-badge--selected`). The pop multiplies it, so it ends exactly where the stylesheet
+        /// puts the element and releasing the inline value does not jump. A test pins these to the USS.
+        /// A picked deck card rests at scale 1 (Phase 4, re-audit item 8: picked is the gold glow, not
+        /// a size, so an equipped card never rests at a different size or height than its row).
         /// </summary>
-        public const float TileRestScale = 1.04f, PerkRestScale = 1.03f, CardPickedRestScale = 1.03f;
+        public const float TileRestScale = 1.04f, PerkRestScale = 1.03f;
 
         /// <summary>Scale multiplier <paramref name="t"/> seconds into a pop: 1 before and after, 0.92 at 36%, 1.06 at 72%.</summary>
         public static float PopFactor(float t)
@@ -55,7 +56,8 @@ namespace CluckWars.UI
         public static float StaggerTotal(int count) => StaggerDelay(count - 1, count) + EntrySeconds;
 
         // ---- Fly-to-slot -------------------------------------------------------------------------
-        public const float FlightSeconds = 0.28f;
+        /// <summary>0.28 -> 0.22 s in Phase 4: the touch now has its own soft tap, so the thunk on landing comes sooner.</summary>
+        public const float FlightSeconds = 0.22f;
         /// <summary>The ghost waits one frame so the slot it is flying to has been laid out.</summary>
         public const float FlightStartDelaySeconds = 0.02f;
         /// <summary>Peak lift of the flight arc, panel points.</summary>

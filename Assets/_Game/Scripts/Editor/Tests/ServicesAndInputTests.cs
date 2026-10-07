@@ -163,9 +163,9 @@ namespace CluckWars.Tests
         private sealed class FakeInput : IInputProvider
         {
             public Vector2 Movement;
-            public bool A1, A2, A3, A4, Cancel;
+            public bool A1, A2, A3, A4, Cancel, Back;
             public bool[] Held = new bool[AbilityController.SlotCount];
-            public int A1Reads, A2Reads, A3Reads, A4Reads, CancelReads;
+            public int A1Reads, A2Reads, A3Reads, A4Reads, CancelReads, BackReads;
 
             public Vector2 GetMovement() => Movement;
             public bool GetAbility1Pressed() { A1Reads++; return A1; }
@@ -175,6 +175,7 @@ namespace CluckWars.Tests
             public bool GetAbilityHeld(int slot) =>
                 slot >= 0 && slot < AbilityController.SlotCount && Held[slot];
             public bool GetAbilityCancelPressed() { CancelReads++; return Cancel; }
+            public bool GetBackPressed() { BackReads++; return Back; }
         }
 
         [Test]
@@ -272,6 +273,38 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void Composite_Back_OrsAcrossProviders_AndReadsEveryProvider()
+        {
+            var first  = new FakeInput { Back = true };
+            var second = new FakeInput { Back = false };
+
+            var composite = new CompositeInputProvider(first, second);
+
+            Assert.IsTrue(composite.GetBackPressed());
+            Assert.AreEqual(1, second.BackReads, "Every provider's back edge is read once per poll.");
+            Assert.IsFalse(new CompositeInputProvider(new FakeInput(), new FakeInput()).GetBackPressed());
+        }
+
+        [Test]
+        public void Back_IsNotTheAbilityCancel_SoTheMenuPollCannotStealIt()
+        {
+            // The menu polls GetBackPressed, the match polls GetAbilityCancelPressed; neither getter
+            // may read through the other (a composite that did would consume the other's latch).
+            var p = new FakeInput { Back = true };
+            var composite = new CompositeInputProvider(p);
+            composite.GetBackPressed();
+            Assert.AreEqual(0, p.CancelReads);
+            composite.GetAbilityCancelPressed();
+            Assert.AreEqual(1, p.BackReads);
+        }
+
+        [Test]
+        public void Touch_HasNoBackButton()
+        {
+            Assert.IsFalse(new TouchInputProvider().GetBackPressed());
+        }
+
+        [Test]
         public void Keyboard_WithNoDeviceAttached_IsInertRatherThanThrowing()
         {
             // Keyboard.current is null on a headless / device-less run (CI, an
@@ -289,6 +322,7 @@ namespace CluckWars.Tests
                 kb.GetAbilityHeld(1);
                 kb.GetAbilityHeld(2);
                 kb.GetAbilityCancelPressed();
+                kb.GetBackPressed();
             });
         }
 

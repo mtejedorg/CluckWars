@@ -68,10 +68,21 @@ namespace CluckWars.Tests
             string css = Read("Assets/UI/Styles/CluckWarsTheme.uss");
             Assert.IsTrue(Regex.IsMatch(css, @"\.cw-class-tile--selected \{\s*scale: 1\.04 1\.04"), "tile");
             Assert.IsTrue(Regex.IsMatch(css, @"\.cw-perk-badge--selected \{\s*scale: 1\.03 1\.03"), "perk badge");
-            Assert.IsTrue(Regex.IsMatch(css, @"\.cw-ability-card--picked \{ scale: 1\.03 1\.03"), "picked card");
             Assert.AreEqual(1.04f, MenuJuicePolicy.TileRestScale);
             Assert.AreEqual(1.03f, MenuJuicePolicy.PerkRestScale);
-            Assert.AreEqual(1.03f, MenuJuicePolicy.CardPickedRestScale);
+            // Phase 4 (re-audit item 8): a picked / focused deck card rests exactly where its row puts
+            // it - no scale, no translate - so the controller's pop (rest 1) settles with no jump.
+            foreach (var rule in new[] { "cw-ability-card--picked", "cw-ability-card--focused" })
+            {
+                foreach (Match m in Regex.Matches(css, @"\." + rule + @"\s*\{([^}]*)\}"))
+                {
+                    StringAssert.DoesNotContain("scale", m.Groups[1].Value, rule);
+                    StringAssert.DoesNotContain("translate", m.Groups[1].Value, rule);
+                }
+            }
+            // Selected tile: no lift either (re-audit item 19), so the stagger entry ends at rest.
+            var tile = Regex.Match(css, @"\.cw-class-tile--selected\s*\{([^}]*)\}");
+            StringAssert.DoesNotContain("translate", tile.Groups[1].Value, "tile lift");
         }
 
         [Test]

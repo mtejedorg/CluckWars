@@ -27,6 +27,8 @@ namespace CluckWars.UI
         private const float CluckDelaySeconds = 0.05f;
         /// <summary>Per-step pitch rise on the 3-2-1 ticks: 1.0 / 1.06 / 1.12 (MANIFEST.md).</summary>
         private const float CountdownPitchStep = 0.06f;
+        /// <summary>Equip touch = the tap at half its volume (re-audit item 14).</summary>
+        public const float EquipTapVolume = 0.5f;
         private const float MusicFadeInSeconds = 0.3f;
         private const float MusicFadeOutSeconds = 0.4f;
 
@@ -62,6 +64,8 @@ namespace CluckWars.UI
 
         // ---- Loadout ----------------------------------------------------------
         public void ArmSlot() => Play("SlotArm", c => c.SlotArm);
+        /// <summary>A deck card was touched and will equip: the tap at half volume, so the thunk on landing stays the event.</summary>
+        public void EquipTap() => Play("Tap", c => c.Tap, volumeScale: EquipTapVolume);
         public void Equip() => Play("EquipThunk", c => c.EquipThunk);
         public void Clear() => Play("ClearPop", c => c.ClearPop);
         public void Ready() => Play("ReadyStamp", c => c.ReadyStamp);
@@ -86,9 +90,9 @@ namespace CluckWars.UI
         public void StopMenuMusicForMatch() => _audio.FadeOutMusic(MusicFadeOutSeconds);
 
         // ---- Plumbing ---------------------------------------------------------
-        private void Play(string name, System.Func<UiAudioSO, UiCue> pick, float pitch = 1f, float delay = 0f)
+        private void Play(string name, System.Func<UiAudioSO, UiCue> pick, float pitch = 1f, float delay = 0f, float volumeScale = 1f)
         {
-            if (TryGet(name, pick, out var cue)) _audio.PlaySFX(cue.Clip, cue.Volume, pitch, delay);
+            if (TryGet(name, pick, out var cue)) _audio.PlaySFX(cue.Clip, cue.Volume * volumeScale, pitch, delay);
         }
 
         private bool TryGet(string name, System.Func<UiAudioSO, UiCue> pick, out UiCue cue)
