@@ -8,9 +8,9 @@
 **control + steal**. Introduced the **Solo Clear Time (SCT) axiom** — every stat is
 *derived* from a per-class clear-time target, not hand-tuned. Win target 150→**40**, match
 3-min→**45 s**. Tiered map food budget (**80 = 2× win**) with pinwheel walls. New Assassin
-**Mark/Kill execute** (the only hard removal). Ability pool split into **Steal / Control /
+**Death Mark execute** (the only hard removal). Ability pool split into **Steal / Control /
 Defense / Utility** with an `AllowedClasses`-gated model (shared / class-only / pre-equip-only). Targeting collapsed to
-**self-centred or directional** (one exception: Mark/Kill). Full rationale in
+**self-centred or directional** (one exception: Death Mark). Full rationale in
 `docs/superpowers/specs/2026-07-24-cluck-wars-core-redesign-design.md` and
 `…/2026-07-25-ability-pool-rewrite-design.md`.
 
@@ -436,7 +436,7 @@ current, shipped state.
 | | The Anxious (Featherfoot) | Immune to the pile-slow | ⏳ *pending — a Peck variant* |
 | **Fatty** | The Hauler (Hoarder) | Carries at least a full win's worth | ⏳ *pending — a Peck variant* |
 | | The Boulder (Bulwark) | Knockback cut by 75%; slows, roots and stuns end 35% sooner | **Ground Quake** (stomp roots the area) |
-| **Assassin** | The Reaper (Spoiler) | Banks a bonus if the clock expires with no winner | **Mark/Kill** (the execute, §6.4) |
+| **Assassin** | The Reaper (Spoiler) | Banks a bonus if the clock expires with no winner | **Death Mark** (the execute, §6.4) |
 | | The Burglar (Thief) | Every steal takes 1.6x more | **Sneaky Steal** |
 
 **Three signatures are still unassigned — and the plan for them changed on 2026-09-04.**
@@ -478,7 +478,7 @@ catching a *loaded* rival mid-route beats winning a fair fight.
   validates range / cooldown / legality with tolerance before it applies (anti-cheat).
 - **Targeting is self-centred or directional.** Self buffs, AoE-around-self, and
   drop-at-feet zones need no aim; dashes auto-snap to the first target in the lane. The
-  **only** single-target ability in the game is the Assassin's Mark/Kill.
+  **only** single-target ability in the game is the Assassin's Death Mark.
 
 ### 6.2 Steal — the natural cap
 
@@ -507,7 +507,8 @@ passives like Slippery can target one without the others.
 
 ### 6.4 The Assassin execute (the only hard removal)
 
-**One button, two presses.** Mark/Kill is the **Reaper** specialization's forced
+**One button, two presses.** Death Mark (named Mark/Kill until 2026-10-07; the code type is still
+`MarkKillAbilitySO`) is the **Reaper** specialization's forced
 pre-equip (§7.1: its `AllowedClasses` is `None`, so it can only arrive this way) — choosing Reaper equips it automatically,
 locked in slot 0 of the four active slots, leaving three to build with. The Burglar specialization does not carry
 it at all, cannot hand-pick it, and cannot execute.
@@ -521,7 +522,7 @@ it at all, cannot hand-pick it, and cannot execute.
 
 On success the victim's **entire cargo transfers to the Assassin as a capacity-exempt
 "bounty bag"** (he becomes a courier of a stolen win) and the victim is removed ~2 s, then
-respawns empty. On failure Mark/Kill takes a **reduced cooldown**, so he re-marks fast.
+respawns empty. On failure Death Mark takes a **reduced cooldown**, so he re-marks fast.
 Stun lives in exactly two classes (Assassin + Warrior), which is what makes the deny/enable
 counterplay reachable.
 
@@ -542,7 +543,7 @@ no class has 5 buttons.
 
 > **Revised 2026-10-06 (Maestro) — the pre-equip model.** Every **subclass** (specialization,
 > `ChickenSubclass`) has **two pre-equipped slots**: a **Peck slot** (a Peck variant for a forager,
-> Mark/Kill for the Reaper) and a **Signature slot**. **The ability owns the assignment**: each ability
+> Death Mark for the Reaper) and a **Signature slot**. **The ability owns the assignment**: each ability
 > carries two flag columns, `PeckSlotPreEquippedBy` and `SignaturePreEquippedBy` (each a
 > `ChickenSubclassFlags` set of subclasses), edited in the Balance Editor's Abilities table ("Peck slot" /
 > "Signature slot"). Two abilities claiming the same slot for one subclass is a flagged data error (runtime
@@ -557,7 +558,7 @@ no class has 5 buttons.
 > **`AllowedClasses` (the "Classes" column) means only "hand-selectable in the loadout picker"** — the old
 > Common/Character slot kind is retired. `All` = shared, a single class = that class's own, and
 > **`None` = pre-equip-only**: never in the picker, bot presets or backfill, obtainable only through a slot
-> column. **Peck is None-class** (never hand-picked; forced via the Peck slot column) and so is Mark/Kill
+> column. **Peck is None-class** (never hand-picked; forced via the Peck slot column) and so is Death Mark
 > (only the Reaper gets it; the Burglar cannot hand-pick it). A subclass **forages iff its resolved Peck slot
 > is a Peck**; the one hard rule is that the **Assassin never forages** (Predation axiom), enforced in code
 > rather than by any ability's class mask.
@@ -566,7 +567,7 @@ The two pre-equipped slots per subclass are therefore filled by the specializati
 
 | Slot | Determined by | Rule |
 |---|---|---|
-| **Peck slot** | Your **specialization** | The forager's Peck (variant) — or Mark/Kill for the Reaper. Falls back to the class's plain Peck if left empty. **The Assassin cannot hold a Peck**: a hard rule (`PreEquippedLoadout.ClassMayForage`), not a class mask, and that is the mechanical reason it cannot farm. A Peck is also never a Signature. |
+| **Peck slot** | Your **specialization** | The forager's Peck (variant) — or Death Mark for the Reaper. Falls back to the class's plain Peck if left empty. **The Assassin cannot hold a Peck**: a hard rule (`PreEquippedLoadout.ClassMayForage`), not a class mask, and that is the mechanical reason it cannot farm. A Peck is also never a Signature. |
 | **Signature** | Your **specialization** | One further ability, force-equipped. |
 
 Everything left over is **freely chosen** from the abilities that class may legally equip
@@ -631,9 +632,9 @@ shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 | **Assassin** | Ambush 🗡️ | 10 s | AoE stun — sets up his own execute. |
 | | Doppelganger 👥 | 11 s | Decoy copy that soaks attacks. |
 | | Invisibility 👻 | 8 s | Fades to a ghostly outline for 4 s (Assassin-only now — was also Speedy). |
-| | Mark/Kill 🎯 *(Reaper Peck-slot pre-equip; pre-equip-only)* | 5 s | The execute — see §6.4. |
+| | Death Mark 🎯 *(Reaper Peck-slot pre-equip; pre-equip-only)* | 5 s | The execute — see §6.4. |
 | | Shadowstep 👤 | 6 s | Short blink dash, phases over walls (Assassin-only — was briefly also Speedy by asset drift, corrected; Speedy is permanently denied all terrain traversal, §5.2). |
-| | Smoke Roost 🌁 | 11 s | Cloud at his own feet — he fades, everyone else in it slows. Pairs with Mark/Kill's isolate-and-execute. |
+| | Smoke Roost 🌁 | 11 s | Cloud at his own feet — he fades, everyone else in it slows. Pairs with Death Mark's isolate-and-execute. |
 | | Snatch 🤏 *(moved from Common)* | 3 s | Robs cargo from every rival in a forward arc. Assassin-only now — a universal AoE steal is exactly the Assassin's core, and diluted the class. |
 | | Sneaky Steal 🤏 *(Thief signature)* | 5 s | Yanks cargo from the nearest carrier within 3 m. |
 
@@ -696,7 +697,7 @@ Seasonal content is post-demo, contingent on success.
 - **Movement:** left-thumb virtual joystick (also sets facing, which aims directional
   abilities and the Mark soft-lock).
 - **Abilities:** right-thumb buttons — **4 for every class** (§7.1). 1-2 are forced by
-  foraging/your specialization's signature; the rest are freely chosen. The Mark/Kill
+  foraging/your specialization's signature; the rest are freely chosen. The Death Mark
   button (Reaper only) is **two-press**: first press marks, and it re-labels to **KILL**
   when the target qualifies.
 - **Collecting:** passive — stand on a pile, cargo fills at Collection Rate.
@@ -839,10 +840,10 @@ Reflects the four committed v0.4 plans (`docs/superpowers/plans/`).
 - **Map & walls** — shipped. Tiered 80-food budget, pinwheel walls on `ObstacleClass`,
   centre pile no longer permanent/regenerating (fixed supply).
 - **Combat** — shipped. HP/damage pipeline deleted; `ControlState`/`ControlRules` ladder;
-  `StealMath` cap; `RPC_ApplyStun`; `AssassinExecute` (Mark/Kill, bounty bag);
+  `StealMath` cap; `RPC_ApplyStun`; `AssassinExecute` (Death Mark, bounty bag);
   `MatchConfig` W=40 / 45 s / Spoiler +15 / DepositRate 9; class stats Oracle-solved.
 - **Ability pool** — shipped. Steal/Control/Defense/Utility categories; ex-damage abilities
-  converted to steal; new Ambush / Wing Slam / Shadowstep / Mark/Kill; roster masks;
+  converted to steal; new Ambush / Wing Slam / Shadowstep / Mark/Kill (now Death Mark); roster masks;
   Spine Coat steal-back rate-gated.
 
 **Known gaps:** passive pools (§5.3) still carry the pre-0.4 set; endgame rule deferred;

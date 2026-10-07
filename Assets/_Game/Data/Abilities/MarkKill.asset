@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6bcd670b3126faf47b3c7094b1d054f9, type: 3}
   m_Name: MarkKill
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.MarkKillAbilitySO
-  DisplayName: Mark/Kill
+  DisplayName: Death Mark
   ShortLabel: EXEC
   Description: Marks an isolated rival, arming a fatal execute once stunned.
   AccentColor: {r: 0.9, g: 0.1, b: 0.2, a: 1}

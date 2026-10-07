@@ -804,7 +804,7 @@ footer b{color:var(--text-dim)}
 <section id="execute">
   <div class="shead">
     <p class="eyebrow">08 &mdash; The only hard removal</p>
-    <h2>Mark / Kill: one button, two presses</h2>
+    <h2>Death Mark: one button, two presses</h2>
     <p class="lede">
       A chicken is never killed &mdash; except by this. It is the Reaper specialization's forced
       signature, so choosing Reaper equips it automatically. The Burglar does not carry it at all
@@ -839,7 +839,7 @@ footer b{color:var(--text-dim)}
     <b>On success</b> the victim's entire cargo transfers to the Assassin as a
     <em>capacity-exempt bounty bag</em> &mdash; he becomes a courier carrying a stolen win, far past
     his own 10-cargo limit. The victim is removed for about two seconds and respawns empty.
-    <b>On failure</b> Mark/Kill takes a reduced cooldown, so he re-marks fast.
+    <b>On failure</b> Death Mark takes a reduced cooldown, so he re-marks fast.
   </div>
 </section>
 
@@ -1506,9 +1506,9 @@ const CLASSES = [
     contract:'Every tool needs a victim. Setup then payoff, binary outcomes, a high skill ceiling — and the only class that cannot forage, because it eats what others carried.',
     proof:[
       ['He has no forage button at all','The game never gives him a Peck. This is not a slow farmer — it is a chicken whose only income is other chickens.'],
-      ['His kit chains into itself','Smoke Roost manufactures the isolation Mark/Kill requires; Ambush supplies the stun that arms it. Setup, then payoff, in one hand.'],
+      ['His kit chains into itself','Smoke Roost manufactures the isolation Death Mark requires; Ambush supplies the stun that arms it. Setup, then payoff, in one hand.'],
       ['Every approach tool is concealment, not speed','Invisibility, Shadowstep and Doppelganger get him next to a victim without being read. He shares Speedy’s move speed and spends it completely differently.'],
-      ['He owns the only hard removal in the game','Mark/Kill is also the only single-target ability. Everything else in Cluck Wars is self-centred or directional.']
+      ['He owns the only hard removal in the game','Death Mark is also the only single-target ability. Everything else in Cluck Wars is self-centred or directional.']
     ] }
 ];
 
@@ -1610,7 +1610,7 @@ const ABILITIES = [
   A({id:'invisibility', name:'Invisibility', short:'INV', cls:['assassin'], cat:3, kind:1, cd:8, dur:4.0,
      accent:'#8cd9d9', desc:'Fades you to a ghostly outline for 4 s.',
      stats:[['Opacity','0.2'],['Duration','4.0 s'],['Cooldown','8 s']]}),
-  A({id:'markkill', name:'Mark / Kill', short:'EXEC', cls:['assassin'], cat:1, kind:1, cd:5, dur:0.1,
+  A({id:'markkill', name:'Death Mark', short:'EXEC', cls:['assassin'], cat:1, kind:1, cd:5, dur:0.1,
      accent:'#e61a33', desc:'Marks an isolated rival, arming a fatal execute once stunned.', sig:'The Reaper',
      stats:[['Isolation','no rival within 8 m'],['Arm time','2.0 s'],['Cooldown','5 s']],
      note:'The only single-target ability in the game, and the only hard removal. Everything else is self-centred or directional.'}),
@@ -1621,7 +1621,7 @@ const ABILITIES = [
   A({id:'smokeroost', name:'Smoke Roost', short:'SMOK', cls:['assassin'], cat:1, kind:1, cd:11, dur:3.5,
      accent:'#736b94', desc:'Drops a choking cloud at his feet. He fades; everyone else stumbles.',
      stats:[['Zone radius','4 m'],['Zone lasts','5.5 s'],['Slow','×0.55'],['Opacity','0.2'],['Cooldown','11 s']],
-     note:'Pairs with Mark/Kill: it manufactures the isolation the execute needs.'}),
+     note:'Pairs with Death Mark: it manufactures the isolation the execute needs.'}),
   A({id:'snatch', name:'Snatch', short:'SNC', cls:['assassin'], cat:0, kind:1, cd:3, dur:0.3,
      accent:'#ff4d1a', desc:'Robs cargo from every rival in a forward arc and shoves them back.',
      stats:[['Range','4.3 m'],['Steal','5 food'],['Knockback','8.1'],['Cooldown','3 s']],
@@ -1633,7 +1633,7 @@ const ABILITIES = [
 
 const PASSIVES = [
   {id:'bully', name:'Bully', spec:'The Brute', cls:'warrior', accent:'#db4d4d', sig:'scrap',
-   desc:'Steals more per hit, and can carry what it takes.',
+   desc:'Steal 40% more, carry 6 more.',
    stats:[['Steal multiplier','×1.4'],['Bonus cargo','+6']]},
   {id:'relentless', name:'Relentless', spec:'The Relentless', cls:'warrior', accent:'#f27340', sig:'headbutt',
    desc:'Every move except Peck recharges 25% faster.',
@@ -1642,19 +1642,19 @@ const PASSIVES = [
    desc:'Slows, roots and stuns end 40% sooner.',
    stats:[['Control duration','×0.6']]},
   {id:'featherfoot', name:'Featherfoot', spec:'The Anxious', cls:'speedy', accent:'#8ce0b3', sig:null,
-   desc:'Immune to the pile slow — raid a pile at full speed.',
+   desc:'Food piles never slow you down.',
    stats:[['Pile slow','ignored']]},
   {id:'hoarder', name:'Hoarder', spec:'The Hauler', cls:'fatty', accent:'#f5b840', sig:null,
-   desc:'Carries a full win’s worth of food in one trip.',
+   desc:'Carries at least 40 food. A whole win in one trip.',
    stats:[['Minimum capacity','40']]},
   {id:'bulwark', name:'Bulwark', spec:'The Boulder', cls:'fatty', accent:'#9ea8b8', sig:'groundquake',
    desc:'Knockback cut by 75%. Slows, roots and stuns end 35% sooner.',
    stats:[['Control duration','×0.65'],['Knockback','×0.25']]},
   {id:'spoiler', name:'Spoiler', spec:'The Reaper', cls:'assassin', accent:'#8c6bd9', sig:'markkill',
-   desc:'Banks bonus food if the timer ends with no winner.',
+   desc:'If nobody wins before time’s up, you bank 15 bonus food first.',
    stats:[['Bonus food','+15']]},
   {id:'thief', name:'Thief', spec:'The Burglar', cls:'assassin', accent:'#7359b3', sig:'sneakysteal',
-   desc:'Every steal takes noticeably more cargo.',
+   desc:'Every steal grabs 60% more.',
    stats:[['Steal multiplier','×1.6']]}
 ];
 

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.FeatherfootPassiveSO
   DisplayName: Featherfoot
   ShortLabel: FEAT
-  Description: Immune to pile slow - raid a pile at full speed.
+  Description: Food piles never slow you down.
   Icon: 
   AccentColor: {r: 0.55, g: 0.88, b: 0.7, a: 1}
   Category: 3

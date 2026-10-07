@@ -14,7 +14,7 @@ namespace CluckWars.Abilities
 
         public MarkKillAbilitySO()
         {
-            DisplayName = "Mark/Kill";
+            DisplayName = "Death Mark";
             ShortLabel = "EXEC";
             Description = "Marks an isolated rival, arming a fatal execute once stunned.";
             Category = AbilityCategory.Control;
