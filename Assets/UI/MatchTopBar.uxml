@@ -52,7 +52,7 @@
 
                 </ui:VisualElement>
 
-                <ui:Label name="WinTargetBadge" text="★ FIRST TO 150" class="cw-target-badge" picking-mode="Ignore" />
+                <ui:Label name="WinTargetBadge" text="" class="cw-target-badge" picking-mode="Ignore" />
             </ui:VisualElement>
 
             <!-- ===== RIGHT: Embossed Timer ===== -->

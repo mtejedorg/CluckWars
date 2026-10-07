@@ -86,16 +86,20 @@
     -unity-background-scale-mode: scale-to-fit;
 }
 
+/* Names, not P# (Phase 4): You / DashFox / BrunoB / PeckNoir / P1-P4, <= 8 chars. 150 px fits
+   "PeckNoir" at 34 px Lilita; anything longer ellipsizes instead of pushing the bar. The bar gave
+   up 70 px of the 88 so the panel only grows 18 px. */
 .cw-lb-name {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 34px;
-    width: 62px;
+    width: 150px;
     -unity-text-align: middle-left;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 /* Progress bar (food / target) */
 .cw-lb-bar-trough {
-    width: 190px;
+    width: 120px;
     height: 15px;
     background-color: rgba(0, 0, 0, 0.6);
     border-radius: 8px;

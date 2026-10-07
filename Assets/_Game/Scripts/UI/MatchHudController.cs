@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using CluckWars.Logging;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -115,8 +116,14 @@ namespace CluckWars.UI
 
             if (_winTargetBadge != null)
             {
-                int target = _matchConfig != null ? Mathf.Max(1, _matchConfig.FoodTargetToWin) : 150;
-                _winTargetBadge.text = $"★ FIRST TO {target}";
+                // The goal is MatchConfigSO's; without it the badge says so rather than inventing one.
+                if (_matchConfig != null)
+                    _winTargetBadge.text = UiText.Format(UiKeys.HudGoal, ("n", Mathf.Max(1, _matchConfig.FoodTargetToWin)));
+                else
+                {
+                    _log?.Error(Source, "No MatchConfigSO injected: the HUD goal badge has no target.");
+                    _winTargetBadge.text = UiText.Get(UiKeys.HudGoalUnknown);
+                }
             }
 
             _bound = true;
@@ -229,7 +236,11 @@ namespace CluckWars.UI
             sorted.Sort((a, b) => b.total.CompareTo(a.total));
 
             int localCorner = LocalCorner();
-            float winTarget = _matchConfig != null ? Mathf.Max(1f, _matchConfig.FoodTargetToWin) : 150f;
+            // Bars fill toward the MatchConfig goal; without one (already logged at bind) they are
+            // relative to the leader instead of a made-up target.
+            float winTarget = _matchConfig != null
+                ? Mathf.Max(1f, _matchConfig.FoodTargetToWin)
+                : Mathf.Max(1f, sorted.Count > 0 ? sorted[0].total : 1f);
 
             for (int rank = 0; rank < 4; rank++)
             {
@@ -246,7 +257,7 @@ namespace CluckWars.UI
                     if (rowRefs.Dot != null) rowRefs.Dot.style.unityBackgroundImageTintColor = color;
                     if (rowRefs.Name != null)
                     {
-                        rowRefs.Name.text = $"P{corner + 1}";
+                        rowRefs.Name.text = NameForCorner(corner, localCorner);
                         rowRefs.Name.style.color = color;
                     }
 
@@ -286,6 +297,40 @@ namespace CluckWars.UI
                     rowRefs.Root.style.display = DisplayStyle.None;
                 }
             }
+        }
+
+        // Per-corner name cache: the same identity as the post-match screen and the nameplates
+        // (MatchStandings.DisplayName), rebuilt only when what it depends on changes, so the 4 Hz
+        // refresh does not format a string per row.
+        private readonly string[] _names = new string[4];
+        private readonly int[]    _nameKeys = { -1, -1, -1, -1 };
+
+        private string NameForCorner(int corner, int localCorner)
+        {
+            if (corner < 0 || corner >= _names.Length) return MatchStandings.DisplayName(false, false, ChickenClass.Warrior, corner);
+            var c = ChickenForCorner(corner);
+            bool isLocal = corner == localCorner;
+            bool isBot = c != null && c.IsBot;
+            var cls = c != null ? c.Class : ChickenClass.Warrior;
+            int key = (isLocal ? 1 : 0) | (isBot ? 2 : 0) | ((int)cls << 2);
+            if (_nameKeys[corner] != key || _names[corner] == null)
+            {
+                _nameKeys[corner] = key;
+                _names[corner] = MatchStandings.DisplayName(isLocal, isBot, cls, corner);
+            }
+            return _names[corner];
+        }
+
+        private static ChickenController ChickenForCorner(int corner)
+        {
+            var controllers = ChickenController.ActiveControllers;
+            for (int i = 0; i < controllers.Count; i++)
+            {
+                var c = controllers[i];
+                if (c == null || c.Object == null || !c.Object.IsValid || c.IsDecoy) continue;
+                if (c.HomeCornerIndex == corner) return c;
+            }
+            return null;
         }
 
         private static string Ordinal(int number) => number switch

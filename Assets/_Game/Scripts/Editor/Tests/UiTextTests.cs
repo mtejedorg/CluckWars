@@ -195,6 +195,9 @@ namespace CluckWars.Tests
             "Assets/_Game/Scripts/UI/MenuUiController.cs",
             "Assets/_Game/Scripts/UI/MatchSettingsText.cs",
             "Assets/_Game/Scripts/UI/MatchOverlaysController.cs",
+            "Assets/_Game/Scripts/UI/MatchStandings.cs",
+            "Assets/_Game/Scripts/UI/MatchHudController.cs",
+            "Assets/_Game/Scripts/Visuals/ChickenNameplate.cs",
             "Assets/_Game/Scripts/Abilities/PassiveAbilitySO.cs",
         };
 
@@ -316,12 +319,11 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void MatchOverlays_MatchEndPanel_HasNoLiteralText_AndItsKeysExist()
+        public void MatchOverlays_HaveNoLiteralText_AndTheirKeysExist()
         {
-            // Only the post-match panel is converted so far (the lobby / session-end / intro overlays
-            // still carry literals), so the scan is scoped to #MatchEndOverlay.
-            var root = CloneUxml("Assets/UI/MatchOverlays.uxml").Q<VisualElement>("MatchEndOverlay");
-            Assert.IsNotNull(root, "MatchOverlays.uxml lost #MatchEndOverlay.");
+            // Phase 4: all four overlays (match end, in-match lobby, session end, intro) are converted.
+            var root = CloneUxml("Assets/UI/MatchOverlays.uxml");
+            Assert.IsNotNull(root.Q<VisualElement>("MatchEndOverlay"), "MatchOverlays.uxml lost #MatchEndOverlay.");
             var bad = new List<string>();
             foreach (var (name, text) in TextsIn(root))
             {

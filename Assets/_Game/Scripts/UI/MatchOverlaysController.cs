@@ -1,9 +1,11 @@
+using System;
 using System.Collections.Generic;
 using CluckWars.Gameplay;
 using CluckWars.Localization;
 using CluckWars.Logging;
 using CluckWars.Networking;
 using CluckWars.Services;
+using CluckWars.Settings;
 using Fusion;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -14,13 +16,14 @@ using LogLevel = CluckWars.Logging.LogLevel;
 namespace CluckWars.UI
 {
     /// <summary>
-    /// UI Toolkit driver for the four in-match overlays (Stage 1 UI rebuild):
-    /// Match End, Lobby, Session End, Intro countdown. Layout lives in
+    /// UI Toolkit driver for the four in-match overlays: Match End (Phase 4: a podium on the barn),
+    /// in-match Lobby, Session End, Intro countdown. Layout lives in
     /// <c>Assets/UI/MatchOverlays.uxml</c>; styling in
     /// <c>Assets/UI/Styles/MatchOverlays.uss</c>. This controller only toggles each
     /// overlay root's visibility per <see cref="GameManager"/> state / network
-    /// shutdown and fills the data containers (rows, code tiles, player grid),
-    /// mirroring the refresh logic that used to live in <see cref="MatchHud"/>.
+    /// shutdown and fills the data containers (podium, rows, code tiles, player grid).
+    /// Who each chicken is called, the final order and the KO-column rule live in
+    /// <see cref="MatchStandings"/> (pure, tested).
     /// </summary>
     /// <remarks>
     /// Reads only through injected interfaces (<see cref="INetworkService"/>,
@@ -61,6 +64,7 @@ namespace CluckWars.UI
         private MatchConfigSO            _matchConfig;
         private ISessionSelectionService _selection;
         private MenuAudio                _audio = MenuAudio.Silent();
+        private ChickenClassRegistrySO   _classRegistry;
 
         // ---- UI element refs (queried once, on bind) ---------------------------
         private VisualElement _root;
@@ -68,16 +72,31 @@ namespace CluckWars.UI
 
         private VisualElement _matchEndOverlay, _lobbyOverlay, _sessionEndOverlay, _introOverlay;
 
-        private Label         _meRibbon, _meWinSub, _meWinName, _meWinScore, _meTargetNote, _meHostNote;
+        private Label         _meRibbon, _meWinSub, _meTargetNote, _meHostNote;
         private Button        _mePlayAgainBtn, _meBackBtn;
-        private VisualElement _meWinChicken, _meWinGlow, _meWinRing, _meWinRosette, _meRows;
-        // Feathers + sparkles over the match-end panel (Phase 3B); null if the UXML has no #MeCelebration.
+        private VisualElement _meSafe, _meCrown, _meWinGlow, _meRows;
+        // Feathers + sparkles under the podium column (Phase 3B); null if the UXML has no #MeCelebration.
         private MatchCelebration _celebration;
         // Local presentation of the networked intro timer (Phase 3B): tick / GO cues + a slam on the numeral.
         private MenuJuice _introJuice;
         private readonly IntroCueTracker _introCues = new();
-        // .cw-chicken--<class> currently on the win-screen hero art (for swap).
-        private string        _meWinChickenClass;
+
+        /// <summary>One podium step (#MePod0..2, left to right = 2nd, 1st, 3rd).</summary>
+        private sealed class PodView
+        {
+            public VisualElement Root, Ring, Chicken, Plate;
+            public Label Name, Score, Place;
+            public string ChickenCss;   // .cw-chicken--<class> currently on Chicken (for swap)
+        }
+        private readonly PodView[] _pods = new PodView[3];
+
+        // Live 3D podium (Performance Mode OFF): the menus' MenuChickenStage, one slot per step.
+        // Null = static hero renders (Performance Mode ON, no registry, or the stage failed once).
+        private MenuChickenStage      _stage;
+        private bool                  _stageFailed;
+        private static readonly Color StageClear = new Color(0.84f, 0.67f, 0.43f, 1f); // warm barn tone behind the podium
+
+        private SafeAreaPadding _safeArea;
 
         private VisualElement _codeTiles, _lobbyGrid, _lobbyStatusDot, _lobbyInviteCard;
         private Label         _lobbyStatusCount, _lobbyStatusText, _lobbyHint, _lobbySettingTime, _lobbySettingGoal;
@@ -109,14 +128,16 @@ namespace CluckWars.UI
             ColorSchemeSO            colors,
             MatchConfigSO            matchConfig,
             ISessionSelectionService selection,
-            [InjectOptional] MenuAudio   audio)
+            [InjectOptional] MenuAudio              audio,
+            [InjectOptional] ChickenClassRegistrySO classRegistry)
         {
-            _network     = network;
-            _log         = log;
-            _colors      = colors;
-            _matchConfig = matchConfig;
-            _selection   = selection;
-            _audio       = audio ?? MenuAudio.Silent();
+            _network       = network;
+            _log           = log;
+            _colors        = colors;
+            _matchConfig   = matchConfig;
+            _selection     = selection;
+            _audio         = audio ?? MenuAudio.Silent();
+            _classRegistry = classRegistry;
         }
 
         // ---- Unity lifecycle ---------------------------------------------------
@@ -139,6 +160,9 @@ namespace CluckWars.UI
         private void OnDestroy()
         {
             if (_network != null) _network.OnShutdown -= HandleShutdown;
+            // The stage owns cameras, lights, models and RenderTextures in this scene plus render-
+            // pipeline callbacks that would outlive it: always hand them back when the scene goes.
+            DisposeStage();
         }
 
         /// <summary>
@@ -166,6 +190,7 @@ namespace CluckWars.UI
         {
             EnsureBound();
             if (!_bound) return;
+            _safeArea.Apply();
 
             if (_shutdownReason.HasValue)
             {
@@ -189,6 +214,13 @@ namespace CluckWars.UI
             SetTopBarHidden(IsShown(_matchEndOverlay) || IsShown(_lobbyOverlay));
         }
 
+        private void LateUpdate()
+        {
+            if (_stage == null) return;
+            try { _stage.Tick(); }
+            catch (Exception e) { FailStage("the podium stage could not render", e); }
+        }
+
         private static bool IsShown(VisualElement ve) =>
             ve != null && ve.style.display.value == DisplayStyle.Flex;
 
@@ -205,19 +237,32 @@ namespace CluckWars.UI
             _sessionEndOverlay = _root.Q<VisualElement>("SessionEndOverlay");
             _introOverlay      = _root.Q<VisualElement>("IntroOverlay");
 
-            _meRibbon     = _root.Q<Label>("MeWinRibbonLabel");
-            _meWinChicken = _root.Q<VisualElement>("MeWinChicken");
-            _meWinGlow    = _root.Q<VisualElement>("MeWinGlow");
-            _meWinRing    = _root.Q<VisualElement>("MeWinRing");
-            _meWinRosette = _root.Q<VisualElement>("MeWinRosette");
-            _meWinSub     = _root.Q<Label>("MeWinSub");
-            _meWinName    = _root.Q<Label>("MeWinName");
-            _meWinScore   = _root.Q<Label>("MeWinScore");
-            _meTargetNote = _root.Q<Label>("MeTargetNote");
+            _meSafe         = _root.Q<VisualElement>("MeSafe");
+            _meRibbon       = _root.Q<Label>("MeWinRibbonLabel");
+            _meCrown        = _root.Q<VisualElement>("MeCrown");
+            _meWinGlow      = _root.Q<VisualElement>("MeWinGlow");
+            _meWinSub       = _root.Q<Label>("MeWinSub");
+            _meTargetNote   = _root.Q<Label>("MeTargetNote");
             _meHostNote     = _root.Q<Label>("MeHostNote");
             _mePlayAgainBtn = _root.Q<Button>("MePlayAgainBtn");
             _meBackBtn      = _root.Q<Button>("MeBackBtn");
-            _meRows       = _root.Q<VisualElement>("MeRows");
+            _meRows         = _root.Q<VisualElement>("MeRows");
+            for (int i = 0; i < _pods.Length; i++)
+            {
+                _pods[i] = new PodView
+                {
+                    Root    = _root.Q<VisualElement>($"MePod{i}"),
+                    Ring    = _root.Q<VisualElement>($"MePod{i}Ring"),
+                    Chicken = _root.Q<VisualElement>($"MePod{i}Chicken"),
+                    Plate   = _root.Q<VisualElement>($"MePod{i}Plate"),
+                    Name    = _root.Q<Label>($"MePod{i}Name"),
+                    Score   = _root.Q<Label>($"MePod{i}Score"),
+                    Place   = _root.Q<Label>($"MePod{i}Place"),
+                };
+                if (_pods[i].Root == null || _pods[i].Chicken == null || _pods[i].Name == null)
+                    _log?.Error(Source, $"MatchOverlays.uxml is missing podium step #MePod{i} (or its chicken / name); the podium will be incomplete.");
+            }
+            _pods[1].Chicken?.RegisterCallback<GeometryChangedEvent>(PlaceCrown);
             var celebrationLayer = _root.Q<VisualElement>("MeCelebration");
             if (celebrationLayer != null) _celebration = new MatchCelebration(celebrationLayer);
             else _log?.Error(Source, "MatchOverlays.uxml has no #MeCelebration; the winner celebration will not show.");
@@ -250,6 +295,13 @@ namespace CluckWars.UI
             UiText.SetLogger(_log);
             UiText.ResolveTree(_root);
 
+            // Same safe-area rule as the menu: content clear of notches / the gesture bar while the
+            // backgrounds stay full-bleed (#MeSafe sits inside the match-end backdrop; the lobby and
+            // session-end overlays pad themselves, their dim fill still reaching the edges).
+            if (_meSafe == null) _log?.Error(Source, "MatchOverlays.uxml has no #MeSafe; the post-match screen ignores the safe area.");
+            _safeArea = new SafeAreaPadding(_meSafe, _lobbyOverlay, _sessionEndOverlay);
+            _root.RegisterCallback<GeometryChangedEvent>(_ => _safeArea.Apply(force: true));
+
             // Start hidden; state polls flip them on.
             SetShown(_matchEndOverlay, false);
             SetShown(_lobbyOverlay, false);
@@ -274,9 +326,15 @@ namespace CluckWars.UI
         {
             bool show = gm != null && gm.State == MatchState.Ended;
             SetShown(_matchEndOverlay, show);
-            if (!show) { _matchEndPopulated = false; _celebration?.Stop(); return; }
+            if (!show)
+            {
+                if (_matchEndPopulated) DisposeStage();
+                _matchEndPopulated = false;
+                _celebration?.Stop();
+                return;
+            }
 
-            // Scores freeze once the match ends, so build the hero + rows once on entry; only
+            // Scores freeze once the match ends, so build the podium + rows once on entry; only
             // the action buttons track live state (authority can migrate with the host).
             if (!_matchEndPopulated)
             {
@@ -356,120 +414,209 @@ namespace CluckWars.UI
 
         private void PopulateMatchEnd(GameManager gm)
         {
-            var sorted = BuildSortedLeaderboard();
-            int   winnerCorner = gm.WinnerCorner;
-            bool  winnerReal    = gm.WinnerPlayer.IsRealPlayer;
-            Color winnerColor   = ColorForCorner(winnerCorner);
+            var ranked = MatchStandings.Ranked(CollectStandings(), gm.WinnerCorner);
+            int winnerIdx = ranked.FindIndex(e => e.Corner == gm.WinnerCorner);
+            bool hasWinner = gm.WinnerCorner >= 0 && winnerIdx >= 0;
+            if (gm.WinnerCorner >= 0 && winnerIdx < 0)
+                _log?.Error(Source, $"Winner corner {gm.WinnerCorner} has no base in the standings; showing MATCH ENDED without a winner.");
+            var winner = hasWinner ? ranked[winnerIdx] : default;
 
-            // Ribbon
-            if (_meRibbon != null)
-            {
-                _meRibbon.text = winnerCorner >= 0
-                    ? UiText.Format(winnerReal ? UiKeys.PostmatchWins : UiKeys.PostmatchWinsCpu, ("n", winnerCorner + 1))
-                    : UiText.Get(UiKeys.PostmatchEnded);
-            }
-
-            // Winner hero art + tints
-            var winnerClass = ClassForCorner(winnerCorner);
-            if (_meWinChicken != null)
-            {
-                if (!string.IsNullOrEmpty(_meWinChickenClass))
-                    _meWinChicken.RemoveFromClassList(_meWinChickenClass);
-                _meWinChickenClass = "cw-chicken--" + KeyOf(winnerClass);
-                _meWinChicken.AddToClassList(_meWinChickenClass);
-            }
-            if (_meWinGlow != null)
-                _meWinGlow.style.unityBackgroundImageTintColor = Fade(winnerColor, 0.45f);
-            if (_meWinRing != null) _meWinRing.style.unityBackgroundImageTintColor = winnerColor;   // Pedestal_Ring art
-            if (winnerCorner >= 0) _celebration?.Start(winnerColor);   // no-op under Reduced Motion
-            if (_meWinRosette != null)
-            {
-                // Winner rosette (Badge_Rosette, white art) in the winner's player colour.
-                _meWinRosette.style.display = winnerCorner >= 0 ? DisplayStyle.Flex : DisplayStyle.None;
-                _meWinRosette.style.unityBackgroundImageTintColor = winnerColor;
-            }
-            if (_meWinName != null)
-                _meWinName.text = winnerCorner >= 0
-                    ? UiText.Format(UiKeys.LobbyPlayerTag, ("n", winnerCorner + 1))
-                    : UiText.Get(UiKeys.PostmatchNoWinner);
+            // Banner: YOU WIN! / {NAME} WINS! / MATCH ENDED, then the winner's class under it.
+            if (_meRibbon != null) _meRibbon.text = MatchStandings.WinBanner(hasWinner, winner);
             if (_meWinSub != null)
-            {
-                _meWinSub.text = winnerCorner >= 0
-                    ? UiText.Format(UiKeys.PostmatchWinSub, ("cls", ClassName(winnerClass)), ("n", winnerCorner + 1))
-                    : string.Empty;
-                _meWinSub.style.color = winnerColor;
-            }
+                _meWinSub.text = hasWinner
+                    ? UiText.Format(UiKeys.PostmatchWinSub, ("cls", ClassName(winner.Class)))
+                    : UiText.Get(UiKeys.PostmatchNoWinner);
+            if (_meCrown != null) _meCrown.style.display = hasWinner ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_meWinGlow != null) _meWinGlow.style.display = hasWinner ? DisplayStyle.Flex : DisplayStyle.None;
+            if (hasWinner) _celebration?.Start();   // no-op under Reduced Motion
 
-            float winnerTotal = FoodForCorner(winnerCorner);
-            if (_meWinScore != null) _meWinScore.text = Mathf.FloorToInt(winnerTotal).ToString();
-
-            // Target note — reached vs timer-out
+            // GOAL 40 · REACHED / TIME'S UP. The goal comes from MatchConfig only; without it the note
+            // is hidden rather than showing a made-up number.
             if (_meTargetNote != null)
             {
-                int target = _matchConfig != null ? Mathf.Max(1, _matchConfig.FoodTargetToWin) : 150;
-                bool reached = winnerTotal >= target;
-                _meTargetNote.text = UiText.Format(
-                    reached ? UiKeys.PostmatchTargetReached : UiKeys.PostmatchTargetTimeout, ("n", target));
+                if (_matchConfig == null)
+                {
+                    _log?.Error(Source, "No MatchConfigSO injected: the post-match goal note is hidden.");
+                    _meTargetNote.style.display = DisplayStyle.None;
+                }
+                else
+                {
+                    int target = Mathf.Max(1, _matchConfig.FoodTargetToWin);
+                    bool reached = hasWinner && MatchStandings.GoalReached(winner.Total, target);
+                    _meTargetNote.style.display = DisplayStyle.Flex;
+                    _meTargetNote.text = UiText.Format(
+                        reached ? UiKeys.PostmatchTargetReached : UiKeys.PostmatchTargetTimeout, ("n", target));
+                }
             }
 
-            // Standings rows
+            PopulatePodium(ranked, hasWinner);
+
+            // Standings rows.
             if (_meRows != null)
             {
                 _meRows.Clear();
-                float maxTotal = sorted.Count > 0 ? Mathf.Max(1f, sorted[0].total) : 1f;
-                for (int rank = 0; rank < sorted.Count; rank++)
-                {
-                    var (corner, total) = sorted[rank];
-                    _meRows.Add(BuildMeRow(rank, corner, total, maxTotal,
-                        GetKillsForCorner(corner), isWinner: corner == winnerCorner));
-                }
+                _meRows.EnableInClassList("cw-me-rows--no-ko", !MatchStandings.ShowKoColumn(ranked));
+                // Bars are the share of the goal, like the HUD (a share of the leader drew a near-full bar
+                // for 0.6 food when nobody scored); without a MatchConfig they fall back to the leader.
+                float maxTotal = _matchConfig != null
+                    ? Mathf.Max(1f, _matchConfig.FoodTargetToWin)
+                    : (ranked.Count > 0 ? Mathf.Max(1f, ranked[0].Total) : 1f);
+                for (int rank = 0; rank < ranked.Count; rank++)
+                    _meRows.Add(BuildMeRow(rank, ranked[rank], maxTotal, isWinner: hasWinner && ranked[rank].Corner == winner.Corner));
+            }
+
+            _log?.Info(Source, $"Match end: {(hasWinner ? $"winner corner {winner.Corner} ({MatchStandings.DisplayName(winner)})" : "no winner")}, " +
+                $"{ranked.Count} in the standings, podium {(_stage != null ? "live" : "static")}.");
+        }
+
+        /// <summary>Fills the three podium steps (2nd, 1st, 3rd) and binds the live stage if it is on.</summary>
+        private void PopulatePodium(List<MatchStandings.Entry> ranked, bool hasWinner)
+        {
+            if (MenuStagePolicy.WantsLive(PlayerPreferences.PerformanceModeEnabled, _stageFailed)) TryCreateStage();
+
+            for (int slot = 0; slot < _pods.Length; slot++)
+            {
+                var v = _pods[slot];
+                if (v?.Root == null) continue;
+                int rank = MatchStandings.PodiumRankBySlot[slot];
+                bool filled = rank < ranked.Count;
+                // visibility (not display) keeps the empty step's width, so 1st stays in the centre.
+                v.Root.EnableInClassList("cw-me-pod--hidden", !filled);
+                if (!filled) { ShowPodChicken(slot, v, null, false); continue; }
+
+                var e = ranked[rank];
+                Color color = ColorForCorner(e.Corner);
+                if (v.Ring != null) v.Ring.style.unityBackgroundImageTintColor = color;
+                if (v.Plate != null) v.Plate.style.borderTopColor = color;
+                if (v.Name != null) v.Name.text = MatchStandings.DisplayName(e);
+                if (v.Score != null) v.Score.text = Mathf.FloorToInt(e.Total).ToString();
+                if (v.Place != null) v.Place.text = (rank + 1).ToString();
+                ShowPodChicken(slot, v, e.HasChicken ? e.Class : (ChickenClass?)null, cheer: hasWinner && rank == 0);
             }
         }
 
-        private VisualElement BuildMeRow(int rank, int corner, float total, float maxTotal, int kills, bool isWinner)
+        /// <summary>Static render class on the element, plus the live model over it when the stage is on.</summary>
+        private void ShowPodChicken(int slot, PodView v, ChickenClass? cls, bool cheer)
         {
-            Color color = ColorForCorner(corner);
+            if (v.Chicken == null) return;
+            if (!string.IsNullOrEmpty(v.ChickenCss)) v.Chicken.RemoveFromClassList(v.ChickenCss);
+            v.ChickenCss = cls.HasValue ? "cw-chicken--" + KeyOf(cls.Value) : null;
+            if (v.ChickenCss != null) v.Chicken.AddToClassList(v.ChickenCss);
+
+            if (_stage == null) return;
+            try
+            {
+                if (cls.HasValue) _stage.Show(slot, v.Chicken, cls.Value, hop: cheer, sway: true, clear: StageClear);
+                else _stage.Clear(slot);
+            }
+            catch (Exception e) { FailStage("a podium chicken could not be staged", e); }
+        }
+
+        private void TryCreateStage()
+        {
+            if (_stage != null) return;
+            if (_classRegistry == null)
+            {
+                FailStage("ChickenClassRegistrySO not injected", null);
+                return;
+            }
+            try
+            {
+                _stage = new MenuChickenStage(_classRegistry, _log, _pods.Length, PanelPixelsPerPoint);
+            }
+            catch (Exception e)
+            {
+                FailStage("the stage could not be created", e);
+            }
+        }
+
+        /// <summary>Stage failure: log once, keep the static renders for the rest of this scene.</summary>
+        private void FailStage(string reason, Exception e)
+        {
+            _stageFailed = true;
+            _log?.Warn(Source, $"Live podium unavailable ({reason}{(e != null ? ": " + e.Message : "")}); showing the static renders.");
+            DisposeStage();
+        }
+
+        private void DisposeStage()
+        {
+            if (_stage == null) return;
+            _stage.Dispose();
+            _stage = null;
+        }
+
+        /// <summary>Screen pixels per panel point (sizes the stage textures), as in the menu.</summary>
+        private float PanelPixelsPerPoint()
+        {
+            float rootW = _root?.layout.width ?? 0f;
+            if (float.IsNaN(rootW) || rootW <= 0f) return 1f;
+            var ps = GetComponent<UIDocument>().panelSettings;
+            float targetW = ps != null && ps.targetTexture != null ? ps.targetTexture.width : Screen.width;
+            return targetW / rootW;
+        }
+
+        /// <summary>
+        /// Puts the crown on the winner's head: the render is drawn as a bottom-aligned square
+        /// (contain), so the head sits near the top of that square, not of the element.
+        /// </summary>
+        private void PlaceCrown(GeometryChangedEvent evt)
+        {
+            if (_meCrown == null) return;
+            float w = evt.newRect.width, h = evt.newRect.height;
+            if (float.IsNaN(w) || float.IsNaN(h) || w <= 0f || h <= 0f) return;
+            float side = Mathf.Min(w, h);
+            float crownH = _meCrown.resolvedStyle.height;
+            if (float.IsNaN(crownH)) crownH = 112f;
+            _meCrown.style.top = (h - side) + side * CrownHeadInset - crownH * 0.62f;
+        }
+        // Top of the head in the 1024 px cheer renders / live framing, as a fraction of the square.
+        private const float CrownHeadInset = 0.06f;
+
+        private VisualElement BuildMeRow(int rank, in MatchStandings.Entry e, float maxTotal, bool isWinner)
+        {
+            Color color = ColorForCorner(e.Corner);
 
             var row = new VisualElement();
             row.AddToClassList("cw-me-row");
-            if (isWinner)
-            {
-                SetBorderColor(row, color);
-                row.style.backgroundColor = Fade(color, 0.2f);
-            }
+            row.EnableInClassList("cw-me-row--winner", isWinner);
 
-            // Placement marker: Medal_1..3 for the podium, a plain ink number badge after it
-            // (so every row has one, and it never reads as a second player dot).
+            // Placement medal (gold / silver / bronze, plain cream after the podium) with its number.
             var medal = new VisualElement();
             medal.AddToClassList("cw-me-medal");
-            if (rank < 3)
-            {
-                medal.AddToClassList($"cw-me-medal--{rank + 1}");
-            }
-            else
-            {
-                medal.AddToClassList("cw-me-place");
-                var place = new Label((rank + 1).ToString());
-                place.AddToClassList("cw-me-place__num");
-                medal.Add(place);
-            }
+            if (rank < 3) medal.AddToClassList($"cw-me-medal--{rank + 1}");
+            var place = new Label((rank + 1).ToString());
+            place.AddToClassList("cw-me-medal__num");
+            medal.Add(place);
             row.Add(medal);
 
-            // Player identity dot.
+            // Player identity dot: the only player colour in the text area.
             var dot = new VisualElement();
             dot.AddToClassList("cw-me-dot");
             dot.style.unityBackgroundImageTintColor = color;
             row.Add(dot);
 
-            // Name + class.
+            // Name (+ CPU tag) over the class, ink and brown on cream.
             var mid = new VisualElement();
             mid.AddToClassList("cw-me-rowmid");
-            var name = new Label(UiText.Format(UiKeys.LobbyPlayerTag, ("n", corner + 1)));
+            var name = new Label(MatchStandings.DisplayName(e));
             name.AddToClassList("cw-me-rowname");
-            var sub = new Label(ClassName(ClassForCorner(corner)));
-            sub.AddToClassList("cw-me-rowpn");
-            sub.style.color = color;
-            mid.Add(name); mid.Add(sub);
+            mid.Add(name);
+            if (e.HasChicken)
+            {
+                var classRow = new VisualElement();
+                classRow.AddToClassList("cw-me-rowclassrow");
+                var cls = new Label(ClassName(e.Class));
+                cls.AddToClassList("cw-me-rowpn");
+                classRow.Add(cls);
+                if (e.IsBot)
+                {
+                    var tag = new Label(UiText.Get(UiKeys.TagCpu));
+                    tag.AddToClassList("cw-me-rowtag");
+                    classRow.Add(tag);
+                }
+                mid.Add(classRow);
+            }
             row.Add(mid);
 
             // Progress bar (share of the leader's total).
@@ -477,7 +624,7 @@ namespace CluckWars.UI
             trough.AddToClassList("cw-me-bartrough");
             var fill = new VisualElement();
             fill.AddToClassList("cw-me-barfill");
-            fill.style.width = Length.Percent(Mathf.Clamp01(total / maxTotal) * 100f);
+            fill.style.width = Length.Percent(Mathf.Clamp01(e.Total / maxTotal) * 100f);
             fill.style.unityBackgroundImageTintColor = color;
             trough.Add(fill);
             row.Add(trough);
@@ -487,18 +634,39 @@ namespace CluckWars.UI
             food.AddToClassList("cw-me-rowfood");
             var foodIcon = new VisualElement();
             foodIcon.AddToClassList("cw-me-rowfoodicon");
-            var score = new Label(Mathf.FloorToInt(total).ToString());
+            var score = new Label(Mathf.FloorToInt(e.Total).ToString());
             score.AddToClassList("cw-me-rowscore");
             food.Add(foodIcon); food.Add(score);
             row.Add(food);
 
-            // Stats — knockouts only (ChickenMatchStats exposes just Kills). "{n} KO": the old
-            // "K0" read as the word "KO" with no number.
-            var stats = new Label(UiText.Format(UiKeys.PostmatchKos, ("n", kills)));
+            // Knockouts ("{n} KO"); the whole column hides via .cw-me-rows--no-ko while nobody has one.
+            var stats = new Label(UiText.Format(UiKeys.PostmatchKos, ("n", e.Kills)));
             stats.AddToClassList("cw-me-rowstats");
             row.Add(stats);
 
             return row;
+        }
+
+        /// <summary>
+        /// One entry per base that a chicken stands on or that banked food (a player who left keeps
+        /// their score; an unclaimed corner in a 2-3 player match does not get a row of zeros).
+        /// </summary>
+        private static List<MatchStandings.Entry> CollectStandings()
+        {
+            var bases = PlayerBase.ActiveBases;
+            var list  = new List<MatchStandings.Entry>(bases.Count);
+            for (int i = 0; i < bases.Count; i++)
+            {
+                var b = bases[i];
+                if (b == null) continue;
+                var c = ChickenForCorner(b.CornerIndex);
+                if (c == null && b.FoodTotal <= 0f) continue;
+                list.Add(c != null
+                    ? new MatchStandings.Entry(b.CornerIndex, b.FoodTotal, GetKillsForCorner(b.CornerIndex),
+                        c.HasInputAuthority, c.IsBot, c.Class)
+                    : new MatchStandings.Entry(b.CornerIndex, b.FoodTotal, 0, false, false, ChickenClass.Warrior, hasChicken: false));
+            }
+            return list;
         }
 
         // ========================================================================
@@ -507,8 +675,11 @@ namespace CluckWars.UI
         private void RefreshLobby(GameManager gm, bool poll)
         {
             bool show = gm != null && gm.State == MatchState.WaitingForPlayers;
+            // Fill on the frame it opens, not on the next poll: its TIME / GOAL / status labels are
+            // authored blank (bound from MatchConfig here), so a late fill would flash empty rows.
+            bool opening = show && !IsShown(_lobbyOverlay);
             SetShown(_lobbyOverlay, show);
-            if (!show || !poll) return;
+            if (!show || !(poll || opening)) return;
 
             var runner = _network?.Runner;
             bool isHost = runner != null &&
@@ -525,26 +696,22 @@ namespace CluckWars.UI
             SetShown(_lobbyInviteCard, showInvite);
             if (showInvite) SetCodeTiles(_selection?.SessionName);
 
-            // Settings.
+            // House rules.
             if (_lobbySettingTime != null && _matchConfig != null)
                 _lobbySettingTime.text = MatchSettingsText.Time(_matchConfig.MatchDurationSeconds);
             if (_lobbySettingGoal != null && _matchConfig != null)
                 _lobbySettingGoal.text = MatchSettingsText.Goal(_matchConfig.FoodTargetToWin);
 
             // Status pill.
-            if (_lobbyStatusCount != null) _lobbyStatusCount.text = $"{playerCount}/{maxPlayers}";
-            if (_lobbyStatusText  != null)
-                _lobbyStatusText.text = solo ? UiText.Get(UiKeys.LobbyStatusSolo)
-                    : isHost ? "Waiting…" : "Waiting for host…";
+            if (_lobbyStatusCount != null)
+                _lobbyStatusCount.text = UiText.Format(UiKeys.LobbyCount, ("n", playerCount), ("max", maxPlayers));
+            if (_lobbyStatusText != null)
+                _lobbyStatusText.text = UiText.Get(solo ? UiKeys.LobbyStatusSolo : UiKeys.LobbyStatusWaiting);
 
             // Start button + hint (host only).
             SetShown(_lobbyStartBtn, isHost);
             if (_lobbyHint != null)
-            {
-                _lobbyHint.text = solo ? UiText.Get(UiKeys.LobbyHintSolo)
-                    : isHost ? "Start whenever ready — no minimum players required."
-                    : "Waiting for host to start the match…";
-            }
+                _lobbyHint.text = UiText.Get(solo ? UiKeys.LobbyHintSolo : isHost ? UiKeys.LobbyHintHost : UiKeys.LobbyHintGuest);
 
             BuildPlayerGrid(runner, maxPlayers);
         }
@@ -564,26 +731,28 @@ namespace CluckWars.UI
                     _lobbyGrid.Add(MakeEmptyCard(corner));
                     continue;
                 }
-                bool isLocalHost = corner == localCorner && runner != null &&
+                bool isLocal = corner == localCorner;
+                bool isLocalHost = isLocal && runner != null &&
                     (runner.GameMode == GameMode.Single || runner.IsSharedModeMasterClient);
-                _lobbyGrid.Add(MakePlayerCard(corner, chicken.Class, chicken.IsBot, isLocalHost));
+                _lobbyGrid.Add(MakePlayerCard(corner, chicken, isLocal, isLocalHost));
             }
         }
 
-        private VisualElement MakeEmptyCard(int corner)
+        private static VisualElement MakeEmptyCard(int corner)
         {
             var card = new VisualElement();
             card.AddToClassList("cw-player-card");
             card.AddToClassList("cw-player-card--empty");
-            var lbl = new Label($"WAITING FOR P{corner + 1}");
+            var lbl = new Label(UiText.Format(UiKeys.LobbyWaitingFor, ("n", corner + 1)));
             lbl.AddToClassList("cw-player-empty-label");
             card.Add(lbl);
             return card;
         }
 
-        private VisualElement MakePlayerCard(int corner, ChickenClass cls, bool isBot, bool isHost)
+        private VisualElement MakePlayerCard(int corner, ChickenController chicken, bool isLocal, bool isHost)
         {
             Color color = ColorForCorner(corner);
+            var cls = chicken.Class;
 
             var card = new VisualElement();
             card.AddToClassList("cw-player-card");
@@ -605,33 +774,37 @@ namespace CluckWars.UI
 
             var nameRow = new VisualElement();
             nameRow.AddToClassList("cw-player-namerow");
-            var name = new Label($"P{corner + 1}");
+            var name = new Label(MatchStandings.DisplayName(isLocal, chicken.IsBot, cls, corner));
             name.AddToClassList("cw-player-name");
-            var pn = new Label(cls.ToString().ToUpperInvariant());
-            pn.AddToClassList("cw-player-pn");
-            pn.style.color = color;
-            nameRow.Add(name); nameRow.Add(pn);
-            if (isHost || isBot)
+            nameRow.Add(name);
+            if (isHost || chicken.IsBot)
             {
-                var tag = new Label(isHost ? "HOST" : "CPU");
+                var tag = new Label(UiText.Get(isHost ? UiKeys.TagHost : UiKeys.TagCpu));
                 tag.AddToClassList("cw-player-host");
-                if (isBot && !isHost) { tag.style.backgroundColor = color; tag.style.color = new Color(1f, 0.96f, 0.88f, 1f); }
                 nameRow.Add(tag);
             }
             mid.Add(nameRow);
 
-            var clsLine = new Label($"{cls.ToString().ToUpperInvariant()} · {Passive(cls)}");
+            // "{CLASS} · {perk}" from the chicken's own equipped passive (AbilityController.Passive: the
+            // chosen one on this peer, the class default for a remote player). No perk, just the class.
+            var passive = chicken.GetComponent<AbilityController>()?.Passive;
+            string perk = passive != null ? passive.DisplayName : null;
+            var clsLine = new Label(string.IsNullOrEmpty(perk)
+                ? ClassName(cls)
+                : UiText.Format(UiKeys.LobbyClassPerk, ("cls", ClassName(cls)), ("perk", perk)));
             clsLine.AddToClassList("cw-player-class");
             mid.Add(clsLine);
-            card.Add(mid);
 
+            // READY sits under the class line, inside the text column: as a third column it
+            // covered the tag and the perk on narrow (4:3) cards.
             var state = new VisualElement();
             state.AddToClassList("cw-player-state");
             state.AddToClassList("cw-player-state--ready");
-            var sl = new Label("✓ READY");
+            var sl = new Label(UiText.Get(UiKeys.StateReady));
             sl.AddToClassList("cw-player-state__label");
             state.Add(sl);
-            card.Add(state);
+            mid.Add(state);
+            card.Add(mid);
 
             return card;
         }
@@ -674,11 +847,14 @@ namespace CluckWars.UI
             SetShown(_matchEndOverlay, false);
             SetShown(_lobbyOverlay, false);
             SetShown(_introOverlay, false);
+            DisposeStage();
 
             float elapsed   = Time.unscaledTime - _shutdownAtUnscaledTime;
             float remaining = Mathf.Max(0f, _disconnectReturnDelay - elapsed);
-            if (_sessionEndReason    != null) _sessionEndReason.text    = $"Reason: {_shutdownReason}";
-            if (_sessionEndCountdown != null) _sessionEndCountdown.text = $"Returning to menu in {Mathf.CeilToInt(remaining)}s…";
+            if (_sessionEndReason != null)
+                _sessionEndReason.text = UiText.Format(UiKeys.SessionReason, ("reason", _shutdownReason.ToString()));
+            if (_sessionEndCountdown != null)
+                _sessionEndCountdown.text = UiText.Format(UiKeys.SessionReturning, ("n", Mathf.CeilToInt(remaining)));
 
             if (!_returnTriggered && remaining <= 0f)
             {
@@ -746,37 +922,6 @@ namespace CluckWars.UI
         // ========================================================================
         //  Data helpers
         // ========================================================================
-        private static List<(int corner, float total)> BuildSortedLeaderboard()
-        {
-            var bases = PlayerBase.ActiveBases;
-            var list  = new List<(int, float)>(bases.Count);
-            for (int i = 0; i < bases.Count; i++)
-            {
-                var b = bases[i];
-                if (b == null) continue;
-                list.Add((b.CornerIndex, b.FoodTotal));
-            }
-            list.Sort((a, b) => b.Item2.CompareTo(a.Item2));
-            return list;
-        }
-
-        private static float FoodForCorner(int corner)
-        {
-            var bases = PlayerBase.ActiveBases;
-            for (int i = 0; i < bases.Count; i++)
-            {
-                var b = bases[i];
-                if (b != null && b.CornerIndex == corner) return b.FoodTotal;
-            }
-            return 0f;
-        }
-
-        private static ChickenClass ClassForCorner(int corner)
-        {
-            var c = ChickenForCorner(corner);
-            return c != null ? c.Class : ChickenClass.Warrior;
-        }
-
         private static ChickenController ChickenForCorner(int corner)
         {
             var controllers = ChickenController.ActiveControllers;
@@ -819,23 +964,7 @@ namespace CluckWars.UI
 
         private static string KeyOf(ChickenClass cls) => cls.ToString().ToLowerInvariant();
 
-        /// <summary>Player-facing class name from the wording dictionary (class.*.short).</summary>
-        private static string ClassName(ChickenClass cls) => UiText.Get(cls switch
-        {
-            ChickenClass.Speedy   => UiKeys.ClassSpeedyShort,
-            ChickenClass.Fatty    => UiKeys.ClassFattyShort,
-            ChickenClass.Assassin => UiKeys.ClassAssassinShort,
-            _                     => UiKeys.ClassWarriorShort,
-        });
-
-        private static string Passive(ChickenClass cls) => cls switch
-        {
-            ChickenClass.Warrior  => "Tough",
-            ChickenClass.Speedy   => "Slippery",
-            ChickenClass.Fatty    => "Immovable",
-            ChickenClass.Assassin => "Combo",
-            _                     => "—",
-        };
+        private static string ClassName(ChickenClass cls) => MatchStandings.ClassName(cls);
 
         private static Color Fade(Color c, float a) => new Color(c.r, c.g, c.b, a);
 

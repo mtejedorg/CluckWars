@@ -5,9 +5,10 @@ using UnityEngine.UIElements;
 namespace CluckWars.UI
 {
     /// <summary>
-    /// The post-match winner celebration: a handful of feathers and sparkles (Art/UI/Fx), lightly
-    /// tinted with the winner's colour, falling slowly down the match-end overlay in a loop. It
-    /// replaces the retired static <c>.cw-bg-particle</c> dots.
+    /// The post-match winner celebration: a handful of feathers and sparkles (Art/UI/Fx) in the
+    /// menus' cream and gold, falling slowly down the podium column in a loop. It replaces the
+    /// retired static <c>.cw-bg-particle</c> dots. Phase 4: no longer tinted toward the winner's
+    /// player colour (player colour lives only on the dots, bars and pedestal rings).
     /// </summary>
     /// <remarks>
     /// Nine pooled elements, one 30 Hz scheduled item that runs only between <see cref="Start"/> and
@@ -28,7 +29,7 @@ namespace CluckWars.UI
         private readonly IVisualElementScheduledItem _tick;
         private float _t0;
 
-        /// <param name="layer">Absolute, full-overlay, non-picking element drawn above the match-end panel.</param>
+        /// <param name="layer">Absolute, non-picking layer drawn first in the podium column, so under all of its text.</param>
         public MatchCelebration(VisualElement layer)
         {
             _layer = layer;
@@ -59,15 +60,19 @@ namespace CluckWars.UI
             _tick.Pause();
         }
 
-        /// <summary>Starts the loop, tinted lightly toward <paramref name="winner"/>. No-op under Reduced Motion.</summary>
-        public bool Start(Color winner)
+        // Cream #fef5e0 and a warm gold for alternate feathers; sparkles in the gold #f5c842 family.
+        private static readonly Color FeatherCream = new Color(0.996f, 0.961f, 0.878f, 1f);
+        private static readonly Color FeatherGold  = new Color(1f, 0.86f, 0.52f, 1f);
+        private static readonly Color SparkleGold  = new Color(1f, 0.84f, 0.31f, 1f);
+
+        /// <summary>Starts the loop. No-op (returns false) under Reduced Motion.</summary>
+        public bool Start()
         {
             if (!MenuJuice.Allowed) return false;
-            // Mostly cream, a third winner colour: reads as theirs without turning the screen to one hue.
-            var tint = Color.Lerp(new Color(1f, 0.93f, 0.75f, 1f), winner, 0.35f);
-            foreach (var p in _pieces)
+            for (int i = 0; i < _pieces.Count; i++)
             {
-                p.El.style.unityBackgroundImageTintColor = p.Sparkle ? Color.Lerp(new Color(1f, 0.84f, 0.31f, 1f), winner, 0.2f) : tint;
+                var p = _pieces[i];
+                p.El.style.unityBackgroundImageTintColor = p.Sparkle ? SparkleGold : (i % 2 == 0 ? FeatherCream : FeatherGold);
                 p.El.style.display = DisplayStyle.Flex;
                 p.El.style.opacity = 0f;
             }

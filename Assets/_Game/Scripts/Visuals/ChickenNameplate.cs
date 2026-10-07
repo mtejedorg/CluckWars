@@ -1,17 +1,21 @@
 using CluckWars.Gameplay;
+using CluckWars.Localization;
+using CluckWars.UI;
 using UnityEngine;
 
 namespace CluckWars.Visuals
 {
     /// <summary>
-    /// Floating "P1 / P2 / P3 / P4" label rendered above each chicken's head.
-    /// Color comes from the 4-player palette (Red / Blue / Green / Yellow). The
-    /// label billboards toward the camera every frame.
+    /// Floating name above each chicken's head, the same identity the menus and the
+    /// post-match screen use (<see cref="MatchStandings.DisplayName(bool, bool, ChickenClass, int)"/>):
+    /// "You" for this peer's own chicken, the Coop's DashFox / BrunoB / PeckNoir for solo
+    /// bots, "P{corner+1}" for a remote human. Colour = the corner's player colour
+    /// (Okabe-Ito, same as the HUD and overlays). The label billboards toward the camera.
     /// </summary>
     /// <remarks>
-    /// Pure local visual — no networking. Reads
-    /// <see cref="ChickenController.Object"/>.<c>InputAuthority</c> to pick the
-    /// player slot. Drop this on the Chicken prefab so every chicken (real or
+    /// Pure local visual — no networking. Reads the replicated
+    /// <c>HomeCornerIndex</c> / <c>IsBot</c> / <c>Class</c> and this peer's input authority; the
+    /// text is rebuilt only when one of those (or the bounty / state badge) changes. Drop this on the Chicken prefab so every chicken (real or
     /// Doppelganger decoy) carries one automatically.
     /// </remarks>
     [RequireComponent(typeof(ChickenController))]
@@ -28,13 +32,14 @@ namespace CluckWars.Visuals
         [Range(0.005f, 0.5f)]
         [SerializeField] private float _characterSize = 0.05f;
 
-        // Per-player identity colors — mirror MatchHud / ART.md §6.
+        // Per-player identity colors (Okabe-Ito) — the same four as MatchHudController /
+        // MatchOverlaysController / ART.md §6. (Was red / blue / green / yellow, which matched nothing.)
         private static readonly Color[] PlayerColors = new[]
         {
-            new Color(0.95f, 0.30f, 0.25f, 1f), // Red
-            new Color(0.30f, 0.55f, 0.95f, 1f), // Blue
-            new Color(0.30f, 0.75f, 0.30f, 1f), // Green
-            new Color(0.95f, 0.85f, 0.25f, 1f), // Yellow
+            new Color(0.91f, 0.46f, 0.10f, 1f), // Orange #E8751A
+            new Color(0.10f, 0.50f, 0.77f, 1f), // Blue   #1A7FC4
+            new Color(0.77f, 0.16f, 0.44f, 1f), // Pink   #C4286F
+            new Color(0.05f, 0.62f, 0.48f, 1f), // Teal   #0D9E7A
         };
 
         private ChickenController _controller;
@@ -46,6 +51,8 @@ namespace CluckWars.Visuals
         private int  _appliedPlayerId  = -2;
         private ChickenClass _appliedClass;
         private bool _appliedClassValid;
+        private bool _appliedLocal;
+        private bool _appliedBot;
         private bool _appliedBountyActive;
         private bool _wasStunned;
         private string _appliedStateIcon = string.Empty;
@@ -71,7 +78,7 @@ namespace CluckWars.Visuals
             _text.fontSize = _fontSize;
             _text.characterSize = _characterSize;
             _text.fontStyle = FontStyle.Bold;
-            _text.text = "P?";
+            _text.text = string.Empty;   // filled on the first LateUpdate with a valid network object
             _text.color = Color.white;
 
             var mr = go.GetComponent<MeshRenderer>();
@@ -112,31 +119,29 @@ namespace CluckWars.Visuals
             {
                 int corner = _controller.HomeCornerIndex;
                 var klass = _controller.Class;
+                bool isLocal = _controller.HasInputAuthority;
+                bool isBot = _controller.IsBot;
                 bool bountyActive = _controller.LeaderBountyActive;
                 string stateIcon = StateIcon();
                 if (corner != _appliedPlayerId || !_appliedClassValid || klass != _appliedClass
+                    || isLocal != _appliedLocal || isBot != _appliedBot
                     || bountyActive != _appliedBountyActive || stateIcon != _appliedStateIcon)
                 {
                     _appliedPlayerId = corner;
                     _appliedClass = klass;
                     _appliedClassValid = true;
+                    _appliedLocal = isLocal;
+                    _appliedBot = isBot;
                     _appliedBountyActive = bountyActive;
                     _appliedStateIcon = stateIcon;
-                    if (corner < 0)
-                    {
-                        _text.text = bountyActive ? $"★ {klass} ★" : klass.ToString();
-                        _text.color = new Color(0.7f, 0.7f, 0.7f, 1f);
-                    }
-                    else
-                    {
-                        bool isBot = _controller.IsBot;
-                        string label = isBot
-                            ? $"P{corner + 1} {klass} (CPU)"
-                            : $"P{corner + 1} {klass}";
-                        if (bountyActive) label = $"★ {label} ★";
-                        _text.text = stateIcon.Length > 0 ? $"{stateIcon} {label}" : label;
-                        _text.color = PlayerColors[corner % PlayerColors.Length];
-                    }
+
+                    // No corner yet (spawn not stamped): the class is all there is to say.
+                    string label = corner < 0
+                        ? MatchStandings.ClassName(klass)
+                        : MatchStandings.DisplayName(isLocal, isBot, klass, corner);
+                    if (bountyActive) label = UiText.Format(UiKeys.NameplateBounty, ("name", label));
+                    _text.text = stateIcon.Length > 0 ? stateIcon + " " + label : label;
+                    _text.color = corner < 0 ? new Color(0.7f, 0.7f, 0.7f, 1f) : PlayerColors[corner % PlayerColors.Length];
                 }
             }
 
