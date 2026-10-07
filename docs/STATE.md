@@ -6,6 +6,109 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Menu UI overhaul — Phase 4 COMPLETE (2026-10-07): all 22 re-audit findings closed (21 fixed, #22 won't fix by decision 5)
+
+Commits on develop: 314099c icons, c2f8bfb old art deleted, 0acef9e Death Mark + passive text, 00f0d5c menu fixes (workstream A),
+e26813c post-match + overlays (workstream B), 85aa8dd START/intro (item 4), then this docs commit. EditMode **794/794**.
+Captures (local, git-excluded): `Captures/phase4/{static,live,postmatch,midanim,extra}`. Compendium site edited, **not republished**.
+Open: on-device Pixel 9 safe-area check; Host/Join live run of the new Starting state; in-match touch HUD hexes still tint from
+`AccentColor` (not the menu category palette); `MenuUiController.ApplySafeArea` duplicates `SafeAreaPadding` (dedupe).
+
+### Item 4: START freeze / eaten "3" (verified in the Editor)
+
+- **Menu:** START MATCH fades in a GET READY card (`Lobby.uxml #GetReadyCard`, `.cw-getready*` in CluckWarsTheme.uss, text
+  `@countdown.getReady`) and then loads Game.unity with `SceneLoader.LoadNextAsync` (`SceneManager.LoadSceneAsync`, Single) — all
+  three modes (Solo / Host / Join) enter Game.unity this way; Fusion starts inside the scene. Menu stays busy (no double START / BACK).
+- **New `MatchState.Starting = 3`** (appended): every round — solo auto-start and the host's START, PLAY AGAIN included — goes
+  WaitingForPlayers/spawn -> Starting -> Active. The state authority feeds `IntroArmGate` from `GameManager.Render` (every player has a
+  chicken, then 0.4 s of frames under 100 ms; 8 s cap + Warn) and arms IntroTimer/MatchTimer in `FixedUpdateNetwork` exactly as before
+  (3 s intro, MatchTimer = duration + intro). Peers see Starting as GET READY (intro overlay, no digit; HUD timer frozen at full length).
+- **Audio at GO, on every peer:** `MatchAudioCueTracker` (pure) in `GameManager.Render`: MatchStart SFX + match music at GO, music only
+  for a peer that joined after GO, StopMusic + Victory/End cue when a round it saw ends. Once per round. (Was authority-only, at arm time.)
+- **Final-minute banner** (`MatchHud`): display deferred until GO! has gone (`EventBannerTiming`, gameplay timing untouched); no
+  sting within 2 s of GO. Banner strings + HUD timer words (--:--/WAIT/ENDED) + 1st..4th are UiText keys now.
+- Verify: `tools/ui_capture/intro_probe.py <out> --item4` (first Play after a recompile): GET READY card, Starting 0.43 s after a 2.3 s
+  first-frame hitch, 3/2/1/GO each 1.00 s, GO -> timer end 45.005 s, PLAY AGAIN -> START: Starting 0.42 s then full 3-2-1-GO.
+  Captures `Captures/phase4/midanim/`. EditMode **794/794** after review fixes (`MatchStartFlowTests` new). No prefab / scene wiring for Maestro.
+- **Not verified live:** Host + Join (stale Sep-16 Windows build); reasoning in the item-4 report. Pre-existing, noticed: the
+  final-minute banner's dark panel does not render (text sits on the arena), and `AudioRegistry.MatchMusic` is unassigned (no match music).
+
+---
+
+## ✅ Menu UI overhaul — Phase 4 workstream B: post-match + in-match overlays (2026-10-07, verified in the Editor)
+
+Re-audit items 1, 2, 6, 7, 12, 15 (overlay part), 16. Written without the Editor, then verified in it (see Editor verify below).
+No scene / prefab wiring for Maestro (the new podium uses the overlay's existing UIDocument; `ChickenClassRegistrySO` is injected
+optionally from ProjectContext).
+
+- **Post-match rebuilt on THE COOP's look** (`MatchOverlays.uxml/.uss`, `MatchOverlaysController`): full-bleed `Bg_Lobby` + vignette,
+  wood `Frame_Ribbon` banner, winner's class on an ink plate, a 2nd/1st/3rd podium (Pedestal_Ring in the player colour on wood steps
+  170/118/82 px, cream nameplates with a player-colour stripe, crown on the winner's head, gold glow), and a wood standings board of
+  `Card_Cream` row cards (winner = `Card_CreamSelected`). Live 3D podium through `MenuChickenStage` (3 slots, sway, cheer hop on the
+  winner) when Performance Mode is OFF; static hero renders otherwise or if the stage fails (logged once). Stage disposed when the
+  overlay closes, on session end and in `OnDestroy`.
+- **Names, not corner numbers (finding 16):** `UI/MatchStandings` (new, pure): local = "You" / "YOU WIN!", solo bots = the Coop's
+  DashFox / BrunoB / PeckNoir by class (bot i spawns as Speedy/Fatty/Assassin, the Coop's seat order), remote humans "P{corner+1}".
+  Corner numbers come from the shuffled corner permutation, which is why "P1 (CPU) WINS!" never matched the Coop. Same names in the
+  podium, rows, in-match lobby cards, the HUD leaderboard (name column 62 -> 150 px, bar 190 -> 120 px, ellipsis) and the
+  in-world `ChickenNameplate` (rebuilt only on change; its colours were red/blue/green/yellow and are now the Okabe-Ito four).
+  Player colour is still per corner, so the Coop's seat colour for "You" can differ from the match colour.
+- KO column hidden while every KO is 0; unclaimed empty corners get no row; class lines brown-on-cream / cream (never player colour);
+  outlined button labels (the "NO text-shadow" header ban is gone); crown + medals redrawn in the icon style
+  (`Art/UI/Icons/Podium/`, PIL); feathers cream/gold (`MatchCelebration.Start()` no longer takes a colour).
+- **In-match lobby / session end / intro:** every string via UiText (THE COOP, HOUSE RULES, START MATCH, MATCH OVER, "Back to the
+  barn in {n}s…", host/guest hints); perk line from the chicken's equipped passive (stale Tough/Slippery/Immovable/Combo list deleted).
+- **Safe area** on `#MeSafe`, `#LobbyOverlay`, `#SessionEndOverlay` via the new shared `UI/SafeAreaPadding` (same math as
+  `MenuUiController.ApplySafeArea`, which still has its own copy — dedupe later).
+- **Countdown digit:** 6 px ink outline + drop, lifted 20% above centre (`#IntroStack`). Intro timing / MatchStart audio untouched.
+- **Copy:** `postmatch.wins` "{name} WINS!", `postmatch.youWin`, `postmatch.winSub` "{cls}", GOAL {n} · REACHED / TIME'S UP,
+  `postmatch.noWinner` "No winner this round.", `hud.goal` "★ FIRST TO {n}" (no MatchConfig: "★ FIRST TO —" + error log). The stale
+  `: 150` fallbacks are gone (HUD bars fall back to leader-relative). Removed `postmatch.winsCpu`, `postmatch.food`.
+- Tests: `MatchStandingsTests` (new); `UiTextTests` now scans the whole overlay UXML and MatchStandings / MatchHudController call sites.
+- **Editor verify (2026-10-07):** EditMode **781/781**; captures in `Captures/phase4/postmatch/` (static + live x human / cpu / nowin /
+  two x desktop / phone / tablet, `solo_cpu_win` = a real 45 s timer win by DashFox, `solo_human_win`, `inmatch_lobby__*`, `intro_digit_*`,
+  `solo_hud_inmatch`). Live podium leaks nothing across PLAY AGAIN (cams 4 -> 1, MenuStageRT 3 -> 0). Fixes found on screen: 4:3 standings
+  board (`.cw-me-right` min-width 800, `.cw-me-rowmid` no longer shrinks, KO col 80, action padding 20, win ribbon padding 128) - the bar
+  had collapsed to ~40 px with the CPU tag under it and BACK TO LOBBY ran over its frame; in-match lobby + session-end panels drew
+  `PanelFrame.png` un-sliced (a second, offset frame line through the rail/grid) -> flat wood + 4 px rim; lobby card READY pill moved
+  into the text column and the class/perk line wraps (it covered HOST/CPU and the perk on 4:3 and 16:9).
+- **Still open:** on-device safe-area check (Pixel 9; math covered by `SafeArea_Cutout_*`); the "FINAL MINUTE: BOUNTY ON THE LEADER!"
+  event banner fires at intro end and overlaps the GO! digit (45 s match is always in the final minute); HUD timer "ENDED"/"WAIT" and
+  "1st..4th" ordinals are still literals in `MatchHudController` (pre-existing, not UiText).
+
+---
+
+## ✅ Menu UI overhaul — Phase 4 workstream A: menu re-audit fixes (2026-10-07, verified in the Editor)
+
+Re-audit items 3, 5, 8-11, 14, 17-21 + decision 4. EditMode **781/781**; captures in `Captures/phase4/{static,live,extra,midanim}`.
+No scene / prefab wiring for Maestro.
+
+- **Ability colours = category colours** (`UI/AbilityPalette`, new): Steal `#b2442a`, Control `#7a3f8f`, Defense `#5f8a2c`, Utility
+  `#2e6b72`. Every menu hex / card frame / band / tag / slot badge / lobby mini-hex reads it; `AbilityBaseSO.AccentColor` stays the
+  in-match VFX colour and the menu no longer reads it. Labels >= 4.5:1 (InkOn), CIEDE2000 >= 15 from every player colour, >= 25 between
+  categories — pinned by `AbilityPaletteTests` (incl. a published dE00 reference pair). **Not yet applied in-match:** the touch HUD hexes
+  (`Input/TouchControlsController.cs:546`) still tint from `AccentColor`.
+- **GEAR UP:** caret says NEXT on an empty armed slot, TAP TO SWAP on a filled one (`loadout.swap`). Cards: fixed 290 px height, 10 px side
+  padding; a name steps down to 26 px only when it cannot fit at 30 (`FitCardName`, measured: DOPPELGANGER needs ~208 pt, a 1920
+  card has ~182); picked = glow only, focused = ink frame at the same width (no scale, no lift; `CardPickedRestScale` removed, pop
+  settles at 1; picked and unpicked cards measure the same width and band y). Soft tap (`MenuAudio.EquipTap`, 0.5x Tap volume) on touch, thunk on landing; flight 0.28 -> 0.22 s. The chosen bird
+  stands in the barn doorway (`#GearChicken`, under the page, peeking over the deck; static render, or live stage slot 5 with a
+  hop on every equip; `.cw-gear-chicken--live` lifts the live render, which frames the bird smaller).
+- **PICK YOUR BIRD:** hero ~1.4x (stage 460, chicken 434, bale 378), text column top-aligned, glow centred at chest height, hero
+  **sways** (decision 4). UI-only class tints in `MenuUiController.Meta` (Warrior `#B02A3A`, Speedy `#F08A2C`; registry untouched).
+  Selected tile = scale 1.04 + gold border + ink ring + USS-drawn check badge; the -6 px lift is gone (fixes the late hop).
+- **THE COOP:** READY! is an outlined gold status label (no ribbon), out of flow in the bar centre; stamp dust/sparkles fire from its
+  bottom edge. HOUSE RULES chips sit on one ink plate (no bunting between them; clears BACK at 1920). P# plate on each pedestal.
+  **Join:** code entry is big and centred in the bar under the gate; JOIN MATCH is disabled wood until the code has >= 6 chars
+  (`IsJoinCodeComplete`); pill says "Need a code" / "Ready to join" with no count (`lobby.count.unknown` "—" removed).
+- **Main menu:** PLAY AGAIN sits above PLAY SOLO and is the green primary while offered (SOLO drops to wood). Dev Mode row + Ability Lab
+  exist only when `Debug.isDebugBuild` (Editor counts) or `CLUCKWARS_DEV_TOOLS` is defined — **note:** `CluckWarsBuildMenu` builds with
+  `BuildOptions.None` (release), so Pixel builds lose the Ability Lab unless built as Development or with the define.
+- **Esc / Android back:** `IInputProvider.GetBackPressed()` (Keyboard: Esc edge; Touch: false; Composite: OR). Menu-only poll: closes
+  settings, else BACK/HOME with the back cue; nothing on the main menu.
+- HOME/BACK/gear 124 pt = 140 px on a Pixel 9 (2424x1080) = ~53 dp. Tests: new `AbilityPaletteTests`, `MenuPhase4Tests`; `MenuJuiceGuardTests` (no scale/translate on picked/focused
+  card or selected tile), `MenuJuicePolicyTests` (flight range 0.20-0.30), `UiAudioTests` (EquipTap), `ServicesAndInputTests` (back).
+
 ## ✅ Menu UI overhaul — Phase 3B: juice (2026-10-07)
 
 EditMode **743/743** (new `MenuJuicePolicyTests` x17, `MenuJuiceGuardTests` x10 incl. the Reduced Motion gate guard). No scene/prefab

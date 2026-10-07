@@ -78,7 +78,7 @@ matches its current field values, so a balance change can never leave stale text
 
 | Key | en | Args from |
 |---|---|---|
-| `perk.relentless.line` | Every move recharges {pct}% faster. | (1 − CooldownMultiplier)·100 |
+| `perk.relentless.line` | Moves recharge {pct}% faster. | (1 − CooldownMultiplier)·100 |
 | `perk.relentless.detail` | Applies to every move except Peck. | |
 | `perk.bully.line` | Steal {steal}% more, carry {cap} more. | (StealMultiplier − 1)·100, BonusCapacity |
 | `perk.thief.line` | Every steal grabs {steal}% more. | (StealMultiplier − 1)·100 |
@@ -86,16 +86,17 @@ matches its current field values, so a balance change can never leave stale text
 | `perk.slippery.detail` | Covers slows, roots and stuns. | |
 | `perk.bulwark.line` | Barely budges when shoved. | |
 | `perk.bulwark.detail` | Knockback cut by {kb}%. Slows, roots and stuns end {cc}% sooner. | (1 − KnockbackMultiplier)·100, (1 − DurationMultiplier)·100 |
-| `perk.hoarder.line` | Carry a whole win at once. | |
+| `perk.hoarder.line` | Carry {cap} food in one trip. | MinimumCapacity |
 | `perk.hoarder.detail` | Carries at least {cap} food. | MinimumCapacity |
 | `perk.featherfoot.line` | Raid piles at full speed. | |
 | `perk.featherfoot.detail` | Food piles never slow you down. | |
 | `perk.spoiler.line` | +{food} food if time runs out. | BonusFood |
 | `perk.spoiler.detail` | If nobody reaches {goal} before time's up, you bank {food} bonus food first. | BonusFood, MatchConfig goal |
 
-Note: the full `Description` fields on the passive assets currently contain inaccurate claims
-(Relentless "Combat abilities", Bulwark "shrugs off", Slippery "far"). Replace them with the detail
-text so every surface (HUD, Ability Lab, compendium site) agrees.
+Note: the full `Description` fields on the passive assets contained inaccurate or vague claims
+(Relentless "Combat abilities", Bulwark "shrugs off", Slippery "far"; Bully, Thief, Hoarder, Spoiler,
+Featherfoot fixed in Phase 4). They now state the real numbers from the asset's own fields, so every
+surface (HUD, Ability Lab, compendium site) agrees; `PerkTextTests` pins those numbers.
 
 **Screens, buttons, labels**
 
@@ -104,14 +105,15 @@ text so every surface (HUD, Ability Lab, compendium site) agrees.
 | `screen.class.title` | PICK YOUR BIRD |
 | `screen.loadout.title` | GEAR UP |
 | `screen.lobby.title` | THE COOP |
-| `lobby.rules` / `lobby.flock` | HOUSE RULES / THE FLOCK |
+| `lobby.rules` | HOUSE RULES |
 | `nav.home` / `nav.back` | HOME / BACK |
 | `btn.next` | GEAR UP ▶ |
 | `btn.ready` | READY ▶ |
 | `btn.pickMore.one` / `btn.pickMore.many` | PICK 1 MORE / PICK {n} MORE |
 | `btn.start` | START MATCH ▶ |
 | `btn.playSolo` / `btn.host` / `btn.join` | PLAY SOLO / HOST GAME / JOIN GAME |
-| `main.soloHint` | Solo: you vs 3 bot chickens. |
+| `main.soloHint` | Solo: you vs 3 CPU chickens. |
+| `lobby.hint.solo` | Hit START MATCH — 3 CPU rivals are waiting. |
 | `btn.playAgain` | PLAY AGAIN |
 | `btn.playAgain.sub` | {cls} · {perk} |
 | `btn.backToLobby` | BACK TO LOBBY |
@@ -129,7 +131,7 @@ text so every surface (HUD, Ability Lab, compendium site) agrees.
 | `callout.assassin.strong` / `.weak` | Blink and it's gone. / Light load, slow beak. |
 
 Existing strings not listed keep their current English text but still move into the table. Ability
-display names stay as authored (Mark/Kill rename is undecided — do not change it).
+display names stay as authored, except Mark/Kill → "Death Mark" (Phase 4 decision 7).
 
 ## Phases (commit each on `develop`)
 
@@ -186,3 +188,36 @@ display names stay as authored (Mark/Kill rename is undecided — do not change 
 
 ## Re-audit
 After Phase 3, re-run the same six lenses on fresh captures and publish the comparison.
+
+## Phase 4 — re-audit fixes (decisions, Maestro 2026-10-07)
+
+Source: re-audit page https://claude.ai/artifact/U139PZEDq42KTY6bEYkgCa ("New findings", 22 items).
+
+1. **Fix all new findings**, including a rebuild of the post-match screen on the Coop's visual
+   system (barn backdrop, podium of pedestals for the top 3, live 3D when Performance Mode is OFF,
+   cream rows, wood ribbon banner, outlined button labels, names instead of P#, safe area).
+2. **Solo after READY keeps the explicit START MATCH.** Decision 5 ("never automatic") stands.
+3. **Ambiguous icons** were redrawn by artist-2d with Unity closed (13 icons, committed first).
+   Icons are glyph-only; the hex colour is tinted in code from the ability's category.
+4. **Hero on PICK YOUR BIRD sways gently** (like the Coop seats) instead of a full turntable.
+5. **Reduced Motion keeps the 3D idle loop.** Re-audit finding 22 is closed as won't fix.
+6. **Delete the unused old art**: the 14 top-level `Art/UI/Icons/Icon_*.png` and the 4 old
+   `Chicken_*.png` portraits, after a GUID grep proves nothing references them.
+7. **Mark/Kill is renamed "Death Mark"** everywhere player-facing (ability `DisplayName`, wording,
+   GDD, compendium). This supersedes the "rename undecided" note above. The C# type and asset file
+   keep their names (GUID stability).
+
+Category colours replace the stock Material colours: abilities are coloured by category only, and no
+category colour may sit near a player hue (orange `#e8751a`, blue `#1a7fc4`, pink `#c4286f`,
+teal `#0d9e7a`). Esc / Android back goes through `IInputProvider` (Cancel), never `Keyboard.current`.
+
+**Match start (finding 4).** START MATCH fades in a GET READY card and loads the Game scene with
+`LoadSceneAsync`. Every round then passes through a new networked `MatchState.Starting` (appended,
+value 3): the state authority arms the unchanged 3 s intro + match TickTimers only once every real
+player has a chicken and frames have stayed smooth for 0.4 s (8 s cap), so "3" is never eaten by a
+load hitch. Peers show GET READY during Starting. The MatchStart sting and match music play locally on
+every peer at GO; the final-minute event banner is displayed 0.6 s after GO (its gameplay timing is
+unchanged).
+
+**Names (finding 16).** Overlays never identify a chicken by its corner number: the local player is
+"You" / "YOU WIN!", solo bots use the Coop's bot names by class, remote humans are "P{corner+1}".
