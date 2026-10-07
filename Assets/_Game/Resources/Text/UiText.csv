@@ -107,6 +107,7 @@ lobby.copied,Copied {code}.
 lobby.err.create,Could not create lobby.
 lobby.err.noCode,Enter a join code first.
 lobby.err.join,Could not join that code.
+lobby.err.load,Could not start the match.
 lobby.joining,Joining…
 tag.host,HOST
 tag.cpu,CPU
@@ -141,3 +142,15 @@ hud.goal.unknown,★ FIRST TO —
 nameplate.bounty,★ {name} ★
 loadout.swap,TAP TO SWAP
 lobby.status.codeReady,Ready to join
+hud.timer.none,--:--
+hud.timer.wait,WAIT
+hud.timer.ended,ENDED
+hud.rank.1,1st
+hud.rank.2,2nd
+hud.rank.3,3rd
+hud.rank.4,4th
+hud.event.banner,FINAL MINUTE: {event}!
+hud.event.goldenPile,GOLDEN PILE
+hud.event.underdogSurge,UNDERDOG SURGE
+hud.event.leaderBounty,BOUNTY ON THE LEADER
+hud.event.restock,RESTOCK

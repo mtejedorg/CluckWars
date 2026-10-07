@@ -1313,6 +1313,25 @@
 .cw-ready-banner--hidden { scale: 0.4 0.4; opacity: 0; transition-duration: 0s; }
 .cw-ready-banner__label { font-size: 76px; letter-spacing: 4px; color: rgb(255, 214, 80); }
 
+/* START MATCH hand-off (Lobby.uxml #GetReadyCard, re-audit item 4): near-opaque ink scrim over the
+   whole page with the GET READY plate in the middle, faded in before the async scene load starts.
+   .cw-reduced-motion zeroes the fade (the card simply appears). */
+.cw-getready {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    background-color: rgba(20, 10, 4, 0.94);
+    align-items: center; justify-content: center;
+    opacity: 1;
+    transition-property: opacity; transition-duration: 0.18s; transition-timing-function: ease-out;
+}
+.cw-getready--hidden { opacity: 0; }
+.cw-getready__plate {
+    padding-top: 18px; padding-bottom: 26px; padding-left: 90px; padding-right: 90px;
+    border-top-width: 4px; border-bottom-width: 4px;
+    border-top-color: rgb(245, 200, 66); border-bottom-color: rgb(245, 200, 66);
+}
+.cw-getready__label { font-size: 132px; letter-spacing: 8px; color: rgb(255, 214, 80); -unity-text-align: middle-center; }
+.layout--short .cw-getready__label { font-size: 104px; }
+
 /* ============================================================================
    SETTINGS SHEET  (main menu gear -> modal; MainMenu.uxml #SettingsSheet)
    ----------------------------------------------------------------------------

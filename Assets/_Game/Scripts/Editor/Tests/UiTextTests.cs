@@ -197,6 +197,7 @@ namespace CluckWars.Tests
             "Assets/_Game/Scripts/UI/MatchOverlaysController.cs",
             "Assets/_Game/Scripts/UI/MatchStandings.cs",
             "Assets/_Game/Scripts/UI/MatchHudController.cs",
+            "Assets/_Game/Scripts/UI/MatchHud.cs",
             "Assets/_Game/Scripts/Visuals/ChickenNameplate.cs",
             "Assets/_Game/Scripts/Abilities/PassiveAbilitySO.cs",
         };
@@ -217,19 +218,36 @@ namespace CluckWars.Tests
                 "Name a UiKeys constant instead of a key literal (typos become compile errors): " + string.Join(", ", offenders));
         }
 
+        // Text assignments and new Labels must come from the dictionary. Element names, class names
+        // and log messages are not text and are not matched here.
+        private static readonly Regex LiteralText =
+            new Regex(@"\.text\s*=\s*\$?""[^""]|new Label\(\s*\$?""[^""]|new Button\(\s*\$?""[^""]");
+
+        private static List<string> LiteralTextHits(string path) =>
+            ReadCode(path).Split('\n')
+                .Select((line, i) => (line, n: i + 1))
+                .Where(x => !x.line.TrimStart().StartsWith("//") && LiteralText.IsMatch(x.line))
+                .Select(x => $"{Path.GetFileName(path)} line {x.n}: {x.line.Trim()}")
+                .ToList();
+
         [Test]
         public void MenuController_HasNoPlayerFacingStringLiterals()
         {
-            // Text assignments and new Labels must come from the dictionary. Element names,
-            // class names and log messages are not text and are not matched here.
-            var literalText = new Regex(@"\.text\s*=\s*\$?""[^""]|new Label\(\s*\$?""[^""]|new Button\(\s*\$?""[^""]");
-            string src = ReadCode("Assets/_Game/Scripts/UI/MenuUiController.cs");
-            var hits = src.Split('\n')
-                .Select((line, i) => (line, n: i + 1))
-                .Where(x => !x.line.TrimStart().StartsWith("//") && literalText.IsMatch(x.line))
-                .Select(x => $"line {x.n}: {x.line.Trim()}")
-                .ToList();
+            var hits = LiteralTextHits("Assets/_Game/Scripts/UI/MenuUiController.cs");
             Assert.IsEmpty(hits, "Player-facing literals in MenuUiController (move to UiText.csv):\n" + string.Join("\n", hits));
+        }
+
+        [Test]
+        public void MatchHud_HasNoPlayerFacingStringLiterals()
+        {
+            // Re-audit item 4: the top-bar timer words (WAIT / ENDED), the 1st..4th ranks and the
+            // final-minute event banner all moved to UiText.csv.
+            var hits = LiteralTextHits("Assets/_Game/Scripts/UI/MatchHudController.cs")
+                .Concat(LiteralTextHits("Assets/_Game/Scripts/UI/MatchHud.cs")).ToList();
+            Assert.IsEmpty(hits, "Player-facing literals in the match HUD (move to UiText.csv):\n" + string.Join("\n", hits));
+            Assert.AreEqual("FINAL MINUTE: GOLDEN PILE!",
+                UiText.Format(UiKeys.HudEventBanner, ("event", UiText.Get(UiKeys.HudEventGoldenPile))));
+            Assert.AreEqual("4th", UiText.Get(UiKeys.HudRank4));
         }
 
         [Test]

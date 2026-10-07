@@ -119,10 +119,14 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void MatchState_HasExactlyTheThreeLifecyclePhases()
+        public void MatchState_HasExactlyTheFourLifecyclePhases()
         {
+            // Starting (re-audit item 4) was APPENDED: the three original phases keep their wire values.
+            Assert.AreEqual(1, (int)MatchState.Active);
+            Assert.AreEqual(2, (int)MatchState.Ended);
+            Assert.AreEqual(3, (int)MatchState.Starting);
             CollectionAssert.AreEquivalent(
-                new[] { MatchState.WaitingForPlayers, MatchState.Active, MatchState.Ended },
+                new[] { MatchState.WaitingForPlayers, MatchState.Active, MatchState.Ended, MatchState.Starting },
                 Enum.GetValues(typeof(MatchState)).Cast<MatchState>().ToList(),
                 "MatchState changed. Every HUD overlay gate switches on it — audit MatchOverlaysController " +
                 "and MatchHudController before adding a phase.");

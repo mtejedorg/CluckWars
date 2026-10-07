@@ -205,23 +205,32 @@ namespace CluckWars.UI
         private void RefreshTimer()
         {
             if (_timer == null) return;
-            if (_gameManager == null) { _timer.text = "--:--"; return; }
+            if (_gameManager == null) { _timer.text = UiText.Get(UiKeys.HudTimerNone); return; }
 
             switch (_gameManager.State)
             {
                 case MatchState.Active:
-                    float r  = _gameManager.TimeRemaining;
-                    int   mm = Mathf.Max(0, Mathf.FloorToInt(r / 60f));
-                    int   ss = Mathf.Max(0, Mathf.FloorToInt(r - mm * 60f));
-                    _timer.text = $"{mm:00}:{ss:00}";
+                    _timer.text = Clock(_gameManager.TimeRemaining);
+                    break;
+                case MatchState.Starting:
+                    // GET READY: the full round length, frozen, as during the intro.
+                    _timer.text = Clock(_gameManager.MatchDurationSeconds);
                     break;
                 case MatchState.Ended:
-                    _timer.text = "ENDED";
+                    _timer.text = UiText.Get(UiKeys.HudTimerEnded);
                     break;
                 default:
-                    _timer.text = "WAIT";
+                    _timer.text = UiText.Get(UiKeys.HudTimerWait);
                     break;
             }
+        }
+
+        /// <summary>MM:SS, digits only (no words to translate).</summary>
+        private static string Clock(float seconds)
+        {
+            int mm = Mathf.Max(0, Mathf.FloorToInt(seconds / 60f));
+            int ss = Mathf.Max(0, Mathf.FloorToInt(seconds - mm * 60f));
+            return $"{mm:00}:{ss:00}";
         }
 
         private void RefreshScores()
@@ -333,12 +342,13 @@ namespace CluckWars.UI
             return null;
         }
 
+        // The top bar has exactly four rows, so a rank is always 1..4.
         private static string Ordinal(int number) => number switch
         {
-            1 => "1st",
-            2 => "2nd",
-            3 => "3rd",
-            _ => $"{number}th"
+            1 => UiText.Get(UiKeys.HudRank1),
+            2 => UiText.Get(UiKeys.HudRank2),
+            3 => UiText.Get(UiKeys.HudRank3),
+            _ => UiText.Get(UiKeys.HudRank4),
         };
 
         private static Color Fade(Color c, float a) => new Color(c.r, c.g, c.b, a);

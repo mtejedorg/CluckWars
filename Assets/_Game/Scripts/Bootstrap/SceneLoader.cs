@@ -60,5 +60,21 @@ namespace CluckWars.Bootstrap
             _log?.Info(Source, $"Loading scene '{_nextSceneName}' (Single mode).");
             SceneManager.LoadScene(_nextSceneName, LoadSceneMode.Single);
         }
+
+        /// <summary>
+        /// Loads the next scene in the background (Single mode) so the current scene keeps
+        /// rendering — the menu's GET READY card — instead of freezing on a synchronous load.
+        /// Returns null, after logging an error, if Unity refused to start the load (scene
+        /// missing from the build list or misnamed).
+        /// </summary>
+        public AsyncOperation LoadNextAsync()
+        {
+            _log?.Info(Source, $"Loading scene '{_nextSceneName}' asynchronously (Single mode).");
+            var op = SceneManager.LoadSceneAsync(_nextSceneName, LoadSceneMode.Single);
+            if (op == null)
+                _log?.Error(Source, $"LoadSceneAsync('{_nextSceneName}') returned null: the scene is not in the " +
+                    "build settings or the name is wrong. The match cannot start.");
+            return op;
+        }
     }
 }

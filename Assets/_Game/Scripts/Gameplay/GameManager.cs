@@ -10,7 +10,8 @@ namespace CluckWars.Gameplay
     /// <summary>
     /// High-level match lifecycle for a single round. Master-client owned scene
     /// NetworkObject. Drives the state machine
-    /// (<see cref="MatchState.WaitingForPlayers"/> → <see cref="MatchState.Active"/>
+    /// (<see cref="MatchState.WaitingForPlayers"/> → <see cref="MatchState.Starting"/>
+    /// → <see cref="MatchState.Active"/>
     /// → <see cref="MatchState.Ended"/>), counts down the match timer, and runs the
     /// win-condition check (first to <c>FoodTargetToWin</c> OR most food when the
     /// timer expires).
@@ -55,6 +56,14 @@ namespace CluckWars.Gameplay
         private float _winCheckIntervalSeconds = 0.25f;
         private float _nextWinCheckTime;
 
+        // Authority-only, local: the Starting -> Active gate. Fed from Render (it measures rendered
+        // frames), consumed in FixedUpdateNetwork (the only place the timers are written).
+        private IntroArmGate _introArmGate;
+        private bool _introArmRequested;
+
+        // Every peer, local: the start / end audio this peer plays for itself.
+        private readonly MatchAudioCueTracker _audioCues = new();
+
         public float MatchDurationSeconds => _config != null ? _config.MatchDurationSeconds : 180f;
         public int FoodTargetToWin => _config != null ? _config.FoodTargetToWin : 110;
 
@@ -69,8 +78,8 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// True only when the playable phase of a round is active: <c>State == Active</c>
         /// and we're past the intro countdown. Chickens / combat / abilities gate
-        /// on this so the lobby (<see cref="MatchState.WaitingForPlayers"/>),
-        /// intro window, and end screen all freeze gameplay.
+        /// on this so the lobby (<see cref="MatchState.WaitingForPlayers"/>), the GET READY
+        /// settle (<see cref="MatchState.Starting"/>), intro window, and end screen all freeze gameplay.
         /// </summary>
         public bool IsMatchRunning => State == MatchState.Active && !IsIntroActive;
 
@@ -131,9 +140,9 @@ namespace CluckWars.Gameplay
 
             // Master client behavior:
             // - Solo (GameMode.Single): auto-start. There's no one to wait for.
-            // - Shared mode: stay in WaitingForPlayers (lobby). Host clicks the
-            //   Start button in MatchHud → StartMatchNow() transitions to Active.
-            //   Joiners sit in the lobby until then.
+            // - Shared mode: stay in WaitingForPlayers (lobby). Host clicks the in-match
+            //   lobby's START → StartMatchNow(). Joiners sit in the lobby until then.
+            // Both go through Starting (BeginStarting): the intro arms once the world renders smoothly.
             if (HasStateAuthority)
             {
                 // GameManager is a master-client object that is destroyed when its authority
@@ -147,7 +156,7 @@ namespace CluckWars.Gameplay
 
                 if (Runner != null && Runner.GameMode == GameMode.Single)
                 {
-                    StartMatch();
+                    BeginStarting("solo auto-start");
                 }
                 else
                 {
@@ -161,10 +170,14 @@ namespace CluckWars.Gameplay
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
             if (Instance == this) Instance = null;
+            // A host change destroys this object mid-round; the music this peer started at GO must not
+            // run on into the next manager's waiting room (it would never see this round's End cue).
+            if (_audioCues.RoundAudible) _audio?.StopMusic();
         }
 
         /// <summary>
-        /// Host-side entry point — called by <c>MatchHud</c>'s Start button.
+        /// Host-side entry point — called by the in-match lobby overlay's START
+        /// (<c>MatchOverlaysController</c>).
         /// Idempotent; no-ops if the match is already running or if the caller
         /// doesn't have StateAuthority (i.e., is not the master client). No
         /// minimum-player-count gate: host can start with just themselves on
@@ -183,7 +196,27 @@ namespace CluckWars.Gameplay
                 return;
             }
             _log?.Info(Source, "StartMatchNow accepted — host pressed Start.");
-            StartMatch();
+            BeginStarting("host pressed START");
+        }
+
+        /// <summary>
+        /// Every round starts here, never straight in <see cref="StartMatch"/>: the intro TickTimer
+        /// keeps counting through frame hitches (a fresh scene's first frames, the frame a START tap
+        /// lands on), which used to eat the "3". <see cref="Render"/> feeds the
+        /// <see cref="IntroArmGate"/>; <see cref="FixedUpdateNetwork"/> arms the timers once it opens
+        /// (~0.4 s on a warm world). State authority only; peers see <see cref="MatchState.Starting"/>
+        /// (GET READY) until the networked intro timer arrives.
+        /// <para>Authority changes: the gate is local, so a peer that inherits this object while it is
+        /// in Starting re-creates it in <see cref="Render"/>. When the old master leaves, though, this
+        /// master-client object is destroyed and the new master spawns a fresh one in the waiting room,
+        /// so the new host simply presses START again.</para>
+        /// </summary>
+        private void BeginStarting(string why)
+        {
+            State = MatchState.Starting;
+            _introArmGate = new IntroArmGate();
+            _introArmRequested = false;
+            _log?.Info(Source, $"Starting ({why}): the intro arms once the world renders smoothly.");
         }
 
         public override void FixedUpdateNetwork()
@@ -194,6 +227,12 @@ namespace CluckWars.Gameplay
             // already assigned skip the inner loop, so the cost is O(players × bases)
             // and the upper bound is 4×4 for the demo.
             AssignBasesToPlayers();
+
+            if (State == MatchState.Starting)
+            {
+                if (_introArmRequested) ArmIntroAfterSettle();
+                return;
+            }
 
             // Match ended — hold here until someone acts. Nothing restarts on a timer:
             // PLAY AGAIN (RequestPlayAgain) re-arms the waiting room, BACK TO LOBBY leaves.
@@ -224,6 +263,96 @@ namespace CluckWars.Gameplay
             {
                 EndOnTimerExpiry();
             }
+        }
+
+        public override void Render()
+        {
+            if (HasStateAuthority && State == MatchState.Starting && !_introArmRequested)
+            {
+                if (_introArmGate == null)
+                {
+                    // Starting was entered on another peer (authority transferred mid-settle): without a
+                    // gate of our own the round would sit on GET READY forever.
+                    _introArmGate = new IntroArmGate();
+                    _log?.Warn(Source, "State authority arrived during Starting; re-created the intro gate locally.");
+                }
+                _introArmRequested = _introArmGate.Observe(EveryPlayerHasAChicken(), Time.unscaledDeltaTime);
+            }
+
+            PlayAudioCue(_audioCues.Observe(State, IsIntroActive));
+        }
+
+        /// <summary>Starting -> Active, on the state authority, once <see cref="IntroArmGate"/> opened.</summary>
+        private void ArmIntroAfterSettle()
+        {
+            if (_introArmGate != null && _introArmGate.TimedOut)
+                _log?.Warn(Source, $"Intro armed after the {IntroArmGate.MaxWaitSeconds}s cap without a settled world " +
+                    $"(chickens ready: {EveryPlayerHasAChicken()}). The first digit may be cut short on this device.");
+            _introArmGate = null;
+            _introArmRequested = false;
+            StartMatch();
+        }
+
+        /// <summary>True when every connected player's chicken has spawned (bots spawn in the same
+        /// frame as this manager, so the settle window covers them).</summary>
+        private bool EveryPlayerHasAChicken()
+        {
+            _readyPlayers.Clear();
+            foreach (var player in Runner.ActivePlayers)
+                if (player.IsRealPlayer) _readyPlayers.Add(player);
+
+            _readyChickens.Clear();
+            var chickens = ChickenController.ActiveControllers;
+            for (int i = 0; i < chickens.Count; i++)
+            {
+                var c = chickens[i];
+                if (c != null && c.Object != null && c.Object.IsValid)
+                    _readyChickens.Add((c.Object.InputAuthority, c.IsDecoy));
+            }
+            return MatchFlowRules.EveryPlayerHasAChicken(_readyPlayers, _readyChickens);
+        }
+
+        // Scratch lists for EveryPlayerHasAChicken (called every frame during Starting; no allocation).
+        private readonly System.Collections.Generic.List<PlayerRef> _readyPlayers = new();
+        private readonly System.Collections.Generic.List<(PlayerRef inputAuthority, bool isDecoy)> _readyChickens = new();
+        private bool _warnedNoAudio;
+
+        /// <summary>
+        /// Local audio for the round's start and end, on every peer (it used to play on the state
+        /// authority only, at the moment the intro was armed rather than at GO).
+        /// </summary>
+        private void PlayAudioCue(MatchAudioCueTracker.Cue cue)
+        {
+            if (cue == MatchAudioCueTracker.Cue.None) return;
+            if (_audio == null)
+            {
+                if (!_warnedNoAudio)
+                    _log?.Warn(Source, $"No IAudioService injected: the match start / end audio ({cue}) will not play on this peer.");
+                _warnedNoAudio = true;
+                return;
+            }
+            switch (cue)
+            {
+                case MatchAudioCueTracker.Cue.Go:
+                    _audio.PlaySFX(_audioReg != null ? _audioReg.MatchStart : null);
+                    PlayMatchMusic();
+                    break;
+                case MatchAudioCueTracker.Cue.JoinedRunning:
+                    PlayMatchMusic();
+                    break;
+                case MatchAudioCueTracker.Cue.End:
+                    _audio.StopMusic();
+                    // MatchVictory only for the peer whose player won; MatchEnd for everyone else (a rival,
+                    // a bot, or a timer expiry with no scorer).
+                    bool localWon = WinnerPlayer.IsRealPlayer && Runner != null && WinnerPlayer == Runner.LocalPlayer;
+                    _audio.PlaySFX(_audioReg == null ? null : localWon ? _audioReg.MatchVictory : _audioReg.MatchEnd);
+                    break;
+            }
+        }
+
+        private void PlayMatchMusic()
+        {
+            if (_audioReg != null && _audioReg.MatchMusic != null) _audio.PlayMusic(_audioReg.MatchMusic, 0.6f);
         }
 
         private void AssignBasesToPlayers()
@@ -355,11 +484,7 @@ namespace CluckWars.Gameplay
             WinnerPlayer = PlayerRef.None;
             WinnerCorner = -1;
             WinnerFoodTotal = 0f;
-            _audio?.PlaySFX(_audioReg != null ? _audioReg.MatchStart : null);
-            if (_audioReg != null && _audioReg.MatchMusic != null)
-            {
-                _audio?.PlayMusic(_audioReg.MatchMusic, 0.6f);
-            }
+            // The start stinger + match music play at GO on every peer (Render -> PlayAudioCue).
             _log?.Info(Source, $"Match started: {MatchDurationSeconds}s playable + {_introSeconds}s intro, target {FoodTargetToWin} food.");
         }
 
@@ -517,12 +642,7 @@ namespace CluckWars.Gameplay
             WinnerPlayer = winner;
             WinnerCorner = winnerCorner;
             WinnerFoodTotal = winnerTotal;
-            _audio?.StopMusic();
-            // MatchVictory if anyone actually won, MatchEnd otherwise (timer expiry with no scorer).
-            var endCue = winner.IsRealPlayer
-                ? (_audioReg != null ? _audioReg.MatchVictory : null)
-                : (_audioReg != null ? _audioReg.MatchEnd : null);
-            _audio?.PlaySFX(endCue);
+            // Music stop + end cue play on every peer when it sees Ended (Render -> PlayAudioCue).
             _log?.Info(Source, $"Match ended ({reason}). Winner={winner}, total={winnerTotal:0.0}. Waiting for Play Again / Back to Lobby.");
 
             // KPI match summary instrumentation (IP7)
@@ -598,7 +718,8 @@ namespace CluckWars.Gameplay
         /// Resets every networked entity master can touch (bases, food piles, the golden event
         /// pile) and RPCs each chicken's authority to clear its own combat / cargo state.
         /// State then returns to <see cref="MatchState.WaitingForPlayers"/> with all timers
-        /// and winner fields cleared; <see cref="StartMatch"/> arms them again on START.
+        /// and winner fields cleared; <see cref="StartMatch"/> arms them again after START, once the
+        /// <see cref="IntroArmGate"/> settle has passed.
         /// </summary>
         private void ResetWorldForNewRound()
         {
@@ -688,7 +809,7 @@ namespace CluckWars.Gameplay
             }
 
             // Back to the waiting room. The timers are cleared (not re-armed): StartMatch
-            // creates the intro + match timers when the host presses START, so each round
+            // creates the intro + match timers after START, once the settle gate opens, so each round
             // opens identically to the first one.
             var fresh = RoundResetFields.Fresh;
             State = fresh.State;

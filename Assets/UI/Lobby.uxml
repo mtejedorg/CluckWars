@@ -11,7 +11,7 @@
          Binding contract (by name): BackBtn, StartBtn, CopyBtn, ShareBtn, InviteCard,
          CodeTiles, JoinCard, LobbyJoinField, StatusPill/StatusDot/StatusCount/StatusText,
          SetTime, SetGoal (filled from MatchConfig; LobbyMatchSettingsTests keeps them blank),
-         PlayerGrid (seat host), ReadyBanner, LobbyStatus.
+         PlayerGrid (seat host), ReadyBanner, LobbyStatus, GetReadyCard.
 
          Sizes follow the MOBILE SIZING CONTRACT at the top of CluckWarsTheme.uss. -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
@@ -82,6 +82,17 @@
             <ui:VisualElement class="cw-coop-right">
                 <ui:Button name="StartBtn" text="@btn.start" class="cw-btn cw-btn--green cw-page-cta" />
                 <ui:Label name="LobbyStatus" text="" class="cw-lobby-error" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- START MATCH hand-off (Phase 4, re-audit item 4): a scrim + GET READY plate that fades in
+             over the whole page and stays up while Game.unity loads in the background (it replaced
+             a synchronous load that froze the menu). Last child, so it covers everything and takes
+             every tap (no double START). The in-match intro overlay continues the same GET READY
+             until the 3-2-1-GO. -->
+        <ui:VisualElement name="GetReadyCard" class="cw-getready cw-getready--hidden" style="display: none;">
+            <ui:VisualElement class="cw-getready__plate" picking-mode="Ignore">
+                <ui:Label text="@countdown.getReady" class="cw-title cw-getready__label" picking-mode="Ignore" />
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

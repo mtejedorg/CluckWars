@@ -165,6 +165,9 @@ namespace CluckWars.UI
     {
         public enum Cue { None, Tick, Go }
 
+        /// <summary>How long the GO! flourish stays on screen after the intro timer runs out.</summary>
+        public const float GoHoldSeconds = 0.6f;
+
         private int _lastNumber = -1;
         private bool _sawIntro;
 
@@ -190,5 +193,57 @@ namespace CluckWars.UI
 
         /// <summary>Forget everything without a GO (match state gone, session ended).</summary>
         public void Reset() { _lastNumber = -1; _sawIntro = false; }
+    }
+
+    /// <summary>
+    /// What the intro overlay shows BEFORE a round's intro is armed (re-audit item 4): GET READY (no
+    /// digit) while the session is still bringing its first GameManager up or while a round is in
+    /// <see cref="CluckWars.Gameplay.MatchState.Starting"/>. Never once a manager has been seen and then
+    /// lost (host change, session ending) or while BACK TO LOBBY is leaving, and never for longer than
+    /// <see cref="NoManagerTimeoutSeconds"/> waiting for a manager that does not arrive (the caller logs
+    /// an error and hides the card, so the player is not stuck behind it).
+    /// </summary>
+    public static class IntroOverlayRule
+    {
+        public enum PreIntro
+        {
+            /// <summary>Not a pre-intro moment: the normal countdown / GO / hidden logic applies.</summary>
+            None,
+            /// <summary>Hold the overlay up with GET READY and no digit.</summary>
+            GetReady,
+            /// <summary>No GameManager after the timeout: hide, and report it once.</summary>
+            TimedOut,
+        }
+
+        public const float NoManagerTimeoutSeconds = 10f;
+
+        /// <param name="secondsWithoutManager">Real seconds this overlay has existed without ever seeing a manager.</param>
+        public static PreIntro Decide(bool hasManager, CluckWars.Gameplay.MatchState state, bool sawManager,
+            bool leavingToLobby, float secondsWithoutManager)
+        {
+            if (hasManager) return state == CluckWars.Gameplay.MatchState.Starting ? PreIntro.GetReady : PreIntro.None;
+            if (sawManager || leavingToLobby) return PreIntro.None;
+            return secondsWithoutManager >= NoManagerTimeoutSeconds ? PreIntro.TimedOut : PreIntro.GetReady;
+        }
+    }
+
+    /// <summary>
+    /// When the final-minute event banner may show (re-audit item 4). The event's gameplay fires on
+    /// schedule; only its DISPLAY waits until the GO! flourish has gone, so the two never stack (in a
+    /// 45 s match the final minute starts at GO). A banner that shows right after GO skips its sting:
+    /// the match-start stinger has just played.
+    /// </summary>
+    public static class EventBannerTiming
+    {
+        /// <summary>Within this long of the intro ending, the banner shows without its sting.</summary>
+        public const float QuietAfterGoSeconds = 2f;
+
+        /// <param name="introActive">The intro countdown is running.</param>
+        /// <param name="secondsSinceIntro">Real seconds since this client last saw the intro running
+        /// (<see cref="float.PositiveInfinity"/> if it never did: a peer that arrived after GO).</param>
+        public static bool CanShow(bool introActive, float secondsSinceIntro) =>
+            !introActive && secondsSinceIntro >= IntroCueTracker.GoHoldSeconds;
+
+        public static bool PlaysSting(float secondsSinceIntro) => secondsSinceIntro >= QuietAfterGoSeconds;
     }
 }

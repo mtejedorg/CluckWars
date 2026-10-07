@@ -118,7 +118,12 @@ namespace CluckWars.UI
 
         // Intro GO flourish — lingers briefly after the countdown hits zero.
         private float       _goExpiresAtUnscaledTime;
-        private const float GoFlourishDuration = 0.6f;
+
+        // Pre-intro GET READY (IntroOverlayRule): whether a GameManager has ever been seen, since when
+        // this overlay has been waiting for the first one, and whether the no-manager timeout was reported.
+        private bool        _sawGameManager;
+        private float       _waitingForManagerSince = -1f;
+        private bool        _reportedNoManager;
 
         // ---- Injection ---------------------------------------------------------
         [Inject]
@@ -872,6 +877,29 @@ namespace CluckWars.UI
             // Visibility only — the top-bar dim is decided once in Update() across
             // all three modals, so this method must not touch it or it would clear
             // a dim the match-end / lobby overlay still needs.
+            // Before the round's intro is armed — no GameManager yet (the session is still starting)
+            // or a round in Starting (the host's world is settling) — the overlay holds GET READY with
+            // no digit: the continuation of the menu's GET READY card, never a blank arena.
+            if (gm != null) _sawGameManager = true;
+            else if (_waitingForManagerSince < 0f) _waitingForManagerSince = Time.unscaledTime;
+            float waited = _waitingForManagerSince < 0f ? 0f : Time.unscaledTime - _waitingForManagerSince;
+            var hold = IntroOverlayRule.Decide(gm != null, gm != null ? gm.State : MatchState.WaitingForPlayers,
+                _sawGameManager, _leavingToLobby, waited);
+
+            if (hold == IntroOverlayRule.PreIntro.TimedOut && !_reportedNoManager)
+            {
+                _reportedNoManager = true;
+                _log?.Error(Source, $"No GameManager after {IntroOverlayRule.NoManagerTimeoutSeconds}s in the match scene " +
+                    "(session start failed or the master never spawned it): hiding GET READY. The match cannot start; " +
+                    "see the MatchBootstrapper / FusionNetworkService errors above.");
+            }
+            if (hold != IntroOverlayRule.PreIntro.None)
+            {
+                _introCues.Reset();
+                if (_introNumber != null && _introNumber.text.Length > 0) _introNumber.text = string.Empty;
+                SetShown(_introOverlay, hold == IntroOverlayRule.PreIntro.GetReady && !_shutdownReason.HasValue);
+                return;
+            }
             if (gm == null) { _introCues.Reset(); SetShown(_introOverlay, false); return; }
 
             // The timer is networked and untouched; the cues below are this client's own presentation of it.
@@ -881,7 +909,7 @@ namespace CluckWars.UI
             {
                 if (_introNumber != null && cue == IntroCueTracker.Cue.Tick) _introNumber.text = number.ToString();
                 SetShown(_introOverlay, true);
-                _goExpiresAtUnscaledTime = Time.unscaledTime + GoFlourishDuration;
+                _goExpiresAtUnscaledTime = Time.unscaledTime + IntroCueTracker.GoHoldSeconds;
                 if (cue == IntroCueTracker.Cue.Tick) { _audio.CountdownTick(number); _introJuice?.Slam(_introNumber); }
                 return;
             }

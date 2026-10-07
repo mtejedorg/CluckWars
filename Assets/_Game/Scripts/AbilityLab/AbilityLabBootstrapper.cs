@@ -216,6 +216,8 @@ namespace CluckWars.AbilityLab
             var gm = GameManager.Instance;
             if (gm == null || gm.Object == null || !gm.Object.IsValid) return;
             if (!gm.HasStateAuthority) return;
+            // Starting: the intro is not armed yet and StartMatch writes both timers itself.
+            if (gm.State != MatchState.Active) return;
             if (gm.TimeRemaining > ReArmBelowSeconds) return;
 
             gm.MatchTimer = TickTimer.CreateFromSeconds(gm.Runner, HeldMatchSeconds);

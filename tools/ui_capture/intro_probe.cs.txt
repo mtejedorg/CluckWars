@@ -63,4 +63,73 @@ public class Intro {
       var card = r.Query<VisualElement>(className: "cw-ability-card").ToList().FirstOrDefault(c => !c.ClassListContains("cw-ability-card--picked")); if (card == null) break;
       using (var e = ClickEvent.GetPooled()) { e.target = card; card.SendEvent(e); } taps++; }
     return "taps=" + taps; }
+
+  // ---- Re-audit item 4 probe (python intro_probe.py <out> --item4) -----------------------------------
+  // One EditorApplication.update hook per session: the menu's GET READY card (captured once fully faded in),
+  // the scene swap, every GameManager state change, every intro-text change (3 / 2 / 1 / GO! captured once
+  // per round), the GameManager's own audio (forwarded to the real service, so the session still sounds),
+  // and the final-minute banner. Scores are capped below the goal so the round ends on the TIMER.
+  sealed class FwdAudio : IAudioService {
+    public IAudioService Inner; public System.Action<string> Log;
+    public void PlaySFX(AudioClip clip, float volume = 1f, float pitch = 1f, float delaySeconds = 0f) { Log("AUDIO sfx " + (clip == null ? "null" : clip.name)); Inner.PlaySFX(clip, volume, pitch, delaySeconds); }
+    public void PlayMusic(AudioClip clip, float volume = 1f, bool loop = true, float fadeInSeconds = 0f) { Log("AUDIO music " + (clip == null ? "null" : clip.name)); Inner.PlayMusic(clip, volume, loop, fadeInSeconds); }
+    public void FadeOutMusic(float seconds) { Inner.FadeOutMusic(seconds); }
+    public void StopMusic() { Log("AUDIO stopMusic"); Inner.StopMusic(); }
+    public bool IsMusicPlaying(AudioClip clip) { return Inner.IsMusicPlaying(clip); }
+    public void SetMasterVolume(float volume01) { Inner.SetMasterVolume(volume01); }
+  }
+  sealed class P4 {
+    public string Out; public float T0, End; public int Round; public bool CardSeen, CardShot; public string Scene = "", Text = null, StateStr = "";
+    public float ShotAt = -1; public string ShotName; public HashSet<string> Shot = new HashSet<string>(); public int Clamps; public bool BannerSeen;
+    static string N(float v) { return v.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture); }
+    public void L(string m) { Lines.Add(N(Time.realtimeSinceStartup - T0) + " f" + Time.frameCount + " dt=" + N(Time.unscaledDeltaTime) + " | " + m); }
+    public void Tick() {
+      float t = Time.realtimeSinceStartup - T0;
+      if (t > End) { UnityEditor.EditorApplication.update -= Tick; L("=== probe end"); return; }
+      var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+      if (scene != Scene) { Scene = scene; L("SCENE " + scene); }
+      var docs = Object.FindObjectsByType<UIDocument>(FindObjectsSortMode.None);
+      foreach (var d in docs) {
+        var root = d.rootVisualElement; if (root == null) continue;
+        var card = root.Q<VisualElement>("GetReadyCard");
+        if (card != null && card.resolvedStyle.display == DisplayStyle.Flex) {
+          if (!CardSeen) { CardSeen = true; L("GETREADY card shown, opacity=" + N(card.resolvedStyle.opacity)); }
+          if (!CardShot && card.resolvedStyle.opacity >= 0.99f) { CardShot = true; ScreenCapture.CaptureScreenshot(Out + "/getready_card.png"); L("SHOT getready_card.png (opacity " + N(card.resolvedStyle.opacity) + ")"); }
+        }
+      }
+      var gm = GameManager.Instance;
+      if (gm != null) {
+        var f = typeof(GameManager).GetField("_audio", BindingFlags.NonPublic | BindingFlags.Instance);
+        var a = f.GetValue(gm) as IAudioService;
+        if (a != null && !(a is FwdAudio)) { f.SetValue(gm, new FwdAudio { Inner = a, Log = L }); L("GameManager audio wrapped"); }
+        string st = gm.State + (gm.IsIntroActive ? "+intro" : "");
+        if (st != StateStr) { if (gm.State == MatchState.Active && !StateStr.StartsWith("Active")) Round++; StateStr = st; L("STATE " + st + " round=" + Round + " timeRemaining=" + N(gm.TimeRemaining) + " introRemaining=" + N(gm.IntroRemaining)); }
+        if (gm.State == MatchState.Active) {
+          int cap = gm.FoodTargetToWin - 5;
+          foreach (var b in PlayerBase.ActiveBases) if (b != null && b.FoodTotal > cap) { b.FoodTotal = cap; if (Clamps++ == 0) L("score cap engaged (" + cap + ") so the round ends on the timer"); }
+        }
+      }
+      foreach (var d in docs) {
+        var root = d.rootVisualElement; if (root == null) continue;
+        var n = root.Q<Label>("IntroNumber"); var ov = root.Q<VisualElement>("IntroOverlay"); if (n == null || ov == null) continue;
+        bool shown = ov.resolvedStyle.display == DisplayStyle.Flex;
+        string txt = shown ? n.text : "<hidden>";
+        if (txt != Text) {
+          Text = txt; L("INTRO '" + txt + "' state=" + (gm == null ? "nogm" : gm.State.ToString()) + " introRemaining=" + (gm == null ? "?" : N(gm.IntroRemaining)));
+          string key = txt == "GO!" ? "go" : txt;
+          if ((txt == "3" || txt == "2" || txt == "1" || txt == "GO!") && Shot.Add(Round + key)) { ShotAt = Time.realtimeSinceStartup + (txt == "GO!" ? 0.18f : 0.30f); ShotName = (Round <= 1 ? "intro_" : "intro_r" + Round + "_") + key + ".png"; }
+          else if (txt == "" && Shot.Add(Round + "ready")) { ShotAt = Time.realtimeSinceStartup + 0.15f; ShotName = "ingame_getready" + (Round == 0 ? "" : "_r" + (Round + 1)) + ".png"; }
+        }
+        if (ShotAt > 0 && Time.realtimeSinceStartup >= ShotAt) { ShotAt = -1; ScreenCapture.CaptureScreenshot(Out + "/" + ShotName); L("SHOT " + ShotName + " (text '" + n.text + "' shown=" + shown + ")"); }
+      }
+      var banner = GameObject.Find("EventBanner");
+      bool bOn = banner != null && banner.activeInHierarchy;
+      if (bOn && !BannerSeen && Shot.Add(Round + "banner") && ShotAt < 0) { ShotAt = Time.realtimeSinceStartup + 0.3f; ShotName = "event_banner" + (Round <= 1 ? "" : "_r" + Round) + ".png"; }
+      if (bOn != BannerSeen) { BannerSeen = bOn; L("EVENT BANNER " + (bOn ? "shown: '" + banner.GetComponentInChildren<UnityEngine.UI.Text>().text + "'" : "hidden") + (gm == null ? "" : " event=" + gm.ActiveEvent)); }
+    }
+  }
+  public static string Arm4(string outDir, string dur) {
+    var p = new P4 { Out = outDir, T0 = Time.realtimeSinceStartup, End = float.Parse(dur, System.Globalization.CultureInfo.InvariantCulture) };
+    p.L("=== item-4 probe armed (t = real seconds since arm, f = frame, dt = unscaled frame time)");
+    UnityEditor.EditorApplication.update += p.Tick; return "armed4"; }
 }

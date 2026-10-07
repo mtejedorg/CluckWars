@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using CluckWars.Logging;
 using CluckWars.Networking;
 using CluckWars.Services;
@@ -46,6 +47,10 @@ namespace CluckWars.UI
         private Text       _eventBannerText;
         private float      _bannerExpireTime;
         private MatchEventKind _lastSeenEvent = MatchEventKind.None;
+        // A new event's banner waits here until the GO! flourish has gone (EventBannerTiming).
+        private bool       _bannerPending;
+        // Last unscaled time this client saw the intro countdown running; -inf = never (joined after GO).
+        private float      _introLastSeenAt = float.NegativeInfinity;
 
         // ---- Cached scene refs -------------------------------------------------
 
@@ -285,37 +290,34 @@ namespace CluckWars.UI
         {
             if (_gameManager == null) return;
 
+            if (_gameManager.IsIntroActive) _introLastSeenAt = Time.unscaledTime;
+
             MatchEventKind evt = _gameManager.ActiveEvent;
             if (evt != _lastSeenEvent)
             {
                 _lastSeenEvent = evt;
                 if (evt != MatchEventKind.None)
                 {
-                    string bannerName = evt switch
-                    {
-                        MatchEventKind.GoldenPile => "GOLDEN PILE",
-                        MatchEventKind.UnderdogSurge => "UNDERDOG SURGE",
-                        MatchEventKind.LeaderBounty => "BOUNTY ON THE LEADER",
-                        MatchEventKind.Restock => "RESTOCK",
-                        _ => evt.ToString().ToUpper()
-                    };
-
                     if (_eventBannerText != null)
-                    {
-                        _eventBannerText.text = $"FINAL MINUTE: {bannerName}!";
-                    }
-                    if (_eventBannerPanel != null)
-                    {
-                        _eventBannerPanel.SetActive(true);
-                    }
-                    _bannerExpireTime = Time.unscaledTime + 3f;
-
-                    _audio?.PlaySFX(_audioReg != null ? _audioReg.MatchStart : null);
+                        _eventBannerText.text = UiText.Format(UiKeys.HudEventBanner, ("event", EventName(evt)));
+                    _bannerPending = true;
                 }
                 else
                 {
+                    _bannerPending = false;
                     if (_eventBannerPanel != null) _eventBannerPanel.SetActive(false);
                 }
+            }
+
+            // The event fired on schedule (gameplay); only its banner waits for GO! to clear.
+            float sinceIntro = Time.unscaledTime - _introLastSeenAt;
+            if (_bannerPending && EventBannerTiming.CanShow(_gameManager.IsIntroActive, sinceIntro))
+            {
+                _bannerPending = false;
+                if (_eventBannerPanel != null) _eventBannerPanel.SetActive(true);
+                _bannerExpireTime = Time.unscaledTime + 3f;
+                if (EventBannerTiming.PlaysSting(sinceIntro))
+                    _audio?.PlaySFX(_audioReg != null ? _audioReg.MatchStart : null);
             }
 
             if (_eventBannerPanel != null && _eventBannerPanel.activeSelf && Time.unscaledTime >= _bannerExpireTime)
@@ -323,5 +325,15 @@ namespace CluckWars.UI
                 _eventBannerPanel.SetActive(false);
             }
         }
+
+        private static string EventName(MatchEventKind evt) => evt switch
+        {
+            MatchEventKind.GoldenPile    => UiText.Get(UiKeys.HudEventGoldenPile),
+            MatchEventKind.UnderdogSurge => UiText.Get(UiKeys.HudEventUnderdogSurge),
+            MatchEventKind.LeaderBounty  => UiText.Get(UiKeys.HudEventLeaderBounty),
+            MatchEventKind.Restock       => UiText.Get(UiKeys.HudEventRestock),
+            // A kind added without a UiText row: its enum name, never a blank banner.
+            _ => evt.ToString().ToUpperInvariant(),
+        };
     }
 }

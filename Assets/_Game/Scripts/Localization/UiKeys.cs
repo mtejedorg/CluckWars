@@ -142,6 +142,7 @@ namespace CluckWars.Localization
         public const string LobbyErrCreate = "lobby.err.create";
         public const string LobbyErrNoCode = "lobby.err.noCode";
         public const string LobbyErrJoin = "lobby.err.join";
+        public const string LobbyErrLoad = "lobby.err.load";
         public const string LobbyJoining = "lobby.joining";
         public const string TagHost = "tag.host";
         public const string TagCpu = "tag.cpu";
@@ -181,6 +182,20 @@ namespace CluckWars.Localization
         // ---- Phase 4 menu (GEAR UP caret, join status) ----
         public const string LoadoutSwap = "loadout.swap";
         public const string LobbyStatusCodeReady = "lobby.status.codeReady";
+
+        // ---- Phase 4 HUD (re-audit item 4: top-bar timer + ranks, final-minute event banner) ----
+        public const string HudTimerNone = "hud.timer.none";
+        public const string HudTimerWait = "hud.timer.wait";
+        public const string HudTimerEnded = "hud.timer.ended";
+        public const string HudRank1 = "hud.rank.1";
+        public const string HudRank2 = "hud.rank.2";
+        public const string HudRank3 = "hud.rank.3";
+        public const string HudRank4 = "hud.rank.4";
+        [UiArgs("event")] public const string HudEventBanner = "hud.event.banner";
+        public const string HudEventGoldenPile = "hud.event.goldenPile";
+        public const string HudEventUnderdogSurge = "hud.event.underdogSurge";
+        public const string HudEventLeaderBounty = "hud.event.leaderBounty";
+        public const string HudEventRestock = "hud.event.restock";
 
     }
 }

@@ -114,6 +114,11 @@ namespace CluckWars.UI
         // ---- THE COOP (seats built once in BuildLobby) ---------------------------
         private readonly SeatView[] _seats = new SeatView[4];
         private VisualElement _readyBanner;
+        // START MATCH hand-off card (Lobby.uxml #GetReadyCard) and how long its fade gets before the
+        // background load starts competing for the main thread.
+        private VisualElement _getReadyCard;
+        private const float GetReadyFadeSeconds = 0.2f;
+        private const string GetReadyHiddenClass = "cw-getready--hidden";
 
         // ---- Live 3D chicken stage (Phase 3; only while Performance Mode is OFF) ----------
         // Slot 0 = the PICK YOUR BIRD hero, 1..4 = the lineup seats. Null = static renders.
@@ -1952,6 +1957,9 @@ namespace CluckWars.UI
             Bind<Button>(_lobby, "CopyBtn",  b => b.clicked += CopyJoinCode);
             Bind<Button>(_lobby, "ShareBtn", b => b.clicked += CopyJoinCode);
             _readyBanner = _lobby.Q<VisualElement>("ReadyBanner");
+            _getReadyCard = _lobby.Q<VisualElement>("GetReadyCard");
+            if (_getReadyCard == null)
+                _log?.Error(Source, "Lobby.uxml has no #GetReadyCard; START MATCH will load with no GET READY card over the menu.");
 
             var grid = _lobby.Q<VisualElement>("PlayerGrid");
             if (grid == null)
@@ -2339,7 +2347,11 @@ namespace CluckWars.UI
             return list;
         }
 
-        /// <summary>The menu-to-match handoff: fade the menu loop, sting, load the Game scene.</summary>
+        /// <summary>
+        /// The menu-to-match handoff: fade the menu loop, sting, fade the GET READY card in over THE
+        /// COOP, then load the Game scene in the background (it used to load synchronously and freeze
+        /// the menu). The menu stays busy until the scene swaps: no second START, no BACK under the card.
+        /// </summary>
         private void LoadMatchScene()
         {
             if (_sceneLoader == null)
@@ -2347,9 +2359,35 @@ namespace CluckWars.UI
                 _log?.Error(Source, "No SceneLoader in the menu scene; the match cannot start.");
                 return;
             }
+            _isBusy = true;
             _audio.StopMenuMusicForMatch();
             _audio.MatchSting();
-            _sceneLoader.LoadNext();
+            StartCoroutine(ShowGetReadyThenLoad());
+        }
+
+        private System.Collections.IEnumerator ShowGetReadyThenLoad()
+        {
+            if (_getReadyCard != null)
+            {
+                // Shown this frame at opacity 0, faded in from the next: a class change in the same
+                // frame as display:flex would not transition (Reduced Motion zeroes the fade anyway).
+                _getReadyCard.AddToClassList(GetReadyHiddenClass);
+                _getReadyCard.style.display = DisplayStyle.Flex;
+                yield return null;
+                _getReadyCard.RemoveFromClassList(GetReadyHiddenClass);
+            }
+
+            float loadAt = Time.unscaledTime + GetReadyFadeSeconds;
+            while (Time.unscaledTime < loadAt) yield return null;
+
+            if (_sceneLoader.LoadNextAsync() != null) yield break;
+
+            // LoadNextAsync already logged why; give the player the menu back with a visible reason.
+            if (_getReadyCard != null) _getReadyCard.style.display = DisplayStyle.None;
+            var status = _lobby?.Q<Label>("LobbyStatus");
+            if (status != null) status.text = UiText.Get(UiKeys.LobbyErrLoad);
+            _audio.StartMenuMusic();
+            _isBusy = false;
         }
 
         private async void OnStartMatch()
@@ -2375,14 +2413,15 @@ namespace CluckWars.UI
                     {
                         var info = await _ugs.JoinLobbyByCodeAsync(code);
                         _selection.SessionName = info.JoinCode;
-                        LoadMatchScene();
+                        _isBusy = false;
+                        LoadMatchScene(); // re-claims _isBusy until the scene swaps
                     }
                     catch (Exception e)
                     {
                         _log?.Error(Source, $"JoinByCode failed: {e.Message}");
                         if (status != null) status.text = UiText.Get(UiKeys.LobbyErrJoin);
+                        _isBusy = false;
                     }
-                    _isBusy = false;
                     break;
             }
         }
