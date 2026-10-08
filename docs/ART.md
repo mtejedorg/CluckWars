@@ -81,6 +81,18 @@ Derived from the Okabe-Ito palette. Validated across protanopia, deuteranopia, a
 
 **Never rely on color alone** — always supplement with labels (P1/P2/P3/P4).
 
+**One source, keyed by spawn corner** (round-2 finding 1): `Assets/_Game/Scripts/UI/PlayerPalette.cs`
+(`PlayerPalette.ForCorner(corner)`) is the only definition; `PlayerPaletteTests` fails on any other copy
+(hex, float triple or USS token). The corner is the identity: the menu Coop already colours each seat by the
+corner it will spawn on (`Gameplay/CornerAssignment`), so a player is the same colour in the lobby, the HUD,
+the world (nameplate, feet ring, base) and the results. A guest's corner is unknown before joining: its seats
+are neutral (`PlayerPalette.Neutral`) with no P#.
+
+**The YOU mark:** the local player's name is drawn as a gold pill with dark-ink text (`#f5c842` / `#1a0e04`,
+10:1) everywhere it appears — Coop seat, in-match waiting room, HUD leaderboard row, in-world nameplate
+(a sliced sprite behind the text), podium and standings row. USS `Label.cw-you-mark` (`YouMark.uss`).
+HUD leaderboard names are cream; the player colour sits on the dot and the bar only.
+
 ### Ability Accent Colors & Icons
 
 Each ability has a unique accent color (used on hex buttons, cooldown overlays, and VFX) and an **icon glyph**. The accent is authored per `AbilityBaseSO.AccentColor`; the glyph per `AbilityBaseSO.Icon` (blank falls back to the subclass `DefaultIcon`, surfaced via `ResolveIcon()`). 14 abilities across 4 categories (GDD §7.2). Cooldown tier: **S** = short 3–6 s, **M** = medium 8–12 s.
@@ -364,8 +376,9 @@ Hex buttons use a **pointy-top hexagon** with dimensional shading. The hexagon s
 | Property | Value |
 |---|---|
 | Size | 150px (mobile reference), scales with `CanvasScaler` |
-| Fill | Ability's `AccentColor` from `AbilityBaseSO` as center stop |
-| Neutral state | `ColorSchemeSO.AbilityNormal` (blue) when no ability equipped |
+| Fill | The ability's **category colour** (`UI/AbilityPalette`, same as the menus; `AccentColor` stays the VFX colour). No target in range: the same hue at 70% over ink (`AbilityPalette.Idle`) plus the ⃠ mark — never plain grey |
+| Category mark | Small cream shape with an ink rim, top-right: Steal diamond, Control circle, Defense square, Utility plus (`UI/CategoryMark`, `CategoryMark.uss`; also on every menu ability icon) |
+| Neutral state | `AbilityPalette.EmptyHex` (warm wood) when no ability equipped |
 | Slot 3 visibility | Hidden unless an ability is equipped in slot 2 (Assassin only) |
 | Cluster layout | 2 abilities → vertical-ish stack; 3 abilities → triangle (primary at thumb base) |
 
@@ -430,7 +443,7 @@ Navigation: Left stick moves. D-pad navigates menus. A confirms, B backs (in men
 | `JoystickBase` | rgba(1,1,1,0.06) center → rgba(1,1,1,0.02) edge | Radial gradient |
 | `JoystickKnob` | rgba(1,1,1,0.25) highlight → rgba(1,1,1,0.08) | Glossy radial |
 | `AttackNormal` | Top: adjust(#d43030, +40), Bottom: adjust(#d43030, -30) | **Legacy** — field retained for the flavor framework but unused (no attack button in v0.3) |
-| `AbilityNormal` | Driven per-ability by `AccentColor` gradient | Three-stop gradient; neutral blue when slot empty |
+| ~~`AbilityNormal`~~ | Removed (round-2 finding 1/5) | Hexes take `AbilityPalette` category colours; empty = `AbilityPalette.EmptyHex` |
 | `CooldownDim` | rgba(0,0,0,0.6) | Dark overlay |
 
 ### 6.10 Control-State Overlays (on-character)

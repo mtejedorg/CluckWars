@@ -6,6 +6,42 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🔧 Menu UI overhaul — Phase 5 chunk 3 (2026-10-08, uncommitted, in review): round-2 findings 1, 5, 9, 15
+
+EditMode **848/848** (828 + 20: `PlayerPaletteTests` new, `AbilityPaletteTests` +4, safe-area +4 in `MatchStandingsTests`).
+Captures (git-excluded): `Captures/phase5/{static,live,postmatch,postmatch_rowfix}`, `Captures/phase5/extra/solo_hud.png` (+ `solo_hud_forced_inset120.png`,
+`solo_lobby_gameview.png`). No prefab / scene wiring.
+
+- **Finding 1 — one player colour, keyed by spawn corner.** `UI/PlayerPalette` (`ForCorner`, `Neutral`, YOU-mark colours) is the only
+  definition; the six copies (menu, overlays, HUD, nameplate, world bars, PlayerBase) and the unused `--cw-player-N` USS tokens (and their
+  generator lines) are gone. `PlayerPaletteTests.NoOtherFile_DefinesItsOwnCopyOfThePlayerColours` scans every .cs/.uss/.uxml for the hex,
+  float-triple or token spelling. **Corners are known in the menu:** `Gameplay/CornerAssignment` (Permutation / SeedFor /
+  LobbySeatCorner) is used by both `MatchBootstrapper` and THE COOP. Solo: the menu rolls `ISessionSelectionService.SoloCornerSeed` each
+  time the Coop opens (seat 0 = You = slot 0, bots = slots 1..3 in seat order, as the spawner does). Host: seeded by the join code once
+  `CreateLobbyAsync` returns (seats repaint then; open seats show the corner the n-th joiner gets in a fresh session). Join: unknown
+  before joining, so neutral seats, no P#, "WAITING FOR A PLAYER". P# on the seats is now P{corner+1} (same as in-match). Verified live:
+  lobby You=P4 → match local @corner 3, every bot seat = its spawned corner. **YOU mark:** the local name as a gold pill with ink text
+  (`YouMark.uss`, `Label.cw-you-mark`) on the Coop seat, the waiting room seat, the HUD row, the podium and the standings row; the
+  in-world nameplate draws the same pill (procedural 9-sliced sprite behind the TextMesh). `ColorSchemeSO.AbilityNormal` (a P2-blue copy)
+  removed; `MatchBootstrapper.SessionNameSeed` moved to `CornerAssignment` (MapGenerator keeps its copy, contract test updated).
+- **Finding 5 — HUD.** Leaderboard names cream (`.cw-lb-name`, ~13:1; test parses the USS and checks the panel over white), player colour
+  only on the dot + bar, local row = player-colour edge + YOU mark (no colour wash). `SafeAreaPadding` on `#TopBarRoot` (padding) and on
+  two new full-screen zones in TouchControls.uxml, `#JoystickRoot` / `#AbilityRoot` (new `SafeAreaPadding.Edge.Offsets`: absolute
+  children are not moved by padding). Hexes take `AbilityPalette.HexColor` (category) instead of `AccentColor`; the "no target in
+  range" state (most of a match — that was the grey) is now the category hue at 70% over ink (`AbilityPalette.Idle`) + the ⃠ mark.
+- **Finding 9 — colour blindness.** Defense `#5f8a2c` → `#30460c` (cream label 9.6:1, was ink 4.65:1). Shape marks on every ability icon
+  (menu) and HUD hex: Steal diamond, Control circle, Defense square, Utility plus (`UI/CategoryMark` + `CategoryMark.uss`; perks get none).
+  `AbilityPaletteTests`: Machado 2009 deuteranopia + protanopia simulation, every category pair ≥ 8 dE00
+  (`AbilityPalette.MinColourBlindDeltaE`; weakest now Steal/Defense 8.5 protan, Control/Utility 10.1 deutan; the old Steal/Defense was 4.7
+  deutan — a test reproduces it). Existing ≥15 vs players / ≥25 between categories / AA rules still green.
+- **Finding 15 — safe area.** Landscape-left, landscape-right and top-cutout cases; `MenuUiController.ApplySafeArea` deleted, the menu
+  page host uses `SafeAreaPadding` (guard test).
+- Compendium: player colours unchanged, category colours not shown there — no edit. `docs/ART.md` player-colour / hex sections updated.
+- **Not verified:** a real device notch (Editor safe area is full-screen; zones verified by forcing 120 px offsets live), host-mode seat
+  colours with a real join code (unit-tested), the multiplayer waiting room YOU mark (code path shared with solo seats).
+
+---
+
 ## 🔧 Menu UI overhaul — Phase 5 chunk 2 (2026-10-08, uncommitted, in review): round-2 findings 2, 12, 14 + decision 3
 
 EditMode **820/820** (805 + 15 in `WaitingRoomAndSessionEndTests`; 828 after the host-race fix below). Captures (git-excluded) in `Captures/phase5/extra/`:
