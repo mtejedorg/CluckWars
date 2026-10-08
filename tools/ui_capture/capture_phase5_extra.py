@@ -7,6 +7,7 @@ solo  Solo START, the round won by pushing the local base to the goal, PLAY AGAI
       state is Starting (solo_playagain_getready.png - GET READY, no waiting room), then a forced
       session end (PhotonCloudTimeout via MatchOverlaysController.HandleShutdown) is rendered off-screen
       (session_end__<size>.png) - it must read COOP CLOSED / "Lost the signal to the barn.", never the enum name.
+cpuwin  A real solo round the CPUs win while the local bird idles (solo_cpu_win_real.png).
 host  HOST GAME -> START: a real Shared-mode session with one player sits in the waiting room; the overlay panel is
       rendered off-screen at desktop and phone size (mp_waiting_room__<size>.png). Needs Photon cloud + UGS.
 Leaves Play mode at the end of each session.
@@ -133,7 +134,22 @@ def host():
     stop()
 
 
+def cpuwin():
+    """A real solo round: the local bird idles, the CPUs play the full 45 s; the Game view is shot on the end screen."""
+    print("== solo real CPU win (idle 45 s)")
+    to_coop("SoloBtn")
+    print(cs("Press", "StartBtn"))
+    wait(("Active",)); time.sleep(4.5)
+    wait(("Ended",), tries=80); time.sleep(3.0)
+    p = bridge.shot("solo_cpu_win_real")
+    if p:
+        os.replace(p, os.path.join(OUT, "solo_cpu_win_real.png")); print("  saved solo_cpu_win_real.png")
+    stop()
+
+
 bridge.init()
+if WHAT == "cpuwin":
+    cpuwin()
 if WHAT in ("solo", "all"):
     solo()
 if WHAT in ("host", "all"):

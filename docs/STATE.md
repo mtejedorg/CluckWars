@@ -6,10 +6,15 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
-## 🔧 Menu UI overhaul — Phase 5 chunk 4 (2026-10-08, uncommitted, in review): round-2 findings 6, 17
+## ✅ Menu UI overhaul — Phase 5 chunk 4 (2026-10-08, committed dbf4c5d, verified in the Editor): round-2 findings 6, 17
+
+**Verified after the Editor restart:** static + live post-match captures re-run (`Captures/phase5/postmatch/`): the standings board now ends inside the
+screen at every size (MeRight 112..968 px at 1920x1080; actions on the wood), live 3D podium with the crown on the Head bone, 2-player podium
+centred. Real 45 s solo round won by DashFox while the local bird idled: `postmatch/solo_cpu_win_real.png` ("You · 2nd" chip, the three
+0-food birds share 2nd). `capture_phase5_extra.py cpuwin` reproduces it.
 
 EditMode **864/864** (848 + 16: `PodiumLayoutTests` new (11), `MatchStandingsTests` +5; existing podium tests now pin the tier classes).
-Captures (git-excluded): `Captures/phase5/postmatch/postmatch__static__{human,cpu,tie,allzero,nowin,two}__{desktop,phone,tablet}.png`.
+Captures (git-excluded): `Captures/phase5/postmatch/postmatch__{static,live}__{human,cpu,tie,allzero,nowin,two}__{desktop,phone,tablet}.png` + `solo_cpu_win_real.png` (a real idle 45 s solo match: DashFox wins, "You · 4th"). Live stage leak check clean (cams/RTs back to 1/0 after every PLAY AGAIN; the draw disposes the stage).
 `capture_postmatch.py` gained `tie` + `allzero` rounds (and `PM_ROUNDS` / `PM_RECTS` env switches). No prefab / scene wiring.
 
 - **Finding 6 — post-match edge cases.** `UI/MatchStandings`: `Score` (shown = floored food), `Ranked` sorts by the shown
@@ -30,7 +35,7 @@ Captures (git-excluded): `Captures/phase5/postmatch/postmatch__static__{human,cp
 
 ---
 
-## 🔧 Menu UI overhaul — Phase 5 chunk 3 (2026-10-08, uncommitted, in review): round-2 findings 1, 5, 9, 15
+## ✅ Menu UI overhaul — Phase 5 chunk 3 (2026-10-08, committed dbf1f1c): round-2 findings 1, 5, 9, 15
 
 EditMode **848/848** (828 + 20: `PlayerPaletteTests` new, `AbilityPaletteTests` +4, safe-area +4 in `MatchStandingsTests`).
 Captures (git-excluded): `Captures/phase5/{static,live,postmatch,postmatch_rowfix}`, `Captures/phase5/extra/solo_hud.png` (+ `solo_hud_forced_inset120.png`,
