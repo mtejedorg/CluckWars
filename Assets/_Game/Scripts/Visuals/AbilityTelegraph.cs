@@ -369,6 +369,7 @@ namespace CluckWars.Visuals
         private byte  _observedSlot;      // 1-based encoding, mirrors AbilityController.ChargingSlot
         private float _illegal01;         // 0 = fully accent, 1 = fully illegal-washed
         private bool  _noTargetPreview;   // nothing in the shape yet: draw the cream dashed outline
+        private bool  _cancelArmed;       // touch edge-band cancel armed: releasing now cancels (grey + dashed)
 
         // 10 Hz target classification (§10) — the geometry still redraws every frame.
         private float _pollTimer;
@@ -508,8 +509,10 @@ namespace CluckWars.Visuals
 
             for (int i = 0; i < _heldScratch.Length; i++)
             {
-                _heldScratch[i]  = _input.GetAbilityHeld(i);
-                _availScratch[i] = _abilities.IsReady(i);
+                // A slot that was cancelled / switched away from (key still down) or is re-arming after a fizzle
+                // is not a live hold, so it must not draw an aim the state machine has already dropped.
+                _heldScratch[i]  = _input.GetAbilityHeld(i) && !_abilities.IsHoldSuppressed(i);
+                _availScratch[i] = _abilities.IsReady(i) && !_abilities.IsRearming(i);
             }
             return AbilityPreviewRules.SelectLocalPreviewSlot(_heldScratch, _availScratch);
         }
@@ -521,6 +524,7 @@ namespace CluckWars.Visuals
 
             _observedSlot = 0;
             _illegal01    = 0f;
+            _cancelArmed  = false;
             _markedCount  = 0;
             _pollTimer    = 0f;
             for (int i = 0; i < MaxMarks; i++) _marked[i] = null;
@@ -562,6 +566,11 @@ namespace CluckWars.Visuals
             Color accent = ability.AccentColor;
             accent.a = FeedbackTuning.TelegraphPreviewAlpha;
             PreviewColor = Color.Lerp(accent, FeedbackTuning.IllegalCastTintColor, _illegal01);
+
+            // Edge-band cancel armed (touch): the preview greys out and goes dashed, so "let go to cancel" reads
+            // without relying on colour. Level-triggered from the input provider; no networked state.
+            _cancelArmed = _input != null && _input.IsAbilityCancelArmed();
+            if (_cancelArmed) PreviewColor = FeedbackTuning.CancelArmedPreviewColor;
         }
 
         private void UpdateGeometry(AbilityAimShape shape, float radius, float forwardOffset,
@@ -582,10 +591,11 @@ namespace CluckWars.Visuals
             }
             // No target yet: the cream dashed ribbon (texture carries cream + ink edge; tint is white).
             // Falls back to a solid cream line if the texture is not wired, and says so once.
-            bool dashed = _noTargetPreview && _dashedMat != null;
-            if (_noTargetPreview && _dashedMat == null)
+            bool wantDashed = _noTargetPreview || _cancelArmed;
+            bool dashed = wantDashed && _dashedMat != null;
+            if (wantDashed && _dashedMat == null)
             {
-                c = FeedbackTuning.NoTargetPreviewStalkColor;
+                c = _cancelArmed ? FeedbackTuning.CancelArmedPreviewColor : FeedbackTuning.NoTargetPreviewStalkColor;
                 if (!_missingTextureLogged)
                 {
                     _missingTextureLogged = true;
@@ -595,7 +605,8 @@ namespace CluckWars.Visuals
             }
             else if (dashed)
             {
-                c = FeedbackTuning.NoTargetPreviewTint;
+                // The dash texture carries cream + ink; a grey tint over it reads as the armed (grey) outline.
+                c = _cancelArmed ? FeedbackTuning.CancelArmedPreviewColor : FeedbackTuning.NoTargetPreviewTint;
             }
             ApplyLineStyle(dashed);
             _shapeLine.startColor = _shapeLine.endColor = c;
@@ -607,7 +618,8 @@ namespace CluckWars.Visuals
             if (stalk)
             {
                 _stalkLine.startColor = _stalkLine.endColor =
-                    _noTargetPreview ? FeedbackTuning.NoTargetPreviewStalkColor : PreviewColor;
+                    _cancelArmed ? FeedbackTuning.CancelArmedPreviewColor
+                    : _noTargetPreview ? FeedbackTuning.NoTargetPreviewStalkColor : PreviewColor;
                 TelegraphShapes.ApplyStalk(_stalkLine, _stalkBuf, pos,
                     AbilityAim.ShapeCenter(shape, pos, fwd, forwardOffset));
                 if (!_stalkLine.enabled) _stalkLine.enabled = true;

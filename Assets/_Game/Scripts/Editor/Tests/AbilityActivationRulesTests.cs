@@ -210,7 +210,7 @@ namespace CluckWars.Tests
         [Test]
         public void Decide_CancelBit_WhilePendingHold_Cancels()
         {
-            // Touch drag-off (FeedbackTuning.DragCancelDistancePx) inside the cost ramp:
+            // A cancel (touch edge band, Esc, right mouse) inside the cost ramp:
             // the gesture is abandoned, so it must cancel rather than fall through to the
             // idle scan and immediately re-pend the still-held button.
             var d = Decide(0, true, false, cancelPressed: true,
@@ -413,12 +413,22 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void Decide_PendingHold_IgnoresPressesOnOtherSlots()
+        public void Decide_PendingHold_PressOnAnotherSlot_SwitchesToIt()
         {
-            // One live gesture at a time: a stray press on another slot mid-ramp must not
-            // pre-empt the gesture in flight.
+            // Phase 6 (A4) replaced "one live gesture, other presses ignored": pressing another slot mid-aim
+            // switches to it (cancel the current, start the new pending hold the same tick).
             var d = Decide(0, true, false, false, new[] { true, false, false }, new[] { false, true, false }, AllCanBegin,
                 pendingSlot: 0, pendingHeldSeconds: Tick);
+            Assert.AreEqual(ChargeAction.SwitchHold, d.Action);
+            Assert.AreEqual(1, d.Slot);
+            Assert.AreEqual(0, d.FromSlot);
+        }
+
+        [Test]
+        public void Decide_PendingHold_PressOnADeadSlot_DoesNotPreemptTheGesture()
+        {
+            var d = Decide(0, true, false, false, new[] { true, false, false }, new[] { false, true, false },
+                new[] { true, false, true }, pendingSlot: 0, pendingHeldSeconds: Tick);
             Assert.AreEqual(ChargeAction.None, d.Action);
         }
     }

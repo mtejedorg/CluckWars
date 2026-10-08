@@ -31,8 +31,8 @@ namespace CluckWars.Input
 
         /// <summary>
         /// Edge-triggered: true for one frame when the hold-cancel gesture fires
-        /// (desktop Esc; touch drag-off-the-button, surfaced via
-        /// <c>TouchControlsController.ConsumeAbilityCancelled</c>). One flag covers
+        /// (desktop Esc or right mouse button; touch: release while the edge-band cancel is armed, or a lost
+        /// touch, surfaced via <c>TouchControlsController.ConsumeAbilityCancelled</c>). One flag covers
         /// every slot — only one hold can be charging at a time. Same one-shot /
         /// must-be-read-every-tick contract as <c>GetAbilityXPressed</c>.
         /// </summary>
@@ -45,5 +45,12 @@ namespace CluckWars.Input
         /// Both read the key's this-frame edge, which nothing consumes.
         /// </summary>
         bool GetBackPressed();
+
+        /// <summary>
+        /// Level-triggered (Phase 6, A4): true while a held ability's pointer sits in the touch edge band, i.e.
+        /// releasing now would CANCEL. Read by the local preview (grey + dashed) and nothing else. Always false
+        /// on keyboard / mouse and gamepad, which cancel with a button instead.
+        /// </summary>
+        bool IsAbilityCancelArmed();
     }
 }

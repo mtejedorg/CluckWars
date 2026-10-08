@@ -21,6 +21,8 @@ MonoBehaviour:
   CargoFull: {fileID: 0}
   AbilityActivate: {fileID: 0}
   AbilityExpire: {fileID: 0}
+  AbilityFizzle: {fileID: 8300000, guid: 58d56336dc21440e948d3075f63da40d, type: 3}
+  AbilityCancel: {fileID: 8300000, guid: f044040db1944d49b95d7c41657ec9a5, type: 3}
   MatchStart: {fileID: 0}
   MatchEnd: {fileID: 0}
   MatchVictory: {fileID: 0}

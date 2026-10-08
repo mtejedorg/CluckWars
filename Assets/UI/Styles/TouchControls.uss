@@ -450,3 +450,68 @@
 .cw-hex-icon--bully        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_BullyPassiveSO.png"); }
 .cw-hex-icon--spoiler      { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SpoilerPassiveSO.png"); }
 .cw-hex-icon--thief        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_ThiefPassiveSO.png"); }
+
+/* ============================================================================
+   FIZZLE + EDGE-BAND CANCEL  (Phase 6 chunk 2)
+   Every element here is built in code (TouchControlsController.BuildFlashElements) or lives in the UXML
+   root, is picking-mode Ignore and starts hidden. Cream bars with an ink border: shape, not just colour.
+   1 dp = ~2.35 px on this canvas.
+   ============================================================================ */
+
+/* The 0.3 s slash flash after a fizzle: a transient bar across the hex, reusing the state-bar geometry
+   (84 px long, centred, rotated). A single "/" so it can never be read as the stunned cross. */
+.cw-hex-flash-slash {
+    position: absolute;
+    left: 33px; top: 69px;
+    width: 84px; height: 12px;
+    background-color: rgb(254, 245, 224);
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    border-top-left-radius: 6px; border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
+    rotate: -45deg;
+}
+
+/* The whiff puff (Art/UI/Fx/Fx_Whiff.png): a little cloud over the hex, scaled and faded by the controller. */
+.cw-hex-puff {
+    position: absolute;
+    left: -20px; top: -20px;
+    width: 190px; height: 190px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Fx/Fx_Whiff.png");
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+/* The cancel X shown over the held hex while the edge band is armed: two crossed bars, bigger than the
+   stunned cross's weight class so it reads as a different thing. */
+.cw-hex-x {
+    position: absolute;
+    left: 0; right: 0; top: 0; bottom: 0;
+}
+.cw-hex-x-bar {
+    position: absolute;
+    left: 28px; top: 69px;
+    width: 94px; height: 12px;
+    background-color: rgb(254, 245, 224);
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    border-top-left-radius: 6px; border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
+}
+.cw-hex-x-bar--a { rotate: -45deg; }
+.cw-hex-x-bar--b { rotate: 45deg; }
+
+/* The edge glow strips: ~4 dp wide (10 px), cream at 85% with a 3 px ink line on the inner side, along ONE
+   physical screen edge at a time. Hidden until a held finger arms the cancel. */
+.cw-edge-glow {
+    position: absolute;
+    background-color: rgba(254, 245, 224, 0.85);
+    display: none;
+}
+.cw-edge-glow--left, .cw-edge-glow--right { top: 0; bottom: 0; width: 13px; }
+.cw-edge-glow--top, .cw-edge-glow--bottom { left: 0; right: 0; height: 13px; }
+.cw-edge-glow--left   { left: 0;   border-right-width:  3px; border-right-color:  rgb(42, 26, 12); }
+.cw-edge-glow--right  { right: 0;  border-left-width:   3px; border-left-color:   rgb(42, 26, 12); }
+.cw-edge-glow--top    { top: 0;    border-bottom-width: 3px; border-bottom-color: rgb(42, 26, 12); }
+.cw-edge-glow--bottom { bottom: 0; border-top-width:    3px; border-top-color:    rgb(42, 26, 12); }

@@ -186,5 +186,13 @@
 
         </ui:VisualElement>
 
+        <!-- Phase 6 chunk 2: the edge-band cancel strips. One per PHYSICAL screen edge (TouchRoot is the whole panel,
+             not the safe area); TouchControlsController shows only the one a held, armed finger is approaching.
+             Cream 85% with an ink line on the inner side; never takes a tap. -->
+        <ui:VisualElement name="EdgeGlowLeft" class="cw-edge-glow cw-edge-glow--left" picking-mode="Ignore" />
+        <ui:VisualElement name="EdgeGlowRight" class="cw-edge-glow cw-edge-glow--right" picking-mode="Ignore" />
+        <ui:VisualElement name="EdgeGlowTop" class="cw-edge-glow cw-edge-glow--top" picking-mode="Ignore" />
+        <ui:VisualElement name="EdgeGlowBottom" class="cw-edge-glow cw-edge-glow--bottom" picking-mode="Ignore" />
+
     </ui:VisualElement>
 </ui:UXML>

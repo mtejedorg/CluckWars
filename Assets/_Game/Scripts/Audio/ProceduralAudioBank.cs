@@ -39,6 +39,9 @@ namespace CluckWars.Audio
             if (reg.AbilityActivate == null) reg.AbilityActivate = Sweep("SFX_Cast", 360f, 920f, 0.18f, Wave.Saw, 0.34f);
             if (reg.AbilityExpire   == null) reg.AbilityExpire   = Sweep("SFX_CastEnd", 620f, 300f, 0.12f, Wave.Sine, 0.20f);
 
+            if (reg.AbilityFizzle == null) reg.AbilityFizzle = Sweep("SFX_Fizzle", 2600f, 900f, 0.12f, Wave.Noise, 0.14f);
+            if (reg.AbilityCancel == null) reg.AbilityCancel = Blip("SFX_Cancel", 240f, 0.06f, Wave.Sine, 0.22f);
+
             // Match
             if (reg.MatchStart   == null) reg.MatchStart   = Arp("SFX_MatchStart", new[] { 523f, 659f, 784f }, 0.12f, 0.40f);
             if (reg.MatchEnd     == null) reg.MatchEnd     = Arp("SFX_MatchEnd", new[] { 587f, 440f }, 0.16f, 0.36f);

@@ -146,18 +146,8 @@ namespace CluckWars.Visuals
         /// </summary>
         public const float TelegraphPreviewAlpha = 0.75f;
 
-        /// <summary>
-        /// Distance, in USS px, the touch point must move away from the ability
-        /// hex's centre before a hold counts as "dragged off" and cancels (§2.6).
-        /// Derived from <c>docs/STATE.md</c>'s measured conversion on this canvas:
-        /// 1 dp ≈ 2.35 USS px, and <c>TouchControls.uss</c>'s hex is 150 px (≈64 dp)
-        /// wide. 130 px (≈55 dp) is roughly the hex's own half-width (≈75 px) plus a
-        /// margin comparable to a thumb's resting wobble radius during aim — big
-        /// enough that ordinary aiming jitter never triggers an accidental cancel,
-        /// small enough that a deliberate "slide off the button" gesture reaches it
-        /// well within the reach of the same thumb that pressed it.
-        /// </summary>
-        public const float DragCancelDistancePx = 130f;
+        // The 130 px radial drag-cancel is gone (Phase 6, A4): kids drift that far by accident. Touch cancel is the
+        // visible edge band (HoldCancelRules: arm at 20 dp, disarm at 28 dp from the physical screen edge).
 
         // ================================================================
         // Impact — FEEDBACK.md §3
@@ -999,6 +989,24 @@ namespace CluckWars.Visuals
         /// the same cream the dashes carry, so the connector does not read as a solid accent line
         /// leading to a dashed shape.</summary>
         public static readonly Color NoTargetPreviewStalkColor = new Color(0.996f, 0.961f, 0.878f, 0.9f);
+
+        // ---- Fizzle + cancel (Phase 6 chunk 2) -------------------------------------
+
+        /// <summary>How long the slash flash and the whiff puff show over the hex after a fizzle.</summary>
+        public const float FizzleFlashSeconds = 0.3f;
+
+        /// <summary>Whiff puff scale at the start / end of its 0.3 s life (static, alpha-only, under Reduced Motion).</summary>
+        public const float FizzlePuffStartScale = 0.6f;
+        public const float FizzlePuffEndScale = 1.35f;
+
+        /// <summary>Play volumes of the fizzle whiff and the cancel tick. The clips are mastered to the same loudness as
+        /// the menu cues, so these keep two "nothing happened" sounds well under the real ability cue.</summary>
+        public const float FizzleSfxVolume = 0.55f;
+        public const float CancelSfxVolume = 0.5f;
+
+        /// <summary>Colour of the preview while the touch cancel is armed: neutral grey (dashed as well, so it is
+        /// never colour-only). Matches the "no effect" grey family rather than the red illegal wash.</summary>
+        public static readonly Color CancelArmedPreviewColor = new Color(0.62f, 0.62f, 0.60f, 0.95f);
 
         // ---- Touch-hex states (Phase 6, A1) -------------------------------------
 

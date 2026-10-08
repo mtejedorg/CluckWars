@@ -294,6 +294,25 @@ def cluck_assassin():
 METER = pyln.Meter(SR)
 
 
+# ------------------------------------------------- in-match ability cues ----
+def ability_fizzle():
+    """Soft airy 'pfft' (~120 ms): a move released with nobody in range. Local only, never a stinger."""
+    d = 0.12
+    t = tt(d)
+    air = bp(noise(len(t), 21), 1200, 5500) * (1 - np.exp(-t / 0.006)) * np.exp(-t / 0.038)
+    body = lp(noise(len(t), 22), 650) * (1 - np.exp(-t / 0.01)) * np.exp(-t / 0.05) * 0.45
+    return air + body
+
+
+def ability_cancel():
+    """Soft low tick (~60 ms): a held move cancelled. Duller and lower than ui_tap so it never reads as a confirm."""
+    d = 0.06
+    t = tt(d)
+    body = modal(d, [(240, 0.012, 1.0), (480, 0.007, 0.35), (150, 0.02, 0.5)], 23)
+    click = lp(noise(len(t), 24), 1400) * np.exp(-t / 0.002) * 0.5
+    return lp(body + click, 2200)
+
+
 def kweight(x):
     y = x.copy()
     for f in METER._filters.values():
@@ -325,8 +344,14 @@ def master_sfx(x):
     return x
 
 
+ABILITY_OUT = os.path.join(os.path.dirname(OUT), "Abilities")  # in-match cues live beside, not inside, the UI folder
+ABILITY_CUES = {"ability_fizzle.wav", "ability_cancel.wav"}
+
+
 def write(name, x, stereo=False):
-    path = os.path.join(OUT, name)
+    out = ABILITY_OUT if name in ABILITY_CUES else OUT
+    os.makedirs(out, exist_ok=True)
+    path = os.path.join(out, name)
     data = np.clip(x, -1, 1)
     pcm = np.round(data * 32767).astype(np.int16)
     wavfile.write(path, SR, pcm)
@@ -340,6 +365,7 @@ SFX = {
     "slot_arm.wav": slot_arm, "equip_thunk.wav": equip_thunk, "clear_pop.wav": clear_pop,
     "ready_stamp.wav": ready_stamp, "countdown_tick.wav": countdown_tick,
     "countdown_go.wav": countdown_go, "match_sting.wav": match_sting,
+    "ability_fizzle.wav": ability_fizzle, "ability_cancel.wav": ability_cancel,
 }
 
 if __name__ == "__main__":

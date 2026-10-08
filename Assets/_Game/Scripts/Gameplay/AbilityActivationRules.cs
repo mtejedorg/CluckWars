@@ -79,6 +79,15 @@ namespace CluckWars.Gameplay
         /// casting model.
         /// </summary>
         BeginPendingHold = 5,
+        /// <summary>
+        /// Another slot was pressed while <see cref="ChargeDecision.FromSlot"/> was pending or
+        /// charging (Phase 6, A4): drop the old gesture without firing or burning cooldown and
+        /// start <see cref="ChargeDecision.Slot"/> as the new pending hold the same tick. The caller
+        /// must then ignore the old slot until its key/finger is released
+        /// (<see cref="AbilityHoldStateMachine.ApplySuppression"/>), or letting go of the NEW slot
+        /// would hand the tick straight back to the old one.
+        /// </summary>
+        SwitchHold = 6,
     }
 
     /// <summary>One tick's verdict: what to do, and which slot it concerns (meaningless
@@ -87,11 +96,14 @@ namespace CluckWars.Gameplay
     {
         public readonly ChargeAction Action;
         public readonly int Slot;
+        /// <summary>For <see cref="ChargeAction.SwitchHold"/> only: the slot being abandoned; else -1.</summary>
+        public readonly int FromSlot;
 
-        public ChargeDecision(ChargeAction action, int slot = -1)
+        public ChargeDecision(ChargeAction action, int slot = -1, int fromSlot = -1)
         {
             Action = action;
             Slot = slot;
+            FromSlot = fromSlot;
         }
 
         public static readonly ChargeDecision None = new ChargeDecision(ChargeAction.None);
@@ -187,7 +199,12 @@ namespace CluckWars.Gameplay
                 // or a peer on a different build. Cancel rather than index past the end.
                 if (slot >= slotCount) return ChargeDecision.Cancel;
 
-                return hold[slot] ? ChargeDecision.None : new ChargeDecision(ChargeAction.Fire, slot);
+                if (!hold[slot]) return new ChargeDecision(ChargeAction.Fire, slot);
+
+                int switchTo = FindSwitchTarget(slot, press, canBeginCharge);
+                return switchTo >= 0
+                    ? new ChargeDecision(ChargeAction.SwitchHold, switchTo, slot)
+                    : ChargeDecision.None;
             }
 
             // 4. A pending hold likewise owns the tick — "one live gesture at a time".
@@ -197,6 +214,11 @@ namespace CluckWars.Gameplay
                 // never entered charge state it never cost a telegraph, a wind-up tell, or
                 // a single frame of the aim-rotate movement lock.
                 if (!hold[pendingSlot]) return new ChargeDecision(ChargeAction.Fire, pendingSlot);
+
+                // Pressing another slot's key/hex mid-aim switches to it. A release (above) wins the
+                // tick; the switch outranks promotion, since the old slot is being abandoned anyway.
+                int switchTo = FindSwitchTarget(pendingSlot, press, canBeginCharge);
+                if (switchTo >= 0) return new ChargeDecision(ChargeAction.SwitchHold, switchTo, pendingSlot);
 
                 // >= not >: a hold that lands exactly on the boundary is a hold. The caller
                 // accumulates in whole ticks, so exact equality is reachable in practice
@@ -234,5 +256,64 @@ namespace CluckWars.Gameplay
             }
             return ChargeDecision.None;
         }
+
+        /// <summary>Lowest slot other than <paramref name="current"/> with a fresh press edge that can
+        /// actually begin a hold, or -1. A dead slot (cooling, rearming) never steals the gesture.</summary>
+        private static int FindSwitchTarget(int current, bool[] press, bool[] canBeginCharge)
+        {
+            for (int slot = 0; slot < press.Length; slot++)
+                if (slot != current && press[slot] && canBeginCharge[slot]) return slot;
+            return -1;
+        }
+
+        /// <summary>
+        /// Slot-suppression pass the caller runs on its own per-tick hold/press scratch BEFORE
+        /// <see cref="Decide"/>. A suppressed slot (it was cancelled, or switched away from) reads as
+        /// not held and not pressed until its hold bit is observed LOW once, which clears the
+        /// suppression. That is what makes "Esc while holding Q" really cancel (the still-down key no
+        /// longer re-arms a pending hold) and what stops releasing a switched-to slot from resuming
+        /// the abandoned one.
+        /// </summary>
+        public static void ApplySuppression(bool[] hold, bool[] press, bool[] suppressed)
+        {
+            if (hold == null || press == null || suppressed == null) return;
+            int n = System.Math.Min(hold.Length, System.Math.Min(press.Length, suppressed.Length));
+            for (int slot = 0; slot < n; slot++)
+            {
+                if (!suppressed[slot]) continue;
+                if (!hold[slot]) { suppressed[slot] = false; continue; }
+                hold[slot] = false;
+                press[slot] = false;
+            }
+        }
+
+        /// <summary>The slot of the live pre-fire gesture (charging beats pending), or -1.</summary>
+        public static int LiveSlot(byte chargingSlot, int pendingSlot) =>
+            chargingSlot != 0 ? chargingSlot - 1 : (pendingSlot >= 0 ? pendingSlot : NoPendingSlot);
+    }
+
+    /// <summary>
+    /// Fizzle rules (Phase 6, A3): releasing a target-gated move with nobody in range is a
+    /// <i>fizzle</i> — no effect, no cooldown, local whiff feedback — NOT a refusal like Cooldown /
+    /// Stunned, which keep the plain denied-press bump. Pure so both release paths (hold release and
+    /// sub-tick quick tap, which both end in <c>TryActivate</c>) classify identically.
+    /// </summary>
+    public static class AbilityFizzleRules
+    {
+        /// <summary>After a fizzle that slot may not begin a new hold/press for this long. NOT a cooldown:
+        /// local state-authority scratch, so free fake wind-ups can't stand in for Feint.</summary>
+        public const float RearmSeconds = 0.4f;
+
+        /// <summary>A refusal is a fizzle iff it is NoTarget (<c>IsUsable</c> false for lack of a
+        /// target: RequiresEnemyInRange abilities, and Peck with no pile in range).</summary>
+        public static bool IsFizzle(AbilityRefusal refusal) => refusal == AbilityRefusal.NoTarget;
+
+        /// <summary>Remaining re-arm time right after a fizzle.</summary>
+        public static float Begin() => RearmSeconds;
+
+        public static float Advance(float remaining, float deltaSeconds) =>
+            remaining > 0f ? System.Math.Max(0f, remaining - deltaSeconds) : 0f;
+
+        public static bool IsRearming(float remaining) => remaining > 0f;
     }
 }

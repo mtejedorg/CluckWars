@@ -29,11 +29,12 @@ namespace CluckWars.Input
     /// pointer on down (mirroring the joystick's own <c>CapturePointer</c>/
     /// <c>ReleasePointer</c> pattern below) and tracks a level-triggered
     /// <see cref="IsAbilityHeld"/> per slot, cleared cleanly on release/capture-loss.
-    /// A hold that drags more than <c>FeedbackTuning.DragCancelDistancePx</c> away
-    /// from the hex's centre sets a one-shot cancel flag
+    /// A hold whose finger is released inside the edge band (within 20 dp of a physical screen
+    /// edge; <see cref="HoldCancelRules"/>), or whose touch is lost (PointerCancel / capture-out),
+    /// sets a one-shot cancel flag
     /// (<see cref="ConsumeAbilityCancelled"/>) instead of clearing the hold silently,
-    /// so <c>TouchInputProvider</c> can tell "released to fire" apart from "dragged
-    /// off to cancel" — both look identical as a plain hold-bit falling edge
+    /// so <c>TouchInputProvider</c> can tell "released to fire" apart from "cancelled"
+    /// — both look identical as a plain hold-bit falling edge
     /// otherwise, and the two must fire opposite outcomes on the network.
     ///
     /// Per-slot visuals mirror the old <c>TouchControlsHud.Update()</c>: accent
@@ -128,6 +129,9 @@ namespace CluckWars.Input
             public VisualElement Mark;       // category shape (CategoryMark): the category without colour
             public VisualElement Pip;        // in-range pip: a rival is in this move's shape (bottom-centre)
             public HexDurationRing Ring;     // duration ring while this slot's ability is running
+            public VisualElement CancelX;    // built in code: the cream X shown while the edge-band cancel is armed
+            public VisualElement FizzleSlash;// built in code: the 0.3 s slash flash after a fizzle
+            public VisualElement Puff;       // built in code: the Fx_Whiff puff after a fizzle
         }
         /// <summary>Mirrors <see cref="Gameplay.AbilityController.SlotCount"/> so the hex
         /// cluster and the gameplay slot count cannot drift apart.</summary>
@@ -144,6 +148,14 @@ namespace CluckWars.Input
 
         // Denied-press bump timers (§6). -1 = idle.
         private readonly float[] _bumpTimer = new float[SlotCount];
+
+        // Phase 6 chunk 2: fizzle flash timers (seconds into the 0.3 s flash; -1 = idle) and the touch edge-band cancel.
+        private readonly float[] _fizzleTimer  = new float[SlotCount] { -1f, -1f, -1f, -1f };
+        private readonly bool[]  _cancelArmed  = new bool[SlotCount];
+        private readonly ScreenEdge[] _armedEdge = new ScreenEdge[SlotCount];
+        private readonly bool[]  _appliedCancelX = new bool[SlotCount];
+        private ScreenEdge _appliedGlowEdge;
+        private VisualElement _glowLeft, _glowRight, _glowTop, _glowBottom;
 
         // Phase 6 (A1) hex states, cached so style writes only happen on a real change.
         private readonly bool[]  _appliedHeld = new bool[SlotCount];
@@ -223,8 +235,20 @@ namespace CluckWars.Input
         /// hasn't been drag-cancelled. Safe to read every frame.</summary>
         public bool IsAbilityHeld(int slot) => slot >= 0 && slot < SlotCount && _held[slot];
 
+        /// <summary>Level-triggered: a held hex's finger is inside the edge band, so releasing now cancels.
+        /// Read by <see cref="TouchInputProvider.IsAbilityCancelArmed"/> for the local preview.</summary>
+        public bool IsCancelArmed
+        {
+            get
+            {
+                for (int i = 0; i < SlotCount; i++)
+                    if (_held[i] && _cancelArmed[i]) return true;
+                return false;
+            }
+        }
+
         /// <summary>Returns (and clears) whether <paramref name="slot"/>'s hold was
-        /// just drag-cancelled — the "released to fire" vs "dragged off to cancel"
+        /// just cancelled — the "released to fire" vs "dragged off to cancel"
         /// distinction <see cref="TouchInputProvider"/> needs (see class remarks).</summary>
         public bool ConsumeAbilityCancelled(int slot)
         {
@@ -341,6 +365,7 @@ namespace CluckWars.Input
                     hex.Add(_slots[i].Mark);
                     hex.Add(_slots[i].Ring);
                     _slots[i].Ring.style.display = DisplayStyle.None;
+                    BuildFlashElements(ref _slots[i], hex);
                     if (_slots[i].Fill == null || _slots[i].Pip == null)
                         _log?.Error(Source, $"TouchControls.uxml is missing #Fill{n} or #Pip{n}: that hex draws without its rim / in-range pip.");
 
@@ -357,15 +382,22 @@ namespace CluckWars.Input
                 {
                     int slot = i; // capture
                     hex.RegisterCallback<PointerDownEvent>(evt => OnHexDown(slot, evt));
-                    // PointerMoveEvent isn't in the spec's literal event list but is the
-                    // only way to measure drag distance for FeedbackTuning.DragCancelDistancePx
-                    // (see class remarks) — without it there is no signal to cancel on.
+                    // PointerMoveEvent drives the edge-band cancel arming (HoldCancelRules).
                     hex.RegisterCallback<PointerMoveEvent>(evt => OnHexMove(slot, evt));
                     hex.RegisterCallback<PointerUpEvent>(evt => OnHexUp(slot, evt));
                     hex.RegisterCallback<PointerLeaveEvent>(evt => OnHexLeave(slot, evt));
                     hex.RegisterCallback<PointerCaptureOutEvent>(evt => OnHexCaptureOut(slot, evt));
+                    // The OS taking the touch (system edge gesture, palm rejection) must cancel, never fire.
+                    hex.RegisterCallback<PointerCancelEvent>(evt => OnHexPointerCancel(slot, evt));
                 }
             }
+
+            _glowLeft   = _root.Q<VisualElement>("EdgeGlowLeft");
+            _glowRight  = _root.Q<VisualElement>("EdgeGlowRight");
+            _glowTop    = _root.Q<VisualElement>("EdgeGlowTop");
+            _glowBottom = _root.Q<VisualElement>("EdgeGlowBottom");
+            if (_glowLeft == null || _glowRight == null || _glowTop == null || _glowBottom == null)
+                _log?.Error(Source, "TouchControls.uxml is missing an #EdgeGlow* strip: the cancel band will not show which edge cancels.");
 
             _bound = true;
             _log?.Info(Source, $"Bound UITK touch controls: joystick + {SlotCount} hex ability buttons + status strip.");
@@ -422,6 +454,8 @@ namespace CluckWars.Input
             _pressed[slot] = true;
             _held[slot] = true;
             _cancelled[slot] = false;
+            _cancelArmed[slot] = false;
+            _armedEdge[slot] = ScreenEdge.None;
             _heldPointerId[slot] = evt.pointerId;
             _slots[slot].Hex?.CapturePointer(evt.pointerId);
             evt.StopPropagation();
@@ -429,61 +463,91 @@ namespace CluckWars.Input
         }
 
         /// <summary>
-        /// Drag-off cancel (FEEDBACK.md §2.6): while held, once the pointer strays past
-        /// <see cref="FeedbackTuning.DragCancelDistancePx"/> from the hex's own centre,
-        /// stop treating this as a live hold and flag it cancelled instead — so the
-        /// eventual release fires <see cref="ConsumeAbilityCancelled"/> rather than a
-        /// plain "hold fell, fire" edge. Once cancelled for this press, stays cancelled
-        /// until the next <see cref="OnHexDown"/> (no un-cancelling by drifting back).
+        /// Edge-band cancel (Phase 6, A4): while held, the pointer's RAW screen position (the panel position
+        /// converted back to screen pixels, then to dp) arms the cancel within 20 dp of any physical screen edge
+        /// and disarms beyond 28 dp (<see cref="HoldCancelRules"/>). Nothing is decided here beyond that: the
+        /// release is what cancels (<see cref="EndHexPointer"/>). There is deliberately no radial drag-off any
+        /// more; a thumb that merely drifts never cancels.
         /// </summary>
         private void OnHexMove(int slot, PointerMoveEvent evt)
         {
             if (!_held[slot] || _heldPointerId[slot] != evt.pointerId) return;
+            if (!TryPanelToScreen(evt.position, out var screen)) return;
 
-            var hex = _slots[slot].Hex;
-            if (hex == null) return;
-
-            var center = hex.contentRect.center;
-            var delta  = new Vector2(evt.localPosition.x - center.x, evt.localPosition.y - center.y);
-            if (delta.magnitude > FeedbackTuning.DragCancelDistancePx)
-            {
-                _held[slot] = false;
-                _cancelled[slot] = true;
-                RefreshHeldVisuals();
-            }
+            bool armed = HoldCancelRules.Evaluate(_cancelArmed[slot], screen, Screen.width, Screen.height,
+                                                  Screen.dpi, out var edge);
+            SetCancelArmed(slot, armed, edge);
         }
+
+        /// <summary>Panel-space position (origin top-left) to physical screen pixels (origin top-left). The panel
+        /// scales with the screen (reference 1920x1080), so the ratio of the two sizes is the whole conversion.</summary>
+        private bool TryPanelToScreen(Vector3 panelPos, out Vector2 screen)
+        {
+            screen = default;
+            var size = _root != null ? _root.worldBound.size : Vector2.zero;
+            if (size.x <= 1f || size.y <= 1f) return false;
+            screen = new Vector2(panelPos.x / size.x * Screen.width, panelPos.y / size.y * Screen.height);
+            return true;
+        }
+
+        private void SetCancelArmed(int slot, bool armed, ScreenEdge edge)
+        {
+            bool wasArmed = _cancelArmed[slot];
+            _cancelArmed[slot] = armed;
+            _armedEdge[slot] = armed ? edge : ScreenEdge.None;
+            if (armed && !wasArmed) OnCancelArmed(slot);
+        }
+
+        /// <summary>
+        /// The moment the edge-band cancel arms. Phase 6 chunk 6 plays the 10-20 ms haptic tick from here
+        /// (gated by the "Buzz When Hit" toggle); there is intentionally no vibration code yet.
+        /// </summary>
+        private void OnCancelArmed(int slot) { }
 
         private void OnHexUp(int slot, PointerUpEvent evt)
         {
             if (_heldPointerId[slot] != evt.pointerId) return;
-
-            var hex = _slots[slot].Hex;
-            if (hex != null && hex.HasPointerCapture(evt.pointerId)) hex.ReleasePointer(evt.pointerId);
-            _held[slot] = false;
-            _heldPointerId[slot] = -1;
-            RefreshHeldVisuals();
+            EndHexPointer(slot, HexPointerEnd.Up, evt.pointerId);
         }
 
         /// <summary>
-        /// Registered per the Stage 2 spec, but deliberately NOT a cancel trigger: the
-        /// hex's own visual bounds (~75px half-width) are smaller than
-        /// <see cref="FeedbackTuning.DragCancelDistancePx"/> (130px), so treating "left
-        /// the element" as cancel would fire well before the tuned drag threshold and
-        /// make that constant meaningless. Left as a no-op — <see cref="OnHexMove"/>'s
-        /// distance check is the single source of truth for drag-off cancel, and the
-        /// captured pointer keeps delivering move/up events regardless of visual bounds.
+        /// Registered per the Stage 2 spec, but deliberately NOT a cancel trigger: the finger legitimately
+        /// leaves the hex's visual bounds while aiming, and the captured pointer keeps delivering move / up
+        /// events regardless. The edge band is the only cancel gesture.
         /// </summary>
         private void OnHexLeave(int slot, PointerLeaveEvent evt) { }
 
         /// <summary>Pointer capture lost abnormally (OS gesture takeover, multi-touch
-        /// conflict). Treated as a cancel, not a release-to-fire — an involuntary loss
+        /// conflict). Treated as a cancel, not a release-to-fire: an involuntary loss
         /// of tracking is not a deliberate "let go to cast" gesture.</summary>
         private void OnHexCaptureOut(int slot, PointerCaptureOutEvent evt)
         {
             if (!_held[slot]) return;
+            EndHexPointer(slot, HexPointerEnd.CaptureOut, -1);
+        }
+
+        /// <summary>The touch was cancelled by the system (edge swipe, palm rejection). Never fires.</summary>
+        private void OnHexPointerCancel(int slot, PointerCancelEvent evt)
+        {
+            if (!_held[slot] || _heldPointerId[slot] != evt.pointerId) return;
+            EndHexPointer(slot, HexPointerEnd.Cancel, evt.pointerId);
+        }
+
+        /// <summary>
+        /// The single place a hex interaction ends. State is settled BEFORE the pointer is released, so the
+        /// capture-out event that release raises finds the slot already idle. A lift fires unless the edge band is
+        /// armed; PointerCancel and a lost capture always cancel (<see cref="HoldCancelRules.ResolveRelease"/>).
+        /// </summary>
+        private void EndHexPointer(int slot, HexPointerEnd end, int pointerId)
+        {
+            var release = HoldCancelRules.ResolveRelease(end, _cancelArmed[slot]);
             _held[slot] = false;
-            _cancelled[slot] = true;
             _heldPointerId[slot] = -1;
+            if (release == HexRelease.Cancel) _cancelled[slot] = true;
+            SetCancelArmed(slot, false, ScreenEdge.None);
+
+            var hex = _slots[slot].Hex;
+            if (pointerId >= 0 && hex != null && hex.HasPointerCapture(pointerId)) hex.ReleasePointer(pointerId);
             RefreshHeldVisuals();
         }
 
@@ -581,7 +645,37 @@ namespace CluckWars.Input
                     _appliedDim[slot] = dim;
                     hex.style.opacity = dim ? FeedbackTuning.HexOthersWhileHeldAlpha : 1f;
                 }
+
+                bool showX = held && _cancelArmed[slot];
+                if (showX != _appliedCancelX[slot])
+                {
+                    _appliedCancelX[slot] = showX;
+                    if (_slots[slot].CancelX != null)
+                        _slots[slot].CancelX.style.display = showX ? DisplayStyle.Flex : DisplayStyle.None;
+                }
             }
+
+            RefreshEdgeGlow();
+        }
+
+        /// <summary>Shows the glow strip along the screen edge a held, armed finger is approaching (and only that one).</summary>
+        private void RefreshEdgeGlow()
+        {
+            var edge = ScreenEdge.None;
+            for (int i = 0; i < SlotCount; i++)
+                if (_held[i] && _cancelArmed[i]) { edge = _armedEdge[i]; break; }
+
+            if (edge == _appliedGlowEdge) return;
+            _appliedGlowEdge = edge;
+            SetGlow(_glowLeft,   edge == ScreenEdge.Left);
+            SetGlow(_glowRight,  edge == ScreenEdge.Right);
+            SetGlow(_glowTop,    edge == ScreenEdge.Top);
+            SetGlow(_glowBottom, edge == ScreenEdge.Bottom);
+        }
+
+        private static void SetGlow(VisualElement strip, bool on)
+        {
+            if (strip != null) strip.style.display = on ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         private const string HeldClass = "cw-hex--held";
@@ -842,7 +936,91 @@ namespace CluckWars.Input
                 _bumpTimer[denied] = 0f;
             }
 
-            for (int slot = 0; slot < SlotCount; slot++) UpdateBump(slot);
+            // A fizzle (target-gated move released with nobody in range) is its own one-shot: the plain bump plus
+            // the slash flash and whiff puff (the whiff SOUND is played by AbilityController, local only).
+            if (abilities != null && abilities.TryConsumeFizzle(out int fizzled)
+                && fizzled >= 0 && fizzled < SlotCount)
+            {
+                _bumpTimer[fizzled] = 0f;
+                _fizzleTimer[fizzled] = 0f;
+                SetFizzleVisible(fizzled, true);
+            }
+
+            for (int slot = 0; slot < SlotCount; slot++)
+            {
+                UpdateBump(slot);
+                UpdateFizzle(slot);
+            }
+        }
+
+        /// <summary>
+        /// Builds the code-made hex overlays: the cancel X (two bars), the fizzle slash and the whiff puff. All
+        /// picking-mode Ignore, hidden until driven. Painted above everything else in the hex.
+        /// </summary>
+        private static void BuildFlashElements(ref HexSlot slot, VisualElement hex)
+        {
+            var x = new VisualElement { pickingMode = PickingMode.Ignore };
+            x.AddToClassList("cw-hex-x");
+            var a = new VisualElement { pickingMode = PickingMode.Ignore };
+            a.AddToClassList("cw-hex-x-bar"); a.AddToClassList("cw-hex-x-bar--a");
+            var b = new VisualElement { pickingMode = PickingMode.Ignore };
+            b.AddToClassList("cw-hex-x-bar"); b.AddToClassList("cw-hex-x-bar--b");
+            x.Add(a); x.Add(b);
+            x.style.display = DisplayStyle.None;
+
+            var puff = new VisualElement { pickingMode = PickingMode.Ignore };
+            puff.AddToClassList("cw-hex-puff");
+            puff.style.display = DisplayStyle.None;
+
+            var slash = new VisualElement { pickingMode = PickingMode.Ignore };
+            slash.AddToClassList("cw-hex-flash-slash");
+            slash.style.display = DisplayStyle.None;
+
+            hex.Add(puff);
+            hex.Add(slash);
+            hex.Add(x);
+            slot.CancelX = x;
+            slot.Puff = puff;
+            slot.FizzleSlash = slash;
+        }
+
+        private void SetFizzleVisible(int slot, bool on)
+        {
+            var d = on ? DisplayStyle.Flex : DisplayStyle.None;
+            var refs = _slots[slot];
+            if (refs.FizzleSlash != null) refs.FizzleSlash.style.display = d;
+            if (refs.Puff != null) refs.Puff.style.display = d;
+        }
+
+        /// <summary>
+        /// The 0.3 s fizzle flash: the slash is a transient flash (full strength, then gone with the puff), and the
+        /// whiff puff grows and fades. Under Reduced Motion the puff does not scale; it only fades. Driven by
+        /// <c>unscaledDeltaTime</c>, like the bump, so a hit-stop dip cannot stretch it.
+        /// </summary>
+        private void UpdateFizzle(int slot)
+        {
+            if (_fizzleTimer[slot] < 0f) return;
+
+            var refs = _slots[slot];
+            _fizzleTimer[slot] += Time.unscaledDeltaTime;
+            float t = _fizzleTimer[slot] / FeedbackTuning.FizzleFlashSeconds;
+            if (t >= 1f)
+            {
+                _fizzleTimer[slot] = -1f;
+                SetFizzleVisible(slot, false);
+                if (refs.Puff != null) refs.Puff.style.scale = new Scale(Vector3.one);
+                return;
+            }
+
+            if (refs.FizzleSlash != null) refs.FizzleSlash.style.opacity = t < 0.6f ? 1f : 1f - (t - 0.6f) / 0.4f;
+            if (refs.Puff != null)
+            {
+                refs.Puff.style.opacity = 1f - t;
+                float k = PlayerPreferences.ReducedMotionEnabled
+                    ? 1f
+                    : Mathf.Lerp(FeedbackTuning.FizzlePuffStartScale, FeedbackTuning.FizzlePuffEndScale, t);
+                refs.Puff.style.scale = new Scale(new Vector3(k, k, 1f));
+            }
         }
 
         /// <summary>

@@ -30,6 +30,10 @@ namespace CluckWars.Audio
         [Header("Abilities")]
         public AudioClip AbilityActivate;
         public AudioClip AbilityExpire;
+        [Tooltip("Soft airy 'pfft': a target-gated move released with nobody in range (local only).")]
+        public AudioClip AbilityFizzle;
+        [Tooltip("Soft low tick: a held move cancelled (edge band, Esc, right mouse) (local only).")]
+        public AudioClip AbilityCancel;
 
         [Header("Match")]
         public AudioClip MatchStart;

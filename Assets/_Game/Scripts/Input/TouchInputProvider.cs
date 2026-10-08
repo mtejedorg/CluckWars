@@ -65,6 +65,12 @@ namespace CluckWars.Input
             return any;
         }
 
+        public bool IsAbilityCancelArmed()
+        {
+            var hud = TouchControlsController.Instance;
+            return hud != null && hud.IsCancelArmed;
+        }
+
         /// <summary>The on-screen controls have no back button (Android back comes through the
         /// keyboard provider as Escape).</summary>
         public bool GetBackPressed() => false;

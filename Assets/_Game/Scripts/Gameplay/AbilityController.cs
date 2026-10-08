@@ -175,6 +175,20 @@ namespace CluckWars.Gameplay
         private bool _deniedPressPending;
         private int _deniedPressSlot;
 
+        // Phase 6 (A3) fizzle: a target-gated move released with nobody in range. Its own one-shot, distinct from
+        // the denied press (Cooldown / Stunned / ...), so the HUD can play the whiff instead of the plain bump.
+        private bool _fizzlePending;
+        private int _fizzleSlot;
+
+        // Phase 6 (A3) re-arm: seconds left per slot after a fizzle, during which that slot may not begin a hold
+        // or press. State-authority local scratch (never networked) and NOT a cooldown, so the cooldown visuals
+        // and TickTimers are untouched.
+        private readonly float[] _rearmRemaining = new float[SlotCount];
+
+        // Phase 6 (A4) suppression: a slot that was cancelled or switched away from reads as released until its
+        // hold bit is observed low, so a still-down key cannot re-arm it. See AbilityHoldStateMachine.ApplySuppression.
+        private readonly bool[] _holdSuppressed = new bool[SlotCount];
+
         [Inject]
         public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry)
         {
@@ -243,6 +257,9 @@ namespace CluckWars.Gameplay
                 Deactivate();
             }
 
+            for (int i = 0; i < SlotCount; i++)
+                _rearmRemaining[i] = AbilityFizzleRules.Advance(_rearmRemaining[i], Runner.DeltaTime);
+
             var gm = GameManager.Instance;
             if (gm == null || !gm.IsMatchRunning)
             {
@@ -281,6 +298,9 @@ namespace CluckWars.Gameplay
             _canBeginCharge[2] = CanBeginCharge(2);
             _canBeginCharge[3] = CanBeginCharge(3);
 
+            // A cancelled / switched-away slot reads as released until its key or finger is actually up.
+            AbilityHoldStateMachine.ApplySuppression(_holdBits, _pressBits, _holdSuppressed);
+
             // Clock a live pending hold BEFORE deciding, so the tick on which it crosses
             // the threshold is the tick it gets promoted — not the one after.
             if (_pendingHoldSlot != InvalidSlot) _pendingHoldSeconds += Runner.DeltaTime;
@@ -304,8 +324,23 @@ namespace CluckWars.Gameplay
                     ClearPendingHold();
                     TryActivate(decision.Slot);
                     break;
-                case ChargeAction.Cancel:
+                case ChargeAction.SwitchHold:
+                    // Pressing another slot mid-aim: abandon the old gesture (no fire, no cooldown), start the new
+                    // slot's pending hold this same tick, and ignore the old slot until it is released.
+                    _holdSuppressed[decision.FromSlot] = true;
                     CancelCharge();
+                    _pendingHoldSlot = decision.Slot;
+                    _pendingHoldSeconds = 0f;
+                    break;
+                case ChargeAction.Cancel:
+                    int liveSlot = AbilityHoldStateMachine.LiveSlot(ChargingSlot, _pendingHoldSlot);
+                    CancelCharge();
+                    if (cancelPressed && liveSlot >= 0 && liveSlot < SlotCount)
+                    {
+                        // A deliberate cancel (Esc / right mouse / touch edge band), not a stun tearing the aim down.
+                        _holdSuppressed[liveSlot] = true;
+                        PlayLocalSfx(_audioReg != null ? _audioReg.AbilityCancel : null, FeedbackTuning.CancelSfxVolume);
+                    }
                     break;
                 case ChargeAction.RefuseAttempt:
                     TryActivate(decision.Slot); // refuses cleanly and logs why — see EvaluateRefusalInternal
@@ -374,6 +409,31 @@ namespace CluckWars.Gameplay
             slot = InvalidSlot;
             return false;
         }
+
+        /// <summary>
+        /// One-shot flag: true (once) when a target-gated move was released with nobody in range (Phase 6, A3).
+        /// Distinct from <see cref="TryConsumeDeniedPress"/>: the HUD plays the slash flash + whiff puff for it.
+        /// A fizzle burns no cooldown and is not a move used (see <see cref="TryActivate"/>).
+        /// </summary>
+        public bool TryConsumeFizzle(out int slot)
+        {
+            if (_fizzlePending)
+            {
+                slot = _fizzleSlot;
+                _fizzlePending = false;
+                return true;
+            }
+            slot = InvalidSlot;
+            return false;
+        }
+
+        /// <summary>True for <see cref="AbilityFizzleRules.RearmSeconds"/> after a fizzle on <paramref name="slot"/>.</summary>
+        public bool IsRearming(int slot) =>
+            slot >= 0 && slot < SlotCount && AbilityFizzleRules.IsRearming(_rearmRemaining[slot]);
+
+        /// <summary>True while <paramref name="slot"/> was cancelled / switched away from and its key is still down;
+        /// the local preview ignores such a slot so it does not keep drawing an aim the machine has dropped.</summary>
+        public bool IsHoldSuppressed(int slot) => slot >= 0 && slot < SlotCount && _holdSuppressed[slot];
 
         public void TriggerCooldown(int slot, float duration)
         {
@@ -565,7 +625,16 @@ namespace CluckWars.Gameplay
         {
             if (slot < 0 || slot >= EquippedSlotCount) return false;
             if (GetSlot(slot) == null) return false;
+            if (IsRearming(slot)) return false;
             return GetCooldown(slot).ExpiredOrNotRunning(Runner);
+        }
+
+        /// <summary>Local-only sound: only the chicken a human is driving plays it (never bots or remote peers).</summary>
+        private void PlayLocalSfx(AudioClip clip, float volume)
+        {
+            if (clip == null || !Object.HasInputAuthority) return;
+            if (_controller != null && _controller.IsBot) return;
+            _audio?.PlaySFX(clip, volume);
         }
 
         /// <summary>Clears an in-progress hold-to-aim gesture — committed charge AND pending
@@ -589,10 +658,30 @@ namespace CluckWars.Gameplay
 
         private void TryActivate(int slot)
         {
+            // Re-arm window after a fizzle: no press may start a cast, whichever path it arrived by.
+            if (IsRearming(slot))
+            {
+                _log?.Debug(Source, $"TryActivate slot {slot}: refused (re-arming after a fizzle).");
+                _deniedPressPending = true;
+                _deniedPressSlot = slot;
+                return;
+            }
+
             var reason = EvaluateRefusalInternal(slot, out var ability);
             if (reason != AbilityRefusal.None)
             {
                 _log?.Debug(Source, $"TryActivate slot {slot}: refused ({reason}).");
+                if (AbilityFizzleRules.IsFizzle(reason))
+                {
+                    // Nobody in range on release: no effect, no cooldown (we return before any is set), and NOT a
+                    // move used. Phase 6 chunk 3 makes casting end stealth; that logic sits BELOW this return,
+                    // so a fizzle never reaches it.
+                    _fizzlePending = true;
+                    _fizzleSlot = slot;
+                    _rearmRemaining[slot] = AbilityFizzleRules.Begin();
+                    PlayLocalSfx(_audioReg != null ? _audioReg.AbilityFizzle : null, FeedbackTuning.FizzleSfxVolume);
+                    return;
+                }
                 _deniedPressPending = true;
                 _deniedPressSlot = slot;
                 return;

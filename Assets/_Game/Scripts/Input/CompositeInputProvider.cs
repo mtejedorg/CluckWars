@@ -97,6 +97,13 @@ namespace CluckWars.Input
             return any;
         }
 
+        public bool IsAbilityCancelArmed()
+        {
+            for (int i = 0; i < _providers.Length; i++)
+                if (_providers[i].IsAbilityCancelArmed()) return true;
+            return false;
+        }
+
         public bool GetBackPressed()
         {
             // Edge-triggered: read every provider, same contract as the getters above.

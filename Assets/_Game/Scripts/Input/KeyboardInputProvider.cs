@@ -70,11 +70,19 @@ namespace CluckWars.Input
 
         public bool GetAbilityHeld(int slot) => Held(slot);
 
+        /// <summary>Esc or the right mouse button. The right button is read here (devices are only read in
+        /// providers); the hold state machine ignores a cancel when nothing is being held, so a stray right
+        /// click in idle does nothing.</summary>
         public bool GetAbilityCancelPressed()
         {
             var kb = Keyboard.current;
-            return kb != null && kb.escapeKey.wasPressedThisFrame;
+            if (kb != null && kb.escapeKey.wasPressedThisFrame) return true;
+            var mouse = Mouse.current;
+            return mouse != null && mouse.rightButton.wasPressedThisFrame;
         }
+
+        /// <summary>Keyboard / mouse cancel with a button, not a screen band.</summary>
+        public bool IsAbilityCancelArmed() => false;
 
         /// <summary>Esc on desktop; on Android the system back button arrives as the Escape key.</summary>
         public bool GetBackPressed()

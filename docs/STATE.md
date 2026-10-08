@@ -6,6 +6,51 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🔧 Phase 6 chunk 2 (2026-10-08, uncommitted, in review): fizzle, edge-band cancel, KB/M cancel + slot switching
+
+EditMode **932/932** (900 + 32: `Phase6Chunk2Tests` new; `AbilityActivationRulesTests` "pending hold ignores presses on other slots" rewritten as
+the switch test + a dead-slot variant; `ServicesAndInputTests.FakeInput` implements the new interface member). Capture tool:
+`tools/ui_capture/capture_phase6_chunk2.py <dir>` -> `Captures/phase6/live/fizzle.png`, `cancel_armed.png` (git-excluded). The Editor runs at a few fps
+in the background, so the real 0.3 s flash is over before a shot can land: `fizzle.png` is the HUD forced into its t = 0 flash frame (reflection), after a
+real hold + release with nobody in range was verified live (re-arm running, cooldown 0, nothing active). `cancel_armed.png` uses the HUD's own armed state.
+
+- **Fizzle (A3).** `AbilityFizzleRules.IsFizzle(refusal)` = the `NoTarget` refusal (`IsUsable` false for lack of a target: RequiresEnemyInRange moves, Peck with
+  no pile). Every release path (hold -> Fire from charging or pending, and the idle sub-tick press -> Fire) ends in `AbilityController.TryActivate`, so one
+  branch classifies all of them; Cooldown / Stunned / SlotUnavailable / OtherAbilityActive / `CanActivate` failures keep the plain denied bump. The fizzle branch
+  returns BEFORE `ActiveSlot` / cooldown are set: no effect, no cooldown, not "a move used". **Hook for chunk 3:** stealth-ending on cast must live below that
+  return in `TryActivate` (a comment marks it). One-shot `TryConsumeFizzle(out slot)` beside `TryConsumeDeniedPress`.
+- **Re-arm 0.4 s.** `AbilityFizzleRules.RearmSeconds`; per-slot `_rearmRemaining` scratch on the state authority (not networked, not a cooldown, cooldown visuals
+  untouched). `CanBeginCharge` is false while rearming (so a held rearming slot is "dead", no spam) AND `TryActivate` refuses first (covers the tap path); the
+  local preview also skips a rearming slot.
+- **Fizzle feedback (local only).** `TouchControlsController.PollDeniedPress` also consumes the fizzle: existing bump + a 0.3 s slash flash (cream bar, ink
+  border, built in code, `.cw-hex-flash-slash`) + the `Fx_Whiff.png` puff (`.cw-hex-puff`, scale 0.6 -> 1.35 and fade; alpha-only under Reduced Motion) +
+  `AbilityFizzle` sound (0.55). Timers use unscaled time. The sound is played by `AbilityController` only for a human-driven chicken (`HasInputAuthority`, not `IsBot`).
+- **Audio.** `AudioRegistrySO.AbilityFizzle` / `AbilityCancel` (wired in `AudioRegistry.asset`), clips `Assets/_Game/Audio/Abilities/ability_fizzle.wav`
+  (airy "pfft", 120 ms) and `ability_cancel.wav` (low tick, 60 ms), synthesised by the menu generator (`tools/audio/menu/synth.py` gained `ability_fizzle` /
+  `ability_cancel` and writes them to `Audio/Abilities`, not `Audio/UI`: `UiAudioTests` requires every WAV in `Audio/UI` to be a UI cue). `ProceduralAudioBank`
+  has fallbacks. Volumes in `FeedbackTuning.FizzleSfxVolume` / `CancelSfxVolume`.
+- **Edge-band cancel (A4).** The radial `OnHexMove` drag-cancel and `FeedbackTuning.DragCancelDistancePx` are GONE. Pure `Input/HoldCancelRules`: arm within 20 dp
+  of any PHYSICAL screen edge, disarm beyond 28 dp (hysteresis), dp = px / (dpi / 160), dpi <= 1 falls back to 160. `OnHexMove` converts the panel position back to
+  screen pixels (`_root.worldBound` ratio) and updates per-slot `_cancelArmed` / `_armedEdge`. Release funnels through one `EndHexPointer(slot, HexPointerEnd, id)`:
+  `HoldCancelRules.ResolveRelease` = Up fires unless armed; `PointerCancelEvent` (newly registered) and `PointerCaptureOutEvent` ALWAYS cancel. State is settled before
+  the capture is released so the capture-out event the release raises finds the slot idle. While armed: cream X over the held hex (`.cw-hex-x`), the telegraph goes
+  grey + dashed (`IInputProvider.IsAbilityCancelArmed()`, level-triggered; Composite ORs; Touch reads the HUD; Keyboard false; no networked state), and a ~4 dp
+  cream-85%-on-ink glow strip on the approached edge (`#EdgeGlow{Left,Right,Top,Bottom}` in `TouchControls.uxml`). **Chunk 6 haptic tick:** `OnCancelArmed(slot)`
+  in `TouchControlsController` is the empty, named call site. A deliberate cancel plays `AbilityCancel` (from `AbilityController`, so touch, Esc and RMB share it).
+- **KB/M (A4).** `KeyboardInputProvider.GetAbilityCancelPressed` = Esc OR right mouse button (read there; `GetBackPressed` stays Esc-only). A cancel with the key still
+  down used to re-arm a pending hold on the next tick (release would then fire); now the cancelled slot is SUPPRESSED until its hold bit is seen low
+  (`AbilityHoldStateMachine.ApplySuppression`, run on the controller's per-tick scratch before `Decide`).
+- **Slot switching (A4), in the pure state machine** so it covers keyboard, gamepad and multi-touch: while pending or charging, a fresh press on another slot that can
+  begin a hold returns `ChargeAction.SwitchHold` (`Slot` = new, `FromSlot` = old). A release of the current slot wins the tick; the switch outranks threshold
+  promotion; a dead slot (cooling, rearming) never steals the gesture. The controller drops the old gesture (no fire, no cooldown), starts the new pending hold the
+  same tick and suppresses the old slot until released. Idle keeps "lowest held slot claims the tick". The local preview ignores suppressed / rearming slots.
+- **Not done / notes.** Haptic tick (chunk 6). No on-device check of the dp conversion: the Editor reports `Screen.dpi` differently from a phone, the pure function is
+  tested at 420 dpi and with the fallback; verify the 20 dp band feels right on the Pixel 9. The `.cw-hex--held` glow strip ink line is 3 px on the inner side (1 px of it
+  survives the 808 px screenshot downscale). The gamepad B cancel is chunk A8.
+- **No prefab wiring needed** (all new HUD elements are built in code or live in `TouchControls.uxml`; `AudioRegistry.asset` is already updated).
+
+---
+
 ## ✅ Phase 6 chunk 1 (2026-10-08, committed, EditMode 900/900 re-run on the final code): touch-hex states, instant local preview, "no target is not illegal", stronger guides
 
 EditMode **900/900** (873 + 27: `AbilityPreviewRulesTests` new; `AbilitySlotOverlayTests`, `HudFeedbackStyleTests`, `PlayerPaletteTests` updated). Capture tool:

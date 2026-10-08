@@ -163,7 +163,7 @@ namespace CluckWars.Tests
         private sealed class FakeInput : IInputProvider
         {
             public Vector2 Movement;
-            public bool A1, A2, A3, A4, Cancel, Back;
+            public bool A1, A2, A3, A4, Cancel, Back, CancelArmed;
             public bool[] Held = new bool[AbilityController.SlotCount];
             public int A1Reads, A2Reads, A3Reads, A4Reads, CancelReads, BackReads;
 
@@ -176,6 +176,7 @@ namespace CluckWars.Tests
                 slot >= 0 && slot < AbilityController.SlotCount && Held[slot];
             public bool GetAbilityCancelPressed() { CancelReads++; return Cancel; }
             public bool GetBackPressed() { BackReads++; return Back; }
+            public bool IsAbilityCancelArmed() => CancelArmed;
         }
 
         [Test]
