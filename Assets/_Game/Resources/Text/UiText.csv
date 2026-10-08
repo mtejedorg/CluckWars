@@ -100,6 +100,7 @@ lobby.status.waiting,Waiting…
 lobby.hint.solo,Hit START MATCH — 3 CPU rivals are waiting.
 lobby.status.enterCode,Need a code
 lobby.waitingFor,WAITING FOR P{n}
+lobby.waitingForPlayer,WAITING FOR A PLAYER
 lobby.playerTag,P{n}
 lobby.classLine,{cls} · {role}
 lobby.codePlaceholder,·····

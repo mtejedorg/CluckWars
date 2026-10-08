@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.UI;
 using UnityEngine;
 
 namespace CluckWars.Visuals
@@ -28,16 +29,6 @@ namespace CluckWars.Visuals
         [Header("Sprites")]
         [SerializeField] private Sprite _barTroughSprite;
         [SerializeField] private Sprite _barFillSprite;
-
-        // Okabe-Ito per-player identity colours — same palette as the HUD,
-        // overlays and menus (ART.md §6).
-        private static readonly Color[] PlayerColors =
-        {
-            new Color(0.91f, 0.46f, 0.10f, 1f), // P1 orange #E8751A
-            new Color(0.10f, 0.50f, 0.77f, 1f), // P2 blue   #1A7FC4
-            new Color(0.77f, 0.16f, 0.44f, 1f), // P3 pink   #C4286F
-            new Color(0.05f, 0.62f, 0.48f, 1f), // P4 teal   #0D9E7A
-        };
 
         private static readonly Color TroughColor = new Color(1f, 1f, 1f, 1f); // Sprite is already dark
 
@@ -229,14 +220,10 @@ namespace CluckWars.Visuals
             if (corner == _appliedRingCorner) return;
             _appliedRingCorner = corner;
 
-            if (corner < 0)
-            {
-                _ring.color = new Color(0.7f, 0.7f, 0.7f, 0.5f);
-                return;
-            }
-
-            var c = PlayerColors[corner % PlayerColors.Length];
-            c.a = 0.75f;
+            // The corner's player colour (PlayerPalette, same as the HUD, menus and podium); neutral and
+            // fainter until the spawn stamps a corner.
+            var c = PlayerPalette.ForCorner(corner);
+            c.a = corner < 0 ? 0.5f : 0.75f;
             _ring.color = c;
         }
 

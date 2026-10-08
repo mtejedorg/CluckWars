@@ -62,6 +62,13 @@ namespace CluckWars.Services
         /// </summary>
         bool OpenClassSelectOnMenuLoad { get; set; }
 
+        /// <summary>
+        /// Seed of the solo corner permutation (<c>CornerAssignment</c>). The menu rolls it each time THE
+        /// COOP opens in solo, so the lobby can colour every seat by the corner it will spawn on and
+        /// <c>MatchBootstrapper</c> spawns from the same value (round-2 finding 1).
+        /// </summary>
+        int SoloCornerSeed { get; set; }
+
         event Action<ChickenClass> OnSelectionChanged;
     }
 }

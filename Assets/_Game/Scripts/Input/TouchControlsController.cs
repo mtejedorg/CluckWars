@@ -98,10 +98,10 @@ namespace CluckWars.Input
         // ---- Injected services -------------------------------------------------
         private ILogService   _log;
         private readonly System.Collections.Generic.HashSet<string> _reportedMissingIcons = new();
-        private ColorSchemeSO _colors;
 
         // ---- UI element refs (queried once, on bind) ---------------------------
         private VisualElement _root;
+        private SafeAreaPadding _safeArea;   // keeps the stick and the hexes out of a notch / cutout / gesture bar
         private bool          _bound;
 
         private VisualElement _joyBase;
@@ -124,6 +124,7 @@ namespace CluckWars.Input
             public VisualElement StateRing;  // the ⃠ circle
             public VisualElement StateBarA;  // ⃠ slash, and one arm of the ✕
             public VisualElement StateBarB;  // the other arm of the ✕
+            public VisualElement Mark;       // category shape (CategoryMark): the category without colour
         }
         /// <summary>Mirrors <see cref="Gameplay.AbilityController.SlotCount"/> so the hex
         /// cluster and the gameplay slot count cannot drift apart.</summary>
@@ -220,10 +221,9 @@ namespace CluckWars.Input
         }
 
         [Inject]
-        public void Construct(ILogService log, ColorSchemeSO colors)
+        public void Construct(ILogService log)
         {
             _log = log;
-            _colors = colors;
         }
 
         private void Awake()
@@ -265,6 +265,13 @@ namespace CluckWars.Input
             var doc = GetComponent<UIDocument>();
             _root = doc != null ? doc.rootVisualElement : null;
             if (_root == null) return;
+
+            // Each cluster lives in a full-screen zone that the safe area insets (round-2 findings 5 + 15).
+            var joyZone = _root.Q<VisualElement>("JoystickRoot");
+            var abilityZone = _root.Q<VisualElement>("AbilityRoot");
+            if (joyZone == null || abilityZone == null)
+                _log?.Error(Source, "TouchControls.uxml is missing #JoystickRoot or #AbilityRoot: the touch controls ignore the safe area.");
+            _safeArea = new SafeAreaPadding(SafeAreaPadding.Edge.Offsets, joyZone, abilityZone);
 
             _joyBase      = _root.Q<VisualElement>("JoystickBase");
             _joyKnob      = _root.Q<VisualElement>("JoystickKnob");
@@ -311,7 +318,9 @@ namespace CluckWars.Input
                     StateRing  = _root.Q<VisualElement>($"StateRing{n}"),
                     StateBarA  = _root.Q<VisualElement>($"StateBarA{n}"),
                     StateBarB  = _root.Q<VisualElement>($"StateBarB{n}"),
+                    Mark       = hex != null ? CategoryMark.Create() : null,
                 };
+                if (hex != null) hex.Add(_slots[i].Mark);
                 if (hex != null)
                 {
                     int slot = i; // capture
@@ -462,6 +471,7 @@ namespace CluckWars.Input
                 TryBind();
                 if (!_bound) return;
             }
+            _safeArea?.Apply();   // two struct compares a frame unless the safe area moved
 
             if (_localChicken == null || _localChicken.Object == null || !_localChicken.Object.IsValid)
             {
@@ -543,11 +553,13 @@ namespace CluckWars.Input
             if (refs.Drain != null)
                 refs.Drain.style.height = new Length(active01 * 100f, LengthUnit.Percent);
 
-            Color accent = equipped != null ? equipped.AccentColor : _colors.AbilityNormal;
+            // The menu's category colour (round-2 finding 5): a move reads the same job in the deck and
+            // on the button. AccentColor stays the VFX colour.
+            Color accent = equipped != null ? AbilityPalette.HexColor(equipped) : AbilityPalette.EmptyHex;
 
             if (refs.DrainFill != null && active01 > 0f)
             {
-                // Full-strength accent: the running slot must be the one bright thing
+                // Full-strength category colour: the running slot must be the one bright thing
                 // while the rest of the cluster sits at HexAlphaOtherActive.
                 var drainTint = accent;
                 drainTint.a = FeedbackTuning.HexAlphaReady;
@@ -564,7 +576,11 @@ namespace CluckWars.Input
                     tint.a = FeedbackTuning.HexAlphaCooldown;
                     break;
                 case AbilityRefusal.NoTarget:
-                    tint = FeedbackTuning.NeutralNoEffectColor;
+                    // Nobody in range: the category colour at 70% (darkened toward ink), not the bare
+                    // no-effect grey (round-2 finding 5: most of a match every hex read grey). The ⃠
+                    // mark and the half-faded icon still say "no target"; the colour still says what
+                    // the move does.
+                    tint = AbilityPalette.Idle(accent);
                     tint.a = FeedbackTuning.HexAlphaNoTarget;
                     break;
                 case AbilityRefusal.Stunned:
@@ -948,6 +964,7 @@ namespace CluckWars.Input
         private void ApplyEquipped(int slot, AbilityBaseSO equipped)
         {
             var refs = _slots[slot];
+            CategoryMark.Apply(refs.Mark, equipped != null ? equipped.Category : (AbilityCategory?)null);
 
             // Icon sprite via USS class (swap the previously applied one). Every mapped
             // ability has a sprite (AbilityIconArtTests), so the icon alone identifies it and

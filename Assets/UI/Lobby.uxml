@@ -16,6 +16,7 @@
          Sizes follow the MOBILE SIZING CONTRACT at the top of CluckWarsTheme.uss. -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
     <ui:Style src="project://database/Assets/UI/Styles/GetReadyCard.uss" />
+    <ui:Style src="project://database/Assets/UI/Styles/YouMark.uss" />
 
     <ui:VisualElement name="LobbyPage" class="cw-screen cw-page">
 

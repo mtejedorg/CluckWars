@@ -15,8 +15,8 @@ namespace CluckWars.Tests
     /// </summary>
     public sealed class AbilityPaletteTests
     {
-        /// <summary>Player colours (Okabe-Ito, design token CW_PLAYERS_V3): orange, blue, pink, teal.</summary>
-        private static readonly string[] PlayerHex = { "e8751a", "1a7fc4", "c4286f", "0d9e7a" };
+        /// <summary>The player colours (the one palette, keyed by spawn corner).</summary>
+        private static readonly Color[] Players = { PlayerPalette.P1, PlayerPalette.P2, PlayerPalette.P3, PlayerPalette.P4 };
 
         private static readonly AbilityCategory[] Categories =
             (AbilityCategory[])Enum.GetValues(typeof(AbilityCategory));
@@ -31,9 +31,9 @@ namespace CluckWars.Tests
             {
                 var hex = AbilityPalette.HexColor(ab);
                 Assert.AreEqual(AbilityPalette.CategoryColor(ab.Category), hex, $"{ab.name} ({ab.Category})");
-                foreach (var p in PlayerHex)
-                    Assert.GreaterOrEqual(DeltaE2000(hex, UiGfx.Hex32(p)), AbilityPalette.MinPlayerDeltaE,
-                        $"{ab.name}'s hex sits too close to player colour #{p}");
+                foreach (var p in Players)
+                    Assert.GreaterOrEqual(DeltaE2000(hex, p), AbilityPalette.MinPlayerDeltaE,
+                        $"{ab.name}'s hex sits too close to player colour #{ColorUtility.ToHtmlStringRGB(p)}");
             }
         }
 
@@ -41,10 +41,10 @@ namespace CluckWars.Tests
         public void CategoryColours_AreFarFromEveryPlayerColour()
         {
             foreach (var cat in Categories)
-            foreach (var p in PlayerHex)
+            foreach (var p in Players)
             {
-                float de = DeltaE2000(AbilityPalette.CategoryColor(cat), UiGfx.Hex32(p));
-                Assert.GreaterOrEqual(de, AbilityPalette.MinPlayerDeltaE, $"{cat} vs player #{p}: dE00 {de:0.0}");
+                float de = DeltaE2000(AbilityPalette.CategoryColor(cat), p);
+                Assert.GreaterOrEqual(de, AbilityPalette.MinPlayerDeltaE, $"{cat} vs player #{ColorUtility.ToHtmlStringRGB(p)}: dE00 {de:0.0}");
             }
         }
 
@@ -68,6 +68,78 @@ namespace CluckWars.Tests
                 float ratio = AbilityPalette.ContrastRatio(AbilityPalette.InkOn(bg), bg);
                 Assert.GreaterOrEqual(ratio, AbilityPalette.MinLabelContrast, $"{cat} label: {ratio:0.00}:1");
             }
+        }
+
+        [Test]
+        public void Defense_TakesACreamLabel_WithMargin()
+        {
+            // Round-2 finding 9: Defense was a light moss with an ink label at 4.65:1; it is dark enough
+            // now for the cream label every other category uses, with margin over AA.
+            var bg = AbilityPalette.Defense;
+            Assert.AreEqual(UiGfx.TextPrimary, AbilityPalette.InkOn(bg));
+            Assert.GreaterOrEqual(AbilityPalette.ContrastRatio(UiGfx.TextPrimary, bg), 5f);
+        }
+
+        /// <summary>
+        /// Round-2 finding 9: Steal and Defense were 4.7 dE00 apart for a deuteranope. After a full-severity
+        /// deuteranopia and protanopia simulation (Machado, Oliveira &amp; Fernandes 2009, applied in linear
+        /// RGB), every pair of category colours must keep <see cref="AbilityPalette.MinColourBlindDeltaE"/>.
+        /// </summary>
+        [TestCase("deuteranopia")]
+        [TestCase("protanopia")]
+        public void CategoryColours_StayApart_UnderColourBlindness(string kind)
+        {
+            var m = kind == "deuteranopia" ? Deuteranopia : Protanopia;
+            for (int i = 0; i < Categories.Length; i++)
+            for (int j = i + 1; j < Categories.Length; j++)
+            {
+                var a = Simulate(AbilityPalette.CategoryColor(Categories[i]), m);
+                var b = Simulate(AbilityPalette.CategoryColor(Categories[j]), m);
+                float de = DeltaE2000(a, b);
+                Assert.GreaterOrEqual(de, AbilityPalette.MinColourBlindDeltaE,
+                    $"{Categories[i]} vs {Categories[j]} under {kind}: dE00 {de:0.0}");
+            }
+        }
+
+        [Test]
+        public void ColourBlindSimulation_KeepsGreysAndReproducesTheOldSteal_DefenseCollision()
+        {
+            // Machado matrices map achromatic colours to themselves (rows sum to ~1).
+            var grey = new Color(0.5f, 0.5f, 0.5f);
+            var g = Simulate(grey, Deuteranopia);
+            Assert.AreEqual(0.5f, g.r, 0.01f); Assert.AreEqual(0.5f, g.g, 0.01f); Assert.AreEqual(0.5f, g.b, 0.01f);
+            // And they reproduce the audit's finding on the old Defense moss.
+            float old = DeltaE2000(Simulate(AbilityPalette.Steal, Deuteranopia), Simulate(UiGfx.Hex32("5f8a2c"), Deuteranopia));
+            Assert.Less(old, AbilityPalette.MinColourBlindDeltaE, $"old Steal / Defense under deuteranopia: {old:0.0}");
+        }
+
+        // Machado, Oliveira & Fernandes (2009), severity 1.0, linear RGB.
+        private static readonly double[,] Deuteranopia =
+        {
+            { 0.367322, 0.860646, -0.227968 },
+            { 0.280085, 0.672501, 0.047413 },
+            { -0.011820, 0.042940, 0.968881 },
+        };
+        private static readonly double[,] Protanopia =
+        {
+            { 0.152286, 1.052583, -0.204868 },
+            { 0.114503, 0.786281, 0.099216 },
+            { -0.003882, -0.048116, 1.051998 },
+        };
+
+        private static Color Simulate(Color c, double[,] m)
+        {
+            static double Lin(double v) => v <= 0.04045 ? v / 12.92 : Math.Pow((v + 0.055) / 1.055, 2.4);
+            static float Gam(double v)
+            {
+                v = Math.Max(0, Math.Min(1, v));
+                return (float)(v <= 0.0031308 ? 12.92 * v : 1.055 * Math.Pow(v, 1 / 2.4) - 0.055);
+            }
+            double r = Lin(c.r), g = Lin(c.g), b = Lin(c.b);
+            return new Color(
+                Gam(m[0, 0] * r + m[0, 1] * g + m[0, 2] * b),
+                Gam(m[1, 0] * r + m[1, 1] * g + m[1, 2] * b),
+                Gam(m[2, 0] * r + m[2, 1] * g + m[2, 2] * b));
         }
 
         [Test]

@@ -88,10 +88,14 @@
 
 /* Names, not P# (Phase 4): You / DashFox / BrunoB / PeckNoir / P1-P4, <= 8 chars. 150 px fits
    "PeckNoir" at 34 px Lilita; anything longer ellipsizes instead of pushing the bar. The bar gave
-   up 70 px of the 88 so the panel only grows 18 px. */
+   up 70 px of the 88 so the panel only grows 18 px.
+   Cream, not the player colour (round-2 finding 5: player colours on this panel were 2.4-3.9:1;
+   cream is ~13:1 on the panel ink). The player colour is on the dot and the bar; the local
+   player's name is the gold YOU mark (YouMark.uss). */
 .cw-lb-name {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 34px;
+    color: rgb(254, 245, 224);
     width: 150px;
     -unity-text-align: middle-left;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

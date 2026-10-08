@@ -14,6 +14,7 @@
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTokens.uss" />
     <ui:Style src="project://database/Assets/UI/Styles/MatchOverlays.uss" />
     <ui:Style src="project://database/Assets/UI/Styles/GetReadyCard.uss" />
+    <ui:Style src="project://database/Assets/UI/Styles/YouMark.uss" />
 
     <ui:VisualElement name="OverlayRoot" class="cw-overlay-host" picking-mode="Ignore">
 
@@ -149,6 +150,7 @@
              Esc / Android back = LEAVE. MatchOverlaysController builds the four seats once (#LobbyGrid). -->
         <ui:VisualElement name="LobbyOverlay" class="cw-overlay cw-overlay--opaque" style="display: none;">
             <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
+            <ui:Style src="project://database/Assets/UI/Styles/YouMark.uss" />
             <ui:VisualElement class="cw-me-backdrop" picking-mode="Ignore" />
             <ui:VisualElement class="cw-me-backdrop-tint" picking-mode="Ignore" />
 

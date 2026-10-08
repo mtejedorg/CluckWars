@@ -6,9 +6,8 @@ namespace CluckWars.UI
 {
     /// <summary>
     /// Pads UI Toolkit elements so their content stays out of a notch, cutout or gesture bar
-    /// while their background still bleeds to the screen edges. Same rule as
-    /// <c>MenuUiController.ApplySafeArea</c> (that copy pads the menu's page host); this shared
-    /// static is what the in-match overlays use. TODO(Phase 4 dedupe): point the menu at it too.
+    /// while their background still bleeds to the screen edges. The one safe-area rule in the game:
+    /// the menu's page host, the in-match overlays, the HUD top bar and the touch controls all use it.
     /// </summary>
     /// <remarks>
     /// <c>Screen.safeArea</c> is in screen pixels with a bottom-left origin; a panel works in its
@@ -18,13 +17,27 @@ namespace CluckWars.UI
     /// </remarks>
     public sealed class SafeAreaPadding
     {
+        /// <summary>Which edges of a target take the insets.</summary>
+        public enum Edge
+        {
+            /// <summary>Padding: the target's background bleeds to the screen edge, its flow content is inset.</summary>
+            Padding,
+            /// <summary>left / top / right / bottom: for a full-screen absolute zone whose children are absolutely
+            /// positioned (the touch controls), which padding would not move.</summary>
+            Offsets,
+        }
+
         private readonly VisualElement[] _targets;
+        private readonly Edge _edge;
         private Rect _applied;
         private Vector2Int _appliedScreen;
         private bool _hasApplied;
 
-        public SafeAreaPadding(params VisualElement[] targets)
+        public SafeAreaPadding(params VisualElement[] targets) : this(Edge.Padding, targets) { }
+
+        public SafeAreaPadding(Edge edge, params VisualElement[] targets)
         {
+            _edge = edge;
             _targets = targets ?? Array.Empty<VisualElement>();
         }
 
@@ -47,10 +60,20 @@ namespace CluckWars.UI
             foreach (var t in _targets)
             {
                 if (t == null) continue;
-                t.style.paddingLeft = insets.x;
-                t.style.paddingTop = insets.y;
-                t.style.paddingRight = insets.z;
-                t.style.paddingBottom = insets.w;
+                if (_edge == Edge.Offsets)
+                {
+                    t.style.left = insets.x;
+                    t.style.top = insets.y;
+                    t.style.right = insets.z;
+                    t.style.bottom = insets.w;
+                }
+                else
+                {
+                    t.style.paddingLeft = insets.x;
+                    t.style.paddingTop = insets.y;
+                    t.style.paddingRight = insets.z;
+                    t.style.paddingBottom = insets.w;
+                }
             }
         }
 

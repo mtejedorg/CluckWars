@@ -158,7 +158,7 @@ namespace CluckWars.Gameplay
                      "by this amount before pushing it. Authored ~0.25: enough hue cue to read a class " +
                      "at ortho-iso distance when the nameplate is small or occluded, without eating " +
                      "the atlas. Note this is CLASS identity, not player identity — player colour is " +
-                     "carried by ChickenNameplate.PlayerColors.")]
+                     "carried by UI/PlayerPalette (by spawn corner).")]
             [Range(0f, 1f)]
             public float TintStrength;
 

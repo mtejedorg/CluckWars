@@ -1,0 +1,57 @@
+/* ============================================================================
+   Cluck Wars : ability category shape marks (round-2 finding 9)
+   A category never rests on colour alone: each ability hex / icon carries a small shape,
+   Steal = diamond, Control = circle, Defense = square, Utility = plus, cream with a
+   dark-ink rim so it reads on every category colour and on the cream cards.
+   Built by CategoryMark.cs (UI); used by the menu icons (MenuUiController.AbilityIconView)
+   and the in-match hexes (TouchControlsController). Sized for a ~100 px icon; hosts scale it.
+   ============================================================================ */
+.cw-cat-mark {
+    position: absolute;
+    top: -4px; right: -4px;
+    width: 24px; height: 24px;
+    background-color: #fef5e0;
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: #1a0e04; border-right-color: #1a0e04; border-top-color: #1a0e04; border-bottom-color: #1a0e04;
+}
+.cw-cat-mark__h, .cw-cat-mark__v, .cw-cat-mark__hub { display: none; }
+
+/* Steal: diamond (a gem). Rotated square, slightly smaller so its corners stay in the box. */
+.cw-cat-mark--steal { rotate: 45deg; scale: 0.86 0.86; border-top-left-radius: 2px; border-top-right-radius: 2px; border-bottom-left-radius: 2px; border-bottom-right-radius: 2px; }
+/* Control: circle (a target). */
+.cw-cat-mark--control { border-top-left-radius: 12px; border-top-right-radius: 12px; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
+/* Defense: square (a block). */
+.cw-cat-mark--defense { border-top-left-radius: 3px; border-top-right-radius: 3px; border-bottom-left-radius: 3px; border-bottom-right-radius: 3px; }
+/* Utility: plus (a tool). The mark itself is transparent; two outlined cream bars cross, and a
+   cream hub over the crossing hides their rims there, so it reads as one outlined plus. */
+.cw-cat-mark--utility {
+    background-color: rgba(0, 0, 0, 0);
+    border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
+    width: 28px; height: 28px; top: -6px; right: -6px;
+}
+.cw-cat-mark--utility > .cw-cat-mark__h,
+.cw-cat-mark--utility > .cw-cat-mark__v {
+    display: flex;
+    position: absolute;
+    background-color: #fef5e0;
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: #1a0e04; border-right-color: #1a0e04; border-top-color: #1a0e04; border-bottom-color: #1a0e04;
+    border-top-left-radius: 2px; border-top-right-radius: 2px; border-bottom-left-radius: 2px; border-bottom-right-radius: 2px;
+}
+.cw-cat-mark--utility > .cw-cat-mark__h { left: 0; top: 9px; width: 28px; height: 10px; }
+.cw-cat-mark--utility > .cw-cat-mark__v { left: 9px; top: 0; width: 10px; height: 28px; }
+.cw-cat-mark--utility > .cw-cat-mark__hub {
+    display: flex;
+    position: absolute;
+    left: 9px; top: 12px; width: 10px; height: 4px;
+    background-color: #fef5e0;
+}
+
+/* ---- Host sizes ---------------------------------------------------------- */
+/* THE COOP's 46 px mini-hex icons. */
+.cw-mini-hex .cw-cat-mark { scale: 0.7 0.7; top: -10px; right: -12px; }
+.cw-mini-hex .cw-cat-mark--steal { scale: 0.6 0.6; }
+/* In-match 150 px hex (TouchControls.uxml): the mark is a direct child of the hex, top-right
+   (the slot number badge has the top-left). */
+.cw-hex > .cw-cat-mark { scale: 1.3 1.3; top: 30px; right: 30px; }
+.cw-hex > .cw-cat-mark--steal { scale: 1.12 1.12; }

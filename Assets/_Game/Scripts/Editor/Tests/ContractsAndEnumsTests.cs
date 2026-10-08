@@ -183,28 +183,23 @@ namespace CluckWars.Tests
         // ---- Cross-class determinism contract ----------------------------------
 
         [Test]
-        public void SessionNameSeed_IsIdentical_InMapGeneratorAndMatchBootstrapper()
+        public void SessionNameSeed_IsIdentical_InMapGeneratorAndCornerAssignment()
         {
-            // Both classes hash the session name to seed a System.Random, and both
-            // rely on every peer computing the same value: MapGenerator lays out the
-            // interior walls (LOCAL geometry, so a mismatch means peers physically
-            // disagree about where the walls are) and MatchBootstrapper picks the
-            // corner permutation. The two copies are duplicated on purpose — the
-            // comment in MapGenerator says "kept in sync (same polynomial)" — so this
-            // test is the only thing actually keeping them in sync.
+            // Both hash the session name to seed a System.Random, and both rely on every peer
+            // computing the same value: MapGenerator lays out the interior walls (LOCAL geometry,
+            // so a mismatch means peers physically disagree about where the walls are) and
+            // CornerAssignment (MatchBootstrapper + the menu Coop) picks the corner permutation.
+            // The two copies are duplicated on purpose (MapGenerator: "kept in sync (same
+            // polynomial)"), so this test is the only thing actually keeping them in sync.
             var mapSeed = typeof(MapGenerator).GetMethod("SessionNameSeed",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-            var bootSeed = typeof(MatchBootstrapper).GetMethod("SessionNameSeed",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-
             Assert.IsNotNull(mapSeed, "MapGenerator.SessionNameSeed was renamed or removed.");
-            Assert.IsNotNull(bootSeed, "MatchBootstrapper.SessionNameSeed was renamed or removed.");
 
             foreach (var name in new[] { "cluck-lan", "ABC123", "", "a", "Zz9-Zz9", "ÑoÑo" })
             {
                 Assert.AreEqual(
                     (int)mapSeed.Invoke(null, new object[] { name }),
-                    (int)bootSeed.Invoke(null, new object[] { name }),
+                    CornerAssignment.SessionNameSeed(name),
                     $"The two SessionNameSeed copies disagree for session name '{name}'. Peers would " +
                     "build different interior-wall layouts and assign different corners from the same session.");
             }

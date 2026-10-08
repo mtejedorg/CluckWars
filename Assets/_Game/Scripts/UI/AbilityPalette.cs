@@ -10,14 +10,19 @@ namespace CluckWars.UI
     /// </summary>
     /// <remarks>
     /// <b>UI only.</b> <see cref="AbilityBaseSO.AccentColor"/> stays the in-match VFX colour
-    /// (telegraphs, cast bursts, range rings) and is not read by the menus any more.
+    /// (telegraphs, cast bursts, range rings); the menus and the in-match hexes read the category colour.
     /// <para>
-    /// The four colours were solved, not picked (<c>AbilityPaletteTests</c> pins all three rules):
+    /// The four colours were solved, not picked (<c>AbilityPaletteTests</c> pins every rule):
     /// the label drawn on each (cream or ink, whichever <see cref="InkOn"/> picks) clears 4.5:1;
     /// each sits at CIEDE2000 &gt;= <see cref="MinPlayerDeltaE"/> from every player colour
-    /// (orange #e8751a, blue #1a7fc4, pink #c4286f, teal #0d9e7a), so a move never reads as a
-    /// player; and they are far apart from each other. The stock Material colours they replace
-    /// (#FF5722, #9C27B0, #4CAF50, #00BCD4) failed the first two.
+    /// (<see cref="PlayerPalette"/>), so a move never reads as a player; they are &gt;= 25 apart from
+    /// each other; and after a deuteranopia or protanopia simulation (Machado, Oliveira &amp; Fernandes
+    /// 2009, severity 1) every pair keeps &gt;= <see cref="MinColourBlindDeltaE"/>. The stock Material
+    /// colours they replace (#FF5722, #9C27B0, #4CAF50, #00BCD4) failed the first two.
+    /// </para>
+    /// <para>
+    /// Colour is never the only cue: every hex also carries its category's shape
+    /// (<see cref="CategoryMark"/>), and the deck cards name the category.
     /// </para>
     /// </remarks>
     public static class AbilityPalette
@@ -26,8 +31,10 @@ namespace CluckWars.UI
         public static readonly Color Steal = UiGfx.Hex32("b2442a");
         /// <summary>Plum. Cream label 6.6:1; nearest player (pink) dE00 19.</summary>
         public static readonly Color Control = UiGfx.Hex32("7a3f8f");
-        /// <summary>Moss. Ink label 4.65:1; nearest player (teal) dE00 18.7.</summary>
-        public static readonly Color Defense = UiGfx.Hex32("5f8a2c");
+        /// <summary>Dark moss. Cream label 9.6:1; nearest player dE00 33. Was #5f8a2c (ink label 4.65:1), which
+        /// sat 4.7 dE00 from Steal under deuteranopia (round-2 finding 9); darkened to L* 27 so it parts from
+        /// Steal (L* 44) by lightness, which colour blindness keeps.</summary>
+        public static readonly Color Defense = UiGfx.Hex32("30460c");
         /// <summary>Slate teal. Cream label 5.6:1; nearest player (blue) dE00 20.</summary>
         public static readonly Color Utility = UiGfx.Hex32("2e6b72");
 
@@ -36,6 +43,22 @@ namespace CluckWars.UI
 
         /// <summary>WCAG AA for normal text.</summary>
         public const float MinLabelContrast = 4.5f;
+
+        /// <summary>
+        /// Smallest CIEDE2000 distance between any two category colours after a full-severity deuteranopia or
+        /// protanopia simulation. 8 dE00 is well past "noticeably different side by side" (~2-5) for the hex
+        /// sizes the game draws; the shape mark (<see cref="CategoryMark"/>) carries the category where colour
+        /// alone cannot. Today's weakest pairs: Control / Utility 10.1 (deuteranopia), Steal / Defense 8.5
+        /// (protanopia; it was 4.7 under deuteranopia before Defense was darkened).
+        /// </summary>
+        public const float MinColourBlindDeltaE = 8f;
+
+        /// <summary>How much of the category colour an in-match hex keeps while it has no target in range
+        /// (the rest is dark ink; round-2 finding 5: those hexes used to be plain grey).</summary>
+        public const float HudIdleStrength = 0.7f;
+
+        /// <summary>An empty hex / slot (no ability): warm wood, nobody's colour.</summary>
+        public static readonly Color EmptyHex = new Color(0.45f, 0.38f, 0.28f, 0.7f);
 
         public static Color CategoryColor(AbilityCategory category) => category switch
         {
@@ -47,6 +70,10 @@ namespace CluckWars.UI
 
         /// <summary>The hex / disc colour of <paramref name="ability"/>: its category colour.</summary>
         public static Color HexColor(AbilityBaseSO ability) => CategoryColor(ability.Category);
+
+        /// <summary>A hex colour quieted for the in-match "no target in range" state: <see cref="HudIdleStrength"/>
+        /// of it over the dark ink, so the hue (the category) survives.</summary>
+        public static Color Idle(Color hex) => Color.Lerp(UiGfx.TextDark, hex, HudIdleStrength);
 
         /// <summary>WCAG 2.1 relative luminance of an sRGB colour (alpha ignored).</summary>
         public static float Luminance(Color c)

@@ -807,7 +807,7 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// Stable session-name hash — identical on every peer/platform. Kept in
-        /// sync with <c>MatchBootstrapper.SessionNameSeed</c> (same polynomial);
+        /// sync with <c>CornerAssignment.SessionNameSeed</c> (same polynomial);
         /// duplicated because both classes need it before any shared home exists.
         /// </summary>
         private static int SessionNameSeed(string s)

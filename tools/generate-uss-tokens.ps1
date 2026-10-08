@@ -65,14 +65,10 @@ foreach ($m in [regex]::Matches($themeBlock, "(?m)^\s*(\w+):\s*(.+?),?\s*$")) {
 }
 
 # ── CW_PLAYER_COLORS (v2) ────────────────────────────────────────────────────
+# Not emitted: the player colours have ONE home, Assets/_Game/Scripts/UI/PlayerPalette.cs
+# (round-2 finding 1); PlayerPaletteTests fails on any other copy, a USS token included.
 $lines.Add('')
-$lines.Add('    /* -- Player colors (Okabe-Ito) -- */')
-$playersRaw = [regex]::Match($V2, "const CW_PLAYER_COLORS = \[(.*?)\];").Groups[1].Value
-$playerColors = [regex]::Matches($playersRaw, "#[0-9a-fA-F]{6}") | ForEach-Object { $_.Value }
-if ($playerColors.Count -ne 4) { throw "expected 4 player colors, got $($playerColors.Count)" }
-for ($i = 0; $i -lt $playerColors.Count; $i++) {
-    $lines.Add("    --cw-player-$($i + 1): $($playerColors[$i]);")
-}
+$lines.Add('    /* -- Player colors: C# only, UI/PlayerPalette.cs (keyed by spawn corner) -- */')
 
 # ── Class colors (v3) ────────────────────────────────────────────────────────
 $lines.Add('')

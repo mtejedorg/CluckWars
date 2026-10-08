@@ -37,8 +37,14 @@
              reads in the SAME GLANCE as the move stick it constrains. -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTokens.uss" />
     <ui:Style src="project://database/Assets/UI/Styles/TouchControls.uss" />
+    <ui:Style src="project://database/Assets/UI/Styles/CategoryMark.uss" />
 
     <ui:VisualElement name="TouchRoot" class="cw-touch-root" picking-mode="Ignore">
+
+        <!-- Round-2 findings 5 + 15: the left cluster (stick + status strip) and the right cluster (hexes)
+             each sit in a full-screen zone that TouchControlsController keeps inside Screen.safeArea
+             (SafeAreaPadding), so a notch / cutout / gesture bar never covers a control. -->
+        <ui:VisualElement name="JoystickRoot" class="cw-touch-zone" picking-mode="Ignore">
 
         <!-- ===== LEFT : virtual joystick ===== -->
         <ui:VisualElement name="JoystickBase" class="cw-joy-base">
@@ -77,6 +83,10 @@
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
+
+        </ui:VisualElement>
+
+        <ui:VisualElement name="AbilityRoot" class="cw-touch-zone" picking-mode="Ignore">
 
         <!-- ===== RIGHT : hex ability cluster (MOBA arc) ===== -->
 
@@ -165,6 +175,8 @@
             <ui:VisualElement name="Badge4" class="cw-hex-badge" picking-mode="Ignore">
                 <ui:Label name="BadgeText4" text="4" class="cw-hex-badge-text" picking-mode="Ignore" />
             </ui:VisualElement>
+        </ui:VisualElement>
+
         </ui:VisualElement>
 
     </ui:VisualElement>

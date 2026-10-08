@@ -26,6 +26,7 @@
 
          Sizes follow the mobile contract at the top of CluckWarsTheme.uss. -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
+    <ui:Style src="project://database/Assets/UI/Styles/CategoryMark.uss" />
 
     <ui:VisualElement name="MainMenuPage" class="cw-screen cw-page cw-menu">
 

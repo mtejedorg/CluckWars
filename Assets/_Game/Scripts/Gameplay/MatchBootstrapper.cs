@@ -55,7 +55,7 @@ namespace CluckWars.Gameplay
         // Corner permutation — a shuffled [0,1,2,3] assigned once per session so
         // every player/bot spawns at a different starting edge each game.
         // Online: seeded from the session name (deterministic → all peers agree).
-        // Solo:   seeded randomly (single peer, no coordination needed).
+        // Solo:   seeded from the menu-rolled SoloCornerSeed (the Coop showed these corners).
         private int[] _cornerPermutation;
 
         // Deduplication guards — prevent double-spawning if Fusion somehow fires
@@ -111,7 +111,7 @@ namespace CluckWars.Gameplay
                 var chosenClass = _selection != null ? _selection.SelectedClass : ChickenClass.Warrior;
 
                 _log?.Info(Source, $"Starting session: mode={mode}, session='{sessionName}', class={chosenClass}.");
-                InitCornerPermutation(sessionName, isSolo: mode == SessionMode.Solo);
+                InitCornerPermutation(sessionName, mode);
                 _networkService.OnPlayerJoined += HandlePlayerJoined;
 
                 switch (mode)
@@ -717,31 +717,23 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Builds <see cref="_cornerPermutation"/> via a Fisher-Yates shuffle.
+        /// Builds <see cref="_cornerPermutation"/> (<see cref="CornerAssignment"/>, the same rule the menu
+        /// Coop colours its seats with, round-2 finding 1).
         /// <para>
-        /// <b>Solo</b>: truly random seed — no coordination needed.
+        /// <b>Solo</b>: seeded from <see cref="ISessionSelectionService.SoloCornerSeed"/>, which the menu
+        /// rolls each time THE COOP opens: a fresh layout every session that the lobby already showed.
         /// <b>Online</b>: seeded from the session name so every peer computes the
         /// identical shuffle and assigns the same corner to each player.
         /// </para>
         /// </summary>
-        private void InitCornerPermutation(string sessionName, bool isSolo)
+        private void InitCornerPermutation(string sessionName, SessionMode mode)
         {
-            _cornerPermutation = new[] { 0, 1, 2, 3 };
-            var rng = isSolo
-                ? new System.Random()                         // different each solo session
-                : new System.Random(SessionNameSeed(sessionName)); // same on all peers
-
-            for (int i = _cornerPermutation.Length - 1; i > 0; i--)
-            {
-                int j = rng.Next(i + 1);
-                (int a, int b) = (_cornerPermutation[i], _cornerPermutation[j]);
-                _cornerPermutation[i] = b;
-                _cornerPermutation[j] = a;
-            }
+            int soloSeed = _selection != null ? _selection.SoloCornerSeed : new System.Random().Next();
+            _cornerPermutation = CornerAssignment.Permutation(CornerAssignment.SeedFor(mode, sessionName, soloSeed));
 
             _log?.Info(Source,
                 $"Corner permutation [{string.Join(",", _cornerPermutation)}] " +
-                $"(seed={( isSolo ? "random" : sessionName )}).");
+                $"(seed={(mode == SessionMode.Solo ? "solo " + soloSeed : sessionName)}).");
         }
 
         private float _lastPromotionPollTime;
@@ -773,21 +765,6 @@ namespace CluckWars.Gameplay
                     }
                 }
                 _lastSeenMaster = isMaster;
-            }
-        }
-
-        /// <summary>
-        /// Stable hash of the session name used as a shared RNG seed in online play.
-        /// Using a manual polynomial hash avoids relying on <c>string.GetHashCode()</c>
-        /// whose output can vary between .NET versions / platforms.
-        /// </summary>
-        private static int SessionNameSeed(string s)
-        {
-            unchecked
-            {
-                int h = 17;
-                foreach (char c in s) h = h * 31 + c;
-                return h;
             }
         }
     }

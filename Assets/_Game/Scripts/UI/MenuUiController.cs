@@ -82,8 +82,7 @@ namespace CluckWars.UI
         private readonly MenuJuice.Effect[] _flightFor = new MenuJuice.Effect[AbilityController.SlotCount];
         private readonly AbilityBaseSO[] _flightAbility = new AbilityBaseSO[AbilityController.SlotCount];
         private readonly List<VisualElement> _staggerScratch = new();
-        private Rect _appliedSafeArea;
-        private Vector2Int _appliedScreenSize;
+        private SafeAreaPadding _safeArea;   // pads _pageHost (shared rule with the in-match overlays)
         // Abilities already reported as having no sprite (logged once each, not per refresh).
         private readonly HashSet<AbilityBaseSO> _reportedMissingIcons = new();
 
@@ -132,9 +131,6 @@ namespace CluckWars.UI
         // What each lineup seat shows (null = open seat), kept so the stage can be (re)bound
         // when Performance Mode turns OFF without the lobby being refreshed.
         private readonly ChickenClass?[] _seatClasses = new ChickenClass?[4];
-
-        // Dim neutral tint for an empty ability hex (no equipped accent).
-        private static readonly Color HexEmptyTint = new Color(0.45f, 0.38f, 0.28f, 0.7f);
 
         // Direction A surface colours (spec "Visual system"; tokens in CluckWarsTokens.uss).
         // Only the ones C# has to paint inline, because it also sets a state colour on the
@@ -301,6 +297,7 @@ namespace CluckWars.UI
             _root.Add(_backdrop);
             _root.Add(_backdropTint);
             _root.Add(_pageHost);
+            _safeArea = new SafeAreaPadding(_pageHost);
 
             // Above every page: fly-to-slot ghosts, particles and the 3-2-1 (never takes a tap).
             _fxLayer = new VisualElement { name = "FxLayer", pickingMode = PickingMode.Ignore };
@@ -400,7 +397,7 @@ namespace CluckWars.UI
         private void OnRootGeometry(GeometryChangedEvent evt)
         {
             UpdateLayout(evt.newRect.width, evt.newRect.height);
-            ApplySafeArea(force: true);
+            _safeArea?.Apply(force: true);
         }
 
         // At or below this panel height the pages compress their headers/title (20:9 phones: the
@@ -425,7 +422,7 @@ namespace CluckWars.UI
         // compares a frame, no allocation.
         private void Update()
         {
-            ApplySafeArea(force: false);
+            _safeArea?.Apply();
             // Menu-only poll: the match never runs this, so the in-match ability cancel (also Esc)
             // is untouched. Both read the key's wasPressedThisFrame, which nothing consumes.
             if (_input != null && _input.GetBackPressed()) OnBackPressed();
@@ -462,48 +459,6 @@ namespace CluckWars.UI
             3 => MenuBackStep.Loadout,
             _ => MenuBackStep.None,
         };
-
-        /// <summary>
-        /// Pads <see cref="_pageHost"/> so no page content sits under a notch, cutout or the
-        /// gesture bar, while the backdrop keeps bleeding to the screen edges.
-        /// </summary>
-        /// <remarks>
-        /// <c>Screen.safeArea</c> is in screen pixels with a bottom-left origin; the panel works
-        /// in its own scaled units with a top-left origin, so each corner goes through
-        /// <see cref="RuntimePanelUtils.ScreenToPanel"/> after flipping Y. When the safe area is
-        /// the whole screen (desktop, Editor, the off-screen capture tool rendering into a
-        /// RenderTexture of a different size than the Game view) the padding is zero rather
-        /// than a conversion of a rect that does not describe this panel.
-        /// </remarks>
-        private void ApplySafeArea(bool force)
-        {
-            if (_pageHost == null || _pageHost.panel == null) return;
-
-            var sa = Screen.safeArea;
-            var screen = new Vector2Int(Screen.width, Screen.height);
-            if (!force && sa == _appliedSafeArea && screen == _appliedScreenSize) return;
-            _appliedSafeArea = sa;
-            _appliedScreenSize = screen;
-
-            float left = 0, top = 0, right = 0, bottom = 0;
-            bool fullScreen = sa.xMin <= 0f && sa.yMin <= 0f && sa.xMax >= screen.x && sa.yMax >= screen.y;
-            if (!fullScreen && screen.x > 0 && screen.y > 0)
-            {
-                var panel = _pageHost.panel;
-                Vector2 min = RuntimePanelUtils.ScreenToPanel(panel, new Vector2(sa.xMin, screen.y - sa.yMax));
-                Vector2 max = RuntimePanelUtils.ScreenToPanel(panel, new Vector2(sa.xMax, screen.y - sa.yMin));
-                Vector2 full = RuntimePanelUtils.ScreenToPanel(panel, new Vector2(screen.x, screen.y));
-                left   = Mathf.Max(0f, min.x);
-                top    = Mathf.Max(0f, min.y);
-                right  = Mathf.Max(0f, full.x - max.x);
-                bottom = Mathf.Max(0f, full.y - max.y);
-            }
-
-            _pageHost.style.paddingLeft = left;
-            _pageHost.style.paddingTop = top;
-            _pageHost.style.paddingRight = right;
-            _pageHost.style.paddingBottom = bottom;
-        }
 
         // ---- Backdrop -----------------------------------------------------------
         /// <summary>How a page wants the shared backdrop: which painted scene (a USS modifier class
@@ -997,6 +952,7 @@ namespace CluckWars.UI
             public readonly VisualElement Disc;
             public readonly VisualElement Sprite;
             public readonly Label Mono;
+            public readonly VisualElement Mark;   // category shape (CategoryMark), round-2 finding 9
             public string SpriteClass;
 
             public AbilityIconView(VisualElement host)
@@ -1007,9 +963,11 @@ namespace CluckWars.UI
                 Sprite.AddToClassList("cw-icon-sprite");
                 Mono = new Label { pickingMode = PickingMode.Ignore };
                 Mono.AddToClassList("cw-ability-mono");
+                Mark = CategoryMark.Create();
                 host.Add(Disc);
                 host.Add(Sprite);
                 host.Add(Mono);
+                host.Add(Mark);
             }
         }
 
@@ -1024,6 +982,9 @@ namespace CluckWars.UI
             if (view == null) return;
             if (!string.IsNullOrEmpty(view.SpriteClass)) view.Sprite.RemoveFromClassList(view.SpriteClass);
             view.SpriteClass = null;
+
+            // The category shape, so a move's job never rests on colour alone. Perks have no category.
+            CategoryMark.Apply(view.Mark, ab != null && ab is not PassiveAbilitySO ? ab.Category : (AbilityCategory?)null);
 
             if (ab == null)
             {
@@ -1926,12 +1887,9 @@ namespace CluckWars.UI
         // ======================================================================
         //  THE COOP
         // ======================================================================
-        // Okabe-Ito player colors (design cluckwars-tokens-v3 CW_PLAYERS_V3).
-        private static readonly Color[] PlayerColors =
-        {
-            UiGfx.Hex32("E8751A"), UiGfx.Hex32("1A7FC4"),
-            UiGfx.Hex32("C4286F"), UiGfx.Hex32("0D9E7A"),
-        };
+        // Seat colours come from PlayerPalette by the corner each seat will spawn on (CornerAssignment),
+        // so "You" is the same colour here, in the HUD and on the podium (round-2 finding 1).
+        private int[] _lobbyPermutation;   // null = corners not known yet (a guest, or a host before its code)
         // Sample CPU bots shown in the Solo lobby (you always spawn vs 3 bots).
         private static readonly ChickenClass[] BotClasses = { ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };
         private static readonly string[]       BotNameKeys = { UiKeys.LobbyBot1, UiKeys.LobbyBot2, UiKeys.LobbyBot3 };
@@ -1984,7 +1942,6 @@ namespace CluckWars.UI
         /// <summary>Builds one lineup seat once: pedestal + chicken, nameplate, four move hexes, ready badge.</summary>
         private SeatView BuildSeat(int idx)
         {
-            var color = PlayerColors[idx];
             var v = new SeatView { Root = new VisualElement() };
             v.Root.AddToClassList("cw-seat");
 
@@ -1992,21 +1949,18 @@ namespace CluckWars.UI
             stage.AddToClassList("cw-seat__stage");
             v.Pedestal = new VisualElement { pickingMode = PickingMode.Ignore };
             v.Pedestal.AddToClassList("cw-seat__pedestal");
-            v.Pedestal.style.unityBackgroundImageTintColor = color;   // Pedestal_Ring is white art
             v.Chicken = new VisualElement { pickingMode = PickingMode.Ignore };
             v.Chicken.AddToClassList("cw-chicken");
             v.Chicken.AddToClassList("cw-seat__chicken");
             // P# on the pedestal in the player colour: tells two birds of the same class apart.
-            v.PedestalTag = new Label(UiText.Format(UiKeys.LobbyPlayerTag, ("n", idx + 1))) { pickingMode = PickingMode.Ignore };
+            // Text and colours are the seat's corner, set on every fill (SetSeatCorner).
+            v.PedestalTag = new Label { pickingMode = PickingMode.Ignore };
             v.PedestalTag.AddToClassList("cw-seat__pedestal-tag");
-            v.PedestalTag.style.backgroundColor = color;
-            v.PedestalTag.style.color = AbilityPalette.InkOn(color);
             stage.Add(v.Pedestal); stage.Add(v.Chicken); stage.Add(v.PedestalTag);
             v.Root.Add(stage);
 
             v.Plate = new VisualElement();
             v.Plate.AddToClassList("cw-seat__plate");
-            v.Plate.style.borderTopColor = color;
             var glow = new VisualElement { pickingMode = PickingMode.Ignore };
             glow.AddToClassList("cw-glow");
             v.Plate.Add(glow);
@@ -2015,10 +1969,8 @@ namespace CluckWars.UI
             v.NameRow.AddToClassList("cw-seat__namerow");
             v.Name = new Label();
             v.Name.AddToClassList("cw-seat__name");
-            v.Pn = new Label(UiText.Format(UiKeys.LobbyPlayerTag, ("n", idx + 1)));
+            v.Pn = new Label();
             v.Pn.AddToClassList("cw-seat__pn");
-            // Player colour as the tag's left stripe: the text stays cream-on-ink (~15:1).
-            v.Pn.style.borderLeftColor = color;
             v.Tag = new Label();
             v.Tag.AddToClassList("cw-seat__tag");
             v.NameRow.Add(v.Name); v.NameRow.Add(v.Pn); v.NameRow.Add(v.Tag);
@@ -2028,7 +1980,7 @@ namespace CluckWars.UI
             v.ClassLine.AddToClassList("cw-seat__class");
             v.Plate.Add(v.ClassLine);
 
-            v.Waiting = new Label(UiText.Format(UiKeys.LobbyWaitingFor, ("n", idx + 1)));
+            v.Waiting = new Label();
             v.Waiting.AddToClassList("cw-seat__waiting");
             v.Plate.Add(v.Waiting);
 
@@ -2060,14 +2012,42 @@ namespace CluckWars.UI
             return v;
         }
 
-        /// <summary>Fills one seat. <paramref name="name"/> null = an open seat (waiting for a player).</summary>
-        private void SetSeat(int idx, ChickenClass cls, string name, bool isHost, bool cpu, bool ready, IReadOnlyList<AbilityBaseSO> abilities)
+        /// <summary>
+        /// Paints a seat in the player colour of the <paramref name="corner"/> it will spawn on (P{corner+1} on
+        /// the pedestal and the name tag, the plate's top edge, the tag stripe), or neutral with no P# when the
+        /// corner is not known yet (-1).
+        /// </summary>
+        private static void SetSeatCorner(SeatView v, int corner)
+        {
+            var color = PlayerPalette.ForCorner(corner);
+            bool known = corner >= 0;
+            string tag = known ? UiText.Format(UiKeys.LobbyPlayerTag, ("n", corner + 1)) : string.Empty;
+            v.Pedestal.style.unityBackgroundImageTintColor = color;   // Pedestal_Ring is white art
+            v.PedestalTag.text = tag;
+            v.PedestalTag.style.backgroundColor = color;
+            v.PedestalTag.style.color = AbilityPalette.InkOn(color);
+            v.PedestalTag.style.visibility = known ? Visibility.Visible : Visibility.Hidden;
+            v.Plate.style.borderTopColor = color;
+            v.Pn.text = tag;
+            v.Pn.style.borderLeftColor = color;   // player colour as the tag's stripe: text stays cream-on-ink (~15:1)
+            v.Pn.style.display = known ? DisplayStyle.Flex : DisplayStyle.None;
+            v.Waiting.text = known
+                ? UiText.Format(UiKeys.LobbyWaitingFor, ("n", corner + 1))
+                : UiText.Get(UiKeys.LobbyWaitingForPlayer);
+        }
+
+        /// <summary>Fills one seat. <paramref name="name"/> null = an open seat (waiting for a player).
+        /// <paramref name="corner"/> = the spawn corner it will get (-1 = not known yet).</summary>
+        private void SetSeat(int idx, int corner, ChickenClass cls, string name, bool isHost, bool cpu, bool ready, IReadOnlyList<AbilityBaseSO> abilities)
         {
             var v = _seats[idx];
             if (v == null) return;
             bool empty = name == null;
+            bool you = idx == 0 && !empty;
             v.Root.EnableInClassList("cw-seat--empty", empty);
-            v.Root.EnableInClassList("cw-seat--you", idx == 0 && !empty);
+            v.Root.EnableInClassList("cw-seat--you", you);
+            v.Name.EnableInClassList(PlayerPalette.YouMarkClass, you);
+            SetSeatCorner(v, corner);
 
             if (!string.IsNullOrEmpty(v.ChickenCss)) v.Chicken.RemoveFromClassList(v.ChickenCss);
             v.ChickenCss = empty ? null : "cw-chicken--" + KeyOf(cls);
@@ -2091,7 +2071,7 @@ namespace CluckWars.UI
             {
                 var ab = abilities != null && i < abilities.Count ? abilities[i] : null;
                 var (hex, icon) = v.HexViews[i];
-                hex.style.unityBackgroundImageTintColor = ab != null ? AbilityPalette.HexColor(ab) : HexEmptyTint;
+                hex.style.unityBackgroundImageTintColor = ab != null ? AbilityPalette.HexColor(ab) : AbilityPalette.EmptyHex;
                 PaintIcon(icon, ab, disc: false);
             }
 
@@ -2114,6 +2094,16 @@ namespace CluckWars.UI
             if (joinCard   != null) { joinCard.RemoveFromClassList("cw-hidden"); joinCard.style.display = isJoin ? DisplayStyle.Flex : DisplayStyle.None; }
             if (status != null) status.text = string.Empty;
 
+            // The corners this lineup will spawn on (CornerAssignment): solo rolls a fresh layout each time
+            // THE COOP opens; a host's is known once its join code exists (below); a guest's is not known.
+            if (isSolo)
+            {
+                _selection.SoloCornerSeed = new System.Random().Next();
+                _lobbyPermutation = CornerAssignment.Permutation(
+                    CornerAssignment.SeedFor(SessionMode.Solo, null, _selection.SoloCornerSeed));
+            }
+            else _lobbyPermutation = null;
+
             bool allReady = RefreshLineup(isSolo, isHost);
             RevealReadyBanner(allReady);
             UpdateLobbyStatus(isSolo, isHost, isJoin);
@@ -2130,6 +2120,14 @@ namespace CluckWars.UI
                     _joinCode = info.JoinCode;
                     _selection.SessionName = info.JoinCode;
                     SetCodeTiles(info.JoinCode);
+                    // The code is the session name, which seeds the corners: colour the seats now
+                    // (unless the player already left for another mode while the lobby was being made).
+                    if (_selection.Mode == SessionMode.Host)
+                    {
+                        _lobbyPermutation = CornerAssignment.Permutation(
+                            CornerAssignment.SeedFor(SessionMode.Host, info.JoinCode, 0));
+                        RefreshLineup(isSolo: false, isHost: true);
+                    }
                 }
                 catch (Exception e)
                 {
@@ -2144,7 +2142,8 @@ namespace CluckWars.UI
         {
             var mine = new List<AbilityBaseSO>();
             for (int i = 0; i < ActiveSlotsForClass; i++) { var a = GetEquipped(i); if (a != null) mine.Add(a); }
-            SetSeat(0, Cls, UiText.Get(UiKeys.LabelYou), isHost, false, ready: true, mine);
+            var mode = _selection != null ? _selection.Mode : SessionMode.Solo;
+            SetSeat(0, CornerAssignment.LobbySeatCorner(mode, 0, _lobbyPermutation), Cls, UiText.Get(UiKeys.LabelYou), isHost, false, ready: true, mine);
 
             bool allReady = true;
             for (int i = 1; i < _seats.Length; i++)
@@ -2152,11 +2151,11 @@ namespace CluckWars.UI
                 if (isSolo)
                 {
                     var bc = BotClasses[i - 1];
-                    SetSeat(i, bc, UiText.Get(BotNameKeys[i - 1]), false, true, ready: true, SampleBotAbilities(bc, i));
+                    SetSeat(i, CornerAssignment.LobbySeatCorner(mode, i, _lobbyPermutation), bc, UiText.Get(BotNameKeys[i - 1]), false, true, ready: true, SampleBotAbilities(bc, i));
                 }
                 else
                 {
-                    SetSeat(i, ChickenClass.Warrior, null, false, false, ready: false, null);
+                    SetSeat(i, CornerAssignment.LobbySeatCorner(mode, i, _lobbyPermutation), ChickenClass.Warrior, null, false, false, ready: false, null);
                     allReady = false;
                 }
             }

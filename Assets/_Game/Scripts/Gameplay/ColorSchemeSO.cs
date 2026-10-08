@@ -42,7 +42,6 @@ namespace CluckWars.Gameplay
         public Color JoystickKnob   = new Color(1f,    1f,    1f,    0.55f);
         public Color AttackNormal   = new Color(0.91f, 0.28f, 0.16f, 0.60f); // warm red-orange
         public Color AttackPressed  = new Color(0.95f, 0.46f, 0.20f, 0.95f);
-        public Color AbilityNormal  = new Color(0.10f, 0.50f, 0.77f, 0.55f); // P2-blue base
         public Color AbilityPressed = new Color(0.30f, 0.70f, 0.95f, 0.95f);
         public Color CooldownDim    = new Color(0f,    0f,    0f,    0.55f);
     }

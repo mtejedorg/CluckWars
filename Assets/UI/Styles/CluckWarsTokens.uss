@@ -72,11 +72,7 @@
     --cw-ribbon-bg-2: #b08018;
     --cw-ribbon-shadow: rgba(0,0,0,0.5);
 
-    /* -- Player colors (Okabe-Ito) -- */
-    --cw-player-1: #E8751A;
-    --cw-player-2: #1A7FC4;
-    --cw-player-3: #C4286F;
-    --cw-player-4: #0D9E7A;
+    /* -- Player colors: C# only, UI/PlayerPalette.cs (keyed by spawn corner) -- */
 
     /* -- Class colors (tokens-v3) -- */
     --cw-class-warrior: #C04030;

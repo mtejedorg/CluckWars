@@ -25,6 +25,5 @@ MonoBehaviour:
   JoystickKnob: {r: 1, g: 1, b: 1, a: 0.55}
   AttackNormal: {r: 0.91, g: 0.28, b: 0.16, a: 0.6}
   AttackPressed: {r: 0.95, g: 0.46, b: 0.2, a: 0.95}
-  AbilityNormal: {r: 0.1, g: 0.5, b: 0.77, a: 0.55}
   AbilityPressed: {r: 0.3, g: 0.7, b: 0.95, a: 0.95}
   CooldownDim: {r: 0, g: 0, b: 0, a: 0.55}

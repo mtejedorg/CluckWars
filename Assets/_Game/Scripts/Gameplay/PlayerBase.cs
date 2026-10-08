@@ -65,14 +65,6 @@ namespace CluckWars.Gameplay
 
         public float DepositRadius => _depositRadius;
 
-        // Per-player identity colors — corner-indexed, matching MatchHud / ART.md §6.
-        private static readonly Color[] PlayerColors =
-        {
-            new Color(0.91f, 0.46f, 0.10f, 1f), // corner 0 — Orange
-            new Color(0.10f, 0.50f, 0.77f, 1f), // corner 1 — Blue
-            new Color(0.77f, 0.16f, 0.44f, 1f), // corner 2 — Pink
-            new Color(0.05f, 0.62f, 0.48f, 1f), // corner 3 — Teal
-        };
         private static readonly Color UnownedColor = new Color(0.42f, 0.42f, 0.42f, 1f);
 
         // Shader property IDs — cached once so SetPropertyBlock is alloc-free.
@@ -146,7 +138,7 @@ namespace CluckWars.Gameplay
         private void ApplyOwnerTint()
         {
             var color = IsClaimed
-                ? PlayerColors[CornerIndex % PlayerColors.Length]
+                ? CluckWars.UI.PlayerPalette.ForCorner(CornerIndex)
                 : UnownedColor;
 
             var mpb = new MaterialPropertyBlock();

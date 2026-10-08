@@ -27,6 +27,12 @@
     position: absolute; left: 0; top: 0; right: 0; bottom: 0;
     /* no background : the 3D game shows through everywhere but the controls */
 }
+/* The two control clusters' zones (JoystickRoot / AbilityRoot): full-screen, transparent, never
+   take a tap. TouchControlsController insets them to Screen.safeArea (SafeAreaPadding), and the
+   controls are positioned inside them. */
+.cw-touch-zone {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+}
 
 /* ============================================================================
    VIRTUAL JOYSTICK  (bottom-left)

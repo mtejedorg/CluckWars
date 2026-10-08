@@ -29,20 +29,12 @@ namespace CluckWars.UI
 
         [SerializeField] private float _refreshInterval = 0.25f;
 
-        // Okabe-Ito per-player identity colors (ART.md §6).
-        private static readonly Color[] PlayerColors =
-        {
-            new Color(0.91f, 0.46f, 0.10f, 1f), // P1 Orange #E8751A
-            new Color(0.10f, 0.50f, 0.77f, 1f), // P2 Blue   #1A7FC4
-            new Color(0.77f, 0.16f, 0.44f, 1f), // P3 Pink   #C4286F
-            new Color(0.05f, 0.62f, 0.48f, 1f), // P4 Teal   #0D9E7A
-        };
-
         private ILogService _log;
         private MatchConfigSO _matchConfig;
 
         private VisualElement _root;
         private VisualElement _topBarRoot;
+        private SafeAreaPadding _safeArea;   // keeps the leaderboard and timer out of a notch / cutout
         private bool          _bound;
         private bool          _introDimmed;
         private bool          _hiddenByModal;
@@ -98,6 +90,10 @@ namespace CluckWars.UI
             if (_root == null) return;
 
             _topBarRoot = _root.Q<VisualElement>("TopBarRoot");
+            if (_topBarRoot == null)
+                _log?.Error(Source, "MatchTopBar.uxml has no #TopBarRoot: no safe-area padding, intro dim or modal hide for the HUD.");
+            else
+                _safeArea = new SafeAreaPadding(_topBarRoot);
 
             for (int i = 0; i < 4; i++)
             {
@@ -175,6 +171,7 @@ namespace CluckWars.UI
                 TryBind();
                 if (!_bound) return;
             }
+            _safeArea?.Apply();   // two struct compares a frame unless the safe area moved
 
             if (Time.unscaledTime < _nextRefresh && _bases.Length > 0 && _gameManager != null)
                 return;
@@ -262,14 +259,17 @@ namespace CluckWars.UI
                 {
                     rowRefs.Root.style.display = DisplayStyle.Flex;
                     var (corner, total) = sorted[rank];
-                    Color color = PlayerColors[corner % PlayerColors.Length];
+                    Color color = PlayerPalette.ForCorner(corner);
+                    bool isLocal = corner == localCorner;
 
                     if (rowRefs.Ord != null) rowRefs.Ord.text = Ordinal(rank + 1);
+                    // The player colour lives on the dot (and the bar); the name stays cream (USS) for
+                    // contrast, and the local player's name is the YOU mark (round-2 findings 1 + 5).
                     if (rowRefs.Dot != null) rowRefs.Dot.style.unityBackgroundImageTintColor = color;
                     if (rowRefs.Name != null)
                     {
                         rowRefs.Name.text = NameForCorner(corner, localCorner);
-                        rowRefs.Name.style.color = color;
+                        rowRefs.Name.EnableInClassList(PlayerPalette.YouMarkClass, isLocal);
                     }
 
                     if (rowRefs.BarFill != null)
@@ -281,27 +281,10 @@ namespace CluckWars.UI
 
                     if (rowRefs.Score != null) rowRefs.Score.text = Mathf.FloorToInt(total).ToString();
 
-                    // The local player's row gets a player-color left border + tint.
-                    if (corner == localCorner)
-                    {
-                        rowRefs.Root.style.borderLeftColor = color;
-                        rowRefs.Root.style.backgroundColor = Fade(color, 0.2f);
-                    }
-                    else
-                    {
-                        rowRefs.Root.style.borderLeftColor = Color.clear;
-                        // The leader's row gets a faint gold wash.
-                        if (rank == 0)
-                        {
-                            rowRefs.Root.AddToClassList("cw-lb-row--leader");
-                            rowRefs.Root.style.backgroundColor = new StyleColor(StyleKeyword.Null); // Clear inline to use USS
-                        }
-                        else
-                        {
-                            rowRefs.Root.RemoveFromClassList("cw-lb-row--leader");
-                            rowRefs.Root.style.backgroundColor = Color.clear;
-                        }
-                    }
+                    // The local player's row gets a player-colour left border (no colour wash behind the
+                    // cream text); the leader's row, local or not, a faint gold wash (USS).
+                    rowRefs.Root.style.borderLeftColor = isLocal ? color : Color.clear;
+                    rowRefs.Root.EnableInClassList("cw-lb-row--leader", rank == 0);
                 }
                 else
                 {
@@ -352,8 +335,6 @@ namespace CluckWars.UI
             3 => UiText.Get(UiKeys.HudRank3),
             _ => UiText.Get(UiKeys.HudRank4),
         };
-
-        private static Color Fade(Color c, float a) => new Color(c.r, c.g, c.b, a);
 
         private int LocalCorner()
         {

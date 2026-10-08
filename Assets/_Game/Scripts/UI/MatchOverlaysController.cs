@@ -48,16 +48,6 @@ namespace CluckWars.UI
         [Tooltip("Bootstrap scene to load after a disconnect.")]
         [SerializeField] private string _bootstrapSceneName = "Bootstrap";
 
-        // Colorblind-safe per-player identity colors (Okabe-Ito; ART.md §6),
-        // matching MatchHud so overlays and HUD read the same palette.
-        private static readonly Color[] PlayerColors =
-        {
-            new Color(0.91f, 0.46f, 0.10f, 1f), // P1 Orange  #E8751A
-            new Color(0.10f, 0.50f, 0.77f, 1f), // P2 Blue    #1A7FC4
-            new Color(0.77f, 0.16f, 0.44f, 1f), // P3 Pink    #C4286F
-            new Color(0.05f, 0.62f, 0.48f, 1f), // P4 Teal    #0D9E7A
-        };
-
         // ---- Injected services -------------------------------------------------
         private INetworkService          _network;
         private ILogService              _log;
@@ -586,10 +576,14 @@ namespace CluckWars.UI
                 if (!filled) { ShowPodChicken(slot, v, null, false); continue; }
 
                 var e = ranked[rank];
-                Color color = ColorForCorner(e.Corner);
+                Color color = PlayerPalette.ForCorner(e.Corner);
                 if (v.Ring != null) v.Ring.style.unityBackgroundImageTintColor = color;
                 if (v.Plate != null) v.Plate.style.borderTopColor = color;
-                if (v.Name != null) v.Name.text = MatchStandings.DisplayName(e);
+                if (v.Name != null)
+                {
+                    v.Name.text = MatchStandings.DisplayName(e);
+                    v.Name.EnableInClassList(PlayerPalette.YouMarkClass, e.IsLocal);
+                }
                 if (v.Score != null) v.Score.text = Mathf.FloorToInt(e.Total).ToString();
                 if (v.Place != null) v.Place.text = (rank + 1).ToString();
                 ShowPodChicken(slot, v, e.HasChicken ? e.Class : (ChickenClass?)null, cheer: hasWinner && rank == 0);
@@ -675,7 +669,7 @@ namespace CluckWars.UI
 
         private VisualElement BuildMeRow(int rank, in MatchStandings.Entry e, float maxTotal, bool isWinner)
         {
-            Color color = ColorForCorner(e.Corner);
+            Color color = PlayerPalette.ForCorner(e.Corner);
 
             var row = new VisualElement();
             row.AddToClassList("cw-me-row");
@@ -701,6 +695,7 @@ namespace CluckWars.UI
             mid.AddToClassList("cw-me-rowmid");
             var name = new Label(MatchStandings.DisplayName(e));
             name.AddToClassList("cw-me-rowname");
+            name.EnableInClassList(PlayerPalette.YouMarkClass, e.IsLocal);
             mid.Add(name);
             if (e.HasChicken)
             {
@@ -836,7 +831,7 @@ namespace CluckWars.UI
             _lobbyGrid.Clear();
             for (int corner = 0; corner < _seats.Length; corner++)
             {
-                var color = ColorForCorner(corner);
+                var color = PlayerPalette.ForCorner(corner);
                 var v = new SeatView { Root = new VisualElement() };
                 v.Root.AddToClassList("cw-seat");
 
@@ -919,6 +914,7 @@ namespace CluckWars.UI
 
                 v.Root.EnableInClassList("cw-seat--empty", !filled);
                 v.Root.EnableInClassList("cw-seat--you", filled && corner == localCorner);
+                v.Name.EnableInClassList(PlayerPalette.YouMarkClass, filled && corner == localCorner);
                 string css = filled ? "cw-chicken--" + KeyOf(chicken.Class) : null;
                 if (v.ChickenCss != css)
                 {
@@ -1184,9 +1180,6 @@ namespace CluckWars.UI
             }
             return -1;
         }
-
-        private static Color ColorForCorner(int corner) =>
-            corner >= 0 ? PlayerColors[corner % PlayerColors.Length] : Color.grey;
 
         private static string KeyOf(ChickenClass cls) => cls.ToString().ToLowerInvariant();
 

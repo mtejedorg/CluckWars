@@ -161,6 +161,51 @@ namespace CluckWars.Tests
             Assert.AreEqual(24f, insets.w, 1e-3f, "bottom");
         }
 
+        [Test]
+        public void SafeArea_Cutout_LandscapeLeft_InsetsTheLeftEdgeOnly()
+        {
+            // Landscape-left (home button / gesture side on the right): the camera cutout is on the left.
+            var sa = new Rect(130, 0, 2400 - 130, 1080);
+            var insets = SafeAreaPadding.Insets(sa, new Vector2Int(2400, 1080), p => p * 0.5f);
+            Assert.AreEqual(new Vector4(65f, 0f, 0f, 0f), insets);
+        }
+
+        [Test]
+        public void SafeArea_Cutout_LandscapeRight_InsetsTheRightEdgeOnly()
+        {
+            // The same phone turned the other way: the cutout is now on the right, so xMax shrinks.
+            var sa = new Rect(0, 0, 2400 - 130, 1080);
+            var insets = SafeAreaPadding.Insets(sa, new Vector2Int(2400, 1080), p => p * 0.5f);
+            Assert.AreEqual(new Vector4(0f, 0f, 65f, 0f), insets);
+        }
+
+        [Test]
+        public void SafeArea_Cutout_AtTheTop_InsetsTheTopEdge_NotTheBottom()
+        {
+            // A notch / status bar at the top: Screen.safeArea is bottom-left origin, so it is yMax that
+            // shrinks (1080 - 90), which must come out as a TOP inset in the panel's top-left space.
+            var sa = new Rect(0, 0, 2400, 1080 - 90);
+            var insets = SafeAreaPadding.Insets(sa, new Vector2Int(2400, 1080), p => p * 0.5f);
+            Assert.AreEqual(new Vector4(0f, 45f, 0f, 0f), insets);
+        }
+
+        [Test]
+        public void SafeArea_IsOneSharedRule_UsedByTheMenuHudAndTouchControls()
+        {
+            // Round-2 finding 15: the menu's private copy is gone; every screen that pads for the safe
+            // area goes through SafeAreaPadding (finding 5: the HUD top bar and both touch clusters too).
+            string menu = Read("Assets/_Game/Scripts/UI/MenuUiController.cs");
+            StringAssert.Contains("new SafeAreaPadding(_pageHost)", menu);
+            StringAssert.DoesNotContain("ApplySafeArea", menu);
+            StringAssert.DoesNotContain("RuntimePanelUtils.ScreenToPanel", menu);
+            StringAssert.Contains("new SafeAreaPadding(_topBarRoot)", Read("Assets/_Game/Scripts/UI/MatchHudController.cs"));
+            StringAssert.Contains("new SafeAreaPadding(SafeAreaPadding.Edge.Offsets, joyZone, abilityZone)",
+                Read("Assets/_Game/Scripts/Input/TouchControlsController.cs"));
+            string touch = Read("Assets/UI/TouchControls.uxml");
+            StringAssert.Contains("name=\"JoystickRoot\"", touch);
+            StringAssert.Contains("name=\"AbilityRoot\"", touch);
+        }
+
         // ---- Stylesheet / copy guards ---------------------------------------------------------------
 
         [Test]

@@ -378,7 +378,7 @@ namespace CluckWars.Visuals
         /// Colour for a cargo *loss* popup (<c>-5 🌽</c> at the victim). ADDED for Stage 4 —
         /// §3.2 specifies "warm red" but no value. Picked as a warm, orange-leaning red
         /// rather than a pure red so it does not collide with P1's identity orange
-        /// (#E8751A, <c>ChickenWorldBars</c>) or with the <c>FULL!</c> cargo warning
+        /// (<c>PlayerPalette.P1</c>) or with the <c>FULL!</c> cargo warning
         /// (1.00, 0.18, 0.08) that already lives on the same chicken — a number reading
         /// "you lost cargo" must not be mistakable for either.
         /// </summary>
@@ -388,7 +388,7 @@ namespace CluckWars.Visuals
         /// Colour for a cargo *gain* popup (<c>+5 🌽</c> at the thief). ADDED for Stage 4.
         /// A bright grass green, matched in hue family to
         /// <see cref="CanonicalRootColor"/>'s deliberate "grass, not teal" choice so it
-        /// stays clear of P4 Forest Teal (#0D9E7A) for the same colour-blind-safety reason
+        /// stays clear of P4 Forest Teal (<c>PlayerPalette.P4</c>) for the same colour-blind-safety reason
         /// documented on that constant. Green-versus-red is carried by the leading
         /// <c>+</c>/<c>-</c> sign as the second channel, per §1.3 — never colour alone.
         /// </summary>
@@ -638,9 +638,10 @@ namespace CluckWars.Visuals
         /// Layer 2–4 alpha for "no valid target in range". Higher than
         /// <see cref="HexAlphaCooldown"/> on purpose: this state is *ready to fire the
         /// moment someone walks into range*, so it must stay visibly brighter than a slot
-        /// the player simply cannot use yet. Its distinguishing channel is hue, not alpha
-        /// — the fill switches to <see cref="NeutralNoEffectColor"/> (§1.3: never colour
-        /// alone, so it also gets the layer-9 ⃠ mark).
+        /// the player simply cannot use yet. Since round-2 finding 5 the fill keeps its
+        /// category hue, quieted toward ink (<c>AbilityPalette.Idle</c>) instead of switching to
+        /// <see cref="NeutralNoEffectColor"/>; the state itself is the layer-9 ⃠ mark and the
+        /// half-faded icon (§1.3: never colour alone).
         /// </summary>
         public const float HexAlphaNoTarget = 0.70f;
 
@@ -900,7 +901,7 @@ namespace CluckWars.Visuals
         //
         // Both existing greens/blues were also checked against the four player-
         // identity colours (docs/ART.md "Player Identity Colors", Okabe-Ito derived):
-        // P2 Ocean Blue #1A7FC4 and P4 Forest Teal #0D9E7A. A raw Okabe-Ito palette
+        // P2 Ocean Blue and P4 Forest Teal (UI/PlayerPalette). A raw Okabe-Ito palette
         // pull for "root = bluish-green" would have landed on #009E73 — almost
         // exactly P4's Forest Teal, which is the one collision this system cannot
         // afford (a rooted P4 chicken would read as "extra teal," not "rooted").

@@ -1,6 +1,7 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTokens.uss" />
     <ui:Style src="project://database/Assets/UI/Styles/MatchTopBar.uss" />
+    <ui:Style src="project://database/Assets/UI/Styles/YouMark.uss" />
 
     <ui:VisualElement name="TopBarRoot" class="cw-topbar" picking-mode="Ignore">
         <ui:VisualElement name="TopBarLayout" class="cw-topbar-layout" picking-mode="Ignore">
