@@ -219,7 +219,7 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// 0 = invisible, 1 = fully opaque. Networked so the fade is visible to every player.
         /// </summary>
-        [Networked] public float VisualOpacity { get; set; }
+        [Networked] public float VisualOpacity { get; private set; }
 
         /// <summary>True for the Doppelganger decoy: skips input processing.</summary>
         public bool IsDecoy { get; set; }
@@ -228,7 +228,7 @@ namespace CluckWars.Gameplay
         [Networked] public bool IsBot { get; set; }
 
         /// <summary>Spine Coat steal-back active hook.</summary>
-        [Networked] public bool StealBackActive { get; set; }
+        [Networked] public bool StealBackActive { get; private set; }
         public float StealBackAmount => Effects.StealBackAmount;
         /// <summary>
         /// Spine Coat's shove-back impulse, world-units/sec. Scaled 8 -> 10.8 (x1.35) with
@@ -311,11 +311,11 @@ namespace CluckWars.Gameplay
 
         /// <summary>True while the Feather Aura ability is active on this chicken.
         /// Replicated so nearby chickens can self-apply the slow in their own FUN.</summary>
-        [Networked] public bool  AuraSlowActive { get; set; }
+        [Networked] public bool  AuraSlowActive { get; private set; }
         /// <summary>World-units radius of the active aura slow effect.</summary>
-        [Networked] public float AuraSlowRadius { get; set; }
+        [Networked] public float AuraSlowRadius { get; private set; }
         /// <summary>Speed multiplier broadcast by the aura (applied to chickens inside the radius).</summary>
-        [Networked] public float AuraSlowFactor { get; set; }
+        [Networked] public float AuraSlowFactor { get; private set; }
 
         // ---- v0.3 Control-state fields (GDD §6.4) ----------------------------
 
@@ -456,6 +456,7 @@ namespace CluckWars.Gameplay
             _cargo = GetComponent<ChickenCargo>();
             _abilities = GetComponent<AbilityController>();
             _activeStats = ResolveStatsForClass(Class);
+            Effects.Log = _log;
 
             if (_activeStats == null)
             {
@@ -707,6 +708,11 @@ namespace CluckWars.Gameplay
         public override void FixedUpdateNetwork()
         {
             if (!HasStateAuthority) return;
+
+            // The networked mirrors of the ability effect stack are re-derived every authority tick (each write
+            // is change-gated), so their correctness never depends on every mutation site remembering to call
+            // SyncAbilityEffects. Before the early returns below: a decoy or a unit without stats still mirrors.
+            SyncAbilityEffects();
 
             // The gate opens the method (CONVENTIONS.md), and the diagnostic below is not
             // weakened by sitting under it. _movement is built in Spawned from _activeStats,
@@ -1132,6 +1138,9 @@ namespace CluckWars.Gameplay
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_ResetControlStates()
         {
+            // End running abilities through their own OnDeactivate first (modifiers, traversal holds, ability
+            // state), THEN hard-release traversal and clear the stack as a backstop.
+            _abilities?.EndAllForReset();
             _traversal?.Abort();
             _abilitySlowUntil    = double.MinValue;
             _abilitySlowFactor   = 1f;

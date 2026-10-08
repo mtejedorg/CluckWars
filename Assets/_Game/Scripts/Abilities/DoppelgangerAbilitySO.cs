@@ -47,7 +47,7 @@ namespace CluckWars.Abilities
         /// Refuses the press when the decoy could not be spawned, before the cast is
         /// committed. Same shape and the same reason as the zone abilities' gate: this is
         /// unassigned wiring, which will never fix itself at runtime, so it is an Error and
-        /// it belongs ahead of <c>ActiveSlot</c> / the activation timer / the cooldown that
+        /// it belongs ahead of the slot's active flag / its duration timer / the cooldown that
         /// <c>AbilityController.TryActivate</c> writes immediately after this returns true.
         /// </summary>
         /// <remarks>

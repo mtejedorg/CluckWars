@@ -106,7 +106,7 @@ ChickenController (NetworkBehaviour)
 ├── ChickenMovement                    Pure C# helper; CharacterController.Move
 ├── ChickenCombat                      [Networked] HP / IsStunned / StunTimer / AttackTimer / AttackEpoch
 ├── ChickenCargo                       [Networked] Cargo; collect/deposit/death-drop/steal
-├── AbilityController                  [Networked] ActiveSlot / ActivationTimer / Cooldown0 / Cooldown1
+├── AbilityController                  [Networked] ActiveMask / ActiveTimer0..3 / Cooldown0..3 / LastCastSlot
 ├── ChickenAnimator                    Local; Speed/AbilityCast/Hit/Stunned animator params
 │                                      + procedural lean/bank on the model child
 ├── ChickenVisuals                     Local; MaterialPropertyBlock tint + alpha
@@ -210,6 +210,10 @@ public abstract class AbilityBaseSO : ScriptableObject {
 ```
 
 Adding a new ability = subclass + drop a `.asset` under `/Assets/_Game/Data/Abilities/`. No code changes to `AbilityController`.
+
+### Concurrent abilities and authority-side state (Phase 6 chunk 3)
+
+Abilities run concurrently. The running set is networked (`ActiveMask` + per-slot `ActiveTimer0..3`), but what the abilities DO is resolved in `AbilityEffectStack` (`ChickenController.Effects`) and the traversal holders (`ChickenTraversal` / `TraversalHolders`): plain C# objects that are **unsynced, authority-side state**. Only the resolved mirrors (`VisualOpacity`, `StealBackActive`, `AuraSlow*`) are `[Networked]`, with private setters, re-derived every authority tick by `SyncAbilityEffects`. That is fine for Shared Mode: the authority runs the abilities, and on an authority change `AbilityController.OnAuthorityGained` ends whatever the mask says runs and scrubs every slot's modifiers. **It must be revisited for Server Mode**: the stack and holders are not rolled back or resimulated, so prediction/rollback needs them as networked state or re-derivable from `ActiveMask` + the timers.
 
 ### Concrete abilities (all 8 shipped)
 

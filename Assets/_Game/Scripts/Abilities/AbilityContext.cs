@@ -15,7 +15,7 @@ namespace CluckWars.Abilities
     /// without requiring a MonoBehaviour reference. <c>AbilityController.TryActivate</c>
     /// refreshes both fields immediately after the refusal check and before the cast is
     /// committed — before <see cref="AbilityBaseSO.CanActivate"/> runs, and therefore
-    /// before <c>ActiveSlot</c>, the activation timer and the cooldown are written. Both
+    /// before the slot's active flag, duration timer and cooldown are written. Both
     /// fields are consequently current for <c>CanActivate</c> and for <c>OnActivate</c>.
     /// The order matters: <c>CanActivate</c> on the zone abilities calls
     /// <see cref="CanSpawnZone"/>, which reads exactly these two fields, so refreshing

@@ -165,7 +165,7 @@ per-cast noise until nobody reads the log at all.
 pre-commitment gate, refusing the press outranks surfacing the failure afterwards: nothing
 is half-applied, no cooldown is charged, and there is no misleading evidence to explain.
 `AbilityBaseSO.CanActivate(AbilityContext)` is that gate — it runs inside
-`AbilityController.TryActivate` before `ActiveSlot`, `ActivationTimer` or `SetCooldown` are
+`AbilityController.TryActivate` before the slot's `ActiveMask` bit, its active timer or `SetCooldown` are
 touched, and the three zone abilities use it. Reach for this first; the corollaries below
 rank what to do when you cannot.
 

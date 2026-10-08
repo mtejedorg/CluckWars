@@ -438,7 +438,7 @@ namespace CluckWars.Visuals
             if (_abilities == null) return;
 
             // TryActivate clears ChargingSlot in the same tick it fires, and a very short
-            // ability's ActiveSlot may already have expired by the time this observes the
+            // ability's active flag may already have cleared by the time this observes the
             // event — so remember what was last aimed, same as AbilityRangeIndicator.
             if (_abilities.ChargingSlot != 0)
             {

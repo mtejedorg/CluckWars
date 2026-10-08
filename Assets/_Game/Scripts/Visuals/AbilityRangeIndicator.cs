@@ -117,7 +117,7 @@ namespace CluckWars.Visuals
 
         /// <summary>
         /// Fires the flash off the replicated <c>LastCastEventId</c> one-shot rather than an
-        /// <c>ActiveSlot</c> transition. The old edge-detect missed two real cases: an
+        /// active-slot transition. The old edge-detect missed two real cases: an
         /// ability whose active window closed inside a single frame, and two back-to-back
         /// casts of the <i>same</i> slot (the slot never returned to Invalid in between, so
         /// the second cast drew nothing). Baseline is seeded on first observation so a late
@@ -130,7 +130,7 @@ namespace CluckWars.Visuals
 
             // Remember what was last being aimed: TryActivate clears ChargingSlot in the same
             // tick it fires, so by the time this observes the event the charge is gone, and
-            // ActiveSlot may also already have expired for a very short-duration ability.
+            // the slot's active flag may also already have cleared for a very short-duration ability.
             if (_abilities.ChargingSlot != 0)
             {
                 var charging = _abilities.ChargingAbility;

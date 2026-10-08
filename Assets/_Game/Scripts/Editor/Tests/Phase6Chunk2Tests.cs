@@ -93,7 +93,7 @@ namespace CluckWars.Tests
             int fizzle = src.IndexOf("_fizzlePending = true;", StringComparison.Ordinal);
             int cooldown = src.IndexOf("SetCooldown(slot, TickTimer.CreateFromSeconds(Runner, ResolveCooldownFor(ability)));",
                                        StringComparison.Ordinal);
-            int active = src.IndexOf("ActiveMask = (byte)(ActiveMask | (1 << slot));", fizzle, StringComparison.Ordinal);
+            int active = src.IndexOf("ActiveMask = AbilityRunRules.Begin(ActiveMask, slot);", fizzle, StringComparison.Ordinal);
             Assert.Greater(fizzle, 0);
             Assert.Greater(cooldown, fizzle, "the fizzle branch returns before any cooldown is started");
             Assert.Greater(active, fizzle, "...and before the slot becomes active (chunk 3's stealth-ending sits below)");

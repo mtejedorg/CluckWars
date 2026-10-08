@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using CluckWars.Logging;
 using UnityEngine;
 
 namespace CluckWars.Gameplay
@@ -95,6 +96,21 @@ namespace CluckWars.Gameplay
         private readonly Channel _stealBack = new Channel();
         private readonly Channel _aura = new Channel();
 
+        /// <summary>Where a rejected Set* reports. Null in pure tests, where a rejection is only a no-op.</summary>
+        public ILogService Log { get; set; }
+
+        /// <summary>
+        /// A modifier needs a real slot as its source: -1 is "outside a slot activation" (a passive, a stray
+        /// call after OnActivate returned) and would be impossible to remove later. Logs an Error and refuses.
+        /// </summary>
+        private bool ValidSource(int source, string kind)
+        {
+            if (source >= 0) return true;
+            Log?.Error("Ability", $"Effects.Set{kind} called with source {source} (outside a slot activation). " +
+                "The modifier was NOT applied: it could never be removed.");
+            return false;
+        }
+
         // ---- Move speed (kinds A + B) --------------------------------------------
 
         /// <summary>
@@ -103,6 +119,7 @@ namespace CluckWars.Gameplay
         /// </summary>
         public void SetMoveSpeed(int source, float multiplier)
         {
+            if (!ValidSource(source, "MoveSpeed")) return;
             RemoveMoveSpeed(source);
             if (multiplier > 1f) _boost.Set(source, multiplier);
             else if (multiplier < 1f) _penalty.Set(source, multiplier);
@@ -119,7 +136,10 @@ namespace CluckWars.Gameplay
 
         // ---- Stealth opacity (kind C) --------------------------------------------
 
-        public void SetOpacity(int source, float opacity) => _opacity.Set(source, Mathf.Clamp01(opacity));
+        public void SetOpacity(int source, float opacity)
+        {
+            if (ValidSource(source, "Opacity")) _opacity.Set(source, Mathf.Clamp01(opacity));
+        }
         public void RemoveOpacity(int source) => _opacity.Remove(source);
 
         /// <summary>Lowest active opacity; 1 when none.</summary>
@@ -127,13 +147,19 @@ namespace CluckWars.Gameplay
 
         // ---- Movement lock (kind D) ----------------------------------------------
 
-        public void SetMovementLock(int source) => _lock.Set(source, 1f);
+        public void SetMovementLock(int source)
+        {
+            if (ValidSource(source, "MovementLock")) _lock.Set(source, 1f);
+        }
         public void RemoveMovementLock(int source) => _lock.Remove(source);
         public bool MovementLocked => _lock.Count > 0;
 
         // ---- Deposit rate (kind G) -----------------------------------------------
 
-        public void SetDepositRate(int source, float multiplier) => _deposit.Set(source, multiplier);
+        public void SetDepositRate(int source, float multiplier)
+        {
+            if (ValidSource(source, "DepositRate")) _deposit.Set(source, multiplier);
+        }
         public void RemoveDepositRate(int source) => _deposit.Remove(source);
 
         /// <summary>Strongest active multiplier; 1 when none.</summary>
@@ -143,7 +169,10 @@ namespace CluckWars.Gameplay
 
         public const float DefaultStealBackAmount = 4f;
 
-        public void SetStealBack(int source, float amount) => _stealBack.Set(source, amount);
+        public void SetStealBack(int source, float amount)
+        {
+            if (ValidSource(source, "StealBack")) _stealBack.Set(source, amount);
+        }
         public void RemoveStealBack(int source) => _stealBack.Remove(source);
         public bool StealBackActive => _stealBack.Count > 0;
 
@@ -152,7 +181,10 @@ namespace CluckWars.Gameplay
 
         // ---- Aura emitter (kind I) -----------------------------------------------
 
-        public void SetAura(int source, float slowFactor, float radius) => _aura.Set(source, slowFactor, radius);
+        public void SetAura(int source, float slowFactor, float radius)
+        {
+            if (ValidSource(source, "Aura")) _aura.Set(source, slowFactor, radius);
+        }
         public void RemoveAura(int source) => _aura.Remove(source);
         public bool AuraActive => _aura.Count > 0;
 

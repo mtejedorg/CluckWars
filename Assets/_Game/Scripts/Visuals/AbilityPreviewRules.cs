@@ -39,10 +39,15 @@ namespace CluckWars.Visuals
 
         /// <summary>
         /// Does this refusal wash the live preview to <c>FeedbackTuning.IllegalCastTintColor</c>?
-        /// Only REAL refusals do: stunned, cooling down, unavailable, another ability running.
+        /// Only REAL refusals do: stunned, cooling down, unavailable.
         /// <see cref="AbilityRefusal.NoTarget"/> deliberately does not — pressing with nobody in the
         /// shape is a legal aim (you are lining the move up), drawn as the dashed no-target preview.
         /// </summary>
+        /// <remarks>
+        /// <see cref="AbilityRefusal.OtherAbilityActive"/> stays classified so the exhaustiveness test keeps
+        /// every enum member decided, but it is retired and unreachable: abilities run concurrently as of
+        /// Phase 6 chunk 3, so nothing produces it any more.
+        /// </remarks>
         public static bool IsRealRefusal(AbilityRefusal refusal) =>
             refusal == AbilityRefusal.Stunned ||
             refusal == AbilityRefusal.Cooldown ||

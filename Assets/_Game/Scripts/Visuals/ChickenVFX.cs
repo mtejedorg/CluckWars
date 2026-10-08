@@ -117,9 +117,9 @@ namespace CluckWars.Visuals
             _wasStunned = isStunned;
 
             // ── Ability activation: AccentColor burst + caster micro-shake on cast ───
-            // Detection used to be a rising-edge test on ActiveSlot (Invalid → non-Invalid
-            // → ... → Invalid). That was broken three ways: (1) a short ability can set and
-            // clear ActiveSlot inside a single tick, so LateUpdate never observes the
+            // Detection used to be a rising-edge test on the old single ActiveSlot (since retired: abilities
+            // now run concurrently on a per-slot mask). That was broken three ways: (1) a short ability can
+            // set and clear its active flag inside a single tick, so LateUpdate never observes the
             // non-Invalid value and the burst/shake silently never plays; (2) back-to-back
             // casts of two different slots produce no Invalid frame in between, so the
             // second cast is silent too; (3) there was no baseline seeding, so a peer that
@@ -127,7 +127,7 @@ namespace CluckWars.Visuals
             // cast that had already happened. HitFeedback.ObserveOwnCast and
             // AbilityRangeIndicator.ObserveCast hit the exact same three failures and were
             // both fixed by keying off the replicated one-shot LastCastEventId instead of a
-            // slot transition — this does the same. Do not revert to an ActiveSlot
+            // slot transition — this does the same. Do not revert to an active-flag
             // edge-detect; it will silently reintroduce all three bugs.
             if (_abilities != null) ObserveCastEvent();
 
@@ -163,7 +163,7 @@ namespace CluckWars.Visuals
         private void ObserveCastEvent()
         {
             // TryActivate clears ChargingSlot in the same tick it fires, and a very short
-            // ability's ActiveSlot may already have expired by the time this observes the
+            // ability's active flag may already have cleared by the time this observes the
             // event — so remember what was last aimed, same as HitFeedback/AbilityRangeIndicator.
             if (_abilities.ChargingSlot != 0)
             {
@@ -206,7 +206,7 @@ namespace CluckWars.Visuals
             // Deliberately NOT gated on ability != null: unlike the burst, the shake does
             // not depend on AccentColor, and §3.1 wants it on every cast without exception.
             // Only the steal-flavoured magnitude needs the ability's Category, which is
-            // unknowable in the rare case neither ActiveAbility nor the remembered charging
+            // unknowable in the rare case neither LastCastAbility nor the remembered charging
             // ability resolved (effectively: a late joiner whose very first observed cast
             // had no charging phase left to remember). Falling back to the base magnitude
             // there is a closer match to "always shake" than skipping it outright.

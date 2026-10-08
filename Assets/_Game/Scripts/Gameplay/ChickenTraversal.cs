@@ -212,7 +212,12 @@ namespace CluckWars.Gameplay
             if (!_holders.Remove(holder)) return;
             if (_holders.Count > 0)
             {
-                _tier = _holders.Highest;
+                var lowered = _holders.Highest;
+                if (lowered != _tier)
+                {
+                    _tier = lowered;
+                    ReleaseUnclearableAfterDowngrade();
+                }
                 return;
             }
 
@@ -353,6 +358,32 @@ namespace CluckWars.Gameplay
             exit = exit.sqrMagnitude > 0.0001f ? exit.normalized : Vector3.forward;
             return true;
         }
+
+        /// <summary>
+        /// The highest holder ended and a lower tier remains: give back every ignored collider the lower tier
+        /// cannot clear (a Blink that ended must not leave a Tall rock ghosted for the Vault still running),
+        /// except those the caster is overlapping right now, which stay ignored for the unstick pass.
+        /// See <see cref="TraversalRules.KeepsIgnoreAfterDowngrade"/>.
+        /// </summary>
+        private void ReleaseUnclearableAfterDowngrade()
+        {
+            if (_cc == null) return;
+            for (int i = _ignored.Count - 1; i >= 0; i--)
+            {
+                var col = _ignored[i];
+                if (col == null) { _ignored.RemoveAt(i); continue; }
+                if (TraversalRules.KeepsIgnoreAfterDowngrade(IsClearable(_tier, col), IsOverlapping(col))) continue;
+
+                Physics.IgnoreCollision(_cc, col, false);
+                _ignored.RemoveAt(i);
+            }
+        }
+
+        private bool IsOverlapping(Collider col) =>
+            Physics.ComputePenetration(
+                _cc, _transform.position, _transform.rotation,
+                col, col.transform.position, col.transform.rotation,
+                out _, out float depth) && depth > 0f;
 
         /// <summary>Re-enables collision against everything in the set and closes the window.</summary>
         private void Restore()

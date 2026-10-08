@@ -69,9 +69,10 @@ namespace CluckWars.AbilityLab
         private float _lastCastLatencyMs = -1f;
         private int _lastCastSlot = AbilityController.InvalidSlot;
         private int _lastCastHits = -1;
-        private float _activeWindowStart = -1f;
+        // Per-slot active-window tracking: abilities overlap, so one shared start time would blur two casts together.
+        private readonly float[] _activeWindowStart = new float[AbilityController.SlotCount];
+        private readonly bool[] _wasActive = new bool[AbilityController.SlotCount];
         private float _lastActiveWindowSeconds = -1f;
-        private int _previousActiveSlot = AbilityController.InvalidSlot;
 
         private readonly StringBuilder _sb = new StringBuilder(1024);
 
@@ -177,8 +178,7 @@ namespace CluckWars.AbilityLab
                 _lastActiveWindowSeconds = -1f;
                 _lastCastSlot = AbilityController.InvalidSlot;
                 _lastCastHits = -1;
-                _previousActiveSlot = AbilityController.InvalidSlot;
-                _activeWindowStart = -1f;
+                for (int i = 0; i < AbilityController.SlotCount; i++) { _wasActive[i] = false; _activeWindowStart[i] = -1f; }
             }
 
             // LastCastEventId is a wrapping one-shot signal, so the first read after spawn
@@ -209,18 +209,21 @@ namespace CluckWars.AbilityLab
                 }
             }
 
-            int activeSlot = abilities.AnyAbilityActive ? abilities.MostRecentActiveSlot : AbilityController.InvalidSlot;
-            if (activeSlot != AbilityController.InvalidSlot && _previousActiveSlot == AbilityController.InvalidSlot)
+            // The window figure is the most recently ENDED slot's own run, measured per slot.
+            for (int i = 0; i < AbilityController.SlotCount; i++)
             {
-                _activeWindowStart = Time.realtimeSinceStartup;
+                bool active = abilities.IsSlotActive(i);
+                if (active && !_wasActive[i])
+                {
+                    _activeWindowStart[i] = Time.realtimeSinceStartup;
+                }
+                else if (!active && _wasActive[i] && _activeWindowStart[i] > 0f)
+                {
+                    _lastActiveWindowSeconds = Time.realtimeSinceStartup - _activeWindowStart[i];
+                    _activeWindowStart[i] = -1f;
+                }
+                _wasActive[i] = active;
             }
-            else if (activeSlot == AbilityController.InvalidSlot && _previousActiveSlot != AbilityController.InvalidSlot
-                     && _activeWindowStart > 0f)
-            {
-                _lastActiveWindowSeconds = Time.realtimeSinceStartup - _activeWindowStart;
-                _activeWindowStart = -1f;
-            }
-            _previousActiveSlot = activeSlot;
         }
 
         private AbilityController PlayerAbilities =>
@@ -274,7 +277,7 @@ namespace CluckWars.AbilityLab
             _sb.Append("Press to cast: ")
                .AppendLine(_lastCastLatencyMs >= 0f ? $"{_lastCastLatencyMs:0} ms" : "—");
 
-            _sb.Append("Active window: ")
+            _sb.Append("Last ended active window: ")
                .AppendLine(_lastActiveWindowSeconds >= 0f ? $"{_lastActiveWindowSeconds:0.000} s" : "—");
 
             _sb.Append("Last cast: ");

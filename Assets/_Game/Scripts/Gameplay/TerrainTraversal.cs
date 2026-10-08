@@ -69,6 +69,15 @@ namespace CluckWars.Gameplay
             Clears(tier, ObstacleClass.Low);
 
         /// <summary>
+        /// A holder ended and the window dropped to a lower tier: does an already-ignored collider stay ignored?
+        /// Yes when the new tier can still clear it, or when the caster overlaps it right now (restoring
+        /// collision inside geometry would trap the caster; the unstick pass releases it later). Otherwise the
+        /// collision is restored at once so the lower tier does not keep walls it was never granted.
+        /// </summary>
+        public static bool KeepsIgnoreAfterDowngrade(bool newTierClearsIt, bool casterOverlapsIt) =>
+            newTierClearsIt || casterOverlapsIt;
+
+        /// <summary>
         /// Strength order of the tiers: None &lt; Barge &lt; Vault &lt; Blink. NOT the enum's integer order
         /// (assets serialize that and it must not be renumbered).
         /// </summary>

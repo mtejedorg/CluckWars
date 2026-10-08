@@ -612,7 +612,7 @@ namespace CluckWars.Abilities
         /// <summary>
         /// Pre-commitment gate: is this ability wired up well enough to run at all? Checked
         /// once per press, immediately before <c>AbilityController.TryActivate</c> commits
-        /// <c>ActiveSlot</c>, the activation timer and the cooldown — so a false here costs
+        /// the slot's active flag, its duration timer and the cooldown — so a false here costs
         /// the player nothing.
         /// </summary>
         /// <remarks>

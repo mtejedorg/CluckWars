@@ -68,7 +68,7 @@ namespace CluckWars.Gameplay
         /// slot of THAT cast. Visuals that mean "the ability that just cast" (cast flash, hit feedback,
         /// range indicator) read this; "is slot N running" is <see cref="IsSlotActive"/>.
         /// </summary>
-        [Networked] public int LastCastSlot { get; set; }
+        [Networked] public int LastCastSlot { get; private set; }
         [Networked] private TickTimer Cooldown0 { get; set; }
         [Networked] private TickTimer Cooldown1 { get; set; }
         [Networked] private TickTimer Cooldown2 { get; set; }
@@ -115,7 +115,7 @@ namespace CluckWars.Gameplay
         /// Is the ability in <paramref name="slot"/> mid-duration right now? The one place the HUD, VFX and bots
         /// ask "is THIS slot running"; several slots can be running at once.
         /// </summary>
-        public bool IsSlotActive(int slot) => slot >= 0 && slot < SlotCount && (ActiveMask & (1 << slot)) != 0;
+        public bool IsSlotActive(int slot) => slot < SlotCount && AbilityRunRules.IsActive(ActiveMask, slot);
 
         /// <summary>True while ANY slot is running. Bots refuse to cast while this holds (see
         /// <see cref="BotTryActivate"/>); players are not gated by it.</summary>
@@ -144,17 +144,13 @@ namespace CluckWars.Gameplay
         {
             get
             {
-                int best = InvalidSlot;
-                float bestElapsed = float.MaxValue;
                 for (int i = 0; i < SlotCount; i++)
                 {
-                    if (!IsSlotActive(i)) continue;
                     var ability = GetSlot(i);
-                    float remaining = GetActiveTimer(i).RemainingTime(Runner) ?? 0f;
-                    float elapsed = (ability != null ? ability.Duration : 0f) - remaining;
-                    if (elapsed < bestElapsed) { bestElapsed = elapsed; best = i; }
+                    float remaining = IsSlotActive(i) ? GetActiveTimer(i).RemainingTime(Runner) ?? 0f : 0f;
+                    _elapsedScratch[i] = (ability != null ? ability.Duration : 0f) - remaining;
                 }
-                return best;
+                return AbilityRunRules.MostRecent(ActiveMask, _elapsedScratch, InvalidSlot);
             }
         }
 
@@ -167,6 +163,13 @@ namespace CluckWars.Gameplay
         private AudioRegistrySO _audioReg;
         private PrefabRegistrySO _prefabRegistry;
         private bool _initialized;
+
+        // Whether this peer held state authority on the previous tick (see OnAuthorityGained).
+        private bool _wasAuthority;
+
+        // Scratch for AbilityRunRules (no per-tick allocation).
+        private readonly float[] _elapsedScratch = new float[SlotCount];
+        private readonly bool[] _flagScratch = new bool[SlotCount];
 
         // ---- Hold/release/cancel state machine scratch (StateAuthority-side only,
         // not networked — re-derived from the input buffer every tick). Reused instance
@@ -265,6 +268,8 @@ namespace CluckWars.Gameplay
 
             if (_combat != null) _combat.OnDeathAuthority += HandleOwnerDeath;
 
+            // Seed the authority edge so the original authority does not see a spurious "gained" on its first tick.
+            _wasAuthority = HasStateAuthority;
             _initialized = true;
             _log?.Debug(Source, $"Spawned. Passive={(_passive != null ? _passive.name : "(none)")}, " +
                 $"Slot0={(Slot0 != null ? Slot0.name : "(none)")}, " +
@@ -280,14 +285,24 @@ namespace CluckWars.Gameplay
 
         public override void FixedUpdateNetwork()
         {
-            if (!HasStateAuthority || !_initialized) return;
+            bool hasAuthority = HasStateAuthority;
+            if (hasAuthority != _wasAuthority)
+            {
+                _wasAuthority = hasAuthority;
+                if (hasAuthority && _initialized) OnAuthorityGained();
+            }
+
+            if (!hasAuthority || !_initialized) return;
 
             if (_controller != null && _controller.IsDecoy) return;
 
-            // Auto-deactivate each running slot whose own duration timer has expired.
+            // Auto-deactivate each running slot whose own duration timer has expired (natural expiry: the only
+            // path that plays the expire sound).
+            for (int i = 0; i < SlotCount; i++) _flagScratch[i] = GetActiveTimer(i).Expired(Runner);
+            byte expired = AbilityRunRules.ExpiredMask(ActiveMask, _flagScratch);
             for (int i = 0; i < SlotCount; i++)
             {
-                if (IsSlotActive(i) && GetActiveTimer(i).Expired(Runner)) Deactivate(i);
+                if (AbilityRunRules.IsActive(expired, i)) Deactivate(i, natural: true);
             }
 
             for (int i = 0; i < SlotCount; i++)
@@ -542,6 +557,10 @@ namespace CluckWars.Gameplay
         public void SetSlots(PassiveAbilitySO passive, AbilityBaseSO slot0, AbilityBaseSO slot1,
             AbilityBaseSO slot2 = null, AbilityBaseSO slot3 = null)
         {
+            // A loadout swap on a live chicken must end what the OLD assets are running first, while the slots
+            // still point at them; otherwise their modifiers / traversal holds would outlive the swap.
+            if (_initialized && HasStateAuthority) DeactivateAll();
+
             if (passive != null) _passive = passive;
             if (slot0 != null) _slot0 = slot0;
             if (slot1 != null) _slot1 = slot1;
@@ -755,7 +774,7 @@ namespace CluckWars.Gameplay
             // stack — a Smoke Roost cast during Invisibility fades again.
             EndStealthAndPeckForCast(slot);
 
-            ActiveMask = (byte)(ActiveMask | (1 << slot));
+            ActiveMask = AbilityRunRules.Begin(ActiveMask, slot);
             SetActiveTimer(slot, TickTimer.CreateFromSeconds(Runner, ability.Duration));
             SetCooldown(slot, TickTimer.CreateFromSeconds(Runner, ResolveCooldownFor(ability)));
             LastCastSlot = slot;
@@ -793,7 +812,8 @@ namespace CluckWars.Gameplay
             LastCastHitCount = (byte)Mathf.Min(hitCount, byte.MaxValue);
 
             _ctx.Slot = slot;
-            ability.OnActivate(_ctx);
+            try { ability.OnActivate(_ctx); }
+            finally { _ctx.Slot = -1; }
             _controller?.SyncAbilityEffects();
 
             // The deferred half of the ordering documented above: a capsule ability has now
@@ -858,32 +878,62 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Ends the run in <paramref name="slot"/>: removes that ability's own effect modifiers (never anyone
         /// else's), releases its traversal hold, and clears its active flag. Idempotent for a slot not running.
+        /// Only <paramref name="natural"/> expiry plays the expire sound (and only for a human-driven chicken);
+        /// death, round reset, a loadout swap and the stealth / Peck break end a slot silently so they don't
+        /// stack on top of the sound the new cast already plays.
         /// </summary>
-        private void Deactivate(int slot)
+        private void Deactivate(int slot, bool natural = false)
         {
             if (!IsSlotActive(slot)) return;
 
             var ability = GetSlot(slot);
+            System.Action<int> endTraversal = _controller != null && _controller.Traversal != null
+                ? _controller.Traversal.End
+                : null;
+            AbilityRunRules.ReleaseSlot(slot, ability, _ctx, _controller != null ? _controller.Effects : null, endTraversal);
             if (ability != null)
             {
-                _ctx.Slot = slot;
-                ability.OnDeactivate(_ctx);
-                _audio?.PlaySFX(_audioReg != null ? _audioReg.AbilityExpire : null);
+                if (natural) PlayLocalSfx(_audioReg != null ? _audioReg.AbilityExpire : null, 1f);
                 _log?.Debug(Source, $"Deactivated {ability.DisplayName}.");
-                if (ability.TerrainTraversal != TerrainTraversal.None && _controller != null && _controller.Traversal != null)
-                {
-                    _controller.Traversal.End(slot);
-                }
             }
-            ActiveMask = (byte)(ActiveMask & ~(1 << slot));
+            ActiveMask = AbilityRunRules.End(ActiveMask, slot);
             _controller?.SyncAbilityEffects();
         }
 
-        /// <summary>Ends every running slot (match stop, removal, death).</summary>
+        /// <summary>Ends every running slot (match stop, removal, death, reset, loadout swap).</summary>
         private void DeactivateAll()
         {
             if (!AnyAbilityActive) return;
             for (int i = 0; i < SlotCount; i++) Deactivate(i);
+        }
+
+        /// <summary>
+        /// Round reset: ends every running ability through its own OnDeactivate so its modifiers, traversal hold
+        /// and any ability-owned state go with it. Authority only; the caller keeps <c>Effects.Clear</c> as a
+        /// backstop afterwards.
+        /// </summary>
+        public void EndAllForReset()
+        {
+            if (!HasStateAuthority || !_initialized) return;
+            DeactivateAll();
+        }
+
+        /// <summary>
+        /// Authority migration (Shared Mode): the effect stack and traversal holders are authority-local, so a
+        /// peer that has just gained authority has an EMPTY stack while the networked ActiveMask may still say
+        /// slots run, and may hold stale modifiers from an earlier stint as authority. Simplest correct option:
+        /// end whatever the mask says runs (those lose their remaining time) and scrub every slot's modifiers.
+        /// </summary>
+        private void OnAuthorityGained()
+        {
+            DeactivateAll();
+            if (_controller == null) return;
+            for (int i = 0; i < SlotCount; i++)
+            {
+                _controller.Effects.RemoveSource(i);
+                _controller.Traversal?.End(i);
+            }
+            _controller.SyncAbilityEffects();
         }
 
         /// <summary>
@@ -894,9 +944,13 @@ namespace CluckWars.Gameplay
         {
             for (int i = 0; i < SlotCount; i++)
             {
-                if (i == castSlot || !IsSlotActive(i)) continue;
                 var running = GetSlot(i);
-                if (running != null && running.EndsOnNextMove) Deactivate(i);
+                _flagScratch[i] = running != null && running.EndsOnNextMove;
+            }
+            byte ended = AbilityRunRules.EndedByCast(ActiveMask, castSlot, _flagScratch);
+            for (int i = 0; i < SlotCount; i++)
+            {
+                if (AbilityRunRules.IsActive(ended, i)) Deactivate(i);
             }
         }
 

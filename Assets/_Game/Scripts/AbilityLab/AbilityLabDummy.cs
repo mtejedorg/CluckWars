@@ -158,8 +158,8 @@ namespace CluckWars.AbilityLab
             _controller.RPC_TeleportTo(_home);
             _controller.transform.rotation = _homeRotation;
 
-            // Not covered by RPC_ResetControlStates — these are cargo/steal concerns.
-            _controller.StealBackActive = false;
+            // Not covered by RPC_ResetControlStates — these are cargo concerns. (Steal-back is derived from the
+            // ability effect stack, which the reset already cleared.)
             _controller.VerticalVelocity = 0f;
             _cargo?.RPC_ResetForNewMatch();
             Restock();

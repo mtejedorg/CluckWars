@@ -36,7 +36,7 @@ namespace CluckWars.Visuals
     /// <c>StunRemaining</c>/<c>RootRemaining</c> (both <c>[Networked] TickTimer</c>-backed),
     /// <c>KnockbackEventId</c> and <c>JumpEventId</c> (the two one-shot impact events),
     /// the already-networked
-    /// <c>IsStunned</c>, and <c>AbilityController.ChargingSlot</c>/<c>ActiveSlot</c>.
+    /// <c>IsStunned</c>, and <c>AbilityController.ChargingSlot</c> and the per-slot active mask (<c>MostRecentActiveSlot</c>).
     /// The particles / LineRenderers / sprites themselves are 100% local — only those
     /// compact triggers cross the wire. Same LineRenderer pattern as
     /// <see cref="AbilityRangeIndicator"/>.
