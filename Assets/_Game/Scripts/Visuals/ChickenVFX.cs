@@ -183,7 +183,7 @@ namespace CluckWars.Visuals
             if (id == _lastCastEventId) return;
             _lastCastEventId = id;
 
-            var ability = _abilities.ActiveAbility ?? _lastChargingAbility;
+            var ability = _abilities.LastCastAbility ?? _lastChargingAbility;
 
             // The burst needs AccentColor, so an unresolved ability means no burst.
             if (ability != null && _abilityPS != null)

@@ -74,6 +74,8 @@ namespace CluckWars.Abilities
         // lands before the cast and its cooldown are committed.
         public override bool CanActivate(AbilityContext ctx) => ctx.CanSpawnZone(Source, "Smoke Roost");
 
+        public override bool IsStealth => true;
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;
@@ -88,7 +90,7 @@ namespace CluckWars.Abilities
             // on it.
 
             // Half one: he fades. Cheap, and independent of the zone spawning at all.
-            caster.VisualOpacity = Opacity;
+            caster.Effects.SetOpacity(ctx.Slot, Opacity);
 
             // Half two: the cloud. Captured into locals — a closure over 'this' can go stale
             // if the SO is unloaded (same reason Feather Trap does it).
@@ -128,7 +130,7 @@ namespace CluckWars.Abilities
 
         public override void OnDeactivate(AbilityContext ctx)
         {
-            ctx.Controller.VisualOpacity = 1f;
+            ctx.Controller.Effects.RemoveOpacity(ctx.Slot);
         }
     }
 }

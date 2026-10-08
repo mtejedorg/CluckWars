@@ -76,6 +76,11 @@ namespace CluckWars.Gameplay
         /// <summary>Colliders this caster is currently ignoring. Every one of these must be restored.</summary>
         private readonly List<Collider> _ignored = new List<Collider>(8);
 
+        /// <summary>Holder id used by callers that are not an ability slot (tests, tools).</summary>
+        public const int DefaultHolder = -1;
+
+        private readonly TraversalHolders _holders = new TraversalHolders();
+
         private TerrainTraversal _tier;
         private bool _windowOpen;
         private int _unstickTicks;
@@ -178,29 +183,39 @@ namespace CluckWars.Gameplay
         // ---- Window lifecycle --------------------------------------------------
 
         /// <summary>
-        /// Opens (or re-opens) a traversal window. Deliberately additive: an existing
-        /// ignore set is kept rather than restored, because restoring it here could
-        /// re-solidify a wall the caster is standing inside. Everything is released
-        /// together once nothing overlaps.
+        /// Opens (or re-opens) a traversal window for <paramref name="holder"/> (an ability slot). Several
+        /// abilities may hold a window at once (Phase 6 chunk 3): the caster gets the HIGHEST tier among
+        /// holders and the window stays open until the last holder ends. Deliberately additive: an existing
+        /// ignore set is kept rather than restored, because restoring it here could re-solidify a wall the
+        /// caster is standing inside. Everything is released together once nothing overlaps.
         /// </summary>
-        public void Begin(TerrainTraversal tier)
+        public void Begin(TerrainTraversal tier, int holder = DefaultHolder)
         {
             if (tier == TerrainTraversal.None) return;
 
-            _tier = tier;
+            _holders.Set(holder, tier);
+            _tier = _holders.Highest;
             _windowOpen = true;
             _unstickTicks = 0;
             Scan();
 
-            _log?.Debug(Source, $"Traversal window open: {tier} (ignoring {_ignored.Count} collider(s)).");
+            _log?.Debug(Source, $"Traversal window open: {_tier} (holder {holder}, ignoring {_ignored.Count} collider(s)).");
         }
 
         /// <summary>
-        /// The ability window elapsed. Restores immediately when the caster is clear;
-        /// otherwise drops into unstick until it is.
+        /// <paramref name="holder"/>'s ability window elapsed. While another holder is still running the window
+        /// stays open at that holder's tier; once the LAST holder ends it restores immediately when the caster
+        /// is clear, otherwise drops into unstick until it is. A holder that never began is ignored.
         /// </summary>
-        public void End()
+        public void End(int holder = DefaultHolder)
         {
+            if (!_holders.Remove(holder)) return;
+            if (_holders.Count > 0)
+            {
+                _tier = _holders.Highest;
+                return;
+            }
+
             if (_tier == TerrainTraversal.None) return;
             _windowOpen = false;
             _unstickTicks = 0;
@@ -214,6 +229,7 @@ namespace CluckWars.Gameplay
         /// </summary>
         public void Abort()
         {
+            _holders.Clear();
             if (_tier == TerrainTraversal.None && _ignored.Count == 0) return;
             _log?.Debug(Source, $"Traversal aborted ({_tier}); restoring {_ignored.Count} collider(s).");
             Restore();

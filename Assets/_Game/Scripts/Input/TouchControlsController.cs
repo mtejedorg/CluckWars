@@ -756,8 +756,8 @@ namespace CluckWars.Input
 
             if (refs.DrainFill != null && active01 > 0f)
             {
-                // Full-strength category colour: the running slot must be the one bright thing
-                // while the rest of the cluster sits at HexAlphaOtherActive.
+                // Full-strength category colour: the running slot reads bright; the cluster is not dimmed
+                // while abilities run (Phase 6 chunk 3).
                 var drainTint = accent;
                 drainTint.a = FeedbackTuning.HexAlphaReady;
                 refs.DrainFill.style.unityBackgroundImageTintColor = drainTint;
@@ -777,10 +777,6 @@ namespace CluckWars.Input
                     // goes illegal mid-aim — being stunned and having your aim invalidated
                     // are the same story told at two moments.
                     tint = FeedbackTuning.IllegalCastTintColor;
-                    break;
-                case AbilityRefusal.OtherAbilityActive:
-                    tint = accent;
-                    tint.a = FeedbackTuning.HexAlphaOtherActive;
                     break;
                 default:
                     // Ready, and "no target in range" too (Phase 6, A1): nobody around is not a refusal, so

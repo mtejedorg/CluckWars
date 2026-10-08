@@ -49,12 +49,12 @@ namespace CluckWars.Tests
                 HudFeedbackStyle.HexClass(AbilityRefusal.Cooldown));
             Assert.AreEqual(HudFeedbackStyle.HexStunnedClass,
                 HudFeedbackStyle.HexClass(AbilityRefusal.Stunned));
-            Assert.AreEqual(HudFeedbackStyle.HexOtherActiveClass,
-                HudFeedbackStyle.HexClass(AbilityRefusal.OtherAbilityActive));
+            // The retired OtherAbilityActive refusal (Phase 6 chunk 3) has no hex class: the cluster is never dimmed.
+            Assert.IsNull(HudFeedbackStyle.HexClass(AbilityRefusal.OtherAbilityActive));
         }
 
         [Test]
-        public void HexClass_TheThreeVisibleRefusals_AreAllDistinct()
+        public void HexClass_TheTwoVisibleRefusals_AreDistinct()
         {
             // §6's whole point: refusals that look identical must become different reads.
             // If any two ever collapsed onto one class the player would be back to guessing.
@@ -62,7 +62,6 @@ namespace CluckWars.Tests
             {
                 HudFeedbackStyle.HexClass(AbilityRefusal.Cooldown),
                 HudFeedbackStyle.HexClass(AbilityRefusal.Stunned),
-                HudFeedbackStyle.HexClass(AbilityRefusal.OtherAbilityActive),
             };
             CollectionAssert.AllItemsAreUnique(classes);
             CollectionAssert.AllItemsAreNotNull(classes);

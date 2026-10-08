@@ -147,7 +147,7 @@ namespace CluckWars.Visuals
             if (id == _lastCastEventId) return;
             _lastCastEventId = id;
 
-            var ability = _abilities.ActiveAbility ?? _lastChargingAbility;
+            var ability = _abilities.LastCastAbility ?? _lastChargingAbility;
             if (ability == null) return;
 
             TelegraphShapes.Resolve(ability, out _flashShape, out _flashRadius,

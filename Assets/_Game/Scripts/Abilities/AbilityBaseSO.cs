@@ -635,6 +635,20 @@ namespace CluckWars.Abilities
         /// </remarks>
         public virtual bool CanActivate(AbilityContext ctx) => true;
 
+        /// <summary>
+        /// True for stealth effects (Invisibility, Smoke Roost's fade): they fade the caster through
+        /// <c>VisualOpacity</c> and END the moment the caster successfully casts any other move
+        /// (Phase 6 chunk 3, "using a move breaks it"). A fizzle, refusal, hold or preview never breaks it.
+        /// Smoke Roost's cloud is a separate zone and persists.
+        /// </summary>
+        public virtual bool IsStealth => false;
+
+        /// <summary>
+        /// True when a successful cast of ANY OTHER move ends this ability's run (Phase 6 chunk 3): stealth
+        /// ("using a move breaks it") and Peck's 0.4 s lock. Everything else keeps running alongside a new cast.
+        /// </summary>
+        public virtual bool EndsOnNextMove => IsStealth;
+
         public abstract void OnActivate(AbilityContext ctx);
         public abstract void OnDeactivate(AbilityContext ctx);
     }

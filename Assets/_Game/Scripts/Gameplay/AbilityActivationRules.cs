@@ -13,6 +13,11 @@ namespace CluckWars.Gameplay
         Cooldown = 1,
         NoTarget = 2,
         Stunned = 3,
+        /// <summary>
+        /// Retired by Phase 6 chunk 3 (abilities run concurrently): no longer produced for player input.
+        /// The value stays so the byte numbering and the HUD switch arms are untouched. Bots still refuse
+        /// while any of their slots runs, but through <c>AbilityController.BotTryActivate</c>, not this enum.
+        /// </summary>
         OtherAbilityActive = 4,
         SlotUnavailable = 5,
     }
@@ -30,12 +35,11 @@ namespace CluckWars.Gameplay
     public static class AbilityRefusalRules
     {
         public static AbilityRefusal Evaluate(
-            bool slotUnavailable, bool onCooldown, bool stunned, bool otherAbilityActive, bool noTarget)
+            bool slotUnavailable, bool onCooldown, bool stunned, bool noTarget)
         {
             if (slotUnavailable) return AbilityRefusal.SlotUnavailable;
             if (onCooldown) return AbilityRefusal.Cooldown;
             if (stunned) return AbilityRefusal.Stunned;
-            if (otherAbilityActive) return AbilityRefusal.OtherAbilityActive;
             if (noTarget) return AbilityRefusal.NoTarget;
             return AbilityRefusal.None;
         }
@@ -151,7 +155,6 @@ namespace CluckWars.Gameplay
         /// <c>FeedbackTuning.TapHoldThresholdSeconds</c>. Passed in rather than referenced so this
         /// stays a pure function of its arguments.</param>
         /// <param name="canCast">False while stunned (<c>ControlRules.CanCast</c>).</param>
-        /// <param name="otherAbilityActive">True while a different ability is already mid-duration (no double-cast).</param>
         /// <param name="cancelPressed">This tick's edge-triggered cancel bit (Esc / touch drag-off).</param>
         /// <param name="hold">One live hold bit per slot. Its LENGTH defines how many slots
         /// exist — the count is deliberately not a constant in here, so growing the loadout
@@ -163,7 +166,7 @@ namespace CluckWars.Gameplay
         /// "no target yet" must never block a hold from starting.</param>
         public static ChargeDecision Decide(
             byte chargingSlot, int pendingSlot, float pendingHeldSeconds, float tapHoldThresholdSeconds,
-            bool canCast, bool otherAbilityActive, bool cancelPressed,
+            bool canCast, bool cancelPressed,
             bool[] hold, bool[] press, bool[] canBeginCharge)
         {
             int slotCount = hold != null ? hold.Length : 0;
@@ -182,7 +185,8 @@ namespace CluckWars.Gameplay
             // firing/burning cooldown. An already-ACTIVE ability (mid-duration) is a
             // separate concern the caller handles elsewhere — this only ever cancels the
             // pre-fire aiming states.
-            if (!canCast || otherAbilityActive)
+            // A RUNNING ability never gates a new hold or preview (Phase 6 chunk 3): only the inability to cast does.
+            if (!canCast)
                 return (chargingSlot != 0 || pendingLive) ? ChargeDecision.Cancel : ChargeDecision.None;
 
             // 2. Explicit cancel (Esc / touch drag-off) kills either pre-fire state.

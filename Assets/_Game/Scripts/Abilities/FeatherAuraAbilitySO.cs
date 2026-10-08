@@ -32,15 +32,12 @@ namespace CluckWars.Abilities
 
         public override void OnActivate(AbilityContext ctx)
         {
-            var c = ctx.Controller;
-            c.AuraSlowFactor = AuraSlowFactor;
-            c.AuraSlowRadius = AuraRadius;
-            c.AuraSlowActive = true; // write last so readers see consistent state
+            ctx.Controller.Effects.SetAura(ctx.Slot, AuraSlowFactor, AuraRadius);
         }
 
         public override void OnDeactivate(AbilityContext ctx)
         {
-            ctx.Controller.AuraSlowActive = false;
+            ctx.Controller.Effects.RemoveAura(ctx.Slot);
         }
     }
 }

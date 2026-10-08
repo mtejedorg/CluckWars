@@ -15,12 +15,12 @@ namespace CluckWars.Abilities
 
         public override void OnActivate(AbilityContext ctx)
         {
-            ctx.Controller.MoveSpeedMultiplier = SpeedMultiplier;
+            ctx.Controller.Effects.SetMoveSpeed(ctx.Slot, SpeedMultiplier);
         }
 
         public override void OnDeactivate(AbilityContext ctx)
         {
-            ctx.Controller.MoveSpeedMultiplier = 1f;
+            ctx.Controller.Effects.RemoveMoveSpeed(ctx.Slot);
         }
     }
 }

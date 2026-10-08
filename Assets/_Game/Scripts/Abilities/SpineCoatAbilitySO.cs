@@ -38,13 +38,12 @@ namespace CluckWars.Abilities
 
         public override void OnActivate(AbilityContext ctx)
         {
-            ctx.Controller.StealBackActive = true;
-            ctx.Controller.StealBackAmount = StealBackAmount;
+            ctx.Controller.Effects.SetStealBack(ctx.Slot, StealBackAmount);
         }
 
         public override void OnDeactivate(AbilityContext ctx)
         {
-            ctx.Controller.StealBackActive = false;
+            ctx.Controller.Effects.RemoveStealBack(ctx.Slot);
         }
     }
 }

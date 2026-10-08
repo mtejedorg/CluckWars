@@ -21,7 +21,7 @@ namespace CluckWars.Tests
         public void Refusal_NothingWrong_ReturnsNone()
         {
             var r = AbilityRefusalRules.Evaluate(
-                slotUnavailable: false, onCooldown: false, stunned: false, otherAbilityActive: false, noTarget: false);
+                slotUnavailable: false, onCooldown: false, stunned: false, noTarget: false);
             Assert.AreEqual(AbilityRefusal.None, r);
         }
 
@@ -29,7 +29,7 @@ namespace CluckWars.Tests
         public void Refusal_SlotUnavailable_WinsOverEveryOtherReason()
         {
             var r = AbilityRefusalRules.Evaluate(
-                slotUnavailable: true, onCooldown: true, stunned: true, otherAbilityActive: true, noTarget: true);
+                slotUnavailable: true, onCooldown: true, stunned: true, noTarget: true);
             Assert.AreEqual(AbilityRefusal.SlotUnavailable, r);
         }
 
@@ -41,7 +41,7 @@ namespace CluckWars.Tests
             // would actually refuse with. Cooldown outranks Stunned in the table, so
             // both this query and the real activation gate must agree on Cooldown.
             var r = AbilityRefusalRules.Evaluate(
-                slotUnavailable: false, onCooldown: true, stunned: true, otherAbilityActive: false, noTarget: false);
+                slotUnavailable: false, onCooldown: true, stunned: true, noTarget: false);
             Assert.AreEqual(AbilityRefusal.Cooldown, r);
         }
 
@@ -49,7 +49,7 @@ namespace CluckWars.Tests
         public void Refusal_Cooldown_WinsOverStunnedOtherActiveAndNoTarget()
         {
             var r = AbilityRefusalRules.Evaluate(
-                slotUnavailable: false, onCooldown: true, stunned: true, otherAbilityActive: true, noTarget: true);
+                slotUnavailable: false, onCooldown: true, stunned: true, noTarget: true);
             Assert.AreEqual(AbilityRefusal.Cooldown, r);
         }
 
@@ -57,23 +57,15 @@ namespace CluckWars.Tests
         public void Refusal_Stunned_WinsOverOtherActiveAndNoTarget()
         {
             var r = AbilityRefusalRules.Evaluate(
-                slotUnavailable: false, onCooldown: false, stunned: true, otherAbilityActive: true, noTarget: true);
+                slotUnavailable: false, onCooldown: false, stunned: true, noTarget: true);
             Assert.AreEqual(AbilityRefusal.Stunned, r);
-        }
-
-        [Test]
-        public void Refusal_OtherAbilityActive_WinsOverNoTarget()
-        {
-            var r = AbilityRefusalRules.Evaluate(
-                slotUnavailable: false, onCooldown: false, stunned: false, otherAbilityActive: true, noTarget: true);
-            Assert.AreEqual(AbilityRefusal.OtherAbilityActive, r);
         }
 
         [Test]
         public void Refusal_NoTarget_OnlyReported_WhenNothingElseApplies()
         {
             var r = AbilityRefusalRules.Evaluate(
-                slotUnavailable: false, onCooldown: false, stunned: false, otherAbilityActive: false, noTarget: true);
+                slotUnavailable: false, onCooldown: false, stunned: false, noTarget: true);
             Assert.AreEqual(AbilityRefusal.NoTarget, r);
         }
 
@@ -100,12 +92,12 @@ namespace CluckWars.Tests
         /// the real shipped threshold.
         /// </summary>
         private static ChargeDecision Decide(
-            byte chargingSlot, bool canCast, bool otherAbilityActive, bool cancelPressed,
+            byte chargingSlot, bool canCast, bool cancelPressed,
             bool[] hold, bool[] press, bool[] canBeginCharge,
             int pendingSlot = NoPending, float pendingHeldSeconds = 0f)
             => AbilityHoldStateMachine.Decide(
                 chargingSlot, pendingSlot, pendingHeldSeconds, Threshold,
-                canCast, otherAbilityActive, cancelPressed, hold, press, canBeginCharge);
+                canCast, cancelPressed, hold, press, canBeginCharge);
 
         // ---- Slot count is defined by the caller's arrays, not by a constant -----
 
@@ -119,7 +111,7 @@ namespace CluckWars.Tests
             var press = new[] { false, false, false, false };
             var can   = new[] { true, true, true, true };
 
-            var d = Decide(0, true, false, false, hold, press, can);
+            var d = Decide(0, true, false, hold, press, can);
 
             Assert.AreEqual(ChargeAction.BeginPendingHold, d.Action);
             Assert.AreEqual(3, d.Slot, "Slot 3 must be reachable once four slots are passed in.");
@@ -130,7 +122,7 @@ namespace CluckWars.Tests
         {
             // The mirror of the test above: passing three slots must still behave exactly as
             // it did before, or the array-length derivation has quietly become a 4-only path.
-            var d = Decide(0, true, false, false, new[] { false, false, true }, NoPress, AllCanBegin);
+            var d = Decide(0, true, false, new[] { false, false, true }, NoPress, AllCanBegin);
 
             Assert.AreEqual(ChargeAction.BeginPendingHold, d.Action);
             Assert.AreEqual(2, d.Slot);
@@ -143,7 +135,7 @@ namespace CluckWars.Tests
             // then press[3] would throw; worse, a partial read could fire an ability the
             // player never pressed. The caller owns all three arrays and sizes them together,
             // so a mismatch is a bug — refuse the tick and stay silent rather than guess.
-            var d = Decide(0, true, false, false,
+            var d = Decide(0, true, false,
                 new[] { false, false, false, true }, NoPress, AllCanBegin);
 
             Assert.AreEqual(ChargeAction.None, d.Action);
@@ -152,7 +144,7 @@ namespace CluckWars.Tests
         [Test]
         public void Decide_Idle_NothingHeldOrPressed_ReturnsNone()
         {
-            var d = Decide(0, true, false, false, NoHold, NoPress, AllCanBegin);
+            var d = Decide(0, true, false, NoHold, NoPress, AllCanBegin);
             Assert.AreEqual(ChargeAction.None, d.Action);
         }
 
@@ -160,7 +152,7 @@ namespace CluckWars.Tests
         public void Decide_CannotCast_WithNoActiveCharge_IsANoOp()
         {
             // Stunned with nothing charging and nothing pending: nothing to cancel, nothing to begin.
-            var d = Decide(0, false, false, false, new[] { true, false, false }, NoPress, AllCanBegin);
+            var d = Decide(0, false, false, new[] { true, false, false }, NoPress, AllCanBegin);
             Assert.AreEqual(ChargeAction.None, d.Action);
         }
 
@@ -169,7 +161,7 @@ namespace CluckWars.Tests
         {
             // Caster gets stunned while charging slot 1 (chargingSlot=2). Must cancel,
             // never fire — this is the "cast becomes illegal mid-hold" case (§2.5/§2.7).
-            var d = Decide(2, false, false, false, new[] { false, true, false }, NoPress, AllCanBegin);
+            var d = Decide(2, false, false, new[] { false, true, false }, NoPress, AllCanBegin);
             Assert.AreEqual(ChargeAction.Cancel, d.Action);
         }
 
@@ -179,30 +171,32 @@ namespace CluckWars.Tests
             // Same story one state earlier: the stun lands while the hold is still inside
             // the cost ramp and has drawn nothing yet. It must still be torn down, and it
             // must NOT be treated as a release — a stunned player never gets a free cast.
-            var d = Decide(0, false, false, false, new[] { true, false, false }, NoPress, AllCanBegin,
+            var d = Decide(0, false, false, new[] { true, false, false }, NoPress, AllCanBegin,
                 pendingSlot: 0, pendingHeldSeconds: Tick);
             Assert.AreEqual(ChargeAction.Cancel, d.Action);
         }
 
         [Test]
-        public void Decide_OtherAbilityBecameActive_MidHold_CancelsWithoutFiring()
+        public void Decide_ARunningAbility_DoesNotCancelAMidHoldCharge()
         {
-            var d = Decide(1, true, true, false, new[] { true, false, false }, NoPress, AllCanBegin);
-            Assert.AreEqual(ChargeAction.Cancel, d.Action);
+            // Phase 6 chunk 3: abilities run concurrently, so a running ability never tears down an aim in
+            // progress (the Decide signature no longer even takes it).
+            var d = Decide(1, true, false, new[] { true, false, false }, NoPress, AllCanBegin);
+            Assert.AreEqual(ChargeAction.None, d.Action, "the held charge simply keeps charging");
         }
 
         [Test]
-        public void Decide_OtherAbilityBecameActive_MidPendingHold_CancelsWithoutFiring()
+        public void Decide_ARunningAbility_DoesNotBlockANewHold()
         {
-            var d = Decide(0, true, true, false, new[] { true, false, false }, NoPress, AllCanBegin,
-                pendingSlot: 0, pendingHeldSeconds: Tick);
-            Assert.AreEqual(ChargeAction.Cancel, d.Action);
+            var d = Decide(0, true, false, new[] { true, false, false }, NoPress, AllCanBegin);
+            Assert.AreEqual(ChargeAction.BeginPendingHold, d.Action);
+            Assert.AreEqual(0, d.Slot);
         }
 
         [Test]
         public void Decide_CancelBit_WhileCharging_Cancels()
         {
-            var d = Decide(3, true, false, cancelPressed: true,
+            var d = Decide(3, true, cancelPressed: true,
                 new[] { false, false, true }, NoPress, AllCanBegin);
             Assert.AreEqual(ChargeAction.Cancel, d.Action);
         }
@@ -213,7 +207,7 @@ namespace CluckWars.Tests
             // A cancel (touch edge band, Esc, right mouse) inside the cost ramp:
             // the gesture is abandoned, so it must cancel rather than fall through to the
             // idle scan and immediately re-pend the still-held button.
-            var d = Decide(0, true, false, cancelPressed: true,
+            var d = Decide(0, true, cancelPressed: true,
                 new[] { true, false, false }, NoPress, AllCanBegin,
                 pendingSlot: 0, pendingHeldSeconds: 2f * Tick);
             Assert.AreEqual(ChargeAction.Cancel, d.Action);
@@ -222,7 +216,7 @@ namespace CluckWars.Tests
         [Test]
         public void Decide_CancelBit_WithNothingCharging_IsANoOp()
         {
-            var d = Decide(0, true, false, cancelPressed: true, NoHold, NoPress, AllCanBegin);
+            var d = Decide(0, true, cancelPressed: true, NoHold, NoPress, AllCanBegin);
             Assert.AreEqual(ChargeAction.None, d.Action, "Esc with nothing held must not spuriously do anything.");
         }
 
@@ -231,7 +225,7 @@ namespace CluckWars.Tests
         [Test]
         public void Decide_HoldRises_BeginsPendingHold_OnSlot0()
         {
-            var d = Decide(0, true, false, false, new[] { true, false, false }, NoPress, AllCanBegin);
+            var d = Decide(0, true, false, new[] { true, false, false }, NoPress, AllCanBegin);
             Assert.AreEqual(ChargeAction.BeginPendingHold, d.Action,
                 "A rising hold must NOT go straight to BeginCharge — that is the bug this model replaces " +
                 "(every human tap paid for a telegraph flash and an aim-rotate movement lock).");
@@ -241,7 +235,7 @@ namespace CluckWars.Tests
         [Test]
         public void Decide_HoldRises_BeginsPendingHold_OnSlot1()
         {
-            var d = Decide(0, true, false, false, new[] { false, true, false }, NoPress, AllCanBegin);
+            var d = Decide(0, true, false, new[] { false, true, false }, NoPress, AllCanBegin);
             Assert.AreEqual(ChargeAction.BeginPendingHold, d.Action);
             Assert.AreEqual(1, d.Slot);
         }
@@ -249,7 +243,7 @@ namespace CluckWars.Tests
         [Test]
         public void Decide_HoldRises_BeginsPendingHold_OnSlot2()
         {
-            var d = Decide(0, true, false, false, new[] { false, false, true }, NoPress, AllCanBegin);
+            var d = Decide(0, true, false, new[] { false, false, true }, NoPress, AllCanBegin);
             Assert.AreEqual(ChargeAction.BeginPendingHold, d.Action);
             Assert.AreEqual(2, d.Slot);
         }
@@ -258,7 +252,7 @@ namespace CluckWars.Tests
         public void Decide_MultipleSlotsHeldAtOnce_Slot0TakesPriority()
         {
             // Mirrors the pre-hold-to-aim press priority (Ability1 > Ability2 > Ability3).
-            var d = Decide(0, true, false, false, new[] { true, true, true }, NoPress, AllCanBegin);
+            var d = Decide(0, true, false, new[] { true, true, true }, NoPress, AllCanBegin);
             Assert.AreEqual(ChargeAction.BeginPendingHold, d.Action);
             Assert.AreEqual(0, d.Slot);
         }
@@ -274,21 +268,21 @@ namespace CluckWars.Tests
             // ever engage. "If not, there is speed."
             var held = new[] { true, false, false };
 
-            var rise = Decide(0, true, false, false, held, new[] { true, false, false }, AllCanBegin);
+            var rise = Decide(0, true, false, held, new[] { true, false, false }, AllCanBegin);
             Assert.AreEqual(ChargeAction.BeginPendingHold, rise.Action);
             Assert.AreEqual(0, rise.Slot);
 
             // Two more ticks still held — 0.0625 s, comfortably inside the 0.12 s ramp.
             for (int tick = 1; tick <= 2; tick++)
             {
-                var mid = Decide(0, true, false, false, held, NoPress, AllCanBegin,
+                var mid = Decide(0, true, false, held, NoPress, AllCanBegin,
                     pendingSlot: 0, pendingHeldSeconds: tick * Tick);
                 Assert.AreEqual(ChargeAction.None, mid.Action,
                     $"tick {tick}: still inside the ramp — nothing to do but keep clocking.");
             }
 
             // Release.
-            var release = Decide(0, true, false, false, NoHold, NoPress, AllCanBegin,
+            var release = Decide(0, true, false, NoHold, NoPress, AllCanBegin,
                 pendingSlot: 0, pendingHeldSeconds: 3f * Tick);
             Assert.AreEqual(ChargeAction.Fire, release.Action, "Release ALWAYS fires — there is no tap window to wait out.");
             Assert.AreEqual(0, release.Slot);
@@ -302,14 +296,14 @@ namespace CluckWars.Tests
             // Ticks 1..3 of accumulation are all under 0.12 s and must not promote.
             for (int tick = 1; tick <= 3; tick++)
             {
-                var d = Decide(0, true, false, false, held, NoPress, AllCanBegin,
+                var d = Decide(0, true, false, held, NoPress, AllCanBegin,
                     pendingSlot: 1, pendingHeldSeconds: tick * Tick);
                 Assert.AreEqual(ChargeAction.None, d.Action,
                     $"tick {tick} ({tick * Tick:0.#####}s) is under the {Threshold}s ramp.");
             }
 
             // Tick 4 = 0.125 s, the first 32 Hz multiple that clears 0.12.
-            var promote = Decide(0, true, false, false, held, NoPress, AllCanBegin,
+            var promote = Decide(0, true, false, held, NoPress, AllCanBegin,
                 pendingSlot: 1, pendingHeldSeconds: 4f * Tick);
             Assert.AreEqual(ChargeAction.BeginCharge, promote.Action);
             Assert.AreEqual(1, promote.Slot);
@@ -317,7 +311,7 @@ namespace CluckWars.Tests
             // Promotion is the caller's job to apply (it sets ChargingSlot and clears
             // pending), so the very next tick is a plain charging tick — not a second
             // BeginCharge. This is what makes "exactly once" structural.
-            var after = Decide(2, true, false, false, held, NoPress, AllCanBegin);
+            var after = Decide(2, true, false, held, NoPress, AllCanBegin);
             Assert.AreEqual(ChargeAction.None, after.Action);
         }
 
@@ -328,7 +322,7 @@ namespace CluckWars.Tests
             // equality is genuinely reachable if the threshold is ever re-tuned to a tick
             // multiple; treating it as "not yet" would silently push the real boundary out
             // by a full tick without anyone editing the constant.
-            var d = Decide(0, true, false, false, new[] { true, false, false }, NoPress, AllCanBegin,
+            var d = Decide(0, true, false, new[] { true, false, false }, NoPress, AllCanBegin,
                 pendingSlot: 0, pendingHeldSeconds: Threshold);
             Assert.AreEqual(ChargeAction.BeginCharge, d.Action);
             Assert.AreEqual(0, d.Slot);
@@ -338,7 +332,7 @@ namespace CluckWars.Tests
         public void Decide_ReleaseAfterCompletedHold_Fires()
         {
             // chargingSlot=2 means slot index 1 is charging (1-based encoding).
-            var d = Decide(2, true, false, false, NoHold, NoPress, AllCanBegin);
+            var d = Decide(2, true, false, NoHold, NoPress, AllCanBegin);
             Assert.AreEqual(ChargeAction.Fire, d.Action);
             Assert.AreEqual(1, d.Slot);
         }
@@ -355,7 +349,7 @@ namespace CluckWars.Tests
             // fire rather than sit waiting for a hold that will never arrive. Renamed from
             // Decide_SubTickTap_FiresImmediately_WhenHoldNeverObserved, which read as though
             // it described the tap case it does not.
-            var d = Decide(0, true, false, false, NoHold, new[] { false, true, false }, AllCanBegin);
+            var d = Decide(0, true, false, NoHold, new[] { false, true, false }, AllCanBegin);
             Assert.AreEqual(ChargeAction.Fire, d.Action);
             Assert.AreEqual(1, d.Slot);
         }
@@ -365,7 +359,7 @@ namespace CluckWars.Tests
         {
             // On cooldown / unavailable, held but no press this tick: must not spam a
             // refusal every tick the player keeps the dead button held down.
-            var d = Decide(0, true, false, false, new[] { true, false, false }, NoPress, NoneCanBegin);
+            var d = Decide(0, true, false, new[] { true, false, false }, NoPress, NoneCanBegin);
             Assert.AreEqual(ChargeAction.None, d.Action);
         }
 
@@ -375,7 +369,7 @@ namespace CluckWars.Tests
             // The very first tick of a doomed hold typically carries BOTH the edge press
             // and the live hold bit — must surface the refusal via TryActivate rather
             // than going silent. A dead slot never enters the pending state either.
-            var d = Decide(0, true, false, false,
+            var d = Decide(0, true, false,
                 new[] { true, false, false }, new[] { true, false, false }, NoneCanBegin);
             Assert.AreEqual(ChargeAction.RefuseAttempt, d.Action);
             Assert.AreEqual(0, d.Slot);
@@ -384,7 +378,7 @@ namespace CluckWars.Tests
         [Test]
         public void Decide_HoldStillDown_OnChargingSlot_KeepsCharging()
         {
-            var d = Decide(1, true, false, false, new[] { true, false, false }, NoPress, AllCanBegin);
+            var d = Decide(1, true, false, new[] { true, false, false }, NoPress, AllCanBegin);
             Assert.AreEqual(ChargeAction.None, d.Action, "Still held — not time to fire yet.");
         }
 
@@ -395,7 +389,7 @@ namespace CluckWars.Tests
             // charging") — the off-by-one this whole state machine hinges on. The pending
             // slot uses the opposite convention (plain 0-based index, -1 for none), so this
             // also guards the two encodings never being confused for each other.
-            var d = Decide(1, true, false, false, NoHold, NoPress, AllCanBegin);
+            var d = Decide(1, true, false, NoHold, NoPress, AllCanBegin);
             Assert.AreEqual(ChargeAction.Fire, d.Action);
             Assert.AreEqual(0, d.Slot);
         }
@@ -406,7 +400,7 @@ namespace CluckWars.Tests
             // Both states set at once should be unreachable — the caller clears pending on
             // promotion — but if it ever happens, the committed, already-drawn charge is the
             // gesture the player can see, so it must win rather than the invisible one.
-            var d = Decide(1, true, false, false, NoHold, NoPress, AllCanBegin,
+            var d = Decide(1, true, false, NoHold, NoPress, AllCanBegin,
                 pendingSlot: 2, pendingHeldSeconds: 10f);
             Assert.AreEqual(ChargeAction.Fire, d.Action);
             Assert.AreEqual(0, d.Slot, "Fired the charging slot (encoding 1 → index 0), not the pending one.");
@@ -417,7 +411,7 @@ namespace CluckWars.Tests
         {
             // Phase 6 (A4) replaced "one live gesture, other presses ignored": pressing another slot mid-aim
             // switches to it (cancel the current, start the new pending hold the same tick).
-            var d = Decide(0, true, false, false, new[] { true, false, false }, new[] { false, true, false }, AllCanBegin,
+            var d = Decide(0, true, false, new[] { true, false, false }, new[] { false, true, false }, AllCanBegin,
                 pendingSlot: 0, pendingHeldSeconds: Tick);
             Assert.AreEqual(ChargeAction.SwitchHold, d.Action);
             Assert.AreEqual(1, d.Slot);
@@ -427,7 +421,7 @@ namespace CluckWars.Tests
         [Test]
         public void Decide_PendingHold_PressOnADeadSlot_DoesNotPreemptTheGesture()
         {
-            var d = Decide(0, true, false, false, new[] { true, false, false }, new[] { false, true, false },
+            var d = Decide(0, true, false, new[] { true, false, false }, new[] { false, true, false },
                 new[] { true, false, true }, pendingSlot: 0, pendingHeldSeconds: Tick);
             Assert.AreEqual(ChargeAction.None, d.Action);
         }

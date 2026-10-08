@@ -13,12 +13,12 @@ namespace CluckWars.Abilities
 
         public override void OnActivate(AbilityContext ctx)
         {
-            ctx.Controller.MovementLocked = true;
+            ctx.Controller.Effects.SetMovementLock(ctx.Slot);
         }
 
         public override void OnDeactivate(AbilityContext ctx)
         {
-            ctx.Controller.MovementLocked = false;
+            ctx.Controller.Effects.RemoveMovementLock(ctx.Slot);
         }
     }
 }

@@ -57,12 +57,12 @@ namespace CluckWars.Abilities
 
         public override void OnActivate(AbilityContext ctx)
         {
-            ctx.Controller.DepositRateMultiplier = DepositRateMultiplier;
+            ctx.Controller.Effects.SetDepositRate(ctx.Slot, DepositRateMultiplier);
         }
 
         public override void OnDeactivate(AbilityContext ctx)
         {
-            ctx.Controller.DepositRateMultiplier = 1f;
+            ctx.Controller.Effects.RemoveDepositRate(ctx.Slot);
         }
     }
 }

@@ -59,6 +59,9 @@ namespace CluckWars.Abilities
         public override AbilityAimShape AimShape => AbilityAimShape.None;
         public override bool RequiresEnemyInRange => false;
 
+        /// <summary>Casting any other move cancels the 0.4 s lock (the food was already credited on peck start).</summary>
+        public override bool EndsOnNextMove => true;
+
         /// <summary>Per-class, solved against the SCT axiom. Falls back to the authored
         /// <see cref="AbilityBaseSO.Cooldown"/> only if stats are somehow missing.</summary>
         public override float ResolveCooldown(ChickenController caster)
@@ -92,7 +95,7 @@ namespace CluckWars.Abilities
             // Commit the chicken in place for Duration. Cleared in OnDeactivate, which
             // AbilityController calls on timer expiry AND on every early teardown, so the
             // lock cannot outlive the peck.
-            chicken.MovementLocked = true;
+            chicken.Effects.SetMovementLock(ctx.Slot);
 
             // The lock above sits BEFORE this guard on purpose, for the `pile == null` half:
             // the pile drained between IsUsable and activation, and the player is still
@@ -122,7 +125,7 @@ namespace CluckWars.Abilities
 
         public override void OnDeactivate(AbilityContext ctx)
         {
-            if (ctx.Controller != null) ctx.Controller.MovementLocked = false;
+            if (ctx.Controller != null) ctx.Controller.Effects.RemoveMovementLock(ctx.Slot);
         }
 
         /// <summary>Food taken per press for this caster's class.</summary>

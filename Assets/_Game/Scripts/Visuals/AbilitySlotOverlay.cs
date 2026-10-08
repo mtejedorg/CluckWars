@@ -307,7 +307,7 @@ namespace CluckWars.Visuals
         {
             // One slot is being aimed, and this is not it: recede as a group. Held steady, the
             // other three would read as "everything went on cooldown simultaneously" — the same
-            // wrong story HexAlphaOtherActive exists to avoid on the HUD.
+            // wrong story.
             if (aimGestureLive) return FeedbackTuning.AmbientSlotOutlineAlphaSuppressed;
 
             if (!_abilities.IsReady(slot)) return FeedbackTuning.AmbientSlotOutlineAlphaCooldown;

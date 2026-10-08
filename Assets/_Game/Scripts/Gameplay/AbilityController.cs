@@ -16,13 +16,14 @@ namespace CluckWars.Gameplay
     /// from the Fusion input buffer, and owns the per-slot cooldown timers.
     /// </summary>
     /// <remarks>
-    /// Exactly one ability can be active at a time — pressing another slot is ignored
-    /// if one is mid-duration. Ability gameplay effects mutate
-    /// <see cref="ChickenController"/> state (move multiplier, movement lock,
-    /// damage immunity) which lives only on the StateAuthority; remote peers
-    /// observe the resulting <c>[Networked]</c> state (position, HP) instead of
-    /// re-running ability logic. Cooldown progress is drawn from the
-    /// <c>ActiveSlot</c> + <c>Cooldown0/1/2</c> networked properties so every peer
+    /// Abilities run concurrently (Phase 6 chunk 3): every slot has its own active flag and duration
+    /// timer, and a new cast never waits for a running one. Same-kind effects do not stack — each
+    /// ability adds / removes a per-slot modifier on <see cref="ChickenController.Effects"/> and the
+    /// strongest wins. The one exception to "keep running" is stealth: a successful cast ends
+    /// Invisibility / Smoke Roost's fade, and any other cast ends Peck's lock. Ability gameplay effects
+    /// mutate <see cref="ChickenController"/> state which lives only on the StateAuthority; remote peers
+    /// observe the resulting <c>[Networked]</c> state (position, HP) instead of re-running ability
+    /// logic. Cooldown and active progress are drawn from the networked per-slot timers so every peer
     /// (including the local HUD) sees an accurate radial fill.
     /// </remarks>
     [RequireComponent(typeof(ChickenController))]
@@ -53,8 +54,21 @@ namespace CluckWars.Gameplay
         [Tooltip("Equipped ability for slot 3. Available to every class as of v0.7.")]
         [SerializeField] private AbilityBaseSO _slot3;
 
-        [Networked] public int ActiveSlot { get; set; }
-        [Networked] private TickTimer ActivationTimer { get; set; }
+        /// <summary>Bit i set = slot i is mid-duration. The authoritative "is it running" flag (the timers
+        /// alone cannot say it: an expired timer stays set until the next activation). 1 byte.</summary>
+        [Networked] private byte ActiveMask { get; set; }
+        [Networked] private TickTimer ActiveTimer0 { get; set; }
+        [Networked] private TickTimer ActiveTimer1 { get; set; }
+        [Networked] private TickTimer ActiveTimer2 { get; set; }
+        [Networked] private TickTimer ActiveTimer3 { get; set; }
+
+        /// <summary>
+        /// The slot of the most recent successful cast, or <see cref="InvalidSlot"/> before the first. Set
+        /// just before <see cref="LastCastEventId"/> is bumped, so a peer reacting to the id change reads the
+        /// slot of THAT cast. Visuals that mean "the ability that just cast" (cast flash, hit feedback,
+        /// range indicator) read this; "is slot N running" is <see cref="IsSlotActive"/>.
+        /// </summary>
+        [Networked] public int LastCastSlot { get; set; }
         [Networked] private TickTimer Cooldown0 { get; set; }
         [Networked] private TickTimer Cooldown1 { get; set; }
         [Networked] private TickTimer Cooldown2 { get; set; }
@@ -90,41 +104,59 @@ namespace CluckWars.Gameplay
         public AbilityBaseSO Slot2 => _slot2;
         public AbilityBaseSO Slot3 => _slot3;
 
-        public AbilityBaseSO ActiveAbility => GetSlot(ActiveSlot);
+        /// <summary>The ability of the most recent successful cast (see <see cref="LastCastSlot"/>), or null.</summary>
+        public AbilityBaseSO LastCastAbility => LastCastSlot == InvalidSlot ? null : GetSlot(LastCastSlot);
 
         /// <summary>The ability currently charging (hold-to-aim), or null if
         /// <see cref="ChargingSlot"/> is 0. Slot-index view of the 1-based encoding.</summary>
         public AbilityBaseSO ChargingAbility => ChargingSlot == 0 ? null : GetSlot(ChargingSlot - 1);
 
         /// <summary>
-        /// Active ability's remaining duration as a 0..1 fraction (1 = just activated, 0 =
-        /// about to expire / nothing active). Read-only wrapper around the private
-        /// <see cref="ActivationTimer"/> for Stage 5's self-ring drain (FEEDBACK.md §5,
-        /// case 30) — exposed as a derived accessor rather than making the timer itself
-        /// public.
+        /// Is the ability in <paramref name="slot"/> mid-duration right now? The one place the HUD, VFX and bots
+        /// ask "is THIS slot running"; several slots can be running at once.
         /// </summary>
-        public float ActiveRemaining01
+        public bool IsSlotActive(int slot) => slot >= 0 && slot < SlotCount && (ActiveMask & (1 << slot)) != 0;
+
+        /// <summary>True while ANY slot is running. Bots refuse to cast while this holds (see
+        /// <see cref="BotTryActivate"/>); players are not gated by it.</summary>
+        public bool AnyAbilityActive => ActiveMask != 0;
+
+        /// <summary>
+        /// <paramref name="slot"/>'s remaining duration as a 0..1 fraction: 1 = just activated, 0 = about to
+        /// expire, that slot not running, or an ability with no meaningful duration. Read-only wrapper around
+        /// the private per-slot timer for the self-ring drain (FEEDBACK.md section 5, case 30).
+        /// </summary>
+        public float ActiveRemaining01For(int slot)
         {
-            get
-            {
-                var ability = ActiveAbility;
-                if (ActiveSlot == InvalidSlot || ability == null || ability.Duration <= 0f) return 0f;
-                float remaining = ActivationTimer.RemainingTime(Runner) ?? 0f;
-                return Mathf.Clamp01(remaining / ability.Duration);
-            }
+            if (!IsSlotActive(slot)) return 0f;
+            var ability = GetSlot(slot);
+            if (ability == null || ability.Duration <= 0f) return 0f;
+            float remaining = GetActiveTimer(slot).RemainingTime(Runner) ?? 0f;
+            return Mathf.Clamp01(remaining / ability.Duration);
         }
 
         /// <summary>
-        /// Is the ability in <paramref name="slot"/> mid-duration right now? The one place the HUD and
-        /// VFX ask "is THIS slot running" — implemented on the single <see cref="ActiveSlot"/> today;
-        /// when abilities may overlap (Phase 6 chunk 3) only this and
-        /// <see cref="ActiveRemaining01For"/> change, not their callers.
+        /// The running slot that was cast most recently (smallest elapsed time), or <see cref="InvalidSlot"/>
+        /// when nothing runs. Derived from the timers, so it needs no extra networked state. What the buff ring
+        /// shows when several abilities overlap.
         /// </summary>
-        public bool IsSlotActive(int slot) => slot >= 0 && ActiveSlot == slot;
-
-        /// <summary><see cref="ActiveRemaining01"/> for <paramref name="slot"/>: 1 = just activated, 0 =
-        /// about to expire or that slot is not running. See <see cref="IsSlotActive"/>.</summary>
-        public float ActiveRemaining01For(int slot) => IsSlotActive(slot) ? ActiveRemaining01 : 0f;
+        public int MostRecentActiveSlot
+        {
+            get
+            {
+                int best = InvalidSlot;
+                float bestElapsed = float.MaxValue;
+                for (int i = 0; i < SlotCount; i++)
+                {
+                    if (!IsSlotActive(i)) continue;
+                    var ability = GetSlot(i);
+                    float remaining = GetActiveTimer(i).RemainingTime(Runner) ?? 0f;
+                    float elapsed = (ability != null ? ability.Duration : 0f) - remaining;
+                    if (elapsed < bestElapsed) { bestElapsed = elapsed; best = i; }
+                }
+                return best;
+            }
+        }
 
         private ChickenController _controller;
         private AbilityContext _ctx;
@@ -216,7 +248,8 @@ namespace CluckWars.Gameplay
 
             if (HasStateAuthority)
             {
-                ActiveSlot = InvalidSlot;
+                ActiveMask = 0;
+                LastCastSlot = InvalidSlot;
             }
 
             if (_passive == null && _controller != null)
@@ -251,10 +284,10 @@ namespace CluckWars.Gameplay
 
             if (_controller != null && _controller.IsDecoy) return;
 
-            // Auto-deactivate when the duration timer expires.
-            if (ActiveSlot != InvalidSlot && ActivationTimer.Expired(Runner))
+            // Auto-deactivate each running slot whose own duration timer has expired.
+            for (int i = 0; i < SlotCount; i++)
             {
-                Deactivate();
+                if (IsSlotActive(i) && GetActiveTimer(i).Expired(Runner)) Deactivate(i);
             }
 
             for (int i = 0; i < SlotCount; i++)
@@ -263,14 +296,14 @@ namespace CluckWars.Gameplay
             var gm = GameManager.Instance;
             if (gm == null || !gm.IsMatchRunning)
             {
-                if (ActiveSlot != InvalidSlot) Deactivate();
+                DeactivateAll();
                 if (IsAimGestureLive) CancelCharge();
                 return;
             }
 
             if (_combat != null && _combat.IsRemoved)
             {
-                if (ActiveSlot != InvalidSlot) Deactivate();
+                DeactivateAll();
                 if (IsAimGestureLive) CancelCharge();
                 return;
             }
@@ -278,10 +311,6 @@ namespace CluckWars.Gameplay
             if (!GetInput<PlayerNetworkInput>(out var input)) return;
 
             bool canCast = _controller == null || ControlRules.CanCast(_controller.CurrentControlState);
-            bool otherAbilityActive = ActiveSlot != InvalidSlot;
-
-            if (otherAbilityActive && _log != null && _log.IsEnabled(Logging.LogLevel.Verbose) && AnyAbilityInputSet(input))
-                _log.Verbose(Source, $"Ability input ignored — slot {ActiveSlot} already active.");
 
             _holdBits[0]  = input.Buttons.IsSet((int)InputButton.AbilityHold1);
             _holdBits[1]  = input.Buttons.IsSet((int)InputButton.AbilityHold2);
@@ -307,7 +336,7 @@ namespace CluckWars.Gameplay
 
             var decision = AbilityHoldStateMachine.Decide(
                 ChargingSlot, _pendingHoldSlot, _pendingHoldSeconds, FeedbackTuning.TapHoldThresholdSeconds,
-                canCast, otherAbilityActive, cancelPressed, _holdBits, _pressBits, _canBeginCharge);
+                canCast, cancelPressed, _holdBits, _pressBits, _canBeginCharge);
 
             switch (decision.Action)
             {
@@ -355,12 +384,6 @@ namespace CluckWars.Gameplay
         /// networked charge or a local pending hold. The single condition every "tear the
         /// aim down" path checks, so neither state can be left behind by the other.</summary>
         private bool IsAimGestureLive => ChargingSlot != 0 || _pendingHoldSlot != InvalidSlot;
-
-        private static bool AnyAbilityInputSet(PlayerNetworkInput input) =>
-            input.Buttons.IsSet((int)InputButton.Ability1) || input.Buttons.IsSet((int)InputButton.Ability2) ||
-            input.Buttons.IsSet((int)InputButton.Ability3) || input.Buttons.IsSet((int)InputButton.Ability4) ||
-            input.Buttons.IsSet((int)InputButton.AbilityHold1) || input.Buttons.IsSet((int)InputButton.AbilityHold2) ||
-            input.Buttons.IsSet((int)InputButton.AbilityHold3) || input.Buttons.IsSet((int)InputButton.AbilityHold4);
 
         // ---- Public read-only helpers (used by the HUD / debug overlays) -------
 
@@ -458,8 +481,8 @@ namespace CluckWars.Gameplay
         public int EquippedSlotCount => SlotCount;
 
         /// <summary>
-        /// Bot-only activation API. Mirrors the exact gates from the player input
-        /// path so cooldown / stun / double-cast rules are always honoured.
+        /// Bot-only activation API. Mirrors the player gates (cooldown / stun) and additionally refuses
+        /// while any of the bot's own slots is running — bots never overlap abilities.
         /// Returns <c>true</c> if the ability fired this call.
         /// Must be called from the StateAuthority (bot FSM already guards this).
         /// </summary>
@@ -469,10 +492,11 @@ namespace CluckWars.Gameplay
             var gm = GameManager.Instance;
             if (gm == null || !gm.IsMatchRunning) return false;
             if (_combat != null && _combat.IsRemoved) return false;
-            if (ActiveSlot != InvalidSlot) return false;
+            // Bots keep the one-at-a-time rule: no bot behaviour change, SCT untouched. Players are not gated.
+            if (AnyAbilityActive) return false;
             if (!IsReady(slot)) return false;
             TryActivate(slot);
-            return ActiveSlot == slot;
+            return IsSlotActive(slot);
         }
 
         /// <summary>
@@ -573,6 +597,23 @@ namespace CluckWars.Gameplay
             _ => null,
         };
 
+        private TickTimer GetActiveTimer(int slot) => slot switch
+        {
+            0 => ActiveTimer0,
+            1 => ActiveTimer1,
+            2 => ActiveTimer2,
+            3 => ActiveTimer3,
+            _ => default,
+        };
+
+        private void SetActiveTimer(int slot, TickTimer timer)
+        {
+            if (slot == 0)      ActiveTimer0 = timer;
+            else if (slot == 1) ActiveTimer1 = timer;
+            else if (slot == 2) ActiveTimer2 = timer;
+            else if (slot == 3) ActiveTimer3 = timer;
+        }
+
         private TickTimer GetCooldown(int slot) => slot switch
         {
             0 => Cooldown0,
@@ -604,19 +645,22 @@ namespace CluckWars.Gameplay
             ability = slotUnavailable ? null : GetSlot(slot);
             slotUnavailable |= ability == null;
 
-            bool onCooldown = !slotUnavailable && !GetCooldown(slot).ExpiredOrNotRunning(Runner);
+            // A slot that is still running reads as "cooling": re-casting the same slot while it runs stays
+            // refused (its cooldown outlasts its duration, so this only guards a Relentless-shortened edge).
+            // Other slots running do NOT refuse anything — abilities run concurrently.
+            bool onCooldown = !slotUnavailable &&
+                              (!GetCooldown(slot).ExpiredOrNotRunning(Runner) || IsSlotActive(slot));
             bool stunned = _controller != null && !ControlRules.CanCast(_controller.CurrentControlState);
-            bool otherActive = ActiveSlot != InvalidSlot;
-            bool noTarget = !slotUnavailable && !onCooldown && !stunned && !otherActive &&
+            bool noTarget = !slotUnavailable && !onCooldown && !stunned &&
                              ability != null && !ability.IsUsable(_controller);
 
-            return AbilityRefusalRules.Evaluate(slotUnavailable, onCooldown, stunned, otherActive, noTarget);
+            return AbilityRefusalRules.Evaluate(slotUnavailable, onCooldown, stunned, noTarget);
         }
 
         /// <summary>
         /// SlotUnavailable + Cooldown only — the two refusal reasons that are stable for
         /// an entire hold and would make charging pointless. Deliberately excludes
-        /// Stunned/OtherAbilityActive (already gated before the hold state machine ever
+        /// Stunned (already gated before the hold state machine ever
         /// runs, see FixedUpdateNetwork) and NoTarget (a target may walk into the shape
         /// mid-hold — that is the whole point of aiming). Used only to decide whether a
         /// hold is even worth starting to charge.
@@ -705,13 +749,20 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            ActiveSlot = slot;
-            ActivationTimer = TickTimer.CreateFromSeconds(Runner, ability.Duration);
+            // "Using a move breaks it" (Phase 6 chunk 3). Only a SUCCESSFUL cast gets here: the fizzle return, every
+            // refusal and CanActivate above, and any hold / preview never reach this line. Stealth (Invisibility,
+            // Smoke Roost's fade) and Peck's lock end first, so the new cast's own modifiers apply to a clean
+            // stack — a Smoke Roost cast during Invisibility fades again.
+            EndStealthAndPeckForCast(slot);
+
+            ActiveMask = (byte)(ActiveMask | (1 << slot));
+            SetActiveTimer(slot, TickTimer.CreateFromSeconds(Runner, ability.Duration));
             SetCooldown(slot, TickTimer.CreateFromSeconds(Runner, ResolveCooldownFor(ability)));
+            LastCastSlot = slot;
 
             if (ability.TerrainTraversal != TerrainTraversal.None && _controller != null)
             {
-                _controller.Traversal?.Begin(ability.TerrainTraversal);
+                _controller.Traversal?.Begin(ability.TerrainTraversal, slot);
             }
 
             // Length-based teleport jump (GDD 3.5). Ordered against the target resolve below
@@ -741,7 +792,9 @@ namespace CluckWars.Gameplay
             int hitCount = _controller != null ? ability.GatherTargets(_controller, _hitCountScratch) : 0;
             LastCastHitCount = (byte)Mathf.Min(hitCount, byte.MaxValue);
 
+            _ctx.Slot = slot;
             ability.OnActivate(_ctx);
+            _controller?.SyncAbilityEffects();
 
             // The deferred half of the ordering documented above: a capsule ability has now
             // resolved and applied its lane from the take-off pose, so it may travel.
@@ -802,26 +855,55 @@ namespace CluckWars.Gameplay
             if (jump.EffectiveDistance > 0f) _controller.JumpEventId++;
         }
 
-        private void Deactivate()
+        /// <summary>
+        /// Ends the run in <paramref name="slot"/>: removes that ability's own effect modifiers (never anyone
+        /// else's), releases its traversal hold, and clears its active flag. Idempotent for a slot not running.
+        /// </summary>
+        private void Deactivate(int slot)
         {
-            var ability = ActiveAbility;
+            if (!IsSlotActive(slot)) return;
+
+            var ability = GetSlot(slot);
             if (ability != null)
             {
+                _ctx.Slot = slot;
                 ability.OnDeactivate(_ctx);
                 _audio?.PlaySFX(_audioReg != null ? _audioReg.AbilityExpire : null);
                 _log?.Debug(Source, $"Deactivated {ability.DisplayName}.");
+                if (ability.TerrainTraversal != TerrainTraversal.None && _controller != null && _controller.Traversal != null)
+                {
+                    _controller.Traversal.End(slot);
+                }
             }
-            if (_controller != null && _controller.Traversal != null)
+            ActiveMask = (byte)(ActiveMask & ~(1 << slot));
+            _controller?.SyncAbilityEffects();
+        }
+
+        /// <summary>Ends every running slot (match stop, removal, death).</summary>
+        private void DeactivateAll()
+        {
+            if (!AnyAbilityActive) return;
+            for (int i = 0; i < SlotCount; i++) Deactivate(i);
+        }
+
+        /// <summary>
+        /// A successful cast of <paramref name="castSlot"/> ends every running stealth ability and Peck's lock.
+        /// Smoke Roost's cloud is a separate zone and stays; only its fade (the opacity modifier) ends.
+        /// </summary>
+        private void EndStealthAndPeckForCast(int castSlot)
+        {
+            for (int i = 0; i < SlotCount; i++)
             {
-                _controller.Traversal.End();
+                if (i == castSlot || !IsSlotActive(i)) continue;
+                var running = GetSlot(i);
+                if (running != null && running.EndsOnNextMove) Deactivate(i);
             }
-            ActiveSlot = InvalidSlot;
         }
 
         private void HandleOwnerDeath(NetworkBehaviourId attackerId)
         {
             if (!HasStateAuthority) return;
-            if (ActiveSlot != InvalidSlot) Deactivate();
+            DeactivateAll();
             // Tear the aim down on the same frame as the death rather than a tick later via
             // FixedUpdateNetwork's IsRemoved branch — otherwise a chicken that dies mid-hold
             // keeps its wind-up glow for one visible tick after it has already fallen over.

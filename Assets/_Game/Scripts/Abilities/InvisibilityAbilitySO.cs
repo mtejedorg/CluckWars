@@ -21,14 +21,16 @@ namespace CluckWars.Abilities
         public override bool AffectsSelf => true;
         public override bool AffectsEnemies => false;
 
+        public override bool IsStealth => true;
+
         public override void OnActivate(AbilityContext ctx)
         {
-            ctx.Controller.VisualOpacity = Opacity;
+            ctx.Controller.Effects.SetOpacity(ctx.Slot, Opacity);
         }
 
         public override void OnDeactivate(AbilityContext ctx)
         {
-            ctx.Controller.VisualOpacity = 1f;
+            ctx.Controller.Effects.RemoveOpacity(ctx.Slot);
         }
     }
 }

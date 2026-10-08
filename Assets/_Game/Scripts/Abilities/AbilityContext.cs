@@ -60,6 +60,15 @@ namespace CluckWars.Abilities
         /// </remarks>
         public ILogService Log;
 
+        /// <summary>
+        /// The ability slot being activated / deactivated, set by <see cref="AbilityController"/> around
+        /// <see cref="AbilityBaseSO.OnActivate"/> and <see cref="AbilityBaseSO.OnDeactivate"/>. It is the
+        /// source key an ability uses when it adds / removes its modifier on
+        /// <see cref="ChickenController.Effects"/> (Phase 6 chunk 3: abilities run concurrently, each
+        /// removes only its own). -1 outside a slot activation (passives, tests).
+        /// </summary>
+        public int Slot = -1;
+
         public AbilityContext(ChickenController controller)
         {
             Controller = controller;

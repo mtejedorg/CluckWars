@@ -183,16 +183,25 @@ namespace CluckWars.Gameplay
         // need to mirror these values — they observe the resulting [Networked]
         // position / HP changes instead.
 
-        /// <summary>Multiplier applied to <c>Stats.MoveSpeed</c> by active abilities. 1 = no buff.</summary>
-        public float MoveSpeedMultiplier { get; set; } = 1f;
+        /// <summary>
+        /// Phase 6 chunk 3: abilities run concurrently and same-kind effects never stack. Every ability adds a
+        /// per-slot modifier here on activate and removes it on deactivate; the properties below are the
+        /// RESOLVED values (strongest wins). State-authority side only. After a change, the networked mirrors
+        /// (<see cref="VisualOpacity"/>, steal-back, aura) are refreshed by <see cref="SyncAbilityEffects"/>.
+        /// </summary>
+        public AbilityEffectStack Effects { get; } = new AbilityEffectStack();
+
+        /// <summary>Resolved multiplier applied to <c>Stats.MoveSpeed</c> by active abilities (strongest boost
+        /// times strongest self-slow). 1 = no buff.</summary>
+        public float MoveSpeedMultiplier => Effects.MoveSpeedMultiplier;
 
         /// <summary>
         /// Multiplier on banking speed, driven by an ABILITY rather than a passive.
         /// 1 = normal.
         /// </summary>
         /// <remarks>
-        /// Mirrors <see cref="MoveSpeedMultiplier"/>: set in an ability's <c>OnActivate</c>,
-        /// reset in <c>OnDeactivate</c>. It exists because banking speed previously had exactly
+        /// Mirrors <see cref="MoveSpeedMultiplier"/>: resolved (strongest wins) from the per-slot modifiers
+        /// abilities add in <c>OnActivate</c> and remove in <c>OnDeactivate</c>. It exists because banking speed previously had exactly
         /// one lever — <c>PassiveAbilitySO.ModifyDepositRate</c> — and a passive is free, whereas
         /// Drop and Go was measured at roughly <b>27% of Speedy's SCT</b>. Maestro's call on
         /// 2026-08-23 was to make that tempo cost a slot and a cooldown instead, which needs a
@@ -201,10 +210,11 @@ namespace CluckWars.Gameplay
         /// Consumed alongside the passive hook in <c>ChickenCargo.ResolveDepositRate</c>, so the
         /// two stack multiplicatively and neither silently overrides the other.
         /// </remarks>
-        public float DepositRateMultiplier { get; set; } = 1f;
+        public float DepositRateMultiplier => Effects.DepositRateMultiplier;
 
-        /// <summary>While true, <c>ChickenMovement</c> ignores planar input but keeps gravity.</summary>
-        public bool MovementLocked { get; set; }
+        /// <summary>While true (any running ability holds a lock), <c>ChickenMovement</c> ignores planar input
+        /// but keeps gravity.</summary>
+        public bool MovementLocked => Effects.MovementLocked;
 
         /// <summary>
         /// 0 = invisible, 1 = fully opaque. Networked so the fade is visible to every player.
@@ -219,7 +229,7 @@ namespace CluckWars.Gameplay
 
         /// <summary>Spine Coat steal-back active hook.</summary>
         [Networked] public bool StealBackActive { get; set; }
-        public float StealBackAmount { get; set; } = 4f;
+        public float StealBackAmount => Effects.StealBackAmount;
         /// <summary>
         /// Spine Coat's shove-back impulse, world-units/sec. Scaled 8 -> 10.8 (x1.35) with
         /// the 2026-08-14 arena/move-speed rescale, for the same reason as the ability
@@ -380,9 +390,12 @@ namespace CluckWars.Gameplay
             Runner != null && !ControlImmuneTimer.ExpiredOrNotRunning(Runner);
 
         /// <summary>Opens a control-immunity window of <paramref name="seconds"/>.</summary>
+        /// <remarks>Never shortens a window already open: a re-grant keeps whichever expiry is LATER.</remarks>
         public void GrantControlImmunity(float seconds)
         {
             if (Runner == null || seconds <= 0f) return;
+            float open = ControlImmuneTimer.ExpiredOrNotRunning(Runner) ? 0f : (ControlImmuneTimer.RemainingTime(Runner) ?? 0f);
+            if (!ControlImmunityRules.ShouldReplace(open, seconds)) return;
             ControlImmuneTimer = TickTimer.CreateFromSeconds(Runner, seconds);
         }
 
@@ -1086,6 +1099,33 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
+        /// Mirrors the resolved ability effects that other peers must see into their [Networked] properties,
+        /// writing each only when it actually changes. State authority only; called by
+        /// <see cref="AbilityController"/> after every activate / deactivate and by the round reset.
+        /// </summary>
+        public void SyncAbilityEffects()
+        {
+            if (!HasStateAuthority) return;
+
+            float opacity = Effects.Opacity;
+            if (!Mathf.Approximately(VisualOpacity, opacity)) VisualOpacity = opacity;
+
+            bool steal = Effects.StealBackActive;
+            if (StealBackActive != steal) StealBackActive = steal;
+
+            if (Effects.TryGetAura(out float factor, out float radius))
+            {
+                if (!Mathf.Approximately(AuraSlowFactor, factor)) AuraSlowFactor = factor;
+                if (!Mathf.Approximately(AuraSlowRadius, radius)) AuraSlowRadius = radius;
+                if (!AuraSlowActive) AuraSlowActive = true; // write last so readers see consistent state
+            }
+            else if (AuraSlowActive)
+            {
+                AuraSlowActive = false;
+            }
+        }
+
+        /// <summary>
         /// Resets all v0.3 control states (slow, root, knockback, aura).
         /// Called by <see cref="GameManager"/> on match restart.
         /// </summary>
@@ -1099,7 +1139,8 @@ namespace CluckWars.Gameplay
             Rooted               = false;
             IsStunned            = false;
             StunTimer            = TickTimer.None;
-            AuraSlowActive       = false;
+            Effects.Clear();
+            SyncAbilityEffects();
             ExternalDisplacement = Vector3.zero;
             UnderdogSurgeActive  = false;
             LeaderBountyActive   = false;

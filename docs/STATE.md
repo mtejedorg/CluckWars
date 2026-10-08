@@ -6,6 +6,46 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🔧 Phase 6 chunk 3 (2026-10-09, uncommitted, in review): concurrent abilities, strongest-wins, stealth/Peck end on cast
+
+EditMode **959/959** (932 baseline: `Phase6Chunk3Tests` new, 27 tests incl. 2 parametrised; `AbilityActivationRulesTests` / `Phase6Chunk2Tests` / `HudFeedbackStyleTests`
+adjusted for the removed `otherAbilityActive` parameter and the retired HUD dim). Live smoke (solo round, Play mode, console clean): slots set to Invisibility / Speed
+Burst / Ruffle / Egg Shell on the local bird; Invisibility cast -> opacity 0.2; Speed Burst cast -> Invisibility ended and `VisualOpacity` back to 1.0, speed 1.5;
+Ruffle on top -> both active, speed still 1.5 (not 2.25), each with its own timer; Egg Shell on top -> lock true, three slots running; everything clean at expiry
+(speed 1.0, opacity 1.0, lock false, no active slots).
+
+- **Per-slot active state (`AbilityController`).** `ActiveSlot` / `ActivationTimer` / `ActiveAbility` / `ActiveRemaining01` are GONE. Networked: `byte ActiveMask`
+  (bit i = slot i running) + `ActiveTimer0..3` + `int LastCastSlot` (set on every successful cast, just before `LastCastEventId` bumps). Query API:
+  `IsSlotActive(slot)`, `ActiveRemaining01For(slot)`, `AnyAbilityActive`, `MostRecentActiveSlot` (derived from timers: smallest elapsed, no extra state),
+  `LastCastAbility`. `Deactivate(slot)` removes that ability's own modifiers, releases its traversal hold, clears its bit and syncs; expiry runs per slot;
+  match-stop / removal / death call `DeactivateAll()`. Re-casting a still-running slot stays refused (`IsSlotActive` counts as "cooling" in `EvaluateRefusalInternal`).
+  Readers converted: ChickenVFX / HitFeedback / AbilityRangeIndicator -> `LastCastAbility`; ControlStateVFX buff ring -> `MostRecentActiveSlot` +
+  `ActiveRemaining01For`; AbilityLabHud -> `LastCastSlot` and "any active" window; DebugHud lists every running slot; TouchControlsController already used `ActiveRemaining01For`.
+- **No more "one ability at a time" for players.** `AbilityRefusalRules.Evaluate` and `AbilityHoldStateMachine.Decide` lost their `otherAbilityActive` parameter.
+  `AbilityRefusal.OtherAbilityActive` stays in the enum (byte numbering) but is never produced; `HexAlphaOtherActive`, `HudFeedbackStyle.HexOtherActiveClass`, its HexClass arm,
+  the TouchControls arm and the `.cw-hex--other-active` USS rule are deleted. (`AbilityPreviewRules.IsRealRefusal` still lists the retired value; unreachable.)
+  `BotTryActivate` still refuses while `AnyAbilityActive` -> no bot behaviour change.
+- **Strongest-wins resolver: `Gameplay/AbilityEffectStack.cs` (pure, new).** One per `ChickenController.Effects`; keyed by ability slot (`AbilityContext.Slot`, set around
+  every OnActivate / OnDeactivate). Kinds: speed boost (max of >1) x speed penalty (min of <1), opacity min, movement lock any, deposit max, steal-back any / max amount,
+  aura any (lowest factor + its radius). `ChickenController.MoveSpeedMultiplier / DepositRateMultiplier / MovementLocked / StealBackAmount` are now resolved getters;
+  the networked `VisualOpacity`, `StealBackActive`, `AuraSlowActive/Factor/Radius` are mirrored by `SyncAbilityEffects()` (state authority, writes only on change; called after
+  every activate / deactivate and by `RPC_ResetControlStates`, which also `Effects.Clear()`s). Converted writers: SpeedBurst, Ruffle, TurtleMode, Shadowstep, RollPush,
+  EggShell, Peck, Invisibility, SmokeRoost, QuickDrop, SpineCoat, FeatherAura (`NoAbilityWritesAResolvedEffectProperty_Directly` guards it). Immovable: `GrantControlImmunity`
+  keeps the later expiry (`ControlImmunityRules.ShouldReplace`). Traversal: `ChickenTraversal.Begin(tier, holder)` / `End(holder)` with pure `TraversalHolders`;
+  highest tier by `TraversalRules.Rank` (Barge < Vault < Blink, NOT enum order), End only when the last holder ends (a holder that never began is ignored; `Abort` clears all).
+  Underdog Surge and the victim-side slow are untouched. Non-ability writers found: only `RPC_ResetControlStates` (handled) and the Lab dummy's own
+  `StealBackActive = false` (a different chicken, left alone and harmless: sync re-derives it from its empty stack).
+- **Stealth + Peck end on cast.** `AbilityBaseSO.IsStealth` (Invisibility, Smoke Roost) and `EndsOnNextMove` (= `IsStealth`, plus Peck overrides it). In `TryActivate`, after
+  `CanActivate` and below the fizzle return, `EndStealthAndPeckForCast(slot)` deactivates every other running slot with `EndsOnNextMove`, then the new cast runs (a Smoke Roost
+  cast during Invisibility fades again; its zone persists). Fizzle / refusal / failed CanActivate / hold / preview never reach it. Mark/Kill needs no special case: both its Mark and Kill presses arrive through
+  `MarkKillAbilitySO.OnActivate`, i.e. through `TryActivate`, so the execute counts as a move.
+- **Copy.** " Using a move breaks it." appended to the `Description` of `Invisibility.asset` and `SmokeRoost.asset` (<= 110 chars, test-enforced) and to the two `desc:` strings in
+  `docs/site/index.html` (site NOT republished to the Artifact URL yet).
+- **Outstanding / for Maestro.** The documented decision that speed boost and self-slow are different kinds (Turtle 0.25 x Roll 2.0 = 0.5) is implemented as specified; no value changed.
+  No prefab / scene wiring. New files: `AbilityEffectStack.cs`, `Phase6Chunk3Tests.cs` (+ metas).
+
+---
+
 ## 🔧 Phase 6 chunk 2 (2026-10-08, uncommitted, in review): fizzle, edge-band cancel, KB/M cancel + slot switching
 
 EditMode **932/932** (900 + 32: `Phase6Chunk2Tests` new; `AbilityActivationRulesTests` "pending hold ignores presses on other slots" rewritten as

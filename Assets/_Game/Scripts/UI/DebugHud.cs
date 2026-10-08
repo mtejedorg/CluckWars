@@ -207,8 +207,7 @@ namespace CluckWars.UI
                       .Append(" CD ").Append(a.CooldownRemaining(0).ToString("0.0")).AppendLine();
                     sb.Append("Slot1: ").Append(a.Slot1 != null ? a.Slot1.name : "—")
                       .Append(" CD ").Append(a.CooldownRemaining(1).ToString("0.0")).AppendLine();
-                    if (a.ActiveSlot != AbilityController.InvalidSlot)
-                        sb.Append("Active: slot ").AppendLine(a.ActiveSlot.ToString());
+                    AppendActiveSlots(sb, a, "Active: slot ");
                 }
             }
 
@@ -284,8 +283,14 @@ namespace CluckWars.UI
             AppendAbilityLine(sb, 0, a.Slot0);
             AppendAbilityLine(sb, 1, a.Slot1);
 
-            if (a.ActiveSlot != AbilityController.InvalidSlot)
-                sb.Append("  Active slot ").AppendLine(a.ActiveSlot.ToString());
+            AppendActiveSlots(sb, a, "  Active slot ");
+        }
+
+        /// <summary>One line per running slot (abilities overlap as of Phase 6 chunk 3).</summary>
+        private static void AppendActiveSlots(StringBuilder sb, AbilityController a, string prefix)
+        {
+            for (int i = 0; i < AbilityController.SlotCount; i++)
+                if (a.IsSlotActive(i)) sb.Append(prefix).AppendLine(i.ToString());
         }
 
         private static void AppendAbilityLine(StringBuilder sb, int slot, AbilityBaseSO ability)

@@ -456,7 +456,7 @@ namespace CluckWars.Visuals
             if (id == _lastCastEventId) return;
             _lastCastEventId = id;
 
-            var ability = _abilities.ActiveAbility ?? _lastChargingAbility;
+            var ability = _abilities.LastCastAbility ?? _lastChargingAbility;
             if (ability == null) return;
 
             // Abilities whose cast-time target count is not a hit/whiff verdict at all sit

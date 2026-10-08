@@ -289,14 +289,16 @@ namespace CluckWars.Visuals
 
             var obj = _abilities.Object;
             if (obj == null || !obj.IsValid) { _buffRing.Hide(); return; }
-            if (_abilities.ActiveSlot == AbilityController.InvalidSlot) { _buffRing.Hide(); return; }
+            // Abilities overlap (Phase 6 chunk 3): the ring shows the most recently cast ability still running.
+            int ringSlot = _abilities.MostRecentActiveSlot;
+            if (ringSlot == AbilityController.InvalidSlot) { _buffRing.Hide(); return; }
 
-            var ability = _abilities.ActiveAbility;
+            var ability = _abilities.GetSlot(ringSlot);
             if (ability == null) { _buffRing.Hide(); return; }
 
-            // ActiveRemaining01 already returns 0 for an ability with no meaningful
+            // ActiveRemaining01For already returns 0 for an ability with no meaningful
             // duration, which is the same "nothing to drain" case as a finished one.
-            float fraction = _abilities.ActiveRemaining01;
+            float fraction = _abilities.ActiveRemaining01For(ringSlot);
             if (fraction <= 0f) { _buffRing.Hide(); return; }
 
             Color c = ability.AccentColor;

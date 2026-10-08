@@ -608,7 +608,7 @@ namespace CluckWars.Visuals
         // the whole table can live as a flat set of constants. Cooldown / NoTarget / Ready
         // reproduce values that already shipped inline in TouchControlsController (they
         // are recorded here, not re-tuned, so the Stage-5 table is readable in one place);
-        // OtherActive is the genuinely new tier.
+        // (A "another ability is running" dim tier existed until Phase 6 chunk 3 retired it.)
 
         /// <summary>Layer 2–4 alpha for a hex that can fire right now
         /// (<c>AbilityRefusal.None</c>). Fully opaque accent — the baseline every other
@@ -631,19 +631,6 @@ namespace CluckWars.Visuals
         /// move stick (rooted / stunned) in <c>TouchControlsController.ApplyJoystickState</c>.
         /// </summary>
         public const float HexAlphaNoTarget = 0.70f;
-
-        /// <summary>
-        /// Layer 2–4 alpha while a *different* ability is mid-duration. ADDED for Stage 5.
-        /// The dimmest tier in the table, and deliberately dimmer than
-        /// <see cref="HexAlphaCooldown"/>: cooldown is a per-slot condition the player is
-        /// used to waiting out, whereas "another ability is running" suppresses the whole
-        /// cluster at once, and if the two sat at the same alpha a suppressed cluster
-        /// would read as "everything went on cooldown simultaneously" — the wrong story.
-        /// Pushing it to 0.35 makes the cluster recede as a group, which is what leaves
-        /// the one slot carrying the top-down accent drain (the ability that is actually
-        /// running) as the only bright thing on screen.
-        /// </summary>
-        public const float HexAlphaOtherActive = 0.35f;
 
         /// <summary>
         /// Colour of the layer-9 ✕ drawn across every hex while the caster is stunned

@@ -67,5 +67,63 @@ namespace CluckWars.Gameplay
         /// </summary>
         public static bool ClearsPiles(TerrainTraversal tier) =>
             Clears(tier, ObstacleClass.Low);
+
+        /// <summary>
+        /// Strength order of the tiers: None &lt; Barge &lt; Vault &lt; Blink. NOT the enum's integer order
+        /// (assets serialize that and it must not be renumbered).
+        /// </summary>
+        public static int Rank(TerrainTraversal tier) => tier switch
+        {
+            TerrainTraversal.Barge => 1,
+            TerrainTraversal.Vault => 2,
+            TerrainTraversal.Blink => 3,
+            _                      => 0,
+        };
+    }
+
+    /// <summary>
+    /// Phase 6 chunk 3: which concurrently running abilities currently hold a traversal window, per holder
+    /// (an ability slot). The window grants the HIGHEST tier among holders and stays open until the LAST
+    /// holder ends. Pure; <see cref="ChickenTraversal"/> owns one.
+    /// </summary>
+    public sealed class TraversalHolders
+    {
+        private readonly System.Collections.Generic.List<int> _holders = new System.Collections.Generic.List<int>(4);
+        private readonly System.Collections.Generic.List<TerrainTraversal> _tiers = new System.Collections.Generic.List<TerrainTraversal>(4);
+
+        public int Count => _holders.Count;
+
+        /// <summary>Adds or replaces <paramref name="holder"/>'s tier.</summary>
+        public void Set(int holder, TerrainTraversal tier)
+        {
+            int i = _holders.IndexOf(holder);
+            if (i >= 0) { _tiers[i] = tier; return; }
+            _holders.Add(holder);
+            _tiers.Add(tier);
+        }
+
+        /// <summary>Removes <paramref name="holder"/>. True when it was holding a window.</summary>
+        public bool Remove(int holder)
+        {
+            int i = _holders.IndexOf(holder);
+            if (i < 0) return false;
+            _holders.RemoveAt(i);
+            _tiers.RemoveAt(i);
+            return true;
+        }
+
+        public void Clear() { _holders.Clear(); _tiers.Clear(); }
+
+        /// <summary>Highest tier among holders; None when nobody holds.</summary>
+        public TerrainTraversal Highest
+        {
+            get
+            {
+                var best = TerrainTraversal.None;
+                for (int i = 0; i < _tiers.Count; i++)
+                    if (TraversalRules.Rank(_tiers[i]) > TraversalRules.Rank(best)) best = _tiers[i];
+                return best;
+            }
+        }
     }
 }

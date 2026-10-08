@@ -67,7 +67,6 @@ namespace CluckWars.UI
 
         public const string HexCooldownClass    = "cw-hex--cooldown";
         public const string HexStunnedClass     = "cw-hex--stunned";
-        public const string HexOtherActiveClass = "cw-hex--other-active";
 
         // ---- Joystick control-consequence classes (§5.2's table) ----------------
 
@@ -153,17 +152,14 @@ namespace CluckWars.UI
             {
                 case AbilityRefusal.Cooldown:           return HexCooldownClass;
                 case AbilityRefusal.Stunned:            return HexStunnedClass;
-                case AbilityRefusal.OtherAbilityActive: return HexOtherActiveClass;
                 default:                                return null;
             }
         }
 
         /// <summary>
         /// Which single mark ART §6.6's layer 9 carries for <paramref name="refusal"/>.
-        /// <c>OtherAbilityActive</c> deliberately gets <see cref="HexCenterMark.None"/>:
-        /// its signal is the top-down accent drain on the *other* slot (the one actually
-        /// running), and stamping a mark on every suppressed hex as well would say "four
-        /// things are wrong" when only one thing is happening.
+        /// The retired <c>OtherAbilityActive</c> (abilities run concurrently as of Phase 6 chunk 3)
+        /// gets <see cref="HexCenterMark.None"/>.
         /// </summary>
         public static HexCenterMark CenterMark(AbilityRefusal refusal)
         {

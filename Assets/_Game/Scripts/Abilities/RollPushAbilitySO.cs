@@ -64,7 +64,7 @@ namespace CluckWars.Abilities
             var caster = ctx.Controller;
 
             // Caster rolls faster.
-            caster.MoveSpeedMultiplier = RollSpeedMultiplier;
+            caster.Effects.SetMoveSpeed(ctx.Slot, RollSpeedMultiplier);
 
             // Push everyone in the forward sweep.
             GatherTargets(caster, _scratch);
@@ -81,7 +81,7 @@ namespace CluckWars.Abilities
         public override void OnDeactivate(AbilityContext ctx)
         {
             // Restore speed when the roll window ends.
-            ctx.Controller.MoveSpeedMultiplier = 1f;
+            ctx.Controller.Effects.RemoveMoveSpeed(ctx.Slot);
         }
     }
 }

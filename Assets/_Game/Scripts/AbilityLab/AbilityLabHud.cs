@@ -192,7 +192,7 @@ namespace CluckWars.AbilityLab
             else if (eventId != _lastSeenCastEventId)
             {
                 _lastSeenCastEventId = eventId;
-                _lastCastSlot = abilities.ActiveSlot;
+                _lastCastSlot = abilities.LastCastSlot;
                 _lastCastHits = abilities.LastCastHitCount;
 
                 if (_lastCastSlot >= 0 && _lastCastSlot < AbilityController.SlotCount &&
@@ -209,7 +209,7 @@ namespace CluckWars.AbilityLab
                 }
             }
 
-            int activeSlot = abilities.ActiveSlot;
+            int activeSlot = abilities.AnyAbilityActive ? abilities.MostRecentActiveSlot : AbilityController.InvalidSlot;
             if (activeSlot != AbilityController.InvalidSlot && _previousActiveSlot == AbilityController.InvalidSlot)
             {
                 _activeWindowStart = Time.realtimeSinceStartup;

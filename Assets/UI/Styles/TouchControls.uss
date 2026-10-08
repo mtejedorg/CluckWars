@@ -245,7 +245,6 @@
    alone and those colours are shared with the world-space feedback. */
 .cw-hex--cooldown    .cw-hex-icon { opacity: 0.35; }   /* ART 6.6 layer 9 */
 .cw-hex--stunned     .cw-hex-icon { opacity: 0.50; }
-.cw-hex--other-active .cw-hex-icon { opacity: 0.40; }
 
 /* No "no target" state (Phase 6, A1): a ready hex with nobody in range renders exactly like any ready hex -
    full category hue, icon at full opacity, nothing drawn over the glyph. The in-range pip (below) is the

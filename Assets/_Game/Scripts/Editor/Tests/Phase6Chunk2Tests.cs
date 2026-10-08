@@ -30,7 +30,7 @@ namespace CluckWars.Tests
         private static ChargeDecision Decide(byte charging, int pending, float pendingSeconds, bool cancel,
                                              bool[] hold, bool[] press, bool[] canBegin) =>
             AbilityHoldStateMachine.Decide(charging, pending, pendingSeconds, Threshold,
-                canCast: true, otherAbilityActive: false, cancelPressed: cancel, hold, press, canBegin);
+                canCast: true, cancelPressed: cancel, hold, press, canBegin);
 
         private static string Read(string rel) =>
             File.ReadAllText(Path.Combine(Path.GetDirectoryName(Application.dataPath), rel));
@@ -54,7 +54,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(ChargeAction.Fire, d.Action);
             Assert.AreEqual(1, d.Slot);
             // Nobody in range: IsUsable is false -> the refusal table says NoTarget -> fizzle.
-            var refusal = AbilityRefusalRules.Evaluate(false, false, false, false, noTarget: true);
+            var refusal = AbilityRefusalRules.Evaluate(false, false, false, noTarget: true);
             Assert.IsTrue(AbilityFizzleRules.IsFizzle(refusal));
         }
 
@@ -64,7 +64,7 @@ namespace CluckWars.Tests
             var d = Decide(3, -1, 0f, false, Slots(), Slots(), All); // charging slot 2 (1-based 3), hold gone
             Assert.AreEqual(ChargeAction.Fire, d.Action);
             Assert.AreEqual(2, d.Slot);
-            Assert.IsTrue(AbilityFizzleRules.IsFizzle(AbilityRefusalRules.Evaluate(false, false, false, false, true)));
+            Assert.IsTrue(AbilityFizzleRules.IsFizzle(AbilityRefusalRules.Evaluate(false, false, false, true)));
         }
 
         [Test]
@@ -73,17 +73,17 @@ namespace CluckWars.Tests
             var d = Decide(0, -1, 0f, false, Slots(), Slots(0), All);
             Assert.AreEqual(ChargeAction.Fire, d.Action, "the idle press branch fires like a release");
             Assert.AreEqual(0, d.Slot);
-            Assert.IsTrue(AbilityFizzleRules.IsFizzle(AbilityRefusalRules.Evaluate(false, false, false, false, true)));
+            Assert.IsTrue(AbilityFizzleRules.IsFizzle(AbilityRefusalRules.Evaluate(false, false, false, true)));
         }
 
         [Test]
         public void Fizzle_CooldownAndStunnedStayDenied_EvenWhenNoTargetToo()
         {
             // Precedence: a cooling slot with nobody in range is a Cooldown refusal, not a fizzle.
-            Assert.AreEqual(AbilityRefusal.Cooldown, AbilityRefusalRules.Evaluate(false, true, false, false, true));
-            Assert.AreEqual(AbilityRefusal.Stunned, AbilityRefusalRules.Evaluate(false, false, true, false, true));
-            Assert.IsFalse(AbilityFizzleRules.IsFizzle(AbilityRefusalRules.Evaluate(false, true, false, false, true)));
-            Assert.IsFalse(AbilityFizzleRules.IsFizzle(AbilityRefusalRules.Evaluate(false, false, true, false, true)));
+            Assert.AreEqual(AbilityRefusal.Cooldown, AbilityRefusalRules.Evaluate(false, true, false, true));
+            Assert.AreEqual(AbilityRefusal.Stunned, AbilityRefusalRules.Evaluate(false, false, true, true));
+            Assert.IsFalse(AbilityFizzleRules.IsFizzle(AbilityRefusalRules.Evaluate(false, true, false, true)));
+            Assert.IsFalse(AbilityFizzleRules.IsFizzle(AbilityRefusalRules.Evaluate(false, false, true, true)));
         }
 
         [Test]
@@ -93,7 +93,7 @@ namespace CluckWars.Tests
             int fizzle = src.IndexOf("_fizzlePending = true;", StringComparison.Ordinal);
             int cooldown = src.IndexOf("SetCooldown(slot, TickTimer.CreateFromSeconds(Runner, ResolveCooldownFor(ability)));",
                                        StringComparison.Ordinal);
-            int active = src.IndexOf("ActiveSlot = slot;", fizzle, StringComparison.Ordinal);
+            int active = src.IndexOf("ActiveMask = (byte)(ActiveMask | (1 << slot));", fizzle, StringComparison.Ordinal);
             Assert.Greater(fizzle, 0);
             Assert.Greater(cooldown, fizzle, "the fizzle branch returns before any cooldown is started");
             Assert.Greater(active, fizzle, "...and before the slot becomes active (chunk 3's stealth-ending sits below)");
