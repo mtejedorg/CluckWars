@@ -8,7 +8,12 @@ mode, walks Main -> Class -> Loadout -> Lobby -> START MATCH and then, in one se
 rounds (PLAY AGAIN -> GET READY between them):
     human   the local player's base is pushed to the goal (real EvaluateWinCondition ends it), no KOs
     cpu     a bot's base is pushed to the goal, two knockouts credited (KO column shown)
-    nowin   GameManager.EndMatch(None, -1) via reflection: the "MATCH ENDED" / no-winner state
+    tie     you and a CPU both on 20 (the CPU declared winner), two more birds both on 8: shared places
+            1,1,3,3 (tied birds stand level), CPU crowned, "You · 1st" chip
+    allzero nobody banked, GameManager names a corner as its timer tie-breaks would: the draw state
+            (EMPTY NESTS!, no podium, the board still lists everyone)
+    (env PM_ROUNDS=cpu,tie limits the rounds; PM_RECTS=1 logs the main layout rects)
+    nowin   GameManager.EndMatch(None, -1) via reflection: the no-winner state (all zero too -> draw)
     two     two bots despawned first, so only 2 chickens stand (hosted-2-player shape: 3rd step hidden)
 Each round saves postmatch__<mode>__<round>__<size>.png. Live mode also logs Camera / RenderTexture
 counts before the round, on the post-match screen and after PLAY AGAIN (leak check).
@@ -47,11 +52,21 @@ public class Pm {
     for (int i = 0; i < o.Count; i++) o[i].FoodTotal = ChickenController.ActiveControllers.Any(k => k != null && k.Object != null && k.Object.IsValid && !k.IsDecoy && k.HomeCornerIndex == o[i].CornerIndex) ? 6f + 9f * i : 0f;
     return "pushed corner " + c.HomeCornerIndex + " (" + c.Class + (c.IsBot ? " bot" : " you") + ")"; }
   public static string Kos() { var s = ChickenMatchStats.ActiveStats.Where(x => x != null && x.Object != null && x.Object.IsValid).ToList(); if (s.Count < 2) return "no stats"; s[0].Kills = 2; s[1].Kills = 1; return "kos set"; }
+  static void End(PlayerBase b, string why) { typeof(GameManager).GetMethod("EndMatch", BindingFlags.NonPublic|BindingFlags.Instance).Invoke(GameManager.Instance, new object[] { b.Owner, b.CornerIndex, b.FoodTotal, why }); }
+  static PlayerBase BaseOf(ChickenController c) { return PlayerBase.ActiveBases.FirstOrDefault(x => x != null && c != null && x.CornerIndex == c.HomeCornerIndex); }
+  public static string Tie() { var you = BaseOf(Local()); var cpu = BaseOf(Bot(0)); if (you == null || cpu == null) return "no bases";
+    foreach (var b in PlayerBase.ActiveBases) if (b != null) b.FoodTotal = 8f;
+    you.FoodTotal = 20f; cpu.FoodTotal = 20f; End(cpu, "capture tie"); return "tie: you + corner " + cpu.CornerIndex + " on 20, cpu declared"; }
+  public static string AllZero() { var cpu = BaseOf(Bot(0)); if (cpu == null) return "no base";
+    foreach (var b in PlayerBase.ActiveBases) if (b != null) b.FoodTotal = 0f;
+    End(cpu, "capture all-zero"); return "all zero, corner " + cpu.CornerIndex + " named"; }
   public static string NoWin() { var gm = GameManager.Instance;
     foreach (var b in PlayerBase.ActiveBases) if (b != null) b.FoodTotal = 0f;
     typeof(GameManager).GetMethod("EndMatch", BindingFlags.NonPublic|BindingFlags.Instance).Invoke(gm, new object[] { PlayerRef.None, -1, 0f, "capture probe" }); return "ended, no winner"; }
   public static string DropTwo() { var r = Object.FindFirstObjectByType<NetworkRunner>(); int n = 0;
     for (int i = 0; i < 2; i++) { var b = Bot(0); if (b == null) break; r.Despawn(b.Object); n++; } return "despawned " + n; }
+  public static string Rects() { var r = Doc("MePlayAgainBtn").rootVisualElement;
+    return string.Join(" ", new[]{"MatchEndPanel","MeHero","MePodium","MeRight","MeRows","MeActions","MeHostNote","MeYouChip"}.Select(n => { var e = r.Q(n); return e == null ? n + "=null" : n + "=" + e.worldBound.ToString("0"); })); }
   public static string Count() { return "cams=" + Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None).Length
       + " rts=" + Resources.FindObjectsOfTypeAll<RenderTexture>().Count(t => t.name.StartsWith("MenuStageRT"))
       + " lights=" + Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None).Length
@@ -63,7 +78,11 @@ public class Pm {
     File.WriteAllBytes(path, t.EncodeToPNG()); return "saved"; }
   public static string Restore() { var ps = Doc("MePlayAgainBtn").panelSettings; var rt = ps.targetTexture; ps.targetTexture = null; ps.clearColor = false; if (rt != null) rt.Release(); return "restored"; }
   public static string Banner() { var r = Doc("MePlayAgainBtn").rootVisualElement; return r.Q<Label>("MeWinRibbonLabel").text + " | " + r.Q<Label>("MeWinSub").text + " | "
-      + string.Join(",", r.Query<Label>(className: "cw-me-rowname").ToList().Select(l => l.text)) + " | noKo=" + r.Q("MeRows").ClassListContains("cw-me-rows--no-ko"); }
+      + string.Join(",", r.Query<Label>(className: "cw-me-rowname").ToList().Select(l => l.text)) + " | noKo=" + r.Q("MeRows").ClassListContains("cw-me-rows--no-ko")
+      + " | chip=" + (r.Q<Label>("MeYouChip").resolvedStyle.display == DisplayStyle.Flex ? r.Q<Label>("MeYouChip").text : "-")
+      + " | podium=" + r.Q("MePodium").resolvedStyle.display
+      + " | medals=" + string.Join(",", r.Query<Label>(className: "cw-me-medal__num").ToList().Select(l => l.text))
+      + " | scales=" + string.Join(",", new[]{0,1,2}.Select(i => { var c = r.Q("MePod" + i + "Chicken"); return c.resolvedStyle.scale.value.x.ToString("0.00") + "@" + Mathf.Min(c.layout.width, c.layout.height).ToString("0"); })); }
 }"""
 
 SIG = {"Setup": ["w", "h"], "Grab": ["path"], "Press": ["name"], "Perf": ["on"], "Win": ["who"]}
@@ -106,10 +125,13 @@ def round_(mode, rnd, first):
     if mode == "live": print("  before end:", cs("Count"))
     if rnd == "human": print(cs("Win", "human"))
     elif rnd == "cpu": print(cs("Kos")); print(cs("Win", "cpu"))
+    elif rnd == "tie": print(cs("Tie"))
+    elif rnd == "allzero": print(cs("AllZero"))
     elif rnd == "nowin": print(cs("NoWin"))
     elif rnd == "two": print(cs("DropTwo")); time.sleep(0.5); print(cs("Win", "human"))
     wait("Ended"); time.sleep(1.5)
     print("  banner:", cs("Banner"))
+    if os.environ.get("PM_RECTS"): print("  rects:", cs("Rects"))
     if mode == "live": print("  on post-match:", cs("Count"))
     grab_all(mode, rnd)
 
@@ -128,7 +150,7 @@ for perf in MODES:
     print(cs("Press", "NextBtn")); time.sleep(0.9)  # page transitions settle
     print(cs("Fill")); print(cs("Press", "ReadyBtn")); time.sleep(0.8)
     print(cs("Press", "StartBtn"))
-    for i, rnd in enumerate(["human", "cpu", "nowin", "two"]):
+    for i, rnd in enumerate(os.environ.get("PM_ROUNDS", "human,cpu,tie,allzero,nowin,two").split(",")):
         print("-- round", rnd)
         round_(mode, rnd, first=(i == 0))
     if mode == "live":

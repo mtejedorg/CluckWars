@@ -42,20 +42,25 @@
                             <ui:Label name="MeWinRibbonLabel" text="" class="cw-me-ribbon__label" />
                         </ui:VisualElement>
                         <ui:Label name="MeWinSub" text="" class="cw-me-winsub" />
+                        <!-- Round 2, finding 6: "You · 2nd" when a CPU / rival won (the YOU mark's gold pill);
+                             hidden when you won, on a draw and with no winner (MatchStandings.YouPlaceChip). -->
+                        <ui:Label name="MeYouChip" text="" class="cw-me-youchip cw-you-mark" style="display: none;" />
 
-                        <!-- Podium, left to right: 2nd, 1st, 3rd (MatchStandings.PodiumRankBySlot).
+                        <!-- Podium, left to right: 2nd, 1st, 3rd (MatchStandings.PodiumRankBySlot). The step height and
+                             medal are the SHARED place (the pod tier-N class, set in C#: tied birds stand level); a step with
+                             nobody on it is display:none, so 2 birds = two steps centred. Hidden on a draw (nobody banked).
                              Each step: chicken over its player-colour Pedestal_Ring, a wood block whose
                              height is the placing (1st > 2nd > 3rd) with its medal, and a cream nameplate.
                              The chicken element shows the static hero render (the per-class cw-chicken modifier) or, with
                              Performance Mode OFF, the live MenuChickenStage texture painted over it. -->
                         <ui:VisualElement name="MePodium" class="cw-me-podium">
-                            <ui:VisualElement name="MePod0" class="cw-me-pod cw-me-pod--2">
+                            <ui:VisualElement name="MePod0" class="cw-me-pod cw-me-pod--2 cw-me-pod--tier-2">
                                 <ui:VisualElement name="MePod0Stage" class="cw-me-pod__stage" picking-mode="Ignore">
                                     <ui:VisualElement name="MePod0Ring" class="cw-me-pod__ring" picking-mode="Ignore" />
                                     <ui:VisualElement name="MePod0Chicken" class="cw-me-pod__chicken" picking-mode="Ignore" />
                                 </ui:VisualElement>
                                 <ui:VisualElement class="cw-me-pod__block" picking-mode="Ignore">
-                                    <ui:VisualElement class="cw-me-medal cw-me-medal--2" picking-mode="Ignore">
+                                    <ui:VisualElement name="MePod0Medal" class="cw-me-medal cw-me-medal--2" picking-mode="Ignore">
                                         <ui:Label text="" name="MePod0Place" class="cw-me-medal__num" picking-mode="Ignore" />
                                     </ui:VisualElement>
                                 </ui:VisualElement>
@@ -68,17 +73,18 @@
                                 </ui:VisualElement>
                             </ui:VisualElement>
 
-                            <ui:VisualElement name="MePod1" class="cw-me-pod cw-me-pod--1">
+                            <ui:VisualElement name="MePod1" class="cw-me-pod cw-me-pod--1 cw-me-pod--tier-1">
                                 <ui:VisualElement name="MePod1Stage" class="cw-me-pod__stage" picking-mode="Ignore">
                                     <ui:VisualElement name="MeWinGlow" class="cw-me-winglow" picking-mode="Ignore" />
                                     <ui:VisualElement name="MePod1Ring" class="cw-me-pod__ring" picking-mode="Ignore" />
-                                    <!-- The crown is a child of the winner's chicken so it rides on its head at any size. -->
+                                    <!-- The crown is a child of the winner's chicken so it scales with it; C# puts it on the
+                                         head every frame (live Head bone / the static render's measured head, PodiumLayout). -->
                                     <ui:VisualElement name="MePod1Chicken" class="cw-me-pod__chicken" picking-mode="Ignore">
                                         <ui:VisualElement name="MeCrown" class="cw-me-crown" picking-mode="Ignore" />
                                     </ui:VisualElement>
                                 </ui:VisualElement>
                                 <ui:VisualElement class="cw-me-pod__block" picking-mode="Ignore">
-                                    <ui:VisualElement class="cw-me-medal cw-me-medal--1" picking-mode="Ignore">
+                                    <ui:VisualElement name="MePod1Medal" class="cw-me-medal cw-me-medal--1" picking-mode="Ignore">
                                         <ui:Label text="" name="MePod1Place" class="cw-me-medal__num" picking-mode="Ignore" />
                                     </ui:VisualElement>
                                 </ui:VisualElement>
@@ -91,13 +97,13 @@
                                 </ui:VisualElement>
                             </ui:VisualElement>
 
-                            <ui:VisualElement name="MePod2" class="cw-me-pod cw-me-pod--3">
+                            <ui:VisualElement name="MePod2" class="cw-me-pod cw-me-pod--3 cw-me-pod--tier-3">
                                 <ui:VisualElement name="MePod2Stage" class="cw-me-pod__stage" picking-mode="Ignore">
                                     <ui:VisualElement name="MePod2Ring" class="cw-me-pod__ring" picking-mode="Ignore" />
                                     <ui:VisualElement name="MePod2Chicken" class="cw-me-pod__chicken" picking-mode="Ignore" />
                                 </ui:VisualElement>
                                 <ui:VisualElement class="cw-me-pod__block" picking-mode="Ignore">
-                                    <ui:VisualElement class="cw-me-medal cw-me-medal--3" picking-mode="Ignore">
+                                    <ui:VisualElement name="MePod2Medal" class="cw-me-medal cw-me-medal--3" picking-mode="Ignore">
                                         <ui:Label text="" name="MePod2Place" class="cw-me-medal__num" picking-mode="Ignore" />
                                     </ui:VisualElement>
                                 </ui:VisualElement>
@@ -122,8 +128,6 @@
 
                         <!-- Controller fills with up to 4 .cw-me-row cards -->
                         <ui:VisualElement name="MeRows" class="cw-me-rows" />
-
-                        <ui:VisualElement class="cw-flex-spacer" />
 
                         <!-- Decision 5: nothing restarts on a timer. PLAY AGAIN (green, the one forward
                              action) re-arms the in-session waiting room; BACK TO LOBBY (wood) leaves the

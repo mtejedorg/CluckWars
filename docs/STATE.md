@@ -6,6 +6,30 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🔧 Menu UI overhaul — Phase 5 chunk 4 (2026-10-08, uncommitted, in review): round-2 findings 6, 17
+
+EditMode **864/864** (848 + 16: `PodiumLayoutTests` new (11), `MatchStandingsTests` +5; existing podium tests now pin the tier classes).
+Captures (git-excluded): `Captures/phase5/postmatch/postmatch__static__{human,cpu,tie,allzero,nowin,two}__{desktop,phone,tablet}.png`.
+`capture_postmatch.py` gained `tie` + `allzero` rounds (and `PM_ROUNDS` / `PM_RECTS` env switches). No prefab / scene wiring.
+
+- **Finding 6 — post-match edge cases.** `UI/MatchStandings`: `Score` (shown = floored food), `Ranked` sorts by the shown
+  score, `Places` (competition ranking 1,1,3), `IsDraw` (every shown score 0), `Ordinal` (shared hud.rank.*; the HUD's
+  private copy is gone), `YouPlaceChip`. **Tie rule:** step height + medal follow the shared place (`cw-me-pod--tier-N`,
+  set in C#), so tied birds stand level; GameManager's declared winner (its kills/corner tie-break) still takes the centre
+  step and the crown. **Draw:** nobody banked -> "EMPTY NESTS!" (`postmatch.draw`) + "No winner this round.", no podium /
+  crown / celebration, plain medals without numbers, the board still lists everyone. **Winner 1.25x:** `UI/PodiumLayout`
+  evens out the three drawn squares and scales the winner exactly 1.25x (USS scale from the feet; the live stage texture
+  is sized for it, `MenuChickenStage.SetRenderScale`). **Crown on a head anchor:** placed every frame from
+  `MenuChickenStage.TryGetHeadAnchor` (the rig's Head bone projected through the slot camera) or, static, from the
+  per-class comb position measured from `Hero_<cls>_cheer.png` (a test re-measures the PNGs). **"You · 2nd" chip**
+  (`postmatch.youPlace`, gold YOU-mark pill) under the winner's class when someone else won. **2-player podium centred**
+  (empty steps are `display: none`). **Standings board sized to its rows** (`align-self: center`, the flex spacer removed).
+- **Finding 17 — leftovers.** Deleted the unused `Art/UI/Icons/{Crown,Medal_1,Medal_2,Medal_3}.png` (+ .meta): each GUID
+  appeared only in its own .meta across Assets/ProjectSettings/Packages. Post-match feathers are two-tone: a cream body over a
+  slightly larger warm-amber copy (`MatchCelebration.FeatherRim` #e89a3c, `.cw-fx-feather__body` scale 0.86).
+
+---
+
 ## 🔧 Menu UI overhaul — Phase 5 chunk 3 (2026-10-08, uncommitted, in review): round-2 findings 1, 5, 9, 15
 
 EditMode **848/848** (828 + 20: `PlayerPaletteTests` new, `AbilityPaletteTests` +4, safe-area +4 in `MatchStandingsTests`).

@@ -8,7 +8,9 @@ namespace CluckWars.UI
     /// The post-match winner celebration: a handful of feathers and sparkles (Art/UI/Fx) in the
     /// menus' cream and gold, falling slowly down the podium column in a loop. It replaces the
     /// retired static <c>.cw-bg-particle</c> dots. Phase 4: no longer tinted toward the winner's
-    /// player colour (player colour lives only on the dots, bars and pedestal rings).
+    /// player colour (player colour lives only on the dots, bars and pedestal rings). Round 2,
+    /// finding 17: every feather is two-tone, a cream body over a slightly larger warm-gold copy of
+    /// the same sprite, so a thin warm rim shows at its edges and tips (subtle, no new art).
     /// </summary>
     /// <remarks>
     /// Nine pooled elements, one 30 Hz scheduled item that runs only between <see cref="Start"/> and
@@ -20,6 +22,7 @@ namespace CluckWars.UI
         private sealed class Piece
         {
             public VisualElement El;
+            public VisualElement Body;     // feathers: the cream body drawn over El (the warm rim); null for sparkles
             public bool Sparkle;
             public float Left01, Cycle, Phase, SwayAmp, SwayHz, SwayPhase, Spin, MaxAlpha, Scale;
         }
@@ -41,10 +44,18 @@ namespace CluckWars.UI
                 el.AddToClassList("cw-fx-particle");
                 el.AddToClassList(sparkle ? "cw-fx-sparkle" : "cw-fx-feather-" + (1 + i % 3));
                 el.style.display = DisplayStyle.None;
+                VisualElement body = null;
+                if (!sparkle)
+                {
+                    body = new VisualElement { pickingMode = PickingMode.Ignore };
+                    body.AddToClassList("cw-fx-feather-" + (1 + i % 3));
+                    body.AddToClassList("cw-fx-feather__body");
+                    el.Add(body);
+                }
                 layer.Add(el);
                 _pieces.Add(new Piece
                 {
-                    El = el, Sparkle = sparkle,
+                    El = el, Body = body, Sparkle = sparkle,
                     Left01 = (i + 0.5f) / MenuJuicePolicy.CelebrationParticles,
                     Cycle = 8f + (float)rng.NextDouble() * 5f,
                     Phase = (float)rng.NextDouble(),
@@ -60,10 +71,10 @@ namespace CluckWars.UI
             _tick.Pause();
         }
 
-        // Cream #fef5e0 and a warm gold for alternate feathers; sparkles in the gold #f5c842 family.
-        private static readonly Color FeatherCream = new Color(0.996f, 0.961f, 0.878f, 1f);
-        private static readonly Color FeatherGold  = new Color(1f, 0.86f, 0.52f, 1f);
-        private static readonly Color SparkleGold  = new Color(1f, 0.84f, 0.31f, 1f);
+        // Feathers: cream #fef5e0 body over a warm amber rim (#e89a3c); sparkles in the gold #f5c842 family.
+        public static readonly Color FeatherCream = new Color(0.996f, 0.961f, 0.878f, 1f);
+        public static readonly Color FeatherRim   = new Color(0.910f, 0.604f, 0.235f, 1f);
+        private static readonly Color SparkleGold = new Color(1f, 0.84f, 0.31f, 1f);
 
         /// <summary>Starts the loop. No-op (returns false) under Reduced Motion.</summary>
         public bool Start()
@@ -72,7 +83,8 @@ namespace CluckWars.UI
             for (int i = 0; i < _pieces.Count; i++)
             {
                 var p = _pieces[i];
-                p.El.style.unityBackgroundImageTintColor = p.Sparkle ? SparkleGold : (i % 2 == 0 ? FeatherCream : FeatherGold);
+                p.El.style.unityBackgroundImageTintColor = p.Sparkle ? SparkleGold : FeatherRim;
+                if (p.Body != null) p.Body.style.unityBackgroundImageTintColor = FeatherCream;
                 p.El.style.display = DisplayStyle.Flex;
                 p.El.style.opacity = 0f;
             }

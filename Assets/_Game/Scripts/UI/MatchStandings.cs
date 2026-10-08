@@ -91,36 +91,92 @@ namespace CluckWars.UI
 
         /// <summary>
         /// The win banner: "YOU WIN!" for the local player, "{NAME} WINS!" for anyone else,
-        /// "MATCH ENDED" with no winner.
+        /// "EMPTY NESTS!" when nobody banked a single food (a draw: no podium), "MATCH ENDED" with
+        /// no winner otherwise.
         /// </summary>
-        public static string WinBanner(bool hasWinner, in Entry winner)
+        public static string WinBanner(bool hasWinner, in Entry winner, bool draw = false)
         {
+            if (draw) return UiText.Get(UiKeys.PostmatchDraw);
             if (!hasWinner) return UiText.Get(UiKeys.PostmatchEnded);
             if (winner.IsLocal) return UiText.Get(UiKeys.PostmatchYouWin);
             return UiText.Format(UiKeys.PostmatchWins, ("name", DisplayName(winner).ToUpperInvariant()));
         }
 
+        /// <summary>The food a chicken is shown with (and ranked by): whole units, rounded down.</summary>
+        public static int Score(in Entry e) => (int)System.Math.Floor(e.Total);
+
         /// <summary>
-        /// Final order: most food first; on a tie the declared winner first (GameManager's call
-        /// is authoritative, so the podium never contradicts the banner), then the lower corner.
+        /// Final order: most food (as shown) first; on a tie the declared winner first (GameManager's
+        /// call is authoritative - it breaks food ties on knockouts, then corner - so the podium never
+        /// contradicts the banner), then the larger exact total, then the lower corner.
         /// </summary>
         public static List<Entry> Ranked(IEnumerable<Entry> entries, int winnerCorner)
         {
             var list = new List<Entry>(entries);
             list.Sort((a, b) =>
             {
-                int byTotal = b.Total.CompareTo(a.Total);
-                if (byTotal != 0) return byTotal;
+                int byScore = Score(b).CompareTo(Score(a));
+                if (byScore != 0) return byScore;
                 bool aw = a.Corner == winnerCorner, bw = b.Corner == winnerCorner;
                 if (aw != bw) return aw ? -1 : 1;
+                int byTotal = b.Total.CompareTo(a.Total);
+                if (byTotal != 0) return byTotal;
                 return a.Corner.CompareTo(b.Corner);
             });
             return list;
         }
 
         /// <summary>
-        /// Rank (0 = first) shown on each podium step, left to right: 2nd, 1st, 3rd. Steps whose
-        /// rank is not in the standings stay hidden.
+        /// Placing (1-based) of each entry of a <see cref="Ranked"/> list, competition style: equal
+        /// shown food = the same place, and the next place skips (40, 20, 20, 5 -> 1, 2, 2, 4).
+        /// The podium step height and every medal follow the place, so tied birds stand level.
+        /// </summary>
+        public static int[] Places(IReadOnlyList<Entry> ranked)
+        {
+            var places = new int[ranked.Count];
+            for (int i = 0; i < ranked.Count; i++)
+                places[i] = i > 0 && Score(ranked[i]) == Score(ranked[i - 1]) ? places[i - 1] : i + 1;
+            return places;
+        }
+
+        /// <summary>
+        /// Nobody banked anything (every shown score is 0, or nobody is listed): a draw. GameManager
+        /// still names a corner (its tie-breaks), but crowning a 0 would be a lie, so the screen
+        /// shows "EMPTY NESTS!" / "No winner this round." and no podium; the board still lists everyone.
+        /// </summary>
+        public static bool IsDraw(IReadOnlyList<Entry> ranked)
+        {
+            for (int i = 0; i < ranked.Count; i++) if (Score(ranked[i]) > 0) return false;
+            return true;
+        }
+
+        /// <summary>"1st".."4th" from the shared hud.rank.* keys (the HUD uses the same ones).</summary>
+        public static string Ordinal(int place) => UiText.Get(place switch
+        {
+            1 => UiKeys.HudRank1,
+            2 => UiKeys.HudRank2,
+            3 => UiKeys.HudRank3,
+            _ => UiKeys.HudRank4,
+        });
+
+        /// <summary>
+        /// The "You · 2nd" chip under the banner when someone else won: the local player's place.
+        /// Null (no chip) when the local player won, on a draw / no winner, or when they are not listed.
+        /// </summary>
+        public static string YouPlaceChip(IReadOnlyList<Entry> ranked, bool hasWinner, int winnerCorner)
+        {
+            if (!hasWinner) return null;
+            int you = -1;
+            for (int i = 0; i < ranked.Count; i++) if (ranked[i].IsLocal) { you = i; break; }
+            if (you < 0 || ranked[you].Corner == winnerCorner) return null;
+            string youName = UiText.Get(UiKeys.LabelYou), place = Ordinal(Places(ranked)[you]);
+            return UiText.Format(UiKeys.PostmatchYouPlace, ("you", youName), ("place", place));
+        }
+
+        /// <summary>
+        /// Index into the ranked list shown on each podium step, left to right: 2nd, 1st, 3rd. Steps
+        /// with nobody to show are removed from the layout (display: none), so a 2-bird podium is
+        /// two steps centred, not 2nd + 1st with an empty gap on the right.
         /// </summary>
         public static readonly int[] PodiumRankBySlot = { 1, 0, 2 };
 

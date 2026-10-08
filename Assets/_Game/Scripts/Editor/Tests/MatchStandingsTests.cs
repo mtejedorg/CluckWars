@@ -104,8 +104,11 @@ namespace CluckWars.Tests
                 Assert.IsNotNull(pod, $"#MePod{slot}");
                 Assert.IsTrue(pod.ClassListContains($"cw-me-pod--{MatchStandings.PodiumRankBySlot[slot] + 1}"),
                     $"#MePod{slot} must carry the style of rank {MatchStandings.PodiumRankBySlot[slot] + 1}");
+                Assert.IsTrue(pod.ClassListContains($"cw-me-pod--tier-{MatchStandings.PodiumRankBySlot[slot] + 1}"),
+                    $"#MePod{slot} starts on the step height of rank {MatchStandings.PodiumRankBySlot[slot] + 1}");
                 Assert.IsNotNull(root.Q<VisualElement>($"MePod{slot}Chicken"));
                 Assert.IsNotNull(root.Q<Label>($"MePod{slot}Name"));
+                Assert.IsNotNull(root.Q<VisualElement>($"MePod{slot}Medal"), "the step medal follows the shared place");
             }
         }
 
@@ -115,12 +118,76 @@ namespace CluckWars.Tests
             string css = Read("Assets/UI/Styles/MatchOverlays.uss");
             int H(int place)
             {
-                var m = Regex.Match(css, $@"\.cw-me-pod--{place} \.cw-me-pod__block \{{ height: (\d+)px; \}}");
+                var m = Regex.Match(css, $@"\.cw-me-pod--tier-{place} \.cw-me-pod__block \{{ height: (\d+)px; \}}");
                 Assert.IsTrue(m.Success, $"no block height for place {place}");
                 return int.Parse(m.Groups[1].Value);
             }
             Assert.Greater(H(1), H(2));
             Assert.Greater(H(2), H(3));
+        }
+
+        // ---- Ties, draws and the "You · 2nd" chip (round-2 finding 6) -------------------------------
+
+        [Test]
+        public void Places_AreCompetitionRanked_EqualFoodSharesAPlace()
+        {
+            var r = MatchStandings.Ranked(new[] { E(0, 40), E(1, 20), E(2, 20), E(3, 5) }, winnerCorner: 0);
+            CollectionAssert.AreEqual(new[] { 1, 2, 2, 4 }, MatchStandings.Places(r));
+            var top = MatchStandings.Ranked(new[] { E(0, 20), E(1, 20), E(2, 8) }, winnerCorner: 1);
+            CollectionAssert.AreEqual(new[] { 1, 1, 3 }, MatchStandings.Places(top), "a tie for first: both 1st, next is 3rd");
+            Assert.AreEqual(1, top[0].Corner, "the declared winner still leads the tie (the crowned centre step)");
+            CollectionAssert.IsEmpty(MatchStandings.Places(new List<Entry>()));
+        }
+
+        [Test]
+        public void Places_FollowTheShownScore_NotHiddenFractions()
+        {
+            // 20.9 and 20.1 both show "20": the board must not call one of them 2nd.
+            var r = MatchStandings.Ranked(new[] { E(0, 20.1f), E(1, 20.9f) }, winnerCorner: 1);
+            CollectionAssert.AreEqual(new[] { 1, 1 }, MatchStandings.Places(r));
+            Assert.AreEqual(20, MatchStandings.Score(r[0]));
+        }
+
+        [Test]
+        public void AllZero_IsADraw_AnythingBankedIsNot()
+        {
+            Assert.IsTrue(MatchStandings.IsDraw(new[] { E(0, 0), E(1, 0), E(2, 0.6f), E(3, 0) }), "0.6 food shows as 0");
+            Assert.IsTrue(MatchStandings.IsDraw(new List<Entry>()));
+            Assert.IsFalse(MatchStandings.IsDraw(new[] { E(0, 0), E(1, 1) }));
+            var any = new Entry(0, 0, 0, true, false, ChickenClass.Warrior);
+            Assert.AreEqual(UiText.Get(UiKeys.PostmatchDraw), MatchStandings.WinBanner(true, any, draw: true),
+                "a draw wins over the corner GameManager's tie-breaks named");
+            Assert.AreNotEqual(UiText.Get(UiKeys.PostmatchEnded), UiText.Get(UiKeys.PostmatchDraw));
+        }
+
+        [Test]
+        public void YouChip_ShowsYourPlace_OnlyWhenSomeoneElseWon()
+        {
+            var you = new Entry(2, 12, 0, isLocal: true, isBot: false, ChickenClass.Warrior);
+            var bot = new Entry(0, 40, 0, isLocal: false, isBot: true, ChickenClass.Fatty);
+            var other = new Entry(1, 5, 0, isLocal: false, isBot: true, ChickenClass.Speedy);
+            var r = MatchStandings.Ranked(new[] { you, bot, other }, winnerCorner: 0);
+            Assert.AreEqual(UiText.Format(UiKeys.PostmatchYouPlace, ("you", UiText.Get(UiKeys.LabelYou)), ("place", UiText.Get(UiKeys.HudRank2))),
+                MatchStandings.YouPlaceChip(r, hasWinner: true, winnerCorner: 0));
+            StringAssert.Contains("2nd", MatchStandings.YouPlaceChip(r, true, 0));
+            Assert.IsNull(MatchStandings.YouPlaceChip(r, hasWinner: true, winnerCorner: 2), "you won: the banner says so");
+            Assert.IsNull(MatchStandings.YouPlaceChip(r, hasWinner: false, winnerCorner: -1), "draw / no winner: no chip");
+            Assert.IsNull(MatchStandings.YouPlaceChip(new List<Entry> { bot, other }, true, 0), "spectating: no chip");
+
+            // Tied with the declared winner: you share 1st.
+            var tied = MatchStandings.Ranked(new[] { new Entry(2, 40, 0, true, false, ChickenClass.Warrior), bot }, winnerCorner: 0);
+            StringAssert.Contains(UiText.Get(UiKeys.HudRank1), MatchStandings.YouPlaceChip(tied, true, 0));
+        }
+
+        [Test]
+        public void Ordinal_IsOneSharedHelper_ForTheHudAndThePostMatchChip()
+        {
+            Assert.AreEqual(UiText.Get(UiKeys.HudRank1), MatchStandings.Ordinal(1));
+            Assert.AreEqual(UiText.Get(UiKeys.HudRank3), MatchStandings.Ordinal(3));
+            Assert.AreEqual(UiText.Get(UiKeys.HudRank4), MatchStandings.Ordinal(4));
+            string hud = Read("Assets/_Game/Scripts/UI/MatchHudController.cs");
+            StringAssert.Contains("MatchStandings.Ordinal(", hud);
+            StringAssert.DoesNotContain("UiKeys.HudRank1", hud, "the HUD keeps no private copy of the ordinals");
         }
 
         [Test]

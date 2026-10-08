@@ -130,6 +130,8 @@ postmatch.winSub,{cls}
 postmatch.noWinner,No winner this round.
 
 postmatch.youWin,YOU WIN!
+postmatch.draw,EMPTY NESTS!
+postmatch.youPlace,{you} · {place}
 lobby.hint.host,Start whenever you like.
 lobby.hint.guest,Waiting for the host…
 session.ended,MATCH OVER

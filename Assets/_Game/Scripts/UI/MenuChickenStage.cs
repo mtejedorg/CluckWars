@@ -71,6 +71,9 @@ namespace CluckWars.UI
             public ChickenClass Class;
             public AnimationClip Idle, Cheer;
             public float Height, Radius;
+            public Transform Head;         // the rig's "Head" bone (null: the crown anchor uses the model's top centre)
+            public float HeadTopAbove;     // rest-pose height of the model's top above the Head bone
+            public float RenderScale = 1f; // the element is drawn this much bigger (USS scale): texture resolution follows
             public float HopStart = -1f;
             public float ShownAt;          // turntable time origin: a chicken coming on screen starts at the 3/4 view
             public bool Rendering;
@@ -226,6 +229,9 @@ namespace CluckWars.UI
             s.Pivot.localRotation = Quaternion.identity;
             s.Idle.SampleAnimation(model, 0f);
             Measure(s, model);
+            s.Head = FindDeep(model.transform, "Head");
+            if (s.Head != null) s.HeadTopAbove = s.Pivot.position.y + s.Height - s.Head.position.y;
+            else _log?.Warn(Source, $"{cls} model has no 'Head' bone; the winner's crown is anchored to the model's top centre.");
             _log?.Debug(Source, $"Slot {s.Index}: {cls} height={s.Height:0.00} radius={s.Radius:0.00}.");
             Frame(s);
         }
@@ -264,6 +270,48 @@ namespace CluckWars.UI
             s.Radius = radius;
         }
 
+        private static Transform FindDeep(Transform t, string name)
+        {
+            if (t.name == name) return t;
+            for (int i = 0; i < t.childCount; i++)
+            {
+                var hit = FindDeep(t.GetChild(i), name);
+                if (hit != null) return hit;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Where the top of the head is in <paramref name="slot"/>'s texture this frame, as (x from the
+        /// left, y from the top), 0..1: the Head bone (it follows the idle, the turntable and the hop)
+        /// raised by the rest-pose distance to the top of the model. False while the slot has no model
+        /// or texture (not rendering yet).
+        /// </summary>
+        public bool TryGetHeadAnchor(int slot, out Vector2 anchor)
+        {
+            anchor = default;
+            if (_disposed || slot < 0 || slot >= _slots.Length) return false;
+            var s = _slots[slot];
+            if (s == null || s.Model == null || s.Texture == null || !s.Rendering) return false;
+            var top = s.Head != null
+                ? s.Head.position + Vector3.up * s.HeadTopAbove
+                : s.Model.transform.position + Vector3.up * s.Height;
+            var vp = s.Camera.WorldToViewportPoint(top);
+            anchor = new Vector2(vp.x, 1f - vp.y);
+            return true;
+        }
+
+        /// <summary>
+        /// The element of <paramref name="slot"/> is drawn <paramref name="scale"/> times its layout
+        /// size (USS scale, the post-match winner): its texture is sized for that, so it stays sharp.
+        /// </summary>
+        public void SetRenderScale(int slot, float scale)
+        {
+            if (slot < 0 || slot >= _slots.Length) return;
+            var s = _slots[slot] ??= CreateSlot(slot);
+            s.RenderScale = Mathf.Max(1f, scale);
+        }
+
         /// <summary>
         /// Frames the chicken like the static hero PNGs: a square whose side is the chicken's height
         /// plus the hop's headroom, x 1.06, feet 5% above the bottom edge. The turntable radius only
@@ -294,7 +342,7 @@ namespace CluckWars.UI
             {
                 if (s == null) continue;
                 bool visible = s.Target != null && IsOnScreen(s.Target);
-                int side = visible ? MenuStagePolicy.TextureSide(s.Target.layout.width, s.Target.layout.height, ppp) : 0;
+                int side = visible ? MenuStagePolicy.TextureSide(s.Target.layout.width, s.Target.layout.height, ppp * s.RenderScale) : 0;
                 bool render = MenuStagePolicy.ShouldRender(true, s.Model != null && s.Target != null, visible, side);
                 if (render && MenuStagePolicy.NeedsRealloc(s.Texture != null ? s.Texture.width : 0, side))
                     Reallocate(s, side);

@@ -262,7 +262,7 @@ namespace CluckWars.UI
                     Color color = PlayerPalette.ForCorner(corner);
                     bool isLocal = corner == localCorner;
 
-                    if (rowRefs.Ord != null) rowRefs.Ord.text = Ordinal(rank + 1);
+                    if (rowRefs.Ord != null) rowRefs.Ord.text = MatchStandings.Ordinal(rank + 1);
                     // The player colour lives on the dot (and the bar); the name stays cream (USS) for
                     // contrast, and the local player's name is the YOU mark (round-2 findings 1 + 5).
                     if (rowRefs.Dot != null) rowRefs.Dot.style.unityBackgroundImageTintColor = color;
@@ -326,15 +326,6 @@ namespace CluckWars.UI
             }
             return null;
         }
-
-        // The top bar has exactly four rows, so a rank is always 1..4.
-        private static string Ordinal(int number) => number switch
-        {
-            1 => UiText.Get(UiKeys.HudRank1),
-            2 => UiText.Get(UiKeys.HudRank2),
-            3 => UiText.Get(UiKeys.HudRank3),
-            _ => UiText.Get(UiKeys.HudRank4),
-        };
 
         private int LocalCorner()
         {

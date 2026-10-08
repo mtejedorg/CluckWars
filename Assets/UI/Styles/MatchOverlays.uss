@@ -36,7 +36,6 @@
 /* Match end is opaque: at 0.88-0.97 the arena and touch HUD still read through around the panel. */
 .cw-overlay--opaque   { background-color: rgb(8, 4, 2); }
 .cw-overlay--introdim { background-color: rgba(0, 0, 0, 0.45); }
-.cw-flex-spacer { flex-grow: 1; }
 
 /* ============================================================================
    MATCH END  (podium on the barn)
@@ -68,6 +67,12 @@
 .cw-fx-feather-1 { background-image: url("project://database/Assets/_Game/Art/UI/Fx/Fx_Feather_1.png"); }
 .cw-fx-feather-2 { background-image: url("project://database/Assets/_Game/Art/UI/Fx/Fx_Feather_2.png"); }
 .cw-fx-feather-3 { background-image: url("project://database/Assets/_Game/Art/UI/Fx/Fx_Feather_3.png"); }
+/* Two-tone feather (round 2, finding 17): the particle itself is the warm rim (tinted amber in C#); this
+   child is the same sprite in cream, a little smaller, laid over it, so only a thin warm edge shows. */
+.cw-fx-feather__body {
+    position: absolute; left: 0; top: 0; margin-left: 0; margin-top: 0;
+    scale: 0.86 0.86;
+}
 
 /* Backdrop: THE COOP's barn gate (Bg_Lobby, 2880x1440, centred 16:9 safe area), scale-and-crop so
    4:3 and 20:9 keep the centre; an ink vignette + light scrim over it, as on the menu pages. */
@@ -128,6 +133,14 @@
     text-shadow: 0px 4px 0px rgba(42, 26, 12, 0.85);
     padding-top: 0; padding-bottom: 0; margin-top: 0; margin-bottom: 0;
 }
+/* Draw (nobody banked): no podium, so the banner + "No winner this round." sit centred in the column. */
+.cw-me-hero--draw { justify-content: center; }
+/* "You · 2nd" (round 2, finding 6): the YOU mark's gold pill (YouMark.uss), one step bigger, under the sub. */
+.cw-me-youchip {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 34px; letter-spacing: 2px; white-space: nowrap; -unity-text-align: middle-center;
+    margin-top: 10px; flex-shrink: 0;
+}
 /* Winner's class under the banner: cream on an ink plate (it sits on the bright barn art). */
 .cw-me-winsub {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
@@ -152,7 +165,8 @@
     margin-left: 10px; margin-right: 10px;
     justify-content: flex-end; align-items: stretch;
 }
-.cw-me-pod--hidden { visibility: hidden; }
+/* A step with nobody on it leaves the layout: 2 birds = two steps centred (round 2, finding 6). */
+.cw-me-pod--hidden { display: none; }
 .cw-me-pod__stage { flex-grow: 1; min-height: 150px; align-items: center; justify-content: flex-end; }
 /* Frames/Pedestal_Ring (512x128, white art) tinted with the player colour in C#; drawn before the
    chicken so its feet stand on it, overlapping the block's top edge. */
@@ -164,18 +178,22 @@
 }
 /* The render is square and the element is not: contain + bottom keeps the feet on the ring at any
    aspect (centred, a tall element left the chicken floating above it on 4:3). */
+/* Every bird is drawn at one common size and the crowned one at 1.25x (PodiumLayout.ChickenScales sets
+   a USS scale per step from the bottom centre: the feet stay on the ring, nothing re-lays out). */
 .cw-me-pod__chicken {
     width: 96%; flex-grow: 1; max-height: 280px; margin-bottom: 10px;
+    transform-origin: 50% 100%;
     background-size: contain; background-repeat: no-repeat;
     background-position-x: center; background-position-y: bottom;
     /* static figure via a .cw-chicken--<class> modifier set in C#; live texture painted over it */
 }
-.cw-me-pod--1 .cw-me-pod__chicken { max-height: 330px; margin-top: 70px; }
-/* Crown in the icon style (Icons/Podium/Crown_Gold: gold, ink outline, cream gems). Its top is set
-   in C# from the drawn square's top edge (MatchOverlaysController.PlaceCrown), so it sits on the head. */
+/* Headroom over the centre step for the 1.25x winner and its crown. */
+.cw-me-pod--1 .cw-me-pod__chicken { margin-top: 110px; }
+/* Crown in the icon style (Icons/Podium/Crown_Gold: gold, ink outline, cream gems). left / top are set
+   every frame in C# from the head anchor (MatchOverlaysController.PlaceCrown, PodiumLayout.CrownTopLeft). */
 .cw-me-crown {
-    position: absolute; top: -66px; left: 50%;
-    width: 112px; height: 112px; margin-left: -56px;
+    position: absolute; top: 0; left: 0;
+    width: 96px; height: 96px;
     background-image: url("project://database/Assets/_Game/Art/UI/Icons/Podium/Crown_Gold.png");
     -unity-background-scale-mode: scale-to-fit;
     rotate: -8deg;
@@ -195,9 +213,10 @@
     -unity-slice-scale: 0.6px;
     margin-left: 6px; margin-right: 6px;
 }
-.cw-me-pod--1 .cw-me-pod__block { height: 170px; }
-.cw-me-pod--2 .cw-me-pod__block { height: 118px; }
-.cw-me-pod--3 .cw-me-pod__block { height: 82px; }
+/* Height = the SHARED place (tier set in C# from MatchStandings.Places), so tied birds stand level. */
+.cw-me-pod--tier-1 .cw-me-pod__block { height: 170px; }
+.cw-me-pod--tier-2 .cw-me-pod__block { height: 118px; }
+.cw-me-pod--tier-3 .cw-me-pod__block { height: 82px; }
 .cw-me-pod__block .cw-me-medal { width: 72px; height: 72px; margin-right: 0; padding-top: 10px; }
 /* Cream nameplate, like THE COOP's seats: ink outline, player-colour top stripe (C#). */
 .cw-me-pod__plate {
@@ -229,8 +248,11 @@
 }
 
 /* -- Right: the standings board (Frames/Frame_WoodPanel 9-slice) -- */
+/* Sized to its rows (round 2, finding 6): centred in the panel's height instead of stretched, so 2 rows
+   are a short board, not a tall one that is mostly empty wood. */
 .cw-me-right {
     flex-grow: 1; flex-basis: 0; min-width: 800px; max-width: 980px;   /* 4:3 floor: rows + KO + both buttons fit */
+    align-self: center;
     background-image: url("project://database/Assets/_Game/Art/UI/Frames/Frame_WoodPanel.png");
     -unity-background-scale-mode: stretch-to-fill;
     -unity-slice-left: 40; -unity-slice-right: 40; -unity-slice-top: 40; -unity-slice-bottom: 40;
