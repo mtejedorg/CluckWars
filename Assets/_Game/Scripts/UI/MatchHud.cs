@@ -18,7 +18,7 @@ namespace CluckWars.UI
     /// the two full-screen effects that have no on-character or UI Toolkit home:
     /// <list type="bullet">
     ///   <item>Full-screen hit-flash on local HP loss.</item>
-    ///   <item>Centered final-minute event banner.</item>
+    ///   <item>The comeback event banner ("FINAL 10!" + the event), lower third between the joystick and the ability buttons.</item>
     /// </list>
     /// The top-bar leaderboard + timer are UI Toolkit (<see cref="MatchHudController"/>
     /// + <c>Assets/UI/MatchTopBar.uxml</c>), and the local HP/cargo bars now live
@@ -37,14 +37,16 @@ namespace CluckWars.UI
         // Self-contained so the warm Clash Royale/Supercell look applies regardless
         // of which ColorSchemeSO asset version is serialised in the scene.
         // ----------------------------------------------------------------
-        private static readonly Color DtPanelBg     = new Color(0.23f, 0.13f, 0.06f, 1f); // #3a2210
         private static readonly Color DtGold        = new Color(0.96f, 0.78f, 0.26f, 1f); // #f5c842
         private static readonly Color DtTextPrimary = new Color(1.00f, 0.96f, 0.88f, 1f); // #fef5e0
+        // The menus' ink (#2a1a0c): text outline + the banner's plate. Gold on it is ~9:1, cream ~14:1.
+        private static readonly Color DtInk         = new Color(0.165f, 0.102f, 0.047f, 1f);
 
         // ---- UI refs built procedurally ------------------------------------
 
         private GameObject _eventBannerPanel;
-        private Text       _eventBannerText;
+        private Text       _eventBannerHeader;   // "FINAL 10!"
+        private Text       _eventBannerText;     // "BOUNTY ON THE LEADER!"
         private float      _bannerExpireTime;
         private MatchEventKind _lastSeenEvent = MatchEventKind.None;
         // A new event's banner waits here until the GO! flourish has gone (EventBannerTiming).
@@ -217,23 +219,6 @@ namespace CluckWars.UI
             return go;
         }
 
-        private static void AddBackground(GameObject go, Color color, float radius = 12f, Color? borderColor = null, float borderWidth = 0f)
-        {
-            var img = go.AddComponent<Image>();
-            img.color         = color;
-            img.raycastTarget = false; // HUD doesn't eat clicks; TouchControlsHud owns input
-            
-            go.AddComponent<SDFImageEffect>();
-            var mat = new Material(Shader.Find("CluckWars/UI/SDF"));
-            mat.SetColor("_Color", Color.white);
-            mat.SetFloat("_Radius", radius);
-            if (borderColor.HasValue) {
-                mat.SetColor("_BorderColor", borderColor.Value);
-                mat.SetFloat("_BorderWidth", borderWidth);
-            }
-            img.material = mat;
-        }
-
         private static Text AddText(Transform parent, string name, string content,
             int fontSize, TextAnchor alignment, FontStyle style)
         {
@@ -252,38 +237,65 @@ namespace CluckWars.UI
             return text;
         }
 
+        /// <summary>
+        /// The comeback banner (round-2 finding 3): an opaque ink plate with gold rules and ink-outlined
+        /// type, so it reads on any patch of arena (the old gold-on-grass text measured 1.2:1; its rounded
+        /// panel never drew: the SDF material read the rect size from UV1, a channel this canvas never
+        /// passed, so the shape had zero size). Anchored bottom-centre in the lower third, between the
+        /// joystick and the ability buttons: the top is taken by the leaderboard column (left, down to its
+        /// FIRST TO chip) and the timer (right), and the local chicken + nameplate sit just above screen
+        /// centre under the follow camera. GO! never shares the screen with it (EventBannerTiming).
+        /// </summary>
         private void BuildEventBanner(Transform parent)
         {
             _eventBannerPanel = CreateUI("EventBanner", parent, out var rt);
-            rt.anchorMin = new Vector2(0.5f, 0.5f);
-            rt.anchorMax = new Vector2(0.5f, 0.5f);
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            // Sized for the mobile contract (see CluckWarsTheme.uss header): this
-            // Canvas uses the same ScaleWithScreenSize 1920x1080 @0.5 as the UI
-            // Toolkit panel, so 1 dp ~= 2.35 px here too. 600x80 with 24px type
-            // rendered at 10 sp in a 34 dp strip.
-            rt.sizeDelta = new Vector2(1150f, 150f);
+            rt.anchorMin = new Vector2(0.5f, 0f);
+            rt.anchorMax = new Vector2(0.5f, 0f);
+            rt.pivot = new Vector2(0.5f, 0f);
+            // 1920x1080 reference (ScaleWithScreenSize @0.5): 760 wide = 40% of a 16:9 screen, 46% of a 4:3 one,
+            // so it stays clear of the joystick (left) and the ability hexes (right); bottom edge above the
+            // gesture bar.
+            rt.sizeDelta = new Vector2(760f, 150f);
             rt.anchoredPosition = new Vector2(0f, 150f);
 
-            AddBackground(_eventBannerPanel, new Color(DtPanelBg.r, DtPanelBg.g, DtPanelBg.b, 0.95f));
+            var plate = _eventBannerPanel.AddComponent<Image>();
+            plate.color = new Color(DtInk.r, DtInk.g, DtInk.b, 0.92f);
+            plate.raycastTarget = false;
+            AddRule(_eventBannerPanel.transform, "TopRule", top: true);
+            AddRule(_eventBannerPanel.transform, "BottomRule", top: false);
 
-            var lineGO = CreateUI("BottomLine", _eventBannerPanel.transform, out var lineRT);
-            lineRT.anchorMin = new Vector2(0f, 0f);
-            lineRT.anchorMax = new Vector2(1f, 0f);
-            lineRT.pivot = new Vector2(0.5f, 0f);
-            lineRT.sizeDelta = new Vector2(0f, 3f);
-            lineRT.anchoredPosition = Vector2.zero;
-            lineGO.AddComponent<Image>().color = DtGold;
-
-            _eventBannerText = AddText(_eventBannerPanel.transform, "Label", "", 44, TextAnchor.MiddleCenter, FontStyle.Bold);
-            _eventBannerText.color = DtGold;
-            var tRT = _eventBannerText.rectTransform;
-            tRT.anchorMin = Vector2.zero;
-            tRT.anchorMax = Vector2.one;
-            tRT.offsetMin = Vector2.zero;
-            tRT.offsetMax = Vector2.zero;
+            _eventBannerHeader = AddBannerLine("Header", 38, DtGold, yMin: 0.58f, yMax: 0.96f);
+            _eventBannerText   = AddBannerLine("Label", 54, DtTextPrimary, yMin: 0.06f, yMax: 0.62f);
 
             _eventBannerPanel.SetActive(false);
+        }
+
+        private static void AddRule(Transform parent, string name, bool top)
+        {
+            var go = CreateUI(name, parent, out var lineRT);
+            lineRT.anchorMin = new Vector2(0f, top ? 1f : 0f);
+            lineRT.anchorMax = new Vector2(1f, top ? 1f : 0f);
+            lineRT.pivot = new Vector2(0.5f, top ? 1f : 0f);
+            lineRT.sizeDelta = new Vector2(0f, 4f);
+            lineRT.anchoredPosition = Vector2.zero;
+            var img = go.AddComponent<Image>();
+            img.color = DtGold;
+            img.raycastTarget = false;
+        }
+
+        private Text AddBannerLine(string name, int size, Color color, float yMin, float yMax)
+        {
+            var text = AddText(_eventBannerPanel.transform, name, "", size, TextAnchor.MiddleCenter, FontStyle.Bold);
+            text.color = color;
+            var outline = text.gameObject.AddComponent<Outline>();
+            outline.effectColor = DtInk;
+            outline.effectDistance = new Vector2(3f, -3f);
+            var tRT = text.rectTransform;
+            tRT.anchorMin = new Vector2(0f, yMin);
+            tRT.anchorMax = new Vector2(1f, yMax);
+            tRT.offsetMin = Vector2.zero;
+            tRT.offsetMax = Vector2.zero;
+            return text;
         }
 
         private void PollComebackEvent()
@@ -298,8 +310,11 @@ namespace CluckWars.UI
                 _lastSeenEvent = evt;
                 if (evt != MatchEventKind.None)
                 {
+                    if (_eventBannerHeader != null)
+                        _eventBannerHeader.text = UiText.Format(UiKeys.HudEventHeader,
+                            ("n", Mathf.RoundToInt(_gameManager.ComebackEventSecondsLeft)));
                     if (_eventBannerText != null)
-                        _eventBannerText.text = UiText.Format(UiKeys.HudEventBanner, ("event", EventName(evt)));
+                        _eventBannerText.text = EventName(evt);
                     _bannerPending = true;
                 }
                 else

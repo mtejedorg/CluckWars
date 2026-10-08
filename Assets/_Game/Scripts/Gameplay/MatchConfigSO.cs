@@ -32,6 +32,11 @@ namespace CluckWars.Gameplay
         [Min(0f)] public float DeathStunSeconds = 5f;
         [Min(0.5f)] public float DepositRatePerSecond = 9f;
 
+        [Tooltip("The comeback event (golden pile / underdog surge / leader bounty / restock) fires " +
+                 "once, when this many playable seconds are left (re-audit round 2, decision 2: the " +
+                 "last 10 s). 0 disables it. Read by GameManager through ComebackEventTiming.")]
+        [Min(0f)] public float ComebackEventSecondsLeft = 10f;
+
         [Header("Networking")]
         // Tick rate lives in NetworkProjectConfig.fusion (Fusion 2 ignores per-session values here)
 

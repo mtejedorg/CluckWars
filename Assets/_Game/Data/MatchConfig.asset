@@ -19,4 +19,5 @@ MonoBehaviour:
   LeaderExecuteBountyMultiplier: 2
   DeathStunSeconds: 5
   DepositRatePerSecond: 9
+  ComebackEventSecondsLeft: 10
   TickRate: 30

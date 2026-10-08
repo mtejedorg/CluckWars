@@ -6,6 +6,8 @@ public class Intro {
     public void PlaySFX(AudioClip clip, float volume = 1f, float pitch = 1f, float delaySeconds = 0f) { Lines.Add("      AUDIO t=" + (Time.unscaledTime - Start).ToString("0.000") + " " + (clip == null ? "null" : clip.name) + " pitch=" + pitch.ToString("0.00")); }
     public void PlayMusic(AudioClip clip, float volume = 1f, bool loop = true, float fadeInSeconds = 0f) { }
     public void FadeOutMusic(float seconds) { }
+    public void SetMusicLevel(float level01, float seconds) { }
+    public void CrossfadeMusic(AudioClip clip, float seconds) { }
     public void StopMusic() { }
     public bool IsMusicPlaying(AudioClip clip) { return false; }
     public void SetMasterVolume(float volume01) { }
@@ -68,12 +70,14 @@ public class Intro {
   // One EditorApplication.update hook per session: the menu's GET READY card (captured once fully faded in),
   // the scene swap, every GameManager state change, every intro-text change (3 / 2 / 1 / GO! captured once
   // per round), the GameManager's own audio (forwarded to the real service, so the session still sounds),
-  // and the final-minute banner. Scores are capped below the goal so the round ends on the TIMER.
+  // and the comeback banner (+ the music sources after GO and after the event). Scores are capped below the goal so the round ends on the TIMER.
   sealed class FwdAudio : IAudioService {
     public IAudioService Inner; public System.Action<string> Log;
     public void PlaySFX(AudioClip clip, float volume = 1f, float pitch = 1f, float delaySeconds = 0f) { Log("AUDIO sfx " + (clip == null ? "null" : clip.name)); Inner.PlaySFX(clip, volume, pitch, delaySeconds); }
     public void PlayMusic(AudioClip clip, float volume = 1f, bool loop = true, float fadeInSeconds = 0f) { Log("AUDIO music " + (clip == null ? "null" : clip.name)); Inner.PlayMusic(clip, volume, loop, fadeInSeconds); }
     public void FadeOutMusic(float seconds) { Inner.FadeOutMusic(seconds); }
+    public void SetMusicLevel(float level01, float seconds) { Log("AUDIO musicLevel " + level01); Inner.SetMusicLevel(level01, seconds); }
+    public void CrossfadeMusic(AudioClip clip, float seconds) { Log("AUDIO crossfade -> " + (clip == null ? "null" : clip.name)); Inner.CrossfadeMusic(clip, seconds); }
     public void StopMusic() { Log("AUDIO stopMusic"); Inner.StopMusic(); }
     public bool IsMusicPlaying(AudioClip clip) { return Inner.IsMusicPlaying(clip); }
     public void SetMasterVolume(float volume01) { Inner.SetMasterVolume(volume01); }
@@ -81,6 +85,10 @@ public class Intro {
   sealed class P4 {
     public string Out; public float T0, End; public int Round; public bool CardSeen, CardShot; public string Scene = "", Text = null, StateStr = "";
     public float ShotAt = -1; public string ShotName; public HashSet<string> Shot = new HashSet<string>(); public int Clamps; public bool BannerSeen;
+    public bool GetReadyOn; public float GetReadyAt; public float BannerAt = -1; public bool MusicLogged;
+    public static string Music() {
+      var host = GameObject.Find("AudioServiceHost"); if (host == null) return "no AudioServiceHost";
+      return string.Join(", ", host.GetComponents<AudioSource>().Where(a => a.isPlaying && a.loop).Select(a => (a.clip == null ? "null" : a.clip.name) + " vol=" + a.volume.ToString("0.00") + " t=" + a.time.ToString("0.00"))); }
     static string N(float v) { return v.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture); }
     public void L(string m) { Lines.Add(N(Time.realtimeSinceStartup - T0) + " f" + Time.frameCount + " dt=" + N(Time.unscaledDeltaTime) + " | " + m); }
     public void Tick() {
@@ -113,10 +121,18 @@ public class Intro {
         var root = d.rootVisualElement; if (root == null) continue;
         var n = root.Q<Label>("IntroNumber"); var ov = root.Q<VisualElement>("IntroOverlay"); if (n == null || ov == null) continue;
         bool shown = ov.resolvedStyle.display == DisplayStyle.Flex;
+        var gr = root.Q<VisualElement>("IntroGetReady");
+        bool grOn = shown && gr != null && gr.resolvedStyle.display == DisplayStyle.Flex;
+        if (grOn != GetReadyOn) {
+          GetReadyOn = grOn;
+          if (grOn) { GetReadyAt = Time.realtimeSinceStartup; L("INGAME GETREADY shown"); }
+          else L("INGAME GETREADY hidden after " + N(Time.realtimeSinceStartup - GetReadyAt) + "s (intro text '" + n.text + "')");
+        }
         string txt = shown ? n.text : "<hidden>";
         if (txt != Text) {
           Text = txt; L("INTRO '" + txt + "' state=" + (gm == null ? "nogm" : gm.State.ToString()) + " introRemaining=" + (gm == null ? "?" : N(gm.IntroRemaining)));
           string key = txt == "GO!" ? "go" : txt;
+          if (txt == "<hidden>" && gm != null && gm.State == MatchState.Active && !gm.IsIntroActive) L("MUSIC after GO: " + Music());
           if ((txt == "3" || txt == "2" || txt == "1" || txt == "GO!") && Shot.Add(Round + key)) { ShotAt = Time.realtimeSinceStartup + (txt == "GO!" ? 0.18f : 0.30f); ShotName = (Round <= 1 ? "intro_" : "intro_r" + Round + "_") + key + ".png"; }
           else if (txt == "" && Shot.Add(Round + "ready")) { ShotAt = Time.realtimeSinceStartup + 0.15f; ShotName = "ingame_getready" + (Round == 0 ? "" : "_r" + (Round + 1)) + ".png"; }
         }
@@ -125,7 +141,9 @@ public class Intro {
       var banner = GameObject.Find("EventBanner");
       bool bOn = banner != null && banner.activeInHierarchy;
       if (bOn && !BannerSeen && Shot.Add(Round + "banner") && ShotAt < 0) { ShotAt = Time.realtimeSinceStartup + 0.3f; ShotName = "event_banner" + (Round <= 1 ? "" : "_r" + Round) + ".png"; }
-      if (bOn != BannerSeen) { BannerSeen = bOn; L("EVENT BANNER " + (bOn ? "shown: '" + banner.GetComponentInChildren<UnityEngine.UI.Text>().text + "'" : "hidden") + (gm == null ? "" : " event=" + gm.ActiveEvent)); }
+      if (bOn != BannerSeen) { BannerSeen = bOn; if (bOn) { BannerAt = Time.realtimeSinceStartup; MusicLogged = false; }
+        L("EVENT BANNER " + (bOn ? "shown: '" + string.Join(" / ", banner.GetComponentsInChildren<UnityEngine.UI.Text>().Select(x => x.text)) + "'" : "hidden") + (gm == null ? "" : " event=" + gm.ActiveEvent + " timeRemaining=" + N(gm.TimeRemaining))); }
+      if (BannerAt > 0 && !MusicLogged && Time.realtimeSinceStartup >= BannerAt + 1.6f) { MusicLogged = true; L("MUSIC after the event: " + Music()); }
     }
   }
   public static string Arm4(string outDir, string dur) {

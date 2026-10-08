@@ -22,6 +22,16 @@ namespace CluckWars.Audio
         /// No-op when nothing is playing; a later <see cref="PlayMusic"/> cancels the fade.</summary>
         void FadeOutMusic(float seconds);
 
+        /// <summary>Ramps the playing music's level (a 0..1 multiplier on its volume) to
+        /// <paramref name="level01"/> over <paramref name="seconds"/> and keeps it playing: the menu
+        /// loop ducks to a low bed under GET READY. No-op when nothing is playing.</summary>
+        void SetMusicLevel(float level01, float seconds);
+
+        /// <summary>Crossfades the playing music into <paramref name="clip"/>, which starts at the same
+        /// playback position (for loops cut to the same length and tempo, e.g. match_loop ->
+        /// match_loop_intense). Plain <see cref="PlayMusic"/> when nothing is playing.</summary>
+        void CrossfadeMusic(AudioClip clip, float seconds);
+
         void StopMusic();
 
         /// <summary>True while <paramref name="clip"/> is the music track and is not on its way out.</summary>

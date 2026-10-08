@@ -120,7 +120,6 @@
 .cw-me-ribbon--win .cw-me-ribbon__label { font-size: 60px; }
 /* Gold-warmed wood (THE COOP's READY! banner). */
 .cw-me-ribbon--gold    { -unity-background-image-tint-color: rgb(255, 226, 150); }
-.cw-me-ribbon--subdued { -unity-background-image-tint-color: rgb(205, 186, 164); }
 .cw-me-ribbon__label {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 52px; letter-spacing: 3px; color: rgb(254, 245, 224);
@@ -683,5 +682,19 @@
     -unity-text-outline-width: 6px; -unity-text-outline-color: rgb(42, 26, 12);
     text-shadow: 0px 12px 0px rgba(42, 26, 12, 0.9);
 }
-/* The GET READY ribbon sits below the number */
-.cw-overlay--introdim .cw-me-ribbon--subdued { position: absolute; bottom: 22%; }
+/* GET READY inside the intro overlay is the shared card (Styles/GetReadyCard.uss). */
+
+/* Host-left notice: an ink plate with gold rules in the upper third, over the arena / lobby. */
+.cw-hostleft {
+    position: absolute; left: 0; right: 0; top: 18%;
+    align-items: center;
+}
+.cw-hostleft__label {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 56px; letter-spacing: 2px; color: rgb(254, 245, 224); -unity-text-align: middle-center;
+    -unity-text-outline-width: 4px; -unity-text-outline-color: rgb(42, 26, 12);
+    background-color: rgba(42, 26, 12, 0.92);
+    border-top-width: 4px; border-bottom-width: 4px;
+    border-top-color: rgb(245, 200, 66); border-bottom-color: rgb(245, 200, 66);
+    padding-top: 14px; padding-bottom: 18px; padding-left: 60px; padding-right: 60px;
+}

@@ -11,7 +11,8 @@ namespace CluckWars.EditorTools
     ///
     /// SFX: Decompress On Load + ADPCM, preloaded, Load In Background off. They are tens to
     /// hundreds of milliseconds long, so tap latency matters more than memory.
-    /// <c>menu_loop</c>: the 32 s music loop, which must wrap seamlessly. <see cref="LoopFormat"/>
+    /// Loops (<c>menu_loop</c>, the 32 s menu bed, and <c>match_loop*</c>, the 30 s match loop + its intense
+    /// twin): music that must wrap seamlessly. <see cref="LoopFormat"/>
     /// and <see cref="LoopLoadType"/> are the result of measuring the imported clip's first and
     /// last samples (see <c>UiAudioTests</c> and STATE.md); if a codec ever adds a gap, change them here.
     /// </summary>
@@ -19,6 +20,8 @@ namespace CluckWars.EditorTools
     {
         public const string Root = "Assets/_Game/Audio/UI/";
         public const string LoopClipFile = "menu_loop.wav";
+        /// <summary>The match music loops: match_loop.wav and match_loop_intense.wav (round-2 decision 4).</summary>
+        public const string MatchLoopPrefix = "match_loop";
 
         public const AudioCompressionFormat SfxFormat = AudioCompressionFormat.ADPCM;
         public const AudioClipLoadType SfxLoadType = AudioClipLoadType.DecompressOnLoad;
@@ -28,9 +31,13 @@ namespace CluckWars.EditorTools
         public const AudioClipLoadType LoopLoadType = AudioClipLoadType.CompressedInMemory;
 
         // Bump whenever the rules above change so Unity re-imports the clips.
-        public override uint GetVersion() => 2;
+        public override uint GetVersion() => 3;
 
-        public static bool IsLoop(string assetPath) => assetPath.EndsWith("/" + LoopClipFile);
+        public static bool IsLoop(string assetPath)
+        {
+            string file = System.IO.Path.GetFileName(assetPath);
+            return file == LoopClipFile || (file.StartsWith(MatchLoopPrefix) && file.EndsWith(".wav"));
+        }
 
         void OnPreprocessAudio()
         {

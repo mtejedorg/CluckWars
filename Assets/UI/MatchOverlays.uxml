@@ -13,6 +13,7 @@
          Styles: Assets/UI/Styles/MatchOverlays.uss -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTokens.uss" />
     <ui:Style src="project://database/Assets/UI/Styles/MatchOverlays.uss" />
+    <ui:Style src="project://database/Assets/UI/Styles/GetReadyCard.uss" />
 
     <ui:VisualElement name="OverlayRoot" class="cw-overlay-host" picking-mode="Ignore">
 
@@ -224,9 +225,19 @@
                 <ui:VisualElement name="IntroGlow" class="cw-intro-glow" picking-mode="Ignore" />
                 <ui:Label name="IntroNumber" text="" class="cw-intro-number" picking-mode="Ignore" />
             </ui:VisualElement>
-            <ui:VisualElement name="IntroRibbon" class="cw-me-ribbon cw-me-ribbon--subdued" picking-mode="Ignore">
-                <ui:Label text="@countdown.getReady" class="cw-me-ribbon__label" />
+            <!-- GET READY: the menu's START card, same classes (Styles/GetReadyCard.uss). Shown only before the
+                 intro is armed (MatchState.Starting / no manager yet), hidden on the first digit. -->
+            <ui:VisualElement name="IntroGetReady" class="cw-getready" style="display: none;" picking-mode="Ignore">
+                <ui:VisualElement class="cw-getready__plate" picking-mode="Ignore">
+                    <ui:Label text="@countdown.getReady" class="cw-getready__label" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:Label name="IntroWaiting" text="" class="cw-getready__sub" style="display: none;" picking-mode="Ignore" />
             </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Host-left notice (round-2 finding 13): a few seconds, upper third, never takes input. -->
+        <ui:VisualElement name="HostLeftNotice" class="cw-hostleft" style="display: none;" picking-mode="Ignore">
+            <ui:Label text="@session.hostLeft" class="cw-hostleft__label" picking-mode="Ignore" />
         </ui:VisualElement>
 
     </ui:VisualElement>

@@ -228,10 +228,11 @@ namespace CluckWars.UI
     }
 
     /// <summary>
-    /// When the final-minute event banner may show (re-audit item 4). The event's gameplay fires on
-    /// schedule; only its DISPLAY waits until the GO! flourish has gone, so the two never stack (in a
-    /// 45 s match the final minute starts at GO). A banner that shows right after GO skips its sting:
-    /// the match-start stinger has just played.
+    /// When the comeback event banner may show (re-audit item 4). The event's gameplay fires on
+    /// schedule (the last <c>MatchConfigSO.ComebackEventSecondsLeft</c> seconds since round 2, so in
+    /// practice long after GO); only its DISPLAY waits until the GO! flourish has gone, so the two never
+    /// stack whatever the config says. A banner that shows right after GO skips its sting: the GO stinger
+    /// has just played.
     /// </summary>
     public static class EventBannerTiming
     {

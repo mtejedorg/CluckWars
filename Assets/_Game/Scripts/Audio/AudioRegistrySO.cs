@@ -39,5 +39,8 @@ namespace CluckWars.Audio
         [Header("Music")]
         public AudioClip MenuMusic;
         public AudioClip MatchMusic;
+        [Tooltip("Same length, tempo and phase as MatchMusic: crossfaded in at the current play position " +
+                 "when the comeback event fires (GameManager, MatchAudioCueTracker.Cue.Intensify).")]
+        public AudioClip MatchMusicIntense;
     }
 }

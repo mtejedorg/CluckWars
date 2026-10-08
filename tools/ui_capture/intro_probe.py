@@ -8,8 +8,8 @@ Clears the stored Reduced Motion preference and leaves Play mode.
     python tools/ui_capture/intro_probe.py <output_dir> --item4
 Re-audit item 4: ONE Play session (run it as the first Play after a script recompile = domain reload). Real Solo
 START from THE COOP, then: the menu's GET READY card (getready_card.png), the scene swap, every GameManager state,
-every intro digit with timestamps (intro_3/2/1/go.png), the GameManager's audio, the final-minute banner, the round
-running out on the TIMER (scores capped below the goal), PLAY AGAIN -> in-session START and the second intro
+every intro digit with timestamps (intro_3/2/1/go.png), the GameManager's audio (+ the music sources after GO and after the event), the in-game GET READY card's on-screen time, the round
+running out on the TIMER (scores capped below the goal; the comeback banner in its last 10 s -> event_banner.png), PLAY AGAIN -> in-session START and the second intro
 (intro_r2_*.png). Writes <output_dir>/intro_item4_log.txt and leaves Play mode.
 """
 import sys, os, json, time

@@ -25,4 +25,5 @@ MonoBehaviour:
   MatchEnd: {fileID: 0}
   MatchVictory: {fileID: 0}
   MenuMusic: {fileID: 0}
-  MatchMusic: {fileID: 0}
+  MatchMusic: {fileID: 8300000, guid: 3977b21a2609fe54198fb293023dfc57, type: 3}
+  MatchMusicIntense: {fileID: 8300000, guid: b1d397c071c4d1441b151b8ec5b20c03, type: 3}

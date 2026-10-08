@@ -4,7 +4,8 @@ namespace CluckWars.Audio
 {
     /// <summary>
     /// Default <see cref="IAudioService"/> implementation backed by Unity's
-    /// <see cref="AudioSource"/>. One source for music (looping), one for SFX
+    /// <see cref="AudioSource"/>. One source for music (looping) plus a second one that only plays
+    /// while <see cref="CrossfadeMusic"/> blends into a new clip, one for SFX
     /// (PlayOneShot), and a small round-robin pool for pitch-shifted SFX. All live on a child
     /// of the provided parent transform so they inherit lifetime - typically ProjectContext,
     /// so audio survives scene loads.
@@ -21,7 +22,9 @@ namespace CluckWars.Audio
         /// <summary>Pitch-shifted voices: a rapid run of taps or a 3-2-1 never needs more.</summary>
         private const int PitchedVoiceCount = 6;
 
-        private readonly AudioSource _musicSource;
+        // Swapped with _incomingSource when a crossfade completes, so not readonly.
+        private AudioSource _musicSource;
+        private AudioSource _incomingSource;
         private readonly AudioSource _sfxSource;
         private readonly AudioSource[] _pitchedVoices = new AudioSource[PitchedVoiceCount];
         private readonly AudioTicker _ticker;
@@ -34,6 +37,10 @@ namespace CluckWars.Audio
         private float _fade = 1f, _fadeTarget = 1f, _fadeRate;
         private bool _stopWhenFadedOut;
 
+        // Crossfade: _xfade moves 0 -> 1 at _xfadeRate; the outgoing source plays at (1 - _xfade).
+        private float _xfade, _xfadeRate;
+        private bool _crossfading;
+
         public UnityAudioService(Transform parent)
         {
             var host = new GameObject("AudioServiceHost");
@@ -41,6 +48,7 @@ namespace CluckWars.Audio
 
             _musicSource = AddSource(host);
             _musicSource.loop = true;
+            _incomingSource = AddSource(host);
 
             _sfxSource = AddSource(host);
 
@@ -91,6 +99,7 @@ namespace CluckWars.Audio
                 _musicSource.clip = null;
                 return;
             }
+            CancelCrossfade();
             _musicBaseVolume = Mathf.Clamp01(volume);
             _musicSource.clip = clip;
             _musicSource.loop = loop;
@@ -121,8 +130,46 @@ namespace CluckWars.Audio
             _ticker.enabled = true;
         }
 
+        public void SetMusicLevel(float level01, float seconds)
+        {
+            if (_musicSource == null || !_musicSource.isPlaying) return;
+            _stopWhenFadedOut = false;
+            _fadeTarget = Mathf.Clamp01(level01);
+            if (seconds <= 0f)
+            {
+                _fade = _fadeTarget;
+                ApplyMusicVolume();
+                return;
+            }
+            _fadeRate = Mathf.Abs(_fadeTarget - _fade) / seconds;
+            _ticker.enabled = true;
+        }
+
+        public void CrossfadeMusic(AudioClip clip, float seconds)
+        {
+            if (clip == null || _musicSource == null || _incomingSource == null) return;
+            if (!_musicSource.isPlaying || _musicSource.clip == null || seconds <= 0f)
+            {
+                PlayMusic(clip, _musicBaseVolume, _musicSource.loop);
+                return;
+            }
+            if (_musicSource.clip == clip) return;
+
+            FinishCrossfade();
+            _incomingSource.clip = clip;
+            _incomingSource.loop = _musicSource.loop;
+            _incomingSource.timeSamples = Mathf.Min(_musicSource.timeSamples, clip.samples - 1);
+            _xfade = 0f;
+            _xfadeRate = 1f / seconds;
+            _crossfading = true;
+            ApplyMusicVolume();
+            _incomingSource.Play();
+            _ticker.enabled = true;
+        }
+
         public void StopMusic()
         {
+            CancelCrossfade();
             if (_musicSource != null) _musicSource.Stop();
             _stopWhenFadedOut = false;
             _fade = _fadeTarget = 1f;
@@ -130,8 +177,8 @@ namespace CluckWars.Audio
         }
 
         public bool IsMusicPlaying(AudioClip clip) =>
-            clip != null && _musicSource != null && _musicSource.isPlaying
-            && _musicSource.clip == clip && !_stopWhenFadedOut;
+            clip != null && _musicSource != null && _musicSource.isPlaying && !_stopWhenFadedOut
+            && (_musicSource.clip == clip || (_crossfading && _incomingSource.clip == clip));
 
         public void SetMasterVolume(float volume01)
         {
@@ -139,17 +186,42 @@ namespace CluckWars.Audio
             if (_musicSource != null && _musicSource.isPlaying) ApplyMusicVolume();
         }
 
-        private void ApplyMusicVolume() => _musicSource.volume = _musicBaseVolume * _masterVolume * _fade;
+        private void ApplyMusicVolume()
+        {
+            float v = _musicBaseVolume * _masterVolume * _fade;
+            _musicSource.volume = _crossfading ? v * (1f - _xfade) : v;
+            if (_crossfading) _incomingSource.volume = v * _xfade;
+        }
 
         private void TickFade()
         {
             if (_musicSource == null) { _ticker.enabled = false; return; }
-            _fade = Mathf.MoveTowards(_fade, _fadeTarget, _fadeRate * Time.unscaledDeltaTime);
+            float dt = Time.unscaledDeltaTime;
+            _fade = Mathf.MoveTowards(_fade, _fadeTarget, _fadeRate * dt);
+            if (_crossfading) _xfade = Mathf.MoveTowards(_xfade, 1f, _xfadeRate * dt);
             ApplyMusicVolume();
-            if (!Mathf.Approximately(_fade, _fadeTarget)) return;
+            if (_crossfading && _xfade >= 1f) FinishCrossfade();
 
+            if (!Mathf.Approximately(_fade, _fadeTarget) || _crossfading) return;
             _ticker.enabled = false;
             if (_stopWhenFadedOut) StopMusic();
+        }
+
+        /// <summary>Completes a running crossfade at once: the incoming source becomes the music source.</summary>
+        private void FinishCrossfade()
+        {
+            if (!_crossfading) return;
+            _musicSource.Stop();
+            (_musicSource, _incomingSource) = (_incomingSource, _musicSource);
+            _crossfading = false;
+            ApplyMusicVolume();
+        }
+
+        private void CancelCrossfade()
+        {
+            if (!_crossfading) return;
+            _crossfading = false;
+            if (_incomingSource != null) _incomingSource.Stop();
         }
     }
 }

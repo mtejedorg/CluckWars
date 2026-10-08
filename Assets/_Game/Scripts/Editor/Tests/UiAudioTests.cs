@@ -24,6 +24,7 @@ namespace CluckWars.Tests
     public sealed class UiAudioTests
     {
         private const string UiAudioPath = TestAssets.DataRoot + "/UiAudio.asset";
+        private const string AudioRegistryPath = TestAssets.DataRoot + "/AudioRegistry.asset";
         private const string AudioDir = "Assets/_Game/Audio/UI";
         private const string ProjectContextPrefab = "Assets/_Game/Resources/ProjectContext.prefab";
 
@@ -60,9 +61,23 @@ namespace CluckWars.Tests
         {
             var so = TestAssets.Load<UiAudioSO>(UiAudioPath);
             var used = CueFields().Select(f => AssetDatabase.GetAssetPath(((UiCue)f.GetValue(so)).Clip)).ToHashSet();
+            // The match loops live beside the menu loop but are gameplay music, played from AudioRegistrySO.
+            var reg = TestAssets.Load<AudioRegistrySO>(AudioRegistryPath);
+            used.Add(AssetDatabase.GetAssetPath(reg.MatchMusic));
+            used.Add(AssetDatabase.GetAssetPath(reg.MatchMusicIntense));
             var orphans = AssetDatabase.FindAssets("t:AudioClip", new[] { AudioDir })
                 .Select(AssetDatabase.GUIDToAssetPath).Where(p => !used.Contains(p)).ToList();
-            Assert.That(orphans, Is.Empty, "WAVs in Audio/UI that no UiAudioSO cue plays: " + string.Join(", ", orphans));
+            Assert.That(orphans, Is.Empty, "WAVs in Audio/UI that no UiAudioSO cue or AudioRegistry music slot plays: " + string.Join(", ", orphans));
+        }
+
+        [Test]
+        public void ShippedAudioRegistry_PlaysTheSynthesisedMatchLoops()
+        {
+            var reg = TestAssets.Load<AudioRegistrySO>(AudioRegistryPath);
+            Assert.That(AssetDatabase.GetAssetPath(reg.MatchMusic), Is.EqualTo(AudioDir + "/match_loop.wav"));
+            Assert.That(AssetDatabase.GetAssetPath(reg.MatchMusicIntense), Is.EqualTo(AudioDir + "/match_loop_intense.wav"));
+            Assert.That(reg.MatchMusicIntense.samples, Is.EqualTo(reg.MatchMusic.samples),
+                "the intense loop is crossfaded in at the same play position: it must be the same length");
         }
 
         [Test]
@@ -110,19 +125,30 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void MenuLoop_ImportKeepsEverySampleSoItWrapsAtTheSeam()
+        public void MusicLoops_AreTheMenuAndMatchLoops()
         {
-            string path = AudioDir + "/" + UiAudioImportSettings.LoopClipFile;
-            var imp = (AudioImporter)AssetImporter.GetAtPath(path);
-            Assert.That(imp.loadInBackground, Is.False);
-            Assert.That(imp.defaultSampleSettings.loadType, Is.Not.EqualTo(AudioClipLoadType.DecompressOnLoad),
-                "a 32 s stereo loop decompressed on load is ~6 MB of resident PCM");
+            var loops = WavPaths().Where(UiAudioImportSettings.IsLoop).Select(Path.GetFileName).OrderBy(f => f).ToList();
+            CollectionAssert.AreEqual(new[] { "match_loop.wav", "match_loop_intense.wav", "menu_loop.wav" }, loops);
+        }
 
-            // A codec that pads or trims the ends (priming silence) changes the sample count; the
-            // WAV source is the loop-exact reference. (The measured seam numbers are in STATE.md.)
-            long wavFrames = WavFrameCount(path);
-            var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
-            Assert.That(clip.samples, Is.EqualTo(wavFrames), "the imported loop no longer has the source's exact length");
+        [Test]
+        public void MusicLoops_ImportKeepsEverySampleSoTheyWrapAtTheSeam()
+        {
+            var problems = new List<string>();
+            foreach (var path in WavPaths().Where(UiAudioImportSettings.IsLoop))
+            {
+                var imp = (AudioImporter)AssetImporter.GetAtPath(path);
+                if (imp.loadInBackground) problems.Add($"{path}: Load In Background is on");
+                // A 30 s stereo loop decompressed on load is ~5-6 MB of resident PCM.
+                if (imp.defaultSampleSettings.loadType == AudioClipLoadType.DecompressOnLoad) problems.Add($"{path}: DecompressOnLoad");
+
+                // A codec that pads or trims the ends (priming silence) changes the sample count; the
+                // WAV source is the loop-exact reference. (The measured seam numbers are in STATE.md.)
+                long wavFrames = WavFrameCount(path);
+                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
+                if (clip.samples != wavFrames) problems.Add($"{path}: imported {clip.samples} frames, source has {wavFrames}");
+            }
+            Assert.That(problems, Is.Empty, string.Join(System.Environment.NewLine, problems));
         }
 
         private static long WavFrameCount(string path)
@@ -156,6 +182,8 @@ namespace CluckWars.Tests
                 a.PlaySFX(null, 1f, 1.1f, 0.05f);
                 a.PlayMusic(null, 1f, true, 0.3f);
                 a.FadeOutMusic(0.4f);
+                a.SetMusicLevel(0.35f, 0.4f);
+                a.CrossfadeMusic(null, 1f);
                 a.StopMusic();
                 a.SetMasterVolume(0.5f);
             });
@@ -169,11 +197,14 @@ namespace CluckWars.Tests
             public readonly List<(AudioClip Clip, float Volume, float Pitch, float Delay)> Sfx = new();
             public readonly List<(AudioClip Clip, float Volume, bool Loop, float FadeIn)> Music = new();
             public readonly List<float> FadeOuts = new();
+            public readonly List<(float Level, float Seconds)> Levels = new();
             public AudioClip Playing;
 
             public void PlaySFX(AudioClip clip, float volume = 1f, float pitch = 1f, float delaySeconds = 0f) => Sfx.Add((clip, volume, pitch, delaySeconds));
             public void PlayMusic(AudioClip clip, float volume = 1f, bool loop = true, float fadeInSeconds = 0f) { Music.Add((clip, volume, loop, fadeInSeconds)); Playing = clip; }
             public void FadeOutMusic(float seconds) => FadeOuts.Add(seconds);
+            public void SetMusicLevel(float level01, float seconds) => Levels.Add((level01, seconds));
+            public void CrossfadeMusic(AudioClip clip, float seconds) => Playing = clip;
             public void StopMusic() => Playing = null;
             public bool IsMusicPlaying(AudioClip clip) => clip != null && Playing == clip;
             public void SetMasterVolume(float volume01) { }
@@ -295,12 +326,12 @@ namespace CluckWars.Tests
             {
                 menu.Tap(); menu.Back(); menu.SelectClass(ChickenClass.Warrior); menu.SelectPerk(); menu.ArmSlot();
                 menu.Equip(); menu.Clear(); menu.Ready(); menu.CountdownTick(3); menu.CountdownGo(); menu.MatchSting();
-                menu.StartMenuMusic(); menu.StopMenuMusicForMatch();
+                menu.StartMenuMusic(); menu.DuckMenuMusicForMatch();
             });
         }
 
         [Test]
-        public void MenuMusic_StartsOnceWithAFadeInThenFadesOutForTheMatch()
+        public void MenuMusic_StartsOnceWithAFadeIn_DucksToALowBedForTheMatch_AndComesBackUp()
         {
             var fake = new FakeAudio(); var so = Catalogue();
             var menu = new MenuAudio(fake, so, new RecordingLog());
@@ -312,9 +343,20 @@ namespace CluckWars.Tests
             Assert.That(fake.Music[0].Loop, Is.True);
             Assert.That(fake.Music[0].FadeIn, Is.GreaterThan(0f));
 
-            menu.StopMenuMusicForMatch();
-            Assert.That(fake.FadeOuts.Count, Is.EqualTo(1));
-            Assert.That(fake.FadeOuts[0], Is.GreaterThan(0f));
+            // The playing loop came back to full level on the second call (it may have been ducked).
+            Assert.That(fake.Levels.Count, Is.EqualTo(1));
+            Assert.That(fake.Levels[0].Level, Is.EqualTo(1f));
+
+            menu.DuckMenuMusicForMatch();
+            Assert.That(fake.FadeOuts, Is.Empty, "the menu loop keeps playing under GET READY: a bed, not silence");
+            Assert.That(fake.Levels.Count, Is.EqualTo(2));
+            Assert.That(fake.Levels[1].Level, Is.EqualTo(MenuAudio.MenuBedLevel));
+            Assert.That(MenuAudio.MenuBedLevel, Is.InRange(0.15f, 0.5f), "low, but audible");
+            Assert.That(fake.Levels[1].Seconds, Is.GreaterThan(0f));
+
+            menu.StartMenuMusic();   // back in the menu (BACK TO LOBBY, a failed load): full level again, no restart
+            Assert.That(fake.Music.Count, Is.EqualTo(1));
+            Assert.That(fake.Levels[2].Level, Is.EqualTo(1f));
         }
 
         // ---- Boundary --------------------------------------------------------------

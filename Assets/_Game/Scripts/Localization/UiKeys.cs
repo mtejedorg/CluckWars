@@ -191,11 +191,16 @@ namespace CluckWars.Localization
         public const string HudRank2 = "hud.rank.2";
         public const string HudRank3 = "hud.rank.3";
         public const string HudRank4 = "hud.rank.4";
-        [UiArgs("event")] public const string HudEventBanner = "hud.event.banner";
+        [UiArgs("n")] public const string HudEventHeader = "hud.event.header";
         public const string HudEventGoldenPile = "hud.event.goldenPile";
         public const string HudEventUnderdogSurge = "hud.event.underdogSurge";
         public const string HudEventLeaderBounty = "hud.event.leaderBounty";
         public const string HudEventRestock = "hud.event.restock";
+
+        // ---- Phase 5 (round-2 findings 11 + 13: GET READY waiting line, host-left notice) ----
+        [UiArgs("name")] public const string CountdownWaitingFor = "countdown.waitingFor";
+        public const string CountdownWaitingSomeone = "countdown.waitingSomeone";
+        public const string SessionHostLeft = "session.hostLeft";
 
     }
 }

@@ -1,0 +1,34 @@
+/* GET READY card (re-audit round 2, finding 11): ONE style for the menu's START MATCH hand-off
+   (Lobby.uxml #GetReadyCard) and the in-match intro overlay's GET READY (MatchOverlays.uxml
+   #IntroGetReady), so the card the menu fades in is the card the arena keeps up until the first
+   digit: near-opaque ink scrim, gold-ruled plate, gold display type with the ink outline.
+   .cw-reduced-motion zeroes the menu's fade (the card simply appears). */
+.cw-getready {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    background-color: rgba(20, 10, 4, 0.94);
+    align-items: center; justify-content: center;
+    opacity: 1;
+    transition-property: opacity; transition-duration: 0.18s; transition-timing-function: ease-out;
+}
+.cw-getready--hidden { opacity: 0; }
+.cw-getready__plate {
+    padding-top: 18px; padding-bottom: 26px; padding-left: 90px; padding-right: 90px;
+    border-top-width: 4px; border-bottom-width: 4px;
+    border-top-color: rgb(245, 200, 66); border-bottom-color: rgb(245, 200, 66);
+    align-items: center;
+}
+.cw-getready__label {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 132px; letter-spacing: 8px; color: rgb(255, 214, 80);
+    -unity-text-align: middle-center; white-space: nowrap;
+    -unity-text-outline-width: 6px; -unity-text-outline-color: rgb(42, 26, 12);
+    text-shadow: 0px 8px 0px rgba(42, 26, 12, 0.9);
+}
+.layout--short .cw-getready__label { font-size: 104px; }
+/* "Waiting for P2..." under the plate (finding 13): empty and collapsed until the room waits 3 s. */
+.cw-getready__sub {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 40px; color: rgb(254, 245, 224); -unity-text-align: middle-center;
+    -unity-text-outline-width: 2px; -unity-text-outline-color: rgb(42, 26, 12);
+    margin-top: 24px;
+}

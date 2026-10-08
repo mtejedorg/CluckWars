@@ -2348,7 +2348,7 @@ namespace CluckWars.UI
         }
 
         /// <summary>
-        /// The menu-to-match handoff: fade the menu loop, sting, fade the GET READY card in over THE
+        /// The menu-to-match handoff: duck the menu loop to a low bed, sting, fade the GET READY card in over THE
         /// COOP, then load the Game scene in the background (it used to load synchronously and freeze
         /// the menu). The menu stays busy until the scene swaps: no second START, no BACK under the card.
         /// </summary>
@@ -2360,7 +2360,7 @@ namespace CluckWars.UI
                 return;
             }
             _isBusy = true;
-            _audio.StopMenuMusicForMatch();
+            _audio.DuckMenuMusicForMatch();
             _audio.MatchSting();
             StartCoroutine(ShowGetReadyThenLoad());
         }

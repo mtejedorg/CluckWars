@@ -39,6 +39,12 @@ namespace CluckWars.Gameplay
         [Networked] public float WinnerFoodTotal { get; set; }
         [Networked] public TickTimer IntroTimer { get; set; }
         [Networked] public MatchEventKind ActiveEvent { get; set; }
+        /// <summary>Bumped every time a round enters <see cref="MatchState.Starting"/>, so a peer's
+        /// "settled" report (<see cref="RPC_ReportSettled"/>) always names the GET READY it belongs to.</summary>
+        [Networked] public byte StartRound { get; set; }
+        /// <summary>During <see cref="MatchState.Starting"/>, after <see cref="IntroArmGate.WaitingNoticeSeconds"/>:
+        /// the first player the room still waits for (GET READY shows "Waiting for {name}"); None otherwise.</summary>
+        [Networked] public PlayerRef WaitingFor { get; set; }
 
         [Tooltip("Pre-match \"3, 2, 1, GO!\" intro window (seconds). Match timer is offset by this so the actual playable duration matches MatchConfigSO.MatchDurationSeconds.")]
         [Min(0f)]
@@ -60,12 +66,23 @@ namespace CluckWars.Gameplay
         // frames), consumed in FixedUpdateNetwork (the only place the timers are written).
         private IntroArmGate _introArmGate;
         private bool _introArmRequested;
+        // Authority-only: who has reported settled for this StartRound, and who GET READY names next tick.
+        private readonly System.Collections.Generic.HashSet<PlayerRef> _settledPlayers = new();
+        private PlayerRef _pendingWaitingFor = PlayerRef.None;
+
+        // Every peer, local: this peer's own settle during Starting, reported once per StartRound.
+        private SettleTracker _localSettle;
+        private int _localSettleRound = -1;
+        private bool _localSettleReported;
 
         // Every peer, local: the start / end audio this peer plays for itself.
         private readonly MatchAudioCueTracker _audioCues = new();
 
         public float MatchDurationSeconds => _config != null ? _config.MatchDurationSeconds : 180f;
         public int FoodTargetToWin => _config != null ? _config.FoodTargetToWin : 110;
+        /// <summary>Playable seconds left when the comeback event fires (MatchConfig); 0 = disabled, which is
+        /// also what an uninjected manager reads (no event rather than one at a guessed time).</summary>
+        public float ComebackEventSecondsLeft => _config != null ? _config.ComebackEventSecondsLeft : 0f;
 
         /// <summary>
         /// Static singleton accessor — there's one <see cref="GameManager"/> per
@@ -202,10 +219,12 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Every round starts here, never straight in <see cref="StartMatch"/>: the intro TickTimer
         /// keeps counting through frame hitches (a fresh scene's first frames, the frame a START tap
-        /// lands on), which used to eat the "3". <see cref="Render"/> feeds the
-        /// <see cref="IntroArmGate"/>; <see cref="FixedUpdateNetwork"/> arms the timers once it opens
-        /// (~0.4 s on a warm world). State authority only; peers see <see cref="MatchState.Starting"/>
-        /// (GET READY) until the networked intro timer arrives.
+        /// lands on), which used to eat the "3". Every peer settles locally (<see cref="SettleTracker"/>:
+        /// its own chicken + 0.4 s of smooth frames) and reports it (<see cref="RPC_ReportSettled"/>);
+        /// <see cref="Render"/> feeds the <see cref="IntroArmGate"/> (everyone settled and GET READY shown
+        /// for 0.7 s, or the 8 s cap); <see cref="FixedUpdateNetwork"/> arms the timers once it opens.
+        /// State authority only; peers see <see cref="MatchState.Starting"/> (GET READY) until the
+        /// networked intro timer arrives.
         /// <para>Authority changes: the gate is local, so a peer that inherits this object while it is
         /// in Starting re-creates it in <see cref="Render"/>. When the old master leaves, though, this
         /// master-client object is destroyed and the new master spawns a fresh one in the waiting room,
@@ -214,6 +233,10 @@ namespace CluckWars.Gameplay
         private void BeginStarting(string why)
         {
             State = MatchState.Starting;
+            StartRound++;
+            WaitingFor = PlayerRef.None;
+            _settledPlayers.Clear();
+            _pendingWaitingFor = PlayerRef.None;
             _introArmGate = new IntroArmGate();
             _introArmRequested = false;
             _log?.Info(Source, $"Starting ({why}): the intro arms once the world renders smoothly.");
@@ -230,6 +253,7 @@ namespace CluckWars.Gameplay
 
             if (State == MatchState.Starting)
             {
+                WaitingFor = _pendingWaitingFor;
                 if (_introArmRequested) ArmIntroAfterSettle();
                 return;
             }
@@ -243,10 +267,10 @@ namespace CluckWars.Gameplay
             // the match during "3, 2, 1, GO!".
             if (IsIntroActive) return;
 
-            // Comeback event check at T-60
-            if (State == MatchState.Active && !IsIntroActive && TimeRemaining <= 60f && ActiveEvent == MatchEventKind.None)
+            // Comeback event: once, in the last MatchConfig.ComebackEventSecondsLeft playable seconds.
+            if (ComebackEventTiming.ShouldFire(State, IsIntroActive, TimeRemaining, ComebackEventSecondsLeft, ActiveEvent))
             {
-                TriggerFinalMinuteEvent();
+                TriggerComebackEvent();
             }
 
             // Cheap throttle: 4 wins-checks per second is plenty and keeps Physics /
@@ -267,28 +291,81 @@ namespace CluckWars.Gameplay
 
         public override void Render()
         {
+            if (State == MatchState.Starting) TickLocalSettle();
+            else _localSettle = null;
+
             if (HasStateAuthority && State == MatchState.Starting && !_introArmRequested)
             {
                 if (_introArmGate == null)
                 {
                     // Starting was entered on another peer (authority transferred mid-settle): without a
-                    // gate of our own the round would sit on GET READY forever.
+                    // gate of our own the round would sit on GET READY forever. Reports sent to the old
+                    // authority went with it, so this gate may run to its cap.
                     _introArmGate = new IntroArmGate();
                     _log?.Warn(Source, "State authority arrived during Starting; re-created the intro gate locally.");
                 }
-                _introArmRequested = _introArmGate.Observe(EveryPlayerHasAChicken(), Time.unscaledDeltaTime);
+                bool chickensUp = EveryPlayerHasAChicken();   // also refreshes _readyPlayers
+                var unsettled = MatchFlowRules.FirstUnsettled(_readyPlayers, _settledPlayers);
+                _introArmRequested = _introArmGate.Observe(chickensUp && unsettled == PlayerRef.None, Time.unscaledDeltaTime);
+                _pendingWaitingFor = _introArmGate.ShowsWaitingNotice ? unsettled : PlayerRef.None;
             }
 
-            PlayAudioCue(_audioCues.Observe(State, IsIntroActive));
+            PlayAudioCue(_audioCues.Observe(State, IsIntroActive, ActiveEvent != MatchEventKind.None));
+        }
+
+        /// <summary>
+        /// This peer's half of the start gate (finding 13): once its own chicken is up and 0.4 s of smooth
+        /// frames have rendered, tell the state authority, once per <see cref="StartRound"/>.
+        /// </summary>
+        private void TickLocalSettle()
+        {
+            if (_localSettle == null || _localSettleRound != StartRound)
+            {
+                _localSettle = new SettleTracker();
+                _localSettleRound = StartRound;
+                _localSettleReported = false;
+            }
+            if (_localSettleReported || !_localSettle.Observe(LocalChickenIsUp(), Time.unscaledDeltaTime)) return;
+
+            _localSettleReported = true;
+            if (HasStateAuthority) _settledPlayers.Add(Runner.LocalPlayer);
+            else RPC_ReportSettled(StartRound);
+        }
+
+        /// <summary>Peer -> state authority: "my own world is up and rendering smoothly" for GET READY
+        /// <paramref name="startRound"/>. A report for an earlier GET READY is dropped.</summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_ReportSettled(byte startRound, RpcInfo info = default)
+        {
+            if (!HasStateAuthority || State != MatchState.Starting || startRound != StartRound) return;
+            if (!info.Source.IsRealPlayer)
+            {
+                _log?.Warn(Source, $"Settled report without a real sender ({info.Source}); ignored, the {IntroArmGate.MaxWaitSeconds}s cap still arms the intro.");
+                return;
+            }
+            if (_settledPlayers.Add(info.Source)) _log?.Debug(Source, $"Player {info.Source} settled (start round {startRound}).");
+        }
+
+        private static bool LocalChickenIsUp()
+        {
+            var chickens = ChickenController.ActiveControllers;
+            for (int i = 0; i < chickens.Count; i++)
+            {
+                var c = chickens[i];
+                if (c != null && c.Object != null && c.Object.IsValid && c.HasInputAuthority && !c.IsDecoy) return true;
+            }
+            return false;
         }
 
         /// <summary>Starting -> Active, on the state authority, once <see cref="IntroArmGate"/> opened.</summary>
         private void ArmIntroAfterSettle()
         {
             if (_introArmGate != null && _introArmGate.TimedOut)
-                _log?.Warn(Source, $"Intro armed after the {IntroArmGate.MaxWaitSeconds}s cap without a settled world " +
-                    $"(chickens ready: {EveryPlayerHasAChicken()}). The first digit may be cut short on this device.");
+                _log?.Warn(Source, $"Intro armed after the {IntroArmGate.MaxWaitSeconds}s cap without a settled room " +
+                    $"(chickens ready: {EveryPlayerHasAChicken()}, first unsettled: " +
+                    $"{MatchFlowRules.FirstUnsettled(_readyPlayers, _settledPlayers)}). The first digit may be cut short on a slow peer.");
             _introArmGate = null;
+            WaitingFor = PlayerRef.None;
             _introArmRequested = false;
             StartMatch();
         }
@@ -333,12 +410,14 @@ namespace CluckWars.Gameplay
             }
             switch (cue)
             {
+                // GO itself is the intro overlay's stinger (MenuAudio.CountdownGo): exactly one sound owns GO.
                 case MatchAudioCueTracker.Cue.Go:
-                    _audio.PlaySFX(_audioReg != null ? _audioReg.MatchStart : null);
-                    PlayMatchMusic();
-                    break;
                 case MatchAudioCueTracker.Cue.JoinedRunning:
                     PlayMatchMusic();
+                    break;
+                case MatchAudioCueTracker.Cue.Intensify:
+                    if (_audioReg != null && _audioReg.MatchMusicIntense != null)
+                        _audio.CrossfadeMusic(_audioReg.MatchMusicIntense, IntenseCrossfadeSeconds);
                     break;
                 case MatchAudioCueTracker.Cue.End:
                     _audio.StopMusic();
@@ -350,9 +429,16 @@ namespace CluckWars.Gameplay
             }
         }
 
+        private const float IntenseCrossfadeSeconds = 1f;
+        private bool _warnedNoMatchMusic;
+
+        /// <summary>The match loop at GO; it replaces the menu bed that played under GET READY.</summary>
         private void PlayMatchMusic()
         {
-            if (_audioReg != null && _audioReg.MatchMusic != null) _audio.PlayMusic(_audioReg.MatchMusic, 0.6f);
+            if (_audioReg != null && _audioReg.MatchMusic != null) { _audio.PlayMusic(_audioReg.MatchMusic, 0.6f); return; }
+            if (!_warnedNoMatchMusic)
+                _log?.Error(Source, "AudioRegistrySO.MatchMusic is not assigned (Assets/_Game/Data/AudioRegistry.asset): the match plays without music.");
+            _warnedNoMatchMusic = true;
         }
 
         private void AssignBasesToPlayers()
@@ -733,7 +819,7 @@ namespace CluckWars.Gameplay
                 if (bases[i] != null) bases[i].FoodTotal = 0f;
             }
 
-            // Event piles (the final-minute golden pile) are despawned, found through the
+            // Event piles (the comeback golden pile) are despawned, found through the
             // networked FoodPile.IsEvent flag so a pile spawned by a previous host is caught too.
             // Despawn removes from ActivePiles, so collect first.
             var piles = FoodPile.ActivePiles;
@@ -822,14 +908,20 @@ namespace CluckWars.Gameplay
             ActiveEvent = fresh.ActiveEvent;
         }
 
-        private void TriggerFinalMinuteEvent()
+        /// <summary>
+        /// The comeback event, once per round in the last <see cref="ComebackEventSecondsLeft"/> seconds
+        /// (decision 2). None of the four outlives the round: the golden pile is despawned and the surge /
+        /// bounty flags are cleared by <see cref="ResetWorldForNewRound"/> (PLAY AGAIN), restock is instant,
+        /// and nothing moves once the round has ended, so a flag still set on the end screen changes nothing.
+        /// </summary>
+        private void TriggerComebackEvent()
         {
             if (!HasStateAuthority) return;
 
             int rolled = Random.Range(1, 5); // 1..4 inclusive
             ActiveEvent = (MatchEventKind)rolled;
 
-            _log?.Info(Source, $"FINAL MINUTE EVENT FIRED: {ActiveEvent}");
+            _log?.Info(Source, $"COMEBACK EVENT FIRED ({TimeRemaining:0.0}s left): {ActiveEvent}");
 
             switch (ActiveEvent)
             {

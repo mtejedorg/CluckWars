@@ -104,6 +104,10 @@ namespace CluckWars.UI
 
         private Label         _sessionEndReason, _sessionEndCountdown;
         private Label         _introNumber;
+        // GET READY inside the intro overlay (finding 11) + its "Waiting for {name}" line (finding 13).
+        private VisualElement _introGetReady;
+        private Label         _introWaiting;
+        private VisualElement _hostLeftNotice;
 
         // ---- Runtime state -----------------------------------------------------
         private float           _nextRefresh;
@@ -124,6 +128,14 @@ namespace CluckWars.UI
         private bool        _sawGameManager;
         private float       _waitingForManagerSince = -1f;
         private bool        _reportedNoManager;
+
+        // Host-left notice (finding 13): the manager this overlay watched last frame, its state authority and
+        // state, and until when the notice stays up.
+        private GameManager _watchedManager;
+        private PlayerRef   _watchedAuthority = PlayerRef.None;
+        private MatchState  _watchedState = MatchState.WaitingForPlayers;
+        private float       _hostLeftUntilUnscaledTime = -1f;
+        public const float  HostLeftNoticeSeconds = 3f;
 
         // ---- Injection ---------------------------------------------------------
         [Inject]
@@ -210,6 +222,7 @@ namespace CluckWars.UI
             RefreshMatchEnd(gm);
             RefreshLobby(gm, poll);
             RefreshIntro(gm);
+            RefreshHostLeft(gm);
 
             // The top bar recedes behind ANY full-screen modal, not just the intro.
             // Previously only RefreshIntro drove this, so during MATCH END the live
@@ -288,6 +301,12 @@ namespace CluckWars.UI
             _sessionEndReason    = _root.Q<Label>("SessionEndReason");
             _sessionEndCountdown = _root.Q<Label>("SessionEndCountdown");
             _introNumber         = _root.Q<Label>("IntroNumber");
+            _introGetReady       = _root.Q<VisualElement>("IntroGetReady");
+            _introWaiting        = _root.Q<Label>("IntroWaiting");
+            _hostLeftNotice      = _root.Q<VisualElement>("HostLeftNotice");
+            if (_introGetReady == null) _log?.Error(Source, "MatchOverlays.uxml has no #IntroGetReady; GET READY will not show before the countdown.");
+            if (_introWaiting == null) _log?.Error(Source, "MatchOverlays.uxml has no #IntroWaiting; GET READY cannot say who the room waits for.");
+            if (_hostLeftNotice == null) _log?.Error(Source, "MatchOverlays.uxml has no #HostLeftNotice; a host leaving mid-round will go unannounced.");
             if (_introOverlay != null) _introJuice = new MenuJuice(_introOverlay);
 
             if (_mePlayAgainBtn != null) _mePlayAgainBtn.clicked += OnPlayAgain;
@@ -312,6 +331,9 @@ namespace CluckWars.UI
             SetShown(_lobbyOverlay, false);
             SetShown(_sessionEndOverlay, false);
             SetShown(_introOverlay, false);
+            SetShown(_introGetReady, false);
+            SetShown(_introWaiting, false);
+            SetShown(_hostLeftNotice, false);
 
             _bound = true;
             _log?.Debug(Source, "Overlays bound.");
@@ -852,6 +874,7 @@ namespace CluckWars.UI
             SetShown(_matchEndOverlay, false);
             SetShown(_lobbyOverlay, false);
             SetShown(_introOverlay, false);
+            SetShown(_hostLeftNotice, false);   // the session-end screen owns a host that left with the session
             DisposeStage();
 
             float elapsed   = Time.unscaledTime - _shutdownAtUnscaledTime;
@@ -893,11 +916,15 @@ namespace CluckWars.UI
                     "(session start failed or the master never spawned it): hiding GET READY. The match cannot start; " +
                     "see the MatchBootstrapper / FusionNetworkService errors above.");
             }
+            bool getReady = hold == IntroOverlayRule.PreIntro.GetReady && !_shutdownReason.HasValue;
+            // GET READY is only the pre-intro card (finding 11): gone on the first digit, never under GO!.
+            SetShown(_introGetReady, getReady);
+            RefreshWaitingLine(getReady ? gm : null);
             if (hold != IntroOverlayRule.PreIntro.None)
             {
                 _introCues.Reset();
                 if (_introNumber != null && _introNumber.text.Length > 0) _introNumber.text = string.Empty;
-                SetShown(_introOverlay, hold == IntroOverlayRule.PreIntro.GetReady && !_shutdownReason.HasValue);
+                SetShown(_introOverlay, getReady);
                 return;
             }
             if (gm == null) { _introCues.Reset(); SetShown(_introOverlay, false); return; }
@@ -934,6 +961,55 @@ namespace CluckWars.UI
         }
 
         /// <summary>
+        /// "Waiting for {name}…" under GET READY (finding 13): the state authority names the first player it
+        /// still waits for after <see cref="IntroArmGate.WaitingNoticeSeconds"/> (<see cref="GameManager.WaitingFor"/>);
+        /// collapsed otherwise. Named the way every overlay names a chicken (<see cref="MatchStandings"/>);
+        /// a player whose chicken is not up yet, or this peer itself, is "a slow bird".
+        /// </summary>
+        private void RefreshWaitingLine(GameManager gm)
+        {
+            if (_introWaiting == null) return;
+            var waitingFor = gm != null ? gm.WaitingFor : PlayerRef.None;
+            SetShown(_introWaiting, waitingFor != PlayerRef.None);
+            if (waitingFor == PlayerRef.None) return;
+
+            var chicken = ChickenForPlayer(waitingFor);
+            string text = chicken != null && !chicken.HasInputAuthority
+                ? UiText.Format(UiKeys.CountdownWaitingFor,
+                    ("name", MatchStandings.DisplayName(false, false, chicken.Class, chicken.HomeCornerIndex)))
+                : UiText.Get(UiKeys.CountdownWaitingSomeone);
+            if (_introWaiting.text != text) _introWaiting.text = text;
+        }
+
+        /// <summary>
+        /// The host-left notice (finding 13): shown for <see cref="HostLeftNoticeSeconds"/> when the match manager
+        /// this peer watched through GET READY or a running round goes away or changes state authority while the
+        /// session itself carries on (<see cref="MatchFlowRules.HostLeftMidRound"/>). A session that ends is the
+        /// session-end screen's (<see cref="TickSessionEnd"/>), so this never stacks on it.
+        /// </summary>
+        private void RefreshHostLeft(GameManager gm)
+        {
+            bool hadManager = !ReferenceEquals(_watchedManager, null);
+            bool managerGone = hadManager && !ReferenceEquals(gm, _watchedManager);
+            var authority = gm != null && gm.Object != null && gm.Object.IsValid ? gm.Object.StateAuthority : PlayerRef.None;
+            bool authorityChanged = hadManager && !managerGone && authority != PlayerRef.None
+                && _watchedAuthority != PlayerRef.None && authority != _watchedAuthority;
+            bool sessionEnding = _shutdownReason.HasValue || _leavingToLobby || _network == null || !_network.IsRunning;
+
+            if (MatchFlowRules.HostLeftMidRound(_watchedState, managerGone, authorityChanged, sessionEnding))
+            {
+                _hostLeftUntilUnscaledTime = Time.unscaledTime + HostLeftNoticeSeconds;
+                _log?.Info(Source, $"Host left mid-round (manager {(managerGone ? "gone" : "changed authority")}, was {_watchedState}): showing the notice.");
+            }
+
+            // Keep the last known authority through a frame where the object is briefly not valid.
+            if (authority != PlayerRef.None || !ReferenceEquals(gm, _watchedManager)) _watchedAuthority = authority;
+            _watchedManager = gm;
+            _watchedState = gm != null ? gm.State : MatchState.WaitingForPlayers;
+            SetShown(_hostLeftNotice, !sessionEnding && Time.unscaledTime < _hostLeftUntilUnscaledTime);
+        }
+
+        /// <summary>
         /// ART.md §6.5: the top bar (a separate UIDocument/controller,
         /// <see cref="MatchHudController"/>) stays visible at 40% opacity behind
         /// a full-screen overlay rather than being hidden outright. Driven from
@@ -958,6 +1034,19 @@ namespace CluckWars.UI
                 var c = controllers[i];
                 if (c == null || c.Object == null || !c.Object.IsValid || c.IsDecoy) continue;
                 if (c.HomeCornerIndex == corner) return c;
+            }
+            return null;
+        }
+
+        /// <summary>The real player's own chicken (no bot, no decoy), or null while it has not spawned.</summary>
+        private static ChickenController ChickenForPlayer(PlayerRef player)
+        {
+            var controllers = ChickenController.ActiveControllers;
+            for (int i = 0; i < controllers.Count; i++)
+            {
+                var c = controllers[i];
+                if (c == null || c.Object == null || !c.Object.IsValid || c.IsDecoy || c.IsBot) continue;
+                if (c.Object.InputAuthority == player) return c;
             }
             return null;
         }

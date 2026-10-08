@@ -15,6 +15,7 @@
 
          Sizes follow the MOBILE SIZING CONTRACT at the top of CluckWarsTheme.uss. -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
+    <ui:Style src="project://database/Assets/UI/Styles/GetReadyCard.uss" />
 
     <ui:VisualElement name="LobbyPage" class="cw-screen cw-page">
 
@@ -88,11 +89,11 @@
         <!-- START MATCH hand-off (Phase 4, re-audit item 4): a scrim + GET READY plate that fades in
              over the whole page and stays up while Game.unity loads in the background (it replaced
              a synchronous load that froze the menu). Last child, so it covers everything and takes
-             every tap (no double START). The in-match intro overlay continues the same GET READY
-             until the 3-2-1-GO. -->
+             every tap (no double START). The in-match intro overlay continues the same GET READY card
+             (Styles/GetReadyCard.uss, #IntroGetReady) until the first digit. -->
         <ui:VisualElement name="GetReadyCard" class="cw-getready cw-getready--hidden" style="display: none;">
             <ui:VisualElement class="cw-getready__plate" picking-mode="Ignore">
-                <ui:Label text="@countdown.getReady" class="cw-title cw-getready__label" picking-mode="Ignore" />
+                <ui:Label text="@countdown.getReady" class="cw-getready__label" picking-mode="Ignore" />
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

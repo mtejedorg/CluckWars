@@ -241,12 +241,12 @@ namespace CluckWars.Tests
         public void MatchHud_HasNoPlayerFacingStringLiterals()
         {
             // Re-audit item 4: the top-bar timer words (WAIT / ENDED), the 1st..4th ranks and the
-            // final-minute event banner all moved to UiText.csv.
+            // comeback event banner all moved to UiText.csv.
             var hits = LiteralTextHits("Assets/_Game/Scripts/UI/MatchHudController.cs")
                 .Concat(LiteralTextHits("Assets/_Game/Scripts/UI/MatchHud.cs")).ToList();
             Assert.IsEmpty(hits, "Player-facing literals in the match HUD (move to UiText.csv):\n" + string.Join("\n", hits));
-            Assert.AreEqual("FINAL MINUTE: GOLDEN PILE!",
-                UiText.Format(UiKeys.HudEventBanner, ("event", UiText.Get(UiKeys.HudEventGoldenPile))));
+            Assert.AreEqual("FINAL 10!", UiText.Format(UiKeys.HudEventHeader, ("n", 10)));
+            Assert.AreEqual("GOLDEN PILE!", UiText.Get(UiKeys.HudEventGoldenPile));
             Assert.AreEqual("4th", UiText.Get(UiKeys.HudRank4));
         }
 

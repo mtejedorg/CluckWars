@@ -30,7 +30,10 @@ namespace CluckWars.UI
         /// <summary>Equip touch = the tap at half its volume (re-audit item 14).</summary>
         public const float EquipTapVolume = 0.5f;
         private const float MusicFadeInSeconds = 0.3f;
-        private const float MusicFadeOutSeconds = 0.4f;
+        private const float MusicDuckSeconds = 0.4f;
+        /// <summary>The menu loop's level under GET READY (round-2 decision 4): a low bed that keeps the
+        /// hand-off from going silent until the match music takes over at GO.</summary>
+        public const float MenuBedLevel = 0.35f;
 
         private readonly IAudioService _audio;
         private readonly UiAudioSO _catalog;
@@ -78,16 +81,18 @@ namespace CluckWars.UI
         public void MatchSting() => Play("MatchSting", c => c.MatchSting);
 
         // ---- Music ------------------------------------------------------------
-        /// <summary>Starts the menu loop unless it is already playing (page changes and a return from a match must not restart it).</summary>
+        /// <summary>Starts the menu loop unless it is already playing (page changes and a return from a match must not
+        /// restart it); a loop still ducked to the GET READY bed comes back up to full level.</summary>
         public void StartMenuMusic()
         {
             if (!TryGet("MenuLoop", c => c.MenuLoop, out var cue)) return;
-            if (_audio.IsMusicPlaying(cue.Clip)) return;
+            if (_audio.IsMusicPlaying(cue.Clip)) { _audio.SetMusicLevel(1f, MusicFadeInSeconds); return; }
             _audio.PlayMusic(cue.Clip, cue.Volume, loop: true, fadeInSeconds: MusicFadeInSeconds);
         }
 
-        /// <summary>Fades the menu loop out so it does not bleed into the match; the sting (or the match's own music) takes over.</summary>
-        public void StopMenuMusicForMatch() => _audio.FadeOutMusic(MusicFadeOutSeconds);
+        /// <summary>START MATCH: the menu loop ducks to a low bed (<see cref="MenuBedLevel"/>) under the sting and GET
+        /// READY and keeps playing through the scene load; the match music replaces it at GO (GameManager).</summary>
+        public void DuckMenuMusicForMatch() => _audio.SetMusicLevel(MenuBedLevel, MusicDuckSeconds);
 
         // ---- Plumbing ---------------------------------------------------------
         private void Play(string name, System.Func<UiAudioSO, UiCue> pick, float pitch = 1f, float delay = 0f, float volumeScale = 1f)

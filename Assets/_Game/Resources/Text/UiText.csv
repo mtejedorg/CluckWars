@@ -149,8 +149,11 @@ hud.rank.1,1st
 hud.rank.2,2nd
 hud.rank.3,3rd
 hud.rank.4,4th
-hud.event.banner,FINAL MINUTE: {event}!
-hud.event.goldenPile,GOLDEN PILE
-hud.event.underdogSurge,UNDERDOG SURGE
-hud.event.leaderBounty,BOUNTY ON THE LEADER
-hud.event.restock,RESTOCK
+hud.event.header,FINAL {n}!
+hud.event.goldenPile,GOLDEN PILE!
+hud.event.underdogSurge,UNDERDOG SURGE!
+hud.event.leaderBounty,BOUNTY ON THE LEADER!
+hud.event.restock,RESTOCK!
+countdown.waitingFor,Waiting for {name}…
+countdown.waitingSomeone,Waiting for a slow bird…
+session.hostLeft,The host flew the coop.
