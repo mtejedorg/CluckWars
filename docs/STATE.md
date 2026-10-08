@@ -6,6 +6,37 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🔧 Menu UI overhaul — Phase 5 chunk 1 (2026-10-08, uncommitted, in review): round-2 findings 3, 4, 11, 13
+
+EditMode **805/805** (baseline 794). Verified live with `tools/ui_capture/intro_probe.py Captures/phase5/extra --item4`
+(captures + `intro_item4_log.txt` there, git-excluded). No prefab / scene wiring for Maestro.
+
+- **Finding 3 / decision 2 — comeback event in the last 10 s.** `MatchConfigSO.ComebackEventSecondsLeft` (= 10 in
+  MatchConfig.asset; 0 disables) replaces the hard-coded `60f`; rule in `ComebackEventTiming.ShouldFire` (MatchFlowRules.cs),
+  `GameManager.TriggerComebackEvent` (renamed). Live: fired at 10.000 s left. Banner (`MatchHud`, legacy UGUI island): opaque ink
+  plate + gold rules + ink-outlined two lines "FINAL {n}!" / "{EVENT}!", anchored bottom-centre in the lower third (clear of the
+  leaderboard column, timer, nameplate, joystick and hexes; first try at the top overlapped the leaderboard). The never-rendering
+  `SDFImageEffect.cs` + `Shaders/UI/SDFUI.shader` were deleted (no GUID / shader-name references left). GDD §2 + compendium §02
+  describe the event now — **compendium edited, not republished**.
+- **Finding 4 / decision 4 — music + one GO.** `AudioRegistry.MatchMusic` = `match_loop.wav`, new `MatchMusicIntense` =
+  `match_loop_intense.wav` (crossfaded 1 s at the same `timeSamples` on `MatchAudioCueTracker.Cue.Intensify`, once per round).
+  `IAudioService.SetMusicLevel` / `CrossfadeMusic` (Unity + Null). Menu loop ducks to 0.35 under GET READY
+  (`MenuAudio.DuckMenuMusicForMatch`); GameManager plays no SFX at GO (the overlay's `CountdownGo` is the one GO sound; source
+  guard test). Import: `match_loop*` = Vorbis q0.70 Compressed In Memory (importer v3). **Seam measured** (Vorbis decoded via a
+  throwaway Decompress-On-Load copy): both loops 1,440,000 samples = WAV frames; no leading silence (first audible frame 0, head
+  matches the source within 0.002); seam jump 0.0008 / 0.0062 vs mean step 0.0127 / 0.0153. Vorbis kept.
+- **Finding 11 — GET READY.** One shared card style `Assets/UI/Styles/GetReadyCard.uss` for `Lobby.uxml #GetReadyCard` and
+  `MatchOverlays.uxml #IntroGetReady` (old `#IntroRibbon` removed). `MatchOverlaysController.RefreshIntro` shows it only pre-intro and
+  hides it on the first digit. `IntroArmGate.MinShowSeconds` 0.7 (first frame's delta not counted: it is spent before the card
+  is drawn). Live: 1.09 s first round, 0.72 s PLAY AGAIN (was 0.42 s), 3/2/1/GO 1.00 s each.
+- **Finding 13 — per-peer start gate.** Every peer runs `SettleTracker` (own chicken + 0.4 s smooth frames) and reports via
+  `GameManager.RPC_ReportSettled(StartRound)` (RpcSources.All -> StateAuthority); the gate opens when all real players settled
+  (`MatchFlowRules.FirstUnsettled`) or at the 8 s cap. After 3 s `[Networked] WaitingFor` drives "Waiting for {name}…"
+  (`#IntroWaiting`); host-left notice (`#HostLeftNotice`, 3 s) via `MatchFlowRules.HostLeftMidRound`, suppressed while the
+  session itself ends. **Not verified live:** waiting line and host-left notice need Host + Join (unit-tested only).
+
+---
+
 ## ✅ Menu UI overhaul — Phase 4 COMPLETE (2026-10-07): all 22 re-audit findings closed (21 fixed, #22 won't fix by decision 5)
 
 Commits on develop: 314099c icons, c2f8bfb old art deleted, 0acef9e Death Mark + passive text, 00f0d5c menu fixes (workstream A),

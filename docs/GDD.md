@@ -55,6 +55,16 @@ PICK class + passive + abilities → SPAWN at your base corner → farm the tier
 - Most food banked when the **45 s** timer expires (tie-break: food → kills → lower corner
   index).
 
+**Comeback event — the last 10 s** (`MatchConfig.ComebackEventSecondsLeft` = 10). Once per
+round, when 10 playable seconds are left (never during the 3-2-1-GO intro), the authority rolls
+one of four events and the HUD shows **"FINAL 10!"** over its name: **Golden Pile** (a 25-food
+pile near the centre), **Underdog Surge** (the lowest-banked chicken moves ×1.4), **Bounty on the
+Leader** (executing the top-banked chicken pays ×`LeaderExecuteBountyMultiplier` = ×2) or
+**Restock** (every pile +10, up to its max). All four end with the round: PLAY AGAIN despawns the
+golden pile and clears the surge / bounty flags. It used to be a hard-coded T-60 s, which in a
+45 s match fired at GO; round-2 decision 2 (2026-10-07) moved it to the last 10 s. Note: Golden
+Pile and Restock add food beyond the §3.2 budget of 80 — a deliberate late-match exception.
+
 **No death.** There is no HP and no damage. A chicken is never "killed" except by the
 Assassin's execute (§6.4), which removes it for ~2 s and respawns it empty. Every other
 interaction is a **steal** or a **control effect** — you take food or buy time, you never
@@ -805,7 +815,7 @@ Pressing a refused button **shakes it and clicks** — a press is never silently
 | 2c | **The arena is too big for 4 players in 45 s — you barely see combat** | ⚠️ **Known, accepted for now, must be solved.** Observed in play: four chickens on a 51.3 m square rarely meet, so the control-and-steal systems that the whole v0.4 redesign exists to serve go unexercised. The map reads as a place, but a place built for more players than it has. See §3.9 |
 | 2a | Wing Slam's cd 12 contradicts Warrior's "spams abilities" essence | Flagged, needs re-tuning |
 | 2b | Specialization visual identity (per-spec colour/model) | Designed (§5.3), concepts need regenerating in the shipped house style |
-| 3 | **Last-15 s endgame rule** | Deferred until base loop is fun; 3 candidates parked (Open Bases / center-collapse / Golden Egg) |
+| 3 | **Last-15 s endgame rule** | Deferred until base loop is fun; 3 candidates parked (Open Bases / center-collapse / Golden Egg). The shipped stand-in is the last-10 s comeback event (§2) |
 | 4 | Currency earn formula | TBD |
 | 5 | Pile-slow / collision-slow magnitudes | Tuning |
 | 6 | Task 8 Oracle test loads real SOs (not hardcoded stats) | Follow-up |

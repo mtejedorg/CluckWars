@@ -581,6 +581,17 @@ footer b{color:var(--text-dim)}
       job is to <b>buy time</b>, and <b>steal</b> is the only mechanic that converts a won fight
       directly into food. Catching a <em>loaded</em> rival mid-route beats winning a fair fight.</p>
     </div>
+
+    <div class="loopside">
+      <h4>&#9201; The last 10 seconds: one comeback event</h4>
+      <p>With <span class="mono">10s</span> left (<span class="mono">MatchConfig.ComebackEventSecondsLeft</span>),
+      once per round, the game rolls one event and the HUD calls it out as <b>FINAL 10!</b>:
+      a <b>Golden Pile</b> of <span class="mono">25</span> food near the centre, an <b>Underdog Surge</b>
+      (the lowest-banked chicken moves <span class="mono">&times;1.4</span>), a <b>Bounty on the Leader</b>
+      (executing the top banker pays <span class="mono">&times;2</span>) or a <b>Restock</b>
+      (every pile <span class="mono">+10</span>, up to its max). It never fires during the intro and ends
+      with the round. Golden Pile and Restock are the one place food arrives beyond the 80 on the map.</p>
+    </div>
   </div>
 </section>
 
