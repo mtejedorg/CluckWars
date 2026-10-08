@@ -6,6 +6,41 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🔧 Menu UI overhaul — Phase 5 chunk 5 (2026-10-08, uncommitted, in review): round-2 findings 7, 16, 10 + leftovers
+
+EditMode **873/873** (864 + 9: `MenuPhase5Chunk5Tests` new; `MenuPhase4Tests` doorway test rewritten for the new slot, join-gate
+test now targets `JoinCodeEntry`). Captures (git-excluded): `Captures/phase5/static/` (all screens x desktop/phone/tablet, plus
+`06c_lobby_join_partial__phone`, `06d_lobby_join_complete__phone`), `Captures/phase5/live/`, `Captures/phase5/extra/`
+`mp_waiting_room{,_longcode}__{desktop,phone}.png`, `host_hud__{desktop,phone}.png`. `capture_phase5_extra.py host` now also
+forces a 12-letter invite code and STARTs from the waiting room to shoot the HUD. No prefab / scene wiring.
+
+- **Finding 7 — GEAR UP doorway bird.** `#GearChicken` moved out of the page root into a new `#GearDoorway` slot between the slot
+  row and the deck (`CharacterSelect.uxml`); the deck keeps its natural height (`.cw-deck` grow 0 / shrink 0) and the doorway takes
+  the rest (`.cw-gear-doorway`), so the bird stands whole on the deck's top edge and no card covers it. `UI/GearDoorway.Fits`
+  (>= 110 panel pt) hides it (`.cw-gear-chicken--nofit`) when the slot is too short: measured 250 pt desktop (big bird), 120 pt 20:9
+  phone (small whole bird), 76 pt 4:3 tablet (hidden: the class cards wrap to two lines there). The old absolute placement,
+  `.layout--narrow` hide and the `--live` lift are gone.
+- **Finding 16 — PICK hero.** Light + bale + bird grouped in `#HeroFigure` (550 pt block) and centred vertically in the stage
+  (`justify-content: center`; 0.9x on 4:3). The flat pink wash is now a painted backdrop: `Bg_Loadout` (barn interior, cropped to
+  its sunlit doorway behind the bird) multiplied by a pale class tint, glow tinted near-white; live clear colour follows the glow.
+- **Finding 10 — THE COOP bar + join.** `CoopBottom` gets `.cw-coop-bottom--centred` (menu only; the waiting room keeps the plain
+  bar): equal side columns, so READY! and the join card sit on the page centre (desktop card 652..1268 of 1920). Phone: lower entry +
+  20 pt bar padding (card ends ~35 px above the bottom, was 9); 4:3: narrower entry so it clears JOIN MATCH. `UI/JoinCodeEntry`
+  (Empty / Partial / Complete) drives the pill: "Need a code" / "Keep typing…" (`lobby.status.keepTyping`, new) / "Ready to join";
+  `MenuUiController.IsJoinCodeComplete` moved there. Enter / KeypadEnter in `LobbyJoinField` calls `OnStartMatch` only when the
+  code is whole. The guest's local seat was already neutral (no P#, grey pedestal; chunk 3) — verified in the captures.
+- **Leftover — invite-code tiles.** `UI/CodeTileFit` (both the menu host card and the waiting room): fixed-width tiles sized from the
+  font; on layout the row shrinks the font to fit what the bar leaves it, else wraps to two lines at <= 36 pt. Unchanged codes are
+  not rebuilt on the waiting room's poll. Verified: 9-letter "cluck-lan" and a forced 12-letter code, desktop + phone.
+- **Leftover — HUD rows for unclaimed corners.** `MatchStandings.Listed(hasChicken, total)` (shared with post-match):
+  `MatchHudController.RefreshScores` skips corners with no chicken and no food. 1-player host session: only row 0 shows.
+- **Not verified:** keyboard Done on a real Android soft keyboard (Enter is handled on the field's KeyDownEvent; whether the Android
+  IME's Done reaches UI Toolkit as Return needs the Pixel 9). `Assets/Resources/PanelSettings.asset` shows a modified clear colour
+  left by `capture_phase5_extra.py` (its `Setup` sets `colorClearValue`, `Restore` does not reset it) — not part of this chunk; revert
+  it before committing unless intended.
+
+---
+
 ## ✅ Menu UI overhaul — Phase 5 chunk 4 (2026-10-08, committed dbf4c5d, verified in the Editor): round-2 findings 6, 17
 
 **Verified after the Editor restart:** static + live post-match captures re-run (`Captures/phase5/postmatch/`): the standings board now ends inside the
