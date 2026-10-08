@@ -6,6 +6,17 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Menu UI overhaul — Phase 5 COMPLETE (2026-10-08): all 17 round-2 re-audit findings fixed
+
+Commits on develop: b92b536 / 08034ef chunk 1 (3, 4, 11, 13), 6a27ef7 menu audio generators, dea91c8 / 6b67e03 chunk 2 (2, 12, 14,
+decision 3), 1b6af39 Host GameManager spawn fix, dbf1f1c / 767f4ad chunk 3 (1, 5, 9, 15), dbf4c5d / 4dcab1b chunk 4 (6, 17),
+f8912f8 / 947f659 chunk 5 (7, 10, 16 + leftovers). Finding 8 (icons) = 07f7504. EditMode **873/873**.
+Captures (git-excluded): `Captures/phase5/{static,live,postmatch,extra}`. Compendium edited (comeback box, Hoarder text), **not republished**.
+Round-2 decisions + new rules recorded in `docs/superpowers/specs/2026-10-06-menu-ui-overhaul.md` (Phase 5).
+Open: Join not run live (needs a second client); Android soft-keyboard Done -> Enter, safe-area notch and touch on the Pixel 9;
+"Waiting for {name}" + host-left notice only unit-tested (need Host + Join); idle HUD hexes may read muted over the arena (Maestro to judge).
+
+
 ## 🔧 Menu UI overhaul — Phase 5 chunk 5 (2026-10-08, uncommitted, in review): round-2 findings 7, 16, 10 + leftovers
 
 EditMode **873/873** (864 + 9: `MenuPhase5Chunk5Tests` new; `MenuPhase4Tests` doorway test rewritten for the new slot, join-gate

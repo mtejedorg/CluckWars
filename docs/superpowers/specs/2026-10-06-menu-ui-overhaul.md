@@ -221,3 +221,23 @@ unchanged).
 
 **Names (finding 16).** Overlays never identify a chicken by its corner number: the local player is
 "You" / "YOU WIN!", solo bots use the Coop's bot names by class, remote humans are "P{corner+1}".
+
+## Phase 5 — round-2 re-audit fixes (decisions, Maestro 2026-10-07, round 2)
+
+1. Fix all 17 round-2 findings.
+2. The comeback event fires in the **last 10 s** (`MatchConfigSO.ComebackEventSecondsLeft = 10`, never a literal);
+   player copy is "FINAL {n}!" + the event, never "final minute". The only gameplay value change of Phase 5.
+3. Solo PLAY AGAIN goes **straight to GET READY** (the player pressed it, so "never auto-restart" holds). Multiplayer
+   PLAY AGAIN keeps a waiting room on the Coop look with LEAVE / CHANGE BIRD and Android back.
+4. Match music is a synthesised loop (`match_loop.wav`, intense twin crossfaded in at the comeback event); the menu
+   loop stays as a low bed under GET READY; exactly ONE sound owns GO (the intro overlay's stinger).
+5. Four icons redrawn (Ambush, Peck, Feather Trap = feather on a fishing hook, Roll & Push) and every glyph +15%.
+
+Rules that came out of the work (keep them):
+- **Player colour = spawn corner, everywhere.** `UI/PlayerPalette.ForCorner` is the only definition (test-enforced);
+  the Coop shows the corner each bird will spawn on (`Gameplay/CornerAssignment`); a guest's seat is neutral until known.
+- **YOU mark:** the local player always wears the gold YOU pill (lobby, waiting room, HUD row, nameplate, podium, rows).
+- **Ability categories carry a shape** as well as a colour (Steal diamond, Control circle, Defense square, Utility plus);
+  categories stay >= 8 dE00 apart under simulated deuteranopia/protanopia.
+- **Start gate is per player:** every peer reports "settled"; GET READY shows >= 0.7 s and names who the room waits for after 3 s.
+- **Ties share a rank; an all-zero round is a draw** ("EMPTY NESTS!", no podium).
