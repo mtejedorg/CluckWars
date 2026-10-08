@@ -54,6 +54,14 @@ namespace CluckWars.Services
         /// </summary>
         bool OpenLobbyOnMenuLoad { get; set; }
 
+        /// <summary>
+        /// One-shot scene-load handoff like <see cref="OpenLobbyOnMenuLoad"/>, set by the in-match waiting
+        /// room's CHANGE BIRD: the menu opens on PICK YOUR BIRD (the current selection kept) instead of the
+        /// main menu or THE COOP. Read once and cleared by <c>MenuUiController</c>; it wins over
+        /// <see cref="OpenLobbyOnMenuLoad"/> when both are set.
+        /// </summary>
+        bool OpenClassSelectOnMenuLoad { get; set; }
+
         event Action<ChickenClass> OnSelectionChanged;
     }
 }

@@ -227,7 +227,8 @@ namespace CluckWars.Tests
             string src = Read("Assets/_Game/Scripts/UI/MatchOverlaysController.cs");
             foreach (var stale in new[] { "\"Tough\"", "\"Slippery\"", "\"Immovable\"", "\"Combo\"" })
                 StringAssert.DoesNotContain(stale, src);
-            StringAssert.Contains("AbilityController>()?.Passive", src, "perk names come from the chicken's equipped passive");
+            // Round 2, finding 2: the waiting room's seat line is "{CLASS} · {role}" like the menu Coop, not the perk.
+            StringAssert.Contains("MatchStandings.ClassRoleLine(cls)", src, "seat lines read class · role, like THE COOP");
         }
     }
 }

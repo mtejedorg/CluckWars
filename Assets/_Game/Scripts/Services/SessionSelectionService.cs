@@ -42,6 +42,7 @@ namespace CluckWars.Services
         public AbilityBaseSO Ability3 { get; set; }
 
         public bool OpenLobbyOnMenuLoad { get; set; }
+        public bool OpenClassSelectOnMenuLoad { get; set; }
 
         public event Action<ChickenClass> OnSelectionChanged;
     }

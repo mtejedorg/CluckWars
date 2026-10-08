@@ -167,12 +167,9 @@ namespace CluckWars.Localization
 
         // ---- Phase 4 overlays (in-match lobby, session end, intro, HUD goal) ----
         public const string PostmatchYouWin = "postmatch.youWin";
-        public const string LobbyPlayers = "lobby.players";
-        [UiArgs("cls", "perk")] public const string LobbyClassPerk = "lobby.classPerk";
         public const string LobbyHintHost = "lobby.hint.host";
         public const string LobbyHintGuest = "lobby.hint.guest";
         public const string SessionEnded = "session.ended";
-        [UiArgs("reason")] public const string SessionReason = "session.reason";
         [UiArgs("n")] public const string SessionReturning = "session.returning";
         public const string CountdownGetReady = "countdown.getReady";
         [UiArgs("n")] public const string HudGoal = "hud.goal";
@@ -201,6 +198,19 @@ namespace CluckWars.Localization
         [UiArgs("name")] public const string CountdownWaitingFor = "countdown.waitingFor";
         public const string CountdownWaitingSomeone = "countdown.waitingSomeone";
         public const string SessionHostLeft = "session.hostLeft";
+
+        // ---- Phase 5 chunk 2 (round-2 findings 2 + 12: in-match waiting room, session end) ----
+        public const string NavLeave = "nav.leave";
+        public const string BtnChangeBird = "btn.changeBird";
+        public const string SessionClosed = "session.closed";
+        public const string SessionReasonSignal = "session.reason.signal";
+        public const string SessionReasonClosed = "session.reason.closed";
+        public const string SessionReasonFull = "session.reason.full";
+        public const string SessionReasonBusy = "session.reason.busy";
+        public const string SessionReasonNotFound = "session.reason.notFound";
+        public const string SessionReasonAuth = "session.reason.auth";
+        public const string SessionReasonVersion = "session.reason.version";
+        public const string SessionReasonGeneric = "session.reason.generic";
 
     }
 }

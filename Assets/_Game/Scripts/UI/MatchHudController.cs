@@ -113,6 +113,8 @@ namespace CluckWars.UI
             }
             _timer = _root.Q<Label>("MatchTimer");
             _winTargetBadge = _root.Q<Label>("WinTargetBadge");
+            // The @key placeholders (ordinals, the timer's --:--) come from the wording dictionary.
+            UiText.ResolveTree(_root);
 
             if (_winTargetBadge != null)
             {

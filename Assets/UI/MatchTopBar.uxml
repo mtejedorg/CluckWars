@@ -9,45 +9,46 @@
             <ui:VisualElement name="LeaderboardContainer" class="cw-lb-container" picking-mode="Ignore">
                 <ui:VisualElement name="LeaderboardPanel" class="cw-lb-panel" picking-mode="Ignore">
                     
-                    <!-- 4 fixed rows for the leaderboard, populated by controller -->
-                    <ui:VisualElement name="LbRow0" class="cw-lb-row" picking-mode="Ignore">
-                        <ui:Label name="LbOrd0" text="1st" class="cw-lb-ord" picking-mode="Ignore" />
+                    <!-- 4 fixed rows for the leaderboard, populated by controller (hidden until it ranks a base;
+                         every placeholder is a UiText key or blank, round-2 finding 14) -->
+                    <ui:VisualElement name="LbRow0" class="cw-lb-row" picking-mode="Ignore" style="display: none;">
+                        <ui:Label name="LbOrd0" text="@hud.rank.1" class="cw-lb-ord" picking-mode="Ignore" />
                         <ui:VisualElement name="LbDot0" class="cw-lb-dot" picking-mode="Ignore" />
-                        <ui:Label name="LbName0" text="P1" class="cw-lb-name" picking-mode="Ignore" />
+                        <ui:Label name="LbName0" text="" class="cw-lb-name" picking-mode="Ignore" />
                         <ui:VisualElement class="cw-lb-bar-trough" picking-mode="Ignore">
                             <ui:VisualElement name="LbBarFill0" class="cw-lb-bar-fill" picking-mode="Ignore" />
                         </ui:VisualElement>
-                        <ui:Label name="LbScore0" text="0" class="cw-lb-score" picking-mode="Ignore" />
+                        <ui:Label name="LbScore0" text="" class="cw-lb-score" picking-mode="Ignore" />
                     </ui:VisualElement>
 
-                    <ui:VisualElement name="LbRow1" class="cw-lb-row" picking-mode="Ignore">
-                        <ui:Label name="LbOrd1" text="2nd" class="cw-lb-ord" picking-mode="Ignore" />
+                    <ui:VisualElement name="LbRow1" class="cw-lb-row" picking-mode="Ignore" style="display: none;">
+                        <ui:Label name="LbOrd1" text="@hud.rank.2" class="cw-lb-ord" picking-mode="Ignore" />
                         <ui:VisualElement name="LbDot1" class="cw-lb-dot" picking-mode="Ignore" />
-                        <ui:Label name="LbName1" text="P2" class="cw-lb-name" picking-mode="Ignore" />
+                        <ui:Label name="LbName1" text="" class="cw-lb-name" picking-mode="Ignore" />
                         <ui:VisualElement class="cw-lb-bar-trough" picking-mode="Ignore">
                             <ui:VisualElement name="LbBarFill1" class="cw-lb-bar-fill" picking-mode="Ignore" />
                         </ui:VisualElement>
-                        <ui:Label name="LbScore1" text="0" class="cw-lb-score" picking-mode="Ignore" />
+                        <ui:Label name="LbScore1" text="" class="cw-lb-score" picking-mode="Ignore" />
                     </ui:VisualElement>
 
-                    <ui:VisualElement name="LbRow2" class="cw-lb-row" picking-mode="Ignore">
-                        <ui:Label name="LbOrd2" text="3rd" class="cw-lb-ord" picking-mode="Ignore" />
+                    <ui:VisualElement name="LbRow2" class="cw-lb-row" picking-mode="Ignore" style="display: none;">
+                        <ui:Label name="LbOrd2" text="@hud.rank.3" class="cw-lb-ord" picking-mode="Ignore" />
                         <ui:VisualElement name="LbDot2" class="cw-lb-dot" picking-mode="Ignore" />
-                        <ui:Label name="LbName2" text="P3" class="cw-lb-name" picking-mode="Ignore" />
+                        <ui:Label name="LbName2" text="" class="cw-lb-name" picking-mode="Ignore" />
                         <ui:VisualElement class="cw-lb-bar-trough" picking-mode="Ignore">
                             <ui:VisualElement name="LbBarFill2" class="cw-lb-bar-fill" picking-mode="Ignore" />
                         </ui:VisualElement>
-                        <ui:Label name="LbScore2" text="0" class="cw-lb-score" picking-mode="Ignore" />
+                        <ui:Label name="LbScore2" text="" class="cw-lb-score" picking-mode="Ignore" />
                     </ui:VisualElement>
 
-                    <ui:VisualElement name="LbRow3" class="cw-lb-row" picking-mode="Ignore">
-                        <ui:Label name="LbOrd3" text="4th" class="cw-lb-ord" picking-mode="Ignore" />
+                    <ui:VisualElement name="LbRow3" class="cw-lb-row" picking-mode="Ignore" style="display: none;">
+                        <ui:Label name="LbOrd3" text="@hud.rank.4" class="cw-lb-ord" picking-mode="Ignore" />
                         <ui:VisualElement name="LbDot3" class="cw-lb-dot" picking-mode="Ignore" />
-                        <ui:Label name="LbName3" text="P4" class="cw-lb-name" picking-mode="Ignore" />
+                        <ui:Label name="LbName3" text="" class="cw-lb-name" picking-mode="Ignore" />
                         <ui:VisualElement class="cw-lb-bar-trough" picking-mode="Ignore">
                             <ui:VisualElement name="LbBarFill3" class="cw-lb-bar-fill" picking-mode="Ignore" />
                         </ui:VisualElement>
-                        <ui:Label name="LbScore3" text="0" class="cw-lb-score" picking-mode="Ignore" />
+                        <ui:Label name="LbScore3" text="" class="cw-lb-score" picking-mode="Ignore" />
                     </ui:VisualElement>
 
                 </ui:VisualElement>
@@ -57,7 +58,7 @@
 
             <!-- ===== RIGHT: Embossed Timer ===== -->
             <ui:VisualElement name="TimerContainer" class="cw-timer-container" picking-mode="Ignore">
-                <ui:Label name="MatchTimer" text="00:00" class="cw-timer" picking-mode="Ignore" />
+                <ui:Label name="MatchTimer" text="@hud.timer.none" class="cw-timer" picking-mode="Ignore" />
             </ui:VisualElement>
 
         </ui:VisualElement>

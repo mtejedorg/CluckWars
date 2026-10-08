@@ -961,16 +961,22 @@ namespace CluckWars.UI
         /// <summary>
         /// Post-match BACK TO LOBBY lands here: <see cref="ISessionSelectionService.OpenLobbyOnMenuLoad"/>
         /// is set by the match overlay before it loads Bootstrap. Read once, cleared at once.
-        /// Solo and Host reopen THE COOP; a joiner (or an invalid setup) stays on the main menu.
+        /// Solo and Host reopen THE COOP; a joiner (or an invalid setup) stays on the main menu. The waiting
+        /// room's CHANGE BIRD sets <see cref="ISessionSelectionService.OpenClassSelectOnMenuLoad"/> instead,
+        /// which opens PICK YOUR BIRD.
         /// </summary>
         private void ConsumePostMatchIntent()
         {
-            if (_selection == null || !_selection.OpenLobbyOnMenuLoad) return;
+            if (_selection == null || !(_selection.OpenLobbyOnMenuLoad || _selection.OpenClassSelectOnMenuLoad)) return;
 
             bool valid = TryGetLastSetup(out var setup);
-            var intent = MatchFlowRules.DecidePostMatchIntent(true, valid, valid ? setup.Mode : SessionMode.Solo);
-            if (intent.ClearFlag) _selection.OpenLobbyOnMenuLoad = false;
-            if (intent.Landing == MenuLanding.Lobby) OpenLobbyWithLastSetup(intent.Mode);
+            var intent = MatchFlowRules.DecidePostMatchIntent(_selection.OpenLobbyOnMenuLoad, _selection.OpenClassSelectOnMenuLoad,
+                valid, valid ? setup.Mode : SessionMode.Solo);
+            if (intent.ClearFlag) { _selection.OpenLobbyOnMenuLoad = false; _selection.OpenClassSelectOnMenuLoad = false; }
+            // CHANGE BIRD (in-match waiting room): PICK YOUR BIRD with the selection the match ran on, which
+            // this ProjectContext service still holds (mode, class, perk, loadout).
+            if (intent.Landing == MenuLanding.ClassSelect) { _log?.Info(Source, "Opening PICK YOUR BIRD (CHANGE BIRD from the match)."); ShowClassSelect(); }
+            else if (intent.Landing == MenuLanding.Lobby) OpenLobbyWithLastSetup(intent.Mode);
         }
 
         private void ChooseMode(SessionMode mode)

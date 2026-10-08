@@ -5,14 +5,14 @@ Usage (Editor open, Bootstrap.unity loaded and the only open scene, not in Play 
 
 Per mode (Performance Mode ON = static hero renders, OFF = live MenuChickenStage podium) it enters Play
 mode, walks Main -> Class -> Loadout -> Lobby -> START MATCH and then, in one session, plays these
-rounds (PLAY AGAIN -> START between them):
+rounds (PLAY AGAIN -> GET READY between them):
     human   the local player's base is pushed to the goal (real EvaluateWinCondition ends it), no KOs
     cpu     a bot's base is pushed to the goal, two knockouts credited (KO column shown)
     nowin   GameManager.EndMatch(None, -1) via reflection: the "MATCH ENDED" / no-winner state
     two     two bots despawned first, so only 2 chickens stand (hosted-2-player shape: 3rd step hidden)
 Each round saves postmatch__<mode>__<round>__<size>.png. Live mode also logs Camera / RenderTexture
 counts before the round, on the post-match screen and after PLAY AGAIN (leak check).
-Element names it drives: SoloBtn, NextBtn, ReadyBtn, StartBtn, MePlayAgainBtn, LobbyStartBtn.
+Element names it drives: SoloBtn, NextBtn, ReadyBtn, StartBtn, MePlayAgainBtn.
 """
 import sys, os, json, time
 sys.stdout.reconfigure(encoding="utf-8")
@@ -85,7 +85,7 @@ def wait(prefix, tries=90):
         if s.startswith(prefix):
             return s
         time.sleep(1)
-    raise SystemExit("timed out waiting for " + prefix + " (last: " + s + ")")
+    raise SystemExit("timed out waiting for " + str(prefix) + " (last: " + s + ")")
 
 
 SIZES = [("desktop_1920x1080", "1920", "1080"), ("phone_2424x1080", "2424", "1080"), ("tablet_2048x1536", "2048", "1536")]
@@ -99,9 +99,9 @@ def grab_all(mode, rnd):
 
 def round_(mode, rnd, first):
     if not first:
-        print(cs("Press", "MePlayAgainBtn")); wait("WaitingForPlayers"); time.sleep(0.6)
+        # Solo PLAY AGAIN goes straight to GET READY (round 2, decision 3): no waiting room, no START.
+        print(cs("Press", "MePlayAgainBtn")); wait(("Starting", "Active")); time.sleep(0.6)
         if mode == "live": print("  after PLAY AGAIN:", cs("Count"))
-        print(cs("Press", "LobbyStartBtn"))
     wait("Active"); time.sleep(4.5)  # intro + a moment of play
     if mode == "live": print("  before end:", cs("Count"))
     if rnd == "human": print(cs("Win", "human"))
@@ -132,7 +132,7 @@ for perf in MODES:
         print("-- round", rnd)
         round_(mode, rnd, first=(i == 0))
     if mode == "live":
-        print(cs("Press", "MePlayAgainBtn")); wait("WaitingForPlayers"); time.sleep(0.8)
+        print(cs("Press", "MePlayAgainBtn")); wait(("Starting", "Active")); time.sleep(0.8)
         print("  final after PLAY AGAIN:", cs("Count"))
     bridge.call("editor-application-set-state", {"isPlaying": False})
     time.sleep(4)

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using CluckWars.Gameplay;
+using CluckWars.Input;
 using CluckWars.Localization;
 using CluckWars.Logging;
 using CluckWars.Networking;
@@ -17,7 +18,7 @@ namespace CluckWars.UI
 {
     /// <summary>
     /// UI Toolkit driver for the four in-match overlays: Match End (Phase 4: a podium on the barn),
-    /// in-match Lobby, Session End, Intro countdown. Layout lives in
+    /// the multiplayer waiting room (Phase 5: THE COOP's lineup), Session End, Intro countdown. Layout lives in
     /// <c>Assets/UI/MatchOverlays.uxml</c>; styling in
     /// <c>Assets/UI/Styles/MatchOverlays.uss</c>. This controller only toggles each
     /// overlay root's visibility per <see cref="GameManager"/> state / network
@@ -63,6 +64,7 @@ namespace CluckWars.UI
         private ColorSchemeSO            _colors;      // injected for DI parity with MatchHud
         private MatchConfigSO            _matchConfig;
         private ISessionSelectionService _selection;
+        private IInputProvider           _input;        // Esc / Android back = LEAVE while the waiting room shows
         private MenuAudio                _audio = MenuAudio.Silent();
         private ChickenClassRegistrySO   _classRegistry;
 
@@ -98,11 +100,21 @@ namespace CluckWars.UI
 
         private SafeAreaPadding _safeArea;
 
-        private VisualElement _codeTiles, _lobbyGrid, _lobbyStatusDot, _lobbyInviteCard;
+        private VisualElement _lobbySafe, _codeTiles, _lobbyGrid, _lobbyStatusDot, _lobbyInviteCard;
         private Label         _lobbyStatusCount, _lobbyStatusText, _lobbyHint, _lobbySettingTime, _lobbySettingGoal;
-        private Button        _lobbyStartBtn, _lobbyShareBtn, _lobbyCopyBtn;
+        private Button        _lobbyStartBtn, _lobbyShareBtn, _lobbyCopyBtn, _lobbyLeaveBtn, _lobbyChangeBirdBtn;
 
-        private Label         _sessionEndReason, _sessionEndCountdown;
+        /// <summary>One waiting-room seat (THE COOP's .cw-seat), one per spawn corner, built once on bind.</summary>
+        private sealed class SeatView
+        {
+            public VisualElement Root, Pedestal, Chicken, Plate, NameRow, State;
+            public Label Name, Pn, Tag, ClassLine, Waiting, StateLabel, PedestalTag;
+            public string ChickenCss;
+        }
+        private readonly SeatView[] _seats = new SeatView[4];
+        private readonly bool[]     _seatFilled = new bool[4];
+
+        private Label         _sessionEndTitle, _sessionEndReason, _sessionEndCountdown;
         private Label         _introNumber;
         // GET READY inside the intro overlay (finding 11) + its "Waiting for {name}" line (finding 13).
         private VisualElement _introGetReady;
@@ -115,9 +127,14 @@ namespace CluckWars.UI
         private ShutdownReason? _shutdownReason;
         private float           _shutdownAtUnscaledTime;
         private bool            _returnTriggered;
-        // True once BACK TO LOBBY has started leaving on purpose; suppresses the "Session ended" overlay
-        // that the runner shutdown would otherwise raise through HandleShutdown.
+        // The round this peer watched had ended (its result was on screen) when the session closed: the
+        // session-end headline says MATCH OVER instead of COOP CLOSED (SessionEndCopy.HeadlineKey).
+        private bool            _roundEndedAtShutdown;
+        // True once BACK TO LOBBY / LEAVE / CHANGE BIRD has started leaving on purpose; suppresses the
+        // "Session ended" overlay that the runner shutdown would otherwise raise through HandleShutdown.
         private bool            _leavingToLobby;
+        // MenuUiController.UpdateLayout's .layout--short threshold (panel height), reused for the waiting room.
+        private const float     ShortLayoutHeight = 1100f;
         private const int       ShutdownTimeoutMs = 5000;
 
         // Intro GO flourish — lingers briefly after the countdown hits zero.
@@ -146,7 +163,8 @@ namespace CluckWars.UI
             MatchConfigSO            matchConfig,
             ISessionSelectionService selection,
             [InjectOptional] MenuAudio              audio,
-            [InjectOptional] ChickenClassRegistrySO classRegistry)
+            [InjectOptional] ChickenClassRegistrySO classRegistry,
+            [InjectOptional] IInputProvider         input)
         {
             _network       = network;
             _log           = log;
@@ -155,6 +173,7 @@ namespace CluckWars.UI
             _selection     = selection;
             _audio         = audio ?? MenuAudio.Silent();
             _classRegistry = classRegistry;
+            _input         = input;
         }
 
         // ---- Unity lifecycle ---------------------------------------------------
@@ -171,6 +190,8 @@ namespace CluckWars.UI
             }
 
             if (_network != null) _network.OnShutdown += HandleShutdown;
+            if (_input == null)
+                _log?.Warn(Source, "IInputProvider not injected; Esc / Android back will not leave the waiting room (LEAVE still works).");
             EnsureEventSystem();
         }
 
@@ -200,7 +221,10 @@ namespace CluckWars.UI
             if (_leavingToLobby) return; // our own BACK TO LOBBY shutdown, not a dropped session
             _shutdownReason         = reason;
             _shutdownAtUnscaledTime = Time.unscaledTime;
-            _log?.Warn(Source, $"Network shutdown: {reason}. Returning to '{_bootstrapSceneName}' in {_disconnectReturnDelay}s.");
+            var gm = GameManager.Instance;
+            _roundEndedAtShutdown   = (gm != null ? gm.State : _watchedState) == MatchState.Ended;
+            _log?.Warn(Source, $"Network shutdown: {reason} (round ended: {_roundEndedAtShutdown}). " +
+                $"Returning to '{_bootstrapSceneName}' in {_disconnectReturnDelay}s.");
         }
 
         private void Update()
@@ -285,6 +309,7 @@ namespace CluckWars.UI
             if (celebrationLayer != null) _celebration = new MatchCelebration(celebrationLayer);
             else _log?.Error(Source, "MatchOverlays.uxml has no #MeCelebration; the winner celebration will not show.");
 
+            _lobbySafe        = _root.Q<VisualElement>("LobbySafe");
             _codeTiles        = _root.Q<VisualElement>("CodeTiles");
             _lobbyGrid        = _root.Q<VisualElement>("LobbyGrid");
             _lobbyInviteCard  = _root.Q<VisualElement>("LobbyInviteCard");
@@ -297,7 +322,14 @@ namespace CluckWars.UI
             _lobbyStartBtn    = _root.Q<Button>("LobbyStartBtn");
             _lobbyShareBtn    = _root.Q<Button>("LobbyShareBtn");
             _lobbyCopyBtn     = _root.Q<Button>("LobbyCopyBtn");
+            _lobbyLeaveBtn      = _root.Q<Button>("LobbyLeaveBtn");
+            _lobbyChangeBirdBtn = _root.Q<Button>("LobbyChangeBirdBtn");
+            if (_lobbyGrid == null) _log?.Error(Source, "MatchOverlays.uxml has no #LobbyGrid; the waiting room shows no seats.");
+            else BuildSeats();
+            if (_lobbyLeaveBtn == null || _lobbyChangeBirdBtn == null)
+                _log?.Error(Source, "MatchOverlays.uxml is missing #LobbyLeaveBtn or #LobbyChangeBirdBtn; the waiting room has no tap-out (Esc / back still leaves).");
 
+            _sessionEndTitle     = _root.Q<Label>("SessionEndTitle");
             _sessionEndReason    = _root.Q<Label>("SessionEndReason");
             _sessionEndCountdown = _root.Q<Label>("SessionEndCountdown");
             _introNumber         = _root.Q<Label>("IntroNumber");
@@ -314,17 +346,25 @@ namespace CluckWars.UI
             if (_lobbyStartBtn != null) _lobbyStartBtn.clicked += OnLobbyStart;
             if (_lobbyCopyBtn  != null) _lobbyCopyBtn.clicked  += CopyJoinCode;
             if (_lobbyShareBtn != null) _lobbyShareBtn.clicked += CopyJoinCode;
+            if (_lobbyLeaveBtn != null) _lobbyLeaveBtn.clicked += OnLobbyLeave;
+            if (_lobbyChangeBirdBtn != null) _lobbyChangeBirdBtn.clicked += OnLobbyChangeBird;
 
             // One-time: every @key text in the overlays comes from the wording dictionary.
             UiText.SetLogger(_log);
             UiText.ResolveTree(_root);
 
             // Same safe-area rule as the menu: content clear of notches / the gesture bar while the
-            // backgrounds stay full-bleed (#MeSafe sits inside the match-end backdrop; the lobby and
-            // session-end overlays pad themselves, their dim fill still reaching the edges).
+            // backgrounds stay full-bleed (#MeSafe / #LobbySafe sit inside their barn backdrops; the
+            // session-end overlay pads itself, its dim fill still reaching the edges).
             if (_meSafe == null) _log?.Error(Source, "MatchOverlays.uxml has no #MeSafe; the post-match screen ignores the safe area.");
-            _safeArea = new SafeAreaPadding(_meSafe, _lobbyOverlay, _sessionEndOverlay);
-            _root.RegisterCallback<GeometryChangedEvent>(_ => _safeArea.Apply(force: true));
+            if (_lobbySafe == null) _log?.Error(Source, "MatchOverlays.uxml has no #LobbySafe; the waiting room ignores the safe area.");
+            _safeArea = new SafeAreaPadding(_meSafe, _lobbySafe, _sessionEndOverlay);
+            _root.RegisterCallback<GeometryChangedEvent>(evt =>
+            {
+                _safeArea.Apply(force: true);
+                // THE COOP's short-panel tightening (MenuUiController.UpdateLayout), for the waiting room.
+                _lobbyOverlay?.EnableInClassList("layout--short", evt.newRect.height < ShortLayoutHeight);
+            });
 
             // Start hidden; state polls flip them on.
             SetShown(_matchEndOverlay, false);
@@ -375,7 +415,10 @@ namespace CluckWars.UI
             SetShown(_meHostNote, !canPlayAgain);
         }
 
-        /// <summary>PLAY AGAIN: host / solo only. Re-arms the in-session waiting room; never starts a match.</summary>
+        /// <summary>
+        /// PLAY AGAIN: host / solo only. Solo goes straight to GET READY, multiplayer back to the waiting room
+        /// (<see cref="MatchFlowRules.StateAfterPlayAgain"/>); never straight into a running match.
+        /// </summary>
         private void OnPlayAgain()
         {
             var gm = GameManager.Instance;
@@ -393,18 +436,48 @@ namespace CluckWars.UI
         private void OnBackToLobby()
         {
             if (_leavingToLobby) return; // a double tap would otherwise start two scene loads
-            _leavingToLobby = true;
             _audio.Tap();
-            if (_mePlayAgainBtn != null) _mePlayAgainBtn.SetEnabled(false);
-            if (_meBackBtn      != null) _meBackBtn.SetEnabled(false);
+            LeaveSession(changeBird: false, "BACK TO LOBBY");
+        }
 
-            if (_selection != null) _selection.OpenLobbyOnMenuLoad = true;
-            else _log?.Error(Source, "No ISessionSelectionService injected: BACK TO LOBBY will open the main menu instead of THE COOP.");
+        /// <summary>Waiting room LEAVE (and Esc / Android back): the same exit as BACK TO LOBBY, with the back cue.</summary>
+        private void OnLobbyLeave()
+        {
+            if (_leavingToLobby) return;
+            _audio.Back();
+            LeaveSession(changeBird: false, "LEAVE");
+        }
+
+        /// <summary>Waiting room CHANGE BIRD: leave the session and open the menu on PICK YOUR BIRD.</summary>
+        private void OnLobbyChangeBird()
+        {
+            if (_leavingToLobby) return;
+            _audio.Tap();
+            LeaveSession(changeBird: true, "CHANGE BIRD");
+        }
+
+        /// <summary>
+        /// Every deliberate exit from the match scene: disables the exits, sets the menu's one-shot landing
+        /// flag (THE COOP / main menu by mode, or PICK YOUR BIRD for CHANGE BIRD), shuts the runner down and
+        /// loads Bootstrap.
+        /// </summary>
+        private void LeaveSession(bool changeBird, string why)
+        {
+            _leavingToLobby = true;
+            foreach (var b in new[] { _mePlayAgainBtn, _meBackBtn, _lobbyStartBtn, _lobbyLeaveBtn, _lobbyChangeBirdBtn })
+                b?.SetEnabled(false);
+
+            if (_selection == null)
+                _log?.Error(Source, $"No ISessionSelectionService injected: {why} will open the main menu instead of " +
+                    (changeBird ? "PICK YOUR BIRD." : "THE COOP."));
+            else if (changeBird) _selection.OpenClassSelectOnMenuLoad = true;
+            else _selection.OpenLobbyOnMenuLoad = true;
+            _log?.Info(Source, $"{why}: leaving the session.");
 
             // async void would swallow anything thrown after the first await; LeaveToLobbyAsync
             // catches and logs everything itself, and the continuation surfaces a fault of its own.
             LeaveToLobbyAsync().ContinueWith(
-                t => _log?.Error(Source, $"BACK TO LOBBY flow faulted: {t.Exception}"),
+                t => _log?.Error(Source, $"{why} flow faulted: {t.Exception}"),
                 System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted
                 | System.Threading.Tasks.TaskContinuationOptions.ExecuteSynchronously);
         }
@@ -413,7 +486,7 @@ namespace CluckWars.UI
         {
             if (_network == null)
             {
-                _log?.Error(Source, "No INetworkService injected: BACK TO LOBBY cannot shut the session down, loading the menu anyway.");
+                _log?.Error(Source, "No INetworkService injected: leaving cannot shut the session down, loading the menu anyway.");
             }
             else
             {
@@ -423,19 +496,19 @@ namespace CluckWars.UI
                     var done = await System.Threading.Tasks.Task.WhenAny(
                         shutdown, System.Threading.Tasks.Task.Delay(ShutdownTimeoutMs));
                     if (done != shutdown)
-                        _log?.Error(Source, $"Runner shutdown for BACK TO LOBBY did not finish in {ShutdownTimeoutMs} ms. " +
+                        _log?.Error(Source, $"Runner shutdown for leaving the match did not finish in {ShutdownTimeoutMs} ms. " +
                             "Loading the menu anyway - the next session may refuse to start; relaunch the app if so.");
                     else
                         await shutdown; // observe a fault from the shutdown itself
                 }
                 catch (System.Exception e)
                 {
-                    _log?.Error(Source, $"Shutting the runner down for BACK TO LOBBY failed: {e}. " +
+                    _log?.Error(Source, $"Shutting the runner down for leaving the match failed: {e}. " +
                         "Loading the menu anyway - but the next session may refuse to start; relaunch the app if so.");
                 }
             }
 
-            _log?.Info(Source, $"Match end: BACK TO LOBBY → loading '{_bootstrapSceneName}'.");
+            _log?.Info(Source, $"Leaving the match → loading '{_bootstrapSceneName}'.");
             SceneManager.LoadScene(_bootstrapSceneName);
         }
 
@@ -697,7 +770,7 @@ namespace CluckWars.UI
         }
 
         // ========================================================================
-        //  LOBBY
+        //  WAITING ROOM  (multiplayer; round 2, finding 2: THE COOP's lineup)
         // ========================================================================
         private void RefreshLobby(GameManager gm, bool poll)
         {
@@ -706,17 +779,17 @@ namespace CluckWars.UI
             // authored blank (bound from MatchConfig here), so a late fill would flash empty rows.
             bool opening = show && !IsShown(_lobbyOverlay);
             SetShown(_lobbyOverlay, show);
-            if (!show || !(poll || opening)) return;
+            if (!show) return;
+
+            // Esc / Android back = LEAVE, polled only while the room is up (the match's own Esc use, the
+            // ability cancel, is idle here: nothing moves in the waiting room).
+            if (!_leavingToLobby && _input != null && _input.GetBackPressed()) { OnLobbyLeave(); return; }
+            if (!(poll || opening)) return;
 
             var runner = _network?.Runner;
-            bool isHost = runner != null &&
-                (runner.GameMode == GameMode.Single || runner.IsSharedModeMasterClient);
-
-            int playerCount = 0;
-            if (runner != null) foreach (var _ in runner.ActivePlayers) playerCount++;
-            int maxPlayers = _matchConfig != null ? _matchConfig.MaxPlayers : 4;
-
             bool solo = runner != null && runner.GameMode == GameMode.Single;
+            bool isHost = runner != null && (solo || runner.IsSharedModeMasterClient);
+            int maxPlayers = _matchConfig != null ? _matchConfig.MaxPlayers : 4;
 
             // Invite code: only a hosted session has anyone to invite, so never in solo.
             bool showInvite = isHost && !solo;
@@ -729,111 +802,144 @@ namespace CluckWars.UI
             if (_lobbySettingGoal != null && _matchConfig != null)
                 _lobbySettingGoal.text = MatchSettingsText.Goal(_matchConfig.FoodTargetToWin);
 
-            // Status pill.
-            if (_lobbyStatusCount != null)
-                _lobbyStatusCount.text = UiText.Format(UiKeys.LobbyCount, ("n", playerCount), ("max", maxPlayers));
-            if (_lobbyStatusText != null)
-                _lobbyStatusText.text = UiText.Get(solo ? UiKeys.LobbyStatusSolo : UiKeys.LobbyStatusWaiting);
+            var master = gm.Object != null && gm.Object.IsValid ? gm.Object.StateAuthority : PlayerRef.None;
+            RefreshSeats(Mathf.Clamp(maxPlayers, 1, _seats.Length), solo, master);
 
-            // Start button + hint (host only).
+            // Status pill: READY seats over the room size (the menu Coop's count and colours).
+            int ready = WaitingRoomRules.ReadyCount(_seatFilled);
+            bool full = ready >= Mathf.Clamp(maxPlayers, 1, _seats.Length);
+            if (_lobbyStatusCount != null)
+                _lobbyStatusCount.text = UiText.Format(UiKeys.LobbyCount, ("n", ready), ("max", maxPlayers));
+            if (_lobbyStatusText != null)
+            {
+                _lobbyStatusText.text = UiText.Get(solo ? UiKeys.LobbyStatusSolo : full ? UiKeys.LobbyAllReady : UiKeys.LobbyStatusWaiting);
+                // Dark green / dark amber clear 4.5:1 on the cream inset; the dot is a lamp, not text.
+                _lobbyStatusText.style.color = full ? StatusInkReady : StatusInkWaiting;
+            }
+            if (_lobbyStatusDot != null) _lobbyStatusDot.style.backgroundColor = full ? StatusLampReady : StatusLampWaiting;
+
+            // START (host only) + the host / guest line.
             SetShown(_lobbyStartBtn, isHost);
             if (_lobbyHint != null)
                 _lobbyHint.text = UiText.Get(solo ? UiKeys.LobbyHintSolo : isHost ? UiKeys.LobbyHintHost : UiKeys.LobbyHintGuest);
-
-            BuildPlayerGrid(runner, maxPlayers);
         }
 
-        private void BuildPlayerGrid(NetworkRunner runner, int maxPlayers)
+        // The menu Coop's status colours (MenuUiController.UpdateLobbyStatus).
+        private static readonly Color StatusInkReady    = new Color32(0x1e, 0x6a, 0x1e, 0xff);
+        private static readonly Color StatusInkWaiting  = new Color32(0x6e, 0x48, 0x00, 0xff);
+        private static readonly Color StatusLampReady   = new Color32(0x4a, 0xe6, 0x6a, 0xff);
+        private static readonly Color StatusLampWaiting = new Color32(0xf5, 0xc8, 0x42, 0xff);
+
+        /// <summary>Builds the four seats once (THE COOP's .cw-seat: pedestal + chicken, nameplate, READY badge).</summary>
+        private void BuildSeats()
         {
-            if (_lobbyGrid == null) return;
             _lobbyGrid.Clear();
+            for (int corner = 0; corner < _seats.Length; corner++)
+            {
+                var color = ColorForCorner(corner);
+                var v = new SeatView { Root = new VisualElement() };
+                v.Root.AddToClassList("cw-seat");
 
+                var stage = new VisualElement { pickingMode = PickingMode.Ignore };
+                stage.AddToClassList("cw-seat__stage");
+                v.Pedestal = new VisualElement { pickingMode = PickingMode.Ignore };
+                v.Pedestal.AddToClassList("cw-seat__pedestal");
+                v.Pedestal.style.unityBackgroundImageTintColor = color;   // Pedestal_Ring is white art
+                v.Chicken = new VisualElement { pickingMode = PickingMode.Ignore };
+                v.Chicken.AddToClassList("cw-chicken");
+                v.Chicken.AddToClassList("cw-seat__chicken");
+                v.PedestalTag = new Label(UiText.Format(UiKeys.LobbyPlayerTag, ("n", corner + 1))) { pickingMode = PickingMode.Ignore };
+                v.PedestalTag.AddToClassList("cw-seat__pedestal-tag");
+                v.PedestalTag.style.backgroundColor = color;
+                v.PedestalTag.style.color = AbilityPalette.InkOn(color);
+                stage.Add(v.Pedestal); stage.Add(v.Chicken); stage.Add(v.PedestalTag);
+                v.Root.Add(stage);
+
+                v.Plate = new VisualElement();
+                v.Plate.AddToClassList("cw-seat__plate");
+                v.Plate.style.borderTopColor = color;
+                var glow = new VisualElement { pickingMode = PickingMode.Ignore };
+                glow.AddToClassList("cw-glow");
+                v.Plate.Add(glow);
+
+                v.NameRow = new VisualElement();
+                v.NameRow.AddToClassList("cw-seat__namerow");
+                v.Name = new Label();
+                v.Name.AddToClassList("cw-seat__name");
+                v.Pn = new Label(UiText.Format(UiKeys.LobbyPlayerTag, ("n", corner + 1)));
+                v.Pn.AddToClassList("cw-seat__pn");
+                v.Pn.style.borderLeftColor = color;   // player colour as the tag's stripe; text stays cream-on-ink
+                v.Tag = new Label();
+                v.Tag.AddToClassList("cw-seat__tag");
+                v.NameRow.Add(v.Name); v.NameRow.Add(v.Pn); v.NameRow.Add(v.Tag);
+                v.Plate.Add(v.NameRow);
+
+                v.ClassLine = new Label();
+                v.ClassLine.AddToClassList("cw-seat__class");
+                v.Plate.Add(v.ClassLine);
+
+                v.Waiting = new Label(UiText.Format(UiKeys.LobbyWaitingFor, ("n", corner + 1)));
+                v.Waiting.AddToClassList("cw-seat__waiting");
+                v.Plate.Add(v.Waiting);
+
+                // READY: gold rosette badge, ink label (~10.6:1; was cream on green, 3.0:1).
+                v.State = new VisualElement();
+                v.State.AddToClassList("cw-seat__state");
+                var rosette = new VisualElement { pickingMode = PickingMode.Ignore };
+                rosette.AddToClassList("cw-seat__rosette");
+                v.State.Add(rosette);
+                v.StateLabel = new Label(UiText.Get(UiKeys.StateReady));
+                v.StateLabel.AddToClassList("cw-seat__state-label");
+                v.State.Add(v.StateLabel);
+                v.Plate.Add(v.State);
+
+                v.Root.Add(v.Plate);
+                _seats[corner] = v;
+                _lobbyGrid.Add(v.Root);
+            }
+        }
+
+        /// <summary>
+        /// Fills each corner's seat from the chicken standing on it: "You" / CPU name / "P{n}", HOST on the
+        /// master's seat (never in solo), CPU on a bot, "{CLASS} · {role}" like the menu Coop, READY. A corner
+        /// with no chicken is an open seat ("WAITING FOR P{n}"); seats past the room size are hidden.
+        /// </summary>
+        private void RefreshSeats(int seatCount, bool solo, PlayerRef master)
+        {
             int localCorner = LocalCorner();
-            int seats = Mathf.Clamp(maxPlayers, 1, 4);
-            for (int corner = 0; corner < seats; corner++)
+            for (int corner = 0; corner < _seats.Length; corner++)
             {
-                var chicken = ChickenForCorner(corner);
-                if (chicken == null)
+                var v = _seats[corner];
+                if (v == null) continue;
+                bool inRoom = corner < seatCount;
+                v.Root.style.display = inRoom ? DisplayStyle.Flex : DisplayStyle.None;
+                var chicken = inRoom ? ChickenForCorner(corner) : null;
+                bool filled = chicken != null;
+                _seatFilled[corner] = filled;
+
+                v.Root.EnableInClassList("cw-seat--empty", !filled);
+                v.Root.EnableInClassList("cw-seat--you", filled && corner == localCorner);
+                string css = filled ? "cw-chicken--" + KeyOf(chicken.Class) : null;
+                if (v.ChickenCss != css)
                 {
-                    _lobbyGrid.Add(MakeEmptyCard(corner));
-                    continue;
+                    if (v.ChickenCss != null) v.Chicken.RemoveFromClassList(v.ChickenCss);
+                    if (css != null) v.Chicken.AddToClassList(css);
+                    v.ChickenCss = css;
                 }
-                bool isLocal = corner == localCorner;
-                bool isLocalHost = isLocal && runner != null &&
-                    (runner.GameMode == GameMode.Single || runner.IsSharedModeMasterClient);
-                _lobbyGrid.Add(MakePlayerCard(corner, chicken, isLocal, isLocalHost));
+
+                SetShown(v.NameRow, filled);
+                SetShown(v.ClassLine, filled);
+                SetShown(v.State, filled);
+                SetShown(v.Waiting, !filled);
+                if (!filled) continue;
+
+                var cls = chicken.Class;
+                v.Name.text = MatchStandings.DisplayName(corner == localCorner, chicken.IsBot, cls, corner);
+                bool host = WaitingRoomRules.ShowHostTag(solo, master != PlayerRef.None && chicken.Object.InputAuthority == master, chicken.IsBot);
+                v.Tag.text = host ? UiText.Get(UiKeys.TagHost) : chicken.IsBot ? UiText.Get(UiKeys.TagCpu) : string.Empty;
+                SetShown(v.Tag, host || chicken.IsBot);
+                v.ClassLine.text = MatchStandings.ClassRoleLine(cls);
             }
-        }
-
-        private static VisualElement MakeEmptyCard(int corner)
-        {
-            var card = new VisualElement();
-            card.AddToClassList("cw-player-card");
-            card.AddToClassList("cw-player-card--empty");
-            var lbl = new Label(UiText.Format(UiKeys.LobbyWaitingFor, ("n", corner + 1)));
-            lbl.AddToClassList("cw-player-empty-label");
-            card.Add(lbl);
-            return card;
-        }
-
-        private VisualElement MakePlayerCard(int corner, ChickenController chicken, bool isLocal, bool isHost)
-        {
-            Color color = ColorForCorner(corner);
-            var cls = chicken.Class;
-
-            var card = new VisualElement();
-            card.AddToClassList("cw-player-card");
-            SetBorderColor(card, Fade(color, 0.85f));
-            card.style.unityBackgroundImageTintColor = Fade(color, 0.18f);
-
-            var accent = new VisualElement();
-            accent.AddToClassList("cw-player-accent");
-            accent.style.backgroundColor = color;
-            card.Add(accent);
-
-            var art = new VisualElement();
-            art.AddToClassList("cw-player-art");
-            art.AddToClassList("cw-chicken--" + KeyOf(cls));
-            card.Add(art);
-
-            var mid = new VisualElement();
-            mid.AddToClassList("cw-player-mid");
-
-            var nameRow = new VisualElement();
-            nameRow.AddToClassList("cw-player-namerow");
-            var name = new Label(MatchStandings.DisplayName(isLocal, chicken.IsBot, cls, corner));
-            name.AddToClassList("cw-player-name");
-            nameRow.Add(name);
-            if (isHost || chicken.IsBot)
-            {
-                var tag = new Label(UiText.Get(isHost ? UiKeys.TagHost : UiKeys.TagCpu));
-                tag.AddToClassList("cw-player-host");
-                nameRow.Add(tag);
-            }
-            mid.Add(nameRow);
-
-            // "{CLASS} · {perk}" from the chicken's own equipped passive (AbilityController.Passive: the
-            // chosen one on this peer, the class default for a remote player). No perk, just the class.
-            var passive = chicken.GetComponent<AbilityController>()?.Passive;
-            string perk = passive != null ? passive.DisplayName : null;
-            var clsLine = new Label(string.IsNullOrEmpty(perk)
-                ? ClassName(cls)
-                : UiText.Format(UiKeys.LobbyClassPerk, ("cls", ClassName(cls)), ("perk", perk)));
-            clsLine.AddToClassList("cw-player-class");
-            mid.Add(clsLine);
-
-            // READY sits under the class line, inside the text column: as a third column it
-            // covered the tag and the perk on narrow (4:3) cards.
-            var state = new VisualElement();
-            state.AddToClassList("cw-player-state");
-            state.AddToClassList("cw-player-state--ready");
-            var sl = new Label(UiText.Get(UiKeys.StateReady));
-            sl.AddToClassList("cw-player-state__label");
-            state.Add(sl);
-            mid.Add(state);
-            card.Add(mid);
-
-            return card;
         }
 
         private void SetCodeTiles(string code)
@@ -879,8 +985,11 @@ namespace CluckWars.UI
 
             float elapsed   = Time.unscaledTime - _shutdownAtUnscaledTime;
             float remaining = Mathf.Max(0f, _disconnectReturnDelay - elapsed);
-            if (_sessionEndReason != null)
-                _sessionEndReason.text = UiText.Format(UiKeys.SessionReason, ("reason", _shutdownReason.ToString()));
+            // In-voice lines only (finding 12): never the raw ShutdownReason name.
+            if (_sessionEndTitle != null)
+                _sessionEndTitle.text = UiText.Get(SessionEndCopy.HeadlineKey(_roundEndedAtShutdown));
+            if (_sessionEndReason != null && _shutdownReason.HasValue)
+                _sessionEndReason.text = SessionEndCopy.For(_shutdownReason.Value);
             if (_sessionEndCountdown != null)
                 _sessionEndCountdown.text = UiText.Format(UiKeys.SessionReturning, ("n", Mathf.CeilToInt(remaining)));
 
@@ -1082,13 +1191,5 @@ namespace CluckWars.UI
         private static string KeyOf(ChickenClass cls) => cls.ToString().ToLowerInvariant();
 
         private static string ClassName(ChickenClass cls) => MatchStandings.ClassName(cls);
-
-        private static Color Fade(Color c, float a) => new Color(c.r, c.g, c.b, a);
-
-        private static void SetBorderColor(VisualElement ve, Color c)
-        {
-            ve.style.borderTopColor = c; ve.style.borderBottomColor = c;
-            ve.style.borderLeftColor = c; ve.style.borderRightColor = c;
-        }
     }
 }

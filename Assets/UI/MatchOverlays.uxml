@@ -4,7 +4,7 @@
          absolute container, hidden by default (display:none). MatchOverlaysController
          toggles visibility per GameManager.State / shutdown, fills the data containers
          (#MeRows, the podium steps, #LobbyGrid, #CodeTiles) and pads the safe-area
-         hosts (#MeSafe, #LobbyOverlay, #SessionEndOverlay) from Screen.safeArea.
+         hosts (#MeSafe, #LobbySafe, #SessionEndOverlay) from Screen.safeArea.
          Every player-facing string is a @key from Resources/Text/UiText.csv (or empty and filled in C#).
          Phase 4 (2026-10-07): the post-match screen is rebuilt on THE COOP's visual system -
          barn backdrop, a 2nd/1st/3rd podium of tinted pedestal rings, wood ribbon banner, a wood
@@ -139,67 +139,74 @@
         </ui:VisualElement>
 
         <!-- ============================================================ -->
-        <!--  IN-MATCH LOBBY  (waiting room after PLAY AGAIN / before START) -->
+        <!--  IN-MATCH WAITING ROOM  (multiplayer only: before START and after PLAY AGAIN)   -->
         <!-- ============================================================ -->
-        <ui:VisualElement name="LobbyOverlay" class="cw-overlay cw-overlay--dim" style="display: none;">
-            <ui:VisualElement name="LobbyPanel" class="cw-lob-panel">
+        <!-- Round 2, finding 2: rebuilt on THE COOP's look (menu Lobby.uxml). The menu theme is attached
+             to THIS element only (a scoped <Style>), so the waiting room reuses the Coop's own classes -
+             .cw-seat lineup, rule chips, bottom bar, cw-btn planks - while the post-match screen above keeps
+             MatchOverlays.uss alone. Solo never shows this room: solo PLAY AGAIN goes straight to GET READY
+             (decision 3). LEAVE = BACK TO LOBBY's exit; CHANGE BIRD leaves to the menu's PICK YOUR BIRD;
+             Esc / Android back = LEAVE. MatchOverlaysController builds the four seats once (#LobbyGrid). -->
+        <ui:VisualElement name="LobbyOverlay" class="cw-overlay cw-overlay--opaque" style="display: none;">
+            <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
+            <ui:VisualElement class="cw-me-backdrop" picking-mode="Ignore" />
+            <ui:VisualElement class="cw-me-backdrop-tint" picking-mode="Ignore" />
 
-                <!-- LEFT rail: ribbon + invite + settings + status + start -->
-                <ui:VisualElement name="LobbyRail" class="cw-lob-rail">
-                    <ui:VisualElement class="cw-me-ribbon cw-me-ribbon--gold">
-                        <ui:Label text="@screen.lobby.title" class="cw-me-ribbon__label" />
+            <ui:VisualElement name="LobbySafe" class="cw-wr-safe">
+                <ui:VisualElement class="cw-page-header">
+                    <ui:Button name="LobbyLeaveBtn" text="@nav.leave" class="cw-home-btn" />
+                    <ui:VisualElement class="cw-ribbon">
+                        <ui:Label text="@screen.lobby.title" class="cw-title" />
                     </ui:VisualElement>
-
-                    <ui:VisualElement name="LobbyInviteCard" class="cw-lob-card">
-                        <ui:Label text="@lobby.invite.label" class="cw-lob-card__label" />
-                        <!-- Controller fills with .cw-code-tile letters (host only) -->
-                        <ui:VisualElement name="CodeTiles" class="cw-code-tiles" />
-                        <ui:VisualElement class="cw-lob-btnrow">
-                            <ui:Button name="LobbyShareBtn" text="@btn.share" class="cw-mini-btn cw-mini-btn--gold" />
-                            <ui:Button name="LobbyCopyBtn" text="@btn.copy" class="cw-mini-btn" />
-                        </ui:VisualElement>
-                    </ui:VisualElement>
-
-                    <ui:VisualElement name="LobbySettingsCard" class="cw-lob-card">
-                        <ui:Label text="@lobby.rules" class="cw-lob-card__head" />
-                        <ui:VisualElement class="cw-setting-row">
-                            <ui:Label text="@lobby.setting.arena" class="cw-setting-k" />
-                            <ui:Label text="@lobby.value.arena" class="cw-setting-v" />
-                        </ui:VisualElement>
-                        <ui:VisualElement class="cw-setting-row">
-                            <ui:Label text="@lobby.setting.time" class="cw-setting-k" />
-                            <ui:Label name="LobbySettingTime" text="" class="cw-setting-v" />
-                        </ui:VisualElement>
-                        <ui:VisualElement class="cw-setting-row">
-                            <ui:Label text="@lobby.setting.goal" class="cw-setting-k" />
-                            <ui:Label name="LobbySettingGoal" text="" class="cw-setting-v" />
-                        </ui:VisualElement>
-                        <ui:VisualElement class="cw-setting-row">
-                            <ui:Label text="@lobby.setting.mode" class="cw-setting-k" />
-                            <ui:Label text="@lobby.value.mode" class="cw-setting-v" />
-                        </ui:VisualElement>
-                    </ui:VisualElement>
-
-                    <ui:VisualElement name="LobbyStatusPill" class="cw-status-pill">
-                        <ui:VisualElement name="LobbyStatusDot" class="cw-status-dot" />
-                        <ui:Label name="LobbyStatusCount" text="" class="cw-status-count" />
-                        <ui:Label name="LobbyStatusText" text="" class="cw-status-text" />
-                    </ui:VisualElement>
-
-                    <ui:VisualElement class="cw-flex-spacer" />
-
-                    <ui:Button name="LobbyStartBtn" text="@btn.start" class="cw-btn cw-btn--green cw-lob-start" />
-                    <ui:Label name="LobbyHint" text="" class="cw-lob-hint" />
                 </ui:VisualElement>
 
-                <!-- RIGHT: 2×2 player grid -->
-                <ui:VisualElement name="LobbyRight" class="cw-lob-right">
-                    <ui:VisualElement class="cw-players-head">
-                        <ui:Label text="@lobby.players" class="cw-players-title" />
-                        <ui:VisualElement class="cw-players-divider" />
+                <ui:VisualElement name="LobbyRuleChips" class="cw-rule-chips">
+                    <ui:Label text="@lobby.rules" class="cw-rule-chips__head" />
+                    <ui:VisualElement class="cw-rule-chip">
+                        <ui:Label text="@lobby.setting.time" class="cw-rule-chip__k" /><ui:Label name="LobbySettingTime" text="" class="cw-rule-chip__v" />
                     </ui:VisualElement>
-                    <!-- Controller fills with 4 player cards (filled or empty) -->
-                    <ui:VisualElement name="LobbyGrid" class="cw-player-grid" />
+                    <ui:VisualElement class="cw-rule-chip">
+                        <ui:Label text="@lobby.setting.goal" class="cw-rule-chip__k" /><ui:Label name="LobbySettingGoal" text="" class="cw-rule-chip__v" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="cw-rule-chip">
+                        <ui:Label text="@lobby.setting.mode" class="cw-rule-chip__k" /><ui:Label text="@lobby.value.mode" class="cw-rule-chip__v" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="cw-rule-chip">
+                        <ui:Label text="@lobby.setting.arena" class="cw-rule-chip__k" /><ui:Label text="@lobby.value.arena" class="cw-rule-chip__v" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- The lineup: four .cw-seat children, one per spawn corner (built once in C#). -->
+                <ui:VisualElement name="LobbyGrid" class="cw-lineup" />
+
+                <ui:VisualElement name="LobbyBottom" class="cw-coop-bottom">
+                    <ui:VisualElement class="cw-coop-left">
+                        <ui:VisualElement name="LobbyStatusPill" class="cw-status-pill">
+                            <ui:VisualElement name="LobbyStatusDot" class="cw-status-dot" />
+                            <ui:Label name="LobbyStatusCount" text="" class="cw-status-count" />
+                            <ui:Label name="LobbyStatusText" text="" class="cw-status-text" />
+                        </ui:VisualElement>
+                        <!-- Invite code (host only) -->
+                        <ui:VisualElement name="LobbyInviteCard" class="cw-raised cw-lobby-card">
+                            <ui:Label text="@lobby.invite.label" class="cw-lobby-cardlabel" />
+                            <ui:VisualElement class="cw-lobby-btnrow">
+                                <ui:VisualElement name="CodeTiles" class="cw-code-tiles" />
+                                <ui:Button name="LobbyShareBtn" text="@btn.share" class="cw-mini-btn" />
+                                <ui:Button name="LobbyCopyBtn" text="@btn.copy" class="cw-mini-btn" />
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+
+                    <ui:VisualElement class="cw-coop-center" />
+
+                    <!-- Actions, with the host / guest line under them (as the menu Coop's status line sits under START). -->
+                    <ui:VisualElement class="cw-coop-right">
+                        <ui:VisualElement class="cw-wr-actions">
+                            <ui:Button name="LobbyChangeBirdBtn" text="@btn.changeBird" class="cw-btn cw-btn--wood cw-wr-changebird" />
+                            <ui:Button name="LobbyStartBtn" text="@btn.start" class="cw-btn cw-btn--green cw-page-cta" />
+                        </ui:VisualElement>
+                        <ui:Label name="LobbyHint" text="" class="cw-body cw-on-art cw-wr-hint" />
+                    </ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
@@ -209,7 +216,7 @@
         <!-- ============================================================ -->
         <ui:VisualElement name="SessionEndOverlay" class="cw-overlay cw-overlay--dim" style="display: none;">
             <ui:VisualElement name="SessionEndPanel" class="cw-se-panel">
-                <ui:Label text="@session.ended" class="cw-se-title" />
+                <ui:Label name="SessionEndTitle" text="" class="cw-se-title" />
                 <ui:Label name="SessionEndReason" text="" class="cw-se-reason" />
                 <ui:Label name="SessionEndCountdown" text="" class="cw-se-countdown" />
             </ui:VisualElement>

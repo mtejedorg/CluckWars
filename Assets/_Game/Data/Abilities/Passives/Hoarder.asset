@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.HoarderPassiveSO
   DisplayName: Hoarder
   ShortLabel: HRDR
-  Description: Carries at least 40 food. A whole win in one trip.
+  Description: Carries at least 40 food.
   Icon: 
   AccentColor: {r: 0.96, g: 0.72, b: 0.25, a: 1}
   Category: 3

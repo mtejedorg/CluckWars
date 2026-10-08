@@ -76,6 +76,19 @@ namespace CluckWars.UI
             _                     => UiKeys.ClassWarriorShort,
         });
 
+        /// <summary>The class's role from the wording dictionary (role.*), as THE COOP's seat line shows it.</summary>
+        public static string RoleName(ChickenClass cls) => UiText.Get(cls switch
+        {
+            ChickenClass.Speedy   => UiKeys.RoleSpeedy,
+            ChickenClass.Fatty    => UiKeys.RoleFatty,
+            ChickenClass.Assassin => UiKeys.RoleAssassin,
+            _                     => UiKeys.RoleWarrior,
+        });
+
+        /// <summary>"{CLASS} · {role}": the seat line of THE COOP and of the in-match waiting room.</summary>
+        public static string ClassRoleLine(ChickenClass cls) =>
+            UiText.Format(UiKeys.LobbyClassLine, ("cls", ClassName(cls)), ("role", RoleName(cls)));
+
         /// <summary>
         /// The win banner: "YOU WIN!" for the local player, "{NAME} WINS!" for anyone else,
         /// "MATCH ENDED" with no winner.

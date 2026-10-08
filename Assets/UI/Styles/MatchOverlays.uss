@@ -381,213 +381,24 @@
 .cw-me-pod--1 .cw-chicken--assassin { background-image: url("project://database/Assets/_Game/Art/UI/Chickens/Hero_assassin_cheer.png"); }
 
 /* ============================================================================
-   MATCH LOBBY  (rail + 2×2 grid) — same visual language as menu lobby
+   IN-MATCH WAITING ROOM  (multiplayer only; round 2, finding 2)
    ============================================================================ */
-.cw-lob-panel {
-    width: 96%; max-width: 2432px; max-height: 92%; flex-grow: 0;
-    flex-direction: row; align-items: stretch;
-    /* Flat wood + the PanelFrame rim colour. PanelFrame.png stretched un-sliced drew its 52 px shadow
-       margin as a second, offset frame line across the rail and the grid. */
-    background-color: rgb(42, 26, 12);
-    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
-    border-left-color: rgb(122, 86, 40); border-right-color: rgb(122, 86, 40);
-    border-top-color: rgb(122, 86, 40); border-bottom-color: rgb(122, 86, 40);
-    border-top-left-radius: 30px; border-top-right-radius: 30px;
-    border-bottom-left-radius: 30px; border-bottom-right-radius: 30px;
+/* The room is THE COOP: Assets/UI/MatchOverlays.uxml attaches CluckWarsTheme.uss to #LobbyOverlay
+   alone, so its seats, rule chips, bottom bar and planks are the menu's own classes (.cw-seat*,
+   .cw-rule-chips, .cw-coop-*, .cw-btn, .cw-home-btn). Only the layout glue lives here. */
+/* Safe-area host (SafeAreaPadding pads it), laid out like a menu page: header / chips / lineup / bar. */
+.cw-wr-safe {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    flex-direction: column; align-items: stretch; justify-content: flex-start;
 }
-.cw-lob-rail {
-    width: 570px; flex-shrink: 0;
-    padding-top: 27px; padding-bottom: 27px; padding-left: 30px; padding-right: 30px;
-    border-right-width: 2px; border-right-color: rgba(138, 106, 58, 0.4);
-}
-.cw-lob-card {
-    margin-top: 17px;
-    padding-top: 17px; padding-bottom: 17px; padding-left: 21px; padding-right: 21px;
-    background-color: rgb(46, 30, 18);
-    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
-    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
-    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
-    border-top-left-radius: 19px; border-top-right-radius: 19px;
-    border-bottom-left-radius: 19px; border-bottom-right-radius: 19px;
-}
-.cw-lob-card__label {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 30px; letter-spacing: 2px; color: rgb(196, 160, 96);
-}
-.cw-lob-card__head {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 34px; letter-spacing: 2px; color: rgb(245, 200, 66); margin-bottom: 8px;
-}
-.cw-code-tiles { flex-direction: row; flex-wrap: wrap; margin-top: 11px; }
-.cw-code-tile {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 42px; color: rgb(26, 14, 4); -unity-text-align: middle-center;
-    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/CodeTile.png");
-    -unity-background-scale-mode: stretch-to-fill;
-    min-width: 57px;
-    padding-top: 4px; padding-bottom: 4px; padding-left: 15px; padding-right: 15px;
-    margin-right: 8px; margin-bottom: 8px;
-}
-.cw-lob-btnrow { flex-direction: row; margin-top: 15px; }
-.cw-mini-btn {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    flex-grow: 1; flex-basis: 0; min-height: 116px;   /* 48 dp touch floor */
-    font-size: 34px; letter-spacing: 2px; color: rgb(254, 245, 224);
-    -unity-text-align: middle-center;
-    background-color: rgb(58, 40, 22);
-    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/ButtonGrayscale.png");
-    -unity-background-scale-mode: stretch-to-fill;
-    -unity-background-image-tint-color: rgb(58, 40, 22);
-    border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
-    border-top-left-radius: 11px; border-top-right-radius: 11px;
-    border-bottom-left-radius: 11px; border-bottom-right-radius: 11px;
-    padding-top: 10px; padding-bottom: 10px;
-    margin-right: 11px;
-}
-.cw-mini-btn--gold {
-    color: rgb(26, 14, 4);
-    -unity-background-image-tint-color: rgb(212, 160, 32);
-}
-.cw-setting-row { flex-direction: row; justify-content: space-between; margin-top: 6px; }
-.cw-setting-k {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 34px; letter-spacing: 1px; color: rgb(196, 160, 96);
-}
-.cw-setting-v {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 34px; color: rgb(254, 245, 224);
-}
-.cw-status-pill {
-    flex-direction: row; align-items: center; margin-top: 19px;
-    padding-top: 11px; padding-bottom: 11px; padding-left: 19px; padding-right: 19px;
-    background-color: rgba(245, 200, 66, 0.06);
-    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
-    border-left-color: rgba(245, 200, 66, 0.25); border-right-color: rgba(245, 200, 66, 0.25);
-    border-top-color: rgba(245, 200, 66, 0.25); border-bottom-color: rgba(245, 200, 66, 0.25);
-    border-top-left-radius: 11px; border-top-right-radius: 11px;
-    border-bottom-left-radius: 11px; border-bottom-right-radius: 11px;
-}
-.cw-status-dot {
-    width: 17px; height: 17px; margin-right: 15px;
-    border-top-left-radius: 10px; border-top-right-radius: 10px;
-    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
-    background-color: rgb(245, 200, 66);
-}
-.cw-status-count {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 34px; color: rgb(254, 245, 224); margin-right: 11px;
-}
-.cw-status-text {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 34px; color: rgb(245, 200, 66); flex-grow: 1; -unity-text-align: middle-right;
-}
-.cw-lob-start { letter-spacing: 4px; margin-top: 15px; }
-.cw-lob-hint {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 34px; color: rgb(196, 160, 96); -unity-text-align: middle-center;
-    white-space: normal; margin-top: 11px; min-height: 27px;
-}
-.cw-lob-right {
-    flex-grow: 1; min-width: 0;
-    padding-top: 27px; padding-bottom: 27px; padding-left: 30px; padding-right: 30px;
-}
-.cw-players-head { flex-direction: row; align-items: center; margin-bottom: 15px; }
-.cw-players-title {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 34px; letter-spacing: 2px; color: rgb(245, 200, 66); margin-right: 15px;
-}
-.cw-players-divider { flex-grow: 1; height: 2px; background-color: rgba(245, 200, 66, 0.4); }
-.cw-player-grid {
-    flex-grow: 1; flex-direction: row; flex-wrap: wrap;
-    justify-content: space-between; align-content: space-between;
-}
-
-/* -- player cards (built in C#) -- */
-.cw-player-card {
-    width: 49%; height: 48%;
-    flex-direction: row; align-items: center;
-    padding-top: 15px; padding-bottom: 15px; padding-left: 19px; padding-right: 19px;
-    background-color: rgb(48, 32, 18);
-    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
-    border-left-color: rgb(106, 74, 40); border-right-color: rgb(106, 74, 40);
-    border-top-color: rgb(106, 74, 40); border-bottom-color: rgb(106, 74, 40);
-    border-top-left-radius: 19px; border-top-right-radius: 19px;
-    border-bottom-left-radius: 19px; border-bottom-right-radius: 19px;
-    overflow: hidden;
-}
-.cw-player-card--empty {
-    background-color: rgba(20, 14, 8, 0.3);
-    align-items: center; justify-content: center;
-    border-left-color: rgba(138, 106, 58, 0.55); border-right-color: rgba(138, 106, 58, 0.55);
-    border-top-color: rgba(138, 106, 58, 0.55); border-bottom-color: rgba(138, 106, 58, 0.55);
-}
-.cw-player-accent { position: absolute; left: 0; top: 0; bottom: 0; width: 8px; }
-.cw-player-art {
-    width: 99px; height: 99px; flex-shrink: 0; margin-right: 17px;
-    -unity-background-scale-mode: scale-to-fit;
-}
-.cw-player-mid { flex-grow: 1; min-width: 0; }
-.cw-player-namerow { flex-direction: row; align-items: center; }
-.cw-player-name {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 34px; color: rgb(254, 245, 224); white-space: nowrap; margin-right: 10px;
-}
-/* Class name: cream, never the player colour (that is the card's accent bar + border). */
-.cw-player-pn {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 34px; margin-right: 10px; color: rgb(254, 245, 224);
-}
-.cw-player-host {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 34px; letter-spacing: 1px; color: rgb(26, 14, 4);
-    background-color: rgb(245, 200, 66);
-    padding-top: 2px; padding-bottom: 2px; padding-left: 10px; padding-right: 10px;
-    border-top-left-radius: 6px; border-top-right-radius: 6px;
-    border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
-}
-.cw-player-class {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 34px; color: rgb(196, 160, 96); white-space: normal; margin-top: 4px;
-}
-.cw-player-chips { flex-direction: row; margin-top: 10px; }
-.cw-mini-hex {
-    width: 46px; height: 53px; margin-right: 8px;
-    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/HexGlossy.png");
-    -unity-background-scale-mode: scale-to-fit;
-    align-items: center; justify-content: center;
-}
-.cw-mini-hex--empty { -unity-background-image-tint-color: rgba(60, 44, 26, 0.8); }
-.cw-mini-hex__icon {
-    width: 30px; height: 30px; -unity-background-scale-mode: scale-to-fit;
-}
-/* Under the class line in the text column (left-aligned), not a third column. */
-.cw-player-state {
-    flex-shrink: 0; align-self: flex-start; margin-top: 10px;
-    padding-top: 8px; padding-bottom: 8px; padding-left: 17px; padding-right: 17px;
-    -unity-text-align: middle-center;
-    border-top-left-radius: 11px; border-top-right-radius: 11px;
-    border-bottom-left-radius: 11px; border-bottom-right-radius: 11px;
-}
-.cw-player-state--ready {
-    background-color: rgb(51, 163, 50);
-    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
-    border-left-color: rgb(74, 230, 106); border-right-color: rgb(74, 230, 106);
-    border-top-color: rgb(74, 230, 106); border-bottom-color: rgb(74, 230, 106);
-}
-.cw-player-state--picking {
-    background-color: rgba(40, 30, 20, 0.6);
-    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
-    border-left-color: rgb(138, 106, 58); border-right-color: rgb(138, 106, 58);
-    border-top-color: rgb(138, 106, 58); border-bottom-color: rgb(138, 106, 58);
-}
-.cw-player-state__label {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 34px; letter-spacing: 1px; color: rgb(254, 245, 224);
-}
-.cw-player-empty-label {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 34px; letter-spacing: 2px; color: rgb(196, 160, 96);
-}
+/* Host / guest line under the action planks: one line of body copy with the on-art outline. (In the
+   bar's centre column it collapsed to one letter per line next to a long invite card.) */
+.cw-wr-hint { -unity-text-align: middle-right; white-space: nowrap; align-self: flex-end; color: rgb(254, 245, 224); margin-top: 4px; }
+/* The status pill keeps its size next to the invite card (it shrank, cutting "Waiting…" and squashing the
+   lamp to a line). Id-qualified, so it outranks the scoped menu theme. */
+#LobbyOverlay .cw-status-pill, #LobbyOverlay .cw-status-dot { flex-shrink: 0; }
+.cw-wr-actions { flex-direction: row; align-items: center; }
+.cw-wr-changebird { margin-right: 18px; min-width: 300px; }
 
 /* ---- Shared buttons — the menus' cw-btn (CluckWarsTheme.uss), restated for this sheet -------- */
 .cw-btn {
@@ -639,7 +450,7 @@
     width: 1178px; max-width: 88%;
     align-items: center; justify-content: center;
     padding-top: 49px; padding-bottom: 49px; padding-left: 57px; padding-right: 57px;
-    background-color: rgb(42, 26, 12);   /* flat, like .cw-lob-panel (no un-sliced PanelFrame) */
+    background-color: rgb(42, 26, 12);   /* flat wood (an un-sliced PanelFrame drew a second, offset frame line) */
     border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
     border-left-color: rgb(122, 86, 40); border-right-color: rgb(122, 86, 40);
     border-top-color: rgb(122, 86, 40); border-bottom-color: rgb(122, 86, 40);

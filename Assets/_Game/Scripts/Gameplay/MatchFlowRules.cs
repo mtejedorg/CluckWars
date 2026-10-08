@@ -10,6 +10,8 @@ namespace CluckWars.Gameplay
         MainMenu,
         /// <summary>THE COOP, with the last class / perk / loadout restored.</summary>
         Lobby,
+        /// <summary>PICK YOUR BIRD, with the current selection kept (the waiting room's CHANGE BIRD).</summary>
+        ClassSelect,
     }
 
     /// <summary>What a scene load with a flow intent should do: whether the one-shot flag was set (and
@@ -69,10 +71,20 @@ namespace CluckWars.Gameplay
     public static class MatchFlowRules
     {
         /// <summary>
-        /// The state PLAY AGAIN resets into: the in-session waiting room. Never
-        /// <see cref="MatchState.Active"/> - the host (or the solo player) must press START.
+        /// The state a round reset (PLAY AGAIN, or a fresh manager over a dirty world) writes: the in-session
+        /// waiting room. Never <see cref="MatchState.Active"/>; see <see cref="StateAfterPlayAgain"/> for where
+        /// PLAY AGAIN goes from there.
         /// </summary>
         public const MatchState PlayAgainState = MatchState.WaitingForPlayers;
+
+        /// <summary>
+        /// Where PLAY AGAIN lands (re-audit round 2, decision 3). Solo goes straight to GET READY
+        /// (<see cref="MatchState.Starting"/>): the player pressed PLAY AGAIN, so nothing starts on its own,
+        /// and a waiting room with nobody to wait for has nothing to decide. Multiplayer stays in the waiting
+        /// room until the host presses START. Never <see cref="MatchState.Active"/>: every round still goes
+        /// through the GET READY settle and the 3-2-1.
+        /// </summary>
+        public static MatchState StateAfterPlayAgain(bool solo) => solo ? MatchState.Starting : PlayAgainState;
 
         /// <summary>
         /// Only the state authority (the host / master client, or the solo player) may re-arm the
@@ -108,8 +120,18 @@ namespace CluckWars.Gameplay
         /// always consumed (cleared), even with no valid last setup; the mode is only read from the
         /// setup when it is valid, otherwise Solo.
         /// </summary>
-        public static PostMatchIntent DecidePostMatchIntent(bool openLobbyFlag, bool hasValidLastSetup, SessionMode lastMode)
+        public static PostMatchIntent DecidePostMatchIntent(bool openLobbyFlag, bool hasValidLastSetup, SessionMode lastMode) =>
+            DecidePostMatchIntent(openLobbyFlag, false, hasValidLastSetup, lastMode);
+
+        /// <summary>
+        /// The menu-load decision with the waiting room's CHANGE BIRD flag: it wins over the BACK TO LOBBY
+        /// flag (PICK YOUR BIRD, whatever the last setup), and either flag is consumed.
+        /// </summary>
+        public static PostMatchIntent DecidePostMatchIntent(bool openLobbyFlag, bool changeBirdFlag,
+            bool hasValidLastSetup, SessionMode lastMode)
         {
+            if (changeBirdFlag)
+                return new PostMatchIntent(true, MenuLanding.ClassSelect, hasValidLastSetup ? lastMode : SessionMode.Solo);
             if (!openLobbyFlag) return new PostMatchIntent(false, MenuLanding.MainMenu, SessionMode.Solo);
             var mode = hasValidLastSetup ? lastMode : SessionMode.Solo;
             return new PostMatchIntent(true, LandingAfterMatch(mode, hasValidLastSetup), mode);

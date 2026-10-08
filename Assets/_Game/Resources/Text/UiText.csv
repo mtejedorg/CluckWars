@@ -72,8 +72,8 @@ category.steal,STEAL
 category.control,CONTROL
 category.defense,DEFENSE
 category.utility,UTILITY
-cooldown.short,SHORT
-cooldown.med,MED
+cooldown.short,SHORT RECHARGE
+cooldown.med,MEDIUM RECHARGE
 settings.title,SETTINGS
 settings.close,CLOSE
 settings.rangeGuides,Range Guides
@@ -104,10 +104,10 @@ lobby.playerTag,P{n}
 lobby.classLine,{cls} · {role}
 lobby.codePlaceholder,·····
 lobby.copied,Copied {code}.
-lobby.err.create,Could not create lobby.
-lobby.err.noCode,Enter a join code first.
-lobby.err.join,Could not join that code.
-lobby.err.load,Could not start the match.
+lobby.err.create,The coop would not open. Check your connection and try again.
+lobby.err.noCode,Type the whole coop code first.
+lobby.err.join,No coop answered that code. Check it and try again.
+lobby.err.load,The barn doors stuck. Press START again.
 lobby.joining,Joining…
 tag.host,HOST
 tag.cpu,CPU
@@ -129,12 +129,9 @@ postmatch.winSub,{cls}
 postmatch.noWinner,No winner this round.
 
 postmatch.youWin,YOU WIN!
-lobby.players,PLAYERS
-lobby.classPerk,{cls} · {perk}
 lobby.hint.host,Start whenever you like.
 lobby.hint.guest,Waiting for the host…
 session.ended,MATCH OVER
-session.reason,The session closed ({reason}).
 session.returning,Back to the barn in {n}s…
 countdown.getReady,GET READY
 hud.goal,★ FIRST TO {n}
@@ -157,3 +154,14 @@ hud.event.restock,RESTOCK!
 countdown.waitingFor,Waiting for {name}…
 countdown.waitingSomeone,Waiting for a slow bird…
 session.hostLeft,The host flew the coop.
+nav.leave,LEAVE
+btn.changeBird,CHANGE BIRD
+session.closed,COOP CLOSED
+session.reason.signal,Lost the signal to the barn.
+session.reason.closed,The coop shut its doors for the night.
+session.reason.full,That coop is full. No room on the perch.
+session.reason.busy,The barn is packed right now. Try again in a bit.
+session.reason.notFound,That coop has flown away.
+session.reason.auth,The barn door would not let us in.
+session.reason.version,Your game and theirs do not match. Update and try again.
+session.reason.generic,Something spooked the flock.

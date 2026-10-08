@@ -259,7 +259,7 @@ namespace CluckWars.Gameplay
             }
 
             // Match ended — hold here until someone acts. Nothing restarts on a timer:
-            // PLAY AGAIN (RequestPlayAgain) re-arms the waiting room, BACK TO LOBBY leaves.
+            // PLAY AGAIN (RequestPlayAgain) re-arms GET READY (solo) or the waiting room, BACK TO LOBBY leaves.
             if (State != MatchState.Active) return;
 
             // No win checks during the intro countdown. Bases are all empty
@@ -761,12 +761,14 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// PLAY AGAIN: stay in the session with the same players, bots and loadouts. Resets
-        /// the world and returns to <see cref="MatchState.WaitingForPlayers"/>, so the
-        /// in-session waiting room shows and the host must press START (<see cref="StartMatchNow"/>).
-        /// Nothing auto-starts, solo included — the solo auto-start in <see cref="Spawned"/>
-        /// runs once at spawn and never again. Ignored unless this peer has state authority and
-        /// the round has ended (<see cref="MatchFlowRules.CanPlayAgain"/>).
+        /// PLAY AGAIN: stay in the session with the same players, bots and loadouts. Resets the world,
+        /// then goes where <see cref="MatchFlowRules.StateAfterPlayAgain"/> says (round 2, decision 3):
+        /// solo straight to GET READY (<see cref="BeginStarting"/>: the settle gate and the full 3-2-1, as
+        /// every round); multiplayer back to <see cref="MatchState.WaitingForPlayers"/>, where the host
+        /// presses START (<see cref="StartMatchNow"/>). Nothing starts on a timer: the player pressed PLAY
+        /// AGAIN. Only the state authority (host / solo player) has the button enabled, so no client RPC is
+        /// needed. Ignored unless this peer has state authority and the round has ended
+        /// (<see cref="MatchFlowRules.CanPlayAgain"/>).
         /// </summary>
         public void RequestPlayAgain()
         {
@@ -775,8 +777,10 @@ namespace CluckWars.Gameplay
                 _log?.Debug(Source, $"RequestPlayAgain ignored — authority={HasStateAuthority}, state={State}.");
                 return;
             }
-            _log?.Info(Source, "Play Again accepted — resetting the world and re-arming the waiting room.");
+            bool solo = Runner != null && Runner.GameMode == GameMode.Single;
+            _log?.Info(Source, $"Play Again accepted — resetting the world ({(solo ? "solo: straight to GET READY" : "re-arming the waiting room")}).");
             ResetWorldForNewRound();
+            if (MatchFlowRules.StateAfterPlayAgain(solo) == MatchState.Starting) BeginStarting("solo PLAY AGAIN");
         }
 
         /// <summary>Reads the live bases and piles into the pure <see cref="WorldDirt"/> the

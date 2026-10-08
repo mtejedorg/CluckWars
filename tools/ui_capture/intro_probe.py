@@ -72,7 +72,7 @@ def playagain(tag, reduced):
         time.sleep(1)
     time.sleep(1.5); say("state:", cs("State"), cs("Press", "MePlayAgainBtn"))
     time.sleep(3); say("state after play again:", cs("State"))
-    say("lobby START:", cs("Press", "LobbyStartBtn"))
+    # Solo PLAY AGAIN goes straight to GET READY (round 2, decision 3): no waiting room, no START.
     time.sleep(10)
     p = f"{OUTCS}/_tmp_{tag}.txt"; cs("Dump", p); time.sleep(0.3)
     LOG.append(open(p, encoding="utf-8").read()); os.remove(p)
@@ -100,7 +100,7 @@ def item4():
     say("state after round 1:", cs("State"))
     time.sleep(2.5); say(cs("Press", "MePlayAgainBtn"))
     time.sleep(2.5); say("state after PLAY AGAIN:", cs("State"))
-    say("lobby START:", cs("Press", "LobbyStartBtn"))
+    # Solo PLAY AGAIN goes straight to GET READY (round 2, decision 3): no waiting room, no START.
     time.sleep(9)
     say("state:", cs("State"))
     p = f"{OUTCS}/_tmp_item4.txt"; cs("Dump", p); time.sleep(0.3)
