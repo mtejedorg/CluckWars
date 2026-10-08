@@ -216,5 +216,8 @@ namespace CluckWars.Localization
         public const string SessionReasonVersion = "session.reason.version";
         public const string SessionReasonGeneric = "session.reason.generic";
 
+        // ---- Phase 5 chunk 5 (round-2 finding 10: join pill for a half-typed code) ----
+        public const string LobbyStatusKeepTyping = "lobby.status.keepTyping";
+
     }
 }

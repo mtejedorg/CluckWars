@@ -238,7 +238,9 @@ namespace CluckWars.UI
             for (int i = 0; i < _bases.Length; i++)
             {
                 var b = _bases[i];
-                if (b != null && b.Object != null && b.Object.IsValid)
+                // No row for a corner nobody plays (round-2 leftover; the same rule as post-match).
+                if (b != null && b.Object != null && b.Object.IsValid
+                    && MatchStandings.Listed(ChickenForCorner(b.CornerIndex) != null, b.FoodTotal))
                     sorted.Add((b.CornerIndex, b.FoodTotal));
             }
             sorted.Sort((a, b) => b.total.CompareTo(a.total));

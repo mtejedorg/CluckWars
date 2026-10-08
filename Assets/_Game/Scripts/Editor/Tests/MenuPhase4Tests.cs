@@ -43,13 +43,13 @@ namespace CluckWars.Tests
         [Test]
         public void JoinCode_IsCompleteAtSixCharacters_Trimmed()
         {
-            Assert.IsFalse(MenuUiController.IsJoinCodeComplete(null));
-            Assert.IsFalse(MenuUiController.IsJoinCodeComplete(""));
-            Assert.IsFalse(MenuUiController.IsJoinCodeComplete("   "));
-            Assert.IsFalse(MenuUiController.IsJoinCodeComplete("ABC12"));
-            Assert.IsFalse(MenuUiController.IsJoinCodeComplete("  ABC12  "));
-            Assert.IsTrue(MenuUiController.IsJoinCodeComplete("ABC123"), "a UGS lobby code");
-            Assert.IsTrue(MenuUiController.IsJoinCodeComplete("cluck-lan"), "the offline host's session name");
+            Assert.IsFalse(JoinCodeEntry.IsComplete(null));
+            Assert.IsFalse(JoinCodeEntry.IsComplete(""));
+            Assert.IsFalse(JoinCodeEntry.IsComplete("   "));
+            Assert.IsFalse(JoinCodeEntry.IsComplete("ABC12"));
+            Assert.IsFalse(JoinCodeEntry.IsComplete("  ABC12  "));
+            Assert.IsTrue(JoinCodeEntry.IsComplete("ABC123"), "a UGS lobby code");
+            Assert.IsTrue(JoinCodeEntry.IsComplete("cluck-lan"), "the offline host's session name");
         }
 
         [Test]
@@ -77,13 +77,19 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void GearUp_HasTheDoorwayBird_BeforeTheBody()
+        public void GearUp_HasTheDoorwayBird_InItsOwnSlotBetweenTheSlotsAndTheDeck()
         {
+            // Round-2 finding 7: the bird used to sit under the body, so the deck hid all but its
+            // forehead on phone / tablet. It now owns the doorway slot between the slot row and the deck.
             string xml = Read("Assets/UI/CharacterSelect.uxml");
+            int slots = xml.IndexOf("name=\"SlotBoxRow\"");
+            int doorway = xml.IndexOf("name=\"GearDoorway\"");
             int bird = xml.IndexOf("name=\"GearChicken\"");
-            int body = xml.IndexOf("name=\"Body\"");
-            Assert.Greater(bird, 0);
-            Assert.Less(bird, body, "drawn under the slots and the deck");
+            int deck = xml.IndexOf("name=\"Deck\"");
+            Assert.Greater(slots, 0);
+            Assert.Greater(doorway, slots, "doorway after the slot row");
+            Assert.Greater(bird, doorway, "bird inside the doorway");
+            Assert.Less(bird, deck, "doorway before the deck");
         }
 
         [Test]

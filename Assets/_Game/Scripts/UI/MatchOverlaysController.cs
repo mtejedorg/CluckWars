@@ -828,7 +828,7 @@ namespace CluckWars.UI
                 var b = bases[i];
                 if (b == null) continue;
                 var c = ChickenForCorner(b.CornerIndex);
-                if (c == null && b.FoodTotal <= 0f) continue;
+                if (!MatchStandings.Listed(c != null, b.FoodTotal)) continue;
                 list.Add(c != null
                     ? new MatchStandings.Entry(b.CornerIndex, b.FoodTotal, GetKillsForCorner(b.CornerIndex),
                         c.HasInputAuthority, c.IsBot, c.Class)
@@ -1014,14 +1014,7 @@ namespace CluckWars.UI
         private void SetCodeTiles(string code)
         {
             if (_codeTiles == null) return;
-            _codeTiles.Clear();
-            if (string.IsNullOrEmpty(code)) return;
-            foreach (var ch in code.ToUpperInvariant())
-            {
-                var t = new Label(ch.ToString());
-                t.AddToClassList("cw-code-tile");
-                _codeTiles.Add(t);
-            }
+            CodeTileFit.Fill(_codeTiles, code);   // shrinks / wraps a long code instead of running under SHARE / COPY
         }
 
         private void OnLobbyStart()

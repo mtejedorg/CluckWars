@@ -48,7 +48,7 @@
         <!-- The lineup: MenuUiController builds four .cw-seat children once. -->
         <ui:VisualElement name="PlayerGrid" class="cw-lineup" />
 
-        <ui:VisualElement name="CoopBottom" class="cw-coop-bottom">
+        <ui:VisualElement name="CoopBottom" class="cw-coop-bottom cw-coop-bottom--centred">
             <ui:VisualElement class="cw-coop-left">
                 <ui:VisualElement name="StatusPill" class="cw-status-pill">
                     <ui:VisualElement name="StatusDot" class="cw-status-dot" />
@@ -68,9 +68,10 @@
 
             </ui:VisualElement>
 
-            <!-- Centre of the bar, under the open gate: the READY! status (all seats ready; a status
-                 label, not a button - display + reveal driven from C#) or, in join mode, the big
-                 centred code entry (JOIN MATCH stays disabled until the code is complete). -->
+            <!-- Centre of the PAGE, under the open gate (round-2 finding 10: the side columns are equal, see
+                 the "centred" bottom-bar modifier): the READY! status (all seats ready; a status label, not a
+                 button - display + reveal driven from C#) or, in join mode, the big centred code entry
+                 (JOIN MATCH stays disabled until the code is complete; Enter / Done submits then). -->
             <ui:VisualElement class="cw-coop-center">
                 <ui:VisualElement name="ReadyBanner" class="cw-ready-banner" style="display: none;" picking-mode="Ignore">
                     <ui:Label text="@lobby.allReady" class="cw-title cw-ready-banner__label" />

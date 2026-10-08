@@ -701,28 +701,37 @@
     padding-top: 16px; padding-bottom: 16px; padding-left: 16px; padding-right: 22px;
 }
 .layout--narrow .cw-hero { flex-grow: 1; }
-/* Phase 4 (re-audit item 10): stage, bale and chicken ~1.4x the Phase 1 size. */
+/* Phase 4 (re-audit item 10): stage, bale and chicken ~1.4x the Phase 1 size.
+   Round-2 finding 16: a painted backdrop instead of a flat wash - the barn interior (Bg_Loadout,
+   cropped to its sunlit doorway, which lands right behind the bird) multiplied by a pale class tint
+   (C#), with the radial glow as a soft light on the bird; the figure is centred vertically. */
 .cw-hero__stage {
     width: 460px; flex-shrink: 0; margin-right: 18px;
-    align-items: center; justify-content: flex-end; padding-bottom: 40px;
+    align-items: center; justify-content: center; overflow: hidden;
     border-top-left-radius: 20px; border-top-right-radius: 20px;
     border-bottom-left-radius: 20px; border-bottom-right-radius: 20px;
-    /* class wash set in C# */
+    background-image: url("project://database/Assets/_Game/Art/UI/Backgrounds/Bg_Loadout.png");
+    -unity-background-scale-mode: scale-and-crop;
+    /* class tint on the painting set in C# */
 }
-/* Centred on the chicken's chest (~55% up the 434 px figure, whose box starts 138 px above the
-   stage bottom): 138 + 0.55 * 434 - 448 / 2 = ~153. */
-.cw-hero__glow { width: 448px; height: 448px; bottom: 153px; }
+/* Light + bale + bird as one block, 550 tall: bale bottom at 0, the 434 px figure from 116 up. */
+.cw-hero__figure { width: 460px; height: 550px; flex-shrink: 0; align-items: center; justify-content: flex-end; }
+/* 4:3: the stage is ~530 tall, so the block is drawn a little smaller (from its centre). */
+.layout--narrow .cw-hero__figure { scale: 0.9 0.9; }
+/* Centred on the chicken's chest (~55% up the 434 px figure, whose box starts 116 px above the
+   block's bottom): 116 + 0.55 * 434 - 448 / 2 = ~131. */
+.cw-hero__glow { width: 448px; height: 448px; bottom: 131px; }
 /* Phase 2: the hero stands on a hay bale (Frames/Pedestal_HayBale, 512x256; its top face
    spans source y 40-96, i.e. ~16-38% of the height). The chicken's feet land on that face. */
 .cw-hero__platform {
-    position: absolute; bottom: 22px;
+    position: absolute; bottom: 0;
     width: 378px; height: 189px;
     background-image: url("project://database/Assets/_Game/Art/UI/Frames/Pedestal_HayBale.png");
     -unity-background-scale-mode: scale-to-fit;
 }
-/* Feet on the bale's top face: bale top = 22 + 189 * 0.73 = ~160; feet sit 5% (22 px) above the
-   figure's bottom edge, which starts at padding 40 + margin -> margin 98. */
-.cw-hero__chicken { width: 434px; height: 434px; margin-bottom: 98px; }
+/* Feet on the bale's top face: bale top = 189 * 0.73 = ~138; feet sit 5% (22 px) above the
+   figure's bottom edge -> margin 116. */
+.cw-hero__chicken { width: 434px; height: 434px; margin-bottom: 116px; }
 /* Top-aligned (re-audit item 10): centring made the name jump whenever a class's quote / perk
    text was a line longer or shorter. */
 .cw-hero__text { flex-grow: 1; flex-basis: 0; min-width: 0; justify-content: flex-start; padding-top: 8px; }
@@ -884,16 +893,17 @@
    READY. Budget, Pixel 9 canvas 961 tall: header 120 + slots ~170 + deck
    ~360 + bottom ~150 = ~800. No page scroll.
    ============================================================================ */
-/* The chosen bird in the barn doorway (Phase 4, re-audit item 21): under the body (first child of
-   the page), centred on the backdrop's door; the deck panels cover its legs, so it peeks over the
-   counter. Static render (.cw-chicken--<cls>) or the live stage (Performance Mode OFF). */
+/* The chosen bird in the barn doorway (Phase 4 item 21, Phase 5 finding 7). It owns a layout slot:
+   the doorway takes the height left between the slot row and the deck (the deck keeps its natural
+   height), so the whole bird stands on the deck's top edge and no card ever covers it. The square
+   render is drawn scale-to-fit, i.e. as tall as the slot and centred on the door. Too short a slot
+   (4:3, where the class cards wrap to two lines) hides the bird: GearDoorway.Fits, set in C#. */
+.cw-gear-doorway { flex-grow: 1; flex-shrink: 1; min-height: 0; align-items: stretch; justify-content: flex-end; }
 .cw-gear-chicken {
-    position: absolute; left: 33%; right: 33%; top: 20%; height: 34%;
+    height: 100%; max-height: 360px;
     -unity-background-scale-mode: scale-to-fit;
 }
-/* The live render frames the bird with hop headroom, so it sits smaller in the box: lift it. */
-.cw-gear-chicken--live { top: 14%; }
-.layout--narrow .cw-gear-chicken { display: none; }
+.cw-gear-chicken--nofit { display: none; }
 .cw-gear-body {
     flex-grow: 1; min-height: 0; min-width: 0;
     padding-left: 16px; padding-right: 16px; padding-bottom: 14px;
@@ -1010,7 +1020,7 @@
    their group (four per line at 290 px): wrapping the class group under the one-card ANY BIRD
    group left a near-empty band across the middle of the page. */
 .cw-deck {
-    flex-grow: 1; min-height: 0;
+    flex-grow: 0; flex-shrink: 0;
     flex-direction: row; flex-wrap: nowrap;
     justify-content: center; align-items: center; align-content: center;
 }
@@ -1300,6 +1310,12 @@
 /* Stretched to the bar's height so the absolutely placed READY! status has a box to centre in. */
 .cw-coop-center { flex-grow: 1; flex-basis: 0; min-width: 0; align-self: stretch; align-items: center; justify-content: center; }
 .cw-coop-right { flex-shrink: 0; align-items: center; }
+/* Menu Coop (round-2 finding 10): equal side columns, so READY! and the join card sit on the centre
+   of the PAGE rather than in whatever gap the status pill and START leave. The in-match waiting
+   room keeps the plain bar (its invite card + two buttons need the room). */
+.cw-coop-bottom--centred > .cw-coop-left { flex-grow: 1; flex-basis: 0; }
+.cw-coop-bottom--centred > .cw-coop-center { flex-grow: 0; flex-basis: auto; min-width: 480px; }
+.cw-coop-bottom--centred > .cw-coop-right { flex-grow: 1; flex-basis: 0; align-items: flex-end; }
 /* READY! is a status, not a control (Phase 4, re-audit item 11): outlined gold display type with
    no plank or ribbon behind it, so it can never read as a second button next to START MATCH. */
 .cw-ready-banner {
@@ -1437,7 +1453,9 @@
     border-top-color: rgb(184, 138, 20); border-bottom-color: rgb(184, 138, 20);
     border-top-left-radius: 8px; border-top-right-radius: 8px;
     border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
-    padding-top: 4px; padding-bottom: 4px; padding-left: 18px; padding-right: 18px;
+    /* Width + font set per tile by CodeTileFit (a long code shrinks its tiles, then wraps). */
+    -unity-text-align: middle-center; flex-shrink: 0;
+    padding-top: 4px; padding-bottom: 4px; padding-left: 0; padding-right: 0;
     margin-right: 8px; margin-bottom: 8px;
 }
 
@@ -1468,6 +1486,13 @@
 .cw-join-card .cw-input .unity-text-field__input, .cw-join-card .cw-input .unity-base-text-field__input {
     font-size: 64px; letter-spacing: 10px; -unity-text-align: middle-center; padding-left: 0;
 }
+/* Round-2 finding 10. 20:9 phone: a lower entry and more bar padding, so the card ends well clear of
+   the screen's bottom edge (it ended 9 px from it). 4:3: a narrower entry, so the page-centred card
+   stays clear of START / JOIN MATCH in the right column. */
+.layout--short .cw-coop-bottom--centred { padding-bottom: 20px; }
+.layout--short .cw-join-card .cw-input { min-height: 92px; }
+.layout--short .cw-join-card .cw-input .unity-text-field__input, .layout--short .cw-join-card .cw-input .unity-base-text-field__input { font-size: 56px; }
+.layout--narrow .cw-join-card .cw-input { min-width: 440px; }
 
 /* Status pill */
 /* Status line: cream inset, dark text (the status colour is set in C# from

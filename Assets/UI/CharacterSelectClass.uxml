@@ -65,12 +65,16 @@
                 </ui:VisualElement>
             </ui:VisualElement>
 
-            <!-- Hero: cream card. Stage (class-tinted platform + big chicken) beside the text. -->
+            <!-- Hero: cream card. Stage (painted barn backdrop in the class tint, a soft light, the bale
+                 and the big chicken) beside the text. HeroFigure groups light + bale + bird so the
+                 whole figure is centred vertically in the stage (round-2 finding 16). -->
             <ui:VisualElement name="Hero" class="cw-hero cw-raised">
                 <ui:VisualElement name="HeroStage" class="cw-hero__stage" picking-mode="Ignore">
-                    <ui:VisualElement name="PreviewGlow" class="cw-radial-glow cw-hero__glow" />
-                    <ui:VisualElement name="PreviewDisc" class="cw-hero__platform" />
-                    <ui:VisualElement name="PreviewChicken" class="cw-chicken cw-hero__chicken" />
+                    <ui:VisualElement name="HeroFigure" class="cw-hero__figure" picking-mode="Ignore">
+                        <ui:VisualElement name="PreviewGlow" class="cw-radial-glow cw-hero__glow" />
+                        <ui:VisualElement name="PreviewDisc" class="cw-hero__platform" />
+                        <ui:VisualElement name="PreviewChicken" class="cw-chicken cw-hero__chicken" />
+                    </ui:VisualElement>
                 </ui:VisualElement>
 
                 <ui:VisualElement class="cw-hero__text">

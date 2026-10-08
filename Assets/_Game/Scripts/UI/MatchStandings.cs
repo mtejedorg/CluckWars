@@ -50,6 +50,13 @@ namespace CluckWars.UI
             }
         }
 
+        /// <summary>
+        /// Whether a corner gets a row on the HUD leaderboard and the post-match standings: a chicken
+        /// stands on it, or it banked food (a player who left keeps their score). An unclaimed corner
+        /// in a 1-3 player session gets no row of zeros.
+        /// </summary>
+        public static bool Listed(bool hasChicken, float total) => hasChicken || total > 0f;
+
         /// <summary>Seat-order index (0..2) of a solo bot of <paramref name="cls"/>, or -1.</summary>
         public static int BotIndex(ChickenClass cls) => System.Array.IndexOf(SoloBotClasses, cls);
 

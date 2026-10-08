@@ -9,7 +9,9 @@ solo  Solo START, the round won by pushing the local base to the goal, PLAY AGAI
       (session_end__<size>.png) - it must read COOP CLOSED / "Lost the signal to the barn.", never the enum name.
 cpuwin  A real solo round the CPUs win while the local bird idles (solo_cpu_win_real.png).
 host  HOST GAME -> START: a real Shared-mode session with one player sits in the waiting room; the overlay panel is
-      rendered off-screen at desktop and phone size (mp_waiting_room__<size>.png). Needs Photon cloud + UGS.
+      rendered off-screen at desktop and phone size (mp_waiting_room__<size>.png), again with a forced 12-letter
+      invite code (mp_waiting_room_longcode__<size>.png), then START from the waiting room and the HUD
+      (host_hud__<size>.png: no leaderboard rows for the unclaimed corners). Needs Photon cloud + UGS.
 Leaves Play mode at the end of each session.
 """
 import sys, os, json, time
@@ -46,6 +48,12 @@ public class P5 {
       + " | pill bg=" + (r.Q(className: "cw-seat__state") != null ? r.Q(className: "cw-seat__state").resolvedStyle.backgroundColor.ToString() : "-")
       + " label=" + (r.Q<Label>(className: "cw-seat__state-label") != null ? r.Q<Label>(className: "cw-seat__state-label").resolvedStyle.color.ToString() : "-")
       + " startBtnImg=" + (r.Q("LobbyStartBtn") != null ? r.Q("LobbyStartBtn").resolvedStyle.backgroundImage.ToString() : "-"); }
+  // Chunk 5: force a long invite code into the waiting room's tile row (the fit / wrap check), and read the HUD rows.
+  public static string ForceCode(string code) { var ctrl = Object.FindFirstObjectByType<MatchOverlaysController>(); if (ctrl == null) return "no controller";
+    Zenject.ProjectContext.Instance.Container.Resolve<CluckWars.Services.ISessionSelectionService>().SessionName = code;   // the room re-fills from it every poll
+    typeof(MatchOverlaysController).GetMethod("SetCodeTiles", BindingFlags.NonPublic|BindingFlags.Instance).Invoke(ctrl, new object[] { code }); return "code " + code; }
+  public static string HudRows() { var d = Doc("LbRow0"); if (d == null) return "no hud"; var r = d.rootVisualElement;
+    return string.Join(" ", Enumerable.Range(0, 4).Select(i => { var e = r.Q("LbRow" + i); return "row" + i + "=" + (e == null ? "null" : e.resolvedStyle.display.ToString()); })); }
   public static string Session() { var d = Doc("SessionEndOverlay"); var r = d.rootVisualElement; return r.Q<Label>("SessionEndTitle").text + " | " + r.Q<Label>("SessionEndReason").text + " | " + r.Q<Label>("SessionEndCountdown").text; }
   public static string ForceShutdown() { var ctrl = Object.FindFirstObjectByType<MatchOverlaysController>(); if (ctrl == null) return "no controller";
     typeof(MatchOverlaysController).GetField("_disconnectReturnDelay", BindingFlags.NonPublic|BindingFlags.Instance).SetValue(ctrl, 30f); // time for both sizes
@@ -56,10 +64,10 @@ public class P5 {
   public static string Grab(string el, string path) { var rt = Doc(el).panelSettings.targetTexture; RenderTexture.active = rt;
     var t = new Texture2D(rt.width, rt.height, TextureFormat.RGBA32, false); t.ReadPixels(new Rect(0,0,rt.width,rt.height),0,0); t.Apply(); RenderTexture.active = null;
     File.WriteAllBytes(path, t.EncodeToPNG()); return "saved " + path; }
-  public static string Restore(string el) { var ps = Doc(el).panelSettings; var rt = ps.targetTexture; ps.targetTexture = null; ps.clearColor = false; if (rt != null) rt.Release(); return "restored"; }
+  public static string Restore(string el) { var ps = Doc(el).panelSettings; var rt = ps.targetTexture; ps.targetTexture = null; ps.clearColor = false; ps.colorClearValue = Color.clear; if (rt != null) rt.Release(); return "restored"; }
 }"""
 
-SIG = {"Setup": ["el", "w", "h"], "Grab": ["el", "path"], "Press": ["name"], "Restore": ["el"]}
+SIG = {"Setup": ["el", "w", "h"], "Grab": ["el", "path"], "Press": ["name"], "Restore": ["el"], "ForceCode": ["code"]}
 SIZES = [("desktop", "1920", "1080"), ("phone", "2424", "1080")]
 
 
@@ -131,6 +139,15 @@ def host():
     wait(("WaitingForPlayers",), tries=60); time.sleep(2.5)
     print("  ", cs("Overlay"))
     render("LobbyOverlay", "mp_waiting_room")
+    # Chunk 5: a 12-letter code must shrink (then wrap) its tiles instead of running under SHARE / COPY.
+    print("  ", cs("ForceCode", "CLUCK-LAN-XL")); time.sleep(0.5)
+    render("LobbyOverlay", "mp_waiting_room_longcode")
+    # Chunk 5: START from the waiting room; a 1-player host session's HUD shows no rows for the empty corners.
+    # (GET READY + countdown run first: wait without polling the Editor through them.)
+    print(cs("Press", "LobbyStartBtn")); time.sleep(12)
+    wait(("Active",), tries=30); time.sleep(2)
+    print("  hud:", cs("HudRows"))
+    render("LbRow0", "host_hud")
     stop()
 
 

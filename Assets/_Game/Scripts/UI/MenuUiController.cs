@@ -1228,8 +1228,9 @@ namespace CluckWars.UI
                 _previewChicken.AddToClassList(_previewChickenClass);
             }
             ShowHeroOnStage(hop: false);
-            if (_heroStage != null) _heroStage.style.backgroundColor = Fade(Lighten(tint, 0.55f), 1f);
-            if (_previewGlow != null) _previewGlow.style.unityBackgroundImageTintColor = Fade(Lighten(tint, 0.3f), 0.9f);
+            // Painted barn backdrop multiplied by a pale class tint; a near-white soft light on the bird.
+            if (_heroStage != null) _heroStage.style.unityBackgroundImageTintColor = Fade(Lighten(tint, 0.5f), 1f);
+            if (_previewGlow != null) _previewGlow.style.unityBackgroundImageTintColor = Fade(Lighten(tint, 0.8f), 0.85f);
             // Class name without "CHICKEN", ink on cream.
             if (_previewName != null) _previewName.text = ClassShortName(cls);
             if (_previewQuote != null)
@@ -1354,6 +1355,13 @@ namespace CluckWars.UI
             _gearChicken       = _loadout.Q<VisualElement>("GearChicken");
             if (_gearChicken == null)
                 _log?.Error(Source, "CharacterSelect.uxml has no #GearChicken; GEAR UP shows no bird.");
+            var doorway = _loadout.Q<VisualElement>("GearDoorway");
+            if (doorway == null)
+                _log?.Error(Source, "CharacterSelect.uxml has no #GearDoorway; the GEAR UP bird has no layout slot.");
+            else if (_gearChicken != null)
+                // The doorway is the height left between the slots and the deck; a whole bird or none.
+                doorway.RegisterCallback<GeometryChangedEvent>(e =>
+                    _gearChicken.EnableInClassList("cw-gear-chicken--nofit", !GearDoorway.Fits(e.newRect.height)));
             if (_readyBtn != null) { _readyBtn.clicked += OnReady; OwnCue(_readyBtn); }
 
             for (int i = 0; i < _slots.Length; i++)
@@ -1908,13 +1916,22 @@ namespace CluckWars.UI
         {
             Bind<TextField>(_lobby, "LobbyJoinField", f =>
             {
-                f.maxLength = JoinCodeMaxLength;
+                f.maxLength = JoinCodeEntry.MaxLength;
                 f.RegisterValueChangedCallback(evt =>
                 {
                     string upper = (evt.newValue ?? string.Empty).ToUpperInvariant();
                     if (upper != evt.newValue) f.SetValueWithoutNotify(upper);
                     if (_selection != null && _selection.Mode == SessionMode.Join) UpdateLobbyStatus(false, false, true);
                 });
+                // Keyboard Enter / Done submits like JOIN MATCH, only once the code is whole (round-2
+                // finding 10). TrickleDown: the field's own input child sees the key first otherwise.
+                f.RegisterCallback<KeyDownEvent>(evt =>
+                {
+                    if (evt.keyCode != KeyCode.Return && evt.keyCode != KeyCode.KeypadEnter && evt.character != '\n') return;
+                    evt.StopPropagation();
+                    if (_selection != null && _selection.Mode == SessionMode.Join && JoinCodeEntry.IsComplete(f.value))
+                        OnStartMatch();
+                }, TrickleDown.TrickleDown);
             });
             Bind<Button>(_lobby, "BackBtn",  b => { b.clicked += ShowLoadout; BackCue(b); });
             Bind<Button>(_lobby, "StartBtn", b => { b.clicked += OnStartMatch; OwnCue(b); });
@@ -2268,12 +2285,13 @@ namespace CluckWars.UI
 
             string c, t; Color dotColor; bool readyish;
             int seats = 4;
-            bool codeComplete = isJoin && IsJoinCodeComplete(_lobby.Q<TextField>("LobbyJoinField")?.value);
+            var codeState = isJoin ? JoinCodeEntry.StateOf(_lobby.Q<TextField>("LobbyJoinField")?.value) : JoinCodeState.Empty;
+            bool codeComplete = codeState == JoinCodeState.Complete;
             if (isSolo)      { c = UiText.Format(UiKeys.LobbyCount, ("n", seats), ("max", seats)); t = UiText.Get(UiKeys.LobbyStatusSolo);    dotColor = UiGfx.Hex32("4ae66a"); readyish = true;  }
             else if (isHost) { c = UiText.Format(UiKeys.LobbyCount, ("n", 1),     ("max", seats)); t = UiText.Get(UiKeys.LobbyStatusWaiting); dotColor = UiGfx.Gold;             readyish = false; }
             // Join: the seat count is unknown until the lobby answers, so the pill shows no count
             // at all (it used to print a bare "-") - just what the player has to do.
-            else             { c = string.Empty; t = UiText.Get(codeComplete ? UiKeys.LobbyStatusCodeReady : UiKeys.LobbyStatusEnterCode); dotColor = codeComplete ? UiGfx.Hex32("4ae66a") : UiGfx.Gold; readyish = codeComplete; }
+            else             { c = string.Empty; t = UiText.Get(JoinCodeEntry.PillKey(codeState)); dotColor = codeComplete ? UiGfx.Hex32("4ae66a") : UiGfx.Gold; readyish = codeComplete; }
 
             if (count != null)
             {
@@ -2294,26 +2312,11 @@ namespace CluckWars.UI
             }
         }
 
-        /// <summary>UGS lobby codes are 6 characters; the offline host's session name ("cluck-lan") is longer.</summary>
-        public const int JoinCodeMinLength = 6;
-        private const int JoinCodeMaxLength = 16;
-
-        /// <summary>True when <paramref name="code"/> (trimmed) is long enough to be a join code.</summary>
-        public static bool IsJoinCodeComplete(string code) =>
-            !string.IsNullOrWhiteSpace(code) && code.Trim().Length >= JoinCodeMinLength;
-
         private void SetCodeTiles(string code)
         {
             var tiles = _lobby.Q<VisualElement>("CodeTiles");
             if (tiles == null) return;
-            tiles.Clear();
-            if (string.IsNullOrEmpty(code)) return;
-            foreach (var ch in code.ToUpperInvariant())
-            {
-                var t = new Label(ch.ToString());
-                t.AddToClassList("cw-code-tile");
-                tiles.Add(t);
-            }
+            CodeTileFit.Fill(tiles, code);
         }
 
         private void CopyJoinCode()
@@ -2410,7 +2413,7 @@ namespace CluckWars.UI
                 case SessionMode.Join:
                     var field = _lobby.Q<TextField>("LobbyJoinField");
                     var code = field?.value?.Trim();
-                    if (!IsJoinCodeComplete(code)) { _audio.Tap(); if (status != null) status.text = UiText.Get(UiKeys.LobbyErrNoCode); return; }
+                    if (!JoinCodeEntry.IsComplete(code)) { _audio.Tap(); if (status != null) status.text = UiText.Get(UiKeys.LobbyErrNoCode); return; }
                     _audio.Tap();
                     _isBusy = true;
                     if (status != null) status.text = UiText.Get(UiKeys.LobbyJoining);
@@ -2450,11 +2453,9 @@ namespace CluckWars.UI
             if (!MenuStagePolicy.WantsLive(PlayerPreferences.PerformanceModeEnabled, _stageFailed))
             {
                 DisposeStage();
-                _gearChicken?.RemoveFromClassList("cw-gear-chicken--live");
                 return;
             }
             if (_stage == null && !TryCreateStage()) return;
-            _gearChicken?.AddToClassList("cw-gear-chicken--live");
 
             ShowHeroOnStage(hop: false);
             for (int i = 0; i < _seats.Length; i++) ShowSeatOnStage(i);
@@ -2485,7 +2486,6 @@ namespace CluckWars.UI
         private void FailStage(string reason, Exception e)
         {
             _stageFailed = true;
-            _gearChicken?.RemoveFromClassList("cw-gear-chicken--live");
             _log?.Warn(Source, $"Live chicken stage unavailable ({reason}{(e != null ? ": " + e.Message : "")}); showing the static renders.");
             DisposeStage();
         }
@@ -2501,8 +2501,8 @@ namespace CluckWars.UI
         private void ShowHeroOnStage(bool hop)
         {
             if (_stage == null || _previewChicken == null) return;
-            // Edges fade into the hero stage's class wash (same colour RefreshClassSelect paints).
-            var clear = Lighten(TintOf(Cls), 0.55f);
+            // Edges fade into the soft light behind the bird (same colour RefreshClassSelect paints the glow).
+            var clear = Lighten(TintOf(Cls), 0.8f);
             // Decision 4 (Phase 4): the hero sways like the Coop seats instead of a full turntable.
             RunOnStage(() => _stage.Show(HeroStageSlot, _previewChicken, Cls, hop, sway: true, clear));
         }
