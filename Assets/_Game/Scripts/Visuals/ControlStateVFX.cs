@@ -460,6 +460,12 @@ namespace CluckWars.Visuals
                 if (obj != null && obj.IsValid) charging = _abilities.ChargingSlot;
             }
 
+            // A faded caster (Invisibility, Smoke Roost) must not announce an aimed move with a glowing
+            // foot-disc: it would give the stealth away exactly when the player holds a button (Phase 6, A2).
+            // Hidden for every peer, the caster's own view included. VisualOpacity is [Networked] and 0 means
+            // "never set" (see ChickenVisuals), so only a real, partial value counts as faded.
+            if (IsFaded(_controller)) charging = 0;
+
             if (charging == 0)
             {
                 _lastChargingSlot = 0;
@@ -489,6 +495,20 @@ namespace CluckWars.Visuals
             _windupGlow.color = c;
             _windupGlow.transform.localScale = Vector3.one * (_windupGlowDiameter * scale01);
             if (!_windupGlow.gameObject.activeSelf) _windupGlow.gameObject.SetActive(true);
+        }
+
+        /// <summary>Is <paramref name="controller"/> visibly faded (<c>VisualOpacity</c> in (0, 0.99))? Pure
+        /// on a plain value so the threshold is testable; 0 is the networked "unset" default, not invisible.</summary>
+        public static bool IsFadedOpacity(float visualOpacity) => visualOpacity > 0f && visualOpacity < FadedOpacityThreshold;
+
+        /// <summary>Opacity below which a caster counts as invisible for the wind-up tell.</summary>
+        public const float FadedOpacityThreshold = 0.99f;
+
+        private static bool IsFaded(ChickenController controller)
+        {
+            if (controller == null) return false;
+            var obj = controller.Object;
+            return obj != null && obj.IsValid && IsFadedOpacity(controller.VisualOpacity);
         }
 
         // ---- Helpers (mirror AbilityRangeIndicator) ---------------------------

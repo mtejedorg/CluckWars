@@ -26,6 +26,9 @@
              nor U+2715 exists in LilitaOne or NotoEmoji and TMP Settings has no
              fallback list, so both would have been tofu. See
              HudFeedbackStyle.UseDrawnRefusalMarks.
+           - Phase 6 (touch-hex states): per hex a Fill* (the inset coloured hex; the Ability* element itself
+             is the ink rim, cream while held) and a Pip* (in-range pip, bottom-centre). The no-target
+             slash (StateRing*) is gone: nobody in range is not a refusal. The duration ring is built in code.
            - on the joystick, a JoyStateGlyph + JoySlowLabel. Both picking-mode
              Ignore so they can never steal a touch : the stick stays draggable
              in every control state, the GAME blocks the movement, the HUD only
@@ -92,6 +95,7 @@
 
         <!-- Slot 1 : primary thumb anchor -->
         <ui:VisualElement name="Ability1" class="cw-hex cw-hex--a1">
+            <ui:VisualElement name="Fill1" class="cw-hex-fill" picking-mode="Ignore" />
             <ui:VisualElement name="Cooldown1" class="cw-hex-cd" picking-mode="Ignore">
                 <ui:VisualElement class="cw-hex-cd-fill" picking-mode="Ignore" />
             </ui:VisualElement>
@@ -102,17 +106,18 @@
             <ui:Label name="Label1" text="" class="cw-hex-label" picking-mode="Ignore" />
             <ui:Label name="CooldownNum1" text="" class="cw-hex-cdnum" picking-mode="Ignore" />
             <ui:VisualElement name="StateGlyph1" class="cw-hex-state" picking-mode="Ignore">
-                <ui:VisualElement name="StateRing1" class="cw-hex-state-ring" picking-mode="Ignore" />
                 <ui:VisualElement name="StateBarA1" class="cw-hex-state-bar cw-hex-state-bar--a" picking-mode="Ignore" />
                 <ui:VisualElement name="StateBarB1" class="cw-hex-state-bar cw-hex-state-bar--b" picking-mode="Ignore" />
             </ui:VisualElement>
             <ui:VisualElement name="Badge1" class="cw-hex-badge" picking-mode="Ignore">
                 <ui:Label name="BadgeText1" text="1" class="cw-hex-badge-text" picking-mode="Ignore" />
             </ui:VisualElement>
+            <ui:VisualElement name="Pip1" class="cw-hex-pip" picking-mode="Ignore" />
         </ui:VisualElement>
 
         <!-- Slot 2 : arc above-left -->
         <ui:VisualElement name="Ability2" class="cw-hex cw-hex--a2">
+            <ui:VisualElement name="Fill2" class="cw-hex-fill" picking-mode="Ignore" />
             <ui:VisualElement name="Cooldown2" class="cw-hex-cd" picking-mode="Ignore">
                 <ui:VisualElement class="cw-hex-cd-fill" picking-mode="Ignore" />
             </ui:VisualElement>
@@ -123,19 +128,20 @@
             <ui:Label name="Label2" text="" class="cw-hex-label" picking-mode="Ignore" />
             <ui:Label name="CooldownNum2" text="" class="cw-hex-cdnum" picking-mode="Ignore" />
             <ui:VisualElement name="StateGlyph2" class="cw-hex-state" picking-mode="Ignore">
-                <ui:VisualElement name="StateRing2" class="cw-hex-state-ring" picking-mode="Ignore" />
                 <ui:VisualElement name="StateBarA2" class="cw-hex-state-bar cw-hex-state-bar--a" picking-mode="Ignore" />
                 <ui:VisualElement name="StateBarB2" class="cw-hex-state-bar cw-hex-state-bar--b" picking-mode="Ignore" />
             </ui:VisualElement>
             <ui:VisualElement name="Badge2" class="cw-hex-badge" picking-mode="Ignore">
                 <ui:Label name="BadgeText2" text="2" class="cw-hex-badge-text" picking-mode="Ignore" />
             </ui:VisualElement>
+            <ui:VisualElement name="Pip2" class="cw-hex-pip" picking-mode="Ignore" />
         </ui:VisualElement>
 
         <!-- Slot 3 : available to every class since v0.7's four-slot loadouts. The gold
              star badge is gone with the Combo passive that justified it - and U+2605 was
              in neither shipped font, surviving only on OS fallback. -->
         <ui:VisualElement name="Ability3" class="cw-hex cw-hex--a3">
+            <ui:VisualElement name="Fill3" class="cw-hex-fill" picking-mode="Ignore" />
             <ui:VisualElement name="Cooldown3" class="cw-hex-cd" picking-mode="Ignore">
                 <ui:VisualElement class="cw-hex-cd-fill" picking-mode="Ignore" />
             </ui:VisualElement>
@@ -146,18 +152,19 @@
             <ui:Label name="Label3" text="" class="cw-hex-label" picking-mode="Ignore" />
             <ui:Label name="CooldownNum3" text="" class="cw-hex-cdnum" picking-mode="Ignore" />
             <ui:VisualElement name="StateGlyph3" class="cw-hex-state" picking-mode="Ignore">
-                <ui:VisualElement name="StateRing3" class="cw-hex-state-ring" picking-mode="Ignore" />
                 <ui:VisualElement name="StateBarA3" class="cw-hex-state-bar cw-hex-state-bar--a" picking-mode="Ignore" />
                 <ui:VisualElement name="StateBarB3" class="cw-hex-state-bar cw-hex-state-bar--b" picking-mode="Ignore" />
             </ui:VisualElement>
             <ui:VisualElement name="Badge3" class="cw-hex-badge" picking-mode="Ignore">
                 <ui:Label name="BadgeText3" text="3" class="cw-hex-badge-text" picking-mode="Ignore" />
             </ui:VisualElement>
+            <ui:VisualElement name="Pip3" class="cw-hex-pip" picking-mode="Ignore" />
         </ui:VisualElement>
 
         <!-- Slot 4 : added with v0.7's four-slot loadouts. On every class except Assassin
              this is where Peck (foraging) most often sits, but the player assigns it. -->
         <ui:VisualElement name="Ability4" class="cw-hex cw-hex--a4">
+            <ui:VisualElement name="Fill4" class="cw-hex-fill" picking-mode="Ignore" />
             <ui:VisualElement name="Cooldown4" class="cw-hex-cd" picking-mode="Ignore">
                 <ui:VisualElement class="cw-hex-cd-fill" picking-mode="Ignore" />
             </ui:VisualElement>
@@ -168,13 +175,13 @@
             <ui:Label name="Label4" text="" class="cw-hex-label" picking-mode="Ignore" />
             <ui:Label name="CooldownNum4" text="" class="cw-hex-cdnum" picking-mode="Ignore" />
             <ui:VisualElement name="StateGlyph4" class="cw-hex-state" picking-mode="Ignore">
-                <ui:VisualElement name="StateRing4" class="cw-hex-state-ring" picking-mode="Ignore" />
                 <ui:VisualElement name="StateBarA4" class="cw-hex-state-bar cw-hex-state-bar--a" picking-mode="Ignore" />
                 <ui:VisualElement name="StateBarB4" class="cw-hex-state-bar cw-hex-state-bar--b" picking-mode="Ignore" />
             </ui:VisualElement>
             <ui:VisualElement name="Badge4" class="cw-hex-badge" picking-mode="Ignore">
                 <ui:Label name="BadgeText4" text="4" class="cw-hex-badge-text" picking-mode="Ignore" />
             </ui:VisualElement>
+            <ui:VisualElement name="Pip4" class="cw-hex-pip" picking-mode="Ignore" />
         </ui:VisualElement>
 
         </ui:VisualElement>

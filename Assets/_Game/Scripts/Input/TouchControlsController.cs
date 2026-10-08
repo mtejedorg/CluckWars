@@ -1,6 +1,7 @@
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
 using CluckWars.Logging;
+using CluckWars.Settings;
 using CluckWars.UI;
 using CluckWars.Visuals;
 using UnityEngine;
@@ -113,7 +114,8 @@ namespace CluckWars.Input
         /// <summary>Per-slot driven element refs for one hex ability button.</summary>
         private struct HexSlot
         {
-            public VisualElement Hex;        // tinted per refusal state (ART §6.6 layers 2–4)
+            public VisualElement Hex;        // the hit target; its sprite is the INK RIM (cream while held), scaled/dimmed while held
+            public VisualElement Fill;       // inset hex sprite tinted per refusal state (ART §6.6 layers 2–4); the rim shows around it
             public VisualElement Cooldown;   // layer 6: bottom-up black clip (height % = remaining/total)
             public VisualElement Drain;      // layer 6 mirrored: top-down accent clip while this slot is running
             public VisualElement DrainFill;  // accent-tinted silhouette inside the drain clip
@@ -121,10 +123,11 @@ namespace CluckWars.Input
             public Label         Label;      // layer 7: short label under the icon
             public Label         CdNum;      // layer 9: seconds remaining
             public VisualElement StateGlyph; // layer 9: drawn refusal mark (⃠ / ✕)
-            public VisualElement StateRing;  // the ⃠ circle
-            public VisualElement StateBarA;  // ⃠ slash, and one arm of the ✕
+            public VisualElement StateBarA;  // one arm of the ✕
             public VisualElement StateBarB;  // the other arm of the ✕
             public VisualElement Mark;       // category shape (CategoryMark): the category without colour
+            public VisualElement Pip;        // in-range pip: a rival is in this move's shape (bottom-centre)
+            public HexDurationRing Ring;     // duration ring while this slot's ability is running
         }
         /// <summary>Mirrors <see cref="Gameplay.AbilityController.SlotCount"/> so the hex
         /// cluster and the gameplay slot count cannot drift apart.</summary>
@@ -141,6 +144,16 @@ namespace CluckWars.Input
 
         // Denied-press bump timers (§6). -1 = idle.
         private readonly float[] _bumpTimer = new float[SlotCount];
+
+        // Phase 6 (A1) hex states, cached so style writes only happen on a real change.
+        private readonly bool[]  _appliedHeld = new bool[SlotCount];
+        private readonly bool[]  _appliedDim  = new bool[SlotCount];
+        private readonly bool[]  _pipShown    = new bool[SlotCount];
+        private readonly float[] _pipPopTimer = new float[SlotCount]; // seconds into the 0.2 s pop; -1 = idle
+        private readonly bool[]  _ringShown   = new bool[SlotCount];
+        private AbilitySlotOverlay _localOverlay;   // the ONE source of the "hot" (rival in shape) fact
+        private ChickenController  _overlayFor;
+        private bool _reportedMissingOverlay;
 
         // ---- Status strip refs -------------------------------------------------
         private struct StatusRowRefs
@@ -246,6 +259,7 @@ namespace CluckWars.Input
                 _appliedRefusal[i]   = UnsetRefusal;
                 _appliedCdSeconds[i] = int.MinValue;
                 _bumpTimer[i]        = -1f;
+                _pipPopTimer[i]      = -1f;
             }
 
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
@@ -315,12 +329,30 @@ namespace CluckWars.Input
                     Label      = _root.Q<Label>($"Label{n}"),
                     CdNum      = _root.Q<Label>($"CooldownNum{n}"),
                     StateGlyph = _root.Q<VisualElement>($"StateGlyph{n}"),
-                    StateRing  = _root.Q<VisualElement>($"StateRing{n}"),
                     StateBarA  = _root.Q<VisualElement>($"StateBarA{n}"),
                     StateBarB  = _root.Q<VisualElement>($"StateBarB{n}"),
+                    Fill       = _root.Q<VisualElement>($"Fill{n}"),
+                    Pip        = _root.Q<VisualElement>($"Pip{n}"),
                     Mark       = hex != null ? CategoryMark.Create() : null,
+                    Ring       = hex != null ? new HexDurationRing() : null,
                 };
-                if (hex != null) hex.Add(_slots[i].Mark);
+                if (hex != null)
+                {
+                    hex.Add(_slots[i].Mark);
+                    hex.Add(_slots[i].Ring);
+                    _slots[i].Ring.style.display = DisplayStyle.None;
+                    if (_slots[i].Fill == null || _slots[i].Pip == null)
+                        _log?.Error(Source, $"TouchControls.uxml is missing #Fill{n} or #Pip{n}: that hex draws without its rim / in-range pip.");
+
+                    // Held hex scales up and the others dim with a 60 ms ease-out (A1). Scale/opacity are
+                    // written inline from FeedbackTuning; only the transition is declared here, once.
+                    hex.style.transitionProperty = new System.Collections.Generic.List<StylePropertyName>
+                        { new StylePropertyName("scale"), new StylePropertyName("opacity") };
+                    hex.style.transitionDuration = new System.Collections.Generic.List<TimeValue>
+                        { new TimeValue(FeedbackTuning.HexHeldTransitionSeconds, TimeUnit.Second) };
+                    hex.style.transitionTimingFunction = new System.Collections.Generic.List<EasingFunction>
+                        { new EasingFunction(EasingMode.EaseOut) };
+                }
                 if (hex != null)
                 {
                     int slot = i; // capture
@@ -393,6 +425,7 @@ namespace CluckWars.Input
             _heldPointerId[slot] = evt.pointerId;
             _slots[slot].Hex?.CapturePointer(evt.pointerId);
             evt.StopPropagation();
+            RefreshHeldVisuals(); // the press frame, locally: not after the networked charge
         }
 
         /// <summary>
@@ -416,6 +449,7 @@ namespace CluckWars.Input
             {
                 _held[slot] = false;
                 _cancelled[slot] = true;
+                RefreshHeldVisuals();
             }
         }
 
@@ -427,6 +461,7 @@ namespace CluckWars.Input
             if (hex != null && hex.HasPointerCapture(evt.pointerId)) hex.ReleasePointer(evt.pointerId);
             _held[slot] = false;
             _heldPointerId[slot] = -1;
+            RefreshHeldVisuals();
         }
 
         /// <summary>
@@ -449,6 +484,7 @@ namespace CluckWars.Input
             _held[slot] = false;
             _cancelled[slot] = true;
             _heldPointerId[slot] = -1;
+            RefreshHeldVisuals();
         }
 
         private void LateUpdate()
@@ -482,6 +518,8 @@ namespace CluckWars.Input
                 }
             }
 
+            ResolveLocalOverlay();
+
             // One 5 Hz gate shared by every string this document writes.
             _textGateOpen = Time.unscaledTime >= _nextTextUpdate;
             if (_textGateOpen)
@@ -490,12 +528,63 @@ namespace CluckWars.Input
             var abilities = _localChicken != null ? _localChicken.Abilities : null;
 
             PollDeniedPress(abilities);
+            RefreshHeldVisuals();
 
             for (int slot = 0; slot < SlotCount; slot++)
                 RefreshSlot(slot, abilities);
 
             RefreshControlConsequences();
         }
+
+        /// <summary>Caches the local chicken's <see cref="AbilitySlotOverlay"/> (the source of the "hot" verdict
+        /// the pips read). Warns once if the local chicken has none — otherwise the pips are silently dead.</summary>
+        private void ResolveLocalOverlay()
+        {
+            if (_localChicken == _overlayFor) return;
+            _overlayFor = _localChicken;
+            _localOverlay = _localChicken != null ? _localChicken.GetComponent<AbilitySlotOverlay>() : null;
+            if (_localChicken != null && _localOverlay == null && !_reportedMissingOverlay)
+            {
+                _reportedMissingOverlay = true;
+                _log?.Warn(Source, "Local chicken has no AbilitySlotOverlay: the in-range pips will never light.");
+            }
+        }
+
+        /// <summary>
+        /// Held / aiming state of the cluster (Phase 6, A1), driven by the LOCAL pointer state so it answers on
+        /// the press frame: the held hex scales to <see cref="FeedbackTuning.HexHeldScale"/> with a bright
+        /// (cream) rim, every other hex dims to <see cref="FeedbackTuning.HexOthersWhileHeldAlpha"/>. The
+        /// transition is the 60 ms ease-out declared at bind.
+        /// </summary>
+        private void RefreshHeldVisuals()
+        {
+            bool any = false;
+            for (int i = 0; i < SlotCount; i++) any |= _held[i];
+
+            for (int slot = 0; slot < SlotCount; slot++)
+            {
+                var hex = _slots[slot].Hex;
+                if (hex == null) continue;
+
+                bool held = _held[slot];
+                if (held != _appliedHeld[slot])
+                {
+                    _appliedHeld[slot] = held;
+                    hex.EnableInClassList(HeldClass, held);
+                    float k = held ? FeedbackTuning.HexHeldScale : 1f;
+                    hex.style.scale = new Scale(new Vector3(k, k, 1f));
+                }
+
+                bool dim = any && !held;
+                if (dim != _appliedDim[slot])
+                {
+                    _appliedDim[slot] = dim;
+                    hex.style.opacity = dim ? FeedbackTuning.HexOthersWhileHeldAlpha : 1f;
+                }
+            }
+        }
+
+        private const string HeldClass = "cw-hex--held";
 
         private void RefreshSlot(int slot, AbilityController abilities)
         {
@@ -547,11 +636,25 @@ namespace CluckWars.Input
             // RUNNING". Opposite direction and opposite colour from the cooldown clip on
             // purpose (§6 case 27): the two states routinely coexist on the same hex,
             // because an ability burns its cooldown at activation.
-            float active01 = (abilities != null && equipped != null && abilities.ActiveSlot == slot)
-                ? abilities.ActiveRemaining01
+            float active01 = (abilities != null && equipped != null)
+                ? abilities.ActiveRemaining01For(slot)
                 : 0f;
             if (refs.Drain != null)
                 refs.Drain.style.height = new Length(active01 * 100f, LengthUnit.Percent);
+
+            // Phase 6 (A1): while the ability runs, a duration ring around the hex rim drains with it.
+            bool ringOn = active01 > 0f;
+            if (refs.Ring != null)
+            {
+                if (ringOn != _ringShown[slot])
+                {
+                    _ringShown[slot] = ringOn;
+                    refs.Ring.style.display = ringOn ? DisplayStyle.Flex : DisplayStyle.None;
+                }
+                if (ringOn) refs.Ring.SetFraction(active01);
+            }
+
+            RefreshPip(slot, equipped, refusal);
 
             // The menu's category colour (round-2 finding 5): a move reads the same job in the deck and
             // on the button. AccentColor stays the VFX colour.
@@ -575,14 +678,6 @@ namespace CluckWars.Input
                     tint = accent;
                     tint.a = FeedbackTuning.HexAlphaCooldown;
                     break;
-                case AbilityRefusal.NoTarget:
-                    // Nobody in range: the category colour at 70% (darkened toward ink), not the bare
-                    // no-effect grey (round-2 finding 5: most of a match every hex read grey). The ⃠
-                    // mark and the half-faded icon still say "no target"; the colour still says what
-                    // the move does.
-                    tint = AbilityPalette.Idle(accent);
-                    tint.a = FeedbackTuning.HexAlphaNoTarget;
-                    break;
                 case AbilityRefusal.Stunned:
                     // The illegal-cast wash, the same one the telegraph uses when a hold
                     // goes illegal mid-aim — being stunned and having your aim invalidated
@@ -594,15 +689,55 @@ namespace CluckWars.Input
                     tint.a = FeedbackTuning.HexAlphaOtherActive;
                     break;
                 default:
+                    // Ready, and "no target in range" too (Phase 6, A1): nobody around is not a refusal, so
+                    // the hex rests at its full category hue, opaque. The in-range pip says when someone is.
                     tint = accent;
                     tint.a = FeedbackTuning.HexAlphaReady;
                     break;
             }
-            refs.Hex.style.unityBackgroundImageTintColor = tint;
+            (refs.Fill ?? refs.Hex).style.unityBackgroundImageTintColor = tint;
 
             // Layer 9. The seconds number is only one of the marks this layer can carry
             // now; the others are drawn shapes toggled by the refusal class in USS.
             RefreshCenterMark(slot, refusal, remaining);
+        }
+
+        /// <summary>
+        /// The in-range pip (Phase 6, A1): lit while a rival is inside this slot's shape and the slot is not
+        /// cooling down (<see cref="AbilityPreviewRules.InRangePipVisible"/>). "Hot" comes from the local
+        /// chicken's <see cref="AbilitySlotOverlay"/> — the same verdict that brightens the ground guide, so the
+        /// two never disagree. One 0.2 s scale pop when it lights; static under Reduced Motion.
+        /// </summary>
+        private void RefreshPip(int slot, AbilityBaseSO equipped, AbilityRefusal refusal)
+        {
+            var pip = _slots[slot].Pip;
+            if (pip == null) return;
+
+            bool hot = equipped != null && _localOverlay != null && _localOverlay.IsHot(slot);
+            bool show = AbilityPreviewRules.InRangePipVisible(hot, refusal == AbilityRefusal.Cooldown);
+
+            if (show != _pipShown[slot])
+            {
+                _pipShown[slot] = show;
+                pip.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+                _pipPopTimer[slot] = show && !PlayerPreferences.ReducedMotionEnabled ? 0f : -1f;
+                if (!show || PlayerPreferences.ReducedMotionEnabled)
+                    pip.style.scale = new Scale(Vector3.one);
+            }
+
+            if (_pipPopTimer[slot] < 0f) return;
+
+            // unscaledDeltaTime: the pop is HUD motion and must not stretch with the hit-stop timeScale dip.
+            _pipPopTimer[slot] += Time.unscaledDeltaTime;
+            float t = _pipPopTimer[slot] / FeedbackTuning.HexPipPopSeconds;
+            if (t >= 1f)
+            {
+                _pipPopTimer[slot] = -1f;
+                pip.style.scale = new Scale(Vector3.one);
+                return;
+            }
+            float k = 1f + (FeedbackTuning.HexPipPopScale - 1f) * Mathf.Sin(t * Mathf.PI);
+            pip.style.scale = new Scale(new Vector3(k, k, 1f));
         }
 
         /// <summary>
@@ -666,13 +801,7 @@ namespace CluckWars.Input
             {
                 // USS decides which strokes are visible; only the semantic colour is
                 // written here, and only from FeedbackTuning.
-                if (mark == HexCenterMark.NoTarget)
-                {
-                    SetBorderColor(refs.StateRing, FeedbackTuning.NeutralNoEffectColor);
-                    if (refs.StateBarA != null)
-                        refs.StateBarA.style.backgroundColor = FeedbackTuning.NeutralNoEffectColor;
-                }
-                else if (mark == HexCenterMark.StunnedCross)
+                if (mark == HexCenterMark.StunnedCross)
                 {
                     if (refs.StateBarA != null)
                         refs.StateBarA.style.backgroundColor = FeedbackTuning.RefusalStunnedCrossColor;
@@ -689,10 +818,6 @@ namespace CluckWars.Input
             if (refs.CdNum == null) return;
             switch (mark)
             {
-                case HexCenterMark.NoTarget:
-                    refs.CdNum.text        = HudFeedbackStyle.NoTargetGlyph;
-                    refs.CdNum.style.color = FeedbackTuning.NeutralNoEffectColor;
-                    break;
                 case HexCenterMark.StunnedCross:
                     refs.CdNum.text        = HudFeedbackStyle.StunnedCrossGlyph;
                     refs.CdNum.style.color = FeedbackTuning.RefusalStunnedCrossColor;
@@ -701,15 +826,6 @@ namespace CluckWars.Input
                     refs.CdNum.style.color = new StyleColor(StyleKeyword.Null);
                     break;
             }
-        }
-
-        private static void SetBorderColor(VisualElement e, Color c)
-        {
-            if (e == null) return;
-            e.style.borderTopColor    = c;
-            e.style.borderRightColor  = c;
-            e.style.borderBottomColor = c;
-            e.style.borderLeftColor   = c;
         }
 
         // ---- Denied-press bump (FEEDBACK.md §6, case 29) -----------------------

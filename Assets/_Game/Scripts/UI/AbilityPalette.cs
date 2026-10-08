@@ -53,10 +53,6 @@ namespace CluckWars.UI
         /// </summary>
         public const float MinColourBlindDeltaE = 8f;
 
-        /// <summary>How much of the category colour an in-match hex keeps while it has no target in range
-        /// (the rest is dark ink; round-2 finding 5: those hexes used to be plain grey).</summary>
-        public const float HudIdleStrength = 0.7f;
-
         /// <summary>An empty hex / slot (no ability): warm wood, nobody's colour.</summary>
         public static readonly Color EmptyHex = new Color(0.45f, 0.38f, 0.28f, 0.7f);
 
@@ -70,10 +66,6 @@ namespace CluckWars.UI
 
         /// <summary>The hex / disc colour of <paramref name="ability"/>: its category colour.</summary>
         public static Color HexColor(AbilityBaseSO ability) => CategoryColor(ability.Category);
-
-        /// <summary>A hex colour quieted for the in-match "no target in range" state: <see cref="HudIdleStrength"/>
-        /// of it over the dark ink, so the hue (the category) survives.</summary>
-        public static Color Idle(Color hex) => Color.Lerp(UiGfx.TextDark, hex, HudIdleStrength);
 
         /// <summary>WCAG 2.1 relative luminance of an sRGB colour (alpha ignored).</summary>
         public static float Luminance(Color c)

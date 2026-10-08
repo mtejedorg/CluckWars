@@ -60,12 +60,17 @@ namespace CluckWars.Visuals
     {
         private ChickenController _controller;
         private AbilityController _abilities;
+        private AbilityTelegraph _telegraph;
 
         /// <summary>One outline per slot, indexed by slot. Sized from
         /// <see cref="AbilityController.SlotCount"/> and never from a literal — the range ring
         /// this replaces hard-coded 3 and silently never drew slot 3 after the four-slot
         /// roster landed.</summary>
         private readonly LineRenderer[] _lines = new LineRenderer[AbilityController.SlotCount];
+
+        /// <summary>The ink under-stroke beneath each guide (Phase 6, A2): same points, twice the width, a
+        /// fixed low alpha, drawn first, so a thin tinted line keeps a dark edge on light grass.</summary>
+        private readonly LineRenderer[] _inkLines = new LineRenderer[AbilityController.SlotCount];
 
         /// <summary>Per-slot point buffers, grown by <see cref="TelegraphShapes.Apply"/> only
         /// when a slot's point count changes (i.e. never, on a steady frame). Per-slot rather
@@ -76,6 +81,15 @@ namespace CluckWars.Visuals
         /// <see cref="FeedbackTuning.TargetScanPollHz"/>. See <see cref="PollHotSlots"/>.</summary>
         private readonly bool[] _hot = new bool[AbilityController.SlotCount];
         private float _hotPollTimer;
+
+        /// <summary>
+        /// Is a rival inside <paramref name="slot"/>'s shape right now (10 Hz verdict)? The ONE source of
+        /// the "hot" fact: the ground guide brightens on it and the touch HUD's in-range pip lights on it,
+        /// so the two can never disagree. Only meaningful on the local player's chicken (every other
+        /// instance reports false), and it keeps updating when the player has turned the range guides OFF —
+        /// the pip must not die with the outlines.
+        /// </summary>
+        public bool IsHot(int slot) => slot >= 0 && slot < _hot.Length && _hot[slot];
 
         private void Awake()
         {
@@ -89,6 +103,7 @@ namespace CluckWars.Visuals
 
             _controller = GetComponent<ChickenController>();
             _abilities  = GetComponent<AbilityController>();
+            _telegraph  = GetComponent<AbilityTelegraph>();
 
             // ONE material for all four lines. TelegraphShapes.BuildLineMaterial does
             // `new Material(...)` per call, so calling it per slot would create four distinct
@@ -99,6 +114,16 @@ namespace CluckWars.Visuals
 
             for (int slot = 0; slot < AbilityController.SlotCount; slot++)
             {
+                var ink = TelegraphShapes.BuildLine(transform, $"AbilitySlotOverlay{slot}Ink", mat,
+                    FeedbackTuning.AmbientSlotOutlineWidth * FeedbackTuning.AmbientSlotOutlineInkWidthMultiplier,
+                    loop: true);
+                ink.sortingOrder = -1; // under the coloured line: both sit at the same ground height
+                var ci = FeedbackTuning.InkColor;
+                ci.a = FeedbackTuning.AmbientSlotOutlineInkAlpha;
+                ink.startColor = ink.endColor = ci;
+                ink.enabled = false;
+                _inkLines[slot] = ink;
+
                 var lr = TelegraphShapes.BuildLine(transform, $"AbilitySlotOverlay{slot}", mat,
                                                    FeedbackTuning.AmbientSlotOutlineWidth, loop: true);
                 lr.enabled = false;
@@ -114,29 +139,39 @@ namespace CluckWars.Visuals
 
         private void LateUpdate()
         {
-            if (!ShouldDraw())
+            if (!IsLiveLocalChicken())
+            {
+                HideAll();
+                ClearHot();
+                return;
+            }
+
+            // The hot scan runs whether or not the guides are drawn: the HUD's in-range pip reads it.
+            PollHotSlots();
+
+            if (!PlayerPreferences.AbilityRangeGuidesEnabled)
             {
                 HideAll();
                 return;
             }
 
-            PollHotSlots();
-
-            byte chargingEncoded = _abilities.ChargingSlot; // 1-based; 0 = nothing being aimed
+            // -1 = nothing being aimed. The slot the telegraph is drawing: the local held slot from the
+            // press frame, else the networked charge (1-based encoding).
+            int aimedSlot = _telegraph != null ? _telegraph.LocalAimedSlot : -1;
             Vector3 pos = _controller.transform.position;
             Vector3 fwd = _controller.transform.forward;
 
             for (int slot = 0; slot < AbilityController.SlotCount; slot++)
-                DrawSlot(slot, chargingEncoded, pos, fwd);
+                DrawSlot(slot, aimedSlot, pos, fwd);
         }
 
         /// <summary>
-        /// Every reason to draw nothing at all, collapsed into one answer: missing components,
-        /// a <c>NetworkObject</c> that is not live (reading <c>[Networked]</c> state outside
-        /// Spawned..Despawned is not safe), a chicken that is not the local player (§1.6), or
-        /// the player having turned the guides off.
+        /// Every reason this overlay has nothing to do at all, collapsed into one answer: missing
+        /// components, a <c>NetworkObject</c> that is not live (reading <c>[Networked]</c> state outside
+        /// Spawned..Despawned is not safe), or a chicken that is not the local player (§1.6). The
+        /// player's own "range guides" toggle is checked separately, AFTER the hot scan.
         /// </summary>
-        private bool ShouldDraw()
+        private bool IsLiveLocalChicken()
         {
             if (_controller == null || _abilities == null) return false;
 
@@ -148,9 +183,13 @@ namespace CluckWars.Visuals
             var obj = _abilities.Object;
             if (obj == null || !obj.IsValid) return false;
 
-            if (!_controller.HasInputAuthority) return false;
+            return _controller.HasInputAuthority;
+        }
 
-            return PlayerPreferences.AbilityRangeGuidesEnabled;
+        private void ClearHot()
+        {
+            for (int i = 0; i < _hot.Length; i++) _hot[i] = false;
+            _hotPollTimer = 0f; // re-scan on the first live frame
         }
 
         /// <summary>
@@ -203,17 +242,20 @@ namespace CluckWars.Visuals
             return false;
         }
 
-        private void DrawSlot(int slot, byte chargingEncoded, Vector3 casterPos, Vector3 casterForward)
+        private void DrawSlot(int slot, int aimedSlot, Vector3 casterPos, Vector3 casterForward)
         {
-            var lr = _lines[slot];
+            var lr  = _lines[slot];
+            var ink = _inkLines[slot];
 
             // The slot being aimed right now is FULLY hidden, not faded underneath.
             // AbilityTelegraph is already drawing identical geometry at 0.75 alpha plus the
             // illegal-cast wash plus target brackets; a faint duplicate of the same outline
             // would show up as a double-stroke fringe around the real preview.
-            if (chargingEncoded != 0 && chargingEncoded - 1 == slot)
+            // `aimedSlot` is the slot the telegraph is showing: the LOCAL held slot from the press
+            // frame (AbilityTelegraph.LocalAimedSlot), else the networked charge.
+            if (aimedSlot == slot)
             {
-                if (lr.enabled) lr.enabled = false;
+                HideLine(slot);
                 return;
             }
 
@@ -221,12 +263,12 @@ namespace CluckWars.Visuals
             if (!TryResolveAmbientShape(ability, out var shape, out float radius,
                                         out float forwardOffset, out float coneAngle))
             {
-                if (lr.enabled) lr.enabled = false;
+                HideLine(slot);
                 return;
             }
 
             Color c = ability.AccentColor;
-            c.a = AlphaFor(slot, aimGestureLive: chargingEncoded != 0);
+            c.a = AlphaFor(slot, aimGestureLive: aimedSlot >= 0);
             lr.startColor = lr.endColor = c;
 
             // NO STALK, by decision — one LineRenderer per slot, not two.
@@ -242,6 +284,19 @@ namespace CluckWars.Visuals
             TelegraphShapes.Apply(lr, ref _pointBuffers[slot], shape, casterPos, casterForward,
                                   radius, forwardOffset, coneAngle);
             if (!lr.enabled) lr.enabled = true;
+
+            // Ink under-stroke: the same points, wider, fixed alpha (colour/width set once in Awake).
+            var pts = _pointBuffers[slot];
+            if (ink.positionCount != pts.Length) ink.positionCount = pts.Length;
+            if (!ink.loop) ink.loop = true;
+            ink.SetPositions(pts);
+            if (!ink.enabled) ink.enabled = true;
+        }
+
+        private void HideLine(int slot)
+        {
+            if (_lines[slot].enabled) _lines[slot].enabled = false;
+            if (_inkLines[slot] != null && _inkLines[slot].enabled) _inkLines[slot].enabled = false;
         }
 
         /// <summary>
@@ -266,8 +321,7 @@ namespace CluckWars.Visuals
         {
             for (int slot = 0; slot < _lines.Length; slot++)
             {
-                var lr = _lines[slot];
-                if (lr != null && lr.enabled) lr.enabled = false;
+                if (_lines[slot] != null) HideLine(slot);
             }
         }
 

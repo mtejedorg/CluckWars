@@ -200,11 +200,13 @@ namespace CluckWars.Tests
         {
             string touch = Read("Assets/_Game/Scripts/Input/TouchControlsController.cs");
             StringAssert.Contains("AbilityPalette.HexColor(equipped)", touch);
-            StringAssert.Contains("tint = AbilityPalette.Idle(accent);", touch);
-            var noTarget = Regex.Match(touch, @"case AbilityRefusal\.NoTarget:(.*?)break;", RegexOptions.Singleline);
-            Assert.IsTrue(noTarget.Success);
-            StringAssert.DoesNotContain("NeutralNoEffectColor", noTarget.Groups[1].Value,
-                "a hex with no target keeps its category hue (AbilityPalette.Idle), not the bare grey");
+            Assert.IsFalse(Regex.IsMatch(touch, @"case AbilityRefusal\.NoTarget:"),
+                "a hex with no target is not a refusal (Phase 6, A1): it falls through to the default " +
+                "branch and rests at its full category hue, never a grey / quieted tint");
+            var tintSwitch = Regex.Match(touch, @"Color tint;(.*?)unityBackgroundImageTintColor = tint;", RegexOptions.Singleline);
+            Assert.IsTrue(tintSwitch.Success);
+            StringAssert.DoesNotContain("NeutralNoEffectColor", tintSwitch.Groups[1].Value,
+                "the hex tint switch must not use the no-effect grey");
             StringAssert.DoesNotContain("equipped.AccentColor", touch);
         }
 

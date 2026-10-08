@@ -635,13 +635,10 @@ namespace CluckWars.Visuals
         public const float HexAlphaCooldown = 0.45f;
 
         /// <summary>
-        /// Layer 2–4 alpha for "no valid target in range". Higher than
-        /// <see cref="HexAlphaCooldown"/> on purpose: this state is *ready to fire the
-        /// moment someone walks into range*, so it must stay visibly brighter than a slot
-        /// the player simply cannot use yet. Since round-2 finding 5 the fill keeps its
-        /// category hue, quieted toward ink (<c>AbilityPalette.Idle</c>) instead of switching to
-        /// <see cref="NeutralNoEffectColor"/>; the state itself is the layer-9 ⃠ mark and the
-        /// half-faded icon (§1.3: never colour alone).
+        /// No longer used by the ability hexes (Phase 6, A1: "no target in range" is not a refusal;
+        /// the hex rests at <see cref="HexAlphaReady"/> and the in-range pip carries the
+        /// "someone is here" cue by its presence). Still the alpha of the greyed, disabled
+        /// move stick (rooted / stunned) in <c>TouchControlsController.ApplyJoystickState</c>.
         /// </summary>
         public const float HexAlphaNoTarget = 0.70f;
 
@@ -838,25 +835,44 @@ namespace CluckWars.Visuals
         public static readonly bool AbilitySlotOverlayEnabled = true;
 
         /// <summary>
-        /// Stroke width of an ambient slot outline — the thinnest in the whole feedback
-        /// system, and deliberately so. Compare <see cref="RivalRingWidth"/> (0.055, itself
-        /// already chosen to stay under the transient status ring) and the telegraph /
-        /// cast-flash outlines at 0.11. Flat across every alpha tier: width is not a state
-        /// channel here.
+        /// Stroke width of an ambient slot outline. Phase 6 (A2) raised it 0.035 -> 0.06: at
+        /// 0.035 the guide was a hairline that vanished on grass at phone size. It is still
+        /// thinner than the telegraph / cast-flash outlines
+        /// (<see cref="TelegraphShapeLineWidth"/>, 0.11), so an always-on reference can never
+        /// out-weigh a live aim. Flat across every alpha tier: width is not a state channel
+        /// here, only alpha is.
         /// </summary>
-        public const float AmbientSlotOutlineWidth = 0.035f;
+        public const float AmbientSlotOutlineWidth = 0.06f;
 
         /// <summary>
-        /// Alpha for a ready slot with nothing in its shape — the resting tier. Sits near the
-        /// old <c>AbilityRangeIndicator</c> range ring's dim 0.16, but that was ONE ring for
-        /// the whole kit; this is per-shape, with up to three others sharing the frame at
-        /// lower tiers, so the net weight of "whole kit, ambient" stays under where the single
-        /// ring sat.
+        /// Stroke width of the live aim preview and the impact flash outline. Lives here (it was a
+        /// private const in <c>AbilityTelegraph</c>) so the ambient guide's "thinner than the
+        /// preview" relationship is checkable against the real number.
         /// </summary>
-        public const float AmbientSlotOutlineAlphaReady = 0.22f;
+        public const float TelegraphShapeLineWidth = 0.11f;
+
+        /// <summary>The ink under-stroke beneath every ambient guide is this many times wider than the
+        /// coloured line, so a thin tinted line keeps a dark edge on light grass (Phase 6, A2).</summary>
+        public const float AmbientSlotOutlineInkWidthMultiplier = 2f;
+
+        /// <summary>Alpha of the ink under-stroke. Constant across the readiness tiers: it is an edge, not a
+        /// state, and scaling it with the tier would make a cooling guide's edge vanish with its colour.</summary>
+        public const float AmbientSlotOutlineInkAlpha = 0.35f;
+
+        /// <summary>The ink colour shared by the ground guides' under-stroke and the HUD's hex rim
+        /// (#2a1a0c, the menu's "Ink").</summary>
+        public static readonly Color InkColor = new Color(0.165f, 0.102f, 0.047f, 1f);
 
         /// <summary>
-        /// Alpha for a slot on cooldown. ~40% of <see cref="AmbientSlotOutlineAlphaReady"/>,
+        /// Alpha for a ready slot with nothing in its shape — the resting tier. Phase 6 (A2)
+        /// raised it 0.22 -> 0.45 together with the width: the guides are how a new player learns
+        /// what a move covers, and at 0.22 they sat below the noise floor of the arena floor.
+        /// Still well under <see cref="TelegraphPreviewAlpha"/>.
+        /// </summary>
+        public const float AmbientSlotOutlineAlphaReady = 0.45f;
+
+        /// <summary>
+        /// Alpha for a slot on cooldown (0.18). ~40% of <see cref="AmbientSlotOutlineAlphaReady"/>,
         /// mirroring the <i>proportional</i> relationship <see cref="HexAlphaCooldown"/> (0.45)
         /// bears to <see cref="HexAlphaReady"/> (1.00) on the HUD hex, so the world and the
         /// HUD tell the same story about the same slot.
@@ -864,28 +880,26 @@ namespace CluckWars.Visuals
         /// It recedes; it does not vanish. Mid-fight is the worst possible moment to lose the
         /// spatial reference for an ability you are waiting on.
         /// </summary>
-        public const float AmbientSlotOutlineAlphaCooldown = 0.09f;
+        public const float AmbientSlotOutlineAlphaCooldown = 0.18f;
 
         /// <summary>
         /// Alpha for a ready slot that currently has a rival standing inside its shape — the
-        /// brightened tier, which folds in the job the retired range ring used to do. ~1.5x
-        /// <see cref="AmbientSlotOutlineAlphaReady"/>, and still well under
-        /// <see cref="TelegraphPreviewAlpha"/> (0.75) so an ambient outline can never be
-        /// mistaken for a live aim preview. At most one or two slots are hot at once, so the
-        /// brightest shape on screen is almost always the most decision-relevant one.
+        /// brightened tier, which folds in the job the retired range ring used to do. 0.70, and
+        /// still just under <see cref="TelegraphPreviewAlpha"/> (0.75) so an ambient outline can
+        /// never be mistaken for a live aim preview (the width gap, 0.06 vs 0.11, does the rest).
+        /// At most one or two slots are hot at once, so the brightest shape on screen is almost
+        /// always the most decision-relevant one.
         /// </summary>
-        public const float AmbientSlotOutlineAlphaHot = 0.34f;
+        public const float AmbientSlotOutlineAlphaHot = 0.70f;
 
         /// <summary>
-        /// Alpha for the three NON-charging slots while one slot is being aimed. A ~65% cut
-        /// from <see cref="AmbientSlotOutlineAlphaReady"/>, the same proportional move
-        /// <see cref="HexAlphaOtherActive"/> (0.35 from 1.00) makes on the HUD, and for the
-        /// same reason: holding them steady would read as "everything went on cooldown at
-        /// once", which is the wrong story. Clamped below
-        /// <see cref="AmbientSlotOutlineAlphaCooldown"/> so "suppressed by an active aim"
-        /// never reads louder than "on cooldown".
+        /// Alpha for the three NON-charging slots while one slot is being aimed. Holding them
+        /// steady would read as "everything went on cooldown at once", which is the wrong
+        /// story. Kept below <see cref="AmbientSlotOutlineAlphaCooldown"/> so "suppressed by an
+        /// active aim" never reads louder than "on cooldown" (ordering is test-pinned:
+        /// suppressed &lt; cooldown &lt; ready &lt; hot).
         /// </summary>
-        public const float AmbientSlotOutlineAlphaSuppressed = 0.06f;
+        public const float AmbientSlotOutlineAlphaSuppressed = 0.12f;
 
         // ================================================================
         // Colours — canonical control-state set
@@ -941,27 +955,67 @@ namespace CluckWars.Visuals
         // in sync with the ability data.
 
         /// <summary>
-        /// Shared neutral-grey used for every "nothing will happen here" case:
-        /// immune/no-effect targets inside the telegraph (§2.2 case 4) AND the "no
-        /// valid target in range" refusal state (§6 case 25). The spec already
-        /// describes both with the same visual language (grey + dashed/⃠ glyph),
-        /// so one colour serves both rather than two greys a player would have to
-        /// learn apart. Kept light enough (not near-black) to read clearly against
+        /// Neutral grey for a "nothing will happen to THIS target" mark: immune/no-effect rivals
+        /// inside the telegraph (§2.2 case 4). (It also used to colour the HUD hex's "no target in
+        /// range" slash; Phase 6 removed that mark: a ready hex with nobody around is not a
+        /// refusal and renders like any ready hex.) Kept light enough (not near-black) to read clearly against
         /// the dark arena background (<c>MatchCamera</c>'s solid clear colour is
         /// ≈(0.10, 0.12, 0.16)).
         /// </summary>
         public static readonly Color NeutralNoEffectColor = new Color(0.58f, 0.58f, 0.62f, 0.85f);
 
         /// <summary>
-        /// Desaturated red-grey wash for a hold that has gone illegal mid-cast
-        /// (§2.5 — "desaturates to red-grey"). Kept distinct from
-        /// <see cref="NeutralNoEffectColor"/> (pure neutral) with a deliberate red
-        /// bias, so "this specific target stopped being valid" (the illegal-wash
-        /// colour) doesn't visually collide with "there was never a valid target
-        /// here" (the neutral-grey colour) — two different refusal stories that
-        /// should not look identical.
+        /// Desaturated red-grey wash for a hold that is REALLY refused: the caster is stunned,
+        /// the slot is on cooldown / unavailable, or another ability is running
+        /// (<c>AbilityPreviewRules.IsRealRefusal</c>; §2.5 — "desaturates to red-grey").
+        /// <b>"No target in the shape" is not one of those</b> (Phase 6, A2: pressing with nobody
+        /// around is a legal, useful aim — you are lining the move up). That state has its own
+        /// cream dashed preview (<see cref="NoTargetPreviewLineWidth"/>), so the contract is:
+        /// <i>never-valid-yet</i> (nothing in the shape) = dashed cream; <i>became-invalid</i>
+        /// (refused mid-hold) = this wash. The two must not look alike, and this one keeps its
+        /// red bias against <see cref="NeutralNoEffectColor"/> (which now marks only an
+        /// individual rival the move would bounce off).
         /// </summary>
         public static readonly Color IllegalCastTintColor = new Color(0.55f, 0.30f, 0.28f, 0.80f);
+
+        /// <summary>
+        /// Width of the "no target yet" preview ribbon (Phase 6, A2): the shape's outline drawn as the
+        /// dashed ring texture (<c>Art/UI/Fx/Fx_DashedRing.png</c>, cream dashes with a baked ink edge)
+        /// tiled along a LineRenderer. The dashes fill ~53% of the strip's height, so a 0.24 strip
+        /// gives ~0.13 world-unit dashes, about the weight of the solid preview. Wider than
+        /// <see cref="TelegraphShapeLineWidth"/> only because the texture's own margins are transparent.
+        /// </summary>
+        public const float NoTargetPreviewLineWidth = 0.24f;
+
+        /// <summary>Texture repeats per world unit of outline length for the dashed ring (4 dashes per
+        /// repeat, so 0.5 = a dash every ~0.5 world units). Only the dash pitch changes with it.</summary>
+        public const float NoTargetPreviewRepeatsPerUnit = 0.5f;
+
+        /// <summary>Vertex tint of the dashed ribbon. White keeps the texture's own cream + ink (a
+        /// tint would darken the ink edge that carries the 3:1 against grass); only alpha is applied.</summary>
+        public static readonly Color NoTargetPreviewTint = new Color(1f, 1f, 1f, 0.95f);
+
+        /// <summary>Caster-to-centre stalk colour while the preview is in its no-target dashed state:
+        /// the same cream the dashes carry, so the connector does not read as a solid accent line
+        /// leading to a dashed shape.</summary>
+        public static readonly Color NoTargetPreviewStalkColor = new Color(0.996f, 0.961f, 0.878f, 0.9f);
+
+        // ---- Touch-hex states (Phase 6, A1) -------------------------------------
+
+        /// <summary>Scale of the hex being held/aimed. Applied on the press frame, locally.</summary>
+        public const float HexHeldScale = 1.12f;
+
+        /// <summary>Ease-out time of the held-hex scale and of the other hexes' dim.</summary>
+        public const float HexHeldTransitionSeconds = 0.06f;
+
+        /// <summary>Opacity of every hex that is NOT the one being held.</summary>
+        public const float HexOthersWhileHeldAlpha = 0.6f;
+
+        /// <summary>Length of the single scale pop the in-range pip plays when it lights.</summary>
+        public const float HexPipPopSeconds = 0.2f;
+
+        /// <summary>Peak scale of the pip's pop. Skipped (static pip) under Reduced Motion.</summary>
+        public const float HexPipPopScale = 1.4f;
 
         /// <summary>Alpha for a solid "valid target" bracket at rest (before the
         /// pulse in <see cref="ValidTargetPulseHz"/> is applied). 0.9 — near-opaque

@@ -36,12 +36,17 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void HexClass_NoTarget_HasNoModifier()
+        {
+            // Phase 6 (A1): nobody in range is not a refusal; the hex rests like any ready hex.
+            Assert.IsNull(HudFeedbackStyle.HexClass(AbilityRefusal.NoTarget));
+        }
+
+        [Test]
         public void HexClass_EveryVisibleRefusal_MapsToItsOwnClass()
         {
             Assert.AreEqual(HudFeedbackStyle.HexCooldownClass,
                 HudFeedbackStyle.HexClass(AbilityRefusal.Cooldown));
-            Assert.AreEqual(HudFeedbackStyle.HexNoTargetClass,
-                HudFeedbackStyle.HexClass(AbilityRefusal.NoTarget));
             Assert.AreEqual(HudFeedbackStyle.HexStunnedClass,
                 HudFeedbackStyle.HexClass(AbilityRefusal.Stunned));
             Assert.AreEqual(HudFeedbackStyle.HexOtherActiveClass,
@@ -49,15 +54,13 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void HexClass_TheFourVisibleRefusals_AreAllDistinct()
+        public void HexClass_TheThreeVisibleRefusals_AreAllDistinct()
         {
-            // §6's whole point: four refusals that currently look identical must become
-            // four different reads. If any two ever collapsed onto one class the player
-            // would be back to guessing.
+            // §6's whole point: refusals that look identical must become different reads.
+            // If any two ever collapsed onto one class the player would be back to guessing.
             var classes = new[]
             {
                 HudFeedbackStyle.HexClass(AbilityRefusal.Cooldown),
-                HudFeedbackStyle.HexClass(AbilityRefusal.NoTarget),
                 HudFeedbackStyle.HexClass(AbilityRefusal.Stunned),
                 HudFeedbackStyle.HexClass(AbilityRefusal.OtherAbilityActive),
             };
@@ -75,12 +78,13 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void CenterMark_NoTargetAndStunned_GetDistinctMarks()
+        public void CenterMark_Stunned_GetsTheCross_AndNoTargetGetsNoMark()
         {
-            Assert.AreEqual(HexCenterMark.NoTarget,
-                HudFeedbackStyle.CenterMark(AbilityRefusal.NoTarget));
             Assert.AreEqual(HexCenterMark.StunnedCross,
                 HudFeedbackStyle.CenterMark(AbilityRefusal.Stunned));
+            Assert.AreEqual(HexCenterMark.None,
+                HudFeedbackStyle.CenterMark(AbilityRefusal.NoTarget),
+                "No slash/no-target glyph is ever drawn over an ability icon (Phase 6, A1).");
         }
 
         [Test]
@@ -264,13 +268,12 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void RefusalMarkGlyphs_AreDefinedEvenThoughShapesAreDrawn()
+        public void RefusalMarkGlyph_IsDefinedEvenThoughTheShapeIsDrawn()
         {
-            // UseDrawnRefusalMarks is true because neither codepoint exists in
+            // UseDrawnRefusalMarks is true because the codepoint does not exist in
             // LilitaOne-Regular.ttf or NotoEmoji-Regular.ttf and TMP Settings has no
-            // fallback list. The character forms stay defined so flipping that one switch
-            // is genuinely a one-line change if a font that carries them is ever added.
-            Assert.AreEqual("⃠", HudFeedbackStyle.NoTargetGlyph);
+            // fallback list. The character form stays defined so flipping that one switch
+            // is genuinely a one-line change if a font that carries it is ever added.
             Assert.AreEqual("✕", HudFeedbackStyle.StunnedCrossGlyph);
         }
     }

@@ -114,6 +114,18 @@ namespace CluckWars.Gameplay
             }
         }
 
+        /// <summary>
+        /// Is the ability in <paramref name="slot"/> mid-duration right now? The one place the HUD and
+        /// VFX ask "is THIS slot running" — implemented on the single <see cref="ActiveSlot"/> today;
+        /// when abilities may overlap (Phase 6 chunk 3) only this and
+        /// <see cref="ActiveRemaining01For"/> change, not their callers.
+        /// </summary>
+        public bool IsSlotActive(int slot) => slot >= 0 && ActiveSlot == slot;
+
+        /// <summary><see cref="ActiveRemaining01"/> for <paramref name="slot"/>: 1 = just activated, 0 =
+        /// about to expire or that slot is not running. See <see cref="IsSlotActive"/>.</summary>
+        public float ActiveRemaining01For(int slot) => IsSlotActive(slot) ? ActiveRemaining01 : 0f;
+
         private ChickenController _controller;
         private AbilityContext _ctx;
         private ChickenCombat _combat;

@@ -6,6 +6,43 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Phase 6 chunk 1 (2026-10-08, committed, EditMode 900/900 re-run on the final code): touch-hex states, instant local preview, "no target is not illegal", stronger guides
+
+EditMode **900/900** (873 + 27: `AbilityPreviewRulesTests` new; `AbilitySlotOverlayTests`, `HudFeedbackStyleTests`, `PlayerPaletteTests` updated). Capture tool:
+`tools/ui_capture/capture_phase6_hud.py <dir> [slot]` (solo match, simulates a hold through `TouchControlsController._held`, teleports a rival into range);
+shots in `Captures/phase6/live/` (git-excluded).
+
+- **Resting hex.** The `.cw-hex` element is now the 3 px INK RIM (hex sprite tinted ink, cream while held); the category colour lives on a new
+  inset `#Fill{n}` child (first child). Cooldown / drain clips are inset to match. "No target in range" is no longer a refusal: no slash, no
+  half-faded icon, full category hue, opaque (`HudFeedbackStyle.HexClass/CenterMark(NoTarget)` return none; the `StateRing*` elements,
+  `.cw-hex--no-target` rules, `HexNoTargetClass`, `HexCenterMark.NoTarget`, `NoTargetGlyph`, `AbilityPalette.Idle` are deleted).
+- **In-range pip** (`#Pip{n}`, gold #f5c842, 28 px disc incl. 3 px ink ring = ~12 dp, bottom-centre). Visible iff `AbilityPreviewRules.InRangePipVisible(hot, onCooldown)`.
+  "Hot" is `AbilitySlotOverlay.IsHot(slot)` on the local chicken, the same 10 Hz verdict that brightens the ground guide; the scan now keeps
+  running when the player turns the range guides off. 0.2 s scale pop (`FeedbackTuning.HexPipPopSeconds/Scale`), none under Reduced Motion.
+- **Held hex.** `TouchControlsController.RefreshHeldVisuals` (called from the pointer handlers, so the press frame): held hex scale 1.12 + cream
+  rim, others opacity 0.6, 60 ms ease-out transition declared at bind from `FeedbackTuning.HexHeld*`.
+- **Active ring.** `UI/HexDurationRing` (Painter2D hexagon, drains clockwise from the top) on every hex, driven by the new
+  `AbilityController.IsSlotActive(slot)` / `ActiveRemaining01For(slot)` (single `ActiveSlot` underneath; chunk 3 changes only those two).
+  The older top-down accent drain clip is still drawn (as shipped); chunk 3 may retire it.
+- **Instant local preview.** `AbilityTelegraph` self-injects `IInputProvider` and previews the lowest held slot from the press frame
+  (`AbilityPreviewRules.SelectLocalPreviewSlot`: lowest held slot claims the gesture, no fall-through to a higher slot when it is
+  unavailable, matching `AbilityHoldStateMachine`). The networked `ChargingSlot` is only the fallback and still drives the rival-visible
+  wind-up + movement lock at 125 ms. `AbilityTelegraph.LocalAimedSlot` is what `AbilitySlotOverlay` hides while aiming.
+- **NoTarget is not illegal.** `UpdateIllegalWash` washes only `AbilityPreviewRules.IsRealRefusal` (Stunned, Cooldown, SlotUnavailable,
+  OtherAbilityActive). NoTarget = the cream dashed ribbon (`Fx_DashedRing.png` on the shape LineRenderer, `LineTextureMode.Tile`, material
+  built in code); back to the accent line the moment a rival is in the shape. FeedbackTuning contract: never-valid-yet = dashed cream,
+  became-invalid = `IllegalCastTintColor` wash (comments fixed).
+- **Range guides.** width 0.035 -> 0.06, alpha ready 0.45 / hot 0.70 / cooldown 0.18 / suppressed 0.12, plus an ink under-stroke line per
+  slot (`AbilitySlotOverlay{n}Ink`, 2x width, alpha 0.35, sortingOrder -1). `FeedbackTuning.TelegraphShapeLineWidth` (0.11) is the new
+  home of the telegraph width constant.
+- **Invisible caster.** `ControlStateVFX.UpdateWindupGlow` hides the rival-visible wind-up glow while `VisualOpacity` is in (0, 0.99).
+- **Import settings.** `UiSpriteImportSettings` (v4) carves out `Fx/Fx_DashedRing` (Default texture, wrap U Repeat / V Clamp, mipmaps, 256 px);
+  `Fx_Whiff` is a Single sprite, 100 PPU (already the postprocessor's default; used in chunk 2).
+- **Maestro / prefab wiring done in the repo:** `Chicken.prefab` -> `AbilityTelegraph._dashedRingTexture` = `Fx_DashedRing.png` (test-guarded;
+  unwired = solid cream fallback + one `ILogService` error).
+
+---
+
 ## ✅ Menu UI overhaul — Phase 5 COMPLETE (2026-10-08): all 17 round-2 re-audit findings fixed
 
 Commits on develop: b92b536 / 08034ef chunk 1 (3, 4, 11, 13), 6a27ef7 menu audio generators, dea91c8 / 6b67e03 chunk 2 (2, 12, 14,

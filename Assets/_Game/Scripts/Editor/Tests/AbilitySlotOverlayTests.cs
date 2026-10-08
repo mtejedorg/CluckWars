@@ -105,10 +105,15 @@ namespace CluckWars.Tests
                 "a zero-width line renders nothing at all.");
 
             Assert.That(FeedbackTuning.AmbientSlotOutlineWidth,
-                Is.LessThan(FeedbackTuning.RivalRingWidth),
-                "the rival ring (itself already chosen to stay under the transient status ring) " +
-                "marks ONE thing per rival; the ambient overlay draws four at once and must be " +
-                "thinner still.");
+                Is.LessThan(FeedbackTuning.TelegraphShapeLineWidth),
+                "the live aim preview / cast flash outline is the transient, decision-relevant " +
+                "stroke; the always-on guide (four at once) must stay thinner than it. (Phase 6 " +
+                "raised the guide to 0.06 so it reads on grass, which is why it is no longer " +
+                "compared with the 0.055 rival ring.)");
+
+            Assert.That(FeedbackTuning.AmbientSlotOutlineInkWidthMultiplier, Is.GreaterThan(1f),
+                "the ink under-stroke must be wider than the coloured line or no edge shows.");
+            Assert.That(FeedbackTuning.AmbientSlotOutlineInkAlpha, Is.InRange(0.01f, 1f));
         }
 
         [Test]
@@ -245,10 +250,25 @@ namespace CluckWars.Tests
             {
                 NewProbeOverlay(go);
 
-                var lines = go.GetComponentsInChildren<LineRenderer>(true);
+                var all   = go.GetComponentsInChildren<LineRenderer>(true);
+                var lines = all.Where(l => !l.name.EndsWith("Ink")).ToArray();
+                var inks  = all.Where(l => l.name.EndsWith("Ink")).ToArray();
                 Assert.AreEqual(AbilityController.SlotCount, lines.Length,
                     $"The overlay built {lines.Length} outlines for {AbilityController.SlotCount} " +
                     "equipped slots. Every slot gets one, or the missing one is invisible forever.");
+                Assert.AreEqual(AbilityController.SlotCount, inks.Length,
+                    "Every outline also gets an ink under-stroke (Phase 6, A2).");
+                foreach (var ink in inks)
+                {
+                    Assert.That(ink.widthMultiplier,
+                        Is.EqualTo(FeedbackTuning.AmbientSlotOutlineWidth *
+                                   FeedbackTuning.AmbientSlotOutlineInkWidthMultiplier).Within(1e-5f),
+                        $"{ink.name}: the ink edge is 2x the coloured line.");
+                    Assert.That(ink.startColor.a, Is.EqualTo(FeedbackTuning.AmbientSlotOutlineInkAlpha).Within(0.005f),
+                        $"{ink.name}: the ink under-stroke alpha is fixed, not tier-scaled.");
+                    Assert.Less(ink.sortingOrder, lines[0].sortingOrder,
+                        $"{ink.name} must draw UNDER the coloured line, not over it.");
+                }
 
                 for (int slot = 0; slot < AbilityController.SlotCount; slot++)
                 {
@@ -272,10 +292,10 @@ namespace CluckWars.Tests
                 // One shared material across all four lines: BuildLineMaterial does
                 // `new Material(...)` per call, so four calls would mean four unbatchable
                 // SetPass calls permanently on the local chicken.
-                var materials = lines.Select(l => l.sharedMaterial).Distinct().ToList();
+                var materials = all.Select(l => l.sharedMaterial).Distinct().ToList();
                 Assert.AreEqual(1, materials.Count,
                     $"The overlay is using {materials.Count} distinct materials for " +
-                    $"{lines.Length} identical unlit lines. Build one in Awake and share it.");
+                    $"{all.Length} identical unlit lines. Build one in Awake and share it.");
             }
             finally { Object.DestroyImmediate(go); }
         }

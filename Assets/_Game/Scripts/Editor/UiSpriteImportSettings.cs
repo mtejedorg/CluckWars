@@ -65,12 +65,19 @@ namespace CluckWars.EditorTools
         public const string FxPrefix = "Fx/";
         public const int FxMaxSize = 128;
 
+        /// <summary>The one Fx texture that is NOT a UI sprite: the dashed ring the aim preview tiles along a
+        /// world-space LineRenderer (AbilityTelegraph's "no target yet" outline). A line tiles along U, so it
+        /// must be Default type, wrap Repeat (U) / Clamp (V), with mipmaps (it is minified at a distance) and
+        /// 256 px so the 4-dash strip is not halved by the Fx cap.</summary>
+        public const string DashedRingKey = "Fx/Fx_DashedRing";
+        public const int DashedRingMaxSize = 256;
+
         static readonly string[] PlatformOverrides = { "Standalone", "Android", "iPhone" };
 
         // Bump whenever the rules above change: Unity then re-imports every texture this
         // postprocessor touched, so the .meta files follow the code (2 = Phase 2 art rules,
-        // 3 = Phase 3B Fx rule).
-        public override uint GetVersion() => 3;
+        // 3 = Phase 3B Fx rule, 4 = Fx_DashedRing world-ribbon exception).
+        public override uint GetVersion() => 4;
 
         void OnPreprocessTexture()
         {
@@ -88,6 +95,12 @@ namespace CluckWars.EditorTools
             ti.filterMode = FilterMode.Bilinear;
             ti.spritePixelsPerUnit = 100;
             ti.maxTextureSize = 2048;
+
+            if (key == DashedRingKey)
+            {
+                ApplyTiledRibbon(ti);
+                return;
+            }
 
             bool backdrop = key.StartsWith(BackdropPrefix);
             bool uncompressed = key.StartsWith("Atoms/") || (key.StartsWith("Backgrounds/") && !backdrop);
@@ -140,6 +153,26 @@ namespace CluckWars.EditorTools
             s.spriteAlignment = (int)SpriteAlignment.Center;
             ti.SetTextureSettings(s);
             ti.spriteBorder = border;
+        }
+
+        static void ApplyTiledRibbon(TextureImporter ti)
+        {
+            ti.textureType = TextureImporterType.Default;
+            ti.textureShape = TextureImporterShape.Texture2D;
+            ti.alphaSource = TextureImporterAlphaSource.FromInput;
+            ti.alphaIsTransparency = true;
+            ti.mipmapEnabled = true;
+            ti.filterMode = FilterMode.Bilinear;
+            ti.wrapModeU = TextureWrapMode.Repeat;
+            ti.wrapModeV = TextureWrapMode.Clamp;
+            ti.textureCompression = TextureImporterCompression.Uncompressed;
+            ti.maxTextureSize = DashedRingMaxSize;
+            foreach (var platform in PlatformOverrides)
+            {
+                var ps = ti.GetPlatformTextureSettings(platform);
+                ps.maxTextureSize = DashedRingMaxSize;
+                ti.SetPlatformTextureSettings(ps);
+            }
         }
     }
 }

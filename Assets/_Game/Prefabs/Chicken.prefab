@@ -467,6 +467,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3cddaa19f9bac6c4fa03822782019da4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.AbilityTelegraph
+  _dashedRingTexture: {fileID: 2800000, guid: 27e7566900cb0f44490be17c5e3f6c81, type: 3}
 --- !u!114 &7606116696970456605
 MonoBehaviour:
   m_ObjectHideFlags: 0

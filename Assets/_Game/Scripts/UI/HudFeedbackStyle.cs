@@ -16,8 +16,8 @@ namespace CluckWars.UI
         None = 0,
         /// <summary>Seconds-remaining integer — the shipped cooldown behaviour.</summary>
         CooldownSeconds = 1,
-        /// <summary>The ⃠ "nothing will happen" mark (§6 case 25).</summary>
-        NoTarget = 2,
+        // 2 was the ⃠ "no target in range" mark (§6 case 25). Retired in Phase 6: a ready hex with nobody
+        // in range is not a refusal and renders like any ready hex (the in-range pip says when someone is).
         /// <summary>The ✕ "you cannot cast" cross (§6 case 26).</summary>
         StunnedCross = 3,
     }
@@ -66,7 +66,6 @@ namespace CluckWars.UI
         // ---- Ability-hex refusal classes (ART §6.6 layers 2–4 + 7) --------------
 
         public const string HexCooldownClass    = "cw-hex--cooldown";
-        public const string HexNoTargetClass    = "cw-hex--no-target";
         public const string HexStunnedClass     = "cw-hex--stunned";
         public const string HexOtherActiveClass = "cw-hex--other-active";
 
@@ -109,35 +108,22 @@ namespace CluckWars.UI
         // ---- Layer-9 refusal marks: drawn shapes vs. real glyphs ----------------
 
         /// <summary>
-        /// Whether the layer-9 ⃠ / ✕ marks are drawn as USS shapes (a bordered circle plus
-        /// a rotated bar; two rotated bars) instead of typed as characters.
+        /// Whether the layer-9 ✕ mark is drawn as USS shapes (two rotated bars) instead of typed
+        /// as a character.
         ///
-        /// <b>Verified true, do not flip blindly.</b> U+20E0 (COMBINING ENCLOSING CIRCLE
-        /// BACKSLASH) and U+2715 (MULTIPLICATION X) are both absent from
+        /// <b>Verified true, do not flip blindly.</b> U+2715 (MULTIPLICATION X) is absent from
         /// <c>LilitaOne-Regular.ttf</c> <i>and</i> from <c>NotoEmoji-Regular.ttf</c>, and
-        /// TMP Settings' global fallback list is empty — both would have drawn tofu on
+        /// TMP Settings' global fallback list is empty — it would draw tofu on
         /// every platform, not just Android. This is the same tofu risk
         /// <c>ChickenStatusBadges</c> documents on its own glyph consts, resolved the same
         /// way: one named switch, so the decision is reversible in one line if a glyph font
         /// that carries them is ever added.
         ///
-        /// Flip to <c>false</c> and the controller types
-        /// <see cref="NoTargetGlyph"/>/<see cref="StunnedCrossGlyph"/> into the existing
-        /// layer-9 label instead; nothing else changes. Kept <c>static readonly</c> rather
+        /// Flip to <c>false</c> and the controller types <see cref="StunnedCrossGlyph"/> into the
+        /// existing layer-9 label instead; nothing else changes. Kept <c>static readonly</c> rather
         /// than <c>const</c> so both branches stay live code and neither rots.
-        ///
-        /// Half-measure on record, deliberately not taken: NotoEmoji <i>does</i> carry
-        /// U+2716 ✖ (HEAVY MULTIPLICATION X), so the stun cross alone could be a real
-        /// glyph. It is drawn anyway, because the no-target mark has no glyph on any font
-        /// the project ships — and one drawn mark plus one typed mark would put the two
-        /// refusal states on different rendering paths, with different optical weights and
-        /// different metrics, for no gain. Both drawn keeps them a matched pair.
         /// </summary>
         public static readonly bool UseDrawnRefusalMarks = true;
-
-        /// <summary>Character form of the "no valid target" mark, used only when
-        /// <see cref="UseDrawnRefusalMarks"/> is false. See that field first.</summary>
-        public const string NoTargetGlyph = "⃠";
 
         /// <summary>Character form of the "cannot cast, stunned" mark, used only when
         /// <see cref="UseDrawnRefusalMarks"/> is false. See that field first.</summary>
@@ -159,13 +145,13 @@ namespace CluckWars.UI
         /// <c>null</c> when the hex needs none (ready, or hidden entirely because the slot
         /// is unavailable for this class — ART §6.6's "slot 3 visibility" rule already
         /// removes that hex from the layout, so painting it would be dead work).
+        /// <c>NoTarget</c> also gets none (Phase 6, A1): nobody in range is not a refusal.
         /// </summary>
         public static string HexClass(AbilityRefusal refusal)
         {
             switch (refusal)
             {
                 case AbilityRefusal.Cooldown:           return HexCooldownClass;
-                case AbilityRefusal.NoTarget:           return HexNoTargetClass;
                 case AbilityRefusal.Stunned:            return HexStunnedClass;
                 case AbilityRefusal.OtherAbilityActive: return HexOtherActiveClass;
                 default:                                return null;
@@ -184,7 +170,6 @@ namespace CluckWars.UI
             switch (refusal)
             {
                 case AbilityRefusal.Cooldown: return HexCenterMark.CooldownSeconds;
-                case AbilityRefusal.NoTarget: return HexCenterMark.NoTarget;
                 case AbilityRefusal.Stunned:  return HexCenterMark.StunnedCross;
                 default:                      return HexCenterMark.None;
             }

@@ -1,6 +1,9 @@
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
+using CluckWars.Input;
+using CluckWars.Logging;
 using UnityEngine;
+using Zenject;
 
 namespace CluckWars.Visuals
 {
@@ -271,10 +274,14 @@ namespace CluckWars.Visuals
     /// <summary>
     /// Beat 1 of the feedback system: the hold-to-aim ground preview (FEEDBACK.md §2.1)
     /// and the target classification that feeds <see cref="TargetHighlight"/> (§2.2).
-    /// While <c>AbilityController.ChargingSlot</c> is non-zero this draws the charging
-    /// ability's *true* aim shape on the ground in its <c>AccentColor</c>, washing it to
-    /// <see cref="FeedbackTuning.IllegalCastTintColor"/> if the cast goes illegal
-    /// mid-hold (§2.5).
+    /// <b>Press always previews (Phase 6, A2):</b> the preview for the LOCAL player starts on the
+    /// press frame, driven by the local input provider's held bit, not by the networked
+    /// <c>AbilityController.ChargingSlot</c> (which only goes live after the 125 ms hold threshold and
+    /// still drives the rival-visible wind-up glow and the aim-rotate movement lock — unchanged).
+    /// It draws the ability's *true* aim shape in its <c>AccentColor</c>; with nobody in the shape it
+    /// is a cream DASHED outline (a legal aim, not an error); it washes to
+    /// <see cref="FeedbackTuning.IllegalCastTintColor"/> only for a real refusal (stunned, cooling,
+    /// another ability running — see <see cref="AbilityPreviewRules.IsRealRefusal"/>).
     /// </summary>
     /// <remarks>
     /// <b>Local-caster only, by design (§1.6).</b> This component does nothing unless the
@@ -295,10 +302,12 @@ namespace CluckWars.Visuals
     [RequireComponent(typeof(ChickenController))]
     public sealed class AbilityTelegraph : MonoBehaviour
     {
+        private const string Source = "AbilityTelegraph";
+
         /// <summary>Outline width — matches <c>AbilityRangeIndicator</c>'s cast-flash weight
-        /// (0.11) rather than its dimmer persistent ring (0.06), because during a hold the
-        /// preview *is* the primary ground element.</summary>
-        private const float ShapeLineWidth = 0.11f;
+        /// (<see cref="FeedbackTuning.TelegraphShapeLineWidth"/>, 0.11) rather than its dimmer persistent
+        /// ring, because during a hold the preview *is* the primary ground element.</summary>
+        private const float ShapeLineWidth = FeedbackTuning.TelegraphShapeLineWidth;
 
         /// <summary>The offset stalk is deliberately thinner than the outline: it is a
         /// connector, not part of the area itself.</summary>
@@ -331,8 +340,24 @@ namespace CluckWars.Visuals
         /// </summary>
         public Color PreviewColor { get; private set; } = Color.white;
 
+        [Tooltip("Art/UI/Fx/Fx_DashedRing.png — the cream dashed strip tiled along the no-target preview " +
+                 "outline. Wired on Chicken.prefab; if it is missing the preview falls back to a solid " +
+                 "cream line and logs an error once.")]
+        [SerializeField] private Texture2D _dashedRingTexture;
+
         private ChickenController _controller;
         private AbilityController _abilities;
+        private ILogService _log;
+        private IInputProvider _input;
+
+        private Material _solidMat;
+        private Material _dashedMat;
+        private bool _dashedApplied;      // the shape line currently wears the dashed material
+        private bool _missingTextureLogged;
+
+        // Scratch for AbilityPreviewRules.SelectLocalPreviewSlot — instance arrays, no per-frame allocation.
+        private readonly bool[] _heldScratch  = new bool[AbilityController.SlotCount];
+        private readonly bool[] _availScratch = new bool[AbilityController.SlotCount];
 
         private LineRenderer _shapeLine;
         private LineRenderer _stalkLine;
@@ -343,6 +368,7 @@ namespace CluckWars.Visuals
         // Charge observation.
         private byte  _observedSlot;      // 1-based encoding, mirrors AbilityController.ChargingSlot
         private float _illegal01;         // 0 = fully accent, 1 = fully illegal-washed
+        private bool  _noTargetPreview;   // nothing in the shape yet: draw the cream dashed outline
 
         // 10 Hz target classification (§10) — the geometry still redraws every frame.
         private float _pollTimer;
@@ -357,16 +383,40 @@ namespace CluckWars.Visuals
         /// Sharing it would let a telegraph poll clobber a cast mid-resolution.</summary>
         private readonly System.Collections.Generic.List<ChickenController> _gathered = new(4);
 
+        [Inject]
+        public void Construct(IInputProvider input, ILogService log)
+        {
+            _input = input;
+            _log   = log;
+        }
+
         private void Awake()
         {
+            // Plain MonoBehaviour spawned inside a Fusion prefab: Zenject never injects it, so
+            // self-inject (CONVENTIONS "Self-injection"). Never gate on ProjectContext.HasInstance.
+            if (_input == null) ProjectContext.Instance.Container.Inject(this);
+
             _controller = GetComponent<ChickenController>();
             _abilities  = GetComponent<AbilityController>();
 
-            var mat = TelegraphShapes.BuildLineMaterial();
-            _shapeLine = TelegraphShapes.BuildLine(transform, "AbilityTelegraphShape", mat, ShapeLineWidth, loop: true);
-            _stalkLine = TelegraphShapes.BuildLine(transform, "AbilityTelegraphStalk", mat, StalkLineWidth, loop: false);
+            _solidMat = TelegraphShapes.BuildLineMaterial();
+            _shapeLine = TelegraphShapes.BuildLine(transform, "AbilityTelegraphShape", _solidMat, ShapeLineWidth, loop: true);
+            _stalkLine = TelegraphShapes.BuildLine(transform, "AbilityTelegraphStalk", _solidMat, StalkLineWidth, loop: false);
             _shapeLine.enabled = false;
             _stalkLine.enabled = false;
+
+            if (_dashedRingTexture != null)
+            {
+                _dashedMat = TelegraphShapes.BuildLineMaterial();
+                if (_dashedMat != null)
+                {
+                    _dashedMat.mainTexture = _dashedRingTexture;
+                    // LineTextureMode.Tile spans ONE texture repeat over (line width / scale.x) world units, so the
+                    // scale that gives N repeats per world unit is width * N.
+                    _dashedMat.mainTextureScale = new Vector2(
+                        FeedbackTuning.NoTargetPreviewLineWidth * FeedbackTuning.NoTargetPreviewRepeatsPerUnit, 1f);
+                }
+            }
         }
 
         private void OnDisable() => Deactivate();
@@ -379,6 +429,14 @@ namespace CluckWars.Visuals
         /// </summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() => Active = null;
+
+        /// <summary>
+        /// The slot this chicken's preview is showing right now, or -1: the LOCAL held slot from the press
+        /// frame, else the networked charge. Computed fresh (not cached from <c>LateUpdate</c>) so
+        /// <see cref="AbilitySlotOverlay"/>, whose own <c>LateUpdate</c> may run first, never lags a frame
+        /// behind and double-draws the slot being aimed.
+        /// </summary>
+        public int LocalAimedSlot => TryGetCharge(out _, out int slot) ? slot : AbilityController.InvalidSlot;
 
         private void LateUpdate()
         {
@@ -419,6 +477,19 @@ namespace CluckWars.Visuals
             // §1.6: the area is caster-private. Opponents get the wind-up tell only.
             if (!_controller.HasInputAuthority) return false;
 
+            // Press = preview, from frame 0, for the local player: the held bit is the local input
+            // provider's own state, so it does not wait for the 125 ms networked ChargingSlot.
+            int local = SelectLocalPreviewSlot();
+            if (local != AbilityPreviewRules.NoSlot)
+            {
+                ability = _abilities.GetSlot(local);
+                if (ability == null) return false;
+                slot = local;
+                return true;
+            }
+
+            // Fallback: a charge the state authority is still holding (e.g. the release has not
+            // reached a tick yet) keeps drawing until it fires or cancels, exactly as before.
             byte encoded = _abilities.ChargingSlot;
             if (encoded == 0) return false;
 
@@ -427,6 +498,20 @@ namespace CluckWars.Visuals
 
             slot = encoded - 1;
             return true;
+        }
+
+        /// <summary>Lowest held slot, if it is available (equipped + off cooldown) — the state machine's
+        /// "lowest slot wins" rule, see <see cref="AbilityPreviewRules.SelectLocalPreviewSlot"/>.</summary>
+        private int SelectLocalPreviewSlot()
+        {
+            if (_input == null) return AbilityPreviewRules.NoSlot;
+
+            for (int i = 0; i < _heldScratch.Length; i++)
+            {
+                _heldScratch[i]  = _input.GetAbilityHeld(i);
+                _availScratch[i] = _abilities.IsReady(i);
+            }
+            return AbilityPreviewRules.SelectLocalPreviewSlot(_heldScratch, _availScratch);
         }
 
         private void Deactivate()
@@ -443,13 +528,17 @@ namespace CluckWars.Visuals
 
             if (_shapeLine != null && _shapeLine.enabled) _shapeLine.enabled = false;
             if (_stalkLine != null && _stalkLine.enabled) _stalkLine.enabled = false;
+            ApplyLineStyle(dashed: false);
         }
 
         /// <summary>
         /// §2.5 live legality. <c>EvaluateRefusal</c> is the same precedence table
-        /// <c>TryActivate</c> gates on, so the preview washes out for exactly the reasons a
-        /// release would refuse — the caster gets stunned, another ability starts, the last
-        /// valid target walks out of the shape.
+        /// <c>TryActivate</c> gates on. Only REAL refusals wash the preview to the illegal tint —
+        /// the caster gets stunned, the slot is cooling, another ability starts
+        /// (<see cref="AbilityPreviewRules.IsRealRefusal"/>). <c>NoTarget</c> is NOT one of them: a
+        /// shape with nobody in it is a legal aim, drawn as the dashed no-target outline
+        /// (<see cref="UpdateGeometry"/>), and it flips back to the accent line the moment a rival
+        /// walks in.
         /// </summary>
         private void UpdateIllegalWash(AbilityBaseSO ability, int slot)
         {
@@ -462,7 +551,9 @@ namespace CluckWars.Visuals
                 _markedCount  = 0;
             }
 
-            bool illegal = _abilities.EvaluateRefusal(slot) != AbilityRefusal.None;
+            var refusal = _abilities.EvaluateRefusal(slot);
+            bool illegal = AbilityPreviewRules.IsRealRefusal(refusal);
+            _noTargetPreview = AbilityPreviewRules.IsNoTargetPreview(refusal);
             float step = FeedbackTuning.PreviewIllegalDesaturateSeconds > 0f
                 ? Time.deltaTime / FeedbackTuning.PreviewIllegalDesaturateSeconds
                 : 1f;
@@ -489,6 +580,24 @@ namespace CluckWars.Visuals
                 float phase = Mathf.Sin(Time.time * FeedbackTuning.ValidTargetPulseHz * Mathf.PI * 2f) * 0.5f + 0.5f;
                 c.a *= Mathf.Lerp(0.6f, 1f, phase);
             }
+            // No target yet: the cream dashed ribbon (texture carries cream + ink edge; tint is white).
+            // Falls back to a solid cream line if the texture is not wired, and says so once.
+            bool dashed = _noTargetPreview && _dashedMat != null;
+            if (_noTargetPreview && _dashedMat == null)
+            {
+                c = FeedbackTuning.NoTargetPreviewStalkColor;
+                if (!_missingTextureLogged)
+                {
+                    _missingTextureLogged = true;
+                    _log?.Error(Source, "AbilityTelegraph._dashedRingTexture is not wired on Chicken.prefab; " +
+                                        "the no-target preview falls back to a solid cream line.");
+                }
+            }
+            else if (dashed)
+            {
+                c = FeedbackTuning.NoTargetPreviewTint;
+            }
+            ApplyLineStyle(dashed);
             _shapeLine.startColor = _shapeLine.endColor = c;
 
             TelegraphShapes.Apply(_shapeLine, ref _shapeBuf, shape, pos, fwd, radius, forwardOffset, coneAngle);
@@ -497,7 +606,8 @@ namespace CluckWars.Visuals
             bool stalk = TelegraphShapes.NeedsStalk(shape, forwardOffset);
             if (stalk)
             {
-                _stalkLine.startColor = _stalkLine.endColor = PreviewColor;
+                _stalkLine.startColor = _stalkLine.endColor =
+                    _noTargetPreview ? FeedbackTuning.NoTargetPreviewStalkColor : PreviewColor;
                 TelegraphShapes.ApplyStalk(_stalkLine, _stalkBuf, pos,
                     AbilityAim.ShapeCenter(shape, pos, fwd, forwardOffset));
                 if (!_stalkLine.enabled) _stalkLine.enabled = true;
@@ -505,6 +615,27 @@ namespace CluckWars.Visuals
             else if (_stalkLine.enabled)
             {
                 _stalkLine.enabled = false;
+            }
+        }
+
+        /// <summary>Switches the shape line between the solid accent outline and the dashed ribbon. Only touches
+        /// the renderer when the state actually changes.</summary>
+        private void ApplyLineStyle(bool dashed)
+        {
+            if (_shapeLine == null || dashed == _dashedApplied) return;
+            _dashedApplied = dashed;
+
+            if (dashed)
+            {
+                _shapeLine.sharedMaterial = _dashedMat;
+                _shapeLine.textureMode    = LineTextureMode.Tile;
+                _shapeLine.widthMultiplier = FeedbackTuning.NoTargetPreviewLineWidth;
+            }
+            else
+            {
+                _shapeLine.sharedMaterial = _solidMat;
+                _shapeLine.textureMode    = LineTextureMode.Stretch;
+                _shapeLine.widthMultiplier = ShapeLineWidth;
             }
         }
 

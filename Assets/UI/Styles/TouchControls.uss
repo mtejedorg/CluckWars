@@ -94,17 +94,29 @@
 
 /* ============================================================================
    HEX ABILITY BUTTONS  (right-hand MOBA arc)
-   Each hex is 150px; the controller sets -unity-background-image-tint-color to
-   the equipped AccentColor (or a desaturated grey when ready-but-no-target,
-   or dimmed while on cooldown).
+   Each hex is 150px; the controller sets -unity-background-image-tint-color on the
+   inset .cw-hex-fill to the equipped ability's category colour (opaque at rest, also
+   with nobody in range; dimmed while on cooldown, red-grey when stunned).
    ============================================================================ */
+/* Phase 6 (A1): the .cw-hex element itself is the INK RIM - the hex sprite tinted ink (#2a1a0c), seen as a
+   3 px band around the inset .cw-hex-fill that carries the category colour. Held = a bright (cream) rim.
+   Scale / opacity of the held state are written inline by TouchControlsController from FeedbackTuning. */
 .cw-hex {
     position: absolute;
     width: 150px; height: 150px;
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/HexGlossy.png");
     -unity-background-scale-mode: scale-to-fit;
-    -unity-background-image-tint-color: rgb(115, 179, 255); /* neutral until equipped */
+    -unity-background-image-tint-color: rgb(42, 26, 12);
     justify-content: center; align-items: center;
+}
+.cw-hex--held { -unity-background-image-tint-color: rgb(254, 245, 224); }
+/* The coloured hex, inset 3 px so the rim shows around it. First child, so everything else paints over it. */
+.cw-hex-fill {
+    position: absolute;
+    left: 3px; right: 3px; top: 3px; bottom: 3px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/HexGlossy.png");
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: rgb(115, 179, 255); /* neutral until equipped */
 }
 /* MOBA arc positions (element edge offsets derived from the center anchors) */
 .cw-hex--a1 { right: 95px;  bottom: 95px;  }   /* center (-170,170) */
@@ -122,14 +134,14 @@
    top so the dark hex silhouette rises from the bottom edge upward. */
 .cw-hex-cd {
     position: absolute;
-    left: 0; right: 0; bottom: 0;
+    left: 3px; right: 3px; bottom: 3px;   /* inside the ink rim, like .cw-hex-fill */
     height: 0%;
     overflow: hidden;
 }
 .cw-hex-cd-fill {
     position: absolute;
     left: 0; right: 0; bottom: 0;
-    height: 150px;                    /* == hex height, so the silhouette aligns */
+    height: 144px;                    /* == .cw-hex-fill height, so the silhouette aligns */
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/HexGlossy.png");
     -unity-background-scale-mode: scale-to-fit;
     -unity-background-image-tint-color: rgba(0, 0, 0, 0.62); /* ART 6.6 layer 6 */
@@ -147,14 +159,14 @@
    controller from the equipped ability's AccentColor. */
 .cw-hex-drain {
     position: absolute;
-    left: 0; right: 0; top: 0;
+    left: 3px; right: 3px; top: 3px;      /* inside the ink rim, like .cw-hex-fill */
     height: 0%;
     overflow: hidden;
 }
 .cw-hex-drain-fill {
     position: absolute;
     left: 0; right: 0; top: 0;
-    height: 150px;                    /* == hex height, so the silhouette aligns */
+    height: 144px;                    /* == .cw-hex-fill height, so the silhouette aligns */
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/HexGlossy.png");
     -unity-background-scale-mode: scale-to-fit;
     /* tint (accent, semi-transparent) written per-frame by the controller */
@@ -215,23 +227,7 @@
     justify-content: center; align-items: center;
     display: none;                    /* shown by the hex's refusal class */
 }
-/* The enclosing circle - only the no-target mark uses it.
-   Insets are explicit ((150-72)/2 = 39) rather than relying on flex centring
-   of absolutely-positioned children, so the mark lands on the same pixel
-   regardless of how the parent's alignment is later touched. */
-.cw-hex-state-ring {
-    position: absolute;
-    left: 39px; top: 39px;
-    width: 72px; height: 72px;
-    border-left-width: 6px; border-right-width: 6px;
-    border-top-width: 6px; border-bottom-width: 6px;
-    border-top-left-radius: 36px; border-top-right-radius: 36px;
-    border-bottom-left-radius: 36px; border-bottom-right-radius: 36px;
-    display: none;
-}
-/* One stroke of the mark. 84px is slightly longer than the ring's 72px
-   diameter so the no-target slash visibly crosses the circle rather than
-   stopping inside it. Insets: (150-84)/2 = 33, (150-8)/2 = 71. */
+/* One stroke of the stunned cross. Insets: (150-84)/2 = 33, (150-8)/2 = 71. */
 .cw-hex-state-bar {
     position: absolute;
     left: 33px; top: 71px;
@@ -248,14 +244,12 @@
    FeedbackTuning via the controller, because 1.3 forbids relying on colour
    alone and those colours are shared with the world-space feedback. */
 .cw-hex--cooldown    .cw-hex-icon { opacity: 0.35; }   /* ART 6.6 layer 9 */
-.cw-hex--no-target   .cw-hex-icon { opacity: 0.50; }
 .cw-hex--stunned     .cw-hex-icon { opacity: 0.50; }
 .cw-hex--other-active .cw-hex-icon { opacity: 0.40; }
 
-/* No valid target : circle + single backslash, in NeutralNoEffectColor. */
-.cw-hex--no-target .cw-hex-state          { display: flex; }
-.cw-hex--no-target .cw-hex-state-ring     { display: flex; }
-.cw-hex--no-target .cw-hex-state-bar--a   { display: flex; }
+/* No "no target" state (Phase 6, A1): a ready hex with nobody in range renders exactly like any ready hex -
+   full category hue, icon at full opacity, nothing drawn over the glyph. The in-range pip (below) is the
+   cue that someone IS in range: presence, not colour. */
 
 /* Stunned : two crossed strokes, red, no ring - a cross, not a "forbidden"
    circle. Shape is the second channel per 1.3, so a colour-blind player still
@@ -286,6 +280,33 @@
     font-size: 34px;
     color: rgb(254, 245, 224);
     -unity-text-align: middle-center;
+}
+
+/* --- In-range pip (Phase 6, A1) ------------------------------------------
+   Bottom-centre of the hex (top-left = slot badge, top-right = category mark). Gold #f5c842 with a
+   3 px ink ring: 22 px of gold inside a 28 px disc (28 px = ~12 dp at this canvas's 1 dp = 2.35 px).
+   Shown only while a rival is inside this move's shape and the move is not cooling down; the one 0.2 s
+   scale pop is driven by TouchControlsController (and skipped under Reduced Motion). */
+.cw-hex-pip {
+    position: absolute;
+    left: 61px; bottom: 6px;          /* (150 - 28) / 2 = 61 */
+    width: 28px; height: 28px;
+    background-color: rgb(245, 200, 66);
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    border-top-left-radius: 14px; border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
+    display: none;
+}
+
+/* --- Active-ability duration ring (Phase 6, A1) ---------------------------
+   HexDurationRing paints a hexagonal outline at radius 80 around the hex centre. The element is larger
+   than the hex (170 px, offset -10) so the stroke can sit outside the hex's own 150 px box. */
+.cw-hex-ring {
+    position: absolute;
+    left: -10px; top: -10px;
+    width: 170px; height: 170px;
 }
 
 /* ============================================================================
