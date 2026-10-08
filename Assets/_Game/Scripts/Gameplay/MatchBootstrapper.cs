@@ -131,6 +131,9 @@ namespace CluckWars.Gameplay
                 _log?.Debug(Source, $"Network start awaited (mode={mode}); runner is up.");
 
                 TrySpawnGameManager();
+                // This peer's master status is now known; only a later change is a promotion.
+                var started = _networkService.IsReady ? _networkService.Runner : null;
+                _lastSeenMaster = started != null ? started.IsSharedModeMasterClient : (bool?)null;
 
                 if (mode == SessionMode.Solo)
                     TrySpawnBots();
@@ -153,24 +156,42 @@ namespace CluckWars.Gameplay
             var runner = _networkService.Runner;
             if (runner == null) return;
 
-            // Only the master client (or solo player) spawns the manager. In Shared
-            // Mode, every client's local-player check passes for itself; the master
-            // client is the one whose LocalPlayer equals runner.LocalPlayer AND is
-            // first to spawn. We additionally guard so we don't end up with two
-            // managers if joins race.
-            if (runner.GameMode != GameMode.Single && !runner.IsSharedModeMasterClient)
+            // Only the solo player or the Shared-mode master client spawns the manager (everyone else gets it
+            // replicated), and only once StartGame has completed: IsRunning turns true while it is still
+            // connecting, and a Spawn in that window throws inside Fusion and leaves a never-spawned manager.
+            bool ready = _networkService.IsReady;
+            bool solo = runner.GameMode == GameMode.Single;
+            bool master = runner.IsSharedModeMasterClient;
+            bool liveManager = ready && (solo || master) && DropDeadManagersAndFindLive();
+
+            if (!MatchFlowRules.ShouldSpawnManager(ready, solo, master, liveManager))
             {
-                _log?.Debug(Source, "Not master client; GameManager will replicate from the master.");
-                return;
-            }
-            if (FindFirstObjectByType<GameManager>() != null)
-            {
-                _log?.Debug(Source, "GameManager already in scene; skipping spawn.");
+                _log?.Debug(Source,
+                    !ready ? "Session not started (StartGame still connecting or failed); no GameManager spawn."
+                    : liveManager ? "GameManager already in scene; skipping spawn."
+                    : "Not master client; GameManager will replicate from the master.");
                 return;
             }
 
             _log?.Info(Source, "Master client spawning GameManager.");
             runner.Spawn(gmPrefab, Vector3.zero, Quaternion.identity);
+        }
+
+        /// <summary>
+        /// True when a spawned (valid) GameManager exists. A never-spawned instance (no valid NetworkObject,
+        /// e.g. left by a Spawn that threw) is not a manager: it is destroyed so it cannot block the real one
+        /// or be picked up by the HUD's lookup.
+        /// </summary>
+        private bool DropDeadManagersAndFindLive()
+        {
+            bool live = false;
+            foreach (var gm in FindObjectsByType<GameManager>(FindObjectsSortMode.None))
+            {
+                if (gm.Object != null && gm.Object.IsValid) { live = true; continue; }
+                _log?.Warn(Source, $"Dropping a never-spawned GameManager '{gm.name}' (no valid NetworkObject).");
+                Destroy(gm.gameObject);
+            }
+            return live;
         }
 
         /// <summary>
@@ -724,14 +745,15 @@ namespace CluckWars.Gameplay
         }
 
         private float _lastPromotionPollTime;
-        private bool _wasMasterClientLastCheck;
+        // Master status last seen while the session was ready; null = not observed yet (see IsMasterPromotion).
+        private bool? _lastSeenMaster;
 
         private void Update()
         {
             var runner = _networkService != null ? _networkService.Runner : null;
-            if (runner == null || !runner.IsRunning)
+            if (runner == null || !_networkService.IsReady)
             {
-                _wasMasterClientLastCheck = false;
+                _lastSeenMaster = null;
                 return;
             }
 
@@ -739,7 +761,7 @@ namespace CluckWars.Gameplay
             {
                 _lastPromotionPollTime = Time.time;
                 bool isMaster = runner.IsSharedModeMasterClient;
-                if (isMaster && !_wasMasterClientLastCheck)
+                if (MatchFlowRules.IsMasterPromotion(_lastSeenMaster, isMaster))
                 {
                     _log?.Info(Source, "Local peer promoted to Master Client. Re-arming match generators.");
                     TrySpawnGameManager();
@@ -750,7 +772,7 @@ namespace CluckWars.Gameplay
                         mapGen.ReArmForMasterPromotion();
                     }
                 }
-                _wasMasterClientLastCheck = isMaster;
+                _lastSeenMaster = isMaster;
             }
         }
 

@@ -179,6 +179,24 @@ namespace CluckWars.Gameplay
             bool sessionEnding) =>
             !sessionEnding && (managerGone || authorityChanged)
             && (lastSeenState == MatchState.Starting || lastSeenState == MatchState.Active);
+
+        /// <summary>
+        /// Whether this peer spawns the match's GameManager now: only once the session has finished starting
+        /// (<c>INetworkService.IsReady</c>; a spawn while <c>StartGame</c> is still connecting throws inside
+        /// Fusion and leaves a never-spawned manager behind), only the solo player or the Shared-mode master
+        /// client, and only when no live (spawned, valid) manager exists. A dead, never-spawned instance does
+        /// not count as live.
+        /// </summary>
+        public static bool ShouldSpawnManager(bool sessionReady, bool solo, bool isMasterClient, bool liveManagerExists) =>
+            sessionReady && (solo || isMasterClient) && !liveManagerExists;
+
+        /// <summary>
+        /// A master-client promotion is a change from an observed non-master state to master. The first
+        /// observation after the session becomes ready (<paramref name="lastSeenMaster"/> null) is not one:
+        /// the peer that started as master spawned its manager on the start path.
+        /// </summary>
+        public static bool IsMasterPromotion(bool? lastSeenMaster, bool isMaster) =>
+            isMaster && lastSeenMaster == false;
     }
 
     /// <summary>

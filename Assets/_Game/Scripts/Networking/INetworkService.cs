@@ -13,6 +13,13 @@ namespace CluckWars.Networking
     {
         bool IsRunning { get; }
 
+        /// <summary>
+        /// True once <c>StartGame</c> has completed successfully (<see cref="OnRunnerReady"/> has fired) and
+        /// until the runner shuts down. <see cref="IsRunning"/> turns true earlier, while <c>StartGame</c> is
+        /// still connecting; spawning in that window throws inside Fusion and leaves a dead object behind.
+        /// </summary>
+        bool IsReady { get; }
+
         /// <summary>The active runner. Null until <see cref="OnRunnerReady"/> fires.</summary>
         NetworkRunner Runner { get; }
 

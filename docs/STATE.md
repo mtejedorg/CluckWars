@@ -8,7 +8,7 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ## 🔧 Menu UI overhaul — Phase 5 chunk 2 (2026-10-08, uncommitted, in review): round-2 findings 2, 12, 14 + decision 3
 
-EditMode **820/820** (805 + 15 in `WaitingRoomAndSessionEndTests`). Captures (git-excluded) in `Captures/phase5/extra/`:
+EditMode **820/820** (805 + 15 in `WaitingRoomAndSessionEndTests`; 828 after the host-race fix below). Captures (git-excluded) in `Captures/phase5/extra/`:
 `solo_playagain_getready.png`, `mp_waiting_room__{desktop,phone}.png` (real Host session in the Editor), `session_end__{desktop,phone}.png`
 (forced PhotonCloudTimeout). Re-run with `python tools/ui_capture/capture_phase5_extra.py <dir> [solo|host|all]`. No prefab / scene wiring.
 
@@ -31,11 +31,14 @@ EditMode **820/820** (805 + 15 in `WaitingRoomAndSessionEndTests`). Captures (gi
   `PerkDetail`; compendium edited, **not republished**). Lobby errors are in voice. The cooldown badge reads SHORT / MEDIUM RECHARGE (the
   fonts have no ⟳ glyph). HUD top bar placeholders are `@hud.rank.N` / `@hud.timer.none` or blank (rows are hidden until ranked), and
   `MatchHudController` resolves them. Unused `lobby.players` / `lobby.classPerk` keys are removed.
-- **Found, not fixed (pre-existing, outside this chunk): Host start race in the Editor.** `MatchBootstrapper.Update`'s master-promotion
-  poll calls `TrySpawnGameManager` before `StartGame` has returned. That GameManager is never `Spawned`, and it then blocks the real spawn
-  ("GameManager already in scene"), so a Host session never gets a manager: no waiting room, and `MatchHud` throws "Networked properties
-  can only be accessed when Spawned()" every frame. Seen twice from a clean Play start. The capture script works around it
-  (`RespawnDeadManager`). Needs a fix before any Host / Join test.
+- **Host start race — FIXED (2026-10-08).** Root cause: Fusion reports `IsRunning` + `IsSharedModeMasterClient` ~0.1 s before
+  `StartGame` returns; `MatchBootstrapper.Update`'s promotion poll spawned the GameManager in that window, `Runner.Spawn` threw a
+  NullReferenceException inside Fusion (`SpawnInternal`) and left a never-spawned manager that then blocked the real spawn.
+  Fix: new `INetworkService.IsReady` (StartGame OK until shutdown) gates every GameManager spawn and the promotion poll;
+  `MatchFlowRules.ShouldSpawnManager` / `IsMasterPromotion` (the first master observation is not a promotion); a never-spawned
+  instance is destroyed with a Warn instead of blocking. `ManagerSpawnRulesTests` (+8, EditMode **828/828**); the capture
+  script's `RespawnDeadManager` workaround is gone. Live: Host waiting room -> START -> Active (Starting 0.72 s), Solo unchanged
+  (`Captures/phase5/extra/host_waiting_room_live.png`, `host_match_running.png`, `solo_match_running.png`).
 
 ---
 

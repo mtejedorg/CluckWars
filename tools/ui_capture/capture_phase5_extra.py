@@ -45,14 +45,6 @@ public class P5 {
       + " | pill bg=" + (r.Q(className: "cw-seat__state") != null ? r.Q(className: "cw-seat__state").resolvedStyle.backgroundColor.ToString() : "-")
       + " label=" + (r.Q<Label>(className: "cw-seat__state-label") != null ? r.Q<Label>(className: "cw-seat__state-label").resolvedStyle.color.ToString() : "-")
       + " startBtnImg=" + (r.Q("LobbyStartBtn") != null ? r.Q("LobbyStartBtn").resolvedStyle.backgroundImage.ToString() : "-"); }
-  // Works around a pre-existing Editor Host race (MatchBootstrapper.Update's master-promotion poll spawns the
-  // GameManager before StartGame completes; that object is never Spawned and blocks the real spawn): drop the
-  // dead one and let the bootstrapper spawn it again on the now-running runner.
-  public static string RespawnDeadManager() { var dead = Object.FindObjectsByType<GameManager>(FindObjectsSortMode.None).Where(g => g.Object == null || !g.Object.IsValid).ToList();
-    foreach (var g in dead) Object.DestroyImmediate(g.gameObject);
-    var mb = Object.FindFirstObjectByType<MatchBootstrapper>(); if (mb == null) return "no bootstrapper";
-    typeof(MatchBootstrapper).GetMethod("TrySpawnGameManager", BindingFlags.NonPublic|BindingFlags.Instance).Invoke(mb, null);
-    return "dropped " + dead.Count + " dead manager(s), respawned"; }
   public static string Session() { var d = Doc("SessionEndOverlay"); var r = d.rootVisualElement; return r.Q<Label>("SessionEndTitle").text + " | " + r.Q<Label>("SessionEndReason").text + " | " + r.Q<Label>("SessionEndCountdown").text; }
   public static string ForceShutdown() { var ctrl = Object.FindFirstObjectByType<MatchOverlaysController>(); if (ctrl == null) return "no controller";
     typeof(MatchOverlaysController).GetField("_disconnectReturnDelay", BindingFlags.NonPublic|BindingFlags.Instance).SetValue(ctrl, 30f); // time for both sizes
@@ -135,8 +127,6 @@ def host():
     time.sleep(3)  # the host pre-creates its UGS lobby (join code tiles)
     print(cs("Press", "StartBtn"))
     time.sleep(10)
-    if cs("State") == "nogm":
-        print("  no GameManager (pre-existing host spawn race):", cs("RespawnDeadManager"))
     wait(("WaitingForPlayers",), tries=60); time.sleep(2.5)
     print("  ", cs("Overlay"))
     render("LobbyOverlay", "mp_waiting_room")

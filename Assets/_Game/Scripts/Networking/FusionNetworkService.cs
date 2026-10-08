@@ -42,6 +42,8 @@ namespace CluckWars.Networking
         private bool _pendingAbility1, _pendingAbility2, _pendingAbility3, _pendingAbility4, _pendingAbilityCancel;
 
         public bool IsRunning => _runner != null && _runner.IsRunning;
+        public bool IsReady => _ready && IsRunning;
+        private bool _ready;
         public NetworkRunner Runner => _runner;
 
         public event Action<NetworkRunner> OnRunnerReady;
@@ -95,6 +97,7 @@ namespace CluckWars.Networking
             if (result.Ok)
             {
                 _log?.Info(Source, $"StartGame OK. LocalPlayer={_runner.LocalPlayer}, MaxPlayers={maxPlayers}, IsSharedModeMasterClient={_runner.IsSharedModeMasterClient}.");
+                _ready = true;
                 OnRunnerReady?.Invoke(_runner);
             }
             else
@@ -202,6 +205,7 @@ namespace CluckWars.Networking
         void INetworkRunnerCallbacks.OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason)
         {
             _log?.Info(Source, $"OnShutdown: reason={shutdownReason}.");
+            _ready = false;
             OnShutdown?.Invoke(shutdownReason);
             var sceneManager = GetComponent<NetworkSceneManagerDefault>();
             if (sceneManager != null)
