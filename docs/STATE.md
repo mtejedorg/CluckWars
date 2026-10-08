@@ -6,6 +6,39 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🔧 Menu UI overhaul — Phase 5 chunk 2 (2026-10-08, uncommitted, in review): round-2 findings 2, 12, 14 + decision 3
+
+EditMode **820/820** (805 + 15 in `WaitingRoomAndSessionEndTests`). Captures (git-excluded) in `Captures/phase5/extra/`:
+`solo_playagain_getready.png`, `mp_waiting_room__{desktop,phone}.png` (real Host session in the Editor), `session_end__{desktop,phone}.png`
+(forced PhotonCloudTimeout). Re-run with `python tools/ui_capture/capture_phase5_extra.py <dir> [solo|host|all]`. No prefab / scene wiring.
+
+- **Decision 3 — solo PLAY AGAIN goes straight to GET READY.** `MatchFlowRules.StateAfterPlayAgain(solo)`; `GameManager.RequestPlayAgain`
+  resets the world and then calls `BeginStarting` in `GameMode.Single` (same settle + 3-2-1 as every round). Multiplayer stays in the waiting
+  room. `capture_postmatch.py` / `intro_probe.py` no longer press the in-match START after a solo PLAY AGAIN.
+- **Finding 2 — waiting room rebuilt on THE COOP.** `MatchOverlays.uxml #LobbyOverlay` attaches `CluckWarsTheme.uss` to that element only
+  (a scoped `<Style>`: the post-match screen keeps `MatchOverlays.uss` alone), so it uses the Coop's own `.cw-seat` lineup, rule chips, bottom
+  bar and `cw-btn` planks. The old `.cw-lob-*` / `.cw-player-*` styles are deleted. Seats are built once (`BuildSeats`) and filled per
+  corner (`RefreshSeats`): "You" / CPU name / P{n}, HOST only on the master's human seat and never in solo (`WaitingRoomRules.ShowHostTag`),
+  "{CLASS} · {role}" (`MatchStandings.ClassRoleLine`), READY ink on gold (10.6:1; was 3.0:1). The "{n}/4" counter counts READY seats
+  (`WaitingRoomRules.ReadyCount`; it used to count connected players, which gave 1/4 with four READY cards). New exits: LEAVE
+  (same path as BACK TO LOBBY, back cue), CHANGE BIRD (new one-shot `ISessionSelectionService.OpenClassSelectOnMenuLoad` →
+  `MenuLanding.ClassSelect` → the menu opens PICK YOUR BIRD), Esc / Android back = LEAVE (`IInputProvider.GetBackPressed`, polled only
+  while the room is shown). Seat colours still come from `MatchOverlaysController.ColorForCorner` (chunk 3 swaps it in one place).
+- **Finding 12 — session end.** `UI/SessionEndCopy` maps every `ShutdownReason` to an in-voice UiText line (host left, lost signal, coop
+  full, barn packed, not found, door would not open, version mismatch, coop closed, generic); the headline is COOP CLOSED, or MATCH OVER
+  only when the round had ended before the session closed. `session.reason` ("{reason}") is deleted.
+- **Finding 14 — copy.** The Hoarder asset description is now exactly its template output ("Carries at least 40 food.", test-pinned to
+  `PerkDetail`; compendium edited, **not republished**). Lobby errors are in voice. The cooldown badge reads SHORT / MEDIUM RECHARGE (the
+  fonts have no ⟳ glyph). HUD top bar placeholders are `@hud.rank.N` / `@hud.timer.none` or blank (rows are hidden until ranked), and
+  `MatchHudController` resolves them. Unused `lobby.players` / `lobby.classPerk` keys are removed.
+- **Found, not fixed (pre-existing, outside this chunk): Host start race in the Editor.** `MatchBootstrapper.Update`'s master-promotion
+  poll calls `TrySpawnGameManager` before `StartGame` has returned. That GameManager is never `Spawned`, and it then blocks the real spawn
+  ("GameManager already in scene"), so a Host session never gets a manager: no waiting room, and `MatchHud` throws "Networked properties
+  can only be accessed when Spawned()" every frame. Seen twice from a clean Play start. The capture script works around it
+  (`RespawnDeadManager`). Needs a fix before any Host / Join test.
+
+---
+
 ## 🔧 Menu UI overhaul — Phase 5 chunk 1 (2026-10-08, uncommitted, in review): round-2 findings 3, 4, 11, 13
 
 EditMode **805/805** (baseline 794). Verified live with `tools/ui_capture/intro_probe.py Captures/phase5/extra --item4`
