@@ -1009,85 +1009,15 @@ namespace CluckWars.UI
         }
 
         // ======================================================================
-        //  ICON VIEW (shared by deck cards, slots, starter chips, lobby hexes)
+        //  ICON PAINT (the view + painter are shared: AbilityIconView.cs)
         // ======================================================================
-        /// <summary>
-        /// One ability icon slot, built once: an accent hex (disc), the icon sprite on it, and a
-        /// monogram label (safety net), which <see cref="PaintIcon"/> repaints in place.
-        /// </summary>
-        private sealed class AbilityIconView
-        {
-            public readonly VisualElement Disc;
-            public readonly VisualElement Sprite;
-            public readonly Label Mono;
-            public readonly VisualElement Mark;   // category shape (CategoryMark), round-2 finding 9
-            public string SpriteClass;
-
-            public AbilityIconView(VisualElement host)
+        /// <summary>Paints <paramref name="ab"/> into <paramref name="view"/>; an unmapped type is logged once.</summary>
+        private void PaintIcon(AbilityIconView view, AbilityBaseSO ab, bool disc = true) =>
+            AbilityIconPainter.Paint(view, ab, disc, a =>
             {
-                Disc = new VisualElement { pickingMode = PickingMode.Ignore };
-                Disc.AddToClassList("cw-icon-disc");
-                Sprite = new VisualElement { pickingMode = PickingMode.Ignore };
-                Sprite.AddToClassList("cw-icon-sprite");
-                Mono = new Label { pickingMode = PickingMode.Ignore };
-                Mono.AddToClassList("cw-ability-mono");
-                Mark = CategoryMark.Create();
-                host.Add(Disc);
-                host.Add(Sprite);
-                host.Add(Mono);
-                host.Add(Mark);
-            }
-        }
-
-        /// <summary>
-        /// Paints <paramref name="ab"/> into <paramref name="view"/>: its icon sprite
-        /// (<see cref="AbilityIconStyle.ClassFor"/>; every mapped type is authored). A type with no
-        /// mapping falls back to its <see cref="AbilityIconStyle.Monogram"/> on an accent disc and is
-        /// logged once — a safety net, since AbilityIconArtTests fails on any unmapped type.
-        /// </summary>
-        private void PaintIcon(AbilityIconView view, AbilityBaseSO ab, bool disc = true)
-        {
-            if (view == null) return;
-            if (!string.IsNullOrEmpty(view.SpriteClass)) view.Sprite.RemoveFromClassList(view.SpriteClass);
-            view.SpriteClass = null;
-
-            // The category shape, so a move's job never rests on colour alone. Perks have no category.
-            CategoryMark.Apply(view.Mark, ab != null && ab is not PassiveAbilitySO ? ab.Category : (AbilityCategory?)null);
-
-            if (ab == null)
-            {
-                view.Disc.style.display = DisplayStyle.None;
-                view.Sprite.style.display = DisplayStyle.None;
-                view.Mono.style.display = DisplayStyle.None;
-                return;
-            }
-
-            var accent = AbilityPalette.HexColor(ab);
-            string iconCls = AbilityIconStyle.ClassFor(ab);
-            if (!string.IsNullOrEmpty(iconCls))
-            {
-                // Cream silhouette on the ability's accent hex (the lobby mini-hex is its own hex).
-                view.Disc.style.display = disc ? DisplayStyle.Flex : DisplayStyle.None;
-                view.Disc.style.unityBackgroundImageTintColor = accent;
-                view.SpriteClass = iconCls;
-                view.Sprite.AddToClassList(iconCls);
-                view.Sprite.EnableInClassList("cw-icon-sprite--on-disc", disc);
-                view.Sprite.style.display = DisplayStyle.Flex;
-                view.Mono.style.display = DisplayStyle.None;
-                return;
-            }
-
-            if (_reportedMissingIcons.Add(ab))
-                _log?.Warn(Source, $"Ability '{ab.name}' ({ab.GetType().Name}) has no AbilityIconStyle entry; showing its monogram '{AbilityIconStyle.Monogram(ab)}'.");
-
-            view.Disc.style.display = DisplayStyle.None;
-            view.Sprite.style.display = DisplayStyle.None;
-            view.Mono.style.display = DisplayStyle.Flex;
-            view.Mono.text = AbilityIconStyle.Monogram(ab);
-            // On a lobby hex the hex is already the accent disc: text only (contrast vs the accent).
-            view.Mono.style.backgroundColor = disc ? accent : new Color(0f, 0f, 0f, 0f);
-            view.Mono.style.color = AbilityPalette.InkOn(accent);
-        }
+                if (_reportedMissingIcons.Add(a))
+                    _log?.Warn(Source, $"Ability '{a.name}' ({a.GetType().Name}) has no AbilityIconStyle entry; showing its monogram '{AbilityIconStyle.Monogram(a)}'.");
+            });
 
         private static string CategoryLabel(AbilityCategory cat) =>
             CategoryLabelKeys.TryGetValue(cat, out var key) ? UiText.Get(key) : string.Empty;
@@ -2035,6 +1965,7 @@ namespace CluckWars.UI
             stage.AddToClassList("cw-seat__stage");
             v.Pedestal = new VisualElement { pickingMode = PickingMode.Ignore };
             v.Pedestal.AddToClassList("cw-seat__pedestal");
+            v.Pedestal.Add(new DashedRim());   // shown on an empty seat only (.cw-seat--empty)
             v.Chicken = new VisualElement { pickingMode = PickingMode.Ignore };
             v.Chicken.AddToClassList("cw-chicken");
             v.Chicken.AddToClassList("cw-seat__chicken");
@@ -2248,7 +2179,27 @@ namespace CluckWars.UI
                     allReady = false;
                 }
             }
+            OrderSeatsByCorner(mode);
             return allReady;
+        }
+
+        /// <summary>
+        /// Lays the Coop's seats out by spawn corner, P1..P4 left to right (round-3 finding 6): seats are FILLED in
+        /// join order (you, then the others), but the cards carry corner labels, so the row is re-ordered to match.
+        /// A guest's corners are unknown: seat order. Only moves cards when the order actually changes.
+        /// </summary>
+        private void OrderSeatsByCorner(SessionMode mode)
+        {
+            var grid = _seats[0]?.Root.parent;
+            if (grid == null) return;
+            var corners = new int[_seats.Length];
+            for (int i = 0; i < corners.Length; i++) corners[i] = CornerAssignment.LobbySeatCorner(mode, i, _lobbyPermutation);
+            var order = CornerAssignment.LobbySeatOrder(corners);
+            bool inOrder = true;
+            for (int pos = 0; pos < order.Length; pos++)
+                if (grid.IndexOf(_seats[order[pos]].Root) != pos) { inOrder = false; break; }
+            if (inOrder) return;
+            for (int pos = 0; pos < order.Length; pos++) grid.Insert(pos, _seats[order[pos]].Root);
         }
 
         /// <summary>

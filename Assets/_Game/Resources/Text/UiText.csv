@@ -10,6 +10,7 @@ btn.abilityLab,ABILITY LAB
 btn.playAgain,PLAY AGAIN
 btn.playAgain.sub,{cls} · {perk}
 btn.backToLobby,BACK TO LOBBY
+btn.backToBarn,BACK TO THE BARN
 nav.home,HOME
 nav.back,BACK
 screen.class.title,PICK YOUR BIRD
@@ -122,7 +123,7 @@ settings.buzzWhenHit.desc,Your phone buzzes when a move hits you.
 settings.musicVolume,Music
 settings.sfxVolume,Sound Effects
 lobby.rules,HOUSE RULES
-lobby.invite.label,INVITE CODE · TAP TO COPY
+lobby.invite.label,INVITE CODE
 lobby.join.label,ENTER JOIN CODE
 lobby.setting.arena,ARENA
 lobby.setting.time,TIME

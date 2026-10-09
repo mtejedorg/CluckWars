@@ -123,7 +123,7 @@
 
 /* ---- Sections ------------------------------------------------------------ */
 .cw-lab-section {
-    font-size: 26px; letter-spacing: 2px;
+    font-size: 28px; letter-spacing: 2px;
     color: rgb(196, 160, 96);
     margin-top: 18px; margin-bottom: 6px;
     padding-left: 20px;
@@ -158,7 +158,7 @@
     margin-top: 4px; margin-bottom: 4px;
     margin-left: 3px; margin-right: 3px;
     padding-left: 6px; padding-right: 6px;
-    font-size: 26px; letter-spacing: 1px;
+    font-size: 28px; letter-spacing: 1px;
     color: rgb(254, 245, 224);
     background-color: rgb(58, 40, 22);
     border-left-width: 2px; border-right-width: 2px;
@@ -279,7 +279,7 @@
 }
 
 .cw-lab-empty {
-    font-size: 26px;
+    font-size: 28px;
     color: rgb(196, 160, 96);
     white-space: normal;
     padding-top: 12px; padding-bottom: 12px;

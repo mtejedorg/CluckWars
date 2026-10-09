@@ -28,6 +28,7 @@ namespace CluckWars.Localization
         public const string BtnPlayAgain = "btn.playAgain";
         [UiArgs("cls", "perk")] public const string BtnPlayAgainSub = "btn.playAgain.sub";
         public const string BtnBackToLobby = "btn.backToLobby";
+        public const string BtnBackToBarn = "btn.backToBarn";
 
         // ---- Navigation and screen titles ----
         public const string NavHome = "nav.home";

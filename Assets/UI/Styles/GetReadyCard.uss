@@ -1,7 +1,7 @@
 /* GET READY card (re-audit round 2, finding 11): ONE style for the menu's START MATCH hand-off
    (Lobby.uxml #GetReadyCard) and the in-match intro overlay's GET READY (MatchOverlays.uxml
    #IntroGetReady), so the card the menu fades in is the card the arena keeps up until the first
-   digit: near-opaque ink scrim, gold-ruled plate, gold display type with the ink outline.
+   digit: near-opaque ink scrim, wood ribbon, gold display type with the ink outline.
    .cw-reduced-motion zeroes the menu's fade (the card simply appears). */
 .cw-getready {
     position: absolute; left: 0; top: 0; right: 0; bottom: 0;
@@ -11,20 +11,28 @@
     transition-property: opacity; transition-duration: 0.18s; transition-timing-function: ease-out;
 }
 .cw-getready--hidden { opacity: 0; }
+/* The plate is the menus' wood ribbon (Frame_Ribbon, horizontal 3-slice 168/0/168/0), big: height 220 = scale 1.375,
+   so the swallowtails grow uniformly and only the plank stretches. The plank's text band is y 15-121 of 160, so the
+   label sits above centre (more padding at the bottom). Round-3 finding 5 (was a gold-ruled ink plate). */
 .cw-getready__plate {
-    padding-top: 18px; padding-bottom: 26px; padding-left: 90px; padding-right: 90px;
-    border-top-width: 4px; border-bottom-width: 4px;
-    border-top-color: rgb(245, 200, 66); border-bottom-color: rgb(245, 200, 66);
-    align-items: center;
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Frame_Ribbon.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    -unity-slice-left: 168; -unity-slice-right: 168; -unity-slice-top: 0; -unity-slice-bottom: 0;
+    -unity-slice-scale: 1.375px;
+    height: 220px; flex-shrink: 0;
+    padding-top: 0; padding-bottom: 40px; padding-left: 250px; padding-right: 250px;
+    align-items: center; justify-content: center;
 }
+.layout--short .cw-getready__plate { height: 176px; -unity-slice-scale: 1.1px; padding-bottom: 32px; padding-left: 200px; padding-right: 200px; }
 .cw-getready__label {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 132px; letter-spacing: 8px; color: rgb(255, 214, 80);
+    font-size: 104px; letter-spacing: 8px; color: rgb(255, 214, 80);
     -unity-text-align: middle-center; white-space: nowrap;
     -unity-text-outline-width: 6px; -unity-text-outline-color: rgb(42, 26, 12);
     text-shadow: 0px 8px 0px rgba(42, 26, 12, 0.9);
+    padding-top: 0; padding-bottom: 0; margin-top: 0; margin-bottom: 0;
 }
-.layout--short .cw-getready__label { font-size: 104px; }
+.layout--short .cw-getready__label { font-size: 84px; }
 /* "Waiting for P2..." under the plate (finding 13): empty and collapsed until the room waits 3 s. */
 .cw-getready__sub {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");

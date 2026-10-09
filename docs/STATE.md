@@ -6,7 +6,17 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
-## ✅ Phase 6 chunk 7c (2026-10-09, UNCOMMITTED, EditMode 1089/1089): active-ability descriptions templated from the real numbers (round-3 finding 8)
+## ✅ 🟡 Phase 6 chunk 7d (2026-10-09, committed, EditMode 1104/1104): overlays on the wood style, Coop seats by corner, waiting room, alignment, 28 px floor (round-3 findings 5, 6, 12, 16, 19)
+
+- **Overlays (5).** Session end = wood panel + ribbon + green BACK TO THE BARN (`btn.backToBarn`, leaves through the countdown's own path; the countdown stays as the fallback). GET READY plate = the wood ribbon (`GetReadyCard.uss`, shared with the menu hand-off). Host-left notice = wood plaque. The comeback / event banner (FINAL 10! + PILES RESTOCKED!) moved from a procedural UGUI plate in `MatchHud` to `#EventBanner` in `MatchOverlays.uxml` (wood plaque, same size and spot); `MatchHud` still owns timing / sting / copy and publishes through `EventBannerFeed` (`MenuJuicePolicy.cs`), `MatchOverlaysController.TickEventBanner` draws it.
+- **Coop seats (6).** `CornerAssignment.LobbySeatOrder` + `MenuUiController.OrderSeatsByCorner`: cards read P1..P4 left to right after every lineup fill (a guest keeps seat order, corners unknown).
+- **Waiting room (12).** Seat cards carry the four loadout hexes (read from each chicken's `AbilityController.GetSlot`); the shared painter is now `AbilityIconView.cs` (`AbilityIconPainter.Paint`, used by the menu too). Empty pedestal opaque with a dashed rim (`DashedRim.cs`, Painter2D; also on the menu Coop). Hint on an ink plate; `lobby.invite.label` = INVITE CODE; phone / 4:3 get slim planks + SHARE / COPY (`layout--narrow` is now toggled on the overlay too); the overlay loads `CategoryMark.uss`.
+- **Alignment (16).** Bottom bar: fixed `min-height: 206px`, columns centred, the line under START (error / hint) is out of flow, so START sits at one y on Coop / join / waiting room. `.layout--narrow .cw-deck { align-items: flex-start }` (ANY BIRD group). Category mark tucked inside the starter pills.
+- **Text floor (19).** Every font-size below 28 px raised to 28 (post-match CPU tag 24, ability monograms 22 / 26, build label, `--long` card names, AbilityLab 26); gold-on-wood deck titles get a 4 px ink outline; Coop mini-hex marks 0.7 -> 1.0 scale. Test `EveryUiStylesheet_HasNoFontSizeBelow28px` scans all of `Assets/UI/Styles`.
+- Tests: `Phase6Chunk7dTests` (15); updated `WaitingRoomAndSessionEndTests` (theme scoped 3x) and `PlayerPaletteTests` (Apply lives in `AbilityIconView.cs`). Captures: `Captures/phase6/{static,live}` (`tools/ui_capture/capture_phase6_chunk7d.py`).
+- Known: a 9+ letter invite code (placeholder CLUCK-LAN, forced CLUCK-LAN-XL) still wraps to two tile rows on 4:3; 6-8 letters stay on one row.
+
+## ✅ Phase 6 chunk 7c (2026-10-09, committed, EditMode 1089/1089): active-ability descriptions templated from the real numbers (round-3 finding 8)
 
 - Every active move's player text is now a UiText template (`ability.<id>.desc`, 29 rows in `UiText.csv`, constants in `UiKeys`) filled from the ability's own serialized fields: `AbilityBaseSO.DescriptionKey` / `DescriptionArgs()` / `DescriptionText` (same idea as the perk lines). Gear Up reads `DescriptionText` (`MenuUiController`). Passives keep `PerkLine`/`PerkDetail` (`PassiveAbilitySO.DescriptionText` just returns `Description`). An ability with no template falls back to `Description` and reports once through `UiText.ReportProblem` (logged via ILogService, also in `UiText.Problems`).
 - Fixed wrong text: Speed Burst 2.5x -> 1.5x; Sneaky Steal and Feather Aura 3m -> 5.4m. Shadowstep and Death Mark rewritten in plain words. The `.asset` `Description` fields hold the rendered text (a test pins them).

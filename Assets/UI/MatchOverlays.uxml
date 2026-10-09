@@ -18,6 +18,16 @@
 
     <ui:VisualElement name="OverlayRoot" class="cw-overlay-host" picking-mode="Ignore">
 
+        <!-- Comeback / event banner ("FINAL 10!" + the event, PILES RESTOCKED!): a wood plaque in the lower third between
+             the joystick and the ability buttons, FIRST child so every other overlay draws over it. Never takes a tap.
+             MatchHud decides when (EventBannerFeed); MatchOverlaysController fills and shows it. -->
+        <ui:VisualElement name="EventBanner" class="cw-eventbanner" style="display: none;" picking-mode="Ignore">
+            <ui:VisualElement class="cw-eventbanner__plaque" picking-mode="Ignore">
+                <ui:Label name="EventBannerHeader" text="" class="cw-eventbanner__header" picking-mode="Ignore" />
+                <ui:Label name="EventBannerText" text="" class="cw-eventbanner__text" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
         <!-- ============================================================ -->
         <!--  MATCH END  (Phase 4: podium on the barn)                     -->
         <!-- ============================================================ -->
@@ -178,6 +188,7 @@
         <ui:VisualElement name="LobbyOverlay" class="cw-overlay cw-overlay--opaque" style="display: none;">
             <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
             <ui:Style src="project://database/Assets/UI/Styles/YouMark.uss" />
+            <ui:Style src="project://database/Assets/UI/Styles/CategoryMark.uss" />
             <ui:VisualElement class="cw-me-backdrop" picking-mode="Ignore" />
             <ui:VisualElement class="cw-me-backdrop-tint" picking-mode="Ignore" />
 
@@ -243,10 +254,17 @@
         <!-- ============================================================ -->
         <!--  SESSION END  (small panel)                                   -->
         <!-- ============================================================ -->
+        <!-- Round-3 finding 5: a wood panel + ribbon (the menu theme is scoped to this element, like the waiting
+             room's and the Leave sheet's). BACK TO THE BARN leaves at once through the same path as the countdown,
+             which stays as the automatic fallback under it. -->
         <ui:VisualElement name="SessionEndOverlay" class="cw-overlay cw-overlay--dim" style="display: none;">
-            <ui:VisualElement name="SessionEndPanel" class="cw-se-panel">
-                <ui:Label name="SessionEndTitle" text="" class="cw-se-title" />
+            <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
+            <ui:VisualElement name="SessionEndPanel" class="cw-wood-panel cw-se-panel">
+                <ui:VisualElement class="cw-ribbon">
+                    <ui:Label name="SessionEndTitle" text="" class="cw-title" />
+                </ui:VisualElement>
                 <ui:Label name="SessionEndReason" text="" class="cw-se-reason" />
+                <ui:Button name="SessionEndBackBtn" text="@btn.backToBarn" class="cw-btn cw-btn--green cw-se-btn" />
                 <ui:Label name="SessionEndCountdown" text="" class="cw-se-countdown" />
             </ui:VisualElement>
         </ui:VisualElement>

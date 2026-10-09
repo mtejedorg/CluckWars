@@ -104,7 +104,10 @@
    width that suits 84 px type would eat 30 px type. Measured on 2026-10-06:
    6 px on titles, 4 px on buttons/headings, 3 px below ~36 px. */
 .cw-title { -unity-text-outline-width: 6px; text-shadow: 0px 8px 0px rgba(42, 26, 12, 0.9); }
-.cw-menu-cast__name, .cw-deck-group__title { -unity-text-outline-width: 3px; text-shadow: 0px 3px 0px rgba(42, 26, 12, 0.85); }
+.cw-menu-cast__name { -unity-text-outline-width: 3px; text-shadow: 0px 3px 0px rgba(42, 26, 12, 0.85); }
+/* Gold on wood (round-3 finding 19): over the lightest grain plain gold dipped to 3.8:1; a 4 px ink outline
+   (half of it inside the glyph) keeps the letter edge against ink at any grain. */
+.cw-deck-group__title { -unity-text-outline-width: 4px; text-shadow: 0px 3px 0px rgba(42, 26, 12, 0.9); }
 
 /* Body text that sits directly on the backdrop art (not on a card): a thin
    ink outline is what keeps it legible over the painted plate. */
@@ -499,7 +502,7 @@
 .cw-menu-build {
     position: absolute; left: 28px; bottom: 20px;
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 26px; letter-spacing: 1px;
+    font-size: 28px; letter-spacing: 1px;
     color: rgba(254, 245, 224, 0.7);
     -unity-text-outline-width: 1px; -unity-text-outline-color: rgb(42, 26, 12);
 }
@@ -821,6 +824,9 @@
     border-bottom-left-radius: 32px; border-bottom-right-radius: 32px;
 }
 .cw-starter-chip__icon { width: 56px; height: 56px; margin-right: 10px; align-items: center; justify-content: center; }
+/* The category mark sits INSIDE the pill (it poked out of its top edge). */
+.cw-starter-chip__icon > .cw-cat-mark { top: 4px; right: 2px; scale: 0.8 0.8; }
+.cw-starter-chip__icon > .cw-cat-mark--steal { scale: 0.7 0.7; }
 .cw-starter-chip__name {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 30px; letter-spacing: 1px; color: rgb(254, 245, 224);
@@ -867,7 +873,7 @@
 .cw-ability-mono {
     position: absolute; left: 0; top: 0; right: 0; bottom: 0;
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 22px; letter-spacing: 0;
+    font-size: 28px; letter-spacing: 0;
     -unity-text-align: middle-center;
     padding-left: 0; padding-right: 0; padding-top: 0; padding-bottom: 0;
     margin-left: 0; margin-right: 0; margin-top: 0; margin-bottom: 0;
@@ -878,10 +884,10 @@
     border-bottom-left-radius: 50%; border-bottom-right-radius: 50%;
 }
 .cw-ability-card__icon .cw-ability-mono { font-size: 34px; }
-.cw-slot-box__icon .cw-ability-mono { font-size: 26px; }
+.cw-slot-box__icon .cw-ability-mono { font-size: 28px; }
 /* On a lobby mini-hex the hex itself is the accent disc; only the text shows. */
 .cw-mini-hex .cw-ability-mono {
-    font-size: 22px; background-color: rgba(0, 0, 0, 0);
+    font-size: 28px; background-color: rgba(0, 0, 0, 0);
     border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
 }
 
@@ -1026,6 +1032,7 @@
 }
 .layout--narrow .cw-deck-cards { flex-wrap: wrap; justify-content: center; }
 .layout--narrow .cw-ability-card { width: 290px; flex-shrink: 0; margin-top: 6px; margin-bottom: 6px; }
+.layout--narrow .cw-deck { align-items: flex-start; }   /* the one-row ANY BIRD group sits level with its neighbour, not centred 185 px lower */
 .layout--narrow #CommonRow { flex-shrink: 0; }   /* the class group absorbs the squeeze, so ANY BIRD never clips its card */
 .cw-deck-group {
     flex-shrink: 1; min-width: 0;
@@ -1081,7 +1088,7 @@
     white-space: nowrap; padding-left: 0; padding-right: 0; padding-top: 0; margin-left: 0; margin-right: 0;
 }
 /* Only a name that cannot fit the card at 30 px steps down (MenuUiController.FitCardName). */
-.cw-ability-card__name--long { font-size: 26px; }
+.cw-ability-card__name--long { font-size: 28px; }
 .cw-ability-card .cw-starter-tag { margin-top: 6px; }
 /* Slot number on a picked card (which in-match button fires it). Fill is the
    accent, text colour picked against it in C#. */
@@ -1211,7 +1218,11 @@
 .cw-seat--empty .cw-seat__pedestal-tag { display: none; }
 .cw-seat__chicken { width: 92%; flex-grow: 1; max-height: 300px; margin-bottom: 26px; -unity-background-scale-mode: scale-to-fit; }
 .cw-seat--empty .cw-seat__chicken { display: none; }
-.cw-seat--empty .cw-seat__pedestal { opacity: 0.45; }
+/* An empty seat's pedestal is OPAQUE (it used to fade to 45% and show the barn through it) with a dashed
+   cream rim: "a bird goes here" (round-3 finding 12; DashedRim.cs strokes the dashes). */
+.cw-seat--empty .cw-seat__pedestal { opacity: 1; }
+.cw-dashed-rim { display: none; position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.cw-seat--empty .cw-seat__pedestal > .cw-dashed-rim { display: flex; }
 .cw-seat__plate {
     flex-shrink: 0; align-items: center;
     margin-top: 8px;
@@ -1301,15 +1312,18 @@
 }
 
 /* Bottom bar: status / invite / join on the left, READY! banner centre, START right. */
+/* ONE baseline across the Coop, the join page and the in-match waiting room (round-3 finding 16): a fixed
+   bar height, every column centred on it, and the line under START (error / host-guest hint) taken out of
+   flow, so START and the cards beside it sit at the same y whatever the caption holds. */
 .cw-coop-bottom {
-    flex-direction: row; align-items: center; flex-shrink: 0;
-    padding-left: 24px; padding-right: 24px; padding-top: 10px; padding-bottom: 14px;
+    flex-direction: row; align-items: center; flex-shrink: 0; min-height: 206px;
+    padding-left: 24px; padding-right: 24px; padding-top: 10px; padding-bottom: 34px;   /* room for the caption under START */
 }
-.layout--short .cw-coop-bottom { padding-top: 6px; padding-bottom: 8px; }
+.layout--short .cw-coop-bottom { padding-top: 6px; padding-bottom: 28px; }
 .cw-coop-left { flex-direction: row; align-items: center; flex-shrink: 1; min-width: 0; }
 /* Stretched to the bar's height so the absolutely placed READY! status has a box to centre in. */
 .cw-coop-center { flex-grow: 1; flex-basis: 0; min-width: 0; align-self: stretch; align-items: center; justify-content: center; }
-.cw-coop-right { flex-shrink: 0; align-items: center; }
+.cw-coop-right { flex-shrink: 0; align-items: center; position: relative; }
 /* Menu Coop (round-2 finding 10): equal side columns, so READY! and the join card sit on the centre
    of the PAGE rather than in whatever gap the status pill and START leave. The in-match waiting
    room keeps the plain bar (its invite card + two buttons need the room). */
@@ -1514,7 +1528,7 @@
 /* Round-2 finding 10. 20:9 phone: a lower entry and more bar padding, so the card ends well clear of
    the screen's bottom edge (it ended 9 px from it). 4:3: a narrower entry, so the page-centred card
    stays clear of START / JOIN MATCH in the right column. */
-.layout--short .cw-coop-bottom--centred { padding-bottom: 20px; }
+.layout--short .cw-coop-bottom--centred { padding-bottom: 28px; }
 .layout--short .cw-join-card .cw-input { min-height: 92px; }
 .layout--short .cw-join-card .cw-input .unity-text-field__input, .layout--short .cw-join-card .cw-input .unity-base-text-field__input { font-size: 56px; }
 .layout--narrow .cw-join-card .cw-input { min-width: 440px; }
@@ -1552,7 +1566,7 @@
 .cw-coop-left .cw-status-pill { margin-top: 0; }
 .cw-lobby-error {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    margin-top: 10px; min-height: 38px; font-size: 32px;
+    position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; min-height: 38px; font-size: 32px;
     color: rgb(255, 150, 140); -unity-text-align: middle-center; white-space: normal;
     -unity-text-outline-width: 2px; -unity-text-outline-color: rgb(42, 26, 12);
 }

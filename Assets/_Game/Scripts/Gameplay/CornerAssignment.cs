@@ -49,6 +49,27 @@ namespace CluckWars.Gameplay
             return permutation[seat % permutation.Length];
         }
 
+        /// <summary>
+        /// The left-to-right order of the Coop's four seats: seat indices sorted by the corner each will spawn on
+        /// (P1..P4), so the cards never read P2, P4, P3, P1. Seat order itself (identity) when any corner is
+        /// unknown (a guest, or a host before its code) or the corners are not a distinct set.
+        /// </summary>
+        public static int[] LobbySeatOrder(int[] cornerBySeat)
+        {
+            int n = cornerBySeat != null ? cornerBySeat.Length : 0;
+            var order = new int[n];
+            for (int i = 0; i < n; i++) order[i] = i;
+            if (n == 0) return order;
+            var seen = new bool[n];
+            foreach (var c in cornerBySeat)
+            {
+                if (c < 0 || c >= n || seen[c]) return order;
+                seen[c] = true;
+            }
+            System.Array.Sort(order, (x, y) => cornerBySeat[x].CompareTo(cornerBySeat[y]));
+            return order;
+        }
+
         /// <summary>Stable 31-polynomial hash of the session name (string.GetHashCode is randomised per process).
         /// <c>MapGenerator</c> keeps an identical copy; <c>ContractsAndEnumsTests</c> keeps them in sync.</summary>
         public static int SessionNameSeed(string s)

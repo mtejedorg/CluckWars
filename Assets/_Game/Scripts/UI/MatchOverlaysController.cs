@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using CluckWars.Abilities;
 using CluckWars.Gameplay;
 using CluckWars.Input;
 using CluckWars.Localization;
@@ -117,14 +118,20 @@ namespace CluckWars.UI
         /// <summary>One waiting-room seat (THE COOP's .cw-seat), one per spawn corner, built once on bind.</summary>
         private sealed class SeatView
         {
-            public VisualElement Root, Pedestal, Chicken, Plate, NameRow, State;
+            public VisualElement Root, Pedestal, Chicken, Plate, NameRow, Hexes, State;
             public Label Name, Pn, Tag, ClassLine, Waiting, StateLabel, PedestalTag;
+            public readonly List<(VisualElement Hex, AbilityIconView Icon)> HexViews = new();
             public string ChickenCss;
         }
         private readonly SeatView[] _seats = new SeatView[4];
         private readonly bool[]     _seatFilled = new bool[4];
 
         private Label         _sessionEndTitle, _sessionEndReason, _sessionEndCountdown;
+        private Button        _sessionEndBackBtn;
+        // The comeback / event banner (a wood plaque; MatchHud feeds it through EventBannerFeed).
+        private VisualElement _eventBanner;
+        private Label         _eventBannerHeader, _eventBannerText;
+        private bool          _sessionEndLeaveNow;   // BACK TO THE BARN pressed: skip what is left of the countdown
         private Label         _introNumber;
         // GET READY inside the intro overlay (finding 11) + its "Waiting for {name}" line (finding 13).
         private VisualElement _introGetReady;
@@ -249,6 +256,8 @@ namespace CluckWars.UI
             if (!_bound) return;
             _safeArea.Apply();
 
+            TickEventBanner();
+
             if (_shutdownReason.HasValue)
             {
                 CloseLeaveSheet();   // the session-end screen owns a session that closed under the sheet
@@ -364,6 +373,12 @@ namespace CluckWars.UI
             _sessionEndTitle     = _root.Q<Label>("SessionEndTitle");
             _sessionEndReason    = _root.Q<Label>("SessionEndReason");
             _sessionEndCountdown = _root.Q<Label>("SessionEndCountdown");
+            _sessionEndBackBtn   = _root.Q<Button>("SessionEndBackBtn");
+            _eventBanner         = _root.Q<VisualElement>("EventBanner");
+            _eventBannerHeader   = _root.Q<Label>("EventBannerHeader");
+            _eventBannerText     = _root.Q<Label>("EventBannerText");
+            EventBannerFeed.Hide();   // a banner left up by the previous scene never carries over
+            if (_sessionEndBackBtn != null) _sessionEndBackBtn.clicked += () => _sessionEndLeaveNow = true;
             _introNumber         = _root.Q<Label>("IntroNumber");
             _introGetReady       = _root.Q<VisualElement>("IntroGetReady");
             _introWaiting        = _root.Q<Label>("IntroWaiting");
@@ -398,6 +413,8 @@ namespace CluckWars.UI
                 _safeArea.Apply(force: true);
                 // THE COOP's short-panel tightening (MenuUiController.UpdateLayout), for the waiting room.
                 _lobbyOverlay?.EnableInClassList("layout--short", evt.newRect.height < ShortLayoutHeight);
+                // 4:3 tablets: the bar is slimmed like the phone's (MenuUiController.NarrowLayoutAspect).
+                _lobbyOverlay?.EnableInClassList("layout--narrow", evt.newRect.height > 0f && evt.newRect.width / evt.newRect.height < 1.55f);
             });
 
             // Start hidden; state polls flip them on.
@@ -1064,6 +1081,7 @@ namespace CluckWars.UI
                 v.Pedestal = new VisualElement { pickingMode = PickingMode.Ignore };
                 v.Pedestal.AddToClassList("cw-seat__pedestal");
                 v.Pedestal.style.unityBackgroundImageTintColor = color;   // Pedestal_Ring is white art
+                v.Pedestal.Add(new DashedRim());   // shown on an empty seat only (.cw-seat--empty)
                 v.Chicken = new VisualElement { pickingMode = PickingMode.Ignore };
                 v.Chicken.AddToClassList("cw-chicken");
                 v.Chicken.AddToClassList("cw-seat__chicken");
@@ -1100,6 +1118,21 @@ namespace CluckWars.UI
                 v.Waiting = new Label(UiText.Format(UiKeys.LobbyWaitingFor, ("n", corner + 1)));
                 v.Waiting.AddToClassList("cw-seat__waiting");
                 v.Plate.Add(v.Waiting);
+
+                // The bird's four moves, as on the Coop's seat cards (round-3 finding 12).
+                v.Hexes = new VisualElement();
+                v.Hexes.AddToClassList("cw-seat__hexes");
+                for (int i = 0; i < AbilityController.SlotCount; i++)
+                {
+                    var hex = new VisualElement();
+                    hex.AddToClassList("cw-mini-hex");
+                    var iconHost = new VisualElement { pickingMode = PickingMode.Ignore };
+                    iconHost.AddToClassList("cw-mini-hex__icon");
+                    hex.Add(iconHost);
+                    v.Hexes.Add(hex);
+                    v.HexViews.Add((hex, new AbilityIconView(iconHost)));
+                }
+                v.Plate.Add(v.Hexes);
 
                 // READY: gold rosette badge, ink label (~10.6:1; was cream on green, 3.0:1).
                 v.State = new VisualElement();
@@ -1149,6 +1182,7 @@ namespace CluckWars.UI
 
                 SetShown(v.NameRow, filled);
                 SetShown(v.ClassLine, filled);
+                SetShown(v.Hexes, filled);
                 SetShown(v.State, filled);
                 SetShown(v.Waiting, !filled);
                 if (!filled) continue;
@@ -1159,6 +1193,20 @@ namespace CluckWars.UI
                 v.Tag.text = host ? UiText.Get(UiKeys.TagHost) : chicken.IsBot ? UiText.Get(UiKeys.TagCpu) : string.Empty;
                 SetShown(v.Tag, host || chicken.IsBot);
                 v.ClassLine.text = MatchStandings.ClassRoleLine(cls);
+                PaintSeatLoadout(v, chicken);
+            }
+        }
+
+        /// <summary>The seat's four mini-hexes from the chicken's equipped moves (set on every peer before spawn).</summary>
+        private static void PaintSeatLoadout(SeatView v, ChickenController chicken)
+        {
+            var abilities = chicken != null ? chicken.GetComponent<AbilityController>() : null;
+            for (int i = 0; i < v.HexViews.Count; i++)
+            {
+                var ab = abilities != null ? abilities.GetSlot(i) : null;
+                var (hex, icon) = v.HexViews[i];
+                hex.style.unityBackgroundImageTintColor = ab != null ? AbilityPalette.HexColor(ab) : AbilityPalette.EmptyHex;
+                AbilityIconPainter.Paint(icon, ab, disc: false);
             }
         }
 
@@ -1187,6 +1235,18 @@ namespace CluckWars.UI
         // ========================================================================
         //  SESSION END
         // ========================================================================
+        private void TickEventBanner()
+        {
+            if (_eventBanner == null) return;
+            bool show = EventBannerFeed.Visible && !_shutdownReason.HasValue;
+            if (show)
+            {
+                if (_eventBannerHeader != null && _eventBannerHeader.text != EventBannerFeed.Header) _eventBannerHeader.text = EventBannerFeed.Header;
+                if (_eventBannerText != null && _eventBannerText.text != EventBannerFeed.Text) _eventBannerText.text = EventBannerFeed.Text;
+            }
+            SetShown(_eventBanner, show);
+        }
+
         private void TickSessionEnd()
         {
             SetShown(_sessionEndOverlay, true);
@@ -1206,7 +1266,7 @@ namespace CluckWars.UI
             if (_sessionEndCountdown != null)
                 _sessionEndCountdown.text = UiText.Format(UiKeys.SessionReturning, ("n", Mathf.CeilToInt(remaining)));
 
-            if (!_returnTriggered && remaining <= 0f)
+            if (!_returnTriggered && (remaining <= 0f || _sessionEndLeaveNow))
             {
                 _returnTriggered = true;
                 _log?.Info(Source, $"Loading '{_bootstrapSceneName}' after disconnect.");

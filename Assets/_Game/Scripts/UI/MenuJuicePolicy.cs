@@ -247,4 +247,19 @@ namespace CluckWars.UI
 
         public static bool PlaysSting(float secondsSinceIntro) => secondsSinceIntro >= QuietAfterGoSeconds;
     }
+
+    /// <summary>
+    /// What the comeback event banner says and whether it is up (Phase 6 chunk 7d). <c>MatchHud</c> decides WHEN
+    /// (timing, sting, expiry); <c>MatchOverlaysController</c> draws it as a wood plaque from MatchOverlays.uxml,
+    /// so the banner wears the same style as the other overlays. Static: one match HUD, one overlay document.
+    /// </summary>
+    public static class EventBannerFeed
+    {
+        public static bool Visible { get; private set; }
+        public static string Header { get; private set; } = string.Empty;
+        public static string Text { get; private set; } = string.Empty;
+
+        public static void Show(string header, string text) { Header = header ?? string.Empty; Text = text ?? string.Empty; Visible = true; }
+        public static void Hide() => Visible = false;
+    }
 }

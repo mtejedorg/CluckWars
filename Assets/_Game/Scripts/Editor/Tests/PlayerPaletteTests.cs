@@ -225,7 +225,7 @@ namespace CluckWars.Tests
             }
             StringAssert.Contains("Assets/UI/Styles/CategoryMark.uss", Read("Assets/UI/MainMenu.uxml"));
             StringAssert.Contains("Assets/UI/Styles/CategoryMark.uss", Read("Assets/UI/TouchControls.uxml"));
-            StringAssert.Contains("CategoryMark.Apply(view.Mark", Read("Assets/_Game/Scripts/UI/MenuUiController.cs"));
+            StringAssert.Contains("CategoryMark.Apply(view.Mark", Read("Assets/_Game/Scripts/UI/AbilityIconView.cs"));   // the shared painter (menu + waiting room)
             StringAssert.Contains("CategoryMark.Apply(refs.Mark", Read("Assets/_Game/Scripts/Input/TouchControlsController.cs"));
         }
     }

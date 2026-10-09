@@ -353,7 +353,7 @@
 /* CPU tag: THE COOP's seat tag (cream inset, ink outline, ink text). */
 .cw-me-rowtag {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 24px; color: rgb(42, 26, 12); flex-shrink: 0; margin-left: 10px;
+    font-size: 28px; color: rgb(42, 26, 12); flex-shrink: 0; margin-left: 10px;
     background-color: rgb(243, 230, 200);
     border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
     border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
@@ -440,11 +440,23 @@
 }
 /* Host / guest line under the action planks: one line of body copy with the on-art outline. (In the
    bar's centre column it collapsed to one letter per line next to a long invite card.) */
-.cw-wr-hint { -unity-text-align: middle-right; white-space: nowrap; align-self: flex-end; color: rgb(254, 245, 224); margin-top: 4px; }
+.cw-wr-hint {
+    -unity-text-align: middle-center; white-space: nowrap; color: rgb(254, 245, 224);
+    position: absolute; right: 0; top: 100%; margin-top: 6px;
+    background-color: rgba(42, 26, 12, 0.9);   /* ink plate: cream on ink ~15:1 over any barn patch */
+    padding-top: 2px; padding-bottom: 4px; padding-left: 22px; padding-right: 22px;
+    border-top-left-radius: 24px; border-top-right-radius: 24px;
+    border-bottom-left-radius: 24px; border-bottom-right-radius: 24px;
+}
 /* The status pill keeps its size next to the invite card (it shrank, cutting "Waiting…" and squashing the
    lamp to a line). Id-qualified, so it outranks the scoped menu theme. */
 #LobbyOverlay .cw-status-pill, #LobbyOverlay .cw-status-dot { flex-shrink: 0; }
 .cw-wr-actions { flex-direction: row; align-items: center; }
+/* Phone and 4:3 tablet (.layout--short / .layout--narrow): slimmer planks and SHARE / COPY, so a long invite code keeps one row instead of wrapping. */
+#LobbyOverlay.layout--short .cw-wr-changebird, #LobbyOverlay.layout--narrow .cw-wr-changebird { min-width: 220px; margin-right: 12px; padding-left: 24px; padding-right: 24px; }
+#LobbyOverlay.layout--short .cw-page-cta, #LobbyOverlay.layout--narrow .cw-page-cta { min-width: 380px; }
+#LobbyOverlay.layout--short .cw-lobby-btnrow .cw-mini-btn, #LobbyOverlay.layout--narrow .cw-lobby-btnrow .cw-mini-btn { min-width: 116px; margin-left: 6px; padding-left: 8px; padding-right: 8px; }
+#LobbyOverlay.layout--short .cw-coop-left .cw-lobby-card, #LobbyOverlay.layout--narrow .cw-coop-left .cw-lobby-card { margin-left: 8px; padding-left: 12px; padding-right: 12px; }
 .cw-wr-changebird { margin-right: 18px; min-width: 300px; }
 
 /* ---- Shared buttons — the menus' cw-btn (CluckWarsTheme.uss), restated for this sheet -------- */
@@ -495,26 +507,20 @@
    ============================================================================ */
 .cw-se-panel {
     width: 1178px; max-width: 88%;
-    align-items: center; justify-content: center;
-    padding-top: 49px; padding-bottom: 49px; padding-left: 57px; padding-right: 57px;
-    background-color: rgb(42, 26, 12);   /* flat wood (an un-sliced PanelFrame drew a second, offset frame line) */
-    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
-    border-left-color: rgb(122, 86, 40); border-right-color: rgb(122, 86, 40);
-    border-top-color: rgb(122, 86, 40); border-bottom-color: rgb(122, 86, 40);
-    border-top-left-radius: 30px; border-top-right-radius: 30px;
-    border-bottom-left-radius: 30px; border-bottom-right-radius: 30px;
-}
-.cw-se-title {
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 72px; letter-spacing: 4px; color: rgb(245, 200, 66); -unity-text-align: middle-center;
+    align-items: stretch; justify-content: center;
+    padding-top: 40px; padding-bottom: 36px; padding-left: 57px; padding-right: 57px;
 }
 .cw-se-reason {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 34px; color: rgb(254, 245, 224); -unity-text-align: middle-center; margin-top: 27px;
+    font-size: 36px; color: rgb(254, 245, 224); -unity-text-align: middle-center; white-space: normal; margin-top: 28px;
+    -unity-text-outline-width: 2px; -unity-text-outline-color: rgb(42, 26, 12);
 }
+.cw-se-panel .cw-ribbon { align-self: center; min-width: 640px; }
+.cw-se-btn { align-self: center; min-width: 560px; margin-top: 28px; }
 .cw-se-countdown {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 30px; color: rgb(196, 160, 96); -unity-text-align: middle-center; margin-top: 15px;
+    font-size: 30px; color: rgb(254, 245, 224); -unity-text-align: middle-center; margin-top: 14px;
+    -unity-text-outline-width: 2px; -unity-text-outline-color: rgb(42, 26, 12);
 }
 
 /* ============================================================================
@@ -542,7 +548,35 @@
 }
 /* GET READY inside the intro overlay is the shared card (Styles/GetReadyCard.uss). */
 
-/* Host-left notice: an ink plate with gold rules in the upper third, over the arena / lobby. */
+/* Comeback / event banner (round-3 finding 5): the wood plaque of the menus (Frame_WoodPanel), lower third between
+   the joystick and the ability hexes. 760 x ~150 on the 1920x1080 reference, as the ink plate it replaces. */
+.cw-eventbanner {
+    position: absolute; left: 0; right: 0; bottom: 150px;
+    align-items: center;
+}
+.cw-eventbanner__plaque {
+    width: 760px; max-width: 94%; align-items: center; justify-content: center;
+    padding-top: 12px; padding-bottom: 20px; padding-left: 36px; padding-right: 36px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Frame_WoodPanel.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    -unity-slice-left: 40; -unity-slice-right: 40; -unity-slice-top: 40; -unity-slice-bottom: 40;
+    -unity-slice-scale: 0.7px;
+}
+.cw-eventbanner__header {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 36px; letter-spacing: 2px; color: rgb(255, 214, 80); -unity-text-align: middle-center; white-space: nowrap;
+    -unity-text-outline-width: 4px; -unity-text-outline-color: rgb(42, 26, 12);
+    padding-top: 0; padding-bottom: 0; margin-top: 0; margin-bottom: 0;
+}
+.cw-eventbanner__text {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 52px; letter-spacing: 1px; color: rgb(254, 245, 224); -unity-text-align: middle-center; white-space: nowrap;
+    -unity-text-outline-width: 5px; -unity-text-outline-color: rgb(42, 26, 12);
+    text-shadow: 0px 4px 0px rgba(42, 26, 12, 0.85);
+    padding-top: 0; padding-bottom: 0; margin-top: 0; margin-bottom: 0;
+}
+
+/* Host-left notice: a wood plaque in the upper third, over the arena / lobby. */
 .cw-hostleft {
     position: absolute; left: 0; right: 0; top: 18%;
     align-items: center;
@@ -551,8 +585,9 @@
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 56px; letter-spacing: 2px; color: rgb(254, 245, 224); -unity-text-align: middle-center;
     -unity-text-outline-width: 4px; -unity-text-outline-color: rgb(42, 26, 12);
-    background-color: rgba(42, 26, 12, 0.92);
-    border-top-width: 4px; border-bottom-width: 4px;
-    border-top-color: rgb(245, 200, 66); border-bottom-color: rgb(245, 200, 66);
-    padding-top: 14px; padding-bottom: 18px; padding-left: 60px; padding-right: 60px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Frames/Frame_WoodPanel.png");
+    -unity-background-scale-mode: stretch-to-fill;
+    -unity-slice-left: 40; -unity-slice-right: 40; -unity-slice-top: 40; -unity-slice-bottom: 40;
+    -unity-slice-scale: 0.7px;
+    padding-top: 18px; padding-bottom: 26px; padding-left: 64px; padding-right: 64px;
 }

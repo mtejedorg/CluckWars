@@ -87,8 +87,9 @@ namespace CluckWars.Tests
         {
             string xml = Read("Assets/UI/MatchOverlays.uxml");
             const string theme = "Styles/CluckWarsTheme.uss";
-            // Scoped twice: the waiting room, and the "Leave match?" sheet (chunk 7b) which wears the same wood panel.
-            Assert.AreEqual(2, Regex.Matches(xml, Regex.Escape(theme)).Count, "the menu theme is attached to the waiting room and the leave sheet only");
+            // Scoped three times: the waiting room, the session-end panel (chunk 7d) and the "Leave match?" sheet (chunk 7b),
+            // which wear the same wood panel; the leave sheet comes last.
+            Assert.AreEqual(3, Regex.Matches(xml, Regex.Escape(theme)).Count, "the menu theme is attached to the waiting room, the session end and the leave sheet only");
             Assert.Greater(xml.LastIndexOf(theme, StringComparison.Ordinal), xml.IndexOf("name=\"LeaveSheet\"", StringComparison.Ordinal),
                 "the second attachment is inside #LeaveSheet");
             int room = xml.IndexOf("name=\"LobbyOverlay\"", StringComparison.Ordinal);
