@@ -140,6 +140,9 @@ postmatch.noWinner,No winner this round.
 postmatch.youWin,YOU WIN!
 postmatch.draw,EMPTY NESTS!
 postmatch.youPlace,{you} · {place}
+postmatch.youPlaceTied,{you} · tied {place}
+postmatch.tiedKos,Tied 1st · won on KOs
+postmatch.tied,Tied for 1st!
 lobby.hint.host,Start whenever you like.
 lobby.hint.guest,Waiting for the host…
 session.ended,MATCH OVER
@@ -161,7 +164,7 @@ hud.event.header,FINAL {n}!
 hud.event.goldenPile,GOLDEN PILE!
 hud.event.underdogSurge,UNDERDOG SURGE!
 hud.event.leaderBounty,BOUNTY ON THE LEADER!
-hud.event.restock,RESTOCK!
+hud.event.restock,PILES RESTOCKED!
 hud.hint.hold.touch,Hold to aim. Let go to use it. Drag to the edge to cancel.
 hud.hint.hold.pad,Hold to aim · Release to use · B to cancel.
 hud.hint.hold.keys,Hold to aim · Release to use · Esc to cancel.

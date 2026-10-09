@@ -246,6 +246,14 @@
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 40px; color: rgb(42, 26, 12); padding-top: 0; padding-bottom: 0;
 }
+/* Draw (EMPTY NESTS!, round-3 finding 14): the same pods, but all four birds on level ground under the banner - no
+   wood steps, medals, scores or winner headroom. Declared after the --1 headroom rule so it wins the tie. */
+.cw-me-podium--draw .cw-me-pod__block,
+.cw-me-podium--draw .cw-me-pod__foodrow { display: none; }
+.cw-me-podium--draw .cw-me-pod__chicken { margin-top: 0; }
+.cw-me-podium--draw .cw-me-pod__ring { bottom: -4px; }
+.cw-me-podium--draw .cw-me-pod { margin-left: 4px; margin-right: 4px; }
+.cw-me-podium--draw .cw-me-pod__name { font-size: 30px; }   /* four plates share the column: "PeckNoir" must not ellipsise on 4:3 */
 
 /* -- Right: the standings board (Frames/Frame_WoodPanel 9-slice) -- */
 /* Sized to its rows (round 2, finding 6): centred in the panel's height instead of stretched, so 2 rows

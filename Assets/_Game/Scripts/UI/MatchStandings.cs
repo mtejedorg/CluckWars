@@ -97,16 +97,55 @@ namespace CluckWars.UI
             UiText.Format(UiKeys.LobbyClassLine, ("cls", ClassName(cls)), ("role", RoleName(cls)));
 
         /// <summary>
-        /// The win banner: "YOU WIN!" for the local player, "{NAME} WINS!" for anyone else,
-        /// "EMPTY NESTS!" when nobody banked a single food (a draw: no podium), "MATCH ENDED" with
-        /// no winner otherwise.
+        /// The win banner, decided from the standings alone so no caller can forget the draw:
+        /// "EMPTY NESTS!" when nobody banked a single food (<see cref="IsDraw"/>, whatever corner
+        /// GameManager named), else "YOU WIN!" for the local winner, "{NAME} WINS!" for anyone else,
+        /// "MATCH ENDED" when the named corner is not in the standings (or none was named).
         /// </summary>
-        public static string WinBanner(bool hasWinner, in Entry winner, bool draw = false)
+        public static string WinBanner(IReadOnlyList<Entry> ranked, int winnerCorner)
         {
-            if (draw) return UiText.Get(UiKeys.PostmatchDraw);
-            if (!hasWinner) return UiText.Get(UiKeys.PostmatchEnded);
+            if (IsDraw(ranked)) return UiText.Get(UiKeys.PostmatchDraw);
+            int idx = IndexOfCorner(ranked, winnerCorner);
+            if (idx < 0) return UiText.Get(UiKeys.PostmatchEnded);
+            var winner = ranked[idx];
             if (winner.IsLocal) return UiText.Get(UiKeys.PostmatchYouWin);
             return UiText.Format(UiKeys.PostmatchWins, ("name", DisplayName(winner).ToUpperInvariant()));
+        }
+
+        /// <summary>Index of the entry on <paramref name="corner"/>, or -1 (also for corner &lt; 0).</summary>
+        public static int IndexOfCorner(IReadOnlyList<Entry> ranked, int corner)
+        {
+            if (corner < 0) return -1;
+            for (int i = 0; i < ranked.Count; i++) if (ranked[i].Corner == corner) return i;
+            return -1;
+        }
+
+        /// <summary>
+        /// The line under the banner. Normally the winner's class. When the winner shares 1st with
+        /// someone (equal shown food) it names how the tie was settled, using what GameManager
+        /// actually does on a timer tie: exact food, then KOs (visible in the KO column), then the lower
+        /// corner. Only the KO decision is something a player can see, so any other tie reads
+        /// "Tied for 1st!" and never claims a reason it cannot show. Null when there is no winner.
+        /// </summary>
+        public static string WinSubLine(IReadOnlyList<Entry> ranked, int winnerCorner)
+        {
+            if (IsDraw(ranked)) return null;
+            int idx = IndexOfCorner(ranked, winnerCorner);
+            if (idx < 0) return null;
+            var winner = ranked[idx];
+            int top = Score(winner);
+            bool tied = false, koDecided = true;
+            for (int i = 0; i < ranked.Count; i++)
+            {
+                if (i == idx || Score(ranked[i]) != top) continue;
+                tied = true;
+                // KOs settle it only when the exact totals were level (GameManager compares exact food
+                // first) and the winner has strictly more knockouts than this rival.
+                if (!UnityEngine.Mathf.Approximately(ranked[i].Total, winner.Total) || winner.Kills <= ranked[i].Kills)
+                    koDecided = false;
+            }
+            if (!tied) return UiText.Format(UiKeys.PostmatchWinSub, ("cls", ClassName(winner.Class)));
+            return UiText.Get(koDecided ? UiKeys.PostmatchTiedKos : UiKeys.PostmatchTied);
         }
 
         /// <summary>The food a chicken is shown with (and ranked by): whole units, rounded down.</summary>
@@ -167,16 +206,22 @@ namespace CluckWars.UI
         });
 
         /// <summary>
-        /// The "You · 2nd" chip under the banner when someone else won: the local player's place.
-        /// Null (no chip) when the local player won, on a draw / no winner, or when they are not listed.
+        /// The "You · 2nd" / "You · tied 1st" chip when someone else won: the local player's place
+        /// (the tied form when another bird shares it). Null (no chip) when the local player won, on a
+        /// draw / no winner, or when they are not listed. The controller puts it on the local player's
+        /// own podium step (or the headline row off the podium), never under the winner's class tag.
         /// </summary>
-        public static string YouPlaceChip(IReadOnlyList<Entry> ranked, bool hasWinner, int winnerCorner)
+        public static string YouPlaceChip(IReadOnlyList<Entry> ranked, int winnerCorner)
         {
-            if (!hasWinner) return null;
+            if (IsDraw(ranked) || IndexOfCorner(ranked, winnerCorner) < 0) return null;
             int you = -1;
             for (int i = 0; i < ranked.Count; i++) if (ranked[i].IsLocal) { you = i; break; }
             if (you < 0 || ranked[you].Corner == winnerCorner) return null;
-            string youName = UiText.Get(UiKeys.LabelYou), place = Ordinal(Places(ranked)[you]);
+            var places = Places(ranked);
+            bool shared = false;
+            for (int i = 0; i < places.Length; i++) if (i != you && places[i] == places[you]) shared = true;
+            string youName = UiText.Get(UiKeys.LabelYou), place = Ordinal(places[you]);
+            if (shared) return UiText.Format(UiKeys.PostmatchYouPlaceTied, ("you", youName), ("place", place));
             return UiText.Format(UiKeys.PostmatchYouPlace, ("you", youName), ("place", place));
         }
 

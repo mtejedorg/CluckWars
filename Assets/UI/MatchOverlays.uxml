@@ -42,13 +42,15 @@
                             <ui:Label name="MeWinRibbonLabel" text="" class="cw-me-ribbon__label" />
                         </ui:VisualElement>
                         <ui:Label name="MeWinSub" text="" class="cw-me-winsub" />
-                        <!-- Round 2, finding 6: "You · 2nd" when a CPU / rival won (the YOU mark's gold pill);
-                             hidden when you won, on a draw and with no winner (MatchStandings.YouPlaceChip). -->
+                        <!-- "You · 2nd" when a CPU / rival won (the YOU mark's gold pill), shown here ONLY when you are off the
+                             podium (4th); on the podium it replaces the name on your own step. Hidden when you won, on a draw
+                             and with no winner (MatchStandings.YouPlaceChip). -->
                         <ui:Label name="MeYouChip" text="" class="cw-me-youchip cw-you-mark" style="display: none;" />
 
                         <!-- Podium, left to right: 2nd, 1st, 3rd (MatchStandings.PodiumRankBySlot). The step height and
                              medal are the SHARED place (the pod tier-N class, set in C#: tied birds stand level); a step with
-                             nobody on it is display:none, so 2 birds = two steps centred. Hidden on a draw (nobody banked).
+                             nobody on it is display:none, so 2 birds = two steps centred. On a draw (nobody banked) the same pods
+                             stand level with no steps (the draw modifier class on the podium, 4 pods).
                              Each step: chicken over its player-colour Pedestal_Ring, a wood block whose
                              height is the placing (1st > 2nd > 3rd) with its medal, and a cream nameplate.
                              The chicken element shows the static hero render (the per-class cw-chicken modifier) or, with
@@ -112,6 +114,27 @@
                                     <ui:VisualElement class="cw-me-pod__foodrow" picking-mode="Ignore">
                                         <ui:VisualElement class="cw-me-pod__foodicon" picking-mode="Ignore" />
                                         <ui:Label name="MePod2Score" text="" class="cw-me-pod__score" picking-mode="Ignore" />
+                                    </ui:VisualElement>
+                                </ui:VisualElement>
+                            </ui:VisualElement>
+
+                            <!-- 4th pod: used only by the draw layout (EMPTY NESTS!: four birds level under the banner,
+                                 no steps or medals); display:none on a normal podium. -->
+                            <ui:VisualElement name="MePod3" class="cw-me-pod cw-me-pod--hidden">
+                                <ui:VisualElement name="MePod3Stage" class="cw-me-pod__stage" picking-mode="Ignore">
+                                    <ui:VisualElement name="MePod3Ring" class="cw-me-pod__ring" picking-mode="Ignore" />
+                                    <ui:VisualElement name="MePod3Chicken" class="cw-me-pod__chicken" picking-mode="Ignore" />
+                                </ui:VisualElement>
+                                <ui:VisualElement class="cw-me-pod__block" picking-mode="Ignore">
+                                    <ui:VisualElement name="MePod3Medal" class="cw-me-medal" picking-mode="Ignore">
+                                        <ui:Label text="" name="MePod3Place" class="cw-me-medal__num" picking-mode="Ignore" />
+                                    </ui:VisualElement>
+                                </ui:VisualElement>
+                                <ui:VisualElement name="MePod3Plate" class="cw-me-pod__plate" picking-mode="Ignore">
+                                    <ui:Label name="MePod3Name" text="" class="cw-me-pod__name" picking-mode="Ignore" />
+                                    <ui:VisualElement class="cw-me-pod__foodrow" picking-mode="Ignore">
+                                        <ui:VisualElement class="cw-me-pod__foodicon" picking-mode="Ignore" />
+                                        <ui:Label name="MePod3Score" text="" class="cw-me-pod__score" picking-mode="Ignore" />
                                     </ui:VisualElement>
                                 </ui:VisualElement>
                             </ui:VisualElement>

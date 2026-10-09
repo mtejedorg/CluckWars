@@ -79,14 +79,15 @@ namespace CluckWars.UI
         private MenuJuice _introJuice;
         private readonly IntroCueTracker _introCues = new();
 
-        /// <summary>One podium step (#MePod0..2, left to right = 2nd, 1st, 3rd).</summary>
+        /// <summary>One podium step (#MePod0..2, left to right = 2nd, 1st, 3rd; #MePod3 = draw only).</summary>
         private sealed class PodView
         {
             public VisualElement Root, Ring, Chicken, Plate, Medal;
             public Label Name, Score, Place;
             public string ChickenCss;   // .cw-chicken--<class> currently on Chicken (for swap)
         }
-        private readonly PodView[] _pods = new PodView[3];
+        // Three podium steps plus a 4th pod that only the draw layout uses (four birds on level ground).
+        private readonly PodView[] _pods = new PodView[4];
 
         // Live 3D podium (Performance Mode OFF): the menus' MenuChickenStage, one slot per step.
         // Null = static hero renders (Performance Mode ON, no registry, or the stage failed once).
@@ -533,17 +534,22 @@ namespace CluckWars.UI
             _crownSlot  = hasWinner && winnerIdx == MatchStandings.PodiumRankBySlot[1] ? 1 : -1;
             _crownClass = winner.Class;
 
-            // Banner: YOU WIN! / {NAME} WINS! / EMPTY NESTS! / MATCH ENDED, then the winner's class under it.
-            if (_meRibbon != null) _meRibbon.text = MatchStandings.WinBanner(hasWinner, winner, draw);
+            // Banner: YOU WIN! / {NAME} WINS! / EMPTY NESTS! / MATCH ENDED, then the winner's class (or how a
+            // tie for 1st was settled) under it. Both come from the standings alone (MatchStandings decides
+            // the draw), so no path here can show MATCH ENDED over an all-zero result.
+            if (_meRibbon != null) _meRibbon.text = MatchStandings.WinBanner(ranked, gm.WinnerCorner);
             if (_meWinSub != null)
-                _meWinSub.text = hasWinner
-                    ? UiText.Format(UiKeys.PostmatchWinSub, ("cls", ClassName(winner.Class)))
-                    : UiText.Get(UiKeys.PostmatchNoWinner);
+                _meWinSub.text = MatchStandings.WinSubLine(ranked, gm.WinnerCorner) ?? UiText.Get(UiKeys.PostmatchNoWinner);
+            // "You · 2nd" goes on the local player's own podium step; only a bird off the podium (4th) gets
+            // it on the headline row, never as a caption under the winner's class.
+            string chip = MatchStandings.YouPlaceChip(ranked, gm.WinnerCorner);
+            int youIdx = ranked.FindIndex(e => e.IsLocal);
+            bool chipOnPodium = chip != null && youIdx >= 0 && youIdx < MatchStandings.PodiumRankBySlot.Length;
             if (_meYouChip != null)
             {
-                string chip = MatchStandings.YouPlaceChip(ranked, hasWinner, winner.Corner);
-                _meYouChip.text = chip ?? string.Empty;
-                _meYouChip.style.display = chip != null ? DisplayStyle.Flex : DisplayStyle.None;
+                bool headline = chip != null && !chipOnPodium;
+                _meYouChip.text = headline ? chip : string.Empty;
+                _meYouChip.style.display = headline ? DisplayStyle.Flex : DisplayStyle.None;
             }
             if (_meCrown != null)
             {
@@ -553,7 +559,6 @@ namespace CluckWars.UI
             if (_meWinGlow != null) _meWinGlow.style.display = hasWinner ? DisplayStyle.Flex : DisplayStyle.None;
             if (hasWinner) _celebration?.Start();   // no-op under Reduced Motion
             _meHero?.EnableInClassList("cw-me-hero--draw", draw);
-            if (_mePodium != null) _mePodium.style.display = draw ? DisplayStyle.None : DisplayStyle.Flex;
 
             // GOAL 40 · REACHED / TIME'S UP. The goal comes from MatchConfig only; without it the note
             // is hidden rather than showing a made-up number.
@@ -574,8 +579,8 @@ namespace CluckWars.UI
                 }
             }
 
-            if (draw) DisposeStage();   // no podium, nothing to render
-            else PopulatePodium(ranked, places);
+            // A draw stands all the birds level under the banner (no steps, medals or crown).
+            PopulatePodium(ranked, places, chipOnPodium ? chip : null, draw);
 
             // Standings rows.
             if (_meRows != null)
@@ -600,21 +605,31 @@ namespace CluckWars.UI
         /// nobody to show leaves the layout, so a 2-bird podium is two steps centred. Step height and
         /// medal follow the shared place (MatchStandings.Places), so tied birds stand level.
         /// </summary>
-        private void PopulatePodium(List<MatchStandings.Entry> ranked, int[] places)
+        private void PopulatePodium(List<MatchStandings.Entry> ranked, int[] places, string youChip, bool draw)
         {
             if (MenuStagePolicy.WantsLive(PlayerPreferences.PerformanceModeEnabled, _stageFailed)) TryCreateStage();
+            _mePodium?.EnableInClassList("cw-me-podium--draw", draw);
+
+            // Draw: every bird on level ground in corner order (the 4th pod exists only for this); otherwise
+            // slot -> rank per PodiumRankBySlot, and the 4th pod stays empty.
+            var order = ranked;
+            if (draw)
+            {
+                order = new List<MatchStandings.Entry>(ranked);
+                order.Sort((a, b) => a.Corner.CompareTo(b.Corner));
+            }
 
             for (int slot = 0; slot < _pods.Length; slot++)
             {
                 var v = _pods[slot];
                 if (v?.Root == null) continue;
-                int idx = MatchStandings.PodiumRankBySlot[slot];
-                bool filled = idx < ranked.Count;
+                int idx = draw ? slot : slot < MatchStandings.PodiumRankBySlot.Length ? MatchStandings.PodiumRankBySlot[slot] : int.MaxValue;
+                bool filled = idx < order.Count;
                 v.Root.EnableInClassList("cw-me-pod--hidden", !filled);
                 if (!filled) { ShowPodChicken(slot, v, null, false); continue; }
 
-                var e = ranked[idx];
-                int place = places[idx];
+                var e = order[idx];
+                int place = draw ? 0 : places[idx];
                 for (int t = 1; t <= 3; t++) v.Root.EnableInClassList($"cw-me-pod--tier-{t}", t == place);
                 if (v.Medal != null)
                     for (int t = 1; t <= 3; t++) v.Medal.EnableInClassList($"cw-me-medal--{t}", t == place);
@@ -623,11 +638,11 @@ namespace CluckWars.UI
                 if (v.Plate != null) v.Plate.style.borderTopColor = color;
                 if (v.Name != null)
                 {
-                    v.Name.text = MatchStandings.DisplayName(e);
+                    v.Name.text = e.IsLocal && youChip != null ? youChip : MatchStandings.DisplayName(e);
                     v.Name.EnableInClassList(PlayerPalette.YouMarkClass, e.IsLocal);
                 }
                 if (v.Score != null) v.Score.text = MatchStandings.Score(e).ToString();
-                if (v.Place != null) v.Place.text = place.ToString();
+                if (v.Place != null) v.Place.text = place > 0 ? place.ToString() : string.Empty;
                 ShowPodChicken(slot, v, e.HasChicken ? e.Class : (ChickenClass?)null, cheer: slot == _crownSlot);
             }
             ApplyPodiumScales();

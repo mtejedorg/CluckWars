@@ -6,6 +6,14 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Phase 6 chunk 7a (2026-10-09, committed, EditMode 1062/1062): post-match correctness + copy nits (round-3 findings 2, 3, 14, 21)
+
+- **Draw headline on every path (2).** `MatchStandings.WinBanner(ranked, winnerCorner)` decides the draw from the standings (`IsDraw`); the old `(hasWinner, winner, draw = false)` overload is gone. Source guard: nothing outside `MatchStandings` references `PostmatchEnded` / `PostmatchDraw`. Live all-zero round now reads EMPTY NESTS! (`Captures/phase6/postmatch/draw_live.png`, `postmatch__live__allzero__*`).
+- **Ties (3).** Real tie-break (`GameManager.EndOnTimerExpiry`): exact food, then KOs, then lower corner. `MatchStandings.WinSubLine`: "Tied 1st · won on KOs" only when exact food was level and the winner had strictly more KOs; any other tie reads "Tied for 1st!" (no invented reason). `YouPlaceChip` gives "You · tied Nth" and now sits on YOUR podium step (headline row only for 4th), not under the winner's class.
+- **Draw screen (14).** A draw-only 4th pod (`MePod3`), `.cw-me-podium--draw`: all four birds level in corner order with the podium idle sway, no steps / medals.
+- **Copy nits (21).** `hud.event.restock` = "PILES RESTOCKED!"; `Spoiler.asset` description re-synced to its template and pinned (`PerkTextTests`); The Coop's guest seat shows no READY pill until joined (`WaitingRoomRules.ShowsStatePill`).
+- **For Maestro:** a food-tie broken by corner order still names a winner ("DASHFOX WINS!" + "Tied for 1st!") — that is the existing GameManager rule, not changed.
+
 ## ✅ Phase 6 chunk 6 (2026-10-09, committed, EditMode 1053/1053): haptics, desktop / pad info HUD, settings rows + volumes, hold hint, thumb-reach cluster, compact phone board
 
 - **Haptics (A9).** `IHapticsService` (`Services/IHapticsService.cs`), `HapticsService` (policy: Buzz When Hit pref -> device -> 200 ms limiter; a STRONGER kind may interrupt inside the window so a stun is not swallowed by the hit that caused it), `HapticRules`/`HapticLimiter` (pure), `AndroidHapticDevice` (JNI `Vibrator`/`VibratorManager`, `VibrationEffect.createOneShot`/`createWaveform`, reads `haptic_feedback_enabled`; any JNI failure logs once and disables), `NullHapticsService` elsewhere. Bound in `ProjectInstaller`. Triggered from `HitFeedback.TriggerVictimHit` (same gate as the camera shake: own peer, not a decoy; stun entry and `HandleRemoval` play the 60/50/90 pattern) and `TouchControlsController.OnCancelArmed` (15 ms tick). **VIBRATE permission:** the project has no custom manifest and Unity only adds VIBRATE when it sees `Handheld.Vibrate`, so I added `Editor/AndroidVibratePermission.cs` (an `IPostGenerateGradleAndroidProject` patching the generated unityLibrary manifest; the XML patch is unit-tested). **Not verified on a device** (no Android build was made).

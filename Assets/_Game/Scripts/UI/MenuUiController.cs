@@ -2105,7 +2105,7 @@ namespace CluckWars.UI
 
         /// <summary>Fills one seat. <paramref name="name"/> null = an open seat (waiting for a player).
         /// <paramref name="corner"/> = the spawn corner it will get (-1 = not known yet).</summary>
-        private void SetSeat(int idx, int corner, ChickenClass cls, string name, bool isHost, bool cpu, bool ready, IReadOnlyList<AbilityBaseSO> abilities)
+        private void SetSeat(int idx, int corner, ChickenClass cls, string name, bool isHost, bool cpu, bool ready, IReadOnlyList<AbilityBaseSO> abilities, bool showState = true)
         {
             var v = _seats[idx];
             if (v == null) return;
@@ -2126,7 +2126,9 @@ namespace CluckWars.UI
             v.ClassLine.style.display = empty ? DisplayStyle.None : DisplayStyle.Flex;
             v.Hexes.style.display = empty ? DisplayStyle.None : DisplayStyle.Flex;
             v.Waiting.style.display = empty ? DisplayStyle.Flex : DisplayStyle.None;
-            v.State.style.display = empty ? DisplayStyle.None : DisplayStyle.Flex;
+            // No READY / PICKING pill until the seat is really taken: an open seat, and a guest's own seat
+            // before they have joined the host (WaitingRoomRules.ShowsStatePill).
+            v.State.style.display = empty || !showState ? DisplayStyle.None : DisplayStyle.Flex;
             if (empty) return;
 
             v.Name.text = name;
@@ -2210,7 +2212,8 @@ namespace CluckWars.UI
             var mine = new List<AbilityBaseSO>();
             for (int i = 0; i < ActiveSlotsForClass; i++) { var a = GetEquipped(i); if (a != null) mine.Add(a); }
             var mode = _selection != null ? _selection.Mode : SessionMode.Solo;
-            SetSeat(0, CornerAssignment.LobbySeatCorner(mode, 0, _lobbyPermutation), Cls, UiText.Get(UiKeys.LabelYou), isHost, false, ready: true, mine);
+            SetSeat(0, CornerAssignment.LobbySeatCorner(mode, 0, _lobbyPermutation), Cls, UiText.Get(UiKeys.LabelYou), isHost, false, ready: true, mine,
+                showState: WaitingRoomRules.ShowsStatePill(mode, seat: 0));
 
             bool allReady = true;
             for (int i = 1; i < _seats.Length; i++)

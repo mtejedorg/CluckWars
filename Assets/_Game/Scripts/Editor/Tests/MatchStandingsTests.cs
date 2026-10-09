@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using CluckWars.Gameplay;
 using CluckWars.Localization;
+using CluckWars.Services;
 using CluckWars.UI;
 using NUnit.Framework;
 using UnityEngine;
@@ -64,12 +65,15 @@ namespace CluckWars.Tests
         public void WinBanner_SaysYouWin_ForTheLocalPlayer_AndTheNameOtherwise()
         {
             var you = new Entry(2, 40, 0, isLocal: true, isBot: false, ChickenClass.Warrior);
-            var bot = new Entry(0, 40, 0, isLocal: false, isBot: true, ChickenClass.Fatty);
-            Assert.AreEqual(UiText.Get(UiKeys.PostmatchYouWin), MatchStandings.WinBanner(true, you));
+            var bot = new Entry(0, 30, 0, isLocal: false, isBot: true, ChickenClass.Fatty);
+            Assert.AreEqual(UiText.Get(UiKeys.PostmatchYouWin), MatchStandings.WinBanner(MatchStandings.Ranked(new[] { you, bot }, 2), 2));
+            var botWon = MatchStandings.Ranked(new[] { new Entry(2, 12, 0, true, false, ChickenClass.Warrior), new Entry(0, 40, 0, false, true, ChickenClass.Fatty) }, 0);
             Assert.AreEqual(UiText.Format(UiKeys.PostmatchWins, ("name", UiText.Get(UiKeys.LobbyBot2).ToUpperInvariant())),
-                MatchStandings.WinBanner(true, bot));
-            Assert.AreEqual(UiText.Get(UiKeys.PostmatchEnded), MatchStandings.WinBanner(false, default));
-            StringAssert.DoesNotContain("P1", MatchStandings.WinBanner(true, bot), "a CPU winner is named, never 'P1 (CPU)'");
+                MatchStandings.WinBanner(botWon, 0));
+            // Banked food but no (or an unknown) named corner: MATCH ENDED, never a made-up winner.
+            Assert.AreEqual(UiText.Get(UiKeys.PostmatchEnded), MatchStandings.WinBanner(botWon, -1));
+            Assert.AreEqual(UiText.Get(UiKeys.PostmatchEnded), MatchStandings.WinBanner(botWon, 3));
+            StringAssert.DoesNotContain("P1", MatchStandings.WinBanner(botWon, 0), "a CPU winner is named, never 'P1 (CPU)'");
         }
 
         // ---- Ranking + podium ---------------------------------------------------------------------
@@ -154,10 +158,118 @@ namespace CluckWars.Tests
             Assert.IsTrue(MatchStandings.IsDraw(new[] { E(0, 0), E(1, 0), E(2, 0.6f), E(3, 0) }), "0.6 food shows as 0");
             Assert.IsTrue(MatchStandings.IsDraw(new List<Entry>()));
             Assert.IsFalse(MatchStandings.IsDraw(new[] { E(0, 0), E(1, 1) }));
-            var any = new Entry(0, 0, 0, true, false, ChickenClass.Warrior);
-            Assert.AreEqual(UiText.Get(UiKeys.PostmatchDraw), MatchStandings.WinBanner(true, any, draw: true),
-                "a draw wins over the corner GameManager's tie-breaks named");
             Assert.AreNotEqual(UiText.Get(UiKeys.PostmatchEnded), UiText.Get(UiKeys.PostmatchDraw));
+        }
+
+        [Test]
+        public void WinBanner_IsEmptyNests_ForEveryAllZeroResult_WhateverCornerWasNamed()
+        {
+            // The draw is decided from the standings alone: there is no flag a caller can forget (round-3 finding 2).
+            string draw = UiText.Get(UiKeys.PostmatchDraw);
+            var local = new Entry(2, 0, 0, true, false, ChickenClass.Warrior);
+            var all = new List<Entry>
+            {
+                new Entry(0, 0, 0, false, true, ChickenClass.Speedy), new Entry(1, 0.6f, 0, false, true, ChickenClass.Fatty),
+                new Entry(3, 0, 0, false, true, ChickenClass.Assassin), local,
+            };
+            foreach (int named in new[] { -1, 0, 1, 2, 3, 7 })
+            {
+                var r = MatchStandings.Ranked(all, named);
+                Assert.AreEqual(draw, MatchStandings.WinBanner(r, named), $"all zero, corner {named} named");
+                Assert.IsNull(MatchStandings.WinSubLine(r, named));
+                Assert.IsNull(MatchStandings.YouPlaceChip(r, named));
+            }
+            Assert.AreEqual(draw, MatchStandings.WinBanner(new List<Entry>(), -1), "nobody listed at all");
+            Assert.AreEqual(draw, MatchStandings.WinBanner(MatchStandings.Ranked(new[] { local }, 2), 2), "solo, nothing banked");
+        }
+
+        [Test]
+        public void EveryHeadlineWriter_GoesThroughTheStandingsOnlyWinBanner()
+        {
+            // Source guard for the live (UI Toolkit) path that unit tests cannot drive: the overlay builds its
+            // headline from MatchStandings.WinBanner(ranked, corner); the caller-supplied draw flag is gone and
+            // nothing outside MatchStandings picks the MATCH ENDED / EMPTY NESTS! key.
+            string ctl = Read("Assets/_Game/Scripts/UI/MatchOverlaysController.cs");
+            StringAssert.Contains("MatchStandings.WinBanner(ranked, gm.WinnerCorner)", ctl);
+            StringAssert.DoesNotContain("bool draw = false", Read("Assets/_Game/Scripts/UI/MatchStandings.cs"));
+            string scripts = Path.Combine(Path.GetDirectoryName(Application.dataPath), "Assets/_Game/Scripts");
+            foreach (var f in Directory.GetFiles(scripts, "*.cs", SearchOption.AllDirectories))
+            {
+                string name = Path.GetFileName(f);
+                if (f.Replace('\\', '/').Contains("/Editor/") || name == "MatchStandings.cs" || name == "UiKeys.cs") continue;
+                string src = File.ReadAllText(f);
+                StringAssert.DoesNotContain("UiKeys.PostmatchEnded", src, $"{name} writes the MATCH ENDED headline outside MatchStandings.WinBanner");
+                StringAssert.DoesNotContain("UiKeys.PostmatchDraw", src, $"{name} writes the EMPTY NESTS! headline outside MatchStandings.WinBanner");
+            }
+        }
+
+        [Test]
+        public void TiedFirst_NamesTheKoTieBreak_OnlyWhenKosActuallyDecidedIt()
+        {
+            string koLine = UiText.Get(UiKeys.PostmatchTiedKos), plain = UiText.Get(UiKeys.PostmatchTied);
+            // Level food, winner has more knockouts (GameManager's 2nd tie-break): a visible reason.
+            var ko = MatchStandings.Ranked(new[] { new Entry(0, 20, 2, false, true, ChickenClass.Speedy), new Entry(1, 20, 0, true, false, ChickenClass.Warrior) }, 0);
+            Assert.AreEqual(koLine, MatchStandings.WinSubLine(ko, 0));
+            // Level food AND level knockouts: GameManager fell back to the lower corner, which nobody can see.
+            var corner = MatchStandings.Ranked(new[] { new Entry(0, 20, 1, false, true, ChickenClass.Speedy), new Entry(1, 20, 1, true, false, ChickenClass.Warrior) }, 0);
+            Assert.AreEqual(plain, MatchStandings.WinSubLine(corner, 0));
+            // Same shown food, different hidden fractions: won on a number the board does not show.
+            var frac = MatchStandings.Ranked(new[] { new Entry(0, 20.9f, 0, false, true, ChickenClass.Speedy), new Entry(1, 20.1f, 3, true, false, ChickenClass.Warrior) }, 0);
+            Assert.AreEqual(plain, MatchStandings.WinSubLine(frac, 0));
+            // No tie: the winner's class, as before.
+            var clear = MatchStandings.Ranked(new[] { new Entry(0, 30, 0, false, true, ChickenClass.Speedy), new Entry(1, 20, 0, true, false, ChickenClass.Warrior) }, 0);
+            Assert.AreEqual(UiText.Format(UiKeys.PostmatchWinSub, ("cls", MatchStandings.ClassName(ChickenClass.Speedy))), MatchStandings.WinSubLine(clear, 0));
+        }
+
+        [Test]
+        public void YouChip_SaysTied_WhenAnotherBirdSharesYourPlace()
+        {
+            var you = new Entry(2, 20, 0, true, false, ChickenClass.Warrior);
+            var win = new Entry(0, 40, 0, false, true, ChickenClass.Fatty);
+            var mate = new Entry(1, 20, 0, false, true, ChickenClass.Speedy);
+            var r = MatchStandings.Ranked(new[] { you, win, mate }, 0);
+            Assert.AreEqual(UiText.Format(UiKeys.PostmatchYouPlaceTied, ("you", UiText.Get(UiKeys.LabelYou)), ("place", MatchStandings.Ordinal(2))),
+                MatchStandings.YouPlaceChip(r, 0));
+        }
+
+        [Test]
+        public void YouChip_LivesOnYourOwnStep_NotUnderTheWinnersClass()
+        {
+            string ctl = Read("Assets/_Game/Scripts/UI/MatchOverlaysController.cs");
+            StringAssert.Contains("v.Name.text = e.IsLocal && youChip != null ? youChip", ctl, "the chip replaces the name on your own step");
+            StringAssert.Contains("chipOnPodium", ctl);
+        }
+
+        [Test]
+        public void DrawLayout_HasAFourthPod_AndLevelGroundRules()
+        {
+            var root = TestAssets.Load<VisualTreeAsset>("Assets/UI/MatchOverlays.uxml").CloneTree();
+            for (int i = 0; i < 4; i++)
+            {
+                Assert.IsNotNull(root.Q<VisualElement>($"MePod{i}"), $"#MePod{i}");
+                Assert.IsNotNull(root.Q<VisualElement>($"MePod{i}Chicken"));
+                Assert.IsNotNull(root.Q<Label>($"MePod{i}Name"));
+            }
+            Assert.IsTrue(root.Q<VisualElement>("MePod3").ClassListContains("cw-me-pod--hidden"), "the 4th pod is draw-only");
+            string css = Read("Assets/UI/Styles/MatchOverlays.uss");
+            StringAssert.Contains(".cw-me-podium--draw .cw-me-pod__block", css);
+            StringAssert.Contains(".cw-me-podium--draw .cw-me-pod__chicken { margin-top: 0; }", css);
+            StringAssert.Contains("PopulatePodium(ranked, places,", Read("Assets/_Game/Scripts/UI/MatchOverlaysController.cs"));
+        }
+
+        [Test]
+        public void GuestSeat_ShowsNoStatePill_UntilJoined()
+        {
+            Assert.IsFalse(WaitingRoomRules.ShowsStatePill(SessionMode.Join, seat: 0), "a guest has not joined yet");
+            Assert.IsTrue(WaitingRoomRules.ShowsStatePill(SessionMode.Host, 0));
+            Assert.IsTrue(WaitingRoomRules.ShowsStatePill(SessionMode.Solo, 0));
+            Assert.IsTrue(WaitingRoomRules.ShowsStatePill(SessionMode.Solo, 2), "CPU seats keep READY");
+        }
+
+        [Test]
+        public void RestockBanner_SaysWhatHappened()
+        {
+            Assert.AreEqual("PILES RESTOCKED!", UiText.Get(UiKeys.HudEventRestock));
         }
 
         [Test]
@@ -168,15 +280,16 @@ namespace CluckWars.Tests
             var other = new Entry(1, 5, 0, isLocal: false, isBot: true, ChickenClass.Speedy);
             var r = MatchStandings.Ranked(new[] { you, bot, other }, winnerCorner: 0);
             Assert.AreEqual(UiText.Format(UiKeys.PostmatchYouPlace, ("you", UiText.Get(UiKeys.LabelYou)), ("place", UiText.Get(UiKeys.HudRank2))),
-                MatchStandings.YouPlaceChip(r, hasWinner: true, winnerCorner: 0));
-            StringAssert.Contains("2nd", MatchStandings.YouPlaceChip(r, true, 0));
-            Assert.IsNull(MatchStandings.YouPlaceChip(r, hasWinner: true, winnerCorner: 2), "you won: the banner says so");
-            Assert.IsNull(MatchStandings.YouPlaceChip(r, hasWinner: false, winnerCorner: -1), "draw / no winner: no chip");
-            Assert.IsNull(MatchStandings.YouPlaceChip(new List<Entry> { bot, other }, true, 0), "spectating: no chip");
+                MatchStandings.YouPlaceChip(r, 0));
+            StringAssert.Contains("2nd", MatchStandings.YouPlaceChip(r, 0));
+            Assert.IsNull(MatchStandings.YouPlaceChip(r, 2), "you won: the banner says so");
+            Assert.IsNull(MatchStandings.YouPlaceChip(r, -1), "no winner: no chip");
+            Assert.IsNull(MatchStandings.YouPlaceChip(new List<Entry> { bot, other }, 0), "spectating: no chip");
 
             // Tied with the declared winner: you share 1st.
             var tied = MatchStandings.Ranked(new[] { new Entry(2, 40, 0, true, false, ChickenClass.Warrior), bot }, winnerCorner: 0);
-            StringAssert.Contains(UiText.Get(UiKeys.HudRank1), MatchStandings.YouPlaceChip(tied, true, 0));
+            Assert.AreEqual(UiText.Format(UiKeys.PostmatchYouPlaceTied, ("you", UiText.Get(UiKeys.LabelYou)), ("place", UiText.Get(UiKeys.HudRank1))),
+                MatchStandings.YouPlaceChip(tied, 0), "a shared 1st reads 'tied 1st', not a bare '1st'");
         }
 
         [Test]

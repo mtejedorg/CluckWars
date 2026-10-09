@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using CluckWars.Services;
 
 namespace CluckWars.UI
 {
@@ -28,5 +29,13 @@ namespace CluckWars.UI
         /// </summary>
         public static bool ShowHostTag(bool solo, bool seatIsMaster, bool seatIsBot) =>
             !solo && seatIsMaster && !seatIsBot;
+
+        /// <summary>
+        /// Whether a seat of THE COOP shows its READY / PICKING pill. A guest who is still on the join card
+        /// (<see cref="SessionMode.Join"/>) has not joined anyone yet, so their own seat (0) shows no pill -
+        /// READY there promised a lineup that did not exist (round-3 finding 21). Every other seat that is
+        /// taken (host, solo, CPU) keeps it; open seats never have one.
+        /// </summary>
+        public static bool ShowsStatePill(SessionMode mode, int seat) => !(mode == SessionMode.Join && seat == 0);
     }
 }

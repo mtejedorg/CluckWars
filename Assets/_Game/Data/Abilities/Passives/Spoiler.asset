@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SpoilerPassiveSO
   DisplayName: Spoiler
   ShortLabel: SPOI
-  Description: "If nobody wins before time's up, you bank 15 bonus food first."
+  Description: "If nobody reaches 40 before time's up, you bank 15 bonus food first."
   Icon: 
   AccentColor: {r: 0.55, g: 0.42, b: 0.85, a: 1}
   Category: 3

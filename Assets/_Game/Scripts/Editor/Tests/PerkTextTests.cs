@@ -121,6 +121,21 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void SpoilerAsset_Description_IsTheDetailTemplate_WithTheCurrentNumbers()
+        {
+            // Round-3 finding 21: the asset said "nobody wins" while the template said "nobody reaches {goal}".
+            // Until the descriptions are generated (chunk 7c), this pins the stored text to the template.
+            foreach (var p in ShippedPassives(out var cfg))
+            {
+                if (!(p is SpoilerPassiveSO sp)) continue;
+                Assert.AreEqual($"If nobody reaches {cfg.FoodTargetToWin} before time's up, you bank {sp.BonusFood} bonus food first.",
+                    sp.Description);
+                return;
+            }
+            Assert.Fail("No Spoiler in the ability registry.");
+        }
+
+        [Test]
         public void SpoilerDetail_WithoutAMatchConfig_IsLoudNotBlank()
         {
             var spoiler = ScriptableObject.CreateInstance<SpoilerPassiveSO>();

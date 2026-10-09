@@ -179,6 +179,9 @@ namespace CluckWars.Localization
         public const string PostmatchYouWin = "postmatch.youWin";
         public const string PostmatchDraw = "postmatch.draw";
         [UiArgs("you", "place")] public const string PostmatchYouPlace = "postmatch.youPlace";
+        [UiArgs("you", "place")] public const string PostmatchYouPlaceTied = "postmatch.youPlaceTied";
+        public const string PostmatchTiedKos = "postmatch.tiedKos";
+        public const string PostmatchTied = "postmatch.tied";
         public const string LobbyHintHost = "lobby.hint.host";
         public const string LobbyHintGuest = "lobby.hint.guest";
         public const string SessionEnded = "session.ended";
