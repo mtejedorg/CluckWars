@@ -2121,7 +2121,7 @@ const fmt = n  => Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/,''
   });
 
   /* --- bases --- */
-  const PC=['#e8751a','#1a7fc4','#c4286f','#0d9e7a'];
+  const PC=['#f59a3a','#0994e8','#f7367b','#17785a'];
   [[1,1],[-1,1],[-1,-1],[1,-1]].forEach(([sx,sy],i)=>{
     const x=sx*D, y=-sy*D, g=mk('g',{});
     g.appendChild(mk('rect',{x:x-3.2,y:y-3.2,width:6.4,height:6.4,rx:1.1,
@@ -2178,7 +2178,7 @@ const fmt = n  => Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/,''
   const LEG=[
     ['#f5c842','Food piles','9 total, 80 food, three tiers. They never respawn.'],
     ['#7a6242','Pinwheel walls','8 arms, 14.76 m each, one 3 m opening apiece — 118 m of interior wall.'],
-    ['#e8751a','Bases','One per corner at r25.65. Banking is 9 food/sec.'],
+    ['#f59a3a','Bases','One per corner at r25.65. Banking is 9 food/sec.'],
     ['#5ec463','Safe lap','Left: rim, edge, contested pile.'],
     ['#ff7043','Risky lap','Right: hub plaza and the centre.']
   ];

@@ -22,7 +22,7 @@ namespace CluckWars.Tests
             (AbilityCategory[])Enum.GetValues(typeof(AbilityCategory));
 
         [Test]
-        public void EveryShippedAbility_HexColourIsItsCategoryColour()
+        public void EveryShippedAbility_HexColourIsItsCategoryFillColour()
         {
             var reg = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
             var abilities = reg.All.Where(a => a != null).ToList();
@@ -30,7 +30,7 @@ namespace CluckWars.Tests
             foreach (var ab in abilities)
             {
                 var hex = AbilityPalette.HexColor(ab);
-                Assert.AreEqual(AbilityPalette.CategoryColor(ab.Category), hex, $"{ab.name} ({ab.Category})");
+                Assert.AreEqual(AbilityPalette.FillColor(ab.Category), hex, $"{ab.name} ({ab.Category})");
                 foreach (var p in Players)
                     Assert.GreaterOrEqual(DeltaE2000(hex, p), AbilityPalette.MinPlayerDeltaE,
                         $"{ab.name}'s hex sits too close to player colour #{ColorUtility.ToHtmlStringRGB(p)}");
@@ -81,6 +81,83 @@ namespace CluckWars.Tests
         }
 
         /// <summary>
+        /// Round-3 finding 15: the Defense hex FILL is a mid moss, not the near-black text background. The fill
+        /// keeps the same separations the text colour has: far from the other fills and from the players, a
+        /// readable label, and colour-blind apart from the other categories.
+        /// </summary>
+        [Test]
+        public void DefenseFill_IsMidMoss_DistinctFromTheOtherFills_AndTheDarkTextColourIsKept()
+        {
+            Assert.AreEqual(UiGfx.Hex32("30460c"), AbilityPalette.Defense, "text background stays the dark moss");
+            Assert.AreNotEqual(AbilityPalette.Defense, AbilityPalette.DefenseFill);
+            Assert.AreEqual(AbilityPalette.DefenseFill, AbilityPalette.FillColor(AbilityCategory.Defense));
+            Assert.AreEqual(AbilityPalette.Defense, AbilityPalette.CategoryColor(AbilityCategory.Defense));
+            foreach (var cat in new[] { AbilityCategory.Steal, AbilityCategory.Control, AbilityCategory.Utility })
+                Assert.AreEqual(AbilityPalette.CategoryColor(cat), AbilityPalette.FillColor(cat), $"{cat} fill = its colour");
+
+            Assert.Greater(ToLab(AbilityPalette.DefenseFill).x, 50f, "mid moss, not near-black (the dark one is L* 27)");
+            Assert.GreaterOrEqual(AbilityPalette.ContrastRatio(AbilityPalette.InkOn(AbilityPalette.DefenseFill), AbilityPalette.DefenseFill),
+                AbilityPalette.MinLabelContrast, "a label on the fill (icon monogram, slot badge) clears AA");
+            foreach (var p in Players)
+                Assert.GreaterOrEqual(DeltaE2000(AbilityPalette.DefenseFill, p), AbilityPalette.MinPlayerDeltaE);
+            var fills = Categories.Select(AbilityPalette.FillColor).ToArray();
+            for (int i = 0; i < fills.Length; i++)
+            for (int j = i + 1; j < fills.Length; j++)
+            {
+                Assert.GreaterOrEqual(DeltaE2000(fills[i], fills[j]), 25f, $"{Categories[i]} vs {Categories[j]} fills");
+                foreach (var m in new[] { Deuteranopia, Protanopia, Tritanopia })
+                    Assert.GreaterOrEqual(DeltaE2000(Simulate(fills[i], m), Simulate(fills[j], m)), AbilityPalette.MinColourBlindDeltaE,
+                        $"{Categories[i]} vs {Categories[j]} fills under CVD");
+            }
+        }
+
+        /// <summary>
+        /// Round-3 finding 11: P3 / P4 were 6.9 dE00 apart under deuteranopia and P2 / P4 9.0 under tritanopia.
+        /// All six player pairs must keep <see cref="AbilityPalette.MinPlayerColourBlindDeltaE"/> under all three
+        /// simulations (the same Machado matrices and CIEDE2000 the category test uses), and the set must be
+        /// separated by lightness too: at least one clearly light and one clearly dark colour.
+        /// </summary>
+        [TestCase("deuteranopia")]
+        [TestCase("protanopia")]
+        [TestCase("tritanopia")]
+        public void PlayerColours_StayApart_UnderColourBlindness(string kind)
+        {
+            var m = kind == "deuteranopia" ? Deuteranopia : kind == "protanopia" ? Protanopia : Tritanopia;
+            for (int i = 0; i < Players.Length; i++)
+            for (int j = i + 1; j < Players.Length; j++)
+            {
+                float de = DeltaE2000(Simulate(Players[i], m), Simulate(Players[j], m));
+                Assert.GreaterOrEqual(de, AbilityPalette.MinPlayerColourBlindDeltaE,
+                    $"P{i + 1} vs P{j + 1} under {kind}: dE00 {de:0.0}");
+            }
+        }
+
+        [Test]
+        public void PlayerColours_AreSeparatedByLightness_AndStayTheirHue()
+        {
+            var l = Players.Select(c => ToLab(c).x).ToArray();
+            Assert.GreaterOrEqual(l.Max() - l.Min(), 20f, $"player lightness range L* {l.Min():0}..{l.Max():0}");
+            Assert.GreaterOrEqual(l[0] - l[3], 20f, "P1 (light orange) clearly lighter than P4 (dark teal)");
+            Color.RGBToHSV(Players[0], out float h1, out _, out _);
+            Color.RGBToHSV(Players[1], out float h2, out _, out _);
+            Color.RGBToHSV(Players[2], out float h3, out _, out _);
+            Color.RGBToHSV(Players[3], out float h4, out _, out _);
+            Assert.That(h1 * 360f, Is.InRange(20f, 45f), "P1 orange");
+            Assert.That(h2 * 360f, Is.InRange(195f, 215f), "P2 blue");
+            Assert.That(h3 * 360f, Is.InRange(330f, 345f), "P3 pink");
+            Assert.That(h4 * 360f, Is.InRange(155f, 175f), "P4 teal");
+            foreach (var p in Players)   // the pedestal tag / podium labels take whichever of cream / ink reads better
+                Assert.GreaterOrEqual(AbilityPalette.ContrastRatio(AbilityPalette.InkOn(p), p), 3f, $"label on #{ColorUtility.ToHtmlStringRGB(p)}");
+        }
+
+        [Test]
+        public void ColourBlindSimulation_Tritanopia_KeepsGreys()
+        {
+            var g = Simulate(new Color(0.5f, 0.5f, 0.5f), Tritanopia);
+            Assert.AreEqual(0.5f, g.r, 0.01f); Assert.AreEqual(0.5f, g.g, 0.01f); Assert.AreEqual(0.5f, g.b, 0.01f);
+        }
+
+        /// <summary>
         /// Round-2 finding 9: Steal and Defense were 4.7 dE00 apart for a deuteranope. After a full-severity
         /// deuteranopia and protanopia simulation (Machado, Oliveira &amp; Fernandes 2009, applied in linear
         /// RGB), every pair of category colours must keep <see cref="AbilityPalette.MinColourBlindDeltaE"/>.
@@ -125,6 +202,13 @@ namespace CluckWars.Tests
             { 0.152286, 1.052583, -0.204868 },
             { 0.114503, 0.786281, 0.099216 },
             { -0.003882, -0.048116, 1.051998 },
+        };
+
+        private static readonly double[,] Tritanopia =
+        {
+            { 1.255528, -0.076749, -0.178779 },
+            { -0.078411, 0.930809, 0.147602 },
+            { 0.004733, 0.691367, 0.303900 },
         };
 
         private static Color Simulate(Color c, double[,] m)

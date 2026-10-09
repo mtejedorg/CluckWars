@@ -152,6 +152,10 @@ namespace CluckWars.Visuals
                     string label = corner < 0
                         ? MatchStandings.ClassName(klass)
                         : MatchStandings.DisplayName(isLocal, isBot, klass, corner);
+                    // A bot's own name hides which colour it is; the P# says it in text too, so ring and nameplate
+                    // colour are never the only way to tell two rivals apart (round-3 finding 11).
+                    if (isBot && !isLocal && corner >= 0 && MatchStandings.BotIndex(klass) >= 0)
+                        label = UiText.Format(UiKeys.LobbyPlayerTag, ("n", corner + 1)) + " " + label;
                     if (bountyActive) label = UiText.Format(UiKeys.NameplateBounty, ("name", label));
                     _text.text = stateIcon.Length > 0 ? stateIcon + " " + label : label;
                     _text.color = isLocal ? PlayerPalette.YouMarkInk : PlayerPalette.ForCorner(corner);

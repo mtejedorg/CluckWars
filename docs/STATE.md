@@ -6,7 +6,21 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
-## ✅ 🟡 Phase 6 chunk 7d (2026-10-09, committed, EditMode 1104/1104): overlays on the wood style, Coop seats by corner, waiting room, alignment, 28 px floor (round-3 findings 5, 6, 12, 16, 19)
+## ✅ Phase 6 chunk 7e (2026-10-09, committed, EditMode 1110/1110): player palette colour-blind separation, Defense hex fill (round-3 findings 11, 15)
+
+- **Finding 11 - player palette.** `PlayerPalette` P1/P2/P3/P4: `#E8751A/#1A7FC4/#C4286F/#0D9E7A` -> `#F59A3A/#0994E8/#F7367B/#17785A` (L* 71/59/56/45;
+  light orange ... dark teal). Worst pair was P3/P4 6.9 dE00 (deutan) and P2/P4 9.0 (tritan); now every pair >= 16.2 under all three
+  (`AbilityPalette.MinPlayerColourBlindDeltaE` = 15). Tests: `PlayerColours_StayApart_UnderColourBlindness` (3 cases),
+  `PlayerColours_AreSeparatedByLightness_AndStayTheirHue`, `ColourBlindSimulation_Tritanopia_KeepsGreys` (added the Machado tritanopia matrix).
+  Bot nameplates now read `P3 <name>` (humans already read `P3`); the rival ring / feet ring are text-less sprites, so no world-space UI was added.
+  ART.md palette table + the compendium site's base colours updated (site NOT republished to the Artifact URL yet).
+- **Finding 15 - Defense fill.** New `AbilityPalette.DefenseFill` `#8E9D43` (mid moss, L* 62) + `FillColor(category)`; `HexColor(ability)` now returns the fill.
+  `Defense` `#30460C` stays the text background (card band, tag, frame). Touch HUD `#Fill{n}`, lobby mini-hexes and icon discs take the fill.
+  Test: `DefenseFill_IsMidMoss_DistinctFromTheOtherFills_AndTheDarkTextColourIsKept`; the shipped-ability hex test now checks `FillColor`.
+- Outstanding: `Design/docs/ART.md` and the Design tokens JSX (mirror of the claude.ai design project) still carry the old player hexes.
+- Captures: `Captures/phase6/extra/hud/*.png`, `palette_hud_defense_zoom.png`, `palette_postmatch_desktop.png`, `palette_postmatch_phone.png`.
+
+## ✅ Phase 6 chunk 7d (2026-10-09, committed, EditMode 1104/1104): overlays on the wood style, Coop seats by corner, waiting room, alignment, 28 px floor (round-3 findings 5, 6, 12, 16, 19)
 
 - **Overlays (5).** Session end = wood panel + ribbon + green BACK TO THE BARN (`btn.backToBarn`, leaves through the countdown's own path; the countdown stays as the fallback). GET READY plate = the wood ribbon (`GetReadyCard.uss`, shared with the menu hand-off). Host-left notice = wood plaque. The comeback / event banner (FINAL 10! + PILES RESTOCKED!) moved from a procedural UGUI plate in `MatchHud` to `#EventBanner` in `MatchOverlays.uxml` (wood plaque, same size and spot); `MatchHud` still owns timing / sting / copy and publishes through `EventBannerFeed` (`MenuJuicePolicy.cs`), `MatchOverlaysController.TickEventBanner` draws it.
 - **Coop seats (6).** `CornerAssignment.LobbySeatOrder` + `MenuUiController.OrderSeatsByCorner`: cards read P1..P4 left to right after every lineup fill (a guest keeps seat order, corners unknown).

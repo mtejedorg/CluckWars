@@ -10,8 +10,11 @@ namespace CluckWars.UI
     /// other file defines its own copy of these four colours.
     /// </summary>
     /// <remarks>
-    /// Okabe-Ito derived, colour-blind safe (docs/ART.md "Player Identity Colors", design token
-    /// CW_PLAYERS_V3). The corner is the identity, so a player is the same colour in the lobby (which
+    /// Colour-blind safe (docs/ART.md "Player Identity Colors"): still orange / blue / pink / teal, but
+    /// separated by <b>lightness</b> as well as hue, because a dichromat keeps lightness. Every one of the six
+    /// pairs stays &gt;= <see cref="AbilityPalette.MinPlayerColourBlindDeltaE"/> CIEDE2000 apart under
+    /// protanopia, deuteranopia and tritanopia (<c>AbilityPaletteTests</c>); round 3 found P3 / P4 at 6.9
+    /// (deuteranopia) and P2 / P4 at 9.0 (tritanopia) with the previous hues-only set. The corner is the identity, so a player is the same colour in the lobby (which
     /// shows the corner each seat will spawn on, see <c>CornerAssignment</c>), the match and the results.
     /// <para>
     /// The local player also carries the <b>YOU mark</b> everywhere: their name drawn as a gold pill
@@ -22,14 +25,14 @@ namespace CluckWars.UI
     /// </remarks>
     public static class PlayerPalette
     {
-        /// <summary>Corner 0, orange.</summary>
-        public static readonly Color P1 = UiGfx.Hex32("e8751a");
-        /// <summary>Corner 1, blue.</summary>
-        public static readonly Color P2 = UiGfx.Hex32("1a7fc4");
-        /// <summary>Corner 2, pink.</summary>
-        public static readonly Color P3 = UiGfx.Hex32("c4286f");
-        /// <summary>Corner 3, teal.</summary>
-        public static readonly Color P4 = UiGfx.Hex32("0d9e7a");
+        /// <summary>Corner 0, light orange (was #e8751a, L* 62; now L* 71).</summary>
+        public static readonly Color P1 = UiGfx.Hex32("f59a3a");
+        /// <summary>Corner 1, bright blue (was #1a7fc4).</summary>
+        public static readonly Color P2 = UiGfx.Hex32("0994e8");
+        /// <summary>Corner 2, hot pink (was #c4286f, L* 45; now L* 56).</summary>
+        public static readonly Color P3 = UiGfx.Hex32("f7367b");
+        /// <summary>Corner 3, dark teal (was #0d9e7a, L* 58; now L* 45): the darkest of the four.</summary>
+        public static readonly Color P4 = UiGfx.Hex32("17785a");
 
         /// <summary>A seat whose corner is not known yet (a guest before joining, a corner not stamped yet):
         /// a warm grey that reads as "nobody's colour".</summary>

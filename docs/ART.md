@@ -70,14 +70,27 @@ Each class has a **primary color** used on the body as the main read, plus a **d
 
 ### Player Identity Colors (Color-Blind Safe)
 
-Derived from the Okabe-Ito palette. Validated across protanopia, deuteranopia, and tritanopia.
+Separated by **lightness as well as hue** (a dichromat keeps lightness). Round 3 found the hue-only set
+(#E8751A / #1A7FC4 / #C4286F / #0D9E7A) had P3 / P4 at 6.9 dE00 under deuteranopia and P2 / P4 at 9.0 under
+tritanopia. Every one of the six pairs now stays >= 15 dE00 under protanopia, deuteranopia and tritanopia
+(`AbilityPaletteTests.PlayerColours_StayApart_UnderColourBlindness`, Machado 2009 severity 1, same simulation
+as the category test); the weakest is P1 / P3 under tritanopia at 16.2.
 
-| Player | Color | Hex | Notes |
-|---|---|---|---|
-| P1 | Sunset Orange | #E8751A | Warm — reads yellow-ish under deuteranopia |
-| P2 | Ocean Blue | #1A7FC4 | Cool — universally distinguishable |
-| P3 | Berry Pink | #C4286F | Bold — reads purple-ish under protanopia |
-| P4 | Forest Teal | #0D9E7A | Green-blue — distinct from all above |
+| Player | Color | Hex (was) | L* | Notes |
+|---|---|---|---|---|
+| P1 | Sunset Orange | #F59A3A (#E8751A) | 71 | Lightest of the four |
+| P2 | Ocean Blue | #0994E8 (#1A7FC4) | 59 | Bright, cool |
+| P3 | Berry Pink | #F7367B (#C4286F) | 56 | Hot pink |
+| P4 | Forest Teal | #17785A (#0D9E7A) | 45 | Darkest of the four |
+
+The in-world nameplate also names the colour in text: a human rival is `P3`, a bot rival is `P3 <name>`
+(`ChickenNameplate`); the feet ring and rival ring themselves are sprites and carry no text.
+
+**Ability category fills.** Defense has two colours: `#30460C` (`AbilityPalette.Defense`) is the TEXT
+background only (card band, category tag, frame: cream label 9.6:1); `#8E9D43` (`AbilityPalette.DefenseFill`,
+L* 62) is the hex FILL (touch HUD `#Fill{n}`, lobby mini-hexes, ability icon discs, via
+`AbilityPalette.FillColor` / `HexColor`), because the dark moss read near-black next to the other three. The
+other three categories use one colour for both.
 
 **Never rely on color alone** — always supplement with labels (P1/P2/P3/P4).
 
