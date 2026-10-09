@@ -89,8 +89,9 @@ namespace CluckWars.Input
         // the status glyphs come from CluckWars.UI.HudFeedbackStyle for the same
         // reason — the world-space badges read the same glyph consts.
 
-        // Joystick geometry (reference px; mirrors the old UGUI tunables).
-        private const float JoyMaxRadius = 108f; // joystickRadius 140 - knobRadius 64 * 0.5
+        // Joystick geometry. The throw is JoystickRules.ThrowRadiusPanelPx (60 dp, floored at the old 108 px
+        // reference value), recomputed at every touch-down because the panel scale follows the screen.
+        private float _joyThrow = JoystickRules.MinThrowPanelPx;
 
         /// <summary>Sentinel forcing the first refusal/state write through the
         /// "only write what changed" guards below.</summary>
@@ -129,6 +130,7 @@ namespace CluckWars.Input
             public VisualElement Mark;       // category shape (CategoryMark): the category without colour
             public VisualElement Pip;        // in-range pip: a rival is in this move's shape (bottom-centre)
             public HexDurationRing Ring;     // duration ring while this slot's ability is running
+            public HexChainRing Chain;       // spinning dashed ring on the Peck hex while the auto-chain runs
             public VisualElement CancelX;    // built in code: the cream X shown while the edge-band cancel is armed
             public VisualElement FizzleSlash;// built in code: the 0.3 s slash flash after a fizzle
             public VisualElement Puff;       // built in code: the Fx_Whiff puff after a fizzle
@@ -163,6 +165,7 @@ namespace CluckWars.Input
         private readonly bool[]  _pipShown    = new bool[SlotCount];
         private readonly float[] _pipPopTimer = new float[SlotCount]; // seconds into the 0.2 s pop; -1 = idle
         private readonly bool[]  _ringShown   = new bool[SlotCount];
+        private readonly bool[]  _chainShown  = new bool[SlotCount];
         private AbilitySlotOverlay _localOverlay;   // the ONE source of the "hot" (rival in shape) fact
         private ChickenController  _overlayFor;
         private bool _reportedMissingOverlay;
@@ -359,12 +362,15 @@ namespace CluckWars.Input
                     Pip        = _root.Q<VisualElement>($"Pip{n}"),
                     Mark       = hex != null ? CategoryMark.Create() : null,
                     Ring       = hex != null ? new HexDurationRing() : null,
+                    Chain      = hex != null ? new HexChainRing() : null,
                 };
                 if (hex != null)
                 {
                     hex.Add(_slots[i].Mark);
                     hex.Add(_slots[i].Ring);
                     _slots[i].Ring.style.display = DisplayStyle.None;
+                    hex.Add(_slots[i].Chain);
+                    _slots[i].Chain.style.display = DisplayStyle.None;
                     BuildFlashElements(ref _slots[i], hex);
                     if (_slots[i].Fill == null || _slots[i].Pip == null)
                         _log?.Error(Source, $"TouchControls.uxml is missing #Fill{n} or #Pip{n}: that hex draws without its rim / in-range pip.");
@@ -408,6 +414,7 @@ namespace CluckWars.Input
         private void OnJoyDown(PointerDownEvent evt)
         {
             _joyPointerId = evt.pointerId;
+            _joyThrow = JoystickRules.ThrowRadiusPanelPx(Screen.dpi, _root.worldBound.width, Screen.width);
             _joyBase.CapturePointer(evt.pointerId);
             UpdateJoyFrom(evt.localPosition);
             evt.StopPropagation();
@@ -431,13 +438,15 @@ namespace CluckWars.Input
         {
             var center  = _joyBase.contentRect.center;
             var delta   = new Vector2(localPos.x - center.x, localPos.y - center.y);
-            var clamped = Vector2.ClampMagnitude(delta, JoyMaxRadius);
+            var clamped = Vector2.ClampMagnitude(delta, _joyThrow);
 
             // Knob follows the finger in UITK space (y down = positive).
             if (_joyKnob != null) _joyKnob.style.translate = new Translate(clamped.x, clamped.y, 0f);
 
-            // Movement: normalize + flip y so up = +y (game convention).
-            _movement = new Vector2(clamped.x, -clamped.y) / JoyMaxRadius;
+            // Movement: normalize + flip y so up = +y (game convention), then the dead zone (0.12) with its
+            // rescaled ramp so the output leaves 0 smoothly at the dead-zone edge. The knob still follows the
+            // finger exactly; only the reported movement is dead-zoned.
+            _movement = JoystickRules.ApplyDeadZone(new Vector2(clamped.x, -clamped.y) / _joyThrow);
         }
 
         private void ResetJoy()
@@ -746,6 +755,18 @@ namespace CluckWars.Input
                     refs.Ring.style.display = ringOn ? DisplayStyle.Flex : DisplayStyle.None;
                 }
                 if (ringOn) refs.Ring.SetFraction(active01);
+            }
+
+            // Phase 6 (A6): the auto-chain is running on this Peck hex. Spins; static under Reduced Motion.
+            bool chainOn = abilities != null && abilities.PeckChainActive && equipped is Abilities.PeckAbilitySO;
+            if (refs.Chain != null)
+            {
+                if (chainOn != _chainShown[slot])
+                {
+                    _chainShown[slot] = chainOn;
+                    refs.Chain.style.display = chainOn ? DisplayStyle.Flex : DisplayStyle.None;
+                }
+                if (chainOn) refs.Chain.Spin(Time.unscaledTime, PlayerPreferences.ReducedMotionEnabled);
             }
 
             RefreshPip(slot, equipped, refusal);

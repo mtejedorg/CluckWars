@@ -84,6 +84,8 @@ settings.performance,Performance Mode
 settings.performance.desc,Static chickens in menus. Saves battery.
 settings.reducedMotion,Reduced Motion
 settings.reducedMotion.desc,Calms camera shake and screen movement.
+settings.autoPeck,Auto-Peck
+settings.autoPeck.desc,Peck by yourself when you stand by a pile.
 lobby.rules,HOUSE RULES
 lobby.invite.label,INVITE CODE · TAP TO COPY
 lobby.join.label,ENTER JOIN CODE

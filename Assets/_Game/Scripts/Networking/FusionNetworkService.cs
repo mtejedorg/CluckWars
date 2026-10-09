@@ -176,6 +176,9 @@ namespace CluckWars.Networking
             if (_inputProvider.GetAbilityHeld(2)) buttons.Set((int)InputButton.AbilityHold3, true);
             if (_inputProvider.GetAbilityHeld(3)) buttons.Set((int)InputButton.AbilityHold4, true);
 
+            // Level-triggered preference, re-sent every tick so the state authority decides on it (A6).
+            if (CluckWars.Settings.PlayerPreferences.AutoPeckEnabled) buttons.Set((int)InputButton.AutoPeck, true);
+
             input.Set(new PlayerNetworkInput
             {
                 Movement = worldMovement,

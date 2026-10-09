@@ -6,6 +6,32 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🔧 Phase 6 chunk 4 (2026-10-09, uncommitted, in review): Peck auto-chain, Auto-Peck, joystick dead zone + throw
+
+EditMode **982/982** (971 baseline + 11 new in `PeckChainAndJoystickTests`; `Phase6Chunk2Tests` two source-guards updated for `TryActivate` now returning `bool`).
+Live smoke (solo round, console clean): one manual Peck -> repeated pecks until cargo 14/14, then the chain ends; AutoPeck pref on + standing still by a pile -> pecking
+starts with no press and chains; move input ends a chain and it does not restart. `Captures/phase6/live/autopeck_chain.png` shows the dashed ring on the Peck hex.
+Driver: `tools/ui_capture/capture_phase6_chunk4.py`.
+
+- **Peck auto-chain (`Gameplay/PeckChainRules.cs`, pure + `AbilityController.UpdatePeckChain`).** State authority only, from the networked input. A manual Peck that
+  succeeds (and no move input) sets `[Networked] NetworkBool PeckChainActive`. Each tick `PeckChainRules.Decide` returns Idle / Wait / Fire / Stop with a reason; stop
+  priority: match ended, dead, stunned (`ControlRules.CanCast`), knocked back (`ChickenController.KnockbackEventId` changed since the last chain tick; body pushes and the self-applied Feint impulse do not raise it), another move cast this tick, move input, cargo full, no pile with food in reach. Fire goes through the
+  same `TryActivate` (cooldown, PeckAmount 3, animation, SFX unchanged). Never restarts by itself (Idle when inactive). `TryActivate` now returns `bool`; `_castSlotThisTick`
+  distinguishes "another move cast". `DeactivateAll()` (match stop, death, reset, loadout swap, authority gain) also clears the chain. Bots have no input -> never chain.
+  Cargo full -> `AudioRegistrySO.CargoFull` played locally on the input authority (nothing else played it; `ChickenVFX` only draws particles).
+  A shove is not move input, but a landed knockback event does stop the chain (review fix).
+- **HUD.** `UI/HexChainRing.cs` (Painter2D, same family as `HexDurationRing`): 18 cream dashes on a hexagon at radius 92, half a lap per second, static under Reduced Motion;
+  `.cw-hex-chain` in TouchControls.uss; one per hex, shown only on the Peck slot while `PeckChainActive`. Per-peck feedback is the ordinary activation feedback.
+- **Auto-Peck.** `PlayerPreferences.AutoPeckEnabled` (key `CluckWars.AutoPeck`, default OFF), carried as `InputButton.AutoPeck = 9` (appended; 10 of 32 bits) set every
+  tick in `FusionNetworkService.OnInput`. Authority starts a peck when the bit is set, the bird has had no move input for `PeckChainRules.AutoPeckIdleSeconds` (0.18 s;
+  accumulated per tick, a 0.17 s idle does not start, 0.18 does), a pile with food is in reach, hold not full, not stunned, Peck ready, no chain running, no other move
+  this tick, not mid-aim, and no stealth move is running (Auto-Peck must not silently break an Invisibility). Casting another move resets the idle timer. Then it chains.
+  Copy added (UI toggle is chunk 6): `settings.autoPeck` "Auto-Peck", `settings.autoPeck.desc` "Peck by yourself when you stand by a pile." (`UiKeys.SettingsAutoPeck[Desc]`).
+- **Joystick (`Input/JoystickRules.cs`).** Dead zone 0.12 with a rescaled ramp (0 at the edge, 1 at full throw, direction kept) on the touch stick output; knob still follows
+  the finger. Throw = 60 dp (`Screen.dpi`, fallback 160, converted into scaled-panel px) floored at the old 108 px, recomputed at touch-down. On a Pixel 9 that is ~141 panel px
+  against the 140 px base radius. Floating origin was skipped (not small: the stick is a fixed UXML element with its own capture area).
+- **Not changed:** BalanceOracle, PeckCooldown, PeckAmount, Peck lock 0.4 s, any ability value. **Maestro wiring:** none (no prefab/scene changes).
+
 ## 🔧 Phase 6 chunk 3 (2026-10-09, uncommitted, in review): concurrent abilities, strongest-wins, stealth/Peck end on cast
 
 EditMode **959/959** (932 baseline: `Phase6Chunk3Tests` new, 27 tests incl. 2 parametrised; `AbilityActivationRulesTests` / `Phase6Chunk2Tests` / `HudFeedbackStyleTests`

@@ -98,6 +98,13 @@ namespace CluckWars.Gameplay
         /// </summary>
         [Networked] public byte LastCastEventId { get; set; }
 
+        /// <summary>
+        /// True while the Peck auto-chain runs (Phase 6 chunk 4, A6): the bird keeps pecking on its own each time
+        /// the per-class cooldown is ready. Decided on the state authority by <see cref="PeckChainRules"/>; the
+        /// HUD reads it to spin the ring on the Peck hex. Only input-driven chickens ever set it.
+        /// </summary>
+        [Networked] public NetworkBool PeckChainActive { get; private set; }
+
         public PassiveAbilitySO Passive => _passive;
         public AbilityBaseSO Slot0 => _slot0;
         public AbilityBaseSO Slot1 => _slot1;
@@ -166,6 +173,12 @@ namespace CluckWars.Gameplay
 
         // Whether this peer held state authority on the previous tick (see OnAuthorityGained).
         private bool _wasAuthority;
+
+        // Phase 6 chunk 4 (A6), state-authority local. The slot of a move that succeeded THIS tick (reset at the
+        // top of FixedUpdateNetwork), and how long the bird has gone without move input (Auto-Peck's idle timer).
+        private int   _castSlotThisTick = InvalidSlot;
+        private float _idleSeconds;
+        private byte  _lastKnockbackId;
 
         // Scratch for AbilityRunRules (no per-tick allocation).
         private readonly float[] _elapsedScratch = new float[SlotCount];
@@ -270,6 +283,7 @@ namespace CluckWars.Gameplay
 
             // Seed the authority edge so the original authority does not see a spurious "gained" on its first tick.
             _wasAuthority = HasStateAuthority;
+            if (_controller != null) _lastKnockbackId = _controller.KnockbackEventId;
             _initialized = true;
             _log?.Debug(Source, $"Spawned. Passive={(_passive != null ? _passive.name : "(none)")}, " +
                 $"Slot0={(Slot0 != null ? Slot0.name : "(none)")}, " +
@@ -295,6 +309,8 @@ namespace CluckWars.Gameplay
             if (!hasAuthority || !_initialized) return;
 
             if (_controller != null && _controller.IsDecoy) return;
+
+            _castSlotThisTick = InvalidSlot;
 
             // Auto-deactivate each running slot whose own duration timer has expired (natural expiry: the only
             // path that plays the expire sound).
@@ -391,6 +407,112 @@ namespace CluckWars.Gameplay
                     break;
                 case ChargeAction.None:
                 default:
+                    break;
+            }
+
+            UpdatePeckChain(input, canCast);
+        }
+
+        /// <summary>The slot holding Peck, or <see cref="InvalidSlot"/> (the Assassin cannot forage).</summary>
+        private int FindPeckSlot()
+        {
+            for (int i = 0; i < SlotCount; i++)
+                if (GetSlot(i) is PeckAbilitySO) return i;
+            return InvalidSlot;
+        }
+
+        /// <summary>True when some running slot other than Peck would end on the next move (Invisibility, Smoke
+        /// Roost's fade): Auto-Peck must not silently break the stealth the player just cast.</summary>
+        private bool AnyStealthRunning(int peckSlot)
+        {
+            for (int i = 0; i < SlotCount; i++)
+            {
+                if (i == peckSlot || !IsSlotActive(i)) continue;
+                var running = GetSlot(i);
+                if (running != null && running.EndsOnNextMove) return true;
+            }
+            return false;
+        }
+
+        private void StopPeckChain()
+        {
+            if (PeckChainActive) PeckChainActive = false;
+        }
+
+        /// <summary>
+        /// Phase 6 chunk 4 (A6): the Peck auto-chain and Auto-Peck, decided here on the state authority from the
+        /// networked input. A manual Peck that succeeded this tick starts the chain; Auto-Peck starts one after
+        /// <see cref="PeckChainRules.AutoPeckIdleSeconds"/> of standing still by a pile. Repeats go through
+        /// <see cref="TryActivate"/> like any press, so cooldown, food credit and per-peck feedback are unchanged.
+        /// The pure decisions live in <see cref="PeckChainRules"/>.
+        /// </summary>
+        private void UpdatePeckChain(in PlayerNetworkInput input, bool canCast)
+        {
+            int peckSlot = FindPeckSlot();
+            bool moving = PeckChainRules.IsMoving(input.Movement);
+            bool otherCast = _castSlotThisTick != InvalidSlot && _castSlotThisTick != peckSlot;
+
+            _idleSeconds = PeckChainRules.AdvanceIdle(_idleSeconds, moving, Runner.DeltaTime);
+
+            // A knockback impulse (the networked event, not mere body-to-body pushes) ends the chain.
+            byte knockbackId = _controller != null ? _controller.KnockbackEventId : _lastKnockbackId;
+            bool knocked = knockbackId != _lastKnockbackId;
+            _lastKnockbackId = knockbackId;
+            // Any other move counts as activity too, so Auto-Peck waits a beat after it instead of pecking at once.
+            if (otherCast) _idleSeconds = 0f;
+
+            if (peckSlot == InvalidSlot)
+            {
+                StopPeckChain();
+                return;
+            }
+
+            var cargo = _controller != null ? _controller.Cargo : null;
+            bool cargoFull = cargo != null && cargo.Cargo >= cargo.Capacity;
+            // IsUsable also demands room in the hold; the rules judge cargoFull first, so a full bird reads
+            // CargoFull (with its sound), not NoPile.
+            bool pileInReach = GetSlot(peckSlot).IsUsable(_controller);
+            bool peckReady = IsReady(peckSlot) && !IsSlotActive(peckSlot);
+
+            if (!PeckChainActive)
+            {
+                if (_castSlotThisTick == peckSlot)
+                {
+                    if (!moving) PeckChainActive = true; // a manual peck starts the chain
+                    return;
+                }
+
+                if (PeckChainRules.ShouldAutoStart(input.Buttons.IsSet((int)InputButton.AutoPeck), _idleSeconds,
+                        chainActive: false, pileInReach, cargoFull, canCast, peckReady, otherCast,
+                        aiming: IsAimGestureLive, wouldBreakStealth: AnyStealthRunning(peckSlot)) &&
+                    TryActivate(peckSlot))
+                {
+                    PeckChainActive = true;
+                    _log?.Debug(Source, "Auto-Peck started a peck.");
+                }
+                return;
+            }
+
+            var state = new PeckChainInputs
+            {
+                Active = true, MatchRunning = true, Alive = true, Moving = moving, CargoFull = cargoFull,
+                PileInReach = pileInReach, CanCast = canCast, Knocked = knocked, OtherAbilityCast = otherCast, PeckReady = peckReady,
+            };
+            switch (PeckChainRules.Decide(state, out var stop))
+            {
+                case PeckChainAction.Stop:
+                    PeckChainActive = false;
+                    // Nothing else plays CargoFull in gameplay (ChickenVFX only draws particles), so no double-play.
+                    if (stop == PeckChainStop.CargoFull)
+                        PlayLocalSfx(_audioReg != null ? _audioReg.CargoFull : null, 1f);
+                    _log?.Debug(Source, $"Peck chain ended: {stop}.");
+                    break;
+                case PeckChainAction.Fire:
+                    if (!TryActivate(peckSlot))
+                    {
+                        PeckChainActive = false;
+                        _log?.Debug(Source, "Peck chain ended: the repeat was refused.");
+                    }
                     break;
             }
         }
@@ -719,7 +841,8 @@ namespace CluckWars.Gameplay
             _pendingHoldSeconds = 0f;
         }
 
-        private void TryActivate(int slot)
+        /// <summary>Runs the full activation path for <paramref name="slot"/>. True only if the move actually cast.</summary>
+        private bool TryActivate(int slot)
         {
             // Re-arm window after a fizzle: no press may start a cast, whichever path it arrived by.
             if (IsRearming(slot))
@@ -727,7 +850,7 @@ namespace CluckWars.Gameplay
                 _log?.Debug(Source, $"TryActivate slot {slot}: refused (re-arming after a fizzle).");
                 _deniedPressPending = true;
                 _deniedPressSlot = slot;
-                return;
+                return false;
             }
 
             var reason = EvaluateRefusalInternal(slot, out var ability);
@@ -743,11 +866,11 @@ namespace CluckWars.Gameplay
                     _fizzleSlot = slot;
                     _rearmRemaining[slot] = AbilityFizzleRules.Begin();
                     PlayLocalSfx(_audioReg != null ? _audioReg.AbilityFizzle : null, FeedbackTuning.FizzleSfxVolume);
-                    return;
+                    return false;
                 }
                 _deniedPressPending = true;
                 _deniedPressSlot = slot;
-                return;
+                return false;
             }
 
             // Refresh context fields that abilities need for NetworkObject spawning. This has
@@ -765,7 +888,7 @@ namespace CluckWars.Gameplay
                 // would just be noise pointing at the same bug.
                 _deniedPressPending = true;
                 _deniedPressSlot = slot;
-                return;
+                return false;
             }
 
             // "Using a move breaks it" (Phase 6 chunk 3). Only a SUCCESSFUL cast gets here: the fizzle return, every
@@ -848,6 +971,8 @@ namespace CluckWars.Gameplay
             LastCastEventId++; // wraps at 255 by design (byte overflow) — a one-shot signal, not a counter
             _log?.Info(Source, $"Activated slot {slot} ({ability.DisplayName}) for {ability.Duration:0.00}s, " +
                 $"CD {ResolveCooldownFor(ability):0.00}s, hits={hitCount}.");
+            _castSlotThisTick = slot;
+            return true;
         }
 
         /// <summary>
@@ -903,6 +1028,7 @@ namespace CluckWars.Gameplay
         /// <summary>Ends every running slot (match stop, removal, death, reset, loadout swap).</summary>
         private void DeactivateAll()
         {
+            StopPeckChain();
             if (!AnyAbilityActive) return;
             for (int i = 0; i < SlotCount; i++) Deactivate(i);
         }

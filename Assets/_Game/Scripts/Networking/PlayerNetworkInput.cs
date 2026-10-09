@@ -46,5 +46,10 @@ namespace CluckWars.Networking
         // 32 bits are in use.
         Ability4     = 7,
         AbilityHold4 = 8,
+
+        /// <summary>Phase 6 chunk 4 (A6): the player's Auto-Peck preference, level-triggered, set every tick by
+        /// <c>FusionNetworkService.OnInput</c>. Carried in the input so the state authority decides on it (fair in
+        /// Shared and Server Mode alike). Appended; 10 of 32 bits are in use.</summary>
+        AutoPeck     = 9,
     }
 }

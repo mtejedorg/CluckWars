@@ -117,6 +117,8 @@ namespace CluckWars.Localization
         public const string SettingsPerformanceDesc = "settings.performance.desc";
         public const string SettingsReducedMotion = "settings.reducedMotion";
         public const string SettingsReducedMotionDesc = "settings.reducedMotion.desc";
+        public const string SettingsAutoPeck = "settings.autoPeck";
+        public const string SettingsAutoPeckDesc = "settings.autoPeck.desc";
 
         // ---- Lobby ----
         public const string LobbyRules = "lobby.rules";

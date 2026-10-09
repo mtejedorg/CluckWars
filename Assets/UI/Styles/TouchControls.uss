@@ -308,6 +308,14 @@
     width: 170px; height: 170px;
 }
 
+/* Peck auto-chain: HexChainRing paints a spinning dashed hexagon at radius 92 (Phase 6 chunk 4). The element
+   is 190 px (offset -20) so the stroke clears the duration ring and stays inside its own box. */
+.cw-hex-chain {
+    position: absolute;
+    left: -20px; top: -20px;
+    width: 190px; height: 190px;
+}
+
 /* ============================================================================
    GLYPH FONT
    LilitaOne carries only 225 codepoints and TMP Settings' fallback list is

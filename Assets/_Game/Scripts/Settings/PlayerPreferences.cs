@@ -243,6 +243,39 @@ namespace CluckWars.Settings
         /// <summary>The value <see cref="PerformanceModeEnabled"/> takes until the player chooses.</summary>
         public static bool DefaultPerformanceMode => Application.isMobilePlatform;
 
+        /// <summary><c>PlayerPrefs</c> key for <see cref="AutoPeckEnabled"/>. Namespaced like every key here.</summary>
+        public const string AutoPeckKey = "CluckWars.AutoPeck";
+
+        private static bool _autoPeck;
+        private static bool _autoPeckLoaded;
+
+        /// <summary>
+        /// Peck by yourself when you stand still by a pile (Phase 6, A6)? <b>Defaults to false</b>: it adds
+        /// behaviour a player did not ask for. Read every input tick by <c>FusionNetworkService.OnInput</c> and
+        /// carried to the state authority as <c>InputButton.AutoPeck</c>. The settings-page toggle is chunk 6.
+        /// </summary>
+        public static bool AutoPeckEnabled
+        {
+            get
+            {
+                if (!_autoPeckLoaded)
+                {
+                    _autoPeck = PlayerPrefs.GetInt(AutoPeckKey, 0) != 0;
+                    _autoPeckLoaded = true;
+                }
+                return _autoPeck;
+            }
+            set
+            {
+                if (_autoPeckLoaded && _autoPeck == value) return;
+
+                _autoPeck = value;
+                _autoPeckLoaded = true;
+                PlayerPrefs.SetInt(AutoPeckKey, value ? 1 : 0);
+                PlayerPrefs.Save();
+            }
+        }
+
         /// <summary><c>PlayerPrefs</c> keys for the last committed setup (see <see cref="LastSetup"/>).
         /// Namespaced like every key here; public so a test asserts the real ones.</summary>
         public const string LastSetupClassKey     = "CluckWars.LastSetup.Class";

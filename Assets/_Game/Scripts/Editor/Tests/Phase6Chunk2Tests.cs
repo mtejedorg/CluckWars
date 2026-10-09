@@ -98,7 +98,7 @@ namespace CluckWars.Tests
             Assert.Greater(cooldown, fizzle, "the fizzle branch returns before any cooldown is started");
             Assert.Greater(active, fizzle, "...and before the slot becomes active (chunk 3's stealth-ending sits below)");
             string branch = src.Substring(fizzle, cooldown - fizzle);
-            StringAssert.Contains("return;", branch.Substring(0, branch.IndexOf("_deniedPressPending", StringComparison.Ordinal)));
+            StringAssert.Contains("return false;", branch.Substring(0, branch.IndexOf("_deniedPressPending", StringComparison.Ordinal)));
         }
 
         // ---- Re-arm ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ namespace CluckWars.Tests
         public void Rearm_IsEnforcedInTryActivate_ForTheTapPath_SourceGuard()
         {
             string src = Read("Assets/_Game/Scripts/Gameplay/AbilityController.cs");
-            int start = src.IndexOf("private void TryActivate(int slot)", StringComparison.Ordinal);
+            int start = src.IndexOf("private bool TryActivate(int slot)", StringComparison.Ordinal);
             Assert.Greater(start, 0);
             int rearm = src.IndexOf("IsRearming(slot)", start, StringComparison.Ordinal);
             int eval = src.IndexOf("EvaluateRefusalInternal(slot, out var ability)", start, StringComparison.Ordinal);
