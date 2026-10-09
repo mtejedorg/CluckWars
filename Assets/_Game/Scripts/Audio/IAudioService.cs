@@ -38,5 +38,11 @@ namespace CluckWars.Audio
         bool IsMusicPlaying(AudioClip clip);
 
         void SetMasterVolume(float volume01);
+
+        /// <summary>Music level 0..1 (the Settings slider), multiplied with the master volume and any fade.</summary>
+        void SetMusicVolume(float volume01);
+
+        /// <summary>Sound-effects level 0..1 (the Settings slider), multiplied with the master volume and each cue's own volume.</summary>
+        void SetSfxVolume(float volume01);
     }
 }

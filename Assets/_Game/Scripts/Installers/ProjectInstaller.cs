@@ -3,6 +3,7 @@ using CluckWars.Gameplay;
 using CluckWars.Input;
 using CluckWars.Logging;
 using CluckWars.Services;
+using CluckWars.Settings;
 using CluckWars.UI;
 using UnityEngine;
 using Zenject;
@@ -78,6 +79,17 @@ namespace CluckWars.Installers
                     new KeyboardInputProvider(),
                     new TouchInputProvider(),
                     new GamepadInputProvider()))
+                .AsSingle();
+
+            // Haptics (Phase 6, A9): the real vibrator on an Android player, nothing anywhere else (desktop, the Editor,
+            // tests). The policy (Buzz When Hit, the 200 ms gap) is HapticsService; the device is the platform part.
+            Container.Bind<IHapticsService>()
+                .FromMethod(ctx => Application.platform == RuntimePlatform.Android
+                    ? (IHapticsService)new HapticsService(
+                        new AndroidHapticDevice(ctx.Container.Resolve<ILogService>()),
+                        () => PlayerPreferences.BuzzWhenHitEnabled,
+                        () => Time.unscaledTime)
+                    : new NullHapticsService())
                 .AsSingle();
 
             // Cross-scene mutable state for menu → match handoff.

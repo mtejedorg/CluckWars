@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CluckWars.Abilities;
+using CluckWars.Audio;
 using CluckWars.Bootstrap;
 using CluckWars.Gameplay;
 using CluckWars.Input;
@@ -61,6 +62,7 @@ namespace CluckWars.UI
         private MatchConfigSO            _matchConfig;
         private MenuAudio                _audio = MenuAudio.Silent();
         private IInputProvider           _input;
+        private IAudioService            _audioService;   // the volume sliders; null = the sliders only persist
 
         // ---- Runtime state ----------------------------------------------------
         private VisualElement _root;
@@ -215,7 +217,8 @@ namespace CluckWars.UI
             [InjectOptional] AbilityRegistrySO abilityRegistry,
             [InjectOptional] MatchConfigSO matchConfig,
             [InjectOptional] MenuAudio audio,
-            [InjectOptional] IInputProvider input)
+            [InjectOptional] IInputProvider input,
+            [InjectOptional] IAudioService audioService)
         {
             _selection       = selection;
             _log             = log;
@@ -226,6 +229,7 @@ namespace CluckWars.UI
             _matchConfig     = matchConfig;
             _audio           = audio ?? MenuAudio.Silent();
             _input           = input;
+            _audioService    = audioService;
         }
 
         private void Awake()
@@ -648,7 +652,7 @@ namespace CluckWars.UI
         //  SETTINGS SHEET (main menu gear -> modal)
         // ======================================================================
         /// <summary>
-        /// Wires the gear, the modal sheet and its four preference rows. The sheet is static
+        /// Wires the gear, the modal sheet and its preference rows and volume sliders. The sheet is static
         /// markup in MainMenu.uxml (#SettingsSheet); this only binds it.
         /// </summary>
         private void BuildSettingsSheet()
@@ -680,11 +684,31 @@ namespace CluckWars.UI
             BindSettingRow("PerformanceModeRow", "PerformanceModeToggle",
                 () => PlayerPreferences.PerformanceModeEnabled,
                 v => { PlayerPreferences.PerformanceModeEnabled = v; RefreshStage(); }, "Performance mode");
+            // Phase 6 chunk 6: the input and feedback options, then the two volume sliders.
+            BindSettingRow("QuickMovesRow", "QuickMovesToggle",
+                () => PlayerPreferences.QuickMovesEnabled,
+                v => PlayerPreferences.QuickMovesEnabled = v, "Quick moves");
+            BindSettingRow("AutoPeckRow", "AutoPeckToggle",
+                () => PlayerPreferences.AutoPeckEnabled,
+                v => PlayerPreferences.AutoPeckEnabled = v, "Auto-peck");
+            BindSettingRow("BuzzWhenHitRow", "BuzzWhenHitToggle",
+                () => PlayerPreferences.BuzzWhenHitEnabled,
+                v => PlayerPreferences.BuzzWhenHitEnabled = v, "Buzz when hit");
+            BindVolumeSlider("MusicVolumeSlider", () => PlayerPreferences.MusicVolume,
+                v => { PlayerPreferences.MusicVolume = v; _audioService?.SetMusicVolume(v); });
+            BindVolumeSlider("SfxVolumeSlider", () => PlayerPreferences.SfxVolume,
+                v => { PlayerPreferences.SfxVolume = v; _audioService?.SetSfxVolume(v); });
+
             // Dev Mode refreshes #DevRow the moment it changes — the Ability Lab button sits
             // right behind the sheet, so waiting for the next ShowMainMenu would look broken.
             BindSettingRow("DeveloperModeRow", "DeveloperModeToggle",
                 () => PlayerPreferences.DeveloperModeEnabled,
                 v => { PlayerPreferences.DeveloperModeEnabled = v; RefreshDevRow(); }, "Developer mode");
+
+            // Buzz When Hit only means something on a phone: desktop and the Editor have no vibrator, so the row
+            // is hidden there rather than offering a switch that can never do anything.
+            if (!Application.isMobilePlatform)
+                Bind<VisualElement>(_settingsSheet, "BuzzWhenHitRow", r => r.style.display = DisplayStyle.None);
 
             // Release builds have no Dev Mode at all (re-audit item 17): the row goes, and the
             // Performance row becomes the last one (no divider under it).
@@ -752,11 +776,36 @@ namespace CluckWars.UI
         }
 
         private readonly List<(Toggle Toggle, Func<bool> Get)> _settingToggles = new();
+        private readonly List<(Slider Slider, Func<float> Get)> _settingSliders = new();
+
+        /// <summary>
+        /// Binds one volume slider (0..1): seeded silently from the stored level, applied live while dragging, flushed
+        /// to disk when the drag ends. A tap plays on release so the new level is heard.
+        /// </summary>
+        private void BindVolumeSlider(string sliderName, Func<float> get, Action<float> set)
+        {
+            var slider = _settingsSheet.Q<Slider>(sliderName);
+            if (slider == null)
+            {
+                _log?.Error(Source, $"Settings sheet is missing #{sliderName}; that volume cannot be changed from the menu.");
+                return;
+            }
+
+            slider.SetValueWithoutNotify(get());
+            slider.RegisterValueChangedCallback(evt => set(evt.newValue));
+            slider.RegisterCallback<PointerUpEvent>(_ =>
+            {
+                PlayerPreferences.FlushVolumes();
+                _audio.Tap();
+            }, TrickleDown.TrickleDown);
+            _settingSliders.Add((slider, get));
+        }
 
         private void OpenSettings()
         {
             if (_settingsSheet == null) return;
             foreach (var (toggle, get) in _settingToggles) toggle.SetValueWithoutNotify(get());
+            foreach (var (slider, get) in _settingSliders) slider.SetValueWithoutNotify(get());
             _settingsSheet.style.display = DisplayStyle.Flex;
         }
 
@@ -764,6 +813,7 @@ namespace CluckWars.UI
         {
             if (_settingsSheet == null || _settingsSheet.style.display == DisplayStyle.None) return;
             _settingsSheet.style.display = DisplayStyle.None;
+            PlayerPreferences.FlushVolumes();
             RefreshDevRow();
         }
 

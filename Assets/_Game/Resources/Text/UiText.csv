@@ -88,6 +88,10 @@ settings.autoPeck,Auto-Peck
 settings.autoPeck.desc,Peck by yourself when you stand by a pile.
 settings.quickMoves,Quick Moves
 settings.quickMoves.desc,Moves fire the moment you tap.
+settings.buzzWhenHit,Buzz When Hit
+settings.buzzWhenHit.desc,Your phone buzzes when a move hits you.
+settings.musicVolume,Music
+settings.sfxVolume,Sound Effects
 lobby.rules,HOUSE RULES
 lobby.invite.label,INVITE CODE · TAP TO COPY
 lobby.join.label,ENTER JOIN CODE
@@ -158,6 +162,9 @@ hud.event.goldenPile,GOLDEN PILE!
 hud.event.underdogSurge,UNDERDOG SURGE!
 hud.event.leaderBounty,BOUNTY ON THE LEADER!
 hud.event.restock,RESTOCK!
+hud.hint.hold.touch,Hold to aim. Let go to use it. Drag to the edge to cancel.
+hud.hint.hold.pad,Hold to aim · Release to use · B to cancel.
+hud.hint.hold.keys,Hold to aim · Release to use · Esc to cancel.
 countdown.waitingFor,Waiting for {name}…
 countdown.waitingSomeone,Waiting for a slow bird…
 session.hostLeft,The host flew the coop.

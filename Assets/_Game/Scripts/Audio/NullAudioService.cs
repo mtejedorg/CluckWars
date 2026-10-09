@@ -13,5 +13,7 @@ namespace CluckWars.Audio
         public void StopMusic() { }
         public bool IsMusicPlaying(AudioClip clip) => false;
         public void SetMasterVolume(float volume01) { }
+        public void SetMusicVolume(float volume01) { }
+        public void SetSfxVolume(float volume01) { }
     }
 }

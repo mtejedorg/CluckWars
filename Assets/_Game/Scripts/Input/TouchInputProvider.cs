@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace CluckWars.Input
 {
@@ -25,12 +26,18 @@ namespace CluckWars.Input
                 {
                     _polledFrame = frame;
                     var hud = TouchControlsController.Instance;
+                    bool active = false;
                     if (hud != null)
                     {
-                        bool active = hud.Movement.sqrMagnitude > 0f;
+                        active = hud.Movement.sqrMagnitude > 0f;
                         for (int slot = 0; slot < 4 && !active; slot++) active = hud.IsAbilityHeld(slot);
-                        if (active) _lastActiveTime = Time.unscaledTime;
                     }
+                    // Any finger on the screen counts, not just one on a control: on the desktop / pad layout the
+                    // joystick is hidden and the hexes take no pointer, so this is how a touchscreen laptop gets the
+                    // thumb layout back.
+                    var screen = Touchscreen.current;
+                    if (!active && screen != null) active = screen.primaryTouch.press.isPressed;
+                    if (active) _lastActiveTime = Time.unscaledTime;
                 }
                 return _lastActiveTime;
             }

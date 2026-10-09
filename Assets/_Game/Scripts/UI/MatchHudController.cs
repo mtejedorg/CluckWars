@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using CluckWars.Gameplay;
+using CluckWars.Input;
 using CluckWars.Localization;
 using CluckWars.Logging;
 using UnityEngine;
@@ -52,6 +53,9 @@ namespace CluckWars.UI
         private readonly LbRow[] _lbRows = new LbRow[4];
         private Label            _timer;
         private Label            _winTargetBadge;
+        private VisualElement    _lbPanel;
+        private float            _tapOpenUntil;      // unscaled time until which a tap keeps the full board open (phone)
+        private readonly bool[]  _rowVisible = new bool[4];
 
         private PlayerBase[] _bases = System.Array.Empty<PlayerBase>();
         private GameManager  _gameManager;
@@ -107,6 +111,14 @@ namespace CluckWars.UI
                     Score   = _root.Q<Label>($"LbScore{i}"),
                 };
             }
+            _lbPanel = _root.Q<VisualElement>("LeaderboardPanel");
+            // A tap on the board opens all four rows on the phone layout (CompactBoardRules); the panel only takes
+            // taps while compact (SetBoardTappable), so on desktop it stays click-through like the rest of the bar.
+            _lbPanel?.RegisterCallback<PointerDownEvent>(_ =>
+            {
+                _tapOpenUntil = Time.unscaledTime + CompactBoardRules.TapShowAllSeconds;
+                _nextRefresh = 0f;
+            });
             _timer = _root.Q<Label>("MatchTimer");
             _winTargetBadge = _root.Q<Label>("WinTargetBadge");
             // The @key placeholders (ordinals, the timer's --:--) come from the wording dictionary.
@@ -246,6 +258,18 @@ namespace CluckWars.UI
             sorted.Sort((a, b) => b.total.CompareTo(a.total));
 
             int localCorner = LocalCorner();
+
+            // Phone layout: leader + your row, all four on tap and in the last 10 s (CompactBoardRules).
+            var touchHud = TouchControlsController.Instance;
+            bool compact = touchHud != null && touchHud.Mode == HudDeviceMode.Touch;
+            SetBoardTappable(compact);
+            bool matchActive = _gameManager != null && _gameManager.State == MatchState.Active;
+            bool showAll = CompactBoardRules.ShowAll(compact, Time.unscaledTime < _tapOpenUntil, matchActive,
+                matchActive ? _gameManager.TimeRemaining : float.MaxValue);
+            int youRank = -1;
+            for (int i = 0; i < sorted.Count; i++) if (sorted[i].corner == localCorner) { youRank = i; break; }
+            CompactBoardRules.SelectRows(sorted.Count, youRank, showAll, _rowVisible);
+
             // Bars fill toward the MatchConfig goal; without one (already logged at bind) they are
             // relative to the leader instead of a made-up target.
             float winTarget = _matchConfig != null
@@ -257,7 +281,7 @@ namespace CluckWars.UI
                 var rowRefs = _lbRows[rank];
                 if (rowRefs.Root == null) continue;
 
-                if (rank < sorted.Count)
+                if (rank < sorted.Count && _rowVisible[rank])
                 {
                     rowRefs.Root.style.display = DisplayStyle.Flex;
                     var (corner, total) = sorted[rank];
@@ -293,6 +317,15 @@ namespace CluckWars.UI
                     rowRefs.Root.style.display = DisplayStyle.None;
                 }
             }
+        }
+
+        private bool _boardTappable;
+
+        private void SetBoardTappable(bool tappable)
+        {
+            if (_lbPanel == null || tappable == _boardTappable) return;
+            _boardTappable = tappable;
+            _lbPanel.pickingMode = tappable ? PickingMode.Position : PickingMode.Ignore;
         }
 
         // Per-corner name cache: the same identity as the post-match screen and the nameplates

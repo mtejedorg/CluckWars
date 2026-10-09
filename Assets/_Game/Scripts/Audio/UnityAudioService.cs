@@ -31,6 +31,9 @@ namespace CluckWars.Audio
         private int _nextPitchedVoice;
 
         private float _masterVolume = 1f;
+        // The Settings sliders (Part B). Read from the saved preferences at construction so the first cue already obeys them.
+        private float _musicVolume = Settings.PlayerPreferences.MusicVolume;
+        private float _sfxVolume   = Settings.PlayerPreferences.SfxVolume;
         private float _musicBaseVolume = 1f;
 
         // Music fade: _fade is a 0..1 multiplier moving toward _fadeTarget at _fadeRate per second.
@@ -72,7 +75,7 @@ namespace CluckWars.Audio
         public void PlaySFX(AudioClip clip, float volume = 1f, float pitch = 1f, float delaySeconds = 0f)
         {
             if (clip == null || _sfxSource == null) return;
-            float v = Mathf.Clamp01(volume) * _masterVolume;
+            float v = Mathf.Clamp01(volume) * _masterVolume * _sfxVolume;
             if (Mathf.Approximately(pitch, 1f) && delaySeconds <= 0f)
             {
                 _sfxSource.PlayOneShot(clip, v);
@@ -186,9 +189,17 @@ namespace CluckWars.Audio
             if (_musicSource != null && _musicSource.isPlaying) ApplyMusicVolume();
         }
 
+        public void SetMusicVolume(float volume01)
+        {
+            _musicVolume = Mathf.Clamp01(volume01);
+            if (_musicSource != null && _musicSource.isPlaying) ApplyMusicVolume();
+        }
+
+        public void SetSfxVolume(float volume01) => _sfxVolume = Mathf.Clamp01(volume01);
+
         private void ApplyMusicVolume()
         {
-            float v = _musicBaseVolume * _masterVolume * _fade;
+            float v = _musicBaseVolume * _masterVolume * _musicVolume * _fade;
             _musicSource.volume = _crossfading ? v * (1f - _xfade) : v;
             if (_crossfading) _incomingSource.volume = v * _xfade;
         }

@@ -143,7 +143,7 @@ namespace CluckWars.Input
             {
                 if (requireAim && _providers[i].GetAim(groundY).Kind == AimInputKind.None) continue;
                 float t = _providers[i].LastActiveTime;
-                if (best < 0 || t > bestTime)
+                if (best < 0 || t > bestTime || (t == bestTime && TiePriority(_providers[i].Device) > TiePriority(_providers[best].Device)))
                 {
                     best = i;
                     bestTime = t;
@@ -151,6 +151,18 @@ namespace CluckWars.Input
             }
             return best;
         }
+
+        /// <summary>
+        /// Who wins when two devices were last used in the same frame: a finger beats a pad beats the keyboard / mouse.
+        /// A touchscreen laptop raises mouse events alongside a touch, and the touch layout must win that tie.
+        /// </summary>
+        private static int TiePriority(InputDeviceKind kind) => kind switch
+        {
+            InputDeviceKind.Touch         => 3,
+            InputDeviceKind.Gamepad       => 2,
+            InputDeviceKind.KeyboardMouse => 1,
+            _                             => 0,
+        };
 
         public bool GetBackPressed()
         {

@@ -208,6 +208,8 @@ namespace CluckWars.Tests
             public void StopMusic() => Playing = null;
             public bool IsMusicPlaying(AudioClip clip) => clip != null && Playing == clip;
             public void SetMasterVolume(float volume01) { }
+            public void SetMusicVolume(float volume01) { }
+            public void SetSfxVolume(float volume01) { }
         }
 
         private sealed class RecordingLog : ILogService

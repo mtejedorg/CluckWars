@@ -22,6 +22,8 @@ namespace CluckWars.Settings
     ///   <item><see cref="ReducedMotionEnabled"/>: Reduced Motion (also mirrored onto the menu
     ///   root as <c>.cw-reduced-motion</c>, which switches off the menus' own transitions)</item>
     ///   <item><see cref="PerformanceModeEnabled"/>: Performance Mode</item>
+    ///   <item><see cref="QuickMovesEnabled"/> / <see cref="AutoPeckEnabled"/> / <see cref="BuzzWhenHitEnabled"/>
+    ///   and the <see cref="MusicVolume"/> / <see cref="SfxVolume"/> sliders (Phase 6 chunk 6)</item>
     ///   <item><see cref="DeveloperModeEnabled"/>: Dev Mode (shows/hides the main menu's
     ///   Ability Lab row as soon as it changes)</item>
     /// </list>
@@ -252,7 +254,7 @@ namespace CluckWars.Settings
         /// <summary>
         /// Peck by yourself when you stand still by a pile (Phase 6, A6)? <b>Defaults to false</b>: it adds
         /// behaviour a player did not ask for. Read every input tick by <c>FusionNetworkService.OnInput</c> and
-        /// carried to the state authority as <c>InputButton.AutoPeck</c>. The settings-page toggle is chunk 6.
+        /// carried to the state authority as <c>InputButton.AutoPeck</c>. Its toggle is on the Settings sheet.
         /// </summary>
         public static bool AutoPeckEnabled
         {
@@ -284,8 +286,7 @@ namespace CluckWars.Settings
 
         /// <summary>
         /// "Quick Moves" (Phase 6, A8): a tap fires the move the moment it lands, with no hold, aim or preview.
-        /// <b>Defaults to false.</b> Carried to the state authority as <c>InputButton.QuickMoves</c>; the settings-page
-        /// toggle is chunk 6.
+        /// <b>Defaults to false.</b> Carried to the state authority as <c>InputButton.QuickMoves</c>.
         /// </summary>
         public static bool QuickMovesEnabled
         {
@@ -306,6 +307,133 @@ namespace CluckWars.Settings
                 _quickMovesLoaded = true;
                 PlayerPrefs.SetInt(QuickMovesKey, value ? 1 : 0);
                 PlayerPrefs.Save();
+            }
+        }
+
+        /// <summary><c>PlayerPrefs</c> key for <see cref="BuzzWhenHitEnabled"/>. Namespaced like every key here.</summary>
+        public const string BuzzWhenHitKey = "CluckWars.BuzzWhenHit";
+
+        private static bool _buzzWhenHit;
+        private static bool _buzzWhenHitLoaded;
+
+        /// <summary>
+        /// "Buzz When Hit" (Phase 6, A9): the phone vibrates when a move hits YOUR bird, and gives a light tick when the
+        /// touch edge-band cancel arms. <b>Defaults to true</b>, independent of Reduced Motion (a buzz is not screen
+        /// movement). Read by the haptics gate on every buzz; a no-op wherever the device has no vibrator.
+        /// </summary>
+        public static bool BuzzWhenHitEnabled
+        {
+            get
+            {
+                if (!_buzzWhenHitLoaded)
+                {
+                    _buzzWhenHit = PlayerPrefs.GetInt(BuzzWhenHitKey, 1) != 0;
+                    _buzzWhenHitLoaded = true;
+                }
+                return _buzzWhenHit;
+            }
+            set
+            {
+                if (_buzzWhenHitLoaded && _buzzWhenHit == value) return;
+
+                _buzzWhenHit = value;
+                _buzzWhenHitLoaded = true;
+                PlayerPrefs.SetInt(BuzzWhenHitKey, value ? 1 : 0);
+                PlayerPrefs.Save();
+            }
+        }
+
+        /// <summary><c>PlayerPrefs</c> key for <see cref="HoldHintCount"/>.</summary>
+        public const string HoldHintCountKey = "CluckWars.HoldHintCount";
+
+        private static int _holdHintCount;
+        private static bool _holdHintCountLoaded;
+
+        /// <summary>
+        /// How many real holds the one-line "Hold to aim" hint has been shown for (Phase 6, A1). The hint stops for good
+        /// once this reaches <c>HoldHintRules.MaxHolds</c>. Written through on every change so a force-quit mid-match
+        /// does not replay it.
+        /// </summary>
+        public static int HoldHintCount
+        {
+            get
+            {
+                if (!_holdHintCountLoaded)
+                {
+                    _holdHintCount = Mathf.Max(0, PlayerPrefs.GetInt(HoldHintCountKey, 0));
+                    _holdHintCountLoaded = true;
+                }
+                return _holdHintCount;
+            }
+            set
+            {
+                value = Mathf.Max(0, value);
+                if (_holdHintCountLoaded && _holdHintCount == value) return;
+
+                _holdHintCount = value;
+                _holdHintCountLoaded = true;
+                PlayerPrefs.SetInt(HoldHintCountKey, value);
+                PlayerPrefs.Save();
+            }
+        }
+
+        /// <summary><c>PlayerPrefs</c> keys for the two volume sliders (Part B).</summary>
+        public const string MusicVolumeKey = "CluckWars.MusicVolume";
+        public const string SfxVolumeKey   = "CluckWars.SfxVolume";
+
+        private static float _musicVolume = 1f, _sfxVolume = 1f;
+        private static bool _musicVolumeLoaded, _sfxVolumeLoaded;
+
+        /// <summary>
+        /// Flushes the volume sliders to disk. The slider setters below only stage the value (a drag fires one change
+        /// per frame, and a disk write per frame is wasteful); the Settings sheet calls this when a drag ends and when
+        /// the sheet closes.
+        /// </summary>
+        public static void FlushVolumes() => PlayerPrefs.Save();
+
+        /// <summary>Music level 0..1 (default 1), applied on top of the master volume by the audio service.</summary>
+        public static float MusicVolume
+        {
+            get
+            {
+                if (!_musicVolumeLoaded)
+                {
+                    _musicVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(MusicVolumeKey, 1f));
+                    _musicVolumeLoaded = true;
+                }
+                return _musicVolume;
+            }
+            set
+            {
+                value = Mathf.Clamp01(value);
+                if (_musicVolumeLoaded && Mathf.Approximately(_musicVolume, value)) return;
+
+                _musicVolume = value;
+                _musicVolumeLoaded = true;
+                PlayerPrefs.SetFloat(MusicVolumeKey, value);
+            }
+        }
+
+        /// <summary>Sound-effects level 0..1 (default 1), applied on top of the master volume by the audio service.</summary>
+        public static float SfxVolume
+        {
+            get
+            {
+                if (!_sfxVolumeLoaded)
+                {
+                    _sfxVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(SfxVolumeKey, 1f));
+                    _sfxVolumeLoaded = true;
+                }
+                return _sfxVolume;
+            }
+            set
+            {
+                value = Mathf.Clamp01(value);
+                if (_sfxVolumeLoaded && Mathf.Approximately(_sfxVolume, value)) return;
+
+                _sfxVolume = value;
+                _sfxVolumeLoaded = true;
+                PlayerPrefs.SetFloat(SfxVolumeKey, value);
             }
         }
 
@@ -394,6 +522,10 @@ namespace CluckWars.Settings
             _performanceModeLoaded    = false;
             _autoPeckLoaded           = false;
             _quickMovesLoaded         = false;
+            _buzzWhenHitLoaded        = false;
+            _holdHintCountLoaded      = false;
+            _musicVolumeLoaded        = false;
+            _sfxVolumeLoaded          = false;
             _lastSetupLoaded          = false;
         }
     }

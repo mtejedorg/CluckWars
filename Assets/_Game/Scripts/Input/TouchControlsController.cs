@@ -1,6 +1,8 @@
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using CluckWars.Logging;
+using CluckWars.Services;
 using CluckWars.Settings;
 using CluckWars.UI;
 using CluckWars.Visuals;
@@ -75,6 +77,12 @@ namespace CluckWars.Input
     /// </list>
     /// All of it is read off already-<c>[Networked]</c> state on the local chicken.
     /// No RPCs, no new networked properties, nothing written back to gameplay.
+    ///
+    /// <b>Phase 6 chunk 6 (A10): the layout follows the last-used device.</b> <see cref="Mode"/> is
+    /// <see cref="HudLayoutRules.FromDevice"/> of <c>IInputProvider.Device</c>: keyboard / mouse and gamepad hide the
+    /// joystick and turn the hexes into a smaller, click-through information strip badged with the keys; any touch
+    /// brings the thumb layout back. Device reads stay in the input providers; this class only asks which one is in
+    /// hand. The class also owns the first-five-holds hint and the cancel-arm haptic tick.
     /// </remarks>
     [RequireComponent(typeof(UIDocument))]
     public sealed class TouchControlsController : MonoBehaviour
@@ -128,6 +136,7 @@ namespace CluckWars.Input
             public VisualElement StateBarA;  // one arm of the ✕
             public VisualElement StateBarB;  // the other arm of the ✕
             public VisualElement Mark;       // category shape (CategoryMark): the category without colour
+            public Label         BadgeText;  // slot badge text: the slot number, or the key / pad button on desktop
             public VisualElement Pip;        // in-range pip: a rival is in this move's shape (bottom-centre)
             public HexDurationRing Ring;     // duration ring while this slot's ability is running
             public HexChainRing Chain;       // spinning dashed ring on the Peck hex while the auto-chain runs
@@ -162,6 +171,21 @@ namespace CluckWars.Input
         // Phase 6 (A1) hex states, cached so style writes only happen on a real change.
         private readonly bool[]  _appliedHeld = new bool[SlotCount];
         private readonly bool[]  _appliedDim  = new bool[SlotCount];
+        private readonly float[] _appliedScale = new float[SlotCount];   // the inline scale last written (rest scale x held scale)
+        private readonly string[] _appliedCdText = new string[SlotCount]; // desktop cooldown readout cache (tenths under 1 s)
+
+        // Phase 6 chunk 6: layout mode (A10), haptics (A9) and the first-time hold hint (A1).
+        private IInputProvider  _input;
+        private IHapticsService _haptics;
+        private HudDeviceMode   _mode = HudDeviceMode.Touch;
+        private bool            _modeApplied;
+        private VisualElement   _hudRoot;
+        private VisualElement   _hintHost;
+        private Label           _hint;
+        private bool            _holdActive;
+        private float           _holdBeganAt;
+        private bool            _holdQualified;
+        private bool            _hintOn;
         private readonly bool[]  _pipShown    = new bool[SlotCount];
         private readonly float[] _pipPopTimer = new float[SlotCount]; // seconds into the 0.2 s pop; -1 = idle
         private readonly bool[]  _ringShown   = new bool[SlotCount];
@@ -260,10 +284,18 @@ namespace CluckWars.Input
             return true;
         }
 
+        /// <summary>The control scheme the HUD is laid out for right now (the last-used device's).</summary>
+        public HudDeviceMode Mode => _mode;
+
+        /// <summary>Test / capture hook: pins the layout regardless of the last-used device. Null = follow the device.</summary>
+        public static HudDeviceMode? DebugForceMode;
+
         [Inject]
-        public void Construct(ILogService log)
+        public void Construct(ILogService log, [InjectOptional] IHapticsService haptics, [InjectOptional] IInputProvider input)
         {
             _log = log;
+            _haptics = haptics;
+            _input = input;
         }
 
         private void Awake()
@@ -274,6 +306,7 @@ namespace CluckWars.Input
                 return;
             }
             Instance = this;
+            DebugForceMode = null;
 
             int rows = Mathf.Max(1, FeedbackTuning.StatusBadgeMaxRows);
             _statusRows         = new StatusRowRefs[rows];
@@ -287,6 +320,7 @@ namespace CluckWars.Input
                 _appliedCdSeconds[i] = int.MinValue;
                 _bumpTimer[i]        = -1f;
                 _pipPopTimer[i]      = -1f;
+                _appliedScale[i]     = 1f;
             }
 
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
@@ -360,6 +394,7 @@ namespace CluckWars.Input
                     StateBarB  = _root.Q<VisualElement>($"StateBarB{n}"),
                     Fill       = _root.Q<VisualElement>($"Fill{n}"),
                     Pip        = _root.Q<VisualElement>($"Pip{n}"),
+                    BadgeText  = _root.Q<Label>($"BadgeText{n}"),
                     Mark       = hex != null ? CategoryMark.Create() : null,
                     Ring       = hex != null ? new HexDurationRing() : null,
                     Chain      = hex != null ? new HexChainRing() : null,
@@ -405,9 +440,138 @@ namespace CluckWars.Input
             if (_glowLeft == null || _glowRight == null || _glowTop == null || _glowBottom == null)
                 _log?.Error(Source, "TouchControls.uxml is missing an #EdgeGlow* strip: the cancel band will not show which edge cancels.");
 
+            _hudRoot  = _root.Q<VisualElement>("TouchRoot") ?? _root;
+            _hintHost = _root.Q<VisualElement>("HoldHintHost");
+            _hint     = _root.Q<Label>("HoldHint");
+            if (_hint == null)
+                _log?.Error(Source, "TouchControls.uxml is missing #HoldHint: the first-time hold hint will not show.");
+
+            _modeApplied = false;   // a re-bind (domain reload, UIDocument re-enable) re-applies the layout classes
             _bound = true;
             _log?.Info(Source, $"Bound UITK touch controls: joystick + {SlotCount} hex ability buttons + status strip.");
         }
+
+        // ---- Layout mode (Phase 6 chunk 6, A10) ---------------------------------
+
+        /// <summary>
+        /// Follows the last-used device (<see cref="HudLayoutRules.FromDevice"/>): re-applies the layout only when the
+        /// mode actually changes, so a steady frame costs one property read.
+        /// </summary>
+        private void UpdateLayoutMode()
+        {
+            var wanted = DebugForceMode ?? HudLayoutRules.FromDevice(
+                _input != null ? _input.Device : InputDeviceKind.None, Application.isMobilePlatform);
+            if (_modeApplied && wanted == _mode) return;
+            ApplyMode(wanted);
+        }
+
+        private void ApplyMode(HudDeviceMode mode)
+        {
+            bool leavingTouch = _modeApplied && _mode == HudDeviceMode.Touch && mode != HudDeviceMode.Touch;
+            if (leavingTouch) ReleaseAllPointers();
+
+            _mode = mode;
+            _modeApplied = true;
+            bool interactive = HudLayoutRules.HexesAreInteractive(mode);
+
+            if (_hudRoot != null)
+            {
+                _hudRoot.EnableInClassList("cw-hud--desktop", mode == HudDeviceMode.KeyboardMouse);
+                _hudRoot.EnableInClassList("cw-hud--pad", mode == HudDeviceMode.Gamepad);
+            }
+            if (_joyBase != null)
+                _joyBase.style.display = interactive ? DisplayStyle.Flex : DisplayStyle.None;
+
+            for (int slot = 0; slot < SlotCount; slot++)
+            {
+                var refs = _slots[slot];
+                if (refs.Hex != null) refs.Hex.pickingMode = interactive ? PickingMode.Position : PickingMode.Ignore;
+                if (refs.BadgeText != null) refs.BadgeText.text = HudLayoutRules.BadgeLabel(mode, slot);
+                _appliedCdText[slot] = null;
+                _appliedCdSeconds[slot] = int.MinValue;
+                _appliedScale[slot] = -1f;   // rest scale changed: force the next held refresh to rewrite it
+            }
+
+            if (_hint != null && _hintOn) HideHint();
+            _log?.Info(Source, $"HUD layout: {mode}.");
+        }
+
+        /// <summary>The layout is leaving the thumb arc while pointers may still be down: nothing fires from them.</summary>
+        private void ReleaseAllPointers()
+        {
+            for (int slot = 0; slot < SlotCount; slot++)
+            {
+                if (_held[slot])
+                {
+                    int id = _heldPointerId[slot];
+                    _held[slot] = false;
+                    _heldPointerId[slot] = -1;
+                    _cancelled[slot] = true;
+                    var hex = _slots[slot].Hex;
+                    if (id >= 0 && hex != null && hex.HasPointerCapture(id)) hex.ReleasePointer(id);
+                }
+                _cancelArmed[slot] = false;
+                _armedEdge[slot] = ScreenEdge.None;
+            }
+            if (_joyBase != null && _joyPointerId >= 0 && _joyBase.HasPointerCapture(_joyPointerId))
+                _joyBase.ReleasePointer(_joyPointerId);
+            ResetJoy();
+        }
+
+        // ---- First-time hold hint (Phase 6 chunk 6, A1) ---------------------------
+
+        /// <summary>
+        /// A real hold (it outlived the tap / hold threshold) shows the one-line hint, and counts toward the five that
+        /// retire it. Taps never count. Quick Moves has no hold to explain, so it neither shows nor counts.
+        /// </summary>
+        private void UpdateHoldHint()
+        {
+            bool any = false;
+            for (int i = 0; i < SlotCount && !any; i++) any = IsHeldVisual(i);
+
+            if (!any)
+            {
+                _holdActive = false;
+                if (_hintOn) HideHint();
+                return;
+            }
+
+            if (!_holdActive)
+            {
+                _holdActive = true;
+                _holdQualified = false;
+                _holdBeganAt = Time.unscaledTime;
+            }
+
+            if (_holdQualified || PlayerPreferences.QuickMovesEnabled) return;
+            if (Time.unscaledTime - _holdBeganAt < FeedbackTuning.TapHoldThresholdSeconds) return;
+
+            _holdQualified = true;
+            int count = PlayerPreferences.HoldHintCount;
+            if (!HoldHintRules.OnHoldQualified(ref count)) return;
+            PlayerPreferences.HoldHintCount = count;
+            ShowHint();
+        }
+
+        private void ShowHint()
+        {
+            if (_hint == null) return;
+            _hint.text = UiText.Get(HoldHintRules.KeyFor(_mode));
+            // Reduced Motion: appear and vanish at once instead of fading.
+            _hint.style.transitionDuration = PlayerPreferences.ReducedMotionEnabled
+                ? new StyleList<TimeValue>(new System.Collections.Generic.List<TimeValue> { new TimeValue(0f, TimeUnit.Second) })
+                : new StyleList<TimeValue>(StyleKeyword.Null);
+            _hint.AddToClassList(HintOnClass);
+            _hintOn = true;
+        }
+
+        private void HideHint()
+        {
+            _hint?.RemoveFromClassList(HintOnClass);
+            _hintOn = false;
+        }
+
+        private const string HintOnClass = "cw-hold-hint--on";
 
         // ---- Joystick pointer handling ----------------------------------------
 
@@ -508,10 +672,10 @@ namespace CluckWars.Input
         }
 
         /// <summary>
-        /// The moment the edge-band cancel arms. Phase 6 chunk 6 plays the 10-20 ms haptic tick from here
-        /// (gated by the "Buzz When Hit" toggle); there is intentionally no vibration code yet.
+        /// The moment the edge-band cancel arms: a 15 ms haptic tick (gated by "Buzz When Hit" and the shared rate
+        /// limit inside <see cref="IHapticsService"/>).
         /// </summary>
-        private void OnCancelArmed(int slot) { }
+        private void OnCancelArmed(int slot) => _haptics?.Buzz(HapticKind.CancelArm);
 
         private void OnHexUp(int slot, PointerUpEvent evt)
         {
@@ -600,8 +764,10 @@ namespace CluckWars.Input
 
             var abilities = _localChicken != null ? _localChicken.Abilities : null;
 
+            UpdateLayoutMode();
             PollDeniedPress(abilities);
             RefreshHeldVisuals();
+            UpdateHoldHint();
 
             for (int slot = 0; slot < SlotCount; slot++)
                 RefreshSlot(slot, abilities);
@@ -632,19 +798,25 @@ namespace CluckWars.Input
         private void RefreshHeldVisuals()
         {
             bool any = false;
-            for (int i = 0; i < SlotCount; i++) any |= _held[i];
+            for (int i = 0; i < SlotCount; i++) any |= IsHeldVisual(i);
 
             for (int slot = 0; slot < SlotCount; slot++)
             {
                 var hex = _slots[slot].Hex;
                 if (hex == null) continue;
 
-                bool held = _held[slot];
+                bool held = IsHeldVisual(slot);
                 if (held != _appliedHeld[slot])
                 {
                     _appliedHeld[slot] = held;
                     hex.EnableInClassList(HeldClass, held);
-                    float k = held ? FeedbackTuning.HexHeldScale : 1f;
+                }
+
+                // Rest scale is 1 on the thumb arc and 0.75 on the desktop / pad strip; held multiplies it.
+                float k = HudLayoutRules.HexRestScale(_mode) * (held ? FeedbackTuning.HexHeldScale : 1f);
+                if (!Mathf.Approximately(k, _appliedScale[slot]))
+                {
+                    _appliedScale[slot] = k;
                     hex.style.scale = new Scale(new Vector3(k, k, 1f));
                 }
 
@@ -666,6 +838,14 @@ namespace CluckWars.Input
 
             RefreshEdgeGlow();
         }
+
+        /// <summary>
+        /// Is this hex drawn as held? On touch that is the pointer state. On the desktop / pad strip the hexes
+        /// take no pointer, so a held KEY or button (read through the input provider, never a device) drives the same
+        /// scale-up and dimming.
+        /// </summary>
+        private bool IsHeldVisual(int slot) =>
+            _held[slot] || (_mode != HudDeviceMode.Touch && _input != null && _input.GetAbilityHeld(slot));
 
         /// <summary>Shows the glow strip along the screen edge a held, armed finger is approaching (and only that one).</summary>
         private void RefreshEdgeGlow()
@@ -876,6 +1056,16 @@ namespace CluckWars.Input
 
             if (mark != HexCenterMark.CooldownSeconds) return;
 
+            if (_mode != HudDeviceMode.Touch)
+            {
+                // Desktop / pad strip: whole seconds, then tenths in the last second (HudLayoutRules.CooldownText).
+                string text = HudLayoutRules.CooldownText(remaining);
+                if (text == _appliedCdText[slot]) return;
+                _appliedCdText[slot] = text;
+                refs.CdNum.text = text;
+                return;
+            }
+
             int seconds = Mathf.CeilToInt(remaining);
             if (seconds == _appliedCdSeconds[slot]) return;
             _appliedCdSeconds[slot] = seconds;
@@ -905,6 +1095,7 @@ namespace CluckWars.Input
             // Force the next seconds write through, so returning to a cooldown after any
             // other state repaints the number instead of trusting a stale cache.
             _appliedCdSeconds[slot] = int.MinValue;
+            _appliedCdText[slot] = null;
 
             var mark = HudFeedbackStyle.CenterMark(refusal);
 

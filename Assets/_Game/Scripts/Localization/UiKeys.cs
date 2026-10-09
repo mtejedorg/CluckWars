@@ -121,6 +121,10 @@ namespace CluckWars.Localization
         public const string SettingsAutoPeckDesc = "settings.autoPeck.desc";
         public const string SettingsQuickMoves = "settings.quickMoves";
         public const string SettingsQuickMovesDesc = "settings.quickMoves.desc";
+        public const string SettingsBuzzWhenHit = "settings.buzzWhenHit";
+        public const string SettingsBuzzWhenHitDesc = "settings.buzzWhenHit.desc";
+        public const string SettingsMusicVolume = "settings.musicVolume";
+        public const string SettingsSfxVolume = "settings.sfxVolume";
 
         // ---- Lobby ----
         public const string LobbyRules = "lobby.rules";
@@ -201,6 +205,9 @@ namespace CluckWars.Localization
         public const string HudEventUnderdogSurge = "hud.event.underdogSurge";
         public const string HudEventLeaderBounty = "hud.event.leaderBounty";
         public const string HudEventRestock = "hud.event.restock";
+        public const string HudHintHoldTouch = "hud.hint.hold.touch";
+        public const string HudHintHoldPad = "hud.hint.hold.pad";
+        public const string HudHintHoldKeys = "hud.hint.hold.keys";
 
         // ---- Phase 5 (round-2 findings 11 + 13: GET READY waiting line, host-left notice) ----
         [UiArgs("name")] public const string CountdownWaitingFor = "countdown.waitingFor";

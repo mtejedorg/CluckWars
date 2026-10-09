@@ -118,16 +118,18 @@
     -unity-background-scale-mode: scale-to-fit;
     -unity-background-image-tint-color: rgb(115, 179, 255); /* neutral until equipped */
 }
-/* MOBA arc positions (element edge offsets derived from the center anchors) */
-.cw-hex--a1 { right: 95px;  bottom: 95px;  }   /* center (-170,170) */
-.cw-hex--a2 { right: 135px; bottom: 285px; }   /* center (-210,360) */
-.cw-hex--a3 { right: 335px; bottom: 195px; }   /* center (-410,270) */
-.cw-hex--a4 { right: 315px; bottom: 385px; }   /* center (-390,460) : v0.7 fourth slot */
-/* a4 continues the arc up and left. Placed for clearance, not yet ergonomics:
-   centre-to-centre it sits 191px from a3, 206px from a2 and 364px from a1, all
-   clear of the 150px hex width. The FOUR-hex arc as a whole wants a proper
-   ui-designer pass on a real Pixel 9 - the original three were derived from the
-   shipped UGUI tunables (ART 6.7) and this one has no such reference. */
+/* MOBA arc positions (element edge offsets, measured from the AbilityRoot's bottom-right corner).
+   Phase 6 chunk 6 (A11): every hex CENTRE sits on a 270 px (~115 dp at 1 dp = 2.35 px) arc around slot 1's
+   centre (170,170 from the corner), 40 degrees apart, so the thumb that rests on slot 1 reaches all four
+   without leaving its pivot (the old fourth slot was ~364 px / 155 dp away). Neighbours are 185 px apart
+   centre to centre against a 150 px hex, so the gap between hexes is 35 px. Centres (from the corner):
+     a1 (170,170)  a2 (217,436)  a3 (377,344)  a4 (440,170)
+   TouchHudLayoutTests parses these four rules and fails if any centre drifts past 125 dp of slot 1, two hexes
+   overlap, or one leaves the 2400x1080 / 1920x864 / 1440x1080 panels. */
+.cw-hex--a1 { right: 95px;  bottom: 95px;  }   /* centre (-170,170) */
+.cw-hex--a2 { right: 142px; bottom: 361px; }   /* centre (-217,436) : straight up, a touch left */
+.cw-hex--a3 { right: 302px; bottom: 269px; }   /* centre (-377,344) : the diagonal */
+.cw-hex--a4 { right: 365px; bottom: 95px;  }   /* centre (-440,170) : level with slot 1, to its left */
 
 /* --- Layer 6 : cooldown clip (dark overlay rising from the bottom) --------- */
 /* The wrapper's height % = remaining/total; overflow hidden crops the fill's
@@ -522,3 +524,63 @@
 .cw-edge-glow--right  { right: 0;  border-left-width:   3px; border-left-color:   rgb(42, 26, 12); }
 .cw-edge-glow--top    { top: 0;    border-bottom-width: 3px; border-bottom-color: rgb(42, 26, 12); }
 .cw-edge-glow--bottom { bottom: 0; border-top-width:    3px; border-top-color:    rgb(42, 26, 12); }
+
+/* ============================================================================
+   DESKTOP / CONTROLLER LAYOUT  (Phase 6 chunk 6, A10)
+   TouchControlsController puts .cw-hud--desktop (keyboard + mouse) or .cw-hud--pad (gamepad) on #TouchRoot while
+   that is the last-used device, and takes it off the moment a finger touches the screen. The joystick goes; the
+   hexes become an INFORMATION strip at the bottom centre (picking-mode Ignore, scale 0.75 written by the
+   controller), left to right in slot order, each badged with the key or button that fires it.
+   Strip geometry: 4 hexes, 136 px pitch, centred on the screen: left edges at -279 / -143 / -7 / +129 from centre.
+   ============================================================================ */
+.cw-hud--desktop .cw-joy-base, .cw-hud--pad .cw-joy-base { display: none; }
+.cw-hud--desktop .cw-status-strip, .cw-hud--pad .cw-status-strip { left: 40px; bottom: 60px; }
+
+.cw-hud--desktop .cw-hex--a1, .cw-hud--pad .cw-hex--a1 { left: 50%; right: auto; bottom: 4px; margin-left: -279px; }
+.cw-hud--desktop .cw-hex--a2, .cw-hud--pad .cw-hex--a2 { left: 50%; right: auto; bottom: 4px; margin-left: -143px; }
+.cw-hud--desktop .cw-hex--a3, .cw-hud--pad .cw-hex--a3 { left: 50%; right: auto; bottom: 4px; margin-left: -7px; }
+.cw-hud--desktop .cw-hex--a4, .cw-hud--pad .cw-hex--a4 { left: 50%; right: auto; bottom: 4px; margin-left: 129px; }
+
+/* Badge: a key cap. 40 px text x the strip's 0.75 scale = 30 px on screen (floor 28); cream on near-black ink is
+   far above 4.5:1. A two-letter pad label (RB / LT) widens the cap into a pill. */
+.cw-hud--desktop .cw-hex-badge, .cw-hud--pad .cw-hex-badge {
+    width: auto; min-width: 54px;
+    padding-left: 10px; padding-right: 10px;
+}
+.cw-hud--desktop .cw-hex-badge-text, .cw-hud--pad .cw-hex-badge-text { font-size: 40px; }
+
+/* ============================================================================
+   FIRST-TIME HOLD HINT  (Phase 6 chunk 6, A1)
+   One line above the ability cluster while a hex is held, for the first five real holds. The host is full width
+   and click-through; the label is the plate. Right-aligned over the thumb arc on touch, centred over the strip on
+   desktop / pad. 32 px text (floor 28). The fade is a plain opacity transition; the controller zeroes it under
+   Reduced Motion.
+   ============================================================================ */
+.cw-hold-hint-host {
+    position: absolute;
+    left: 0; right: 0; bottom: 560px;
+    align-items: flex-end;
+    padding-right: 40px;
+}
+.cw-hud--desktop .cw-hold-hint-host, .cw-hud--pad .cw-hold-hint-host {
+    bottom: 160px; align-items: center; padding-right: 0;
+}
+.cw-hold-hint {
+    max-width: 880px;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    font-size: 32px;
+    color: rgb(254, 245, 224);
+    -unity-text-align: middle-center;
+    white-space: normal;
+    padding-top: 10px; padding-bottom: 10px; padding-left: 22px; padding-right: 22px;
+    background-color: rgba(26, 14, 4, 0.9);
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    border-top-left-radius: 14px; border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
+    opacity: 0;
+    transition-property: opacity;
+    transition-duration: 0.25s;
+}
+.cw-hold-hint--on { opacity: 1; }

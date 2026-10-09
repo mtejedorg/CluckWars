@@ -1380,6 +1380,31 @@
     white-space: normal; margin-left: 0; padding-left: 0; padding-top: 0; padding-bottom: 0;
 }
 
+/* Volume sliders (Phase 6 chunk 6): the same row, a slider where the checkbox sits. The dragger is the touch
+   target (56 px = 24 dp wide; the row it sits in is 116 px tall); an ink ring keeps the gold knob visible on cream. */
+.cw-setting-slider {
+    flex-shrink: 0; width: 460px; height: 72px; align-self: center; justify-content: center;
+    margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 8px;
+}
+.cw-setting-slider .unity-base-slider__input { height: 72px; justify-content: center; }
+.cw-setting-slider .unity-base-slider__drag-container { height: 72px; justify-content: center; }
+.cw-setting-slider .unity-base-slider__dragger {
+    width: 60px; height: 60px; margin-top: -30px;
+    background-color: rgb(245, 200, 66);
+    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    border-top-left-radius: 30px; border-top-right-radius: 30px;
+    border-bottom-left-radius: 30px; border-bottom-right-radius: 30px;
+}
+.cw-setting-slider .unity-base-slider__tracker {
+    height: 12px;
+    background-color: rgb(107, 74, 42);
+    border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
+    border-top-left-radius: 6px; border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
+}
+
 .cw-opt-toggle {
     flex-shrink: 0;
     margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 0;

@@ -21,7 +21,7 @@
             (.cw-art-plate) so it keeps WCAG-AA contrast over the sky and sun.
 
          Settings (stage 2): the gear at the top-right opens #SettingsSheet, a
-         modal over this page with the four PlayerPreferences toggles. It replaced
+         modal over this page with the PlayerPreferences toggles and the two volume sliders (a ScrollView: nine rows do not fit a phone). It replaced
          the two toggles that used to sit on the loadout screen.
 
          Sizes follow the mobile contract at the top of CluckWarsTheme.uss. -->
@@ -119,7 +119,7 @@
                     </ui:VisualElement>
                     <ui:Button name="SettingsCloseBtn" text="@settings.close" class="cw-btn cw-btn--wood cw-sheet__close" />
                 </ui:VisualElement>
-                <ui:VisualElement class="cw-sheet__body cw-raised">
+                <ui:ScrollView class="cw-sheet__body cw-raised">
                     <ui:VisualElement name="RangeGuidesRow" class="cw-setting-toggle-row">
                         <ui:VisualElement class="cw-setting-toggle-row__texts">
                             <ui:Label text="@settings.rangeGuides" class="cw-setting-toggle-row__name" />
@@ -133,6 +133,39 @@
                             <ui:Label text="@settings.reducedMotion.desc" class="cw-setting-toggle-row__desc" />
                         </ui:VisualElement>
                         <ui:Toggle name="ReducedMotionToggle" class="cw-opt-toggle" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="QuickMovesRow" class="cw-setting-toggle-row">
+                        <ui:VisualElement class="cw-setting-toggle-row__texts">
+                            <ui:Label text="@settings.quickMoves" class="cw-setting-toggle-row__name" />
+                            <ui:Label text="@settings.quickMoves.desc" class="cw-setting-toggle-row__desc" />
+                        </ui:VisualElement>
+                        <ui:Toggle name="QuickMovesToggle" class="cw-opt-toggle" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="AutoPeckRow" class="cw-setting-toggle-row">
+                        <ui:VisualElement class="cw-setting-toggle-row__texts">
+                            <ui:Label text="@settings.autoPeck" class="cw-setting-toggle-row__name" />
+                            <ui:Label text="@settings.autoPeck.desc" class="cw-setting-toggle-row__desc" />
+                        </ui:VisualElement>
+                        <ui:Toggle name="AutoPeckToggle" class="cw-opt-toggle" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="BuzzWhenHitRow" class="cw-setting-toggle-row">
+                        <ui:VisualElement class="cw-setting-toggle-row__texts">
+                            <ui:Label text="@settings.buzzWhenHit" class="cw-setting-toggle-row__name" />
+                            <ui:Label text="@settings.buzzWhenHit.desc" class="cw-setting-toggle-row__desc" />
+                        </ui:VisualElement>
+                        <ui:Toggle name="BuzzWhenHitToggle" class="cw-opt-toggle" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="MusicVolumeRow" class="cw-setting-toggle-row">
+                        <ui:VisualElement class="cw-setting-toggle-row__texts">
+                            <ui:Label text="@settings.musicVolume" class="cw-setting-toggle-row__name" />
+                        </ui:VisualElement>
+                        <ui:Slider name="MusicVolumeSlider" low-value="0" high-value="1" value="1" class="cw-setting-slider" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="SfxVolumeRow" class="cw-setting-toggle-row">
+                        <ui:VisualElement class="cw-setting-toggle-row__texts">
+                            <ui:Label text="@settings.sfxVolume" class="cw-setting-toggle-row__name" />
+                        </ui:VisualElement>
+                        <ui:Slider name="SfxVolumeSlider" low-value="0" high-value="1" value="1" class="cw-setting-slider" />
                     </ui:VisualElement>
                     <ui:VisualElement name="PerformanceModeRow" class="cw-setting-toggle-row">
                         <ui:VisualElement class="cw-setting-toggle-row__texts">
@@ -148,7 +181,7 @@
                         </ui:VisualElement>
                         <ui:Toggle name="DeveloperModeToggle" class="cw-opt-toggle" />
                     </ui:VisualElement>
-                </ui:VisualElement>
+                </ui:ScrollView>
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

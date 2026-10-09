@@ -1,6 +1,7 @@
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
 using CluckWars.Logging;
+using CluckWars.Services;
 using Fusion;
 using UnityEngine;
 using Zenject;
@@ -155,6 +156,7 @@ namespace CluckWars.Visuals
         private AbilityController _abilities;
         private ChickenVisuals    _visuals;
         private ILogService       _log;
+        private IHapticsService   _haptics;   // local phone buzz (Phase 6 chunk 6): the victim's own peer only
 
         // ---- Body flash -------------------------------------------------------
 
@@ -211,7 +213,11 @@ namespace CluckWars.Visuals
         private readonly System.Collections.Generic.List<ChickenController> _castTargets = new(4);
 
         [Inject]
-        public void Construct(ILogService log) => _log = log;
+        public void Construct(ILogService log, [InjectOptional] IHapticsService haptics)
+        {
+            _log = log;
+            _haptics = haptics;
+        }
 
         // ---- Lifecycle --------------------------------------------------------
 
@@ -382,6 +388,7 @@ namespace CluckWars.Visuals
             }
 
             bool anyEntered = false;
+            bool stunEntered = false;
 
             // Floating combat text is suppressed on a decoy (see Render). Not only because
             // it is a local-player-facing channel: a decoy is never really slowed or rooted
@@ -394,6 +401,7 @@ namespace CluckWars.Visuals
             if (stunned && !_wasStunned)
             {
                 anyEntered = true;
+                stunEntered = true;
                 if (showText) SpawnControlText("STUN", _controller.StunRemaining, FeedbackTuning.CanonicalStunColor);
             }
             if (rooted && !_wasRooted)
@@ -424,7 +432,7 @@ namespace CluckWars.Visuals
             _wasRooted  = rooted;
             _wasSnared  = snared;
 
-            if (anyEntered) TriggerVictimHit();
+            if (anyEntered) TriggerVictimHit(stunEntered ? HapticKind.Stun : HapticKind.Hit);
         }
 
         /// <summary>
@@ -731,7 +739,7 @@ namespace CluckWars.Visuals
         /// player's channels and a decoy must never reach them — see <see cref="Render"/>
         /// for why <c>HasInputAuthority</c> alone is not enough of a gate here.
         /// </summary>
-        private void TriggerVictimHit()
+        private void TriggerVictimHit(HapticKind haptic = HapticKind.Hit)
         {
             StartFlash();
 
@@ -747,6 +755,8 @@ namespace CluckWars.Visuals
                 MatchCamera.Instance?.ApplyShake(
                     FeedbackTuning.VictimHitShakeMagnitude,
                     FeedbackTuning.VictimHitShakeDurationSeconds);
+                // The phone buzz rides the same local gate as the shake: only the victim's own peer, never a decoy.
+                _haptics?.Buzz(haptic);
             }
 
             if (_attribution.TryClaimAtImpact(AttributionNow, out var attackerPos))
@@ -1090,6 +1100,9 @@ namespace CluckWars.Visuals
         private void HandleRemoval()
         {
             _featherPS?.Play();
+
+            // Knocked out: the long buzz, on the victim's own peer (a decoy shares its caster's input authority).
+            if (HasInputAuthority && _controller != null && !_controller.IsDecoy) _haptics?.Buzz(HapticKind.Stun);
 
             // Hit-stop is the victim's own beat only — see HitStopDriver's remarks for why
             // the killer does not get one.

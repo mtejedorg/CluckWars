@@ -6,7 +6,18 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
-## 🔧 Phase 6 chunk 5 (2026-10-09, uncommitted, in review): aim byte, mouse aim, gamepad provider, soft-lock / pad magnetism, Quick Moves
+## ✅ Phase 6 chunk 6 (2026-10-09, committed, EditMode 1053/1053): haptics, desktop / pad info HUD, settings rows + volumes, hold hint, thumb-reach cluster, compact phone board
+
+- **Haptics (A9).** `IHapticsService` (`Services/IHapticsService.cs`), `HapticsService` (policy: Buzz When Hit pref -> device -> 200 ms limiter; a STRONGER kind may interrupt inside the window so a stun is not swallowed by the hit that caused it), `HapticRules`/`HapticLimiter` (pure), `AndroidHapticDevice` (JNI `Vibrator`/`VibratorManager`, `VibrationEffect.createOneShot`/`createWaveform`, reads `haptic_feedback_enabled`; any JNI failure logs once and disables), `NullHapticsService` elsewhere. Bound in `ProjectInstaller`. Triggered from `HitFeedback.TriggerVictimHit` (same gate as the camera shake: own peer, not a decoy; stun entry and `HandleRemoval` play the 60/50/90 pattern) and `TouchControlsController.OnCancelArmed` (15 ms tick). **VIBRATE permission:** the project has no custom manifest and Unity only adds VIBRATE when it sees `Handheld.Vibrate`, so I added `Editor/AndroidVibratePermission.cs` (an `IPostGenerateGradleAndroidProject` patching the generated unityLibrary manifest; the XML patch is unit-tested). **Not verified on a device** (no Android build was made).
+- **Desktop / pad HUD (A10).** `HudLayoutRules` (`Input/HudLayoutRules.cs`): last-used `IInputProvider.Device` -> `HudDeviceMode` (None -> platform default). `TouchControlsController.Mode` applies `.cw-hud--desktop` / `.cw-hud--pad` on `#TouchRoot`: joystick hidden, hexes `PickingMode.Ignore`, scale 0.75 in a bottom-centre strip, badges Q/E/R/F or RB/RT/LB/LT (40 px x 0.75 = 30 px, derived from the real binding tables), cooldown number with tenths under 1 s, held keys scale the hex. Touch wins ties (`CompositeInputProvider.TiePriority`) and `TouchInputProvider` now counts ANY finger via `Touchscreen.current`, so a touchscreen laptop gets the thumb layout back. `TouchControlsController.DebugForceMode` pins a layout for captures.
+- **Settings.** Quick Moves, Auto-Peck, Buzz When Hit (hidden when `!Application.isMobilePlatform`: no vibrator elsewhere), Music and Sound Effects sliders (`IAudioService.SetMusicVolume/SetSfxVolume`, `PlayerPreferences.MusicVolume/SfxVolume`, flushed on drag end / sheet close). The sheet body is now a `ScrollView` (nine rows).
+- **Hold hint (A1).** `#HoldHint` above the cluster, per-device copy (`hud.hint.hold.*`), counted when a hold outlives `TapHoldThresholdSeconds`; first 5 holds then never (`PlayerPreferences.HoldHintCount`); Quick Moves neither shows nor counts.
+- **A11.** Cluster re-laid on a 270 px (~115 dp) arc around slot 1 (`TouchControls.uss` a1-a4); `CompactBoardRules`: on the touch layout the board shows leader + you (you lead: you + 2nd), all four on tap (4 s) and in the last 10 s; desktop unchanged. Joystick dead zone / throw were chunk 4.
+- **Tests:** `Phase6Chunk6Tests` (37), EditMode 1053/1053. Captures: `Captures/phase6/static/settings_page__{desktop,phone,phone_scrolled}.png`, `live/{desktop_info_hud,pad_info_hud,touch_hud_phone,hint_first_hold}.png` (`tools/ui_capture/capture_phase6_chunk6.py`).
+- **Review fixes (architect).** `AndroidVibratePermission.EnsurePermission` wrote `encoding="utf-16"` into a manifest saved as UTF-8 (a `StringWriter` reports UTF-16), which Gradle's merger rejects: now a UTF-8 writer, and the test asserts the declaration. `AndroidHapticDevice` checks `hasVibrator()` at start (no motor = legal off state, Info log).
+- **Outstanding / Maestro:** Pixel-9 pass for the buzz + VIBRATE merge; the compendium site controls section needs the new layout / settings (republish by main session).
+
+## ✅ Phase 6 chunk 5 (2026-10-09, committed): aim byte, mouse aim, gamepad provider, soft-lock / pad magnetism, Quick Moves
 
 EditMode **1016/1016** (982 baseline + 34 new in `Phase6Chunk5Tests`; `PeckChainAndJoystickTests.AutoPeckInputBit_IsAppended...` now only compares AutoPeck with the bits that existed before it, since chunk 5 appends three after it).
 Live smoke (solo round, Editor, console clean) - `tools/ui_capture/capture_phase6_chunk5.py`. The bridge cannot move the real mouse, so the local `FusionNetworkService` and `AbilityTelegraph` providers were wrapped by a fake that forwards everything and returns a chosen `AimInput` (a ground point, exactly what the mouse provider returns); everything downstream is the real path. Results: aim 100 deg off facing -> bird turned 0 -> 100.2 deg on the fire tick, Wing Slam hit the rival placed there, telegraph drew while held; no aim + touch hex + rival 20 deg off -> soft-lock turned the bird 100 -> 120 deg and hit; rival 55 deg off -> no snap, facing unchanged, fizzle; Quick Moves on + press and hold -> fired inside 0.25 s, no charge, no re-fire while held, no preview. **Gamepad could not be exercised live (no device): unit tests only.** Real mouse cursor raycast and multi-peer rotation replication were not exercised live either.
@@ -26,7 +37,7 @@ Live smoke (solo round, Editor, console clean) - `tools/ui_capture/capture_phase
 
 ---
 
-## 🔧 Phase 6 chunk 4 (2026-10-09, uncommitted, in review): Peck auto-chain, Auto-Peck, joystick dead zone + throw
+## ✅ Phase 6 chunk 4 (2026-10-09, committed): Peck auto-chain, Auto-Peck, joystick dead zone + throw
 
 EditMode **982/982** (971 baseline + 11 new in `PeckChainAndJoystickTests`; `Phase6Chunk2Tests` two source-guards updated for `TryActivate` now returning `bool`).
 Live smoke (solo round, console clean): one manual Peck -> repeated pecks until cargo 14/14, then the chain ends; AutoPeck pref on + standing still by a pile -> pecking
@@ -52,7 +63,7 @@ Driver: `tools/ui_capture/capture_phase6_chunk4.py`.
   against the 140 px base radius. Floating origin was skipped (not small: the stick is a fixed UXML element with its own capture area).
 - **Not changed:** BalanceOracle, PeckCooldown, PeckAmount, Peck lock 0.4 s, any ability value. **Maestro wiring:** none (no prefab/scene changes).
 
-## 🔧 Phase 6 chunk 3 (2026-10-09, uncommitted, in review): concurrent abilities, strongest-wins, stealth/Peck end on cast
+## ✅ Phase 6 chunk 3 (2026-10-09, committed): concurrent abilities, strongest-wins, stealth/Peck end on cast
 
 EditMode **959/959** (932 baseline: `Phase6Chunk3Tests` new, 27 tests incl. 2 parametrised; `AbilityActivationRulesTests` / `Phase6Chunk2Tests` / `HudFeedbackStyleTests`
 adjusted for the removed `otherAbilityActive` parameter and the retired HUD dim). Live smoke (solo round, Play mode, console clean): slots set to Invisibility / Speed
@@ -100,7 +111,7 @@ Ruffle on top -> both active, speed still 1.5 (not 2.25), each with its own time
 
 ---
 
-## 🔧 Phase 6 chunk 2 (2026-10-08, uncommitted, in review): fizzle, edge-band cancel, KB/M cancel + slot switching
+## ✅ Phase 6 chunk 2 (2026-10-08, committed): fizzle, edge-band cancel, KB/M cancel + slot switching
 
 EditMode **932/932** (900 + 32: `Phase6Chunk2Tests` new; `AbilityActivationRulesTests` "pending hold ignores presses on other slots" rewritten as
 the switch test + a dead-slot variant; `ServicesAndInputTests.FakeInput` implements the new interface member). Capture tool:

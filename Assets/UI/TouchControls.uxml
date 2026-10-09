@@ -184,6 +184,12 @@
             <ui:VisualElement name="Pip4" class="cw-hex-pip" picking-mode="Ignore" />
         </ui:VisualElement>
 
+        <!-- Phase 6 chunk 6 (A1): the one-line "hold to aim" hint above the cluster, for the first five real holds.
+             Text is written by TouchControlsController from UiText (hud.hint.hold.*), per device. -->
+        <ui:VisualElement name="HoldHintHost" class="cw-hold-hint-host" picking-mode="Ignore">
+            <ui:Label name="HoldHint" text="" class="cw-hold-hint" picking-mode="Ignore" />
+        </ui:VisualElement>
+
         </ui:VisualElement>
 
         <!-- Phase 6 chunk 2: the edge-band cancel strips. One per PHYSICAL screen edge (TouchRoot is the whole panel,
