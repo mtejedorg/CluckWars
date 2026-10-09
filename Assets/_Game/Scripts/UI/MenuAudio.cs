@@ -31,6 +31,7 @@ namespace CluckWars.UI
         public const float EquipTapVolume = 0.5f;
         private const float MusicFadeInSeconds = 0.3f;
         private const float MusicDuckSeconds = 0.4f;
+        private const float BedFadeInSeconds = 0.8f;
         /// <summary>The menu loop's level under GET READY (round-2 decision 4): a low bed that keeps the
         /// hand-off from going silent until the match music takes over at GO.</summary>
         public const float MenuBedLevel = 0.35f;
@@ -88,6 +89,16 @@ namespace CluckWars.UI
             if (!TryGet("MenuLoop", c => c.MenuLoop, out var cue)) return;
             if (_audio.IsMusicPlaying(cue.Clip)) { _audio.SetMusicLevel(1f, MusicFadeInSeconds); return; }
             _audio.PlayMusic(cue.Clip, cue.Volume, loop: true, fadeInSeconds: MusicFadeInSeconds);
+        }
+
+        /// <summary>The menu loop as a low bed (<see cref="MenuBedLevel"/>) under the post-match podium and the solo PLAY AGAIN
+        /// countdown; the match music replaces it at GO. A loop already playing just settles to the bed level.</summary>
+        public void StartMenuBed()
+        {
+            if (!TryGet("MenuLoop", c => c.MenuLoop, out var cue)) return;
+            if (!_audio.IsMusicPlaying(cue.Clip))
+                _audio.PlayMusic(cue.Clip, cue.Volume, loop: true, fadeInSeconds: BedFadeInSeconds);
+            _audio.SetMusicLevel(MenuBedLevel, BedFadeInSeconds);
         }
 
         /// <summary>START MATCH: the menu loop ducks to a low bed (<see cref="MenuBedLevel"/>) under the sting and GET

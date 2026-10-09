@@ -309,6 +309,22 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void MenuBed_StartsTheLoopAtTheBedLevelUnderThePodium_AndOnlySettlesAPlayingLoop()
+        {
+            var fake = new FakeAudio(); var so = Catalogue();
+            var menu = new MenuAudio(fake, so, new RecordingLog());
+
+            menu.StartMenuBed();   // the match loop has faded out: the menu loop comes in as a bed
+            Assert.That(fake.Music.Count, Is.EqualTo(1));
+            Assert.That(fake.Music[0].Clip, Is.EqualTo(so.MenuLoop.Clip));
+            Assert.That(fake.Music[0].FadeIn, Is.GreaterThan(0f), "eased in, never a cut");
+            Assert.That(fake.Levels[fake.Levels.Count - 1].Level, Is.EqualTo(MenuAudio.MenuBedLevel));
+
+            menu.StartMenuBed();   // already playing (a PLAY AGAIN came back through the podium): no restart
+            Assert.That(fake.Music.Count, Is.EqualTo(1));
+        }
+
+        [Test]
         public void MissingCatalogue_WarnsOnceNotPerCue()
         {
             var fake = new FakeAudio(); var log = new RecordingLog();

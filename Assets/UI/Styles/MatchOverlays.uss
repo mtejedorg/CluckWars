@@ -37,6 +37,23 @@
 .cw-overlay--opaque   { background-color: rgb(8, 4, 2); }
 .cw-overlay--introdim { background-color: rgba(0, 0, 0, 0.45); }
 
+/* LEAVE MATCH? sheet (Phase 6 chunk 7b): a dark scrim over the frozen arena and the touch HUD, one wood panel. */
+.cw-leave-sheet { background-color: rgba(20, 10, 4, 0.82); }
+.cw-leave-panel {
+    width: 1000px; max-width: 94%;
+    padding-top: 36px; padding-bottom: 40px; padding-left: 48px; padding-right: 48px;
+    align-items: stretch;
+}
+.cw-leave-body {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 44px; letter-spacing: 1px; color: rgb(254, 245, 224);
+    -unity-text-align: middle-center; white-space: normal;
+    margin-top: 36px; margin-bottom: 40px; padding-left: 0; padding-right: 0;
+    -unity-text-outline-width: 3px; -unity-text-outline-color: rgb(42, 26, 12);
+}
+.cw-leave-actions { flex-direction: row; justify-content: center; }
+.cw-leave-btn { flex-grow: 1; flex-basis: 0; min-height: 132px; margin-left: 12px; margin-right: 12px; }
+
 /* ============================================================================
    MATCH END  (podium on the barn)
    ============================================================================ */

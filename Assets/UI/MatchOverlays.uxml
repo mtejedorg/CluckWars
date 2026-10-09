@@ -276,5 +276,26 @@
             <ui:Label text="@session.hostLeft" class="cw-hostleft__label" picking-mode="Ignore" />
         </ui:VisualElement>
 
+        <!-- ============================================================ -->
+        <!--  LEAVE MATCH?  (Phase 6 chunk 7b, round-3 finding 4)          -->
+        <!-- ============================================================ -->
+        <!-- Esc / Android back / pad Start during GET READY, the countdown or a round. Solo freezes under it
+             (MatchOverlaysController: runner.SinglePlayerPause); multiplayer keeps going. The menu theme is
+             scoped to this element, like the waiting room's, so the sheet wears the menu's wood panel,
+             ribbon and planks. KEEP PLAYING takes focus (pad / keyboard default); LEAVE is the BACK TO LOBBY exit. -->
+        <ui:VisualElement name="LeaveSheet" class="cw-overlay cw-leave-sheet" style="display: none;">
+            <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
+            <ui:VisualElement name="LeavePanel" class="cw-wood-panel cw-leave-panel">
+                <ui:VisualElement class="cw-ribbon">
+                    <ui:Label text="@leave.title" class="cw-title" />
+                </ui:VisualElement>
+                <ui:Label name="LeaveBody" text="" class="cw-leave-body" />
+                <ui:VisualElement class="cw-leave-actions">
+                    <ui:Button name="LeaveKeepBtn" text="@leave.keep" class="cw-btn cw-btn--green cw-leave-btn" />
+                    <ui:Button name="LeaveConfirmBtn" text="@nav.leave" class="cw-btn cw-btn--wood cw-leave-btn" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
     </ui:VisualElement>
 </ui:UXML>

@@ -87,7 +87,10 @@ namespace CluckWars.Tests
         {
             string xml = Read("Assets/UI/MatchOverlays.uxml");
             const string theme = "Styles/CluckWarsTheme.uss";
-            Assert.AreEqual(1, Regex.Matches(xml, Regex.Escape(theme)).Count, "the menu theme is attached once");
+            // Scoped twice: the waiting room, and the "Leave match?" sheet (chunk 7b) which wears the same wood panel.
+            Assert.AreEqual(2, Regex.Matches(xml, Regex.Escape(theme)).Count, "the menu theme is attached to the waiting room and the leave sheet only");
+            Assert.Greater(xml.LastIndexOf(theme, StringComparison.Ordinal), xml.IndexOf("name=\"LeaveSheet\"", StringComparison.Ordinal),
+                "the second attachment is inside #LeaveSheet");
             int room = xml.IndexOf("name=\"LobbyOverlay\"", StringComparison.Ordinal);
             int session = xml.IndexOf("name=\"SessionEndOverlay\"", StringComparison.Ordinal);
             int style = xml.IndexOf(theme, StringComparison.Ordinal);
@@ -125,16 +128,14 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void BackPress_LeavesOnlyWhileTheWaitingRoomIsShown()
+        public void BackPress_LeavesTheWaitingRoom_ThroughTheOnePhaseDecision()
         {
+            // Chunk 7b: one poll for the whole match scene; the waiting room's LEAVE is its WaitingForPlayers branch.
             string src = Read("Assets/_Game/Scripts/UI/MatchOverlaysController.cs");
-            int refresh = src.IndexOf("private void RefreshLobby(", StringComparison.Ordinal);
-            int hidden = src.IndexOf("if (!show) return;", refresh, StringComparison.Ordinal);
+            Assert.AreEqual(1, Regex.Matches(src, @"GetBackPressed\(\)").Count, "one poll, in RefreshBack");
             int back = src.IndexOf("_input.GetBackPressed()", StringComparison.Ordinal);
-            Assert.Greater(refresh, 0);
-            Assert.AreEqual(1, Regex.Matches(src, @"GetBackPressed\(\)").Count, "one poll, in the waiting room");
-            Assert.Greater(back, hidden, "polled after the room-hidden early-out");
-            StringAssert.Contains("OnLobbyLeave()", src.Substring(back, 200));
+            StringAssert.Contains("MatchBackAction.LeaveWaitingRoom: OnLobbyLeave()", src.Substring(back, 900));
+            Assert.AreEqual(MatchBackAction.LeaveWaitingRoom, MatchBackRules.Resolve(MatchState.WaitingForPlayers, false, false));
         }
 
         [Test]

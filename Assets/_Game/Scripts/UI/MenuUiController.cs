@@ -446,7 +446,7 @@ namespace CluckWars.UI
                 CloseSettings();
                 return;
             }
-            var step = MenuBackTarget(PageOrder(_currentPage));
+            var step = MenuBackTarget(PageOrder(_currentPage), _lobbyViaGearUp);
             if (step == MenuBackStep.None) return;
             _audio.Back();
             if (step == MenuBackStep.MainMenu) ShowMainMenu();
@@ -455,12 +455,14 @@ namespace CluckWars.UI
         }
 
         /// <summary>Where Esc / back goes from the page at <paramref name="pageOrder"/>
-        /// (0 main, 1 pick, 2 gear up, 3 coop) - the same target as that page's BACK / HOME button.</summary>
-        public static MenuBackStep MenuBackTarget(int pageOrder) => pageOrder switch
+        /// (0 main, 1 pick, 2 gear up, 3 coop) - the same target as that page's BACK / HOME button.
+        /// THE COOP goes back through GEAR UP only when it was reached through it; opened directly (PLAY AGAIN,
+        /// BACK TO LOBBY) it goes home (round-3 finding 18).</summary>
+        public static MenuBackStep MenuBackTarget(int pageOrder, bool lobbyViaGearUp = true) => pageOrder switch
         {
             1 => MenuBackStep.MainMenu,
             2 => MenuBackStep.ClassSelect,
-            3 => MenuBackStep.Loadout,
+            3 => lobbyViaGearUp ? MenuBackStep.Loadout : MenuBackStep.MainMenu,
             _ => MenuBackStep.None,
         };
 
@@ -518,7 +520,22 @@ namespace CluckWars.UI
         private void ShowMainMenu()    { SetPage(_mainMenu); RefreshDevRow(); RefreshPlayAgain(); }
         private void ShowClassSelect() { SetPage(_classSelect); RefreshClassSelect(); }
         private void ShowLoadout()     { SetPage(_loadout); RefreshLoadout(); }
-        private void ShowLobby()       { SetPage(_lobby); RefreshLobby(); }
+        private void ShowLobby()       { SetPage(_lobby); RefreshLobby(); RefreshLobbyBackButton(); }
+
+        // True when THE COOP was reached through PICK YOUR BIRD and GEAR UP (READY): its BACK returns to GEAR UP.
+        // False when it was opened directly (main-menu PLAY AGAIN, post-match BACK TO LOBBY): its BACK is HOME.
+        private bool _lobbyViaGearUp = true;
+        private Button _lobbyBackBtn;
+
+        private void OnLobbyBack()
+        {
+            if (_lobbyViaGearUp) ShowLoadout(); else ShowMainMenu();
+        }
+
+        private void RefreshLobbyBackButton()
+        {
+            if (_lobbyBackBtn != null) _lobbyBackBtn.text = UiText.Get(_lobbyViaGearUp ? UiKeys.NavBack : UiKeys.NavHome);
+        }
 
         // Page transitions (spec Phase 1): the outgoing page fades/slides out (120 ms ease-in),
         // then the incoming one slides in from the travel direction (200 ms ease-out). Forward
@@ -959,6 +976,7 @@ namespace CluckWars.UI
             _selection.Ability2 = setup.Slots[2];
             _selection.Ability3 = setup.Slots[3];
             _log?.Info(Source, $"Opening THE COOP with the last setup: {setup.Class} / {setup.Passive.name}, mode {mode}.");
+            _lobbyViaGearUp = false;
             ShowLobby();
             return true;
         }
@@ -1939,6 +1957,7 @@ namespace CluckWars.UI
             // The stamp slams in when THE COOP is on screen (OnPageShown) and the Ready cue lands on
             // its hit frame (or at once under Reduced Motion). RefreshLobby reads this flag first.
             _stampPending = true;
+            _lobbyViaGearUp = true;
             ShowLobby();
         }
 
@@ -1983,7 +2002,7 @@ namespace CluckWars.UI
                         OnStartMatch();
                 }, TrickleDown.TrickleDown);
             });
-            Bind<Button>(_lobby, "BackBtn",  b => { b.clicked += ShowLoadout; BackCue(b); });
+            Bind<Button>(_lobby, "BackBtn",  b => { _lobbyBackBtn = b; b.clicked += OnLobbyBack; BackCue(b); });
             Bind<Button>(_lobby, "StartBtn", b => { b.clicked += OnStartMatch; OwnCue(b); });
             Bind<Button>(_lobby, "CopyBtn",  b => b.clicked += CopyJoinCode);
             Bind<Button>(_lobby, "ShareBtn", b => b.clicked += CopyJoinCode);

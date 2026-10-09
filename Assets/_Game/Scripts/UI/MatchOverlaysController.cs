@@ -54,7 +54,7 @@ namespace CluckWars.UI
         private ColorSchemeSO            _colors;      // injected for DI parity with MatchHud
         private MatchConfigSO            _matchConfig;
         private ISessionSelectionService _selection;
-        private IInputProvider           _input;        // Esc / Android back = LEAVE while the waiting room shows
+        private IInputProvider           _input;        // Esc / Android back / pad Start: LEAVE (waiting room), "Leave match?" (round), BACK TO LOBBY (podium)
         private MenuAudio                _audio = MenuAudio.Silent();
         private ChickenClassRegistrySO   _classRegistry;
 
@@ -63,6 +63,19 @@ namespace CluckWars.UI
         private bool          _bound;
 
         private VisualElement _matchEndOverlay, _lobbyOverlay, _sessionEndOverlay, _introOverlay;
+
+        // "Leave match?" (round-3 finding 4): Back during GET READY / the countdown / a round asks first.
+        private VisualElement _leaveSheet;
+        private Label         _leaveBody;
+        private Button        _leaveKeepBtn, _leaveConfirmBtn;
+        private bool          _leaveSheetOpen;
+        // True while this controller holds the solo runner paused under the sheet (always released on close / leave / destroy).
+        private bool          _soloPaused;
+        // The 45% countdown scrim is on for GET READY and the 3-2-1 only (finding 17); the top bar dims with it.
+        private bool          _introScrim;
+        // Post-match music (finding 7): when the podium appeared and whether the menu bed has started under it.
+        private float         _podiumShownAt;
+        private bool          _podiumBedStarted;
 
         private Label         _meRibbon, _meWinSub, _meTargetNote, _meHostNote;
         private Button        _mePlayAgainBtn, _meBackBtn;
@@ -188,8 +201,14 @@ namespace CluckWars.UI
 
             if (_network != null) _network.OnShutdown += HandleShutdown;
             if (_input == null)
-                _log?.Warn(Source, "IInputProvider not injected; Esc / Android back will not leave the waiting room (LEAVE still works).");
+                _log?.Warn(Source, "IInputProvider not injected; Esc / Android back / pad Start will not leave the match (the on-screen buttons still work).");
             EnsureEventSystem();
+        }
+
+        private void OnDisable()
+        {
+            // The sheet's pause and input gate are process-wide: never leave them behind with this controller.
+            CloseLeaveSheet();
         }
 
         private void OnDestroy()
@@ -232,6 +251,7 @@ namespace CluckWars.UI
 
             if (_shutdownReason.HasValue)
             {
+                CloseLeaveSheet();   // the session-end screen owns a session that closed under the sheet
                 TickSessionEnd();
                 return;
             }
@@ -240,6 +260,7 @@ namespace CluckWars.UI
             if (poll) _nextRefresh = Time.unscaledTime + _refreshInterval;
 
             var gm = GameManager.Instance;
+            RefreshBack(gm);
             RefreshMatchEnd(gm);
             RefreshLobby(gm, poll);
             RefreshIntro(gm);
@@ -249,7 +270,7 @@ namespace CluckWars.UI
             // Previously only RefreshIntro drove this, so during MATCH END the live
             // leaderboard sat at full brightness on top of the dimmed arena, directly
             // competing with the FINAL STANDINGS panel showing the same four scores.
-            SetTopBarDimmed(IsShown(_introOverlay));
+            SetTopBarDimmed(_introScrim && IsShown(_introOverlay));
             SetTopBarHidden(IsShown(_matchEndOverlay) || IsShown(_lobbyOverlay));
         }
 
@@ -278,6 +299,12 @@ namespace CluckWars.UI
             _lobbyOverlay      = _root.Q<VisualElement>("LobbyOverlay");
             _sessionEndOverlay = _root.Q<VisualElement>("SessionEndOverlay");
             _introOverlay      = _root.Q<VisualElement>("IntroOverlay");
+            _leaveSheet        = _root.Q<VisualElement>("LeaveSheet");
+            _leaveBody         = _root.Q<Label>("LeaveBody");
+            _leaveKeepBtn      = _root.Q<Button>("LeaveKeepBtn");
+            _leaveConfirmBtn   = _root.Q<Button>("LeaveConfirmBtn");
+            if (_leaveSheet == null || _leaveBody == null || _leaveKeepBtn == null || _leaveConfirmBtn == null)
+                _log?.Error(Source, "MatchOverlays.uxml is missing #LeaveSheet / #LeaveBody / #LeaveKeepBtn / #LeaveConfirmBtn; Back in a running match will do nothing.");
 
             _meSafe         = _root.Q<VisualElement>("MeSafe");
             _meRibbon       = _root.Q<Label>("MeWinRibbonLabel");
@@ -353,6 +380,8 @@ namespace CluckWars.UI
             if (_lobbyShareBtn != null) _lobbyShareBtn.clicked += CopyJoinCode;
             if (_lobbyLeaveBtn != null) _lobbyLeaveBtn.clicked += OnLobbyLeave;
             if (_lobbyChangeBirdBtn != null) _lobbyChangeBirdBtn.clicked += OnLobbyChangeBird;
+            if (_leaveKeepBtn    != null) _leaveKeepBtn.clicked    += OnLeaveKeep;
+            if (_leaveConfirmBtn != null) _leaveConfirmBtn.clicked += OnLeaveConfirm;
 
             // One-time: every @key text in the overlays comes from the wording dictionary.
             UiText.SetLogger(_log);
@@ -363,7 +392,7 @@ namespace CluckWars.UI
             // session-end overlay pads itself, its dim fill still reaching the edges).
             if (_meSafe == null) _log?.Error(Source, "MatchOverlays.uxml has no #MeSafe; the post-match screen ignores the safe area.");
             if (_lobbySafe == null) _log?.Error(Source, "MatchOverlays.uxml has no #LobbySafe; the waiting room ignores the safe area.");
-            _safeArea = new SafeAreaPadding(_meSafe, _lobbySafe, _sessionEndOverlay);
+            _safeArea = new SafeAreaPadding(_meSafe, _lobbySafe, _sessionEndOverlay, _leaveSheet);
             _root.RegisterCallback<GeometryChangedEvent>(evt =>
             {
                 _safeArea.Apply(force: true);
@@ -379,6 +408,7 @@ namespace CluckWars.UI
             SetShown(_introGetReady, false);
             SetShown(_introWaiting, false);
             SetShown(_hostLeftNotice, false);
+            SetShown(_leaveSheet, false);
 
             _bound = true;
             _log?.Debug(Source, "Overlays bound.");
@@ -392,6 +422,103 @@ namespace CluckWars.UI
         }
 
         // ========================================================================
+        //  BACK  (Esc / Android back / pad Start) + the "Leave match?" sheet
+        // ========================================================================
+        /// <summary>
+        /// One Back press = one action, decided per match phase by <see cref="MatchBackRules"/>: LEAVE in the
+        /// waiting room, the "Leave match?" sheet in GET READY / the countdown / a round (Back again closes it),
+        /// BACK TO LOBBY on the podium. Also keeps the sheet honest: it closes when the phase no longer allows it
+        /// and a solo runner is paused exactly while it is up.
+        /// </summary>
+        private void RefreshBack(GameManager gm)
+        {
+            MatchState? state = gm != null ? gm.State : (MatchState?)null;
+            if (_leaveSheetOpen && !MatchBackRules.SheetAllowed(state)) CloseLeaveSheet();
+
+            if (!_leavingToLobby && _input != null && _input.GetBackPressed())
+            {
+                // Esc is also the keyboard's ability cancel: with a move held it only cancels it.
+                switch (MatchBackRules.Resolve(state, _leaveSheetOpen, _leavingToLobby, AnyAbilityHeld()))
+                {
+                    case MatchBackAction.LeaveWaitingRoom: OnLobbyLeave(); return;
+                    case MatchBackAction.OpenLeaveSheet:   OpenLeaveSheet(); break;
+                    case MatchBackAction.CloseLeaveSheet:  _audio.Back(); CloseLeaveSheet(); break;
+                    case MatchBackAction.BackToLobby:      OnBackToLobby(); return;
+                }
+            }
+
+            ApplySoloPause(state);
+        }
+
+        private bool AnyAbilityHeld()
+        {
+            for (int i = 0; i < 4; i++)
+                if (_input.GetAbilityHeld(i)) return true;
+            return false;
+        }
+
+        private bool IsSolo()
+        {
+            var runner = _network?.Runner;
+            return runner != null && runner.GameMode == GameMode.Single;
+        }
+
+        private void OpenLeaveSheet()
+        {
+            if (_leaveSheetOpen || _leaveSheet == null) return;
+            _leaveSheetOpen = true;
+            LeaveSheetState.IsOpen = true;
+            bool solo = IsSolo();
+            if (_leaveBody != null) _leaveBody.text = UiText.Get(solo ? UiKeys.LeaveBodySolo : UiKeys.LeaveBodyMp);
+            SetShown(_leaveSheet, true);
+            _audio.Tap();
+            _leaveKeepBtn?.Focus();   // the default focus: a pad / keyboard confirm keeps playing
+            _log?.Info(Source, $"Leave sheet opened ({(solo ? "solo: the round pauses" : "multiplayer: the match keeps going")}).");
+        }
+
+        /// <summary>Hides the sheet, lifts the input gate and resumes a paused solo runner. Safe to call when it is not open.</summary>
+        private void CloseLeaveSheet()
+        {
+            bool wasOpen = _leaveSheetOpen;
+            _leaveSheetOpen = false;
+            LeaveSheetState.IsOpen = false;
+            SetShown(_leaveSheet, false);
+            ApplySoloPause(GameManager.Instance != null ? GameManager.Instance.State : (MatchState?)null);
+            if (wasOpen) _log?.Info(Source, "Leave sheet closed.");
+        }
+
+        /// <summary>Solo only: <c>NetworkRunner.SinglePlayerPause</c> freezes ticks, so the match clock, bots,
+        /// cooldowns and physics all stop together. Multiplayer is never paused.</summary>
+        private void ApplySoloPause(MatchState? state)
+        {
+            bool want = MatchBackRules.PausesSimulation(IsSolo(), state, _leaveSheetOpen);
+            if (want == _soloPaused) return;
+            var runner = _network?.Runner;
+            if (runner != null)
+            {
+                try { runner.SinglePlayerPause(want); }
+                catch (Exception e)
+                {
+                    _log?.Error(Source, $"SinglePlayerPause({want}) failed: {e}. The round {(want ? "keeps running under the sheet" : "may stay frozen - leave and restart")}.");
+                }
+            }
+            _soloPaused = want;
+        }
+
+        private void OnLeaveKeep()
+        {
+            _audio.Back();
+            CloseLeaveSheet();
+        }
+
+        private void OnLeaveConfirm()
+        {
+            if (_leavingToLobby) return;
+            _audio.Back();
+            LeaveSession(changeBird: false, "LEAVE");
+        }
+
+        // ========================================================================
         //  MATCH END
         // ========================================================================
         private void RefreshMatchEnd(GameManager gm)
@@ -402,6 +529,7 @@ namespace CluckWars.UI
             {
                 if (_matchEndPopulated) DisposeStage();
                 _matchEndPopulated = false;
+                _podiumBedStarted = false;
                 _celebration?.Stop();
                 return;
             }
@@ -412,6 +540,15 @@ namespace CluckWars.UI
             {
                 PopulateMatchEnd(gm);
                 _matchEndPopulated = true;
+                _podiumShownAt = Time.unscaledTime;
+            }
+
+            // The match loop fades out at the round's end (GameManager); the menu loop comes in under the podium
+            // and stays through the solo PLAY AGAIN countdown (the match loop replaces it at GO).
+            if (!_leavingToLobby && MatchPresentationRules.StartsPodiumBed(true, _podiumBedStarted, Time.unscaledTime - _podiumShownAt))
+            {
+                _podiumBedStarted = true;
+                _audio.StartMenuBed();
             }
 
             if (_leavingToLobby) return; // buttons stay disabled while the session shuts down
@@ -469,6 +606,8 @@ namespace CluckWars.UI
         private void LeaveSession(bool changeBird, string why)
         {
             _leavingToLobby = true;
+            // A paused solo runner must be running again before it shuts down.
+            CloseLeaveSheet();
             foreach (var b in new[] { _mePlayAgainBtn, _meBackBtn, _lobbyStartBtn, _lobbyLeaveBtn, _lobbyChangeBirdBtn })
                 b?.SetEnabled(false);
 
@@ -864,9 +1003,6 @@ namespace CluckWars.UI
             SetShown(_lobbyOverlay, show);
             if (!show) return;
 
-            // Esc / Android back = LEAVE, polled only while the room is up (the match's own Esc use, the
-            // ability cancel, is idle here: nothing moves in the waiting room).
-            if (!_leavingToLobby && _input != null && _input.GetBackPressed()) { OnLobbyLeave(); return; }
             if (!(poll || opening)) return;
 
             var runner = _network?.Runner;
@@ -1110,6 +1246,7 @@ namespace CluckWars.UI
             {
                 _introCues.Reset();
                 if (_introNumber != null && _introNumber.text.Length > 0) _introNumber.text = string.Empty;
+                SetIntroScrim(MatchPresentationRules.IntroScrimVisible(getReady, introActive: false));
                 SetShown(_introOverlay, getReady);
                 return;
             }
@@ -1117,6 +1254,9 @@ namespace CluckWars.UI
 
             // The timer is networked and untouched; the cues below are this client's own presentation of it.
             var cue = _introCues.Observe(gm.IsIntroActive, gm.IsIntroActive ? gm.IntroRemaining : 0f, out int number);
+
+            // The scrim dims GET READY and the 3-2-1; the GO! slam below plays on the bare arena (finding 17).
+            SetIntroScrim(MatchPresentationRules.IntroScrimVisible(getReady: false, introActive: gm.IsIntroActive));
 
             if (gm.IsIntroActive)
             {
@@ -1144,6 +1284,12 @@ namespace CluckWars.UI
             {
                 SetShown(_introOverlay, false);
             }
+        }
+
+        private void SetIntroScrim(bool on)
+        {
+            _introScrim = on;
+            _introOverlay?.EnableInClassList("cw-overlay--introdim", on);
         }
 
         /// <summary>

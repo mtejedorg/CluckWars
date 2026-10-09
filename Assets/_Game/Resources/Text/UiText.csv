@@ -183,3 +183,7 @@ session.reason.auth,The barn door would not let us in.
 session.reason.version,Your game and theirs do not match. Update and try again.
 session.reason.generic,Something spooked the flock.
 lobby.status.keepTyping,Keep typing…
+leave.title,Leave match?
+leave.body.solo,Paused. Your bird waits right here.
+leave.body.mp,The match keeps going without you.
+leave.keep,KEEP PLAYING

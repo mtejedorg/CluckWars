@@ -217,6 +217,12 @@ namespace CluckWars.Localization
         public const string CountdownWaitingSomeone = "countdown.waitingSomeone";
         public const string SessionHostLeft = "session.hostLeft";
 
+        // ---- Phase 6 chunk 7b (round-3 finding 4: leaving a running match) ----
+        public const string LeaveTitle = "leave.title";
+        public const string LeaveBodySolo = "leave.body.solo";
+        public const string LeaveBodyMp = "leave.body.mp";
+        public const string LeaveKeep = "leave.keep";
+
         // ---- Phase 5 chunk 2 (round-2 findings 2 + 12: in-match waiting room, session end) ----
         public const string NavLeave = "nav.leave";
         public const string BtnChangeBird = "btn.changeBird";

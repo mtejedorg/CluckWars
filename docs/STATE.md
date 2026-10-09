@@ -6,6 +6,16 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Phase 6 chunk 7b (2026-10-09, committed, EditMode 1080/1080): leaving a match, music fades, GO scrim, Coop BACK (round-3 findings 4, 7, 17, 18)
+
+- **Leave sheet (4).** Back (Esc / Android back / pad Start, all via `GetBackPressed`) is decided per phase by `MatchBackRules.Resolve`: waiting room = LEAVE (unchanged), GET READY / countdown / round = "Leave match?" sheet (`#LeaveSheet` in `MatchOverlays.uxml`, KEEP PLAYING default focus / LEAVE), podium = BACK TO LOBBY. Back with the sheet up = KEEP PLAYING. A Back while a move is held only cancels it (Esc is also the keyboard cancel). One poll now lives in `MatchOverlaysController.RefreshBack`.
+- **Solo pause.** `NetworkRunner.SinglePlayerPause(bool)` (Fusion has it; `Time.timeScale` does NOT stop Fusion ticks - probed). Paused only while solo + `Active` + sheet open (`MatchBackRules.PausesSimulation`); released on close, LEAVE, `OnDisable`. Live: tick, clock and bots frozen under the sheet, resume on close. Multiplayer never pauses; `LeaveSheetState.IsOpen` makes `FusionNetworkService.OnInput` send only an ability-cancel (no moves / presses) while the sheet is up.
+- **Music (7).** Round end fades the match loop (`MatchPresentationRules.EndMusicFadeOutSeconds` 0.6 s) instead of `StopMusic`; `MenuAudio.StartMenuBed()` brings the menu loop in at `MenuBedLevel` under the podium (stays through solo PLAY AGAIN); the match loop fades in over 0.25 s at GO.
+- **GO scrim (17).** `cw-overlay--introdim` is toggled by `MatchPresentationRules.IntroScrimVisible` (GET READY + 3-2-1 only); top-bar dim follows it.
+- **Coop BACK (18).** `_lobbyViaGearUp` in `MenuUiController`: false when opened via `OpenLobbyWithLastSetup` (PLAY AGAIN / BACK TO LOBBY) -> BACK is labelled HOME and goes to the main menu (button and Esc, `MenuBackTarget(3, viaGearUp)`); READY keeps the Gear Up path.
+- Copy: `leave.title/body.solo/body.mp/keep` in `UiText.csv` / `UiKeys`. Tests: `Phase6Chunk7bTests` + `UiAudioTests.MenuBed_...`; `WaitingRoomAndSessionEndTests` updated (one back poll in RefreshBack; theme scoped twice).
+- Captures: `Captures/phase6/static/leave_sheet__{desktop,phone}.png`. Not verified: MP body copy live, gamepad Start, Android back on device, audio by ear.
+
 ## ✅ Phase 6 chunk 7a (2026-10-09, committed, EditMode 1062/1062): post-match correctness + copy nits (round-3 findings 2, 3, 14, 21)
 
 - **Draw headline on every path (2).** `MatchStandings.WinBanner(ranked, winnerCorner)` decides the draw from the standings (`IsDraw`); the old `(hasWinner, winner, draw = false)` overload is gone. Source guard: nothing outside `MatchStandings` references `PostmatchEnded` / `PostmatchDraw`. Live all-zero round now reads EMPTY NESTS! (`Captures/phase6/postmatch/draw_live.png`, `postmatch__live__allzero__*`).

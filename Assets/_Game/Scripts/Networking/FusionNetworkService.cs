@@ -125,7 +125,7 @@ namespace CluckWars.Networking
         {
             if (_inputProvider == null) return;
 
-            if (GameManager.Instance == null || !GameManager.Instance.IsMatchRunning)
+            if (GameManager.Instance == null || !GameManager.Instance.IsMatchRunning || LeaveSheetState.IsOpen)
             {
                 _pendingAbility1 = false;
                 _pendingAbility2 = false;
@@ -145,6 +145,17 @@ namespace CluckWars.Networking
         void INetworkRunnerCallbacks.OnInput(NetworkRunner runner, NetworkInput input)
         {
             if (_inputProvider == null) return;
+
+            // "Leave match?" is up: this peer's bird stands still and nothing it presses reaches the simulation.
+            // The only thing sent is a cancel, so a move being aimed when the sheet opened is dropped, not fired.
+            if (LeaveSheetState.IsOpen)
+            {
+                _pendingAbility1 = _pendingAbility2 = _pendingAbility3 = _pendingAbility4 = _pendingAbilityCancel = false;
+                var cancelOnly = new NetworkButtons();
+                cancelOnly.Set((int)InputButton.AbilityCancel, true);
+                input.Set(new PlayerNetworkInput { Buttons = cancelOnly });
+                return;
+            }
 
             var movement = _inputProvider.GetMovement();
             var worldMovement = movement;

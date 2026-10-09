@@ -420,7 +420,8 @@ namespace CluckWars.Gameplay
                         _audio.CrossfadeMusic(_audioReg.MatchMusicIntense, IntenseCrossfadeSeconds);
                     break;
                 case MatchAudioCueTracker.Cue.End:
-                    _audio.StopMusic();
+                    // Fade, never cut: the menu loop comes in under the podium once this has faded (MatchOverlaysController).
+                    _audio.FadeOutMusic(MatchPresentationRules.EndMusicFadeOutSeconds);
                     // MatchVictory only for the peer whose player won; MatchEnd for everyone else (a rival,
                     // a bot, or a timer expiry with no scorer).
                     bool localWon = WinnerPlayer.IsRealPlayer && Runner != null && WinnerPlayer == Runner.LocalPlayer;
@@ -432,10 +433,11 @@ namespace CluckWars.Gameplay
         private const float IntenseCrossfadeSeconds = 1f;
         private bool _warnedNoMatchMusic;
 
-        /// <summary>The match loop at GO; it replaces the menu bed that played under GET READY.</summary>
+        /// <summary>The match loop at GO, faded in over <see cref="MatchPresentationRules.GoMusicFadeInSeconds"/> so the GO sound
+        /// leads; it replaces the menu bed that played under GET READY.</summary>
         private void PlayMatchMusic()
         {
-            if (_audioReg != null && _audioReg.MatchMusic != null) { _audio.PlayMusic(_audioReg.MatchMusic, 0.6f); return; }
+            if (_audioReg != null && _audioReg.MatchMusic != null) { _audio.PlayMusic(_audioReg.MatchMusic, 0.6f, loop: true, fadeInSeconds: MatchPresentationRules.GoMusicFadeInSeconds); return; }
             if (!_warnedNoMatchMusic)
                 _log?.Error(Source, "AudioRegistrySO.MatchMusic is not assigned (Assets/_Game/Data/AudioRegistry.asset): the match plays without music.");
             _warnedNoMatchMusic = true;
