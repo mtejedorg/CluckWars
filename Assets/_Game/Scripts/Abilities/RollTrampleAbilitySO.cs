@@ -1,11 +1,16 @@
 using CluckWars.Gameplay;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
     [CreateAssetMenu(fileName = "DiveBomb", menuName = "Cluck Wars/Ability/Steal/Dive Bomb", order = 5)]
     public sealed class RollTrampleAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityDiveBombDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("n", Num(StealAmount)) };
+
         public RollTrampleAbilitySO()
         {
             Category = AbilityCategory.Steal;

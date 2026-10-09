@@ -1,5 +1,6 @@
 using CluckWars.Gameplay;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -34,6 +35,10 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Control/Belly Flop", order = 7)]
     public sealed class BellyFlopAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityBellyFlopDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("r", Num(ImpactRadius)), ("secs", Num(StunSeconds)) };
+
         public BellyFlopAbilitySO()
         {
             Category = AbilityCategory.Control;

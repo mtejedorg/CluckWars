@@ -75,6 +75,37 @@ namespace CluckWars.Localization
         public const string GlyphPlus = "glyph.plus";
         public const string GlyphMinus = "glyph.minus";
 
+        // ---- Active-ability descriptions (templated from each ability's own fields; see AbilityBaseSO.DescriptionText) ----
+        [UiArgs("r", "secs")] public const string AbilityAmbushDesc = "ability.ambush.desc";
+        [UiArgs("r", "secs")] public const string AbilityWingSlamDesc = "ability.wingslam.desc";
+        [UiArgs("r", "secs")] public const string AbilityBellyFlopDesc = "ability.bellyflop.desc";
+        [UiArgs("r")] public const string AbilityCluckShockDesc = "ability.cluckshock.desc";
+        [UiArgs("n")] public const string AbilityDiveBombDesc = "ability.divebomb.desc";
+        [UiArgs("secs")] public const string AbilityDoppelgangerDesc = "ability.doppelganger.desc";
+        [UiArgs("r", "pct", "secs")] public const string AbilityDustKickDesc = "ability.dustkick.desc";
+        [UiArgs("secs")] public const string AbilityEggShellDesc = "ability.eggshell.desc";
+        [UiArgs("r", "pct", "secs")] public const string AbilityFeatherAuraDesc = "ability.featheraura.desc";
+        [UiArgs("secs", "pct")] public const string AbilityFeatherTrapDesc = "ability.feathertrap.desc";
+        public const string AbilityFeintDesc = "ability.feint.desc";
+        [UiArgs("r", "secs")] public const string AbilityGroundQuakeDesc = "ability.groundquake.desc";
+        [UiArgs("r", "secs")] public const string AbilityHeadbuttDesc = "ability.headbutt.desc";
+        [UiArgs("secs")] public const string AbilityImmovableDesc = "ability.immovable.desc";
+        [UiArgs("secs")] public const string AbilityInvisibilityDesc = "ability.invisibility.desc";
+        [UiArgs("r")] public const string AbilityMarkKillDesc = "ability.markkill.desc";
+        public const string AbilityPeckDesc = "ability.peck.desc";
+        [UiArgs("mult", "secs")] public const string AbilityQuickDropDesc = "ability.quickdrop.desc";
+        [UiArgs("mult", "secs")] public const string AbilityRollPushDesc = "ability.rollpush.desc";
+        [UiArgs("secs")] public const string AbilityRootEggDesc = "ability.rootegg.desc";
+        [UiArgs("mult", "secs")] public const string AbilityRuffleDesc = "ability.ruffle.desc";
+        [UiArgs("n", "r")] public const string AbilityScrapDesc = "ability.scrap.desc";
+        [UiArgs("mult", "secs")] public const string AbilityShadowstepDesc = "ability.shadowstep.desc";
+        [UiArgs("r", "secs", "pct")] public const string AbilitySmokeRoostDesc = "ability.smokeroost.desc";
+        [UiArgs("n", "r")] public const string AbilitySnatchDesc = "ability.snatch.desc";
+        [UiArgs("n", "r")] public const string AbilitySneakyStealDesc = "ability.sneakysteal.desc";
+        [UiArgs("secs", "mult")] public const string AbilitySpeedBurstDesc = "ability.speedburst.desc";
+        [UiArgs("secs", "n")] public const string AbilitySpineCoatDesc = "ability.spinecoat.desc";
+        [UiArgs("pct", "secs")] public const string AbilityTurtleModeDesc = "ability.turtlemode.desc";
+
         // ---- Perks (templated from each passive's own fields) ----
         [UiArgs("pct")] public const string PerkRelentlessLine = "perk.relentless.line";
         public const string PerkRelentlessDetail = "perk.relentless.detail";

@@ -1,5 +1,6 @@
 using CluckWars.Gameplay;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -13,6 +14,10 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Steal/Snatch", order = 7)]
     public sealed class SnatchAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilitySnatchDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("n", Num(StealAmount)), ("r", Num(SnatchRange)) };
+
         public SnatchAbilitySO()
         {
             Category = AbilityCategory.Steal;

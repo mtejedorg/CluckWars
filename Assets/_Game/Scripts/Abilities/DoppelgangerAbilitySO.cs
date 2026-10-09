@@ -1,6 +1,7 @@
 using CluckWars.Gameplay;
 using Fusion;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -17,6 +18,10 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "Doppelganger", menuName = "Cluck Wars/Ability/Doppelganger", order = 7)]
     public sealed class DoppelgangerAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityDoppelgangerDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("secs", Num(DecoyLifetimeSeconds)) };
+
         private const string Source = "Doppelganger";
 
         public DoppelgangerAbilitySO()

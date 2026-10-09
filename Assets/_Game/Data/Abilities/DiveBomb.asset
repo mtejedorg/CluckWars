@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.RollTrampleAbilitySO
   DisplayName: Dive Bomb
   ShortLabel: DVB
-  Description: Hurls itself forward in a diving lunge, robbing cargo on contact.
+  Description: Hurls itself forward in a diving lunge, robbing 8 food from rivals on contact.
   AccentColor: {r: 1, g: 0.55, b: 0.2, a: 1}
   Category: 0
   TerrainTraversal: 1

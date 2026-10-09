@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.HeadbuttAbilitySO
   DisplayName: Headbutt
   ShortLabel: BUTT
-  Description: Short forward shove that staggers whoever it catches.
+  Description: Shoves rivals up to 3.6m ahead and staggers them for 0.35s.
   Icon: 
   AccentColor: {r: 0.75, g: 0.3, b: 0.22, a: 1}
   Category: 1

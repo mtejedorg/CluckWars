@@ -74,6 +74,9 @@ namespace CluckWars.Abilities
         // value in a .asset changes the text; PerkTextTests fails if the two ever disagree.
         // If a perk's MECHANIC changes (not just its numbers), rewrite its template.
 
+        /// <summary>Passives are described by <see cref="PerkLine"/>/<see cref="PerkDetail"/> (they need the MatchConfig), not by an ability template.</summary>
+        public override string DescriptionText => Description;
+
         /// <summary>UiKeys template for the one-line perk summary, or null if this passive has none.</summary>
         public virtual string PerkLineKey => null;
 

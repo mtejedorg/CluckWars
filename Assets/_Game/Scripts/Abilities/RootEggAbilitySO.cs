@@ -1,6 +1,7 @@
 using CluckWars.Gameplay;
 using Fusion;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -22,6 +23,10 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Control/Root Egg", order = 11)]
     public sealed class RootEggAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityRootEggDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("secs", Num(RootDuration)) };
+
         private const string Source = "RootEgg";
 
         [Tooltip("Seconds before the egg despawns if no chicken triggers it.")]

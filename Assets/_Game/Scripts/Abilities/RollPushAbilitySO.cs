@@ -1,5 +1,6 @@
 using CluckWars.Gameplay;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -21,6 +22,10 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Control/Roll and Push", order = 8)]
     public sealed class RollPushAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityRollPushDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("mult", Num(RollSpeedMultiplier)), ("secs", Num(Duration)) };
+
         public RollPushAbilitySO()
         {
             TerrainTraversal = TerrainTraversal.Barge;

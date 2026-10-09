@@ -1,6 +1,7 @@
 using CluckWars.Gameplay;
 using Fusion;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -24,6 +25,10 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Control/Feather Trap", order = 9)]
     public sealed class FeatherTrapAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityFeatherTrapDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("secs", Num(ZoneDuration)), ("pct", Pct(SlowFactor)) };
+
         private const string Source = "FeatherTrap";
 
         [Tooltip("Distance in front of the caster where the zone center is placed.")]

@@ -1,5 +1,6 @@
 using CluckWars.Gameplay;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -40,6 +41,8 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Utility/Peck", order = 4)]
     public sealed class PeckAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityPeckDesc;
+
         public PeckAbilitySO()
         {
             Category = AbilityCategory.Utility;

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.ImmovableAbilitySO
   DisplayName: Immovable
   ShortLabel: WALL
-  Description: Plants himself. Nothing stuns, roots, slows or shoves him.
+  Description: Plants himself for 3s. Nothing stuns, roots, slows or shoves him.
   Icon: 
   AccentColor: {r: 0.58, g: 0.52, b: 0.45, a: 1}
   Category: 2

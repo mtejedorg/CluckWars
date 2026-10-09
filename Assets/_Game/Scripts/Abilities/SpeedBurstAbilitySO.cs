@@ -1,4 +1,5 @@
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -10,6 +11,10 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "SpeedBurst", menuName = "Cluck Wars/Ability/Speed Burst", order = 0)]
     public sealed class SpeedBurstAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilitySpeedBurstDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("mult", Num(SpeedMultiplier)), ("secs", Num(Duration)) };
+
         [Tooltip("Multiplier applied to MoveSpeed while active. 2.5 ≈ doubled top speed without feeling teleporty.")]
         [Min(1f)] public float SpeedMultiplier = 2.5f;
 

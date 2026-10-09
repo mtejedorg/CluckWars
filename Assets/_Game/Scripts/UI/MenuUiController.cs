@@ -1830,7 +1830,7 @@ namespace CluckWars.UI
                     _abilityDetailCd.EnableInClassList("cw-cd-badge--med", !shortCd);
                 }
             }
-            _abilityDetailText.text = has ? ab.Description : UiText.Get(UiKeys.LoadoutDetailEmpty);
+            _abilityDetailText.text = has ? ab.DescriptionText : UiText.Get(UiKeys.LoadoutDetailEmpty);
             _abilityDetailText.style.color = has ? Ink : InkSoft;
             if (_abilityDetail != null) SetBorder(_abilityDetail, has ? AbilityPalette.CategoryColor(ab.Category) : Ink);
         }

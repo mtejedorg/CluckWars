@@ -1,5 +1,6 @@
 using CluckWars.Gameplay;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -17,6 +18,10 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "SneakySteal", menuName = "Cluck Wars/Ability/Sneaky Steal", order = 6)]
     public sealed class SneakyStealAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilitySneakyStealDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("n", Num(StealAmount)), ("r", Num(StealRange)) };
+
         [Tooltip("How close an enemy chicken needs to be to steal from. Generous so it feels reliable.")]
         [Min(0.5f)] public float StealRange = 5.4f;
 

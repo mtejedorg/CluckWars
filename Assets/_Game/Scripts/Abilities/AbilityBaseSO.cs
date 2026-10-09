@@ -1,5 +1,8 @@
+using System;
 using System.Collections.Generic;
+using System.Globalization;
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using UnityEngine;
 
 namespace CluckWars.Abilities
@@ -123,6 +126,42 @@ namespace CluckWars.Abilities
                  "via GatherTargets (see AbilityAimTests' 'no stray scans' regression lock). Kept in case a " +
                  "future ability needs a real physics query (e.g. line-of-sight); not currently read.")]
         public LayerMask SearchMask = 256; // 1 << 8 (Chickens layer)
+
+        // ---- Player-facing description (templated from this ability's own fields) ----
+        // Every move that is shown to a player carries a UiText template and supplies the named
+        // numbers it uses FROM ITS OWN FIELDS, exactly like PassiveAbilitySO's perk lines. Nothing
+        // here is prose with a number typed into it, so changing a value in a .asset changes the
+        // text; AbilityDescriptionTests fails if the two ever disagree. If a move's MECHANIC
+        // changes (not just its numbers), rewrite its template. The raw Description field is
+        // kept in step by that test and is only a fallback for an ability with no template.
+
+        /// <summary>UiKeys template for this ability's description, or null if it has none.</summary>
+        public virtual string DescriptionKey => null;
+
+        /// <summary>The named arguments for <see cref="DescriptionKey"/>, read from this ability's fields.</summary>
+        public virtual (string name, object value)[] DescriptionArgs() => Array.Empty<(string, object)>();
+
+        /// <summary>
+        /// The description every player-facing reader shows. Falls back to the authored
+        /// <see cref="Description"/> only for an ability with no template, and says so (once) through UiText's logger.
+        /// </summary>
+        public virtual string DescriptionText
+        {
+            get
+            {
+                var key = DescriptionKey;
+                if (key != null) return UiText.Format(key, DescriptionArgs());
+                UiText.ReportProblem($"no ability description template:{name}",
+                    $"Ability '{name}' ({GetType().Name}) has no DescriptionKey; showing its raw Description. Add an ability.*.desc template.");
+                return Description;
+            }
+        }
+
+        /// <summary>A number as it reads in a description: at most two decimals, no trailing zeros (1.5, 5.4, 2).</summary>
+        protected static string Num(float value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+
+        /// <summary>A 0..1 fraction as a whole percent (0.55 becomes 55).</summary>
+        protected static string Pct(float fraction) => Mathf.RoundToInt(fraction * 100f).ToString(CultureInfo.InvariantCulture);
 
         /// <summary>
         /// Returns the effective <see cref="BotRole"/> for this ability.

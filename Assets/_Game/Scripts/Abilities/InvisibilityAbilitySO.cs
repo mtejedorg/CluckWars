@@ -1,4 +1,5 @@
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -13,6 +14,10 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "Invisibility", menuName = "Cluck Wars/Ability/Invisibility", order = 4)]
     public sealed class InvisibilityAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityInvisibilityDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("secs", Num(Duration)) };
+
         [Tooltip("Alpha while active. 0 = totally invisible (fragile), 0.2 ≈ ghostly outline (readable).")]
         [Range(0f, 1f)] public float Opacity = 0.2f;
 

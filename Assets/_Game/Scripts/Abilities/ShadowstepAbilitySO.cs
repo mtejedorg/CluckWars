@@ -1,5 +1,6 @@
 using CluckWars.Gameplay;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -9,11 +10,15 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "Shadowstep", menuName = "Cluck Wars/Ability/Utility/Shadowstep", order = 11)]
     public sealed class ShadowstepAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityShadowstepDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("mult", Num(SpeedMultiplier)), ("secs", Num(Duration)) };
+
         public ShadowstepAbilitySO()
         {
             DisplayName = "Shadowstep";
             ShortLabel = "STEP";
-            Description = "Short blink dash phasing over walls along facing direction.";
+            Description = "Dashes forward at 3x speed for 0.4s, straight over walls.";
             Category = AbilityCategory.Utility;
             TerrainTraversal = TerrainTraversal.Blink;
             AllowedClasses = ChickenClassFlags.Assassin;

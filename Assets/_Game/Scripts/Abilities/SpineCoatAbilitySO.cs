@@ -1,5 +1,6 @@
 using CluckWars.Gameplay;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -7,6 +8,10 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Defense/Spine Coat", order = 3)]
     public sealed class SpineCoatAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilitySpineCoatDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("secs", Num(Duration)), ("n", Num(StealBackAmount)) };
+
         public SpineCoatAbilitySO()
         {
             Category = AbilityCategory.Defense;

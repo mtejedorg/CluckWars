@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.QuickDropAbilitySO
   DisplayName: Quick Drop
   ShortLabel: DROP
-  Description: Dumps your whole beakful into the base in one motion.
+  Description: Banks food 4x faster for 2s - cash in at your base.
   Icon: 
   AccentColor: {r: 0.95, g: 0.82, b: 0.35, a: 1}
   Category: 3

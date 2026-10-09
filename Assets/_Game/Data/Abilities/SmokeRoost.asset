@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SmokeRoostAbilitySO
   DisplayName: Smoke Roost
   ShortLabel: SMOK
-  Description: Drops a choking cloud at his feet. He fades; everyone else stumbles. Using a move breaks it.
+  Description: "Drops a choking cloud (4m, 5.5s): he fades, rivals inside slow to 55% speed. Using a move breaks it."
   Icon: 
   AccentColor: {r: 0.45, g: 0.42, b: 0.58, a: 1}
   Category: 1

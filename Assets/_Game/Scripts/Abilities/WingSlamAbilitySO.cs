@@ -1,4 +1,5 @@
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -8,11 +9,13 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "WingSlam", menuName = "Cluck Wars/Ability/Control/Wing Slam", order = 10)]
     public sealed class WingSlamAbilitySO : StunBurstAbilitySO
     {
+        public override string DescriptionKey => UiKeys.AbilityWingSlamDesc;
+
         public WingSlamAbilitySO()
         {
             DisplayName = "Wing Slam";
             ShortLabel = "SLAM";
-            Description = "Slams the ground, stunning nearby rivals for 1.5 seconds.";
+            Description = "Slams the ground ahead, stunning rivals within 4.5m for 1.5s.";
             AllowedClasses = ChickenClassFlags.Warrior;
             StunRadius = 4.5f;
             StunDuration = 1.5f;

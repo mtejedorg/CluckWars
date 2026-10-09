@@ -1,4 +1,5 @@
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -31,6 +32,10 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Defense/Immovable", order = 7)]
     public sealed class ImmovableAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityImmovableDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("secs", Num(Duration)) };
+
         public ImmovableAbilitySO()
         {
             Category = AbilityCategory.Defense;

@@ -1,5 +1,6 @@
 using CluckWars.Gameplay;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -27,6 +28,10 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Control/Dust Kick", order = 7)]
     public sealed class DustKickAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityDustKickDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("r", Num(Reach)), ("pct", Pct(SlowFactor)), ("secs", Num(SlowSeconds)) };
+
         public DustKickAbilitySO()
         {
             Category = AbilityCategory.Control;

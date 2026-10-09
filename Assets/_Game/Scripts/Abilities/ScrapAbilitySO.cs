@@ -1,5 +1,6 @@
 using CluckWars.Gameplay;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -21,6 +22,10 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Steal/Scrap", order = 7)]
     public sealed class ScrapAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityScrapDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("n", Num(StealAmount)), ("r", Num(ScrapRange)) };
+
         public ScrapAbilitySO()
         {
             Category = AbilityCategory.Steal;

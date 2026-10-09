@@ -1,5 +1,6 @@
 using CluckWars.Gameplay;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -23,6 +24,10 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Control/Headbutt", order = 7)]
     public sealed class HeadbuttAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityHeadbuttDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("r", Num(Reach)), ("secs", Num(StaggerSeconds)) };
+
         public HeadbuttAbilitySO()
         {
             Category = AbilityCategory.Control;

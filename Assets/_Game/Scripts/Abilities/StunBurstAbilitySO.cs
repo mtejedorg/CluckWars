@@ -20,6 +20,9 @@ namespace CluckWars.Abilities
         [Tooltip("Stun duration applied to hit rivals.")]
         [Min(0.1f)] public float StunDuration = 1.0f;
 
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("r", Num(StunRadius)), ("secs", Num(StunDuration)) };
+
         public override float IndicatorRange => StunRadius;
         public override bool RequiresEnemyInRange => true;
 

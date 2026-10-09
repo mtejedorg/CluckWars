@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SpineCoatAbilitySO
   DisplayName: Spine Coat
   ShortLabel: SPN
-  Description: Punishes contact by stealing cargo back and knocking attackers away.
+  Description: For 2s, anyone who hits you loses 4 food to you and gets knocked away.
   AccentColor: {r: 0.55, g: 0.65, b: 0.20, a: 1}
   Category: 2
   TerrainTraversal: 0

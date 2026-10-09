@@ -6,6 +6,15 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Phase 6 chunk 7c (2026-10-09, UNCOMMITTED, EditMode 1089/1089): active-ability descriptions templated from the real numbers (round-3 finding 8)
+
+- Every active move's player text is now a UiText template (`ability.<id>.desc`, 29 rows in `UiText.csv`, constants in `UiKeys`) filled from the ability's own serialized fields: `AbilityBaseSO.DescriptionKey` / `DescriptionArgs()` / `DescriptionText` (same idea as the perk lines). Gear Up reads `DescriptionText` (`MenuUiController`). Passives keep `PerkLine`/`PerkDetail` (`PassiveAbilitySO.DescriptionText` just returns `Description`). An ability with no template falls back to `Description` and reports once through `UiText.ReportProblem` (logged via ILogService, also in `UiText.Problems`).
+- Fixed wrong text: Speed Burst 2.5x -> 1.5x; Sneaky Steal and Feather Aura 3m -> 5.4m. Shadowstep and Death Mark rewritten in plain words. The `.asset` `Description` fields hold the rendered text (a test pins them).
+- Formatting house style: `{n}m`, `{n}s`, `{n}x`, `{pct}% speed`, at most two decimals.
+- Not changed: any ability value. Note the code default of `SpeedBurstAbilitySO.SpeedMultiplier` is still 2.5 (asset overrides it with 1.5) and `DiveBomb.asset` / `SpineCoat.asset` do not serialize `StealAmount` / `StealBackAmount` (code defaults 8 / 4 apply; DiveBomb.asset still carries a stale `TrampleDamage`, TurtleMode a stale `DamageResistance`, CluckShock a stale `ShockDamage`).
+- Tests: `AbilityDescriptionTests` (9). Capture: `Captures/phase6/static/gearup_ability_desc.png`.
+- Outstanding Maestro prefab-wiring steps: none. Compendium site / GDD ability lines should take the rendered text from the chunk report.
+
 ## ✅ Phase 6 chunk 7b (2026-10-09, committed, EditMode 1080/1080): leaving a match, music fades, GO scrim, Coop BACK (round-3 findings 4, 7, 17, 18)
 
 - **Leave sheet (4).** Back (Esc / Android back / pad Start, all via `GetBackPressed`) is decided per phase by `MatchBackRules.Resolve`: waiting room = LEAVE (unchanged), GET READY / countdown / round = "Leave match?" sheet (`#LeaveSheet` in `MatchOverlays.uxml`, KEEP PLAYING default focus / LEAVE), podium = BACK TO LOBBY. Back with the sheet up = KEEP PLAYING. A Back while a move is held only cancels it (Esc is also the keyboard cancel). One poll now lives in `MatchOverlaysController.RefreshBack`.

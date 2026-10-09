@@ -1,5 +1,6 @@
 using CluckWars.Gameplay;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -10,13 +11,17 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "MarkKill", menuName = "Cluck Wars/Ability/Control/Mark Kill", order = 12)]
     public sealed class MarkKillAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityMarkKillDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("r", Num(IndicatorRange)) };
+
         private const string Source = "MarkKill";
 
         public MarkKillAbilitySO()
         {
             DisplayName = "Death Mark";
             ShortLabel = "EXEC";
-            Description = "Marks an isolated rival, arming a fatal execute once stunned.";
+            Description = "Marks a lone rival within 8m. Stun them, then press again to take everything they carry.";
             Category = AbilityCategory.Control;
             AllowedClasses = ChickenClassFlags.None; // pre-equip-only: obtainable solely as a subclass pre-equip (Spoiler Peck slot)
             Duration = 0.1f;

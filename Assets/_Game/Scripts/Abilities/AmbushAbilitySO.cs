@@ -1,4 +1,5 @@
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -8,11 +9,13 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "Ambush", menuName = "Cluck Wars/Ability/Control/Ambush", order = 9)]
     public sealed class AmbushAbilitySO : StunBurstAbilitySO
     {
+        public override string DescriptionKey => UiKeys.AbilityAmbushDesc;
+
         public AmbushAbilitySO()
         {
             DisplayName = "Ambush";
             ShortLabel = "AMB";
-            Description = "Stuns nearby rivals for 1 second.";
+            Description = "Stuns rivals within 3.6m for 1s.";
             AllowedClasses = ChickenClassFlags.Assassin;
             StunRadius = 3.6f;
             StunDuration = 1.0f;

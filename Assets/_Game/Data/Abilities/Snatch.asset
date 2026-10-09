@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SnatchAbilitySO
   DisplayName: Snatch
   ShortLabel: SNC
-  Description: Robs cargo from every rival in a forward arc and shoves them back.
+  Description: Robs 5 food from every rival within 4.3m ahead and shoves them back.
   Icon: 
   AccentColor: {r: 1, g: 0.3, b: 0.1, a: 1}
   Category: 0

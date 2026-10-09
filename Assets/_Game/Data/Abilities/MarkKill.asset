@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.MarkKillAbilitySO
   DisplayName: Death Mark
   ShortLabel: EXEC
-  Description: Marks an isolated rival, arming a fatal execute once stunned.
+  Description: Marks a lone rival within 8m. Stun them, then press again to take everything they carry.
   AccentColor: {r: 0.9, g: 0.1, b: 0.2, a: 1}
   Category: 1
   TerrainTraversal: 0

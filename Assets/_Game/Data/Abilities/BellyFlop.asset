@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.BellyFlopAbilitySO
   DisplayName: Belly Flop
   ShortLabel: FLOP
-  Description: Launches his whole mass forward and lands hard.
+  Description: Launches his whole mass forward and lands hard, stunning rivals within 4m for 1.4s.
   Icon: 
   AccentColor: {r: 0.9, g: 0.72, b: 0.3, a: 1}
   Category: 1

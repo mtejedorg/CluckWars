@@ -67,6 +67,9 @@ namespace CluckWars.Localization
             ProblemList.Clear();
         }
 
+        /// <summary>Reports a wording problem found outside UiText (each distinct <paramref name="dedupeKey"/> once), visibly and through the logger.</summary>
+        public static void ReportProblem(string dedupeKey, string message) => Report(dedupeKey, message);
+
         /// <summary>Registers the logger problems are reported through, flushing any held ones.</summary>
         public static void SetLogger(ILogService log)
         {

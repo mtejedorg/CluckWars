@@ -1,4 +1,5 @@
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -25,6 +26,8 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Utility/Feint", order = 7)]
     public sealed class FeintAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityFeintDesc;
+
         public FeintAbilitySO()
         {
             Category = AbilityCategory.Utility;

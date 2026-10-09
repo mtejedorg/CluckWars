@@ -1,5 +1,6 @@
 using CluckWars.Gameplay;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -20,6 +21,10 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Control/Ground Quake", order = 7)]
     public sealed class GroundQuakeAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityGroundQuakeDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("r", Num(QuakeRadius)), ("secs", Num(RootSeconds)) };
+
         public GroundQuakeAbilitySO()
         {
             Category = AbilityCategory.Control;

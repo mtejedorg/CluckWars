@@ -1,6 +1,7 @@
 using CluckWars.Gameplay;
 using Fusion;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -35,6 +36,10 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Control/Smoke Roost", order = 7)]
     public sealed class SmokeRoostAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilitySmokeRoostDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("r", Num(ZoneRadius)), ("secs", Num(ZoneDuration)), ("pct", Pct(SlowFactor)) };
+
         private const string Source = "SmokeRoost";
 
         public SmokeRoostAbilitySO()

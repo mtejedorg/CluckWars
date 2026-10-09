@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.DustKickAbilitySO
   DisplayName: Dust Kick
   ShortLabel: DUST
-  Description: Kicks dust backwards, slowing whoever is chasing you.
+  Description: "Kicks dust backwards: chasers within 4.5m slow to 55% speed for 2.5s."
   Icon: 
   AccentColor: {r: 0.72, g: 0.66, b: 0.48, a: 1}
   Category: 1

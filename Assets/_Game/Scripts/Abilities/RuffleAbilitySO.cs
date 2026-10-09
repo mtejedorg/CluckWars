@@ -1,4 +1,5 @@
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -19,6 +20,10 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Utility/Ruffle", order = 7)]
     public sealed class RuffleAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityRuffleDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("mult", Num(SpeedMultiplier)), ("secs", Num(Duration)) };
+
         public RuffleAbilitySO()
         {
             Category = AbilityCategory.Utility;

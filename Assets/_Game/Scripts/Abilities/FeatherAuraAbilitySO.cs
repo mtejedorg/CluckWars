@@ -1,5 +1,6 @@
 using CluckWars.Gameplay;
 using UnityEngine;
+using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
@@ -21,6 +22,10 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Control/Feather Aura", order = 10)]
     public sealed class FeatherAuraAbilitySO : AbilityBaseSO
     {
+        public override string DescriptionKey => UiKeys.AbilityFeatherAuraDesc;
+        public override (string name, object value)[] DescriptionArgs() =>
+            new (string, object)[] { ("r", Num(AuraRadius)), ("pct", Pct(AuraSlowFactor)), ("secs", Num(Duration)) };
+
         [Tooltip("Radius of the slow aura around the caster.")]
         [Min(0.5f)] public float AuraRadius = 5.4f;
 

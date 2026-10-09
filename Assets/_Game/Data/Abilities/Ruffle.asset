@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.RuffleAbilitySO
   DisplayName: Ruffle
   ShortLabel: RUFF
-  Description: A short burst of pace. Enough to close a gap or leave one.
+  Description: "A burst of pace: 1.5x speed for 2.5s. Enough to close a gap or leave one."
   Icon: 
   AccentColor: {r: 0.85, g: 0.62, b: 0.28, a: 1}
   Category: 3

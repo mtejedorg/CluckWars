@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.GroundQuakeAbilitySO
   DisplayName: Ground Quake
   ShortLabel: QUAK
-  Description: A stomp that pins everyone standing nearby.
+  Description: A stomp that pins everyone within 4.5m in place for 1.8s.
   Icon: 
   AccentColor: {r: 0.62, g: 0.4, b: 0.24, a: 1}
   Category: 1

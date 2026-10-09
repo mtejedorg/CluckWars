@@ -46,6 +46,35 @@ callout.assassin.strong,Blink and it's gone.
 callout.assassin.weak,"Light load, slow beak."
 glyph.plus,+
 glyph.minus,−
+ability.ambush.desc,Stuns rivals within {r}m for {secs}s.
+ability.wingslam.desc,"Slams the ground ahead, stunning rivals within {r}m for {secs}s."
+ability.bellyflop.desc,"Launches his whole mass forward and lands hard, stunning rivals within {r}m for {secs}s."
+ability.cluckshock.desc,A shockwave that shoves every rival within {r}m away.
+ability.divebomb.desc,"Hurls itself forward in a diving lunge, robbing {n} food from rivals on contact."
+ability.doppelganger.desc,Spawns a decoy copy beside you for {secs}s to soak up enemy attacks.
+ability.dustkick.desc,Kicks dust backwards: chasers within {r}m slow to {pct}% speed for {secs}s.
+ability.eggshell.desc,Seals you in an egg for {secs}s - you cannot walk or turn.
+ability.featheraura.desc,Slows every chicken within {r}m to {pct}% speed for {secs}s.
+ability.feathertrap.desc,Throws a feather cloud ahead that lasts {secs}s - chickens in it slow to {pct}% speed.
+ability.feint.desc,A hard sidestep. Walls still stop you.
+ability.groundquake.desc,A stomp that pins everyone within {r}m in place for {secs}s.
+ability.headbutt.desc,Shoves rivals up to {r}m ahead and staggers them for {secs}s.
+ability.immovable.desc,"Plants himself for {secs}s. Nothing stuns, roots, slows or shoves him."
+ability.invisibility.desc,Fades you to a ghostly outline for {secs}s. Using a move breaks it.
+ability.markkill.desc,"Marks a lone rival within {r}m. Stun them, then press again to take everything they carry."
+ability.peck.desc,Take a beakful of food from the pile you are standing at.
+ability.quickdrop.desc,Banks food {mult}x faster for {secs}s - cash in at your base.
+ability.rollpush.desc,"Rolls forward at {mult}x speed for {secs}s, shoving chickens out of the path."
+ability.rootegg.desc,Drops an egg that roots the first chicken to step on it for {secs}s.
+ability.ruffle.desc,A burst of pace: {mult}x speed for {secs}s. Enough to close a gap or leave one.
+ability.scrap.desc,Grabs {n} food off the nearest carrier within {r}m.
+ability.shadowstep.desc,"Dashes forward at {mult}x speed for {secs}s, straight over walls."
+ability.smokeroost.desc,"Drops a choking cloud ({r}m, {secs}s): he fades, rivals inside slow to {pct}% speed. Using a move breaks it."
+ability.snatch.desc,Robs {n} food from every rival within {r}m ahead and shoves them back.
+ability.sneakysteal.desc,Yanks {n} food from the nearest carrier within {r}m.
+ability.speedburst.desc,A {secs}s sprint at {mult}x movement speed.
+ability.spinecoat.desc,"For {secs}s, anyone who hits you loses {n} food to you and gets knocked away."
+ability.turtlemode.desc,Shuffles along at a turtle crawl - {pct}% speed for {secs}s.
 perk.relentless.line,Moves recharge {pct}% faster.
 perk.relentless.detail,Applies to every move except Peck.
 perk.bully.line,"Steal {steal}% more, carry {cap} more."
