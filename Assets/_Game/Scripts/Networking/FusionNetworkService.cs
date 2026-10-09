@@ -148,16 +148,11 @@ namespace CluckWars.Networking
 
             var movement = _inputProvider.GetMovement();
             var worldMovement = movement;
+            float cameraYaw = CluckWars.Visuals.MatchCamera.Instance != null
+                ? CluckWars.Visuals.MatchCamera.Instance.CurrentYaw
+                : 0f;
             if (CluckWars.Visuals.MatchCamera.Instance != null && movement.sqrMagnitude > 0.0001f)
-            {
-                float yawRad = CluckWars.Visuals.MatchCamera.Instance.CurrentYaw * Mathf.Deg2Rad;
-                float cosY = Mathf.Cos(yawRad);
-                float sinY = Mathf.Sin(yawRad);
-                worldMovement = new Vector2(
-                    movement.x * cosY + movement.y * sinY,
-                    -movement.x * sinY + movement.y * cosY
-                );
-            }
+                worldMovement = AimRules.StickToWorld(movement, cameraYaw);
 
             var buttons = new NetworkButtons();
             // Consume the latch OR a same-frame live press (covers either Update/OnInput
@@ -176,13 +171,31 @@ namespace CluckWars.Networking
             if (_inputProvider.GetAbilityHeld(2)) buttons.Set((int)InputButton.AbilityHold3, true);
             if (_inputProvider.GetAbilityHeld(3)) buttons.Set((int)InputButton.AbilityHold4, true);
 
-            // Level-triggered preference, re-sent every tick so the state authority decides on it (A6).
+            // Level-triggered preferences, re-sent every tick so the state authority decides on them (A6, A8).
             if (CluckWars.Settings.PlayerPreferences.AutoPeckEnabled) buttons.Set((int)InputButton.AutoPeck, true);
+            if (CluckWars.Settings.PlayerPreferences.QuickMovesEnabled) buttons.Set((int)InputButton.QuickMoves, true);
+
+            // Phase 6 chunk 5 (A7): the aim byte, and which device the soft-lock magnetism should treat this input as.
+            // Resolved here, on the local client, from the device; the state authority only ever sees the byte and bits.
+            var localBird = FindLocalChicken();
+            byte aim = 0;
+            if (localBird != null)
+            {
+                var birdPos = localBird.transform.position;
+                var aimWorld = AimRules.Resolve(_inputProvider.GetAim(birdPos.y), birdPos, cameraYaw);
+                aim = AimQuantizer.Encode(aimWorld);
+            }
+            switch (_inputProvider.Device)
+            {
+                case InputDeviceKind.Touch: buttons.Set((int)InputButton.SoftLockTouch, true); break;
+                case InputDeviceKind.Gamepad: buttons.Set((int)InputButton.SoftLockPad, true); break;
+            }
 
             input.Set(new PlayerNetworkInput
             {
                 Movement = worldMovement,
                 Buttons = buttons,
+                Aim = aim,
             });
 
             // Verbose-only because this fires every simulation tick (32 Hz). Gated by IsEnabled
@@ -191,6 +204,18 @@ namespace CluckWars.Networking
             {
                 _log.Verbose(Source, $"OnInput tick: move={movement}, a1={buttons.IsSet((int)InputButton.Ability1)}, a2={buttons.IsSet((int)InputButton.Ability2)}, a3={buttons.IsSet((int)InputButton.Ability3)}.");
             }
+        }
+
+        /// <summary>The chicken this client drives (input authority, not a bot), or null before it spawns.</summary>
+        private static ChickenController FindLocalChicken()
+        {
+            var all = ChickenController.ActiveControllers;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var c = all[i];
+                if (c != null && c.Object != null && c.Object.IsValid && c.HasInputAuthority && !c.IsBot) return c;
+            }
+            return null;
         }
 
         void INetworkRunnerCallbacks.OnPlayerJoined(NetworkRunner runner, PlayerRef player)

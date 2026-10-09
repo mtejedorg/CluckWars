@@ -164,10 +164,14 @@ namespace CluckWars.Gameplay
         /// class AND off cooldown. Deliberately excludes target-in-range — a target may
         /// walk into the shape mid-hold, which is the entire point of aiming, so
         /// "no target yet" must never block a hold from starting.</param>
+        /// <param name="quickCast">Phase 6 chunk 5 (A8), the "Quick Moves" setting: an idle slot that is pressed (or held)
+        /// fires on THIS tick, with no pending hold and no charge, so no preview and no movement lock. A dead slot still
+        /// refuses, and the fizzle rule is unchanged because Fire ends in <c>TryActivate</c>. The caller must suppress the
+        /// slot afterwards (see <see cref="ApplySuppression"/>) or a held key would fire again every tick.</param>
         public static ChargeDecision Decide(
             byte chargingSlot, int pendingSlot, float pendingHeldSeconds, float tapHoldThresholdSeconds,
             bool canCast, bool cancelPressed,
-            bool[] hold, bool[] press, bool[] canBeginCharge)
+            bool[] hold, bool[] press, bool[] canBeginCharge, bool quickCast = false)
         {
             int slotCount = hold != null ? hold.Length : 0;
             if (press == null || canBeginCharge == null ||
@@ -240,6 +244,12 @@ namespace CluckWars.Gameplay
             // same-tick press collision.
             for (int slot = 0; slot < slotCount; slot++)
             {
+                if (quickCast && (hold[slot] || press[slot]))
+                {
+                    if (canBeginCharge[slot]) return new ChargeDecision(ChargeAction.Fire, slot);
+                    return press[slot] ? new ChargeDecision(ChargeAction.RefuseAttempt, slot) : ChargeDecision.None;
+                }
+
                 if (hold[slot])
                 {
                     if (canBeginCharge[slot]) return new ChargeDecision(ChargeAction.BeginPendingHold, slot);

@@ -142,6 +142,8 @@ namespace CluckWars.Tests
             foreach (InputButton b in Enum.GetValues(typeof(InputButton)))
             {
                 if (b == InputButton.AutoPeck) continue;
+                // Bits appended after AutoPeck (Phase 6 chunk 5) are newer by construction; only older ones are checked.
+                if ((int)b > autoPeck) continue;
                 Assert.Greater(autoPeck, (int)b, $"AutoPeck must be appended after {b}");
             }
             Assert.Less(autoPeck, 32, "NetworkButtons is Int32-backed");

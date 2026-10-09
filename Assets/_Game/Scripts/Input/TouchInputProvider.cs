@@ -10,6 +10,32 @@ namespace CluckWars.Input
     /// </summary>
     public sealed class TouchInputProvider : IInputProvider
     {
+        private float _lastActiveTime = float.NegativeInfinity;
+        private int _polledFrame = -1;
+
+        public InputDeviceKind Device => InputDeviceKind.Touch;
+
+        /// <summary>A finger on the stick or on a hex. Reads only level-triggered state, so it never consumes a press.</summary>
+        public float LastActiveTime
+        {
+            get
+            {
+                int frame = Time.frameCount;
+                if (frame != _polledFrame)
+                {
+                    _polledFrame = frame;
+                    var hud = TouchControlsController.Instance;
+                    if (hud != null)
+                    {
+                        bool active = hud.Movement.sqrMagnitude > 0f;
+                        for (int slot = 0; slot < 4 && !active; slot++) active = hud.IsAbilityHeld(slot);
+                        if (active) _lastActiveTime = Time.unscaledTime;
+                    }
+                }
+                return _lastActiveTime;
+            }
+        }
+
         public Vector2 GetMovement()
         {
             var hud = TouchControlsController.Instance;

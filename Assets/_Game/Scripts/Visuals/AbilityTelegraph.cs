@@ -449,13 +449,32 @@ namespace CluckWars.Visuals
 
             Active          = this;
             ChargingAbility = ability;
+            _currentRotatesToAim = ability.RotatesToAim;
 
             TelegraphShapes.Resolve(ability, out var shape, out float radius,
                                     out float forwardOffset, out float coneAngle);
 
+            ResolveLocalAim(ability);
             UpdateIllegalWash(ability, slot);
             UpdateGeometry(shape, radius, forwardOffset, coneAngle, isSelfRing: shape == AbilityAimShape.None);
             UpdateMarks(ability);
+        }
+
+        // Phase 6 chunk 5 (A7): the aim the local player is holding right now, from the input provider (mouse cursor /
+        // right stick), snapped to the same byte the state authority will receive so the preview is exactly the cast.
+        // Zero = no aim, draw along the bird's heading. Local only; nothing here is networked.
+        private Vector3 _aimDirection;
+        private bool _currentRotatesToAim;
+
+        private void ResolveLocalAim(AbilityBaseSO ability)
+        {
+            _aimDirection = Vector3.zero;
+            if (_input == null || !ability.UsesAim) return;
+
+            var pos = _controller.transform.position;
+            float yaw = MatchCamera.Instance != null ? MatchCamera.Instance.CurrentYaw : 0f;
+            var dir = AimQuantizer.Snap(AimRules.Resolve(_input.GetAim(pos.y), pos, yaw));
+            if (dir != Vector2.zero) _aimDirection = new Vector3(dir.x, 0f, dir.y);
         }
 
         /// <summary>
@@ -507,6 +526,9 @@ namespace CluckWars.Visuals
         {
             if (_input == null) return AbilityPreviewRules.NoSlot;
 
+            // "Quick Moves" fires on the press tick: there is no hold to aim, so no preview.
+            if (CluckWars.Settings.PlayerPreferences.QuickMovesEnabled) return AbilityPreviewRules.NoSlot;
+
             for (int i = 0; i < _heldScratch.Length; i++)
             {
                 // A slot that was cancelled / switched away from (key still down) or is re-arming after a fizzle
@@ -521,6 +543,7 @@ namespace CluckWars.Visuals
         {
             if (Active == this) Active = null;
             ChargingAbility = null;
+            _aimDirection = Vector3.zero;
 
             _observedSlot = 0;
             _illegal01    = 0f;
@@ -577,7 +600,10 @@ namespace CluckWars.Visuals
                                     float coneAngle, bool isSelfRing)
         {
             Vector3 pos = _controller.transform.position;
-            Vector3 fwd = _controller.transform.forward;
+            // A directional shape draws along the aim while one is held, else along the heading (as before).
+            Vector3 fwd = _aimDirection != Vector3.zero && _currentRotatesToAim
+                ? _aimDirection
+                : _controller.transform.forward;
 
             Color c = PreviewColor;
             if (isSelfRing)
@@ -675,7 +701,7 @@ namespace CluckWars.Visuals
             if (_pollTimer > 0f) return;
             _pollTimer = FeedbackTuning.TargetScanPollHz > 0f ? 1f / FeedbackTuning.TargetScanPollHz : 0.1f;
 
-            ability.GatherTargets(_controller, _gathered);
+            ability.GatherTargets(_controller, _gathered, _aimDirection);
 
             _markedCount = 0;
             var all = ChickenController.ActiveControllers;
@@ -690,7 +716,7 @@ namespace CluckWars.Visuals
 
                 // Still the geometric gate: a chicken outside the shape gets no bracket at
                 // all, which is the difference between "no mark" and the grey "no effect" one.
-                if (!ability.IsInAimShape(_controller, candidate)) continue;
+                if (!ability.IsInAimShape(_controller, candidate, AimedForward())) continue;
 
                 // Selected by the scan AND the effect survives arrival. The second half is
                 // the only thing GatherTargets cannot answer: a control-immune rival
@@ -708,6 +734,9 @@ namespace CluckWars.Visuals
 
             for (int i = _markedCount; i < MaxMarks; i++) _marked[i] = null;
         }
+
+        private Vector3 AimedForward() =>
+            _aimDirection != Vector3.zero && _currentRotatesToAim ? _aimDirection : _controller.transform.forward;
 
         /// <summary>Did this poll's <see cref="AbilityBaseSO.GatherTargets"/> actually select
         /// <paramref name="candidate"/>? A linear scan over at most 4 entries — no

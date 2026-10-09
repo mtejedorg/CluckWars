@@ -11,6 +11,11 @@ namespace CluckWars.Networking
     {
         public Vector2 Movement;
         public NetworkButtons Buttons;
+
+        /// <summary>Phase 6 chunk 5 (A7): quantised world-XZ aim direction, see <c>CluckWars.Input.AimQuantizer</c>.
+        /// 0 = no aim, the move uses the bird's facing (today's behaviour); 1..255 = a direction. Resolved on the local
+        /// client from the mouse / right stick and applied by the state authority at fire time only.</summary>
+        public byte Aim;
     }
 
     /// <summary>
@@ -51,5 +56,16 @@ namespace CluckWars.Networking
         /// <c>FusionNetworkService.OnInput</c>. Carried in the input so the state authority decides on it (fair in
         /// Shared and Server Mode alike). Appended; 10 of 32 bits are in use.</summary>
         AutoPeck     = 9,
+
+        /// <summary>Phase 6 chunk 5 (A7): the last input came from touch, so a fired move with no explicit aim snaps to
+        /// a rival within +-30 degrees of facing. Level-triggered, set by <c>FusionNetworkService.OnInput</c>.</summary>
+        SoftLockTouch = 10,
+
+        /// <summary>Phase 6 chunk 5 (A7): the last input came from a gamepad: the lighter +-12 degree magnetism.</summary>
+        SoftLockPad  = 11,
+
+        /// <summary>Phase 6 chunk 5 (A8): the player's "Quick Moves" preference, level-triggered. A press fires on the
+        /// press tick with no hold or preview. Carried in the input so the state authority decides on it.</summary>
+        QuickMoves   = 12,
     }
 }

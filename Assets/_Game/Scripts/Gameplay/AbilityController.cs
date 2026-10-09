@@ -352,6 +352,7 @@ namespace CluckWars.Gameplay
             _pressBits[2] = input.Buttons.IsSet((int)InputButton.Ability3);
             _pressBits[3] = input.Buttons.IsSet((int)InputButton.Ability4);
             bool cancelPressed = input.Buttons.IsSet((int)InputButton.AbilityCancel);
+            bool quickCast = input.Buttons.IsSet((int)InputButton.QuickMoves);
 
             _canBeginCharge[0] = CanBeginCharge(0);
             _canBeginCharge[1] = CanBeginCharge(1);
@@ -367,7 +368,7 @@ namespace CluckWars.Gameplay
 
             var decision = AbilityHoldStateMachine.Decide(
                 ChargingSlot, _pendingHoldSlot, _pendingHoldSeconds, FeedbackTuning.TapHoldThresholdSeconds,
-                canCast, cancelPressed, _holdBits, _pressBits, _canBeginCharge);
+                canCast, cancelPressed, _holdBits, _pressBits, _canBeginCharge, quickCast);
 
             switch (decision.Action)
             {
@@ -382,7 +383,12 @@ namespace CluckWars.Gameplay
                 case ChargeAction.Fire:
                     ChargingSlot = 0;
                     ClearPendingHold();
+                    // Quick Moves fired on the press tick: ignore the slot until its key / finger is up, or the
+                    // still-down hold bit would fire it again every tick.
+                    if (quickCast) _holdSuppressed[decision.Slot] = true;
+                    ApplyAimForFire(decision.Slot, input);
                     TryActivate(decision.Slot);
+                    if (_controller != null) _controller.CastAim = Vector3.zero;
                     break;
                 case ChargeAction.SwitchHold:
                     // Pressing another slot mid-aim: abandon the old gesture (no fire, no cooldown), start the new
@@ -411,6 +417,72 @@ namespace CluckWars.Gameplay
             }
 
             UpdatePeckChain(input, canCast);
+        }
+
+        // Scratch for the soft-lock pick (offsets to eligible rivals).
+        private readonly Vector2[] _softLockOffsets = new Vector2[8];
+
+        /// <summary>
+        /// Phase 6 chunk 5 (A7): turns the aim byte into the bird's heading at FIRE time, on the state authority, before
+        /// <see cref="TryActivate"/> resolves targets. So <c>GatherTargets</c>, the shape centre, the jump and every
+        /// peer's shape test (the heading replicates through NetworkTransform) all follow the aim without any of them
+        /// knowing about it.
+        /// <list type="bullet">
+        ///   <item>Aim 0 and no soft-lock bit: nothing changes (today's behaviour).</item>
+        ///   <item>A move that does not <see cref="AbilityBaseSO.UsesAim"/> (self shapes, auras, Speed Burst, Shadowstep,
+        ///   Roll &amp; Push) is left alone, on every device.</item>
+        ///   <item>Single-target moves keep the heading and pick by angle through <c>ChickenController.CastAim</c>.</item>
+        ///   <item>No explicit aim from touch or a pad: snap to the rival with the smallest angle within 30 / 12 degrees of
+        ///   facing who would be inside the shape if the bird turned there. Single-target moves keep picking nearest.</item>
+        /// </list>
+        /// </summary>
+        private void ApplyAimForFire(int slot, in PlayerNetworkInput input)
+        {
+            if (_controller == null) return;
+            _controller.CastAim = Vector3.zero;
+
+            var ability = GetSlot(slot);
+            if (ability == null || !ability.UsesAim) return;
+
+            Vector2 dir = CluckWars.Input.AimQuantizer.Decode(input.Aim);
+            if (dir == Vector2.zero && ability.RotatesToAim)
+            {
+                float halfAngle = input.Buttons.IsSet((int)InputButton.SoftLockTouch) ? CluckWars.Input.AimSoftLock.TouchHalfAngleDegrees
+                                : input.Buttons.IsSet((int)InputButton.SoftLockPad) ? CluckWars.Input.AimSoftLock.PadHalfAngleDegrees
+                                : 0f;
+                if (halfAngle > 0f) dir = PickSoftLockDirection(ability, halfAngle);
+            }
+            if (dir == Vector2.zero) return;
+
+            var world = new Vector3(dir.x, 0f, dir.y);
+            if (ability.RotatesToAim) _controller.FaceNow(world);
+            else _controller.CastAim = world;
+        }
+
+        /// <summary>Direction to the eligible rival with the smallest angle to the bird's facing within
+        /// <paramref name="halfAngleDegrees"/>, or zero. Eligible = would be hit if the bird faced them.</summary>
+        private Vector2 PickSoftLockDirection(AbilityBaseSO ability, float halfAngleDegrees)
+        {
+            var all = ChickenController.ActiveControllers;
+            Vector3 origin = _controller.transform.position;
+            int n = 0;
+            for (int i = 0; i < all.Count && n < _softLockOffsets.Length; i++)
+            {
+                var rival = all[i];
+                if (rival == null || rival == _controller) continue;
+
+                Vector3 to = rival.transform.position - origin;
+                to.y = 0f;
+                if (to.sqrMagnitude < 1e-4f) continue;
+                if (!ability.WouldAffect(_controller, rival, to.normalized)) continue;
+
+                _softLockOffsets[n++] = new Vector2(to.x, to.z);
+            }
+
+            Vector3 facing = _controller.transform.forward;
+            int best = CluckWars.Input.AimSoftLock.PickClosestAngle(
+                new Vector2(facing.x, facing.z), _softLockOffsets, n, halfAngleDegrees);
+            return best < 0 ? Vector2.zero : _softLockOffsets[best].normalized;
         }
 
         /// <summary>The slot holding Peck, or <see cref="InvalidSlot"/> (the Assassin cannot forage).</summary>

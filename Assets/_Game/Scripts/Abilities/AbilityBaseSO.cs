@@ -313,7 +313,7 @@ namespace CluckWars.Abilities
         /// <summary>
         /// Does aiming this ability mean aiming a <i>direction</i>? True for every shape
         /// whose footprint moves when the caster turns, which is what
-        /// <c>ChickenController.IsAimRotating</c> uses to convert the movement stick into
+        /// <c>ChickenController.AimRotatingAbility</c> uses to convert the movement stick into
         /// facing during a hold (FEEDBACK.md §2.3).
         /// </summary>
         /// <remarks>
@@ -332,6 +332,29 @@ namespace CluckWars.Abilities
             AbilityAimShape.SingleTarget => false, // resolves by distance, not by facing
             _                            => true,  // Cone, ForwardCircle, Jump, Capsule, …
         };
+
+        /// <summary>
+        /// True for the movement abilities (Speed Burst, Shadowstep, Roll &amp; Push) whose direction comes from where the
+        /// player is moving, on every device, rather than from the aim (Phase 6 chunk 5, A7). A declared property, never
+        /// inferred from a name.
+        /// </summary>
+        public virtual bool FollowsMovementNotAim => false;
+
+        /// <summary>Does the aim (mouse / right stick / pad magnetism / touch soft-lock) steer this move? Directional shapes
+        /// and single-target picks do; self shapes, auras and <see cref="FollowsMovementNotAim"/> moves do not.</summary>
+        public bool UsesAim => !FollowsMovementNotAim && AimShape switch
+        {
+            AbilityAimShape.Cone          => true,
+            AbilityAimShape.ForwardCircle => true,
+            AbilityAimShape.Capsule       => true,
+            AbilityAimShape.Jump          => true,
+            AbilityAimShape.SingleTarget  => true,
+            _                             => false,
+        };
+
+        /// <summary>Does the bird turn to the aim on the fire tick? <see cref="UsesAim"/> minus single-target, which keeps
+        /// its heading and only changes WHO it picks.</summary>
+        public bool RotatesToAim => UsesAim && AimShape != AbilityAimShape.SingleTarget;
 
         /// <summary>
         /// True for abilities that <i>place</i> something (an <c>AbilityZone</c>) instead of
@@ -477,7 +500,16 @@ namespace CluckWars.Abilities
         public bool IsInAimShape(Gameplay.ChickenController caster, Gameplay.ChickenController candidate)
         {
             if (caster == null || candidate == null) return false;
-            return AbilityAim.InShape(AimShape, caster.transform.position, caster.transform.forward,
+            return IsInAimShape(caster, candidate, caster.transform.forward);
+        }
+
+        /// <summary><see cref="IsInAimShape(Gameplay.ChickenController, Gameplay.ChickenController)"/> as if the caster
+        /// faced <paramref name="forward"/>: the local aim preview and the touch / pad soft-lock ask "what would be inside
+        /// the shape if I turned there" without turning the bird.</summary>
+        public bool IsInAimShape(Gameplay.ChickenController caster, Gameplay.ChickenController candidate, Vector3 forward)
+        {
+            if (caster == null || candidate == null) return false;
+            return AbilityAim.InShape(AimShape, caster.transform.position, forward,
                 candidate.transform.position, AimRadius, AimForwardOffset, AimConeAngle);
         }
 
@@ -511,6 +543,14 @@ namespace CluckWars.Abilities
         public bool WouldAffect(Gameplay.ChickenController caster, Gameplay.ChickenController candidate)
         {
             if (caster == null || candidate == null) return false;
+            return WouldAffect(caster, candidate, caster.transform.forward);
+        }
+
+        /// <summary><see cref="WouldAffect(Gameplay.ChickenController, Gameplay.ChickenController)"/> with the caster
+        /// facing <paramref name="forward"/> instead of its real heading.</summary>
+        public bool WouldAffect(Gameplay.ChickenController caster, Gameplay.ChickenController candidate, Vector3 forward)
+        {
+            if (caster == null || candidate == null) return false;
 
             bool isSelf = candidate == caster;
             if (isSelf && !AffectsSelf) return false;
@@ -518,7 +558,7 @@ namespace CluckWars.Abilities
 
             if (candidate.Combat != null && candidate.Combat.IsDead) return false;
 
-            if (!IsInAimShape(caster, candidate)) return false;
+            if (!IsInAimShape(caster, candidate, forward)) return false;
 
             return ExtraTargetFilter(caster, candidate);
         }
@@ -552,18 +592,33 @@ namespace CluckWars.Abilities
         /// and insertion-sorts — cheap enough to not need <see cref="System.Linq"/>, which
         /// would allocate.
         /// </summary>
-        public int GatherTargets(Gameplay.ChickenController caster, List<Gameplay.ChickenController> buffer)
+        public int GatherTargets(Gameplay.ChickenController caster, List<Gameplay.ChickenController> buffer) =>
+            GatherTargets(caster, buffer, caster != null ? caster.CastAim : Vector3.zero);
+
+        /// <summary>
+        /// <see cref="GatherTargets(Gameplay.ChickenController, List{Gameplay.ChickenController})"/> for a caster aiming
+        /// along <paramref name="aimDirection"/> (world XZ, zero = just use facing). Directional shapes are evaluated as
+        /// if the caster faced the aim, so the local preview and the authority's post-rotation scan agree; a
+        /// <see cref="AbilityAimShape.SingleTarget"/> ability picks the eligible target with the smallest angle to the
+        /// aim instead of the nearest. An ability that does not <see cref="UsesAim"/> ignores the aim.
+        /// </summary>
+        public int GatherTargets(Gameplay.ChickenController caster, List<Gameplay.ChickenController> buffer,
+                                 Vector3 aimDirection)
         {
             buffer.Clear();
             if (caster == null) return 0;
 
+            aimDirection.y = 0f;
+            bool aimed = UsesAim && aimDirection.sqrMagnitude > 1e-6f;
+            Vector3 forward = aimed && RotatesToAim ? aimDirection.normalized : caster.transform.forward;
+
             var all = Gameplay.ChickenController.ActiveControllers;
-            Vector3 center = AbilityAim.ShapeCenter(AimShape, caster.transform.position, caster.transform.forward, AimForwardOffset);
+            Vector3 center = AbilityAim.ShapeCenter(AimShape, caster.transform.position, forward, AimForwardOffset);
 
             for (int i = 0; i < all.Count; i++)
             {
                 var candidate = all[i];
-                if (candidate == null || !WouldAffect(caster, candidate)) continue;
+                if (candidate == null || !WouldAffect(caster, candidate, forward)) continue;
 
                 float distSqr = PlanarSqrDistance(center, candidate.transform.position);
                 int insertAt = buffer.Count;
@@ -579,7 +634,13 @@ namespace CluckWars.Abilities
             // ordering rule for every shape, and so index 0 keeps meaning "nearest" for the
             // OnActivate implementations that already rely on it.
             if (AimShape == AbilityAimShape.SingleTarget && buffer.Count > 1)
+            {
+                // With an explicit aim (mouse / right stick) the pick is the target nearest the aim DIRECTION; the
+                // nearest-first order above is the tie-break, so aim 0 and equal angles keep today's behaviour.
+                int keep = aimed ? SmallestAngleIndex(caster, buffer, aimDirection) : 0;
+                if (keep > 0) buffer[0] = buffer[keep];
                 buffer.RemoveRange(1, buffer.Count - 1);
+            }
 
             return buffer.Count;
         }
@@ -600,6 +661,22 @@ namespace CluckWars.Abilities
                 if (all[i] != null && WouldAffect(caster, all[i])) return true;
             }
             return false;
+        }
+
+        [System.NonSerialized] private static readonly Vector2[] _angleScratch = new Vector2[8];
+
+        private static int SmallestAngleIndex(Gameplay.ChickenController caster,
+                                              List<Gameplay.ChickenController> candidates, Vector3 aim)
+        {
+            int n = Mathf.Min(candidates.Count, _angleScratch.Length);
+            Vector3 origin = caster.transform.position;
+            for (int i = 0; i < n; i++)
+            {
+                Vector3 p = candidates[i].transform.position;
+                _angleScratch[i] = new Vector2(p.x - origin.x, p.z - origin.z);
+            }
+            int best = CluckWars.Input.AimSoftLock.PickClosestAngle(new Vector2(aim.x, aim.z), _angleScratch, n, 180f);
+            return best < 0 ? 0 : best;
         }
 
         private static float PlanarSqrDistance(Vector3 a, Vector3 b)

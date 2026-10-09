@@ -15,6 +15,10 @@ namespace CluckWars.Abilities
 
         // Self-buff, no target area — marks the caster's own ring instead (FEEDBACK.md §2.2).
         public override AbilityAimShape AimShape => AbilityAimShape.None;
+
+        /// <summary>A movement ability: its direction follows where the player moves, never the aim
+        /// (Phase 6 chunk 5, A7).</summary>
+        public override bool FollowsMovementNotAim => true;
         public override bool AffectsSelf => true;
         public override bool AffectsEnemies => false;
 

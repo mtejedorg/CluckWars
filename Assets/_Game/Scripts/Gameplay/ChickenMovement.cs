@@ -54,7 +54,9 @@ namespace CluckWars.Gameplay
         /// suppressed; gravity and knockback keep running exactly as normal so a rooted-
         /// in-place chicken doesn't float or clip through the floor while aiming.
         /// </param>
-        public void Tick(Vector2 input, float deltaTime, bool aimRotateOnly = false)
+        /// <param name="lockFacing">Phase 6 chunk 5 (A7): true on the tick an ability has just turned the bird to its aim,
+        /// so this tick's movement cannot rotate it again before the rotation replicates.</param>
+        public void Tick(Vector2 input, float deltaTime, bool aimRotateOnly = false, bool lockFacing = false)
         {
             var stats = _owner.Stats;
             if (stats == null) return;
@@ -109,7 +111,7 @@ namespace CluckWars.Gameplay
             // Skip while locked, rooted (aim-rotating is never both true — see the
             // ControlRules.CanMove gate at the ChickenController call site), or with no input.
             Vector3 faceDir = aimRotateOnly ? new Vector3(input.x, 0f, input.y) : planar;
-            if (!_owner.MovementLocked && (aimRotateOnly || !_owner.Rooted) && faceDir.sqrMagnitude > 0.01f)
+            if (!lockFacing && !_owner.MovementLocked && (aimRotateOnly || !_owner.Rooted) && faceDir.sqrMagnitude > 0.01f)
             {
                 var targetRot = Quaternion.LookRotation(faceDir.normalized, Vector3.up);
                 _transform.rotation = Quaternion.RotateTowards(

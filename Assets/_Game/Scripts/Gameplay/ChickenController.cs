@@ -822,8 +822,39 @@ namespace CluckWars.Gameplay
 
             if (GetInput<PlayerNetworkInput>(out var input))
             {
-                _movement.Tick(input.Movement, Runner.DeltaTime, IsAimRotating());
+                // Aiming a directional move with the mouse / right stick turns the bird toward the aim; otherwise the
+                // movement stick steers the facing, exactly as before (Aim 0).
+                var steer = input.Movement;
+                var aiming = AimRotatingAbility();
+                if (aiming != null && aiming.RotatesToAim && input.Aim != 0) steer = CluckWars.Input.AimQuantizer.Decode(input.Aim);
+
+                _movement.Tick(steer, Runner.DeltaTime, aiming != null, lockFacing: _facingLockTick == Runner.Tick.Raw);
             }
+        }
+
+        // Phase 6 chunk 5 (A7), state-authority local: the tick an ability last turned the bird to its aim, and the
+        // aim a single-target pick should use while that cast resolves.
+        private int _facingLockTick = -1;
+
+        /// <summary>
+        /// The aim direction (world XZ, y = 0) the cast in progress was fired with, or zero. Set by
+        /// <see cref="AbilityController"/> around a fire so a <see cref="Abilities.AbilityBaseSO.GatherTargets(ChickenController, System.Collections.Generic.List{ChickenController})"/>
+        /// inside <c>OnActivate</c> can choose by angle. Authority-only scratch, never networked.
+        /// </summary>
+        public Vector3 CastAim { get; set; }
+
+        /// <summary>
+        /// Turns the bird to face <paramref name="worldDirection"/> right now and keeps this tick's movement from turning
+        /// it again. Used on the fire tick so the rotation replicates through the chicken's NetworkTransform and every
+        /// peer's shape test sees the same heading. State authority only.
+        /// </summary>
+        public void FaceNow(Vector3 worldDirection)
+        {
+            if (!HasStateAuthority) return;
+            worldDirection.y = 0f;
+            if (worldDirection.sqrMagnitude < 1e-6f) return;
+            transform.rotation = Quaternion.LookRotation(worldDirection.normalized, Vector3.up);
+            _facingLockTick = Runner.Tick.Raw;
         }
 
         /// <summary>
@@ -838,11 +869,11 @@ namespace CluckWars.Gameplay
         /// rather than being restated here: it used to be a hard-coded list of three shapes,
         /// which a fourth (Capsule) would have quietly failed to join.
         /// </summary>
-        private bool IsAimRotating()
+        private Abilities.AbilityBaseSO AimRotatingAbility()
         {
-            if (_abilities == null || _abilities.ChargingSlot == 0) return false;
+            if (_abilities == null || _abilities.ChargingSlot == 0) return null;
             var ability = _abilities.ChargingAbility;
-            return ability != null && ability.IsDirectionalAim;
+            return ability != null && ability.IsDirectionalAim ? ability : null;
         }
 
         // ---- Passive hooks ---------------------------------------------------

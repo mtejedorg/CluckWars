@@ -104,6 +104,54 @@ namespace CluckWars.Input
             return false;
         }
 
+        /// <summary>The device family of the most recently used provider (see <see cref="IInputProvider.LastActiveTime"/>).</summary>
+        public InputDeviceKind Device
+        {
+            get
+            {
+                int idx = MostRecentProvider(requireAim: false, groundY: 0f);
+                // A provider that has never been used is not "the device in hand".
+                return idx >= 0 && !float.IsNegativeInfinity(_providers[idx].LastActiveTime)
+                    ? _providers[idx].Device
+                    : InputDeviceKind.None;
+            }
+        }
+
+        public float LastActiveTime
+        {
+            get
+            {
+                float best = float.NegativeInfinity;
+                for (int i = 0; i < _providers.Length; i++)
+                    best = Mathf.Max(best, _providers[i].LastActiveTime);
+                return best;
+            }
+        }
+
+        /// <summary>The aim of the most recently used provider that has one (a resting mouse does not beat a stick in use).</summary>
+        public AimInput GetAim(float groundY)
+        {
+            int idx = MostRecentProvider(requireAim: true, groundY);
+            return idx >= 0 ? _providers[idx].GetAim(groundY) : AimInput.None;
+        }
+
+        private int MostRecentProvider(bool requireAim, float groundY)
+        {
+            int best = -1;
+            float bestTime = float.NegativeInfinity;
+            for (int i = 0; i < _providers.Length; i++)
+            {
+                if (requireAim && _providers[i].GetAim(groundY).Kind == AimInputKind.None) continue;
+                float t = _providers[i].LastActiveTime;
+                if (best < 0 || t > bestTime)
+                {
+                    best = i;
+                    bestTime = t;
+                }
+            }
+            return best;
+        }
+
         public bool GetBackPressed()
         {
             // Edge-triggered: read every provider, same contract as the getters above.

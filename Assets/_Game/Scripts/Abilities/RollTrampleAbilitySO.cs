@@ -61,6 +61,10 @@ namespace CluckWars.Abilities
         /// was aimed at and hit whatever happened to be at the far end.
         /// </summary>
         public override AbilityAimShape AimShape => AbilityAimShape.Capsule;
+
+        /// <summary>A movement ability: its direction follows where the player moves, never the aim
+        /// (Phase 6 chunk 5, A7).</summary>
+        public override bool FollowsMovementNotAim => true;
         public override float AimRadius => SweepRadius;
         public override float AimForwardOffset => ForwardOffset;
 

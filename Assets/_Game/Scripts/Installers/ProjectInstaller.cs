@@ -69,14 +69,15 @@ namespace CluckWars.Installers
                 .FromMethod(_ => new UnityAudioService(transform))
                 .AsSingle();
 
-            // Input: keyboard + on-screen touch HUD compose into one provider so the
+            // Input: keyboard/mouse + on-screen touch HUD + gamepad compose into one provider so the
             // local player can drive the chicken from either source. The touch HUD is
             // dormant until the Game scene's TouchControlsHud builds itself; on PC the
             // keyboard side dominates, on mobile the touch side does.
             Container.Bind<IInputProvider>()
                 .FromMethod(_ => new CompositeInputProvider(
                     new KeyboardInputProvider(),
-                    new TouchInputProvider()))
+                    new TouchInputProvider(),
+                    new GamepadInputProvider()))
                 .AsSingle();
 
             // Cross-scene mutable state for menu → match handoff.

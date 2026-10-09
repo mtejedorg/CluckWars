@@ -50,6 +50,64 @@ namespace CluckWars.Input
     /// </remarks>
     public sealed class KeyboardInputProvider : IInputProvider
     {
+        // Phase 6 chunk 5 (A7): mouse aim. The cursor only aims once it has actually moved, so a mouse parked in the
+        // window by a keyboard-only player never hijacks the facing.
+        private bool _mouseAimArmed;
+        private float _lastActiveTime = float.NegativeInfinity;
+        private int _polledFrame = -1;
+
+        public InputDeviceKind Device => InputDeviceKind.KeyboardMouse;
+
+        public float LastActiveTime
+        {
+            get
+            {
+                Poll();
+                return _lastActiveTime;
+            }
+        }
+
+        /// <summary>
+        /// A ground point under the cursor: a ray from <c>Camera.main</c> through the cursor onto the plane
+        /// y = <paramref name="groundY"/>. None while the cursor is outside the window, before the mouse has moved,
+        /// or when no camera / ground hit exists. The bird-relative direction (and the 0.5 m dead radius) is resolved
+        /// by <see cref="AimRules.Resolve"/>.
+        /// </summary>
+        public AimInput GetAim(float groundY)
+        {
+            Poll();
+            var mouse = Mouse.current;
+            if (!_mouseAimArmed || mouse == null || !Application.isFocused) return AimInput.None;
+
+            Vector2 cursor = mouse.position.ReadValue();
+            if (cursor.x < 0f || cursor.y < 0f || cursor.x >= Screen.width || cursor.y >= Screen.height)
+                return AimInput.None;
+
+            var cam = Camera.main;
+            if (cam == null) return AimInput.None;
+
+            return AimRules.TryRayToGround(cam.ScreenPointToRay(cursor), groundY, out var hit)
+                ? AimInput.FromGroundPoint(hit)
+                : AimInput.None;
+        }
+
+        /// <summary>Once per frame: stamps activity and arms the mouse aim on the first real cursor movement.</summary>
+        private void Poll()
+        {
+            int frame = Time.frameCount;
+            if (frame == _polledFrame) return;
+            _polledFrame = frame;
+
+            var kb = Keyboard.current;
+            var mouse = Mouse.current;
+            bool mouseMoved = mouse != null && mouse.delta.ReadValue().sqrMagnitude > 0.01f;
+            if (mouseMoved) _mouseAimArmed = true;
+
+            bool keyDown = kb != null && kb.anyKey.isPressed;
+            bool mouseButton = mouse != null && (mouse.leftButton.isPressed || mouse.rightButton.isPressed);
+            if (mouseMoved || keyDown || mouseButton) _lastActiveTime = Time.unscaledTime;
+        }
+
         public Vector2 GetMovement()
         {
             var kb = Keyboard.current;

@@ -276,6 +276,39 @@ namespace CluckWars.Settings
             }
         }
 
+        /// <summary><c>PlayerPrefs</c> key for <see cref="QuickMovesEnabled"/>. Namespaced like every key here.</summary>
+        public const string QuickMovesKey = "CluckWars.QuickMoves";
+
+        private static bool _quickMoves;
+        private static bool _quickMovesLoaded;
+
+        /// <summary>
+        /// "Quick Moves" (Phase 6, A8): a tap fires the move the moment it lands, with no hold, aim or preview.
+        /// <b>Defaults to false.</b> Carried to the state authority as <c>InputButton.QuickMoves</c>; the settings-page
+        /// toggle is chunk 6.
+        /// </summary>
+        public static bool QuickMovesEnabled
+        {
+            get
+            {
+                if (!_quickMovesLoaded)
+                {
+                    _quickMoves = PlayerPrefs.GetInt(QuickMovesKey, 0) != 0;
+                    _quickMovesLoaded = true;
+                }
+                return _quickMoves;
+            }
+            set
+            {
+                if (_quickMovesLoaded && _quickMoves == value) return;
+
+                _quickMoves = value;
+                _quickMovesLoaded = true;
+                PlayerPrefs.SetInt(QuickMovesKey, value ? 1 : 0);
+                PlayerPrefs.Save();
+            }
+        }
+
         /// <summary><c>PlayerPrefs</c> keys for the last committed setup (see <see cref="LastSetup"/>).
         /// Namespaced like every key here; public so a test asserts the real ones.</summary>
         public const string LastSetupClassKey     = "CluckWars.LastSetup.Class";
@@ -359,6 +392,8 @@ namespace CluckWars.Settings
             _reducedMotionLoaded      = false;
             _developerModeLoaded      = false;
             _performanceModeLoaded    = false;
+            _autoPeckLoaded           = false;
+            _quickMovesLoaded         = false;
             _lastSetupLoaded          = false;
         }
     }

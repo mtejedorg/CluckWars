@@ -51,6 +51,10 @@ namespace CluckWars.Abilities
         /// actually does: plough a line, not detonate a circle.
         /// </summary>
         public override AbilityAimShape AimShape => AbilityAimShape.Capsule;
+
+        /// <summary>A movement ability: its direction follows where the player moves, never the aim
+        /// (Phase 6 chunk 5, A7).</summary>
+        public override bool FollowsMovementNotAim => true;
         public override float AimRadius => PushRadius;
         public override float AimForwardOffset => ForwardOffset;
 
