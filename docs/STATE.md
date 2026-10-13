@@ -68,6 +68,24 @@ Commits on `develop` (pushed): `7a3a5a7` art prep · `d9967e3` c1 hex states / i
 
 **Workspace note (2026-10-13):** an uncommitted Unity MCP bump (core `com.ivanmurzak.unity.mcp` 0.93.2 -> 0.93.4, `packages-lock.json`, `Assets/Plugins/NuGet/*`) is in the tree and is NOT part of Phase 6. With it the three MCP add-ons (animation 1.2.34, inputsystem / navigation 1.0.19) fail to compile against core 0.93.4 (`GameObjectRef`, `AIGD`, `com.IvanMurzak.Unity.MCP.Editor` missing; core wants `UNITY_MCP_DEPS_8`), so the Editor cannot enter Play mode. Bump the add-ons together with core (memory `unity-mcp-bump-and-bee-cache`).
 
+### Chunk E part 1 - arena framing / out-of-bounds dressing (round-4 finding 17, decision 7) - EditMode 1263/1263
+- **Cause:** the void is `MapSurroundings/SurroundGrass` in `Map.unity` (260 m cube, `Surround_Grass.mat`, flat colour), seen from the fixed ortho camera (`MatchCamera`, ortho 5.6); the home corner sits at screen bottom so ~35-40 % of the spawn view is that plane. `MapGenerator` only owns the playable `GeneratedGround`; nothing there changed.
+- **Change 1:** `Assets/_Game/Art/Materials/Surround_Grass.mat` base colour (0.22,0.34,0.16) -> (0.15,0.22,0.14): darker, desaturated, recedes behind the bright arena. No draw-call change.
+- **Change 2:** new `Map.unity > MapSurroundings > ArenaHedge`: four static, collider-free, shadow-off cubes (`Hedge_N/S/E/W`, 2 m thick x 1 m high, inner face at |27.8| m, i.e. ~1.9 m outside the wall face) sharing the new `Surround_Hedge.mat` (URP Lit, colour (0.07,0.18,0.08), smoothness 0). Reads as a low hedge bank framing the fence. 48 tris, one batch (static batching), no transparency, no lights. Play area, colliders, bases, piles, fences untouched (hand-authored scene content: `MapSceneBaker` only owns `GeneratedMapGeometry`, so a re-bake keeps it).
+- **Not done:** camera pull-in at GET READY (left to avoid changing the view gameplay relies on); bush ring from `Prop_bush_round` (2 500 tris each, ~90 needed - too heavy for 30 fps mid-range Android).
+- **Measurement** (Editor, play mode, solo match, bots frozen, local bird at its spawn corner; `tools/ui_capture/capture_phase7_arena.py before|after`). The Mobile quality LEVEL is excluded on Standalone so it cannot be selected in the Editor; the script instead applies what differs on Mobile at runtime (Mobile_RPAsset via `QualitySettings.renderPipeline`, lodBias 1, 2-bone skinning, aniso 1) for 300 frames, then restores PC. Metrics: UnityStats batches / SetPass / tris (per editor tick) and CPU ms of 300 explicit `Camera.Render()` calls of the match camera at 1920x1080 (deterministic; the Editor frame delta itself is dominated by editor overhead, median ~3.4 ms editor tick, so not used).
+
+| Mobile tier | before | after |
+|---|---|---|
+| Camera.Render CPU ms (mean / median / p95) | 0.562 / 0.523 / 0.766 | 0.558 / 0.530 / 0.766 |
+| Batches | 49 | 42 |
+| SetPass | 21 | 20 |
+| Tris | 128 476 | 114 744 |
+
+  The batch/tris drop is NOT an effect of the change: the spawn corner is random per match (before = corner -21.6,21.8; after = 22.1,21.8) and fewer props were in frustum. The hedge adds +1 batch / +48 tris at most; CPU render cost is unchanged (within noise). GPU time not measurable in the Editor (frame timing stats off); the added fill is four opaque flat boxes. Re-measure on the Pixel 9 in the hardware pass.
+- Captures: `Captures/phase7/extra/arena/{before,after}_{getready,spawn_active,mid,edge}_{desktop,phone}.png` (camera renders, no UI; 1920x1080 and 2400x1080) + `{before,after}_{getready,edge}_gameview.png` (with UI) + `{before,after}_stats.json`.
+- **For the grass pass (render-pipeline-artist):** the playable `GrassFloor` is still the very bright, high-frequency lime/cyan texture; with the dark surround it now pops very hard against it. Calm it (lower contrast / lower frequency, slightly darker) - do NOT touch `Surround_Grass.mat` / `Surround_Hedge.mat` colours unless the pair stops reading. Do not edit `Assets/Settings/*RPAsset*.asset`.
+
 ### Chunk-3 effect kinds (strongest-wins) and notable cross-kind combos
 
 Kinds: self speed boost (max: Speed Burst 1.5, Ruffle 1.5, Shadowstep 3.0, Roll & Push 2.0) x self speed penalty (min: Turtle 0.25) · stealth opacity (lowest: Invisibility, Smoke Roost) · movement lock (any: Egg Shell, Peck) · control immunity (later expiry: Immovable) · steal-back (any / max: Spine Coat) · deposit rate (max: Quick Drop 4.0) · wall-phasing tier (highest holder: Barge < Vault < Blink) · aura slow (Feather Aura). Outside the rule: Underdog Surge x1.4, victim-side slow. Bots still cast one move at a time.
