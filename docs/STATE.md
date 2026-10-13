@@ -6,6 +6,47 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ PHASE 6 COMPLETE (2026-10-13): ability input rework + all 21 round-3 findings — EditMode 1128/1128
+
+Commits on `develop` (pushed): `7a3a5a7` art prep · `d9967e3` c1 hex states / instant preview · `cf17ea4` c2 fizzle + edge-band cancel · `9ff97cb` + `cada5c6` c3 concurrent abilities, strongest-wins, stealth breaks on the next move · `01df269` c4 Peck auto-chain + Auto-Peck · `4cfcb0c` c5 aim byte, mouse / right-stick aim, gamepad, soft-lock, Quick Moves · `2dfdd26` c6 haptics, desktop / pad info HUD, settings rows + volumes, hold hint · `b10a112` 7a post-match draw / tie / You chip · `d6286d1` 7b Leave match sheet, music fades, GO scrim, Coop BACK · `3fab082` 7c ability text templated from values · `105e2e1` 7d wood overlays, Coop seats, waiting room, 28 px floor · `c540ee3` 7e CVD player palette + Defense fill · `71784e4` 7f see-through fence / coop + YOU ring · `a52a26b` capture-script upkeep.
+
+**What a player gets now.** Press a move = instant local preview (no target = cream dashed ring, never the red "illegal" wash); release = use it; a target-gated move released with nobody in range fizzles (no cooldown, 0.4 s re-arm); drag to the screen edge, Esc, right mouse or B cancels. Moves run side by side; same-kind effects never stack (strongest wins, each keeps its own timer); stealth (Invisibility, Smoke Roost fade) ends on your next move. Peck repeats by itself until the hold is full; Auto-Peck starts it when you stand by a pile. Twin-stick aim on mouse / pad, soft-lock on touch; RB/RT/LB/LT on pad. Settings: Quick Moves, Auto-Peck, Buzz When Hit (Android), Music / Sound Effects sliders. Desktop / pad show the hexes as an information strip. Back opens "Leave match?" (solo pauses). The near fence and the base coop open around your bird; a pulsing YOU ring at GET READY.
+
+**Round-3 findings -> chunk:** 1 c1 · 2, 3, 14, 21 7a · 4, 7, 17, 18 7b · 8 7c · 5, 6, 12, 16, 19 7d · 10 c6 · 11, 15 7e · 9 7f · 13, 20 art `7a3a5a7`. All 21 done. Deviations: finding 11 put the P# on bot nameplates, not on the rival ring (the ring is a text-less sprite); finding 3's tie line only says "won on KOs" when exact food was level and KOs decided it (otherwise "Tied for 1st!").
+
+**For Maestro (no value changed):** (1) cross-kind combos that are now legal on one bird, see the chunk-3 list below (Spine Coat steal-back triggers on proximity, so Roll & Push + Spine Coat robs; Invisibility is now a steal opener for the Assassin; Immovable + Roll & Push is a control-immune charge); (2) speed boost and self-slow are different kinds (Turtle 0.25 x Roll 2.0 = 0.5); (3) a food tie broken by corner order still names a winner (existing GameManager rule).
+
+**Not verified on hardware:** Pixel-9 haptics + VIBRATE merge, a real gamepad, a real mouse cursor, two-peer aim replication, audio by ear.
+
+**Workspace note (2026-10-13):** an uncommitted Unity MCP bump (core `com.ivanmurzak.unity.mcp` 0.93.2 -> 0.93.4, `packages-lock.json`, `Assets/Plugins/NuGet/*`) is in the tree and is NOT part of Phase 6. With it the three MCP add-ons (animation 1.2.34, inputsystem / navigation 1.0.19) fail to compile against core 0.93.4 (`GameObjectRef`, `AIGD`, `com.IvanMurzak.Unity.MCP.Editor` missing; core wants `UNITY_MCP_DEPS_8`), so the Editor cannot enter Play mode. Bump the add-ons together with core (memory `unity-mcp-bump-and-bee-cache`).
+
+### Chunk-3 effect kinds (strongest-wins) and notable cross-kind combos
+
+Kinds: self speed boost (max: Speed Burst 1.5, Ruffle 1.5, Shadowstep 3.0, Roll & Push 2.0) x self speed penalty (min: Turtle 0.25) · stealth opacity (lowest: Invisibility, Smoke Roost) · movement lock (any: Egg Shell, Peck) · control immunity (later expiry: Immovable) · steal-back (any / max: Spine Coat) · deposit rate (max: Quick Drop 4.0) · wall-phasing tier (highest holder: Barge < Vault < Blink) · aura slow (Feather Aura). Outside the rule: Underdog Surge x1.4, victim-side slow. Bots still cast one move at a time.
+
+Notable combos one bird can hold (mechanics-designer, 2026-10-13; Egg Shell / Turtle carry no damage reduction today, so there is no "invulnerable + fast"):
+
+| Combo | Class | Why it matters | Severity |
+|---|---|---|---|
+| Immovable + Roll & Push | Fatty | control-immune charge (3 s window, Roll cd 3) | watch |
+| Roll & Push + Spine Coat | Fatty | steal-back fires on proximity (1.2 m), not on being hit: a rolling robber, up to 4 food per rival | likely problem; gate on "took a hit"? |
+| Immovable + Spine Coat | Fatty | intended anti-raid kit (about 77 % of a full bank covered) | fine |
+| Shadowstep / Doppelganger + Invisibility / Smoke Roost | Assassin | wall-phase + decoy + 4 s stealth (stealth must be cast last); Smoke Roost's slow zone outlives the stealth | watch |
+| Invisibility, then Sneaky Steal / Snatch / Ambush | Assassin | stealth ends on the cast, but the old rule locked all casts for its 4 s; now an attack opener, re-solve Assassin income | watch |
+| Speed Burst + Feather Aura | Speedy | about 3x relative speed vs chasers inside 5.4 m for 1.5 s | watch |
+| Turtle + Roll & Push | Fatty | 0.5x crawl-barge; harmless while Turtle has no defence | fine, revisit |
+| Speed Burst + Quick Drop, Ruffle + Dive Bomb, Egg Shell + a boost | Speedy / Warrior / all | small or self-defeating | fine |
+
+## ✅ Phase 6 chunk 7f (2026-10-13, committed `71784e4`, EditMode 1128/1128): see-through fence + coop near your bird, YOU ring at GET READY (round-3 finding 9)
+
+- **Shader.** `Assets/_Game/Art/Shaders/FenceFadeLit.shader` ("Cluck Wars/Fence Fade Lit", a copy of URP Lit, SubShader tagged UniversalPipeline) + `CWFenceFade.hlsl`: a 4x4 ordered-dither alpha-clip in ForwardLit, GBuffer, DepthOnly and DepthNormals (the shadow caster does not clip: the shadow stays). Opaque queue, no extra pass, no sorting. Only fragments in front of the local bird (eye depth, 0.35 m soft ramp) inside a screen circle (inner 0.09 / outer 0.15 of the screen height) fade, peak 0.85 so a faint screen-door of fence remains. Globals `_CW_LocalBirdPos` (xyz + strength) and `_CW_FenceFadeParams`; strength 0 is a uniform early-out. Compiles for GLES3 and Vulkan (every pass); checked live on the Mobile quality tier (`Captures/phase6/extra/fence_fade_mobile_tier/`). `Mobile_RPAsset` untouched.
+- **Materials.** `Prop_wall_segment.mat` (boundary runs + inner walls) and `Prop_chicken_coop.mat` swapped to the fade shader, same inputs. The coop matters most: the spawn point sits against it, so at "3" / GO it was the coop, not the fence, that hid the bird down to its comb.
+- **Driver.** `Visuals/FenceFadeDriver.cs`, added by `MatchCamera.Awake` (no scene edit), follows `MatchCamera.LocalChicken`: 3 rays (feet / body / comb) toward the camera against the cached bounds of every renderer on the fade shader, eases strength over 0.15 s (`FenceFadeRules.StepStrength`), two `Shader.SetGlobalVector` calls a frame; resets on disable. Local only, nothing networked. Pure rules + the C# twin of the shader maths in `Visuals/FenceFadeRules.cs`.
+- **YOU marker.** `Visuals/YouMarkerRules.cs`: during `Starting` and the intro countdown the local feet ring (`ChickenWorldBars.RefreshYouMarker`) grows x1.6, goes opaque and pulses (1.25 Hz), and the YOU label (`ChickenNameplate.ApplyYouEmphasis`) scales x1.45; eases back after GO; static under Reduced Motion.
+- **Cost.** CPU: 3 rays x about 90 AABB tests a frame. GPU: fence / coop fragments only; one uniform branch when nothing is covered, else about 30 ALU + `clip`. Alpha-clip turns off early-Z for those fragments on tile GPUs; the fence is a small share of the screen.
+- **Tests.** `FenceFadeTests` (fade maths, occlusion incl. comb-only, the shader exists / compiles, every fence renderer + the 4 coops in `Map.unity` on the fade shader and nothing else, YOU marker rules); `ProjectConfigTests.EveryGameMaterial_UsesAUrpShader` accepts project shaders tagged UniversalPipeline.
+- **Captures.** `Captures/phase6/live/fence_fade__getready.png` (at "2", effect on) vs `__getready_before.png`, `fence_fade__play_spawn.png`, `fence_fade__play.png` vs `__play_before.png`, `fence_fade__corner{0..3}.png` (bird against each base coop; corner 0 is on the far side, no fade needed). Driver: `tools/ui_capture/capture_phase6_chunk7f.py`.
+
 ## ✅ Phase 6 chunk 7e (2026-10-09, committed, EditMode 1110/1110): player palette colour-blind separation, Defense hex fill (round-3 findings 11, 15)
 
 - **Finding 11 - player palette.** `PlayerPalette` P1/P2/P3/P4: `#E8751A/#1A7FC4/#C4286F/#0D9E7A` -> `#F59A3A/#0994E8/#F7367B/#17785A` (L* 71/59/56/45;
