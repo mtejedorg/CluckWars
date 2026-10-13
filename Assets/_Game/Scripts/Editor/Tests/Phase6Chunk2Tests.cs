@@ -151,12 +151,15 @@ namespace CluckWars.Tests
         // ---- Edge-band cancel hysteresis --------------------------------------------------------
 
         [Test]
-        public void EdgeBand_Arms_At19Dp_StaysArmedAt25Dp_DisarmsAt29Dp()
+        public void EdgeBand_Arms_At35Dp_StaysArmedAt41Dp_DisarmsAt45Dp()
         {
-            Assert.IsTrue(HoldCancelRules.NextArmed(false, 19f), "19 dp from the edge arms");
-            Assert.IsFalse(HoldCancelRules.NextArmed(false, 25f), "25 dp does not arm from idle");
-            Assert.IsTrue(HoldCancelRules.NextArmed(true, 25f), "25 dp stays armed (hysteresis)");
-            Assert.IsFalse(HoldCancelRules.NextArmed(true, 29f), "29 dp disarms");
+            // Phase 7 B2 widened the band: arm 36 dp, disarm 44 dp (+8 dp hysteresis).
+            Assert.AreEqual(36f, HoldCancelRules.ArmDp);
+            Assert.AreEqual(HoldCancelRules.ArmDp + 8f, HoldCancelRules.DisarmDp);
+            Assert.IsTrue(HoldCancelRules.NextArmed(false, 35f), "35 dp from the edge arms");
+            Assert.IsFalse(HoldCancelRules.NextArmed(false, 41f), "41 dp does not arm from idle");
+            Assert.IsTrue(HoldCancelRules.NextArmed(true, 41f), "41 dp stays armed (hysteresis)");
+            Assert.IsFalse(HoldCancelRules.NextArmed(true, 45f), "45 dp disarms");
             Assert.IsTrue(HoldCancelRules.NextArmed(false, HoldCancelRules.ArmDp));
             Assert.IsTrue(HoldCancelRules.NextArmed(true, HoldCancelRules.DisarmDp));
         }
@@ -164,14 +167,14 @@ namespace CluckWars.Tests
         [Test]
         public void EdgeBand_Evaluate_UsesTheRawScreenEdge_AtTheDeviceDpi()
         {
-            // 420 dpi -> 1 dp = 2.625 px, so the 20 dp arm line is 52.5 px from the physical edge.
+            // 420 dpi -> 1 dp = 2.625 px, so the 36 dp arm line is 94.5 px from the physical edge and the 44 dp disarm line 115.5 px.
             const float w = 2400f, h = 1080f, dpi = 420f;
-            Assert.IsTrue(HoldCancelRules.Evaluate(false, new Vector2(w - 50f, 500f), w, h, dpi, out var edge));
+            Assert.IsTrue(HoldCancelRules.Evaluate(false, new Vector2(w - 90f, 500f), w, h, dpi, out var edge));
             Assert.AreEqual(ScreenEdge.Right, edge);
-            Assert.IsFalse(HoldCancelRules.Evaluate(false, new Vector2(w - 60f, 500f), w, h, dpi, out _), "60 px = 22.9 dp");
-            Assert.IsTrue(HoldCancelRules.Evaluate(true, new Vector2(w - 60f, 500f), w, h, dpi, out _), "...but stays armed once armed");
-            Assert.IsFalse(HoldCancelRules.Evaluate(true, new Vector2(w - 80f, 500f), w, h, dpi, out _), "80 px = 30.5 dp disarms");
-            Assert.IsTrue(HoldCancelRules.Evaluate(false, new Vector2(500f, 40f), w, h, dpi, out edge));
+            Assert.IsFalse(HoldCancelRules.Evaluate(false, new Vector2(w - 105f, 500f), w, h, dpi, out _), "105 px = 40 dp");
+            Assert.IsTrue(HoldCancelRules.Evaluate(true, new Vector2(w - 105f, 500f), w, h, dpi, out _), "...but stays armed once armed");
+            Assert.IsFalse(HoldCancelRules.Evaluate(true, new Vector2(w - 125f, 500f), w, h, dpi, out _), "125 px = 47.6 dp disarms");
+            Assert.IsTrue(HoldCancelRules.Evaluate(false, new Vector2(500f, 80f), w, h, dpi, out edge));
             Assert.AreEqual(ScreenEdge.Top, edge);
             Assert.IsTrue(HoldCancelRules.Evaluate(false, new Vector2(30f, 500f), w, h, dpi, out edge));
             Assert.AreEqual(ScreenEdge.Left, edge);
@@ -185,7 +188,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(160f, HoldCancelRules.SanitiseDpi(0f));
             Assert.AreEqual(160f, HoldCancelRules.SanitiseDpi(-1f));
             Assert.AreEqual(20f, HoldCancelRules.PxToDp(20f, 0f), 1e-4f, "1 dp = 1 px at the fallback");
-            Assert.IsTrue(HoldCancelRules.Evaluate(false, new Vector2(15f, 300f), 1920f, 1080f, 0f, out _));
+            Assert.IsTrue(HoldCancelRules.Evaluate(false, new Vector2(15f, 300f), 1920f, 1080f, 0f, out _), "15 px = 15 dp at the fallback, inside the 36 dp band");
         }
 
         [Test]

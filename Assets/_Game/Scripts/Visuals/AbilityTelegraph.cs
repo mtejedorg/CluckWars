@@ -362,6 +362,16 @@ namespace CluckWars.Visuals
         private LineRenderer _shapeLine;
         private LineRenderer _stalkLine;
 
+        // Phase 7 B1: the held move reads on grass. A near-opaque ink line sits under the outline (solid, dashed or grey) and a
+        // cream fill (~25%) covers the shape. Both follow the outline's own points every frame.
+        private LineRenderer _inkLine;
+        private MeshFilter _fillFilter;
+        private MeshRenderer _fillRenderer;
+        private Mesh _fillMesh;
+        private Vector3[] _fillVerts;
+        private int[] _fillTris;
+        private Color[] _fillColors;
+
         private Vector3[] _shapeBuf;                        // grown only on shape change
         private readonly Vector3[] _stalkBuf = new Vector3[2];
 
@@ -405,6 +415,7 @@ namespace CluckWars.Visuals
             _stalkLine = TelegraphShapes.BuildLine(transform, "AbilityTelegraphStalk", _solidMat, StalkLineWidth, loop: false);
             _shapeLine.enabled = false;
             _stalkLine.enabled = false;
+            BuildUnderlays();
 
             if (_dashedRingTexture != null)
             {
@@ -420,8 +431,85 @@ namespace CluckWars.Visuals
             }
         }
 
+        /// <summary>Builds the ink under-stroke and the cream fill. Both use the same unlit transparent material as the
+        /// outline and sort under it (fill below ink below the coloured line).</summary>
+        private void BuildUnderlays()
+        {
+            _inkLine = TelegraphShapes.BuildLine(transform, "AbilityTelegraphInk", _solidMat, ShapeLineWidth, loop: true);
+            _inkLine.sortingOrder = -2;
+            _inkLine.startColor = _inkLine.endColor = FeedbackTuning.PreviewInkUnderStrokeColor;
+            _inkLine.enabled = false;
+
+            var go = new GameObject("AbilityTelegraphFill");
+            go.transform.SetParent(transform, worldPositionStays: false);
+            _fillFilter = go.AddComponent<MeshFilter>();
+            _fillRenderer = go.AddComponent<MeshRenderer>();
+            _fillRenderer.sharedMaterial = _solidMat;
+            _fillRenderer.sortingOrder = -3;
+            _fillRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            _fillRenderer.receiveShadows = false;
+            _fillMesh = new Mesh { name = "AbilityTelegraphFill" };
+            _fillMesh.MarkDynamic();
+            _fillFilter.sharedMesh = _fillMesh;
+            _fillRenderer.enabled = false;
+        }
+
+        /// <summary>Copies the outline into the ink under-stroke and rebuilds the cream fan fill (the shapes are convex
+        /// outlines, so a fan from their centroid covers them exactly).</summary>
+        private void UpdateUnderlays(Vector3[] outline, bool dashed)
+        {
+            if (_inkLine == null || outline == null) return;
+
+            float strokeWidth = dashed
+                ? FeedbackTuning.NoTargetPreviewLineWidth * FeedbackTuning.NoTargetDashHeightFraction
+                : ShapeLineWidth;
+            _inkLine.widthMultiplier = strokeWidth + FeedbackTuning.PreviewInkUnderStrokeMargin;
+            if (_inkLine.positionCount != outline.Length) _inkLine.positionCount = outline.Length;
+            if (!_inkLine.loop) _inkLine.loop = true;
+            _inkLine.SetPositions(outline);
+            if (!_inkLine.enabled) _inkLine.enabled = true;
+
+            int n = outline.Length;
+            if (_fillVerts == null || _fillVerts.Length != n + 1)
+            {
+                _fillVerts = new Vector3[n + 1];
+                _fillColors = new Color[n + 1];
+                _fillTris = new int[n * 3];
+                for (int i = 0; i < n; i++)
+                {
+                    _fillTris[i * 3]     = 0;
+                    _fillTris[i * 3 + 1] = 1 + i;
+                    _fillTris[i * 3 + 2] = 1 + (i + 1) % n;
+                }
+                _fillMesh.Clear();
+                _fillMesh.vertices = _fillVerts;
+                _fillMesh.triangles = _fillTris;
+            }
+
+            Vector3 centroid = Vector3.zero;
+            for (int i = 0; i < n; i++) centroid += outline[i];
+            centroid /= n;
+
+            _fillVerts[0] = transform.InverseTransformPoint(centroid);
+            for (int i = 0; i < n; i++) _fillVerts[1 + i] = transform.InverseTransformPoint(outline[i]);
+
+            var fill = FeedbackTuning.HeldFillColor;
+            fill.a = _cancelArmed ? FeedbackTuning.HeldFillAlphaCancelArmed : FeedbackTuning.HeldFillAlpha;
+            for (int i = 0; i <= n; i++) _fillColors[i] = fill;
+
+            _fillMesh.vertices = _fillVerts;
+            _fillMesh.colors = _fillColors;
+            _fillMesh.RecalculateBounds();
+            if (!_fillRenderer.enabled) _fillRenderer.enabled = true;
+        }
+
         private void OnDisable() => Deactivate();
-        private void OnDestroy() => Deactivate();
+
+        private void OnDestroy()
+        {
+            Deactivate();
+            if (_fillMesh != null) Destroy(_fillMesh);
+        }
 
         /// <summary>
         /// Clears the static handle between Editor play sessions. Needed because "Enter
@@ -449,7 +537,6 @@ namespace CluckWars.Visuals
 
             Active          = this;
             ChargingAbility = ability;
-            _currentRotatesToAim = ability.RotatesToAim;
 
             TelegraphShapes.Resolve(ability, out var shape, out float radius,
                                     out float forwardOffset, out float coneAngle);
@@ -464,17 +551,47 @@ namespace CluckWars.Visuals
         // right stick), snapped to the same byte the state authority will receive so the preview is exactly the cast.
         // Zero = no aim, draw along the bird's heading. Local only; nothing here is networked.
         private Vector3 _aimDirection;
-        private bool _currentRotatesToAim;
+
+        // Phase 7 B3: the direction the release will use (explicit aim, else the touch / pad soft-lock pick, else the
+        // facing), from the same function the state authority calls at fire time. The shape, the marks and the pip use it.
+        private Vector3 _previewForward;
+        private bool _previewAimed;
+        private readonly Vector2[] _softLockScratch = new Vector2[8];
 
         private void ResolveLocalAim(AbilityBaseSO ability)
         {
             _aimDirection = Vector3.zero;
-            if (_input == null || !ability.UsesAim) return;
+            Vector2 explicitAim = ResolveExplicitAim(ability);
+            if (explicitAim != Vector2.zero) _aimDirection = new Vector3(explicitAim.x, 0f, explicitAim.y);
+
+            _previewForward = ResolvePreviewForward(ability, explicitAim, out _previewAimed);
+        }
+
+        /// <summary>The mouse cursor / right stick aim for <paramref name="ability"/> in world XZ, snapped to the byte the
+        /// state authority receives; zero when the device gives none or the move does not use aim.</summary>
+        private Vector2 ResolveExplicitAim(AbilityBaseSO ability)
+        {
+            if (_input == null || ability == null || !ability.UsesAim) return Vector2.zero;
 
             var pos = _controller.transform.position;
             float yaw = MatchCamera.Instance != null ? MatchCamera.Instance.CurrentYaw : 0f;
-            var dir = AimQuantizer.Snap(AimRules.Resolve(_input.GetAim(pos.y), pos, yaw));
-            if (dir != Vector2.zero) _aimDirection = new Vector3(dir.x, 0f, dir.y);
+            return AimQuantizer.Snap(AimRules.Resolve(_input.GetAim(pos.y), pos, yaw));
+        }
+
+        private Vector3 ResolvePreviewForward(AbilityBaseSO ability, Vector2 explicitAim, out bool aimed)
+        {
+            float half = _input != null ? AimSoftLock.HalfAngleFor(_input.Device) : 0f;
+            return AbilityAimForward.Resolve(ability, _controller, explicitAim, half, _softLockScratch, out aimed);
+        }
+
+        /// <summary>
+        /// The forward the local player's release would use for <paramref name="ability"/> right now. Used by
+        /// <see cref="AbilitySlotOverlay"/> so the in-range pip asks the same question the preview and the cast do.
+        /// </summary>
+        public Vector3 FireForward(AbilityBaseSO ability)
+        {
+            if (ability == null) return _controller != null ? _controller.transform.forward : Vector3.forward;
+            return ResolvePreviewForward(ability, ResolveExplicitAim(ability), out _);
         }
 
         /// <summary>
@@ -544,6 +661,7 @@ namespace CluckWars.Visuals
             if (Active == this) Active = null;
             ChargingAbility = null;
             _aimDirection = Vector3.zero;
+            _previewAimed = false;
 
             _observedSlot = 0;
             _illegal01    = 0f;
@@ -555,6 +673,8 @@ namespace CluckWars.Visuals
 
             if (_shapeLine != null && _shapeLine.enabled) _shapeLine.enabled = false;
             if (_stalkLine != null && _stalkLine.enabled) _stalkLine.enabled = false;
+            if (_inkLine != null && _inkLine.enabled) _inkLine.enabled = false;
+            if (_fillRenderer != null && _fillRenderer.enabled) _fillRenderer.enabled = false;
             ApplyLineStyle(dashed: false);
         }
 
@@ -600,10 +720,8 @@ namespace CluckWars.Visuals
                                     float coneAngle, bool isSelfRing)
         {
             Vector3 pos = _controller.transform.position;
-            // A directional shape draws along the aim while one is held, else along the heading (as before).
-            Vector3 fwd = _aimDirection != Vector3.zero && _currentRotatesToAim
-                ? _aimDirection
-                : _controller.transform.forward;
+            // A directional shape draws along the forward the release will use (explicit aim, soft-lock pick, heading).
+            Vector3 fwd = _previewForward;
 
             Color c = PreviewColor;
             if (isSelfRing)
@@ -639,6 +757,7 @@ namespace CluckWars.Visuals
 
             TelegraphShapes.Apply(_shapeLine, ref _shapeBuf, shape, pos, fwd, radius, forwardOffset, coneAngle);
             if (!_shapeLine.enabled) _shapeLine.enabled = true;
+            UpdateUnderlays(_shapeBuf, dashed);
 
             bool stalk = TelegraphShapes.NeedsStalk(shape, forwardOffset);
             if (stalk)
@@ -701,7 +820,9 @@ namespace CluckWars.Visuals
             if (_pollTimer > 0f) return;
             _pollTimer = FeedbackTuning.TargetScanPollHz > 0f ? 1f / FeedbackTuning.TargetScanPollHz : 0.1f;
 
-            ability.GatherTargets(_controller, _gathered, _aimDirection);
+            // Rotating shapes are scanned along the resolved forward (incl. the soft-lock pick); a single-target pick by
+            // angle only ever uses the explicit aim, exactly as the cast does.
+            ability.GatherTargets(_controller, _gathered, _previewAimed ? _previewForward : _aimDirection);
 
             _markedCount = 0;
             var all = ChickenController.ActiveControllers;
@@ -735,8 +856,7 @@ namespace CluckWars.Visuals
             for (int i = _markedCount; i < MaxMarks; i++) _marked[i] = null;
         }
 
-        private Vector3 AimedForward() =>
-            _aimDirection != Vector3.zero && _currentRotatesToAim ? _aimDirection : _controller.transform.forward;
+        private Vector3 AimedForward() => _previewForward;
 
         /// <summary>Did this poll's <see cref="AbilityBaseSO.GatherTargets"/> actually select
         /// <paramref name="candidate"/>? A linear scan over at most 4 entries — no

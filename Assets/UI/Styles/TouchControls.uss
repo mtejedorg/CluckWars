@@ -283,21 +283,21 @@
     -unity-text-align: middle-center;
 }
 
-/* --- In-range pip (Phase 6, A1) ------------------------------------------
+/* --- In-range pip (Phase 6, A1; Phase 7 B20: 28 -> 40 px) ----------------------------------------------
    Bottom-centre of the hex (top-left = slot badge, top-right = category mark). Gold #f5c842 with a
-   3 px ink ring: 22 px of gold inside a 28 px disc (28 px = ~12 dp at this canvas's 1 dp = 2.35 px).
+   3 px ink ring: 40 px disc = ~17 dp at this canvas's 1 dp = 2.35 px (was 12 dp, too small to catch at a glance).
    Shown only while a rival is inside this move's shape and the move is not cooling down; the one 0.2 s
    scale pop is driven by TouchControlsController (and skipped under Reduced Motion). */
 .cw-hex-pip {
     position: absolute;
-    left: 61px; bottom: 6px;          /* (150 - 28) / 2 = 61 */
-    width: 28px; height: 28px;
+    left: 55px; bottom: 4px;          /* (150 - 40) / 2 = 55 */
+    width: 40px; height: 40px;
     background-color: rgb(245, 200, 66);
     border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
     border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
     border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
-    border-top-left-radius: 14px; border-top-right-radius: 14px;
-    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
+    border-top-left-radius: 20px; border-top-right-radius: 20px;
+    border-bottom-left-radius: 20px; border-bottom-right-radius: 20px;
     display: none;
 }
 
@@ -482,11 +482,12 @@
     rotate: -45deg;
 }
 
-/* The whiff puff (Art/UI/Fx/Fx_Whiff.png): a little cloud over the hex, scaled and faded by the controller. */
+/* The whiff puff (Art/UI/Fx/Fx_Whiff.png): a ~90 px cloud off the hex's top-right corner (centre at 145, 5), so the
+   icon underneath stays visible (Phase 7 B10). Scaled and faded (from 0.7) by the controller. */
 .cw-hex-puff {
     position: absolute;
-    left: -20px; top: -20px;
-    width: 190px; height: 190px;
+    left: 100px; top: -40px;
+    width: 90px; height: 90px;
     background-image: url("project://database/Assets/_Game/Art/UI/Fx/Fx_Whiff.png");
     -unity-background-scale-mode: scale-to-fit;
 }
@@ -499,10 +500,10 @@
 }
 .cw-hex-x-bar {
     position: absolute;
-    left: 28px; top: 69px;
-    width: 94px; height: 12px;
+    left: 28px; top: 68px;
+    width: 94px; height: 14px;
     background-color: rgb(254, 245, 224);
-    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
     border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
     border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
     border-top-left-radius: 6px; border-top-right-radius: 6px;
@@ -511,19 +512,30 @@
 .cw-hex-x-bar--a { rotate: -45deg; }
 .cw-hex-x-bar--b { rotate: 45deg; }
 
-/* The edge glow strips: ~4 dp wide (10 px), cream at 85% with a 3 px ink line on the inner side, along ONE
-   physical screen edge at a time. Hidden until a held finger arms the cancel. */
+/* While the cancel is armed the icon steps back to ~40% so the X is the only loud thing on the hex (Phase 7 B2). */
+.cw-hex--cancel-armed .cw-hex-icon { opacity: 0.4; }
+
+/* The cancel zone (Phase 7 B2): four strips ~44 dp (104 px at 1 dp = 2.35 px) deep, exactly the arm + hysteresis
+   band (HoldCancelRules.ZoneDp). They appear as soon as a hold passes the tap threshold, dim (a dark 45% wash with a
+   cream inner line, so it reads on bright grass); the strip of the edge the finger has ARMED goes bright (cream 85%,
+   solid ink line). */
 .cw-edge-glow {
     position: absolute;
-    background-color: rgba(254, 245, 224, 0.85);
+    background-color: rgba(42, 26, 12, 0.45);
     display: none;
 }
-.cw-edge-glow--left, .cw-edge-glow--right { top: 0; bottom: 0; width: 13px; }
-.cw-edge-glow--top, .cw-edge-glow--bottom { left: 0; right: 0; height: 13px; }
-.cw-edge-glow--left   { left: 0;   border-right-width:  3px; border-right-color:  rgb(42, 26, 12); }
-.cw-edge-glow--right  { right: 0;  border-left-width:   3px; border-left-color:   rgb(42, 26, 12); }
-.cw-edge-glow--top    { top: 0;    border-bottom-width: 3px; border-bottom-color: rgb(42, 26, 12); }
-.cw-edge-glow--bottom { bottom: 0; border-top-width:    3px; border-top-color:    rgb(42, 26, 12); }
+.cw-edge-glow--left, .cw-edge-glow--right { top: 0; bottom: 0; width: 104px; }
+.cw-edge-glow--top, .cw-edge-glow--bottom { left: 0; right: 0; height: 104px; }
+.cw-edge-glow--left   { left: 0;   border-right-width:  3px; border-right-color:  rgba(254, 245, 224, 0.8); }
+.cw-edge-glow--right  { right: 0;  border-left-width:   3px; border-left-color:   rgba(254, 245, 224, 0.8); }
+.cw-edge-glow--top    { top: 0;    border-bottom-width: 3px; border-bottom-color: rgba(254, 245, 224, 0.8); }
+.cw-edge-glow--bottom { bottom: 0; border-top-width:    3px; border-top-color:    rgba(254, 245, 224, 0.8); }
+
+.cw-edge-glow--armed { background-color: rgba(254, 245, 224, 0.85); }
+.cw-edge-glow--armed.cw-edge-glow--left   { border-right-color:  rgb(42, 26, 12); }
+.cw-edge-glow--armed.cw-edge-glow--right  { border-left-color:   rgb(42, 26, 12); }
+.cw-edge-glow--armed.cw-edge-glow--top    { border-bottom-color: rgb(42, 26, 12); }
+.cw-edge-glow--armed.cw-edge-glow--bottom { border-top-color:    rgb(42, 26, 12); }
 
 /* ============================================================================
    DESKTOP / CONTROLLER LAYOUT  (Phase 6 chunk 6, A10)

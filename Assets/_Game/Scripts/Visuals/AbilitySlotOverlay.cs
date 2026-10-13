@@ -219,25 +219,32 @@ namespace CluckWars.Visuals
             if (_hotPollTimer > 0f) return;
             _hotPollTimer = FeedbackTuning.TargetScanPollHz > 0f ? 1f / FeedbackTuning.TargetScanPollHz : 0.1f;
 
+            // The slot being aimed is judged along the forward its release will use (explicit aim, soft-lock pick,
+            // heading: Phase 7 B3), the same one the preview draws and the cast fires along, so the pip never lights for
+            // a rival the shape will not actually cover. Every other slot is judged along the heading it is drawn on.
+            int aimedSlot = _telegraph != null ? _telegraph.LocalAimedSlot : AbilityController.InvalidSlot;
             for (int slot = 0; slot < AbilityController.SlotCount; slot++)
             {
                 var ability = _abilities.GetSlot(slot);
-                _hot[slot] = ability != null && HasRivalInShape(ability);
+                if (ability == null) { _hot[slot] = false; continue; }
+
+                Vector3 forward = slot == aimedSlot ? _telegraph.FireForward(ability) : _controller.transform.forward;
+                _hot[slot] = HasRivalInShape(ability, forward);
             }
         }
 
         /// <summary>Is any chicken other than the caster currently eligible inside
-        /// <paramref name="ability"/>'s aim shape? Scans the ≤4-entry
+        /// <paramref name="ability"/>'s aim shape when the caster faces <paramref name="forward"/>? Scans the ≤4-entry
         /// <see cref="ChickenController.ActiveControllers"/> registry — the same registry
         /// <c>GatherTargets</c> and the telegraph use, never a physics query.</summary>
-        private bool HasRivalInShape(AbilityBaseSO ability)
+        private bool HasRivalInShape(AbilityBaseSO ability, Vector3 forward)
         {
             var all = ChickenController.ActiveControllers;
             for (int i = 0; i < all.Count; i++)
             {
                 var candidate = all[i];
                 if (candidate == null || candidate == _controller) continue;
-                if (ability.WouldAffect(_controller, candidate)) return true;
+                if (ability.WouldAffect(_controller, candidate, forward)) return true;
             }
             return false;
         }
@@ -270,6 +277,12 @@ namespace CluckWars.Visuals
             Color c = ability.AccentColor;
             c.a = AlphaFor(slot, aimGestureLive: aimedSlot >= 0);
             lr.startColor = lr.endColor = c;
+
+            // The dark edge recedes with the colour while another move is being aimed (Phase 7 B1).
+            var inkColor = FeedbackTuning.InkColor;
+            inkColor.a = FeedbackTuning.AmbientSlotOutlineInkAlpha *
+                         (aimedSlot >= 0 ? FeedbackTuning.AmbientInkAlphaWhileAimingMultiplier : 1f);
+            ink.startColor = ink.endColor = inkColor;
 
             // NO STALK, by decision — one LineRenderer per slot, not two.
             // TelegraphShapes.NeedsStalk is true for a detached ForwardCircle (Feather Trap is

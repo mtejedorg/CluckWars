@@ -28,8 +28,19 @@ namespace CluckWars.Input
     /// </summary>
     public static class HoldCancelRules
     {
-        public const float ArmDp = 20f;
-        public const float DisarmDp = 28f;
+        /// <summary>Arm band width (Phase 7 B2, was 20): a thumb sliding to the edge arms well before the bezel.</summary>
+        public const float ArmDp = 36f;
+
+        /// <summary>Disarm line: <see cref="ArmDp"/> + 8 dp hysteresis.</summary>
+        public const float DisarmDp = ArmDp + 8f;
+
+        /// <summary>Width of the visible cancel zone (Phase 7 B2): it reaches exactly to the disarm line, so a finger
+        /// that is inside the drawn zone is never "almost armed".</summary>
+        public const float ZoneDp = DisarmDp;
+
+        /// <summary>The cancel zone is drawn once a hold has outlived the tap threshold (a tap never shows it).</summary>
+        public static bool ZoneVisible(bool held, float heldSeconds, float tapThresholdSeconds) =>
+            held && heldSeconds >= tapThresholdSeconds;
 
         /// <summary>1 dp = dpi / 160 px. Platforms that report no dpi (0, or negative) fall back to 160 (1 dp = 1 px).</summary>
         public const float FallbackDpi = 160f;

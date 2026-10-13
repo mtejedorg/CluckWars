@@ -447,45 +447,20 @@ namespace CluckWars.Gameplay
             var ability = GetSlot(slot);
             if (ability == null || !ability.UsesAim) return;
 
-            Vector2 dir = CluckWars.Input.AimQuantizer.Decode(input.Aim);
-            if (dir == Vector2.zero && ability.RotatesToAim)
+            // The same function the preview calls (Phase 7 B3), so the shape the player saw is the shape that fires.
+            Vector2 explicitAim = CluckWars.Input.AimQuantizer.Decode(input.Aim);
+            float halfAngle = CluckWars.Input.AimSoftLock.HalfAngleFor(
+                input.Buttons.IsSet((int)InputButton.SoftLockTouch), input.Buttons.IsSet((int)InputButton.SoftLockPad));
+            Vector3 world = AbilityAimForward.Resolve(ability, _controller, explicitAim, halfAngle, _softLockOffsets, out bool aimed);
+
+            if (ability.RotatesToAim)
             {
-                float halfAngle = input.Buttons.IsSet((int)InputButton.SoftLockTouch) ? CluckWars.Input.AimSoftLock.TouchHalfAngleDegrees
-                                : input.Buttons.IsSet((int)InputButton.SoftLockPad) ? CluckWars.Input.AimSoftLock.PadHalfAngleDegrees
-                                : 0f;
-                if (halfAngle > 0f) dir = PickSoftLockDirection(ability, halfAngle);
+                if (aimed) _controller.FaceNow(world);
             }
-            if (dir == Vector2.zero) return;
-
-            var world = new Vector3(dir.x, 0f, dir.y);
-            if (ability.RotatesToAim) _controller.FaceNow(world);
-            else _controller.CastAim = world;
-        }
-
-        /// <summary>Direction to the eligible rival with the smallest angle to the bird's facing within
-        /// <paramref name="halfAngleDegrees"/>, or zero. Eligible = would be hit if the bird faced them.</summary>
-        private Vector2 PickSoftLockDirection(AbilityBaseSO ability, float halfAngleDegrees)
-        {
-            var all = ChickenController.ActiveControllers;
-            Vector3 origin = _controller.transform.position;
-            int n = 0;
-            for (int i = 0; i < all.Count && n < _softLockOffsets.Length; i++)
+            else if (explicitAim != Vector2.zero)
             {
-                var rival = all[i];
-                if (rival == null || rival == _controller) continue;
-
-                Vector3 to = rival.transform.position - origin;
-                to.y = 0f;
-                if (to.sqrMagnitude < 1e-4f) continue;
-                if (!ability.WouldAffect(_controller, rival, to.normalized)) continue;
-
-                _softLockOffsets[n++] = new Vector2(to.x, to.z);
+                _controller.CastAim = new Vector3(explicitAim.x, 0f, explicitAim.y);
             }
-
-            Vector3 facing = _controller.transform.forward;
-            int best = CluckWars.Input.AimSoftLock.PickClosestAngle(
-                new Vector2(facing.x, facing.z), _softLockOffsets, n, halfAngleDegrees);
-            return best < 0 ? Vector2.zero : _softLockOffsets[best].normalized;
         }
 
         /// <summary>The slot holding Peck, or <see cref="InvalidSlot"/> (the Assassin cannot forage).</summary>

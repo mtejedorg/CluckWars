@@ -793,7 +793,7 @@ namespace CluckWars.UI
         }
 
         private readonly List<(Toggle Toggle, Func<bool> Get)> _settingToggles = new();
-        private readonly List<(Slider Slider, Func<float> Get)> _settingSliders = new();
+        private readonly List<(Slider Slider, Func<float> Get, Label Percent)> _settingSliders = new();
 
         /// <summary>
         /// Binds one volume slider (0..1): seeded silently from the stored level, applied live while dragging, flushed
@@ -808,21 +808,81 @@ namespace CluckWars.UI
                 return;
             }
 
+            // "73%" next to the name (Phase 7 B20). #MusicVolumePercent for #MusicVolumeSlider.
+            var percent = _settingsSheet.Q<Label>(sliderName.Replace("Slider", "Percent"));
+            if (percent == null)
+                _log?.Warn(Source, $"Settings sheet has no percent readout for #{sliderName}; the volume shows no number.");
+
             slider.SetValueWithoutNotify(get());
-            slider.RegisterValueChangedCallback(evt => set(evt.newValue));
+            if (percent != null) percent.text = SliderRowRules.Percent(get());
+            slider.RegisterValueChangedCallback(evt =>
+            {
+                set(evt.newValue);
+                if (percent != null) percent.text = SliderRowRules.Percent(evt.newValue);
+            });
             slider.RegisterCallback<PointerUpEvent>(_ =>
             {
                 PlayerPreferences.FlushVolumes();
                 _audio.Tap();
             }, TrickleDown.TrickleDown);
-            _settingSliders.Add((slider, get));
+            _settingSliders.Add((slider, get, percent));
+
+            BindFullRowDrag(slider);
+        }
+
+        /// <summary>
+        /// A press that lands on the slider's row but not on the slider itself (the name / percent header) drags the volume
+        /// too: the pointer is captured by the row and mapped onto the track by x (<see cref="SliderRowRules"/>). Presses on
+        /// the slider keep its own dragging.
+        /// </summary>
+        private void BindFullRowDrag(Slider slider)
+        {
+            var row = slider.parent;
+            if (row == null) return;
+
+            int pointer = -1;
+            void Apply(float x)
+            {
+                var track = slider.worldBound;
+                var dragger = slider.Q(className: "unity-base-slider__dragger");
+                float thumb = Mathf.Max(SliderRowRules.MinThumbPx, dragger != null ? dragger.resolvedStyle.width : 0f);
+                float f = SliderRowRules.FractionFromPointer(x, track.xMin, track.width, thumb);
+                slider.value = SliderRowRules.ValueFromFraction(f, slider.lowValue, slider.highValue);
+            }
+
+            row.RegisterCallback<PointerDownEvent>(evt =>
+            {
+                if (pointer >= 0 || slider.worldBound.Contains(evt.position)) return;
+                pointer = evt.pointerId;
+                row.CapturePointer(pointer);
+                Apply(evt.position.x);
+                evt.StopPropagation();
+            });
+            row.RegisterCallback<PointerMoveEvent>(evt =>
+            {
+                if (evt.pointerId != pointer || !row.HasPointerCapture(pointer)) return;
+                Apply(evt.position.x);
+            });
+            row.RegisterCallback<PointerUpEvent>(evt =>
+            {
+                if (evt.pointerId != pointer) return;
+                row.ReleasePointer(pointer);
+                pointer = -1;
+                PlayerPreferences.FlushVolumes();
+                _audio.Tap();
+            });
+            row.RegisterCallback<PointerCaptureOutEvent>(_ => pointer = -1);
         }
 
         private void OpenSettings()
         {
             if (_settingsSheet == null) return;
             foreach (var (toggle, get) in _settingToggles) toggle.SetValueWithoutNotify(get());
-            foreach (var (slider, get) in _settingSliders) slider.SetValueWithoutNotify(get());
+            foreach (var (slider, get, percent) in _settingSliders)
+            {
+                slider.SetValueWithoutNotify(get());
+                if (percent != null) percent.text = SliderRowRules.Percent(get());
+            }
             _settingsSheet.style.display = DisplayStyle.Flex;
         }
 

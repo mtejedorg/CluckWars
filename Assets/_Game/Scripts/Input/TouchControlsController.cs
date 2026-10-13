@@ -166,6 +166,8 @@ namespace CluckWars.Input
         private readonly ScreenEdge[] _armedEdge = new ScreenEdge[SlotCount];
         private readonly bool[]  _appliedCancelX = new bool[SlotCount];
         private ScreenEdge _appliedGlowEdge;
+        private bool _appliedZoneShown;
+        private readonly float[] _heldSeconds = new float[SlotCount]; // touch hold time per hex; the cancel zone shows past the tap threshold
         private VisualElement _glowLeft, _glowRight, _glowTop, _glowBottom;
 
         // Phase 6 (A1) hex states, cached so style writes only happen on a real change.
@@ -629,23 +631,33 @@ namespace CluckWars.Input
             _cancelled[slot] = false;
             _cancelArmed[slot] = false;
             _armedEdge[slot] = ScreenEdge.None;
+            _heldSeconds[slot] = 0f;
             _heldPointerId[slot] = evt.pointerId;
             _slots[slot].Hex?.CapturePointer(evt.pointerId);
             evt.StopPropagation();
+            // A press that lands inside the edge band (a hex near the screen edge, a wide thumb) is armed from the first
+            // frame, not only after the first move event (Phase 7 B2).
+            EvaluateCancelBand(slot, evt.position);
             RefreshHeldVisuals(); // the press frame, locally: not after the networked charge
         }
 
         /// <summary>
         /// Edge-band cancel (Phase 6, A4): while held, the pointer's RAW screen position (the panel position
-        /// converted back to screen pixels, then to dp) arms the cancel within 20 dp of any physical screen edge
-        /// and disarms beyond 28 dp (<see cref="HoldCancelRules"/>). Nothing is decided here beyond that: the
+        /// converted back to screen pixels, then to dp) arms the cancel within 36 dp of any physical screen edge
+        /// and disarms beyond 44 dp (<see cref="HoldCancelRules"/>). Nothing is decided here beyond that: the
         /// release is what cancels (<see cref="EndHexPointer"/>). There is deliberately no radial drag-off any
         /// more; a thumb that merely drifts never cancels.
         /// </summary>
         private void OnHexMove(int slot, PointerMoveEvent evt)
         {
             if (!_held[slot] || _heldPointerId[slot] != evt.pointerId) return;
-            if (!TryPanelToScreen(evt.position, out var screen)) return;
+            EvaluateCancelBand(slot, evt.position);
+        }
+
+        /// <summary>Runs <see cref="HoldCancelRules"/> for a pointer position (down frame and every move).</summary>
+        private void EvaluateCancelBand(int slot, Vector3 panelPos)
+        {
+            if (!TryPanelToScreen(panelPos, out var screen)) return;
 
             bool armed = HoldCancelRules.Evaluate(_cancelArmed[slot], screen, Screen.width, Screen.height,
                                                   Screen.dpi, out var edge);
@@ -766,6 +778,8 @@ namespace CluckWars.Input
 
             UpdateLayoutMode();
             PollDeniedPress(abilities);
+            for (int i = 0; i < SlotCount; i++)
+                _heldSeconds[i] = _held[i] ? _heldSeconds[i] + Time.unscaledDeltaTime : 0f;
             RefreshHeldVisuals();
             UpdateHoldHint();
 
@@ -831,6 +845,7 @@ namespace CluckWars.Input
                 if (showX != _appliedCancelX[slot])
                 {
                     _appliedCancelX[slot] = showX;
+                    hex.EnableInClassList(CancelArmedClass, showX); // dims the icon to ~40% under the X
                     if (_slots[slot].CancelX != null)
                         _slots[slot].CancelX.style.display = showX ? DisplayStyle.Flex : DisplayStyle.None;
                 }
@@ -847,27 +862,39 @@ namespace CluckWars.Input
         private bool IsHeldVisual(int slot) =>
             _held[slot] || (_mode != HudDeviceMode.Touch && _input != null && _input.GetAbilityHeld(slot));
 
-        /// <summary>Shows the glow strip along the screen edge a held, armed finger is approaching (and only that one).</summary>
+        /// <summary>
+        /// The cancel zone (Phase 7 B2): once a touch hold outlives the tap threshold all four edge strips show dim, so
+        /// the player can see WHERE the cancel is before reaching it; the strip of the armed edge is bright.
+        /// </summary>
         private void RefreshEdgeGlow()
         {
+            bool zone = false;
             var edge = ScreenEdge.None;
             for (int i = 0; i < SlotCount; i++)
-                if (_held[i] && _cancelArmed[i]) { edge = _armedEdge[i]; break; }
+            {
+                if (!HoldCancelRules.ZoneVisible(_held[i], _heldSeconds[i], FeedbackTuning.TapHoldThresholdSeconds)) continue;
+                zone = true;
+                if (_cancelArmed[i]) { edge = _armedEdge[i]; break; }
+            }
 
-            if (edge == _appliedGlowEdge) return;
+            if (zone == _appliedZoneShown && edge == _appliedGlowEdge) return;
+            _appliedZoneShown = zone;
             _appliedGlowEdge = edge;
-            SetGlow(_glowLeft,   edge == ScreenEdge.Left);
-            SetGlow(_glowRight,  edge == ScreenEdge.Right);
-            SetGlow(_glowTop,    edge == ScreenEdge.Top);
-            SetGlow(_glowBottom, edge == ScreenEdge.Bottom);
+            SetGlow(_glowLeft,   zone, edge == ScreenEdge.Left);
+            SetGlow(_glowRight,  zone, edge == ScreenEdge.Right);
+            SetGlow(_glowTop,    zone, edge == ScreenEdge.Top);
+            SetGlow(_glowBottom, zone, edge == ScreenEdge.Bottom);
         }
 
-        private static void SetGlow(VisualElement strip, bool on)
+        private static void SetGlow(VisualElement strip, bool shown, bool armed)
         {
-            if (strip != null) strip.style.display = on ? DisplayStyle.Flex : DisplayStyle.None;
+            if (strip == null) return;
+            strip.style.display = shown ? DisplayStyle.Flex : DisplayStyle.None;
+            strip.EnableInClassList("cw-edge-glow--armed", armed);
         }
 
         private const string HeldClass = "cw-hex--held";
+        private const string CancelArmedClass = "cw-hex--cancel-armed";
 
         private void RefreshSlot(int slot, AbilityController abilities)
         {
@@ -1231,7 +1258,7 @@ namespace CluckWars.Input
             if (refs.FizzleSlash != null) refs.FizzleSlash.style.opacity = t < 0.6f ? 1f : 1f - (t - 0.6f) / 0.4f;
             if (refs.Puff != null)
             {
-                refs.Puff.style.opacity = 1f - t;
+                refs.Puff.style.opacity = FeedbackTuning.FizzlePuffStartAlpha * (1f - t);
                 float k = PlayerPreferences.ReducedMotionEnabled
                     ? 1f
                     : Mathf.Lerp(FeedbackTuning.FizzlePuffStartScale, FeedbackTuning.FizzlePuffEndScale, t);

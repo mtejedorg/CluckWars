@@ -174,6 +174,13 @@ namespace CluckWars.Input
         /// <summary>Gamepad's lighter magnetism.</summary>
         public const float PadHalfAngleDegrees = 12f;
 
+        /// <summary>Magnetism cone for a device: touch 30, pad 12, keyboard + mouse none (it aims explicitly).</summary>
+        public static float HalfAngleFor(bool touch, bool pad) =>
+            touch ? TouchHalfAngleDegrees : pad ? PadHalfAngleDegrees : 0f;
+
+        public static float HalfAngleFor(InputDeviceKind device) =>
+            HalfAngleFor(device == InputDeviceKind.Touch, device == InputDeviceKind.Gamepad);
+
         /// <summary>Index of the offset with the smallest angle to <paramref name="aim"/> within
         /// <paramref name="maxAngleDegrees"/>, or -1. Ties keep the lowest index (callers pass nearest-first). Offsets of
         /// zero length are skipped. With 180 as the limit this is a plain "smallest angle" pick.</summary>

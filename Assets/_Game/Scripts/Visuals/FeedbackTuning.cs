@@ -977,6 +977,31 @@ namespace CluckWars.Visuals
         /// leading to a dashed shape.</summary>
         public static readonly Color NoTargetPreviewStalkColor = new Color(0.996f, 0.961f, 0.878f, 0.9f);
 
+        // ---- Held-move readability on grass (Phase 7 B1) -----------------------------
+
+        /// <summary>Cream of the filled shape drawn under a held move's outline (the same cream as the dashed ring).</summary>
+        public static readonly Color HeldFillColor = new Color(0.996f, 0.961f, 0.878f, 1f);
+
+        /// <summary>Fill opacity of the held shape (~25%); eased to <see cref="HeldFillAlphaCancelArmed"/> while the
+        /// cancel is armed, so "this will NOT fire" reads as a fainter shape as well as a grey dashed one.</summary>
+        public const float HeldFillAlpha = 0.25f;
+        public const float HeldFillAlphaCancelArmed = 0.10f;
+
+        /// <summary>Ink under-stroke beneath the held shape's outline (solid, dashed no-target and grey cancel alike):
+        /// near opaque, so the edge keeps &gt;= 3:1 against the lightest grass (see <c>Phase7ChunkBTests</c>).</summary>
+        public static readonly Color PreviewInkUnderStrokeColor = new Color(InkColor.r, InkColor.g, InkColor.b, 0.9f);
+
+        /// <summary>Total extra width of the ink under-stroke over the stroke it backs: 0.06 world units, about 3 px a
+        /// side at the arena camera (96 px per world unit at 1080p).</summary>
+        public const float PreviewInkUnderStrokeMargin = 0.06f;
+
+        /// <summary>Share of the dashed ribbon's height the cream dashes fill (see <see cref="NoTargetPreviewLineWidth"/>).</summary>
+        public const float NoTargetDashHeightFraction = 0.53f;
+
+        /// <summary>While a move is held, the always-on guides' ink under-strokes fall to this share of their usual alpha,
+        /// so the receding guides lose their dark edge together with their colour.</summary>
+        public const float AmbientInkAlphaWhileAimingMultiplier = 0.3f;
+
         // ---- Fizzle + cancel (Phase 6 chunk 2) -------------------------------------
 
         /// <summary>How long the slash flash and the whiff puff show over the hex after a fizzle.</summary>
@@ -985,6 +1010,10 @@ namespace CluckWars.Visuals
         /// <summary>Whiff puff scale at the start / end of its 0.3 s life (static, alpha-only, under Reduced Motion).</summary>
         public const float FizzlePuffStartScale = 0.6f;
         public const float FizzlePuffEndScale = 1.35f;
+
+        /// <summary>Opacity of the whiff puff when it appears (Phase 7 B10: a ~90 px cloud off the hex's top-right corner,
+        /// translucent so the icon stays readable), fading to 0 over <see cref="FizzleFlashSeconds"/>.</summary>
+        public const float FizzlePuffStartAlpha = 0.7f;
 
         /// <summary>Play volumes of the fizzle whiff and the cancel tick. The clips are mastered to the same loudness as
         /// the menu cues, so these keep two "nothing happened" sounds well under the real ability cue.</summary>

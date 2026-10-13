@@ -155,15 +155,17 @@
                         </ui:VisualElement>
                         <ui:Toggle name="BuzzWhenHitToggle" class="cw-opt-toggle" />
                     </ui:VisualElement>
-                    <ui:VisualElement name="MusicVolumeRow" class="cw-setting-toggle-row">
-                        <ui:VisualElement class="cw-setting-toggle-row__texts">
+                    <ui:VisualElement name="MusicVolumeRow" class="cw-setting-toggle-row cw-setting-toggle-row--slider">
+                        <ui:VisualElement class="cw-setting-slider-head">
                             <ui:Label text="@settings.musicVolume" class="cw-setting-toggle-row__name" />
+                            <ui:Label name="MusicVolumePercent" text="" class="cw-setting-slider-pct" />
                         </ui:VisualElement>
                         <ui:Slider name="MusicVolumeSlider" low-value="0" high-value="1" value="1" class="cw-setting-slider" />
                     </ui:VisualElement>
-                    <ui:VisualElement name="SfxVolumeRow" class="cw-setting-toggle-row">
-                        <ui:VisualElement class="cw-setting-toggle-row__texts">
+                    <ui:VisualElement name="SfxVolumeRow" class="cw-setting-toggle-row cw-setting-toggle-row--slider">
+                        <ui:VisualElement class="cw-setting-slider-head">
                             <ui:Label text="@settings.sfxVolume" class="cw-setting-toggle-row__name" />
+                            <ui:Label name="SfxVolumePercent" text="" class="cw-setting-slider-pct" />
                         </ui:VisualElement>
                         <ui:Slider name="SfxVolumeSlider" low-value="0" high-value="1" value="1" class="cw-setting-slider" />
                     </ui:VisualElement>
