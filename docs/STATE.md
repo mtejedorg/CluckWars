@@ -6,7 +6,7 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
-## ✅ PHASE 7 COMPLETE (2026-10-13, pending hardware session + builds): round-4 findings (21) + Maestro decisions 1-8 - EditMode 1265/1265
+## ✅ PHASE 7 COMPLETE (2026-10-13, pending the hardware session): round-4 findings (21) + Maestro decisions 1-8 - EditMode 1265/1265
 
 **Commits on `develop`:** `ff19e0a` art prep (Spine Coat hedgehog, Fx_Dust) · `775e32d` chunk D steal-proof, Egg Shell "Full shell", Turtle Mode "Shell walk" · `7cb18c6` security follow-up (steal refund must match a pending credit; execute transfer validates its caller) · `cfe32ef` chunk A input bugs · `a407f9c` chunk B readability + honest preview · `2f84707` chunk C1 nameplates / tie / countdown / hint / Defense / Auto-Peck · `4ea37e1` chunk C2 copy + UI leftovers · `c6ae4cc` chunk E1 out-of-bounds dressing · `7131bd5` chunk E2 calmer grass · `6f3aa2c` chunk F1 hint vs cancel strip, countdown slam, fair frame-time comparison · F2 docs (GDD, FEEDBACK, ART, compendium site, STATE; this commit).
 
@@ -42,7 +42,7 @@ what's shipped, what's in flight, and what's blocked on testing.
 | 18 | Ability text voice / STUCK / Sticky Egg / pops in UiText | C2 | `4ea37e1` |
 | 19 | Leftovers (LEAVE MATCH?, focus ring, scrollbar, invite card, PLAY AGAIN) | C2 | `4ea37e1` |
 | 20 | Small targets | B | `a407f9c` |
-| 21 | Hardware + fresh builds | F: hardware session and Windows + Android build NOT run yet | - |
+| 21 | Hardware + fresh builds | F: fresh Windows + Android build via Cluck Wars/Build/All on 2026-10-13: Windows OK, Android OK (`Builds/Android/CluckWars-1.0.apk`, 96.8 MB); Pixel 9 + pad session is run by the main session next | - |
 | decision 6 | Egg Shell / Turtle steal-proof | D (+ security hardening) | `775e32d`, `7cb18c6` |
 
 **Deviations / not done.**
@@ -53,7 +53,7 @@ what's shipped, what's in flight, and what's blocked on testing.
 - The spawn camera pull-in and a bush ring around the arena were not done (see Chunk E part 1: view change / 2 500 tris per bush). GPU frame time is unmeasured; CPU `Camera.Render` showed no regression within noise.
 - Decision 5 (cross-kind combos) deliberately left unchanged.
 - GameManager's corner-order tie-break still names a stored winner (stats only).
-- Finding 21: no fresh Windows + Android build was run in this phase; the hardware session and builds are the next step.
+- Finding 21: fresh Build All passed (Windows OK, Android OK). The build toggles `m_PrefilterReflectionProbeRotation` in `Assets/Settings/Mobile_RPAsset.asset` (readable YAML, URP build-time prefilter, not corruption); reverted, not committed. Pixel 9 + pad session still to do.
 
 **Watch list for the hardware / playtest session.**
 - Combos (no caps): Fatty Egg Shell + Turtle back to back (steal-proof about 5 of every 10 s); Turtle + Roll & Push + Spine Coat (0.5 x 2.0 = 1.0 speed, steal-proof, robbing on proximity); Immovable + Turtle; Egg Shell inside your own base; plus the older chunk-3 list below.
