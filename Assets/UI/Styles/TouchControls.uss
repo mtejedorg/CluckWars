@@ -568,6 +568,9 @@
    desktop / pad. 32 px text (floor 28). The fade is a plain opacity transition; the controller zeroes it under
    Reduced Motion.
    ============================================================================ */
+/* Round-4 finding 11: on touch the plate is as wide as the hex cluster (cluster spans 95..515 px from the right
+   edge) and sits straight above it, wrapping to two or three lines, so it never reaches toward the bird at screen
+   centre on 4:3. Desktop / pad: one line centred above the info strip. */
 .cw-hold-hint-host {
     position: absolute;
     left: 0; right: 0; bottom: 560px;
@@ -578,7 +581,7 @@
     bottom: 160px; align-items: center; padding-right: 0;
 }
 .cw-hold-hint {
-    max-width: 880px;
+    max-width: 640px;
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
     font-size: 32px;
     color: rgb(254, 245, 224);
@@ -595,4 +598,5 @@
     transition-property: opacity;
     transition-duration: 0.25s;
 }
+.cw-hud--desktop .cw-hold-hint, .cw-hud--pad .cw-hold-hint { max-width: 1400px; }
 .cw-hold-hint--on { opacity: 1; }

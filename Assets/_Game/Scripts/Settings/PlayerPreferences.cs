@@ -252,8 +252,9 @@ namespace CluckWars.Settings
         private static bool _autoPeckLoaded;
 
         /// <summary>
-        /// Peck by yourself when you stand still by a pile (Phase 6, A6)? <b>Defaults to false</b>: it adds
-        /// behaviour a player did not ask for. Read every input tick by <c>FusionNetworkService.OnInput</c> and
+        /// Peck by yourself when you stand still by a pile (Phase 6, A6)? <b>Defaults to on for touch devices</b>
+        /// (<see cref="DefaultAutoPeck"/>: holding a hex through a whole peck is the hardest thing to ask of a thumb,
+        /// round-4 decision 3) and off on desktop; whatever the player saved wins. Read every input tick by <c>FusionNetworkService.OnInput</c> and
         /// carried to the state authority as <c>InputButton.AutoPeck</c>. Its toggle is on the Settings sheet.
         /// </summary>
         public static bool AutoPeckEnabled
@@ -262,7 +263,7 @@ namespace CluckWars.Settings
             {
                 if (!_autoPeckLoaded)
                 {
-                    _autoPeck = PlayerPrefs.GetInt(AutoPeckKey, 0) != 0;
+                    _autoPeck = PlayerPrefs.GetInt(AutoPeckKey, DefaultAutoPeck ? 1 : 0) != 0;
                     _autoPeckLoaded = true;
                 }
                 return _autoPeck;
@@ -277,6 +278,12 @@ namespace CluckWars.Settings
                 PlayerPrefs.Save();
             }
         }
+
+        /// <summary>The value <see cref="AutoPeckEnabled"/> takes until the player chooses: on for phones and tablets.</summary>
+        public static bool DefaultAutoPeck => AutoPeckDefaultFor(Application.isMobilePlatform);
+
+        /// <summary>Pure form of <see cref="DefaultAutoPeck"/>: touch / mobile on, desktop off.</summary>
+        public static bool AutoPeckDefaultFor(bool isMobilePlatform) => isMobilePlatform;
 
         /// <summary><c>PlayerPrefs</c> key for <see cref="QuickMovesEnabled"/>. Namespaced like every key here.</summary>
         public const string QuickMovesKey = "CluckWars.QuickMoves";

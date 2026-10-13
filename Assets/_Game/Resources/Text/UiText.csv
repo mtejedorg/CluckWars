@@ -172,7 +172,8 @@ postmatch.draw,EMPTY NESTS!
 postmatch.youPlace,{you} · {place}
 postmatch.youPlaceTied,{you} · tied {place}
 postmatch.tiedKos,Tied 1st · won on KOs
-postmatch.tied,Tied for 1st!
+postmatch.tied,Share the crown!
+postmatch.tiedTop,TIED AT THE TOP!
 lobby.hint.host,Start whenever you like.
 lobby.hint.guest,Waiting for the host…
 session.ended,MATCH OVER
@@ -196,9 +197,9 @@ hud.event.underdogSurge,UNDERDOG SURGE!
 hud.event.leaderBounty,BOUNTY ON THE LEADER!
 hud.event.restock,PILES RESTOCKED!
 hud.pop.safe,SAFE
-hud.hint.hold.touch,Hold to aim. Let go to use it. Drag to the edge to cancel.
-hud.hint.hold.pad,Hold to aim · Release to use · B to cancel.
-hud.hint.hold.keys,Hold to aim · Release to use · Esc to cancel.
+hud.hint.hold.touch,Hold to see the reach · Let go to use it · Slide to the edge to cancel
+hud.hint.hold.pad,Hold to see the reach · Let go to use it · B to cancel
+hud.hint.hold.keys,Hold to see the reach · Let go to use it · Esc to cancel
 countdown.waitingFor,Waiting for {name}…
 countdown.waitingSomeone,Waiting for a slow bird…
 session.hostLeft,The host flew the coop.

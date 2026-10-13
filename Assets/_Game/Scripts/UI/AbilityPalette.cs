@@ -43,11 +43,18 @@ namespace CluckWars.UI
         /// sat 4.7 dE00 from Steal under deuteranopia (round-2 finding 9); darkened to L* 27 so it parts from
         /// Steal (L* 44) by lightness, which colour blindness keeps.</summary>
         public static readonly Color Defense = UiGfx.Hex32("30460c");
-        /// <summary>Mid moss, the Defense hex FILL (round-3 finding 15; #30460c read near-black on a hex). L* 62, so it
-        /// parts from Steal (L* 44) by lightness like the dark one did. Ink label 6.4:1; dE00 &gt;= 36 from the other
-        /// three categories, &gt;= 26 from every player colour; &gt;= 13 from the others under deutan, protan and tritan
-        /// simulation (<c>AbilityPaletteTests</c>).</summary>
-        public static readonly Color DefenseFill = UiGfx.Hex32("8e9d43");
+        /// <summary>Mid moss, the Defense hex FILL (round-3 finding 15; #30460c read near-black on a hex). Round-4
+        /// finding 13: was #8e9d43 (L* 62), where the cream ability icon only reached 2.74:1; darkened to L* 57 so the
+        /// cream icon clears <see cref="MinIconContrast"/> (3.3:1) and the ink label still clears AA (5.4:1) while it keeps
+        /// parting from Steal (L* 44) by lightness. The distance rules (players, other fills, colour-blind pairs) are
+        /// pinned by <c>AbilityPaletteTests</c>.</summary>
+        public static readonly Color DefenseFill = UiGfx.Hex32("80902c");
+
+        /// <summary>The ability icons are cream with an ink outline (Icons/Abilities); this is the cream.</summary>
+        public static readonly Color IconCream = UiGfx.TextPrimary;
+
+        /// <summary>WCAG 1.4.11 non-text contrast: the cream icon against its category fill (round-4 finding 13).</summary>
+        public const float MinIconContrast = 3f;
         /// <summary>Slate teal. Cream label 5.6:1; nearest player (teal) dE00 16.2.</summary>
         public static readonly Color Utility = UiGfx.Hex32("2e6b72");
 

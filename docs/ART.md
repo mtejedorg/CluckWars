@@ -87,8 +87,8 @@ The in-world nameplate also names the colour in text: a human rival is `P3`, a b
 (`ChickenNameplate`); the feet ring and rival ring themselves are sprites and carry no text.
 
 **Ability category fills.** Defense has two colours: `#30460C` (`AbilityPalette.Defense`) is the TEXT
-background only (card band, category tag, frame: cream label 9.6:1); `#8E9D43` (`AbilityPalette.DefenseFill`,
-L* 62) is the hex FILL (touch HUD `#Fill{n}`, lobby mini-hexes, ability icon discs, via
+background only (card band, category tag, frame: cream label 9.6:1); `#80902C` (`AbilityPalette.DefenseFill`,
+L* 57) is the hex FILL (touch HUD `#Fill{n}`, lobby mini-hexes, ability icon discs, via
 `AbilityPalette.FillColor` / `HexColor`), because the dark moss read near-black next to the other three. The
 other three categories use one colour for both.
 
@@ -389,7 +389,7 @@ Hex buttons use a **pointy-top hexagon** with dimensional shading. The hexagon s
 | Property | Value |
 |---|---|
 | Size | 150px (mobile reference), scales with `CanvasScaler` |
-| Fill | The ability's **category colour** (`UI/AbilityPalette.FillColor`, same as the menus; `AccentColor` stays the VFX colour). Defense uses the mid moss fill `#8E9D43`, not the dark text colour `#30460C`. **Phase 6:** no target in range is NOT a hex state any more: the fill stays at full hue and opaque (the old 70% `AbilityPalette.Idle` + ⃠ mark is deleted) |
+| Fill | The ability's **category colour** (`UI/AbilityPalette.FillColor`, same as the menus; `AccentColor` stays the VFX colour). Defense uses the mid moss fill `#80902C`, not the dark text colour `#30460C`. **Phase 6:** no target in range is NOT a hex state any more: the fill stays at full hue and opaque (the old 70% `AbilityPalette.Idle` + ⃠ mark is deleted) |
 | Category mark | Small cream shape with an ink rim, top-right: Steal diamond, Control circle, Defense square, Utility plus (`UI/CategoryMark`, `CategoryMark.uss`; also on every menu ability icon) |
 | Neutral state | `AbilityPalette.EmptyHex` (warm wood) when no ability equipped |
 | Slot 3 visibility | Hidden unless an ability is equipped in slot 2 (Assassin only) |
@@ -470,7 +470,7 @@ not buttons.
 | B | cancel a held move |
 | Start | Back / Leave sheet |
 
-Hold hint copy (shown for the first 5 holds, `UiText.csv` `hud.hint.hold.pad`): "Hold to aim · Release to use · B to cancel." Keyboard copy: "Hold to aim · Release to use · Esc to cancel." Menu navigation hint (`hint.console`): "←→ Select · A Confirm · LB/RB Tab".
+Hold hint copy (shown for the first 5 holds, `UiText.csv` `hud.hint.hold.pad`): "Hold to see the reach · Let go to use it · B to cancel" Keyboard copy: "Hold to see the reach · Let go to use it · Esc to cancel" Menu navigation hint (`hint.console`): "←→ Select · A Confirm · LB/RB Tab".
 
 Not verified on a real gamepad yet (unit tests and fakes only).
 

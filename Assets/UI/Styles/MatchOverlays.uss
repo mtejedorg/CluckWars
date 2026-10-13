@@ -206,6 +206,8 @@
 }
 /* Headroom over the centre step for the 1.25x winner and its crown. */
 .cw-me-pod--1 .cw-me-pod__chicken { margin-top: 110px; }
+/* A tie at the top crowns the side steps' birds too (MatchOverlaysController sets the class): same headroom. */
+.cw-me-pod--crowned .cw-me-pod__chicken { margin-top: 110px; }
 /* Crown in the icon style (Icons/Podium/Crown_Gold: gold, ink outline, cream gems). left / top are set
    every frame in C# from the head anchor (MatchOverlaysController.PlaceCrown, PodiumLayout.CrownTopLeft). */
 .cw-me-crown {
@@ -238,6 +240,7 @@
 /* Cream nameplate, like THE COOP's seats: ink outline, player-colour top stripe (C#). */
 .cw-me-pod__plate {
     flex-shrink: 0; align-items: center;
+    align-self: center; min-width: 100%;   /* as wide as the step, wider when the "You · tied 1st" chip needs it (4:3) */
     margin-top: 8px;
     padding-top: 6px; padding-bottom: 10px; padding-left: 12px; padding-right: 12px;
     background-color: rgb(255, 248, 232);
@@ -253,6 +256,9 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
     padding-top: 0; padding-bottom: 0; margin-top: 0; margin-bottom: 0;
 }
+/* The YOU chip ("You · tied 1st") is longer than a name: it sizes outside the name's max-width + ellipsis instead of
+   cutting to "You · ti..." on the 4:3 podium (round-4 finding 7). */
+.cw-me-pod__name.cw-you-mark { max-width: none; overflow: visible; text-overflow: clip; flex-shrink: 0; font-size: 34px; }
 .cw-me-pod__foodrow { flex-direction: row; align-items: center; justify-content: center; }
 .cw-me-pod__foodicon {
     width: 34px; height: 34px; margin-right: 8px;
@@ -526,14 +532,15 @@
 /* ============================================================================
    INTRO COUNTDOWN  (topmost, non-interactive)
    ============================================================================ */
-/* Digit + glow ride ~20% of the screen above centre: the follow camera keeps the player's own
-   chicken near screen centre, and the 342 px digit used to sit right on top of it (re-audit 12). */
+/* Digit + glow ride in the TOP THIRD (centre ~16% down): the follow camera keeps the player's own chicken near
+   screen centre and the GET READY "YOU" marker (1.45x nameplate) floats above it, so a digit centred 20% above
+   centre still covered the marker (round-4 finding 8, after re-audit 12 first lifted it). */
 .cw-intro-stack {
-    top: -20%;
+    top: -34%;
     align-items: center; justify-content: center;
 }
 .cw-intro-glow {
-    position: absolute; width: 1064px; height: 1064px;
+    position: absolute; width: 760px; height: 760px;
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/RadialGlow.png");
     -unity-background-scale-mode: stretch-to-fill;
     -unity-background-image-tint-color: rgba(245, 200, 66, 0.5);
@@ -542,7 +549,7 @@
    any patch of arena. */
 .cw-intro-number {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 342px; color: rgb(245, 200, 66); -unity-text-align: middle-center;
+    font-size: 250px; color: rgb(245, 200, 66); -unity-text-align: middle-center;
     -unity-text-outline-width: 6px; -unity-text-outline-color: rgb(42, 26, 12);
     text-shadow: 0px 12px 0px rgba(42, 26, 12, 0.9);
 }

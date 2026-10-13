@@ -435,9 +435,9 @@ namespace CluckWars.Tests
         public void Hint_CopyByDevice()
         {
             UiText.Reset();
-            Assert.AreEqual("Hold to aim. Let go to use it. Drag to the edge to cancel.", UiText.Get(HoldHintRules.KeyFor(HudDeviceMode.Touch)));
-            Assert.AreEqual("Hold to aim · Release to use · B to cancel.", UiText.Get(HoldHintRules.KeyFor(HudDeviceMode.Gamepad)));
-            Assert.AreEqual("Hold to aim · Release to use · Esc to cancel.", UiText.Get(HoldHintRules.KeyFor(HudDeviceMode.KeyboardMouse)));
+            Assert.AreEqual("Hold to see the reach · Let go to use it · Slide to the edge to cancel", UiText.Get(HoldHintRules.KeyFor(HudDeviceMode.Touch)));
+            Assert.AreEqual("Hold to see the reach · Let go to use it · B to cancel", UiText.Get(HoldHintRules.KeyFor(HudDeviceMode.Gamepad)));
+            Assert.AreEqual("Hold to see the reach · Let go to use it · Esc to cancel", UiText.Get(HoldHintRules.KeyFor(HudDeviceMode.KeyboardMouse)));
             Assert.IsEmpty(UiText.Problems);
             UiText.Reset();
         }

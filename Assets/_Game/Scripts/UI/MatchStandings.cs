@@ -99,7 +99,8 @@ namespace CluckWars.UI
         /// <summary>
         /// The win banner, decided from the standings alone so no caller can forget the draw:
         /// "EMPTY NESTS!" when nobody banked a single food (<see cref="IsDraw"/>, whatever corner
-        /// GameManager named), else "YOU WIN!" for the local winner, "{NAME} WINS!" for anyone else,
+        /// GameManager named), "TIED AT THE TOP!" when the top is shared and no visible KO lead settles it
+        /// (<see cref="IsTiedAtTop"/>; GameManager's corner-order pick is not shown as a win), else "YOU WIN!" for the local winner, "{NAME} WINS!" for anyone else,
         /// "MATCH ENDED" when the named corner is not in the standings (or none was named).
         /// </summary>
         public static string WinBanner(IReadOnlyList<Entry> ranked, int winnerCorner)
@@ -107,6 +108,7 @@ namespace CluckWars.UI
             if (IsDraw(ranked)) return UiText.Get(UiKeys.PostmatchDraw);
             int idx = IndexOfCorner(ranked, winnerCorner);
             if (idx < 0) return UiText.Get(UiKeys.PostmatchEnded);
+            if (SharesTop(ranked, idx, out bool koDecided) && !koDecided) return UiText.Get(UiKeys.PostmatchTiedTop);
             var winner = ranked[idx];
             if (winner.IsLocal) return UiText.Get(UiKeys.PostmatchYouWin);
             return UiText.Format(UiKeys.PostmatchWins, ("name", DisplayName(winner).ToUpperInvariant()));
@@ -133,19 +135,62 @@ namespace CluckWars.UI
             int idx = IndexOfCorner(ranked, winnerCorner);
             if (idx < 0) return null;
             var winner = ranked[idx];
+            if (!SharesTop(ranked, idx, out bool koDecided)) return UiText.Format(UiKeys.PostmatchWinSub, ("cls", ClassName(winner.Class)));
+            return UiText.Get(koDecided ? UiKeys.PostmatchTiedKos : UiKeys.PostmatchTied);
+        }
+
+        /// <summary>
+        /// True when the declared winner shares the top shown score with another bird. <paramref name="koDecided"/>
+        /// is true only when every such rival had exactly level food (GameManager compares exact food first) and
+        /// strictly fewer knockouts: the one tie-break a player can see in the KO column.
+        /// </summary>
+        private static bool SharesTop(IReadOnlyList<Entry> ranked, int winnerIdx, out bool koDecided)
+        {
+            var winner = ranked[winnerIdx];
             int top = Score(winner);
-            bool tied = false, koDecided = true;
+            bool tied = false;
+            koDecided = true;
             for (int i = 0; i < ranked.Count; i++)
             {
-                if (i == idx || Score(ranked[i]) != top) continue;
+                if (i == winnerIdx || Score(ranked[i]) != top) continue;
                 tied = true;
-                // KOs settle it only when the exact totals were level (GameManager compares exact food
-                // first) and the winner has strictly more knockouts than this rival.
                 if (!UnityEngine.Mathf.Approximately(ranked[i].Total, winner.Total) || winner.Kills <= ranked[i].Kills)
                     koDecided = false;
             }
-            if (!tied) return UiText.Format(UiKeys.PostmatchWinSub, ("cls", ClassName(winner.Class)));
-            return UiText.Get(koDecided ? UiKeys.PostmatchTiedKos : UiKeys.PostmatchTied);
+            if (!tied) koDecided = false;
+            return tied;
+        }
+
+        /// <summary>
+        /// A tie for 1st that nothing visible settles (equal shown food and no clear KO lead; GameManager fell
+        /// back to exact food or corner order): the screen says "TIED AT THE TOP!" and crowns every tied-1st bird
+        /// instead of naming a winner (Maestro, round 4). False on a draw, with no winner, or a KO-decided tie.
+        /// </summary>
+        public static bool IsTiedAtTop(IReadOnlyList<Entry> ranked, int winnerCorner)
+        {
+            if (IsDraw(ranked)) return false;
+            int idx = IndexOfCorner(ranked, winnerCorner);
+            return idx >= 0 && SharesTop(ranked, idx, out bool koDecided) && !koDecided;
+        }
+
+        /// <summary>
+        /// Which entries of <paramref name="ranked"/> wear the crown: every bird tied for 1st on a
+        /// <see cref="IsTiedAtTop"/> result, otherwise only the declared winner when ranked first; nobody on a
+        /// draw or when no winner is named.
+        /// </summary>
+        public static bool[] Crowned(IReadOnlyList<Entry> ranked, int winnerCorner)
+        {
+            var crowned = new bool[ranked.Count];
+            if (IsDraw(ranked)) return crowned;
+            int idx = IndexOfCorner(ranked, winnerCorner);
+            if (idx < 0) return crowned;
+            if (IsTiedAtTop(ranked, winnerCorner))
+            {
+                int top = Score(ranked[idx]);
+                for (int i = 0; i < ranked.Count; i++) crowned[i] = Score(ranked[i]) == top;
+            }
+            else crowned[idx] = idx == 0;
+            return crowned;
         }
 
         /// <summary>The food a chicken is shown with (and ranked by): whole units, rounded down.</summary>
@@ -216,7 +261,8 @@ namespace CluckWars.UI
             if (IsDraw(ranked) || IndexOfCorner(ranked, winnerCorner) < 0) return null;
             int you = -1;
             for (int i = 0; i < ranked.Count; i++) if (ranked[i].IsLocal) { you = i; break; }
-            if (you < 0 || ranked[you].Corner == winnerCorner) return null;
+            if (you < 0) return null;
+            if (ranked[you].Corner == winnerCorner && !IsTiedAtTop(ranked, winnerCorner)) return null;
             var places = Places(ranked);
             bool shared = false;
             for (int i = 0; i < places.Length; i++) if (i != you && places[i] == places[you]) shared = true;

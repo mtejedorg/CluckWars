@@ -61,6 +61,17 @@ namespace CluckWars.UI
         /// <param name="winnerSlot">The crowned step, or -1 (no winner: everyone at the common size).</param>
         public static float[] ChickenScales(IReadOnlyList<float> drawnSides, int winnerSlot)
         {
+            var crowned = new bool[drawnSides.Count];
+            if (winnerSlot >= 0 && winnerSlot < crowned.Length) crowned[winnerSlot] = true;
+            return ChickenScales(drawnSides, crowned);
+        }
+
+        /// <summary>
+        /// As <see cref="ChickenScales(IReadOnlyList{float}, int)"/> for a podium where SEVERAL birds are crowned (a tie
+        /// at the top): every crowned step gets <see cref="WinnerScale"/>, so tied birds stand the same size.
+        /// </summary>
+        public static float[] ChickenScales(IReadOnlyList<float> drawnSides, IReadOnlyList<bool> crowned)
+        {
             var scales = new float[drawnSides.Count];
             float common = float.MaxValue;
             for (int i = 0; i < drawnSides.Count; i++)
@@ -72,7 +83,8 @@ namespace CluckWars.UI
             for (int i = 0; i < drawnSides.Count; i++)
             {
                 if (!Valid(drawnSides[i])) continue;
-                float target = i == winnerSlot ? common * WinnerScale : common;
+                bool isCrowned = i < crowned.Count && crowned[i];
+                float target = isCrowned ? common * WinnerScale : common;
                 scales[i] = target / drawnSides[i];
             }
             return scales;

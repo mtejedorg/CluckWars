@@ -829,14 +829,14 @@ and the in-range pip. A held key scales its hex. The last device you touched dec
 layout; any finger on a touchscreen brings the thumb layout back.
 
 **Hold hint.** A one-line hint above the cluster teaches the gesture for your device
-("Hold to aim · Release to use · B to cancel." on pad). It shows for your first 5 holds, then
+("Hold to see the reach · Let go to use it · B to cancel" on pad). It shows for your first 5 holds, then
 never again, and not with Quick Moves.
 
 **Peck chain.** A Peck that succeeds with no move input keeps pecking by itself until the
 hold is full. A dashed ring turns on the Peck hex while the chain runs. It stops on: match
 end, death, stun, a knockback, another move cast, move input, hold full (a "full" sound
 plays), or no pile with food in reach. It never restarts by itself. **Auto-Peck** (setting,
-off by default) starts the first peck for you after you stand still (0.18 s) by a pile with
+on by default on touch devices, off on desktop; a saved choice always wins) starts the first peck for you after you stand still (0.18 s) by a pile with
 food, unless a stealth move is running (it must not break your Invisibility).
 
 **Settings** (Settings sheet; labels and descriptions are the player copy in `UiText.csv`):
@@ -845,7 +845,7 @@ food, unless a stealth move is running (it must not break your Invisibility).
 |---|---|---|
 | Range Guides | Show how far your moves reach. | on |
 | Quick Moves | Moves fire the moment you tap. | off |
-| Auto-Peck | Peck by yourself when you stand by a pile. | off |
+| Auto-Peck | Peck by yourself when you stand by a pile. | on (touch) / off (desktop) |
 | Buzz When Hit | Your phone buzzes when a move hits you. (Android only; hidden elsewhere) | on |
 | Reduced Motion | Calms camera shake and screen movement. | off |
 | Performance Mode | Static chickens in menus. Saves battery. | on for phones and tablets |

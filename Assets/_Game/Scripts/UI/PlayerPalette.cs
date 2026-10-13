@@ -42,6 +42,12 @@ namespace CluckWars.UI
         public static readonly Color YouMarkFill = UiGfx.Gold;
         /// <summary>YOU mark text (the brand dark ink).</summary>
         public static readonly Color YouMarkInk = UiGfx.TextDark;
+        /// <summary>A rival's nameplate pill (round-4 finding 4): opaque dark ink, so the label never depends on the ground.</summary>
+        public static readonly Color RivalPillFill = UiGfx.TextDark;
+        /// <summary>Cream label on <see cref="RivalPillFill"/> (&gt;= 4.5:1, PlayerPaletteTests).</summary>
+        public static readonly Color RivalPillText = UiGfx.TextPrimary;
+        /// <summary>The rival pill's rim and its colour-dot ring: cream, so the capsule parts from dark grass.</summary>
+        public static readonly Color RivalPillRim = UiGfx.TextPrimary;
         /// <summary>USS class that draws a name label as the YOU mark (Assets/UI/Styles/YouMark.uss).</summary>
         public const string YouMarkClass = "cw-you-mark";
 

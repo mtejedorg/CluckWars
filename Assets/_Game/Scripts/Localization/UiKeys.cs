@@ -214,6 +214,7 @@ namespace CluckWars.Localization
         [UiArgs("you", "place")] public const string PostmatchYouPlaceTied = "postmatch.youPlaceTied";
         public const string PostmatchTiedKos = "postmatch.tiedKos";
         public const string PostmatchTied = "postmatch.tied";
+        public const string PostmatchTiedTop = "postmatch.tiedTop";
         public const string LobbyHintHost = "lobby.hint.host";
         public const string LobbyHintGuest = "lobby.hint.guest";
         public const string SessionEnded = "session.ended";

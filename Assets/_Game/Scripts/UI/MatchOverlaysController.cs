@@ -85,8 +85,9 @@ namespace CluckWars.UI
         private Label         _meYouChip;
         // The crowned step (PodiumLayout: 1.25x, crown on the head) or -1, and the winner's class for the
         // static head anchor; set once per match end.
-        private int           _crownSlot = -1;
-        private ChickenClass  _crownClass;
+        private readonly bool[]          _crownSlots = new bool[3];             // podium slots wearing a crown (ties crown several)
+        private readonly ChickenClass[]  _crownClasses = new ChickenClass[3];
+        private readonly VisualElement[] _crowns = new VisualElement[3];        // [1] is #MeCrown; the side steps' are built in code
         // Feathers + sparkles under the podium column (Phase 3B); null if the UXML has no #MeCelebration.
         private MatchCelebration _celebration;
         // Local presentation of the networked intro timer (Phase 3B): tick / GO cues + a slam on the numeral.
@@ -344,6 +345,17 @@ namespace CluckWars.UI
                 };
                 if (_pods[i].Root == null || _pods[i].Chicken == null || _pods[i].Name == null)
                     _log?.Error(Source, $"MatchOverlays.uxml is missing podium step #MePod{i} (or its chicken / name); the podium will be incomplete.");
+            }
+            _crowns[1] = _meCrown;
+            for (int slot = 0; slot < _crowns.Length; slot++)
+            {
+                if (_crowns[slot] != null || _pods[slot]?.Chicken == null) continue;
+                // A tie for 1st crowns every tied bird, so the side steps need a crown too (same class as #MeCrown).
+                var crown = new VisualElement { name = $"MeCrown{slot}", pickingMode = PickingMode.Ignore };
+                crown.AddToClassList("cw-me-crown");
+                crown.style.display = DisplayStyle.None;
+                _pods[slot].Chicken.Add(crown);
+                _crowns[slot] = crown;
             }
             foreach (var pod in _pods) pod.Chicken?.RegisterCallback<GeometryChangedEvent>(_ => ApplyPodiumScales());
             var celebrationLayer = _root.Q<VisualElement>("MeCelebration");
@@ -687,8 +699,15 @@ namespace CluckWars.UI
             var winner = hasWinner ? ranked[winnerIdx] : default;
             // The crown rides the centre step's bird; Ranked puts the declared winner there unless someone
             // out-banked them (not a real outcome: GameManager names the most food), then nobody is crowned.
-            _crownSlot  = hasWinner && winnerIdx == MatchStandings.PodiumRankBySlot[1] ? 1 : -1;
-            _crownClass = winner.Class;
+            // A tie for 1st nothing visible settles crowns EVERY tied-1st bird (Maestro, round 4): "TIED AT THE TOP!".
+            bool[] crowned = MatchStandings.Crowned(ranked, gm.WinnerCorner);
+            for (int slot = 0; slot < _crownSlots.Length; slot++)
+            {
+                int rank = MatchStandings.PodiumRankBySlot[slot];
+                _crownSlots[slot] = !draw && rank < crowned.Length && crowned[rank];
+                _crownClasses[slot] = _crownSlots[slot] ? ranked[rank].Class : default;
+            }
+            bool tiedAtTop = MatchStandings.IsTiedAtTop(ranked, gm.WinnerCorner);
 
             // Banner: YOU WIN! / {NAME} WINS! / EMPTY NESTS! / MATCH ENDED, then the winner's class (or how a
             // tie for 1st was settled) under it. Both come from the standings alone (MatchStandings decides
@@ -707,10 +726,13 @@ namespace CluckWars.UI
                 _meYouChip.text = headline ? chip : string.Empty;
                 _meYouChip.style.display = headline ? DisplayStyle.Flex : DisplayStyle.None;
             }
-            if (_meCrown != null)
+            for (int slot = 0; slot < _crowns.Length; slot++)
             {
-                _meCrown.style.display = _crownSlot >= 0 ? DisplayStyle.Flex : DisplayStyle.None;
-                _meCrown.style.visibility = Visibility.Hidden;   // PlaceCrown shows it once it is on the head
+                var crown = _crowns[slot];
+                if (crown == null) continue;
+                crown.style.display = _crownSlots[slot] ? DisplayStyle.Flex : DisplayStyle.None;
+                crown.style.visibility = Visibility.Hidden;   // PlaceCrowns shows it once it is on the head
+                _pods[slot]?.Root?.EnableInClassList("cw-me-pod--crowned", _crownSlots[slot]);
             }
             if (_meWinGlow != null) _meWinGlow.style.display = hasWinner ? DisplayStyle.Flex : DisplayStyle.None;
             if (hasWinner) _celebration?.Start();   // no-op under Reduced Motion
@@ -752,7 +774,7 @@ namespace CluckWars.UI
                     _meRows.Add(BuildMeRow(draw ? 0 : places[i], ranked[i], maxTotal, isWinner: hasWinner && ranked[i].Corner == winner.Corner));
             }
 
-            _log?.Info(Source, $"Match end: {(hasWinner ? $"winner corner {winner.Corner} ({MatchStandings.DisplayName(winner)})" : draw ? "draw (nobody banked)" : "no winner")}, " +
+            _log?.Info(Source, $"Match end: {(tiedAtTop ? "tied at the top (all tied-1st crowned), GameManager named corner " + winner.Corner : hasWinner ? $"winner corner {winner.Corner} ({MatchStandings.DisplayName(winner)})" : draw ? "draw (nobody banked)" : "no winner")}, " +
                 $"{ranked.Count} in the standings, podium {(_stage != null ? "live" : "static")}.");
         }
 
@@ -799,7 +821,7 @@ namespace CluckWars.UI
                 }
                 if (v.Score != null) v.Score.text = MatchStandings.Score(e).ToString();
                 if (v.Place != null) v.Place.text = place > 0 ? place.ToString() : string.Empty;
-                ShowPodChicken(slot, v, e.HasChicken ? e.Class : (ChickenClass?)null, cheer: slot == _crownSlot);
+                ShowPodChicken(slot, v, e.HasChicken ? e.Class : (ChickenClass?)null, cheer: slot < _crownSlots.Length && _crownSlots[slot]);
             }
             ApplyPodiumScales();
         }
@@ -818,7 +840,7 @@ namespace CluckWars.UI
                 bool shown = c != null && _pods[i].Root != null && !_pods[i].Root.ClassListContains("cw-me-pod--hidden");
                 sides[i] = shown ? Mathf.Min(c.layout.width, c.layout.height) : float.NaN;
             }
-            var scales = PodiumLayout.ChickenScales(sides, _crownSlot);
+            var scales = PodiumLayout.ChickenScales(sides, _crownSlots);
             for (int i = 0; i < _pods.Length; i++)
             {
                 var c = _pods[i]?.Chicken;
@@ -895,19 +917,24 @@ namespace CluckWars.UI
         /// </summary>
         private void PlaceCrown()
         {
-            if (_meCrown == null || _crownSlot < 0 || !IsShown(_matchEndOverlay)) return;
-            var chicken = _pods[_crownSlot]?.Chicken;
-            if (chicken == null) return;
-            float w = chicken.layout.width, h = chicken.layout.height;
-            float cw = _meCrown.resolvedStyle.width, ch = _meCrown.resolvedStyle.height;
-            if (float.IsNaN(w) || float.IsNaN(h) || w <= 1f || h <= 1f || float.IsNaN(cw) || float.IsNaN(ch)) return;
+            if (!IsShown(_matchEndOverlay)) return;
+            for (int slot = 0; slot < _crowns.Length; slot++)
+            {
+                var crown = _crowns[slot];
+                if (crown == null || !_crownSlots[slot]) continue;
+                var chicken = _pods[slot]?.Chicken;
+                if (chicken == null) continue;
+                float w = chicken.layout.width, h = chicken.layout.height;
+                float cw = crown.resolvedStyle.width, ch = crown.resolvedStyle.height;
+                if (float.IsNaN(w) || float.IsNaN(h) || w <= 1f || h <= 1f || float.IsNaN(cw) || float.IsNaN(ch)) continue;
 
-            Vector2 anchor = PodiumLayout.StaticHeadAnchor(_crownClass);
-            if (_stage != null && _stage.TryGetHeadAnchor(_crownSlot, out var live)) anchor = live;
-            var pos = PodiumLayout.CrownTopLeft(w, h, anchor, cw, ch);
-            _meCrown.style.left = pos.x;
-            _meCrown.style.top = pos.y;
-            if (_meCrown.style.visibility != Visibility.Visible) _meCrown.style.visibility = Visibility.Visible;
+                Vector2 anchor = PodiumLayout.StaticHeadAnchor(_crownClasses[slot]);
+                if (_stage != null && _stage.TryGetHeadAnchor(slot, out var live)) anchor = live;
+                var pos = PodiumLayout.CrownTopLeft(w, h, anchor, cw, ch);
+                crown.style.left = pos.x;
+                crown.style.top = pos.y;
+                if (crown.style.visibility != Visibility.Visible) crown.style.visibility = Visibility.Visible;
+            }
         }
 
         /// <param name="place">Shared placing (1-based, MatchStandings.Places); 0 = a draw: plain medal, no number.</param>
