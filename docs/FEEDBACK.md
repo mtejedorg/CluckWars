@@ -3,7 +3,8 @@
 **Status:** design locked; Stages 1–5 implemented (v0.6), four confirmed defects fixed in
 v0.6.1 (casting model, placed-zone whiff, single-target marking, decoy targetability) plus
 a richer shape vocabulary. Per-case status is marked in §7 — 25 implemented, 5 partial,
-1 deferred. The visual language is specified in
+1 deferred (as of v0.6.1; Phase 6, 2026-10, changed the telegraph, whiff, cancel and
+refusal cases — see "Phase 6 (2026-10)" notes inline and §11). The visual language is specified in
 `docs/ART.md` §6.11–§6.13; the player-facing rules in `docs/GDD.md` §10.1–§10.2.
 **Problem statement:** abilities currently fire on button *press* with almost no
 readable consequence. A player cannot tell whether an ability fired, whether it
@@ -67,11 +68,22 @@ arena into a solved puzzle.
 
 **Input model changes from press-to-fire to hold-to-aim, release-to-fire.**
 
+> **Phase 6 (2026-10) changes to this section.** The preview is now **instant and
+> local** (from the press frame, not after the hold threshold); "no target" is a
+> legal state drawn as a cream dashed ring, not a refusal; the cancel gesture is the
+> screen edge (touch), Esc / right mouse (keyboard) or B (pad); a target-gated move
+> released with nobody in range fizzles. Items below are marked where they changed.
+
 While the ability button is held:
 
 1. **Area preview** — a ground decal at the ability's *true* shape and size, in
    the ability's `AccentColor`. Not a generic circle: the shape must match what
-   the ability actually scans (§4).
+   the ability actually scans (§4). **Phase 6:** it appears the moment you press
+   (`AbilityTelegraph` reads the local `IInputProvider` and previews the lowest held
+   slot from the press frame); the networked `ChargingSlot` is only the fallback.
+   **No target in range = a cream dashed ring** (`Fx_DashedRing.png` tiled on the shape
+   line), back to the solid accent line the moment a rival is inside the shape. The
+   red-grey wash is reserved for real refusals (stunned, cooldown, slot unavailable).
 2. **Target marking** — every chicken currently inside the shape gets a
    **threat overlay**: a pulsing body tint plus a bracket reticle at its feet.
    Three overlay states:
@@ -91,15 +103,22 @@ While the ability button is held:
    losing aim-rotate (a broken one).
 4. **Caster wind-up tell (all peers)** — a growing emissive glow at the caster's
    feet scaled by hold time, in the accent colour. Visible to everyone.
-5. **Live legality** — if the cast becomes illegal mid-hold (caster gets stunned,
-   last valid target leaves the area), the preview desaturates to red-grey and
-   the button shows the block reason. Releasing then **cancels without burning
-   cooldown**.
-6. **Cancel gesture** — drag off the button (touch) / press Esc (desktop) cancels.
+5. **Live legality** — if the cast becomes illegal mid-hold (caster gets stunned or
+   the slot goes dead), the preview desaturates to red-grey and the button shows the
+   block reason. Releasing then **cancels without burning cooldown**. **Phase 6:** the
+   last valid target walking out of the area is no longer "illegal": the preview goes
+   dashed cream, and releasing is a fizzle (§3.3).
+6. **Cancel gesture** — **Phase 6:** drag the thumb to the screen edge (arms within 20 dp
+   of a physical edge, disarms past 28 dp), Esc or right mouse on keyboard, B on pad.
+   System edge gestures and a lost finger cancel and never fire. Feedback while armed:
+   see §11.
 
 **Hold cap.** Holding does not charge power, and there is no minimum hold.
 
-**No tap window (v0.6.1, Maestro's call — supersedes the original §2 wording).**
+**No tap window (v0.6.1, Maestro's call — supersedes the original §2 wording; Phase 6
+keeps the fire-on-release rule but makes the local preview instant, so the "tap = no
+telegraph" half below no longer holds for your own screen. The threshold still gates the
+rival-visible wind-up glow and the aim-rotate movement lock.)**
 *"I want no window, I want a fire on release. If user holds, there is feedback, if
 not there is speed."* Every cast fires on release; `TapHoldThresholdSeconds` is a
 **cost/feedback ramp**, not a fire-path branch. Below it: no telegraph, no target
@@ -143,6 +162,13 @@ Fired the instant the ability resolves. All peers.
 ### 3.3 On whiff
 Deliberately **not** silent. A muted "swish" SFX plus a grey (not accent) cast
 ring. A whiff that looks identical to a hit is the single worst feedback failure.
+
+**Phase 6 — the target-gated fizzle.** A move that needs a rival in range, released with
+nobody in range, does not fire at all: no effect, no cooldown, 0.4 s re-arm (taps
+included). It gets its own local feedback instead of a cast: a 0.3 s cream slash flash on
+the hex, the hex bump, the `AbilityFizzle` "pfft" sound, and an `Fx_Whiff` dust puff
+(scale 0.6 to 1.35 and fade; alpha-only under Reduced Motion). The ordinary cast whiff
+above (a move that did fire and hit nobody) is unchanged.
 
 ### 3.4 Kill / execute
 Assassin execute and any removal get the loudest treatment: hit-stop (0.08 s
@@ -281,16 +307,18 @@ felt, not discovered.
 
 ## 6. Why is my button dead? — refusal feedback
 
-`TryActivate` currently refuses silently in four distinct cases that all look
-identical to the player. Each gets its own signal on the button:
+`TryActivate` used to refuse silently in four distinct cases that all looked
+identical to the player. Each got its own signal on the button. **Phase 6 note:** two
+rows below are retired (see the markers) and a fizzle row was added.
 
 | Refusal | Current | New |
 |---|---|---|
 | On cooldown | radial fill (exists) | + remaining seconds as text |
-| No valid target in range | greyed | grey + ⃠ glyph + "no target" pip; the slot's own ambient reach outline sits at its dim ready tier (see note below) |
+| No valid target in range | greyed | ~~grey + ⃠ glyph~~ **Phase 6: not a refusal any more.** Full colour, no slash, opaque. The ground preview is the cream dashed ring; a gold in-range pip shows on the hex when a rival IS in range. Releasing = fizzle (§3.3). |
 | Stunned | nothing | red cross over all buttons + shake on press |
-| Another ability active | nothing | buttons dim, active ability's button shows a duration ring |
+| Another ability active | nothing | ~~buttons dim~~ **Phase 6: retired.** Moves run side by side; every running move has a duration ring on its own hex (draining clockwise from the top) |
 | Slot 2 without Combo | nothing | button not rendered at all |
+| Re-arming after a fizzle (Phase 6) | nothing | slot dead for 0.4 s, no cooldown shown; a held re-arming slot is inert |
 
 Plus a **denied-press bump**: pressing a refused button plays a short muted click
 and shakes the button 4 px. Never absorb an input silently.
@@ -304,6 +332,10 @@ and shakes the button 4 px. Never absorb an input silently.
 > slot's* shape). So the refusal above is now expressed per-slot rather than by one shared
 > ring, and two range-gated abilities can light up independently instead of a tie-break
 > picking one winner. `AbilityRangeIndicator` still owns the §3.1 cast flash and its stalk.
+>
+> **Phase 6 — the wind-up glow and invisibility.** The rival-visible wind-up glow
+> (`ControlStateVFX.UpdateWindupGlow`) is hidden while the caster's `VisualOpacity` is
+> between 0 and 0.99, so a charging invisible Assassin is not given away by a glow.
 >
 > Note also that **§4's descriptor table is stale for Peck**: `PeckAbilitySO.AimShape` is
 > `None`, because Peck targets a *food pile*, not a chicken — its reach lives in
@@ -328,10 +360,10 @@ as of v0.6 Stages 1–5. Status is marked against shipped code, not against inte
 | 4 | Chicken in area but immune / no-op | Telegraph | §2.2 | ✅ | `TargetHighlight` `NoEffect` — `NeutralNoEffectColor`, dashed, static, ⃠ glyph. Exactly the gap between `IsInAimShape` and `WouldAffect`. |
 | 5 | Aiming a directional ability | Telegraph | §2.3 | ✅ | `ChickenMovement.Tick(..., aimRotateOnly)` — the stick rotates instead of translating while a directional ability is charging; shape predicate is `AbilityBaseSO.IsDirectionalAim`. **v0.6.1 fix:** the lock used to engage on the *first tick the hold bit read true*, so every human tap stuttered the caster. `ChargingSlot` now only goes live past `TapHoldThresholdSeconds`, so a tap keeps full speed. |
 | 6 | Opponent is charging something | Telegraph | §2.4 | ✅ | `ControlStateVFX` wind-up foot glow, ramped over `WindupGlowRampSeconds`, observed off `[Networked] AbilityController.ChargingSlot`. No RPC. **v0.6.1:** now a real tell — it previously fired on *every* press, so rivals learned to ignore it. |
-| 7 | Cast became illegal mid-hold | Telegraph | §2.5 | ✅ | `AbilityTelegraph.PreviewColor` lerps to `IllegalCastTintColor` over `PreviewIllegalDesaturateSeconds`; releasing cancels without burning cooldown (`AbilityHoldStateMachine` → `ChargeAction.Cancel`). |
-| 8 | Cancelling a held ability | Telegraph | §2.6 | ✅ | Touch: drag past `DragCancelDistancePx` → `TouchControlsController.ConsumeAbilityCancelled`. Desktop: `KeyboardInputProvider.GetAbilityCancelPressed` (Esc). Capture-loss counts as cancel, not as fire. |
+| 7 | Cast became illegal mid-hold | Telegraph | §2.5 | ✅ | `AbilityTelegraph.PreviewColor` lerps to `IllegalCastTintColor` over `PreviewIllegalDesaturateSeconds`; releasing cancels without burning cooldown (`AbilityHoldStateMachine` → `ChargeAction.Cancel`). **Phase 6:** washes only for `AbilityPreviewRules.IsRealRefusal` (Stunned, Cooldown, SlotUnavailable); NoTarget is the cream dashed ring instead. |
+| 8 | Cancelling a held ability | Telegraph | §2.6 | ✅ | Touch: drag past `DragCancelDistancePx` → `TouchControlsController.ConsumeAbilityCancelled`. Desktop: `KeyboardInputProvider.GetAbilityCancelPressed` (Esc). Capture-loss counts as cancel, not as fire. **Phase 6:** touch cancel is now the screen-edge band (`HoldCancelRules`, 20 / 28 dp); Esc or right mouse on keyboard, B on pad; cancel feedback in §11. |
 | 9 | The ability connected | Impact | §3.2 | 🟡 | Visual half shipped — white hit-spark per victim + caster micro-shake in `HitFeedback`, driven off `LastCastHitCount`/`LastCastEventId`. **Outstanding: the distinct rising "connect" SFX.** `AudioRegistrySO` has no `HitConfirm` clip; needs `audio-designer` + a new clip field. |
-| 10 | The ability whiffed | Impact | §3.3 | 🟡 | Visual half shipped — grey, dimmed cast ring via `WhiffRingSaturationMultiplier` / `WhiffRingAlphaMultiplier`. **v0.6.1:** the exemption is now `AbilityBaseSO.ReportsCastHits`, covering self-buffs **and placed zones**. Root Egg / Feather Trap resolve their hit *later*, in `AbilityZone`, so they reported 0 targets at cast time and were whiff-styled on **every** cast — Root Egg on open ground, always. **Outstanding: the muted "swish" SFX** (`WhiffSfxVolumeMultiplier` records the intended relative gain; no clip exists). |
+| 10 | The ability whiffed | Impact | §3.3 | 🟡 | Visual half shipped — grey, dimmed cast ring via `WhiffRingSaturationMultiplier` / `WhiffRingAlphaMultiplier`. **v0.6.1:** the exemption is now `AbilityBaseSO.ReportsCastHits`, covering self-buffs **and placed zones**. Root Egg / Feather Trap resolve their hit *later*, in `AbilityZone`, so they reported 0 targets at cast time and were whiff-styled on **every** cast — Root Egg on open ground, always. **Outstanding: the muted "swish" SFX** for a cast that landed on nobody (`WhiffSfxVolumeMultiplier` records the intended relative gain; no clip exists). **Phase 6 answered the fizzle half:** a target-gated release with nobody in range plays `AbilityFizzle` plus the slash flash and puff (§3.3, §11). |
 | 11 | Who exactly got hit | Impact | §3.2 | ✅ | Per-victim hit flash + spark in `HitFeedback`; the marked target set from case 3 is the same set that resolves. |
 | 12 | How much cargo was stolen / lost | Impact | §3.2 | ✅ | `ChickenCargo` → `FloatingCombatText.SpawnCargoDelta`, gated by `FloatingTextCargoDeltaThreshold` so continuous collect/deposit drip never spams popups. `FloatingTextCargoLossColor` / `…GainColor`, sign carried as a second channel. |
 | 13 | Which direction I was hit from | Impact | §3.2 | ✅ | `HitFeedback` screen-edge arc, `ScreenEdgeArcWidthDegrees` wide, fading over `ScreenEdgeArcLifetimeSeconds` on `ScreenEdgeArcFadeExponent`. Gated on `HasInputAuthority`. |
@@ -347,14 +379,16 @@ as of v0.6 Stages 1–5. Status is marked against shipped code, not against inte
 | 22b | A placed zone actually caught someone | Aftermath | §3.2, v0.6.1 | ✅ | **New.** A zone that worked perfectly was also the one ability that never told you so. `AbilityZone.Render()` observes the trigger locally — the replicated `Consumed` false→true edge for root, a derived occupancy edge for slow — and calls `HitFeedback.NotifyZoneTriggered()` on the caster. Plain local call off replicated state, **no RPC**. A `Despawned` fallback covers the case where the zone consumes and despawns inside one rendered frame at the 30 fps Android floor. |
 | 23 | A zone is about to expire | Aftermath | zone ring drains | ✅ | Same component; the ring drains against the zone's replicated `LifetimeTimer`, sharing `DrainRingTrackAlphaMultiplier` with the status arc so all three drain rings read as one mechanism. |
 | 24 | My ability is on cooldown, and for how long | Refusal | §6 | ✅ | ART §6.6 layer 6 black bottom-up clip (existing) + layer 9 seconds integer. Alpha `HexAlphaCooldown`. |
-| 25 | No valid target in range | Refusal | §6 | ✅ | `NeutralNoEffectColor` at `HexAlphaNoTarget` + a USS-drawn ⃠ in layer 9. |
+| 25 | No valid target in range | Refusal | §6 | ✅ | **Phase 6: no longer a refusal.** The ⃠ / `HexAlphaNoTarget` treatment is deleted. Hex stays at full colour; the ground shows the cream dashed ring; a gold pip on the hex marks "in range". Release with nobody in range = fizzle (no cooldown). |
 | 26 | Can't cast — I'm stunned | Refusal | §6 | ✅ | `IllegalCastTintColor` wash + a USS-drawn ✕ in `RefusalStunnedCrossColor`, on **every** hex at once, plus the greyed stick. |
-| 27 | Another ability already active | Refusal | §6 | ✅ | Cluster dims to `HexAlphaOtherActive`; the running slot alone keeps a full-alpha accent **top-down** drain off `ActiveRemaining01` — deliberately the mirror of the bottom-up black cooldown clip, because the two routinely coexist on the same hex. |
+| 27 | Another ability already active | Refusal | §6 | ✅ | **Phase 6: retired as a refusal** (moves run side by side, GDD §7.4). `HexAlphaOtherActive` and the dim are deleted. Each running move shows `HexDurationRing` (a hexagonal ring draining clockwise from the top) on its own hex. |
 | 28 | Slot unavailable for my class | Refusal | §6 | ✅ | Hex is `display: none` — ART §6.6's slot-3 visibility rule already removes it from the layout, so there is nothing left to mark. |
-| 29 | My press was ignored | Refusal | §6 | 🟡 | Visual half shipped — `AbilityController.TryConsumeDeniedPress` drives a decaying bump, `DeniedPressBumpAmplitudePx` over `DeniedPressBumpDurationSeconds` at `DeniedPressBumpOscillations` cycles. **Outstanding: the short muted click SFX.** |
+| 29 | My press was ignored | Refusal | §6 | 🟡 | Visual half shipped — `AbilityController.TryConsumeDeniedPress` drives a decaying bump, `DeniedPressBumpAmplitudePx` over `DeniedPressBumpDurationSeconds` at `DeniedPressBumpOscillations` cycles. **Outstanding: the short muted click SFX.** Phase 6 added the fizzle and cancel sounds (`AbilityFizzle`, `AbilityCancel`) but not a denied-press click. |
 | 30 | My buff is active and expiring | Aftermath | caster self-ring drains | ✅ | `ControlStateVFX` buff ring at `SelfBuffRingRadius` (0.80), deliberately outside the 0.62 status ring so "my buff is running out" and "I am slowed" read as two concentric rings rather than one flickering one. |
 
-**Rollup:** 25 implemented, 5 partial, 1 deferred.
+**Rollup (v0.6.1):** 25 implemented, 5 partial, 1 deferred. Phase 6 reworked cases 2, 5,
+7, 8, 25, 27 and answered the fizzle half of case 10; the counts above were not
+recomputed.
 
 ### 7.1 Still unanswered — not changed, awaiting Maestro
 
@@ -367,7 +401,8 @@ load-bearing for the telegraph's grey "no effect" mark, so changing it would cha
 the preview shows as well as what the ability does.
 
 Four of the five partials (cases 9, 10, 16, 29) are the **same** outstanding item — the
-audio pass. `AudioRegistrySO` currently has no hit-confirm, whiff, execute-stinger or
+audio pass. (Phase 6 added a fizzle and a cancel clip; the rest still stand.)
+`AudioRegistrySO` currently has no hit-confirm, cast-whiff, execute-stinger or
 denied-click clip, and adding them is `audio-designer`'s call plus four new clip fields.
 Every one of those cases ships its visual half today. Case 16 additionally wants a
 kill-feed line, which is an undesigned HUD surface. Case 18 is a design decision, not
@@ -517,3 +552,55 @@ All of this must hold 30 fps on a 2021 mid-range Android. Constraints:
 - Floating text is pooled (max 12 live), single dynamic UI mesh.
 - Ground decals reuse the existing `LineRenderer` + `Sprites/Default` path — no
   new render feature, no extra camera pass.
+
+---
+
+## 11. Phase 6 (2026-10) — hex states, range guides, cancel, haptics
+
+What the ability input rework added to feedback. Values live in `FeedbackTuning` and the
+HUD stylesheets; the player rules are in `docs/GDD.md` §10.1.
+
+### 11.1 Touch hex states
+- **Rest.** The `.cw-hex` element is the 3 px ink rim; the category colour sits on an inset
+  `#Fill{n}` child. No slash, no half-faded icon, full hue, opaque when nothing is wrong.
+- **Held.** The held hex scales to 1.12 with a cream rim; the other hexes drop to opacity
+  0.6 (60 ms ease-out), applied on the press frame.
+- **Active.** A running move shows `HexDurationRing`, draining clockwise from the top. Several
+  can run at once, one ring per hex.
+- **Peck chain.** While `PeckChainActive`, the Peck hex carries a dashed cream ring (18
+  dashes, half a lap per second, static under Reduced Motion).
+- **In-range pip.** A gold (#f5c842) pip at the bottom centre of the hex, visible when a rival
+  is inside that slot's shape and the slot is not on cooldown (same 10 Hz verdict that makes
+  the ground guide "hot"). 0.2 s scale pop, none under Reduced Motion.
+- **Desktop and pad.** The hexes become a non-clickable information strip with key badges
+  (Q / E / R / F, RB / RT / LB / LT), a cooldown number and the pip; see ART.md §6.8.
+
+### 11.2 Range guides
+Always-on ground outline per equipped slot (`AbilitySlotOverlay`): line width 0.06 with an ink
+under-stroke (2x width, alpha 0.35, sorted behind). Alpha by tier: ready 0.45, hot 0.70,
+cooldown 0.18, suppressed 0.12. The scan keeps running when the Range Guides setting is off
+(the pip still needs it).
+
+### 11.3 Cancel feedback (touch)
+While the thumb is in the edge band: a cream X over the held hex, the ground preview goes grey
+and dashed, a thin cream glow strip lights the approached screen edge (about 4 dp, cream 85%
+on ink), and a 15 ms haptic tick plays. A deliberate cancel plays the `AbilityCancel` sound
+(low tick, 60 ms) on every input device.
+
+### 11.4 Buzz When Hit (Android, default on, setting)
+Pattern table (`HapticRules`): hit 40 ms; stun and knock-out 60 ms on, 50 off, 90 on; cancel
+arm tick 15 ms. A 200 ms limiter drops a buzz that follows another too closely, but a
+stronger kind may interrupt inside the window so a stun is not swallowed by the hit that
+caused it. Triggered on the victim's own peer, same gate as the camera shake. Not verified
+on a device yet.
+
+### 11.5 Refusals, restated
+Refusals are now: cooldown (number), stunned (red wash and X on all hexes), slot unavailable
+(not drawn), re-arming after a fizzle (0.4 s). NoTarget is not on the list. The wind-up glow
+is hidden while the caster is invisible.
+
+### 11.6 Match-level feedback in the same pass
+The comeback / event banner ("FINAL 10!", "PILES RESTOCKED!") is a wood plaque in
+`MatchOverlays.uxml`. The fence and base coop fade to a screen-door near your bird; at GET
+READY the YOU ring grows x1.6 and pulses and the YOU label scales x1.45 (static under Reduced
+Motion).

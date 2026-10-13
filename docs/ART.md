@@ -389,11 +389,28 @@ Hex buttons use a **pointy-top hexagon** with dimensional shading. The hexagon s
 | Property | Value |
 |---|---|
 | Size | 150px (mobile reference), scales with `CanvasScaler` |
-| Fill | The ability's **category colour** (`UI/AbilityPalette`, same as the menus; `AccentColor` stays the VFX colour). No target in range: the same hue at 70% over ink (`AbilityPalette.Idle`) plus the ⃠ mark — never plain grey |
+| Fill | The ability's **category colour** (`UI/AbilityPalette.FillColor`, same as the menus; `AccentColor` stays the VFX colour). Defense uses the mid moss fill `#8E9D43`, not the dark text colour `#30460C`. **Phase 6:** no target in range is NOT a hex state any more: the fill stays at full hue and opaque (the old 70% `AbilityPalette.Idle` + ⃠ mark is deleted) |
 | Category mark | Small cream shape with an ink rim, top-right: Steal diamond, Control circle, Defense square, Utility plus (`UI/CategoryMark`, `CategoryMark.uss`; also on every menu ability icon) |
 | Neutral state | `AbilityPalette.EmptyHex` (warm wood) when no ability equipped |
 | Slot 3 visibility | Hidden unless an ability is equipped in slot 2 (Assassin only) |
 | Cluster layout | 2 abilities → vertical-ish stack; 3 abilities → triangle (primary at thumb base) |
+
+**Hex states (Phase 6, touch HUD).** The `.cw-hex` element is the 3 px **ink rim** (the hex sprite
+tinted ink, cream while held); the category colour lives on an inset `#Fill{n}` child, and the
+cooldown / drain clips are inset to match.
+
+| State | Look |
+|---|---|
+| Rest | ink rim, full-hue fill, no slash, no fade |
+| Held | scale 1.12, cream rim; every other hex drops to opacity 0.6 (60 ms ease-out, set on the press frame) |
+| Active (running) | `HexDurationRing`: a hexagonal ring that drains clockwise from the top, one per running move (several can run at once) |
+| Peck chain | dashed cream ring (18 dashes, half a lap per second) on the Peck hex only |
+| In range | gold pip (#f5c842, 28 px disc with a 3 px ink ring, about 12 dp), bottom centre; 0.2 s pop, none under Reduced Motion |
+| Cancel armed | cream X over the held hex; cream glow strip on the screen edge (`#EdgeGlow*`) |
+| Fizzle | 0.3 s cream slash flash with an ink border, the hex bump, an `Fx_Whiff` puff (scale 0.6 to 1.35 and fade) |
+
+The cluster is laid on a 270 px (about 115 dp) arc around slot 1 for thumb reach. The match board on
+the touch layout shows the leader and you (all four on tap and in the last 10 s).
 
 ### 6.7 Touch Controls — MOBA Layout (Mobile)
 
@@ -428,17 +445,37 @@ All touch elements on a `CanvasScaler` at 1920×1080 reference, `matchWidthOrHei
 
 ### 6.8 Console Adaptation
 
-On console (16:9, gamepad input), all touch controls are removed. **Gamepad button hints** appear in the bottom-right. There is no attack — every face button maps to an ability slot:
+Shipped in Phase 6 (the same layout serves a keyboard and mouse on desktop; the last device you
+touched picks it, and any touchscreen finger brings the touch cluster back). On a gamepad or
+keyboard the thumb controls are removed and the ability hexes become an **information strip**,
+not buttons.
 
-| Button | Action | Accent Color | Style |
-|---|---|---|---|
-| X | Ability 1 | Equipped slot-0 accent | Glossy gradient square, 30×30, radius 8, with bevel highlights |
-| Y | Ability 2 | Equipped slot-1 accent | Same glossy style |
-| B | Ability 3 ★ | Equipped slot-2 accent | **Assassin only** — hidden otherwise |
+| Element | Shipped |
+|---|---|
+| Position | bottom centre of the screen |
+| Hexes | scale x0.75 (a 40 px badge becomes 30 px), `PickingMode.Ignore` (not clickable) |
+| Joystick | hidden |
+| Badges | RB / RT / LB / LT on pad = slots 1-4; Q / E / R / F on keyboard. Badge text is at least 28 px on the panel, derived from the real binding tables |
+| Cooldown | a number on the hex, tenths of a second under 1 s |
+| In range | the same gold pip as on touch |
+| Held | a held key or trigger scales its hex like a touch hold |
+| Cancel | B on pad, Esc / right mouse on keyboard (no on-screen cancel control) |
+| Back | Start on pad (Esc on keyboard) opens the Leave sheet; with a move held it only cancels the move |
 
-Button hints: 30×30 rounded squares with 3-stop gradient fill matching ability color, 2px darker border, inset highlight + drop shadow. Text label to the right in Nunito 600, 11px, at 70% opacity. Group with 14px gap.
+| Input | Action |
+|---|---|
+| Left stick | move |
+| Right stick | aim (dead zone 0.25, outer 0.95, 150 ms hold) |
+| RB / RT / LB / LT | slots 1 / 2 / 3 / 4: hold to aim, release to use |
+| B | cancel a held move |
+| Start | Back / Leave sheet |
 
-Navigation: Left stick moves. D-pad navigates menus. A confirms, B backs (in menus). LB/RB switches between panel sections in character select.
+Hold hint copy (shown for the first 5 holds, `UiText.csv` `hud.hint.hold.pad`): "Hold to aim · Release to use · B to cancel." Keyboard copy: "Hold to aim · Release to use · Esc to cancel." Menu navigation hint (`hint.console`): "←→ Select · A Confirm · LB/RB Tab".
+
+Not verified on a real gamepad yet (unit tests and fakes only).
+
+Navigation in menus is unchanged: left stick / D-pad navigates, A confirms, B backs, LB/RB switches
+panel sections in character select.
 
 ### 6.9 ColorSchemeSO Updates
 
@@ -608,6 +645,11 @@ global fallback list is empty, so any element showing one **must** carry the
 
 ### 6.13 Hex refusal states — extending §6.6's nine layers
 
+> **Phase 6 update.** "No target" and "Other ability active" are no longer refusals: moves run
+> side by side and a missing target is a legal state (cream dashed ground ring, gold pip when in
+> range, fizzle on release). Their rows below are history; the live refusals are Cooldown,
+> Stunned, Slot unavailable and the 0.4 s re-arm after a fizzle. See `docs/FEEDBACK.md` §11.
+
 The four distinguishable refusal reasons add **no tenth layer**. Instead, §6.6's **layer 9**
 generalises from "the cooldown seconds" to "**the state indicator**". This works because
 `AbilityRefusalRules.Evaluate` makes the reasons mutually exclusive by precedence
@@ -618,9 +660,9 @@ the hex never has to arbitrate between two marks.
 |---|---|---|---|---|
 | *(ready)* | accent, alpha `HexAlphaReady` | — | full | hidden |
 | **Cooldown** | accent, alpha `HexAlphaCooldown` | **black, bottom-up** | dimmed | **seconds integer** |
-| **No target** | `NeutralNoEffectColor`, alpha `HexAlphaNoTarget` | — | dimmed | **⃠** in `NeutralNoEffectColor` |
+| ~~No target~~ (retired, Phase 6) | full hue, opaque | — | full | hidden |
 | **Stunned** | `IllegalCastTintColor` wash, on **every** hex at once | — | dimmed | **✕** in `RefusalStunnedCrossColor` |
-| **Other ability active** | accent, alpha `HexAlphaOtherActive` (the dimmest tier) | on the *running* slot only: **accent, top-down** | dimmed | hidden |
+| ~~Other ability active~~ (retired, Phase 6) | — | the running slot shows `HexDurationRing` instead | — | — |
 | **Slot unavailable** | `display: none` | — | — | — |
 
 Three orthogonal channels do the separating, so no two states can collapse into each

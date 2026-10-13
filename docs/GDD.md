@@ -610,7 +610,7 @@ specializations therefore need **ordinary signature abilities** assigned (see §
 
 ### 7.2 The pool — 29 abilities, one class each (except the shared two)
 
-Rebuilt 2026-08-23/24: abilities used to be shared across classes to widen loadout
+Ability text in this table follows the `Description` field of each shipped `.asset` (Phase 6 chunk 7c; the in-game text is templated from the same numbers). Rebuilt 2026-08-23/24: abilities used to be shared across classes to widen loadout
 pools, which cost the thing that makes a 4-player FFA readable — you could not tell
 what a chicken was by what it did (`docs/design/class-essence-and-signatures.md` §1).
 **A class ability now belongs to exactly one class.** Cooldowns below are the
@@ -619,34 +619,34 @@ shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 | | Ability | Cooldown | Effect |
 |---|---|---|---|
 | **Shared** | Peck 🐦 | 0.8 s | Take a beakful from the pile you're standing on. Forced for every forager (§7.1). |
-| | Egg Shell 🥚 | 8 s | Seals you in an egg — invulnerable, immobile. |
-| **Warrior** | Cluck Shock ⚡ | 7 s | Knockback shockwave, shoves the swarm off. |
-| | Dive Bomb 🪽 | 6 s | Diving lunge, robs cargo on contact. |
-| | Headbutt 🐏 *(Relentless signature)* | 4 s | Short shove + brief stagger — deliberately weaker than Cluck Shock; the shortest cooldown pays for it. |
-| | Ruffle 💨 | 5 s | Short pace burst — deliberately weaker than Speed Burst; no traversal, ground only. |
-| | Scrap 🪝 *(Bully signature)* | 5 s | Grabs cargo off the nearest carrier — deliberately weaker than Sneaky Steal. |
-| | Wing Slam 💥 | 12 s | Ground slam, 1.5 s stun. ⚠️ Longest cooldown in the game, on the class whose essence is spamming — flagged for re-tuning, see §11. |
-| **Speedy** | Dust Kick 🌫️ | 6 s | Kicks dust **backwards** — the one cone in the game that fires away from facing, so fleeing is the play. |
-| | Feather Aura 💨 | 7 s | Slows every rival within 3 m for the cloud's lifetime. |
-| | Feather Trap 🪤 | 7 s | Feather cloud thrown ahead; crossing it slows for 5 s. |
-| | Feint ↔️ | 5 s | Hard sidestep, delivered as a knockback impulse — walls still stop it, unlike a blink. |
-| | Quick Drop 💰 | 12 s | Dumps the whole beakful at the base in one motion. Retired as a passive (was worth ~27% of Speedy's SCT for free); now an ability, so the tempo costs a slot. |
-| | Speed Burst 💨 *(moved from Common)* | 6 s | 2.5x movement speed. Speedy-only now — a universal sprint erased the "fastest in the game" claim. |
-| **Fatty** | Belly Flop 🫃 | 10 s | Launches his mass forward, lands with an AoE stun — the justified jump: long telegraph, shortest jump tier, payoff on landing not travel. |
-| | Ground Quake 🌋 *(Bulwark signature)* | 9 s | Stomp roots everyone nearby — reachable pre-emptively while guarding, not just as a Retreat reflex. |
-| | Immovable 🧱 | 12 s | Immunity (not resistance) to stun/root/slow/knockback for the duration. Does not clear control already on him — spent in anticipation, not as an escape. |
-| | Roll & Push 🌀 | 3 s | Rolls forward at double speed, shoves chickens from the path. |
+| | Egg Shell 🥚 | 8 s | Seals you in an egg for 2 s - you cannot walk or turn. |
+| **Warrior** | Cluck Shock ⚡ | 7 s | A shockwave that shoves every rival within 4.5 m away. |
+| | Dive Bomb 🪽 | 6 s | Diving lunge, robs 8 food from rivals on contact. |
+| | Headbutt 🐏 *(Relentless signature)* | 4 s | Shoves rivals up to 3.6 m ahead and staggers them 0.35 s — deliberately weaker than Cluck Shock; the shortest cooldown pays for it. |
+| | Ruffle 💨 | 5 s | 1.5x speed for 2.5 s — same pace as Speed Burst but longer and ground only (no traversal). |
+| | Scrap 🪝 *(Bully signature)* | 5 s | Grabs 3 food off the nearest carrier within 3.8 m — deliberately weaker than Sneaky Steal. |
+| | Wing Slam 💥 | 12 s | Slams the ground ahead, stunning rivals within 4.5 m for 1.5 s. ⚠️ Longest cooldown in the game, on the class whose essence is spamming — flagged for re-tuning, see §11. |
+| **Speedy** | Dust Kick 🌫️ | 6 s | Kicks dust **backwards** — the one cone in the game that fires away from facing, so fleeing is the play. Chasers within 4.5 m slow to 55% for 2.5 s. |
+| | Feather Aura 💨 | 7 s | Slows every chicken within 5.4 m to 55% speed for 3 s. |
+| | Feather Trap 🪤 | 7 s | Feather cloud thrown ahead, lasts 5 s; chickens in it slow to 45% speed. |
+| | Feint ↔️ | 5 s | A hard sidestep, delivered as a knockback impulse — walls still stop it, unlike a blink. |
+| | Quick Drop 💰 | 12 s | Banks food 4x faster for 2 s — cash in at your base. Retired as a passive (was worth ~27% of Speedy's SCT for free); now an ability, so the tempo costs a slot. |
+| | Speed Burst 💨 *(moved from Common)* | 6 s | A 1.5 s sprint at 1.5x movement speed. Speedy-only now — a universal sprint erased the "fastest in the game" claim. |
+| **Fatty** | Belly Flop 🫃 | 10 s | Launches his whole mass forward and lands hard, stunning rivals within 4 m for 1.4 s — the justified jump: long telegraph, shortest jump tier, payoff on landing not travel. |
+| | Ground Quake 🌋 *(Bulwark signature)* | 9 s | A stomp that pins everyone within 4.5 m in place for 1.8 s — reachable pre-emptively while guarding, not just as a Retreat reflex. |
+| | Immovable 🧱 | 12 s | Plants himself for 3 s. Nothing stuns, roots, slows or shoves him (immunity, not resistance). Does not clear control already on him — spent in anticipation, not as an escape. |
+| | Roll & Push 🌀 | 3 s | Rolls forward at 2x speed for 0.8 s, shoving chickens out of the path. |
 | | Root Egg 🌱 | 7 s | Drops an egg; the first chicken to step on it roots for 2 s. |
-| | Spine Coat 🦔 | 8 s | Steals cargo back from and knocks away anyone who hits you. |
-| | Turtle Mode 🐢 | 8 s | Heavy control resistance at quarter speed. |
-| **Assassin** | Ambush 🗡️ | 10 s | AoE stun — sets up his own execute. |
-| | Doppelganger 👥 | 11 s | Decoy copy that soaks attacks. |
-| | Invisibility 👻 | 8 s | Fades to a ghostly outline for 4 s (Assassin-only now — was also Speedy). |
-| | Death Mark 🎯 *(Reaper Peck-slot pre-equip; pre-equip-only)* | 5 s | The execute — see §6.4. |
-| | Shadowstep 👤 | 6 s | Short blink dash, phases over walls (Assassin-only — was briefly also Speedy by asset drift, corrected; Speedy is permanently denied all terrain traversal, §5.2). |
-| | Smoke Roost 🌁 | 11 s | Cloud at his own feet — he fades, everyone else in it slows. Pairs with Death Mark's isolate-and-execute. |
-| | Snatch 🤏 *(moved from Common)* | 3 s | Robs cargo from every rival in a forward arc. Assassin-only now — a universal AoE steal is exactly the Assassin's core, and diluted the class. |
-| | Sneaky Steal 🤏 *(Thief signature)* | 5 s | Yanks cargo from the nearest carrier within 3 m. |
+| | Spine Coat 🦔 | 8 s | For 2 s, anyone who hits you loses 4 food to you and is knocked away. |
+| | Turtle Mode 🐢 | 8 s | Shuffles along at a turtle crawl - 25% speed for 2 s. |
+| **Assassin** | Ambush 🗡️ | 10 s | Stuns rivals within 3.6 m for 1 s — sets up his own execute. |
+| | Doppelganger 👥 | 11 s | Decoy copy beside you for 4 s that soaks attacks. |
+| | Invisibility 👻 | 8 s | Fades you to a ghostly outline for 4 s. Using a move breaks it. (Assassin-only now — was also Speedy.) |
+| | Death Mark 🎯 *(Reaper Peck-slot pre-equip; pre-equip-only)* | 5 s | The execute — see §6.4. Marks a lone rival within 8 m; stun them, then press again to take everything they carry. |
+| | Shadowstep 👤 | 6 s | Dashes forward at 3x speed for 0.4 s, straight over walls (Assassin-only — was briefly also Speedy by asset drift, corrected; Speedy is permanently denied all terrain traversal, §5.2). |
+| | Smoke Roost 🌁 | 11 s | Cloud at his own feet (4 m, 5.5 s) — he fades, rivals inside slow to 55% speed. Using a move breaks the fade (the cloud stays). Pairs with Death Mark's isolate-and-execute. |
+| | Snatch 🤏 *(moved from Common)* | 3 s | Robs 5 food from every rival within 4.3 m ahead and shoves them back. Assassin-only now — a universal AoE steal is exactly the Assassin's core, and diluted the class. |
+| | Sneaky Steal 🤏 *(Thief signature)* | 5 s | Yanks 6 food from the nearest carrier within 5.4 m. |
 
 **Turtle Mode and Egg Shell are unimplemented on their defensive half.** The Effect
 column above states their design intent, not what ships. The HP-removal commit (`468bf1d`)
@@ -671,6 +671,44 @@ caster — "lay it as you flee."
 
 Exact per-ability values (steal amounts, stun/slow durations, radii, cooldowns) are tuned
 against the Oracle and playtests.
+
+### 7.4 Several moves at once (Phase 6)
+
+There is **no "one ability at a time" rule** for players. A used move runs on its own
+timer; a second move cast while the first is still running starts alongside it, and each
+keeps its own countdown. Re-casting a move that is still running stays refused (it counts
+as cooling). Bots still cast one move at a time.
+
+**Same kind of effect never stacks: the strongest active value wins.** Example: Ruffle
+(x1.5) then Speed Burst (x1.5) is still x1.5, not x2.25. Each move keeps its own timer, so
+when the stronger one ends the weaker one is still in force. **Different kinds both apply**
+(Turtle 0.25 speed x Roll & Push 2.0 speed = 0.5, because a speed boost and a self-slow are
+different kinds).
+
+| Kind | How several are resolved | Moves |
+|---|---|---|
+| Self speed boost | highest | Speed Burst 1.5, Ruffle 1.5, Shadowstep 3.0, Roll & Push 2.0 |
+| Self speed penalty | lowest | Turtle Mode 0.25 |
+| Stealth opacity | lowest | Invisibility, Smoke Roost (the fade) |
+| Movement lock | any | Egg Shell, Peck |
+| Control immunity | later expiry | Immovable |
+| Steal-back | any; highest amount | Spine Coat |
+| Deposit rate | highest | Quick Drop 4.0 |
+| Wall-phasing tier | highest holder (Barge < Vault < Blink) | the traversal moves |
+| Aura slow | lowest factor, its radius | Feather Aura |
+
+Outside the rule: Underdog Surge (x1.4) and the slow done *to* you by rivals.
+
+**Stealth breaks on your next move.** Invisibility and Smoke Roost's fade end the moment
+you cast anything else. Peck counts as a move; a fizzle (§10.1) does not. The smoke cloud
+stays when the fade ends. **Peck's 0.4 s movement lock ends when you cast.** So Invisibility
+is an opener for Sneaky Steal / Snatch / Ambush, not a 4 s cast lock.
+
+**Combos that are now legal on one bird** (flagged for balance, no value changed): Roll &
+Push + Spine Coat robs on proximity (1.2 m), not on being hit; Immovable + Roll & Push is
+a control-immune charge; Speed Burst + Feather Aura is about 3x relative speed against
+chasers inside 5.4 m for 1.5 s. Egg Shell and Turtle Mode protect nothing today (above), so
+there is no "invulnerable and fast".
 
 ---
 
@@ -703,68 +741,116 @@ Seasonal content is post-demo, contingent on success.
 
 ## 10. Controls & UX
 
-- **Mobile-first**, all inputs work on touchscreen.
-- **Movement:** left-thumb virtual joystick (also sets facing, which aims directional
-  abilities and the Mark soft-lock).
+- **Mobile-first**, all inputs work on touchscreen. Desktop (keyboard + mouse) and gamepad
+  are first-class too (below).
+- **Movement:** left-thumb virtual joystick (dead zone 0.12 with a rescaled ramp, throw 60 dp;
+  also sets facing). Keyboard WASD; gamepad left stick.
 - **Abilities:** right-thumb buttons — **4 for every class** (§7.1). 1-2 are forced by
   foraging/your specialization's signature; the rest are freely chosen. The Death Mark
   button (Reaper only) is **two-press**: first press marks, and it re-labels to **KILL**
   when the target qualifies.
-- **Collecting:** passive — stand on a pile, cargo fills at Collection Rate.
+- **Collecting:** stand on a pile and Peck (Peck chain, §10.1). Peck repeats by itself
+  until the hold is full.
 - **Cooldowns:** bottom-up clip + seconds remaining. Ability buttons must feel responsive.
+- **Leaving a match:** Back (Esc, Android back, pad Start) during GET READY, the countdown or
+  the round opens "Leave match?" (KEEP PLAYING is the default; LEAVE). Solo pauses the game
+  under the sheet; multiplayer keeps going without you. On the podium Back is BACK TO LOBBY.
+  With a move held, Back only cancels the move.
+- **Near cover:** the fence and your base coop fade to a faint screen-door around your own
+  bird, so the bird is never hidden behind them. At GET READY a pulsing YOU ring marks
+  your bird.
 - Class silhouettes must read instantly in the isometric view.
 
-### 10.1 Casting: hold to aim, release to fire (v0.6)
+### 10.1 Casting: hold to aim, release to use (v0.7, Phase 6)
 
-Abilities changed from **press-to-fire** to **hold-to-aim, release-to-fire**. The rule that
-matters is short: **an ability always fires on release, never on press.**
+An ability always fires on **release**, never on press. There is no tap window and no
+minimum hold; holding does not charge power.
 
-**There is no tap window and no branch.** Every cast fires on release, full stop. Nothing
-waits out a threshold before committing, and no press is ever swallowed. Holding does
-**not** charge power; there is no minimum hold and no damage ramp.
+**Press = instant preview.** The moment you press a move's button (or key) your own screen
+shows its true area on the ground and marks every chicken inside it. It does not wait for a
+threshold. What you see marked is exactly what gets hit (preview and real scan run through
+the same `WouldAffect` predicate). Release = use it.
 
-**What the hold buys you, and what it costs.** `FeedbackTuning.TapHoldThresholdSeconds`
-(~120 ms) is not a fire-path decision — it is a **cost/feedback ramp**:
+**Past about 125 ms (4 ticks at 32 Hz) the commitment becomes real:**
 
-| | Below the threshold (a quick tap) | Past it (a deliberate hold) |
+| | Quick tap (under ~125 ms) | Deliberate hold |
 |---|---|---|
-| **Ground telegraph** | none | your true area, drawn |
-| **Target marks** | none | every chicken in the area classified |
-| **Wind-up glow rivals can see** | none | ramps up at your feet |
-| **Movement** | **full speed** | the stick rotates your aim instead of moving you |
+| **Your preview** | shown from the press frame | shown |
+| **Wind-up glow rivals can see** | none | ramps up at your feet (hidden while you are invisible) |
+| **Movement** | full speed | the stick rotates your aim instead of moving you (directional shapes only) |
 
-So the trade is explicit: *tap for speed, hold for information.* A player who wants to
-keep moving taps and gives up the preview; a player who wants to aim holds and pays for it
-in mobility. Both fire on release, with identical latency.
+Rivals see only the glow at your feet — a wind-up tell, not your area. That asymmetry is
+deliberate: counterplay ("he's charging something, disengage") without a solved puzzle.
 
-This also makes the wind-up glow mean something. It used to fire on every press, so rivals
-learned to ignore it; now it only appears when someone is genuinely committing to an aim,
-which is what makes "he's charging something, disengage" a real read.
+**No target is not illegal.** A move that needs a rival in range and has nobody in range
+shows a **cream dashed ring** (a legal state: you may still release). The red-grey wash is
+only for real refusals: stunned, cooling down, slot unavailable.
 
-> **Superseded (v0.6.1).** This section previously said the threshold "only ever changes
-> what gets drawn, never when the cast happens", and carried a warning that the 120 ms had
-> to be clocked off the local raw input timestamp rather than the replicated hold bit,
-> because Shared Mode's ~50 ms of input latency would otherwise inflate the effective
-> threshold to ~170 ms and feel laggy. Both are retired. The first is now too narrow — the
-> threshold governs the *movement cost* as well as the drawing. The second assumed a tap
-> had to **wait out** the window before committing to fire, which is exactly the design
-> Maestro removed: a cast fires on release with unchanged latency, and the threshold
-> measures a *duration*, which is preserved under a constant input delay. The charge state
-> is therefore clocked in whole simulation ticks (4 ticks at 32 Hz = 125 ms).
+**Fizzle.** Release a target-gated move with nobody in range and nothing happens: no
+effect, no cooldown, and the slot re-arms after 0.4 s (so you cannot spam it). This
+applies to quick taps too. Other refusals (cooldown, stunned) keep the plain denied bump.
 
-**While holding:**
+**Cancelling.** A cancelled hold never fires and never burns the cooldown.
 
-| | |
+| Input | Cancel |
 |---|---|
-| **You see** | The ability's true area on the ground, and every chicken inside it marked — accent + solid + pulsing for "will be hit", grey + dashed + ⃠ for "in the area but immune / no-op". What you see marked is exactly what gets hit; the preview and the real scan run through the same `WouldAffect` predicate. |
-| **Rivals see** | Only a growing glow at your feet — a wind-up tell, not your area. This asymmetry is deliberate: it preserves counterplay ("he's charging something, disengage") without turning the arena into a solved puzzle. |
-| **Aiming** | Once past the threshold, directional abilities (cone / forward-offset / swept capsule / jump) let the movement stick **rotate your aim** instead of moving you. Caster-centred shapes (self-circle, aura, single-target) are rotation-invariant, so they keep normal movement even on a long hold — there is nothing to aim. |
-| **If it goes illegal** | If you get stunned mid-hold, or the last valid target walks out, the preview washes to red-grey and the button shows why. Releasing then **cancels without burning the cooldown**. |
+| Touch | Drag your thumb to the screen edge. It arms within 20 dp of a physical edge and disarms past 28 dp. While armed the hex shows an X, the preview goes grey and dashed, the edge glows cream, and the phone gives a 15 ms tick. Release while armed = cancel. |
+| Touch, involuntary | A system edge gesture or a lost finger cancels and never fires. |
+| Keyboard / mouse | **Esc** or **right mouse button**. |
+| Gamepad | **B**. |
 
-**Cancelling a held ability** — drag your thumb off the button (past
-`FeedbackTuning.DragCancelDistancePx`, ≈55 dp) on touch, or press **Esc** on desktop.
-Losing pointer capture to an OS gesture also counts as a cancel, never as a fire — an
-involuntary loss of tracking is not a deliberate "let go to cast".
+**Switching.** Pressing another slot's key while holding one switches the hold to the new
+slot (the old one is dropped with no fire and no cooldown). When nothing is held yet, the
+lowest held slot claims the gesture.
+
+**Quick Moves (setting, off by default).** The move fires the moment you press, with no
+preview and no hold.
+
+**Aiming (twin-stick).** Directional shapes (cone / forward circle / capsule / jump) turn the
+bird toward your aim when the move fires. Single-target moves keep their heading and pick
+the rival closest to your aim (nearest as tie-break). Self, aura and no-shape moves ignore
+aim. Dashes (Speed Burst, Shadowstep, Roll & Push, Roll & Trample) follow your movement, not
+your aim.
+
+| Device | Aim |
+|---|---|
+| Mouse | the ground point under the cursor (a cursor that has never moved does not hijack a keyboard player) |
+| Gamepad | right stick: dead zone 0.25, outer 0.95, 150 ms hold; with no aim given, a soft-lock of +-12 deg |
+| Touch | no explicit aim; soft-lock snaps to the rival with the smallest angle to your facing, within +-30 deg; farther than that, the move fizzles |
+
+**Gamepad bindings:** left stick move · right stick aim · RB / RT / LB / LT = slots 1 / 2 /
+3 / 4 · B cancel · Start = Back (opens the Leave sheet). **Keyboard:** WASD move; Q / E / R /
+F (also 1-4 or the arrow keys) = slots 1-4; Esc or right mouse cancels.
+
+**Desktop and pad HUD.** With a keyboard, mouse or gamepad the hexes become an
+**information strip** at the bottom centre (scale 0.75, not clickable): each hex carries its
+key badge (Q / E / R / F, or RB / RT / LB / LT on pad), the cooldown number (tenths under 1 s)
+and the in-range pip. A held key scales its hex. The last device you touched decides the
+layout; any finger on a touchscreen brings the thumb layout back.
+
+**Hold hint.** A one-line hint above the cluster teaches the gesture for your device
+("Hold to aim · Release to use · B to cancel." on pad). It shows for your first 5 holds, then
+never again, and not with Quick Moves.
+
+**Peck chain.** A Peck that succeeds with no move input keeps pecking by itself until the
+hold is full. A dashed ring turns on the Peck hex while the chain runs. It stops on: match
+end, death, stun, a knockback, another move cast, move input, hold full (a "full" sound
+plays), or no pile with food in reach. It never restarts by itself. **Auto-Peck** (setting,
+off by default) starts the first peck for you after you stand still (0.18 s) by a pile with
+food, unless a stealth move is running (it must not break your Invisibility).
+
+**Settings** (Settings sheet; labels and descriptions are the player copy in `UiText.csv`):
+
+| Setting | Description shown | Default |
+|---|---|---|
+| Range Guides | Show how far your moves reach. | on |
+| Quick Moves | Moves fire the moment you tap. | off |
+| Auto-Peck | Peck by yourself when you stand by a pile. | off |
+| Buzz When Hit | Your phone buzzes when a move hits you. (Android only; hidden elsewhere) | on |
+| Reduced Motion | Calms camera shake and screen movement. | off |
+| Performance Mode | Static chickens in menus. Saves battery. | on for phones and tablets |
+| Dev Mode | Unlock the Ability Lab. | off |
+| Music, Sound Effects | volume sliders | full |
 
 ### 10.2 What each control state prevents, and how you're told
 
@@ -792,17 +878,23 @@ countdown. That is also the more useful number: when the honest answer to "how l
 
 ### 10.3 Why a button refuses
 
-A dead button always says why, and the four reasons are told apart at a glance:
+A dead button always says why. The reasons are told apart at a glance:
 
 | Reason | What you see |
 |---|---|
 | **On cooldown** | Button darkens from the bottom up, with the **seconds remaining** in the centre. |
-| **No valid target in range** | Colour drains to grey and a **⃠** appears. |
 | **Stunned — can't cast** | Red wash and a **✕**, on all buttons at once. |
-| **Another ability is running** | The whole cluster dims; the **running** ability's button keeps full colour and drains from the top down. |
 | **Slot not available for your class** | The button isn't rendered at all. |
+| **Re-arming after a fizzle** | The slot is dead for 0.4 s; no cooldown shows. |
+
+**Not a refusal any more:** "no valid target in range". The button stays at full colour with
+no slash; the ground preview is the cream dashed ring, and a gold pip on the hex appears
+when something is in range. **Also retired:** "another ability is running". Moves run side
+by side (§7.4); a running move shows a draining ring on its own hex.
 
 Pressing a refused button **shakes it and clicks** — a press is never silently swallowed.
+A fizzle (release with nobody in range) plays a short slash flash, a bump, a whiff sound
+and a dust puff on the hex, and costs nothing.
 
 ---
 
@@ -841,7 +933,7 @@ variation is a configurable layer, never a code fork.
 
 ---
 
-## 13. Implementation status (v0.4)
+## 13. Implementation status (v0.4, Phase 6 added)
 
 Reflects the four committed v0.4 plans (`docs/superpowers/plans/`).
 
@@ -855,6 +947,15 @@ Reflects the four committed v0.4 plans (`docs/superpowers/plans/`).
 - **Ability pool** — shipped. Steal/Control/Defense/Utility categories; ex-damage abilities
   converted to steal; new Ambush / Wing Slam / Shadowstep / Mark/Kill (now Death Mark); roster masks;
   Spine Coat steal-back rate-gated.
+
+- **Phase 6 (2026-10-13) — shipped.** Ability input rework: instant preview, fizzle, edge
+  cancel, Esc / right mouse / B cancel, slot switching, Quick Moves, twin-stick aim and
+  soft-lock, gamepad, desktop / pad info strip, Peck auto-chain + Auto-Peck, joystick dead
+  zone, haptics (Buzz When Hit), Music / Sound Effects sliders. Moves run side by side with
+  strongest-wins per effect kind (§7.4). Ability text rendered from the real numbers (§7.2).
+  Leave-match sheet, colour-blind-safe player palette, see-through fence / coop, YOU ring
+  (§10). Not verified on hardware: Pixel 9 haptics, a real gamepad, a real mouse cursor,
+  two-peer aim replication.
 
 **Known gaps:** passive pools (§5.3) still carry the pre-0.4 set; endgame rule deferred;
 the Oracle re-solve rests on the simulator's model refinement (bank a winning load without
