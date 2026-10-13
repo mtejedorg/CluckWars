@@ -454,8 +454,8 @@ namespace CluckWars.UI
 
             if (!_leavingToLobby && _input != null && _input.GetBackPressed())
             {
-                // Esc is also the keyboard's ability cancel: with a move held it only cancels it.
-                switch (MatchBackRules.Resolve(state, _leaveSheetOpen, _leavingToLobby, AnyAbilityHeld()))
+                // Esc / B are also the ability cancel: with a move held it only cancels it. B never opens the sheet (Start does).
+                switch (MatchBackRules.Resolve(state, _leaveSheetOpen, _leavingToLobby, AnyAbilityHeld(), _input.GetPausePressed()))
                 {
                     case MatchBackAction.LeaveWaitingRoom: OnLobbyLeave(); return;
                     case MatchBackAction.OpenLeaveSheet:   OpenLeaveSheet(); break;

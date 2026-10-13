@@ -172,5 +172,13 @@ namespace CluckWars.Input
                 any |= _providers[i].GetBackPressed();
             return any;
         }
+
+        public bool GetPausePressed()
+        {
+            bool any = false;
+            for (int i = 0; i < _providers.Length; i++)
+                any |= _providers[i].GetPausePressed();
+            return any;
+        }
     }
 }

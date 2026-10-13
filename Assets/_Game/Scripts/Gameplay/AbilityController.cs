@@ -386,8 +386,11 @@ namespace CluckWars.Gameplay
                     // Quick Moves fired on the press tick: ignore the slot until its key / finger is up, or the
                     // still-down hold bit would fire it again every tick.
                     if (quickCast) _holdSuppressed[decision.Slot] = true;
+                    // The aim turns the bird so the shape tests run along it, but only a REAL cast keeps that turn:
+                    // a fizzle / refusal puts the heading back (Phase 7 A15).
+                    Quaternion headingBeforeAim = _controller != null ? _controller.transform.rotation : Quaternion.identity;
                     ApplyAimForFire(decision.Slot, input);
-                    TryActivate(decision.Slot);
+                    if (!TryActivate(decision.Slot) && _controller != null) _controller.RestoreFacing(headingBeforeAim);
                     if (_controller != null) _controller.CastAim = Vector3.zero;
                     break;
                 case ChargeAction.SwitchHold:
@@ -580,6 +583,9 @@ namespace CluckWars.Gameplay
                     _log?.Debug(Source, $"Peck chain ended: {stop}.");
                     break;
                 case PeckChainAction.Fire:
+                    // Paused (not ended) while the player is lining up another move: a peck mid-aim would spend a
+                    // tick on the aim gesture's heading and read as the chain fighting the player (Phase 7 A15).
+                    if (IsAimGestureLive) break;
                     if (!TryActivate(peckSlot))
                     {
                         PeckChainActive = false;
@@ -871,7 +877,7 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// SlotUnavailable + Cooldown only — the two refusal reasons that are stable for
+        /// SlotUnavailable + Cooldown (a running slot counts as cooling) only — the refusal reasons that are stable for
         /// an entire hold and would make charging pointless. Deliberately excludes
         /// Stunned (already gated before the hold state machine ever
         /// runs, see FixedUpdateNetwork) and NoTarget (a target may walk into the shape
@@ -882,7 +888,7 @@ namespace CluckWars.Gameplay
         {
             if (slot < 0 || slot >= EquippedSlotCount) return false;
             if (GetSlot(slot) == null) return false;
-            if (IsRearming(slot)) return false;
+            if (IsRearming(slot) || IsSlotActive(slot)) return false;
             return GetCooldown(slot).ExpiredOrNotRunning(Runner);
         }
 

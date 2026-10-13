@@ -59,9 +59,11 @@ namespace CluckWars.Visuals
 
         /// <summary>
         /// The HUD's in-range pip: lit while a rival is inside the slot's shape (the same "hot"
-        /// verdict the ground guide brightens on) and the slot is not cooling down. Presence or
-        /// absence is the cue, not colour.
+        /// verdict the ground guide brightens on) and the slot would actually fire: hidden on any REAL refusal
+        /// (cooling, stunned, unavailable) and while re-arming after a fizzle (Phase 7 A15). Presence or absence is
+        /// the cue, not colour.
         /// </summary>
-        public static bool InRangePipVisible(bool hot, bool onCooldown) => hot && !onCooldown;
+        public static bool InRangePipVisible(bool hot, AbilityRefusal refusal, bool rearming) =>
+            hot && !rearming && !IsRealRefusal(refusal);
     }
 }

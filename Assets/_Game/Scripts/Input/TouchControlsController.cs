@@ -949,7 +949,7 @@ namespace CluckWars.Input
                 if (chainOn) refs.Chain.Spin(Time.unscaledTime, PlayerPreferences.ReducedMotionEnabled);
             }
 
-            RefreshPip(slot, equipped, refusal);
+            RefreshPip(slot, equipped, refusal, abilities != null && abilities.IsRearming(slot));
 
             // The menu's category colour (round-2 finding 5): a move reads the same job in the deck and
             // on the button. AccentColor stays the VFX colour.
@@ -999,13 +999,13 @@ namespace CluckWars.Input
         /// chicken's <see cref="AbilitySlotOverlay"/> — the same verdict that brightens the ground guide, so the
         /// two never disagree. One 0.2 s scale pop when it lights; static under Reduced Motion.
         /// </summary>
-        private void RefreshPip(int slot, AbilityBaseSO equipped, AbilityRefusal refusal)
+        private void RefreshPip(int slot, AbilityBaseSO equipped, AbilityRefusal refusal, bool rearming)
         {
             var pip = _slots[slot].Pip;
             if (pip == null) return;
 
             bool hot = equipped != null && _localOverlay != null && _localOverlay.IsHot(slot);
-            bool show = AbilityPreviewRules.InRangePipVisible(hot, refusal == AbilityRefusal.Cooldown);
+            bool show = AbilityPreviewRules.InRangePipVisible(hot, refusal, rearming);
 
             if (show != _pipShown[slot])
             {
@@ -1141,7 +1141,7 @@ namespace CluckWars.Input
             if (abilities != null && abilities.TryConsumeDeniedPress(out int denied)
                 && denied >= 0 && denied < SlotCount)
             {
-                _bumpTimer[denied] = 0f;
+                StartBump(denied);
             }
 
             // A fizzle (target-gated move released with nobody in range) is its own one-shot: the plain bump plus
@@ -1149,7 +1149,7 @@ namespace CluckWars.Input
             if (abilities != null && abilities.TryConsumeFizzle(out int fizzled)
                 && fizzled >= 0 && fizzled < SlotCount)
             {
-                _bumpTimer[fizzled] = 0f;
+                StartBump(fizzled);
                 _fizzleTimer[fizzled] = 0f;
                 SetFizzleVisible(fizzled, true);
             }
@@ -1159,6 +1159,14 @@ namespace CluckWars.Input
                 UpdateBump(slot);
                 UpdateFizzle(slot);
             }
+        }
+
+        /// <summary>Starts the denied / fizzle shake. Skipped under Reduced Motion: the refusal marks and the sound
+        /// still say "no", only the wobble is dropped (Phase 7 A15).</summary>
+        private void StartBump(int slot)
+        {
+            if (PlayerPreferences.ReducedMotionEnabled) return;
+            _bumpTimer[slot] = 0f;
         }
 
         /// <summary>
@@ -1355,7 +1363,7 @@ namespace CluckWars.Input
             int quantity = Mathf.RoundToInt(slowMultiplier * 100f);
             if (quantity == _appliedSlowQuantity || !_textGateOpen) return;
             _appliedSlowQuantity = quantity;
-            _joySlowLabel.text = "×" + (quantity * 0.01f).ToString("0.00");
+            _joySlowLabel.text = string.Empty;   // icon + colour say "slowed"; a x0.45 means nothing to a kid (Phase 7 A12)
             _joySlowLabel.style.color = FeedbackTuning.CanonicalSlowColor;
         }
 
@@ -1444,9 +1452,10 @@ namespace CluckWars.Input
 
                 if (quantity == _appliedRowQuantity[i] || !_textGateOpen) continue;
                 _appliedRowQuantity[i] = quantity;
-                row.Value.text = data.Kind == HudStatusKind.Slow
-                    ? "×" + (quantity * 0.01f).ToString("0.00")
-                    : (quantity > 0 ? (quantity * 0.1f).ToString("0.0") + "s" : string.Empty);
+                // Slow shows no number (icon + bar). Seconds are invariant-culture: "1,2s" on an es-ES phone is a bug.
+                row.Value.text = data.Kind != HudStatusKind.Slow && quantity > 0
+                    ? HudFeedbackStyle.Seconds(quantity)
+                    : string.Empty;
             }
         }
 

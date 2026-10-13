@@ -194,4 +194,33 @@ namespace CluckWars.Input
             return best;
         }
     }
+
+    /// <summary>
+    /// Pure rules for when the desktop cursor may aim, and what counts as "the keyboard is in use" (Phase 7 chunk A,
+    /// round-4 findings 5 and 6).
+    /// </summary>
+    public static class DesktopInputRules
+    {
+        /// <summary>A parked cursor stops aiming after this long once the movement keys are in use.</summary>
+        public const float MouseIdleSeconds = 1.5f;
+
+        /// <summary>
+        /// Mouse aim is live while the cursor has moved within <see cref="MouseIdleSeconds"/>; after that it stays live
+        /// only while no movement key has been used since the cursor last moved (a mouse-only player keeps aiming at a
+        /// resting cursor, a WASD player whose mouse is parked gets facing back). Never armed before the first move.
+        /// </summary>
+        public static bool MouseAimActive(float now, float lastMouseMoveTime, float lastMoveKeyTime)
+        {
+            if (float.IsNegativeInfinity(lastMouseMoveTime)) return false;
+            if (now - lastMouseMoveTime <= MouseIdleSeconds) return true;
+            return lastMoveKeyTime <= lastMouseMoveTime;
+        }
+
+        /// <summary>
+        /// Whether the keys currently down mean the player is on a keyboard. On a phone the system Back button arrives as
+        /// Escape and must not flip the HUD to the desktop layout, so a lone Escape is ignored there.
+        /// </summary>
+        public static bool KeyDownIsActivity(bool anyKeyDown, bool escapeDown, int pressedKeyCount, bool mobilePlatform) =>
+            anyKeyDown && !(mobilePlatform && escapeDown && pressedKeyCount <= 1);
+    }
 }

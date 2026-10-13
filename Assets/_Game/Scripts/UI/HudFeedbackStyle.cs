@@ -63,6 +63,11 @@ namespace CluckWars.UI
     /// </remarks>
     public static class HudFeedbackStyle
     {
+        /// <summary>"1.2s" from tenths of a second. Always the invariant culture: a Spanish phone must not print "1,2s"
+        /// next to HUD text that uses dots everywhere else (Phase 7 A12).</summary>
+        public static string Seconds(int tenths) =>
+            (tenths * 0.1f).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "s";
+
         // ---- Ability-hex refusal classes (ART §6.6 layers 2–4 + 7) --------------
 
         public const string HexCooldownClass    = "cw-hex--cooldown";
@@ -224,7 +229,7 @@ namespace CluckWars.UI
         /// scratch every tick out of whatever is currently touching the chicken (zones,
         /// auras, piles, collisions) and has no end time at all — two overlapping sources
         /// would make any single "time left" meaningless. A bar there would be a lie, so
-        /// the slow row shows its <i>magnitude</i> (<c>×0.45</c>) instead. See
+        /// the slow row shows just its icon (Phase 7 A12: no <c>×0.45</c> number for a kid). See
         /// <c>ChickenController.SlowMultiplier</c>'s remarks: there is no slow-end timer to
         /// invent.
         /// </summary>

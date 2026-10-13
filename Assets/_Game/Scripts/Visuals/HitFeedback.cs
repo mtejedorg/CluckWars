@@ -1066,7 +1066,7 @@ namespace CluckWars.Visuals
 
         private void SpawnControlText(string label, float seconds, Color color)
         {
-            string text = seconds > 0.05f ? $"{label} {seconds:0.0}s" : label;
+            string text = seconds > 0.05f ? $"{label} {seconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)}s" : label;
             FloatingCombatText.Spawn(TextAnchorPoint(), text, color);
         }
 

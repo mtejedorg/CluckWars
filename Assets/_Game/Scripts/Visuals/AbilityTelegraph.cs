@@ -534,7 +534,7 @@ namespace CluckWars.Visuals
                 // A slot that was cancelled / switched away from (key still down) or is re-arming after a fizzle
                 // is not a live hold, so it must not draw an aim the state machine has already dropped.
                 _heldScratch[i]  = _input.GetAbilityHeld(i) && !_abilities.IsHoldSuppressed(i);
-                _availScratch[i] = _abilities.IsReady(i) && !_abilities.IsRearming(i);
+                _availScratch[i] = _abilities.IsReady(i) && !_abilities.IsRearming(i) && !_abilities.IsSlotActive(i);
             }
             return AbilityPreviewRules.SelectLocalPreviewSlot(_heldScratch, _availScratch);
         }

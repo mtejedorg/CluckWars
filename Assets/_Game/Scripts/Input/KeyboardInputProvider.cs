@@ -50,9 +50,10 @@ namespace CluckWars.Input
     /// </remarks>
     public sealed class KeyboardInputProvider : IInputProvider
     {
-        // Phase 6 chunk 5 (A7): mouse aim. The cursor only aims once it has actually moved, so a mouse parked in the
+        // Phase 6 chunk 5 (A7): mouse aim. The cursor only aims once it has actually moved (and stops after an idle spell while WASD is in use), so a mouse parked in the
         // window by a keyboard-only player never hijacks the facing.
-        private bool _mouseAimArmed;
+        private float _lastMouseMoveTime = float.NegativeInfinity;
+        private float _lastMoveKeyTime = float.NegativeInfinity;
         private float _lastActiveTime = float.NegativeInfinity;
         private int _polledFrame = -1;
 
@@ -77,7 +78,7 @@ namespace CluckWars.Input
         {
             Poll();
             var mouse = Mouse.current;
-            if (!_mouseAimArmed || mouse == null || !Application.isFocused) return AimInput.None;
+            if (!DesktopInputRules.MouseAimActive(Time.unscaledTime, _lastMouseMoveTime, _lastMoveKeyTime) || mouse == null || !Application.isFocused) return AimInput.None;
 
             Vector2 cursor = mouse.position.ReadValue();
             if (cursor.x < 0f || cursor.y < 0f || cursor.x >= Screen.width || cursor.y >= Screen.height)
@@ -101,11 +102,26 @@ namespace CluckWars.Input
             var kb = Keyboard.current;
             var mouse = Mouse.current;
             bool mouseMoved = mouse != null && mouse.delta.ReadValue().sqrMagnitude > 0.01f;
-            if (mouseMoved) _mouseAimArmed = true;
+            float now = Time.unscaledTime;
+            if (mouseMoved) _lastMouseMoveTime = now;
+            if (kb != null && (kb.wKey.isPressed || kb.aKey.isPressed || kb.sKey.isPressed || kb.dKey.isPressed))
+                _lastMoveKeyTime = now;
 
-            bool keyDown = kb != null && kb.anyKey.isPressed;
+            bool keyDown = kb != null && DesktopInputRules.KeyDownIsActivity(
+                kb.anyKey.isPressed, kb.escapeKey.isPressed, PressedKeyCount(kb), Application.isMobilePlatform);
             bool mouseButton = mouse != null && (mouse.leftButton.isPressed || mouse.rightButton.isPressed);
-            if (mouseMoved || keyDown || mouseButton) _lastActiveTime = Time.unscaledTime;
+            if (mouseMoved || keyDown || mouseButton) _lastActiveTime = now;
+        }
+
+        /// <summary>Keys down, counted only when Escape is one of them on a phone (the one case the rule needs it).</summary>
+        private static int PressedKeyCount(Keyboard kb)
+        {
+            if (!Application.isMobilePlatform || !kb.escapeKey.isPressed) return 0;
+            int n = 0;
+            var keys = kb.allKeys;
+            for (int i = 0; i < keys.Count; i++)
+                if (keys[i].isPressed) n++;
+            return n;
         }
 
         public Vector2 GetMovement()
@@ -148,6 +164,9 @@ namespace CluckWars.Input
             var kb = Keyboard.current;
             return kb != null && kb.escapeKey.wasPressedThisFrame;
         }
+
+        /// <summary>Esc opens the Leave sheet.</summary>
+        public bool GetPausePressed() => GetBackPressed();
 
         /// <summary>
         /// The one and only slot-to-key table: <c>AbilityKeys[slot]</c> is every key that

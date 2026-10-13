@@ -64,13 +64,22 @@ namespace CluckWars.Tests
 
         // ---- In-range pip ----------------------------------------------------
 
-        [TestCase(true, false, true)]
-        [TestCase(true, true, false)]
-        [TestCase(false, false, false)]
-        [TestCase(false, true, false)]
-        public void Pip_IsVisible_OnlyWhenHotAndNotOnCooldown(bool hot, bool cooldown, bool expected)
+        [TestCase(true, AbilityRefusal.None, true)]
+        [TestCase(true, AbilityRefusal.NoTarget, true)]
+        [TestCase(true, AbilityRefusal.Cooldown, false)]
+        [TestCase(true, AbilityRefusal.Stunned, false)]
+        [TestCase(true, AbilityRefusal.SlotUnavailable, false)]
+        [TestCase(false, AbilityRefusal.None, false)]
+        [TestCase(false, AbilityRefusal.Cooldown, false)]
+        public void Pip_IsVisible_OnlyWhenHotAndNoRealRefusal(bool hot, AbilityRefusal refusal, bool expected)
         {
-            Assert.AreEqual(expected, AbilityPreviewRules.InRangePipVisible(hot, cooldown));
+            Assert.AreEqual(expected, AbilityPreviewRules.InRangePipVisible(hot, refusal, rearming: false));
+        }
+
+        [Test]
+        public void Pip_IsHiddenWhileRearming()
+        {
+            Assert.IsFalse(AbilityPreviewRules.InRangePipVisible(true, AbilityRefusal.None, rearming: true));
         }
 
         [Test]

@@ -884,6 +884,15 @@ namespace CluckWars.Gameplay
             _facingLockTick = Runner.Tick.Raw;
         }
 
+        /// <summary>Undoes a <see cref="FaceNow"/> whose cast was refused: the bird keeps the heading it had before the
+        /// aim turned it (a fizzle must not spin the bird). State authority only.</summary>
+        public void RestoreFacing(Quaternion rotation)
+        {
+            if (!HasStateAuthority) return;
+            transform.rotation = rotation;
+            _facingLockTick = -1;
+        }
+
         /// <summary>
         /// v0.6 hold-to-aim (FEEDBACK.md §2.3): true while this chicken is charging an
         /// ability whose footprint moves when they turn — the movement stick should rotate

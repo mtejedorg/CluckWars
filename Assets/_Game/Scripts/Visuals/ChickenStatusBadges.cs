@@ -331,9 +331,7 @@ namespace CluckWars.Visuals
         private static int Quantize(Badge badge, float value)
         {
             if (value <= 0f) return 0;
-            return badge == Badge.Slow
-                ? Mathf.RoundToInt(value * 100f)
-                : Mathf.CeilToInt(value * 10f);
+            return badge == Badge.Slow ? 1 : Mathf.CeilToInt(value * 10f);
         }
 
         private static string Compose(Badge badge, int quantity)
@@ -341,12 +339,12 @@ namespace CluckWars.Visuals
             switch (badge)
             {
                 case Badge.Stun:
-                    return quantity > 0 ? StunGlyph + (quantity * 0.1f).ToString("0.0") + "s" : StunGlyph;
+                    return quantity > 0 ? StunGlyph + CluckWars.UI.HudFeedbackStyle.Seconds(quantity) : StunGlyph;
                 case Badge.Root:
-                    return quantity > 0 ? RootGlyph + " " + (quantity * 0.1f).ToString("0.0") + "s" : RootGlyph;
+                    return quantity > 0 ? RootGlyph + " " + CluckWars.UI.HudFeedbackStyle.Seconds(quantity) : RootGlyph;
                 case Badge.Slow:
-                    // The magnitude, not a countdown — slow has no deadline.
-                    return quantity > 0 ? SlowGlyph + " ×" + (quantity * 0.01f).ToString("0.00") : SlowGlyph;
+                    // Icon only: slow has no deadline and a x0.45 means nothing to a kid (Phase 7 A12).
+                    return SlowGlyph;
                 default:
                     return string.Empty;
             }

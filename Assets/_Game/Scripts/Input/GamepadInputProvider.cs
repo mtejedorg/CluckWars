@@ -6,7 +6,7 @@ namespace CluckWars.Input
 {
     /// <summary>
     /// Gamepad input (Phase 6 chunk 5, A8). Left stick moves, right stick aims, and the four ability slots sit on the
-    /// shoulders and triggers (the face buttons fight the right stick). B cancels a hold, Start is back.
+    /// shoulders and triggers (the face buttons fight the right stick). B cancels a hold (and backs out of menus, the Leave sheet and the podium), Start opens the Leave sheet.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -36,7 +36,7 @@ namespace CluckWars.Input
         /// <summary>B cancels the hold in progress.</summary>
         public const GamepadButton CancelButton = GamepadButton.East;
 
-        /// <summary>Start is UI back (the leave sheet, later in Part B).</summary>
+        /// <summary>Start opens the Leave sheet in a match.</summary>
         public const GamepadButton BackButton = GamepadButton.Start;
 
         private readonly StickAimFilter _aimFilter = new StickAimFilter();
@@ -89,7 +89,15 @@ namespace CluckWars.Input
         /// <summary>A pad cancels with a button, not a screen band.</summary>
         public bool IsAbilityCancelArmed() => false;
 
+        /// <summary>Start or B: back out of a menu page, the Leave sheet or the podium. In a match only Start opens the
+        /// sheet (<see cref="GetPausePressed"/>); B there is the hold cancel.</summary>
         public bool GetBackPressed()
+        {
+            var gp = Gamepad.current;
+            return gp != null && (gp[BackButton].wasPressedThisFrame || gp[CancelButton].wasPressedThisFrame);
+        }
+
+        public bool GetPausePressed()
         {
             var gp = Gamepad.current;
             return gp != null && gp[BackButton].wasPressedThisFrame;

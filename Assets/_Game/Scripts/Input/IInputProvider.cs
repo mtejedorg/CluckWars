@@ -47,6 +47,13 @@ namespace CluckWars.Input
         bool GetBackPressed();
 
         /// <summary>
+        /// Edge-triggered (Phase 7 A, finding 9): the button that opens the Leave sheet in a match - Esc, or a pad's
+        /// Start. <see cref="GetBackPressed"/> is a superset (a pad's B also backs out of a sheet, the podium and
+        /// menus, but must not OPEN the sheet mid-match, where B is the ability cancel).
+        /// </summary>
+        bool GetPausePressed() => GetBackPressed();
+
+        /// <summary>
         /// Level-triggered (Phase 6, A4): true while a held ability's pointer sits in the touch edge band, i.e.
         /// releasing now would CANCEL. Read by the local preview (grey + dashed) and nothing else. Always false
         /// on keyboard / mouse and gamepad, which cancel with a button instead.
