@@ -82,8 +82,7 @@ namespace CluckWars.Abilities
                     : 0f;
                 if (stolen > 0f)
                 {
-                    thiefCargo.Cargo += stolen;
-                    targetCargo.RPC_DrainStolen(stolen, thief.Id);
+                    thiefCargo.CreditStealAndDrain(targetCargo, stolen);
                 }
 
                 if (KnockbackStrength > 0f)

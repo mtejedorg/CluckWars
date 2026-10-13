@@ -116,17 +116,17 @@ namespace CluckWars.Tests
             var m = typeof(ChickenCargo).GetMethod(nameof(ChickenCargo.RPC_RefundRefusedSteal));
             Assert.IsNotNull(m);
             Assert.IsTrue(m.GetParameters().Any(p => p.ParameterType == typeof(Fusion.RpcInfo)));
-            string body = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_RefundRefusedSteal(", 2400);
+            string body = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_RefundRefusedSteal(", 3000);
             StringAssert.Contains("IsPlausibleAmount", body);
             StringAssert.Contains("victim.Object.StateAuthority == info.Source", body);
             StringAssert.Contains("victim.Object.HasStateAuthority", body);
-            StringAssert.Contains("StealRules.RefundAmount(amount, Cargo)", body);
+            StringAssert.Contains("StealRules.RefundAmount(allowed, Cargo)", body);
         }
 
         [Test]
         public void RpcTransferAllToBountyBag_RefusesAStealProofVictim_BeforeTouchingCargo()
         {
-            string body = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_TransferAllToBountyBag(", 900);
+            string body = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_TransferAllToBountyBag(", 1400);
             int proof = body.IndexOf("_controller.IsStealProof", StringComparison.Ordinal);
             int zero  = body.IndexOf("Cargo = 0f", StringComparison.Ordinal);
             Assert.Greater(proof, 0);
@@ -135,11 +135,11 @@ namespace CluckWars.Tests
 
         // ---- 3. The six thief sites: gate BEFORE the self-credit ---------------
 
-        [TestCase("Abilities/SnatchAbilitySO.cs",      "thiefCargo.Cargo += stolen")]
-        [TestCase("Abilities/SneakyStealAbilitySO.cs", "thiefCargo.Cargo += take")]
-        [TestCase("Abilities/ScrapAbilitySO.cs",       "thiefCargo.Cargo += take")]
-        [TestCase("Abilities/RollTrampleAbilitySO.cs", "thiefCargo.Cargo += stolen")]
-        [TestCase("Gameplay/ChickenController.cs",     "Cargo.Cargo += stolen")]
+        [TestCase("Abilities/SnatchAbilitySO.cs",      "CreditStealAndDrain(")]
+        [TestCase("Abilities/SneakyStealAbilitySO.cs", "CreditStealAndDrain(")]
+        [TestCase("Abilities/ScrapAbilitySO.cs",       "CreditStealAndDrain(")]
+        [TestCase("Abilities/RollTrampleAbilitySO.cs", "CreditStealAndDrain(")]
+        [TestCase("Gameplay/ChickenController.cs",     "CreditStealAndDrain(")]
         public void ThiefSite_ChecksStealProof_BeforeCreditingItself(string file, string credit)
         {
             string src = Src(file);
@@ -193,7 +193,7 @@ namespace CluckWars.Tests
                 string norm = path.Replace('\\', '/');
                 if (norm.Contains("/Editor/") || Path.GetFileName(path) == "ChickenCargo.cs") continue;
                 string src = Src(norm.Substring(Dir.Length));
-                if (!src.Contains(".RPC_DrainStolen(") && !src.Contains(".RPC_TransferAllToBountyBag(")) continue;
+                if (!src.Contains(".RPC_DrainStolen(") && !src.Contains(".CreditStealAndDrain(") && !src.Contains(".RPC_TransferAllToBountyBag(")) continue;
                 StringAssert.Contains("StealRules.CanStealFrom(", src, $"{Path.GetFileName(path)} steals without the steal-proof gate.");
             }
         }

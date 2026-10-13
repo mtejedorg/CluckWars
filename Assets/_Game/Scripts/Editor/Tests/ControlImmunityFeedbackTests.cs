@@ -131,7 +131,7 @@ namespace CluckWars.Tests
         /// the wrong thing — so an ability that also robs is never "immune-proof".</summary>
         private static readonly string[] NonControlDelivery =
         {
-            "RPC_DrainStolen", "AssassinExecute",
+            "RPC_DrainStolen", "CreditStealAndDrain", "AssassinExecute",
         };
 
         // ---- 1. The split itself: eligibility must not have moved ------------

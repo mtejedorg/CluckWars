@@ -157,6 +157,9 @@ namespace CluckWars.Gameplay
         private float _maxStealReach;
         private bool  _stealBoundsResolved;
 
+        // Optimistic steal credits awaiting the victim's confirmation; gates RPC_RefundRefusedSteal.
+        private readonly PendingStealLedger<NetworkBehaviourId> _pendingSteals = new PendingStealLedger<NetworkBehaviourId>();
+
         // Accumulators for batched RPCs (Stage D)
         private PlayerBase _activeBaseTarget;
         private float _pendingBaseFood;
@@ -561,6 +564,31 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
+        /// The ONE thief-side entry point for a steal: credits this chicken's cargo optimistically,
+        /// records the credit as pending, and asks <paramref name="victim"/>'s authority to drain it.
+        /// Callers keep their own <see cref="StealRules.CanStealFrom"/> gate and call this only
+        /// after it passes (gate BEFORE credit, or a shell would duplicate food).
+        /// </summary>
+        /// <remarks>
+        /// The pending record is what lets <see cref="RPC_RefundRefusedSteal"/> reject a refund
+        /// that no steal asked for. It is written before the RPC because a local invoke (bot or
+        /// solo victim) can run the refusal, and so the refund, synchronously inside the call.
+        /// </remarks>
+        public void CreditStealAndDrain(ChickenCargo victim, float amount)
+        {
+            if (amount <= 0f || victim == null) return;
+            if (_controller == null || victim._controller == null)
+            {
+                _log?.Error(Source, $"{name}: CreditStealAndDrain({amount:0.00}) skipped - thief or victim has no ChickenController yet.");
+                return;
+            }
+
+            Cargo += amount;
+            _pendingSteals.Record(victim._controller.Id, amount, Time.unscaledTime);
+            victim.RPC_DrainStolen(amount, _controller.Id);
+        }
+
+        /// <summary>
         /// The untrusted steal path: a thief's ability asking this chicken's authority to hand
         /// over <paramref name="amount"/> of its <see cref="Cargo"/>. Five callers: Snatch,
         /// Scrap, Sneaky Steal and Dive Bomb cast at a target they resolved through an aim
@@ -650,8 +678,9 @@ namespace CluckWars.Gameplay
         /// invoke the victim must be simulated here, off the wire the sender must be the victim's
         /// state authority (a bot victim is owned by the master). Same attribution split as
         /// <see cref="TryResolveThief"/>. The amount is held to the same single-hit bound and
-        /// clamped to the cargo actually held, so a forged refund can at worst remove one
-        /// plausible steal's worth from the chicken it targets.
+        /// clamped to the cargo actually held. On top of that it must match a pending credit
+        /// this chicken recorded in <see cref="CreditStealAndDrain"/>, which is consumed, so a
+        /// refund cannot be sent without a steal having happened.
         /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_RefundRefusedSteal(float amount, NetworkBehaviourId victimId, RpcInfo info = default)
@@ -677,7 +706,15 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            float refund = StealRules.RefundAmount(amount, Cargo);
+            // Unsolicited-refund guard: only a credit this chicken really made, from this victim,
+            // inside the window, once. See PendingStealLedger for the window's justification.
+            if (!_pendingSteals.TryConsume(victimId, amount, Time.unscaledTime, out float allowed))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_RefundRefusedSteal({amount:0.00}) from {info.Source} - no pending steal from {victim.name} (unsolicited, expired or already refunded).");
+                return;
+            }
+
+            float refund = StealRules.RefundAmount(allowed, Cargo);
             Cargo -= refund;
             _log?.Debug(Source, $"Refunded refused steal: -{refund:0.00} (steal-proof {victim.name}) → Cargo={Cargo:0.0}.");
         }
@@ -801,26 +838,89 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Assassin execute cargo transfer: moves ALL cargo to the assassin's bounty bag.
         /// </summary>
+        /// <remarks>
+        /// <c>RpcSources.All</c>, so the call is a claim: it is honoured only when the caller is
+        /// the assassin's state authority (local invoke on the assassin's authority, or the wire
+        /// sender is that authority) AND that assassin's <see cref="AssassinExecute"/> currently
+        /// has this chicken as <c>MarkedTarget</c>. The mark is written at mark time, seconds
+        /// before the execute, so replication lag cannot make a genuine call fail the check.
+        /// <para>
+        /// Known remaining gap, not fixed here: the bounty bag is written on the assassin's
+        /// cargo from this (victim's) authority, a cross-authority write that Shared Mode lets
+        /// the victim's peer make. It needs a bag-credit RPC to the assassin's authority.
+        /// </para>
+        /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_TransferAllToBountyBag(NetworkBehaviourId assassinId)
+        public void RPC_TransferAllToBountyBag(NetworkBehaviourId assassinId, RpcInfo info = default)
         {
+            if (!TryResolveExecutor(assassinId, info, out var assassinCargo, out string rejection))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_TransferAllToBountyBag from {info.Source} - {rejection}");
+                return;
+            }
+
             // Steal-proof victim: the transfer is refused here. The assassin never credited
             // anything ahead of this RPC (the bag is written below, on this side), so refusing
             // creates no food. The thief-side gate in AssassinExecute normally stops the call
             // first; this catches the sub-round-trip race.
             if (_controller.IsStealProof)
             {
-                _log?.Info(Source, $"{name}: execute transfer refused — steal-proof (a shell went up inside one round trip).");
+                _log?.Info(Source, $"{name}: execute transfer refused - steal-proof (a shell went up inside one round trip).");
                 return;
             }
 
             float amountToTransfer = Cargo;
             Cargo = 0f;
-            if (Runner.TryFindBehaviour(assassinId, out ChickenCargo assassinCargo))
+            assassinCargo.BountyBag += amountToTransfer;
+            _log?.Info(Source, $"Execute: transferred {amountToTransfer:0.0} cargo to assassin {assassinId} bounty bag.");
+        }
+
+        /// <summary>
+        /// Resolves <paramref name="assassinId"/> to the assassin's cargo if the caller may act
+        /// for it and it has marked this chicken. Attribution split as in
+        /// <see cref="RPC_RefundRefusedSteal"/>: local invoke needs state authority here, a wire
+        /// message must come from the assassin's state authority.
+        /// </summary>
+        private bool TryResolveExecutor(NetworkBehaviourId assassinId, in RpcInfo info,
+            out ChickenCargo assassinCargo, out string rejection)
+        {
+            assassinCargo = null;
+
+            if (Runner == null || !Runner.TryFindBehaviour(assassinId, out AssassinExecute execute) ||
+                execute == null || execute.Object == null || !execute.Object.IsValid)
             {
-                assassinCargo.BountyBag += amountToTransfer;
-                _log?.Info(Source, $"Execute: transferred {amountToTransfer:0.0} cargo to assassin {assassinId} bounty bag.");
+                rejection = $"no live assassin resolves from id {assassinId}.";
+                return false;
             }
+
+            bool attributable = info.IsInvokeLocal
+                ? execute.Object.HasStateAuthority
+                : execute.Object.StateAuthority == info.Source;
+            if (!attributable)
+            {
+                rejection = $"{execute.name} is not a chicken {info.Source} is entitled to act for.";
+                return false;
+            }
+
+            // An execute needs this chicken marked by that assassin OR stunned right now (KillReady
+            // requires the stun). The stun half matters across peers: AssassinExecute.Press sends this
+            // RPC and resets its mark in the same tick, so the replicated MarkedTarget can already read
+            // None when the RPC lands; the victim's own IsStunned is authoritative on this side.
+            if (_controller == null || (execute.MarkedTarget != _controller.Id && !_controller.IsStunned))
+            {
+                rejection = $"{execute.name} has not marked {name} and {name} is not stunned.";
+                return false;
+            }
+
+            assassinCargo = execute.GetComponent<ChickenCargo>();
+            if (assassinCargo == null || assassinCargo == this)
+            {
+                rejection = $"{execute.name} has no usable ChickenCargo.";
+                return false;
+            }
+
+            rejection = null;
+            return true;
         }
 
         /// <summary>
@@ -834,6 +934,7 @@ namespace CluckWars.Gameplay
             _pendingBaseFood = 0f;
             _activeBaseTarget = null;
             _baseDepositTicks = 0;
+            _pendingSteals.Clear();
 
             Cargo = 0f;
             BountyBag = 0f;

@@ -409,7 +409,7 @@ namespace CluckWars.Tests
                 {
                     string trimmed = line.TrimStart();
                     if (trimmed.StartsWith("//")) return false;
-                    return trimmed.Contains("RPC_DrainStolen(");
+                    return trimmed.Contains("CreditStealAndDrain(");
                 });
                 if (calls) yield return path;
             }

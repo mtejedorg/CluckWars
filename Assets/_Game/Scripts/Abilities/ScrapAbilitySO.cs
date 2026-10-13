@@ -80,8 +80,7 @@ namespace CluckWars.Abilities
             float take = Mathf.Min(ResolveStealAmount(StealAmount, thief), victim.Cargo, spaceLeft);
             if (take <= 0f) return;
 
-            thiefCargo.Cargo += take;
-            victim.RPC_DrainStolen(take, thief.Id);
+            thiefCargo.CreditStealAndDrain(victim, take);
         }
 
         public override void OnDeactivate(AbilityContext ctx) { }
