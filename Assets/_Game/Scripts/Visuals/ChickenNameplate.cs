@@ -1,5 +1,6 @@
 using CluckWars.Gameplay;
 using CluckWars.Localization;
+using CluckWars.Settings;
 using CluckWars.UI;
 using UnityEngine;
 
@@ -54,6 +55,7 @@ namespace CluckWars.Visuals
         private bool _appliedBountyActive;
         private bool _wasStunned;
         private string _appliedStateIcon = string.Empty;
+        private float _youEmphasis;   // 0..1, GET READY "this is you" marker (YouMarkerRules)
 
         private void Awake()
         {
@@ -117,6 +119,8 @@ namespace CluckWars.Visuals
                 }
             }
 
+            ApplyYouEmphasis(!isNowStunned);
+
             if (isNowStunned)
             {
                 if (_youPill != null) _youPill.enabled = false;
@@ -164,6 +168,28 @@ namespace CluckWars.Visuals
             }
 
             BillboardToCamera();
+        }
+
+        /// <summary>
+        /// GET READY "this is you" marker (Phase 6 chunk 7f): the local bird's YOU label is drawn
+        /// <see cref="YouMarkerRules.NameplateScale"/>x larger (lifted so it does not sink into the bird) during
+        /// GET READY and the countdown, easing back after GO. Reduced Motion snaps instead of easing.
+        /// </summary>
+        private void ApplyYouEmphasis(bool alive)
+        {
+            if (_textTransform == null) return;
+            var obj = _controller.Object;
+            bool show = alive && obj != null && obj.IsValid && _controller.HasInputAuthority && !_controller.IsDecoy
+                        && YouMarkerRules.IsGetReadyNow();
+            float before = _youEmphasis;
+            _youEmphasis = YouMarkerRules.StepEmphasis(_youEmphasis, show, Time.unscaledDeltaTime,
+                PlayerPreferences.ReducedMotionEnabled);
+            if (_youEmphasis == before && (before <= 0f || before >= 1f)) return;   // settled: nothing to write
+
+            float scale = YouMarkerRules.NameplateScaleAt(_youEmphasis);
+            _textTransform.localScale = Vector3.one * scale;
+            // Grow upward from the label's bottom edge rather than about its centre.
+            _textTransform.localPosition = _offset + Vector3.up * (scale - 1f) * 0.25f;
         }
 
         /// <summary>Shows the YOU pill behind the local chicken's label, sized to the text.</summary>

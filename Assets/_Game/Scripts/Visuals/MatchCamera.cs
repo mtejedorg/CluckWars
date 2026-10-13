@@ -90,10 +90,20 @@ namespace CluckWars.Visuals
         /// </summary>
         public Camera Camera => _camera;
 
+        /// <summary>
+        /// The chicken this camera follows (this peer's input-authority, non-decoy chicken), or null
+        /// before it spawns. May briefly hold a despawned reference until the next throttled re-scan,
+        /// so callers check <c>Object.IsValid</c>. Read by <see cref="FenceFadeDriver"/>.
+        /// </summary>
+        public ChickenController LocalChicken => _localChicken;
+
         private void Awake()
         {
             Instance = this;
             _camera = GetComponent<Camera>();
+            // See-through fence near the local bird (Phase 6 chunk 7f). Added here rather than on the
+            // scene object so every scene with a match camera gets it without a scene edit.
+            if (GetComponent<FenceFadeDriver>() == null) gameObject.AddComponent<FenceFadeDriver>();
             _currentFocus = _focusPoint;
             ApplyCamera();
             ApplyTransform(_currentFocus);

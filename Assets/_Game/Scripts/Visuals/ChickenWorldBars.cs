@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Settings;
 using CluckWars.UI;
 using UnityEngine;
 
@@ -45,6 +46,9 @@ namespace CluckWars.Visuals
         private SpriteRenderer _ring;
 
         private int _appliedRingCorner = -2;
+        private Color _ringBaseColor = Color.white;
+        private float _youEmphasis;          // 0..1, GET READY "this is you" marker (YouMarkerRules)
+        private bool _ringEmphasised;        // last frame wrote an emphasised scale/alpha
 
         private float CargoHeight => _hpHeight * 0.72f;
 
@@ -150,6 +154,7 @@ namespace CluckWars.Visuals
             bool live = obj != null && obj.IsValid;
 
             RefreshRing(live);
+            RefreshYouMarker(live);
 
             bool stunned = _combat != null && _combat.IsRemoved;
             bool show    = live && !stunned;
@@ -224,7 +229,41 @@ namespace CluckWars.Visuals
             // fainter until the spawn stamps a corner.
             var c = PlayerPalette.ForCorner(corner);
             c.a = corner < 0 ? 0.5f : 0.75f;
+            _ringBaseColor = c;
             _ring.color = c;
+        }
+
+        /// <summary>
+        /// GET READY "this is you" marker (Phase 6 chunk 7f): the local bird's ring grows, goes opaque and
+        /// pulses during GET READY and the countdown, then eases back after GO. Static under Reduced Motion.
+        /// See <see cref="YouMarkerRules"/>.
+        /// </summary>
+        private void RefreshYouMarker(bool live)
+        {
+            if (_ring == null) return;
+
+            // This peer's own bird only (a Doppelganger decoy shares its input authority).
+            bool show = live && _controller.HasInputAuthority && !_controller.IsDecoy && YouMarkerRules.IsGetReadyNow();
+            bool reduced = PlayerPreferences.ReducedMotionEnabled;
+            _youEmphasis = YouMarkerRules.StepEmphasis(_youEmphasis, show, Time.unscaledDeltaTime, reduced);
+
+            if (_youEmphasis <= 0f)
+            {
+                if (_ringEmphasised)
+                {
+                    _ring.transform.localScale = Vector3.one * (_ringRadius * 2f);
+                    _ring.color = _ringBaseColor;
+                    _ringEmphasised = false;
+                }
+                return;
+            }
+
+            float scale = YouMarkerRules.RingScaleAt(_youEmphasis, Time.unscaledTime, reduced);
+            _ring.transform.localScale = Vector3.one * (_ringRadius * 2f * scale);
+            var c = _ringBaseColor;
+            c.a = YouMarkerRules.RingAlphaAt(_youEmphasis, _ringBaseColor.a);
+            _ring.color = c;
+            _ringEmphasised = true;
         }
 
         private void Billboard()

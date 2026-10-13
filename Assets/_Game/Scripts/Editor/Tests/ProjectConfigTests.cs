@@ -308,13 +308,26 @@ namespace CluckWars.Tests
                 bool urp = shader.StartsWith("Universal Render Pipeline/")
                         || shader.StartsWith("Shader Graphs/")
                         || shader.StartsWith("Sprites/")
-                        || shader.StartsWith("UI/");
+                        || shader.StartsWith("UI/")
+                        // Our own hand-written shaders (chunk 7f: "Cluck Wars/Fence Fade Lit", a copy of
+                        // URP Lit) count only if their SubShader is tagged for the Universal pipeline.
+                        || (shader.StartsWith("Cluck Wars/") && IsUrpTaggedProjectShader(mat.shader));
                 if (!urp) offenders.Add($"{mat.name} → '{shader}'");
             }
 
             Assert.IsEmpty(offenders,
                 "These materials are not on a URP-compatible shader and will render magenta " +
                 "(CONVENTIONS.md: URP materials only).");
+        }
+
+        /// <summary>A project .shader file (not a package or built-in one) whose source declares
+        /// <c>"RenderPipeline" = "UniversalPipeline"</c>.</summary>
+        private static bool IsUrpTaggedProjectShader(Shader shader)
+        {
+            string path = AssetDatabase.GetAssetPath(shader);
+            if (string.IsNullOrEmpty(path) || !path.StartsWith("Assets/") || !path.EndsWith(".shader")) return false;
+            string src = System.IO.File.ReadAllText(path);
+            return System.Text.RegularExpressions.Regex.IsMatch(src, @"""RenderPipeline""\s*=\s*""UniversalPipeline""");
         }
 
         /// <summary>
