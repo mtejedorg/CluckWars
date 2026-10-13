@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 
 namespace CluckWars.UI
 {
@@ -100,15 +101,6 @@ namespace CluckWars.UI
         public const string RootGlyph = "⛓";        // CHAINS
         public const string SlowGlyph = "\U0001F40C";    // SNAIL
 
-        /// <summary>
-        /// Short row names for the status strip. Kept to four characters so the glyph, the
-        /// name and the quantity all fit one 26px-floor row without wrapping at the mobile
-        /// reference — §1.4, nothing mid-fight is a sentence.
-        /// </summary>
-        public const string StunName = "STUN";
-        public const string RootName = "ROOT";
-        public const string SlowName = "SLOW";
-
         // ---- Layer-9 refusal marks: drawn shapes vs. real glyphs ----------------
 
         /// <summary>
@@ -207,15 +199,16 @@ namespace CluckWars.UI
             }
         }
 
-        /// <summary>Short name for a strip row, or the empty string for
+        /// <summary>Short name for a strip row (from UiText: STUN / STUCK / SLOW; kept to one short word so the
+        /// glyph, name and quantity fit one 26px-floor row, §1.4), or the empty string for
         /// <see cref="HudStatusKind.None"/>.</summary>
         public static string NameFor(HudStatusKind kind)
         {
             switch (kind)
             {
-                case HudStatusKind.Stun: return StunName;
-                case HudStatusKind.Root: return RootName;
-                case HudStatusKind.Slow: return SlowName;
+                case HudStatusKind.Stun: return UiText.Get(UiKeys.HudStatusStun);
+                case HudStatusKind.Root: return UiText.Get(UiKeys.HudStatusStuck);
+                case HudStatusKind.Slow: return UiText.Get(UiKeys.HudStatusSlow);
                 default:                 return string.Empty;
             }
         }

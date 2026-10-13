@@ -153,7 +153,7 @@ Fired the instant the ability resolves. All peers.
   direction, so the victim reads *where it came from*.
 - **Floating combat text** at the victim, rising and fading over 0.9 s:
   - Steal: `-5 🌽` at victim (warm red), `+5 🌽` at thief (green).
-  - Control: `STUN 1.5s`, `ROOT 2s`, `SLOW 45%`.
+  - Control: `STUN 1.5s`, `STUCK! 2.0s`, `SLOW 45%` (one kid word, STUCK, for root / pin; all pop words live in UiText `hud.pop.*`: STUN, STUCK!, SLOW, IMMUNE, FULL!, SAFE).
   - Blocked: `BLOCKED` / `IMMUNE` in grey.
 - **Directional damage indicator** for the local player — an arc at the screen
   edge pointing at the attacker, fading over 1.2 s. This is the only reliable way

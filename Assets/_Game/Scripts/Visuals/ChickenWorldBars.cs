@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using CluckWars.Settings;
 using CluckWars.UI;
 using UnityEngine;
@@ -188,7 +189,7 @@ namespace CluckWars.Visuals
             int   capInt  = Mathf.FloorToInt(_cargo.Capacity);
             if (frac >= 1f)
             {
-                _cargoText.text  = "FULL!";
+                _cargoText.text  = UiText.Get(UiKeys.HudPopFull);
                 _cargoText.color = new Color(1f, 0.18f, 0.08f, 1f);
             }
             else

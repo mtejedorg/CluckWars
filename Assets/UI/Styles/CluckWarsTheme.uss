@@ -321,11 +321,18 @@
 /* Focus ring for D-pad/keyboard navigation on the shared button atoms (their
    border is 0 at rest, so this never fights the resting look). Slot boxes and
    perk badges are left out on purpose: a real tap focuses a Button, and a cream
-   focus border would hide their gold armed/selected border. */
+   focus border would hide their gold armed/selected border. Rounded (round-4 finding 19).
+   A mouse click or a touch also focuses a Button, so NavFocusRing puts .cw-no-focus-ring on the
+   panel root after any pointer press and takes it off again on the next key / pad navigation. */
 .cw-btn:focus, .cw-home-btn:focus {
     border-left-width: 5px; border-right-width: 5px; border-top-width: 5px; border-bottom-width: 5px;
     border-left-color: rgb(254, 245, 224); border-right-color: rgb(254, 245, 224);
     border-top-color: rgb(254, 245, 224); border-bottom-color: rgb(254, 245, 224);
+    border-top-left-radius: 24px; border-top-right-radius: 24px;
+    border-bottom-left-radius: 24px; border-bottom-right-radius: 24px;
+}
+.cw-no-focus-ring .cw-btn:focus, .cw-no-focus-ring .cw-home-btn:focus {
+    border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
 }
 
 /* Home/back button — absolutely placed at a header's top-left, leaves the
@@ -1375,6 +1382,22 @@
 }
 .cw-sheet__close { position: absolute; right: 0; top: 0; left: auto; min-width: 180px; }
 .cw-sheet__body { padding-top: 10px; padding-bottom: 10px; padding-left: 22px; padding-right: 22px; flex-shrink: 1; }
+/* Themed scrollbar (round-4 finding 19): a thin ink track, a gold thumb, no arrow buttons. */
+.cw-sheet__body .unity-scroller--vertical { width: 18px; margin-left: 8px; background-color: rgba(0, 0, 0, 0); border-left-width: 0; }
+.cw-sheet__body .unity-scroller__low-button, .cw-sheet__body .unity-scroller__high-button { display: none; }
+.cw-sheet__body .unity-scroller--vertical .unity-base-slider__tracker {
+    background-color: rgba(42, 26, 12, 0.75);
+    border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
+    width: 8px; margin-left: 5px; margin-right: 5px;
+    border-top-left-radius: 4px; border-top-right-radius: 4px; border-bottom-left-radius: 4px; border-bottom-right-radius: 4px;
+}
+.cw-sheet__body .unity-scroller--vertical .unity-base-slider__dragger {
+    background-color: rgb(212, 160, 32);
+    border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
+    width: 16px; margin-left: 1px;
+    border-top-left-radius: 8px; border-top-right-radius: 8px; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
+}
+.cw-sheet__body .unity-scroller--vertical .unity-base-slider__dragger-border { display: none; }
 .cw-setting-toggle-row {
     flex-direction: row; align-items: center;
     min-height: 116px;                        /* 48 dp floor - the whole row is the target */
@@ -1489,6 +1512,10 @@
     font-size: 30px; letter-spacing: 1px; color: rgb(107, 74, 42);
 }
 .cw-coop-left .cw-lobby-card { margin-top: 0; margin-left: 14px; padding-top: 8px; padding-bottom: 10px; }
+/* Phone / 4:3: the invite card keeps ~16 px of breathing room all round (round-4 finding 19). */
+.layout--short .cw-coop-left .cw-lobby-card, .layout--narrow .cw-coop-left .cw-lobby-card {
+    padding-top: 16px; padding-bottom: 16px; padding-left: 16px; padding-right: 16px;
+}
 /* Gold invite-code letter tiles */
 .cw-code-tiles { flex-direction: row; flex-wrap: wrap; margin-top: 12px; }
 .cw-code-tile {

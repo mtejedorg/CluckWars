@@ -462,7 +462,7 @@
 #LobbyOverlay.layout--short .cw-wr-changebird, #LobbyOverlay.layout--narrow .cw-wr-changebird { min-width: 220px; margin-right: 12px; padding-left: 24px; padding-right: 24px; }
 #LobbyOverlay.layout--short .cw-page-cta, #LobbyOverlay.layout--narrow .cw-page-cta { min-width: 380px; }
 #LobbyOverlay.layout--short .cw-lobby-btnrow .cw-mini-btn, #LobbyOverlay.layout--narrow .cw-lobby-btnrow .cw-mini-btn { min-width: 116px; margin-left: 6px; padding-left: 8px; padding-right: 8px; }
-#LobbyOverlay.layout--short .cw-coop-left .cw-lobby-card, #LobbyOverlay.layout--narrow .cw-coop-left .cw-lobby-card { margin-left: 8px; padding-left: 12px; padding-right: 12px; }
+#LobbyOverlay.layout--short .cw-coop-left .cw-lobby-card, #LobbyOverlay.layout--narrow .cw-coop-left .cw-lobby-card { margin-left: 8px; padding-top: 16px; padding-bottom: 16px; padding-left: 16px; padding-right: 16px; }
 .cw-wr-changebird { margin-right: 18px; min-width: 300px; }
 
 /* ---- Shared buttons — the menus' cw-btn (CluckWarsTheme.uss), restated for this sheet -------- */
@@ -506,6 +506,11 @@
     border-left-width: 5px; border-right-width: 5px; border-top-width: 5px; border-bottom-width: 5px;
     border-left-color: rgb(254, 245, 224); border-right-color: rgb(254, 245, 224);
     border-top-color: rgb(254, 245, 224); border-bottom-color: rgb(254, 245, 224);
+    border-top-left-radius: 24px; border-top-right-radius: 24px;
+    border-bottom-left-radius: 24px; border-bottom-right-radius: 24px;
+}
+.cw-no-focus-ring .cw-btn:focus {   /* pointer / touch focus: no ring (NavFocusRing) */
+    border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
 }
 
 /* ============================================================================

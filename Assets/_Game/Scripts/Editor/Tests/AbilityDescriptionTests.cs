@@ -134,7 +134,7 @@ namespace CluckWars.Tests
                 burst.SpeedMultiplier = 3f; burst.Duration = 0.75f;
                 steal.StealRange = 7.25f; steal.StealAmount = 9f;
                 Assert.AreEqual("A 0.75s sprint at 3x movement speed.", burst.DescriptionText);
-                Assert.AreEqual("Yanks 9 food from the nearest carrier within 7.25m.", steal.DescriptionText);
+                Assert.AreEqual("Yanks 9 food from the nearest rival within 7.25m.", steal.DescriptionText);
             }
             finally
             {

@@ -403,12 +403,12 @@ namespace CluckWars.Visuals
             {
                 anyEntered = true;
                 stunEntered = true;
-                if (showText) SpawnControlText("STUN", _controller.StunRemaining, FeedbackTuning.CanonicalStunColor);
+                if (showText) SpawnControlText(UiText.Get(UiKeys.HudPopStun), _controller.StunRemaining, FeedbackTuning.CanonicalStunColor);
             }
             if (rooted && !_wasRooted)
             {
                 anyEntered = true;
-                if (showText) SpawnControlText("ROOT", _controller.RootRemaining, FeedbackTuning.CanonicalRootColor);
+                if (showText) SpawnControlText(UiText.Get(UiKeys.HudPopStuck), _controller.RootRemaining, FeedbackTuning.CanonicalRootColor);
             }
             // Snare edge: an enemy did this, so it is a real impact and keeps the full
             // treatment. Edge-derived from _wasSnared rather than from _wasSlowed on purpose —
@@ -543,7 +543,7 @@ namespace CluckWars.Visuals
                         // that is nullified was a steal refused by the steal-proof state: SAFE.
                         FloatingCombatText.Spawn(
                             victim.transform.position + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight,
-                            ability.TargetEffectIsPurelyControl ? "IMMUNE" : UiText.Get(UiKeys.HudPopSafe),
+                            ability.TargetEffectIsPurelyControl ? UiText.Get(UiKeys.HudPopImmune) : UiText.Get(UiKeys.HudPopSafe),
                             FeedbackTuning.NeutralNoEffectColor);
                         continue;
                     }
@@ -644,7 +644,7 @@ namespace CluckWars.Visuals
 
                 FloatingCombatText.Spawn(
                     candidate.transform.position + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight,
-                    "IMMUNE",
+                    UiText.Get(UiKeys.HudPopImmune),
                     FeedbackTuning.NeutralNoEffectColor);
             }
         }
@@ -1089,11 +1089,11 @@ namespace CluckWars.Visuals
         /// </summary>
         private void SpawnSlowText()
         {
-            string text = "SLOW";
+            string text = UiText.Get(UiKeys.HudPopSlow);
             if (HasStateAuthority)
             {
                 int percent = Mathf.Clamp(Mathf.RoundToInt(_controller.SlowMultiplier * 100f), 0, 100);
-                text = $"SLOW {percent}%";
+                text = $"{text} {percent}%";
             }
             FloatingCombatText.Spawn(TextAnchorPoint(), text, FeedbackTuning.CanonicalSlowColor);
         }

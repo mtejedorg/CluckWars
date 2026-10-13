@@ -337,7 +337,7 @@ namespace CluckWars.Tests
                 "ConfirmHits is the only place a control-immune victim can be caught: they are " +
                 "counted, so hitCount > 0 and MarkImmuneTargets (zero-hit only) never sees them.");
 
-            StringAssert.Contains("\"IMMUNE\"", body,
+            StringAssert.Contains("UiKeys.HudPopImmune", body,
                 "The nullified branch must spawn the §3.2 case 15 label — the same word and colour " +
                 "§2.2's grey bracket just used, so 'nothing will happen' and 'nothing happened' match.");
 

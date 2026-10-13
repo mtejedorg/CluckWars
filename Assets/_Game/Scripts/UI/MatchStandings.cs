@@ -122,6 +122,10 @@ namespace CluckWars.UI
             return -1;
         }
 
+        /// <summary>"1 KO" / "2 KOs" (and "0 KOs"): the post-match row's knockout count, singular only for exactly one.</summary>
+        public static string KoText(int kos) =>
+            UiText.Format(kos == 1 ? UiKeys.PostmatchKosOne : UiKeys.PostmatchKosMany, ("n", kos));
+
         /// <summary>
         /// The line under the banner. Normally the winner's class. When the winner shares 1st with
         /// someone (equal shown food) it names how the tie was settled, using what GameManager

@@ -78,7 +78,7 @@ namespace CluckWars.Tests
         [Test]
         public void Sheet_Copy_IsTheBriefsWording()
         {
-            Assert.AreEqual("Leave match?", UiText.Get(UiKeys.LeaveTitle));
+            Assert.AreEqual("LEAVE MATCH?", UiText.Get(UiKeys.LeaveTitle));
             Assert.AreEqual("Paused. Your bird waits right here.", UiText.Get(UiKeys.LeaveBodySolo));
             Assert.AreEqual("The match keeps going without you.", UiText.Get(UiKeys.LeaveBodyMp));
             Assert.AreEqual("KEEP PLAYING", UiText.Get(UiKeys.LeaveKeep));

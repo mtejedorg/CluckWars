@@ -47,7 +47,7 @@ system below is tuned against this number.
 PICK class + passive + abilities → SPAWN at your base corner → farm the tiered piles
 → CARRY food home → DEPOSIT at base → REPEAT
                          ↕
-   STEAL from loaded rivals · CONTROL them (slow/root/stun) · DEFEND your haul
+   STEAL from loaded rivals · CONTROL them (slow/stuck/stun) · DEFEND your haul
 ```
 
 **Win condition**
@@ -418,7 +418,7 @@ instead of collects.
 2026-08-21: *"Speedy can use control on other chickens and escape just by having more speed.
 Speedy with a jump feels unfair."* Speedy already answers two currencies by itself: **escape**
 (highest Move Speed in the roster, and Speed Burst multiplies it further) and **denial** (three
-Control abilities — Root Egg, Feather Trap, Feather Aura). Traversal would be a third with
+Control abilities — Sticky Egg, Feather Trap, Feather Aura). Traversal would be a third with
 nothing traded for it, and the map would stop constraining the fastest chicken in the game.
 
 The line is *"no ignoring terrain"*, not *"no mobility"* — Speed Burst is deliberately legal,
@@ -442,10 +442,10 @@ current, shipped state.
 |---|---|---|---|
 | **Warrior** | The Brute (Bully) | Steals bigger, + cargo room to hold it | **Scrap** (steal on contact) |
 | | The Relentless | Every move except Peck recharges 25% faster | **Headbutt** (shove + stagger, low cd) |
-| **Speedy** | The Agile (Slippery) | Slows, roots and stuns end 40% sooner | ⏳ *pending — a Peck variant* |
+| **Speedy** | The Agile (Slippery) | Slows, stuns and getting stuck end 40% sooner | ⏳ *pending — a Peck variant* |
 | | The Anxious (Featherfoot) | Immune to the pile-slow | ⏳ *pending — a Peck variant* |
 | **Fatty** | The Hauler (Hoarder) | Carries at least a full win's worth | ⏳ *pending — a Peck variant* |
-| | The Boulder (Bulwark) | Knockback cut by 75%; slows, roots and stuns end 35% sooner | **Ground Quake** (stomp roots the area) |
+| | The Boulder (Bulwark) | Knockback cut by 75%; slows, stuns and getting stuck end 35% sooner | **Ground Quake** (stomp leaves the area stuck) |
 | **Assassin** | The Reaper (Spoiler) | Banks a bonus if the clock expires with no winner | **Death Mark** (the execute, §6.4) |
 | | The Burglar (Thief) | Every steal takes 1.6x more | **Sneaky Steal** |
 
@@ -507,7 +507,7 @@ what he's actually playing.
 | State | Move | Cast abilities | Collect | Source |
 |---|---|---|---|---|
 | **Slowed** | reduced | ✅ | ✅ | collision / pile / slow abilities |
-| **Rooted** | ❌ | ✅ | ❌ | trap abilities |
+| **Stuck** (rooted) | ❌ | ✅ | ❌ | trap abilities |
 | **Stunned** | ❌ | **❌** | ❌ | stun abilities (Ambush, Wing Slam) |
 
 Stun is the only state that locks *casting* — which is exactly why it's the qualifier for
@@ -634,10 +634,10 @@ shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 | | Speed Burst 💨 *(moved from Common)* | 6 s | A 1.5 s sprint at 1.5x movement speed. Speedy-only now — a universal sprint erased the "fastest in the game" claim. |
 | **Fatty** | Belly Flop 🫃 | 10 s | Launches his whole mass forward and lands hard, stunning rivals within 4 m for 1.4 s — the justified jump: long telegraph, shortest jump tier, payoff on landing not travel. |
 | | Ground Quake 🌋 *(Bulwark signature)* | 9 s | A stomp that pins everyone within 4.5 m in place for 1.8 s — reachable pre-emptively while guarding, not just as a Retreat reflex. |
-| | Immovable 🧱 | 12 s | Plants himself for 3 s. Nothing stuns, roots, slows or shoves him (immunity, not resistance). Does not clear control already on him — spent in anticipation, not as an escape. |
+| | Immovable 🧱 | 12 s | Plant yourself for 3 s. You can't be stunned, slowed, stuck or shoved (immunity, not resistance). Does not clear control already on him — spent in anticipation, not as an escape. |
 | | Roll & Push 🌀 | 3 s | Rolls forward at 2x speed for 0.8 s, shoving chickens out of the path. |
-| | Root Egg 🌱 | 7 s | Drops an egg; the first chicken to step on it roots for 2 s. |
-| | Spine Coat 🦔 | 8 s | For 2 s, anyone who hits you loses 4 food to you and is knocked away. |
+| | Sticky Egg 🌱 | 7 s | Drops a sticky egg; the first chicken to step on it is STUCK for 2 s. (Was "Root Egg"; the C# type `RootEggAbilitySO` and asset keep the old name.) |
+| | Spine Coat 🦔 | 8 s | For 2 s, any rival who bumps into you (comes within the collision radius) loses 4 food to you and is knocked away. Triggers on proximity, not on being hit. |
 | | Turtle Mode 🐢 | 8 s | Shuffles along at a turtle crawl - 25% speed for 2 s. |
 | **Assassin** | Ambush 🗡️ | 10 s | Stuns rivals within 3.6 m for 1 s — sets up his own execute. |
 | | Doppelganger 👥 | 11 s | Decoy copy beside you for 4 s that soaks attacks. |
@@ -653,13 +653,13 @@ column above states their design intent, not what ships. The HP-removal commit (
 deleted their `DamageResistance` / `DamageImmune` and left both as "no-op stubs for plan 4";
 no control resistance or invulnerability was ever added. In code, Turtle Mode only sets
 quarter move speed (`TurtleModeAbilitySO`) and Egg Shell only locks movement
-(`EggShellAbilitySO`) — stuns, roots, knockback and steals all land through both. Their
+(`EggShellAbilitySO`) — stuns, sticky eggs, knockback and steals all land through both. Their
 in-game descriptions (`Assets/_Game/Data/Abilities/*.asset`) were rewritten 2026-09-12 to
 describe what ships, and Roll & Push's leftover "No damage." was dropped in the same pass.
 Restoring a real defensive effect is an open design decision, to be solved against the
 Oracle rather than hand-tuned.
 
-Zones (Feather Trap, Root Egg) drop **at the caster's feet** and never affect their own
+Zones (Feather Trap, Sticky Egg) drop **at the caster's feet** and never affect their own
 caster — "lay it as you flee."
 
 ### 7.3 Cooldown tiers
@@ -862,7 +862,7 @@ badge somewhere.
 |---|---|---|---|---|
 | **Free** | ✅ | ✅ | ✅ | Nothing marked. |
 | **Slowed** | reduced | ✅ | ✅ | Stick tints cyan with a **`×0.45`** magnitude label. Ability buttons untouched — casting is unaffected, and greying them would say the opposite of the truth. |
-| **Rooted** | ❌ | ✅ | ❌ | Stick greys out and shows a **⛓** shackle. Ability buttons stay normal — **you can still cast while rooted**, and that is a real tactical option the UI must not hide. |
+| **Stuck** (rooted) | ❌ | ✅ | ❌ | Stick greys out and shows a **⛓** shackle. Ability buttons stay normal — **you can still cast while rooted**, and that is a real tactical option the UI must not hide. |
 | **Stunned** | ❌ | **❌** | ❌ | **Every** ability hex takes a red wash and a **✕**; the stick greys. Stun is the only state that locks casting — which is exactly why it's the qualifier for the Assassin execute (§6.4). |
 
 Alongside the controls, a **status strip** above the joystick lists every currently active

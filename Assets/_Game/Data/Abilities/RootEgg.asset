@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1, type: 3}
   m_Name: RootEgg
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.RootEggAbilitySO
-  DisplayName: Root Egg
-  ShortLabel: REG
-  Description: Drops an egg that roots the first chicken to step on it for 2s.
+  DisplayName: Sticky Egg
+  ShortLabel: STKY
+  Description: Drops a sticky egg. The first chicken to step on it is stuck for 2s.
   AccentColor: {r: 0.65, g: 0.45, b: 0.1, a: 1}
   Category: 1
   TerrainTraversal: 0

@@ -266,6 +266,7 @@ namespace CluckWars.UI
             var doc = GetComponent<UIDocument>();
             _root = doc.rootVisualElement;
             if (_root == null) return;
+            NavFocusRing.Attach(_root);
             // Build next frame so it doesn't matter whether UIDocument.OnEnable ran first.
             _root.schedule.Execute(BuildAll).ExecuteLater(0);
         }
@@ -1008,7 +1009,7 @@ namespace CluckWars.UI
             });
             if (!valid) return;
             Bind<Label>(_mainMenu, "PlayAgainSub", l => l.text = UiText.Format(UiKeys.BtnPlayAgainSub,
-                ("cls", ClassShortName(setup.Class)), ("perk", setup.Passive.DisplayName.ToUpperInvariant())));
+                ("cls", ClassShortName(setup.Class)), ("role", RoleName(setup.Class))));
         }
 
         private void OnPlayAgainFromMenu()

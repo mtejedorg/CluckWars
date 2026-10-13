@@ -304,6 +304,7 @@ namespace CluckWars.UI
             var doc = GetComponent<UIDocument>();
             _root = doc != null ? doc.rootVisualElement : null;
             if (_root == null) return; // UIDocument not ready yet — retry next frame.
+            NavFocusRing.Attach(_root);
 
             _matchEndOverlay   = _root.Q<VisualElement>("MatchEndOverlay");
             _lobbyOverlay      = _root.Q<VisualElement>("LobbyOverlay");
@@ -1006,7 +1007,7 @@ namespace CluckWars.UI
             row.Add(food);
 
             // Knockouts ("{n} KO"); the whole column hides via .cw-me-rows--no-ko while nobody has one.
-            var stats = new Label(UiText.Format(UiKeys.PostmatchKos, ("n", e.Kills)));
+            var stats = new Label(MatchStandings.KoText(e.Kills));
             stats.AddToClassList("cw-me-rowstats");
             row.Add(stats);
 

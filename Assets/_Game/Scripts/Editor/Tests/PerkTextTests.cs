@@ -37,10 +37,10 @@ namespace CluckWars.Tests
                     return (thief, thief);
                 case SlipperyPassiveSO s:
                     return ($"Slows and stuns end {Pct(1.0 - s.DurationMultiplier)}% sooner.",
-                            "Covers slows, roots and stuns.");
+                            "Covers slows, stuns and getting stuck.");
                 case BulwarkPassiveSO w:
                     return ("Barely budges when shoved.",
-                            $"Knockback cut by {Pct(1.0 - w.KnockbackMultiplier)}%. Slows, roots and stuns end {Pct(1.0 - w.DurationMultiplier)}% sooner.");
+                            $"Knockback cut by {Pct(1.0 - w.KnockbackMultiplier)}%. Slows, stuns and getting stuck end {Pct(1.0 - w.DurationMultiplier)}% sooner.");
                 case HoarderPassiveSO h:
                     int cap = (int)Math.Round(h.MinimumCapacity, MidpointRounding.AwayFromZero);
                     return ($"Carry {cap} food in one trip.", $"Carries at least {cap} food.");
@@ -108,7 +108,7 @@ namespace CluckWars.Tests
                 hoarder.MinimumCapacity = 55f;
 
                 Assert.AreEqual("Moves recharge 50% faster.", relentless.PerkLine());
-                Assert.AreEqual("Knockback cut by 90%. Slows, roots and stuns end 50% sooner.", bulwark.PerkDetail());
+                Assert.AreEqual("Knockback cut by 90%. Slows, stuns and getting stuck end 50% sooner.", bulwark.PerkDetail());
                 Assert.AreEqual("Carry 55 food in one trip.", hoarder.PerkLine(),
                     "The Hoarder line must carry {cap} from MinimumCapacity, not a fixed phrase.");
             }
@@ -133,6 +133,21 @@ namespace CluckWars.Tests
                 return;
             }
             Assert.Fail("No Spoiler in the ability registry.");
+        }
+
+        [Test]
+        public void RelentlessAsset_Description_IsTheLinePlusTheDetail_WithTheCurrentNumbers()
+        {
+            // Round-4 finding 18: the asset said "Every move except Peck recharges 25% faster." while the menu line said
+            // "Moves recharge 25% faster." Pinned like Spoiler: the stored text is the two templates, joined.
+            foreach (var p in ShippedPassives(out var cfg))
+            {
+                if (!(p is RelentlessPassiveSO r)) continue;
+                Assert.AreEqual($"Moves recharge {Pct(1.0 - r.CooldownMultiplier)}% faster. Applies to every move except Peck.", r.Description);
+                Assert.AreEqual(r.PerkLine(cfg) + " " + r.PerkDetail(cfg), r.Description);
+                return;
+            }
+            Assert.Fail("No Relentless in the ability registry.");
         }
 
         [Test]

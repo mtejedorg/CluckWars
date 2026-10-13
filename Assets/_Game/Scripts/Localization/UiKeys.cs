@@ -26,7 +26,7 @@ namespace CluckWars.Localization
         public const string BtnJoin = "btn.join";
         public const string BtnAbilityLab = "btn.abilityLab";
         public const string BtnPlayAgain = "btn.playAgain";
-        [UiArgs("cls", "perk")] public const string BtnPlayAgainSub = "btn.playAgain.sub";
+        [UiArgs("cls", "role")] public const string BtnPlayAgainSub = "btn.playAgain.sub";
         public const string BtnBackToLobby = "btn.backToLobby";
         public const string BtnBackToBarn = "btn.backToBarn";
 
@@ -203,7 +203,8 @@ namespace CluckWars.Localization
         [UiArgs("n")] public const string PostmatchTargetReached = "postmatch.target.reached";
         [UiArgs("n")] public const string PostmatchTargetTimeout = "postmatch.target.timeout";
         public const string PostmatchHostOnly = "postmatch.hostOnly";
-        [UiArgs("n")] public const string PostmatchKos = "postmatch.kos";
+        [UiArgs("n")] public const string PostmatchKosOne = "postmatch.kos.one";
+        [UiArgs("n")] public const string PostmatchKosMany = "postmatch.kos.many";
         [UiArgs("cls")] public const string PostmatchWinSub = "postmatch.winSub";
         public const string PostmatchNoWinner = "postmatch.noWinner";
 
@@ -243,6 +244,15 @@ namespace CluckWars.Localization
         public const string HudEventRestock = "hud.event.restock";
         /// <summary>Grey floating pop over a victim whose steal was refused by the steal-proof state.</summary>
         public const string HudPopSafe = "hud.pop.safe";
+        public const string HudPopStun = "hud.pop.stun";
+        /// <summary>The one kid word for root / pin (Maestro, round 4 decision 8).</summary>
+        public const string HudPopStuck = "hud.pop.stuck";
+        public const string HudPopSlow = "hud.pop.slow";
+        public const string HudPopImmune = "hud.pop.immune";
+        public const string HudPopFull = "hud.pop.full";
+        public const string HudStatusStun = "hud.status.stun";
+        public const string HudStatusStuck = "hud.status.stuck";
+        public const string HudStatusSlow = "hud.status.slow";
         public const string HudHintHoldTouch = "hud.hint.hold.touch";
         public const string HudHintHoldPad = "hud.hint.hold.pad";
         public const string HudHintHoldKeys = "hud.hint.hold.keys";
