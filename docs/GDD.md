@@ -54,6 +54,12 @@ PICK class + passive + abilities → SPAWN at your base corner → farm the tier
 - First to bank **40 food** at base wins immediately, OR
 - Most food banked when the **45 s** timer expires (tie-break: food → kills → lower corner
   index).
+- **Ties at the top (Phase 7).** The corner-index rule only decides the stored winner (stats);
+  the player is never told a coin-flip won. If food is level at the top and KOs do not settle it,
+  the end screen reads **"TIED AT THE TOP!"** ("Share the crown!") and **every tied-1st bird is
+  crowned**; there is no "{name} WINS!". If the tie is settled by KOs the banner stays
+  "{name} WINS!" with "Tied 1st · won on KOs". A 4-way tie at the top shows three birds on the
+  podium (the standings board lists all four).
 
 **Comeback event — the last 10 s** (`MatchConfig.ComebackEventSecondsLeft` = 10). Once per
 round, when 10 playable seconds are left (never during the 3-2-1-GO intro), the authority rolls
@@ -500,7 +506,8 @@ Cargo transfers **directly** attacker←→victim — nothing ever drops on the 
 formula self-regulates: a **loaded thief cannot steal** (no free space), so theft is a
 rhythm (steal → bank → return), not a drain. Fatty's 35 cargo can only leave in ≤10–14
 bites, so he *bleeds* under pressure instead of popping, and his defensive abilities are
-what he's actually playing.
+what he's actually playing. A **steal-proof** bird (Egg Shell, Turtle Mode, §7.2) refuses every
+steal outright: the thief is not credited, so the formula never runs.
 
 ### 6.3 Control ladder
 
@@ -512,7 +519,7 @@ what he's actually playing.
 
 Stun is the only state that locks *casting* — which is exactly why it's the qualifier for
 the Assassin execute. Stun duration is authored per-ability (Assassin Ambush 1.0 s, Warrior
-Wing Slam 1.5 s). **Slow sources** (collision, pile, ability) are tagged separately so
+Wing Slam 1.5 s). **Protections:** control immunity (Immovable, Egg Shell) stops the whole ladder; **steal-proof** (Egg Shell, Turtle Mode) is separate and only stops cargo being taken (§7.2). **Slow sources** (collision, pile, ability) are tagged separately so
 passives like Slippery can target one without the others.
 
 ### 6.4 The Assassin execute (the only hard removal)
@@ -532,7 +539,8 @@ it at all, cannot hand-pick it, and cannot execute.
 
 On success the victim's **entire cargo transfers to the Assassin as a capacity-exempt
 "bounty bag"** (he becomes a courier of a stolen win) and the victim is removed ~2 s, then
-respawns empty. On failure Death Mark takes a **reduced cooldown**, so he re-marks fast.
+respawns empty. (A **steal-proof** victim keeps its load: the execute still removes it and pays
+the bounty, but nothing transfers.) On failure Death Mark takes a **reduced cooldown**, so he re-marks fast.
 Stun lives in exactly two classes (Assassin + Warrior), which is what makes the deny/enable
 counterplay reachable.
 
@@ -619,7 +627,7 @@ shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 | | Ability | Cooldown | Effect |
 |---|---|---|---|
 | **Shared** | Peck 🐦 | 0.8 s | Take a beakful from the pile you're standing on. Forced for every forager (§7.1). |
-| | Egg Shell 🥚 | 8 s | Seals you in an egg for 2 s - you cannot walk or turn. |
+| | Egg Shell 🥚 | 8 s | "Full shell": hide in an egg for 2 s. You can't move, but nobody can push you, stop you or steal your food (control immunity + steal-proof for the 2 s). |
 | **Warrior** | Cluck Shock ⚡ | 7 s | A shockwave that shoves every rival within 4.5 m away. |
 | | Dive Bomb 🪽 | 6 s | Diving lunge, robs 8 food from rivals on contact. |
 | | Headbutt 🐏 *(Relentless signature)* | 4 s | Shoves rivals up to 3.6 m ahead and staggers them 0.35 s — deliberately weaker than Cluck Shock; the shortest cooldown pays for it. |
@@ -638,7 +646,7 @@ shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 | | Roll & Push 🌀 | 3 s | Rolls forward at 2x speed for 0.8 s, shoving chickens out of the path. |
 | | Sticky Egg 🌱 | 7 s | Drops a sticky egg; the first chicken to step on it is STUCK for 2 s. (Was "Root Egg"; the C# type `RootEggAbilitySO` and asset keep the old name.) |
 | | Spine Coat 🦔 | 8 s | For 2 s, any rival who bumps into you (comes within the collision radius) loses 4 food to you and is knocked away. Triggers on proximity, not on being hit. |
-| | Turtle Mode 🐢 | 8 s | Shuffles along at a turtle crawl - 25% speed for 2 s. |
+| | Turtle Mode 🐢 | 10 s | "Shell walk": pull into your shell for 3 s. You walk at half speed (0.5x), but nobody can steal your food (steal-proof). Still stunnable, stuck-able and pushable; no damage resistance (the dead `DamageResistance` field is gone). |
 | **Assassin** | Ambush 🗡️ | 10 s | Stuns rivals within 3.6 m for 1 s — sets up his own execute. |
 | | Doppelganger 👥 | 11 s | Decoy copy beside you for 4 s that soaks attacks. |
 | | Invisibility 👻 | 8 s | Fades you to a ghostly outline for 4 s. Using a move breaks it. (Assassin-only now — was also Speedy.) |
@@ -648,16 +656,28 @@ shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 | | Snatch 🤏 *(moved from Common)* | 3 s | Robs 5 food from every rival within 4.3 m ahead and shoves them back. Assassin-only now — a universal AoE steal is exactly the Assassin's core, and diluted the class. |
 | | Sneaky Steal 🤏 *(Thief signature)* | 5 s | Yanks 6 food from the nearest carrier within 5.4 m. |
 
-**Turtle Mode and Egg Shell are unimplemented on their defensive half.** The Effect
-column above states their design intent, not what ships. The HP-removal commit (`468bf1d`)
-deleted their `DamageResistance` / `DamageImmune` and left both as "no-op stubs for plan 4";
-no control resistance or invulnerability was ever added. In code, Turtle Mode only sets
-quarter move speed (`TurtleModeAbilitySO`) and Egg Shell only locks movement
-(`EggShellAbilitySO`) — stuns, sticky eggs, knockback and steals all land through both. Their
-in-game descriptions (`Assets/_Game/Data/Abilities/*.asset`) were rewritten 2026-09-12 to
-describe what ships, and Roll & Push's leftover "No damage." was dropped in the same pass.
-Restoring a real defensive effect is an open design decision, to be solved against the
-Oracle rather than hand-tuned.
+**Egg Shell and Turtle Mode have a real defensive half (Phase 7, Maestro decision 6).** Both
+grant the new **steal-proof** state (`ChickenController.IsStealProof` / `GrantStealProof`, a
+networked timer; recasting keeps the later end). While steal-proof, nothing can take the bird's
+cargo: Snatch, Sneaky Steal, Scrap, Dive Bomb / Roll & Trample, Spine Coat's steal-back and Death
+Mark's execute transfer all check it *before* crediting the thief, so no food is created or
+duplicated; the victim's side re-checks in `RPC_DrainStolen` / `RPC_TransferAllToBountyBag`
+(sub-RTT race, logged; a refused optimistic drain is refunded). What it blocks and what it does
+not:
+
+- **Snatch** takes nothing from a steal-proof bird but still shoves it (unless it is also
+  control-immune, as in Egg Shell). Nearest-target steals (Sneaky Steal, Scrap) do not fall
+  through to the next rival.
+- **Death Mark's execute** still removes the bird for ~2 s and still pays its execute bounty,
+  but the victim's load is not transferred.
+- **Egg Shell** is the strongest form: movement locked, control-immune (the same control-immunity
+  timer as Immovable) and steal-proof, for its 2 s (cooldown 8 s, unchanged).
+- **Turtle Mode** is steal-proof only. Slows, stuns, sticky eggs and shoves still land. Values
+  changed with Maestro's approval: duration 2.0 -> 3.0 s, cooldown 8 -> 10 s, speed 0.25 -> 0.5x.
+- **Telegraph:** a rival aiming a steal at a steal-proof bird sees the grey no-effect mark and a
+  **SAFE** pop (`hud.pop.safe`), the way Immovable shows IMMUNE.
+- **Bots** raise a shell when a rival with a steal ability is within 5.4 m and the bot carries
+  5 or more food.
 
 Zones (Feather Trap, Sticky Egg) drop **at the caster's feet** and never affect their own
 caster — "lay it as you flee."
@@ -682,16 +702,17 @@ as cooling). Bots still cast one move at a time.
 **Same kind of effect never stacks: the strongest active value wins.** Example: Ruffle
 (x1.5) then Speed Burst (x1.5) is still x1.5, not x2.25. Each move keeps its own timer, so
 when the stronger one ends the weaker one is still in force. **Different kinds both apply**
-(Turtle 0.25 speed x Roll & Push 2.0 speed = 0.5, because a speed boost and a self-slow are
+(Turtle 0.5 speed x Roll & Push 2.0 speed = 1.0, because a speed boost and a self-slow are
 different kinds).
 
 | Kind | How several are resolved | Moves |
 |---|---|---|
 | Self speed boost | highest | Speed Burst 1.5, Ruffle 1.5, Shadowstep 3.0, Roll & Push 2.0 |
-| Self speed penalty | lowest | Turtle Mode 0.25 |
+| Self speed penalty | lowest | Turtle Mode 0.5 |
 | Stealth opacity | lowest | Invisibility, Smoke Roost (the fade) |
 | Movement lock | any | Egg Shell, Peck |
-| Control immunity | later expiry | Immovable |
+| Control immunity | later expiry | Immovable, Egg Shell |
+| Steal-proof | later expiry | Egg Shell, Turtle Mode |
 | Steal-back | any; highest amount | Spine Coat |
 | Deposit rate | highest | Quick Drop 4.0 |
 | Wall-phasing tier | highest holder (Barge < Vault < Blink) | the traversal moves |
@@ -707,8 +728,10 @@ is an opener for Sneaky Steal / Snatch / Ambush, not a 4 s cast lock.
 **Combos that are now legal on one bird** (flagged for balance, no value changed): Roll &
 Push + Spine Coat robs on proximity (1.2 m), not on being hit; Immovable + Roll & Push is
 a control-immune charge; Speed Burst + Feather Aura is about 3x relative speed against
-chasers inside 5.4 m for 1.5 s. Egg Shell and Turtle Mode protect nothing today (above), so
-there is no "invulnerable and fast".
+chasers inside 5.4 m for 1.5 s. Egg Shell and Turtle Mode protect cargo since Phase 7 (Egg Shell
+is also control-immune; neither has any damage resistance). **Watch in playtest (no caps now):**
+Fatty Egg Shell + Turtle Mode back to back (steal-proof about 5 of every 10 s), Turtle +
+Roll & Push + Spine Coat, Immovable + Turtle, and Egg Shell inside your own base.
 
 ---
 
@@ -782,19 +805,21 @@ the same `WouldAffect` predicate). Release = use it.
 Rivals see only the glow at your feet — a wind-up tell, not your area. That asymmetry is
 deliberate: counterplay ("he's charging something, disengage") without a solved puzzle.
 
+**The preview is honest (Phase 7).** The ground shape, the dashed / solid state, the target marks and the gold in-range pip on the hex all use the direction the release will use: your explicit aim (mouse / right stick), else the touch soft-lock pick, else your facing. While a move is held it is drawn as a bold cream-filled shape (about 25%) with an ink under-stroke, and the other range guides dim, so it reads on grass.
+
 **No target is not illegal.** A move that needs a rival in range and has nobody in range
 shows a **cream dashed ring** (a legal state: you may still release). The red-grey wash is
 only for real refusals: stunned, cooling down, slot unavailable.
 
 **Fizzle.** Release a target-gated move with nobody in range and nothing happens: no
 effect, no cooldown, and the slot re-arms after 0.4 s (so you cannot spam it). This
-applies to quick taps too. Other refusals (cooldown, stunned) keep the plain denied bump.
+applies to quick taps too. A fizzle does not turn the bird (it keeps its heading; only a real cast rotates it). Other refusals (cooldown, stunned) keep the plain denied bump.
 
 **Cancelling.** A cancelled hold never fires and never burns the cooldown.
 
 | Input | Cancel |
 |---|---|
-| Touch | Drag your thumb to the screen edge. It arms within 20 dp of a physical edge and disarms past 28 dp. While armed the hex shows an X, the preview goes grey and dashed, the edge glows cream, and the phone gives a 15 ms tick. Release while armed = cancel. |
+| Touch | Drag your thumb to the screen edge. A cancel zone is drawn along the edges as soon as the hold passes the tap threshold (dim), bright on the edge you approach. It arms within 36 dp of a physical edge and disarms past 44 dp. While armed the hex icon dims to 40% under an ink-outlined X, the preview goes grey and dashed, and the phone gives a 15 ms tick. Release while armed = cancel. |
 | Touch, involuntary | A system edge gesture or a lost finger cancels and never fires. |
 | Keyboard / mouse | **Esc** or **right mouse button**. |
 | Gamepad | **B**. |
@@ -814,12 +839,12 @@ your aim.
 
 | Device | Aim |
 |---|---|
-| Mouse | the ground point under the cursor (a cursor that has never moved does not hijack a keyboard player) |
+| Mouse | the ground point under the cursor, live for 1.5 s after the cursor moves; once it has sat idle that long and you steer with WASD, aim falls back to your facing (a cursor that has never moved does not hijack a keyboard player) |
 | Gamepad | right stick: dead zone 0.25, outer 0.95, 150 ms hold; with no aim given, a soft-lock of +-12 deg |
 | Touch | no explicit aim; soft-lock snaps to the rival with the smallest angle to your facing, within +-30 deg; farther than that, the move fizzles |
 
 **Gamepad bindings:** left stick move · right stick aim · RB / RT / LB / LT = slots 1 / 2 /
-3 / 4 · B cancel · Start = Back (opens the Leave sheet). **Keyboard:** WASD move; Q / E / R /
+3 / 4 · B = cancel a hold, and Back in menus, the Leave sheet and the podium · Start = pause (the only button that opens the Leave sheet mid-match). **Keyboard:** WASD move; Q / E / R /
 F (also 1-4 or the arrow keys) = slots 1-4; Esc or right mouse cancels.
 
 **Desktop and pad HUD.** With a keyboard, mouse or gamepad the hexes become an
@@ -956,6 +981,13 @@ Reflects the four committed v0.4 plans (`docs/superpowers/plans/`).
   Leave-match sheet, colour-blind-safe player palette, see-through fence / coop, YOU ring
   (§10). Not verified on hardware: Pixel 9 haptics, a real gamepad, a real mouse cursor,
   two-peer aim replication.
+
+- **Phase 7 (2026-10-13) — shipped.** Round-4 audit fixes: steal-proof state, Egg Shell
+  "Full shell" and Turtle Mode "Shell walk" (§7.2), Root Egg renamed Sticky Egg and one kid word
+  STUCK! (§6.3), Spine Coat text matches the code, ties at the top (§2), Auto-Peck on by default
+  on touch (§10.1), honest preview + visible cancel zone, rival nameplates, calmer arena
+  (darker surround + hedge bank, calmer grass). Not verified on hardware: Pixel 9 touch feel and
+  GPU frame time, a real pad B, Android Back.
 
 **Known gaps:** passive pools (§5.3) still carry the pre-0.4 set; endgame rule deferred;
 the Oracle re-solve rests on the simulator's model refinement (bank a winning load without

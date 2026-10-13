@@ -89,8 +89,12 @@ While the ability button is held:
    Three overlay states:
    - **Valid target** — accent colour, solid bracket. Will be hit.
    - **Immune / no-effect** — grey, dashed bracket, small ⃠ glyph. In the area but
-     the ability will do nothing (Spine Coat reflect, Turtle Mode, already-stunned
-     for a stun, `requireCargo` abilities vs an empty-handed rival).
+     the ability will do nothing (a control move vs an Immovable / Egg Shell bird, a steal vs a
+     **steal-proof** bird in Egg Shell or Turtle Mode, already-stunned for a stun,
+     `requireCargo` abilities vs an empty-handed rival). On a cast the rival gets a grey
+     **SAFE** pop (steal refused) or IMMUNE pop (control refused). Phase 7: Snatch (steal + shove)
+     is marked only when the bird is both steal-proof and control-immune (Egg Shell); against a
+     Turtle the shove still lands.
    - **Self** — never marked. Self-buffs mark the caster's own ring instead.
 3. **Aim rotation** — **once the hold passes `TapHoldThresholdSeconds`**, the
    movement stick rotates the aim instead of translating the chicken, for
@@ -108,8 +112,9 @@ While the ability button is held:
    block reason. Releasing then **cancels without burning cooldown**. **Phase 6:** the
    last valid target walking out of the area is no longer "illegal": the preview goes
    dashed cream, and releasing is a fizzle (§3.3).
-6. **Cancel gesture** — **Phase 6:** drag the thumb to the screen edge (arms within 20 dp
-   of a physical edge, disarms past 28 dp), Esc or right mouse on keyboard, B on pad.
+6. **Cancel gesture** — **Phase 6:** drag the thumb to the screen edge (arms within 36 dp
+   of a physical edge, disarms past 44 dp; **Phase 7:** the zone is drawn as soon as the hold
+   passes the tap threshold, see §11.7), Esc or right mouse on keyboard, B on pad.
    System edge gestures and a lost finger cancel and never fire. Feedback while armed:
    see §11.
 
@@ -251,7 +256,7 @@ Per-ability mapping (**v0.6.1** — changed values marked ⚠ are live balance c
 | Roll Push | ⚠ Capsule | ⚠ 1.05 | ⚠ 4.0 | ⚠ was ForwardCircle r1.8 @1.2; area 10.18 → 11.86 m² (+17%) |
 | Dive Bomb (`RollTrampleAbilitySO`) | Capsule | 2.05 | 3.25 | shipped values, see the reach note below |
 | Feather Trap | ForwardCircle | 3.6 | 4.5 | placed zone, persists 5 s; shipped values |
-| Root Egg | ForwardCircle | 0.8 | 0 | placed zone, at the caster's feet |
+| Sticky Egg (type `RootEggAbilitySO`) | ForwardCircle | 0.8 | 0 | placed zone, at the caster's feet |
 | Feather Aura | Aura | 3.0 | — | follows caster while active |
 | Shadowstep | Jump | landing | tier length | ⚠ `AffectsEnemies = false` — pure mobility, was reporting phantom enemy hits |
 | Speed Burst, Turtle Mode, Invisibility, Spine Coat, Egg Shell, Doppelganger | None | — | — | self-ring pulse only |
@@ -569,7 +574,7 @@ HUD stylesheets; the player rules are in `docs/GDD.md` §10.1.
   can run at once, one ring per hex.
 - **Peck chain.** While `PeckChainActive`, the Peck hex carries a dashed cream ring (18
   dashes, half a lap per second, static under Reduced Motion).
-- **In-range pip.** A gold (#f5c842) pip at the bottom centre of the hex, visible when a rival
+- **In-range pip.** A gold (#f5c842) pip (40 px, Phase 7) at the bottom centre of the hex, visible when a rival
   is inside that slot's shape and the slot is not on cooldown (same 10 Hz verdict that makes
   the ground guide "hot"). 0.2 s scale pop, none under Reduced Motion.
 - **Desktop and pad.** The hexes become a non-clickable information strip with key badges
@@ -604,3 +609,56 @@ The comeback / event banner ("FINAL 10!", "PILES RESTOCKED!") is a wood plaque i
 `MatchOverlays.uxml`. The fence and base coop fade to a screen-door near your bird; at GET
 READY the YOU ring grows x1.6 and pulses and the YOU label scales x1.45 (static under Reduced
 Motion).
+
+## 12. Phase 7 (2026-10-13) - readable holds, honest preview, steal-proof feedback
+
+Round-4 fixes. Values live in `FeedbackTuning`, `HoldCancelRules` and the HUD stylesheets.
+
+### 12.1 Held shape and ink under-stroke (§11.2 amended)
+While a move is held its shape is drawn bold: a cream fill (`HeldFillAlpha` 0.25, eased to 0.10
+while the cancel is armed) along the real aim, with a near-opaque ink under-stroke
+(`PreviewInkUnderStrokeColor`, +0.06 wide) under the solid line, the dashed no-target ring and
+the grey cancel outline. The always-on range guides dim to 0.12 while a hold is live (their own
+ink under-stroke dims with them). The contrast test samples the real ground texture (mean,
+lightest decile, p99), not a flat colour. Bare cream and grey strokes alone are < 3:1 on grass,
+which is why the ink exists. After the calmer-grass pass (ART.md §6.14) the ink stroke is 5.7:1
+on the grass mean.
+
+### 12.2 Honest preview forward
+The ground shape, the dashed / solid state, the target brackets and the hex's in-range pip use
+one direction (`AbilityAimForward`): the resolved explicit aim (mouse / right stick), else the
+touch soft-lock pick, else the bird's facing; it is also what the cast uses on release. A
+fizzle does not rotate the bird. The pip also hides on any real refusal and while the slot is
+re-arming, and a slot that is already running is not offered a preview.
+
+### 12.3 Visible cancel zone (touch)
+Once a hold passes the tap threshold, four edge strips (104 px, a dim ink wash with a cream
+line) appear; the one you approach goes bright cream when armed. Arm band 36 dp, disarm 44 dp
+(`HoldCancelRules`), also evaluated on the down frame. While armed the hex icon dims to 40%
+under an ink-outlined X and the preview goes grey and dashed (§11.3 still applies for the
+haptic tick and sound).
+
+### 12.4 Fizzle puff and small targets
+Fizzle puff: 90 px at the hex's top-right, starts at 0.7 alpha (icon stays readable), scale 0.6
+to 1.35 over 0.3 s (alpha-only under Reduced Motion). In-range pip 40 px (about 17 dp). Settings
+volume sliders: 72 px thumb, full-row drag, a % readout. Leaderboard dots carry a cream ring.
+
+### 12.5 Reduced Motion
+The denied-press and fizzle bump on the hex is skipped under Reduced Motion (it used to ignore
+the setting). The pip pop, the Peck chain dashes, the YOU ring pulse and the countdown slam
+already honoured it.
+
+### 12.6 SAFE pop (steal-proof)
+A steal refused by a steal-proof bird (Egg Shell, Turtle Mode) shows a grey **SAFE** pop
+(`hud.pop.safe`) over that bird, beside the existing IMMUNE pop for refused control. The
+telegraph marks such a target grey and dashed before the cast (§2 case 2). Snatch against a
+Turtle (steal-proof but not control-immune) shows SAFE and still shoves with the normal spark.
+Local only, read from the replicated steal-proof timer; the rare sub-RTT race where the cast
+lands anyway is logged, not shown.
+
+### 12.7 Match-level
+Countdown digit 250 px in the top third; the slam-in peaks at 1.4x (`MenuJuicePolicy.CountdownPeakScale`,
+was 1.7x) so it never reaches the YOU pill. Touch hold hint: one phrase per line, right margin
+130 px clear of the cancel strip ("Hold to see the reach", "Let go to use it", "Slide to the edge
+to cancel"); pad and keys keep the one-line mid-dot copy above the info strip. Pop words (STUN,
+STUCK!, SLOW, IMMUNE, FULL!, SAFE) all come from UiText.

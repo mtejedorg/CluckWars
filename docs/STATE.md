@@ -6,9 +6,63 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
-## 🚧 PHASE 7 IN PROGRESS (2026-10-13): round-4 findings (21) + Maestro decisions 1-8
+## ✅ PHASE 7 COMPLETE (2026-10-13, pending hardware session + builds): round-4 findings (21) + Maestro decisions 1-8 - EditMode 1265/1265
 
-Brief: Maestro round-4 decisions (tie = TIED AT THE TOP + crown all tied-1st; Auto-Peck default on touch; Spine Coat text matches code; combos no change; Egg Shell / Turtle steal-proof; arena framing; STUCK! / Sticky Egg). Chunks: D (steal-proof) -> A (bugs) -> B (readability / honest preview) -> C (copy / UI / palette) -> E (arena) -> F (captures, docs, builds).
+**Commits on `develop`:** `ff19e0a` art prep (Spine Coat hedgehog, Fx_Dust) · `775e32d` chunk D steal-proof, Egg Shell "Full shell", Turtle Mode "Shell walk" · `7cb18c6` security follow-up (steal refund must match a pending credit; execute transfer validates its caller) · `cfe32ef` chunk A input bugs · `a407f9c` chunk B readability + honest preview · `2f84707` chunk C1 nameplates / tie / countdown / hint / Defense / Auto-Peck · `4ea37e1` chunk C2 copy + UI leftovers · `c6ae4cc` chunk E1 out-of-bounds dressing · `7131bd5` chunk E2 calmer grass · `6f3aa2c` chunk F1 hint vs cancel strip, countdown slam, fair frame-time comparison · F2 docs (GDD, FEEDBACK, ART, compendium site, STATE; this commit).
+
+**What a player gets now.**
+- **Safer food.** Egg Shell (2 s, cd 8) is a "Full shell": you cannot move, but nobody can push, stop or steal from you. Turtle Mode (3 s, cd 10, half speed) is a "Shell walk": still stunnable and pushable, but nobody can steal. Steal-proof is its own effect kind; a refused steal shows a grey SAFE; Snatch still shoves, Death Mark still removes but takes no load. Bots raise a shell vs a stealer within 5.4 m when carrying 5+.
+- **Readable holds.** A held move is a bold cream-filled shape with an ink outline on the grass; the cancel zone shows once a hold is past the tap threshold and goes bright when armed (36 / 44 dp); the shape, the dashed / solid state and the in-range pip all use the direction the release will use; a fizzle no longer spins the bird; bigger pip (40 px), fizzle puff (90 px), slider thumb (72 px) with a % readout.
+- **Fair endings.** A dead heat at the top reads "TIED AT THE TOP!" and crowns every tied-1st bird; a KO-decided tie keeps "{name} WINS!" + won on KOs.
+- **Clearer UI.** Rival nameplates are ink pills with a colour dot; the GET READY digit sits in the top third and never covers YOU; Defense icons clear 3:1; one kid word, STUCK!, for root / pin; Root Egg is now Sticky Egg; every ability line is second person and Spine Coat's text matches what it does; themed Settings scrollbar, rounded focus ring only on pad / keys.
+- **Better controls.** Android Back no longer flips the HUD to the desktop layout; the mouse aim drops after 1.5 s idle once WASD is used; pad B backs out of menus / the Leave sheet / the podium (Start = pause); HUD seconds use the invariant culture; Auto-Peck defaults ON on touch devices.
+- **Calmer arena.** Darker, muted out-of-bounds ground with a low hedge bank around the fence; calmer, lower-frequency playable grass.
+
+**Round-4 finding -> chunk / commit.**
+
+| # | Finding | Chunk | Commit |
+|---|---|---|---|
+| 1 | States invisible on grass | B (re-validated by E2) | `a407f9c`, `7131bd5` |
+| 2 | Cancel zone | B | `a407f9c` |
+| 3 | Honest preview | B | `a407f9c` |
+| 4 | Rival nameplates | C1 | `2f84707` |
+| 5 | Android Back -> desktop layout | A | `cfe32ef` |
+| 6 | Mouse-aim latch | A | `cfe32ef` |
+| 7 | Tie + tablet chip cut-off | C1 | `2f84707` |
+| 8 | Countdown covers YOU | C1 (+ F1 slam 1.4x) | `2f84707`, `6f3aa2c` |
+| 9 | Pad B | A | `cfe32ef` |
+| 10 | Fizzle puff | B | `a407f9c` |
+| 11 | Hold hint copy + placement | C1 (+ F1 touch hint clear of cancel strip) | `2f84707`, `6f3aa2c` |
+| 12 | Locale decimals | A | `cfe32ef` |
+| 13 | Defense icon contrast | C1 | `2f84707` |
+| 14 | Spine Coat | C2 (icon: art prep) | `4ea37e1`, `ff19e0a` |
+| 15 | Input seams | A | `cfe32ef` |
+| 16 | Auto-Peck default | C1 | `2f84707` |
+| 17 | Arena framing | E1 + E2 (+ F1 fair measurement) | `c6ae4cc`, `7131bd5`, `6f3aa2c` |
+| 18 | Ability text voice / STUCK / Sticky Egg / pops in UiText | C2 | `4ea37e1` |
+| 19 | Leftovers (LEAVE MATCH?, focus ring, scrollbar, invite card, PLAY AGAIN) | C2 | `4ea37e1` |
+| 20 | Small targets | B | `a407f9c` |
+| 21 | Hardware + fresh builds | F: hardware session and Windows + Android build NOT run yet | - |
+| decision 6 | Egg Shell / Turtle steal-proof | D (+ security hardening) | `775e32d`, `7cb18c6` |
+
+**Deviations / not done.**
+- Chunk B: the cream held-shape fill (25%) is faint on the bright grass; the ink under-stroke carries the contrast (the fill is a bonus). Revisit in the Pixel 9 session.
+- Auto-Peck default follows `Application.isMobilePlatform`: Windows touchscreen laptops default it OFF (a saved choice still wins).
+- A 4-way tie at the top shows only three birds on the podium (the standings board lists all four).
+- The STUCK! pop was not captured live (static copy checked only).
+- The spawn camera pull-in and a bush ring around the arena were not done (see Chunk E part 1: view change / 2 500 tris per bush). GPU frame time is unmeasured; CPU `Camera.Render` showed no regression within noise.
+- Decision 5 (cross-kind combos) deliberately left unchanged.
+- GameManager's corner-order tie-break still names a stored winner (stats only).
+- Finding 21: no fresh Windows + Android build was run in this phase; the hardware session and builds are the next step.
+
+**Watch list for the hardware / playtest session.**
+- Combos (no caps): Fatty Egg Shell + Turtle back to back (steal-proof about 5 of every 10 s); Turtle + Roll & Push + Spine Coat (0.5 x 2.0 = 1.0 speed, steal-proof, robbing on proximity); Immovable + Turtle; Egg Shell inside your own base; plus the older chunk-3 list below.
+- Two-peer checks: the steal refund (a refused optimistic drain returns exactly the food, never twice, `PendingStealLedger`), and a genuine Death Mark execute actually filling the assassin's bounty bag (the assassin lookup was repaired in `7cb18c6`).
+- Known open: `RPC_TransferAllToBountyBag` still writes the assassin's `BountyBag` from the victim's authority (cross-authority write; only right when both share an authority, e.g. bots on the master).
+- Pixel 9: GPU frame time with the hedge + calmer grass (30 fps target), real touch drag on the cancel zone and slider header, the hold hint placement, the focus ring after a real touch / pad press, a real Android Back press, a real pad B, a parked mouse.
+- Docs: compendium (`docs/site/index.html`) updated in F2 from the shipped `.asset` / `UiText.csv` values; it needs a republish to the Artifact URL.
+
+Per-chunk detail below.
 
 ### Chunk A - input bugs (round-4 findings 5, 6, 9, 12, 15) - EditMode 1185/1185
 - **5 Android Back vs HUD layout:** `DesktopInputRules.KeyDownIsActivity` (`Input/AimRules.cs`, end of file); `KeyboardInputProvider.Poll` uses it, so a lone Escape on a mobile platform no longer stamps keyboard activity.
@@ -47,7 +101,7 @@ Brief: Maestro round-4 decisions (tie = TIED AT THE TOP + crown all tied-1st; Au
 ### Chunk D - steal-proof state, Egg Shell "Full shell", Turtle Mode "Shell walk" (decision 6)
 - New `ChickenController.IsStealProof` / `GrantStealProof` (own networked timer, later end wins). Egg Shell now grants control immunity + steal-proof ("Full shell"); Turtle Mode grants steal-proof only (3 s / 10 s cd / 0.5x speed, dead `DamageResistance` removed from the asset).
 - All 6 steal sites gate on `StealRules.CanStealFrom` before self-credit; victim side refuses in `RPC_DrainStolen` and refunds via `ChickenCargo.RPC_RefundRefusedSteal`. `IsEffectNullified` extended (`TargetEffectIncludesSteal/Control`); "SAFE" pop (`hud.pop.safe`). Bots cast a shell when a stealer is within 5.4 m and cargo >= 5.
-- No prefab wiring needed. Compendium site (docs/site/index.html) not yet updated for the new Egg Shell / Turtle Mode numbers and text.
+- No prefab wiring needed. Compendium site (docs/site/index.html) updated in F2 for the new Egg Shell / Turtle Mode numbers and text (needs a republish).
 - Refund path validation: `RPC_RefundRefusedSteal` is honoured only from the victim's state authority, bounded by the single-steal plausibility cap and clamped to held cargo; it does not require the victim to look steal-proof on the thief side (state may lag the RPC).
 - Known, not touched: `RPC_TransferAllToBountyBag` writes the assassin's `BountyBag` from the victim's authority (cross-authority write; only correct when both share an authority, e.g. bots on the master).
 - Security hardening follow-up: `RPC_RefundRefusedSteal` now consumes a pending record (new pure `Gameplay/PendingStealLedger.cs`, 8-slot ring, 1.0 s window = 250 ms RTT x2 + tick slack) written by the one thief-side helper `ChickenCargo.CreditStealAndDrain` (credit + record + drain RPC), which all 5 drain sites use. `RPC_TransferAllToBountyBag` now takes `RpcInfo` and is honoured only from the assassin's state authority while its `AssassinExecute.MarkedTarget` is this chicken OR this chicken is stunned right now (`TryResolveExecutor`; the stun half covers the assassin resetting its mark in the same tick it sends the RPC). Side effect: the transfer used to resolve the assassin's `ChickenCargo` from the `AssassinExecute` id (a type mismatch, so the bounty bag never filled); it now resolves `AssassinExecute` then its `ChickenCargo`. Still open: the cross-authority `BountyBag` write. Watch in a two-peer Death Mark test that a genuine execute transfers the load. Tests: `PendingStealLedgerTests.cs`.

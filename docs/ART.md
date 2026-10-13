@@ -106,6 +106,11 @@ are neutral (`PlayerPalette.Neutral`) with no P#.
 (a sliced sprite behind the text), podium and standings row. USS `Label.cw-you-mark` (`YouMark.uss`).
 HUD leaderboard names are cream; the player colour sits on the dot and the bar only.
 
+**Rival nameplate (Phase 7):** an opaque ink capsule (`PlayerPalette.RivalPillFill`, cream rim) with
+cream text (about 17:1 on any ground) and the player colour as a cream-ringed dot on the left, so
+the colour survives on any ground while the text stays readable. The YOU pill and the rival pill
+slice left / right only. The leaderboard dots carry a cream ring too (P4 teal alone was 2.7:1).
+
 ### Ability Accent Colors & Icons
 
 Each ability has a unique accent color (used on hex buttons, cooldown overlays, and VFX) and an **icon glyph**. The accent is authored per `AbilityBaseSO.AccentColor`; the glyph per `AbilityBaseSO.Icon` (blank falls back to the subclass `DefaultIcon`, surfaced via `ResolveIcon()`). 14 abilities across 4 categories (GDD §7.2). Cooldown tier: **S** = short 3–6 s, **M** = medium 8–12 s.
@@ -118,7 +123,7 @@ Each ability has a unique accent color (used on hex buttons, cooldown overlays, 
 | Control | Roll & Push   | 🌀 | Light Purple| #AB47BC | S |
 | Control | Feather Trap  | 🪤 | Purple      | #9C27B0 | M |
 | Control | Feather Aura  | 💨 | Deep Purple | #8E24AA | M |
-| Control | Root Egg      | 🌱 | Dark Purple | #7B1FA2 | M |
+| Control | Sticky Egg (was Root Egg; ShortLabel STKY) | 🌱 | Dark Purple | #7B1FA2 | M |
 | Defense | Egg Shell     | 🥚 | Light Green | #66BB6A | S |
 | Defense | Turtle Mode   | 🐢 | Green       | #4CAF50 | S |
 | Defense | Spine Coat    | 🦔 | Dark Green  | #43A047 | M |
@@ -512,7 +517,7 @@ Control states attach to the affected chicken **in world space** — never to a 
 | **Stunned** | A stun ability (Wing Slam 1.5 s, Ambush 1.0 s) | 1.0–1.5 s, authored per ability | Cartoon stars circle overhead; body tilts + desaturates; nameplate turns red. Blocks movement, casting and collection — see `ControlRules`. |
 | **Slowed** | Collision / pile / slow ability | 1–4 s (ability-dependent) | Subtle blue tint blob + fading speed-trail behind the chicken; 🐌 on the nameplate. Speedy resists via Slippery. |
 | **Knocked back** | Push abilities (Roll & Push, Spine Coat, Peck) | Instant | Motion lines + ghost trail in the travel direction; no persistent overlay; 💨 flash on the nameplate. Fatty resists via Immovable. |
-| **Rooted** | Root Egg trap | 2–3 s | Vines/roots wrap the legs; 🌱 on the nameplate. Can still cast abilities while rooted. |
+| **Stuck** (rooted) | Sticky Egg trap | 2–3 s | Vines/roots wrap the legs; 🌱 on the nameplate; the pop and status row read STUCK!. Can still cast abilities while stuck. |
 
 Nameplate badge: rounded pill in the player's color (dark red while stunned), holding the state icon + `P#`. All overlays are local, driven by observed `[Networked]` state — never networked themselves.
 
@@ -711,6 +716,32 @@ the cargo readout moved to world space on the chicken (`ChickenWorldBars`, §6.3
 game area is sacred") and no longer exists in the HUD. Siting it by the joystick puts the
 constraint and the control it constrains in one glance. It lives in the existing
 `TouchControls` UIDocument — no new UIDocument, no new PanelSettings.
+
+### 6.14 Arena framing, settings widgets, focus (Phase 7, 2026-10-13)
+
+**Arena.** The out-of-bounds plane `MapSurroundings/SurroundGrass` (`Surround_Grass.mat`) is a
+dark, muted green `(0.15, 0.22, 0.14)` (was `(0.22, 0.34, 0.16)`) so it recedes behind the bright
+arena; four low hedge boxes (`ArenaHedge`, `Hedge_N/S/E/W`, 2 m thick x 1 m high, inner face about
+1.9 m outside the fence; `Surround_Hedge.mat` URP Lit `(0.07, 0.18, 0.08)`, smoothness 0) frame the
+fence. Static, collider-free, shadow-off, one static batch, 48 tris. The playable ground uses
+`Assets/_Game/Art/GrassCalm.png` (blurred, 85% saturation, contrast 40% around the mean, warm
+tint; seamless; `Grass.png` is kept) at tiling 7 (was 10); luminance std 0.154 to 0.037, p99 0.748
+to 0.449, so the ink and cream guides read. Material colour and shader unchanged. Mobile cost:
+batches +2 at a fixed corner, SetPass identical; GPU time still to measure on the Pixel 9.
+Not done: a camera pull-in at GET READY, and a bush ring (about 2 500 tris each, too heavy for 30 fps).
+
+**Ability category fill, Defense.** Mid moss `#80902C` (cream icon 3.3:1, ink label 5.4:1,
+Steal/Defense colour-blind separation 9.4 dE00); `#30460C` stays the text background.
+
+**Settings sheet.** Themed scrollbar: 8 px ink track (rgba 42,26,12 at 0.75), 16 px gold thumb,
+no arrow buttons, 18 px wide gutter. Volume rows are stacked: name and a `%` readout over a
+full-width slider with a 72 px thumb; pressing the header drags too.
+
+**Focus ring.** A rounded (24 px) cream ring shown only after key / pad navigation; a pointer
+or touch press hides it (`NavFocusRing`). **Invite card:** 16 px padding on narrow / short
+layouts. **Tie podium:** every tied-1st bird wears a crown (side crowns built in code, the crowned pods get headroom).
+**Countdown:** the 250 px digit sits
+in the top third, glow 760 px.
 
 ---
 

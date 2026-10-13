@@ -593,6 +593,15 @@ Full gameplay improvement plan implemented, compile-verified, and documented. âœ
 
 ---
 
+## UI audit follow-ups: Phase 6 + Phase 7 (2026-10) âœ… (pending hardware session + builds)
+
+(Note: "Phase 7" here is the 2026-10 UI/feel audit pass, not the older "Phase 7: Game Loop & Balancing" above.)
+
+- [x] Phase 6 (2026-10-13): ability input rework + 21 round-3 findings. See `docs/STATE.md`.
+- [x] Phase 7 (2026-10-13): 21 round-4 findings + Maestro decisions 1-8 (steal-proof Egg Shell / Turtle Mode, TIED AT THE TOP, Auto-Peck on touch, Sticky Egg / STUCK!, arena framing). See `docs/STATE.md` "PHASE 7 COMPLETE".
+- [ ] Pixel 9 + gamepad hardware session (round-4 finding 21), fresh Windows + Android build, GPU frame time on the Mobile tier.
+- [ ] Playtest the stacked defensive combos (Egg Shell + Turtle; Turtle + Roll & Push + Spine Coat) before any cap.
+
 ## Post-Demo Roadmap (TBD)
 
 - **Phase 11:** Dedicated server mode for production (+ UGS Relay if Photon is replaced)
