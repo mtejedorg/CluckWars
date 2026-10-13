@@ -103,6 +103,16 @@ def main():
     print(cs("Press", "StartBtn"))
     wait(("Active",)); time.sleep(4.5)
     try:
+        if os.environ.get("SHOT_ONLY"):
+            # Rounds are 45 s: go straight to the Auto-Peck chain shot while the piles are still full.
+            print(cs("Park")); print(cs("SetCargo", "0")); print(cs("Pref", "1"))
+            for _ in range(30):
+                if "chain=true" in str(cs("Info")):
+                    break
+                time.sleep(0.25)
+            print(" chain for shot:", cs("Info"), cs("ChainRing"))
+            shot("autopeck_chain")
+            return
         print(cs("Pref", "0"))
         print(cs("Park")); time.sleep(1.0)
         print(cs("SetCargo", "0")); print(cs("Info"))

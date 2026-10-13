@@ -5,7 +5,7 @@ Usage (Editor open, Bootstrap.unity the only open scene, not in Play mode):
 
 Drives a solo match, picks a target-gated slot (EvaluateRefusal == NoTarget with the rival far away), then:
   fizzle.png        the slot is held then released with nobody in range: the 0.3 s slash flash + whiff puff are caught
-                    mid-flash (the HUD's own timer is pinned for the shot), no cooldown, ActiveSlot unchanged
+                    mid-flash (the HUD's own timer is pinned for the shot), no cooldown, no slot left running
   cancel_armed.png  the slot is held with the edge-band cancel armed on the right edge: X over the hex, the cream
                     glow strip on the right edge, grey dashed preview
 Then releases while armed through the HUD's own EndHexPointer and prints the cooldown / active slot (must be unchanged).
@@ -46,7 +46,7 @@ public class P6 {
   static FieldInfo F(string n) { return typeof(TouchControlsController).GetField(n, BindingFlags.NonPublic|BindingFlags.Instance); }
   // First slot whose move is target-gated and currently has nobody in range (EvaluateRefusal == NoTarget).
   public static string GatedSlot() { var l = Local(); if (l == null) return "-1"; for (int i = 0; i < 4; i++) if (l.Abilities.GetSlot(i) != null && l.Abilities.EvaluateRefusal(i) == AbilityRefusal.NoTarget) return i.ToString(); return "-1"; }
-  public static string Slots() { var l = Local(); var a = l.Abilities; string s = ""; for (int i = 0; i < 4; i++) s += i + ":" + (a.GetSlot(i) == null ? "-" : a.GetSlot(i).name) + " ref=" + a.EvaluateRefusal(i) + " cd=" + a.CooldownRemaining(i).ToString("0.00") + " rearm=" + a.IsRearming(i) + "; "; return s + "active=" + a.ActiveSlot; }
+  public static string Slots() { var l = Local(); var a = l.Abilities; string s = ""; for (int i = 0; i < 4; i++) s += i + ":" + (a.GetSlot(i) == null ? "-" : a.GetSlot(i).name) + " ref=" + a.EvaluateRefusal(i) + " cd=" + a.CooldownRemaining(i).ToString("0.00") + " rearm=" + a.IsRearming(i) + "; "; return s + "active=" + a.MostRecentActiveSlot; }
   // Holds the flash on screen for the shot: stops the HUD's own 0.3 s timer where it is.
   public static string Pin(string slot) { var h = TouchControlsController.Instance; int s = int.Parse(slot);
     var t = (float[])F("_fizzleTimer").GetValue(h); string was = t[s].ToString("0.00"); if (t[s] >= 0f) t[s] = -1f;
