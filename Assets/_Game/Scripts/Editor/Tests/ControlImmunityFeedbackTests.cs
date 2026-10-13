@@ -330,7 +330,7 @@ namespace CluckWars.Tests
         [Test]
         public void HitFeedback_LabelsANullifiedVictim_InsteadOfSparkingThem()
         {
-            string body = BodyAt(StripComments(Read(HitFeedbackPath)), "private void ConfirmHits(", 2000);
+            string body = BodyAt(StripComments(Read(HitFeedbackPath)), "private void ConfirmHits(", 3200);
 
             int nullifiedAt = body.IndexOf("IsEffectNullified", StringComparison.Ordinal);
             Assert.Greater(nullifiedAt, 0,

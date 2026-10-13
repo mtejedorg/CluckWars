@@ -224,6 +224,10 @@ namespace CluckWars.Gameplay
                 return;
             }
 
+            // Overlay (never returns): a loaded bot with a stealer in reach pulls up a steal-proof
+            // shell if it has one ready.
+            TryStealGuard(cargo);
+
             // Latch ReturnToBase until all cargo is deposited (IP1). Fire the Bank plan
             // once actually on the base — a deposit accelerator is worthless anywhere else,
             // which is exactly why Quick Drop is BotRole.Bank and not Forage.
@@ -547,6 +551,50 @@ namespace CluckWars.Gameplay
             _log?.Debug(Source, $"Cast slot {bestSlot} ('{chosen.name}', role={chosen.ResolveBotRole()}) " +
                 $"for {situation}.");
             return true;
+        }
+
+        /// <summary>
+        /// Phase 7 chunk D: cast Egg Shell / Turtle Mode (whichever is ready) when a rival that owns a
+        /// steal ability is within <see cref="BotTactics.StealGuardRadius"/> and our cargo is worth
+        /// protecting. Silent when it cannot fire: no shell equipped or on cooldown is ordinary.
+        /// </summary>
+        private void TryStealGuard(float cargo)
+        {
+            if (_abilities == null || cargo < BotTactics.StealGuardMinCargo) return;
+
+            var   selfPos = _controller.transform.position;
+            var   all     = ChickenController.ActiveControllers;
+            float nearest = float.MaxValue;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var c = all[i];
+                if (c == null || c == _controller) continue;
+                if (c.Combat != null && (c.Combat.IsRemoved || c.Combat.IsDead)) continue;
+                float dist = PlanarDistance(selfPos, c.transform.position);
+                if (dist >= nearest || dist > BotTactics.StealGuardRadius) continue;
+                if (HasStealAbility(c)) nearest = dist;
+            }
+
+            if (!BotTactics.ShouldStealGuard(cargo, nearest, _controller.IsStealProof)) return;
+
+            for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
+            {
+                var ability = _abilities.GetSlot(slot);
+                if (!BotTactics.IsStealShield(ability) || !_abilities.IsReady(slot)) continue;
+                if (!ability.IsUsable(_controller)) continue;
+                if (!_abilities.BotTryActivate(slot)) continue;
+                _log?.Debug(Source, $"Steal guard: cast slot {slot} ('{ability.name}') with cargo={cargo:0.0}, stealer within {nearest:0.0} m.");
+                return;
+            }
+        }
+
+        private static bool HasStealAbility(ChickenController chicken)
+        {
+            var abilities = chicken.GetComponent<AbilityController>();
+            if (abilities == null) return false;
+            for (int slot = 0; slot < abilities.EquippedSlotCount; slot++)
+                if (BotTactics.IsStealer(abilities.GetSlot(slot))) return true;
+            return false;
         }
 
         private static int IndexInPlan(BotRole[] plan, BotRole role)

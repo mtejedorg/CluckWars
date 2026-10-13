@@ -105,7 +105,7 @@ namespace CluckWars.Localization
         [UiArgs("n", "r")] public const string AbilitySneakyStealDesc = "ability.sneakysteal.desc";
         [UiArgs("secs", "mult")] public const string AbilitySpeedBurstDesc = "ability.speedburst.desc";
         [UiArgs("secs", "n")] public const string AbilitySpineCoatDesc = "ability.spinecoat.desc";
-        [UiArgs("pct", "secs")] public const string AbilityTurtleModeDesc = "ability.turtlemode.desc";
+        [UiArgs("secs")] public const string AbilityTurtleModeDesc = "ability.turtlemode.desc";
 
         // ---- Perks (templated from each passive's own fields) ----
         [UiArgs("pct")] public const string PerkRelentlessLine = "perk.relentless.line";
@@ -240,6 +240,8 @@ namespace CluckWars.Localization
         public const string HudEventUnderdogSurge = "hud.event.underdogSurge";
         public const string HudEventLeaderBounty = "hud.event.leaderBounty";
         public const string HudEventRestock = "hud.event.restock";
+        /// <summary>Grey floating pop over a victim whose steal was refused by the steal-proof state.</summary>
+        public const string HudPopSafe = "hud.pop.safe";
         public const string HudHintHoldTouch = "hud.hint.hold.touch";
         public const string HudHintHoldPad = "hud.hint.hold.pad";
         public const string HudHintHoldKeys = "hud.hint.hold.keys";

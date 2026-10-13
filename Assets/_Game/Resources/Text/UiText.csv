@@ -54,7 +54,7 @@ ability.cluckshock.desc,A shockwave that shoves every rival within {r}m away.
 ability.divebomb.desc,"Hurls itself forward in a diving lunge, robbing {n} food from rivals on contact."
 ability.doppelganger.desc,Spawns a decoy copy beside you for {secs}s to soak up enemy attacks.
 ability.dustkick.desc,Kicks dust backwards: chasers within {r}m slow to {pct}% speed for {secs}s.
-ability.eggshell.desc,Seals you in an egg for {secs}s - you cannot walk or turn.
+ability.eggshell.desc,"Hide in an egg for {secs} seconds. You can't move, but nobody can push you, stop you or steal your food."
 ability.featheraura.desc,Slows every chicken within {r}m to {pct}% speed for {secs}s.
 ability.feathertrap.desc,Throws a feather cloud ahead that lasts {secs}s - chickens in it slow to {pct}% speed.
 ability.feint.desc,A hard sidestep. Walls still stop you.
@@ -75,7 +75,7 @@ ability.snatch.desc,Robs {n} food from every rival within {r}m ahead and shoves 
 ability.sneakysteal.desc,Yanks {n} food from the nearest carrier within {r}m.
 ability.speedburst.desc,A {secs}s sprint at {mult}x movement speed.
 ability.spinecoat.desc,"For {secs}s, anyone who hits you loses {n} food to you and gets knocked away."
-ability.turtlemode.desc,Shuffles along at a turtle crawl - {pct}% speed for {secs}s.
+ability.turtlemode.desc,"Pull into your shell for {secs} seconds. You walk slowly, but nobody can steal your food."
 perk.relentless.line,Moves recharge {pct}% faster.
 perk.relentless.detail,Applies to every move except Peck.
 perk.bully.line,"Steal {steal}% more, carry {cap} more."
@@ -195,6 +195,7 @@ hud.event.goldenPile,GOLDEN PILE!
 hud.event.underdogSurge,UNDERDOG SURGE!
 hud.event.leaderBounty,BOUNTY ON THE LEADER!
 hud.event.restock,PILES RESTOCKED!
+hud.pop.safe,SAFE
 hud.hint.hold.touch,Hold to aim. Let go to use it. Drag to the edge to cancel.
 hud.hint.hold.pad,Hold to aim · Release to use · B to cancel.
 hud.hint.hold.keys,Hold to aim · Release to use · Esc to cancel.

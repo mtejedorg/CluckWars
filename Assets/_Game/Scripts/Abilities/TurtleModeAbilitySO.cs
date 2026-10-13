@@ -8,10 +8,10 @@ namespace CluckWars.Abilities
     {
         public override string DescriptionKey => UiKeys.AbilityTurtleModeDesc;
         public override (string name, object value)[] DescriptionArgs() =>
-            new (string, object)[] { ("pct", Pct(SpeedMultiplier)), ("secs", Num(Duration)) };
+            new (string, object)[] { ("secs", Num(Duration)) };
 
-        [Tooltip("Movement speed scalar while active. 0.25 = quarter speed, slow but still mobile.")]
-        [Range(0.05f, 1f)] public float SpeedMultiplier = 0.25f;
+        [Tooltip("Movement speed scalar while active. 0.5 = half speed, a shell walk.")]
+        [Range(0.05f, 1f)] public float SpeedMultiplier = 0.5f;
 
         // Self-buff, no target area — marks the caster's own ring instead (FEEDBACK.md §2.2).
         public override AbilityAimShape AimShape => AbilityAimShape.None;
@@ -21,6 +21,9 @@ namespace CluckWars.Abilities
         public override void OnActivate(AbilityContext ctx)
         {
             ctx.Controller.Effects.SetMoveSpeed(ctx.Slot, SpeedMultiplier);
+            // "Shell walk": steal-proof for the cast's Duration. Deliberately NO control immunity —
+            // still stunnable, rootable and pushable.
+            ctx.Controller.GrantStealProof(Duration);
         }
 
         public override void OnDeactivate(AbilityContext ctx)

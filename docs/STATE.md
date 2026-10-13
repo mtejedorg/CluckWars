@@ -6,6 +6,19 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🚧 PHASE 7 IN PROGRESS (2026-10-13): round-4 findings (21) + Maestro decisions 1-8
+
+Brief: Maestro round-4 decisions (tie = TIED AT THE TOP + crown all tied-1st; Auto-Peck default on touch; Spine Coat text matches code; combos no change; Egg Shell / Turtle steal-proof; arena framing; STUCK! / Sticky Egg). Chunks: D (steal-proof) -> A (bugs) -> B (readability / honest preview) -> C (copy / UI / palette) -> E (arena) -> F (captures, docs, builds).
+
+### Chunk D - steal-proof state, Egg Shell "Full shell", Turtle Mode "Shell walk" (decision 6)
+- New `ChickenController.IsStealProof` / `GrantStealProof` (own networked timer, later end wins). Egg Shell now grants control immunity + steal-proof ("Full shell"); Turtle Mode grants steal-proof only (3 s / 10 s cd / 0.5x speed, dead `DamageResistance` removed from the asset).
+- All 6 steal sites gate on `StealRules.CanStealFrom` before self-credit; victim side refuses in `RPC_DrainStolen` and refunds via `ChickenCargo.RPC_RefundRefusedSteal`. `IsEffectNullified` extended (`TargetEffectIncludesSteal/Control`); "SAFE" pop (`hud.pop.safe`). Bots cast a shell when a stealer is within 5.4 m and cargo >= 5.
+- No prefab wiring needed. Compendium site (docs/site/index.html) not yet updated for the new Egg Shell / Turtle Mode numbers and text.
+- Refund path validation: `RPC_RefundRefusedSteal` is honoured only from the victim's state authority, bounded by the single-steal plausibility cap and clamped to held cargo; it does not require the victim to look steal-proof on the thief side (state may lag the RPC).
+- Known, not touched: `RPC_TransferAllToBountyBag` writes the assassin's `BountyBag` from the victim's authority (cross-authority write; only correct when both share an authority, e.g. bots on the master).
+- Combos to WATCH in playtest (no caps now): Fatty Egg Shell + Turtle back to back (steal-proof ~5 of every 10 s), Turtle + Roll & Push + Spine Coat, Immovable + Turtle, Egg Shell inside own base.
+
+
 ## ✅ PHASE 6 COMPLETE (2026-10-13): ability input rework + all 21 round-3 findings — EditMode 1128/1128
 
 Commits on `develop` (pushed): `7a3a5a7` art prep · `d9967e3` c1 hex states / instant preview · `cf17ea4` c2 fizzle + edge-band cancel · `9ff97cb` + `cada5c6` c3 concurrent abilities, strongest-wins, stealth breaks on the next move · `01df269` c4 Peck auto-chain + Auto-Peck · `4cfcb0c` c5 aim byte, mouse / right-stick aim, gamepad, soft-lock, Quick Moves · `2dfdd26` c6 haptics, desktop / pad info HUD, settings rows + volumes, hold hint · `b10a112` 7a post-match draw / tie / You chip · `d6286d1` 7b Leave match sheet, music fades, GO scrim, Coop BACK · `3fab082` 7c ability text templated from values · `105e2e1` 7d wood overlays, Coop seats, waiting room, 28 px floor · `c540ee3` 7e CVD player palette + Defense fill · `71784e4` 7f see-through fence / coop + YOU ring · `a52a26b` capture-script upkeep.

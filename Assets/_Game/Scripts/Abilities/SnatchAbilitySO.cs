@@ -51,6 +51,9 @@ namespace CluckWars.Abilities
 
         public override float NominalStealAmount => StealAmount;
 
+        public override bool TargetEffectIncludesSteal => true;
+        public override bool TargetEffectIncludesControl => true; // the shove
+
         /// <summary>Only a cargo-carrier is a valid Snatch target — an empty-handed rival in range now gets the "immune / no-effect" telegraph instead of a knockback that used to land anyway.</summary>
         protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)
         {
@@ -70,8 +73,13 @@ namespace CluckWars.Abilities
                 var targetCtrl = _scratch[i];
                 var targetCargo = targetCtrl.Cargo; // ExtraTargetFilter already guaranteed Cargo > 0
 
+                // Steal-proof victim (Egg Shell / Turtle Mode): skip the steal BEFORE crediting
+                // ourselves — the knockback below is unaffected (ApplyKnockback has its own
+                // control-immunity check).
                 float freeSpace = thiefCargo.Capacity - thiefCargo.Cargo;
-                float stolen = StealMath.Clamp(ResolveStealAmount(StealAmount, thief), freeSpace, targetCargo.Cargo);
+                float stolen = StealRules.CanStealFrom(targetCtrl)
+                    ? StealMath.Clamp(ResolveStealAmount(StealAmount, thief), freeSpace, targetCargo.Cargo)
+                    : 0f;
                 if (stolen > 0f)
                 {
                     thiefCargo.Cargo += stolen;

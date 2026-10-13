@@ -600,5 +600,33 @@ namespace CluckWars.Gameplay
             if (phase != MatchPhase.Endgame) return Mathf.Clamp01(t);
             return Mathf.Clamp01(leading ? t * 0.55f : Mathf.Min(1f, t * 1.20f));
         }
+
+        // ---- Steal guard (Phase 7 chunk D) ------------------------------------
+
+        /// <summary>A rival with a steal ability this close is about to rob a loaded bot (Sneaky Steal's reach).</summary>
+        public const float StealGuardRadius = 5.4f;
+
+        /// <summary>Below this much cargo there is nothing worth hiding.</summary>
+        public const float StealGuardMinCargo = 5f;
+
+        /// <summary>
+        /// Does <paramref name="ability"/> take cargo off a rival? Snatch, Sneaky Steal, Scrap, Dive Bomb
+        /// and Spine Coat declare a nominal steal amount; Death Mark's execute moves the whole load
+        /// (<c>RPC_TransferAllToBountyBag</c>), which has no nominal amount.
+        /// </summary>
+        public static bool IsStealer(AbilityBaseSO ability) =>
+            ability != null && (ability.NominalStealAmount > 0f || ability is MarkKillAbilitySO);
+
+        /// <summary>Is <paramref name="ability"/> a steal-proof shell (Egg Shell, Turtle Mode)?</summary>
+        public static bool IsStealShield(AbilityBaseSO ability) =>
+            ability is EggShellAbilitySO || ability is TurtleModeAbilitySO;
+
+        /// <summary>
+        /// Cast a shell when a loaded bot has a stealer in reach. <paramref name="nearestStealerDist"/>
+        /// is the planar distance to the closest rival owning a steal ability
+        /// (<see cref="float.MaxValue"/> when none).
+        /// </summary>
+        public static bool ShouldStealGuard(float ownCargo, float nearestStealerDist, bool alreadyProof) =>
+            !alreadyProof && ownCargo >= StealGuardMinCargo && nearestStealerDist <= StealGuardRadius;
     }
 }

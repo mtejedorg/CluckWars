@@ -1,5 +1,6 @@
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using CluckWars.Logging;
 using CluckWars.Services;
 using Fusion;
@@ -538,11 +539,23 @@ namespace CluckWars.Visuals
                     // happen" and "nothing happened" are the same sentence twice.
                     if (ability.IsEffectNullified(_controller, victim))
                     {
+                        // A pure-control ability bounced off control immunity: IMMUNE. Anything else
+                        // that is nullified was a steal refused by the steal-proof state: SAFE.
                         FloatingCombatText.Spawn(
                             victim.transform.position + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight,
-                            "IMMUNE",
+                            ability.TargetEffectIsPurelyControl ? "IMMUNE" : UiText.Get(UiKeys.HudPopSafe),
                             FeedbackTuning.NeutralNoEffectColor);
                         continue;
+                    }
+
+                    // Snatch against a Turtle Mode shell: the shove still lands (so the victim gets
+                    // the normal spark below) but the food stayed put. Local pop only.
+                    if (ability.TargetEffectIncludesSteal && victim.IsStealProof)
+                    {
+                        FloatingCombatText.Spawn(
+                            victim.transform.position + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight,
+                            UiText.Get(UiKeys.HudPopSafe),
+                            FeedbackTuning.NeutralNoEffectColor);
                     }
 
                     var victimFeedback = victim.GetComponent<HitFeedback>();

@@ -19,6 +19,10 @@ namespace CluckWars.Abilities
         public override void OnActivate(AbilityContext ctx)
         {
             ctx.Controller.Effects.SetMovementLock(ctx.Slot);
+            // "Full shell": nobody can push, stop or rob a chicken inside the egg. Both windows
+            // are the cast's own Duration; the abilities run on the caster's StateAuthority.
+            ctx.Controller.GrantControlImmunity(Duration);
+            ctx.Controller.GrantStealProof(Duration);
         }
 
         public override void OnDeactivate(AbilityContext ctx)

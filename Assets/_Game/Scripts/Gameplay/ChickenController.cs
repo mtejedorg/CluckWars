@@ -399,6 +399,33 @@ namespace CluckWars.Gameplay
             ControlImmuneTimer = TickTimer.CreateFromSeconds(Runner, seconds);
         }
 
+        /// <summary>
+        /// Steal-proof window (Phase 7 chunk D): while open, nobody can take this chicken's cargo —
+        /// not Snatch, Sneaky Steal, Scrap, Dive Bomb, Spine Coat or a Death Mark execute transfer.
+        /// Its own effect kind, independent of <see cref="IsControlImmune"/>: Egg Shell grants both,
+        /// Turtle Mode only this one (still stunnable, rootable and pushable).
+        /// </summary>
+        /// <remarks>
+        /// <c>[Networked]</c> so every peer agrees: each thief reads <see cref="IsStealProof"/> locally
+        /// BEFORE crediting itself (<see cref="StealRules.CanStealFrom"/>), and the victim's authority
+        /// re-checks it in <c>ChickenCargo.RPC_DrainStolen</c> for the sub-round-trip race.
+        /// </remarks>
+        [Networked] private TickTimer StealProofTimer { get; set; }
+
+        /// <summary>True while a steal-proof window is open. Readable on every peer.</summary>
+        public bool IsStealProof =>
+            Runner != null && !StealProofTimer.ExpiredOrNotRunning(Runner);
+
+        /// <summary>Opens a steal-proof window of <paramref name="seconds"/>. Caster's own StateAuthority only.</summary>
+        /// <remarks>Never shortens a window already open: a re-grant keeps whichever expiry is LATER.</remarks>
+        public void GrantStealProof(float seconds)
+        {
+            if (Runner == null || seconds <= 0f) return;
+            float open = StealProofTimer.ExpiredOrNotRunning(Runner) ? 0f : (StealProofTimer.RemainingTime(Runner) ?? 0f);
+            if (!ControlImmunityRules.ShouldReplace(open, seconds)) return;
+            StealProofTimer = TickTimer.CreateFromSeconds(Runner, seconds);
+        }
+
         /// <summary>Seconds of root remaining, for the Aftermath countdown (FEEDBACK.md
         /// §5.1, case 18). 0 when not rooted/expired.</summary>
         public float RootRemaining => RootTimer.ExpiredOrNotRunning(Runner) ? 0f : (RootTimer.RemainingTime(Runner) ?? 0f);
@@ -1274,7 +1301,11 @@ namespace CluckWars.Gameplay
 
                         float attackerFreeSpace = Cargo.Capacity - Cargo.Cargo;
                         float defenderCargo = other.Cargo.Cargo;
-                        float stolen = StealMath.Clamp(StealBackAmount, attackerFreeSpace, defenderCargo);
+                        // Steal-proof victim (Egg Shell / Turtle Mode): no steal, no self-credit.
+                        // The knockback below is unchanged (its own immunity check lives in ApplyKnockback).
+                        float stolen = StealRules.CanStealFrom(other)
+                            ? StealMath.Clamp(StealBackAmount, attackerFreeSpace, defenderCargo)
+                            : 0f;
                         if (stolen > 0f)
                         {
                             // Spine Coat is a steal too, so it names its thief like every other

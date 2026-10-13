@@ -36,6 +36,8 @@ namespace CluckWars.Abilities
 
         public override float NominalStealAmount => StealAmount;
 
+        public override bool TargetEffectIncludesSteal => true;
+
         /// <summary>Only a cargo-carrier is a valid steal target.</summary>
         protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)
         {
@@ -56,6 +58,9 @@ namespace CluckWars.Abilities
             // by distance, so index 0 is always "nearest valid target".
             GatherTargets(thief, _scratch);
             if (_scratch.Count == 0) return;
+            // Nearest target stays the telegraphed target: if it is steal-proof there is no
+            // steal (and no fallback to the next rival).
+            if (!StealRules.CanStealFrom(_scratch[0])) return;
             var target = _scratch[0].Cargo;
             if (target == null) return;
 

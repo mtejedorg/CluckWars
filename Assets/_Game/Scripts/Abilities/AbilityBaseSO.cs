@@ -522,12 +522,33 @@ namespace CluckWars.Abilities
         /// networked field. <c>IsControlImmune</c> is readable everywhere for exactly this
         /// reason.
         /// </remarks>
+        /// <remarks>
+        /// Phase 7 chunk D adds the steal-proof half: a pure-steal ability is nullified by
+        /// <c>IsStealProof</c>; a steal + control ability (Snatch) only when the candidate is
+        /// steal-proof AND control-immune (Egg Shell), because Turtle Mode's shell still lets the
+        /// shove land.
+        /// </remarks>
         public bool IsEffectNullified(Gameplay.ChickenController caster, Gameplay.ChickenController candidate)
         {
-            if (!TargetEffectIsPurelyControl) return false;
             if (candidate == null || candidate == caster) return false;
-            return candidate.IsControlImmune;
+            if (TargetEffectIsPurelyControl) return candidate.IsControlImmune;
+            if (!TargetEffectIncludesSteal) return false;
+            return candidate.IsStealProof && (!TargetEffectIncludesControl || candidate.IsControlImmune);
         }
+
+        /// <summary>
+        /// Does this ability's effect on a target include taking its cargo (<c>RPC_DrainStolen</c>)?
+        /// Declared per ability, like <see cref="TargetEffectIsPurelyControl"/>. A steal-proof
+        /// target (Egg Shell, Turtle Mode) refuses it.
+        /// </summary>
+        public virtual bool TargetEffectIncludesSteal => false;
+
+        /// <summary>
+        /// Does the effect on a target ALSO include a control effect (knockback / stun / root / slow)
+        /// besides the steal? Only meaningful when <see cref="TargetEffectIncludesSteal"/> is true
+        /// (Snatch: steal + shove). A pure-control ability uses <see cref="TargetEffectIsPurelyControl"/>.
+        /// </summary>
+        public virtual bool TargetEffectIncludesControl => false;
 
         /// <summary>
         /// Geometry only: is <paramref name="candidate"/> inside this ability's aim

@@ -601,6 +601,21 @@ namespace CluckWars.Gameplay
                 return;
             }
 
+            // Steal-proof (Egg Shell / Turtle Mode). Every thief checks StealRules.CanStealFrom
+            // before crediting itself, so reaching this point means the shell went up inside one
+            // round trip of the thief's scan (the same sub-RTT race Immovable has). The thief has
+            // ALREADY credited itself, so a bare refusal would duplicate food: send the credit back.
+            if (_controller.IsStealProof)
+            {
+                _log?.Info(Source, $"{name}: steal hit a shell that went up inside one round trip — " +
+                                   $"refunded {amount:0.00} to {thief.name}.");
+                if (thief.Cargo != null)
+                    thief.Cargo.RPC_RefundRefusedSteal(amount, _controller.Id);
+                else
+                    _log?.Error(Source, $"{name}: cannot refund the refused steal — {thief.name} has no ChickenCargo, so {amount:0.00} food was duplicated.");
+                return;
+            }
+
             if (Cargo <= 0f)
             {
                 // Not an attack: the victim banked or lost the load between the thief's scan and
@@ -624,6 +639,47 @@ namespace CluckWars.Gameplay
             StealEventId++;
 
             _log?.Debug(Source, $"Stolen: -{actual:0.00} by {thief.name} → Cargo={Cargo:0.0}.");
+        }
+
+        /// <summary>
+        /// Thief-side half of a refused steal: the victim's authority was steal-proof when the
+        /// drain arrived (see <see cref="RPC_DrainStolen"/>), so the optimistic credit is taken back.
+        /// </summary>
+        /// <remarks>
+        /// Honoured only when the sender is entitled to speak for the named victim: on a local
+        /// invoke the victim must be simulated here, off the wire the sender must be the victim's
+        /// state authority (a bot victim is owned by the master). Same attribution split as
+        /// <see cref="TryResolveThief"/>. The amount is held to the same single-hit bound and
+        /// clamped to the cargo actually held, so a forged refund can at worst remove one
+        /// plausible steal's worth from the chicken it targets.
+        /// </remarks>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_RefundRefusedSteal(float amount, NetworkBehaviourId victimId, RpcInfo info = default)
+        {
+            if (!IsPlausibleAmount(amount, out string amountRejection))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_RefundRefusedSteal({amount:0.00}) from {info.Source} — {amountRejection}");
+                return;
+            }
+
+            if (Runner == null || !Runner.TryFindBehaviour(victimId, out ChickenController victim) ||
+                victim == null || victim.Object == null || !victim.Object.IsValid)
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_RefundRefusedSteal({amount:0.00}) — no live chicken resolves from victim id {victimId}.");
+                return;
+            }
+
+            bool attributable = victim != _controller &&
+                (info.IsInvokeLocal ? victim.Object.HasStateAuthority : victim.Object.StateAuthority == info.Source);
+            if (!attributable)
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_RefundRefusedSteal({amount:0.00}) from {info.Source} — {victim.name} is not a victim it speaks for.");
+                return;
+            }
+
+            float refund = StealRules.RefundAmount(amount, Cargo);
+            Cargo -= refund;
+            _log?.Debug(Source, $"Refunded refused steal: -{refund:0.00} (steal-proof {victim.name}) → Cargo={Cargo:0.0}.");
         }
 
         /// <summary>Magnitude check, with the reason so the caller can log it.</summary>
@@ -748,6 +804,16 @@ namespace CluckWars.Gameplay
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_TransferAllToBountyBag(NetworkBehaviourId assassinId)
         {
+            // Steal-proof victim: the transfer is refused here. The assassin never credited
+            // anything ahead of this RPC (the bag is written below, on this side), so refusing
+            // creates no food. The thief-side gate in AssassinExecute normally stops the call
+            // first; this catches the sub-round-trip race.
+            if (_controller.IsStealProof)
+            {
+                _log?.Info(Source, $"{name}: execute transfer refused — steal-proof (a shell went up inside one round trip).");
+                return;
+            }
+
             float amountToTransfer = Cargo;
             Cargo = 0f;
             if (Runner.TryFindBehaviour(assassinId, out ChickenCargo assassinCargo))

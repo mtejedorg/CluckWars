@@ -123,7 +123,9 @@ namespace CluckWars.Gameplay
                 if (Runner.TryFindBehaviour(MarkedTarget, out ChickenController target))
                 {
                     // Target execute
-                    if (target.Cargo != null)
+                    // A steal-proof target (Egg Shell / Turtle Mode) keeps its cargo; the execute
+                    // itself, the removal and the bounty below are unchanged.
+                    if (target.Cargo != null && StealRules.CanStealFrom(target))
                     {
                         target.Cargo.RPC_TransferAllToBountyBag(Id);
                     }

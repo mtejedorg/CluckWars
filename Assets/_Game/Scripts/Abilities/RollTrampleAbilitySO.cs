@@ -84,6 +84,8 @@ namespace CluckWars.Abilities
         /// </remarks>
         public override float NominalStealAmount => StealAmount;
 
+        public override bool TargetEffectIncludesSteal => true;
+
         /// <summary>Only a cargo-carrier is a valid Trample target.</summary>
         protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)
         {
@@ -102,6 +104,8 @@ namespace CluckWars.Abilities
             GatherTargets(thief, _scratch);
             if (_scratch.Count == 0) return;
 
+            // Nearest target stays the telegraphed target: steal-proof means no steal, no fallback.
+            if (!StealRules.CanStealFrom(_scratch[0])) return;
             var targetCargo = _scratch[0].Cargo;
             if (targetCargo == null) return;
 
