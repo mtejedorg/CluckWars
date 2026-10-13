@@ -569,13 +569,14 @@
    Reduced Motion.
    ============================================================================ */
 /* Round-4 finding 11: on touch the plate is as wide as the hex cluster (cluster spans 95..515 px from the right
-   edge) and sits straight above it, wrapping to two or three lines, so it never reaches toward the bird at screen
+   edge) and sits straight above it, showing one phrase per line (HoldHintRules.Format), so it never reaches toward the bird at screen
    centre on 4:3. Desktop / pad: one line centred above the info strip. */
 .cw-hold-hint-host {
     position: absolute;
     left: 0; right: 0; bottom: 560px;
     align-items: flex-end;
-    padding-right: 40px;
+    /* Clear of the right-edge cancel strip (104 px deep, HoldCancelRules.ZoneDp) plus a 26 px gap. */
+    padding-right: 130px;
 }
 .cw-hud--desktop .cw-hold-hint-host, .cw-hud--pad .cw-hold-hint-host {
     bottom: 160px; align-items: center; padding-right: 0;

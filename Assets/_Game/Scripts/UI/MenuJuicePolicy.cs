@@ -109,14 +109,18 @@ namespace CluckWars.UI
         // ---- In-game intro countdown (3-2-1-GO), presentation only ---------------------------------
         public const float CountdownPopSeconds = 0.22f;
 
-        /// <summary>Numeral scale <paramref name="t"/> seconds after a beat starts: slams in from 1.7 with a little overshoot, then rests.</summary>
+        /// <summary>Scale a countdown numeral starts its slam at. Kept low enough that the scaled digit (3, 2, 1, GO!) never reaches
+        /// the YOU marker below it (Phase 7 F1); the slam undershoots 1 on the way down, never exceeds this.</summary>
+        public const float CountdownPeakScale = 1.4f;
+
+        /// <summary>Numeral scale <paramref name="t"/> seconds after a beat starts: slams in from <see cref="CountdownPeakScale"/> with a little overshoot, then rests.</summary>
         public static float CountdownScale(float t)
         {
             if (t >= CountdownPopSeconds) return 1f;
             float u = Mathf.Clamp01(t / CountdownPopSeconds);
             const float s = 1.2f;                                    // ease-out-back
             float v = u - 1f;
-            return Mathf.LerpUnclamped(1.7f, 1f, 1f + (s + 1f) * v * v * v + s * v * v);
+            return Mathf.LerpUnclamped(CountdownPeakScale, 1f, 1f + (s + 1f) * v * v * v + s * v * v);
         }
 
         // ---- Particles ---------------------------------------------------------------------------

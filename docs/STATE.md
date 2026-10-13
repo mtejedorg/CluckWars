@@ -92,6 +92,22 @@ Commits on `develop` (pushed): `7a3a5a7` art prep · `d9967e3` c1 hex states / i
 - **Mobile tier** (`capture_phase7_arena.py after2`, same method as part 1). Camera.Render CPU ms mean/median/p95: part-1 after 0.558 / 0.530 / 0.766 -> 0.673 / 0.652 / 0.898 (batches 42 -> 45, SetPass 20 -> 20, tris 114 744 -> 123 975). The rise is the random spawn corner (-21.6,21.8 / 22.1,21.8 / 22.1,-21.8: different props in frustum), not the material (same shader, same one sample; texture memory unchanged). Re-measure on the Pixel 9.
 - **Captures.** `Captures/phase7/extra/arena/after2_*` (same views as part 1) and `Captures/phase7/live/hold_on_calm_grass.png`.
 
+### Chunk E fair frame-time comparison + Chunk F1 fixes - EditMode 1265/1265
+- **Fair arena measurement** (`tools/ui_capture/capture_phase7_arena_fair.py`): ONE fixed spawn corner (-21.6, 21.8), bots frozen, Mobile-tier settings applied by script, 3 configs per round x 3 rounds in one play session, 300 `Camera.Render` CPU samples + 300 editor-tick stat samples each. Configs set in memory and restored (`git status` shows no asset change): (a) orig = `GrassFloor` base map `Grass.png` tiling 10, `Surround_Grass` (0.22,0.34,0.16), `ArenaHedge` off; (b) hedge = (a) grass + dark surround + hedge on; (c) current = all on (`GrassCalm.png` tiling 7). Raw: `Captures/phase7/extra/arena/fair_stats.json`.
+
+| Camera.Render CPU ms, mean / median / p95 (avg of 3 rounds) | (a) original | (b) hedge + dark surround | (c) current |
+|---|---|---|---|
+| mean / median / p95 | 0.614 / 0.589 / 0.828 | 0.661 / 0.623 / 0.919 | 0.643 / 0.620 / 0.845 |
+| per round mean | 0.586, 0.656, 0.601 | 0.580, 0.723, 0.679 | 0.703, 0.696, 0.531 |
+| batches (median, rounds 1/2/3) | 45 / 45 / 49 | 47 / 51 / 51 | 47 / 51 / 51 |
+| SetPass | 20 | 20 | 20 |
+| tris (median) | 132 071 / 132 071 / 132 982 | 132 093 / 133 006 / 133 006 | 132 095 / 133 006 / 133 006 |
+
+  Reading: at a fixed corner the hedge adds +2 batches / +22 tris over (a) in the same round and nothing else moves (SetPass identical, tris within 0.02 %). The calmer grass (b -> c) is cost-neutral (same shader, one sample; batches and tris identical per round). CPU spread between rounds of the SAME config (0.53-0.72 ms) is larger than any difference between configs, so no CPU regression is measurable; the batch count also steps 45 -> 49/51 between rounds irrespective of config (dynamic content in frame), so compare within a round. GPU time is not measurable in the Editor: re-measure on the Pixel 9.
+- **F1.1 Hold hint vs cancel strip.** `HoldHintRules.Format` (`Input/HudLayoutRules.cs:~118`) turns the touch copy into one phrase per line (no dots); pad/keys keep the one-line dotted copy; `TouchControlsController.ShowHint` (`:561`) uses it. `.cw-hold-hint-host` right padding 40 -> 130 px (`Styles/TouchControls.uss:~578`): clear of the 104 px cancel strip. Test `Phase7ChunkC1Tests.HoldHint_OnTouch_OnePhrasePerLine_NoDots_AndClearOfTheCancelStrip`. Capture `Captures/phase7/live/hold_on_calm_grass.png`.
+- **F1.2 Countdown digit.** Cause: `MenuJuicePolicy.CountdownScale` slammed in from 1.7x; at peak the 250 px digit's bottom reached the YOU pill. New `MenuJuicePolicy.CountdownPeakScale = 1.4` (`UI/MenuJuicePolicy.cs:~112`), used by the curve; the one `#IntroNumber` label serves 3, 2, 1 and GO!, so all beats share it. Test `Phase7ChunkC1Tests.CountdownDigit_AtPeakSlamScale_NeverReachesTheYouMarker`; `MenuJuicePolicyTests` start-scale assert now reads the constant. Captures (digit pinned at peak scale) `Captures/phase7/extra/f1/getready_digit_{1,2}_at_peak_scale.png`: ~65 px gap above YOU.
+- **Captures re-run:** `Captures/phase7/static` (capture_menu.py), `Captures/phase7/live` (`--live`, files `live_*`), `Captures/phase7/postmatch` (both modes); driver `tools/ui_capture/capture_phase7_f1.py`.
+
 ### Chunk-3 effect kinds (strongest-wins) and notable cross-kind combos
 
 Kinds: self speed boost (max: Speed Burst 1.5, Ruffle 1.5, Shadowstep 3.0, Roll & Push 2.0) x self speed penalty (min: Turtle 0.25) · stealth opacity (lowest: Invisibility, Smoke Roost) · movement lock (any: Egg Shell, Peck) · control immunity (later expiry: Immovable) · steal-back (any / max: Spine Coat) · deposit rate (max: Quick Drop 4.0) · wall-phasing tier (highest holder: Barge < Vault < Blink) · aura slow (Feather Aura). Outside the rule: Underdog Surge x1.4, victim-side slow. Bots still cast one move at a time.

@@ -87,7 +87,7 @@ namespace CluckWars.Tests
         [Test]
         public void CountdownSlam_PopsInBigAndRestsAtOne()
         {
-            Assert.AreEqual(1.7f, MenuJuicePolicy.CountdownScale(0f), 1e-3f);
+            Assert.AreEqual(MenuJuicePolicy.CountdownPeakScale, MenuJuicePolicy.CountdownScale(0f), 1e-3f);
             Assert.AreEqual(1f, MenuJuicePolicy.CountdownScale(MenuJuicePolicy.CountdownPopSeconds), 1e-4f);
             Assert.AreEqual(1f, MenuJuicePolicy.CountdownScale(0.6f), 1e-4f);
         }

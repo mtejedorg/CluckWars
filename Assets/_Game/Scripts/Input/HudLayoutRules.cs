@@ -115,6 +115,18 @@ namespace CluckWars.Input
             return true;
         }
 
+        /// <summary>Phrase separator in the hint copy.</summary>
+        public const string PhraseSeparator = " · ";
+
+        /// <summary>
+        /// Display text for the hint. Touch shows each phrase on its own line (no dots), so a narrow plate never wraps
+        /// mid-phrase or leaves a dangling dot; desktop / pad keep the one-line dotted copy.
+        /// </summary>
+        public static string Format(HudDeviceMode mode, string copy) =>
+            mode == HudDeviceMode.Gamepad || mode == HudDeviceMode.KeyboardMouse
+                ? copy
+                : copy.Replace(PhraseSeparator, "\n");
+
         /// <summary>Hint copy for the layout the player is using.</summary>
         public static string KeyFor(HudDeviceMode mode) => mode switch
         {

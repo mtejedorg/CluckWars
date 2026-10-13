@@ -558,7 +558,7 @@ namespace CluckWars.Input
         private void ShowHint()
         {
             if (_hint == null) return;
-            _hint.text = UiText.Get(HoldHintRules.KeyFor(_mode));
+            _hint.text = HoldHintRules.Format(_mode, UiText.Get(HoldHintRules.KeyFor(_mode)));
             // Reduced Motion: appear and vanish at once instead of fading.
             _hint.style.transitionDuration = PlayerPreferences.ReducedMotionEnabled
                 ? new StyleList<TimeValue>(new System.Collections.Generic.List<TimeValue> { new TimeValue(0f, TimeUnit.Second) })

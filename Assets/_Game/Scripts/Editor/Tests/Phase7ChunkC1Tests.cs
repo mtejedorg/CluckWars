@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
+using CluckWars.Input;
 using CluckWars.Localization;
 using CluckWars.Settings;
 using CluckWars.UI;
@@ -226,6 +227,21 @@ namespace CluckWars.Tests
             Assert.LessOrEqual(int.Parse(size.Groups[1].Value), 260, "was 342 px");
         }
 
+        [Test]
+        public void CountdownDigit_AtPeakSlamScale_NeverReachesTheYouMarker()
+        {
+            string css = Read("Assets/UI/Styles/MatchOverlays.uss");
+            int top = int.Parse(Regex.Match(css, @"\.cw-intro-stack \{[^}]*top: -(\d+)%;").Groups[1].Value);
+            int font = int.Parse(Regex.Match(css, @"\.cw-intro-number \{[^}]*font-size: (\d+)px").Groups[1].Value);
+            // One label serves 3, 2, 1 and GO!, so one bound covers every beat. Digit height ~0.72 em on the 1080 px reference;
+            // the YOU pill's top edge sits at ~32% of the screen height (round-4 capture), so keep the peak bottom at or above 30%.
+            float centrePct = 50f - top;
+            float halfHeightPct = font * 0.72f * MenuJuicePolicy.CountdownPeakScale / 2f / 1080f * 100f;
+            Assert.LessOrEqual(centrePct + halfHeightPct, 30f, "peak-scale digit bottom (% of screen height)");
+            for (float t = 0f; t <= MenuJuicePolicy.CountdownPopSeconds; t += 0.01f)
+                Assert.LessOrEqual(MenuJuicePolicy.CountdownScale(t), MenuJuicePolicy.CountdownPeakScale + 1e-3f);
+        }
+
         // ---- 11: the hold hint -----------------------------------------------------------------------------
 
         [Test]
@@ -236,6 +252,22 @@ namespace CluckWars.Tests
             Assert.AreEqual("Hold to see the reach · Let go to use it · Esc to cancel", UiText.Get(UiKeys.HudHintHoldKeys));
             foreach (var key in new[] { UiKeys.HudHintHoldTouch, UiKeys.HudHintHoldPad, UiKeys.HudHintHoldKeys })
                 Assert.AreEqual(2, UiText.Get(key).Count(c => c == '·'), key);
+        }
+
+        [Test]
+        public void HoldHint_OnTouch_OnePhrasePerLine_NoDots_AndClearOfTheCancelStrip()
+        {
+            string touch = HoldHintRules.Format(HudDeviceMode.Touch, UiText.Get(UiKeys.HudHintHoldTouch));
+            Assert.AreEqual("Hold to see the reach\nLet go to use it\nSlide to the edge to cancel", touch);
+            StringAssert.DoesNotContain("·", touch);
+            Assert.AreEqual(UiText.Get(UiKeys.HudHintHoldPad), HoldHintRules.Format(HudDeviceMode.Gamepad, UiText.Get(UiKeys.HudHintHoldPad)), "pad stays one line");
+            Assert.AreEqual(UiText.Get(UiKeys.HudHintHoldKeys), HoldHintRules.Format(HudDeviceMode.KeyboardMouse, UiText.Get(UiKeys.HudHintHoldKeys)), "keys stay one line");
+
+            string css = Read("Assets/UI/Styles/TouchControls.uss");
+            int strip = int.Parse(Regex.Match(css, @"\.cw-edge-glow--left, \.cw-edge-glow--right \{[^}]*width: (\d+)px").Groups[1].Value);
+            var host = Regex.Match(css, @"\.cw-hold-hint-host \{([^}]*)\}").Groups[1].Value;
+            int margin = int.Parse(Regex.Match(host, @"padding-right: (\d+)px").Groups[1].Value);
+            Assert.GreaterOrEqual(margin, strip, "touch plate right margin clears the visible cancel-zone depth");
         }
 
         [Test]
