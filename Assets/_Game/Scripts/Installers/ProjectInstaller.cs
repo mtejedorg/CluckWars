@@ -92,6 +92,10 @@ namespace CluckWars.Installers
                     : new NullHapticsService())
                 .AsSingle();
 
+            // Frame pacing (Phase 8 A7): Application.targetFrameRate = 30 on Android, left at the default
+            // elsewhere (PC paces with the PC quality level's vSyncCount = 1). Runs once at boot.
+            Container.BindInterfacesTo<FrameRateInitializer>().AsSingle().NonLazy();
+
             // Cross-scene mutable state for menu → match handoff.
             Container.Bind<ISessionSelectionService>().To<SessionSelectionService>().AsSingle();
 

@@ -1,6 +1,8 @@
 using CluckWars.Gameplay;
 using CluckWars.Settings;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace CluckWars.Visuals
 {
@@ -69,6 +71,9 @@ namespace CluckWars.Visuals
 
         // Runtime state
         private Camera _camera;
+        private UniversalAdditionalCameraData _urpData;
+        private RenderPipelineAsset _appliedTier;
+        private bool _tierApplied;
         private ChickenController _localChicken;
         private Vector3 _currentFocus;
         private Vector3 _focusVelocity;
@@ -113,6 +118,7 @@ namespace CluckWars.Visuals
             if (GetComponent<FenceFadeDriver>() == null) gameObject.AddComponent<FenceFadeDriver>();
             _currentFocus = _focusPoint;
             ApplyCamera();
+            ApplyRenderTier();
             ApplyTransform(_currentFocus);
         }
 
@@ -133,6 +139,7 @@ namespace CluckWars.Visuals
             // Camera config can change in the inspector at runtime (orthoSize,
             // background) — cheap to push every frame.
             ApplyCamera();
+            ApplyRenderTier();
 
             // Resolve target — local chicken position if follow is on + the
             // chicken has spawned, otherwise the configured focus point.
@@ -280,6 +287,22 @@ namespace CluckWars.Visuals
                 _camera.clearFlags = CameraClearFlags.SolidColor;
                 _camera.backgroundColor = _backgroundColor;
             }
+        }
+
+        /// <summary>
+        /// Post-processing on the PC tier only (<see cref="RenderTierPolicy"/>). Runtime-only, never from
+        /// OnValidate, so Game.unity keeps the cheap serialized default (post off). Re-applied only when the
+        /// active pipeline asset changes (a reference compare per frame): quality switches and the Editor
+        /// tier-preview tools swap it mid-match.
+        /// </summary>
+        private void ApplyRenderTier()
+        {
+            var rp = GraphicsSettings.currentRenderPipeline;
+            if (_tierApplied && rp == _appliedTier) return;
+            _appliedTier = rp;
+            _tierApplied = true;
+            if (_urpData == null && !TryGetComponent(out _urpData)) return;
+            _urpData.renderPostProcessing = RenderTierPolicy.PostProcessingFor(rp);
         }
 
         private void ApplyTransform(Vector3 focus)
