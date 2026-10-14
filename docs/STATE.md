@@ -6,6 +6,12 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## PHASE 8 chunk B IN PROGRESS (2026-10-14): mesh/texture cleanup (brief items B1-B6)
+
+| Item | Status | Commit | Notes |
+|---|---|---|---|
+| B1 black ground plates | done (Blender-verified; Unity reimport check pending - the Editor was wedged at startup) | see git log | Plates stripped from barrel, hay_bale, feed_silo, bush_round, food_pile_small (`Assets/Generated/*.fbx`, same object/mesh/material/UV names so fileIDs survive; .meta untouched). No plate on wheelbarrow, milk_churn, feed_sack, nest_basket, crate, scarecrow, trough, oak_tree, chicken_coop, big_barn, wall_segment, food_pile_medium/large (the wheelbarrow capture's slab belongs to the neighbouring hay bale). hay_bale lowered 0.067 m so its feet touch y=0 (it stood on a 6.7 cm slab). Follow-up: `Prop_feed_silo.prefab` BoxCollider (2.75 x 2.0 x 3.0) was sized to the plate (silo itself ~1.1 m); not changed (colliders out of scope; silos are outside the arena since A5). Renders + scripts: scratchpad `env3d/B1/`. |
+
 ## ✅ PHASE 8 chunk A COMPLETE (2026-10-14): 3D environment fixes from the six-lens env audit (no design decisions) - EditMode 1356/1356
 
 Brief items A1-A11 (one sun, matte ground/props, ground overlays on the ground, honest arm walls, open lanes, shadows, AA + pipeline waste, ambient + background, cover cubes, fence fade, hygiene). Audit evidence `Captures/env3d/` (`tools/ui_capture/capture_env3d.py`); per-item re-captures `Captures/env3d_after/<item>/`; Mobile-tier frame cost `tools/ui_capture/measure_phase8_cost.py <tag>` -> `Captures/env3d_cost/<tag>.json` (fixed corner -21.6, 21.8, 3 rounds).
