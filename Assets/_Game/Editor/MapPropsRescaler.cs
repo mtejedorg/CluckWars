@@ -642,6 +642,14 @@ namespace CluckWars.EditorTools
                 ? (GameObject)PrefabUtility.InstantiatePrefab(source, parent)
                 : Object.Instantiate(template.gameObject, parent);
 
+            // A fresh prefab instance drops the template's mesh override - the arm panels use
+            // wall_segment_inner (Phase 8 B4: UVs compensated for their 0.35 thickness scale).
+            var srcFilters = template.GetComponentsInChildren<MeshFilter>(true);
+            var dstFilters = clone.GetComponentsInChildren<MeshFilter>(true);
+            for (int i = 0; i < Mathf.Min(srcFilters.Length, dstFilters.Length); i++)
+                if (dstFilters[i].sharedMesh != srcFilters[i].sharedMesh)
+                    dstFilters[i].sharedMesh = srcFilters[i].sharedMesh;
+
             Undo.RegisterCreatedObjectUndo(clone, "Add fence post");
             return clone.transform;
         }

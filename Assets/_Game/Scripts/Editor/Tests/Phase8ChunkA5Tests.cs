@@ -276,7 +276,7 @@ namespace CluckWars.Tests
             foreach (var prop in map.PropRoots)
             {
                 string mesh = MeshOf(prop);
-                if (mesh == "wall_segment" || mesh == "scarecrow") continue;          // fence/arm panels; scarecrows have their own rule
+                if (mesh.StartsWith("wall_segment") || mesh == "scarecrow") continue; // fence/arm panels (incl. wall_segment_inner); scarecrows have their own rule
                 if (prop.GetComponentsInChildren<Collider>(true).Length > 0) continue; // solid dressing: covered by the arm-tip rule
                 var p = prop.position;
                 var foot = FootprintXZ(prop);
