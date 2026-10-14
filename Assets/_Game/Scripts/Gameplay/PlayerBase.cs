@@ -127,37 +127,49 @@ namespace CluckWars.Gameplay
             ApplyOwnerTint();
         }
 
+        // Reused across tints — ApplyOwnerTint only runs when the owner changes, but there is
+        // no reason to allocate a block each time.
+        private MaterialPropertyBlock _tintBlock;
+
         /// <summary>
         /// Tints every <see cref="MeshRenderer"/> on this base with the player's
-        /// identity color (corner-indexed). Sets both <c>_Color</c> (Standard /
-        /// Built-in pipeline) and <c>_BaseColor</c> (URP) via a
-        /// <see cref="MaterialPropertyBlock"/> to avoid creating material instances,
-        /// then also writes directly to <c>material.color</c> as a fallback for
-        /// shaders that don't honour PropertyBlock overrides.
+        /// identity color (corner-indexed), through a <see cref="MaterialPropertyBlock"/>
+        /// only, so the renderers keep their <c>sharedMaterial</c>.
         /// </summary>
+        /// <remarks>
+        /// Never touch <c>renderer.material</c> here: it clones a <c>Lit (Instance)</c> copy per
+        /// renderer (Phase 8 A2). URP Lit honours per-renderer property blocks for
+        /// <c>_BaseColor</c>; the block costs the SRP batcher for these few renderers, which
+        /// is accepted. <c>_Color</c> is written as well for any shader that still reads it.
+        /// </remarks>
         private void ApplyOwnerTint()
         {
             var color = IsClaimed
                 ? CluckWars.UI.PlayerPalette.ForCorner(CornerIndex)
                 : UnownedColor;
 
-            var mpb = new MaterialPropertyBlock();
-            mpb.SetColor(SColorId,     color);
-            mpb.SetColor(SBaseColorId, color);
-
             var renderers = GetComponentsInChildren<MeshRenderer>(includeInactive: false);
             _log?.Debug(Source, $"{name}: ApplyOwnerTint — {renderers.Length} renderer(s), " +
                 $"color={color}, corner={CornerIndex}, owner={Owner}.");
 
+            _tintBlock ??= new MaterialPropertyBlock();
             foreach (var r in renderers)
-            {
-                r.SetPropertyBlock(mpb);
-                // Direct material fallback — handles shaders that ignore PropertyBlock
-                // for the base color (some URP variants, custom shaders, etc.).
-                // Creates a per-instance material copy but there are only 4 bases.
-                r.material.color = color;
-                r.material.SetColor(SBaseColorId, color);
-            }
+                ApplyTint(r, _tintBlock, color);
+        }
+
+        /// <summary>
+        /// Writes <paramref name="color"/> into <paramref name="renderer"/>'s property block
+        /// (<c>_BaseColor</c>, plus <c>_Color</c> when its shared material has one), preserving
+        /// any other overrides already in the block. Leaves <c>sharedMaterial</c> untouched.
+        /// </summary>
+        public static void ApplyTint(Renderer renderer, MaterialPropertyBlock block, Color color)
+        {
+            renderer.GetPropertyBlock(block);
+            block.SetColor(SBaseColorId, color);
+            var shared = renderer.sharedMaterial;
+            if (shared == null || shared.HasProperty(SColorId))
+                block.SetColor(SColorId, color);
+            renderer.SetPropertyBlock(block);
         }
 
         /// <summary>
