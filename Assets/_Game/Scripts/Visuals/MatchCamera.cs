@@ -55,7 +55,7 @@ namespace CluckWars.Visuals
 
         [Header("Background")]
         [Tooltip("Solid background color when no skybox is in use.")]
-        [SerializeField] private Color _backgroundColor = new Color(0.10f, 0.12f, 0.16f, 1f);
+        [SerializeField] private Color _backgroundColor = new Color(0.45f, 0.58f, 0.66f, 1f);
 
         [Tooltip("If true, force solid color clear over whatever the scene was configured with.")]
         [SerializeField] private bool _useSolidColor = true;

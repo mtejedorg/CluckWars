@@ -14,7 +14,8 @@ Brief items A1-A11 (one sun, matte ground/props, ground overlays on the ground, 
 
 | Item | Status | Commit | Notes |
 |---|---|---|---|
-| A1 one sun | done | (this commit) | Map.unity's own Directional Light removed (Map.unity is BINARY-serialized despite the baker comment; verified by object-by-object compare); `MapSceneBaker.CreateMapSceneByCloningGameScene` strips all roots; guardrail `Phase8ChunkA1Tests` (Game+Map loaded = exactly one enabled directional light, in Game). Game sun left at 1.0 (not too dark). Overview centre luminance 222 -> 178 (RGB (201,249,139) -> (126,220,93)). EditMode 1266/1266. |
+| A1 one sun | done | `15d51ae` | Map.unity's own Directional Light removed (Map.unity is BINARY-serialized despite the baker comment; verified by object-by-object compare); `MapSceneBaker.CreateMapSceneByCloningGameScene` strips all roots; guardrail `Phase8ChunkA1Tests` (Game+Map loaded = exactly one enabled directional light, in Game). Game sun left at 1.0 (not too dark). Overview centre luminance 222 -> 178 (RGB (201,249,139) -> (126,220,93)). EditMode 1266/1266. |
+| A8 ambient + background | done | (this commit) | Game.unity RenderSettings (the active scene in a match; no script writes ambient): Skybox -> Trilight sky (0.55,0.60,0.68) / equator (0.42,0.40,0.33) / ground (0.20,0.17,0.12); MatchCamera `_backgroundColor` (0.10,0.12,0.16) -> (0.45,0.58,0.66) in Game.unity, AbilityLab.unity and the `MatchCamera.cs:58` default. Same on both tiers (ambient is per scene). Ground centre luminance 191 -> 194 (slightly warmer). `Phase8ChunkA8Tests` (3). EditMode 1269/1269. |
 
 ## ✅ PHASE 7 COMPLETE (2026-10-13, pending the hardware session): round-4 findings (21) + Maestro decisions 1-8 - EditMode 1265/1265
 
