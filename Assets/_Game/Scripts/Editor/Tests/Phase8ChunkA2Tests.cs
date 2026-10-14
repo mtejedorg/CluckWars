@@ -46,6 +46,8 @@ namespace CluckWars.Tests
             "Assets/_Game/Art/Materials/Prop_milk_churn.mat",
             "Assets/_Game/Art/Materials/Prop_nest_basket.mat",
             "Assets/_Game/Art/Materials/Prop_oak_tree.mat",
+            "Assets/_Game/Art/Materials/Prop_oak_tree_Billboard_y45.mat",
+            "Assets/_Game/Art/Materials/Prop_oak_tree_Billboard_y135.mat",
             "Assets/_Game/Art/Materials/Prop_scarecrow.mat",
             "Assets/_Game/Art/Materials/Prop_trough.mat",
             "Assets/_Game/Art/Materials/Prop_wheelbarrow.mat",
