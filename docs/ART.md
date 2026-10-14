@@ -34,7 +34,9 @@ The UI must feel **exciting, tactile, and attractive** — not minimalist. Think
   framing is identical in ortho) so the whole view sits inside the shadow distance; near clip -6 so the 6 m
   surround trees at the bottom edge are not sliced. World billboards face along the camera forward.
 - **Shadows (Phase 8).** Mobile tier: 30 m, 1 cascade, border 0.1. PC tier: 35 m, 2 cascades, split 0.55,
-  border 0.1. Every chicken has a contact shadow on both tiers.
+  border 0.1. Every chicken has a contact shadow on both tiers. Out-of-arena dressing casts only where its shadow
+  can reach a match view (Phase 8 B3): Tree_6/10/12/17/29 cast; the barn, its silos and the other 25 trees don't
+  (chosen by rendering the match camera along the fence with each object's shadow toggled; guarded by a test).
 - **AA / pipeline (Phase 8).** MSAA 4x PC, 2x Mobile. No camera depth / opaque texture copies. Mobile renders LDR.
   Volume profile `CW_MatchProfile` (Neutral tonemapping, mild bloom + vignette) is NOT applied yet: post-processing
   is plumbed for the PC tier only (`RenderTierPolicy.PcPostProcessingEnabled`, off) pending sign-off, because the
@@ -217,6 +219,16 @@ Characters use **radial gradients** (light highlight at upper-left → primary c
   never sits within 4 m of an arm tip; silos live outside the fence by the barn.
 - **Open lanes (Phase 8).** Collider-free clutter hugs an arm wall (flush to its face) instead of standing in
   open lanes; four scarecrows in 90-degree symmetry, at least 4 m from any pile edge, no troughs.
+- **Generated-prop hygiene (Phase 8 B).** No baked ground plates: the TRELLIS dark discs under barrel, hay bale,
+  feed silo, bush and small food pile are stripped (pivot at the base centre, hay bale seated on y = 0). Prop
+  atlases are dilated (every texel outside a UV island carries the nearest island colour) so mips never bleed the
+  dark background. Fence panel = 1 642 tris (from 4 000); its atlas has no black baked faces (lifted to dark
+  wood) and softened smear marks. Arm walls use `wall_segment_inner` (UVs compensated for their 0.35 thickness
+  squash, so post and rail tops show unsquashed grain); the outer fence keeps `wall_segment`.
+- **Surround trees (Phase 8 B3).** `Prop_oak_tree` has a billboard LOD1 (a cross of two alpha-clipped quads from
+  `Art/Billboards/oak_tree_y45/135`, matte, base colour 0.8, normals up, no shadow). The orthographic match camera
+  always picks LOD0 (ortho LOD ignores distance; the smallest tree is ~0.4 of the view vs the 0.10 threshold), so
+  billboards appear only in perspective views (overviews, intros).
 - **Ground overlays (Phase 8).** Identity / rival rings, state blobs and target marks sit on the grass under the
   bird (`ChickenGround` anchor from the CharacterController), not at the body pivot.
 
