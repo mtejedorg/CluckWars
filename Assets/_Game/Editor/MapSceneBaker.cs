@@ -35,7 +35,10 @@ namespace CluckWars.EditorTools
     /// only that. Every other root in <c>Map.unity</c> is hand-authored content that no
     /// script regenerates (<c>MapProps</c>, <c>MapSurroundings</c>, the light), so a bake
     /// must leave it alone. Re-scaling that hand-authored dressing after an arena resize
-    /// is <see cref="MapPropsRescaler"/>'s job, not this one's.
+    /// is <see cref="MapPropsRescaler"/>'s job, not this one's — and so is re-laying the
+    /// pinwheel-arm wall art (<c>InnerWall_i_*</c>) onto the arm colliders this bake writes:
+    /// run <c>Cluck Wars/Map/Re-lay Arm Walls From Colliders</c> after any bake that moves
+    /// or resizes an arm (<see cref="MapPropsRescaler.RelayArmWalls()"/>).
     /// </para>
     /// </summary>
     public static class MapSceneBaker
@@ -155,8 +158,13 @@ namespace CluckWars.EditorTools
         /// An earlier version of this baker re-cloned the whole scene from
         /// <c>Game.unity</c> on every run and deleted every root it did not keep, which
         /// silently destroyed all of that hand work —
-        /// recoverable only from git. Editing in place is also what keeps the scene text-
-        /// serialized, since the file already exists and is only being re-saved.
+        /// recoverable only from git.
+        /// <para>
+        /// <b>Map.unity is BINARY-serialized</b> (see <c>.gitattributes</c>), unlike every other
+        /// scene in the project — re-saving it in place keeps whatever format it already has, and
+        /// that is binary. git cannot diff it: verify a re-bake by dumping an object inventory
+        /// (paths, transforms, colliders) before and after and comparing those instead.
+        /// </para>
         /// </remarks>
         private static Scene ReopenExistingMapScene()
         {
@@ -179,19 +187,17 @@ namespace CluckWars.EditorTools
         /// </summary>
         /// <remarks>
         /// The map scene is CLONED from Game.unity rather than created with
-        /// <c>EditorSceneManager.NewScene</c>. A newly-created scene is written in Unity's
-        /// BINARY format and stubbornly stays that way — ForceReserializeAssets, a dirty
-        /// re-save and a forced reimport were all tried and none converted it — even
-        /// though the project is set to ForceText. A scene that cannot be diffed or merged
-        /// defeats the point of baking it for hand-editing. Cloning an existing text scene
-        /// inherits both the text serialization and Game.unity's render/lighting settings,
-        /// so the baked map looks the same as in play.
+        /// <c>EditorSceneManager.NewScene</c>, so it inherits Game.unity's render/lighting
+        /// settings and the baked map looks the same as in play. The clone was also meant to
+        /// keep the file text-serialized (a NewScene-created scene is written BINARY even
+        /// under ForceText), but it did not: the shipped <c>Map.unity</c> is binary — see
+        /// <c>.gitattributes</c> and <see cref="ReopenExistingMapScene"/>. Do not rely on git
+        /// diffs of it.
         ///
         /// <para>
         /// This runs only when <c>Map.unity</c> does not exist. Once it does, re-baking
-        /// goes through <see cref="ReopenExistingMapScene"/> instead: the file is already
-        /// text-serialized, so there is nothing left for the clone to buy, and cloning
-        /// would throw away the hand-authored roots added since the first bake.
+        /// goes through <see cref="ReopenExistingMapScene"/> instead: cloning again would
+        /// throw away the hand-authored roots added since the first bake.
         /// </para>
         /// </remarks>
         private static Scene CreateMapSceneByCloningGameScene()

@@ -197,6 +197,11 @@ namespace CluckWars.EditorTools
 
             int fencePosts = RebuildFence(props.transform, targetPlaneSize);
 
+            // TranslateChildren just pushed the arm panels about the origin with everything
+            // else, but the arm colliders come from PinwheelLayout, not from a uniform scale —
+            // re-lay the art from the baked colliders so the walls stay where you collide.
+            RelayArmWalls(props.transform, geometry.transform);
+
             EditorSceneManager.MarkSceneDirty(scene);
             Undo.CollapseUndoOperations(undoGroup);
 
@@ -211,6 +216,243 @@ namespace CluckWars.EditorTools
                       $"({currentPlaneSize:F2} m → {targetPlaneSize:F2} m arena): " +
                       $"{movedProps} {PropsRootName} children, {movedSurroundings} {SurroundingsRootName} " +
                       $"children, fence rebuilt to {fencePosts} posts.");
+        }
+
+        // ---- Pinwheel-arm wall art ----------------------------------------------
+
+        /// <summary>Baked arm collider names: <c>Terrain_Standard_{arm}</c> under <c>GeneratedMapGeometry</c>.</summary>
+        public const string ArmColliderPrefix = "Terrain_Standard_";
+
+        /// <summary>Arm wall art names: <c>InnerWall_{arm}_{panel}</c>, direct children of <c>MapProps</c>.</summary>
+        public const string ArmPanelPrefix = "InnerWall_";
+
+        /// <summary>
+        /// How many panels cover an arm collider and how much each is stretched along its run.
+        /// </summary>
+        /// <remarks>
+        /// The covered extent must equal the collider's length EXACTLY — the end panels' outer
+        /// edges land on the collider's ends, so the art stops where the chicken stops — and
+        /// panels butt end to end with no gap and no overlap (overlap would put coplanar plank
+        /// faces on top of each other and z-fight; see <see cref="SolveFenceLayout"/>). That
+        /// leaves the panel count as the only choice; round to the count whose stretch is
+        /// closest to 1 so the planks are distorted as little as possible either way.
+        /// </remarks>
+        public static (int Count, float Stretch) SolveArmPanels(float colliderLength, float panelLength)
+        {
+            int count = Mathf.Max(1, Mathf.RoundToInt(colliderLength / panelLength));
+            return (count, colliderLength / (count * panelLength));
+        }
+
+        [MenuItem("Cluck Wars/Map/Re-lay Arm Walls From Colliders", priority = 23)]
+        public static void RelayArmWalls()
+        {
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+            {
+                Debug.Log("[MapPropsRescaler] Cancelled — unsaved changes were kept.");
+                return;
+            }
+
+            var scene = SceneManager.GetActiveScene();
+            if (scene.path != MapScenePath)
+                scene = EditorSceneManager.OpenScene(MapScenePath, OpenSceneMode.Single);
+
+            var roots = scene.GetRootGameObjects();
+            var props = roots.FirstOrDefault(g => g.name == PropsRootName);
+            var geometry = roots.FirstOrDefault(g => g.name == GeometryRootName);
+            if (props == null || geometry == null)
+            {
+                Debug.LogError($"[MapPropsRescaler] {MapScenePath} needs both '{PropsRootName}' and " +
+                               $"'{GeometryRootName}' to re-lay the arm walls (bake first; recover " +
+                               "MapProps from git if a bake destroyed it).");
+                return;
+            }
+
+            int undoGroup = Undo.GetCurrentGroup();
+            Undo.SetCurrentGroupName("Re-lay pinwheel arm walls");
+            int laid = RelayArmWalls(props.transform, geometry.transform);
+            Undo.CollapseUndoOperations(undoGroup);
+            if (laid <= 0) return; // already logged why.
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            if (!EditorSceneManager.SaveScene(scene, MapScenePath))
+                Debug.LogError($"[MapPropsRescaler] Failed to save {MapScenePath} after re-laying the arm walls.");
+        }
+
+        /// <summary>
+        /// Rebuilds every <c>InnerWall_{arm}_*</c> run from its baked <c>Terrain_Standard_{arm}</c>
+        /// collider: contiguous panels centred on the collider's centre line, covering its full
+        /// length, oriented along it. Returns the number of panels laid, or -1 on failure.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The colliders are the truth — they are what the chicken, bots and NavMesh collide
+        /// with — and the art follows them, never the reverse. The 2026-08-14 ×1.35 rescale moved
+        /// the art; the 2026-08-19 revert re-baked the colliders but not the art, leaving
+        /// 3.6–4.5 m of invisible wall at each arm's hub end and 0.65 m see-through gaps between
+        /// panels (four 2 m panels on a 2.55 m pitch). Deriving the art from the colliders means
+        /// the two can only drift again if somebody forgets to run this after a bake.
+        /// </para>
+        /// <para>
+        /// Existing panels are reused (keeping their prefab link); missing ones are cloned from
+        /// the arm's first panel, surplus ones deleted. Only the panel roots' position, rotation
+        /// and Z (run-axis) scale are written — mesh, material and height stay as authored.
+        /// Panels face outward from the hub so the 4-fold symmetry is exact.
+        /// </para>
+        /// </remarks>
+        public static int RelayArmWalls(Transform props, Transform geometry)
+        {
+            var arms = geometry.Cast<Transform>()
+                .Select(t => (Transform: t, Arm: ArmIndexOf(t.name)))
+                .Where(a => a.Arm >= 0)
+                .OrderBy(a => a.Arm)
+                .ToList();
+            if (arms.Count == 0)
+            {
+                Debug.LogError($"[MapPropsRescaler] No '{ArmColliderPrefix}*' arm colliders under " +
+                               $"'{geometry.name}' — nothing to lay the arm walls against. Bake first.");
+                return -1;
+            }
+
+            var anyPanel = props.Cast<Transform>().FirstOrDefault(t => PanelIndexOf(t.name).Arm >= 0);
+            if (anyPanel == null)
+            {
+                Debug.LogError($"[MapPropsRescaler] No '{ArmPanelPrefix}*' panel under '{props.name}' to " +
+                               "use as a template — the arm wall art is missing (recover it from git).");
+                return -1;
+            }
+
+            int total = 0;
+            foreach (var (collider, arm) in arms)
+            {
+                var box = collider.GetComponent<BoxCollider>();
+                if (box == null)
+                {
+                    Debug.LogError($"[MapPropsRescaler] '{collider.name}' has no BoxCollider — skipped; " +
+                                   $"its {ArmPanelPrefix}{arm}_* art was left as it was.");
+                    continue;
+                }
+
+                var panels = props.Cast<Transform>()
+                    .Select(t => (Transform: t, Index: PanelIndexOf(t.name)))
+                    .Where(p => p.Index.Arm == arm)
+                    .OrderBy(p => p.Index.Panel)
+                    .Select(p => p.Transform)
+                    .ToList();
+                var template = panels.Count > 0 ? panels[0] : anyPanel;
+
+                if (!TryMeasurePanelRun(template, out float panelLength, out float runCentre))
+                {
+                    Debug.LogError($"[MapPropsRescaler] '{template.name}' has no mesh to measure — " +
+                                   $"arm {arm} skipped.");
+                    continue;
+                }
+
+                // The collider's long horizontal axis is the arm's run.
+                Vector3 size = Vector3.Scale(box.size, collider.lossyScale);
+                bool alongX = size.x >= size.z;
+                Vector3 axis = (alongX ? collider.right : collider.forward);
+                axis.y = 0f;
+                axis.Normalize();
+                float length = alongX ? size.x : size.z;
+                Vector3 centre = collider.TransformPoint(box.center);
+                if (Vector3.Dot(axis, new Vector3(centre.x, 0f, centre.z)) < 0f) axis = -axis; // outward
+
+                var (count, stretch) = SolveArmPanels(length, panelLength);
+                float pitch = length / count;
+                Vector3 start = centre - axis * (length * 0.5f);
+                var rotation = Quaternion.LookRotation(axis, Vector3.up);
+                float y = template.position.y;
+
+                while (panels.Count > count)
+                {
+                    Undo.DestroyObjectImmediate(panels[^1].gameObject);
+                    panels.RemoveAt(panels.Count - 1);
+                }
+                while (panels.Count < count)
+                {
+                    int after = (panels.Count > 0 ? panels[^1] : template).GetSiblingIndex();
+                    var clone = ClonePost(template, props);
+                    clone.SetSiblingIndex(after + 1);
+                    panels.Add(clone);
+                }
+
+                for (int k = 0; k < count; k++)
+                {
+                    var panel = panels[k];
+                    Undo.RecordObject(panel, "Re-lay arm wall");
+                    panel.gameObject.name = $"{ArmPanelPrefix}{arm}_{k}";
+                    Vector3 mid = start + axis * (pitch * (k + 0.5f));
+                    // The mesh's run is not centred exactly on the pivot; shift so the
+                    // STRETCHED run's midpoint lands on this panel's slot.
+                    Vector3 pos = mid - axis * (runCentre * stretch);
+                    panel.SetPositionAndRotation(new Vector3(pos.x, y, pos.z), rotation);
+                    var s = panel.localScale;
+                    panel.localScale = new Vector3(s.x, s.y, stretch);
+                    total++;
+                }
+            }
+
+            foreach (Transform t in props)
+            {
+                int arm = PanelIndexOf(t.name).Arm;
+                if (arm >= 0 && arms.All(a => a.Arm != arm))
+                    Debug.LogWarning($"[MapPropsRescaler] '{t.name}' has no '{ArmColliderPrefix}{arm}' " +
+                                     "collider — left where it is. Delete it if that arm is gone for good.");
+            }
+
+            Debug.Log($"[MapPropsRescaler] Re-laid {total} arm wall panels over {arms.Count} arm colliders.");
+            return total;
+        }
+
+        /// <summary>
+        /// Measures a panel's run (its local Z, the axis <see cref="RelayArmWalls(Transform, Transform)"/>
+        /// lays along) in the panel root's own space with the root's scale removed, so the result is
+        /// the same however the panel is currently stretched.
+        /// </summary>
+        /// <remarks>
+        /// Read off the mesh, not hardcoded: <c>Prop_wall_segment</c>'s run is its source mesh's Y,
+        /// turned onto the root's Z by the inner model's -90° X rotation and squashed by its
+        /// 0.35 X scale — a stored constant would go stale the moment the prefab is touched.
+        /// </remarks>
+        public static bool TryMeasurePanelRun(Transform panelRoot, out float length, out float centre)
+        {
+            length = 0f; centre = 0f;
+            float min = float.MaxValue, max = float.MinValue;
+            var rootRotation = Matrix4x4.TRS(panelRoot.position, panelRoot.rotation, Vector3.one).inverse;
+
+            foreach (var filter in panelRoot.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (filter.sharedMesh == null) continue;
+                // Child-to-root with the root's own scale divided back out.
+                var m = rootRotation * filter.transform.localToWorldMatrix;
+                var rootScale = panelRoot.lossyScale;
+                var b = filter.sharedMesh.bounds;
+                for (int c = 0; c < 8; c++)
+                {
+                    var corner = b.center + Vector3.Scale(b.extents,
+                        new Vector3((c & 1) == 0 ? -1 : 1, (c & 2) == 0 ? -1 : 1, (c & 4) == 0 ? -1 : 1));
+                    float z = m.MultiplyPoint3x4(corner).z / rootScale.z;
+                    min = Mathf.Min(min, z);
+                    max = Mathf.Max(max, z);
+                }
+            }
+
+            if (max <= min) return false;
+            length = max - min;
+            centre = (min + max) * 0.5f;
+            return true;
+        }
+
+        private static int ArmIndexOf(string name) =>
+            name.StartsWith(ArmColliderPrefix) && int.TryParse(name[ArmColliderPrefix.Length..], out int i) ? i : -1;
+
+        private static (int Arm, int Panel) PanelIndexOf(string name)
+        {
+            if (!name.StartsWith(ArmPanelPrefix)) return (-1, -1);
+            var parts = name[ArmPanelPrefix.Length..].Split('_');
+            return parts.Length == 2 && int.TryParse(parts[0], out int arm) && int.TryParse(parts[1], out int panel)
+                ? (arm, panel)
+                : (-1, -1);
         }
 
         /// <summary>
