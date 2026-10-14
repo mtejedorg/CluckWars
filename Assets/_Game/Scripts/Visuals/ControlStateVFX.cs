@@ -520,7 +520,7 @@ namespace CluckWars.Visuals
         private SpriteRenderer BuildWindupGlow()
         {
             var go = new GameObject("AbilityWindupGlow");
-            go.transform.SetParent(transform, worldPositionStays: false);
+            go.transform.SetParent(ChickenGround.Anchor(this), worldPositionStays: false);
             // Below the status ring's ribbon (0.05) and the target bracket (0.045) so the
             // glow reads as light on the floor rather than a competing decal.
             go.transform.localPosition = new Vector3(0f, 0.02f, 0f);

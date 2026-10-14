@@ -134,7 +134,7 @@ namespace CluckWars.Visuals
         private void BuildRing()
         {
             var go = new GameObject("IdentityRing");
-            go.transform.SetParent(transform, worldPositionStays: false);
+            go.transform.SetParent(ChickenGround.Anchor(this), worldPositionStays: false);
             go.transform.localPosition = new Vector3(0f, 0.02f, 0f);
             go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             go.transform.localScale    = Vector3.one * (_ringRadius * 2f);

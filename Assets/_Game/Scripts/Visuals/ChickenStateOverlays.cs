@@ -173,7 +173,7 @@ namespace CluckWars.Visuals
         private void BuildStreaks()
         {
             var root = new GameObject("SlowStreaks");
-            root.transform.SetParent(transform, worldPositionStays: false);
+            root.transform.SetParent(ChickenGround.Anchor(this), worldPositionStays: false);
             root.transform.localPosition = new Vector3(0f, 0.04f, 0f);
             _streakRoot = root.transform;
 
@@ -203,7 +203,7 @@ namespace CluckWars.Visuals
                                                Color color, int sortingOrder, float y)
         {
             var go = new GameObject(goName);
-            go.transform.SetParent(transform, worldPositionStays: false);
+            go.transform.SetParent(ChickenGround.Anchor(this), worldPositionStays: false);
             go.transform.localPosition = new Vector3(0f, y, 0f);
             go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             go.transform.localScale    = Vector3.one * diameter;

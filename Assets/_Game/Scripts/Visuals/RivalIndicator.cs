@@ -148,7 +148,7 @@ namespace CluckWars.Visuals
         private void BuildGeometry()
         {
             var ringGo = new GameObject("RivalRing");
-            ringGo.transform.SetParent(transform, worldPositionStays: false);
+            ringGo.transform.SetParent(ChickenGround.Anchor(this), worldPositionStays: false);
             ringGo.transform.localPosition = new Vector3(0f, 0.02f, 0f);
             ringGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             ringGo.transform.localScale = Vector3.one * (FeedbackTuning.RivalRingRadius * 2f);

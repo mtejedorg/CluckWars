@@ -499,6 +499,7 @@ namespace CluckWars.Gameplay
             if (HasStateAuthority && VisualOpacity <= 0f) VisualOpacity = 1f;
 
             transform.localScale = Vector3.one * _activeStats.Scale;
+            ChickenGround.Refresh(this); // ground overlays hang off an anchor that depends on the scale
             _log?.Debug(Source, $"Applied scale {_activeStats.Scale} for class {Class}.");
 
             if (_registry != null && _registry.TryGet(Class, out var entry))
@@ -567,7 +568,7 @@ namespace CluckWars.Gameplay
             // to the bottom of the capsule puts the feet on the ground. The pivot sits at the
             // capsule's mid-height (center is zero), i.e. half the height above ground contact —
             // parenting at localPosition zero would leave every chicken hovering by that much.
-            float groundLocalY = _characterController.center.y - _characterController.height * 0.5f;
+            float groundLocalY = ChickenGround.LocalFeetY(_characterController);
             model.transform.localPosition = new Vector3(0f, groundLocalY, 0f);
             model.transform.localRotation = Quaternion.identity;
 

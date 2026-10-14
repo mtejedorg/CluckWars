@@ -132,8 +132,9 @@ namespace CluckWars.Visuals
                 if (_glyph != null)
                 {
                     _glyph.transform.rotation = FlatRotation;
-                    _glyph.transform.position = transform.position
-                                              + new Vector3(0f, OverlayY, GlyphForwardOffset);
+                    var p = transform.position;
+                    p.y = ChickenGround.GroundWorldY(this) + OverlayY;
+                    _glyph.transform.position = p + new Vector3(0f, 0f, GlyphForwardOffset);
                 }
             }
 
@@ -167,7 +168,7 @@ namespace CluckWars.Visuals
         private SpriteRenderer BuildFlatSprite(string goName, float diameter, Vector3 localOffset, int sortingOrder)
         {
             var go = new GameObject(goName);
-            go.transform.SetParent(transform, worldPositionStays: false);
+            go.transform.SetParent(ChickenGround.Anchor(this), worldPositionStays: false);
             go.transform.localPosition = new Vector3(localOffset.x, OverlayY, localOffset.z);
             go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             go.transform.localScale    = Vector3.one * diameter;
