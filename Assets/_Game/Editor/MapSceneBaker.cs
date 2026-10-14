@@ -111,6 +111,10 @@ namespace CluckWars.EditorTools
             // magenta. Persist them as assets and re-point the renderers before saving.
             PersistGeneratedMaterials(root);
 
+            // Scatter cover renders as a crate stack, not a bare cube (Phase 8 A9). Collider-free
+            // children, so the PhysicsColliders NavMesh bake below is unaffected.
+            CoverBoxDresser.DressCovers(root.transform);
+
             // NavMesh is baked here rather than at runtime: the geometry is static, so
             // paying for a bake every launch is waste, and a baked surface also lets the
             // map scene be opened and pathing inspected without entering Play Mode.
