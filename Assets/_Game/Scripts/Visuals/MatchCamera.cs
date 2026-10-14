@@ -33,9 +33,16 @@ namespace CluckWars.Visuals
         [Tooltip("Fallback world-space point the camera looks at when no local chicken is found (intro / between matches).")]
         [SerializeField] private Vector3 _focusPoint = Vector3.zero;
 
-        [Tooltip("How far back to pull the camera. Doesn't affect ortho framing — just keeps the near clip off the geometry.")]
+        [Tooltip("How far back to pull the camera along its view axis. Doesn't affect ortho framing, but URP measures " +
+                 "shadow distance from the camera, so the far (top-edge) ground sits at ~distance + 9.7 m: keep this " +
+                 "well under every RP asset's shadowDistance or shadows vanish (Phase 8 A6: 30 put the whole view " +
+                 "beyond Mobile's shadow range).")]
         [Min(1f)]
-        [SerializeField] private float _distance = 30f;
+        [SerializeField] private float _distance = 15f;
+
+        [Tooltip("Near clip plane. Negative is legal for an orthographic camera and keeps the tall surround trees " +
+                 "(up to ~6.2 m) at the bottom screen edge from being sliced open now that the camera sits only 15 m back.")]
+        [SerializeField] private float _nearClipPlane = -6f;
 
         [Tooltip("Half the vertical view height in world units. Smaller = more zoomed in. 5.6 per GDD v0.5.")]
         [Min(1f)]
@@ -267,6 +274,7 @@ namespace CluckWars.Visuals
             if (_camera == null) return;
             _camera.orthographic = true;
             _camera.orthographicSize = _orthoSize;
+            _camera.nearClipPlane = _nearClipPlane;
             if (_useSolidColor)
             {
                 _camera.clearFlags = CameraClearFlags.SolidColor;

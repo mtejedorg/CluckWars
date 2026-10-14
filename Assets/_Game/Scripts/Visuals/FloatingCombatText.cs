@@ -256,7 +256,6 @@ namespace CluckWars.Visuals
             // One Camera.main resolve per frame, shared by every live popup, instead of
             // one per popup like the per-chicken billboards do.
             var cam = Camera.main;
-            Vector3 camPos = cam != null ? cam.transform.position : Vector3.zero;
             float dt = Time.deltaTime;
 
             for (int i = 0; i < _pool.Length; i++)
@@ -283,7 +282,7 @@ namespace CluckWars.Visuals
 
                 if (cam != null)
                 {
-                    var dir = p.Root.position - camPos;
+                    var dir = BillboardFacing.Direction(cam, p.Root.position);
                     if (dir.sqrMagnitude > 1e-6f)
                         p.Root.rotation = Quaternion.LookRotation(dir, Vector3.up);
                 }

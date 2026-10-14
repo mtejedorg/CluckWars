@@ -378,7 +378,7 @@ namespace CluckWars.Visuals
             var cam = Camera.main;
             if (cam == null) return;
 
-            var lookDir = _stackRoot.position - cam.transform.position;
+            var lookDir = BillboardFacing.Direction(cam, _stackRoot.position);
             if (lookDir.sqrMagnitude > 1e-6f)
                 _stackRoot.rotation = Quaternion.LookRotation(lookDir, Vector3.up);
         }

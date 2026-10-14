@@ -355,7 +355,7 @@ namespace CluckWars.Visuals
             var cam = Camera.main;
             if (cam != null && _textTransform != null)
             {
-                var lookDir = _textTransform.position - cam.transform.position;
+                var lookDir = BillboardFacing.Direction(cam, _textTransform.position);
                 if (lookDir.sqrMagnitude > 1e-6f)
                     _textTransform.rotation = Quaternion.LookRotation(lookDir, Vector3.up);
             }
