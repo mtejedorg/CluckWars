@@ -27,6 +27,21 @@ The UI must feel **exciting, tactile, and attractive** — not minimalist. Think
 - Fixed camera — full map always visible. No zoom, no pan.
 - Isometric angle: standard 45° rotation, ~30° elevation (exact value TBD in engine).
 - URP 2D lights may be used for ambient warmth and food pile glow — evaluate against mobile performance budget.
+- **Lighting (Phase 8, 2026-10-14).** ONE sun: Game.unity's Directional Light (intensity 1.0); Map.unity carries no
+  lights (guarded by a test). Ambient is Trilight, warm: sky (0.55, 0.60, 0.68), equator (0.42, 0.40, 0.33),
+  ground (0.20, 0.17, 0.12), same on both tiers. Match background colour (0.45, 0.58, 0.66), a muted daytime blue.
+- **Camera (Phase 8).** Orthographic size 5.6, yaw 45, pitch 30, placed 15 m back along the view axis (was 30;
+  framing is identical in ortho) so the whole view sits inside the shadow distance; near clip -6 so the 6 m
+  surround trees at the bottom edge are not sliced. World billboards face along the camera forward.
+- **Shadows (Phase 8).** Mobile tier: 30 m, 1 cascade, border 0.1. PC tier: 35 m, 2 cascades, split 0.55,
+  border 0.1. Every chicken has a contact shadow on both tiers.
+- **AA / pipeline (Phase 8).** MSAA 4x PC, 2x Mobile. No camera depth / opaque texture copies. Mobile renders LDR.
+  Volume profile `CW_MatchProfile` (Neutral tonemapping, mild bloom + vignette) is NOT applied yet: post-processing
+  is plumbed for the PC tier only (`RenderTierPolicy.PcPostProcessingEnabled`, off) pending sign-off, because the
+  Neutral tonemapper darkens the grass ~12 % and desaturates ~13 %.
+- **Surfaces (Phase 8).** Ground, props, fence, coop, base and pile zones are matte: smoothness <= 0.08, specular
+  highlights and environment reflections off, GPU instancing on. Chickens keep their own materials. Base tints are
+  MaterialPropertyBlocks on the shared material (no material copies).
 
 ---
 
@@ -196,6 +211,14 @@ Characters use **radial gradients** (light highlight at upper-left → primary c
 - Props are low-profile — must not obscure characters or food piles.
 - No tall props near the center or high-traffic areas.
 - Suggested prop set (preliminary): hay bales, wooden fence segments, flower patches, mud puddles.
+- **What you see is what blocks you (Phase 8).** Arm walls are laid end to end from the baked arm colliders
+  (`Cluck Wars/Map/Re-lay Arm Walls From Colliders`): no gaps, no invisible wall. Cover boxes render as crate
+  stacks sized to their colliders (`CoverBoxDresser`). Dressing never carries a collider inside the arena and
+  never sits within 4 m of an arm tip; silos live outside the fence by the barn.
+- **Open lanes (Phase 8).** Collider-free clutter hugs an arm wall (flush to its face) instead of standing in
+  open lanes; four scarecrows in 90-degree symmetry, at least 4 m from any pile edge, no troughs.
+- **Ground overlays (Phase 8).** Identity / rival rings, state blobs and target marks sit on the grass under the
+  bird (`ChickenGround` anchor from the CharacterController), not at the body pivot.
 
 ### Food Pile Visuals
 
@@ -729,6 +752,10 @@ tint; seamless; `Grass.png` is kept) at tiling 7 (was 10); luminance std 0.154 t
 to 0.449, so the ink and cream guides read. Material colour and shader unchanged. Mobile cost:
 batches +2 at a fixed corner, SetPass identical; GPU time still to measure on the Pixel 9.
 Not done: a camera pull-in at GET READY, and a bush ring (about 2 500 tris each, too heavy for 30 fps).
+
+**Fence fade (Phase 8).** The see-through hole in the near fence / coop clears up to 92 % (15 of 16 dither
+pixels) and has a thin cream (#FEF5E0, 45 %) rim at its edge so the wall still reads. The fade code only runs
+in the `_CW_FENCE_FADE` shader variant, switched on while a hole is open.
 
 **Ability category fill, Defense.** Mid moss `#80902C` (cream icon 3.3:1, ink label 5.4:1,
 Steal/Defense colour-blind separation 9.4 dE00); `#30460C` stays the text background.
