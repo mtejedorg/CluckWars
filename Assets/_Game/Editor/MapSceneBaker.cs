@@ -149,10 +149,12 @@ namespace CluckWars.EditorTools
         /// The baker owns exactly one root — <see cref="GeometryRootName"/>. Everything
         /// else in <c>Map.unity</c> is hand-authored content that no script regenerates:
         /// <c>MapProps</c> (farm dressing — coops, fence, silos, pinwheel-arm props),
-        /// <c>MapSurroundings</c> (the outer grass apron, barn, trees and bushes) and the
-        /// <c>Directional Light</c>. An earlier version of this baker re-cloned the whole
-        /// scene from <c>Game.unity</c> on every run and deleted every root without a
-        /// <see cref="Light"/> in it, which silently destroyed all of that hand work —
+        /// <c>MapSurroundings</c> (the outer grass apron, barn, trees and bushes). The map
+        /// scene has NO lights of its own: it is always loaded additively with
+        /// <c>Game.unity</c>, whose sun lights it (a second sun here lit the arena twice).
+        /// An earlier version of this baker re-cloned the whole scene from
+        /// <c>Game.unity</c> on every run and deleted every root it did not keep, which
+        /// silently destroyed all of that hand work —
         /// recoverable only from git. Editing in place is also what keeps the scene text-
         /// serialized, since the file already exists and is only being re-saved.
         /// </remarks>
@@ -208,15 +210,13 @@ namespace CluckWars.EditorTools
                 return default;
             }
 
-            // Strip the clone's contents but KEEP its lights. Deleting everything left the
-            // map scene with no Directional Light, so the baked geometry rendered almost
-            // black under ambient alone — the scene looked broken while every scripted
-            // check still passed.
+            // Strip ALL of the clone's roots, lights included. Lighting comes from
+            // Game.unity's sun: the map scene is always loaded additively with Game, and a
+            // kept clone of the sun lit the arena twice (Phase 8 A1 — guarded by
+            // Phase8ChunkA1Tests). Opened on its own, the map scene renders dark under
+            // ambient alone; that is expected, not a broken bake.
             foreach (var go in scene.GetRootGameObjects())
-            {
-                if (go.GetComponentInChildren<Light>(true) != null) continue;
                 Object.DestroyImmediate(go);
-            }
 
             return scene;
         }

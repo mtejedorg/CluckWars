@@ -6,6 +6,16 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🚧 PHASE 8 chunk A IN PROGRESS (2026-10-14): 3D environment fixes from the six-lens env audit (no design decisions)
+
+Brief items A1-A11 (one sun, matte ground/props, ground overlays on the ground, honest arm walls, open lanes, shadows, AA + pipeline waste, ambient + background, cover cubes, fence fade, hygiene). Audit evidence `Captures/env3d/` (`tools/ui_capture/capture_env3d.py`); per-item re-captures `Captures/env3d_after/<item>/`; Mobile-tier frame cost `tools/ui_capture/measure_phase8_cost.py <tag>` -> `Captures/env3d_cost/<tag>.json` (fixed corner -21.6, 21.8, 3 rounds).
+
+**Baseline (before, Mobile tier):** batches 52, SetPass 21, tris ~128.9k, Camera.Render CPU mean 0.58-0.78 ms. EditMode 1265/1265.
+
+| Item | Status | Commit | Notes |
+|---|---|---|---|
+| A1 one sun | done | (this commit) | Map.unity's own Directional Light removed (Map.unity is BINARY-serialized despite the baker comment; verified by object-by-object compare); `MapSceneBaker.CreateMapSceneByCloningGameScene` strips all roots; guardrail `Phase8ChunkA1Tests` (Game+Map loaded = exactly one enabled directional light, in Game). Game sun left at 1.0 (not too dark). Overview centre luminance 222 -> 178 (RGB (201,249,139) -> (126,220,93)). EditMode 1266/1266. |
+
 ## ✅ PHASE 7 COMPLETE (2026-10-13, pending the hardware session): round-4 findings (21) + Maestro decisions 1-8 - EditMode 1265/1265
 
 **Commits on `develop`:** `ff19e0a` art prep (Spine Coat hedgehog, Fx_Dust) · `775e32d` chunk D steal-proof, Egg Shell "Full shell", Turtle Mode "Shell walk" · `7cb18c6` security follow-up (steal refund must match a pending credit; execute transfer validates its caller) · `cfe32ef` chunk A input bugs · `a407f9c` chunk B readability + honest preview · `2f84707` chunk C1 nameplates / tie / countdown / hint / Defense / Auto-Peck · `4ea37e1` chunk C2 copy + UI leftovers · `c6ae4cc` chunk E1 out-of-bounds dressing · `7131bd5` chunk E2 calmer grass · `6f3aa2c` chunk F1 hint vs cancel strip, countdown slam, fair frame-time comparison · F2 docs (GDD, FEEDBACK, ART, compendium site, STATE; this commit).
