@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace CluckWars.Visuals
 {
@@ -11,7 +12,8 @@ namespace CluckWars.Visuals
     /// <para>
     /// Added by <see cref="MatchCamera"/> to its own GameObject and follows the camera's
     /// <see cref="MatchCamera.LocalChicken"/> (input authority, never a Doppelganger decoy). Purely local
-    /// presentation: two <c>Shader.SetGlobalVector</c> calls a frame, no networked state, no RPC.
+    /// presentation: one <c>Shader.SetGlobalVector</c> call a frame (plus the global <c>_CW_FENCE_FADE</c>
+    /// keyword, set only when the strength crosses 0 — Phase 8 A10), no networked state, no RPC.
     /// </para>
     /// <para>
     /// The fence renderers are found by their material's shader, not by name, so the guard in
@@ -21,7 +23,8 @@ namespace CluckWars.Visuals
     /// </para>
     /// <para>
     /// Cost: up to 3 sample rays x ~84 AABB tests a frame on the CPU (microseconds); on the GPU, fence
-    /// fragments only, one uniform branch when nothing is covered, else ~30 ALU + a clip.
+    /// fragments only; with no hole open the keyword is off and the fence runs the stock Lit variant, else
+    /// ~35 ALU + a clip (+ the rim lerp in ForwardLit).
     /// </para>
     /// </remarks>
     [DisallowMultipleComponent]
@@ -29,6 +32,8 @@ namespace CluckWars.Visuals
     {
         private static readonly int BirdPosId = Shader.PropertyToID("_CW_LocalBirdPos");
         private static readonly int ParamsId  = Shader.PropertyToID("_CW_FenceFadeParams");
+        private static readonly int RimParamsId = Shader.PropertyToID("_CW_FenceRimParams");
+        private static readonly int RimColorId  = Shader.PropertyToID("_CW_FenceRimColor");
 
         /// <summary>While no fence renderer is known, how often to look again (seconds, unscaled).</summary>
         private const float RescanInterval = 1f;
@@ -39,6 +44,8 @@ namespace CluckWars.Visuals
         private float _nextScanTime;
         private float _strength;
         private Vector3 _lastBirdCentre;
+        private GlobalKeyword _fadeKeyword;
+        private bool _keywordOn;
 
         /// <summary>Current eased strength 0..1 (for captures / debugging).</summary>
         public float Strength => _strength;
@@ -49,16 +56,40 @@ namespace CluckWars.Visuals
         private void Awake()
         {
             _matchCamera = GetComponent<MatchCamera>();
-            Shader.SetGlobalVector(ParamsId, FenceFadeRules.ShaderParams);
+            _fadeKeyword = GlobalKeyword.Create(FenceFadeRules.KeywordName);
+            PushParams();
         }
 
-        private void OnEnable() => Shader.SetGlobalVector(ParamsId, FenceFadeRules.ShaderParams);
+        private void OnEnable()
+        {
+            PushParams();
+            // Phase 8 A10: the fade variant follows the strength; start from the keyword's real state.
+            _keywordOn = Shader.IsKeywordEnabled(_fadeKeyword);
+            SyncKeyword();
+        }
 
-        /// <summary>Globals outlive the scene: leave the fence solid for whatever renders next (menus, lab).</summary>
+        /// <summary>Globals outlive the scene: leave the fence solid (and on the plain Lit variant) for whatever
+        /// renders next (menus, lab).</summary>
         private void OnDisable()
         {
             _strength = 0f;
             Shader.SetGlobalVector(BirdPosId, Vector4.zero);
+            SyncKeyword();
+        }
+
+        private static void PushParams()
+        {
+            Shader.SetGlobalVector(ParamsId, FenceFadeRules.ShaderParams);
+            Shader.SetGlobalVector(RimParamsId, FenceFadeRules.RimParams);
+            Shader.SetGlobalColor(RimColorId, FenceFadeRules.RimColor);
+        }
+
+        /// <summary>Sets the global <c>_CW_FENCE_FADE</c> keyword only when the strength crosses 0 (no per-frame churn).</summary>
+        private void SyncKeyword()
+        {
+            if (!FenceFadeRules.KeywordToggle(_keywordOn, _strength, out bool wantOn)) return;
+            Shader.SetKeyword(_fadeKeyword, wantOn);
+            _keywordOn = wantOn;
         }
 
         private void LateUpdate()
@@ -84,6 +115,7 @@ namespace CluckWars.Visuals
             _strength = FenceFadeRules.StepStrength(_strength, occluded, Time.unscaledDeltaTime);
             // While fading out after the bird is gone, keep the hole where it last was rather than at the origin.
             Shader.SetGlobalVector(BirdPosId, new Vector4(_lastBirdCentre.x, _lastBirdCentre.y, _lastBirdCentre.z, _strength));
+            SyncKeyword();
         }
 
         private static void MeasureBody(Component chicken, out Vector3 feet, out float height)

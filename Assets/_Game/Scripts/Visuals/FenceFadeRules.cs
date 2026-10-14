@@ -39,8 +39,30 @@ namespace CluckWars.Visuals
         public const float OuterRadius = 0.15f;
 
         /// <summary>Peak fade. Below 1 leaves a faint screen-door of fence so the player still sees there is a
-        /// wall between them and the open arena (it still blocks movement).</summary>
-        public const float MaxFade = 0.85f;
+        /// wall between them and the open arena (it still blocks movement). The 4x4 dither has 16 thresholds at
+        /// (k + 0.5) / 16, so 0.92 clears 15 of 16 pixels: 6.25 % of the fence remains at the hole centre
+        /// (0.90 would clear only 14, leaving 12.5 %). Phase 8 A10 raised it from 0.85.</summary>
+        public const float MaxFade = 0.92f;
+
+        /// <summary>Width of the cream rim band at the hole's edge, as a fraction of the screen height
+        /// (~0.13 of <see cref="OuterRadius"/>). Phase 8 A10.</summary>
+        public const float RimWidth = 0.02f;
+
+        /// <summary>Centre of the rim band: just inside <see cref="OuterRadius"/>, on the still-mostly-solid
+        /// fence where the dithered ramp ends, so it outlines the hole on the pickets that remain.</summary>
+        public const float RimCentre = OuterRadius - 0.5f * RimWidth;
+
+        /// <summary>Peak blend of the fence colour toward <see cref="RimColor"/> (subtle: the fence keeps its
+        /// wood colour, the rim reads as a light edge).</summary>
+        public const float RimIntensity = 0.45f;
+
+        /// <summary>The UI cream (<c>UiGfx.TextPrimary</c>, #FEF5E0) — the same light edge the HUD rims use.</summary>
+        public static readonly Color RimColor = new Color32(0xFE, 0xF5, 0xE0, 0xFF);
+
+        /// <summary>Global shader keyword that compiles the fade / rim code into the fence passes
+        /// (<c>#pragma multi_compile_fragment _ _CW_FENCE_FADE</c>). Global, not local: the driver feeds globals,
+        /// and keywords cannot go in a MaterialPropertyBlock.</summary>
+        public const string KeywordName = "_CW_FENCE_FADE";
 
         /// <summary>World units in front of the bird over which the depth gate ramps in. Keeps the edge of the
         /// hole soft when the bird hugs the fence instead of popping on the fence's own plane.</summary>
@@ -106,8 +128,35 @@ namespace CluckWars.Visuals
             return Mathf.Clamp01(strength) * MaxFade * radial * inFront;
         }
 
+        /// <summary>
+        /// C# twin of <c>CW_FenceRimAmount</c>: the 0..1 rim blend for a fence fragment. A band of total width
+        /// <see cref="RimWidth"/> centred on <see cref="RimCentre"/>, gated like the fade to fragments in front of
+        /// the bird.
+        /// </summary>
+        public static float RimWeight(float strength, float screenDist, float fragmentEyeDepth, float birdEyeDepth)
+        {
+            float halfWidth = 0.5f * RimWidth;
+            float band = 1f - Smoothstep(0f, Mathf.Max(halfWidth, 1e-5f), Mathf.Abs(screenDist - RimCentre));
+            float inFront = Smoothstep(0f, Mathf.Max(DepthSoftness, 1e-4f), birdEyeDepth - fragmentEyeDepth);
+            return Mathf.Clamp01(strength) * RimIntensity * band * inFront;
+        }
+
+        /// <summary>
+        /// The keyword rule: the fade variant is on exactly while <paramref name="strength"/> is above 0.
+        /// Returns true only when the keyword must CHANGE (so the driver never re-sets it every frame);
+        /// <paramref name="wantOn"/> is the state to set.
+        /// </summary>
+        public static bool KeywordToggle(bool keywordOn, float strength, out bool wantOn)
+        {
+            wantOn = strength > 0f;
+            return wantOn != keywordOn;
+        }
+
         /// <summary>The shader global <c>_CW_FenceFadeParams</c>.</summary>
         public static Vector4 ShaderParams => new Vector4(InnerRadius, OuterRadius, MaxFade, DepthSoftness);
+
+        /// <summary>The shader global <c>_CW_FenceRimParams</c> (centre, half width, intensity, unused).</summary>
+        public static Vector4 RimParams => new Vector4(RimCentre, 0.5f * RimWidth, RimIntensity, 0f);
 
         /// <summary>HLSL <c>smoothstep</c> (Unity's <c>Mathf.SmoothStep</c> is an interpolator, not this).</summary>
         public static float Smoothstep(float edge0, float edge1, float x)

@@ -2,7 +2,9 @@
 // Pipeline/Lit" with the same properties, keywords and passes, so Prop_wall_segment.mat keeps its exact look and
 // the stock Lit inspector. The only change: every pass that writes colour or depth runs CW_FenceFadeClip
 // (CWFenceFade.hlsl) first, a dithered alpha-clip that opens a see-through hole in the fence in front of the
-// LOCAL bird. Opaque queue, depth write on, no extra pass. Driven by CluckWars.Visuals.FenceFadeDriver.
+// LOCAL bird, plus a thin cream rim at the hole's edge in ForwardLit (Phase 8 A10). The fade code is compiled
+// only in the global _CW_FENCE_FADE variant, enabled by the driver only while a hole is open. Opaque queue,
+// depth write on, no extra pass. Driven by CluckWars.Visuals.FenceFadeDriver.
 // If URP is upgraded, re-copy Lit.shader and re-apply the four "CW fence fade" fragment wrappers below.
 Shader "Cluck Wars/Fence Fade Lit"
 {
@@ -182,6 +184,9 @@ Shader "Cluck Wars/Fence Fade Lit"
 
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitForwardPass.hlsl"
+            // CW fence fade (Phase 8 A10): the clip/rim code exists only in this variant; FenceFadeDriver sets the
+            // GLOBAL keyword only while a hole is open, so a closed fence runs the stock Lit fragment.
+            #pragma multi_compile_fragment _ _CW_FENCE_FADE
             #include "CWFenceFade.hlsl"
 
             // CW fence fade: clip, then the stock Lit forward fragment.
@@ -193,12 +198,15 @@ Shader "Cluck Wars/Fence Fade Lit"
             #endif
             )
             {
-                CW_FenceFadeClip(input.positionCS);
+                float cwRim = CW_FenceFadeClipRim(input.positionCS);
                 LitPassFragment(input, outColor
             #ifdef _WRITE_RENDERING_LAYERS
                     , outRenderingLayers
             #endif
                 );
+                // Thin cream rim at the hole's edge so the fence outline still reads (forward only; both
+                // renderers are Forward / Forward+, the GBuffer pass clips without a rim).
+                outColor.rgb = CW_FenceApplyRim(outColor.rgb, cwRim);
             }
             ENDHLSL
         }
@@ -338,6 +346,9 @@ Shader "Cluck Wars/Fence Fade Lit"
             // Includes
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitGBufferPass.hlsl"
+            // CW fence fade (Phase 8 A10): the clip/rim code exists only in this variant; FenceFadeDriver sets the
+            // GLOBAL keyword only while a hole is open, so a closed fence runs the stock Lit fragment.
+            #pragma multi_compile_fragment _ _CW_FENCE_FADE
             #include "CWFenceFade.hlsl"
 
             // CW fence fade
@@ -389,6 +400,9 @@ Shader "Cluck Wars/Fence Fade Lit"
             // Includes
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthOnlyPass.hlsl"
+            // CW fence fade (Phase 8 A10): the clip/rim code exists only in this variant; FenceFadeDriver sets the
+            // GLOBAL keyword only while a hole is open, so a closed fence runs the stock Lit fragment.
+            #pragma multi_compile_fragment _ _CW_FENCE_FADE
             #include "CWFenceFade.hlsl"
 
             // CW fence fade
@@ -447,6 +461,9 @@ Shader "Cluck Wars/Fence Fade Lit"
             // Includes
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitDepthNormalsPass.hlsl"
+            // CW fence fade (Phase 8 A10): the clip/rim code exists only in this variant; FenceFadeDriver sets the
+            // GLOBAL keyword only while a hole is open, so a closed fence runs the stock Lit fragment.
+            #pragma multi_compile_fragment _ _CW_FENCE_FADE
             #include "CWFenceFade.hlsl"
 
             // CW fence fade
