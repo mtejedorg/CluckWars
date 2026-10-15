@@ -618,14 +618,15 @@ footer b{color:var(--text-dim)}
     <div class="note why">
       <b>The load-bearing detail.</b> Speedy and Assassin share the exact same move speed
       (<span class="mono">12.15</span>) and the exact same cargo (<span class="mono">10</span>) &mdash;
-      yet one clears in 30s and the other in 40s. The entire gap is foraging rate. The Assassin
-      is a fast chicken who is <em>genuinely bad at farming</em>, and that is the mechanical
-      reason he denies instead of collects.
+      yet Speedy clears in 30s and the Assassin cannot clear at all: he has no Peck, so he cannot
+      forage and is exempt from the farming axiom. The Assassin is a fast chicken who is
+      <em>unable to farm</em>, and that is the mechanical reason he denies instead of collects.
     </div>
 
     <div class="note warn">
       <b>Verified, not asserted.</b> A pure-C# simulator (<span class="mono">BalanceOracle</span>)
-      runs the greedy farming policy against the real pile coordinates and asserts each class lands
+      runs the greedy farming policy against the real pile coordinates, from all four seats, with
+      reach-aware legs (deposit radius + pile oval + peck reach), and asserts each class lands
       within &plusmn;1.5s of its target. Trips are <span class="mono">ceil(40 / CargoCapacity)</span>
       &mdash; which is why Fatty's 35 cargo buys him two trips and Speedy's 10 buys four.
     </div>
@@ -1595,7 +1596,7 @@ const CATS = [
 
 const CLASSES = [
   { id:'warrior', name:'Warrior', col:'#c04030', lt:'#f09888', glow:'rgba(192,64,48,.45)',
-    move:10.125, cargo:14, peckAmt:3, peckCd:0.91, scale:1.0, sct:35, trips:3,
+    move:10.125, cargo:14, peckAmt:3, peckCd:0.79, scale:1.0, sct:35, trips:3,
     strategy:'The ability class — mid stats, leans on his kit',
     fantasy:'The farm is a battlefield.',
     essence:'The bruiser. Good for all, expert in nothing. Spams abilities.',
@@ -1607,7 +1608,7 @@ const CLASSES = [
     ],
     violation:'Wing Slam sits at a 12 s cooldown — the longest in the game, on the class whose entire identity is spamming. The kit contradicts the essence here, and it is flagged for re-tuning.' },
   { id:'speedy', name:'Speedy', col:'#e85a2a', lt:'#ffb088', glow:'rgba(232,90,42,.45)',
-    move:12.15, cargo:10, peckAmt:3, peckCd:0.77, scale:0.85, sct:30, trips:4,
+    move:12.15, cargo:10, peckAmt:3, peckCd:0.71, scale:0.85, sct:30, trips:4,
     strategy:'Throughput — many small loads, roams wide',
     fantasy:'If you cannot catch me, you cannot rob me.',
     essence:'The fastest one. Pick all the grain you can in the shortest time. Tools for escaping and slowing others — but never jumping obstacles, because it would be unfair.',
@@ -1619,7 +1620,7 @@ const CLASSES = [
       ['Speed Burst is legal precisely because it is not traversal','A pure ground multiplier deepens the identity; a jump would bypass the geometry that balances him.']
     ] },
   { id:'fatty', name:'Fatty', col:'#f5d75a', lt:'#fff3b0', glow:'rgba(245,215,90,.4)',
-    move:10.125, cargo:35, peckAmt:3, peckCd:0.78, scale:1.35, sct:30, trips:2,
+    move:10.125, cargo:35, peckAmt:3, peckCd:0.71, scale:1.35, sct:30, trips:2,
     strategy:'Payload — one huge sweep, barely returns',
     fantasy:'Slow, but it all fits in the beak.',
     essence:'The slow but unstoppable force that carries no matter what. Jumps must be justified in the narrative, given the big size and low agility. His toolbox is opportunity and control.',
@@ -1649,7 +1650,7 @@ const ABILITIES = [
   /* ---- COMMON ---- */
   A({id:'peck', name:'Peck', short:'PECK', cls:['warrior','speedy','fatty'], cat:3, kind:0, cd:0.8, dur:0.4,
      accent:'#f5cc4d', desc:'Take a beakful of food from the pile you are standing at.',
-     stats:[['Food per press','3'],['Cooldown','per class, 0.77–0.91 s']],
+     stats:[['Food per press','3'],['Cooldown','per class, 0.71–0.79 s']],
      note:'Foraging IS Peck — there is no passive collection. The Assassin is excluded from this ability outright, which is exactly why he cannot farm.'}),
   A({id:'eggshell', name:'Egg Shell', short:'EGG', cls:['warrior','speedy','fatty','assassin'], cat:2, kind:0, cd:8, dur:2.0,
      accent:'#ebf0ff', desc:'Hide in an egg for 2 seconds. You can\'t move, but nobody can push you, stop you or steal your food.',

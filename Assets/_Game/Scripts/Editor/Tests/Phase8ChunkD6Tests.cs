@@ -90,7 +90,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(720f, st.TurnSpeed, 1e-4f);
             Assert.AreEqual(10, st.CargoCapacity);
             Assert.AreEqual(3f, st.PeckAmount, 1e-4f);
-            Assert.AreEqual(0.77f, st.PeckCooldown, 1e-4f);
+            Assert.AreEqual(0.71f, st.PeckCooldown, 1e-4f);
             Assert.AreEqual(Entry(ChickenClass.Speedy).Stats, st, "registry still points at the same stats asset");
         }
 

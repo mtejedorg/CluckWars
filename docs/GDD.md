@@ -85,7 +85,12 @@ Every stat is a *dependent variable* solved against SCT — we don't pick `MoveS
 9 feels nice, we pick it because Speedy must clear in 30 s. This is verified automatically
 by the **Balance Oracle** (a pure-C# simulator, `Assets/_Game/Scripts/Balance/`) which
 runs the greedy policy on the real pile coordinates and asserts each class lands within
-±1.5 s of its target.
+±1.5 s of its target, from all four seats. Travel is **reach-aware**: a chicken does not walk
+to a pile's centre or a base's centre, so each leg is
+`max(0, centre distance − r_from − r_to)`, where a base's radius is its deposit radius
+(`PlayerBase._depositRadius`, 2.5 m) and a pile's is its oval's radius toward the other end
+plus the peck reach (`FoodPile._collectReach`, 1.0 m). The nearest pile is still chosen
+centre-to-centre. Walls and detours are not modelled.
 
 | Class | SCT | Trips | Strategy |
 |---|---|---|---|
@@ -420,7 +425,7 @@ Classes differ by stat spread, passive pool, and **class-gated ability access** 
 | Stat | Meaning |
 |---|---|
 | **Cargo Capacity** | Food carried before a forced return (also caps how much you can *steal* in one go) |
-| **Collection Rate** | Food/sec while standing on a pile |
+| **Peck** (amount / cooldown) | Food per press (3 for every class) and the per-class seconds between presses; the Assassin cannot forage |
 | **Move Speed** | Across-map speed |
 
 There is **no HP and no Resistance** — durability is expressed through *control resistance*
@@ -428,23 +433,26 @@ There is **no HP and no Resistance** — durability is expressed through *contro
 
 ### 5.2 The roster (stats are Oracle-solved to hit §2.1 targets)
 
-| Class | Move | Cargo | Collect | SCT | Fantasy |
+| Class | Move | Cargo | Peck cooldown | SCT | Fantasy |
 |---|---|---|---|---|---|
-| **Fatty** 🐔 | 10.125 | 35 | 3.2 | 30 s / 2 trips | *"Slow, but it all fits in the beak."* |
-| **Speedy** 🐤 | 12.15 | 10 | 3.0 | 30 s / 4 trips | *"If you can't catch me, you can't rob me."* |
-| **Warrior** ⚔️ | 10.125 | 14 | 2.6 | 35 s / 3 trips | *"The farm is a battlefield."* |
-| **Assassin** 🗡️ | 12.15 | 10 | 1.7 | 40 s / 4 trips | *"Blink and your food is gone."* |
+| **Fatty** 🐔 | 10.125 | 35 | 0.71 s | 30 s / 2 trips | *"Slow, but it all fits in the beak."* |
+| **Speedy** 🐤 | 12.15 | 10 | 0.71 s | 30 s / 4 trips | *"If you can't catch me, you can't rob me."* |
+| **Warrior** ⚔️ | 10.125 | 14 | 0.79 s | 35 s / 3 trips | *"The farm is a battlefield."* |
+| **Assassin** 🗡️ | 12.15 | 10 | n/a (cannot forage) | 40 s / 4 trips | *"Blink and your food is gone."* |
 
 > **Move speeds are the x1.35 values** from the 2026-08-14 arena rescale (38 m -> 51.3 m).
-> Arena and speed scaled together, so SCT is unchanged — travel time is `distance / speed`
+> Arena and speed scaled together, so SCT was unchanged then — travel time is `distance / speed`
+> (no longer exactly scale-invariant: the reach-aware legs subtract fixed 2.5 m / 1.0 m radii that
+> do not scale with the arena)
 > and both moved by the same factor. The table above previously still listed the pre-rescale
 > 7.5 / 9.0; the authority is `Assets/_Game/Data/Classes/*.asset`, solved against
 > `BalanceOracle`, never this table.
 
 **The load-bearing detail:** Speedy and Assassin share Move Speed (12.15) and cargo (10) but
-clear in 30 s vs 40 s — the entire gap is **Collection Rate** (3.0 vs 1.7). The Assassin is
-a fast chicken who is *genuinely bad at farming*; that is the mechanical reason he denies
-instead of collects.
+target 30 s vs 40 s — the gap is that Speedy forages (Peck every 0.71 s) and the Assassin
+cannot forage at all (his 40 s target is exempt from the farming axiom, `SctTargets.Exempt`). The
+Assassin is a fast chicken who is *genuinely bad at farming*; that is the mechanical reason he
+denies instead of collects.
 
 **Speedy never gets terrain traversal.** Not a jump, not a Blink, not a Vault — Maestro,
 2026-08-21: *"Speedy can use control on other chickens and escape just by having more speed.

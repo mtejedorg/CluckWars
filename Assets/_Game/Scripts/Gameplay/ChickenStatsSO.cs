@@ -36,8 +36,8 @@ namespace CluckWars.Gameplay
         [Header("Peck (foraging)")]
         [Tooltip("Food taken from a pile per Peck press. Authored per class from day one even " +
                  "though all four currently share a value: with a uniform amount, per-class " +
-                 "COOLDOWN is the only lever, and it barely separates Speedy from Fatty " +
-                 "(their solved cooldowns land within 0.01s). Amount is the lever that would " +
+                 "COOLDOWN is the only lever, and it does not separate Speedy from Fatty " +
+                 "(both solve to 0.71s). Amount is the lever that would " +
                  "actually differentiate them.")]
         [Min(0.1f)] public float PeckAmount = 3f;
 
@@ -45,7 +45,8 @@ namespace CluckWars.Gameplay
                  "hand-tune it; change SctTargets and re-solve. Note a partial press still costs " +
                  "a full cooldown, so the effective rate (amount/cooldown) sits ~20-30% above the " +
                  "old CollectionRate for the same clear time. That gap is quantisation waste, " +
-                 "not a buff.")]
+                 "not a buff. Solved on the reach-aware Oracle map (legs shortened by the base " +
+                 "deposit radius, pile oval and peck reach), checked from all four seats.")]
         [Min(0.05f)] public float PeckCooldown = 1f;
 
         [Header("Visuals")]

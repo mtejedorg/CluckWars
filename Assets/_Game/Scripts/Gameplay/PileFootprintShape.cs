@@ -193,6 +193,22 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
+        /// Radius of the footprint ellipse from its centre along a WORLD XZ direction
+        /// (<paramref name="dirXZ"/> need not be normalised; a zero vector gives the first semi-axis).
+        /// </summary>
+        public static float RadiusToward(Vector2 dirXZ, float yawDeg, Vector2 footprint)
+        {
+            float a = footprint.x * 0.5f, b = footprint.y * 0.5f;
+            if (a <= 0f || b <= 0f) return 0f;
+            if (dirXZ.sqrMagnitude < 1e-12f) return a;
+            var local = ToLocal(new Vector3(dirXZ.x, 0f, dirXZ.y), Vector3.zero, yawDeg);
+            float c = local.x, s = local.y;
+            float len2 = c * c + s * s;
+            // r(theta) = ab / sqrt(b^2 cos^2 + a^2 sin^2), with cos/sin from the unnormalised local vector.
+            return a * b * Mathf.Sqrt(len2) / Mathf.Sqrt(b * b * c * c + a * a * s * s);
+        }
+
+        /// <summary>
         /// Shortest XZ distance from <paramref name="worldPos"/> to the footprint ellipse's
         /// surface; 0 inside. This is what makes collection surface-relative (a chicken pressed
         /// against any side of a pile is the same ~0.58 m away) now that the surface is an oval.

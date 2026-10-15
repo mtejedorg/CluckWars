@@ -1,3 +1,4 @@
+using CluckWars.Gameplay;
 using UnityEngine;
 
 namespace CluckWars.Balance
@@ -5,7 +6,9 @@ namespace CluckWars.Balance
     /// <summary>
     /// Solo Clear Time simulator. Runs the greedy "farm nearest pile, return when full"
     /// policy the SCT axiom describes and returns seconds + trip count. Pure, deterministic,
-    /// no Fusion — spec §7.1. Travel is straight-line (walls are the PlayMode layer's job, §7.2).
+    /// no Fusion — spec §7.1. Travel is straight-line (walls are the PlayMode layer's job, §7.2)
+    /// but reach-aware: each leg is the centre distance minus the radius the chicken does not
+    /// have to walk at either end (see <see cref="OracleMap"/>).
     /// </summary>
     public static class BalanceOracle
     {
@@ -13,13 +16,32 @@ namespace CluckWars.Balance
         private const int MaxIterations = 10_000;
         private const float Epsilon = 1e-4f;
 
+        private const int AtBase = -1;
+
+        /// <summary>Walkable length of a leg between two places; <c>-1</c> is the base, otherwise a pile index.</summary>
+        private static float Leg(OracleMap map, int from, int to)
+        {
+            Vector2 a = from == AtBase ? map.BasePos : map.Piles[from].Pos;
+            Vector2 b = to == AtBase ? map.BasePos : map.Piles[to].Pos;
+            float centreDistance = Vector2.Distance(a, b);
+            return Mathf.Max(0f, centreDistance - Radius(map, from, b - a) - Radius(map, to, a - b));
+        }
+
+        /// <summary>Radius around a place that need not be walked: base deposit radius, or a pile's oval toward <paramref name="toward"/> plus peck reach.</summary>
+        private static float Radius(OracleMap map, int place, Vector2 toward)
+        {
+            if (place == AtBase) return map.BaseRadius;
+            var pile = map.Piles[place];
+            return PileFootprintShape.RadiusToward(toward, pile.Yaw, pile.Footprint) + map.CollectReach;
+        }
+
         public static OracleResult Simulate(OracleMap map, OracleChicken chicken, float winTarget)
         {
             // Mutable copy of pile food so the input map is not modified.
             float[] remaining = new float[map.Piles.Length];
             for (int i = 0; i < map.Piles.Length; i++) remaining[i] = map.Piles[i].Food;
 
-            Vector2 pos = map.BasePos;
+            int at = AtBase;
             float carrying = 0f;
             float banked = 0f;
             float time = 0f;
@@ -38,8 +60,8 @@ namespace CluckWars.Balance
                 if (full || (!anyFood && carrying > Epsilon))
                 {
                     // ---- return to base and deposit ----
-                    time += Vector2.Distance(pos, map.BasePos) / chicken.MoveSpeed;
-                    pos = map.BasePos;
+                    time += Leg(map, at, AtBase) / chicken.MoveSpeed;
+                    at = AtBase;
 
                     float needed = winTarget - banked;
                     if (carrying >= needed - Epsilon)
@@ -60,18 +82,18 @@ namespace CluckWars.Balance
 
                 if (anyFood)
                 {
-                    // ---- walk to the nearest pile that still has food, collect ----
+                    // ---- walk to the nearest pile (centre-to-centre) that still has food, collect ----
                     int nearest = -1;
                     float bestDist = float.MaxValue;
                     for (int i = 0; i < remaining.Length; i++)
                     {
                         if (remaining[i] <= Epsilon) continue;
-                        float d = Vector2.Distance(pos, map.Piles[i].Pos);
+                        float d = Vector2.Distance(at == AtBase ? map.BasePos : map.Piles[at].Pos, map.Piles[i].Pos);
                         if (d < bestDist) { bestDist = d; nearest = i; }
                     }
 
-                    time += bestDist / chicken.MoveSpeed;
-                    pos = map.Piles[nearest].Pos;
+                    time += Leg(map, at, nearest) / chicken.MoveSpeed;
+                    at = nearest;
 
                     float space = capacity - carrying;
                     float take = Mathf.Min(space, remaining[nearest]);

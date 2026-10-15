@@ -20,7 +20,7 @@ namespace CluckWars.Abilities
     /// Foraging cadence is solved against the SCT axiom per class, so it is a class stat.
     /// All four classes currently share <c>PeckAmount = 3</c> and differ only in cooldown —
     /// but the amount is authored per class from day one because with a uniform amount the
-    /// cooldown is the only lever, and it barely separates Speedy (0.77s) from Fatty (0.78s).
+    /// cooldown is the only lever, and it does not separate Speedy from Fatty at all (both 0.71s).
     ///
     /// <b>The movement lock is a balance requirement, not just feel.</b> The Balance Oracle
     /// charges travel and collection sequentially — walk to the pile, then stand and take

@@ -1,5 +1,9 @@
 using System.Collections.Generic;
+using System.Linq;
+using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
+using CluckWars.Balance;
 using CluckWars.Gameplay;
 
 namespace CluckWars.Tests
@@ -83,6 +87,74 @@ namespace CluckWars.Tests
                 discs.Add(new KeepClearDisc(new Vector2(contested.x, contested.z), contestedRadius));
             }
             return discs.ToArray();
+        }
+
+        // ---- the nine piles + the Oracle map -------------------------------------------------
+
+        /// <summary>One shipped pile: name, centre, oval yaw/footprint and starting food.</summary>
+        public struct PileSpec
+        {
+            public string Name;
+            public Vector3 Pos;
+            public float Yaw;
+            public Vector2 Footprint;
+            public float Food;
+        }
+
+        /// <summary>The 9 piles exactly as <c>MapGenerator.SpawnFoodPiles</c> places them for a given per-match nudge.</summary>
+        public static List<PileSpec> ShippedPiles(Vector2 personalNudge, Vector2 contestedNudge)
+        {
+            var corners = Corners();
+            var piles = new List<PileSpec>
+            {
+                new PileSpec { Name = "Center", Pos = Vector3.zero, Yaw = 0f, Footprint = CentrePileFootprint,
+                               Food = TestAssets.SceneFloat("_centerPileAmount") },
+            };
+            for (int i = 0; i < 4; i++)
+            {
+                var p = MapGenerator.OuterPilePosition(MapGenerator.PersonalPileNominal(corners[i], PersonalPileInset), personalNudge, i);
+                piles.Add(new PileSpec { Name = $"Personal{i}", Pos = p, Yaw = PileFootprintShape.RadialLongAxisYaw(p),
+                                         Footprint = PersonalPileFootprint, Food = TestAssets.SceneFloat("_personalPileAmount") });
+            }
+            for (int i = 0; i < 4; i++)
+            {
+                var p = MapGenerator.OuterPilePosition(
+                    MapGenerator.ContestedPileNominal(corners[i], corners[(i + 1) % 4], ContestedEdgeInset), contestedNudge, i);
+                piles.Add(new PileSpec { Name = $"Contested{i}", Pos = p, Yaw = PileFootprintShape.RadialLongAxisYaw(p),
+                                         Footprint = ContestedPileFootprint, Food = TestAssets.SceneFloat("_contestedPileAmount") });
+            }
+            return piles;
+        }
+
+        /// <summary>Deposit radius, read off the shipped <c>PlayerBase.prefab</c>.</summary>
+        public static float BaseDepositRadius => TestAssets.PrivateField<float>(
+            TestAssets.Load<GameObject>(TestAssets.PlayerBasePrefabPath).GetComponent<PlayerBase>(), "_depositRadius");
+
+        /// <summary>Peck reach, read off the shipped <c>FoodPile.prefab</c>.</summary>
+        public static float PileCollectReach => TestAssets.PrivateField<float>(
+            TestAssets.Load<GameObject>(TestAssets.FoodPilePrefabPath).GetComponent<FoodPile>(), "_collectReach");
+
+        /// <summary>
+        /// The map the SCT axiom is solved on, as seat <paramref name="seat"/> sees it: that
+        /// corner's base, all nine piles (no nudge: shipped jitter is 0), the shipped footprints,
+        /// yaws and food, and the prefab deposit radius + peck reach. The centre pile is not
+        /// permanent in the shipped scene, so its whole amount is farmable.
+        /// </summary>
+        public static OracleMap OracleMap(int seat)
+        {
+            Assert.IsFalse(TestAssets.SceneFloat("_centerPileIsPermanent") > 0.5f,
+                "The centre pile is permanent in Game.unity: only the food above its floor is farmable. Teach ShippedMap.OracleMap that before trusting any SCT number.");
+            var spawn = MapGenerator.SpawnPointNominal(Corners()[seat]);
+            return new OracleMap
+            {
+                BasePos = new Vector2(spawn.x, spawn.z),
+                BaseRadius = BaseDepositRadius,
+                CollectReach = PileCollectReach,
+                Piles = ShippedPiles(Vector2.zero, Vector2.zero).Select(p => new OraclePile
+                {
+                    Pos = new Vector2(p.Pos.x, p.Pos.z), Food = p.Food, Footprint = p.Footprint, Yaw = p.Yaw,
+                }).ToArray(),
+            };
         }
 
         public static ScatterSettings ScatterSettings() => new ScatterSettings(

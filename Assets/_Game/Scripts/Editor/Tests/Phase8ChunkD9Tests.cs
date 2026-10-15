@@ -9,6 +9,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.SceneManagement;
+using PileSpec = CluckWars.Tests.ShippedMap.PileSpec;
 
 namespace CluckWars.Tests
 {
@@ -56,45 +57,14 @@ namespace CluckWars.Tests
 
         // ---- shipped layout (Game.unity values + the generator's own formulas) -----------------
 
-        private struct PileSpec
-        {
-            public string Name;
-            public Vector3 Pos;
-            public float Yaw;
-            public Vector2 Footprint;
-            public float Food;
-        }
-
         private static Vector3 Rot90(Vector3 v, int turns)
         {
             for (int k = 0; k < ((turns % 4) + 4) % 4; k++) v = new Vector3(-v.z, 0f, v.x);
             return v;
         }
 
-        /// <summary>The 9 piles exactly as <c>MapGenerator.SpawnFoodPiles</c> places them for a given per-match nudge.</summary>
-        private static List<PileSpec> ShippedPiles(Vector2 personalNudge, Vector2 contestedNudge)
-        {
-            var corners = ShippedMap.Corners();
-            var piles = new List<PileSpec>
-            {
-                new PileSpec { Name = "Center", Pos = Vector3.zero, Yaw = 0f, Footprint = ShippedMap.CentrePileFootprint,
-                               Food = TestAssets.SceneFloat("_centerPileAmount") },
-            };
-            for (int i = 0; i < 4; i++)
-            {
-                var p = MapGenerator.OuterPilePosition(MapGenerator.PersonalPileNominal(corners[i], ShippedMap.PersonalPileInset), personalNudge, i);
-                piles.Add(new PileSpec { Name = $"Personal{i}", Pos = p, Yaw = PileFootprintShape.RadialLongAxisYaw(p),
-                                         Footprint = ShippedMap.PersonalPileFootprint, Food = TestAssets.SceneFloat("_personalPileAmount") });
-            }
-            for (int i = 0; i < 4; i++)
-            {
-                var p = MapGenerator.OuterPilePosition(
-                    MapGenerator.ContestedPileNominal(corners[i], corners[(i + 1) % 4], ShippedMap.ContestedEdgeInset), contestedNudge, i);
-                piles.Add(new PileSpec { Name = $"Contested{i}", Pos = p, Yaw = PileFootprintShape.RadialLongAxisYaw(p),
-                                         Footprint = ShippedMap.ContestedPileFootprint, Food = TestAssets.SceneFloat("_contestedPileAmount") });
-            }
-            return piles;
-        }
+        private static List<ShippedMap.PileSpec> ShippedPiles(Vector2 personalNudge, Vector2 contestedNudge) =>
+            ShippedMap.ShippedPiles(personalNudge, contestedNudge);
 
         private static Vector3[] ShippedBases() => ShippedMap.Corners().Select(MapGenerator.SpawnPointNominal).ToArray();
 
@@ -381,9 +351,9 @@ namespace CluckWars.Tests
         // ---- oracle: equal travel per seat, from the shipped scene -------------------------------
 
         /// <summary>
-        /// Builds the Oracle map from MAP.UNITY's baked discs (piles + bases), after pinning them to
-        /// the generator's formulas, so the numbers are the shipped geometry - not the drifted
-        /// <c>BalanceOracleTests.Task8OracleMap</c> fixture and not a restatement of literals.
+        /// Runs the Oracle on <see cref="ShippedMap.OracleMap"/> (the generator's formulas over
+        /// Game.unity + prefab values), after pinning MAP.UNITY's baked discs (piles + bases) to
+        /// those same formulas, so the numbers are the shipped geometry and not a restatement of literals.
         /// </summary>
         [Test]
         public void Oracle_TravelAndSct_AreEqualAcrossTheFourSeats_OnTheShippedMap()
@@ -395,6 +365,8 @@ namespace CluckWars.Tests
             {
                 var disc = geo.Find("PileZone_" + s.Name);
                 Assert.IsNotNull(disc);
+                Assert.Less(Vector2.Distance(new Vector2(disc.position.x, disc.position.z), new Vector2(s.Pos.x, s.Pos.z)), 0.01f,
+                    $"Map.unity's PileZone_{s.Name} is not where the generator's formulas put the pile.");
                 return (s, pos: new Vector2(disc.position.x, disc.position.z), yaw: disc.eulerAngles.y,
                         fp: new Vector2(disc.lossyScale.x, disc.lossyScale.z));
             }).ToList();
@@ -410,7 +382,6 @@ namespace CluckWars.Tests
             var stats = TestAssets.LoadAllIn<ChickenStatsSO>(TestAssets.ClassesDir).Where(s => SctTargets.All.Any(t => t.ClassName == s.DisplayName)).ToList();
             Assert.IsNotEmpty(stats);
 
-            var oracleMap = piles.Select(p => new OraclePile { Pos = p.pos, Food = p.s.Food }).ToArray();
             var report = new System.Text.StringBuilder("[D9] per seat:");
             float[] refTravel = null;
             var refSct = new Dictionary<string, OracleResult>();
@@ -442,7 +413,7 @@ namespace CluckWars.Tests
 
                 foreach (var s in stats)
                 {
-                    var r = BalanceOracle.Simulate(new OracleMap { BasePos = bases[seat], Piles = oracleMap },
+                    var r = BalanceOracle.Simulate(ShippedMap.OracleMap(seat),
                         new OracleChicken { MoveSpeed = s.MoveSpeed, CargoCapacity = s.CargoCapacity, PeckAmount = s.PeckAmount,
                                             PeckCooldown = s.PeckCooldown, DepositRate = config.DepositRatePerSecond },
                         config.FoodTargetToWin);

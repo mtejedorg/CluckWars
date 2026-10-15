@@ -8,7 +8,8 @@ namespace CluckWars.Tests
     /// <summary>
     /// EditMode tests for the Balance Oracle (spec: docs/superpowers/specs/
     /// 2026-07-24-cluck-wars-core-redesign-design.md §7). Pure-C# simulation, so every
-    /// case here is hand-computable: travel = distance / speed,
+    /// case here is hand-computable: travel = walkable leg / speed (the centre distance minus the
+    /// base deposit radius and the pile's oval radius + peck reach, floored at 0),
     /// collect = ceil(food / PeckAmount) * PeckCooldown, deposit = units / depositRate.
     /// <para>
     /// The collect term used to be <c>units / CollectionRate</c>. It changed when food
@@ -19,51 +20,12 @@ namespace CluckWars.Tests
     public sealed class BalanceOracleTests
     {
         /// <summary>
-        /// The map every SCT number is solved against. Coordinates were rescaled x1.35 on
-        /// 2026-08-14 in lockstep with the arena (<c>_planeSize</c> 38 -> 51.3).
-        /// </summary>
-        /// <remarks>
-        /// <b>Scaling this fixture is what makes the arena rescale SCT-neutral, and it is not
-        /// optional.</b> Every travel term in <see cref="BalanceOracle"/> is
-        /// <c>distance / speed</c>, so scaling the map and every <c>MoveSpeed</c> by the same
-        /// factor leaves all three classes' clear times bit-identical. Scaling only one side
-        /// moves them by 3–5 s, far outside the ±1.5 s tolerance. Measured, both ways, before
-        /// the change was made.
-        /// <para>
-        /// ⚠️ <b>Known pre-existing drift, deliberately NOT fixed here.</b> These absolute
-        /// coordinates are smaller than the arena the game actually builds: the base sits at
-        /// r = 21.0 against a real spawn at r = 30.8, and the doorstep piles at r = 16.5
-        /// against a real r = 22.9. The fixture predates the current
-        /// <c>_baseCornerDistance</c> and was never re-derived. Correcting it would lengthen
-        /// every trip and force a full re-solve of all three classes' speeds — a balance
-        /// change, not a rescale — so it is out of scope for the x1.35 pass and flagged for
-        /// <c>mechanics-designer</c>. <see cref="OracleFixture_Scale_TracksTheAuthoredArena"/>
-        /// pins the ratio so the two can no longer drift further apart silently.
-        /// </para>
-        /// </remarks>
-        private static OracleMap Task8OracleMap()
-        {
-            return new OracleMap
-            {
-                BasePos = new Vector2(14.85f, 14.85f),
-                Piles = new[]
-                {
-                    new OraclePile { Pos = new Vector2(12.0555f, 11.2995f),   Food = 5f },  // Personal0
-                    new OraclePile { Pos = new Vector2(11.7180f, -0.3510f),   Food = 10f }, // Contested3
-                    new OraclePile { Pos = new Vector2(0.0000f, 0.0000f),     Food = 20f }, // Center
-                    new OraclePile { Pos = new Vector2(-1.4175f, 13.3380f),   Food = 10f }, // Contested0
-                    new OraclePile { Pos = new Vector2(10.5300f, -11.5290f),  Food = 5f },  // Personal3
-                    new OraclePile { Pos = new Vector2(-10.9890f, 11.8260f),  Food = 5f },  // Personal1
-                    new OraclePile { Pos = new Vector2(-12.0690f, 0.5805f),   Food = 10f }, // Contested1
-                    new OraclePile { Pos = new Vector2(-10.4895f, -10.0575f), Food = 5f },  // Personal2
-                    new OraclePile { Pos = new Vector2(0.9855f, -13.6080f),   Food = 10f }  // Contested2
-                }
-            };
-        }
-
-        /// <summary>
         /// The SCT axiom, asserted against the <b>shipped</b> <see cref="ChickenStatsSO"/> and
-        /// <see cref="MatchConfigSO"/> assets rather than against literals.
+        /// <see cref="MatchConfigSO"/> assets rather than against literals, on the shipped map
+        /// (<see cref="ShippedMap.OracleMap"/>) from every one of the four seats. The map is
+        /// reach-aware (Option B): it carries the prefab deposit radius, peck reach and oval
+        /// footprints, so a change to arena size, base distance, pile footprints, pile food,
+        /// deposit radius or peck reach moves these numbers and fails here.
         /// </summary>
         /// <remarks>
         /// ⚠️ <b>This test previously hardcoded its inputs</b> — four <c>OracleChicken</c>
@@ -80,7 +42,6 @@ namespace CluckWars.Tests
         [Test]
         public void RealMap_ShippedClassAssets_SatisfyTheSctAxiom()
         {
-            var map = Task8OracleMap();
             var config = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
             var stats = TestAssets.LoadAllIn<ChickenStatsSO>(TestAssets.ClassesDir);
 
@@ -111,89 +72,86 @@ namespace CluckWars.Tests
                     DepositRate   = config.DepositRatePerSecond,
                 };
 
-                var result = BalanceOracle.Simulate(map, chicken, config.FoodTargetToWin);
+                for (int seat = 0; seat < 4; seat++)
+                {
+                    var result = BalanceOracle.Simulate(ShippedMap.OracleMap(seat), chicken, config.FoodTargetToWin);
 
-                Assert.IsTrue(SctTargets.Within(result, target),
-                    $"{target.ClassName} misses its SCT target: got {result.SctSeconds:0.0}s / {result.Trips} trips, " +
-                    $"want {target.Seconds}s / {target.Trips} trips (±{SctTargets.DefaultToleranceSeconds}s). " +
-                    $"Shipped stats: move {s.MoveSpeed}, cap {s.CargoCapacity}, " +
-                    $"peck {s.PeckAmount} per {s.PeckCooldown}s, " +
-                    $"deposit {config.DepositRatePerSecond}, W {config.FoodTargetToWin}. " +
-                    "Stats are solved AGAINST this axiom — re-solve them, do not relax the target.");
+                    Assert.IsTrue(SctTargets.Within(result, target),
+                        $"{target.ClassName} (seat {seat}) misses its SCT target: got {result.SctSeconds:0.0}s / {result.Trips} trips, " +
+                        $"want {target.Seconds}s / {target.Trips} trips (±{SctTargets.DefaultToleranceSeconds}s). " +
+                        $"Shipped stats: move {s.MoveSpeed}, cap {s.CargoCapacity}, " +
+                        $"peck {s.PeckAmount} per {s.PeckCooldown}s, " +
+                        $"deposit {config.DepositRatePerSecond}, W {config.FoodTargetToWin}. " +
+                        "Stats are solved AGAINST this axiom — re-solve them, do not relax the target.");
+                }
             }
         }
 
         /// <summary>
-        /// The Oracle fixture's pile layout must stay in step with <see cref="MapGenerator"/>'s
-        /// authored food amounts, or the axiom is solved against a map that is not the one
-        /// being played. Guards the other half of the drift surface: §<see
-        /// cref="RealMap_ShippedClassAssets_SatisfyTheSctAxiom"/> pins the chickens, this pins
-        /// the map they farm.
+        /// The map the axiom is solved on must be the map the game builds: nine piles carrying
+        /// exactly twice the win target (80 of 40), the figure every pile amount in
+        /// <c>Game.unity</c> is tuned to. A change to a pile amount without re-solving the
+        /// classes (or to the win target without re-tuning the piles) lands here first.
         /// </summary>
-        /// <remarks>
-        /// Reads the values out of <c>Game.unity</c>'s YAML rather than off a MapGenerator
-        /// instance, for two reasons. MapGenerator's <c>Awake</c> builds the plane, the walls,
-        /// the obstacles and a NavMesh, so instantiating one in an EditMode test is a heavy
-        /// side effect. More importantly the scene <b>overrides</b> the C# field initializers,
-        /// so reading the code defaults would assert against numbers the game never uses.
-        /// </remarks>
         [Test]
-        public void OracleFixture_PileFood_MatchesTheAuthoredMap()
+        public void ShippedMap_TotalFood_IsTwiceTheWinTarget()
         {
-            float centre    = TestAssets.SceneFloat("_centerPileAmount");
-            float personal  = TestAssets.SceneFloat("_personalPileAmount");
-            float contested = TestAssets.SceneFloat("_contestedPileAmount");
-
-            float expected = centre + 4f * personal + 4f * contested;
-            float actual = 0f;
-            foreach (var p in Task8OracleMap().Piles) actual += p.Food;
-
-            Assert.AreEqual(expected, actual, 0.01f,
-                $"The Oracle fixture holds {actual} food but Game.unity authors {expected} " +
-                $"(centre {centre} + 4x personal {personal} + 4x contested {contested}). " +
-                "Every SCT number is solved on this map — update Task8OracleMap to match, " +
-                "then re-solve the class stats against the new supply.");
+            var config = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
+            float total = 0f;
+            foreach (var p in ShippedMap.OracleMap(0).Piles) total += p.Food;
+            Assert.AreEqual(2f * config.FoodTargetToWin, total, 0.01f,
+                $"Game.unity authors {total} food but the win target is {config.FoodTargetToWin} (map should hold 2x).");
         }
 
-        /// <summary>
-        /// The Oracle fixture's GEOMETRY must stay in step with the arena the game builds.
-        /// Companion to <see cref="OracleFixture_PileFood_MatchesTheAuthoredMap"/>, which
-        /// pins the fixture's food but says nothing about its distances — and distance is
-        /// half of every travel term the SCT axiom is solved from.
-        /// </summary>
-        /// <remarks>
-        /// Asserts a dimensionless RATIO rather than absolute coordinates, deliberately.
-        /// The fixture's absolute positions are known to be smaller than the real map (see
-        /// <see cref="Task8OracleMap"/>), so an absolute check could only be written by
-        /// restating the fixture's own numbers — the exact self-referential shape that let
-        /// the 2026-08-13 speed drift ship. The ratio is the real invariant: resize the
-        /// arena in <c>Game.unity</c> without rescaling this fixture (or the reverse) and
-        /// this goes red, which is precisely the mistake that would silently invalidate
-        /// every solved MoveSpeed.
-        /// </remarks>
-        [Test]
-        public void OracleFixture_Scale_TracksTheAuthoredArena()
+        // ---- reach-aware legs (hand-computed) -----------------------------------------------
+
+        private static OracleChicken TenEverything() => new OracleChicken
         {
-            // Pinned when the fixture and the arena were last rescaled together (x1.35,
-            // 2026-08-14). Unchanged by that pass, because both sides moved.
-            const float expectedRatio = 0.6442f;
+            MoveSpeed = 1f, CargoCapacity = 10, PeckAmount = 10f, PeckCooldown = 0.001f, DepositRate = 1000f
+        };
 
-            float arenaHalfSize = TestAssets.SceneFloat("_planeSize") * 0.5f;
-            Assert.Greater(arenaHalfSize, 0f, "Game.unity authors a non-positive _planeSize.");
+        /// <summary>Time of a single base -> pile -> base run with ~free pecking/deposit = 2 legs at speed 1.</summary>
+        private static float RoundTrip(OracleMap map)
+        {
+            var r = BalanceOracle.Simulate(map, TenEverything(), winTarget: 10f);
+            Assert.IsTrue(r.ReachedTarget);
+            return r.SctSeconds - 0.001f - 10f / 1000f; // minus one peck cooldown and the deposit
+        }
 
-            float furthestPile = 0f;
-            foreach (var p in Task8OracleMap().Piles)
-                furthestPile = Mathf.Max(furthestPile, p.Pos.magnitude);
+        [Test]
+        public void Leg_SubtractsBaseRadius_PileRadius_AndReach()
+        {
+            // centre distance 10, base radius 2.5, 2x2 pile -> oval radius 1, reach 1  =>  10 - 2.5 - 2 = 5.5 each way
+            var map = new OracleMap
+            {
+                BasePos = Vector2.zero, BaseRadius = 2.5f, CollectReach = 1f,
+                Piles = new[] { new OraclePile { Pos = new Vector2(10f, 0f), Food = 10f, Footprint = new Vector2(2f, 2f) } },
+            };
+            Assert.AreEqual(2f * 5.5f, RoundTrip(map), 0.01f);
+        }
 
-            float ratio = furthestPile / arenaHalfSize;
+        [Test]
+        public void Leg_UsesTheOvalRadiusTowardTheOtherEnd()
+        {
+            // 4x2 oval, base on its +X side. Yaw 0: long axis points at the base -> radius 2. Yaw 90: short axis -> radius 1.
+            OracleMap Map(float yaw) => new OracleMap
+            {
+                BasePos = Vector2.zero,
+                Piles = new[] { new OraclePile { Pos = new Vector2(10f, 0f), Food = 10f, Footprint = new Vector2(4f, 2f), Yaw = yaw } },
+            };
+            Assert.AreEqual(2f * (10f - 2f), RoundTrip(Map(0f)), 0.01f, "long axis toward the base");
+            Assert.AreEqual(2f * (10f - 1f), RoundTrip(Map(90f)), 0.01f, "short axis toward the base");
+        }
 
-            Assert.AreEqual(expectedRatio, ratio, 0.01f,
-                $"The Oracle fixture's outermost pile sits at r={furthestPile:0.00} in a " +
-                $"{arenaHalfSize * 2f:0.0} m arena (ratio {ratio:0.0000}, expected {expectedRatio:0.0000}). " +
-                "The arena and the fixture have been scaled by different amounts, so every class's " +
-                "SCT is now solved against a map the game does not build. Rescale Task8OracleMap by " +
-                "the same factor as _planeSize and re-solve the MoveSpeeds — do not edit this ratio " +
-                "to make the test pass.");
+        [Test]
+        public void Leg_NeverGoesNegative_WhenTheRadiiOverlap()
+        {
+            var map = new OracleMap
+            {
+                BasePos = Vector2.zero, BaseRadius = 2.5f, CollectReach = 1f,
+                Piles = new[] { new OraclePile { Pos = new Vector2(3f, 0f), Food = 10f, Footprint = new Vector2(2f, 2f) } },
+            };
+            Assert.AreEqual(0f, RoundTrip(map), 0.01f);
         }
 
         [Test]
