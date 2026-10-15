@@ -37,6 +37,7 @@ public class PA {
     var prev = RenderTexture.active; RenderTexture.active = rt; var tex = new Texture2D(W, H, TextureFormat.RGB24, false); tex.ReadPixels(new Rect(0, 0, W, H), 0, 0); tex.Apply(); RenderTexture.active = prev;
     System.IO.File.WriteAllBytes(path, tex.EncodeToPNG()); Object.DestroyImmediate(tex); rt.Release(); Object.DestroyImmediate(rt); return "saved " + path; }
 
+  static System.Globalization.CultureInfo CI = System.Globalization.CultureInfo.InvariantCulture;
   // Tier switch. Each script-execute compiles a fresh assembly, so state rides in SessionState.
   // Preferred path: SetQualityLevel(<Mobile index>, true), so the RP asset, vSync, lodBias, skinWeights, anisotropic filtering and
   // everything else come from the real level. BUT the Mobile level is excluded from the Standalone platform: in Play mode the level

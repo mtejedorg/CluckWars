@@ -227,20 +227,31 @@ namespace CluckWars.EditorTools
         public const string ArmPanelPrefix = "InnerWall_";
 
         /// <summary>
-        /// How many panels cover an arm collider and how much each is stretched along its run.
+        /// How many panels cover an arm collider and how much each is stretched along its run,
+        /// for panels butted end to end (no shared post). The degenerate case of
+        /// <see cref="SolveArmPanels(float, float, float)"/>: post spacing = covered span = panel length.
         /// </summary>
+        public static (int Count, float Stretch) SolveArmPanels(float colliderLength, float panelLength) =>
+            SolveArmPanels(colliderLength, panelLength, panelLength);
+
+        /// <summary>
+        /// How many panels cover an arm collider when neighbours SHARE a post, and how much each
+        /// is stretched along its run (Phase 8 C13).
+        /// </summary>
+        /// <param name="colliderLength">The arm collider's length along its run.</param>
+        /// <param name="postSpacing">Unstretched distance between a panel's two post centres. It is
+        /// the pitch, so panel k's far post lands exactly on panel k+1's near post.</param>
+        /// <param name="endSpan">Unstretched run one panel covers from the middle of its near end
+        /// stub to the middle of its far end stub (<see cref="PanelProfile.EndSpan"/>).</param>
         /// <remarks>
-        /// The covered extent must equal the collider's length EXACTLY — the end panels' outer
-        /// edges land on the collider's ends, so the art stops where the chicken stops — and
-        /// panels butt end to end with no gap and no overlap (overlap would put coplanar plank
-        /// faces on top of each other and z-fight; see <see cref="SolveFenceLayout"/>). That
-        /// leaves the panel count as the only choice; round to the count whose stretch is
-        /// closest to 1 so the planks are distorted as little as possible either way.
+        /// <c>n</c> panels cover <c>stretch * ((n - 1) * postSpacing + endSpan)</c>, which must equal
+        /// the collider's length exactly. That leaves the count as the only choice; round to the
+        /// count whose stretch is closest to 1 so the planks are distorted as little as possible.
         /// </remarks>
-        public static (int Count, float Stretch) SolveArmPanels(float colliderLength, float panelLength)
+        public static (int Count, float Stretch) SolveArmPanels(float colliderLength, float postSpacing, float endSpan)
         {
-            int count = Mathf.Max(1, Mathf.RoundToInt(colliderLength / panelLength));
-            return (count, colliderLength / (count * panelLength));
+            int count = Mathf.Max(1, Mathf.RoundToInt((colliderLength - endSpan) / postSpacing) + 1);
+            return (count, colliderLength / ((count - 1) * postSpacing + endSpan));
         }
 
         [MenuItem("Cluck Wars/Map/Re-lay Arm Walls From Colliders", priority = 23)]
@@ -298,6 +309,16 @@ namespace CluckWars.EditorTools
         /// and Z (run-axis) scale are written — mesh, material and height stay as authored.
         /// Panels face outward from the hub so the 4-fold symmetry is exact.
         /// </para>
+        /// <para>
+        /// Phase 8 C13, shared posts: the panel mesh's two posts stand ~14 cm in from its ends and
+        /// the rails run on past them as stubs, so panels butted end to end read as a doubled
+        /// post with rail nubs between at every joint. Panels are laid on a pitch of their own
+        /// post spacing instead: panel k's far post and panel k+1's near post are one post, and
+        /// k's stub is buried in k+1's rails. The stub at each run END cannot go without editing
+        /// the mesh (pinned to the fence mesh by the B4/C1 tests), so the collider end sits at its
+        /// midpoint: the end post stands ~7 cm inside where the chicken stops and the nub ends
+        /// ~7 cm past it, inside the ±0.1 m coverage tolerance, instead of a 15 cm nub.
+        /// </para>
         /// </remarks>
         public static int RelayArmWalls(Transform props, Transform geometry)
         {
@@ -340,10 +361,10 @@ namespace CluckWars.EditorTools
                     .ToList();
                 var template = panels.Count > 0 ? panels[0] : anyPanel;
 
-                if (!TryMeasurePanelRun(template, out float panelLength, out float runCentre))
+                if (!TryMeasurePanelProfile(template, out var profile))
                 {
-                    Debug.LogError($"[MapPropsRescaler] '{template.name}' has no mesh to measure — " +
-                                   $"arm {arm} skipped.");
+                    Debug.LogError($"[MapPropsRescaler] '{template.name}' has no mesh with two posts to " +
+                                   $"measure — arm {arm} skipped.");
                     continue;
                 }
 
@@ -357,11 +378,15 @@ namespace CluckWars.EditorTools
                 Vector3 centre = collider.TransformPoint(box.center);
                 if (Vector3.Dot(axis, new Vector3(centre.x, 0f, centre.z)) < 0f) axis = -axis; // outward
 
-                var (count, stretch) = SolveArmPanels(length, panelLength);
-                float pitch = length / count;
+                var (count, stretch) = SolveArmPanels(length, profile.PostSpacing, profile.EndSpan);
+                float pitch = profile.PostSpacing * stretch;
                 Vector3 start = centre - axis * (length * 0.5f);
+                // Panel 0's near end-stub midpoint sits on the collider's start (see remarks).
+                Vector3 origin0 = start - axis * (stretch * (profile.RunMin + profile.NearStub * 0.5f));
                 var rotation = Quaternion.LookRotation(axis, Vector3.up);
                 float y = template.position.y;
+                // Fresh prefab instances come in at the prefab's scale; keep the template's.
+                Vector2 crossScale = new Vector2(template.localScale.x, template.localScale.y);
 
                 while (panels.Count > count)
                 {
@@ -381,13 +406,9 @@ namespace CluckWars.EditorTools
                     var panel = panels[k];
                     Undo.RecordObject(panel, "Re-lay arm wall");
                     panel.gameObject.name = $"{ArmPanelPrefix}{arm}_{k}";
-                    Vector3 mid = start + axis * (pitch * (k + 0.5f));
-                    // The mesh's run is not centred exactly on the pivot; shift so the
-                    // STRETCHED run's midpoint lands on this panel's slot.
-                    Vector3 pos = mid - axis * (runCentre * stretch);
+                    Vector3 pos = origin0 + axis * (pitch * k);
                     panel.SetPositionAndRotation(new Vector3(pos.x, y, pos.z), rotation);
-                    var s = panel.localScale;
-                    panel.localScale = new Vector3(s.x, s.y, stretch);
+                    panel.localScale = new Vector3(crossScale.x, crossScale.y, stretch);
                     total++;
                 }
             }
@@ -405,43 +426,78 @@ namespace CluckWars.EditorTools
         }
 
         /// <summary>
-        /// Measures a panel's run (its local Z, the axis <see cref="RelayArmWalls(Transform, Transform)"/>
-        /// lays along) in the panel root's own space with the root's scale removed, so the result is
-        /// the same however the panel is currently stretched.
+        /// A panel's run profile in its root's own space (local Z, the axis
+        /// <see cref="RelayArmWalls(Transform, Transform)"/> lays along) with the root's scale divided
+        /// out, so it is the same however the panel is currently stretched: where the mesh starts
+        /// and ends and where its two posts stand. Phase 8 C13.
+        /// </summary>
+        public readonly struct PanelProfile
+        {
+            public readonly float RunMin, RunMax;
+            /// <summary>(min, max) of each post along the run; near = the -Z (hub-side) one.</summary>
+            public readonly Vector2 NearPost, FarPost;
+
+            public PanelProfile(float runMin, float runMax, Vector2 nearPost, Vector2 farPost)
+            {
+                RunMin = runMin; RunMax = runMax; NearPost = nearPost; FarPost = farPost;
+            }
+
+            public float PostSpacing => (FarPost.x + FarPost.y - NearPost.x - NearPost.y) * 0.5f;
+            public float PostWidth => Mathf.Max(NearPost.y - NearPost.x, FarPost.y - FarPost.x);
+            /// <summary>Rail stub reaching past the near post's outer face.</summary>
+            public float NearStub => NearPost.x - RunMin;
+            /// <summary>Rail stub reaching past the far post's outer face.</summary>
+            public float FarStub => RunMax - FarPost.y;
+            /// <summary>Run from the middle of the near end stub to the middle of the far one.</summary>
+            public float EndSpan => RunMax - RunMin - (NearStub + FarStub) * 0.5f;
+        }
+
+        /// <summary>Top fraction of a panel's height that only its post caps reach.</summary>
+        /// <remarks>wall_segment: rails top out at 1.27 m, post caps at 1.38-1.46 m of 1.49 m (top 8 % = above 1.34 m).</remarks>
+        public const float PostCapBand = 0.08f;
+
+        /// <summary>
+        /// Measures <paramref name="panelRoot"/>'s <see cref="PanelProfile"/> from its mesh vertices.
+        /// The posts are the only geometry reaching the top <see cref="PostCapBand"/> of the panel's
+        /// height; those vertices on either side of the run's middle give each post's extent.
         /// </summary>
         /// <remarks>
         /// Read off the mesh, not hardcoded: <c>Prop_wall_segment</c>'s run is its source mesh's Y,
         /// turned onto the root's Z by the inner model's -90° X rotation and squashed by its
         /// 0.35 X scale — a stored constant would go stale the moment the prefab is touched.
         /// </remarks>
-        public static bool TryMeasurePanelRun(Transform panelRoot, out float length, out float centre)
+        public static bool TryMeasurePanelProfile(Transform panelRoot, out PanelProfile profile)
         {
-            length = 0f; centre = 0f;
-            float min = float.MaxValue, max = float.MinValue;
-            var rootRotation = Matrix4x4.TRS(panelRoot.position, panelRoot.rotation, Vector3.one).inverse;
-
+            profile = default;
+            // Child-to-root with the root's own scale divided back out.
+            var toRoot = Matrix4x4.TRS(panelRoot.position, panelRoot.rotation, Vector3.one).inverse;
+            var rootScale = panelRoot.lossyScale;
+            var points = new List<Vector3>();
             foreach (var filter in panelRoot.GetComponentsInChildren<MeshFilter>(true))
             {
                 if (filter.sharedMesh == null) continue;
-                // Child-to-root with the root's own scale divided back out.
-                var m = rootRotation * filter.transform.localToWorldMatrix;
-                var rootScale = panelRoot.lossyScale;
-                var b = filter.sharedMesh.bounds;
-                for (int c = 0; c < 8; c++)
+                var m = toRoot * filter.transform.localToWorldMatrix;
+                foreach (var v in filter.sharedMesh.vertices)
                 {
-                    var corner = b.center + Vector3.Scale(b.extents,
-                        new Vector3((c & 1) == 0 ? -1 : 1, (c & 2) == 0 ? -1 : 1, (c & 4) == 0 ? -1 : 1));
-                    float z = m.MultiplyPoint3x4(corner).z / rootScale.z;
-                    min = Mathf.Min(min, z);
-                    max = Mathf.Max(max, z);
+                    var p = m.MultiplyPoint3x4(v);
+                    points.Add(new Vector3(p.x / rootScale.x, p.y / rootScale.y, p.z / rootScale.z));
                 }
             }
+            if (points.Count == 0) return false;
 
-            if (max <= min) return false;
-            length = max - min;
-            centre = (min + max) * 0.5f;
+            float runMin = points.Min(p => p.z), runMax = points.Max(p => p.z);
+            float bottom = points.Min(p => p.y), top = points.Max(p => p.y);
+            float capLine = top - (top - bottom) * PostCapBand, mid = (runMin + runMax) * 0.5f;
+            var caps = points.Where(p => p.y >= capLine).Select(p => p.z).ToList();
+            var near = caps.Where(z => z < mid).ToList();
+            var far = caps.Where(z => z >= mid).ToList();
+            if (near.Count == 0 || far.Count == 0) return false;
+
+            profile = new PanelProfile(runMin, runMax,
+                new Vector2(near.Min(), near.Max()), new Vector2(far.Min(), far.Max()));
             return true;
         }
+
 
         private static int ArmIndexOf(string name) =>
             name.StartsWith(ArmColliderPrefix) && int.TryParse(name[ArmColliderPrefix.Length..], out int i) ? i : -1;
