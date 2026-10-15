@@ -6,6 +6,14 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🔎 PHASE 8 RE-AUDIT (2026-10-15): six-lens re-grade after chunks A+B - overall C- -> C+
+
+Same six lenses, fresh full capture `Captures/env3d_reaudit/` (before/now pairs in `cmp/`), decision page https://claude.ai/artifact/8j5NN2zzB1rWAecqMoJbjm (v2). Grades: art direction D+ -> C, readability C- -> C+, 3D models C -> C+, level design C -> B-, render pipeline C -> B-, materials C- -> C+. Of the 26 original findings: 17 fixed, 1 regressed, 8 wait on decisions.
+- **REGRESSION (B2):** the 1 642-tri `wall_segment.fbx` shows hollow post caps / see-through slits at MATCH distance (B2's own same-camera `Captures/env3d_after/B/B2_cmp/cmp_wall_W0.png`, today's `mc_B1`, `mc_spawn`). It was signed off from an overview. Restore the 4 000-tri mesh, then redo the decimation with the posts/caps protected (~1 800 tris).
+- **GAMEPLAY BUG (pre-existing):** Invisibility / Smoke Roost / the stunned ghost never fade the chicken. The `Chicken_*.mat` are Opaque and `ChickenVisuals` writes alpha via MPB, which opaque URP Lit ignores (only the nameplates/rings hide). Fix: a dithered opaque-queue ghost material swapped in while opacity < 0.99.
+- **Proposed batch C (no decision):** piles and bases use the URP package default `Lit.mat` (glossy; the A2 test checks .mat files, not renderers); placeholder mound/nest ~79k tris + every-frame MPB writes; the ground and zone discs cast shadows; Mobile soft shadows Low / PC Medium; unused Mobile RP features; "You" label sorting under rival nameplates; empty pile = brown cone; scarecrows in the rim openings; walk-through crates look like cover; per-quadrant prop kits; props through arm walls; mesh holes in barrel/silo/bush; doubled posts at arm joints; surround/barn materials not matte; fence-fade stipple band; 16-gon discs. The capture inventory labels the Mobile pass "PC" (the settings were right; label only).
+- **New decisions:** D8 ground colour/exposure (grass renders 121/220/80, the loudest surface; crates ~ P1 orange), D9 pile fairness (pile BoxCollider 0.7-1.5 m larger than the visible oval at the diagonals; per-pile jitter +-0.4 m `MapGenerator.cs:932` is not 4-fold; contested ovals not rotated) -> mechanics-designer. D5 recommendation changed to (b) fog + colour first.
+
 ## ✅ PHASE 8 chunk B COMPLETE (2026-10-15): mesh/texture cleanup (brief items B1-B6) - EditMode 1364/1364
 
 | Item | Status | Commit | Notes |
