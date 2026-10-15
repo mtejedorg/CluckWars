@@ -51,6 +51,8 @@ namespace CluckWars.Tests
             "Assets/_Game/Art/Materials/Prop_scarecrow.mat",
             "Assets/_Game/Art/Materials/Prop_trough.mat",
             "Assets/_Game/Art/Materials/Prop_wheelbarrow.mat",
+            "Assets/_Game/Art/Materials/FoodPile.mat",
+            "Assets/_Game/Art/Materials/PlayerBase.mat",
         };
 
         private static Material Load(string path)
@@ -88,7 +90,8 @@ namespace CluckWars.Tests
                 {
                     var n = Path.GetFileNameWithoutExtension(p);
                     return n == "GrassFloor" || n.StartsWith("Prop_") || n.StartsWith("TerrainObstacle")
-                        || n.StartsWith("BaseZone") || n.StartsWith("PileZone");
+                        || n.StartsWith("BaseZone") || n.StartsWith("PileZone")
+                        || n == "FoodPile" || n == "PlayerBase";
                 })
                 .Where(p => AssetDatabase.LoadAssetAtPath<Material>(p).shader.name == "Universal Render Pipeline/Lit")
                 .Except(MatteMaterials)

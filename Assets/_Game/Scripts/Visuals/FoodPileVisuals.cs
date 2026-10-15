@@ -32,7 +32,11 @@ namespace CluckWars.Visuals
         [Tooltip("Legacy per-pile override. If null/alpha=0, ColorScheme.FoodPileEmpty is used.")]
         [SerializeField] private Color _emptyColorOverride = new Color(0f, 0f, 0f, 0f);
 
+        /// <summary>Smallest fill-ratio change that re-writes the property blocks (0.5 % of a pile).</summary>
+        public const float TintWriteThreshold = 0.005f;
+
         private FoodPile _pile;
+        private float _lastTintRatio = float.NaN;
         private MaterialPropertyBlock _propertyBlock;
         private ColorSchemeSO _colors;
 
@@ -64,6 +68,19 @@ namespace CluckWars.Visuals
             ? _emptyColorOverride
             : (_colors != null ? _colors.FoodPileEmpty : new Color(0.4f, 0.3f, 0.15f));
 
+        /// <summary>
+        /// True when the tint must be re-written: first frame (NaN), a change beyond
+        /// <see cref="TintWriteThreshold"/>, or the pile landing exactly on empty / full so the
+        /// end colours are never left up to 0.5 % off.
+        /// </summary>
+        public static bool ShouldWriteTint(float lastWritten, float ratio)
+        {
+            if (float.IsNaN(lastWritten)) return true;
+            float delta = Mathf.Abs(ratio - lastWritten);
+            if (delta > TintWriteThreshold) return true;
+            return delta > 0f && (ratio <= 0f || ratio >= 1f);
+        }
+
         private void LateUpdate()
         {
             if (_pile == null) return;
@@ -78,8 +95,9 @@ namespace CluckWars.Visuals
                 _meshRoot.localScale = Vector3.Lerp(_emptyScale, _fullScale, ratio);
             }
 
-            if (_renderers != null && _renderers.Length > 0)
+            if (_renderers != null && _renderers.Length > 0 && ShouldWriteTint(_lastTintRatio, ratio))
             {
+                _lastTintRatio = ratio;
                 var color = Color.Lerp(EmptyColor, FullColor, ratio);
                 for (int i = 0; i < _renderers.Length; i++)
                 {
