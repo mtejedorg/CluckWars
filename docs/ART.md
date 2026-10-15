@@ -91,11 +91,13 @@ Separated by **lightness as well as hue** (a dichromat keeps lightness). Round 3
 (#E8751A / #1A7FC4 / #C4286F / #0D9E7A) had P3 / P4 at 6.9 dE00 under deuteranopia and P2 / P4 at 9.0 under
 tritanopia. Every one of the six pairs now stays >= 15 dE00 under protanopia, deuteranopia and tritanopia
 (`AbilityPaletteTests.PlayerColours_StayApart_UnderColourBlindness`, Machado 2009 severity 1, same simulation
-as the category test); the weakest is P1 / P3 under tritanopia at 16.2.
+as the category test); the weakest are P1 / P2 and P2 / P4 under tritanopia at 18.7 each. P1 moved from Sunset
+Orange #F59A3A to Splash Aqua in Phase 8 C S4: the orange sat 5.6 dE00 from the Speedy body (#E85A2A family), so a
+P1 Speedy's feet ring read as part of the chicken; the aqua sits ~49 apart and stays clear of the gold food ramp.
 
 | Player | Color | Hex (was) | L* | Notes |
 |---|---|---|---|---|
-| P1 | Sunset Orange | #F59A3A (#E8751A) | 71 | Lightest of the four |
+| P1 | Splash Aqua | #3FE8E8 (#F59A3A, #E8751A) | 84 | Lightest of the four; bright cyan, not the dark green-teal of P4 |
 | P2 | Ocean Blue | #0994E8 (#1A7FC4) | 59 | Bright, cool |
 | P3 | Berry Pink | #F7367B (#C4286F) | 56 | Hot pink |
 | P4 | Forest Teal | #17785A (#0D9E7A) | 45 | Darkest of the four |
@@ -824,7 +826,7 @@ All VFX are local — never networked. Triggered by observed state changes.
 | 3 | ~~UI font selection~~ | ~~Medium~~ | **Resolved v0.2** — Lilita One + Nunito (§6.2) |
 | 4 | Ability VFX color assignments per ability | Medium | Accent colors specified in §3 — VFX application TBD |
 | 5 | Food pile mesh swap thresholds (<25%, <10%) | Medium | |
-| 6 | ~~Player identity color set (color-blind safe)~~ | ~~Medium~~ | **Resolved v0.2** — Orange/Blue/Pink/Teal (§3) |
+| 6 | ~~Player identity color set (color-blind safe)~~ | ~~Medium~~ | **Resolved v0.2** — Orange/Blue/Pink/Teal (§3); P1 is Aqua since Phase 8 C S4 |
 | 7 | Stunned FX — stars vs birds vs custom | Low | |
 | 8 | Map prop set finalized | Low | |
 | 9 | ~~Select art direction~~ | ~~High~~ | **Resolved v0.3** — Rich glossy (§6.1) |

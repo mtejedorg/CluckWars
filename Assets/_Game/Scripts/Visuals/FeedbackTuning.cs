@@ -367,10 +367,10 @@ namespace CluckWars.Visuals
         /// <summary>
         /// Colour for a cargo *loss* popup (<c>-5 🌽</c> at the victim). ADDED for Stage 4 —
         /// §3.2 specifies "warm red" but no value. Picked as a warm, orange-leaning red
-        /// rather than a pure red so it does not collide with P1's identity orange
-        /// (<c>PlayerPalette.P1</c>) or with the <c>FULL!</c> cargo warning
+        /// rather than a pure red so it does not collide with the <c>FULL!</c> cargo warning
         /// (1.00, 0.18, 0.08) that already lives on the same chicken — a number reading
-        /// "you lost cargo" must not be mistakable for either.
+        /// "you lost cargo" must not be mistakable for it. (It was also kept clear of P1's
+        /// old identity orange; P1 is aqua since Phase 8 C S4, <c>PlayerPalette.P1</c>.)
         /// </summary>
         public static readonly Color FloatingTextCargoLossColor = new Color(0.95f, 0.35f, 0.25f, 1f);
 

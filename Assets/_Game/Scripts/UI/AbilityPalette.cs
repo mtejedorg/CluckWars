@@ -76,7 +76,7 @@ namespace CluckWars.UI
         /// <summary>
         /// Smallest CIEDE2000 distance between any two PLAYER colours after a full-severity protanopia,
         /// deuteranopia or tritanopia simulation (round-3 finding 11). The player set is hue AND lightness
-        /// separated; today's weakest pair is P1 / P3 under tritanopia (16.2).
+        /// separated; today's weakest pairs are P1 / P2 and P2 / P4 under tritanopia (18.7 each).
         /// </summary>
         public const float MinPlayerColourBlindDeltaE = 15f;
 

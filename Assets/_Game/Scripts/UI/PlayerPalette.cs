@@ -10,11 +10,12 @@ namespace CluckWars.UI
     /// other file defines its own copy of these four colours.
     /// </summary>
     /// <remarks>
-    /// Colour-blind safe (docs/ART.md "Player Identity Colors"): still orange / blue / pink / teal, but
+    /// Colour-blind safe (docs/ART.md "Player Identity Colors"): aqua / blue / pink / teal, but
     /// separated by <b>lightness</b> as well as hue, because a dichromat keeps lightness. Every one of the six
     /// pairs stays &gt;= <see cref="AbilityPalette.MinPlayerColourBlindDeltaE"/> CIEDE2000 apart under
     /// protanopia, deuteranopia and tritanopia (<c>AbilityPaletteTests</c>); round 3 found P3 / P4 at 6.9
-    /// (deuteranopia) and P2 / P4 at 9.0 (tritanopia) with the previous hues-only set. The corner is the identity, so a player is the same colour in the lobby (which
+    /// (deuteranopia) and P2 / P4 at 9.0 (tritanopia) with the previous hues-only set. P1 moved from orange (#f59a3a)
+    /// to aqua in Phase 8 C S4: the orange sat 5.6 dE00 from the Speedy body, so the feet ring read as part of the chicken. The corner is the identity, so a player is the same colour in the lobby (which
     /// shows the corner each seat will spawn on, see <c>CornerAssignment</c>), the match and the results.
     /// <para>
     /// The local player also carries the <b>YOU mark</b> everywhere: their name drawn as a gold pill
@@ -25,8 +26,8 @@ namespace CluckWars.UI
     /// </remarks>
     public static class PlayerPalette
     {
-        /// <summary>Corner 0, light orange (was #e8751a, L* 62; now L* 71).</summary>
-        public static readonly Color P1 = UiGfx.Hex32("f59a3a");
+        /// <summary>Corner 0, "Splash Aqua", L* 84: the lightest of the four (was light orange #f59a3a, L* 71; before that #e8751a, L* 62).</summary>
+        public static readonly Color P1 = UiGfx.Hex32("3fe8e8");
         /// <summary>Corner 1, bright blue (was #1a7fc4).</summary>
         public static readonly Color P2 = UiGfx.Hex32("0994e8");
         /// <summary>Corner 2, hot pink (was #c4286f, L* 45; now L* 56).</summary>

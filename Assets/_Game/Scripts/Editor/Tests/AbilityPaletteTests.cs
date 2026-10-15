@@ -137,12 +137,12 @@ namespace CluckWars.Tests
         {
             var l = Players.Select(c => ToLab(c).x).ToArray();
             Assert.GreaterOrEqual(l.Max() - l.Min(), 20f, $"player lightness range L* {l.Min():0}..{l.Max():0}");
-            Assert.GreaterOrEqual(l[0] - l[3], 20f, "P1 (light orange) clearly lighter than P4 (dark teal)");
+            Assert.GreaterOrEqual(l[0] - l[3], 20f, "P1 (light aqua) clearly lighter than P4 (dark teal)");
             Color.RGBToHSV(Players[0], out float h1, out _, out _);
             Color.RGBToHSV(Players[1], out float h2, out _, out _);
             Color.RGBToHSV(Players[2], out float h3, out _, out _);
             Color.RGBToHSV(Players[3], out float h4, out _, out _);
-            Assert.That(h1 * 360f, Is.InRange(20f, 45f), "P1 orange");
+            Assert.That(h1 * 360f, Is.InRange(176f, 190f), "P1 aqua");
             Assert.That(h2 * 360f, Is.InRange(195f, 215f), "P2 blue");
             Assert.That(h3 * 360f, Is.InRange(330f, 345f), "P3 pink");
             Assert.That(h4 * 360f, Is.InRange(155f, 175f), "P4 teal");
