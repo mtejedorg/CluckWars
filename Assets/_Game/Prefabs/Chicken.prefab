@@ -231,6 +231,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ChickenVisuals
   _renderers: []
+  _ghostMaterial: {fileID: 2100000, guid: 11cb234185cf14b4d9131cbec7833fd3, type: 2}
 --- !u!114 &-8672661885974516826
 MonoBehaviour:
   m_ObjectHideFlags: 0

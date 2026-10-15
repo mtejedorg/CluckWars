@@ -1,5 +1,9 @@
+using System.Collections.Generic;
 using CluckWars.Gameplay;
+using CluckWars.Logging;
 using UnityEngine;
+using UnityEngine.Rendering;
+using Zenject;
 
 namespace CluckWars.Visuals
 {
@@ -10,6 +14,14 @@ namespace CluckWars.Visuals
     /// copies (instancing-friendly, mobile-friendly). Polls
     /// <see cref="ChickenController.VisualOpacity"/> in <c>LateUpdate</c> for
     /// abilities that modulate alpha (Invisibility, …).
+    ///
+    /// <para><b>Ghost fade (Phase 8 C2).</b> The chicken materials are URP Lit <i>Opaque</i>, which
+    /// ignores <c>_BaseColor.a</c>, so a pushed alpha used to do nothing. While the pushed alpha is
+    /// below <see cref="GhostOpacityThreshold"/> every tinted renderer's <c>sharedMaterials</c> are
+    /// swapped for ghost twins (<c>Cluck Wars/Chicken Ghost Lit</c>, a dithered opaque clip that keeps
+    /// <c>_BaseColor.a</c> of the pixels) and swapped back to the cached originals when it returns.
+    /// One ghost twin per original material, shared by every chicken — never a per-chicken or
+    /// per-frame instance. Below <see cref="GhostShadowOpacityThreshold"/> shadow casting is also off.</para>
     /// </summary>
     public sealed class ChickenVisuals : MonoBehaviour
     {
@@ -20,6 +32,31 @@ namespace CluckWars.Visuals
         [Tooltip("Renderers receiving the class tint. If empty, auto-populated from children at Awake, " +
                  "then replaced by SetModelRoot once the per-class model is attached at spawn.")]
         [SerializeField] private Renderer[] _renderers;
+
+        [Tooltip("Template for the ghost fade (Assets/_Game/Art/Materials/Chicken_Ghost.mat, shader " +
+                 "Cluck Wars/Chicken Ghost Lit). Each original body material gets one shared ghost twin " +
+                 "built from it, swapped in only while opacity < 0.99 (Invisibility, Smoke Roost, stunned).")]
+        [SerializeField] private Material _ghostMaterial;
+
+        /// <summary>Below this pushed alpha the body renders with the dithered ghost material.</summary>
+        public const float GhostOpacityThreshold = 0.99f;
+
+        /// <summary>Below this pushed alpha the ghost also stops casting a shadow (a stippled shadow
+        /// of a 0.2 bird would give the stealth away and reads as dirt on the ground).</summary>
+        public const float GhostShadowOpacityThreshold = 0.5f;
+
+        private const string Source = "ChickenVisuals";
+
+        // Original material -> its ghost twin. Bounded by the number of distinct chicken materials (4 classes).
+        private static readonly Dictionary<Material, Material> GhostTwins = new Dictionary<Material, Material>();
+
+        // Non-null exactly while the ghost is applied: the renderers it was applied to and what they had before.
+        private Renderer[]          _ghostedRenderers;
+        private Material[][]        _savedMaterials;
+        private ShadowCastingMode[] _savedShadowModes;
+        private bool                _ghostShadowsOff;
+        private bool                _missingGhostReported;
+        private ILogService         _log;
 
         private MaterialPropertyBlock _propertyBlock;
         private Color _currentTint = Color.white;
@@ -45,13 +82,19 @@ namespace CluckWars.Visuals
         /// </summary>
         public Renderer[] TintedRenderers => _renderers;
 
+        /// <summary>True while the body renders with the ghost material (test/diagnostic seam).</summary>
+        public bool IsGhosted => _ghostedRenderers != null;
+
+        [Inject]
+        public void Construct(ILogService log) => _log = log;
+
         private void Awake()
         {
             if (_renderers == null || _renderers.Length == 0)
             {
                 _renderers = GetComponentsInChildren<Renderer>(includeInactive: true);
             }
-            _propertyBlock = new MaterialPropertyBlock();
+            _propertyBlock ??= new MaterialPropertyBlock();
             _controller = GetComponent<ChickenController>();
             _combat     = GetComponent<ChickenCombat>();
         }
@@ -74,6 +117,9 @@ namespace CluckWars.Visuals
         {
             if (modelRoot == null) return;
 
+            // Hand the old renderers their own materials back before the set changes; PushColor below
+            // re-applies the ghost to the new set if the bird is still faded.
+            RestoreOriginalMaterials();
             _renderers = modelRoot.GetComponentsInChildren<Renderer>(includeInactive: true);
             // Re-apply whatever colour was last in effect so a model attached after a tint /
             // opacity / dead-state change does not spawn in default white.
@@ -147,10 +193,13 @@ namespace CluckWars.Visuals
             }
         }
 
+        private void OnDestroy() => RestoreOriginalMaterials();
+
         private void PushColor(Color color)
         {
             _lastPushedColor = color;
             if (_renderers == null) return;
+            _propertyBlock ??= new MaterialPropertyBlock();
             for (int i = 0; i < _renderers.Length; i++)
             {
                 var renderer = _renderers[i];
@@ -161,6 +210,107 @@ namespace CluckWars.Visuals
                 _propertyBlock.SetColor(ColorId, color);
                 renderer.SetPropertyBlock(_propertyBlock);
             }
+            ApplyGhostState(color.a);
+        }
+
+        // ---- ghost fade (Phase 8 C2) ------------------------------------------------------------------
+
+        /// <summary>
+        /// Swaps the ghost in / out and toggles shadow casting from the alpha just pushed. Runs only
+        /// when <see cref="PushColor"/> runs (tint / opacity / stun changes), so material arrays are
+        /// assigned on transitions only — never per frame.
+        /// </summary>
+        private void ApplyGhostState(float opacity)
+        {
+            bool wantGhost = opacity < GhostOpacityThreshold;
+            if (wantGhost && _ghostedRenderers == null) ApplyGhostMaterials();
+            else if (!wantGhost && _ghostedRenderers != null) RestoreOriginalMaterials();
+
+            if (_ghostedRenderers != null) SetGhostShadowsOff(opacity < GhostShadowOpacityThreshold);
+        }
+
+        private void ApplyGhostMaterials()
+        {
+            if (_ghostMaterial == null)
+            {
+                // A wiring bug, not a game state: the bird would stay fully opaque while faded.
+                if (!_missingGhostReported)
+                {
+                    _missingGhostReported = true;
+                    if (_log == null) ProjectContext.Instance.Container.Inject(this);
+                    _log?.Error(Source, $"{name}: no ghost material assigned; Invisibility / Smoke Roost / stun " +
+                                        "cannot fade the body. Wire Chicken_Ghost.mat on ChickenVisuals.");
+                }
+                return;
+            }
+
+            var renderers = _renderers;
+            _savedMaterials   = new Material[renderers.Length][];
+            _savedShadowModes = new ShadowCastingMode[renderers.Length];
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                var r = renderers[i];
+                if (r == null) continue;
+                var originals = r.sharedMaterials;
+                _savedMaterials[i]   = originals;
+                _savedShadowModes[i] = r.shadowCastingMode;
+
+                var ghosts = new Material[originals.Length];
+                for (int m = 0; m < originals.Length; m++) ghosts[m] = GhostTwinOf(originals[m]);
+                r.sharedMaterials = ghosts;
+            }
+            _ghostedRenderers = renderers;
+            _ghostShadowsOff  = false;
+        }
+
+        private void RestoreOriginalMaterials()
+        {
+            if (_ghostedRenderers == null) return;
+            for (int i = 0; i < _ghostedRenderers.Length; i++)
+            {
+                var r = _ghostedRenderers[i];
+                if (r == null || _savedMaterials[i] == null) continue;
+                r.sharedMaterials   = _savedMaterials[i];
+                r.shadowCastingMode = _savedShadowModes[i];
+            }
+            _ghostedRenderers = null;
+            _savedMaterials   = null;
+            _savedShadowModes = null;
+            _ghostShadowsOff  = false;
+        }
+
+        private void SetGhostShadowsOff(bool off)
+        {
+            if (off == _ghostShadowsOff) return;
+            _ghostShadowsOff = off;
+            for (int i = 0; i < _ghostedRenderers.Length; i++)
+            {
+                var r = _ghostedRenderers[i];
+                if (r == null || _savedMaterials[i] == null) continue;
+                r.shadowCastingMode = off ? ShadowCastingMode.Off : _savedShadowModes[i];
+            }
+        }
+
+        /// <summary>
+        /// The one shared ghost twin of <paramref name="original"/>: the template's shader with the
+        /// original's properties and keywords (texture, matte settings), built once and reused by
+        /// every chicken wearing that material.
+        /// </summary>
+        private Material GhostTwinOf(Material original)
+        {
+            if (original == null) return null;
+            if (original.shader == _ghostMaterial.shader) return original; // already a ghost
+            if (GhostTwins.TryGetValue(original, out var twin) && twin != null) return twin;
+
+            twin = new Material(_ghostMaterial)
+            {
+                name      = original.name + "_Ghost",
+                hideFlags = HideFlags.DontSave,
+            };
+            twin.CopyPropertiesFromMaterial(original);
+            twin.enableInstancing = true;
+            GhostTwins[original] = twin;
+            return twin;
         }
     }
 }
