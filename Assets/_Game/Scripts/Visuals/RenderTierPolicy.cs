@@ -13,18 +13,18 @@ namespace CluckWars.Visuals
     /// <c>renderPostProcessing</c> off, which is also the serialized default in Game.unity, so an unknown or
     /// missing pipeline asset falls back to the cheap path.
     ///
-    /// <see cref="PcPostProcessingEnabled"/> is OFF pending Maestro's call (Phase 8 A7): with the profile as
-    /// authored, the Neutral tonemapper alone darkens the grass ~12% (luminance 195 -> 170) and the food ~16%
-    /// and drops saturation ~13%, a bigger look change than the brief allows without sign-off. Evidence:
-    /// Captures/env3d_after/A7/post_preview/. Flipping the flag is the whole change.
+    /// <see cref="PcPostProcessingEnabled"/> is ON since Phase 8 D7 (Maestro, 2026-10-15). It was held OFF in A7
+    /// because the Neutral tonemapper alone darkened the grass ~12% and the food ~16%; the profile now carries a
+    /// PC-only exposure / contrast compensation (see Phase8ChunkD7Tests) that keeps PC within 10% of Mobile.
+    /// Evidence: Captures/env3d_after/C/D7/.
     /// </remarks>
     public static class RenderTierPolicy
     {
         /// <summary>Asset name of the PC tier's URP asset (Assets/Settings/PC_RPAsset.asset).</summary>
         public const string PcRpAssetName = "PC_RPAsset";
 
-        /// <summary>Whether the PC tier renders post-processing at all. Off until the look change is signed off.</summary>
-        public static readonly bool PcPostProcessingEnabled = false;
+        /// <summary>Whether the PC tier renders post-processing at all (Phase 8 D7: on).</summary>
+        public static readonly bool PcPostProcessingEnabled = true;
 
         /// <summary>True when the match camera should render post-processing under a pipeline asset with this name.</summary>
         public static bool PostProcessingFor(string rpAssetName) =>
