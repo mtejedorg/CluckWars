@@ -7,14 +7,14 @@ namespace CluckWars.Visuals
     /// Builds the placeholder "testing models" by combining Unity's built-in
     /// primitive meshes (sphere / cube / cylinder) into a single cached mesh per
     /// kind. Programmer-art stand-ins for the real artwork: chunky chicken
-    /// silhouette per GDD §4 (big head, round body, tiny limbs), a grain-mound
-    /// food pile, and a nest pad for player bases. Single mesh + single material
+    /// silhouette per GDD §4 (big head, round body, tiny limbs) and a nest pad for player bases. Single mesh + single material
     /// so the existing per-class / per-owner tint paths (MaterialPropertyBlock on
     /// the renderer) keep working unchanged.
     /// </summary>
     public static class PlaceholderMeshFactory
     {
-        public enum Kind : byte { Chicken = 0, FoodMound = 1, BaseNest = 2 }
+        // Value 1 was FoodMound: retired in Phase 8 C S1 (the pile mound is Generated/Env/food_mound.fbx). Keep 1 unused so serialized kinds stay valid.
+        public enum Kind : byte { Chicken = 0, BaseNest = 2 }
 
         private static readonly Dictionary<Kind, Mesh> Cache = new Dictionary<Kind, Mesh>();
 
@@ -25,7 +25,6 @@ namespace CluckWars.Visuals
             Mesh built = kind switch
             {
                 Kind.Chicken   => BuildChicken(),
-                Kind.FoodMound => BuildFoodMound(),
                 Kind.BaseNest  => BuildBaseNest(),
                 _              => null,
             };
@@ -72,24 +71,6 @@ namespace CluckWars.Visuals
             // Tiny legs — two short cylinders down to the capsule's foot line.
             AddPart(parts, Primitive.Cylinder, new Vector3(+0.18f, -0.85f, 0f), new Vector3(0.08f, 0.18f, 0.08f));
             AddPart(parts, Primitive.Cylinder, new Vector3(-0.18f, -0.85f, 0f), new Vector3(0.08f, 0.18f, 0.08f));
-
-            return Combine(parts);
-        }
-
-        private static Mesh BuildFoodMound()
-        {
-            var parts = new List<CombineInstance>();
-
-            // Three flattened spheres stacked into a grain mound. Replaces a unit
-            // cube, so everything fits inside -0.5..+0.5 with the base at y=-0.5.
-            AddPart(parts, Primitive.Sphere, new Vector3(0f, -0.38f, 0f), new Vector3(1.00f, 0.42f, 1.00f));
-            AddPart(parts, Primitive.Sphere, new Vector3(0f, -0.16f, 0f), new Vector3(0.72f, 0.40f, 0.72f));
-            AddPart(parts, Primitive.Sphere, new Vector3(0f, 0.06f, 0f), new Vector3(0.44f, 0.36f, 0.44f));
-
-            // A few stray grains around the rim for texture.
-            AddPart(parts, Primitive.Sphere, new Vector3(+0.38f, -0.48f, +0.22f), Vector3.one * 0.14f);
-            AddPart(parts, Primitive.Sphere, new Vector3(-0.34f, -0.48f, -0.30f), Vector3.one * 0.12f);
-            AddPart(parts, Primitive.Sphere, new Vector3(+0.10f, -0.48f, -0.42f), Vector3.one * 0.10f);
 
             return Combine(parts);
         }

@@ -250,33 +250,37 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void Mound_GroundRing_IsTheColliderOval_AndNeverPokesOutsideIt()
+        public void Mound_NeverPokesOutsideTheColliderOval_AtEveryFill()
         {
+            // Phase 8 C S1: the mound is Generated/Env/food_mound.fbx, whose outline is an IRREGULAR oval (r 0.41-0.495 by
+            // design), so the old "ground ring reaches r 0.5" half is gone; only "never outside r 0.5" remains.
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(FoodPilePrefabPath);
             var visuals = prefab.GetComponent<FoodPileVisuals>();
             var meshRoot = TestAssets.PrivateField<Transform>(visuals, "_meshRoot");
+            var moundFilter = TestAssets.PrivateField<MeshFilter>(visuals, "_moundFilter");
             float depth = TestAssets.PrivateField<float>(visuals, "_widestRingDepth");
             Assert.AreEqual(Vector3.one.x, meshRoot.localScale.x, 1e-4f, "The mound must not carry its own X,Z scale.");
             Assert.AreEqual(Vector3.one.z, meshRoot.localScale.z, 1e-4f);
+            Assert.IsNotNull(moundFilter, "_moundFilter");
+            Assert.IsNotNull(moundFilter.sharedMesh, "the prefab mound has no mesh");
 
-            var mesh = PlaceholderMeshFactory.Get(PlaceholderMeshFactory.Kind.FoodMound);
+            // Mesh -> pile-root local, through the FBX node's own rotation (the MoundMesh child) and the meshRoot's TRS.
+            var node = moundFilter.transform.localRotation;
+            var mesh = moundFilter.sharedMesh;
             foreach (float ratio in new[] { 1f, 0.5f, 0.05f })
             {
                 float h = visuals.MoundHeight(ratio);
                 var trs = Matrix4x4.TRS(new Vector3(0f, depth * h, 0f), Quaternion.identity, new Vector3(1f, h, 1f));
-                float widestAboveGround = 0f, maxR = 0f;
+                float maxR = 0f;
                 foreach (var v in mesh.vertices)
                 {
-                    var p = trs.MultiplyPoint3x4(v);     // pile-root local: unit footprint, ground at y = 0
-                    float r = new Vector2(p.x, p.z).magnitude;
-                    if (p.y < -1e-3f) continue;          // buried
-                    maxR = Mathf.Max(maxR, r);
-                    widestAboveGround = Mathf.Max(widestAboveGround, r);
+                    var p = trs.MultiplyPoint3x4(node * v);   // pile-root local: unit footprint, ground at y = 0
+                    if (p.y < -1e-3f) continue;               // buried
+                    maxR = Mathf.Max(maxR, new Vector2(p.x, p.z).magnitude);
                 }
                 // In unit space the oval is radius 0.5; on the 7.8 m centre pile 0.1 m = 0.0128 units.
                 float tolUnits = ColliderTolerance / (ShippedMap.CentrePileFootprint.x);
                 Assert.LessOrEqual(maxR, 0.5f + tolUnits, $"fill {ratio}: the mound pokes outside the collider oval (r {maxR:F4} > 0.5).");
-                Assert.GreaterOrEqual(widestAboveGround, 0.5f - tolUnits, $"fill {ratio}: the visible ground ring (r {widestAboveGround:F4}) is narrower than the collider oval (0.5).");
             }
         }
 

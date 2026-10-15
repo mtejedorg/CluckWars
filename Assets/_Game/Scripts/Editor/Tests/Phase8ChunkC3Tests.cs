@@ -15,7 +15,7 @@ namespace CluckWars.Tests
     /// <remarks>
     /// The bug class: both prefabs were left on the URP package's default <c>Lit.mat</c> (glossy,
     /// specular on) while A2 matted every other arena material, because they were not in A2's list.
-    /// The matte settings themselves are pinned by <see cref="Phase8ChunkA2Tests"/> (FoodPile and
+    /// The matte settings themselves are pinned by <see cref="Phase8ChunkA2Tests"/> (FoodMound and
     /// PlayerBase are in its list). Disabled renderers are exempt: they are never drawn. In Map.unity
     /// that is the 4 boundary walls and 8 standard terrain blocks (collider-only boxes whose cube
     /// renderers the generator leaves disabled, still on the package Lit.mat), and A9's bare cover cubes.
@@ -40,7 +40,7 @@ namespace CluckWars.Tests
                 EditorSceneManager.OpenScene(_originalScenePath, OpenSceneMode.Single);
         }
 
-        [TestCase("Assets/_Game/Prefabs/FoodPile.prefab", "Assets/_Game/Art/Materials/FoodPile.mat")]
+        [TestCase("Assets/_Game/Prefabs/FoodPile.prefab", "Assets/_Game/Art/Materials/FoodMound.mat")]
         [TestCase("Assets/_Game/Prefabs/PlayerBase.prefab", "Assets/_Game/Art/Materials/PlayerBase.mat")]
         public void Prefab_UsesItsProjectMatteMaterial(string prefabPath, string materialPath)
         {
@@ -53,14 +53,15 @@ namespace CluckWars.Tests
                     Assert.AreEqual(materialPath, AssetDatabase.GetAssetPath(m), $"{prefabPath}/{r.name}");
         }
 
-        [TestCase("Assets/_Game/Art/Materials/FoodPile.mat")]
+        // FoodMound.mat carries the neutral grain tile on purpose (Phase 8 C S1); that is pinned in Phase8ChunkS1Tests.
+        [TestCase("Assets/_Game/Art/Materials/FoodMound.mat")]
         [TestCase("Assets/_Game/Art/Materials/PlayerBase.mat")]
         public void TintedMaterial_HasWhiteBase_SoThePropertyBlockCarriesTheColour(string path)
         {
             var m = AssetDatabase.LoadAssetAtPath<Material>(path);
             Assert.IsNotNull(m, path);
             Assert.AreEqual(Color.white, m.GetColor("_BaseColor"), path);
-            Assert.IsNull(m.GetTexture("_BaseMap"), path + ": a base texture would multiply the tint.");
+            if (!path.EndsWith("FoodMound.mat")) Assert.IsNull(m.GetTexture("_BaseMap"), path + ": a base texture would multiply the tint.");
         }
 
         [Test]

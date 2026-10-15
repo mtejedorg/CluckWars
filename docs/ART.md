@@ -74,6 +74,8 @@ The UI must feel **exciting, tactile, and attractive** — not minimalist. Think
 
 Transition is continuous (driven by food % in `FoodPileVisuals`) — the three values above are waypoints.
 
+**Tint floor (Phase 8 C S1, Maestro-approved):** the pile colour is `Lerp(FoodPileEmpty, FoodPileFull, max(food %, 0.35))` (`FoodPileVisuals.TintFloor` / `TintFor`), so it never goes darker than `Lerp(Empty, Full, 0.35)` = about `#9C7D33` with the shipped ColorScheme. The raw empty colour (`#7A6040` waypoint above, `ColorScheme.FoodPileEmpty`) is only ever reached by the lerp's far end and is never displayed: at that colour the low and empty states vanished into the `#6E5235` pile disc. Fill still reads through the mound height (1.0 -> 0.3) and, at zero, the swap to the scattered-grain `food_mound_empty` mesh. The mound is `Env/food_mound.fbx` with `FoodMound.mat` (matte URP Lit, neutral grain tile x the tint).
+
 ### Character Palette
 
 Each class has a **primary color** used on the body as the main read, plus a **dark** and **light** variant for gradients and highlights. Player identity (player 1–4) is communicated via a **color ring at the base** of the character.

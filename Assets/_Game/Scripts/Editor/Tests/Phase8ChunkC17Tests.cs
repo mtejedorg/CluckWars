@@ -10,7 +10,7 @@ using UnityEngine.SceneManagement;
 namespace CluckWars.Tests
 {
     /// <summary>
-    /// Phase 8 C17: the pile and base zone discs are 64-sided (the built-in Cylinder has 20, which read
+    /// Phase 8 C17: the base zone discs (and, until C S1, the pile ones) are 64-sided (the built-in Cylinder has 20, which read
     /// as a polygon from the match camera). Same radius, height and winding as the primitive, so the
     /// existing scale / position maths is untouched.
     /// </summary>
@@ -82,13 +82,14 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void ShippedMap_EveryZoneDisc_UsesTheSixtyFourSidedAsset_AtItsOriginalSize()
+        public void ShippedMap_EveryBaseZoneDisc_UsesTheSixtyFourSidedAsset_AtItsOriginalSize()
         {
             var scene = EditorSceneManager.OpenScene(MapScene, OpenSceneMode.Single);
             var geometry = scene.GetRootGameObjects().First(g => g.name == "GeneratedMapGeometry").transform;
             var zones = geometry.Cast<Transform>()
-                .Where(t => t.name.StartsWith("PileZone_") || t.name.StartsWith("BaseZone_")).ToList();
-            Assert.AreEqual(13, zones.Count);
+                .Where(t => t.name.StartsWith("BaseZone_")).ToList();
+            // The nine PileZone_* discs moved to the irregular-oval mesh in Phase 8 C S1 (see Phase8ChunkS1Tests).
+            Assert.AreEqual(4, zones.Count);
 
             var asset = AssetDatabase.LoadAssetAtPath<Mesh>(ZoneMarkerBaker.MeshAssetPath);
             foreach (var z in zones)

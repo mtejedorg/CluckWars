@@ -6,7 +6,8 @@ namespace CluckWars.Visuals
 {
     /// <summary>
     /// Local-only feedback for a <see cref="FoodPile"/>: flattens the mound as the pile is
-    /// drained, and tints it from the full to the empty colour.
+    /// drained, tints it from the full to the empty colour (never darker than <see cref="TintFloor"/>),
+    /// and swaps to the scattered-grain "empty" mesh at zero.
     /// Reads the networked <c>Amount</c> on every peer — no [Networked] state of its own.
     /// </summary>
     /// <remarks>
@@ -29,6 +30,18 @@ namespace CluckWars.Visuals
         [Tooltip("Renderer(s) tinted from full → empty. Auto-populated from _meshRoot children if empty.")]
         [SerializeField] private Renderer[] _renderers;
 
+        [Tooltip("MeshFilter of the grain mound (child of _meshRoot carrying the FBX's 270 deg X node rotation). Swapped between _fullMesh and _emptyMesh.")]
+        [SerializeField] private MeshFilter _moundFilter;
+
+        [Tooltip("Mound mesh while the pile has food (Generated/Env/food_mound.fbx, unit footprint, ground ring at y 0).")]
+        [SerializeField] private Mesh _fullMesh;
+
+        [Tooltip("Scattered-grain mesh shown at Amount 0 (Generated/Env/food_mound_empty.fbx). Drawn at scale 1 in footprint space, lifted by _emptyLift.")]
+        [SerializeField] private Mesh _emptyMesh;
+
+        [Tooltip("Lift (pile-root local Y) of the empty-grain mesh so it clears the pile disc slab.")]
+        [SerializeField] private float _emptyLift = 0.015f;
+
         [Tooltip("Mound height (local Y scale) at 100% full.")]
         [Min(0.01f)]
         [SerializeField] private float _fullHeight = 1f;
@@ -37,8 +50,8 @@ namespace CluckWars.Visuals
         [Min(0.01f)]
         [SerializeField] private float _emptyHeight = 0.3f;
 
-        [Tooltip("Height of the mound mesh's WIDEST ring below the mesh pivot, in mesh units (the placeholder mound's bottom sphere centre: 0.38). The mesh is lifted by this x its Y scale so that ring sits on the ground, which makes the visible oval equal to the collider ellipse (Phase 8 D9).")]
-        [SerializeField] private float _widestRingDepth = 0.38f;
+        [Tooltip("Height of the mound mesh's WIDEST ring below the mesh pivot, in mesh units. 0 for food_mound.fbx (its ground ring is its widest, at y 0). The mesh is lifted by this x its Y scale so that ring sits on the ground, which makes the visible oval equal to the collider ellipse (Phase 8 D9).")]
+        [SerializeField] private float _widestRingDepth = 0f;
 
         [Tooltip("Legacy per-pile override. If null, ColorScheme.FoodPileFull is used.")]
         [SerializeField] private Color _fullColorOverride = new Color(0f, 0f, 0f, 0f);
@@ -48,8 +61,19 @@ namespace CluckWars.Visuals
         /// <summary>Smallest fill-ratio change that re-writes the property blocks (0.5 % of a pile).</summary>
         public const float TintWriteThreshold = 0.005f;
 
+        /// <summary>
+        /// Tint floor (Phase 8 C S1, approved by Maestro): the pile colour never goes darker than
+        /// <c>Lerp(Empty, Full, TintFloor)</c>. At the raw empty colour the low / empty states vanish into the pile disc.
+        /// </summary>
+        public const float TintFloor = 0.35f;
+
+        /// <summary>Pile colour for a fill ratio: the empty-to-full lerp, clamped at <see cref="TintFloor"/>.</summary>
+        public static Color TintFor(Color empty, Color full, float ratio) =>
+            Color.Lerp(empty, full, Mathf.Max(Mathf.Clamp01(ratio), TintFloor));
+
         private FoodPile _pile;
         private float _lastTintRatio = float.NaN;
+        private bool _showingEmpty;
         private MaterialPropertyBlock _propertyBlock;
         private ColorSchemeSO _colors;
 
@@ -85,6 +109,23 @@ namespace CluckWars.Visuals
         public float MoundHeight(float ratio) => Mathf.Lerp(_emptyHeight, _fullHeight, Mathf.Clamp01(ratio));
 
         /// <summary>
+        /// Pose of the mound root (pile-root local). Food present: Y scale by fill height, widest ring seated on the ground.
+        /// Empty: the scattered-grain mesh is authored in footprint space, so scale 1, lifted just above the disc.
+        /// </summary>
+        public void MoundPose(bool showEmptyMesh, float ratio, out Vector3 scale, out Vector3 localPosition)
+        {
+            if (showEmptyMesh)
+            {
+                scale = Vector3.one;
+                localPosition = new Vector3(0f, _emptyLift, 0f);
+                return;
+            }
+            float height = MoundHeight(ratio);
+            scale = new Vector3(1f, height, 1f);
+            localPosition = new Vector3(0f, _widestRingDepth * height, 0f);
+        }
+
+        /// <summary>
         /// True when the tint must be re-written: first frame (NaN), a change beyond
         /// <see cref="TintWriteThreshold"/>, or the pile landing exactly on empty / full so the
         /// end colours are never left up to 0.5 % off.
@@ -106,17 +147,24 @@ namespace CluckWars.Visuals
 
             float ratio = _pile.MaxAmount > 0f ? Mathf.Clamp01(_pile.Amount / _pile.MaxAmount) : 0f;
 
+            bool empty = _pile.Amount <= 0f;
+            if (_moundFilter != null && _fullMesh != null && _emptyMesh != null && (empty != _showingEmpty || _moundFilter.sharedMesh == null))
+            {
+                _showingEmpty = empty;
+                _moundFilter.sharedMesh = empty ? _emptyMesh : _fullMesh;
+            }
+
             if (_meshRoot != null)
             {
-                float height = MoundHeight(ratio);
-                _meshRoot.localScale = new Vector3(1f, height, 1f);
-                _meshRoot.localPosition = new Vector3(0f, _widestRingDepth * height, 0f);
+                MoundPose(empty && _emptyMesh != null, ratio, out var scale, out var pos);
+                _meshRoot.localScale = scale;
+                _meshRoot.localPosition = pos;
             }
 
             if (_renderers != null && _renderers.Length > 0 && ShouldWriteTint(_lastTintRatio, ratio))
             {
                 _lastTintRatio = ratio;
-                var color = Color.Lerp(EmptyColor, FullColor, ratio);
+                var color = TintFor(EmptyColor, FullColor, ratio);
                 for (int i = 0; i < _renderers.Length; i++)
                 {
                     var r = _renderers[i];
