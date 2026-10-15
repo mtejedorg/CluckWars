@@ -143,7 +143,8 @@ namespace CluckWars.Visuals
         {
             var go = GameObject.CreatePrimitive(type);
             var mesh = go.GetComponent<MeshFilter>().sharedMesh;
-            Object.Destroy(go);
+            // Destroy is refused outside Play mode and would leave the temp primitive in the scene.
+            if (Application.isPlaying) Object.Destroy(go); else Object.DestroyImmediate(go);
             return mesh;
         }
 

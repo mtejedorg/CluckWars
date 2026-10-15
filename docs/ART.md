@@ -235,7 +235,12 @@ Characters use **radial gradients** (light highlight at upper-left → primary c
 ### Food Pile Visuals
 
 - Full pile: large mound, vibrant golden color with radial gradient (center highlight), subtle glow shadow.
-- As it depletes: physically shrinks + color desaturates (continuous, driven by food %).
+- As it depletes: the mound flattens (height 1.0 -> 0.3, continuous, driven by food %) and desaturates; its X,Z
+  footprint steps down with the pile's collider (4 steps, min 0.45x), never independently of it.
+- **Footprint contract (Phase 8 D9):** the mound's ground ring IS the pile's footprint ellipse (centre 7.8 x 6.5,
+  contested 4.2 x 3.5, doorstep 3.6 x 3.0 m), which is also the collider, the NavMesh carve and the baked zone disc.
+  Outer piles point their long axis at the arena centre. Any replacement mound (D2) must stay inside that oval at
+  every fill state (guarded by `Phase8ChunkD9Tests`).
 - At <25%: consider a visual "last scraps" state — small pile, dull color, maybe a flies/dust particle (TBD).
 - Empty pile: a faint ground mark or shadow — should still be readable as "there was food here".
 

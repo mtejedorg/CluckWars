@@ -29,8 +29,8 @@ Transform:
   m_GameObject: {fileID: 6432817117043065153}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.25, z: 0}
-  m_LocalScale: {x: 1, y: 0.5, z: 1}
+  m_LocalPosition: {x: 0, y: 0.38, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4788273731732299835}
@@ -212,7 +212,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.FoodPileVisuals
   _meshRoot: {fileID: 1628982796020543560}
   _renderers: []
-  _fullScale: {x: 1, y: 1, z: 1}
-  _emptyScale: {x: 0.3, y: 0.3, z: 0.3}
+  _fullHeight: 1
+  _emptyHeight: 0.3
+  _widestRingDepth: 0.38
   _fullColorOverride: {r: 0, g: 0, b: 0, a: 0}
   _emptyColorOverride: {r: 0, g: 0, b: 0, a: 0}

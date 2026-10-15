@@ -32,6 +32,9 @@ namespace CluckWars.Tests
         public static float ContestedEdgeInset => TestAssets.SceneFloat("_contestedEdgeInset");
         public static float PilePositionJitter => TestAssets.SceneFloat("_pilePositionJitter");
 
+        /// <summary>Keep-clear inflation the generator applies (Phase 8 D9: the jitter, never below <see cref="MapGenerator.PileKeepClearSlack"/>).</summary>
+        public static float PileKeepClearAllowance => MapGenerator.PileKeepClearAllowance(PilePositionJitter);
+
         public static int CoverPerSector => Mathf.RoundToInt(TestAssets.SceneFloat("_coverPerSector"));
         public static Vector2 CoverSpanRange => TestAssets.SceneVector2("_coverSpanRange");
         public static int BarrierPerSector => Mathf.RoundToInt(TestAssets.SceneFloat("_barrierPerSector"));
@@ -60,8 +63,8 @@ namespace CluckWars.Tests
         /// <summary>Mirrors <c>MapGenerator.ComputeBaseAndPileKeepClearDiscs</c>.</summary>
         public static KeepClearDisc[] KeepClearDiscs()
         {
-            float personalRadius = FootprintRadius(PersonalPileFootprint) + PilePositionJitter + PinwheelLayout.PileArmBuffer;
-            float contestedRadius = FootprintRadius(ContestedPileFootprint) + PilePositionJitter + PinwheelLayout.PileArmBuffer;
+            float personalRadius = FootprintRadius(PersonalPileFootprint) + PileKeepClearAllowance + PinwheelLayout.PileArmBuffer;
+            float contestedRadius = FootprintRadius(ContestedPileFootprint) + PileKeepClearAllowance + PinwheelLayout.PileArmBuffer;
             float personalInset = PersonalPileInset;
             float contestedInset = ContestedEdgeInset;
 

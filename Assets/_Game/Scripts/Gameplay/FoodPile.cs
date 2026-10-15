@@ -81,7 +81,9 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Shortest XZ distance from a point to the surface of an axis-aligned box.
+        /// Shortest XZ distance from a point to the surface of an axis-aligned box. Legacy: piles
+        /// are ellipses since Phase 8 D9 (<see cref="PileFootprintShape.DistanceToSurfaceXZ"/>);
+        /// kept as a generic helper.
         /// 0 when the point is inside the footprint. This is what makes collection
         /// <i>surface-relative</i> and therefore size-independent: a chicken pressed
         /// against a pile is always ~0.58 away (capsule radius 0.5 + controller skin
@@ -157,6 +159,13 @@ namespace CluckWars.Gameplay
         [Networked] public Vector2 FootprintSize { get; set; }
 
         /// <summary>
+        /// Yaw (degrees about Y) of the footprint ellipse's local +X axis, stamped by the spawner via
+        /// <c>onBeforeSpawned</c> and applied to the root in <see cref="Spawned"/> on every peer
+        /// (Phase 8 D9: outer piles point their long axis at the arena centre). Zero = unrotated.
+        /// </summary>
+        [Networked] public float Yaw { get; set; }
+
+        /// <summary>
         /// Set by the spawner via <c>onBeforeSpawned</c> so it is valid from tick zero.
         /// A permanent pile clamps drains at <see cref="DrainFloor"/> and regenerates.
         /// </summary>
@@ -211,16 +220,12 @@ namespace CluckWars.Gameplay
         public Vector2 CurrentFootprint => FootprintAtStep(FootprintStep());
 
         /// <summary>
-        /// Shortest XZ distance from <paramref name="worldPos"/> to the pile's surface.
+        /// Shortest XZ distance from <paramref name="worldPos"/> to the pile's surface — the
+        /// footprint ELLIPSE, in the pile's own yaw (Phase 8 D9; it was the bounding box).
         /// 0 when the position is inside the footprint.
         /// </summary>
-        public float DistanceToSurface(Vector3 worldPos)
-        {
-            var size = CurrentFootprint;
-            var centre = transform.position;
-            return FoodPileMath.DistanceToBoxSurfaceXZ(
-                worldPos.x, worldPos.z, centre.x, centre.z, size.x * 0.5f, size.y * 0.5f);
-        }
+        public float DistanceToSurface(Vector3 worldPos) =>
+            PileFootprintShape.DistanceToSurfaceXZ(worldPos, transform.position, transform.eulerAngles.y, CurrentFootprint);
 
         /// <summary>
         /// True when a chicken standing at <paramref name="worldPos"/> is close enough to
@@ -236,49 +241,8 @@ namespace CluckWars.Gameplay
         /// Never returns NaN and never returns the pile's centre — a mover already inside or
         /// exactly on the footprint is sent out through its nearest face.
         /// </summary>
-        public Vector3 SurfaceApproachPoint(Vector3 from, float standoff)
-        {
-            var centre = transform.position;
-            var size = CurrentFootprint;
-            float halfX = Mathf.Max(size.x * 0.5f, 0.001f);
-            float halfZ = Mathf.Max(size.y * 0.5f, 0.001f);
-
-            float dx = from.x - centre.x;
-            float dz = from.z - centre.z;
-
-            // Nearest point of the footprint, in pile-local XZ.
-            float nx = Mathf.Clamp(dx, -halfX, halfX);
-            float nz = Mathf.Clamp(dz, -halfZ, halfZ);
-
-            // Outward direction = the part of the offset that pokes past the box. It is
-            // exactly zero when 'from' is inside the footprint, which is the degenerate
-            // case: there is nothing to normalise, so pick the nearest face instead. The
-            // >= tie-break is deterministic, so a bot standing dead-centre on a square
-            // island still gets one stable answer rather than oscillating.
-            float ox = dx - nx;
-            float oz = dz - nz;
-            float outLength = Mathf.Sqrt(ox * ox + oz * oz);
-            if (outLength > 1e-4f)
-            {
-                ox /= outLength;
-                oz /= outLength;
-            }
-            else if (halfX - Mathf.Abs(dx) <= halfZ - Mathf.Abs(dz))
-            {
-                ox = dx >= 0f ? 1f : -1f;
-                oz = 0f;
-                nx = ox * halfX;
-            }
-            else
-            {
-                ox = 0f;
-                oz = dz >= 0f ? 1f : -1f;
-                nz = oz * halfZ;
-            }
-
-            float push = Mathf.Max(0f, standoff);
-            return new Vector3(centre.x + nx + ox * push, centre.y, centre.z + nz + oz * push);
-        }
+        public Vector3 SurfaceApproachPoint(Vector3 from, float standoff) =>
+            PileFootprintShape.ApproachPoint(from, transform.position, transform.eulerAngles.y, CurrentFootprint, standoff);
 
         private ILogService _log;
         private GameObject _blocker;
@@ -291,6 +255,10 @@ namespace CluckWars.Gameplay
         {
             ActivePiles.Add(this);
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
+
+            // Every peer applies the stamped yaw itself — the root has no NetworkTransform, and the
+            // collider, carve and visuals all hang off this one rotation.
+            transform.rotation = Quaternion.Euler(0f, Yaw, 0f);
 
             CreateBlocker();
 
@@ -334,32 +302,45 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Solid box + NavMesh carve, built in code so the prefab needs no re-authoring.
-        /// Local on every peer — Amount is networked, so all peers agree on whether the
-        /// pile blocks. Both shapes are authored as a UNIT box and get their world size
-        /// purely from the root's non-uniform scale (see <see cref="ApplyFootprint"/>);
-        /// a capsule could not do this, because Unity snaps a non-uniformly scaled
-        /// CapsuleCollider to its larger lateral axis and a 7×4 island would come out round.
-        /// Centre y = 0.5 puts the box's base on the ground plane.
+        /// Solid ellipse prism + NavMesh carve, built in code so the prefab needs no re-authoring
+        /// (Phase 8 D9; it was one box the size of the footprint's bounding box, which stood
+        /// 0.7-1.5 m proud of the visible oval at the diagonals). Local on every peer — Amount is
+        /// networked, so all peers agree on whether the pile blocks.
         /// </summary>
+        /// <remarks>
+        /// Both shapes are authored in UNIT space (radius 0.5, y 0..1) and get their world size
+        /// purely from the root's non-uniform scale (see <see cref="ApplyFootprint"/>), which
+        /// stretches the unit circle into the footprint ellipse. The collider is a convex
+        /// <see cref="MeshCollider"/> on <see cref="PileFootprintShape.UnitPrism"/> (PhysX scales a
+        /// convex mesh non-uniformly; a CapsuleCollider would snap to its larger lateral axis and
+        /// come out round). <see cref="NavMeshObstacle"/> only offers a box or a capsule, so the
+        /// carve is a staircase of <see cref="PileFootprintShape.CarveBoxCount"/> nested boxes,
+        /// one obstacle per child, within ~4 % of the semi-major axis of the same ellipse.
+        /// </remarks>
         private void CreateBlocker()
         {
             if (_blocker != null) return;
             _blocker = new GameObject("Blocker");
             _blocker.transform.SetParent(transform, worldPositionStays: false);
             _blocker.transform.localPosition = Vector3.zero;
+            _blocker.transform.localRotation = Quaternion.identity;
+
+            var hull = _blocker.AddComponent<MeshCollider>();
+            hull.sharedMesh = PileFootprintShape.UnitPrism;
+            hull.convex = true;
 
             var unitCentre = new Vector3(0f, 0.5f, 0f);
-
-            var box = _blocker.AddComponent<BoxCollider>();
-            box.size = Vector3.one;
-            box.center = unitCentre;
-
-            var carve = _blocker.AddComponent<NavMeshObstacle>();
-            carve.shape = NavMeshObstacleShape.Box;
-            carve.size = Vector3.one;
-            carve.center = unitCentre;
-            carve.carving = true;
+            var boxes = PileFootprintShape.CarveBoxHalfExtents();
+            for (int i = 0; i < boxes.Length; i++)
+            {
+                var child = new GameObject($"Carve{i}");
+                child.transform.SetParent(_blocker.transform, worldPositionStays: false);
+                var carve = child.AddComponent<NavMeshObstacle>();
+                carve.shape = NavMeshObstacleShape.Box;
+                carve.size = new Vector3(boxes[i].x * 2f, 1f, boxes[i].y * 2f);
+                carve.center = unitCentre;
+                carve.carving = true;
+            }
         }
 
         public override void Render()

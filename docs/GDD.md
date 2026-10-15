@@ -137,8 +137,13 @@ The **boundary is a hybrid** — straight along each base frontage, curving thro
 corners — and is delimited by **props** rather than a uniform wall, so the arena reads as
 a place rather than a box. Prop placement is art-tunable without touching the generator.
 
-Pile positions jitter each match (seeded from the session code so all peers agree); the
-centre never moves.
+**Piles do not jitter (Phase 8 D9, 2026-10-15).** Every pile sits on its nominal spot
+(`MapGenerator._pilePositionJitter` = 0), concentric with its baked zone disc. The old
+independent ±0.4 m offset per pile gave the four seats different round trips every match
+(up to ~0.8 m to the doorstep pile and ~1.5 m summed over the two contested piles; Balance
+Oracle SCT spread up to ~0.4 s between seats). If a nudge is ever turned back on it is ONE
+random vector per match, rotated 90° per corner (`MapGenerator.FourFoldNudge`), so the seats
+stay exact rotations of each other. The centre never moves.
 
 **The arena is a baked scene, not runtime geometry.** Because the layout is now fixed
 (§3.4), the ground, boundary and walls live in `Assets/_Game/Scenes/Map.unity`, loaded
@@ -223,17 +228,18 @@ pile's radius (20.2507 m) the wall LINE passes 7.7496 m from the pile centre aga
 
 Measured at the time: any wall jitter swung a wall into a pile's disc and got clipped away —
 27 % of walls collapsed entirely and the rest shrank from 7.6 m to 1–3 m, destroying the
-two-lap topology. Match-to-match variety therefore comes from **pile jitter only**
-(±0.4 m), and — now the primary reason — a fixed wall layout makes the map **learnable**,
-which the two-lap rule above depends on.
+two-lap topology. Match-to-match variety used to come from **pile jitter only** (±0.4 m,
+removed in Phase 8 D9 as a fairness bug, see §3.1), and — now the primary reason — a fixed
+layout makes the map **learnable**, which the two-lap rule above depends on.
 
 Two consequences worth keeping in mind if this is ever revisited:
 
 - Should jitter ever return, it must repeat with **4-fold period** — a 90° rotation maps
   each wall onto another, so those must share a value or the four players' sectors differ,
   which is a fairness bug in an FFA, not a cosmetic one.
-- Pile keep-clear discs scale with pile footprint + jitter, so **growing a pile eats the
-  walls**. `PinwheelLayoutTests.Build_WallsSurvivePileKeepClearDiscs_AtRealV05Sizes` guards
+- Pile keep-clear discs scale with pile footprint + `max(jitter, PileKeepClearSlack 0.4)`
+  (the 0.4 is pinned so the shipped arms re-bake identically with jitter 0), so **growing a
+  pile eats the walls**. `PinwheelLayoutTests.Build_WallsSurvivePileKeepClearDiscs_AtRealV05Sizes` guards
   this; clearance tests alone cannot, because clipping shortens a wall without ever
   violating corridor clearance.
 
@@ -338,6 +344,26 @@ view. If these must hold across devices, pin the camera to a **horizontal** exte
 Piles are **near-circular ellipses** (~1.2 : 1). They shrink and desaturate as they
 deplete, driven locally by the `[Networked]` food amount — instant strategic read, no extra
 sync. Shrinking is also load-bearing for traversal (§3.6), not merely cosmetic.
+
+**One oval for everything (Phase 8 D9).** The footprint ellipse (centre 7.8 × 6.5, contested
+4.2 × 3.5, doorstep 3.6 × 3.0 m at full; stepped down with fill, min 0.45×) is at once:
+
+- the **collider** — a convex `MeshCollider` on a 48-sided ellipse prism, within 4 mm of the
+  oval (it was a `BoxCollider` of the bounding rectangle, 0.7–1.5 m proud at the diagonals);
+- the **NavMesh carve** — 10 nested `NavMeshObstacle` boxes (a staircase; the API has no
+  ellipse), within 0.15 m of the oval on the centre pile and ≤ 0.08 m on the others;
+- the **collect surface** — `FoodPile.DistanceToSurface` / `SurfaceApproachPoint` measure to the
+  ellipse, so a chicken pressed against any side (0.58 m off) is inside the 1.0 m reach;
+- the **visible mound** — its widest ring is seated on the ground and its X,Z come only from
+  the footprint step; fill reads through **height** (1.0 → 0.3) rather than a second X,Z
+  shrink that used to leave the grain ~0.8× the collider when full and ~0.3× near empty;
+- the **baked zone disc** in `Map.unity`.
+
+Outer ovals (doorstep and contested) point their **long axis at the arena centre**, so the
+layout is exactly 4-fold (it was 2-fold: two contested ovals lay radial, two tangential, and
+the doorstep ovals were chiral). The centre oval stays E–W and is the one 2-fold element left
+(see open question in `docs/STATE.md`). Any replacement mound (Phase 8 D2) must fit inside
+this oval at every fill step.
 
 ### 3.9 ⚠️ Open problem: the arena is too big for four players in 45 seconds
 

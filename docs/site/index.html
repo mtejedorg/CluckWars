@@ -1488,6 +1488,21 @@ footer b{color:var(--text-dim)}
     </div>
 
     <div class="card">
+      <p class="eyebrow" style="margin-bottom:6px">Fairness &middot; Phase 8 D9</p>
+      <h4 style="color:var(--gold);margin-bottom:7px">You bump into the pile you see</h4>
+      <p style="font-size:.85rem;color:var(--text-dim)">Piles used to block with a box the size of the
+        footprint's bounding rectangle, <span class="mono">0.7&ndash;1.5&nbsp;m</span> proud of the visible
+        oval at the diagonals, and every outer pile got its own random <span class="mono">&plusmn;0.4&nbsp;m</span>
+        jitter each match &mdash; enough to hand seats up to <span class="mono">1.5&nbsp;m</span> unequal
+        contested round trips. Now the collider is a convex ellipse prism of the footprint (within
+        <span class="mono">4&nbsp;mm</span>), the NavMesh carve a staircase of the same oval, collection is
+        measured to that oval from every side, outer ovals point their long axis at the centre, and jitter
+        is <span class="mono">0</span>: all four seats are exact 90&deg; rotations of one layout. Base to
+        pile surface, every seat: doorstep <span class="mono">6.08&nbsp;m</span>, both contested
+        <span class="mono">20.11&nbsp;m</span>, centre <span class="mono">27.25&nbsp;m</span>.</p>
+    </div>
+
+    <div class="card">
       <p class="eyebrow" style="margin-bottom:6px">Consolidation</p>
       <h4 style="color:var(--assassin-lt);margin-bottom:7px">Abilities stopped being shared</h4>
       <p style="font-size:.85rem;color:var(--text-dim)">Speed Burst and Snatch used to live in the
@@ -2143,10 +2158,16 @@ const fmt = n  => Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/,''
 (function(){
   const svg=$('#arenaMap'); if(!svg) return;
   const NS='http://www.w3.org/2000/svg';
-  const HALF=25.65, HUB=10, OPEN=3, WALL_T=0.7, BASE_R=25.65;
-  const D=BASE_R/Math.SQRT2;                 // base centre on the diagonal: 18.137
-  const T1=D*(1-0.3673);                     // doorstep pile: 11.475 per axis
-  const T2=HALF*0.7895;                      // contested pile radius: 20.251
+  // Game.unity MapGenerator: _planeSize 51.3, _baseCornerDistance 25.65, _personalPileInset 0.3673,
+  // _contestedEdgeInset 0.7895; MapGenerator.BaseInsetFraction 0.15.
+  const HALF=25.65, HUB=10, OPEN=3, WALL_T=0.7, CORNER=25.65;
+  const D=CORNER*(1-0.15);                   // base centre per axis: 21.803 (r30.83)
+  const BASE_R=(D*Math.SQRT2).toFixed(1);
+  const T1=CORNER*(1-0.3673);                // doorstep pile per axis: 16.229 (r22.95)
+  const T2=CORNER*0.7895;                    // contested pile radius: 20.251
+  // Phase 8 D9: every outer oval points its long axis at the centre (MapGenerator ->
+  // PileFootprintShape.RadialLongAxisYaw). SVG y = -world z, so the SVG rotation is atan2(y, x).
+  const yawToCentre=(x,y)=>Math.atan2(y,x)*180/Math.PI;
   const rad=d=>d*Math.PI/180;
   const bnd=deg=>{const a=rad(deg); return HALF/Math.max(Math.abs(Math.cos(a)),Math.abs(Math.sin(a)));};
   const mk=(t,at)=>{const n=document.createElementNS(NS,t); for(const k in at) n.setAttribute(k,at[k]); return n;};
@@ -2201,10 +2222,11 @@ const fmt = n  => Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/,''
   /* --- piles --- */
   function pile(x,y,rx,ry,food,label,tier,detail){
     const g=mk('g',{});
-    g.appendChild(mk('ellipse',{cx:x,cy:y,rx:rx,ry:ry,fill:'#f5c842',opacity:.9,stroke:'#8a6410','stroke-width':.25}));
-    g.appendChild(mk('ellipse',{cx:x,cy:y-ry*.25,rx:rx*.62,ry:ry*.5,fill:'#fff0b8',opacity:.55}));
+    const oval=mk('g',{transform:`rotate(${(x||y)?yawToCentre(x,y).toFixed(2):0} ${x} ${y})`});
+    oval.appendChild(mk('ellipse',{cx:x,cy:y,rx:rx,ry:ry,fill:'#f5c842',opacity:.9,stroke:'#8a6410','stroke-width':.25}));
+    oval.appendChild(mk('ellipse',{cx:x,cy:y,rx:rx*.62,ry:ry*.5,fill:'#fff0b8',opacity:.55}));
     const h=mk('ellipse',{cx:x,cy:y,rx:rx+1,ry:ry+1,fill:'none',stroke:'#fff0b8','stroke-width':.5,opacity:0});
-    h.classList.add('hl'); g.appendChild(h);
+    h.classList.add('hl'); oval.appendChild(h); g.appendChild(oval);
     const t=mk('text',{x:x,y:y+ry+2.2,'text-anchor':'middle',fill:'#f5c842','font-size':'1.7',
       'font-weight':'700','font-family':'JetBrains Mono, monospace'});
     t.textContent=label; g.appendChild(t);
@@ -2214,17 +2236,20 @@ const fmt = n  => Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/,''
   pile(0,0,3.9,3.25,20,'20','T3',
     `<b>Centre pile — T3, 20 food.</b> Footprint 7.8 × 6.5 m at full. It never moves and never respawns. `+
     `It is simultaneously the biggest prize and the wall protecting it: as it depletes its footprint shrinks, `+
-    `so the arena opens itself exactly as the match converges.`);
+    `so the arena opens itself exactly as the match converges. You bump into the oval you see: the collider is an `+
+    `ellipse prism of the footprint (it was the bounding box, 1.5 m proud at the diagonals). Its long axis lies E–W, so `+
+    `this one oval is only 2-fold symmetric.`);
   [[1,1],[1,-1],[-1,-1],[-1,1]].forEach(([sx,sy])=>{
     pile(sx*T1, -sy*T1, 1.8, 1.5, 5, '5', 'T1',
       `<b>Doorstep pile — T1, 5 food.</b> One per base, footprint 3.6 × 3.0 m, sitting about 8 m off your `+
-      `base mouth at r${(T1*Math.SQRT2).toFixed(1)}. Safe income. Position jitters ±0.4 m each match, seeded `+
-      `from the session code so every peer agrees.`);
+      `base at r${(T1*Math.SQRT2).toFixed(1)}. Safe income. Long axis points at the centre; no per-match jitter `+
+      `(it handed seats unequal trips), so every seat's layout is an exact 90° rotation of the others.`);
   });
   [[T2,0],[0,T2],[-T2,0],[0,-T2]].forEach(([x,y])=>{
     pile(x,-y,2.1,1.75,10,'10','T2',
       `<b>Contested pile — T2, 10 food.</b> Four of them, on the edge midpoints at r${T2.toFixed(2)}, `+
-      `footprint 4.2 × 3.5 m. Equidistant from two bases, so a contested arrival is the default, not the exception. `+
+      `footprint 4.2 × 3.5 m, long axis pointing at the centre. Equidistant from two bases (both surfaces 20.11 m from each base), `+
+      `so a contested arrival is the default, not the exception. `+
       `Fatty's winning route is forced straight through this ring.`);
   });
 

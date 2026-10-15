@@ -5,27 +5,40 @@ using Zenject;
 namespace CluckWars.Visuals
 {
     /// <summary>
-    /// Local-only feedback for a <see cref="FoodPile"/>: scales a child mesh down as the
-    /// pile is drained, and tints it from <see cref="_fullColor"/> to <see cref="_emptyColor"/>.
+    /// Local-only feedback for a <see cref="FoodPile"/>: flattens the mound as the pile is
+    /// drained, and tints it from the full to the empty colour.
     /// Reads the networked <c>Amount</c> on every peer — no [Networked] state of its own.
     /// </summary>
+    /// <remarks>
+    /// <b>The mound's ground footprint IS the pile's collider (Phase 8 D9).</b> The X,Z size
+    /// comes only from the pile root's scale (the current footprint step, the same scale that
+    /// sizes the ellipse collider and the NavMesh carve), and the mesh is seated so its widest
+    /// ring sits on the ground. Until D9 the mound also shrank in X,Z with the fill ratio and
+    /// sat half-buried, so its visible oval was ~0.8x the collider when full and ~0.3x near
+    /// empty: chickens stopped well short of the grain. Fill now reads through height.
+    /// </remarks>
     [RequireComponent(typeof(FoodPile))]
     public sealed class FoodPileVisuals : MonoBehaviour
     {
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         private static readonly int ColorId = Shader.PropertyToID("_Color");
 
-        [Tooltip("Transform whose local scale is multiplied by the pile fill ratio. Defaults to first child.")]
+        [Tooltip("Mound transform (child of the pile root, unit-footprint mesh). Its Y scale follows the fill ratio; X,Z stay 1 so the footprint is the root's. Defaults to first child.")]
         [SerializeField] private Transform _meshRoot;
 
         [Tooltip("Renderer(s) tinted from full → empty. Auto-populated from _meshRoot children if empty.")]
         [SerializeField] private Renderer[] _renderers;
 
-        [Tooltip("Scale at 100% full.")]
-        [SerializeField] private Vector3 _fullScale = Vector3.one;
+        [Tooltip("Mound height (local Y scale) at 100% full.")]
+        [Min(0.01f)]
+        [SerializeField] private float _fullHeight = 1f;
 
-        [Tooltip("Scale at 0% (still visible so the pile doesn't disappear unexpectedly during draining).")]
-        [SerializeField] private Vector3 _emptyScale = new Vector3(0.3f, 0.3f, 0.3f);
+        [Tooltip("Mound height (local Y scale) at 0% (still visible so the pile doesn't disappear unexpectedly during draining).")]
+        [Min(0.01f)]
+        [SerializeField] private float _emptyHeight = 0.3f;
+
+        [Tooltip("Height of the mound mesh's WIDEST ring below the mesh pivot, in mesh units (the placeholder mound's bottom sphere centre: 0.38). The mesh is lifted by this x its Y scale so that ring sits on the ground, which makes the visible oval equal to the collider ellipse (Phase 8 D9).")]
+        [SerializeField] private float _widestRingDepth = 0.38f;
 
         [Tooltip("Legacy per-pile override. If null, ColorScheme.FoodPileFull is used.")]
         [SerializeField] private Color _fullColorOverride = new Color(0f, 0f, 0f, 0f);
@@ -68,6 +81,9 @@ namespace CluckWars.Visuals
             ? _emptyColorOverride
             : (_colors != null ? _colors.FoodPileEmpty : new Color(0.4f, 0.3f, 0.15f));
 
+        /// <summary>Mound Y scale for a fill ratio: linear from <see cref="_emptyHeight"/> to <see cref="_fullHeight"/>.</summary>
+        public float MoundHeight(float ratio) => Mathf.Lerp(_emptyHeight, _fullHeight, Mathf.Clamp01(ratio));
+
         /// <summary>
         /// True when the tint must be re-written: first frame (NaN), a change beyond
         /// <see cref="TintWriteThreshold"/>, or the pile landing exactly on empty / full so the
@@ -92,7 +108,9 @@ namespace CluckWars.Visuals
 
             if (_meshRoot != null)
             {
-                _meshRoot.localScale = Vector3.Lerp(_emptyScale, _fullScale, ratio);
+                float height = MoundHeight(ratio);
+                _meshRoot.localScale = new Vector3(1f, height, 1f);
+                _meshRoot.localPosition = new Vector3(0f, _widestRingDepth * height, 0f);
             }
 
             if (_renderers != null && _renderers.Length > 0 && ShouldWriteTint(_lastTintRatio, ratio))

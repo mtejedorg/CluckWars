@@ -579,7 +579,7 @@ MonoBehaviour:
   _contestedPileAmount: 10
   _contestedPileFootprint: {x: 4.2, y: 3.5}
   _contestedEdgeInset: 0.7895
-  _pilePositionJitter: 0.4
+  _pilePositionJitter: 0
   _useBakedGeometry: 1
   _bakedMapSceneName: Map
   _baseZoneRadius: 2.5

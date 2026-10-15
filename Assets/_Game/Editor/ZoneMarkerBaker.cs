@@ -13,12 +13,14 @@ namespace CluckWars.EditorTools
     /// Finishes the baked ground and zone markers in <c>Map.unity</c> (Phase 8 C5 + C17): the ground
     /// and every <c>PileZone_*</c> / <c>BaseZone_*</c> disc stop casting shadows (they keep receiving),
     /// and the discs use a saved 64-segment mesh asset instead of the 20-sided built-in Cylinder.
+    /// Phase 8 D9: the outer pile ovals (<c>PileZone_Personal*</c> / <c>PileZone_Contested*</c>) are
+    /// yawed so their long axis points at the arena centre, matching the spawned piles.
     /// </summary>
     /// <remarks>
     /// <see cref="MapGenerator"/> already does both at build time, but its mesh is a
     /// <c>HideAndDontSave</c> runtime object that a saved scene cannot reference, so the baker (and the
     /// in-place menu item, which avoids a re-bake re-rolling the scatter seed) swaps in the asset.
-    /// Position, scale and materials are never touched. Idempotent.
+    /// Position, scale and materials are never touched; only the outer pile discs' yaw is set (D9). Idempotent.
     /// </remarks>
     public static class ZoneMarkerBaker
     {
@@ -85,11 +87,18 @@ namespace CluckWars.EditorTools
                         continue;
                     }
                     filter.sharedMesh = mesh;
+
+                    if (IsOuterPileZone(child.name))
+                        child.localRotation = Quaternion.Euler(0f, PileFootprintShape.RadialLongAxisYaw(child.localPosition), 0f);
                 }
                 touched++;
             }
             return touched;
         }
+
+        /// <summary>Personal / contested pile discs: the ones whose oval is yawed toward the centre (D9). The centre disc stays at yaw 0.</summary>
+        public static bool IsOuterPileZone(string name) =>
+            name.StartsWith("PileZone_Personal") || name.StartsWith("PileZone_Contested");
 
         /// <summary>Creates (or refreshes in place, so its GUID is stable) the 64-segment disc mesh asset.</summary>
         public static Mesh EnsureMeshAsset()

@@ -199,7 +199,7 @@ namespace CluckWars.Tests
                     Assert.Greater(len, minAcceptable,
                         $"seed={seed}: wall {i} was clipped to {len:0.00} m by a pile keep-clear " +
                         $"disc - the designed length is {designedLength:0.00} m in this " +
-                        $"{half * 2f:0.0} m arena. Check pile footprints, _pilePositionJitter and " +
+                        $"{half * 2f:0.0} m arena. Check pile footprints, the pile keep-clear allowance and " +
                         "PinwheelLayout.JitterFraction.");
                 }
             }
@@ -260,7 +260,7 @@ namespace CluckWars.Tests
             // asin(contested disc radius / contested pile radius), from the shipped scene.
             float contestedRadius = Vector2.Distance(Vector2.zero, ContestedPileFlat());
             float contestedDisc = ShippedMap.FootprintRadius(ShippedMap.ContestedPileFootprint)
-                                  + ShippedMap.PilePositionJitter + PinwheelLayout.PileArmBuffer;
+                                  + ShippedMap.PileKeepClearAllowance + PinwheelLayout.PileArmBuffer;
             float requiredDegrees = Mathf.Asin(contestedDisc / contestedRadius) * Mathf.Rad2Deg;
 
             Assert.AreEqual(11.665f, requiredDegrees, 0.02f,

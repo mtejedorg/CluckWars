@@ -127,9 +127,9 @@ namespace CluckWars.Gameplay
         [Range(0.4f, 1f)]
         [SerializeField] private float _contestedEdgeInset = 0.7895f;
 
-        [Tooltip("Random XZ jitter applied to personal + contested island positions each match (GDD §3: positions randomized within constraints). Center pile never moves. Kept small — the keep-clear disc must cover every jittered position, and piles now sit only 22.5° off the wall bearings, so a large jitter erases the walls entirely. Deliberately NOT scaled by the 2026-08-14 x1.35 arena rescale: this is a pile-local quantity and the piles keep their absolute size, so scaling it would inflate the keep-clear discs and clip the walls for no gain.")]
+        [Tooltip("Per-match XZ nudge radius for the personal + contested islands (GDD §3: positions randomized within constraints). SHIPPED AT 0 (Phase 8 D9): piles sit exactly on their nominal spots, concentric with their baked zone discs, and every seat's travel is identical. When non-zero, ONE random nudge per pile tier is drawn per match and rotated 90° per corner (FourFoldNudge), so the map stays exactly 4-fold — it used to be an independent random offset per pile, which handed the seats unequal round trips. Center pile never moves. The terrain keep-clear discs inflate by max(this, PileKeepClearSlack), so changing it never moves the baked arms.")]
         [Min(0f)]
-        [SerializeField] private float _pilePositionJitter = 0.4f;
+        [SerializeField] private float _pilePositionJitter = 0f;
 
         private INetworkService _network;
         private PrefabRegistrySO _prefabRegistry;
@@ -281,9 +281,9 @@ namespace CluckWars.Gameplay
         /// <see cref="JumpResolver"/>'s overlap test, which treats any non-trigger collider
         /// as blocking and would make every pile zone reject a landing.
         ///
-        /// Markers sit at the piles' NOMINAL positions. Piles jitter ±_pilePositionJitter
-        /// each match, so a spawned pile is offset from its marker by up to that much —
-        /// intended, since the marker denotes the zone rather than the exact footprint.
+        /// Markers sit at the piles' NOMINAL positions and yaws (outer ovals point their long
+        /// axis at the centre, Phase 8 D9). With the shipped nudge radius of 0 each pile spawns
+        /// exactly on its marker, so marker, mound and collider are one concentric oval.
         /// </remarks>
         private void BuildPileZoneMarkers(Material material)
         {
@@ -293,15 +293,16 @@ namespace CluckWars.Gameplay
 
             for (int i = 0; i < _corners.Length; i++)
             {
-                AddZoneMarker($"PileZone_Personal{i}",
-                    PersonalPileNominal(_corners[i], _personalPileInset), _personalPileFootprint, material);
+                var nominal = PersonalPileNominal(_corners[i], _personalPileInset);
+                AddZoneMarker($"PileZone_Personal{i}", nominal, _personalPileFootprint, material,
+                    PileFootprintShape.RadialLongAxisYaw(nominal));
             }
 
             for (int i = 0; i < _corners.Length; i++)
             {
-                AddZoneMarker($"PileZone_Contested{i}",
-                    ContestedPileNominal(_corners[i], _corners[(i + 1) % _corners.Length], _contestedEdgeInset),
-                    _contestedPileFootprint, material);
+                var nominal = ContestedPileNominal(_corners[i], _corners[(i + 1) % _corners.Length], _contestedEdgeInset);
+                AddZoneMarker($"PileZone_Contested{i}", nominal, _contestedPileFootprint, material,
+                    PileFootprintShape.RadialLongAxisYaw(nominal));
             }
         }
 
@@ -309,7 +310,7 @@ namespace CluckWars.Gameplay
         /// Creates one flat, collider-free zone decal. Shared by the pile and base
         /// markers — see their callers for why colliders are omitted.
         /// </summary>
-        private void AddZoneMarker(string name, Vector3 position, Vector2 footprint, Material material)
+        private void AddZoneMarker(string name, Vector3 position, Vector2 footprint, Material material, float yawDeg = 0f)
         {
             var marker = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             marker.name = name;
@@ -319,6 +320,7 @@ namespace CluckWars.Gameplay
             // Lifted 1 cm so it rests ON the ground (top at y=0) rather than z-fighting it.
             marker.transform.localScale = new Vector3(footprint.x, 0.01f, footprint.y);
             marker.transform.localPosition = new Vector3(position.x, 0.01f, position.z);
+            marker.transform.localRotation = Quaternion.Euler(0f, yawDeg, 0f);
 
             var collider = marker.GetComponent<Collider>();
             if (collider != null) DestroyImmediate(collider);
@@ -695,18 +697,21 @@ namespace CluckWars.Gameplay
         /// <c>MapClearanceTests.BaseKeepClearDiscs_AreCentredOnTheBases_NotTheRawCorners</c>.
         /// </para>
         /// <para>
-        /// Piles get their per-match XZ jitter (<see cref="JitterXZ"/>) only once
+        /// Piles get their per-match nudge (<see cref="FourFoldNudge"/>) only once
         /// <see cref="SpawnFoodPiles"/> runs, which is after interior terrain is built - so
-        /// this uses each pile's NOMINAL (pre-jitter) position and inflates its radius by
-        /// <see cref="_pilePositionJitter"/> to cover every position the pile could actually
+        /// this uses each pile's NOMINAL (pre-nudge) position and inflates its radius by
+        /// <see cref="PileKeepClearAllowance"/> (the nudge radius, never below the 0.4 the
+        /// shipped terrain was baked with) to cover every position the pile could actually
         /// land at, plus <see cref="PinwheelLayout.PileArmBuffer"/> so a stocked pile can
-        /// never end up flush against terrain.
+        /// never end up flush against terrain. The circumscribed footprint radius is
+        /// yaw-independent, so the D9 rotation of the outer ovals leaves these discs unchanged.
         /// </para>
         /// </remarks>
         private KeepClearDisc[] ComputeBaseAndPileKeepClearDiscs()
         {
-            float personalRadius = FootprintRadius(_personalPileFootprint) + _pilePositionJitter + PinwheelLayout.PileArmBuffer;
-            float contestedRadius = FootprintRadius(_contestedPileFootprint) + _pilePositionJitter + PinwheelLayout.PileArmBuffer;
+            float slack = PileKeepClearAllowance(_pilePositionJitter);
+            float personalRadius = FootprintRadius(_personalPileFootprint) + slack + PinwheelLayout.PileArmBuffer;
+            float contestedRadius = FootprintRadius(_contestedPileFootprint) + slack + PinwheelLayout.PileArmBuffer;
 
             var discs = new KeepClearDisc[_corners.Length * 3]; // base + personal + contested per corner
             int idx = 0;
@@ -891,10 +896,13 @@ namespace CluckWars.Gameplay
             //   Secure:  personal island near own base (low yield, safe).
             //   Contest: large central pile (high risk, high reward).
             //   Invade:  rivals' islands / loaded carriers.
-            // Center is fixed; personal + contested islands get per-match XZ jitter
-            // (GDD: "food island positions are randomized within constraints").
-            // Master-spawned NetworkObjects replicate, so plain Random is fine —
+            // Center is fixed; personal + contested islands get ONE per-match nudge per tier,
+            // rotated 90 degrees per corner so the seats stay exact rotations of each other
+            // (Phase 8 D9; shipped radius 0). Outer piles point their long axis at the centre.
+            // Master-spawned NetworkObjects replicate, so plain Random is fine -
             // no cross-peer seeding needed.
+            var personalNudge  = Random.insideUnitCircle * _pilePositionJitter;
+            var contestedNudge = Random.insideUnitCircle * _pilePositionJitter;
 
             var loggedCoords = new System.Text.StringBuilder();
             loggedCoords.AppendLine("--- ORACLE PILE COORDINATES ---");
@@ -903,22 +911,23 @@ namespace CluckWars.Gameplay
             // Center pile — bigger Amount + bigger visual. Never moves, and (ADR 0003
             // Decision 2b) never fully drains: the outer piles are consumed away over the
             // match, so the centre is what the endgame converges on.
-            SpawnPile(runner, pilePrefab, Vector3.zero, _centerPileAmount, _centerPileFootprint, _centerPileIsPermanent);
+            SpawnPile(runner, pilePrefab, Vector3.zero, 0f, _centerPileAmount, _centerPileFootprint, _centerPileIsPermanent);
 
             // Personal doorstep islands — 4 piles on the corner diagonals.
             for (int i = 0; i < _corners.Length; i++)
             {
-                var pos = PersonalPileNominal(_corners[i], _personalPileInset) + JitterXZ();
-                SpawnPile(runner, pilePrefab, pos, _personalPileAmount, _personalPileFootprint);
+                var pos = OuterPilePosition(PersonalPileNominal(_corners[i], _personalPileInset), personalNudge, i);
+                SpawnPile(runner, pilePrefab, pos, PileFootprintShape.RadialLongAxisYaw(pos), _personalPileAmount, _personalPileFootprint);
                 loggedCoords.AppendLine($"Personal {i}: ({pos.x:F2}, {pos.z:F2}) | Food: {_personalPileAmount:0.00}");
             }
 
             // Contested islands — 4 piles on the edge midpoints.
             for (int i = 0; i < _corners.Length; i++)
             {
-                var pos = ContestedPileNominal(_corners[i], _corners[(i + 1) % _corners.Length], _contestedEdgeInset)
-                          + JitterXZ();
-                SpawnPile(runner, pilePrefab, pos, _contestedPileAmount, _contestedPileFootprint);
+                var pos = OuterPilePosition(
+                    ContestedPileNominal(_corners[i], _corners[(i + 1) % _corners.Length], _contestedEdgeInset),
+                    contestedNudge, i);
+                SpawnPile(runner, pilePrefab, pos, PileFootprintShape.RadialLongAxisYaw(pos), _contestedPileAmount, _contestedPileFootprint);
                 loggedCoords.AppendLine($"Contested {i}: ({pos.x:F2}, {pos.z:F2}) | Food: {_contestedPileAmount:0.00}");
             }
             loggedCoords.AppendLine("-------------------------------");
@@ -933,11 +942,40 @@ namespace CluckWars.Gameplay
                 $"{(_centerPileIsPermanent ? " (+ centre regen)" : "")}.");
         }
 
-        private Vector3 JitterXZ()
+        /// <summary>
+        /// Keep-clear inflation applied to every outer pile's terrain no-build disc, on top of its
+        /// footprint radius. It used to BE <see cref="_pilePositionJitter"/> (0.4) - the discs
+        /// had to cover every jittered position. Phase 8 D9 ships the jitter at 0, but the
+        /// pinwheel arms and scatter are baked against 0.4-inflated discs (and the W = 8 bearing
+        /// table is derived from them), so the inflation is pinned here: a re-bake reproduces the
+        /// shipped terrain exactly, and a pile can never sit flush against an arm.
+        /// </summary>
+        public const float PileKeepClearSlack = 0.4f;
+
+        /// <summary>Keep-clear inflation actually used: the nudge radius, never below <see cref="PileKeepClearSlack"/>.</summary>
+        public static float PileKeepClearAllowance(float pilePositionJitter) =>
+            Mathf.Max(Mathf.Max(0f, pilePositionJitter), PileKeepClearSlack);
+
+        /// <summary>
+        /// One per-match nudge, rotated to corner <paramref name="cornerIndex"/>: corner i+1 is
+        /// corner i turned +90 degrees about Y ((x, z) -> (-z, x); see <see cref="ComputeSpawnPoints"/>),
+        /// and so is each of its piles' nudge. The four seats therefore always get exact
+        /// rotations of one layout (Phase 8 D9) - an independent offset per pile did not.
+        /// </summary>
+        public static Vector3 FourFoldNudge(Vector2 nudge, int cornerIndex)
         {
-            var j = Random.insideUnitCircle * _pilePositionJitter;
-            return new Vector3(j.x, 0f, j.y);
+            var v = new Vector3(nudge.x, 0f, nudge.y);
+            int turns = ((cornerIndex % 4) + 4) % 4;
+            for (int k = 0; k < turns; k++) v = new Vector3(-v.z, 0f, v.x);
+            return v;
         }
+
+        /// <summary>
+        /// Where outer pile i actually spawns this match: its nominal spot plus the 4-fold nudge.
+        /// Static so the EditMode tests exercise the spawn path's own arithmetic.
+        /// </summary>
+        public static Vector3 OuterPilePosition(Vector3 nominal, Vector2 matchNudge, int cornerIndex) =>
+            nominal + FourFoldNudge(matchNudge, cornerIndex);
 
         /// <summary>
         /// Centre and outer piles share one prefab, so everything that differs between them
@@ -945,12 +983,12 @@ namespace CluckWars.Gameplay
         /// <c>[Networked]</c> property is replicated from tick zero, before <c>Spawned()</c>
         /// runs on any peer and sizes the pile's footprint.
         /// </summary>
-        private NetworkObject SpawnPile(NetworkRunner runner, NetworkObject pilePrefab, Vector3 pos, float amount, Vector2 footprint, bool permanent = false)
+        private NetworkObject SpawnPile(NetworkRunner runner, NetworkObject pilePrefab, Vector3 pos, float yaw, float amount, Vector2 footprint, bool permanent = false)
         {
             return runner.Spawn(
                 pilePrefab,
                 pos,
-                Quaternion.identity,
+                Quaternion.Euler(0f, yaw, 0f),
                 onBeforeSpawned: (_, networkObject) =>
                 {
                     var pile = networkObject.GetComponent<FoodPile>();
@@ -969,6 +1007,7 @@ namespace CluckWars.Gameplay
                         pile.MaxAmount = amount;
                     }
                     pile.FootprintSize = footprint;
+                    pile.Yaw = yaw;
                     pile.IsPermanent = permanent;
                 });
         }
