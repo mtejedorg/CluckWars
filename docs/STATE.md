@@ -6,6 +6,13 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🔧 PHASE 8 chunk C (2026-10-15, IN PROGRESS): re-audit fixes C1-C18 + decisions D4/D6/D7/D8/D9 (Stage 1, Unity open)
+
+Brief: scratchpad `env3d/phase8c_brief.md`. Decisions binding (memory `env3d-decisions-2026-10-15`). Stage 2 (D2 mound, D3 base kit, D5 surround; Unity closed) and Stage 3 (integration) not started.
+
+| Item | Status | Commit | Notes |
+|---|---|---|---|
+
 ## 🔎 PHASE 8 RE-AUDIT (2026-10-15): six-lens re-grade after chunks A+B - overall C- -> C+
 
 Same six lenses, fresh full capture `Captures/env3d_reaudit/` (before/now pairs in `cmp/`), decision page https://claude.ai/artifact/8j5NN2zzB1rWAecqMoJbjm (v2). Grades: art direction D+ -> C, readability C- -> C+, 3D models C -> C+, level design C -> B-, render pipeline C -> B-, materials C- -> C+. Of the 26 original findings: 17 fixed, 1 regressed, 8 wait on decisions.
