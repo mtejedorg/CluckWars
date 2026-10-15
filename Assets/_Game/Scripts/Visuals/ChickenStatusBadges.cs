@@ -137,6 +137,13 @@ namespace CluckWars.Visuals
             BuildStack(rows);
         }
 
+        /// <summary>Raises the badge stack for a class model drawn taller than the collider (Phase 8 D6).
+        /// Root-local metres; presentation only.</summary>
+        public void SetHeadLift(float lift)
+        {
+            if (_stackRoot != null) _stackRoot.localPosition = new Vector3(0f, FeedbackTuning.StatusBadgeStackBaseHeight + lift, 0f);
+        }
+
         private void BuildStack(int rows)
         {
             var root = new GameObject("StatusBadges");

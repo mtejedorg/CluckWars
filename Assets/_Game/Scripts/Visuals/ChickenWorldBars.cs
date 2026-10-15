@@ -65,6 +65,13 @@ namespace CluckWars.Visuals
 
         // ── Construction ───────────────────────────────────────────────────────
 
+        /// <summary>Raises the bar stack for a class model drawn taller than the collider (Phase 8 D6).
+        /// Root-local metres; presentation only.</summary>
+        public void SetHeadLift(float lift)
+        {
+            if (_barRoot != null) _barRoot.localPosition = _barOffset + Vector3.up * lift;
+        }
+
         private void BuildBars()
         {
             var root = new GameObject("WorldBars");

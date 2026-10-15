@@ -572,6 +572,13 @@ namespace CluckWars.Gameplay
             model.transform.localPosition = new Vector3(0f, groundLocalY, 0f);
             model.transform.localRotation = Quaternion.identity;
 
+            // Visual-only class scale (Phase 8 D6). The model origin is at the feet, so scaling the model root
+            // keeps the feet planted; the root, CharacterController and stats are not touched. ChickenAnimator
+            // captures _restScale from this transform in SetModelRoot (called after we return), so it keeps it.
+            var modelScale = entry.ResolvedModelScale;
+            model.transform.localScale = modelScale;
+            ApplyOverlayHeadLift(_characterController.height * (modelScale.y - 1f));
+
             // Caches its renderer set in Spawned, which may already have run — and could not have
             // included the model in any case, since the model only exists now.
             GetComponent<HitFeedback>()?.RefreshBodyRenderers();
@@ -581,6 +588,20 @@ namespace CluckWars.Gameplay
             _log?.Debug(Source, $"Attached model '{model.name}' at localY={groundLocalY:0.###}, " +
                                 $"skeletal={_skeletalAnimationActive}.");
             return model.transform;
+        }
+
+        /// <summary>
+        /// Lifts the world-space overlays that hang above the head (nameplate, cargo bars, status badges,
+        /// stun stars) by <paramref name="lift"/> root-local metres, so a class model drawn taller than the
+        /// collider does not swallow them. Ground overlays are untouched: they describe the hitbox.
+        /// </summary>
+        private void ApplyOverlayHeadLift(float lift)
+        {
+            if (Mathf.Approximately(lift, 0f)) return;
+            GetComponent<ChickenNameplate>()?.SetHeadLift(lift);
+            GetComponent<ChickenWorldBars>()?.SetHeadLift(lift);
+            GetComponent<ChickenStatusBadges>()?.SetHeadLift(lift);
+            GetComponent<ChickenStateOverlays>()?.SetHeadLift(lift);
         }
 
         /// <summary>

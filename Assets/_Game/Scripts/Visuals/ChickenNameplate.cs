@@ -64,6 +64,15 @@ namespace CluckWars.Visuals
         private bool _wasStunned;
         private string _appliedStateIcon = string.Empty;
         private float _youEmphasis;   // 0..1, GET READY "this is you" marker (YouMarkerRules)
+        private float _headLift;      // root-local metres added above _offset for a taller class model (Phase 8 D6)
+
+        /// <summary>Raises the label for a class model drawn taller than the collider (Phase 8 D6).
+        /// Root-local metres; presentation only.</summary>
+        public void SetHeadLift(float lift)
+        {
+            _headLift = lift;
+            if (_textTransform != null) _textTransform.localPosition = _offset + Vector3.up * _headLift;
+        }
 
         private void Awake()
         {
@@ -84,7 +93,7 @@ namespace CluckWars.Visuals
         {
             var go = new GameObject("Nameplate");
             go.transform.SetParent(transform, worldPositionStays: false);
-            go.transform.localPosition = _offset;
+            go.transform.localPosition = _offset + Vector3.up * _headLift;
             _textTransform = go.transform;
 
             _text = go.AddComponent<TextMesh>();
@@ -226,7 +235,7 @@ namespace CluckWars.Visuals
             float scale = YouMarkerRules.NameplateScaleAt(_youEmphasis);
             _textTransform.localScale = Vector3.one * scale;
             // Grow upward from the label's bottom edge rather than about its centre.
-            _textTransform.localPosition = _offset + Vector3.up * (scale - 1f) * 0.25f;
+            _textTransform.localPosition = _offset + Vector3.up * (_headLift + (scale - 1f) * 0.25f);
         }
 
         private void ShowMarks(bool you, bool rival, Color dot)

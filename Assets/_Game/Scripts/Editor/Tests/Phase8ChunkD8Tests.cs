@@ -160,7 +160,7 @@ namespace CluckWars.Tests
 
         // ---- CIEDE2000 (sRGB D65 -> CIELAB -> dE00), same formulation as AbilityPaletteTests ----------------
 
-        private static float DeltaE2000(Color a, Color b)
+        internal static float DeltaE2000(Color a, Color b)
         {
             var la = ToLab(a); var lb = ToLab(b);
             return (float)DeltaE2000Lab(la.x, la.y, la.z, lb.x, lb.y, lb.z);

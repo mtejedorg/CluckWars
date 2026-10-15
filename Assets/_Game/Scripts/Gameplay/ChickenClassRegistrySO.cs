@@ -169,6 +169,17 @@ namespace CluckWars.Gameplay
                      "CharacterController's — see ChickenController.AttachClassModel.")]
             public GameObject ModelPrefab;
 
+            [Tooltip("VISUAL-only scale of the model root (x width, y height, z depth), applied about the feet " +
+                     "so the bird stays grounded. The networked root, CharacterController and every stat are " +
+                     "untouched - the hitbox is NOT scaled. (1,1,1) = as authored; an all-zero value (an entry " +
+                     "saved before this field existed) is treated as (1,1,1). Phase 8 D6 uses it to make the " +
+                     "Speedy taller and leaner. Nameplate / bars / badges / stun stars are lifted to match " +
+                     "(see ChickenController.AttachClassModel).")]
+            public Vector3 ModelScale;
+
+            /// <summary>The model scale to apply: <see cref="ModelScale"/>, or one when it was never authored.</summary>
+            public Vector3 ResolvedModelScale => ModelScale == Vector3.zero ? Vector3.one : ModelScale;
+
             [Tooltip("GENERIC Avatar sub-asset of ModelPrefab's .fbx, assigned to the root Animator. " +
                      "Must not be Humanoid: humanoid retargeting reshapes the rig to human " +
                      "proportions, which collapses the chicken's rest pose and sinks it ~1m " +

@@ -136,6 +136,13 @@ namespace CluckWars.Visuals
 
         // ── Construction ───────────────────────────────────────────────────────
 
+        /// <summary>Raises the stun stars for a class model drawn taller than the collider (Phase 8 D6).
+        /// Root-local metres; presentation only.</summary>
+        public void SetHeadLift(float lift)
+        {
+            if (_starRoot != null) _starRoot.localPosition = new Vector3(0f, _starHeight + lift, 0f);
+        }
+
         private void BuildStars()
         {
             var root = new GameObject("StunStars");
