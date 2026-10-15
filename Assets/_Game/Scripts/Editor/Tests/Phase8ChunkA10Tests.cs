@@ -23,6 +23,7 @@ namespace CluckWars.Tests
         private static readonly string[] FenceMaterials =
         {
             "Assets/_Game/Art/Materials/Prop_wall_segment.mat",
+            "Assets/_Game/Art/Materials/Prop_wall_segment_Inner.mat", // Phase 8 D4: the arm panels' twin
             "Assets/_Game/Art/Materials/Prop_chicken_coop.mat",
         };
 

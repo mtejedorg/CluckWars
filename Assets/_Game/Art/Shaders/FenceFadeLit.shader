@@ -187,6 +187,8 @@ Shader "Cluck Wars/Fence Fade Lit"
             // CW fence fade (Phase 8 A10): the clip/rim code exists only in this variant; FenceFadeDriver sets the
             // GLOBAL keyword only while a hole is open, so a closed fence runs the stock Lit fragment.
             #pragma multi_compile_fragment _ _CW_FENCE_FADE
+            // Phase 8 D4: outer fence materials (Prop_wall_segment.mat) also open for every other chicken behind them.
+            #pragma shader_feature_local_fragment _ _CW_FENCE_ALL_BIRDS
             #include "CWFenceFade.hlsl"
 
             // CW fence fade: clip, then the stock Lit forward fragment.
@@ -349,6 +351,8 @@ Shader "Cluck Wars/Fence Fade Lit"
             // CW fence fade (Phase 8 A10): the clip/rim code exists only in this variant; FenceFadeDriver sets the
             // GLOBAL keyword only while a hole is open, so a closed fence runs the stock Lit fragment.
             #pragma multi_compile_fragment _ _CW_FENCE_FADE
+            // Phase 8 D4: outer fence materials (Prop_wall_segment.mat) also open for every other chicken behind them.
+            #pragma shader_feature_local_fragment _ _CW_FENCE_ALL_BIRDS
             #include "CWFenceFade.hlsl"
 
             // CW fence fade
@@ -403,6 +407,8 @@ Shader "Cluck Wars/Fence Fade Lit"
             // CW fence fade (Phase 8 A10): the clip/rim code exists only in this variant; FenceFadeDriver sets the
             // GLOBAL keyword only while a hole is open, so a closed fence runs the stock Lit fragment.
             #pragma multi_compile_fragment _ _CW_FENCE_FADE
+            // Phase 8 D4: outer fence materials (Prop_wall_segment.mat) also open for every other chicken behind them.
+            #pragma shader_feature_local_fragment _ _CW_FENCE_ALL_BIRDS
             #include "CWFenceFade.hlsl"
 
             // CW fence fade
@@ -464,6 +470,8 @@ Shader "Cluck Wars/Fence Fade Lit"
             // CW fence fade (Phase 8 A10): the clip/rim code exists only in this variant; FenceFadeDriver sets the
             // GLOBAL keyword only while a hole is open, so a closed fence runs the stock Lit fragment.
             #pragma multi_compile_fragment _ _CW_FENCE_FADE
+            // Phase 8 D4: outer fence materials (Prop_wall_segment.mat) also open for every other chicken behind them.
+            #pragma shader_feature_local_fragment _ _CW_FENCE_ALL_BIRDS
             #include "CWFenceFade.hlsl"
 
             // CW fence fade

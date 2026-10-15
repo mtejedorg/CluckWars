@@ -706,6 +706,14 @@ namespace CluckWars.EditorTools
                 if (dstFilters[i].sharedMesh != srcFilters[i].sharedMesh)
                     dstFilters[i].sharedMesh = srcFilters[i].sharedMesh;
 
+            // ...and its material override: arm panels use Prop_wall_segment_Inner.mat (Phase 8 D4: no
+            // _CW_FENCE_ALL_BIRDS, so they keep the local-bird-only hole), the prefab default is the outer fence.
+            var srcRenderers = template.GetComponentsInChildren<Renderer>(true);
+            var dstRenderers = clone.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < Mathf.Min(srcRenderers.Length, dstRenderers.Length); i++)
+                if (!srcRenderers[i].sharedMaterials.SequenceEqual(dstRenderers[i].sharedMaterials))
+                    dstRenderers[i].sharedMaterials = srcRenderers[i].sharedMaterials;
+
             Undo.RegisterCreatedObjectUndo(clone, "Add fence post");
             return clone.transform;
         }

@@ -1,7 +1,8 @@
 #ifndef CW_FENCE_FADE_INCLUDED
 #define CW_FENCE_FADE_INCLUDED
 
-// Cluck Wars — see-through fence near the LOCAL bird (Phase 6 chunk 7f; rim + keyword Phase 8 A10).
+// Cluck Wars — see-through fence near the LOCAL bird (Phase 6 chunk 7f; rim + keyword Phase 8 A10) and,
+// on outer fences, near every other chicken behind them (Phase 8 D4).
 //
 // A dithered alpha-clip, not transparency: the fence stays in the opaque queue, keeps writing depth,
 // costs no extra pass and needs no sorting. Every pass that writes colour or depth (ForwardLit, GBuffer,
@@ -23,12 +24,25 @@
 //                        z = rim blend 0..1 toward _CW_FenceRimColor (ForwardLit only)
 //   _CW_FenceRimColor    rgb = rim colour (the UI cream)
 //
-// Keep the math identical to FenceFadeRules.FragmentFade / RimWeight (EditMode-tested on the C# side).
+// Phase 8 D4 — a hole for every chicken behind an OUTER fence (Maestro: "all OUTER fences fade when a chicken is
+// behind them"). Only materials with the local keyword _CW_FENCE_ALL_BIRDS (Prop_wall_segment.mat: the boundary
+// runs) read these; the inner arm walls (Prop_wall_segment_Inner.mat) and the coops keep the local-bird-only hole:
+//   _CW_FenceBirds[CW_FENCE_MAX_BIRDS]  xyz = a chicken's body centre (world), w = its strength 0..1 (smoothed,
+//                        already scaled by its networked VisualOpacity); rivals and decoys alike, compacted
+//   _CW_FenceBirdCount   how many leading slots are live (0..CW_FENCE_MAX_BIRDS)
+// Every hole has the local hole's exact shape, depth gate and rim; overlapping holes take the max.
+//
+// Keep the math identical to FenceFadeRules.FragmentFade / RimWeight / CombinedFragmentFade (EditMode-tested on the
+// C# side), and CW_FENCE_MAX_BIRDS equal to FenceFadeRules.MaxBirdSlots.
+
+#define CW_FENCE_MAX_BIRDS 8
 
 float4 _CW_LocalBirdPos;
 float4 _CW_FenceFadeParams;
 float4 _CW_FenceRimParams;
 float4 _CW_FenceRimColor;
+float4 _CW_FenceBirds[CW_FENCE_MAX_BIRDS];
+float _CW_FenceBirdCount;
 
 #if defined(_CW_FENCE_FADE)
 
@@ -47,47 +61,71 @@ float CW_FenceInFront(float fragEyeDepth, float birdEyeDepth)
 }
 
 // 0 = keep, 1 = fully faded. screenDist and the radii are fractions of the screen height.
-float CW_FenceFadeAmount(float screenDist, float inFront)
+float CW_FenceFadeAmount(float screenDist, float inFront, float strength)
 {
     float radial = 1.0 - smoothstep(_CW_FenceFadeParams.x, _CW_FenceFadeParams.y, screenDist);
-    return saturate(_CW_LocalBirdPos.w) * _CW_FenceFadeParams.z * radial * inFront;
+    return saturate(strength) * _CW_FenceFadeParams.z * radial * inFront;
 }
 
 // 0..1 weight of the thin rim band around the hole's outer edge.
-float CW_FenceRimAmount(float screenDist, float inFront)
+float CW_FenceRimAmount(float screenDist, float inFront, float strength)
 {
     float band = 1.0 - smoothstep(0.0, max(_CW_FenceRimParams.y, 1e-5), abs(screenDist - _CW_FenceRimParams.x));
-    return saturate(_CW_LocalBirdPos.w) * _CW_FenceRimParams.z * band * inFront;
+    return saturate(strength) * _CW_FenceRimParams.z * band * inFront;
 }
 
-// Clips the hole and returns the rim weight for the surviving fragment (0 when strength is 0).
+// One hole (bird: xyz world centre, w strength) as this fragment sees it; folds into fade / rim by max.
+void CW_FenceHole(float4 bird, float2 fragUV, float2 screenPx, float fragEye, inout float fade, inout float rim)
+{
+    // Where the bird lands on screen. ComputeScreenPos-style mapping paired with GetNormalizedScreenSpaceUV is
+    // the same pairing URP uses for its own screen-space textures, so both sides agree on any y-flip.
+    float3 birdVS = TransformWorldToView(bird.xyz);
+    float4 birdCS = TransformWViewToHClip(birdVS);
+    float2 birdUV = (birdCS.xy * float2(0.5, 0.5 * _ProjectionParams.x) + 0.5 * birdCS.w) / max(birdCS.w, 1e-5);
+    float screenDist = length((fragUV - birdUV) * screenPx) / max(screenPx.y, 1.0);
+
+    float inFront = CW_FenceInFront(fragEye, -birdVS.z);
+    fade = max(fade, CW_FenceFadeAmount(screenDist, inFront, bird.w));
+    rim = max(rim, CW_FenceRimAmount(screenDist, inFront, bird.w));
+}
+
+// Clips the holes and returns the rim weight for the surviving fragment (0 when no hole is open).
 // One exit point on purpose (Phase 8 C16): an early `return` inside the UNITY_BRANCH ahead of the clip() made
 // FXC/HLSLcc warn "use of potentially uninitialized variable" (the multiple returns are merged into a hidden
-// return temp the compiler cannot prove is set on every path). Same behaviour: strength <= 0 skips all the
-// work and returns 0.
+// return temp the compiler cannot prove is set on every path). No hole open skips all the work and returns 0.
 float CW_FenceFadeClipRim(float4 positionCS)
 {
     float rim = 0.0;
 
+    bool anyHole = _CW_LocalBirdPos.w > 0.0;
+#if defined(_CW_FENCE_ALL_BIRDS)
+    float birdCount = min(_CW_FenceBirdCount, (float)CW_FENCE_MAX_BIRDS);
+    anyHole = anyHole || birdCount > 0.5;
+#endif
+
     UNITY_BRANCH
-    if (_CW_LocalBirdPos.w > 0.0)
+    if (anyHole)
     {
-        // Where the bird lands on screen. ComputeScreenPos-style mapping paired with GetNormalizedScreenSpaceUV is
-        // the same pairing URP uses for its own screen-space textures, so both sides agree on any y-flip.
-        float4 birdCS = TransformWorldToHClip(_CW_LocalBirdPos.xyz);
-        float2 birdUV = (birdCS.xy * float2(0.5, 0.5 * _ProjectionParams.x) + 0.5 * birdCS.w) / max(birdCS.w, 1e-5);
         float2 fragUV = GetNormalizedScreenSpaceUV(positionCS);
-
         float2 screenPx = GetScaledScreenParams().xy;
-        float screenDist = length((fragUV - birdUV) * screenPx) / max(screenPx.y, 1.0);
-
-        float birdEye = -TransformWorldToView(_CW_LocalBirdPos.xyz).z;
         float fragEye = CW_FragmentEyeDepth(positionCS.z);
-        float inFront = CW_FenceInFront(fragEye, birdEye);
+        float fade = 0.0;
 
-        float fade = CW_FenceFadeAmount(screenDist, inFront);
+        CW_FenceHole(_CW_LocalBirdPos, fragUV, screenPx, fragEye, fade, rim);
+
+#if defined(_CW_FENCE_ALL_BIRDS)
+        // Constant bound, unrolled, each slot behind a uniform branch: constant array indices (fine at shader
+        // target 2.0 / GLES3), and slots past the live count cost one compare each.
+        UNITY_UNROLL
+        for (int i = 0; i < CW_FENCE_MAX_BIRDS; i++)
+        {
+            UNITY_BRANCH
+            if ((float)i < birdCount)
+                CW_FenceHole(_CW_FenceBirds[i], fragUV, screenPx, fragEye, fade, rim);
+        }
+#endif
+
         clip(CW_Bayer4(positionCS.xy) - fade - 1e-4);
-        rim = CW_FenceRimAmount(screenDist, inFront);
     }
 
     return rim;

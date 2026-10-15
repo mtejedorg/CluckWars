@@ -20,6 +20,11 @@ namespace CluckWars.Visuals
     /// fragments within a screen-space circle around the bird AND closer to the camera than the bird fade, so
     /// the far fence and anything behind the bird stay solid.
     /// </para>
+    /// <para>
+    /// <b>Phase 8 D4.</b> Besides the local bird's hole (every fence material), every other chicken — rivals and
+    /// Doppelganger decoys alike — covered by an OUTER fence gets its own hole of the same shape and timing, on the
+    /// materials with <see cref="AllBirdsKeywordName"/> only (<see cref="CombinedFragmentFade"/>).
+    /// </para>
     /// <para>Local presentation only — nothing here is networked.</para>
     /// </remarks>
     public static class FenceFadeRules
@@ -87,9 +92,131 @@ namespace CluckWars.Visuals
         /// at a constant rate that crosses the whole range in <see cref="FadeSeconds"/>.
         /// </summary>
         public static float StepStrength(float current, bool occluded, float deltaSeconds)
+            => StepStrengthToward(current, occluded ? 1f : 0f, deltaSeconds);
+
+        /// <summary>
+        /// Eases a strength toward any <paramref name="target"/> in 0..1 at the same constant rate as
+        /// <see cref="StepStrength"/> (the whole range in <see cref="FadeSeconds"/>). Phase 8 D4: a faded
+        /// (ghosted) chicken's hole targets its visual opacity instead of 1 (<see cref="TargetStrength"/>).
+        /// </summary>
+        public static float StepStrengthToward(float current, float target, float deltaSeconds)
         {
             float rate = FadeSeconds > 0f ? Mathf.Max(0f, deltaSeconds) / FadeSeconds : 1f;
-            return Mathf.MoveTowards(Mathf.Clamp01(current), occluded ? 1f : 0f, rate);
+            return Mathf.MoveTowards(Mathf.Clamp01(current), Mathf.Clamp01(target), rate);
+        }
+
+        // ---- Phase 8 D4: holes for every chicken behind an OUTER fence ------------------------------------
+
+        /// <summary>Material keyword (<c>#pragma shader_feature_local_fragment _ _CW_FENCE_ALL_BIRDS</c>) that marks a
+        /// fence material as an OUTER perimeter fence: it opens for every chicken behind it (Phase 8 D4, Maestro:
+        /// "all OUTER fences fade when a chicken is behind them"). Set on <c>Prop_wall_segment.mat</c> (the boundary
+        /// runs <c>Wall_[NSEW]_*</c> and the prefab default); OFF on <c>Prop_wall_segment_Inner.mat</c> (the pinwheel
+        /// arm panels <c>InnerWall_*</c>) and <c>Prop_chicken_coop.mat</c>, which keep the local-bird-only hole.
+        /// The driver picks its outer occluders by this same keyword, so the CPU selection and the shader can never
+        /// disagree about which panel is "outer".</summary>
+        public const string AllBirdsKeywordName = "_CW_FENCE_ALL_BIRDS";
+
+        /// <summary>Is <paramref name="material"/> an outer fence that opens for every chicken
+        /// (<see cref="AllBirdsKeywordName"/> enabled on the material)?</summary>
+        public static bool FadesForAllBirds(Material material) =>
+            material != null && material.IsKeywordEnabled(AllBirdsKeywordName);
+
+        /// <summary>Hole slots for chickens other than the local bird (shader <c>CW_FENCE_MAX_BIRDS</c>; keep equal).
+        /// 3 rivals + their Doppelganger decoys + the local player's own decoy fit with room to spare.</summary>
+        public const int MaxBirdSlots = 8;
+
+        /// <summary>
+        /// The strength a non-local chicken's hole eases toward. Not covered: 0. Covered: its networked
+        /// <c>VisualOpacity</c> (every peer sees the same value), so a ghosted rival (Invisibility / Smoke Roost,
+        /// 0.2) opens only a ~20 % screen-door hole and the hole never reveals more than the ghost body itself
+        /// does in the open. 0 means "not replicated yet" and counts as fully visible (same rule as
+        /// <c>ChickenVisuals</c>). Decoys go through exactly this rule; nothing here knows what a decoy is.
+        /// </summary>
+        public static float TargetStrength(bool occluded, float visualOpacity)
+        {
+            if (!occluded) return 0f;
+            return visualOpacity > 0f ? Mathf.Clamp01(visualOpacity) : 1f;
+        }
+
+        /// <summary>
+        /// Can a hole centred at <paramref name="viewport"/> (camera viewport coordinates, z = distance in front)
+        /// touch the screen? The hole's outer radius is <see cref="OuterRadius"/> screen HEIGHTS, never more than
+        /// that in viewport-width units on a landscape screen, so <see cref="OuterRadius"/> is a safe margin on both
+        /// axes. Off-screen holes take no slot and do not keep the fade variant on (a rival behind the far side of
+        /// the arena's outer fence costs nothing).
+        /// </summary>
+        public static bool HoleOnScreen(Vector3 viewport) =>
+            viewport.z > 0f
+            && viewport.x > -OuterRadius && viewport.x < 1f + OuterRadius
+            && viewport.y > -OuterRadius && viewport.y < 1f + OuterRadius;
+
+        /// <summary>
+        /// Picks which candidates get one of the <paramref name="maxSlots"/> hole slots: only those with a strength
+        /// above 0; the strongest first, ties to the lower <paramref name="priorities"/> value (the driver passes the
+        /// distance from the screen centre). Writes candidate indices into <paramref name="chosen"/> and returns how
+        /// many. No allocation (a partial selection sort over at most a dozen entries).
+        /// </summary>
+        public static int SelectSlots(IReadOnlyList<float> strengths, IReadOnlyList<float> priorities, int count,
+            int[] chosen, int maxSlots)
+        {
+            if (strengths == null || chosen == null) return 0;
+            count = Mathf.Min(count, strengths.Count);
+            int cap = Mathf.Min(maxSlots, chosen.Length);
+            int n = 0;
+            while (n < cap)
+            {
+                int best = -1;
+                for (int i = 0; i < count; i++)
+                {
+                    if (strengths[i] <= 0f || Contains(chosen, n, i)) continue;
+                    if (best < 0 || Better(i, best)) best = i;
+                }
+                if (best < 0) break;
+                chosen[n++] = best;
+            }
+            return n;
+
+            bool Better(int a, int b)
+            {
+                if (strengths[a] != strengths[b]) return strengths[a] > strengths[b];
+                float pa = priorities != null && a < priorities.Count ? priorities[a] : 0f;
+                float pb = priorities != null && b < priorities.Count ? priorities[b] : 0f;
+                return pa != pb ? pa < pb : a < b;
+            }
+        }
+
+        private static bool Contains(int[] values, int count, int value)
+        {
+            for (int i = 0; i < count; i++) if (values[i] == value) return true;
+            return false;
+        }
+
+        /// <summary>One screen-space hole as one fence fragment sees it (C# side of a shader slot).</summary>
+        public readonly struct HoleSample
+        {
+            public readonly float Strength, ScreenDist, BirdEyeDepth;
+            public HoleSample(float strength, float screenDist, float birdEyeDepth)
+            { Strength = strength; ScreenDist = screenDist; BirdEyeDepth = birdEyeDepth; }
+        }
+
+        /// <summary>
+        /// C# twin of the combined clip in <c>CW_FenceFadeClipRim</c>: the local bird's hole applies to every fence
+        /// material; the other chickens' holes only where the material is an outer fence
+        /// (<paramref name="fadesForAllBirds"/>, i.e. <see cref="AllBirdsKeywordName"/> on). Overlapping holes take
+        /// the max, so one hole alone is exactly <see cref="FragmentFade"/>.
+        /// </summary>
+        public static float CombinedFragmentFade(bool fadesForAllBirds, float fragmentEyeDepth, HoleSample local,
+            IReadOnlyList<HoleSample> others)
+        {
+            float fade = FragmentFade(local.Strength, local.ScreenDist, fragmentEyeDepth, local.BirdEyeDepth);
+            if (!fadesForAllBirds || others == null) return fade;
+            int n = Mathf.Min(others.Count, MaxBirdSlots);
+            for (int i = 0; i < n; i++)
+            {
+                var h = others[i];
+                fade = Mathf.Max(fade, FragmentFade(h.Strength, h.ScreenDist, fragmentEyeDepth, h.BirdEyeDepth));
+            }
+            return fade;
         }
 
         /// <summary>
