@@ -15,7 +15,8 @@
 //
 // Inputs are globals set by CluckWars.Visuals.FenceFadeDriver (local presentation only):
 //   _CW_LocalBirdPos     xyz = the local bird's body centre (world), w = strength 0..1 (time-smoothed)
-//   _CW_FenceFadeParams  x = inner radius, y = outer radius (both as a fraction of the screen HEIGHT),
+//   _CW_FenceFadeParams  x = inner radius, y = outer radius (both as a fraction of the screen HEIGHT; the
+//                        dithered edge between them is FenceFadeRules.EdgeBandWidth, 0.03 since Phase 8 C16),
 //                        z = max fade 0..1 (below 1 leaves a faint screen-door so the fence still reads),
 //                        w = depth softness in world units (how far in front of the bird the fade ramps in)
 //   _CW_FenceRimParams   x = rim centre radius, y = rim half width (fractions of the screen height),
@@ -60,28 +61,36 @@ float CW_FenceRimAmount(float screenDist, float inFront)
 }
 
 // Clips the hole and returns the rim weight for the surviving fragment (0 when strength is 0).
+// One exit point on purpose (Phase 8 C16): an early `return` inside the UNITY_BRANCH ahead of the clip() made
+// FXC/HLSLcc warn "use of potentially uninitialized variable" (the multiple returns are merged into a hidden
+// return temp the compiler cannot prove is set on every path). Same behaviour: strength <= 0 skips all the
+// work and returns 0.
 float CW_FenceFadeClipRim(float4 positionCS)
 {
+    float rim = 0.0;
+
     UNITY_BRANCH
-    if (_CW_LocalBirdPos.w <= 0.0)
-        return 0.0;
+    if (_CW_LocalBirdPos.w > 0.0)
+    {
+        // Where the bird lands on screen. ComputeScreenPos-style mapping paired with GetNormalizedScreenSpaceUV is
+        // the same pairing URP uses for its own screen-space textures, so both sides agree on any y-flip.
+        float4 birdCS = TransformWorldToHClip(_CW_LocalBirdPos.xyz);
+        float2 birdUV = (birdCS.xy * float2(0.5, 0.5 * _ProjectionParams.x) + 0.5 * birdCS.w) / max(birdCS.w, 1e-5);
+        float2 fragUV = GetNormalizedScreenSpaceUV(positionCS);
 
-    // Where the bird lands on screen. ComputeScreenPos-style mapping paired with GetNormalizedScreenSpaceUV is
-    // the same pairing URP uses for its own screen-space textures, so both sides agree on any y-flip.
-    float4 birdCS = TransformWorldToHClip(_CW_LocalBirdPos.xyz);
-    float2 birdUV = (birdCS.xy * float2(0.5, 0.5 * _ProjectionParams.x) + 0.5 * birdCS.w) / max(birdCS.w, 1e-5);
-    float2 fragUV = GetNormalizedScreenSpaceUV(positionCS);
+        float2 screenPx = GetScaledScreenParams().xy;
+        float screenDist = length((fragUV - birdUV) * screenPx) / max(screenPx.y, 1.0);
 
-    float2 screenPx = GetScaledScreenParams().xy;
-    float screenDist = length((fragUV - birdUV) * screenPx) / max(screenPx.y, 1.0);
+        float birdEye = -TransformWorldToView(_CW_LocalBirdPos.xyz).z;
+        float fragEye = CW_FragmentEyeDepth(positionCS.z);
+        float inFront = CW_FenceInFront(fragEye, birdEye);
 
-    float birdEye = -TransformWorldToView(_CW_LocalBirdPos.xyz).z;
-    float fragEye = CW_FragmentEyeDepth(positionCS.z);
-    float inFront = CW_FenceInFront(fragEye, birdEye);
+        float fade = CW_FenceFadeAmount(screenDist, inFront);
+        clip(CW_Bayer4(positionCS.xy) - fade - 1e-4);
+        rim = CW_FenceRimAmount(screenDist, inFront);
+    }
 
-    float fade = CW_FenceFadeAmount(screenDist, inFront);
-    clip(CW_Bayer4(positionCS.xy) - fade - 1e-4);
-    return CW_FenceRimAmount(screenDist, inFront);
+    return rim;
 }
 
 void CW_FenceFadeClip(float4 positionCS)

@@ -32,11 +32,17 @@ namespace CluckWars.Visuals
         public const float FadeSeconds = 0.15f;
 
         /// <summary>Hole radius where the fade is full, as a fraction of the screen height. At the match
-        /// camera's ortho size 5.6 (11.2 m of view height) 0.09 is ~1 m: the whole bird.</summary>
-        public const float InnerRadius = 0.09f;
+        /// camera's ortho size 5.6 (11.2 m of view height) 0.12 is ~1.3 m: the whole bird. Phase 8 C16 raised it
+        /// from 0.09 so the dithered ramp to <see cref="OuterRadius"/> is a narrow edge
+        /// (<see cref="EdgeBandWidth"/>), not a wide stippled band; the hole's outer size is unchanged.</summary>
+        public const float InnerRadius = 0.12f;
 
         /// <summary>Where the fade has ramped back to solid, as a fraction of the screen height (~1.7 m).</summary>
         public const float OuterRadius = 0.15f;
+
+        /// <summary>Width of the dithered edge (inner -> outer radius), fractions of the screen height. Phase 8 C16:
+        /// 0.03 (was 0.06) keeps the edge to a few dither steps instead of a wide screen-door ring.</summary>
+        public const float EdgeBandWidth = OuterRadius - InnerRadius;
 
         /// <summary>Peak fade. Below 1 leaves a faint screen-door of fence so the player still sees there is a
         /// wall between them and the open arena (it still blocks movement). The 4x4 dither has 16 thresholds at
