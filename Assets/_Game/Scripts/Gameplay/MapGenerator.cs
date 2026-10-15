@@ -911,7 +911,7 @@ namespace CluckWars.Gameplay
             // Center pile — bigger Amount + bigger visual. Never moves, and (ADR 0003
             // Decision 2b) never fully drains: the outer piles are consumed away over the
             // match, so the centre is what the endgame converges on.
-            SpawnPile(runner, pilePrefab, Vector3.zero, 0f, _centerPileAmount, _centerPileFootprint, _centerPileIsPermanent);
+            SpawnPile(runner, pilePrefab, Vector3.zero, 0f, _centerPileAmount, _centerPileFootprint, _centerPileIsPermanent, centre: true);
 
             // Personal doorstep islands — 4 piles on the corner diagonals.
             for (int i = 0; i < _corners.Length; i++)
@@ -983,7 +983,7 @@ namespace CluckWars.Gameplay
         /// <c>[Networked]</c> property is replicated from tick zero, before <c>Spawned()</c>
         /// runs on any peer and sizes the pile's footprint.
         /// </summary>
-        private NetworkObject SpawnPile(NetworkRunner runner, NetworkObject pilePrefab, Vector3 pos, float yaw, float amount, Vector2 footprint, bool permanent = false)
+        private NetworkObject SpawnPile(NetworkRunner runner, NetworkObject pilePrefab, Vector3 pos, float yaw, float amount, Vector2 footprint, bool permanent = false, bool centre = false)
         {
             return runner.Spawn(
                 pilePrefab,
@@ -1009,6 +1009,7 @@ namespace CluckWars.Gameplay
                     pile.FootprintSize = footprint;
                     pile.Yaw = yaw;
                     pile.IsPermanent = permanent;
+                    pile.IsCentre = centre;
                 });
         }
 

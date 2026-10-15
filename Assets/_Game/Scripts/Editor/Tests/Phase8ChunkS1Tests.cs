@@ -23,6 +23,8 @@ namespace CluckWars.Tests
         private const string MoundMaterial = "Assets/_Game/Art/Materials/FoodMound.mat";
         private const string GrainTile = "Assets/Generated/Env/Textures/grain_corn_tile_neutral.png";
         private const string MapScene = "Assets/_Game/Scenes/Map.unity";
+        private const string GlowMaterial = "Assets/_Game/Art/Materials/PileGlow.mat";
+        private const string MapGeneratorSource = "Assets/_Game/Scripts/Gameplay/MapGenerator.cs";
 
         private string _originalScenePath;
 
@@ -193,6 +195,101 @@ namespace CluckWars.Tests
             var rim = v.Where(p => p.y > 0.019f).Select(p => new Vector2(p.x, p.z).magnitude).Where(r => r > 0.3f).ToArray();
             Assert.Greater(rim.Max() - rim.Min(), 0.03f, "an irregular outline, not a regular polygon");
             Assert.AreEqual(v.Length, m.normals.Length, "normals present");
+        }
+
+        // ---- centre-pile warm glow -----------------------------------------------------------------
+
+        private static MeshRenderer Glow() => TestAssets.PrivateField<Renderer>(Visuals(), "_centreGlow") as MeshRenderer;
+
+        [Test]
+        public void CentreGlow_IsAFlatHaloOnThePileRoot_DisabledByDefault_AndShadowFree()
+        {
+            var glow = Glow();
+            Assert.IsNotNull(glow, "FoodPileVisuals._centreGlow is wired to a MeshRenderer");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(FoodPilePrefab);
+            Assert.AreSame(prefab.transform, glow.transform.parent, "on the pile root (scales with the footprint), not under the Y-scaled mound");
+            Assert.IsFalse(glow.enabled, "off by default: only the centre pile turns it on, so outer piles cost no extra draw");
+            Assert.AreEqual(ShadowCastingMode.Off, glow.shadowCastingMode);
+            Assert.IsFalse(glow.receiveShadows);
+            Assert.IsNull(glow.GetComponent<Collider>(), "no collider");
+            Assert.AreSame(AssetDatabase.LoadAssetAtPath<Mesh>(PileGlowRingMesh.AssetPath), glow.GetComponent<MeshFilter>().sharedMesh);
+            float worldLift = glow.transform.localPosition.y * TestAssets.PrivateField<float>(prefab.GetComponent<FoodPile>(), "_blockerHeight");
+            Assert.That(worldLift, Is.InRange(0.021f, 0.05f), "just above the 2 cm pile disc slab");
+            CollectionAssert.DoesNotContain(TestAssets.PrivateField<Renderer[]>(Visuals(), "_renderers") ?? new Renderer[0], glow, "the mound tint never writes the glow");
+        }
+
+        [Test]
+        public void CentreGlowMaterial_IsUnderAssets_UnlitAlphaBlended_AndCannotBloom()
+        {
+            var m = Glow().sharedMaterial;
+            Assert.AreEqual(GlowMaterial, AssetDatabase.GetAssetPath(m), "project material (C3 rule: under Assets/)");
+            Assert.AreEqual("Universal Render Pipeline/Particles/Unlit", m.shader.name, "unlit: no lighting, no specular");
+            Assert.AreEqual(1f, m.GetFloat("_Surface"), "transparent");
+            Assert.AreEqual(0f, m.GetFloat("_Blend"), "alpha blend, not additive: it can only lerp toward the glow colour");
+            Assert.AreEqual((float)BlendMode.SrcAlpha, m.GetFloat("_SrcBlend"));
+            Assert.AreEqual((float)BlendMode.OneMinusSrcAlpha, m.GetFloat("_DstBlend"));
+            Assert.AreEqual(0f, m.GetFloat("_ZWrite"));
+            Assert.GreaterOrEqual(m.renderQueue, (int)RenderQueue.Transparent);
+            Assert.IsTrue(m.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT"));
+            Assert.IsTrue(m.enableInstancing);
+
+            var c = TestAssets.PrivateField<Color>(Visuals(), "_glowColor");
+            Assert.LessOrEqual(Mathf.Max(c.r, Mathf.Max(c.g, c.b)), 1f, "LDR colour: alpha-blending toward it never exceeds the PC bloom threshold (1.0)");
+            Color.RGBToHSV(c, out float h, out float s, out _);
+            Assert.That(h * 360f, Is.InRange(35f, 55f), "warm gold (food ramp), never a player colour");
+            Assert.Greater(s, 0.5f);
+        }
+
+        [Test]
+        public void GlowRingMesh_MatchesTheProfile_FacesUp_AndFadesToZeroAtBothEdges()
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<Mesh>(PileGlowRingMesh.AssetPath);
+            var built = PileGlowRingMesh.Build();
+            Assert.AreEqual(built.vertexCount, asset.vertexCount);
+            Assert.AreEqual(built.triangles.Length, asset.triangles.Length);
+            var v = asset.vertices; var col = asset.colors;
+            Assert.AreEqual(v.Length, col.Length, "vertex alpha carries the falloff");
+            Assert.That(v.Max(p => Mathf.Abs(p.y)), Is.LessThan(1e-6f), "flat");
+            float inner = v.Min(p => new Vector2(p.x, p.z).magnitude), outer = v.Max(p => new Vector2(p.x, p.z).magnitude);
+            Assert.Less(inner, 0.41f, "starts under the mound (outline 0.41-0.495)");
+            Assert.That(outer, Is.InRange(0.6f, 0.85f), "a soft halo, not a second disc across the plaza");
+            for (int i = 0; i < v.Length; i++)
+            {
+                float r = new Vector2(v[i].x, v[i].z).magnitude;
+                if (Mathf.Abs(r - inner) < 1e-4f || Mathf.Abs(r - outer) < 1e-4f) Assert.AreEqual(0f, col[i].a, 1e-6f, $"edge vertex {i} r={r}");
+            }
+            var t = asset.triangles;
+            for (int i = 0; i < t.Length; i += 3)
+            {
+                var n = Vector3.Cross(v[t[i + 1]] - v[t[i]], v[t[i + 2]] - v[t[i]]);
+                Assert.Greater(n.y, 0f, $"triangle {i / 3} faces up (back-face culled)");
+            }
+        }
+
+        [Test]
+        public void GlowAlpha_IsZeroWhenEmpty_DimsWithFill_AndPeaksWhenFull()
+        {
+            const float peak = 0.6f;
+            Assert.AreEqual(0f, FoodPileVisuals.GlowAlpha(0f, peak), "empty pile: glow off (it reads 'food here')");
+            Assert.AreEqual(0f, FoodPileVisuals.GlowAlpha(-0.1f, peak));
+            Assert.AreEqual(peak, FoodPileVisuals.GlowAlpha(1f, peak), 1e-6f);
+            Assert.AreEqual(peak * FoodPileVisuals.GlowFloor, FoodPileVisuals.GlowAlpha(1e-6f, peak), 1e-4f, "a sliver still glows, dimly");
+            Assert.Less(FoodPileVisuals.GlowAlpha(0.5f, peak), FoodPileVisuals.GlowAlpha(1f, peak));
+            float last = 0f;
+            for (int i = 1; i <= 100; i++) { float a = FoodPileVisuals.GlowAlpha(i / 100f, peak); Assert.GreaterOrEqual(a, last); last = a; }
+            Assert.That(TestAssets.PrivateField<float>(Visuals(), "_glowPeakAlpha"), Is.InRange(0.3f, 0.8f));
+        }
+
+        [Test]
+        public void OnlyTheCentrePile_IsStampedCentre()
+        {
+            var src = System.IO.File.ReadAllText(MapGeneratorSource);
+            var stamped = System.Text.RegularExpressions.Regex.Matches(src, @"SpawnPile\([^;]*centre:\s*true");
+            Assert.AreEqual(1, stamped.Count, "exactly one SpawnPile call passes centre: true");
+            StringAssert.Contains("Vector3.zero", stamped[0].Value, "and it is the arena-centre spawn");
+            StringAssert.Contains("_centerPileAmount", stamped[0].Value);
+            StringAssert.Contains("pile.IsCentre = centre;", src, "the flag is stamped in onBeforeSpawned (valid from tick zero on every peer)");
+            Assert.IsNotNull(typeof(FoodPile).GetProperty(nameof(FoodPile.IsCentre)).GetCustomAttributes(typeof(Fusion.NetworkedAttribute), false).FirstOrDefault(), "[Networked]");
         }
     }
 }

@@ -178,6 +178,13 @@ namespace CluckWars.Gameplay
         /// </summary>
         [Networked] public bool IsEvent { get; set; }
 
+        /// <summary>
+        /// Set by <c>MapGenerator</c> via <c>onBeforeSpawned</c> on the arena-centre pile only, so every peer
+        /// agrees from tick zero which pile is "the prize". Visual-only (Phase 8 C S1: <c>FoodPileVisuals</c>
+        /// draws the warm ground glow under it); no gameplay rule reads it.
+        /// </summary>
+        [Networked] public bool IsCentre { get; set; }
+
         /// <summary>True when the pile has no food left at all — it stops blocking and stops slowing.</summary>
         public bool IsEmpty => Amount <= 0f;
 

@@ -58,6 +58,24 @@ namespace CluckWars.Visuals
         [Tooltip("Legacy per-pile override. If null/alpha=0, ColorScheme.FoodPileEmpty is used.")]
         [SerializeField] private Color _emptyColorOverride = new Color(0f, 0f, 0f, 0f);
 
+        [Header("Centre-pile glow (Phase 8 C S1)")]
+        [Tooltip("Flat alpha-blended halo under the pile (Art/Meshes/PileGlowRing, Art/Materials/PileGlow.mat). Disabled in the prefab; enabled only on the pile MapGenerator stamps FoodPile.IsCentre, and only while it has food.")]
+        [SerializeField] private Renderer _centreGlow;
+
+        [Tooltip("Glow colour (food gold ramp, never a player colour). RGB <= 1 and alpha-blended, so it cannot exceed the PC bloom threshold.")]
+        [SerializeField] private Color _glowColor = new Color(0.961f, 0.784f, 0.259f, 1f);
+
+        [Tooltip("Halo opacity at its brightest ring when the pile is full. Scaled down with fill (see GlowAlpha) and 0 when empty.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float _glowPeakAlpha = 0.6f;
+
+        /// <summary>Fraction of the full glow left on a nearly drained centre pile (the halo dims with fill, then turns off at 0).</summary>
+        public const float GlowFloor = 0.35f;
+
+        /// <summary>Halo opacity for a fill ratio: 0 when empty ("no food here"), else <c>peak * Lerp(GlowFloor, 1, ratio)</c>.</summary>
+        public static float GlowAlpha(float ratio, float peak) =>
+            ratio <= 0f ? 0f : peak * Mathf.Lerp(GlowFloor, 1f, Mathf.Clamp01(ratio));
+
         /// <summary>Smallest fill-ratio change that re-writes the property blocks (0.5 % of a pile).</summary>
         public const float TintWriteThreshold = 0.005f;
 
@@ -74,6 +92,7 @@ namespace CluckWars.Visuals
         private FoodPile _pile;
         private float _lastTintRatio = float.NaN;
         private bool _showingEmpty;
+        private bool _glowAppliedForCentre;
         private MaterialPropertyBlock _propertyBlock;
         private ColorSchemeSO _colors;
 
@@ -161,9 +180,19 @@ namespace CluckWars.Visuals
                 _meshRoot.localPosition = pos;
             }
 
-            if (_renderers != null && _renderers.Length > 0 && ShouldWriteTint(_lastTintRatio, ratio))
+            // Same throttle as the tint (C4: write-on-change only). The glow is re-applied when the tint is due or
+            // when the pile's centre flag differs from what was last applied (Fusion pools NetworkObjects).
+            bool tintDue = ShouldWriteTint(_lastTintRatio, ratio);
+            bool centre = _pile.IsCentre;
+            if (_centreGlow != null && (tintDue || centre != _glowAppliedForCentre))
             {
-                _lastTintRatio = ratio;
+                _glowAppliedForCentre = centre;
+                ApplyGlow(centre ? GlowAlpha(ratio, _glowPeakAlpha) : 0f);
+            }
+
+            if (tintDue) _lastTintRatio = ratio;
+            if (_renderers != null && _renderers.Length > 0 && tintDue)
+            {
                 var color = TintFor(EmptyColor, FullColor, ratio);
                 for (int i = 0; i < _renderers.Length; i++)
                 {
@@ -175,6 +204,16 @@ namespace CluckWars.Visuals
                     r.SetPropertyBlock(_propertyBlock);
                 }
             }
+        }
+
+        private void ApplyGlow(float alpha)
+        {
+            bool on = alpha > 0f;
+            if (_centreGlow.enabled != on) _centreGlow.enabled = on;
+            if (!on) return;
+            _centreGlow.GetPropertyBlock(_propertyBlock);
+            _propertyBlock.SetColor(BaseColorId, new Color(_glowColor.r, _glowColor.g, _glowColor.b, alpha));
+            _centreGlow.SetPropertyBlock(_propertyBlock);
         }
     }
 }

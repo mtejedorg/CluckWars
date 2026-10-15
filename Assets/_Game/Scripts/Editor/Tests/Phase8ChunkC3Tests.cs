@@ -48,9 +48,16 @@ namespace CluckWars.Tests
             Assert.IsNotNull(prefab, prefabPath);
             var renderers = prefab.GetComponentsInChildren<MeshRenderer>(true);
             Assert.That(renderers.Length, Is.GreaterThan(0), prefabPath + " has no MeshRenderer.");
+            // The centre-pile glow halo (Phase 8 C S1) is the one non-matte renderer on the pile: an unlit project
+            // material under Assets/, pinned in Phase8ChunkS1Tests.
+            var visuals = prefab.GetComponent<CluckWars.Visuals.FoodPileVisuals>();
+            var glow = visuals != null ? TestAssets.PrivateField<Renderer>(visuals, "_centreGlow") : null;
             foreach (var r in renderers)
                 foreach (var m in r.sharedMaterials)
+                {
+                    if (r == glow) { StringAssert.StartsWith("Assets/", AssetDatabase.GetAssetPath(m), $"{prefabPath}/{r.name}"); continue; }
                     Assert.AreEqual(materialPath, AssetDatabase.GetAssetPath(m), $"{prefabPath}/{r.name}");
+                }
         }
 
         // FoodMound.mat carries the neutral grain tile on purpose (Phase 8 C S1); that is pinned in Phase8ChunkS1Tests.
