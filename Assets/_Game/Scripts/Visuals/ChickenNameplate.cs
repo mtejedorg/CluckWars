@@ -73,6 +73,13 @@ namespace CluckWars.Visuals
             BuildLabel();
         }
 
+        /// <summary>
+        /// Sorting orders of the label parts. Rival marks stay in 1-3; the local bird's "You" pill and text sit above them
+        /// so a rival nameplate never draws over it where two overlap on screen.
+        /// </summary>
+        public const int RivalPillOrder = 1, RivalTextOrder = 2;
+        public const int LocalPillOrder = 11, LocalTextOrder = 12;
+
         private void BuildLabel()
         {
             var go = new GameObject("Nameplate");
@@ -94,7 +101,7 @@ namespace CluckWars.Visuals
             {
                 _textRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 _textRenderer.receiveShadows = false;
-                _textRenderer.sortingOrder = 2;   // over the YOU pill
+                _textRenderer.sortingOrder = RivalTextOrder;   // over its pill; FitMarks lifts it for the local bird
             }
 
             // The YOU mark's pill, behind the text (the label faces away from the camera, so +z is behind).
@@ -105,14 +112,14 @@ namespace CluckWars.Visuals
             _youPill.sprite = PillSprite(rival: false);
             _youPill.drawMode = SpriteDrawMode.Sliced;
             _youPill.color = Color.white;   // the sprite carries the gold fill and ink rim
-            _youPill.sortingOrder = 1;
+            _youPill.sortingOrder = LocalPillOrder;
             _youPill.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             _youPill.receiveShadows = false;
             _youPill.enabled = false;
 
             // A rival's mark (round-4 finding 4): the same capsule in ink with a cream rim, cream text on it (so the label
             // never depends on the ground behind it) and the player colour as a dot on the left, ringed in cream.
-            _rivalPill = AddSprite(_textTransform, "RivalMark", PillSprite(rival: true), 1, SpriteDrawMode.Sliced);
+            _rivalPill = AddSprite(_textTransform, "RivalMark", PillSprite(rival: true), RivalPillOrder, SpriteDrawMode.Sliced);
             _rivalDotRing = AddSprite(_textTransform, "RivalDotRing", DotSprite(), 2, SpriteDrawMode.Simple);
             _rivalDotRing.color = PlayerPalette.RivalPillRim;
             _rivalDot = AddSprite(_textTransform, "RivalDot", DotSprite(), 3, SpriteDrawMode.Simple);
@@ -242,6 +249,7 @@ namespace CluckWars.Visuals
         {
             ShowMarks(isLocal, !isLocal, playerColour);
             if (_textRenderer == null) return;
+            _textRenderer.sortingOrder = isLocal ? LocalTextOrder : RivalTextOrder;
             // localBounds is in the label's own space, so billboarding does not change it.
             var size = (Vector2)_textRenderer.localBounds.size;
             if (size.x <= 0f || size.y <= 0f) size = new Vector2(0.6f, 0.3f);   // mesh not built yet: a "You"-sized pill

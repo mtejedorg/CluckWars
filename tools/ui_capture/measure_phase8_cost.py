@@ -4,7 +4,7 @@
 
 Derived from capture_phase7_arena_fair.py (same Mobile-tier method, same corner) without the in-memory config swaps.
 
-Same Mobile-tier method as capture_phase7_arena.py (runtime Mobile_RPAsset etc., 300 sampled editor ticks + 300 Camera.Render CPU
+Same Mobile-tier method as capture_phase7_arena.py (the Mobile quality level via SetQualityLevel where selectable, else its serialized fields applied at runtime, 300 sampled editor ticks + 300 Camera.Render CPU
 samples). Asset values are changed in memory and put back afterwards.
 """
 import sys, os, json, time
@@ -37,22 +37,42 @@ public class PA {
     var prev = RenderTexture.active; RenderTexture.active = rt; var tex = new Texture2D(W, H, TextureFormat.RGB24, false); tex.ReadPixels(new Rect(0, 0, W, H), 0, 0); tex.Apply(); RenderTexture.active = prev;
     System.IO.File.WriteAllBytes(path, tex.EncodeToPNG()); Object.DestroyImmediate(tex); rt.Release(); Object.DestroyImmediate(rt); return "saved " + path; }
 
-  // Each script-execute compiles a fresh assembly, so statics do not survive between calls: persist through SessionState.
-  // The "Mobile" quality LEVEL is excluded from the Standalone platform, so in play mode in the Editor it cannot be selected by
-  // SetQualityLevel. The Mobile level differs from PC in: render pipeline asset (Mobile_RPAsset), lodBias 1/2, skinWeights 2/4,
-  // anisotropic 1/2 - apply those four at runtime instead, and put the PC values back on restore.
+  // Tier switch. Each script-execute compiles a fresh assembly, so state rides in SessionState.
+  // Preferred path: SetQualityLevel(<Mobile index>, true), so the RP asset, vSync, lodBias, skinWeights, anisotropic filtering and
+  // everything else come from the real level. BUT the Mobile level is excluded from the Standalone platform: in Play mode the level
+  // list is filtered to [PC] and SetQualityLevel cannot reach it (verified). So "capture" (run in EDIT mode, before Play, where both
+  // levels exist) selects the real Mobile level once, snapshots its values into SessionState, and selects the previous level again;
+  // "mobile" in Play mode applies that snapshot and records the tier ("pa_tier") so the inventory labels it "Mobile".
+  // Restore re-selects the saved level and re-applies its snapshot (taken by "capture").
+  static string Snap() { var rp = QualitySettings.renderPipeline; return string.Join("|", new[] { AssetDatabase.GetAssetPath(rp), QualitySettings.vSyncCount.ToString(), QualitySettings.lodBias.ToString("R", CI),
+      ((int)QualitySettings.skinWeights).ToString(), ((int)QualitySettings.anisotropicFiltering).ToString(), QualitySettings.pixelLightCount.ToString(), QualitySettings.maximumLODLevel.ToString(),
+      QualitySettings.softParticles ? "1" : "0", QualitySettings.realtimeReflectionProbes ? "1" : "0" }); }
+  static void ApplySnap(string snap) { var f = snap.Split('|');
+    QualitySettings.renderPipeline = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.RenderPipelineAsset>(f[0]); QualitySettings.vSyncCount = int.Parse(f[1]); QualitySettings.lodBias = float.Parse(f[2], CI);
+    QualitySettings.skinWeights = (SkinWeights)int.Parse(f[3]); QualitySettings.anisotropicFiltering = (AnisotropicFiltering)int.Parse(f[4]); QualitySettings.pixelLightCount = int.Parse(f[5]);
+    QualitySettings.maximumLODLevel = int.Parse(f[6]); QualitySettings.softParticles = f[7] == "1"; QualitySettings.realtimeReflectionProbes = f[8] == "1"; }
   public static string Quality(string mode) {
-    string before = QualitySettings.renderPipeline != null ? QualitySettings.renderPipeline.name : "null";
-    if (mode == "mobile") {
-      var pc = QualitySettings.renderPipeline; SessionState.SetString("pa_pc_path", AssetDatabase.GetAssetPath(pc));
-      var mob = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.RenderPipelineAsset>("Assets/Settings/Mobile_RPAsset.asset");
-      if (mob == null) return "Mobile_RPAsset not found";
-      QualitySettings.renderPipeline = mob; QualitySettings.lodBias = 1f; QualitySettings.skinWeights = SkinWeights.TwoBones; QualitySettings.anisotropicFiltering = AnisotropicFiltering.Enable;
-    } else if (mode == "restore") {
-      var pc = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.RenderPipelineAsset>(SessionState.GetString("pa_pc_path", "Assets/Settings/PC_RPAsset.asset"));
-      QualitySettings.renderPipeline = pc; QualitySettings.lodBias = 2f; QualitySettings.skinWeights = SkinWeights.FourBones; QualitySettings.anisotropicFiltering = AnisotropicFiltering.ForceEnable;
+    string how = "";
+    int mob = System.Array.IndexOf(QualitySettings.names, "Mobile");
+    if (mode == "capture") {   // EDIT mode only: both levels are selectable here
+      if (mob < 0) return "ERROR no Mobile quality level in the level list (is the Editor in Play mode?)";
+      int prev = QualitySettings.GetQualityLevel();
+      SessionState.SetString("pa_pc_snap", Snap());   // the level we will return to
+      try { QualitySettings.SetQualityLevel(mob, true); SessionState.SetString("pa_mobile_snap", Snap()); } finally { QualitySettings.SetQualityLevel(prev, true); }
+      how = "snapshotted Mobile level";
+    } else if (mode == "mobile") {
+      if (SessionState.GetString("pa_prev_level", "") == "") SessionState.SetString("pa_prev_level", QualitySettings.names[QualitySettings.GetQualityLevel()]);
+      if (mob >= 0) { QualitySettings.SetQualityLevel(mob, true); SessionState.SetString("pa_tier", ""); how = "SetQualityLevel(" + mob + ")"; }
+      else { string snap = SessionState.GetString("pa_mobile_snap", ""); if (snap == "") return "ERROR no Mobile snapshot: run Quality(capture) in Edit mode first";
+        ApplySnap(snap); SessionState.SetString("pa_tier", "Mobile"); how = "Mobile level snapshot applied (level not selectable in Play mode)"; }
+    } else {   // "pc" / "restore": back to the level that was active before the Mobile pass
+      string prev = SessionState.GetString("pa_prev_level", "");
+      if (prev != "") { int i = System.Array.IndexOf(QualitySettings.names, prev); QualitySettings.SetQualityLevel(i >= 0 ? i : QualitySettings.GetQualityLevel(), true);
+        string pcSnap = SessionState.GetString("pa_pc_snap", ""); if (pcSnap != "") ApplySnap(pcSnap);   // SetQualityLevel to the already-current level re-applies nothing, so put the fields back explicitly
+        SessionState.SetString("pa_prev_level", ""); SessionState.SetString("pa_tier", ""); how = "restored " + prev; }
     }
-    return "mode=" + mode + " before=" + before + " now=" + QualitySettings.renderPipeline.name + " lodBias=" + QualitySettings.lodBias + " skin=" + QualitySettings.skinWeights; }
+    return "tier=" + Tier() + " (" + how + ") rp=" + QualitySettings.renderPipeline.name + " vsync=" + QualitySettings.vSyncCount + " lodBias=" + QualitySettings.lodBias + " skin=" + QualitySettings.skinWeights; }
+  static string Tier() { string t = SessionState.GetString("pa_tier", ""); return t != "" ? t : QualitySettings.names[QualitySettings.GetQualityLevel()]; }
 
   // Per-editor-tick sampler: unscaled delta + UnityStats (last Game View frame).
   static List<float> _dt = new List<float>(); static List<float> _batches = new List<float>(), _setpass = new List<float>(), _tris = new List<float>(), _verts = new List<float>();
@@ -127,16 +147,17 @@ def measure(mode):
 def main():
     stats = {}
     bridge.init()
-    bridge.call("editor-application-set-state", {"isPlaying": True})
-    for _ in range(60):
-        if str(cs("Press", "SoloBtn")).startswith("clicked"):
-            break
-        time.sleep(1)
-    time.sleep(0.8)
-    print(cs("Press", "NextBtn")); time.sleep(1.0)
-    print(cs("Fill")); print(cs("Press", "ReadyBtn")); time.sleep(1.5)
-    print(cs("Press", "StartBtn"))
     try:
+        print(cs("Quality", "capture"))   # Edit mode: snapshot the real Mobile level while it is selectable
+        bridge.call("editor-application-set-state", {"isPlaying": True})
+        for _ in range(60):
+            if str(cs("Press", "SoloBtn")).startswith("clicked"):
+                break
+            time.sleep(1)
+        time.sleep(0.8)
+        print(cs("Press", "NextBtn")); time.sleep(1.0)
+        print(cs("Fill")); print(cs("Press", "ReadyBtn")); time.sleep(1.5)
+        print(cs("Press", "StartBtn"))
         for _ in range(80):
             if str(cs("State")) == "Active":
                 break
@@ -147,8 +168,14 @@ def main():
         for rnd in (1, 2, 3):
             stats["cur_r" + str(rnd)] = measure("cur")
     finally:
-        print(cs("Quality", "restore")); time.sleep(1.0)
-        bridge.call("editor-application-set-state", {"isPlaying": False}); time.sleep(4)
+        # Always: back to the quality level that was active before the Mobile pass, then leave Play mode (each step reported if it fails).
+        for label, step in (("restore quality", lambda: print(cs("Quality", "restore"))),
+                            ("stop Play mode", lambda: bridge.call("editor-application-set-state", {"isPlaying": False}))):
+            try:
+                step()
+            except Exception as ex:
+                print(f"CLEANUP FAILED ({label}): {ex}")
+        time.sleep(4)
     print("STATS", json.dumps(stats))
     out = os.path.join(ROOT, "Captures", "env3d_cost"); os.makedirs(out, exist_ok=True)
     open(os.path.join(out, TAG + ".json"), "w", encoding="utf-8").write(json.dumps(stats, indent=2))

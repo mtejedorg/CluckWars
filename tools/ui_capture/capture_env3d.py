@@ -39,9 +39,12 @@ public class E3 {
     System.IO.File.WriteAllBytes(path, tex.EncodeToPNG()); Object.DestroyImmediate(tex); rt.Release(); Object.DestroyImmediate(rt); }
   public static string CamShot(string w, string h, string path) { Save(MatchCamera.Instance.Camera, int.Parse(w), int.Parse(h), path); return "saved " + path; }
 
-  static Camera Free() { var go = GameObject.Find("__E3Cam"); if (go == null) { go = new GameObject("__E3Cam"); var c = go.AddComponent<Camera>(); c.enabled = false;
-      var src = MatchCamera.Instance.Camera; c.CopyFrom(src); c.targetTexture = null;
-      var srcData = src.GetComponent("UniversalAdditionalCameraData"); var dst = go.AddComponent(srcData.GetType());
+  static Camera Free() { var go = GameObject.Find("__E3Cam"); if (go == null) {
+      // The match camera only exists while a match is running; once the match ends (45 s) or never started, fail with a message instead of an NRE.
+      if (MatchCamera.Instance == null || MatchCamera.Instance.Camera == null) throw new System.InvalidOperationException("no MatchCamera: the match is not running (ended or never started)");
+      var src = MatchCamera.Instance.Camera; var srcData = src.GetComponent("UniversalAdditionalCameraData");
+      if (srcData == null) throw new System.InvalidOperationException("match camera has no UniversalAdditionalCameraData");
+      go = new GameObject("__E3Cam"); var c = go.AddComponent<Camera>(); c.enabled = false; c.CopyFrom(src); c.targetTexture = null; var dst = go.AddComponent(srcData.GetType());
       foreach (var p in new[] { "renderPostProcessing", "antialiasing" }) { var pi = srcData.GetType().GetProperty(p); if (pi != null) pi.SetValue(dst, pi.GetValue(srcData)); } }
     var cam = go.GetComponent<Camera>(); cam.enabled = false; return cam; }
   // Shot from a direction (yaw/pitch degrees) framing a world bounds.
@@ -100,7 +103,7 @@ public class E3 {
     return "lined " + all.Count; }
 
   public static string Inventory(string path) { var sb = new StringBuilder(); sb.Append("{\n");
-    var rp = QualitySettings.renderPipeline; sb.Append("\"quality\":\"" + QualitySettings.names[QualitySettings.GetQualityLevel()] + "\",\"rp\":\"" + (rp ? rp.name : "null") + "\",\n");
+    var rp = QualitySettings.renderPipeline; sb.Append("\"quality\":\"" + Tier() + "\",\"vSync\":" + QualitySettings.vSyncCount + ",\"lodBias\":" + QualitySettings.lodBias.ToString(CI) + ",\"rp\":\"" + (rp ? rp.name : "null") + "\",\n");
     if (rp != null) { var t = rp.GetType(); sb.Append("\"urp\":{");
       foreach (var p in new[] { "shadowDistance", "shadowCascadeCount", "msaaSampleCount", "renderScale", "supportsHDR", "mainLightShadowmapResolution", "additionalLightsRenderingMode", "maxAdditionalLightsCount", "supportsSoftShadows", "supportsCameraDepthTexture", "supportsCameraOpaqueTexture" }) { var pi = t.GetProperty(p); if (pi != null) sb.Append("\"" + p + "\":\"" + pi.GetValue(rp) + "\","); }
       sb.Append("\"_\":0},\n"); }
@@ -124,11 +127,42 @@ public class E3 {
       sb.Append("\"\"]},\n"); }
     sb.Append("{}],\n\"totalTris\":" + totalTris + ",\"textureMB\":" + (texBytes / 1048576.0).ToString("0.0", CI) + "\n}"); System.IO.File.WriteAllText(path, sb.ToString()); return "inventory " + path + " tris=" + totalTris; }
 
+  // Tier switch. Each script-execute compiles a fresh assembly, so state rides in SessionState.
+  // Preferred path: SetQualityLevel(<Mobile index>, true), so the RP asset, vSync, lodBias, skinWeights, anisotropic filtering and
+  // everything else come from the real level. BUT the Mobile level is excluded from the Standalone platform: in Play mode the level
+  // list is filtered to [PC] and SetQualityLevel cannot reach it (verified). So "capture" (run in EDIT mode, before Play, where both
+  // levels exist) selects the real Mobile level once, snapshots its values into SessionState, and selects the previous level again;
+  // "mobile" in Play mode applies that snapshot and records the tier ("e3_tier") so the inventory labels it "Mobile".
+  // Restore re-selects the saved level and re-applies its snapshot (taken by "capture").
+  static string Snap() { var rp = QualitySettings.renderPipeline; return string.Join("|", new[] { AssetDatabase.GetAssetPath(rp), QualitySettings.vSyncCount.ToString(), QualitySettings.lodBias.ToString("R", CI),
+      ((int)QualitySettings.skinWeights).ToString(), ((int)QualitySettings.anisotropicFiltering).ToString(), QualitySettings.pixelLightCount.ToString(), QualitySettings.maximumLODLevel.ToString(),
+      QualitySettings.softParticles ? "1" : "0", QualitySettings.realtimeReflectionProbes ? "1" : "0" }); }
+  static void ApplySnap(string snap) { var f = snap.Split('|');
+    QualitySettings.renderPipeline = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.RenderPipelineAsset>(f[0]); QualitySettings.vSyncCount = int.Parse(f[1]); QualitySettings.lodBias = float.Parse(f[2], CI);
+    QualitySettings.skinWeights = (SkinWeights)int.Parse(f[3]); QualitySettings.anisotropicFiltering = (AnisotropicFiltering)int.Parse(f[4]); QualitySettings.pixelLightCount = int.Parse(f[5]);
+    QualitySettings.maximumLODLevel = int.Parse(f[6]); QualitySettings.softParticles = f[7] == "1"; QualitySettings.realtimeReflectionProbes = f[8] == "1"; }
   public static string Quality(string mode) {
-    if (mode == "mobile") { SessionState.SetString("e3_pc_path", AssetDatabase.GetAssetPath(QualitySettings.renderPipeline));
-      QualitySettings.renderPipeline = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.RenderPipelineAsset>("Assets/Settings/Mobile_RPAsset.asset"); QualitySettings.lodBias = 1f; QualitySettings.skinWeights = SkinWeights.TwoBones; QualitySettings.anisotropicFiltering = AnisotropicFiltering.Enable; }
-    else { QualitySettings.renderPipeline = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.RenderPipelineAsset>(SessionState.GetString("e3_pc_path", "Assets/Settings/PC_RPAsset.asset")); QualitySettings.lodBias = 2f; QualitySettings.skinWeights = SkinWeights.FourBones; QualitySettings.anisotropicFiltering = AnisotropicFiltering.ForceEnable; }
-    return "rp=" + QualitySettings.renderPipeline.name; }
+    string how = "";
+    int mob = System.Array.IndexOf(QualitySettings.names, "Mobile");
+    if (mode == "capture") {   // EDIT mode only: both levels are selectable here
+      if (mob < 0) return "ERROR no Mobile quality level in the level list (is the Editor in Play mode?)";
+      int prev = QualitySettings.GetQualityLevel();
+      SessionState.SetString("e3_pc_snap", Snap());   // the level we will return to
+      try { QualitySettings.SetQualityLevel(mob, true); SessionState.SetString("e3_mobile_snap", Snap()); } finally { QualitySettings.SetQualityLevel(prev, true); }
+      how = "snapshotted Mobile level";
+    } else if (mode == "mobile") {
+      if (SessionState.GetString("e3_prev_level", "") == "") SessionState.SetString("e3_prev_level", QualitySettings.names[QualitySettings.GetQualityLevel()]);
+      if (mob >= 0) { QualitySettings.SetQualityLevel(mob, true); SessionState.SetString("e3_tier", ""); how = "SetQualityLevel(" + mob + ")"; }
+      else { string snap = SessionState.GetString("e3_mobile_snap", ""); if (snap == "") return "ERROR no Mobile snapshot: run Quality(capture) in Edit mode first";
+        ApplySnap(snap); SessionState.SetString("e3_tier", "Mobile"); how = "Mobile level snapshot applied (level not selectable in Play mode)"; }
+    } else {   // "pc" / "restore": back to the level that was active before the Mobile pass
+      string prev = SessionState.GetString("e3_prev_level", "");
+      if (prev != "") { int i = System.Array.IndexOf(QualitySettings.names, prev); QualitySettings.SetQualityLevel(i >= 0 ? i : QualitySettings.GetQualityLevel(), true);
+        string pcSnap = SessionState.GetString("e3_pc_snap", ""); if (pcSnap != "") ApplySnap(pcSnap);   // SetQualityLevel to the already-current level re-applies nothing, so put the fields back explicitly
+        SessionState.SetString("e3_prev_level", ""); SessionState.SetString("e3_tier", ""); how = "restored " + prev; }
+    }
+    return "tier=" + Tier() + " (" + how + ") rp=" + QualitySettings.renderPipeline.name + " vsync=" + QualitySettings.vSyncCount + " lodBias=" + QualitySettings.lodBias + " skin=" + QualitySettings.skinWeights; }
+  static string Tier() { string t = SessionState.GetString("e3_tier", ""); return t != "" ? t : QualitySettings.names[QualitySettings.GetQualityLevel()]; }
   public static string Spots() { var sb = new StringBuilder();
     foreach (var b in Object.FindObjectsByType<PlayerBase>(FindObjectsSortMode.None)) sb.Append("B" + b.transform.position.x.ToString("0.0", CI) + ";" + b.transform.position.z.ToString("0.0", CI) + "|");
     foreach (var p in Object.FindObjectsByType<FoodPile>(FindObjectsSortMode.None)) sb.Append("P" + p.transform.position.x.ToString("0.0", CI) + ";" + p.transform.position.z.ToString("0.0", CI) + "|");
@@ -139,13 +173,21 @@ SIG = {"PropsOnly": ["dir"], "Assets": ["path"], "Press": ["name"], "Move": ["x"
        "Overviews": ["dir"], "Subjects": ["dir"], "Inventory": ["path"]}
 
 
-def cs(method, *args, timeout=300):
+def cs(method, *args, timeout=300, strict=True):
+    """Runs E3.<method> in the Editor. A compile/exception failure (no result value) raises, so a broken step stops the run
+    (callers restore the quality level and Play mode in `finally`) instead of printing the error and carrying on with partial output."""
     params = [{"name": n, "typeName": "System.String", "value": v} for n, v in zip(SIG.get(method, []), args)]
     m = bridge.call("script-execute", {"csharpCode": CS, "className": "E3", "methodName": method, "parameters": params}, timeout=timeout)
     try:
-        return m["result"]["structuredContent"]["result"]["value"]
+        value = m["result"]["structuredContent"]["result"]["value"]
     except Exception:
-        return bridge.text(m)[:800]
+        value = None
+    if value is None or str(value).startswith("ERROR"):
+        detail = str(value) if value is not None else bridge.text(m)[:800]
+        if strict:
+            raise RuntimeError(f"E3.{method} failed: {detail}")
+        return detail
+    return value
 
 
 def P(*parts):
@@ -157,47 +199,68 @@ def match_shots(tag):
         print(cs("CamShot", str(w), str(h), P(f"mc_{tag}_{name}.png")))
 
 
-def main2():
-    bridge.init()
-    print(cs("Assets", P("assets.txt")))
-    bridge.call("editor-application-set-state", {"isPlaying": True})
-    for _ in range(60):
-        if str(cs("Press", "SoloBtn")).startswith("clicked"): break
-        time.sleep(1)
-    time.sleep(0.8); print(cs("Press", "NextBtn")); time.sleep(1.0); print(cs("Fill")); print(cs("Press", "ReadyBtn")); time.sleep(1.5); print(cs("Press", "StartBtn"))
-    try:
-        for _ in range(80):
-            if str(cs("State")) == "Active": break
-            time.sleep(0.5)
-        time.sleep(2.5); print(cs("FreezeBots")); print(cs("HideUi", "1"))
-        print(cs("Overviews", OUT.replace("\\", "/")))
-        os.makedirs(os.path.join(OUT, "props"), exist_ok=True); print(cs("PropsOnly", (OUT + "/props").replace("\\", "/")))
-        print(cs("Quality", "mobile")); time.sleep(2.5); os.makedirs(os.path.join(OUT, "mobile"), exist_ok=True)
-        print(cs("Overviews", (OUT + "/mobile").replace("\\", "/"))); print(cs("Quality", "pc"))
-    finally:
-        cs("HideUi", "0"); bridge.call("editor-application-set-state", {"isPlaying": False}); time.sleep(4)
+def cleanup():
+    """Always runs: puts the quality level back to what it was (also after a failure) and leaves Play mode. Each step is
+    attempted on its own so one failure cannot skip the others; failures are reported, not swallowed."""
+    for label, step in (("restore quality", lambda: print(cs("Quality", "restore"))),
+                        ("show UI", lambda: cs("HideUi", "0")),
+                        ("stop Play mode", lambda: bridge.call("editor-application-set-state", {"isPlaying": False}))):
+        try:
+            step()
+        except Exception as e:
+            print(f"CLEANUP FAILED ({label}): {e}")
+    time.sleep(4)
 
 
-def main():
-    bridge.init()
-    bridge.call("editor-application-set-state", {"isPlaying": True})
+def start_solo_match():
+    """Menu -> solo match -> Active. Raises if the match never reaches Active (so no step runs against a missing MatchCamera)."""
     for _ in range(60):
-        if str(cs("Press", "SoloBtn")).startswith("clicked"):
+        if str(cs("Press", "SoloBtn", strict=False)).startswith("clicked"):
             break
         time.sleep(1)
     time.sleep(0.8)
     print(cs("Press", "NextBtn")); time.sleep(1.0)
     print(cs("Fill")); print(cs("Press", "ReadyBtn")); time.sleep(1.5)
     print(cs("Press", "StartBtn"))
+
+
+def wait_active():
+    for _ in range(80):
+        if str(cs("State", strict=False)) == "Active":
+            return
+        time.sleep(0.5)
+    raise RuntimeError("match never reached Active (last state: %s)" % cs("State", strict=False))
+
+
+def main2():
+    bridge.init()
     try:
+        print(cs("Assets", P("assets.txt")))
+        print(cs("Quality", "capture"))   # Edit mode: snapshot the real Mobile level while it is selectable
+        bridge.call("editor-application-set-state", {"isPlaying": True})
+        start_solo_match(); wait_active()
+        time.sleep(2.5); print(cs("FreezeBots")); print(cs("HideUi", "1"))
+        print(cs("Inventory", P("inventory_pc.json")))
+        print(cs("Overviews", OUT.replace("\\", "/")))
+        os.makedirs(os.path.join(OUT, "props"), exist_ok=True); print(cs("PropsOnly", (OUT + "/props").replace("\\", "/")))
+        print(cs("Quality", "mobile")); time.sleep(2.5); os.makedirs(os.path.join(OUT, "mobile"), exist_ok=True)
+        print(cs("Inventory", P("inventory_mobile.json")))
+        print(cs("Overviews", (OUT + "/mobile").replace("\\", "/")))
+    finally:
+        cleanup()
+
+
+def main():
+    bridge.init()
+    try:
+        print(cs("Quality", "capture"))   # Edit mode: snapshot the real Mobile level while it is selectable
+        bridge.call("editor-application-set-state", {"isPlaying": True})
+        start_solo_match()
         for _ in range(80):
-            if str(cs("State")).startswith("Active+intro"):
+            if str(cs("State", strict=False)).startswith("Active+intro"):
                 time.sleep(0.3); match_shots("getready"); break
             time.sleep(0.25)
-        for _ in range(80):
-            if str(cs("State")) == "Active":
-                break
-            time.sleep(0.5)
+        wait_active()
         time.sleep(2.5)
         print(cs("FreezeBots"))
         print(cs("HideUi", "1"))
@@ -225,10 +288,8 @@ def main():
         print(cs("Inventory", P("inventory_mobile.json")))
         print(cs("Move", "0", "0")); time.sleep(1.4); match_shots("center_MOBILE")
         print(cs("Overviews", (OUT + "/mobile").replace("\\", "/")) if os.makedirs(os.path.join(OUT, "mobile"), exist_ok=True) is None else "")
-        print(cs("Quality", "pc")); time.sleep(1.5)
     finally:
-        cs("HideUi", "0")
-        bridge.call("editor-application-set-state", {"isPlaying": False}); time.sleep(4)
+        cleanup()
 
 
 main2() if os.environ.get("E3_PASS") == "2" else main()
