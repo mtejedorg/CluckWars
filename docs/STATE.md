@@ -12,6 +12,7 @@ Brief: scratchpad `env3d/phase8c_brief.md`. Decisions binding (memory `env3d-dec
 
 | Item | Status | Commit | Notes |
 |---|---|---|---|
+| C1 fence regression | done | `3d432ef` | `Assets/Generated/wall_segment.fbx` restored to the original 4 000-tri mesh (pre-5bfc0ef bytes); `wall_segment_inner.asset` regenerated from it (B4 UV rule). Candidates (~3 000 protected-cap, 1 642) were measured with the new match-camera guardrail `tools/ui_capture/capture_c1_fence.py` (4 corners, see-through pixels inside the fence mask, `Captures/env3d_after/C/C1/`) and neither stayed within +0.5 % of the original, so the full mesh ships (+2 358 tris x 108 panels back, accepted). `Phase8ChunkC1Tests` (tri floor 3 900, pivot/bounds, open-edge count). Survived a PC crash mid-item; re-verified after relaunch. EditMode 1368/1368. |
 
 ## 🔎 PHASE 8 RE-AUDIT (2026-10-15): six-lens re-grade after chunks A+B - overall C- -> C+
 
