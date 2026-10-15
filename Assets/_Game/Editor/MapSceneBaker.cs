@@ -115,6 +115,9 @@ namespace CluckWars.EditorTools
             // children, so the PhysicsColliders NavMesh bake below is unaffected.
             CoverBoxDresser.DressCovers(root.transform);
 
+            // Ground + zone discs: no shadow casting, 64-segment saved mesh (Phase 8 C5 / C17).
+            ZoneMarkerBaker.Apply(root.transform);
+
             // NavMesh is baked here rather than at runtime: the geometry is static, so
             // paying for a bake every launch is waste, and a baked surface also lets the
             // map scene be opened and pathing inspected without entering Play Mode.

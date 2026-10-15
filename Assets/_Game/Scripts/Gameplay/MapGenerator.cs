@@ -323,7 +323,13 @@ namespace CluckWars.Gameplay
             var collider = marker.GetComponent<Collider>();
             if (collider != null) DestroyImmediate(collider);
 
-            if (material != null) marker.GetComponent<Renderer>().sharedMaterial = material;
+            // 64 sides instead of the primitive's 20 (Phase 8 C17); the baker swaps in the saved asset.
+            marker.GetComponent<MeshFilter>().sharedMesh = ZoneDiscMesh.Shared;
+
+            var renderer = marker.GetComponent<Renderer>();
+            // A 2 cm decal has no shadow worth casting (Phase 8 C5); it still receives them.
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            if (material != null) renderer.sharedMaterial = material;
         }
 
         private void Awake()
@@ -471,10 +477,10 @@ namespace CluckWars.Gameplay
             plane.transform.localScale = new Vector3(_planeSize, 1f, _planeSize);
             plane.transform.localPosition = new Vector3(0f, -0.5f, 0f);
 
-            if (_groundMaterial != null)
-            {
-                plane.GetComponent<Renderer>().sharedMaterial = _groundMaterial;
-            }
+            var renderer = plane.GetComponent<Renderer>();
+            // The ground is the shadow receiver, never a caster (Phase 8 C5).
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            if (_groundMaterial != null) renderer.sharedMaterial = _groundMaterial;
         }
 
         private void BuildBoundaryWalls()
