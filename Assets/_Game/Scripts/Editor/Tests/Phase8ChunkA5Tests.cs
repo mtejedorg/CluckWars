@@ -24,7 +24,7 @@ namespace CluckWars.Tests
     /// </remarks>
     public class Phase8ChunkA5Tests
     {
-        private const string MapScene = "Assets/_Game/Scenes/Map.unity";
+        internal const string MapScene = "Assets/_Game/Scenes/Map.unity";
 
         /// <summary>No collider-bearing dressing within this XZ distance of either end of an arm.</summary>
         private const float ArmTipClearance = 4f;
@@ -57,14 +57,14 @@ namespace CluckWars.Tests
 
         // ---------------------------------------------------------------- scene model
 
-        private sealed class Arm
+        internal sealed class Arm
         {
             public int Index;
             public Vector3 Hub, Tip, Dir, Normal;
             public float Length, HalfThickness;
         }
 
-        private sealed class Map
+        internal sealed class Map
         {
             public Transform Geometry, Props, Surroundings;
             public List<Arm> Arms;
@@ -76,7 +76,7 @@ namespace CluckWars.Tests
             public List<Transform> PropRoots;
         }
 
-        private static Map LoadMap()
+        internal static Map LoadMap()
         {
             var scene = EditorSceneManager.OpenScene(MapScene, OpenSceneMode.Single);
             var roots = scene.GetRootGameObjects();
@@ -139,12 +139,12 @@ namespace CluckWars.Tests
             return map;
         }
 
-        private static string MeshOf(Transform prop) =>
+        internal static string MeshOf(Transform prop) =>
             prop.GetComponentsInChildren<MeshFilter>(true).Select(mf => mf.sharedMesh != null ? mf.sharedMesh.name : "").FirstOrDefault() ?? "";
 
         private static IEnumerable<Transform> WithMesh(Map map, string mesh) => map.PropRoots.Where(p => MeshOf(p) == mesh);
 
-        private static List<Vector3> FootprintXZ(Transform prop)
+        internal static List<Vector3> FootprintXZ(Transform prop)
         {
             var pts = new List<Vector3>();
             foreach (var mf in prop.GetComponentsInChildren<MeshFilter>(true))
@@ -168,7 +168,7 @@ namespace CluckWars.Tests
             return Mathf.Sqrt(dx * dx + dz * dz);
         }
 
-        private static string Fmt(Vector3 p) => $"({p.x:F2}, {p.z:F2})";
+        internal static string Fmt(Vector3 p) => $"({p.x:F2}, {p.z:F2})";
 
         // ---------------------------------------------------------------- (a)
 
@@ -315,6 +315,160 @@ namespace CluckWars.Tests
 
             Assert.Greater(checkedCount, 20, "Expected the arm-side dressing (InnerProps + fence dressing) to be checked.");
             Assert.IsEmpty(offenders, "Walk-through clutter must hug an arm wall:\n" + string.Join("\n", offenders));
+        }
+        // ---------------------------------------------------------------- (e) Phase 8 C9
+
+        /// <summary>Dressing whose top is above this height (m) counts as "tall": it hides a chicken and reads as a blocker.</summary>
+        private const float TallDressingHeight = 1.0f;
+        /// <summary>So a 1.00 m prop (milk churn, hedge top) is not "taller than 1 m" by float noise.</summary>
+        private const float TallTolerance = 0.02f;
+
+        /// <summary>
+        /// C9: tall dressing (scarecrows, coops, anything over 1 m) stays at least <see cref="ArmTipClearance"/> from
+        /// both ends of every arm, collider or not - a walk-through scarecrow in a rim opening still hides chickens
+        /// and reads as a plug. Distance is measured to each mesh's oriented box (its local bounds placed in world
+        /// space), so a rotated prop is neither inflated (world AABB) nor shrunk to its pivot.
+        /// </summary>
+        [Test]
+        public void ShippedMap_TallDressing_StaysClearOfArmTips_ColliderOrNot()
+        {
+            var map = LoadMap();
+            var tips = map.Arms.SelectMany(a => new[] { (a.Index, End: "hub", P: a.Hub), (a.Index, End: "rim", P: a.Tip) }).ToList();
+            var offenders = new List<string>();
+            int tall = 0;
+            foreach (var prop in map.PropRoots)
+            {
+                if (MeshOf(prop).StartsWith("wall_segment")) continue; // the fence / arm panels themselves
+                var foot = FootprintXZ(prop);
+                float span = Mathf.Max(foot.Max(v => v.x) - foot.Min(v => v.x), foot.Max(v => v.z) - foot.Min(v => v.z));
+                if (span > map.ArenaHalf) continue; // ground / hedge shells
+                var filters = prop.GetComponentsInChildren<MeshFilter>(true)
+                    .Where(f => f.sharedMesh != null && f.GetComponent<Renderer>() != null).ToList();
+                if (filters.Count == 0) continue;
+                float top = filters.Max(f => f.GetComponent<Renderer>().bounds.max.y);
+                if (top <= TallDressingHeight + TallTolerance) continue;
+                tall++;
+                foreach (var tip in tips)
+                {
+                    float d = filters.Min(f => DistanceToOrientedBoundsXZ(f, tip.P));
+                    if (d < ArmTipClearance)
+                        offenders.Add($"{prop.name} ({MeshOf(prop)}, {top:F2} m tall) is {d:F2} m from arm {tip.Index}'s {tip.End} end {Fmt(tip.P)}");
+                }
+            }
+            Assert.GreaterOrEqual(tall, 8, "Expected at least the 4 scarecrows and 4 coops to be checked as tall dressing.");
+            Assert.IsEmpty(offenders, "Tall dressing stands in an arm opening:\n" + string.Join("\n", offenders));
+        }
+
+        /// <summary>XZ distance from a point to a mesh's local bounds box placed in world space (exact for an upright, unsheared transform).</summary>
+        private static float DistanceToOrientedBoundsXZ(MeshFilter f, Vector3 point)
+        {
+            var b = f.sharedMesh.bounds;
+            var m = f.transform.localToWorldMatrix;
+            Vector3 c = m.MultiplyPoint3x4(b.center);
+            point.y = c.y;
+            float sq = 0f;
+            for (int i = 0; i < 3; i++)
+            {
+                Vector3 axis = m.GetColumn(i);
+                float len = axis.magnitude;
+                if (len < 1e-6f) continue;
+                axis /= len;
+                float d = Mathf.Abs(Vector3.Dot(point - c, axis)) - b.extents[i] * len;
+                if (d > 0f) sq += d * d;
+            }
+            return Mathf.Sqrt(sq);
+        }
+
+        // ---------------------------------------------------------------- (f) Phase 8 C12
+
+        /// <summary>A dressing mesh may touch an arm-wall panel but not cut into it by more than this.</summary>
+        private const float WallPenetrationTolerance = 0.02f;
+
+        /// <summary>
+        /// C12: no InnerProp_* / Dress_* mesh pokes into an arm wall (any InnerWall_* panel, end posts included).
+        /// </summary>
+        /// <remarks>
+        /// World AABBs are useless here: a prop yawed 67.5 degrees has an AABB up to ~40 % wider than itself, and so
+        /// has the panel, so AABB overlap flags props that sit centimetres clear. Instead this is a separating-axis
+        /// test between the two ACTUAL vertex clouds (i.e. their convex hulls) on 15 axes: the panel's 3 local axes,
+        /// the prop's 3 local axes and their 9 cross products. If any axis separates them there is no overlap;
+        /// otherwise the smallest interval overlap is the penetration depth. The hulls are never larger than the
+        /// oriented boxes, so a prop flush against a panel face or standing past the end post passes, while
+        /// wheelbarrow handles through the planks or a crate corner inside a post fail.
+        /// </remarks>
+        [Test]
+        public void ShippedMap_Dressing_DoesNotPokeIntoArmWalls()
+        {
+            var map = LoadMap();
+            var walls = map.Props.Cast<Transform>().Where(t => t.name.StartsWith("InnerWall_"))
+                .SelectMany(t => t.GetComponentsInChildren<MeshFilter>(true))
+                .Where(f => f.sharedMesh != null && f.GetComponent<MeshRenderer>() != null)
+                .Select(f => (Name: f.transform.parent != null ? f.transform.parent.name : f.name, Hull: WorldVerts(f), Axes: AxesOf(f.transform)))
+                .ToList();
+            Assert.GreaterOrEqual(walls.Count, 40, "Expected the 8 arm-wall runs (7 panels each).");
+
+            var props = map.Props.GetComponentsInChildren<Transform>(true)
+                .Where(t => t.name.StartsWith("InnerProp_") || t.name.StartsWith("Dress_")).ToList();
+            Assert.GreaterOrEqual(props.Count, 40, "Expected the InnerProp_* and Dress_* dressing.");
+
+            var offenders = new List<string>();
+            foreach (var prop in props)
+            foreach (var f in prop.GetComponentsInChildren<MeshFilter>(true).Where(f => f.sharedMesh != null && f.GetComponent<Renderer>() != null))
+            {
+                var hull = WorldVerts(f);
+                var axes = AxesOf(f.transform);
+                foreach (var wall in walls)
+                {
+                    float depth = SatPenetration(hull, wall.Hull, axes, wall.Axes);
+                    if (depth > WallPenetrationTolerance)
+                        offenders.Add($"{prop.name} ({f.sharedMesh.name}) {Fmt(prop.position)} cuts {depth * 100f:F1} cm into {wall.Name}");
+                }
+            }
+            Assert.IsEmpty(offenders, "Dressing pokes into an arm wall:\n" + string.Join("\n", offenders));
+        }
+
+        private static Vector3[] WorldVerts(MeshFilter f)
+        {
+            var m = f.transform.localToWorldMatrix;
+            return f.sharedMesh.vertices.Select(v => m.MultiplyPoint3x4(v)).ToArray();
+        }
+
+        private static Vector3[] AxesOf(Transform t) => new[] { t.right, t.up, t.forward };
+
+        /// <summary>Smallest interval overlap over the 15 SAT axes; &lt;= 0 means the hulls are separated.</summary>
+        private static float SatPenetration(Vector3[] a, Vector3[] b, Vector3[] axesA, Vector3[] axesB)
+        {
+            var axes = new List<Vector3>(15);
+            axes.AddRange(axesA);
+            axes.AddRange(axesB);
+            foreach (var x in axesA)
+            foreach (var y in axesB)
+            {
+                var c = Vector3.Cross(x, y);
+                if (c.sqrMagnitude > 1e-6f) axes.Add(c.normalized);
+            }
+            float best = float.MaxValue;
+            foreach (var axis in axes)
+            {
+                Project(a, axis, out float aMin, out float aMax);
+                Project(b, axis, out float bMin, out float bMax);
+                float overlap = Mathf.Min(aMax, bMax) - Mathf.Max(aMin, bMin);
+                if (overlap <= 0f) return overlap;
+                best = Mathf.Min(best, overlap);
+            }
+            return best;
+        }
+
+        private static void Project(Vector3[] pts, Vector3 axis, out float min, out float max)
+        {
+            min = float.MaxValue;
+            max = float.MinValue;
+            foreach (var p in pts)
+            {
+                float d = Vector3.Dot(p, axis);
+                if (d < min) min = d;
+                if (d > max) max = d;
+            }
         }
     }
 }
