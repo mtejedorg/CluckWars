@@ -20,6 +20,7 @@ import sys, os, time
 sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bridge
+import capture_common
 
 OUT = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "out")
 BOTS = len(sys.argv) > 2 and sys.argv[2] == "bots"
@@ -102,13 +103,13 @@ public class D9 {
       overlapAt, d0, overlapIn, d1, pile.DistanceToSurface(l.transform.position), pile.IsWithinCollectRange(l.transform.position)); }
 
   static void Save(Camera cam, int W, int H, string path) {
-    var rt = new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 }; var old = cam.targetTexture; cam.targetTexture = rt; cam.Render(); cam.targetTexture = old;
+    var rt = new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32) { antiAliasing = CapTier.Msaa() }; var old = cam.targetTexture; cam.targetTexture = rt; cam.Render(); cam.targetTexture = old;
     var prev = RenderTexture.active; RenderTexture.active = rt; var tex = new Texture2D(W, H, TextureFormat.RGB24, false); tex.ReadPixels(new Rect(0, 0, W, H), 0, 0); tex.Apply(); RenderTexture.active = prev;
     System.IO.File.WriteAllBytes(path, tex.EncodeToPNG()); Object.DestroyImmediate(tex); rt.Release(); Object.DestroyImmediate(rt); }
   public static string CamShot(string path) { Save(MatchCamera.Instance.Camera, 1920, 1080, path); var c = MatchCamera.Instance.Camera.transform; return "saved " + path + " cam " + c.position.ToString("F1") + " " + c.eulerAngles.ToString("F1"); }
   static Camera Free() { var go = GameObject.Find("__D9Cam"); if (go == null) { var src = MatchCamera.Instance.Camera; var data = src.GetComponent("UniversalAdditionalCameraData");
       go = new GameObject("__D9Cam"); var c = go.AddComponent<Camera>(); c.enabled = false; c.CopyFrom(src); c.targetTexture = null; if (data != null) go.AddComponent(data.GetType()); }
-    return go.GetComponent<Camera>(); }
+    var fc = go.GetComponent<Camera>(); CapTier.ApplyPost(fc); return fc; }
   public static string Top(string x, string z, string size, string path) { var cam = Free(); cam.orthographic = true; cam.orthographicSize = float.Parse(size, CI); cam.nearClipPlane = 0.1f; cam.farClipPlane = 300f;
     cam.transform.position = new Vector3(float.Parse(x, CI), 120f, float.Parse(z, CI)); cam.transform.rotation = Quaternion.Euler(90f, 0f, 0f); cam.aspect = 1f; Save(cam, 1600, 1600, path); return "saved " + path; }
   public static string LocalXZ() { var l = Local(); return l.transform.position.x.ToString("0.00", CI) + ";" + l.transform.position.z.ToString("0.00", CI); }
@@ -139,7 +140,7 @@ public class D9 {
       if (!moved && !atPile && nearPile) stuck++; }
     var am = string.Join(" ", Piles().Select(p => p.name.Replace("FoodPile", "P") + "@" + p.transform.position.x.ToString("0", CI) + "," + p.transform.position.z.ToString("0", CI) + "=" + p.Amount.ToString("0.#", CI)));
     return "stuckNearPile=" + stuck + " | " + am + " | state=" + State(); }
-}"""
+}""" + capture_common.CAP_TIER_CS
 
 SIG = {"Press": ["name"], "HideUi": ["on"], "Verify": ["path"], "CamShot": ["path"], "Top": ["x", "z", "size", "path"]}
 
@@ -178,6 +179,7 @@ def start():
 def main():
     try:
         start()
+        print("PASS " + capture_common.cap_info())
         if PHYS:
             time.sleep(1.0); print(cs("FreezeBots"))
             r = cs("Slide"); print(r); open(P("slide.txt"), "w", encoding="utf-8").write(r)
@@ -209,4 +211,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    bridge.init()
+    with capture_common.perf_mode():
+        main()

@@ -13,6 +13,7 @@ corner colour forced to P4 (#17785A, the worst case) used to measure ring visibi
 import sys, os, json, time
 sys.stdout.reconfigure(encoding="utf-8")
 import bridge
+import capture_common
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -55,7 +56,7 @@ public class RG {
     var c = PlayerPalette.ForCorner(int.Parse(corner)); c.a = 0.75f; var ring = (SpriteRenderer)t.GetField("_ring", BindingFlags.NonPublic|BindingFlags.Instance).GetValue(wb);
     t.GetField("_appliedRingCorner", BindingFlags.NonPublic|BindingFlags.Instance).SetValue(wb, k.HomeCornerIndex); t.GetField("_ringBaseColor", BindingFlags.NonPublic|BindingFlags.Instance).SetValue(wb, c); ring.color = c; return cls + " ring=" + ColorUtility.ToHtmlStringRGBA(c); }
   static void Save(Camera cam, int W, int H, string path) {
-    var rt = new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 }; var old = cam.targetTexture; cam.targetTexture = rt; cam.Render(); cam.targetTexture = old;
+    var rt = new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32) { antiAliasing = CapTier.Msaa() }; var old = cam.targetTexture; cam.targetTexture = rt; cam.Render(); cam.targetTexture = old;
     var prev = RenderTexture.active; RenderTexture.active = rt; var tex = new Texture2D(W, H, TextureFormat.RGB24, false); tex.ReadPixels(new Rect(0, 0, W, H), 0, 0); tex.Apply(); RenderTexture.active = prev;
     System.IO.File.WriteAllBytes(path, tex.EncodeToPNG()); Object.DestroyImmediate(tex); rt.Release(); Object.DestroyImmediate(rt); }
   public static string Shot(string w, string h, string path) { Save(MatchCamera.Instance.Camera, int.Parse(w), int.Parse(h), path); return "saved"; }
@@ -68,7 +69,7 @@ public class RG {
     foreach (var k in All().OrderBy(k => k.Class.ToString())) { var cc = k.GetComponent<CharacterController>(); float s = k.transform.lossyScale.y; sb.Append(k.Class + " rootScale=" + s.ToString("0.###", CI) + " capsuleR(world)=" + (cc.radius * s).ToString("0.000", CI));
       foreach (var r in RingsOf(k)) sb.Append(" | " + r.name + " worldDia=" + r.bounds.size.x.ToString("0.000", CI));
       sb.Append("\n"); } return sb.ToString(); }
-}"""
+}""" + capture_common.CAP_TIER_CS
 
 RG_SIG = {"Freeze": ["on"], "Line": ["gap", "cx", "cz"], "Rings": ["cls", "on", "which"], "ForceCorner": ["cls", "corner"], "Shot": ["w", "h", "path"], "Vp": ["cls", "w", "h"]}
 
@@ -188,6 +189,11 @@ def cleanup():
 
 def main():
     bridge.init()
+    with capture_common.perf_mode():
+        _main()
+
+
+def _main():
     try:
         print(e3("Quality", "capture"))
         bridge.call("editor-application-set-state", {"isPlaying": True})
@@ -204,8 +210,10 @@ def main():
             raise RuntimeError("match never reached Active")
         time.sleep(2.5); print(e3("FreezeBots")); print(e3("HideUi", "1"))
         spots = rg("Spots"); print("spots", spots)
+        print(e3("PassInfo", "PASS PC"))
         allstats = {"pc": run_tier("pc", spots)}
         print(e3("Quality", "mobile")); time.sleep(2.5)
+        print(e3("PassInfo", "PASS MOBILE"))
         allstats["mobile"] = run_tier("mobile", spots)
         json.dump(allstats, open(P("stats_all.json"), "w"), indent=1)
     finally:

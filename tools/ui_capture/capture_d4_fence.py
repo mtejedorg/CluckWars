@@ -15,6 +15,7 @@ import sys, os, time
 sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bridge
+import capture_common
 
 OUT = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "out")
 EXPLORE = len(sys.argv) > 2 and sys.argv[2] == "explore"
@@ -152,6 +153,7 @@ def shots():
 def main():
     start()
     try:
+        print("PASS " + capture_common.cap_info())
         print(cs("Walls")); print(cs("Info"))
         global ROT
         lx, lz = [float(v) for v in str(cs("LocalXZ")).split(";")]
@@ -170,4 +172,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    bridge.init()
+    with capture_common.perf_mode():
+        main()

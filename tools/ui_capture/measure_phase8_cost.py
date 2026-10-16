@@ -10,6 +10,7 @@ samples). Asset values are changed in memory and put back afterwards.
 import sys, os, json, time
 sys.stdout.reconfigure(encoding="utf-8")
 import bridge
+import capture_common
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 
@@ -27,13 +28,15 @@ public class PA {
   public static string State() { var gm = GameManager.Instance; return gm == null ? "nogm" : gm.State.ToString() + (gm.IsIntroActive ? "+intro" : ""); }
   static ChickenController Local() { return ChickenController.ActiveControllers.FirstOrDefault(k => k != null && k.Object != null && k.Object.IsValid && !k.IsDecoy && k.HasInputAuthority); }
   public static string Move(string x, string z) { var l = Local(); if (l == null) return "no local"; var ci = System.Globalization.CultureInfo.InvariantCulture;
-    var pos = new Vector3(float.Parse(x, ci), l.transform.position.y, float.Parse(z, ci)); var nt = l.GetComponent<NetworkTransform>(); if (nt != null) nt.Teleport(pos); else l.transform.position = pos; return "local -> " + pos; }
+    var pos = new Vector3(float.Parse(x, ci), l.transform.position.y, float.Parse(z, ci));
+    string near = CapTier.NearOther(pos, l, 1f); if (near != null) return "SKIP spot " + pos + " is within 1 m of another chicken (" + near + ")";   // D16: a neighbour in the frame changes the batches/tris being measured
+    var nt = l.GetComponent<NetworkTransform>(); if (nt != null) nt.Teleport(pos); else l.transform.position = pos; return "local -> " + pos; }
   public static string LocalPos() { var l = Local(); return l == null ? "no local" : l.transform.position.x.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + ";" + l.transform.position.z.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture); }
   public static string FreezeBots() { string o = ""; foreach (var k in ChickenController.ActiveControllers) { if (k == null || k.HasInputAuthority) continue;
       foreach (var m in k.GetComponents<MonoBehaviour>()) if (m != null && m.GetType().Name.Contains("Bot") && m.enabled) { m.enabled = false; o += m.GetType().Name + " "; } } return "froze " + o; }
   public static string CamShot(string w, string h, string path) {
     var cam = MatchCamera.Instance.Camera; int W = int.Parse(w), H = int.Parse(h);
-    var rt = new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32); var old = cam.targetTexture; var oldA = cam.aspect; cam.targetTexture = rt; cam.Render(); cam.targetTexture = old;
+    var rt = CapTier.NewRt(W, H); var old = cam.targetTexture; var oldA = cam.aspect; cam.targetTexture = rt; cam.Render(); cam.targetTexture = old;
     var prev = RenderTexture.active; RenderTexture.active = rt; var tex = new Texture2D(W, H, TextureFormat.RGB24, false); tex.ReadPixels(new Rect(0, 0, W, H), 0, 0); tex.Apply(); RenderTexture.active = prev;
     System.IO.File.WriteAllBytes(path, tex.EncodeToPNG()); Object.DestroyImmediate(tex); rt.Release(); Object.DestroyImmediate(rt); return "saved " + path; }
 
@@ -90,7 +93,7 @@ public class PA {
   static string SampleResultLocal() { return "{\"frames\":" + _dt.Count + ",\"editorTickMs\":" + Sum(_dt) + ",\"batches\":" + Sum(_batches) + ",\"setPass\":" + Sum(_setpass) + ",\"tris\":" + Sum(_tris) + ",\"verts\":" + Sum(_verts) + "}"; }
 
   // CPU time to submit one full camera render of the match camera (deterministic, not capped by Editor vsync / focus).
-  public static string RenderBench(string n) { var cam = MatchCamera.Instance.Camera; int N = int.Parse(n); var rt = new RenderTexture(1920, 1080, 24, RenderTextureFormat.ARGB32); var old = cam.targetTexture; cam.targetTexture = rt;
+  public static string RenderBench(string n) { var cam = MatchCamera.Instance.Camera; int N = int.Parse(n); var rt = CapTier.NewRt(1920, 1080); var old = cam.targetTexture; cam.targetTexture = rt;
     for (int i = 0; i < 10; i++) cam.Render(); var ts = new List<double>(); var sw = new Stopwatch();
     for (int i = 0; i < N; i++) { sw.Restart(); cam.Render(); sw.Stop(); ts.Add(sw.Elapsed.TotalMilliseconds); }
     cam.targetTexture = old; rt.Release(); Object.DestroyImmediate(rt); var s = ts.OrderBy(x => x).ToList(); var ci = System.Globalization.CultureInfo.InvariantCulture;
@@ -119,7 +122,7 @@ public class PA {
     hedge.gameObject.SetActive(hedgeOn);
     if (mode == "restore") SessionState.SetString("cfg_saved", "");
     return mode + ": grassTex=" + AssetDatabase.GetAssetPath(grass.GetTexture("_BaseMap")) + " tile=" + grass.GetTextureScale("_BaseMap").x + " sur=" + sur.GetColor("_BaseColor") + " hedge=" + hedge.gameObject.activeSelf; }
-}"""
+}""" + capture_common.CAP_TIER_CS
 
 SIG = {"Press": ["name"], "Move": ["x", "z"], "Quality": ["mode"], "StartSample": ["n"], "RenderBench": ["n"], "Cfg": ["mode"]}
 CORNER = ("-21.6", "21.8")
@@ -135,7 +138,11 @@ def cs(method, *args):
 
 
 def measure(mode):
-    print(cs("Move", *CORNER)); time.sleep(2.5); print("at", cs("LocalPos"))
+    moved = str(cs("Move", *CORNER)); print(moved)
+    if moved.startswith("SKIP"):
+        print("  -> round skipped: " + moved)
+        return {"skipped": moved}
+    time.sleep(2.5); print("at", cs("LocalPos"))
     print(cs("StartSample", "300"))
     for _ in range(240):
         if str(cs("SampleProgress")).startswith("done"):
@@ -146,8 +153,13 @@ def measure(mode):
 
 
 def main():
-    stats = {}
     bridge.init()
+    with capture_common.perf_mode():
+        _main()
+
+
+def _main():
+    stats = {}
     try:
         print(cs("Quality", "capture"))   # Edit mode: snapshot the real Mobile level while it is selectable
         bridge.call("editor-application-set-state", {"isPlaying": True})
@@ -166,6 +178,8 @@ def main():
         time.sleep(2.0)
         print(cs("FreezeBots"))
         print(cs("Quality", "mobile")); time.sleep(3.0)
+        stats["_meta"] = capture_common.cap_json(); stats["_meta"]["tier"] = "Mobile"
+        print("PASS MOBILE " + capture_common.cap_info())
         for rnd in (1, 2, 3):
             stats["cur_r" + str(rnd)] = measure("cur")
     finally:

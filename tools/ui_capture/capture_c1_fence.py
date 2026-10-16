@@ -5,6 +5,7 @@ import sys, os, time
 sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bridge
+import capture_common
 
 OUT = os.path.abspath(sys.argv[1]); TAG = sys.argv[2]
 os.makedirs(OUT, exist_ok=True)
@@ -36,7 +37,7 @@ public class C1 {
     var rt = new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32) { antiAliasing = aa }; Pose(cam); var old = cam.targetTexture; cam.targetTexture = rt; cam.Render(); cam.targetTexture = old;
     var prev = RenderTexture.active; RenderTexture.active = rt; var tex = new Texture2D(W, H, TextureFormat.RGB24, false); tex.ReadPixels(new Rect(0, 0, W, H), 0, 0); tex.Apply(); RenderTexture.active = prev;
     System.IO.File.WriteAllBytes(path, tex.EncodeToPNG()); Object.DestroyImmediate(tex); rt.Release(); Object.DestroyImmediate(rt); }
-  public static string Shot(string w, string h, string path) { Render(MatchCamera.Instance.Camera, int.Parse(w), int.Parse(h), path, 4); return "color " + path; }
+  public static string Shot(string w, string h, string path) { Render(MatchCamera.Instance.Camera, int.Parse(w), int.Parse(h), path, CapTier.Msaa()); return "color " + path; }
   public static string Mask(string w, string h, string path) {
     var cam = MatchCamera.Instance.Camera; var rs = Fence().ToList();
     var sh = Shader.Find("Universal Render Pipeline/Unlit"); var mat = new Material(sh); mat.SetColor("_BaseColor", Color.white);
@@ -49,7 +50,7 @@ public class C1 {
     cam.cullingMask = oldMask; cam.clearFlags = oldFlags; cam.backgroundColor = oldBg; ppProp.SetValue(uacd, oldPp); Object.DestroyImmediate(mat);
     return "mask " + rs.Count + " fence renderers " + path; }
   public static string Info() { var cam = MatchCamera.Instance.Camera; var m = Fence().FirstOrDefault(); var mf = m ? m.GetComponent<MeshFilter>() : null; return "cam ortho=" + cam.orthographic + " size=" + cam.orthographicSize + " pos=" + cam.transform.position + " rot=" + cam.transform.eulerAngles + " fence=" + Fence().Count() + " mesh=" + (mf ? mf.sharedMesh.name + " tris=" + mf.sharedMesh.triangles.Length / 3 : "none"); }
-}"""
+}""" + capture_common.CAP_TIER_CS
 SIG = {"Press": ["name"], "Move": ["x", "z"], "Corner": ["sx", "sz"], "Shot": ["w", "h", "path"], "Mask": ["w", "h", "path"], "HideUi": ["on"]}
 
 
@@ -67,6 +68,7 @@ def P(n):
 
 
 bridge.init()
+_perf = capture_common.perf_mode(); _perf.__enter__()   # Performance Mode explicit + logged + restored; before Play
 bridge.call("editor-application-set-state", {"isPlaying": True})
 for _ in range(60):
     if str(cs("Press", "SoloBtn")).startswith("clicked"):
@@ -78,7 +80,7 @@ try:
         if str(cs("State")) == "Active":
             break
         time.sleep(0.5)
-    time.sleep(2.5); print(cs("FreezeBots")); print(cs("HideUi", "1"))
+    time.sleep(2.5); print(cs("FreezeBots")); print(cs("HideUi", "1")); print("PASS " + capture_common.cap_info())
     spots = [s for s in str(cs("Spots")).split("|") if s]; spots.sort(); print(spots)
     print(cs("Info"))
     for i, s in enumerate(spots):
@@ -87,4 +89,4 @@ try:
         print(cs("Shot", "3840", "2160", P(f"{TAG}_corner{i}_color.png")))
         print(cs("Mask", "3840", "2160", P(f"{TAG}_corner{i}_mask.png")))
 finally:
-    cs("HideUi", "0"); bridge.call("editor-application-set-state", {"isPlaying": False}); time.sleep(4)
+    cs("HideUi", "0"); bridge.call("editor-application-set-state", {"isPlaying": False}); time.sleep(4); _perf.__exit__(None, None, None)

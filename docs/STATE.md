@@ -12,6 +12,7 @@ Brief: scratchpad `env3d/phase8d_brief.md`; decisions E1-E4 all option a (memory
 
 | Item | Status | Commit | Notes |
 |---|---|---|---|
+| D16 capture tools per tier | done | see git log | New `tools/ui_capture/capture_common.py` (C# `CapTier` appended to each tool's script + Python `perf_mode()`), used by capture_env3d / measure_phase8_cost / capture_c_rings / capture_d9_piles / capture_c1_fence / capture_d4_fence. RT MSAA from the ACTIVE URP asset (PC 4x, Mobile 2x; was forced 4x); free-camera post re-applied on every `Free()` from `RenderTierPolicy.PostProcessingFor` (PC overviews now get D7 post); Performance Mode set explicitly per run in Edit mode before Play (default OFF, `PERF_MODE=1` for ON), logged per pass (`PASS PC/MOBILE: rp msaa postPolicy matchCamPost performanceMode fencePerfMeshShown`) and in the inventory json `capture` block, restored in `finally`; E3/cost teleports nudge onto a 1.5 m ring or SKIP when within 1 m of another chicken. Smoke `Captures/env3d_after/D/D16/` (E3_PASS=2): PC msaa 4 / post on / perf 0; Mobile msaa 2 / post off / perf 0; pref 1 restored. Python tools only (no EditMode change). Note: cost-tool RenderBench now renders with tier MSAA, CPU numbers vs `C_final*` may shift slightly. |
 
 ## 🔎 PHASE 8 FINAL AUDIT (2026-10-16): six-lens grade after chunks A+B+C - overall C- -> C+ -> B-
 

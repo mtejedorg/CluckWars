@@ -8,6 +8,7 @@ Runs a solo match (bots frozen once Active) so the arena is fully spawned.
 import sys, os, json, time
 sys.stdout.reconfigure(encoding="utf-8")
 import bridge
+import capture_common
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 OUT = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "Captures", "env3d"))
@@ -31,9 +32,17 @@ public class E3 {
   // checked against every pile and fails loudly (cs() raises on "ERROR") instead of producing a misleading capture.
   const float PileClearance = 0.5f;
   static string InsidePile(Vector3 pos) { foreach (var f in Object.FindObjectsByType<FoodPile>(FindObjectsSortMode.None)) { float d = f.DistanceToSurface(pos); if (d < PileClearance) return f.name + " surface distance " + d.ToString("0.00", CI); } return null; }
+  // Phase 8 D16: a spot within 1 m of another chicken makes the shot a pile of overlapping birds, not the scene. Nudge to the nearest free spot on a
+  // 1.5 m ring, else return "SKIP ..." (not "ERROR": the caller logs it and drops that shot, the run goes on).
+  const float ChickenClearance = 1f;
   static string Teleport(Vector3 pos) { var l = Local(); if (l == null) return "ERROR no local";
     string bad = InsidePile(pos); if (bad != null) return "ERROR spot " + pos + " is inside a pile oval (" + bad + ")";
-    var nt = l.GetComponent<NetworkTransform>(); if (nt != null) nt.Teleport(pos); else l.transform.position = pos; return "local -> " + pos; }
+    string note = ""; string near = CapTier.NearOther(pos, l, ChickenClearance);
+    if (near != null) { bool ok = false;
+      for (int i = 0; i < 8 && !ok; i++) { float a = i * 45f * Mathf.Deg2Rad; var c = pos + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 1.5f;
+        if (InsidePile(c) == null && CapTier.NearOther(c, l, ChickenClearance) == null) { note = " (nudged from " + pos + ": " + near + " was within " + ChickenClearance.ToString("0.0", CI) + " m)"; pos = c; ok = true; } }
+      if (!ok) return "SKIP spot " + pos + " is within " + ChickenClearance.ToString("0.0", CI) + " m of another chicken (" + near + ") and no free spot on a 1.5 m ring"; }
+    var nt = l.GetComponent<NetworkTransform>(); if (nt != null) nt.Teleport(pos); else l.transform.position = pos; return "local -> " + pos + note; }
   public static string Move(string x, string z) { var l = Local(); if (l == null) return "ERROR no local"; return Teleport(new Vector3(float.Parse(x, CI), l.transform.position.y, float.Parse(z, CI))); }
   // Stand just outside the oval of the pile nearest (x, z), on the side facing the match camera, so the chicken is between camera and pile and the
   // pile stays in frame. The camera yaw depends on the local seat (315 deg for seat 0, not a fixed -x,-z), so the side comes from the live camera's
@@ -49,7 +58,7 @@ public class E3 {
   public static string HideUi(string on) { foreach (var d in Object.FindObjectsByType<UIDocument>(FindObjectsSortMode.None)) if (d.rootVisualElement != null) d.rootVisualElement.style.display = on == "1" ? DisplayStyle.None : DisplayStyle.Flex; return "ui hidden=" + on; }
 
   static void Save(Camera cam, int W, int H, string path) {
-    var rt = new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 }; var old = cam.targetTexture; cam.targetTexture = rt; cam.Render(); cam.targetTexture = old;
+    var rt = CapTier.NewRt(W, H); var old = cam.targetTexture; cam.targetTexture = rt; cam.Render(); cam.targetTexture = old;
     var prev = RenderTexture.active; RenderTexture.active = rt; var tex = new Texture2D(W, H, TextureFormat.RGB24, false); tex.ReadPixels(new Rect(0, 0, W, H), 0, 0); tex.Apply(); RenderTexture.active = prev;
     System.IO.File.WriteAllBytes(path, tex.EncodeToPNG()); Object.DestroyImmediate(tex); rt.Release(); Object.DestroyImmediate(rt); }
   public static string CamShot(string w, string h, string path) { Save(MatchCamera.Instance.Camera, int.Parse(w), int.Parse(h), path); return "saved " + path; }
@@ -60,8 +69,9 @@ public class E3 {
       var src = MatchCamera.Instance.Camera; var srcData = src.GetComponent("UniversalAdditionalCameraData");
       if (srcData == null) throw new System.InvalidOperationException("match camera has no UniversalAdditionalCameraData");
       go = new GameObject("__E3Cam"); var c = go.AddComponent<Camera>(); c.enabled = false; c.CopyFrom(src); c.targetTexture = null; var dst = go.AddComponent(srcData.GetType());
-      foreach (var p in new[] { "renderPostProcessing", "antialiasing" }) { var pi = srcData.GetType().GetProperty(p); if (pi != null) pi.SetValue(dst, pi.GetValue(srcData)); } }
+      foreach (var p in new[] { "antialiasing" }) { var pi = srcData.GetType().GetProperty(p); if (pi != null) pi.SetValue(dst, pi.GetValue(srcData)); } }
     var cam = go.GetComponent<Camera>(); cam.enabled = false;
+    CapTier.ApplyPost(cam);   // D16: per call, from RenderTierPolicy, so a tier switch changes the overview post exactly as it changes the match camera's
     // CopyFrom ran once, on whatever tier was active then. Follow the live MatchCamera's clear colour so a tier switch is seen the way
     // the game applies it (MatchCamera bakes the surround haze into the Mobile background); F1 stage 3.
     if (MatchCamera.Instance != null && MatchCamera.Instance.Camera != null) cam.backgroundColor = MatchCamera.Instance.Camera.backgroundColor;
@@ -122,7 +132,7 @@ public class E3 {
     return "lined " + all.Count; }
 
   public static string Inventory(string path) { var sb = new StringBuilder(); sb.Append("{\n");
-    var rp = QualitySettings.renderPipeline; sb.Append("\"quality\":\"" + Tier() + "\",\"vSync\":" + QualitySettings.vSyncCount + ",\"lodBias\":" + QualitySettings.lodBias.ToString(CI) + ",\"rp\":\"" + (rp ? rp.name : "null") + "\",\n");
+    var rp = QualitySettings.renderPipeline; sb.Append("\"capture\":" + CapTier.Json() + ",\n"); sb.Append("\"quality\":\"" + Tier() + "\",\"vSync\":" + QualitySettings.vSyncCount + ",\"lodBias\":" + QualitySettings.lodBias.ToString(CI) + ",\"rp\":\"" + (rp ? rp.name : "null") + "\",\n");
     if (rp != null) { var t = rp.GetType(); sb.Append("\"urp\":{");
       foreach (var p in new[] { "shadowDistance", "shadowCascadeCount", "msaaSampleCount", "renderScale", "supportsHDR", "mainLightShadowmapResolution", "additionalLightsRenderingMode", "maxAdditionalLightsCount", "supportsSoftShadows", "supportsCameraDepthTexture", "supportsCameraOpaqueTexture" }) { var pi = t.GetProperty(p); if (pi != null) sb.Append("\"" + p + "\":\"" + pi.GetValue(rp) + "\","); }
       sb.Append("\"_\":0},\n"); }
@@ -181,15 +191,16 @@ public class E3 {
         SessionState.SetString("e3_prev_level", ""); SessionState.SetString("e3_tier", ""); how = "restored " + prev; }
     }
     return "tier=" + Tier() + " (" + how + ") rp=" + QualitySettings.renderPipeline.name + " vsync=" + QualitySettings.vSyncCount + " lodBias=" + QualitySettings.lodBias + " skin=" + QualitySettings.skinWeights; }
+  public static string PassInfo(string label) { return label + ": tier=" + Tier() + " " + CapTier.Info(); }
   static string Tier() { string t = SessionState.GetString("e3_tier", ""); return t != "" ? t : QualitySettings.names[QualitySettings.GetQualityLevel()]; }
   public static string Spots() { var sb = new StringBuilder();
     foreach (var b in Object.FindObjectsByType<PlayerBase>(FindObjectsSortMode.None)) sb.Append("B" + b.transform.position.x.ToString("0.0", CI) + ";" + b.transform.position.z.ToString("0.0", CI) + "|");
     foreach (var p in Object.FindObjectsByType<FoodPile>(FindObjectsSortMode.None)) sb.Append("P" + p.transform.position.x.ToString("0.0", CI) + ";" + p.transform.position.z.ToString("0.0", CI) + "|");
     return sb.ToString(); }
-}"""
+}""" + capture_common.CAP_TIER_CS
 
 SIG = {"PropsOnly": ["dir"], "Assets": ["path"], "Press": ["name"], "Move": ["x", "z"], "MoveBeside": ["x", "z"], "CamShot": ["w", "h", "path"], "Quality": ["mode"], "HideUi": ["on"],
-       "Overviews": ["dir"], "Subjects": ["dir"], "Inventory": ["path"]}
+       "Overviews": ["dir"], "Subjects": ["dir"], "Inventory": ["path"], "PassInfo": ["label"]}
 
 
 def cs(method, *args, timeout=300, strict=True):
@@ -251,18 +262,35 @@ def wait_active():
     raise RuntimeError("match never reached Active (last state: %s)" % cs("State", strict=False))
 
 
+def place(method, *args):
+    """Teleport helper: True when the chicken is placed. A "SKIP ..." result (spot within 1 m of another chicken, no free spot nearby) is logged and the
+    caller drops that shot; "ERROR ..." still raises inside cs()."""
+    r = str(cs(method, *args)); print(r)
+    if r.startswith("SKIP"):
+        print(f"  -> shot skipped: {r}")
+        return False
+    return True
+
+
 def main2():
     bridge.init()
+    with capture_common.perf_mode():
+        _main2()
+
+
+def _main2():
     try:
         print(cs("Assets", P("assets.txt")))
         print(cs("Quality", "capture"))   # Edit mode: snapshot the real Mobile level while it is selectable
         bridge.call("editor-application-set-state", {"isPlaying": True})
         start_solo_match(); wait_active()
         time.sleep(2.5); print(cs("FreezeBots")); print(cs("HideUi", "1"))
+        print(cs("PassInfo", "PASS PC"))
         print(cs("Inventory", P("inventory_pc.json")))
         print(cs("Overviews", OUT.replace("\\", "/")))
         os.makedirs(os.path.join(OUT, "props"), exist_ok=True); print(cs("PropsOnly", (OUT + "/props").replace("\\", "/")))
         print(cs("Quality", "mobile")); time.sleep(2.5); os.makedirs(os.path.join(OUT, "mobile"), exist_ok=True)
+        print(cs("PassInfo", "PASS MOBILE"))
         print(cs("Inventory", P("inventory_mobile.json")))
         print(cs("Overviews", (OUT + "/mobile").replace("\\", "/")))
     finally:
@@ -271,6 +299,11 @@ def main2():
 
 def main():
     bridge.init()
+    with capture_common.perf_mode():
+        _main()
+
+
+def _main():
     try:
         print(cs("Quality", "capture"))   # Edit mode: snapshot the real Mobile level while it is selectable
         bridge.call("editor-application-set-state", {"isPlaying": True})
@@ -284,6 +317,7 @@ def main():
         print(cs("FreezeBots"))
         print(cs("HideUi", "1"))
         spots = str(cs("Spots")); print("spots", spots)
+        print(cs("PassInfo", "PASS PC"))
         print(cs("Inventory", P("inventory_pc.json")))
         match_shots("spawn")
         # gameplay camera at each base and pile
@@ -292,14 +326,18 @@ def main():
             x, z = float(xy[0]), float(xy[1])
             # stand just inside the base / just outside the pile's collision oval, on the camera-facing side
             if kind == "B":
-                print(cs("Move", f"{x * 0.85:.2f}", f"{z * 0.85:.2f}"))
+                ok = place("Move", f"{x * 0.85:.2f}", f"{z * 0.85:.2f}")
             else:
-                print(cs("MoveBeside", f"{x:.2f}", f"{z:.2f}"))
+                ok = place("MoveBeside", f"{x:.2f}", f"{z:.2f}")
+            if not ok:
+                continue
             time.sleep(1.4)
             for name, w, h in (("desktop", 1920, 1080), ("phone", 2400, 1080)):
                 print(cs("CamShot", str(w), str(h), P(f"mc_{kind}{i}_{name}.png")))
-        print(cs("MoveBeside", "0", "0")); time.sleep(1.4); match_shots("center")
-        print(cs("Move", "21", "21")); time.sleep(1.4); match_shots("corner_edge")
+        if place("MoveBeside", "0", "0"):
+            time.sleep(1.4); match_shots("center")
+        if place("Move", "21", "21"):
+            time.sleep(1.4); match_shots("corner_edge")
         print(cs("Overviews", OUT.replace("\\", "/")))
         print(cs("Subjects", OUT.replace("\\", "/")))
         print(cs("LineUp")); time.sleep(1.2)
@@ -307,8 +345,10 @@ def main():
         print(cs("Subjects", lin.replace("\\", "/")))
         # Mobile tier
         print(cs("Quality", "mobile")); time.sleep(2.5)
+        print(cs("PassInfo", "PASS MOBILE"))
         print(cs("Inventory", P("inventory_mobile.json")))
-        print(cs("MoveBeside", "0", "0")); time.sleep(1.4); match_shots("center_MOBILE")
+        if place("MoveBeside", "0", "0"):
+            time.sleep(1.4); match_shots("center_MOBILE")
         print(cs("Overviews", (OUT + "/mobile").replace("\\", "/")) if os.makedirs(os.path.join(OUT, "mobile"), exist_ok=True) is None else "")
     finally:
         cleanup()
