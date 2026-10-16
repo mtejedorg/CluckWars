@@ -231,7 +231,7 @@ Characters use **radial gradients** (light highlight at upper-left → primary c
   dark background. Fence panel = the full 4 000-tri `wall_segment` (the 1 642-tri B2 decimation was reverted in
   Phase 8 C1: hollow post caps at match distance); with **Performance Mode** on, every outer and arm panel draws a
   2 999-tri protected-cap twin (`wall_segment_perf` / `wall_segment_inner_perf`, Phase 8 C S5). Its atlas has no black baked faces (lifted to dark
-  wood) and softened smear marks. Arm walls use `wall_segment_inner` (UVs compensated for their 0.35 thickness
+  wood; Phase 8 D2 raised the darkest wood again, linear gain 2.6 below luma 55, so shaded fence faces render L* >= 15 on both tiers) and softened smear marks. Arm walls use `wall_segment_inner` (UVs compensated for their 0.35 thickness
   squash, so post and rail tops show unsquashed grain); the outer fence keeps `wall_segment`.
 - **Surround trees (Phase 8 B3).** `Prop_oak_tree` has a billboard LOD1 (a cross of two alpha-clipped quads from
   `Art/Billboards/oak_tree_y45/135`, matte, base colour 0.8, normals up, no shadow). The orthographic match camera

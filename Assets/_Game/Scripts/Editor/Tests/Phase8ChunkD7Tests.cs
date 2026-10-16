@@ -15,9 +15,11 @@ namespace CluckWars.Tests
     /// The profile reaches the match camera as the RP assets' default volume profile (there are no Volume components
     /// in any scene): PC_RPAsset updates the volume stack every frame, MatchCamera.ApplyRenderTier turns the camera's
     /// renderPostProcessing on only under PC_RPAsset. Neutral tonemapping on this LDR-authored scene costs ~8% grass
-    /// and ~18% food-pile luma vs Mobile (its shoulder compresses the bright pile); postExposure +0.3 with contrast +20
-    /// brings PC to grass +3%, food -6% of Mobile (match-camera Rec.709 luma, Captures/env3d_after/C/D7/). Saturation
-    /// is deliberately NOT overridden: contrast already restores it (grass +3%, food -7% vs Mobile).
+    /// and ~18% food-pile luma vs Mobile (its shoulder compresses the bright pile); D7 shipped postExposure +0.3 with
+    /// contrast +20 (grass +3%, food -6% of Mobile, Captures/env3d_after/C/D7/). Phase 8 D2 re-measured with masks: that
+    /// contrast crushed the dark fence wood (-13%, shaded faces -20%), so it is now postExposure +0.22, contrast +10 and a
+    /// tiny LiftGammaGain lift (see Phase8ChunkD2Tests; PC / Mobile fence 0.95-0.96, grass 1.00, pile 1.03-1.04).
+    /// Saturation is deliberately NOT overridden.
     /// Bloom threshold 1 only sees HDR (>1) pixels, so PC_RPAsset must keep HDR on: ~4.5-5.4% of the frame is above 1.
     /// </remarks>
     public class Phase8ChunkD7Tests
@@ -26,8 +28,8 @@ namespace CluckWars.Tests
         private const string PcRpAsset     = "Assets/Settings/PC_RPAsset.asset";
         private const string MobileRpAsset = "Assets/Settings/Mobile_RPAsset.asset";
 
-        private const float CompPostExposure = 0.3f;
-        private const float CompContrast     = 20f;
+        private const float CompPostExposure = 0.22f;   // D2 (was 0.3 in D7)
+        private const float CompContrast     = 10f;     // D2 (was 20 in D7)
 
         [Test]
         public void PcPostProcessing_IsOn()
@@ -62,8 +64,8 @@ namespace CluckWars.Tests
         public void Profile_HasOnlyTonemapBloomVignetteAndCompensation()
         {
             var names = Profile().components.Select(c => c.GetType().Name).OrderBy(n => n).ToArray();
-            CollectionAssert.AreEqual(new[] { "Bloom", "ColorAdjustments", "Tonemapping", "Vignette" }, names,
-                "D7: Neutral tonemapping + light bloom + vignette + the PC compensation, nothing else.");
+            CollectionAssert.AreEqual(new[] { "Bloom", "ColorAdjustments", "LiftGammaGain", "Tonemapping", "Vignette" }, names,
+                "D7: Neutral tonemapping + light bloom + vignette + the PC compensation (D2 adds the LiftGammaGain shadows lift), nothing else.");
             foreach (var c in Profile().components) Assert.IsTrue(c.active, $"{c.GetType().Name} is inactive");
         }
 
@@ -99,9 +101,9 @@ namespace CluckWars.Tests
         {
             Assert.IsTrue(Profile().TryGet<ColorAdjustments>(out var ca));
             Assert.IsTrue(ca.postExposure.overrideState);
-            Assert.AreEqual(CompPostExposure, ca.postExposure.value, 1e-4f, "postExposure re-measured in D7; change only with new captures.");
+            Assert.AreEqual(CompPostExposure, ca.postExposure.value, 1e-4f, "postExposure re-measured in D2; change only with new captures.");
             Assert.IsTrue(ca.contrast.overrideState);
-            Assert.AreEqual(CompContrast, ca.contrast.value, 1e-4f, "contrast re-measured in D7; change only with new captures.");
+            Assert.AreEqual(CompContrast, ca.contrast.value, 1e-4f, "contrast re-measured in D2; change only with new captures.");
             Assert.IsFalse(ca.saturation.overrideState, "Saturation is not part of the compensation.");
             Assert.IsFalse(ca.hueShift.overrideState, "No hue shift.");
             Assert.IsFalse(ca.colorFilter.overrideState, "No colour filter (it would tint the whole frame).");
