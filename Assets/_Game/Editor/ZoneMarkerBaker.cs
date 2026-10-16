@@ -14,6 +14,8 @@ namespace CluckWars.EditorTools
     /// and every <c>PileZone_*</c> / <c>BaseZone_*</c> disc stop casting shadows (they keep receiving),
     /// and the discs use a saved 64-segment mesh asset instead of the 20-sided built-in Cylinder.
     /// Phase 8 C S1: the nine <c>PileZone_*</c> discs use the irregular-oval slab baked from <c>pile_disc_irregular.fbx</c> instead (Y scale 1, no lift).
+    /// Phase 8 C S2: the four <c>BaseZone_*</c> discs keep their mesh/footprint but their renderers are disabled (the
+    /// visible pad is the straw floor + ring on <c>PlayerBase.prefab</c>).
     /// Phase 8 D9: the outer pile ovals (<c>PileZone_Personal*</c> / <c>PileZone_Contested*</c>) are
     /// yawed so their long axis points at the arena centre, matching the spawned piles.
     /// </summary>
@@ -84,6 +86,9 @@ namespace CluckWars.EditorTools
                 }
                 renderer.shadowCastingMode = ShadowCastingMode.Off;
                 renderer.receiveShadows = true;
+                // Phase 8 C S2: the base pad is PlayerBase.prefab's straw floor + ring; the baked base disc keeps its
+                // footprint but stops drawing (it would z-fight the floor). Pile discs and the ground still draw.
+                if (child.name.StartsWith("BaseZone_")) renderer.enabled = false;
                 if (isZone)
                 {
                     var filter = child.GetComponent<MeshFilter>();

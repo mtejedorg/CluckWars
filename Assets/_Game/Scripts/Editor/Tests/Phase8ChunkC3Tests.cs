@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEditor;
@@ -40,6 +41,13 @@ namespace CluckWars.Tests
                 EditorSceneManager.OpenScene(_originalScenePath, OpenSceneMode.Single);
         }
 
+        private static readonly string[] BaseKitMaterials =
+        {
+            "Assets/_Game/Art/Materials/BaseKit_Straw.mat",
+            "Assets/_Game/Art/Materials/BaseKit_PennantFlag.mat",
+            "Assets/_Game/Art/Materials/BaseKit_PennantPole.mat",
+        };
+
         [TestCase("Assets/_Game/Prefabs/FoodPile.prefab", "Assets/_Game/Art/Materials/FoodMound.mat")]
         [TestCase("Assets/_Game/Prefabs/PlayerBase.prefab", "Assets/_Game/Art/Materials/PlayerBase.mat")]
         public void Prefab_UsesItsProjectMatteMaterial(string prefabPath, string materialPath)
@@ -56,6 +64,9 @@ namespace CluckWars.Tests
                 foreach (var m in r.sharedMaterials)
                 {
                     if (r == glow) { StringAssert.StartsWith("Assets/", AssetDatabase.GetAssetPath(m), $"{prefabPath}/{r.name}"); continue; }
+                    // The base kit (Phase 8 C S2): the ring keeps PlayerBase.mat; the straw floor and the pennant use their
+                    // own matte BaseKit_* project materials (in the A2 matte list, pinned in Phase8ChunkS2Tests).
+                    if (BaseKitMaterials.Contains(AssetDatabase.GetAssetPath(m)) && prefabPath.EndsWith("/PlayerBase.prefab")) continue;
                     Assert.AreEqual(materialPath, AssetDatabase.GetAssetPath(m), $"{prefabPath}/{r.name}");
                 }
         }

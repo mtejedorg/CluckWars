@@ -242,9 +242,9 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Flat dark discs marking each player base's deposit zone. Bases are
-        /// <c>NetworkObject</c>s spawned at runtime, so without these the baked map gives
-        /// no hint of where a quarter of the arena's meaning lives.
+        /// Flat discs recording each player base's deposit zone in the baked map. Since Phase 8 C S2 their
+        /// renderers are OFF: the base pad (straw floor + player-colour ring) is drawn by <c>PlayerBase.prefab</c>
+        /// itself, which spawns on exactly this spot and owns the player tint.
         /// </summary>
         /// <remarks>
         /// Drawn as CIRCLES, not ellipses like the pile zones: a base's deposit trigger is
@@ -263,8 +263,11 @@ namespace CluckWars.Gameplay
             float diameter = _baseZoneRadius * 2f;
             for (int i = 0; i < _spawnPoints.Length; i++)
             {
-                AddZoneMarker($"BaseZone_{i}", _spawnPoints[i],
+                var marker = AddZoneMarker($"BaseZone_{i}", _spawnPoints[i],
                     new Vector2(diameter, diameter), material);
+                // Phase 8 C S2: the visible pad is PlayerBase.prefab's straw floor + player ring, laid on this same
+                // spot; the marker keeps its footprint (radius checks) but no longer draws, so the two never z-fight.
+                marker.enabled = false;
             }
         }
 
@@ -310,7 +313,7 @@ namespace CluckWars.Gameplay
         /// Creates one flat, collider-free zone decal. Shared by the pile and base
         /// markers — see their callers for why colliders are omitted.
         /// </summary>
-        private void AddZoneMarker(string name, Vector3 position, Vector2 footprint, Material material, float yawDeg = 0f)
+        private Renderer AddZoneMarker(string name, Vector3 position, Vector2 footprint, Material material, float yawDeg = 0f)
         {
             var marker = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             marker.name = name;
@@ -332,6 +335,7 @@ namespace CluckWars.Gameplay
             // A 2 cm decal has no shadow worth casting (Phase 8 C5); it still receives them.
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             if (material != null) renderer.sharedMaterial = material;
+            return renderer;
         }
 
         private void Awake()

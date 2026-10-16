@@ -7,14 +7,16 @@ namespace CluckWars.Visuals
     /// Builds the placeholder "testing models" by combining Unity's built-in
     /// primitive meshes (sphere / cube / cylinder) into a single cached mesh per
     /// kind. Programmer-art stand-ins for the real artwork: chunky chicken
-    /// silhouette per GDD §4 (big head, round body, tiny limbs) and a nest pad for player bases. Single mesh + single material
+    /// silhouette per GDD §4 (big head, round body, tiny limbs). Single mesh + single material
     /// so the existing per-class / per-owner tint paths (MaterialPropertyBlock on
     /// the renderer) keep working unchanged.
     /// </summary>
     public static class PlaceholderMeshFactory
     {
-        // Value 1 was FoodMound: retired in Phase 8 C S1 (the pile mound is Generated/Env/food_mound.fbx). Keep 1 unused so serialized kinds stay valid.
-        public enum Kind : byte { Chicken = 0, BaseNest = 2 }
+        // Value 1 was FoodMound: retired in Phase 8 C S1 (the pile mound is Generated/Env/food_mound.fbx).
+        // Value 2 was BaseNest: retired in Phase 8 C S2 (the base is the straw pad + ring + pennant on PlayerBase.prefab,
+        // the nest is the generated nest_basket prop in Map.unity). Keep 1 and 2 unused so serialized kinds stay valid.
+        public enum Kind : byte { Chicken = 0 }
 
         private static readonly Dictionary<Kind, Mesh> Cache = new Dictionary<Kind, Mesh>();
 
@@ -25,7 +27,6 @@ namespace CluckWars.Visuals
             Mesh built = kind switch
             {
                 Kind.Chicken   => BuildChicken(),
-                Kind.BaseNest  => BuildBaseNest(),
                 _              => null,
             };
             if (built != null)
@@ -39,8 +40,7 @@ namespace CluckWars.Visuals
         // ---- Builders ---------------------------------------------------------
         // All shapes are authored in the local space of the mesh they replace:
         // the chicken replaces the prefab's capsule (local bounds roughly -1..+1
-        // on Y, feet at the bottom, facing +Z); mound and nest replace a unit
-        // cube child (bounds -0.5..+0.5).
+        // on Y, feet at the bottom, facing +Z).
 
         private static Mesh BuildChicken()
         {
@@ -71,29 +71,6 @@ namespace CluckWars.Visuals
             // Tiny legs — two short cylinders down to the capsule's foot line.
             AddPart(parts, Primitive.Cylinder, new Vector3(+0.18f, -0.85f, 0f), new Vector3(0.08f, 0.18f, 0.08f));
             AddPart(parts, Primitive.Cylinder, new Vector3(-0.18f, -0.85f, 0f), new Vector3(0.08f, 0.18f, 0.08f));
-
-            return Combine(parts);
-        }
-
-        private static Mesh BuildBaseNest()
-        {
-            var parts = new List<CombineInstance>();
-
-            // Flat pad replacing the unit cube footprint.
-            AddPart(parts, Primitive.Cylinder, new Vector3(0f, -0.42f, 0f), new Vector3(1.05f, 0.08f, 1.05f));
-
-            // Raised rim — a ring of small spheres approximating a nest's twigs.
-            const int rimCount = 10;
-            for (int i = 0; i < rimCount; i++)
-            {
-                float a = (i / (float)rimCount) * Mathf.PI * 2f;
-                var pos = new Vector3(Mathf.Cos(a) * 0.46f, -0.28f, Mathf.Sin(a) * 0.46f);
-                AddPart(parts, Primitive.Sphere, pos, new Vector3(0.22f, 0.18f, 0.22f));
-            }
-
-            // A couple of eggs resting inside.
-            AddPart(parts, Primitive.Sphere, new Vector3(+0.10f, -0.30f, +0.06f), new Vector3(0.18f, 0.24f, 0.18f));
-            AddPart(parts, Primitive.Sphere, new Vector3(-0.12f, -0.30f, -0.08f), new Vector3(0.16f, 0.22f, 0.16f));
 
             return Combine(parts);
         }

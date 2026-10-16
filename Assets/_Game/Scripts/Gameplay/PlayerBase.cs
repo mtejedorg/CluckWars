@@ -35,6 +35,24 @@ namespace CluckWars.Gameplay
         [Min(0f)]
         [SerializeField] private float _depositRadius = 2.5f;
 
+        [Header("Base kit (Phase 8 C S2) - visual only")]
+        [Tooltip("Parent of the pad dressing (straw floor, ring, pennant), authored for corner 0. Spawned() yaws it by " +
+            "-90 degrees per corner so every seat gets the same layout relative to its own corner (KitYawFor).")]
+        [SerializeField] private Transform _kit;
+
+        [Tooltip("Renderers drawn in the full player colour (the pad ring, the pennant flag). Nothing else on the base is tinted at full strength.")]
+        [SerializeField] private Renderer[] _identityRenderers = System.Array.Empty<Renderer>();
+
+        [Tooltip("Renderers that take only a hint of the player colour (the straw floor): white lerped toward the colour by Floor Tint.")]
+        [SerializeField] private Renderer[] _floorRenderers = System.Array.Empty<Renderer>();
+
+        [Tooltip("How far the floor is pulled from white toward the player colour (0 = plain straw). Capped at 15 % so the straw stays straw.")]
+        [Range(0f, MaxFloorTint)]
+        [SerializeField] private float _floorTint = 0.12f;
+
+        /// <summary>Upper bound for <see cref="_floorTint"/>: the straw floor carries at most a 15 % hint of the player colour.</summary>
+        public const float MaxFloorTint = 0.15f;
+
         public static readonly System.Collections.Generic.List<PlayerBase> ActiveBases = new System.Collections.Generic.List<PlayerBase>();
 
         [Networked] public float FoodTotal { get; set; }
@@ -96,6 +114,9 @@ namespace CluckWars.Gameplay
             ActiveBases.Add(this);
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
 
+            // Local, visual-only: the position replicates with the spawn, so every peer lays the kit out the same way.
+            if (_kit != null) _kit.rotation = Quaternion.Euler(0f, KitYawFor(transform.position), 0f);
+
             if (_matchConfig == null)
             {
                 _log?.Error(Source, $"{name}: no MatchConfigSO resolved, so RPC_AddFood cannot bound " +
@@ -132,9 +153,10 @@ namespace CluckWars.Gameplay
         private MaterialPropertyBlock _tintBlock;
 
         /// <summary>
-        /// Tints every <see cref="MeshRenderer"/> on this base with the player's
-        /// identity color (corner-indexed), through a <see cref="MaterialPropertyBlock"/>
-        /// only, so the renderers keep their <c>sharedMaterial</c>.
+        /// Tints the base kit with the player's identity colour (corner-indexed), grey while the base is unclaimed:
+        /// <see cref="_identityRenderers"/> (ring, pennant flag) at full strength, <see cref="_floorRenderers"/>
+        /// (straw) by <see cref="FloorTintFor"/>. Property blocks only, so the renderers keep their <c>sharedMaterial</c>.
+        /// The pennant pole and the scene props (coop, nest, barrel) are deliberately left untinted.
         /// </summary>
         /// <remarks>
         /// Never touch <c>renderer.material</c> here: it clones a <c>Lit (Instance)</c> copy per
@@ -148,13 +170,45 @@ namespace CluckWars.Gameplay
                 ? CluckWars.UI.PlayerPalette.ForCorner(CornerIndex)
                 : UnownedColor;
 
-            var renderers = GetComponentsInChildren<MeshRenderer>(includeInactive: false);
-            _log?.Debug(Source, $"{name}: ApplyOwnerTint — {renderers.Length} renderer(s), " +
-                $"color={color}, corner={CornerIndex}, owner={Owner}.");
+            _log?.Debug(Source, $"{name}: ApplyOwnerTint - {_identityRenderers.Length} identity + " +
+                $"{_floorRenderers.Length} floor renderer(s), color={color}, corner={CornerIndex}, owner={Owner}.");
 
             _tintBlock ??= new MaterialPropertyBlock();
-            foreach (var r in renderers)
-                ApplyTint(r, _tintBlock, color);
+            ApplyKitTint(_identityRenderers, _floorRenderers, _floorTint, color, _tintBlock);
+        }
+
+        /// <summary>
+        /// The kit tint itself, separated from the networked claim state so it can be exercised in EditMode:
+        /// <paramref name="identity"/> get <paramref name="color"/>, <paramref name="floor"/> get
+        /// <see cref="FloorTintFor"/>(<paramref name="color"/>, <paramref name="floorTint"/>). Null entries are skipped.
+        /// </summary>
+        public static void ApplyKitTint(Renderer[] identity, Renderer[] floor, float floorTint, Color color, MaterialPropertyBlock block)
+        {
+            foreach (var r in identity)
+                if (r != null) ApplyTint(r, block, color);
+
+            var floorColor = FloorTintFor(color, floorTint);
+            foreach (var r in floor)
+                if (r != null) ApplyTint(r, block, floorColor);
+        }
+
+        /// <summary>The straw floor's colour: white pulled toward <paramref name="playerColor"/> by <paramref name="strength"/>, clamped to <see cref="MaxFloorTint"/>.</summary>
+        public static Color FloorTintFor(Color playerColor, float strength)
+        {
+            var c = Color.Lerp(Color.white, playerColor, Mathf.Clamp(strength, 0f, MaxFloorTint));
+            c.a = 1f;
+            return c;
+        }
+
+        /// <summary>
+        /// Yaw (degrees) that turns the corner-0-authored kit to the corner this base sits in: 0 for the (+x,+z) corner,
+        /// -90 per corner counter-clockwise (the same 4-fold rotation as the Map.unity base dressing). 0 at the origin.
+        /// </summary>
+        public static float KitYawFor(Vector3 basePosition)
+        {
+            var flat = new Vector2(basePosition.x, basePosition.z);
+            if (flat.sqrMagnitude < 1e-6f) return 0f;
+            return Mathf.Atan2(flat.x, flat.y) * Mathf.Rad2Deg - 45f;
         }
 
         /// <summary>
