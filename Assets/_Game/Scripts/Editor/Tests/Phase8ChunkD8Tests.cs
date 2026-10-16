@@ -12,6 +12,8 @@ namespace CluckWars.Tests
     /// Phase 8 decision D8 (a) "ground colour": the grass floor is toned down from the loudest surface on screen
     /// (match-camera grass luma ~190 -> ~158, a touch warmer) by a <c>_BaseColor</c> tint on GrassFloor.mat, and the
     /// cover crates move from P1-orange to a weathered brown by a tint on Prop_crate.mat. Textures are untouched.
+    /// Phase 8 E3 (a) re-tuned the grass tint (same brightness, ~20 % less chroma; D8 tint was (0.869, 0.827, 0.710)), see
+    /// <see cref="Phase8ChunkE3Tests"/> for the saturation cap, retiling and the macro variation map.
     /// </summary>
     /// <remarks>
     /// The project renders in GAMMA colour space (ProjectSettings m_ActiveColorSpace 0), so a material colour multiplies
@@ -23,11 +25,11 @@ namespace CluckWars.Tests
     /// </remarks>
     public class Phase8ChunkD8Tests
     {
-        private const string GrassPath = "Assets/_Game/Materials/GrassFloor.mat";
+        internal const string GrassPath = "Assets/_Game/Materials/GrassFloor.mat";
         private const string CratePath = "Assets/_Game/Art/Materials/Prop_crate.mat";
         private const float MinCrateDeltaE = 15f;
 
-        private static readonly Color GrassTint = new Color(0.869f, 0.827f, 0.71f, 1f);
+        internal static readonly Color GrassTint = new Color(0.96f, 0.80f, 0.99f, 1f);   // E3 (was D8 0.869 / 0.827 / 0.710)
         private static readonly Color CrateTint = new Color(0.61f, 0.69f, 0.84f, 1f);
 
         private static Material Load(string path)
@@ -47,7 +49,7 @@ namespace CluckWars.Tests
 
         /// <summary>The material's base map decoded from its PNG, as sRGB texels times the material's _BaseColor
         /// (or bare, without the tint).</summary>
-        private static Color[] TintedTexels(Material m, bool applyTint = true)
+        internal static Color[] TintedTexels(Material m, bool applyTint = true)
         {
             var tex = m.GetTexture("_BaseMap");
             Assert.IsNotNull(tex, $"{m.name} has no base map");
@@ -65,7 +67,7 @@ namespace CluckWars.Tests
             finally { Object.DestroyImmediate(decoded); }
         }
 
-        private static float Luma709(Color c) => 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
+        internal static float Luma709(Color c) => 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
 
         private static Color Mean(Color[] px, int from, int to, int[] order)
         {
@@ -104,19 +106,20 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void GrassFloor_TintedColour_IsDimmerAndWarmerThanTheBareTexture()
+        public void GrassFloor_TintedColour_IsDimmerAndWarmerThanTheBareTexture_AndStillGreen()
         {
             var m = Load(GrassPath);
             var (mean, _) = Stats(TintedTexels(m));
             var (bare, _) = Stats(TintedTexels(m, applyTint: false));
-            float bareLuma = Luma709(bare), bareRg = bare.r / bare.g, bareBg = bare.b / bare.g;
+            float bareLuma = Luma709(bare), bareRg = bare.r / bare.g;
             float luma = Luma709(mean);
             // Material-level band (texture x tint, sRGB 0..1); the match camera renders it at luma ~158 of 255.
             Assert.That(luma * 255f, Is.InRange(120f, 140f), "tinted grass mean luma (material level)");
             Assert.Less(luma, bareLuma * 0.85f, "D8 dims the grass");
             Assert.Greater(mean.r / mean.g, bareRg, "warmer: more red relative to green (toward yellow)");
-            Assert.Less(mean.b / mean.g, bareBg, "warmer: less blue relative to green");
-            Assert.Greater(mean.g - mean.b, 0.35f, "still a saturated, cheerful green (not olive / grey)");
+            // E3 lifted blue relative to green on purpose (it is the desaturation); the floor must still read as green grass,
+            // not grey or olive: green leads both other channels clearly.
+            Assert.Greater(mean.g - Mathf.Max(mean.r, mean.b), 0.15f, "still clearly green (not grey / olive)");
         }
 
         [Test]

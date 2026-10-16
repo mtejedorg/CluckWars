@@ -44,6 +44,21 @@ The UI must feel **exciting, tactile, and attractive** — not minimalist. Think
 - **Surfaces (Phase 8).** Ground, props, fence, coop, base and pile zones are matte: smoothness <= 0.08, specular
   highlights and environment reflections off, GPU instancing on. Chickens keep their own materials. Base tints are
   MaterialPropertyBlocks on the shared material (no material copies).
+- **Ground grass (Phase 8 D8 + E3).** `Materials/GrassFloor.mat` (stock URP Lit on the `GeneratedGround` cube; the
+  cube's top face is UV 0..1, so tiling lives on the material) = `GrassCalm.png` at tiling **5** (E3; was 7, before
+  that 10) x tint `(0.96, 0.80, 0.99)` (E3; D8 was `(0.869, 0.827, 0.710)`). The project renders in gamma space, so
+  the tint multiplies the sRGB texel. Target at the match camera (sunlit grass, both tiers): Rec.709 luma **158 +- 3**
+  (D8's brightness) and CIELAB chroma **<= ~55** (E3 measured PC 53.7-53.9, Mobile 56.4-56.8, from 67 / 70; HSV
+  saturation 0.67 -> 0.53), hue ~130 (still grass green, not olive or grey). A Detail Albedo x2 map
+  (`Generated/Env/Textures/grass_macro_variation.png`, 256 x 256 RGB24 uncompressed, linear, made by
+  `tools/art/e3_grass_macro/make_grass_macro.py`) at detail tiling 1 / base tiling = one period across the whole
+  51.3 m floor adds a large soft variation: olive / yellow patches vs deeper green, +-8 % red, +-5 % blue, luma RMS
+  ~1 %, mean exactly neutral (127.5). It breaks the visible tile grid without stains or mud. It costs two extra
+  texture samples per ground pixel and one new Lit variant (`_DETAIL_MULX2`): add it to the shader warm-up list.
+  Anisotropic filtering: the PC quality level forces it on every texture; the Mobile level only uses each texture's
+  own level, and GrassCalm keeps level 1 (off), so Android is unchanged. A TextureImporter has no per-platform aniso
+  setting. Because luma was held, pile-vs-grass and ring-vs-grass luminance contrast are unchanged (E3 tables).
+  Guarded by `Phase8ChunkD8Tests` + `Phase8ChunkE3Tests`.
 
 ---
 
@@ -786,7 +801,7 @@ arena; four low hedge boxes (`ArenaHedge`, `Hedge_N/S/E/W`, 2 m thick x 1 m high
 1.9 m outside the fence; `Surround_Hedge.mat` URP Lit `(0.07, 0.18, 0.08)`, smoothness 0) frame the
 fence. Static, collider-free, shadow-off, one static batch, 48 tris. The playable ground uses
 `Assets/_Game/Art/GrassCalm.png` (blurred, 85% saturation, contrast 40% around the mean, warm
-tint; seamless; `Grass.png` is kept) at tiling 7 (was 10); luminance std 0.154 to 0.037, p99 0.748
+tint; seamless; `Grass.png` is kept) at tiling 7 (was 10; Phase 8 E3: now 5, see "Ground grass" above); luminance std 0.154 to 0.037, p99 0.748
 to 0.449, so the ink and cream guides read. Material colour and shader unchanged. Mobile cost:
 batches +2 at a fixed corner, SetPass identical; GPU time still to measure on the Pixel 9.
 Not done: a camera pull-in at GET READY, and a bush ring (about 2 500 tris each, too heavy for 30 fps).
