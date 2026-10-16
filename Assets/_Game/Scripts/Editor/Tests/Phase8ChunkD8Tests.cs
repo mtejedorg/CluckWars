@@ -166,7 +166,7 @@ namespace CluckWars.Tests
             return (float)DeltaE2000Lab(la.x, la.y, la.z, lb.x, lb.y, lb.z);
         }
 
-        private static Vector3 ToLab(Color c)
+        internal static Vector3 ToLab(Color c)
         {
             static double Lin(double v) => v <= 0.04045 ? v / 12.92 : Math.Pow((v + 0.055) / 1.055, 2.4);
             double r = Lin(c.r), g = Lin(c.g), bl = Lin(c.b);

@@ -1,0 +1,1 @@
+Phase 8 E4 Fatty buff recolour scripts (reference copy; paths inside point at the session scratchpad). Final settings: back [174,96,52], cream [250,240,222], registry TintStrength 0.1. dump.py dumps the Fatty mesh from Unity, raster.py rasterises it into UV space, recolour.py applies the two-tone, cloud.py visualises.

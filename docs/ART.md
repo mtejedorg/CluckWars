@@ -82,10 +82,12 @@ Each class has a **primary color** used on the body as the main read, plus a **d
 
 | Class | Primary | Dark | Light | Feel |
 |---|---|---|---|---|
-| Fatty Chicken | #F5D75A | #B89E20 | #FFF3B0 | Soft, round, inviting |
+| Fatty Chicken | #F5D75A (UI / class colour; in-world body is buff, see below) | #B89E20 | #FFF3B0 | Soft, round, inviting |
 | Speedy Chicken | #E85A2A | #B84418 | #FFB088 | Energetic, alert |
 | Warrior Chicken | #C04030 | #8A2A20 | #F09888 | Strong, grounded |
 | Assassin Chicken | #7B68EE | #5A48C8 | #C4B8FF | Mysterious, sleek |
+
+**Fatty in-world body (Phase 8 E4, Maestro option a):** after the D1 gold mound the all-yellow Fatty read as part of the food pile (match-camera hue gap 2-3 deg), so the Fatty *model* is a buff hen: a **cream breast / face** (texel target about `#FAF0DE` under the wash) and an **orange-brown back, wings and tail** (about `#AE6034`), shading kept from the original atlas; comb, wattle, beak, eyes and feet are unchanged. The registry wash is `TintStrength` 0.1 (was 0.25) so `#F5D75A` does not yellow the cream. `#F5D75A` stays the Fatty **class colour** for UI (`--cw-class-fatty`, `MenuUiController` class meta, the rival chevron via registry `TintColor`); it is no longer the body read. Rendered at the match camera: cream breast ~`#7A715B`, back ~`#60381F` lit/shade mean (PC); Fatty vs full mound dE00 22-27 (was 15-21). Guardrail `Phase8ChunkE4Tests` (breast low-chroma and lighter than an orange-brown back, comb and feet untouched).
 
 ### Player Identity Colors (Color-Blind Safe)
 

@@ -64,7 +64,7 @@ MonoBehaviour:
   - Class: 2
     Stats: {fileID: 11400000, guid: cb8b4aa3fcd58054daff2e725896035b, type: 2}
     TintColor: {r: 0.9607843, g: 0.8431373, b: 0.3529412, a: 1}
-    TintStrength: 0.25
+    TintStrength: 0.1
     LoreQuote: An immovable object with a big appetite.
     ModelPrefab: {fileID: 919132149155446097, guid: e50a32da5c9fdeb43bd81e18521c0afb, type: 3}
     ModelScale: {x: 1, y: 1, z: 1}
