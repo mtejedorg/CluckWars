@@ -76,9 +76,10 @@ namespace CluckWars.Tests
                 {
                     var result = BalanceOracle.Simulate(ShippedMap.OracleMap(seat), chicken, config.FoodTargetToWin);
 
-                    Assert.IsTrue(SctTargets.Within(result, target),
+                    TestContext.WriteLine($"SCT {target.ClassName} seat {seat}: {result.SctSeconds:0.00}s / {result.Trips} trips (target {target.Seconds}s / {target.Trips})");
+                    Assert.IsTrue(SctTargets.Within(result, target, SctTargets.ShippedAssetToleranceSeconds),
                         $"{target.ClassName} (seat {seat}) misses its SCT target: got {result.SctSeconds:0.0}s / {result.Trips} trips, " +
-                        $"want {target.Seconds}s / {target.Trips} trips (±{SctTargets.DefaultToleranceSeconds}s). " +
+                        $"want {target.Seconds}s / {target.Trips} trips (±{SctTargets.ShippedAssetToleranceSeconds}s shipped-asset band). " +
                         $"Shipped stats: move {s.MoveSpeed}, cap {s.CargoCapacity}, " +
                         $"peck {s.PeckAmount} per {s.PeckCooldown}s, " +
                         $"deposit {config.DepositRatePerSecond}, W {config.FoodTargetToWin}. " +
@@ -319,6 +320,14 @@ namespace CluckWars.Tests
             var fatty = System.Array.Find(SctTargets.All, t => t.ClassName == "Fatty");
             Assert.AreEqual(30f, fatty.Seconds, 0.001f);
             Assert.AreEqual(2, fatty.Trips);
+        }
+
+        [Test]
+        public void ToleranceBands_ShippedGuardIsTighterThanDesignBand()
+        {
+            Assert.AreEqual(1.5f, SctTargets.DefaultToleranceSeconds, 0.0001f, "GDD design band.");
+            Assert.AreEqual(0.5f, SctTargets.ShippedAssetToleranceSeconds, 0.0001f, "Shipped-asset drift guard.");
+            Assert.Less(SctTargets.ShippedAssetToleranceSeconds, SctTargets.DefaultToleranceSeconds);
         }
 
         [Test]

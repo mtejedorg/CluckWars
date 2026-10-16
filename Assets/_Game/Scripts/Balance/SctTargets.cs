@@ -15,7 +15,22 @@ namespace CluckWars.Balance
     /// </summary>
     public static class SctTargets
     {
+        /// <summary>
+        /// The GDD <b>design band</b> (§2.1): how close a design must land to its SCT target.
+        /// Used by <see cref="Within"/> by default and by the pure-oracle unit tests.
+        /// </summary>
         public const float DefaultToleranceSeconds = 1.5f;
+
+        /// <summary>
+        /// The <b>shipped-asset drift guard</b>: the tolerance for the test that runs the real
+        /// <c>.asset</c> values on the real map from all four seats. The shipped numbers are
+        /// solved to land within ~0.05 s of target, so the wide design band only hides drift:
+        /// at ±1.5 s a +5 % <c>_baseCornerDistance</c> (piles move with the base) or collect
+        /// reach dropping to 0 stayed green. Must stay strictly below
+        /// <see cref="DefaultToleranceSeconds"/>. If the shipped assets drift past it, re-solve
+        /// the stats; do not widen this.
+        /// </summary>
+        public const float ShippedAssetToleranceSeconds = 0.5f;
 
         public static readonly SctTarget[] All =
         {

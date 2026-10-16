@@ -85,7 +85,10 @@ Every stat is a *dependent variable* solved against SCT — we don't pick `MoveS
 9 feels nice, we pick it because Speedy must clear in 30 s. This is verified automatically
 by the **Balance Oracle** (a pure-C# simulator, `Assets/_Game/Scripts/Balance/`) which
 runs the greedy policy on the real pile coordinates and asserts each class lands within
-±1.5 s of its target, from all four seats. Travel is **reach-aware**: a chicken does not walk
+a tolerance of its target, from all four seats. Two bands: **±1.5 s is the design band** (what
+a design must land inside; `SctTargets.DefaultToleranceSeconds`), and **±0.5 s is the
+shipped-asset drift guard** applied to the real `.asset` values on the real map
+(`SctTargets.ShippedAssetToleranceSeconds`) — the wide band let a +5 % corner distance stay green; if the shipped values drift past ±0.5 s, re-solve them, never widen the guard. Travel is **reach-aware**: a chicken does not walk
 to a pile's centre or a base's centre, so each leg is
 `max(0, centre distance − r_from − r_to)`, where a base's radius is its deposit radius
 (`PlayerBase._depositRadius`, 2.5 m) and a pile's is its oval's radius toward the other end
