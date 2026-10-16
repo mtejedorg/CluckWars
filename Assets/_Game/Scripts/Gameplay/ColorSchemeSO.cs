@@ -22,7 +22,7 @@ namespace CluckWars.Gameplay
     {
         [Header("Food piles (full → empty lerp)")]
         public Color FoodPileFull  = new Color(1f,    0.85f, 0.30f, 1f);   // ripe corn
-        public Color FoodPileEmpty = new Color(0.40f, 0.30f, 0.15f, 1f);   // husk (never shown raw: FoodPileVisuals.TintFloor keeps the pile at Lerp(Empty, Full, 0.35) or brighter)
+        public Color FoodPileEmpty = new Color(0.71f, 0.54f, 0.25f, 1f);   // husk (D1 2026-10-16: raised from 0.40/0.30/0.15 so a low pile on the re-levelled grain tile stays lighter than the brown disc) (never shown raw: FoodPileVisuals.TintFloor keeps the pile at Lerp(Empty, Full, 0.35) or brighter)
 
         // Phase 10 redesign: warm Clash Royale / Supercell palette (cluckwars-tokens-v2).
         // If you have a pre-existing ColorScheme.asset, use "Reset" in the Inspector

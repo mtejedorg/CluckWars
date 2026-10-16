@@ -122,7 +122,7 @@ namespace CluckWars.Visuals
 
         private Color EmptyColor => _emptyColorOverride.a > 0f
             ? _emptyColorOverride
-            : (_colors != null ? _colors.FoodPileEmpty : new Color(0.4f, 0.3f, 0.15f));
+            : (_colors != null ? _colors.FoodPileEmpty : new Color(0.71f, 0.54f, 0.25f));
 
         /// <summary>Mound Y scale for a fill ratio: linear from <see cref="_emptyHeight"/> to <see cref="_fullHeight"/>.</summary>
         public float MoundHeight(float ratio) => Mathf.Lerp(_emptyHeight, _fullHeight, Mathf.Clamp01(ratio));

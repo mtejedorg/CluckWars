@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: ColorScheme
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ColorSchemeSO
   FoodPileFull: {r: 1, g: 0.85, b: 0.3, a: 1}
-  FoodPileEmpty: {r: 0.4, g: 0.3, b: 0.15, a: 1}
+  FoodPileEmpty: {r: 0.71, g: 0.54, b: 0.25, a: 1}
   PanelBackground: {r: 0.23, g: 0.13, b: 0.06, a: 0.96}
   ButtonNormal: {r: 0.31, g: 0.18, b: 0.08, a: 1}
   ButtonHover: {r: 0.42, g: 0.25, b: 0.12, a: 1}
