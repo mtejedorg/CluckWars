@@ -27,8 +27,23 @@ public class E3 {
     return "taps=" + taps; }
   public static string State() { var gm = GameManager.Instance; return gm == null ? "nogm" : gm.State.ToString() + (gm.IsIntroActive ? "+intro" : ""); }
   static ChickenController Local() { return ChickenController.ActiveControllers.FirstOrDefault(k => k != null && k.Object != null && k.Object.IsValid && !k.IsDecoy && k.HasInputAuthority); }
-  public static string Move(string x, string z) { var l = Local(); if (l == null) return "no local";
-    var pos = new Vector3(float.Parse(x, CI), l.transform.position.y, float.Parse(z, CI)); var nt = l.GetComponent<NetworkTransform>(); if (nt != null) nt.Teleport(pos); else l.transform.position = pos; return "local -> " + pos; }
+  // Standing inside a pile's collision oval (Phase 8 D9) can never happen in play and buries the chicken in the mound, so every teleport is
+  // checked against every pile and fails loudly (cs() raises on "ERROR") instead of producing a misleading capture.
+  const float PileClearance = 0.5f;
+  static string InsidePile(Vector3 pos) { foreach (var f in Object.FindObjectsByType<FoodPile>(FindObjectsSortMode.None)) { float d = f.DistanceToSurface(pos); if (d < PileClearance) return f.name + " surface distance " + d.ToString("0.00", CI); } return null; }
+  static string Teleport(Vector3 pos) { var l = Local(); if (l == null) return "ERROR no local";
+    string bad = InsidePile(pos); if (bad != null) return "ERROR spot " + pos + " is inside a pile oval (" + bad + ")";
+    var nt = l.GetComponent<NetworkTransform>(); if (nt != null) nt.Teleport(pos); else l.transform.position = pos; return "local -> " + pos; }
+  public static string Move(string x, string z) { var l = Local(); if (l == null) return "ERROR no local"; return Teleport(new Vector3(float.Parse(x, CI), l.transform.position.y, float.Parse(z, CI))); }
+  // Stand just outside the oval of the pile nearest (x, z), on the side facing the match camera, so the chicken is between camera and pile and the
+  // pile stays in frame. The camera yaw depends on the local seat (315 deg for seat 0, not a fixed -x,-z), so the side comes from the live camera's
+  // flattened forward. Standoff = the largest chicken capsule radius (0.54) + PileClearance + margin.
+  public static string MoveBeside(string x, string z) { var l = Local(); if (l == null) return "ERROR no local"; var at = new Vector3(float.Parse(x, CI), 0, float.Parse(z, CI));
+    var pile = Object.FindObjectsByType<FoodPile>(FindObjectsSortMode.None).OrderBy(f => (f.transform.position - at).sqrMagnitude).FirstOrDefault(); if (pile == null) return "ERROR no pile";
+    if (MatchCamera.Instance == null || MatchCamera.Instance.Camera == null) return "ERROR no MatchCamera";
+    var fwd = MatchCamera.Instance.Camera.transform.forward; fwd.y = 0f; if (fwd.sqrMagnitude < 1e-4f) return "ERROR match camera looks straight down"; fwd.Normalize();
+    var from = pile.transform.position - fwd * 100f; var pos = pile.SurfaceApproachPoint(from, 1.3f); pos.y = l.transform.position.y;
+    return Teleport(pos); }
   public static string FreezeBots() { string o = ""; foreach (var k in ChickenController.ActiveControllers) { if (k == null || k.HasInputAuthority) continue;
       foreach (var m in k.GetComponents<MonoBehaviour>()) if (m != null && m.GetType().Name.Contains("Bot") && m.enabled) { m.enabled = false; o += m.GetType().Name + " "; } } return "froze " + o; }
   public static string HideUi(string on) { foreach (var d in Object.FindObjectsByType<UIDocument>(FindObjectsSortMode.None)) if (d.rootVisualElement != null) d.rootVisualElement.style.display = on == "1" ? DisplayStyle.None : DisplayStyle.Flex; return "ui hidden=" + on; }
@@ -169,7 +184,7 @@ public class E3 {
     return sb.ToString(); }
 }"""
 
-SIG = {"PropsOnly": ["dir"], "Assets": ["path"], "Press": ["name"], "Move": ["x", "z"], "CamShot": ["w", "h", "path"], "Quality": ["mode"], "HideUi": ["on"],
+SIG = {"PropsOnly": ["dir"], "Assets": ["path"], "Press": ["name"], "Move": ["x", "z"], "MoveBeside": ["x", "z"], "CamShot": ["w", "h", "path"], "Quality": ["mode"], "HideUi": ["on"],
        "Overviews": ["dir"], "Subjects": ["dir"], "Inventory": ["path"]}
 
 
@@ -271,12 +286,15 @@ def main():
         for i, s in enumerate(x for x in spots.split("|") if x):
             kind, xy = s[0], s[1:].split(";")
             x, z = float(xy[0]), float(xy[1])
-            # stand just inside the base / beside the pile
-            ox, oz = (x * 0.85, z * 0.85) if kind == "B" else (x + 1.6, z - 1.6)
-            print(cs("Move", f"{ox:.2f}", f"{oz:.2f}")); time.sleep(1.4)
+            # stand just inside the base / just outside the pile's collision oval, on the camera-facing side
+            if kind == "B":
+                print(cs("Move", f"{x * 0.85:.2f}", f"{z * 0.85:.2f}"))
+            else:
+                print(cs("MoveBeside", f"{x:.2f}", f"{z:.2f}"))
+            time.sleep(1.4)
             for name, w, h in (("desktop", 1920, 1080), ("phone", 2400, 1080)):
                 print(cs("CamShot", str(w), str(h), P(f"mc_{kind}{i}_{name}.png")))
-        print(cs("Move", "0", "0")); time.sleep(1.4); match_shots("center")
+        print(cs("MoveBeside", "0", "0")); time.sleep(1.4); match_shots("center")
         print(cs("Move", "21", "21")); time.sleep(1.4); match_shots("corner_edge")
         print(cs("Overviews", OUT.replace("\\", "/")))
         print(cs("Subjects", OUT.replace("\\", "/")))
@@ -286,7 +304,7 @@ def main():
         # Mobile tier
         print(cs("Quality", "mobile")); time.sleep(2.5)
         print(cs("Inventory", P("inventory_mobile.json")))
-        print(cs("Move", "0", "0")); time.sleep(1.4); match_shots("center_MOBILE")
+        print(cs("MoveBeside", "0", "0")); time.sleep(1.4); match_shots("center_MOBILE")
         print(cs("Overviews", (OUT + "/mobile").replace("\\", "/")) if os.makedirs(os.path.join(OUT, "mobile"), exist_ok=True) is None else "")
     finally:
         cleanup()
