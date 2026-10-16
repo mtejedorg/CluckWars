@@ -58,6 +58,9 @@ namespace CluckWars.Tests
             "Assets/_Game/Art/Materials/BaseKit_Straw.mat",
             "Assets/_Game/Art/Materials/BaseKit_PennantFlag.mat",
             "Assets/_Game/Art/Materials/BaseKit_PennantPole.mat",
+            "Assets/_Game/Art/Materials/Prop_big_barn.mat",
+            "Assets/_Game/Art/Materials/Hedge_Side.mat",
+            "Assets/_Game/Art/Materials/Hedge_Top.mat",
         };
 
         private static Material Load(string path)
@@ -96,7 +99,8 @@ namespace CluckWars.Tests
                     var n = Path.GetFileNameWithoutExtension(p);
                     return n == "GrassFloor" || n.StartsWith("Prop_") || n.StartsWith("TerrainObstacle")
                         || n.StartsWith("BaseZone") || n.StartsWith("PileZone")
-                        || n == "FoodMound" || n == "PlayerBase" || n.StartsWith("Surround_") || n.StartsWith("BaseKit_");
+                        || n == "FoodMound" || n == "PlayerBase" || n.StartsWith("Surround_") || n.StartsWith("BaseKit_")
+                        || n.StartsWith("Hedge_");
                 })
                 .Where(p => AssetDatabase.LoadAssetAtPath<Material>(p).shader.name == "Universal Render Pipeline/Lit")
                 .Except(MatteMaterials)
