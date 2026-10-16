@@ -651,7 +651,7 @@ namespace CluckWars.Visuals
         // ================================================================
         //
         // Maestro: "rivals are hard to keep track of during a match" — an on-ground
-        // class-tinted ring under every visible rival, and a chevron at the view edge
+        // player-coloured ring under every visible rival, and a chevron at the view edge
         // pointing at every rival that has left the frame. Drawn entirely by
         // RivalIndicator from state that is already replicated; no networking of any kind.
         //
@@ -681,7 +681,7 @@ namespace CluckWars.Visuals
         public static readonly bool RivalIndicatorsEnabled = true;
 
         /// <summary>
-        /// Radius of the class-tinted ground ring under an on-screen rival. Third and
+        /// Radius of the player-coloured ground ring under an on-screen rival. Third and
         /// outermost of three concentric rings a single chicken can wear, and sized
         /// against the other two rather than picked in isolation:
         /// <see cref="SelfRingRadius"/> (0.62, the §5.1 control-state ring) inside
@@ -703,8 +703,8 @@ namespace CluckWars.Visuals
 
         /// <summary>
         /// Ring alpha before the rival's own <c>VisualOpacity</c> is multiplied in. 0.5
-        /// keeps it clearly a ground decal rather than a solid painted circle; the class
-        /// hue is what carries the identity, and hue survives a low alpha far better than
+        /// keeps it clearly a ground decal rather than a solid painted circle; the player
+        /// hue (PlayerPalette) is what carries the identity, and hue survives a low alpha far better than
         /// a shape does.
         /// </summary>
         public const float RivalRingAlpha = 0.5f;
@@ -769,6 +769,16 @@ namespace CluckWars.Visuals
         /// whatever arena content happens to be behind that edge of the screen, and unlike
         /// the ring it has no world context to sit in.</summary>
         public const float RivalChevronAlpha = 0.85f;
+
+        /// <summary>Width of the chevron's dark ink outline (<c>RivalIndicator.ChevronOutlineColor</c>), as a fraction of the
+        /// chevron's size so it scales with the arrow: 0.026 x 96 texels = 2.5 texels, ~2 px at 1080 rows (0.026 x
+        /// <see cref="RivalChevronSizeFraction"/> x 1080). Phase 8 decision E1: without it the player-colour fill is
+        /// 1.2-2.0:1 against the sunlit grass; the ink edge is what carries the arrow's silhouette (>= 3:1).</summary>
+        public const float RivalChevronOutlineRatio = 0.026f;
+
+        /// <summary>Ink outline alpha before the rival's <c>VisualOpacity</c> is multiplied in. Near-opaque, like the
+        /// rival nameplate pill it borrows its ink from.</summary>
+        public const float RivalChevronOutlineAlpha = 0.95f;
 
         /// <summary>
         /// How far past the camera's near clip plane the chevron geometry is placed, in

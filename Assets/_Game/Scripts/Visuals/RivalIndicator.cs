@@ -1,5 +1,6 @@
 using CluckWars.Gameplay;
 using CluckWars.Logging;
+using CluckWars.UI;
 using UnityEngine;
 using Zenject;
 
@@ -11,9 +12,16 @@ namespace CluckWars.Visuals
     ///
     /// <para>
     /// Two presentations of one idea, switched on whether the rival is in frame:
-    /// a class-tinted <b>ground ring</b> under an on-screen rival, and a class-tinted
-    /// <b>chevron</b> pinned to the view edge pointing at an off-screen one. Exactly one is
-    /// ever lit — an on-screen rival is its own indicator and does not also need an arrow.
+    /// a <b>ground ring</b> under an on-screen rival, and a <b>chevron</b> pinned to the view
+    /// edge pointing at an off-screen one. Exactly one is ever lit — an on-screen rival is its
+    /// own indicator and does not also need an arrow.
+    /// </para>
+    /// <para>
+    /// <b>Both are tinted with the rival's PLAYER colour</b> (<see cref="PlayerPalette.ForCorner"/>
+    /// of <see cref="ChickenController.HomeCornerIndex"/>) — the same source as the nameplate
+    /// dot and the identity ring (Phase 8 decision E1 a). Class identity stays in the chicken
+    /// itself: class colours were ~9 degrees apart for Warrior / Speedy, two rivals of one class
+    /// got identical arrows, and P1 aqua never reached them.
     /// </para>
     /// </summary>
     /// <remarks>
@@ -84,24 +92,35 @@ namespace CluckWars.Visuals
         private const int ChevronSortingOrder = 250;
 
         private static Sprite _chevronSprite;
+        private static Sprite _chevronOutlineSprite;
+
+        /// <summary>The chevron's dark ink outline (Phase 8 decision E1, in the spirit of D9's "dark ink edge on light
+        /// ground"): the brand ink of the rival nameplate pill, so the arrow and the pill read as one family. No seat colour
+        /// clears 3:1 against the sunlit grass on luminance alone (measured 1.2-2.0), while the ink edge at
+        /// <see cref="FeedbackTuning.RivalChevronOutlineAlpha"/> does, and every seat still parts from the ink (the darkest,
+        /// P4 teal, ~3.6:1), so no seat needs a cream edge instead.</summary>
+        public static Color ChevronOutlineColor => PlayerPalette.RivalPillFill;
+
+        /// <summary>Sorting order of the outline: directly behind the chevron fill, above all arena geometry.</summary>
+        public const int ChevronOutlineSortingOrder = ChevronSortingOrder - 1;
 
         private ChickenController _controller;
-        private ChickenClassRegistrySO _registry;
         private ILogService _log;
 
         private SpriteRenderer _ring;
         private SpriteRenderer _ringEdge;      // thin cream outer edge (GroundRingStyle)
         private float _ringRadius = FeedbackTuning.RivalRingRadius;
         private SpriteRenderer _chevron;
-        private Color _classColor = Color.white;
-        private bool _colorResolved;
+        private SpriteRenderer _chevronOutline; // ink edge child, drawn behind the fill (E1)
 
         [Inject]
-        public void Construct(ChickenClassRegistrySO registry, ILogService log)
-        {
-            _registry = registry;
-            _log = log;
-        }
+        public void Construct(ILogService log) => _log = log;
+
+        /// <summary>The tint of a rival seated at <paramref name="corner"/>: the player colour, or
+        /// <see cref="PlayerPalette.Neutral"/> while the corner is not stamped yet — exactly what the
+        /// nameplate dot and the identity ring do (<see cref="ChickenWorldBars"/>). A legitimate
+        /// transient state, so it is deliberately not logged and has no class-colour fallback.</summary>
+        public static Color TintFor(int corner) => PlayerPalette.ForCorner(corner);
 
         private void Awake()
         {
@@ -114,7 +133,7 @@ namespace CluckWars.Visuals
             }
 
             // Self-injection per CONVENTIONS — not gated on HasInstance.
-            if (_registry == null && ProjectContext.HasInstance)
+            if (_log == null && ProjectContext.HasInstance)
                 ProjectContext.Instance.Container.Inject(this);
 
             _controller = GetComponent<ChickenController>();
@@ -164,6 +183,16 @@ namespace CluckWars.Visuals
             _chevron = chevGo.AddComponent<SpriteRenderer>();
             _chevron.sprite = ChevronSprite();
             _chevron.sortingOrder = ChevronSortingOrder;
+
+            // Ink outline as a child renderer rather than baked into the fill sprite: the fill is tinted by
+            // SpriteRenderer.color (the player colour), which would tint a baked edge too. As a child it inherits the
+            // chevron's position / rotation / scale, so shape, size and safe-area placement stay exactly the fill's.
+            var edgeGo = new GameObject("RivalChevronOutline");
+            edgeGo.transform.SetParent(chevGo.transform, worldPositionStays: false);
+            _chevronOutline = edgeGo.AddComponent<SpriteRenderer>();
+            _chevronOutline.sprite = ChevronOutlineSprite();
+            _chevronOutline.sortingOrder = ChevronOutlineSortingOrder;
+            _chevronOutline.color = WithAlpha(ChevronOutlineColor, FeedbackTuning.RivalChevronOutlineAlpha);
             chevGo.SetActive(false);
         }
 
@@ -192,17 +221,17 @@ namespace CluckWars.Visuals
                 return;
             }
 
-            if (!_colorResolved) ResolveClassColor();
+            var tint = TintFor(_controller.HomeCornerIndex);
 
             if (ScreenEdgeProjection.TryProject(cam, transform.position,
                     FeedbackTuning.RivalChevronSafeArea,
                     out Vector2 clamped, out Vector2 bearing))
             {
-                ShowChevron(cam, clamped, bearing, opacity);
+                ShowChevron(cam, clamped, bearing, tint, opacity);
             }
             else
             {
-                ShowRing(opacity);
+                ShowRing(tint, opacity);
             }
         }
 
@@ -233,33 +262,17 @@ namespace CluckWars.Visuals
             return opacity >= MinVisibleOpacity;
         }
 
-        private void ResolveClassColor()
-        {
-            if (_registry == null)
-            {
-                // White still reads as an indicator; only the per-class identity is lost.
-                _log?.Warn(Source,
-                    "No ChickenClassRegistrySO injected — rival indicators fall back to white " +
-                    "and lose their class identity.");
-                _colorResolved = true;
-                return;
-            }
-
-            _classColor = _registry.GetOrDefault(_controller.Class).TintColor;
-            _colorResolved = true;
-        }
-
-        private void ShowRing(float opacity)
+        private void ShowRing(Color tint, float opacity)
         {
             if (_chevron != null && _chevron.gameObject.activeSelf) _chevron.gameObject.SetActive(false);
             if (_ring == null) return;
 
-            _ring.color = WithAlpha(_classColor, FeedbackTuning.RivalRingAlpha * opacity);
+            _ring.color = WithAlpha(tint, FeedbackTuning.RivalRingAlpha * opacity);
             GroundRingStyle.SetEdgeAlpha(_ringEdge, GroundRingStyle.RivalEdgeAlpha * opacity);
             if (!_ring.gameObject.activeSelf) _ring.gameObject.SetActive(true);
         }
 
-        private void ShowChevron(Camera cam, Vector2 clamped, Vector2 bearing, float opacity)
+        private void ShowChevron(Camera cam, Vector2 clamped, Vector2 bearing, Color tint, float opacity)
         {
             if (_ring != null && _ring.gameObject.activeSelf) _ring.gameObject.SetActive(false);
             if (_chevron == null) return;
@@ -278,9 +291,18 @@ namespace CluckWars.Visuals
                          * FeedbackTuning.RivalChevronSizeFraction;
             t.localScale = Vector3.one * Mathf.Max(0.0001f, size);
 
-            _chevron.color = WithAlpha(_classColor, FeedbackTuning.RivalChevronAlpha * opacity);
+            _chevron.color = WithAlpha(tint, FeedbackTuning.RivalChevronAlpha * opacity);
+            if (_chevronOutline != null)
+                _chevronOutline.color = WithAlpha(ChevronOutlineColor, FeedbackTuning.RivalChevronOutlineAlpha * opacity);
             if (!_chevron.gameObject.activeSelf) _chevron.gameObject.SetActive(true);
         }
+
+        /// <summary>Test seams: light the ring / chevron for a rival at <paramref name="corner"/> without a
+        /// networked controller (Phase8ChunkE1Tests).</summary>
+        public void ShowRingForTests(int corner, float opacity) => ShowRing(TintFor(corner), opacity);
+
+        public void ShowChevronForTests(Camera cam, int corner, float opacity) =>
+            ShowChevron(cam, new Vector2(0.5f, 0.9f), Vector2.up, TintFor(corner), opacity);
 
         private void Hide()
         {
@@ -299,38 +321,91 @@ namespace CluckWars.Visuals
         /// thickness of <see cref="FeedbackTuning.RivalChevronWidthRatio"/>. Drawn as a
         /// filled arrowhead rather than an outline: at the size this appears on a phone an
         /// outline collapses into a smudge, and a solid silhouette is what reads
-        /// peripherally, which is the entire job.
+        /// peripherally, which is the entire job. The thin ink edge round it
+        /// (<see cref="ChevronOutlineSprite"/>) is a rim on that solid shape, not a
+        /// replacement for it.
         /// </summary>
         private static Sprite ChevronSprite()
         {
             if (_chevronSprite != null) return _chevronSprite;
 
-            const int S = 96;
-            var px = new Color[S * S];
-            float halfBase = 0.5f * FeedbackTuning.RivalChevronWidthRatio * 2.2f;
+            var px = new Color[ChevronTexels * ChevronTexels];
+            for (int y = 0; y < ChevronTexels; y++)
+            for (int x = 0; x < ChevronTexels; x++)
+                px[y * ChevronTexels + x] = new Color(1f, 1f, 1f, ChevronFill(x, y) ? 1f : 0f);
 
-            for (int y = 0; y < S; y++)
-            for (int x = 0; x < S; x++)
-            {
-                float u = (x + 0.5f) / S - 0.5f;   // -0.5 .. 0.5
-                float v = (y + 0.5f) / S - 0.5f;   // -0.5 bottom .. 0.5 tip
-
-                // Triangle: full width at the base, converging to a point at the tip.
-                float t = Mathf.InverseLerp(-0.45f, 0.48f, v);
-                float halfWidth = Mathf.Lerp(0.42f, 0.0f, t);
-                bool inside = v >= -0.45f && v <= 0.48f && Mathf.Abs(u) <= halfWidth;
-
-                // Notch the base into a chevron rather than a plain triangle.
-                bool notch = v < -0.45f + halfBase && Mathf.Abs(u) < halfWidth * 0.55f;
-
-                px[y * S + x] = new Color(1f, 1f, 1f, inside && !notch ? 1f : 0f);
-            }
-
-            _chevronSprite = MakeSprite(px, S);
+            _chevronSprite = MakeSprite(px, ChevronTexels, ChevronTexels);
             return _chevronSprite;
         }
 
-        private static Sprite MakeSprite(Color[] px, int size)
+        /// <summary>Fill texture size; the sprite is one world unit across (pixels per unit = this).</summary>
+        private const int ChevronTexels = 96;
+
+        /// <summary>Transparent margin the outline sprite adds on every side, so the edge round the tip (2 texels from the
+        /// fill sprite's top) is not clipped. Must exceed the outline radius.</summary>
+        private const int ChevronOutlinePad = 5;
+
+        /// <summary>Whether fill texel (<paramref name="x"/>, <paramref name="y"/>) is inside the arrowhead. Shared by the fill
+        /// and the outline so the outline hugs exactly the shape that is drawn.</summary>
+        private static bool ChevronFill(int x, int y)
+        {
+            if (x < 0 || y < 0 || x >= ChevronTexels || y >= ChevronTexels) return false;
+            const int S = ChevronTexels;
+            float halfBase = 0.5f * FeedbackTuning.RivalChevronWidthRatio * 2.2f;
+            float u = (x + 0.5f) / S - 0.5f;   // -0.5 .. 0.5
+            float v = (y + 0.5f) / S - 0.5f;   // -0.5 bottom .. 0.5 tip
+
+            // Triangle: full width at the base, converging to a point at the tip.
+            float t = Mathf.InverseLerp(-0.45f, 0.48f, v);
+            float halfWidth = Mathf.Lerp(0.42f, 0.0f, t);
+            bool inside = v >= -0.45f && v <= 0.48f && Mathf.Abs(u) <= halfWidth;
+
+            // Notch the base into a chevron rather than a plain triangle.
+            bool notch = v < -0.45f + halfBase && Mathf.Abs(u) < halfWidth * 0.55f;
+            return inside && !notch;
+        }
+
+        /// <summary>
+        /// The ink edge: every texel within <see cref="FeedbackTuning.RivalChevronOutlineRatio"/> of the fill (soft by half a
+        /// texel), plus the fill's own boundary texels so bilinear filtering leaves no see-through seam between fill and edge.
+        /// Same pixels-per-unit as the fill and <see cref="ChevronOutlinePad"/> texels larger on every side, centred, so it
+        /// sits exactly round the fill at the fill's transform.
+        /// </summary>
+        private static Sprite ChevronOutlineSprite()
+        {
+            if (_chevronOutlineSprite != null) return _chevronOutlineSprite;
+
+            int n = ChevronTexels + 2 * ChevronOutlinePad;
+            float r = FeedbackTuning.RivalChevronOutlineRatio * ChevronTexels;
+            int win = Mathf.CeilToInt(r) + 1;
+            var px = new Color[n * n];
+            for (int oy = 0; oy < n; oy++)
+            for (int ox = 0; ox < n; ox++)
+            {
+                int fx = ox - ChevronOutlinePad, fy = oy - ChevronOutlinePad;
+                float a;
+                if (ChevronFill(fx, fy))
+                {
+                    bool boundary = !ChevronFill(fx + 1, fy) || !ChevronFill(fx - 1, fy) ||
+                                    !ChevronFill(fx, fy + 1) || !ChevronFill(fx, fy - 1);
+                    a = boundary ? 1f : 0f;
+                }
+                else
+                {
+                    float best = float.MaxValue;
+                    for (int dy = -win; dy <= win; dy++)
+                    for (int dx = -win; dx <= win; dx++)
+                        if (ChevronFill(fx + dx, fy + dy)) best = Mathf.Min(best, dx * dx + dy * dy);
+                    a = best == float.MaxValue ? 0f : Mathf.Clamp01(r + 0.5f - Mathf.Sqrt(best));
+                }
+                px[oy * n + ox] = new Color(1f, 1f, 1f, a);
+            }
+
+            _chevronOutlineSprite = MakeSprite(px, n, ChevronTexels);
+            return _chevronOutlineSprite;
+        }
+
+        private static Sprite MakeSprite(Color[] px, int size, int pixelsPerUnit)
         {
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
             {
@@ -339,7 +414,7 @@ namespace CluckWars.Visuals
             };
             tex.SetPixels(px);
             tex.Apply();
-            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), pixelsPerUnit);
         }
     }
 }

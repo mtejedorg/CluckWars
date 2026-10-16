@@ -102,7 +102,7 @@ Each class has a **primary color** used on the body as the main read, plus a **d
 | Warrior Chicken | #C04030 | #8A2A20 | #F09888 | Strong, grounded |
 | Assassin Chicken | #7B68EE | #5A48C8 | #C4B8FF | Mysterious, sleek |
 
-**Fatty in-world body (Phase 8 E4, Maestro option a):** after the D1 gold mound the all-yellow Fatty read as part of the food pile (match-camera hue gap 2-3 deg), so the Fatty *model* is a buff hen: a **cream breast / face** (texel target about `#FAF0DE` under the wash) and an **orange-brown back, wings and tail** (about `#AE6034`), shading kept from the original atlas; comb, wattle, beak, eyes and feet are unchanged. The registry wash is `TintStrength` 0.1 (was 0.25) so `#F5D75A` does not yellow the cream. `#F5D75A` stays the Fatty **class colour** for UI (`--cw-class-fatty`, `MenuUiController` class meta, the rival chevron via registry `TintColor`); it is no longer the body read. Rendered at the match camera: cream breast ~`#7A715B`, back ~`#60381F` lit/shade mean (PC); Fatty vs full mound dE00 22-27 (was 15-21). Guardrail `Phase8ChunkE4Tests` (breast low-chroma and lighter than an orange-brown back, comb and feet untouched).
+**Fatty in-world body (Phase 8 E4, Maestro option a):** after the D1 gold mound the all-yellow Fatty read as part of the food pile (match-camera hue gap 2-3 deg), so the Fatty *model* is a buff hen: a **cream breast / face** (texel target about `#FAF0DE` under the wash) and an **orange-brown back, wings and tail** (about `#AE6034`), shading kept from the original atlas; comb, wattle, beak, eyes and feet are unchanged. The registry wash is `TintStrength` 0.1 (was 0.25) so `#F5D75A` does not yellow the cream. `#F5D75A` stays the Fatty **class colour** for UI (`--cw-class-fatty`, `MenuUiController` class meta); it is no longer the body read (and, since Phase 8 E1, no longer tints the rival ring / chevron either). Rendered at the match camera: cream breast ~`#7A715B`, back ~`#60381F` lit/shade mean (PC); Fatty vs full mound dE00 22-27 (was 15-21). Guardrail `Phase8ChunkE4Tests` (breast low-chroma and lighter than an orange-brown back, comb and feet untouched).
 
 ### Player Identity Colors (Color-Blind Safe)
 
@@ -123,6 +123,12 @@ P1 Speedy's feet ring read as part of the chicken; the aqua sits ~49 apart and s
 
 The in-world nameplate also names the colour in text: a human rival is `P3`, a bot rival is `P3 <name>`
 (`ChickenNameplate`); the feet ring and rival ring themselves are sprites and carry no text.
+
+**Rival markers use the player colour (Phase 8 E1 a).** The ring under an on-screen rival and the chevron pinned to the
+screen edge for an off-screen one are tinted `PlayerPalette.ForCorner(rival.HomeCornerIndex)` - the same colour as that
+rival's nameplate dot and feet ring - not the class colour (Warrior / Speedy class hues were ~9 deg apart, two rivals of
+one class got identical arrows, and P1 aqua never reached them). Class identity stays in the chicken model. A corner that
+is not stamped yet draws `PlayerPalette.Neutral`, as the nameplate does. The chevron is a plain arrowhead (no class glyph).
 
 **Ability category fills.** Defense has two colours: `#30460C` (`AbilityPalette.Defense`) is the TEXT
 background only (card band, category tag, frame: cream label 9.6:1); `#80902C` (`AbilityPalette.DefenseFill`,
