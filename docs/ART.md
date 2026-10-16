@@ -816,6 +816,16 @@ Not done: a camera pull-in at GET READY, and a bush ring (about 2 500 tris each,
 pixels) and has a thin cream (#FEF5E0, 45 %) rim at its edge so the wall still reads. The fade code only runs
 in the `_CW_FENCE_FADE` shader variant, switched on while a hole is open.
 
+Who gets a hole (all local presentation, `FenceFadeDriver` + `FenceFixedTargets`, ease 0.15 s in and out):
+the local bird on every fence material; every other chicken (rivals, decoys) covered by an OUTER fence, up to
+8 slots (D4); and, Phase 8 E2, three FIXED targets for the local player on the outer fence only: the own deposit
+pad (hole inner radius (2.5 m + 0.5 m) / 11.2 m view height = 0.27 screen heights, a chicken's is 0.12) and the
+two home-side piles (the two contested piles beside the pad's own fences; radius = half the footprint's long axis
++ 0.5 m, 0.23). A target opens when an outer fence covers it (centre or near-rim ray, same test as a chicken) AND
+the local bird carries food, or is within 8 m of it, or the round is in GET READY. Own shader array
+(`_CW_FenceTargets[3]` + per-target radius shift), so rivals' 8 slots are never starved. The inner arm walls and the
+coops never read either array.
+
 **Ability category fill, Defense.** Mid moss `#80902C` (cream icon 3.3:1, ink label 5.4:1,
 Steal/Defense colour-blind separation 9.4 dE00); `#30460C` stays the text background.
 

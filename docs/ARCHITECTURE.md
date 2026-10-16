@@ -191,6 +191,7 @@ leaderboard rows, and nameplates all key off the same stamped corner.
 - `_followLocalChicken = true` (default): finds `ChickenController` with `HasInputAuthority`, smooth-damps `_focusPoint` toward chicken position with `_followSmoothTime` (default 0.15s).
 - Falls back to `_focusPoint` (map center) when no local chicken — intro, post-despawn, between matches.
 - `_orthoSize = 8` for close framing. Bump to ~18 for the original ART.md §2 "full map" view.
+- Adds `FenceFadeDriver` (see-through fence, local presentation only). It feeds `Shader` globals each frame: the local bird's hole, up to 8 other-chicken holes (`_CW_FenceBirds[8]`, Phase 8 D4) and 3 fixed targets for the local player's own pad + 2 home-side piles (`_CW_FenceTargets[3]`, `FenceFixedTargets`, Phase 8 E2). Targets and other-chicken holes are read only by outer-fence materials (keyword `_CW_FENCE_ALL_BIRDS`); inner arm walls and coops stay local-bird-only. Nothing is networked. Details: ART.md "Fence fade".
 
 ---
 

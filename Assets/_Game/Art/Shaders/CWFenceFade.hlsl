@@ -32,10 +32,20 @@
 //   _CW_FenceBirdCount   how many leading slots are live (0..CW_FENCE_MAX_BIRDS)
 // Every hole has the local hole's exact shape, depth gate and rim; overlapping holes take the max.
 //
-// Keep the math identical to FenceFadeRules.FragmentFade / RimWeight / CombinedFragmentFade (EditMode-tested on the
-// C# side), and CW_FENCE_MAX_BIRDS equal to FenceFadeRules.MaxBirdSlots.
+// Phase 8 E2 — three FIXED targets for the local player (own deposit pad, 2 home-side piles), same outer-fence-only
+// keyword, their own slots so rival holes are never starved:
+//   _CW_FenceTargets[CW_FENCE_MAX_TARGETS]  xyz = the target's centre (world), w = its strength 0..1 (smoothed)
+//   _CW_FenceTargetShift  x,y,z = per target: how far its hole is shifted outward from the chicken hole (inner, outer
+//                        and rim radius all move together, so the edge band and rim keep their width; a pad's hole
+//                        is ~0.27 screen heights, a chicken's 0.12)
+//   _CW_FenceTargetCount  how many leading target slots are live (0..CW_FENCE_MAX_TARGETS)
+//
+// Keep the math identical to FenceFadeRules.FragmentFade / RimWeight / CombinedFragmentFade / ShiftedFragmentFade
+// (EditMode-tested on the C# side), CW_FENCE_MAX_BIRDS equal to FenceFadeRules.MaxBirdSlots and CW_FENCE_MAX_TARGETS
+// equal to FenceFadeRules.MaxFixedTargets.
 
 #define CW_FENCE_MAX_BIRDS 8
+#define CW_FENCE_MAX_TARGETS 3
 
 float4 _CW_LocalBirdPos;
 float4 _CW_FenceFadeParams;
@@ -43,6 +53,9 @@ float4 _CW_FenceRimParams;
 float4 _CW_FenceRimColor;
 float4 _CW_FenceBirds[CW_FENCE_MAX_BIRDS];
 float _CW_FenceBirdCount;
+float4 _CW_FenceTargets[CW_FENCE_MAX_TARGETS];
+float4 _CW_FenceTargetShift;
+float _CW_FenceTargetCount;
 
 #if defined(_CW_FENCE_FADE)
 
@@ -74,15 +87,16 @@ float CW_FenceRimAmount(float screenDist, float inFront, float strength)
     return saturate(strength) * _CW_FenceRimParams.z * band * inFront;
 }
 
-// One hole (bird: xyz world centre, w strength) as this fragment sees it; folds into fade / rim by max.
-void CW_FenceHole(float4 bird, float2 fragUV, float2 screenPx, float fragEye, inout float fade, inout float rim)
+// One hole (bird: xyz world centre, w strength) as this fragment sees it; folds into fade / rim by max. radiusShift
+// moves the whole hole profile outward (0 for a chicken; a fixed target's pad / pile is bigger).
+void CW_FenceHole(float4 bird, float radiusShift, float2 fragUV, float2 screenPx, float fragEye, inout float fade, inout float rim)
 {
     // Where the bird lands on screen. ComputeScreenPos-style mapping paired with GetNormalizedScreenSpaceUV is
     // the same pairing URP uses for its own screen-space textures, so both sides agree on any y-flip.
     float3 birdVS = TransformWorldToView(bird.xyz);
     float4 birdCS = TransformWViewToHClip(birdVS);
     float2 birdUV = (birdCS.xy * float2(0.5, 0.5 * _ProjectionParams.x) + 0.5 * birdCS.w) / max(birdCS.w, 1e-5);
-    float screenDist = length((fragUV - birdUV) * screenPx) / max(screenPx.y, 1.0);
+    float screenDist = length((fragUV - birdUV) * screenPx) / max(screenPx.y, 1.0) - radiusShift;
 
     float inFront = CW_FenceInFront(fragEye, -birdVS.z);
     fade = max(fade, CW_FenceFadeAmount(screenDist, inFront, bird.w));
@@ -101,6 +115,8 @@ float CW_FenceFadeClipRim(float4 positionCS)
 #if defined(_CW_FENCE_ALL_BIRDS)
     float birdCount = min(_CW_FenceBirdCount, (float)CW_FENCE_MAX_BIRDS);
     anyHole = anyHole || birdCount > 0.5;
+    float targetCount = min(_CW_FenceTargetCount, (float)CW_FENCE_MAX_TARGETS);
+    anyHole = anyHole || targetCount > 0.5;
 #endif
 
     UNITY_BRANCH
@@ -111,7 +127,7 @@ float CW_FenceFadeClipRim(float4 positionCS)
         float fragEye = CW_FragmentEyeDepth(positionCS.z);
         float fade = 0.0;
 
-        CW_FenceHole(_CW_LocalBirdPos, fragUV, screenPx, fragEye, fade, rim);
+        CW_FenceHole(_CW_LocalBirdPos, 0.0, fragUV, screenPx, fragEye, fade, rim);
 
 #if defined(_CW_FENCE_ALL_BIRDS)
         // Constant bound, unrolled, each slot behind a uniform branch: constant array indices (fine at shader
@@ -121,7 +137,17 @@ float CW_FenceFadeClipRim(float4 positionCS)
         {
             UNITY_BRANCH
             if ((float)i < birdCount)
-                CW_FenceHole(_CW_FenceBirds[i], fragUV, screenPx, fragEye, fade, rim);
+                CW_FenceHole(_CW_FenceBirds[i], 0.0, fragUV, screenPx, fragEye, fade, rim);
+        }
+
+        // Phase 8 E2: the local player's fixed targets, same constant-bound unrolled loop (3 slots, one compare each
+        // past the live count).
+        UNITY_UNROLL
+        for (int t = 0; t < CW_FENCE_MAX_TARGETS; t++)
+        {
+            UNITY_BRANCH
+            if ((float)t < targetCount)
+                CW_FenceHole(_CW_FenceTargets[t], _CW_FenceTargetShift[t], fragUV, screenPx, fragEye, fade, rim);
         }
 #endif
 

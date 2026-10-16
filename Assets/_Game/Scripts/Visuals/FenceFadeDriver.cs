@@ -8,7 +8,8 @@ namespace CluckWars.Visuals
     /// <summary>
     /// Feeds the see-through-fence shader (<see cref="FenceFadeRules.ShaderName"/>) once per frame: where the
     /// LOCAL bird is and how strongly to open the fence in front of it (Phase 6 chunk 7f), plus one hole slot per
-    /// other chicken covered by an OUTER fence (Phase 8 D4).
+    /// other chicken covered by an OUTER fence (Phase 8 D4), plus three fixed targets for the local player's own pad and
+    /// home-side piles (Phase 8 E2, <see cref="FenceFixedTargets"/>).
     /// </summary>
     /// <remarks>
     /// <para>
@@ -82,6 +83,9 @@ namespace CluckWars.Visuals
         private int _uploadedSlotCount = -1;
         private float _maxSlotStrength;
 
+        // Phase 8 E2: the local player's own pad + 2 home-side piles (own shader array, never competes with the chicken slots).
+        private readonly FenceFixedTargets _fixedTargets = new FenceFixedTargets();
+
         /// <summary>Current eased strength 0..1 of the LOCAL bird's hole (for captures / debugging).</summary>
         public float Strength => _strength;
 
@@ -90,6 +94,12 @@ namespace CluckWars.Visuals
 
         /// <summary>Strongest other-chicken hole this frame (captures / debugging).</summary>
         public float MaxSlotStrength => _maxSlotStrength;
+
+        /// <summary>Fixed-target holes (own pad, home piles) uploaded this frame (captures / debugging).</summary>
+        public int FixedTargetCount => _fixedTargets.Count;
+
+        /// <summary>Eased strength of fixed target <paramref name="slot"/> (0 pad, 1-2 home piles) (captures / debugging).</summary>
+        public float FixedTargetStrength(int slot) => _fixedTargets.StrengthOf(slot);
 
         /// <summary>Test / capture seam: false pins the strength at 0 (the "before" look).</summary>
         public static bool EffectEnabled { get; set; } = true;
@@ -120,6 +130,7 @@ namespace CluckWars.Visuals
             _maxSlotStrength = 0f;
             _uploadedSlotCount = -1; // force the zero upload
             UploadSlots(0);
+            _fixedTargets.Clear();
             SyncKeyword();
         }
 
@@ -130,11 +141,12 @@ namespace CluckWars.Visuals
             Shader.SetGlobalColor(RimColorId, FenceFadeRules.RimColor);
         }
 
-        /// <summary>Sets the global <c>_CW_FENCE_FADE</c> keyword only when the strongest hole (local or any slot)
+        /// <summary>Sets the global <c>_CW_FENCE_FADE</c> keyword only when the strongest hole (local, any chicken slot or any fixed target)
         /// crosses 0 (no per-frame churn).</summary>
         private void SyncKeyword()
         {
-            if (!FenceFadeRules.KeywordToggle(_keywordOn, Mathf.Max(_strength, _maxSlotStrength), out bool wantOn)) return;
+            if (!FenceFadeRules.KeywordToggle(_keywordOn,
+                Mathf.Max(_strength, Mathf.Max(_maxSlotStrength, _fixedTargets.MaxVisibleStrength)), out bool wantOn)) return;
             Shader.SetKeyword(_fadeKeyword, wantOn);
             _keywordOn = wantOn;
         }
@@ -162,6 +174,7 @@ namespace CluckWars.Visuals
             Shader.SetGlobalVector(BirdPosId, new Vector4(_lastBirdCentre.x, _lastBirdCentre.y, _lastBirdCentre.z, _strength));
 
             UpdateOtherBirds(cam, chicken, active, dt);
+            _fixedTargets.Update(cam, hasBird ? chicken : null, active, _outerBounds, dt);
             SyncKeyword();
         }
 

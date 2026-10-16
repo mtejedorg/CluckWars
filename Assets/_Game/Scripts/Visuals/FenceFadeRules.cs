@@ -25,6 +25,11 @@ namespace CluckWars.Visuals
     /// Doppelganger decoys alike — covered by an OUTER fence gets its own hole of the same shape and timing, on the
     /// materials with <see cref="AllBirdsKeywordName"/> only (<see cref="CombinedFragmentFade"/>).
     /// </para>
+    /// <para>
+    /// <b>Phase 8 E2.</b> Three more holes for the LOCAL player, on outer fences only: the own deposit pad and its two
+    /// home-side piles (<see cref="FixedTargetWanted"/>, <see cref="IsTargetOccluded"/>, <see cref="TargetRadiusShift"/>).
+    /// They have their own shader array, so they never take a chicken slot.
+    /// </para>
     /// <para>Local presentation only — nothing here is networked.</para>
     /// </remarks>
     public static class FenceFadeRules
@@ -217,6 +222,136 @@ namespace CluckWars.Visuals
                 fade = Mathf.Max(fade, FragmentFade(h.Strength, h.ScreenDist, fragmentEyeDepth, h.BirdEyeDepth));
             }
             return fade;
+        }
+
+        // ---- Phase 8 E2: fixed targets (the local player's own pad + 2 home-side piles) ---------------------
+
+        /// <summary>Fixed hole slots, separate from the <see cref="MaxBirdSlots"/> chicken slots so a 4-player match can
+        /// never starve a rival's hole for the local player's pad (shader <c>CW_FENCE_MAX_TARGETS</c>; keep equal):
+        /// slot 0 = the own deposit pad, slots 1-2 = the home-side piles.</summary>
+        public const int MaxFixedTargets = 3;
+
+        /// <summary>How many home-side piles the fixed targets reveal (the rest of <see cref="MaxFixedTargets"/> is the pad).</summary>
+        public const int HomePileCount = MaxFixedTargets - 1;
+
+        /// <summary>A fixed target opens while the local chicken is within this many metres of it (XZ, to the target's
+        /// centre) even when it carries nothing.</summary>
+        public const float FixedTargetNearMetres = 8f;
+
+        /// <summary>Metres added to the target's own radius (pad ring, pile footprint) before it is turned into a hole
+        /// radius, so the hole clears the ring / mound edge and not just the disc.</summary>
+        public const float FixedTargetMarginMetres = 0.5f;
+
+        /// <summary>Largest hole inner radius a fixed target may ask for (screen heights): keeps an unusually large
+        /// pile from opening half the screen.</summary>
+        public const float FixedTargetMaxInnerRadius = 0.32f;
+
+        /// <summary>Where on the radius toward the camera the second occlusion probe sits (the near rim is what the
+        /// fence hides first; the centre of a pile or of a 5 m pad is often clear while its near half is covered).</summary>
+        public const float FixedTargetProbeFraction = 0.85f;
+
+        /// <summary>Probe height of a pile (its mound), metres.</summary>
+        public const float PileProbeHeight = 1.1f;
+
+        /// <summary>Probe height of the flat deposit pad, metres.</summary>
+        public const float PadProbeHeight = 0.1f;
+
+        /// <summary>Piles the local pad skips before the home-side ones start: the nearest non-centre pile is the personal
+        /// doorstep island, deep inside the arena (never behind a fence); the next ones are the two contested piles that sit
+        /// beside the pad's own fences.</summary>
+        public const int PersonalPilesSkipped = 1;
+
+        /// <summary>
+        /// Should a fixed target be open? It must be covered by an OUTER fence (nothing to reveal otherwise) AND the
+        /// local chicken must be carrying food, or within <see cref="FixedTargetNearMetres"/> of the target, or the
+        /// round must be in GET READY. Eased by the caller toward 1 / 0 at <see cref="FadeSeconds"/>.
+        /// </summary>
+        public static bool FixedTargetWanted(bool occluded, bool carrying, float distanceToTarget, bool getReady) =>
+            occluded && FixedTargetInRange(carrying, distanceToTarget, getReady);
+
+        /// <summary>The cheap half of <see cref="FixedTargetWanted"/>: carrying, GET READY, or within
+        /// <see cref="FixedTargetNearMetres"/>. The driver tests this first and only casts the occlusion rays when it holds.</summary>
+        public static bool FixedTargetInRange(bool carrying, float distanceToTarget, bool getReady) =>
+            carrying || getReady || distanceToTarget <= FixedTargetNearMetres;
+
+        /// <summary>
+        /// Picks the home-side piles: of the non-centre piles, ranked by XZ distance from <paramref name="pad"/>, skip the
+        /// first <see cref="PersonalPilesSkipped"/> (the personal island) and take the next <paramref name="chosen"/>.Length.
+        /// Writes pile indices and returns how many. Ties go to the lower index (the map is 4-fold symmetric, so the two
+        /// contested piles tie exactly). No allocation.
+        /// </summary>
+        public static int PickHomePiles(Vector3 pad, IReadOnlyList<Vector3> piles, IReadOnlyList<bool> isCentre, int[] chosen)
+        {
+            if (piles == null || chosen == null) return 0;
+            int total = Mathf.Min(piles.Count, 32); // a match spawns 9; the mask below covers 32
+            uint used = 0;
+            int n = 0;
+            for (int pass = 0; pass < PersonalPilesSkipped + chosen.Length; pass++)
+            {
+                int best = -1;
+                float bestD = float.MaxValue;
+                for (int i = 0; i < total; i++)
+                {
+                    if ((used & (1u << i)) != 0 || (isCentre != null && i < isCentre.Count && isCentre[i])) continue;
+                    float dx = piles[i].x - pad.x, dz = piles[i].z - pad.z;
+                    float d = dx * dx + dz * dz;
+                    if (d < bestD) { bestD = d; best = i; }
+                }
+                if (best < 0) break;
+                used |= 1u << best;
+                if (pass >= PersonalPilesSkipped) chosen[n++] = best;
+            }
+            return n;
+        }
+
+        /// <summary>
+        /// Is a fixed target (a disc / mound of <paramref name="radius"/> metres whose ground centre is
+        /// <paramref name="groundCentre"/>) covered by an outer fence? The same <see cref="IsOccluded"/> ray test as a
+        /// chicken, run from the centre and from a second probe on the near rim toward the camera.
+        /// </summary>
+        public static bool IsTargetOccluded(Vector3 groundCentre, float radius, float height, Vector3 towardCamera,
+            float maxDistance, IReadOnlyList<Bounds> occluders)
+        {
+            if (IsOccluded(groundCentre, height, towardCamera, maxDistance, occluders)) return true;
+            var flat = new Vector3(towardCamera.x, 0f, towardCamera.z);
+            if (flat.sqrMagnitude < 1e-8f) return false;
+            var rim = groundCentre + flat.normalized * (radius * FixedTargetProbeFraction);
+            return IsOccluded(rim, height, towardCamera, maxDistance, occluders);
+        }
+
+        /// <summary>
+        /// A fixed target's hole inner radius as a fraction of the screen height: its radius plus
+        /// <see cref="FixedTargetMarginMetres"/> over the view height in metres at the target, never smaller than the
+        /// chicken hole (<see cref="InnerRadius"/>) nor larger than <see cref="FixedTargetMaxInnerRadius"/>. The outer
+        /// edge and the rim keep their offsets from it, so the edge band is still <see cref="EdgeBandWidth"/>.
+        /// </summary>
+        public static float TargetInnerRadius(float radiusMetres, float viewHeightMetres)
+        {
+            if (viewHeightMetres <= 1e-4f) return InnerRadius;
+            return Mathf.Clamp((radiusMetres + FixedTargetMarginMetres) / viewHeightMetres, InnerRadius, FixedTargetMaxInnerRadius);
+        }
+
+        /// <summary>How far a fixed target's hole is shifted outward from the chicken hole (the shader's per-target
+        /// <c>_CW_FenceTargetShift</c>): <see cref="TargetInnerRadius"/> minus <see cref="InnerRadius"/>.</summary>
+        public static float TargetRadiusShift(float radiusMetres, float viewHeightMetres) =>
+            TargetInnerRadius(radiusMetres, viewHeightMetres) - InnerRadius;
+
+        /// <summary>C# twin of the shader's shifted hole: the chicken hole's shape with every radius (inner, outer, rim)
+        /// moved out by <paramref name="radiusShift"/>.</summary>
+        public static float ShiftedFragmentFade(float strength, float screenDist, float radiusShift, float fragmentEyeDepth,
+            float targetEyeDepth) => FragmentFade(strength, screenDist - radiusShift, fragmentEyeDepth, targetEyeDepth);
+
+        /// <summary>
+        /// HoleOnScreen for a fixed target. The hole's outer radius is <see cref="OuterRadius"/> + shift in SCREEN HEIGHTS, so
+        /// on the horizontal viewport axis it is that over <paramref name="aspect"/> (width / height); a pad's hole is wide
+        /// enough that the chicken-sized margin of <see cref="HoleOnScreen"/> would keep far-away targets (and the fade
+        /// variant) alive.
+        /// </summary>
+        public static bool TargetHoleOnScreen(Vector3 viewport, float radiusShift, float aspect)
+        {
+            float m = OuterRadius + Mathf.Max(0f, radiusShift);
+            float mx = m / Mathf.Max(aspect, 1e-3f);
+            return viewport.z > 0f && viewport.x > -mx && viewport.x < 1f + mx && viewport.y > -m && viewport.y < 1f + m;
         }
 
         /// <summary>
