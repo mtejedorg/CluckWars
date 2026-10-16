@@ -25,13 +25,13 @@ namespace CluckWars.Visuals
     public static class HazeSettings
     {
         /// <summary>
-        /// Haze colour as an sRGB colour, the same space as a material colour picked in the inspector. Warm grey-green
-        /// (ART.md §6.14): light enough that hazed trees / barn recede, dark and green enough not to read as white fog.
+        /// Haze colour as an inspector-style (sRGB) colour value: what a material colour field would hold. The project
+        /// is in Gamma colour space, where the colour buffer holds these values as-is, so this is also what the haze
+        /// blends toward on screen. Tuned by eye on the shipped Gamma build (a darker, greener haze than the 0.60 / 0.64
+        /// / 0.55 first documented, which was never what rendered); keep that look if the colour space ever changes
+        /// (<see cref="ShaderColourFor"/> converts for Linear).
         /// </summary>
-        public static readonly Color Colour = new Color(0.60f, 0.64f, 0.55f, 1f);
-
-        /// <summary><see cref="Colour"/> in linear space (what the shader blends with in the HDR colour buffer).</summary>
-        public static Color ColourLinear => Colour.linear;
+        public static readonly Color Colour = new Color(0.319f, 0.367f, 0.263f, 1f);
 
         /// <summary>
         /// World XZ centre of the arena. The map is generated and baked around the world origin: pile / base / pinwheel
@@ -94,14 +94,18 @@ namespace CluckWars.Visuals
             }
         }
 
-        /// <summary>Shader colour constant: linear rgb, alpha = <see cref="MaxAmount"/>.</summary>
-        public static Vector4 ShaderColour
+        /// <summary>
+        /// Shader colour constant in colour-buffer space, alpha = <see cref="MaxAmount"/>. A Vector4 global gets no
+        /// colour-space conversion from Unity, so the conversion is explicit: Linear project -> <c>Colour.linear</c>,
+        /// Gamma project -> <see cref="Colour"/> as-is.
+        /// </summary>
+        public static Vector4 ShaderColour => ShaderColourFor(QualitySettings.activeColorSpace);
+
+        /// <summary>Pure form of <see cref="ShaderColour"/> for a given colour space (tests).</summary>
+        public static Vector4 ShaderColourFor(ColorSpace space)
         {
-            get
-            {
-                var l = ColourLinear;
-                return new Vector4(l.r, l.g, l.b, MaxAmount);
-            }
+            var c = space == ColorSpace.Linear ? Colour.linear : Colour;
+            return new Vector4(c.r, c.g, c.b, MaxAmount);
         }
 
         /// <summary>Sets the haze shader globals. Called by <see cref="CWHazeFeature"/> each frame it renders.</summary>

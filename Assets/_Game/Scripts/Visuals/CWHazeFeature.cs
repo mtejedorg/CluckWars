@@ -9,7 +9,7 @@ namespace CluckWars.Visuals
 {
     /// <summary>
     /// PC / console tier surround haze (Phase 8 C F1, Stage 1): one full-screen pass that reconstructs each pixel's
-    /// world position from the camera depth texture and blends it toward <see cref="HazeSettings.Colour"/> by
+    /// world position from the camera depth texture and blends it toward <see cref="HazeSettings.ShaderColour"/> (<see cref="HazeSettings.Colour"/> in colour-buffer space) by
     /// <see cref="HazeSettings.AmountAt"/> (0 everywhere inside the fence). Lives on <c>PC_Renderer.asset</c> only;
     /// the Mobile tier gets the same look from baked material copies instead (no per-pixel cost there).
     /// </summary>

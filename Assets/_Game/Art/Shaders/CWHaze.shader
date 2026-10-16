@@ -29,7 +29,7 @@ Shader "Cluck Wars/Haze"
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
-            // xyz = linear haze colour, w = max amount.
+            // xyz = haze colour in colour-buffer space (HazeSettings.ShaderColour: sRGB value in Gamma projects, linear in Linear ones), w = max amount.
             float4 _CW_HazeColor;
             // xy = arena centre XZ, z = ramp start (square distance), w = max / (ramp end - ramp start).
             float4 _CW_HazeParams;

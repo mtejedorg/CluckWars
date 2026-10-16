@@ -33,5 +33,20 @@ namespace CluckWars.Visuals
         /// <inheritdoc cref="PostProcessingFor(string)"/>
         public static bool PostProcessingFor(RenderPipelineAsset rpAsset) =>
             rpAsset != null && PostProcessingFor(rpAsset.name);
+
+        /// <summary>
+        /// Surround haze (Phase 8 C F1): the PC / console tier hazes the surround with the full-screen
+        /// <see cref="CWHazeFeature"/> pass (it lives on PC_Renderer.asset). True only for the PC pipeline asset.
+        /// </summary>
+        public static bool PcHazePassFor(RenderPipelineAsset rpAsset) =>
+            rpAsset != null && rpAsset.name == PcRpAssetName;
+
+        /// <summary>
+        /// Surround haze (Phase 8 C F1): every other tier, and an unknown / missing pipeline asset, gets the haze baked
+        /// into material copies instead (<see cref="SurroundHazeSwap"/>). The exact complement of
+        /// <see cref="PcHazePassFor"/>, so no tier is hazed twice or not at all; the fallback is the same cheap path
+        /// as for post-processing.
+        /// </summary>
+        public static bool MobileBakedHazeFor(RenderPipelineAsset rpAsset) => !PcHazePassFor(rpAsset);
     }
 }

@@ -61,7 +61,11 @@ public class E3 {
       if (srcData == null) throw new System.InvalidOperationException("match camera has no UniversalAdditionalCameraData");
       go = new GameObject("__E3Cam"); var c = go.AddComponent<Camera>(); c.enabled = false; c.CopyFrom(src); c.targetTexture = null; var dst = go.AddComponent(srcData.GetType());
       foreach (var p in new[] { "renderPostProcessing", "antialiasing" }) { var pi = srcData.GetType().GetProperty(p); if (pi != null) pi.SetValue(dst, pi.GetValue(srcData)); } }
-    var cam = go.GetComponent<Camera>(); cam.enabled = false; return cam; }
+    var cam = go.GetComponent<Camera>(); cam.enabled = false;
+    // CopyFrom ran once, on whatever tier was active then. Follow the live MatchCamera's clear colour so a tier switch is seen the way
+    // the game applies it (MatchCamera bakes the surround haze into the Mobile background); F1 stage 3.
+    if (MatchCamera.Instance != null && MatchCamera.Instance.Camera != null) cam.backgroundColor = MatchCamera.Instance.Camera.backgroundColor;
+    return cam; }
   // Shot from a direction (yaw/pitch degrees) framing a world bounds.
   static string Frame(Bounds b, float yaw, float pitch, float pad, int W, int H, string path, bool ortho) {
     var cam = Free(); cam.orthographic = ortho; cam.fieldOfView = 30f; cam.nearClipPlane = 0.05f; cam.farClipPlane = 500f; cam.aspect = (float)W / H;

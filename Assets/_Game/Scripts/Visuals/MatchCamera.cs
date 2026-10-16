@@ -74,6 +74,7 @@ namespace CluckWars.Visuals
         private UniversalAdditionalCameraData _urpData;
         private RenderPipelineAsset _appliedTier;
         private bool _tierApplied;
+        private bool _bakedHaze;
         private ChickenController _localChicken;
         private Vector3 _currentFocus;
         private Vector3 _focusVelocity;
@@ -118,9 +119,11 @@ namespace CluckWars.Visuals
             if (GetComponent<FenceFadeDriver>() == null) gameObject.AddComponent<FenceFadeDriver>();
             // Performance Mode fence (Phase 8 S5): draws the lighter fence panels while the mode is on.
             if (GetComponent<FencePerformanceSwap>() == null) gameObject.AddComponent<FencePerformanceSwap>();
+            // Mobile-tier baked surround haze (Phase 8 C F1): swaps the hazed material copies in on the Mobile tier.
+            if (GetComponent<SurroundHazeSwap>() == null) gameObject.AddComponent<SurroundHazeSwap>();
             _currentFocus = _focusPoint;
-            ApplyCamera();
             ApplyRenderTier();
+            ApplyCamera();
             ApplyTransform(_currentFocus);
         }
 
@@ -140,8 +143,8 @@ namespace CluckWars.Visuals
         {
             // Camera config can change in the inspector at runtime (orthoSize,
             // background) — cheap to push every frame.
-            ApplyCamera();
             ApplyRenderTier();
+            ApplyCamera();
 
             // Resolve target — local chicken position if follow is on + the
             // chicken has spawned, otherwise the configured focus point.
@@ -287,7 +290,8 @@ namespace CluckWars.Visuals
             if (_useSolidColor)
             {
                 _camera.clearFlags = CameraClearFlags.SolidColor;
-                _camera.backgroundColor = _backgroundColor;
+                // Mobile tier: the PC haze pass also hazes background pixels, so bake the same blend into the clear colour.
+                _camera.backgroundColor = _bakedHaze ? SurroundHazeMapSO.HazedBackground(_backgroundColor) : _backgroundColor;
             }
         }
 
@@ -303,6 +307,7 @@ namespace CluckWars.Visuals
             if (_tierApplied && rp == _appliedTier) return;
             _appliedTier = rp;
             _tierApplied = true;
+            _bakedHaze = RenderTierPolicy.MobileBakedHazeFor(rp);
             if (_urpData == null && !TryGetComponent(out _urpData)) return;
             _urpData.renderPostProcessing = RenderTierPolicy.PostProcessingFor(rp);
         }

@@ -1,0 +1,215 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ccc493761408e6a45b15e9d39b1e9c44, type: 3}
+  m_Name: SurroundHazeMap
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.SurroundHazeMapSO
+  _bandEdges:
+  - 27
+  - 33
+  - 39
+  - 45
+  - 51
+  - 57
+  _bandAmounts:
+  - 0.05454546
+  - 0.16363637
+  - 0.27272728
+  - 0.3818182
+  - 0.4909091
+  - 0.6
+  _copies:
+  - _original: {fileID: 2100000, guid: 6b4aa4f3ad7c46746b0846e00f20d8cc, type: 2}
+    _hazed: {fileID: 2100000, guid: 9c8648ee6e0e13a48ada9c94a22a2193, type: 2}
+    _band: 0
+    _amount: 0.05454546
+    _uses: 13
+  - _original: {fileID: 2100000, guid: 6b4aa4f3ad7c46746b0846e00f20d8cc, type: 2}
+    _hazed: {fileID: 2100000, guid: c50c2977f21938947bdf6ab6cf492fb6, type: 2}
+    _band: 1
+    _amount: 0.16363637
+    _uses: 1
+  - _original: {fileID: 2100000, guid: 75492c8e88687414e99cc867b2f86239, type: 2}
+    _hazed: {fileID: 2100000, guid: 8b01e44338f181a4986e2bde06c771e6, type: 2}
+    _band: 0
+    _amount: 0.05454546
+    _uses: 4
+  - _original: {fileID: 2100000, guid: 2d049113d0bed404a87b0b3589487b30, type: 2}
+    _hazed: {fileID: 2100000, guid: fc2d611f07de40f4a8c3ea060c767b49, type: 2}
+    _band: 0
+    _amount: 0.05454546
+    _uses: 4
+  - _original: {fileID: 2100000, guid: e70a92f9d6db55142b461af452c9cf34, type: 2}
+    _hazed: {fileID: 2100000, guid: 70210318400f84d49bd5421095bc2604, type: 2}
+    _band: 0
+    _amount: 0.05454546
+    _uses: 2
+  - _original: {fileID: 2100000, guid: e70a92f9d6db55142b461af452c9cf34, type: 2}
+    _hazed: {fileID: 2100000, guid: 01c9f64606a9f8d4cacd6fc2442e5d3f, type: 2}
+    _band: 1
+    _amount: 0.16363637
+    _uses: 4
+  - _original: {fileID: 2100000, guid: ebe0ffd0a9bcf4e459680603b8b1bc4f, type: 2}
+    _hazed: {fileID: 2100000, guid: c42ecca28da536840885e599a5877af5, type: 2}
+    _band: 2
+    _amount: 0.27272728
+    _uses: 1
+  - _original: {fileID: 2100000, guid: 329066634aa4d62449ab0da6ea46828a, type: 2}
+    _hazed: {fileID: 2100000, guid: a2615888167c614449f5fe24832dc824, type: 2}
+    _band: 0
+    _amount: 0.05454546
+    _uses: 1
+  - _original: {fileID: 2100000, guid: 329066634aa4d62449ab0da6ea46828a, type: 2}
+    _hazed: {fileID: 2100000, guid: a03fc378a243e914bb97ec889b443da5, type: 2}
+    _band: 1
+    _amount: 0.16363637
+    _uses: 6
+  - _original: {fileID: 2100000, guid: 329066634aa4d62449ab0da6ea46828a, type: 2}
+    _hazed: {fileID: 2100000, guid: 3cdc30a41b49e7a4cbef7c2071fb874d, type: 2}
+    _band: 2
+    _amount: 0.27272728
+    _uses: 4
+  - _original: {fileID: 2100000, guid: 329066634aa4d62449ab0da6ea46828a, type: 2}
+    _hazed: {fileID: 2100000, guid: c73c21008555f424d8141e3d84c2be58, type: 2}
+    _band: 3
+    _amount: 0.3818182
+    _uses: 2
+  - _original: {fileID: 2100000, guid: ce4b24a66d2eab244a7bb8d2544c1eb8, type: 2}
+    _hazed: {fileID: 2100000, guid: d54bda2f9ea75c94c92afc6fec42cb28, type: 2}
+    _band: 0
+    _amount: 0.05454546
+    _uses: 3
+  - _original: {fileID: 2100000, guid: ce4b24a66d2eab244a7bb8d2544c1eb8, type: 2}
+    _hazed: {fileID: 2100000, guid: 2d313d381bf35de4c95c7825cb716e66, type: 2}
+    _band: 1
+    _amount: 0.16363637
+    _uses: 3
+  - _original: {fileID: 2100000, guid: cf387f4b82129564ba76f7f4de00b165, type: 2}
+    _hazed: {fileID: 2100000, guid: ea2e33f60d5a86241a0732676362b5eb, type: 2}
+    _band: 0
+    _amount: 0.05454546
+    _uses: 1
+  - _original: {fileID: 2100000, guid: cf387f4b82129564ba76f7f4de00b165, type: 2}
+    _hazed: {fileID: 2100000, guid: 8da9e83ad3ed65341a35f82875d10eb5, type: 2}
+    _band: 1
+    _amount: 0.16363637
+    _uses: 2
+  - _original: {fileID: 2100000, guid: e536007576b33ee46b0897fc69c72c29, type: 2}
+    _hazed: {fileID: 2100000, guid: 5a59a396533a30e4d8c1e957816c9228, type: 2}
+    _band: 0
+    _amount: 0.05454546
+    _uses: 14
+  - _original: {fileID: 2100000, guid: e536007576b33ee46b0897fc69c72c29, type: 2}
+    _hazed: {fileID: 2100000, guid: 771c6062c371584458948ed382f05773, type: 2}
+    _band: 1
+    _amount: 0.16363637
+    _uses: 4
+  - _original: {fileID: 2100000, guid: e536007576b33ee46b0897fc69c72c29, type: 2}
+    _hazed: {fileID: 2100000, guid: 46ae0ecfae8030143911ac070a0adc5f, type: 2}
+    _band: 3
+    _amount: 0.3818182
+    _uses: 1
+  - _original: {fileID: 2100000, guid: 254af6871457b444c870ea9084087d95, type: 2}
+    _hazed: {fileID: 2100000, guid: bfdd270d6e7272e4d8789d6c59d85f2c, type: 2}
+    _band: 1
+    _amount: 0.16363637
+    _uses: 4
+  - _original: {fileID: 2100000, guid: 254af6871457b444c870ea9084087d95, type: 2}
+    _hazed: {fileID: 2100000, guid: 6b74795a155a6494392bbf4c90c5fd54, type: 2}
+    _band: 2
+    _amount: 0.27272728
+    _uses: 6
+  - _original: {fileID: 2100000, guid: 254af6871457b444c870ea9084087d95, type: 2}
+    _hazed: {fileID: 2100000, guid: c9ff016516e0b7042afaa6bd4e607cb3, type: 2}
+    _band: 3
+    _amount: 0.3818182
+    _uses: 4
+  - _original: {fileID: 2100000, guid: 254af6871457b444c870ea9084087d95, type: 2}
+    _hazed: {fileID: 2100000, guid: 0660a9ffddc39504081ed028c0f530ec, type: 2}
+    _band: 4
+    _amount: 0.4909091
+    _uses: 6
+  - _original: {fileID: 2100000, guid: 254af6871457b444c870ea9084087d95, type: 2}
+    _hazed: {fileID: 2100000, guid: b387695e0cdb2a14f9d4e8279e99f818, type: 2}
+    _band: 5
+    _amount: 0.6
+    _uses: 10
+  - _original: {fileID: 2100000, guid: 338aeae0b33a1f24cb489e4c8805d713, type: 2}
+    _hazed: {fileID: 2100000, guid: 178e86cbbf901554fa75e1b6f3c95415, type: 2}
+    _band: 1
+    _amount: 0.16363637
+    _uses: 4
+  - _original: {fileID: 2100000, guid: 338aeae0b33a1f24cb489e4c8805d713, type: 2}
+    _hazed: {fileID: 2100000, guid: 402ea789146936e4c84971387e85842f, type: 2}
+    _band: 2
+    _amount: 0.27272728
+    _uses: 6
+  - _original: {fileID: 2100000, guid: 338aeae0b33a1f24cb489e4c8805d713, type: 2}
+    _hazed: {fileID: 2100000, guid: 96094771ba2cb4847aa969dcf6af7ed0, type: 2}
+    _band: 3
+    _amount: 0.3818182
+    _uses: 4
+  - _original: {fileID: 2100000, guid: 338aeae0b33a1f24cb489e4c8805d713, type: 2}
+    _hazed: {fileID: 2100000, guid: 96a20af864c96f74ab739cf449f3e1ac, type: 2}
+    _band: 4
+    _amount: 0.4909091
+    _uses: 6
+  - _original: {fileID: 2100000, guid: 338aeae0b33a1f24cb489e4c8805d713, type: 2}
+    _hazed: {fileID: 2100000, guid: c083bcf31aaa14e48b32be48c7361188, type: 2}
+    _band: 5
+    _amount: 0.6
+    _uses: 10
+  - _original: {fileID: 2100000, guid: e7f55b74afa93904796bd230bdc7cc0f, type: 2}
+    _hazed: {fileID: 2100000, guid: 2a3823041538b0942946aa50df9b19bc, type: 2}
+    _band: 1
+    _amount: 0.16363637
+    _uses: 4
+  - _original: {fileID: 2100000, guid: e7f55b74afa93904796bd230bdc7cc0f, type: 2}
+    _hazed: {fileID: 2100000, guid: e920d706997b9624bb3d8c0339841b2d, type: 2}
+    _band: 2
+    _amount: 0.27272728
+    _uses: 6
+  - _original: {fileID: 2100000, guid: e7f55b74afa93904796bd230bdc7cc0f, type: 2}
+    _hazed: {fileID: 2100000, guid: 208f1a95a513a6848857722fc1f333fe, type: 2}
+    _band: 3
+    _amount: 0.3818182
+    _uses: 4
+  - _original: {fileID: 2100000, guid: e7f55b74afa93904796bd230bdc7cc0f, type: 2}
+    _hazed: {fileID: 2100000, guid: c47b9cb6c0f970842a66b19558cd39d4, type: 2}
+    _band: 4
+    _amount: 0.4909091
+    _uses: 6
+  - _original: {fileID: 2100000, guid: e7f55b74afa93904796bd230bdc7cc0f, type: 2}
+    _hazed: {fileID: 2100000, guid: 6726d04f3f0684c49974096f6cd54b37, type: 2}
+    _band: 5
+    _amount: 0.6
+    _uses: 10
+  - _original: {fileID: 2100000, guid: 3562ec503cb5f69409e92c894fd5d880, type: 2}
+    _hazed: {fileID: 2100000, guid: 90e2e12e8150d1d439067261b89004a8, type: 2}
+    _band: 0
+    _amount: 0.05454546
+    _uses: 2
+  - _original: {fileID: 2100000, guid: 8f9db28719cc0764a8c9956885411e04, type: 2}
+    _hazed: {fileID: 2100000, guid: ed7aec0420fb63b4c9ec7b034d78e516, type: 2}
+    _band: 0
+    _amount: 0.05454546
+    _uses: 2
+  - _original: {fileID: 2100000, guid: 8f9db28719cc0764a8c9956885411e04, type: 2}
+    _hazed: {fileID: 2100000, guid: 996196142cf89494aa377b386190d874, type: 2}
+    _band: 1
+    _amount: 0.16363637
+    _uses: 1
+  - _original: {fileID: 2100000, guid: 1306f37c4aad98544810fcfb460c79d1, type: 2}
+    _hazed: {fileID: 2100000, guid: 42566893ae86ddb4887099ecc878a841, type: 2}
+    _band: -1
+    _amount: 0.6
+    _uses: 1
+  _rendererCount: 132

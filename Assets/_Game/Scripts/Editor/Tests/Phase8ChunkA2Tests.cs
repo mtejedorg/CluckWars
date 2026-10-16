@@ -65,6 +65,15 @@ namespace CluckWars.Tests
             "Assets/_Game/Art/Materials/Ground_Decals.mat",
         };
 
+        /// <summary>
+        /// Phase 8 C F1 Mobile haze copies (SurroundHazeBaker): generated from the matte originals above, so they are
+        /// held to the same matte + instancing rules instead of being listed one by one (the set changes with a re-bake).
+        /// </summary>
+        public const string HazedFolder = "Assets/_Game/Art/Materials/Hazed";
+
+        private static string[] HazedCopies() =>
+            AssetDatabase.FindAssets("t:Material", new[] { HazedFolder }).Select(AssetDatabase.GUIDToAssetPath).OrderBy(p => p).ToArray();
+
         private static Material Load(string path)
         {
             var m = AssetDatabase.LoadAssetAtPath<Material>(path);
@@ -73,6 +82,7 @@ namespace CluckWars.Tests
         }
 
         [TestCaseSource(nameof(MatteMaterials))]
+        [TestCaseSource(nameof(HazedCopies))]
         public void Material_IsMatteUrpLit(string path)
         {
             var m = Load(path);
@@ -85,12 +95,13 @@ namespace CluckWars.Tests
         }
 
         [TestCaseSource(nameof(MatteMaterials))]
+        [TestCaseSource(nameof(HazedCopies))]
         public void Material_HasGpuInstancing(string path)
         {
             Assert.IsTrue(Load(path).enableInstancing, $"{path}: Enable GPU Instancing");
         }
 
-        /// <summary>Every Prop_/TerrainObstacle/zone material on URP Lit is in the list above.</summary>
+        /// <summary>Every Prop_/TerrainObstacle/zone material on URP Lit is in the list above (or a hazed copy, see <see cref="HazedFolder"/>).</summary>
         [Test]
         public void MatteList_CoversEveryArenaUrpLitMaterial()
         {
@@ -105,6 +116,7 @@ namespace CluckWars.Tests
                         || n.StartsWith("Hedge_") || n.StartsWith("Ground_");
                 })
                 .Where(p => AssetDatabase.LoadAssetAtPath<Material>(p).shader.name == "Universal Render Pipeline/Lit")
+                .Where(p => !p.StartsWith(HazedFolder + "/"))   // checked by HazedCopies
                 .Except(MatteMaterials)
                 .ToArray();
             CollectionAssert.IsEmpty(missing, "Arena URP Lit materials not pinned as matte: " + string.Join(", ", missing));

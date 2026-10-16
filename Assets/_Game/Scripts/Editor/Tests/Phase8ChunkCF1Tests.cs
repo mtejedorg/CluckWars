@@ -1,10 +1,16 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.SceneManagement;
 using UnityEngine.Rendering.Universal;
 using CluckWars.Gameplay;
+using CluckWars.EditorTools;
+using CluckWars.Logging;
 using CluckWars.Visuals;
 
 namespace CluckWars.Tests
@@ -96,8 +102,7 @@ namespace CluckWars.Tests
                 float shader = Mathf.Min(Mathf.Max(d - prm.z, 0f) * prm.w, col.w);
                 Assert.AreEqual(HazeSettings.AmountAt(new Vector3(x, 0f, z)), shader, 1e-5f, $"tiers disagree at ({x}, {z})");
             }
-            var lin = HazeSettings.Colour.linear;
-            Assert.AreEqual(lin.r, col.x, 1e-6f); Assert.AreEqual(lin.g, col.y, 1e-6f); Assert.AreEqual(lin.b, col.z, 1e-6f);
+            Assert.AreEqual(HazeSettings.ShaderColourFor(QualitySettings.activeColorSpace), col, "ShaderColour follows the active colour space");
         }
 
         [Test]
@@ -155,7 +160,268 @@ namespace CluckWars.Tests
                 Assert.IsTrue(MatchCamera.Instance == null, "EditMode precondition: no live MatchCamera");
                 Assert.IsFalse(CWHazeFeature.ShouldHaze(cam, CameraRenderType.Base), "menu camera with no arena loaded");
             }
-            finally { Object.DestroyImmediate(go); }
+            finally { UnityEngine.Object.DestroyImmediate(go); }
+        }
+
+        // ---- Stage 3: colour space, tier policy, runtime swap ---------------------------------------------------------
+
+        [Test]
+        public void ShaderColour_IsColourInGamma_AndItsLinearFormInLinear()
+        {
+            var c = HazeSettings.Colour;
+            var gamma = HazeSettings.ShaderColourFor(ColorSpace.Gamma);
+            Assert.AreEqual(c.r, gamma.x, 1e-6f); Assert.AreEqual(c.g, gamma.y, 1e-6f); Assert.AreEqual(c.b, gamma.z, 1e-6f);
+            Assert.AreEqual(HazeSettings.MaxAmount, gamma.w, 1e-6f);
+            var lin = c.linear;
+            var linear = HazeSettings.ShaderColourFor(ColorSpace.Linear);
+            Assert.AreEqual(lin.r, linear.x, 1e-6f); Assert.AreEqual(lin.g, linear.y, 1e-6f); Assert.AreEqual(lin.b, linear.z, 1e-6f);
+            Assert.AreEqual(HazeSettings.MaxAmount, linear.w, 1e-6f);
+        }
+
+        [Test]
+        public void HazeColour_KeepsTheVerifiedLook()
+        {
+            // The haze that was tuned by eye and captured (Gamma project: the buffer holds this value as-is).
+            Assert.AreEqual(0.319f, HazeSettings.Colour.r, 1e-4f);
+            Assert.AreEqual(0.367f, HazeSettings.Colour.g, 1e-4f);
+            Assert.AreEqual(0.263f, HazeSettings.Colour.b, 1e-4f);
+        }
+
+        [Test]
+        public void HazedBackground_IsTheBackgroundBlendedTowardTheHazeByMax_AsThePcPassDoes()
+        {
+            var bg = new Color(0.45f, 0.58f, 0.66f, 1f);
+            var h = HazeSettings.ShaderColour;
+            var hazed = SurroundHazeMapSO.HazedBackground(bg);
+            bool linear = QualitySettings.activeColorSpace == ColorSpace.Linear;
+            var want = Color.Lerp(linear ? bg.linear : bg, new Color(h.x, h.y, h.z), HazeSettings.MaxAmount);
+            if (linear) want = want.gamma;
+            Assert.AreEqual(want.r, hazed.r, 1e-5f); Assert.AreEqual(want.g, hazed.g, 1e-5f); Assert.AreEqual(want.b, hazed.b, 1e-5f);
+            Assert.AreEqual(1f, hazed.a);
+        }
+
+        [Test]
+        public void TierPolicy_PcGetsThePass_EverythingElseGetsTheBakedCopies()
+        {
+            var pc = AssetDatabase.LoadAssetAtPath<RenderPipelineAsset>(PcRpAsset);
+            var mobile = AssetDatabase.LoadAssetAtPath<RenderPipelineAsset>(MobileRpAsset);
+            Assert.IsNotNull(pc, PcRpAsset); Assert.IsNotNull(mobile, MobileRpAsset);
+            Assert.IsTrue(RenderTierPolicy.PcHazePassFor(pc));
+            Assert.IsFalse(RenderTierPolicy.MobileBakedHazeFor(pc), "PC must not also get baked copies");
+            Assert.IsFalse(RenderTierPolicy.PcHazePassFor(mobile), "Mobile never runs the pass");
+            Assert.IsTrue(RenderTierPolicy.MobileBakedHazeFor(mobile));
+            Assert.IsFalse(RenderTierPolicy.PcHazePassFor(null));
+            Assert.IsTrue(RenderTierPolicy.MobileBakedHazeFor(null), "unknown pipeline falls back to the cheap baked path");
+        }
+
+        private sealed class RecordingLog : ILogService
+        {
+            public readonly List<string> Errors = new List<string>();
+            public LogLevel MinLevel { get; set; } = LogLevel.Verbose;
+            public bool IsEnabled(LogLevel level) => true;
+            public void Verbose(string source, string message) { }
+            public void Debug(string source, string message) { }
+            public void Info(string source, string message) { }
+            public void Warn(string source, string message) { }
+            public void Error(string source, string message, Exception exception = null) => Errors.Add(message);
+        }
+
+        private static (MeshRenderer r, Material[] orig, Material[] hazed) MakeEntryParts(string name, int slots, List<UnityEngine.Object> junk)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = name; junk.Add(go);
+            var r = go.GetComponent<MeshRenderer>();
+            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            var orig = new Material[slots]; var hazed = new Material[slots];
+            for (int i = 0; i < slots; i++)
+            {
+                orig[i] = new Material(shader) { name = name + "_o" + i }; hazed[i] = new Material(shader) { name = name + "_h" + i };
+                junk.Add(orig[i]); junk.Add(hazed[i]);
+            }
+            r.sharedMaterials = orig;
+            return (r, orig, hazed);
+        }
+
+        [Test]
+        public void Swap_AppliesHazedOnMobile_RestoresOriginalOnPc_IsIdempotent_AndNeverMutatesMaterials()
+        {
+            var junk = new List<UnityEngine.Object>();
+            try
+            {
+                var a = MakeEntryParts("F1_A", 1, junk);
+                var b = MakeEntryParts("F1_B", 2, junk);
+                var setGo = new GameObject("F1_Set"); junk.Add(setGo);
+                var set = setGo.AddComponent<SurroundHazeSet>();
+                set.EditorSetEntries(new List<SurroundHazeSet.Entry>
+                {
+                    new SurroundHazeSet.Entry(a.r, a.orig, a.hazed, 0.1f, 0),
+                    new SurroundHazeSet.Entry(b.r, b.orig, b.hazed, 0.2f, 1),
+                }, null);
+                var colourBefore = a.orig[0].color;
+                var log = new RecordingLog();
+                var swapGo = new GameObject("F1_Swap"); junk.Add(swapGo);
+                var swap = swapGo.AddComponent<SurroundHazeSwap>();
+                swap.Construct(log);
+
+                Assert.IsFalse(swap.Sync(wantBaked: false), "PC at start: nothing to do");
+                CollectionAssert.AreEqual(a.orig, a.r.sharedMaterials);
+
+                Assert.IsTrue(swap.Sync(wantBaked: true));
+                Assert.IsTrue(swap.BakedShown);
+                CollectionAssert.AreEqual(a.hazed, a.r.sharedMaterials);
+                CollectionAssert.AreEqual(b.hazed, b.r.sharedMaterials);
+                Assert.IsFalse(swap.Sync(wantBaked: true), "idempotent");
+
+                Assert.IsTrue(swap.Sync(wantBaked: false), "tier change back to PC restores the originals");
+                CollectionAssert.AreEqual(a.orig, a.r.sharedMaterials);
+                CollectionAssert.AreEqual(b.orig, b.r.sharedMaterials);
+                Assert.AreEqual(colourBefore, a.orig[0].color, "shared material assets are never mutated");
+                CollectionAssert.IsEmpty(log.Errors, "a sound set logs nothing");
+            }
+            finally { foreach (var o in junk) if (o != null) UnityEngine.Object.DestroyImmediate(o); }
+        }
+
+        [Test]
+        public void Swap_ReportsBrokenEntriesOnce_AndStillSwapsTheValidOnes()
+        {
+            var junk = new List<UnityEngine.Object>();
+            try
+            {
+                var good = MakeEntryParts("F1_Good", 1, junk);
+                var mismatch = MakeEntryParts("F1_Mismatch", 2, junk);
+                var gone = MakeEntryParts("F1_Gone", 1, junk);
+                var setGo = new GameObject("F1_Set"); junk.Add(setGo);
+                var set = setGo.AddComponent<SurroundHazeSet>();
+                set.EditorSetEntries(new List<SurroundHazeSet.Entry>
+                {
+                    new SurroundHazeSet.Entry(good.r, good.orig, good.hazed, 0.1f, 0),
+                    new SurroundHazeSet.Entry(mismatch.r, mismatch.orig, new[] { mismatch.hazed[0] }, 0.1f, 0),   // slot-count mismatch
+                    new SurroundHazeSet.Entry(null, gone.orig, gone.hazed, 0.1f, 0),                              // null renderer
+                    new SurroundHazeSet.Entry(gone.r, gone.orig, new Material[] { null }, 0.1f, 0),               // null material
+                }, null);
+                var log = new RecordingLog();
+                var swapGo = new GameObject("F1_Swap"); junk.Add(swapGo);
+                var swap = swapGo.AddComponent<SurroundHazeSwap>();
+                swap.Construct(log);
+
+                Assert.IsTrue(swap.Sync(wantBaked: true));
+                Assert.IsFalse(swap.Sync(wantBaked: true));
+                Assert.IsTrue(swap.Sync(wantBaked: false));
+                Assert.IsTrue(swap.Sync(wantBaked: true));
+                Assert.AreEqual(1, log.Errors.Count, "wiring problems are reported once, not per swap:\n" + string.Join("\n", log.Errors));
+                StringAssert.Contains("3 problem", log.Errors[0]);
+                CollectionAssert.AreEqual(good.hazed, good.r.sharedMaterials, "the valid entry still swaps");
+                CollectionAssert.AreEqual(mismatch.orig, mismatch.r.sharedMaterials, "a mismatched entry is skipped, not half-applied");
+            }
+            finally { foreach (var o in junk) if (o != null) UnityEngine.Object.DestroyImmediate(o); }
+        }
+
+        // ---- Stage 3: the shipped Map.unity set ------------------------------------------------------------------------
+
+        private const string MapScene = SurroundHazeBaker.MapScenePath;
+
+        private static void WithMap(Action<Scene, GameObject, SurroundHazeSet> body)
+        {
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+                Assert.AreNotEqual(MapScene, SceneManager.GetSceneAt(i).path, "precondition: Map.unity is not already open");
+            var map = EditorSceneManager.OpenScene(MapScene, OpenSceneMode.Additive);
+            try
+            {
+                var surroundings = map.GetRootGameObjects().FirstOrDefault(g => g.name == SurroundHazeBaker.SurroundingsName);
+                Assert.IsNotNull(surroundings, "Map.unity has no " + SurroundHazeBaker.SurroundingsName);
+                var set = surroundings.GetComponent<SurroundHazeSet>();
+                Assert.IsNotNull(set, "MapSurroundings has no SurroundHazeSet: run Cluck Wars/Map/Bake Mobile Surround Haze");
+                body(map, surroundings, set);
+                Assert.IsFalse(map.isDirty, "the tests must not dirty Map.unity");
+            }
+            finally { EditorSceneManager.CloseScene(map, removeScene: true); }
+        }
+
+        private static bool Skipped(Renderer r) => r is ParticleSystemRenderer || r is TrailRenderer || r is LineRenderer;
+
+        [Test]
+        public void MapSet_EveryEntryIsWiredAndOutsideTheFence()
+        {
+            WithMap((map, surroundings, set) =>
+            {
+                Assert.Greater(set.Entries.Count, 50, "the bake produced a plausible number of surround renderers");
+                Assert.IsNotNull(set.Map, "manifest asset reference");
+                Assert.AreEqual(set.Entries.Count, set.Map.RendererCount, "manifest and set come from the same bake");
+                var problems = new List<string>();
+                for (int i = 0; i < set.Entries.Count; i++)
+                {
+                    var e = set.Entries[i];
+                    string p = SurroundHazeSwap.EntryProblem(e);
+                    if (p != null) { problems.Add($"#{i}: {p}"); continue; }
+                    // The one exception is the surround grass plane: it lies under the whole arena and carries the ramp per texel
+                    // (0 inside the fence, baked into its ramp textures), so it is the single band -1 entry.
+                    bool ramp = e.Band == -1;
+                    if (ramp != (e.Renderer.name == SurroundHazeBaker.GrassName))
+                        problems.Add($"{e.Renderer.name}: band {e.Band}; only {SurroundHazeBaker.GrassName} uses the per-texel ramp");
+                    float near = SurroundHazeBaker.NearestSquareDistance(e.Renderer.bounds);
+                    if (!ramp && near <= HazeSettings.FenceHalfSize)
+                        problems.Add($"{e.Renderer.name}: footprint reaches {near:0.00} m, inside the fence ({HazeSettings.FenceHalfSize:0.00} m)");
+                    if (!e.Renderer.transform.IsChildOf(surroundings.transform))
+                        problems.Add($"{e.Renderer.name}: not under {SurroundHazeBaker.SurroundingsName}");
+                }
+                CollectionAssert.IsEmpty(problems, string.Join("\n", problems));
+                Assert.AreEqual(0, SurroundHazeSwap.ReportWiring(set, null), "ReportWiring agrees");
+            });
+        }
+
+        [Test]
+        public void MapSet_EverySurroundRendererPastTheRampStartHasAnEntry()
+        {
+            // Catches the GroundDressingBaker order issue: it rebuilds MapSurroundings/Vignettes, so the haze bake
+            // has to run after it or the new renderers silently stay unhazed on Mobile.
+            WithMap((map, surroundings, set) =>
+            {
+                var inSet = new HashSet<Renderer>(set.Entries.Where(e => e.Renderer != null).Select(e => e.Renderer));
+                var missing = surroundings.GetComponentsInChildren<Renderer>(true)
+                    .Where(r => !Skipped(r) && HazeSettings.SquareDistance(r.bounds.center) >= HazeSettings.RampStart && !inSet.Contains(r))
+                    .Select(r => r.transform.parent != null ? r.transform.parent.name + "/" + r.name : r.name).ToList();
+                CollectionAssert.IsEmpty(missing, "surround renderers without a hazed entry (re-run the haze bake):\n" + string.Join("\n", missing));
+            });
+        }
+
+        [Test]
+        public void MapSet_ContainsNoArenaFenceOrPlayfieldRenderer()
+        {
+            WithMap((map, surroundings, set) =>
+            {
+                var inSet = new HashSet<Renderer>(set.Entries.Where(e => e.Renderer != null).Select(e => e.Renderer));
+                foreach (var root in map.GetRootGameObjects())
+                {
+                    if (root == surroundings) continue;
+                    var leaked = root.GetComponentsInChildren<Renderer>(true).Where(inSet.Contains).Select(r => root.name + "/" + r.name).ToList();
+                    CollectionAssert.IsEmpty(leaked, $"renderers of '{root.name}' (arena / props / playfield ground) must keep their materials");
+                }
+                foreach (var e in set.Entries)
+                {
+                    Assert.IsFalse(e.Renderer.name.StartsWith("Wall_", StringComparison.Ordinal)
+                                   || e.Renderer.name.StartsWith("InnerWall_", StringComparison.Ordinal), e.Renderer.name + " is a fence panel");
+                    foreach (var m in e.Original)
+                        Assert.AreNotEqual(FenceFadeRules.ShaderName, m.shader.name, e.Renderer.name + " uses the fence fade shader");
+                }
+            });
+        }
+
+        [Test]
+        public void HazedCopies_AreUrpAndKeepEmissionOn()
+        {
+            var map = AssetDatabase.LoadAssetAtPath<SurroundHazeMapSO>(SurroundHazeBaker.MapAssetPath);
+            Assert.IsNotNull(map, SurroundHazeBaker.MapAssetPath);
+            Assert.Greater(map.Copies.Count, 0);
+            foreach (var c in map.Copies)
+            {
+                Assert.IsNotNull(c.Hazed, "copy of " + (c.Original != null ? c.Original.name : "?"));
+                StringAssert.StartsWith(SurroundHazeBaker.HazedFolder, AssetDatabase.GetAssetPath(c.Hazed));
+                StringAssert.StartsWith("Universal Render Pipeline/", c.Hazed.shader.name, c.Hazed.name);
+                Assert.IsTrue(c.Hazed.IsKeywordEnabled("_EMISSION"), c.Hazed.name + ": _EMISSION off, the copy would only darken");
+                Assert.AreNotEqual(MaterialGlobalIlluminationFlags.None, c.Hazed.globalIlluminationFlags & MaterialGlobalIlluminationFlags.AnyEmissive,
+                    c.Hazed.name + ": URP validation would switch _EMISSION back off");
+                Assert.AreNotSame(c.Original, c.Hazed);
+            }
         }
     }
 }
