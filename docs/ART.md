@@ -226,13 +226,24 @@ Characters use **radial gradients** (light highlight at upper-left → primary c
 - **Generated-prop hygiene (Phase 8 B).** No baked ground plates: the TRELLIS dark discs under barrel, hay bale,
   feed silo, bush and small food pile are stripped (pivot at the base centre, hay bale seated on y = 0). Prop
   atlases are dilated (every texel outside a UV island carries the nearest island colour) so mips never bleed the
-  dark background. Fence panel = 1 642 tris (from 4 000); its atlas has no black baked faces (lifted to dark
+  dark background. Fence panel = the full 4 000-tri `wall_segment` (the 1 642-tri B2 decimation was reverted in
+  Phase 8 C1: hollow post caps at match distance); with **Performance Mode** on, every outer and arm panel draws a
+  2 999-tri protected-cap twin (`wall_segment_perf` / `wall_segment_inner_perf`, Phase 8 C S5). Its atlas has no black baked faces (lifted to dark
   wood) and softened smear marks. Arm walls use `wall_segment_inner` (UVs compensated for their 0.35 thickness
   squash, so post and rail tops show unsquashed grain); the outer fence keeps `wall_segment`.
 - **Surround trees (Phase 8 B3).** `Prop_oak_tree` has a billboard LOD1 (a cross of two alpha-clipped quads from
   `Art/Billboards/oak_tree_y45/135`, matte, base colour 0.8, normals up, no shadow). The orthographic match camera
   always picks LOD0 (ortho LOD ignores distance; the smallest tree is ~0.4 of the view vs the 0.10 threshold), so
   billboards appear only in perspective views (overviews, intros).
+- **Bases (Phase 8 C S2).** Each base pad is a straw floor (`straw_floor_tile`, ~2 m/tile, at most a 15 % hint of
+  the player colour) with a thick player-colour ring on the deposit edge (2.35-2.65 m) and a player-tinted pennant
+  (x1.5) beside the pad, outside the cone toward the centre; the nest basket sits in the corner and the coop along
+  one fence, all clear of the 2.5 m deposit disc. Only ring + flag carry the full player colour.
+- **Surround (Phase 8 C S3).** Matte gambrel barn (no silo; separate silos stay), lumpy textured hedge strips on
+  the four sides, worn dirt-path hints from each base to its doorstep and two contested piles (none to the centre),
+  alpha-clipped flower / mud decals (never reading as obstacles), and 15 low prop vignettes outside the fence
+  (< 0.8 m in every fence-hedge gap, no colliders). Distance fog is NOT used: URP fog on the orthographic match
+  camera is a screen-row gradient that would grey the far playfield (open decision, STATE S3c).
 - **Ground overlays (Phase 8).** Identity / rival rings, state blobs and target marks sit on the grass under the
   bird (`ChickenGround` anchor from the CharacterController), not at the body pivot.
 
@@ -245,8 +256,12 @@ Characters use **radial gradients** (light highlight at upper-left → primary c
   contested 4.2 x 3.5, doorstep 3.6 x 3.0 m), which is also the collider, the NavMesh carve and the baked zone disc.
   Outer piles point their long axis at the arena centre. Any replacement mound (D2) must stay inside that oval at
   every fill state (guarded by `Phase8ChunkD9Tests`).
-- At <25%: consider a visual "last scraps" state — small pile, dull color, maybe a flies/dust particle (TBD).
-- Empty pile: a faint ground mark or shadow — should still be readable as "there was food here".
+- **Mound (Phase 8 C S1/D2).** Grain-and-corn mound `Generated/Env/food_mound` (irregular oval outline r 0.41-0.495 of
+  the footprint, inside the collider ellipse), matte `FoodMound.mat` tinted by MPB; the tint never goes darker than
+  `Lerp(Empty, Full, 0.35)` so low piles stay readable against the dirt disc. Pile discs are the matching irregular
+  `PileDiscIrregular`. The centre pile carries a soft unlit gold ground halo that dims with fill.
+- Empty pile: the mound swaps to a scatter of grain clumps (`food_mound_empty`) on the disc - readable as "there was
+  food here", no cone.
 
 ---
 
