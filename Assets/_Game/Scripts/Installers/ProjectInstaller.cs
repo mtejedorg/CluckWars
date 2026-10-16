@@ -5,6 +5,7 @@ using CluckWars.Logging;
 using CluckWars.Services;
 using CluckWars.Settings;
 using CluckWars.UI;
+using CluckWars.Visuals;
 using UnityEngine;
 using Zenject;
 
@@ -46,6 +47,11 @@ namespace CluckWars.Installers
                  "the project — the Bootstrap menu lobby and the Game-scene match systems both read " +
                  "it from this one slot, so the advertised rules and the played rules cannot drift.")]
         [SerializeField] private MatchConfigSO _matchConfig;
+
+        [Tooltip("Drop the FencePerformanceMeshes asset here (Assets/_Game/Data/FencePerformanceMeshes.asset): the lighter fence panels " +
+                 "FencePerformanceSwap draws while Performance Mode is on. If null, an empty instance is bound, the swap logs an error " +
+                 "and Performance Mode keeps the full fence.")]
+        [SerializeField] private FencePerformanceMeshesSO _fencePerformanceMeshes;
 
         public override void InstallBindings()
         {
@@ -187,6 +193,13 @@ namespace CluckWars.Installers
                     "built-in defaults. Match duration, food target and MaxPlayers are NOT " +
                     "coming from MatchConfig.asset. Assign it here.");
             }
+
+            // Performance Mode fence meshes (Phase 8 S5): an empty instance keeps FencePerformanceSwap injectable;
+            // it reports the missing meshes through ILogService and leaves the full fence on.
+            var fenceMeshes = _fencePerformanceMeshes != null
+                ? _fencePerformanceMeshes
+                : ScriptableObject.CreateInstance<FencePerformanceMeshesSO>();
+            Container.Bind<FencePerformanceMeshesSO>().FromInstance(fenceMeshes).AsSingle();
         }
     }
 }

@@ -116,6 +116,8 @@ namespace CluckWars.Visuals
             // See-through fence near the local bird (Phase 6 chunk 7f). Added here rather than on the
             // scene object so every scene with a match camera gets it without a scene edit.
             if (GetComponent<FenceFadeDriver>() == null) gameObject.AddComponent<FenceFadeDriver>();
+            // Performance Mode fence (Phase 8 S5): draws the lighter fence panels while the mode is on.
+            if (GetComponent<FencePerformanceSwap>() == null) gameObject.AddComponent<FencePerformanceSwap>();
             _currentFocus = _focusPoint;
             ApplyCamera();
             ApplyRenderTier();
