@@ -578,6 +578,7 @@ namespace CluckWars.Gameplay
             var modelScale = entry.ResolvedModelScale;
             model.transform.localScale = modelScale;
             ApplyOverlayHeadLift(_characterController.height * (modelScale.y - 1f));
+            ChickenFootprint.Apply(this, model.transform);   // foot rings clear the body (Phase 8 chunk C R3)
 
             // Caches its renderer set in Spawned, which may already have run — and could not have
             // included the model in any case, since the model only exists now.

@@ -24,7 +24,8 @@ namespace CluckWars.Visuals
         [Range(0.02f, 0.3f)]
         [SerializeField] private float _hpHeight = 0.11f;
 
-        [Tooltip("Radius of the player-identity ring at the chicken's feet.")]
+        [Tooltip("Minimum radius of the player-identity ring at the chicken's feet (root-local). The live radius grows to clear the " +
+                 "class model's body: see GroundRingStyle / ChickenFootprint.")]
         [Range(0.1f, 1.5f)]
         [SerializeField] private float _ringRadius = 0.42f;
 
@@ -33,8 +34,6 @@ namespace CluckWars.Visuals
         [SerializeField] private Sprite _barFillSprite;
 
         private static readonly Color TroughColor = new Color(1f, 1f, 1f, 1f); // Sprite is already dark
-
-        private static Sprite _ringSprite; // soft ring    — identity ring
 
         private ChickenController _controller;
         private ChickenCombat     _combat;
@@ -45,6 +44,8 @@ namespace CluckWars.Visuals
         private SpriteRenderer _cargoFill;
         private TextMesh       _cargoText;
         private SpriteRenderer _ring;
+        private SpriteRenderer _ringEdge;    // thin cream outer edge so a dark player colour reads on grass
+        private float _ringDrawRadius;       // live outer radius of the colour stroke, root-local
 
         private int _appliedRingCorner = -2;
         private Color _ringBaseColor = Color.white;
@@ -147,9 +148,24 @@ namespace CluckWars.Visuals
             go.transform.localScale    = Vector3.one * (_ringRadius * 2f);
 
             _ring = go.AddComponent<SpriteRenderer>();
-            _ring.sprite       = RingSprite();
             _ring.color        = Color.white;
             _ring.sortingOrder = 1;
+            SetRingRadius(_ringRadius);
+        }
+
+        /// <summary>Re-sizes the identity ring to clear the class model's body (Phase 8 chunk C R3). Presentation only;
+        /// <paramref name="bodyHalfWidth"/> is the model's lateral half-width in root-local metres.</summary>
+        public void SetBodyFootprint(float bodyHalfWidth)
+        {
+            if (_ring == null) return;
+            SetRingRadius(Mathf.Max(_ringRadius, GroundRingStyle.IdentityRadius(bodyHalfWidth)));
+        }
+
+        private void SetRingRadius(float radius)
+        {
+            _ringDrawRadius = radius;
+            GroundRingStyle.Apply(_ring, ref _ringEdge, radius, GroundRingStyle.IdentityStroke,
+                GroundRingStyle.IdentityEdge, GroundRingStyle.IdentityEdgeAlpha);
         }
 
         // ── Per-frame refresh ──────────────────────────────────────────────────
@@ -259,7 +275,7 @@ namespace CluckWars.Visuals
             {
                 if (_ringEmphasised)
                 {
-                    _ring.transform.localScale = Vector3.one * (_ringRadius * 2f);
+                    _ring.transform.localScale = Vector3.one * (_ringDrawRadius * 2f);
                     _ring.color = _ringBaseColor;
                     _ringEmphasised = false;
                 }
@@ -267,7 +283,7 @@ namespace CluckWars.Visuals
             }
 
             float scale = YouMarkerRules.RingScaleAt(_youEmphasis, Time.unscaledTime, reduced);
-            _ring.transform.localScale = Vector3.one * (_ringRadius * 2f * scale);
+            _ring.transform.localScale = Vector3.one * (_ringDrawRadius * 2f * scale);
             var c = _ringBaseColor;
             c.a = YouMarkerRules.RingAlphaAt(_youEmphasis, _ringBaseColor.a);
             _ring.color = c;
@@ -295,34 +311,5 @@ namespace CluckWars.Visuals
             frac >= 1f   ? new Color(1f, 0.18f, 0.08f, 1f) :
             frac >= 0.7f ? new Color(1f, 0.55f, 0.05f, 1f) :
                            new Color(0.95f, 0.88f, 0.20f, 1f);
-
-        // ── Shared procedural sprites ──────────────────────────────────────────
-
-        /// <summary>Soft-edged ring (hollow disc) for the identity marker at the feet.</summary>
-        private static Sprite RingSprite()
-        {
-            if (_ringSprite != null) return _ringSprite;
-
-            const int S = 128;
-            const float outer = 0.5f, inner = 0.34f, feather = 0.05f;
-            var px = new Color[S * S];
-            for (int y = 0; y < S; y++)
-            for (int x = 0; x < S; x++)
-            {
-                float dx = (x + 0.5f) / S - 0.5f;
-                float dy = (y + 0.5f) / S - 0.5f;
-                float d  = Mathf.Sqrt(dx * dx + dy * dy);
-                float a = Mathf.Clamp01((d - inner) / feather) *
-                          Mathf.Clamp01((outer - d) / feather);
-                px[y * S + x] = new Color(1f, 1f, 1f, a);
-            }
-
-            var tex = new Texture2D(S, S, TextureFormat.RGBA32, false)
-            { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
-            tex.SetPixels(px);
-            tex.Apply();
-            _ringSprite = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), S);
-            return _ringSprite;
-        }
     }
 }

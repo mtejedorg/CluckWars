@@ -694,11 +694,12 @@ namespace CluckWars.Visuals
         /// </summary>
         public const float RivalRingRadius = 0.98f;
 
-        /// <summary>Ring stroke width. Deliberately thinner than the §5.1 status ring's
-        /// bright arc (0.11) — a persistent "this is a rival" marker sitting under every
-        /// opponent for the whole match must not out-shout the transient control states
-        /// drawn inside it.</summary>
-        public const float RivalRingWidth = 0.055f;
+        /// <summary>Ring stroke width (root-local metres; 0.055 until Phase 8 chunk C R3, raised so it reads on a phone).
+        /// Still thinner than the identity ring's stroke (<c>GroundRingStyle.IdentityStroke</c>) and at half its alpha — a
+        /// persistent "this is a rival" marker under every opponent for the whole match must not out-shout the transient
+        /// control states drawn inside it. <see cref="RivalRingRadius"/> is the floor; the live radius follows the body
+        /// (<c>GroundRingStyle.RivalRadius</c>).</summary>
+        public const float RivalRingWidth = 0.085f;
 
         /// <summary>
         /// Ring alpha before the rival's own <c>VisualOpacity</c> is multiplied in. 0.5

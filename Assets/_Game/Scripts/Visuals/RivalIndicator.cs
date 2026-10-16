@@ -83,7 +83,6 @@ namespace CluckWars.Visuals
         /// geometry and every world overlay it is drawn over.</summary>
         private const int ChevronSortingOrder = 250;
 
-        private static Sprite _ringSprite;
         private static Sprite _chevronSprite;
 
         private ChickenController _controller;
@@ -91,6 +90,8 @@ namespace CluckWars.Visuals
         private ILogService _log;
 
         private SpriteRenderer _ring;
+        private SpriteRenderer _ringEdge;      // thin cream outer edge (GroundRingStyle)
+        private float _ringRadius = FeedbackTuning.RivalRingRadius;
         private SpriteRenderer _chevron;
         private Color _classColor = Color.white;
         private bool _colorResolved;
@@ -151,10 +152,9 @@ namespace CluckWars.Visuals
             ringGo.transform.SetParent(ChickenGround.Anchor(this), worldPositionStays: false);
             ringGo.transform.localPosition = new Vector3(0f, 0.02f, 0f);
             ringGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            ringGo.transform.localScale = Vector3.one * (FeedbackTuning.RivalRingRadius * 2f);
             _ring = ringGo.AddComponent<SpriteRenderer>();
-            _ring.sprite = RingSprite();
             _ring.sortingOrder = RingSortingOrder;
+            ApplyRingGeometry();
             ringGo.SetActive(false);
 
             // NOT parented to the chicken. The chevron is screen furniture: it is positioned
@@ -166,6 +166,18 @@ namespace CluckWars.Visuals
             _chevron.sortingOrder = ChevronSortingOrder;
             chevGo.SetActive(false);
         }
+
+        /// <summary>Sizes the rival ring to sit just outside the (body-sized) identity ring (Phase 8 chunk C R3).
+        /// <paramref name="bodyHalfWidth"/> is the class model's lateral half-width, root-local metres.</summary>
+        public void SetBodyFootprint(float bodyHalfWidth)
+        {
+            _ringRadius = GroundRingStyle.RivalRadius(bodyHalfWidth);
+            if (_ring != null) ApplyRingGeometry();
+        }
+
+        private void ApplyRingGeometry() =>
+            GroundRingStyle.Apply(_ring, ref _ringEdge, _ringRadius, FeedbackTuning.RivalRingWidth,
+                GroundRingStyle.RivalEdge, GroundRingStyle.RivalEdgeAlpha);
 
         private void LateUpdate()
         {
@@ -243,6 +255,7 @@ namespace CluckWars.Visuals
             if (_ring == null) return;
 
             _ring.color = WithAlpha(_classColor, FeedbackTuning.RivalRingAlpha * opacity);
+            GroundRingStyle.SetEdgeAlpha(_ringEdge, GroundRingStyle.RivalEdgeAlpha * opacity);
             if (!_ring.gameObject.activeSelf) _ring.gameObject.SetActive(true);
         }
 
@@ -280,41 +293,6 @@ namespace CluckWars.Visuals
         // ── Procedural sprites ─────────────────────────────────────────────────
         // Same approach as ChickenStateOverlays': generated once, shared statically, so the
         // feature adds no art dependency and can be deleted without orphaning assets.
-
-        /// <summary>
-        /// Hard-edged annulus. Its stroke is <see cref="FeedbackTuning.RivalRingWidth"/>
-        /// expressed as a fraction of the ring's own diameter, so the drawn ring is the
-        /// authored width at the authored radius rather than whatever the texture happened
-        /// to bake in.
-        /// </summary>
-        private static Sprite RingSprite()
-        {
-            if (_ringSprite != null) return _ringSprite;
-
-            const int S = 128;
-            float outer = 0.5f;
-            float stroke = FeedbackTuning.RivalRingWidth / (FeedbackTuning.RivalRingRadius * 2f);
-            float inner = Mathf.Max(0f, outer - stroke);
-
-            // Feather over roughly one texel so the ring is not aliased at low resolutions.
-            float feather = 1.5f / S;
-
-            var px = new Color[S * S];
-            for (int y = 0; y < S; y++)
-            for (int x = 0; x < S; x++)
-            {
-                float dx = (x + 0.5f) / S - 0.5f;
-                float dy = (y + 0.5f) / S - 0.5f;
-                float d = Mathf.Sqrt(dx * dx + dy * dy);
-
-                float a = Mathf.SmoothStep(0f, 1f, (d - (inner - feather)) / feather) *
-                          (1f - Mathf.SmoothStep(0f, 1f, (d - (outer - feather)) / feather));
-                px[y * S + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(a));
-            }
-
-            _ringSprite = MakeSprite(px, S);
-            return _ringSprite;
-        }
 
         /// <summary>
         /// Solid triangular chevron pointing along +Y in sprite space, with the stroke
