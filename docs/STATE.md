@@ -6,6 +6,13 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🚧 PHASE 8 chunk D IN PROGRESS (2026-10-16): final-audit polish D1-D18 + decisions E1-E4 - EditMode baseline 1684/1684
+
+Brief: scratchpad `env3d/phase8d_brief.md`; decisions E1-E4 all option a (memory `env3d-decisions-2026-10-15`). Order D16 -> D1 -> E4 measure -> D2 -> E3 -> E1 -> E2 -> D7-D10 -> D3-D6 -> D11-D15 -> D17-D18 -> warm-up -> final re-capture. Editor `CluckWars.PerformanceMode` pref was 1 at session start (restore at the end). Captures `Captures/env3d_after/D/<item>/`.
+
+| Item | Status | Commit | Notes |
+|---|---|---|---|
+
 ## 🔎 PHASE 8 FINAL AUDIT (2026-10-16): six-lens grade after chunks A+B+C - overall C- -> C+ -> B-
 
 Fresh full capture `Captures/env3d_final/` (3-way original / re-audit / final pairs in `cmp/`), page https://claude.ai/artifact/8j5NN2zzB1rWAecqMoJbjm (v3). Grades: art direction B- (D+ -> C), readability B- (C- -> C+), 3D models B- (C -> C+), level design B+ (C -> B-), render pipeline B (C -> B-), materials B- (C- -> C+). 17 of 20 re-audit findings delivered, 2 partly (grass tiling, fence-hole core), 0 regressions. NOTE: the Editor's `CluckWars.PerformanceMode` pref was 1 during the capture, so `env3d_final` shows the 3 000-tri Performance Mode fence.
