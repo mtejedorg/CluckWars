@@ -18,7 +18,8 @@ namespace CluckWars.Tests
     /// The RP assets are read through SerializedObject: Mobile_RPAsset has a corruption history (see
     /// ProjectConfigTests), and a zeroed asset fails loudly here too. Nothing in the project samples
     /// <c>_CameraDepthTexture</c> / <c>_CameraOpaqueTexture</c> (no SceneDepth / SceneColor ShaderGraph nodes, no
-    /// renderer feature or camera asking for them; PC_Renderer's SSAO requests its own depth-normals input), so
+    /// renderer feature or camera asking for them; PC_Renderer's SSAO requests its own depth-normals input and the F1
+    /// haze feature asks for depth through its own pass input, not the asset toggle), so
     /// requiring them only paid for a depth prepass/copy and an opaque copy every frame.
     /// </remarks>
     public class Phase8ChunkA7Tests
