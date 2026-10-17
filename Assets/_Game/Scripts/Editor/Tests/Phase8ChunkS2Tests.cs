@@ -38,6 +38,12 @@ namespace CluckWars.Tests
         private const float ShippedBaseCoordinate = 21.8025f;
         private const float MinFenceGap = 0.6f;
 
+        /// <summary>
+        /// Phase 8 D7: every vertex of the pennant (pole and flag) stays at least this far from the pad centre, which is clear of the
+        /// 2.35-2.65 m deposit ring (the pole used to stand at 2.67 m, on top of it).
+        /// </summary>
+        private const float MinPennantRadius = 2.9f;
+
         private string _originalScenePath;
 
         [SetUp]
@@ -177,8 +183,10 @@ namespace CluckWars.Tests
         {
             var b = Base();
             var identity = TestAssets.PrivateField<Renderer[]>(b, "_identityRenderers");
+            var flags = TestAssets.PrivateField<Renderer[]>(b, "_flagRenderers");
             var floor = TestAssets.PrivateField<Renderer[]>(b, "_floorRenderers");
-            CollectionAssert.AreEquivalent(new[] { "PlayerRing", "Pennant_Flag" }, identity.Select(r => r.name));
+            CollectionAssert.AreEquivalent(new[] { "PlayerRing" }, identity.Select(r => r.name));
+            CollectionAssert.AreEquivalent(new[] { "Pennant_Flag" }, flags.Select(r => r.name), "the unlit flag takes the lifted colour (Phase 8 D7)");
             CollectionAssert.AreEquivalent(new[] { "StrawFloor" }, floor.Select(r => r.name));
             float tint = TestAssets.PrivateField<float>(b, "_floorTint");
             Assert.That(tint, Is.GreaterThan(0f).And.LessThanOrEqualTo(0.15f), "straw hint <= 15 %");
@@ -206,17 +214,24 @@ namespace CluckWars.Tests
             var go = (GameObject)PrefabUtility.InstantiatePrefab(BasePrefab(), scene);
             var pb = go.GetComponent<PlayerBase>();
             var identity = TestAssets.PrivateField<Renderer[]>(pb, "_identityRenderers");
+            var flags = TestAssets.PrivateField<Renderer[]>(pb, "_flagRenderers");
+            float lift = TestAssets.PrivateField<float>(pb, "_flagLift");
             var floor = TestAssets.PrivateField<Renderer[]>(pb, "_floorRenderers");
             float tint = TestAssets.PrivateField<float>(pb, "_floorTint");
             var colour = PlayerPalette.ForCorner(corner);
 
-            PlayerBase.ApplyKitTint(identity, floor, tint, colour, new MaterialPropertyBlock());
+            PlayerBase.ApplyKitTint(identity, flags, lift, floor, tint, colour, new MaterialPropertyBlock());
 
             var read = new MaterialPropertyBlock();
             foreach (var r in identity)
             {
                 r.GetPropertyBlock(read);
                 Assert.AreEqual(colour, read.GetColor("_BaseColor"), $"{r.name} corner {corner}");
+            }
+            foreach (var r in flags)
+            {
+                r.GetPropertyBlock(read);
+                Assert.AreEqual(PlayerBase.FlagColorFor(colour, lift), read.GetColor("_BaseColor"), $"{r.name} corner {corner}: the lifted player colour");
             }
             floor[0].GetPropertyBlock(read);
             Assert.AreEqual(PlayerBase.FloorTintFor(colour, tint), read.GetColor("_BaseColor"), "straw hint");
@@ -252,9 +267,11 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void Pennant_IsOutsideTheDeposit_AndOutOfTheApproachCone()
+        public void Pennant_IsClearOfTheRing_TheFence_AndOutOfTheApproachCone()
         {
-            float radius = TestAssets.PrivateField<float>(Base(), "_depositRadius");
+            Assert.GreaterOrEqual(MinPennantRadius, TestAssets.PrivateField<float>(Base(), "_depositRadius") + 0.3f, "the pennant constant itself must clear the 2.65 m ring edge");
+            float radius = MinPennantRadius;
+            float fenceFace = FenceFace(OpenMap());
             var pennantRenderers = new[] { Named("Pennant_Pole"), Named("Pennant_Flag") };
             var kitInverse = Kit().worldToLocalMatrix; // prefab kit sits at the base origin
             foreach (var centre in BaseCentres())
@@ -266,7 +283,10 @@ namespace CluckWars.Tests
                 foreach (var p in WorldVertices(r, place))
                 {
                     var d = Flat(p) - centre;
-                    Assert.GreaterOrEqual(d.magnitude, radius, $"{r.name} vertex inside the deposit disc at base {centre}");
+                    Assert.GreaterOrEqual(d.magnitude, radius, $"{r.name} vertex {d.magnitude:0.00} m from the pad centre at base {centre}: it must clear the deposit ring (>= {MinPennantRadius} m)");
+                    // Both fences run along the outer edge of the arena: |x| and |z| stay below the fence's inner face by the same gap the coop and nest keep.
+                    float worst = Mathf.Max(Mathf.Abs(p.x), Mathf.Abs(p.z));
+                    Assert.GreaterOrEqual(fenceFace - worst, MinFenceGap - 0.005f, $"{r.name} vertex {fenceFace - worst:0.00} m from the fence at base {centre}");
                     // Beside the pad on a fence side, never in the front approach cone (centre -> base, +-60 deg).
                     float fromApproach = Vector2.Angle(d, toCentre);
                     Assert.GreaterOrEqual(fromApproach, 60f, $"{r.name} sits in the deposit approach at base {centre}");
@@ -340,18 +360,24 @@ namespace CluckWars.Tests
             CollectionAssert.IsEmpty(offenders.Distinct().ToList(), "props inside a deposit disc");
         }
 
-        [Test]
-        public void CoopAndBasket_StandOffTheCornerFence()
+        /// <summary>Inner face of the boundary fence (distance from the arena centre along either axis): the arena-side extent of the outer Wall_* panels.</summary>
+        private static float FenceFace(Scene scene)
         {
-            var scene = OpenMap();
-            var all = All(scene);
-            // Inner face of the boundary fence: the arena-side extent of the outer Wall_* panels.
-            float face = all.SelectMany(t => t.GetComponents<Renderer>())
+            float face = All(scene).SelectMany(t => t.GetComponents<Renderer>())
                 .Where(r => r.enabled && r.transform.parent != null && r.transform.parent.name.StartsWith("Wall_"))
                 .Min(r => r.transform.parent.name.StartsWith("Wall_N") || r.transform.parent.name.StartsWith("Wall_S")
                     ? Mathf.Min(Mathf.Abs(r.bounds.min.z), Mathf.Abs(r.bounds.max.z))
                     : Mathf.Min(Mathf.Abs(r.bounds.min.x), Mathf.Abs(r.bounds.max.x)));
             Assert.That(face, Is.InRange(24f, 25.5f), "fence face");
+            return face;
+        }
+
+        [Test]
+        public void CoopAndBasket_StandOffTheCornerFence()
+        {
+            var scene = OpenMap();
+            var all = All(scene);
+            float face = FenceFace(scene);
             for (int i = 0; i < 4; i++)
             foreach (var name in new[] { $"Base{i}_Coop", $"Base{i}_Nest" })
             {

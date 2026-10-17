@@ -56,7 +56,7 @@ namespace CluckWars.Tests
             "Assets/_Game/Art/Materials/Surround_Grass.mat",
             "Assets/_Game/Art/Materials/Surround_Hedge.mat",
             "Assets/_Game/Art/Materials/BaseKit_Straw.mat",
-            "Assets/_Game/Art/Materials/BaseKit_PennantFlag.mat",
+            // BaseKit_PennantFlag is deliberately NOT here: since Phase 8 D7 it is URP Unlit (pinned in Phase8ChunkD7PennantTests).
             "Assets/_Game/Art/Materials/BaseKit_PennantPole.mat",
             "Assets/_Game/Art/Materials/Prop_big_barn.mat",
             "Assets/_Game/Art/Materials/Hedge_Side.mat",

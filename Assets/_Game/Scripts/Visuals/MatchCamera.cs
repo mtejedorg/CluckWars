@@ -89,6 +89,31 @@ namespace CluckWars.Visuals
         public float CurrentYaw => _yaw;
 
         /// <summary>
+        /// The yaw (0..360) the camera settles at for seat <paramref name="corner"/> (0..3): the bearing from that corner toward
+        /// the arena centre, so the seat's home corner sits at the bottom of the screen (225, 135, 45, 315 for seats 0..3).
+        /// False for an unknown corner. Public so the pennant facing test (Phase 8 D7) reads the real rule, not a copy.
+        /// </summary>
+        public static bool TryYawForCorner(int corner, out float yaw)
+        {
+            // Only the BEARING from the corner toward the centre matters and a bearing is scale-invariant, so these are
+            // unit directions, not real corner coordinates (literal coordinates went stale when the arena was resized x1.35).
+            Vector2 cornerDir = corner switch
+            {
+                0 => new Vector2(+1f, +1f),
+                1 => new Vector2(-1f, +1f),
+                2 => new Vector2(-1f, -1f),
+                3 => new Vector2(+1f, -1f),
+                _ => Vector2.zero,
+            };
+            yaw = 0f;
+            if (cornerDir == Vector2.zero) return false;
+            // Bearing from base toward centre (-c.x, -c.z)
+            yaw = Mathf.Atan2(-cornerDir.x, -cornerDir.y) * Mathf.Rad2Deg;
+            if (yaw < 0f) yaw += 360f;
+            return true;
+        }
+
+        /// <summary>
         /// Scene-wide singleton set in <c>Awake</c>. Abilities and combat use this
         /// to trigger positional impulses without needing a direct reference.
         /// </summary>
@@ -158,26 +183,9 @@ namespace CluckWars.Visuals
             {
                 int cornerIdx = _localChicken.HomeCornerIndex;
 
-                // Only the BEARING from this corner toward the centre is used below, and a
-                // bearing is scale-invariant — so these are unit directions rather than real
-                // corner coordinates. They used to be literal (±19, ±19), which silently
-                // encoded the arena's half-size in the camera and would have gone stale the
-                // moment the arena was resized (it was, x1.35, on 2026-08-14). Signs only.
-                Vector2 cornerDir = cornerIdx switch
-                {
-                    0 => new Vector2(+1f, +1f),
-                    1 => new Vector2(-1f, +1f),
-                    2 => new Vector2(-1f, -1f),
-                    3 => new Vector2(+1f, -1f),
-                    _ => Vector2.zero,
-                };
-                if (cornerDir != Vector2.zero)
-                {
-                    // Bearing from base toward centre (-c.x, -c.z)
-                    float targetYaw = Mathf.Atan2(-cornerDir.x, -cornerDir.y) * Mathf.Rad2Deg;
-                    if (targetYaw < 0f) targetYaw += 360f;
+                // Seat -> yaw rule: TryYawForCorner.
+                if (TryYawForCorner(cornerIdx, out float targetYaw))
                     _yaw = Mathf.LerpAngle(_yaw, targetYaw, Time.deltaTime * 5f);
-                }
             }
 
             _currentFocus = Vector3.SmoothDamp(_currentFocus, target, ref _focusVelocity, _followSmoothTime);

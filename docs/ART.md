@@ -262,6 +262,15 @@ Characters use **radial gradients** (light highlight at upper-left → primary c
   the player colour) with a thick player-colour ring on the deposit edge (2.35-2.65 m) and a player-tinted pennant
   (x1.5) beside the pad, outside the cone toward the centre; the nest basket sits in the corner and the coop along
   one fence, all clear of the 2.5 m deposit disc. Only ring + flag carry the full player colour.
+  **Pennant (Phase 8 D7).** The flag is URP **Unlit** (`BaseKit_PennantFlag`, the cloth/hem texture kept), so the sun and
+  the side the camera sees never decide its colour (a Lit flag on its sun-away face rendered dark teal / navy and read as
+  P2 or P4). `PlayerBase` tints it with the player colour x `FlagLift` (1.3, each channel capped at 1: it can never reach
+  the PC bloom threshold), which puts the rendered flag within 3.5-6.3 dE00 of the sunlit half of the rendered ring on all
+  four seats, both tiers (`tools/ui_capture/capture_d7_pennant.py`). The kit is authored once and yawed per corner, and the
+  four seats' cameras look along the four diagonals, so no single yaw is face-on for every viewer; the flag plane sits on an
+  axis, 45 degrees off EVERY seat's camera (yaw only; it was 0 for two bases and 90, edge-on, for the other two). The pole
+  stands at r 2.95 m (nearest surface 2.91) on the fence side opposite the coop, the flag pointing along the fence, every
+  vertex >= 2.9 m from the pad centre, >= 0.6 m from the fence face and outside the +-60 degree approach cone.
 - **Surround (Phase 8 C S3).** Matte gambrel barn (no silo; separate silos stay), lumpy textured hedge strips on
   the four sides, worn dirt-path hints from each base to its doorstep and two contested piles (none to the centre),
   alpha-clipped flower / mud decals (never reading as obstacles), and 15 low prop vignettes outside the fence

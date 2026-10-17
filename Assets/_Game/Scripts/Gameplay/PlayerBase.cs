@@ -40,8 +40,15 @@ namespace CluckWars.Gameplay
             "-90 degrees per corner so every seat gets the same layout relative to its own corner (KitYawFor).")]
         [SerializeField] private Transform _kit;
 
-        [Tooltip("Renderers drawn in the full player colour (the pad ring, the pennant flag). Nothing else on the base is tinted at full strength.")]
+        [Tooltip("Renderers drawn in the full player colour (the pad ring). With the pennant flag, nothing else on the base is tinted at full strength.")]
         [SerializeField] private Renderer[] _identityRenderers = System.Array.Empty<Renderer>();
+
+        [Tooltip("The pennant flag: an UNLIT cloth, so the sun and the side the camera sees never decide its colour (Phase 8 D7). Takes the player colour times Flag Lift, see FlagColorFor.")]
+        [SerializeField] private Renderer[] _flagRenderers = System.Array.Empty<Renderer>();
+
+        [Tooltip("Brightness the unlit flag is lifted by so it reads like the sunlit ring (an unlit surface skips the sun's contribution the ring gets). Channels clamp at 1, so the flag can never bloom.")]
+        [Range(1f, MaxFlagLift)]
+        [SerializeField] private float _flagLift = DefaultFlagLift;
 
         [Tooltip("Renderers that take only a hint of the player colour (the straw floor): white lerped toward the colour by Floor Tint.")]
         [SerializeField] private Renderer[] _floorRenderers = System.Array.Empty<Renderer>();
@@ -52,6 +59,12 @@ namespace CluckWars.Gameplay
 
         /// <summary>Upper bound for <see cref="_floorTint"/>: the straw floor carries at most a 15 % hint of the player colour.</summary>
         public const float MaxFloorTint = 0.15f;
+
+        /// <summary>Upper bound for <see cref="_flagLift"/>.</summary>
+        public const float MaxFlagLift = 1.6f;
+
+        /// <summary>Shipped flag lift (Phase 8 D7): chosen by a sweep (1.0 / 1.15 / 1.3 / 1.45) so the rendered flag lands within 10 dE00 of the sunlit half of the rendered pad ring, all four seats, both tiers (1.3: 3.5-6.3 dE00) (Phase8ChunkD7PennantTests pins the setup, tools/ui_capture/capture_d7_pennant.py measures it).</summary>
+        public const float DefaultFlagLift = 1.3f;
 
         public static readonly System.Collections.Generic.List<PlayerBase> ActiveBases = new System.Collections.Generic.List<PlayerBase>();
 
@@ -154,8 +167,8 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// Tints the base kit with the player's identity colour (corner-indexed), grey while the base is unclaimed:
-        /// <see cref="_identityRenderers"/> (ring, pennant flag) at full strength, <see cref="_floorRenderers"/>
-        /// (straw) by <see cref="FloorTintFor"/>. Property blocks only, so the renderers keep their <c>sharedMaterial</c>.
+        /// <see cref="_identityRenderers"/> (ring) at full strength, <see cref="_flagRenderers"/> (pennant flag) by
+        /// <see cref="FlagColorFor"/>, <see cref="_floorRenderers"/> (straw) by <see cref="FloorTintFor"/>. Property blocks only, so the renderers keep their <c>sharedMaterial</c>.
         /// The pennant pole and the scene props (coop, nest, barrel) are deliberately left untinted.
         /// </summary>
         /// <remarks>
@@ -170,26 +183,41 @@ namespace CluckWars.Gameplay
                 ? CluckWars.UI.PlayerPalette.ForCorner(CornerIndex)
                 : UnownedColor;
 
-            _log?.Debug(Source, $"{name}: ApplyOwnerTint - {_identityRenderers.Length} identity + " +
+            _log?.Debug(Source, $"{name}: ApplyOwnerTint - {_identityRenderers.Length} identity + {_flagRenderers.Length} flag + " +
                 $"{_floorRenderers.Length} floor renderer(s), color={color}, corner={CornerIndex}, owner={Owner}.");
 
             _tintBlock ??= new MaterialPropertyBlock();
-            ApplyKitTint(_identityRenderers, _floorRenderers, _floorTint, color, _tintBlock);
+            ApplyKitTint(_identityRenderers, _flagRenderers, _flagLift, _floorRenderers, _floorTint, color, _tintBlock);
         }
 
         /// <summary>
         /// The kit tint itself, separated from the networked claim state so it can be exercised in EditMode:
-        /// <paramref name="identity"/> get <paramref name="color"/>, <paramref name="floor"/> get
+        /// <paramref name="identity"/> get <paramref name="color"/>, <paramref name="flags"/> get
+        /// <see cref="FlagColorFor"/>(<paramref name="color"/>, <paramref name="flagLift"/>), <paramref name="floor"/> get
         /// <see cref="FloorTintFor"/>(<paramref name="color"/>, <paramref name="floorTint"/>). Null entries are skipped.
         /// </summary>
-        public static void ApplyKitTint(Renderer[] identity, Renderer[] floor, float floorTint, Color color, MaterialPropertyBlock block)
+        public static void ApplyKitTint(Renderer[] identity, Renderer[] flags, float flagLift, Renderer[] floor, float floorTint, Color color, MaterialPropertyBlock block)
         {
             foreach (var r in identity)
                 if (r != null) ApplyTint(r, block, color);
 
+            var flagColor = FlagColorFor(color, flagLift);
+            foreach (var r in flags)
+                if (r != null) ApplyTint(r, block, flagColor);
+
             var floorColor = FloorTintFor(color, floorTint);
             foreach (var r in floor)
                 if (r != null) ApplyTint(r, block, floorColor);
+        }
+
+        /// <summary>
+        /// The unlit pennant flag's colour: <paramref name="playerColor"/> scaled by <paramref name="lift"/> (clamped to <see cref="MaxFlagLift"/>),
+        /// each channel capped at 1 so the flag never exceeds white, and so never reaches the PC bloom threshold (1).
+        /// </summary>
+        public static Color FlagColorFor(Color playerColor, float lift)
+        {
+            float k = Mathf.Clamp(lift, 1f, MaxFlagLift);
+            return new Color(Mathf.Min(1f, playerColor.r * k), Mathf.Min(1f, playerColor.g * k), Mathf.Min(1f, playerColor.b * k), 1f);
         }
 
         /// <summary>The straw floor's colour: white pulled toward <paramref name="playerColor"/> by <paramref name="strength"/>, clamped to <see cref="MaxFloorTint"/>.</summary>
