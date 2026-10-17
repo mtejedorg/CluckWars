@@ -152,6 +152,26 @@ def measure(mode):
     print(mode, json.dumps(r)); return r
 
 
+def stop_play_verified(attempts=6):
+    """Leave Play mode and CONFIRM it (D chunk: a failed round once left the Editor in Play on the match-end screen and wedged the
+    bridge). Retries with short timeouts; prints loudly if Play mode could not be confirmed off."""
+    for i in range(attempts):
+        try:
+            bridge.call("editor-application-set-state", {"isPlaying": False}, timeout=60)
+        except Exception as ex:
+            print(f"stop Play mode attempt {i + 1} failed: {ex}")
+        time.sleep(4)
+        try:
+            st = bridge.text(bridge.call("editor-application-get-state", {}, timeout=30))
+            if '"IsPlaying":false' in st and '"IsPlayingOrWillChangePlaymode":false' in st:
+                print("Play mode off (verified)")
+                return True
+        except Exception as ex:
+            print(f"state check {i + 1} failed: {ex}")
+    print("CLEANUP FAILED: Play mode could NOT be confirmed off - stop it by hand before anything else")
+    return False
+
+
 def main():
     bridge.init()
     with capture_common.perf_mode():
@@ -181,16 +201,19 @@ def _main():
         stats["_meta"] = capture_common.cap_json(); stats["_meta"]["tier"] = "Mobile"
         print("PASS MOBILE " + capture_common.cap_info())
         for rnd in (1, 2, 3):
+            # A round can outlive the match (45 s timer): measuring the match-end screen is meaningless and is where the Editor
+            # wedged once (MatchOverlaysController.PopulateMatchEnd). Stop instead of sampling it.
+            state = str(cs("State"))
+            if state != "Active":
+                raise RuntimeError(f"match left Active before round {rnd} (state {state}); rounds so far kept")
             stats["cur_r" + str(rnd)] = measure("cur")
     finally:
         # Always: back to the quality level that was active before the Mobile pass, then leave Play mode (each step reported if it fails).
-        for label, step in (("restore quality", lambda: print(cs("Quality", "restore"))),
-                            ("stop Play mode", lambda: bridge.call("editor-application-set-state", {"isPlaying": False}))):
-            try:
-                step()
-            except Exception as ex:
-                print(f"CLEANUP FAILED ({label}): {ex}")
-        time.sleep(4)
+        try:
+            print(cs("Quality", "restore"))
+        except Exception as ex:
+            print(f"CLEANUP FAILED (restore quality): {ex}")
+        stop_play_verified()
     print("STATS", json.dumps(stats))
     out = os.path.join(ROOT, "Captures", "env3d_cost"); os.makedirs(out, exist_ok=True)
     open(os.path.join(out, TAG + ".json"), "w", encoding="utf-8").write(json.dumps(stats, indent=2))

@@ -73,7 +73,7 @@ namespace CluckWars.Tests
                 }
         }
 
-        // FoodMound.mat carries the neutral grain tile on purpose (Phase 8 C S1); that is pinned in Phase8ChunkS1Tests.
+        // FoodMound.mat carries a near-neutral grain albedo on purpose (Phase 8 C S1, unique baked albedo since D3); pinned in Phase8ChunkS1Tests / Phase8ChunkD3Tests.
         [TestCase("Assets/_Game/Art/Materials/FoodMound.mat")]
         [TestCase("Assets/_Game/Art/Materials/PlayerBase.mat")]
         public void TintedMaterial_HasWhiteBase_SoThePropertyBlockCarriesTheColour(string path)

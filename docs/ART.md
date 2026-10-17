@@ -89,7 +89,7 @@ The UI must feel **exciting, tactile, and attractive** — not minimalist. Think
 
 Transition is continuous (driven by food % in `FoodPileVisuals`) — the three values above are waypoints.
 
-**Tint floor (Phase 8 C S1, Maestro-approved):** the pile colour is `Lerp(FoodPileEmpty, FoodPileFull, max(food %, 0.35))` (`FoodPileVisuals.TintFloor` / `TintFor`), so it never goes darker than `Lerp(Empty, Full, 0.35)` = about `#CFA645` with the shipped ColorScheme (Phase 8 D1: `FoodPileEmpty` raised 0.40/0.30/0.15 -> 0.71/0.54/0.25 when the grain tile was re-levelled to a mid value, mean luma 231 -> 154, so the full lit top stops clipping to lemon (R <= 230, hue ~45 deg on both tiers, guardrail `Phase8ChunkD1Tests` renders it at the match camera) and a low pile still reads lighter than the disc). The raw empty colour (`#7A6040` waypoint above, `ColorScheme.FoodPileEmpty`) is only ever reached by the lerp's far end and is never displayed: at that colour the low and empty states vanished into the `#6E5235` pile disc. Fill still reads through the mound height (1.0 -> 0.3) and, at zero, the swap to the scattered-grain `food_mound_empty` mesh. The mound is `Env/food_mound.fbx` with `FoodMound.mat` (matte URP Lit, neutral grain tile x the tint).
+**Tint floor (Phase 8 C S1, Maestro-approved):** the pile colour is `Lerp(FoodPileEmpty, FoodPileFull, max(food %, 0.35))` (`FoodPileVisuals.TintFloor` / `TintFor`), so it never goes darker than `Lerp(Empty, Full, 0.35)` = about `#CFA645` with the shipped ColorScheme (Phase 8 D1: `FoodPileEmpty` raised 0.40/0.30/0.15 -> 0.71/0.54/0.25 when the grain tile was re-levelled to a mid value, mean luma 231 -> 154, so the full lit top stops clipping to lemon (R <= 230, hue ~45 deg on both tiers, guardrail `Phase8ChunkD1Tests` renders it at the match camera) and a low pile still reads lighter than the disc). The raw empty colour (`#7A6040` waypoint above, `ColorScheme.FoodPileEmpty`) is only ever reached by the lerp's far end and is never displayed: at that colour the low and empty states vanished into the `#6E5235` pile disc. Fill still reads through the mound height (1.0 -> 0.3) and, at zero, the swap to the scattered-grain `food_mound_empty` mesh. The mound is `Env/food_mound.fbx` with `FoodMound.mat` (matte URP Lit, near-neutral grain albedo x the tint; since D3 a unique baked albedo + occlusion map, see "Mound volume").
 
 ### Character Palette
 
@@ -315,6 +315,21 @@ Characters use **radial gradients** (light highlight at upper-left → primary c
   the footprint, inside the collider ellipse), matte `FoodMound.mat` tinted by MPB; the tint never goes darker than
   `Lerp(Empty, Full, 0.35)` so low piles stay readable against the dirt disc. Pile discs are the matching irregular
   `PileDiscIrregular`. The centre pile carries a soft unlit gold ground halo that dims with fill.
+- **Mound volume (Phase 8 D3).** At match distance the tiled grain averaged to flat custard, so the mound now samples a
+  **unique baked albedo** `Generated/Env/Textures/food_mound_albedo.png` (2048, Android 1024, clamp) instead of the bare
+  tile: the D1 grain tile tiled x4 in the same phase, x a warm amber darkening (green / blue drop more than red) in the
+  concave dips and the ground-occluded base (Cycles AO bake with a ground plane + a concavity term from the mesh
+  heightfield), x a small lift (+7.5 %) on the untouched crest / flanks, plus 5 small clusters of domed corn kernels on
+  the crest (bright centre, darker rim, thin contact ring; **no sun direction baked** - pile yaws differ per seat). The
+  same dip term is a stock-Lit `_OcclusionMap` (`food_mound_occlusion.png`, 512 linear; indirect light only), so dips
+  sink further on the ambient-lit shaded side. Both maps ride UV0 at `_BaseMap` tiling **0.25** (the mound UVs are a
+  planar top-down projection spanning 0..4, so each map lands once; the empty-clump mesh shares the mapping). Stock URP
+  Lit, mesh / footprint / collider / tint MPB / `MoundStencilMark` untouched; cost = one 512 texture sample and the
+  `_OCCLUSIONMAP` variant. Keep the base map near-neutral (the tint carries the hue) and the lit top inside the D1
+  window (`Phase8ChunkD1Tests`); `Phase8ChunkD3Tests` pins the mapping, the darker/warmer base vs crest and
+  crest-only kernels. Trade-off measured at the match camera: darkening the mound moves it toward the Fatty's
+  luminance (Fatty vs full mound lit-half dE00 home 21.8 -> 19.6, centre 25.9-26.1 -> 24.9-25.8; hue gap unchanged
+  10-12 deg). Regenerate with the D3 bake scripts (kept with the captures, `Captures/env3d_after/D/D3/gen/`).
 - Empty pile: the mound swaps to a scatter of grain clumps (`food_mound_empty`) on the disc - readable as "there was
   food here", no cone.
 

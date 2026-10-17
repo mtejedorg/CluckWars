@@ -75,17 +75,23 @@ namespace CluckWars.Tests
 
         private string _originalScenePath;
         private int _originalQuality;
+        private bool _originalAsync;
 
         [SetUp]
         public void CaptureState()
         {
             _originalScenePath = SceneManager.GetActiveScene().path;
             _originalQuality = QualitySettings.GetQualityLevel();
+            // A cold Editor compiles shader variants asynchronously and draws them with the cyan placeholder meanwhile
+            // (seen once: hue 179 deg on the first run after a restart). Render tests must compile synchronously.
+            _originalAsync = ShaderUtil.allowAsyncCompilation;
+            ShaderUtil.allowAsyncCompilation = false;
         }
 
         [TearDown]
         public void RestoreState()
         {
+            ShaderUtil.allowAsyncCompilation = _originalAsync;
             QualitySettings.SetQualityLevel(_originalQuality, true);
             if (string.IsNullOrEmpty(_originalScenePath))
                 EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -143,7 +149,8 @@ namespace CluckWars.Tests
         /// <summary>
         /// Renders the full mound at the match camera under <paramref name="tier"/>'s quality level and measures it.
         /// <paramref name="baseMapOverridePng"/> (a PNG file path) swaps the grain tile through the property block, loaded after
-        /// the scene loads (diagnostics only, e.g. to re-measure the pre-D1 tile).
+        /// the scene loads (diagnostics only, e.g. to re-measure the pre-D1 tile). Since D3 the material samples _BaseMap at tiling 0.25 (unique
+        /// albedo over UV0 0..4), so an override must be in that unique space: a bare tile would show once, 4x too coarse.
         /// Leaves Game + Map open and the quality level changed: callers (the test's TearDown) restore both.
         /// </summary>
         public static MoundRead Measure(string tier, string pile, string baseMapOverridePng)

@@ -21,7 +21,6 @@ namespace CluckWars.Tests
         private const string MoundFbx = "Assets/Generated/Env/food_mound.fbx";
         private const string EmptyFbx = "Assets/Generated/Env/food_mound_empty.fbx";
         private const string MoundMaterial = "Assets/_Game/Art/Materials/FoodMound.mat";
-        private const string GrainTile = "Assets/Generated/Env/Textures/grain_corn_tile_neutral.png";
         private const string MapScene = "Assets/_Game/Scenes/Map.unity";
         private const string GlowMaterial = "Assets/_Game/Art/Materials/PileGlow.mat";
         private const string MapGeneratorSource = "Assets/_Game/Scripts/Gameplay/MapGenerator.cs";
@@ -112,12 +111,14 @@ namespace CluckWars.Tests
             var m = AssetDatabase.LoadAssetAtPath<Material>(MoundMaterial);
             Assert.IsNotNull(m);
             Assert.AreEqual("Universal Render Pipeline/Lit", m.shader.name);
-            Assert.AreEqual(GrainTile, AssetDatabase.GetAssetPath(m.GetTexture("_BaseMap")));
+            // Phase 8 D3: the base map is the mound's UNIQUE albedo (grain tile x4 baked in + dips + crest kernels) at tiling 0.25,
+            // so UV0 (which spans 0..4) samples it once; pinned in Phase8ChunkD3Tests.
+            Assert.AreEqual(Phase8ChunkD3Tests.MoundAlbedo, AssetDatabase.GetAssetPath(m.GetTexture("_BaseMap")));
             Assert.AreEqual(Color.white, m.GetColor("_BaseColor"), "white base: the MPB tint carries");
             Assert.AreEqual(0f, m.GetFloat("_Smoothness"));
             Assert.IsTrue(m.enableInstancing);
             Assert.IsTrue(m.IsKeywordEnabled("_SPECULARHIGHLIGHTS_OFF") && m.IsKeywordEnabled("_ENVIRONMENTREFLECTIONS_OFF"));
-            Assert.AreEqual(TextureWrapMode.Repeat, m.GetTexture("_BaseMap").wrapMode, "the mound UVs tile x4");
+            Assert.AreEqual(new Vector2(0.25f, 0.25f), m.GetTextureScale("_BaseMap"), "the mound UVs span 0..4: tiling 0.25 maps the unique albedo once");
         }
 
         // ---- tint floor ----------------------------------------------------------------------------

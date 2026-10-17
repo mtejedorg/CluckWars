@@ -210,12 +210,21 @@ namespace CluckWars.Tests
 
         private string _scenePath;
 
+        private bool _originalAsync;
+
         [SetUp]
-        public void Remember() => _scenePath = SceneManager.GetActiveScene().path;
+        public void Remember()
+        {
+            _scenePath = SceneManager.GetActiveScene().path;
+            // Cold Editor: async shader compilation draws the cyan placeholder for a few frames (flaked once after a restart).
+            _originalAsync = ShaderUtil.allowAsyncCompilation;
+            ShaderUtil.allowAsyncCompilation = false;
+        }
 
         [TearDown]
         public void Restore()
         {
+            ShaderUtil.allowAsyncCompilation = _originalAsync;
             if (string.IsNullOrEmpty(_scenePath)) EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             else EditorSceneManager.OpenScene(_scenePath, OpenSceneMode.Single);
         }
