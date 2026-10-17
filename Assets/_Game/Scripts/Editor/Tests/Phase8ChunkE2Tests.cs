@@ -195,7 +195,7 @@ namespace CluckWars.Tests
             // At a pad-sized radius the fence is fully open where a chicken hole would already be closed.
             float d = FenceFadeRules.OuterRadius + 0.5f * shift;
             Assert.AreEqual(0f, FenceFadeRules.FragmentFade(1f, d, front, target), 1e-6f, "a chicken's hole is closed here");
-            Assert.AreEqual(FenceFadeRules.MaxFade, FenceFadeRules.ShiftedFragmentFade(1f, d, shift, front, target), 1e-6f, "the pad's is wide open");
+            Assert.AreEqual(FenceFadeRules.CoreFade, FenceFadeRules.ShiftedFragmentFade(1f, d, shift, front, target), 1e-6f, "the pad's is wide open (fully clear core, D10)");
             // The whole profile moves rigidly: the edge band keeps its width.
             Assert.AreEqual(FenceFadeRules.FragmentFade(1f, 0.135f, front, target),
                 FenceFadeRules.ShiftedFragmentFade(1f, 0.135f + shift, shift, front, target), 1e-6f);

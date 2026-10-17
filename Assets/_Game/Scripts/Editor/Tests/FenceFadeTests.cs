@@ -30,12 +30,13 @@ namespace CluckWars.Tests
         // ── Fragment fade (C# twin of CW_FenceFadeAmount) ───────────────────
 
         [Test]
-        public void FragmentFade_InFrontOfTheBirdAtItsCentre_IsTheFullPeakFade()
+        public void FragmentFade_InFrontOfTheBirdAtItsCentre_IsFullyClear()
         {
+            // Phase 8 D10: the core is fully clear (the old 0.92 cap left a crawling 1-in-16 dot grid over the bird);
+            // the "still a wall" cue is the dithered edge band + cream rim (Phase8ChunkD10Tests).
             float fade = FenceFadeRules.FragmentFade(1f, 0f, fragmentEyeDepth: 10f, birdEyeDepth: 12f);
-            Assert.That(fade, Is.EqualTo(FenceFadeRules.MaxFade).Within(1e-5f));
-            Assert.That(FenceFadeRules.MaxFade, Is.LessThan(1f),
-                "A faint screen-door of fence must remain: it still blocks movement and should still read as a wall.");
+            Assert.That(fade, Is.EqualTo(FenceFadeRules.CoreFade).Within(1e-6f));
+            Assert.That(FenceFadeRules.CoreFade, Is.EqualTo(1f));
         }
 
         [Test]
@@ -53,7 +54,7 @@ namespace CluckWars.Tests
 
             float inner = FenceFadeRules.FragmentFade(1f, FenceFadeRules.InnerRadius, 10f, 12f);
             float mid = FenceFadeRules.FragmentFade(1f, 0.5f * (FenceFadeRules.InnerRadius + FenceFadeRules.OuterRadius), 10f, 12f);
-            Assert.That(inner, Is.EqualTo(FenceFadeRules.MaxFade).Within(1e-5f));
+            Assert.That(inner, Is.EqualTo(FenceFadeRules.CoreFade).Within(1e-5f));
             Assert.That(mid, Is.GreaterThan(0f).And.LessThan(inner), "The hole's edge must be soft, not a hard cut.");
             Assert.That(FenceFadeRules.InnerRadius, Is.LessThan(FenceFadeRules.OuterRadius));
         }
@@ -63,14 +64,14 @@ namespace CluckWars.Tests
         {
             Assert.That(FenceFadeRules.FragmentFade(0f, 0f, 10f, 12f), Is.EqualTo(0f));
             Assert.That(FenceFadeRules.FragmentFade(0.5f, 0f, 10f, 12f),
-                Is.EqualTo(0.5f * FenceFadeRules.MaxFade).Within(1e-5f));
+                Is.EqualTo(0.5f * FenceFadeRules.CoreFade).Within(1e-5f));
         }
 
         [Test]
         public void FragmentFade_HuggingTheFence_RampsInOverTheDepthSoftness()
         {
             float half = FenceFadeRules.FragmentFade(1f, 0f, 12f - 0.5f * FenceFadeRules.DepthSoftness, 12f);
-            Assert.That(half, Is.EqualTo(0.5f * FenceFadeRules.MaxFade).Within(1e-4f));
+            Assert.That(half, Is.EqualTo(0.5f * FenceFadeRules.CoreFade).Within(1e-4f));
         }
 
         [Test]
@@ -78,7 +79,7 @@ namespace CluckWars.Tests
         {
             var p = FenceFadeRules.ShaderParams;
             Assert.That(p, Is.EqualTo(new Vector4(FenceFadeRules.InnerRadius, FenceFadeRules.OuterRadius,
-                FenceFadeRules.MaxFade, FenceFadeRules.DepthSoftness)));
+                0f, FenceFadeRules.DepthSoftness)), "z is reserved since Phase 8 D10 (was the peak cap)");
         }
 
         // ── Time easing ─────────────────────────────────────────────────────

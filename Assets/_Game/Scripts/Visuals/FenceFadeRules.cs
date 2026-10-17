@@ -54,11 +54,12 @@ namespace CluckWars.Visuals
         /// 0.03 (was 0.06) keeps the edge to a few dither steps instead of a wide screen-door ring.</summary>
         public const float EdgeBandWidth = OuterRadius - InnerRadius;
 
-        /// <summary>Peak fade. Below 1 leaves a faint screen-door of fence so the player still sees there is a
-        /// wall between them and the open arena (it still blocks movement). The 4x4 dither has 16 thresholds at
-        /// (k + 0.5) / 16, so 0.92 clears 15 of 16 pixels: 6.25 % of the fence remains at the hole centre
-        /// (0.90 would clear only 14, leaving 12.5 %). Phase 8 A10 raised it from 0.85.</summary>
-        public const float MaxFade = 0.92f;
+        /// <summary>Fade inside <see cref="InnerRadius"/> of a fully open hole: 1, every pixel clipped. Phase 8 D10 removed
+        /// the old 0.92 peak cap (A10): it left 1 in 16 fence pixels (one fixed 4x4 Bayer cell) standing in the core, a dot
+        /// grid over the chicken's legs and foot ring that crawled as the camera followed. The "there is still a wall"
+        /// cue now lives only in the edge band (inner -> outer: the dither ramps the fence back in) and the cream rim.
+        /// Strength (time easing, a ghosted rival's <c>VisualOpacity</c>) and the depth gate still scale it below 1.</summary>
+        public const float CoreFade = 1f;
 
         /// <summary>Width of the cream rim band at the hole's edge, as a fraction of the screen height
         /// (~0.13 of <see cref="OuterRadius"/>). Phase 8 A10.</summary>
@@ -393,7 +394,7 @@ namespace CluckWars.Visuals
         {
             float radial = 1f - Smoothstep(InnerRadius, OuterRadius, screenDist);
             float inFront = Smoothstep(0f, Mathf.Max(DepthSoftness, 1e-4f), birdEyeDepth - fragmentEyeDepth);
-            return Mathf.Clamp01(strength) * MaxFade * radial * inFront;
+            return Mathf.Clamp01(strength) * radial * inFront; // Phase 8 D10: no peak cap, the core is CoreFade = 1
         }
 
         /// <summary>
@@ -420,8 +421,9 @@ namespace CluckWars.Visuals
             return wantOn != keywordOn;
         }
 
-        /// <summary>The shader global <c>_CW_FenceFadeParams</c>.</summary>
-        public static Vector4 ShaderParams => new Vector4(InnerRadius, OuterRadius, MaxFade, DepthSoftness);
+        /// <summary>The shader global <c>_CW_FenceFadeParams</c> (inner radius, outer radius, reserved 0, depth softness).
+        /// z carried the 0.92 peak cap until Phase 8 D10; the shader no longer reads it.</summary>
+        public static Vector4 ShaderParams => new Vector4(InnerRadius, OuterRadius, 0f, DepthSoftness);
 
         /// <summary>The shader global <c>_CW_FenceRimParams</c> (centre, half width, intensity, unused).</summary>
         public static Vector4 RimParams => new Vector4(RimCentre, 0.5f * RimWidth, RimIntensity, 0f);

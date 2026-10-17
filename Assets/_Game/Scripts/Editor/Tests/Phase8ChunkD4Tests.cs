@@ -74,8 +74,8 @@ namespace CluckWars.Tests
         {
             var rivalHole = new[] { new FenceFadeRules.HoleSample(1f, 0f, 10f) };
             var noLocal = new FenceFadeRules.HoleSample(0f, 0f, 10f);
-            Assert.AreEqual(FenceFadeRules.MaxFade, FenceFadeRules.CombinedFragmentFade(true, 8f, noLocal, rivalHole), 1e-5f,
-                "outer fence in front of the rival: full peak fade");
+            Assert.AreEqual(FenceFadeRules.CoreFade, FenceFadeRules.CombinedFragmentFade(true, 8f, noLocal, rivalHole), 1e-5f,
+                "outer fence in front of the rival: fully clear core (Phase 8 D10)");
             Assert.AreEqual(0f, FenceFadeRules.CombinedFragmentFade(true, 12f, noLocal, rivalHole), 1e-6f,
                 "fence behind the rival stays solid (same depth gate as the local hole)");
         }

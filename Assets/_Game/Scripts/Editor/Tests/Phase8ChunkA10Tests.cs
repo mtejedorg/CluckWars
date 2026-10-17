@@ -94,14 +94,15 @@ namespace CluckWars.Tests
         // ---- max fade + rim ---------------------------------------------------------------------------------
 
         [Test]
-        public void MaxFade_LeavesAtMostTenPercentOfTheFence()
+        public void HoleCentre_LeavesAtMostTenPercentOfTheFence()
         {
-            Assert.GreaterOrEqual(FenceFadeRules.MaxFade, 0.9f);
-            Assert.Less(FenceFadeRules.MaxFade, 1f, "a faint screen-door stays so the wall still reads");
+            // A10 asked for <= 10 % at the centre with a faint screen-door; Phase 8 D10 takes it to 0 % (the 1-in-16
+            // survivors crawled over the bird) and keeps the "still a wall" cue in the edge band + rim instead.
+            float fade = FenceFadeRules.FragmentFade(1f, 0f, 8f, 10f);
             // CW_Bayer4 thresholds are (k + 0.5) / 16; a pixel survives when threshold > fade.
-            int survive = Enumerable.Range(0, 16).Count(k => (k + 0.5f) / 16f - FenceFadeRules.MaxFade - 1e-4f >= 0f);
+            int survive = Enumerable.Range(0, 16).Count(k => (k + 0.5f) / 16f - fade - 1e-4f >= 0f);
             Assert.LessOrEqual(survive / 16f, 0.10f, $"{survive}/16 dither pixels survive at the hole centre");
-            Assert.Greater(survive, 0, "not a full cut-out");
+            Assert.AreEqual(0, survive, "Phase 8 D10: the core is a full cut-out");
         }
 
         [Test]
@@ -127,7 +128,6 @@ namespace CluckWars.Tests
             Assert.AreEqual(FenceFadeRules.RimCentre, p.x, 1e-6f);
             Assert.AreEqual(0.5f * FenceFadeRules.RimWidth, p.y, 1e-6f);
             Assert.AreEqual(FenceFadeRules.RimIntensity, p.z, 1e-6f);
-            Assert.AreEqual(FenceFadeRules.MaxFade, FenceFadeRules.ShaderParams.z, 1e-6f);
             Color32 c = FenceFadeRules.RimColor;
             Assert.AreEqual(new Color32(0xFE, 0xF5, 0xE0, 0xFF), c, "the UI cream");
         }

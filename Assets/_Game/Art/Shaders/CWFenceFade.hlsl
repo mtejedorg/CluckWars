@@ -18,7 +18,7 @@
 //   _CW_LocalBirdPos     xyz = the local bird's body centre (world), w = strength 0..1 (time-smoothed)
 //   _CW_FenceFadeParams  x = inner radius, y = outer radius (both as a fraction of the screen HEIGHT; the
 //                        dithered edge between them is FenceFadeRules.EdgeBandWidth, 0.03 since Phase 8 C16),
-//                        z = max fade 0..1 (below 1 leaves a faint screen-door so the fence still reads),
+//                        z = reserved (was the max fade 0.92 until Phase 8 D10; not read: the core is fully clear),
 //                        w = depth softness in world units (how far in front of the bird the fade ramps in)
 //   _CW_FenceRimParams   x = rim centre radius, y = rim half width (fractions of the screen height),
 //                        z = rim blend 0..1 toward _CW_FenceRimColor (ForwardLit only)
@@ -74,10 +74,14 @@ float CW_FenceInFront(float fragEyeDepth, float birdEyeDepth)
 }
 
 // 0 = keep, 1 = fully faded. screenDist and the radii are fractions of the screen height.
+// Phase 8 D10: no peak cap. Inside the inner radius radial is exactly 1, so an open hole (strength 1, in front) fades
+// by 1 and every Bayer threshold (at most 31/32) is clipped: no surviving fence pixels crawl over the chicken's legs
+// and ring. The dither lives only in the edge band (inner -> outer), where the fence visibly closes back up and the
+// cream rim outlines it: that band + rim is the "there is a wall here" cue (it used to be a 1-in-16 core stipple).
 float CW_FenceFadeAmount(float screenDist, float inFront, float strength)
 {
     float radial = 1.0 - smoothstep(_CW_FenceFadeParams.x, _CW_FenceFadeParams.y, screenDist);
-    return saturate(strength) * _CW_FenceFadeParams.z * radial * inFront;
+    return saturate(strength) * radial * inFront;
 }
 
 // 0..1 weight of the thin rim band around the hole's outer edge.

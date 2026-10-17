@@ -14,7 +14,7 @@ namespace CluckWars.Tests
     /// <summary>
     /// Phase 8 C16 "Fence-fade band": the dithered ramp between the hole's inner and outer radius was 0.06 screen
     /// heights, a wide stippled ring. It is now ~0.03 (inner radius 0.09 -> 0.12), with the hole size (outer radius),
-    /// MaxFade and the cream rim unchanged. Also pins the fix for the FXC "use of potentially uninitialized variable"
+    /// the cream rim unchanged (the peak cap, then 0.92, is gone since Phase 8 D10: the core is fully clear). Also pins the fix for the FXC "use of potentially uninitialized variable"
     /// warning in <c>CW_FenceFadeClipRim</c> (one exit point, no early return ahead of the clip).
     /// </summary>
     public class Phase8ChunkC16Tests
@@ -34,10 +34,9 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void HoleSize_AndMaxFade_AreUnchanged()
+        public void HoleSize_AndRim_AreUnchanged()
         {
             Assert.AreEqual(0.15f, FenceFadeRules.OuterRadius, 1e-6f, "outer radius (hole size)");
-            Assert.AreEqual(0.92f, FenceFadeRules.MaxFade, 1e-6f, "MaxFade (A10)");
             Assert.AreEqual(0.02f, FenceFadeRules.RimWidth, 1e-6f, "rim width (A10)");
             Assert.AreEqual(0.45f, FenceFadeRules.RimIntensity, 1e-6f, "rim intensity (A10)");
         }
@@ -45,11 +44,11 @@ namespace CluckWars.Tests
         [Test]
         public void Fade_IsFullInsideTheInnerRadius_AndSolidAtTheOuterRadius()
         {
-            Assert.AreEqual(FenceFadeRules.MaxFade, FenceFadeRules.FragmentFade(1f, FenceFadeRules.InnerRadius, Front, Bird), 1e-5f);
-            Assert.AreEqual(FenceFadeRules.MaxFade, FenceFadeRules.FragmentFade(1f, 0.5f * FenceFadeRules.InnerRadius, Front, Bird), 1e-5f);
+            Assert.AreEqual(FenceFadeRules.CoreFade, FenceFadeRules.FragmentFade(1f, FenceFadeRules.InnerRadius, Front, Bird), 1e-5f);
+            Assert.AreEqual(FenceFadeRules.CoreFade, FenceFadeRules.FragmentFade(1f, 0.5f * FenceFadeRules.InnerRadius, Front, Bird), 1e-5f);
             Assert.AreEqual(0f, FenceFadeRules.FragmentFade(1f, FenceFadeRules.OuterRadius, Front, Bird), 1e-5f);
             float mid = FenceFadeRules.FragmentFade(1f, FenceFadeRules.InnerRadius + 0.5f * FenceFadeRules.EdgeBandWidth, Front, Bird);
-            Assert.That(mid, Is.GreaterThan(0f).And.LessThan(FenceFadeRules.MaxFade), "still a dithered (soft) edge, not a hard cut");
+            Assert.That(mid, Is.GreaterThan(0f).And.LessThan(FenceFadeRules.CoreFade), "still a dithered (soft) edge, not a hard cut");
         }
 
         [Test]
@@ -59,7 +58,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(FenceFadeRules.InnerRadius, p.x, 1e-6f);
             Assert.AreEqual(FenceFadeRules.OuterRadius, p.y, 1e-6f);
             Assert.AreEqual(FenceFadeRules.EdgeBandWidth, p.y - p.x, 1e-6f);
-            Assert.AreEqual(FenceFadeRules.MaxFade, p.z, 1e-6f);
+            Assert.AreEqual(0f, p.z, 1e-6f, "reserved since Phase 8 D10 (was the peak cap)");
         }
 
         // ---- the rim ----------------------------------------------------------------------------------------

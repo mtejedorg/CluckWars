@@ -845,9 +845,14 @@ to 0.449, so the ink and cream guides read. Material colour and shader unchanged
 batches +2 at a fixed corner, SetPass identical; GPU time still to measure on the Pixel 9.
 Not done: a camera pull-in at GET READY, and a bush ring (about 2 500 tris each, too heavy for 30 fps).
 
-**Fence fade (Phase 8).** The see-through hole in the near fence / coop clears up to 92 % (15 of 16 dither
-pixels) and has a thin cream (#FEF5E0, 45 %) rim at its edge so the wall still reads. The fade code only runs
-in the `_CW_FENCE_FADE` shader variant, switched on while a hole is open.
+**Fence fade (Phase 8).** The see-through hole in the near fence / coop is fully clear inside its inner radius
+(0.12 screen heights; Phase 8 D10 removed the old 92 % cap, whose 1-in-16 surviving dither pixels drew a dot grid
+over the chicken's legs and foot ring that crawled as the camera followed). The 4x4 dither lives only in the
+0.03-wide edge band (inner -> outer 0.15), where the fence closes back up, and a thin cream (#FEF5E0, 45 %) rim
+(centre 0.14, width 0.02) outlines it: band + rim are the "there is still a wall here" cue. The same rule holds for
+every hole (local bird, other chickens, fixed targets) and every fence material, inner arm walls and coops included;
+a ghosted rival's hole is still only as open as its opacity. The fade code only runs in the `_CW_FENCE_FADE` shader
+variant, switched on while a hole is open.
 
 Who gets a hole (all local presentation, `FenceFadeDriver` + `FenceFixedTargets`, ease 0.15 s in and out):
 the local bird on every fence material; every other chicken (rivals, decoys) covered by an OUTER fence, up to
