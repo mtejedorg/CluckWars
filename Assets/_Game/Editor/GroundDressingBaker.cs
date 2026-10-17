@@ -655,11 +655,16 @@ namespace CluckWars.EditorTools
             return png;
         }
 
+        /// <summary>Phase 8 D5 sources (<c>tools/art/d5_decals/make_d5_decals.py</c> from the Stage 2 decals): ~58 % of the
+        /// flowers, warm cream / yellow / a little pink, ~30 % darker; the mud a dark wet blue-grey, out of the pile-disc browns.</summary>
+        public const string FlowerSource = "flower_patch_decal_d5.png";
+        public const string MudSource = "mud_puddle_decal_d5.png";
+
         /// <summary>1024 x 512: flower patch (alpha x 0.4/0.35, so the shared 0.4 cutoff keeps its 0.35 edge) | mud puddle.</summary>
         private static byte[] BuildDecalAtlas()
         {
-            var flower = LoadRaw("flower_patch_decal.png");
-            var mud = LoadRaw("mud_puddle_decal.png");
+            var flower = LoadRaw(FlowerSource);
+            var mud = LoadRaw(MudSource);
             const int S = 512;
             var o = new Texture2D(2 * S, S, TextureFormat.RGBA32, false, false);
             var px = new Color32[2 * S * S];
