@@ -8,6 +8,8 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ## 🚧 PHASE 8 chunk D IN PROGRESS (2026-10-16): final-audit polish D1-D18 + decisions E1-E4 - EditMode baseline 1684/1684
 
+**PAUSED 2026-10-17 by Maestro:** the remaining chunk D work (D11 from `git stash`, D12–D15, D17, D18, shader warm-up, final re-capture + cost) and two open questions are in `docs/HANDOFF-PHASE8D-2026-10.md`, for a future Sonnet agent. EditMode run: `python tools/ui_capture/run_editmode_tests.py`.
+
 Brief: scratchpad `env3d/phase8d_brief.md`; decisions E1-E4 all option a (memory `env3d-decisions-2026-10-15`). Order D16 -> D1 -> E4 measure -> D2 -> E3 -> E1 -> E2 -> D7-D10 -> D3-D6 -> D11-D15 -> D17-D18 -> warm-up -> final re-capture. Editor `CluckWars.PerformanceMode` pref was 1 at session start (restore at the end). Captures `Captures/env3d_after/D/<item>/`.
 
 | Item | Status | Commit | Notes |
