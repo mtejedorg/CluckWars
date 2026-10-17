@@ -276,6 +276,21 @@ Characters use **radial gradients** (light highlight at upper-left → primary c
   alpha-clipped flower / mud decals (never reading as obstacles), and 15 low prop vignettes outside the fence
   (< 0.8 m in every fence-hedge gap, no colliders). Distance fog is NOT used: URP fog on the orthographic match
   camera is a screen-row gradient that would grey the far playfield (open decision, STATE S3c).
+- **Surround ground + hedges (Phase 8 D4).** Outside the fence is the SAME field a step darker: `Surround_Grass.mat`
+  keeps its flat base colour `(0.15, 0.22, 0.14)` as the mean (renders luma ~66 vs the arena's ~158, CIELAB C* ~20 vs
+  ~54, both tiers) and carries the arena grass as a stock URP Lit Detail Albedo x2 map (`surround_grass_detail.png`,
+  linear, neutral mean: `GrassCalm` / its mean, half per-channel / half luma so its variation is less saturated, x1.35
+  contrast) at the arena tile's world period (10.26 m, detail tiling 25.34). The tile lives in the DETAIL slot on purpose:
+  the base map must stay empty because the Mobile haze copy writes its per-texel ramp there (`SurroundHazeBaker`), and
+  the copy inherits the detail map. Hedges: clumpy leaf tiles (`hedge_leaf_side_d4.png` / `hedge_leaf_top_d4.png`, round
+  8-15 cm leaf clusters, top-lit with dark gaps, luma std 24-26 vs 9-10, the source tiles' mean colour) on a 2 m x 1 m
+  period (base tiling (0.5, 1); the strip's UVs are metres), so the clumps do not repeat every metre. The top edge is
+  **scalloped in texture, no alpha clip, no new geometry**: the sides' top row (v 0.6-0.78, unique per strip height) is a
+  hanging row of six irregular top-lit lobes per 2 m with dark notches between them, and the crown takes a Detail Albedo x2
+  map (`hedge_crown_scallop.png`, detail tiling (1, 1/3): the crown's planar v 0.47-2.52 maps into 0..1 once) that lobes
+  BOTH crown edges at the same u, so one clump reads across the shoulder; neutral (128) across the crown middle. Generator
+  `tools/art/d4_surround/make_d4_surround.py` (PIL/numpy edits of the existing tiles, no generation). Changing any of
+  these materials means re-running `Cluck Wars/Map/Bake Mobile Surround Haze` (after `GroundDressingBaker`, the F1 rule).
 - **Ground overlays (Phase 8).** Identity / rival rings, state blobs and target marks sit on the grass under the
   bird (`ChickenGround` anchor from the CharacterController), not at the body pivot.
 - **Ring edge: ink band + cream rim (Phase 8 D9).** No player colour separates from the ground on its own (stroke vs

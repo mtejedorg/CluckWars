@@ -143,17 +143,20 @@ namespace CluckWars.Tests
         [Test]
         public void HedgeMaterials_UseTheLeafTiles_WhiteBase()
         {
+            // Phase 8 D4 swapped the S3a leaf tiles for clumpy, scalloped 2 m x 1 m tiles (base tiling (0.5, 1): the mesh UVs
+            // are in metres) and gave the crown a scallop Detail Albedo x2 map; Phase8ChunkD4SurroundTests pins those.
             var side = AssetDatabase.LoadAssetAtPath<Material>(HedgeSide);
             var top = AssetDatabase.LoadAssetAtPath<Material>(HedgeTop);
-            Assert.AreEqual("Assets/Generated/Env/Textures/hedge_leaf_tile.png", AssetDatabase.GetAssetPath(side.GetTexture("_BaseMap")));
-            Assert.AreEqual("Assets/Generated/Env/Textures/hedge_leaf_tile_top.png", AssetDatabase.GetAssetPath(top.GetTexture("_BaseMap")));
+            Assert.AreEqual(Phase8ChunkD4SurroundTests.SideTile, AssetDatabase.GetAssetPath(side.GetTexture("_BaseMap")));
+            Assert.AreEqual(Phase8ChunkD4SurroundTests.TopTile, AssetDatabase.GetAssetPath(top.GetTexture("_BaseMap")));
             foreach (var m in new[] { side, top })
             {
                 Assert.AreEqual(Color.white, m.GetColor("_BaseColor"), m.name);
-                Assert.AreEqual(Vector2.one, m.GetTextureScale("_BaseMap"), $"{m.name}: UVs are already in metres");
-                // The macro map is only valid as a linear (sRGB off) Detail Albedo x2; if a material uses it, check it.
+                Assert.AreEqual(new Vector2(1f / Phase8ChunkD4SurroundTests.HedgePeriod, 1f), m.GetTextureScale("_BaseMap"),
+                    $"{m.name}: UVs are in metres; the tile spans {Phase8ChunkD4SurroundTests.HedgePeriod} m along the hedge x 1 m");
+                // A Detail Albedo x2 map is only valid linear (sRGB off); the side has none, the crown has the D4 scallop.
                 if (m.IsKeywordEnabled("_DETAIL_MULX2"))
-                    Assert.AreEqual(HedgeMacro, AssetDatabase.GetAssetPath(m.GetTexture("_DetailAlbedoMap")), m.name);
+                    Assert.IsFalse(((TextureImporter)AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(m.GetTexture("_DetailAlbedoMap")))).sRGBTexture, m.name);
             }
         }
 

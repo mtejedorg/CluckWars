@@ -25,6 +25,7 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
+  - _DETAIL_MULX2
   - _EMISSION
   - _ENVIRONMENTREFLECTIONS_OFF
   - _SPECULARHIGHLIGHTS_OFF
@@ -50,8 +51,8 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _DetailAlbedoMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
+        m_Texture: {fileID: 2800000, guid: e224970aba3395a4cafe72cf3326509c, type: 3}
+        m_Scale: {x: 25.341131, y: 25.341131}
         m_Offset: {x: 0, y: 0}
     - _DetailMask:
         m_Texture: {fileID: 0}
