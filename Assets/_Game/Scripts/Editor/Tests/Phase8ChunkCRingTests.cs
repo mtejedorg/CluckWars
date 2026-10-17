@@ -133,7 +133,7 @@ namespace CluckWars.Tests
         [TestCase(ChickenClass.Speedy)]
         [TestCase(ChickenClass.Fatty)]
         [TestCase(ChickenClass.Assassin)]
-        public void EveryClass_Rings_ClearTheBody_WithAStrokeAndACreamEdge(ChickenClass cls)
+        public void EveryClass_Rings_ClearTheBody_WithAStrokeAndAnInkCreamEdge(ChickenClass cls)
         {
             var root = SpawnAs(cls);
             float body = BodyHalfWidthWorld(_model);
@@ -143,7 +143,7 @@ namespace CluckWars.Tests
             {
                 var ring = Find(root, ringName).GetComponent<SpriteRenderer>();
                 var edgeT = Find(root, ringName + "Edge");
-                Assert.IsNotNull(edgeT, $"{cls}: {ringName} has no cream edge child.");
+                Assert.IsNotNull(edgeT, $"{cls}: {ringName} has no edge child.");
                 var edge = edgeT.GetComponent<SpriteRenderer>();
 
                 float outer = ring.transform.lossyScale.x * 0.5f;
@@ -154,7 +154,8 @@ namespace CluckWars.Tests
                 Assert.IsNotNull(ring.sprite, $"{cls}: {ringName} has no sprite.");
                 Assert.IsNotNull(edge.sprite, $"{cls}: {ringName}Edge has no sprite.");
                 Assert.Greater(edge.transform.lossyScale.x, ring.transform.lossyScale.x, $"{cls}: {ringName}Edge is not outside the stroke.");
-                Assert.AreEqual(UiGfx.TextPrimary.r, edge.color.r, 0.001f, $"{cls}: {ringName}Edge is not cream.");
+                // Phase 8 D9: the edge is an ink band + cream rim baked into its sprite (Phase8ChunkD9RingEdgeTests pins the tones); the renderer is white.
+                Assert.AreEqual(1f, edge.color.r, 0.001f, $"{cls}: {ringName}Edge renderer must be white (tones live in the D9 edge sprite).");
                 Assert.Less(edge.sortingOrder, ring.sortingOrder, $"{cls}: {ringName}Edge must draw under the colour stroke.");
             }
 

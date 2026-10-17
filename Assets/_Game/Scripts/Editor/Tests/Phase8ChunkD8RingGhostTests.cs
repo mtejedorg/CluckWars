@@ -144,7 +144,7 @@ namespace CluckWars.Tests
                 var ghost = Private<SpriteRenderer>(bars, "_ringGhost");
                 AssertGhostMirrors(ring, ghost, "identity");
                 Assert.IsNull(Private<SpriteRenderer>(bars, "_ringEdge").transform.Find("IdentityRingEdge" + GroundRingStyle.GhostSuffix),
-                    "the cream edge has no ghost (40 % cream is invisible on the gold mound)");
+                    "the ink / cream edge has no ghost (the ghost is colour-only, Phase 8 D9)");
 
                 bars.SetBodyFootprint(0.9f); // a Fatty-sized body: new radius, new annulus sprite
                 AssertGhostMirrors(ring, ghost, "identity after SetBodyFootprint");
@@ -240,7 +240,7 @@ namespace CluckWars.Tests
             var ring = ringGo.AddComponent<SpriteRenderer>();
             ring.color = new Color(1f, 0f, 0f, 1f);
             SpriteRenderer edge = null, ghost = null;
-            GroundRingStyle.Apply(ring, ref edge, 1.5f, 0.3f, 0.02f, 0f);
+            GroundRingStyle.Apply(ring, ref edge, 1.5f, 0.3f, 0.02f, 0.01f, 0f);
             Assert.IsTrue(GroundRingStyle.ApplyGhost(ring, ref ghost, Load(GhostMatPath)));
             GroundRingStyle.SyncGhost(ring, ghost, 1f);
 

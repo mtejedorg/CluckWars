@@ -238,13 +238,16 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void RingCreamEdge_StillSitsUnderTheRivalRing_WhateverThePlayerColour()
+        public void RingEdge_StillSitsUnderTheRivalRing_WhateverThePlayerColour()
         {
-            // R3's cream edge is what keeps the darkest player colour (P4) readable on grass; it must exist and stay cream.
+            // The rival ring's edge (R3 cream, D9 ink band + cream rim) is what separates the player colour from the ground; it must
+            // exist whatever the seat. D9: the tones live in the edge sprite, the renderer is white and only fades.
             RingColour(3);
             var edge = Field("_ringEdge");
-            Assert.IsNotNull(edge, "rival ring lost its cream edge child");
-            AssertRgb(UiGfx.TextPrimary, edge.color, "rival ring edge");
+            Assert.IsNotNull(edge, "rival ring lost its edge child");
+            AssertRgb(Color.white, edge.color, "rival ring edge renderer (tones are in the sprite)");
+            Assert.AreSame(GroundRingStyle.EdgeBand(Field("_ring").transform.localScale.x * 0.5f, GroundRingStyle.RivalEdge, GroundRingStyle.RivalRim),
+                edge.sprite, "rival edge is the D9 ink / cream band");
         }
     }
 }

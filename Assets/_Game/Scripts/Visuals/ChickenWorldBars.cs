@@ -49,7 +49,7 @@ namespace CluckWars.Visuals
         private SpriteRenderer _cargoFill;
         private TextMesh       _cargoText;
         private SpriteRenderer _ring;
-        private SpriteRenderer _ringEdge;    // thin cream outer edge so a dark player colour reads on grass
+        private SpriteRenderer _ringEdge;    // D9 two-tone edge: ink band + cream rim, every player colour reads on light and shaded ground
         private SpriteRenderer _ringGhost;   // D8: the arc hidden by a food-pile mound, drawn faint (RingGhost.mat)
         private float _ringDrawRadius;       // live outer radius of the colour stroke, root-local
 
@@ -177,7 +177,7 @@ namespace CluckWars.Visuals
         {
             _ringDrawRadius = radius;
             GroundRingStyle.Apply(_ring, ref _ringEdge, radius, GroundRingStyle.IdentityStroke,
-                GroundRingStyle.IdentityEdge, GroundRingStyle.IdentityEdgeAlpha);
+                GroundRingStyle.IdentityEdge, GroundRingStyle.IdentityRim, GroundRingStyle.IdentityEdgeAlpha);
             GroundRingStyle.ApplyGhost(_ring, ref _ringGhost, _ringGhostMaterial);
         }
 

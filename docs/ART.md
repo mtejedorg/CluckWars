@@ -278,10 +278,24 @@ Characters use **radial gradients** (light highlight at upper-left → primary c
   camera is a screen-row gradient that would grey the far playfield (open decision, STATE S3c).
 - **Ground overlays (Phase 8).** Identity / rival rings, state blobs and target marks sit on the grass under the
   bird (`ChickenGround` anchor from the CharacterController), not at the body pivot.
+- **Ring edge: ink band + cream rim (Phase 8 D9).** No player colour separates from the ground on its own (stroke vs
+  sunlit ground 1.0-2.1:1 at the match camera), and the R3 cream edge only helped on dark ground (1.35-1.65:1 on sunlit
+  grass / straw, rival ring 1.15-1.25:1). The arena has both: sunlit grass / dirt path / straw pad / mound (rel. luminance
+  0.35-0.5) and real shadows from fences, props and the birds themselves (grass ~0.05-0.07, shaded straw ~0.09). So the
+  colour stroke is framed by a **two-tone edge**: an **ink** band (`#1A0E04`, `UiGfx.TextDark`, the same ink as the
+  rival pill and the E1 chevron outline) right against the stroke, carrying light ground, and a thin **cream** rim
+  (`#FEF5E0`, `UiGfx.TextPrimary`) outside it, carrying the shadows. Modelled on the measured ground colours, ink alone gets
+  1.5-2.8:1 in shadow and cream alone 1.7-2.2:1 in sun; together every seat's ring reads >= 3:1 on every ground. Both tones are baked into the one
+  edge sprite (`GroundRingStyle.EdgeBand`, no extra renderer); widths identity ink 0.045 m + rim 0.03 m at alpha 0.9,
+  rival 0.04 + 0.025 at 0.85 (lighter than identity; the rival stroke stays 0.5 alpha). Bands are sized for the Mobile
+  0.8 render scale (a 0.035 + 0.02 m first try blurred to 2.3-2.9:1 there). Stroke radius / width, alpha, the GET READY
+  pulse and hitboxes unchanged; the edge now reaches 7.5 cm (identity) / 6.5 cm (rival) outside the stroke, ~4 cm more than R3. Measured match camera, both tiers, ring
+  median vs its ground (weakest pair): 3.26:1 (Mobile, rival ring on shadowed grass), PC >= 4.4:1; before 1.15:1.
+  Guardrail `Phase8ChunkD9RingEdgeTests`; tool `tools/ui_capture/capture_d9_ringedge.py`.
 - **Ring ghost under food piles (Phase 8 D8).** The body-sized rings (R3) run under a mound when a chicken pecks at a
   pile, and from the far side most of the colour vanished (match camera: 46 % of a Warrior's identity ring left
   behind the home pile, 70 % of a Fatty rival ring). The hidden arc of the colour stroke (identity and rival ring;
-  not the cream edge) now shows as a faint ghost: same annulus, same player colour, **40 % alpha** for a ring at its
+  not the D9 ink / cream edge) now shows as a faint ghost: same annulus, same player colour, **40 % alpha** for a ring at its
   normal opacity, fading with it (`GroundRingStyle.ApplyGhost`, `Art/Materials/RingGhost.mat`). It draws only
   where the ring is behind the **mound itself**: the mound's second material (`MoundStencilMark.mat`, colourless,
   last opaque queue) marks the pixels where the mound is the front-most surface, so the ghost never shows through a
@@ -397,7 +411,7 @@ The match HUD is minimal — the game area is sacred. There is **no attack butto
 - HP bar: 52–64px wide, 7px tall, dark trough (#0a0604) with 1.5px border (#4a2818), inset shadow. Fill uses HP gradient with inset highlight at top.
 - Cargo bar: same width, 5px tall, 2px below HP. Fill uses cargo gradient.
 - Cargo text: food icon + "9/20" in Nunito 700, 10px.
-- Player identity ring: colored oval at feet, matching player color with slight stroke; the arc hidden under a food
+- Player identity ring: colored oval at feet, matching player color, framed by an ink band + cream rim (D9); the arc hidden under a food
   pile shows as a 40 % ghost (Phase 8 D8, see "Ring ghost under food piles").
 - All bars have beveled appearance: inset shadow on trough, highlight on fill.
 

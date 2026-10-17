@@ -111,7 +111,7 @@ namespace CluckWars.Visuals
         private ILogService _log;
 
         private SpriteRenderer _ring;
-        private SpriteRenderer _ringEdge;      // thin cream outer edge (GroundRingStyle)
+        private SpriteRenderer _ringEdge;      // D9 two-tone edge: ink band + cream rim (GroundRingStyle)
         private SpriteRenderer _ringGhost;     // D8: the arc hidden by a food-pile mound, drawn faint (RingGhost.mat)
         private float _ringRadius = FeedbackTuning.RivalRingRadius;
         private SpriteRenderer _chevron;
@@ -213,7 +213,7 @@ namespace CluckWars.Visuals
         private void ApplyRingGeometry()
         {
             GroundRingStyle.Apply(_ring, ref _ringEdge, _ringRadius, FeedbackTuning.RivalRingWidth,
-                GroundRingStyle.RivalEdge, GroundRingStyle.RivalEdgeAlpha);
+                GroundRingStyle.RivalEdge, GroundRingStyle.RivalRim, GroundRingStyle.RivalEdgeAlpha);
             GroundRingStyle.ApplyGhost(_ring, ref _ringGhost, _ringGhostMaterial);
         }
 
