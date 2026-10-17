@@ -2,7 +2,9 @@ using CluckWars.Gameplay;
 using CluckWars.Localization;
 using CluckWars.Settings;
 using CluckWars.UI;
+using CluckWars.Logging;
 using UnityEngine;
+using Zenject;
 
 namespace CluckWars.Visuals
 {
@@ -29,6 +31,9 @@ namespace CluckWars.Visuals
         [Range(0.1f, 1.5f)]
         [SerializeField] private float _ringRadius = 0.42f;
 
+        [Tooltip("Phase 8 D8: Art/Materials/RingGhost.mat. Draws the part of the identity ring hidden under a food-pile mound as a faint ghost (GroundRingStyle.ApplyGhost).")]
+        [SerializeField] private Material _ringGhostMaterial;
+
         [Header("Sprites")]
         [SerializeField] private Sprite _barTroughSprite;
         [SerializeField] private Sprite _barFillSprite;
@@ -45,12 +50,16 @@ namespace CluckWars.Visuals
         private TextMesh       _cargoText;
         private SpriteRenderer _ring;
         private SpriteRenderer _ringEdge;    // thin cream outer edge so a dark player colour reads on grass
+        private SpriteRenderer _ringGhost;   // D8: the arc hidden by a food-pile mound, drawn faint (RingGhost.mat)
         private float _ringDrawRadius;       // live outer radius of the colour stroke, root-local
 
         private int _appliedRingCorner = -2;
         private Color _ringBaseColor = Color.white;
         private float _youEmphasis;          // 0..1, GET READY "this is you" marker (YouMarkerRules)
         private bool _ringEmphasised;        // last frame wrote an emphasised scale/alpha
+
+        /// <summary>Identity ring alpha once the corner is stamped (unstamped: 0.5). Also the ghost's nominal alpha (D8).</summary>
+        public const float RingAlpha = 0.75f;
 
         private float CargoHeight => _hpHeight * 0.72f;
 
@@ -151,6 +160,9 @@ namespace CluckWars.Visuals
             _ring.color        = Color.white;
             _ring.sortingOrder = 1;
             SetRingRadius(_ringRadius);
+            if (_ringGhost == null && ProjectContext.HasInstance)
+                ProjectContext.Instance.Container.TryResolve<ILogService>()?.Error("ChickenWorldBars",
+                    "_ringGhostMaterial is not assigned on " + name + ": the identity ring's arc under a food pile is not drawn (Phase 8 D8)");
         }
 
         /// <summary>Re-sizes the identity ring to clear the class model's body (Phase 8 chunk C R3). Presentation only;
@@ -166,6 +178,7 @@ namespace CluckWars.Visuals
             _ringDrawRadius = radius;
             GroundRingStyle.Apply(_ring, ref _ringEdge, radius, GroundRingStyle.IdentityStroke,
                 GroundRingStyle.IdentityEdge, GroundRingStyle.IdentityEdgeAlpha);
+            GroundRingStyle.ApplyGhost(_ring, ref _ringGhost, _ringGhostMaterial);
         }
 
         // ── Per-frame refresh ──────────────────────────────────────────────────
@@ -179,6 +192,7 @@ namespace CluckWars.Visuals
 
             RefreshRing(live);
             RefreshYouMarker(live);
+            GroundRingStyle.SyncGhost(_ring, _ringGhost, RingAlpha);
 
             bool stunned = _combat != null && _combat.IsRemoved;
             bool show    = live && !stunned;
@@ -252,7 +266,7 @@ namespace CluckWars.Visuals
             // The corner's player colour (PlayerPalette, same as the HUD, menus and podium); neutral and
             // fainter until the spawn stamps a corner.
             var c = PlayerPalette.ForCorner(corner);
-            c.a = corner < 0 ? 0.5f : 0.75f;
+            c.a = corner < 0 ? 0.5f : RingAlpha;
             _ringBaseColor = c;
             _ring.color = c;
         }

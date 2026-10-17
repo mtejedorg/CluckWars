@@ -104,11 +104,15 @@ namespace CluckWars.Visuals
         /// <summary>Sorting order of the outline: directly behind the chevron fill, above all arena geometry.</summary>
         public const int ChevronOutlineSortingOrder = ChevronSortingOrder - 1;
 
+        [Tooltip("Phase 8 D8: Art/Materials/RingGhost.mat. Draws the part of the rival ring hidden under a food-pile mound as a faint ghost (GroundRingStyle.ApplyGhost).")]
+        [SerializeField] private Material _ringGhostMaterial;
+
         private ChickenController _controller;
         private ILogService _log;
 
         private SpriteRenderer _ring;
         private SpriteRenderer _ringEdge;      // thin cream outer edge (GroundRingStyle)
+        private SpriteRenderer _ringGhost;     // D8: the arc hidden by a food-pile mound, drawn faint (RingGhost.mat)
         private float _ringRadius = FeedbackTuning.RivalRingRadius;
         private SpriteRenderer _chevron;
         private SpriteRenderer _chevronOutline; // ink edge child, drawn behind the fill (E1)
@@ -174,6 +178,8 @@ namespace CluckWars.Visuals
             _ring = ringGo.AddComponent<SpriteRenderer>();
             _ring.sortingOrder = RingSortingOrder;
             ApplyRingGeometry();
+            if (_ringGhost == null)
+                _log?.Error(Source, "_ringGhostMaterial is not assigned: the rival ring's arc under a food pile is not drawn (Phase 8 D8).");
             ringGo.SetActive(false);
 
             // NOT parented to the chicken. The chevron is screen furniture: it is positioned
@@ -204,9 +210,12 @@ namespace CluckWars.Visuals
             if (_ring != null) ApplyRingGeometry();
         }
 
-        private void ApplyRingGeometry() =>
+        private void ApplyRingGeometry()
+        {
             GroundRingStyle.Apply(_ring, ref _ringEdge, _ringRadius, FeedbackTuning.RivalRingWidth,
                 GroundRingStyle.RivalEdge, GroundRingStyle.RivalEdgeAlpha);
+            GroundRingStyle.ApplyGhost(_ring, ref _ringGhost, _ringGhostMaterial);
+        }
 
         private void LateUpdate()
         {
@@ -269,6 +278,7 @@ namespace CluckWars.Visuals
 
             _ring.color = WithAlpha(tint, FeedbackTuning.RivalRingAlpha * opacity);
             GroundRingStyle.SetEdgeAlpha(_ringEdge, GroundRingStyle.RivalEdgeAlpha * opacity);
+            GroundRingStyle.SyncGhost(_ring, _ringGhost, FeedbackTuning.RivalRingAlpha);
             if (!_ring.gameObject.activeSelf) _ring.gameObject.SetActive(true);
         }
 

@@ -35,6 +35,16 @@ namespace CluckWars.Visuals
         public const float RivalEdge = 0.022f;
         public const float RivalEdgeAlpha = 0.55f;
 
+        /// <summary>Phase 8 D8: opacity of the ghost arc (the part of a ring hidden by a food-pile mound) for a ring at its
+        /// nominal alpha (see <see cref="SyncGhost"/>). Lives on the material (<c>RingGhost.mat</c> <c>_GhostAlpha</c>); pinned here for the tests.</summary>
+        public const float GhostAlpha = 0.4f;
+
+        /// <summary>Name suffix of the ghost child (<c>IdentityRingGhost</c>, <c>RivalRingGhost</c>).</summary>
+        public const string GhostSuffix = "Ghost";
+
+        /// <summary>Ghost sorting order relative to its ring (the cream edge is at -1).</summary>
+        public const int GhostSortingOffset = -2;
+
         private const int Size = 256;
         private const float Feather = 0.012f; // root-local metres
 
@@ -107,6 +117,51 @@ namespace CluckWars.Visuals
             edge.transform.localScale = Vector3.one * (outer / radius);
             edge.sortingOrder = ring.sortingOrder - 1;
             edge.sortingLayerID = ring.sortingLayerID;
+        }
+
+        /// <summary>
+        /// Phase 8 D8: builds (or refreshes) the ghost child of <paramref name="ring"/>: the same annulus sprite drawn with
+        /// <paramref name="material"/> (<c>Art/Materials/RingGhost.mat</c>, shader <c>Cluck Wars/Ring Ghost</c>), which only
+        /// draws where the ring is behind a food-pile mound (ZTest Greater + the mound's stencil mark), at
+        /// <see cref="GhostAlpha"/> alpha in the ring's colour. A child at identity, so it follows the ring's scale (GET READY pulse),
+        /// position and active state; the colour follows via <see cref="SyncGhost"/>. Only the colour stroke gets a ghost: the
+        /// cream edge at 40 % is invisible on the gold mound. Returns false (no ghost) when <paramref name="material"/> is null.
+        /// </summary>
+        public static bool ApplyGhost(SpriteRenderer ring, ref SpriteRenderer ghost, Material material)
+        {
+            if (ring == null || material == null) return false;
+            if (ghost == null)
+            {
+                var go = new GameObject(ring.gameObject.name + GhostSuffix);
+                go.transform.SetParent(ring.transform, worldPositionStays: false);
+                go.transform.localPosition = Vector3.zero;
+                go.transform.localRotation = Quaternion.identity;
+                go.transform.localScale = Vector3.one;
+                ghost = go.AddComponent<SpriteRenderer>();
+                ghost.sharedMaterial = material;
+            }
+            ghost.sprite = ring.sprite;
+            ghost.sortingLayerID = ring.sortingLayerID;
+            // Below the ring (order) and its cream edge (order - 1): every ghost sorts into one consecutive run, so the
+            // ghost shader costs one SetPass per frame instead of a switch per ring. Ghost and ring never share a pixel
+            // (ZTest Greater vs LEqual), so drawing it first changes nothing visible.
+            ghost.sortingOrder = ring.sortingOrder + GhostSortingOffset;
+            ghost.color = new Color(ring.color.r, ring.color.g, ring.color.b, 0f); // SyncGhost sets the alpha
+            return true;
+        }
+
+        /// <summary>
+        /// Copies the ring's colour onto its ghost, with the alpha expressed relative to the ring's nominal alpha
+        /// (<paramref name="nominalAlpha"/>: identity 0.75, rival <see cref="FeedbackTuning.RivalRingAlpha"/>), so a ring at its
+        /// normal opacity gets a ghost at exactly <see cref="GhostAlpha"/> (the material multiplies by it) and a fading ring
+        /// (rival opacity, unstamped corner) fades its ghost with it. Brighter than nominal (GET READY) clamps at 1.
+        /// </summary>
+        public static void SyncGhost(SpriteRenderer ring, SpriteRenderer ghost, float nominalAlpha)
+        {
+            if (ring == null || ghost == null) return;
+            var c = ring.color;
+            c.a = nominalAlpha > 0f ? Mathf.Clamp01(c.a / nominalAlpha) : 0f;
+            if (ghost.color != c) ghost.color = c;
         }
 
         /// <summary>Opacity of the cream edge follows the ring's own fade (rival opacity, GET READY pulse).</summary>

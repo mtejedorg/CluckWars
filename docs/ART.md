@@ -278,6 +278,15 @@ Characters use **radial gradients** (light highlight at upper-left → primary c
   camera is a screen-row gradient that would grey the far playfield (open decision, STATE S3c).
 - **Ground overlays (Phase 8).** Identity / rival rings, state blobs and target marks sit on the grass under the
   bird (`ChickenGround` anchor from the CharacterController), not at the body pivot.
+- **Ring ghost under food piles (Phase 8 D8).** The body-sized rings (R3) run under a mound when a chicken pecks at a
+  pile, and from the far side most of the colour vanished (match camera: 46 % of a Warrior's identity ring left
+  behind the home pile, 70 % of a Fatty rival ring). The hidden arc of the colour stroke (identity and rival ring;
+  not the cream edge) now shows as a faint ghost: same annulus, same player colour, **40 % alpha** for a ring at its
+  normal opacity, fading with it (`GroundRingStyle.ApplyGhost`, `Art/Materials/RingGhost.mat`). It draws only
+  where the ring is behind the **mound itself**: the mound's second material (`MoundStencilMark.mat`, colourless,
+  last opaque queue) marks the pixels where the mound is the front-most surface, so the ghost never shows through a
+  chicken body, fence, prop or the base. A ring that is merely behind a mound on screen (a chicken a step past the
+  pile) ghosts through it too, which is the same "who is back there" read. Hitboxes unchanged.
 
 ### Food Pile Visuals
 
@@ -388,7 +397,8 @@ The match HUD is minimal — the game area is sacred. There is **no attack butto
 - HP bar: 52–64px wide, 7px tall, dark trough (#0a0604) with 1.5px border (#4a2818), inset shadow. Fill uses HP gradient with inset highlight at top.
 - Cargo bar: same width, 5px tall, 2px below HP. Fill uses cargo gradient.
 - Cargo text: food icon + "9/20" in Nunito 700, 10px.
-- Player identity ring: colored oval at feet, matching player color with slight stroke.
+- Player identity ring: colored oval at feet, matching player color with slight stroke; the arc hidden under a food
+  pile shows as a 40 % ghost (Phase 8 D8, see "Ring ghost under food piles").
 - All bars have beveled appearance: inset shadow on trough, highlight on fill.
 
 ### 6.4 Character Select Screen

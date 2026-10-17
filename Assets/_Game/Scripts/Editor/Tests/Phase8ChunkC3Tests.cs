@@ -67,6 +67,8 @@ namespace CluckWars.Tests
                     // The base kit (Phase 8 C S2): the ring keeps PlayerBase.mat; the straw floor and the pennant use their
                     // own matte BaseKit_* project materials (in the A2 matte list, pinned in Phase8ChunkS2Tests).
                     if (BaseKitMaterials.Contains(AssetDatabase.GetAssetPath(m)) && prefabPath.EndsWith("/PlayerBase.prefab")) continue;
+                    // Phase 8 D8: the mound's second material is the colourless stencil mark for the ring ghost (pinned in Phase8ChunkD8RingGhostTests).
+                    if (AssetDatabase.GetAssetPath(m) == "Assets/_Game/Art/Materials/MoundStencilMark.mat" && r.name == "MoundMesh") continue;
                     Assert.AreEqual(materialPath, AssetDatabase.GetAssetPath(m), $"{prefabPath}/{r.name}");
                 }
         }
