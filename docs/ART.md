@@ -291,6 +291,21 @@ Characters use **radial gradients** (light highlight at upper-left → primary c
   BOTH crown edges at the same u, so one clump reads across the shoulder; neutral (128) across the crown middle. Generator
   `tools/art/d4_surround/make_d4_surround.py` (PIL/numpy edits of the existing tiles, no generation). Changing any of
   these materials means re-running `Cluck Wars/Map/Bake Mobile Surround Haze` (after `GroundDressingBaker`, the F1 rule).
+- **Ground dressing stays quieter than the play marks (Phase 8 D5 + D6).** Decals and dirt paths are scenery: they never
+  out-shine the piles, rings or birds and never borrow a gameplay colour family.
+  - *Flower patches* (`flower_patch_decal_d5.png`, `tools/art/d5_decals/make_d5_decals.py` from the Stage 2 decal): ~58 % of
+    the original daisies (64 dots, was 111), warm cream / buttercup yellow with a few soft pinks (no white: near-white texels
+    52 % -> 0 %), ~30 % darker (kept-texel luma 211 -> 148; rendered ~160-170 PC, ~140-165 Mobile against grass ~158).
+  - *Mud puddles* (`mud_puddle_decal_d5.png`): a dark wet blue-grey (mean ~(60, 66, 76), the drying rim near-neutral grey),
+    never brown: brown ovals read as empty pile discs (`PileZone.mat` (0.34, 0.25, 0.17); dE00 was 1.7, now ~19 in the
+    atlas and 17-23 rendered). The in-arena puddles were re-tinted, not removed; the surround ones share the atlas.
+  - *Dirt paths* (`DirtPathStrip.png`, built by `GroundDressingBaker.BuildPathStrip`): dirt tile x `PathAlbedoScale` 0.86, so
+    the path renders just below the grass (path / grass luma 0.92-0.95 on both tiers, was 1.06-1.08). Wear holes only in the
+    edge bands (`PathHoleBand`: none within |v - 0.5| < 0.25, the inner ~60 % of the visible strip), so the worn edge is
+    ragged and the middle is solid dirt instead of leopard spots.
+  - Both textures are rebuilt by `GroundDressingBaker.EnsureTextures()` (byte-identical on a re-run). The decal and path
+    materials are untouched; the Mobile hazed decal copies (`Ground_Decals_Hz*`) reference the same atlas, so no haze re-bake
+    is needed for a texture-only change (re-run it if `Ground_Decals.mat` itself changes).
 - **Ground overlays (Phase 8).** Identity / rival rings, state blobs and target marks sit on the grass under the
   bird (`ChickenGround` anchor from the CharacterController), not at the body pivot.
 - **Ring edge: ink band + cream rim (Phase 8 D9).** No player colour separates from the ground on its own (stroke vs

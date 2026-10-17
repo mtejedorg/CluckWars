@@ -26,7 +26,7 @@ namespace CluckWars.EditorTools
     /// pile). No path to the centre pile: it belongs to everyone (it has its own glow), and four more spokes into the hub
     /// would read as a road network. Strips are 1 cm above the grass (the hub fork 2 mm higher so the fork overlap never
     /// z-fights), ~1 m wide with rounded, tapering ends, and alpha-clipped against the ragged edge mask plus a little
-    /// wear noise so grass shows through: a hint, not a road.</para>
+    /// wear noise along the edges only (Phase 8 D6: solid centre band, dirt a step darker than the grass): a hint, not a road.</para>
     /// <para><b>Decals.</b> Flat quads on one atlas material (<see cref="DecalAtlasPath"/>: flower patch left, mud
     /// puddle right; the flower alpha is rescaled so its 0.35 cutoff lands on the shared 0.4). In the arena they sit
     /// off the routes, beside walls/fences, never on a pile disc or base pad. No URP Decal Projector (Mobile).</para>
@@ -619,7 +619,20 @@ namespace CluckWars.EditorTools
             return t;
         }
 
-        /// <summary>4 m (U, wraps) x 1 m (V) at 256 px/m: dirt tile RGB, alpha = ragged edge mask x sparse wear holes.</summary>
+        /// <summary>Phase 8 D6: the dirt tile RGB is scaled by this so the path renders just below the E3 grass (luma ~158)
+        /// instead of ~7 % above it (audit L06).</summary>
+        public const float PathAlbedoScale = 0.86f;
+        /// <summary>Phase 8 D6: wear holes only where |v - 0.5| &gt;= this (the strip's edge mask spans v ~0.1-0.9, so the inner
+        /// ~60 % of the visible path is solid); full strength from <see cref="PathHoleEdgeFull"/> out.</summary>
+        public const float PathHoleSolidHalfBand = 0.25f;
+        public const float PathHoleEdgeFull = 0.33f;
+
+        /// <summary>0 in the solid centre band, 1 along the edges (holes as bites in the worn edge, not leopard spots).</summary>
+        public static float PathHoleBand(float v) =>
+            Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(PathHoleSolidHalfBand, PathHoleEdgeFull, Mathf.Abs(v - 0.5f)));
+
+        /// <summary>4 m (U, wraps) x 1 m (V) at 256 px/m: dirt tile RGB x <see cref="PathAlbedoScale"/>, alpha = ragged edge
+        /// mask x wear holes kept to the edge bands (<see cref="PathHoleBand"/>).</summary>
         private static byte[] BuildPathStrip()
         {
             const int W = 1024, H = 256;
@@ -643,9 +656,10 @@ namespace CluckWars.EditorTools
                     var mc = mask.GetPixelBilinear((x + 0.5f) / W, (y + 0.5f) / H);
                     float m = maskInAlpha ? mc.a : mc.r;
                     float n = 0.6f * ValueNoise(x / 64f, y / 64f, W / 64, 11) + 0.4f * ValueNoise(x / 32f, y / 32f, W / 32, 23);
-                    float holes = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.64f, 0.76f, n));
+                    float holes = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.64f, 0.76f, n)) * PathHoleBand((y + 0.5f) / H);
                     float a = m * (1f - 0.85f * holes);
-                    outPx[y * W + x] = new Color32((byte)(r / 4f + 0.5f), (byte)(g / 4f + 0.5f), (byte)(b / 4f + 0.5f), (byte)Mathf.RoundToInt(Mathf.Clamp01(a) * 255f));
+                    float k = PathAlbedoScale / 4f;
+                    outPx[y * W + x] = new Color32((byte)(r * k + 0.5f), (byte)(g * k + 0.5f), (byte)(b * k + 0.5f), (byte)Mathf.RoundToInt(Mathf.Clamp01(a) * 255f));
                 }
             var o = new Texture2D(W, H, TextureFormat.RGBA32, false, false);
             o.SetPixels32(outPx);
