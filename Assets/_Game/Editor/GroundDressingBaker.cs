@@ -90,7 +90,9 @@ namespace CluckWars.EditorTools
         {
             new Route { Name = "Doorstep", Width = 1.0f, Lift = 0f, Via = new Vector2[0] },
             new Route { Name = "Rim", Width = 1.0f, Lift = 0f,
-                Via = new[] { new Vector2(23.85f, 15.5f), new Vector2(23.9f, 11.5f), new Vector2(23.85f, 9.3f), new Vector2(23.2f, 6.2f) } },
+                // Phase 8 D13: the first stretch runs 2.27 m off the home (E) fence, where the owner sees it past the near fence, then
+                // swings back into the rim gap (between arm 0's rim tip and the fence) at (23.85, 9.3). Was x 23.85-23.9, 0.9 m off the fence.
+                Via = new[] { new Vector2(22.5f, 15.5f), new Vector2(22.5f, 12.8f), new Vector2(23.45f, 10.6f), new Vector2(23.85f, 9.3f), new Vector2(23.2f, 6.2f) } },
             new Route { Name = "Hub", Width = 0.9f, Lift = HubForkLift,
                 Via = new[] { new Vector2(16.0f, 18.65f), new Vector2(13.6f, 17.7f), new Vector2(9.0f, 13.6f), new Vector2(6.3f, 11.35f),
                               new Vector2(4.55f, 10.75f), new Vector2(3.55f, 12.0f), new Vector2(2.6f, 14.0f) } },
@@ -390,46 +392,53 @@ namespace CluckWars.EditorTools
 
         // ---- meshes ----------------------------------------------------------------------------------------------
 
+        private static Transform Zone(Transform geometry, string n)
+        {
+            var t = geometry.Find(n);
+            if (t == null) throw new System.InvalidOperationException($"GeneratedMapGeometry/{n} missing.");
+            return t;
+        }
+
+        /// <summary>Control points (world XZ, corner 0) of one route: its start beside the base, its Via points, then the pile end.</summary>
+        public static List<Vector2> RoutePoints(Transform geometry, string routeName)
+        {
+            var baseT = Zone(geometry, "BaseZone_0");
+            var b = new Vector2(baseT.position.x, baseT.position.z);
+            var personal = Zone(geometry, "PileZone_Personal0");
+            var rimPile = Zone(geometry, "PileZone_Contested3");   // reached through the gap past arm 0's rim tip
+            var hubPile = Zone(geometry, "PileZone_Contested0");   // round arm 1's hub tip (arm 1 is joined to the fence)
+            var p0 = new Vector2(personal.position.x, personal.position.z);
+            var dDoor = (p0 - b).normalized;
+            var route = Routes.First(r => r.Name == routeName);
+            var pts = new List<Vector2>();
+            switch (routeName)
+            {
+                case "Doorstep":
+                    pts.Add(b + dDoor * PathStartFromBase);
+                    pts.Add(PileEnd(personal, b));
+                    break;
+                case "Rim":
+                    pts.Add(b + (route.Via[0] - b).normalized * PathStartFromBase);
+                    pts.AddRange(route.Via);
+                    pts.Add(PileEnd(rimPile, route.Via[route.Via.Length - 1]));
+                    break;
+                default:
+                    pts.Add(b + dDoor * HubForkFromBase);
+                    pts.AddRange(route.Via);
+                    pts.Add(PileEnd(hubPile, route.Via[route.Via.Length - 1]));
+                    break;
+            }
+            return pts;
+        }
+
         /// <summary>Corner 0's three routes as one mesh in world space (y = 0; the object carries the lift).</summary>
         public static Mesh BuildPathMesh(Transform geometry)
         {
-            Transform Z(string n)
-            {
-                var t = geometry.Find(n);
-                if (t == null) throw new System.InvalidOperationException($"GeneratedMapGeometry/{n} missing.");
-                return t;
-            }
-            var baseT = Z("BaseZone_0");
-            var b = new Vector2(baseT.position.x, baseT.position.z);
-            var personal = Z("PileZone_Personal0");
-            var rimPile = Z("PileZone_Contested3");   // reached through the gap past arm 0's rim tip
-            var hubPile = Z("PileZone_Contested0");   // round arm 1's hub tip (arm 1 is joined to the fence)
-            var p0 = new Vector2(personal.position.x, personal.position.z);
-            var dDoor = (p0 - b).normalized;
-
             var verts = new List<Vector3>(); var uvs = new List<Vector2>(); var tris = new List<int>();
             for (int r = 0; r < Routes.Length; r++)
             {
                 var route = Routes[r];
-                var pts = new List<Vector2>();
-                switch (route.Name)
-                {
-                    case "Doorstep":
-                        pts.Add(b + dDoor * PathStartFromBase);
-                        pts.Add(PileEnd(personal, b));
-                        break;
-                    case "Rim":
-                        pts.Add(b + (route.Via[0] - b).normalized * PathStartFromBase);
-                        pts.AddRange(route.Via);
-                        pts.Add(PileEnd(rimPile, route.Via[route.Via.Length - 1]));
-                        break;
-                    default:
-                        pts.Add(b + dDoor * HubForkFromBase);
-                        pts.AddRange(route.Via);
-                        pts.Add(PileEnd(hubPile, route.Via[route.Via.Length - 1]));
-                        break;
-                }
-                AppendRibbon(CatmullRom(pts, SampleStep), route.Width, route.Lift, r * 1.37f, r, verts, uvs, tris);
+                AppendRibbon(CatmullRom(RoutePoints(geometry, route.Name), SampleStep), route.Width, route.Lift, r * 1.37f, r, verts, uvs, tris);
             }
             var mesh = new Mesh { name = "DirtPathsCorner" };
             mesh.SetVertices(verts);
