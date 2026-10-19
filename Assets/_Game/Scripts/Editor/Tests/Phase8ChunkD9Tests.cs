@@ -102,8 +102,8 @@ namespace CluckWars.Tests
                         var pi = piles.First(p => p.Name == tier + i);
                         var expected = Rot90(p0.Pos, i);
                         Assert.Less((pi.Pos - expected).magnitude, 1e-4f, $"{tier}{i} is not seat 0's {tier} pile turned {90 * i} degrees (trial {trial}).");
-                        float dYaw = Mathf.DeltaAngle(p0.Yaw + 90f * i, pi.Yaw);
-                        Assert.Less(Mathf.Abs(Mathf.Repeat(dYaw + 90f, 180f) - 90f), 1e-3f, $"{tier}{i} yaw is not seat 0's + {90 * i} (mod 180).");
+                        float dYaw = Mathf.DeltaAngle(p0.Yaw - 90f * i, pi.Yaw);
+                        Assert.Less(Mathf.Abs(dYaw), 1e-3f, $"{tier}{i} yaw is not seat 0's - {90 * i} (full turn, D15: no mod-180 fold).");
                     }
                 }
             }
@@ -136,7 +136,7 @@ namespace CluckWars.Tests
                 Assert.Less(Vector2.Distance(new Vector2(disc.position.x, disc.position.z), new Vector2(p.Pos.x, p.Pos.z)), 0.01f, $"{disc.name} is not on its pile.");
                 Assert.AreEqual(p.Footprint.x, disc.lossyScale.x, 0.01f, $"{disc.name} X size");
                 Assert.AreEqual(p.Footprint.y, disc.lossyScale.z, 0.01f, $"{disc.name} Z size");
-                float d = Mathf.Abs(Mathf.Repeat(Mathf.DeltaAngle(disc.eulerAngles.y, p.Yaw) + 90f, 180f) - 90f);
+                float d = Mathf.Abs(Mathf.DeltaAngle(disc.eulerAngles.y, p.Yaw)); // full turn since D15 (the outline is not half-turn symmetric)
                 Assert.Less(d, 2f, $"{disc.name} yaw {disc.eulerAngles.y:F1} vs the spawned pile's {p.Yaw:F1}.");
             }
         }

@@ -119,22 +119,26 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Yaw (degrees, in [0, 180)) that points an outer pile's long axis (local +X) at the
+        /// Yaw (degrees, in [0, 360)) that points an outer pile's long axis (local +X) at the
         /// arena centre. 0 for a pile at the centre, where no direction is preferred.
         /// </summary>
         /// <remarks>
         /// <c>Euler(0, yaw, 0) * right = (cos yaw, 0, -sin yaw)</c>, so the yaw that maps local +X
-        /// onto the radial direction (x, z) is <c>atan2(-z, x)</c>. An ellipse is symmetric under a
-        /// half turn, hence the fold into [0, 180). Depends only on the direction from the centre,
-        /// so piles at 90-degree rotations of each other get yaws 90 degrees apart: exactly 4-fold.
+        /// onto the radial direction (x, z) is <c>atan2(-z, x)</c>. The ellipse itself (collider,
+        /// NavMesh carve, every distance) is symmetric under a half turn, but the mound's and the
+        /// disc's irregular outline is NOT, so since Phase 8 D15 the yaw keeps its full turn
+        /// instead of folding into [0, 180): piles at 90-degree rotations of each other get yaws
+        /// exactly 90 degrees apart, so the four seats' piles are rotated copies (the map is
+        /// 4-fold rotationally symmetric) and opposite piles are NOT translated copies that look
+        /// mirrored from their own seat. The value is only a stamped float: the networked
+        /// <c>FoodPile.Yaw</c> semantics (degrees about Y, applied to the root on every peer) are unchanged.
         /// </remarks>
         public static float RadialLongAxisYaw(Vector3 position)
         {
             if (position.x * position.x + position.z * position.z < 1e-8f) return 0f;
             float yaw = Mathf.Atan2(-position.z, position.x) * Mathf.Rad2Deg;
-            yaw %= 180f;
-            if (yaw < 0f) yaw += 180f;
-            return yaw;
+            if (yaw < 0f) yaw += 360f;
+            return yaw >= 360f ? 0f : yaw;
         }
 
         /// <summary>True when the pile-local point lies inside (or on) the ellipse with semi-axes a, b.</summary>
