@@ -13,8 +13,10 @@ namespace CluckWars.Visuals
     /// <para>
     /// Two presentations of one idea, switched on whether the rival is in frame:
     /// a <b>ground ring</b> under an on-screen rival, and a <b>chevron</b> pinned to the view
-    /// edge pointing at an off-screen one. Exactly one is ever lit — an on-screen rival is its
-    /// own indicator and does not also need an arrow.
+    /// edge pointing at an off-screen one. Never both — an on-screen rival is its own
+    /// indicator and does not also need an arrow. "On screen" means any part of the body in
+    /// frame (hysteresis on the way out), and the chevron is kept out of the HUD control
+    /// zones (<see cref="HudControlZones"/>) by sliding along the edge band.
     /// </para>
     /// <para>
     /// <b>Both are tinted with the rival's PLAYER colour</b> (<see cref="PlayerPalette.ForCorner"/>
@@ -108,6 +110,9 @@ namespace CluckWars.Visuals
         [SerializeField] private Material _ringGhostMaterial;
 
         private ChickenController _controller;
+        private CharacterController _body;      // body extent for the on-screen test (capsule bounds)
+        private float _bodyHalfWidth;           // class model's lateral half-width (SetBodyFootprint), widens the capsule
+        private bool _wasOnScreen;              // last frame's on-screen verdict: the hysteresis memory
         private ILogService _log;
 
         private SpriteRenderer _ring;
@@ -141,6 +146,7 @@ namespace CluckWars.Visuals
                 ProjectContext.Instance.Container.Inject(this);
 
             _controller = GetComponent<ChickenController>();
+            _body = GetComponent<CharacterController>();
             if (_controller == null)
             {
                 _log?.Error(Source,
@@ -206,6 +212,7 @@ namespace CluckWars.Visuals
         /// <paramref name="bodyHalfWidth"/> is the class model's lateral half-width, root-local metres.</summary>
         public void SetBodyFootprint(float bodyHalfWidth)
         {
+            _bodyHalfWidth = bodyHalfWidth;
             _ringRadius = GroundRingStyle.RivalRadius(bodyHalfWidth);
             if (_ring != null) ApplyRingGeometry();
         }
@@ -226,14 +233,20 @@ namespace CluckWars.Visuals
 
             if (!ShouldShow(cam, out float opacity))
             {
+                _wasOnScreen = false;
                 Hide();
                 return;
             }
 
             var tint = TintFor(_controller.HomeCornerIndex);
 
-            if (ScreenEdgeProjection.TryProject(cam, transform.position,
+            // On screen = ANY part of the body in frame (with hysteresis on the way out), not just the feet: a bird whose feet
+            // are below the bottom edge but whose body is in view is its own indicator and must not also get an arrow on top.
+            _wasOnScreen = IsOnScreen(cam);
+
+            if (!_wasOnScreen && ScreenEdgeProjection.TryProject(cam, transform.position,
                     FeedbackTuning.RivalChevronSafeArea,
+                    HudControlZones.Current(cam), ChevronClearance(cam),
                     out Vector2 clamped, out Vector2 bearing))
             {
                 ShowChevron(cam, clamped, bearing, tint, opacity);
@@ -242,6 +255,35 @@ namespace CluckWars.Visuals
             {
                 ShowRing(tint, opacity);
             }
+        }
+
+        /// <summary>Whether any part of this chicken's body is inside the viewport (see
+        /// <see cref="ScreenEdgeProjection.IsPartlyOnScreen"/>). The body is the CharacterController capsule, widened to the
+        /// model's lateral half-width; a chicken without one falls back to its feet point.</summary>
+        private bool IsOnScreen(Camera cam)
+        {
+            Bounds b;
+            if (_body != null && _body.enabled)
+            {
+                b = _body.bounds;
+                float r = Mathf.Max(b.extents.x, b.extents.z, _bodyHalfWidth);
+                b.extents = new Vector3(r, b.extents.y, r);
+            }
+            else
+            {
+                b = new Bounds(transform.position, new Vector3(_bodyHalfWidth * 2f, 0f, _bodyHalfWidth * 2f));
+            }
+
+            return ScreenEdgeProjection.TryProjectBounds(cam, b, out Rect vp)
+                   && ScreenEdgeProjection.IsPartlyOnScreen(vp, _wasOnScreen, FeedbackTuning.RivalOnScreenHysteresis);
+        }
+
+        /// <summary>Half the chevron's footprint in viewport units (x scaled by 1/aspect because the chevron is sized in
+        /// fractions of the viewport HEIGHT): how far from a HUD control rect the arrow's centre must stay.</summary>
+        private static Vector2 ChevronClearance(Camera cam)
+        {
+            float r = FeedbackTuning.RivalChevronSizeFraction * FeedbackTuning.RivalChevronClearanceRadius;
+            return new Vector2(r / Mathf.Max(0.1f, cam.aspect), r);
         }
 
         /// <summary>

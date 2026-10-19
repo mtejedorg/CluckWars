@@ -790,6 +790,22 @@ namespace CluckWars.Visuals
         /// </summary>
         public const float RivalChevronDepthOffset = 0.5f;
 
+        /// <summary>
+        /// Phase 8 chunk D (Maestro-approved edge-arrow polish): a rival counts as ON SCREEN while any part of its body
+        /// is inside the viewport, and keeps counting as on screen until it is fully this far outside it (viewport
+        /// units, 0.02 = 2 % of the frame). The margin only applies to the way OUT, so a rival creeping along the border
+        /// does not flicker between "ring" and "arrow" frame to frame. See <c>ScreenEdgeProjection.IsPartlyOnScreen</c>.
+        /// </summary>
+        public const float RivalOnScreenHysteresis = 0.02f;
+
+        /// <summary>
+        /// Radius of the circle that contains the rotated chevron (outline included), as a fraction of the chevron's own
+        /// size: the farthest sprite-space point of the arrowhead is a base corner at sqrt(0.42^2 + 0.45^2) = 0.62 from the
+        /// pivot (<c>RivalIndicator.ChevronFill</c>), plus the ink outline (~0.03). Used to keep a whole arrow, not just its
+        /// centre, out of the HUD control zones (<see cref="HudControlZones"/>).
+        /// </summary>
+        public const float RivalChevronClearanceRadius = 0.65f;
+
         // ================================================================
         // Always-on ability reach overlay — AbilitySlotOverlay
         // ================================================================
