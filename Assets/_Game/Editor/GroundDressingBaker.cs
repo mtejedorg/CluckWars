@@ -127,12 +127,15 @@ namespace CluckWars.EditorTools
 
         private const string Flower = "decal:flower", Mud = "decal:mud";
 
-        // V1 corner feed nook (fence-hedge corner square, all <= 0.8 m: the feed sack at x0.95 is 0.76 m).
+        // V1 corner feed nook (fence-hedge corner square, all <= 0.8 m: the feed sack at x0.95 is 0.76 m). Phase 8 D12: the nook
+        // is an L (sack in the fence-side corner, one bale along each hedge) so every renderer stays >= 0.2 m clear of the
+        // HedgeStrip bounds (Phase8ChunkD12Tests); the bales are x1.5 (was x1.6) to fit the 1.9 m gap. Group frame is yaw 45 - 90k:
+        // local x runs along the corner's anti-diagonal, local z out toward the hedge corner.
         private static readonly Item[] V1 =
         {
-            new Item("feed_sack", 0.28f, 0f, -0.07f, 20f, 0.95f),
-            new Item("hay_bale", -0.53f, 0f, 0.04f, 10f, 1.6f),
-            new Item("hay_bale", 0.07f, 0f, 0.71f, 75f, 1.6f),
+            new Item("feed_sack", 0f, 0f, -0.495f, 20f, 0.95f),
+            new Item("hay_bale", -0.566f, 0f, 0f, 10f, 1.5f),
+            new Item("hay_bale", 0.566f, 0f, 0f, 75f, 1.5f),
             new Item(Flower, 0f, 0f, 0.1f, 0f, 1.6f),
         };
         // V2 wheelbarrow and hay (outside the N / S hedge).

@@ -106,7 +106,7 @@ MonoBehaviour:
     _hazed: {fileID: 2100000, guid: 5a59a396533a30e4d8c1e957816c9228, type: 2}
     _band: 0
     _amount: 0.05454546
-    _uses: 14
+    _uses: 6
   - _original: {fileID: 2100000, guid: e536007576b33ee46b0897fc69c72c29, type: 2}
     _hazed: {fileID: 2100000, guid: 771c6062c371584458948ed382f05773, type: 2}
     _band: 1
@@ -212,4 +212,4 @@ MonoBehaviour:
     _band: -1
     _amount: 0.6
     _uses: 1
-  _rendererCount: 132
+  _rendererCount: 124
