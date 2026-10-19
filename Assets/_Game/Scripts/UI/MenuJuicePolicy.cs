@@ -232,6 +232,67 @@ namespace CluckWars.UI
     }
 
     /// <summary>
+    /// Whether GET READY's "Waiting for ..." line is shown (finding 13): only for ANOTHER player. A peer's own warm-up is already
+    /// what GET READY is about, so naming the local player ("a slow bird") blames the reader. Other peers still see the name.
+    /// </summary>
+    public static class WaitingLineRule
+    {
+        public static bool Shows(bool someoneIsWaitedFor, bool isThisPeer) => someoneIsWaitedFor && !isThisPeer;
+    }
+
+    /// <summary>
+    /// Whether the opaque arena cover (<c>#ArenaCover</c> inside the intro overlay) is up, and when it is revealed. The Game
+    /// scene must never show a half-ready arena (cyan shader placeholders, pop-in, a camera swing): the cover is up from the very
+    /// first rendered frame and goes once, together on every peer, on the round's networked "3" (the intro is armed: state
+    /// Active, or Ended for a late joiner) AND only if this peer is locally ready (<c>IArenaReadiness</c>). A peer that is not
+    /// ready when the master arms the intro (the master's cap) keeps the cover through the countdown (the digits play over it:
+    /// the held countdown) and reveals the moment it is ready. The cover never hides the waiting room or the match-end screen
+    /// (they are opaque overlays of their own), is gone while leaving, and has two safety nets so a player is never stuck
+    /// behind it: the no-manager timeout (<see cref="IntroOverlayRule"/>) and <see cref="HardCapSeconds"/> of cover time.
+    /// After the first reveal (the caller latches it, once per scene load) later rounds keep today's GET READY card.
+    /// </summary>
+    public static class ArenaCoverRule
+    {
+        /// <summary>Seconds of actual cover time (waiting-room time does not count) after which the cover is dropped and an Error is logged.</summary>
+        public const float HardCapSeconds = 30f;
+
+        /// <summary>The cover's opacity fade (ArenaCover.uss); Reduced Motion drops it instantly.</summary>
+        public const float FadeSeconds = 0.25f;
+
+        public readonly struct Decision
+        {
+            /// <summary>Keep the opaque cover up this frame.</summary>
+            public readonly bool CoverShown;
+            /// <summary>Reveal now: the caller latches it, fades the cover out once and never covers again this scene load.</summary>
+            public readonly bool Reveal;
+            /// <summary>The reveal came from <see cref="HardCapSeconds"/> (a bug somewhere: the caller logs an Error).</summary>
+            public readonly bool HardCap;
+
+            public Decision(bool coverShown, bool reveal, bool hardCap) { CoverShown = coverShown; Reveal = reveal; HardCap = hardCap; }
+        }
+
+        /// <param name="localReady">This peer's <c>IArenaReadiness.IsReady</c> (true when the binding is missing: the old behaviour).</param>
+        /// <param name="lobbyShown">The opaque waiting-room overlay is up.</param>
+        /// <param name="matchEndShown">The opaque match-end overlay is up.</param>
+        /// <param name="leaving">BACK TO LOBBY is leaving, or the session is ending.</param>
+        /// <param name="noManagerTimedOut"><see cref="IntroOverlayRule.PreIntro.TimedOut"/>.</param>
+        /// <param name="revealed">The caller's once-per-scene-load latch.</param>
+        /// <param name="secondsCovered">Real seconds the cover has been wanted so far (not counting the waiting room).</param>
+        public static Decision Decide(bool localReady, bool hasManager, CluckWars.Gameplay.MatchState state, bool lobbyShown,
+            bool matchEndShown, bool leaving, bool noManagerTimedOut, bool revealed, float secondsCovered)
+        {
+            if (revealed || leaving || lobbyShown || matchEndShown) return new Decision(false, false, false);
+            if (noManagerTimedOut) return new Decision(false, true, false);
+
+            bool introArmed = hasManager
+                && (state == CluckWars.Gameplay.MatchState.Active || state == CluckWars.Gameplay.MatchState.Ended);
+            if (localReady && introArmed) return new Decision(false, true, false);
+            if (secondsCovered >= HardCapSeconds) return new Decision(false, true, true);
+            return new Decision(true, false, false);
+        }
+    }
+
+    /// <summary>
     /// When the comeback event banner may show (re-audit item 4). The event's gameplay fires on
     /// schedule (the last <c>MatchConfigSO.ComebackEventSecondsLeft</c> seconds since round 2, so in
     /// practice long after GO); only its DISPLAY waits until the GO! flourish has gone, so the two never

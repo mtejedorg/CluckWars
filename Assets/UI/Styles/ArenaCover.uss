@@ -1,0 +1,13 @@
+/* Arena cover (arena-reveal gate): the opaque ink sheet inside #IntroOverlay (MatchOverlays.uxml) that hides the Game scene's world
+   until the arena is fully ready (IArenaReadiness: scene content in, render tier applied, overview warm-up done, camera snapped) AND
+   the round's intro is armed (ArenaCoverRule). Same ink as the GET READY card (GetReadyCard.uss, rgb(20, 10, 4)), so the menu's GET READY
+   hand-off -> scene load -> cover is one unbroken colour. Visible by default in the UXML so the very first rendered frame is covered.
+   It sits BEFORE #IntroStack in the UXML: the countdown digit and the GET READY plate draw above it. Never takes a tap (picking-mode
+   Ignore in the UXML). Reduced Motion: MatchOverlaysController drops it instantly (no fade). */
+.cw-arena-cover {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    background-color: rgb(20, 10, 4);
+    opacity: 1;
+    transition-property: opacity; transition-duration: 0.25s; transition-timing-function: ease-out;
+}
+.cw-arena-cover--hidden { opacity: 0; }

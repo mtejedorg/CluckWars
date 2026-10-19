@@ -228,7 +228,7 @@ namespace CluckWars.Visuals
         /// unlit particles shader first; falls back to the legacy equivalent so
         /// it works on either render pipeline without manual setup.
         /// </summary>
-        private static Material BuildMaterial()
+        public static Material BuildMaterial()
         {
             Shader sh = Shader.Find("Universal Render Pipeline/Particles/Unlit");
             if (sh == null) sh = Shader.Find("Particles/Standard Unlit");

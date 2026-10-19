@@ -56,6 +56,7 @@ namespace CluckWars.Visuals
         private ShadowCastingMode[] _savedShadowModes;
         private bool                _ghostShadowsOff;
         private bool                _missingGhostReported;
+        private bool                _warmupGhost;
         private ILogService         _log;
 
         private MaterialPropertyBlock _propertyBlock;
@@ -84,6 +85,19 @@ namespace CluckWars.Visuals
 
         /// <summary>True while the body renders with the ghost material (test/diagnostic seam).</summary>
         public bool IsGhosted => _ghostedRenderers != null;
+
+        /// <summary>
+        /// Arena warm-up override (<c>ArenaReadinessDriver</c>): forces the ghost twin materials on while the overview renders, so the
+        /// ghost shader's programs exist before the first Invisibility / Smoke Roost / stun. Presentation only: the pushed opacity,
+        /// <see cref="ChickenController.VisualOpacity"/> and every [Networked] value are untouched, and releasing it hands the body
+        /// back to exactly what the normal ghost logic (<see cref="ApplyGhostState"/>) wants for the opacity in effect.
+        /// </summary>
+        public void SetWarmupGhost(bool on)
+        {
+            if (_warmupGhost == on) return;
+            _warmupGhost = on;
+            ApplyGhostState(_lastPushedColor.a);
+        }
 
         [Inject]
         public void Construct(ILogService log) => _log = log;
@@ -222,7 +236,7 @@ namespace CluckWars.Visuals
         /// </summary>
         private void ApplyGhostState(float opacity)
         {
-            bool wantGhost = opacity < GhostOpacityThreshold;
+            bool wantGhost = _warmupGhost || opacity < GhostOpacityThreshold;
             if (wantGhost && _ghostedRenderers == null) ApplyGhostMaterials();
             else if (!wantGhost && _ghostedRenderers != null) RestoreOriginalMaterials();
 

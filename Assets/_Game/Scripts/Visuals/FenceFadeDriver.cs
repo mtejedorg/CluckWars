@@ -67,6 +67,7 @@ namespace CluckWars.Visuals
         private Vector3 _lastBirdCentre;
         private GlobalKeyword _fadeKeyword;
         private bool _keywordOn;
+        private bool _warmupKeyword;
 
         // Phase 8 D4: outer fence occluders + per-chicken hole state (parallel fixed arrays: no per-frame GC).
         private readonly List<Bounds> _outerBounds = new List<Bounds>();
@@ -123,6 +124,7 @@ namespace CluckWars.Visuals
         /// renders next (menus, lab).</summary>
         private void OnDisable()
         {
+            _warmupKeyword = false;
             _strength = 0f;
             Shader.SetGlobalVector(BirdPosId, Vector4.zero);
             for (int i = 0; i < _trackedCount; i++) { _tracked[i] = null; _trackedBody[i] = null; }
@@ -131,6 +133,17 @@ namespace CluckWars.Visuals
             _uploadedSlotCount = -1; // force the zero upload
             UploadSlots(0);
             _fixedTargets.Clear();
+            SyncKeyword();
+        }
+
+        /// <summary>
+        /// Arena warm-up (<c>ArenaReadinessDriver</c>): forces the global <c>_CW_FENCE_FADE</c> keyword on while the overview renders (with
+        /// no hole open: the strength globals stay at 0, only the shader variant is exercised), then releases it back to whatever the
+        /// current hole strengths say. Presentation only.
+        /// </summary>
+        public void SetWarmupKeyword(bool on)
+        {
+            _warmupKeyword = on;
             SyncKeyword();
         }
 
@@ -145,8 +158,9 @@ namespace CluckWars.Visuals
         /// crosses 0 (no per-frame churn).</summary>
         private void SyncKeyword()
         {
-            if (!FenceFadeRules.KeywordToggle(_keywordOn,
-                Mathf.Max(_strength, Mathf.Max(_maxSlotStrength, _fixedTargets.MaxVisibleStrength)), out bool wantOn)) return;
+            float strongest = Mathf.Max(_strength, Mathf.Max(_maxSlotStrength, _fixedTargets.MaxVisibleStrength));
+            // Warm-up override: the fade variant counts as "a hole is open" so its programs compile before the first real hole.
+            if (!FenceFadeRules.KeywordToggle(_keywordOn, _warmupKeyword ? 1f : strongest, out bool wantOn)) return;
             Shader.SetKeyword(_fadeKeyword, wantOn);
             _keywordOn = wantOn;
         }

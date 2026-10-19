@@ -51,6 +51,9 @@ namespace CluckWars.Gameplay
         [SerializeField] private float _introSeconds = 3f;
 
         private MatchConfigSO _config;
+        // Local readiness of THIS peer's arena (warm-up behind the cover); bound in GameInstaller. Null = a wiring bug (logged once).
+        private IArenaReadiness _arenaReadiness;
+        private bool _warnedNoReadiness;
 
         /// <summary>The live match tunables, for the few systems outside this class that need
         /// them (AssassinExecute's bounty). Null before Zenject injection completes.</summary>
@@ -129,8 +132,10 @@ namespace CluckWars.Gameplay
         }
 
         [Inject]
-        public void Construct(MatchConfigSO config, ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry)
+        public void Construct(MatchConfigSO config, ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry,
+            [InjectOptional] IArenaReadiness arenaReadiness = null)
         {
+            _arenaReadiness = arenaReadiness;
             _config = config;
             _log = log;
             _audio = audio;
@@ -220,9 +225,10 @@ namespace CluckWars.Gameplay
         /// Every round starts here, never straight in <see cref="StartMatch"/>: the intro TickTimer
         /// keeps counting through frame hitches (a fresh scene's first frames, the frame a START tap
         /// lands on), which used to eat the "3". Every peer settles locally (<see cref="SettleTracker"/>:
-        /// its own chicken + 0.4 s of smooth frames) and reports it (<see cref="RPC_ReportSettled"/>);
+        /// its own chicken up AND its arena fully ready (<see cref="IArenaReadiness"/>: the warm-up behind the cover),
+        /// then 0.4 s of smooth frames) and reports it (<see cref="RPC_ReportSettled"/>);
         /// <see cref="Render"/> feeds the <see cref="IntroArmGate"/> (everyone settled and GET READY shown
-        /// for 0.7 s, or the 8 s cap); <see cref="FixedUpdateNetwork"/> arms the timers once it opens.
+        /// for 0.7 s, or the <see cref="IntroArmGate.MaxWaitSeconds"/> cap); <see cref="FixedUpdateNetwork"/> arms the timers once it opens.
         /// State authority only; peers see <see cref="MatchState.Starting"/> (GET READY) until the
         /// networked intro timer arrives.
         /// <para>Authority changes: the gate is local, so a peer that inherits this object while it is
@@ -325,11 +331,28 @@ namespace CluckWars.Gameplay
                 _localSettleRound = StartRound;
                 _localSettleReported = false;
             }
-            if (_localSettleReported || !_localSettle.Observe(LocalChickenIsUp(), Time.unscaledDeltaTime)) return;
+            if (_localSettleReported ||
+                !_localSettle.Observe(MatchFlowRules.LocalWorldUp(LocalChickenIsUp(), ArenaIsReady()), Time.unscaledDeltaTime)) return;
 
             _localSettleReported = true;
             if (HasStateAuthority) _settledPlayers.Add(Runner.LocalPlayer);
             else RPC_ReportSettled(StartRound);
+        }
+
+        /// <summary>
+        /// This peer's arena is fully ready to be revealed. A missing <see cref="IArenaReadiness"/> binding is a wiring bug
+        /// (GameInstaller): it is logged once and the old behaviour (own chicken only) applies, so the match still starts.
+        /// </summary>
+        private bool ArenaIsReady()
+        {
+            if (_arenaReadiness != null) return _arenaReadiness.IsReady;
+            if (!_warnedNoReadiness)
+            {
+                _warnedNoReadiness = true;
+                _log?.Error(Source, "IArenaReadiness is not bound (GameInstaller): the settle gate waits for the own chicken only " +
+                    "and the arena is not warmed up, so cold-start shader placeholders and pop-in may show.");
+            }
+            return true;
         }
 
         /// <summary>Peer -> state authority: "my own world is up and rendering smoothly" for GET READY

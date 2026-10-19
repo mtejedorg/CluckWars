@@ -42,6 +42,7 @@ Lives on the `SceneContext` GameObject.
 ```
 MatchConfigSO   FromInstance(serialized)                     ← match duration, food target, tick rate, MaxPlayers, intro seconds
 INetworkService FusionNetworkService.FromNewComponentOnNewGameObject().NonLazy()
+IArenaReadiness ArenaReadinessDriver.FromNewComponentOnNewGameObject().NonLazy()   ← local arena readiness + warm-up (presentation only)
 ```
 
 ### Self-injection
@@ -136,6 +137,33 @@ WaitingForPlayers ──host clicks Start──► Active (Intro 3s) ──count
                                                               ▼
                                                   Active (Intro 3s) (next round)
 ```
+
+### Arena reveal gate (the arena is shown only when fully ready)
+
+The Game scene never shows a half-ready arena (Editor async-compile cyan placeholders, first-use shader pops, pop-in of
+fence holes / ghost / haze / hedge variants, the camera swinging into place). Everything is local presentation; nothing is networked.
+
+```
+scene start ──► ArenaReadinessDriver (IArenaReadiness, ticks from the first frame, in the lobby too)
+                 gates: Scene (manager, local chicken, every chicken's model, all bases, all piles)
+                        Tier  (render tier applied, fence twins + surround haze swapped once)
+                        Warmup (ArenaWarmupSequence: overview with variants forced on -> plain overview -> restore + snap)
+                        Camera (MatchCamera.FollowSettled: on the chicken, final yaw, no SmoothDamp travel)
+                 IsReady = all gates, or 15 s (ArenaReadinessTracker.MaxSeconds; TimedOut + the pending gates are logged)
+                    │
+                    ├─► GameManager.TickLocalSettle: settle = LocalWorldUp(chickenUp, arenaReady) -> RPC_ReportSettled
+                    │     => the authority's IntroArmGate arms the 3-2-1 only when every peer is ready (cap 18 s = 15 + 0.4 + margin)
+                    └─► MatchOverlaysController: #ArenaCover (opaque ink, first child of #IntroOverlay, visible by default in the UXML
+                          so frame 1 is covered) ... revealed ONCE per scene load on the networked "3" (state Active/Ended) when ready
+                          (ArenaCoverRule). A peer that is not ready when the master's cap arms the intro keeps the cover through the
+                          3-2-1 (the digits play over it) and reveals when ready. Never hides the waiting room / match end; later rounds
+                          (PLAY AGAIN) keep the GET READY card only.
+```
+
+Gameplay never starts before the reveal on a ready peer: `IsMatchRunning` is false through `Starting` and the 3-2-1, the `MatchTimer`
+is armed in `StartMatch` at the moment the intro arms, and the intro arms only after every real peer reported settled (which now implies
+"arena ready"). The warm-up overrides (`ChickenVisuals.SetWarmupGhost`, `FenceFadeDriver.SetWarmupKeyword`, `ArenaWarmupProxies`,
+`MatchCamera.BeginWarmupFraming`) are always released on completion, abort, disable and destroy.
 
 Drivers:
 

@@ -224,6 +224,14 @@ namespace CluckWars.Gameplay
         /// <summary>True for the Doppelganger decoy: skips input processing.</summary>
         public bool IsDecoy { get; set; }
 
+        /// <summary>
+        /// True once <see cref="Spawned"/> has finished building this chicken's local presentation (class model attached, tinted and
+        /// bound to the animator). Also true on the logged error paths (no stats / no registry entry / no model): the chicken will
+        /// never get a better presentation, so the arena readiness gate (<see cref="IArenaReadiness"/>) must not wait for it.
+        /// Local only, never networked.
+        /// </summary>
+        public bool PresentationReady { get; private set; }
+
         /// <summary>True for AI-controlled bots spawned in solo mode.</summary>
         [Networked] public bool IsBot { get; set; }
 
@@ -488,6 +496,7 @@ namespace CluckWars.Gameplay
             if (_activeStats == null)
             {
                 _log?.Error(Source, $"{name}: could not resolve stats for class '{Class}'. Assign _fallbackStats on the prefab or populate ChickenClassRegistry.");
+                PresentationReady = true;   // nothing better will ever come (error logged): do not hold the arena gate on it
                 return;
             }
 
@@ -532,6 +541,7 @@ namespace CluckWars.Gameplay
                                     $"(registryBound={_registry != null}). This chicken spawns with no " +
                                     "model and no class tint — populate ChickenClassRegistry.asset.");
             }
+            PresentationReady = true;
         }
 
         /// <summary>

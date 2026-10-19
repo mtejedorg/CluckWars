@@ -1,0 +1,104 @@
+using UnityEngine; using UnityEngine.UIElements; using UnityEngine.Rendering; using System.Linq; using System.Reflection; using System.Collections.Generic; using System.Text; using System.IO;
+using CluckWars.Gameplay; using CluckWars.UI;
+// Arena-reveal capture probe (tools/ui_capture/capture_arena_reveal.py). className "Rev".
+// Every method is its own script-execute compile (a fresh assembly), so cross-call state lives in BCL types in AppDomain data.
+// The recorder itself is an EditorApplication.update delegate armed by Arm(): once armed it needs NO further bridge calls
+// (each call compiles on the main thread = a hitch that would pollute the load being measured).
+public class Rev {
+  static string F(float v) { return v.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture); }
+  static string Q(string s) { return "\"" + (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"") + "\""; }
+
+  // ---- menu driving (same helpers as intro_probe.cs.txt) --------------------------------------------------
+  public static string Press(string name) { var r = Object.FindObjectsByType<UIDocument>(FindObjectsSortMode.None).Select(x => x.rootVisualElement).FirstOrDefault(x => x != null && x.Q<Button>(name) != null); if (r == null) return "NOBTN " + name;
+    var b = r.Q<Button>(name); var c = typeof(Button).GetField("m_Clickable", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(b);
+    ((System.Action)typeof(Clickable).GetField("clicked", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(c)).Invoke(); return "clicked " + name; }
+  public static string FillQuiet() { var r = Object.FindObjectsByType<UIDocument>(FindObjectsSortMode.None).Select(x => x.rootVisualElement).First(x => x != null && x.Q<Button>("ReadyBtn") != null); int taps = 0;
+    for (int i = 0; i < 14; i++) { var rb = r.Q<Button>("ReadyBtn"); if (rb != null && rb.enabledSelf) break;
+      var card = r.Query<VisualElement>(className: "cw-ability-card").ToList().FirstOrDefault(c => !c.ClassListContains("cw-ability-card--picked")); if (card == null) break;
+      using (var e = ClickEvent.GetPooled()) { e.target = card; card.SendEvent(e); } taps++; }
+    return "taps=" + taps; }
+  public static string Win() { var b = PlayerBase.ActiveBases.FirstOrDefault(x => x != null && x.IsClaimed); if (b == null) return "no claimed base"; b.FoodTotal = 999f; return "ok"; }
+  public static string State() { var gm = GameManager.Instance; return gm == null ? "nogm" : gm.State + (gm.IsIntroActive ? "+intro" : ""); }
+  public static string Status() { var d = System.AppDomain.CurrentDomain.GetData("rev.status") as string; return d ?? "idle"; }
+
+  // ---- the recorder ---------------------------------------------------------------------------------------
+  sealed class P {
+    public string Out, Scene; public float Interval, PostGo, MaxSecs;
+    float t0 = -1, nextShot, goAt = -1; int n; bool done;
+    public List<string> Lines = new List<string>();
+    UIDocument doc; MonoBehaviour driver; int driverTries; FieldInfo latchField; Component overlays; string lastSceneSeen = "";
+
+    VisualElement Root() {
+      if (doc != null && doc.rootVisualElement != null && doc.rootVisualElement.Q<VisualElement>("IntroOverlay") != null) return doc.rootVisualElement;
+      doc = Object.FindObjectsByType<UIDocument>(FindObjectsSortMode.None).FirstOrDefault(x => x.rootVisualElement != null && x.rootVisualElement.Q<VisualElement>("IntroOverlay") != null);
+      return doc != null ? doc.rootVisualElement : null;
+    }
+    static string Disp(VisualElement e) { return e == null ? "-" : (e.resolvedStyle.display == DisplayStyle.Flex ? "1" : "0"); }
+    string Drv() {
+      if (driver == null && driverTries++ % 8 == 0) driver = Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None).FirstOrDefault(m => m != null && m.GetType().Name == "ArenaReadinessDriver");
+      if (driver == null) return "{\"present\":false}";
+      var t = driver.GetType();
+      string Get(string p) { var pi = t.GetProperty(p); return pi == null ? "" : System.Convert.ToString(pi.GetValue(driver), System.Globalization.CultureInfo.InvariantCulture); }
+      return "{\"present\":true,\"ready\":" + Get("IsReady").ToLowerInvariant() + ",\"timedOut\":" + Get("TimedOut").ToLowerInvariant() + ",\"last\":" + Q(Get("LastGate")) + ",\"pending\":" + Q(Get("PendingGates")) + ",\"at\":" + Q(Get("ReadyAtSeconds")) + "}";
+    }
+    string Latch(VisualElement root) {
+      if (overlays == null && doc != null) overlays = doc.GetComponent("MatchOverlaysController");
+      if (overlays == null) return "-";
+      if (latchField == null) latchField = overlays.GetType().GetField("_arenaRevealed", BindingFlags.NonPublic | BindingFlags.Instance);
+      return latchField == null ? "-" : ((bool)latchField.GetValue(overlays) ? "1" : "0");
+    }
+    public void Tick() {
+      if (done) return;
+      var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+      if (t0 < 0) {
+        if (scene != Scene) return;
+        t0 = Time.realtimeSinceStartup; nextShot = 0f;
+        Directory.CreateDirectory(Out);
+        Lines.Add("{\"event\":\"start\",\"scene\":" + Q(scene) + ",\"screen\":\"" + Screen.width + "x" + Screen.height + "\",\"frame\":" + Time.frameCount + "}");
+      }
+      float t = Time.realtimeSinceStartup - t0;
+      var gm = GameManager.Instance;
+      if (gm != null && gm.State == MatchState.Active && !gm.IsIntroActive && goAt < 0) { goAt = t; Lines.Add("{\"event\":\"go\",\"t\":" + F(t) + "}"); }
+      bool over = (goAt >= 0 && t >= goAt + PostGo) || t > MaxSecs || (gm != null && gm.State == MatchState.Ended);
+      if (over) { Finish(t); return; }
+      if (t < nextShot) return;
+      nextShot = t + Interval;
+      Shoot(t, gm);
+    }
+    void Shoot(float t, GameManager gm) {
+      var root = Root();
+      var ov = root?.Q<VisualElement>("IntroOverlay"); var cover = root?.Q<VisualElement>("ArenaCover"); var gr = root?.Q<VisualElement>("IntroGetReady"); var num = root?.Q<Label>("IntroNumber");
+      var sb = new StringBuilder();
+      sb.Append("{\"i\":").Append(n).Append(",\"t\":").Append(F(t)).Append(",\"f\":").Append(Time.frameCount).Append(",\"dt\":").Append(F(Time.unscaledDeltaTime));
+      sb.Append(",\"state\":").Append(Q(gm == null ? "nogm" : gm.State + (gm.IsIntroActive ? "+intro" : "")));
+      sb.Append(",\"digit\":").Append(Q(num == null ? "-" : num.text));
+      sb.Append(",\"introOverlay\":").Append(Q(Disp(ov))).Append(",\"getReady\":").Append(Q(Disp(gr)));
+      sb.Append(",\"cover\":").Append(Q(Disp(cover))).Append(",\"coverOpacity\":").Append(cover == null ? "-1" : F(cover.resolvedStyle.opacity));
+      sb.Append(",\"latch\":").Append(Q(Latch(root)));
+      sb.Append(",\"readiness\":").Append(Drv()).Append("}");
+      Lines.Add(sb.ToString());
+      // CaptureScreenshotIntoRenderTexture grabs the EDITOR WINDOW's backbuffer (verified: it returned the Editor's own dialog), so the
+      // file route it is: the Game view, UI Toolkit overlays included, written at the end of this frame.
+      ScreenCapture.CaptureScreenshot(Path.Combine(Out, "f" + n.ToString("0000") + ".png")); n++;
+    }
+    void Finish(float t) {
+      done = true; UnityEditor.EditorApplication.update -= Tick;
+      // Let the last queued screenshots reach the disk (they are written at the end of their frame), then write the telemetry.
+      int guard = 0; UnityEditor.EditorApplication.CallbackFunction wait = null;
+      wait = () => { if (guard++ < 12) return; UnityEditor.EditorApplication.update -= wait; Write(t); };
+      UnityEditor.EditorApplication.update += wait;
+    }
+    void Write(float t) {
+      int saved = Directory.GetFiles(Out, "f*.png").Length;
+      Lines.Add("{\"event\":\"end\",\"t\":" + F(t) + ",\"shots\":" + n + ",\"saved\":" + saved + "}");
+      File.WriteAllText(Path.Combine(Out, "frames.jsonl"), string.Join("\n", Lines));
+      System.AppDomain.CurrentDomain.SetData("rev.status", "done:" + saved);
+    }
+  }
+  // sceneName: the scene the recording starts on ("Game"); interval seconds; seconds recorded after GO; hard cap seconds.
+  public static string Arm(string outDir, string sceneName, string interval, string postGo, string maxSecs) {
+    var ci = System.Globalization.CultureInfo.InvariantCulture;
+    var p = new P { Out = outDir, Scene = sceneName, Interval = float.Parse(interval, ci), PostGo = float.Parse(postGo, ci), MaxSecs = float.Parse(maxSecs, ci) };
+    System.AppDomain.CurrentDomain.SetData("rev.status", "armed");
+    UnityEditor.EditorApplication.update += p.Tick; return "armed (" + sceneName + ", every " + interval + " s, +" + postGo + " s after GO, cap " + maxSecs + " s)"; }
+}

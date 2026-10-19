@@ -14,6 +14,7 @@
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTokens.uss" />
     <ui:Style src="project://database/Assets/UI/Styles/MatchOverlays.uss" />
     <ui:Style src="project://database/Assets/UI/Styles/GetReadyCard.uss" />
+    <ui:Style src="project://database/Assets/UI/Styles/ArenaCover.uss" />
     <ui:Style src="project://database/Assets/UI/Styles/YouMark.uss" />
 
     <ui:VisualElement name="OverlayRoot" class="cw-overlay-host" picking-mode="Ignore">
@@ -272,7 +273,13 @@
         <!-- ============================================================ -->
         <!--  INTRO COUNTDOWN  — topmost, never eats input                 -->
         <!-- ============================================================ -->
-        <ui:VisualElement name="IntroOverlay" class="cw-overlay cw-overlay--introdim" style="display: none;" picking-mode="Ignore">
+        <ui:VisualElement name="IntroOverlay" class="cw-overlay cw-overlay--introdim" picking-mode="Ignore">
+            <!-- Arena cover (arena-reveal gate): fully opaque ink that hides the Game scene's world until this peer's arena is
+                 fully ready (IArenaReadiness) AND the round's intro is armed (ArenaCoverRule); then it fades out once (0.25 s).
+                 FIRST child, so the digit and the GET READY plate draw above it. #IntroOverlay, #ArenaCover and #IntroGetReady are
+                 VISIBLE by default (no display:none): the very first rendered frame of the Game scene is the opaque GET READY card,
+                 not the bare world; MatchOverlaysController takes over once it binds (Styles/ArenaCover.uss). -->
+            <ui:VisualElement name="ArenaCover" class="cw-arena-cover" picking-mode="Ignore" />
             <!-- The digit + its glow sit ~a fifth of the screen above centre (#IntroStack), so they do
                  not cover the player's own chicken, which the camera keeps near screen centre. -->
             <ui:VisualElement name="IntroStack" class="cw-intro-stack" picking-mode="Ignore">
@@ -281,7 +288,7 @@
             </ui:VisualElement>
             <!-- GET READY: the menu's START card, same classes (Styles/GetReadyCard.uss). Shown only before the
                  intro is armed (MatchState.Starting / no manager yet), hidden on the first digit. -->
-            <ui:VisualElement name="IntroGetReady" class="cw-getready" style="display: none;" picking-mode="Ignore">
+            <ui:VisualElement name="IntroGetReady" class="cw-getready" picking-mode="Ignore">
                 <ui:VisualElement class="cw-getready__plate" picking-mode="Ignore">
                     <ui:Label text="@countdown.getReady" class="cw-getready__label" picking-mode="Ignore" />
                 </ui:VisualElement>

@@ -490,6 +490,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5d36823f6224921438efe5160bf579f8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Installers.GameInstaller
+  _useArenaReadiness: 0
 --- !u!114 &1302822478
 MonoBehaviour:
   m_ObjectHideFlags: 0

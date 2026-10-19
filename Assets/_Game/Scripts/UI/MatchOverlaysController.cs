@@ -138,6 +138,9 @@ namespace CluckWars.UI
         private VisualElement _introGetReady;
         private Label         _introWaiting;
         private VisualElement _hostLeftNotice;
+        // The opaque arena cover inside the intro overlay (ArenaCoverRule) + this peer's local arena readiness.
+        private VisualElement   _arenaCover;
+        private IArenaReadiness _arenaReadiness;
 
         // ---- Runtime state -----------------------------------------------------
         private float           _nextRefresh;
@@ -163,6 +166,14 @@ namespace CluckWars.UI
         private bool        _sawGameManager;
         private float       _waitingForManagerSince = -1f;
         private bool        _reportedNoManager;
+        private bool        _noManagerTimedOut;
+
+        // Arena cover (ArenaCoverRule): latched once per scene load when the arena is revealed, the seconds the cover has actually
+        // been wanted (the waiting room does not count), when its fade-out ends, and the one-shot wiring error.
+        private bool        _arenaRevealed;
+        private float       _arenaCoveredSeconds;
+        private float       _arenaCoverFadeEndsAt = -1f;
+        private bool        _reportedNoReadiness;
 
         // Host-left notice (finding 13): the manager this overlay watched last frame, its state authority and
         // state, and until when the notice stays up.
@@ -182,8 +193,10 @@ namespace CluckWars.UI
             ISessionSelectionService selection,
             [InjectOptional] MenuAudio              audio,
             [InjectOptional] ChickenClassRegistrySO classRegistry,
-            [InjectOptional] IInputProvider         input)
+            [InjectOptional] IInputProvider         input,
+            [InjectOptional] IArenaReadiness        arenaReadiness)
         {
+            _arenaReadiness = arenaReadiness;
             _network       = network;
             _log           = log;
             _colors        = colors;
@@ -395,8 +408,11 @@ namespace CluckWars.UI
             _introNumber         = _root.Q<Label>("IntroNumber");
             _introGetReady       = _root.Q<VisualElement>("IntroGetReady");
             _introWaiting        = _root.Q<Label>("IntroWaiting");
+            _arenaCover          = _root.Q<VisualElement>("ArenaCover");
             _hostLeftNotice      = _root.Q<VisualElement>("HostLeftNotice");
             if (_introGetReady == null) _log?.Error(Source, "MatchOverlays.uxml has no #IntroGetReady; GET READY will not show before the countdown.");
+            if (_arenaCover == null) _log?.Error(Source, "MatchOverlays.uxml has no #ArenaCover; the arena is revealed as soon as the intro arms, " +
+                "so cold-start shader placeholders and pop-in may show.");
             if (_introWaiting == null) _log?.Error(Source, "MatchOverlays.uxml has no #IntroWaiting; GET READY cannot say who the room waits for.");
             if (_hostLeftNotice == null) _log?.Error(Source, "MatchOverlays.uxml has no #HostLeftNotice; a host leaving mid-round will go unannounced.");
             if (_introOverlay != null) _introJuice = new MenuJuice(_introOverlay);
@@ -434,8 +450,8 @@ namespace CluckWars.UI
             SetShown(_matchEndOverlay, false);
             SetShown(_lobbyOverlay, false);
             SetShown(_sessionEndOverlay, false);
-            SetShown(_introOverlay, false);
-            SetShown(_introGetReady, false);
+            // #IntroOverlay / #ArenaCover / #IntroGetReady stay visible (UXML default): the first RefreshIntro below decides, in
+            // this same Update, before anything renders. Hiding them here would flash the bare world for a frame.
             SetShown(_introWaiting, false);
             SetShown(_hostLeftNotice, false);
             SetShown(_leaveSheet, false);
@@ -1307,6 +1323,65 @@ namespace CluckWars.UI
         // ========================================================================
         private void RefreshIntro(GameManager gm)
         {
+            RefreshIntroCard(gm);
+            RefreshArenaCover(gm);
+        }
+
+        /// <summary>
+        /// The arena cover (<see cref="ArenaCoverRule"/>): opaque ink inside the intro overlay, up from the very first frame, revealed
+        /// once per scene load on the round's networked "3" when this peer's arena is ready (<see cref="IArenaReadiness"/>). While it is
+        /// up (or fading) the intro overlay is kept shown, so the countdown digits play OVER it when this peer is not ready yet.
+        /// </summary>
+        private void RefreshArenaCover(GameManager gm)
+        {
+            if (_arenaCover == null) return;
+            if (_arenaReadiness == null && !_reportedNoReadiness)
+            {
+                _reportedNoReadiness = true;
+                _log?.Error(Source, "IArenaReadiness is not bound (GameInstaller): the arena cover reveals on the networked 3 " +
+                    "without waiting for this peer's warm-up.");
+            }
+
+            var state = gm != null ? gm.State : MatchState.WaitingForPlayers;
+            var d = ArenaCoverRule.Decide(_arenaReadiness == null || _arenaReadiness.IsReady, gm != null, state,
+                IsShown(_lobbyOverlay), IsShown(_matchEndOverlay), _shutdownReason.HasValue || _leavingToLobby,
+                _noManagerTimedOut, _arenaRevealed, _arenaCoveredSeconds);
+
+            if (d.CoverShown) _arenaCoveredSeconds += Time.unscaledDeltaTime;
+            if (d.Reveal)
+            {
+                _arenaRevealed = true;
+                _arenaCoverFadeEndsAt = PlayerPreferences.ReducedMotionEnabled
+                    ? Time.unscaledTime
+                    : Time.unscaledTime + ArenaCoverRule.FadeSeconds;
+                _arenaCover.AddToClassList("cw-arena-cover--hidden");
+                if (d.HardCap)
+                    _log?.Error(Source, $"The arena cover was still up after {ArenaCoverRule.HardCapSeconds:0} s: revealing anyway " +
+                        $"(readiness: ready={_arenaReadiness?.IsReady}, pending={_arenaReadiness?.PendingGates}, state={state}).");
+                else
+                    _log?.Info(Source, $"Arena revealed (state {state}, ready={(_arenaReadiness == null ? "n/a" : _arenaReadiness.IsReady.ToString())}, " +
+                        $"covered {_arenaCoveredSeconds:0.00} s).");
+            }
+
+            if (_arenaRevealed)
+            {
+                // Fade out, then drop the element (and let the intro overlay follow its own rules again).
+                bool fading = Time.unscaledTime < _arenaCoverFadeEndsAt;
+                SetShown(_arenaCover, fading);
+                if (fading) SetShown(_introOverlay, true);
+                return;
+            }
+
+            SetShown(_arenaCover, d.CoverShown);
+            if (d.CoverShown)
+            {
+                _arenaCover.RemoveFromClassList("cw-arena-cover--hidden");
+                SetShown(_introOverlay, true);
+            }
+        }
+
+        private void RefreshIntroCard(GameManager gm)
+        {
             // Visibility only — the top-bar dim is decided once in Update() across
             // all three modals, so this method must not touch it or it would clear
             // a dim the match-end / lobby overlay still needs.
@@ -1319,6 +1394,7 @@ namespace CluckWars.UI
             var hold = IntroOverlayRule.Decide(gm != null, gm != null ? gm.State : MatchState.WaitingForPlayers,
                 _sawGameManager, _leavingToLobby, waited);
 
+            _noManagerTimedOut = hold == IntroOverlayRule.PreIntro.TimedOut;
             if (hold == IntroOverlayRule.PreIntro.TimedOut && !_reportedNoManager)
             {
                 _reportedNoManager = true;
@@ -1390,11 +1466,14 @@ namespace CluckWars.UI
         {
             if (_introWaiting == null) return;
             var waitingFor = gm != null ? gm.WaitingFor : PlayerRef.None;
-            SetShown(_introWaiting, waitingFor != PlayerRef.None);
-            if (waitingFor == PlayerRef.None) return;
+            var chicken = waitingFor == PlayerRef.None ? null : ChickenForPlayer(waitingFor);
+            var runner = _network != null ? _network.Runner : null;
+            bool isThisPeer = (chicken != null && chicken.HasInputAuthority) || (runner != null && waitingFor == runner.LocalPlayer);
+            bool show = WaitingLineRule.Shows(waitingFor != PlayerRef.None, isThisPeer);
+            SetShown(_introWaiting, show);
+            if (!show) return;
 
-            var chicken = ChickenForPlayer(waitingFor);
-            string text = chicken != null && !chicken.HasInputAuthority
+            string text = chicken != null
                 ? UiText.Format(UiKeys.CountdownWaitingFor,
                     ("name", MatchStandings.DisplayName(false, false, chicken.Class, chicken.HomeCornerIndex)))
                 : UiText.Get(UiKeys.CountdownWaitingSomeone);

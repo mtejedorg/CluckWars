@@ -54,10 +54,15 @@ namespace CluckWars.Visuals
         private readonly List<Pair> _pairs = new List<Pair>();
         private bool _performanceShown;
         private bool _gaveUp;
+        private bool _settled;
         private float _nextScanTime;
 
         /// <summary>True while the twins (perf meshes) are the ones drawn.</summary>
         public bool PerformanceShown => _performanceShown;
+
+        /// <summary>True once the drawn meshes match the preference (the first <see cref="Sync"/> that had nothing left to do, or
+        /// the twins were built and shown, or the swap gave up with an Error). Read by the arena readiness Tier gate.</summary>
+        public bool Settled => _settled;
 
         /// <summary>The perf twins built so far (empty until Performance Mode was first on). Tests / captures.</summary>
         public IEnumerable<MeshRenderer> Twins
@@ -86,7 +91,7 @@ namespace CluckWars.Visuals
         public bool Sync(bool batch)
         {
             bool want = PlayerPreferences.PerformanceModeEnabled;
-            if (want == _performanceShown || _gaveUp) return false;
+            if (want == _performanceShown || _gaveUp) { _settled = true; return false; }
 
             if (_pairs.Count > 0 && _pairs[0].Original == null)
             {
@@ -99,6 +104,7 @@ namespace CluckWars.Visuals
             if (!want)
             {
                 Show(false);
+                _settled = true;
                 return true;
             }
 
@@ -109,6 +115,7 @@ namespace CluckWars.Visuals
                 if (!BuildTwins(batch)) return false;
             }
             Show(true);
+            _settled = true;
             return true;
         }
 

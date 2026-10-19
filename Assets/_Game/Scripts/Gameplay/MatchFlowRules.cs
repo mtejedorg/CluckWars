@@ -157,6 +157,14 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
+        /// What this peer's <see cref="SettleTracker"/> is fed during GET READY: its own chicken is up AND its arena is fully
+        /// ready (<see cref="IArenaReadiness"/>), so the 0.4 s smooth-frame settle runs AFTER readiness and "settled" is never
+        /// reported (<c>GameManager.RPC_ReportSettled</c>) by a peer whose arena is still warming up. The state authority's
+        /// <see cref="IntroArmGate"/> therefore arms the 3-2-1 only once every peer is ready.
+        /// </summary>
+        public static bool LocalWorldUp(bool ownChickenUp, bool arenaReady) => ownChickenUp && arenaReady;
+
+        /// <summary>
         /// The first connected real player the state authority has no "settled" report from
         /// (<see cref="SettleTracker"/>), or <see cref="PlayerRef.None"/> when everyone is settled.
         /// A player who left is no longer in <paramref name="realPlayers"/> and is not waited for.
@@ -248,8 +256,11 @@ namespace CluckWars.Gameplay
         /// <summary>After this long with someone unsettled, GET READY names who the room waits for.</summary>
         public const float WaitingNoticeSeconds = 3f;
 
-        /// <summary>Total real time after which the gate opens regardless (and says so).</summary>
-        public const float MaxWaitSeconds = 8f;
+        /// <summary>Total real time after which the gate opens regardless (and says so). Must outlast
+        /// <see cref="ArenaReadinessTracker.MaxSeconds"/> + <see cref="SettleTracker.SettleSeconds"/> with margin (pinned by
+        /// <c>ArenaRevealGateTests</c>): in solo the state authority IS the local peer, so the cap must never arm the intro
+        /// while its own arena cover is still up. (It was 8 s before the readiness gate: the world needed no warm-up then.)</summary>
+        public const float MaxWaitSeconds = 18f;
 
         private float _waited, _shown;
         private bool _opened, _drawn;

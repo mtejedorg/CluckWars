@@ -141,6 +141,14 @@ namespace CluckWars.Gameplay
         /// <summary>Four corner spawn positions, computed at <c>Awake</c>. Read by <c>MatchBootstrapper</c> if it wants per-base spawning.</summary>
         public IReadOnlyList<Vector3> SpawnPoints => _spawnPoints;
 
+        /// <summary>How many corner bases <see cref="SpawnBases"/> spawns (0 before <c>Awake</c>). The arena readiness gate
+        /// (<c>ArenaReadinessDriver</c>) waits for this many live <see cref="PlayerBase"/>s.</summary>
+        public int ExpectedBaseCount => _spawnPoints != null ? _spawnPoints.Length : 0;
+
+        /// <summary>How many piles <see cref="SpawnFoodPiles"/> spawns: the centre pile + one personal and one contested pile per
+        /// corner (0 before <c>Awake</c>). Event piles later come on top, so the readiness gate waits for at least this many.</summary>
+        public int ExpectedPileCount => _corners != null ? 1 + 2 * _corners.Length : 0;
+
         [Inject]
         public void Construct(INetworkService network, PrefabRegistrySO prefabRegistry, ISessionSelectionService selection, ILogService log)
         {

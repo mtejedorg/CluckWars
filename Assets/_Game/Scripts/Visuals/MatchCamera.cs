@@ -80,6 +80,15 @@ namespace CluckWars.Visuals
         private Vector3 _focusVelocity;
         private float _nextLocalChickenSearchTime;
 
+        // Arena warm-up framing (ArenaReadinessDriver): a whole-arena overview with the same camera, render target and post.
+        private bool _warmupActive;
+        private Vector3 _warmupFocus;
+        private float _warmupOrthoSize, _warmupDistance;
+
+        // Follow state: the first time the local chicken is found the camera SNAPS onto it (no swing from the scene's defaults).
+        private bool _hadLocalChicken;
+        private bool _followSettled;
+
         // Screen shake
         private float _shakeRemaining;
         private float _shakeDuration;
@@ -135,6 +144,18 @@ namespace CluckWars.Visuals
         /// </summary>
         public ChickenController LocalChicken => _localChicken;
 
+        /// <summary>True once the render tier (post-processing, baked haze) has been applied from the active pipeline asset.</summary>
+        public bool RenderTierApplied => _tierApplied;
+
+        /// <summary>True while the warm-up overview framing is in force (<see cref="BeginWarmupFraming"/>).</summary>
+        public bool WarmupFramingActive => _warmupActive;
+
+        /// <summary>
+        /// True when the camera sits on the local chicken at its final corner yaw with no SmoothDamp travel left (focus within
+        /// 5 cm, yaw within 0.2 degrees), and no warm-up framing is active. The arena readiness Camera gate reads it.
+        /// </summary>
+        public bool FollowSettled => _followSettled;
+
         private void Awake()
         {
             Instance = this;
@@ -171,25 +192,37 @@ namespace CluckWars.Visuals
             ApplyRenderTier();
             ApplyCamera();
 
+            // Warm-up overview (ArenaReadinessDriver): the framing is fixed, the follow state is untouched until it ends and snaps.
+            if (_warmupActive)
+            {
+                _followSettled = false;
+                ApplyTransform(_warmupFocus);
+                return;
+            }
+
             // Resolve target — local chicken position if follow is on + the
             // chicken has spawned, otherwise the configured focus point.
             var target = _followLocalChicken
                 ? ResolveLocalChickenPosition()
                 : _focusPoint;
 
+            // The first frame the local chicken exists the camera snaps onto it (focus and yaw): it used to swing in from the
+            // scene defaults (map centre, 45 degrees) with the SmoothDamp / yaw lerp, visibly, as the world was revealed.
+            bool acquired = _localChicken != null && !_hadLocalChicken;
+            _hadLocalChicken = _localChicken != null;
+
             // Per-player corner rotation (GDD v0.5 Section 3.1 & Phase 4):
             // Rotate camera by local chicken's HomeCornerIndex so home corner sits at bottom of screen.
-            if (_localChicken != null && _localChicken.HomeCornerIndex >= 0 && _localChicken.HomeCornerIndex < 4)
-            {
-                int cornerIdx = _localChicken.HomeCornerIndex;
+            bool haveYaw = TryLocalYaw(out float targetYaw);
+            if (haveYaw) _yaw = acquired ? targetYaw : Mathf.LerpAngle(_yaw, targetYaw, Time.deltaTime * 5f);
 
-                // Seat -> yaw rule: TryYawForCorner.
-                if (TryYawForCorner(cornerIdx, out float targetYaw))
-                    _yaw = Mathf.LerpAngle(_yaw, targetYaw, Time.deltaTime * 5f);
-            }
-
-            _currentFocus = Vector3.SmoothDamp(_currentFocus, target, ref _focusVelocity, _followSmoothTime);
+            if (acquired) { _currentFocus = target; _focusVelocity = Vector3.zero; }
+            else _currentFocus = Vector3.SmoothDamp(_currentFocus, target, ref _focusVelocity, _followSmoothTime);
             ApplyTransform(_currentFocus);
+
+            _followSettled = _localChicken != null
+                && (!haveYaw || Mathf.Abs(Mathf.DeltaAngle(_yaw, targetYaw)) < 0.2f)
+                && (_currentFocus - target).sqrMagnitude < 0.0025f;
 
             // Screen shake — positional impulse that decays linearly to zero
             // over the requested duration. Applied after ApplyTransform so it's
@@ -254,6 +287,61 @@ namespace CluckWars.Visuals
             }
         }
 
+        /// <summary>The yaw the local chicken's home corner calls for (<see cref="TryYawForCorner"/>), when it has one.</summary>
+        private bool TryLocalYaw(out float yaw)
+        {
+            yaw = 0f;
+            return _localChicken != null && _localChicken.HomeCornerIndex >= 0 && _localChicken.HomeCornerIndex < 4
+                && TryYawForCorner(_localChicken.HomeCornerIndex, out yaw);
+        }
+
+        /// <summary>
+        /// Arena warm-up (<see cref="ArenaReadinessDriver"/>): reframes the camera to show the WHOLE arena plus its surround band
+        /// (<see cref="ArenaWarmupFraming"/>), at the yaw the match will use, until <see cref="EndWarmupFraming"/>. Same camera,
+        /// render target, post-processing and haze as the match, so the shader programs the overview compiles are the match's own.
+        /// False when there is no camera.
+        /// </summary>
+        public bool BeginWarmupFraming(float arenaHalfSize, float surroundMargin, float surroundHeight)
+        {
+            if (_camera == null) return false;
+            // Scan for the local chicken first so the overview shares the match's yaw (the seat's corner rotation).
+            _nextLocalChickenSearchTime = 0f;
+            if (_followLocalChicken) ResolveLocalChickenPosition();
+            if (TryLocalYaw(out float yaw)) _yaw = yaw;
+
+            var f = ArenaWarmupFraming.Compute(arenaHalfSize, surroundMargin, surroundHeight, _yaw, _pitch,
+                _camera.aspect > 0.01f ? _camera.aspect : 16f / 9f, _distance);
+            _warmupFocus = f.Focus;
+            _warmupOrthoSize = f.OrthoSize;
+            _warmupDistance = f.Distance;
+            _warmupActive = true;
+            _followSettled = false;
+            ApplyCamera();
+            ApplyTransform(_warmupFocus);
+            return true;
+        }
+
+        /// <summary>Ends the warm-up framing: back to follow mode, SNAPPED onto the local chicken at its final yaw (no SmoothDamp
+        /// travel, velocity zeroed).</summary>
+        public void EndWarmupFraming()
+        {
+            _warmupActive = false;
+            SnapToFollowTarget();
+        }
+
+        /// <summary>Puts the camera exactly on its follow target (focus + yaw) now, with the SmoothDamp velocity zeroed.</summary>
+        public void SnapToFollowTarget()
+        {
+            _nextLocalChickenSearchTime = 0f;   // force the local chicken scan
+            var target = _followLocalChicken ? ResolveLocalChickenPosition() : _focusPoint;
+            if (TryLocalYaw(out float yaw)) _yaw = yaw;
+            _currentFocus = target;
+            _focusVelocity = Vector3.zero;
+            _hadLocalChicken = _localChicken != null;
+            ApplyCamera();
+            ApplyTransform(_currentFocus);
+        }
+
         private Vector3 ResolveLocalChickenPosition()
         {
             // Lost / never had reference? Throttled re-scan for the local
@@ -293,7 +381,7 @@ namespace CluckWars.Visuals
         {
             if (_camera == null) return;
             _camera.orthographic = true;
-            _camera.orthographicSize = _orthoSize;
+            _camera.orthographicSize = _warmupActive ? _warmupOrthoSize : _orthoSize;
             _camera.nearClipPlane = _nearClipPlane;
             if (_useSolidColor)
             {
@@ -324,7 +412,7 @@ namespace CluckWars.Visuals
         {
             var rot = Quaternion.Euler(_pitch, _yaw, 0f);
             var dir = rot * Vector3.forward;
-            transform.SetPositionAndRotation(focus - dir * _distance, rot);
+            transform.SetPositionAndRotation(focus - dir * (_warmupActive ? _warmupDistance : _distance), rot);
         }
     }
 }

@@ -39,10 +39,15 @@ namespace CluckWars.Visuals
         private SurroundHazeSet _set;
         private bool _bakedShown;
         private bool _reportedMissing;
+        private bool _firstSyncDone;
         private float _nextScanTime;
 
         /// <summary>True while the hazed copies are the ones drawn.</summary>
         public bool BakedShown => _bakedShown;
+
+        /// <summary>True once the first <see cref="Sync"/> has found the map's set and brought the materials in line with the tier
+        /// (or reported the set missing). Read by the arena readiness Tier gate.</summary>
+        public bool FirstSyncDone => _firstSyncDone;
 
         [Inject]
         public void Construct(ILogService log) => _log = log;
@@ -85,12 +90,14 @@ namespace CluckWars.Visuals
                         _log?.Error(Source, $"Scene '{MapSceneName}' is loaded but has no {nameof(SurroundHazeSet)} " +
                                             "(run Cluck Wars/Map/Bake Mobile Surround Haze); the Mobile tier surround will be unhazed.");
                     }
+                    if (_reportedMissing) _firstSyncDone = true;   // a wiring bug is logged, not a reason to hold the arena gate
                     return false;
                 }
                 _reportedMissing = false;
                 ReportWiring(_set, _log);
             }
 
+            _firstSyncDone = true;
             if (wantBaked == _bakedShown) return false;
             Apply(_set, wantBaked);
             _bakedShown = wantBaked;
