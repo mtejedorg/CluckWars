@@ -56,14 +56,15 @@ namespace CluckWars.Tests
             Assert.IsNotNull(prefab, prefabPath);
             var renderers = prefab.GetComponentsInChildren<MeshRenderer>(true);
             Assert.That(renderers.Length, Is.GreaterThan(0), prefabPath + " has no MeshRenderer.");
-            // The centre-pile glow halo (Phase 8 C S1) is the one non-matte renderer on the pile: an unlit project
-            // material under Assets/, pinned in Phase8ChunkS1Tests.
+            // The centre-pile glow halo (Phase 8 C S1) and the slow-band apron (Phase 8 D14) are the non-matte renderers on the
+            // pile: unlit project materials under Assets/ (PileGlow.mat; the apron is pinned in Phase8ChunkD14Tests).
             var visuals = prefab.GetComponent<CluckWars.Visuals.FoodPileVisuals>();
             var glow = visuals != null ? TestAssets.PrivateField<Renderer>(visuals, "_centreGlow") : null;
+            var band = visuals != null ? TestAssets.PrivateField<Renderer>(visuals, "_slowBand") : null;
             foreach (var r in renderers)
                 foreach (var m in r.sharedMaterials)
                 {
-                    if (r == glow) { StringAssert.StartsWith("Assets/", AssetDatabase.GetAssetPath(m), $"{prefabPath}/{r.name}"); continue; }
+                    if (r == glow || (band != null && r == band)) { StringAssert.StartsWith("Assets/", AssetDatabase.GetAssetPath(m), $"{prefabPath}/{r.name}"); continue; }
                     // The base kit (Phase 8 C S2): the ring keeps PlayerBase.mat; the straw floor and the pennant use their
                     // own matte BaseKit_* project materials (in the A2 matte list, pinned in Phase8ChunkS2Tests).
                     if (BaseKitMaterials.Contains(AssetDatabase.GetAssetPath(m)) && prefabPath.EndsWith("/PlayerBase.prefab")) continue;

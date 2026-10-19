@@ -208,6 +208,9 @@ namespace CluckWars.Gameplay
         /// <summary>True when there is food left to collect (as opposed to left standing).</summary>
         public bool HasCollectableFood => Available > 0f;
 
+        /// <summary>How far past the footprint's surface a chicken may collect (and is pile-slowed). Read-only; the slow-band apron (Phase 8 D14) is drawn to this width.</summary>
+        public float CollectReach => _collectReach;
+
         /// <summary>Authored full footprint: the networked stamp, or the prefab default when unstamped.</summary>
         private Vector2 FullFootprint
         {

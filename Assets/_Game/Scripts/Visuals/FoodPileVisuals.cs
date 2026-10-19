@@ -69,6 +69,27 @@ namespace CluckWars.Visuals
         [Range(0f, 1f)]
         [SerializeField] private float _glowPeakAlpha = 0.6f;
 
+        [Header("Slow-band apron (Phase 8 D14)")]
+        [Tooltip("Flat alpha-blended apron on the ground around the footprint, as wide as FoodPile.CollectReach: the band a chicken is pile-slowed in. Child of the pile root, uses Art/Materials/PileGlow.mat with a per-pile colour; its mesh is built at runtime in world metres and counter-scaled against the root's footprint scale. Shown on every pile that has food.")]
+        [SerializeField] private Renderer _slowBand;
+
+        [Tooltip("Apron colour: pale bleached straw, deliberately off the gold of the centre glow, the dark of mud and the tan of the paths. Tuned against the match camera on both tiers (about +7 % luma on the grass at the inner edge, a third of the foot ring's colour distance).")]
+        [SerializeField] private Color _bandColor = new Color(0.86f, 0.78f, 0.52f, 1f);
+
+        [Tooltip("Apron opacity at its most opaque (inner edge) when the pile is full. Scaled down with fill and 0 when empty. Quieter than the ring and the disc edge.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float _bandPeakAlpha = 0.45f;
+
+        [Tooltip("Apron height above the ground (world metres): over the dirt paths (0.012) but UNDER the pile disc slab (0.02), so the disc and its rim stay the crisp mark and the apron starts where the disc ends. The renderer also sorts first (sortingOrder -5) so the foot ring and the centre glow draw over it.")]
+        [SerializeField] private float _bandLift = 0.015f;
+
+        /// <summary>Fraction of the full apron opacity left on a nearly drained pile.</summary>
+        public const float BandFloor = 0.4f;
+
+        /// <summary>Apron opacity for a fill ratio: 0 when empty (no food, no slow), else <c>peak * Lerp(BandFloor, 1, ratio)</c>, so it rises with fill.</summary>
+        public static float BandAlpha(float ratio, float peak) =>
+            ratio <= 0f ? 0f : peak * Mathf.Lerp(BandFloor, 1f, Mathf.Clamp01(ratio));
+
         /// <summary>Fraction of the full glow left on a nearly drained centre pile (the halo dims with fill, then turns off at 0).</summary>
         public const float GlowFloor = 0.35f;
 
@@ -93,6 +114,10 @@ namespace CluckWars.Visuals
         private float _lastTintRatio = float.NaN;
         private bool _showingEmpty;
         private bool _glowAppliedForCentre;
+        private Mesh _bandMesh;
+        private Vector2 _bandFootprint;
+        private Vector3 _bandRootScale;
+        private float _bandReach;
         private MaterialPropertyBlock _propertyBlock;
         private ColorSchemeSO _colors;
 
@@ -190,6 +215,8 @@ namespace CluckWars.Visuals
                 ApplyGlow(centre ? GlowAlpha(ratio, _glowPeakAlpha) : 0f);
             }
 
+            if (_slowBand != null) UpdateSlowBand(ratio, tintDue);
+
             if (tintDue) _lastTintRatio = ratio;
             if (_renderers != null && _renderers.Length > 0 && tintDue)
             {
@@ -204,6 +231,58 @@ namespace CluckWars.Visuals
                     r.SetPropertyBlock(_propertyBlock);
                 }
             }
+        }
+
+        /// <summary>
+        /// Keeps the slow-band apron on the pile's CURRENT footprint (rebuilt only when the footprint step or the root scale
+        /// changes) and writes its opacity with the tint throttle. Local and visual only: reads the replicated Amount.
+        /// </summary>
+        private void UpdateSlowBand(float ratio, bool alphaDue)
+        {
+            var footprint = _pile.CurrentFootprint;
+            var rootScale = transform.lossyScale;
+            float reach = _pile.CollectReach;
+            if (_bandMesh == null)
+            {
+                _bandMesh = new Mesh { name = "PileSlowBand" };
+                _bandMesh.MarkDynamic();
+                var filter = _slowBand.GetComponent<MeshFilter>();
+                if (filter != null) filter.sharedMesh = _bandMesh;
+                _bandFootprint = Vector2.zero;
+            }
+            if (footprint != _bandFootprint || rootScale != _bandRootScale || !Mathf.Approximately(reach, _bandReach))
+            {
+                _bandFootprint = footprint;
+                _bandRootScale = rootScale;
+                _bandReach = reach;
+                PileBandMesh.Fill(_bandMesh, footprint, reach);
+                PoseBand(_slowBand.transform, rootScale, _bandLift);
+            }
+            if (!alphaDue && _slowBand.enabled == (_pile.Amount > 0f)) return;
+            float alpha = BandAlpha(ratio, _bandPeakAlpha);
+            bool on = alpha > 0f;
+            if (_slowBand.enabled != on) _slowBand.enabled = on;
+            if (!on) return;
+            _slowBand.GetPropertyBlock(_propertyBlock);
+            _propertyBlock.SetColor(BaseColorId, new Color(_bandColor.r, _bandColor.g, _bandColor.b, alpha));
+            _slowBand.SetPropertyBlock(_propertyBlock);
+        }
+
+        /// <summary>
+        /// Seats the apron under the pile root: the mesh is in world metres, so undo the root's (footprint-sized) scale to land it 1:1,
+        /// and lift it <paramref name="lift"/> world metres above the ground. Rotation stays identity: the mesh already uses the
+        /// pile's local axes, so the root's yaw carries it.
+        /// </summary>
+        public static void PoseBand(Transform band, Vector3 rootScale, float lift)
+        {
+            band.localScale = new Vector3(1f / Mathf.Max(rootScale.x, 1e-4f), 1f / Mathf.Max(rootScale.y, 1e-4f), 1f / Mathf.Max(rootScale.z, 1e-4f));
+            band.localPosition = new Vector3(0f, lift / Mathf.Max(rootScale.y, 1e-4f), 0f);
+            band.localRotation = Quaternion.identity;
+        }
+
+        private void OnDestroy()
+        {
+            if (_bandMesh != null) Destroy(_bandMesh);
         }
 
         private void ApplyGlow(float alpha)
