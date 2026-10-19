@@ -18,6 +18,9 @@ namespace CluckWars.EditorTools
     /// visible pad is the straw floor + ring on <c>PlayerBase.prefab</c>).
     /// Phase 8 D9: the outer pile ovals (<c>PileZone_Personal*</c> / <c>PileZone_Contested*</c>) are
     /// yawed so their long axis points at the arena centre, matching the spawned piles.
+    /// Phase 8 D17: the ground's RENDERED mesh is trimmed to the fence centre line + <see cref="GroundTrimBeyondFence"/>, so
+    /// its edge hides under the fence panel instead of showing as a lime strip in the fence-hedge gap; the ground's
+    /// transform and BoxCollider (the floor, the arena hard limit, the NavMesh input) are untouched.
     /// </summary>
     /// <remarks>
     /// <see cref="MapGenerator"/> already does both at build time, but its mesh is a
@@ -33,6 +36,10 @@ namespace CluckWars.EditorTools
         /// <summary>The FBX mesh with the node rotation applied (Y-up, unit footprint, 2 cm slab y 0..0.02), so a zone marker can use it on its own GameObject.</summary>
         public const string PileDiscMeshAssetPath = "Assets/_Game/Art/Meshes/PileDiscIrregular.asset";
         public const string GroundName = "GeneratedGround";
+        /// <summary>The ground's rendered mesh (Phase 8 D17): the built-in cube trimmed in X and Z, UVs keeping the full-floor mapping.</summary>
+        public const string GroundMeshAssetPath = "Assets/_Game/Art/Meshes/GeneratedGroundTrimmed.asset";
+        /// <summary>The rendered ground ends this far past the fence's centre line, i.e. under the panel (it is 0.49 m thick).</summary>
+        public const float GroundTrimBeyondFence = 0.1f;
         public static readonly string[] ZonePrefixes = { "PileZone_", "BaseZone_" };
 
         private const string MapScenePath = "Assets/_Game/Scenes/Map.unity";
@@ -89,6 +96,7 @@ namespace CluckWars.EditorTools
                 // Phase 8 C S2: the base pad is PlayerBase.prefab's straw floor + ring; the baked base disc keeps its
                 // footprint but stops drawing (it would z-fight the floor). Pile discs and the ground still draw.
                 if (child.name.StartsWith("BaseZone_")) renderer.enabled = false;
+                if (isGround) TrimGroundMesh(child);
                 if (isZone)
                 {
                     var filter = child.GetComponent<MeshFilter>();
@@ -115,6 +123,61 @@ namespace CluckWars.EditorTools
                 touched++;
             }
             return touched;
+        }
+
+        /// <summary>Half-extent (world m) the rendered ground is trimmed to for an arena of <paramref name="planeSize"/>.</summary>
+        public static float GroundTrimHalf(float planeSize) => MapPropsRescaler.FenceLine(planeSize) + GroundTrimBeyondFence;
+
+        /// <summary>
+        /// Swaps the ground's mesh for the trimmed asset. Only the MeshFilter changes: scale, position and the BoxCollider stay,
+        /// so the floor, <c>ArenaHalf</c> and the NavMesh bake read exactly what they did.
+        /// </summary>
+        private static void TrimGroundMesh(Transform ground)
+        {
+            var filter = ground.GetComponent<MeshFilter>();
+            if (filter == null)
+            {
+                Debug.LogError($"[ZoneMarkerBaker] {ground.name} has no MeshFilter - not trimmed.");
+                return;
+            }
+            float planeSize = ground.lossyScale.x;
+            filter.sharedMesh = EnsureGroundMeshAsset(GroundTrimHalf(planeSize) / (planeSize * 0.5f));
+        }
+
+        /// <summary>
+        /// The built-in cube with X and Z scaled by <paramref name="fraction"/> (0..1). UVs are shrunk about the centre by the same
+        /// factor, so a texel stays exactly where the untrimmed cube put it (the top face's 0..1 spans the full floor).
+        /// </summary>
+        public static Mesh BuildTrimmedGround(float fraction)
+        {
+            var cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+            var v = cube.vertices.Select(p => new Vector3(p.x * fraction, p.y, p.z * fraction)).ToList();
+            var uv = cube.uv.Select(u => new Vector2(0.5f + (u.x - 0.5f) * fraction, 0.5f + (u.y - 0.5f) * fraction)).ToList();
+            var m = new Mesh { name = "GeneratedGroundTrimmed" };
+            m.SetVertices(v);
+            m.SetNormals(cube.normals);
+            m.SetUVs(0, uv);
+            m.SetTriangles(cube.triangles, 0);
+            m.RecalculateBounds();
+            return m;
+        }
+
+        /// <summary>Creates (or refreshes in place, so its GUID is stable) the trimmed ground mesh asset.</summary>
+        public static Mesh EnsureGroundMeshAsset(float fraction)
+        {
+            var fresh = BuildTrimmedGround(fraction);
+            var existing = AssetDatabase.LoadAssetAtPath<Mesh>(GroundMeshAssetPath);
+            if (existing == null)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(GroundMeshAssetPath)!);
+                AssetDatabase.CreateAsset(fresh, GroundMeshAssetPath);
+                return fresh;
+            }
+            EditorUtility.CopySerialized(fresh, existing);
+            Object.DestroyImmediate(fresh);
+            EditorUtility.SetDirty(existing);
+            AssetDatabase.SaveAssets();
+            return existing;
         }
 
         /// <summary>Personal / contested pile discs: the ones whose oval is yawed toward the centre (D9). The centre disc stays at yaw 0.</summary>

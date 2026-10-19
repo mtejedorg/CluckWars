@@ -101,7 +101,7 @@ namespace CluckWars.EditorTools
         /// this returns exactly 18.60 — that round-trip is the check that this describes
         /// the authored fence rather than merely fitting it.
         /// </summary>
-        private static float FenceLine(float planeSize) =>
+        public static float FenceLine(float planeSize) =>
             HardLimit(planeSize) - FenceStandoff - FencePanelHalfDepth;
 
         /// <summary>Below this the arena is already the size the props are placed for.</summary>
