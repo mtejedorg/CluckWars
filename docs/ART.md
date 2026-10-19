@@ -37,10 +37,23 @@ The UI must feel **exciting, tactile, and attractive** — not minimalist. Think
   border 0.1. Every chicken has a contact shadow on both tiers. Out-of-arena dressing casts only where its shadow
   can reach a match view (Phase 8 B3): Tree_6/10/12/17/29 cast; the barn, its silos and the other 25 trees don't
   (chosen by rendering the match camera along the fence with each object's shadow toggled; guarded by a test).
-- **AA / pipeline (Phase 8).** MSAA 4x PC, 2x Mobile. No camera depth / opaque texture copies. Mobile renders LDR.
-  Volume profile `CW_MatchProfile` (Neutral tonemapping, mild bloom + vignette) is NOT applied yet: post-processing
-  is plumbed for the PC tier only (`RenderTierPolicy.PcPostProcessingEnabled`, off) pending sign-off, because the
-  Neutral tonemapper darkens the grass ~12 % and desaturates ~13 %.
+- **AA / pipeline (Phase 8; D18 2026-10-19).** Two URP assets, picked per quality tier (`Assets/Settings/`). No camera
+  depth / opaque texture copies on either (RP asset toggles off); both keep the SRP Batcher on. Light layers,
+  reflection-probe blending and box projection are OFF on both (the project has no probe and no non-default light /
+  renderer layer; `Phase8ChunkD18Tests`).
+  - **PC** (`PC_RPAsset` + `PC_Renderer`): Forward+, HDR on, MSAA 4x, render scale 1. Post-processing ON (D7; the match
+    camera's `renderPostProcessing` follows `RenderTierPolicy`, volume updated every frame) from `CW_MatchProfile`:
+    **Neutral tonemapping**, **bloom** (threshold 1, intensity 0.2, scatter 0.5, high-quality filtering), vignette 0.2,
+    colour adjustments postExposure +0.22 / contrast +10, Lift-Gamma-Gain lift w +0.003. The Neutral tonemapper alone
+    darkened the grass ~12 %; the exposure / contrast / lift compensate (D2, D7). Renderer features: **SSAO** (depth-normals
+    source, intensity 0.25, radius 0.3) and the **surround haze pass** (`CWHazeFeature`, `HazeSettings`: colour
+    (0.319, 0.367, 0.263), 0 inside the fence, linear ramp from 27 m to 60 m (square distance from the centre) up to 0.6).
+    The haze reconstructs world position from the camera depth texture, which the SSAO depth-normals prepass already fills,
+    so it adds no extra depth pass; it runs after the skybox, before transparents and before post.
+  - **Mobile** (`Mobile_RPAsset` + `Mobile_Renderer`): Forward, **LDR** (HDR off), MSAA 2x, render scale 0.8, no volume
+    update (`ViaScripting`) and no post-processing at all (so no tonemap, bloom, vignette or SSAO), no renderer features.
+    The surround haze is **baked** into material copies instead (`SurroundHazeSwap` / `SurroundHazeBaker`, same
+    `HazeSettings`), so it costs no per-pixel work.
 - **Surfaces (Phase 8).** Ground, props, fence, coop, base and pile zones are matte: smoothness <= 0.08, specular
   highlights and environment reflections off, GPU instancing on. Chickens keep their own materials. Base tints are
   MaterialPropertyBlocks on the shared material (no material copies).
