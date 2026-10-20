@@ -238,18 +238,58 @@ namespace CluckWars.Diagnostics
 
             var runner = gm.Runner;
             if (runner == null || runner.GameMode == GameMode.Single) return;
+            ObserveLoop(gm);
             if (!gm.HasStateAuthority)
             {
                 if (_cfg.AutoLoop > 0 && !_joinerLoopNoted)
                 {
                     _joinerLoopNoted = true;
-                    _log.Info(Source, "AutoTest: cw_autoloop only acts on the host (PLAY AGAIN is host-only); this peer follows.");
+                    _log.Info(Source, "AutoTest: joiner in a cw_autoloop session - stays on the results and follows the host's PLAY AGAIN.");
                 }
                 return;
             }
 
             TickAutoStart(gm, runner);
             TickAutoLoop(gm);
+        }
+
+        // ---- loop observation (host and joiner) --------------------------------------------------------------------
+        private MatchState _observedState = MatchState.WaitingForPlayers;
+        private bool _observedAny;
+        private int _loopRestarts;
+        private float _playAgainPressedAt = -1f;
+        private const float PlayAgainVerifySeconds = 10f;
+
+        /// <summary>
+        /// Every peer: a round that leaves Ended (the host's PLAY AGAIN) is logged as <c>AutoTest loop round=k/N</c>, and the
+        /// host checks its own press actually restarted the round (Error if the state is still Ended 10 s later).
+        /// </summary>
+        private void ObserveLoop(GameManager gm)
+        {
+            var st = gm.State;
+            if (_observedAny && _observedState == MatchState.Ended && st != MatchState.Ended)
+            {
+                _loopRestarts++;
+                _playAgainPressedAt = -1f;
+                if (_cfg.AutoLoop > 0)
+                    _log.Info(Source, $"AutoTest loop round={_loopRestarts}/{_cfg.AutoLoop} restarted (state={st}, " +
+                        $"{(gm.HasStateAuthority ? "host" : "joiner")}).");
+            }
+            else if (_cfg.AutoLoop > 0 && !gm.HasStateAuthority && st == MatchState.Ended && _observedState != MatchState.Ended
+                     && _loopRestarts >= _cfg.AutoLoop && !_loopDoneLogged)
+            {
+                _loopDoneLogged = true;
+                _log.Info(Source, $"AutoTest loop done ({_loopRestarts}/{_cfg.AutoLoop} extra rounds); staying on the results screen.");
+            }
+            _observedState = st;
+            _observedAny = true;
+
+            if (_playAgainPressedAt >= 0f && st == MatchState.Ended && Time.realtimeSinceStartup - _playAgainPressedAt > PlayAgainVerifySeconds)
+            {
+                _log.Error(Source, $"AutoTest loop round={_extraRounds}/{_cfg.AutoLoop}: PLAY AGAIN did not restart the round " +
+                    $"(state still Ended after {PlayAgainVerifySeconds:0} s).");
+                _playAgainPressedAt = -1f;
+            }
         }
 
         private void TickAutoPlay(GameManager gm)
@@ -304,13 +344,15 @@ namespace CluckWars.Diagnostics
                 _startPressed = false;
                 return;
             }
-            if (_cfg.AutoStart <= 0 || _startPressed) return;
+            // A looped round (after PLAY AGAIN) restarts at once when no cw_autostart was given: the room is already in.
+            int target = AutoTestRules.AutoStartTarget(_cfg.AutoStart, _extraRounds > 0 && _cfg.AutoLoop > 0);
+            if (target <= 0 || _startPressed) return;
 
             float now = Time.realtimeSinceStartup;
             if (_waitingSince < 0f) _waitingSince = now;
             int humans = 0;
             foreach (var p in runner.ActivePlayers) if (p.IsRealPlayer) humans++;
-            if (!AutoTestRules.ShouldStart(_cfg.AutoStart, humans, now - _waitingSince, _cfg.AutoStartTimeout, out var reason)) return;
+            if (!AutoTestRules.ShouldStart(target, humans, now - _waitingSince, _cfg.AutoStartTimeout, out var reason)) return;
 
             var overlays = FindFirstObjectByType<MatchOverlaysController>();
             if (overlays == null) return;   // the overlay binds on its first Update; try again next frame
@@ -338,8 +380,9 @@ namespace CluckWars.Diagnostics
                 var overlays = FindFirstObjectByType<MatchOverlaysController>();
                 if (overlays == null) { _loopHandled = false; return; }
                 _extraRounds++;
-                _log.Info(Source, $"AutoTest round {_extraRounds}/{_cfg.AutoLoop}: PLAY AGAIN.");
+                _log.Info(Source, $"AutoTest loop round={_extraRounds}/{_cfg.AutoLoop}: PLAY AGAIN pressed.");
                 overlays.AutoTestPressPlayAgain();
+                _playAgainPressedAt = Time.realtimeSinceStartup;
             }
             else if (_cfg.AutoLoop > 0 && !_loopDoneLogged)
             {

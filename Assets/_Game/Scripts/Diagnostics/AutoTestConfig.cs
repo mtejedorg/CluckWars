@@ -201,6 +201,12 @@ namespace CluckWars.Diagnostics
             return false;
         }
 
+        /// <summary>
+        /// The humans the host waits for before START: <c>cw_autostart</c> when given; else, for a round re-armed by the
+        /// auto-loop's PLAY AGAIN, 1 (start at once: the room is already in); else 0 (a human presses START).
+        /// </summary>
+        public static int AutoStartTarget(int autoStart, bool loopedRound) => autoStart > 0 ? autoStart : loopedRound ? 1 : 0;
+
         /// <summary>Take PLAY AGAIN after a round when fewer than <paramref name="autoLoop"/> extra rounds have been played.</summary>
         public static bool ShouldPlayAgain(int extraRoundsPlayed, int autoLoop) => extraRoundsPlayed < autoLoop;
 

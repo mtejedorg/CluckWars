@@ -147,6 +147,9 @@ namespace CluckWars.Tests
             Assert.IsTrue(AutoTestRules.ShouldPlayAgain(0, 2));
             Assert.IsTrue(AutoTestRules.ShouldPlayAgain(1, 2));
             Assert.IsFalse(AutoTestRules.ShouldPlayAgain(2, 2), "N extra rounds, then stay on the results");
+            Assert.AreEqual(3, AutoTestRules.AutoStartTarget(3, loopedRound: true), "cw_autostart wins");
+            Assert.AreEqual(1, AutoTestRules.AutoStartTarget(0, loopedRound: true), "a looped round restarts at once");
+            Assert.AreEqual(0, AutoTestRules.AutoStartTarget(0, loopedRound: false), "first round without cw_autostart: a human starts");
             Assert.IsTrue(AutoTestRules.ShouldRetryJoin(0f));
             Assert.IsTrue(AutoTestRules.ShouldRetryJoin(119.9f));
             Assert.IsFalse(AutoTestRules.ShouldRetryJoin(120f), "2 min");
