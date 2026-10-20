@@ -442,7 +442,7 @@ At boot every build logs one `[Session]` line (`Session sha=<short>[+dirty] buil
 |---|---|---|
 | `Perf` | Info/Warn | `Hitch ms= frame= state= phase= abilities= gc= alloc=` for frames > 50 ms (Warn > 100 ms, capped at Info while `phase=loading\|covered`); every 5 s `Perf avg= p95= p99= max= hitches50= hitches100= fps= mem= gc= cpu= gpu=` |
 | `Sync` | Debug | every 2 s of simulation, keyed by the tick boundary: `Sync t= st= rem= \| P<id>:x=,z=,hp=,cg=,cs=[,bot] ; ... \| bases=<corner>=<food>,... \| piles=...` (humans by PlayerId, bots `B<corner>`; `hp` = 1 in play / 0 removed) |
-| `Visual` | Info/Warn | `Visual scan#N reason=reveal\|periodic\|manual renderers= ms= errShader= unsupported= nullMat= nan= outOfBounds= chickensNoRenderer= cams= mask=0x cover= offenders=`, then one Warn per category with up to 8 paths. At the reveal, every 10 s in Game, F9 / three-finger tap / overlay button |
+| `Visual` | Info/Warn | `Visual scan#N reason=reveal\|periodic\|manual renderers= ms= errShader= unsupported= nullMat= nan= outOfBounds= chickensNoRenderer= cams= mask=0x cover= offenders= frames=`, then one Warn per category with up to 8 paths. 3.5 s of uncovered play after the reveal, every 10 s in Game, F9 / three-finger tap / overlay button; spread over frames (150 renderers each), hitches on scan frames tagged `probe=1` |
 | `Fusion` | Info | `Net rtt= loss=n/a players= master= tick= resim=` every 5 s (Fusion 2 exposes no loss figure) |
 | `AutoTest` | Info | config, steps, `AutoTest code=XXXXXX`, rounds |
 

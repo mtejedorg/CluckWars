@@ -17,22 +17,43 @@ namespace CluckWars.Diagnostics
     /// the arena cover. One Info summary per scan, then one Warn per category with offenders (up to 8 hierarchy paths).
     /// </summary>
     /// <remarks>
-    /// Runs when the arena is revealed (<see cref="RevealState.ArenaRevealed"/>), every 10 s while the Game scene is
-    /// active, and on demand: F9 (dev keyboard check: diagnostics, not gameplay input), a three-finger tap, or the
-    /// overlay's "Scan visuals" button (<see cref="DiagnosticsReadout.VisualScanRequested"/>). Dev tools only. A scan
-    /// allocates (it lists the scene's renderers); the per-frame trigger checks do not. Reads only.
+    /// <para>When: after <see cref="VisualScanRules.RevealScanDelaySeconds"/> of uncovered play following the reveal
+    /// (never inside the cover or its fade-out, so the probe cannot add a hitch to the reveal it is checking), every
+    /// 10 s while the Game scene is active, and on demand: F9 (dev keyboard check: diagnostics, not gameplay input), a
+    /// three-finger tap, or the overlay's "Scan visuals" button (<see cref="DiagnosticsReadout.VisualScanRequested"/>).
+    /// The automatic scans only run when <see cref="HeavyProbes.Enabled"/>; on-demand scans always run.</para>
+    /// <para>Cost: the renderer list is taken once per scan, then checked <see cref="RenderersPerFrame"/> at a time across
+    /// frames; each shader's verdict is cached by instance id, so <c>shader.name</c> (which allocates) and
+    /// <c>isSupported</c> are read once per shader per session, names of offenders only for their log line. Every frame
+    /// that did scan work is published in <see cref="DiagnosticsReadout.ProbeWorkFrame"/>, and PerfProbe tags a hitch on
+    /// such a frame <c>probe=1</c> (capped at Info). Dev tools only; reads only.</para>
     /// </remarks>
     public sealed class VisualProbe : MonoBehaviour
     {
         private const string Source = "Visual";
         private const float PeriodicSeconds = 10f;
         private const string GameSceneName = "Game";
+        /// <summary>Renderers checked per frame while a scan is in progress.</summary>
+        public const int RenderersPerFrame = 150;
 
         private ILogService _log;
         private int _scanCount;
         private float _nextPeriodicAt = -1f;
-        private bool _revealPending, _threeFingerLatched;
+        private bool _threeFingerLatched;
 
+        // Reveal scan: armed by the reveal, runs after enough uncovered play.
+        private bool _revealArmed;
+        private float _revealPlaySeconds;
+
+        // The scan in progress (_scanRenderers == null: none).
+        private Renderer[] _scanRenderers;
+        private int _scanIndex, _scanLive, _scanFrames, _scanMask;
+        private string _scanReason;
+        private bool _scanInArena;
+        private float _scanHalf;
+        private readonly Stopwatch _scanWatch = new Stopwatch();
+
+        private readonly Dictionary<int, ShaderVerdict> _verdicts = new Dictionary<int, ShaderVerdict>(64);
         private readonly List<Material> _materials = new List<Material>(8);
         private readonly List<Renderer> _chickenRenderers = new List<Renderer>(32);
         private readonly int[] _counts = new int[VisualScanRules.CategoryCount];
@@ -55,24 +76,40 @@ namespace CluckWars.Diagnostics
 
         private void OnDestroy() => RevealState.ArenaRevealed -= OnRevealed;
 
-        // Deferred to the next Update so the scan runs outside the overlay's own Update.
-        private void OnRevealed() => _revealPending = true;
+        private void OnRevealed()
+        {
+            _revealArmed = HeavyProbes.Enabled;
+            _revealPlaySeconds = 0f;
+        }
 
         private void Update()
         {
-            if (_revealPending) { _revealPending = false; Scan("reveal"); return; }
+            if (_scanRenderers != null) { ContinueScan(); return; }
 
             if (DiagnosticsReadout.VisualScanRequested || F9Pressed() || ThreeFingerTap())
             {
                 DiagnosticsReadout.VisualScanRequested = false;
-                Scan("manual");
+                BeginScan("manual");
                 return;
             }
 
-            if (!InGameScene()) { _nextPeriodicAt = -1f; return; }
+            if (!HeavyProbes.Enabled || !InGameScene()) { _nextPeriodicAt = -1f; _revealArmed = false; return; }
             float now = Time.realtimeSinceStartup;
+
+            if (_revealArmed)
+            {
+                // Only uncovered play counts: never the cover, never its fade-out (the reveal's own frames).
+                if (!RevealState.CoverShown && !RevealState.InRevealFade(now)) _revealPlaySeconds += Time.unscaledDeltaTime;
+                if (VisualScanRules.RevealScanDue(_revealPlaySeconds))
+                {
+                    _revealArmed = false;
+                    BeginScan("reveal");
+                }
+                return;   // the periodic scan waits for the reveal scan
+            }
+
             if (_nextPeriodicAt < 0f) _nextPeriodicAt = now + PeriodicSeconds;
-            else if (now >= _nextPeriodicAt) Scan("periodic");
+            else if (now >= _nextPeriodicAt) BeginScan("periodic");
         }
 
         // Scene.name allocates a string on every call: compare the handle per frame, the name only when it changes.
@@ -110,43 +147,58 @@ namespace CluckWars.Diagnostics
             return true;
         }
 
-        private void Scan(string reason)
+        private void BeginScan(string reason)
         {
-            _nextPeriodicAt = Time.realtimeSinceStartup + PeriodicSeconds;
-            var sw = Stopwatch.StartNew();
+            DiagnosticsReadout.ProbeWorkFrame = Time.frameCount;
+            _scanWatch.Restart();
             Array.Clear(_counts, 0, _counts.Length);
             for (int i = 0; i < _paths.Length; i++) _paths[i].Clear();
 
             var main = Camera.main;
-            int mask = main != null ? main.cullingMask : 0;
-            bool inArena = FindFirstObjectByType<MapGenerator>() != null;
-            float half = MapGenerator.ArenaHalfSize;
+            _scanMask = main != null ? main.cullingMask : 0;
+            _scanInArena = FindFirstObjectByType<MapGenerator>() != null;
+            _scanHalf = MapGenerator.ArenaHalfSize;
+            _scanReason = reason;
+            _scanIndex = 0;
+            _scanLive = 0;
+            _scanFrames = 1;
+            _scanRenderers = FindObjectsByType<Renderer>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            _scanWatch.Stop();
+        }
 
-            var renderers = FindObjectsByType<Renderer>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            int live = 0;
-            for (int i = 0; i < renderers.Length; i++)
+        private void ContinueScan()
+        {
+            DiagnosticsReadout.ProbeWorkFrame = Time.frameCount;
+            _scanWatch.Start();
+            _scanFrames++;
+            int end = Mathf.Min(_scanRenderers.Length, _scanIndex + RenderersPerFrame);
+            for (; _scanIndex < end; _scanIndex++)
             {
-                var r = renderers[i];
+                var r = _scanRenderers[_scanIndex];
+                // Destroyed since the list was taken (Unity null), disabled or inactive: not live.
                 if (r == null || !r.enabled || !r.gameObject.activeInHierarchy) continue;
-                live++;
+                _scanLive++;
                 CheckMaterials(r);
                 var t = r.transform;
                 if (VisualScanRules.IsNonFinite(t.position) || VisualScanRules.IsNonFinite(t.rotation) || VisualScanRules.IsNonFinite(t.lossyScale))
                     Add(VisualCategory.Nan, t, null);
-                else if (inArena && VisualScanRules.IsLayerVisible(mask, r.gameObject.layer) && VisualScanRules.IsOutOfBounds(r.bounds.center, half))
+                else if (_scanInArena && VisualScanRules.IsLayerVisible(_scanMask, r.gameObject.layer) && VisualScanRules.IsOutOfBounds(r.bounds.center, _scanHalf))
                     Add(VisualCategory.OutOfBounds, t, null);
             }
-            CheckChickens();
+            if (_scanIndex < _scanRenderers.Length) { _scanWatch.Stop(); return; }
 
-            sw.Stop();
+            CheckChickens();
+            _scanWatch.Stop();
+            _scanRenderers = null;
+            _nextPeriodicAt = Time.realtimeSinceStartup + PeriodicSeconds;
             _scanCount++;
             int total = 0;
             for (int i = 0; i < _counts.Length; i++) total += _counts[i];
             DiagnosticsReadout.VisualOffenders = total;
             DiagnosticsReadout.LastVisualScanUtc = DateTime.UtcNow.ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
 
-            _log?.Info(Source, VisualScanRules.Summary(_scanCount, reason, live, (float)sw.Elapsed.TotalMilliseconds, _counts,
-                Camera.allCamerasCount, mask, RevealState.CoverShown));
+            _log?.Info(Source, VisualScanRules.Summary(_scanCount, _scanReason, _scanLive, (float)_scanWatch.Elapsed.TotalMilliseconds,
+                _counts, Camera.allCamerasCount, _scanMask, RevealState.CoverShown, _scanFrames));
             for (int i = 0; i < _counts.Length; i++)
                 if (_counts[i] > 0) _log?.Warn(Source, VisualScanRules.OffenderLine((VisualCategory)i, _counts[i], _paths[i]));
         }
@@ -155,26 +207,34 @@ namespace CluckWars.Diagnostics
         {
             r.GetSharedMaterials(_materials);
             bool nullMat = _materials.Count == 0, err = false, unsupported = false;
-            string detail = null;
+            Material bad = null;
             for (int i = 0; i < _materials.Count; i++)
             {
                 var m = _materials[i];
                 if (m == null) { nullMat = true; continue; }
-                var shader = m.shader;
-                if (shader == null || VisualScanRules.IsErrorShaderName(shader.name))
+                switch (VerdictOf(m.shader))
                 {
-                    err = true;
-                    detail ??= m.name + " (" + (shader != null ? shader.name : "no shader") + ")";
-                }
-                else if (!shader.isSupported)
-                {
-                    unsupported = true;
-                    detail ??= m.name + " (" + shader.name + ")";
+                    case ShaderVerdict.Error:       err = true; bad ??= m; break;
+                    case ShaderVerdict.Unsupported: unsupported = true; bad ??= m; break;
                 }
             }
+            if (!nullMat && !err && !unsupported) return;
+            // Offenders only: names (which allocate) are read for the log line, never for a healthy renderer.
+            string detail = bad != null ? bad.name + " (" + (bad.shader != null ? bad.shader.name : "no shader") + ")" : null;
             if (nullMat) Add(VisualCategory.NullMat, r.transform, null);
             if (err) Add(VisualCategory.ErrShader, r.transform, detail);
             if (unsupported) Add(VisualCategory.Unsupported, r.transform, detail);
+        }
+
+        /// <summary>Cached per shader instance: its name and support check are read once per shader per session.</summary>
+        private ShaderVerdict VerdictOf(Shader shader)
+        {
+            if (shader == null) return ShaderVerdict.Error;
+            int id = shader.GetInstanceID();
+            if (_verdicts.TryGetValue(id, out var v)) return v;
+            v = VisualScanRules.Classify(shader.name, shader.isSupported);
+            _verdicts[id] = v;
+            return v;
         }
 
         /// <summary>

@@ -92,7 +92,9 @@ namespace CluckWars.Diagnostics
             float now = Time.realtimeSinceStartup;
             string phase = HitchRules.Phase(RevealState.IsLoading(now), RevealState.CoverShown,
                 RevealState.InRevealFade(now - ms / 1000f), hasManager, state, hasManager && gm.IsIntroActive);
-            var level = HitchRules.Classify(ms, HitchRules.IsExpectedPhase(phase));
+            // A frame on which the Visual probe did scan work carries the probe's own cost: Info at most, tagged probe=1.
+            bool probe = DiagnosticsReadout.ProbeWorkFrame == Time.frameCount - 1;
+            var level = HitchRules.Classify(ms, probe || HitchRules.IsExpectedPhase(phase));
             if (level == HitchLevel.None || !_limiter.Allow(now)) return;
 
             var msg = "Hitch ms=" + ms.ToString("0.0", CultureInfo.InvariantCulture) +
@@ -101,7 +103,8 @@ namespace CluckWars.Diagnostics
                       " phase=" + phase +
                       " abilities=" + LocalActiveAbilityCount().ToString(CultureInfo.InvariantCulture) +
                       " gc=" + gcDelta.ToString(CultureInfo.InvariantCulture) +
-                      " alloc=" + FormatKb(allocDelta);
+                      " alloc=" + FormatKb(allocDelta) +
+                      (probe ? " probe=1" : string.Empty);
             if (level == HitchLevel.Warn) _log?.Warn(Source, msg);
             else _log?.Info(Source, msg);
         }

@@ -6,6 +6,9 @@ using UnityEngine;
 
 namespace CluckWars.Diagnostics
 {
+    /// <summary>What a shader renders as: fine, the error / fallback colour, or nothing this GPU supports.</summary>
+    public enum ShaderVerdict : byte { Ok, Error, Unsupported }
+
     /// <summary>The offender categories of a Visual scan, in the order the summary prints them.</summary>
     public enum VisualCategory : byte { ErrShader = 0, Unsupported = 1, NullMat = 2, Nan = 3, OutOfBounds = 4, ChickensNoRenderer = 5 }
 
@@ -41,6 +44,15 @@ namespace CluckWars.Diagnostics
             return false;
         }
 
+        /// <summary>Error names first (an error shader is often also "unsupported"), then the support check.</summary>
+        public static ShaderVerdict Classify(string shaderName, bool isSupported) =>
+            IsErrorShaderName(shaderName) ? ShaderVerdict.Error : isSupported ? ShaderVerdict.Ok : ShaderVerdict.Unsupported;
+
+        /// <summary>Seconds of uncovered play (cover gone, fade-out over) after the reveal before the reveal scan runs.</summary>
+        public const float RevealScanDelaySeconds = 3.5f;
+
+        public static bool RevealScanDue(float uncoveredPlaySeconds) => uncoveredPlaySeconds >= RevealScanDelaySeconds;
+
         public static bool IsNonFinite(float v) => float.IsNaN(v) || float.IsInfinity(v);
 
         public static bool IsNonFinite(Vector3 v) => IsNonFinite(v.x) || IsNonFinite(v.y) || IsNonFinite(v.z);
@@ -71,10 +83,11 @@ namespace CluckWars.Diagnostics
 
         /// <summary>
         /// <c>Visual scan#N reason=.. renderers=R ms=.. errShader=a unsupported=b nullMat=c nan=d outOfBounds=e
-        /// chickensNoRenderer=f cams=g mask=0x.. cover=0|1 offenders=N</c>. The trailing total is what
+        /// chickensNoRenderer=f cams=g mask=0x.. cover=0|1 offenders=N frames=K</c> (K = frames the scan was spread over, <c>ms</c> = the
+        /// summed work). The offenders total is what
         /// tools/test-session/merge.ps1 keys its Visual finding on.
         /// </summary>
-        public static string Summary(int scan, string reason, int renderers, float ms, int[] counts, int cams, int mask, bool cover)
+        public static string Summary(int scan, string reason, int renderers, float ms, int[] counts, int cams, int mask, bool cover, int frames = 1)
         {
             var sb = new StringBuilder(200);
             sb.Append("Visual scan#").Append(scan.ToString(CultureInfo.InvariantCulture))
@@ -89,7 +102,8 @@ namespace CluckWars.Diagnostics
             sb.Append(" cams=").Append(cams.ToString(CultureInfo.InvariantCulture))
               .Append(" mask=0x").Append(mask.ToString("X8", CultureInfo.InvariantCulture))
               .Append(" cover=").Append(cover ? '1' : '0')
-              .Append(" offenders=").Append(total.ToString(CultureInfo.InvariantCulture));
+              .Append(" offenders=").Append(total.ToString(CultureInfo.InvariantCulture))
+              .Append(" frames=").Append(frames.ToString(CultureInfo.InvariantCulture));
             return sb.ToString();
         }
 

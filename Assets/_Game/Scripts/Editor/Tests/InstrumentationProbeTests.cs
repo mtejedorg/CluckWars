@@ -163,6 +163,18 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void ShaderVerdict_ErrorNamesWinOverSupport_AndTheRevealScanWaitsForPlay()
+        {
+            Assert.AreEqual(ShaderVerdict.Error, VisualScanRules.Classify("Hidden/InternalErrorShader", false));
+            Assert.AreEqual(ShaderVerdict.Error, VisualScanRules.Classify("Standard", true));
+            Assert.AreEqual(ShaderVerdict.Unsupported, VisualScanRules.Classify("Universal Render Pipeline/Lit", false));
+            Assert.AreEqual(ShaderVerdict.Ok, VisualScanRules.Classify("Universal Render Pipeline/Lit", true));
+            Assert.IsFalse(VisualScanRules.RevealScanDue(0f));
+            Assert.IsFalse(VisualScanRules.RevealScanDue(3.4f));
+            Assert.IsTrue(VisualScanRules.RevealScanDue(3.5f), "3-4 s of uncovered play after the reveal");
+        }
+
+        [Test]
         public void Transforms_NaNOrInfinityAreFlagged()
         {
             Assert.IsTrue(VisualScanRules.IsNonFinite(new Vector3(float.NaN, 0, 0)));
@@ -192,8 +204,8 @@ namespace CluckWars.Tests
             var counts = new[] { 2, 0, 1, 0, 0, 1 };
             Assert.AreEqual(
                 "Visual scan#3 reason=reveal renderers=412 ms=7.5 errShader=2 unsupported=0 nullMat=1 nan=0 outOfBounds=0 " +
-                "chickensNoRenderer=1 cams=2 mask=0x0000FFFF cover=0 offenders=4",
-                VisualScanRules.Summary(3, "reveal", 412, 7.46f, counts, 2, 0xFFFF, false));
+                "chickensNoRenderer=1 cams=2 mask=0x0000FFFF cover=0 offenders=4 frames=4",
+                VisualScanRules.Summary(3, "reveal", 412, 7.46f, counts, 2, 0xFFFF, false, 4));
 
             var paths = new List<string>();
             for (int i = 0; i < 8; i++) paths.Add("Arena/Fence" + i);

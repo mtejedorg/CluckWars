@@ -24,8 +24,19 @@ namespace CluckWars.Diagnostics
         public static float NetRttMs = -1f;
         /// <summary>Packet loss as printed in the <c>Net</c> line (Fusion 2 does not expose it: <c>n/a</c>).</summary>
         public static string NetLoss = "n/a";
+        /// <summary>Last <c>Time.frameCount</c> on which a probe did scan work (PerfProbe tags a hitch on it <c>probe=1</c>).</summary>
+        public static int ProbeWorkFrame = -1;
         /// <summary>Auto-test <c>cw_hud 1</c>: show the overlay as soon as it exists.</summary>
         public static bool HudRequestedAtBoot;
+    }
+
+    /// <summary>
+    /// Whether the heavy probes (automatic Visual scans, Sync heartbeat lines) run. Set once at boot by
+    /// <c>ProjectInstaller</c>; true by default (players).
+    /// </summary>
+    public static class HeavyProbes
+    {
+        public static bool Enabled = true;
     }
 
     /// <summary>
