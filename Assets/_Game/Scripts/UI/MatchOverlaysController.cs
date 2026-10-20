@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using CluckWars.Abilities;
+using CluckWars.Diagnostics;
 using CluckWars.Gameplay;
 using CluckWars.Input;
 using CluckWars.Localization;
@@ -234,6 +235,8 @@ namespace CluckWars.UI
 
         private void OnDestroy()
         {
+            // The cover goes with this scene: nothing may read a stale "cover up" after it.
+            RevealState.ResetForScene();
             if (_network != null) _network.OnShutdown -= HandleShutdown;
             // The stage owns cameras, lights, models and RenderTextures in this scene plus render-
             // pipeline callbacks that would outlive it: always hand them back when the scene goes.
@@ -1355,12 +1358,19 @@ namespace CluckWars.UI
                     ? Time.unscaledTime
                     : Time.unscaledTime + ArenaCoverRule.FadeSeconds;
                 _arenaCover.AddToClassList("cw-arena-cover--hidden");
+                // Late join: this peer's first reveal lands on a round already past its intro (it never saw the 3-2-1).
+                bool lateJoin = gm != null && (state == MatchState.Ended || (state == MatchState.Active && !gm.IsIntroActive));
                 if (d.HardCap)
                     _log?.Error(Source, $"The arena cover was still up after {ArenaCoverRule.HardCapSeconds:0} s: revealing anyway " +
                         $"(readiness: ready={_arenaReadiness?.IsReady}, pending={_arenaReadiness?.PendingGates}, state={state}).");
                 else
                     _log?.Info(Source, $"Arena revealed (state {state}, ready={(_arenaReadiness == null ? "n/a" : _arenaReadiness.IsReady.ToString())}, " +
                         $"covered {_arenaCoveredSeconds:0.00} s).");
+                // Test-session breadcrumb (item 5): cover off, with what the reveal looked like on this peer.
+                _log?.Info(Source, $"Cover off: covered={_arenaCoveredSeconds:0.00}s lateJoin={(lateJoin ? 1 : 0)} " +
+                    $"reducedMotion={(PlayerPreferences.ReducedMotionEnabled ? 1 : 0)} fade={(PlayerPreferences.ReducedMotionEnabled ? 0f : ArenaCoverRule.FadeSeconds):0.00}s " +
+                    $"hardCap={(d.HardCap ? 1 : 0)} state={state}");
+                RevealState.NotifyRevealed();
             }
 
             if (_arenaRevealed)
@@ -1373,6 +1383,13 @@ namespace CluckWars.UI
             }
 
             SetShown(_arenaCover, d.CoverShown);
+            if (d.CoverShown != RevealState.CoverShown)
+            {
+                // Breadcrumb (item 5): every cover transition before the reveal (the waiting room hides it, Starting shows it).
+                RevealState.CoverShown = d.CoverShown;
+                _log?.Info(Source, $"Cover {(d.CoverShown ? "on" : "off (waiting room / overlay)")}: state={state} " +
+                    $"ready={(_arenaReadiness == null ? "n/a" : _arenaReadiness.IsReady ? "1" : "0")} covered={_arenaCoveredSeconds:0.00}s");
+            }
             if (d.CoverShown)
             {
                 _arenaCover.RemoveFromClassList("cw-arena-cover--hidden");
@@ -1403,6 +1420,7 @@ namespace CluckWars.UI
                     "see the MatchBootstrapper / FusionNetworkService errors above.");
             }
             bool getReady = hold == IntroOverlayRule.PreIntro.GetReady && !_shutdownReason.HasValue;
+            TrackGetReadyHold(getReady, gm);
             // GET READY is only the pre-intro card (finding 11): gone on the first digit, never under GO!.
             SetShown(_introGetReady, getReady);
             RefreshWaitingLine(getReady ? gm : null);
@@ -1448,6 +1466,39 @@ namespace CluckWars.UI
             {
                 SetShown(_introOverlay, false);
             }
+        }
+
+        // Breadcrumb (test-session item 5): how long GET READY stayed up each time, read-only.
+        private float _getReadySince = -1f;
+
+        private void TrackGetReadyHold(bool shown, GameManager gm)
+        {
+            if (shown && _getReadySince < 0f) _getReadySince = Time.unscaledTime;
+            else if (!shown && _getReadySince >= 0f)
+            {
+                _log?.Info(Source, $"GET READY held {Time.unscaledTime - _getReadySince:0.00}s " +
+                    $"(now {(gm != null ? gm.State.ToString() : "no manager")}, {RevealState.Describe()}).");
+                _getReadySince = -1f;
+            }
+        }
+
+        // ---- Dev auto-test hooks (CluckWars.Diagnostics.AutoTestDriver; dev-tools builds only) ------------------
+        // The same handlers the waiting room's START and the podium's PLAY AGAIN buttons call.
+
+        /// <summary>Waiting room START (host).</summary>
+        public void AutoTestPressStart()
+        {
+            if (!DevTools.Available) { _log?.Warn(Source, "Auto-test START refused: dev tools are not available."); return; }
+            OnLobbyStart();
+        }
+
+        /// <summary>Podium PLAY AGAIN (host), only while the button itself would be enabled.</summary>
+        public void AutoTestPressPlayAgain()
+        {
+            if (!DevTools.Available) { _log?.Warn(Source, "Auto-test PLAY AGAIN refused: dev tools are not available."); return; }
+            var gm = GameManager.Instance;
+            if (gm == null || !gm.CanRequestPlayAgain || _leavingToLobby) return;
+            OnPlayAgain();
         }
 
         private void SetIntroScrim(bool on)

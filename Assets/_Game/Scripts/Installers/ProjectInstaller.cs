@@ -92,6 +92,11 @@ namespace CluckWars.Installers
                     new GamepadInputProvider()))
                 .AsSingle();
 
+            // Test-session instrumentation (docs/TEST_SESSION_PLAN_2026-10.md §2). Breadcrumbs (first-use marks, scene-load
+            // bookkeeping) are always on; the probes and the auto-test exist only in a dev-tools build. A build without them
+            // still says so once if someone passes cw_* auto-test keys.
+            Container.BindInterfacesTo<RevealBreadcrumbs>().AsSingle().NonLazy();
+
             // Haptics (Phase 6, A9): the real vibrator on an Android player, nothing anywhere else (desktop, the Editor,
             // tests). The policy (Buzz When Hit, the 200 ms gap) is HapticsService; the device is the platform part.
             Container.Bind<IHapticsService>()

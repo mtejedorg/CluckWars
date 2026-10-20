@@ -1,6 +1,7 @@
 using CluckWars.Gameplay;
 using CluckWars.Logging;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 using Zenject;
 
@@ -98,6 +99,7 @@ namespace CluckWars.Visuals
 
             bool scene = _tracker.IsDone(ArenaGate.Scene) || SceneGateHolds(gm, t);
             bool tier = _tracker.IsDone(ArenaGate.Tier) || TierGateHolds();
+            if (tier) LogRenderTier();
 
             if (!_tracker.IsReady)
             {
@@ -152,6 +154,24 @@ namespace CluckWars.Visuals
             if (_fenceDriver == null) _fenceDriver = _camera.GetComponent<FenceFadeDriver>();
             if (_fenceSwap == null) _fenceSwap = _camera.GetComponent<FencePerformanceSwap>();
             if (_hazeSwap == null) _hazeSwap = _camera.GetComponent<SurroundHazeSwap>();
+        }
+
+        // Breadcrumb (test-session item 5): which tier the RenderTierPolicy decisions were made for, and why. Logged when the
+        // Tier gate first holds and again if the active pipeline asset changes before the round (a reference compare per frame).
+        private RenderPipelineAsset _loggedTier;
+        private bool _tierLogged;
+
+        private void LogRenderTier()
+        {
+            var rp = GraphicsSettings.currentRenderPipeline;
+            if (_tierLogged && rp == _loggedTier) return;
+            _tierLogged = true;
+            _loggedTier = rp;
+            var names = QualitySettings.names;
+            int q = QualitySettings.GetQualityLevel();
+            _log?.Info(Source, $"Render tier: rp={(rp != null ? rp.name : "none")} quality={(q >= 0 && q < names.Length ? names[q] : q.ToString())} " +
+                $"post={(RenderTierPolicy.PostProcessingFor(rp) ? "on" : "off")} haze={(RenderTierPolicy.PcHazePassFor(rp) ? "pass" : "baked")} " +
+                $"(RenderTierPolicy keys on the active pipeline asset: post-processing and the haze pass are {RenderTierPolicy.PcRpAssetName} only).");
         }
 
         private bool TierGateHolds() =>

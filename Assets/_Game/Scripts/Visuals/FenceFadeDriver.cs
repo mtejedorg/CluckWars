@@ -163,6 +163,8 @@ namespace CluckWars.Visuals
             if (!FenceFadeRules.KeywordToggle(_keywordOn, _warmupKeyword ? 1f : strongest, out bool wantOn)) return;
             Shader.SetKeyword(_fadeKeyword, wantOn);
             _keywordOn = wantOn;
+            // Breadcrumb only: the first real fence hole of this scene (not the warm-up's forced variant).
+            if (wantOn && !_warmupKeyword) CluckWars.Diagnostics.FirstUseMarkers.Note(CluckWars.Diagnostics.FirstUseKind.FenceHole);
         }
 
         private void LateUpdate()

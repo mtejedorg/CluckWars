@@ -71,6 +71,8 @@ namespace CluckWars.Bootstrap
         {
             _log?.Info(Source, $"Loading scene '{_nextSceneName}' asynchronously (Single mode).");
             var op = SceneManager.LoadSceneAsync(_nextSceneName, LoadSceneMode.Single);
+            // Diagnostics only (PerfProbe phase=loading); cleared by RevealBreadcrumbs when the load completes.
+            CluckWars.Diagnostics.RevealState.SceneLoadInFlight = op != null;
             if (op == null)
                 _log?.Error(Source, $"LoadSceneAsync('{_nextSceneName}') returned null: the scene is not in the " +
                     "build settings or the name is wrong. The match cannot start.");

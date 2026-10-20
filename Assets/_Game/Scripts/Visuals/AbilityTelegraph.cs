@@ -756,7 +756,11 @@ namespace CluckWars.Visuals
             _shapeLine.startColor = _shapeLine.endColor = c;
 
             TelegraphShapes.Apply(_shapeLine, ref _shapeBuf, shape, pos, fwd, radius, forwardOffset, coneAngle);
-            if (!_shapeLine.enabled) _shapeLine.enabled = true;
+            if (!_shapeLine.enabled)
+            {
+                _shapeLine.enabled = true;
+                CluckWars.Diagnostics.FirstUseMarkers.Note(CluckWars.Diagnostics.FirstUseKind.Telegraph);   // breadcrumb only
+            }
             UpdateUnderlays(_shapeBuf, dashed);
 
             bool stalk = TelegraphShapes.NeedsStalk(shape, forwardOffset);
