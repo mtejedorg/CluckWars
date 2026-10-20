@@ -85,7 +85,7 @@ namespace CluckWars.Diagnostics
 
         private IEnumerator MenuFlow()
         {
-            var role = _cfg.AutoHost ? "host" : "join";
+            var role = _cfg.AutoHost ? "host" : _cfg.AutoJoin != null ? "join" : "solo";
             float t0 = Time.realtimeSinceStartup;
             MenuUiController menu = null;
             while (menu == null || !menu.AutoTestIdle)
@@ -100,7 +100,7 @@ namespace CluckWars.Diagnostics
             }
             yield return new WaitForSecondsRealtime(1f);   // the first page's slide-in
 
-            var mode = _cfg.AutoHost ? SessionMode.Host : SessionMode.Join;
+            var mode = _cfg.AutoHost ? SessionMode.Host : _cfg.AutoJoin != null ? SessionMode.Join : SessionMode.Solo;
             _log.Info(Source, $"AutoTest {role}: {mode} button, class {_cfg.Class}.");
             if (!menu.AutoTestChooseMode(mode)) yield break;
             yield return new WaitForSecondsRealtime(StepSeconds);
@@ -132,7 +132,13 @@ namespace CluckWars.Diagnostics
             yield return new WaitForSecondsRealtime(1f);
 
             if (_cfg.AutoHost) yield return HostFlow(menu);
-            else yield return JoinFlow(menu, _cfg.AutoJoin);
+            else if (_cfg.AutoJoin != null) yield return JoinFlow(menu, _cfg.AutoJoin);
+            else
+            {
+                // PLAY SOLO: THE COOP's START loads the match; the solo round starts by itself (no waiting room).
+                _log.Info(Source, "AutoTest solo: START (loading the match scene vs 3 bots).");
+                menu.AutoTestPressStartOrJoin(null);
+            }
         }
 
         private IEnumerator HostFlow(MenuUiController menu)
@@ -237,8 +243,14 @@ namespace CluckWars.Diagnostics
             if (!valid) return;
 
             var runner = gm.Runner;
-            if (runner == null || runner.GameMode == GameMode.Single) return;
+            if (runner == null) return;
             ObserveLoop(gm);
+            if (runner.GameMode == GameMode.Single)
+            {
+                // Solo: no waiting room to start; PLAY AGAIN loops the rounds (goes straight to GET READY).
+                if (gm.HasStateAuthority) TickAutoLoop(gm);
+                return;
+            }
             if (!gm.HasStateAuthority)
             {
                 if (_cfg.AutoLoop > 0 && !_joinerLoopNoted)

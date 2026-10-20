@@ -34,7 +34,7 @@ namespace CluckWars.Tests
             Assert.IsNull(cfg.AutoJoin);
             Assert.AreEqual(AutoTestConfig.DefaultAutoStartTimeout, cfg.AutoStartTimeout);
             CollectionAssert.IsEmpty(cfg.Problems);
-            Assert.AreEqual("AutoTest config autohost=1 autojoin=- class=Speedy autostart=2 autoloop=3 autoplay=1 timeout=90 devmode=1 hud=1 profile=default",
+            Assert.AreEqual("AutoTest config autohost=1 autojoin=- autosolo=0 class=Speedy autostart=2 autoloop=3 autoplay=1 timeout=90 devmode=1 hud=1 profile=default",
                 cfg.Describe());
         }
 
@@ -105,6 +105,22 @@ namespace CluckWars.Tests
             Assert.AreEqual("client2", bad.Profile);
             Assert.AreEqual(1, bad.Problems.Count, "sanitised with a Warn");
             Assert.IsNull(AutoTestConfig.FromCommandLine(new[] { "x.exe" }).Profile, "unset: default profile");
+        }
+
+        [Test]
+        public void AutoSolo_PlaysSolo_AndASessionKeyWins()
+        {
+            var solo = AutoTestConfig.FromCommandLine(new[] { "CluckWars.exe", "-cw_autosolo", "-cw_autoloop", "3", "-cw_class", "fatty" });
+            Assert.IsTrue(solo.AutoSolo);
+            Assert.IsTrue(solo.WantsMenuFlow);
+            Assert.AreEqual(3, solo.AutoLoop);
+            Assert.AreEqual(ChickenClass.Fatty, solo.Class);
+            CollectionAssert.IsEmpty(solo.Problems);
+
+            var both = AutoTestConfig.FromMap(new Dictionary<string, string> { ["cw_autosolo"] = "1", ["cw_autohost"] = "1" });
+            Assert.IsFalse(both.AutoSolo, "a session (host/join) wins over solo");
+            Assert.IsTrue(both.AutoHost);
+            Assert.AreEqual(1, both.Problems.Count);
         }
 
         [Test]

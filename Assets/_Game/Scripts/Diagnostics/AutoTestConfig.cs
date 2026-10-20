@@ -15,10 +15,11 @@ namespace CluckWars.Diagnostics
         public const string KeyPrefix = "cw_";
         public const string AutoHostKey = "cw_autohost", AutoJoinKey = "cw_autojoin", ClassKey = "cw_class",
             AutoStartKey = "cw_autostart", AutoStartTimeoutKey = "cw_autostart_timeout", AutoLoopKey = "cw_autoloop",
-            AutoPlayKey = "cw_autoplay", DevModeKey = "cw_devmode", HudKey = "cw_hud", ProfileKey = "cw_profile";
+            AutoPlayKey = "cw_autoplay", DevModeKey = "cw_devmode", HudKey = "cw_hud", ProfileKey = "cw_profile",
+            AutoSoloKey = "cw_autosolo";
 
         public static readonly string[] Keys =
-            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey };
+            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey };
 
         public const ChickenClass DefaultClass = ChickenClass.Warrior;
         public const float DefaultAutoStartTimeout = 90f;
@@ -49,7 +50,10 @@ namespace CluckWars.Diagnostics
         /// <summary>Human-readable parse problems (each logged as a Warn).</summary>
         public readonly List<string> Problems = new List<string>();
 
-        public bool WantsMenuFlow => AutoHost || AutoJoin != null;
+        /// <summary><c>cw_autosolo</c>: PLAY SOLO (vs 3 bots); loops with <c>cw_autoloop</c> like the others.</summary>
+        public bool AutoSolo;
+
+        public bool WantsMenuFlow => AutoHost || AutoJoin != null || AutoSolo;
 
         /// <summary><c>-cw_key value</c> pairs; a <c>-cw_key</c> followed by another switch (or nothing) is a bare flag (= 1).</summary>
         public static AutoTestConfig FromCommandLine(IReadOnlyList<string> args)
@@ -108,6 +112,7 @@ namespace CluckWars.Diagnostics
                 switch (key)
                 {
                     case AutoHostKey: cfg.AutoHost = cfg.ParseBool(key, value); break;
+                    case AutoSoloKey: cfg.AutoSolo = cfg.ParseBool(key, value); break;
                     case AutoPlayKey: cfg.AutoPlay = cfg.ParseBool(key, value); break;
                     case DevModeKey:  cfg.DevMode = cfg.ParseBool(key, value); break;
                     case HudKey:
@@ -135,6 +140,11 @@ namespace CluckWars.Diagnostics
                     case AutoStartTimeoutKey: cfg.AutoStartTimeout = cfg.ParseInt(key, value, 1, 3600, (int)DefaultAutoStartTimeout); break;
                     default: cfg.Problems.Add($"unknown key {kv.Key}"); break;
                 }
+            }
+            if (cfg.AutoSolo && (cfg.AutoHost || cfg.AutoJoin != null))
+            {
+                cfg.Problems.Add($"{AutoSoloKey} with {AutoHostKey}/{AutoJoinKey}; the session wins ({AutoSoloKey} ignored)");
+                cfg.AutoSolo = false;
             }
             if (cfg.AutoHost && cfg.AutoJoin != null)
             {
@@ -199,6 +209,7 @@ namespace CluckWars.Diagnostics
         public string Describe() =>
             "AutoTest config autohost=" + (AutoHost ? 1 : 0) +
             " autojoin=" + (AutoJoin ?? "-") +
+            " autosolo=" + (AutoSolo ? 1 : 0) +
             " class=" + Class +
             " autostart=" + AutoStart.ToString(CultureInfo.InvariantCulture) +
             " autoloop=" + AutoLoop.ToString(CultureInfo.InvariantCulture) +
