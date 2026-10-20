@@ -166,7 +166,8 @@ namespace CluckWars.Settings
         /// Editor menu to launch it from — which also means a player build contains it and
         /// something has to keep players out.
         ///
-        /// <b><c>Debug.isDebugBuild</c> cannot do this job.</b> <c>CluckWarsBuildMenu</c>
+        /// <b><c>Debug.isDebugBuild</c> alone cannot do this job</b> (the shared build gate is
+        /// <c>CluckWars.Diagnostics.DevTools.Available</c>). <c>CluckWarsBuildMenu</c>
         /// builds with <c>BuildOptions.None</c>, so the flag is false on every artefact we
         /// ship, including the ones Maestro installs on the Pixel 9 to test with. A gate on
         /// it would hide the lab from precisely the build it exists to be used in. Likewise

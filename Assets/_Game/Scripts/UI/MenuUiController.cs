@@ -740,19 +740,10 @@ namespace CluckWars.UI
         /// <summary>
         /// Dev Mode (and so the Ability Lab) exists in development builds and the Editor only, or in
         /// a build compiled with <c>CLUCKWARS_DEV_TOOLS</c>. A release build hides the toggle and
-        /// ignores a Dev Mode preference left over from a development build.
+        /// ignores a Dev Mode preference left over from a development build. The rule itself is
+        /// <see cref="CluckWars.Diagnostics.DevTools.Available"/>, shared with the test-session tools.
         /// </summary>
-        private static bool DevToolsAvailable
-        {
-            get
-            {
-#if CLUCKWARS_DEV_TOOLS
-                return true;
-#else
-                return Debug.isDebugBuild;
-#endif
-            }
-        }
+        private static bool DevToolsAvailable => CluckWars.Diagnostics.DevTools.Available;
 
         /// <summary>
         /// Binds one settings row: seeds its Toggle from the preference and writes changes
