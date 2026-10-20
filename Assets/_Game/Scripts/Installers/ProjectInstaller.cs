@@ -96,6 +96,7 @@ namespace CluckWars.Installers
             // bookkeeping) are always on; the probes and the auto-test exist only in a dev-tools build. A build without them
             // still says so once if someone passes cw_* auto-test keys.
             Container.BindInterfacesTo<RevealBreadcrumbs>().AsSingle().NonLazy();
+            if (DevTools.Available) InstallDiagnostics();
 
             // Haptics (Phase 6, A9): the real vibrator on an Android player, nothing anywhere else (desktop, the Editor,
             // tests). The policy (Buzz When Hit, the 200 ms gap) is HapticsService; the device is the platform part.
@@ -210,6 +211,16 @@ namespace CluckWars.Installers
                 ? _fencePerformanceMeshes
                 : ScriptableObject.CreateInstance<FencePerformanceMeshesSO>();
             Container.Bind<FencePerformanceMeshesSO>().FromInstance(fenceMeshes).AsSingle();
+        }
+
+        /// <summary>
+        /// The dev-tools probes, each on its own object under the ProjectContext (so they live across scene loads):
+        /// PerfProbe (Perf), SyncHeartbeat (Sync), VisualProbe (Visual), the auto-test driver (AutoTest) and the
+        /// spawner that puts the DebugHud into the Game scene. All read-only toward gameplay.
+        /// </summary>
+        private void InstallDiagnostics()
+        {
+            Container.Bind<PerfProbe>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.Perf").AsSingle().NonLazy();
         }
     }
 }
