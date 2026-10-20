@@ -201,11 +201,22 @@ namespace CluckWars.Diagnostics
             return false;
         }
 
+        /// <summary>A looped round never waits longer than this for the previous round's humans to come back.</summary>
+        public const float LoopRestartMaxWaitSeconds = 15f;
+
         /// <summary>
-        /// The humans the host waits for before START: <c>cw_autostart</c> when given; else, for a round re-armed by the
-        /// auto-loop's PLAY AGAIN, 1 (start at once: the room is already in); else 0 (a human presses START).
+        /// Round 2+ of an auto-loop (the waiting room re-armed by PLAY AGAIN): START as soon as every human who was in
+        /// the previous round is back (<paramref name="humansAtEnd"/>), or after <see cref="LoopRestartMaxWaitSeconds"/>.
+        /// <c>cw_autostart</c>'s N and its long timeout only govern the first round (a 3-seat target with 2 humans left
+        /// used to hold every looped round for the whole timeout).
         /// </summary>
-        public static int AutoStartTarget(int autoStart, bool loopedRound) => autoStart > 0 ? autoStart : loopedRound ? 1 : 0;
+        public static bool ShouldRestartLoop(int humansNow, int humansAtEnd, float waitedSeconds, out string reason)
+        {
+            reason = null;
+            if (humansNow >= Math.Max(1, humansAtEnd)) { reason = $"{humansNow}/{humansAtEnd} of last round's humans back"; return true; }
+            if (waitedSeconds >= LoopRestartMaxWaitSeconds) { reason = $"max wait {LoopRestartMaxWaitSeconds:0}s with {humansNow}/{humansAtEnd}"; return true; }
+            return false;
+        }
 
         /// <summary>Take PLAY AGAIN after a round when fewer than <paramref name="autoLoop"/> extra rounds have been played.</summary>
         public static bool ShouldPlayAgain(int extraRoundsPlayed, int autoLoop) => extraRoundsPlayed < autoLoop;

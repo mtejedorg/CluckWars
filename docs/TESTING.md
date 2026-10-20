@@ -459,7 +459,7 @@ Always on (breadcrumbs): `MatchOverlays` `Cover on/off`, `Cover off: covered= la
 | `cw_class Warrior\|Speedy\|Fatty\|Assassin` | case-insensitive; invalid → Warn + Warrior |
 | `cw_autostart N` | host: press the waiting room's START once N humans are in (1 = at once) |
 | `cw_autostart_timeout S` | …or after S seconds with whoever is there (default 90) |
-| `cw_autoloop N` | host: PLAY AGAIN for N extra rounds (re-STARTs at once if no `cw_autostart`), then stay on the results; joiners just follow. Every peer logs `AutoTest loop round=k/N`; the host logs an Error if its PLAY AGAIN did not restart the round within 10 s |
+| `cw_autoloop N` | host: PLAY AGAIN for N extra rounds (round 2+ re-STARTs as soon as the previous round's humans are back, max 15 s: `AutoTest loop restart humans=k wait=Xs`), then stay on the results; joiners just follow. Every peer logs `AutoTest loop round=k/N`; the host logs an Error if its PLAY AGAIN did not restart the round within 10 s |
 | `cw_autoplay 1` | fake local input: piles → base, weave, unstick, an ability every 3 s |
 | `cw_devmode 1` | Developer Mode on |
 | `cw_hud 1` / `cw_hud 2` | overlay at boot: 1 = compact one-line strip (FPS \| p95 \| hitches \| Visual \| RTT, top-left, translucent; leaves the match HUD visible), 2 = full panel |

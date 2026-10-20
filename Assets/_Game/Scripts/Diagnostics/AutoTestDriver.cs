@@ -344,21 +344,36 @@ namespace CluckWars.Diagnostics
                 _startPressed = false;
                 return;
             }
-            // A looped round (after PLAY AGAIN) restarts at once when no cw_autostart was given: the room is already in.
-            int target = AutoTestRules.AutoStartTarget(_cfg.AutoStart, _extraRounds > 0 && _cfg.AutoLoop > 0);
-            if (target <= 0 || _startPressed) return;
+            bool looped = _extraRounds > 0 && _cfg.AutoLoop > 0;
+            if (_startPressed || (!looped && _cfg.AutoStart <= 0)) return;
 
             float now = Time.realtimeSinceStartup;
             if (_waitingSince < 0f) _waitingSince = now;
-            int humans = 0;
-            foreach (var p in runner.ActivePlayers) if (p.IsRealPlayer) humans++;
-            if (!AutoTestRules.ShouldStart(target, humans, now - _waitingSince, _cfg.AutoStartTimeout, out var reason)) return;
+            int humans = CountHumans(runner);
+            float waited = now - _waitingSince;
+            string reason;
+            if (looped)
+            {
+                // Round 2+: the previous round's humans, or 15 s - never cw_autostart's full timeout again.
+                if (!AutoTestRules.ShouldRestartLoop(humans, _humansAtRoundEnd, waited, out reason)) return;
+            }
+            else if (!AutoTestRules.ShouldStart(_cfg.AutoStart, humans, waited, _cfg.AutoStartTimeout, out reason)) return;
 
             var overlays = FindFirstObjectByType<MatchOverlaysController>();
             if (overlays == null) return;   // the overlay binds on its first Update; try again next frame
             _startPressed = true;
-            _log.Info(Source, $"AutoTest start: {reason}; pressing the waiting room's START.");
+            if (looped) _log.Info(Source, $"AutoTest loop restart humans={humans} wait={waited:0.0}s ({reason}); pressing START.");
+            else _log.Info(Source, $"AutoTest start: {reason}; pressing the waiting room's START.");
             overlays.AutoTestPressStart();
+        }
+
+        private int _humansAtRoundEnd;
+
+        private static int CountHumans(NetworkRunner runner)
+        {
+            int n = 0;
+            foreach (var p in runner.ActivePlayers) if (p.IsRealPlayer) n++;
+            return n;
         }
 
         private void TickAutoLoop(GameManager gm)
@@ -380,7 +395,9 @@ namespace CluckWars.Diagnostics
                 var overlays = FindFirstObjectByType<MatchOverlaysController>();
                 if (overlays == null) { _loopHandled = false; return; }
                 _extraRounds++;
-                _log.Info(Source, $"AutoTest loop round={_extraRounds}/{_cfg.AutoLoop}: PLAY AGAIN pressed.");
+                var loopRunner = gm.Runner;
+                _humansAtRoundEnd = loopRunner != null ? CountHumans(loopRunner) : 1;
+                _log.Info(Source, $"AutoTest loop round={_extraRounds}/{_cfg.AutoLoop}: PLAY AGAIN pressed (humans={_humansAtRoundEnd}).");
                 overlays.AutoTestPressPlayAgain();
                 _playAgainPressedAt = Time.realtimeSinceStartup;
             }

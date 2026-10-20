@@ -147,9 +147,13 @@ namespace CluckWars.Tests
             Assert.IsTrue(AutoTestRules.ShouldPlayAgain(0, 2));
             Assert.IsTrue(AutoTestRules.ShouldPlayAgain(1, 2));
             Assert.IsFalse(AutoTestRules.ShouldPlayAgain(2, 2), "N extra rounds, then stay on the results");
-            Assert.AreEqual(3, AutoTestRules.AutoStartTarget(3, loopedRound: true), "cw_autostart wins");
-            Assert.AreEqual(1, AutoTestRules.AutoStartTarget(0, loopedRound: true), "a looped round restarts at once");
-            Assert.AreEqual(0, AutoTestRules.AutoStartTarget(0, loopedRound: false), "first round without cw_autostart: a human starts");
+            // Live run: cw_autostart 3 with 2 humans left held every looped round for the whole 150 s timeout.
+            Assert.IsTrue(AutoTestRules.ShouldRestartLoop(2, 2, 0.5f, out var why), "the previous round's humans are back");
+            StringAssert.Contains("2/2", why);
+            Assert.IsFalse(AutoTestRules.ShouldRestartLoop(1, 2, 5f, out _), "one still reconnecting");
+            Assert.IsTrue(AutoTestRules.ShouldRestartLoop(1, 2, 15f, out why), "never longer than 15 s");
+            StringAssert.Contains("max wait", why);
+            Assert.IsTrue(AutoTestRules.ShouldRestartLoop(1, 0, 0f, out _), "unknown count: the host alone is enough");
             Assert.IsTrue(AutoTestRules.ShouldRetryJoin(0f));
             Assert.IsTrue(AutoTestRules.ShouldRetryJoin(119.9f));
             Assert.IsFalse(AutoTestRules.ShouldRetryJoin(120f), "2 min");
