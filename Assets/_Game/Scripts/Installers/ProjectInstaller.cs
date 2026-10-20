@@ -1,4 +1,5 @@
 using CluckWars.Audio;
+using CluckWars.Diagnostics;
 using CluckWars.Gameplay;
 using CluckWars.Input;
 using CluckWars.Logging;
@@ -60,6 +61,10 @@ namespace CluckWars.Installers
                 .To<UnityLogService>()
                 .AsSingle()
                 .WithArguments(_logMinLevel);
+
+            // Session stamp (test-session instrumentation, always on): one "Session sha=.. device=.." line at boot and a
+            // "SessionChange" line when the quality tier / Performance Mode changes. Ties every log file to a build + device.
+            Container.BindInterfacesTo<SessionStamp>().AsSingle().NonLazy();
 
             // UGS: real service when the packages are present; NullUGSService in
             // offline/demo builds (define UGS_DISABLED in Project Settings to force null).
