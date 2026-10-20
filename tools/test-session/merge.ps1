@@ -232,6 +232,50 @@ foreach ($e in $sorted) {
     $beatsBySrc[$e.Src].Add($beat)
 }
 
+
+# ---- Round-start invariants (from Sync heartbeats) ------------------------------------------------
+# Lesson of 2026-10-20 (CW-221): a log line saying "Teleported" is not proof the chicken moved. These rules assert the
+# STATE of the world at the first Active heartbeat of every round (rem >= 44.99, intro frozen), on every source:
+#   * every chicken sits in a corner quadrant (|x| and |z| >= $CornerMin) and no two chickens share a quadrant
+#   * cargo == 0, every base food == 0
+#   * the pile amounts equal that source's round-1 snapshot
+# Violations are filed under the INVARIANT category.
+$CornerMin = 17.5
+foreach ($src in @($beatsBySrc.Keys)) {
+    $round = 0; $prevSt = ''; $firstPiles = $null
+    foreach ($b in $beatsBySrc[$src]) {
+        $isStart = ($b.St -eq 'Active' -and $b.Rem -ge 44.99 -and $prevSt -ne 'Active')
+        $prevSt = $b.St
+        if (-not $isStart) { if ($b.St -ne 'Active') { } ; continue }
+        $round++
+        $quads = @{}
+        foreach ($id in $b.Ch.Keys) {
+            $c = $b.Ch[$id]
+            if ($c['hp'] -eq '0') { continue }
+            $x = 0.0; $z = 0.0
+            [void][double]::TryParse($c['x'], [Globalization.NumberStyles]::Float, $inv, [ref]$x)
+            [void][double]::TryParse($c['z'], [Globalization.NumberStyles]::Float, $inv, [ref]$z)
+            if ([math]::Abs($x) -lt $CornerMin -or [math]::Abs($z) -lt $CornerMin) {
+                Add-Finding @('INVARIANT') $b.Entry ("round $round start on $src (t=$($b.T)): chicken $id is NOT at a corner: x=$($x.ToString('0.0',$inv)) z=$($z.ToString('0.0',$inv)) (expected |x|,|z| >= $CornerMin)")
+            } else {
+                $q = "$([math]::Sign($x)),$([math]::Sign($z))"
+                if ($quads.ContainsKey($q)) { Add-Finding @('INVARIANT') $b.Entry ("round $round start on $src (t=$($b.T)): chickens $($quads[$q]) and $id share corner quadrant $q") }
+                else { $quads[$q] = $id }
+            }
+            if ($c.ContainsKey('cg') -and $c['cg'] -ne '0') { Add-Finding @('INVARIANT') $b.Entry ("round $round start on $src (t=$($b.T)): chicken $id carries cg=$($c['cg']) at round start (expected 0)") }
+        }
+        foreach ($k in $b.Bases.Keys) {
+            $v = 0.0; [void][double]::TryParse($b.Bases[$k], [Globalization.NumberStyles]::Float, $inv, [ref]$v)
+            if ($v -ne 0) { Add-Finding @('INVARIANT') $b.Entry ("round $round start on $src (t=$($b.T)): base $k food=$($b.Bases[$k]) at round start (expected 0)") }
+        }
+        if ($round -eq 1) { $firstPiles = @($b.Piles) }
+        elseif ($firstPiles) {
+            $now = @($b.Piles)
+            if (($now -join ',') -ne ($firstPiles -join ',')) { Add-Finding @('INVARIANT') $b.Entry ("round $round start on $src (t=$($b.T)): piles differ from round 1: [$($now -join ',')] vs [$($firstPiles -join ',')]") }
+        }
+    }
+}
+
 function Test-Num($a, $b, $tol) {
     $x = 0.0; $y = 0.0
     if ([double]::TryParse($a, [Globalization.NumberStyles]::Float, $inv, [ref]$x) -and [double]::TryParse($b, [Globalization.NumberStyles]::Float, $inv, [ref]$y)) { return ([math]::Abs($x - $y) -le $tol) }
@@ -331,7 +375,7 @@ $shaMismatch = ($distinct.Count -gt 1)
 # findings.txt
 # ---------------------------------------------------------------------------------------------
 $sortedFindings = $findings | Sort-Object -Property Ticks, Seq
-$catCounts = [ordered]@{ ERROR = 0; WARN = 0; EXCEPTION = 0; PERF = 0; VISUAL = 0; SYNC = 0; GHOST = 0 }
+$catCounts = [ordered]@{ ERROR = 0; WARN = 0; EXCEPTION = 0; PERF = 0; VISUAL = 0; SYNC = 0; GHOST = 0; INVARIANT = 0 }
 $srcCounts = @{}
 foreach ($f in $findings) {
     foreach ($c in $f.Cats) { $catCounts[$c]++ }
@@ -358,7 +402,7 @@ foreach ($cat in $catCounts.Keys) {
     $items = @($sortedFindings | Where-Object { $_.Cats -contains $cat })
     $r.Add("== $cat ($($items.Count)) ==")
     foreach ($f in $items) {
-        if ($cat -in 'SYNC', 'GHOST') { $r.Add("[$cat] $($f.Text)"); continue }
+        if ($cat -in 'SYNC', 'GHOST', 'INVARIANT') { $r.Add("[$cat] $($f.Text)"); continue }
         $tags = ($f.Cats | ForEach-Object { "[$_]" }) -join ''
         $r.Add("$tags $($f.Text)")
         $n = 0

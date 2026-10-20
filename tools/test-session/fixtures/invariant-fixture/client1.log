@@ -1,0 +1,7 @@
+Initialize engine version: 6000.3.14f1
+[10:00:00.000][00:00.900][Info][Session] Session sha=aaa111 date=2026-10-20 platform=WindowsPlayer
+[10:00:01.000][00:01.000][Debug][Sync] Sync t=100 st=Active rem=45.0 | P1:x=21.8,z=21.8,hp=1,cg=0,cs=Free ; P2:x=-21.8,z=21.8,hp=1,cg=0,cs=Free ; P3:x=-21.8,z=-21.8,hp=1,cg=0,cs=Free ; P4:x=21.8,z=-21.8,hp=1,cg=0,cs=Free | bases=0=0,1=0,2=0,3=0 | piles=10.0,5.0,5.0
+[10:00:03.000][00:03.000][Debug][Sync] Sync t=200 st=Active rem=30.0 | P1:x=2.0,z=3.0,hp=1,cg=4,cs=Free ; P2:x=-10.0,z=21.8,hp=1,cg=0,cs=Free ; P3:x=-21.8,z=-21.8,hp=1,cg=0,cs=Free ; P4:x=21.8,z=-21.8,hp=1,cg=0,cs=Free | bases=0=7,1=0,2=0,3=0 | piles=10.0,0.0,5.0
+[10:00:05.000][00:05.000][Debug][Sync] Sync t=300 st=Ended rem=0.0 | P1:x=2.0,z=3.0,hp=1,cg=4,cs=Free ; P2:x=-10.0,z=21.8,hp=1,cg=0,cs=Free ; P3:x=-21.8,z=-21.8,hp=1,cg=0,cs=Free ; P4:x=21.8,z=-21.8,hp=1,cg=0,cs=Free | bases=0=7,1=0,2=0,3=0 | piles=10.0,0.0,5.0
+[10:00:07.000][00:07.000][Debug][Sync] Sync t=400 st=Active rem=45.0 | P1:x=2.0,z=3.0,hp=1,cg=4,cs=Free ; P2:x=-21.8,z=21.8,hp=1,cg=0,cs=Free ; P3:x=-21.8,z=-21.8,hp=1,cg=0,cs=Free ; P4:x=-21.8,z=-21.8,hp=1,cg=0,cs=Free | bases=0=7,1=0,2=0,3=0 | piles=10.0,0.0,5.0
+[10:00:09.000][00:09.000][Info][Match] client done

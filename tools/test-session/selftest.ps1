@@ -68,6 +68,19 @@ $code = Get-AutoTestCode -Session $tmp
 Assert ($code -eq 'ABC123') 'Get-AutoTestCode finds AutoTest code in editor.log'
 
 Remove-Item $tmp -Recurse -Force
+
+# ---- Round-start invariants (CW-221 regression): synthetic 2-round log, round 2 is wrong in 5 ways ----
+$tmp2 = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-inv-' + [Guid]::NewGuid().ToString('N'))
+Copy-Item (Join-Path $PSScriptRoot 'fixtures\invariant-fixture') $tmp2 -Recurse
+& (Join-Path $PSScriptRoot 'merge.ps1') -Session $tmp2 | Out-Null
+$f2 = Get-Content (Join-Path $tmp2 'findings.txt') -Raw
+Assert ($f2 -notmatch 'round 1 start') 'invariants: a correct round 1 start is not flagged'
+Assert ($f2 -match 'round 2 start on client1 \(t=400\): chicken P1 is NOT at a corner') 'invariants: chicken left where it ended is flagged (CW-221)'
+Assert ($f2 -match 'chicken P1 carries cg=4') 'invariants: cargo carried into a new round is flagged'
+Assert ($f2 -match 'base 0 food=7') 'invariants: base food not reset is flagged'
+Assert ($f2 -match 'piles differ from round 1') 'invariants: piles not reset are flagged'
+Assert ($f2 -match 'share corner quadrant') 'invariants: two chickens in one corner are flagged'
+Remove-Item $tmp2 -Recurse -Force
 Write-Host ''
 if ($script:fail -eq 0) { Write-Host 'SELFTEST OK' -ForegroundColor Green; exit 0 }
 Write-Host "SELFTEST FAILED ($($script:fail) assertion(s))" -ForegroundColor Red
