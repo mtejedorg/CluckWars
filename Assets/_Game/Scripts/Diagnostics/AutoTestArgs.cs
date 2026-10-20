@@ -77,8 +77,9 @@ namespace CluckWars.Diagnostics
     /// <summary>
     /// Editor entry points for driving an auto-test from <c>script-execute</c> (the Unity MCP) without a command line:
     /// <c>CluckWars.Diagnostics.AutoTest.EditorConfigure("autohost=1 class=Warrior autostart=2")</c> before entering Play
-    /// Mode, <see cref="EditorClear"/> afterwards. The spec lives in <c>SessionState</c>, so it survives the domain reload
-    /// into Play Mode and ends with the Editor session; it applies to every Play Mode entry until cleared.
+    /// Mode. The spec lives in <c>SessionState</c>, so it survives the domain reload into Play Mode; it applies to that
+    /// one Play Mode session and is cleared on exiting Play Mode (<c>AutoTestEditorHooks</c>). <see cref="EditorClear"/>
+    /// clears it earlier.
     /// </summary>
     public static class AutoTest
     {

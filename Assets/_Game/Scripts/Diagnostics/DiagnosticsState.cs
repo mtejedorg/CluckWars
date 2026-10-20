@@ -32,11 +32,31 @@ namespace CluckWars.Diagnostics
 
     /// <summary>
     /// Whether the heavy probes (automatic Visual scans, Sync heartbeat lines) run. Set once at boot by
-    /// <c>ProjectInstaller</c>; true by default (players).
+    /// <c>ProjectInstaller</c>: always in a player; in the Editor only with an auto-test config or the
+    /// "Cluck Wars / Diagnostics / Heavy Probes In Editor" toggle, so day-to-day Play Mode is not flooded.
+    /// PerfProbe, the net line, the breadcrumbs and the Session line are not heavy and always run.
     /// </summary>
     public static class HeavyProbes
     {
+        public const string EditorPrefKey = "CluckWars.Diagnostics.HeavyProbesInEditor";
+
         public static bool Enabled = true;
+
+        public static bool Decide(bool isEditor, bool autoTestActive, bool editorToggle) =>
+            !isEditor || autoTestActive || editorToggle;
+
+        /// <summary>The Editor toggle (false in a player).</summary>
+        public static bool EditorToggle
+        {
+            get
+            {
+#if UNITY_EDITOR
+                return UnityEditor.EditorPrefs.GetBool(EditorPrefKey, false);
+#else
+                return false;
+#endif
+            }
+        }
     }
 
     /// <summary>

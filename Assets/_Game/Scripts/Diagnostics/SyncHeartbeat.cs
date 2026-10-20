@@ -40,6 +40,9 @@ namespace CluckWars.Diagnostics
         {
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
             DiagnosticsObjects.KeepAcrossScenes(gameObject);
+            if (!HeavyProbes.Enabled)
+                _log?.Info(Source, "Heavy probes off in the Editor (no auto-test config): no Sync lines, no automatic Visual scans " +
+                    "(F9 still scans). Turn on: Cluck Wars / Diagnostics / Heavy Probes In Editor.");
         }
 
         private void Update()
@@ -48,7 +51,7 @@ namespace CluckWars.Diagnostics
             if (gm == null || gm.Object == null || !gm.Object.IsValid) { _boundary.Reset(); return; }
             var runner = gm.Runner;
             if (runner == null || !runner.IsRunning) { _boundary.Reset(); return; }
-            if (_log == null || !_log.IsEnabled(LogLevel.Debug)) return;
+            if (!HeavyProbes.Enabled || _log == null || !_log.IsEnabled(LogLevel.Debug)) return;
 
             int tick = (int)runner.Tick;
             if (!_boundary.TryCross(tick, Mathf.RoundToInt(PeriodSeconds * runner.TickRate), out int boundary)) return;

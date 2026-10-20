@@ -446,6 +446,8 @@ At boot every build logs one `[Session]` line (`Session sha=<short>[+dirty] buil
 | `Fusion` | Info | `Net rtt= loss=n/a players= master= tick= resim=` every 5 s (Fusion 2 exposes no loss figure) |
 | `AutoTest` | Info | config, steps, `AutoTest code=XXXXXX`, rounds |
 
+In the **Editor** the heavy probes (automatic Visual scans, Sync lines) are off unless an auto-test config is active or **Cluck Wars / Diagnostics / Heavy Probes In Editor** is ticked; F9 still scans, Perf / Net / Session stay on.
+
 Always on (breadcrumbs): `MatchOverlays` `Cover on/off`, `Cover off: covered= lateJoin= reducedMotion=`, `GET READY held Xs`; `ArenaReadiness` `Render tier: rp= quality= post= haze=`; `Reveal` `first-use hitspark|invisibility|fencehole|telegraph frame=N` (once per scene load); `Fusion` join / leave / master change / shutdown with `cover= revealed= state=`.
 
 ### Auto-test (dev-tools builds)
@@ -474,7 +476,7 @@ Windows / Editor command line (booleans: `1`/`true` or a bare flag):
 CluckWars.exe -cw_autohost -cw_class Warrior -cw_autostart 3 -cw_autoloop 2 -cw_autoplay
 ```
 
-Editor via the MCP `script-execute` (survives the domain reload into Play Mode, applies until cleared):
+Editor via the MCP `script-execute` (survives the domain reload into Play Mode; cleared automatically when Play Mode is exited):
 
 ```
 CluckWars.Diagnostics.AutoTest.EditorConfigure("autohost=1 class=Warrior autostart=2 autoplay");

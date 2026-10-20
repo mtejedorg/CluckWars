@@ -108,6 +108,15 @@ namespace CluckWars.Tests
             CollectionAssert.IsEmpty(cfg.Problems);
         }
 
+        [Test]
+        public void HeavyProbes_AlwaysInPlayers_InTheEditorOnlyWhenAsked()
+        {
+            Assert.IsTrue(HeavyProbes.Decide(isEditor: false, autoTestActive: false, editorToggle: false));
+            Assert.IsFalse(HeavyProbes.Decide(isEditor: true, autoTestActive: false, editorToggle: false), "no Editor noise by default");
+            Assert.IsTrue(HeavyProbes.Decide(isEditor: true, autoTestActive: true, editorToggle: false));
+            Assert.IsTrue(HeavyProbes.Decide(isEditor: true, autoTestActive: false, editorToggle: true));
+        }
+
         // ---- decisions --------------------------------------------------------------------------------------------
 
         [Test]
