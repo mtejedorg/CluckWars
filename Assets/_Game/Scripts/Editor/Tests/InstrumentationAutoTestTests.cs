@@ -250,9 +250,9 @@ namespace CluckWars.Tests
         }
 
         private static AutoPlayView View(Vector2 self, float cargo, float capacity, AutoPlayPile[] piles,
-            bool hasBase = true, Vector2 basePos = default, AutoPlayRival[] rivals = null) => new AutoPlayView
+            bool hasBase = true, Vector2 basePos = default, AutoPlayRival[] rivals = null, bool canForage = true) => new AutoPlayView
         {
-            Self = self, Cargo = cargo, Capacity = capacity, HasBase = hasBase, BasePos = basePos, BaseRadius = 3f,
+            Self = self, Cargo = cargo, Capacity = capacity, CanForage = canForage, HasBase = hasBase, BasePos = basePos, BaseRadius = 3f,
             Piles = piles, PileCount = piles.Length, Rivals = rivals ?? new AutoPlayRival[0], RivalCount = rivals?.Length ?? 0,
         };
 
@@ -312,19 +312,137 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void AutoPlay_NoProgressFor2s_RetargetsAndStrafes()
+        public void AutoPlay_Unstick_StrafeThenBackOffThenGiveThePileUp()
         {
             var brain = new AutoPlayBrain(AutoPlayPersonality.Runner);
             var piles = Piles((10f, 0f, 10f), (0f, 14f, 10f));
-            var self = Vector2.zero;
+            var self = Vector2.zero;   // pinned: every move is blocked
             brain.Tick(0f, View(self, 0f, 10f, piles, hasBase: false), 0.2f);
             Assert.AreEqual(0, brain.TargetPile);
             brain.Tick(1f, View(self, 0f, 10f, piles, hasBase: false), 0.2f);
-            var dir = brain.Tick(2.1f, View(self, 0f, 10f, piles, hasBase: false), 0.2f);   // stuck
-            Assert.AreEqual(1f, dir.magnitude, 1e-3f);
-            Assert.Less(Mathf.Abs(Vector2.Dot(dir, Vector2.right)), 0.01f, "strafes sideways out of the jam");
-            brain.Tick(3.5f, View(self, 0f, 10f, piles, hasBase: false), 0.2f);
-            Assert.AreEqual(1, brain.TargetPile, "the stuck pile is skipped for a while");
+            var dir = brain.Tick(2.1f, View(self, 0f, 10f, piles, hasBase: false), 0.2f);
+            Assert.AreEqual(1, brain.StuckTicks, "moved < 0.3 m in 2 s with somewhere to go");
+            Assert.Less(Mathf.Abs(Vector2.Dot(dir, Vector2.right)), 0.01f, "1st: strafe sideways");
+            dir = brain.Tick(4.2f, View(self, 0f, 10f, piles, hasBase: false), 0.2f);
+            Assert.AreEqual(2, brain.StuckTicks);
+            Assert.Less(dir.x, -0.5f, "2nd: back off, away from the target");
+            brain.Tick(4.5f, View(self, 0f, 10f, piles, hasBase: false), 0.2f);
+            Assert.AreEqual(1, brain.TargetPile, "no progress for 4 s: the pile is given up for a while");
+            Assert.GreaterOrEqual(brain.Unsticks, 2);
+        }
+
+        // ---- the live-run regression: piles are solid ellipses, Peck reach is surface-relative -----------------------
+
+        private const float CapsuleClearance = 0.58f;   // capsule radius 0.5 + controller skin 0.08 (FoodPile doc)
+        private const float CollectReach = 1.0f;         // FoodPile.prefab _collectReach
+
+        /// <summary>The pile as the provider builds it from the real footprint helpers (FoodPile.SurfaceApproachPoint /
+        /// IsWithinCollectRange both delegate to PileFootprintShape).</summary>
+        private static AutoPlayPile RealPile(Vector3 centre, float yaw, Vector2 footprint, float amount, Vector2 self, bool withApproach = true)
+        {
+            var self3 = new Vector3(self.x, 0f, self.y);
+            var approach = PileFootprintShape.ApproachPoint(self3, centre, yaw, footprint, AutoPlayInputProvider.PileStandoff);
+            return new AutoPlayPile
+            {
+                Position = new Vector2(centre.x, centre.z),
+                Amount = amount,
+                HasApproach = withApproach,
+                Approach = new Vector2(approach.x, approach.z),
+                InReach = PileFootprintShape.DistanceToSurfaceXZ(self3, centre, yaw, footprint) <= CollectReach,
+            };
+        }
+
+        /// <summary>Walks the brain against a solid elliptical pile (a step into the footprint + capsule is blocked).</summary>
+        private static (AutoPlayBrain brain, Vector2 self, int steps) WalkToPile(bool withApproach, Vector2 start, Vector3 centre, float yaw, Vector2 footprint)
+        {
+            var brain = new AutoPlayBrain(AutoPlayPersonality.Runner);
+            var self = start;
+            int step = 0;
+            for (; step < 300; step++)
+            {
+                var piles = new[] { RealPile(centre, yaw, footprint, 30f, self, withApproach) };
+                var dir = brain.Tick(step * 0.1f, View(self, 0f, 40f, piles, hasBase: false), 0.3f);
+                if (brain.Goal == AutoPlayGoal.AtPile) break;
+                var next = self + dir * 4f * 0.1f;   // 4 m/s
+                if (PileFootprintShape.DistanceToSurfaceXZ(new Vector3(next.x, 0f, next.y), centre, yaw, footprint) >= CapsuleClearance)
+                    self = next;
+            }
+            return (brain, self, step);
+        }
+
+        [Test]
+        public void AutoPlay_ReachesPecksAtARealSolidPile()
+        {
+            // The centre pile of the live run (session 20261020-203530: "Footprint=7,8x6,5"), approached from a corner;
+            // the birds circled it at |x|,|z| ~ 4-6 for four rounds.
+            var centre = new Vector3(0f, 0f, 0f);
+            var footprint = new Vector2(7.8f, 6.5f);
+            var (brain, self, steps) = WalkToPile(true, new Vector2(18f, 14f), centre, 35f, footprint);
+            Assert.AreEqual(AutoPlayGoal.AtPile, brain.Goal, $"never got into Peck's reach (ended at {self}, {steps} steps)");
+            float surface = PileFootprintShape.DistanceToSurfaceXZ(new Vector3(self.x, 0f, self.y), centre, 35f, footprint);
+            Assert.LessOrEqual(surface, CollectReach, "standing where Peck (IsWithinCollectRange) can drain it");
+        }
+
+        [Test]
+        public void AutoPlay_OldCentreTarget_NeverArrivesAtASolidPile()
+        {
+            // Documents the live-run bug: walking to the CENTRE and arriving at 1.2 m cannot work when the pile's own
+            // half-axes (3.9 / 3.25 m) plus the capsule keep the bird >= 3.8 m from it - it circled the pile all round.
+            var (brain, _, _) = WalkToPile(false, new Vector2(18f, 14f), Vector3.zero, 35f, new Vector2(7.8f, 6.5f));
+            Assert.AreNotEqual(AutoPlayGoal.AtPile, brain.Goal);
+        }
+
+        [Test]
+        public void AutoPlay_BanksInsideTheRealDepositRadius()
+        {
+            var brain = new AutoPlayBrain(AutoPlayPersonality.Runner);
+            var home = new Vector2(-19f, -19f);
+            const float depositRadius = 2.5f;   // PlayerBase.prefab _depositRadius
+            var self = new Vector2(0f, 0f);
+            var noPiles = new AutoPlayPile[0];
+            for (int step = 0; step < 200 && brain.Goal != AutoPlayGoal.AtBase; step++)
+            {
+                var v = View(self, 30f, 40f, noPiles, basePos: home);
+                v.BaseRadius = depositRadius;
+                self += brain.Tick(step * 0.1f, v, 0.5f) * 0.4f;
+            }
+            Assert.AreEqual(AutoPlayGoal.AtBase, brain.Goal);
+            Assert.LessOrEqual((self - home).magnitude, depositRadius, "inside the radius BaseDepositRules banks at");
+        }
+
+        [Test]
+        public void AutoPlay_ANonForager_Hunts_AndBanksWhatItSteals()
+        {
+            var brain = new AutoPlayBrain(AutoPlayPersonality.Runner);
+            var piles = Piles((5f, 0f, 30f));
+            var rivals = new[] { new AutoPlayRival { Position = new Vector2(0f, 20f), Cargo = 0f },
+                                 new AutoPlayRival { Position = new Vector2(0f, -2f), Cargo = 8f } };
+            var dir = brain.Tick(0f, View(Vector2.zero, 0f, 40f, piles, basePos: new Vector2(-19f, -19f), rivals: rivals, canForage: false), 0.5f);
+            Assert.AreEqual(AutoPlayState.Attack, brain.State, "no Peck slot: it never stands at a pile (the live run's Assassin)");
+            Assert.AreEqual(1, brain.TargetRival, "the loaded rival");
+            Assert.IsTrue(brain.TakeAttackCast(), "in cast range");
+            brain.Tick(1f, View(Vector2.zero, 5f, 40f, piles, basePos: new Vector2(-19f, -19f), rivals: rivals, canForage: false), 0.5f);
+            Assert.AreEqual(AutoPlayState.Deposit, brain.State, "anything stolen is banked at once");
+        }
+
+        [Test]
+        public void AutoPlayLog_InvariantCulture_AllFields()
+        {
+            var culture = System.Threading.Thread.CurrentThread.CurrentCulture;
+            try
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = new System.Globalization.CultureInfo("es-ES");
+                var line = AutoPlayLog.Line("AutoPlay hb", new AutoPlayLog.Snapshot
+                {
+                    State = AutoPlayState.Forage, Goal = AutoPlayGoal.ToPile, GoalDistance = 3.26f, Cargo = 12.4f, StuckTicks = 1,
+                    Unsticks = 2, PeckPresses = 7, Position = new Vector2(-1.26f, 19.5f), CanForage = true, Personality = "runner",
+                });
+                Assert.AreEqual("AutoPlay hb state=Forage goal=ToPile dist=3.3 cargo=12 stuck_ticks=1 unsticks=2 pecks=7 pos=-1.3,19.5 forage=1 personality=runner", line);
+            }
+            finally
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = culture;
+            }
         }
 
         [Test]
@@ -348,7 +466,7 @@ namespace CluckWars.Tests
             var brain = new AutoPlayBrain(AutoPlayPersonality.Aggressive);
             brain.Tick(1f, View(Vector2.zero, 0f, 40f, piles, rivals: rivals), 0.5f);
             Assert.AreEqual(AutoPlayState.Forage, brain.State, "no hunt before the first interval");
-            var dir = brain.Tick(6f, View(Vector2.zero, 0f, 40f, piles, rivals: rivals), 0.5f);
+            var dir = brain.Tick(6f, View(new Vector2(0.5f, 0f), 0f, 40f, piles, rivals: rivals), 0.5f);   // it has been walking (not stuck)
             Assert.AreEqual(AutoPlayState.Attack, brain.State);
             Assert.AreEqual(0, brain.TargetRival, "the loaded rival, not the closer empty-handed one");
             Assert.Greater(dir.y, 0.9f, "closes on it");

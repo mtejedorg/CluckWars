@@ -228,7 +228,7 @@ namespace CluckWars.Diagnostics
             if (target <= 0) return false;
             if (target == 1) { reason = "autostart=1"; return true; }
             if (humans >= target) { reason = $"{humans}/{target} humans in"; return true; }
-            if (waitedSeconds >= timeoutSeconds) { reason = $"timeout {timeoutSeconds:0}s with {humans}/{target} humans"; return true; }
+            if (waitedSeconds >= timeoutSeconds) { reason = FormattableString.Invariant($"timeout {timeoutSeconds:0}s with {humans}/{target} humans"); return true; }
             return false;
         }
 
@@ -245,7 +245,7 @@ namespace CluckWars.Diagnostics
         {
             reason = null;
             if (humansNow >= Math.Max(1, humansAtEnd)) { reason = $"{humansNow}/{humansAtEnd} of last round's humans back"; return true; }
-            if (waitedSeconds >= LoopRestartMaxWaitSeconds) { reason = $"max wait {LoopRestartMaxWaitSeconds:0}s with {humansNow}/{humansAtEnd}"; return true; }
+            if (waitedSeconds >= LoopRestartMaxWaitSeconds) { reason = FormattableString.Invariant($"max wait {LoopRestartMaxWaitSeconds:0}s with {humansNow}/{humansAtEnd}"); return true; }
             return false;
         }
 
@@ -254,5 +254,24 @@ namespace CluckWars.Diagnostics
 
         /// <summary>Retry a failed join while the first attempt is less than <see cref="JoinGiveUpSeconds"/> old.</summary>
         public static bool ShouldRetryJoin(float secondsSinceFirstAttempt) => secondsSinceFirstAttempt < JoinGiveUpSeconds;
+    }
+
+    /// <summary>The <c>AutoPlay</c> log lines (transition + 5 s heartbeat), invariant culture so every device prints them alike.</summary>
+    public static class AutoPlayLog
+    {
+        public struct Snapshot
+        {
+            public AutoPlayState State;
+            public AutoPlayGoal Goal;
+            public float GoalDistance, Cargo;
+            public int StuckTicks, Unsticks, PeckPresses;
+            public UnityEngine.Vector2 Position;
+            public bool CanForage;
+            public string Personality;
+        }
+
+        /// <summary><c>&lt;prefix&gt; state=.. goal=.. dist=0.0 cargo=0 stuck_ticks=0 unsticks=0 pecks=0 pos=0.0,0.0 forage=0|1 personality=..</c></summary>
+        public static string Line(string prefix, in Snapshot s) => prefix + FormattableString.Invariant(
+            $" state={s.State} goal={s.Goal} dist={s.GoalDistance:0.0} cargo={s.Cargo:0} stuck_ticks={s.StuckTicks} unsticks={s.Unsticks} pecks={s.PeckPresses} pos={s.Position.x:0.0},{s.Position.y:0.0} forage={(s.CanForage ? 1 : 0)} personality={s.Personality}");
     }
 }

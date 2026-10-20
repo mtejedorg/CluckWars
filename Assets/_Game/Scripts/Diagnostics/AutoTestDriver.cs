@@ -306,6 +306,8 @@ namespace CluckWars.Diagnostics
                     int playerId = self != null ? self.Object.InputAuthority.PlayerId : 0;
                     _autoPlay.Configure(playerId);
                     _lastAutoPlayState = _autoPlay.State;
+                    _lastAutoPlayGoal = _autoPlay.Goal;
+                    _nextAutoPlayBeatAt = 0f;
                     _lastBanked = -1f;
                 }
                 _autoPlay.SetActive(run);
@@ -316,22 +318,40 @@ namespace CluckWars.Diagnostics
             if (!run) return;
 
             _autoPlay.Tick(self, Time.unscaledTime);
-            if (_autoPlay.State != _lastAutoPlayState)
+            // Every state or goal change, and a heartbeat every 5 s: the next run's log explains itself.
+            float now = Time.realtimeSinceStartup;
+            if (_autoPlay.State != _lastAutoPlayState || _autoPlay.Goal != _lastAutoPlayGoal)
             {
-                _log.Debug(AutoPlaySource, $"AutoPlay state {_lastAutoPlayState}->{_autoPlay.State} cargo={_autoPlay.Cargo:0} " +
-                    $"goal={_autoPlay.Goal} personality={_autoPlay.Personality.Name}");
+                _log.Info(AutoPlaySource, AutoPlayLog.Line(
+                    $"AutoPlay {_lastAutoPlayState}/{_lastAutoPlayGoal}->{_autoPlay.State}/{_autoPlay.Goal}", Snapshot()));
                 _lastAutoPlayState = _autoPlay.State;
+                _lastAutoPlayGoal = _autoPlay.Goal;
+            }
+            if (now >= _nextAutoPlayBeatAt)
+            {
+                _nextAutoPlayBeatAt = now + AutoPlayBeatSeconds;
+                _log.Info(AutoPlaySource, AutoPlayLog.Line("AutoPlay hb", Snapshot()));
             }
             float banked = _autoPlay.OwnBaseFood;
             if (banked >= 0f && Mathf.FloorToInt(banked) != Mathf.FloorToInt(_lastBanked))
             {
                 if (_lastBanked >= 0f)
-                    _log.Info(AutoPlaySource, $"AutoPlay banked={banked:0} ({(banked - _lastBanked >= 0f ? "+" : "")}{banked - _lastBanked:0}) " +
-                        $"cargo={_autoPlay.Cargo:0} state={_autoPlay.State}");
+                    _log.Info(AutoPlaySource, System.FormattableString.Invariant(
+                        $"AutoPlay banked={banked:0} ({(banked - _lastBanked >= 0f ? "+" : "")}{banked - _lastBanked:0}) cargo={_autoPlay.Cargo:0} state={_autoPlay.State}"));
                 _lastBanked = banked;
             }
         }
 
+        private AutoPlayLog.Snapshot Snapshot() => new AutoPlayLog.Snapshot
+        {
+            State = _autoPlay.State, Goal = _autoPlay.Goal, GoalDistance = _autoPlay.GoalDistance, Cargo = _autoPlay.Cargo,
+            StuckTicks = _autoPlay.StuckTicks, Unsticks = _autoPlay.Unsticks, PeckPresses = _autoPlay.PeckPresses,
+            Position = _autoPlay.Position, CanForage = _autoPlay.CanForage, Personality = _autoPlay.Personality.Name,
+        };
+
+        private const float AutoPlayBeatSeconds = 5f;
+        private float _nextAutoPlayBeatAt;
+        private AutoPlayGoal _lastAutoPlayGoal;
         private const string AutoPlaySource = "AutoPlay";
         private AutoPlayState _lastAutoPlayState;
         private float _lastBanked = -1f;
@@ -362,7 +382,7 @@ namespace CluckWars.Diagnostics
             var overlays = FindFirstObjectByType<MatchOverlaysController>();
             if (overlays == null) return;   // the overlay binds on its first Update; try again next frame
             _startPressed = true;
-            if (looped) _log.Info(Source, $"AutoTest loop restart humans={humans} wait={waited:0.0}s ({reason}); pressing START.");
+            if (looped) _log.Info(Source, System.FormattableString.Invariant($"AutoTest loop restart humans={humans} wait={waited:0.0}s ({reason}); pressing START."));
             else _log.Info(Source, $"AutoTest start: {reason}; pressing the waiting room's START.");
             overlays.AutoTestPressStart();
         }

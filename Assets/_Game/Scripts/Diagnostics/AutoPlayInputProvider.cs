@@ -60,6 +60,16 @@ namespace CluckWars.Diagnostics
         /// <summary>Cargo of the local chicken seen on the last <see cref="Tick"/>.</summary>
         public float Cargo { get; private set; }
 
+        /// <summary>World XZ of the local chicken on the last <see cref="Tick"/>.</summary>
+        public Vector2 Position { get; private set; }
+
+        public float GoalDistance => _brain.GoalDistance;
+        public int StuckTicks => _brain.StuckTicks;
+        public int Unsticks => _brain.Unsticks;
+        public bool CanForage { get; private set; }
+        /// <summary>Peck presses made this round (a forager standing at a pile should rack these up).</summary>
+        public int PeckPresses { get; private set; }
+
         /// <param name="clock">Seconds, unscaled (default <c>Time.unscaledTime</c>); injectable for tests.</param>
         public AutoPlayInputProvider(System.Func<float> clock = null)
         {
@@ -67,7 +77,11 @@ namespace CluckWars.Diagnostics
         }
 
         /// <summary>Picks the personality for this client (<see cref="AutoPlayPersonality.For"/> of its PlayerId).</summary>
-        public void Configure(int playerId) => _brain = new AutoPlayBrain(AutoPlayPersonality.For(playerId));
+        public void Configure(int playerId)
+        {
+            _brain = new AutoPlayBrain(AutoPlayPersonality.For(playerId));
+            PeckPresses = 0;
+        }
 
         public void SetActive(bool active)
         {
@@ -82,17 +96,33 @@ namespace CluckWars.Diagnostics
         {
             if (!Active || self == null || self.Object == null || !self.Object.IsValid) { _stick = Vector2.zero; return; }
 
-            var view = new AutoPlayView { Piles = _piles, Rivals = _rivals, BaseRadius = BaseRadius };
+            var mine3 = self.transform.position;
+            var view = new AutoPlayView { Piles = _piles, Rivals = _rivals };
+            var abilities = self.Abilities;
+            // Foraging needs a Peck slot (slot 0); the Assassin has none and hunts instead.
+            view.CanForage = abilities != null && abilities.GetSlot(0) is PeckAbilitySO;
+
+            // Piles are solid blockers with an elliptical footprint: walk to the rim point (what the bots do) and count
+            // as "at the pile" with Peck's own surface-relative reach test - never the centre (unreachable).
             var piles = FoodPile.ActivePiles;
             for (int i = 0; i < piles.Count && view.PileCount < MaxPiles; i++)
             {
                 var p = piles[i];
                 if (p == null || p.Object == null || !p.Object.IsValid) continue;
                 var pos = p.transform.position;
-                _piles[view.PileCount++] = new AutoPlayPile { Position = new Vector2(pos.x, pos.z), Amount = p.Amount };
+                var approach = p.SurfaceApproachPoint(mine3, PileStandoff);
+                _piles[view.PileCount++] = new AutoPlayPile
+                {
+                    Position = new Vector2(pos.x, pos.z),
+                    Amount = p.Amount,
+                    HasApproach = true,
+                    Approach = new Vector2(approach.x, approach.z),
+                    InReach = p.IsWithinCollectRange(mine3),
+                };
             }
 
-            // The OWN base: the one this player owns (PlayerBase.Owner), else the chicken's home corner.
+            // The OWN base: the one at this chicken's home corner (the deposit rule: BaseDepositRules allegiance),
+            // else the one this player owns.
             var me = self.Object.InputAuthority;
             PlayerBase own = null;
             var bases = PlayerBase.ActiveBases;
@@ -100,14 +130,15 @@ namespace CluckWars.Diagnostics
             {
                 var b = bases[i];
                 if (b == null || b.Object == null || !b.Object.IsValid) continue;
-                if (b.Owner == me) { own = b; break; }
-                if (own == null && b.CornerIndex == self.HomeCornerIndex) own = b;
+                if (b.CornerIndex == self.HomeCornerIndex) { own = b; break; }
+                if (own == null && b.Owner == me) own = b;
             }
             if (own != null)
             {
                 var bp = own.transform.position;
                 view.HasBase = true;
                 view.BasePos = new Vector2(bp.x, bp.z);
+                view.BaseRadius = own.DepositRadius;
                 OwnBaseFood = own.FoodTotal;
             }
             else OwnBaseFood = -1f;
@@ -125,9 +156,10 @@ namespace CluckWars.Diagnostics
                 };
             }
 
-            var mine = self.transform.position;
-            view.Self = new Vector2(mine.x, mine.z);
+            view.Self = new Vector2(mine3.x, mine3.z);
+            Position = view.Self;
             Cargo = view.Cargo = self.Cargo != null ? self.Cargo.Cargo : 0f;
+            CanForage = view.CanForage;
             view.Capacity = self.Cargo != null ? self.Cargo.Capacity : 0f;
             var world = _brain.Tick(now, view, (float)_rng.NextDouble());
 
@@ -138,14 +170,8 @@ namespace CluckWars.Diagnostics
             ScheduleAbilities(self, now);
         }
 
-        private float BaseRadius
-        {
-            get
-            {
-                var map = MapGeneratorCache.Get();
-                return map != null ? map.BaseZoneRadius : 2.5f;
-            }
-        }
+        /// <summary>Same rim standoff the bots walk to (Chicken.prefab BotController._pileStandoff).</summary>
+        public const float PileStandoff = 0.7f;
 
         private void ScheduleAbilities(ChickenController self, float now)
         {
@@ -161,7 +187,7 @@ namespace CluckWars.Diagnostics
             bool peckSlot = abilities.GetSlot(0) is PeckAbilitySO;
             if (peckSlot && _brain.Goal == AutoPlayGoal.AtPile && _brain.State == AutoPlayState.Forage)
             {
-                if (now >= _nextPeckAt) { Press(0, PeckHoldSeconds); _nextPeckAt = now + PeckEverySeconds; }
+                if (now >= _nextPeckAt) { Press(0, PeckHoldSeconds); _nextPeckAt = now + PeckEverySeconds; PeckPresses++; }
                 return;
             }
             // Banking: stand still, no casts (a dash out of the deposit zone would only delay the deposit).
@@ -237,23 +263,5 @@ namespace CluckWars.Diagnostics
 
         /// <summary>Everything for an offensive personality; Utility / Defense only for a pure runner.</summary>
         public static bool Allowed(AbilityCategory category, bool castsOffense) => castsOffense || !IsOffensive(category);
-    }
-
-    /// <summary>One <c>FindFirstObjectByType</c> per Game scene instead of one per frame.</summary>
-    internal static class MapGeneratorCache
-    {
-        private static MapGenerator _map;
-        private static int _sceneHandle = -1;
-
-        public static MapGenerator Get()
-        {
-            int handle = UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle;
-            if (_map == null || handle != _sceneHandle)
-            {
-                _sceneHandle = handle;
-                _map = Object.FindFirstObjectByType<MapGenerator>();
-            }
-            return _map;
-        }
     }
 }
