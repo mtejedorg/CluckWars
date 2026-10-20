@@ -123,6 +123,7 @@ namespace CluckWars.Networking
         // next OnInput tick. Movement is continuous and stays read live in OnInput.
         private void Update()
         {
+            TickNetDiagnostics();
             if (_inputProvider == null) return;
 
             if (GameManager.Instance == null || !GameManager.Instance.IsMatchRunning || LeaveSheetState.IsOpen)
@@ -229,21 +230,80 @@ namespace CluckWars.Networking
             return null;
         }
 
+        // ---------- Test-session network diagnostics (item 8) ----------
+        // Breadcrumbs (always): join / leave / master change / shutdown, each with the cover and match state at that moment.
+        // Net line (dev tools only): every 5 s, RTT to the session for the local player. Fusion 2 exposes no packet-loss
+        // figure, so loss prints n/a; resimulations come from the runner's statistics when it has them enabled.
+        private const float NetLineSeconds = 5f;
+        private float _nextNetLineAt = -1f;
+        private bool _masterKnown, _wasMaster;
+
+        private void TickNetDiagnostics()
+        {
+            if (!IsReady)
+            {
+                _masterKnown = false;
+                _nextNetLineAt = -1f;
+                CluckWars.Diagnostics.DiagnosticsReadout.NetRttMs = -1f;
+                return;
+            }
+
+            bool master = _runner.IsSharedModeMasterClient;
+            if (!_masterKnown) { _masterKnown = true; _wasMaster = master; }
+            else if (master != _wasMaster)
+            {
+                _wasMaster = master;
+                _log?.Info(Source, $"Master client changed: this peer is {(master ? "now" : "no longer")} the master " +
+                    $"(local={_runner.LocalPlayer}, players={CountPlayers(_runner)}, {DescribeMoment()}).");
+            }
+
+            if (!CluckWars.Diagnostics.DevTools.Available || _runner.GameMode == GameMode.Single) return;
+            float now = Time.realtimeSinceStartup;
+            if (_nextNetLineAt < 0f) { _nextNetLineAt = now + NetLineSeconds; return; }
+            if (now < _nextNetLineAt) return;
+            _nextNetLineAt = now + NetLineSeconds;
+
+            float rttMs = (float)(_runner.GetPlayerRtt(_runner.LocalPlayer) * 1000.0);
+            CluckWars.Diagnostics.DiagnosticsReadout.NetRttMs = rttMs;
+            CluckWars.Diagnostics.DiagnosticsReadout.NetLoss = "n/a";
+            string resim = "n/a";
+            if (_runner.TryGetFusionStatistics(out var stats) && stats != null && stats.CompleteSnapshot != null)
+                resim = stats.CompleteSnapshot.Resimulations.ToString();
+            _log?.Info(Source, $"Net rtt={rttMs:0} loss=n/a players={CountPlayers(_runner)} master={(master ? 1 : 0)} " +
+                $"tick={(int)_runner.Tick} resim={resim}");
+        }
+
+        private static int CountPlayers(NetworkRunner runner)
+        {
+            int n = 0;
+            foreach (var p in runner.ActivePlayers) if (p.IsRealPlayer) n++;
+            return n;
+        }
+
+        /// <summary><c>cover=.. revealed=.. state=..</c> at this moment (presentation + match state, read-only).</summary>
+        private static string DescribeMoment()
+        {
+            var gm = GameManager.Instance;
+            string state = gm != null && gm.Object != null && gm.Object.IsValid ? gm.State.ToString() : "none";
+            return $"{CluckWars.Diagnostics.RevealState.Describe()} state={state}";
+        }
+
         void INetworkRunnerCallbacks.OnPlayerJoined(NetworkRunner runner, PlayerRef player)
         {
-            _log?.Debug(Source, $"OnPlayerJoined: player={player}.");
+            _log?.Info(Source, $"OnPlayerJoined: player={player} id={player.PlayerId} players={CountPlayers(runner)} " +
+                $"local={(player == runner.LocalPlayer ? 1 : 0)} {DescribeMoment()}.");
             OnPlayerJoined?.Invoke(runner, player);
         }
 
         void INetworkRunnerCallbacks.OnPlayerLeft(NetworkRunner runner, PlayerRef player)
         {
-            _log?.Debug(Source, $"OnPlayerLeft: player={player}.");
+            _log?.Info(Source, $"OnPlayerLeft: player={player} id={player.PlayerId} players={CountPlayers(runner)} {DescribeMoment()}.");
             OnPlayerLeft?.Invoke(runner, player);
         }
 
         void INetworkRunnerCallbacks.OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason)
         {
-            _log?.Info(Source, $"OnShutdown: reason={shutdownReason}.");
+            _log?.Info(Source, $"OnShutdown: reason={shutdownReason} {DescribeMoment()}.");
             _ready = false;
             OnShutdown?.Invoke(shutdownReason);
             var sceneManager = GetComponent<NetworkSceneManagerDefault>();
