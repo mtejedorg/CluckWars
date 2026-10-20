@@ -6,6 +6,15 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ Test-session instrumentation (2026-10-20, branch `test/instrumentation-2026-10-20`) - EditMode 1938/1938
+
+Dev / diagnostic only, read-only toward gameplay (no `[Networked]` writes, no RPCs, no new networked objects). Spec: `docs/TEST_SESSION_PLAN_2026-10.md` §2; how to use it: `docs/TESTING.md` ▸ "Test-session instrumentation".
+- **Gate:** `CluckWars.Diagnostics.DevTools.Available` (`CLUCKWARS_DEV_TOOLS` || `Debug.isDebugBuild`; Editor counts) is the one gate (MenuUiController's Dev Mode uses it). Build menu: **Cluck Wars / Build / Test Session (Windows + Android, dev tools)**, or `-cwDevTools` / `CW_DEV_TOOLS=1`, adds the define (still `BuildOptions.None`; Frame Timing Stats on for that build only). Production builds unchanged.
+- **Every build:** log lines are `[HH:mm:ss.fff UTC][mm:ss.fff uptime][Level][Source] msg` (`LogLineFormat`); one `Session sha=.. device=.. quality=.. perfMode=..` line at boot (+ `SessionChange`); reveal breadcrumbs (`Cover on/off`, `GET READY held`, `Render tier`, `Reveal first-use <hitspark|invisibility|fencehole|telegraph>`) and Fusion join/leave/master/shutdown lines with the cover + match state.
+- **Dev-tools builds:** `PerfProbe` (Perf: hitches > 50/100 ms + 5 s summary with p95/p99/FrameTimingManager), `SyncHeartbeat` (Sync, Debug: same-tick per-peer state every 2 s), `VisualProbe` (Visual: error/unsupported shaders, null materials, NaN, out-of-arena, chickens with no renderer; at reveal, every 10 s, F9 / 3-finger tap / overlay button), Fusion `Net rtt= loss=n/a` every 5 s, `DebugHud` added to Game scenes with a five-tap top-left toggle (Developer Mode) and probe lines, and the **auto-test** (`cw_autohost`, `cw_autojoin CODE`, `cw_class`, `cw_autostart N`, `cw_autoloop N`, `cw_autoplay`, `cw_devmode`, `cw_hud`; Android intent extras, CLI, or `AutoTest.EditorConfigure`).
+- **Build stamp:** `BuildInfoWriter` writes `Assets/_Game/Resources/BuildInfo.json` before each build and deletes it after (also on a failed build). Should be in `.gitignore` (+ `.meta`) in case a build is interrupted.
+- **Not verified on device yet:** player builds were not run in this pass (the architect builds after review); `AndroidApplication.currentActivity` intent-extras path, FrameTimingManager numbers on the Pixel 9 and the auto-test end-to-end need the session's first run. No Maestro prefab wiring needed (everything installs from `ProjectInstaller` / at runtime).
+
 ## ✅ Arena reveal gate (2026-10-19): the Game scene shows the arena only when fully ready - EditMode 1899/1899
 
 **Problem:** loading the Game scene showed cyan async-compile placeholders on a cold Editor, first-use shader pops, pop-in (fence holes / ghost / haze / hedge / mound variants) and the camera swinging into place. **Now:** an opaque `#ArenaCover` (ink rgb(20,10,4), first child of `#IntroOverlay`, visible by default in `MatchOverlays.uxml` so frame 1 is covered) hides the world until this peer's arena is ready AND the round's intro is armed.
