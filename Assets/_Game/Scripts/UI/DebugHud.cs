@@ -1,7 +1,9 @@
 using System.Text;
 using CluckWars.Abilities;
+using CluckWars.Diagnostics;
 using CluckWars.Gameplay;
 using CluckWars.Networking;
+using CluckWars.Settings;
 using Fusion;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -10,10 +12,11 @@ using Zenject;
 namespace CluckWars.UI
 {
     /// <summary>
-    /// Developer overlay — toggle with F1. Reports FPS, networking state,
-    /// GameManager phase, local chicken stats, base ownership, loose pickup
-    /// count, and ability cooldowns at a glance. Read-only — no debug
-    /// commands, no networked side effects.
+    /// Developer overlay — toggle with F1, or on a touch device with five taps in the top-left corner
+    /// within 2 s (dev-tools build + Developer Mode; <see cref="CornerTapDetector"/>). Reports FPS, networking
+    /// state, GameManager phase, local chicken stats, base ownership, ability cooldowns, and the test-session
+    /// probes (FPS p95 + hitch count from PerfProbe, Visual offenders + last scan, RTT / loss). Read-only — the
+    /// one button only asks the Visual probe for a scan; no networked side effects.
     /// </summary>
     /// <remarks>
     /// IMGUI on purpose: zero scene wiring, draws over whatever else is on
@@ -40,6 +43,8 @@ namespace CluckWars.UI
         private float _nextRefreshUnscaledTime;
         private bool  _balanceVisible;
 
+        private readonly CornerTapDetector _cornerTaps = new CornerTapDetector();
+
         private readonly StringBuilder _sb        = new StringBuilder(1024);
         private readonly StringBuilder _balanceSb = new StringBuilder(1024);
 
@@ -48,7 +53,18 @@ namespace CluckWars.UI
 
         private void Awake()
         {
-            if (_network == null) ProjectContext.Instance.Container.Inject(this);
+            if (_network == null)
+            {
+                // INetworkService is scene-scoped (GameInstaller): SceneContext first (CONVENTIONS "Self-injection").
+                var sceneCtx = FindFirstObjectByType<SceneContext>();
+                if (sceneCtx != null) sceneCtx.Container.Inject(this);
+                else ProjectContext.Instance.Container.Inject(this);
+            }
+            // Only GUI.Box / Label / Button are used: skipping IMGUI's layout pass keeps the hidden overlay's per-frame
+            // cost down now that a dev-tools build also puts it into every Game scene (perf numbers stay representative).
+            useGUILayout = false;
+            // Auto-test cw_hud 1: show the overlay as soon as it exists.
+            if (DevTools.Available && DiagnosticsReadout.HudRequestedAtBoot) _visible = true;
         }
 
         private void Update()
@@ -70,6 +86,30 @@ namespace CluckWars.UI
                 if (kb.f1Key.wasPressedThisFrame) _visible        = !_visible;
                 if (kb.f2Key.wasPressedThisFrame) _balanceVisible = !_balanceVisible;
             }
+
+            // A phone has no F1: five taps in the top-left corner, in a dev-tools build with Developer Mode on.
+            if (DevTools.Available && PlayerPreferences.DeveloperModeEnabled && TryGetTap(out var tap)
+                && _cornerTaps.Register(tap, Screen.width, Screen.height, Time.unscaledTime))
+                _visible = !_visible;
+        }
+
+        /// <summary>A touch (or mouse click, for testing on PC) that began this frame, in screen pixels.</summary>
+        private static bool TryGetTap(out Vector2 position)
+        {
+            var ts = Touchscreen.current;
+            if (ts != null && ts.primaryTouch.press.wasPressedThisFrame)
+            {
+                position = ts.primaryTouch.position.ReadValue();
+                return true;
+            }
+            var mouse = Mouse.current;
+            if (mouse != null && mouse.leftButton.wasPressedThisFrame)
+            {
+                position = mouse.position.ReadValue();
+                return true;
+            }
+            position = default;
+            return false;
         }
 
         /// <summary>
@@ -101,7 +141,7 @@ namespace CluckWars.UI
             if (_visible)
             {
                 const int width  = 360;
-                const int height = 22 * 18;
+                const int height = 22 * 24;
                 int x = pad;
                 int y = 110;
 
@@ -110,6 +150,9 @@ namespace CluckWars.UI
 
                 GUI.Box(new Rect(x, y, width, height), "Debug (F1)");
                 GUI.Label(new Rect(x + 10, y + 24, width - 20, height - 32), _sb.ToString());
+                // Asks VisualProbe (dev tools) for a scan; same as F9 or a three-finger tap.
+                if (DevTools.Available && GUI.Button(new Rect(x, y + height + 6, 180, 36), "Scan visuals (F9)"))
+                    DiagnosticsReadout.VisualScanRequested = true;
             }
 
             if (_balanceVisible)
@@ -132,6 +175,7 @@ namespace CluckWars.UI
         private void BuildReport(StringBuilder sb)
         {
             sb.Append("FPS ").AppendLine(_fps.ToString("0"));
+            AppendDiagnostics(sb);
 
             // --- Network ---
             sb.AppendLine();
@@ -223,6 +267,21 @@ namespace CluckWars.UI
                   .Append(": owner=").Append(b.Owner.IsRealPlayer ? "P" + (b.Owner.PlayerId + 1) : "—")
                   .Append("  food=").AppendLine(Mathf.FloorToInt(b.FoodTotal).ToString());
             }
+        }
+
+        /// <summary>Test-session probe readouts (dev tools only; "n/a" until a probe has reported).</summary>
+        private static void AppendDiagnostics(StringBuilder sb)
+        {
+            if (!DevTools.Available) return;
+            float p95 = DiagnosticsReadout.PerfP95Ms;
+            sb.Append("p95 ").Append(p95 >= 0f ? p95.ToString("0.0") + " ms (" + (1000f / Mathf.Max(p95, 0.01f)).ToString("0") + " fps)" : "n/a")
+              .Append("  hitches ").AppendLine(DiagnosticsReadout.PerfHitchCount.ToString());
+            int offenders = DiagnosticsReadout.VisualOffenders;
+            sb.Append("Visual ").Append(offenders >= 0 ? offenders.ToString() : "n/a")
+              .Append(" @ ").AppendLine(DiagnosticsReadout.LastVisualScanUtc);
+            float rtt = DiagnosticsReadout.NetRttMs;
+            sb.Append("RTT ").Append(rtt >= 0f ? rtt.ToString("0") + " ms" : "n/a")
+              .Append("  loss ").AppendLine(DiagnosticsReadout.NetLoss);
         }
 
         // ---- Balance report (F2) -------------------------------------------------
