@@ -222,6 +222,7 @@ namespace CluckWars.Installers
         {
             Container.Bind<PerfProbe>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.Perf").AsSingle().NonLazy();
             Container.Bind<SyncHeartbeat>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.Sync").AsSingle().NonLazy();
+            Container.Bind<VisualProbe>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.Visual").AsSingle().NonLazy();
         }
     }
 }
