@@ -912,11 +912,14 @@ namespace CluckWars.Gameplay
                 // modulo mapping ignored the corner-permutation shuffle and could
                 // send a player to a rival's corner).
                 int fallbackCorner = 0;
+                bool single = Runner != null && Runner.GameMode == GameMode.Single;
                 for (int i = 0; i < controllers.Count; i++)
                 {
                     var ctrl = controllers[i];
                     if (ctrl == null || ctrl.Object == null) continue;
-                    if (!ctrl.Object.InputAuthority.IsRealPlayer && !ctrl.IsBot) continue;
+                    // Every human (whatever its PlayerRef looks like, Single mode included) and every bot; never a decoy.
+                    if (!RoundTeleportRules.ShouldTeleport(ctrl.Object.IsValid, ctrl.IsDecoy, ctrl.IsBot,
+                            ctrl.Object.InputAuthority.IsRealPlayer, single)) continue;
                     int corner = ctrl.HomeCornerIndex;
                     if (corner < 0) corner = fallbackCorner++; // legacy chickens without a stamp
                     ctrl.RPC_TeleportTo(spawnPoints[corner % spawnPoints.Count] + Vector3.up * 0.05f);

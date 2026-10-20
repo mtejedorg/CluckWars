@@ -769,6 +769,9 @@ namespace CluckWars.Gameplay
         {
             if (!HasStateAuthority) return;
 
+            // A round-reset teleport queued by RPC_TeleportTo: first thing, before anything moves or reads the position.
+            ApplyPendingTeleport();
+
             // The networked mirrors of the ability effect stack are re-derived every authority tick (each write
             // is change-gated), so their correctness never depends on every mutation site remembering to call
             // SyncAbilityEffects. Before the early returns below: a decoy or a unit without stats still mirrors.
@@ -1079,18 +1082,38 @@ namespace CluckWars.Gameplay
                 return;
             }
 
+            // Recorded only: applied at the top of this chicken's own state-authority FixedUpdateNetwork through
+            // NetworkTransform.Teleport (RoundTeleportRules). A direct transform write from inside another object's tick
+            // (the master's reset is a local invoke for its own chicken and its bots) was undone by the NetworkTransform.
             _traversal?.Abort();
-            if (_characterController != null)
-            {
-                _characterController.enabled = false;
-                transform.position = position;
-                _characterController.enabled = true;
-            }
-            else
-            {
-                transform.position = position;
-            }
-            _log?.Debug(Source, $"Teleported to {position}.");
+            _pendingTeleport.Request(position);
+            _log?.Debug(Source, $"Teleport queued to {position}.");
+        }
+
+        private PendingTeleport _pendingTeleport;
+        private NetworkTransform _networkTransform;
+        private bool _networkTransformLooked;
+
+        /// <summary>
+        /// State authority, top of FixedUpdateNetwork: moves the chicken to a queued teleport target with the networked
+        /// teleport (state written for this tick, interpolation suspended on every peer), the CharacterController off
+        /// around it, and the fall speed cleared.
+        /// </summary>
+        private void ApplyPendingTeleport()
+        {
+            if (!_pendingTeleport.TryConsume(out var target)) return;
+            if (!_networkTransformLooked) { _networkTransform = GetComponent<NetworkTransform>(); _networkTransformLooked = true; }
+
+            var from = transform.position;
+            bool hadController = _characterController != null && _characterController.enabled;
+            if (hadController) _characterController.enabled = false;
+            if (_networkTransform != null) _networkTransform.Teleport(target, transform.rotation);
+            else transform.position = target;
+            if (hadController) _characterController.enabled = true;
+            VerticalVelocity = 0f;
+
+            _log?.Info("Reset", System.FormattableString.Invariant(
+                $"Teleport applied {Object.InputAuthority}{(IsBot ? "/bot" : "")} home={HomeCornerIndex} from={from.x:0.0},{from.z:0.0} to={target.x:0.0},{target.z:0.0}"));
         }
 
         /// <summary>
