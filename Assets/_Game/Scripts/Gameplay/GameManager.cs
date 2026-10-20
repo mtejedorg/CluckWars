@@ -1014,6 +1014,9 @@ namespace CluckWars.Gameplay
                         pile.Amount = 25f;
                         pile.MaxAmount = 25f;
                         pile.IsEvent = true;
+                        // No NetworkTransform on piles: the position reaches the other peers only through this stamp.
+                        pile.SpawnPosition = pos;
+                        pile.HasSpawnPosition = true;
                     }
                 });
 

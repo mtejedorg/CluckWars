@@ -46,6 +46,45 @@ namespace CluckWars.Tests
             }
         }
 
+        /// <summary>NetworkObject prefabs whose world position means nothing (they are not placed in the arena).</summary>
+        private static readonly string[] PositionlessPrefabs = { "GameManager" };
+
+        [Test]
+        public void EverySpawnedNetworkObjectPrefab_HasANetworkTransformOrAStampedSpawnPosition()
+        {
+            // CW-216 (bases, piles) and CW-217 (ability zones): Fusion does not replicate the spawn position of an object
+            // without a NetworkTransform, so every other peer puts it at the prefab root. Moving objects need a
+            // NetworkTransform; statically placed ones need the [Networked] SpawnPosition + HasSpawnPosition stamp.
+            var offenders = new System.Collections.Generic.List<string>();
+            int checkedCount = 0;
+            foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/_Game/Prefabs" }))
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (prefab == null || prefab.GetComponent<Fusion.NetworkObject>() == null) continue;
+                checkedCount++;
+                if (System.Array.IndexOf(PositionlessPrefabs, prefab.name) >= 0) continue;
+                if (prefab.GetComponent<Fusion.NetworkTransform>() != null) continue;
+
+                bool stamped = false;
+                foreach (var nb in prefab.GetComponents<Fusion.NetworkBehaviour>())
+                {
+                    if (nb == null) continue;
+                    var prop = nb.GetType().GetProperty("HasSpawnPosition", BindingFlags.Public | BindingFlags.Instance);
+                    var pos = nb.GetType().GetProperty("SpawnPosition", BindingFlags.Public | BindingFlags.Instance);
+                    if (prop?.GetCustomAttribute<Fusion.NetworkedAttribute>() != null && pos?.GetCustomAttribute<Fusion.NetworkedAttribute>() != null)
+                    {
+                        stamped = true;
+                        break;
+                    }
+                }
+                if (!stamped) offenders.Add(path);
+            }
+            Assert.Greater(checkedCount, 4, "found the game's NetworkObject prefabs");
+            CollectionAssert.IsEmpty(offenders, "NetworkObject prefab(s) with neither a NetworkTransform nor a stamped spawn position: " +
+                string.Join(", ", offenders));
+        }
+
         [Test]
         public void ThePlayerBasePrefabRoot_IsNotWhereAnyBaseStands()
         {
