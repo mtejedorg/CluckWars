@@ -80,6 +80,7 @@ Assert ($f2 -match 'chicken P1 carries cg=4') 'invariants: cargo carried into a 
 Assert ($f2 -match 'base 0 food=7') 'invariants: base food not reset is flagged'
 Assert ($f2 -match 'piles differ from round 1') 'invariants: piles not reset are flagged'
 Assert ($f2 -match 'share corner quadrant') 'invariants: two chickens in one corner are flagged'
+Assert ($f2 -match 'world static hash differs across peers from t=1000') 'invariants: persistent static-world hash disagreement between peers is flagged (CW-216/217 class)'
 Remove-Item $tmp2 -Recurse -Force
 Write-Host ''
 if ($script:fail -eq 0) { Write-Host 'SELFTEST OK' -ForegroundColor Green; exit 0 }

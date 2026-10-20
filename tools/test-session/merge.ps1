@@ -29,7 +29,7 @@
 param(
     [Parameter(Mandatory)][string]$Session,
     [double]$RemTolerance = 0.5,
-    [double]$PosTolerance = 1.5,
+    [double]$PosTolerance = 3.0,   # owner leads remote peers by interpolation delay (~0.25 s x 12 m/s); real divergence is caught by World hash + invariants
     [int]$TickTolerance = 3,
     [double]$TimeGuardSec = 15,
     [int]$Persist = 2,
@@ -274,6 +274,35 @@ foreach ($src in @($beatsBySrc.Keys)) {
             if (($now -join ',') -ne ($firstPiles -join ',')) { Add-Finding @('INVARIANT') $b.Entry ("round $round start on $src (t=$($b.T)): piles differ from round 1: [$($now -join ',')] vs [$($firstPiles -join ',')]") }
         }
     }
+}
+
+
+# ---- World-hash parity (CW-216/217 class: spawned objects positioned differently per peer) ---------------------
+# The game logs `World t=<tick> static=<hash> n=<count> ...` on every peer every 2 s (Source Invariant). Peers log on the
+# same ticks, so for each tick every reporting peer must have the same `static` hash (bases, piles, pickups, zones at
+# 0.5 m resolution). A mismatch that lasts >= $WorldPersist consecutive shared ticks is an INVARIANT finding.
+$WorldPersist = 2
+$rxWorld = New-Object Text.RegularExpressions.Regex('^World t=(\d+) static=(\w+) n=(\d+)')
+$worldByT = @{}
+foreach ($e in $sorted) {
+    if ($e.Source -ne 'Invariant') { continue }
+    $m = $rxWorld.Match($e.Message); if (-not $m.Success) { continue }
+    $t = [long]$m.Groups[1].Value
+    if (-not $worldByT.ContainsKey($t)) { $worldByT[$t] = @{ Entry = $e; Peers = @{} } }
+    $worldByT[$t].Peers[$e.Src] = @{ H = $m.Groups[2].Value; N = $m.Groups[3].Value }
+}
+$run = 0; $runFirst = $null
+foreach ($t in ($worldByT.Keys | Sort-Object)) {
+    $w = $worldByT[$t]
+    if ($w.Peers.Count -lt 2) { continue }
+    $distinct = @($w.Peers.Values | ForEach-Object { $_.H } | Sort-Object -Unique)
+    if ($distinct.Count -gt 1) {
+        $run++; if ($run -eq 1) { $runFirst = @{ T = $t; W = $w } }
+        if ($run -eq $WorldPersist) {
+            $desc = ($runFirst.W.Peers.Keys | Sort-Object | ForEach-Object { "$_=$($runFirst.W.Peers[$_].H)(n=$($runFirst.W.Peers[$_].N))" }) -join ' '
+            Add-Finding @('INVARIANT') $runFirst.W.Entry ("world static hash differs across peers from t=$($runFirst.T) ($WorldPersist+ consecutive heartbeats): $desc - a spawned object (base/pile/pickup/zone) is positioned differently on some peers")
+        }
+    } else { $run = 0 }
 }
 
 function Test-Num($a, $b, $tol) {
