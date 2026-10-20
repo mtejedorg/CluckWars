@@ -117,6 +117,14 @@ namespace CluckWars.Tests
             Assert.IsTrue(HeavyProbes.Decide(isEditor: true, autoTestActive: false, editorToggle: true));
         }
 
+        [Test]
+        public void AndroidRestoreFromRecents_IgnoresTheOldExtras()
+        {
+            Assert.IsTrue(AutoTestArgs.IsRestoredLaunch(0x10000000 | AutoTestArgs.FlagActivityLaunchedFromHistory));
+            Assert.IsFalse(AutoTestArgs.IsRestoredLaunch(0x10000000), "FLAG_ACTIVITY_NEW_TASK alone: a fresh am start");
+            Assert.AreEqual(0x00100000, AutoTestArgs.FlagActivityLaunchedFromHistory, "Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY");
+        }
+
         // ---- decisions --------------------------------------------------------------------------------------------
 
         [Test]

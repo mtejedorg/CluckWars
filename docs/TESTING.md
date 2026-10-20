@@ -463,7 +463,7 @@ Always on (breadcrumbs): `MatchOverlays` `Cover on/off`, `Cover off: covered= la
 | `cw_autoplay 1` | fake local input: piles → base, weave, unstick, an ability every 3 s |
 | `cw_devmode 1` / `cw_hud 1` | Developer Mode on / overlay shown at boot |
 
-Android (`-e` string extras; `--ei` / `--ez` work too):
+Android (`-e` string extras; `--ei` / `--ez` work too). **Always use `am start -S`** (force-stop first): the extras are read once per process and then removed from the intent, and an activity re-opened from Recents ignores them, so a run never re-hosts / re-joins by accident:
 
 ```
 adb shell am start -S -n com.UnityTechnologies.com.unity.template.urpblank/com.unity3d.player.UnityPlayerGameActivity     -e cw_autojoin ABC123 -e cw_class Speedy -e cw_autoplay 1 -e cw_hud 1
