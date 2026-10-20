@@ -31,16 +31,20 @@ namespace CluckWars.Tests
         [Test]
         public void Phase_LoadingAndCoverWinOverTheMatchState()
         {
-            Assert.AreEqual("loading", HitchRules.Phase(true, true, true, MatchState.Active, false));
-            Assert.AreEqual("covered", HitchRules.Phase(false, true, true, MatchState.Starting, false));
-            Assert.AreEqual("menu", HitchRules.Phase(false, false, false, MatchState.WaitingForPlayers, false));
-            Assert.AreEqual("lobby", HitchRules.Phase(false, false, true, MatchState.WaitingForPlayers, false));
-            Assert.AreEqual("starting", HitchRules.Phase(false, false, true, MatchState.Starting, false));
-            Assert.AreEqual("intro", HitchRules.Phase(false, false, true, MatchState.Active, true));
-            Assert.AreEqual("active", HitchRules.Phase(false, false, true, MatchState.Active, false));
-            Assert.AreEqual("ended", HitchRules.Phase(false, false, true, MatchState.Ended, false));
+            Assert.AreEqual("loading", HitchRules.Phase(true, true, false, true, MatchState.Active, false));
+            Assert.AreEqual("covered", HitchRules.Phase(false, true, false, true, MatchState.Starting, false));
+            Assert.AreEqual("menu", HitchRules.Phase(false, false, false, false, MatchState.WaitingForPlayers, false));
+            Assert.AreEqual("lobby", HitchRules.Phase(false, false, false, true, MatchState.WaitingForPlayers, false));
+            Assert.AreEqual("starting", HitchRules.Phase(false, false, false, true, MatchState.Starting, false));
+            Assert.AreEqual("intro", HitchRules.Phase(false, false, false, true, MatchState.Active, true));
+            Assert.AreEqual("active", HitchRules.Phase(false, false, false, true, MatchState.Active, false));
+            Assert.AreEqual("ended", HitchRules.Phase(false, false, false, true, MatchState.Ended, false));
             Assert.IsTrue(HitchRules.IsExpectedPhase("loading"));
             Assert.IsTrue(HitchRules.IsExpectedPhase("covered"));
+            Assert.AreEqual("reveal-fade", HitchRules.Phase(false, false, true, true, MatchState.Active, true),
+                "a hitch in the cover's fade-out is the reveal's, not the intro's");
+            Assert.AreEqual("covered", HitchRules.Phase(false, true, true, true, MatchState.Active, false));
+            Assert.IsTrue(HitchRules.IsExpectedPhase("reveal-fade"));
             Assert.IsFalse(HitchRules.IsExpectedPhase("active"));
         }
 
@@ -253,6 +257,11 @@ namespace CluckWars.Tests
                 Assert.IsTrue(RevealState.IsLoading(100f));
                 RevealState.ResetForScene();
                 StringAssert.AreEqualIgnoringCase("cover=0 revealed=0", RevealState.Describe());
+                Assert.IsFalse(RevealState.InRevealFade(0f), "no reveal yet");
+                RevealState.FadeEndsRealtime = 20f;
+                Assert.IsTrue(RevealState.InRevealFade(19.9f), "frame started inside the fade");
+                Assert.IsFalse(RevealState.InRevealFade(20f));
+                RevealState.ResetForScene();
             }
             finally
             {

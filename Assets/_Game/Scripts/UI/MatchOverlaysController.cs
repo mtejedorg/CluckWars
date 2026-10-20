@@ -1370,7 +1370,7 @@ namespace CluckWars.UI
                 _log?.Info(Source, $"Cover off: covered={_arenaCoveredSeconds:0.00}s lateJoin={(lateJoin ? 1 : 0)} " +
                     $"reducedMotion={(PlayerPreferences.ReducedMotionEnabled ? 1 : 0)} fade={(PlayerPreferences.ReducedMotionEnabled ? 0f : ArenaCoverRule.FadeSeconds):0.00}s " +
                     $"hardCap={(d.HardCap ? 1 : 0)} state={state}");
-                RevealState.NotifyRevealed();
+                RevealState.NotifyRevealed(PlayerPreferences.ReducedMotionEnabled ? 0f : ArenaCoverRule.FadeSeconds);
             }
 
             if (_arenaRevealed)

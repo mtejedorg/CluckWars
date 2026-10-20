@@ -88,8 +88,9 @@ namespace CluckWars.Diagnostics
             bool hasManager = gm != null && gm.Object != null && gm.Object.IsValid;
 
             var state = hasManager ? gm.State : MatchState.WaitingForPlayers;
-            string phase = HitchRules.Phase(RevealState.IsLoading(Time.realtimeSinceStartup), RevealState.CoverShown,
-                hasManager, state, hasManager && gm.IsIntroActive);
+            float now = Time.realtimeSinceStartup;
+            string phase = HitchRules.Phase(RevealState.IsLoading(now), RevealState.CoverShown,
+                RevealState.InRevealFade(now - ms / 1000f), hasManager, state, hasManager && gm.IsIntroActive);
             var level = HitchRules.Classify(ms, HitchRules.IsExpectedPhase(phase));
             if (level == HitchLevel.None) return;
 

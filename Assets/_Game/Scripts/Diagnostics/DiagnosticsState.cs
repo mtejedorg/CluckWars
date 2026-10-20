@@ -48,10 +48,15 @@ namespace CluckWars.Diagnostics
         /// <summary>Fires once per scene load when the cover starts to fade (the reveal).</summary>
         public static event Action ArenaRevealed;
 
-        public static void NotifyRevealed()
+        /// <summary><c>Time.realtimeSinceStartup</c> at which the cover's fade-out ends; negative before a reveal.</summary>
+        public static float FadeEndsRealtime = -1f;
+
+        /// <param name="fadeSeconds">The cover's fade-out (0 under Reduced Motion).</param>
+        public static void NotifyRevealed(float fadeSeconds)
         {
             Revealed = true;
             CoverShown = false;
+            FadeEndsRealtime = Time.realtimeSinceStartup + Mathf.Max(0f, fadeSeconds);
             ArenaRevealed?.Invoke();
         }
 
@@ -60,7 +65,15 @@ namespace CluckWars.Diagnostics
         {
             CoverShown = false;
             Revealed = false;
+            FadeEndsRealtime = -1f;
         }
+
+        /// <summary>
+        /// A frame that STARTED (<paramref name="frameStartRealtime"/>) before the cover's fade-out ended belongs to the
+        /// reveal, not to the intro / active round: its hitch is the reveal's.
+        /// </summary>
+        public static bool InRevealFade(float frameStartRealtime) =>
+            FadeEndsRealtime >= 0f && frameStartRealtime < FadeEndsRealtime;
 
         /// <summary><c>cover=0|1 revealed=0|1</c>, for breadcrumb lines.</summary>
         public static string Describe() => "cover=" + (CoverShown ? "1" : "0") + " revealed=" + (Revealed ? "1" : "0");

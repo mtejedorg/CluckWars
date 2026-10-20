@@ -24,14 +24,16 @@ namespace CluckWars.Diagnostics
         }
 
         /// <summary>
-        /// <c>loading</c> (a scene load in flight or just finished), <c>covered</c> (the arena cover is up), <c>menu</c>
+        /// <c>loading</c> (a scene load in flight or just finished), <c>covered</c> (the arena cover is up),
+        /// <c>reveal-fade</c> (the frame started before the cover's fade-out ended), <c>menu</c>
         /// (no match manager), <c>lobby</c> (multiplayer waiting room), <c>starting</c> (GET READY without the cover),
         /// <c>intro</c> (3-2-1), <c>active</c>, <c>ended</c>.
         /// </summary>
-        public static string Phase(bool loading, bool covered, bool hasManager, MatchState state, bool introActive)
+        public static string Phase(bool loading, bool covered, bool revealFade, bool hasManager, MatchState state, bool introActive)
         {
             if (loading) return "loading";
             if (covered) return "covered";
+            if (revealFade) return "reveal-fade";
             if (!hasManager) return "menu";
             switch (state)
             {
@@ -44,7 +46,7 @@ namespace CluckWars.Diagnostics
         }
 
         /// <summary>Phases whose hitches are expected (capped at Info).</summary>
-        public static bool IsExpectedPhase(string phase) => phase == "loading" || phase == "covered";
+        public static bool IsExpectedPhase(string phase) => phase == "loading" || phase == "covered" || phase == "reveal-fade";
     }
 
     /// <summary>
