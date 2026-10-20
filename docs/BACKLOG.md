@@ -154,3 +154,17 @@ The handoff's progress log was never filled in. **Check first** each against STA
 4. **CW-012/013/043** documentation + compendium pass in one go.
 5. Gameplay balance (CW-057/058) after real 4-player data; progression release (CW-011).
 6. Cleanup tickets (CW-015, 052, 061, 083) any time.
+
+---
+
+## 9. Test session 2026-10-20 findings (Pixel 10 Pro + Windows EXE; build `db0cfad+`)
+
+Evidence lives in `Captures/session-<utc>/` (git-ignored). SHA = commit under test. New IDs continue from CW-200.
+
+| ID | Type | Pri | Title | Evidence / notes |
+|---|---|---|---|---|
+| CW-200 | Bug | P1 | **Headless (`-batchmode`) builds carry no UGS cloud project id** → every Host/Join fails with `CreateLobby failed: Some services couldn't be initialized` on Android **and** Windows. `ProjectSettings.asset` has `cloudProjectId:` empty; only a build made from a signed-in Editor injects it. Any CLI/CI build is silently multiplayer-dead. Fix: commit the id (or inject it in `CluckWarsBuildMenu`) and add a build guard that fails when it is empty. Project id `14249009-abbe-423c-8c0c-8391b8974857` (from history) used as a temporary local override for the session. | phone.log / client1.log 19:53Z |
+| CW-201 | Bug | P2 | Headless APK installs as `com.DefaultCompany.CluckWars` (empty `applicationIdentifier`), side by side with the older `com.UnityTechnologies.com.unity.template.urpblank` install; `coop-test` skill and docs still name the old id. Pin the identifier in ProjectSettings and update the skill/docs. | `pm list packages` |
+| CW-202 | Chore | P2 | UGS init failure hid its inner exceptions (diagnosis cost ~15 min). **Fixed** `5c6625a` (logs every inner exception). | |
+| CW-203 | Chore | P3 | Stale-install trap: `start.ps1` launched the old package after installing the new one. **Fixed** `5791ab7`. | |
+| CW-204 | Chore | P3 | A crash during a 14-min IL2CPP build (Kernel-Power 41, no dump, Hyper-V active) cost one build cycle — known PC issue (see memory `hypervisor-crash-known-pc-issue`). Build in smaller steps / avoid concurrent GPU load. | Event log 20:30:36 |
