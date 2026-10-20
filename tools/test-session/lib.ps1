@@ -3,7 +3,7 @@
 
 $script:RepoRoot   = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $script:DefaultAdb = 'C:\Users\MARCO\Documents\platform-tools\adb.exe'
-$script:AppPackage = 'com.UnityTechnologies.com.unity.template.urpblank'
+$script:AppPackage = 'com.DefaultCompany.CluckWars'
 $script:AppActivity = 'com.unity3d.player.UnityPlayerGameActivity'
 
 function Get-AdbPath {
