@@ -83,9 +83,9 @@ namespace CluckWars.Diagnostics
 
         private void LogHitchIfAny(float ms, int gcDelta, long allocDelta)
         {
+            if (ms <= HitchRules.InfoMs) return;
             var gm = GameManager.Instance;
             bool hasManager = gm != null && gm.Object != null && gm.Object.IsValid;
-            if (ms <= HitchRules.InfoMs) return;
 
             var state = hasManager ? gm.State : MatchState.WaitingForPlayers;
             string phase = HitchRules.Phase(RevealState.IsLoading(Time.realtimeSinceStartup), RevealState.CoverShown,

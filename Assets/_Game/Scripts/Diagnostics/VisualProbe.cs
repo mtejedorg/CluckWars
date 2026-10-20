@@ -69,10 +69,25 @@ namespace CluckWars.Diagnostics
                 return;
             }
 
-            if (SceneManager.GetActiveScene().name != GameSceneName) { _nextPeriodicAt = -1f; return; }
+            if (!InGameScene()) { _nextPeriodicAt = -1f; return; }
             float now = Time.realtimeSinceStartup;
             if (_nextPeriodicAt < 0f) _nextPeriodicAt = now + PeriodicSeconds;
             else if (now >= _nextPeriodicAt) Scan("periodic");
+        }
+
+        // Scene.name allocates a string on every call: compare the handle per frame, the name only when it changes.
+        private int _sceneHandle = -1;
+        private bool _inGameScene;
+
+        private bool InGameScene()
+        {
+            var scene = SceneManager.GetActiveScene();
+            if (scene.handle != _sceneHandle)
+            {
+                _sceneHandle = scene.handle;
+                _inGameScene = scene.name == GameSceneName;
+            }
+            return _inGameScene;
         }
 
         private static bool F9Pressed()

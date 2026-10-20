@@ -167,7 +167,7 @@ namespace CluckWars.Diagnostics
 
                 while (true)
                 {
-                    if (menu == null || SceneManager.GetActiveScene().name != menu.gameObject.scene.name)
+                    if (menu == null || SceneManager.GetActiveScene().handle != menu.gameObject.scene.handle)
                     {
                         _log.Info(Source, $"AutoTest join: lobby {code} joined on attempt {attempt}; loading the match scene.");
                         yield break;
