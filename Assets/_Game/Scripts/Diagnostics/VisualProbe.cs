@@ -13,7 +13,7 @@ namespace CluckWars.Diagnostics
     /// <summary>
     /// Visual-integrity probe (test-session item 4, Source <c>Visual</c>): scans every live renderer for the things that
     /// show as pink / cyan / missing on a device — error or Built-in-RP shaders, unsupported shaders, null materials,
-    /// NaN / Inf transforms, renderers outside the arena, chickens with no visible renderer — plus the camera set-up and
+    /// NaN / Inf transforms, gameplay objects outside the arena, chickens with no visible renderer — plus the camera set-up and
     /// the arena cover. One Info summary per scan, then one Warn per category with offenders (up to 8 hierarchy paths).
     /// </summary>
     /// <remarks>
@@ -182,7 +182,10 @@ namespace CluckWars.Diagnostics
                 var t = r.transform;
                 if (VisualScanRules.IsNonFinite(t.position) || VisualScanRules.IsNonFinite(t.rotation) || VisualScanRules.IsNonFinite(t.lossyScale))
                     Add(VisualCategory.Nan, t, null);
-                else if (_scanInArena && VisualScanRules.IsLayerVisible(_scanMask, r.gameObject.layer) && VisualScanRules.IsOutOfBounds(r.bounds.center, _scanHalf))
+                else if (_scanInArena && VisualScanRules.IsLayerVisible(_scanMask, r.gameObject.layer)
+                         && VisualScanRules.IsOutOfBounds(r.bounds.center, _scanHalf)
+                         // Cheap test first; only an outside renderer pays for the gameplay / root checks (root name allocates).
+                         && VisualScanRules.CountsForBounds(r.GetComponentInParent<Fusion.NetworkObject>() != null, t.root.name))
                     Add(VisualCategory.OutOfBounds, t, null);
             }
             if (_scanIndex < _scanRenderers.Length) { _scanWatch.Stop(); return; }

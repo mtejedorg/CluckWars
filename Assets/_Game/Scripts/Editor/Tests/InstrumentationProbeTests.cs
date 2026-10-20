@@ -199,6 +199,16 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void OutOfBounds_GameplayObjectsOnly_NeverTheSurroundArt()
+        {
+            Assert.IsTrue(VisualScanRules.CountsForBounds(true, "Chicken(Clone)"), "a chicken outside the arena is a bug");
+            Assert.IsTrue(VisualScanRules.CountsForBounds(true, "FoodPile(Clone)"));
+            Assert.IsFalse(VisualScanRules.CountsForBounds(false, "MapSurroundings"), "the surround is designed to be outside");
+            Assert.IsFalse(VisualScanRules.CountsForBounds(true, "MapSurroundings"), "even a networked object parented under it");
+            Assert.IsFalse(VisualScanRules.CountsForBounds(false, "Environment"), "static scenery is never a gameplay offender");
+        }
+
+        [Test]
         public void VisualLines_SummaryAndOffendersWithCap()
         {
             var counts = new[] { 2, 0, 1, 0, 0, 1 };

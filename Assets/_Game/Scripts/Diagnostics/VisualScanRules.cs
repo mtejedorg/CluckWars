@@ -68,6 +68,21 @@ namespace CluckWars.Diagnostics
         }
 
         /// <summary>Only what the match camera can see may count as out of bounds (the podium stage renders elsewhere on its own layer).</summary>
+        /// <summary>Scene roots whose art is designed to stand beyond the arena edge (the surround: trees, hedges, haze).</summary>
+        public static readonly string[] DesignedOutsideRoots = { "MapSurroundings" };
+
+        /// <summary>
+        /// Only gameplay objects can be "out of bounds": chickens, piles, pickups, zones, bases - everything spawned as a
+        /// <c>NetworkObject</c> - and never anything under a root designed to extend beyond the arena. Scenery outside the
+        /// fence is how the map is built, and flagging it every 10 s buried real findings under a design-intended Warn.
+        /// </summary>
+        public static bool CountsForBounds(bool isGameplayObject, string rootName)
+        {
+            if (!isGameplayObject) return false;
+            foreach (var root in DesignedOutsideRoots) if (rootName == root) return false;
+            return true;
+        }
+
         public static bool IsLayerVisible(int cullingMask, int layer) => layer >= 0 && layer < 32 && (cullingMask & (1 << layer)) != 0;
 
         public static string CategoryName(VisualCategory c) => c switch
