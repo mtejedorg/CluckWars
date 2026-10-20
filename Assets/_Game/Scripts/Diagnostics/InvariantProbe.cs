@@ -39,7 +39,9 @@ namespace CluckWars.Diagnostics
         private readonly List<(int corner, float food)> _bases = new List<(int, float)>(4);
         private readonly List<(float amount, float initial)> _piles = new List<(float, float)>(16);
         private readonly List<InvariantFailure> _fails = new List<InvariantFailure>(16);
-        private readonly List<(string type, Vector2 position)> _static = new List<(string, Vector2)>(32);
+        private readonly List<(string type, Vector2 position)> _basesW = new List<(string, Vector2)>(8);
+        private readonly List<(string type, Vector2 position)> _pilesW = new List<(string, Vector2)>(32);
+        private readonly List<(string type, Vector2 position)> _zones = new List<(string, Vector2)>(16);
         private readonly List<(string type, Vector2 position)> _moving = new List<(string, Vector2)>(16);
 
         [Inject]
@@ -57,6 +59,7 @@ namespace CluckWars.Diagnostics
             if (gm == null || gm.Object == null || !gm.Object.IsValid || gm.Runner == null || !gm.Runner.IsRunning)
             {
                 _haveState = false;
+                _round = 0;
                 _startCheckAt = -1f;
                 _worldBoundary.Reset();
                 return;
@@ -79,10 +82,12 @@ namespace CluckWars.Diagnostics
             var st = gm.State;
             if (!_haveState || st != _state)
             {
-                if (_haveState) _log?.Info(Source, $"Invariant state {_state}->{st} round={gm.StartRound}");
+                // round = the ordinal of the match this transition belongs to, counted here the way "Match started" is
+                // logged (one per Starting, or per Active reached without a Starting: a late join), not gm.StartRound.
+                _round = RoundOrdinal.Next(_round, _haveState, _haveState ? _state : MatchState.WaitingForPlayers, st);
+                if (_haveState) _log?.Info(Source, $"Invariant state {_state}->{st} round={_round}");
                 _haveState = true;
                 _state = st;
-                _round = gm.StartRound;
                 if (st == MatchState.Active) _startCheckAt = Time.realtimeSinceStartup + StartCheckDelaySeconds;
                 if (st == MatchState.Ended) CheckEnd(gm);
             }
@@ -180,30 +185,54 @@ namespace CluckWars.Diagnostics
             if (_log == null || !_log.IsEnabled(LogLevel.Info)) return;
             if (!_worldBoundary.TryCross((int)runner.Tick, Mathf.RoundToInt(WorldPeriodSeconds * runner.TickRate), out int t)) return;
 
-            _static.Clear();
+            _basesW.Clear();
+            _pilesW.Clear();
+            _zones.Clear();
             _moving.Clear();
             var bases = PlayerBase.ActiveBases;
             for (int i = 0; i < bases.Count; i++)
-                if (bases[i] != null && bases[i].Object != null && bases[i].Object.IsValid) _static.Add(("PlayerBase", Xz(bases[i].transform)));
+                if (bases[i] != null && bases[i].Object != null && bases[i].Object.IsValid) _basesW.Add(("PlayerBase", Xz(bases[i].transform)));
             var piles = FoodPile.ActivePiles;
             for (int i = 0; i < piles.Count; i++)
-                if (piles[i] != null && piles[i].Object != null && piles[i].Object.IsValid) _static.Add(("FoodPile", Xz(piles[i].transform)));
+                if (piles[i] != null && piles[i].Object != null && piles[i].Object.IsValid) _pilesW.Add(("FoodPile", Xz(piles[i].transform)));
             var zones = AbilityZone.ActiveZones;
             for (int i = 0; i < zones.Count; i++)
-                if (zones[i] != null && zones[i].Object != null && zones[i].Object.IsValid) _static.Add(("AbilityZone", Xz(zones[i].transform)));
+                if (zones[i] != null && zones[i].Object != null && zones[i].Object.IsValid) _zones.Add(("AbilityZone", Xz(zones[i].transform)));
             var chickens = ChickenController.ActiveControllers;
             for (int i = 0; i < chickens.Count; i++)
                 if (chickens[i] != null && chickens[i].Object != null && chickens[i].Object.IsValid) _moving.Add(("Chicken", Xz(chickens[i].transform)));
 
-            uint hs = RoundInvariants.WorldHash(_static, out int ns);
+            // Per type, so a differing static hash can be attributed (CW-217); static = their sum, as before.
+            uint hb = RoundInvariants.WorldHash(_basesW, out int nb);
+            uint hp = RoundInvariants.WorldHash(_pilesW, out int np);
+            uint hz = RoundInvariants.WorldHash(_zones, out int nz);
             uint hc = RoundInvariants.WorldHash(_moving, out int nc);
-            _log.Info(Source, $"World t={t} static={hs:X8} n={ns} chickens={hc:X8} m={nc} round={gm.StartRound}");
+            uint hs = unchecked(hb + hp + hz);
+            _log.Info(Source, $"World t={t} static={hs:X8} n={nb + np + nz} bases={hb:X8}/{nb} piles={hp:X8}/{np} zones={hz:X8}/{nz} " +
+                $"chickens={hc:X8} m={nc} round={_round}");
         }
 
         private static Vector2 Xz(Transform t)
         {
             var p = t.position;
             return new Vector2(p.x, p.z);
+        }
+    }
+
+    /// <summary>The match ordinal the Invariant probe labels its lines with (pure, tested).</summary>
+    public static class RoundOrdinal
+    {
+        /// <summary>
+        /// A new match begins on every entry into Starting, or on reaching Active / Ended without a Starting seen first (a
+        /// late join, or a probe that attached mid-round). Ended -> WaitingForPlayers (PLAY AGAIN) still belongs to the
+        /// match that just ended, so the label always matches the count of "Match started" lines.
+        /// </summary>
+        public static int Next(int current, bool hadState, MatchState from, MatchState to)
+        {
+            if (to == MatchState.Starting) return current + 1;
+            if ((to == MatchState.Active || to == MatchState.Ended) && (!hadState || current == 0 ||
+                (from != MatchState.Starting && from != MatchState.Active))) return current + 1;
+            return current;
         }
     }
 }

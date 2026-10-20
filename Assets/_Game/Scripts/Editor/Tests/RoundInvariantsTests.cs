@@ -86,6 +86,28 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void RoundOrdinal_MatchesTheMatchStartedCount()
+        {
+            // Shared: waiting room -> GET READY -> round -> results -> PLAY AGAIN (waiting room) -> GET READY ...
+            int r = 0;
+            r = RoundOrdinal.Next(r, false, CluckWars.Gameplay.MatchState.WaitingForPlayers, CluckWars.Gameplay.MatchState.WaitingForPlayers);
+            Assert.AreEqual(0, r, "the first waiting room is no match yet");
+            r = RoundOrdinal.Next(r, true, CluckWars.Gameplay.MatchState.WaitingForPlayers, CluckWars.Gameplay.MatchState.Starting);
+            r = RoundOrdinal.Next(r, true, CluckWars.Gameplay.MatchState.Starting, CluckWars.Gameplay.MatchState.Active);
+            r = RoundOrdinal.Next(r, true, CluckWars.Gameplay.MatchState.Active, CluckWars.Gameplay.MatchState.Ended);
+            Assert.AreEqual(1, r);
+            r = RoundOrdinal.Next(r, true, CluckWars.Gameplay.MatchState.Ended, CluckWars.Gameplay.MatchState.WaitingForPlayers);
+            Assert.AreEqual(1, r, "PLAY AGAIN's waiting room still belongs to match 1");
+            r = RoundOrdinal.Next(r, true, CluckWars.Gameplay.MatchState.WaitingForPlayers, CluckWars.Gameplay.MatchState.Starting);
+            Assert.AreEqual(2, r);
+            // Solo: results -> GET READY straight away.
+            r = RoundOrdinal.Next(r, true, CluckWars.Gameplay.MatchState.Ended, CluckWars.Gameplay.MatchState.Starting);
+            Assert.AreEqual(3, r);
+            // A late joiner whose first look is a running round.
+            Assert.AreEqual(1, RoundOrdinal.Next(0, false, CluckWars.Gameplay.MatchState.WaitingForPlayers, CluckWars.Gameplay.MatchState.Active));
+        }
+
+        [Test]
         public void WorldHash_IsOrderIndependent_AndSeesAMovedBase()
         {
             var a = new List<(string, Vector2)> { ("PlayerBase", new Vector2(21.8f, 21.8f)), ("FoodPile", Vector2.zero) };

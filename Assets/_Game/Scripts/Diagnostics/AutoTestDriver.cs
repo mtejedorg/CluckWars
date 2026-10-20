@@ -284,7 +284,7 @@ namespace CluckWars.Diagnostics
                 _loopRestarts++;
                 _playAgainPressedAt = -1f;
                 if (_cfg.AutoLoop > 0)
-                    _log.Info(Source, $"AutoTest loop round={_loopRestarts}/{_cfg.AutoLoop} restarted (state={st}, " +
+                    _log.Info(Source, $"AutoTest loop round={_loopRestarts}/{_cfg.AutoLoop} match={_loopRestarts + 1} restarted (state={st}, " +
                         $"{(gm.HasStateAuthority ? "host" : "joiner")}).");
             }
             else if (_cfg.AutoLoop > 0 && !gm.HasStateAuthority && st == MatchState.Ended && _observedState != MatchState.Ended
@@ -429,7 +429,7 @@ namespace CluckWars.Diagnostics
                 _extraRounds++;
                 var loopRunner = gm.Runner;
                 _humansAtRoundEnd = loopRunner != null ? CountHumans(loopRunner) : 1;
-                _log.Info(Source, $"AutoTest loop round={_extraRounds}/{_cfg.AutoLoop}: PLAY AGAIN pressed (humans={_humansAtRoundEnd}).");
+                _log.Info(Source, $"AutoTest loop round={_extraRounds}/{_cfg.AutoLoop} match={_extraRounds + 1}: PLAY AGAIN pressed (humans={_humansAtRoundEnd}).");
                 overlays.AutoTestPressPlayAgain();
                 _playAgainPressedAt = Time.realtimeSinceStartup;
             }
