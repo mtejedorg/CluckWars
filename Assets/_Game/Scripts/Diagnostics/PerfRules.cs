@@ -50,6 +50,38 @@ namespace CluckWars.Diagnostics
     }
 
     /// <summary>
+    /// At most <see cref="MaxPerSecond"/> hitch lines per wall-clock second: a stutter storm (a stalled device, a
+    /// long load) must not flood logcat and bury everything else. The lines that were held back are counted and the
+    /// count is printed in the next 5 s summary (<c>suppressed=N</c>). Pure, tested.
+    /// </summary>
+    public sealed class HitchLineLimiter
+    {
+        public const int MaxPerSecond = 5;
+
+        private float _windowStart = float.NegativeInfinity;
+        private int _inWindow;
+
+        /// <summary>Lines held back since the last <see cref="TakeSuppressed"/>.</summary>
+        public int Suppressed { get; private set; }
+
+        /// <summary>True when a hitch line may be logged at <paramref name="now"/> (seconds); false counts it as suppressed.</summary>
+        public bool Allow(float now)
+        {
+            if (now - _windowStart >= 1f) { _windowStart = now; _inWindow = 0; }
+            if (_inWindow < MaxPerSecond) { _inWindow++; return true; }
+            Suppressed++;
+            return false;
+        }
+
+        public int TakeSuppressed()
+        {
+            int n = Suppressed;
+            Suppressed = 0;
+            return n;
+        }
+    }
+
+    /// <summary>
     /// Fixed-capacity ring of frame times (ms) with average / max / hitch counts and nearest-rank percentiles.
     /// No allocation after construction: the percentile sorts a preallocated scratch copy. Holds the most recent
     /// <c>capacity</c> frames; PerfProbe clears it after each 5 s summary.

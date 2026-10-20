@@ -77,6 +77,18 @@ namespace CluckWars.Tests
             Assert.AreEqual(1, w.HitchesOver100, "hitch counts cover everything since Clear, not just the ring");
         }
 
+        [Test]
+        public void HitchLines_AtMostFivePerSecond_RestCountedForTheSummary()
+        {
+            var l = new HitchLineLimiter();
+            for (int i = 0; i < 5; i++) Assert.IsTrue(l.Allow(10f + i * 0.1f));
+            Assert.IsFalse(l.Allow(10.6f));
+            Assert.IsFalse(l.Allow(10.9f));
+            Assert.IsTrue(l.Allow(11.0f), "a new second");
+            Assert.AreEqual(2, l.TakeSuppressed());
+            Assert.AreEqual(0, l.TakeSuppressed(), "taken once, for one summary");
+        }
+
         // ---- Sync heartbeat ---------------------------------------------------------------------------------------
 
         [Test]

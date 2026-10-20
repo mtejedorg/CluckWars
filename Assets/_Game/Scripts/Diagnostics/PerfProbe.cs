@@ -39,6 +39,7 @@ namespace CluckWars.Diagnostics
         private long _monoPrevFrame;
         private double _cpuSumMs, _gpuSumMs;
         private int _cpuSamples, _gpuSamples;
+        private readonly HitchLineLimiter _limiter = new HitchLineLimiter();
 
         [Inject]
         public void Construct(ILogService log) => _log = log;
@@ -92,7 +93,7 @@ namespace CluckWars.Diagnostics
             string phase = HitchRules.Phase(RevealState.IsLoading(now), RevealState.CoverShown,
                 RevealState.InRevealFade(now - ms / 1000f), hasManager, state, hasManager && gm.IsIntroActive);
             var level = HitchRules.Classify(ms, HitchRules.IsExpectedPhase(phase));
-            if (level == HitchLevel.None) return;
+            if (level == HitchLevel.None || !_limiter.Allow(now)) return;
 
             var msg = "Hitch ms=" + ms.ToString("0.0", CultureInfo.InvariantCulture) +
                       " frame=" + (Time.frameCount - 1).ToString(CultureInfo.InvariantCulture) +
@@ -126,7 +127,8 @@ namespace CluckWars.Diagnostics
                     " mem=" + reservedMb.ToString(CultureInfo.InvariantCulture) + "/" + monoMb.ToString(CultureInfo.InvariantCulture) + "MB" +
                     " gc=" + (gc - _gcAtSummaryStart).ToString(CultureInfo.InvariantCulture) +
                     " cpu=" + AverageOrNa(_cpuSumMs, _cpuSamples) +
-                    " gpu=" + AverageOrNa(_gpuSumMs, _gpuSamples));
+                    " gpu=" + AverageOrNa(_gpuSumMs, _gpuSamples) +
+                    " suppressed=" + _limiter.TakeSuppressed().ToString(CultureInfo.InvariantCulture));
             }
 
             _window.Clear();
