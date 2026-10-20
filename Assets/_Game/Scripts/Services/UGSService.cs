@@ -45,7 +45,21 @@ namespace CluckWars.Services
         public async Task InitializeAsync()
         {
             if (_initialized) return;
-            await UnityServices.InitializeAsync();
+            try
+            {
+                await UnityServices.InitializeAsync();
+            }
+            catch (System.Exception e)
+            {
+                // The aggregate message ("Some services couldn't be initialized") hides the cause (e.g. no linked
+                // project id in a headless build); log every inner exception before rethrowing.
+                for (var inner = e; inner != null; inner = inner.InnerException)
+                    _log.Error(Source, $"UnityServices.InitializeAsync failed: {inner.GetType().Name}: {inner.Message}");
+                if (e is System.AggregateException agg)
+                    foreach (var x in agg.Flatten().InnerExceptions)
+                        _log.Error(Source, $"  inner: {x.GetType().Name}: {x.Message}");
+                throw;
+            }
             _initialized = true;
             _log.Info(Source, "Unity Services initialized.");
         }
