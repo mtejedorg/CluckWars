@@ -45,8 +45,8 @@ function Phone-Launch([string[]]$extras) {
 }
 
 if ($Phone -eq 'join') {
-    Start-Exe 'host' @('-cw_autohost','-cw_class','Assassin','-cw_autostart','4','-cw_autostart_timeout','120',"-cw_autoloop","$Rounds")
-    $code = Wait-Code "$S\host.log"
+    Start-Exe 'client1' @('-cw_autohost','-cw_class','Assassin','-cw_autostart','4','-cw_autostart_timeout','120',"-cw_autoloop","$Rounds")
+    $code = Wait-Code "$S\ient1.log"
 } else {
     Phone-Launch @('cw_autohost=1','cw_class=Assassin','cw_autostart=4','cw_autostart_timeout=120',"cw_autoloop=$Rounds",'cw_autoplay=1','cw_hud=1','cw_devmode=1','cw_profile=phone')
     $code = Wait-Code "$S\phone.log"
@@ -55,16 +55,16 @@ if (-not $code) { throw 'no join code appeared' }
 Write-Host "join code: $code"
 if ($Phone -eq 'join') {
     Phone-Launch @("cw_autojoin=$code",'cw_class=Fatty','cw_autoplay=1','cw_hud=1','cw_devmode=1','cw_profile=phone',"cw_autoloop=$Rounds")
-    Start-Exe 'c2' @('-cw_autojoin',$code,'-cw_class','Speedy',"-cw_autoloop","$Rounds")
-    Start-Exe 'c3' @('-cw_autojoin',$code,'-cw_class','Warrior',"-cw_autoloop","$Rounds")
+    Start-Exe 'client2' @('-cw_autojoin',$code,'-cw_class','Speedy',"-cw_autoloop","$Rounds")
+    Start-Exe 'client3' @('-cw_autojoin',$code,'-cw_class','Warrior',"-cw_autoloop","$Rounds")
 } else {
-    Start-Exe 'host' @('-cw_autojoin',$code,'-cw_class','Speedy',"-cw_autoloop","$Rounds")
-    Start-Exe 'c2' @('-cw_autojoin',$code,'-cw_class','Fatty',"-cw_autoloop","$Rounds")
-    Start-Exe 'c3' @('-cw_autojoin',$code,'-cw_class','Warrior',"-cw_autoloop","$Rounds")
+    Start-Exe 'client1' @('-cw_autojoin',$code,'-cw_class','Speedy',"-cw_autoloop","$Rounds")
+    Start-Exe 'client2' @('-cw_autojoin',$code,'-cw_class','Fatty',"-cw_autoloop","$Rounds")
+    Start-Exe 'client3' @('-cw_autojoin',$code,'-cw_class','Warrior',"-cw_autoloop","$Rounds")
 }
 
 $deadline = (Get-Date).AddMinutes($MaxMinutes); $n = 0
-$mainLog = if ($Phone -eq 'join') { "$S\host.log" } else { "$S\phone.log" }
+$mainLog = if ($Phone -eq 'join') { "$S\ient1.log" } else { "$S\phone.log" }
 while ((Get-Date) -lt $deadline) {
     Start-Sleep $ShotEvery
     $n++
