@@ -384,7 +384,10 @@ for ($ia = 0; $ia -lt $srcNames.Count; $ia++) {
         }
         foreach ($k in $runs.Keys) { $done.Add($runs[$k]) }
         foreach ($r in $done) {
-            if ($r.N -lt $Persist) { continue }
+            # cargo changes every few seconds while foraging/depositing: a 2-beat mismatch is sampling skew at a flush, so it
+            # needs 2 more consecutive beats to count as a real divergence
+            $need = if ($r.Key -like 'c*.cg') { $Persist + 2 } else { $Persist }
+            if ($r.N -lt $need) { continue }
             $inf = $r.Info
             $text = 't={1}..{2} {3} vs {4}: {5} {6}={7} {8}={9}  ({10} consecutive heartbeats, from {11})' -f $inf.Cat, $r.FirstT, $r.LastT, $sa, $sb, $inf.Desc, $sa, $inf.A, $sb, $inf.B, $r.N, (Format-Time $r.First.Ticks)
             Add-Finding @($inf.Cat) $r.First $text

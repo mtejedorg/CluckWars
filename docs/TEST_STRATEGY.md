@@ -72,3 +72,11 @@ control states, bases, piles) and add it to `RoundInvariants`/`merge.ps1` before
 .\tools\test-session\verify.ps1 -Session Captures\session-<utc>   # re-judge an old capture
 .\tools\test-session\selftest.ps1                                  # tests the checker itself
 ```
+
+## 6. Status (2026-10-21)
+
+Rules 1–10 are implemented in tooling: `merge.ps1` INVARIANT rules (round-start corner/cargo/base/pile, world-hash parity), the in-game
+`Invariant`/`World`/`Respawn` probes (dev-tools builds), `verify.ps1` (PASS/FAIL), `scenario-pc.ps1` (4 modes × 3 rounds), and a
+self-test that pins the checker against synthetic bad logs. First full matrix on build `f135268`: solo/shared2/shared4 PASS,
+hostleave FAIL on one watch item (CW-226). Bugs the new gates found within hours: CW-221 (round reset), CW-224 (cooldowns),
+CW-217 (zones positioned per peer; remote players were never slowed/rooted), CW-216 (remote deposits).
