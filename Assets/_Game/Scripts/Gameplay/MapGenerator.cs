@@ -889,7 +889,13 @@ namespace CluckWars.Gameplay
                         // player who spawned at the matching corner. SpawnPoints[i]
                         // and CornerIndex i agree by construction.
                         var pb = networkObject.GetComponent<PlayerBase>();
-                        if (pb != null) pb.CornerIndex = cornerIndex;
+                        if (pb != null)
+                        {
+                            pb.CornerIndex = cornerIndex;
+                            // No NetworkTransform: the position only reaches the other peers through this stamp.
+                            pb.SpawnPosition = pos;
+                            pb.HasSpawnPosition = true;
+                        }
                     });
             }
             _log?.Info(Source, $"Spawned {_spawnPoints.Length} corner bases.");
@@ -1020,6 +1026,9 @@ namespace CluckWars.Gameplay
                     }
                     pile.FootprintSize = footprint;
                     pile.Yaw = yaw;
+                    // No NetworkTransform: the position only reaches the other peers through this stamp.
+                    pile.SpawnPosition = pos;
+                    pile.HasSpawnPosition = true;
                     pile.IsPermanent = permanent;
                     pile.IsCentre = centre;
                 });
