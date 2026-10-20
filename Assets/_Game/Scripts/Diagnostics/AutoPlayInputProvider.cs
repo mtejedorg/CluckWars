@@ -27,12 +27,18 @@ namespace CluckWars.Diagnostics
         public const float PeckEverySeconds = 0.8f;
         public const float HoldSeconds = 0.35f;
         private const float PeckHoldSeconds = 0.1f;
+        /// <summary>An unread press is dropped after this long (a press is meant for the next input read, not later).</summary>
+        public const float PressLatchSeconds = 0.25f;
         private const int MaxPiles = 64;
 
         private readonly AutoPlayBrain _brain = new AutoPlayBrain();
         private readonly AutoPlayPile[] _piles = new AutoPlayPile[MaxPiles];
-        private readonly int[] _pressFrame = new int[AbilityController.SlotCount];
+        // A press is latched until a reader takes it (FusionNetworkService.Update latches it for OnInput) or it expires:
+        // valid on one frame only, it was lost whenever the reader ran before the driver in that frame.
+        private readonly bool[] _pressPending = new bool[AbilityController.SlotCount];
+        private readonly float[] _pressExpires = new float[AbilityController.SlotCount];
         private readonly float[] _holdUntil = new float[AbilityController.SlotCount];
+        private readonly System.Func<float> _clock;
         private Vector2 _stick;
         private float _nextCastAt, _nextPeckAt;
         private int _nextSlot = 1;
@@ -43,12 +49,18 @@ namespace CluckWars.Diagnostics
 
         public AutoPlayGoal Goal => _brain.Goal;
 
+        /// <param name="clock">Seconds, unscaled (default <c>Time.unscaledTime</c>); injectable for tests.</param>
+        public AutoPlayInputProvider(System.Func<float> clock = null)
+        {
+            _clock = clock ?? (() => Time.unscaledTime);
+        }
+
         public void SetActive(bool active)
         {
             if (Active == active) return;
             Active = active;
             _stick = Vector2.zero;
-            for (int i = 0; i < _holdUntil.Length; i++) { _holdUntil[i] = 0f; _pressFrame[i] = -1; }
+            for (int i = 0; i < _holdUntil.Length; i++) { _holdUntil[i] = 0f; _pressPending[i] = false; }
         }
 
         /// <summary>Called once per rendered frame by the driver: decide the stick and the presses for this frame.</summary>
@@ -109,7 +121,7 @@ namespace CluckWars.Diagnostics
             bool peckSlot = abilities.GetSlot(0) is PeckAbilitySO;
             if (peckSlot && _brain.Goal == AutoPlayGoal.AtPile)
             {
-                if (now >= _nextPeckAt) { Press(0, now, PeckHoldSeconds); _nextPeckAt = now + PeckEverySeconds; }
+                if (now >= _nextPeckAt) { Press(0, PeckHoldSeconds); _nextPeckAt = now + PeckEverySeconds; }
                 return;
             }
 
@@ -122,32 +134,45 @@ namespace CluckWars.Diagnostics
                 _nextSlot = (_nextSlot + 1) % AbilityController.SlotCount;
                 var ab = abilities.GetSlot(slot);
                 if (ab == null || ab is PeckAbilitySO) continue;
-                Press(slot, now, HoldSeconds);
+                Press(slot, HoldSeconds);
                 return;
             }
         }
 
-        private void Press(int slot, float now, float hold)
+        /// <summary>Presses <paramref name="slot"/> now and holds it for <paramref name="hold"/> seconds (release = cast).</summary>
+        public void Press(int slot, float hold)
         {
-            _pressFrame[slot] = Time.frameCount;
+            if (slot < 0 || slot >= _pressPending.Length) return;
+            float now = _clock();
+            _pressPending[slot] = true;
+            _pressExpires[slot] = now + PressLatchSeconds;
             _holdUntil[slot] = now + hold;
         }
 
         // ---- IInputProvider ---------------------------------------------------------------------------------
 
         public Vector2 GetMovement() => Active ? _stick : Vector2.zero;
-        public bool GetAbility1Pressed() => PressedThisFrame(0);
-        public bool GetAbility2Pressed() => PressedThisFrame(1);
-        public bool GetAbility3Pressed() => PressedThisFrame(2);
-        public bool GetAbility4Pressed() => PressedThisFrame(3);
+        public bool GetAbility1Pressed() => TakePress(0);
+        public bool GetAbility2Pressed() => TakePress(1);
+        public bool GetAbility3Pressed() => TakePress(2);
+        public bool GetAbility4Pressed() => TakePress(3);
         public bool GetAbilityHeld(int slot) =>
-            Active && slot >= 0 && slot < _holdUntil.Length && Time.unscaledTime < _holdUntil[slot];
+            Active && slot >= 0 && slot < _holdUntil.Length && _clock() < _holdUntil[slot];
         public bool GetAbilityCancelPressed() => false;
         public bool GetBackPressed() => false;
         public bool IsAbilityCancelArmed() => false;
 
-        // Like a key's wasPressedThisFrame: true for the whole frame of the press, read as often as the caller likes.
-        private bool PressedThisFrame(int slot) => Active && _pressFrame[slot] == Time.frameCount;
+        /// <summary>
+        /// The edge, consumed by the first read (the composite reads every provider once per caller read, and
+        /// FusionNetworkService latches what it reads until OnInput), dropped once <see cref="PressLatchSeconds"/> old.
+        /// Independent of whether the driver or the reader runs first in a frame.
+        /// </summary>
+        private bool TakePress(int slot)
+        {
+            if (!_pressPending[slot]) return false;
+            _pressPending[slot] = false;
+            return Active && _clock() <= _pressExpires[slot];
+        }
     }
 
     /// <summary>One <c>FindFirstObjectByType</c> per Game scene instead of one per frame.</summary>

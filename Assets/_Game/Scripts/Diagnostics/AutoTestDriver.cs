@@ -26,6 +26,8 @@ namespace CluckWars.Diagnostics
     /// Steps are spaced like a person's (≈0.6 s) so page transitions finish. A step that cannot happen (no menu, no code
     /// after 60 s, an incomplete loadout) is logged at Error and the driver stops, leaving the game where it is.
     /// </remarks>
+    // Before FusionNetworkService.Update (default order 0), so a press decided this frame is read this frame.
+    [DefaultExecutionOrder(-500)]
     public sealed class AutoTestDriver : MonoBehaviour
     {
         private const string Source = "AutoTest";

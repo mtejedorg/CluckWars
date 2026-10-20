@@ -228,6 +228,31 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void AutoPlayPress_LatchesUntilRead_OnceOnly_AndExpires()
+        {
+            float t = 100f;
+            var p = new AutoPlayInputProvider(() => t);
+            p.SetActive(true);
+
+            p.Press(1, AutoPlayInputProvider.HoldSeconds);
+            t += 0.05f;   // a later frame: the reader ran before the driver in the press frame
+            Assert.IsTrue(p.GetAbility2Pressed(), "the press survives until it is read");
+            Assert.IsFalse(p.GetAbility2Pressed(), "read once: a second read is not a second press");
+            Assert.IsTrue(p.GetAbilityHeld(1), "still held (range preview)");
+            t += AutoPlayInputProvider.HoldSeconds;
+            Assert.IsFalse(p.GetAbilityHeld(1), "released (cast)");
+
+            p.Press(3, 0.1f);
+            t += AutoPlayInputProvider.PressLatchSeconds + 0.01f;
+            Assert.IsFalse(p.GetAbility4Pressed(), "an unread press expires");
+            Assert.IsFalse(p.GetAbility1Pressed(), "other slots untouched");
+
+            p.Press(0, 0.1f);
+            p.SetActive(false);
+            Assert.IsFalse(p.GetAbility1Pressed(), "deactivating drops pending presses");
+        }
+
+        [Test]
         public void AutoPlayProvider_IsDormantUntilActivated_AndNeverClaimsTheDevice()
         {
             var p = new AutoPlayInputProvider();

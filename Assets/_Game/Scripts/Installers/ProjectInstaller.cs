@@ -88,7 +88,7 @@ namespace CluckWars.Installers
             // A dev-tools build adds the auto-test's fake player (cw_autoplay) as one more provider: dormant unless the
             // auto-test switches it on, and it only ever produces device-like input on this peer.
             bool devTools = DevTools.Available;
-            if (devTools) Container.Bind<AutoPlayInputProvider>().AsSingle();
+            if (devTools) Container.Bind<AutoPlayInputProvider>().FromMethod(_ => new AutoPlayInputProvider()).AsSingle();
             Container.Bind<IInputProvider>()
                 .FromMethod(ctx => devTools
                     ? new CompositeInputProvider(
