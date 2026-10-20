@@ -45,9 +45,17 @@ namespace CluckWars.Services
         public async Task InitializeAsync()
         {
             if (_initialized) return;
+            // Dev-tools builds only: cw_profile picks an authentication profile, so two clients on one PC get two
+            // anonymous identities. Unset (and every production build): the default profile, as before.
+            var profile = CluckWars.Diagnostics.DevTools.Available ? CluckWars.Diagnostics.AutoTestArgs.Read(null).Profile : null;
             try
             {
-                await UnityServices.InitializeAsync();
+                if (profile != null)
+                {
+                    _log.Info(Source, $"Unity Services profile '{profile}' (cw_profile).");
+                    await UnityServices.InitializeAsync(new InitializationOptions().SetProfile(profile));
+                }
+                else await UnityServices.InitializeAsync();
             }
             catch (System.Exception e)
             {

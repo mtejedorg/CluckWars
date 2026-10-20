@@ -15,10 +15,10 @@ namespace CluckWars.Diagnostics
         public const string KeyPrefix = "cw_";
         public const string AutoHostKey = "cw_autohost", AutoJoinKey = "cw_autojoin", ClassKey = "cw_class",
             AutoStartKey = "cw_autostart", AutoStartTimeoutKey = "cw_autostart_timeout", AutoLoopKey = "cw_autoloop",
-            AutoPlayKey = "cw_autoplay", DevModeKey = "cw_devmode", HudKey = "cw_hud";
+            AutoPlayKey = "cw_autoplay", DevModeKey = "cw_devmode", HudKey = "cw_hud", ProfileKey = "cw_profile";
 
         public static readonly string[] Keys =
-            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey };
+            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey };
 
         public const ChickenClass DefaultClass = ChickenClass.Warrior;
         public const float DefaultAutoStartTimeout = 90f;
@@ -37,6 +37,12 @@ namespace CluckWars.Diagnostics
         public bool AutoPlay, DevMode;
         /// <summary><c>cw_hud</c>: 0 off, 1 compact strip, 2 full panel (true / a bare flag = 1).</summary>
         public int Hud;
+        /// <summary>
+        /// <c>cw_profile</c>: the Unity Services authentication profile (sanitised, see <see cref="SanitizeProfile"/>), or
+        /// null for the default profile. Two clients on one PC share the anonymous identity in the default profile, so
+        /// the second one's join fails with "player is already a member of the lobby".
+        /// </summary>
+        public string Profile;
 
         /// <summary>At least one <c>cw_</c> key was present (valid or not).</summary>
         public bool AnyKey;
@@ -119,6 +125,11 @@ namespace CluckWars.Diagnostics
                         if (TryParseClass(value, out var cls)) cfg.Class = cls;
                         else cfg.Problems.Add($"{key} '{value}' is not a class ({string.Join("|", Enum.GetNames(typeof(ChickenClass)))}); using {DefaultClass}");
                         break;
+                    case ProfileKey:
+                        cfg.Profile = SanitizeProfile(value);
+                        if (cfg.Profile == null) cfg.Problems.Add($"{key} '{value}' has no letters, digits, '-' or '_'; using the default profile");
+                        else if (cfg.Profile != value) cfg.Problems.Add($"{key} '{value}' sanitised to '{cfg.Profile}' (A-Z a-z 0-9 - _, max {MaxProfileLength})");
+                        break;
                     case AutoStartKey:        cfg.AutoStart = cfg.ParseInt(key, value, 0, 4); break;
                     case AutoLoopKey:         cfg.AutoLoop = cfg.ParseInt(key, value, 0, 1000); break;
                     case AutoStartTimeoutKey: cfg.AutoStartTimeout = cfg.ParseInt(key, value, 1, 3600, (int)DefaultAutoStartTimeout); break;
@@ -139,6 +150,25 @@ namespace CluckWars.Diagnostics
         /// </summary>
         public static bool IsJoinCode(string value) =>
             CluckWars.UI.JoinCodeEntry.IsComplete(value) && value.Trim().Length <= CluckWars.UI.JoinCodeEntry.MaxLength;
+
+        /// <summary>Unity Authentication's profile-name limit.</summary>
+        public const int MaxProfileLength = 30;
+
+        /// <summary>
+        /// A name Unity Authentication accepts (<c>^[a-zA-Z0-9_-]{1,30}$</c>): every other character dropped, cut to 30;
+        /// null when nothing is left (the default profile is then used).
+        /// </summary>
+        public static string SanitizeProfile(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return null;
+            var sb = new System.Text.StringBuilder(Math.Min(value.Length, MaxProfileLength));
+            foreach (char c in value)
+            {
+                if (sb.Length >= MaxProfileLength) break;
+                if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') sb.Append(c);
+            }
+            return sb.Length > 0 ? sb.ToString() : null;
+        }
 
         /// <summary>A class name, case-insensitive. Numbers are refused (Enum.TryParse would accept "2").</summary>
         public static bool TryParseClass(string value, out ChickenClass cls)
@@ -175,7 +205,8 @@ namespace CluckWars.Diagnostics
             " autoplay=" + (AutoPlay ? 1 : 0) +
             " timeout=" + AutoStartTimeout.ToString("0", CultureInfo.InvariantCulture) +
             " devmode=" + (DevMode ? 1 : 0) +
-            " hud=" + Hud.ToString(CultureInfo.InvariantCulture);
+            " hud=" + Hud.ToString(CultureInfo.InvariantCulture) +
+            " profile=" + (Profile ?? "default");
     }
 
     /// <summary>The auto-test's timing decisions (start, play again, join retries), pure so tests pin them.</summary>

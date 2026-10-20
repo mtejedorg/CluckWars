@@ -462,6 +462,7 @@ Always on (breadcrumbs): `MatchOverlays` `Cover on/off`, `Cover off: covered= la
 | `cw_autoloop N` | host: PLAY AGAIN for N extra rounds (round 2+ re-STARTs as soon as the previous round's humans are back, max 15 s: `AutoTest loop restart humans=k wait=Xs`), then stay on the results; joiners just follow. Every peer logs `AutoTest loop round=k/N`; the host logs an Error if its PLAY AGAIN did not restart the round within 10 s |
 | `cw_autoplay 1` | fake local input: piles → base, weave, unstick, an ability every 3 s |
 | `cw_devmode 1` | Developer Mode on |
+| `cw_profile NAME` | Unity Services authentication profile (A-Z a-z 0-9 - _, max 30; other characters dropped). Give each EXE on one PC its own (`-cw_profile client2`): they otherwise share one anonymous identity and the second join fails with "player is already a member of the lobby". Unset: default profile |
 | `cw_hud 1` / `cw_hud 2` | overlay at boot: 1 = compact one-line strip (FPS \| p95 \| hitches \| Visual \| RTT, top-left, translucent; leaves the match HUD visible), 2 = full panel |
 
 Android (`-e` string extras; `--ei` / `--ez` work too). **Always use `am start -S`** (force-stop first): the extras are read once per process and then removed from the intent, and an activity re-opened from Recents ignores them, so a run never re-hosts / re-joins by accident:

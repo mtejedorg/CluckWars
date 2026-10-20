@@ -34,7 +34,7 @@ namespace CluckWars.Tests
             Assert.IsNull(cfg.AutoJoin);
             Assert.AreEqual(AutoTestConfig.DefaultAutoStartTimeout, cfg.AutoStartTimeout);
             CollectionAssert.IsEmpty(cfg.Problems);
-            Assert.AreEqual("AutoTest config autohost=1 autojoin=- class=Speedy autostart=2 autoloop=3 autoplay=1 timeout=90 devmode=1 hud=1",
+            Assert.AreEqual("AutoTest config autohost=1 autojoin=- class=Speedy autostart=2 autoloop=3 autoplay=1 timeout=90 devmode=1 hud=1 profile=default",
                 cfg.Describe());
         }
 
@@ -85,6 +85,26 @@ namespace CluckWars.Tests
             Assert.IsFalse(AutoTestConfig.TryParseClass("2", out _));
             Assert.IsTrue(AutoTestConfig.TryParseClass("ASSASSIN", out var c));
             Assert.AreEqual(ChickenClass.Assassin, c);
+        }
+
+        [Test]
+        public void Profile_SanitisedToWhatUnityAuthenticationAccepts()
+        {
+            Assert.AreEqual("client2", AutoTestConfig.SanitizeProfile("client2"));
+            Assert.AreEqual("pc-exe_2", AutoTestConfig.SanitizeProfile("pc exe_2!".Replace(" ", "-")));
+            Assert.AreEqual("abc", AutoTestConfig.SanitizeProfile("a b.c"));
+            Assert.AreEqual(30, AutoTestConfig.SanitizeProfile(new string('x', 45)).Length, "max 30");
+            Assert.IsNull(AutoTestConfig.SanitizeProfile("!!!"), "nothing left: default profile");
+            Assert.IsNull(AutoTestConfig.SanitizeProfile(""));
+            Assert.IsNull(AutoTestConfig.SanitizeProfile(null));
+
+            var cfg = AutoTestConfig.FromCommandLine(new[] { "CluckWars.exe", "-cw_profile", "client2" });
+            Assert.AreEqual("client2", cfg.Profile);
+            CollectionAssert.IsEmpty(cfg.Problems);
+            var bad = AutoTestConfig.FromMap(new Dictionary<string, string> { ["cw_profile"] = "client #2" });
+            Assert.AreEqual("client2", bad.Profile);
+            Assert.AreEqual(1, bad.Problems.Count, "sanitised with a Warn");
+            Assert.IsNull(AutoTestConfig.FromCommandLine(new[] { "x.exe" }).Profile, "unset: default profile");
         }
 
         [Test]
