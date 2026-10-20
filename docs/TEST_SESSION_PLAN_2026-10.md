@@ -91,3 +91,22 @@ Checklist (each at the match camera, at the 4 corners and centre pile):
 - MCP bridge saturation after the Android build (mitigated by *Restore Windows Target*).
 - HYPERVISOR_ERROR crashes on this PC (memory: *hypervisor-crash-known-pc-issue*) — verify state and resume.
 - Editor in Play Mode must stay the host for the whole run; Editor exit = host leaves = master migration (which is P7, so do it on purpose, not by accident).
+
+---
+
+## 8. Execution log (2026-10-20, unattended)
+
+Branch `test/instrumentation-2026-10-20` (not merged). Phone was a **Pixel 10 Pro** (`57311FDCH005RG`, Android 17), not the Pixel 9. Editor was never opened (MCP down), so the Editor leg was replaced by Windows EXE clients; per-device logs merge via `tools/test-session/merge.ps1`.
+
+| Phase | Result |
+|---|---|
+| P0/P1 gate + builds | EditMode 1963/1963; headless dev-tools builds needed a temporary `cloudProjectId` (CW-200); SHA `4328d36` on all 4 devices in the final runs |
+| P2 phone smoke | Menu/gameplay render fine in landscape+portrait; portrait layout problems (CW-206/212/219) |
+| P3 reveal gate (CW-102) | PASS — no hitch in Active/intro; arena ready ≈3.5 s |
+| P4 host+join sync (CW-103) | PASS — 4 peers, 0 Sync mismatches; late join PASS |
+| P5 4-seat full loop | Found + fixed **CW-216 (P1)** remote deposits rejected; after the fix 0 rejections, food banked on all peers |
+| P6 visual sweep | `Visual` probe offenders=0 everywhere; no pink/cyan; human-eye items open (CW-220) |
+| P7 faults | Master departure PASS (CW-112); app backgrounded 12 s → disconnected to menu (CW-218) |
+| P8 soak | 4 rounds ×3 sessions on the phone, p99 33.6 ms, mem ≈516 MB flat; battery drained ~1 %/session while on USB |
+
+All findings: `docs/BACKLOG.md` §9 (CW-200 … CW-220). Captures: `Captures/session-2026102*/` (git-ignored).
