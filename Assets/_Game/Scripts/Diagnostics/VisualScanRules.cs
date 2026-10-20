@@ -71,7 +71,8 @@ namespace CluckWars.Diagnostics
 
         /// <summary>
         /// <c>Visual scan#N reason=.. renderers=R ms=.. errShader=a unsupported=b nullMat=c nan=d outOfBounds=e
-        /// chickensNoRenderer=f cams=g mask=0x.. cover=0|1</c>.
+        /// chickensNoRenderer=f cams=g mask=0x.. cover=0|1 offenders=N</c>. The trailing total is what
+        /// tools/test-session/merge.ps1 keys its Visual finding on.
         /// </summary>
         public static string Summary(int scan, string reason, int renderers, float ms, int[] counts, int cams, int mask, bool cover)
         {
@@ -83,9 +84,12 @@ namespace CluckWars.Diagnostics
             for (int i = 0; i < CategoryCount; i++)
                 sb.Append(' ').Append(CategoryName((VisualCategory)i)).Append('=')
                   .Append((counts != null && i < counts.Length ? counts[i] : 0).ToString(CultureInfo.InvariantCulture));
+            int total = 0;
+            if (counts != null) foreach (var c in counts) total += c;
             sb.Append(" cams=").Append(cams.ToString(CultureInfo.InvariantCulture))
               .Append(" mask=0x").Append(mask.ToString("X8", CultureInfo.InvariantCulture))
-              .Append(" cover=").Append(cover ? '1' : '0');
+              .Append(" cover=").Append(cover ? '1' : '0')
+              .Append(" offenders=").Append(total.ToString(CultureInfo.InvariantCulture));
             return sb.ToString();
         }
 

@@ -176,7 +176,7 @@ namespace CluckWars.Tests
             var counts = new[] { 2, 0, 1, 0, 0, 1 };
             Assert.AreEqual(
                 "Visual scan#3 reason=reveal renderers=412 ms=7.5 errShader=2 unsupported=0 nullMat=1 nan=0 outOfBounds=0 " +
-                "chickensNoRenderer=1 cams=2 mask=0x0000FFFF cover=0",
+                "chickensNoRenderer=1 cams=2 mask=0x0000FFFF cover=0 offenders=4",
                 VisualScanRules.Summary(3, "reveal", 412, 7.46f, counts, 2, 0xFFFF, false));
 
             var paths = new List<string>();
