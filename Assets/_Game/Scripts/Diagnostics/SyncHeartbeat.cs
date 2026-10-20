@@ -18,7 +18,9 @@ namespace CluckWars.Diagnostics
     /// without a runner and a spawned <see cref="GameManager"/> (the menu). Doppelganger decoys are left out: they share
     /// their caster's PlayerId and are not a player. <c>hp</c> is 1 for a chicken in play and 0 while it is removed
     /// (<see cref="ChickenCombat.IsRemoved"/>): chickens have had no health since v0.4, and this is the only life
-    /// state there is. Remote values are whatever this peer last received, so peers agree to within one snapshot.
+    /// state there is. <c>cs</c> comes from the replicated <c>ControlFlags</c> (<see cref="SyncControlState"/>). Remote
+    /// values are whatever this peer last received: positions of a moving chicken lag its owner's own view by the
+    /// interpolation delay plus half the RTT (about 0.2-0.35 s, i.e. 1.5-3 m at 7-10 m/s in the 2026-10-20 runs).
     /// </remarks>
     public sealed class SyncHeartbeat : MonoBehaviour
     {
@@ -121,7 +123,7 @@ namespace CluckWars.Diagnostics
                     Z = p.z,
                     Hp = c.Combat != null && c.Combat.IsRemoved ? 0 : 1,
                     Cargo = c.Cargo != null ? Mathf.FloorToInt(c.Cargo.Cargo) : 0,
-                    ControlState = c.CurrentControlState.ToString(),
+                    ControlState = SyncControlState.Name(c.ControlFlags),   // replicated, so every peer agrees
                 };
             }
 

@@ -125,6 +125,15 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void SyncControlState_FromTheReplicatedFlags_StrongestFirst()
+        {
+            Assert.AreEqual("Free", SyncControlState.Name(ControlVfx.None));
+            Assert.AreEqual("Slowed", SyncControlState.Name(ControlVfx.Slowed | ControlVfx.Snared));
+            Assert.AreEqual("Rooted", SyncControlState.Name(ControlVfx.Rooted | ControlVfx.Slowed));
+            Assert.AreEqual("Stunned", SyncControlState.Name(ControlVfx.Stunned | ControlVfx.Rooted | ControlVfx.Slowed));
+        }
+
+        [Test]
         public void TickBoundary_SameTicksOnEveryPeer_SkippedTicksKeyedByTheBoundary()
         {
             var b = new TickBoundary();

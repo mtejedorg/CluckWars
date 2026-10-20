@@ -165,4 +165,21 @@ namespace CluckWars.Diagnostics
             return true;
         }
     }
+
+    /// <summary>
+    /// The <c>cs=</c> value of a Sync line, from the REPLICATED control flags (<c>ChickenController.ControlFlags</c>) so
+    /// every peer reports the same thing. <c>CurrentControlState</c> reads <c>SlowMultiplier</c> / <c>Rooted</c>, plain
+    /// fields re-derived only on the chicken's state authority: on every other peer they are stale, so the owner said
+    /// "Slowed" while everyone else said "Free" - 69 of the 93 SYNC findings of session 20261020-212850 were that.
+    /// </summary>
+    public static class SyncControlState
+    {
+        public static string Name(CluckWars.Gameplay.ControlVfx flags)
+        {
+            if ((flags & CluckWars.Gameplay.ControlVfx.Stunned) != 0) return "Stunned";
+            if ((flags & CluckWars.Gameplay.ControlVfx.Rooted) != 0) return "Rooted";
+            if ((flags & CluckWars.Gameplay.ControlVfx.Slowed) != 0) return "Slowed";
+            return "Free";
+        }
+    }
 }
