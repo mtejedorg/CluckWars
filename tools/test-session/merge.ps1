@@ -1,0 +1,374 @@
+<#
+.SYNOPSIS
+  Merge phone.log (logcat), editor.log and client*.log of a test session into one UTC timeline
+  (merged.log) and extract findings.txt (warnings/errors, exceptions, perf hitches, visual-integrity
+  problems, cross-peer Sync mismatches, build-SHA mismatches).
+
+.DESCRIPTION
+  Game line format:  [HH:mm:ss.fff][mm:ss.fff][Level][Source] message     (1st bracket = UTC wall clock)
+  Decisions:
+   * Phone: only logcat lines with tag "Unity" are timeline entries; plus crash lines of other tags
+     (AndroidRuntime/DEBUG FATAL, "Fatal signal", ANR) as Source "Android", dated relative to the
+     nearest preceding Unity line (logcat time is phone-local, not UTC).
+   * Unstamped lines (stack traces, engine noise) belong to the previous stamped line. Pure stack-trace
+     boilerplate and blank lines are dropped unless the parent is Warn/Error/Exception. At most 40
+     continuation lines are kept per entry. An unstamped "...Exception:" line after a non-Warn/Error
+     parent becomes its own synthetic Error entry (source "Unity") so uncaught exceptions are never lost.
+   * Date comes from the "[Session] ... date=yyyy-MM-dd" line (resets per process), else the date of
+     session.json startUtc. Midnight rollover = time-of-day jumping backwards by more than 6 h.
+   * Sort key: (UTC ticks, global sequence) so equal timestamps keep per-source line order.
+   * Sync mismatch rules (per source pair): heartbeats pair by tick t (nearest within -TickTolerance,
+     default 3, and within 15 s wall clock); compare st exact, rem +-0.5 s, per chicken hp/cg/cs exact,
+     x/z +-1.5 m, bases and piles exact; a field must differ on 2 consecutive paired heartbeats
+     (-Persist) to be reported; chicken ids present on one peer only are reported as GHOST on the same rule.
+
+.EXAMPLE
+  .\tools\test-session\merge.ps1 -Session .\Captures\session-20261020-173000
+#>
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory)][string]$Session,
+    [double]$RemTolerance = 0.5,
+    [double]$PosTolerance = 1.5,
+    [int]$TickTolerance = 3,
+    [double]$TimeGuardSec = 15,
+    [int]$Persist = 2,
+    [double]$MidnightJumpHours = 6,
+    [double]$P99ThresholdMs = 50
+)
+
+$ErrorActionPreference = 'Stop'
+. "$PSScriptRoot\lib.ps1"
+$Session = (Resolve-Path $Session).Path
+$inv = [Globalization.CultureInfo]::InvariantCulture
+
+# ---------------------------------------------------------------------------------------------
+# regexes
+# ---------------------------------------------------------------------------------------------
+$rxStamp = New-Object Text.RegularExpressions.Regex('^\[(\d\d):(\d\d):(\d\d)\.(\d{3})\]\[[\d:]+\.\d{3}\]\[(Verbose|Debug|Info|Warn|Error)\]\[([^\]]+)\] ?(.*)$')
+$rxLogcat = New-Object Text.RegularExpressions.Regex('^\d\d-\d\d (\d\d):(\d\d):(\d\d)\.(\d{3})\s+\d+\s+\d+\s+([VDIWEFA])\s+(.+?)\s*:\s?(.*)$')
+$rxDate = New-Object Text.RegularExpressions.Regex('date=(\d{4}-\d\d-\d\d)')
+$rxSha = New-Object Text.RegularExpressions.Regex('sha=(\S+)')
+$rxBoiler = New-Object Text.RegularExpressions.Regex('^\s*$|^\s*at\s|^\(Filename:|\(at [^)]+:\d+\)\s*$|^\s*(UnityEngine|UnityEditor|System|Zenject|Fusion|Cysharp)\.[\w\.<>`+]*:[\w<>\.\[\]]+\s*\(')
+$rxExcLine = New-Object Text.RegularExpressions.Regex('^[\w\.]*Exception\b')
+$rxAndroidCrash = New-Object Text.RegularExpressions.Regex('FATAL EXCEPTION|Fatal signal|\bANR in\b|\*\*\* \*\*\* \*\*\*')
+$maxCont = 40
+
+# ---------------------------------------------------------------------------------------------
+# session info
+# ---------------------------------------------------------------------------------------------
+$sj = Read-SessionJson $Session
+$fallbackDate = [DateTime]::UtcNow.Date
+if ($sj -and $sj.startUtc) { $fallbackDate = ([DateTime]::Parse([string]$sj.startUtc, $inv, [Globalization.DateTimeStyles]::RoundtripKind)).ToUniversalTime().Date }
+
+$sourceFiles = New-Object System.Collections.Generic.List[object]
+if (Test-Path (Join-Path $Session 'phone.log')) { $sourceFiles.Add(@{ Name = 'phone'; Path = (Join-Path $Session 'phone.log'); Kind = 'logcat' }) }
+if (Test-Path (Join-Path $Session 'editor.log')) { $sourceFiles.Add(@{ Name = 'editor'; Path = (Join-Path $Session 'editor.log'); Kind = 'unity' }) }
+foreach ($f in (Get-ChildItem $Session -Filter 'client*.log' | Sort-Object { [regex]::Replace($_.Name, '\d+', { param($m) $m.Value.PadLeft(6, '0') }) })) {
+    $sourceFiles.Add(@{ Name = [IO.Path]::GetFileNameWithoutExtension($f.Name); Path = $f.FullName; Kind = 'unity' })
+}
+if ($sourceFiles.Count -eq 0) { throw "No phone.log / editor.log / client*.log in $Session" }
+
+# ---------------------------------------------------------------------------------------------
+# parse
+# ---------------------------------------------------------------------------------------------
+$all = New-Object System.Collections.Generic.List[object]
+$sessionInfo = New-Object System.Collections.Generic.List[object]   # {Src, Sha, Line}
+$stats = @{}
+$script:seq = 0
+
+function New-Entry($src, $ticks, $level, $source, $msg) {
+    $script:seq++
+    return [pscustomobject]@{
+        Src = $src; Ticks = $ticks; Level = $level; Source = $source; Message = $msg
+        Cont = (New-Object System.Collections.Generic.List[string]); ContDropped = 0
+        Seq = $script:seq; LcTod = -1.0
+    }
+}
+
+foreach ($sf in $sourceFiles) {
+    $src = $sf.Name
+    $lines = Read-SharedLines $sf.Path
+    $date = $fallbackDate
+    $prevTod = $null
+    $cur = $null
+    $anchor = $null        # last Unity-stamped entry (phone) for dating Android crash lines
+    $st = @{ Lines = $lines.Count; Entries = 0; Dropped = 0 }
+
+    foreach ($line in $lines) {
+        $msg = $line
+        $lcTod = -1.0
+        if ($sf.Kind -eq 'logcat') {
+            $lm = $rxLogcat.Match($line)
+            if (-not $lm.Success) { continue }          # "--------- beginning of ..." etc.
+            $lcTod = [int]$lm.Groups[1].Value * 3600 + [int]$lm.Groups[2].Value * 60 + [int]$lm.Groups[3].Value + [int]$lm.Groups[4].Value / 1000.0
+            $tag = $lm.Groups[6].Value.Trim()
+            $msg = $lm.Groups[7].Value
+            if ($tag -ne 'Unity') {
+                if ($anchor -and $rxAndroidCrash.IsMatch($msg) -and ($tag -in 'AndroidRuntime', 'DEBUG', 'ActivityManager', 'libc')) {
+                    $d = $lcTod - $anchor.LcTod
+                    if ($d -lt -43200) { $d += 86400 } elseif ($d -gt 43200) { $d -= 86400 }
+                    $e = New-Entry $src ($anchor.Ticks + [long]($d * 1e7)) 'Error' 'Android' "[$tag] $msg"
+                    $all.Add($e); $st.Entries++
+                    $cur = $e
+                }
+                continue
+            }
+        }
+
+        $m = $rxStamp.Match($msg)
+        if ($m.Success) {
+            $tod = [int]$m.Groups[1].Value * 3600 + [int]$m.Groups[2].Value * 60 + [int]$m.Groups[3].Value + [int]$m.Groups[4].Value / 1000.0
+            $level = $m.Groups[5].Value
+            $source = $m.Groups[6].Value
+            $text = $m.Groups[7].Value
+            if ($source -eq 'Session') {
+                $dm = $rxDate.Match($text)
+                if ($dm.Success) { $date = [DateTime]::ParseExact($dm.Groups[1].Value, 'yyyy-MM-dd', $inv); $prevTod = $null }
+                $sm = $rxSha.Match($text)
+                $sessionInfo.Add([pscustomobject]@{ Src = $src; Sha = $(if ($sm.Success) { $sm.Groups[1].Value } else { '?' }); Line = $text })
+            }
+            if ($null -ne $prevTod -and $tod -lt ($prevTod - $MidnightJumpHours * 3600)) { $date = $date.AddDays(1) }
+            $prevTod = $tod
+            $ticks = $date.Ticks + [long]($tod * 1e7)
+            $cur = New-Entry $src $ticks $level $source $text
+            $cur.LcTod = $lcTod
+            $all.Add($cur); $st.Entries++
+            if ($sf.Kind -eq 'logcat') { $anchor = $cur }
+            continue
+        }
+
+        # ---- unstamped line -------------------------------------------------------------------
+        if ($null -eq $cur) { $st.Dropped++; continue }
+        $parentLoud = ($cur.Level -eq 'Warn' -or $cur.Level -eq 'Error' -or $cur.Message -match 'Exception')
+        if ($rxExcLine.IsMatch($msg) -and -not ($cur.Level -eq 'Warn' -or $cur.Level -eq 'Error')) {
+            $e = New-Entry $src $cur.Ticks 'Error' 'Unity' $msg
+            $e.LcTod = $cur.LcTod
+            $all.Add($e); $st.Entries++
+            $cur = $e
+            continue
+        }
+        if ($msg -match '^\s*$') { $st.Dropped++; continue }
+        if ($rxBoiler.IsMatch($msg) -and -not $parentLoud -and $msg -notmatch 'Exception') { $st.Dropped++; continue }
+        if ($cur.Cont.Count -ge $maxCont) { $cur.ContDropped++; $st.Dropped++; continue }
+        $cur.Cont.Add($msg.TrimEnd())
+    }
+    $stats[$src] = $st
+}
+
+$sorted = $all | Sort-Object -Property Ticks, Seq
+
+# ---------------------------------------------------------------------------------------------
+# merged.log
+# ---------------------------------------------------------------------------------------------
+function Format-Time($ticks) { return ([DateTime]::new([long]$ticks, [DateTimeKind]::Utc)).ToString('yyyy-MM-dd HH:mm:ss.fff', $inv) + 'Z' }
+function Format-Entry($e) { return ('{0} [{1,-7}] [{2,-5}][{3}] {4}' -f (Format-Time $e.Ticks), $e.Src, $e.Level, $e.Source, $e.Message) }
+
+$out = New-Object System.Collections.Generic.List[string]
+foreach ($e in $sorted) {
+    $out.Add((Format-Entry $e))
+    foreach ($c in $e.Cont) { $out.Add('    | ' + $c) }
+    if ($e.ContDropped -gt 0) { $out.Add("    | ... +$($e.ContDropped) more lines") }
+}
+Write-Utf8 (Join-Path $Session 'merged.log') (($out -join "`r`n") + "`r`n")
+
+# ---------------------------------------------------------------------------------------------
+# findings
+# ---------------------------------------------------------------------------------------------
+$findings = New-Object System.Collections.Generic.List[object]   # {Cats, Ticks, Seq, Src, Text}
+function Add-Finding($cats, $e, $text) {
+    $findings.Add([pscustomobject]@{ Cats = $cats; Ticks = $e.Ticks; Seq = $e.Seq; Src = $e.Src; Entry = $e; Text = $text })
+}
+
+foreach ($e in $sorted) {
+    $cats = New-Object System.Collections.Generic.List[string]
+    $contText = $e.Cont -join "`n"
+    if ($e.Level -eq 'Error') { $cats.Add('ERROR') } elseif ($e.Level -eq 'Warn') { $cats.Add('WARN') }
+    if (($e.Message -match 'Exception') -or ($contText -match 'Exception')) { $cats.Add('EXCEPTION') }
+
+    if ($e.Source -eq 'Perf') {
+        $isSummary = $e.Message -match '\bp99\b'
+        if ($isSummary) {
+            $pm = [regex]::Match($e.Message, 'p99\D{0,4}([\d.]+)')
+            if ($pm.Success -and [double]::Parse($pm.Groups[1].Value, $inv) -gt $P99ThresholdMs) { $cats.Add('PERF') }
+        } elseif ($e.Level -in 'Warn', 'Error' -or $e.Message -match 'hitch|spike|stall|slow frame|frame\s*[=:]?\s*[\d.]+\s*ms') {
+            $cats.Add('PERF')
+        }
+    }
+    elseif ($e.Source -eq 'Visual') {
+        if ($e.Level -ne 'Warn' -and $e.Level -ne 'Error') {
+            foreach ($kv in [regex]::Matches($e.Message, '(\w+)\s*[=:]\s*(\d+)')) {
+                if ($kv.Groups[1].Value -match 'offender|null|error|magenta|pink|nan|inf|outside|unsupported|missing|invalid|bad' -and [int]$kv.Groups[2].Value -gt 0) { $cats.Add('VISUAL'); break }
+            }
+        } else { $cats.Add('VISUAL') }
+    }
+    if ($cats.Count -gt 0) { Add-Finding $cats.ToArray() $e (Format-Entry $e) }
+}
+
+# ---- Sync heartbeats ----------------------------------------------------------------------------
+$rxSync = New-Object Text.RegularExpressions.Regex('(?:^|\s)t=(\d+)\s+st=(\S+)\s+rem=(-?[\d.]+)\s*\|(.*?)\|\s*bases=(.*?)\s*\|\s*piles=(.*)$')
+$beatsBySrc = @{}
+foreach ($e in $sorted) {
+    if ($e.Source -ne 'Sync') { continue }
+    $m = $rxSync.Match($e.Message)
+    if (-not $m.Success) { continue }
+    $ch = @{}
+    foreach ($seg in ($m.Groups[4].Value -split ';')) {
+        $seg = $seg.Trim(); if (-not $seg) { continue }
+        $ci = $seg.IndexOf(':'); if ($ci -lt 1) { continue }
+        $id = $seg.Substring(0, $ci).Trim()
+        $f = @{}
+        foreach ($p in ($seg.Substring($ci + 1) -split ',')) {
+            $pi = $p.IndexOf('=')
+            if ($pi -gt 0) { $f[$p.Substring(0, $pi).Trim()] = $p.Substring($pi + 1).Trim() }
+        }
+        $ch[$id] = $f
+    }
+    $bases = @{}
+    foreach ($b in ($m.Groups[5].Value -split ',')) { $bi = $b.IndexOf('='); if ($bi -gt 0) { $bases[$b.Substring(0, $bi).Trim()] = $b.Substring($bi + 1).Trim() } }
+    $piles = @($m.Groups[6].Value.Trim() -split ',' | Where-Object { $_ -ne '' } | ForEach-Object { $_.Trim() })
+    $beat = [pscustomobject]@{ Src = $e.Src; T = [long]$m.Groups[1].Value; St = $m.Groups[2].Value; Rem = [double]::Parse($m.Groups[3].Value, $inv); Ch = $ch; Bases = $bases; Piles = $piles; Entry = $e }
+    if (-not $beatsBySrc.ContainsKey($e.Src)) { $beatsBySrc[$e.Src] = New-Object System.Collections.Generic.List[object] }
+    $beatsBySrc[$e.Src].Add($beat)
+}
+
+function Test-Num($a, $b, $tol) {
+    $x = 0.0; $y = 0.0
+    if ([double]::TryParse($a, [Globalization.NumberStyles]::Float, $inv, [ref]$x) -and [double]::TryParse($b, [Globalization.NumberStyles]::Float, $inv, [ref]$y)) { return ([math]::Abs($x - $y) -le $tol) }
+    return ($a -eq $b)
+}
+
+# returns hashtable key -> @{Cat; Desc; A; B}
+function Compare-Beats($a, $b) {
+    $d = @{}
+    if ($a.St -ne $b.St) { $d['st'] = @{ Cat = 'SYNC'; Desc = 'state'; A = $a.St; B = $b.St } }
+    if ([math]::Abs($a.Rem - $b.Rem) -gt $RemTolerance) { $d['rem'] = @{ Cat = 'SYNC'; Desc = 'time remaining'; A = $a.Rem.ToString($inv); B = $b.Rem.ToString($inv) } }
+    $ids = @($a.Ch.Keys) + @($b.Ch.Keys) | Sort-Object -Unique
+    foreach ($id in $ids) {
+        $ca = $a.Ch[$id]; $cb = $b.Ch[$id]
+        if ($null -eq $ca -or $null -eq $cb) {
+            $d["ghost:$id"] = @{ Cat = 'GHOST'; Desc = "chicken $id"; A = $(if ($ca) { 'present' } else { 'missing' }); B = $(if ($cb) { 'present' } else { 'missing' }) }
+            continue
+        }
+        foreach ($fld in 'hp', 'cg', 'cs') {
+            $va = $ca[$fld]; $vb = $cb[$fld]
+            if ("$va" -ne "$vb") { $d["c$id.$fld"] = @{ Cat = 'SYNC'; Desc = "chicken $id $fld"; A = "$va"; B = "$vb" } }
+        }
+        foreach ($fld in 'x', 'z') {
+            $va = $ca[$fld]; $vb = $cb[$fld]
+            if (-not (Test-Num $va $vb $PosTolerance)) { $d["c$id.$fld"] = @{ Cat = 'SYNC'; Desc = "chicken $id $fld"; A = "$va"; B = "$vb" } }
+        }
+    }
+    $bids = @($a.Bases.Keys) + @($b.Bases.Keys) | Sort-Object -Unique
+    foreach ($id in $bids) {
+        $va = $a.Bases[$id]; $vb = $b.Bases[$id]
+        if ("$va" -ne "$vb") { $d["base$id"] = @{ Cat = 'SYNC'; Desc = "base $id food"; A = $(if ($null -eq $va) { '<absent>' } else { $va }); B = $(if ($null -eq $vb) { '<absent>' } else { $vb }) } }
+    }
+    $n = [math]::Max($a.Piles.Count, $b.Piles.Count)
+    for ($i = 0; $i -lt $n; $i++) {
+        $va = $(if ($i -lt $a.Piles.Count) { $a.Piles[$i] } else { '<absent>' })
+        $vb = $(if ($i -lt $b.Piles.Count) { $b.Piles[$i] } else { '<absent>' })
+        if ($va -ne $vb) { $d["pile$i"] = @{ Cat = 'SYNC'; Desc = "pile[$i]"; A = $va; B = $vb } }
+    }
+    return $d
+}
+
+$pairStats = New-Object System.Collections.Generic.List[string]
+$srcNames = @($sourceFiles | ForEach-Object { $_.Name } | Where-Object { $beatsBySrc.ContainsKey($_) })
+for ($ia = 0; $ia -lt $srcNames.Count; $ia++) {
+    for ($ib = $ia + 1; $ib -lt $srcNames.Count; $ib++) {
+        $sa = $srcNames[$ia]; $sb = $srcNames[$ib]
+        $A = $beatsBySrc[$sa].ToArray(); $B = $beatsBySrc[$sb].ToArray()
+        $paired = New-Object System.Collections.Generic.List[object]
+        $byT = @{}
+        foreach ($bb in $B) { if (-not $byT.ContainsKey($bb.T)) { $byT[$bb.T] = New-Object System.Collections.Generic.List[object] }; $byT[$bb.T].Add($bb) }
+        foreach ($ba in $A) {
+            $best = $null
+            for ($dt = 0; $dt -le $TickTolerance -and -not $best; $dt++) {
+                foreach ($t in @(($ba.T - $dt), ($ba.T + $dt) | Select-Object -Unique)) {
+                    if (-not $byT.ContainsKey([long]$t)) { continue }
+                    foreach ($bb in $byT[[long]$t]) {
+                        if (([math]::Abs($bb.Entry.Ticks - $ba.Entry.Ticks) / 1e7) -le $TimeGuardSec) { $best = $bb; break }
+                    }
+                    if ($best) { break }
+                }
+            }
+            if ($best) { $paired.Add(@($ba, $best)) }
+        }
+        $pairStats.Add("$sa <-> $sb : $($paired.Count) paired heartbeats (of $($A.Count) / $($B.Count))")
+
+        $runs = @{}        # key -> run
+        $done = New-Object System.Collections.Generic.List[object]
+        foreach ($pr in $paired) {
+            $diff = Compare-Beats $pr[0] $pr[1]
+            foreach ($k in @($runs.Keys)) {
+                if (-not $diff.ContainsKey($k)) { $done.Add($runs[$k]); $runs.Remove($k) }
+            }
+            foreach ($k in $diff.Keys) {
+                if ($runs.ContainsKey($k)) { $runs[$k].N++; $runs[$k].LastT = $pr[0].T }
+                else { $runs[$k] = @{ Key = $k; N = 1; FirstT = $pr[0].T; LastT = $pr[0].T; First = $pr[0].Entry; Info = $diff[$k] } }
+            }
+        }
+        foreach ($k in $runs.Keys) { $done.Add($runs[$k]) }
+        foreach ($r in $done) {
+            if ($r.N -lt $Persist) { continue }
+            $inf = $r.Info
+            $text = 't={1}..{2} {3} vs {4}: {5} {6}={7} {8}={9}  ({10} consecutive heartbeats, from {11})' -f $inf.Cat, $r.FirstT, $r.LastT, $sa, $sb, $inf.Desc, $sa, $inf.A, $sb, $inf.B, $r.N, (Format-Time $r.First.Ticks)
+            Add-Finding @($inf.Cat) $r.First $text
+        }
+    }
+}
+
+# ---------------------------------------------------------------------------------------------
+# SHA comparison
+# ---------------------------------------------------------------------------------------------
+$shaLines = New-Object System.Collections.Generic.List[string]
+$distinct = @($sessionInfo | ForEach-Object { $_.Sha } | Sort-Object -Unique)
+foreach ($s in $sessionInfo) { $shaLines.Add(("  {0,-8} sha={1}" -f $s.Src, $s.Sha)) }
+$shaMismatch = ($distinct.Count -gt 1)
+
+# ---------------------------------------------------------------------------------------------
+# findings.txt
+# ---------------------------------------------------------------------------------------------
+$sortedFindings = $findings | Sort-Object -Property Ticks, Seq
+$catCounts = [ordered]@{ ERROR = 0; WARN = 0; EXCEPTION = 0; PERF = 0; VISUAL = 0; SYNC = 0; GHOST = 0 }
+$srcCounts = @{}
+foreach ($f in $findings) {
+    foreach ($c in $f.Cats) { $catCounts[$c]++ }
+    if (-not $srcCounts.ContainsKey($f.Src)) { $srcCounts[$f.Src] = 0 }
+    $srcCounts[$f.Src]++
+}
+
+$r = New-Object System.Collections.Generic.List[string]
+$r.Add("Cluck Wars test session findings  (generated $((Get-Date).ToUniversalTime().ToString('u')))")
+$r.Add("Session: $Session")
+if ($sj -and $sj.deviceModel) { $r.Add("Device: $($sj.deviceModel) [$($sj.deviceSerial)]") }
+$r.Add('')
+$r.Add('SUMMARY')
+$r.Add('  per category : ' + (($catCounts.Keys | ForEach-Object { "$_=$($catCounts[$_])" }) -join '  '))
+$r.Add('  per source   : ' + (($sourceFiles | ForEach-Object { "$($_.Name)=$($(if ($srcCounts.ContainsKey($_.Name)) { $srcCounts[$_.Name] } else { 0 })) (entries $($stats[$_.Name].Entries))" }) -join '  '))
+$r.Add('  Sync pairing :' + $(if ($pairStats.Count) { '' } else { ' no Sync heartbeats found / fewer than 2 sources with Sync' }))
+foreach ($p in $pairStats) { $r.Add("    $p") }
+$r.Add('  session SHAs :')
+if ($shaLines.Count -eq 0) { $r.Add('    (no [Session] lines found)') } else { foreach ($l in $shaLines) { $r.Add("  $l") } }
+if ($shaMismatch) { $r.Add("  !! SHA MISMATCH between sources: " + ($distinct -join ' vs ')) }
+$r.Add('')
+
+foreach ($cat in $catCounts.Keys) {
+    $items = @($sortedFindings | Where-Object { $_.Cats -contains $cat })
+    $r.Add("== $cat ($($items.Count)) ==")
+    foreach ($f in $items) {
+        if ($cat -in 'SYNC', 'GHOST') { $r.Add("[$cat] $($f.Text)"); continue }
+        $tags = ($f.Cats | ForEach-Object { "[$_]" }) -join ''
+        $r.Add("$tags $($f.Text)")
+        $n = 0
+        foreach ($c in $f.Entry.Cont) { if ($n -ge 6) { $r.Add('        ...'); break }; $r.Add('        | ' + $c); $n++ }
+    }
+    $r.Add('')
+}
+if ($shaMismatch) { $r.Add('== SHA ==' ); $r.Add("[SHA] build SHAs differ across sources: " + ($distinct -join ', ')); $r.Add('') }
+
+Write-Utf8 (Join-Path $Session 'findings.txt') (($r -join "`r`n") + "`r`n")
+
+Write-Host "merged.log : $($out.Count) lines ($($all.Count) entries) -> $(Join-Path $Session 'merged.log')"
+Write-Host "findings   : $(($catCounts.Keys | ForEach-Object { "$_=$($catCounts[$_])" }) -join ' ')$(if ($shaMismatch) { '  SHA-MISMATCH' }) -> $(Join-Path $Session 'findings.txt')"

@@ -1,0 +1,23 @@
+--------- beginning of main
+10-21 01:59:41.000  4242  4271 I Unity  : [23:59:41.000][00:00.000][Info][Session] Session sha=aaa111 date=2026-10-20 platform=Android model=Pixel
+10-21 01:59:41.100  4242  4271 I ActivityManager: Start proc 4242:com.UnityTechnologies.com.unity.template.urpblank
+10-21 01:59:42.500  4242  4271 I Unity  : [23:59:42.500][00:00.000][Info][Boot] Boot complete
+10-21 01:59:42.500  4242  4271 I Unity  : UnityEngine.Debug:Log (object)
+10-21 01:59:42.500  4242  4271 I Unity  : 
+10-21 01:59:42.500  4242  4271 I Unity  : (Filename: ./Runtime/Export/Debug/Debug.bindings.h Line: 39)
+10-21 01:59:43.000  4242  4271 W Unity  : [23:59:43.000][00:00.000][Warn][Net] Slow RTT=180ms
+10-21 01:59:43.000  4242  4271 W Unity  : UnityEngine.Logger:Log (UnityEngine.LogType,object)
+10-21 01:59:45.000  4242  4271 W Unity  : [23:59:45.000][00:00.000][Warn][Perf] Hitch frame=87.3ms phase=Active gc=12KB
+10-21 01:59:46.000  4242  4271 D Unity  : [23:59:46.000][00:00.000][Debug][Visual] scan renderers=812 offenders=0 nulls=0
+10-21 01:59:54.000  4242  4271 D Unity  : [23:59:54.000][00:00.000][Debug][Sync] Sync t=100 st=Active rem=40.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=100,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
+10-21 01:59:56.000  4242  4271 D Unity  : [23:59:56.000][00:00.000][Debug][Sync] Sync t=200 st=Active rem=38.3 | 1:x=1.8,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=100,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
+10-21 01:59:58.000  4242  4271 D Unity  : [23:59:58.000][00:00.000][Debug][Sync] Sync t=300 st=Active rem=40.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=80,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
+10-21 01:59:59.000  4242  4271 D Unity  : [23:59:59.000][00:00.000][Debug][Perf] 5s summary avg=16.2 p95=22.0 p99=20.1 ms
+10-21 02:00:00.000  4242  4271 D Unity  : [00:00:00.000][00:00.000][Debug][Sync] Sync t=400 st=Active rem=40.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=80,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
+10-21 02:00:02.000  4242  4271 D Unity  : [00:00:02.000][00:00.000][Debug][Sync] Sync t=500 st=Active rem=40.0 | 1:x=1.0,z=2.0,hp=100,cg=3,cs=Normal ; 2:x=8.0,z=5.0,hp=100,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
+10-21 02:00:03.000  4242  4271 W Unity  : [00:00:03.000][00:00.000][Warn][Visual] Magenta material on Hierarchy/Arena/Fence_07 (Hidden/InternalErrorShader)
+10-21 02:00:03.500  4242  4271 D Unity  : [00:00:03.500][00:00.000][Debug][Visual] scan renderers=812 offenders=3 nulls=1
+10-21 02:00:04.000  4242  4271 E AndroidRuntime: FATAL EXCEPTION: main
+10-21 02:00:04.000  4242  4271 D Unity  : [00:00:04.000][00:00.000][Debug][Sync] Sync t=600 st=Active rem=40.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=100,cg=0,cs=Normal,bot ; 4:x=9.0,z=9.0,hp=100,cg=0,cs=Normal | bases=1=0,2=0 | piles=10,10
+10-21 02:00:06.000  4242  4271 D Unity  : [00:00:06.000][00:00.000][Debug][Sync] Sync t=700 st=Active rem=40.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=100,cg=0,cs=Normal,bot ; 4:x=9.0,z=9.0,hp=100,cg=0,cs=Normal | bases=1=0,2=0 | piles=10,10
+10-21 02:00:05.000  4242  4271 D Unity  : [00:00:05.000][00:00.000][Debug][Perf] 5s summary avg=19.0 p95=40.0 p99=65.2 ms

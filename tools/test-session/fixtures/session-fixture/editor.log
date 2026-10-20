@@ -1,0 +1,24 @@
+Refresh completed in 0.123 seconds
+Reloading assembly for play mode
+[23:59:39.500][00:01.000][Info][Session] Session sha=aaa111 date=2026-10-20 platform=WindowsEditor
+UnityEngine.Debug:Log (object)
+[23:59:40.000][00:00.000][Info][AutoTest] AutoTest code=ABC123
+UnityEngine.Debug:Log (object)
+CluckWars.Test.AutoHost:Start () (at Assets/_Game/Scripts/Test/AutoHost.cs:44)
+
+[23:59:54.050][00:00.000][Debug][Sync] Sync t=100 st=Active rem=40.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=100,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
+[23:59:56.050][00:00.000][Debug][Sync] Sync t=200 st=Active rem=38.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=100,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
+[23:59:58.050][00:00.000][Debug][Sync] Sync t=300 st=Active rem=40.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=100,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
+[00:00:00.050][00:00.000][Debug][Sync] Sync t=400 st=Active rem=40.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=100,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
+[00:00:01.200][00:00.000][Error][Combat] Ability failed: NullReferenceException
+NullReferenceException: Object reference not set to an instance of an object
+CluckWars.Gameplay.AbilityController.Fire () (at Assets/_Game/Scripts/Gameplay/AbilityController.cs:88)
+UnityEngine.Debug:LogError (object)
+
+[00:00:02.050][00:00.000][Debug][Sync] Sync t=500 st=Active rem=40.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=100,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
+[00:00:04.050][00:00.000][Debug][Sync] Sync t=600 st=Active rem=40.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=100,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
+[00:00:06.050][00:00.000][Debug][Sync] Sync t=700 st=Active rem=40.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=100,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
+[00:00:08.000][00:00.000][Info][Match] Round over
+InvalidOperationException: Sequence contains no elements
+System.Linq.Enumerable.First[TSource] (System.Collections.Generic.IEnumerable`1[T] source) (at <abc>:0)
+UnityEngine.Debug:Log (object)

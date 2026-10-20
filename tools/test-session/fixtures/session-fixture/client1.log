@@ -1,0 +1,7 @@
+Initialize engine version: 6000.3.14f1
+[23:59:41.500][00:00.900][Info][Session] Session sha=bbb222 date=2026-10-20 platform=WindowsPlayer
+[23:59:54.020][00:00.000][Debug][Sync] Sync t=100 st=Active rem=40.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=100,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
+[23:59:56.020][00:00.000][Debug][Sync] Sync t=200 st=Active rem=38.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=100,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
+[23:59:58.020][00:00.000][Debug][Sync] Sync t=300 st=Active rem=40.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=100,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
+[00:00:00.020][00:00.000][Debug][Sync] Sync t=400 st=Active rem=40.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=100,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
+[00:00:07.000][00:00.000][Info][Match] client done
