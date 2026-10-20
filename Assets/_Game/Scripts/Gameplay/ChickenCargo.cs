@@ -341,6 +341,15 @@ namespace CluckWars.Gameplay
             {
                 if (_activeBaseTarget != null && _activeBaseTarget.Object != null && _activeBaseTarget.Object.IsValid)
                 {
+                    // Dev-tools diagnostics (Source Base): this peer's view of the flush the host is about to validate.
+                    if (CluckWars.Diagnostics.DevTools.Available && _log != null)
+                    {
+                        var c = _controller;
+                        _log.Info("Base", CluckWars.Diagnostics.DepositDiagnostics.FlushLine(
+                            c != null && c.Object != null ? c.Object.InputAuthority.ToString() : name, c != null ? c.HomeCornerIndex : -1,
+                            transform.position, _activeBaseTarget.CornerIndex, _activeBaseTarget.transform.position,
+                            _activeBaseTarget.DepositRadius, _pendingBaseFood));
+                    }
                     _activeBaseTarget.RPC_AddFood(_pendingBaseFood);
                     GetComponent<ChickenMatchStats>()?.RPC_AddDeposit(_pendingBaseFood);
                 }

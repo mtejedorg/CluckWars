@@ -307,14 +307,49 @@ namespace CluckWars.Gameplay
 
             if (!TryResolveDepositor(info, out var depositor))
             {
-                _log?.Warn(Source, $"{name}: rejected RPC_AddFood({amount:0.00}) from {info.Source} — " +
-                    $"no chicken that caller is entitled to speak for is standing at corner " +
-                    $"{CornerIndex} with a matching HomeCornerIndex.");
+                // Rate-limited per caller (a parked chicken flushes 4x a second) and detailed: the HOST's view of the base
+                // and of every chicken that could have been the depositor, so one line tells which check failed.
+                if (RejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
+                    _log?.Warn(Source, $"{name}: rejected RPC_AddFood({amount:0.00}) from {info.Source} — " +
+                        $"no chicken that caller is entitled to speak for is standing at corner " +
+                        $"{CornerIndex} with a matching HomeCornerIndex. {DescribeRejection(info)}" +
+                        (held > 0 ? $" (+{held} similar suppressed)" : string.Empty));
                 return;
             }
 
             FoodTotal += amount;
             _log?.Debug(Source, $"{name}: +{amount:0.00} from {depositor.name} → FoodTotal={FoodTotal:0.0}.");
+        }
+
+        // One detailed rejection line per caller per 2 s (shared by all bases: a caller rejected at one base is the story).
+        private static readonly CluckWars.Diagnostics.PerKeyRateLimiter RejectionLimiter = new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
+
+        /// <summary>
+        /// The host's side of a rejection, read-only: this base's position / radius and, for every non-decoy chicken that is
+        /// the caller's or belongs to this corner, its host-side position, home corner, the allegiance and attribution
+        /// verdicts and the planar distance against radius + latency margin.
+        /// </summary>
+        private string DescribeRejection(in RpcInfo info)
+        {
+            float latency = info.IsInvokeLocal || Runner == null ? 0f : (float)Runner.GetPlayerRtt(info.Source);
+            var sb = new System.Text.StringBuilder(CluckWars.Diagnostics.DepositDiagnostics.RejectionBase(CornerIndex, transform.position, DepositRadius));
+            sb.Append(" candidates=");
+            int n = 0;
+            var all = ChickenController.ActiveControllers;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var c = all[i];
+                if (c == null || c.Object == null || !c.Object.IsValid || c.IsDecoy) continue;
+                bool attributable = info.IsInvokeLocal ? c.Object.HasStateAuthority : c.Object.InputAuthority == info.Source;
+                bool allegiance = BaseDepositRules.IsAllegianceMatch(c.HomeCornerIndex, CornerIndex);
+                if (!attributable && !allegiance) continue;
+                float margin = BaseDepositRules.RangeMargin(c.Stats != null ? c.Stats.MoveSpeed : 0f, latency);
+                sb.Append(CluckWars.Diagnostics.DepositDiagnostics.Candidate($"{c.Object.InputAuthority}{(c.IsBot ? "/bot" : "")}",
+                    c.transform.position, c.HomeCornerIndex, allegiance, attributable, transform.position, DepositRadius, margin));
+                n++;
+            }
+            if (n == 0) sb.Append("none");
+            return sb.ToString();
         }
 
         /// <summary>

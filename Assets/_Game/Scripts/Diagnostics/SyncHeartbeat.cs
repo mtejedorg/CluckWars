@@ -36,6 +36,24 @@ namespace CluckWars.Diagnostics
         [Inject]
         public void Construct(ILogService log) => _log = log;
 
+        // Deposit diagnostics (Source Base, every peer, every round): where THIS peer thinks each base is. A base whose
+        // position differs between the host's and a client's dump is a client that will bank in the wrong place.
+        private int _basesDumpedForRound = -1;
+
+        private void DumpBasesOncePerRound(GameManager gm)
+        {
+            if (_log == null || gm.State == MatchState.WaitingForPlayers || gm.StartRound == _basesDumpedForRound) return;
+            _basesDumpedForRound = gm.StartRound;
+            var bases = PlayerBase.ActiveBases;
+            for (int i = 0; i < bases.Count; i++)
+            {
+                var b = bases[i];
+                if (b == null || b.Object == null || !b.Object.IsValid) continue;
+                _log.Info("Base", DepositDiagnostics.BaseLine(b.CornerIndex, b.Owner.ToString(), b.transform.position, b.DepositRadius,
+                    false) + $" round={gm.StartRound} authority={(b.HasStateAuthority ? 1 : 0)}");
+            }
+        }
+
         private void Start()
         {
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
@@ -51,6 +69,7 @@ namespace CluckWars.Diagnostics
             if (gm == null || gm.Object == null || !gm.Object.IsValid) { _boundary.Reset(); return; }
             var runner = gm.Runner;
             if (runner == null || !runner.IsRunning) { _boundary.Reset(); return; }
+            DumpBasesOncePerRound(gm);
             if (!HeavyProbes.Enabled || _log == null || !_log.IsEnabled(LogLevel.Debug)) return;
 
             int tick = (int)runner.Tick;

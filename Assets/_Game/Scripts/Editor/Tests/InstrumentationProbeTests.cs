@@ -244,6 +244,33 @@ namespace CluckWars.Tests
             }
         }
 
+        // ---- deposit diagnostics (Source Base) ------------------------------------------------------------------------
+
+        [Test]
+        public void DepositLines_TellWhichHostCheckFailed()
+        {
+            Assert.AreEqual("Base corner=3 owner=[Player:2] pos=21.8,-21.8 radius=2.50 stamped=1",
+                DepositDiagnostics.BaseLine(3, "[Player:2]", new Vector3(21.8f, 0f, -21.8f), 2.5f, true));
+            Assert.AreEqual("Base flush chicken=[Player:2] home=3 pos=8.2,8.2 base=3 basePos=9.5,9.4 dist=1.73 radius=2.50 in=1 amount=2.25",
+                DepositDiagnostics.FlushLine("[Player:2]", 3, new Vector3(8.2f, 1f, 8.2f), 3, new Vector3(9.47f, 0f, 9.38f), 2.5f, 2.25f));
+            Assert.AreEqual("{[Player:2] pos=8.2,8.2 home=3 allegiance=1 attributable=1 dist=32.94 limit=3.10 inRange=0}",
+                DepositDiagnostics.Candidate("[Player:2]", new Vector3(8.2f, 0f, 8.2f), 3, true, true, new Vector3(21.8f, 0f, -21.8f), 2.5f, 0.6f));
+            Assert.AreEqual(1.0f, DepositDiagnostics.PlanarDistance(new Vector3(0f, 5f, 0f), new Vector3(1f, 0f, 0f)), 1e-5f, "planar: height ignored");
+        }
+
+        [Test]
+        public void RejectionLines_OnePerCallerPerTwoSeconds()
+        {
+            var l = new PerKeyRateLimiter(2f);
+            Assert.IsTrue(l.Allow(2, 10f, out int held));
+            Assert.AreEqual(0, held);
+            Assert.IsFalse(l.Allow(2, 10.25f, out _));
+            Assert.IsFalse(l.Allow(2, 11.9f, out _));
+            Assert.IsTrue(l.Allow(3, 10.3f, out _), "another caller has its own budget");
+            Assert.IsTrue(l.Allow(2, 12.0f, out held));
+            Assert.AreEqual(2, held, "the held-back lines are counted on the next one");
+        }
+
         // ---- breadcrumbs ------------------------------------------------------------------------------------------
 
         [Test]
