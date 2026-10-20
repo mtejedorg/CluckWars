@@ -259,6 +259,13 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void RespawnCheckLine()
+        {
+            Assert.AreEqual("Respawn check chicken=P1 home=0 pos=0.1,19.3 dist_to_corner=21.92 round=2",
+                SyncHeartbeat.RespawnLine("P1", 0, new Vector3(0.1f, 0f, 19.3f), "21.92", 2));
+        }
+
+        [Test]
         public void RejectionLines_OnePerCallerPerTwoSeconds()
         {
             var l = new PerKeyRateLimiter(2f);

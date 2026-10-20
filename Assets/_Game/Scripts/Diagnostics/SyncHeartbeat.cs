@@ -40,6 +40,35 @@ namespace CluckWars.Diagnostics
         // position differs between the host's and a client's dump is a client that will bank in the wrong place.
         private int _basesDumpedForRound = -1;
 
+        // Round-reset diagnostics (Source Reset, every peer, dev tools): when a round goes Active (its 3-2-1), where every
+        // chicken stands against its home corner's spawn point. After a reset every distance should be ~0.
+        private int _respawnCheckedForRound = -1;
+        private MapGenerator _map;
+
+        private void CheckRespawnOncePerRound(GameManager gm)
+        {
+            if (_log == null || gm.State != MatchState.Active || gm.StartRound == _respawnCheckedForRound) return;
+            _respawnCheckedForRound = gm.StartRound;
+            if (_map == null) _map = FindFirstObjectByType<MapGenerator>();
+            var spawns = _map != null ? _map.SpawnPoints : null;
+            var chickens = ChickenController.ActiveControllers;
+            for (int i = 0; i < chickens.Count; i++)
+            {
+                var c = chickens[i];
+                if (c == null || c.Object == null || !c.Object.IsValid || c.IsDecoy) continue;
+                var p = c.transform.position;
+                int home = c.HomeCornerIndex;
+                string dist = spawns != null && home >= 0 && home < spawns.Count
+                    ? DepositDiagnostics.PlanarDistance(p, spawns[home]).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)
+                    : "n/a";
+                _log.Info("Reset", RespawnLine(c.IsBot ? "B" + home : "P" + c.Object.InputAuthority.PlayerId, home, p, dist, gm.StartRound));
+            }
+        }
+
+        /// <summary><c>Respawn check chicken=P2 home=3 pos=x,z dist_to_corner=0.00 round=2</c></summary>
+        public static string RespawnLine(string id, int home, Vector3 pos, string distToCorner, int round) =>
+            System.FormattableString.Invariant($"Respawn check chicken={id} home={home} pos={pos.x:0.0},{pos.z:0.0} dist_to_corner={distToCorner} round={round}");
+
         private void DumpBasesOncePerRound(GameManager gm)
         {
             if (_log == null || gm.State == MatchState.WaitingForPlayers || gm.StartRound == _basesDumpedForRound) return;
@@ -70,6 +99,7 @@ namespace CluckWars.Diagnostics
             var runner = gm.Runner;
             if (runner == null || !runner.IsRunning) { _boundary.Reset(); return; }
             DumpBasesOncePerRound(gm);
+            CheckRespawnOncePerRound(gm);
             if (!HeavyProbes.Enabled || _log == null || !_log.IsEnabled(LogLevel.Debug)) return;
 
             int tick = (int)runner.Tick;
