@@ -162,11 +162,13 @@ namespace CluckWars.Diagnostics
             float first = Time.realtimeSinceStartup;
             for (int attempt = 1; ; attempt++)
             {
-                if (menu == null) yield break;
+                if (menu == null) { GiveUp(code, attempt, "menu-gone"); yield break; }
                 int failuresBefore = menu.AutoTestJoinFailures;
                 _log.Info(Source, $"AutoTest join attempt {attempt} code={code}.");
-                if (!menu.AutoTestPressStartOrJoin(code)) yield break;
+                if (!menu.AutoTestPressStartOrJoin(code)) { GiveUp(code, attempt, "join-refused-by-menu"); yield break; }
 
+                // Wait for the outcome: the scene swaps (joined), the menu reports a failure, or nothing happens in time.
+                float attemptStarted = Time.realtimeSinceStartup;
                 while (true)
                 {
                     if (menu == null || SceneManager.GetActiveScene().handle != menu.gameObject.scene.handle)
@@ -175,18 +177,32 @@ namespace CluckWars.Diagnostics
                         yield break;
                     }
                     if (menu.AutoTestJoinFailures > failuresBefore) break;
+                    float now = Time.realtimeSinceStartup;
+                    if (now - attemptStarted > AutoTestRules.JoinAttemptTimeoutSeconds)
+                    {
+                        GiveUp(code, attempt, $"attempt-timeout ({AutoTestRules.JoinAttemptTimeoutSeconds:0}s without a join result or the match scene)");
+                        yield break;
+                    }
+                    if (!AutoTestRules.ShouldRetryJoin(now - first))
+                    {
+                        GiveUp(code, attempt, $"timeout ({AutoTestRules.JoinGiveUpSeconds:0}s)");
+                        yield break;
+                    }
                     yield return null;
                 }
 
-                if (!AutoTestRules.ShouldRetryJoin(Time.realtimeSinceStartup - first))
+                if (!AutoTestRules.ShouldRetryJoin(Time.realtimeSinceStartup - first + AutoTestRules.JoinRetrySeconds))
                 {
-                    _log.Error(Source, $"AutoTest join: gave up after {attempt} attempts in {AutoTestRules.JoinGiveUpSeconds:0} s (code {code}).");
+                    GiveUp(code, attempt, $"retries-exhausted ({AutoTestRules.JoinGiveUpSeconds:0}s)");
                     yield break;
                 }
                 _log.Info(Source, $"AutoTest join attempt {attempt} failed; retrying in {AutoTestRules.JoinRetrySeconds:0} s (the host may not be up yet).");
                 yield return new WaitForSecondsRealtime(AutoTestRules.JoinRetrySeconds);
             }
         }
+
+        private void GiveUp(string code, int attempts, string reason) =>
+            _log.Error(Source, $"AutoTest join gave up reason={reason} code={code} attempts={attempts}");
 
         private void WriteResult(string code, string role)
         {

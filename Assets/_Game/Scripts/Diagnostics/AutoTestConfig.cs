@@ -104,7 +104,9 @@ namespace CluckWars.Diagnostics
                     case DevModeKey:  cfg.DevMode = cfg.ParseBool(key, value); break;
                     case HudKey:      cfg.Hud = cfg.ParseBool(key, value); break;
                     case AutoJoinKey:
-                        if (value.Length == 0 || value == "1") cfg.Problems.Add($"{key} needs a join code (got '{value}')");
+                        if (!IsJoinCode(value))
+                            cfg.Problems.Add($"{key} '{value}' is not a whole join code ({CluckWars.UI.JoinCodeEntry.MinLength}-" +
+                                             $"{CluckWars.UI.JoinCodeEntry.MaxLength} characters, the JOIN MATCH rule); auto-join off");
                         else cfg.AutoJoin = value.ToUpperInvariant();
                         break;
                     case ClassKey:
@@ -125,6 +127,13 @@ namespace CluckWars.Diagnostics
             }
             return cfg;
         }
+
+        /// <summary>
+        /// A code JOIN MATCH would accept (<see cref="CluckWars.UI.JoinCodeEntry.IsComplete"/>) and that fits the join field
+        /// (<see cref="CluckWars.UI.JoinCodeEntry.MaxLength"/>): anything else would sit on THE COOP forever.
+        /// </summary>
+        public static bool IsJoinCode(string value) =>
+            CluckWars.UI.JoinCodeEntry.IsComplete(value) && value.Trim().Length <= CluckWars.UI.JoinCodeEntry.MaxLength;
 
         /// <summary>A class name, case-insensitive. Numbers are refused (Enum.TryParse would accept "2").</summary>
         public static bool TryParseClass(string value, out ChickenClass cls)
@@ -169,6 +178,8 @@ namespace CluckWars.Diagnostics
     {
         public const float JoinRetrySeconds = 5f;
         public const float JoinGiveUpSeconds = 120f;
+        /// <summary>One JOIN MATCH press must end (joined + match scene loading, or a failure) within this.</summary>
+        public const float JoinAttemptTimeoutSeconds = 60f;
         public const float PlayAgainDelaySeconds = 4f;
 
         /// <summary>

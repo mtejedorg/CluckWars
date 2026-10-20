@@ -2602,7 +2602,13 @@ namespace CluckWars.UI
                     _log?.Error(Source, "Auto-test JOIN: Lobby.uxml has no #LobbyJoinField.");
                     return false;
                 }
-                field.value = joinCode ?? string.Empty;   // the same callback a keyboard runs (upper-case, status pill)
+                if (!JoinCodeEntry.IsComplete(joinCode))
+                {
+                    // OnStartMatch would only show "enter a code" and return: refuse here so the auto-test does not wait on it.
+                    _log?.Warn(Source, $"Auto-test JOIN refused: '{joinCode}' is not a whole join code.");
+                    return false;
+                }
+                field.value = joinCode;   // the same callback a keyboard runs (upper-case, status pill)
             }
             OnStartMatch();
             return true;

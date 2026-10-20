@@ -62,6 +62,20 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void JoinCode_MustBeWhole_ElseAutoJoinIsOff()
+        {
+            var shortCode = AutoTestConfig.FromMap(new Dictionary<string, string> { ["cw_autojoin"] = "AB12" });
+            Assert.IsNull(shortCode.AutoJoin, "a partial code would sit on THE COOP forever");
+            Assert.AreEqual(1, shortCode.Problems.Count);
+            Assert.IsFalse(shortCode.WantsMenuFlow);
+            var bare = AutoTestConfig.FromCommandLine(new[] { "x.exe", "-cw_autojoin" });
+            Assert.IsNull(bare.AutoJoin, "a bare flag has no code");
+            Assert.IsFalse(AutoTestConfig.IsJoinCode(new string('A', 17)), "longer than the join field");
+            Assert.IsTrue(AutoTestConfig.IsJoinCode("abc123"));
+            Assert.AreEqual(60f, AutoTestRules.JoinAttemptTimeoutSeconds);
+        }
+
+        [Test]
         public void HostAndJoinTogether_Hosts_AndNumbersAreRefusedAsClasses()
         {
             var cfg = AutoTestConfig.FromMap(new Dictionary<string, string> { ["cw_autohost"] = "1", ["cw_autojoin"] = "ABC123" });
