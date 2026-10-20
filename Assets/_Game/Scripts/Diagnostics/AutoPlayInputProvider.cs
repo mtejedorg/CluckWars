@@ -13,13 +13,15 @@ namespace CluckWars.Diagnostics
     /// like a human's; it never writes game state. Dormant (all zero / false) until the auto-test driver activates it.
     /// </summary>
     /// <remarks>
-    /// Installed only in a dev-tools build (<see cref="DevTools.Available"/>). Movement comes from
-    /// <see cref="AutoPlayBrain"/>; the stick is the brain's world direction rotated into the match camera's frame
-    /// (the inverse of <c>AimRules.StickToWorld</c>, which OnInput applies). Abilities: at a pile, Peck (slot 0) is
-    /// pressed and released every <see cref="PeckEverySeconds"/>; elsewhere, every <see cref="CastEverySeconds"/> the
-    /// next equipped non-Peck slot is pressed, held for <see cref="HoldSeconds"/> (the range preview) and released (the cast).
-    /// It reports <see cref="InputDeviceKind.None"/> and a never-used <see cref="LastActiveTime"/>, so it never changes
-    /// which real device the HUD and aim assist think is in hand.
+    /// Installed only in a dev-tools build (<see cref="DevTools.Available"/>). Decisions come from
+    /// <see cref="AutoPlayBrain"/> (forage -> deposit at the OWN base -> repeat, hunts for aggressive personalities; the
+    /// personality is seeded from the local PlayerId by <see cref="Configure"/>). The stick is the brain's world direction
+    /// rotated into the match camera's frame (the inverse of <c>AimRules.StickToWorld</c>, which OnInput applies).
+    /// Abilities: standing at a pile, Peck (slot 0) is pressed and released every <see cref="PeckEverySeconds"/>; a hunt
+    /// that reaches its rival presses the first Steal / Control move; otherwise every <see cref="CastEverySeconds"/> the
+    /// next equipped non-Peck move the personality allows is pressed, held for <see cref="HoldSeconds"/> (the range
+    /// preview) and released (the cast). It reports <see cref="InputDeviceKind.None"/> and a never-used
+    /// <see cref="LastActiveTime"/>, so it never changes which real device the HUD and aim assist think is in hand.
     /// </remarks>
     public sealed class AutoPlayInputProvider : IInputProvider
     {
@@ -29,10 +31,11 @@ namespace CluckWars.Diagnostics
         private const float PeckHoldSeconds = 0.1f;
         /// <summary>An unread press is dropped after this long (a press is meant for the next input read, not later).</summary>
         public const float PressLatchSeconds = 0.25f;
-        private const int MaxPiles = 64;
+        private const int MaxPiles = 64, MaxRivals = 16;
 
-        private readonly AutoPlayBrain _brain = new AutoPlayBrain();
+        private AutoPlayBrain _brain = new AutoPlayBrain(AutoPlayPersonality.Balanced);
         private readonly AutoPlayPile[] _piles = new AutoPlayPile[MaxPiles];
+        private readonly AutoPlayRival[] _rivals = new AutoPlayRival[MaxRivals];
         // A press is latched until a reader takes it (FusionNetworkService.Update latches it for OnInput) or it expires:
         // valid on one frame only, it was lost whenever the reader ran before the driver in that frame.
         private readonly bool[] _pressPending = new bool[AbilityController.SlotCount];
@@ -48,12 +51,23 @@ namespace CluckWars.Diagnostics
         public bool Active { get; private set; }
 
         public AutoPlayGoal Goal => _brain.Goal;
+        public AutoPlayState State => _brain.State;
+        public AutoPlayPersonality Personality => _brain.Personality;
+
+        /// <summary>Banked food of the own base seen on the last <see cref="Tick"/>; negative when no own base was found.</summary>
+        public float OwnBaseFood { get; private set; } = -1f;
+
+        /// <summary>Cargo of the local chicken seen on the last <see cref="Tick"/>.</summary>
+        public float Cargo { get; private set; }
 
         /// <param name="clock">Seconds, unscaled (default <c>Time.unscaledTime</c>); injectable for tests.</param>
         public AutoPlayInputProvider(System.Func<float> clock = null)
         {
             _clock = clock ?? (() => Time.unscaledTime);
         }
+
+        /// <summary>Picks the personality for this client (<see cref="AutoPlayPersonality.For"/> of its PlayerId).</summary>
+        public void Configure(int playerId) => _brain = new AutoPlayBrain(AutoPlayPersonality.For(playerId));
 
         public void SetActive(bool active)
         {
@@ -66,36 +80,56 @@ namespace CluckWars.Diagnostics
         /// <summary>Called once per rendered frame by the driver: decide the stick and the presses for this frame.</summary>
         public void Tick(ChickenController self, float now)
         {
-            if (!Active || self == null) { _stick = Vector2.zero; return; }
+            if (!Active || self == null || self.Object == null || !self.Object.IsValid) { _stick = Vector2.zero; return; }
 
-            int np = 0;
+            var view = new AutoPlayView { Piles = _piles, Rivals = _rivals, BaseRadius = BaseRadius };
             var piles = FoodPile.ActivePiles;
-            for (int i = 0; i < piles.Count && np < MaxPiles; i++)
+            for (int i = 0; i < piles.Count && view.PileCount < MaxPiles; i++)
             {
                 var p = piles[i];
                 if (p == null || p.Object == null || !p.Object.IsValid) continue;
                 var pos = p.transform.position;
-                _piles[np++] = new AutoPlayPile { Position = new Vector2(pos.x, pos.z), Amount = p.Amount };
+                _piles[view.PileCount++] = new AutoPlayPile { Position = new Vector2(pos.x, pos.z), Amount = p.Amount };
             }
 
-            bool hasBase = false;
-            Vector2 basePos = default;
+            // The OWN base: the one this player owns (PlayerBase.Owner), else the chicken's home corner.
+            var me = self.Object.InputAuthority;
+            PlayerBase own = null;
             var bases = PlayerBase.ActiveBases;
             for (int i = 0; i < bases.Count; i++)
             {
                 var b = bases[i];
-                if (b == null || b.Object == null || !b.Object.IsValid || b.CornerIndex != self.HomeCornerIndex) continue;
-                var bp = b.transform.position;
-                basePos = new Vector2(bp.x, bp.z);
-                hasBase = true;
-                break;
+                if (b == null || b.Object == null || !b.Object.IsValid) continue;
+                if (b.Owner == me) { own = b; break; }
+                if (own == null && b.CornerIndex == self.HomeCornerIndex) own = b;
+            }
+            if (own != null)
+            {
+                var bp = own.transform.position;
+                view.HasBase = true;
+                view.BasePos = new Vector2(bp.x, bp.z);
+                OwnBaseFood = own.FoodTotal;
+            }
+            else OwnBaseFood = -1f;
+
+            var chickens = ChickenController.ActiveControllers;
+            for (int i = 0; i < chickens.Count && view.RivalCount < MaxRivals; i++)
+            {
+                var c = chickens[i];
+                if (c == null || c == self || c.IsDecoy || c.Object == null || !c.Object.IsValid) continue;
+                var cp = c.transform.position;
+                _rivals[view.RivalCount++] = new AutoPlayRival
+                {
+                    Position = new Vector2(cp.x, cp.z),
+                    Cargo = c.Cargo != null ? c.Cargo.Cargo : 0f,
+                };
             }
 
-            var me = self.transform.position;
-            float cargo = self.Cargo != null ? self.Cargo.Cargo : 0f;
-            float capacity = self.Cargo != null ? self.Cargo.Capacity : 0f;
-            var world = _brain.Tick(now, new Vector2(me.x, me.z), cargo, capacity, hasBase, basePos, BaseRadius,
-                _piles, np, (float)_rng.NextDouble());
+            var mine = self.transform.position;
+            view.Self = new Vector2(mine.x, mine.z);
+            Cargo = view.Cargo = self.Cargo != null ? self.Cargo.Cargo : 0f;
+            view.Capacity = self.Cargo != null ? self.Cargo.Capacity : 0f;
+            var world = _brain.Tick(now, view, (float)_rng.NextDouble());
 
             float yaw = MatchCamera.Instance != null ? MatchCamera.Instance.CurrentYaw : 0f;
             // OnInput turns the stick into world space with StickToWorld(stick, yaw), a rotation: its inverse is the same call at -yaw.
@@ -118,25 +152,45 @@ namespace CluckWars.Diagnostics
             var abilities = self.Abilities;
             if (abilities == null) return;
 
+            if (_brain.TakeAttackCast())
+            {
+                int slot = FirstSlot(abilities, offensiveOnly: true);
+                if (slot >= 0) { Press(slot, HoldSeconds); _nextCastAt = now + CastEverySeconds; return; }
+            }
+
             bool peckSlot = abilities.GetSlot(0) is PeckAbilitySO;
-            if (peckSlot && _brain.Goal == AutoPlayGoal.AtPile)
+            if (peckSlot && _brain.Goal == AutoPlayGoal.AtPile && _brain.State == AutoPlayState.Forage)
             {
                 if (now >= _nextPeckAt) { Press(0, PeckHoldSeconds); _nextPeckAt = now + PeckEverySeconds; }
                 return;
             }
+            // Banking: stand still, no casts (a dash out of the deposit zone would only delay the deposit).
+            if (_brain.Goal == AutoPlayGoal.AtBase) return;
 
             if (now < _nextCastAt) return;
             _nextCastAt = now + CastEverySeconds;
-            // Round-robin over the equipped slots, skipping Peck (only useful at a pile).
+            // Round-robin over the equipped slots the personality allows, skipping Peck (only useful at a pile).
             for (int tries = 0; tries < AbilityController.SlotCount; tries++)
             {
                 int slot = _nextSlot;
                 _nextSlot = (_nextSlot + 1) % AbilityController.SlotCount;
                 var ab = abilities.GetSlot(slot);
                 if (ab == null || ab is PeckAbilitySO) continue;
+                if (!AutoPlayCasting.Allowed(ab.Category, _brain.Personality.CastsOffense)) continue;
                 Press(slot, HoldSeconds);
                 return;
             }
+        }
+
+        private static int FirstSlot(AbilityController abilities, bool offensiveOnly)
+        {
+            for (int slot = 0; slot < AbilityController.SlotCount; slot++)
+            {
+                var ab = abilities.GetSlot(slot);
+                if (ab == null || ab is PeckAbilitySO) continue;
+                if (!offensiveOnly || AutoPlayCasting.IsOffensive(ab.Category)) return slot;
+            }
+            return -1;
         }
 
         /// <summary>Presses <paramref name="slot"/> now and holds it for <paramref name="hold"/> seconds (release = cast).</summary>
@@ -173,6 +227,16 @@ namespace CluckWars.Diagnostics
             _pressPending[slot] = false;
             return Active && _clock() <= _pressExpires[slot];
         }
+    }
+
+    /// <summary>Which moves a personality casts (pure, tested).</summary>
+    public static class AutoPlayCasting
+    {
+        public static bool IsOffensive(AbilityCategory category) =>
+            category == AbilityCategory.Steal || category == AbilityCategory.Control;
+
+        /// <summary>Everything for an offensive personality; Utility / Defense only for a pure runner.</summary>
+        public static bool Allowed(AbilityCategory category, bool castsOffense) => castsOffense || !IsOffensive(category);
     }
 
     /// <summary>One <c>FindFirstObjectByType</c> per Game scene instead of one per frame.</summary>

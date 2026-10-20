@@ -206,54 +206,135 @@ namespace CluckWars.Tests
             return a;
         }
 
-        [Test]
-        public void AutoPlay_ToNearestFoodWhenEmpty_HomeWhenFull()
+        private static AutoPlayView View(Vector2 self, float cargo, float capacity, AutoPlayPile[] piles,
+            bool hasBase = true, Vector2 basePos = default, AutoPlayRival[] rivals = null) => new AutoPlayView
         {
-            var brain = new AutoPlayBrain();
-            var piles = Piles((10f, 0f, 10f), (-30f, 0f, 10f), (2f, 0f, 0f));
-            var dir = brain.Tick(0f, Vector2.zero, 0f, 10f, true, new Vector2(0f, -20f), 3f, piles, piles.Length, 0.1f);
+            Self = self, Cargo = cargo, Capacity = capacity, HasBase = hasBase, BasePos = basePos, BaseRadius = 3f,
+            Piles = piles, PileCount = piles.Length, Rivals = rivals ?? new AutoPlayRival[0], RivalCount = rivals?.Length ?? 0,
+        };
+
+        [Test]
+        public void AutoPlay_FullLoop_ForageToReturnFraction_BankAtOwnBaseUntilEmpty_Repeat()
+        {
+            var brain = new AutoPlayBrain(AutoPlayPersonality.Runner);   // returns at 60 %
+            var piles = Piles((10f, 0f, 30f), (-30f, 0f, 30f), (2f, 0f, 0f));
+            var home = new Vector2(0f, -20f);
+
+            var dir = brain.Tick(0f, View(Vector2.zero, 0f, 40f, piles, basePos: home), 0.1f);
+            Assert.AreEqual(AutoPlayState.Forage, brain.State);
             Assert.AreEqual(AutoPlayGoal.ToPile, brain.Goal);
             Assert.AreEqual(0, brain.TargetPile, "the empty pile is skipped, the near one wins");
             Assert.Greater(dir.x, 0.9f);
 
-            dir = brain.Tick(0.1f, new Vector2(9.5f, 0f), 2f, 10f, true, new Vector2(0f, -20f), 3f, piles, piles.Length, 0.1f);
-            Assert.AreEqual(AutoPlayGoal.AtPile, brain.Goal);
-            Assert.AreEqual(Vector2.zero, dir, "stands still to peck");
+            dir = brain.Tick(1f, View(new Vector2(9.5f, 0f), 21f, 40f, piles, basePos: home), 0.1f);
+            Assert.AreEqual(AutoPlayGoal.AtPile, brain.Goal, "below 60 %: keeps pecking");
+            Assert.AreEqual(Vector2.zero, dir);
 
-            dir = brain.Tick(0.2f, new Vector2(9.5f, 0f), 10f, 10f, true, new Vector2(0f, -20f), 3f, piles, piles.Length, 0.1f);
+            dir = brain.Tick(2f, View(new Vector2(9.5f, 0f), 24f, 40f, piles, basePos: home), 0.1f);
+            Assert.AreEqual(AutoPlayState.Deposit, brain.State, "60 % of capacity: go bank");
             Assert.AreEqual(AutoPlayGoal.ToBase, brain.Goal);
-            Assert.Less(dir.y, -0.4f, "full: heads home");
+            Assert.Less(dir.y, -0.4f, "heads to the own base");
 
-            brain.Tick(0.3f, new Vector2(0f, -19f), 10f, 10f, true, new Vector2(0f, -20f), 3f, piles, piles.Length, 0.1f);
+            dir = brain.Tick(3f, View(new Vector2(0f, -19f), 24f, 40f, piles, basePos: home), 0.1f);
             Assert.AreEqual(AutoPlayGoal.AtBase, brain.Goal, "inside the deposit zone: stands still");
+            Assert.AreEqual(Vector2.zero, dir);
+            brain.Tick(4f, View(new Vector2(0f, -19f), 6f, 40f, piles, basePos: home), 0.1f);
+            Assert.AreEqual(AutoPlayState.Deposit, brain.State, "stays until cargo is 0");
+
+            brain.Tick(5f, View(new Vector2(0f, -19f), 0f, 40f, piles, basePos: home), 0.1f);
+            Assert.AreEqual(AutoPlayState.Forage, brain.State, "banked everything: back to foraging");
+            Assert.AreEqual(AutoPlayGoal.ToPile, brain.Goal);
+        }
+
+        [Test]
+        public void AutoPlay_ACapacityPeckCannotFillExactly_StillBanks()
+        {
+            // The first live run: Peck = 3, capacity 40, so cargo topped out at 39 and the old "full" test never fired.
+            var brain = new AutoPlayBrain(AutoPlayPersonality.Balanced);
+            var piles = Piles((1f, 0f, 30f));
+            brain.Tick(0f, View(Vector2.zero, 39f, 40f, piles, basePos: new Vector2(0f, -20f)), 0.5f);
+            Assert.AreEqual(AutoPlayState.Deposit, brain.State);
+        }
+
+        [Test]
+        public void AutoPlay_PileRunsDry_WithCargo_GoesToBank()
+        {
+            var brain = new AutoPlayBrain(AutoPlayPersonality.Aggressive);
+            var piles = Piles((1f, 0f, 5f), (25f, 0f, 30f));
+            brain.Tick(0f, View(new Vector2(1f, 0f), 3f, 40f, piles, basePos: new Vector2(0f, -20f)), 0.5f);
+            Assert.AreEqual(AutoPlayGoal.AtPile, brain.Goal);
+            piles[0].Amount = 0f;
+            brain.Tick(0.5f, View(new Vector2(1f, 0f), 6f, 40f, piles, basePos: new Vector2(0f, -20f)), 0.5f);
+            Assert.AreEqual(AutoPlayState.Deposit, brain.State, "the pecked pile ran dry: bank what we have");
         }
 
         [Test]
         public void AutoPlay_NoProgressFor2s_RetargetsAndStrafes()
         {
-            var brain = new AutoPlayBrain();
+            var brain = new AutoPlayBrain(AutoPlayPersonality.Runner);
             var piles = Piles((10f, 0f, 10f), (0f, 14f, 10f));
             var self = Vector2.zero;
-            brain.Tick(0f, self, 0f, 10f, false, default, 3f, piles, piles.Length, 0.2f);
+            brain.Tick(0f, View(self, 0f, 10f, piles, hasBase: false), 0.2f);
             Assert.AreEqual(0, brain.TargetPile);
-            brain.Tick(1f, self, 0f, 10f, false, default, 3f, piles, piles.Length, 0.2f);
-            var dir = brain.Tick(2.1f, self, 0f, 10f, false, default, 3f, piles, piles.Length, 0.2f);   // stuck
+            brain.Tick(1f, View(self, 0f, 10f, piles, hasBase: false), 0.2f);
+            var dir = brain.Tick(2.1f, View(self, 0f, 10f, piles, hasBase: false), 0.2f);   // stuck
             Assert.AreEqual(1f, dir.magnitude, 1e-3f);
             Assert.Less(Mathf.Abs(Vector2.Dot(dir, Vector2.right)), 0.01f, "strafes sideways out of the jam");
-            brain.Tick(3.5f, self, 0f, 10f, false, default, 3f, piles, piles.Length, 0.2f);
+            brain.Tick(3.5f, View(self, 0f, 10f, piles, hasBase: false), 0.2f);
             Assert.AreEqual(1, brain.TargetPile, "the stuck pile is skipped for a while");
         }
 
         [Test]
         public void AutoPlay_NoFoodAnywhere_BringsCargoHome_OrIdles()
         {
-            var brain = new AutoPlayBrain();
+            var brain = new AutoPlayBrain(AutoPlayPersonality.Runner);
             var dry = Piles((5f, 5f, 0f));
-            brain.Tick(0f, Vector2.zero, 3f, 10f, true, new Vector2(-10f, 0f), 3f, dry, dry.Length, 0.5f);
+            brain.Tick(0f, View(Vector2.zero, 3f, 40f, dry, basePos: new Vector2(-10f, 0f)), 0.5f);
             Assert.AreEqual(AutoPlayGoal.ToBase, brain.Goal);
-            var dir = brain.Tick(0.1f, Vector2.zero, 0f, 10f, true, new Vector2(-10f, 0f), 3f, dry, dry.Length, 0.5f);
+            var dir = brain.Tick(0.1f, View(Vector2.zero, 0f, 40f, dry, basePos: new Vector2(-10f, 0f)), 0.5f);
             Assert.AreEqual(AutoPlayGoal.Idle, brain.Goal);
             Assert.AreEqual(Vector2.zero, dir);
+        }
+
+        [Test]
+        public void AutoPlay_AggressiveHuntsALoadedRival_RunnerNever()
+        {
+            var piles = Piles((20f, 0f, 30f));
+            var rivals = new[] { new AutoPlayRival { Position = new Vector2(0f, 6f), Cargo = 10f },
+                                 new AutoPlayRival { Position = new Vector2(0f, 2f), Cargo = 0f } };
+            var brain = new AutoPlayBrain(AutoPlayPersonality.Aggressive);
+            brain.Tick(1f, View(Vector2.zero, 0f, 40f, piles, rivals: rivals), 0.5f);
+            Assert.AreEqual(AutoPlayState.Forage, brain.State, "no hunt before the first interval");
+            var dir = brain.Tick(6f, View(Vector2.zero, 0f, 40f, piles, rivals: rivals), 0.5f);
+            Assert.AreEqual(AutoPlayState.Attack, brain.State);
+            Assert.AreEqual(0, brain.TargetRival, "the loaded rival, not the closer empty-handed one");
+            Assert.Greater(dir.y, 0.9f, "closes on it");
+            Assert.IsFalse(brain.TakeAttackCast());
+            brain.Tick(6.5f, View(new Vector2(0f, 4f), 0f, 40f, piles, rivals: rivals), 0.5f);
+            Assert.IsTrue(brain.TakeAttackCast(), "in cast range: one offensive cast");
+            Assert.IsFalse(brain.TakeAttackCast(), "once");
+            Assert.AreEqual(AutoPlayState.Forage, brain.State, "then back to foraging");
+
+            var runner = new AutoPlayBrain(AutoPlayPersonality.Runner);
+            for (float t = 0f; t < 30f; t += 1f) runner.Tick(t, View(Vector2.zero, 0f, 40f, piles, rivals: rivals), 0.5f);
+            Assert.AreNotEqual(AutoPlayState.Attack, runner.State, "a runner only forages and banks");
+        }
+
+        [Test]
+        public void AutoPlay_PersonalityFromPlayerId_AndWhatEachCasts()
+        {
+            Assert.AreEqual("aggressive", AutoPlayPersonality.For(3).Name);
+            Assert.AreEqual("runner", AutoPlayPersonality.For(1).Name);
+            Assert.AreEqual("balanced", AutoPlayPersonality.For(2).Name);
+            Assert.AreEqual("runner", AutoPlayPersonality.For(-2).Name, "never throws on odd ids");
+            Assert.IsTrue(AutoPlayPersonality.Aggressive.Hunts);
+            Assert.IsFalse(AutoPlayPersonality.Runner.Hunts);
+            Assert.AreEqual(0.7f, AutoPlayPersonality.Balanced.ReturnFraction, 1e-4f);
+            Assert.IsTrue(AutoPlayCasting.IsOffensive(CluckWars.Abilities.AbilityCategory.Steal));
+            Assert.IsTrue(AutoPlayCasting.IsOffensive(CluckWars.Abilities.AbilityCategory.Control));
+            Assert.IsFalse(AutoPlayCasting.Allowed(CluckWars.Abilities.AbilityCategory.Steal, castsOffense: false));
+            Assert.IsTrue(AutoPlayCasting.Allowed(CluckWars.Abilities.AbilityCategory.Utility, castsOffense: false));
+            Assert.IsTrue(AutoPlayCasting.Allowed(CluckWars.Abilities.AbilityCategory.Control, castsOffense: true));
         }
 
         [Test]

@@ -256,14 +256,45 @@ namespace CluckWars.Diagnostics
         {
             if (_autoPlay == null || !_cfg.AutoPlay) return;
             bool run = gm != null && gm.IsMatchRunning;
+            var self = run ? LocalChicken() : null;
             if (run != _autoPlayOn)
             {
                 _autoPlayOn = run;
+                if (run)
+                {
+                    // One personality per client, from its PlayerId, so the clients of a session play differently.
+                    int playerId = self != null ? self.Object.InputAuthority.PlayerId : 0;
+                    _autoPlay.Configure(playerId);
+                    _lastAutoPlayState = _autoPlay.State;
+                    _lastBanked = -1f;
+                }
                 _autoPlay.SetActive(run);
-                _log.Info(Source, run ? "AutoTest autoplay on (round running)." : "AutoTest autoplay off.");
+                _log.Info(Source, run
+                    ? $"AutoTest autoplay on (round running), personality={_autoPlay.Personality.Name}."
+                    : "AutoTest autoplay off.");
             }
-            if (run) _autoPlay.Tick(LocalChicken(), Time.unscaledTime);
+            if (!run) return;
+
+            _autoPlay.Tick(self, Time.unscaledTime);
+            if (_autoPlay.State != _lastAutoPlayState)
+            {
+                _log.Debug(AutoPlaySource, $"AutoPlay state {_lastAutoPlayState}->{_autoPlay.State} cargo={_autoPlay.Cargo:0} " +
+                    $"goal={_autoPlay.Goal} personality={_autoPlay.Personality.Name}");
+                _lastAutoPlayState = _autoPlay.State;
+            }
+            float banked = _autoPlay.OwnBaseFood;
+            if (banked >= 0f && Mathf.FloorToInt(banked) != Mathf.FloorToInt(_lastBanked))
+            {
+                if (_lastBanked >= 0f)
+                    _log.Info(AutoPlaySource, $"AutoPlay banked={banked:0} ({(banked - _lastBanked >= 0f ? "+" : "")}{banked - _lastBanked:0}) " +
+                        $"cargo={_autoPlay.Cargo:0} state={_autoPlay.State}");
+                _lastBanked = banked;
+            }
         }
+
+        private const string AutoPlaySource = "AutoPlay";
+        private AutoPlayState _lastAutoPlayState;
+        private float _lastBanked = -1f;
 
         private void TickAutoStart(GameManager gm, NetworkRunner runner)
         {
