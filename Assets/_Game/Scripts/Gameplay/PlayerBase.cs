@@ -94,6 +94,18 @@ namespace CluckWars.Gameplay
         /// </summary>
         [Networked] public int CornerIndex { get; set; }
 
+        /// <summary>
+        /// Where the spawner put this base, stamped in <c>onBeforeSpawned</c> (<c>MapGenerator.SpawnBases</c>) because Fusion
+        /// does not replicate the spawn position of an object without a NetworkTransform (<see cref="SpawnPlacement"/>).
+        /// </summary>
+        [Networked] public Vector3 SpawnPosition { get; set; }
+
+        /// <summary><see cref="SpawnPosition"/> was stamped (a base may legitimately stand at the origin).</summary>
+        [Networked] public NetworkBool HasSpawnPosition { get; set; }
+
+        // True once this peer has applied a stamped spawn position (or holds the authority, whose transform is the truth).
+        private bool _placed;
+
         public float DepositRadius => _depositRadius;
 
         private static readonly Color UnownedColor = new Color(0.42f, 0.42f, 0.42f, 1f);
@@ -127,8 +139,13 @@ namespace CluckWars.Gameplay
             ActiveBases.Add(this);
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
 
-            // Local, visual-only: the position replicates with the spawn, so every peer lays the kit out the same way.
-            if (_kit != null) _kit.rotation = Quaternion.Euler(0f, KitYawFor(transform.position), 0f);
+            // A base not spawned through MapGenerator (scene-baked, Ability Lab) stamps its own spot for the other peers.
+            if (HasStateAuthority && !HasSpawnPosition)
+            {
+                SpawnPosition = transform.position;
+                HasSpawnPosition = true;
+            }
+            ApplySpawnPosition();
 
             if (_matchConfig == null)
             {
@@ -144,6 +161,23 @@ namespace CluckWars.Gameplay
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
             ActiveBases.Remove(this);
+            _placed = false;   // pooled: the next life re-applies its own stamp
+        }
+
+        /// <summary>
+        /// Moves a non-authority copy to the spawner's position (<see cref="SpawnPlacement"/>) and lays the kit out for that
+        /// corner. Local, read-only toward networked state. Retried from <see cref="LateUpdate"/> until a stamp has been seen.
+        /// </summary>
+        private void ApplySpawnPosition()
+        {
+            if (SpawnPlacement.ProxyMustMove(HasStateAuthority, HasSpawnPosition, SpawnPosition, transform.position))
+            {
+                transform.position = SpawnPosition;
+                _log?.Debug(Source, $"{name}: moved to its spawn position {SpawnPosition} (corner {CornerIndex}).");
+            }
+            _placed = HasStateAuthority || HasSpawnPosition;
+            // Local, visual-only: every peer lays the kit out for the corner the base really stands in.
+            if (_kit != null) _kit.rotation = Quaternion.Euler(0f, KitYawFor(transform.position), 0f);
         }
 
         // LateUpdate polls Owner every frame — O(1) PlayerRef comparison.
@@ -153,6 +187,7 @@ namespace CluckWars.Gameplay
         private void LateUpdate()
         {
             if (Object == null || !Object.IsValid) return;
+            if (!_placed) ApplySpawnPosition();
             if (_tintInitialized && Owner == _lastOwnerForTint && (bool)BotClaimed == _lastBotClaimedForTint) return;
 
             _tintInitialized       = true;

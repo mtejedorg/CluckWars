@@ -166,6 +166,18 @@ namespace CluckWars.Gameplay
         [Networked] public float Yaw { get; set; }
 
         /// <summary>
+        /// Where the spawner put this pile, stamped in <c>onBeforeSpawned</c> (<c>MapGenerator.SpawnPile</c>): Fusion does not
+        /// replicate the spawn position of an object without a NetworkTransform, so every client stood every pile at the
+        /// prefab's origin (<see cref="SpawnPlacement"/>).
+        /// </summary>
+        [Networked] public Vector3 SpawnPosition { get; set; }
+
+        /// <summary><see cref="SpawnPosition"/> was stamped (the centre pile legitimately stands at the origin).</summary>
+        [Networked] public NetworkBool HasSpawnPosition { get; set; }
+
+        private bool _placed;
+
+        /// <summary>
         /// Set by the spawner via <c>onBeforeSpawned</c> so it is valid from tick zero.
         /// A permanent pile clamps drains at <see cref="DrainFloor"/> and regenerates.
         /// </summary>
@@ -266,8 +278,14 @@ namespace CluckWars.Gameplay
             ActivePiles.Add(this);
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
 
-            // Every peer applies the stamped yaw itself — the root has no NetworkTransform, and the
-            // collider, carve and visuals all hang off this one rotation.
+            // Every peer applies the stamped yaw (and, off the authority, the stamped position) itself — the root has no
+            // NetworkTransform, and the collider, carve and visuals all hang off this one transform.
+            if (HasStateAuthority && !HasSpawnPosition)
+            {
+                SpawnPosition = transform.position;
+                HasSpawnPosition = true;
+            }
+            ApplySpawnPosition();
             transform.rotation = Quaternion.Euler(0f, Yaw, 0f);
 
             CreateBlocker();
@@ -295,6 +313,7 @@ namespace CluckWars.Gameplay
 
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
+            _placed = false;   // pooled: the next life re-applies its own stamp
             ActivePiles.Remove(this);
         }
 
@@ -355,7 +374,16 @@ namespace CluckWars.Gameplay
 
         public override void Render()
         {
+            if (!_placed) ApplySpawnPosition();
             ApplyFootprint();
+        }
+
+        /// <summary>Moves a non-authority copy to the spawner's position (<see cref="SpawnPlacement"/>); retried from Render until stamped.</summary>
+        private void ApplySpawnPosition()
+        {
+            if (SpawnPlacement.ProxyMustMove(HasStateAuthority, HasSpawnPosition, SpawnPosition, transform.position))
+                transform.position = SpawnPosition;
+            _placed = HasStateAuthority || HasSpawnPosition;
         }
 
         /// <summary>

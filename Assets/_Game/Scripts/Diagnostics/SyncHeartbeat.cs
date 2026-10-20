@@ -50,7 +50,7 @@ namespace CluckWars.Diagnostics
                 var b = bases[i];
                 if (b == null || b.Object == null || !b.Object.IsValid) continue;
                 _log.Info("Base", DepositDiagnostics.BaseLine(b.CornerIndex, b.Owner.ToString(), b.transform.position, b.DepositRadius,
-                    false) + $" round={gm.StartRound} authority={(b.HasStateAuthority ? 1 : 0)}");
+                    b.HasSpawnPosition) + $" round={gm.StartRound} authority={(b.HasStateAuthority ? 1 : 0)}");
             }
         }
 
