@@ -169,6 +169,17 @@ namespace CluckWars.Tests
             Assert.IsFalse(d.Register(corner, w, h, 0.6f));
         }
 
+        [Test]
+        public void DebugHudScale_FitsThePanelOnAPhoneScreen()
+        {
+            const float pixel9Height = 1080f, content = 32f + 34 * 16f;   // ~34 lines with the probe readouts
+            float s = CluckWars.UI.DebugHud.FitScale(3f, pixel9Height, content);
+            Assert.Less(s, 3f, "the 3x density scale would push the panel off a 1080 px landscape screen");
+            Assert.LessOrEqual((CluckWars.UI.DebugHud.PanelTop + content) * s, pixel9Height, "the whole panel fits");
+            Assert.AreEqual(1.5f, CluckWars.UI.DebugHud.FitScale(1.5f, 4000f, content), 1e-4f, "room to spare: density wins");
+            Assert.AreEqual(CluckWars.UI.DebugHud.MinScale, CluckWars.UI.DebugHud.FitScale(3f, 100f, content), 1e-4f, "never below the floor");
+        }
+
         // ---- auto-play --------------------------------------------------------------------------------------------
 
         private static AutoPlayPile[] Piles(params (float x, float z, float amount)[] p)

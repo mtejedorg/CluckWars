@@ -125,11 +125,49 @@ namespace CluckWars.UI
         private static float HudScale =>
             Screen.dpi > 1f ? Mathf.Clamp(Screen.dpi / 96f, 1f, 3f) : 1f;
 
+        /// <summary>Top of the panels in logical (pre-scale) pixels, under the match HUD's top bar.</summary>
+        public const float PanelTop = 110f;
+        /// <summary>IMGUI's default label line height at the default font, in logical pixels.</summary>
+        public const float LineHeight = 16f;
+        /// <summary>The panel's title strip + padding above and below the text.</summary>
+        public const float PanelChrome = 32f;
+        /// <summary>Smallest scale the fit may shrink to (below this the text is unreadable anyway).</summary>
+        public const float MinScale = 0.6f;
+
+        /// <summary>
+        /// The density scale, capped so a panel of <paramref name="contentHeight"/> logical pixels starting at
+        /// <see cref="PanelTop"/> ends above the bottom of a <paramref name="screenHeight"/>-pixel screen. On a ~420 dpi
+        /// phone the density alone asks for 3x, which pushed the panel's lower half (and the Scan button) off a 1080 px
+        /// tall landscape screen. Pure, tested.
+        /// </summary>
+        public static float FitScale(float densityScale, float screenHeight, float contentHeight)
+        {
+            float needed = PanelTop + contentHeight + 12f;
+            float fit = needed > 0f && screenHeight > 0f ? screenHeight / needed : densityScale;
+            return Mathf.Max(MinScale, Mathf.Min(densityScale, fit));
+        }
+
+        private static int LineCount(StringBuilder sb)
+        {
+            int n = 1;
+            for (int i = 0; i < sb.Length; i++) if (sb[i] == '\n') n++;
+            return n;
+        }
+
         private void OnGUI()
         {
             const int pad = 12;
 
-            float scale = HudScale;
+            // Build first: the panel's height (and so the scale that fits it on screen) depends on how many lines it has.
+            float debugHeight = 0f;
+            if (_visible)
+            {
+                _sb.Clear();
+                BuildReport(_sb);
+                debugHeight = PanelChrome + LineCount(_sb) * LineHeight;
+            }
+            const float balanceHeight = 22 * 24;
+            float scale = FitScale(HudScale, Screen.height, Mathf.Max(debugHeight, _balanceVisible ? balanceHeight : 0f));
             var prevMatrix = GUI.matrix;
             if (!Mathf.Approximately(scale, 1f))
                 GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(scale, scale, 1f));
@@ -141,26 +179,24 @@ namespace CluckWars.UI
             if (_visible)
             {
                 const int width  = 360;
-                const int height = 22 * 24;
+                float height = debugHeight;
                 int x = pad;
-                int y = 110;
-
-                _sb.Clear();
-                BuildReport(_sb);
+                float y = PanelTop;
 
                 GUI.Box(new Rect(x, y, width, height), "Debug (F1)");
-                GUI.Label(new Rect(x + 10, y + 24, width - 20, height - 32), _sb.ToString());
-                // Asks VisualProbe (dev tools) for a scan; same as F9 or a three-finger tap.
-                if (DevTools.Available && GUI.Button(new Rect(x, y + height + 6, 180, 36), "Scan visuals (F9)"))
+                GUI.Label(new Rect(x + 10, y + 24, width - 20, height - PanelChrome), _sb.ToString());
+                // In the title strip (top-right), so it is on screen whenever the panel's top is: asks VisualProbe for a
+                // scan, same as F9 or a three-finger tap.
+                if (DevTools.Available && GUI.Button(new Rect(x + width - 128, y + 2, 124, 20), "Scan visuals (F9)"))
                     DiagnosticsReadout.VisualScanRequested = true;
             }
 
             if (_balanceVisible)
             {
                 const int width  = 480;
-                const int height = 22 * 24;
+                const float height = balanceHeight;
                 float x = logicalWidth - width - pad;
-                int y = 110;
+                float y = PanelTop;
 
                 _balanceSb.Clear();
                 BuildBalanceReport(_balanceSb);
