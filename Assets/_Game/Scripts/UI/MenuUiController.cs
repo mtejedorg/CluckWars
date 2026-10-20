@@ -2501,12 +2501,111 @@ namespace CluckWars.UI
                     }
                     catch (Exception e)
                     {
+                        _autoTestJoinFailures++;
                         _log?.Error(Source, $"JoinByCode failed: {e.Message}");
                         if (status != null) status.text = UiText.Get(UiKeys.LobbyErrJoin);
                         _isBusy = false;
                     }
                     break;
             }
+        }
+
+        // ======================================================================
+        //  DEV AUTO-TEST HOOKS (CluckWars.Diagnostics.AutoTestDriver; dev-tools builds only)
+        // ======================================================================
+        // Each hook calls the handler the matching button calls, so an auto-test walks exactly the path a player's taps
+        // walk (selection service, slot model, LastSetup, UGS lobby, scene load). Refused outside a dev-tools build.
+
+        private int _autoTestJoinFailures;
+
+        /// <summary>Pages built and nothing loading: the auto-test may start pressing.</summary>
+        public bool AutoTestIdle => DevToolsAvailable && _lobby != null && _selection != null && !_isBusy;
+
+        /// <summary>The host's join code once UGS created the lobby (THE COOP's code tiles); empty before.</summary>
+        public string AutoTestJoinCode => _joinCode;
+
+        /// <summary>Failed JOIN MATCH attempts (the auto-test's retry signal).</summary>
+        public int AutoTestJoinFailures => _autoTestJoinFailures;
+
+        private bool AutoTestAllowed(string what)
+        {
+            if (DevToolsAvailable && _selection != null) return true;
+            _log?.Warn(Source, $"Auto-test '{what}' refused: dev tools are not available or the menu is not built.");
+            return false;
+        }
+
+        /// <summary>Main menu HOST / JOIN.</summary>
+        public bool AutoTestChooseMode(SessionMode mode)
+        {
+            if (!AutoTestAllowed("mode")) return false;
+            ChooseMode(mode);
+            return true;
+        }
+
+        /// <summary>PICK YOUR BIRD: the class tile (which also seeds the perk's starters, the pre-filled loadout).</summary>
+        public bool AutoTestPickClass(ChickenClass cls)
+        {
+            if (!AutoTestAllowed("class")) return false;
+            OnClassTileTapped(cls);
+            return _selection.SelectedClass == cls && _selection.Passive != null;
+        }
+
+        /// <summary>PICK YOUR BIRD: NEXT.</summary>
+        public void AutoTestOpenLoadout()
+        {
+            if (AutoTestAllowed("next")) ShowLoadout();
+        }
+
+        /// <summary>
+        /// GEAR UP: taps deck cards in deck order (shared row, then the class row; starters skipped) until every slot is
+        /// filled, as a player tapping the first cards would. Returns the slots still empty and the resulting loadout.
+        /// </summary>
+        public int AutoTestFillLoadout(out string loadout)
+        {
+            loadout = string.Empty;
+            if (!AutoTestAllowed("loadout")) return AbilityController.SlotCount;
+            SyncSlotModel();
+            _slotModel.AutoArmFirstEmpty();
+            foreach (var card in _deckCards.ToArray())
+            {
+                if (_slotModel.Missing == 0) break;
+                if (card.Ability == null || _slotModel.SlotOf(card.Ability) >= 0 || IsPreEquipped(card.Ability)) continue;
+                OnAbilityCardTapped(card.Ability);
+                SyncSlotModel();
+            }
+            SettleFlights();
+            var names = new string[ActiveSlotsForClass];
+            for (int i = 0; i < names.Length; i++) names[i] = GetEquipped(i) != null ? GetEquipped(i).name : "-";
+            loadout = string.Join(",", names);
+            return _slotModel.Missing;
+        }
+
+        /// <summary>GEAR UP: READY (only when the button itself would be enabled).</summary>
+        public bool AutoTestPressReady()
+        {
+            if (!AutoTestAllowed("ready")) return false;
+            SyncSlotModel();
+            if (_slotModel.Missing != 0 || _selection.Passive == null) return false;
+            OnReady();
+            return true;
+        }
+
+        /// <summary>THE COOP: START (host) or, with a code typed into the join field, JOIN MATCH (guest).</summary>
+        public bool AutoTestPressStartOrJoin(string joinCode)
+        {
+            if (!AutoTestAllowed("start")) return false;
+            if (_selection.Mode == SessionMode.Join)
+            {
+                var field = _lobby.Q<TextField>("LobbyJoinField");
+                if (field == null)
+                {
+                    _log?.Error(Source, "Auto-test JOIN: Lobby.uxml has no #LobbyJoinField.");
+                    return false;
+                }
+                field.value = joinCode ?? string.Empty;   // the same callback a keyboard runs (upper-case, status pill)
+            }
+            OnStartMatch();
+            return true;
         }
 
         // ======================================================================
