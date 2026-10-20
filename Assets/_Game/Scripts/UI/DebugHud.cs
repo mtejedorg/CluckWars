@@ -12,8 +12,9 @@ using Zenject;
 namespace CluckWars.UI
 {
     /// <summary>
-    /// Developer overlay — toggle with F1, or on a touch device with five taps in the top-left corner
-    /// within 2 s (dev-tools build + Developer Mode; <see cref="CornerTapDetector"/>). Reports FPS, networking
+    /// Developer overlay — F1, or on a touch device five taps in the top-left corner within 2 s (dev-tools build +
+    /// Developer Mode; <see cref="CornerTapDetector"/>), cycle off → compact one-line strip → full panel
+    /// (<see cref="DebugHudModes"/>). Reports FPS, networking
     /// state, GameManager phase, local chicken stats, base ownership, ability cooldowns, and the test-session
     /// probes (FPS p95 + hitch count from PerfProbe, Visual offenders + last scan, RTT / loss). Read-only — the
     /// one button only asks the Visual probe for a scan; no networked side effects.
@@ -25,8 +26,13 @@ namespace CluckWars.UI
     /// </remarks>
     public sealed class DebugHud : MonoBehaviour
     {
-        [Tooltip("Visible at start? Toggle with F1 either way.")]
+        [Tooltip("Full panel at start? F1 cycles off -> compact strip -> full panel either way.")]
         [SerializeField] private bool _visible = false;
+
+        // Off / one-line strip / full panel (DebugHudModes). _visible is the scene-serialized "start on the full panel".
+        private DebugHudMode _mode;
+        private readonly GUIContent _compactContent = new GUIContent();
+        private float _compactBuiltAt = -1f;
 
         [Tooltip("Seconds between FPS samples.")]
         [Min(0.05f)]
@@ -63,8 +69,9 @@ namespace CluckWars.UI
             // Only GUI.Box / Label / Button are used: skipping IMGUI's layout pass keeps the hidden overlay's per-frame
             // cost down now that a dev-tools build also puts it into every Game scene (perf numbers stay representative).
             useGUILayout = false;
-            // Auto-test cw_hud 1: show the overlay as soon as it exists.
-            if (DevTools.Available && DiagnosticsReadout.HudRequestedAtBoot) _visible = true;
+            _mode = _visible ? DebugHudMode.Full : DebugHudMode.Off;
+            // Auto-test cw_hud 1 (compact strip) / 2 (full panel): show it as soon as it exists.
+            if (DevTools.Available && DiagnosticsReadout.HudModeAtBoot != DebugHudMode.Off) _mode = DiagnosticsReadout.HudModeAtBoot;
         }
 
         private void Update()
@@ -83,14 +90,14 @@ namespace CluckWars.UI
             var kb = Keyboard.current;
             if (kb != null)
             {
-                if (kb.f1Key.wasPressedThisFrame) _visible        = !_visible;
+                if (kb.f1Key.wasPressedThisFrame) _mode           = DebugHudModes.Next(_mode);
                 if (kb.f2Key.wasPressedThisFrame) _balanceVisible = !_balanceVisible;
             }
 
             // A phone has no F1: five taps in the top-left corner, in a dev-tools build with Developer Mode on.
             if (DevTools.Available && PlayerPreferences.DeveloperModeEnabled && TryGetTap(out var tap)
                 && _cornerTaps.Register(tap, Screen.width, Screen.height, Time.unscaledTime))
-                _visible = !_visible;
+                _mode = DebugHudModes.Next(_mode);
         }
 
         /// <summary>A touch (or mouse click, for testing on PC) that began this frame, in screen pixels.</summary>
@@ -158,9 +165,12 @@ namespace CluckWars.UI
         {
             const int pad = 12;
 
+            if (_mode == DebugHudMode.Compact) DrawCompact();
+            bool full = _mode == DebugHudMode.Full;
+
             // Build first: the panel's height (and so the scale that fits it on screen) depends on how many lines it has.
             float debugHeight = 0f;
-            if (_visible)
+            if (full)
             {
                 _sb.Clear();
                 BuildReport(_sb);
@@ -176,7 +186,7 @@ namespace CluckWars.UI
             // in the scaled space, not in raw pixels.
             float logicalWidth = Screen.width / scale;
 
-            if (_visible)
+            if (full)
             {
                 const int width  = 360;
                 float height = debugHeight;
@@ -205,6 +215,38 @@ namespace CluckWars.UI
                 GUI.Label(new Rect(x + 10, y + 24, width - 20, height - 32), _balanceSb.ToString());
             }
 
+            GUI.matrix = prevMatrix;
+        }
+
+        /// <summary>
+        /// cw_hud 1: one line (FPS | p95 | hitches | Visual offenders | RTT) on a translucent strip in the top-left corner,
+        /// inside the safe area, small enough to leave the match HUD readable. Rebuilt at the FPS sample rate, not every frame.
+        /// </summary>
+        private void DrawCompact()
+        {
+            if (_compactBuiltAt < 0f || Time.unscaledTime - _compactBuiltAt >= _fpsSampleInterval)
+            {
+                _compactBuiltAt = Time.unscaledTime;
+                _compactContent.text = DebugHudModes.CompactLine(_fps, DiagnosticsReadout.PerfP95Ms, DiagnosticsReadout.PerfHitchCount,
+                    DiagnosticsReadout.VisualOffenders, DiagnosticsReadout.NetRttMs);
+            }
+
+            float scale = Mathf.Min(HudScale, 2f);
+            var prevMatrix = GUI.matrix;
+            var prevColor = GUI.color;
+            GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(scale, scale, 1f));
+
+            var safe = Screen.safeArea;
+            float x = safe.xMin / scale + 6f;
+            float y = (Screen.height - safe.yMax) / scale + 4f;
+            var size = GUI.skin.label.CalcSize(_compactContent);
+            var rect = new Rect(x, y, size.x + 12f, size.y + 4f);
+            GUI.color = new Color(0f, 0f, 0f, 0.45f);
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUI.Label(new Rect(x + 6f, y + 2f, size.x + 4f, size.y), _compactContent);
+
+            GUI.color = prevColor;
             GUI.matrix = prevMatrix;
         }
 

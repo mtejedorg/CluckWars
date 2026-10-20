@@ -34,7 +34,9 @@ namespace CluckWars.Diagnostics
         public float AutoStartTimeout = DefaultAutoStartTimeout;
         /// <summary>Extra rounds to take with PLAY AGAIN after the first.</summary>
         public int AutoLoop;
-        public bool AutoPlay, DevMode, Hud;
+        public bool AutoPlay, DevMode;
+        /// <summary><c>cw_hud</c>: 0 off, 1 compact strip, 2 full panel (true / a bare flag = 1).</summary>
+        public int Hud;
 
         /// <summary>At least one <c>cw_</c> key was present (valid or not).</summary>
         public bool AnyKey;
@@ -102,7 +104,10 @@ namespace CluckWars.Diagnostics
                     case AutoHostKey: cfg.AutoHost = cfg.ParseBool(key, value); break;
                     case AutoPlayKey: cfg.AutoPlay = cfg.ParseBool(key, value); break;
                     case DevModeKey:  cfg.DevMode = cfg.ParseBool(key, value); break;
-                    case HudKey:      cfg.Hud = cfg.ParseBool(key, value); break;
+                    case HudKey:
+                        if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int level) && level >= 0 && level <= 2) cfg.Hud = level;
+                        else cfg.Hud = cfg.ParseBool(key, value) ? 1 : 0;
+                        break;
                     case AutoJoinKey:
                         if (!IsJoinCode(value))
                             cfg.Problems.Add($"{key} '{value}' is not a whole join code ({CluckWars.UI.JoinCodeEntry.MinLength}-" +
@@ -170,7 +175,7 @@ namespace CluckWars.Diagnostics
             " autoplay=" + (AutoPlay ? 1 : 0) +
             " timeout=" + AutoStartTimeout.ToString("0", CultureInfo.InvariantCulture) +
             " devmode=" + (DevMode ? 1 : 0) +
-            " hud=" + (Hud ? 1 : 0);
+            " hud=" + Hud.ToString(CultureInfo.InvariantCulture);
     }
 
     /// <summary>The auto-test's timing decisions (start, play again, join retries), pure so tests pin them.</summary>

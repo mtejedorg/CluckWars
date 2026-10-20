@@ -74,7 +74,7 @@ namespace CluckWars.Diagnostics
                 PlayerPreferences.DeveloperModeEnabled = true;
                 _log.Info(Source, "AutoTest: Developer Mode switched on (cw_devmode).");
             }
-            if (_cfg.Hud) DiagnosticsReadout.HudRequestedAtBoot = true;
+            DiagnosticsReadout.HudModeAtBoot = DebugHudModes.FromLevel(_cfg.Hud);
             if (_cfg.AutoPlay && _autoPlay == null)
                 _log.Error(Source, "cw_autoplay is set but no AutoPlayInputProvider is bound (ProjectInstaller); the bird will not move by itself.");
 

@@ -30,7 +30,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(3, cfg.AutoLoop);
             Assert.IsTrue(cfg.AutoPlay);
             Assert.IsTrue(cfg.DevMode, "a bare flag followed by another switch");
-            Assert.IsTrue(cfg.Hud);
+            Assert.AreEqual(1, cfg.Hud);
             Assert.IsNull(cfg.AutoJoin);
             Assert.AreEqual(AutoTestConfig.DefaultAutoStartTimeout, cfg.AutoStartTimeout);
             CollectionAssert.IsEmpty(cfg.Problems);
@@ -56,7 +56,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(AutoTestConfig.DefaultClass, cfg.Class, "invalid class -> default");
             Assert.AreEqual(45f, cfg.AutoStartTimeout);
             Assert.IsTrue(cfg.AutoPlay);
-            Assert.IsFalse(cfg.Hud);
+            Assert.AreEqual(0, cfg.Hud);
             Assert.AreEqual(3, cfg.Problems.Count, string.Join(" | ", cfg.Problems));
             Assert.IsTrue(cfg.WantsMenuFlow);
         }
@@ -184,6 +184,22 @@ namespace CluckWars.Tests
             for (int i = 0; i < 4; i++) d.Register(corner, w, h, i * 0.1f);
             Assert.IsFalse(d.Register(new Vector2(900f, 500f), w, h, 0.5f), "a tap elsewhere resets the count");
             Assert.IsFalse(d.Register(corner, w, h, 0.6f));
+        }
+
+        [Test]
+        public void HudModes_CwHudLevels_AndTheToggleCycle()
+        {
+            Assert.AreEqual(2, AutoTestConfig.FromMap(new Dictionary<string, string> { ["cw_hud"] = "2" }).Hud);
+            Assert.AreEqual(1, AutoTestConfig.FromMap(new Dictionary<string, string> { ["cw_hud"] = "true" }).Hud);
+            Assert.AreEqual(DebugHudMode.Compact, DebugHudModes.FromLevel(1));
+            Assert.AreEqual(DebugHudMode.Full, DebugHudModes.FromLevel(2));
+            Assert.AreEqual(DebugHudMode.Off, DebugHudModes.FromLevel(0));
+            Assert.AreEqual(DebugHudMode.Compact, DebugHudModes.Next(DebugHudMode.Off));
+            Assert.AreEqual(DebugHudMode.Full, DebugHudModes.Next(DebugHudMode.Compact));
+            Assert.AreEqual(DebugHudMode.Off, DebugHudModes.Next(DebugHudMode.Full));
+            Assert.AreEqual("FPS 59 | p95 18.2ms | hitches 3 | visual 0 | rtt 45ms",
+                DebugHudModes.CompactLine(59.4f, 18.24f, 3, 0, 45.2f));
+            Assert.AreEqual("FPS 0 | p95 n/a | hitches 0 | visual n/a | rtt n/a", DebugHudModes.CompactLine(0f, -1f, 0, -1, -1f));
         }
 
         [Test]

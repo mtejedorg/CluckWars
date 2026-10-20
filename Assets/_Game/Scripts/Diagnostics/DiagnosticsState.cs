@@ -26,8 +26,8 @@ namespace CluckWars.Diagnostics
         public static string NetLoss = "n/a";
         /// <summary>Last <c>Time.frameCount</c> on which a probe did scan work (PerfProbe tags a hitch on it <c>probe=1</c>).</summary>
         public static int ProbeWorkFrame = -1;
-        /// <summary>Auto-test <c>cw_hud 1</c>: show the overlay as soon as it exists.</summary>
-        public static bool HudRequestedAtBoot;
+        /// <summary>Auto-test <c>cw_hud</c>: 1 = compact strip, 2 = full panel as soon as the overlay exists.</summary>
+        public static DebugHudMode HudModeAtBoot;
     }
 
     /// <summary>

@@ -276,7 +276,7 @@ While playing, press **F1** to toggle the developer overlay (`DebugHud` MonoBeha
 
 Read-only. No debug commands. Placed in `AbilityLab.unity`; a **dev-tools build** (see "Test-session instrumentation" below) also adds it to every loaded `Game.unity` at runtime (`DebugHudSpawner`).
 
-On a phone (no F1): in a dev-tools build with **Developer Mode** on, **tap the top-left corner five times within 2 s** (corner = max(120 px, 8 % of the short side); a mouse click counts too, for testing on PC). Auto-test `cw_hud 1` shows it at boot. A dev-tools build adds the probe lines: frame-time p95 (+ fps), hitch count, Visual offenders + last scan time (UTC), RTT / loss, and a **Scan visuals (F9)** button.
+F1 and the five-tap gesture cycle **off → compact strip → full panel**. On a phone (no F1): in a dev-tools build with **Developer Mode** on, **tap the top-left corner five times within 2 s** (corner = max(120 px, 8 % of the short side); a mouse click counts too, for testing on PC). Auto-test `cw_hud 1` shows it at boot. A dev-tools build adds the probe lines: frame-time p95 (+ fps), hitch count, Visual offenders + last scan time (UTC), RTT / loss, and a **Scan visuals (F9)** button.
 
 ---
 
@@ -461,7 +461,8 @@ Always on (breadcrumbs): `MatchOverlays` `Cover on/off`, `Cover off: covered= la
 | `cw_autostart_timeout S` | …or after S seconds with whoever is there (default 90) |
 | `cw_autoloop N` | host: PLAY AGAIN for N extra rounds, then stay on the results |
 | `cw_autoplay 1` | fake local input: piles → base, weave, unstick, an ability every 3 s |
-| `cw_devmode 1` / `cw_hud 1` | Developer Mode on / overlay shown at boot |
+| `cw_devmode 1` | Developer Mode on |
+| `cw_hud 1` / `cw_hud 2` | overlay at boot: 1 = compact one-line strip (FPS \| p95 \| hitches \| Visual \| RTT, top-left, translucent; leaves the match HUD visible), 2 = full panel |
 
 Android (`-e` string extras; `--ei` / `--ez` work too). **Always use `am start -S`** (force-stop first): the extras are read once per process and then removed from the intent, and an activity re-opened from Recents ignores them, so a run never re-hosts / re-joins by accident:
 
