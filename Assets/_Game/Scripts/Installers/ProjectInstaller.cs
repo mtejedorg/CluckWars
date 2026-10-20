@@ -221,6 +221,7 @@ namespace CluckWars.Installers
         private void InstallDiagnostics()
         {
             Container.Bind<PerfProbe>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.Perf").AsSingle().NonLazy();
+            Container.Bind<SyncHeartbeat>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.Sync").AsSingle().NonLazy();
         }
     }
 }
