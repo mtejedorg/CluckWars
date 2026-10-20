@@ -82,6 +82,19 @@ namespace CluckWars.Gameplay
         /// </summary>
         [Networked] public NetworkBehaviourId OwnerChicken { get; set; }
 
+        /// <summary>
+        /// Where the caster placed the zone, stamped in <c>onBeforeSpawned</c> by the ability SOs: the prefab has no
+        /// NetworkTransform and Fusion does not replicate a spawn position without one (<see cref="SpawnPlacement"/>), so
+        /// every other peer stood the zone at the prefab root - and every OTHER chicken's own authority, which tests zone
+        /// overlap in its own tick, never felt a zone placed by someone else (CW-217's differing World hashes).
+        /// </summary>
+        [Networked] public Vector3 SpawnPosition { get; set; }
+
+        /// <summary><see cref="SpawnPosition"/> was stamped.</summary>
+        [Networked] public NetworkBool HasSpawnPosition { get; set; }
+
+        private bool _placed;
+
         // ---- Read-only accessor (ChickenController uses this) -----------------
 
         /// <summary>
@@ -122,6 +135,13 @@ namespace CluckWars.Gameplay
 
             ActiveZones.Add(this);
 
+            if (HasStateAuthority && !HasSpawnPosition)
+            {
+                SpawnPosition = transform.position;
+                HasSpawnPosition = true;
+            }
+            ApplySpawnPosition();
+
             _changes        = GetChangeDetector(ChangeDetector.Source.SimulationState);
             _consumedReader = GetPropertyReader<bool>(nameof(Consumed));
 
@@ -138,6 +158,7 @@ namespace CluckWars.Gameplay
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
             ActiveZones.Remove(this);
+            _placed = false;   // pooled: the next life re-applies its own stamp
 
             // Fallback for the one case the Render() detector structurally cannot see: a
             // root zone flips Consumed on tick N and despawns on tick N+1, and at the 30 fps
@@ -233,8 +254,17 @@ namespace CluckWars.Gameplay
         /// <c>AbilityBaseSO.ReportsCastHits</c>), so without this the ability that worked
         /// perfectly is also the ability that never tells you it worked.
         /// </summary>
+        /// <summary>Moves a non-authority copy to the caster's spot (<see cref="SpawnPlacement"/>); retried from Render until stamped.</summary>
+        private void ApplySpawnPosition()
+        {
+            if (SpawnPlacement.ProxyMustMove(HasStateAuthority, HasSpawnPosition, SpawnPosition, transform.position))
+                transform.position = SpawnPosition;
+            _placed = HasStateAuthority || HasSpawnPosition;
+        }
+
         public override void Render()
         {
+            if (!_placed) ApplySpawnPosition();
             if (Effect == ZoneEffect.Root) ObserveRootConsumed();
             else                           ObserveSlowZoneEntry();
         }

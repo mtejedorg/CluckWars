@@ -94,6 +94,9 @@ namespace CluckWars.Abilities
                             + "persist for the rest of the match doing nothing — fix the prefab.");
                         return;
                     }
+                    // No NetworkTransform on the zone: its position reaches the other peers only through this stamp.
+                    zone.SpawnPosition    = pos;
+                    zone.HasSpawnPosition = true;
                     zone.Effect          = ZoneEffect.Slow;
                     zone.OwnerChicken    = capOwner;
                     zone.SlowFactor      = capSlowFactor;
