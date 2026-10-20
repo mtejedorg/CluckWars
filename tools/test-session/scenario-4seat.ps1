@@ -46,7 +46,7 @@ function Phone-Launch([string[]]$extras) {
 
 if ($Phone -eq 'join') {
     Start-Exe 'client1' @('-cw_autohost','-cw_class','Assassin','-cw_autostart','4','-cw_autostart_timeout','120',"-cw_autoloop","$Rounds")
-    $code = Wait-Code "$S\client1.log"
+    $code = Wait-Code "$S\client1.log"
 } else {
     Phone-Launch @('cw_autohost=1','cw_class=Assassin','cw_autostart=4','cw_autostart_timeout=120',"cw_autoloop=$Rounds",'cw_autoplay=1','cw_hud=1','cw_devmode=1','cw_profile=phone')
     $code = Wait-Code "$S\phone.log"
@@ -64,7 +64,7 @@ if ($Phone -eq 'join') {
 }
 
 $deadline = (Get-Date).AddMinutes($MaxMinutes); $n = 0
-$mainLog = if ($Phone -eq 'join') { "$S\client1.log" } else { "$S\phone.log" }
+$mainLog = if ($Phone -eq 'join') { "$S\client1.log" } else { "$S\phone.log" }
 while ((Get-Date) -lt $deadline) {
     Start-Sleep $ShotEvery
     $n++
