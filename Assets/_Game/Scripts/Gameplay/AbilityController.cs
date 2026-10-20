@@ -1088,13 +1088,18 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// Round reset: ends every running ability through its own OnDeactivate so its modifiers, traversal hold
-        /// and any ability-owned state go with it. Authority only; the caller keeps <c>Effects.Clear</c> as a
-        /// backstop afterwards.
+        /// and any ability-owned state go with it, then starts the new round with every move ready: all slot
+        /// cooldowns, the hold-to-aim charge and the peck chain are cleared (CW-224: a bot opened round 2 with a
+        /// 3.8 s cooldown left over from round 1; humans with 0.7-2.3 s). Authority only; the caller keeps
+        /// <c>Effects.Clear</c> as a backstop afterwards.
         /// </summary>
         public void EndAllForReset()
         {
             if (!HasStateAuthority || !_initialized) return;
             DeactivateAll();
+            for (int slot = 0; slot < SlotCount; slot++) SetCooldown(slot, TickTimer.None);
+            ChargingSlot = 0;
+            if (PeckChainActive) PeckChainActive = false;
         }
 
         /// <summary>
