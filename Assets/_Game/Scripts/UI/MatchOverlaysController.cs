@@ -1367,8 +1367,8 @@ namespace CluckWars.UI
                     _log?.Info(Source, $"Arena revealed (state {state}, ready={(_arenaReadiness == null ? "n/a" : _arenaReadiness.IsReady.ToString())}, " +
                         $"covered {_arenaCoveredSeconds:0.00} s).");
                 // Test-session breadcrumb (item 5): cover off, with what the reveal looked like on this peer.
-                _log?.Info(Source, $"Cover off: covered={_arenaCoveredSeconds:0.00}s lateJoin={(lateJoin ? 1 : 0)} " +
-                    $"reducedMotion={(PlayerPreferences.ReducedMotionEnabled ? 1 : 0)} fade={(PlayerPreferences.ReducedMotionEnabled ? 0f : ArenaCoverRule.FadeSeconds):0.00}s " +
+                _log?.Info(Source, FormattableString.Invariant($"Cover off: covered={_arenaCoveredSeconds:0.00}s lateJoin={(lateJoin ? 1 : 0)} ") +
+                    FormattableString.Invariant($"reducedMotion={(PlayerPreferences.ReducedMotionEnabled ? 1 : 0)} fade={(PlayerPreferences.ReducedMotionEnabled ? 0f : ArenaCoverRule.FadeSeconds):0.00}s ") +
                     $"hardCap={(d.HardCap ? 1 : 0)} state={state}");
                 RevealState.NotifyRevealed(PlayerPreferences.ReducedMotionEnabled ? 0f : ArenaCoverRule.FadeSeconds);
             }
@@ -1388,7 +1388,7 @@ namespace CluckWars.UI
                 // Breadcrumb (item 5): every cover transition before the reveal (the waiting room hides it, Starting shows it).
                 RevealState.CoverShown = d.CoverShown;
                 _log?.Info(Source, $"Cover {(d.CoverShown ? "on" : "off (waiting room / overlay)")}: state={state} " +
-                    $"ready={(_arenaReadiness == null ? "n/a" : _arenaReadiness.IsReady ? "1" : "0")} covered={_arenaCoveredSeconds:0.00}s");
+                    FormattableString.Invariant($"ready={(_arenaReadiness == null ? "n/a" : _arenaReadiness.IsReady ? "1" : "0")} covered={_arenaCoveredSeconds:0.00}s"));
             }
             if (d.CoverShown)
             {
@@ -1476,7 +1476,7 @@ namespace CluckWars.UI
             if (shown && _getReadySince < 0f) _getReadySince = Time.unscaledTime;
             else if (!shown && _getReadySince >= 0f)
             {
-                _log?.Info(Source, $"GET READY held {Time.unscaledTime - _getReadySince:0.00}s " +
+                _log?.Info(Source, FormattableString.Invariant($"GET READY held {Time.unscaledTime - _getReadySince:0.00}s ") +
                     $"(now {(gm != null ? gm.State.ToString() : "no manager")}, {RevealState.Describe()}).");
                 _getReadySince = -1f;
             }
