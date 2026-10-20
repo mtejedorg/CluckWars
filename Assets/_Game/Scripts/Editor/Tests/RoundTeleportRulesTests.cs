@@ -1,3 +1,4 @@
+using System.IO;
 using CluckWars.Gameplay;
 using NUnit.Framework;
 using UnityEngine;
@@ -36,6 +37,28 @@ namespace CluckWars.Tests
             p.Request(Vector3.one);
             p.Clear();
             Assert.IsFalse(p.TryConsume(out _));
+        }
+
+        [Test]
+        public void RoundReset_ClearsEveryAbilityCooldown_CW224()
+        {
+            // The reset path (GameManager.ResetWorldForNewRound -> ChickenController.RPC_ResetControlStates ->
+            // AbilityController.EndAllForReset) needs a live runner, so pin the body: it must end the running abilities
+            // AND clear every slot's cooldown, the hold charge and the peck chain. Bots go through the same RPC.
+            var src = File.ReadAllText("Assets/_Game/Scripts/Gameplay/AbilityController.cs").Replace("\r\n", "\n");
+            int start = src.IndexOf("public void EndAllForReset()");
+            Assert.GreaterOrEqual(start, 0, "EndAllForReset was renamed - update this test");
+            int end = src.IndexOf("\n        }", start);
+            var body = src.Substring(start, end - start);
+            StringAssert.Contains("DeactivateAll();", body);
+            StringAssert.Contains("for (int slot = 0; slot < SlotCount; slot++) SetCooldown(slot, TickTimer.None);", body);
+            StringAssert.Contains("ChargingSlot = 0;", body);
+            StringAssert.Contains("PeckChainActive = false", body);
+
+            var gm = File.ReadAllText("Assets/_Game/Scripts/Gameplay/GameManager.cs");
+            StringAssert.Contains("RPC_ResetControlStates()", gm, "the reset still asks every chicken (bots included) to reset");
+            var ctrl = File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenController.cs");
+            StringAssert.Contains("_abilities?.EndAllForReset();", ctrl);
         }
     }
 }
