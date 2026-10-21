@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using System.Text;
 using CluckWars.Gameplay;
 using CluckWars.Logging;
+using Fusion;
 using UnityEngine;
 using Zenject;
 using LogLevel = CluckWars.Logging.LogLevel;
@@ -21,6 +23,13 @@ namespace CluckWars.Diagnostics
     /// state there is. <c>cs</c> comes from the replicated <c>ControlFlags</c> (<see cref="SyncControlState"/>). Remote
     /// values are whatever this peer last received: positions of a moving chicken lag its owner's own view by the
     /// interpolation delay plus half the RTT (about 0.2-0.35 s, i.e. 1.5-3 m at 7-10 m/s in the 2026-10-20 runs).
+    /// <para>The same lag applies to <c>cs</c>: the owner prints the flags of its newest tick, every other peer the newest
+    /// snapshot it has, so a flag that toggled in that window differs for one line, and when it toggles again before the
+    /// next line the difference is the same sequence seen later (owner Free/Slowed, remotes Slowed/Free: CW-226, session
+    /// 20261021-150533). merge.ps1 therefore only reports a <c>cs</c> pair that repeats with the SAME values. To tell a
+    /// toggling flag from one that never arrived, each chicken also carries <c>fl=N</c> (how often this peer saw its
+    /// replicated flags change since the last line, sampled every frame on every peer alike, printed when N &gt; 0) and,
+    /// on the peer that simulates it, <c>own=1</c> plus <c>src=</c> (its slow sources of the last tick).</para>
     /// </remarks>
     public sealed class SyncHeartbeat : MonoBehaviour
     {
@@ -34,6 +43,10 @@ namespace CluckWars.Diagnostics
         private readonly SyncBase[] _bases = new SyncBase[MaxBases];
         private readonly SyncPile[] _piles = new SyncPile[MaxPiles];
         private readonly StringBuilder _sb = new StringBuilder(1024);
+
+        // fl=N: replicated control-flag changes seen on this peer since the last line, per chicken (CW-226).
+        private struct FlagTrack { public ControlVfx Last; public int Flips; }
+        private readonly Dictionary<NetworkId, FlagTrack> _flagTrack = new Dictionary<NetworkId, FlagTrack>(16);
 
         [Inject]
         public void Construct(ILogService log) => _log = log;
@@ -97,12 +110,13 @@ namespace CluckWars.Diagnostics
         private void Update()
         {
             var gm = GameManager.Instance;
-            if (gm == null || gm.Object == null || !gm.Object.IsValid) { _boundary.Reset(); return; }
+            if (gm == null || gm.Object == null || !gm.Object.IsValid) { _boundary.Reset(); _flagTrack.Clear(); return; }
             var runner = gm.Runner;
-            if (runner == null || !runner.IsRunning) { _boundary.Reset(); return; }
+            if (runner == null || !runner.IsRunning) { _boundary.Reset(); _flagTrack.Clear(); return; }
             DumpBasesOncePerRound(gm);
             CheckRespawnOncePerRound(gm);
             if (!HeavyProbes.Enabled || _log == null || !_log.IsEnabled(LogLevel.Debug)) return;
+            TrackControlFlags();
 
             int tick = (int)runner.Tick;
             if (!_boundary.TryCross(tick, Mathf.RoundToInt(PeriodSeconds * runner.TickRate), out int boundary)) return;
@@ -124,6 +138,9 @@ namespace CluckWars.Diagnostics
                     Hp = c.Combat != null && c.Combat.IsRemoved ? 0 : 1,
                     Cargo = c.Cargo != null ? Mathf.FloorToInt(c.Cargo.Cargo) : 0,
                     ControlState = SyncControlState.Name(c.ControlFlags),   // replicated, so every peer agrees
+                    Flips = TakeFlips(c.Object.Id),
+                    Own = c.HasStateAuthority,
+                    Src = c.HasStateAuthority ? SyncControlState.Sources(c.ActiveSlowSources) : null,
                 };
             }
 
@@ -150,6 +167,27 @@ namespace CluckWars.Diagnostics
             SyncHeartbeatFormat.Build(_sb, boundary, gm.State.ToString(), gm.TimeRemaining,
                 _chickens, nc, _bases, nb, _piles, np);
             _log.Debug(Source, _sb.ToString());
+        }
+
+        private void TrackControlFlags()
+        {
+            var chickens = ChickenController.ActiveControllers;
+            for (int i = 0; i < chickens.Count; i++)
+            {
+                var c = chickens[i];
+                if (c == null || c.Object == null || !c.Object.IsValid || c.IsDecoy) continue;
+                var id = c.Object.Id;
+                var flags = c.ControlFlags;
+                if (!_flagTrack.TryGetValue(id, out var t)) _flagTrack[id] = new FlagTrack { Last = flags };
+                else if (t.Last != flags) _flagTrack[id] = new FlagTrack { Last = flags, Flips = t.Flips + 1 };
+            }
+        }
+
+        private int TakeFlips(NetworkId id)
+        {
+            if (!_flagTrack.TryGetValue(id, out var t)) return 0;
+            _flagTrack[id] = new FlagTrack { Last = t.Last };
+            return t.Flips;
         }
     }
 }

@@ -83,6 +83,20 @@ Assert ($f2 -match 'piles differ from round 1') 'invariants: piles not reset are
 Assert ($f2 -match 'share corner quadrant') 'invariants: two chickens in one corner are flagged'
 Assert ($f2 -match 'world static hash differs across peers from t=1000') 'invariants: persistent static-world hash disagreement between peers is flagged (CW-216/217 class)'
 Remove-Item $tmp2 -Recurse -Force
+
+# ---- lag vs stuck (CW-226): a mismatch counts only while one side stays constant; both sides changing is lag ----
+$tmp3 = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-cs-' + [Guid]::NewGuid().ToString('N'))
+Copy-Item (Join-Path $PSScriptRoot 'fixtures\cs-fixture') $tmp3 -Recurse
+& (Join-Path $PSScriptRoot 'merge.ps1') -Session $tmp3 | Out-Null
+$f3 = Get-Content (Join-Path $tmp3 'findings.txt') -Raw
+Assert ($f3 -notmatch 'chicken P2 cs') 'lag: owner Slowed/Free vs remote Free/Slowed (swapped pairs, session 150533) NOT reported'
+Assert ($f3 -notmatch 'pile\[1\]') 'lag: pile 5.0/0.0 then 0.0/2.0, both sides change (refill seen a beat late, session 153100) NOT reported'
+Assert ((Count $f3 '\[SYNC\] t=292\.\.356 client1 vs client2: chicken P3 cs client1=Free client2=Slowed') -eq 1) 'stuck: the same pair on 2 heartbeats IS reported'
+Assert ($f3 -match 'chicken P3 cs .*\[owner=client2 src=Collision fl client1=0 client2=1\]') 'stuck: cs finding names the owner, its slow sources and each side''s flag changes'
+Assert ((Count $f3 '\[SYNC\] t=100\.\.228 client1 vs client2: chicken P4 cs client1=Slowed client2=Free') -eq 1) 'stuck: remote constant Slowed while the owner flickers Free/Rooted/Free IS reported (pairs differ every beat)'
+Assert ((Count $f3 '\[SYNC\] t=292\.\.420 client1 vs client2: chicken P5 cs client1=Slowed client2=Free  \(3 consecutive') -eq 1) 'stuck: 3-beat owner-Slowed / remotes-Free (session 225001 shape) IS reported'
+Assert ($f3 -match 'SYNC=3\s') 'lag/stuck: exactly three SYNC findings'
+Remove-Item $tmp3 -Recurse -Force
 Write-Host ''
 if ($script:fail -eq 0) { Write-Host 'SELFTEST OK' -ForegroundColor Green; exit 0 }
 Write-Host "SELFTEST FAILED ($($script:fail) assertion(s))" -ForegroundColor Red

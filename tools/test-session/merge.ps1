@@ -21,6 +21,11 @@
      default 3, and within 15 s wall clock); compare st exact, rem +-0.5 s, per chicken hp/cg/cs exact,
      x/z +-1.5 m, bases and piles exact; a field must differ on 2 consecutive paired heartbeats
      (-Persist) to be reported; chicken ids present on one peer only are reported as GHOST on the same rule.
+     Lag vs stuck (CW-226, every field): the owner prints its newest tick, the others their newest snapshot, so a
+     value that changes near a heartbeat differs for a beat or two while BOTH sides keep changing (swapped cs pairs,
+     a pile refill the clients see one beat later). A mismatch only counts when, over -Persist consecutive beats, at
+     least one side's value stays constant (a remote stuck / an update that never arrives; a repeated pair is a case
+     of this). cs findings append the owner (own=1), each side's flag changes (fl=) and the owner's slow sources (src=).
 
 .EXAMPLE
   .\tools\test-session\merge.ps1 -Session .\Captures\session-20261020-173000
@@ -339,9 +344,15 @@ function Compare-Beats($a, $b) {
             $d["ghost:$id"] = @{ Cat = 'GHOST'; Desc = "chicken $id"; A = $(if ($ca) { 'present' } else { 'missing' }); B = $(if ($cb) { 'present' } else { 'missing' }) }
             continue
         }
-        foreach ($fld in 'hp', 'cg', 'cs') {
+        foreach ($fld in 'hp', 'cg') {
             $va = $ca[$fld]; $vb = $cb[$fld]
             if ("$va" -ne "$vb") { $d["c$id.$fld"] = @{ Cat = 'SYNC'; Desc = "chicken $id $fld"; A = "$va"; B = "$vb" } }
+        }
+        # cs carries the owner diagnostics (own/fl/src, CW-226) for the finding text
+        $va = $ca['cs']; $vb = $cb['cs']
+        if ("$va" -ne "$vb") {
+            $d["c$id.cs"] = @{ Cat = 'SYNC'; Desc = "chicken $id cs"; A = "$va"; B = "$vb"
+                OwnA = ($ca['own'] -eq '1'); OwnB = ($cb['own'] -eq '1'); FlA = $ca['fl']; FlB = $cb['fl']; SrcA = $ca['src']; SrcB = $cb['src'] }
         }
         foreach ($fld in 'x', 'z') {
             $va = $ca[$fld]; $vb = $cb[$fld]
@@ -360,6 +371,22 @@ function Compare-Beats($a, $b) {
         if ($va -ne $vb) { $d["pile$i"] = @{ Cat = 'SYNC'; Desc = "pile[$i]"; A = $va; B = $vb } }
     }
     return $d
+}
+
+# Longest stretch of a run's beats (all mismatching) over which at least one side's value stays constant: the stuck
+# side. A stretch where both sides change every beat is lag (see header) and never qualifies. $null for an empty run.
+function Find-StuckWindow($beats) {
+    $best = $null
+    foreach ($side in 'A', 'B') {
+        $start = 0
+        for ($i = 1; $i -le $beats.Count; $i++) {
+            if ($i -lt $beats.Count -and "$($beats[$i].Info[$side])" -eq "$($beats[$i - 1].Info[$side])") { continue }
+            $n = $i - $start
+            if ($null -eq $best -or $n -gt $best.N) { $best = @{ N = $n; First = $beats[$start]; Last = $beats[$i - 1] } }
+            $start = $i
+        }
+    }
+    return $best
 }
 
 $pairStats = New-Object System.Collections.Generic.List[string]
@@ -394,8 +421,9 @@ for ($ia = 0; $ia -lt $srcNames.Count; $ia++) {
                 if (-not $diff.ContainsKey($k)) { $done.Add($runs[$k]); $runs.Remove($k) }
             }
             foreach ($k in $diff.Keys) {
-                if ($runs.ContainsKey($k)) { $runs[$k].N++; $runs[$k].LastT = $pr[0].T }
-                else { $runs[$k] = @{ Key = $k; N = 1; FirstT = $pr[0].T; LastT = $pr[0].T; First = $pr[0].Entry; Info = $diff[$k] } }
+                $beat = @{ T = $pr[0].T; Entry = $pr[0].Entry; Info = $diff[$k] }
+                if ($runs.ContainsKey($k)) { $runs[$k].Beats.Add($beat) }
+                else { $l = New-Object System.Collections.Generic.List[object]; $l.Add($beat); $runs[$k] = @{ Key = $k; Beats = $l } }
             }
         }
         foreach ($k in $runs.Keys) { $done.Add($runs[$k]) }
@@ -403,10 +431,16 @@ for ($ia = 0; $ia -lt $srcNames.Count; $ia++) {
             # cargo changes every few seconds while foraging/depositing: a 2-beat mismatch is sampling skew at a flush, so it
             # needs 2 more consecutive beats to count as a real divergence
             $need = if ($r.Key -like 'c*.cg') { $Persist + 2 } else { $Persist }
-            if ($r.N -lt $need) { continue }
-            $inf = $r.Info
-            $text = 't={1}..{2} {3} vs {4}: {5} {6}={7} {8}={9}  ({10} consecutive heartbeats, from {11})' -f $inf.Cat, $r.FirstT, $r.LastT, $sa, $sb, $inf.Desc, $sa, $inf.A, $sb, $inf.B, $r.N, (Format-Time $r.First.Ticks)
-            Add-Finding @($inf.Cat) $r.First $text
+            $w = Find-StuckWindow $r.Beats
+            if ($null -eq $w -or $w.N -lt $need) { continue }
+            $inf = $w.First.Info
+            $text = 't={1}..{2} {3} vs {4}: {5} {6}={7} {8}={9}  ({10} consecutive heartbeats, from {11})' -f $inf.Cat, $w.First.T, $w.Last.T, $sa, $sb, $inf.Desc, $sa, $inf.A, $sb, $inf.B, $w.N, (Format-Time $w.First.Entry.Ticks)
+            if ($inf.ContainsKey('OwnA')) {
+                # first heartbeat of the run: who simulates the bird, how often each side saw the flags change, what slows it
+                $own = $(if ($inf.OwnA) { "$sa src=$(if ($inf.SrcA) { $inf.SrcA } else { 'none' })" } elseif ($inf.OwnB) { "$sb src=$(if ($inf.SrcB) { $inf.SrcB } else { 'none' })" } else { 'neither' })
+                $text += ('  [owner={0} fl {1}={2} {3}={4}]' -f $own, $sa, $(if ($inf.FlA) { $inf.FlA } else { 0 }), $sb, $(if ($inf.FlB) { $inf.FlB } else { 0 }))
+            }
+            Add-Finding @($inf.Cat) $w.First.Entry $text
         }
     }
 }

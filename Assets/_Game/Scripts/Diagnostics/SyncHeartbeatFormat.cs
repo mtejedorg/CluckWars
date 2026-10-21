@@ -12,6 +12,12 @@ namespace CluckWars.Diagnostics
         public float X, Z;
         public int Hp, Cargo;
         public string ControlState;
+        /// <summary>Changes of the replicated control flags this peer saw since its last line (<c>fl=</c>, printed when &gt; 0).</summary>
+        public int Flips;
+        /// <summary>This peer simulates the chicken (<c>own=1</c>); only then is <see cref="Src"/> meaningful.</summary>
+        public bool Own;
+        /// <summary>The owner's slow sources of its last tick (<c>src=</c>, e.g. <c>Collision+Pile</c>); empty = none.</summary>
+        public string Src;
     }
 
     /// <summary>One base: its corner and its banked food (floored).</summary>
@@ -28,7 +34,7 @@ namespace CluckWars.Diagnostics
 
     /// <summary>
     /// The <c>Sync</c> heartbeat line (test-session item 3), which the merge script diffs across peers:
-    /// <c>Sync t=&lt;boundaryTick&gt; st=&lt;state&gt; rem=&lt;0.0&gt; | &lt;id&gt;:x=0.0,z=0.0,hp=0,cg=0,cs=Free[,bot] ; … |
+    /// <c>Sync t=&lt;boundaryTick&gt; st=&lt;state&gt; rem=&lt;0.0&gt; | &lt;id&gt;:x=0.0,z=0.0,hp=0,cg=0,cs=Free[,fl=N][,own=1[,src=..]][,bot] ; … |
     /// bases=&lt;corner&gt;=&lt;food&gt;,… | piles=&lt;0.0&gt;,…</c>. Pure, so the ordering and the fixed decimals are pinned
     /// by tests: humans first by PlayerId (id <c>P&lt;n&gt;</c>), then bots by home corner (<c>B&lt;corner&gt;</c>); bases
     /// by corner; piles by x then z (rounded to 0.1 m so peers sort the same pile identically). Sorting is in place
@@ -59,6 +65,12 @@ namespace CluckWars.Diagnostics
                   .Append(",hp=").Append(c.Hp.ToString(CultureInfo.InvariantCulture))
                   .Append(",cg=").Append(c.Cargo.ToString(CultureInfo.InvariantCulture))
                   .Append(",cs=").Append(string.IsNullOrEmpty(c.ControlState) ? "None" : c.ControlState);
+                if (c.Flips > 0) sb.Append(",fl=").Append(c.Flips.ToString(CultureInfo.InvariantCulture));
+                if (c.Own)
+                {
+                    sb.Append(",own=1");
+                    if (!string.IsNullOrEmpty(c.Src)) sb.Append(",src=").Append(c.Src);
+                }
                 if (c.Bot) sb.Append(",bot");
             }
             sb.Append(" | bases=");
@@ -180,6 +192,18 @@ namespace CluckWars.Diagnostics
             if ((flags & CluckWars.Gameplay.ControlVfx.Rooted) != 0) return "Rooted";
             if ((flags & CluckWars.Gameplay.ControlVfx.Slowed) != 0) return "Slowed";
             return "Free";
+        }
+
+        /// <summary>The <c>src=</c> value: the owner's slow sources joined by <c>+</c> (no <c>,;|</c>, which the line uses
+        /// as separators); empty for none.</summary>
+        public static string Sources(CluckWars.Gameplay.SlowSource s)
+        {
+            if (s == CluckWars.Gameplay.SlowSource.None) return string.Empty;
+            string r = string.Empty;
+            if ((s & CluckWars.Gameplay.SlowSource.Collision) != 0) r = "Collision";
+            if ((s & CluckWars.Gameplay.SlowSource.Pile) != 0) r += (r.Length > 0 ? "+" : "") + "Pile";
+            if ((s & CluckWars.Gameplay.SlowSource.Ability) != 0) r += (r.Length > 0 ? "+" : "") + "Ability";
+            return r;
         }
     }
 }

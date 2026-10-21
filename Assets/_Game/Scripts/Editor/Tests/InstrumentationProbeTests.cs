@@ -125,6 +125,27 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void SyncLine_OwnerDiagnostics_FlipsOwnSources_CW226()
+        {
+            // fl / own / src let the merge tell a flag the owner leads by the replication delay (fl > 0) from one that
+            // never arrived (fl absent on both sides). Only cs/hp/cg/x/z are compared, so these never make a mismatch.
+            var chickens = new[]
+            {
+                new SyncChicken { Key = 2, X = 1f, Z = 2f, Hp = 1, ControlState = "Slowed", Flips = 3, Own = true,
+                    Src = SyncControlState.Sources(SlowSource.Pile | SlowSource.Collision) },
+                new SyncChicken { Key = 3, X = 0f, Z = 0f, Hp = 1, ControlState = "Free", Own = true, Src = SyncControlState.Sources(SlowSource.None) },
+                new SyncChicken { Key = 4, X = 0f, Z = 0f, Hp = 1, ControlState = "Free", Flips = 1 },
+            };
+            var sb = new StringBuilder();
+            SyncHeartbeatFormat.Build(sb, 64, "Active", 10f, chickens, 3, new SyncBase[0], 0, new SyncPile[0], 0);
+            Assert.AreEqual(
+                "Sync t=64 st=Active rem=10.0 | P2:x=1.0,z=2.0,hp=1,cg=0,cs=Slowed,fl=3,own=1,src=Collision+Pile ; " +
+                "P3:x=0.0,z=0.0,hp=1,cg=0,cs=Free,own=1 ; P4:x=0.0,z=0.0,hp=1,cg=0,cs=Free,fl=1 | bases= | piles=",
+                sb.ToString());
+            Assert.AreEqual("Collision+Pile+Ability", SyncControlState.Sources(SlowSource.Collision | SlowSource.Pile | SlowSource.Ability));
+        }
+
+        [Test]
         public void SyncControlState_FromTheReplicatedFlags_StrongestFirst()
         {
             Assert.AreEqual("Free", SyncControlState.Name(ControlVfx.None));
