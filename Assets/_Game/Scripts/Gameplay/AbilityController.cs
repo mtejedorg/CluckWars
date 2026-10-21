@@ -1098,7 +1098,7 @@ namespace CluckWars.Gameplay
             if (!HasStateAuthority || !_initialized) return;
             DeactivateAll();
             for (int slot = 0; slot < SlotCount; slot++) SetCooldown(slot, TickTimer.None);
-            ChargingSlot = 0;
+            CancelCharge();   // also drops the pending hold, so a held ability cannot fire in the next round
             if (PeckChainActive) PeckChainActive = false;
         }
 
