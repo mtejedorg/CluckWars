@@ -52,6 +52,7 @@ namespace CluckWars.Gameplay
         private ChickenCombat _combat;
         private ChickenCargo _cargo;
         private AbilityController _abilities;
+        private ChickenMatchStats _stats;
         private ILogService _log;
 
         [Inject]
@@ -71,6 +72,7 @@ namespace CluckWars.Gameplay
             _combat = GetComponent<ChickenCombat>();
             _cargo = GetComponent<ChickenCargo>();
             _abilities = GetComponent<AbilityController>();
+            _stats = GetComponent<ChickenMatchStats>();
         }
 
         /// <summary>
@@ -164,11 +166,18 @@ namespace CluckWars.Gameplay
                         target.Cargo.RPC_TransferAllToBountyBag(Id);
                     }
 
+                    // The victim's authority reports the kill back through RPC_CreditKill, which
+                    // only pays an execute recorded here (CW-230). Recorded BEFORE the removal for
+                    // the same shared-authority reason as ExpectExecuteLoot above.
+                    if (_stats != null) _stats.ExpectKillCredit(target);
+                    else _log?.Error(Source, $"{name}: no ChickenMatchStats sibling - this execute scores no kill.");
+
                     // RPC, not a direct call: the victim is usually owned by another peer, and
                     // ExecuteRemoval is authority-local. The id is the sibling ChickenCombat's,
                     // because CreditKillToAttacker resolves a ChickenCombat - passing this
-                    // behaviour's own Id (CW-050) meant no execute ever scored a kill.
-                    target.Combat.RPC_ExecuteRemoval(_combat.Id, 2.0f);
+                    // behaviour's own Id (CW-050) meant no execute ever scored a kill. Sent while
+                    // MarkedTarget still names the victim: the receiver checks the mark (CW-230).
+                    target.Combat.RPC_ExecuteRemoval(_combat.Id, ExecuteRules.RemovalDurationSeconds);
 
                     // The execute bounty. Every other Assassin income route - Snatch, Sneaky
                     // Steal, and the cargo transfer above - requires the victim to already be

@@ -30,6 +30,8 @@ namespace CluckWars.Gameplay
 
         private ChickenController _controller;
         private ChickenAnimator _animator;
+        private AssassinExecute _execute;
+        private bool _missingControllerLogged;
         private ChangeDetector _detector;
         private PropertyReader<bool> _stunReader;
         private ILogService _log;
@@ -67,6 +69,7 @@ namespace CluckWars.Gameplay
 
             _controller = GetComponent<ChickenController>();
             _animator = GetComponent<ChickenAnimator>();
+            _execute = GetComponent<AssassinExecute>();
             _detector = GetChangeDetector(ChangeDetector.Source.SimulationState);
 
             _stunReader = GetPropertyReader<bool>(nameof(IsRemoved));
@@ -82,6 +85,8 @@ namespace CluckWars.Gameplay
         public override void FixedUpdateNetwork()
         {
             if (!HasStateAuthority) return;
+
+            ObserveMarksOnMe();
 
             var stats = _controller.Stats;
             if (stats == null) return;
@@ -151,7 +156,7 @@ namespace CluckWars.Gameplay
         /// (CW-050; pinned by <c>AssassinExecuteCreditTests</c>).
         /// </para>
         /// </remarks>
-        public void ExecuteRemoval(NetworkBehaviourId assassinId, float duration = 2.0f)
+        public void ExecuteRemoval(NetworkBehaviourId assassinId, float duration = ExecuteRules.RemovalDurationSeconds)
         {
             if (!HasStateAuthority) return;
             if (IsRemoved) return;
@@ -172,26 +177,144 @@ namespace CluckWars.Gameplay
         /// execute now travel the same way — previously the cargo transfer was an RPC and the
         /// removal was a plain call, so they disagreed about who could apply them and the
         /// removal silently lost.
+        /// <para>
+        /// <b>Receiver-validated (CW-230).</b> <c>RpcSources.All</c>, so the call is a claim. It is
+        /// honoured only when the sender speaks for the named attacker (local invoke: the attacker
+        /// is simulated here; off the wire: the sender is its state authority), that attacker has
+        /// an <see cref="AssassinExecute"/> that marked this chicken or this chicken is stunned
+        /// (the rule <c>ChickenCargo.TryResolveExecutor</c> applies to the cargo half), it is
+        /// within execute range, and the duration is the execute's. See <see cref="ExecuteRules"/>.
+        /// </para>
         /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_ExecuteRemoval(NetworkBehaviourId assassinId, float duration)
+        public void RPC_ExecuteRemoval(NetworkBehaviourId assassinId, float duration, RpcInfo info = default)
         {
+            var verdict = JudgeRemoval(assassinId, duration, info, out string attackerName);
+            if (verdict != ExecuteRules.RemovalVerdict.Accepted)
+            {
+                if (RejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
+                    _log?.Warn(Source, $"{name}: rejected RPC_ExecuteRemoval(attacker={attackerName}, " +
+                        $"duration={duration:0.00}) from {info.Source} ({verdict}) - {ExecuteRules.Describe(verdict)}" +
+                        (held > 0 ? $" (+{held} similar suppressed)" : string.Empty));
+                return;
+            }
+
             ExecuteRemoval(assassinId, duration);
+        }
+
+        // One rejection line per sender per 2 s, shared by every chicken (as PlayerBase's deposit rejections).
+        private static readonly CluckWars.Diagnostics.PerKeyRateLimiter RejectionLimiter =
+            new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
+
+        /// <summary>Gathers what this (the victim's) authority can see about a removal claim and judges it.</summary>
+        private ExecuteRules.RemovalVerdict JudgeRemoval(NetworkBehaviourId attackerId, float duration, in RpcInfo info,
+            out string attackerName)
+        {
+            attackerName = attackerId.ToString();
+            var claim = new ExecuteRules.RemovalClaim { Duration = duration };
+
+            if (Runner != null && Runner.TryFindBehaviour(attackerId, out ChickenCombat attacker) &&
+                attacker != null && attacker.Object != null && attacker.Object.IsValid)
+            {
+                attackerName = attacker.name;
+                var attackerController = attacker.GetComponent<ChickenController>();
+                var execute = attacker.GetComponent<AssassinExecute>();
+
+                claim.AttackerResolved = true;
+                claim.AttackerIsVictim = attacker == this;
+                claim.AttackerIsDecoy = attackerController != null && attackerController.IsDecoy;
+                claim.SenderSpeaksForAttacker = info.IsInvokeLocal
+                    ? attacker.Object.HasStateAuthority
+                    : attacker.Object.StateAuthority == info.Source;
+                claim.AttackerHasExecute = execute != null;
+                claim.MarkedThisVictim = execute != null && _controller != null && execute.MarkedTarget == _controller.Id;
+                claim.VictimStunned = _controller != null && _controller.IsStunned;
+
+                // A local invoke has no wire time (both chickens simulated here); a remote one is
+                // floored because GetPlayerRtt is not confirmed to report remote players in Shared Mode.
+                claim.Latency = SenderLatency(info);
+                claim.MarkEverSeen = TrySecondsSinceMarkedBy(execute, out claim.SecondsSinceMarkSeen);
+
+                // Two ticks cover the press landing a tick after the mark's own range check.
+                claim.RangeMargin = StealRules.RangeMargin(
+                    ChickenCargo.DriftSpeed(attackerController) + ChickenCargo.DriftSpeed(_controller),
+                    claim.Latency + 2f * Runner.DeltaTime);
+                Vector3 a = attacker.transform.position, v = transform.position;
+                claim.PlanarDistance = Mathf.Sqrt((a.x - v.x) * (a.x - v.x) + (a.z - v.z) * (a.z - v.z));
+            }
+
+            return ExecuteRules.EvaluateRemoval(claim);
+        }
+
+        /// <summary>The RPC sender's latency for allowances: 0 for a local invoke, else the floored RTT.</summary>
+        internal float SenderLatency(in RpcInfo info) =>
+            info.IsInvokeLocal || Runner == null ? 0f : ExecuteRules.RemoteLatency((float)Runner.GetPlayerRtt(info.Source));
+
+        // Victim-side, local, never replicated: when this chicken's authority last saw each
+        // attacker's replicated MarkedTarget name it. Lets an execute whose mark was cleared in the
+        // press tick still count as marked after the qualifying stun ended (CW-230 review).
+        private readonly System.Collections.Generic.Dictionary<AssassinExecute, float> _markSeenAt =
+            new System.Collections.Generic.Dictionary<AssassinExecute, float>();
+
+        /// <summary>
+        /// Seconds since this chicken's authority last saw <paramref name="execute"/>'s mark name it.
+        /// False when it never has (or the record was cleared by a round reset).
+        /// </summary>
+        internal bool TrySecondsSinceMarkedBy(AssassinExecute execute, out float seconds)
+        {
+            seconds = 0f;
+            if (execute == null || !_markSeenAt.TryGetValue(execute, out float at)) return false;
+            seconds = Time.unscaledTime - at;
+            return true;
+        }
+
+        // Authority only, every tick: at most four chickens, so a straight scan of the registry.
+        private void ObserveMarksOnMe()
+        {
+            if (_controller == null) return;
+            var all = ActiveCombats;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var execute = all[i] != null ? all[i]._execute : null;
+                if (execute != null && execute.Object != null && execute.Object.IsValid &&
+                    execute.MarkedTarget == _controller.Id)
+                    _markSeenAt[execute] = Time.unscaledTime;
+            }
         }
 
         private void CreditKillToAttacker(NetworkBehaviourId attackerId)
         {
             if (attackerId == this.Id) return;
-            if (_controller != null && _controller.IsDecoy) return;
+            if (_controller == null)
+            {
+                if (!_missingControllerLogged)
+                {
+                    _missingControllerLogged = true;
+                    _log?.Error(Source, $"{name}: kill not credited - no ChickenController sibling (prefab wiring).");
+                }
+                return;
+            }
+            if (_controller.IsDecoy) return;
 
             if (Runner.TryFindBehaviour(attackerId, out ChickenCombat attackerCombat))
             {
                 var s = attackerCombat.GetComponent<ChickenMatchStats>();
                 if (s != null)
                 {
-                    s.RPC_CreditKill();
-                    _log?.Debug(Source, $"Kill credited to {attackerId}.");
+                    // The victim's ChickenController id: the attacker's stats check it against the
+                    // execute it recorded at press time (CW-230).
+                    s.RPC_CreditKill(_controller.Id);
+                    _log?.Debug(Source, $"Kill credit reported to {attackerId}.");
                 }
+                else
+                {
+                    _log?.Error(Source, $"{name}: kill not credited - {attackerCombat.name} has no ChickenMatchStats.");
+                }
+            }
+            else
+            {
+                // Legitimate when the assassin left between the press and this landing.
+                _log?.Info(Source, $"{name}: kill not credited - attacker {attackerId} no longer resolves.");
             }
         }
 
@@ -200,6 +323,7 @@ namespace CluckWars.Gameplay
         {
             IsRemoved = false;
             StunTimer = default;
+            _markSeenAt.Clear();
             _log?.Debug(Source, "Reset combat for new match.");
         }
 

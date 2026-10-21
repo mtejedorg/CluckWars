@@ -274,3 +274,14 @@ Matrix on the final build (3 rounds each): solo PASS, shared2 PASS, shared4 PASS
 | Smoke Roost | **Rejected** the per-ability `FollowsCaster` flag. Ability effects get **types**: an **Aura** (follows its caster) and a **Static AoE** (placed and fixed). Needs a design first (effect-type model on the ability assets / zones, how each syncs, how existing zones map). Smoke Roost stays a Static AoE. |
 | Portrait | **Design first** (layout rules per orientation, camera framing for equal visible arena area, test plan), then build; verify in PC window sizes, device later. |
 | CW-218 + CW-082 | Both: disconnect overlay with Rejoin (PC-tested; real Android trigger "needs device") and tick the done ROADMAP boxes. |
+
+### 2026-10-21 addendum 2
+
+| ID | Status |
+|---|---|
+| CW-230 | **Fixed** (see git log): sender validation on `RPC_ExecuteRemoval` / `RPC_CreditKill` (`ExecuteRules`: stun-or-mark-or-recent-mark evidence, range with a 150 ms latency floor, 2.0 s duration cap, pending kill ledger 2.5 s). qa-reviewer sign-off after one round of fixes. EditMode 2081/2081; matrix on the build: solo/shared2/shared4/hostleave all PASS, no rejected lines. **Not run live:** a real two-client Assassin execute (autoplay never executes) — expect 0 rejected `RPC_ExecuteRemoval`/`RPC_CreditKill` lines and `Kills` +1 per execute. |
+| CW-053 | **Premise outdated.** Mighty/Bracer/Opportunist were deleted 2026-08-13 (`62219fc`) and replaced by eight working specializations. Real findings (Featherfoot ≈0.25 s/match; Bully is a hidden farming buff +6 cargo = 34.98→30.91 s; Spoiler can win from 0 food; a new stun replaces a longer running one) and 14 decisions are in `docs/proposals/BALANCE_AND_PASSIVES_2026-10.md`. Nothing applied. |
+| CW-057 / CW-058 | Proposals in the same file (Wing Slam 12→9 s primary, 8 s + 1.3 s stun fallback). Nothing applied. |
+| Smoke Roost / effect types | Design: `docs/proposals/EFFECT_TYPES_AURA_VS_STATIC_AOE.md` (type on the ability asset, aura computed from the caster's replicated position, no NetworkTransform on the zone; found that nameplate/overlays may read Feather Aura's "casting" flag as "slowed"). 9 questions for Maestro. |
+| CW-206/212/219 | Spec: `docs/proposals/PORTRAIT_AND_LANDSCAPE_SPEC.md` (camera ignores aspect: portrait sees 25 % of the 16:9 ground; 6 stages ≈ 6.75 days; 12 decisions). |
+| CW-082 | Partial: five ROADMAP boxes ticked (`bf5067a`). |
