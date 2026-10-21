@@ -40,18 +40,15 @@ namespace CluckWars.EditorTools
         private const string EnableIosMenuPath = "Cluck Wars/Build/Enable iOS Export (needs a Mac)";
         private const string EnableIosPrefKey  = "CluckWars.Build.EnableIos";
 
-        /// <summary>Reverse-DNS bundle id applied to iOS builds.</summary>
+        /// <summary>Reverse-DNS application id pinned for Android and iOS (see <see cref="BuildGuards.AppIdentifier"/>).</summary>
         /// <remarks>
-        /// The project was created from Unity's URP template and every platform
-        /// still carries a <c>com.Unity-Technologies.com.unity.template.*</c>
-        /// identifier. We fix iOS here because it has no installed builds to
-        /// break yet. Android and Standalone are deliberately left alone —
-        /// changing an Android applicationIdentifier makes existing sideloaded
-        /// installs (the Pixel 9 test device) a *different* app: no in-place
-        /// upgrade, separate PlayerPrefs. That's Maestro's call, not this
-        /// script's.
+        /// The project came from Unity's URP template, so the identifiers were never set: headless builds fell back to
+        /// <c>com.DefaultCompany.CluckWars</c> next to older <c>com.UnityTechnologies.*</c> installs (CW-201). It is now pinned
+        /// in ProjectSettings and re-asserted here on every Android/iOS build. Changing it again makes sideloaded installs a
+        /// *different* app (no in-place upgrade, separate PlayerPrefs), so treat it as frozen.
         /// </remarks>
-        private const string IosBundleIdentifier = "com.cluckwars.game";
+        private const string AppIdentifier = BuildGuards.AppIdentifier;
+        private const string IosBundleIdentifier = AppIdentifier;
 
         /// <summary>
         /// Minimum iOS version. 15.0 covers iPhone 6s and newer, which is well
@@ -185,6 +182,23 @@ namespace CluckWars.EditorTools
         /// <returns>True only if the build reported <c>Succeeded</c>.</returns>
         private static bool Build(BuildTarget target, string subfolder, string filename)
         {
+            // CW-200: a build without a cloud project id is silently multiplayer-dead, so fail instead of building.
+            // Throws BuildFailedException (non-zero exit in -batchmode); runs before the slow target switch.
+            var injectedId = EnsureCloudProjectId(out var previousId);
+            try
+            {
+                return BuildCore(target, subfolder, filename);
+            }
+            finally
+            {
+                // Don't leave an injected id in ProjectSettings.asset as an unrelated git diff.
+                if (injectedId != null && string.Equals(ReadCloudProjectId(), injectedId, StringComparison.Ordinal))
+                    WriteCloudProjectId(previousId);
+            }
+        }
+
+        private static bool BuildCore(BuildTarget target, string subfolder, string filename)
+        {
             if (!ValidateScenes()) return false;
             if (!ValidateTargetSupported(target)) return false;
 
@@ -279,6 +293,72 @@ namespace CluckWars.EditorTools
 
         private static string Verdict(bool ok) => ok ? "OK" : "FAILED";
 
+        // ---- Cloud project id (CW-200) -----------------------------------------
+
+        private const string PlayerSettingsAssetPath = "ProjectSettings/ProjectSettings.asset";
+        private const string CloudProjectIdProperty  = "cloudProjectId";
+
+        /// <summary>
+        /// Guarantees PlayerSettings carries a valid cloud project id for the build about to run: keeps a valid one, else
+        /// injects the env override / <see cref="BuildGuards.UgsProjectId"/>. Application.cloudProjectId in the player is baked
+        /// from this field, and only a signed-in Editor populates it on its own.
+        /// </summary>
+        /// <returns>The injected id (so the caller can restore the previous value), or null when nothing was injected.</returns>
+        /// <exception cref="BuildFailedException">The id is still invalid after resolution.</exception>
+        private static string EnsureCloudProjectId(out string previousId)
+        {
+            previousId = ReadCloudProjectId();
+            var wanted = BuildGuards.ResolveCloudProjectId(
+                previousId, Environment.GetEnvironmentVariable(BuildGuards.CloudProjectIdEnvVar), out var source);
+
+            var invalid = BuildGuards.ValidateCloudProjectId(wanted);
+            if (invalid != null) throw CloudIdFailure(invalid);
+            if (string.Equals(wanted, previousId, StringComparison.Ordinal)) return null;
+
+            Debug.Log($"{LogTag} cloudProjectId was empty/invalid in ProjectSettings; injecting {wanted} from {source} for this build.");
+            WriteCloudProjectId(wanted);
+
+            // Read it back: the guard must check what the player will actually be built with.
+            var applied = ReadCloudProjectId();
+            invalid = BuildGuards.ValidateCloudProjectId(applied);
+            if (invalid != null || !string.Equals(applied, wanted, StringComparison.Ordinal))
+                throw CloudIdFailure(invalid ?? $"injection did not stick (PlayerSettings holds '{applied}', expected '{wanted}').");
+            return wanted;
+        }
+
+        private static BuildFailedException CloudIdFailure(string reason)
+        {
+            var message = $"{LogTag} Build aborted (CW-200): {reason}";
+            Debug.LogError(message);
+            return new BuildFailedException(message);
+        }
+
+        private static SerializedObject LoadPlayerSettings()
+        {
+            var settings = AssetDatabase.LoadAllAssetsAtPath(PlayerSettingsAssetPath).FirstOrDefault(o => o is PlayerSettings);
+            if (settings == null)
+                throw CloudIdFailure($"could not load PlayerSettings from {PlayerSettingsAssetPath}.");
+            return new SerializedObject(settings);
+        }
+
+        private static string ReadCloudProjectId()
+        {
+            var prop = LoadPlayerSettings().FindProperty(CloudProjectIdProperty);
+            if (prop == null)
+                throw CloudIdFailure($"PlayerSettings has no '{CloudProjectIdProperty}' property in this Unity version.");
+            return prop.stringValue;
+        }
+
+        private static void WriteCloudProjectId(string id)
+        {
+            var so = LoadPlayerSettings();
+            var prop = so.FindProperty(CloudProjectIdProperty);
+            if (prop == null)
+                throw CloudIdFailure($"PlayerSettings has no '{CloudProjectIdProperty}' property in this Unity version.");
+            prop.stringValue = id ?? string.Empty;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         // ---- Validation -------------------------------------------------------
 
         /// <summary>
@@ -355,6 +435,14 @@ namespace CluckWars.EditorTools
             {
                 Debug.Log($"{LogTag} Raising Android minSdkVersion {PlayerSettings.Android.minSdkVersion} → {desiredMin}.");
                 PlayerSettings.Android.minSdkVersion = desiredMin;
+            }
+
+            // CW-201: pin the identifier (also pinned in ProjectSettings; this covers a reverted/edited asset).
+            if (PlayerSettings.GetApplicationIdentifier(named) != AppIdentifier)
+            {
+                Debug.Log($"{LogTag} Setting Android application identifier → {AppIdentifier} " +
+                          $"(was '{PlayerSettings.GetApplicationIdentifier(named)}').");
+                PlayerSettings.SetApplicationIdentifier(named, AppIdentifier);
             }
 
             // .apk for sideloading the demo. Flip to AAB later if we go through Play Store.
