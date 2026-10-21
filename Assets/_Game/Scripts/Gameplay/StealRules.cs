@@ -71,6 +71,8 @@ namespace CluckWars.Gameplay
         /// <c>RPC_DrainStolen</c> / <c>RPC_TransferAllToBountyBag</c> (Snatch, Sneaky Steal, Scrap,
         /// Dive Bomb, Spine Coat, Death Mark) asks this BEFORE crediting itself. Thieves credit
         /// optimistically ahead of the RPC, so skipping the call after crediting would create food.
+        /// Death Mark credits nothing ahead (its loot is reported back by the victim), but still
+        /// gates here so a shelled victim is not even asked to drain.
         /// </summary>
         public static bool CanStealFrom(ChickenController victim) => victim != null && !victim.IsStealProof;
 
@@ -81,6 +83,64 @@ namespace CluckWars.Gameplay
         /// </summary>
         public static float RefundAmount(float refused, float thiefCargo) =>
             Mathf.Min(Mathf.Max(0f, refused), Mathf.Max(0f, thiefCargo));
+
+        /// <summary>
+        /// The most an Assassin execute may bank as looted cargo: the victim's carry capacity, or
+        /// the cargo the assassin can see it holding if that is somehow larger. Both are values
+        /// the assassin's own peer legitimately reads, never a number the victim's peer supplies.
+        /// </summary>
+        /// <remarks>
+        /// Recorded by <c>ChickenCargo.ExpectExecuteLoot</c> and enforced by
+        /// <c>RPC_CreditExecuteLoot</c>: the victim's authority reports what it actually drained,
+        /// and the assassin banks <c>min(report, this cap)</c>. A forged or inflated report is
+        /// therefore bounded by one full load of that victim, once per execute.
+        /// </remarks>
+        public static float ExecuteLootCap(float victimCapacity, float visibleVictimCargo) =>
+            Mathf.Max(0f, Mathf.Max(victimCapacity, visibleVictimCargo));
+
+        /// <summary>
+        /// How long an execute's loot expectation stays payable. Longer than the steal refund's
+        /// <see cref="PendingStealLedger{TKey}.WindowSeconds"/> because the report makes two
+        /// relayed trips in Shared Mode (assassin -> victim's authority -> assassin), each through
+        /// the Photon relay, rather than one round trip.
+        /// </summary>
+        public const float ExecuteLootWindowSeconds = 2.5f;
+
+        /// <summary>The ledger an assassin's cargo keeps its pending executes in.</summary>
+        public static PendingStealLedger<TKey> NewExecuteLootLedger<TKey>() where TKey : struct =>
+            new PendingStealLedger<TKey>(ExecuteLootWindowSeconds);
+
+        /// <summary>
+        /// Assassin side, at press time: records that a loot report from <paramref name="victim"/>
+        /// is expected, worth at most <see cref="ExecuteLootCap"/>.
+        /// </summary>
+        /// <returns>False (nothing recorded) when the cap is 0 - no report from that victim can pay.</returns>
+        public static bool RecordExecuteExpectation<TKey>(PendingStealLedger<TKey> ledger, TKey victim,
+            float victimCapacity, float visibleVictimCargo, float now, out float cap) where TKey : struct
+        {
+            cap = ExecuteLootCap(victimCapacity, visibleVictimCargo);
+            if (ledger == null || cap <= 0f) return false;
+            ledger.Record(victim, cap, now);
+            return true;
+        }
+
+        /// <summary>True when a loot report's amount is a positive finite number.</summary>
+        public static bool IsPlausibleLootReport(float reported) =>
+            reported > 0f && !float.IsInfinity(reported);
+
+        /// <summary>
+        /// Assassin side, when the victim's report arrives: how much of
+        /// <paramref name="reported"/> may be banked. Matches it against a pending expectation for
+        /// <paramref name="victim"/> (consumed, once, inside the window) and clamps to its cap.
+        /// </summary>
+        /// <returns>False (and 0) for an implausible amount or when no expectation is pending.</returns>
+        public static bool TryResolveExecuteLoot<TKey>(PendingStealLedger<TKey> ledger, TKey victim,
+            float reported, float now, out float credited) where TKey : struct
+        {
+            credited = 0f;
+            if (ledger == null || !IsPlausibleLootReport(reported)) return false;
+            return ledger.TryConsume(victim, reported, now, out credited);
+        }
 
         /// <summary>True when <paramref name="amount"/> could have come from one real steal.</summary>
         public static bool IsPlausibleAmount(float amount, float maxSingleSteal) =>

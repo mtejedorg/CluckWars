@@ -48,7 +48,24 @@ namespace CluckWars.Gameplay
         }
 
         private readonly Entry[] _entries = new Entry[Capacity];
+        private readonly float _windowSeconds;
         private int _next;
+
+        /// <param name="windowSeconds">
+        /// How long a record stays consumable. Defaults to <see cref="WindowSeconds"/> (the steal
+        /// refund's one round trip); the execute-loot ledger passes a longer one because its
+        /// report makes two relayed trips in Shared Mode (see
+        /// <c>StealRules.ExecuteLootWindowSeconds</c>).
+        /// </param>
+        public PendingStealLedger(float windowSeconds = WindowSeconds)
+        {
+            if (!(windowSeconds > 0f))
+                throw new ArgumentOutOfRangeException(nameof(windowSeconds), windowSeconds, "window must be positive");
+            _windowSeconds = windowSeconds;
+        }
+
+        /// <summary>This ledger's consumable window, in seconds.</summary>
+        public float Window => _windowSeconds;
 
         /// <summary>Records an optimistic credit of <paramref name="amount"/> taken from <paramref name="key"/>.</summary>
         public void Record(TKey key, float amount, float now)
@@ -74,7 +91,7 @@ namespace CluckWars.Gameplay
             for (int i = 0; i < Capacity; i++)
             {
                 if (!_entries[i].Live) continue;
-                if (now - _entries[i].Time > WindowSeconds)
+                if (now - _entries[i].Time > _windowSeconds)
                 {
                     _entries[i].Live = false;
                     continue;

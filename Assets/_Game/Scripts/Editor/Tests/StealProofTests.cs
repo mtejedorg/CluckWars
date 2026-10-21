@@ -176,7 +176,10 @@ namespace CluckWars.Tests
         public void DeathMark_DoesNotTransferFromAStealProofTarget_ButStillExecutes()
         {
             string src = Src("Gameplay/AssassinExecute.cs");
-            string body = Body(src, "TryFindBehaviour(MarkedTarget", 900);
+            // Whole method, brace-matched and comment-stripped, rather than a fixed span that
+            // drifts as Press grows (CW-050 added a victim guard ahead of the gate).
+            string press = AssassinExecuteCreditTests.MethodBody(Dir + "Gameplay/AssassinExecute.cs", "public bool Press(");
+            string body = Body(press, "TryFindBehaviour(MarkedTarget", press.Length); // to the end of Press
             int gate = body.IndexOf("StealRules.CanStealFrom(target)", StringComparison.Ordinal);
             int rpc  = body.IndexOf("RPC_TransferAllToBountyBag", StringComparison.Ordinal);
             Assert.Greater(gate, -1);

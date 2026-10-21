@@ -160,6 +160,13 @@ namespace CluckWars.Gameplay
         // Optimistic steal credits awaiting the victim's confirmation; gates RPC_RefundRefusedSteal.
         private readonly PendingStealLedger<NetworkBehaviourId> _pendingSteals = new PendingStealLedger<NetworkBehaviourId>();
 
+        // Executes this assassin has sent and not yet been paid for, keyed by victim, valued at
+        // the most that victim could have carried; gates RPC_CreditExecuteLoot. A separate ring
+        // from _pendingSteals so a loot report can never consume a refund record or vice versa,
+        // and with its own longer window (StealRules.ExecuteLootWindowSeconds): the report makes
+        // two relayed trips in Shared Mode, not the refund's one round trip.
+        private readonly PendingStealLedger<NetworkBehaviourId> _pendingExecutes = StealRules.NewExecuteLootLedger<NetworkBehaviourId>();
+
         // Accumulators for batched RPCs (Stage D)
         private PlayerBase _activeBaseTarget;
         private float _pendingBaseFood;
@@ -836,7 +843,42 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Assassin execute cargo transfer: moves ALL cargo to the assassin's bounty bag.
+        /// Assassin-side half of an execute, called by <c>AssassinExecute.Press</c> on this
+        /// (the assassin's) state authority just before it sends
+        /// <see cref="RPC_TransferAllToBountyBag"/>: records that a loot report from
+        /// <paramref name="victim"/> is expected, and the most it may be worth.
+        /// </summary>
+        /// <remarks>
+        /// Recorded BEFORE the transfer RPC because on a shared authority (solo, bots) the
+        /// transfer and the report back both invoke locally and synchronously inside that call.
+        /// The cap uses only what this peer legitimately sees — see
+        /// <see cref="StealRules.ExecuteLootCap"/>.
+        /// </remarks>
+        public void ExpectExecuteLoot(ChickenController victim)
+        {
+            if (!HasStateAuthority || victim == null || victim.Cargo == null)
+            {
+                // Press is authority-gated and validates the victim first, so this is a wiring bug.
+                _log?.Error(Source, $"{name}: ExpectExecuteLoot ignored (authority={HasStateAuthority}, " +
+                    $"victim={(victim != null ? victim.name : "null")}) - the execute's loot will be refused.");
+                return;
+            }
+
+            if (!StealRules.RecordExecuteExpectation(_pendingExecutes, victim.Id,
+                    victim.Cargo.Capacity, victim.Cargo.Cargo, Time.unscaledTime, out _))
+            {
+                // Capacity 0 means the victim's Stats did not resolve on this peer - a wiring or
+                // spawn-order fault, not a game state. Any loot it reports will be refused; the
+                // flat execute bounty is paid by Press regardless.
+                _log?.Warn(Source, $"{name}: execute on {victim.name} expects no loot - its carry " +
+                    "capacity reads 0 here (Stats unresolved?) and no cargo is visible, so any loot report will be refused.");
+            }
+        }
+
+        /// <summary>
+        /// Assassin execute cargo transfer, victim side: drains ALL of this chicken's cargo and
+        /// reports the amount actually drained back to the assassin's authority, which credits
+        /// its own bounty bag (<see cref="RPC_CreditExecuteLoot"/>).
         /// </summary>
         /// <remarks>
         /// <c>RpcSources.All</c>, so the call is a claim: it is honoured only when the caller is
@@ -845,9 +887,12 @@ namespace CluckWars.Gameplay
         /// has this chicken as <c>MarkedTarget</c>. The mark is written at mark time, seconds
         /// before the execute, so replication lag cannot make a genuine call fail the check.
         /// <para>
-        /// Known remaining gap, not fixed here: the bounty bag is written on the assassin's
-        /// cargo from this (victim's) authority, a cross-authority write that Shared Mode lets
-        /// the victim's peer make. It needs a bag-credit RPC to the assassin's authority.
+        /// <b>Nothing is written to the assassin's cargo from here.</b> This runs on the
+        /// VICTIM's authority, where the assassin's cargo is a proxy; a <c>[Networked]</c> write
+        /// through a proxy never replicates, so the bag credit used to vanish in Shared-mode PvP
+        /// while appearing to work solo. The amount reported is the one zeroed HERE, at the
+        /// moment of the drain, so food the victim banked while stunned in its own base before
+        /// this landed is never paid to the assassin as well (CW-050).
         /// </para>
         /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
@@ -859,20 +904,78 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            // Steal-proof victim: the transfer is refused here. The assassin never credited
-            // anything ahead of this RPC (the bag is written below, on this side), so refusing
-            // creates no food. The thief-side gate in AssassinExecute normally stops the call
-            // first; this catches the sub-round-trip race.
+            // Steal-proof victim: the transfer is refused here. The assassin credits nothing until
+            // the report below, so refusing creates no food; its pending record simply expires.
+            // The thief-side gate in AssassinExecute normally stops the call first; this catches
+            // the sub-round-trip race.
             if (_controller.IsStealProof)
             {
                 _log?.Info(Source, $"{name}: execute transfer refused - steal-proof (a shell went up inside one round trip).");
                 return;
             }
 
-            float amountToTransfer = Cargo;
+            float drained = Cargo;
             Cargo = 0f;
-            assassinCargo.BountyBag += amountToTransfer;
-            _log?.Info(Source, $"Execute: transferred {amountToTransfer:0.0} cargo to assassin {assassinId} bounty bag.");
+            if (drained <= 0f)
+            {
+                // Legitimate: the victim banked or lost the load before the execute landed.
+                _log?.Info(Source, $"Execute: {name} carried nothing to drain for {assassinCargo.name}.");
+                return;
+            }
+
+            assassinCargo.RPC_CreditExecuteLoot(drained, _controller.Id);
+            _log?.Info(Source, $"Execute: drained {drained:0.0} cargo, reported to {assassinCargo.name}.");
+        }
+
+        /// <summary>
+        /// Assassin side of an execute's loot: the victim's authority reports how much cargo
+        /// it actually drained, and this (the assassin's) authority banks it into its own
+        /// <see cref="BountyBag"/>.
+        /// </summary>
+        /// <remarks>
+        /// <c>RpcSources.All</c>, so every report is a claim. Same receiver-validated shape as
+        /// <see cref="RPC_RefundRefusedSteal"/>: the sender must be entitled to speak for the
+        /// named victim (local invoke: victim simulated here; off the wire: the victim's state
+        /// authority), and the report must match an execute this chicken recorded in
+        /// <see cref="ExpectExecuteLoot"/>, consumed once, inside the ledger window, and never
+        /// worth more than the cap recorded there.
+        /// </remarks>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_CreditExecuteLoot(float amount, NetworkBehaviourId victimId, RpcInfo info = default)
+        {
+            if (!StealRules.IsPlausibleLootReport(amount))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_CreditExecuteLoot({amount:0.00}) from {info.Source} - the amount is not a positive finite number.");
+                return;
+            }
+
+            if (Runner == null || !Runner.TryFindBehaviour(victimId, out ChickenController victim) ||
+                victim == null || victim.Object == null || !victim.Object.IsValid)
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_CreditExecuteLoot({amount:0.00}) - no live chicken resolves from victim id {victimId}.");
+                return;
+            }
+
+            bool attributable = victim != _controller &&
+                (info.IsInvokeLocal ? victim.Object.HasStateAuthority : victim.Object.StateAuthority == info.Source);
+            if (!attributable)
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_CreditExecuteLoot({amount:0.00}) from {info.Source} - {victim.name} is not a victim it speaks for.");
+                return;
+            }
+
+            if (!StealRules.TryResolveExecuteLoot(_pendingExecutes, victimId, amount, Time.unscaledTime, out float allowed))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_CreditExecuteLoot({amount:0.00}) from {info.Source} - no pending execute on {victim.name} (unsolicited, expired or already paid).");
+                return;
+            }
+
+            BountyBag += allowed;
+            if (allowed + 1e-4f < amount)
+            {
+                _log?.Warn(Source, $"{name}: execute loot from {victim.name} clamped {amount:0.00} -> {allowed:0.00} (above the victim's carry cap).");
+            }
+            _log?.Info(Source, $"Execute loot: +{allowed:0.0} from {victim.name} into the bounty bag (BountyBag={BountyBag:0.0}).");
         }
 
         /// <summary>
@@ -935,6 +1038,7 @@ namespace CluckWars.Gameplay
             _activeBaseTarget = null;
             _baseDepositTicks = 0;
             _pendingSteals.Clear();
+            _pendingExecutes.Clear();
 
             Cargo = 0f;
             BountyBag = 0f;
