@@ -468,8 +468,8 @@ Always on (breadcrumbs): `MatchOverlays` `Cover on/off`, `Cover off: covered= la
 Android (`-e` string extras; `--ei` / `--ez` work too). **Always use `am start -S`** (force-stop first): the extras are read once per process and then removed from the intent, and an activity re-opened from Recents ignores them, so a run never re-hosts / re-joins by accident:
 
 ```
-adb shell am start -S -n com.UnityTechnologies.com.unity.template.urpblank/com.unity3d.player.UnityPlayerGameActivity     -e cw_autojoin ABC123 -e cw_class Speedy -e cw_autoplay 1 -e cw_hud 1
-adb shell cat /storage/emulated/0/Android/data/com.UnityTechnologies.com.unity.template.urpblank/files/cw_autotest.json
+adb shell am start -S -n com.cluckwars.game/com.unity3d.player.UnityPlayerGameActivity     -e cw_autojoin ABC123 -e cw_class Speedy -e cw_autoplay 1 -e cw_hud 1
+adb shell cat /storage/emulated/0/Android/data/com.cluckwars.game/files/cw_autotest.json
 ```
 
 Windows / Editor command line (booleans: `1`/`true` or a bare flag):

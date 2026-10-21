@@ -11,7 +11,7 @@ param(
     [int]$Rounds = 3,
     [int]$ShotEvery = 25,
     [ValidateSet('join','host')][string]$Phone = 'join',
-    [string]$Package = 'com.DefaultCompany.CluckWars',
+    [string]$Package = 'com.cluckwars.game',
     [int]$MaxMinutes = 12
 )
 $ErrorActionPreference = 'Stop'
