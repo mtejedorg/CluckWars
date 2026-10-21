@@ -16,10 +16,10 @@ namespace CluckWars.Diagnostics
         public const string AutoHostKey = "cw_autohost", AutoJoinKey = "cw_autojoin", ClassKey = "cw_class",
             AutoStartKey = "cw_autostart", AutoStartTimeoutKey = "cw_autostart_timeout", AutoLoopKey = "cw_autoloop",
             AutoPlayKey = "cw_autoplay", DevModeKey = "cw_devmode", HudKey = "cw_hud", ProfileKey = "cw_profile",
-            AutoSoloKey = "cw_autosolo";
+            AutoSoloKey = "cw_autosolo", AutoDisconnectKey = "cw_autodisconnect";
 
         public static readonly string[] Keys =
-            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey };
+            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey };
 
         public const ChickenClass DefaultClass = ChickenClass.Warrior;
         public const float DefaultAutoStartTimeout = 90f;
@@ -52,6 +52,14 @@ namespace CluckWars.Diagnostics
 
         /// <summary><c>cw_autosolo</c>: PLAY SOLO (vs 3 bots); loops with <c>cw_autoloop</c> like the others.</summary>
         public bool AutoSolo;
+
+        /// <summary>
+        /// <c>cw_autodisconnect</c> (CW-218): seconds into this peer's first multiplayer round after which the driver
+        /// freezes the main thread for <see cref="AutoTestRules.AutoDisconnectStallSeconds"/> (what a phone sent to the
+        /// background does, so Fusion times the peer out). With the key set, the driver also presses REJOIN on ANY disconnect
+        /// sheet that comes up (its own freeze or a real drop) and logs the outcome. 0 = off.
+        /// </summary>
+        public int AutoDisconnect;
 
         public bool WantsMenuFlow => AutoHost || AutoJoin != null || AutoSolo;
 
@@ -138,6 +146,7 @@ namespace CluckWars.Diagnostics
                     case AutoStartKey:        cfg.AutoStart = cfg.ParseInt(key, value, 0, 4); break;
                     case AutoLoopKey:         cfg.AutoLoop = cfg.ParseInt(key, value, 0, 1000); break;
                     case AutoStartTimeoutKey: cfg.AutoStartTimeout = cfg.ParseInt(key, value, 1, 3600, (int)DefaultAutoStartTimeout); break;
+                    case AutoDisconnectKey:   cfg.AutoDisconnect = cfg.ParseInt(key, value, 1, 600); break;
                     default: cfg.Problems.Add($"unknown key {kv.Key}"); break;
                 }
             }
@@ -220,6 +229,12 @@ namespace CluckWars.Diagnostics
             " profile=" + (Profile ?? "default");
     }
 
+    /// <summary>cw_autodisconnect's menu half: waiting for the disconnect sheet, REJOIN pressed, finished.</summary>
+    public enum AutoRejoinPhase { WaitSheet, Pressed, Done }
+
+    /// <summary>What a REJOIN press led to (<see cref="AutoTestRules.DecideRejoinOutcome"/>).</summary>
+    public enum AutoRejoinOutcome { Pending, Joined, Failed, TimedOut }
+
     /// <summary>The auto-test's timing decisions (start, play again, join retries), pure so tests pin them.</summary>
     public static class AutoTestRules
     {
@@ -228,6 +243,35 @@ namespace CluckWars.Diagnostics
         /// <summary>One JOIN MATCH press must end (joined + match scene loading, or a failure) within this.</summary>
         public const float JoinAttemptTimeoutSeconds = 60f;
         public const float PlayAgainDelaySeconds = 4f;
+
+        /// <summary>
+        /// <c>cw_autodisconnect</c>'s main-thread freeze. The CW-218 phone stalled 12.8 s and was timed out; 15 s clears
+        /// Fusion's timeout with margin.
+        /// </summary>
+        public const int AutoDisconnectStallSeconds = 15;
+
+        /// <summary>After the freeze, the menu's disconnect sheet must be up within this, or the hook reports an Error.</summary>
+        public const float AutoRejoinSheetWaitSeconds = 60f;
+
+        /// <summary>How long the sheet is up before the auto-test presses REJOIN (a person reads it first).</summary>
+        public const float AutoRejoinPressDelaySeconds = 1.2f;
+
+        /// <summary>After REJOIN: back in the match or a reported failure within this, else the outcome is a timeout.</summary>
+        public const float AutoRejoinOutcomeWaitSeconds = 60f;
+
+        public static bool ShouldPressRejoin(float sheetVisibleSeconds) => sheetVisibleSeconds >= AutoRejoinPressDelaySeconds;
+
+        /// <summary>The REJOIN press's result: a valid match manager again wins, then a reported failure, then the timeout.</summary>
+        public static AutoRejoinOutcome DecideRejoinOutcome(bool backInMatch, bool failureReported, float secondsSincePress)
+        {
+            if (backInMatch) return AutoRejoinOutcome.Joined;
+            if (failureReported) return AutoRejoinOutcome.Failed;
+            return secondsSincePress > AutoRejoinOutcomeWaitSeconds ? AutoRejoinOutcome.TimedOut : AutoRejoinOutcome.Pending;
+        }
+
+        /// <summary>Freeze once this peer's round has been Active for <paramref name="afterSeconds"/> (0 = the hook is off).</summary>
+        public static bool ShouldAutoDisconnect(int afterSeconds, bool multiplayer, float activeSeconds) =>
+            afterSeconds > 0 && multiplayer && activeSeconds >= afterSeconds;
 
         /// <summary>
         /// Host in the waiting room: start once <paramref name="target"/> humans are in (1 = at once), or after the timeout

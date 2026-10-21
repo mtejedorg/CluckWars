@@ -147,6 +147,7 @@ namespace CluckWars.UI
         private float           _nextRefresh;
         private bool            _matchEndPopulated;
         private ShutdownReason? _shutdownReason;
+        private SessionExitKind _exitKind;      // DisconnectRules.Classify of _shutdownReason (CW-218)
         private float           _shutdownAtUnscaledTime;
         private bool            _returnTriggered;
         // The round this peer watched had ended (its result was on screen) when the session closed: the
@@ -263,8 +264,22 @@ namespace CluckWars.UI
             _shutdownAtUnscaledTime = Time.unscaledTime;
             var gm = GameManager.Instance;
             _roundEndedAtShutdown   = (gm != null ? gm.State : _watchedState) == MatchState.Ended;
-            _log?.Warn(Source, $"Network shutdown: {reason} (round ended: {_roundEndedAtShutdown}). " +
-                $"Returning to '{_bootstrapSceneName}' in {_disconnectReturnDelay}s.");
+
+            // CW-218: a lost connection (e.g. the app backgrounded past the timeout) goes straight to the menu, which
+            // says "You were disconnected" and offers REJOIN; host-left / closed sessions keep this screen's countdown.
+            var transport = _network?.LastDisconnectReason;
+            _exitKind = DisconnectRules.Classify(reason, transport, leftOnPurpose: false);
+            var mode = _selection != null ? _selection.Mode : SessionMode.Solo;
+            bool menuNotice = DisconnectRules.ShowsMenuNotice(_exitKind, mode);
+            if (menuNotice)   // only for a multiplayer mode, so _selection is there
+            {
+                _selection.DisconnectNoticeOnMenuLoad = true;
+                _sessionEndLeaveNow = true;   // TickSessionEnd loads the menu at once
+            }
+            _log?.Warn(Source, $"Network shutdown: {reason} (transport={(transport.HasValue ? transport.Value.ToString() : "none")}, " +
+                $"exit={_exitKind}, mode={mode}, round ended: {_roundEndedAtShutdown}). " +
+                (menuNotice ? $"Returning to '{_bootstrapSceneName}' now with the disconnect notice."
+                            : $"Returning to '{_bootstrapSceneName}' in {_disconnectReturnDelay}s."));
         }
 
         private void Update()
@@ -1309,7 +1324,7 @@ namespace CluckWars.UI
             if (_sessionEndTitle != null)
                 _sessionEndTitle.text = UiText.Get(SessionEndCopy.HeadlineKey(_roundEndedAtShutdown));
             if (_sessionEndReason != null && _shutdownReason.HasValue)
-                _sessionEndReason.text = SessionEndCopy.For(_shutdownReason.Value);
+                _sessionEndReason.text = SessionEndCopy.For(_exitKind, _shutdownReason.Value);
             if (_sessionEndCountdown != null)
                 _sessionEndCountdown.text = UiText.Format(UiKeys.SessionReturning, ("n", Mathf.CeilToInt(remaining)));
 

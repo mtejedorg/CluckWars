@@ -67,6 +67,9 @@ namespace CluckWars.Diagnostics
 
             foreach (var p in _cfg.Problems) _log.Warn(Source, "AutoTest config: " + p);
             _log.Info(Source, _cfg.Describe());
+            if (_cfg.AutoDisconnect > 0)
+                _log.Info(Source, $"AutoTest autodisconnect={_cfg.AutoDisconnect}s: this peer freezes {AutoTestRules.AutoDisconnectStallSeconds} s " +
+                    "into its first multiplayer round, then presses REJOIN (CW-218).");
             _log.Info(Source, $"AutoTest persistentDataPath={Application.persistentDataPath}");
 
             if (_cfg.DevMode && !PlayerPreferences.DeveloperModeEnabled)
@@ -236,6 +239,7 @@ namespace CluckWars.Diagnostics
 
         private void Update()
         {
+            TickAutoRejoin();
             var gm = GameManager.Instance;
             bool valid = gm != null && gm.Object != null && gm.Object.IsValid;
 
@@ -244,6 +248,7 @@ namespace CluckWars.Diagnostics
 
             var runner = gm.Runner;
             if (runner == null) return;
+            TickAutoDisconnect(gm, runner);
             ObserveLoop(gm);
             if (runner.GameMode == GameMode.Single)
             {
@@ -263,6 +268,120 @@ namespace CluckWars.Diagnostics
 
             TickAutoStart(gm, runner);
             TickAutoLoop(gm);
+        }
+
+        // ---- cw_autodisconnect (CW-218): freeze like a backgrounded phone, then REJOIN from the menu -----------------
+        private float _activeSince = -1f;
+        private float _autoDisconnectAt = -1f;      // realtime when the freeze ended; -1 = not done
+        private float _rejoinSheetSeenAt = -1f;
+        private float _rejoinPressedAt = -1f;
+        private int _rejoinFailuresBefore;
+        private float _nextRejoinLookAt;
+        // WaitSheet: any disconnect sheet (from the freeze OR a real drop the hook did not cause) is answered.
+        private AutoRejoinPhase _rejoinPhase = AutoRejoinPhase.WaitSheet;
+
+        private bool _autoDisconnectSkipped;   // the first multiplayer round ended before the mark: the hook is off
+
+        /// <summary>Fires in this peer's FIRST multiplayer round only; a round shorter than the mark switches the hook off.</summary>
+        private void TickAutoDisconnect(GameManager gm, NetworkRunner runner)
+        {
+            if (_cfg.AutoDisconnect <= 0 || _autoDisconnectAt >= 0f || _autoDisconnectSkipped) return;
+            if (_rejoinPhase != AutoRejoinPhase.WaitSheet) return;   // already dropped once (by anything) and rejoined: never freeze the rejoined round
+            if (runner.GameMode == GameMode.Single) return;
+            if (gm.State != MatchState.Active)
+            {
+                if (_activeSince >= 0f)
+                {
+                    _autoDisconnectSkipped = true;
+                    _log.Warn(Source, $"AutoTest autodisconnect: the first multiplayer round ended after {Time.realtimeSinceStartup - _activeSince:0.0} s, " +
+                        $"before the {_cfg.AutoDisconnect} s mark; the hook is off for this run.");
+                }
+                return;
+            }
+            float now = Time.realtimeSinceStartup;
+            if (_activeSince < 0f) _activeSince = now;
+            if (!AutoTestRules.ShouldAutoDisconnect(_cfg.AutoDisconnect, runner.GameMode != GameMode.Single, now - _activeSince)) return;
+
+            _log.Info(Source, $"AutoTest autodisconnect: freezing the main thread for {AutoTestRules.AutoDisconnectStallSeconds} s " +
+                "(an app sent to the background past the Fusion timeout).");
+            System.Threading.Thread.Sleep(AutoTestRules.AutoDisconnectStallSeconds * 1000);
+            _autoDisconnectAt = Time.realtimeSinceStartup;
+            _log.Info(Source, "AutoTest autodisconnect: freeze over; expecting a timeout, then the menu's disconnect sheet.");
+        }
+
+        /// <summary>
+        /// cw_autodisconnect's menu half: answers the disconnect sheet whatever caused it (the freeze, or a real drop such as
+        /// session-20261021-205856's cloud outage, which the old freeze-only arming never answered), presses REJOIN without
+        /// waiting for the lobby check, then logs the outcome: back in the match, failed, or no answer in time.
+        /// </summary>
+        private void TickAutoRejoin()
+        {
+            if (_cfg.AutoDisconnect <= 0 || _rejoinPhase == AutoRejoinPhase.Done) return;
+            float now = Time.realtimeSinceStartup;
+            if (now < _nextRejoinLookAt) return;
+            _nextRejoinLookAt = now + 0.5f;
+            var menu = FindFirstObjectByType<MenuUiController>();
+
+            if (_rejoinPhase == AutoRejoinPhase.Pressed)
+            {
+                var gm = GameManager.Instance;
+                bool backInMatch = gm != null && gm.Object != null && gm.Object.IsValid;
+                bool failed = menu != null && menu.AutoTestRejoinFailures > _rejoinFailuresBefore;
+                switch (AutoTestRules.DecideRejoinOutcome(backInMatch, failed, now - _rejoinPressedAt))
+                {
+                    case AutoRejoinOutcome.Joined:
+                        _rejoinPhase = AutoRejoinPhase.Done;
+                        _log.Info(Source, $"AutoTest autodisconnect: REJOIN outcome=joined, back in the match (state={gm.State}) " +
+                            $"{now - _rejoinPressedAt:0.0} s after the press.");
+                        break;
+                    case AutoRejoinOutcome.Failed:
+                        _rejoinPhase = AutoRejoinPhase.Done;
+                        _log.Error(Source, "AutoTest autodisconnect: REJOIN outcome=failed (the sheet shows 'over or full'; the reason is in the " +
+                            "MenuUI 'REJOIN ... failed' and UGS lines above).");
+                        break;
+                    case AutoRejoinOutcome.TimedOut:
+                        _rejoinPhase = AutoRejoinPhase.Done;
+                        _log.Error(Source, $"AutoTest autodisconnect: REJOIN outcome=timeout, neither back in the match nor failed " +
+                            $"{AutoTestRules.AutoRejoinOutcomeWaitSeconds:0} s after the press (scene '{SceneManager.GetActiveScene().name}').");
+                        break;
+                }
+                return;
+            }
+
+            // WaitSheet
+            if (menu == null || !menu.AutoTestDisconnectSheetOpen)
+            {
+                if (_autoDisconnectAt >= 0f && now - _autoDisconnectAt > AutoTestRules.AutoRejoinSheetWaitSeconds)
+                {
+                    _rejoinPhase = AutoRejoinPhase.Done;
+                    _log.Error(Source, $"AutoTest autodisconnect: no disconnect sheet on the menu {AutoTestRules.AutoRejoinSheetWaitSeconds:0} s after the freeze " +
+                        $"(scene '{SceneManager.GetActiveScene().name}'; did the peer time out? see the Fusion / MatchOverlays lines).");
+                }
+                _rejoinSheetSeenAt = -1f;
+                return;
+            }
+            if (_rejoinSheetSeenAt < 0f)
+            {
+                _rejoinSheetSeenAt = now;
+                _log.Info(Source, "AutoTest autodisconnect: disconnect sheet up on the menu " +
+                    (_autoDisconnectAt >= 0f ? "(after this hook's freeze)." : "(a drop this hook did NOT cause - answering it anyway)."));
+                return;
+            }
+            if (!AutoTestRules.ShouldPressRejoin(now - _rejoinSheetSeenAt)) return;   // a person reads the sheet first
+
+            _rejoinFailuresBefore = menu.AutoTestRejoinFailures;
+            if (menu.AutoTestPressRejoin())
+            {
+                _rejoinPhase = AutoRejoinPhase.Pressed;
+                _rejoinPressedAt = now;
+                _log.Info(Source, "AutoTest autodisconnect: REJOIN pressed (not waiting for the lobby check).");
+            }
+            else
+            {
+                _rejoinPhase = AutoRejoinPhase.Done;
+                _log.Error(Source, "AutoTest autodisconnect: REJOIN outcome=not-offered (the sheet has no REJOIN: no remembered code, the lobby is gone, " +
+                    "or a join is already running).");
+            }
         }
 
         // ---- loop observation (host and joiner) --------------------------------------------------------------------

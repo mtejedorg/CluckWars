@@ -71,6 +71,11 @@ namespace CluckWars.UI
         private VisualElement _backdrop, _backdropTint, _pageHost;
         private VisualElement _mainMenu, _classSelect, _loadout, _lobby;
         private VisualElement _settingsSheet;
+        // CW-218 "You were disconnected" sheet (MainMenu.uxml #DisconnectSheet) and the code REJOIN uses.
+        private VisualElement _disconnectSheet;
+        private Label _disconnectBody, _disconnectStatus;
+        private Button _disconnectRejoinBtn, _disconnectBackBtn;
+        private string _rejoinCode;
         private bool _isBusy;
 
         // ---- Menu juice (Phase 3B): MenuJuice engine, MenuJuicePolicy timings ----
@@ -341,6 +346,7 @@ namespace CluckWars.UI
 
             ShowMainMenu();
             ConsumePostMatchIntent();
+            ConsumeDisconnectNotice();
             RefreshStage();
             _audio.StartMenuMusic();
         }
@@ -441,6 +447,12 @@ namespace CluckWars.UI
         private void OnBackPressed()
         {
             if (_isBusy || _currentPage == null) return;
+            if (IsDisconnectSheetOpen)
+            {
+                _audio.Back();
+                CloseDisconnectSheet();
+                return;
+            }
             if (_settingsSheet != null && _settingsSheet.style.display == DisplayStyle.Flex)
             {
                 _audio.Back();
@@ -553,7 +565,7 @@ namespace CluckWars.UI
 
         private void SetPage(VisualElement page)
         {
-            if (page != _mainMenu) CloseSettings();
+            if (page != _mainMenu) { CloseSettings(); CloseDisconnectSheet(); }
             var previous = _currentPage;
             _currentPage = page;
             ApplyBackdrop();
@@ -664,6 +676,132 @@ namespace CluckWars.UI
             Bind<Label>(_mainMenu, "BuildStamp", l => l.text = UiText.Format(UiKeys.MainBuild, ("version", Application.version)));
 
             BuildSettingsSheet();
+            BuildDisconnectSheet();
+        }
+
+        // ======================================================================
+        //  DISCONNECT NOTICE (CW-218: lost connection -> "You were disconnected" + REJOIN)
+        // ======================================================================
+        /// <summary>Binds MainMenu.uxml #DisconnectSheet (static markup, hidden until <see cref="ConsumeDisconnectNotice"/>).</summary>
+        private void BuildDisconnectSheet()
+        {
+            _disconnectSheet     = _mainMenu.Q<VisualElement>("DisconnectSheet");
+            _disconnectBody      = _mainMenu.Q<Label>("DisconnectBody");
+            _disconnectStatus    = _mainMenu.Q<Label>("DisconnectStatus");
+            _disconnectRejoinBtn = _mainMenu.Q<Button>("DisconnectRejoinBtn");
+            _disconnectBackBtn   = _mainMenu.Q<Button>("DisconnectBackBtn");
+            if (_disconnectSheet == null || _disconnectBody == null || _disconnectStatus == null || _disconnectRejoinBtn == null || _disconnectBackBtn == null)
+            {
+                _log?.Error(Source, "MainMenu.uxml is missing #DisconnectSheet / #DisconnectBody / #DisconnectStatus / #DisconnectRejoinBtn / #DisconnectBackBtn; " +
+                    "a player who lost the connection lands on the main menu with no message and no REJOIN.");
+                _disconnectSheet = null;
+                return;
+            }
+            _disconnectRejoinBtn.clicked += OnRejoin;
+            OwnCue(_disconnectRejoinBtn);
+            _disconnectBackBtn.clicked += CloseDisconnectSheet;
+            BackCue(_disconnectBackBtn);
+        }
+
+        private bool IsDisconnectSheetOpen =>
+            _disconnectSheet != null && _disconnectSheet.style.display == DisplayStyle.Flex;
+
+        /// <summary>
+        /// The match scene set <see cref="ISessionSelectionService.DisconnectNoticeOnMenuLoad"/> after a lost connection
+        /// (<see cref="CluckWars.Networking.DisconnectRules.ShowsMenuNotice"/>). Read once, cleared at once: opens the sheet
+        /// over the main menu, with REJOIN when there is a session to go back to.
+        /// </summary>
+        private void ConsumeDisconnectNotice()
+        {
+            if (_selection == null || !_selection.DisconnectNoticeOnMenuLoad) return;
+            _selection.DisconnectNoticeOnMenuLoad = false;
+            if (_disconnectSheet == null) return;   // BuildDisconnectSheet already reported the wiring gap
+
+            _rejoinCode = _ugs?.LastJoinCode;
+            bool offered = CluckWars.Networking.DisconnectRules.OffersRejoin(_selection.Mode, _rejoinCode);
+            _log?.Info(Source, $"Disconnect notice: mode {_selection.Mode}, last code '{_rejoinCode ?? "-"}', REJOIN {(offered ? "offered" : "not offered")}.");
+
+            // BuildAll has just shown the main menu (the post-match landing flags are never set alongside this one).
+            SetDisconnectStatus(null);
+            _disconnectBody.style.display = DisplayStyle.Flex;
+            _disconnectRejoinBtn.SetEnabled(true);
+            _disconnectBackBtn.SetEnabled(true);
+            _disconnectRejoinBtn.style.display = offered ? DisplayStyle.Flex : DisplayStyle.None;
+            _disconnectSheet.style.display = DisplayStyle.Flex;
+            if (offered) CheckRejoinLobby(_rejoinCode);
+        }
+
+        /// <summary>Asks the lobby service whether the lobby is still there; only a lobby known to be gone hides REJOIN.</summary>
+        private async void CheckRejoinLobby(string code)
+        {
+            try
+            {
+                var availability = await _ugs.CheckLobbyAsync(code);
+                if (!IsDisconnectSheetOpen || _isBusy || code != _rejoinCode) return;   // closed, or a REJOIN already started
+                if (CluckWars.Networking.DisconnectRules.ShowsRejoin(true, availability)) return;
+                // A lobby that is gone means the match ended (possibly the host-left case a transport reason of Unknown
+                // was read as a lost connection, see DisconnectRules.Classify): no "Lost the signal" claim, only the outcome.
+                _log?.Info(Source, $"Disconnect notice: lobby '{code}' is gone; REJOIN hidden.");
+                _disconnectBody.style.display = DisplayStyle.None;
+                _disconnectRejoinBtn.style.display = DisplayStyle.None;
+                SetDisconnectStatus(UiText.Get(UiKeys.DisconnectRejoinFailed));
+            }
+            catch (Exception e)
+            {
+                // CheckLobbyAsync never throws by contract; anything here is a bug in this method. REJOIN stays up.
+                _log?.Error(Source, $"Disconnect notice: the lobby check faulted: {e}");
+            }
+        }
+
+        /// <summary>
+        /// REJOIN: the same join-by-code flow as THE COOP's JOIN MATCH (UGS lobby, then the match scene joins the Fusion
+        /// session of that name) - a fresh join under the late-join rules, nothing restored. A failure stays on the sheet.
+        /// </summary>
+        private async void OnRejoin()
+        {
+            if (_isBusy || _selection == null || string.IsNullOrWhiteSpace(_rejoinCode)) return;
+            _audio.Tap();
+            _isBusy = true;
+            _disconnectRejoinBtn.SetEnabled(false);
+            _disconnectBackBtn.SetEnabled(false);
+            SetDisconnectStatus(UiText.Get(UiKeys.DisconnectRejoining));
+            _log?.Info(Source, $"REJOIN: joining '{_rejoinCode}' again.");
+            try
+            {
+                var info = await _ugs.JoinLobbyByCodeAsync(_rejoinCode);
+                _selection.Mode = SessionMode.Join;
+                _selection.SessionName = info.JoinCode;
+                _log?.Info(Source, $"REJOIN: lobby '{info.JoinCode}' joined ({info.PlayerCount}/{info.MaxPlayers}); loading the match to join its session.");
+                _isBusy = false;
+                CloseDisconnectSheet();
+                LoadMatchScene(); // re-claims _isBusy until the scene swaps
+            }
+            catch (Exception e)
+            {
+                // The match ending (lobby gone) or filling up is a legal outcome, not a wiring bug: Warn, and say so on the sheet.
+                _autoTestRejoinFailures++;
+                // The lobby service logged its Reason / ErrorCode just before (UGS line); the type tells the rest apart.
+                _log?.Warn(Source, $"REJOIN '{_rejoinCode}' failed: {e.GetType().Name}: {e.Message}" +
+                    (e.InnerException != null ? $" (inner {e.InnerException.GetType().Name}: {e.InnerException.Message})" : string.Empty));
+                _disconnectBody.style.display = DisplayStyle.None;
+                _disconnectRejoinBtn.style.display = DisplayStyle.None;
+                _disconnectBackBtn.SetEnabled(true);
+                SetDisconnectStatus(UiText.Get(UiKeys.DisconnectRejoinFailed));
+                _isBusy = false;
+            }
+        }
+
+        private void SetDisconnectStatus(string text)
+        {
+            if (_disconnectStatus == null) return;
+            _disconnectStatus.text = text ?? string.Empty;
+            _disconnectStatus.style.display = string.IsNullOrEmpty(text) ? DisplayStyle.None : DisplayStyle.Flex;
+        }
+
+        private void CloseDisconnectSheet()
+        {
+            if (!IsDisconnectSheetOpen) return;
+            _disconnectSheet.style.display = DisplayStyle.None;
         }
 
         // ======================================================================
@@ -2587,6 +2725,23 @@ namespace CluckWars.UI
             SyncSlotModel();
             if (_slotModel.Missing != 0 || _selection.Passive == null) return false;
             OnReady();
+            return true;
+        }
+
+        private int _autoTestRejoinFailures;
+
+        /// <summary>Failed REJOIN presses (the auto-test's outcome signal).</summary>
+        public int AutoTestRejoinFailures => _autoTestRejoinFailures;
+
+        /// <summary>The CW-218 "You were disconnected" sheet is on screen.</summary>
+        public bool AutoTestDisconnectSheetOpen => DevToolsAvailable && IsDisconnectSheetOpen;
+
+        /// <summary>The disconnect sheet's REJOIN (only while the button itself is shown and nothing is loading).</summary>
+        public bool AutoTestPressRejoin()
+        {
+            if (!AutoTestAllowed("rejoin")) return false;
+            if (!IsDisconnectSheetOpen || _isBusy || _disconnectRejoinBtn.style.display == DisplayStyle.None) return false;
+            OnRejoin();
             return true;
         }
 

@@ -51,6 +51,8 @@ namespace CluckWars.Networking
         public event Action<NetworkRunner, PlayerRef> OnPlayerLeft;
         public event Action<ShutdownReason> OnShutdown;
 
+        public NetDisconnectReason? LastDisconnectReason { get; private set; }
+
         [Inject]
         public void Construct(IInputProvider inputProvider, MatchConfigSO matchConfig, ILogService log)
         {
@@ -72,6 +74,7 @@ namespace CluckWars.Networking
             }
 
             _log?.Info(Source, $"StartGame requested: mode={mode}, session='{sessionName}'.");
+            LastDisconnectReason = null;
 
             _runner = gameObject.AddComponent<NetworkRunner>();
             _runner.ProvideInput = true;
@@ -326,6 +329,7 @@ namespace CluckWars.Networking
         void INetworkRunnerCallbacks.OnDisconnectedFromServer(NetworkRunner runner, NetDisconnectReason reason)
         {
             _log?.Warn(Source, $"OnDisconnectedFromServer. reason={reason}.");
+            LastDisconnectReason = reason;   // read by the OnShutdown handlers that follow (DisconnectRules.Classify, CW-218)
         }
         void INetworkRunnerCallbacks.OnConnectRequest(NetworkRunner runner, NetworkRunnerCallbackArgs.ConnectRequest request, byte[] token)
         {

@@ -186,5 +186,26 @@
                 </ui:ScrollView>
             </ui:VisualElement>
         </ui:VisualElement>
+
+        <!-- Disconnect notice (CW-218, modal). Shown once when this player lost the connection mid-session (an app
+             backgrounded past the timeout, a network drop): the match scene hands over through
+             ISessionSelectionService.DisconnectNoticeOnMenuLoad and MenuUiController opens this sheet over the main menu.
+             REJOIN runs the ordinary join-by-code flow with the remembered code (a fresh join under the late-join rules,
+             no state restore); a failure stays on the sheet with #DisconnectStatus. BACK TO MENU (or Esc / back) closes
+             it. REJOIN is hidden when there is no code to go back to or the lobby is known to be gone.
+             Display is driven from C#. -->
+        <ui:VisualElement name="DisconnectSheet" class="cw-sheet-scrim" style="display: none;">
+            <ui:VisualElement name="DisconnectPanel" class="cw-wood-panel cw-dc-panel">
+                <ui:VisualElement class="cw-ribbon">
+                    <ui:Label text="@disconnect.title" class="cw-title" />
+                </ui:VisualElement>
+                <ui:Label name="DisconnectBody" text="@session.reason.signal" class="cw-dc-body" />
+                <ui:Label name="DisconnectStatus" text="" class="cw-dc-status" style="display: none;" />
+                <ui:VisualElement class="cw-dc-actions">
+                    <ui:Button name="DisconnectRejoinBtn" text="@btn.rejoin" class="cw-btn cw-btn--green cw-dc-btn" />
+                    <ui:Button name="DisconnectBackBtn" text="@btn.backToMenu" class="cw-btn cw-btn--wood cw-dc-btn" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

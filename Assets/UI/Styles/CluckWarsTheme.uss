@@ -1608,6 +1608,33 @@
     -unity-text-outline-width: 2px; -unity-text-outline-color: rgb(42, 26, 12);
 }
 
+/* ============================================================================
+   DISCONNECT NOTICE  (CW-218; MainMenu.uxml #DisconnectSheet, over the main menu)
+   ----------------------------------------------------------------------------
+   The in-match LEAVE MATCH? sheet's shape on the menu's scrim: a wood panel, the
+   ribbon headline, one cream line, then REJOIN (green, forward) and BACK TO MENU
+   (wood) side by side as equal 132 px planks. #DisconnectStatus carries
+   "Rejoining..." / "The match is over or full." in the same cream, a step smaller.
+   ============================================================================ */
+.cw-dc-panel {
+    width: 1000px; max-width: 94%;
+    padding-top: 36px; padding-bottom: 40px; padding-left: 48px; padding-right: 48px;
+    align-items: stretch;
+}
+.cw-dc-panel .cw-ribbon { align-self: center; }
+.cw-dc-body, .cw-dc-status {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    color: rgb(254, 245, 224); -unity-text-align: middle-center; white-space: normal;
+    padding-left: 0; padding-right: 0;
+    -unity-text-outline-width: 3px; -unity-text-outline-color: rgb(42, 26, 12);
+}
+.cw-dc-body { font-size: 44px; letter-spacing: 1px; margin-top: 36px; margin-bottom: 24px; }
+.cw-dc-status { font-size: 36px; margin-top: 0; margin-bottom: 24px; }
+.cw-dc-actions { flex-direction: row; justify-content: center; margin-top: 16px; }
+.cw-dc-btn { flex-grow: 1; flex-basis: 0; min-height: 132px; margin-left: 12px; margin-right: 12px; }
+.layout--portrait .cw-dc-actions { flex-direction: column; align-items: stretch; }
+.layout--portrait .cw-dc-btn { flex-basis: auto; margin-top: 8px; margin-bottom: 8px; margin-left: 0; margin-right: 0; }
+
 /* ---- Responsive ---------------------------------------------------------- */
 .layout--portrait  .cw-mode-row { flex-direction: column; align-items: stretch; }
 .layout--landscape .cw-mode-row { flex-direction: row; justify-content: center; }

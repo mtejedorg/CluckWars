@@ -228,3 +228,8 @@ leave.title,LEAVE MATCH?
 leave.body.solo,Paused. Your bird waits right here.
 leave.body.mp,The match keeps going without you.
 leave.keep,KEEP PLAYING
+disconnect.title,YOU WERE DISCONNECTED
+disconnect.rejoining,Rejoining…
+disconnect.rejoinFailed,The match is over or full.
+btn.rejoin,REJOIN
+btn.backToMenu,BACK TO MENU

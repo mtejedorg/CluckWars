@@ -45,5 +45,13 @@ namespace CluckWars.Networking
 
         /// <summary>Fires after the runner shuts down, normal or otherwise.</summary>
         event Action<ShutdownReason> OnShutdown;
+
+        /// <summary>
+        /// The transport's reason from the last <c>OnDisconnectedFromServer</c> of the current / last runner, or null when
+        /// none arrived. Fusion reports it before <see cref="OnShutdown"/>, so a shutdown handler can read it: a
+        /// backgrounded phone shows <c>Timeout</c> here while the shutdown says <c>DisconnectedByPluginLogic</c> (CW-218).
+        /// Cleared when a new runner starts.
+        /// </summary>
+        Fusion.Sockets.NetDisconnectReason? LastDisconnectReason { get; }
     }
 }

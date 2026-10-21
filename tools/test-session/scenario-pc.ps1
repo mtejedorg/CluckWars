@@ -18,7 +18,8 @@ param(
     [ValidateSet('solo','shared2','shared4','hostleave')][string]$Mode = 'shared4',
     [int]$Rounds = 3,
     [int]$MaxMinutes = 8,
-    [string]$Class = 'Warrior'
+    [string]$Class = 'Warrior',
+    [string]$JoinerExtra = ''   # extra EXE args (space separated) for every joiner, e.g. -JoinerExtra '-cw_autodisconnect 25'
 )
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\lib.ps1"
@@ -58,7 +59,7 @@ switch ($Mode) {
         if (-not $code) { throw 'no join code appeared' }
         Write-Host "join code: $code"
         for ($j = 1; $j -le $joiners; $j++) {
-            Start-Exe "client$($j + 1)" @('-cw_autojoin',$code,'-cw_class',$classes[($j - 1) % 3],'-cw_autoloop',"$Rounds")
+            Start-Exe "client$($j + 1)" (@('-cw_autojoin',$code,'-cw_class',$classes[($j - 1) % 3],'-cw_autoloop',"$Rounds") + @($JoinerExtra -split '\s+' | Where-Object { $_ }))
         }
     }
 }
