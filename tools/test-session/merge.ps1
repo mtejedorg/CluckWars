@@ -53,6 +53,10 @@ $rxBoiler = New-Object Text.RegularExpressions.Regex('^\s*$|^\s*at\s|^\(Filename
 $rxExcLine = New-Object Text.RegularExpressions.Regex('^[\w\.]*Exception\b')
 $rxAndroidCrash = New-Object Text.RegularExpressions.Regex('FATAL EXCEPTION|Fatal signal|\bANR in\b|\*\*\* \*\*\* \*\*\*')
 $maxCont = 40
+# Raw engine warnings (not ILogService lines, so they arrive unstamped) that must never silently return.
+# CW-207: a non-legacy clip sampled without an Animator in a player prints this per call (thousands per run).
+$rxEngineWarn = New-Object Text.RegularExpressions.Regex('Non-Legacy animations cannot be sampled')
+$engineWarn = @{}      # src -> @{ Count; Ticks; Text }
 
 # ---------------------------------------------------------------------------------------------
 # session info
@@ -114,6 +118,11 @@ foreach ($sf in $sourceFiles) {
                 }
                 continue
             }
+        }
+
+        if ($rxEngineWarn.IsMatch($msg)) {
+            if (-not $engineWarn.ContainsKey($src)) { $engineWarn[$src] = @{ Count = 0; Ticks = $(if ($cur) { $cur.Ticks } else { $date.Ticks }); Text = $msg.Trim() } }
+            $engineWarn[$src].Count++
         }
 
         $m = $rxStamp.Match($msg)
@@ -203,6 +212,13 @@ foreach ($e in $sorted) {
         } else { $cats.Add('VISUAL') }
     }
     if ($cats.Count -gt 0) { Add-Finding $cats.ToArray() $e (Format-Entry $e) }
+}
+
+# ---- Engine warnings that must stay at zero (CW-207) ---------------------------------------------
+foreach ($src in @($engineWarn.Keys)) {
+    $w = $engineWarn[$src]
+    $we = New-Entry $src $w.Ticks 'Warn' 'Unity' $w.Text
+    Add-Finding @('WARN') $we ("$(Format-Time $w.Ticks) [$($src.PadRight(7))] [Warn ][Unity] x$($w.Count) engine warning (expected 0): $($w.Text)")
 }
 
 # ---- Sync heartbeats ----------------------------------------------------------------------------

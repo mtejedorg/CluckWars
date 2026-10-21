@@ -56,6 +56,7 @@ Assert ($find -match 'Magenta material') 'visual warn reported'
 Assert ($find -match 'offenders=3') 'visual summary with nonzero offenders reported'
 Assert ($find -notmatch 'offenders=0') 'visual summary with zero offenders NOT reported'
 Assert ($find -match '\[ERROR\]\[EXCEPTION\].*Ability failed') 'error + exception line reported once with both tags'
+Assert ($find -match '\[WARN\].*client1.*x3 engine warning \(expected 0\): Non-Legacy animations cannot be sampled') 'engine warning (CW-207) flagged with its count'
 Assert ($find -match 'SHA MISMATCH') 'build SHA mismatch flagged (aaa111 vs bbb222)'
 Assert ($find -match 'phone\s+sha=aaa111' -and $find -match 'client1\s+sha=bbb222') 'SHAs listed per source'
 

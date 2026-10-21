@@ -5,3 +5,6 @@ Initialize engine version: 6000.3.14f1
 [23:59:58.020][00:00.000][Debug][Sync] Sync t=300 st=Active rem=40.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=100,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
 [00:00:00.020][00:00.000][Debug][Sync] Sync t=400 st=Active rem=40.0 | 1:x=1.0,z=2.0,hp=100,cg=0,cs=Normal ; 2:x=5.0,z=5.0,hp=100,cg=0,cs=Normal,bot | bases=1=0,2=0 | piles=10,10
 [00:00:07.000][00:00.000][Info][Match] client done
+Non-Legacy animations cannot be sampled outside the Editor without an Animator. If you want to sample this clip outside the Editor, add an Animator Component to this GameObject
+Non-Legacy animations cannot be sampled outside the Editor without an Animator. If you want to sample this clip outside the Editor, add an Animator Component to this GameObject
+Non-Legacy animations cannot be sampled outside the Editor without an Animator. If you want to sample this clip outside the Editor, add an Animator Component to this GameObject
