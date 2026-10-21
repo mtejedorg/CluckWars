@@ -141,11 +141,15 @@ namespace CluckWars.Gameplay
         /// <remarks>
         /// ⚠️ This is authority-local and returns silently when called from anywhere else.
         /// <c>AssassinExecute</c> used to call it directly, which meant that against a victim
-        /// owned by another peer — i.e. every real PvP execute — the removal did nothing while
-        /// the sibling <c>RPC_TransferAllToBountyBag</c> succeeded: the Assassin took 100% of
-        /// the victim's cargo and the victim walked away unharmed, uncredited and unstunned.
-        /// Solo testing never caught it because bots share the host's authority, so the guard
-        /// below incidentally passed.
+        /// owned by another peer — i.e. every real PvP execute — the removal did nothing and the
+        /// victim walked away unharmed and unstunned. Solo testing never caught it because bots
+        /// share the host's authority, so the guard below incidentally passed.
+        /// <para>
+        /// <paramref name="assassinId"/> must be the assassin's <b>ChickenCombat</b> id:
+        /// <see cref="CreditKillToAttacker"/> resolves it as one. <c>AssassinExecute</c> used to
+        /// pass its own behaviour id, which never resolved, so no execute ever scored a kill
+        /// (CW-050; pinned by <c>AssassinExecuteCreditTests</c>).
+        /// </para>
         /// </remarks>
         public void ExecuteRemoval(NetworkBehaviourId assassinId, float duration = 2.0f)
         {

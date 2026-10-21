@@ -120,39 +120,70 @@ namespace CluckWars.Gameplay
                     return false;
                 }
 
+                // Without these siblings there is no kill-credit id to hand out and no bag to
+                // pay into, so say so rather than executing for free.
+                if (_cargo == null || _combat == null)
+                {
+                    _log?.Error(Source, $"{name}: cannot execute - sibling behaviours missing " +
+                        $"(ChickenCargo={_cargo != null}, ChickenCombat={_combat != null}). Check the " +
+                        "Chicken prefab still carries both alongside AssassinExecute.");
+                    ResetMark();
+                    return false;
+                }
+
                 if (Runner.TryFindBehaviour(MarkedTarget, out ChickenController target))
                 {
-                    // Target execute
-                    // A steal-proof target (Egg Shell / Turtle Mode) keeps its cargo; the execute
-                    // itself, the removal and the bounty below are unchanged.
-                    if (target.Cargo != null && StealRules.CanStealFrom(target))
+                    // Nothing is paid until the victim is a complete, live chicken: the bounty
+                    // below is unconditional once reached, and ExecuteRemoval early-returns on
+                    // an already-removed victim, so going ahead would pay for a corpse. The
+                    // IsRemoved read is a proxy view here (advisory); ExecuteRemoval's own guard
+                    // on the victim's authority stays the real defence.
+                    if (target.Cargo == null || target.Combat == null || target.Combat.IsRemoved)
                     {
-                        target.Cargo.RPC_TransferAllToBountyBag(Id);
-                    }
-                    if (target.Combat != null)
-                    {
-                        // RPC, not a direct call: the victim is usually owned by another
-                        // peer, and ExecuteRemoval is authority-local.
-                        target.Combat.RPC_ExecuteRemoval(Id, 2.0f);
+                        _log?.Info(Source, $"Execute aborted: {target.name} is not an executable " +
+                            $"target (Cargo={target.Cargo != null}, Combat={target.Combat != null}, " +
+                            $"alreadyRemoved={target.Combat != null && target.Combat.IsRemoved}).");
+                        ResetMark();
+                        return false;
                     }
 
-                    // The execute bounty. Every other Assassin income route - Snatch, Sneaky
-                    // Steal, and the cargo transfer just above - requires the victim to
-                    // already be carrying, so without this an execute on an empty-handed
-                    // rival pays exactly nothing and the class can be starved out early.
+                    // A steal-proof target (Egg Shell / Turtle Mode) keeps its cargo; the execute
+                    // itself, the removal and the bounty below are unchanged.
                     //
-                    // Paid straight into the bounty bag rather than dropped on the ground, so
-                    // it cannot be vultured by a bystander who happens to walk past. Written
-                    // directly because Press() is already gated on this Assassin's own
-                    // StateAuthority.
+                    // The looted cargo is NOT credited here. The victim's authority drains it and
+                    // reports the amount it actually took back through
+                    // ChickenCargo.RPC_CreditExecuteLoot, so food the victim banked while stunned
+                    // on its own doorstep is never paid twice. The expectation is recorded first
+                    // because on a shared authority (solo, bots) both RPCs run synchronously
+                    // inside this call. RPC_TransferAllToBountyBag takes THIS behaviour's Id on
+                    // purpose: its receiver resolves an AssassinExecute and checks the mark.
+                    bool takesCargo = StealRules.CanStealFrom(target);
+                    if (takesCargo)
+                    {
+                        _cargo.ExpectExecuteLoot(target);
+                        target.Cargo.RPC_TransferAllToBountyBag(Id);
+                    }
+
+                    // RPC, not a direct call: the victim is usually owned by another peer, and
+                    // ExecuteRemoval is authority-local. The id is the sibling ChickenCombat's,
+                    // because CreditKillToAttacker resolves a ChickenCombat - passing this
+                    // behaviour's own Id (CW-050) meant no execute ever scored a kill.
+                    target.Combat.RPC_ExecuteRemoval(_combat.Id, 2.0f);
+
+                    // The execute bounty. Every other Assassin income route - Snatch, Sneaky
+                    // Steal, and the cargo transfer above - requires the victim to already be
+                    // carrying, so without this an execute on an empty-handed rival pays
+                    // nothing and the class can be starved out early. Paid into the bounty bag
+                    // rather than onto the ground so a bystander cannot vulture it, and written
+                    // directly because Press() is gated on this Assassin's own StateAuthority.
                     float bounty = ResolveExecuteBounty(target);
-                    if (bounty > 0f && _cargo != null)
+                    if (bounty > 0f)
                     {
                         _cargo.BountyBag += bounty;
                     }
 
-                    _log?.Info(Source, $"Kill Executed! Cargo transferred to bounty bag (+{bounty:0.#} " +
-                        $"execute bounty), {target.name} removed.");
+                    _log?.Info(Source, $"Kill Executed! +{bounty:0.#} execute bounty into the bounty bag, " +
+                        $"{target.name} removed (cargo transfer {(takesCargo ? "requested" : "skipped: steal-proof")}).");
                     ResetMark();
 
                     if (_abilities != null)
