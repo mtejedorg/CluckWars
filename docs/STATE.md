@@ -6,6 +6,33 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🛠 PC-matrix follow-ups CW-231 + CW-226 (2026-10-21) - working tree, NOT yet run in Unity
+
+- **CW-231 (cooldown survives the reset, shared4 session 150220 rounds 3+4, P3 = client4's Assassin):** a Death Mark placed in the last ~1 s of a round lived through the end screen; the reset teleport put the target 30-56 m away, the next tick fizzled the mark on range and `AssassinExecute.FizzleMark` re-armed a 5 s cooldown *after* `EndAllForReset` had cleared every slot (fizzle 15:04:30.56, invariant 15:04:31.71 = 3.85 s left, logged 3.88/3.78 on all four peers). Fix: `AssassinExecute.ResetForNewRound()` drops the mark without the fail cooldown; `ChickenController.RPC_ResetControlStates` calls it before `EndAllForReset`. Also the fizzle log printed `301m` for 30.1 m (`{dist:0.1}` format) - now `0.0`. Test: `RoundTeleportRulesTests.RoundReset_ReachesEveryComponentThatArmsACooldownOfItsOwn_CW231` (scans every script that calls `TriggerCooldown`; fails on HEAD). Live gate stays the in-game `cooldowns-zero` invariant.
+- **CW-226 (hostleave session 150533 SYNC=4):** by design, not a replication bug. In both findings the odd peer out is the chicken's owner (client4 owns P2, client2 owns P3) and the pairs swap between the two heartbeats (owner Free/Slowed, remotes Slowed/Free): the owner prints its newest tick, the others their newest snapshot, and a pile/collision slow toggled near both heartbeats. `merge.ps1` now counts a mismatch in ANY Sync field as persistent only while at least one side stays constant over the consecutive beats (both sides changing = lag; also clears the 153100 pile-refill SYNC); the 225001 shape (owner Slowed, remotes Free, 3 heartbeats in a row) is still reported. New dev-tools Sync fields: `fl=N` (flag changes this peer saw since the last line), `own=1` and `src=Collision+Pile+Ability` on the owner; merge appends `[owner=.. src=.. fl ..]` to cs findings. Tests: `InstrumentationProbeTests.SyncLine_OwnerDiagnostics_FlipsOwnSources_CW226`, selftest `fixtures/cs-fixture` (old merge flags its lag case; new one does not). No `[Networked]` layout change, no new RPC, no prefab wiring.
+- Maestro: EditMode, `selftest.ps1` (already green here), then `scenario-pc.ps1 -Mode shared4 -Rounds 3` and `-Mode hostleave -Rounds 3` x2-3.
+
+---
+
+## 🛠 Build guards: UGS cloud project id + pinned app id (CW-200, CW-201) - working tree, NOT yet verified in Unity
+
+- **CW-200:** `CluckWarsBuildMenu.Build` now runs `EnsureCloudProjectId` first. If `cloudProjectId` in PlayerSettings is empty/invalid it injects `CW_CLOUD_PROJECT_ID` (env) or the project id constant (`BuildGuards.UgsProjectId`), reads it back, and throws `BuildFailedException` (non-zero batch exit) if still invalid. The injected value is restored after the build so `ProjectSettings.asset` shows no diff. Pure rules live in `Assets/_Game/Scripts/Editor/BuildGuards.cs`.
+- **CW-201:** Android and iOS `applicationIdentifier` pinned to `com.cluckwars.game` in `ProjectSettings.asset` and re-asserted by the Android/iOS build setup. Old installs (`com.DefaultCompany.CluckWars`, `com.UnityTechnologies.com.unity.template.urpblank`) must be uninstalled from test phones; PlayerPrefs do not carry over. `tools/test-session/*.ps1`, `docs/TESTING.md` and `.claude/skills/coop-test` updated; `~/.claude/skills/coop-test` (user-level copy) is Maestro's to update.
+- Tests: `Assets/_Game/Scripts/Editor/Tests/BuildGuardsTests.cs`. Maestro steps: let Unity generate the `.meta` files for the two new scripts, run EditMode, do one headless Windows build and confirm `Application.cloudProjectId` is non-empty in the player log.
+
+---
+
+## 🛠 Assassin execute pays (CW-050) - working tree, NOT yet run in Unity / multi-client
+
+- Hand-ported from unmerged `fix/assassin-execute-credit` (692736f, 86fe81c), re-derived against 7cb18c6's hardened transfer. Not a blind port: that branch passed `_cargo.Id` to `RPC_TransferAllToBountyBag`, which `TryResolveExecutor` (resolves an `AssassinExecute`) would now reject on every execute. The transfer keeps `Id`; only the removal changed.
+- **Kill credit:** `Press` passes `_combat.Id` to `RPC_ExecuteRemoval` (`CreditKillToAttacker` resolves a `ChickenCombat`; the old own-`Id` never resolved, so no execute ever scored a kill).
+- **Loot credit:** the victim's authority no longer writes the assassin's `BountyBag` through a proxy (lost in Shared PvP). It drains, then reports the amount it actually zeroed via new `ChickenCargo.RPC_CreditExecuteLoot` to the assassin's authority. That RPC checks the sender like `RPC_RefundRefusedSteal` does, and only pays against a pending record `Press` wrote via `ExpectExecuteLoot`, capped at `StealRules.ExecuteLootCap` (victim capacity or visible cargo). Paid once, inside a 2.5 s window (`StealRules.ExecuteLootWindowSeconds`, a separate ledger built through the new `PendingStealLedger(windowSeconds)` constructor). Recording and amount resolution are pure `StealRules` helpers that production and the tests both call. Follow-up: CW-230 (caller checks for the removal and kill-credit RPCs). Food a stunned victim banks before the drain lands is no longer paid out twice.
+- Steal-proof gate kept: shelled victims keep cargo; removal + flat bounty still apply. `Press` now checks the victim (Cargo, Combat, !IsRemoved) and its own siblings before it pays anything.
+- Tests: `Assets/_Game/Scripts/Editor/Tests/AssassinExecuteCreditTests.cs`. Its structural tests fail on HEAD and on the fix branch. `StealProofTests.DeathMark_*` now anchors on the brace-matched `Press` body (shared `AssassinExecuteCreditTests.MethodBody`) instead of a fixed character span. Verified outside Unity only (scratch `dotnet build` + reflection runner): everything that does not need the Unity engine passes. Maestro: run EditMode, then a 2-client Shared execute (assassin on client A, victim on B) and check bounty bag + Kills.
+- No prefab wiring. No `[Networked]` layout change. One new RPC, so all peers must run the same build (they already must).
+
+---
+
 ## ✅ Test-session instrumentation (2026-10-20, branch `test/instrumentation-2026-10-20`) - EditMode 1938/1938
 
 Dev / diagnostic only, read-only toward gameplay (no `[Networked]` writes, no RPCs, no new networked objects). Spec: `docs/TEST_SESSION_PLAN_2026-10.md` §2; how to use it: `docs/TESTING.md` ▸ "Test-session instrumentation".
