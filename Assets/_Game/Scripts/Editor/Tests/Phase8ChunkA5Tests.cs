@@ -28,6 +28,13 @@ namespace CluckWars.Tests
 
         /// <summary>No collider-bearing dressing within this XZ distance of either end of an arm.</summary>
         private const float ArmTipClearance = 4f;
+        /// <summary>
+        /// Relaxed C9 clearance for scarecrows ONLY (CW-040 / D12, Maestro 2026-10-21): they are walk-through, so a
+        /// scarecrow may stand 3 m from an arm tip, which lets it slide ~1.2 m along its fence away from its coop.
+        /// Every other tall prop (coops, barn, silos, trees...) keeps <see cref="ArmTipClearance"/>.
+        /// </summary>
+        private const float ScarecrowArmTipClearance = 3f;
+        private const string ScarecrowMesh = "scarecrow";
         /// <summary>Silos must sit at least this far out on X or Z (outside the fence and the hedge).</summary>
         private const float SiloMinCoord = 28f;
         /// <summary>Scarecrow centre to the nearest pile footprint edge.</summary>
@@ -324,8 +331,8 @@ namespace CluckWars.Tests
         private const float TallTolerance = 0.02f;
 
         /// <summary>
-        /// C9: tall dressing (scarecrows, coops, anything over 1 m) stays at least <see cref="ArmTipClearance"/> from
-        /// both ends of every arm, collider or not - a walk-through scarecrow in a rim opening still hides chickens
+        /// C9: tall dressing (scarecrows, coops, anything over 1 m) stays at least <see cref="ArmTipClearance"/> (3 m for
+        /// the walk-through scarecrows, see <see cref="ScarecrowArmTipClearance"/>) from both ends of every arm, collider or not - a walk-through scarecrow in a rim opening still hides chickens
         /// and reads as a plug. Distance is measured to each mesh's oriented box (its local bounds placed in world
         /// space), so a rotated prop is neither inflated (world AABB) nor shrunk to its pivot.
         /// </summary>
@@ -351,13 +358,17 @@ namespace CluckWars.Tests
                 foreach (var tip in tips)
                 {
                     float d = filters.Min(f => DistanceToOrientedBoundsXZ(f, tip.P));
-                    if (d < ArmTipClearance)
-                        offenders.Add($"{prop.name} ({MeshOf(prop)}, {top:F2} m tall) is {d:F2} m from arm {tip.Index}'s {tip.End} end {Fmt(tip.P)}");
+                    float required = TallDressingTipClearance(MeshOf(prop));
+                    if (d < required)
+                        offenders.Add($"{prop.name} ({MeshOf(prop)}, {top:F2} m tall, needs {required:F1} m) is {d:F2} m from arm {tip.Index}'s {tip.End} end {Fmt(tip.P)}");
                 }
             }
             Assert.GreaterOrEqual(tall, 8, "Expected at least the 4 scarecrows and 4 coops to be checked as tall dressing.");
             Assert.IsEmpty(offenders, "Tall dressing stands in an arm opening:\n" + string.Join("\n", offenders));
         }
+
+        /// <summary>The C9 arm-tip clearance (m) that applies to a prop with this mesh: 3 m for scarecrows, 4 m for everything else.</summary>
+        internal static float TallDressingTipClearance(string mesh) => mesh == ScarecrowMesh ? ScarecrowArmTipClearance : ArmTipClearance;
 
         /// <summary>XZ distance from a point to a mesh's local bounds box placed in world space (exact for an upright, unsheared transform).</summary>
         private static float DistanceToOrientedBoundsXZ(MeshFilter f, Vector3 point)
@@ -377,6 +388,23 @@ namespace CluckWars.Tests
                 if (d > 0f) sq += d * d;
             }
             return Mathf.Sqrt(sq);
+        }
+
+        /// <summary>
+        /// CW-040 / D12: the rule itself. A scarecrow slid 1.2 m (3.0-3.1 m from an arm tip) is accepted, a
+        /// non-scarecrow at 3.5 m is still rejected, and the old uniform 4 m rule would have rejected the scarecrow.
+        /// </summary>
+        [Test]
+        public void TipClearanceRule_ScarecrowsRelaxedTo3m_EverythingElseKeeps4m()
+        {
+            Assert.AreEqual(3f, TallDressingTipClearance("scarecrow"));
+            foreach (var other in new[] { "chicken_coop", "big_barn", "feed_silo", "oak_tree", "milk_churn" })
+                Assert.AreEqual(4f, TallDressingTipClearance(other), other);
+
+            Assert.GreaterOrEqual(3.05f, TallDressingTipClearance("scarecrow"), "A 1.2 m slide (3.05 m from the tip) is legal for a scarecrow.");
+            Assert.Less(3.05f, ArmTipClearance, "...and is exactly what the old uniform 4 m rule rejected.");
+            Assert.Less(3.5f, TallDressingTipClearance("chicken_coop"), "A coop at 3.5 m is still rejected.");
+            Assert.Less(2.9f, TallDressingTipClearance("scarecrow"), "A scarecrow inside 3 m is still rejected.");
         }
 
         // ---------------------------------------------------------------- (f) Phase 8 C12
