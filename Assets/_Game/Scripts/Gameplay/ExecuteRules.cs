@@ -43,30 +43,75 @@ namespace CluckWars.Gameplay
         public const float MinRemoteLatencySeconds = 0.15f;
 
         /// <summary>
-        /// How long after the victim last saw an attacker's replicated mark name it a removal or
-        /// cargo claim from that attacker still counts as marked, on top of the latency. Covers
-        /// Press clearing the mark in the same tick it sends the RPC, so the cleared mark can reach
-        /// the victim's peer before (or with) the RPC while the stun that qualified it is over.
+        /// Cap on any latency fed into an allowance (range margin, grace windows), so a sender
+        /// reporting or causing a huge RTT cannot widen them.
+        /// </summary>
+        public const float MaxLatencySeconds = 0.5f;
+
+        /// <summary>
+        /// How long after the victim last saw an attacker's replicated mark name it a claim from
+        /// that attacker still counts as marked, on top of the latency. Covers Press clearing the
+        /// mark in the same tick it sends the RPC.
         /// </summary>
         public const float RecentMarkGraceSeconds = 0.5f;
 
-        /// <summary>A remote sender's latency for allowances: the measured RTT, never below the floor (NaN reads as the floor).</summary>
+        /// <summary>
+        /// How long after the victim's own authority last saw itself stunned the stun still
+        /// qualifies an execute, on top of the latency. KillReady latches on a stun and outlives it
+        /// (stuns 1-1.5 s); the qualifying stun is always inside the mark's window, so the whole
+        /// window is a safe bound.
+        /// </summary>
+        public const float RecentStunWindowSeconds = AssassinExecute.WindowDuration;
+
+        /// <summary>A latency for allowances: clamped to [0, <see cref="MaxLatencySeconds"/>] (NaN reads as 0).</summary>
+        public static float CapLatency(float latency) =>
+            latency > 0f ? (latency < MaxLatencySeconds ? latency : MaxLatencySeconds) : 0f;
+
+        /// <summary>A remote sender's latency for allowances: the measured RTT floored and capped (NaN reads as the floor).</summary>
         public static float RemoteLatency(float measuredRtt) =>
-            measuredRtt > MinRemoteLatencySeconds ? measuredRtt : MinRemoteLatencySeconds;
+            CapLatency(measuredRtt > MinRemoteLatencySeconds ? measuredRtt : MinRemoteLatencySeconds);
 
         /// <summary>
-        /// The evidence half of an execute, shared by the removal and the cargo transfer so both
-        /// halves accept and refuse together: the attacker's replicated mark names this victim
-        /// now, OR the victim is stunned on its own authority, OR the victim saw that mark within
-        /// <c>latency + RecentMarkGraceSeconds</c> (the mark-reset race, stun already over).
+        /// Age of a victim-side record, in seconds, from two <c>Runner.SimulationTime</c> readings.
+        /// Simulation time, never wall-clock: the execute window runs on ticks, and a solo pause
+        /// (<c>SinglePlayerPause</c>) stops ticks while <c>Time.unscaledTime</c> keeps running.
         /// </summary>
-        /// <param name="markEverSeen">The victim has seen this attacker's mark name it at all.</param>
-        /// <param name="secondsSinceMarkSeen">Since the victim last saw the mark (ignored when never seen).</param>
-        public static bool HasExecuteEvidence(bool markedNow, bool victimStunned, bool markEverSeen,
-            float secondsSinceMarkSeen, float latency) =>
-            markedNow || victimStunned ||
-            (markEverSeen && secondsSinceMarkSeen >= 0f &&
-             secondsSinceMarkSeen <= Mathf.Max(0f, latency) + RecentMarkGraceSeconds);
+        public static float AgeSeconds(double simulationNow, double recordedAt) => (float)(simulationNow - recordedAt);
+
+        /// <summary>True when a local record exists and is no older than <paramref name="window"/> (NaN or negative ages fail).</summary>
+        public static bool IsRecent(bool everSeen, float secondsSince, float window) =>
+            everSeen && secondsSince >= 0f && secondsSince <= window;
+
+        /// <summary>
+        /// The evidence half of an execute, shared by the removal (<see cref="EvaluateRemoval"/>)
+        /// and the cargo transfer (<c>ChickenCargo.TryResolveExecutor</c>) so both halves accept and
+        /// refuse together. BOTH must hold:
+        /// <list type="bullet">
+        /// <item>the mark: the attacker's replicated mark names this victim now, or the victim's
+        /// authority saw it within <c>latency + RecentMarkGraceSeconds</c>;</item>
+        /// <item>the stun: the victim is stunned now, or its OWN authority recorded itself stunned
+        /// within <c>latency + RecentStunWindowSeconds</c>.</item>
+        /// </list>
+        /// A mark alone (the attacker controls its own MarkedTarget) or a stun alone from nobody
+        /// does not pass. The press-tick race (mark already cleared, stun already over) passes
+        /// because both were recorded locally on the victim.
+        /// </summary>
+        /// <remarks>
+        /// Trust model: the attacker's own state authority can still self-execute within these
+        /// bounds (skip the arm timer or isolation on a marked, recently stunned victim in range).
+        /// Shared Mode trusts each state authority over its own objects; this closes forged calls
+        /// from peers that are not, and executes with no real mark + stun behind them.
+        /// </remarks>
+        public static bool HasExecuteEvidence(
+            bool markedNow, bool markEverSeen, float secondsSinceMarkSeen,
+            bool stunnedNow, bool stunEverSeen, float secondsSinceStunned,
+            float latency)
+        {
+            float l = CapLatency(latency);
+            bool mark = markedNow || IsRecent(markEverSeen, secondsSinceMarkSeen, l + RecentMarkGraceSeconds);
+            bool stun = stunnedNow || IsRecent(stunEverSeen, secondsSinceStunned, l + RecentStunWindowSeconds);
+            return mark && stun;
+        }
 
         // ---- RPC_ExecuteRemoval ---------------------------------------------------------
 
@@ -79,7 +124,7 @@ namespace CluckWars.Gameplay
             DecoyAttacker,
             NotAttributable,
             NoAssassinExecute,
-            NotMarkedNorStunned,
+            NoExecuteEvidence,
             OutOfRange,
         }
 
@@ -101,7 +146,11 @@ namespace CluckWars.Gameplay
             public bool MarkEverSeen;
             /// <summary>Seconds since the victim last saw that mark (ignored unless <see cref="MarkEverSeen"/>).</summary>
             public float SecondsSinceMarkSeen;
-            /// <summary>The sender's latency (0 for a local invoke, floored for a remote one).</summary>
+            /// <summary>The victim's own authority has recorded itself stunned (local record).</summary>
+            public bool StunEverSeen;
+            /// <summary>Seconds since the victim's authority last saw itself stunned (ignored unless <see cref="StunEverSeen"/>).</summary>
+            public float SecondsSinceStunned;
+            /// <summary>The sender's latency (0 for a local invoke, floored and capped for a remote one).</summary>
             public float Latency;
             public float PlanarDistance;
             public float RangeMargin;
@@ -122,9 +171,9 @@ namespace CluckWars.Gameplay
         /// <remarks>
         /// <b>Why not "marked AND KillReady".</b> Press resets the mark in the same tick it sends
         /// this RPC, and KillReady can turn true one tick before a press, so either replicated value
-        /// can be stale when the RPC lands on another peer. KillReady also outlives the stun that
-        /// qualified it (stuns 1-1.5 s, window 5 s), so "stunned now" alone is not enough either:
-        /// the victim's own recent sighting of the mark (<see cref="HasExecuteEvidence"/>) covers it.
+        /// can be stale when the RPC lands on another peer; KillReady also outlives the stun that
+        /// qualified it. The victim's own local records of the mark and of its stun
+        /// (<see cref="HasExecuteEvidence"/>) cover both.
         /// </remarks>
         public static RemovalVerdict EvaluateRemoval(in RemovalClaim c)
         {
@@ -134,8 +183,9 @@ namespace CluckWars.Gameplay
             if (c.AttackerIsDecoy) return RemovalVerdict.DecoyAttacker;
             if (!c.SenderSpeaksForAttacker) return RemovalVerdict.NotAttributable;
             if (!c.AttackerHasExecute) return RemovalVerdict.NoAssassinExecute;
-            if (!HasExecuteEvidence(c.MarkedThisVictim, c.VictimStunned, c.MarkEverSeen, c.SecondsSinceMarkSeen, c.Latency))
-                return RemovalVerdict.NotMarkedNorStunned;
+            if (!HasExecuteEvidence(c.MarkedThisVictim, c.MarkEverSeen, c.SecondsSinceMarkSeen,
+                    c.VictimStunned, c.StunEverSeen, c.SecondsSinceStunned, c.Latency))
+                return RemovalVerdict.NoExecuteEvidence;
             if (!(c.PlanarDistance <= MaxExecuteDistance(c.RangeMargin))) return RemovalVerdict.OutOfRange;
             return RemovalVerdict.Accepted;
         }
@@ -150,7 +200,7 @@ namespace CluckWars.Gameplay
                 case RemovalVerdict.DecoyAttacker:       return "the named attacker is a Doppelganger decoy.";
                 case RemovalVerdict.NotAttributable:     return "the sender is not entitled to act for the named attacker.";
                 case RemovalVerdict.NoAssassinExecute:   return "the named attacker has no AssassinExecute.";
-                case RemovalVerdict.NotMarkedNorStunned: return "the attacker has not marked this chicken recently and it is not stunned.";
+                case RemovalVerdict.NoExecuteEvidence:   return "this chicken has not seen both a recent mark from the attacker and a recent stun on itself.";
                 case RemovalVerdict.OutOfRange:          return "the attacker is too far away to have executed this chicken.";
                 default:                                 return "accepted.";
             }

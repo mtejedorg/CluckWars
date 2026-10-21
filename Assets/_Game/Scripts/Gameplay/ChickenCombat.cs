@@ -234,6 +234,7 @@ namespace CluckWars.Gameplay
                 // floored because GetPlayerRtt is not confirmed to report remote players in Shared Mode.
                 claim.Latency = SenderLatency(info);
                 claim.MarkEverSeen = TrySecondsSinceMarkedBy(execute, out claim.SecondsSinceMarkSeen);
+                claim.StunEverSeen = TrySecondsSinceStunned(out claim.SecondsSinceStunned);
 
                 // Two ticks cover the press landing a tick after the mark's own range check.
                 claim.RangeMargin = StealRules.RangeMargin(
@@ -253,8 +254,10 @@ namespace CluckWars.Gameplay
         // Victim-side, local, never replicated: when this chicken's authority last saw each
         // attacker's replicated MarkedTarget name it. Lets an execute whose mark was cleared in the
         // press tick still count as marked after the qualifying stun ended (CW-230 review).
-        private readonly System.Collections.Generic.Dictionary<AssassinExecute, float> _markSeenAt =
-            new System.Collections.Generic.Dictionary<AssassinExecute, float>();
+        // Stored in simulation time (Runner.SimulationTime), like the execute window itself: a solo
+        // pause stops ticks but not the wall clock, and must not age these records.
+        private readonly System.Collections.Generic.Dictionary<AssassinExecute, double> _markSeenAt =
+            new System.Collections.Generic.Dictionary<AssassinExecute, double>();
 
         /// <summary>
         /// Seconds since this chicken's authority last saw <paramref name="execute"/>'s mark name it.
@@ -263,22 +266,45 @@ namespace CluckWars.Gameplay
         internal bool TrySecondsSinceMarkedBy(AssassinExecute execute, out float seconds)
         {
             seconds = 0f;
-            if (execute == null || !_markSeenAt.TryGetValue(execute, out float at)) return false;
-            seconds = Time.unscaledTime - at;
+            if (Runner == null || execute == null || !_markSeenAt.TryGetValue(execute, out double at)) return false;
+            seconds = ExecuteRules.AgeSeconds(Runner.SimulationTime, at);
             return true;
         }
 
-        // Authority only, every tick: at most four chickens, so a straight scan of the registry.
+        // Victim-side, local, never replicated: when this chicken's own authority last saw itself
+        // stunned. KillReady latches on a stun and outlives it, so an execute can land after the
+        // stun ended; this is the victim's own record that the stun really happened.
+        private double _stunnedAt;   // Runner.SimulationTime, see _markSeenAt
+        private bool _stunEverSeen;
+
+        /// <summary>Seconds since this chicken's authority last saw itself stunned. False when never this round.</summary>
+        internal bool TrySecondsSinceStunned(out float seconds)
+        {
+            seconds = 0f;
+            if (Runner == null || !_stunEverSeen) return false;
+            seconds = ExecuteRules.AgeSeconds(Runner.SimulationTime, _stunnedAt);
+            return true;
+        }
+
+        // Authority only, every tick: this chicken's own stun, and every mark naming it (at most
+        // four chickens, so a straight scan of the registry).
         private void ObserveMarksOnMe()
         {
-            if (_controller == null) return;
+            if (_controller == null || Runner == null) return;
+            double now = Runner.SimulationTime;
+            if (_controller.IsStunned)
+            {
+                _stunnedAt = now;
+                _stunEverSeen = true;
+            }
+
             var all = ActiveCombats;
             for (int i = 0; i < all.Count; i++)
             {
                 var execute = all[i] != null ? all[i]._execute : null;
                 if (execute != null && execute.Object != null && execute.Object.IsValid &&
                     execute.MarkedTarget == _controller.Id)
-                    _markSeenAt[execute] = Time.unscaledTime;
+                    _markSeenAt[execute] = now;
             }
         }
 
@@ -324,6 +350,7 @@ namespace CluckWars.Gameplay
             IsRemoved = false;
             StunTimer = default;
             _markSeenAt.Clear();
+            _stunEverSeen = false;
             _log?.Debug(Source, "Reset combat for new match.");
         }
 
