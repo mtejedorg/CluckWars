@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using CluckWars.Gameplay;
 using CluckWars.Logging;
 using CluckWars.UI;
@@ -141,9 +142,8 @@ namespace CluckWars.Visuals
                 return;
             }
 
-            // Self-injection per CONVENTIONS — not gated on HasInstance.
-            if (_log == null && ProjectContext.HasInstance)
-                ProjectContext.Instance.Container.Inject(this);
+            // Self-injection per CONVENTIONS. Never gate on ProjectContext.HasInstance: it is false until .Instance is first read.
+            if (_log == null) ProjectContext.Instance.Container.Inject(this);
 
             _controller = GetComponent<ChickenController>();
             _body = GetComponent<CharacterController>();
@@ -166,7 +166,91 @@ namespace CluckWars.Visuals
         /// <c>enabled = false</c> is an ordinary Unity operation (a settings toggle, a test
         /// harness) and the ghost would be baffling.
         /// </summary>
-        private void OnDisable() => Hide();
+        private void OnDisable()
+        {
+            _spreadCam = null;
+            SpreadQueue.Remove(this);
+            Hide();
+        }
+
+        // ── Edge-arrow spread (CW-022) ─────────────────────────────────────────
+        // Each indicator places its own chevron in LateUpdate (clamp + HUD-zone slide), in arbitrary order. Two rivals the
+        // same zone pushes to the same edge spot would then overlap, so every chevron queues its placement here and one
+        // shared pass (EdgeArrowSpread, pure) gives each its own slot just before render, when every LateUpdate has run.
+        // Purely local presentation: nothing networked.
+
+        private static readonly List<RivalIndicator> SpreadQueue = new List<RivalIndicator>(4);
+        private static readonly List<Vector2> SpreadDesired = new List<Vector2>(4);
+        private static Vector2[] _spreadResult = new Vector2[4];
+        private static bool _spreadHooked;
+
+        private Camera _spreadCam;       // non-null while this indicator is queued this frame
+        private Vector2 _spreadClamped;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            SpreadQueue.Clear();
+            SpreadDesired.Clear();
+            Application.onBeforeRender -= FlushSpread;   // with domain reload off the old subscription survives Play restarts
+            _spreadHooked = false;
+        }
+
+        private void QueueForSpread(Camera cam, Vector2 clamped)
+        {
+            bool alreadyQueued = _spreadCam != null;   // no render since the last LateUpdate (batchmode): refresh, do not grow the queue
+            _spreadCam = cam;
+            _spreadClamped = clamped;
+            if (!alreadyQueued) SpreadQueue.Add(this);
+            if (_spreadHooked) return;
+            Application.onBeforeRender += FlushSpread;
+            _spreadHooked = true;
+        }
+
+        private static void FlushSpread()
+        {
+            try
+            {
+                int count = SpreadQueue.Count;
+                if (count == 0) return;
+
+                // Entries can be stale (destroyed, hidden, camera gone) by the time the frame renders: only live ones take part.
+                Camera cam = null;
+                for (int i = 0; i < count && cam == null; i++)
+                {
+                    var e = SpreadQueue[i];
+                    if (e != null && e._spreadCam != null) cam = e._spreadCam;
+                }
+                if (cam == null) return;
+
+                SpreadDesired.Clear();
+                for (int i = 0; i < count; i++)
+                    SpreadDesired.Add(SpreadQueue[i] != null ? SpreadQueue[i]._spreadClamped : Vector2.zero);
+                if (_spreadResult.Length < count) _spreadResult = new Vector2[count];
+
+                float size = FeedbackTuning.RivalChevronSizeFraction * FeedbackTuning.RivalChevronSpacing;
+                var minSep = new Vector2(size / Mathf.Max(0.1f, cam.aspect), size);
+                var clearance = ChevronClearance(cam);
+                EdgeArrowSpread.Spread(SpreadDesired, FeedbackTuning.RivalChevronSafeArea, HudControlZones.Current(cam),
+                    clearance, minSep, _spreadResult);
+
+                for (int i = 0; i < count; i++)
+                {
+                    var ind = SpreadQueue[i];
+                    if (ind == null || ind._spreadCam == null || ind._chevron == null || !ind._chevron.gameObject.activeSelf) continue;
+                    if (_spreadResult[i] == ind._spreadClamped) continue;   // not moved: already placed correctly in LateUpdate
+                    Vector2 bearing = ScreenEdgeProjection.BearingToward(_spreadResult[i],
+                        ScreenEdgeProjection.TargetViewport(ind._spreadCam, ind.transform.position));
+                    ind.PlaceChevron(ind._spreadCam, _spreadResult[i], bearing);
+                }
+            }
+            finally
+            {
+                for (int i = 0; i < SpreadQueue.Count; i++)
+                    if (SpreadQueue[i] != null) SpreadQueue[i]._spreadCam = null;
+                SpreadQueue.Clear();
+            }
+        }
 
         private void OnDestroy()
         {
@@ -250,6 +334,7 @@ namespace CluckWars.Visuals
                     out Vector2 clamped, out Vector2 bearing))
             {
                 ShowChevron(cam, clamped, bearing, tint, opacity);
+                QueueForSpread(cam, clamped);
             }
             else
             {
@@ -329,9 +414,21 @@ namespace CluckWars.Visuals
             if (_ring != null && _ring.gameObject.activeSelf) _ring.gameObject.SetActive(false);
             if (_chevron == null) return;
 
+            PlaceChevron(cam, clamped, bearing);
+
+            _chevron.color = WithAlpha(tint, FeedbackTuning.RivalChevronAlpha * opacity);
+            if (_chevronOutline != null)
+                _chevronOutline.color = WithAlpha(ChevronOutlineColor, FeedbackTuning.RivalChevronOutlineAlpha * opacity);
+            if (!_chevron.gameObject.activeSelf) _chevron.gameObject.SetActive(true);
+        }
+
+        /// <summary>Positions, orients and sizes the chevron at viewport point <paramref name="at"/> pointing along
+        /// <paramref name="bearing"/> (viewport axes). Shared by the LateUpdate placement and the spread pass.</summary>
+        private void PlaceChevron(Camera cam, Vector2 at, Vector2 bearing)
+        {
             float depth = cam.nearClipPlane + FeedbackTuning.RivalChevronDepthOffset;
             var t = _chevron.transform;
-            t.position = cam.ViewportToWorldPoint(new Vector3(clamped.x, clamped.y, depth));
+            t.position = cam.ViewportToWorldPoint(new Vector3(at.x, at.y, depth));
 
             // Bearing is in viewport axes; rebuild it in the camera's basis so the arrow
             // points the right way whatever the match camera's yaw happens to be.
@@ -342,11 +439,6 @@ namespace CluckWars.Visuals
             float size = ScreenEdgeProjection.ViewportWorldHeight(cam, FeedbackTuning.RivalChevronDepthOffset)
                          * FeedbackTuning.RivalChevronSizeFraction;
             t.localScale = Vector3.one * Mathf.Max(0.0001f, size);
-
-            _chevron.color = WithAlpha(tint, FeedbackTuning.RivalChevronAlpha * opacity);
-            if (_chevronOutline != null)
-                _chevronOutline.color = WithAlpha(ChevronOutlineColor, FeedbackTuning.RivalChevronOutlineAlpha * opacity);
-            if (!_chevron.gameObject.activeSelf) _chevron.gameObject.SetActive(true);
         }
 
         /// <summary>Test seams: light the ring / chevron for a rival at <paramref name="corner"/> without a

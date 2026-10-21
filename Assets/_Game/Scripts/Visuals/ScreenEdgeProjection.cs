@@ -132,7 +132,11 @@ namespace CluckWars.Visuals
         /// the two coincide. Prefers from -> target: for a rival off the top-right this points into the corner, which is a truer
         /// "that way" than a bearing measured from screen centre. The centre fallback covers the forceOffScreen case, where the
         /// target can sit inside the inset rect and the first difference is therefore zero.</summary>
-        private static Vector2 BearingFrom(Vector2 from, Vector2 target)
+        private static Vector2 BearingFrom(Vector2 from, Vector2 target) => BearingToward(from, target);
+
+        /// <summary>Public form of the bearing rule, for callers that move an arrow after placement (<see cref="EdgeArrowSpread"/>)
+        /// and must re-aim it at the real target.</summary>
+        public static Vector2 BearingToward(Vector2 from, Vector2 target)
         {
             Vector2 d = target - from;
             if (d.sqrMagnitude < DegenerateSqr) d = target - ViewportCentre;
@@ -329,6 +333,17 @@ namespace CluckWars.Visuals
             if (behind && !cam.orthographic) point = new Vector2(1f - point.x, 1f - point.y);
 
             return ClampToEdge(point, behind, safeArea, avoidZones, clearance, out clamped, out bearing);
+        }
+
+        /// <summary>The target's viewport point with the same behind-camera mirror correction <see cref="TryProject(Camera, Vector3, Rect, IReadOnlyList{Rect}, Vector2, out Vector2, out Vector2)"/>
+        /// applies. Used to re-aim an arrow that <see cref="EdgeArrowSpread"/> moved along the edge.</summary>
+        public static Vector2 TargetViewport(Camera cam, Vector3 worldPos)
+        {
+            if (cam == null) return ViewportCentre;
+            Vector3 vp = cam.WorldToViewportPoint(worldPos);
+            var point = new Vector2(vp.x, vp.y);
+            if (vp.z < 0f && !cam.orthographic) point = new Vector2(1f - point.x, 1f - point.y);
+            return point;
         }
 
         /// <summary>

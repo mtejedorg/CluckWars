@@ -217,12 +217,55 @@ namespace CluckWars.Visuals
         /// <summary>Unlit, vertex-coloured, transparent line material. Identical fallback
         /// chain to <c>AbilityRangeIndicator</c> / <c>ControlStateVFX</c> — Sprites/Default
         /// is present in every project and honours per-vertex alpha under URP.</summary>
-        public static Material BuildLineMaterial()
+        public static Material BuildLineMaterial(ILogService log = null) => CreateLineMaterial(Shader.Find, log);
+
+        private static bool _reportedNoLineShader;
+
+        /// <summary>Test seam: <paramref name="find"/> stands in for <c>Shader.Find</c>. A missing shader is a build /
+        /// wiring problem (every telegraph line would draw magenta or not at all), so it is logged as an Error ONCE per
+        /// session, however many lines ask.</summary>
+        public static Material CreateLineMaterial(System.Func<string, Shader> find, ILogService log)
         {
-            Shader sh = Shader.Find("Sprites/Default");
-            if (sh == null) sh = Shader.Find("Universal Render Pipeline/Particles/Unlit");
-            if (sh == null) sh = Shader.Find("Legacy Shaders/Particles/Alpha Blended Premultiply");
-            return sh != null ? new Material(sh) : null;
+            Shader sh = find("Sprites/Default");
+            if (sh == null) sh = find("Universal Render Pipeline/Particles/Unlit");
+            if (sh == null) sh = find("Legacy Shaders/Particles/Alpha Blended Premultiply");
+            if (sh != null) return new Material(sh);
+
+            if (!_reportedNoLineShader)
+            {
+                _reportedNoLineShader = true;
+                log?.Error("TelegraphShapes", "No line shader found (Sprites/Default, URP Particles/Unlit and the legacy " +
+                    "fallback are all missing from the build): ability telegraphs, range rings and zone rings will not draw. " +
+                    "Add one to Always Included Shaders.");
+            }
+            return null;
+        }
+
+        private static Material _sharedSolidLine;
+
+        /// <summary>One unlit line material shared by every telegraph chicken (they all use it unmodified; colour is
+        /// per-vertex). Replaces a per-instance material that was never destroyed.</summary>
+        public static Material SharedSolidLineMaterial(ILogService log)
+        {
+            if (_sharedSolidLine == null) _sharedSolidLine = BuildLineMaterial(log);
+            return _sharedSolidLine;
+        }
+
+        /// <summary>Clears the statics between Editor play sessions (domain reload may be off): a destroyed shared material
+        /// would otherwise be handed out, and the once-per-session report would never fire again.</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetLineStatics()
+        {
+            _reportedNoLineShader = false;
+            _sharedSolidLine = null;
+        }
+
+        /// <summary>Test seam: forget the once-per-session report and the shared material.</summary>
+        public static void ResetLineMaterialStateForTests()
+        {
+            _reportedNoLineShader = false;
+            if (_sharedSolidLine != null) Object.DestroyImmediate(_sharedSolidLine);
+            _sharedSolidLine = null;
         }
 
         /// <summary>Builds a world-space ground LineRenderer, mirroring
@@ -410,7 +453,7 @@ namespace CluckWars.Visuals
             _controller = GetComponent<ChickenController>();
             _abilities  = GetComponent<AbilityController>();
 
-            _solidMat = TelegraphShapes.BuildLineMaterial();
+            _solidMat = TelegraphShapes.SharedSolidLineMaterial(_log);   // shared, never destroyed per instance
             _shapeLine = TelegraphShapes.BuildLine(transform, "AbilityTelegraphShape", _solidMat, ShapeLineWidth, loop: true);
             _stalkLine = TelegraphShapes.BuildLine(transform, "AbilityTelegraphStalk", _solidMat, StalkLineWidth, loop: false);
             _shapeLine.enabled = false;
@@ -419,7 +462,7 @@ namespace CluckWars.Visuals
 
             if (_dashedRingTexture != null)
             {
-                _dashedMat = TelegraphShapes.BuildLineMaterial();
+                _dashedMat = TelegraphShapes.BuildLineMaterial(_log);   // per instance (texture scale is set below): destroyed in OnDestroy
                 if (_dashedMat != null)
                 {
                     _dashedMat.mainTexture = _dashedRingTexture;
@@ -509,6 +552,7 @@ namespace CluckWars.Visuals
         {
             Deactivate();
             if (_fillMesh != null) Destroy(_fillMesh);
+            if (_dashedMat != null) Destroy(_dashedMat);
         }
 
         /// <summary>

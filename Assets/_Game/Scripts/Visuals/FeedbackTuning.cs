@@ -806,6 +806,12 @@ namespace CluckWars.Visuals
         /// </summary>
         public const float RivalChevronClearanceRadius = 0.65f;
 
+        /// <summary>
+        /// CW-022: minimum centre-to-centre distance between two off-screen rival arrows, in chevron sizes
+        /// (<see cref="RivalChevronSizeFraction"/>). 1.2 leaves a visible gap between adjacent arrows. See <c>EdgeArrowSpread</c>.
+        /// </summary>
+        public const float RivalChevronSpacing = 1.2f;
+
         // ================================================================
         // Always-on ability reach overlay — AbilitySlotOverlay
         // ================================================================
