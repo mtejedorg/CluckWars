@@ -42,6 +42,20 @@ namespace CluckWars.Visuals
             return LocalFeetY(cc) - skin / scaleY;
         }
 
+        /// <summary>
+        /// World Y of the root pivot at which the chicken STANDS on ground at <paramref name="groundY"/>: the capsule bottom
+        /// rests one skin width above it (the same resting gap <see cref="LocalGroundY"/> models). CW-021 / CW-006: chickens
+        /// used to be placed at the spawn point's Y (0.05) with the pivot at the capsule centre, i.e. half under the grass, and
+        /// only the first <c>CharacterController.Move</c> (at GO) lifted them. Placing them at this height makes that Move a
+        /// no-op, with no per-tick settle (which, moving a chicken whose transform had not caught up with a networked
+        /// teleport, undid the round-reset teleports).
+        /// </summary>
+        public static float StandingPivotY(float capsuleCenterY, float capsuleHeight, float skinWidth, float rootScaleY, float groundY = 0f)
+        {
+            float scaleY = Mathf.Max(0.01f, Mathf.Abs(rootScaleY));
+            return groundY + scaleY * (capsuleHeight * 0.5f - capsuleCenterY) + skinWidth;
+        }
+
         /// <summary>World Y of the grass under the chicken right now.</summary>
         public static float GroundWorldY(Component chicken) =>
             chicken.transform.TransformPoint(new Vector3(0f, LocalGroundY(chicken), 0f)).y;

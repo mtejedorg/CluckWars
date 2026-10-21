@@ -515,6 +515,7 @@ namespace CluckWars.Gameplay
 
             transform.localScale = Vector3.one * _activeStats.Scale;
             ChickenGround.Refresh(this); // ground overlays hang off an anchor that depends on the scale
+            SeatOnGroundAtSpawn();       // scale is known now: stand on the grass before the countdown (CW-021)
             _log?.Debug(Source, $"Applied scale {_activeStats.Scale} for class {Class}.");
 
             if (_registry != null && _registry.TryGet(Class, out var entry))
@@ -1110,6 +1111,7 @@ namespace CluckWars.Gameplay
             if (!_pendingTeleport.TryConsume(out var target)) return;
             if (!_networkTransformLooked) { _networkTransform = GetComponent<NetworkTransform>(); _networkTransformLooked = true; }
 
+            target.y = StandingPivotY();   // stand on the grass, not half under it (CW-021)
             var from = transform.position;
             bool hadController = _characterController != null && _characterController.enabled;
             if (hadController) _characterController.enabled = false;
@@ -1120,6 +1122,29 @@ namespace CluckWars.Gameplay
 
             _log?.Info("Reset", System.FormattableString.Invariant(
                 $"Teleport applied {Object.InputAuthority}{(IsBot ? "/bot" : "")} home={HomeCornerIndex} from={from.x:0.0},{from.z:0.0} to={target.x:0.0},{target.z:0.0}"));
+        }
+
+        /// <summary>Root-pivot world Y at which this chicken (its CharacterController and current root scale) stands on the
+        /// ground at Y 0. See <see cref="ChickenGround.StandingPivotY"/>.</summary>
+        private float StandingPivotY()
+        {
+            var cc = _characterController != null ? _characterController : GetComponent<CharacterController>();
+            if (cc == null) return transform.position.y;
+            return ChickenGround.StandingPivotY(cc.center.y, cc.height, cc.skinWidth, transform.lossyScale.y);
+        }
+
+        /// <summary>State authority, once in <see cref="Spawned"/>: seats the freshly spawned chicken on the ground. A plain
+        /// transform write with the controller off (the NetworkTransform of a state-authority object reads the transform each
+        /// tick); no <c>CharacterController.Move</c>, whose depenetration is what a per-tick settle got wrong.</summary>
+        private void SeatOnGroundAtSpawn()
+        {
+            if (!HasStateAuthority) return;
+            var p = transform.position;
+            p.y = StandingPivotY();
+            bool hadController = _characterController != null && _characterController.enabled;
+            if (hadController) _characterController.enabled = false;
+            transform.position = p;
+            if (hadController) _characterController.enabled = true;
         }
 
         /// <summary>
