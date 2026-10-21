@@ -1006,26 +1006,26 @@ namespace CluckWars.Gameplay
                 return false;
             }
 
-            // An execute needs this chicken marked by that assassin OR stunned right now (KillReady
-            // requires the stun). The stun half matters across peers: AssassinExecute.Press sends this
-            // RPC and resets its mark in the same tick, so the replicated MarkedTarget can already read
-            // None when the RPC lands; the victim's own IsStunned is authoritative on this side.
-            // KillReady outlives the stun, so the victim's own recent sighting of the mark also counts
-            // (same rule as ChickenCombat.RPC_ExecuteRemoval, ExecuteRules.HasExecuteEvidence; CW-230).
+            // An execute needs this chicken marked by that assassin AND stunned (KillReady requires the
+            // stun). AssassinExecute.Press sends this RPC and resets its mark in the same tick, so the
+            // replicated MarkedTarget can already read None when the RPC lands, and the stun may be over.
+            // Mark AND stun, each either current or recorded recently by this victim's own authority
+            // (KillReady outlives the stun; the mark is cleared in the press tick). Same rule as
+            // ChickenCombat.RPC_ExecuteRemoval: ExecuteRules.HasExecuteEvidence (CW-230).
             var combat = _controller != null ? _controller.Combat : null;
-            bool everSeen = false;
-            float sinceSeen = 0f;
-            float latency = 0f;
+            bool markSeen = false, stunSeen = false;
+            float sinceMark = 0f, sinceStun = 0f, latency = 0f;
             if (combat != null)
             {
-                everSeen = combat.TrySecondsSinceMarkedBy(execute, out sinceSeen);
+                markSeen = combat.TrySecondsSinceMarkedBy(execute, out sinceMark);
+                stunSeen = combat.TrySecondsSinceStunned(out sinceStun);
                 latency = combat.SenderLatency(info);
             }
             if (_controller == null ||
-                !ExecuteRules.HasExecuteEvidence(execute.MarkedTarget == _controller.Id, _controller.IsStunned,
-                    everSeen, sinceSeen, latency))
+                !ExecuteRules.HasExecuteEvidence(execute.MarkedTarget == _controller.Id, markSeen, sinceMark,
+                    _controller.IsStunned, stunSeen, sinceStun, latency))
             {
-                rejection = $"{execute.name} has not marked {name} recently and {name} is not stunned.";
+                rejection = $"{name} has not seen both a recent mark from {execute.name} and a recent stun on itself.";
                 return false;
             }
 
