@@ -324,9 +324,9 @@ Everything that needs real-device, multi-device, or playtest data is queued for 
 - [x] `ColorSchemeSO` — updated defaults: warm brown palette, gold accent, green CTA, warm white text
 - [x] UGS packages added to `Packages/manifest.json` (`core 1.16.0`, `authentication 3.6.1`, `multiplayer 2.2.2`)
 - [x] Bug fixes: host lobby loop, second-player-becomes-host, `ZenjectException` on `GameManager.Spawned()`
-- [ ] **Maestro: link Unity project to Cloud Dashboard** (Edit → Project Settings → Services). Enable Authentication + Lobby. Required before UGS paths activate.
+- [x] **Maestro: link Unity project to Cloud Dashboard** (Edit → Project Settings → Services). Enable Authentication + Lobby. Required before UGS paths activate. _(done: UGS live on all platforms since 2026-06-11)_
 - [ ] **Maestro: reset `ColorScheme.asset`** in Inspector ("Reset" button) to pick up Phase 10 palette for `TouchControlsHud` button visuals.
-- [ ] Live smoke test: Host on PC, Join from Android using the displayed code.
+- [x] Live smoke test: Host on PC, Join from Android using the displayed code. _(done: 2026-10-20 Pixel 10 Pro session, host + join over a UGS lobby)_
 
 ### Architecture note
 UGS Relay is **not** part of Phase 10. Photon Cloud relay already handles internet routing — adding UGS Relay would require a custom Fusion transport adapter with no net benefit. Deferred to Phase 11 (dedicated server work).
@@ -404,7 +404,7 @@ v0.3 §6.4 defines four states. Stun already exists and already drops cargo (`Ch
 v0.3 reorganizes abilities into Damage / Control / Defense / Utility. Seven of today's eight map directly; only **Roll & Trample** is removed (it splits into **Flying Peck** + **Roll & Push**). For parity, keep the seven that already work and convert Roll & Trample into Flying Peck:
 - [x] Keep as-is (update `DisplayName` / `ShortLabel` / `[CreateAssetMenu]` category only if you want the menu to read by category): `SpeedBurstAbilitySO`, `EggShellAbilitySO`, `TurtleModeAbilitySO`, `SpineCoatAbilitySO`, `InvisibilityAbilitySO`, `SneakyStealAbilitySO`, `DoppelgangerAbilitySO`.
 - [x] `Abilities/RollTrampleAbilitySO.cs` → repurpose **in place** into **Flying Peck** (damage dash, HP on contact). Keep the class name to preserve the existing `.asset` reference, OR if you want a clean class name, create `FlyingPeckAbilitySO` + new `.asset` and delete the old pair (script + `.cs.meta` + `.asset` + `.asset.meta`) together — see CONVENTIONS GUID note. Update `DisplayName = "Flying Peck"`, menu name, and (Part B) add the forward dash on the caster.
-- [ ] **Roll & Push** (control, push no damage) is **deferred to Part B** — it needs the knockback primitive.
+- [x] **Roll & Push** (control, push no damage) is **deferred to Part B** — it needs the knockback primitive. _(done: shipped in Part B, see below)_
 - [x] Net result: 7 working abilities, full slot/selection/cooldown pipeline intact = functional parity with today.
 
 #### A10. Animation
@@ -545,7 +545,7 @@ Wiring (simplest path, no `AbilityRegistrySO` dependency):
 - [x] Helper `bool TryPickBotLoadout(ChickenClass cls, out BotLoadoutPreset preset)`: filters `_botLoadouts` to presets that have ≥1 ability AND allow `cls`, then picks uniformly with `UnityEngine.Random`. **Solo-only**, single authoritative client, so plain `Random` is fine — no cross-peer seeding needed (contrast with the corner-permutation seeding). Returns false when nothing is eligible.
 - [x] In `TrySpawnBots()`, the loadout is rolled *outside* the `onBeforeSpawned` lambda (so the random pick is stable per spawn) and applied via `SetSlots(loadout.Slot0, loadout.Slot1, botClass == Assassin ? loadout.Slot2 : null)`. Also removed the dead `int captured = i;` and the redundant `capturedBotClass` left over from the fixed-loadout version.
 - [x] Guard: empty/ineligible pool → `ILogService` Warn and the bot runs ability-less (no NRE). Rolled preset logged per bot at Info via `DisplayLabel`.
-- [ ] **Maestro:** author the preset rows on `MatchBootstrapper._botLoadouts` in the Game scene inspector (the five presets in the table above). Until then bots spawn ability-less (logged).
+- [x] **Maestro:** author the preset rows on `MatchBootstrapper._botLoadouts` in the Game scene inspector (the five presets in the table above). Until then bots spawn ability-less (logged). _(done: rows baked in Game.unity `_botLoadouts`, verified by the 2026-10-21 audit)_
 
 > **Deferred (not this pass):** weighted / fully-open random loadouts drawn from the populated `AbilityRegistrySO` once Part B's full roster exists (e.g. probability tables per class). The preset pool above is the deliberate, easily-extended placeholder — add a row to grow it.
 
@@ -564,7 +564,7 @@ Wiring (simplest path, no `AbilityRegistrySO` dependency):
 **BOT-8 — Tuning, balance, validation.**
 - [ ] Add to the **Dedicated test session** balance list: bot radii/thresholds per class, oscillation check (add Hunt↔Flee hysteresis if a bot flip-flops on the think boundary — e.g. require the trigger to hold two consecutive thinks, or separate enter/exit radii).
 - [ ] Verify solo mode: 3 bots farm, protect hauls, hunt loaded rivals.
-- [ ] **Maestro:** author the `_botLoadouts` preset rows on `MatchBootstrapper` in the Game scene (the five presets in BOT-3's table). This is the same outstanding item listed under BOT-3 — until done, bots spawn ability-less (a Warn is logged).
+- [x] **Maestro:** author the `_botLoadouts` preset rows on `MatchBootstrapper` in the Game scene (the five presets in BOT-3's table). This is the same outstanding item listed under BOT-3 — until done, bots spawn ability-less (a Warn is logged). _(done, same as BOT-3)_
 
 ### Phase R-Bot deliverable
 Solo-mode bots that play the v0.3 game: farm efficiently, protect a full haul (turtle/dash/shove when chased), hunt loaded rivals to stun-and-rob them, and contest piles — each class with a recognisably different temperament, all driven by their equipped abilities through one small FSM.
