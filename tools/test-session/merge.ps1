@@ -25,7 +25,8 @@
      value that changes near a heartbeat differs for a beat or two while BOTH sides keep changing (swapped cs pairs,
      a pile refill the clients see one beat later). A mismatch only counts when, over -Persist consecutive beats, at
      least one side's value stays constant (a remote stuck / an update that never arrives; a repeated pair is a case
-     of this). cs findings append the owner (own=1), each side's flag changes (fl=) and the owner's slow sources (src=).
+     of this). For cs a side is only constant if it also saw no flag change between the beats (fl absent/0).
+     cs findings append the owner (own=1), each side's flag changes (fl=) and the owner's slow sources (src=).
 
 .EXAMPLE
   .\tools\test-session\merge.ps1 -Session .\Captures\session-20261020-173000
@@ -375,12 +376,16 @@ function Compare-Beats($a, $b) {
 
 # Longest stretch of a run's beats (all mismatching) over which at least one side's value stays constant: the stuck
 # side. A stretch where both sides change every beat is lag (see header) and never qualifies. $null for an empty run.
+# For cs a side is constant only if it also saw NO flag change since the previous beat (fl absent/0): equal values at
+# the two sample instants with fl>0 in between are a toggling flag sampled in phase, not a stuck one (CW-226, sessions
+# 163938 / 164644: owner Slowed at both beats with fl=2, remotes Free at both with fl=2).
 function Find-StuckWindow($beats) {
     $best = $null
     foreach ($side in 'A', 'B') {
         $start = 0
         for ($i = 1; $i -le $beats.Count; $i++) {
-            if ($i -lt $beats.Count -and "$($beats[$i].Info[$side])" -eq "$($beats[$i - 1].Info[$side])") { continue }
+            $fl = $(if ($i -lt $beats.Count) { $beats[$i].Info["Fl$side"] } else { $null })
+            if ($i -lt $beats.Count -and "$($beats[$i].Info[$side])" -eq "$($beats[$i - 1].Info[$side])" -and (-not $fl -or $fl -eq '0')) { continue }
             $n = $i - $start
             if ($null -eq $best -or $n -gt $best.N) { $best = @{ N = $n; First = $beats[$start]; Last = $beats[$i - 1] } }
             $start = $i

@@ -95,6 +95,7 @@ Assert ((Count $f3 '\[SYNC\] t=292\.\.356 client1 vs client2: chicken P3 cs clie
 Assert ($f3 -match 'chicken P3 cs .*\[owner=client2 src=Collision fl client1=0 client2=1\]') 'stuck: cs finding names the owner, its slow sources and each side''s flag changes'
 Assert ((Count $f3 '\[SYNC\] t=100\.\.228 client1 vs client2: chicken P4 cs client1=Slowed client2=Free') -eq 1) 'stuck: remote constant Slowed while the owner flickers Free/Rooted/Free IS reported (pairs differ every beat)'
 Assert ((Count $f3 '\[SYNC\] t=292\.\.420 client1 vs client2: chicken P5 cs client1=Slowed client2=Free  \(3 consecutive') -eq 1) 'stuck: 3-beat owner-Slowed / remotes-Free (session 225001 shape) IS reported'
+Assert ($f3 -notmatch 'chicken P6 cs') 'lag: owner Slowed / remote Free at both beats but BOTH saw the flag change in between (fl=2, sessions 163938/164644) NOT reported'
 Assert ($f3 -match 'SYNC=3\s') 'lag/stuck: exactly three SYNC findings'
 Remove-Item $tmp3 -Recurse -Force
 Write-Host ''

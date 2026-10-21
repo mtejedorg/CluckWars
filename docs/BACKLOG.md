@@ -246,3 +246,17 @@ Baseline: EditMode 1976/1976 (needs the GPU: `-nographics` makes 7 render tests 
 Matrix on the final build (3 rounds each): solo PASS, shared2 PASS, shared4 PASS ×1 / SYNC=3 ×1 (pile refill seen a beat late by clients: lag, now judged correctly), hostleave PASS ×3.
 
 **Needs Maestro:** merge/landing approvals (architect plan: cherry-pick `4328d36 fa4836a bfc8a78 f135268` onto a branch off `develop`, plus a `CancelCharge()` fix at `AbilityController.cs:1101`), the new RPC in CW-050, and the CW-230 hardening decision.
+
+### 2026-10-21 addendum (later in the session)
+
+| ID | Status | Evidence |
+|---|---|---|
+| CW-021 | **Fixed** (`67c745e`): root cause was spawn/reset height (capsule half under the grass until the first `Move` at GO), not the pose. A first attempt (per-tick settle `Move`) was rejected by the matrix (it overwrote the CW-221 teleport: `dist_to_corner=30.84`, 7-28 INVARIANT per run); shipped fix sets the standing height at spawn and in `ApplyPendingTeleport`. Rule `StandingHeightTests`. Final-build matrix: INVARIANT=0 in 6/6 runs. Visual confirmation of "stands at 3" still wants eyes on a PC build. | sessions 163017-164644 |
+| CW-022 / CW-008 | **Fixed** (`838e984`): `EdgeArrowSpread` (pure, 9 tests incl. old-placement stacking proof), flush hardened per qa-reviewer. Needs an eyeball with two rivals behind one HUD zone. | |
+| CW-055 / CW-056 | **Fixed** (`838e984`): shared telegraph line material + one-time Error when the shader is missing + dashed material destroyed; RivalIndicator self-injection without the `HasInstance` gate. `TelegraphMaterialAndInjectionTests`. | |
+| CW-226 | **Closed as by-design (cosmetic).** Write path verified: `ControlFlags` is written by the state authority on change and replicated; the flagged runs (163938, 164644) show both sides changing (`fl=2/2`) — the owner's collision/aura slow toggles at the contact-range edge and the heartbeat samples it a replication delay apart. Only visuals read the remote bit (`ChickenStateOverlays`, `ChickenStatusBadges`, `ControlStateVFX`, `HitFeedback`). `merge.ps1` now treats a side as constant only when its `fl` is 0 at the sample; 163938/164644/153100/150533 re-merge to SYNC=0, the 225001 stuck shape is still flagged. If a doubt remains: add a dev-gated per-transition log to measure the delay. | `tools/test-session` selftest P6 |
+| CW-010 / CW-007 | **Not started.** `feature/progression` rebase is a large conflict job (164+ commits); needs the CW-050 branch landed first and Maestro's go for a local rebase branch. | |
+| CW-012/013/043 | Docs/compendium pass not done (compendium sync is only needed when `.asset` values or design docs change; none changed this session). | |
+| CW-053, CW-057, CW-058 | **Blocked on Maestro:** balance numbers / passive redesign (hard stop rule). | |
+| CW-206/212/219 | Decision: support landscape AND portrait. Large HUD/menu layout task (UXML/USS) — not started; needs a Pixel check. CW-218 rejoin: decision = message + Rejoin button — not started (needs device). Smoke Roost follow-caster option — not started. CW-040 (relax arm-tip rule to ~3 m) — not started. | |
+| CW-082 | Stale ROADMAP boxes confirmed done: `:407` Roll & Push, `:327` UGS link, bot preset rows (`:521,:548,:567`); on-device/LAN items remain open. Not yet edited. | |
