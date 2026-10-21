@@ -34,7 +34,8 @@ namespace CluckWars.UI
     ///
     /// <b>Animation</b> is <see cref="AnimationClip.SampleAnimation"/> on the class's own clips
     /// (the same path the static hero renders used): the Idle loop, and on a hop the Flare cast
-    /// clip as a cheer (there is no cheer clip). No Animator, no controller asset.
+    /// clip as a cheer (there is no cheer clip). The model keeps a controller-less Animator, which is what
+    /// makes sampling legal in a player (<see cref="MenuStageAnimationRules"/>); no controller asset.
     /// </remarks>
     public sealed class MenuChickenStage : IDisposable
     {
@@ -198,9 +199,8 @@ namespace CluckWars.UI
             if (s.Model != null) Object.Destroy(s.Model);
             var model = Object.Instantiate(e.ModelPrefab, s.Pivot, false);
             model.name = e.ModelPrefab.name;
-            // The imported .fbx carries its own Animator; the clips are sampled directly instead.
-            var nested = model.GetComponent<Animator>();
-            if (nested != null) { nested.enabled = false; Object.Destroy(nested); }
+            // SampleAnimation needs an Animator outside the Editor (CW-207); with no controller it drives nothing.
+            MenuStageAnimationRules.PrepareForSampling(model);
 
             // Same class wash the match applies (ChickenVisuals.ApplyTint: white -> tint by strength).
             var tint = Color.Lerp(Color.white, e.TintColor, Mathf.Clamp01(e.TintStrength));
