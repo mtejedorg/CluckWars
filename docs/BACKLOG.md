@@ -285,3 +285,13 @@ Matrix on the final build (3 rounds each): solo PASS, shared2 PASS, shared4 PASS
 | Smoke Roost / effect types | Design: `docs/proposals/EFFECT_TYPES_AURA_VS_STATIC_AOE.md` (type on the ability asset, aura computed from the caster's replicated position, no NetworkTransform on the zone; found that nameplate/overlays may read Feather Aura's "casting" flag as "slowed"). 9 questions for Maestro. |
 | CW-206/212/219 | Spec: `docs/proposals/PORTRAIT_AND_LANDSCAPE_SPEC.md` (camera ignores aspect: portrait sees 25 % of the 16:9 ground; 6 stages ≈ 6.75 days; 12 decisions). |
 | CW-082 | Partial: five ROADMAP boxes ticked (`bf5067a`). |
+
+### 2026-10-21 addendum 3 (end of session)
+
+| ID | Status |
+|---|---|
+| CW-230 | **Fixed + hardened** (`7677065`): the removal/cargo claim needs a mark AND a stun, each current or recorded on the victim's own authority in **simulation time** (not wall clock: solo pause). Two automated security reviews of the earlier "mark OR stun" rule led to this; residual: the assassin's own authority can still self-execute within bounds (Shared Mode trust model). **Not run live** (autoplay never executes). |
+| CW-218 | **Implemented and run on PC** (`f6fcb7d`): `-cw_autodisconnect 20` froze the joiner 15 s, the host kicked it (`DisconnectedByPluginLogic`, no transport reason on PC), the classifier now reads that as a lost connection, the menu showed the disconnect sheet, the autotest pressed REJOIN, the "already a member of the lobby" path worked, and the player re-entered the session as a late joiner (2 runs). Real Android backgrounding is **needs device**. The scenario's own verdict is FAIL by design (a late joiner appears to the round-start probe as "round 1 start": INVARIANT respawn/base/pile/timer, plus a UGS `LobbyServiceException` warning); add a `disconnect` mode with its own expectations if it should gate. Host lobby heartbeat now survives transient failures. |
+| CW-040 | **Rule done** (`b3403e0`: scarecrows 3 m, other tall props 4 m, test). **Scene slide still needs the Editor** (four scarecrows in `Map.unity`, direction to confirm: see STATE.md). Not closed. |
+| Landing branch | `landing/shared-mode-fixes-2026-10-21` (local, off `develop`): 4 original fixes + `CancelCharge()` + CW-200/201/207/050/231/021/022/055/056/230 + CW-040 rule. EditMode **2021/2021**, production Windows build compiles. Excludes instrumentation, harness, CW-218 (needs the AutoTest code), docs. Two cherry-picked commit messages still mention things not in the branch (diagnostics/proposals). Scenario matrix cannot run there (needs dev tools). |
+| Final work-branch matrix (build with everything, 3 rounds each) | solo / shared2 / shared4 / hostleave = PASS / PASS / PASS / PASS; EditMode 2114/2114. |
