@@ -149,6 +149,7 @@ namespace CluckWars.Gameplay
         private ChickenCombat _combat;
         private ChickenCargo _cargo;
         private AbilityController _abilities;
+        private AssassinExecute _assassin;
         private ILogService _log;
 
         // True once the class's avatar AND all five clips are bound, i.e. the Animator is really
@@ -177,6 +178,10 @@ namespace CluckWars.Gameplay
         public ChickenCombat Combat => _combat;
         public ChickenCargo Cargo => _cargo;
         public AbilityController Abilities => _abilities;
+
+        /// <summary>The slow sources of the last simulated tick. Re-derived on the state authority only (stale anywhere
+        /// else); read by the dev-tools Sync heartbeat to say what slows the owner's own bird (CW-226).</summary>
+        public SlowSource ActiveSlowSources => _activeSlowSources;
 
         // ---- Ability state (StateAuthority-side only) -------------------------
         // Abilities mutate these locally on the StateAuthority. Other peers don't
@@ -490,6 +495,7 @@ namespace CluckWars.Gameplay
             _combat = GetComponent<ChickenCombat>();
             _cargo = GetComponent<ChickenCargo>();
             _abilities = GetComponent<AbilityController>();
+            _assassin = GetComponent<AssassinExecute>();
             _activeStats = ResolveStatsForClass(Class);
             Effects.Log = _log;
 
@@ -1261,6 +1267,9 @@ namespace CluckWars.Gameplay
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_ResetControlStates()
         {
+            // Drop a live Death Mark first, without its fail cooldown: left in place, the reset teleport makes it
+            // fizzle on range next tick and re-arm a 5 s cooldown after the clear below (CW-231).
+            _assassin?.ResetForNewRound();
             // End running abilities through their own OnDeactivate first (modifiers, traversal holds, ability
             // state), THEN hard-release traversal and clear the stack as a backstop.
             _abilities?.EndAllForReset();

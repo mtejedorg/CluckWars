@@ -60,5 +60,48 @@ namespace CluckWars.Tests
             var ctrl = File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenController.cs");
             StringAssert.Contains("_abilities?.EndAllForReset();", ctrl);
         }
+
+        [Test]
+        public void RoundReset_ReachesEveryComponentThatArmsACooldownOfItsOwn_CW231()
+        {
+            // CW-231: AssassinExecute keeps a [Networked] mark and re-arms Death Mark's cooldown from its OWN tick when the
+            // mark fizzles. A mark alive at PLAY AGAIN fizzled on the next tick (the reset teleport puts the target out of
+            // range), after EndAllForReset had cleared the slots: P3 opened rounds 3 and 4 of session 20261021-150220
+            // with 3.8 s of cooldown. Every script outside AbilityController that calls TriggerCooldown therefore needs a
+            // ResetForNewRound() that RPC_ResetControlStates calls BEFORE EndAllForReset (the reset needs a live runner,
+            // so the wiring is pinned from source, like the CW-224 test above).
+            var ctrl = File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenController.cs").Replace("\r\n", "\n");
+            int start = ctrl.IndexOf("public void RPC_ResetControlStates()");
+            Assert.GreaterOrEqual(start, 0, "RPC_ResetControlStates was renamed - update this test");
+            var body = ctrl.Substring(start, ctrl.IndexOf("\n        }", start) - start);
+            int endAll = body.IndexOf("_abilities?.EndAllForReset();");
+            Assert.GreaterOrEqual(endAll, 0);
+
+            int armers = 0;
+            foreach (var path in Directory.GetFiles("Assets/_Game/Scripts", "*.cs", SearchOption.AllDirectories))
+            {
+                var p = path.Replace('\\', '/');
+                if (p.Contains("/Editor/") || p.Contains("/AbilityLab/") || p.EndsWith("/AbilityController.cs")) continue;
+                var src = File.ReadAllText(path);
+                if (!src.Contains(".TriggerCooldown(")) continue;
+                armers++;
+                string cls = Path.GetFileNameWithoutExtension(path);
+                StringAssert.Contains("public void ResetForNewRound()", src,
+                    $"{cls} arms a cooldown from its own state; it needs a ResetForNewRound() that drops that state without arming one");
+                var field = System.Text.RegularExpressions.Regex.Match(ctrl, @"(_\w+) = GetComponent<" + cls + @">\(\);");
+                Assert.IsTrue(field.Success, $"ChickenController must cache its {cls} to reset it");
+                int call = body.IndexOf(field.Groups[1].Value + "?.ResetForNewRound();");
+                Assert.GreaterOrEqual(call, 0, $"RPC_ResetControlStates must call {field.Groups[1].Value}?.ResetForNewRound()");
+                Assert.Less(call, endAll, "reset it BEFORE EndAllForReset clears the cooldowns");
+            }
+            Assert.GreaterOrEqual(armers, 1, "AssassinExecute arms Death Mark's cooldown itself; the scan found nothing - update it");
+
+            var assassin = File.ReadAllText("Assets/_Game/Scripts/Gameplay/AssassinExecute.cs").Replace("\r\n", "\n");
+            int r = assassin.IndexOf("public void ResetForNewRound()");
+            var reset = assassin.Substring(r, assassin.IndexOf("\n        }", r) - r);
+            StringAssert.Contains("ResetMark();", reset);
+            StringAssert.DoesNotContain("FizzleMark", reset, "the reset must not charge the fail cooldown");
+            StringAssert.DoesNotContain("TriggerCooldown", reset);
+        }
     }
 }

@@ -218,7 +218,7 @@ namespace CluckWars.Gameplay
             float dist = PlanarDistance(transform.position, target.transform.position);
             if (dist > MaxMarkRange)
             {
-                _log?.Info(Source, $"Mark fizzled: target exceeded range ({dist:0.1}m > {MaxMarkRange}m).");
+                _log?.Info(Source, $"Mark fizzled: target exceeded range ({dist:0.0}m > {MaxMarkRange}m).");
                 FizzleMark();
                 return;
             }
@@ -301,6 +301,19 @@ namespace CluckWars.Gameplay
             float dx = a.x - b.x;
             float dz = a.z - b.z;
             return dx * dx + dz * dz;
+        }
+
+        /// <summary>
+        /// Round reset (PLAY AGAIN, via <c>ChickenController.RPC_ResetControlStates</c> on this chicken's state
+        /// authority): drops a live mark WITHOUT the fail cooldown. CW-231: a mark placed in the last ~1 s of a round
+        /// outlived the end screen; the reset teleport then put the target 30-56 m away, the next tick fizzled the mark
+        /// on range and <see cref="FizzleMark"/> re-armed a 5 s cooldown AFTER <c>EndAllForReset</c> had cleared every
+        /// slot, so the Assassin opened the new round with ~3.8 s left on Death Mark.
+        /// </summary>
+        public void ResetForNewRound()
+        {
+            if (!HasStateAuthority) return;
+            ResetMark();
         }
 
         private void FizzleMark()
