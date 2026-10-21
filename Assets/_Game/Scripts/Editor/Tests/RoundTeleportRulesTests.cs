@@ -52,7 +52,7 @@ namespace CluckWars.Tests
             var body = src.Substring(start, end - start);
             StringAssert.Contains("DeactivateAll();", body);
             StringAssert.Contains("for (int slot = 0; slot < SlotCount; slot++) SetCooldown(slot, TickTimer.None);", body);
-            StringAssert.Contains("ChargingSlot = 0;", body);
+            StringAssert.Contains("CancelCharge();", body);   // cancels the committed charge AND the pending hold
             StringAssert.Contains("PeckChainActive = false", body);
 
             var gm = File.ReadAllText("Assets/_Game/Scripts/Gameplay/GameManager.cs");
