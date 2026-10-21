@@ -260,3 +260,17 @@ Matrix on the final build (3 rounds each): solo PASS, shared2 PASS, shared4 PASS
 | CW-053, CW-057, CW-058 | **Blocked on Maestro:** balance numbers / passive redesign (hard stop rule). | |
 | CW-206/212/219 | Decision: support landscape AND portrait. Large HUD/menu layout task (UXML/USS) — not started; needs a Pixel check. CW-218 rejoin: decision = message + Rejoin button — not started (needs device). Smoke Roost follow-caster option — not started. CW-040 (relax arm-tip rule to ~3 m) — not started. | |
 | CW-082 | Stale ROADMAP boxes confirmed done: `:407` Roll & Push, `:327` UGS link, bot preset rows (`:521,:548,:567`); on-device/LAN items remain open. Not yet edited. | |
+
+### Maestro's decisions, 2026-10-21 (second round, asked one by one with context)
+
+| Topic | Decision |
+|---|---|
+| Landing | Prepare a LOCAL branch off `develop` (4 earlier fixes + `CancelCharge()` fix + this session's fixes); extra CW-050 RPC accepted. No push/merge without a further OK. |
+| CW-230 | **Fix now** (sender validation on `RPC_ExecuteRemoval` / `RPC_CreditKill`), folded into the landing branch. |
+| CW-053 | **Re-design** Mighty / Bracer / Opportunist without damage; proposal document first (with oracle numbers), nothing applied before approval. |
+| CW-057 / CW-058 | **Full oracle-based proposal for both**; nothing applied without approval. |
+| CW-010 | Rebase `feature/progression` on a NEW local branch **after** the landing branch exists. No merge/push. |
+| CW-040 | Do it: relax the scarecrow arm-tip rule to ~3 m, keep symmetry, map tests + screenshot. |
+| Smoke Roost | **Rejected** the per-ability `FollowsCaster` flag. Ability effects get **types**: an **Aura** (follows its caster) and a **Static AoE** (placed and fixed). Needs a design first (effect-type model on the ability assets / zones, how each syncs, how existing zones map). Smoke Roost stays a Static AoE. |
+| Portrait | **Design first** (layout rules per orientation, camera framing for equal visible arena area, test plan), then build; verify in PC window sizes, device later. |
+| CW-218 + CW-082 | Both: disconnect overlay with Rejoin (PC-tested; real Android trigger "needs device") and tick the done ROADMAP boxes. |
