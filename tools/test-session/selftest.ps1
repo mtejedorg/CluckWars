@@ -110,6 +110,24 @@ foreach ($fx in @(@('world-lag-fixture', $false), @('world-stuck-fixture', $true
     Remove-Item $tw -Recurse -Force
 }
 
+# ---- Aura parity (WP3): caster-anchored zones hash by identity into auras=, never into static ----
+$tw = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-au-' + [Guid]::NewGuid().ToString('N'))
+Copy-Item (Join-Path $PSScriptRoot 'fixtures\aura-stuck-fixture') $tw -Recurse
+& (Join-Path $PSScriptRoot 'merge.ps1') -Session $tw | Out-Null
+$fw = Get-Content (Join-Path $tw 'findings.txt') -Raw
+Assert ((Count $fw '\[INVARIANT\] world auras hash differs across peers from t=3200 ') -eq 1) 'WP3 auras: a peer missing an aura for 2+ heartbeats (both sides constant) IS flagged once'
+Assert ($fw -notmatch 'world static hash differs') 'WP3 auras: the aura mismatch does not leak into static'
+Remove-Item $tw -Recurse -Force
+
+$tw = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-au-ok-' + [Guid]::NewGuid().ToString('N'))
+Copy-Item (Join-Path $PSScriptRoot 'fixtures\aura-moving-fixture') $tw -Recurse
+& (Join-Path $PSScriptRoot 'merge.ps1') -Session $tw | Out-Null
+$fw = Get-Content (Join-Path $tw 'findings.txt') -Raw
+Assert ($fw -notmatch 'world static hash differs') 'WP3 auras: a moving aura (caster seen apart on each peer) does NOT trip static'
+Assert ($fw -notmatch 'world auras hash differs') 'WP3 auras: an aura reaching one peer a single beat late (lag) is NOT flagged'
+Assert ($fw -match 'INVARIANT=0') 'WP3 auras clean: INVARIANT=0'
+Remove-Item $tw -Recurse -Force
+
 # ---- Round-start leftovers (B10): a Root Egg placed just before the end must not survive PLAY AGAIN ----
 $tmp4 = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-zn-' + [Guid]::NewGuid().ToString('N'))
 Copy-Item (Join-Path $PSScriptRoot 'fixtures\zones-fixture') $tmp4 -Recurse

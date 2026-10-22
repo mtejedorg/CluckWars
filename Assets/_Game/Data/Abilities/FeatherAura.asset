@@ -24,5 +24,6 @@ MonoBehaviour:
   Duration: 3
   Cooldown: 7
   CastMotion: 2
+  AreaKind: 2
   AuraRadius: 5.4
   AuraSlowFactor: 0.55

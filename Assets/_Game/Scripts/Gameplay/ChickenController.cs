@@ -1283,6 +1283,10 @@ namespace CluckWars.Gameplay
             IsStunned = true;
             StunTimer = TickTimer.CreateFromSeconds(Runner, seconds);
             _log?.Debug(Source, $"RPC_ApplyStun: stunned for {seconds:0.0}s.");
+
+            // MATCH SUMMARY "Stuns Landed" (F7). A decoy counts too; the summary skips decoys.
+            if (TryGetComponent(out ChickenMatchStats stats)) stats.RecordStunTaken();
+            else _log?.Warn(Source, $"{name}: no ChickenMatchStats - stun not counted in MATCH SUMMARY.");
         }
 
         /// <summary>
@@ -1598,8 +1602,9 @@ namespace CluckWars.Gameplay
                 var caster = ActiveControllers[i];
                 if (caster == null || caster == this) continue;
                 if (!caster.AuraSlowActive) continue;
-                float sqr = (caster.transform.position - transform.position).sqrMagnitude;
-                if (sqr <= caster.AuraSlowRadius * caster.AuraSlowRadius)
+                // Planar since B7, the same "inside" as every zone (it was 3D). WP4 moves Feather Aura onto a
+                // Caster-anchored AbilityZone and deletes this method with the triplet.
+                if (AreaEffectRules.IsInside(caster.transform.position, caster.AuraSlowRadius, transform.position))
                 {
                     ApplySlow(SlowSource.Ability, caster.AuraSlowFactor);
                 }
@@ -1611,16 +1616,25 @@ namespace CluckWars.Gameplay
         /// type <see cref="ZoneEffect.Slow"/> within their trigger radius. Runs
         /// locally — no RPC needed because zones are Networked scene objects.
         /// </summary>
+        /// <remarks>
+        /// The WhileInside channel (B3) of every zone, Static AoE and Aura alike: this chicken's own authority decides,
+        /// every tick, from the zone's <see cref="AbilityZone.TryGetCenter"/> - never its transform (a Caster zone's
+        /// transform only follows in Render). An Aura whose caster this peer cannot resolve has no centre and is skipped.
+        /// Owner and decoys are ignored by the shared zone rule (<see cref="AreaEffectRules.IgnoresChicken"/>, B7); a
+        /// decoy never reaches this method anyway (the <c>IsDecoy</c> return in <see cref="FixedUpdateNetwork"/>).
+        /// Planar distance since B7 (<see cref="AreaEffectRules.IsInside"/>; it was 3D before WP3).
+        /// </remarks>
         private void CheckAbilityZoneSlow()
         {
             for (int i = 0; i < AbilityZone.ActiveZones.Count; i++)
             {
                 var zone = AbilityZone.ActiveZones[i];
                 if (zone == null || zone.Effect != ZoneEffect.Slow) continue;
-                if (zone.OwnerChicken == this.Id) continue; // own Feather Trap never slows the owner (GDD §7.2)
-                float sqr = (zone.transform.position - transform.position).sqrMagnitude;
-                float r   = zone.TriggerRadius;
-                if (sqr <= r * r)
+                if (!zone.HasChannel(AreaEffectChannel.WhileInside)) continue;
+                // Own Feather Trap never slows the owner (GDD §7.2); zones ignore decoys (B7).
+                if (AreaEffectRules.IgnoresChicken(zone.OwnerChicken == this.Id, IsDecoy)) continue;
+                if (!zone.TryGetCenter(out Vector3 center)) continue;
+                if (AreaEffectRules.IsInside(center, zone.TriggerRadius, transform.position))
                     ApplySlow(SlowSource.Ability, zone.SlowFactor);
             }
         }

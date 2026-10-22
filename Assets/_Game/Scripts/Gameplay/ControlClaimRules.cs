@@ -96,9 +96,11 @@ namespace CluckWars.Gameplay
             public readonly float MaxZoneRadius;
             /// <summary>Root only: how far ahead of its caster such a zone is placed (Root Egg: 0, at the feet).</summary>
             public readonly float MaxZonePlacement;
+            /// <summary>Root only: the longest such a zone lives (Root Egg's EggLifetime). 0 = no zone can vouch.</summary>
+            public readonly float MaxZoneLifetime;
 
             public Ceiling(bool known, float maxSeconds, float minSlowFactor, float maxReach,
-                float maxZoneRadius = 0f, float maxZonePlacement = 0f)
+                float maxZoneRadius = 0f, float maxZonePlacement = 0f, float maxZoneLifetime = 0f)
             {
                 Known = known;
                 MaxSeconds = maxSeconds;
@@ -106,6 +108,7 @@ namespace CluckWars.Gameplay
                 MaxReach = maxReach;
                 MaxZoneRadius = maxZoneRadius;
                 MaxZonePlacement = maxZonePlacement;
+                MaxZoneLifetime = maxZoneLifetime;
             }
 
             public static readonly Ceiling Unknown = new Ceiling(false, 0f, 1f, 0f);
@@ -119,7 +122,7 @@ namespace CluckWars.Gameplay
         {
             if (pool == null) return Ceiling.Unknown;
 
-            float maxSeconds = 0f, minFactor = 1f, maxReach = 0f, zoneRadius = 0f, zonePlacement = 0f;
+            float maxSeconds = 0f, minFactor = 1f, maxReach = 0f, zoneRadius = 0f, zonePlacement = 0f, zoneLifetime = 0f;
             foreach (var ability in pool)
             {
                 if (ability == null) continue;
@@ -133,71 +136,83 @@ namespace CluckWars.Gameplay
                     // The zone's footprint as the ability authors it (Root Egg: ForwardCircle, EggRadius, offset 0).
                     zoneRadius = Mathf.Max(zoneRadius, ability.AimRadius);
                     zonePlacement = Mathf.Max(zonePlacement, ability.AimForwardOffset);
+                    // How long such a zone can live, from the ability's own area spec (WP3). A zone ability that
+                    // declares no spec contributes 0 and so can never vouch: refused, not trusted forever.
+                    if (ability.TryGetAreaEffect(out var area) && area.Effect == ZoneEffect.Root)
+                        zoneLifetime = Mathf.Max(zoneLifetime, area.Lifetime);
                 }
             }
             if (kind == ControlKind.Slow && maxReach > 0f) maxReach += SlowReachHeadroomMeters;
-            return new Ceiling(true, maxSeconds, minFactor, maxReach, zoneRadius, zonePlacement);
+            return new Ceiling(true, maxSeconds, minFactor, maxReach, zoneRadius, zonePlacement, zoneLifetime);
         }
 
-        // ---- Root-zone evidence (security review 2026-10-22) -------------------------------
+        // ---- Root-zone evidence (security review 2026-10-22, hardened in WP3) ---------------
         //
         // A zone is replicated state its own authority wrote, so the victim must not take its geometry on
         // faith: an attacker-authored zone could claim any radius or stand anywhere. The victim accepts a zone
-        // as evidence only when (1) the zone's state authority is the claimed caster's, (2) its centre is within
-        // the authored placement of where the caster stood when this peer first saw the zone, and (3) its
-        // radius is clamped to the largest radius the pool authors.
+        // as evidence only when (1) the zone's state authority is the claimed caster's, (2) its owner and
+        // authority are still the ones this peer snapshotted when it first saw the zone, (3) this peer resolved
+        // the caster at that moment, (4) its centre is within the authored placement of where the caster stood
+        // then, (5) the zone is not older, measured locally, than the pool's longest zone lifetime plus the
+        // latency cap, and (6) its radius is clamped to the largest radius the pool authors.
+        //
+        // Trade-off of (3), accepted: a peer that first sees a zone before it can resolve the caster (a late
+        // joiner, a caster still in flight) gets no evidence from that zone, so a root it sends from out of
+        // direct reach is refused there once and logged ("rejected RPC_ApplyRoot ... OutOfRange"). The old
+        // fallback anchored on the caster's CURRENT position plus drift over the zone's whole age, which an
+        // attacker could stretch across most of the arena over an 8 s egg.
 
         /// <summary>What the victim's peer knows about one Root zone (live, or recorded at its despawn).</summary>
         public struct RootZoneEvidence
         {
             /// <summary>The zone's state authority equals the claimed caster's.</summary>
             public bool SameAuthorityAsCaster;
+            /// <summary>The zone's owner or state authority changed after this peer snapshotted them: the evidence is void.</summary>
+            public bool IdentityChanged;
             public Vector3 Center;
             /// <summary>The zone's own (replicated, untrusted) radius; clamped before use.</summary>
             public float Radius;
-            /// <summary>The caster was resolvable when this peer first saw the zone (its Spawned here).</summary>
+            /// <summary>The caster was resolvable when this peer first saw the zone (its Spawned here). False = no evidence.</summary>
             public bool HasCasterAtSpawn;
             public Vector3 CasterAtSpawn;
             /// <summary>How far the caster may have moved between placing the zone and this peer seeing it.</summary>
             public float SpawnDrift;
-            /// <summary>Real seconds since this peer first saw the zone (for the fallback anchor).</summary>
+            /// <summary>Real seconds since this peer first saw the zone (local clock, never replicated).</summary>
             public float SecondsSinceSeen;
         }
 
         /// <summary>
         /// The zone centre is where the caster could have placed it: within the pool's authored placement
         /// (+ <see cref="RangeSlackMeters"/>) of the caster's position when this peer first saw the zone, plus the
-        /// drift over that observation delay. When the caster could not be resolved then, the anchor falls back
-        /// to the caster's CURRENT position with drift over the zone's whole observed age plus the latency cap: a
-        /// looser bound, but still one an attacker cannot stretch past its own chicken's speed.
+        /// drift over that observation delay. False when the caster was not resolved then: there is no anchor
+        /// to check against, so the zone is not evidence.
         /// </summary>
-        public static bool IsCredibleZoneCenter(in RootZoneEvidence z, Vector3 casterNow, float casterDriftSpeed, in Ceiling c)
+        public static bool IsCredibleZoneCenter(in RootZoneEvidence z, in Ceiling c)
         {
-            Vector3 anchor;
-            float allowance;
-            if (z.HasCasterAtSpawn)
-            {
-                anchor = z.CasterAtSpawn;
-                allowance = Mathf.Max(0f, z.SpawnDrift);
-            }
-            else
-            {
-                anchor = casterNow;
-                allowance = Mathf.Max(0f, casterDriftSpeed) * (Mathf.Max(0f, z.SecondsSinceSeen) + ExecuteRules.MaxLatencySeconds);
-            }
-            return IsInsideZone(anchor, Mathf.Max(0f, c.MaxZonePlacement) + RangeSlackMeters + allowance, z.Center, 0f);
+            if (!z.HasCasterAtSpawn) return false;
+            float allowance = Mathf.Max(0f, z.SpawnDrift);
+            return IsInsideZone(z.CasterAtSpawn, Mathf.Max(0f, c.MaxZonePlacement) + RangeSlackMeters + allowance, z.Center, 0f);
         }
 
         /// <summary>
-        /// True when <paramref name="z"/> may vouch for a root on a victim at <paramref name="victim"/>: same
-        /// authority as the caster, a credible centre, and the victim inside the radius clamped to
-        /// <see cref="Ceiling.MaxZoneRadius"/> (+ <paramref name="margin"/>). False with no known ceiling.
+        /// The zone is still inside its authored life as this peer counts it: at most the pool's longest zone lifetime
+        /// plus <see cref="ExecuteRules.MaxLatencySeconds"/> since this peer first saw it. NaN and negative ages fail.
         /// </summary>
-        public static bool RootZoneVouches(in RootZoneEvidence z, Vector3 victim, float margin,
-            Vector3 casterNow, float casterDriftSpeed, in Ceiling c)
+        public static bool IsWithinZoneLifetime(in RootZoneEvidence z, in Ceiling c) =>
+            c.MaxZoneLifetime > 0f && z.SecondsSinceSeen >= 0f &&
+            z.SecondsSinceSeen <= c.MaxZoneLifetime + ExecuteRules.MaxLatencySeconds;
+
+        /// <summary>
+        /// True when <paramref name="z"/> may vouch for a root on a victim at <paramref name="victim"/>: same and
+        /// unchanged authority/owner, a caster anchor seen at spawn, a credible centre, inside its authored life, and
+        /// the victim inside the radius clamped to <see cref="Ceiling.MaxZoneRadius"/> (+ <paramref name="margin"/>).
+        /// False with no known ceiling.
+        /// </summary>
+        public static bool RootZoneVouches(in RootZoneEvidence z, Vector3 victim, float margin, in Ceiling c)
         {
-            if (!c.Known || !(c.MaxZoneRadius > 0f) || !z.SameAuthorityAsCaster) return false;
-            if (!IsCredibleZoneCenter(z, casterNow, casterDriftSpeed, c)) return false;
+            if (!c.Known || !(c.MaxZoneRadius > 0f) || !z.SameAuthorityAsCaster || z.IdentityChanged) return false;
+            if (!IsWithinZoneLifetime(z, c)) return false;
+            if (!IsCredibleZoneCenter(z, c)) return false;
             float radius = z.Radius > 0f ? Mathf.Min(z.Radius, c.MaxZoneRadius) : 0f;   // NaN reads as 0
             return IsInsideZone(z.Center, radius, victim, margin);
         }

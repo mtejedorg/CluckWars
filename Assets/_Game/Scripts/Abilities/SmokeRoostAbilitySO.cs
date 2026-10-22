@@ -1,5 +1,4 @@
 using CluckWars.Gameplay;
-using Fusion;
 using UnityEngine;
 using CluckWars.Localization;
 
@@ -49,6 +48,9 @@ namespace CluckWars.Abilities
             BotRole = BotRole.Escape;
             Duration = 3.5f;
             Cooldown = 11f;
+            // Maestro, 2026-10-21: Smoke Roost stays a Static AoE (the cloud stays where it was dropped).
+            // Authored on the asset too; defaulted here for fresh instances. Pinned by SmokeRoost_IsAStaticAoE.
+            AreaKind = AreaEffectKind.StaticAoE;
         }
 
         [Tooltip("Radius of the cloud.")]
@@ -67,8 +69,13 @@ namespace CluckWars.Abilities
 
         // The cast lands a cloud, not a hit. Chickens are slowed later, by the zone, so
         // cast-time hit/whiff styling must skip it entirely — dropping smoke on empty ground
-        // is the normal, correct play. See AbilityBaseSO.ReportsCastHits.
-        public override bool PlacesZone => true;
+        // is the normal, correct play. PlacesZone derives that from AreaKind; see
+        // AbilityBaseSO.ReportsCastHits.
+        public override bool TryGetAreaEffect(out AreaEffectSpec spec)
+        {
+            spec = AreaEffectSpec.StaticSlow(ZoneRadius, ZoneDuration, SlowFactor, 0f);   // at his feet
+            return true;
+        }
 
         public override AbilityAimShape AimShape => AbilityAimShape.SelfCircle;
         public override float AimRadius => ZoneRadius;
@@ -97,43 +104,9 @@ namespace CluckWars.Abilities
             // Half one: he fades. Cheap, and independent of the zone spawning at all.
             caster.Effects.SetOpacity(ctx.Slot, Opacity);
 
-            // Half two: the cloud. Captured into locals — a closure over 'this' can go stale
-            // if the SO is unloaded (same reason Feather Trap does it).
-            float capDuration   = ZoneDuration;
-            float capSlowFactor = SlowFactor;
-            float capRadius     = ZoneRadius;
-            var   capOwner      = caster.Id;
-            // Captured like the rest so the abandoned-spawn report below closes over the logger
-            // rather than over ctx.
-            var   capLog        = ctx.Log;
-
-            var pos = caster.transform.position;
-
-            ctx.Runner.Spawn(
-                ctx.PrefabRegistry.AbilityZone,
-                pos,
-                Quaternion.identity,
-                inputAuthority: null,
-                onBeforeSpawned: (runner, networkObject) =>
-                {
-                    var zone = networkObject.GetComponent<AbilityZone>();
-                    if (zone == null)
-                    {
-                        capLog?.Error(Source, "Smoke Roost leaked a zone: the prefab wired to "
-                            + "PrefabRegistrySO.AbilityZone has no AbilityZone component, so its lifetime "
-                            + "timer was never set. The NetworkObject has ALREADY spawned and will now "
-                            + "persist for the rest of the match doing nothing — fix the prefab.");
-                        return;
-                    }
-                    // No NetworkTransform on the zone: its position reaches the other peers only through this stamp.
-                    zone.SpawnPosition    = pos;
-                    zone.HasSpawnPosition = true;
-                    zone.Effect          = ZoneEffect.Slow;
-                    zone.OwnerChicken    = capOwner;
-                    zone.SlowFactor      = capSlowFactor;
-                    zone.NetworkedRadius = capRadius;
-                    zone.LifetimeTimer   = TickTimer.CreateFromSeconds(runner, capDuration);
-                });
+            // Half two: the cloud, at his feet.
+            TryGetAreaEffect(out var spec);
+            AreaEffectSpawner.Spawn(ctx, spec, caster.transform.position, Source, "Smoke Roost");
         }
 
         public override void OnDeactivate(AbilityContext ctx)

@@ -35,6 +35,18 @@ namespace CluckWars.Abilities
         public override AbilityAimShape AimShape => AbilityAimShape.Aura;
         public override float AimRadius => AuraRadius;
 
+        // WP3 (phase 1): tagged as an Aura (authored on the asset, defaulted here for fresh instances) and its spec is
+        // declared, but the cast still runs on the ChickenController aura triplet below and spawns no zone. WP4 moves
+        // OnActivate onto AreaEffectSpawner with this spec (a Caster-anchored zone that ends with the slot, Duration as
+        // its backstop) and deletes the triplet.
+        public FeatherAuraAbilitySO() { AreaKind = AreaEffectKind.Aura; }
+
+        public override bool TryGetAreaEffect(out AreaEffectSpec spec)
+        {
+            spec = AreaEffectSpec.AuraSlow(AuraRadius, Duration, AuraSlowFactor);
+            return true;
+        }
+
         public override void OnActivate(AbilityContext ctx)
         {
             ctx.Controller.Effects.SetAura(ctx.Slot, AuraSlowFactor, AuraRadius);

@@ -36,6 +36,8 @@ namespace CluckWars.Tests
             ("RPC_ApplyAbilitySlow", ControlKind.Slow),
         };
 
+        private static string Src(string path) => File.ReadAllText(path).Replace("\r\n", "\n");
+
         private static AbilityRegistrySO Registry() => TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
 
         private static ControlClaimRules.Ceiling Shipped(ControlKind kind) =>
@@ -263,7 +265,6 @@ namespace CluckWars.Tests
             SecondsSinceSeen = 5f,
         };
 
-        private static readonly Vector3 FarCaster = new Vector3(30f, 0f, 30f);   // walked away since
 
         [Test]
         public void RootCeiling_ZoneGeometry_IsReadOffRootEgg()
@@ -272,6 +273,7 @@ namespace CluckWars.Tests
             var c = Shipped(ControlKind.Root);
             Assert.AreEqual(egg.EggRadius, c.MaxZoneRadius, 1e-6f);
             Assert.AreEqual(egg.AimForwardOffset, c.MaxZonePlacement, 1e-6f);
+            Assert.AreEqual(egg.EggLifetime, c.MaxZoneLifetime, 1e-6f, "the zone's authored life bounds how long it can vouch");
             Assert.AreEqual(0f, Shipped(ControlKind.Stun).MaxZoneRadius, "no stun comes from a zone");
         }
 
@@ -279,7 +281,7 @@ namespace CluckWars.Tests
         public void RootZone_Honest_VouchesForAVictimInside_WhileItsCasterIsFarAway()
         {
             var zone = HonestZone(new Vector3(2f, 0f, 2f));
-            Assert.IsTrue(ControlClaimRules.RootZoneVouches(zone, new Vector3(3f, 0f, 2f), 0.5f, FarCaster, 12.15f, Shipped(ControlKind.Root)));
+            Assert.IsTrue(ControlClaimRules.RootZoneVouches(zone, new Vector3(3f, 0f, 2f), 0.5f, Shipped(ControlKind.Root)));
         }
 
         [Test]
@@ -289,9 +291,9 @@ namespace CluckWars.Tests
             zone.Radius = 30f;   // attacker-written
             var victim = new Vector3(8f, 0f, 2f);
             Assert.IsTrue(ControlClaimRules.IsInsideZone(zone.Center, zone.Radius, victim, 0.5f), "fixture: the old check trusted this radius");
-            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, FarCaster, 12.15f, Shipped(ControlKind.Root)));
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, Shipped(ControlKind.Root)));
             zone.Radius = float.NaN;
-            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, new Vector3(3f, 0f, 2f), 0.5f, FarCaster, 12.15f, Shipped(ControlKind.Root)));
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, new Vector3(3f, 0f, 2f), 0.5f, Shipped(ControlKind.Root)));
         }
 
         [Test]
@@ -299,7 +301,7 @@ namespace CluckWars.Tests
         {
             var zone = HonestZone(new Vector3(2f, 0f, 2f));
             zone.SameAuthorityAsCaster = false;
-            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, new Vector3(3f, 0f, 2f), 0.5f, FarCaster, 12.15f, Shipped(ControlKind.Root)));
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, new Vector3(3f, 0f, 2f), 0.5f, Shipped(ControlKind.Root)));
         }
 
         [Test]
@@ -307,20 +309,68 @@ namespace CluckWars.Tests
         {
             var zone = HonestZone(new Vector3(-15f, 0f, -15f));   // dropped on the victim, not at the caster's feet
             zone.CasterAtSpawn = new Vector3(10f, 0f, 10f);
-            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, new Vector3(-15f, 0f, -14.5f), 0.5f, FarCaster, 12.15f, Shipped(ControlKind.Root)));
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, new Vector3(-15f, 0f, -14.5f), 0.5f, Shipped(ControlKind.Root)));
         }
 
         [Test]
-        public void RootZone_WithNoSpawnAnchor_FallsBackToTheCasterNowPlusDriftOverItsAge()
+        public void RootZone_WithNoSpawnAnchor_IsNotEvidence()
         {
+            // Security review (WP3): the old fallback anchored on the caster's CURRENT position plus drift over the
+            // zone's whole age, so an attacker's zone gained ~12 m of credible placement per second of age. A peer that
+            // never resolved the caster at first sight now gets no evidence (the far root is refused once, logged).
             var zone = HonestZone(new Vector3(2f, 0f, 2f));
             zone.HasCasterAtSpawn = false;
             zone.SecondsSinceSeen = 0.2f;
-            var c = Shipped(ControlKind.Root);
             var victim = new Vector3(3f, 0f, 2f);
-            Assert.IsTrue(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, new Vector3(5f, 0f, 2f), 12.15f, c), "3 m of walking in 0.7 s is plausible");
-            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, FarCaster, 12.15f, c), "39 m in 0.7 s is not");
-            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, new Vector3(5f, 0f, 2f), 12.15f, ControlClaimRules.Ceiling.Unknown));
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, Shipped(ControlKind.Root)));
+            Assert.IsFalse(ControlClaimRules.IsCredibleZoneCenter(zone, Shipped(ControlKind.Root)));
+        }
+
+        [Test]
+        public void RootZone_WhoseOwnerOrAuthorityChangedAfterTheSnapshot_IsNotEvidence()
+        {
+            var zone = HonestZone(new Vector3(2f, 0f, 2f));
+            var victim = new Vector3(3f, 0f, 2f);
+            Assert.IsTrue(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, Shipped(ControlKind.Root)), "fixture: honest");
+            zone.IdentityChanged = true;
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, Shipped(ControlKind.Root)),
+                "a zone re-pointed at another owner or authority must stop vouching, not re-anchor");
+        }
+
+        [Test]
+        public void RootZone_OlderThanItsAuthoredLife_StopsVouching()
+        {
+            var c = Shipped(ControlKind.Root);
+            var zone = HonestZone(new Vector3(2f, 0f, 2f));
+            var victim = new Vector3(3f, 0f, 2f);
+            zone.SecondsSinceSeen = c.MaxZoneLifetime + ExecuteRules.MaxLatencySeconds - 0.01f;
+            Assert.IsTrue(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, c), "inside its life plus the latency cap");
+            zone.SecondsSinceSeen = c.MaxZoneLifetime + ExecuteRules.MaxLatencySeconds + 0.01f;
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, c), "an egg kept alive past its life is no evidence");
+            zone.SecondsSinceSeen = float.NaN;
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, c));
+            zone.SecondsSinceSeen = 1f;
+            var noLife = new ControlClaimRules.Ceiling(true, c.MaxSeconds, c.MinSlowFactor, c.MaxReach, c.MaxZoneRadius, c.MaxZonePlacement, 0f);
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, noLife), "no authored lifetime: no zone may vouch");
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, ControlClaimRules.Ceiling.Unknown));
+        }
+
+        [Test]
+        public void AbilityZone_SnapshotsOwnerAndAuthorityOnce_AndRefreshesOnlyTheGeometry()
+        {
+            const string zonePath = "Assets/_Game/Scripts/Gameplay/AbilityZone.cs";
+            string capture = AssassinExecuteCreditTests.MethodBody(zonePath, "private void CaptureRootEvidence()");
+            StringAssert.Contains("_seen.Owner       = OwnerChicken;", capture);
+            StringAssert.Contains("_seen.Authority   = Object != null ? Object.StateAuthority : default;", capture);
+
+            string observe = AssassinExecuteCreditTests.MethodBody(zonePath, "private void ObserveRootEvidence()");
+            Assert.IsFalse(Regex.IsMatch(observe, @"_seen\.(Owner|Authority)\s*=[^=]"), "Render must never re-anchor the owner or authority");
+            StringAssert.Contains("_seen.IdentityChanged = true;", observe, "a change voids the evidence");
+            StringAssert.Contains("RefreshRootGeometry();", observe);
+            string refresh = AssassinExecuteCreditTests.MethodBody(zonePath, "private void RefreshRootGeometry()");
+            Assert.IsFalse(Regex.IsMatch(refresh, @"_seen\.(Owner|Authority|CasterAtSpawn|HasCasterAtSpawn|FirstSeenAt)\s*=[^=]"),
+                "only Center and Radius are refreshed");
+            StringAssert.Contains("IdentityChanged = s.IdentityChanged,", Src(zonePath), "the void flag reaches the rule");
         }
 
         [Test]

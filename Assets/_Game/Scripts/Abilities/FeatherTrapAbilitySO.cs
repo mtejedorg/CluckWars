@@ -1,5 +1,4 @@
 using CluckWars.Gameplay;
-using Fusion;
 using UnityEngine;
 using CluckWars.Localization;
 
@@ -52,8 +51,16 @@ namespace CluckWars.Abilities
 
         // The cast lands a cloud, not a hit — chickens are slowed later, by the zone. A trap
         // thrown at empty ground (the normal, correct play) reports 0 targets, so cast-time
-        // hit/whiff styling must skip it entirely. See AbilityBaseSO.ReportsCastHits.
-        public override bool PlacesZone => true;
+        // hit/whiff styling must skip it entirely: PlacesZone (derived from AreaKind = StaticAoE,
+        // authored on the asset and defaulted here for fresh instances) does that. See
+        // AbilityBaseSO.ReportsCastHits.
+        public FeatherTrapAbilitySO() { AreaKind = AreaEffectKind.StaticAoE; }
+
+        public override bool TryGetAreaEffect(out AreaEffectSpec spec)
+        {
+            spec = AreaEffectSpec.StaticSlow(ZoneRadius, ZoneDuration, SlowFactor, ForwardOffset);
+            return true;
+        }
 
         // Unassigned wiring, not a gameplay state — CanSpawnZone logs which reference is
         // missing. Sits in CanActivate rather than at the top of OnActivate so the refusal
@@ -68,41 +75,8 @@ namespace CluckWars.Abilities
             var pos    = caster.transform.position + caster.transform.forward * ForwardOffset;
             pos.y      = caster.transform.position.y; // keep on ground plane
 
-            // Capture SO values for the lambda (closures on 'this' can be stale if
-            // the SO is unloaded, so capture into locals to be safe).
-            float capDuration   = ZoneDuration;
-            float capSlowFactor = SlowFactor;
-            float capRadius     = ZoneRadius;
-            var   capOwner      = caster.Id;
-            // Captured like the rest so the abandoned-spawn report below closes over the logger
-            // rather than over ctx.
-            var   capLog        = ctx.Log;
-
-            ctx.Runner.Spawn(
-                ctx.PrefabRegistry.AbilityZone,
-                pos,
-                Quaternion.identity,
-                inputAuthority: null,
-                onBeforeSpawned: (runner, networkObject) =>
-                {
-                    var zone = networkObject.GetComponent<AbilityZone>();
-                    if (zone == null)
-                    {
-                        capLog?.Error(Source, "Feather Trap leaked a zone: the prefab wired to "
-                            + "PrefabRegistrySO.AbilityZone has no AbilityZone component, so its lifetime "
-                            + "timer was never set. The NetworkObject has ALREADY spawned and will now "
-                            + "persist for the rest of the match doing nothing — fix the prefab.");
-                        return;
-                    }
-                    // No NetworkTransform on the zone: its position reaches the other peers only through this stamp.
-                    zone.SpawnPosition    = pos;
-                    zone.HasSpawnPosition = true;
-                    zone.Effect          = ZoneEffect.Slow;
-                    zone.OwnerChicken    = capOwner;
-                    zone.SlowFactor      = capSlowFactor;
-                    zone.NetworkedRadius = capRadius;
-                    zone.LifetimeTimer   = TickTimer.CreateFromSeconds(runner, capDuration);
-                });
+            TryGetAreaEffect(out var spec);
+            AreaEffectSpawner.Spawn(ctx, spec, pos, Source, "Feather Trap");
         }
 
         public override void OnDeactivate(AbilityContext ctx) { }

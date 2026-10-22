@@ -817,6 +817,10 @@ namespace CluckWars.Gameplay
                 sb.AppendLine($"Event Fired: {ActiveEvent}");
                 sb.AppendLine("Players Stats:");
                 var statsList = ChickenMatchStats.ActiveStats;
+                int executes = 0, stuns = 0;
+                bool winnerFound = false;
+                var winnerClass = ChickenClass.Warrior;
+                float winnerDeposited = 0f;
                 for (int i = 0; i < statsList.Count; i++)
                 {
                     var s = statsList[i];
@@ -827,9 +831,21 @@ namespace CluckWars.Gameplay
                     var cc = s.GetComponent<ChickenController>();
                     if (cc != null && !cc.IsDecoy)
                     {
-                        sb.AppendLine($"  P{cc.HomeCornerIndex + 1} ({cc.Class}): Kills={s.Kills}, Deposited={s.FoodDeposited:0.0}");
+                        sb.AppendLine(MatchSummaryLines.PlayerRow(cc.HomeCornerIndex, cc.Class, s.Kills, s.FoodDeposited, s.StunsTaken));
+                        executes += s.Kills;
+                        stuns    += s.StunsTaken;
+                        if (winnerCorner >= 0 && cc.HomeCornerIndex == winnerCorner)
+                        {
+                            winnerFound     = true;
+                            winnerClass     = cc.Class;
+                            winnerDeposited = s.FoodDeposited;
+                        }
                     }
                 }
+                // Balance counters (F7): makes "won with 0 deposited" and the execute / stun rates greppable.
+                sb.AppendLine(MatchSummaryLines.WinnerDeposited(winnerCorner, winnerFound, winnerClass, winnerDeposited));
+                sb.AppendLine(MatchSummaryLines.ExecutesLanded(executes));
+                sb.AppendLine(MatchSummaryLines.StunsLanded(stuns));
                 sb.AppendLine("=====================");
                 _log?.Info("MatchSummary", sb.ToString());
             }

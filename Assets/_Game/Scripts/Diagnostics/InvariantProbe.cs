@@ -45,6 +45,9 @@ namespace CluckWars.Diagnostics
         private readonly List<(string type, Vector2 position)> _pilesW = new List<(string, Vector2)>(32);
         private readonly List<(string type, Vector2 position)> _zones = new List<(string, Vector2)>(16);
         private readonly List<(string type, Vector2 position)> _moving = new List<(string, Vector2)>(16);
+        private readonly List<RoundInvariants.WorldZone> _zoneScan = new List<RoundInvariants.WorldZone>(16);
+        private readonly List<(uint owner, int radiusBucket, byte effect, byte channels)> _auras =
+            new List<(uint, int, byte, byte)>(8);
 
         [Inject]
         public void Construct(ILogService log) => _log = log;
@@ -144,8 +147,13 @@ namespace CluckWars.Diagnostics
             // B10 leftovers: what the previous round placed must be gone (the check runs during the intro: nobody can cast).
             int zones = 0, auras = 0, decoys = 0;
             var live = AbilityZone.ActiveZones;
+            // A Caster-anchored zone (WP3) is an aura: counted with the triplet auras, not with the placed zones.
             for (int i = 0; i < live.Count; i++)
-                if (live[i] != null && live[i].Object != null && live[i].Object.IsValid) zones++;
+                if (live[i] != null && live[i].Object != null && live[i].Object.IsValid)
+                {
+                    if (live[i].Anchor == ZoneAnchor.Caster) auras++;
+                    else zones++;
+                }
             for (int i = 0; i < all.Count; i++)
             {
                 var c = all[i];
@@ -204,15 +212,33 @@ namespace CluckWars.Diagnostics
             _pilesW.Clear();
             _zones.Clear();
             _moving.Clear();
+            _zoneScan.Clear();
+            _auras.Clear();
             var bases = PlayerBase.ActiveBases;
             for (int i = 0; i < bases.Count; i++)
                 if (bases[i] != null && bases[i].Object != null && bases[i].Object.IsValid) _basesW.Add(("PlayerBase", Xz(bases[i].transform)));
             var piles = FoodPile.ActivePiles;
             for (int i = 0; i < piles.Count; i++)
                 if (piles[i] != null && piles[i].Object != null && piles[i].Object.IsValid) _pilesW.Add(("FoodPile", Xz(piles[i].transform)));
+            // WP3: World zones stay in zones/static (by their transform, so a mis-placed visual is still caught, CW-217);
+            // Caster zones follow a chicken that peers see ~3 m apart, so they hash by identity into auras= instead.
             var zones = AbilityZone.ActiveZones;
             for (int i = 0; i < zones.Count; i++)
-                if (zones[i] != null && zones[i].Object != null && zones[i].Object.IsValid) _zones.Add(("AbilityZone", Xz(zones[i].transform)));
+            {
+                var z = zones[i];
+                if (z == null || z.Object == null || !z.Object.IsValid) continue;
+                var owner = z.OwnerChicken;
+                _zoneScan.Add(new RoundInvariants.WorldZone
+                {
+                    CasterAnchored = z.Anchor == ZoneAnchor.Caster,
+                    Position = Xz(z.transform),
+                    OwnerRaw = unchecked(owner.Object.Raw * 16777619u ^ (uint)owner.Behaviour),
+                    Radius = z.TriggerRadius,
+                    Effect = (byte)z.Effect,
+                    Channels = (byte)z.Channels,
+                });
+            }
+            RoundInvariants.SplitZones(_zoneScan, _zones, _auras);
             var chickens = ChickenController.ActiveControllers;
             for (int i = 0; i < chickens.Count; i++)
                 if (chickens[i] != null && chickens[i].Object != null && chickens[i].Object.IsValid) _moving.Add(("Chicken", Xz(chickens[i].transform)));
@@ -222,9 +248,10 @@ namespace CluckWars.Diagnostics
             uint hp = RoundInvariants.WorldHash(_pilesW, out int np);
             uint hz = RoundInvariants.WorldHash(_zones, out int nz);
             uint hc = RoundInvariants.WorldHash(_moving, out int nc);
+            uint ha = RoundInvariants.AuraHash(_auras, out int na);
             uint hs = unchecked(hb + hp + hz);
             _log.Info(Source, $"World t={t} static={hs:X8} n={nb + np + nz} bases={hb:X8}/{nb} piles={hp:X8}/{np} zones={hz:X8}/{nz} " +
-                $"chickens={hc:X8} m={nc} round={_round}");
+                $"auras={ha:X8}/{na} chickens={hc:X8} m={nc} round={_round}");
         }
 
         private static Vector2 Xz(Transform t)

@@ -323,12 +323,13 @@ foreach ($e in $sorted) {
 #     (0.5 s after Active, inside the intro: nobody can cast). Any non-zero count is a finding, once per source and round.
 # (b) Any build (also the ones before B10): the 2 s World line's zones=<hash>/<n>. From $LeftoverGraceSec after a round
 #     leaves Ended (PLAY AGAIN; the despawn is one tick + replication away) until $IntroGraceSec after the next Active
-#     (the intro is 3 s: still nobody can cast), n must be 0.
+#     (the intro is 3 s: still nobody can cast), n must be 0. WP3 builds also print auras=<hash>/<n> (Caster-anchored
+#     zones); they are added to the count.
 $LeftoverGraceSec = 1.0
 $IntroGraceSec = 2.5
 $rxStartCounts = New-Object Text.RegularExpressions.Regex('^Invariant (?:ok|FAIL)\b(?=.*\bphase=start\b)(?=.*\bround=(\d+)\b).*\bzn=(\d+) au=(\d+) dc=(\d+)')
 $rxStateLine = New-Object Text.RegularExpressions.Regex('^Invariant state (\w+)->(\w+) round=(\d+)')
-$rxWorldZones = New-Object Text.RegularExpressions.Regex('^World t=(\d+) .*\bzones=\w+/(\d+)')
+$rxWorldZones = New-Object Text.RegularExpressions.Regex('^World t=(\d+) .*\bzones=\w+/(\d+)(?:.*\bauras=\w+/(\d+))?')
 $leftoverSeen = @{}
 $leftWin = @{}   # src -> @{ From; Until; Round }
 foreach ($e in $sorted) {
@@ -352,13 +353,15 @@ foreach ($e in $sorted) {
         continue
     }
     $m = $rxWorldZones.Match($e.Message)
-    if ($m.Success -and [int]$m.Groups[2].Value -gt 0 -and $leftWin.ContainsKey($e.Src)) {
+    $liveZones = 0
+    if ($m.Success) { $liveZones = [int]$m.Groups[2].Value + $(if ($m.Groups[3].Success) { [int]$m.Groups[3].Value } else { 0 }) }
+    if ($m.Success -and $liveZones -gt 0 -and $leftWin.ContainsKey($e.Src)) {
         $w = $leftWin[$e.Src]
         if ($e.Ticks -lt $w.From -or $e.Ticks -gt $w.Until) { continue }
         $key = "world|$($e.Src)|$($w.Round)"
         if ($leftoverSeen.ContainsKey($key)) { continue }
         $leftoverSeen[$key] = 1
-        Add-Finding @('INVARIANT') $e ("round reset after round $($w.Round) on $($e.Src) (World t=$($m.Groups[1].Value)): $($m.Groups[2].Value) ability zone(s) still alive after PLAY AGAIN, before anyone could cast (expected 0, B10)")
+        Add-Finding @('INVARIANT') $e ("round reset after round $($w.Round) on $($e.Src) (World t=$($m.Groups[1].Value)): $liveZones ability zone(s) still alive after PLAY AGAIN, before anyone could cast (expected 0, B10)")
     }
 }
 
@@ -384,42 +387,47 @@ foreach ($src in $ctlRejects.Keys) {
 }
 
 # ---- World-hash parity (CW-216/217 class: spawned objects positioned differently per peer) ---------------------
-# The game logs `World t=<tick> static=<hash> n=<count> ...` on every peer every 2 s (Source Invariant). Peers log on the
-# same ticks, so for each tick every reporting peer must have the same `static` hash (bases, piles, pickups, zones at
-# 0.5 m resolution). A mismatch that lasts >= $WorldPersist consecutive shared ticks is an INVARIANT finding.
+# The game logs `World t=<tick> static=<hash> n=<count> ... auras=<hash>/<n> ...` on every peer every 2 s (Source
+# Invariant). Peers log on the same ticks, so for each tick every reporting peer must have the same `static` hash (bases,
+# piles, pickups, World-anchored zones at 0.5 m resolution) and the same `auras` hash (WP3: Caster-anchored zones, keyed by
+# owner id, radius bucket, effect and channels - never by position, which follows a moving chicken). A mismatch that lasts
+# >= $WorldPersist consecutive shared ticks is an INVARIANT finding. Builds before WP3 print no auras= and are skipped there.
 $WorldPersist = 2
-$rxWorld = New-Object Text.RegularExpressions.Regex('^World t=(\d+) static=(\w+) n=(\d+)')
-$worldByT = @{}
-foreach ($e in $sorted) {
-    if ($e.Source -ne 'Invariant') { continue }
-    $m = $rxWorld.Match($e.Message); if (-not $m.Success) { continue }
-    $t = [long]$m.Groups[1].Value
-    if (-not $worldByT.ContainsKey($t)) { $worldByT[$t] = @{ Entry = $e; Peers = @{} } }
-    $worldByT[$t].Peers[$e.Src] = @{ H = $m.Groups[2].Value; N = $m.Groups[3].Value }
-}
-# Like-with-like persistence (same idea as Find-StuckWindow for Sync fields): right after a master migration objects keep
-# spawning and each peer's hash is only a beat behind the other's, so BOTH sides change between mismatching beats (lag).
-# A mismatch run counts only when, over its consecutive beats, some peer's hash stays CONSTANT (a missing / misplaced
-# static object: CW-216/217) - which also covers the same mismatching pair repeating.
-$run = @(); $runFlagged = $false
-foreach ($t in ($worldByT.Keys | Sort-Object)) {
-    $w = $worldByT[$t]
-    if ($w.Peers.Count -lt 2) { continue }
-    $distinct = @($w.Peers.Values | ForEach-Object { $_.H } | Sort-Object -Unique)
-    if ($distinct.Count -le 1) { $run = @(); $runFlagged = $false; continue }
-    $run += , @{ T = $t; W = $w }
-    if ($run.Count -lt $WorldPersist -or $runFlagged) { continue }
-    $stuckPeer = $null
-    foreach ($peer in $w.Peers.Keys) {
-        $hashes = @($run | ForEach-Object { if ($_.W.Peers.ContainsKey($peer)) { $_.W.Peers[$peer].H } else { '' } } | Sort-Object -Unique)
-        if ($hashes.Count -eq 1 -and $hashes[0] -ne '') { $stuckPeer = $peer; break }
+function Test-WorldParity([string]$field, [Text.RegularExpressions.Regex]$rx, [string]$what) {
+    $byT = @{}
+    foreach ($e in $sorted) {
+        if ($e.Source -ne 'Invariant') { continue }
+        $m = $rx.Match($e.Message); if (-not $m.Success) { continue }
+        $t = [long]$m.Groups[1].Value
+        if (-not $byT.ContainsKey($t)) { $byT[$t] = @{ Entry = $e; Peers = @{} } }
+        $byT[$t].Peers[$e.Src] = @{ H = $m.Groups[2].Value; N = $m.Groups[3].Value }
     }
-    if ($null -eq $stuckPeer) { continue }   # every side kept changing: replication lag, not a stuck difference
-    $runFlagged = $true
-    $first = $run[0]
-    $desc = ($first.W.Peers.Keys | Sort-Object | ForEach-Object { "$_=$($first.W.Peers[$_].H)(n=$($first.W.Peers[$_].N))" }) -join ' '
-    Add-Finding @('INVARIANT') $first.W.Entry ("world static hash differs across peers from t=$($first.T) ($WorldPersist+ consecutive heartbeats, $stuckPeer constant at $($w.Peers[$stuckPeer].H)): $desc - a spawned object (base/pile/pickup/zone) is positioned differently on some peers")
+    # Like-with-like persistence (same idea as Find-StuckWindow for Sync fields): right after a master migration objects keep
+    # spawning and each peer's hash is only a beat behind the other's, so BOTH sides change between mismatching beats (lag).
+    # A mismatch run counts only when, over its consecutive beats, some peer's hash stays CONSTANT (a missing / misplaced
+    # object: CW-216/217) - which also covers the same mismatching pair repeating.
+    $run = @(); $runFlagged = $false
+    foreach ($t in ($byT.Keys | Sort-Object)) {
+        $w = $byT[$t]
+        if ($w.Peers.Count -lt 2) { continue }
+        $distinct = @($w.Peers.Values | ForEach-Object { $_.H } | Sort-Object -Unique)
+        if ($distinct.Count -le 1) { $run = @(); $runFlagged = $false; continue }
+        $run += , @{ T = $t; W = $w }
+        if ($run.Count -lt $WorldPersist -or $runFlagged) { continue }
+        $stuckPeer = $null
+        foreach ($peer in $w.Peers.Keys) {
+            $hashes = @($run | ForEach-Object { if ($_.W.Peers.ContainsKey($peer)) { $_.W.Peers[$peer].H } else { '' } } | Sort-Object -Unique)
+            if ($hashes.Count -eq 1 -and $hashes[0] -ne '') { $stuckPeer = $peer; break }
+        }
+        if ($null -eq $stuckPeer) { continue }   # every side kept changing: replication lag, not a stuck difference
+        $runFlagged = $true
+        $first = $run[0]
+        $desc = ($first.W.Peers.Keys | Sort-Object | ForEach-Object { "$_=$($first.W.Peers[$_].H)(n=$($first.W.Peers[$_].N))" }) -join ' '
+        Add-Finding @('INVARIANT') $first.W.Entry ("world $field hash differs across peers from t=$($first.T) ($WorldPersist+ consecutive heartbeats, $stuckPeer constant at $($w.Peers[$stuckPeer].H)): $desc - $what")
+    }
 }
+Test-WorldParity 'static' (New-Object Text.RegularExpressions.Regex('^World t=(\d+) static=(\w+) n=(\d+)')) 'a spawned object (base/pile/pickup/zone) is positioned differently on some peers'
+Test-WorldParity 'auras' (New-Object Text.RegularExpressions.Regex('^World t=(\d+) .*\bauras=(\w+)/(\d+)')) 'an aura (caster-anchored zone) is missing on some peer, or has another owner, radius, effect or channels there'
 
 function Test-Num($a, $b, $tol) {
     $x = 0.0; $y = 0.0

@@ -24,6 +24,7 @@ MonoBehaviour:
   Duration: 0.3
   Cooldown: 7
   CastMotion: 4
+  AreaKind: 1
   EggLifetime: 8
   RootDuration: 2
   EggRadius: 1.45

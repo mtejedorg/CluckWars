@@ -165,6 +165,57 @@ namespace CluckWars.Diagnostics
             return sum;
         }
 
+        /// <summary>One live <c>AbilityZone</c> as the World probe sees it (pure input of <see cref="SplitZones"/>).</summary>
+        public struct WorldZone
+        {
+            /// <summary>Anchor == Caster (an Aura): its position is a chicken's, which peers see up to ~3 m apart.</summary>
+            public bool CasterAnchored;
+            public Vector2 Position;
+            /// <summary>The owner chicken's <c>NetworkBehaviourId</c> raw value: the aura's identity on every peer.</summary>
+            public uint OwnerRaw;
+            public float Radius;
+            public byte Effect;
+            public byte Channels;
+        }
+
+        /// <summary>Radius bucket of the aura hash: 0.1 m, finer than any authored difference and coarser than float noise.</summary>
+        public const float AuraRadiusBucket = 0.1f;
+
+        /// <summary>
+        /// Splits the live zones for the World line (WP3, B1): World-anchored zones go to <paramref name="statics"/>
+        /// (hashed by position like every static object); Caster-anchored zones go to <paramref name="auras"/>, keyed by
+        /// what is the same on every peer - owner id, radius bucket, effect, channels - and never by position, which
+        /// follows a moving chicken (it would make the static hash differ on every heartbeat).
+        /// </summary>
+        public static void SplitZones(IEnumerable<WorldZone> zones, List<(string type, Vector2 position)> statics,
+            List<(uint owner, int radiusBucket, byte effect, byte channels)> auras)
+        {
+            foreach (var z in zones)
+            {
+                if (z.CasterAnchored) auras.Add((z.OwnerRaw, Mathf.RoundToInt(z.Radius / AuraRadiusBucket), z.Effect, z.Channels));
+                else statics.Add(("AbilityZone", z.Position));
+            }
+        }
+
+        /// <summary>Order-independent hash of the Caster-anchored zones (owner, radius bucket, effect, channels): <c>auras=</c>.</summary>
+        public static uint AuraHash(IEnumerable<(uint owner, int radiusBucket, byte effect, byte channels)> auras, out int count)
+        {
+            uint sum = 0;
+            count = 0;
+            foreach (var (owner, radius, effect, channels) in auras)
+            {
+                count++;
+                uint h = 2166136261u;
+                h = Fnv(h, "Aura");
+                h = Fnv(h, unchecked((int)owner));
+                h = Fnv(h, radius);
+                h = Fnv(h, effect);
+                h = Fnv(h, channels);
+                unchecked { sum += h; }
+            }
+            return sum;
+        }
+
         private static uint Fnv(uint h, string s)
         {
             unchecked

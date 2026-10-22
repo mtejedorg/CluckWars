@@ -145,6 +145,46 @@ namespace CluckWars.Tests
             }
         }
 
+        // ---- Every area ability (WP3: AreaKind != None) -------------------------
+
+        /// <summary>
+        /// Area abilities that do not spawn a zone yet. Phase 1 of WP3 tags Feather Aura as an Aura but it still runs on
+        /// the <c>ChickenController</c> aura triplet; WP4 moves it onto <see cref="AreaEffectSpawner"/>, and
+        /// <see cref="EveryAreaAbility_RefusesWithoutTheAbilityZonePrefab"/> then fails until it is removed from here.
+        /// </summary>
+        private static readonly HashSet<System.Type> AreaAbilitiesWithoutAZoneYet = new HashSet<System.Type>
+        {
+            typeof(FeatherAuraAbilitySO),
+        };
+
+        [Test]
+        public void EveryAreaAbility_RefusesWithoutTheAbilityZonePrefab()
+        {
+            var registry = Track(ScriptableObject.CreateInstance<PrefabRegistrySO>());   // AbilityZone unassigned
+            var unwired = ContextWith(InertRunner(), registry);
+            var wired = ContextWith(InertRunner(), RegistryWithZone());
+
+            int checkedCount = 0;
+            foreach (var ability in TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir))
+            {
+                if (ability.AreaKind == AreaEffectKind.None) continue;
+                string src = System.IO.File.ReadAllText($"Assets/_Game/Scripts/Abilities/{ability.GetType().Name}.cs");
+                if (AreaAbilitiesWithoutAZoneYet.Contains(ability.GetType()))
+                {
+                    Assert.AreEqual(AreaEffectKind.Aura, ability.AreaKind, $"{ability.name}: only a phase-1 Aura may skip the gate");
+                    Assert.IsFalse(src.Contains("AreaEffectSpawner.Spawn("),
+                        $"{ability.name} spawns its zone now (WP4): remove it from AreaAbilitiesWithoutAZoneYet so the gate is checked");
+                    continue;
+                }
+                checkedCount++;
+                StringAssert.Contains("AreaEffectSpawner.Spawn(", src, $"{ability.name} declares an area but never spawns it");
+                Assert.IsFalse(ability.CanActivate(unwired),
+                    $"{ability.name} (AreaKind {ability.AreaKind}) must refuse before the cast when PrefabRegistrySO.AbilityZone is unassigned.");
+                Assert.IsTrue(ability.CanActivate(wired), $"{ability.name} must allow the cast once fully wired.");
+            }
+            Assert.GreaterOrEqual(checkedCount, 3, "Feather Trap, Root Egg and Smoke Roost at least: the sweep went blind");
+        }
+
         // ---- The base default ---------------------------------------------------
 
         [Test]
@@ -357,9 +397,18 @@ namespace CluckWars.Tests
 
             foreach (var file in System.IO.Directory.GetFiles(abilityScriptDir, "*.cs"))
             {
-                if (!System.IO.File.ReadAllText(file).Contains("onBeforeSpawned")) continue;
-
                 var typeName = System.IO.Path.GetFileNameWithoutExtension(file);
+                var text = System.IO.File.ReadAllText(file);
+
+                // WP3: the zone abilities spawn through AreaEffectSpawner, which holds the one onBeforeSpawned block for
+                // zones. The spawner is not an ability (nothing to gate); its callers are.
+                if (typeName == nameof(AreaEffectSpawner))
+                {
+                    Assert.IsFalse(typeof(AbilityBaseSO).IsAssignableFrom(typeof(AreaEffectSpawner)));
+                    continue;
+                }
+                if (!text.Contains("onBeforeSpawned") && !text.Contains("AreaEffectSpawner.Spawn(")) continue;
+
                 Assert.IsTrue(covered.Contains(typeName),
                     $"{typeName} calls runner.Spawn(onBeforeSpawned: …) but is invisible to " +
                     $"{nameof(EverySpawningAbility_OverridesCanActivate)}, so nothing checks that it " +

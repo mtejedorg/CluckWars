@@ -120,6 +120,13 @@ namespace CluckWars.Abilities
                  "dedicated state and trigger.")]
         public CastArchetype CastMotion = CastArchetype.Lunge;
 
+        [Header("Area effect")]
+        [Tooltip("The lasting area this ability leaves behind. None = no lasting area (self-buffs, bursts resolved at " +
+                 "cast). Static AoE = placed once, stays fixed (Feather Trap, Root Egg, Smoke Roost). Aura = follows " +
+                 "the caster (Feather Aura). Data, not code (decisions B1-B3): the tuned numbers stay in the ability's " +
+                 "own fields, read through TryGetAreaEffect.")]
+        public AreaEffectKind AreaKind = AreaEffectKind.None;
+
         [Header("Physics Scans")]
         [Tooltip("Legacy layer mask from the Stage G Physics.OverlapSphere scans. No longer used to find " +
                  "chicken targets — every ability's OnActivate now scans ChickenController.ActiveControllers " +
@@ -416,10 +423,29 @@ namespace CluckWars.Abilities
         /// resolving a hit at the instant of the cast. Their aim shape is real — it is the
         /// zone's footprint, and the telegraph draws it correctly — but nobody is hit when
         /// the button is released; the hit happens later, in <c>AbilityZone</c>'s own tick.
-        /// Feather Trap and Root Egg. See <see cref="ReportsCastHits"/> for why this needs
-        /// to be declared rather than inferred.
+        /// Feather Trap, Root Egg and Smoke Roost. See <see cref="ReportsCastHits"/> for why this
+        /// needs to be declared rather than inferred.
         /// </summary>
-        public virtual bool PlacesZone => false;
+        /// <remarks>
+        /// <b>Derived from the authored <see cref="AreaKind"/> (WP3), no longer a per-ability override.</b> Phase 1 maps
+        /// only <see cref="AreaEffectKind.StaticAoE"/>: Feather Aura is tagged <see cref="AreaEffectKind.Aura"/> but still
+        /// runs on the <c>ChickenController</c> aura triplet and spawns nothing, so counting it here would change its
+        /// cast-hit feedback, the bots' "cast without a target" rule (<c>BotController</c>) and the wiring gate's sweep
+        /// for an ability that has no zone yet. WP4 moves it onto a Caster-anchored zone and widens this to
+        /// <c>AreaKind != None</c> in the same change.
+        /// </remarks>
+        public bool PlacesZone => AreaKind == AreaEffectKind.StaticAoE;
+
+        /// <summary>
+        /// The lasting area this ability creates, built from its own serialized fields; false for
+        /// <see cref="AreaEffectKind.None"/>. Overridden by every ability whose <see cref="AreaKind"/> is not None
+        /// (<c>AreaEffectTypeTests</c> pins both directions and that the spec equals the authored fields).
+        /// </summary>
+        public virtual bool TryGetAreaEffect(out AreaEffectSpec spec)
+        {
+            spec = default;
+            return false;
+        }
 
         /// <summary>
         /// Is <c>AbilityController.LastCastHitCount</c> a meaningful hit-vs-whiff verdict for
