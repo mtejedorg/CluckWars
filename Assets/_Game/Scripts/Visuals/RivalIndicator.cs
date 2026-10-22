@@ -378,7 +378,13 @@ namespace CluckWars.Visuals
                 target = chevron ? ScreenEdgeProjection.TargetViewport(cam, transform.position) : default;
             }
 
-            if (chevron)
+            // Dev prototype (-cw_floorarrows): a rival that would get a chevron is offered to the floor ring round the local
+            // chicken first; if it is represented there, its chevron is suppressed. Off (production): returns false at once.
+            if (chevron && FloorRivalArrows.TryRepresent(GetInstanceID(), transform.position, tint, opacity))
+            {
+                HideChevron(_wasUnderHud, tint, opacity);
+            }
+            else if (chevron)
             {
                 ShowChevron(cam, clamped, bearing, tint, opacity, keepRing: _wasUnderHud);
                 QueueForSpread(cam, clamped, target);
@@ -489,6 +495,21 @@ namespace CluckWars.Visuals
                 _chevronOutline.color = WithAlpha(ChevronOutlineColor, FeedbackTuning.RivalChevronOutlineAlpha * opacity);
             if (!_chevron.gameObject.activeSelf) _chevron.gameObject.SetActive(true);
         }
+
+        /// <summary>The rival is drawn by <see cref="FloorRivalArrows"/> instead: no chevron; the ring only while it is under the
+        /// HUD (partly visible), as <see cref="ShowChevron"/> would have kept it. The nameplate rule (<see cref="HidesNameplate"/>)
+        /// is unchanged.</summary>
+        private void HideChevron(bool keepRing, Color tint, float opacity)
+        {
+            if (keepRing) LightRing(tint, opacity);
+            else if (_ring != null && _ring.gameObject.activeSelf) _ring.gameObject.SetActive(false);
+            if (_chevron != null && _chevron.gameObject.activeSelf) _chevron.gameObject.SetActive(false);
+        }
+
+        /// <summary>The chevron fill / ink-outline sprites, shared with <see cref="FloorRivalArrows"/> so both arrow
+        /// presentations are one shape family.</summary>
+        public static Sprite SharedChevronSprite() => ChevronSprite();
+        public static Sprite SharedChevronOutlineSprite() => ChevronOutlineSprite();
 
         /// <summary>Positions, orients and sizes the chevron at viewport point <paramref name="at"/> pointing along
         /// <paramref name="bearing"/> (viewport axes). Shared by the LateUpdate placement and the spread pass.</summary>

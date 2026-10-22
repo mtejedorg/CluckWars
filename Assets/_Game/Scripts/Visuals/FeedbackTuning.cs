@@ -816,6 +816,41 @@ namespace CluckWars.Visuals
         /// </summary>
         public const float RivalChevronSpacing = 1.2f;
 
+        // ---- Floor rival arrows: DEV PROTOTYPE (-cw_floorarrows), Maestro 2026-10-22 ---------------------------------
+        // "For the arrows, the best and more immersive way is to put them in the outer circle at the floor." A ring on the
+        // ground round the LOCAL chicken with one arrow per hidden rival, compared side by side with the edge chevrons, which
+        // stay the default. Drawn by FloorRivalArrows; the rules are FloorArrowRules. Nothing reads these in production.
+
+        /// <summary>Preferred ring radius, metres (inside the 5.4 m longest reach, outside every chicken-worn ring).</summary>
+        public const float FloorArrowPreferredRadius = 4.5f;
+
+        /// <summary>The ring never exceeds this share of the smallest clear ground extent from the chicken (lateral half-width,
+        /// depth up to the top HUD band, depth down), so it stays in the clear viewport: portrait 4.48 m (lateral 5.6 binds),
+        /// landscape 16:9 3.48 m and 20:9 2.84 m (the top band binds). See FloorArrowRules.RingRadius.</summary>
+        public const float FloorArrowLateralFraction = 0.8f;
+
+        /// <summary>Floor on the radius (nonsense framings only): well outside the rival ring (~1 m) and the identity ring.</summary>
+        public const float FloorArrowMinRadius = 2f;
+
+        /// <summary>Arrow length (metres, the chevron sprite is 1 unit) for a rival just beyond the ring, and far away.</summary>
+        public const float FloorArrowNearSize = 1.0f;
+        public const float FloorArrowFarSize = 0.6f;
+
+        /// <summary>Arrow alpha for a rival just beyond the ring, and far away (times the rival's VisualOpacity).</summary>
+        public const float FloorArrowNearAlpha = 0.95f;
+        public const float FloorArrowFarAlpha = 0.55f;
+
+        /// <summary>Planar distance (metres) at which an arrow reaches its far size / alpha; ~half the 51.3 m arena.</summary>
+        public const float FloorArrowFarDistance = 24f;
+
+        /// <summary>Centre-to-centre spacing between two arrows on the ring, in near-arrow widths (as <see cref="RivalChevronSpacing"/>).</summary>
+        public const float FloorArrowSpacing = 1.2f;
+
+        /// <summary>The ring's stroke (metres) and alpha: a faint cream guide, thinner and dimmer than the ability reach
+        /// outlines (<see cref="AmbientSlotOutlineWidth"/>) so it never reads as one more ability range.</summary>
+        public const float FloorArrowRingWidth = 0.035f;
+        public const float FloorArrowRingAlpha = 0.22f;
+
         // ================================================================
         // Always-on ability reach overlay — AbilitySlotOverlay
         // ================================================================
