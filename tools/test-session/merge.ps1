@@ -392,15 +392,21 @@ foreach ($src in $ctlRejects.Keys) {
 # not-snared> round=<r>` (remote=1: the victim's state authority is not the aura's). (a) Any not-snared verdict is an
 # INVARIANT finding, once per source. (b) Once a `cw_autoaura` peer logged `AutoTest autoaura: cast ...`, the session must
 # hold at least one remote=1 verdict=ok line from some peer: an aura cast into a rival that no peer saw slow is the bug.
+#     Skipped where no remote rival can exist - one source and no remote=1 line at all (solo: every victim is a bot on
+#     the caster's own peer); there a remote=0 verdict=ok is required instead, so solo -AutoAura still proves the slow.
+#     Snared comes from any enemy slow (a Feather Trap too), so ok is weak evidence in a mixed spot; not-snared is strong.
 $rxAuraVerdict = New-Object Text.RegularExpressions.Regex('^Invariant aura owner=(\S+) victim=(\S+) remote=([01]) deep=(\d+) snared=(\d+) verdict=(\S+)')
 $auraCasts = New-Object System.Collections.Generic.List[object]
-$auraRemoteOk = 0
+$auraRemoteOk = 0; $auraLocalOk = 0; $auraRemoteSeen = $false
+$auraSources = @{}
 $auraNotSnared = [ordered]@{}   # src -> @{ Count; First }
 foreach ($e in $sorted) {
     if ($e.Source -eq 'AutoTest' -and $e.Message -match '^AutoTest autoaura: cast ') { $auraCasts.Add($e); continue }
     if ($e.Source -ne 'Invariant') { continue }
+    $auraSources[$e.Src] = 1
     $m = $rxAuraVerdict.Match($e.Message); if (-not $m.Success) { continue }
-    if ($m.Groups[6].Value -eq 'ok' -and $m.Groups[3].Value -eq '1') { $auraRemoteOk++ }
+    if ($m.Groups[3].Value -eq '1') { $auraRemoteSeen = $true }
+    if ($m.Groups[6].Value -eq 'ok') { if ($m.Groups[3].Value -eq '1') { $auraRemoteOk++ } else { $auraLocalOk++ } }
     if ($m.Groups[6].Value -eq 'not-snared') {
         if (-not $auraNotSnared.Contains($e.Src)) { $auraNotSnared[$e.Src] = @{ Count = 0; First = $e } }
         $auraNotSnared[$e.Src].Count++
@@ -410,8 +416,12 @@ foreach ($src in $auraNotSnared.Keys) {
     $r = $auraNotSnared[$src]
     Add-Finding @('INVARIANT') $r.First ("aura victims not slowed on ${src}: $($r.Count) (a rival deep inside a Slow aura without its replicated Snared flag, WP4) - first: $($r.First.Message)")
 }
-if ($auraCasts.Count -gt 0 -and $auraRemoteOk -eq 0) {
+$auraSinglePeer = ($auraSources.Count -le 1) -and -not $auraRemoteSeen
+if ($auraCasts.Count -gt 0 -and -not $auraSinglePeer -and $auraRemoteOk -eq 0) {
     Add-Finding @('INVARIANT') $auraCasts[0] ("autoaura cast $($auraCasts.Count) aura(s) but no peer proved a remote victim slowed (expected >= 1 'Invariant aura ... remote=1 ... verdict=ok', WP4/CW-217) - first: $($auraCasts[0].Message)")
+}
+if ($auraCasts.Count -gt 0 -and $auraSinglePeer -and $auraLocalOk -eq 0) {
+    Add-Finding @('INVARIANT') $auraCasts[0] ("autoaura cast $($auraCasts.Count) aura(s) in a single-peer session but no victim was proven slowed (expected >= 1 'Invariant aura ... verdict=ok'; no remote rival exists here, WP4) - first: $($auraCasts[0].Message)")
 }
 
 # ---- World-hash parity (CW-216/217 class: spawned objects positioned differently per peer) ---------------------

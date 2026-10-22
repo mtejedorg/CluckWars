@@ -31,13 +31,20 @@ namespace CluckWars.Visuals
         /// arrows of rivals "up" the screen under the band, the one place a hidden rival's arrow must not be. The same 0.8 share
         /// of every clear extent keeps the whole ring in the clear viewport: 3.48 m at 16:9, 2.84 m at 20:9
         /// (<c>FloorRivalArrowsTests.RingRadius_PerAspectTable</c>).</para>
+        /// <para>Iteration 2 (qa): the corner CONTROL zones (joystick, hex buttons, desktop strip) are a fourth extent,
+        /// <paramref name="controlDistance"/> = ground distance from the chicken to the nearest one, under the same 0.8 share, so
+        /// the ring never runs under a thumb. On phones it does not bind (>= 6.7 m at 16:9, >= 10 m in portrait); on a 4:3
+        /// touch tablet the hex cluster is 4.63 m away and it does (3.70 m instead of 4.22). The status strip is NOT in it:
+        /// its rows come and go, and the radius must not jump with them (arrows avoid it one by one, <see cref="FitAlongRay"/>).</para>
         /// </remarks>
-        public static float RingRadius(float lateralHalfExtent, float clearDepthUp, float clearDepthDown)
+        public static float RingRadius(float lateralHalfExtent, float clearDepthUp, float clearDepthDown,
+                                       float controlDistance = float.PositiveInfinity)
         {
             if (!(lateralHalfExtent > 0f)) return FeedbackTuning.FloorArrowPreferredRadius;
             float up = clearDepthUp >= 0f ? clearDepthUp : 0f;       // NaN / negative: no room
             float down = clearDepthDown >= 0f ? clearDepthDown : 0f;
-            float extent = Mathf.Min(lateralHalfExtent, Mathf.Min(up, down));
+            float controls = controlDistance >= 0f ? controlDistance : 0f;
+            float extent = Mathf.Min(Mathf.Min(lateralHalfExtent, controls), Mathf.Min(up, down));
             float r = Mathf.Min(FeedbackTuning.FloorArrowPreferredRadius, FeedbackTuning.FloorArrowLateralFraction * extent);
             return Mathf.Max(FeedbackTuning.FloorArrowMinRadius, r);
         }
@@ -46,22 +53,130 @@ namespace CluckWars.Visuals
         /// The ring radius for the match camera's framing: orthographic size <paramref name="orthoSize"/> at
         /// <paramref name="aspect"/> and <paramref name="pitchDegrees"/>, the chicken drawn at the framing's own focus height
         /// (<see cref="OrientationFraming.PortraitFocusViewportYAt"/> in portrait, 0.5 in landscape: the nominal value, so the
-        /// radius does not wobble while the follow smooths), and the clear band left by <paramref name="infoZones"/>
-        /// (<see cref="ScreenEdgeProjection.ClearBand"/>, the same cut the edge chevrons use).
+        /// radius does not wobble while the follow smooths), the clear band left by <paramref name="infoZones"/>
+        /// (<see cref="ScreenEdgeProjection.ClearBand"/>, the same cut the edge chevrons use) and the HUD
+        /// <paramref name="controlZones"/> (<see cref="HudControlZones.Current"/>), all viewport rects.
         /// </summary>
         public static float FramingRadius(float aspect, float orthoSize, float pitchDegrees,
-                                          System.Collections.Generic.IReadOnlyList<Rect> infoZones)
+                                          System.Collections.Generic.IReadOnlyList<Rect> infoZones,
+                                          System.Collections.Generic.IReadOnlyList<Rect> controlZones = null)
         {
             if (!(aspect > 0f) || !(orthoSize > 0f)) return FeedbackTuning.FloorArrowPreferredRadius;
             float fy = aspect < 1f ? OrientationFraming.PortraitFocusViewportYAt(aspect) : 0.5f;
             Rect clear = ScreenEdgeProjection.ClearBand(new Rect(0f, 0f, 1f, 1f), infoZones, Vector2.zero);
             float metresPerViewport = GroundMetresPerViewportHeight(orthoSize, pitchDegrees);
-            return RingRadius(orthoSize * aspect, (clear.yMax - fy) * metresPerViewport, (fy - clear.yMin) * metresPerViewport);
+            float lateral = orthoSize * aspect;
+
+            float controls = float.PositiveInfinity;
+            if (controlZones != null)
+            {
+                for (int i = 0; i < controlZones.Count; i++)
+                {
+                    Rect z = controlZones[i];
+                    // The zone in ground metres round the chicken: x lateral (2L per viewport width), y depth.
+                    var g = Rect.MinMaxRect((z.xMin - 0.5f) * 2f * lateral, (z.yMin - fy) * metresPerViewport,
+                                            (z.xMax - 0.5f) * 2f * lateral, (z.yMax - fy) * metresPerViewport);
+                    float dx = Mathf.Max(0f, Mathf.Max(g.xMin, -g.xMax));
+                    float dy = Mathf.Max(0f, Mathf.Max(g.yMin, -g.yMax));
+                    controls = Mathf.Min(controls, Mathf.Sqrt(dx * dx + dy * dy));
+                }
+            }
+            return RingRadius(lateral, (clear.yMax - fy) * metresPerViewport, (fy - clear.yMin) * metresPerViewport, controls);
         }
+
+        // ── Screen space ("screen metres") ─────────────────────────────────────────────────────
+        // The arrows are sized and fitted on SCREEN, in screen metres: x = lateral ground metres, y = ground depth x sin(pitch),
+        // origin at the local chicken's feet, so one unit is the same number of pixels both ways (H / 2s). A ground ring of
+        // radius R is the ellipse (R, R sin(pitch)) here, and an arrow drawn undistorted here is what the player sees.
+
+        /// <summary>Unit screen direction of a ground bearing <paramref name="relativeBearingDeg"/> measured from the camera's
+        /// ground-forward (bearing minus camera yaw): (sin b, cos b x sin(pitch)), normalised. The arrow is drawn along this, so it
+        /// points where the rival really is on screen, not along the unprojected ground angle.</summary>
+        public static Vector2 ScreenDirection(float relativeBearingDeg, float pitchDegrees)
+        {
+            float b = relativeBearingDeg * Mathf.Deg2Rad;
+            var d = new Vector2(Mathf.Sin(b), Mathf.Cos(b) * SinPitch(pitchDegrees));
+            return d.sqrMagnitude < 1e-12f ? Vector2.up : d.normalized;
+        }
+
+        /// <summary>The ring point at <paramref name="relativeBearingDeg"/>, screen metres from the chicken's feet.</summary>
+        public static Vector2 ScreenRingPoint(float relativeBearingDeg, float radius, float pitchDegrees)
+        {
+            float b = relativeBearingDeg * Mathf.Deg2Rad;
+            return new Vector2(Mathf.Sin(b) * radius, Mathf.Cos(b) * radius * SinPitch(pitchDegrees));
+        }
+
+        /// <summary>Screen metres back to ground metres: (lateral, depth along the camera's ground-forward).</summary>
+        public static Vector2 ScreenToGround(Vector2 screen, float pitchDegrees) =>
+            new Vector2(screen.x, screen.y / SinPitch(pitchDegrees));
+
+        /// <summary>The ground stretch along the camera's ground-forward that makes a flat arrow read undistorted: 1 / sin(pitch)
+        /// (2 at 30 degrees). Without it an arrow pointing up or down the screen looks half as long as a sideways one.</summary>
+        public static float DepthStretch(float pitchDegrees) => 1f / SinPitch(pitchDegrees);
+
+        /// <summary>A viewport rect in screen metres round a chicken drawn at viewport <paramref name="focus"/>.</summary>
+        public static Rect ViewportToScreenMetres(Rect viewport, Vector2 focus, float orthoSize, float aspect)
+        {
+            float k = 2f * orthoSize;   // screen metres per viewport height
+            return Rect.MinMaxRect((viewport.xMin - focus.x) * k * aspect, (viewport.yMin - focus.y) * k,
+                                   (viewport.xMax - focus.x) * k * aspect, (viewport.yMax - focus.y) * k);
+        }
+
+        /// <summary>
+        /// Fits an arrow on the screen ray p(t) = <paramref name="centre"/> + t <paramref name="dir"/> (screen metres, unit dir):
+        /// the largest length up to <paramref name="desiredSize"/> whose whole extent stays inside <paramref name="frame"/> and
+        /// out of every obstacle (HUD zones, the chicken's own body), centred as close to the ring point (t = 0) as the free
+        /// stretch allows. Returns the length; <paramref name="offset"/> is the centre's t. Never below
+        /// <see cref="FeedbackTuning.FloorArrowMinSize"/>: with no room the arrow overlaps rather than disappears, and a ring
+        /// point inside an obstacle keeps it at t = 0 at the minimum size.
+        /// </summary>
+        public static float FitAlongRay(Vector2 centre, Vector2 dir, float desiredSize, Rect frame,
+                                        Rect[] obstacles, int obstacleCount, out float offset)
+        {
+            offset = 0f;
+            float min = Mathf.Min(FeedbackTuning.FloorArrowMinSize, desiredSize);
+            if (!Slab(centre, dir, frame, out float tMin, out float tMax)) return min;
+
+            for (int i = 0; i < obstacleCount; i++)
+            {
+                if (!Slab(centre, dir, obstacles[i], out float enter, out float exit)) continue;
+                if (enter > 0f) tMax = Mathf.Min(tMax, enter);
+                else if (exit < 0f) tMin = Mathf.Max(tMin, exit);
+                else return min;   // the ring point itself is covered
+            }
+
+            float room = tMax - tMin;
+            if (room <= min) { offset = 0.5f * (tMin + tMax); return min; }
+            float size = Mathf.Min(desiredSize, room);
+            float h = 0.5f * size;
+            offset = Mathf.Clamp(0f, tMin + h, tMax - h);
+            return size;
+        }
+
+        /// <summary>Parameter interval [enter, exit] of the line p(t) = c + t d inside rect <paramref name="r"/>; false if it misses.</summary>
+        private static bool Slab(Vector2 c, Vector2 d, Rect r, out float enter, out float exit)
+        {
+            enter = float.NegativeInfinity;
+            exit = float.PositiveInfinity;
+            if (!Axis(c.x, d.x, r.xMin, r.xMax, ref enter, ref exit)) return false;
+            if (!Axis(c.y, d.y, r.yMin, r.yMax, ref enter, ref exit)) return false;
+            return enter <= exit;
+        }
+
+        private static bool Axis(float c, float d, float min, float max, ref float enter, ref float exit)
+        {
+            if (Mathf.Abs(d) < 1e-9f) return c >= min && c <= max;
+            float t1 = (min - c) / d, t2 = (max - c) / d;
+            enter = Mathf.Max(enter, Mathf.Min(t1, t2));
+            exit = Mathf.Min(exit, Mathf.Max(t1, t2));
+            return true;
+        }
+
+        private static float SinPitch(float pitchDegrees) => Mathf.Sin(Mathf.Clamp(pitchDegrees, 1f, 89f) * Mathf.Deg2Rad);
 
         /// <summary>Ground depth covered by one full viewport height of a pitched orthographic camera: 2s / sin(pitch).</summary>
         public static float GroundMetresPerViewportHeight(float orthoSize, float pitchDegrees) =>
-            2f * orthoSize / Mathf.Sin(Mathf.Clamp(pitchDegrees, 1f, 89f) * Mathf.Deg2Rad);
+            2f * orthoSize / SinPitch(pitchDegrees);
 
         // ── Bearing and ring point ─────────────────────────────────────────────────────────────
 
@@ -125,9 +240,11 @@ namespace CluckWars.Visuals
         // ── Angular de-overlap ─────────────────────────────────────────────────────────────────
 
         /// <summary>Minimum angular separation, degrees, between two arrow centres on a ring of <paramref name="ringRadius"/>:
-        /// the largest arrow's width times <see cref="FeedbackTuning.FloorArrowSpacing"/>, as an arc.</summary>
+        /// the largest arrow's width (<see cref="FeedbackTuning.FloorArrowWidthRatio"/> of its length) times
+        /// <see cref="FeedbackTuning.FloorArrowSpacing"/>, as an arc: ~26 degrees at 4.48 m, ~41 at 2.84 m.</summary>
         public static float MinSeparationDegrees(float ringRadius) =>
-            FeedbackTuning.FloorArrowNearSize * FeedbackTuning.FloorArrowSpacing / Mathf.Max(0.5f, ringRadius) * Mathf.Rad2Deg;
+            FeedbackTuning.FloorArrowNearSize * FeedbackTuning.FloorArrowWidthRatio * FeedbackTuning.FloorArrowSpacing
+            / Mathf.Max(0.5f, ringRadius) * Mathf.Rad2Deg;
 
         /// <summary>Largest count <see cref="Spread"/> accepts (the 4-seat ceiling's three rivals).</summary>
         public const int MaxArrows = 3;

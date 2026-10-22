@@ -160,6 +160,21 @@ namespace CluckWars.Gameplay
                 available, available ? owner.transform.position : default, out center);
         }
 
+        /// <summary>
+        /// A live aura of <paramref name="owner"/> that ends with <paramref name="slot"/> exists on this peer
+        /// (<see cref="AreaEffectRules.BlocksRecast"/>). Read on the caster's authority, where its own zones are spawned.
+        /// </summary>
+        public static bool HasLiveAuraFrom(NetworkBehaviourId owner, int slot)
+        {
+            for (int i = 0; i < ActiveZones.Count; i++)
+            {
+                var z = ActiveZones[i];
+                if (z == null || z.Object == null || !z.Object.IsValid) continue;
+                if (AreaEffectRules.BlocksRecast(z.Anchor, z.OwnerChicken == owner, z.SourceSlot, slot)) return true;
+            }
+            return false;
+        }
+
         /// <summary>The owner resolves on this peer, is live, and has not been removed from the match.</summary>
         private bool TryGetAvailableOwner(out ChickenController owner)
         {
@@ -201,7 +216,7 @@ namespace CluckWars.Gameplay
             public Vector3 CasterAtSpawn;
             public float SpawnDrift;
             public float CasterDriftSpeed;     // m/s at first sight; prices the late-joiner extension (qa W1)
-            public bool FirstSeenAtJoin;       // first seen within JoinWindowSeconds of this peer's own join (local)
+            public bool InJoinSnapshot;        // part of this peer's initial snapshot (local Spawned tick <= join tick)
             public float RemainingAtFirstSight;// the networked LifetimeTimer then (attacker-writable; -1 = unknown)
             public float FirstSeenAt;          // Time.realtimeSinceStartup
             public float DespawnedAt;          // records only
@@ -223,9 +238,10 @@ namespace CluckWars.Gameplay
             _seen.FirstSeenAt = Time.realtimeSinceStartup;
             _seen.Owner       = OwnerChicken;
             _seen.Authority   = Object != null ? Object.StateAuthority : default;
-            // Late joiner (qa W1): an egg already in this peer's first snapshot may be up to a lifetime old. The join
-            // moment is local; the remaining time is the zone's own claim, priced by ControlClaimRules.AgeAtFirstSight.
-            _seen.FirstSeenAtJoin = LocalJoinClock.SecondsSinceJoin(Runner) <= ControlClaimRules.JoinWindowSeconds;
+            // Late joiner (qa W1): an egg in this peer's initial snapshot may be up to a lifetime old. The join tick and
+            // this Spawned's tick are local; the remaining time is the zone's own claim, priced (and capped) by
+            // ControlClaimRules.LateJoinDrift. _spawnTick is this peer's Spawned tick (set just above in Spawned).
+            _seen.InJoinSnapshot = LocalJoinClock.InJoinSnapshot(Runner, _spawnTick);
             _seen.RemainingAtFirstSight = Runner != null ? (LifetimeTimer.RemainingTime(Runner) ?? -1f) : -1f;
             RefreshRootGeometry();
             if (Runner != null && Runner.TryFindBehaviour(OwnerChicken, out ChickenController caster) &&
@@ -299,7 +315,7 @@ namespace CluckWars.Gameplay
                 CasterAtSpawn = s.CasterAtSpawn,
                 SpawnDrift = s.SpawnDrift,
                 SecondsSinceSeen = now - s.FirstSeenAt,
-                FirstSeenAtJoin = s.FirstSeenAtJoin,
+                InJoinSnapshot = s.InJoinSnapshot,
                 RemainingAtFirstSight = s.RemainingAtFirstSight,
                 CasterDriftSpeed = s.CasterDriftSpeed,
             };

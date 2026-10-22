@@ -251,6 +251,42 @@ namespace CluckWars.Visuals
             return _sharedSolidLine;
         }
 
+        /// <summary>URP's own unlit sprite shader: one pass with no LightMode tag (drawn by the Universal Renderer's
+        /// SRPDefaultUnlit pass), transparent, reads <c>_MainTex</c> (which SpriteRenderer binds) and the vertex colour (which
+        /// SpriteRenderer.color and LineRenderer colours write). It ships with URP and is the project's default sprite / unlit
+        /// material in <c>UniversalRenderPipelineGlobalSettings</c>.</summary>
+        public const string UrpUnlitSpriteShader = "Universal Render Pipeline/2D/Sprite-Unlit-Default";
+
+        private static Material _sharedUnlitSprite;
+        private static bool _reportedSpriteFallback;
+
+        /// <summary>
+        /// One shared URP unlit transparent material for flat world sprites and lines that take their colour per vertex
+        /// (<see cref="FloorRivalArrows"/>). Prefers <see cref="UrpUnlitSpriteShader"/>; if a player build stripped it, falls back
+        /// to <see cref="BuildLineMaterial"/>'s chain (Sprites/Default, what every telegraph already draws with) and says so
+        /// once as a Warn; if that is missing too, its own once-per-session Error fires and this returns null.
+        /// </summary>
+        public static Material SharedUnlitSpriteMaterial(ILogService log)
+        {
+            if (_sharedUnlitSprite == null) _sharedUnlitSprite = CreateUnlitSpriteMaterial(Shader.Find, log);
+            return _sharedUnlitSprite;
+        }
+
+        /// <summary>Test seam of <see cref="SharedUnlitSpriteMaterial"/>: <paramref name="find"/> stands in for <c>Shader.Find</c>.</summary>
+        public static Material CreateUnlitSpriteMaterial(System.Func<string, Shader> find, ILogService log)
+        {
+            Shader urp = find(UrpUnlitSpriteShader);
+            if (urp != null) return new Material(urp);
+
+            if (!_reportedSpriteFallback)
+            {
+                _reportedSpriteFallback = true;
+                log?.Warn("TelegraphShapes", $"'{UrpUnlitSpriteShader}' is not in this build: floor arrows fall back to the " +
+                    "telegraph line material (Sprites/Default). Add it to Always Included Shaders to use the URP shader.");
+            }
+            return CreateLineMaterial(find, log);
+        }
+
         /// <summary>Clears the statics between Editor play sessions (domain reload may be off): a destroyed shared material
         /// would otherwise be handed out, and the once-per-session report would never fire again.</summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -258,6 +294,8 @@ namespace CluckWars.Visuals
         {
             _reportedNoLineShader = false;
             _sharedSolidLine = null;
+            _reportedSpriteFallback = false;
+            _sharedUnlitSprite = null;
         }
 
         /// <summary>Test seam: forget the once-per-session report and the shared material.</summary>
@@ -266,6 +304,9 @@ namespace CluckWars.Visuals
             _reportedNoLineShader = false;
             if (_sharedSolidLine != null) Object.DestroyImmediate(_sharedSolidLine);
             _sharedSolidLine = null;
+            _reportedSpriteFallback = false;
+            if (_sharedUnlitSprite != null) Object.DestroyImmediate(_sharedUnlitSprite);
+            _sharedUnlitSprite = null;
         }
 
         /// <summary>Builds a world-space ground LineRenderer, mirroring

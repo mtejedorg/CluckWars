@@ -404,27 +404,52 @@ namespace CluckWars.Tests
             zone.CasterAtSpawn = casterAtJoin;
             zone.CasterDriftSpeed = 12.15f;
             zone.SpawnDrift = 12.15f * 0.2f;
-            zone.FirstSeenAtJoin = true;
+            zone.InJoinSnapshot = true;
             zone.RemainingAtFirstSight = c.MaxZoneLifetime - age;
             zone.SecondsSinceSeen = 0.3f;
             return zone;
         }
 
         [Test]
-        public void RootZone_SeenAtJoin_AllowsTheCastersDriftOverTheEggsAge()
+        public void RootZone_InTheJoinSnapshot_AllowsTheCastersDriftOverTheEggsAge()
         {
-            // qa W1: the egg was placed 3 s before this peer joined; its caster ran 20 m since. Before, the anchor was where
-            // the caster stood at the join with only latency drift, so this honest egg could never vouch here.
+            // qa W1: the egg was placed 3 s before this peer joined; its caster walked 10 m since. Before, the anchor was
+            // where the caster stood at the join with only latency drift, so this honest egg could never vouch here.
             var c = Shipped(ControlKind.Root);
             var egg = new Vector3(2f, 0f, 2f);
-            var zone = LateJoinerZone(3f, egg, egg + new Vector3(20f, 0f, 0f), c);
+            var zone = LateJoinerZone(3f, egg, egg + new Vector3(10f, 0f, 0f), c);
             var victim = egg + new Vector3(0.5f, 0f, 0f);
             Assert.AreEqual(3f, ControlClaimRules.AgeAtFirstSight(zone, c), 1e-4f);
-            Assert.IsTrue(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, c), "honest late-joiner case accepted");
+            Assert.IsTrue(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, c), "honest pre-join egg, in-range claim: accepted");
 
-            zone.FirstSeenAtJoin = false;   // a peer that was already in the match: no extension, ever
+            zone.InJoinSnapshot = false;   // spawned after this peer joined, or a peer already in the match: no extension
             Assert.AreEqual(0f, ControlClaimRules.AgeAtFirstSight(zone, c));
+            Assert.AreEqual(0f, ControlClaimRules.LateJoinDrift(zone, c));
             Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, c));
+        }
+
+        [Test]
+        public void RootZone_LateJoinDrift_IsCapped_WhateverAgeTheTimerClaims()
+        {
+            // Security review: the timer is the zone owner's; 7.5 s at 12.15 m/s would have bought 91 m.
+            var c = Shipped(ControlKind.Root);
+            var egg = new Vector3(2f, 0f, 2f);
+            var victim = egg + new Vector3(0.5f, 0f, 0f);
+            var inflated = LateJoinerZone(7.5f, egg, egg + new Vector3(30f, 0f, 0f), c);
+            Assert.AreEqual(ControlClaimRules.LateJoinDriftCapMeters, ControlClaimRules.LateJoinDrift(inflated, c), 1e-4f);
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(inflated, victim, 0.5f, c), "30 m away: beyond the cap");
+            inflated.CasterAtSpawn = egg + new Vector3(ControlClaimRules.LateJoinDriftCapMeters + 0.5f, 0f, 0f);
+            Assert.IsTrue(ControlClaimRules.RootZoneVouches(inflated, victim, 0.5f, c), "the most an inflated claim buys is the cap (+ slack, spawn drift)");
+            Assert.LessOrEqual(ControlClaimRules.LateJoinDriftCapMeters, 12f, "a quarter of the arena at most; see its remarks");
+        }
+
+        [Test]
+        public void JoinSnapshot_IsTickBased_OnlyZonesSeenAtOrBeforeTheJoinTick()
+        {
+            Assert.IsTrue(LocalJoinClock.IsInJoinSnapshot(firstSeenTick: 4000, joinTick: 4000), "delivered with the initial snapshot");
+            Assert.IsTrue(LocalJoinClock.IsInJoinSnapshot(3990, 4000));
+            Assert.IsFalse(LocalJoinClock.IsInJoinSnapshot(4001, 4000), "spawned after the join: no extension");
+            Assert.IsFalse(LocalJoinClock.InJoinSnapshot(null, 0), "no runner: no extension");
         }
 
         [Test]
@@ -466,8 +491,11 @@ namespace CluckWars.Tests
         {
             const string zonePath = "Assets/_Game/Scripts/Gameplay/AbilityZone.cs";
             string capture = AssassinExecuteCreditTests.MethodBody(zonePath, "private void CaptureRootEvidence()");
-            StringAssert.Contains("LocalJoinClock.SecondsSinceJoin(Runner) <= ControlClaimRules.JoinWindowSeconds", capture,
-                "the late-joiner extension keys on this peer's own join, never on replicated state");
+            StringAssert.Contains("_seen.InJoinSnapshot = LocalJoinClock.InJoinSnapshot(Runner, _spawnTick);", capture,
+                "the late-joiner extension keys on this peer's own join tick, never on replicated state");
+            string spawned = AssassinExecuteCreditTests.MethodBody(zonePath, "public override void Spawned()");
+            Assert.Less(spawned.IndexOf("_spawnTick = Runner.Tick.Raw;", StringComparison.Ordinal),
+                        spawned.IndexOf("CaptureRootEvidence();", StringComparison.Ordinal), "the capture reads this life's Spawned tick");
             StringAssert.Contains("LifetimeTimer.RemainingTime(Runner) ?? -1f", capture);
             StringAssert.Contains("_seen.CasterDriftSpeed = ChickenCargo.DriftSpeed(caster);", capture);
             StringAssert.Contains("LocalJoinClock.Note(Runner);", AssassinExecuteCreditTests.MethodBody(zonePath, "public override void Spawned()"));

@@ -336,6 +336,11 @@ namespace CluckWars.Diagnostics
                         v.Victim = Label(c);
                         v.Remote = c.Object.StateAuthority != z.Object.StateAuthority;
                     }
+                    // Snared is "slowed by ANY enemy-agency source" (zones, auras, Dust Kick's timed slow), not "slowed by
+                    // THIS aura": a victim also standing in a Feather Trap reads Snared either way. So verdict=ok is weak
+                    // evidence in a mixed situation; not-snared is strong (deep inside, no enemy slow at all). The merge
+                    // rule therefore asks for a remote=1 ok from a session where a cw_autoaura peer cast into a rival on
+                    // purpose, not from any aura line.
                     v.Tally = RoundInvariants.SampleAuraVictim(v.Tally, deep, (c.ControlFlags & ControlVfx.Snared) != 0, now);
                     _auraVictims[key] = v;
                 }

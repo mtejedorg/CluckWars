@@ -269,7 +269,7 @@ namespace CluckWars.Tests
         {
             string src = Read("Assets/_Game/Scripts/Gameplay/AbilityController.cs");
             int fizzle = src.IndexOf("_fizzlePending = true;", StringComparison.Ordinal);
-            int canActivate = src.IndexOf("if (!ability.CanActivate(_ctx))", StringComparison.Ordinal);
+            int canActivate = src.IndexOf("canActivate = ability.CanActivate(_ctx);", StringComparison.Ordinal);
             int call = src.IndexOf("EndStealthAndPeckForCast(slot);", StringComparison.Ordinal);
             int onActivate = src.IndexOf("ability.OnActivate(_ctx);", StringComparison.Ordinal);
             int mask = src.IndexOf("ActiveMask = AbilityRunRules.Begin(ActiveMask, slot);", StringComparison.Ordinal);

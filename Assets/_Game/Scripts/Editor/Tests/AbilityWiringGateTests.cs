@@ -69,7 +69,9 @@ namespace CluckWars.Tests
             // Controller is null throughout: none of CanSpawnZone, and none of the three
             // CanActivate overrides, touch it. Log is null too, so the Error lines those
             // overrides emit no-op via ctx.Log?. rather than needing a fake logger.
-            return new AbilityContext(null) { Runner = runner, PrefabRegistry = registry };
+            // Slot is set the way AbilityController.TryActivate sets it around CanActivate (an Aura's spec refuses a
+            // cast with no valid slot, since it ends with that slot).
+            return new AbilityContext(null) { Runner = runner, PrefabRegistry = registry, Slot = 1 };
         }
 
         private PrefabRegistrySO RegistryWithZone()

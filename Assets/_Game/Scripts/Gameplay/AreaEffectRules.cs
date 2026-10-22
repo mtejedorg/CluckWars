@@ -76,6 +76,16 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
+        /// No overlapping auras (WP4 qa): a live Caster zone that ends with slot <paramref name="zoneSlot"/> of the same
+        /// owner blocks a new cast from that slot. Needed because a running slot refuses a re-cast but the zone only
+        /// notices its slot ended on its own next authority tick: a cooldown shorter than the aura (Relentless can take
+        /// any cooldown to x0.25) could re-activate the slot first, and the old zone would then see "slot active" and
+        /// live on to its lifetime backstop beside the new one. The refusal lasts at most that one tick.
+        /// </summary>
+        public static bool BlocksRecast(ZoneAnchor anchor, bool sameOwner, byte zoneSlot, int castSlot) =>
+            anchor == ZoneAnchor.Caster && sameOwner && zoneSlot != NoSourceSlot && zoneSlot == castSlot;
+
+        /// <summary>
         /// Whether, and why, the zone's authority despawns it this tick (after the B10 round-reset check, which runs
         /// first). Lifetime and consumption are every zone's; the owner and slot rules are a Caster zone's only.
         /// </summary>

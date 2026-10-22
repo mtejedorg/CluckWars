@@ -825,20 +825,41 @@ namespace CluckWars.Visuals
         public const float FloorArrowPreferredRadius = 4.5f;
 
         /// <summary>The ring never exceeds this share of the smallest clear ground extent from the chicken (lateral half-width,
-        /// depth up to the top HUD band, depth down), so it stays in the clear viewport: portrait 4.48 m (lateral 5.6 binds),
-        /// landscape 16:9 3.48 m and 20:9 2.84 m (the top band binds). See FloorArrowRules.RingRadius.</summary>
+        /// depth up to the top HUD band, depth down, distance to the nearest HUD control), so it stays in the clear viewport and
+        /// off the controls: portrait 4.48 m (lateral 5.6 binds), landscape 16:9 3.48 m and 20:9 2.84 m (the top band binds),
+        /// 4:3 touch 3.70 m (the hexes bind). See FloorArrowRules.RingRadius.</summary>
         public const float FloorArrowLateralFraction = 0.8f;
 
         /// <summary>Floor on the radius (nonsense framings only): well outside the rival ring (~1 m) and the identity ring.</summary>
         public const float FloorArrowMinRadius = 2f;
 
-        /// <summary>Arrow length (metres, the chevron sprite is 1 unit) for a rival just beyond the ring, and far away.</summary>
-        public const float FloorArrowNearSize = 1.0f;
-        public const float FloorArrowFarSize = 0.6f;
+        /// <summary>Arrow length on SCREEN, in screen metres (1 = one metre of ground seen side-on; the chevron sprite is 1 unit),
+        /// for a rival just beyond the ring, and far away. Iteration 2 (2026-10-22 A/B shots: 1.0 / 0.6 read as specks).
+        /// Up / down arrows are depth-stretched by 1 / sin(pitch) so they read as long as sideways ones.</summary>
+        public const float FloorArrowNearSize = 2.0f;
+        public const float FloorArrowFarSize = 1.2f;
+
+        /// <summary>An arrow squeezed by the HUD or its own chicken (FloorArrowRules.FitAlongRay) never drops below this; it
+        /// overlaps rather than vanishes. Landscape up-arrows land near it: 16:9 leaves ~1.1 m between head and top band.</summary>
+        public const float FloorArrowMinSize = 0.9f;
+
+        /// <summary>Arrow width / length (the chevron's base, <c>RivalIndicator.ChevronFill</c>: 2 x 0.42).</summary>
+        public const float FloorArrowWidthRatio = 0.84f;
 
         /// <summary>Arrow alpha for a rival just beyond the ring, and far away (times the rival's VisualOpacity).</summary>
         public const float FloorArrowNearAlpha = 0.95f;
-        public const float FloorArrowFarAlpha = 0.55f;
+        public const float FloorArrowFarAlpha = 0.75f;
+
+        /// <summary>Ink outline width as a share of the arrow's length: about twice the chevron's
+        /// (<see cref="RivalChevronOutlineRatio"/>), drawn at full <see cref="RivalChevronOutlineAlpha"/> whatever the distance.</summary>
+        public const float FloorArrowOutlineRatio = 0.05f;
+
+        /// <summary>Screen-metre gap kept between an arrow and the frame edge.</summary>
+        public const float FloorArrowEdgeMargin = 0.25f;
+
+        /// <summary>The local chicken's own body on screen, screen metres round its feet (x left/right, y down/up): an arrow
+        /// never overlaps it (the bird is ~1 m tall, ~0.9 screen m at 30 degrees, plus its nameplate's lower edge).</summary>
+        public static readonly Rect FloorArrowBodyRect = Rect.MinMaxRect(-0.6f, -0.4f, 0.6f, 1.1f);
 
         /// <summary>Planar distance (metres) at which an arrow reaches its far size / alpha; ~half the 51.3 m arena.</summary>
         public const float FloorArrowFarDistance = 24f;
@@ -846,10 +867,14 @@ namespace CluckWars.Visuals
         /// <summary>Centre-to-centre spacing between two arrows on the ring, in near-arrow widths (as <see cref="RivalChevronSpacing"/>).</summary>
         public const float FloorArrowSpacing = 1.2f;
 
-        /// <summary>The ring's stroke (metres) and alpha: a faint cream guide, thinner and dimmer than the ability reach
-        /// outlines (<see cref="AmbientSlotOutlineWidth"/>) so it never reads as one more ability range.</summary>
-        public const float FloorArrowRingWidth = 0.035f;
-        public const float FloorArrowRingAlpha = 0.22f;
+        /// <summary>The ring's stroke (metres) and alpha, drawn only while an arrow shows. Iteration 2: 0.035 / 0.22 cream
+        /// barely read; now heavier than the ambient reach outlines (<see cref="AmbientSlotOutlineWidth"/> 0.06) and in a
+        /// cool white (<see cref="FloorArrowRingColor"/>) so it never reads as the yellow ability range ring.</summary>
+        public const float FloorArrowRingWidth = 0.09f;
+        public const float FloorArrowRingAlpha = 0.5f;
+
+        /// <summary>Cool white, blue-leaning: parts from the yellow / accent ability outlines and from the cream rival rim.</summary>
+        public static readonly Color FloorArrowRingColor = new Color(0.82f, 0.93f, 1.00f, 1f);
 
         // ================================================================
         // Always-on ability reach overlay — AbilitySlotOverlay

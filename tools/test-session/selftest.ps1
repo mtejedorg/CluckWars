@@ -186,7 +186,7 @@ Assert ($f9 -match 'INVARIANT=0') 'F4 clean: INVARIANT=0'
 Remove-Item $tmp9 -Recurse -Force
 
 # ---- Remote aura victim (WP4): a rival deep inside a Slow aura must carry the replicated Snared flag on every peer ----
-foreach ($fx in @('aura-victim-fixture', 'aura-unproven-fixture', 'aura-victim-clean-fixture')) {
+foreach ($fx in @('aura-victim-fixture', 'aura-unproven-fixture', 'aura-victim-clean-fixture', 'aura-solo-fixture', 'aura-solo-unproven-fixture')) {
     $ta = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-av-' + [Guid]::NewGuid().ToString('N'))
     Copy-Item (Join-Path $PSScriptRoot "fixtures\$fx") $ta -Recurse
     & (Join-Path $PSScriptRoot 'merge.ps1') -Session $ta | Out-Null
@@ -201,6 +201,14 @@ foreach ($fx in @('aura-victim-fixture', 'aura-unproven-fixture', 'aura-victim-c
         'aura-unproven-fixture' {
             Assert ((Count $fa '\[INVARIANT\] autoaura cast 1 aura\(s\) but no peer proved a remote victim slowed') -eq 1) 'WP4: an aura cast with only too-few / local verdicts IS flagged (no evidence is not a pass)'
             Assert ($fa -match 'INVARIANT=1') 'WP4 unproven: exactly one INVARIANT finding'
+        }
+        'aura-solo-fixture' {
+            Assert ($fa -notmatch 'no peer proved a remote victim|no victim was proven slowed') 'WP4 solo: one peer, every victim a local bot (remote=0) -> the remote rule is skipped, a remote=0 ok suffices'
+            Assert ($fa -match 'INVARIANT=0') 'WP4 solo: INVARIANT=0'
+        }
+        'aura-solo-unproven-fixture' {
+            Assert ((Count $fa '\[INVARIANT\] autoaura cast 1 aura\(s\) in a single-peer session but no victim was proven slowed') -eq 1) 'WP4 solo: an aura cast with only a too-few brush IS flagged'
+            Assert ($fa -match 'INVARIANT=1') 'WP4 solo unproven: exactly one INVARIANT finding'
         }
         default {
             Assert ($fa -notmatch 'aura victims not slowed|no peer proved a remote victim') 'WP4 clean: remote=1 verdict=ok on two peers, a too-few brush -> no finding'

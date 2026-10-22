@@ -24,9 +24,12 @@ namespace CluckWars.Abilities
     /// including the rivals already inside when it was cast (Maestro's rule), from <c>AbilityZone.Render</c>.
     /// </para>
     /// <para>
-    /// <b>No overlapping auras:</b> <c>Cooldown</c> (7 s) is longer than <c>Duration</c> (3 s) and the cooldown starts
-    /// with the cast, so a second aura from the same caster cannot start while the first lives
-    /// (<c>FeatherAuraZoneTests.Cooldown_OutlastsTheAura</c>). Bots need no "aura already up" guard for the same reason.
+    /// <b>No overlapping auras, explicitly:</b> <see cref="CanActivate"/> refuses while a live aura of this caster still
+    /// ends with this slot (<see cref="AreaEffectRules.BlocksRecast"/>). The shipped numbers would already prevent it
+    /// (Cooldown 7 s &gt; Duration 3 s, and a running slot refuses a re-cast), but a cooldown passive can shorten the
+    /// cooldown below the aura (Relentless goes to x0.25), and the old zone only sees its slot end on its next authority
+    /// tick. Pinned by <c>FeatherAuraZoneTests.ASecondAura_IsRefusedWhileTheFirstLives_EvenAtAQuarterCooldown</c>. Bots
+    /// get the same refusal through <c>BotTryActivate</c>, so they need no extra "aura already up" guard.
     /// </para>
     /// Cooldown tier: Medium.
     /// </remarks>
@@ -58,10 +61,31 @@ namespace CluckWars.Abilities
             return true;
         }
 
-        // Unassigned wiring, not a gameplay state: CanSpawnZone logs which reference is missing, before the cast and its
-        // cooldown are committed (CONVENTIONS, the pre-commitment gate).
-        public override bool CanActivate(AbilityContext ctx) => ctx.CanSpawnZone(Source, "Feather Aura");
+        /// <summary>
+        /// The pre-commitment gate (CONVENTIONS): everything that would make <see cref="OnActivate"/>'s spawn fail is
+        /// checked here, before the slot's cooldown is charged. Unassigned wiring (<c>CanSpawnZone</c>) and a spec the
+        /// spawner refuses are code/wiring bugs and log an Error; a previous aura from this slot still live is a legal
+        /// one-tick state and only refuses (see the remarks).
+        /// </summary>
+        public override bool CanActivate(AbilityContext ctx)
+        {
+            if (!ctx.CanSpawnZone(Source, "Feather Aura")) return false;
+            TryGetAreaEffect(out var spec);
+            string refusal = AreaEffectSpawner.Refusal(spec, ctx.Slot);
+            if (refusal != null)
+            {
+                ctx.Log?.Error(Source, $"Feather Aura refused before the cast (no cooldown charged): {refusal}. Fix TryGetAreaEffect.");
+                return false;
+            }
+            return ctx.Controller == null || !AbilityZone.HasLiveAuraFrom(ctx.Controller.Id, ctx.Slot);
+        }
 
+        /// <remarks>
+        /// <c>AreaEffectSpawner.Spawn</c>'s false is not handled here on purpose: its only cause is a spec refusal, which
+        /// <see cref="CanActivate"/> has already ruled out with the same <c>Refusal</c> call before the cooldown was
+        /// charged, so a false here cannot happen with this spec. (A prefab without an <c>AbilityZone</c> component is
+        /// the spawner's own Error inside the pre-spawn callback, after the spawn committed; nothing to refund then.)
+        /// </remarks>
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;

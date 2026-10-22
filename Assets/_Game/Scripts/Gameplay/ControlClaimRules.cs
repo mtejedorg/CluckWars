@@ -162,13 +162,14 @@ namespace CluckWars.Gameplay
         // caster's CURRENT position plus drift over the zone's whole age, which an attacker could stretch across
         // most of the arena over an 8 s egg - against every peer.
         //
-        // Late joiner (qa W1): a peer that joined after the egg was placed first sees it up to a lifetime late,
-        // so where the caster stands at that moment is not where it laid the egg. Only for a zone first seen
-        // within JoinWindowSeconds of this peer's own join (a local, unforgeable fact), the caster may have
-        // drifted over the zone's claimed age = MaxZoneLifetime - the networked timer's remaining time, clamped
-        // to [0, MaxZoneLifetime]. The age is attacker-writable, so it is charged twice: the drift it buys widens
-        // the centre allowance, and the same age is spent from the vouching window (rule 5 counts claimed age +
-        // local age). A peer that was already in the match never gets the extension.
+        // Late joiner (qa W1, bounded by the security review): a peer that joined after the egg was placed first
+        // sees it up to a lifetime late, so where the caster stands at that moment is not where it laid the egg.
+        // Only for a zone that was part of THIS peer's initial snapshot (its local Spawned tick <= its own join
+        // tick: LocalJoinClock, never replicated), the caster may have drifted over the zone's claimed age =
+        // MaxZoneLifetime - the networked timer's remaining time, clamped to [0, MaxZoneLifetime]. The age is
+        // attacker-writable, so (a) the drift it buys is capped at LateJoinDriftCapMeters whatever the age, and
+        // (b) the same age is spent from the vouching window (rule 5 counts claimed age + local age). Zones spawned
+        // after the join, and every peer that was already in the match, never get the extension.
 
         /// <summary>What the victim's peer knows about one Root zone (live, or recorded at its despawn).</summary>
         public struct RootZoneEvidence
@@ -187,32 +188,43 @@ namespace CluckWars.Gameplay
             public float SpawnDrift;
             /// <summary>Real seconds since this peer first saw the zone (local clock, never replicated).</summary>
             public float SecondsSinceSeen;
-            /// <summary>This peer first saw the zone within <see cref="JoinWindowSeconds"/> of its own join (local fact).</summary>
-            public bool FirstSeenAtJoin;
+            /// <summary>The zone was part of this peer's initial snapshot (local Spawned tick &lt;= join tick; local fact).</summary>
+            public bool InJoinSnapshot;
             /// <summary>The zone's networked lifetime timer remaining when this peer first saw it (attacker-writable; NaN/negative = unknown).</summary>
             public float RemainingAtFirstSight;
             /// <summary>The caster's drift speed (m/s) when this peer first saw the zone; prices the late-joiner extension.</summary>
             public float CasterDriftSpeed;
         }
 
-        /// <summary>How soon after this peer's own join a zone counts as "already there when I arrived" (qa W1).</summary>
-        public const float JoinWindowSeconds = 2f;
+        /// <summary>
+        /// Hard cap on the late-joiner drift allowance (security review of qa W1), whatever age the zone's timer claims.
+        /// 12 m is one second of the fastest authored chicken (Speedy MoveSpeed 12.15 m/s, the same speed the drift
+        /// margins are priced at) and about a quarter of the 51 m arena: a pre-join egg whose caster has walked further
+        /// than that is refused once on the joiner (logged), and no forged timer can make a zone credible more than
+        /// 12 m + Root Egg's placement reach (0, at the feet) + <see cref="RangeSlackMeters"/> + spawn drift from where
+        /// its owner stood when the joiner arrived.
+        /// </summary>
+        public const float LateJoinDriftCapMeters = 12f;
 
         /// <summary>
         /// Seconds the zone had already lived when this peer first saw it, as far as this peer may believe: 0 unless it
-        /// was first seen at this peer's join; then <c>MaxZoneLifetime - RemainingAtFirstSight</c>, clamped to
+        /// was in this peer's initial snapshot; then <c>MaxZoneLifetime - RemainingAtFirstSight</c>, clamped to
         /// [0, MaxZoneLifetime]. An unknown remaining time (NaN, negative) claims the whole lifetime; such a zone is
         /// also refused outright by <see cref="IsCredibleZoneCenter"/> (fail closed).
-        /// <para>Residual, accepted: a zone authority can claim a near-dead egg to widen the centre allowance, but only
-        /// against a peer that joined within <see cref="JoinWindowSeconds"/>, and the claimed age is spent from the same
-        /// vouching window (at most MaxZoneLifetime + latency in total).</para>
+        /// <para>Residual, accepted: a zone authority that placed an egg before a peer joined can claim it is older than it
+        /// is; that buys at most <see cref="LateJoinDriftCapMeters"/> of allowance (<see cref="LateJoinDrift"/>) and is
+        /// spent from the same vouching window (at most MaxZoneLifetime + latency in total).</para>
         /// </summary>
         public static float AgeAtFirstSight(in RootZoneEvidence z, in Ceiling c)
         {
-            if (!z.FirstSeenAtJoin || !(c.MaxZoneLifetime > 0f)) return 0f;
+            if (!z.InJoinSnapshot || !(c.MaxZoneLifetime > 0f)) return 0f;
             float remaining = z.RemainingAtFirstSight >= 0f ? z.RemainingAtFirstSight : 0f;   // NaN reads as 0
             return Mathf.Clamp(c.MaxZoneLifetime - remaining, 0f, c.MaxZoneLifetime);
         }
+
+        /// <summary>The extra centre allowance a late joiner grants: caster drift over the claimed age, at most <see cref="LateJoinDriftCapMeters"/>.</summary>
+        public static float LateJoinDrift(in RootZoneEvidence z, in Ceiling c) =>
+            Mathf.Min(LateJoinDriftCapMeters, Mathf.Max(0f, z.CasterDriftSpeed) * AgeAtFirstSight(z, c));
 
         /// <summary>The evidence identity check of one Render (qa W2): what to do with the snapshot.</summary>
         public enum IdentityObservation : byte
@@ -246,14 +258,14 @@ namespace CluckWars.Gameplay
         {
             if (!z.HasCasterAtSpawn) return false;
             // Seen at join with no readable timer: its age is unknown, so no drift can be priced - not evidence.
-            if (z.FirstSeenAtJoin && !(z.RemainingAtFirstSight >= 0f)) return false;
-            float allowance = Mathf.Max(0f, z.SpawnDrift) + Mathf.Max(0f, z.CasterDriftSpeed) * AgeAtFirstSight(z, c);
+            if (z.InJoinSnapshot && !(z.RemainingAtFirstSight >= 0f)) return false;
+            float allowance = Mathf.Max(0f, z.SpawnDrift) + LateJoinDrift(z, c);
             return IsInsideZone(z.CasterAtSpawn, Mathf.Max(0f, c.MaxZonePlacement) + RangeSlackMeters + allowance, z.Center, 0f);
         }
 
         /// <summary>
         /// The zone is still inside its authored life as this peer counts it: its age at first sight
-        /// (<see cref="AgeAtFirstSight"/>, 0 unless first seen at this peer's join) plus the local seconds since, at
+        /// (<see cref="AgeAtFirstSight"/>, 0 unless in this peer's initial snapshot) plus the local seconds since, at
         /// most the pool's longest zone lifetime plus <see cref="ExecuteRules.MaxLatencySeconds"/>. NaN and negative
         /// ages fail.
         /// </summary>

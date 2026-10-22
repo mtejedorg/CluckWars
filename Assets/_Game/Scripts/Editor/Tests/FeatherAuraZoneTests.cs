@@ -15,8 +15,15 @@ namespace CluckWars.Tests
     /// WP4 (decisions B3, B4, B5, B6, F2; Fable plan 2026-10-22): Feather Aura is a Caster-anchored <see cref="AbilityZone"/>
     /// spawned through <see cref="AreaEffectSpawner"/>, and the <c>ChickenController</c> emitter triplet, the effect-stack
     /// aura channel and the three visual reads of the emitter flag are gone (the self-snail-badge bug, proposal §3.1).
-    /// Every test here fails on the pre-WP4 build.
     /// </summary>
+    /// <remarks>
+    /// <b>Which ones fail on the pre-WP4 build:</b> the removed-member scan, the visual reads, the spawn / channels / no
+    /// cast-time hits / OnEnter-confirmation / bot / no-overlap tests, and everything on the probe and <c>cw_autoaura</c>
+    /// (new code: they do not compile there). <b>WP3 rule tests that already passed before WP4</b>, kept here because
+    /// the aura now depends on them: <see cref="AuraZone_FollowsTheOwner_PureRule"/>,
+    /// <see cref="AuraZone_Despawns_WhenTheSlotDeactivates_OrTheOwnerIsGone"/> and
+    /// <see cref="FeatherAura_KeepsItsGameplayNumbers"/> (a no-drift pin, true before and after).
+    /// </remarks>
     public sealed class FeatherAuraZoneTests
     {
         private const string ScriptsDir     = "Assets/_Game/Scripts";
@@ -113,8 +120,11 @@ namespace CluckWars.Tests
             string deactivate = Body(AuraPath, "public override void OnDeactivate(AbilityContext ctx)");
             StringAssert.DoesNotContain("Effects.", deactivate);
             StringAssert.DoesNotContain("Despawn", deactivate, "the zone despawns itself (slot-inactive rule)");
-            StringAssert.Contains("public override bool CanActivate(AbilityContext ctx) => ctx.CanSpawnZone(", Src(AuraPath),
+            string gate = Body(AuraPath, "public override bool CanActivate(AbilityContext ctx)");
+            StringAssert.Contains("if (!ctx.CanSpawnZone(Source, \"Feather Aura\")) return false;", gate,
                 "refuses before the cast and its cooldown when PrefabRegistrySO.AbilityZone is unassigned");
+            StringAssert.Contains("AreaEffectSpawner.Refusal(spec, ctx.Slot)", gate,
+                "the spawner's one failure (a refused spec) is checked BEFORE the cooldown is charged, so OnActivate's spawn cannot fail");
 
             // The stamp the despawn rule reads: SourceSlot is the casting slot for an EndsWithAbility spec.
             StringAssert.Contains("byte  capSlot  = spec.EndsWithAbility ? (byte)ctx.Slot : AreaEffectRules.NoSourceSlot;",
@@ -207,11 +217,47 @@ namespace CluckWars.Tests
                 Body(BotPath, "private bool TryCast(BotSituation situation, ChickenController target)"),
                 "only a placed zone is worth dropping with nobody near (the pre-WP4 Feather Aura rule)");
 
-            // "Aura already up": the cooldown starts with the cast and outlasts the aura, so no caster - bot or human -
-            // can start a second Feather Aura while the first lives. Bots also refuse while any slot runs.
-            var a = Shipped();
-            Assert.Greater(a.Cooldown, a.Duration, "Feather Aura's cooldown must outlast its aura (no overlapping auras)");
+            // "Aura already up": bots go through the same TryActivate -> CanActivate gate as players (no overlapping
+            // auras, see the next test), and also refuse while any of their slots runs.
             StringAssert.Contains("if (AnyAbilityActive) return false;", Body(AbilityCtlPath, "public bool BotTryActivate(int slot)"));
+            StringAssert.Contains("TryActivate(slot);", Body(AbilityCtlPath, "public bool BotTryActivate(int slot)"));
+        }
+
+        [Test]
+        public void ASecondAura_IsRefusedWhileTheFirstLives_EvenAtAQuarterCooldown()
+        {
+            // The shipped numbers alone (7 s cooldown > 3 s aura) are not the guarantee: a cooldown passive can go to x0.25.
+            var a = Shipped();
+            var relentless = ScriptableObject.CreateInstance<RelentlessPassiveSO>();
+            try
+            {
+                relentless.CooldownMultiplier = 0.25f;
+                float cd = relentless.ModifyCooldown(a.Cooldown, a, null);
+                Assert.AreEqual(1.75f, cd, 1e-4f);
+                Assert.Less(cd, a.Duration, "fixture: at x0.25 the cooldown is up while the aura still lives");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(relentless); }
+
+            // So the refusal is explicit: a live aura of this owner that ends with this slot blocks the re-cast.
+            Assert.IsTrue(AreaEffectRules.BlocksRecast(ZoneAnchor.Caster, sameOwner: true, zoneSlot: 1, castSlot: 1));
+            Assert.IsFalse(AreaEffectRules.BlocksRecast(ZoneAnchor.Caster, sameOwner: true, zoneSlot: 1, castSlot: 2), "another slot");
+            Assert.IsFalse(AreaEffectRules.BlocksRecast(ZoneAnchor.Caster, sameOwner: false, zoneSlot: 1, castSlot: 1), "another caster's aura");
+            Assert.IsFalse(AreaEffectRules.BlocksRecast(ZoneAnchor.World, sameOwner: true, zoneSlot: 1, castSlot: 1), "a placed zone never blocks");
+            Assert.IsFalse(AreaEffectRules.BlocksRecast(ZoneAnchor.Caster, true, AreaEffectRules.NoSourceSlot, AreaEffectRules.NoSourceSlot),
+                "a zone that does not end with a slot blocks nothing");
+
+            StringAssert.Contains("return ctx.Controller == null || !AbilityZone.HasLiveAuraFrom(ctx.Controller.Id, ctx.Slot);",
+                Body(AuraPath, "public override bool CanActivate(AbilityContext ctx)"));
+            StringAssert.Contains("AreaEffectRules.BlocksRecast(z.Anchor, z.OwnerChicken == owner, z.SourceSlot, slot)",
+                Body(ZonePath, "public static bool HasLiveAuraFrom(NetworkBehaviourId owner, int slot)"));
+
+            // CanActivate knows the slot: TryActivate sets it before the gate and clears it after.
+            string activate = Body(AbilityCtlPath, "private bool TryActivate(int slot)");
+            int set = activate.IndexOf("_ctx.Slot = slot;", StringComparison.Ordinal);
+            int gate = activate.IndexOf("canActivate = ability.CanActivate(_ctx);", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(set, 0);
+            Assert.Greater(gate, set, "the slot is set before CanActivate");
+            StringAssert.Contains("finally { _ctx.Slot = -1; }", activate.Substring(gate));
         }
 
         // ---- The remote-victim probe (state, not logs) ---------------------------------------------------------------
