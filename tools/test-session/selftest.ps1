@@ -184,6 +184,31 @@ $f9 = Get-Content (Join-Path $tmp9 'findings.txt') -Raw
 Assert ($f9 -notmatch 'control RPC rejections') 'F4 clean: accepted/kept control lines and a rejected RPC_TeleportTo are not control rejections'
 Assert ($f9 -match 'INVARIANT=0') 'F4 clean: INVARIANT=0'
 Remove-Item $tmp9 -Recurse -Force
+
+# ---- Remote aura victim (WP4): a rival deep inside a Slow aura must carry the replicated Snared flag on every peer ----
+foreach ($fx in @('aura-victim-fixture', 'aura-unproven-fixture', 'aura-victim-clean-fixture')) {
+    $ta = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-av-' + [Guid]::NewGuid().ToString('N'))
+    Copy-Item (Join-Path $PSScriptRoot "fixtures\$fx") $ta -Recurse
+    & (Join-Path $PSScriptRoot 'merge.ps1') -Session $ta | Out-Null
+    $fa = Get-Content (Join-Path $ta 'findings.txt') -Raw
+    switch ($fx) {
+        'aura-victim-fixture' {
+            Assert ((Count $fa '\[INVARIANT\] aura victims not slowed on client1: 1 ') -eq 1) 'WP4: a not-snared verdict on client1 IS flagged (one per source)'
+            Assert ((Count $fa '\[INVARIANT\] aura victims not slowed on client2: 1 ') -eq 1) 'WP4: and on client2'
+            Assert ((Count $fa '\[INVARIANT\] autoaura cast 1 aura\(s\) but no peer proved a remote victim slowed') -eq 1) 'WP4: a remote=0 ok does not prove a REMOTE victim'
+            Assert ($fa -match 'INVARIANT=3') 'WP4: exactly three INVARIANT findings (too-few is no verdict)'
+        }
+        'aura-unproven-fixture' {
+            Assert ((Count $fa '\[INVARIANT\] autoaura cast 1 aura\(s\) but no peer proved a remote victim slowed') -eq 1) 'WP4: an aura cast with only too-few / local verdicts IS flagged (no evidence is not a pass)'
+            Assert ($fa -match 'INVARIANT=1') 'WP4 unproven: exactly one INVARIANT finding'
+        }
+        default {
+            Assert ($fa -notmatch 'aura victims not slowed|no peer proved a remote victim') 'WP4 clean: remote=1 verdict=ok on two peers, a too-few brush -> no finding'
+            Assert ($fa -match 'INVARIANT=0') 'WP4 clean: INVARIANT=0'
+        }
+    }
+    Remove-Item $ta -Recurse -Force
+}
 Write-Host ''
 if ($script:fail -eq 0) { Write-Host 'SELFTEST OK' -ForegroundColor Green; exit 0 }
 Write-Host "SELFTEST FAILED ($($script:fail) assertion(s))" -ForegroundColor Red

@@ -13,7 +13,7 @@ namespace CluckWars.Tests
 {
     /// <summary>
     /// Guards the pre-commitment wiring gate: <see cref="AbilityBaseSO.CanActivate"/> and the
-    /// four spawning abilities that override it — the three zone placers, plus Doppelganger,
+    /// five spawning abilities that override it — the four zone abilities, plus Doppelganger,
     /// which spawns a NetworkObject without placing a zone. Before the gate existed, a missing
     /// <c>PrefabRegistrySO.AbilityZone</c> cost the player the whole cast <i>and</i> its
     /// cooldown, because the guard sat inside <c>OnActivate</c> — after
@@ -82,12 +82,13 @@ namespace CluckWars.Tests
             return registry;
         }
 
-        /// <summary>The three abilities that place an <c>AbilityZone</c>, as live instances.</summary>
+        /// <summary>The four abilities that spawn an <c>AbilityZone</c> (Feather Aura since WP4), as live instances.</summary>
         private IEnumerable<AbilityBaseSO> ZoneAbilities()
         {
             yield return Track(ScriptableObject.CreateInstance<FeatherTrapAbilitySO>());
             yield return Track(ScriptableObject.CreateInstance<RootEggAbilitySO>());
             yield return Track(ScriptableObject.CreateInstance<SmokeRoostAbilitySO>());
+            yield return Track(ScriptableObject.CreateInstance<FeatherAuraAbilitySO>());
         }
 
         // ---- The three ways the wiring can be broken ----------------------------
@@ -147,15 +148,8 @@ namespace CluckWars.Tests
 
         // ---- Every area ability (WP3: AreaKind != None) -------------------------
 
-        /// <summary>
-        /// Area abilities that do not spawn a zone yet. Phase 1 of WP3 tags Feather Aura as an Aura but it still runs on
-        /// the <c>ChickenController</c> aura triplet; WP4 moves it onto <see cref="AreaEffectSpawner"/>, and
-        /// <see cref="EveryAreaAbility_RefusesWithoutTheAbilityZonePrefab"/> then fails until it is removed from here.
-        /// </summary>
-        private static readonly HashSet<System.Type> AreaAbilitiesWithoutAZoneYet = new HashSet<System.Type>
-        {
-            typeof(FeatherAuraAbilitySO),
-        };
+        // WP3 listed Feather Aura here as the one area ability without a zone yet (it ran on the ChickenController aura
+        // triplet). WP4 moved it onto AreaEffectSpawner, so every AreaKind != None is checked with no exception.
 
         [Test]
         public void EveryAreaAbility_RefusesWithoutTheAbilityZonePrefab()
@@ -169,20 +163,13 @@ namespace CluckWars.Tests
             {
                 if (ability.AreaKind == AreaEffectKind.None) continue;
                 string src = System.IO.File.ReadAllText($"Assets/_Game/Scripts/Abilities/{ability.GetType().Name}.cs");
-                if (AreaAbilitiesWithoutAZoneYet.Contains(ability.GetType()))
-                {
-                    Assert.AreEqual(AreaEffectKind.Aura, ability.AreaKind, $"{ability.name}: only a phase-1 Aura may skip the gate");
-                    Assert.IsFalse(src.Contains("AreaEffectSpawner.Spawn("),
-                        $"{ability.name} spawns its zone now (WP4): remove it from AreaAbilitiesWithoutAZoneYet so the gate is checked");
-                    continue;
-                }
                 checkedCount++;
                 StringAssert.Contains("AreaEffectSpawner.Spawn(", src, $"{ability.name} declares an area but never spawns it");
                 Assert.IsFalse(ability.CanActivate(unwired),
                     $"{ability.name} (AreaKind {ability.AreaKind}) must refuse before the cast when PrefabRegistrySO.AbilityZone is unassigned.");
                 Assert.IsTrue(ability.CanActivate(wired), $"{ability.name} must allow the cast once fully wired.");
             }
-            Assert.GreaterOrEqual(checkedCount, 3, "Feather Trap, Root Egg and Smoke Roost at least: the sweep went blind");
+            Assert.GreaterOrEqual(checkedCount, 4, "Feather Trap, Root Egg, Smoke Roost and Feather Aura at least: the sweep went blind");
         }
 
         // ---- The base default ---------------------------------------------------
@@ -366,9 +353,9 @@ namespace CluckWars.Tests
                     "ability, or a hand-written check for an ability with its own prefab field.");
             }
 
-            Assert.GreaterOrEqual(spawnerCount, 4,
-                "Expected at least the four known spawning abilities (Feather Trap, Root Egg, Smoke " +
-                "Roost, Doppelganger). Fewer means the sweep stopped seeing assets, not that the " +
+            Assert.GreaterOrEqual(spawnerCount, 5,
+                "Expected at least the five known spawning abilities (Feather Trap, Root Egg, Smoke " +
+                "Roost, Feather Aura, Doppelganger). Fewer means the sweep stopped seeing assets, not that the " +
                 "guards are gone.");
         }
 

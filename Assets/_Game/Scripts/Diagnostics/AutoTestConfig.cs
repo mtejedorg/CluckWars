@@ -17,10 +17,13 @@ namespace CluckWars.Diagnostics
             AutoStartKey = "cw_autostart", AutoStartTimeoutKey = "cw_autostart_timeout", AutoLoopKey = "cw_autoloop",
             AutoPlayKey = "cw_autoplay", DevModeKey = "cw_devmode", HudKey = "cw_hud", ProfileKey = "cw_profile",
             AutoSoloKey = "cw_autosolo", AutoDisconnectKey = "cw_autodisconnect", AutoZoneKey = "cw_autozone",
-            ShotsKey = "cw_shots", ShotTagKey = "cw_shottag", BandKey = "cw_band", ZonesKey = "cw_zones";
+            ShotsKey = "cw_shots", ShotTagKey = "cw_shottag", BandKey = "cw_band", ZonesKey = "cw_zones",
+            FloorArrowsKey = "cw_floorarrows";
+        /// <summary>WP4: see <see cref="AutoAura"/>.</summary>
+        public const string AutoAuraKey = "cw_autoaura";
 
         public static readonly string[] Keys =
-            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey, AutoZoneKey, ShotsKey, ShotTagKey, BandKey, ZonesKey };
+            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey, AutoZoneKey, ShotsKey, ShotTagKey, BandKey, ZonesKey, FloorArrowsKey, AutoAuraKey };
 
         public const ChickenClass DefaultClass = ChickenClass.Warrior;
         public const float DefaultAutoStartTimeout = 90f;
@@ -73,6 +76,16 @@ namespace CluckWars.Diagnostics
         public bool AutoZone;
 
         /// <summary>
+        /// <c>cw_autoaura</c> (WP4): every round, the local chicken keeps its Feather Aura out of the fake player's rotation,
+        /// walks into the nearest rival from <see cref="AutoAuraRules.ChaseAtRemaining"/> s left, casts it there and keeps
+        /// walking into that rival while the aura lives. Every peer's <c>Invariant</c> probe then samples the victim's
+        /// replicated <c>ControlVfx.Snared</c> (<c>Invariant aura ... remote=1 verdict=ok</c>), and merge.ps1 requires that
+        /// line once an aura was cast: a REMOTE victim proven slowed by state (CW-217). Needs <c>cw_autoplay</c>; not with
+        /// <c>cw_autozone</c> (one reserved slot).
+        /// </summary>
+        public bool AutoAura;
+
+        /// <summary>
         /// <c>cw_shots 15,22,29</c> (dev tools only): seconds since this peer's first Active round began at which the driver
         /// saves a screenshot (<see cref="AutoTestRules.ShotFileName"/>). Sorted, distinct, 0..<see cref="MaxShotSecond"/>; empty = off.
         /// </summary>
@@ -83,6 +96,9 @@ namespace CluckWars.Diagnostics
         public int BandOverride;
         /// <summary><c>cw_zones</c>: draw the HUD info / control zones as an outlined overlay (dev tools only).</summary>
         public bool Zones;
+        /// <summary><c>cw_floorarrows</c> (dev tools only): the floor-ring rival arrows prototype (<c>FloorRivalArrows</c>)
+        /// replaces the edge chevrons for the rivals it represents. Off = the shipped edge chevrons.</summary>
+        public bool FloorArrows;
 
         public const int MaxShotSecond = 3600;
 
@@ -190,6 +206,7 @@ namespace CluckWars.Diagnostics
                     case AutoStartTimeoutKey: cfg.AutoStartTimeout = cfg.ParseInt(key, value, 1, 3600, (int)DefaultAutoStartTimeout); break;
                     case AutoDisconnectKey:   cfg.AutoDisconnect = cfg.ParseInt(key, value, 1, 600); break;
                     case AutoZoneKey:         cfg.AutoZone = cfg.ParseBool(key, value); break;
+                    case AutoAuraKey:         cfg.AutoAura = cfg.ParseBool(key, value); break;
                     case ShotsKey:            cfg.Shots = ParseShots(value, cfg.Problems); break;
                     case ShotTagKey:
                         cfg.ShotTag = SanitizeProfile(value);
@@ -200,6 +217,7 @@ namespace CluckWars.Diagnostics
                         else cfg.Problems.Add($"{key} '{value}' is not 290 or 330; using the shipped band");
                         break;
                     case ZonesKey:            cfg.Zones = cfg.ParseBool(key, value); break;
+                    case FloorArrowsKey:      cfg.FloorArrows = cfg.ParseBool(key, value); break;
                     default: cfg.Problems.Add($"unknown key {kv.Key}"); break;
                 }
             }
@@ -207,6 +225,16 @@ namespace CluckWars.Diagnostics
             {
                 cfg.Problems.Add($"{AutoZoneKey} needs {AutoPlayKey} (the cast is a fake-player press); {AutoZoneKey} off");
                 cfg.AutoZone = false;
+            }
+            if (cfg.AutoAura && !cfg.AutoPlay)
+            {
+                cfg.Problems.Add($"{AutoAuraKey} needs {AutoPlayKey} (the walk and the cast are fake-player input); {AutoAuraKey} off");
+                cfg.AutoAura = false;
+            }
+            if (cfg.AutoAura && cfg.AutoZone)
+            {
+                cfg.Problems.Add($"{AutoAuraKey} with {AutoZoneKey}: one reserved slot; {AutoZoneKey} wins ({AutoAuraKey} off)");
+                cfg.AutoAura = false;
             }
             if (cfg.AutoSolo && (cfg.AutoHost || cfg.AutoJoin != null))
             {
@@ -320,7 +348,7 @@ namespace CluckWars.Diagnostics
 
         /// <summary>
         /// The slot <c>cw_autozone</c> casts: a Root Egg (8 s, the longest-lived zone), else any other zone-placing ability
-        /// (<see cref="CluckWars.Abilities.AbilityBaseSO.PlacesZone"/>: Feather Trap, Smoke Roost), else a Doppelganger
+        /// (a Static AoE: Feather Trap, Smoke Roost), else a Doppelganger
         /// (its decoy subscribes to the same reset). -1 = nothing in the loadout outlives a round.
         /// </summary>
         public static int PickZoneSlot(IReadOnlyList<CluckWars.Abilities.AbilityBaseSO> slots)
@@ -332,7 +360,8 @@ namespace CluckWars.Diagnostics
                 var a = slots[i];
                 if (a == null) continue;
                 if (a is CluckWars.Abilities.RootEggAbilitySO) return i;
-                if (zone < 0 && a.PlacesZone) zone = i;
+                // Placed zones only: an Aura ends with its 3 s cast, so it never outlives a round (WP4 widened PlacesZone).
+                if (zone < 0 && a.AreaKind == CluckWars.Abilities.AreaEffectKind.StaticAoE) zone = i;
                 if (decoy < 0 && a is CluckWars.Abilities.DoppelgangerAbilitySO) decoy = i;
             }
             return zone >= 0 ? zone : decoy;

@@ -7,7 +7,7 @@ namespace CluckWars.Abilities
     /// <summary>
     /// The one <c>Runner.Spawn</c> + <c>onBeforeSpawned</c> stamp of an <see cref="AbilityZone"/> (WP3). Feather Trap,
     /// Root Egg and Smoke Roost each carried a copy of this block; they now compute the position and call
-    /// <see cref="Spawn"/>.
+    /// <see cref="Spawn"/>, and so does Feather Aura (WP4, a Caster-anchored zone).
     /// </summary>
     /// <remarks>
     /// <b>Stamp order and values are the copies' own, byte for byte:</b> <c>SpawnPosition</c>, <c>HasSpawnPosition</c>,
@@ -31,11 +31,19 @@ namespace CluckWars.Abilities
             if (spec.Kind == AreaEffectKind.None) return "its AreaEffectSpec has Kind None (no lasting area to spawn)";
             if ((spec.Channels & AreaEffectChannel.Periodic) != 0)
                 return "it asks for the Periodic channel, which has no RPC or receiver yet (WP5 is deferred to the first Periodic aura)";
-            // Phase 1 (B9: Slow only, plus Root Egg's root): AbilityZone applies a root on the OnEnter channel and a slow
-            // on the WhileInside channel, nothing else. Any other pairing would spawn a zone that affects nobody.
-            var expected = spec.Effect == ZoneEffect.Root ? AreaEffectChannel.OnEnter : AreaEffectChannel.WhileInside;
-            if (spec.Channels != expected)
-                return $"its channels ({spec.Channels}) are not the {expected} channel AbilityZone applies a {spec.Effect} on";
+            // B9 (Slow only, plus Root Egg's root): AbilityZone applies a root on the OnEnter channel and a slow on the
+            // WhileInside channel, nothing else. A slow zone may add OnEnter (WP4, Feather Aura): it then confirms each
+            // chicken's first entry, including the ones inside at the cast; the slow itself stays WhileInside. Any other
+            // pairing would spawn a zone that affects nobody.
+            bool channelsOk = spec.Effect == ZoneEffect.Root
+                ? spec.Channels == AreaEffectChannel.OnEnter
+                : spec.Channels == AreaEffectChannel.WhileInside
+                  || spec.Channels == (AreaEffectChannel.WhileInside | AreaEffectChannel.OnEnter);
+            if (!channelsOk)
+            {
+                string allowed = spec.Effect == ZoneEffect.Root ? "OnEnter" : "WhileInside (optionally with OnEnter)";
+                return $"its channels ({spec.Channels}) are not the {allowed} channel AbilityZone applies a {spec.Effect} on";
+            }
             // AbilityZone consumes Root zones on their first trigger and never consumes Slow zones (no networked flag for it).
             if (spec.ConsumeOnTrigger != (spec.Effect == ZoneEffect.Root))
                 return $"ConsumeOnTrigger={spec.ConsumeOnTrigger} disagrees with what AbilityZone does for {spec.Effect} zones";
@@ -44,6 +52,18 @@ namespace CluckWars.Abilities
             if (spec.EndsWithAbility && (slot < 0 || slot >= AreaEffectRules.NoSourceSlot))
                 return $"it ends with its ability but the cast carries no valid slot ({slot}), so it would despawn on its first tick";
             return null;
+        }
+
+        /// <summary>
+        /// Where a Static AoE is placed: <see cref="AreaEffectSpec.ForwardOffset"/> metres along the caster's forward, on
+        /// the caster's ground height (offset 0 = at the feet: Root Egg, Smoke Roost). An Aura's position only seeds its
+        /// transform. The one reader of <c>ForwardOffset</c>, so the spec and the cast cannot disagree.
+        /// </summary>
+        public static Vector3 Placement(Vector3 casterPosition, Vector3 casterForward, in AreaEffectSpec spec)
+        {
+            var pos = casterPosition + casterForward * spec.ForwardOffset;
+            pos.y = casterPosition.y; // keep on ground plane
+            return pos;
         }
 
         /// <summary>

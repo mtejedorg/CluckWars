@@ -386,6 +386,34 @@ foreach ($src in $ctlRejects.Keys) {
     Add-Finding @('INVARIANT') $r.First ("control RPC rejections on ${src}: $($r.Count) [$((@($r.Kinds.Keys) | Sort-Object) -join ', ')] (expected 0 with honest clients, F4) - first: $($r.First.Message)")
 }
 
+# ---- Remote aura victim (WP4, the CW-217 lesson: state on a REMOTE peer, not logs) ---------------------------------
+# Every peer's Invariant probe samples each rival deep inside a live Slow aura for its replicated ControlVfx.Snared and,
+# when the aura is gone, logs `Invariant aura owner=<id> victim=<id> remote=<0|1> deep=<n> snared=<m> verdict=<ok|too-few|
+# not-snared> round=<r>` (remote=1: the victim's state authority is not the aura's). (a) Any not-snared verdict is an
+# INVARIANT finding, once per source. (b) Once a `cw_autoaura` peer logged `AutoTest autoaura: cast ...`, the session must
+# hold at least one remote=1 verdict=ok line from some peer: an aura cast into a rival that no peer saw slow is the bug.
+$rxAuraVerdict = New-Object Text.RegularExpressions.Regex('^Invariant aura owner=(\S+) victim=(\S+) remote=([01]) deep=(\d+) snared=(\d+) verdict=(\S+)')
+$auraCasts = New-Object System.Collections.Generic.List[object]
+$auraRemoteOk = 0
+$auraNotSnared = [ordered]@{}   # src -> @{ Count; First }
+foreach ($e in $sorted) {
+    if ($e.Source -eq 'AutoTest' -and $e.Message -match '^AutoTest autoaura: cast ') { $auraCasts.Add($e); continue }
+    if ($e.Source -ne 'Invariant') { continue }
+    $m = $rxAuraVerdict.Match($e.Message); if (-not $m.Success) { continue }
+    if ($m.Groups[6].Value -eq 'ok' -and $m.Groups[3].Value -eq '1') { $auraRemoteOk++ }
+    if ($m.Groups[6].Value -eq 'not-snared') {
+        if (-not $auraNotSnared.Contains($e.Src)) { $auraNotSnared[$e.Src] = @{ Count = 0; First = $e } }
+        $auraNotSnared[$e.Src].Count++
+    }
+}
+foreach ($src in $auraNotSnared.Keys) {
+    $r = $auraNotSnared[$src]
+    Add-Finding @('INVARIANT') $r.First ("aura victims not slowed on ${src}: $($r.Count) (a rival deep inside a Slow aura without its replicated Snared flag, WP4) - first: $($r.First.Message)")
+}
+if ($auraCasts.Count -gt 0 -and $auraRemoteOk -eq 0) {
+    Add-Finding @('INVARIANT') $auraCasts[0] ("autoaura cast $($auraCasts.Count) aura(s) but no peer proved a remote victim slowed (expected >= 1 'Invariant aura ... remote=1 ... verdict=ok', WP4/CW-217) - first: $($auraCasts[0].Message)")
+}
+
 # ---- World-hash parity (CW-216/217 class: spawned objects positioned differently per peer) ---------------------
 # The game logs `World t=<tick> static=<hash> n=<count> ... auras=<hash>/<n> ...` on every peer every 2 s (Source
 # Invariant). Peers log on the same ticks, so for each tick every reporting peer must have the same `static` hash (bases,

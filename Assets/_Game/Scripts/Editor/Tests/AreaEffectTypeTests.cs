@@ -55,7 +55,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(4, (int)AreaEffectChannel.Periodic);
 
             Assert.AreEqual(typeof(byte), Enum.GetUnderlyingType(typeof(ZoneAnchor)), "a [Networked] byte on AbilityZone");
-            Assert.AreEqual(0, (int)ZoneAnchor.World, "the zero default: an unstamped zone behaves as before WP3");
+            Assert.AreEqual(0, (int)ZoneAnchor.World, "the zero default (only the spawner creates zones and it always stamps Anchor)");
             Assert.AreEqual(1, (int)ZoneAnchor.Caster);
         }
 
@@ -98,8 +98,8 @@ namespace CluckWars.Tests
                 if (a.AreaKind == AreaEffectKind.StaticAoE)
                     Assert.That(a.AimShape, Is.EqualTo(AbilityAimShape.ForwardCircle).Or.EqualTo(AbilityAimShape.SelfCircle),
                         $"{a.name}: a Static AoE's telegraph is its placed footprint");
-                Assert.AreEqual(a.AreaKind == AreaEffectKind.StaticAoE, a.PlacesZone,
-                    $"{a.name}: PlacesZone is derived from AreaKind (phase 1: StaticAoE only, WP4 widens it to Aura)");
+                Assert.AreEqual(a.AreaKind != AreaEffectKind.None, a.PlacesZone,
+                    $"{a.name}: PlacesZone is derived from AreaKind (every area spawns a zone since WP4, Aura included)");
             }
             Assert.AreEqual(4, areas, "Feather Trap, Root Egg, Smoke Roost, Feather Aura");
         }
@@ -160,6 +160,9 @@ namespace CluckWars.Tests
             Assert.AreEqual(aura.AuraSlowFactor, f.SlowFactor);
             Assert.AreEqual(aura.Duration, f.Lifetime, "Duration is the aura's backstop lifetime");
             Assert.IsTrue(f.EndsWithAbility);
+            Assert.AreEqual(ZoneEffect.Slow, f.Effect);
+            Assert.AreEqual(AreaEffectChannel.WhileInside | AreaEffectChannel.OnEnter, f.Channels,
+                "WP4: the slow is WhileInside; OnEnter confirms each rival once, the ones inside at the cast included");
         }
 
         [Test]
@@ -202,7 +205,13 @@ namespace CluckWars.Tests
             Assert.IsNotNull(AreaEffectSpawner.Refusal(new AreaEffectSpec(AreaEffectKind.Aura,
                 AreaEffectChannel.Periodic, ZoneEffect.Slow, 1.2f, 3f, periodicInterval: 0.5f), 1), "Periodic has no RPC yet (WP5)");
             Assert.IsNotNull(AreaEffectSpawner.Refusal(new AreaEffectSpec(AreaEffectKind.StaticAoE,
-                AreaEffectChannel.OnEnter, ZoneEffect.Slow, 1f, 1f), 0), "a slow on OnEnter would affect nobody");
+                AreaEffectChannel.OnEnter, ZoneEffect.Slow, 1f, 1f), 0), "a slow on OnEnter alone would affect nobody");
+            Assert.IsNull(AreaEffectSpawner.Refusal(new AreaEffectSpec(AreaEffectKind.StaticAoE,
+                AreaEffectChannel.WhileInside | AreaEffectChannel.OnEnter, ZoneEffect.Slow, 1f, 1f), 0),
+                "a slow may add OnEnter (per-chicken entry confirmation, WP4)");
+            Assert.IsNotNull(AreaEffectSpawner.Refusal(new AreaEffectSpec(AreaEffectKind.StaticAoE,
+                AreaEffectChannel.WhileInside | AreaEffectChannel.OnEnter, ZoneEffect.Root, 1f, 1f, rootDuration: 1f,
+                consumeOnTrigger: true), 0), "a root is OnEnter only: AbilityZone has no WhileInside root");
             Assert.IsNotNull(AreaEffectSpawner.Refusal(new AreaEffectSpec(AreaEffectKind.StaticAoE,
                 AreaEffectChannel.OnEnter, ZoneEffect.Root, 1f, 1f, rootDuration: 1f), 0), "a root zone the zone would not consume");
             Assert.IsNotNull(AreaEffectSpawner.Refusal(AreaEffectSpec.AuraSlow(5f, 3f, 0.5f), -1), "ends with a slot it does not know");
@@ -240,9 +249,28 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void TheThreeZoneAbilities_SpawnOnlyThroughTheSpawner()
+        public void Placement_ReadsTheSpecsForwardOffset_OnTheCastersGround()
         {
-            foreach (var file in new[] { "FeatherTrapAbilitySO.cs", "RootEggAbilitySO.cs", "SmokeRoostAbilitySO.cs" })
+            var at = new Vector3(3f, 0.4f, -2f);
+            var fwd = new Vector3(0.6f, 0.8f, 0f);   // tilted: the height must still be the caster's
+            var trap = AreaEffectSpec.StaticSlow(3.6f, 5f, 0.45f, 4.5f);
+            var p = AreaEffectSpawner.Placement(at, fwd, trap);
+            Assert.AreEqual(5.7f, p.x, 1e-4f);
+            Assert.AreEqual(0.4f, p.y, 0f, "on the caster's ground plane, whatever the forward's pitch");
+            Assert.AreEqual(-2f, p.z, 1e-4f);
+            var egg = Asset<RootEggAbilitySO>();
+            Assert.IsTrue(egg.TryGetAreaEffect(out var e));
+            Assert.AreEqual(at, AreaEffectSpawner.Placement(at, fwd, e), "Root Egg: exactly the caster's feet");
+
+            foreach (var file in new[] { "FeatherTrapAbilitySO.cs", "RootEggAbilitySO.cs", "SmokeRoostAbilitySO.cs", "FeatherAuraAbilitySO.cs" })
+                StringAssert.Contains("AreaEffectSpawner.Placement(", Src(Path.Combine(AbilityDir, file)),
+                    $"{file}: the spec's ForwardOffset is the one placement (it cannot disagree with the cast)");
+        }
+
+        [Test]
+        public void TheFourZoneAbilities_SpawnOnlyThroughTheSpawner()
+        {
+            foreach (var file in new[] { "FeatherTrapAbilitySO.cs", "RootEggAbilitySO.cs", "SmokeRoostAbilitySO.cs", "FeatherAuraAbilitySO.cs" })
             {
                 string src = Src(Path.Combine(AbilityDir, file));
                 StringAssert.DoesNotContain("Runner.Spawn(", src, $"{file}: the spawn block lives in AreaEffectSpawner now");
@@ -329,7 +357,7 @@ namespace CluckWars.Tests
                      {
                          "private void ScanOnEnter()", "private void NotifyCaughtVictims()", "private bool AnyRivalInside()",
                          "private bool IsCaught(", "private void RefreshRootGeometry()", "public override void FixedUpdateNetwork()",
-                         "private void ObserveRootEvidence()",
+                         "private void ObserveRootEvidence()", "private void ConfirmEachFirstEntry()",
                      })
             {
                 string body = AssassinExecuteCreditTests.MethodBody(ZonePath, method);
@@ -386,11 +414,10 @@ namespace CluckWars.Tests
             Assert.IsTrue(AreaEffectRules.IsInside(center, 3f, onTheMound));
             Assert.IsFalse(AreaEffectRules.IsInside(center, 3f, new Vector3(3.01f, 0f, 0f)));
 
+            // WP4: Feather Aura is a zone, so CheckAbilityZoneSlow is the one slow-zone test (CheckAuraSlow is gone).
             StringAssert.Contains("AreaEffectRules.IsInside(center, zone.TriggerRadius, transform.position)",
                 AssassinExecuteCreditTests.MethodBody(ControllerPath, "private void CheckAbilityZoneSlow()"));
-            string aura = AssassinExecuteCreditTests.MethodBody(ControllerPath, "private void CheckAuraSlow()");
-            StringAssert.Contains("AreaEffectRules.IsInside(caster.transform.position, caster.AuraSlowRadius, transform.position)", aura);
-            StringAssert.DoesNotContain("sqrMagnitude", aura);
+            StringAssert.DoesNotContain("CheckAuraSlow", Src(ControllerPath));
         }
 
         // ---- 6. World hash: auras leave static ---------------------------------------------------------------------

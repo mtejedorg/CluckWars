@@ -133,7 +133,6 @@ namespace CluckWars.Gameplay
         /// would be a real slow that no remote peer can see. See <see cref="ApplySlow"/>.
         /// </remarks>
         public const float SlowVfxFlagThreshold = 0.92f;
-        private const float AuraSlowSearchRadius     = 10f;   // broadphase for CheckAuraSlow
 
         public static readonly System.Collections.Generic.List<ChickenController> ActiveControllers = new System.Collections.Generic.List<ChickenController>();
 
@@ -330,15 +329,9 @@ namespace CluckWars.Gameplay
         [Networked] public NetworkBool UnderdogSurgeActive { get; set; }
         [Networked] public NetworkBool LeaderBountyActive { get; set; }
 
-        // ---- v0.3 Feather Aura (Networked so every peer sees the caster's state) ---
-
-        /// <summary>True while the Feather Aura ability is active on this chicken.
-        /// Replicated so nearby chickens can self-apply the slow in their own FUN.</summary>
-        [Networked] public bool  AuraSlowActive { get; private set; }
-        /// <summary>World-units radius of the active aura slow effect.</summary>
-        [Networked] public float AuraSlowRadius { get; private set; }
-        /// <summary>Speed multiplier broadcast by the aura (applied to chickens inside the radius).</summary>
-        [Networked] public float AuraSlowFactor { get; private set; }
+        // WP4 (PROTOCOL CHANGE, B4): the Feather Aura triplet (the bool + radius + factor emitter flags) was
+        // removed from this behaviour's networked layout. Feather Aura is a Caster-anchored AbilityZone now, slowed through
+        // CheckAbilityZoneSlow like every zone; all peers must run one SHA.
 
         // ---- v0.3 Control-state fields (GDD §6.4) ----------------------------
 
@@ -495,6 +488,7 @@ namespace CluckWars.Gameplay
         public override void Spawned()
         {
             ActiveControllers.Add(this);
+            LocalJoinClock.Note(Runner);   // a joiner's first snapshot carries every chicken (root evidence, qa W1)
             if (_log == null)
             {
                 ProjectContext.Instance.Container.Inject(this);
@@ -856,15 +850,12 @@ namespace CluckWars.Gameplay
             if (_cargo != null && _cargo.IsPileSlow && !ignoresPileSlow)
                 ApplySlow(SlowSource.Pile, PileSlowFactor);
 
-            // Timed ability slow (RPC_ApplyAbilitySlow; Dust Kick is its only sender - zones and the aura slow in
-            // CheckAbilityZoneSlow / CheckAuraSlow below, without an RPC).
+            // Timed ability slow (RPC_ApplyAbilitySlow; Dust Kick is its only sender - zones and auras slow in
+            // CheckAbilityZoneSlow below, without an RPC).
             if (Runner.SimulationTime < _abilitySlowUntil)
                 ApplySlow(SlowSource.Ability, _abilitySlowFactor);
 
-            // Feather Aura: self-check from nearby casters broadcasting an aura.
-            CheckAuraSlow();
-
-            // Placed-zone slow (Feather Trap).
+            // Zone slow, the WhileInside channel: placed zones (Feather Trap, Smoke Roost) and auras (Feather Aura).
             CheckAbilityZoneSlow();
 
             // General stun timer expiry
@@ -1284,9 +1275,13 @@ namespace CluckWars.Gameplay
             StunTimer = TickTimer.CreateFromSeconds(Runner, seconds);
             _log?.Debug(Source, $"RPC_ApplyStun: stunned for {seconds:0.0}s.");
 
-            // MATCH SUMMARY "Stuns Landed" (F7). A decoy counts too; the summary skips decoys.
-            if (TryGetComponent(out ChickenMatchStats stats)) stats.RecordStunTaken();
-            else _log?.Warn(Source, $"{name}: no ChickenMatchStats - stun not counted in MATCH SUMMARY.");
+            // MATCH SUMMARY "Stuns Landed" (F7): real players only, so a decoy's stun is not counted
+            // here (the summary skips decoy rows as well).
+            if (!IsDecoy)
+            {
+                if (TryGetComponent(out ChickenMatchStats stats)) stats.RecordStunTaken();
+                else _log?.Warn(Source, $"{name}: no ChickenMatchStats - stun not counted in MATCH SUMMARY.");
+            }
         }
 
         /// <summary>
@@ -1416,21 +1411,11 @@ namespace CluckWars.Gameplay
 
             bool steal = Effects.StealBackActive;
             if (StealBackActive != steal) StealBackActive = steal;
-
-            if (Effects.TryGetAura(out float factor, out float radius))
-            {
-                if (!Mathf.Approximately(AuraSlowFactor, factor)) AuraSlowFactor = factor;
-                if (!Mathf.Approximately(AuraSlowRadius, radius)) AuraSlowRadius = radius;
-                if (!AuraSlowActive) AuraSlowActive = true; // write last so readers see consistent state
-            }
-            else if (AuraSlowActive)
-            {
-                AuraSlowActive = false;
-            }
         }
 
         /// <summary>
-        /// Resets all v0.3 control states (slow, root, knockback, aura).
+        /// Resets all v0.3 control states (slow, root, knockback). A live aura is a zone: it despawns with its slot
+        /// (<c>EndAllForReset</c> below) and on the round reset signal (B10).
         /// Called by <see cref="GameManager"/> on match restart.
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
@@ -1502,7 +1487,7 @@ namespace CluckWars.Gameplay
         /// </summary>
         /// <remarks>
         /// Iterates the capped four-entry <see cref="ActiveControllers"/> list with a distance
-        /// test, exactly like <see cref="CheckAuraSlow"/> below and <c>AbilityZone</c>. This was
+        /// test, exactly like <see cref="CheckAbilityZoneSlow"/> below and <c>AbilityZone</c>. This was
         /// the last <c>Physics.OverlapSphere</c> in the per-tick path: it ran a broadphase query
         /// plus a <c>GetComponentInParent</c> per chicken per tick to rediscover a list the class
         /// already keeps. Locked by <c>AbilityAimTests.NoAbilityScript_CallsPhysicsOverlapDirectly</c>.
@@ -1588,27 +1573,6 @@ namespace CluckWars.Gameplay
             var passive = Passive;
             if (passive != null && passive.IgnoresCollisionSlow(this)) return;
             ApplySlow(SlowSource.Collision, CollisionSlowFactor);
-        }
-
-        /// <summary>
-        /// Checks whether this chicken is inside the aura of any nearby caster with
-        /// <see cref="AuraSlowActive"/> set. Runs locally on this chicken's authority —
-        /// no RPC needed because <c>AuraSlowActive/Radius/Factor</c> are Networked.
-        /// </summary>
-        private void CheckAuraSlow()
-        {
-            for (int i = 0; i < ActiveControllers.Count; i++)
-            {
-                var caster = ActiveControllers[i];
-                if (caster == null || caster == this) continue;
-                if (!caster.AuraSlowActive) continue;
-                // Planar since B7, the same "inside" as every zone (it was 3D). WP4 moves Feather Aura onto a
-                // Caster-anchored AbilityZone and deletes this method with the triplet.
-                if (AreaEffectRules.IsInside(caster.transform.position, caster.AuraSlowRadius, transform.position))
-                {
-                    ApplySlow(SlowSource.Ability, caster.AuraSlowFactor);
-                }
-            }
         }
 
         /// <summary>

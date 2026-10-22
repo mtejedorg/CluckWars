@@ -17,10 +17,19 @@
            PLAY AGAIN follows 1.5 s later), so the next round-start Invariant line must read zn=0. Root Egg (Fatty) is the
            reliable carrier (8 s): in solo the class becomes Fatty unless -Class is given; shared2's joiner is a Speedy (Feather
            Trap, 5 s), shared4/hostleave add a Fatty (joiner 2) and an Assassin (Doppelganger decoy, 4 s, may expire first).
+.PARAMETER AutoAura  WP4: the Speedy joiner (client2) gets -cw_autoaura: every round it walks into the nearest rival, casts
+           Feather Aura there and keeps walking into it; every peer's Invariant probe samples that rival's replicated
+           Snared flag, and merge.ps1 requires one 'Invariant aura ... remote=1 ... verdict=ok' line once an aura was cast.
+           In solo the class becomes Speedy unless -Class is given (victims are bots on the same peer: remote=0, so the
+           remote-victim rule can only be satisfied in shared2/shared4/hostleave). Not together with -AutoZone.
 .PARAMETER Width   window width of every EXE (default 960). Use 540x960 / 1080x2400 for portrait checks.
 .PARAMETER Height  window height of every EXE (default 540).
 .PARAMETER ExtraArgs  one space-separated string appended to EVERY EXE's args, e.g. HUD band screenshots (dev-tools build):
            -ExtraArgs '-cw_shots 15,22,29,36 -cw_band 290 -cw_zones -cw_shottag band290'  (PNGs land in <session>\shots)
+           Floor-ring rival arrows prototype vs the shipped edge chevrons (same seconds, one run each, compare the PNGs):
+           -ExtraArgs '-cw_shots 15,22,29,36 -cw_zones -cw_shottag edge'
+           -ExtraArgs '-cw_shots 15,22,29,36 -cw_zones -cw_shottag floor -cw_floorarrows'
+           The log says which one ran ("AutoTest floorarrows=0|1") and the ring radius in use ("Floor ring radius=").
 #>
 param(
     [ValidateSet('solo','shared2','shared4','hostleave')][string]$Mode = 'shared4',
@@ -29,12 +38,16 @@ param(
     [string]$Class = 'Warrior',
     [string]$JoinerExtra = '',  # extra EXE args (space separated) for every joiner, e.g. -JoinerExtra '-cw_autodisconnect 25'
     [switch]$AutoZone,
+    [switch]$AutoAura,
     [int]$Width = 960,
     [int]$Height = 540,
     [string]$ExtraArgs = ''     # extra EXE args (space separated) for every EXE, e.g. -ExtraArgs '-cw_shots 15,22 -cw_band 290 -cw_zones'
 )
 if ($AutoZone -and $Mode -eq 'solo' -and -not $PSBoundParameters.ContainsKey('Class')) { $Class = 'Fatty' }
 $zoneArgs = @(if ($AutoZone) { '-cw_autozone' })
+if ($AutoAura -and $AutoZone) { throw '-AutoAura and -AutoZone both reserve one ability slot; run them separately' }
+if ($AutoAura -and $Mode -eq 'solo' -and -not $PSBoundParameters.ContainsKey('Class')) { $Class = 'Speedy' }
+$auraArgs = @(if ($AutoAura) { '-cw_autoaura' })   # solo: client1; shared modes: the Speedy joiner (client2) only
 $allExtra = @($ExtraArgs -split '\s+' | Where-Object { $_ })
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\lib.ps1"
@@ -46,7 +59,7 @@ Get-Process CluckWars -ErrorAction SilentlyContinue | Stop-Process -Force
 # PC-only: never touch a phone (no logcat / screenrecord)
 & "$PSScriptRoot\start.ps1" -NoRecord | Out-Null
 $S = (Get-ChildItem (Join-Path $root 'Captures') -Directory | Sort-Object Name | Select-Object -Last 1).FullName
-Write-Host "session: $S   mode: $Mode   rounds: $Rounds   window: ${Width}x${Height}$(if ($AutoZone) { '   autozone' })$(if ($allExtra) { '   extra: ' + ($allExtra -join ' ') })"
+Write-Host "session: $S   mode: $Mode   rounds: $Rounds   window: ${Width}x${Height}$(if ($AutoZone) { '   autozone' })$(if ($AutoAura) { '   autoaura' })$(if ($allExtra) { '   extra: ' + ($allExtra -join ' ') })"
 
 function Start-Exe([string]$name, [string[]]$extra) {
     $a = @('-screen-fullscreen','0','-screen-width',"$Width",'-screen-height',"$Height",'-logFile',"`"$S\$name.log`"",'-cw_autoplay','-cw_hud','-cw_profile',$name) + $zoneArgs + $allExtra + $extra
@@ -64,7 +77,7 @@ function Wait-Code([string]$log) {
 $classes = @('Speedy','Fatty','Assassin')
 switch ($Mode) {
     'solo' {
-        Start-Exe 'client1' @('-cw_autosolo','-cw_class',$Class,'-cw_autoloop',"$Rounds")
+        Start-Exe 'client1' (@('-cw_autosolo','-cw_class',$Class,'-cw_autoloop',"$Rounds") + $auraArgs)
     }
     default {
         $joiners = switch ($Mode) { 'shared2' { 1 } default { 3 } }
@@ -74,7 +87,8 @@ switch ($Mode) {
         if (-not $code) { throw 'no join code appeared' }
         Write-Host "join code: $code"
         for ($j = 1; $j -le $joiners; $j++) {
-            Start-Exe "client$($j + 1)" (@('-cw_autojoin',$code,'-cw_class',$classes[($j - 1) % 3],'-cw_autoloop',"$Rounds") + @($JoinerExtra -split '\s+' | Where-Object { $_ }))
+            $jAura = @(if ($j -eq 1) { $auraArgs })   # joiner 1 is the Speedy ($classes[0])
+            Start-Exe "client$($j + 1)" (@('-cw_autojoin',$code,'-cw_class',$classes[($j - 1) % 3],'-cw_autoloop',"$Rounds") + $jAura + @($JoinerExtra -split '\s+' | Where-Object { $_ }))
         }
     }
 }

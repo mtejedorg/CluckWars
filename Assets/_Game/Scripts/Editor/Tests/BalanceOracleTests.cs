@@ -148,6 +148,11 @@ namespace CluckWars.Tests
                 };
 
                 bool declared = SpecSctTargets.TryGet(passive.Subclass, out var spec);
+                if (declared)
+                    Assert.AreEqual(spec.CargoCapacity, chicken.CargoCapacity,
+                        $"{className} with {passive.name} now carries {chicken.CargoCapacity}, but its SpecSctTargets entry " +
+                        $"was measured at {spec.CargoCapacity}. The Oracle is not monotonic in cargo, so the seconds can still " +
+                        "match by accident: re-measure and get the new number approved.");
                 for (int seat = 0; seat < 4; seat++)
                 {
                     var result = BalanceOracle.Simulate(ShippedMap.OracleMap(seat), chicken, config.FoodTargetToWin);
@@ -169,6 +174,30 @@ namespace CluckWars.Tests
                 checkedCount++;
             }
             Assert.GreaterOrEqual(checkedCount, 6, "Expected the six farming-class passives (Warrior, Speedy, Fatty x2) to be checked.");
+        }
+
+        /// <summary>
+        /// qa follow-up 10: a declared entry pins the cargo capacity it was measured at, not just
+        /// the seconds. Bully's 38.77 s / 3 is a plateau: caps 16, 17 and 18 all produce it, so
+        /// without this a BonusCapacity of 3 or 4 would pass the time check silently.
+        /// </summary>
+        [Test]
+        public void SpecSctTargets_PinTheCargoCapacityTheyWereMeasuredAt()
+        {
+            var stats = TestAssets.LoadAllIn<ChickenStatsSO>(TestAssets.ClassesDir);
+            var passives = TestAssets.LoadAllIn<PassiveAbilitySO>(TestAssets.AbilitiesDir);
+            foreach (var entry in SpecSctTargets.All)
+            {
+                Assert.Greater(entry.CargoCapacity, 0, $"{entry.Subclass} declares no CargoCapacity.");
+                var passive = passives.Find(p => p.Subclass == entry.Subclass);
+                Assert.IsNotNull(passive, $"No shipped passive for {entry.Subclass}.");
+                string className = entry.Subclass.ClassOf().ToString();
+                var s = stats.Find(x => x.DisplayName == className);
+                Assert.IsNotNull(s, $"No ChickenStatsSO with DisplayName '{className}'.");
+                float capacity = passive.ModifyCargoCapacity(s.CargoCapacity, null);
+                Assert.AreEqual(entry.CargoCapacity, capacity, 1e-4f,
+                    $"{entry.Subclass}: shipped capacity {capacity} differs from the declared {entry.CargoCapacity}.");
+            }
         }
 
         /// <summary>

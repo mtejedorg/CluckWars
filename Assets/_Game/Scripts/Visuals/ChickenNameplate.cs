@@ -402,7 +402,6 @@ namespace CluckWars.Visuals
             if (_controller.Rooted) return "🌱";
 
             bool slowed = _controller.SlowMultiplier < 0.999f
-                          || _controller.AuraSlowActive
                           || (_cargo != null && _cargo.IsPileSlow);
             return slowed ? "🐌" : string.Empty;
         }

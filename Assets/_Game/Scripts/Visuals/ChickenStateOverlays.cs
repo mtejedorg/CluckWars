@@ -332,8 +332,8 @@ namespace CluckWars.Visuals
         }
 
         /// <summary>
-        /// Slowed = any of the three sources §6.10 lists: an ability's slow
-        /// multiplier, a Feather-Aura field, or the food-pile drag.
+        /// Slowed = any of the sources §6.10 lists: an ability's slow multiplier (zones and
+        /// Feather Aura included, since WP4 it is a zone), or the food-pile drag.
         /// </summary>
         /// <remarks>
         /// <c>ControlFlags</c> is checked <i>first</i> and is the only source that works on
@@ -347,7 +347,6 @@ namespace CluckWars.Visuals
         {
             if ((flags & ControlVfx.Slowed) != 0) return true;
             if (_controller.SlowMultiplier < 0.999f) return true;
-            if (_controller.AuraSlowActive) return true;
             return _cargo != null && _cargo.IsPileSlow;
         }
 
@@ -358,12 +357,12 @@ namespace CluckWars.Visuals
         /// streaks.
         /// </summary>
         /// <remarks>
-        /// The replicated <c>Snared</c> bit is the real source and works on every peer.
-        /// <c>AuraSlowActive</c> is added as the same kind of one-frame-early local fallback
-        /// <see cref="IsSlowed"/> keeps, and it qualifies because an aura is unambiguously
-        /// enemy agency.
+        /// The replicated <c>Snared</c> bit is the one source and works on every peer. Until WP4
+        /// this also read the Feather Aura caster's emitter flag, which is set on the CASTER, so
+        /// the caster pulsed as if snared by their own aura (proposal §3.1); the flag is gone and
+        /// an aura is a zone like any other.
         /// <para>
-        /// There is deliberately <b>no</b> local fallback for a zone-sourced snare. The only
+        /// There is deliberately <b>no</b> local fallback for a zone-sourced snare (auras included). The only
         /// way to get one would be to scan <c>AbilityZone.ActiveZones</c> every frame on every
         /// chicken, duplicating <c>ChickenController.CheckAbilityZoneSlow</c> so that a pulse
         /// could start one frame sooner. The replicated flag arrives a frame later and a
@@ -372,8 +371,7 @@ namespace CluckWars.Visuals
         /// </remarks>
         private bool IsSnared(ControlVfx flags)
         {
-            if ((flags & ControlVfx.Snared) != 0) return true;
-            return _controller.AuraSlowActive;
+            return (flags & ControlVfx.Snared) != 0;
         }
 
         private static void SetActive(GameObject go, bool on)

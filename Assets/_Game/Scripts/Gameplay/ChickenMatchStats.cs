@@ -33,7 +33,8 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// Stuns this chicken received this round that started or extended its stun timer (a
-        /// shorter stun swallowed by a longer running one is not counted). Written on this
+        /// shorter stun swallowed by a longer running one is not counted), from any stun source.
+        /// Always 0 on a Doppelganger decoy (real players only). Written on this
         /// chicken's state authority by <c>ChickenController.RPC_ApplyStun</c>; read by the
         /// host's MATCH SUMMARY (decision F7, 2026-10-22). <b>Protocol change:</b> one more
         /// networked int on this behaviour, so all peers must run the same build.

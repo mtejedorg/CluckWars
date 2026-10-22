@@ -71,12 +71,9 @@ namespace CluckWars.Abilities
 
         public override void OnActivate(AbilityContext ctx)
         {
-            var caster = ctx.Controller;
-            var pos    = caster.transform.position + caster.transform.forward * ForwardOffset;
-            pos.y      = caster.transform.position.y; // keep on ground plane
-
-            TryGetAreaEffect(out var spec);
-            AreaEffectSpawner.Spawn(ctx, spec, pos, Source, "Feather Trap");
+            var caster = ctx.Controller.transform;
+            TryGetAreaEffect(out var spec);   // ForwardOffset ahead, on the caster's ground plane
+            AreaEffectSpawner.Spawn(ctx, spec, AreaEffectSpawner.Placement(caster.position, caster.forward, spec), Source, "Feather Trap");
         }
 
         public override void OnDeactivate(AbilityContext ctx) { }

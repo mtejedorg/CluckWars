@@ -56,6 +56,12 @@ namespace CluckWars.Diagnostics
         /// </summary>
         public int ReservedSlot { get; set; } = -1;
 
+        /// <summary>
+        /// <c>cw_autoaura</c> (WP4): while set, the stick walks straight at this world XZ point instead of following the
+        /// brain (the driver points it at the rival the aura is meant for). Null = the brain steers, as always.
+        /// </summary>
+        public Vector2? SteerOverride { get; set; }
+
         public AutoPlayGoal Goal => _brain.Goal;
         public AutoPlayState State => _brain.State;
         public AutoPlayPersonality Personality => _brain.Personality;
@@ -168,6 +174,11 @@ namespace CluckWars.Diagnostics
             CanForage = view.CanForage;
             view.Capacity = self.Cargo != null ? self.Cargo.Capacity : 0f;
             var world = _brain.Tick(now, view, (float)_rng.NextDouble());
+            if (SteerOverride.HasValue)
+            {
+                var toTarget = SteerOverride.Value - view.Self;
+                world = toTarget.sqrMagnitude > 0.01f ? toTarget.normalized : Vector2.zero;   // full stick, into the target
+            }
 
             float yaw = MatchCamera.Instance != null ? MatchCamera.Instance.CurrentYaw : 0f;
             // OnInput turns the stick into world space with StickToWorld(stick, yaw), a rotation: its inverse is the same call at -yaw.

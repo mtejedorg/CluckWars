@@ -156,11 +156,19 @@ namespace CluckWars.Gameplay
         // then, (5) the zone is not older, measured locally, than the pool's longest zone lifetime plus the
         // latency cap, and (6) its radius is clamped to the largest radius the pool authors.
         //
-        // Trade-off of (3), accepted: a peer that first sees a zone before it can resolve the caster (a late
-        // joiner, a caster still in flight) gets no evidence from that zone, so a root it sends from out of
-        // direct reach is refused there once and logged ("rejected RPC_ApplyRoot ... OutOfRange"). The old
-        // fallback anchored on the caster's CURRENT position plus drift over the zone's whole age, which an
-        // attacker could stretch across most of the arena over an 8 s egg.
+        // Trade-off of (3), accepted: a peer that first sees a zone before it can resolve the caster (a caster
+        // still in flight) gets no evidence from that zone, so a root it sends from out of direct reach is refused
+        // there once and logged ("rejected RPC_ApplyRoot ... OutOfRange"). The old fallback anchored on the
+        // caster's CURRENT position plus drift over the zone's whole age, which an attacker could stretch across
+        // most of the arena over an 8 s egg - against every peer.
+        //
+        // Late joiner (qa W1): a peer that joined after the egg was placed first sees it up to a lifetime late,
+        // so where the caster stands at that moment is not where it laid the egg. Only for a zone first seen
+        // within JoinWindowSeconds of this peer's own join (a local, unforgeable fact), the caster may have
+        // drifted over the zone's claimed age = MaxZoneLifetime - the networked timer's remaining time, clamped
+        // to [0, MaxZoneLifetime]. The age is attacker-writable, so it is charged twice: the drift it buys widens
+        // the centre allowance, and the same age is spent from the vouching window (rule 5 counts claimed age +
+        // local age). A peer that was already in the match never gets the extension.
 
         /// <summary>What the victim's peer knows about one Root zone (live, or recorded at its despawn).</summary>
         public struct RootZoneEvidence
@@ -179,6 +187,53 @@ namespace CluckWars.Gameplay
             public float SpawnDrift;
             /// <summary>Real seconds since this peer first saw the zone (local clock, never replicated).</summary>
             public float SecondsSinceSeen;
+            /// <summary>This peer first saw the zone within <see cref="JoinWindowSeconds"/> of its own join (local fact).</summary>
+            public bool FirstSeenAtJoin;
+            /// <summary>The zone's networked lifetime timer remaining when this peer first saw it (attacker-writable; NaN/negative = unknown).</summary>
+            public float RemainingAtFirstSight;
+            /// <summary>The caster's drift speed (m/s) when this peer first saw the zone; prices the late-joiner extension.</summary>
+            public float CasterDriftSpeed;
+        }
+
+        /// <summary>How soon after this peer's own join a zone counts as "already there when I arrived" (qa W1).</summary>
+        public const float JoinWindowSeconds = 2f;
+
+        /// <summary>
+        /// Seconds the zone had already lived when this peer first saw it, as far as this peer may believe: 0 unless it
+        /// was first seen at this peer's join; then <c>MaxZoneLifetime - RemainingAtFirstSight</c>, clamped to
+        /// [0, MaxZoneLifetime]. An unknown remaining time (NaN, negative) claims the whole lifetime; such a zone is
+        /// also refused outright by <see cref="IsCredibleZoneCenter"/> (fail closed).
+        /// <para>Residual, accepted: a zone authority can claim a near-dead egg to widen the centre allowance, but only
+        /// against a peer that joined within <see cref="JoinWindowSeconds"/>, and the claimed age is spent from the same
+        /// vouching window (at most MaxZoneLifetime + latency in total).</para>
+        /// </summary>
+        public static float AgeAtFirstSight(in RootZoneEvidence z, in Ceiling c)
+        {
+            if (!z.FirstSeenAtJoin || !(c.MaxZoneLifetime > 0f)) return 0f;
+            float remaining = z.RemainingAtFirstSight >= 0f ? z.RemainingAtFirstSight : 0f;   // NaN reads as 0
+            return Mathf.Clamp(c.MaxZoneLifetime - remaining, 0f, c.MaxZoneLifetime);
+        }
+
+        /// <summary>The evidence identity check of one Render (qa W2): what to do with the snapshot.</summary>
+        public enum IdentityObservation : byte
+        {
+            Unchanged = 0,
+            /// <summary>The snapshot had no authority yet (None when first seen) and it is valid now: capture it, once.</summary>
+            CaptureAuthority = 1,
+            /// <summary>The owner, or an already captured authority, differs: the evidence is void for good.</summary>
+            Changed = 2,
+        }
+
+        /// <summary>
+        /// Owner and authority are snapshotted once. A stored authority of None means "not captured yet", never
+        /// "changed": it is captured on the first frame the zone has a valid one. Until then the evidence cannot vouch
+        /// (None never equals the caster's authority).
+        /// </summary>
+        public static IdentityObservation ObserveIdentity(bool sameOwner, bool snapshotAuthorityKnown, bool authorityKnown, bool sameAuthority)
+        {
+            if (!sameOwner) return IdentityObservation.Changed;
+            if (!snapshotAuthorityKnown) return authorityKnown ? IdentityObservation.CaptureAuthority : IdentityObservation.Unchanged;
+            return sameAuthority ? IdentityObservation.Unchanged : IdentityObservation.Changed;
         }
 
         /// <summary>
@@ -190,17 +245,21 @@ namespace CluckWars.Gameplay
         public static bool IsCredibleZoneCenter(in RootZoneEvidence z, in Ceiling c)
         {
             if (!z.HasCasterAtSpawn) return false;
-            float allowance = Mathf.Max(0f, z.SpawnDrift);
+            // Seen at join with no readable timer: its age is unknown, so no drift can be priced - not evidence.
+            if (z.FirstSeenAtJoin && !(z.RemainingAtFirstSight >= 0f)) return false;
+            float allowance = Mathf.Max(0f, z.SpawnDrift) + Mathf.Max(0f, z.CasterDriftSpeed) * AgeAtFirstSight(z, c);
             return IsInsideZone(z.CasterAtSpawn, Mathf.Max(0f, c.MaxZonePlacement) + RangeSlackMeters + allowance, z.Center, 0f);
         }
 
         /// <summary>
-        /// The zone is still inside its authored life as this peer counts it: at most the pool's longest zone lifetime
-        /// plus <see cref="ExecuteRules.MaxLatencySeconds"/> since this peer first saw it. NaN and negative ages fail.
+        /// The zone is still inside its authored life as this peer counts it: its age at first sight
+        /// (<see cref="AgeAtFirstSight"/>, 0 unless first seen at this peer's join) plus the local seconds since, at
+        /// most the pool's longest zone lifetime plus <see cref="ExecuteRules.MaxLatencySeconds"/>. NaN and negative
+        /// ages fail.
         /// </summary>
         public static bool IsWithinZoneLifetime(in RootZoneEvidence z, in Ceiling c) =>
             c.MaxZoneLifetime > 0f && z.SecondsSinceSeen >= 0f &&
-            z.SecondsSinceSeen <= c.MaxZoneLifetime + ExecuteRules.MaxLatencySeconds;
+            AgeAtFirstSight(z, c) + z.SecondsSinceSeen <= c.MaxZoneLifetime + ExecuteRules.MaxLatencySeconds;
 
         /// <summary>
         /// True when <paramref name="z"/> may vouch for a root on a victim at <paramref name="victim"/>: same and

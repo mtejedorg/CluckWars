@@ -17,10 +17,21 @@ namespace CluckWars.Tests
         [Test]
         public void WinnerDeposited_ShowsAZeroDepositWinnerExplicitly()
         {
-            Assert.AreEqual("Winner Deposited: 0.0 (Assassin, corner 2)",
+            Assert.AreEqual("Winner Deposited: 0.0 by P3 (Assassin)",
                 MatchSummaryLines.WinnerDeposited(2, true, ChickenClass.Assassin, 0f));
-            Assert.AreEqual("Winner Deposited: 24.0 (Fatty, corner 0)",
+            Assert.AreEqual("Winner Deposited: 24.0 by P1 (Fatty)",
                 MatchSummaryLines.WinnerDeposited(0, true, ChickenClass.Fatty, 24f));
+        }
+
+        /// <summary>qa follow-up 11: the winner line and the player rows must name the same player the same way.</summary>
+        [Test]
+        public void WinnerLine_AndPlayerRow_UseTheSameOneBasedLabel()
+        {
+            string winner = MatchSummaryLines.WinnerDeposited(2, true, ChickenClass.Assassin, 0f);
+            string row = MatchSummaryLines.PlayerRow(2, ChickenClass.Assassin, 0, 0f, 0);
+            StringAssert.Contains("P3 (Assassin)", winner);
+            StringAssert.StartsWith("  P3 (Assassin):", row);
+            StringAssert.Contains("no stats for P4", MatchSummaryLines.WinnerDeposited(3, false, ChickenClass.Warrior, 0f));
         }
 
         [Test]
@@ -35,7 +46,8 @@ namespace CluckWars.Tests
         public void Counters_HaveStableShapes()
         {
             Assert.AreEqual("Executes Landed: 3", MatchSummaryLines.ExecutesLanded(3));
-            Assert.AreEqual("Stuns Landed: 0", MatchSummaryLines.StunsLanded(0));
+            Assert.AreEqual("Stuns Landed (all sources, real players): 0", MatchSummaryLines.StunsLanded(0));
+            StringAssert.StartsWith("Stuns Landed", MatchSummaryLines.StunsLanded(7), "grep prefix must stay stable");
         }
 
         [Test]
@@ -52,7 +64,7 @@ namespace CluckWars.Tests
             try
             {
                 Thread.CurrentThread.CurrentCulture = new CultureInfo("es-ES");
-                Assert.AreEqual("Winner Deposited: 12.5 (Speedy, corner 1)",
+                Assert.AreEqual("Winner Deposited: 12.5 by P2 (Speedy)",
                     MatchSummaryLines.WinnerDeposited(1, true, ChickenClass.Speedy, 12.5f));
                 StringAssert.Contains("Deposited=12.5,", MatchSummaryLines.PlayerRow(1, ChickenClass.Speedy, 0, 12.5f, 0));
             }
@@ -86,6 +98,8 @@ namespace CluckWars.Tests
             int count = body.IndexOf("RecordStunTaken()", StringComparison.Ordinal);
             Assert.Greater(timer, 0);
             Assert.Greater(count, timer, "a stun swallowed by a longer running one returns before this, so it must come after the timer write");
+            int decoy = body.IndexOf("if (!IsDecoy)", timer, StringComparison.Ordinal);
+            Assert.That(decoy > timer && decoy < count, "decoy stuns must be skipped before counting (real players only)");
         }
     }
 }

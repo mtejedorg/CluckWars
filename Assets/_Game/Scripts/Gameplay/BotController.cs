@@ -521,10 +521,12 @@ namespace CluckWars.Gameplay
                 if (!float.IsPositiveInfinity(reach))
                 {
                     // A reach-having ability with nobody to point it at is a whiff by
-                    // construction — unless it places a zone, which is worth dropping on the
-                    // ground the bot is standing on (a trap behind a fleeing chicken is the
-                    // whole point of the ability).
-                    if (!haveTarget && !ability.PlacesZone) continue;
+                    // construction — unless it places a Static AoE, which is worth dropping on
+                    // the ground the bot is standing on (a trap behind a fleeing chicken is the
+                    // whole point of the ability). An Aura is not: it follows the bot and ends
+                    // with the cast, so with nobody near it slows nobody (WP4 keeps the bots'
+                    // pre-WP4 Feather Aura rule).
+                    if (!haveTarget && ability.AreaKind != AreaEffectKind.StaticAoE) continue;
                     if (haveTarget && targetDist > reach * BotTactics.CommitReachFraction) continue;
                 }
 

@@ -251,7 +251,7 @@ namespace CluckWars.Tests
                     bool deliversSomethingElse = NonControlDelivery.Any(r => src.Contains(r));
 
                     // A placed zone's slow and root reach the victim through
-                    // CheckAbilityZoneSlow / CheckAuraSlow, which call ApplySlow directly
+                    // CheckAbilityZoneSlow (auras included), which calls ApplySlow directly
                     // rather than routing through ApplyPassiveControlDuration — so immunity
                     // does not refuse them, and claiming it would grey a bracket for an
                     // effect that lands. They also resolve long after the cast.

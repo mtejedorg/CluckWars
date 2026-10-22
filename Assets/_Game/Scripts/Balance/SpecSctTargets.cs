@@ -11,6 +11,14 @@ namespace CluckWars.Balance
         public ChickenSubclass Subclass;
         public float           Seconds;
         public int             Trips;
+
+        /// <summary>
+        /// Cargo capacity (class stat through the passive's hook) the entry was measured at. The
+        /// Oracle is not monotonic in cargo (Warrior caps 16, 17 and 18 all give 38.77 s / 3), so
+        /// the seconds alone would let a different bonus pass silently; the test pins this too.
+        /// </summary>
+        public int             CargoCapacity;
+
         public string          Reason;
     }
 
@@ -39,13 +47,13 @@ namespace CluckWars.Balance
         {
             new SpecSctTarget
             {
-                Subclass = ChickenSubclass.Fatty_Hoarder, Seconds = 25.82f, Trips = 1,
+                Subclass = ChickenSubclass.Fatty_Hoarder, Seconds = 25.82f, Trips = 1, CargoCapacity = 40,
                 Reason = "Designed: cargo floor 40 = the win target, so a perfect run is one trip " +
                          "(Fatty signature fantasy). 4.2 s faster than the naked Fatty by intent.",
             },
             new SpecSctTarget
             {
-                Subclass = ChickenSubclass.Warrior_Bully, Seconds = 38.77f, Trips = 3,
+                Subclass = ChickenSubclass.Warrior_Bully, Seconds = 38.77f, Trips = 3, CargoCapacity = 16,
                 Reason = "Maestro 2026-10-22 (A2/F1): steal x1.4 plus a symbolic +2 cargo (14 -> 16). " +
                          "The greedy nearest-pile router is non-monotonic in cargo (caps 16-18 all give " +
                          "38.77 s / 3, cap 15 gives 31.65 s): a router artifact, not a real slowdown of a " +

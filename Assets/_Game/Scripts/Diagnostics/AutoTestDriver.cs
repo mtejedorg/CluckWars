@@ -28,7 +28,7 @@ namespace CluckWars.Diagnostics
     /// </remarks>
     // Before FusionNetworkService.Update (default order 0), so a press decided this frame is read this frame.
     [DefaultExecutionOrder(-500)]
-    public sealed class AutoTestDriver : MonoBehaviour
+    public sealed partial class AutoTestDriver : MonoBehaviour
     {
         private const string Source = "AutoTest";
         private const float StepSeconds = 0.6f;
@@ -99,10 +99,10 @@ namespace CluckWars.Diagnostics
 
         private void ApplyScreenshotTools()
         {
-            bool wanted = _cfg.Shots.Length > 0 || _cfg.BandOverride != 0 || _cfg.Zones;
+            bool wanted = _cfg.Shots.Length > 0 || _cfg.BandOverride != 0 || _cfg.Zones || _cfg.FloorArrows;
             if (!DevTools.Available)
             {
-                if (wanted) _log.Warn(Source, "AutoTest cw_shots/cw_band/cw_zones ignored: dev tools not available in this build");
+                if (wanted) _log.Warn(Source, "AutoTest cw_shots/cw_band/cw_zones/cw_floorarrows ignored: dev tools not available in this build");
                 _shotsDone = true;
                 return;
             }
@@ -113,6 +113,12 @@ namespace CluckWars.Diagnostics
 
             DiagnosticsReadout.ZonesOverlay = _cfg.Zones;
             if (_cfg.Zones) _log.Info(Source, "AutoTest zones=1: HUD info / control zones outlined by the overlay.");
+
+            CluckWars.Visuals.FloorRivalArrows.DevRequested = _cfg.FloorArrows;
+            _log.Info(Source, _cfg.FloorArrows
+                ? "AutoTest floorarrows=1: hidden rivals get an arrow on a floor ring round the local chicken (prototype); " +
+                  "their edge chevrons are suppressed."
+                : "AutoTest floorarrows=0: rival arrows are the shipped edge chevrons.");
 
             if (_cfg.Shots.Length == 0) { _shotsDone = true; return; }
             _shotDir = AutoTestRules.ShotDirectoryFromArgs(Environment.GetCommandLineArgs())
@@ -312,6 +318,7 @@ namespace CluckWars.Diagnostics
             bool valid = gm != null && gm.Object != null && gm.Object.IsValid;
 
             TickAutoZone(valid ? gm : null);   // before autoplay: the reservation must hold before its first cast
+            TickAutoAura(valid ? gm : null);   // same, and its steer must be set before the fake player decides (AutoTestDriver.Aura.cs)
             TickAutoPlay(valid ? gm : null);
             TickShots(valid ? gm : null);
             if (!valid) return;

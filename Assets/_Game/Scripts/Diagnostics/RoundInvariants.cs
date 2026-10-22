@@ -216,6 +216,75 @@ namespace CluckWars.Diagnostics
             return sum;
         }
 
+        // ---- WP4: a REMOTE victim inside a Slow aura is slowed (state on every peer, the CW-217 lesson) ----------------
+
+        /// <summary>One rival inside one Slow aura, as one peer saw it over the aura's life (<see cref="SampleAuraVictim"/>).</summary>
+        public struct AuraVictimTally
+        {
+            /// <summary>Settled frames: the victim stood deep inside for at least <see cref="AuraSettleSeconds"/>.</summary>
+            public int Deep;
+            /// <summary>Of <see cref="Deep"/>, the frames whose replicated <c>ControlVfx</c> carried <c>Snared</c>.</summary>
+            public int Snared;
+            /// <summary>The victim is deep inside right now, since <see cref="RunStart"/> (local seconds).</summary>
+            public bool InRun;
+            public float RunStart;
+        }
+
+        /// <summary>
+        /// "Deep inside": within this fraction of the radius. The observer sees the caster and the victim where IT
+        /// interpolates them, and the victim's authority decides from its own view (peers differ by up to ~3 m at speed),
+        /// so the rim is no evidence either way: 0.6 x 5.4 m leaves a 2.2 m margin.
+        /// </summary>
+        public const float AuraDeepFraction = 0.6f;
+
+        /// <summary>
+        /// A frame counts only after the victim has been deep inside continuously for this long on this peer: the zone's
+        /// spawn has to reach the victim's authority, its next tick applies the slow, and the flag has to come back.
+        /// </summary>
+        public const float AuraSettleSeconds = 0.4f;
+
+        /// <summary>Fewer settled frames than this is no verdict (the victim only brushed the aura).</summary>
+        public const int AuraMinSamples = 8;
+
+        /// <summary>A victim snared on fewer than this share of its settled frames was not slowed by the aura.</summary>
+        public const float AuraMinSnaredShare = 0.5f;
+
+        /// <summary>A Caster zone whose owner does not resolve on this peer for longer than this is orphaned (hostleave).</summary>
+        public const float AuraOrphanSeconds = 1.5f;
+
+        public enum AuraVerdict { TooFew, Ok, NotSnared }
+
+        public static bool IsDeepInsideAura(float planarDistance, float radius) => planarDistance <= radius * AuraDeepFraction;
+
+        /// <summary>One frame of one victim: leaving the deep core ends the run; a frame counts once the run has settled.</summary>
+        public static AuraVictimTally SampleAuraVictim(AuraVictimTally t, bool deep, bool snared, float now)
+        {
+            if (!deep) { t.InRun = false; return t; }
+            if (!t.InRun) { t.InRun = true; t.RunStart = now; return t; }
+            if (now - t.RunStart < AuraSettleSeconds) return t;
+            t.Deep++;
+            if (snared) t.Snared++;
+            return t;
+        }
+
+        public static AuraVerdict JudgeAuraVictim(in AuraVictimTally t)
+        {
+            if (t.Deep < AuraMinSamples) return AuraVerdict.TooFew;
+            return t.Snared >= AuraMinSnaredShare * t.Deep ? AuraVerdict.Ok : AuraVerdict.NotSnared;
+        }
+
+        public static string VerdictName(AuraVerdict v) =>
+            v == AuraVerdict.Ok ? "ok" : v == AuraVerdict.NotSnared ? "not-snared" : "too-few";
+
+        /// <summary>
+        /// The line merge.ps1 reads (<c>Invariant aura ...</c>, Info; a <c>not-snared</c> verdict is also logged as
+        /// <c>Invariant FAIL aura-victim-snared</c>, Error). <paramref name="remote"/>: the victim's state authority is not
+        /// the aura's, i.e. the victim's own peer had to see a zone another peer spawned (CW-217).
+        /// </summary>
+        public static string AuraVictimLine(string owner, string victim, bool remote, in AuraVictimTally t, int round) =>
+            "Invariant aura owner=" + owner + " victim=" + victim + " remote=" + (remote ? 1 : 0) + " deep=" + t.Deep +
+            " snared=" + t.Snared + " verdict=" + VerdictName(JudgeAuraVictim(t)) + " round=" + round;
+
         private static uint Fnv(uint h, string s)
         {
             unchecked

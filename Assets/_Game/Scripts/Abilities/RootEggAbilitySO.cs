@@ -70,10 +70,9 @@ namespace CluckWars.Abilities
 
         public override void OnActivate(AbilityContext ctx)
         {
-            var pos = ctx.Controller.transform.position;   // at the caster's feet (AimForwardOffset 0)
-
-            TryGetAreaEffect(out var spec);
-            AreaEffectSpawner.Spawn(ctx, spec, pos, Source, "Root Egg");
+            var caster = ctx.Controller.transform;
+            TryGetAreaEffect(out var spec);   // offset 0: at the caster's feet
+            AreaEffectSpawner.Spawn(ctx, spec, AreaEffectSpawner.Placement(caster.position, caster.forward, spec), Source, "Root Egg");
         }
 
         public override void OnDeactivate(AbilityContext ctx) { }

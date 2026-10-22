@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using CluckWars.Abilities;
 using CluckWars.Gameplay;
 using CluckWars.Logging;
 using Fusion;
@@ -19,8 +20,10 @@ namespace CluckWars.Diagnostics
     /// <remarks>
     /// Lines: <c>Invariant state A->B round=k</c> (Info), <c>Invariant FAIL &lt;name&gt; expected=.. actual=.. who=..</c>
     /// (Error), <c>Invariant ok round=k n=..</c> (Info), <c>World t=.. static=XXXXXXXX n=.. chickens=XXXXXXXX m=..</c> (Info).
-    /// Round-start lines (ok and FAIL) end with <c> zn=.. au=.. dc=..</c>: live ability zones, chickens with an aura on and
-    /// Doppelganger decoys, all of which must be 0 (B10, <see cref="RoundInvariants.StartCounts"/>).
+    /// Round-start lines (ok and FAIL) end with <c> zn=.. au=.. dc=..</c>: live placed (World) zones, live auras
+    /// (Caster-anchored zones, WP4) and Doppelganger decoys, all of which must be 0 (B10, <see cref="RoundInvariants.StartCounts"/>).
+    /// While a Slow aura lives, every peer also samples each rival inside it (<see cref="AuraVictimSampler"/>): the
+    /// victim's replicated <c>ControlVfx.Snared</c> must be on (WP4, the CW-217 lesson - state on a REMOTE peer, not logs).
     /// Read-only; it never changes gameplay and never throws (an exception inside a check is logged as an Error).
     /// </remarks>
     public sealed class InvariantProbe : MonoBehaviour
@@ -49,6 +52,15 @@ namespace CluckWars.Diagnostics
         private readonly List<(uint owner, int radiusBucket, byte effect, byte channels)> _auras =
             new List<(uint, int, byte, byte)>(8);
 
+        // WP4 aura sampling (local to this peer): per live Caster zone, and per (zone, rival) that was ever deep inside it.
+        private struct AuraWatch { public string Owner; public bool Unresolved; public float UnresolvedSince; public bool OrphanReported; }
+        private struct AuraVictim { public string Victim; public bool Remote; public RoundInvariants.AuraVictimTally Tally; }
+        private readonly Dictionary<uint, AuraWatch> _auraWatch = new Dictionary<uint, AuraWatch>(8);
+        private readonly Dictionary<(uint zone, uint victim), AuraVictim> _auraVictims = new Dictionary<(uint, uint), AuraVictim>(16);
+        private readonly HashSet<uint> _auraSeen = new HashSet<uint>();
+        private readonly List<uint> _auraGone = new List<uint>(4);
+        private readonly List<(uint zone, uint victim)> _victimKeys = new List<(uint, uint)>(16);
+
         [Inject]
         public void Construct(ILogService log) => _log = log;
 
@@ -67,6 +79,8 @@ namespace CluckWars.Diagnostics
                 _round = 0;
                 _startCheckAt = -1f;
                 _worldBoundary.Reset();
+                _auraWatch.Clear();     // a left session judges nothing: its zones are gone with it
+                _auraVictims.Clear();
                 return;
             }
 
@@ -74,6 +88,7 @@ namespace CluckWars.Diagnostics
             {
                 Observe(gm);
                 World(gm);
+                Auras(gm.Runner);
             }
             catch (Exception e)
             {
@@ -123,7 +138,7 @@ namespace CluckWars.Diagnostics
                 var p = c.transform.position;
                 _chickens.Add(new InvariantChicken
                 {
-                    Id = c.IsBot ? "B" + c.HomeCornerIndex : "P" + c.Object.InputAuthority.PlayerId,
+                    Id = Label(c),
                     Home = c.HomeCornerIndex,
                     Position = new Vector2(p.x, p.z),
                     Cargo = c.Cargo != null ? c.Cargo.Cargo : 0f,
@@ -147,7 +162,7 @@ namespace CluckWars.Diagnostics
             // B10 leftovers: what the previous round placed must be gone (the check runs during the intro: nobody can cast).
             int zones = 0, auras = 0, decoys = 0;
             var live = AbilityZone.ActiveZones;
-            // A Caster-anchored zone (WP3) is an aura: counted with the triplet auras, not with the placed zones.
+            // A Caster-anchored zone is an aura (the only kind since WP4 deleted the ChickenController triplet).
             for (int i = 0; i < live.Count; i++)
                 if (live[i] != null && live[i].Object != null && live[i].Object.IsValid)
                 {
@@ -159,7 +174,6 @@ namespace CluckWars.Diagnostics
                 var c = all[i];
                 if (c == null || c.Object == null || !c.Object.IsValid) continue;
                 if (c.IsDecoy) decoys++;
-                if (c.AuraSlowActive) auras++;
             }
 
             _fails.Clear();
@@ -258,6 +272,98 @@ namespace CluckWars.Diagnostics
         {
             var p = t.position;
             return new Vector2(p.x, p.z);
+        }
+
+        /// <summary>The probe's chicken id: <c>B&lt;corner&gt;</c> for a bot, <c>P&lt;PlayerId&gt;</c> for a player.</summary>
+        private static string Label(ChickenController c) =>
+            c.IsBot ? "B" + c.HomeCornerIndex : "P" + c.Object.InputAuthority.PlayerId;
+
+        /// <summary>
+        /// WP4, every frame on every peer: for each live Slow aura (Caster zone), every rival deep inside it is sampled for
+        /// its replicated <c>ControlVfx.Snared</c> (<see cref="RoundInvariants.SampleAuraVictim"/>); when the aura is gone the
+        /// verdict per victim is logged (<see cref="RoundInvariants.AuraVictimLine"/>), and a <c>not-snared</c> one as an
+        /// <c>Invariant FAIL aura-victim-snared</c> Error. A Caster zone whose owner does not resolve here for
+        /// <see cref="RoundInvariants.AuraOrphanSeconds"/> is an <c>aura-orphan</c> FAIL (a bot's aura must go with its bot
+        /// on hostleave; the authority despawns it the tick its owner is gone, B5).
+        /// </summary>
+        private void Auras(NetworkRunner runner)
+        {
+            float now = Time.realtimeSinceStartup;
+            _auraSeen.Clear();
+            var zones = AbilityZone.ActiveZones;
+            for (int i = 0; i < zones.Count; i++)
+            {
+                var z = zones[i];
+                if (z == null || z.Object == null || !z.Object.IsValid || z.Anchor != ZoneAnchor.Caster) continue;
+                uint id = z.Object.Id.Raw;
+                _auraSeen.Add(id);
+
+                _auraWatch.TryGetValue(id, out var w);
+                bool resolved = z.TryGetCenter(out Vector3 center);
+                if (resolved)
+                {
+                    w.Unresolved = false;
+                    if (w.Owner == null && runner.TryFindBehaviour(z.OwnerChicken, out ChickenController owner) && owner != null &&
+                        owner.Object != null && owner.Object.IsValid)
+                        w.Owner = Label(owner);
+                }
+                else if (!w.Unresolved) { w.Unresolved = true; w.UnresolvedSince = now; }
+                else if (!w.OrphanReported && now - w.UnresolvedSince > RoundInvariants.AuraOrphanSeconds)
+                {
+                    w.OrphanReported = true;
+                    string waited = (now - w.UnresolvedSince).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+                    _log?.Error(Source, new InvariantFailure("aura-orphan", "owner resolves", "unresolved for " + waited + "s",
+                        "aura" + id).Line() + " owner=" + (w.Owner ?? "?") + " round=" + _round);
+                }
+                _auraWatch[id] = w;
+
+                if (!resolved || z.Effect != ZoneEffect.Slow || !z.HasChannel(AreaEffectChannel.WhileInside)) continue;
+                float radius = z.TriggerRadius;
+                var all = ChickenController.ActiveControllers;
+                for (int k = 0; k < all.Count; k++)
+                {
+                    var c = all[k];
+                    if (c == null || c.Object == null || !c.Object.IsValid || c.IsDecoy || c.Id == z.OwnerChicken) continue;
+                    if (c.Combat != null && c.Combat.IsRemoved) continue;
+                    var p = c.transform.position;
+                    float dx = p.x - center.x, dz = p.z - center.z;
+                    bool deep = RoundInvariants.IsDeepInsideAura(Mathf.Sqrt(dx * dx + dz * dz), radius);
+                    var key = (id, c.Object.Id.Raw);
+                    bool known = _auraVictims.TryGetValue(key, out var v);
+                    if (!known && !deep) continue;   // never deep inside: no record
+                    if (!known)
+                    {
+                        v.Victim = Label(c);
+                        v.Remote = c.Object.StateAuthority != z.Object.StateAuthority;
+                    }
+                    v.Tally = RoundInvariants.SampleAuraVictim(v.Tally, deep, (c.ControlFlags & ControlVfx.Snared) != 0, now);
+                    _auraVictims[key] = v;
+                }
+            }
+
+            _auraGone.Clear();
+            foreach (var id in _auraWatch.Keys) if (!_auraSeen.Contains(id)) _auraGone.Add(id);
+            for (int i = 0; i < _auraGone.Count; i++) FinishAura(_auraGone[i]);
+        }
+
+        /// <summary>The aura is gone on this peer: one verdict line per victim that was ever deep inside it.</summary>
+        private void FinishAura(uint zoneId)
+        {
+            string owner = _auraWatch.TryGetValue(zoneId, out var w) && w.Owner != null ? w.Owner : "?";
+            _auraWatch.Remove(zoneId);
+            _victimKeys.Clear();
+            foreach (var key in _auraVictims.Keys) if (key.zone == zoneId) _victimKeys.Add(key);
+            for (int i = 0; i < _victimKeys.Count; i++)
+            {
+                var v = _auraVictims[_victimKeys[i]];
+                _auraVictims.Remove(_victimKeys[i]);
+                _log?.Info(Source, RoundInvariants.AuraVictimLine(owner, v.Victim, v.Remote, v.Tally, _round));
+                if (RoundInvariants.JudgeAuraVictim(v.Tally) == RoundInvariants.AuraVerdict.NotSnared)
+                    _log?.Error(Source, new InvariantFailure("aura-victim-snared",
+                        ">=" + Mathf.RoundToInt(RoundInvariants.AuraMinSnaredShare * 100f) + "%",
+                        v.Tally.Snared + "/" + v.Tally.Deep, v.Victim).Line() +
+                        " owner=" + owner + " remote=" + (v.Remote ? 1 : 0) + " round=" + _round);
+            }
         }
     }
 

@@ -32,9 +32,8 @@ namespace CluckWars.Gameplay
 
     /// <summary>
     /// The networked area-effect object for both effect types (WP3): a <b>Static AoE</b> (Feather Trap, Root Egg, Smoke
-    /// Roost; <see cref="ZoneAnchor.World"/>) and an <b>Aura</b> (<see cref="ZoneAnchor.Caster"/>; Feather Aura moves
-    /// onto it in WP4). Spawned by <see cref="AreaEffectSpawner"/>; parameters are stamped in <c>onBeforeSpawned</c>
-    /// from tick zero.
+    /// Roost; <see cref="ZoneAnchor.World"/>) and an <b>Aura</b> (<see cref="ZoneAnchor.Caster"/>; Feather Aura since
+    /// WP4). Spawned by <see cref="AreaEffectSpawner"/>; parameters are stamped in <c>onBeforeSpawned</c> from tick zero.
     /// </summary>
     /// <remarks>
     /// <b>One centre.</b> Every simulation and feedback test reads <see cref="TryGetCenter"/>, never the transform: a
@@ -43,11 +42,14 @@ namespace CluckWars.Gameplay
     /// chicken and there is no NetworkTransform (decision F2): the aura costs zero bandwidth after its spawn.
     /// Locked by <c>AreaEffectTypeTests.NoSimulationRead_OfZoneTransform</c>.
     /// <para>
-    /// <b>Channels</b> (<see cref="Channels"/>, B3): <see cref="AreaEffectChannel.OnEnter"/> is evaluated HERE, on the
-    /// zone's authority, once per chicken per zone life, including chickens already inside on its first tick (Root
-    /// Egg: <see cref="ChickenController.RPC_ApplyRoot"/>, then consumed). <see cref="AreaEffectChannel.WhileInside"/> is
-    /// evaluated by each VICTIM's own authority in <see cref="ChickenController.CheckAbilityZoneSlow"/> from
-    /// <see cref="ActiveZones"/>, zero RPC (B2 hybrid authority). Periodic is spec-only (WP5).
+    /// <b>Channels</b> (<see cref="Channels"/>, B3): <see cref="AreaEffectChannel.OnEnter"/> fires once per chicken per
+    /// zone life, including chickens already inside when the zone first runs. On a Root zone it is evaluated HERE, on the
+    /// zone's authority (Root Egg: <see cref="ChickenController.RPC_ApplyRoot"/>, then consumed). On a Slow zone (Feather
+    /// Aura, WP4) it changes no state - the slow is WhileInside - and is the per-chicken entry confirmation, evaluated in
+    /// <see cref="Render"/> on every peer from replicated positions (<see cref="ObserveSlowZoneEntry"/>).
+    /// <see cref="AreaEffectChannel.WhileInside"/> is evaluated by each VICTIM's own authority in
+    /// <see cref="ChickenController.CheckAbilityZoneSlow"/> from <see cref="ActiveZones"/>, zero RPC (B2 hybrid
+    /// authority). Periodic is spec-only (WP5).
     /// </para>
     /// <para>
     /// <b>Maestro:</b> one <c>AbilityZone</c> prefab (NetworkObject + this script + <c>AbilityZoneVisuals</c>), assigned
@@ -111,9 +113,13 @@ namespace CluckWars.Gameplay
         /// <summary><see cref="SpawnPosition"/> was stamped.</summary>
         [Networked] public NetworkBool HasSpawnPosition { get; set; }
 
-        // WP3 (+3 bytes, protocol change): stamped last by AreaEffectSpawner. Byte enums / byte only (Fusion weaver).
+        // WP3 (protocol change): three byte-sized fields, stamped last by AreaEffectSpawner. Fusion stores each
+        // networked field in its own 4-byte word, so the layout grows by 12 bytes. Byte enums / byte only (weaver).
 
-        /// <summary>World (Static AoE) or Caster (Aura). Default World, so an unstamped zone behaves as before WP3.</summary>
+        /// <summary>
+        /// World (Static AoE) or Caster (Aura). Only <see cref="AreaEffectSpawner"/> creates zones and it always stamps
+        /// this; an unstamped zone would also have <see cref="Channels"/> None and affect nobody.
+        /// </summary>
         [Networked] public ZoneAnchor Anchor { get; set; }
 
         /// <summary>
@@ -187,13 +193,16 @@ namespace CluckWars.Gameplay
         private struct RootSnapshot
         {
             public NetworkBehaviourId Owner;   // snapshot, never refreshed
-            public PlayerRef Authority;        // the zone's state authority; snapshot, never refreshed
+            public PlayerRef Authority;        // the zone's state authority; snapshot once (None = not captured yet, qa W2)
             public bool IdentityChanged;       // owner or authority differed from the snapshot later: no evidence
             public Vector3 Center;
             public float Radius;               // the zone's own radius; clamped by ControlClaimRules
             public bool HasCasterAtSpawn;
             public Vector3 CasterAtSpawn;
             public float SpawnDrift;
+            public float CasterDriftSpeed;     // m/s at first sight; prices the late-joiner extension (qa W1)
+            public bool FirstSeenAtJoin;       // first seen within JoinWindowSeconds of this peer's own join (local)
+            public float RemainingAtFirstSight;// the networked LifetimeTimer then (attacker-writable; -1 = unknown)
             public float FirstSeenAt;          // Time.realtimeSinceStartup
             public float DespawnedAt;          // records only
         }
@@ -214,6 +223,10 @@ namespace CluckWars.Gameplay
             _seen.FirstSeenAt = Time.realtimeSinceStartup;
             _seen.Owner       = OwnerChicken;
             _seen.Authority   = Object != null ? Object.StateAuthority : default;
+            // Late joiner (qa W1): an egg already in this peer's first snapshot may be up to a lifetime old. The join
+            // moment is local; the remaining time is the zone's own claim, priced by ControlClaimRules.AgeAtFirstSight.
+            _seen.FirstSeenAtJoin = LocalJoinClock.SecondsSinceJoin(Runner) <= ControlClaimRules.JoinWindowSeconds;
+            _seen.RemainingAtFirstSight = Runner != null ? (LifetimeTimer.RemainingTime(Runner) ?? -1f) : -1f;
             RefreshRootGeometry();
             if (Runner != null && Runner.TryFindBehaviour(OwnerChicken, out ChickenController caster) &&
                 caster != null && caster.Object != null && caster.Object.IsValid)
@@ -223,7 +236,8 @@ namespace CluckWars.Gameplay
                 float latency = HasStateAuthority ? 0f : ExecuteRules.RemoteLatency((float)Runner.GetPlayerRtt(Object.StateAuthority));
                 _seen.HasCasterAtSpawn = true;
                 _seen.CasterAtSpawn = caster.transform.position;
-                _seen.SpawnDrift = ChickenCargo.DriftSpeed(caster) * (latency + 2f * Runner.DeltaTime);
+                _seen.CasterDriftSpeed = ChickenCargo.DriftSpeed(caster);
+                _seen.SpawnDrift = _seen.CasterDriftSpeed * (latency + 2f * Runner.DeltaTime);
             }
             else
             {
@@ -233,12 +247,24 @@ namespace CluckWars.Gameplay
             }
         }
 
-        /// <summary>Render: refreshes the geometry only; a changed owner or authority voids the evidence instead.</summary>
+        /// <summary>
+        /// Render: refreshes the geometry only; a changed owner or authority voids the evidence instead. A stored None
+        /// authority is "not captured yet" (qa W2): it is captured on the first frame the zone has a valid one.
+        /// </summary>
         private void ObserveRootEvidence()
         {
             if (!_seenAsRoot || _seen.IdentityChanged) return;
             var authority = Object != null ? Object.StateAuthority : default;
-            if (OwnerChicken != _seen.Owner || authority != _seen.Authority)
+            var seen = ControlClaimRules.ObserveIdentity(
+                sameOwner: OwnerChicken == _seen.Owner,
+                snapshotAuthorityKnown: _seen.Authority != PlayerRef.None,
+                authorityKnown: authority != PlayerRef.None,
+                sameAuthority: authority == _seen.Authority);
+            if (seen == ControlClaimRules.IdentityObservation.CaptureAuthority)
+            {
+                _seen.Authority = authority;   // the one deferred capture; never overwritten after this
+            }
+            else if (seen == ControlClaimRules.IdentityObservation.Changed)
             {
                 _seen.IdentityChanged = true;
                 _log?.Warn(Source, $"Root zone changed hands after this peer first saw it (owner {_seen.Owner} -> {OwnerChicken}, " +
@@ -273,6 +299,9 @@ namespace CluckWars.Gameplay
                 CasterAtSpawn = s.CasterAtSpawn,
                 SpawnDrift = s.SpawnDrift,
                 SecondsSinceSeen = now - s.FirstSeenAt,
+                FirstSeenAtJoin = s.FirstSeenAtJoin,
+                RemainingAtFirstSight = s.RemainingAtFirstSight,
+                CasterDriftSpeed = s.CasterDriftSpeed,
             };
 
         /// <summary>
@@ -323,6 +352,10 @@ namespace CluckWars.Gameplay
         /// in the cloud. Slow zones have no <see cref="Consumed"/> flip to watch.</summary>
         private bool _slowZoneOccupied;
 
+        /// <summary>Slow zones with the OnEnter channel (Feather Aura): who this zone life has already confirmed on THIS
+        /// peer (local, re-armed per spawn).</summary>
+        private readonly HashSet<NetworkBehaviourId> _confirmed = new HashSet<NetworkBehaviourId>();
+
         /// <summary>Root zones confirm exactly once. Shared between the
         /// <see cref="Render"/> detector and the <see cref="Despawned"/> fallback so the two
         /// can never both fire for one trigger.</summary>
@@ -357,6 +390,7 @@ namespace CluckWars.Gameplay
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
 
             ActiveZones.Add(this);
+            LocalJoinClock.Note(Runner);   // a zone in a joiner's first snapshot can be the first thing it sees
 
             if (HasStateAuthority && !HasSpawnPosition)
             {
@@ -374,6 +408,7 @@ namespace CluckWars.Gameplay
             _rootConfirmSent  = false;
             _slowZoneOccupied = false;
             _entered.Clear();   // OnEnter fires once per chicken per zone LIFE
+            _confirmed.Clear();
 
             _resetTick = 0;
             _spawnTick = Runner.Tick.Raw;
@@ -552,9 +587,17 @@ namespace CluckWars.Gameplay
         /// Slow zones never flip a flag — they just sit there slowing whoever is inside — so
         /// the "it caught someone" edge is derived from replicated positions instead. Rising
         /// edge only: a rival standing in the cloud must not re-confirm every frame.
+        /// <para>
+        /// With the OnEnter channel (an Aura, WP4) the edge is per CHICKEN instead of "anyone": each rival confirms once
+        /// per zone life, the first frame it is seen inside - so the rivals already inside at the cast confirm on the
+        /// zone's first frame (Maestro's rule), and a second rival walking in later confirms again. An aura sweeps over
+        /// people as its caster runs; "the cloud became occupied" would hide every catch after the first.
+        /// </para>
         /// </summary>
         private void ObserveSlowZoneEntry()
         {
+            if (HasChannel(AreaEffectChannel.OnEnter)) { ConfirmEachFirstEntry(); return; }
+
             bool occupied = AnyRivalInside();
             if (occupied && !_slowZoneOccupied)
             {
@@ -562,6 +605,25 @@ namespace CluckWars.Gameplay
                 NotifyOwnerZoneTriggered(Runner);
             }
             _slowZoneOccupied = occupied;
+        }
+
+        /// <summary>The OnEnter half of <see cref="ObserveSlowZoneEntry"/>: each newly inside rival gets its bearing, and
+        /// the caster one confirmation per frame in which someone new was caught.</summary>
+        private void ConfirmEachFirstEntry()
+        {
+            if (!TryGetCenter(out Vector3 center)) return;
+            float radius = TriggerRadius;
+            bool caughtSomeone = false;
+
+            var all = ChickenController.ActiveControllers;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var chicken = all[i];
+                if (!IsCaught(chicken, center, radius) || !_confirmed.Add(chicken.Id)) continue;
+                chicken.GetComponent<HitFeedback>()?.NotifyAttacker(center);   // missing component: see NotifyCaughtVictims
+                caughtSomeone = true;
+            }
+            if (caughtSomeone) NotifyOwnerZoneTriggered(Runner);
         }
 
         /// <summary>

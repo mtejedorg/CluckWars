@@ -67,10 +67,14 @@ namespace CluckWars.Abilities
             new AreaEffectSpec(AreaEffectKind.StaticAoE, AreaEffectChannel.OnEnter, ZoneEffect.Root, radius, lifetime,
                 rootDuration: rootDuration, forwardOffset: forwardOffset, consumeOnTrigger: true);
 
-        /// <summary>A slow centred on the caster that ends with the casting slot (Feather Aura).</summary>
+        /// <summary>
+        /// A slow centred on the caster that ends with the casting slot (Feather Aura). WhileInside carries the slow;
+        /// OnEnter is the once-per-chicken entry confirmation, which also covers the chickens already inside at the cast
+        /// (Maestro: "it should have effect on the chickens that were in the zone when it is cast"; WP4).
+        /// </summary>
         public static AreaEffectSpec AuraSlow(float radius, float lifetime, float slowFactor) =>
-            new AreaEffectSpec(AreaEffectKind.Aura, AreaEffectChannel.WhileInside, ZoneEffect.Slow, radius, lifetime,
-                slowFactor: slowFactor, endsWithAbility: true);
+            new AreaEffectSpec(AreaEffectKind.Aura, AreaEffectChannel.WhileInside | AreaEffectChannel.OnEnter, ZoneEffect.Slow,
+                radius, lifetime, slowFactor: slowFactor, endsWithAbility: true);
 
         /// <summary>How the zone is anchored: a Static AoE to the world, an Aura to its caster.</summary>
         public ZoneAnchor Anchor => Kind == AreaEffectKind.Aura ? ZoneAnchor.Caster : ZoneAnchor.World;

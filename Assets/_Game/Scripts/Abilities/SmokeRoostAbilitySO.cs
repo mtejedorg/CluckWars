@@ -106,7 +106,8 @@ namespace CluckWars.Abilities
 
             // Half two: the cloud, at his feet.
             TryGetAreaEffect(out var spec);
-            AreaEffectSpawner.Spawn(ctx, spec, caster.transform.position, Source, "Smoke Roost");
+            AreaEffectSpawner.Spawn(ctx, spec, AreaEffectSpawner.Placement(caster.transform.position, caster.transform.forward, spec),
+                Source, "Smoke Roost");
         }
 
         public override void OnDeactivate(AbilityContext ctx)

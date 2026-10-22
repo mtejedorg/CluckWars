@@ -364,13 +364,115 @@ namespace CluckWars.Tests
             StringAssert.Contains("_seen.Authority   = Object != null ? Object.StateAuthority : default;", capture);
 
             string observe = AssassinExecuteCreditTests.MethodBody(zonePath, "private void ObserveRootEvidence()");
-            Assert.IsFalse(Regex.IsMatch(observe, @"_seen\.(Owner|Authority)\s*=[^=]"), "Render must never re-anchor the owner or authority");
+            Assert.IsFalse(Regex.IsMatch(observe, @"_seen\.Owner\s*=[^=]"), "Render must never re-anchor the owner");
+            // The one authority write in Render is the deferred capture of a None snapshot (qa W2), gated by the pure rule.
+            Assert.AreEqual(1, Regex.Matches(observe, @"_seen\.Authority\s*=[^=]").Count);
+            int gate = observe.IndexOf("ControlClaimRules.IdentityObservation.CaptureAuthority", StringComparison.Ordinal);
+            int write = observe.IndexOf("_seen.Authority = authority;", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(gate, 0);
+            Assert.Greater(write, gate, "the authority is written only on the CaptureAuthority verdict");
+            StringAssert.Contains("snapshotAuthorityKnown: _seen.Authority != PlayerRef.None,", observe);
             StringAssert.Contains("_seen.IdentityChanged = true;", observe, "a change voids the evidence");
             StringAssert.Contains("RefreshRootGeometry();", observe);
             string refresh = AssassinExecuteCreditTests.MethodBody(zonePath, "private void RefreshRootGeometry()");
             Assert.IsFalse(Regex.IsMatch(refresh, @"_seen\.(Owner|Authority|CasterAtSpawn|HasCasterAtSpawn|FirstSeenAt)\s*=[^=]"),
                 "only Center and Radius are refreshed");
             StringAssert.Contains("IdentityChanged = s.IdentityChanged,", Src(zonePath), "the void flag reaches the rule");
+        }
+
+        [Test]
+        public void RootEvidence_ANoneAuthorityAtFirstSight_IsCapturedLater_NotChanged()
+        {
+            // qa W2: before, a None authority at Spawned marked the evidence changed for good on the next frame.
+            Assert.AreEqual(ControlClaimRules.IdentityObservation.CaptureAuthority,
+                ControlClaimRules.ObserveIdentity(sameOwner: true, snapshotAuthorityKnown: false, authorityKnown: true, sameAuthority: false));
+            Assert.AreEqual(ControlClaimRules.IdentityObservation.Unchanged,
+                ControlClaimRules.ObserveIdentity(true, false, false, true), "still None: wait (the evidence cannot vouch meanwhile)");
+            Assert.AreEqual(ControlClaimRules.IdentityObservation.Unchanged, ControlClaimRules.ObserveIdentity(true, true, true, true));
+            Assert.AreEqual(ControlClaimRules.IdentityObservation.Changed, ControlClaimRules.ObserveIdentity(true, true, true, false),
+                "a captured authority that changes still voids the evidence (security review)");
+            Assert.AreEqual(ControlClaimRules.IdentityObservation.Changed, ControlClaimRules.ObserveIdentity(true, true, false, false),
+                "a captured authority that turns None voids it too");
+            Assert.AreEqual(ControlClaimRules.IdentityObservation.Changed, ControlClaimRules.ObserveIdentity(false, false, true, false),
+                "an owner change voids it, captured or not");
+        }
+
+        /// <summary>A late joiner's view of an honest egg placed <paramref name="age"/> s before it joined: the caster walked off.</summary>
+        private static ControlClaimRules.RootZoneEvidence LateJoinerZone(float age, Vector3 eggAt, Vector3 casterAtJoin, ControlClaimRules.Ceiling c)
+        {
+            var zone = HonestZone(eggAt);
+            zone.CasterAtSpawn = casterAtJoin;
+            zone.CasterDriftSpeed = 12.15f;
+            zone.SpawnDrift = 12.15f * 0.2f;
+            zone.FirstSeenAtJoin = true;
+            zone.RemainingAtFirstSight = c.MaxZoneLifetime - age;
+            zone.SecondsSinceSeen = 0.3f;
+            return zone;
+        }
+
+        [Test]
+        public void RootZone_SeenAtJoin_AllowsTheCastersDriftOverTheEggsAge()
+        {
+            // qa W1: the egg was placed 3 s before this peer joined; its caster ran 20 m since. Before, the anchor was where
+            // the caster stood at the join with only latency drift, so this honest egg could never vouch here.
+            var c = Shipped(ControlKind.Root);
+            var egg = new Vector3(2f, 0f, 2f);
+            var zone = LateJoinerZone(3f, egg, egg + new Vector3(20f, 0f, 0f), c);
+            var victim = egg + new Vector3(0.5f, 0f, 0f);
+            Assert.AreEqual(3f, ControlClaimRules.AgeAtFirstSight(zone, c), 1e-4f);
+            Assert.IsTrue(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, c), "honest late-joiner case accepted");
+
+            zone.FirstSeenAtJoin = false;   // a peer that was already in the match: no extension, ever
+            Assert.AreEqual(0f, ControlClaimRules.AgeAtFirstSight(zone, c));
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, c));
+        }
+
+        [Test]
+        public void RootZone_SeenAtJoin_TheClaimedAgeIsPaidFromTheVouchingWindow_AndUnknownFailsClosed()
+        {
+            var c = Shipped(ControlKind.Root);
+            var egg = new Vector3(2f, 0f, 2f);
+            var victim = egg + new Vector3(0.5f, 0f, 0f);
+
+            // An attacker claiming a near-dead egg to buy drift gets almost no window to use it.
+            var old = LateJoinerZone(c.MaxZoneLifetime - 0.1f, egg, egg + new Vector3(60f, 0f, 0f), c);
+            old.SecondsSinceSeen = 0.7f;
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(old, victim, 0.5f, c), "claimed age + local age past the lifetime");
+
+            // Drift is still bounded by the claimed age: 20 m in 1 s is not credible at 12 m/s.
+            var young = LateJoinerZone(1f, egg, egg + new Vector3(20f, 0f, 0f), c);
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(young, victim, 0.5f, c));
+
+            // A timer that claims MORE than the authored lifetime buys nothing.
+            var inflated = LateJoinerZone(-5f, egg, egg + new Vector3(20f, 0f, 0f), c);
+            Assert.AreEqual(0f, ControlClaimRules.AgeAtFirstSight(inflated, c));
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(inflated, victim, 0.5f, c));
+
+            var unknown = LateJoinerZone(3f, egg, egg + new Vector3(20f, 0f, 0f), c);
+            unknown.RemainingAtFirstSight = float.NaN;
+            Assert.AreEqual(c.MaxZoneLifetime, ControlClaimRules.AgeAtFirstSight(unknown, c), "unknown remaining claims the whole life");
+            Assert.IsFalse(ControlClaimRules.IsCredibleZoneCenter(unknown, c), "an unreadable timer prices no drift: not evidence");
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(unknown, victim, 0.5f, c), "fail closed");
+            unknown.CasterAtSpawn = egg;   // even with the caster right on the egg
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(unknown, victim, 0.5f, c));
+
+            var unresolved = LateJoinerZone(3f, egg, egg + new Vector3(20f, 0f, 0f), c);
+            unresolved.HasCasterAtSpawn = false;
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(unresolved, victim, 0.5f, c), "no anchor is still no evidence");
+        }
+
+        [Test]
+        public void AbilityZone_RecordsTheJoinFactsAtFirstSight()
+        {
+            const string zonePath = "Assets/_Game/Scripts/Gameplay/AbilityZone.cs";
+            string capture = AssassinExecuteCreditTests.MethodBody(zonePath, "private void CaptureRootEvidence()");
+            StringAssert.Contains("LocalJoinClock.SecondsSinceJoin(Runner) <= ControlClaimRules.JoinWindowSeconds", capture,
+                "the late-joiner extension keys on this peer's own join, never on replicated state");
+            StringAssert.Contains("LifetimeTimer.RemainingTime(Runner) ?? -1f", capture);
+            StringAssert.Contains("_seen.CasterDriftSpeed = ChickenCargo.DriftSpeed(caster);", capture);
+            StringAssert.Contains("LocalJoinClock.Note(Runner);", AssassinExecuteCreditTests.MethodBody(zonePath, "public override void Spawned()"));
+            StringAssert.Contains("LocalJoinClock.Note(Runner);",
+                AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/ChickenController.cs", "public override void Spawned()"));
         }
 
         [Test]

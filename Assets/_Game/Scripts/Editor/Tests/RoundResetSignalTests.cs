@@ -122,7 +122,9 @@ namespace CluckWars.Tests
             var scan = Body(Src(GameManagerPath), "private static WorldDirt ScanWorldDirt()");
             StringAssert.Contains("AbilityZone.ActiveZones", scan);
             StringAssert.Contains("c.IsDecoy", scan);
-            StringAssert.Contains("c.AuraSlowActive", scan);
+            // WP4: an aura is a Caster-anchored zone (the ChickenController emitter flag is gone).
+            StringAssert.Contains("if (z.Anchor == ZoneAnchor.Caster) auras++;", scan);
+            StringAssert.DoesNotContain("AuraSlowActive", scan);
             StringAssert.Contains("MatchFlowRules.Leftovers(liveZones, decoys, auras)", scan);
         }
 
@@ -300,6 +302,11 @@ namespace CluckWars.Tests
             Assert.AreEqual(1, AutoTestRules.PickZoneSlot(new AbilityBaseSO[] { peck, trap, decoy, null }));
             Assert.AreEqual(2, AutoTestRules.PickZoneSlot(new AbilityBaseSO[] { peck, null, decoy, null }));
             Assert.AreEqual(-1, AutoTestRules.PickZoneSlot(new AbilityBaseSO[] { peck, null, null, null }), "a Warrior's loadout places nothing");
+            // WP4 widened PlacesZone to auras; an aura ends with its 3 s cast and never outlives a round, so it is not picked.
+            var aura = Make<FeatherAuraAbilitySO>();
+            Assert.IsTrue(aura.PlacesZone, "fixture: an Aura spawns a zone since WP4");
+            Assert.AreEqual(2, AutoTestRules.PickZoneSlot(new AbilityBaseSO[] { peck, aura, trap, null }), "the trap, not the aura");
+            Assert.AreEqual(-1, AutoTestRules.PickZoneSlot(new AbilityBaseSO[] { peck, aura, null, null }));
             Assert.AreEqual(-1, AutoTestRules.PickZoneSlot(null));
         }
 

@@ -878,18 +878,23 @@ namespace CluckWars.Gameplay
         /// reset decision is made on (a round that ended before any food moved can still leave a zone behind).</summary>
         private static WorldDirt ScanWorldDirt()
         {
-            int liveZones = 0;
+            // An aura is a Caster-anchored zone (WP4): counted apart from the placed zones, as the Invariant probe does.
+            int liveZones = 0, auras = 0;
             var zones = AbilityZone.ActiveZones;
             for (int i = 0; i < zones.Count; i++)
-                if (zones[i] != null && zones[i].Object != null && zones[i].Object.IsValid) liveZones++;
-            int decoys = 0, auras = 0;
+            {
+                var z = zones[i];
+                if (z == null || z.Object == null || !z.Object.IsValid) continue;
+                if (z.Anchor == ZoneAnchor.Caster) auras++;
+                else liveZones++;
+            }
+            int decoys = 0;
             var chickens = ChickenController.ActiveControllers;
             for (int i = 0; i < chickens.Count; i++)
             {
                 var c = chickens[i];
                 if (c == null || c.Object == null || !c.Object.IsValid) continue;
                 if (c.IsDecoy) decoys++;
-                if (c.AuraSlowActive) auras++;
             }
 
             float maxBaseFood = 0f;

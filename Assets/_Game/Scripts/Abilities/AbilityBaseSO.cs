@@ -423,18 +423,16 @@ namespace CluckWars.Abilities
         /// resolving a hit at the instant of the cast. Their aim shape is real — it is the
         /// zone's footprint, and the telegraph draws it correctly — but nobody is hit when
         /// the button is released; the hit happens later, in <c>AbilityZone</c>'s own tick.
-        /// Feather Trap, Root Egg and Smoke Roost. See <see cref="ReportsCastHits"/> for why this
-        /// needs to be declared rather than inferred.
+        /// Feather Trap, Root Egg, Smoke Roost (Static AoE) and Feather Aura (Aura). See
+        /// <see cref="ReportsCastHits"/> for why this needs to be declared rather than inferred.
         /// </summary>
         /// <remarks>
-        /// <b>Derived from the authored <see cref="AreaKind"/> (WP3), no longer a per-ability override.</b> Phase 1 maps
-        /// only <see cref="AreaEffectKind.StaticAoE"/>: Feather Aura is tagged <see cref="AreaEffectKind.Aura"/> but still
-        /// runs on the <c>ChickenController</c> aura triplet and spawns nothing, so counting it here would change its
-        /// cast-hit feedback, the bots' "cast without a target" rule (<c>BotController</c>) and the wiring gate's sweep
-        /// for an ability that has no zone yet. WP4 moves it onto a Caster-anchored zone and widens this to
-        /// <c>AreaKind != None</c> in the same change.
+        /// <b>Derived from the authored <see cref="AreaKind"/>, no longer a per-ability override:</b> every area
+        /// spawns an <c>AbilityZone</c> (WP4 moved Feather Aura onto a Caster-anchored one). Where only a <i>placed</i>
+        /// zone is meant - one worth dropping on empty ground (<c>BotController</c>'s cast-without-a-target rule, the
+        /// <c>cw_autozone</c> pick) - test <c>AreaKind == AreaEffectKind.StaticAoE</c>, not this.
         /// </remarks>
-        public bool PlacesZone => AreaKind == AreaEffectKind.StaticAoE;
+        public bool PlacesZone => AreaKind != AreaEffectKind.None;
 
         /// <summary>
         /// The lasting area this ability creates, built from its own serialized fields; false for
@@ -534,8 +532,8 @@ namespace CluckWars.Abilities
         /// control is removed may set this true.
         ///
         /// <b>Placed zones are false too</b>, for a different reason: a zone's slow and root
-        /// reach the victim through <c>ChickenController.CheckAbilityZoneSlow</c> /
-        /// <c>CheckAuraSlow</c>, which call <c>ApplySlow</c> directly rather than routing
+        /// reach the victim through <c>ChickenController.CheckAbilityZoneSlow</c>
+        /// (auras included, WP4), which calls <c>ApplySlow</c> directly rather than routing
         /// through <c>ApplyPassiveControlDuration</c> — so immunity does not stop them, and
         /// claiming it would grey out a bracket for an effect that lands.
         /// </remarks>
