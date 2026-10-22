@@ -106,7 +106,7 @@ Everything Phase 6–8 shipped "pending the hardware session". One session, fres
 | CW-055 | Bug | P3 | `AbilityTelegraph.BuildLineMaterial()` silently returns null (magenta) and leaks a Material per instance — add log + shared material | **Check first** |
 | CW-056 | Bug | P3 | `RivalIndicator.Awake` gates self-injection on `ProjectContext.HasInstance` (forbidden by CONVENTIONS) | **Check first** (file was rewritten in E1 / arrows) |
 | CW-057 | Task | P2 | Balance pass from 4-player playtest data: cooldown tiers, pile/collision slow, control durations, passive magnitudes, bot radii and Hunt↔Flee hysteresis (use `BalanceEditorWindow`; guard with the SCT oracle ±0.5 s test) | mechanics-designer; ROADMAP "dedicated test session" |
-| CW-058 | Task | P2 | Wing Slam (12 s, longest CD on the spam class) flagged for re-tuning (GDD §11) | mechanics-designer |
+| CW-058 | Task | P2 | ~~Wing Slam (12 s, longest CD on the spam class) flagged for re-tuning (GDD §11)~~ **Decided + implemented 2026-10-22 (A4, WP2):** cooldown 8 s, stun 1.3 s (Standard tier, GDD §7.3); fallback 9 s / 1.5 s if the human session reports "stunned too often" | mechanics-designer |
 | CW-059 | Chore | P3 | Roll & Push "knockback" deferred item, weighted/open random bot loadouts from the full registry, probability tables per class | ROADMAP deferred · **Check first** |
 
 ---
@@ -306,3 +306,7 @@ All three proposals were decided with Maestro (see `docs/proposals/DECISIONS_202
 | Effect types (Aura vs Static AoE) | Decided; WP0 (round-reset event), WP3 (type model, anchored zone, OnEnter/WhileInside), WP4 (Feather Aura migration); WP5 (Periodic) deferred to the Spine Coat steal aura. |
 | CW-206 / 212 / 219 | Decided; WP6-WP9 (orientation classes, camera framing, portrait HUD, menus). |
 | CW-232 | **Doppelganger fidelity** (new): the decoy is a perfect copy of its caster in the future (ring, arrow, nameplate colours, visibly slowed/rooted/stunned, zones and confirmations treat it as a chicken). Today zones deliberately ignore decoys (pinned by `ZonesIgnoreDecoys` once WP3 lands); that is a known stopgap. |
+
+### Maestro's end-of-work requirement (2026-10-22)
+
+When the current work is finished: **everything on `develop`, tested, and the `feature/progression` branch rebased onto it** (CW-010, CW-007). Plan: merge `feature/effect-types-and-portrait` into local `develop` after the full verification (EditMode unfiltered + the scenario matrix, solo/shared2/shared4/hostleave x 3 rounds), then rebase `feature/progression` onto the new `develop` (backup tag first, resolve conflicts incl. the `AnnounceExecuteSteal` line, re-run the suite and the matrix). Pushing anything, and force-pushing the rebased progression branch (it is the head of PR #1), still needs Maestro's explicit OK.
