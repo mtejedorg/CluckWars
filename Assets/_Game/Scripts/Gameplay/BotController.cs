@@ -51,6 +51,11 @@ namespace CluckWars.Gameplay
     {
         private const string Source = "Bot";
 
+        /// <summary>"Warrior@c2"-style prefix so four bots' lines can be told apart in one merged log.</summary>
+        private string Who => _controller != null
+            ? BotTactics.LogIdentity(_controller.Class, _controller.HomeCornerIndex)
+            : "?@c?";
+
         /// <summary>
         /// Shortest remaining leg that justifies spending a mobility cooldown to travel it.
         /// Roughly one Speed Burst's worth of gain on the shipped arena; below it the burst
@@ -255,7 +260,7 @@ namespace CluckWars.Gameplay
                 TryCast(BotSituation.Retreating, _nearestRival);
 
                 if (_state != _prevState)
-                    _log?.Debug(Source, $"→ Flee (cargo={cargoFraction:P0}, rival dist={_nearestRivalDist:0.0}).");
+                    _log?.Debug(Source, $"{Who} → Flee (cargo={cargoFraction:P0}, rival dist={_nearestRivalDist:0.0}).");
                 return;
             }
 
@@ -286,7 +291,7 @@ namespace CluckWars.Gameplay
                 TryCast(BotSituation.Guarding, _nearestRival);
 
                 if (_state != _prevState)
-                    _log?.Debug(Source, "→ Guard (rival closing on own base).");
+                    _log?.Debug(Source, $"{Who} → Guard (rival closing on own base).");
                 return;
             }
 
@@ -310,7 +315,7 @@ namespace CluckWars.Gameplay
                     _moveTarget = _nearestRival.transform.position;
 
                     if (_state != _prevState)
-                        _log?.Debug(Source, $"→ Search (nearest rival {_nearestRivalDist:0.0}m, " +
+                        _log?.Debug(Source, $"{Who} → Search (nearest rival {_nearestRivalDist:0.0}m, " +
                             $"outside hunt band {_profile.HuntRadius:0.0}m).");
                     return;
                 }
@@ -319,7 +324,7 @@ namespace CluckWars.Gameplay
                 // Predator can legally do — it must not wander to a pile it cannot use.
                 _state = BotState.Idle;
                 if (_state != _prevState)
-                    _log?.Debug(Source, "→ Idle (Predator, no rival anywhere to search for).");
+                    _log?.Debug(Source, $"{Who} → Idle (Predator, no rival anywhere to search for).");
                 return;
             }
 
@@ -354,14 +359,14 @@ namespace CluckWars.Gameplay
                 }
 
                 if (_state != _prevState)
-                    _log?.Debug(Source, $"→ CollectFood (pile '{pile.name}', surface dist={pileDist:0.0}).");
+                    _log?.Debug(Source, $"{Who} → CollectFood (pile '{pile.name}', surface dist={pileDist:0.0}).");
                 return;
             }
 
             // Priority 7: IDLE.
             _state = BotState.Idle;
             if (_state != _prevState)
-                _log?.Debug(Source, "→ Idle (no piles found).");
+                _log?.Debug(Source, $"{Who} → Idle (no piles found).");
         }
 
         private void EnterReturnToBase(Vector3 homePos, string why)
@@ -369,7 +374,7 @@ namespace CluckWars.Gameplay
             _state      = BotState.ReturnToBase;
             _moveTarget = homePos;
             if (_state != _prevState)
-                _log?.Debug(Source, $"→ ReturnToBase ({why}).");
+                _log?.Debug(Source, $"{Who} → ReturnToBase ({why}).");
         }
 
         /// <summary>
@@ -417,7 +422,7 @@ namespace CluckWars.Gameplay
             }
 
             if (_state != _prevState)
-                _log?.Debug(Source, $"→ {_state} prey dist={_preyDist:0.0}, cargo={_preyCargo:P0}.");
+                _log?.Debug(Source, $"{Who} → {_state} prey dist={_preyDist:0.0}, cargo={_preyCargo:P0}.");
             return true;
         }
 
@@ -548,7 +553,7 @@ namespace CluckWars.Gameplay
 
             if (!_abilities.BotTryActivate(bestSlot)) return false;
 
-            _log?.Debug(Source, $"Cast slot {bestSlot} ('{chosen.name}', role={chosen.ResolveBotRole()}) " +
+            _log?.Debug(Source, $"{Who} cast slot {bestSlot} ('{chosen.name}', role={chosen.ResolveBotRole()}) " +
                 $"for {situation}.");
             return true;
         }
@@ -583,7 +588,7 @@ namespace CluckWars.Gameplay
                 if (!BotTactics.IsStealShield(ability) || !_abilities.IsReady(slot)) continue;
                 if (!ability.IsUsable(_controller)) continue;
                 if (!_abilities.BotTryActivate(slot)) continue;
-                _log?.Debug(Source, $"Steal guard: cast slot {slot} ('{ability.name}') with cargo={cargo:0.0}, stealer within {nearest:0.0} m.");
+                _log?.Debug(Source, $"{Who} steal guard: cast slot {slot} ('{ability.name}') with cargo={cargo:0.0}, stealer within {nearest:0.0} m.");
                 return;
             }
         }

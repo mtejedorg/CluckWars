@@ -163,9 +163,13 @@ namespace CluckWars.Gameplay
             // TheBrawler_TakesTheNearerPile_AtEveryBaseDistance, which sweeps the return leg
             // and so states the property rather than sampling it. If this class is ever meant
             // to have partial round-trip awareness, argue with the sweep first.
+            //
+            // dangerRadius 4.0 -> 5.5 (2026-10-22, decision A10): 4.0 sat inside the longest
+            // steal reaches (Sneaky Steal 5.4 m, Dive Bomb 3.25 + 2.05 = 5.3 m), so a loaded
+            // Brawler let a thief stand in range without reacting. 5.5 is just past 5.4.
             ChickenClass.Warrior => new BotProfile(
                 strategy: BotStrategy.Brawler,
-                returnThreshold: 0.85f, protectCargoThreshold: 0.60f, dangerRadius: 4.0f,
+                returnThreshold: 0.85f, protectCargoThreshold: 0.60f, dangerRadius: 5.5f,
                 huntRadius: 11.0f, huntCargoThreshold: 0.10f, engageRadius: 9.0f,
                 guardRadius: 6.0f, roundTripBias: 0.0f, leaderFocus: 0.35f,
                 thinkInterval: 0.28f),
@@ -203,6 +207,18 @@ namespace CluckWars.Gameplay
 
             _ => ProfileFor(ChickenClass.Warrior),
         };
+
+        /// <summary>
+        /// Identity prefix for <c>[Bot]</c> log lines: class and home corner, e.g.
+        /// <c>"Warrior@c2"</c>; <c>"c?"</c> while the corner is unassigned (-1).
+        /// </summary>
+        /// <remarks>
+        /// Without it the FSM transition lines of four bots were indistinguishable in a merged
+        /// log, so per-bot Flee/Hunt flip rates could not be measured (decision A8). Format
+        /// is pinned by <c>BotTacticsTests</c>; log parsers may rely on it.
+        /// </remarks>
+        public static string LogIdentity(ChickenClass cls, int homeCornerIndex) =>
+            homeCornerIndex >= 0 ? $"{cls}@c{homeCornerIndex}" : $"{cls}@c?";
 
         // ---- Cast plans -----------------------------------------------------
         // Static arrays, never built per call: this is read inside the think tick and a

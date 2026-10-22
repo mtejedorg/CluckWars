@@ -330,14 +330,41 @@ namespace CluckWars.Tests
 
         /// <summary>
         /// Within one role, the cheap tool wins. This is what stops a Warrior opening every
-        /// skirmish with a 12-second Wing Slam when a 4-second Headbutt does the same job,
-        /// then standing empty-handed for the next ten seconds.
+        /// skirmish with an 8-second Wing Slam when a 4-second Headbutt does the same job,
+        /// then standing empty-handed for the next several seconds.
         /// </summary>
         [Test]
         public void WithinOneRole_TheCheaperCooldownWins()
         {
-            Assert.Less(BotTactics.ScoreCastCandidate(0, 4f), BotTactics.ScoreCastCandidate(0, 12f),
-                "Headbutt (4 s) must outrank Wing Slam (12 s) when both satisfy the same role.");
+            Assert.Less(BotTactics.ScoreCastCandidate(0, 4f), BotTactics.ScoreCastCandidate(0, 8f),
+                "Headbutt (4 s) must outrank Wing Slam (8 s) when both satisfy the same role.");
+        }
+
+        /// <summary>
+        /// Every [Bot] transition line carries "Class@cN" so per-bot flip rates can be counted
+        /// in a merged four-bot log (decision A8). Log parsers key on this exact shape.
+        /// </summary>
+        [Test]
+        public void LogIdentity_IsClassAtCorner_WithAPlaceholderBeforeTheCornerIsAssigned()
+        {
+            Assert.AreEqual("Warrior@c2", BotTactics.LogIdentity(ChickenClass.Warrior, 2));
+            Assert.AreEqual("Assassin@c0", BotTactics.LogIdentity(ChickenClass.Assassin, 0));
+            Assert.AreEqual("Speedy@c?", BotTactics.LogIdentity(ChickenClass.Speedy, -1));
+        }
+
+        /// <summary>
+        /// The Brawler must notice a thief before the thief is in steal range: its danger
+        /// radius sits past the longest steal reach (Sneaky Steal, 5.4 m as shipped). Decision A10.
+        /// </summary>
+        [Test]
+        public void Brawler_DangerRadius_ExceedsSneakyStealReach()
+        {
+            var steals = TestAssets.LoadAllIn<SneakyStealAbilitySO>(TestAssets.AbilitiesDir);
+            Assert.AreEqual(1, steals.Count, "Expected exactly one shipped Sneaky Steal asset.");
+            float reach = steals[0].StealRange;
+            Assert.Greater(BotTactics.ProfileFor(ChickenClass.Warrior).DangerRadius, reach,
+                $"Warrior bot dangerRadius is inside Sneaky Steal's {reach} m reach, so a loaded Brawler lets a " +
+                "thief stand in range without reacting (A10 set it to 5.5 against 5.4).");
         }
 
         // ---- Pile choice ---------------------------------------------------------

@@ -7,7 +7,7 @@ using LogLevel = CluckWars.Logging.LogLevel;
 namespace CluckWars.Gameplay
 {
     /// <summary>
-    /// Per-chicken match statistics: kills credited and food deposited this round.
+    /// Per-chicken match statistics: kills credited, food deposited and stuns taken this round.
     /// Both values are <c>[Networked]</c> so the match-end overlay reads the same
     /// data on every peer. RPCs always target <c>StateAuthority</c> so only the
     /// chicken's owning peer mutates its own stats.
@@ -30,6 +30,15 @@ namespace CluckWars.Gameplay
 
         /// <summary>Total food this chicken successfully deposited at its base this round.</summary>
         [Networked] public float FoodDeposited { get; set; }
+
+        /// <summary>
+        /// Stuns this chicken received this round that started or extended its stun timer (a
+        /// shorter stun swallowed by a longer running one is not counted). Written on this
+        /// chicken's state authority by <c>ChickenController.RPC_ApplyStun</c>; read by the
+        /// host's MATCH SUMMARY (decision F7, 2026-10-22). <b>Protocol change:</b> one more
+        /// networked int on this behaviour, so all peers must run the same build.
+        /// </summary>
+        [Networked] public int StunsTaken { get; set; }
 
         // Executes this chicken pressed whose kill report has not arrived yet. Local to this
         // chicken's state authority, never replicated; gates RPC_CreditKill (CW-230). Lost on a host
@@ -133,6 +142,21 @@ namespace CluckWars.Gameplay
         public void RPC_AddDeposit(float amount) { FoodDeposited += amount; }
 
         /// <summary>
+        /// Count one applied stun. Called by <c>ChickenController.RPC_ApplyStun</c>, which already
+        /// runs on this chicken's state authority (same NetworkObject), so no RPC is needed.
+        /// </summary>
+        public void RecordStunTaken()
+        {
+            if (!HasStateAuthority)
+            {
+                // RPC_ApplyStun targets the state authority, so reaching here elsewhere is a wiring bug.
+                _log?.Error(Source, $"{name}: RecordStunTaken called without state authority - stun not counted.");
+                return;
+            }
+            StunsTaken++;
+        }
+
+        /// <summary>
         /// Reset stats for a new round. Called by <see cref="GameManager.ResetWorldForNewRound"/>.
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
@@ -140,6 +164,7 @@ namespace CluckWars.Gameplay
         {
             Kills         = 0;
             FoodDeposited = 0f;
+            StunsTaken    = 0;
             _pendingKills.Clear();
         }
     }

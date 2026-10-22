@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.BullyPassiveSO
   DisplayName: Bully
   ShortLabel: BULY
-  Description: Steal 40% more, carry 6 more.
+  Description: Steal 40% more, carry 2 more.
   Icon: 
   AccentColor: {r: 0.86, g: 0.3, b: 0.3, a: 1}
   Category: 3
@@ -30,5 +30,5 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 256
   StealMultiplier: 1.4
-  BonusCapacity: 6
+  BonusCapacity: 2
   Subclass: 2
