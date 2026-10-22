@@ -34,11 +34,49 @@ namespace CluckWars.Gameplay
         public readonly float MaxBaseFood;
         public readonly bool AnyPileBelowMax;
         public readonly bool EventPilePresent;
+        /// <summary>Live ability zones + Doppelganger decoys + chickens with an aura on (B10): a round placed them, even
+        /// one that ended before any food moved.</summary>
+        public readonly int LeftoverObjects;
 
-        public WorldDirt(float maxBaseFood, bool anyPileBelowMax, bool eventPilePresent)
+        public WorldDirt(float maxBaseFood, bool anyPileBelowMax, bool eventPilePresent, int leftoverObjects = 0)
         {
             MaxBaseFood = maxBaseFood; AnyPileBelowMax = anyPileBelowMax; EventPilePresent = eventPilePresent;
+            LeftoverObjects = leftoverObjects;
         }
+    }
+
+    /// <summary>
+    /// Rate limit for <c>GameManager.AssignBasesToPlayers</c>'s "base ... is already claimed" warning: once per
+    /// (player, corner) collision instead of every tick (5248 lines in session-20261022-100224). An entry is forgotten when
+    /// the player gets a base, leaves, or the round resets, so a new collision warns again.
+    /// </summary>
+    public sealed class BaseClaimWarnings
+    {
+        private readonly System.Collections.Generic.HashSet<(PlayerRef player, int corner)> _warned = new();
+        private readonly System.Collections.Generic.HashSet<PlayerRef> _scratch = new();
+
+        public int Count => _warned.Count;
+
+        /// <summary>True the first time this collision is seen (log it), false while it persists.</summary>
+        public bool ShouldWarn(PlayerRef player, int corner) => _warned.Add((player, corner));
+
+        /// <summary>The player got a base: its collisions are over.</summary>
+        public void Forget(PlayerRef player)
+        {
+            if (_warned.Count == 0) return;
+            _warned.RemoveWhere(k => k.player == player);
+        }
+
+        /// <summary>Drops the entries of players no longer in <paramref name="activePlayers"/> (they left).</summary>
+        public void KeepOnly(System.Collections.Generic.IEnumerable<PlayerRef> activePlayers)
+        {
+            if (_warned.Count == 0) return;
+            _scratch.Clear();
+            foreach (var p in activePlayers) _scratch.Add(p);
+            _warned.RemoveWhere(k => !_scratch.Contains(k.player));
+        }
+
+        public void Clear() => _warned.Clear();
     }
 
     /// <summary>The <see cref="GameManager"/> networked fields a round reset writes, as plain values.</summary>
@@ -108,12 +146,17 @@ namespace CluckWars.Gameplay
             lastMode == SessionMode.Host ? SessionMode.Host : SessionMode.Solo;
 
         /// <summary>
-        /// True when a previous round left state behind: banked food, a drained pile, or a live event
-        /// pile. A freshly built world has none of these, so a GameManager that spawns over a dirty
-        /// one (host change) must reset it first.
+        /// True when a previous round left state behind: banked food, a drained pile, a live event
+        /// pile, or a live zone / decoy / aura (B10). A freshly built world has none of these, so a
+        /// GameManager that spawns over a dirty one must reset it first. (A host change does NOT respawn
+        /// the manager - it is a MasterClientObject, authority moves to the new master - see GameManager.Spawned.)
         /// </summary>
         public static bool IsWorldDirty(WorldDirt d) =>
-            d.MaxBaseFood > 0f || d.AnyPileBelowMax || d.EventPilePresent;
+            d.MaxBaseFood > 0f || d.AnyPileBelowMax || d.EventPilePresent || d.LeftoverObjects > 0;
+
+        /// <summary>What <see cref="WorldDirt.LeftoverObjects"/> counts: live zones, decoys and chickens with an aura on.</summary>
+        public static int Leftovers(int liveZones, int decoys, int aurasOn) =>
+            Mathf.Max(0, liveZones) + Mathf.Max(0, decoys) + Mathf.Max(0, aurasOn);
 
         /// <summary>
         /// The menu-load decision: when the one-shot <c>OpenLobbyOnMenuLoad</c> flag is set it is

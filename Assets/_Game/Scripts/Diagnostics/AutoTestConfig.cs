@@ -16,10 +16,10 @@ namespace CluckWars.Diagnostics
         public const string AutoHostKey = "cw_autohost", AutoJoinKey = "cw_autojoin", ClassKey = "cw_class",
             AutoStartKey = "cw_autostart", AutoStartTimeoutKey = "cw_autostart_timeout", AutoLoopKey = "cw_autoloop",
             AutoPlayKey = "cw_autoplay", DevModeKey = "cw_devmode", HudKey = "cw_hud", ProfileKey = "cw_profile",
-            AutoSoloKey = "cw_autosolo", AutoDisconnectKey = "cw_autodisconnect";
+            AutoSoloKey = "cw_autosolo", AutoDisconnectKey = "cw_autodisconnect", AutoZoneKey = "cw_autozone";
 
         public static readonly string[] Keys =
-            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey };
+            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey, AutoZoneKey };
 
         public const ChickenClass DefaultClass = ChickenClass.Warrior;
         public const float DefaultAutoStartTimeout = 90f;
@@ -60,6 +60,16 @@ namespace CluckWars.Diagnostics
         /// sheet that comes up (its own freeze or a real drop) and logs the outcome. 0 = off.
         /// </summary>
         public int AutoDisconnect;
+
+        /// <summary>
+        /// <c>cw_autozone</c> (B10): every round, the local chicken keeps its zone-placing ability (Root Egg first, see
+        /// <see cref="AutoTestRules.PickZoneSlot"/>) out of the fake player's rotation and casts it once with
+        /// <see cref="AutoTestRules.ZoneLeadSeconds"/> left, and PLAY AGAIN is pressed after
+        /// <see cref="AutoTestRules.PlayAgainDelay"/>, so a zone is alive when the world resets. The next round-start
+        /// <c>Invariant</c> check then shows whether the reset despawned it (<c>zn=0</c>) or not (<c>zones-zero</c>).
+        /// Needs <c>cw_autoplay</c> (the press goes through the fake player's input).
+        /// </summary>
+        public bool AutoZone;
 
         public bool WantsMenuFlow => AutoHost || AutoJoin != null || AutoSolo;
 
@@ -147,8 +157,14 @@ namespace CluckWars.Diagnostics
                     case AutoLoopKey:         cfg.AutoLoop = cfg.ParseInt(key, value, 0, 1000); break;
                     case AutoStartTimeoutKey: cfg.AutoStartTimeout = cfg.ParseInt(key, value, 1, 3600, (int)DefaultAutoStartTimeout); break;
                     case AutoDisconnectKey:   cfg.AutoDisconnect = cfg.ParseInt(key, value, 1, 600); break;
+                    case AutoZoneKey:         cfg.AutoZone = cfg.ParseBool(key, value); break;
                     default: cfg.Problems.Add($"unknown key {kv.Key}"); break;
                 }
+            }
+            if (cfg.AutoZone && !cfg.AutoPlay)
+            {
+                cfg.Problems.Add($"{AutoZoneKey} needs {AutoPlayKey} (the cast is a fake-player press); {AutoZoneKey} off");
+                cfg.AutoZone = false;
             }
             if (cfg.AutoSolo && (cfg.AutoHost || cfg.AutoJoin != null))
             {
@@ -243,6 +259,42 @@ namespace CluckWars.Diagnostics
         /// <summary>One JOIN MATCH press must end (joined + match scene loading, or a failure) within this.</summary>
         public const float JoinAttemptTimeoutSeconds = 60f;
         public const float PlayAgainDelaySeconds = 4f;
+
+        // ---- cw_autozone (B10) -----------------------------------------------------------------------------------
+
+        /// <summary>Playable seconds left when <c>cw_autozone</c> presses its zone slot (released, i.e. cast, one hold later).</summary>
+        public const float ZoneLeadSeconds = 1.5f;
+
+        /// <summary>
+        /// PLAY AGAIN under <c>cw_autozone</c>: soon enough that the zone cast at <see cref="ZoneLeadSeconds"/> is still alive
+        /// at the next round-start check (Root Egg lives 8 s: lead 1.5 + this 1.5 + GET READY 1-2 + 0.5 s probe delay), as
+        /// fast as a person who taps the button at once. Otherwise the person-paced <see cref="PlayAgainDelaySeconds"/>.
+        /// </summary>
+        public static float PlayAgainDelay(bool autoZone) => autoZone ? 1.5f : PlayAgainDelaySeconds;
+
+        /// <summary>Press the reserved zone slot: the round is playable, it was not pressed yet, and the mark is reached.</summary>
+        public static bool ShouldCastZone(bool matchRunning, bool alreadyPressed, float timeRemaining) =>
+            matchRunning && !alreadyPressed && timeRemaining <= ZoneLeadSeconds;
+
+        /// <summary>
+        /// The slot <c>cw_autozone</c> casts: a Root Egg (8 s, the longest-lived zone), else any other zone-placing ability
+        /// (<see cref="CluckWars.Abilities.AbilityBaseSO.PlacesZone"/>: Feather Trap, Smoke Roost), else a Doppelganger
+        /// (its decoy subscribes to the same reset). -1 = nothing in the loadout outlives a round.
+        /// </summary>
+        public static int PickZoneSlot(IReadOnlyList<CluckWars.Abilities.AbilityBaseSO> slots)
+        {
+            if (slots == null) return -1;
+            int zone = -1, decoy = -1;
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var a = slots[i];
+                if (a == null) continue;
+                if (a is CluckWars.Abilities.RootEggAbilitySO) return i;
+                if (zone < 0 && a.PlacesZone) zone = i;
+                if (decoy < 0 && a is CluckWars.Abilities.DoppelgangerAbilitySO) decoy = i;
+            }
+            return zone >= 0 ? zone : decoy;
+        }
 
         /// <summary>
         /// <c>cw_autodisconnect</c>'s main-thread freeze. The CW-218 phone stalled 12.8 s and was timed out; 15 s clears

@@ -124,6 +124,25 @@ namespace CluckWars.Gameplay
         /// can never both fire for one trigger.</summary>
         private bool _rootConfirmSent;
 
+        /// <summary>
+        /// The reset tick last delivered by <see cref="MatchSignals.RoundReset"/> (B10; 0 = none) and this life's spawn tick.
+        /// The authority despawns at the top of its next <see cref="FixedUpdateNetwork"/> when
+        /// <see cref="RoundResetObservation.OutlivedReset"/> says this zone belongs to the round that reset ended - never
+        /// inside the handler (it can run inside another object's tick, a <c>Spawned</c> or a UI press). Re-armed per
+        /// spawn: Fusion pools this object.
+        /// </summary>
+        /// <remarks>
+        /// <b>When the caster's peer leaves (hostleave, B10 audit):</b> the prefab's <c>NetworkObject</c> is serialised with
+        /// <c>Flags: 262145</c> = <c>V1 (1) | DestroyWhenStateAuthorityLeaves (262144)</c>, without
+        /// <c>MasterClientObject (131072)</c> (values read from <c>Fusion.Runtime.dll</c>'s <c>NetworkObjectFlags</c>). In
+        /// Shared Mode the zone's state authority is the peer that spawned it, so when that peer leaves Fusion destroys the
+        /// zone on every remaining peer: it is never orphaned. A bot's zone has the master as authority and goes with it.
+        /// <c>RoundResetSignalTests.ZoneAndDecoyPrefabs_AreDestroyedWithTheirAuthority</c> pins the flag; an orphan would
+        /// show as <c>zones-zero</c> at the next round start.
+        /// </remarks>
+        private int _resetTick;
+        private int _spawnTick;
+
         [Inject]
         public void Construct(ILogService log) => _log = log;
 
@@ -151,12 +170,18 @@ namespace CluckWars.Gameplay
             _rootConfirmSent  = false;
             _slowZoneOccupied = false;
 
+            _resetTick = 0;
+            _spawnTick = Runner.Tick.Raw;
+            MatchSignals.RoundReset -= OnRoundReset;   // never twice, whatever the pool did
+            MatchSignals.RoundReset += OnRoundReset;
+
             _log?.Debug(Source, $"Spawned. Effect={Effect}, Radius={TriggerRadius}, " +
                 $"Slow={SlowFactor:P0}, RootDuration={RootDuration:0.0}s.");
         }
 
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
+            MatchSignals.RoundReset -= OnRoundReset;
             ActiveZones.Remove(this);
             _placed = false;   // pooled: the next life re-applies its own stamp
 
@@ -173,6 +198,14 @@ namespace CluckWars.Gameplay
         {
             if (!HasStateAuthority) return;
 
+            // The round was reset (B10): no zone outlives the round it was placed in.
+            if (RoundResetObservation.OutlivedReset(_spawnTick, _resetTick))
+            {
+                _log?.Info(Source, $"Despawned by the round reset (effect={Effect}, consumed={Consumed}, spawned tick {_spawnTick} <= reset tick {_resetTick}).");
+                Runner.Despawn(Object);
+                return;
+            }
+
             // Despawn when lifetime expires or zone was consumed.
             if (LifetimeTimer.Expired(Runner) || Consumed)
             {
@@ -188,6 +221,9 @@ namespace CluckWars.Gameplay
             }
             // Slow zones: handled passively by ChickenController.CheckAbilityZoneSlow.
         }
+
+        /// <summary>Record only; <see cref="FixedUpdateNetwork"/> acts (see <see cref="_resetTick"/>).</summary>
+        private void OnRoundReset(int resetTick) => _resetTick = resetTick;
 
         /// <summary>
         /// The root trigger. Iterates <see cref="ChickenController.ActiveControllers"/>

@@ -48,11 +48,15 @@ namespace CluckWars.Diagnostics
         /// <summary>
         /// Round start (+0.5 s): every chicken near its home corner, no cargo, no cooldowns, no control state, no running
         /// ability; every base at 0; every pile at its authored amount; the match timer at the configured duration; 3 bots
-        /// in solo and none in a shared session. Returns how many checks were evaluated; failures are appended.
+        /// in solo and none in a shared session; and nothing the last round placed is still alive (B10): no ability zone
+        /// (<paramref name="zones"/>), no chicken with an aura on (<paramref name="auras"/>), no Doppelganger decoy
+        /// (<paramref name="decoys"/>). The check runs during the intro, when nobody can cast, so any of these is a
+        /// leftover. Returns how many checks were evaluated; failures are appended.
         /// </summary>
         public static int CheckRoundStart(IReadOnlyList<InvariantChicken> chickens, IReadOnlyList<Vector3> spawnPoints,
             IReadOnlyList<(int corner, float food)> bases, IReadOnlyList<(float amount, float initial)> piles,
-            float timeRemaining, float configuredDuration, bool singleMode, List<InvariantFailure> fails)
+            float timeRemaining, float configuredDuration, bool singleMode, List<InvariantFailure> fails,
+            int zones = 0, int auras = 0, int decoys = 0)
         {
             int n = 0, bots = 0;
             for (int i = 0; i < chickens.Count; i++)
@@ -98,8 +102,20 @@ namespace CluckWars.Diagnostics
             int expectedBots = singleMode ? ExpectedSoloBots : 0;
             if (bots != expectedBots)
                 fails.Add(new InvariantFailure("bots", expectedBots.ToString(), bots.ToString(), singleMode ? "solo" : "shared"));
+
+            n += 3;
+            if (zones > 0) fails.Add(new InvariantFailure("zones-zero", "0", zones.ToString(), "world"));
+            if (auras > 0) fails.Add(new InvariantFailure("auras-zero", "0", auras.ToString(), "world"));
+            if (decoys > 0) fails.Add(new InvariantFailure("decoys-zero", "0", decoys.ToString(), "world"));
             return n;
         }
+
+        /// <summary>
+        /// The <c> zn=.. au=.. dc=..</c> suffix the probe prints on every round-start <c>Invariant ok|FAIL</c> line (B10);
+        /// merge.ps1's round-start leftover rule parses exactly this.
+        /// </summary>
+        public static string StartCounts(int zones, int auras, int decoys) =>
+            " zn=" + zones + " au=" + auras + " dc=" + decoys;
 
         /// <summary>
         /// Round end: a named winner (corner >= 0) holds the most banked food (ties allowed); no winner means nobody leads

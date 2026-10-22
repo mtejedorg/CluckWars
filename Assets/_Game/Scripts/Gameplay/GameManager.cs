@@ -45,6 +45,14 @@ namespace CluckWars.Gameplay
         /// <summary>During <see cref="MatchState.Starting"/>, after <see cref="IntroArmGate.WaitingNoticeSeconds"/>:
         /// the first player the room still waits for (GET READY shows "Waiting for {name}"); None otherwise.</summary>
         [Networked] public PlayerRef WaitingFor { get; set; }
+        /// <summary>The simulation tick (<c>Tick.Raw</c>) of the last <see cref="ResetWorldForNewRound"/> (0 = never reset;
+        /// stored as int because the Fusion weaver rejects a <c>[Networked] Tick</c>, and Raw ordering is tick ordering). It is both
+        /// the trigger and the cut-off: every peer that is not the state authority raises <see cref="MatchSignals.RoundReset"/>
+        /// when it sees this change (<see cref="RoundResetObservation"/>; the authority raises it inside the reset), and a
+        /// zone / decoy despawns only if it spawned at or before this tick (<see cref="RoundResetObservation.OutlivedReset"/>),
+        /// so one cast on a stalled peer that sees the new round before its Render raised the signal is never caught.
+        /// Protocol: one int added to this object's networked layout (B10, 2026-10-22).</summary>
+        [Networked] public int ResetTickRaw { get; private set; }
 
         [Tooltip("Pre-match \"3, 2, 1, GO!\" intro window (seconds). Match timer is offset by this so the actual playable duration matches MatchConfigSO.MatchDurationSeconds.")]
         [Min(0f)]
@@ -80,6 +88,10 @@ namespace CluckWars.Gameplay
 
         // Every peer, local: the start / end audio this peer plays for itself.
         private readonly MatchAudioCueTracker _audioCues = new();
+
+        // Every peer, local: observes ResetTickRaw so non-authority peers raise MatchSignals.RoundReset (B10).
+        private ChangeDetector _resetDetector;
+        private PropertyReader<int> _resetTickReader;
 
         public float MatchDurationSeconds => _config != null ? _config.MatchDurationSeconds : 180f;
         public int FoodTargetToWin => _config != null ? _config.FoodTargetToWin : 110;
@@ -160,6 +172,12 @@ namespace CluckWars.Gameplay
 
             Instance = this;
 
+            // Baseline = the state this copy spawned with; Render reports every later ResetTickRaw change.
+            _resetDetector = GetChangeDetector(ChangeDetector.Source.SimulationState);
+            _resetTickReader = GetPropertyReader<int>(nameof(ResetTickRaw));
+            if (RoundResetObservation.ShouldRaiseOnSpawn(HasStateAuthority, ResetTickRaw))
+                RaiseObservedRoundReset(ResetTickRaw, "spawned after a reset (a fresh manager that cleaned a dirty world, or a late join)");
+
             // Master client behavior:
             // - Solo (GameMode.Single): auto-start. There's no one to wait for.
             // - Shared mode: stay in WaitingForPlayers (lobby). Host clicks the in-match
@@ -167,12 +185,17 @@ namespace CluckWars.Gameplay
             // Both go through Starting (BeginStarting): the intro arms once the world renders smoothly.
             if (HasStateAuthority)
             {
-                // GameManager is a master-client object that is destroyed when its authority
-                // leaves. A host change while a match was running or ended respawns it on the new
-                // master over a world the old round dirtied; clean it before arming the lobby.
+                // A host change does NOT normally come through here. GameManager.prefab's NetworkObject
+                // Flags 393217 = V1 | MasterClientObject | DestroyWhenStateAuthorityLeaves (values from
+                // Fusion.Runtime.dll); with MasterClientObject the new master becomes the state authority of
+                // THIS object and the round goes on (hostleave sessions 20261022-100545 / -101459: "Master
+                // client changed" then no second "GameManager Spawned", the round ends and PLAY AGAIN resets
+                // on the new master; MatchBootstrapper's promotion TrySpawnGameManager skips a live manager).
+                // This branch is the fallback for a manager that really is gone (spawned again over a world
+                // a round dirtied): clean it before arming the lobby.
                 if (MatchFlowRules.IsWorldDirty(ScanWorldDirt()))
                 {
-                    _log?.Info(Source, "Spawned over a dirty world (host change mid-round?) — resetting before arming the lobby.");
+                    _log?.Info(Source, "Spawned over a dirty world (previous manager lost mid-round?) — resetting before arming the lobby.");
                     ResetWorldForNewRound();
                 }
 
@@ -192,8 +215,8 @@ namespace CluckWars.Gameplay
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
             if (Instance == this) Instance = null;
-            // A host change destroys this object mid-round; the music this peer started at GO must not
-            // run on into the next manager's waiting room (it would never see this round's End cue).
+            // If this object is ever destroyed mid-round (session end, a lost manager; a host change transfers it
+            // instead, see Spawned), the music this peer started at GO must not run on into the next waiting room.
             if (_audioCues.RoundAudible) _audio?.StopMusic();
         }
 
@@ -232,9 +255,9 @@ namespace CluckWars.Gameplay
         /// State authority only; peers see <see cref="MatchState.Starting"/> (GET READY) until the
         /// networked intro timer arrives.
         /// <para>Authority changes: the gate is local, so a peer that inherits this object while it is
-        /// in Starting re-creates it in <see cref="Render"/>. When the old master leaves, though, this
-        /// master-client object is destroyed and the new master spawns a fresh one in the waiting room,
-        /// so the new host simply presses START again.</para>
+        /// in Starting re-creates it in <see cref="Render"/>. That is also what happens when the old master
+        /// leaves: this is a MasterClientObject, so the new master inherits it (not a fresh spawn; see
+        /// <see cref="Spawned"/>).</para>
         /// </summary>
         private void BeginStarting(string why)
         {
@@ -297,6 +320,8 @@ namespace CluckWars.Gameplay
 
         public override void Render()
         {
+            ObserveResetTick();
+
             if (State == MatchState.Starting) TickLocalSettle();
             else _localSettle = null;
 
@@ -317,6 +342,25 @@ namespace CluckWars.Gameplay
             }
 
             PlayAudioCue(_audioCues.Observe(State, IsIntroActive, ActiveEvent != MatchEventKind.None));
+        }
+
+        /// <summary>Non-authority peers: the replicated <see cref="ResetTickRaw"/> changed, so the world was reset (B10).</summary>
+        private void ObserveResetTick()
+        {
+            if (_resetDetector == null) return;
+            foreach (var changed in _resetDetector.DetectChanges(this, out var previous, out var current))
+            {
+                if (changed != nameof(ResetTickRaw)) continue;
+                var (before, after) = _resetTickReader.Read(previous, current);
+                if (RoundResetObservation.ShouldRaiseOnChange(HasStateAuthority, before, after))
+                    RaiseObservedRoundReset(after, $"observed reset tick {before}->{after}");
+            }
+        }
+
+        private void RaiseObservedRoundReset(int resetTick, string why)
+        {
+            int n = MatchSignals.RaiseRoundReset(resetTick, _log);
+            _log?.Info(Source, $"Round reset signal raised on this peer ({why}, state={State}, {n} subscriber(s)).");
         }
 
         /// <summary>
@@ -466,15 +510,19 @@ namespace CluckWars.Gameplay
             _warnedNoMatchMusic = true;
         }
 
+        // Authority-only, local: which "base already claimed" collisions were already logged (once each).
+        private readonly BaseClaimWarnings _baseClaimWarnings = new();
+
         private void AssignBasesToPlayers()
         {
             var bases = PlayerBase.ActiveBases;
             if (bases.Count == 0) return;
 
+            _baseClaimWarnings.KeepOnly(Runner.ActivePlayers);   // a player who left: its collision is over
             foreach (var player in Runner.ActivePlayers)
             {
                 if (!player.IsRealPlayer) continue;
-                if (PlayerHasBase(bases, player)) continue;
+                if (PlayerHasBase(bases, player)) { _baseClaimWarnings.Forget(player); continue; }
 
                 // Prefer the base whose CornerIndex matches the chicken's stamped
                 // HomeCornerIndex (exact identity). No fallbacks.
@@ -498,7 +546,8 @@ namespace CluckWars.Gameplay
                                 for (int j = 0; j < bases.Count; j++)
                                 {
                                     var b = bases[j];
-                                    if (b != null && b.CornerIndex == c.HomeCornerIndex && (b.Owner.IsRealPlayer || b.BotClaimed))
+                                    if (b != null && b.CornerIndex == c.HomeCornerIndex && (b.Owner.IsRealPlayer || b.BotClaimed)
+                                        && _baseClaimWarnings.ShouldWarn(player, b.CornerIndex))   // once per collision, not per tick
                                     {
                                         _log?.Warn(Source, $"Invariant violation: base {b.name} (corner {b.CornerIndex}) is already claimed, but player {player} has it as home corner.");
                                     }
@@ -518,6 +567,7 @@ namespace CluckWars.Gameplay
                 }
 
                 freeBase.Owner = player;
+                _baseClaimWarnings.Forget(player);
                 _log?.Info(Source, $"Assigned '{freeBase.name}' (corner {freeBase.CornerIndex}) " +
                     $"to player {player} (PlayerId={player.PlayerId}).");
             }
@@ -808,10 +858,24 @@ namespace CluckWars.Gameplay
             if (MatchFlowRules.StateAfterPlayAgain(solo) == MatchState.Starting) BeginStarting("solo PLAY AGAIN");
         }
 
-        /// <summary>Reads the live bases and piles into the pure <see cref="WorldDirt"/> the
-        /// reset decision is made on.</summary>
+        /// <summary>Reads the live bases, piles, zones, decoys and auras into the pure <see cref="WorldDirt"/> the
+        /// reset decision is made on (a round that ended before any food moved can still leave a zone behind).</summary>
         private static WorldDirt ScanWorldDirt()
         {
+            int liveZones = 0;
+            var zones = AbilityZone.ActiveZones;
+            for (int i = 0; i < zones.Count; i++)
+                if (zones[i] != null && zones[i].Object != null && zones[i].Object.IsValid) liveZones++;
+            int decoys = 0, auras = 0;
+            var chickens = ChickenController.ActiveControllers;
+            for (int i = 0; i < chickens.Count; i++)
+            {
+                var c = chickens[i];
+                if (c == null || c.Object == null || !c.Object.IsValid) continue;
+                if (c.IsDecoy) decoys++;
+                if (c.AuraSlowActive) auras++;
+            }
+
             float maxBaseFood = 0f;
             var bases = PlayerBase.ActiveBases;
             for (int i = 0; i < bases.Count; i++)
@@ -826,7 +890,7 @@ namespace CluckWars.Gameplay
                 if (p.IsEvent) eventPile = true;
                 else if (p.Amount < p.MaxAmount) pileBelowMax = true;
             }
-            return new WorldDirt(maxBaseFood, pileBelowMax, eventPile);
+            return new WorldDirt(maxBaseFood, pileBelowMax, eventPile, MatchFlowRules.Leftovers(liveZones, decoys, auras));
         }
 
         /// <summary>
@@ -838,6 +902,13 @@ namespace CluckWars.Gameplay
         /// </summary>
         private void ResetWorldForNewRound()
         {
+            // B10: every live zone / decoy / aura despawns on its OWN authority's next tick. Raised here on this peer;
+            // every other peer raises it when it sees ResetTickRaw change (Render -> ObserveResetTick). Subscribers only
+            // record the cut-off tick, so raising before the RPC fan-out below changes nothing about what those RPCs do.
+            ResetTickRaw = Runner.Tick.Raw;
+            int subscribers = MatchSignals.RaiseRoundReset(ResetTickRaw, _log);
+            _log?.Info(Source, $"Round reset signal raised on the state authority (tick={ResetTickRaw}, {subscribers} subscriber(s)).");
+            _baseClaimWarnings.Clear();   // a collision that persists into the new round warns once more
 
             // Master has authority over scene NetworkObjects (bases, piles) — mutate
             // their networked state directly; replication carries the new values to

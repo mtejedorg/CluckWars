@@ -70,6 +70,11 @@ namespace CluckWars.Diagnostics
             if (_cfg.AutoDisconnect > 0)
                 _log.Info(Source, $"AutoTest autodisconnect={_cfg.AutoDisconnect}s: this peer freezes {AutoTestRules.AutoDisconnectStallSeconds} s " +
                     "into its first multiplayer round, then presses REJOIN (CW-218).");
+            if (_cfg.AutoZone)
+                _log.Info(Source, string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "AutoTest autozone=1: every round this peer casts its zone ability once with {0:0.0} s left, " +
+                    "and PLAY AGAIN waits {1:0.0} s (B10: the next round must start with zn=0).",
+                    AutoTestRules.ZoneLeadSeconds, AutoTestRules.PlayAgainDelay(true)));
             _log.Info(Source, $"AutoTest persistentDataPath={Application.persistentDataPath}");
 
             if (_cfg.DevMode && !PlayerPreferences.DeveloperModeEnabled)
@@ -243,6 +248,7 @@ namespace CluckWars.Diagnostics
             var gm = GameManager.Instance;
             bool valid = gm != null && gm.Object != null && gm.Object.IsValid;
 
+            TickAutoZone(valid ? gm : null);   // before autoplay: the reservation must hold before its first cast
             TickAutoPlay(valid ? gm : null);
             if (!valid) return;
 
@@ -423,6 +429,94 @@ namespace CluckWars.Diagnostics
             }
         }
 
+        // ---- cw_autozone (B10): a zone alive at PLAY AGAIN, so the next round-start check sees whether the reset cleared it --
+        private enum AutoZonePhase { Idle, Armed, Pressed, Unavailable }
+        private AutoZonePhase _zonePhase = AutoZonePhase.Idle;
+        private int _zoneSlot = -1;
+        private string _zoneAbility;
+        private float _zonePressedLeft;
+        private readonly System.Collections.Generic.List<CluckWars.Abilities.AbilityBaseSO> _zoneSlots =
+            new System.Collections.Generic.List<CluckWars.Abilities.AbilityBaseSO>(AbilityController.SlotCount);
+
+        /// <summary>
+        /// Idle -> Armed when a round becomes playable (the zone slot is reserved from the fake player's rotation, so it is
+        /// off cooldown at the mark) -> Pressed at <see cref="AutoTestRules.ZoneLeadSeconds"/> left -> one report when the
+        /// round ends (cast or not, and how many zones / decoys this peer still sees) -> Idle. A loadout with nothing to
+        /// place says so once (Warn) and the hook stays off for the run.
+        /// </summary>
+        private void TickAutoZone(GameManager gm)
+        {
+            if (!_cfg.AutoZone || _autoPlay == null || _zonePhase == AutoZonePhase.Unavailable) return;
+            if (gm == null)
+            {
+                // Left the match (host change, disconnect): the next manager starts a fresh round from Idle.
+                _zonePhase = AutoZonePhase.Idle;
+                _autoPlay.ReservedSlot = -1;
+                return;
+            }
+            var abilities = LocalChicken()?.Abilities;
+
+            if (gm.State == MatchState.Ended)
+            {
+                if (_zonePhase != AutoZonePhase.Idle) ReportAutoZoneRound(abilities);
+                return;
+            }
+            if (!gm.IsMatchRunning || abilities == null) return;
+
+            if (_zonePhase == AutoZonePhase.Idle)
+            {
+                _zoneSlots.Clear();
+                for (int s = 0; s < AbilityController.SlotCount; s++) _zoneSlots.Add(abilities.GetSlot(s));
+                _zoneSlot = AutoTestRules.PickZoneSlot(_zoneSlots);
+                if (_zoneSlot < 0)
+                {
+                    _zonePhase = AutoZonePhase.Unavailable;
+                    _log.Warn(Source, "AutoTest autozone: nothing in this loadout outlives a round (no zone ability, no Doppelganger); " +
+                        "nothing is placed this run. Use cw_class Fatty (Root Egg) or Speedy (Feather Trap).");
+                    return;
+                }
+                _zoneAbility = _zoneSlots[_zoneSlot].name;
+                _autoPlay.ReservedSlot = _zoneSlot;
+                _zonePhase = AutoZonePhase.Armed;
+                _log.Info(Source, $"AutoTest autozone: slot {_zoneSlot} ({_zoneAbility}) reserved for one cast near the round end.");
+                return;
+            }
+
+            if (AutoTestRules.ShouldCastZone(gm.IsMatchRunning, _zonePhase == AutoZonePhase.Pressed, gm.TimeRemaining))
+            {
+                _zonePressedLeft = gm.TimeRemaining;
+                _autoPlay.Press(_zoneSlot, AutoPlayInputProvider.HoldSeconds);
+                _zonePhase = AutoZonePhase.Pressed;
+                _log.Info(Source, System.FormattableString.Invariant(
+                    $"AutoTest autozone: casting {_zoneAbility} (slot {_zoneSlot}) with {_zonePressedLeft:0.00} s left."));
+            }
+        }
+
+        private void ReportAutoZoneRound(AbilityController abilities)
+        {
+            int zones = 0, decoys = 0;
+            var live = AbilityZone.ActiveZones;
+            for (int i = 0; i < live.Count; i++) if (live[i] != null && live[i].Object != null && live[i].Object.IsValid) zones++;
+            var all = ChickenController.ActiveControllers;
+            for (int i = 0; i < all.Count; i++) if (all[i] != null && all[i].Object != null && all[i].Object.IsValid && all[i].IsDecoy) decoys++;
+
+            if (_zonePhase == AutoZonePhase.Armed)
+                _log.Warn(Source, System.FormattableString.Invariant($"AutoTest autozone: the round ended before the {AutoTestRules.ZoneLeadSeconds:0.0} s mark ") +
+                    $"(food target reached?); {_zoneAbility} was not cast this round.");
+            else
+            {
+                bool cast = abilities != null && (abilities.CooldownRemaining(_zoneSlot) > 0f || abilities.IsSlotActive(_zoneSlot));
+                if (cast)
+                    _log.Info(Source, $"AutoTest autozone: {_zoneAbility} placed; at the round end this peer sees zones={zones} decoys={decoys}.");
+                else
+                    _log.Warn(Source, $"AutoTest autozone: {_zoneAbility} was pressed but did not cast (stunned / rooted at the mark?); " +
+                        $"this round proves nothing about the reset. zones={zones} decoys={decoys}.");
+            }
+            _autoPlay.ReservedSlot = -1;
+            _zoneSlot = -1;
+            _zonePhase = AutoZonePhase.Idle;
+        }
+
         private void TickAutoPlay(GameManager gm)
         {
             if (_autoPlay == null || !_cfg.AutoPlay) return;
@@ -538,7 +632,7 @@ namespace CluckWars.Diagnostics
             if (_loopHandled) return;
             float now = Time.realtimeSinceStartup;
             if (_endedSince < 0f) _endedSince = now;
-            if (now - _endedSince < AutoTestRules.PlayAgainDelaySeconds || !gm.CanRequestPlayAgain) return;
+            if (now - _endedSince < AutoTestRules.PlayAgainDelay(_cfg.AutoZone) || !gm.CanRequestPlayAgain) return;
 
             _loopHandled = true;
             if (AutoTestRules.ShouldPlayAgain(_extraRounds, _cfg.AutoLoop))

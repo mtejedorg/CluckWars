@@ -298,6 +298,69 @@ foreach ($src in @($beatsBySrc.Keys)) {
     }
 }
 
+# ---- Home-corner identity (CW-233): no two real players share a HomeCornerIndex ---------------------------------
+# Every peer prints `Respawn check chicken=<id> home=<HomeCornerIndex> ... round=<n>` once per round for every chicken
+# (Source Reset; P<PlayerId> = a real player, B<corner> = a bot). Two P ids with the same home on one peer in one round
+# is the CW-233 spawn race: both chickens stand on one corner, one of them has no base and the master warns "already
+# claimed" every tick. The quadrant rule above sees the same thing by position; this one names the stamped identity.
+$rxRespawn = New-Object Text.RegularExpressions.Regex('^Respawn check chicken=(P\d+) home=(-?\d+) .*\bround=(\d+)')
+$homeSeen = @{}     # "src|round|home" -> first player id
+$homeFiled = @{}
+foreach ($e in $sorted) {
+    if ($e.Source -ne 'Reset') { continue }
+    $m = $rxRespawn.Match($e.Message); if (-not $m.Success) { continue }
+    $id = $m.Groups[1].Value; $hc = $m.Groups[2].Value; $rd = $m.Groups[3].Value
+    if ([int]$hc -lt 0) { continue }   # unstamped: the corner-quadrant / spawn rules own that case
+    $key = "$($e.Src)|$rd|$hc"
+    if (-not $homeSeen.ContainsKey($key)) { $homeSeen[$key] = $id; continue }
+    if ($homeSeen[$key] -eq $id -or $homeFiled.ContainsKey($key)) { continue }
+    $homeFiled[$key] = 1
+    Add-Finding @('INVARIANT') $e ("round $rd on $($e.Src): real players $($homeSeen[$key]) and $id share HomeCornerIndex $hc (CW-233 spawn-corner race: one of them has no base)")
+}
+
+# ---- Round-start leftovers (B10): nothing the last round placed survives the reset -------------------------------
+# (a) Builds with the B10 probe print " zn=<zones> au=<auras> dc=<decoys>" on every round-start Invariant ok|FAIL line
+#     (0.5 s after Active, inside the intro: nobody can cast). Any non-zero count is a finding, once per source and round.
+# (b) Any build (also the ones before B10): the 2 s World line's zones=<hash>/<n>. From $LeftoverGraceSec after a round
+#     leaves Ended (PLAY AGAIN; the despawn is one tick + replication away) until $IntroGraceSec after the next Active
+#     (the intro is 3 s: still nobody can cast), n must be 0.
+$LeftoverGraceSec = 1.0
+$IntroGraceSec = 2.5
+$rxStartCounts = New-Object Text.RegularExpressions.Regex('^Invariant (?:ok|FAIL)\b(?=.*\bphase=start\b)(?=.*\bround=(\d+)\b).*\bzn=(\d+) au=(\d+) dc=(\d+)')
+$rxStateLine = New-Object Text.RegularExpressions.Regex('^Invariant state (\w+)->(\w+) round=(\d+)')
+$rxWorldZones = New-Object Text.RegularExpressions.Regex('^World t=(\d+) .*\bzones=\w+/(\d+)')
+$leftoverSeen = @{}
+$leftWin = @{}   # src -> @{ From; Until; Round }
+foreach ($e in $sorted) {
+    if ($e.Source -ne 'Invariant') { continue }
+    $m = $rxStartCounts.Match($e.Message)
+    if ($m.Success) {
+        $rd = $m.Groups[1].Value; $zn = [int]$m.Groups[2].Value; $au = [int]$m.Groups[3].Value; $dc = [int]$m.Groups[4].Value
+        $key = "start|$($e.Src)|$rd"
+        if (($zn + $au + $dc) -gt 0 -and -not $leftoverSeen.ContainsKey($key)) {
+            $leftoverSeen[$key] = 1
+            Add-Finding @('INVARIANT') $e ("round $rd start on $($e.Src): zn=$zn au=$au dc=$dc - zones/auras/decoys of the last round survived the reset (expected 0, B10)")
+        }
+        continue
+    }
+    $m = $rxStateLine.Match($e.Message)
+    if ($m.Success) {
+        $from = $m.Groups[1].Value; $to = $m.Groups[2].Value
+        if ($from -eq 'Ended' -and $to -ne 'Ended') { $leftWin[$e.Src] = @{ From = $e.Ticks + [long]($LeftoverGraceSec * 1e7); Until = [long]::MaxValue; Round = [int]$m.Groups[3].Value } }
+        elseif ($to -eq 'Active' -and $leftWin.ContainsKey($e.Src) -and $leftWin[$e.Src].Until -eq [long]::MaxValue) { $leftWin[$e.Src].Until = $e.Ticks + [long]($IntroGraceSec * 1e7) }
+        elseif ($to -eq 'Ended') { $leftWin.Remove($e.Src) }
+        continue
+    }
+    $m = $rxWorldZones.Match($e.Message)
+    if ($m.Success -and [int]$m.Groups[2].Value -gt 0 -and $leftWin.ContainsKey($e.Src)) {
+        $w = $leftWin[$e.Src]
+        if ($e.Ticks -lt $w.From -or $e.Ticks -gt $w.Until) { continue }
+        $key = "world|$($e.Src)|$($w.Round)"
+        if ($leftoverSeen.ContainsKey($key)) { continue }
+        $leftoverSeen[$key] = 1
+        Add-Finding @('INVARIANT') $e ("round reset after round $($w.Round) on $($e.Src) (World t=$($m.Groups[1].Value)): $($m.Groups[2].Value) ability zone(s) still alive after PLAY AGAIN, before anyone could cast (expected 0, B10)")
+    }
+}
 
 # ---- World-hash parity (CW-216/217 class: spawned objects positioned differently per peer) ---------------------
 # The game logs `World t=<tick> static=<hash> n=<count> ...` on every peer every 2 s (Source Invariant). Peers log on the

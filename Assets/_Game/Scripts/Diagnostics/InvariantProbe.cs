@@ -19,6 +19,8 @@ namespace CluckWars.Diagnostics
     /// <remarks>
     /// Lines: <c>Invariant state A->B round=k</c> (Info), <c>Invariant FAIL &lt;name&gt; expected=.. actual=.. who=..</c>
     /// (Error), <c>Invariant ok round=k n=..</c> (Info), <c>World t=.. static=XXXXXXXX n=.. chickens=XXXXXXXX m=..</c> (Info).
+    /// Round-start lines (ok and FAIL) end with <c> zn=.. au=.. dc=..</c>: live ability zones, chickens with an aura on and
+    /// Doppelganger decoys, all of which must be 0 (B10, <see cref="RoundInvariants.StartCounts"/>).
     /// Read-only; it never changes gameplay and never throws (an exception inside a check is logged as an Error).
     /// </remarks>
     public sealed class InvariantProbe : MonoBehaviour
@@ -139,10 +141,23 @@ namespace CluckWars.Diagnostics
             }
             if (_map == null) _map = FindFirstObjectByType<MapGenerator>();
 
+            // B10 leftovers: what the previous round placed must be gone (the check runs during the intro: nobody can cast).
+            int zones = 0, auras = 0, decoys = 0;
+            var live = AbilityZone.ActiveZones;
+            for (int i = 0; i < live.Count; i++)
+                if (live[i] != null && live[i].Object != null && live[i].Object.IsValid) zones++;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var c = all[i];
+                if (c == null || c.Object == null || !c.Object.IsValid) continue;
+                if (c.IsDecoy) decoys++;
+                if (c.AuraSlowActive) auras++;
+            }
+
             _fails.Clear();
             int n = RoundInvariants.CheckRoundStart(_chickens, _map != null ? _map.SpawnPoints : null, _bases, _piles,
-                gm.TimeRemaining, gm.MatchDurationSeconds, gm.Runner.GameMode == GameMode.Single, _fails);
-            Report("start", n);
+                gm.TimeRemaining, gm.MatchDurationSeconds, gm.Runner.GameMode == GameMode.Single, _fails, zones, auras, decoys);
+            Report("start", n, RoundInvariants.StartCounts(zones, auras, decoys));
         }
 
         private void CheckEnd(GameManager gm)
@@ -173,10 +188,10 @@ namespace CluckWars.Diagnostics
             }
         }
 
-        private void Report(string phase, int checks)
+        private void Report(string phase, int checks, string counts = "")
         {
-            for (int i = 0; i < _fails.Count; i++) _log?.Error(Source, _fails[i].Line() + $" phase={phase} round={_round}");
-            if (_fails.Count == 0) _log?.Info(Source, $"Invariant ok round={_round} phase={phase} n={checks}");
+            for (int i = 0; i < _fails.Count; i++) _log?.Error(Source, _fails[i].Line() + $" phase={phase} round={_round}" + counts);
+            if (_fails.Count == 0) _log?.Info(Source, $"Invariant ok round={_round} phase={phase} n={checks}" + counts);
         }
 
         private void World(GameManager gm)

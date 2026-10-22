@@ -13,14 +13,21 @@
 
 .PARAMETER Mode    solo | shared2 | shared4 | hostleave
 .PARAMETER Rounds  rounds to play (auto-loop). Default 3.
+.PARAMETER AutoZone  B10: every EXE gets -cw_autozone (each peer casts its zone ability ~1.5 s before every round end and
+           PLAY AGAIN follows 1.5 s later), so the next round-start Invariant line must read zn=0. Root Egg (Fatty) is the
+           reliable carrier (8 s): in solo the class becomes Fatty unless -Class is given; shared2's joiner is a Speedy (Feather
+           Trap, 5 s), shared4/hostleave add a Fatty (joiner 2) and an Assassin (Doppelganger decoy, 4 s, may expire first).
 #>
 param(
     [ValidateSet('solo','shared2','shared4','hostleave')][string]$Mode = 'shared4',
     [int]$Rounds = 3,
     [int]$MaxMinutes = 8,
     [string]$Class = 'Warrior',
-    [string]$JoinerExtra = ''   # extra EXE args (space separated) for every joiner, e.g. -JoinerExtra '-cw_autodisconnect 25'
+    [string]$JoinerExtra = '',  # extra EXE args (space separated) for every joiner, e.g. -JoinerExtra '-cw_autodisconnect 25'
+    [switch]$AutoZone
 )
+if ($AutoZone -and $Mode -eq 'solo' -and -not $PSBoundParameters.ContainsKey('Class')) { $Class = 'Fatty' }
+$zoneArgs = @(if ($AutoZone) { '-cw_autozone' })
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\lib.ps1"
 $root = $script:RepoRoot
@@ -31,10 +38,10 @@ Get-Process CluckWars -ErrorAction SilentlyContinue | Stop-Process -Force
 # PC-only: never touch a phone (no logcat / screenrecord)
 & "$PSScriptRoot\start.ps1" -NoRecord | Out-Null
 $S = (Get-ChildItem (Join-Path $root 'Captures') -Directory | Sort-Object Name | Select-Object -Last 1).FullName
-Write-Host "session: $S   mode: $Mode   rounds: $Rounds"
+Write-Host "session: $S   mode: $Mode   rounds: $Rounds$(if ($AutoZone) { '   autozone' })"
 
 function Start-Exe([string]$name, [string[]]$extra) {
-    $a = @('-screen-fullscreen','0','-screen-width','960','-screen-height','540','-logFile',"`"$S\$name.log`"",'-cw_autoplay','-cw_hud','-cw_profile',$name) + $extra
+    $a = @('-screen-fullscreen','0','-screen-width','960','-screen-height','540','-logFile',"`"$S\$name.log`"",'-cw_autoplay','-cw_hud','-cw_profile',$name) + $zoneArgs + $extra
     Start-Process $exe -ArgumentList $a | Out-Null
 }
 function Wait-Code([string]$log) {

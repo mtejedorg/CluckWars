@@ -50,6 +50,12 @@ namespace CluckWars.Diagnostics
         /// <summary>True while the driver wants the fake player to play (a running round on this peer).</summary>
         public bool Active { get; private set; }
 
+        /// <summary>
+        /// A slot the fake player never casts by itself (-1 = none): <c>cw_autozone</c> keeps its zone ability off cooldown
+        /// for the one cast it makes near the round end (<see cref="Press"/> still works for it).
+        /// </summary>
+        public int ReservedSlot { get; set; } = -1;
+
         public AutoPlayGoal Goal => _brain.Goal;
         public AutoPlayState State => _brain.State;
         public AutoPlayPersonality Personality => _brain.Personality;
@@ -180,7 +186,7 @@ namespace CluckWars.Diagnostics
 
             if (_brain.TakeAttackCast())
             {
-                int slot = FirstSlot(abilities, offensiveOnly: true);
+                int slot = FirstSlot(abilities, offensiveOnly: true, ReservedSlot);
                 if (slot >= 0) { Press(slot, HoldSeconds); _nextCastAt = now + CastEverySeconds; return; }
             }
 
@@ -201,19 +207,19 @@ namespace CluckWars.Diagnostics
                 int slot = _nextSlot;
                 _nextSlot = (_nextSlot + 1) % AbilityController.SlotCount;
                 var ab = abilities.GetSlot(slot);
-                if (ab == null || ab is PeckAbilitySO) continue;
+                if (ab == null || ab is PeckAbilitySO || slot == ReservedSlot) continue;
                 if (!AutoPlayCasting.Allowed(ab.Category, _brain.Personality.CastsOffense)) continue;
                 Press(slot, HoldSeconds);
                 return;
             }
         }
 
-        private static int FirstSlot(AbilityController abilities, bool offensiveOnly)
+        private static int FirstSlot(AbilityController abilities, bool offensiveOnly, int reserved)
         {
             for (int slot = 0; slot < AbilityController.SlotCount; slot++)
             {
                 var ab = abilities.GetSlot(slot);
-                if (ab == null || ab is PeckAbilitySO) continue;
+                if (ab == null || ab is PeckAbilitySO || slot == reserved) continue;
                 if (!offensiveOnly || AutoPlayCasting.IsOffensive(ab.Category)) return slot;
             }
             return -1;

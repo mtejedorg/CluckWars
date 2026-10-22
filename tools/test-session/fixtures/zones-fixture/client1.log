@@ -1,0 +1,10 @@
+[10:00:00.000][00:00.000][Info][Session] Session sha=ccc333 date=2026-10-22 platform=WindowsPlayer
+[10:00:01.000][00:01.000][Info][Invariant] Invariant state WaitingForPlayers->Starting round=1
+[10:00:02.000][00:02.000][Info][Invariant] Invariant state Starting->Active round=1
+[10:00:02.500][00:02.500][Info][Invariant] Invariant ok round=1 phase=start n=40 zn=0 au=0 dc=0
+[10:00:49.000][00:49.000][Info][AutoTest] AutoTest autozone: casting RootEgg (slot 3) with 1.48 s left.
+[10:00:50.000][00:50.000][Info][Invariant] Invariant state Active->Ended round=1
+[10:00:51.500][00:51.500][Info][Invariant] Invariant state Ended->Starting round=2
+[10:00:53.000][00:53.000][Info][Invariant] Invariant state Starting->Active round=2
+[10:00:53.500][00:53.500][Error][Invariant] Invariant FAIL zones-zero expected=0 actual=1 who=world phase=start round=2 zn=1 au=0 dc=0
+[10:00:53.500][00:53.500][Error][Invariant] Invariant FAIL cooldowns-zero expected=0 actual=0.50s who=P1 phase=start round=2 zn=1 au=0 dc=0

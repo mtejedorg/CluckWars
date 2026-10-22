@@ -98,6 +98,45 @@ Assert ((Count $f3 '\[SYNC\] t=292\.\.420 client1 vs client2: chicken P5 cs clie
 Assert ($f3 -notmatch 'chicken P6 cs') 'lag: owner Slowed / remote Free at both beats but BOTH saw the flag change in between (fl=2, sessions 163938/164644) NOT reported'
 Assert ($f3 -match 'SYNC=3\s') 'lag/stuck: exactly three SYNC findings'
 Remove-Item $tmp3 -Recurse -Force
+
+# ---- Round-start leftovers (B10): a Root Egg placed just before the end must not survive PLAY AGAIN ----
+$tmp4 = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-zn-' + [Guid]::NewGuid().ToString('N'))
+Copy-Item (Join-Path $PSScriptRoot 'fixtures\zones-fixture') $tmp4 -Recurse
+& (Join-Path $PSScriptRoot 'merge.ps1') -Session $tmp4 | Out-Null
+$f4 = Get-Content (Join-Path $tmp4 'findings.txt') -Raw
+Assert ((Count $f4 '\[INVARIANT\] round 2 start on client1: zn=1 au=0 dc=0') -eq 1) 'B10: zn=1 on the round-start probe lines is ONE finding (two FAIL lines of round 2 deduped)'
+Assert ($f4 -notmatch 'round 1 start on client1') 'B10: round 1 with zn=0 is not flagged'
+Assert ((Count $f4 '\[INVARIANT\] round reset after round 1 on client2 \(World t=1664\): 1 ability zone') -eq 1) 'B10 (pre-B10 build, World lines only): a zone alive after PLAY AGAIN is flagged once per round'
+Assert ($f4 -notmatch 'World t=1600\)') 'B10: a zone inside the 1 s despawn grace after the reset is not flagged'
+Assert ($f4 -notmatch 'World t=1792\)') 'B10: a zone cast after the intro of the new round is not flagged'
+Remove-Item $tmp4 -Recurse -Force
+
+$tmp5 = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-zn-ok-' + [Guid]::NewGuid().ToString('N'))
+Copy-Item (Join-Path $PSScriptRoot 'fixtures\zones-clean-fixture') $tmp5 -Recurse
+& (Join-Path $PSScriptRoot 'merge.ps1') -Session $tmp5 | Out-Null
+$f5 = Get-Content (Join-Path $tmp5 'findings.txt') -Raw
+Assert ($f5 -notmatch 'B10') 'B10 clean: zn=0 at every round start, a zone gone within the grace, a fresh zone after the intro -> no finding'
+Assert ($f5 -match 'INVARIANT=0') 'B10 clean: INVARIANT=0'
+Remove-Item $tmp5 -Recurse -Force
+
+# ---- Home-corner identity (CW-233): two real players stamped with one HomeCornerIndex ----
+$tmp6 = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-hc-' + [Guid]::NewGuid().ToString('N'))
+Copy-Item (Join-Path $PSScriptRoot 'fixtures\corner-fixture') $tmp6 -Recurse
+& (Join-Path $PSScriptRoot 'merge.ps1') -Session $tmp6 | Out-Null
+$f6 = Get-Content (Join-Path $tmp6 'findings.txt') -Raw
+Assert ((Count $f6 '\[INVARIANT\] round 1 on client1: real players P3 and P2 share HomeCornerIndex 1') -eq 1) 'CW-233: two players on one home corner flagged once on client1 (repeated line deduped)'
+Assert ((Count $f6 '\[INVARIANT\] round 1 on client2: real players P2 and P3 share HomeCornerIndex 1') -eq 1) 'CW-233: flagged on every peer that sees it (client2)'
+Assert ($f6 -notmatch 'share HomeCornerIndex [23]') 'CW-233: players with their own corner are not flagged'
+Assert ($f6 -match 'share corner quadrant') 'CW-233: the position-based quadrant rule fires on the same run'
+Remove-Item $tmp6 -Recurse -Force
+
+$tmp7 = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-hc-ok-' + [Guid]::NewGuid().ToString('N'))
+Copy-Item (Join-Path $PSScriptRoot 'fixtures\corner-clean-fixture') $tmp7 -Recurse
+& (Join-Path $PSScriptRoot 'merge.ps1') -Session $tmp7 | Out-Null
+$f7 = Get-Content (Join-Path $tmp7 'findings.txt') -Raw
+Assert ($f7 -notmatch 'HomeCornerIndex') 'CW-233 clean: distinct homes, a repeated line, unstamped (-1) players and a bot on a player''s old corner -> no finding'
+Assert ($f7 -match 'INVARIANT=0') 'CW-233 clean: INVARIANT=0'
+Remove-Item $tmp7 -Recurse -Force
 Write-Host ''
 if ($script:fail -eq 0) { Write-Host 'SELFTEST OK' -ForegroundColor Green; exit 0 }
 Write-Host "SELFTEST FAILED ($($script:fail) assertion(s))" -ForegroundColor Red
