@@ -566,7 +566,8 @@
 /* GET READY inside the intro overlay is the shared card (Styles/GetReadyCard.uss). */
 
 /* Comeback / event banner (round-3 finding 5): the wood plaque of the menus (Frame_WoodPanel), lower third between
-   the joystick and the ability hexes. 760 x ~150 on the 1920x1080 reference, as the ink plate it replaces. */
+   the joystick and the ability hexes (landscape; portrait below). 760 x ~150 on the 1920x1080 reference, as the ink
+   plate it replaces. */
 .cw-eventbanner {
     position: absolute; left: 0; right: 0; bottom: 150px;
     align-items: center;
@@ -592,6 +593,11 @@
     text-shadow: 0px 4px 0px rgba(42, 26, 12, 0.85);
     padding-top: 0; padding-bottom: 0; margin-top: 0; margin-bottom: 0;
 }
+/* Portrait (WP7, spec 1.5): no lane between the stick and the hexes, so the plaque sits above the whole bottom band
+   (hexes top out at ~531 px), centred. MatchOverlaysController puts the shape classes on #EventBanner itself
+   (measured on #OverlayRoot), so the GET READY plate never sees them. */
+.cw-eventbanner.layout--portrait { bottom: 600px; }
+.cw-eventbanner.layout--portrait .cw-eventbanner__plaque { max-width: 90%; }
 
 /* Host-left notice: a wood plaque in the upper third, over the arena / lobby. */
 .cw-hostleft {

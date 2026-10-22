@@ -18,7 +18,9 @@ namespace CluckWars.UI
     /// the two full-screen effects that have no on-character or UI Toolkit home:
     /// <list type="bullet">
     ///   <item>Full-screen hit-flash on local HP loss.</item>
-    ///   <item>The comeback event banner ("FINAL 10!" + the event), lower third between the joystick and the ability buttons.</item>
+    ///   <item>The comeback event banner ("FINAL 10!" + the event): its timing and copy. Where it sits is USS
+    ///   (<c>MatchOverlays.uss</c>): the lower third between the joystick and the ability buttons in landscape, above the
+    ///   whole bottom band in portrait (bottom 600 px, centred, max-width 90 %, WP7), since portrait has no lane between them.</item>
     /// </list>
     /// The top-bar leaderboard + timer are UI Toolkit (<see cref="MatchHudController"/>
     /// + <c>Assets/UI/MatchTopBar.uxml</c>), and the local HP/cargo bars now live

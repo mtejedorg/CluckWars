@@ -12,12 +12,19 @@ namespace CluckWars.Visuals
     /// to find the opponents in the map, at least with bots."*
     ///
     /// <para>
-    /// Two presentations of one idea, switched on whether the rival is in frame:
+    /// Two presentations of one idea, switched on whether the rival is in the clear viewport:
     /// a <b>ground ring</b> under an on-screen rival, and a <b>chevron</b> pinned to the view
-    /// edge pointing at an off-screen one. Never both — an on-screen rival is its own
-    /// indicator and does not also need an arrow. "On screen" means any part of the body in
-    /// frame (hysteresis on the way out), and the chevron is kept out of the HUD control
-    /// zones (<see cref="HudControlZones"/>) by sliding along the edge band.
+    /// edge pointing at an off-screen one. An on-screen rival is its own indicator and does not
+    /// also need an arrow. "On screen" means any part of the body in frame (hysteresis on the
+    /// way out), and the chevron is kept out of the HUD control and information zones
+    /// (<see cref="HudControlZones"/>) by sliding along the edge band.
+    /// </para>
+    /// <para>
+    /// <b>Under the HUD (WP7, decisions C6 / F6, both orientations).</b> A rival whose body plus
+    /// nameplate is at least half inside an information zone (the top band, the status strip)
+    /// is hidden by the HUD, not by the frame: its nameplate is hidden (<see cref="HidesNameplate"/>,
+    /// read by <see cref="ChickenNameplate"/>) and it gets a chevron pinned at the zone's edge,
+    /// pointing at it. Its ground ring stays, since part of the bird may still show.
     /// </para>
     /// <para>
     /// <b>Both are tinted with the rival's PLAYER colour</b> (<see cref="PlayerPalette.ForCorner"/>
@@ -114,7 +121,13 @@ namespace CluckWars.Visuals
         private CharacterController _body;      // body extent for the on-screen test (capsule bounds)
         private float _bodyHalfWidth;           // class model's lateral half-width (SetBodyFootprint), widens the capsule
         private bool _wasOnScreen;              // last frame's on-screen verdict: the hysteresis memory
+        private bool _wasUnderHud;              // last frame's "mostly under an info zone" verdict (its own hysteresis)
+        private ChickenNameplate _nameplate;    // its plate is part of the "under the HUD" rect; optional
         private ILogService _log;
+
+        /// <summary>True while this rival is mostly under a HUD information zone: <see cref="ChickenNameplate"/> hides its
+        /// label then, and this indicator draws the chevron at the zone's edge instead (WP7).</summary>
+        public bool HidesNameplate => _wasUnderHud;
 
         private SpriteRenderer _ring;
         private SpriteRenderer _ringEdge;      // D9 two-tone edge: ink band + cream rim (GroundRingStyle)
@@ -147,6 +160,7 @@ namespace CluckWars.Visuals
 
             _controller = GetComponent<ChickenController>();
             _body = GetComponent<CharacterController>();
+            _nameplate = GetComponent<ChickenNameplate>();   // absent: the body alone decides "under the HUD"
             if (_controller == null)
             {
                 _log?.Error(Source,
@@ -168,6 +182,7 @@ namespace CluckWars.Visuals
         /// </summary>
         private void OnDisable()
         {
+            _wasUnderHud = false;   // a disabled indicator must never keep a nameplate hidden
             _spreadCam = null;
             SpreadQueue.Remove(this);
             Hide();
@@ -186,6 +201,7 @@ namespace CluckWars.Visuals
 
         private Camera _spreadCam;       // non-null while this indicator is queued this frame
         private Vector2 _spreadClamped;
+        private Vector2 _spreadTarget;   // viewport point the chevron aims at (feet, or the covered piece under the HUD)
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
@@ -196,11 +212,12 @@ namespace CluckWars.Visuals
             _spreadHooked = false;
         }
 
-        private void QueueForSpread(Camera cam, Vector2 clamped)
+        private void QueueForSpread(Camera cam, Vector2 clamped, Vector2 target)
         {
             bool alreadyQueued = _spreadCam != null;   // no render since the last LateUpdate (batchmode): refresh, do not grow the queue
             _spreadCam = cam;
             _spreadClamped = clamped;
+            _spreadTarget = target;
             if (!alreadyQueued) SpreadQueue.Add(this);
             if (_spreadHooked) return;
             Application.onBeforeRender += FlushSpread;
@@ -231,7 +248,9 @@ namespace CluckWars.Visuals
                 float size = FeedbackTuning.RivalChevronSizeFraction * FeedbackTuning.RivalChevronSpacing;
                 var minSep = new Vector2(size / Mathf.Max(0.1f, cam.aspect), size);
                 var clearance = ChevronClearance(cam);
-                EdgeArrowSpread.Spread(SpreadDesired, FeedbackTuning.RivalChevronSafeArea, HudControlZones.Current(cam),
+                // The clear band: chevrons pinned under the top HUD band sit on its edge, so they spread along it.
+                Rect band = ScreenEdgeProjection.ClearBand(FeedbackTuning.RivalChevronSafeArea, HudControlZones.CurrentInfo(cam), clearance);
+                EdgeArrowSpread.Spread(SpreadDesired, band, HudControlZones.CurrentAvoid(cam),
                     clearance, minSep, _spreadResult);
 
                 for (int i = 0; i < count; i++)
@@ -239,8 +258,7 @@ namespace CluckWars.Visuals
                     var ind = SpreadQueue[i];
                     if (ind == null || ind._spreadCam == null || ind._chevron == null || !ind._chevron.gameObject.activeSelf) continue;
                     if (_spreadResult[i] == ind._spreadClamped) continue;   // not moved: already placed correctly in LateUpdate
-                    Vector2 bearing = ScreenEdgeProjection.BearingToward(_spreadResult[i],
-                        ScreenEdgeProjection.TargetViewport(ind._spreadCam, ind.transform.position));
+                    Vector2 bearing = ScreenEdgeProjection.BearingToward(_spreadResult[i], ind._spreadTarget);
                     ind.PlaceChevron(ind._spreadCam, _spreadResult[i], bearing);
                 }
             }
@@ -318,6 +336,7 @@ namespace CluckWars.Visuals
             if (!ShouldShow(cam, out float opacity))
             {
                 _wasOnScreen = false;
+                _wasUnderHud = false;
                 Hide();
                 return;
             }
@@ -326,15 +345,34 @@ namespace CluckWars.Visuals
 
             // On screen = ANY part of the body in frame (with hysteresis on the way out), not just the feet: a bird whose feet
             // are below the bottom edge but whose body is in view is its own indicator and must not also get an arrow on top.
-            _wasOnScreen = IsOnScreen(cam);
+            _wasOnScreen = IsOnScreen(cam, out Rect bodyVp);
 
-            if (!_wasOnScreen && ScreenEdgeProjection.TryProject(cam, transform.position,
-                    FeedbackTuning.RivalChevronSafeArea,
-                    HudControlZones.Current(cam), ChevronClearance(cam),
-                    out Vector2 clamped, out Vector2 bearing))
+            // Mostly under a HUD information zone counts as hidden too (WP7): nameplate off, chevron at the zone's edge.
+            var info = HudControlZones.CurrentInfo(cam);
+            Vector2 covered = default;
+            _wasUnderHud = _wasOnScreen && IsUnderHud(cam, bodyVp, info, out covered);
+
+            var clearance = ChevronClearance(cam);
+            Vector2 clamped = default, bearing = default, target;
+            bool chevron;
+            if (_wasUnderHud)
             {
-                ShowChevron(cam, clamped, bearing, tint, opacity);
-                QueueForSpread(cam, clamped);
+                target = covered;   // inside the zone, so the clear-viewport clamp pins it to the zone's edge
+                chevron = ScreenEdgeProjection.ClampToClearViewport(covered, true, FeedbackTuning.RivalChevronSafeArea,
+                    info, HudControlZones.CurrentAvoid(cam), clearance, out clamped, out bearing);
+            }
+            else
+            {
+                chevron = !_wasOnScreen && ScreenEdgeProjection.TryProject(cam, transform.position,
+                    FeedbackTuning.RivalChevronSafeArea, info, HudControlZones.CurrentAvoid(cam), clearance,
+                    out clamped, out bearing);
+                target = chevron ? ScreenEdgeProjection.TargetViewport(cam, transform.position) : default;
+            }
+
+            if (chevron)
+            {
+                ShowChevron(cam, clamped, bearing, tint, opacity, keepRing: _wasUnderHud);
+                QueueForSpread(cam, clamped, target);
             }
             else
             {
@@ -342,10 +380,24 @@ namespace CluckWars.Visuals
             }
         }
 
+        /// <summary>Whether this rival's body plus nameplate is mostly inside a HUD information zone
+        /// (<see cref="ScreenEdgeProjection.InfoZoneCoverage"/>, with the hide / show hysteresis), and the centre of the covered
+        /// piece the chevron points at.</summary>
+        private bool IsUnderHud(Camera cam, Rect bodyVp, IReadOnlyList<Rect> info, out Vector2 covered)
+        {
+            Rect mark = bodyVp;
+            if (_nameplate != null && _nameplate.TryGetPlateViewport(cam, out Rect plate))
+                mark = Rect.MinMaxRect(Mathf.Min(mark.xMin, plate.xMin), Mathf.Min(mark.yMin, plate.yMin),
+                                       Mathf.Max(mark.xMax, plate.xMax), Mathf.Max(mark.yMax, plate.yMax));
+            float coverage = ScreenEdgeProjection.InfoZoneCoverage(mark, info, out covered);
+            return ScreenEdgeProjection.IsUnderInfoZone(coverage, _wasUnderHud);
+        }
+
         /// <summary>Whether any part of this chicken's body is inside the viewport (see
-        /// <see cref="ScreenEdgeProjection.IsPartlyOnScreen"/>). The body is the CharacterController capsule, widened to the
-        /// model's lateral half-width; a chicken without one falls back to its feet point.</summary>
-        private bool IsOnScreen(Camera cam)
+        /// <see cref="ScreenEdgeProjection.IsPartlyOnScreen"/>), and the body's viewport rect. The body is the
+        /// CharacterController capsule, widened to the model's lateral half-width; a chicken without one falls back to its
+        /// feet point.</summary>
+        private bool IsOnScreen(Camera cam, out Rect bodyVp)
         {
             Bounds b;
             if (_body != null && _body.enabled)
@@ -359,8 +411,8 @@ namespace CluckWars.Visuals
                 b = new Bounds(transform.position, new Vector3(_bodyHalfWidth * 2f, 0f, _bodyHalfWidth * 2f));
             }
 
-            return ScreenEdgeProjection.TryProjectBounds(cam, b, out Rect vp)
-                   && ScreenEdgeProjection.IsPartlyOnScreen(vp, _wasOnScreen, FeedbackTuning.RivalOnScreenHysteresis);
+            return ScreenEdgeProjection.TryProjectBounds(cam, b, out bodyVp)
+                   && ScreenEdgeProjection.IsPartlyOnScreen(bodyVp, _wasOnScreen, FeedbackTuning.RivalOnScreenHysteresis);
         }
 
         /// <summary>Half the chevron's footprint in viewport units (x scaled by 1/aspect because the chevron is sized in
@@ -401,6 +453,11 @@ namespace CluckWars.Visuals
         private void ShowRing(Color tint, float opacity)
         {
             if (_chevron != null && _chevron.gameObject.activeSelf) _chevron.gameObject.SetActive(false);
+            LightRing(tint, opacity);
+        }
+
+        private void LightRing(Color tint, float opacity)
+        {
             if (_ring == null) return;
 
             _ring.color = WithAlpha(tint, FeedbackTuning.RivalRingAlpha * opacity);
@@ -409,9 +466,11 @@ namespace CluckWars.Visuals
             if (!_ring.gameObject.activeSelf) _ring.gameObject.SetActive(true);
         }
 
-        private void ShowChevron(Camera cam, Vector2 clamped, Vector2 bearing, Color tint, float opacity)
+        /// <param name="keepRing">True for a rival under the HUD (WP7): it is partly visible, so its ground ring stays.</param>
+        private void ShowChevron(Camera cam, Vector2 clamped, Vector2 bearing, Color tint, float opacity, bool keepRing = false)
         {
-            if (_ring != null && _ring.gameObject.activeSelf) _ring.gameObject.SetActive(false);
+            if (keepRing) LightRing(tint, opacity);
+            else if (_ring != null && _ring.gameObject.activeSelf) _ring.gameObject.SetActive(false);
             if (_chevron == null) return;
 
             PlaceChevron(cam, clamped, bearing);

@@ -601,3 +601,13 @@
 }
 .cw-hud--desktop .cw-hold-hint, .cw-hud--pad .cw-hold-hint { max-width: 1400px; }
 .cw-hold-hint--on { opacity: 1; }
+
+/* ============================================================================
+   PORTRAIT (WP7, PORTRAIT_AND_LANDSCAPE_SPEC 1.5). TouchControlsController puts
+   .layout--portrait on #TouchRoot (LayoutClasses). Joystick, hexes, hold hint and
+   edge strips are unchanged; only the status strip narrows, so its right edge is
+   never past the joystick's (80 + 280 = 360) and it keeps clear of hex a4.
+   HudControlZones mirrors the width (the strip is an info zone while it has rows).
+   ============================================================================ */
+.layout--portrait .cw-status-strip { width: 280px; }
+.layout--portrait .cw-status-value { min-width: 72px; }

@@ -712,8 +712,8 @@ namespace CluckWars.Visuals
         /// <summary>
         /// How far inside the frame the off-screen chevron is drawn, in viewport units.
         /// Note this does <i>not</i> decide who counts as off screen — see
-        /// <see cref="ScreenEdgeProjection.ClampToEdge"/> for why that is judged against
-        /// the full unit rect. It only stops the chevron's own geometry from being half
+        /// <see cref="ScreenEdgeProjection"/> for why that is judged against the clear
+        /// viewport (the frame minus the HUD info zones). It only stops the chevron's own geometry from being half
         /// clipped by the frame it is pinned to, so it is a hair over half the chevron's
         /// size (<see cref="RivalChevronSizeFraction"/>).
         /// </summary>
@@ -735,6 +735,10 @@ namespace CluckWars.Visuals
         /// <see cref="RivalChevronSafeArea"/>: raising the uniform margin instead would push
         /// the side and bottom chevrons far enough inboard to read as floating in the play
         /// field rather than pinned to the frame.
+        ///
+        /// Since WP7 the top HUD band is an information zone and
+        /// <c>ScreenEdgeProjection.ClearBand</c> cuts the band at its lower edge, which is
+        /// lower than this inset in both orientations; this remains the cap if it ever is not.
         /// </remarks>
         public const float RivalChevronTopHudInset = 0.17f;
 

@@ -289,6 +289,10 @@ namespace CluckWars.Input
         /// <summary>The control scheme the HUD is laid out for right now (the last-used device's).</summary>
         public HudDeviceMode Mode => _mode;
 
+        /// <summary>How many status-strip rows are showing (0 = strip hidden). The strip is an info zone only while it has
+        /// rows (<c>HudControlZones.BuildInfoZones</c>, WP7).</summary>
+        public int StatusRowCount { get; private set; }
+
         /// <summary>Test / capture hook: pins the layout regardless of the last-used device. Null = follow the device.</summary>
         public static HudDeviceMode? DebugForceMode;
 
@@ -1405,7 +1409,8 @@ namespace CluckWars.Input
         /// </summary>
         private void ApplyStatusStrip(int count)
         {
-            if (_statusStrip == null) return;
+            if (_statusStrip == null) { StatusRowCount = 0; return; }
+            StatusRowCount = count;
 
             var stripDisplay = count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
             if (_statusStrip.style.display != stripDisplay) _statusStrip.style.display = stripDisplay;

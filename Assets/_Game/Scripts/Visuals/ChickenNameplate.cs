@@ -66,6 +66,30 @@ namespace CluckWars.Visuals
         private float _youEmphasis;   // 0..1, GET READY "this is you" marker (YouMarkerRules)
         private float _headLift;      // root-local metres added above _offset for a taller class model (Phase 8 D6)
 
+        // WP7 info-zone rule: a rival mostly under the HUD hides its label (RivalIndicator decides, from this plate's rect).
+        private RivalIndicator _rivalIndicator;
+        private bool _hiddenByHud;
+        private Vector2 _plateCentreLocal;   // the visible pill's centre and half size in label space, set by FitMarks
+        private Vector2 _plateHalfSize;
+
+        /// <summary>
+        /// The label plate's viewport rect (the pill behind the text), for <see cref="RivalIndicator"/>'s "mostly under the
+        /// HUD" test. Computed from the label transform, so it stays valid while the label is hidden. False until the first
+        /// label has been fitted.
+        /// </summary>
+        public bool TryGetPlateViewport(Camera cam, out Rect viewport)
+        {
+            viewport = default;
+            if (cam == null || _textTransform == null || _plateHalfSize == Vector2.zero) return false;
+            Vector3 c = _textTransform.TransformPoint(_plateCentreLocal);
+            Vector3 vc = cam.WorldToViewportPoint(c);
+            Vector3 vr = cam.WorldToViewportPoint(c + _textTransform.TransformVector(new Vector3(_plateHalfSize.x, 0f, 0f))) - vc;
+            Vector3 vu = cam.WorldToViewportPoint(c + _textTransform.TransformVector(new Vector3(0f, _plateHalfSize.y, 0f))) - vc;
+            float hx = Mathf.Abs(vr.x) + Mathf.Abs(vu.x), hy = Mathf.Abs(vr.y) + Mathf.Abs(vu.y);
+            viewport = Rect.MinMaxRect(vc.x - hx, vc.y - hy, vc.x + hx, vc.y + hy);
+            return true;
+        }
+
         /// <summary>Raises the label for a class model drawn taller than the collider (Phase 8 D6).
         /// Root-local metres; presentation only.</summary>
         public void SetHeadLift(float lift)
@@ -79,6 +103,7 @@ namespace CluckWars.Visuals
             _controller = GetComponent<ChickenController>();
             _combat     = GetComponent<ChickenCombat>();
             _cargo      = GetComponent<ChickenCargo>();
+            _rivalIndicator = GetComponent<RivalIndicator>();   // absent: the label never hides for the HUD
             BuildLabel();
         }
 
@@ -152,6 +177,16 @@ namespace CluckWars.Visuals
         private void LateUpdate()
         {
             if (_text == null || _controller == null) return;
+
+            // ── Under the HUD (WP7): hide the whole label while a rival is mostly inside an info zone ──
+            bool hide = _rivalIndicator != null && _rivalIndicator.isActiveAndEnabled && _rivalIndicator.HidesNameplate;
+            if (hide != _hiddenByHud)
+            {
+                _hiddenByHud = hide;
+                _textTransform.gameObject.SetActive(!hide);
+                // A label that changed while hidden was fitted against an inactive mesh: refit it now it shows again.
+                if (!hide) _appliedPlayerId = -2;
+            }
 
             // ── Death skull ──────────────────────────────────────────────────
             bool isNowStunned = _combat != null && _combat.IsRemoved;
@@ -269,6 +304,8 @@ namespace CluckWars.Visuals
                 if (_youPill == null) return;
                 _youPill.size = size + YouPillPadding * 2f;
                 _youPill.transform.localPosition = centre;
+                _plateCentreLocal = centre;
+                _plateHalfSize = _youPill.size * 0.5f;
                 return;
             }
 
@@ -277,6 +314,8 @@ namespace CluckWars.Visuals
             float extra = dot + RivalDotGap;               // room on the left for the dot
             _rivalPill.size = new Vector2(size.x + extra, size.y) + YouPillPadding * 2f;
             _rivalPill.transform.localPosition = centre + Vector3.left * (extra * 0.5f);
+            _plateCentreLocal = _rivalPill.transform.localPosition;
+            _plateHalfSize = _rivalPill.size * 0.5f;
             var dotPos = new Vector3(centre.x - size.x * 0.5f - RivalDotGap - dot * 0.5f, centre.y, 0.005f);
             // The dot sprite is 1 world unit across, so the scale is the diameter.
             _rivalDotRing.transform.localPosition = dotPos;

@@ -17,7 +17,10 @@ namespace CluckWars.Visuals
     /// perimeter, alternating direction (lower perimeter parameter first), for the nearest spot that is clear of every placed
     /// arrow AND outside every HUD zone, so spreading never re-introduces the overlap the zones exist to prevent.
     /// </para>
-    /// <para>The status strip is deliberately not a zone here (CW-009: not included until a playtest shows overlap).</para>
+    /// <para>The caller passes the CLEAR band (<see cref="ScreenEdgeProjection.ClearBand"/>: the top HUD band cut off, so
+    /// chevrons pinned under it spread along its edge) and every avoid zone, control and information alike
+    /// (<see cref="HudControlZones.CurrentAvoid"/>). The status strip is one of them while it shows rows: WP7 / decision C6
+    /// overrode CW-009's "not until a playtest shows overlap" on the portrait evidence of an arrow on the SLOW strip.</para>
     /// </remarks>
     public static class EdgeArrowSpread
     {

@@ -459,6 +459,11 @@ namespace CluckWars.UI
             // stay off the overlay root so the intro's GET READY plate keeps its full size (.layout--short
             // .cw-getready__plate is the menu's rule).
             if (_lobbyOverlay != null) LayoutClasses.Bind(_root, _lobbyOverlay);
+            // The event banner's portrait position (WP7, .cw-eventbanner.layout--portrait). Bind keeps one target per
+            // measured element, so this one measures the full-panel #OverlayRoot instead of _root.
+            var overlayHost = _root.Q<VisualElement>("OverlayRoot");
+            if (_eventBanner != null && overlayHost != null) LayoutClasses.Bind(overlayHost, _eventBanner);
+            else _log?.Error(Source, "MatchOverlays.uxml has no #EventBanner or #OverlayRoot: the event banner keeps the landscape spot in portrait, over the ability hexes.");
 
             // Start hidden; state polls flip them on.
             SetShown(_matchEndOverlay, false);
