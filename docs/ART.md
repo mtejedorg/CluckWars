@@ -687,7 +687,7 @@ Control states attach to the affected chicken **in world space** — never to a 
 
 | State | Trigger | Duration | Visual |
 |---|---|---|---|
-| **Stunned** | A stun ability (Wing Slam 1.5 s, Ambush 1.0 s) | 1.0–1.5 s, authored per ability | Cartoon stars circle overhead; body tilts + desaturates; nameplate turns red. Blocks movement, casting and collection — see `ControlRules`. |
+| **Stunned** | A stun ability (Wing Slam 1.3 s, Belly Flop 1.4 s, Ambush 1.0 s) | 1.0–1.4 s, authored per ability | Cartoon stars circle overhead; body tilts + desaturates; nameplate turns red. Blocks movement, casting and collection — see `ControlRules`. |
 | **Slowed** | Collision / pile / slow ability | 1–4 s (ability-dependent) | Subtle blue tint blob + fading speed-trail behind the chicken; 🐌 on the nameplate. Speedy resists via Slippery. |
 | **Knocked back** | Push abilities (Roll & Push, Spine Coat, Peck) | Instant | Motion lines + ghost trail in the travel direction; no persistent overlay; 💨 flash on the nameplate. Fatty resists via Immovable. |
 | **Stuck** (rooted) | Sticky Egg trap | 2–3 s | Vines/roots wrap the legs; 🌱 on the nameplate; the pop and status row read STUCK!. Can still cast abilities while stuck. |
