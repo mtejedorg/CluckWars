@@ -443,7 +443,7 @@ Everything below is net-new gameplay the v0.3 design unlocks. It builds on the P
 - [x] **Peck** (Damage, Short) — nearest-enemy HP hit + minor knockback. *(B2 commit)*
 - [x] **Roll & Push** (Control, Short) — roll forward + sphere push, no damage. *(B2 commit)*
 - [x] **Feather Trap** (Control, Medium) — spawns slow zone `ForwardOffset` metres ahead. *(B2 commit)*
-- [x] **Feather Aura** (Control, Medium) — broadcasts `AuraSlowActive/Radius/Factor` on caster; nearby chickens self-apply slow. *(B2 commit)*
+- [x] **Feather Aura** (Control, Medium) — broadcasts `AuraSlowActive/Radius/Factor` on caster; nearby chickens self-apply slow. *(B2 commit)* Since WP4 (2026-10-22) a Caster-anchored `AbilityZone`; the three networked fields were removed.
 - [x] **Root Egg** (Control, Medium) — spawns root zone consumed on first trigger. *(B2 commit)*
 - [x] **SpineCoat knockback** — `ReflectKnockback` field; `ReflectDamageTo` pushes attacker away. *(B2 commit)*
 - **Maestro:** Create `.asset` files for all 6 new SOs in `Data/Abilities/`; set `Category` and `AccentColor` on each; set `BotRole = Steal` on Sneaky Steal `.asset`.
