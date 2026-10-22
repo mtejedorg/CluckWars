@@ -310,3 +310,7 @@ All three proposals were decided with Maestro (see `docs/proposals/DECISIONS_202
 ### Maestro's end-of-work requirement (2026-10-22)
 
 When the current work is finished: **everything on `develop`, tested, and the `feature/progression` branch rebased onto it** (CW-010, CW-007). Plan: merge `feature/effect-types-and-portrait` into local `develop` after the full verification (EditMode unfiltered + the scenario matrix, solo/shared2/shared4/hostleave x 3 rounds), then rebase `feature/progression` onto the new `develop` (backup tag first, resolve conflicts incl. the `AnnounceExecuteSteal` line, re-run the suite and the matrix). Pushing anything, and force-pushing the rebased progression branch (it is the head of PR #1), still needs Maestro's explicit OK.
+
+### Maestro's end-of-work requirement, updated 2026-10-23
+
+"I want all ready, committed, pushed and tested in develop (when done)." This explicitly authorizes a normal (non-force) **push of `develop`** once everything is merged and the full tests pass on `develop` (EditMode unfiltered + scenario matrix). The `feature/progression` branch is rebased onto the new `develop` and tested; **force-pushing the rebased progression branch (head of PR #1) is a rewrite of published history and will be confirmed with Maestro at that moment** (safe alternative: push it under a new name).
