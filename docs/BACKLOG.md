@@ -295,3 +295,14 @@ Matrix on the final build (3 rounds each): solo PASS, shared2 PASS, shared4 PASS
 | CW-040 | **Rule done** (`b3403e0`: scarecrows 3 m, other tall props 4 m, test). **Scene slide still needs the Editor** (four scarecrows in `Map.unity`, direction to confirm: see STATE.md). Not closed. |
 | Landing branch | `landing/shared-mode-fixes-2026-10-21` (local, off `develop`): 4 original fixes + `CancelCharge()` + CW-200/201/207/050/231/021/022/055/056/230 + CW-040 rule. EditMode **2021/2021**, production Windows build compiles. Excludes instrumentation, harness, CW-218 (needs the AutoTest code), docs. Two cherry-picked commit messages still mention things not in the branch (diagnostics/proposals). Scenario matrix cannot run there (needs dev tools). |
 | Final work-branch matrix (build with everything, 3 rounds each) | solo / shared2 / shared4 / hostleave = PASS / PASS / PASS / PASS; EditMode 2114/2114. |
+
+### 2026-10-22: proposals decided, implementation plan
+
+All three proposals were decided with Maestro (see `docs/proposals/DECISIONS_2026-10-21.md` for every decision and who made it) and reviewed independently (`docs/proposals/FABLE_REVIEW_AND_CODE_PLAN_2026-10-22.md`: 11 work packages WP0-WP11, two lanes). Implementation runs on branch `feature/effect-types-and-portrait` (off `work/backlog-2026-10-21`).
+
+| ID | Status |
+|---|---|
+| CW-053 / CW-057 / CW-058 | Decided; implemented by WP1/WP2 (balance values, spec-aware oracle test, Wing Slam 8 s / 1.3 s, Bully x1.4 + 2 cargo, Featherfoot, bot radius, hysteresis). |
+| Effect types (Aura vs Static AoE) | Decided; WP0 (round-reset event), WP3 (type model, anchored zone, OnEnter/WhileInside), WP4 (Feather Aura migration); WP5 (Periodic) deferred to the Spine Coat steal aura. |
+| CW-206 / 212 / 219 | Decided; WP6-WP9 (orientation classes, camera framing, portrait HUD, menus). |
+| CW-232 | **Doppelganger fidelity** (new): the decoy is a perfect copy of its caster in the future (ring, arrow, nameplate colours, visibly slowed/rooted/stunned, zones and confirmations treat it as a chicken). Today zones deliberately ignore decoys (pinned by `ZonesIgnoreDecoys` once WP3 lands); that is a known stopgap. |
