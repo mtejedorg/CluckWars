@@ -71,6 +71,8 @@ The control RPCs (`RPC_ApplyStun/Root/AbilitySlow`, F4/WP1) are gated automatica
 .\tools\test-session\scenario-pc.ps1 -Mode solo      -Rounds 3   # exit 0 = PASS
 .\tools\test-session\scenario-pc.ps1 -Mode shared4   -Rounds 3
 .\tools\test-session\scenario-pc.ps1 -Mode hostleave -Rounds 3
+# HUD band / portrait screenshots (dev-tools build): -cw_shots seconds, -cw_band 290|330, -cw_zones outline overlay; PNGs in <session>\shots
+.\tools\test-session\scenario-pc.ps1 -Mode solo -Rounds 1 -Width 1920 -Height 1080 -ExtraArgs '-cw_shots 15,22,29,36 -cw_band 290 -cw_zones -cw_shottag band290'
 .\tools\test-session\verify.ps1 -Session Captures\session-<utc>   # re-judge an old capture
 .\tools\test-session\selftest.ps1                                  # tests the checker itself
 ```

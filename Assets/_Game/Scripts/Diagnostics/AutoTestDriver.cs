@@ -76,6 +76,7 @@ namespace CluckWars.Diagnostics
                     "and PLAY AGAIN waits {1:0.0} s (B10: the next round must start with zn=0).",
                     AutoTestRules.ZoneLeadSeconds, AutoTestRules.PlayAgainDelay(true)));
             _log.Info(Source, $"AutoTest persistentDataPath={Application.persistentDataPath}");
+            ApplyScreenshotTools();
 
             if (_cfg.DevMode && !PlayerPreferences.DeveloperModeEnabled)
             {
@@ -87,6 +88,68 @@ namespace CluckWars.Diagnostics
                 _log.Error(Source, "cw_autoplay is set but no AutoPlayInputProvider is bound (ProjectInstaller); the bird will not move by itself.");
 
             if (_cfg.WantsMenuFlow) StartCoroutine(MenuFlow());
+        }
+
+        // ---- cw_shots / cw_band / cw_zones: comparable HUD screenshots (dev tools only) ---------------------------------
+
+        private string _shotDir;
+        private int _shotsTaken;
+        private float _shotActiveSince = -1f;
+        private bool _shotsDone;
+
+        private void ApplyScreenshotTools()
+        {
+            bool wanted = _cfg.Shots.Length > 0 || _cfg.BandOverride != 0 || _cfg.Zones;
+            if (!DevTools.Available)
+            {
+                if (wanted) _log.Warn(Source, "AutoTest cw_shots/cw_band/cw_zones ignored: dev tools not available in this build");
+                _shotsDone = true;
+                return;
+            }
+
+            if (_cfg.BandOverride != 0) CluckWars.Visuals.HudControlZones.DevBandOverride = _cfg.BandOverride;
+            _log.Info(Source, $"AutoTest band={CluckWars.Visuals.HudControlZones.TopBandLandscapeZonePx:0}px " +
+                $"({(_cfg.BandOverride != 0 ? "cw_band override" : "shipped")}, landscape top-band info zone)");
+
+            DiagnosticsReadout.ZonesOverlay = _cfg.Zones;
+            if (_cfg.Zones) _log.Info(Source, "AutoTest zones=1: HUD info / control zones outlined by the overlay.");
+
+            if (_cfg.Shots.Length == 0) { _shotsDone = true; return; }
+            _shotDir = AutoTestRules.ShotDirectoryFromArgs(Environment.GetCommandLineArgs())
+                       ?? Path.Combine(Application.persistentDataPath, "shots");
+            try { Directory.CreateDirectory(_shotDir); }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            {
+                _log.Error(Source, $"AutoTest shots: cannot create {_shotDir}: {e.Message}; no screenshots this run.");
+                _shotsDone = true;
+                return;
+            }
+            _log.Info(Source, $"AutoTest shots at t={string.Join(",", _cfg.Shots)}s of the first Active round into {_shotDir} (tag={_cfg.ShotTag ?? "-"})");
+        }
+
+        /// <summary>Screenshots at the listed seconds since this peer's FIRST Active round began; done once that round ends.</summary>
+        private void TickShots(GameManager gm)
+        {
+            if (_shotsDone || gm == null) return;
+            if (gm.State != MatchState.Active)
+            {
+                if (_shotActiveSince >= 0f)
+                {
+                    _shotsDone = true;
+                    if (_shotsTaken < _cfg.Shots.Length)
+                        _log.Warn(Source, $"AutoTest shots: the round ended after {Time.realtimeSinceStartup - _shotActiveSince:0.0} s; " +
+                            $"{_cfg.Shots.Length - _shotsTaken} of {_cfg.Shots.Length} shot(s) not taken.");
+                }
+                return;
+            }
+            float now = Time.realtimeSinceStartup;
+            if (_shotActiveSince < 0f) _shotActiveSince = now;
+            if (!AutoTestRules.ShouldTakeShot(_cfg.Shots, _shotsTaken, now - _shotActiveSince)) return;
+
+            int second = _cfg.Shots[_shotsTaken++];
+            var path = Path.Combine(_shotDir, AutoTestRules.ShotFileName(_cfg.Profile, second, _cfg.ShotTag));
+            ScreenCapture.CaptureScreenshot(path, 1);
+            _log.Info(Source, $"AutoTest shot t={second}s window={Screen.width}x{Screen.height} -> {path}");
         }
 
         // ---- menu: HOST / JOIN -> class -> loadout -> READY -> START / JOIN MATCH ---------------------------------
@@ -250,6 +313,7 @@ namespace CluckWars.Diagnostics
 
             TickAutoZone(valid ? gm : null);   // before autoplay: the reservation must hold before its first cast
             TickAutoPlay(valid ? gm : null);
+            TickShots(valid ? gm : null);
             if (!valid) return;
 
             var runner = gm.Runner;

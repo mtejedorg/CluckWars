@@ -99,6 +99,17 @@ Assert ($f3 -notmatch 'chicken P6 cs') 'lag: owner Slowed / remote Free at both 
 Assert ($f3 -match 'SYNC=3\s') 'lag/stuck: exactly three SYNC findings'
 Remove-Item $tmp3 -Recurse -Force
 
+# ---- World-hash lag vs stuck (session 124805): both peers changing after a master migration is lag; one constant is stuck ----
+foreach ($fx in @(@('world-lag-fixture', $false), @('world-stuck-fixture', $true))) {
+    $tw = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-wh-' + [Guid]::NewGuid().ToString('N'))
+    Copy-Item (Join-Path $PSScriptRoot "fixtures\$($fx[0])") $tw -Recurse
+    & (Join-Path $PSScriptRoot 'merge.ps1') -Session $tw | Out-Null
+    $fw = Get-Content (Join-Path $tw 'findings.txt') -Raw
+    if ($fx[1]) { Assert ($fw -match 'world static hash differs across peers from t=3264 .*client3 constant at 15BA3BA5') 'world hash: a peer constant at the wrong hash while the other changes IS flagged (CW-216/217 class)' }
+    else { Assert ($fw -notmatch 'world static hash differs') 'world hash: both peers changing between mismatching beats (lag after a master migration) NOT flagged'; Assert ($fw -match 'INVARIANT=0') 'world hash lag: INVARIANT=0' }
+    Remove-Item $tw -Recurse -Force
+}
+
 # ---- Round-start leftovers (B10): a Root Egg placed just before the end must not survive PLAY AGAIN ----
 $tmp4 = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-zn-' + [Guid]::NewGuid().ToString('N'))
 Copy-Item (Join-Path $PSScriptRoot 'fixtures\zones-fixture') $tmp4 -Recurse

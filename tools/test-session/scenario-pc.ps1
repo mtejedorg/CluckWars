@@ -17,6 +17,10 @@
            PLAY AGAIN follows 1.5 s later), so the next round-start Invariant line must read zn=0. Root Egg (Fatty) is the
            reliable carrier (8 s): in solo the class becomes Fatty unless -Class is given; shared2's joiner is a Speedy (Feather
            Trap, 5 s), shared4/hostleave add a Fatty (joiner 2) and an Assassin (Doppelganger decoy, 4 s, may expire first).
+.PARAMETER Width   window width of every EXE (default 960). Use 540x960 / 1080x2400 for portrait checks.
+.PARAMETER Height  window height of every EXE (default 540).
+.PARAMETER ExtraArgs  one space-separated string appended to EVERY EXE's args, e.g. HUD band screenshots (dev-tools build):
+           -ExtraArgs '-cw_shots 15,22,29,36 -cw_band 290 -cw_zones -cw_shottag band290'  (PNGs land in <session>\shots)
 #>
 param(
     [ValidateSet('solo','shared2','shared4','hostleave')][string]$Mode = 'shared4',
@@ -24,10 +28,14 @@ param(
     [int]$MaxMinutes = 8,
     [string]$Class = 'Warrior',
     [string]$JoinerExtra = '',  # extra EXE args (space separated) for every joiner, e.g. -JoinerExtra '-cw_autodisconnect 25'
-    [switch]$AutoZone
+    [switch]$AutoZone,
+    [int]$Width = 960,
+    [int]$Height = 540,
+    [string]$ExtraArgs = ''     # extra EXE args (space separated) for every EXE, e.g. -ExtraArgs '-cw_shots 15,22 -cw_band 290 -cw_zones'
 )
 if ($AutoZone -and $Mode -eq 'solo' -and -not $PSBoundParameters.ContainsKey('Class')) { $Class = 'Fatty' }
 $zoneArgs = @(if ($AutoZone) { '-cw_autozone' })
+$allExtra = @($ExtraArgs -split '\s+' | Where-Object { $_ })
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\lib.ps1"
 $root = $script:RepoRoot
@@ -38,10 +46,10 @@ Get-Process CluckWars -ErrorAction SilentlyContinue | Stop-Process -Force
 # PC-only: never touch a phone (no logcat / screenrecord)
 & "$PSScriptRoot\start.ps1" -NoRecord | Out-Null
 $S = (Get-ChildItem (Join-Path $root 'Captures') -Directory | Sort-Object Name | Select-Object -Last 1).FullName
-Write-Host "session: $S   mode: $Mode   rounds: $Rounds$(if ($AutoZone) { '   autozone' })"
+Write-Host "session: $S   mode: $Mode   rounds: $Rounds   window: ${Width}x${Height}$(if ($AutoZone) { '   autozone' })$(if ($allExtra) { '   extra: ' + ($allExtra -join ' ') })"
 
 function Start-Exe([string]$name, [string[]]$extra) {
-    $a = @('-screen-fullscreen','0','-screen-width','960','-screen-height','540','-logFile',"`"$S\$name.log`"",'-cw_autoplay','-cw_hud','-cw_profile',$name) + $zoneArgs + $extra
+    $a = @('-screen-fullscreen','0','-screen-width',"$Width",'-screen-height',"$Height",'-logFile',"`"$S\$name.log`"",'-cw_autoplay','-cw_hud','-cw_profile',$name) + $zoneArgs + $allExtra + $extra
     Start-Process $exe -ArgumentList $a | Out-Null
 }
 function Wait-Code([string]$log) {

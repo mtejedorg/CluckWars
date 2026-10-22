@@ -28,6 +28,8 @@ namespace CluckWars.Diagnostics
         public static int ProbeWorkFrame = -1;
         /// <summary>Auto-test <c>cw_hud</c>: 1 = compact strip, 2 = full panel as soon as the overlay exists.</summary>
         public static DebugHudMode HudModeAtBoot;
+        /// <summary>Auto-test <c>cw_zones</c> (dev tools only): the overlay outlines the HUD info / control zones.</summary>
+        public static bool ZonesOverlay;
     }
 
     /// <summary>

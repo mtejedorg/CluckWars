@@ -165,6 +165,7 @@ namespace CluckWars.UI
         {
             const int pad = 12;
 
+            if (DevTools.Available && DiagnosticsReadout.ZonesOverlay) DrawZonesOverlay();
             if (_mode == DebugHudMode.Compact) DrawCompact();
             bool full = _mode == DebugHudMode.Full;
 
@@ -216,6 +217,45 @@ namespace CluckWars.UI
             }
 
             GUI.matrix = prevMatrix;
+        }
+
+        /// <summary>
+        /// cw_zones (dev tools only): outlines the HUD's information zones (magenta: top band, status strip) and control zones
+        /// (cyan: joystick, hexes) in raw screen pixels, each labelled with its screen size and its panel-px height, so a
+        /// screenshot shows where the band ends. Same zone lists the rival arrows / nameplates avoid.
+        /// </summary>
+        private static void DrawZonesOverlay()
+        {
+            if (Event.current.type != EventType.Repaint) return;
+            var cam = Camera.main;
+            float aspect = cam != null ? cam.aspect : (float)Screen.width / Mathf.Max(1, Screen.height);
+            float panelH = CluckWars.Visuals.HudControlZones.PanelSize(aspect).y;
+            var info = CluckWars.Visuals.HudControlZones.CurrentInfo(cam);
+            var ctrl = CluckWars.Visuals.HudControlZones.Current(cam);
+            bool touch = ctrl.Count == 5;
+            var prevColor = GUI.color;
+            for (int i = 0; i < info.Count; i++)
+                DrawZone(info[i], new Color(1f, 0.2f, 0.9f), i == 0 ? "top band" : "status strip", panelH);
+            for (int i = 0; i < ctrl.Count; i++)
+                DrawZone(ctrl[i], new Color(0.2f, 0.9f, 1f), touch ? (i == 0 ? "joystick" : "hex " + i) : "hex " + (i + 1), panelH);
+            GUI.color = prevColor;
+        }
+
+        private static void DrawZone(Rect vp, Color color, string name, float panelH)
+        {
+            float w = vp.width * Screen.width, h = vp.height * Screen.height;
+            var r = new Rect(vp.xMin * Screen.width, (1f - vp.yMax) * Screen.height, w, h);
+            GUI.color = new Color(color.r, color.g, color.b, 0.12f);
+            GUI.DrawTexture(r, Texture2D.whiteTexture);
+            GUI.color = new Color(color.r, color.g, color.b, 0.9f);
+            const float t = 2f;
+            GUI.DrawTexture(new Rect(r.x, r.y, r.width, t), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(r.x, r.yMax - t, r.width, t), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(r.x, r.y, t, r.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(r.xMax - t, r.y, t, r.height), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUI.Label(new Rect(r.x + 4f, r.y + 3f, Mathf.Max(220f, r.width - 8f), 20f),
+                $"{name} {w:0}x{h:0} px ({vp.height * panelH:0} panel px high)");
         }
 
         /// <summary>

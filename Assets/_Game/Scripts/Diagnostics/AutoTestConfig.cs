@@ -16,10 +16,11 @@ namespace CluckWars.Diagnostics
         public const string AutoHostKey = "cw_autohost", AutoJoinKey = "cw_autojoin", ClassKey = "cw_class",
             AutoStartKey = "cw_autostart", AutoStartTimeoutKey = "cw_autostart_timeout", AutoLoopKey = "cw_autoloop",
             AutoPlayKey = "cw_autoplay", DevModeKey = "cw_devmode", HudKey = "cw_hud", ProfileKey = "cw_profile",
-            AutoSoloKey = "cw_autosolo", AutoDisconnectKey = "cw_autodisconnect", AutoZoneKey = "cw_autozone";
+            AutoSoloKey = "cw_autosolo", AutoDisconnectKey = "cw_autodisconnect", AutoZoneKey = "cw_autozone",
+            ShotsKey = "cw_shots", ShotTagKey = "cw_shottag", BandKey = "cw_band", ZonesKey = "cw_zones";
 
         public static readonly string[] Keys =
-            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey, AutoZoneKey };
+            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey, AutoZoneKey, ShotsKey, ShotTagKey, BandKey, ZonesKey };
 
         public const ChickenClass DefaultClass = ChickenClass.Warrior;
         public const float DefaultAutoStartTimeout = 90f;
@@ -70,6 +71,37 @@ namespace CluckWars.Diagnostics
         /// Needs <c>cw_autoplay</c> (the press goes through the fake player's input).
         /// </summary>
         public bool AutoZone;
+
+        /// <summary>
+        /// <c>cw_shots 15,22,29</c> (dev tools only): seconds since this peer's first Active round began at which the driver
+        /// saves a screenshot (<see cref="AutoTestRules.ShotFileName"/>). Sorted, distinct, 0..<see cref="MaxShotSecond"/>; empty = off.
+        /// </summary>
+        public int[] Shots = new int[0];
+        /// <summary><c>cw_shottag</c>: sanitised text appended to every screenshot file name, or null.</summary>
+        public string ShotTag;
+        /// <summary><c>cw_band 290|330</c>: dev override of the landscape top-band info zone height in panel px; 0 = the shipped value.</summary>
+        public int BandOverride;
+        /// <summary><c>cw_zones</c>: draw the HUD info / control zones as an outlined overlay (dev tools only).</summary>
+        public bool Zones;
+
+        public const int MaxShotSecond = 3600;
+
+        /// <summary>The landscape top-band heights <c>cw_band</c> accepts: the bar without its 40 px fade, and the whole bar.</summary>
+        public static bool IsValidBand(int px) => px == 290 || px == 330;
+
+        /// <summary>A comma-separated list of whole seconds, sorted and de-duplicated; bad items are reported in <paramref name="problems"/>.</summary>
+        public static int[] ParseShots(string value, ICollection<string> problems)
+        {
+            var list = new List<int>();
+            foreach (var item in (value ?? string.Empty).Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (int.TryParse(item.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int sec) && sec >= 0 && sec <= MaxShotSecond)
+                { if (!list.Contains(sec)) list.Add(sec); }
+                else problems?.Add($"{ShotsKey} item '{item}' is not a whole number of seconds in 0..{MaxShotSecond}; skipped");
+            }
+            list.Sort();
+            return list.ToArray();
+        }
 
         public bool WantsMenuFlow => AutoHost || AutoJoin != null || AutoSolo;
 
@@ -158,6 +190,16 @@ namespace CluckWars.Diagnostics
                     case AutoStartTimeoutKey: cfg.AutoStartTimeout = cfg.ParseInt(key, value, 1, 3600, (int)DefaultAutoStartTimeout); break;
                     case AutoDisconnectKey:   cfg.AutoDisconnect = cfg.ParseInt(key, value, 1, 600); break;
                     case AutoZoneKey:         cfg.AutoZone = cfg.ParseBool(key, value); break;
+                    case ShotsKey:            cfg.Shots = ParseShots(value, cfg.Problems); break;
+                    case ShotTagKey:
+                        cfg.ShotTag = SanitizeProfile(value);
+                        if (cfg.ShotTag == null) cfg.Problems.Add($"{key} '{value}' has no letters, digits, '-' or '_'; no tag");
+                        break;
+                    case BandKey:
+                        if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int band) && IsValidBand(band)) cfg.BandOverride = band;
+                        else cfg.Problems.Add($"{key} '{value}' is not 290 or 330; using the shipped band");
+                        break;
+                    case ZonesKey:            cfg.Zones = cfg.ParseBool(key, value); break;
                     default: cfg.Problems.Add($"unknown key {kv.Key}"); break;
                 }
             }
@@ -338,6 +380,32 @@ namespace CluckWars.Diagnostics
             if (waitedSeconds >= timeoutSeconds) { reason = FormattableString.Invariant($"timeout {timeoutSeconds:0}s with {humans}/{target} humans"); return true; }
             return false;
         }
+
+        // ---- cw_shots: screenshots at fixed seconds into the first Active round ------------------------------------
+
+        /// <summary>Take the next screenshot (<paramref name="taken"/> already done) once the round has been Active for its second.</summary>
+        public static bool ShouldTakeShot(int[] shots, int taken, float activeSeconds) =>
+            shots != null && taken >= 0 && taken < shots.Length && activeSeconds >= shots[taken];
+
+        /// <summary>The directory of the <c>-logFile</c> argument (the session folder), or null when it is absent, <c>-</c> or has no directory.</summary>
+        public static string ShotDirectoryFromArgs(IReadOnlyList<string> args)
+        {
+            if (args == null) return null;
+            for (int i = 0; i + 1 < args.Count; i++)
+            {
+                if (!string.Equals(args[i], "-logFile", StringComparison.OrdinalIgnoreCase)) continue;
+                var path = args[i + 1];
+                if (string.IsNullOrWhiteSpace(path) || path == "-") return null;
+                try { var dir = System.IO.Path.GetDirectoryName(path); return string.IsNullOrEmpty(dir) ? null : System.IO.Path.Combine(dir, "shots"); }
+                catch (ArgumentException) { return null; }
+            }
+            return null;
+        }
+
+        /// <summary><c>&lt;profile&gt;-t&lt;sec&gt;[-&lt;tag&gt;].png</c>; profile "default" when none.</summary>
+        public static string ShotFileName(string profile, int second, string tag) =>
+            (string.IsNullOrEmpty(profile) ? "default" : profile) + "-t" + second.ToString(CultureInfo.InvariantCulture) +
+            (string.IsNullOrEmpty(tag) ? string.Empty : "-" + tag) + ".png";
 
         /// <summary>A looped round never waits longer than this for the previous round's humans to come back.</summary>
         public const float LoopRestartMaxWaitSeconds = 15f;
