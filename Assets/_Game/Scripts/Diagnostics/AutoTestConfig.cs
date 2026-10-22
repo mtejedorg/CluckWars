@@ -18,12 +18,12 @@ namespace CluckWars.Diagnostics
             AutoPlayKey = "cw_autoplay", DevModeKey = "cw_devmode", HudKey = "cw_hud", ProfileKey = "cw_profile",
             AutoSoloKey = "cw_autosolo", AutoDisconnectKey = "cw_autodisconnect", AutoZoneKey = "cw_autozone",
             ShotsKey = "cw_shots", ShotTagKey = "cw_shottag", BandKey = "cw_band", ZonesKey = "cw_zones",
-            FloorArrowsKey = "cw_floorarrows";
+            FloorArrowsKey = "cw_floorarrows", EdgeArrowsKey = "cw_edgearrows";
         /// <summary>WP4: see <see cref="AutoAura"/>.</summary>
         public const string AutoAuraKey = "cw_autoaura";
 
         public static readonly string[] Keys =
-            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey, AutoZoneKey, ShotsKey, ShotTagKey, BandKey, ZonesKey, FloorArrowsKey, AutoAuraKey };
+            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey, AutoZoneKey, ShotsKey, ShotTagKey, BandKey, ZonesKey, FloorArrowsKey, EdgeArrowsKey, AutoAuraKey };
 
         public const ChickenClass DefaultClass = ChickenClass.Warrior;
         public const float DefaultAutoStartTimeout = 90f;
@@ -96,9 +96,12 @@ namespace CluckWars.Diagnostics
         public int BandOverride;
         /// <summary><c>cw_zones</c>: draw the HUD info / control zones as an outlined overlay (dev tools only).</summary>
         public bool Zones;
-        /// <summary><c>cw_floorarrows</c> (dev tools only): the floor-ring rival arrows prototype (<c>FloorRivalArrows</c>)
-        /// replaces the edge chevrons for the rivals it represents. Off = the shipped edge chevrons.</summary>
+        /// <summary><c>cw_floorarrows</c> (dev tools only): explicitly ask for the floor-ring rival arrows
+        /// (<c>FloorRivalArrows</c>). Since 2026-10-22 they are the dev-build default, so this only documents intent.</summary>
         public bool FloorArrows;
+        /// <summary><c>cw_edgearrows</c> (dev tools only): switch a dev build back to the shipped edge chevrons, for
+        /// comparisons. Production always has the chevrons.</summary>
+        public bool EdgeArrows;
 
         public const int MaxShotSecond = 3600;
 
@@ -218,8 +221,14 @@ namespace CluckWars.Diagnostics
                         break;
                     case ZonesKey:            cfg.Zones = cfg.ParseBool(key, value); break;
                     case FloorArrowsKey:      cfg.FloorArrows = cfg.ParseBool(key, value); break;
+                    case EdgeArrowsKey:       cfg.EdgeArrows = cfg.ParseBool(key, value); break;
                     default: cfg.Problems.Add($"unknown key {kv.Key}"); break;
                 }
+            }
+            if (cfg.FloorArrows && cfg.EdgeArrows)
+            {
+                cfg.Problems.Add($"{FloorArrowsKey} and {EdgeArrowsKey} both given; edge chevrons ({FloorArrowsKey} ignored)");
+                cfg.FloorArrows = false;
             }
             if (cfg.AutoZone && !cfg.AutoPlay)
             {

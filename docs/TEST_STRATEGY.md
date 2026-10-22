@@ -73,9 +73,10 @@ The control RPCs (`RPC_ApplyStun/Root/AbilitySlow`, F4/WP1) are gated automatica
 .\tools\test-session\scenario-pc.ps1 -Mode hostleave -Rounds 3
 # HUD band / portrait screenshots (dev-tools build): -cw_shots seconds, -cw_band 290|330, -cw_zones outline overlay; PNGs in <session>\shots
 .\tools\test-session\scenario-pc.ps1 -Mode solo -Rounds 1 -Width 1920 -Height 1080 -ExtraArgs '-cw_shots 15,22,29,36 -cw_band 290 -cw_zones -cw_shottag band290'
-# Rival arrows A/B (dev prototype): edge chevrons (shipped) vs floor ring round the local chicken (-cw_floorarrows)
-.\tools\test-session\scenario-pc.ps1 -Mode solo -Rounds 1 -Width 1920 -Height 1080 -ExtraArgs '-cw_shots 15,22,29,36 -cw_zones -cw_shottag edge1080'
-.\tools\test-session\scenario-pc.ps1 -Mode solo -Rounds 1 -Width 1920 -Height 1080 -ExtraArgs '-cw_shots 15,22,29,36 -cw_zones -cw_shottag floor1080 -cw_floorarrows'
+# Rival arrows A/B: dev builds default to the floor ring painted round the local chicken; -cw_edgearrows = the shipped edge
+# chevrons (production always has the chevrons). Log line: "AutoTest arrows=floor|edge".
+.\tools\test-session\scenario-pc.ps1 -Mode solo -Rounds 1 -Width 1920 -Height 1080 -ExtraArgs '-cw_shots 15,22,29,36 -cw_zones -cw_shottag floor1080'
+.\tools\test-session\scenario-pc.ps1 -Mode solo -Rounds 1 -Width 1920 -Height 1080 -ExtraArgs '-cw_shots 15,22,29,36 -cw_zones -cw_shottag edge1080 -cw_edgearrows'
 .\tools\test-session\verify.ps1 -Session Captures\session-<utc>   # re-judge an old capture
 .\tools\test-session\selftest.ps1                                  # tests the checker itself
 ```

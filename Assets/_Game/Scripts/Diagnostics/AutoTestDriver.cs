@@ -99,10 +99,10 @@ namespace CluckWars.Diagnostics
 
         private void ApplyScreenshotTools()
         {
-            bool wanted = _cfg.Shots.Length > 0 || _cfg.BandOverride != 0 || _cfg.Zones || _cfg.FloorArrows;
+            bool wanted = _cfg.Shots.Length > 0 || _cfg.BandOverride != 0 || _cfg.Zones || _cfg.FloorArrows || _cfg.EdgeArrows;
             if (!DevTools.Available)
             {
-                if (wanted) _log.Warn(Source, "AutoTest cw_shots/cw_band/cw_zones/cw_floorarrows ignored: dev tools not available in this build");
+                if (wanted) _log.Warn(Source, "AutoTest cw_shots/cw_band/cw_zones/cw_floorarrows/cw_edgearrows ignored: dev tools not available in this build");
                 _shotsDone = true;
                 return;
             }
@@ -114,11 +114,11 @@ namespace CluckWars.Diagnostics
             DiagnosticsReadout.ZonesOverlay = _cfg.Zones;
             if (_cfg.Zones) _log.Info(Source, "AutoTest zones=1: HUD info / control zones outlined by the overlay.");
 
-            CluckWars.Visuals.FloorRivalArrows.DevRequested = _cfg.FloorArrows;
-            _log.Info(Source, _cfg.FloorArrows
-                ? "AutoTest floorarrows=1: hidden rivals get an arrow on a floor ring round the local chicken (prototype); " +
-                  "their edge chevrons are suppressed."
-                : "AutoTest floorarrows=0: rival arrows are the shipped edge chevrons.");
+            CluckWars.Visuals.FloorRivalArrows.EdgeArrowsRequested = _cfg.EdgeArrows;
+            _log.Info(Source, _cfg.EdgeArrows
+                ? "AutoTest arrows=edge (-cw_edgearrows): rival arrows are the shipped edge chevrons."
+                : "AutoTest arrows=floor (dev default): hidden rivals get an arrow painted on a floor ring round the local " +
+                  "chicken; their edge chevrons are suppressed. -cw_edgearrows restores the chevrons.");
 
             if (_cfg.Shots.Length == 0) { _shotsDone = true; return; }
             _shotDir = AutoTestRules.ShotDirectoryFromArgs(Environment.GetCommandLineArgs())

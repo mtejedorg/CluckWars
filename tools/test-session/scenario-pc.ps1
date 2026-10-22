@@ -26,10 +26,11 @@
 .PARAMETER Height  window height of every EXE (default 540).
 .PARAMETER ExtraArgs  one space-separated string appended to EVERY EXE's args, e.g. HUD band screenshots (dev-tools build):
            -ExtraArgs '-cw_shots 15,22,29,36 -cw_band 290 -cw_zones -cw_shottag band290'  (PNGs land in <session>\shots)
-           Floor-ring rival arrows prototype vs the shipped edge chevrons (same seconds, one run each, compare the PNGs):
-           -ExtraArgs '-cw_shots 15,22,29,36 -cw_zones -cw_shottag edge'
-           -ExtraArgs '-cw_shots 15,22,29,36 -cw_zones -cw_shottag floor -cw_floorarrows'
-           The log says which one ran ("AutoTest floorarrows=0|1") and the ring radius in use ("Floor ring radius=").
+           Rival arrows: dev builds paint them on a floor ring round your chicken BY DEFAULT; -cw_edgearrows switches back to
+           the shipped edge chevrons (production always has the chevrons). A/B, same seconds, one run each:
+           -ExtraArgs '-cw_shots 15,22,29,36 -cw_zones -cw_shottag floor'                  (default: floor arrows)
+           -ExtraArgs '-cw_shots 15,22,29,36 -cw_zones -cw_shottag edge -cw_edgearrows'    (edge chevrons)
+           The log says which one ran ("AutoTest arrows=floor|edge") and the ring radius in use ("Floor ring radius=").
 #>
 param(
     [ValidateSet('solo','shared2','shared4','hostleave')][string]$Mode = 'shared4',

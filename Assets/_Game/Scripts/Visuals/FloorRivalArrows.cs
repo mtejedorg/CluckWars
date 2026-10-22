@@ -7,29 +7,29 @@ using Zenject;
 namespace CluckWars.Visuals
 {
     /// <summary>
-    /// <b>DEV PROTOTYPE</b> (<c>-cw_floorarrows</c>, dev tools only): rival arrows on a ring on the floor round the LOCAL
-    /// chicken instead of at the screen edge. Maestro 2026-10-22: "for the arrows, the best and more immersive way is to put
-    /// them in the outer circle at the floor." Built to be compared side by side with the edge chevrons, which stay the default:
-    /// with the switch off nothing of this exists (no object, no per-frame cost) and <see cref="RivalIndicator"/> is unchanged.
+    /// <b>DEV PROTOTYPE</b> (the default in dev-tools builds; <c>-cw_edgearrows</c> switches back): rival arrows PAINTED on a
+    /// ring on the floor round the LOCAL chicken instead of at the screen edge. Maestro 2026-10-22: "for the arrows, the best
+    /// and more immersive way is to put them in the outer circle at the floor", then (pass 3) "imagine they were painted on the
+    /// floor". Production (no dev tools) keeps the edge chevrons exactly as before: nothing of this exists there and
+    /// <see cref="RivalIndicator"/> behaves as it always did.
     /// </summary>
     /// <remarks>
     /// <para><b>Who decides.</b> Each <see cref="RivalIndicator"/> still makes its own "is this rival hidden from the clear
     /// viewport" decision (off the frame, or mostly under a HUD information zone: <see cref="ScreenEdgeProjection"/>). Where it
     /// would draw a chevron it first offers the rival here (<see cref="TryRepresent"/>); if this accepts, the chevron is
-    /// suppressed and an arrow lies on the ring instead. A rival this cannot represent (local chicken removed / absent, cover
-    /// up, rival inside the ring, pool full) keeps its edge chevron, so a rival is never left with no arrow at all.</para>
-    /// <para><b>Lifetime.</b> One instance, created EAGERLY when the switch is set (<see cref="DevRequested"/>, at boot by
-    /// <c>AutoTestDriver</c>) and kept across scene loads, so the first offer in a match is drawn the same frame. Never
-    /// parented under a chicken: <c>ChickenVisuals</c>' renderer scan and ghost material swap must never find these renderers.
-    /// It follows the local chicken in <see cref="LateUpdate"/> (after every indicator has offered, <see cref="ExecutionOrder"/>).
-    /// Pooled: one ring and <see cref="FloorArrowRules.MaxArrows"/> arrows built in <see cref="Awake"/>, no per-frame
-    /// allocation. Purely local presentation: no networked state, no RPCs.</para>
-    /// <para><b>Drawing (iteration 2).</b> Each arrow is sized and fitted on SCREEN (<see cref="FloorArrowRules.FitAlongRay"/>:
-    /// out of the HUD zones and off the player's own bird), points along the rival's real screen direction, and lies on the
-    /// floor under a parent stretched by 1 / sin(pitch) along the camera's ground-forward, so an arrow pointing up or down the
-    /// screen reads as long as a sideways one. Material: URP's unlit sprite shader through
-    /// <see cref="TelegraphShapes.SharedUnlitSpriteMaterial"/>.</para>
-    /// <para><b>Motion.</b> Nothing animates (no pulse, no bob), so Reduced Motion needs no branch here.</para>
+    /// suppressed and an arrow is painted on the ring instead. A rival this cannot represent (local chicken removed / absent,
+    /// cover up, rival inside the ring, pool full) keeps its edge chevron, so a rival is never left with no arrow at all.</para>
+    /// <para><b>Painted marking.</b> The ring and the arrows are flat meshes in the world XZ plane, just above the floor, in one
+    /// paint family (<see cref="TelegraphShapes.SharedUnlitSpriteMaterial"/>, colour per vertex). Each arrow is a chevron decal
+    /// whose tail sits ON the ring line at the bearing to its rival, tip outward, rotated about world up only (never a
+    /// billboard) and foreshortened by the camera exactly like the ring: no screen-space fitting or compensation. Fill = the
+    /// rival's player colour at paint alpha with a soft inner fade, rim = the same hue darkened. Ring drawn only while an
+    /// arrow shows.</para>
+    /// <para><b>Lifetime.</b> One instance, created EAGERLY after the first scene loads in a dev build
+    /// (<see cref="CreateForDevBuilds"/>; removed again by <see cref="EdgeArrowsRequested"/>) and kept across scene loads. Never parented under a chicken: <c>ChickenVisuals</c>' renderer scan
+    /// and ghost material swap must never find these renderers. Pooled: one ring mesh and <see cref="FloorArrowRules.MaxArrows"/>
+    /// arrow meshes built in <see cref="Awake"/>; per frame only transforms move and, when a tint changes, vertex colours are
+    /// rewritten from fixed buffers. Purely local presentation: no networked state, no RPCs. Nothing animates.</para>
     /// </remarks>
     [DefaultExecutionOrder(ExecutionOrder)]
     public sealed class FloorRivalArrows : MonoBehaviour
@@ -39,45 +39,61 @@ namespace CluckWars.Visuals
 
         private const string Source = "FloorRivalArrows";
 
-        /// <summary>The ring sits under the arrows; both above the rival ring (1) and the ambient ability outlines.</summary>
+        /// <summary>Paint layers: ring under arrows, both above the rival ring (1). With the y offsets below, no z-fighting.</summary>
         private const int RingSortingOrder = 2;
-        private const int ArrowOutlineSortingOrder = 6;
-        private const int ArrowSortingOrder = 7;
+        private const int ArrowSortingOrder = 3;
 
-        /// <summary>Draw heights above the y = 0 arena floor (the telegraph outlines sit at <see cref="TelegraphShapes.GroundY"/>).</summary>
+        /// <summary>Paint heights above the y = 0 arena floor (the telegraph outlines sit at <see cref="TelegraphShapes.GroundY"/>).</summary>
         private const float RingY = TelegraphShapes.GroundY + 0.005f;
-        private const float ArrowY = TelegraphShapes.GroundY + 0.015f;
+        private const float ArrowY = TelegraphShapes.GroundY + 0.012f;
+
+        /// <summary>Ring tessellation (segments round the circle).</summary>
+        private const int RingSegments = 72;
 
         // ── Dev switch ─────────────────────────────────────────────────────────────────────────
 
-        private static bool _devRequested;
+        private static bool _edgeArrowsRequested;
 
-        /// <summary>Set by <c>AutoTestDriver</c> from <c>-cw_floorarrows</c> (after its dev-tools gate). Inert unless
-        /// <see cref="DevTools.Available"/> (<see cref="IsEnabled"/>). Turning it on in Play creates the instance at once.</summary>
-        public static bool DevRequested
+        /// <summary>
+        /// Dev comparison switch back to the shipped edge chevrons: set by <c>AutoTestDriver</c> from <c>-cw_edgearrows</c>
+        /// (after its dev-tools gate). In a dev build (<see cref="DevTools.Available"/>) the floor arrows are the DEFAULT
+        /// (2026-10-22: Maestro kept seeing the chevrons in the test window); in production they never exist
+        /// (<see cref="FloorArrowsActive"/>). Setting it in Play creates or removes the instance at once.
+        /// </summary>
+        public static bool EdgeArrowsRequested
         {
-            get => _devRequested;
+            get => _edgeArrowsRequested;
             set
             {
-                _devRequested = value;
+                _edgeArrowsRequested = value;
                 if (DevEnabled && Application.isPlaying) EnsureInstance();
-                else if (!value && _instance != null) Destroy(_instance.gameObject);
+                else if (value && _instance != null) Destroy(_instance.gameObject);
             }
         }
 
-        /// <summary>The prototype is on: requested AND dev tools available. Production behaviour (edge chevrons) otherwise.</summary>
-        public static bool DevEnabled => IsEnabled(_devRequested, DevTools.Available);
+        /// <summary>The floor arrows are on: a dev build that did not ask for the edge chevrons. Production: edge chevrons.</summary>
+        public static bool DevEnabled => FloorArrowsActive(DevTools.Available, _edgeArrowsRequested);
 
-        /// <summary>Pure form of the gate, pinned by tests.</summary>
-        public static bool IsEnabled(bool requested, bool devToolsAvailable) => requested && devToolsAvailable;
+        /// <summary>Pure form of the gate, pinned by tests: dev builds default to the floor arrows, <c>-cw_edgearrows</c>
+        /// restores the chevrons, production is always the chevrons.</summary>
+        public static bool FloorArrowsActive(bool devToolsAvailable, bool edgeArrowsRequested) =>
+            devToolsAvailable && !edgeArrowsRequested;
 
         private static FloorRivalArrows _instance;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
         {
-            _devRequested = false;   // with domain reload off the last Play session's switch would survive
+            _edgeArrowsRequested = false;   // with domain reload off the last Play session's switch would survive
             _instance = null;
+        }
+
+        /// <summary>Dev default: the instance exists from the first scene on, with or without any <c>-cw_*</c> key (the
+        /// auto-test driver only runs with one). Production: nothing is created.</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void CreateForDevBuilds()
+        {
+            if (DevEnabled) EnsureInstance();
         }
 
         private static void EnsureInstance()
@@ -103,16 +119,20 @@ namespace CluckWars.Visuals
         // ── Instance ───────────────────────────────────────────────────────────────────────────
 
         private ILogService _log;
-
-        private LineRenderer _ring;
-        private readonly Vector3[] _ringPoints = new Vector3[TelegraphShapes.CircleSegments];
-        private float _ringBuiltRadius = -1f;
         private bool _missingMaterialReported, _missingCombatReported;
 
-        // Per arrow: a root lying flat in the camera's ground frame, depth-stretched; the fill (rotated in that plane) under it.
-        private readonly Transform[] _roots = new Transform[FloorArrowRules.MaxArrows];
-        private readonly SpriteRenderer[] _arrows = new SpriteRenderer[FloorArrowRules.MaxArrows];
-        private readonly SpriteRenderer[] _outlines = new SpriteRenderer[FloorArrowRules.MaxArrows];
+        // Ring: a flat annulus mesh (4 vertex rings: soft inner edge, paint, paint, soft outer edge), rebuilt only on a radius change.
+        private Mesh _ringMesh;
+        private MeshRenderer _ringRenderer;
+        private readonly Vector3[] _ringVerts = new Vector3[RingSegments * 4];
+        private float _ringBuiltRadius = -1f;
+
+        // Arrows: one flat chevron mesh each, unit length along local +Z, built once; only vertex colours change (on a tint change).
+        private const int ArrowVerts = FloorArrowRules.ChevronPointCount * 4;   // rim outer, rim inner, fill edge, fill core
+        private readonly Mesh[] _arrowMeshes = new Mesh[FloorArrowRules.MaxArrows];
+        private readonly MeshRenderer[] _arrowRenderers = new MeshRenderer[FloorArrowRules.MaxArrows];
+        private readonly Color[] _arrowColors = new Color[ArrowVerts];
+        private readonly Color[] _shownTint = new Color[FloorArrowRules.MaxArrows];
 
         // This frame's offers (fixed pool).
         private int _queueFrame = -1;
@@ -124,13 +144,9 @@ namespace CluckWars.Visuals
         private readonly Color[] _tints = new Color[FloorArrowRules.MaxArrows];
         private readonly float[] _opacities = new float[FloorArrowRules.MaxArrows];
 
-        // HUD zones + the bird's body in screen metres, rebuilt each drawn frame (fixed scratch: body + <= 7 avoid zones).
-        private readonly Rect[] _obstacles = new Rect[12];
-
         // This frame's context, resolved once (PrepareFrame).
         private int _preparedFrame = -1;
         private bool _active;
-        private Camera _cam;
         private Vector3 _centre;
         private float _radius = FeedbackTuning.FloorArrowPreferredRadius;
         private float _loggedRadius = -1f;
@@ -143,50 +159,138 @@ namespace CluckWars.Visuals
             // Self-injection per CONVENTIONS (created with AddComponent, so nothing injected it). Never gate on HasInstance.
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
 
-            var mat = TelegraphShapes.SharedUnlitSpriteMaterial(_log);   // shared URP unlit sprite material, never destroyed here
+            var mat = TelegraphShapes.SharedUnlitSpriteMaterial(_log);   // shared URP unlit material, never destroyed here
             if (mat == null) ReportMissingMaterial();
 
-            _ring = TelegraphShapes.BuildLine(transform, "FloorArrowRing", mat, FeedbackTuning.FloorArrowRingWidth, loop: true);
-            _ring.useWorldSpace = false;   // points are fixed per radius; the root follows the chicken
-            _ring.sortingOrder = RingSortingOrder;
-            if (mat != null) _ring.sharedMaterial = mat;
-            _ring.enabled = false;
+            _ringMesh = new Mesh { name = "FloorArrowRing" };
+            _ringMesh.MarkDynamic();
+            _ringRenderer = BuildPaintLayer("FloorArrowRing", _ringMesh, mat, RingSortingOrder);
+            _ringRenderer.transform.localPosition = new Vector3(0f, RingY, 0f);
+            BuildRingTopology();
 
-            for (int i = 0; i < _arrows.Length; i++)
+            for (int i = 0; i < _arrowMeshes.Length; i++)
             {
-                var root = new GameObject("FloorArrow" + i);
-                root.transform.SetParent(transform, worldPositionStays: false);
-
-                var fillGo = new GameObject("FloorArrowFill");
-                fillGo.transform.SetParent(root.transform, worldPositionStays: false);
-                var fill = fillGo.AddComponent<SpriteRenderer>();
-                fill.sprite = RivalIndicator.SharedChevronSprite();
-                fill.sortingOrder = ArrowSortingOrder;
-                if (mat != null) fill.sharedMaterial = mat;
-
-                var edgeGo = new GameObject("FloorArrowOutline");
-                edgeGo.transform.SetParent(fillGo.transform, worldPositionStays: false);
-                var edge = edgeGo.AddComponent<SpriteRenderer>();
-                edge.sprite = RivalIndicator.SharedThickChevronOutlineSprite();
-                edge.sortingOrder = ArrowOutlineSortingOrder;
-                if (mat != null) edge.sharedMaterial = mat;
-
-                _roots[i] = root.transform;
-                _arrows[i] = fill;
-                _outlines[i] = edge;
-                root.SetActive(false);
+                _arrowMeshes[i] = BuildArrowMesh(i);
+                _arrowRenderers[i] = BuildPaintLayer("FloorArrow" + i, _arrowMeshes[i], mat, ArrowSortingOrder);
+                _shownTint[i] = new Color(-1f, -1f, -1f, -1f);   // forces the first colour write
+                _arrowRenderers[i].gameObject.SetActive(false);
             }
+            _ringRenderer.gameObject.SetActive(false);
 
             _log?.Info(Source, string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "Floor rival arrows ON (dev prototype, -cw_floorarrows): ring R = min({0:0.0} m, {1:0.0} x smallest clear ground extent), " +
-                "arrows {2:0.0}-{3:0.0} m, edge chevrons suppressed for the rivals the ring represents.",
+                "Floor rival arrows ON (dev default, painted; -cw_edgearrows for the chevrons): ring R = min({0:0.0} m, {1:0.0} x smallest clear " +
+                "ground extent), arrows {2:0.00}-{3:0.00} m long, edge chevrons suppressed for the rivals the ring represents.",
                 FeedbackTuning.FloorArrowPreferredRadius, FeedbackTuning.FloorArrowLateralFraction,
-                FeedbackTuning.FloorArrowNearSize, FeedbackTuning.FloorArrowFarSize));
+                FeedbackTuning.FloorArrowNearLength, FeedbackTuning.FloorArrowFarLength));
+        }
+
+        private MeshRenderer BuildPaintLayer(string name, Mesh mesh, Material mat, int sortingOrder)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(transform, worldPositionStays: false);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var r = go.AddComponent<MeshRenderer>();
+            if (mat != null) r.sharedMaterial = mat;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.receiveShadows = false;
+            r.sortingOrder = sortingOrder;
+            return r;
+        }
+
+        /// <summary>Ring triangles and colours: fixed for the session (only the vertex positions follow the radius).</summary>
+        private void BuildRingTopology()
+        {
+            var colors = new Color[_ringVerts.Length];
+            Color paint = FeedbackTuning.FloorArrowRingColor;
+            paint.a = FeedbackTuning.FloorArrowRingAlpha;
+            Color clear = paint;
+            clear.a = 0f;
+            var tris = new int[RingSegments * 3 * 6];
+            int t = 0;
+            for (int s = 0; s < RingSegments; s++)
+            {
+                for (int k = 0; k < 4; k++) colors[s * 4 + k] = k == 0 || k == 3 ? clear : paint;
+                int n = (s + 1) % RingSegments;
+                for (int k = 0; k < 3; k++)   // three bands: soft inner, paint, soft outer
+                {
+                    int a = s * 4 + k, b = s * 4 + k + 1, c = n * 4 + k + 1, d = n * 4 + k;
+                    tris[t++] = a; tris[t++] = b; tris[t++] = c;
+                    tris[t++] = a; tris[t++] = c; tris[t++] = d;
+                }
+            }
+            SetRingRadius(_radius);
+            _ringMesh.colors = colors;
+            _ringMesh.triangles = tris;
+        }
+
+        private void SetRingRadius(float radius)
+        {
+            float half = 0.5f * FeedbackTuning.FloorArrowRingWidth, soft = FeedbackTuning.FloorArrowRingSoftEdge;
+            for (int s = 0; s < RingSegments; s++)
+            {
+                Vector3 d = FloorArrowRules.Direction(s * (360f / RingSegments));
+                _ringVerts[s * 4 + 0] = d * (radius - half - soft);
+                _ringVerts[s * 4 + 1] = d * (radius - half);
+                _ringVerts[s * 4 + 2] = d * (radius + half);
+                _ringVerts[s * 4 + 3] = d * (radius + half + soft);
+            }
+            _ringMesh.vertices = _ringVerts;   // copies the fixed buffer; no allocation of ours
+            _ringMesh.RecalculateBounds();
+            _ringBuiltRadius = radius;
+        }
+
+        /// <summary>
+        /// One chevron decal, unit length along local +Z (scaled by the transform to the arrow's length), flat in local XZ:
+        /// vertices 0-3 rim outer edge, 4-7 rim inner edge (= the fill's edge, rim colour), 8-11 the fill's edge (fill colour),
+        /// 12-15 the fill's core (inset, fainter: the soft inner fade).
+        /// </summary>
+        private Mesh BuildArrowMesh(int index)
+        {
+            const int n = FloorArrowRules.ChevronPointCount;
+            var shape = new Vector2[n];
+            var rim = new Vector2[n];
+            var core = new Vector2[n];
+            FloorArrowRules.ChevronPolygon(shape);
+            FloorArrowRules.OffsetPolygon(shape, n, FeedbackTuning.FloorArrowOutlineRatio, rim);
+            FloorArrowRules.OffsetPolygon(shape, n, -FeedbackTuning.FloorArrowFadeInset, core);
+
+            var verts = new Vector3[ArrowVerts];
+            for (int i = 0; i < n; i++)
+            {
+                verts[i] = new Vector3(rim[i].x, 0f, rim[i].y);
+                verts[n + i] = new Vector3(shape[i].x, 0f, shape[i].y);
+                verts[2 * n + i] = verts[n + i];
+                verts[3 * n + i] = new Vector3(core[i].x, 0f, core[i].y);
+            }
+
+            var tris = new int[(n * 2 * 2 + 2) * 3];
+            int t = 0;
+            for (int i = 0; i < n; i++)
+            {
+                int j = (i + 1) % n;
+                // rim band (outer 0..3 -> inner 4..7)
+                tris[t++] = i; tris[t++] = n + i; tris[t++] = n + j;
+                tris[t++] = i; tris[t++] = n + j; tris[t++] = j;
+                // fill fade band (edge 8..11 -> core 12..15)
+                tris[t++] = 2 * n + i; tris[t++] = 3 * n + i; tris[t++] = 3 * n + j;
+                tris[t++] = 2 * n + i; tris[t++] = 3 * n + j; tris[t++] = 2 * n + j;
+            }
+            // core: concave chevron (tail-right 0, tip 1, tail-left 2, notch 3) as two triangles about the tip
+            tris[t++] = 3 * n + 1; tris[t++] = 3 * n + 2; tris[t++] = 3 * n + 3;
+            tris[t++] = 3 * n + 1; tris[t++] = 3 * n + 3; tris[t++] = 3 * n + 0;
+
+            var mesh = new Mesh { name = "FloorArrow" + index, vertices = verts, triangles = tris };
+            mesh.colors = new Color[ArrowVerts];
+            mesh.RecalculateBounds();
+            mesh.MarkDynamic();
+            return mesh;
         }
 
         private void OnDestroy()
         {
             if (_instance == this) _instance = null;
+            if (_ringMesh != null) Destroy(_ringMesh);
+            for (int i = 0; i < _arrowMeshes.Length; i++) if (_arrowMeshes[i] != null) Destroy(_arrowMeshes[i]);
         }
 
         private void OnDisable() => HideAll();
@@ -239,7 +343,6 @@ namespace CluckWars.Visuals
             if (local.Combat.IsRemoved) return;                          // dead or eliminated (IsDead is the same flag)
 
             var cam = mc.Camera;
-            _cam = cam;
             _radius = cam.orthographic   // MatchCamera forces orthographic every frame; anything else gets the preferred radius
                 ? FloorArrowRules.FramingRadius(cam.aspect, cam.orthographicSize, cam.transform.eulerAngles.x,
                     HudControlZones.CurrentInfo(cam), HudControlZones.Current(cam))
@@ -259,118 +362,82 @@ namespace CluckWars.Visuals
         {
             PrepareFrame();
             int count = _queueFrame == Time.frameCount ? _count : 0;
-            if (!_active || count == 0 || !_cam.orthographic)
+            if (!_active || count == 0)
             {
                 HideAll();
                 return;
             }
 
             transform.SetPositionAndRotation(new Vector3(_centre.x, 0f, _centre.z), Quaternion.identity);
-            ShowRing();
-
-            float yaw = _cam.transform.eulerAngles.y;
-            float pitch = _cam.transform.eulerAngles.x;
-            Rect frame = BuildScreenObstacles(out int obstacleCount);
+            if (!Mathf.Approximately(_ringBuiltRadius, _radius)) SetRingRadius(_radius);
+            SetActive(_ringRenderer, true);
 
             FloorArrowRules.Spread(_bearings, _keys, count, FloorArrowRules.MinSeparationDegrees(_radius), _spread);
-            for (int i = 0; i < _arrows.Length; i++)
+            for (int i = 0; i < _arrowRenderers.Length; i++)
             {
-                if (i >= count) { SetActive(_roots[i], false); continue; }
-                PlaceArrow(i, yaw, pitch, frame, obstacleCount);
+                if (i >= count) { SetActive(_arrowRenderers[i], false); continue; }
+                PaintArrow(i);
             }
         }
 
-        /// <summary>The viewport (less <see cref="FeedbackTuning.FloorArrowEdgeMargin"/>) in screen metres round the chicken as it
-        /// is drawn this frame, and the obstacles: the bird's own body, then every HUD avoid zone (controls, top band, status strip).</summary>
-        private Rect BuildScreenObstacles(out int count)
+        /// <summary>Lays arrow <paramref name="i"/> flat on the floor: tail centre on the ring line at its (spread) bearing, a
+        /// yaw about world up only, uniform scale = its length.</summary>
+        private void PaintArrow(int i)
         {
-            Vector3 vp = _cam.WorldToViewportPoint(_centre);
-            var focus = new Vector2(vp.x, vp.y);
-            float s = _cam.orthographicSize, a = _cam.aspect;
-            Rect frame = FloorArrowRules.ViewportToScreenMetres(new Rect(0f, 0f, 1f, 1f), focus, s, a);
-            float m = FeedbackTuning.FloorArrowEdgeMargin;
-            frame = Rect.MinMaxRect(frame.xMin + m, frame.yMin + m, frame.xMax - m, frame.yMax - m);
+            float b = _spread[i];
+            Vector3 tail = FloorArrowRules.ArrowTail(_centre, _radius, b);
+            tail.y = ArrowY;
+            var t = _arrowRenderers[i].transform;
+            t.SetPositionAndRotation(tail, Quaternion.Euler(0f, FloorArrowRules.ArrowYaw(b), 0f));
+            t.localScale = Vector3.one * FloorArrowRules.ArrowLength(_distances[i], _radius);
 
-            count = 0;
-            _obstacles[count++] = FeedbackTuning.FloorArrowBodyRect;
-            var avoid = HudControlZones.CurrentAvoid(_cam);
-            for (int i = 0; i < avoid.Count && count < _obstacles.Length; i++)
-                _obstacles[count++] = FloorArrowRules.ViewportToScreenMetres(avoid[i], focus, s, a);
-            return frame;
+            Color tint = _tints[i];
+            tint.a = Mathf.Clamp01(_opacities[i]);   // the rival's own fade rides in alpha; the paint alphas multiply it
+            if (tint != _shownTint[i]) WriteArrowColors(i, tint);
+            SetActive(_arrowRenderers[i], true);
         }
 
-        private void PlaceArrow(int i, float yaw, float pitch, Rect frame, int obstacleCount)
+        /// <summary>Rewrites one arrow's vertex colours from the fixed buffer (only when its tint or opacity changed).</summary>
+        private void WriteArrowColors(int i, Color tintAndOpacity)
         {
-            float rel = _spread[i] - yaw;
-            Vector2 dir = FloorArrowRules.ScreenDirection(rel, pitch);
-            Vector2 ringPoint = FloorArrowRules.ScreenRingPoint(rel, _radius, pitch);
-            float size = FloorArrowRules.FitAlongRay(ringPoint, dir, FloorArrowRules.ArrowSize(_distances[i], _radius),
-                frame, _obstacles, obstacleCount, out float offset);
-
-            // Screen metres -> ground in the camera's frame -> world.
-            Vector2 ground = FloorArrowRules.ScreenToGround(ringPoint + dir * offset, pitch);
-            Quaternion camGround = Quaternion.Euler(0f, yaw, 0f);
-            Vector3 p = _centre + camGround * new Vector3(ground.x, 0f, ground.y);
-            p.y = ArrowY;
-
-            // Root: flat in the camera's ground frame, stretched along its forward by 1 / sin(pitch). Fill: rotated inside that
-            // plane to the SCREEN direction, uniform size, so after the stretch and the camera's foreshortening it reads undistorted.
-            var root = _roots[i];
-            root.SetPositionAndRotation(p, camGround);
-            root.localScale = new Vector3(1f, 1f, FloorArrowRules.DepthStretch(pitch));
-            var t = _arrows[i].transform;
-            t.localRotation = Quaternion.LookRotation(Vector3.down, new Vector3(dir.x, 0f, dir.y));
-            t.localScale = Vector3.one * size;
-
-            float alpha = FloorArrowRules.ArrowAlpha(_distances[i], _radius) * _opacities[i];
-            Color c = _tints[i];
-            _arrows[i].color = new Color(c.r, c.g, c.b, Mathf.Clamp01(alpha));
-            Color ink = RivalIndicator.ChevronOutlineColor;   // full-strength ink rim at every distance (only the rival's own fade)
-            _outlines[i].color = new Color(ink.r, ink.g, ink.b, Mathf.Clamp01(FeedbackTuning.RivalChevronOutlineAlpha * _opacities[i]));
-            SetActive(root, true);
-        }
-
-        private void ShowRing()
-        {
-            if (_ring == null) return;
-            if (!Mathf.Approximately(_ringBuiltRadius, _radius))
+            const int n = FloorArrowRules.ChevronPointCount;
+            float opacity = tintAndOpacity.a;
+            Color rim = FloorArrowRules.OutlineFor(tintAndOpacity);
+            rim.a *= opacity;
+            Color edge = tintAndOpacity;
+            edge.a = FeedbackTuning.FloorArrowPaintAlpha * opacity;
+            Color core = edge;
+            core.a *= FeedbackTuning.FloorArrowCoreAlphaShare;
+            for (int k = 0; k < n; k++)
             {
-                for (int i = 0; i < _ringPoints.Length; i++)
-                {
-                    float a = i * (360f / _ringPoints.Length);
-                    Vector3 d = FloorArrowRules.Direction(a) * _radius;
-                    _ringPoints[i] = new Vector3(d.x, RingY, d.z);
-                }
-                _ring.positionCount = _ringPoints.Length;
-                _ring.SetPositions(_ringPoints);
-                _ringBuiltRadius = _radius;
+                _arrowColors[k] = rim;
+                _arrowColors[n + k] = rim;
+                _arrowColors[2 * n + k] = edge;
+                _arrowColors[3 * n + k] = core;
             }
-            Color rc = FeedbackTuning.FloorArrowRingColor;
-            rc.a = FeedbackTuning.FloorArrowRingAlpha;
-            _ring.startColor = rc;
-            _ring.endColor = rc;
-            if (!_ring.enabled) _ring.enabled = true;
+            _arrowMeshes[i].colors = _arrowColors;   // copies the fixed buffer; no allocation of ours
+            _shownTint[i] = tintAndOpacity;
         }
 
         private void HideAll()
         {
-            if (_ring != null && _ring.enabled) _ring.enabled = false;
-            for (int i = 0; i < _roots.Length; i++) SetActive(_roots[i], false);
+            SetActive(_ringRenderer, false);
+            for (int i = 0; i < _arrowRenderers.Length; i++) SetActive(_arrowRenderers[i], false);
         }
 
-        private static void SetActive(Transform t, bool on)
+        private static void SetActive(Renderer r, bool on)
         {
-            if (t != null && t.gameObject.activeSelf != on) t.gameObject.SetActive(on);
+            if (r != null && r.gameObject.activeSelf != on) r.gameObject.SetActive(on);
         }
 
         /// <summary>No material at all (URP sprite shader AND the Sprites/Default chain missing; the helper's own Error may have
-        /// gone to an earlier caller with no logger), so this says it once too: ring and arrows would draw magenta or not at all.</summary>
+        /// gone to an earlier caller with no logger), so this says it once too: the painted ring and arrows would draw magenta.</summary>
         private void ReportMissingMaterial()
         {
             if (_missingMaterialReported) return;
             _missingMaterialReported = true;
-            _log?.Error(Source, "No unlit sprite / line material in the build: the floor-arrow ring will not draw and the arrows " +
-                "fall back to the sprite default material.");
+            _log?.Error(Source, "No unlit sprite / line material in the build: the painted floor ring and arrows will draw with " +
+                "Unity's default material (magenta).");
         }
     }
 }

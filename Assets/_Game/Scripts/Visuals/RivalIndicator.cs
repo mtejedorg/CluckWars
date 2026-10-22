@@ -506,10 +506,6 @@ namespace CluckWars.Visuals
             if (_chevron != null && _chevron.gameObject.activeSelf) _chevron.gameObject.SetActive(false);
         }
 
-        /// <summary>The chevron fill sprite, shared with <see cref="FloorRivalArrows"/> so both arrow presentations are one
-        /// shape family (its outline: <see cref="SharedThickChevronOutlineSprite"/>).</summary>
-        public static Sprite SharedChevronSprite() => ChevronSprite();
-
         /// <summary>Positions, orients and sizes the chevron at viewport point <paramref name="at"/> pointing along
         /// <paramref name="bearing"/> (viewport axes). Shared by the LateUpdate placement and the spread pass.</summary>
         private void PlaceChevron(Camera cam, Vector2 at, Vector2 bearing)
@@ -605,35 +601,16 @@ namespace CluckWars.Visuals
         /// </summary>
         private static Sprite ChevronOutlineSprite()
         {
-            if (_chevronOutlineSprite == null)
-                _chevronOutlineSprite = BuildChevronOutline(FeedbackTuning.RivalChevronOutlineRatio, ChevronOutlinePad);
-            return _chevronOutlineSprite;
-        }
+            if (_chevronOutlineSprite != null) return _chevronOutlineSprite;
 
-        /// <summary>Transparent margin of the thick floor-arrow outline; must exceed its radius (0.05 x 96 = 4.8 texels).</summary>
-        private const int FloorArrowOutlinePad = 7;
-
-        /// <summary>The same ink edge, thicker (<see cref="FeedbackTuning.FloorArrowOutlineRatio"/>), for <see cref="FloorRivalArrows"/>:
-        /// an arrow lying on sunlit grass needs a heavier rim than a screen-edge chevron to hold its silhouette.</summary>
-        public static Sprite SharedThickChevronOutlineSprite()
-        {
-            if (_thickOutlineSprite == null)
-                _thickOutlineSprite = BuildChevronOutline(FeedbackTuning.FloorArrowOutlineRatio, FloorArrowOutlinePad);
-            return _thickOutlineSprite;
-        }
-
-        private static Sprite _thickOutlineSprite;
-
-        private static Sprite BuildChevronOutline(float ratio, int pad)
-        {
-            int n = ChevronTexels + 2 * pad;
-            float r = ratio * ChevronTexels;
+            int n = ChevronTexels + 2 * ChevronOutlinePad;
+            float r = FeedbackTuning.RivalChevronOutlineRatio * ChevronTexels;
             int win = Mathf.CeilToInt(r) + 1;
             var px = new Color[n * n];
             for (int oy = 0; oy < n; oy++)
             for (int ox = 0; ox < n; ox++)
             {
-                int fx = ox - pad, fy = oy - pad;
+                int fx = ox - ChevronOutlinePad, fy = oy - ChevronOutlinePad;
                 float a;
                 if (ChevronFill(fx, fy))
                 {
@@ -652,7 +629,8 @@ namespace CluckWars.Visuals
                 px[oy * n + ox] = new Color(1f, 1f, 1f, a);
             }
 
-            return MakeSprite(px, n, ChevronTexels);
+            _chevronOutlineSprite = MakeSprite(px, n, ChevronTexels);
+            return _chevronOutlineSprite;
         }
 
         private static Sprite MakeSprite(Color[] px, int size, int pixelsPerUnit)
