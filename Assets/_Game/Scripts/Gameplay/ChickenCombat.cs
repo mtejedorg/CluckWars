@@ -248,8 +248,11 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>The RPC sender's latency for allowances: 0 for a local invoke, else the floored RTT.</summary>
-        internal float SenderLatency(in RpcInfo info) =>
-            info.IsInvokeLocal || Runner == null ? 0f : ExecuteRules.RemoteLatency((float)Runner.GetPlayerRtt(info.Source));
+        internal float SenderLatency(in RpcInfo info) => SenderLatency(Runner, info);
+
+        /// <summary>The shared form, for receivers that are not a ChickenCombat (ChickenController's control RPCs, F4).</summary>
+        internal static float SenderLatency(NetworkRunner runner, in RpcInfo info) =>
+            info.IsInvokeLocal || runner == null ? 0f : ExecuteRules.RemoteLatency((float)runner.GetPlayerRtt(info.Source));
 
         // Victim-side, local, never replicated: when this chicken's authority last saw each
         // attacker's replicated MarkedTarget name it. Lets an execute whose mark was cleared in the

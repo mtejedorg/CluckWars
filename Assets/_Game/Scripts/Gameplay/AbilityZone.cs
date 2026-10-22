@@ -121,44 +121,109 @@ namespace CluckWars.Gameplay
         /// <summary>How long a despawned Root zone still counts as evidence for a root claim from its owner.</summary>
         public const float RecentRootWindowSeconds = 1.0f;
 
-        private struct DespawnedRoot
+        // This life's root evidence (local, plain fields, never networked). Snapshotted in Spawned and refreshed every
+        // Render on every peer, so Despawned records it without reading networked state: a remote copy's Despawned may
+        // get hasState == false, and a record gated on it would be lost exactly on the victim's peer (qa W1).
+        // The caster's position is captured once, when THIS peer first sees the zone, as the anchor its centre is
+        // checked against (security review: the zone's own geometry is attacker-writable).
+        private struct RootSnapshot
         {
             public NetworkBehaviourId Owner;
+            public PlayerRef Authority;        // the zone's state authority
             public Vector3 Center;
-            public float Radius;
-            public float At;   // Time.realtimeSinceStartup
+            public float Radius;               // the zone's own radius; clamped by ControlClaimRules
+            public bool HasCasterAtSpawn;
+            public Vector3 CasterAtSpawn;
+            public float SpawnDrift;
+            public float FirstSeenAt;          // Time.realtimeSinceStartup
+            public float DespawnedAt;          // records only
         }
 
-        private static readonly List<DespawnedRoot> _recentRoots = new List<DespawnedRoot>();
+        private bool _seenAsRoot;
+        private RootSnapshot _seen;
 
-        private static void RememberDespawnedRoot(NetworkBehaviourId owner, Vector3 center, float radius)
+        private static readonly List<RootSnapshot> _recentRoots = new List<RootSnapshot>();
+
+        /// <summary>Spawned: the full snapshot, including where the caster stands as this peer first sees the zone.</summary>
+        private void CaptureRootEvidence()
+        {
+            _seenAsRoot = Effect == ZoneEffect.Root;
+            if (!_seenAsRoot) return;
+            _seen = default;
+            _seen.FirstSeenAt = Time.realtimeSinceStartup;
+            ObserveRootEvidence();
+            if (Runner != null && Runner.TryFindBehaviour(OwnerChicken, out ChickenController caster) &&
+                caster != null && caster.Object != null && caster.Object.IsValid)
+            {
+                // The zone and its caster reach this peer in the same snapshot, so the caster has moved at most its
+                // drift over the zone authority's latency (0 on the authority, which spawns inside the caster's tick).
+                float latency = HasStateAuthority ? 0f : ExecuteRules.RemoteLatency((float)Runner.GetPlayerRtt(Object.StateAuthority));
+                _seen.HasCasterAtSpawn = true;
+                _seen.CasterAtSpawn = caster.transform.position;
+                _seen.SpawnDrift = ChickenCargo.DriftSpeed(caster) * (latency + 2f * Runner.DeltaTime);
+            }
+        }
+
+        /// <summary>Render (and Spawned): refreshes the parts that are readable state, never the spawn anchor.</summary>
+        private void ObserveRootEvidence()
+        {
+            if (!_seenAsRoot) return;
+            _seen.Owner     = OwnerChicken;
+            _seen.Authority = Object != null ? Object.StateAuthority : default;
+            _seen.Center    = Center;
+            _seen.Radius    = TriggerRadius;
+        }
+
+        private static void RememberDespawnedRoot(RootSnapshot snapshot)
         {
             float now = Time.realtimeSinceStartup;
-            _recentRoots.RemoveAll(r => now - r.At > RecentRootWindowSeconds);
-            _recentRoots.Add(new DespawnedRoot { Owner = owner, Center = center, Radius = radius, At = now });
+            _recentRoots.RemoveAll(r => now - r.DespawnedAt > RecentRootWindowSeconds);
+            snapshot.DespawnedAt = now;
+            _recentRoots.Add(snapshot);
         }
 
+        private static ControlClaimRules.RootZoneEvidence Evidence(in RootSnapshot s, PlayerRef casterAuthority, float now) =>
+            new ControlClaimRules.RootZoneEvidence
+            {
+                SameAuthorityAsCaster = s.Authority == casterAuthority,
+                Center = s.Center,
+                Radius = s.Radius,
+                HasCasterAtSpawn = s.HasCasterAtSpawn,
+                CasterAtSpawn = s.CasterAtSpawn,
+                SpawnDrift = s.SpawnDrift,
+                SecondsSinceSeen = now - s.FirstSeenAt,
+            };
+
         /// <summary>
-        /// True when <paramref name="point"/> is inside (plus <paramref name="margin"/>) a Root zone
-        /// owned by <paramref name="owner"/> that is alive on this peer or despawned within
-        /// <see cref="RecentRootWindowSeconds"/>. Read by <c>ChickenController</c>'s root-claim check.
+        /// True when <paramref name="point"/> is inside (plus <paramref name="margin"/>) a Root zone owned by
+        /// <paramref name="caster"/> that is alive on this peer or despawned within <see cref="RecentRootWindowSeconds"/>,
+        /// judged by <see cref="ControlClaimRules.RootZoneVouches"/>: same state authority as the caster, a centre
+        /// where the caster could have placed it, the radius clamped to the pool's authored one. Read by
+        /// <c>ChickenController</c>'s root-claim check.
         /// </summary>
-        public static bool ContainsRootOf(NetworkBehaviourId owner, Vector3 point, float margin)
+        public static bool ContainsRootOf(ChickenController caster, Vector3 point, float margin, in ControlClaimRules.Ceiling ceiling)
         {
+            if (caster == null || caster.Object == null || !caster.Object.IsValid) return false;
+            var owner = caster.Id;
+            var authority = caster.Object.StateAuthority;
+            Vector3 casterNow = caster.transform.position;
+            float drift = ChickenCargo.DriftSpeed(caster);
+            float now = Time.realtimeSinceStartup;
+
             for (int i = 0; i < ActiveZones.Count; i++)
             {
                 var z = ActiveZones[i];
-                if (z == null || z.Object == null || !z.Object.IsValid) continue;
-                if (z.Effect != ZoneEffect.Root || z.OwnerChicken != owner) continue;
-                if (ControlClaimRules.IsInsideZone(z.Center, z.TriggerRadius, point, margin)) return true;
+                if (z == null || !z._seenAsRoot || z._seen.Owner != owner) continue;
+                if (ControlClaimRules.RootZoneVouches(Evidence(z._seen, authority, now), point, margin, casterNow, drift, ceiling))
+                    return true;
             }
 
-            float now = Time.realtimeSinceStartup;
             for (int i = 0; i < _recentRoots.Count; i++)
             {
                 var r = _recentRoots[i];
-                if (r.Owner != owner || now - r.At > RecentRootWindowSeconds) continue;
-                if (ControlClaimRules.IsInsideZone(r.Center, r.Radius, point, margin)) return true;
+                if (r.Owner != owner || now - r.DespawnedAt > RecentRootWindowSeconds) continue;
+                if (ControlClaimRules.RootZoneVouches(Evidence(r, authority, now), point, margin, casterNow, drift, ceiling))
+                    return true;
             }
             return false;
         }
@@ -235,6 +300,8 @@ namespace CluckWars.Gameplay
             MatchSignals.RoundReset -= OnRoundReset;   // never twice, whatever the pool did
             MatchSignals.RoundReset += OnRoundReset;
 
+            CaptureRootEvidence();
+
             _log?.Debug(Source, $"Spawned. Effect={Effect}, Radius={TriggerRadius}, " +
                 $"Slow={SlowFactor:P0}, RootDuration={RootDuration:0.0}s.");
         }
@@ -243,7 +310,9 @@ namespace CluckWars.Gameplay
         {
             MatchSignals.RoundReset -= OnRoundReset;
             ActiveZones.Remove(this);
-            if (hasState && Effect == ZoneEffect.Root) RememberDespawnedRoot(OwnerChicken, Center, TriggerRadius);
+            // From the local snapshot, never gated on hasState (W1): see ObserveRootEvidence.
+            if (_seenAsRoot) RememberDespawnedRoot(_seen);
+            _seenAsRoot = false;   // pooled: the next life observes its own
             _placed = false;   // pooled: the next life re-applies its own stamp
 
             // Fallback for the one case the Render() detector structurally cannot see: a
@@ -365,6 +434,7 @@ namespace CluckWars.Gameplay
         public override void Render()
         {
             if (!_placed) ApplySpawnPosition();
+            ObserveRootEvidence();
             if (Effect == ZoneEffect.Root) ObserveRootConsumed();
             else                           ObserveSlowZoneEntry();
         }

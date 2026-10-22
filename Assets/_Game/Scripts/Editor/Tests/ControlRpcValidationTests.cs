@@ -223,6 +223,123 @@ namespace CluckWars.Tests
             Assert.IsTrue(ControlClaimRules.IsInsideZone(center, 1.45f, new Vector3(7.5f, 0f, 5f), 1.1f));
         }
 
+        // ---- 2b. Dust Kick headroom (qa W3) -------------------------------------------------
+
+        [Test]
+        public void DustKick_AtItsEdge_WithASpeedBurstCaster_IsAccepted_ButNotMuchFurther()
+        {
+            var kick = AllAbilityAssets().OfType<DustKickAbilitySO>().Single();
+            var c = Shipped(ControlKind.Slow);
+            float edge = ControlClaimRules.Reach(kick) + ControlClaimRules.RangeSlackMeters;
+            // A buffed fleeing Speedy outruns the DriftSpeed margin by ~1.3 m (see SlowReachHeadroomMeters).
+            var claim = Honest(ControlKind.Slow, kick.SlowSeconds, kick.SlowFactor, edge + 1.3f);
+            Assert.AreEqual(ControlClaimRules.Verdict.Accepted, ControlClaimRules.Evaluate(claim, c),
+                "before W3 the slow bound had no headroom past Dust Kick's own reach");
+            claim.PlanarDistance = edge + ControlClaimRules.SlowReachHeadroomMeters + 0.1f;
+            Assert.AreEqual(ControlClaimRules.Verdict.OutOfRange, ControlClaimRules.Evaluate(claim, c));
+        }
+
+        [Test]
+        public void SlowHeadroom_DoesNotLeakIntoStunOrRoot()
+        {
+            foreach (var kind in new[] { ControlKind.Stun, ControlKind.Root })
+            {
+                float poolMax = Registry().All.Where(a => a != null && a.EmittedControl.Kind == kind)
+                                              .Max(a => ControlClaimRules.Reach(a));
+                Assert.AreEqual(poolMax, Shipped(kind).MaxReach, 1e-4f, $"{kind} reach must be exactly the pool's");
+            }
+        }
+
+        // ---- 2c. Root-zone evidence (security review) ---------------------------------------
+
+        private static ControlClaimRules.RootZoneEvidence HonestZone(Vector3 center) => new ControlClaimRules.RootZoneEvidence
+        {
+            SameAuthorityAsCaster = true,
+            Center = center,
+            Radius = AllAbilityAssets().OfType<RootEggAbilitySO>().Single().EggRadius,
+            HasCasterAtSpawn = true,
+            CasterAtSpawn = center,          // Root Egg spawns at its caster's feet
+            SpawnDrift = 0.5f,
+            SecondsSinceSeen = 5f,
+        };
+
+        private static readonly Vector3 FarCaster = new Vector3(30f, 0f, 30f);   // walked away since
+
+        [Test]
+        public void RootCeiling_ZoneGeometry_IsReadOffRootEgg()
+        {
+            var egg = AllAbilityAssets().OfType<RootEggAbilitySO>().Single();
+            var c = Shipped(ControlKind.Root);
+            Assert.AreEqual(egg.EggRadius, c.MaxZoneRadius, 1e-6f);
+            Assert.AreEqual(egg.AimForwardOffset, c.MaxZonePlacement, 1e-6f);
+            Assert.AreEqual(0f, Shipped(ControlKind.Stun).MaxZoneRadius, "no stun comes from a zone");
+        }
+
+        [Test]
+        public void RootZone_Honest_VouchesForAVictimInside_WhileItsCasterIsFarAway()
+        {
+            var zone = HonestZone(new Vector3(2f, 0f, 2f));
+            Assert.IsTrue(ControlClaimRules.RootZoneVouches(zone, new Vector3(3f, 0f, 2f), 0.5f, FarCaster, 12.15f, Shipped(ControlKind.Root)));
+        }
+
+        [Test]
+        public void RootZone_InflatedRadius_IsClampedToTheAuthoredOne()
+        {
+            var zone = HonestZone(new Vector3(2f, 0f, 2f));
+            zone.Radius = 30f;   // attacker-written
+            var victim = new Vector3(8f, 0f, 2f);
+            Assert.IsTrue(ControlClaimRules.IsInsideZone(zone.Center, zone.Radius, victim, 0.5f), "fixture: the old check trusted this radius");
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, FarCaster, 12.15f, Shipped(ControlKind.Root)));
+            zone.Radius = float.NaN;
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, new Vector3(3f, 0f, 2f), 0.5f, FarCaster, 12.15f, Shipped(ControlKind.Root)));
+        }
+
+        [Test]
+        public void RootZone_OfAnotherAuthority_IsRefused()
+        {
+            var zone = HonestZone(new Vector3(2f, 0f, 2f));
+            zone.SameAuthorityAsCaster = false;
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, new Vector3(3f, 0f, 2f), 0.5f, FarCaster, 12.15f, Shipped(ControlKind.Root)));
+        }
+
+        [Test]
+        public void RootZone_FarFromWhereItsCasterStood_IsRefused()
+        {
+            var zone = HonestZone(new Vector3(-15f, 0f, -15f));   // dropped on the victim, not at the caster's feet
+            zone.CasterAtSpawn = new Vector3(10f, 0f, 10f);
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, new Vector3(-15f, 0f, -14.5f), 0.5f, FarCaster, 12.15f, Shipped(ControlKind.Root)));
+        }
+
+        [Test]
+        public void RootZone_WithNoSpawnAnchor_FallsBackToTheCasterNowPlusDriftOverItsAge()
+        {
+            var zone = HonestZone(new Vector3(2f, 0f, 2f));
+            zone.HasCasterAtSpawn = false;
+            zone.SecondsSinceSeen = 0.2f;
+            var c = Shipped(ControlKind.Root);
+            var victim = new Vector3(3f, 0f, 2f);
+            Assert.IsTrue(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, new Vector3(5f, 0f, 2f), 12.15f, c), "3 m of walking in 0.7 s is plausible");
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, FarCaster, 12.15f, c), "39 m in 0.7 s is not");
+            Assert.IsFalse(ControlClaimRules.RootZoneVouches(zone, victim, 0.5f, new Vector3(5f, 0f, 2f), 12.15f, ControlClaimRules.Ceiling.Unknown));
+        }
+
+        [Test]
+        public void AbilityZone_RecordsDespawnedRootsFromItsSnapshot_NotFromHasState()
+        {
+            const string zonePath = "Assets/_Game/Scripts/Gameplay/AbilityZone.cs";
+            string despawned = AssassinExecuteCreditTests.MethodBody(zonePath, "public override void Despawned(");
+            StringAssert.Contains("if (_seenAsRoot) RememberDespawnedRoot(_seen);", despawned,
+                "W1: a remote copy's Despawned may get hasState == false; the record must come from the local snapshot");
+            StringAssert.DoesNotContain("hasState && Effect == ZoneEffect.Root) RememberDespawnedRoot", despawned);
+            StringAssert.Contains("CaptureRootEvidence();", AssassinExecuteCreditTests.MethodBody(zonePath, "public override void Spawned("));
+            StringAssert.Contains("ObserveRootEvidence();", AssassinExecuteCreditTests.MethodBody(zonePath, "public override void Render("));
+
+            string contains = AssassinExecuteCreditTests.MethodBody(zonePath, "public static bool ContainsRootOf(");
+            StringAssert.Contains("ControlClaimRules.RootZoneVouches(", contains, "live and recorded zones are judged by the clamped rule");
+            StringAssert.DoesNotContain("IsInsideZone(", contains, "the zone's own radius must never be used unclamped");
+            StringAssert.Contains("caster.Object.StateAuthority", contains, "the zone must share the caster's state authority");
+        }
+
         // ---- 3. Wiring ------------------------------------------------------------------------
 
         [Test]
@@ -249,7 +366,7 @@ namespace CluckWars.Tests
             string judgeBody = AssassinExecuteCreditTests.MethodBody(ControllerPath, "private ControlClaimRules.Verdict JudgeControl(");
             StringAssert.Contains("caster.Object.StateAuthority == info.Source", judgeBody, "off the wire: the caster's state authority");
             StringAssert.Contains("caster.Object.HasStateAuthority", judgeBody, "local invoke (solo, bots, master): simulated here");
-            StringAssert.Contains("AbilityZone.ContainsRootOf(casterId", judgeBody, "a root from a far caster is judged against its own zones");
+            StringAssert.Contains("AbilityZone.ContainsRootOf(caster, v,", judgeBody, "a root from a far caster is judged against its own zones");
             StringAssert.Contains("ControlClaimRules.Evaluate(claim, ceiling)", judgeBody);
 
             string accept = AssassinExecuteCreditTests.MethodBody(ControllerPath, "private bool AcceptControlClaim(");

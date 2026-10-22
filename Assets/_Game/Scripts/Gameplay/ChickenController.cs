@@ -856,7 +856,8 @@ namespace CluckWars.Gameplay
             if (_cargo != null && _cargo.IsPileSlow && !ignoresPileSlow)
                 ApplySlow(SlowSource.Pile, PileSlowFactor);
 
-            // Ability slow timer (RPC_ApplyAbilitySlow — zones, aura, etc.).
+            // Timed ability slow (RPC_ApplyAbilitySlow; Dust Kick is its only sender - zones and the aura slow in
+            // CheckAbilityZoneSlow / CheckAuraSlow below, without an RPC).
             if (Runner.SimulationTime < _abilitySlowUntil)
                 ApplySlow(SlowSource.Ability, _abilitySlowFactor);
 
@@ -1358,13 +1359,13 @@ namespace CluckWars.Gameplay
 
                 // A local invoke has no wire time; a remote one is floored and capped (ExecuteRules).
                 // Two ticks cover the cast resolving a tick before the RPC is applied.
-                float latency = info.IsInvokeLocal ? 0f : ExecuteRules.RemoteLatency((float)Runner.GetPlayerRtt(info.Source));
+                float latency = ChickenCombat.SenderLatency(Runner, info);
                 claim.RangeMargin = StealRules.RangeMargin(
                     ChickenCargo.DriftSpeed(caster) + ChickenCargo.DriftSpeed(this), latency + 2f * Runner.DeltaTime);
                 Vector3 c = caster.transform.position, v = transform.position;
                 claim.PlanarDistance = Mathf.Sqrt((c.x - v.x) * (c.x - v.x) + (c.z - v.z) * (c.z - v.z));
                 claim.InsideCastersRootZone = kind == ControlKind.Root &&
-                    AbilityZone.ContainsRootOf(casterId, v, claim.RangeMargin + ControlClaimRules.RangeSlackMeters);
+                    AbilityZone.ContainsRootOf(caster, v, claim.RangeMargin + ControlClaimRules.RangeSlackMeters, ceiling);
             }
 
             return ControlClaimRules.Evaluate(claim, ceiling);

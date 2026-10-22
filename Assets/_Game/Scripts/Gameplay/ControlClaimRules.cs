@@ -92,13 +92,20 @@ namespace CluckWars.Gameplay
             public readonly float MinSlowFactor;
             /// <summary>Furthest a producing ability's caster can be from its victim when the effect is sent.</summary>
             public readonly float MaxReach;
+            /// <summary>Root only: the largest radius a zone-placing root ability authors (Root Egg's EggRadius). 0 = no zone can vouch.</summary>
+            public readonly float MaxZoneRadius;
+            /// <summary>Root only: how far ahead of its caster such a zone is placed (Root Egg: 0, at the feet).</summary>
+            public readonly float MaxZonePlacement;
 
-            public Ceiling(bool known, float maxSeconds, float minSlowFactor, float maxReach)
+            public Ceiling(bool known, float maxSeconds, float minSlowFactor, float maxReach,
+                float maxZoneRadius = 0f, float maxZonePlacement = 0f)
             {
                 Known = known;
                 MaxSeconds = maxSeconds;
                 MinSlowFactor = minSlowFactor;
                 MaxReach = maxReach;
+                MaxZoneRadius = maxZoneRadius;
+                MaxZonePlacement = maxZonePlacement;
             }
 
             public static readonly Ceiling Unknown = new Ceiling(false, 0f, 1f, 0f);
@@ -112,7 +119,7 @@ namespace CluckWars.Gameplay
         {
             if (pool == null) return Ceiling.Unknown;
 
-            float maxSeconds = 0f, minFactor = 1f, maxReach = 0f;
+            float maxSeconds = 0f, minFactor = 1f, maxReach = 0f, zoneRadius = 0f, zonePlacement = 0f;
             foreach (var ability in pool)
             {
                 if (ability == null) continue;
@@ -121,9 +128,90 @@ namespace CluckWars.Gameplay
                 maxSeconds = Mathf.Max(maxSeconds, e.Seconds);
                 if (kind == ControlKind.Slow) minFactor = Mathf.Min(minFactor, e.SlowFactor);
                 maxReach = Mathf.Max(maxReach, Reach(ability));
+                if (kind == ControlKind.Root && ability.PlacesZone)
+                {
+                    // The zone's footprint as the ability authors it (Root Egg: ForwardCircle, EggRadius, offset 0).
+                    zoneRadius = Mathf.Max(zoneRadius, ability.AimRadius);
+                    zonePlacement = Mathf.Max(zonePlacement, ability.AimForwardOffset);
+                }
             }
-            return new Ceiling(true, maxSeconds, minFactor, maxReach);
+            if (kind == ControlKind.Slow && maxReach > 0f) maxReach += SlowReachHeadroomMeters;
+            return new Ceiling(true, maxSeconds, minFactor, maxReach, zoneRadius, zonePlacement);
         }
+
+        // ---- Root-zone evidence (security review 2026-10-22) -------------------------------
+        //
+        // A zone is replicated state its own authority wrote, so the victim must not take its geometry on
+        // faith: an attacker-authored zone could claim any radius or stand anywhere. The victim accepts a zone
+        // as evidence only when (1) the zone's state authority is the claimed caster's, (2) its centre is within
+        // the authored placement of where the caster stood when this peer first saw the zone, and (3) its
+        // radius is clamped to the largest radius the pool authors.
+
+        /// <summary>What the victim's peer knows about one Root zone (live, or recorded at its despawn).</summary>
+        public struct RootZoneEvidence
+        {
+            /// <summary>The zone's state authority equals the claimed caster's.</summary>
+            public bool SameAuthorityAsCaster;
+            public Vector3 Center;
+            /// <summary>The zone's own (replicated, untrusted) radius; clamped before use.</summary>
+            public float Radius;
+            /// <summary>The caster was resolvable when this peer first saw the zone (its Spawned here).</summary>
+            public bool HasCasterAtSpawn;
+            public Vector3 CasterAtSpawn;
+            /// <summary>How far the caster may have moved between placing the zone and this peer seeing it.</summary>
+            public float SpawnDrift;
+            /// <summary>Real seconds since this peer first saw the zone (for the fallback anchor).</summary>
+            public float SecondsSinceSeen;
+        }
+
+        /// <summary>
+        /// The zone centre is where the caster could have placed it: within the pool's authored placement
+        /// (+ <see cref="RangeSlackMeters"/>) of the caster's position when this peer first saw the zone, plus the
+        /// drift over that observation delay. When the caster could not be resolved then, the anchor falls back
+        /// to the caster's CURRENT position with drift over the zone's whole observed age plus the latency cap: a
+        /// looser bound, but still one an attacker cannot stretch past its own chicken's speed.
+        /// </summary>
+        public static bool IsCredibleZoneCenter(in RootZoneEvidence z, Vector3 casterNow, float casterDriftSpeed, in Ceiling c)
+        {
+            Vector3 anchor;
+            float allowance;
+            if (z.HasCasterAtSpawn)
+            {
+                anchor = z.CasterAtSpawn;
+                allowance = Mathf.Max(0f, z.SpawnDrift);
+            }
+            else
+            {
+                anchor = casterNow;
+                allowance = Mathf.Max(0f, casterDriftSpeed) * (Mathf.Max(0f, z.SecondsSinceSeen) + ExecuteRules.MaxLatencySeconds);
+            }
+            return IsInsideZone(anchor, Mathf.Max(0f, c.MaxZonePlacement) + RangeSlackMeters + allowance, z.Center, 0f);
+        }
+
+        /// <summary>
+        /// True when <paramref name="z"/> may vouch for a root on a victim at <paramref name="victim"/>: same
+        /// authority as the caster, a credible centre, and the victim inside the radius clamped to
+        /// <see cref="Ceiling.MaxZoneRadius"/> (+ <paramref name="margin"/>). False with no known ceiling.
+        /// </summary>
+        public static bool RootZoneVouches(in RootZoneEvidence z, Vector3 victim, float margin,
+            Vector3 casterNow, float casterDriftSpeed, in Ceiling c)
+        {
+            if (!c.Known || !(c.MaxZoneRadius > 0f) || !z.SameAuthorityAsCaster) return false;
+            if (!IsCredibleZoneCenter(z, casterNow, casterDriftSpeed, c)) return false;
+            float radius = z.Radius > 0f ? Mathf.Min(z.Radius, c.MaxZoneRadius) : 0f;   // NaN reads as 0
+            return IsInsideZone(z.Center, radius, victim, margin);
+        }
+
+        /// <summary>
+        /// Extra reach on the timed-slow bound only (qa W3, 2026-10-22). Dust Kick is the only slow emitter and the
+        /// Stun/Root bounds get incidental headroom from a longer-reaching emitter (Belly Flop's jump), the slow bound
+        /// none: a kick at the very edge of its 4.5 m rear arc sat on the bound. Its caster is a FLEEING Speedy,
+        /// often under Speed Burst (x1.5 on 12.15 m/s), and the drift margin reads <c>ChickenCargo.DriftSpeed</c> =
+        /// base MoveSpeed + knockback, which cannot see an authority-local speed buff on a remote caster. The buff's
+        /// extra 6.1 m/s over the floored latency plus two ticks (0.15 + 0.0625 s) is 1.3 m; 1.5 m covers it.
+        /// Not added to stun or root, and no other bound moves.
+        /// </summary>
+        public const float SlowReachHeadroomMeters = 1.5f;
 
         /// <summary>
         /// How far apart <paramref name="ability"/>'s caster and victim can be when its control
