@@ -120,6 +120,30 @@ namespace CluckWars.Tests
             StringAssert.Contains("LayoutClasses.Bind(overlayHost, _eventBanner);", Read("Assets/_Game/Scripts/UI/MatchOverlaysController.cs"));
         }
 
+        [Test]
+        public void PortraitEventBanner_ClearsTheHexArc_DerivedFromTouchControlsUss()
+        {
+            // The 600 px comes from "the hexes top out at ~531 px": re-derive it from the hex rules so a re-layout of the arc
+            // fails here instead of putting the banner over a button.
+            string touch = Read("Assets/UI/Styles/TouchControls.uss");
+            float hex = float.Parse(Regex.Match(touch, @"^\.cw-hex\s*\{[^}]*height:\s*(\d+)px", RegexOptions.Multiline).Groups[1].Value,
+                CultureInfo.InvariantCulture);
+            float top = 0f;
+            var rules = Regex.Matches(touch, @"^\.cw-hex--a\d\s*\{\s*right:\s*\d+px;\s*bottom:\s*(\d+)px;", RegexOptions.Multiline);
+            Assert.AreEqual(4, rules.Count, "four .cw-hex--aN rules");
+            foreach (Match m in rules)
+                top = Mathf.Max(top, float.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture) + hex + CluckWars.Visuals.HudControlZones.ControlPadPx);
+            Assert.AreEqual(531f, top, "the arc's top (hex + its chain ring) the banner rule was derived from");
+
+            string overlays = Read("Assets/UI/Styles/MatchOverlays.uss");
+            float banner = float.Parse(Regex.Match(Block(overlays, ".cw-eventbanner.layout--portrait"), @"bottom:\s*(\d+)px").Groups[1].Value,
+                CultureInfo.InvariantCulture);
+            // The hexes sit inside the safe area and the banner does not: allow the spec's simulated gesture bar (2 % of a
+            // 9:20 panel, 2147 px) plus the 8 px U1 gap.
+            float gestureBar = 0.02f * 2147f;
+            Assert.GreaterOrEqual(banner, top + gestureBar + 8f, "the portrait banner must clear the hex arc");
+        }
+
         // ---- Landscape is unchanged apart from the goal pill --------------------------------------------------
 
         [Test]

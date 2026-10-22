@@ -241,14 +241,43 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void ClearViewport_UnderTheStatusStrip_IsOffScreen_AndTheArrowLeavesTheStrip()
+        public void ClearViewport_UnderTheStatusStrip_IsPinnedToTheStripsNearestEdge_NextToTheRival()
         {
+            // W5: an island zone pins the arrow to its own nearest edge (grown by the clearance), like the top band does,
+            // rather than sliding it to the frame edge across the play field.
             var info = InfoZones(TopBand, Strip);
-            var target = new Vector2(0.12f, 0.35f);
+            var target = new Vector2(0.12f, 0.37f);   // nearer the strip's top edge than its bottom or right edge
             bool off = ScreenEdgeProjection.ClampToClearViewport(target, false, Band, info, info, Clr, out Vector2 clamped, out Vector2 bearing);
             Assert.That(off, Is.True);
+            Assert.That(clamped.x, Is.EqualTo(0.12f).Within(1e-5f), "straight above the rival");
+            Assert.That(clamped.y, Is.EqualTo(Strip.yMax + Clr.y).Within(1e-5f), "on the strip's top edge, the arrow clear of it");
             Assert.That(ScreenEdgeProjection.IsInsideAnyZone(clamped, info, Clr), Is.False, "never drawn on the strip (the CW-009 case)");
-            Assert.That(Vector2.Dot(bearing, (target - clamped).normalized), Is.GreaterThan(0.9999f), "still aimed at the rival");
+            Assert.That(Vector2.Dot(bearing, Vector2.down), Is.GreaterThan(0.9999f), "pointing down at the rival");
+        }
+
+        [Test]
+        public void ClearViewport_IslandPinBlockedByAControl_PicksTheNextEdge()
+        {
+            // A control zone right above the strip blocks the top-edge pin: the right edge is used instead.
+            var info = InfoZones(TopBand, Strip);
+            var avoid = InfoZones(TopBand, Strip, Rect.MinMaxRect(0.05f, 0.40f, 0.20f, 0.55f));
+            var target = new Vector2(0.17f, 0.385f);   // the top edge (0.055 away) would win if it were free
+            ScreenEdgeProjection.ClampToClearViewport(target, false, Band, info, avoid, Clr, out Vector2 clamped, out _);
+            Assert.That(clamped.x, Is.EqualTo(Strip.xMax + Clr.x).Within(1e-5f));
+            Assert.That(clamped.y, Is.EqualTo(0.385f).Within(1e-5f));
+            Assert.That(ScreenEdgeProjection.IsInsideAnyZone(clamped, avoid, Clr), Is.False);
+        }
+
+        [Test]
+        public void ClearViewport_OffTheFrameBesideTheStrip_StaysOnTheFrameEdge()
+        {
+            // Hidden by the frame, not by the strip: the arrow stays pinned to the frame and slides out of the strip.
+            var info = InfoZones(TopBand, Strip);
+            var target = new Vector2(-0.4f, 0.35f);
+            bool off = ScreenEdgeProjection.ClampToClearViewport(target, false, Band, info, info, Clr, out Vector2 clamped, out _);
+            Assert.That(off, Is.True);
+            Assert.That(clamped.x, Is.EqualTo(Band.xMin).Within(1e-5f), "on the left frame edge, not floating at the strip's edge");
+            Assert.That(ScreenEdgeProjection.IsInsideAnyZone(clamped, info, Clr), Is.False);
         }
 
         [Test]

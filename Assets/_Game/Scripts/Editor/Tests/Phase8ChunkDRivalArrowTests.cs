@@ -397,7 +397,7 @@ namespace CluckWars.Tests
             var z = Info(HudDeviceMode.Touch, land, 0);
             Assert.That(z.Count, Is.EqualTo(1), "no rows: the top band only");
             Assert.That(z[0].xMin, Is.EqualTo(0f)); Assert.That(z[0].xMax, Is.EqualTo(1f)); Assert.That(z[0].yMax, Is.EqualTo(1f));
-            Assert.That(z[0].yMin, Is.EqualTo(1f - 330f / 1080f).Within(Eps), "landscape: the 330 px bar");
+            Assert.That(z[0].yMin, Is.EqualTo(1f - HudControlZones.TopBandLandscapeZonePx / 1080f).Within(Eps), "landscape: the bar, per the fade switch");
 
             z = Info(HudDeviceMode.Touch, land, 2);
             Assert.That(z.Count, Is.EqualTo(2));
@@ -497,6 +497,42 @@ namespace CluckWars.Tests
                 Assert.That(p.y, Is.EqualTo(info[0].yMin - clr.y).Within(Eps), "pinned at the band's lower edge, the arrow clear of it");
                 Assert.That(Vector2.Dot(bearing, Vector2.up), Is.GreaterThan(0.9999f), "pointing up at the rival");
             }
+        }
+
+        [Test]
+        public void LandscapeTopBand_IsOneSwitch_330WithTheFade_290Without()
+        {
+            // Pending Maestro decision: the switch is HudControlZones.LandscapeTopBandIncludesFade, nothing else.
+            Assert.That(HudControlZones.TopBandLandscapeZonePx, Is.EqualTo(HudControlZones.LandscapeTopBandIncludesFade
+                ? HudControlZones.TopBandLandscapePx
+                : HudControlZones.TopBandLandscapePx - HudControlZones.TopBandLandscapeFadePx));
+            Assert.That(HudControlZones.TopBandLandscapePx - HudControlZones.TopBandLandscapeFadePx, Is.EqualTo(290f));
+            string zones = File.ReadAllText(Path.Combine(ProjectRoot(), "Assets/_Game/Scripts/Visuals/HudControlZones.cs"));
+            StringAssert.Contains(": 1f - TopBandLandscapeZonePx / ph;", zones, "BuildInfoZones reads the switch, not the raw bar height");
+        }
+
+        [Test]
+        public void ChickenNameplate_RunsAfterRivalIndicator_SoItReadsThisFramesVerdict()
+        {
+            int Order(System.Type t)
+            {
+                var a = (DefaultExecutionOrder)System.Attribute.GetCustomAttribute(t, typeof(DefaultExecutionOrder));
+                Assert.That(a, Is.Not.Null, t.Name + " has no [DefaultExecutionOrder]");
+                return a.order;
+            }
+            Assert.That(Order(typeof(ChickenNameplate)), Is.GreaterThan(Order(typeof(RivalIndicator))));
+        }
+
+        [Test]
+        public void UnderHudRival_WithoutAnArrow_KeepsItsNameplate_AndAStoppedHudLeavesNoStripZone()
+        {
+            string src = File.ReadAllText(Path.Combine(ProjectRoot(), "Assets/_Game/Scripts/Visuals/RivalIndicator.cs"));
+            StringAssert.Contains("if (!chevron) _wasUnderHud = false;", src, "never a ring with neither nameplate nor arrow");
+            string touch = File.ReadAllText(Path.Combine(ProjectRoot(), "Assets/_Game/Scripts/Input/TouchControlsController.cs"));
+            StringAssert.Contains("private void OnDisable() => StatusRowCount = 0;", touch);
+            StringAssert.Contains("if (!_bound) { StatusRowCount = 0; return; }", touch);
+            string zones = File.ReadAllText(Path.Combine(ProjectRoot(), "Assets/_Game/Scripts/Visuals/HudControlZones.cs"));
+            StringAssert.Contains("touch != null && touch.isActiveAndEnabled ? touch.StatusRowCount : 0", zones);
         }
 
         [Test]

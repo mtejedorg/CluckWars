@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using CluckWars.Diagnostics;
 using CluckWars.Input;
 using UnityEngine;
 
@@ -71,6 +72,35 @@ namespace CluckWars.Visuals
 
         // MatchTopBar.uss: .cw-topbar { height: 330px } (border-box: the safe-area padding sits inside it).
         public const float TopBandLandscapePx = 330f;
+
+        /// <summary>The bottom 40 px of the landscape bar's gradient: the fade, arena showing through (portrait's twin is
+        /// <see cref="TopBandPortraitFadePx"/>).</summary>
+        public const float TopBandLandscapeFadePx = 40f;
+
+        /// <summary>
+        /// <b>PENDING DECISION (Maestro): does the landscape fade count as HUD?</b> true = the info zone is the whole 330 px
+        /// bar (what WP7 shipped); false = 290 px, the fade excluded like portrait's. This one line is the switch. Note that at
+        /// 290 the lower ~34 px of a full four-row board (20 + 24 + 4 x 70 = 324 px) hangs below the zone.
+        /// </summary>
+        public const bool LandscapeTopBandIncludesFade = true;
+
+        /// <summary>
+        /// Dev-tools-only runtime override of the landscape band (<c>-cw_band 290|330</c>, panel px; 0 = none), so one build can
+        /// be screenshotted both ways. Ignored unless <see cref="DevTools.Available"/>; production keeps
+        /// <see cref="LandscapeTopBandIncludesFade"/>.
+        /// </summary>
+        public static int DevBandOverride
+        {
+            get => _devBandOverride;
+            set { _devBandOverride = value; _cacheAspect = -1f; }   // the cached info zones were built with the old band
+        }
+        private static int _devBandOverride;
+
+        /// <summary>Height of the landscape top-band info zone in panel px: the dev override when set, else per <see cref="LandscapeTopBandIncludesFade"/>.</summary>
+        public static float TopBandLandscapeZonePx =>
+            _devBandOverride > 0 && DevTools.Available
+                ? _devBandOverride
+                : LandscapeTopBandIncludesFade ? TopBandLandscapePx : TopBandLandscapePx - TopBandLandscapeFadePx;
 
         // MatchTopBar.uss: .layout--portrait .cw-topbar-layout { min-height: 316px; padding-bottom: 40px }. The band is the
         // layout minus its 40 px fade (the gradient's tail, arena showing through), below the safe-area top inset.
@@ -156,7 +186,7 @@ namespace CluckWars.Visuals
 
             float bandBottom = portrait
                 ? 1f - T - (TopBandPortraitLayoutPx - TopBandPortraitFadePx) / ph
-                : 1f - TopBandLandscapePx / ph;
+                : 1f - TopBandLandscapeZonePx / ph;
             into.Add(Rect.MinMaxRect(0f, Mathf.Clamp01(bandBottom), 1f, 1f));
 
             if (statusRows <= 0) return;
@@ -209,7 +239,7 @@ namespace CluckWars.Visuals
             HudDeviceMode mode = touch != null
                 ? touch.Mode
                 : (Application.isMobilePlatform ? HudDeviceMode.Touch : HudDeviceMode.KeyboardMouse);
-            int statusRows = touch != null ? touch.StatusRowCount : 0;
+            int statusRows = touch != null && touch.isActiveAndEnabled ? touch.StatusRowCount : 0;   // a disabled HUD draws no strip
             Vector4 insets = SafeInsets();
 
             if (mode == _cacheMode && Mathf.Approximately(aspect, _cacheAspect) && insets == _cacheInsets

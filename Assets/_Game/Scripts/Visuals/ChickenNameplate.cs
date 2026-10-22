@@ -22,6 +22,7 @@ namespace CluckWars.Visuals
     /// Doppelganger decoy) carries one automatically.
     /// </remarks>
     [RequireComponent(typeof(ChickenController))]
+    [DefaultExecutionOrder(RivalIndicator.ExecutionOrder + 1)]   // after RivalIndicator: its HidesNameplate is this frame's
     public sealed class ChickenNameplate : MonoBehaviour
     {
         [Tooltip("Offset above the chicken's pivot. Adjust for taller / shorter visuals.")]

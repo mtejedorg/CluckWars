@@ -334,6 +334,9 @@ namespace CluckWars.Input
 
         private void OnEnable() => TryBind();
 
+        // A controller that stops ticking must not leave a stale strip info zone behind (HudControlZones, WP7 W6).
+        private void OnDisable() => StatusRowCount = 0;
+
         private void OnDestroy()
         {
             if (Instance == this) Instance = null;
@@ -761,7 +764,7 @@ namespace CluckWars.Input
             if (!_bound)
             {
                 TryBind();
-                if (!_bound) return;
+                if (!_bound) { StatusRowCount = 0; return; }   // no strip drawn: no strip zone
             }
             _safeArea?.Apply();   // two struct compares a frame unless the safe area moved
 

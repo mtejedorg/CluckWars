@@ -302,16 +302,64 @@ namespace CluckWars.Visuals
         /// The clear-viewport form of the zone-aware <see cref="ClampToEdge(Vector2, bool, Rect, IReadOnlyList{Rect}, Vector2, out Vector2, out Vector2)"/>:
         /// "off screen" means outside the clear viewport (<see cref="IsInClearViewport"/>), and the arrow is placed in
         /// <see cref="ClearBand"/> and kept out of <paramref name="avoidZones"/> (control zones and info zones together:
-        /// <see cref="HudControlZones.CurrentAvoid"/>). A point under the top band therefore lands on the band's lower edge,
-        /// straight below the target, pointing up at it.
+        /// <see cref="HudControlZones.CurrentAvoid"/>). Where the arrow lands, by what hides the target:
+        /// <list type="bullet">
+        /// <item>A full-width edge zone (the top band): <see cref="ClearBand"/> cuts the band at its inner edge, so the arrow
+        /// sits on that edge straight below (above) the target, pointing at it. Also for a target past the frame on that side.</item>
+        /// <item>An island zone (the status strip) the target itself is under: the arrow is pinned to that zone's nearest
+        /// edge (grown by <paramref name="clearance"/>), right next to the hidden rival, the same "at the zone's edge" read as
+        /// the top band. Chosen over sliding to the frame edge because the rival is in the middle of the play field, and an
+        /// arrow at the frame edge would point across the screen at a bird a thumb's width away.</item>
+        /// <item>Off the frame (or an island pin that is blocked): clamped to the band and slid along it out of every avoid
+        /// zone, as before.</item>
+        /// </list>
         /// </summary>
         public static bool ClampToClearViewport(Vector2 viewport, bool forceOffScreen, Rect band,
                                                 IReadOnlyList<Rect> infoZones, IReadOnlyList<Rect> avoidZones,
                                                 Vector2 clearance, out Vector2 clamped, out Vector2 bearing)
         {
             bool off = forceOffScreen || !IsInClearViewport(viewport, infoZones);
-            return ClampToEdge(viewport, off, ClearBand(band, infoZones, clearance), avoidZones, clearance,
-                out clamped, out bearing);
+            Rect clear = ClearBand(band, infoZones, clearance);
+            if (off && TryPinToIslandEdge(viewport, clear, infoZones, avoidZones, clearance, out clamped))
+            {
+                bearing = BearingFrom(clamped, viewport);
+                return true;
+            }
+            return ClampToEdge(viewport, off, clear, avoidZones, clearance, out clamped, out bearing);
+        }
+
+        /// <summary>True when <paramref name="target"/> is under an island info zone (not full width), with the nearest point
+        /// on that zone's grown edge that is inside <paramref name="band"/> and outside every avoid zone.</summary>
+        private static bool TryPinToIslandEdge(Vector2 target, Rect band, IReadOnlyList<Rect> infoZones,
+                                               IReadOnlyList<Rect> avoidZones, Vector2 clearance, out Vector2 pinned)
+        {
+            pinned = target;
+            if (infoZones == null) return false;
+            for (int i = 0; i < infoZones.Count; i++)
+            {
+                Rect z = infoZones[i];
+                if (z.xMin <= ZoneEpsilon && z.xMax >= 1f - ZoneEpsilon) continue;   // full width: ClearBand's job
+                if (!(target.x > z.xMin && target.x < z.xMax && target.y > z.yMin && target.y < z.yMax)) continue;
+
+                float bestSqr = float.MaxValue;
+                bool found = false;
+                ConsiderPin(new Vector2(z.xMin - clearance.x, target.y), target, band, avoidZones, clearance, ref pinned, ref bestSqr, ref found);
+                ConsiderPin(new Vector2(z.xMax + clearance.x, target.y), target, band, avoidZones, clearance, ref pinned, ref bestSqr, ref found);
+                ConsiderPin(new Vector2(target.x, z.yMin - clearance.y), target, band, avoidZones, clearance, ref pinned, ref bestSqr, ref found);
+                ConsiderPin(new Vector2(target.x, z.yMax + clearance.y), target, band, avoidZones, clearance, ref pinned, ref bestSqr, ref found);
+                return found;
+            }
+            return false;
+        }
+
+        private static void ConsiderPin(Vector2 c, Vector2 target, Rect band, IReadOnlyList<Rect> avoidZones, Vector2 clearance,
+                                        ref Vector2 best, ref float bestSqr, ref bool found)
+        {
+            if (c.x < band.xMin - ZoneEpsilon || c.x > band.xMax + ZoneEpsilon ||
+                c.y < band.yMin - ZoneEpsilon || c.y > band.yMax + ZoneEpsilon) return;
+            if (avoidZones != null && IsInsideAnyZone(c, avoidZones, clearance)) return;
+            float d = (c - target).sqrMagnitude;
+            if (!found || d < bestSqr) { best = c; bestSqr = d; found = true; }
         }
 
         /// <summary>Share of an on-screen rival's rect at which its nameplate hides and the chevron takes over (spec §1.5).</summary>

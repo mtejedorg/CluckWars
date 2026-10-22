@@ -55,8 +55,13 @@ namespace CluckWars.Visuals
     /// </para>
     /// </remarks>
     [DisallowMultipleComponent]
+    [DefaultExecutionOrder(ExecutionOrder)]
     public sealed class RivalIndicator : MonoBehaviour
     {
+        /// <summary>Script order (the default, made explicit): <see cref="ChickenNameplate"/> runs after it, so it reads this
+        /// frame's <see cref="HidesNameplate"/>, never last frame's.</summary>
+        public const int ExecutionOrder = 0;
+
         private const string Source = "RivalIndicator";
 
         /// <summary>
@@ -357,9 +362,13 @@ namespace CluckWars.Visuals
             bool chevron;
             if (_wasUnderHud)
             {
-                target = covered;   // inside the zone, so the clear-viewport clamp pins it to the zone's edge
+                // Inside the zone, so the clear-viewport clamp pins it to the zone's edge: a full-width band's inner edge
+                // (ClearBand) or an island zone's nearest edge (the status strip).
+                target = covered;
                 chevron = ScreenEdgeProjection.ClampToClearViewport(covered, true, FeedbackTuning.RivalChevronSafeArea,
                     info, HudControlZones.CurrentAvoid(cam), clearance, out clamped, out bearing);
+                // Never a rival with a ring but neither nameplate nor arrow: no arrow, so the nameplate stays.
+                if (!chevron) _wasUnderHud = false;
             }
             else
             {
