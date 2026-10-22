@@ -162,6 +162,11 @@ namespace CluckWars.Abilities
         /// Chokepoint: the pile-slow branch of <c>ChickenController.FixedUpdateNetwork</c>.</summary>
         public virtual bool IgnoresPileSlow(ChickenController self) => false;
 
+        /// <summary>True if this chicken ignores the GDD §6.1 collision slow (brushing another chicken).
+        /// Pure. Chokepoint: <c>ChickenController.CheckCollisionSlow</c>, which still runs its contact
+        /// tracking and the Spine Coat steal-back; only the slow itself is skipped.</summary>
+        public virtual bool IgnoresCollisionSlow(ChickenController self) => false;
+
         /// <summary>
         /// Extra food banked if the match timer expires with <b>no</b> winner. Spoiler's whole
         /// mechanic. Chokepoint: <c>GameManager</c>'s timer-expiry resolution.

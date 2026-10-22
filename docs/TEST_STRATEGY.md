@@ -44,7 +44,7 @@ post-mortem and the standing rules. Tools: `tools/test-session/` (see its README
 | Layer | What | How | Gate |
 |---|---|---|---|
 | 0 | Pure rules | EditMode suite (`tests-run`/batchmode), ≈ 1 960 tests | green before any build |
-| 1 | State invariants | in-game `Invariant` probe + `merge.ps1` INVARIANT rules (round-start corner/cargo/base/pile, quadrant uniqueness, unique real-player HomeCornerIndex per peer and round (CW-233), round-N==round-1 piles) | 0 violations |
+| 1 | State invariants | in-game `Invariant` probe + `merge.ps1` INVARIANT rules (round-start corner/cargo/base/pile, quadrant uniqueness, unique real-player HomeCornerIndex per peer and round (CW-233), round-N==round-1 piles, zero `rejected RPC_Apply*` control rejections (F4)) | 0 violations |
 | 2 | Scenario matrix (PC only) | `scenario-pc.ps1 -Mode solo|shared2|shared4|hostleave -Rounds 3` | `VERDICT: PASS` |
 | 3 | Differential | cross-peer `Sync` + `World` hash; SHA parity across peers | 0 SYNC/GHOST, one SHA |
 | 4 | Device / human | phone smoke, visual sweep, haptics, notch, portrait/landscape | checklist in `docs/TEST_SESSION_PLAN_2026-10.md` §4 |
@@ -60,6 +60,8 @@ positions on a *client*, not only the host.
 control states, bases, piles) and add it to `RoundInvariants`/`merge.ps1` before the code is "done".
 
 **New RPC with authority checks** → run shared4 and grep for `rejected RPC`; a non-zero count with honest clients is a bug.
+The control RPCs (`RPC_ApplyStun/Root/AbilitySlow`, F4/WP1) are gated automatically: `merge.ps1` files any
+`rejected RPC_Apply*` line as an INVARIANT finding per source (selftest fixtures `control-fixture` / `control-clean-fixture`).
 
 **Mode coverage** → solo / host / join / late-join / host-leave / reconnect. Missing mode = untested mode; say so in the report.
 

@@ -5,7 +5,7 @@ namespace CluckWars.Abilities
 {
     /// <summary>
     /// Shared base class for AoE-around-self stun abilities (Ambush & Wing Slam).
-    /// Calls target.Controller.RPC_ApplyStun(StunDuration) for each rival in radius.
+    /// Calls target.Controller.RPC_ApplyStun(StunDuration, caster) for each rival in radius.
     /// </summary>
     public abstract class StunBurstAbilitySO : AbilityBaseSO
     {
@@ -43,6 +43,8 @@ namespace CluckWars.Abilities
         // See AbilityBaseSO.TargetEffectIsPurelyControl for why it is declared, not inferred.
         public override bool TargetEffectIsPurelyControl => true;
 
+        public override ControlEmission EmittedControl => ControlEmission.Stun(StunDuration);
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;
@@ -50,7 +52,7 @@ namespace CluckWars.Abilities
             GatherTargets(caster, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
             {
-                _scratch[i].RPC_ApplyStun(StunDuration);
+                _scratch[i].RPC_ApplyStun(StunDuration, caster.Id);
             }
         }
 

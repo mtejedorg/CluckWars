@@ -270,6 +270,22 @@ namespace CluckWars.Abilities
         /// </remarks>
         public virtual float NominalStealAmount => 0f;
 
+        /// <summary>
+        /// The stun, root or timed slow this ability sends its victims through
+        /// <c>ChickenController.RPC_ApplyStun</c> / <c>RPC_ApplyRoot</c> / <c>RPC_ApplyAbilitySlow</c>,
+        /// as authored (before the victim's passive shortens it). <see cref="Gameplay.ControlEmission.None"/>
+        /// for every ability that sends none.
+        /// </summary>
+        /// <remarks>
+        /// Declared for the same reason as <see cref="NominalStealAmount"/>: the receiver-side bound on
+        /// those RPCs is derived from this across the shipped registry
+        /// (<c>ControlClaimRules.CeilingFor</c>, F4), so an ability that sends control without
+        /// declaring it contributes nothing and its stuns are rejected at the victim.
+        /// <c>ControlClaimRulesTests</c> pins every ability whose source calls one of the three RPCs
+        /// against this override. Root Egg declares its root although the zone sends it.
+        /// </remarks>
+        public virtual Gameplay.ControlEmission EmittedControl => Gameplay.ControlEmission.None;
+
         // ---- Aim descriptor (FEEDBACK.md §4 / §8) ------------------------------
         // One declarative shape per ability, used by every consumer that needs to
         // agree on "what does this ability cover": the hold-to-aim preview, the

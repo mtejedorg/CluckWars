@@ -362,6 +362,27 @@ foreach ($e in $sorted) {
     }
 }
 
+# ---- Control RPC rejections (F4 / WP1): honest clients never trip the receiver-side control check ---------------
+# ChickenController refuses an RPC_ApplyStun / RPC_ApplyRoot / RPC_ApplyAbilitySlow it cannot attribute or bound with a
+# rate-limited Warn "<chicken>: rejected RPC_Apply<Kind>(...) from <player> (<Verdict>) - <reason>". With honest clients
+# the count is 0 (TEST_STRATEGY: grep `rejected RPC_Apply` = 0): any line is a validation bound that no longer covers a
+# real ability, or a caller that stopped naming its caster. One INVARIANT finding per source, with the count and the
+# first line (a line may carry "(+N similar suppressed)", which is added to the count).
+$rxCtlReject = New-Object Text.RegularExpressions.Regex('\brejected (RPC_Apply(?:Stun|Root|AbilitySlow))\(.*\) from \S+ \((\w+)\) - (?:.*\(\+(\d+) similar suppressed\))?')
+$ctlRejects = [ordered]@{}   # src -> @{ Count; First; Kinds }
+foreach ($e in $sorted) {
+    if ($e.Message -notmatch '\brejected RPC_Apply') { continue }   # the stable prefix decides; the details are best effort
+    if (-not $ctlRejects.Contains($e.Src)) { $ctlRejects[$e.Src] = @{ Count = 0; First = $e; Kinds = @{} } }
+    $r = $ctlRejects[$e.Src]
+    $m = $rxCtlReject.Match($e.Message)
+    $r.Count += 1 + $(if ($m.Success -and $m.Groups[3].Success) { [int]$m.Groups[3].Value } else { 0 })
+    $r.Kinds[$(if ($m.Success) { "$($m.Groups[1].Value)/$($m.Groups[2].Value)" } else { 'unparsed' })] = 1
+}
+foreach ($src in $ctlRejects.Keys) {
+    $r = $ctlRejects[$src]
+    Add-Finding @('INVARIANT') $r.First ("control RPC rejections on ${src}: $($r.Count) [$((@($r.Kinds.Keys) | Sort-Object) -join ', ')] (expected 0 with honest clients, F4) - first: $($r.First.Message)")
+}
+
 # ---- World-hash parity (CW-216/217 class: spawned objects positioned differently per peer) ---------------------
 # The game logs `World t=<tick> static=<hash> n=<count> ...` on every peer every 2 s (Source Invariant). Peers log on the
 # same ticks, so for each tick every reporting peer must have the same `static` hash (bases, piles, pickups, zones at

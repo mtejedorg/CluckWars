@@ -486,7 +486,7 @@ current, shipped state.
 | **Warrior** | The Brute (Bully) | Steals bigger, + cargo room to hold it | **Scrap** (steal on contact) |
 | | The Relentless | Every move except Peck recharges 25% faster | **Headbutt** (shove + stagger, low cd) |
 | **Speedy** | The Agile (Slippery) | Slows, stuns and getting stuck end 40% sooner | ⏳ *pending — a Peck variant* |
-| | The Anxious (Featherfoot) | Immune to the pile-slow | ⏳ *pending — a Peck variant* |
+| | The Anxious (Featherfoot) | Immune to the pile-slow and the collision slow (A6, 2026-10-21) | ⏳ *pending — a Peck variant* |
 | **Fatty** | The Hauler (Hoarder) | Carries at least a full win's worth | ⏳ *pending — a Peck variant* |
 | | The Boulder (Bulwark) | Knockback cut by 75%; slows, stuns and getting stuck end 35% sooner | **Ground Quake** (stomp leaves the area stuck) |
 | **Assassin** | The Reaper (Spoiler) | Banks a bonus if the clock expires with no winner | **Death Mark** (the execute, §6.4) |

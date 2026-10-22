@@ -116,7 +116,7 @@ namespace CluckWars.Gameplay
         private const string Source = "Chicken";
 
         // ---- Passive tuning constants (balance-pass values; Part B / test session) ---
-        private const float CollisionSlowRadius      = 1.2f;  // metres — two chickens touching
+        private const float CollisionSlowRadius      = ContactHysteresis.EnterMeters;  // metres — two chickens touching
         private const float CollisionSlowFactor      = 0.75f; // GDD TBD #7
         private const float PileSlowFactor           = 0.80f; // GDD TBD #6
 
@@ -133,7 +133,6 @@ namespace CluckWars.Gameplay
         /// would be a real slow that no remote peer can see. See <see cref="ApplySlow"/>.
         /// </remarks>
         public const float SlowVfxFlagThreshold = 0.92f;
-        private const float ToughDamageBonus         = 1.25f; // 25% bonus outgoing damage for Tough
         private const float AuraSlowSearchRadius     = 10f;   // broadphase for CheckAuraSlow
 
         public static readonly System.Collections.Generic.List<ChickenController> ActiveControllers = new System.Collections.Generic.List<ChickenController>();
@@ -150,7 +149,18 @@ namespace CluckWars.Gameplay
         private ChickenCargo _cargo;
         private AbilityController _abilities;
         private AssassinExecute _assassin;
+        private AbilityRegistrySO _abilityRegistry;
         private ILogService _log;
+
+        // Receiver-side bounds for the three control RPCs (F4), derived once per spawn from the
+        // shipped ability pool (ResolveControlCeilings). Unknown = no honest bound: the magnitude
+        // and range checks are skipped (logged as an Error), attribution still applies.
+        private ControlClaimRules.Ceiling _stunCeiling = ControlClaimRules.Ceiling.Unknown;
+        private ControlClaimRules.Ceiling _rootCeiling = ControlClaimRules.Ceiling.Unknown;
+        private ControlClaimRules.Ceiling _slowCeiling = ControlClaimRules.Ceiling.Unknown;
+
+        // Collision-slow contact with hysteresis (A11): authority-local, never networked.
+        private bool _inContact;
 
         // True once the class's avatar AND all five clips are bound, i.e. the Animator is really
         // driving the skeleton. Drives ChickenAnimator's two-path split — see SetSkeletalActive.
@@ -475,9 +485,10 @@ namespace CluckWars.Gameplay
         [Networked] public float VerticalVelocity { get; set; }
 
         [Inject]
-        public void Construct(ChickenClassRegistrySO registry, ILogService log)
+        public void Construct(ChickenClassRegistrySO registry, AbilityRegistrySO abilityRegistry, ILogService log)
         {
             _registry = registry;
+            _abilityRegistry = abilityRegistry;
             _log = log;
         }
 
@@ -498,6 +509,8 @@ namespace CluckWars.Gameplay
             _assassin = GetComponent<AssassinExecute>();
             _activeStats = ResolveStatsForClass(Class);
             Effects.Log = _log;
+            _inContact = false;   // pooled: no contact carried over from a previous life
+            ResolveControlCeilings();
 
             if (_activeStats == null)
             {
@@ -1219,43 +1232,169 @@ namespace CluckWars.Gameplay
             _log?.Debug(Source, $"RPC_ApplySelfImpulse: impulse={impulse:F2}.");
         }
 
+        // ---- Control RPCs (F4 sender validation + A1 re-application) -----------
+        //
+        // PROTOCOL CHANGE (WP1): all three take the casting chicken's ChickenController id and an
+        // RpcInfo. A claim is judged by ControlClaimRules before anything is applied (see there for
+        // the rules and the trust model); a rejection is a rate-limited Warn with the stable prefix
+        // "rejected RPC_Apply" that tools/test-session/merge.ps1 counts (0 with honest clients).
+        // An accepted claim then merges with what is already running (ControlReapplyRules): it may
+        // extend a stun, root or slow, never cut one short.
+
         /// <summary>
-        /// Applies a timed ability slow, shortened by the equipped specialization's
-        /// <c>ModifyControlDuration</c> (Slippery, Bulwark).
+        /// Applies a timed ability slow from <paramref name="caster"/>, shortened by the equipped
+        /// specialization's <c>ModifyControlDuration</c> (Slippery, Bulwark). Keeps the strongest
+        /// factor and the later expiry of this and any slow already running (A1).
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_ApplyAbilitySlow(float duration, float factor)
+        public void RPC_ApplyAbilitySlow(float duration, float factor, NetworkBehaviourId caster, RpcInfo info = default)
         {
+            if (!AcceptControlClaim(nameof(RPC_ApplyAbilitySlow), ControlKind.Slow, duration, factor, caster, info)) return;
+
             duration = ApplyPassiveControlDuration(duration);
-            _abilitySlowUntil  = Runner.SimulationTime + duration;
-            _abilitySlowFactor = factor;
-            _log?.Debug(Source, $"RPC_ApplyAbilitySlow: factor={factor:P0} for {duration:0.0}s.");
+            double now = Runner.SimulationTime;
+            var merged = ControlReapplyRules.MergeSlow(
+                new ControlReapplyRules.TimedSlow(_abilitySlowFactor, _abilitySlowUntil),
+                new ControlReapplyRules.TimedSlow(factor, now + duration), now);
+            _abilitySlowUntil  = merged.Until;
+            _abilitySlowFactor = merged.Factor;
+            _log?.Debug(Source, $"RPC_ApplyAbilitySlow: incoming factor={factor:P0} for {duration:0.0}s -> " +
+                                $"factor={merged.Factor:P0} for {(merged.Until - now):0.0}s.");
         }
 
         /// <summary>
-        /// Stuns this chicken for <paramref name="seconds"/> seconds — blocks movement,
-        /// casting, and collecting. Shortened by <c>ModifyControlDuration</c>.
+        /// Stuns this chicken for <paramref name="seconds"/> seconds (from <paramref name="caster"/>)
+        /// — blocks movement, casting, and collecting. Shortened by <c>ModifyControlDuration</c>.
+        /// A stun already running for longer is kept (A1).
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_ApplyStun(float seconds)
+        public void RPC_ApplyStun(float seconds, NetworkBehaviourId caster, RpcInfo info = default)
         {
+            if (!AcceptControlClaim(nameof(RPC_ApplyStun), ControlKind.Stun, seconds, 1f, caster, info)) return;
+
             seconds = ApplyPassiveControlDuration(seconds);
+            float remaining = StunRemaining;
+            if (!ControlReapplyRules.IncomingExtends(remaining, seconds))
+            {
+                _log?.Debug(Source, $"RPC_ApplyStun: {seconds:0.00}s does not outlast the {remaining:0.00}s left - kept.");
+                return;
+            }
             IsStunned = true;
             StunTimer = TickTimer.CreateFromSeconds(Runner, seconds);
             _log?.Debug(Source, $"RPC_ApplyStun: stunned for {seconds:0.0}s.");
         }
 
         /// <summary>
-        /// Roots this chicken for <paramref name="duration"/> seconds — movement
-        /// blocked, abilities still castable (GDD §6.4). Shortened by
-        /// <c>ModifyControlDuration</c>.
+        /// Roots this chicken for <paramref name="duration"/> seconds (from <paramref name="caster"/>,
+        /// directly or through a Root Egg it owns) — movement blocked, abilities still castable
+        /// (GDD §6.4). Shortened by <c>ModifyControlDuration</c>. A root already running for longer
+        /// is kept (A1).
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_ApplyRoot(float duration)
+        public void RPC_ApplyRoot(float duration, NetworkBehaviourId caster, RpcInfo info = default)
         {
+            if (!AcceptControlClaim(nameof(RPC_ApplyRoot), ControlKind.Root, duration, 1f, caster, info)) return;
+
             duration = ApplyPassiveControlDuration(duration);
+            float remaining = RootRemaining;
+            if (!ControlReapplyRules.IncomingExtends(remaining, duration))
+            {
+                _log?.Debug(Source, $"RPC_ApplyRoot: {duration:0.00}s does not outlast the {remaining:0.00}s left - kept.");
+                return;
+            }
             RootTimer = TickTimer.CreateFromSeconds(Runner, duration);
             _log?.Debug(Source, $"RPC_ApplyRoot: rooted for {duration:0.0}s.");
+        }
+
+        // One rejection line per sender per 2 s, shared by every chicken (as ChickenCombat's execute rejections).
+        private static readonly CluckWars.Diagnostics.PerKeyRateLimiter ControlRejectionLimiter =
+            new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
+
+        /// <summary>
+        /// Judges a control claim and logs a refusal. True only for an accepted claim.
+        /// </summary>
+        private bool AcceptControlClaim(string rpc, ControlKind kind, float seconds, float factor,
+            NetworkBehaviourId casterId, in RpcInfo info)
+        {
+            var ceiling = CeilingFor(kind);
+            var verdict = JudgeControl(kind, seconds, factor, casterId, info, ceiling, out var caster);
+            if (verdict == ControlClaimRules.Verdict.Accepted) return true;
+
+            if (ControlRejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
+                _log?.Warn(Source, $"{name}: rejected {rpc}(seconds={seconds:0.00}" +
+                    (kind == ControlKind.Slow ? $", factor={factor:0.00}" : string.Empty) +
+                    $", caster={(caster != null ? caster.name : casterId.ToString())}) from {info.Source} ({verdict}) - " +
+                    ControlClaimRules.Describe(verdict, kind, ceiling) +
+                    (held > 0 ? $" (+{held} similar suppressed)" : string.Empty));
+            return false;
+        }
+
+        private ControlClaimRules.Ceiling CeilingFor(ControlKind kind) => kind switch
+        {
+            ControlKind.Stun => _stunCeiling,
+            ControlKind.Root => _rootCeiling,
+            ControlKind.Slow => _slowCeiling,
+            _                => ControlClaimRules.Ceiling.Unknown,
+        };
+
+        /// <summary>Gathers what this (the victim's) authority can see about a control claim and judges it.</summary>
+        private ControlClaimRules.Verdict JudgeControl(ControlKind kind, float seconds, float factor,
+            NetworkBehaviourId casterId, in RpcInfo info, in ControlClaimRules.Ceiling ceiling, out ChickenController caster)
+        {
+            caster = null;
+            var claim = new ControlClaimRules.Claim { Kind = kind, Seconds = seconds, SlowFactor = factor };
+
+            if (Runner != null && Runner.TryFindBehaviour(casterId, out caster) &&
+                caster != null && caster.Object != null && caster.Object.IsValid)
+            {
+                claim.CasterResolved = true;
+                claim.CasterIsVictim = caster == this;
+                claim.CasterIsDecoy = caster.IsDecoy;
+                // Local invoke: the caster is simulated here (solo, bots, the master's own chicken).
+                // Off the wire: the sender must be the caster's state authority (a bot's is the master).
+                claim.SenderSpeaksForCaster = info.IsInvokeLocal
+                    ? caster.Object.HasStateAuthority
+                    : caster.Object.StateAuthority == info.Source;
+
+                // A local invoke has no wire time; a remote one is floored and capped (ExecuteRules).
+                // Two ticks cover the cast resolving a tick before the RPC is applied.
+                float latency = info.IsInvokeLocal ? 0f : ExecuteRules.RemoteLatency((float)Runner.GetPlayerRtt(info.Source));
+                claim.RangeMargin = StealRules.RangeMargin(
+                    ChickenCargo.DriftSpeed(caster) + ChickenCargo.DriftSpeed(this), latency + 2f * Runner.DeltaTime);
+                Vector3 c = caster.transform.position, v = transform.position;
+                claim.PlanarDistance = Mathf.Sqrt((c.x - v.x) * (c.x - v.x) + (c.z - v.z) * (c.z - v.z));
+                claim.InsideCastersRootZone = kind == ControlKind.Root &&
+                    AbilityZone.ContainsRootOf(casterId, v, claim.RangeMargin + ControlClaimRules.RangeSlackMeters);
+            }
+
+            return ControlClaimRules.Evaluate(claim, ceiling);
+        }
+
+        /// <summary>
+        /// Derives the three control ceilings from the shipped ability pool, once per spawn. A pool
+        /// that yields no bound (registry unbound or empty) leaves the ceiling Unknown, which skips
+        /// the magnitude and range checks rather than rejecting every real stun in the match; the
+        /// attribution check needs no authored data and still stands. Same shape as
+        /// <c>ChickenCargo.ResolveStealBounds</c>.
+        /// </summary>
+        private void ResolveControlCeilings()
+        {
+            var pool = _abilityRegistry != null ? _abilityRegistry.All : null;
+            _stunCeiling = ResolveCeiling(pool, ControlKind.Stun);
+            _rootCeiling = ResolveCeiling(pool, ControlKind.Root);
+            _slowCeiling = ResolveCeiling(pool, ControlKind.Slow);
+        }
+
+        private ControlClaimRules.Ceiling ResolveCeiling(AbilityBaseSO[] pool, ControlKind kind)
+        {
+            var ceiling = ControlClaimRules.CeilingFor(pool, kind);
+            if (ceiling.Known && ceiling.MaxSeconds > 0f && ceiling.MaxReach > 0f) return ceiling;
+
+            _log?.Error(Source, $"{name}: no {kind} bound could be derived from the AbilityRegistry " +
+                $"(known={ceiling.Known}, maxSeconds={ceiling.MaxSeconds:0.00}, maxReach={ceiling.MaxReach:0.00}), so " +
+                $"incoming {kind} RPCs are checked for their sender only, not for duration or range. Check that " +
+                "ProjectInstaller._abilityRegistry is assigned and that every control ability is listed in its All array.");
+            return ControlClaimRules.Ceiling.Unknown;
         }
 
         /// <summary>
@@ -1301,6 +1440,7 @@ namespace CluckWars.Gameplay
             _traversal?.Abort();
             _abilitySlowUntil    = double.MinValue;
             _abilitySlowFactor   = 1f;
+            _inContact           = false;
             RootTimer            = TickTimer.None;
             Rooted               = false;
             IsStunned            = false;
@@ -1373,9 +1513,20 @@ namespace CluckWars.Gameplay
         /// found them, so a Doppelganger has always slowed whoever walks into it — that is the
         /// point of a decoy. It carries no <c>ChickenCargo</c>, so the steal-back block below
         /// falls through on its own null check.
+        ///
+        /// <b>Hysteresis (A11).</b> The slow follows <see cref="_inContact"/>, which enters at 1.2 m
+        /// and leaves past 1.3 m from the nearest chicken (<see cref="ContactHysteresis"/>), so two
+        /// birds walking side by side at the edge no longer flicker in and out of the slow. The
+        /// Spine Coat steal-back keeps the plain 1.2 m test, one chicken per tick.
+        ///
+        /// <b>Featherfoot (A6).</b> <see cref="Abilities.PassiveAbilitySO.IgnoresCollisionSlow"/> is
+        /// consulted here and only here, and skips only the slow: contact is still tracked and the
+        /// steal-back still runs.
         /// </remarks>
         private void CheckCollisionSlow()
         {
+            float nearestSqr = float.PositiveInfinity;
+            bool touched = false;   // the first chicken inside CollisionSlowRadius this tick, as before
             for (int i = 0; i < ActiveControllers.Count; i++)
             {
                 var other = ActiveControllers[i];
@@ -1386,11 +1537,12 @@ namespace CluckWars.Gameplay
                 if (other.Object == null || !other.Object.IsValid) continue;
                 // Ignore dead chickens (stunned / falling through respawn).
                 if (other.Combat != null && other.Combat.IsDead) continue;
-                if ((other.transform.position - transform.position).sqrMagnitude >
-                    CollisionSlowRadius * CollisionSlowRadius)
-                {
-                    continue;
-                }
+                float sqr = (other.transform.position - transform.position).sqrMagnitude;
+                if (sqr < nearestSqr) nearestSqr = sqr;
+                // The steal-back keeps the plain 1.2 m test and one chicken per tick (A11 adds the
+                // hysteresis band to the slow below, never to the steal).
+                if (touched || sqr > CollisionSlowRadius * CollisionSlowRadius) continue;
+                touched = true;
 
                 if (StealBackActive && other.Cargo != null && Cargo != null)
                 {
@@ -1420,10 +1572,17 @@ namespace CluckWars.Gameplay
                         other.RPC_ApplyKnockback(dir.normalized * StealBackKnockback);
                     }
                 }
-
-                ApplySlow(SlowSource.Collision, CollisionSlowFactor);
-                break; // One other chicken is enough to trigger the slow.
             }
+
+            // Contact with hysteresis (A11): enter at 1.2 m, leave past 1.3 m, from the nearest chicken.
+            _inContact = ContactHysteresis.Update(_inContact, Mathf.Sqrt(nearestSqr));
+            if (!_inContact) return;
+
+            // Featherfoot (A6): the one production call site of the hook. Skips only the slow; the
+            // steal-back above has already run.
+            var passive = Passive;
+            if (passive != null && passive.IgnoresCollisionSlow(this)) return;
+            ApplySlow(SlowSource.Collision, CollisionSlowFactor);
         }
 
         /// <summary>

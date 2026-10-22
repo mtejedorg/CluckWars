@@ -137,6 +137,24 @@ $f7 = Get-Content (Join-Path $tmp7 'findings.txt') -Raw
 Assert ($f7 -notmatch 'HomeCornerIndex') 'CW-233 clean: distinct homes, a repeated line, unstamped (-1) players and a bot on a player''s old corner -> no finding'
 Assert ($f7 -match 'INVARIANT=0') 'CW-233 clean: INVARIANT=0'
 Remove-Item $tmp7 -Recurse -Force
+
+# ---- Control RPC rejections (F4 / WP1): any 'rejected RPC_Apply*' line is an INVARIANT finding, per source ----
+$tmp8 = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-ctl-' + [Guid]::NewGuid().ToString('N'))
+Copy-Item (Join-Path $PSScriptRoot 'fixtures\control-fixture') $tmp8 -Recurse
+& (Join-Path $PSScriptRoot 'merge.ps1') -Session $tmp8 | Out-Null
+$f8 = Get-Content (Join-Path $tmp8 'findings.txt') -Raw
+Assert ((Count $f8 '\[INVARIANT\] control RPC rejections on client1: 4 \[RPC_ApplyRoot/OutOfRange, RPC_ApplyStun/ImplausibleDuration\]') -eq 1) 'F4: two rejection lines (one carrying +2 suppressed) on client1 = ONE finding counting 4, verdicts named'
+Assert ((Count $f8 '\[INVARIANT\] control RPC rejections on client2: 1 \[RPC_ApplyAbilitySlow/ImplausibleFactor\]') -eq 1) 'F4: a slow rejection on client2 is its own finding'
+Assert ($f8 -match 'INVARIANT=2') 'F4: exactly two INVARIANT findings'
+Remove-Item $tmp8 -Recurse -Force
+
+$tmp9 = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-ctl-ok-' + [Guid]::NewGuid().ToString('N'))
+Copy-Item (Join-Path $PSScriptRoot 'fixtures\control-clean-fixture') $tmp9 -Recurse
+& (Join-Path $PSScriptRoot 'merge.ps1') -Session $tmp9 | Out-Null
+$f9 = Get-Content (Join-Path $tmp9 'findings.txt') -Raw
+Assert ($f9 -notmatch 'control RPC rejections') 'F4 clean: accepted/kept control lines and a rejected RPC_TeleportTo are not control rejections'
+Assert ($f9 -match 'INVARIANT=0') 'F4 clean: INVARIANT=0'
+Remove-Item $tmp9 -Recurse -Force
 Write-Host ''
 if ($script:fail -eq 0) { Write-Host 'SELFTEST OK' -ForegroundColor Green; exit 0 }
 Write-Host "SELFTEST FAILED ($($script:fail) assertion(s))" -ForegroundColor Red

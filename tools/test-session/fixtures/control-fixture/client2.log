@@ -1,0 +1,3 @@
+Initialize engine version: 6000.3.14f1
+[10:00:00.000][00:00.900][Info][Session] Session sha=aaa111 date=2026-10-22 platform=WindowsPlayer
+[10:00:05.000][00:05.000][Warn][Chicken] Chicken(Clone): rejected RPC_ApplyAbilitySlow(seconds=2.50, factor=0.05, caster=Chicken(Clone)) from [Player:1] (ImplausibleFactor) - the slow factor is not in [0.55, 1), the strongest slow any ability in the pool applies.

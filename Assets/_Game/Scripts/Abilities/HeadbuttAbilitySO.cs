@@ -62,6 +62,8 @@ namespace CluckWars.Abilities
         // rather than inferred from Category, and why a mixed ability stays false.
         public override bool TargetEffectIsPurelyControl => true;
 
+        public override ControlEmission EmittedControl => ControlEmission.Stun(StaggerSeconds);
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;
@@ -77,7 +79,7 @@ namespace CluckWars.Abilities
                 if (dir.sqrMagnitude < 0.001f) dir = caster.transform.forward;
 
                 victim.RPC_ApplyKnockback(dir.normalized * KnockbackForce);
-                victim.RPC_ApplyStun(StaggerSeconds);
+                victim.RPC_ApplyStun(StaggerSeconds, caster.Id);
             }
         }
 

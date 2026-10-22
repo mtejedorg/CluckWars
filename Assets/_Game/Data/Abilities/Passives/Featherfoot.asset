@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.FeatherfootPassiveSO
   DisplayName: Featherfoot
   ShortLabel: FEAT
-  Description: Food piles never slow you down.
+  Description: Food piles and bumping into rivals never slow you down.
   Icon: 
   AccentColor: {r: 0.55, g: 0.88, b: 0.7, a: 1}
   Category: 3

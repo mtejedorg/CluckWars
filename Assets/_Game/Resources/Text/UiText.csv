@@ -86,8 +86,8 @@ perk.bulwark.line,Barely budges when shoved.
 perk.bulwark.detail,"Knockback cut by {kb}%. Slows, stuns and getting stuck end {cc}% sooner."
 perk.hoarder.line,Carry {cap} food in one trip.
 perk.hoarder.detail,Carries at least {cap} food.
-perk.featherfoot.line,Raid piles at full speed.
-perk.featherfoot.detail,Food piles never slow you down.
+perk.featherfoot.line,Piles and bumps never slow you.
+perk.featherfoot.detail,Food piles and bumping into rivals never slow you down.
 perk.spoiler.line,+{food} food if time runs out.
 perk.spoiler.detail,"If nobody reaches {goal} before time's up, you bank {food} bonus food first."
 loadout.row.shared,ANY BIRD

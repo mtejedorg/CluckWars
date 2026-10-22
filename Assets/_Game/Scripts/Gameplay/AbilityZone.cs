@@ -103,6 +103,66 @@ namespace CluckWars.Gameplay
         /// </summary>
         public float TriggerRadius => NetworkedRadius > 0f ? NetworkedRadius : _triggerRadius;
 
+        /// <summary>Where the zone stands on every peer: the stamped spawn position, else the transform (authority before the stamp).</summary>
+        public Vector3 Center => HasSpawnPosition ? SpawnPosition : transform.position;
+
+        // ---- Root-claim evidence for the victim's authority (F4) --------------
+        //
+        // RPC_ApplyRoot names the CASTER, and the victim's authority accepts a root from a caster
+        // out of direct reach only while it stands inside a Root zone that caster owns. A live zone
+        // answers from ActiveZones. The record below covers the one honest case a live lookup
+        // misses: the zone was consumed and its despawn replicated to this peer before the RPC it
+        // sent in the same tick (an RPC is not ordered against state). Local, never networked; a
+        // record lives RecentRootWindowSeconds of real time, longer than any latency the range
+        // allowances accept (ExecuteRules.MaxLatencySeconds). A zone consumed in its first ticks
+        // may never reach this peer at all; Root Egg spawns at its caster's feet, so that case is
+        // inside the caster's direct reach instead.
+
+        /// <summary>How long a despawned Root zone still counts as evidence for a root claim from its owner.</summary>
+        public const float RecentRootWindowSeconds = 1.0f;
+
+        private struct DespawnedRoot
+        {
+            public NetworkBehaviourId Owner;
+            public Vector3 Center;
+            public float Radius;
+            public float At;   // Time.realtimeSinceStartup
+        }
+
+        private static readonly List<DespawnedRoot> _recentRoots = new List<DespawnedRoot>();
+
+        private static void RememberDespawnedRoot(NetworkBehaviourId owner, Vector3 center, float radius)
+        {
+            float now = Time.realtimeSinceStartup;
+            _recentRoots.RemoveAll(r => now - r.At > RecentRootWindowSeconds);
+            _recentRoots.Add(new DespawnedRoot { Owner = owner, Center = center, Radius = radius, At = now });
+        }
+
+        /// <summary>
+        /// True when <paramref name="point"/> is inside (plus <paramref name="margin"/>) a Root zone
+        /// owned by <paramref name="owner"/> that is alive on this peer or despawned within
+        /// <see cref="RecentRootWindowSeconds"/>. Read by <c>ChickenController</c>'s root-claim check.
+        /// </summary>
+        public static bool ContainsRootOf(NetworkBehaviourId owner, Vector3 point, float margin)
+        {
+            for (int i = 0; i < ActiveZones.Count; i++)
+            {
+                var z = ActiveZones[i];
+                if (z == null || z.Object == null || !z.Object.IsValid) continue;
+                if (z.Effect != ZoneEffect.Root || z.OwnerChicken != owner) continue;
+                if (ControlClaimRules.IsInsideZone(z.Center, z.TriggerRadius, point, margin)) return true;
+            }
+
+            float now = Time.realtimeSinceStartup;
+            for (int i = 0; i < _recentRoots.Count; i++)
+            {
+                var r = _recentRoots[i];
+                if (r.Owner != owner || now - r.At > RecentRootWindowSeconds) continue;
+                if (ControlClaimRules.IsInsideZone(r.Center, r.Radius, point, margin)) return true;
+            }
+            return false;
+        }
+
         private ILogService _log;
 
         // ---- Local trigger observation (FEEDBACK.md §3.2 for placed zones) ----
@@ -183,6 +243,7 @@ namespace CluckWars.Gameplay
         {
             MatchSignals.RoundReset -= OnRoundReset;
             ActiveZones.Remove(this);
+            if (hasState && Effect == ZoneEffect.Root) RememberDespawnedRoot(OwnerChicken, Center, TriggerRadius);
             _placed = false;   // pooled: the next life re-applies its own stamp
 
             // Fallback for the one case the Render() detector structurally cannot see: a
@@ -266,7 +327,10 @@ namespace CluckWars.Gameplay
                 if (chicken.Combat != null && chicken.Combat.IsRemoved) continue;
                 if (PlanarSqrDistance(center, chicken.transform.position) > radiusSqr) continue;
 
-                chicken.RPC_ApplyRoot(RootDuration);
+                // Names the caster, not this zone: the victim's authority checks the sender against the
+                // caster's state authority (the zone's own), and may never have seen this zone at all
+                // when it is consumed in its first ticks (F4, see ContainsRootOf).
+                chicken.RPC_ApplyRoot(RootDuration, OwnerChicken);
                 _log?.Debug(Source, $"Root applied to {chicken.name}.");
 
                 // No hit-attribution push here, deliberately: this method is behind

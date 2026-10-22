@@ -51,6 +51,10 @@ namespace CluckWars.Abilities
         // ground. Without this the whiff styling fired on every correctly-placed egg.
         public override bool PlacesZone => true;
 
+        // The egg's AbilityZone sends this root later (TryTriggerRoot, naming this caster), but the
+        // receiver's bound comes from the ability pool, so the ability declares it (F4).
+        public override ControlEmission EmittedControl => ControlEmission.Root(RootDuration);
+
         // Unassigned wiring, not a gameplay state — CanSpawnZone logs which reference is
         // missing. Sits in CanActivate rather than at the top of OnActivate so the refusal
         // lands before the cast and its cooldown are committed. The logger reaches an ability
