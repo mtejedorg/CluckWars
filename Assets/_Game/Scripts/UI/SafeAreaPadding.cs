@@ -44,7 +44,7 @@ namespace CluckWars.UI
         /// <summary>Re-applies when the safe area or screen size changed (or <paramref name="force"/>). Cheap to poll each frame.</summary>
         public void Apply(bool force = false)
         {
-            var sa = Screen.safeArea;
+            var sa = SafeAreaSource.Current;   // Screen.safeArea, or the dev -cw_safearea override
             var screen = new Vector2Int(Screen.width, Screen.height);
             if (!force && _hasApplied && sa == _applied && screen == _appliedScreen) return;
 

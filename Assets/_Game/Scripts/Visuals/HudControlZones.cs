@@ -134,11 +134,12 @@ namespace CluckWars.Visuals
             return Cache;
         }
 
-        /// <summary>Screen.safeArea as viewport fractions (left, bottom, right, top); zero on a screen with no cutout.</summary>
+        /// <summary>The safe area (<see cref="CluckWars.UI.SafeAreaSource.Current"/>) as viewport fractions (left, bottom,
+        /// right, top); zero on a screen with no cutout.</summary>
         private static Vector4 SafeInsets()
         {
             if (Screen.width <= 0 || Screen.height <= 0) return Vector4.zero;
-            Rect sa = Screen.safeArea;
+            Rect sa = CluckWars.UI.SafeAreaSource.Current;   // same source as the UI padding (dev -cw_safearea override)
             return new Vector4(
                 Mathf.Clamp01(sa.xMin / Screen.width),
                 Mathf.Clamp01(sa.yMin / Screen.height),

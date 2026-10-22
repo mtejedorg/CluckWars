@@ -443,6 +443,9 @@ namespace CluckWars.Input
                 _log?.Error(Source, "TouchControls.uxml is missing an #EdgeGlow* strip: the cancel band will not show which edge cancels.");
 
             _hudRoot  = _root.Q<VisualElement>("TouchRoot") ?? _root;
+            // Screen-shape classes (portrait / landscape / tall / short / narrow) for the portrait overrides (WP7). Separate
+            // from UpdateLayoutMode, which switches on the device in hand (touch / desktop / pad), not the screen.
+            LayoutClasses.Bind(_root, _hudRoot);
             _hintHost = _root.Q<VisualElement>("HoldHintHost");
             _hint     = _root.Q<Label>("HoldHint");
             if (_hint == null)

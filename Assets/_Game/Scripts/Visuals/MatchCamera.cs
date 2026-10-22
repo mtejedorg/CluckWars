@@ -1,8 +1,10 @@
 using CluckWars.Gameplay;
+using CluckWars.Logging;
 using CluckWars.Settings;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using Zenject;
 
 namespace CluckWars.Visuals
 {
@@ -46,7 +48,8 @@ namespace CluckWars.Visuals
                  "(up to ~6.2 m) at the bottom screen edge from being sliced open now that the camera sits only 15 m back.")]
         [SerializeField] private float _nearClipPlane = -6f;
 
-        [Tooltip("Half the vertical view height in world units. Smaller = more zoomed in. 5.6 per GDD v0.5.")]
+        [Tooltip("Half the vertical view height in world units, LANDSCAPE. Smaller = more zoomed in. 5.6 per GDD v0.5. " +
+                 "Portrait derives its own size from the aspect (OrientationFraming); landscape uses this at every aspect.")]
         [Min(1f)]
         [SerializeField] private float _orthoSize = 5.6f;
 
@@ -69,8 +72,14 @@ namespace CluckWars.Visuals
         [Tooltip("If true, force solid color clear over whatever the scene was configured with.")]
         [SerializeField] private bool _useSolidColor = true;
 
+        private const string Source = "MatchCamera";
+
         // Runtime state
+        private ILogService _log;
         private Camera _camera;
+        // Per-orientation framing (OrientationFraming), recomputed from the live aspect every ApplyCamera.
+        private OrientationFraming.Result _framing;
+        private float _loggedFramingAspect = -1f;
         private UniversalAdditionalCameraData _urpData;
         private RenderPipelineAsset _appliedTier;
         private bool _tierApplied;
@@ -156,9 +165,13 @@ namespace CluckWars.Visuals
         /// </summary>
         public bool FollowSettled => _followSettled;
 
+        [Inject]
+        public void Construct(ILogService log) => _log = log;
+
         private void Awake()
         {
             Instance = this;
+            if (_log == null) ProjectContext.Instance.Container.Inject(this);
             _camera = GetComponent<Camera>();
             // See-through fence near the local bird (Phase 6 chunk 7f). Added here rather than on the
             // scene object so every scene with a match camera gets it without a scene edit.
@@ -381,8 +394,14 @@ namespace CluckWars.Visuals
         {
             if (_camera == null) return;
             _camera.orthographic = true;
-            _camera.orthographicSize = _warmupActive ? _warmupOrthoSize : _orthoSize;
-            _camera.nearClipPlane = _nearClipPlane;
+            // Read from the live aspect every frame: a rotation (or a Game View resize) reframes on the next LateUpdate.
+            // Outside Play Mode (OnValidate) it is always the landscape framing, so a portrait Game View never writes
+            // portrait ortho / near clip / focus values into Game.unity.
+            _framing = OrientationFraming.Compute(OrientationFraming.FramingAspect(Application.isPlaying, _camera.aspect),
+                _orthoSize, _nearClipPlane, _distance, _pitch);
+            _camera.orthographicSize = _warmupActive ? _warmupOrthoSize : _framing.OrthoSize;
+            _camera.nearClipPlane = _warmupActive ? _nearClipPlane : _framing.NearClip;
+            LogVisibleGround();
             if (_useSolidColor)
             {
                 _camera.clearFlags = CameraClearFlags.SolidColor;
@@ -408,10 +427,32 @@ namespace CluckWars.Visuals
             _urpData.renderPostProcessing = RenderTierPolicy.PostProcessingFor(rp);
         }
 
+        /// <summary>
+        /// Dev builds: one <c>VisibleGround</c> line whenever the framing's aspect changes (start, rotation, Game View
+        /// resize), so a capture run can check the C1 rule (L = lateral half-extent, D = depth half-extent, G = ground
+        /// area, fy = the chicken's viewport height) against OrientationFramingTests.
+        /// </summary>
+        private void LogVisibleGround()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (!Application.isPlaying || _log == null || _warmupActive) return;
+            float aspect = _camera.aspect;
+            if (Mathf.Abs(aspect - _loggedFramingAspect) < 0.001f) return;
+            _loggedFramingAspect = aspect;
+            var f = _framing;
+            // One interpolated literal: "a" + "b" interpolations concatenate to a string, which Invariant() does not take.
+            _log.Info(Source, System.FormattableString.Invariant($"VisibleGround aspect={aspect:F3} {(f.Portrait ? "portrait" : "landscape")} s={f.OrthoSize:F2} L={f.LateralHalfExtent:F2} D={f.DepthHalfExtent:F2} G={f.GroundArea:F0} fy={f.FocusViewportY:F3} near={f.NearClip:F2}"));
+#endif
+        }
+
         private void ApplyTransform(Vector3 focus)
         {
             var rot = Quaternion.Euler(_pitch, _yaw, 0f);
             var dir = rot * Vector3.forward;
+            // Portrait: the look-at point sits behind the chicken along the ground-forward, so the chicken is drawn at
+            // the clear band's centre (OrientationFraming.FocusViewportY). Zero in landscape and during the warm-up.
+            if (!_warmupActive && _framing.FocusBackOffset != 0f)
+                focus -= Quaternion.Euler(0f, _yaw, 0f) * Vector3.forward * _framing.FocusBackOffset;
             transform.SetPositionAndRotation(focus - dir * (_warmupActive ? _warmupDistance : _distance), rot);
         }
     }

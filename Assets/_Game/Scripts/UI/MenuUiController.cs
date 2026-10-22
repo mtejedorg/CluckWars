@@ -331,8 +331,11 @@ namespace CluckWars.UI
             _root.UnregisterCallback<ClickEvent>(OnRootClick, TrickleDown.TrickleDown);
             _root.RegisterCallback<ClickEvent>(OnRootClick, TrickleDown.TrickleDown);
 
+            // Shape classes (layout--portrait/landscape/tall/short/narrow) come from the shared helper; this
+            // controller's own geometry hook only re-applies the safe area.
             _root.RegisterCallback<GeometryChangedEvent>(OnRootGeometry);
-            UpdateLayout(_root.resolvedStyle.width, _root.resolvedStyle.height);
+            LayoutClasses.Bind(_root);
+            SafeAreaSource.LogOnce(_log);
 
             // Next on the class screen is never gated (a class is always selected), so a
             // specialization must be too — otherwise a player who skips the pills reaches the
@@ -405,28 +408,7 @@ namespace CluckWars.UI
         }
 
         // ---- Layout -----------------------------------------------------------
-        private void OnRootGeometry(GeometryChangedEvent evt)
-        {
-            UpdateLayout(evt.newRect.width, evt.newRect.height);
-            _safeArea?.Apply(force: true);
-        }
-
-        // At or below this panel height the pages compress their headers/title (20:9 phones: the
-        // Pixel 9 canvas is ~2157x961; 16:9 at 1080 too, where the main menu with PLAY AGAIN
-        // otherwise touches both edges). Below this aspect the wide two-column pages stack
-        // (4:3 tablets: 2048x1536 -> ~1663x1247).
-        private const float ShortLayoutHeight = 1100f;
-        private const float NarrowLayoutAspect = 1.55f;
-
-        private void UpdateLayout(float w, float h)
-        {
-            if (float.IsNaN(w) || float.IsNaN(h) || w <= 0f || h <= 0f) return;
-            bool landscape = w >= h;
-            _root.EnableInClassList("layout--landscape", landscape);
-            _root.EnableInClassList("layout--portrait", !landscape);
-            _root.EnableInClassList("layout--short", h < ShortLayoutHeight);
-            _root.EnableInClassList("layout--narrow", w / h < NarrowLayoutAspect);
-        }
+        private void OnRootGeometry(GeometryChangedEvent evt) => _safeArea?.Apply(force: true);
 
         // A notch or gesture bar can change Screen.safeArea without the panel's geometry
         // changing (e.g. the system bars toggling), so it is also polled — two struct

@@ -519,9 +519,10 @@
    PHASE 1 STRUCTURE (2026-10-06): shared page chrome + page transitions
    ----------------------------------------------------------------------------
    Every menu page is header (ribbon + HOME/BACK) / body / one green CTA.
-   The root carries layout classes from MenuUiController.UpdateLayout:
+   The root carries layout classes from LayoutClasses (UI/LayoutClasses.cs, bound by MenuUiController):
      .layout--short   panel height < 1100 (16:9 at 1080, 20:9 phones: Pixel 9 canvas ~2157x961)
-     .layout--narrow  aspect < 1.55 (4:3 tablets: 2048x1536 canvas ~1663x1247)
+     .layout--narrow  1 <= aspect < 1.55 (4:3 tablets: 2048x1536 canvas ~1663x1247); portrait is never narrow
+     .layout--portrait / --landscape (exactly one), .layout--tall (h/w >= 1.95). Thresholds: LayoutClasses.cs only.
    ============================================================================ */
 .cw-page-header {
     align-items: center; justify-content: center; flex-shrink: 0;
@@ -627,12 +628,14 @@
     width: 100%; max-width: 2240px; align-self: center;
 }
 .layout--narrow .cw-pick-body { flex-direction: column; }
+.layout--portrait .cw-pick-body { flex-direction: column; }   /* S0 parity: portrait was --narrow before LayoutClasses; WP9 owns the portrait look */
 
 /* Wide layouts (16:9 desktop, 20:9 phone): the four tiles are a 2x2 grid, so each tile is close to
    square and its chicken fills most of it. A single row of four made tall, narrow tiles with the
    chicken small and a dead colour field above it. Narrow (4:3) keeps one row of four. */
 .cw-class-tiles { flex-direction: row; flex-wrap: wrap; align-content: stretch; flex-grow: 1; flex-basis: 0; min-width: 0; margin-right: 18px; }
 .layout--narrow .cw-class-tiles { flex-wrap: nowrap; flex-grow: 0; flex-basis: auto; height: 330px; margin-right: 0; margin-bottom: 18px; }
+.layout--portrait .cw-class-tiles { flex-wrap: nowrap; flex-grow: 0; flex-basis: auto; height: 330px; margin-right: 0; margin-bottom: 18px; }
 
 /* Portrait tile: class fill (lightened tint, set in C#), ink outline, big
    chicken. Selected = gold border + CardGlowFrame + lift, never colour alone. */
@@ -650,6 +653,7 @@
     transition-property: scale, translate; transition-duration: 0.12s;
 }
 .layout--narrow .cw-class-tile { flex-basis: 0; margin-top: 0; margin-bottom: 0; }
+.layout--portrait .cw-class-tile { flex-basis: 0; margin-top: 0; margin-bottom: 0; }
 .cw-class-tile:hover { scale: 1.02 1.02; }
 /* Selected (Phase 4, re-audit items 10 + 19) = scale + gold inner border + an ink ring outside
    + a corner check badge. No translate lift: the stagger entry's inline translate ended on 0 and
@@ -711,6 +715,7 @@
     padding-top: 16px; padding-bottom: 16px; padding-left: 16px; padding-right: 22px;
 }
 .layout--narrow .cw-hero { flex-grow: 1; }
+.layout--portrait .cw-hero { flex-grow: 1; }
 /* Phase 4 (re-audit item 10): stage, bale and chicken ~1.4x the Phase 1 size.
    Round-2 finding 16: a painted backdrop instead of a flat wash - the barn interior (Bg_Loadout,
    cropped to its sunlit doorway, which lands right behind the bird) multiplied by a pale class tint
@@ -728,6 +733,7 @@
 .cw-hero__figure { width: 460px; height: 550px; flex-shrink: 0; align-items: center; justify-content: flex-end; }
 /* 4:3: the stage is ~530 tall, so the block is drawn a little smaller (from its centre). */
 .layout--narrow .cw-hero__figure { scale: 0.9 0.9; }
+.layout--portrait .cw-hero__figure { scale: 0.9 0.9; }
 /* Centred on the chicken's chest (~55% up the 434 px figure, whose box starts 116 px above the
    block's bottom): 116 + 0.55 * 434 - 448 / 2 = ~131. */
 .cw-hero__glow { width: 448px; height: 448px; bottom: 131px; }
@@ -1041,6 +1047,11 @@
 .layout--narrow .cw-ability-card { width: 290px; flex-shrink: 0; margin-top: 6px; margin-bottom: 6px; }
 .layout--narrow .cw-deck { align-items: flex-start; }   /* the one-row ANY BIRD group sits level with its neighbour, not centred 185 px lower */
 .layout--narrow #CommonRow { flex-shrink: 0; }   /* the class group absorbs the squeeze, so ANY BIRD never clips its card */
+/* S0 parity: the same four rules for portrait, which was --narrow before LayoutClasses (WP6); WP9 owns the portrait look. */
+.layout--portrait .cw-deck-cards { flex-wrap: wrap; justify-content: center; }
+.layout--portrait .cw-ability-card { width: 290px; flex-shrink: 0; margin-top: 6px; margin-bottom: 6px; }
+.layout--portrait .cw-deck { align-items: flex-start; }
+.layout--portrait #CommonRow { flex-shrink: 0; }
 .cw-deck-group {
     flex-shrink: 1; min-width: 0;
     margin-left: 6px; margin-right: 6px; margin-top: 6px; margin-bottom: 6px;
@@ -1516,6 +1527,7 @@
 .layout--short .cw-coop-left .cw-lobby-card, .layout--narrow .cw-coop-left .cw-lobby-card {
     padding-top: 16px; padding-bottom: 16px; padding-left: 16px; padding-right: 16px;
 }
+.layout--portrait .cw-coop-left .cw-lobby-card { padding-top: 16px; padding-bottom: 16px; padding-left: 16px; padding-right: 16px; }   /* S0 parity (was --narrow) */
 /* Gold invite-code letter tiles */
 .cw-code-tiles { flex-direction: row; flex-wrap: wrap; margin-top: 12px; }
 .cw-code-tile {
@@ -1569,6 +1581,7 @@
 .layout--short .cw-join-card .cw-input { min-height: 92px; }
 .layout--short .cw-join-card .cw-input .unity-text-field__input, .layout--short .cw-join-card .cw-input .unity-base-text-field__input { font-size: 56px; }
 .layout--narrow .cw-join-card .cw-input { min-width: 440px; }
+.layout--portrait .cw-join-card .cw-input { min-width: 440px; }   /* S0 parity (was --narrow) */
 
 /* Status pill */
 /* Status line: cream inset, dark text (the status colour is set in C# from

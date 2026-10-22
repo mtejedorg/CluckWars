@@ -156,8 +156,6 @@ namespace CluckWars.UI
         // True once BACK TO LOBBY / LEAVE / CHANGE BIRD has started leaving on purpose; suppresses the
         // "Session ended" overlay that the runner shutdown would otherwise raise through HandleShutdown.
         private bool            _leavingToLobby;
-        // MenuUiController.UpdateLayout's .layout--short threshold (panel height), reused for the waiting room.
-        private const float     ShortLayoutHeight = 1100f;
         private const int       ShutdownTimeoutMs = 5000;
 
         // Intro GO flourish — lingers briefly after the countdown hits zero.
@@ -455,14 +453,12 @@ namespace CluckWars.UI
             if (_meSafe == null) _log?.Error(Source, "MatchOverlays.uxml has no #MeSafe; the post-match screen ignores the safe area.");
             if (_lobbySafe == null) _log?.Error(Source, "MatchOverlays.uxml has no #LobbySafe; the waiting room ignores the safe area.");
             _safeArea = new SafeAreaPadding(_meSafe, _lobbySafe, _sessionEndOverlay, _leaveSheet);
-            _root.RegisterCallback<GeometryChangedEvent>(evt =>
-            {
-                _safeArea.Apply(force: true);
-                // THE COOP's short-panel tightening (MenuUiController.UpdateLayout), for the waiting room.
-                _lobbyOverlay?.EnableInClassList("layout--short", evt.newRect.height < ShortLayoutHeight);
-                // 4:3 tablets: the bar is slimmed like the phone's (MenuUiController.NarrowLayoutAspect).
-                _lobbyOverlay?.EnableInClassList("layout--narrow", evt.newRect.height > 0f && evt.newRect.width / evt.newRect.height < 1.55f);
-            });
+            _root.RegisterCallback<GeometryChangedEvent>(_ => _safeArea.Apply(force: true));
+            // The menu's shape classes (LayoutClasses), measured on the full overlay panel but set on the waiting room
+            // only: its #LobbyOverlay.layout--short / --narrow rules slim THE COOP's bar on phones and 4:3 tablets. They
+            // stay off the overlay root so the intro's GET READY plate keeps its full size (.layout--short
+            // .cw-getready__plate is the menu's rule).
+            if (_lobbyOverlay != null) LayoutClasses.Bind(_root, _lobbyOverlay);
 
             // Start hidden; state polls flip them on.
             SetShown(_matchEndOverlay, false);
