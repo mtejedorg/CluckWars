@@ -143,6 +143,18 @@ rival's nameplate dot and feet ring - not the class colour (Warrior / Speedy cla
 one class got identical arrows, and P1 aqua never reached them). Class identity stays in the chicken model. A corner that
 is not stamped yet draws `PlayerPalette.Neutral`, as the nameplate does. The chevron is a plain arrowhead (no class glyph).
 
+**Off-screen rivals: arrows painted on the floor (Maestro 2026-10-23, decision 2a, both orientations).** The shipped look
+for a hidden rival (off the frame, or mostly under the top HUD band) is no longer the screen-edge chevron but a chevron
+**painted on a ring on the floor** round the player's own chicken (`FloorRivalArrows`): a flat decal whose tail sits on
+the ring line at the bearing to that rival, tip outward, foreshortened by the camera like the ring itself (never a
+billboard). Fill = the rival's player colour at paint alpha 0.85 with a soft inner fade, a thin rim in the same hue darkened
+to 0.3 of its value; 1.7 m long near (1.3 m from 24 m away), 0.85 x length wide. The ring is a soft cream (1, 0.96, 0.86)
+at alpha 0.62, 0.1 m wide, shown only while an arrow is. Ring radius: min(4.5 m, 0.8 x the smallest clear ground extent
+from the chicken) = 4.48 m portrait, 4.15 m at 16:9, 3.58 m at 20:9. The screen-edge chevron above remains the fallback
+for a rival the ring cannot take (inside the ring, more than three hidden marks, the player's own chicken down) and a
+dev-tools build can switch back to it with `-cw_edgearrows` for comparisons. The landscape top-band info zone is 290 px
+(the bar's 40 px fade is not HUD, decision 1a), as in portrait.
+
 **Ability category fills.** Defense has two colours: `#30460C` (`AbilityPalette.Defense`) is the TEXT
 background only (card band, category tag, frame: cream label 9.6:1); `#80902C` (`AbilityPalette.DefenseFill`,
 L* 57) is the hex FILL (touch HUD `#Fill{n}`, lobby mini-hexes, ability icon discs, via
