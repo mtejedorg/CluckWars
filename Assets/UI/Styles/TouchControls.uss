@@ -546,18 +546,19 @@
    scale = (W/1920 + H/1080) / 2, so a 9:20 phone (1080x2400, Pixel 10 Pro 1080x2410) gets a 776 x 1724 panel,
    not the 966 x 2147 the WP7 layout was sized for. At 776 px the landscape arc (hexes up to 515 px from the
    right) ran into the joystick (80..360). Portrait touch uses a 2 x 2 grid instead, same order as the arc
-   (a1 bottom-right, a2 above it, a4 to its left, a3 diagonal): boxes 24 px apart side by side, 25 px apart
-   above (discs with their 80 px rings: 14 / 15 px), the right column 80 px from the edge (the edge-cancel arm
+   (a1 bottom-right, a2 above it, a4 to its left, a3 diagonal): boxes 30 px apart side by side (column pitch 180,
+   ~ the landscape arc's 185), 25 px apart above; with their 80 px rings 20 / 15 px, so the 10 px denied-press
+   bump (a horizontal shake) still leaves >= 10 px (WP8 gate: 9:16 caught a 7.7 px gap at pitch 174), the right column 80 px from the edge (the edge-cancel arm
    band is 36 dp = ~80 panel px on a 9:20 phone), and the stick + status strip 40 px from the left. It fits
-   down to a 746 px panel (9:21). Placed BEFORE the desktop / pad block on purpose: at equal specificity those
+   down to a 749 px panel (just under 9:21). Placed BEFORE the desktop / pad block on purpose: at equal specificity those
    rules win when the keyboard / pad strip is up. HudControlZones mirrors every number
    (TouchHexRightBottomPortraitPx, JoystickLeftPortraitPx, StatusStripPortraitLeftPx).
    ============================================================================ */
 .layout--portrait .cw-joy-base     { left: 40px; }
 .layout--portrait .cw-hex--a1 { right: 80px;  bottom: 95px;  }
 .layout--portrait .cw-hex--a2 { right: 80px;  bottom: 270px; }
-.layout--portrait .cw-hex--a3 { right: 254px; bottom: 270px; }
-.layout--portrait .cw-hex--a4 { right: 254px; bottom: 95px;  }
+.layout--portrait .cw-hex--a3 { right: 260px; bottom: 270px; }
+.layout--portrait .cw-hex--a4 { right: 260px; bottom: 95px;  }
 
 /* ============================================================================
    DESKTOP / CONTROLLER LAYOUT  (Phase 6 chunk 6, A10)

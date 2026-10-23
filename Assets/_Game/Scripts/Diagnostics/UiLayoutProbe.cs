@@ -278,6 +278,11 @@ namespace CluckWars.Diagnostics
             var ownScale = rs.scale.value;
             if (ownScale.x != 1f || ownScale.y != 1f)
                 wb = UiLayoutRules.Unscaled(wb, ownScale.x, ownScale.y);
+            // Same for its own translate (the denied-press bump shakes a hex 10 px sideways; the stick's knob follows the
+            // finger): judged where layout put it. Ancestors' translate still applies.
+            var ownTranslate = rs.translate;
+            if (ownTranslate.x != 0f || ownTranslate.y != 0f)
+                wb = UiLayoutRules.Untranslated(wb, ownTranslate.x, ownTranslate.y, ParentScale(ve));
             // Inside a ScrollView only the part in its viewport is drawn and takes taps (WP9: the portrait GEAR UP deck).
             bool cut = false;
             if (inScroll) wb = UiLayoutRules.VisibleInViewport(wb, clip, out cut);

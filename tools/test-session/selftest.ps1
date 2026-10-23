@@ -105,7 +105,7 @@ foreach ($fx in @(@('world-lag-fixture', $false), @('world-stuck-fixture', $true
     Copy-Item (Join-Path $PSScriptRoot "fixtures\$($fx[0])") $tw -Recurse
     & (Join-Path $PSScriptRoot 'merge.ps1') -Session $tw | Out-Null
     $fw = Get-Content (Join-Path $tw 'findings.txt') -Raw
-    if ($fx[1]) { Assert ($fw -match 'world static hash differs across peers from t=3264 .*client3 constant at 15BA3BA5') 'world hash: a peer constant at the wrong hash while the other changes IS flagged (CW-216/217 class)' }
+    if ($fx[1]) { Assert ($fw -match 'world static hash differs across peers from t=3264 .*client\d constant at') 'world hash: a peer constant at the wrong hash while the other changes IS flagged (CW-216/217 class)' }
     else { Assert ($fw -notmatch 'world static hash differs') 'world hash: both peers changing between mismatching beats (lag after a master migration) NOT flagged'; Assert ($fw -match 'INVARIANT=0') 'world hash lag: INVARIANT=0' }
     Remove-Item $tw -Recurse -Force
 }
@@ -127,6 +127,23 @@ Assert ($fw -notmatch 'world static hash differs') 'WP3 auras: a moving aura (ca
 Assert ($fw -notmatch 'world auras hash differs') 'WP3 auras: an aura reaching one peer a single beat late (lag) is NOT flagged'
 Assert ($fw -match 'INVARIANT=0') 'WP3 auras clean: INVARIANT=0'
 Remove-Item $tw -Recurse -Force
+
+# ---- Per-field persistence ($PersistBeats): world hashes and st need 3 beats, so 2-beat replication / start-gate skew is not a finding ----
+$pb = @(
+    @('world-lag3-fixture',    'a new zone seen by client3, then client1, then client2/4 one beat apart (session 184600): 2 mismatching beats',  'world static hash differs', $false),
+    @('world-stuck5-fixture',  'client3 constant at the wrong world hash for 5 beats',                                                          'world static hash differs across peers from t=3264 \(3\+ consecutive heartbeats, client\d constant at', $true),
+    @('st-lag-fixture',        'st Starting vs WaitingForPlayers for 2 beats (joiner start-gate skew, session 183432)',                         'state client2=', $false),
+    @('st-stuck-fixture',      'st Starting vs WaitingForPlayers for 5 beats',                                                                  'state client2=Starting client3=WaitingForPlayers  \(5 consecutive', $true)
+)
+foreach ($c in $pb) {
+    $tp = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-pb-' + [Guid]::NewGuid().ToString('N'))
+    Copy-Item (Join-Path $PSScriptRoot "fixtures\$($c[0])") $tp -Recurse
+    & (Join-Path $PSScriptRoot 'merge.ps1') -Session $tp | Out-Null
+    $fp = Get-Content (Join-Path $tp 'findings.txt') -Raw
+    if ($c[3]) { Assert ($fp -match $c[2]) "persistence: $($c[1]) IS flagged" }
+    else { Assert ($fp -notmatch $c[2]) "persistence: $($c[1]) NOT flagged" }
+    Remove-Item $tp -Recurse -Force
+}
 
 # ---- Round-start leftovers (B10): a Root Egg placed just before the end must not survive PLAY AGAIN ----
 $tmp4 = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-zn-' + [Guid]::NewGuid().ToString('N'))

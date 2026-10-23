@@ -481,8 +481,23 @@ foreach ($key in $uiMenuPages.Keys) {
 # Invariant). Peers log on the same ticks, so for each tick every reporting peer must have the same `static` hash (bases,
 # piles, pickups, World-anchored zones at 0.5 m resolution) and the same `auras` hash (WP3: Caster-anchored zones, keyed by
 # owner id, radius bucket, effect and channels - never by position, which follows a moving chicken). A mismatch that lasts
-# >= $WorldPersist consecutive shared ticks is an INVARIANT finding. Builds before WP3 print no auras= and are skipped there.
-$WorldPersist = 2
+# >= Get-PersistBeats "world-<field>" consecutive shared ticks is an INVARIANT finding. Builds before WP3 print no auras= and are skipped there.
+# ---- Persistence per field: how many CONSECUTIVE mismatching heartbeats count as a finding (on top of the one-side-constant
+# rule). 2 (= -Persist) is the default; a field that is legitimately a beat or two late on some peers needs more, with evidence:
+#   world-static, world-auras  3  session 20261023-184600 (shared4 -AutoAura): a new zone was seen by client3 at t=704, by client1 at
+#                                 t=768 and by client2/client4 one beat later, so client3 was 'constant' vs the rest for exactly 2
+#                                 beats (also session 20261022-124805 after a master migration). The real CW-216/217 failures last
+#                                 dozens of beats (57 of 83 in sessions 20261020-222412 / -222828), so 3 loses nothing.
+#   st            3               session 20261023-183432 (hostleave): `t=384..448 client2=Starting client3=WaitingForPlayers`, a
+#                                 joiner's start-gate / scene-load skew of 2 beats.
+#   c*.cg         4 (Persist+2)   cargo changes every few seconds while foraging / depositing; a 2-beat mismatch is sampling skew.
+# Everything else (hp, cs, x, z, rem, bases, piles, ghosts) uses -Persist.
+$PersistBeats = [ordered]@{ 'world-static' = 3; 'world-auras' = 3; 'st' = 3; 'cg' = $Persist + 2 }
+function Get-PersistBeats([string]$key) {
+    $k = if ($key -like 'c*.cg') { 'cg' } else { $key }
+    if ($PersistBeats.Contains($k)) { return [int]$PersistBeats[$k] }
+    return $Persist
+}
 function Test-WorldParity([string]$field, [Text.RegularExpressions.Regex]$rx, [string]$what) {
     $byT = @{}
     foreach ($e in $sorted) {
@@ -496,6 +511,7 @@ function Test-WorldParity([string]$field, [Text.RegularExpressions.Regex]$rx, [s
     # spawning and each peer's hash is only a beat behind the other's, so BOTH sides change between mismatching beats (lag).
     # A mismatch run counts only when, over its consecutive beats, some peer's hash stays CONSTANT (a missing / misplaced
     # object: CW-216/217) - which also covers the same mismatching pair repeating.
+    $need = Get-PersistBeats "world-$field"
     $run = @(); $runFlagged = $false
     foreach ($t in ($byT.Keys | Sort-Object)) {
         $w = $byT[$t]
@@ -503,7 +519,7 @@ function Test-WorldParity([string]$field, [Text.RegularExpressions.Regex]$rx, [s
         $distinct = @($w.Peers.Values | ForEach-Object { $_.H } | Sort-Object -Unique)
         if ($distinct.Count -le 1) { $run = @(); $runFlagged = $false; continue }
         $run += , @{ T = $t; W = $w }
-        if ($run.Count -lt $WorldPersist -or $runFlagged) { continue }
+        if ($run.Count -lt $need -or $runFlagged) { continue }
         $stuckPeer = $null
         foreach ($peer in $w.Peers.Keys) {
             $hashes = @($run | ForEach-Object { if ($_.W.Peers.ContainsKey($peer)) { $_.W.Peers[$peer].H } else { '' } } | Sort-Object -Unique)
@@ -513,7 +529,7 @@ function Test-WorldParity([string]$field, [Text.RegularExpressions.Regex]$rx, [s
         $runFlagged = $true
         $first = $run[0]
         $desc = ($first.W.Peers.Keys | Sort-Object | ForEach-Object { "$_=$($first.W.Peers[$_].H)(n=$($first.W.Peers[$_].N))" }) -join ' '
-        Add-Finding @('INVARIANT') $first.W.Entry ("world $field hash differs across peers from t=$($first.T) ($WorldPersist+ consecutive heartbeats, $stuckPeer constant at $($w.Peers[$stuckPeer].H)): $desc - $what")
+        Add-Finding @('INVARIANT') $first.W.Entry ("world $field hash differs across peers from t=$($first.T) ($need+ consecutive heartbeats, $stuckPeer constant at $($w.Peers[$stuckPeer].H)): $desc - $what")
     }
 }
 Test-WorldParity 'static' (New-Object Text.RegularExpressions.Regex('^World t=(\d+) static=(\w+) n=(\d+)')) 'a spawned object (base/pile/pickup/zone) is positioned differently on some peers'
@@ -625,9 +641,7 @@ for ($ia = 0; $ia -lt $srcNames.Count; $ia++) {
         }
         foreach ($k in $runs.Keys) { $done.Add($runs[$k]) }
         foreach ($r in $done) {
-            # cargo changes every few seconds while foraging/depositing: a 2-beat mismatch is sampling skew at a flush, so it
-            # needs 2 more consecutive beats to count as a real divergence
-            $need = if ($r.Key -like 'c*.cg') { $Persist + 2 } else { $Persist }
+            $need = Get-PersistBeats $r.Key   # per-field table ($PersistBeats, with the evidence)
             $w = Find-StuckWindow $r.Beats
             if ($null -eq $w -or $w.N -lt $need) { continue }
             $inf = $w.First.Info

@@ -1,0 +1,7 @@
+Initialize engine version: 6000.3.14f1
+[10:00:00.000][00:00.900][Info][Session] Session sha=aaa111 date=2026-10-23 platform=WindowsPlayer
+[10:00:20.000][00:20.000][Info][Invariant] World t=640 static=H10000AAAA n=13 chickens=11 m=4 round=1
+[10:00:22.000][00:22.000][Info][Invariant] World t=704 static=H10000AAAA n=13 chickens=11 m=4 round=1
+[10:00:24.000][00:24.000][Info][Invariant] World t=768 static=H20000AAAA n=14 chickens=11 m=4 round=1
+[10:00:26.000][00:26.000][Info][Invariant] World t=832 static=H20000AAAA n=14 chickens=11 m=4 round=1
+[10:00:28.000][00:28.000][Info][Invariant] World t=896 static=H20000AAAA n=14 chickens=11 m=4 round=1

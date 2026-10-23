@@ -71,8 +71,8 @@ namespace CluckWars.Visuals
         {
             new Vector2(80f, 95f),
             new Vector2(80f, 270f),
-            new Vector2(254f, 270f),
-            new Vector2(254f, 95f),
+            new Vector2(260f, 270f),
+            new Vector2(260f, 95f),
         };
 
         /// <summary>Desktop / pad layout: hex a1..a4 left edge relative to the zone's horizontal centre

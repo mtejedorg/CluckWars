@@ -109,7 +109,45 @@ namespace CluckWars.Tests
             Assert.AreEqual(350f, rest.height, 1e-3f);
             Assert.AreEqual(0f, rest.yMin, 1e-3f, "at rest it starts at the panel top: not 'partly off the panel'");
             Assert.AreEqual(slammed, UiLayoutRules.Unscaled(slammed, 0f, 1f), "a zero scale leaves the box alone");
+
+            // The denied-press bump: a hex shaken -6 px at 0.75 parent scale is judged where layout put it.
+            var shaken = UiLayoutRules.Untranslated(R(515.5f, 1216, 160, 160), -8f, 0f, 0.75f);
+            Assert.AreEqual(521.5f, shaken.x, 1e-3f);
+            Assert.AreEqual(1216f, shaken.y, 1e-3f);
         }
+
+        /// <summary>The portrait 2x2 grid (HudControlZones mirrors TouchControls.uss) keeps every pair of ring discs >= 8 px
+        /// apart and every box >= 19 px apart, clear of the stick and the strip, on every phone panel 773..1080 wide (WP8 gate:
+        /// the 9:16 panel once read 7.7 px).</summary>
+        [Test]
+        public void PortraitGrid_ClearsEveryRule_OnEveryPortraitPanel()
+        {
+            var rb = CluckWars.Visuals.HudControlZones.TouchHexRightBottomPortraitPx;
+            float joyLeft = CluckWars.Visuals.HudControlZones.JoystickLeftPortraitPx;
+            foreach (float aspect in new[] { 1080f / 1920f, 1080f / 2400f, 1080f / 2410f, 1080f / 1350f })
+            {
+                float w = CluckWars.Visuals.HudControlZones.PanelSize(aspect).x;
+                var boxes = new Rect[4];
+                for (int i = 0; i < 4; i++) boxes[i] = R(w - rb[i].x - 150f, -rb[i].y - 150f, 150f, 150f);   // y up as negative: only gaps matter
+                var joy = R(joyLeft, -360f, 280f, 280f);
+                for (int i = 0; i < 4; i++)
+                {
+                    Assert.IsFalse(UiLayoutRules.TargetsTooClose(boxes[i], joy, out float gj), $"a{i + 1} vs stick at {w:0} px: {gj:0.0}");
+                    var di = UiShape.Disc(boxes[i].center, UiLayoutRules.HexRingRadiusPx);
+                    Assert.IsFalse(UiLayoutRules.ClustersConflict(di, UiShape.Box(joy), out float gd), $"a{i + 1} ring vs stick at {w:0} px: {gd:0.0}");
+                    for (int j = i + 1; j < 4; j++)
+                    {
+                        Assert.IsFalse(UiLayoutRules.TargetsTooClose(boxes[i], boxes[j], out float g), $"a{i + 1}/a{j + 1} boxes at {w:0} px: {g:0.0}");
+                        var dj = UiShape.Disc(boxes[j].center, UiLayoutRules.HexRingRadiusPx);
+                        // The bump is horizontal: same-row neighbours need its 10 px on top of the 8 px gap.
+                        float need = UiLayoutRules.ClusterMinGapPx + (rb[i].y == rb[j].y ? FeedbackBumpPx : 0f);
+                        Assert.GreaterOrEqual(UiLayoutRules.ShapeGap(di, dj), need, $"a{i + 1}/a{j + 1} rings at {w:0} px");
+                    }
+                }
+            }
+        }
+
+        private const float FeedbackBumpPx = 10f;   // FeedbackTuning.DeniedPressBumpAmplitudePx (horizontal only)
 
         [Test]
         public void U2_HexRestRect_IgnoresTheHeldPop()

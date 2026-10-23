@@ -133,6 +133,11 @@ namespace CluckWars.Diagnostics
             return new Rect(c.x - w * 0.5f, c.y - h * 0.5f, w, h);
         }
 
+        /// <summary>The box an element moved by its own translate (<paramref name="dx"/>, <paramref name="dy"/> in its parent's
+        /// units, <paramref name="parentScale"/> to panel px) occupies where layout put it: a shake / follow offset is juice.</summary>
+        public static Rect Untranslated(Rect moved, float dx, float dy, float parentScale) =>
+            new Rect(moved.x - dx * parentScale, moved.y - dy * parentScale, moved.width, moved.height);
+
         /// <summary>Signed gap between two discs (negative = overlap depth).</summary>
         public static float DiscGap(Vector2 c1, float r1, Vector2 c2, float r2) => Vector2.Distance(c1, c2) - r1 - r2;
 
