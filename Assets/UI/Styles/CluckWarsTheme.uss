@@ -1863,7 +1863,7 @@
 .cw-chip-lock, .cw-ability-card__lock {
     position: absolute; top: 6px; left: 6px;
     padding: 2px 8px;
-    font-size: 24px; -unity-text-align: middle-center;
+    font-size: 28px; -unity-text-align: middle-center;
     color: rgb(40, 28, 16); background-color: rgb(245, 200, 66);
     border-top-left-radius: 12px; border-top-right-radius: 12px;
     border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;

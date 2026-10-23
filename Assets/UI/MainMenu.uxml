@@ -38,7 +38,7 @@
         <ui:VisualElement name="MenuHeaderRow" picking-mode="Ignore" style="position: absolute; left: 20px; top: 20px;">
             <ui:VisualElement name="IdentityStrip" class="cw-id-strip" style="display: none;">
                 <ui:VisualElement name="IdentityEmblem" class="cw-emblem cw-emblem--small">
-                    <ui:Label name="IdentityEmblemLevel" text="0" class="cw-emblem__level" />
+                    <ui:Label name="IdentityEmblemLevel" text="" class="cw-emblem__level" />
                 </ui:VisualElement>
                 <ui:VisualElement class="cw-id-strip__text">
                     <ui:Label name="IdentityName" text="" class="cw-id-strip__name" />
@@ -96,7 +96,7 @@
                 <ui:Button name="JoinBtn" text="@btn.join" class="cw-btn cw-btn--wood cw-menu-secondary" />
             </ui:VisualElement>
             <ui:VisualElement name="ProfileRow" class="cw-mode-row cw-menu-secondary-row">
-                <ui:Button name="ProfileBtn" text="PROFILE" class="cw-btn cw-btn--wood cw-menu-secondary" />
+                <ui:Button name="ProfileBtn" text="@btn.profile" class="cw-btn cw-btn--wood cw-menu-secondary" />
             </ui:VisualElement>
             <ui:Label name="MainMenuHint" text="@main.soloHint" class="cw-body cw-on-art cw-art-plate cw-menu-hint" />
 
