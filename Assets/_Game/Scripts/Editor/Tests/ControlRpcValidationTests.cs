@@ -504,6 +504,45 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void RootClaim_AVictimThatJumpedOutOfTheEgg_IsJudgedOnWhereItStoodWithinTheWindow()
+        {
+            // Session 20261023-173009 (hostleave, client4 17:31:14.617): the victim stood in the egg, blinked 11.7 m
+            // (Doppelganger, 17:31:14.282); the zone authority rooted its lagged copy at 14.466 and the victim, judging
+            // only where it stood NOW, refused an honest root (OutOfRange). The victim's own recent positions are local
+            // truth; the zone must still vouch for one of them.
+            var history = new RecentPositions();
+            var egg = new Vector3(-23f, 0f, -10.5f);
+            System.Func<Vector3, bool> insideEgg = p => ControlClaimRules.IsInsideZone(egg, 1.45f, p, 0.5f);
+            history.Record(10.00f, egg);                                // standing in the egg
+            history.Record(10.03f, egg + new Vector3(11.7f, 0f, 0f));   // landed the blink
+            Assert.IsFalse(insideEgg(egg + new Vector3(11.7f, 0f, 0f)), "fixture: where it stands now is outside");
+            Assert.IsTrue(history.AnyWithinWindow(10.34f, insideEgg), "inside 0.34 s ago, inside the window: honest");
+            Assert.IsFalse(history.AnyWithinWindow(10.00f + RecentPositions.WindowSeconds + 0.01f, insideEgg),
+                "older than the latency cap: never vouches");
+            Assert.IsFalse(history.AnyWithinWindow(9.5f, insideEgg), "a sample from the future (clock reset) never counts");
+            history.Clear();
+            Assert.IsFalse(history.AnyWithinWindow(10.1f, insideEgg), "cleared (round-reset teleport, respawn): nothing vouches");
+            Assert.AreEqual(ExecuteRules.MaxLatencySeconds, RecentPositions.WindowSeconds, "the window is the latency cap the bounds already accept");
+
+            for (int i = 0; i < 100; i++) history.Record(20f + i * 0.03125f, Vector3.zero);
+            Assert.LessOrEqual(history.Count, 24, "a fixed ring, no growth");
+        }
+
+        [Test]
+        public void RootClaim_RecordsOwnPositions_AndClearsThemOnTeleportAndSpawn()
+        {
+            const string controller = "Assets/_Game/Scripts/Gameplay/ChickenController.cs";
+            string judge = AssassinExecuteCreditTests.MethodBody(controller, "private ControlClaimRules.Verdict JudgeControl(");
+            StringAssert.Contains("|| WasRecentlyInsideRootOf(caster, zoneMargin, ceiling))", judge);
+            StringAssert.Contains("AbilityZone.ContainsRootOf(caster, p, margin, c)",
+                AssassinExecuteCreditTests.MethodBody(controller, "private bool WasRecentlyInsideRootOf("), "each past position is judged by the same zone rule");
+            StringAssert.Contains("_recentPositions.Record(Time.realtimeSinceStartup, transform.position);",
+                AssassinExecuteCreditTests.MethodBody(controller, "public override void FixedUpdateNetwork()"));
+            StringAssert.Contains("_recentPositions.Clear();", AssassinExecuteCreditTests.MethodBody(controller, "private void ApplyPendingTeleport()"));
+            StringAssert.Contains("_recentPositions.Clear();", AssassinExecuteCreditTests.MethodBody(controller, "public override void Spawned()"));
+        }
+
+        [Test]
         public void AbilityZone_RecordsDespawnedRootsFromItsSnapshot_NotFromHasState()
         {
             const string zonePath = "Assets/_Game/Scripts/Gameplay/AbilityZone.cs";

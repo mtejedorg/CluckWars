@@ -489,6 +489,7 @@ namespace CluckWars.Gameplay
         {
             ActiveControllers.Add(this);
             LocalJoinClock.Note(Runner);   // a joiner's first snapshot carries every chicken (root evidence, qa W1)
+            _recentPositions.Clear();      // pooled: a previous life's positions never vouch
             if (_log == null)
             {
                 ProjectContext.Instance.Container.Inject(this);
@@ -785,6 +786,7 @@ namespace CluckWars.Gameplay
 
             // A round-reset teleport queued by RPC_TeleportTo: first thing, before anything moves or reads the position.
             ApplyPendingTeleport();
+            _recentPositions.Record(Time.realtimeSinceStartup, transform.position);   // root-claim window (local)
 
             // The networked mirrors of the ability effect stack are re-derived every authority tick (each write
             // is change-gated), so their correctness never depends on every mutation site remembering to call
@@ -1124,6 +1126,7 @@ namespace CluckWars.Gameplay
             else transform.position = target;
             if (hadController) _characterController.enabled = true;
             VerticalVelocity = 0f;
+            _recentPositions.Clear();   // nothing from the previous round may vouch for a root claim
 
             _log?.Info("Reset", System.FormattableString.Invariant(
                 $"Teleport applied {Object.InputAuthority}{(IsBot ? "/bot" : "")} home={HomeCornerIndex} from={from.x:0.0},{from.z:0.0} to={target.x:0.0},{target.z:0.0}"));
@@ -1363,11 +1366,25 @@ namespace CluckWars.Gameplay
                     ChickenCargo.DriftSpeed(caster) + ChickenCargo.DriftSpeed(this), latency + 2f * Runner.DeltaTime);
                 Vector3 c = caster.transform.position, v = transform.position;
                 claim.PlanarDistance = Mathf.Sqrt((c.x - v.x) * (c.x - v.x) + (c.z - v.z) * (c.z - v.z));
+                // Now, or anywhere this chicken stood within the window the RPC could have been in flight: the zone's
+                // authority judged a lagged copy of us, and a jump right after stepping in (Doppelganger blink, session
+                // 20261023-173009) moved us out before its RPC landed. The zone itself must still vouch either way.
+                float zoneMargin = claim.RangeMargin + ControlClaimRules.RangeSlackMeters;
                 claim.InsideCastersRootZone = kind == ControlKind.Root &&
-                    AbilityZone.ContainsRootOf(caster, v, claim.RangeMargin + ControlClaimRules.RangeSlackMeters, ceiling);
+                    (AbilityZone.ContainsRootOf(caster, v, zoneMargin, ceiling) || WasRecentlyInsideRootOf(caster, zoneMargin, ceiling));
             }
 
             return ControlClaimRules.Evaluate(claim, ceiling);
+        }
+
+        /// <summary>This authority's own positions over the last <see cref="RecentPositions.WindowSeconds"/> (local; root claims only).</summary>
+        private readonly RecentPositions _recentPositions = new RecentPositions();
+
+        /// <summary>Was this chicken inside a Root zone <paramref name="caster"/> owns at any recorded point of the last window?</summary>
+        private bool WasRecentlyInsideRootOf(ChickenController caster, float margin, in ControlClaimRules.Ceiling ceiling)
+        {
+            var c = ceiling;   // an 'in' parameter cannot be captured
+            return _recentPositions.AnyWithinWindow(Time.realtimeSinceStartup, p => AbilityZone.ContainsRootOf(caster, p, margin, c));
         }
 
         /// <summary>
