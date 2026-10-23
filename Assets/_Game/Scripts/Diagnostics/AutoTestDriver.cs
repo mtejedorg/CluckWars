@@ -117,7 +117,7 @@ namespace CluckWars.Diagnostics
             CluckWars.Visuals.FloorRivalArrows.EdgeArrowsRequested = _cfg.EdgeArrows;
             _log.Info(Source, _cfg.EdgeArrows
                 ? "AutoTest arrows=edge (-cw_edgearrows): rival arrows are the shipped edge chevrons."
-                : "AutoTest arrows=floor (dev default): hidden rivals get an arrow painted on a floor ring round the local " +
+                : "AutoTest arrows=floor (the shipped default): hidden rivals get an arrow painted on a floor ring round the local " +
                   "chicken; their edge chevrons are suppressed. -cw_edgearrows restores the chevrons.");
 
             if (_cfg.Shots.Length == 0) { _shotsDone = true; return; }

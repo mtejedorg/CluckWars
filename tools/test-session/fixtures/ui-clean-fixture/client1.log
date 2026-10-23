@@ -1,0 +1,9 @@
+[10:00:00.000][00:00.000][Info][Session] Session sha=fff666 date=2026-10-23 platform=WindowsPlayer
+[10:00:03.000][00:03.000][Info][UiProbe] ui offenders=3 scope=menu page=main reason=request scan=1 U1=0 U2=0 U3=3 U4=0 U5=0 U6=0 allowed=0 docs=1 elements=420 panel=966x2147 orient=portrait safe=0,118,966x1985 ms=2.40
+[10:00:03.000][00:03.000][Warn][UiProbe] ui offender U3 scope=menu page=main doc=MenuUi el=.cw-menu-title<MainMenu [-40,180,1046x150] partly off the panel 0,0,966x2147
+[10:00:20.000][00:20.000][Info][UiProbe] ui offenders=2 scope=overlay page=- reason=periodic scan=2 U1=2 U2=0 U3=0 U4=0 U5=0 U6=0 allowed=0 docs=3 elements=260 panel=966x2147 orient=portrait safe=0,118,966x1985 ms=1.50
+[10:00:30.000][00:30.000][Info][UiProbe] ui offenders=0 scope=hud page=- reason=periodic scan=3 U1=0 U2=0 U3=0 U4=0 U5=0 U6=0 allowed=1 docs=3 elements=180 panel=966x2147 orient=portrait safe=0,118,966x1985 ms=0.90
+[10:00:32.000][00:32.000][Info][UiProbe] ui offenders=0 scope=hud page=- reason=geometry scan=4 U1=0 U2=0 U3=0 U4=0 U5=0 U6=0 allowed=1 docs=3 elements=180 panel=966x2147 orient=portrait safe=0,118,966x1985 ms=0.90
+[10:00:34.000][00:34.000][Info][UiProbe] UiProbe touchhud=1: HUD pinned to the touch layout (joystick + thumb-arc hexes) for this match scene.
+[10:00:50.000][00:50.000][Info][GameManager] Match ended. Winner P1 total=12
+[10:01:50.000][01:50.000][Info][GameManager] Match ended. Winner P2 total=7

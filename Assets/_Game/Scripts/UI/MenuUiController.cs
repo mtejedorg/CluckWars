@@ -2638,8 +2638,57 @@ namespace CluckWars.UI
 
         private int _autoTestJoinFailures;
 
-        /// <summary>Pages built and nothing loading: the auto-test may start pressing.</summary>
-        public bool AutoTestIdle => DevToolsAvailable && _lobby != null && _selection != null && !_isBusy;
+        /// <summary>Pages built and nothing loading: the auto-test may start pressing (after any <c>-cw_menushots</c> walk).</summary>
+        public bool AutoTestIdle => AutoTestPagesReady && !CluckWars.Diagnostics.MenuShotsDriver.Holding;
+
+        /// <summary>Pages built and nothing loading (the menu-shot walk's own readiness; it ignores its own hold).</summary>
+        public bool AutoTestPagesReady => DevToolsAvailable && _lobby != null && _selection != null && !_isBusy;
+
+        /// <summary>
+        /// WP8 <c>-cw_menushots</c>: shows one page for a layout probe + screenshot, without pressing anything. Ids:
+        /// <c>main</c>, <c>settings</c> (the sheet over the main menu), <c>disconnect</c> (the CW-218 sheet, REJOIN shown but
+        /// disabled: there is nothing to rejoin), <c>class</c>, <c>gear</c>, <c>coop</c> (THE COOP in Solo mode) and
+        /// <c>coopjoin</c> (Join mode, the code field). THE COOP is never opened in Host mode here: that creates a UGS lobby.
+        /// </summary>
+        public bool AutoTestShowPage(string id)
+        {
+            if (!AutoTestAllowed("page")) return false;
+            switch (id)
+            {
+                case "main":
+                    CloseSettings();
+                    CloseDisconnectSheet();
+                    ShowMainMenu();
+                    return true;
+                case "settings":
+                    CloseDisconnectSheet();
+                    ShowMainMenu();
+                    OpenSettings();
+                    return _settingsSheet != null;
+                case "disconnect":
+                    CloseSettings();
+                    ShowMainMenu();
+                    if (_disconnectSheet == null) return false;   // BuildDisconnectSheet already reported the wiring gap
+                    SetDisconnectStatus(null);
+                    _disconnectBody.style.display = DisplayStyle.Flex;
+                    _disconnectRejoinBtn.style.display = DisplayStyle.Flex;
+                    _disconnectRejoinBtn.SetEnabled(false);   // ConsumeDisconnectNotice re-enables it for a real notice
+                    _disconnectBackBtn.SetEnabled(true);
+                    _disconnectSheet.style.display = DisplayStyle.Flex;
+                    return true;
+                case "class": ShowClassSelect(); return true;
+                case "gear":  ShowLoadout(); return true;
+                case "coop":
+                case "coopjoin":
+                    _selection.Mode = id == "coop" ? SessionMode.Solo : SessionMode.Join;
+                    _lobbyViaGearUp = true;
+                    ShowLobby();
+                    return true;
+                default:
+                    _log?.Warn(Source, $"Auto-test page '{id}' is not a menu page id.");
+                    return false;
+            }
+        }
 
         /// <summary>The host's join code once UGS created the lobby (THE COOP's code tiles); empty before.</summary>
         public string AutoTestJoinCode => _joinCode;

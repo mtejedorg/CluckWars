@@ -26,11 +26,18 @@
 .PARAMETER Height  window height of every EXE (default 540).
 .PARAMETER ExtraArgs  one space-separated string appended to EVERY EXE's args, e.g. HUD band screenshots (dev-tools build):
            -ExtraArgs '-cw_shots 15,22,29,36 -cw_band 290 -cw_zones -cw_shottag band290'  (PNGs land in <session>\shots)
-           Rival arrows: dev builds paint them on a floor ring round your chicken BY DEFAULT; -cw_edgearrows switches back to
-           the shipped edge chevrons (production always has the chevrons). A/B, same seconds, one run each:
+           Rival arrows: every build paints them on a floor ring round your chicken (decision 2a); -cw_edgearrows (dev tools
+           only) switches back to the screen-edge chevrons for comparisons. A/B, same seconds, one run each:
            -ExtraArgs '-cw_shots 15,22,29,36 -cw_zones -cw_shottag floor'                  (default: floor arrows)
            -ExtraArgs '-cw_shots 15,22,29,36 -cw_zones -cw_shottag edge -cw_edgearrows'    (edge chevrons)
            The log says which one ran ("AutoTest arrows=floor|edge") and the ring radius in use ("Floor ring radius=").
+           WP8 layout keys (dev tools): -cw_touchhud (check the phone's thumb-arc HUD instead of the desktop strip),
+           -cw_menushots [main,settings,disconnect,class,gear,coop,coopjoin] (menu-<page>.png + one UiProbe scan per page
+           before the menu flow starts), -cw_safearea l,b,r,t (simulated insets, screen px). tools\ui_capture\capture_orientation.py
+           runs the size matrix with them.
+.PARAMETER NoUiRequirement  do not require an in-match HUD layout scan (WP8 UiProbe) in the logs, for builds older than
+           WP8. UI offenders still fail the run: every scope=hud 'ui offenders=N' line with N > 0 is a UI finding, at any
+           -Width/-Height (portrait included).
 #>
 param(
     [ValidateSet('solo','shared2','shared4','hostleave')][string]$Mode = 'shared4',
@@ -42,7 +49,8 @@ param(
     [switch]$AutoAura,
     [int]$Width = 960,
     [int]$Height = 540,
-    [string]$ExtraArgs = ''     # extra EXE args (space separated) for every EXE, e.g. -ExtraArgs '-cw_shots 15,22 -cw_band 290 -cw_zones'
+    [string]$ExtraArgs = '',    # extra EXE args (space separated) for every EXE, e.g. -ExtraArgs '-cw_shots 15,22 -cw_band 290 -cw_zones'
+    [switch]$NoUiRequirement
 )
 if ($AutoZone -and $Mode -eq 'solo' -and -not $PSBoundParameters.ContainsKey('Class')) { $Class = 'Fatty' }
 $zoneArgs = @(if ($AutoZone) { '-cw_autozone' })
@@ -111,5 +119,5 @@ while ((Get-Date) -lt $deadline) {
 }
 Get-Process CluckWars -ErrorAction SilentlyContinue | Stop-Process -Force
 & "$PSScriptRoot\stop.ps1" -Session $S | Out-Null
-& "$PSScriptRoot\verify.ps1" -Session $S
+& "$PSScriptRoot\verify.ps1" -Session $S -RequireUi:(-not $NoUiRequirement)
 exit $LASTEXITCODE

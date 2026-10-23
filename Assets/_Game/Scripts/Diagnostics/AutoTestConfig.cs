@@ -210,6 +210,8 @@ namespace CluckWars.Diagnostics
                     case AutoDisconnectKey:   cfg.AutoDisconnect = cfg.ParseInt(key, value, 1, 600); break;
                     case AutoZoneKey:         cfg.AutoZone = cfg.ParseBool(key, value); break;
                     case AutoAuraKey:         cfg.AutoAura = cfg.ParseBool(key, value); break;
+                    // Read by their own owners, not here (WP8 UiProbeArgs; WP6 SafeAreaSource): known, so not "unknown key".
+                    case UiProbeArgs.MenuShotsKey: case UiProbeArgs.TouchHudKey: case "cw_safearea": break;
                     case ShotsKey:            cfg.Shots = ParseShots(value, cfg.Problems); break;
                     case ShotTagKey:
                         cfg.ShotTag = SanitizeProfile(value);

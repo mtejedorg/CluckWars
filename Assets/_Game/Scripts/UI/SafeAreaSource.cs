@@ -6,8 +6,8 @@ using UnityEngine;
 namespace CluckWars.UI
 {
     /// <summary>
-    /// The safe area every UI and HUD rule reads: <c>Screen.safeArea</c>, or in dev builds the
-    /// <c>-cw_safearea l,b,r,t</c> override (insets in screen pixels from the left, bottom, right and top edges), so a PC
+    /// The safe area every UI and HUD rule reads: <c>Screen.safeArea</c>, or in the Editor, development and dev-tools builds
+    /// the <c>-cw_safearea l,b,r,t</c> override (insets in screen pixels from the left, bottom, right and top edges), so a PC
     /// window can stand in for a phone's punch-hole and gesture bar in the orientation captures. Shared by
     /// <see cref="SafeAreaPadding"/> and <c>HudControlZones</c>, so the UI padding and the chevron avoid-zones agree.
     /// </summary>
@@ -91,7 +91,9 @@ namespace CluckWars.UI
         {
             if (_read) return;
             _read = true;
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // CLUCKWARS_DEV_TOOLS: the test-session EXEs are non-development players built with that define (DevTools),
+            // and they are the ones the orientation captures run (WP8 U5 needs the simulated insets).
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || CLUCKWARS_DEV_TOOLS
             string[] args = Environment.GetCommandLineArgs();
 #else
             string[] args = null;   // release builds never take the override

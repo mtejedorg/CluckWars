@@ -144,7 +144,7 @@ $tmp5 = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-zn-ok-' + [Guid]::New
 Copy-Item (Join-Path $PSScriptRoot 'fixtures\zones-clean-fixture') $tmp5 -Recurse
 & (Join-Path $PSScriptRoot 'merge.ps1') -Session $tmp5 | Out-Null
 $f5 = Get-Content (Join-Path $tmp5 'findings.txt') -Raw
-Assert ($f5 -notmatch 'B10') 'B10 clean: zn=0 at every round start, a zone gone within the grace, a fresh zone after the intro -> no finding'
+Assert ($f5 -cnotmatch 'B10')'B10 clean: zn=0 at every round start, a zone gone within the grace, a fresh zone after the intro -> no finding'
 Assert ($f5 -match 'INVARIANT=0') 'B10 clean: INVARIANT=0'
 Remove-Item $tmp5 -Recurse -Force
 
@@ -217,6 +217,42 @@ foreach ($fx in @('aura-victim-fixture', 'aura-unproven-fixture', 'aura-victim-c
     }
     Remove-Item $ta -Recurse -Force
 }
+
+# ---- UI layout (WP8): any in-match HUD scan with offenders is ONE UI finding per source; menu / overlay scans never are ----
+$tu = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-ui-' + [Guid]::NewGuid().ToString('N'))
+Copy-Item (Join-Path $PSScriptRoot 'fixtures\ui-fixture') $tu -Recurse
+& (Join-Path $PSScriptRoot 'merge.ps1') -Session $tu | Out-Null
+$fu = Get-Content (Join-Path $tu 'findings.txt') -Raw
+Assert ((Count $fu '\[UI\] UI layout offenders in the in-match HUD on client1: 2 of 4 hud scan\(s\) \(worst: offenders=3 U1=1 U2=0 U3=2 U4=0 U5=0 U6=0\)') -eq 1) 'WP8 UI: two offending hud scans on client1 = ONE finding, with the worst scan''s rule counts'
+Assert ($fu -notmatch 'in-match HUD on client2') 'WP8 UI: a source whose hud scans are all 0 is clean (its menu offenders do not count)'
+Assert ($fu -match 'UI=1\b') 'WP8 UI: exactly one UI finding'
+Assert ($fu -match 'UI hud scans : 6\b') 'WP8 UI: the summary counts every hud scan of every source (verify -RequireUi reads it)'
+Assert ($fu -match 'INVARIANT=0') 'WP8 UI: layout offenders are not INVARIANT findings'
+$vu = (& (Join-Path $PSScriptRoot 'verify.ps1') -Session $tu -RequireUi *>&1 | Out-String)
+Assert ($LASTEXITCODE -eq 1 -and $vu -match 'VERDICT: FAIL - UI=1') 'WP8 UI: verify fails on a HUD layout offender'
+Remove-Item $tu -Recurse -Force
+
+$tu = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-ui-ok-' + [Guid]::NewGuid().ToString('N'))
+Copy-Item (Join-Path $PSScriptRoot 'fixtures\ui-clean-fixture') $tu -Recurse
+& (Join-Path $PSScriptRoot 'merge.ps1') -Session $tu | Out-Null
+$fu = Get-Content (Join-Path $tu 'findings.txt') -Raw
+Assert ($fu -match 'UI=0\b' -and $fu -notmatch '\[UI\]') 'WP8 UI clean: hud scans at 0 (one allow-listed case), menu and overlay offenders -> no UI finding'
+Assert ($fu -match 'UI hud scans : 2\b') 'WP8 UI clean: two hud scans counted'
+$vu = (& (Join-Path $PSScriptRoot 'verify.ps1') -Session $tu -RequireUi *>&1 | Out-String)
+Assert ($LASTEXITCODE -eq 0 -and $vu -match 'VERDICT: PASS') 'WP8 UI clean: verify -RequireUi passes (a portrait run judged by the same rule)'
+Remove-Item $tu -Recurse -Force
+
+$tu = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-ui-none-' + [Guid]::NewGuid().ToString('N'))
+Copy-Item (Join-Path $PSScriptRoot 'fixtures\zones-clean-fixture') $tu -Recurse
+& (Join-Path $PSScriptRoot 'merge.ps1') -Session $tu | Out-Null
+$fu = Get-Content (Join-Path $tu 'findings.txt') -Raw
+Assert ($fu -match 'UI=0\b' -and $fu -match 'UI hud scans : 0  \(no UiProbe lines\)') 'WP8 UI: an older capture (no UiProbe lines) has UI=0, so its old verdict stands'
+$vu = (& (Join-Path $PSScriptRoot 'verify.ps1') -Session $tu -RequireUi *>&1 | Out-String)
+Assert ($vu -match 'no UiProbe hud scan') 'WP8 UI: verify -RequireUi names the missing probe'
+$vu = (& (Join-Path $PSScriptRoot 'verify.ps1') -Session $tu *>&1 | Out-String)
+Assert ($vu -notmatch 'no UiProbe hud scan') 'WP8 UI: without -RequireUi an old capture is judged as before'
+Remove-Item $tu -Recurse -Force
+
 Write-Host ''
 if ($script:fail -eq 0) { Write-Host 'SELFTEST OK' -ForegroundColor Green; exit 0 }
 Write-Host "SELFTEST FAILED ($($script:fail) assertion(s))" -ForegroundColor Red

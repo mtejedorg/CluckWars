@@ -237,6 +237,9 @@ namespace CluckWars.Installers
             Container.Bind<SyncHeartbeat>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.Sync").AsSingle().NonLazy();
             Container.Bind<VisualProbe>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.Visual").AsSingle().NonLazy();
             Container.Bind<InvariantProbe>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.Invariant").AsSingle().NonLazy();
+            // WP8: UI layout rules U1-U6 (UiProbe) and the -cw_menushots page walk that feeds it menu pages.
+            Container.Bind<UiLayoutProbe>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.UiLayout").AsSingle().NonLazy();
+            Container.Bind<MenuShotsDriver>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.MenuShots").AsSingle().NonLazy();
             Container.Bind<AutoTestDriver>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.AutoTest").AsSingle().NonLazy();
             Container.Bind<DebugHudSpawner>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.DebugHud").AsSingle().NonLazy();
         }

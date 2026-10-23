@@ -1,0 +1,5 @@
+[10:00:00.000][00:00.000][Info][Session] Session sha=eee555 date=2026-10-23 platform=WindowsPlayer
+[10:00:03.000][00:03.000][Info][UiProbe] ui offenders=2 scope=menu page=class reason=request scan=1 U1=0 U2=2 U3=0 U4=0 U5=0 U6=0 allowed=0 docs=1 elements=500 panel=1920x1080 orient=landscape safe=0,0,1920x1080 ms=2.00
+[10:00:30.000][00:30.000][Info][UiProbe] ui offenders=0 scope=hud page=- reason=periodic scan=2 U1=0 U2=0 U3=0 U4=0 U5=0 U6=0 allowed=0 docs=3 elements=150 panel=1920x1080 orient=landscape safe=0,0,1920x1080 ms=0.80
+[10:00:32.000][00:32.000][Info][UiProbe] ui offenders=0 scope=hud page=- reason=periodic scan=3 U1=0 U2=0 U3=0 U4=0 U5=0 U6=0 allowed=0 docs=3 elements=150 panel=1920x1080 orient=landscape safe=0,0,1920x1080 ms=0.80
+[10:00:50.000][00:50.000][Info][GameManager] Match ended. Winner P1 total=12

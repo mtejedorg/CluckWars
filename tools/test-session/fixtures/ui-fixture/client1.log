@@ -1,0 +1,12 @@
+[10:00:00.000][00:00.000][Info][Session] Session sha=eee555 date=2026-10-23 platform=WindowsPlayer
+[10:00:01.000][00:01.000][Info][UiProbe] UiProbe on: rules U1-U6 every 2 s while heavy probes run (now on), 10 allow-list entries, touchhud=1.
+[10:00:03.000][00:03.000][Info][UiProbe] ui offenders=4 scope=menu page=gear reason=request scan=1 U1=0 U2=4 U3=0 U4=0 U5=0 U6=0 allowed=0 docs=1 elements=640 panel=1080x1920 orient=portrait safe=0,0,1080x1920 ms=3.10
+[10:00:03.000][00:03.000][Warn][UiProbe] ui offender U2 scope=menu page=gear doc=MenuUi el=.cw-ability-card<DeckShared [40,900,226x290] other=.cw-ability-card<DeckShared [276,900,226x290] gap=10.0 (need >= 19)
+[10:00:20.000][00:20.000][Info][UiProbe] ui offenders=1 scope=overlay page=- reason=periodic scan=2 U1=1 U2=0 U3=0 U4=0 U5=0 U6=0 allowed=0 docs=3 elements=210 panel=1080x1920 orient=portrait safe=0,0,1080x1920 ms=1.20
+[10:00:30.000][00:30.000][Info][UiProbe] ui offenders=0 scope=hud page=- reason=periodic scan=3 U1=0 U2=0 U3=0 U4=0 U5=0 U6=0 allowed=1 docs=3 elements=180 panel=1080x1920 orient=portrait safe=0,0,1080x1920 ms=0.90
+[10:00:32.000][00:32.000][Info][UiProbe] ui offenders=2 scope=hud page=- reason=periodic scan=4 U1=1 U2=0 U3=1 U4=0 U5=0 U6=0 allowed=1 docs=3 elements=182 panel=1080x1920 orient=portrait safe=0,0,1080x1920 ms=0.95
+[10:00:32.000][00:32.000][Warn][UiProbe] ui offender U1 scope=hud doc=TouchControls+MatchOverlays el=HoldHint<HoldHintHost [400,1200,500x110] other=.cw-eventbanner__plaque<EventBanner [160,1080,760x140] overlap=12.0
+[10:00:34.000][00:34.000][Info][UiProbe] ui offenders=3 scope=hud page=- reason=geometry scan=5 U1=1 U2=0 U3=2 U4=0 U5=0 U6=0 allowed=1 docs=3 elements=182 panel=1080x1920 orient=portrait safe=0,0,1080x1920 ms=0.97
+[10:00:36.000][00:36.000][Info][UiProbe] ui offenders=0 scope=hud page=- reason=periodic scan=6 U1=0 U2=0 U3=0 U4=0 U5=0 U6=0 allowed=1 docs=3 elements=180 panel=1080x1920 orient=portrait safe=0,0,1080x1920 ms=0.90
+[10:00:50.000][00:50.000][Info][GameManager] Match ended. Winner P1 total=12
+[10:01:50.000][01:50.000][Info][GameManager] Match ended. Winner P1 total=9

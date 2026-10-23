@@ -424,6 +424,39 @@ if ($auraCasts.Count -gt 0 -and $auraSinglePeer -and $auraLocalOk -eq 0) {
     Add-Finding @('INVARIANT') $auraCasts[0] ("autoaura cast $($auraCasts.Count) aura(s) in a single-peer session but no victim was proven slowed (expected >= 1 'Invariant aura ... verdict=ok'; no remote rival exists here, WP4) - first: $($auraCasts[0].Message)")
 }
 
+# ---- UI layout (WP8, PORTRAIT_AND_LANDSCAPE_SPEC 3.5 U1-U6): the in-match HUD has no layout offenders ---------------
+# Dev-tools builds run UiLayoutProbe (Source UiProbe): one `ui offenders=N scope=hud|menu|overlay page=.. reason=.. scan=..
+# U1=.. U2=.. U3=.. U4=.. U5=.. U6=.. allowed=..` line per scan (~2 s, and on a resize / rotation), plus one rate-limited
+# Warn per offender (rule, element, rects; those are ordinary WARN findings). Only scope=hud (an Active round on the Game
+# scene, arena revealed) is gated: every hud scan with N > 0 counts, filed as ONE UI finding per source (offending scans
+# of all hud scans, the worst scan's per-rule counts, the first offending line). Menu (-cw_menushots) and overlay scans
+# (waiting room, GET READY, results) are only counted in the summary. Allow-listed cases are not offenders (allowed=).
+# The whole window size decides nothing here: a -Width/-Height portrait run is judged by exactly the same rule.
+$rxUi = New-Object Text.RegularExpressions.Regex('^ui offenders=(\d+) scope=(\w+)\b.*?\bU1=(\d+) U2=(\d+) U3=(\d+) U4=(\d+) U5=(\d+) U6=(\d+)')
+$uiStats = [ordered]@{}   # src -> counts per scope, first / worst offending hud scan
+foreach ($e in $sorted) {
+    if ($e.Source -ne 'UiProbe') { continue }
+    $m = $rxUi.Match($e.Message); if (-not $m.Success) { continue }
+    if (-not $uiStats.Contains($e.Src)) { $uiStats[$e.Src] = @{ hud = 0; hudBad = 0; menu = 0; menuBad = 0; overlay = 0; overlayBad = 0; First = $null; Worst = $null; WorstN = -1 } }
+    $u = $uiStats[$e.Src]
+    $scope = $m.Groups[2].Value; if ($scope -notin 'hud', 'menu', 'overlay') { $scope = 'overlay' }
+    $n = [int]$m.Groups[1].Value
+    $u[$scope]++
+    if ($n -le 0) { continue }
+    $u["${scope}Bad"]++
+    if ($scope -ne 'hud') { continue }
+    if ($null -eq $u.First) { $u.First = $e }
+    if ($n -gt $u.WorstN) { $u.WorstN = $n; $u.Worst = "U1=$($m.Groups[3].Value) U2=$($m.Groups[4].Value) U3=$($m.Groups[5].Value) U4=$($m.Groups[6].Value) U5=$($m.Groups[7].Value) U6=$($m.Groups[8].Value)" }
+}
+$uiHudScans = 0
+foreach ($src in $uiStats.Keys) {
+    $u = $uiStats[$src]
+    $uiHudScans += $u.hud
+    if ($u.hudBad -gt 0) {
+        Add-Finding @('UI') $u.First ("UI layout offenders in the in-match HUD on ${src}: $($u.hudBad) of $($u.hud) hud scan(s) (worst: offenders=$($u.WorstN) $($u.Worst)) (expected 0, WP8 U1-U6; the 'ui offender' Warn lines name each one) - first: $($u.First.Message)")
+    }
+}
+
 # ---- World-hash parity (CW-216/217 class: spawned objects positioned differently per peer) ---------------------
 # The game logs `World t=<tick> static=<hash> n=<count> ... auras=<hash>/<n> ...` on every peer every 2 s (Source
 # Invariant). Peers log on the same ticks, so for each tick every reporting peer must have the same `static` hash (bases,
@@ -602,7 +635,7 @@ $shaMismatch = ($distinct.Count -gt 1)
 # findings.txt
 # ---------------------------------------------------------------------------------------------
 $sortedFindings = $findings | Sort-Object -Property Ticks, Seq
-$catCounts = [ordered]@{ ERROR = 0; WARN = 0; EXCEPTION = 0; PERF = 0; VISUAL = 0; SYNC = 0; GHOST = 0; INVARIANT = 0 }
+$catCounts = [ordered]@{ ERROR = 0; WARN = 0; EXCEPTION = 0; PERF = 0; VISUAL = 0; SYNC = 0; GHOST = 0; INVARIANT = 0; UI = 0 }
 $srcCounts = @{}
 foreach ($f in $findings) {
     foreach ($c in $f.Cats) { $catCounts[$c]++ }
@@ -623,13 +656,15 @@ foreach ($p in $pairStats) { $r.Add("    $p") }
 $r.Add('  session SHAs :')
 if ($shaLines.Count -eq 0) { $r.Add('    (no [Session] lines found)') } else { foreach ($l in $shaLines) { $r.Add("  $l") } }
 if ($shaMismatch) { $r.Add("  !! SHA MISMATCH between sources: " + ($distinct -join ' vs ')) }
+# verify.ps1 -RequireUi reads the total: a run whose build never scanned the in-match HUD proves nothing about U1-U6.
+$r.Add("  UI hud scans : $uiHudScans" + $(if ($uiStats.Count) { '  (' + (($uiStats.Keys | ForEach-Object { $u = $uiStats[$_]; "$_ hud=$($u.hud)/bad=$($u.hudBad) menu=$($u.menu)/bad=$($u.menuBad) overlay=$($u.overlay)/bad=$($u.overlayBad)" }) -join '; ') + ')' } else { '  (no UiProbe lines)' }))
 $r.Add('')
 
 foreach ($cat in $catCounts.Keys) {
     $items = @($sortedFindings | Where-Object { $_.Cats -contains $cat })
     $r.Add("== $cat ($($items.Count)) ==")
     foreach ($f in $items) {
-        if ($cat -in 'SYNC', 'GHOST', 'INVARIANT') { $r.Add("[$cat] $($f.Text)"); continue }
+        if ($cat -in 'SYNC', 'GHOST', 'INVARIANT', 'UI') { $r.Add("[$cat] $($f.Text)"); continue }
         $tags = ($f.Cats | ForEach-Object { "[$_]" }) -join ''
         $r.Add("$tags $($f.Text)")
         $n = 0
