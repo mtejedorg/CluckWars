@@ -24,17 +24,19 @@ There are three root causes. All of them can be fixed.
 2. **The camera ignores aspect.** `MatchCamera._orthoSize = 5.6` is half the view *height* in every orientation. In portrait the view is 2.5 m wide either side of the chicken, which is **25 % of the ground a 16:9 player sees**. Everything world-space (nameplates, rings, chevrons) is sized in metres, so in portrait it is drawn 2.2 times larger in pixels. That is why the nameplate takes half the width.
 3. **The ground area does not count the world under the HUD.** `HudControlZones` lists only the controls. A rival under the leaderboard keeps its nameplate behind the panel and gets no edge chevron. The status strip is deliberately left out of the zones (HudControlZones.cs:24), so a chevron can land on it.
 
-**Useful fact: element sizes do not change between orientations.** `Assets/Resources/PanelSettings.asset` uses ScaleWithScreenSize, 1920x1080, match 0.5. The scale is `sqrt(W*H / (1920*1080))`, which depends only on the screen *area*. On a given phone, portrait and landscape use the same scale. The dp table in the CluckWarsTheme.uss header (1 dp = 2.35 panel px, 48 dp target = 116 px, 30 px text floor) stays valid without being re-derived. Portrait is a narrower canvas, not a smaller one.
+**Correction (WP8, 2026-10-23, measured): the panel is NOT area-scaled.** `Assets/Resources/PanelSettings.asset` (the only one; every UIDocument uses it) is ScaleWithScreenSize, 1920x1080, MatchWidthOrHeight 0.5. UI Toolkit blends the two ratios **linearly**: `scale = (W/1920 + H/1080) / 2` (UGUI's CanvasScaler blends in log space, which gives the `sqrt(W*H / (1920*1080))` this section first assumed). The panel size still depends only on the aspect, so a half-size PC window has exactly a phone's panel (540x1200 = 1080x2400), but portrait and landscape do **not** share a scale: on a Pixel 10 Pro the panel scale is 1.397 upright and 1.128 sideways, so portrait elements are ~24 % larger on the glass and the portrait canvas is 776 px wide, not 966. The dp table in the CluckWarsTheme.uss header (2.35 panel px per dp) holds in landscape; in portrait a 9:20 phone has ~2.2 panel px per dp (a 116 px target is ~52 dp, still above 48). The WP8 UiProbe measured 960x540 -> 1920x1080, 2400x1080 -> 2133x960, 540x960 -> 923x1641, 540x1200 -> 776x1724; `HudControlZones.PanelSize` uses the linear rule and `Phase8ChunkDRivalArrowTests` pins those four.
 
 | Screen | Panel size (panel px) | Aspect |
 |---|---|---|
 | 1920x1080, 960x540 | 1920 x 1080 | 16:9 |
-| 2400x1080 | 2147 x 966 | 20:9 |
-| 1080x2400 (and 540x1200) | **966 x 2147** | 9:20 |
-| 1080x2410 (Pixel 10 Pro) | 964 x 2151 | 9:20.1 |
-| 540x960 (and 1080x1920) | 1080 x 1920 | 9:16 |
+| 2400x1080 | 2133 x 960 | 20:9 |
+| 1080x2400 (and 540x1200) | **776 x 1724** | 9:20 |
+| 1080x2410 (Pixel 10 Pro, and 540x1205) | 773 x 1725 | 9:20.1 |
+| 540x960 (and 1080x1920) | 923 x 1641 | 9:16 |
+| 9:21 phone | 746 x 1740 | 9:21 |
 
-The rest of this spec targets the **966-px-wide portrait column**, and every rule also has to hold at 1080 x 1920.
+Where this spec below says "966-px-wide column" / "966 x 2147", read **776 x 1724**. The portrait touch HUD of §1.5 was re-laid for it (WP8 follow-up): the hex arc became a 2 x 2 grid 80 px from the right edge and the stick + status strip moved to 40 px from the left (TouchControls.uss "PORTRAIT TOUCH LAYOUT"), because at 776 px the landscape arc (515 px from the right) ran into the stick (80..360).
+The rest of this spec targets the portrait column (written as 966 px wide; the real 9:20 column is 776 px, see the correction above), and every rule also has to hold at 1080 x 1920.
 
 ---
 
@@ -254,8 +256,8 @@ Panel layout depends only on aspect (§0), and so does camera framing (§2). So 
 |---|---|---|---|---|
 | M1 | 540x960 | 1080x1920 | standalone `start.ps1 -Width 540 -Height 960`, or Game View fixed size | 9:16 portrait |
 | M2 | 960x540 | 1920x1080 | standalone (the scenario default) | landscape regression |
-| M3 | 1080x2400 | 966x2147 | **Editor Game View fixed resolution 1080x2400** + MCP `screenshot-game-view` (it reads the full-size RT). Standalone stand-in: **540x1200**. | 9:20 portrait |
-| M4 | 2400x1080 | 2147x966 | standalone (fits a 3840-wide screen) or Game View | 20:9 landscape |
+| M3 | 1080x2400 | 776x1724 | **Editor Game View fixed resolution 1080x2400** + MCP `screenshot-game-view` (it reads the full-size RT). Standalone stand-in: **540x1200**. | 9:20 portrait |
+| M4 | 2400x1080 | 2133x960 | standalone (fits a 3840-wide screen) or Game View | 20:9 landscape |
 | M5 | 1920x1080 | 1920x1080 | standalone / Game View | PC baseline |
 | + | 1080x2410 (540x1205), 1440x1080, 2560x1080 | — | Game View | Pixel exact, 4:3, 21:9 spot checks |
 

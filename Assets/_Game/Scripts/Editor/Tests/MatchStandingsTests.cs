@@ -395,9 +395,10 @@ namespace CluckWars.Tests
             var digit = Regex.Match(css, @"\.cw-intro-number \{([^}]*)\}");
             Assert.IsTrue(digit.Success);
             StringAssert.Contains("-unity-text-outline-width: 6px;", digit.Groups[1].Value);
-            var stack = Regex.Match(css, @"\.cw-intro-stack \{[^}]*top: -(\d+)%;");
+            // WP8: the stack is a top band whose centre is the digit centre (height H% -> centre H/2 %).
+            var stack = Regex.Match(css, @"\.cw-intro-stack \{[^}]*top: 0;[^}]*height: (\d+)%;");
             Assert.IsTrue(stack.Success, ".cw-intro-stack must lift the digit above centre");
-            Assert.GreaterOrEqual(int.Parse(stack.Groups[1].Value), 15);
+            Assert.LessOrEqual(int.Parse(stack.Groups[1].Value) / 2f, 35f, "digit centre at least 15% above the screen centre");
             var root = TestAssets.Load<VisualTreeAsset>("Assets/UI/MatchOverlays.uxml").CloneTree();
             Assert.AreEqual("IntroStack", root.Q<Label>("IntroNumber")?.parent?.name, "the digit lives in #IntroStack");
         }

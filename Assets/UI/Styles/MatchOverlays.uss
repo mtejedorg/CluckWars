@@ -545,8 +545,13 @@
 /* Digit + glow ride in the TOP THIRD (centre ~16% down): the follow camera keeps the player's own chicken near
    screen centre and the GET READY "YOU" marker (1.45x nameplate) floats above it, so a digit centred 20% above
    centre still covered the marker (round-4 finding 8, after re-audit 12 first lifted it). */
+/* A band from the top of the panel, its height = twice the digit centre (32% = centre at 16%, as the old relative top: -34%),
+   but never shorter than the digit label's own box (250 px Lilita = ~350 px line box): on a short panel (20:9 landscape,
+   960 high) or at 1080 the label used to start above the panel (UiProbe U3, WP8 live run). Absolute, so nothing else moves:
+   #IntroGetReady is absolute too. Same on every aspect where it fitted (portrait panels: the same centre either way). */
 .cw-intro-stack {
-    top: -34%;
+    position: absolute; left: 0; right: 0; top: 0;
+    height: 32%; min-height: 352px;
     align-items: center; justify-content: center;
 }
 .cw-intro-glow {

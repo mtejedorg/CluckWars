@@ -196,7 +196,8 @@
 .layout--portrait .cw-lb-container { flex-grow: 1; flex-shrink: 1; min-width: 0; max-width: 640px; }
 .layout--portrait .cw-lb-panel { align-self: stretch; }
 .layout--portrait .cw-lb-row { height: 52px; }
-.layout--portrait .cw-lb-ord { width: 44px; font-size: 28px; flex-shrink: 0; }
+/* 48 px with no Label padding (the default 2 + 2 px left 40 px of content, under "2nd" / "4th" at 28 px: UiProbe U3). */
+.layout--portrait .cw-lb-ord { width: 48px; padding-left: 0; padding-right: 0; font-size: 28px; flex-shrink: 0; }
 .layout--portrait .cw-lb-dot {
     width: 32px; height: 32px;
     border-top-left-radius: 16px; border-top-right-radius: 16px;

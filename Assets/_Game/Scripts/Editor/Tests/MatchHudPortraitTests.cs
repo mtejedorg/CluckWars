@@ -139,8 +139,8 @@ namespace CluckWars.Tests
             float banner = float.Parse(Regex.Match(Block(overlays, ".cw-eventbanner.layout--portrait"), @"bottom:\s*(\d+)px").Groups[1].Value,
                 CultureInfo.InvariantCulture);
             // The hexes sit inside the safe area and the banner does not: allow the spec's simulated gesture bar (2 % of a
-            // 9:20 panel, 2147 px) plus the 8 px U1 gap.
-            float gestureBar = 0.02f * 2147f;
+            // 9:20 panel, 1724 px high: UI Toolkit's linear scale blend, WP8) plus the 8 px U1 gap.
+            float gestureBar = 0.02f * 1724f;
             Assert.GreaterOrEqual(banner, top + gestureBar + 8f, "the portrait banner must clear the hex arc");
         }
 

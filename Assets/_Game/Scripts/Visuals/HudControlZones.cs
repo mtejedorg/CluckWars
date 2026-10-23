@@ -20,8 +20,9 @@ namespace CluckWars.Visuals
     /// </para>
     /// <para>
     /// <b>Panel size.</b> The HUD panel is <c>Resources/PanelSettings.asset</c>: ScaleWithScreenSize, reference 1920x1080,
-    /// match 0.5, so its scale is sqrt((W/1920) x (H/1080)) and its size in panel px depends on the aspect alone
-    /// (2400x1080 gives 2147x966). That is why zones are built from the camera aspect, not from a pixel size.
+    /// MatchWidthOrHeight 0.5. UI Toolkit blends LINEARLY (unlike UGUI's CanvasScaler, which blends in log space): scale =
+    /// (W/1920 + H/1080) / 2, so the panel's size in panel px depends on the aspect alone (2400x1080 gives 2133x960, a 9:20
+    /// phone 776x1724, measured by the WP8 UiProbe). That is why zones are built from the camera aspect, not from a pixel size.
     /// </para>
     /// <para>
     /// <b>Two lists.</b> <see cref="Build"/> gives the CONTROL zones (joystick, hexes, desktop strip): a thumb needs them
@@ -46,6 +47,9 @@ namespace CluckWars.Visuals
         public const float JoystickBottomPx = 80f;
         public const float JoystickSizePx = 280f;
 
+        /// <summary>Portrait touch: <c>.layout--portrait .cw-joy-base { left: 40px }</c> (the 776 px panel of a 9:20 phone).</summary>
+        public const float JoystickLeftPortraitPx = 40f;
+
         // TouchControls.uss: .cw-hex { width/height: 150px }
         public const float HexSizePx = 150f;
 
@@ -60,6 +64,15 @@ namespace CluckWars.Visuals
             new Vector2(142f, 361f),
             new Vector2(302f, 269f),
             new Vector2(365f, 95f),
+        };
+
+        /// <summary>Portrait touch layout: the 2 x 2 grid of <c>.layout--portrait .cw-hex--aN</c> (right, bottom).</summary>
+        public static readonly Vector2[] TouchHexRightBottomPortraitPx =
+        {
+            new Vector2(80f, 95f),
+            new Vector2(80f, 270f),
+            new Vector2(254f, 270f),
+            new Vector2(254f, 95f),
         };
 
         /// <summary>Desktop / pad layout: hex a1..a4 left edge relative to the zone's horizontal centre
@@ -78,11 +91,12 @@ namespace CluckWars.Visuals
         public const float TopBandLandscapeFadePx = 40f;
 
         /// <summary>
-        /// <b>PENDING DECISION (Maestro): does the landscape fade count as HUD?</b> true = the info zone is the whole 330 px
-        /// bar (what WP7 shipped); false = 290 px, the fade excluded like portrait's. This one line is the switch. Note that at
-        /// 290 the lower ~34 px of a full four-row board (20 + 24 + 4 x 70 = 324 px) hangs below the zone.
+        /// <b>Decided (Maestro 2026-10-23, 1a): the landscape fade is NOT HUD</b>, so the info zone is 290 px, the fade excluded
+        /// in both orientations like portrait's (WP7 had shipped the whole 330 px bar). This one line is the switch; the dev
+        /// override <c>-cw_band 290|330</c> still compares the two. Known and accepted: the lower ~34 px of a full four-row board
+        /// (20 + 24 + 4 x 70 = 324 px) hangs below the zone.
         /// </summary>
-        public const bool LandscapeTopBandIncludesFade = true;
+        public const bool LandscapeTopBandIncludesFade = false;
 
         /// <summary>
         /// Dev-tools-only runtime override of the landscape band (<c>-cw_band 290|330</c>, panel px; 0 = none), so one build can
@@ -113,18 +127,21 @@ namespace CluckWars.Visuals
         public const float StatusStripBottomPx = 380f;
         public const float StatusStripWidthPx = 380f;
         public const float StatusStripPortraitWidthPx = 280f;
+        /// <summary>Portrait touch: <c>.layout--portrait .cw-status-strip { left: 40px }</c>, over the moved joystick.</summary>
+        public const float StatusStripPortraitLeftPx = 40f;
         public const float StatusStripDesktopLeftPx = 40f;
         public const float StatusStripDesktopBottomPx = 60f;
         public const float StatusRowPitchPx = 62f + 8f;
 
         /// <summary>HUD panel size in panel px for a screen of the given aspect (width / height).</summary>
-        /// <remarks>scale^2 = (W/RefW) x (H/RefH) with W = aspect x H, and panelH = H / scale, so
-        /// panelH^2 = RefW x RefH / aspect. Closed form only because <see cref="ReferenceMatch"/> is 0.5; the test pins the
-        /// constant against the PanelSettings asset so a changed match value fails loudly instead of drifting.</remarks>
+        /// <remarks>UI Toolkit's ScaleWithScreenSize + MatchWidthOrHeight: scale = lerp(W/RefW, H/RefH, match), linear. With
+        /// W = aspect x H and panelH = H / scale: panelH = 1 / ((1 - match) x aspect / RefW + match / RefH). Measured by the
+        /// WP8 probe: 960x540 -> 1920x1080, 540x960 -> 923x1641, 540x1200 -> 776x1724, 2400x1080 -> 2133x960. (It used to be
+        /// the area rule sqrt(RefW x RefH / aspect), which is UGUI's log-space blend, and put a 9:20 panel at 966x2147.)</remarks>
         public static Vector2 PanelSize(float aspect)
         {
             aspect = Mathf.Max(0.1f, aspect);
-            float h = Mathf.Sqrt(ReferenceWidth * ReferenceHeight / aspect);
+            float h = 1f / ((1f - ReferenceMatch) * aspect / ReferenceWidth + ReferenceMatch / ReferenceHeight);
             return new Vector2(aspect * h, h);
         }
 
@@ -144,11 +161,13 @@ namespace CluckWars.Visuals
 
             if (mode == HudDeviceMode.Touch)
             {
+                bool portrait = aspect < 1f;
+                float joyLeft = portrait ? JoystickLeftPortraitPx : JoystickLeftPx;
                 into.Add(Rect.MinMaxRect(
-                    FromLeft(JoystickLeftPx - pad), FromBottom(JoystickBottomPx - pad),
-                    FromLeft(JoystickLeftPx + JoystickSizePx + pad), FromBottom(JoystickBottomPx + JoystickSizePx + pad)));
+                    FromLeft(joyLeft - pad), FromBottom(JoystickBottomPx - pad),
+                    FromLeft(joyLeft + JoystickSizePx + pad), FromBottom(JoystickBottomPx + JoystickSizePx + pad)));
 
-                foreach (var rb in TouchHexRightBottomPx)
+                foreach (var rb in portrait ? TouchHexRightBottomPortraitPx : TouchHexRightBottomPx)
                 {
                     into.Add(Rect.MinMaxRect(
                         FromRight(rb.x + HexSizePx + pad), FromBottom(rb.y - pad),
@@ -191,7 +210,7 @@ namespace CluckWars.Visuals
 
             if (statusRows <= 0) return;
             bool touch = mode == HudDeviceMode.Touch;
-            float left = touch ? StatusStripLeftPx : StatusStripDesktopLeftPx;
+            float left = !touch ? StatusStripDesktopLeftPx : portrait ? StatusStripPortraitLeftPx : StatusStripLeftPx;
             float bottom = touch ? StatusStripBottomPx : StatusStripDesktopBottomPx;
             float width = portrait ? StatusStripPortraitWidthPx : StatusStripWidthPx;
             into.Add(Rect.MinMaxRect(

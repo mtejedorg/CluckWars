@@ -217,11 +217,11 @@ namespace CluckWars.Tests
         public void CountdownDigit_SitsInTheTopThird_AndIsSmallerThanBefore()
         {
             string css = Read("Assets/UI/Styles/MatchOverlays.uss");
-            var stack = Regex.Match(css, @"\.cw-intro-stack \{[^}]*top: -(\d+)%;");
+            var stack = Regex.Match(css, @"\.cw-intro-stack \{[^}]*top: 0;[^}]*height: (\d+)%;");
             Assert.IsTrue(stack.Success);
-            // Digit centre = 50% - top. The top third ends at 33%, so a centre at or above ~17% keeps the digit's lower half out of the
-            // 25-45% band the bird's YOU marker floats in.
-            Assert.GreaterOrEqual(int.Parse(stack.Groups[1].Value), 30, "digit centre at or above 20% of the screen height");
+            // Digit centre = half the top band's height (WP8: was 50% - a relative top). The top third ends at 33%, so a centre at or
+            // above ~17% keeps the digit's lower half out of the 25-45% band the bird's YOU marker floats in.
+            Assert.LessOrEqual(int.Parse(stack.Groups[1].Value) / 2f, 20f, "digit centre at or above 20% of the screen height");
             var size = Regex.Match(css, @"\.cw-intro-number \{[^}]*font-size: (\d+)px");
             Assert.IsTrue(size.Success);
             Assert.LessOrEqual(int.Parse(size.Groups[1].Value), 260, "was 342 px");
@@ -231,11 +231,13 @@ namespace CluckWars.Tests
         public void CountdownDigit_AtPeakSlamScale_NeverReachesTheYouMarker()
         {
             string css = Read("Assets/UI/Styles/MatchOverlays.uss");
-            int top = int.Parse(Regex.Match(css, @"\.cw-intro-stack \{[^}]*top: -(\d+)%;").Groups[1].Value);
+            var band = Regex.Match(css, @"\.cw-intro-stack \{[^}]*height: (\d+)%; min-height: (\d+)px;");
+            Assert.IsTrue(band.Success, ".cw-intro-stack is a top band with a min-height (WP8)");
             int font = int.Parse(Regex.Match(css, @"\.cw-intro-number \{[^}]*font-size: (\d+)px").Groups[1].Value);
             // One label serves 3, 2, 1 and GO!, so one bound covers every beat. Digit height ~0.72 em on the 1080 px reference;
             // the YOU pill's top edge sits at ~32% of the screen height (round-4 capture), so keep the peak bottom at or above 30%.
-            float centrePct = 50f - top;
+            // Centre = half the band: H/2 %, or half the min-height where that is taller (on the 1080 px reference).
+            float centrePct = System.Math.Max(int.Parse(band.Groups[1].Value) / 2f, int.Parse(band.Groups[2].Value) / 2f / 1080f * 100f);
             float halfHeightPct = font * 0.72f * MenuJuicePolicy.CountdownPeakScale / 2f / 1080f * 100f;
             Assert.LessOrEqual(centrePct + halfHeightPct, 30f, "peak-scale digit bottom (% of screen height)");
             for (float t = 0f; t <= MenuJuicePolicy.CountdownPopSeconds; t += 0.01f)
