@@ -292,6 +292,8 @@ namespace CluckWars.UI
             if (_progression != null) _progression.OnIdentityChanged -= OnIdentityChanged;
             _profileController?.Dispose();
             _profileController = null;
+            DisposeStage();
+            DisposeJuice();
         }
 
         private void OnEnable()
@@ -406,8 +408,6 @@ namespace CluckWars.UI
         }
 
         private void LateUpdate() { if (_stage != null) RunOnStage(_stage.Tick); }
-
-        private void OnDisable() { DisposeStage(); DisposeJuice(); }
 
         private void OnDestroy() { DisposeStage(); DisposeJuice(); }
 
@@ -1407,7 +1407,7 @@ namespace CluckWars.UI
         {
             _classTiles.Clear();
             _chipMastery.Clear();
-            _chipLocks.Clear();
+            _tileLocks.Clear();
             for (int i = 0; i < Order.Length; i++)
             {
                 var cls = Order[i];
@@ -1421,7 +1421,7 @@ namespace CluckWars.UI
                 tile.Q<VisualElement>(ChipNames[i] + "Art")?.AddToClassList("cw-chicken--" + KeyOf(cls));
 
                 // Ramp lock badge (progression slice 4): shown only while the ramp gates this class.
-                var lockBadge = new Label("LOCKED") { name = ChipNames[i] + "Lock", pickingMode = PickingMode.Ignore };
+                var lockBadge = new Label(UiText.Get(UiKeys.RampLocked)) { name = ChipNames[i] + "Lock", pickingMode = PickingMode.Ignore };
                 lockBadge.AddToClassList("cw-chip-lock");
                 lockBadge.style.display = DisplayStyle.None;
                 tile.Add(lockBadge);
@@ -1584,20 +1584,22 @@ namespace CluckWars.UI
         private bool IsAbilityLocked(AbilityBaseSO ab) =>
             ab != null && RampGatesAnything && !_progression.Unlocks.Ramp.IsAbilityUnlocked(ab.UnlockKey);
 
-        private string ClassLockedMessage(ChickenClass cls)
+        private string RampStepText()
         {
             var ramp = _progression.Unlocks.Ramp;
-            string step = string.IsNullOrEmpty(ramp.StepName) ? $"ramp step {ramp.StepNumber}" : ramp.StepName;
-            return $"{Meta[cls].Name} unlocks later on the ramp ({step}: {ramp.ObjectiveText}).";
+            return string.IsNullOrEmpty(ramp.StepName)
+                ? UiText.Format(UiKeys.RampStepFallback, ("n", ramp.StepNumber))
+                : ramp.StepName;
         }
 
-        private string AbilityLockedMessage(AbilityBaseSO ab)
-        {
-            var ramp = _progression.Unlocks.Ramp;
-            string step = string.IsNullOrEmpty(ramp.StepName) ? $"ramp step {ramp.StepNumber}" : ramp.StepName;
-            string label = !string.IsNullOrEmpty(ab.DisplayName) ? ab.DisplayName : ab.name;
-            return $"{label} unlocks at {step} ({ramp.ObjectiveText}).";
-        }
+        private string ClassLockedMessage(ChickenClass cls) =>
+            UiText.Format(UiKeys.RampClassLocked, ("cls", cls.ToString()), ("step", RampStepText()),
+                ("objective", _progression.Unlocks.Ramp.ObjectiveText));
+
+        private string AbilityLockedMessage(AbilityBaseSO ab) =>
+            UiText.Format(UiKeys.RampAbilityLocked,
+                ("ability", !string.IsNullOrEmpty(ab.DisplayName) ? ab.DisplayName : ab.name),
+                ("step", RampStepText()), ("objective", _progression.Unlocks.Ramp.ObjectiveText));
 
         /// <summary>
         /// A locked card/chip was pressed: refuse it with visible feedback instead of silently doing
@@ -1609,7 +1611,7 @@ namespace CluckWars.UI
         {
             if (_abilityDetailName != null)
             {
-                _abilityDetailName.text = "LOCKED";
+                _abilityDetailName.text = UiText.Get(UiKeys.RampLocked);
                 _abilityDetailName.style.color = UiGfx.TextSecondary;
                 _abilityDetailName.style.display = DisplayStyle.Flex;
             }
@@ -2110,7 +2112,7 @@ namespace CluckWars.UI
             if (IsAbilityLocked(ab))
             {
                 card.AddToClassList("cw-ability-card--locked");
-                var lockBadge = new Label("LOCKED") { pickingMode = PickingMode.Ignore };
+                var lockBadge = new Label(UiText.Get(UiKeys.RampLocked)) { pickingMode = PickingMode.Ignore };
                 lockBadge.AddToClassList("cw-ability-card__lock");
                 card.Add(lockBadge);
             }

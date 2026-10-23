@@ -233,3 +233,9 @@ disconnect.rejoining,Rejoining…
 disconnect.rejoinFailed,The match is over or full.
 btn.rejoin,REJOIN
 btn.backToMenu,BACK TO MENU
+btn.profile,PROFILE
+lobby.dailyTask.head,TODAY'S TASK
+ramp.locked,LOCKED
+ramp.step.fallback,ramp step {n}
+ramp.class.locked,{cls} unlocks later on the ramp ({step}: {objective}).
+ramp.ability.locked,{ability} unlocks at {step} ({objective}).

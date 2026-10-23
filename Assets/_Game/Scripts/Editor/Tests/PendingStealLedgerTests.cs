@@ -179,8 +179,8 @@ namespace CluckWars.Tests
         public void HelperRecordsBeforeItSendsTheDrain_AndEveryDrainGoesThroughIt()
         {
             string cargo = Src("Gameplay/ChickenCargo.cs");
-            string helper = Body(cargo, "public void CreditStealAndDrain(", 1100);
-            int credit = helper.IndexOf("Cargo += amount", StringComparison.Ordinal);
+            string helper = Body(cargo, "public void CreditStealAndDrain(", 1300);
+            int credit = helper.IndexOf("ReceiveStolen(amount", StringComparison.Ordinal);
             int record = helper.IndexOf("_pendingSteals.Record(", StringComparison.Ordinal);
             int rpc = helper.IndexOf("RPC_DrainStolen(amount", StringComparison.Ordinal);
             Assert.Greater(credit, 0);

@@ -140,6 +140,12 @@ namespace CluckWars.Localization
 
         // ---- Settings ----
         public const string SettingsTitle = "settings.title";
+        public const string BtnProfile = "btn.profile";
+        public const string LobbyDailyTaskHead = "lobby.dailyTask.head";
+        public const string RampLocked = "ramp.locked";
+        [UiArgs("n")] public const string RampStepFallback = "ramp.step.fallback";
+        [UiArgs("cls", "step", "objective")] public const string RampClassLocked = "ramp.class.locked";
+        [UiArgs("ability", "step", "objective")] public const string RampAbilityLocked = "ramp.ability.locked";
         public const string SettingsClose = "settings.close";
         public const string SettingsRangeGuides = "settings.rangeGuides";
         public const string SettingsRangeGuidesDesc = "settings.rangeGuides.desc";

@@ -28,17 +28,14 @@ namespace CluckWars.Tests
         private const string UiRoot = "Assets/UI";
         private const string ProfileUxml = UiRoot + "/Profile.uxml";
         private const string MainMenuUxml = UiRoot + "/MainMenu.uxml";
-        private const string CharacterSelectUxml = UiRoot + "/CharacterSelect.uxml";
         private const string ProfileUss = UiRoot + "/Styles/Profile.uss";
         private const string ProfileControllerPath = "Assets/_Game/Scripts/UI/ProfileController.cs";
 
         /// <summary>Elements whose text is new in slice 3, by their <c>name</c> attribute.</summary>
         private static readonly string[] NewMainMenuElements = { "IdentityStrip", "ProfileBtn" };
 
-        private static readonly string[] NewCharacterSelectElements =
-        {
-            "ClassWarriorMastery", "ClassSpeedyMastery", "ClassFattyMastery", "ClassAssassinMastery",
-        };
+        // The class tiles' mastery rings are built in MenuUiController.BuildClassSelect (the pick page is
+        // a templated tile row now), so they carry no UXML text to scan.
 
         // ---- Sources of on-screen text ----------------------------------------------
 
@@ -101,7 +98,6 @@ namespace CluckWars.Tests
 
             foreach (string text in TextAttributes(ProfileUxml)) strings.Add((ProfileUxml, text));
             foreach (string text in TextAttributes(MainMenuUxml, NewMainMenuElements)) strings.Add((MainMenuUxml, text));
-            foreach (string text in TextAttributes(CharacterSelectUxml, NewCharacterSelectElements)) strings.Add((CharacterSelectUxml, text));
             foreach (string text in SourceLiterals(ProfileControllerPath)) strings.Add((ProfileControllerPath, text));
 
             var config = TestAssets.Load<ProgressionConfigSO>(TestAssets.ProgressionConfigPath);
@@ -170,7 +166,6 @@ namespace CluckWars.Tests
             var offenders = new List<string>();
             var scanned = TextAttributes(ProfileUxml)
                 .Concat(TextAttributes(MainMenuUxml, NewMainMenuElements))
-                .Concat(TextAttributes(CharacterSelectUxml, NewCharacterSelectElements))
                 .ToList();
 
             Assert.IsNotEmpty(scanned);
@@ -271,14 +266,11 @@ namespace CluckWars.Tests
                 CollectionAssert.Contains(menu, required, $"MenuUiController binds #{required} on the main menu.");
             }
 
-            var chips = new HashSet<string>(Load(CharacterSelectUxml).Root.DescendantsAndSelf()
-                .Select(e => (string)e.Attribute("name")).Where(n => !string.IsNullOrEmpty(n)), StringComparer.Ordinal);
-
-            foreach (string cls in new[] { "Warrior", "Speedy", "Fatty", "Assassin" })
-            {
-                CollectionAssert.Contains(chips, "Class" + cls + "Mastery");
-                CollectionAssert.Contains(chips, "Class" + cls + "MasteryLevel");
-            }
+            string controller = File.ReadAllText("Assets/_Game/Scripts/UI/MenuUiController.cs");
+            StringAssert.Contains("ChipNames[i] + \"Mastery\"", controller,
+                "BuildClassSelect must create each class tile's mastery ring (#Class<Name>Mastery).");
+            StringAssert.Contains("ChipNames[i] + \"MasteryLevel\"", controller,
+                "BuildClassSelect must create each mastery ring's level label (#Class<Name>MasteryLevel).");
         }
     }
 }

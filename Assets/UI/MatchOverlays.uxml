@@ -164,6 +164,10 @@
                         <!-- Controller fills with up to 4 .cw-me-row cards -->
                         <ui:VisualElement name="MeRows" class="cw-me-rows" />
 
+                        <!-- The round's Grain, one line above the actions. Hidden until progression has recorded the round
+                             (a frame after the panel opens); never a placeholder. -->
+                        <ui:Label name="MeGrain" text="" class="cw-me-head__title cw-me-grain" style="display: none;" />
+
                         <!-- Decision 5: nothing restarts on a timer. PLAY AGAIN (green, the one forward
                              action) re-arms the in-session waiting room; BACK TO LOBBY (wood) leaves the
                              session and reopens the menu on THE COOP. MatchOverlaysController enables
@@ -172,9 +176,6 @@
                             <ui:Button name="MePlayAgainBtn" text="@btn.playAgain" class="cw-btn cw-btn--green cw-me-action" />
                             <ui:Button name="MeBackBtn" text="@btn.backToLobby" class="cw-btn cw-btn--wood cw-me-action" />
                         </ui:VisualElement>
-                        <!-- The round's Grain, one line above the actions. Hidden until progression has recorded the round
-                             (a frame after the panel opens); never a placeholder. -->
-                        <ui:Label name="MeGrain" text="+0 Grain" class="cw-me-head__title cw-me-grain" style="display: none;" />
                         <ui:Label name="MeHostNote" text="@postmatch.hostOnly" class="cw-me-restart" />
                     </ui:VisualElement>
                 </ui:VisualElement>
