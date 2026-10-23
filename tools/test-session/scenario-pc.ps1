@@ -71,7 +71,7 @@ $S = (Get-ChildItem (Join-Path $root 'Captures') -Directory | Sort-Object Name |
 Write-Host "session: $S   mode: $Mode   rounds: $Rounds   window: ${Width}x${Height}$(if ($AutoZone) { '   autozone' })$(if ($AutoAura) { '   autoaura' })$(if ($allExtra) { '   extra: ' + ($allExtra -join ' ') })"
 
 function Start-Exe([string]$name, [string[]]$extra) {
-    $a = @('-screen-fullscreen','0','-screen-width',"$Width",'-screen-height',"$Height",'-logFile',"`"$S\$name.log`"",'-cw_autoplay','-cw_hud','-cw_profile',$name) + $zoneArgs + $allExtra + $extra
+    $a = @('-screen-fullscreen','0','-screen-width',"$Width",'-screen-height',"$Height",'-logFile',"`"$S\$name.log`"",'-cw_autoplay','-cw_hud','-cw_profile',$name,'-progressionDir',"`"$S\progression-$name`"") + $zoneArgs + $allExtra + $extra
     Start-Process $exe -ArgumentList $a | Out-Null
 }
 function Wait-Code([string]$log) {
