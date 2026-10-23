@@ -826,7 +826,7 @@ namespace CluckWars.Visuals
 
         /// <summary>The ring never exceeds this share of the smallest clear ground extent from the chicken (lateral half-width,
         /// depth up to the top HUD band, depth down, distance to the nearest HUD control), so it stays in the clear viewport and
-        /// off the controls: portrait 4.48 m (lateral 5.6 binds), landscape 16:9 3.48 m and 20:9 2.84 m (the top band binds),
+        /// off the controls: portrait 4.48 m (lateral 5.6 binds), landscape 16:9 4.15 m and 20:9 3.58 m (the 290 px top band binds),
         /// 4:3 touch 3.70 m (the hexes bind). See FloorArrowRules.RingRadius.</summary>
         public const float FloorArrowLateralFraction = 0.8f;
 

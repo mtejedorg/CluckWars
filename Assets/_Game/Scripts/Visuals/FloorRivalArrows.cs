@@ -7,11 +7,11 @@ using Zenject;
 namespace CluckWars.Visuals
 {
     /// <summary>
-    /// <b>DEV PROTOTYPE</b> (the default in dev-tools builds; <c>-cw_edgearrows</c> switches back): rival arrows PAINTED on a
+    /// <b>The rival arrows, in production</b> (Maestro 2026-10-23, decision 2a, both orientations): rival arrows PAINTED on a
     /// ring on the floor round the LOCAL chicken instead of at the screen edge. Maestro 2026-10-22: "for the arrows, the best
     /// and more immersive way is to put them in the outer circle at the floor", then (pass 3) "imagine they were painted on the
-    /// floor". Production (no dev tools) keeps the edge chevrons exactly as before: nothing of this exists there and
-    /// <see cref="RivalIndicator"/> behaves as it always did.
+    /// floor". The edge chevrons (<see cref="RivalIndicator"/>) remain the fallback for any rival the ring declines, and a
+    /// dev-tools build can switch back to them for comparisons with <c>-cw_edgearrows</c>.
     /// </summary>
     /// <remarks>
     /// <para><b>Who decides.</b> Each <see cref="RivalIndicator"/> still makes its own "is this rival hidden from the clear
@@ -25,11 +25,12 @@ namespace CluckWars.Visuals
     /// billboard) and foreshortened by the camera exactly like the ring: no screen-space fitting or compensation. Fill = the
     /// rival's player colour at paint alpha with a soft inner fade, rim = the same hue darkened. Ring drawn only while an
     /// arrow shows.</para>
-    /// <para><b>Lifetime.</b> One instance, created EAGERLY after the first scene loads in a dev build
-    /// (<see cref="CreateForDevBuilds"/>; removed again by <see cref="EdgeArrowsRequested"/>) and kept across scene loads. Never parented under a chicken: <c>ChickenVisuals</c>' renderer scan
-    /// and ghost material swap must never find these renderers. Pooled: one ring mesh and <see cref="FloorArrowRules.MaxArrows"/>
-    /// arrow meshes built in <see cref="Awake"/>; per frame only transforms move and, when a tint changes, vertex colours are
-    /// rewritten from fixed buffers. Purely local presentation: no networked state, no RPCs. Nothing animates.</para>
+    /// <para><b>Lifetime.</b> One instance, created by the first <see cref="RivalIndicator"/> to wake in a match
+    /// (<see cref="EnsureForMatch"/>, before any indicator's first LateUpdate, so no offer is lost) and kept across scene loads.
+    /// Never parented under a chicken: <c>ChickenVisuals</c>' renderer scan and ghost material swap must never find these
+    /// renderers. Pooled: one ring mesh and <see cref="FloorArrowRules.MaxArrows"/> arrow meshes built in <see cref="Awake"/>;
+    /// per frame only transforms move and, when a tint changes, vertex colours are rewritten from fixed buffers. Purely local
+    /// presentation: no networked state, no RPCs. Nothing animates.</para>
     /// </remarks>
     [DefaultExecutionOrder(ExecutionOrder)]
     public sealed class FloorRivalArrows : MonoBehaviour
@@ -50,15 +51,14 @@ namespace CluckWars.Visuals
         /// <summary>Ring tessellation (segments round the circle).</summary>
         private const int RingSegments = 72;
 
-        // ── Dev switch ─────────────────────────────────────────────────────────────────────────
+        // ── On / off ───────────────────────────────────────────────────────────────────────────
 
         private static bool _edgeArrowsRequested;
 
         /// <summary>
-        /// Dev comparison switch back to the shipped edge chevrons: set by <c>AutoTestDriver</c> from <c>-cw_edgearrows</c>
-        /// (after its dev-tools gate). In a dev build (<see cref="DevTools.Available"/>) the floor arrows are the DEFAULT
-        /// (2026-10-22: Maestro kept seeing the chevrons in the test window); in production they never exist
-        /// (<see cref="FloorArrowsActive"/>). Setting it in Play creates or removes the instance at once.
+        /// Dev comparison switch back to the edge chevrons: set by <c>AutoTestDriver</c> from <c>-cw_edgearrows</c> (after its
+        /// dev-tools gate). Ignored without dev tools (<see cref="FloorArrowsActive"/>): production has no switch. Turning it on in
+        /// Play removes the instance at once; the next match's first indicator recreates it when it is turned off again.
         /// </summary>
         public static bool EdgeArrowsRequested
         {
@@ -66,18 +66,17 @@ namespace CluckWars.Visuals
             set
             {
                 _edgeArrowsRequested = value;
-                if (DevEnabled && Application.isPlaying) EnsureInstance();
-                else if (value && _instance != null) Destroy(_instance.gameObject);
+                if (!Active && _instance != null) Destroy(_instance.gameObject);
             }
         }
 
-        /// <summary>The floor arrows are on: a dev build that did not ask for the edge chevrons. Production: edge chevrons.</summary>
-        public static bool DevEnabled => FloorArrowsActive(DevTools.Available, _edgeArrowsRequested);
+        /// <summary>The floor arrows are on: always, except a dev build that asked for the edge chevrons.</summary>
+        public static bool Active => FloorArrowsActive(DevTools.Available, _edgeArrowsRequested);
 
-        /// <summary>Pure form of the gate, pinned by tests: dev builds default to the floor arrows, <c>-cw_edgearrows</c>
-        /// restores the chevrons, production is always the chevrons.</summary>
+        /// <summary>Pure form of the switch, pinned by tests: on in every build (decision 2a); only a dev-tools build can turn
+        /// it off, with <c>-cw_edgearrows</c>.</summary>
         public static bool FloorArrowsActive(bool devToolsAvailable, bool edgeArrowsRequested) =>
-            devToolsAvailable && !edgeArrowsRequested;
+            !(devToolsAvailable && edgeArrowsRequested);
 
         private static FloorRivalArrows _instance;
 
@@ -88,31 +87,26 @@ namespace CluckWars.Visuals
             _instance = null;
         }
 
-        /// <summary>Dev default: the instance exists from the first scene on, with or without any <c>-cw_*</c> key (the
-        /// auto-test driver only runs with one). Production: nothing is created.</summary>
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void CreateForDevBuilds()
+        /// <summary>Called by every <see cref="RivalIndicator"/> as it wakes, i.e. once the first match scene has chickens:
+        /// creates the one instance if the floor arrows are on. Play mode only (an EditMode test driving an indicator's Awake
+        /// must not leave a DontDestroyOnLoad object behind).</summary>
+        public static void EnsureForMatch()
         {
-            if (DevEnabled) EnsureInstance();
-        }
-
-        private static void EnsureInstance()
-        {
-            if (_instance != null) return;
+            if (_instance != null || !Active || !Application.isPlaying) return;
             var go = new GameObject("FloorRivalArrows");
-            DontDestroyOnLoad(go);   // created at boot (menu scene); lives into every match
+            DontDestroyOnLoad(go);   // first match scene; lives on through PLAY AGAIN and later matches
             _instance = go.AddComponent<FloorRivalArrows>();
         }
 
         /// <summary>
         /// Offered by a <see cref="RivalIndicator"/> that would draw an edge chevron for the rival at <paramref name="rivalPos"/>.
         /// True when a floor arrow will represent it this frame (the caller then suppresses its chevron). <paramref name="key"/>
-        /// is a stable per-rival id (tie-break of the de-overlap). False at once while the prototype is off; never creates
-        /// anything (the instance is made when the switch is set).
+        /// is a stable per-rival id (tie-break of the de-overlap). False at once when the floor arrows are off or not created;
+        /// never creates anything.
         /// </summary>
         public static bool TryRepresent(int key, Vector3 rivalPos, Color tint, float opacity)
         {
-            if (!DevEnabled || _instance == null) return false;
+            if (!Active || _instance == null) return false;
             return _instance.Accept(key, rivalPos, tint, opacity);
         }
 
@@ -178,7 +172,7 @@ namespace CluckWars.Visuals
             _ringRenderer.gameObject.SetActive(false);
 
             _log?.Info(Source, string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "Floor rival arrows ON (dev default, painted; -cw_edgearrows for the chevrons): ring R = min({0:0.0} m, {1:0.0} x smallest clear " +
+                "Floor rival arrows ON (painted; dev builds: -cw_edgearrows for the chevrons): ring R = min({0:0.0} m, {1:0.0} x smallest clear " +
                 "ground extent), arrows {2:0.00}-{3:0.00} m long, edge chevrons suppressed for the rivals the ring represents.",
                 FeedbackTuning.FloorArrowPreferredRadius, FeedbackTuning.FloorArrowLateralFraction,
                 FeedbackTuning.FloorArrowNearLength, FeedbackTuning.FloorArrowFarLength));

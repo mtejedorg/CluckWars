@@ -151,11 +151,18 @@ namespace CluckWars.Tests
             Assert.That(ps.match, Is.EqualTo(HudControlZones.ReferenceMatch).Within(1e-5f),
                 "PanelSize is the closed form for match 0.5; a changed match must update HudControlZones.PanelSize.");
 
-            // Cross-check the closed form against Unity's own definition of the scale at 2400x1080.
-            float scale = Mathf.Sqrt((2400f / 1920f) * (1080f / 1080f));
-            var size = HudControlZones.PanelSize(2400f / 1080f);
-            Assert.That(size.x, Is.EqualTo(2400f / scale).Within(0.5f));
-            Assert.That(size.y, Is.EqualTo(1080f / scale).Within(0.5f));
+            // Cross-check the closed form against UI Toolkit's definition of the scale: a LINEAR blend of the two ratios
+            // (UGUI's CanvasScaler blends in log space; UI Toolkit does not). Panels measured by the WP8 UiProbe in standalone
+            // players: 2400x1080 -> 2133x960, 540x1200 (= any 9:20 phone) -> 776x1724, 540x960 -> 923x1641.
+            foreach (var (w, h, pw, ph) in new[] { (2400f, 1080f, 2133f, 960f), (540f, 1200f, 776f, 1724f), (540f, 960f, 923f, 1641f), (960f, 540f, 1920f, 1080f) })
+            {
+                float scale = Mathf.Lerp(w / 1920f, h / 1080f, 0.5f);
+                var size = HudControlZones.PanelSize(w / h);
+                Assert.That(size.x, Is.EqualTo(w / scale).Within(0.5f), $"{w}x{h} width");
+                Assert.That(size.y, Is.EqualTo(h / scale).Within(0.5f), $"{w}x{h} height");
+                Assert.That(size.x, Is.EqualTo(pw).Within(1f), $"{w}x{h} measured width");
+                Assert.That(size.y, Is.EqualTo(ph).Within(1f), $"{w}x{h} measured height");
+            }
         }
 
         [Test]
@@ -186,7 +193,16 @@ namespace CluckWars.Tests
                 Assert.That(d.Success, Is.True, $"desktop a{i + 1} rule not found");
                 Assert.That(float.Parse(d.Groups[1].Value), Is.EqualTo(HudControlZones.DesktopStripBottomPx), $"desktop a{i + 1} bottom");
                 Assert.That(float.Parse(d.Groups[2].Value), Is.EqualTo(HudControlZones.DesktopStripLeftFromCentrePx[i]), $"desktop a{i + 1} margin-left");
+
+                var p = Regex.Match(uss, @"^\.layout--portrait \.cw-hex--a" + (i + 1) + @"\s*\{\s*right:\s*(\d+)px;\s*bottom:\s*(\d+)px;", RegexOptions.Multiline);
+                Assert.That(p.Success, Is.True, $"portrait a{i + 1} rule not found");
+                Assert.That(float.Parse(p.Groups[1].Value), Is.EqualTo(HudControlZones.TouchHexRightBottomPortraitPx[i].x), $"portrait a{i + 1} right");
+                Assert.That(float.Parse(p.Groups[2].Value), Is.EqualTo(HudControlZones.TouchHexRightBottomPortraitPx[i].y), $"portrait a{i + 1} bottom");
             }
+            var pj = Regex.Match(uss, @"^\.layout--portrait \.cw-joy-base\s*\{\s*left:\s*(\d+)px;", RegexOptions.Multiline);
+            Assert.That(pj.Success && float.Parse(pj.Groups[1].Value) == HudControlZones.JoystickLeftPortraitPx, Is.True, "portrait joystick left");
+            var ps = Regex.Match(uss, @"^\.layout--portrait \.cw-status-strip\s*\{[^}]*left:\s*(\d+)px;", RegexOptions.Multiline);
+            Assert.That(ps.Success && float.Parse(ps.Groups[1].Value) == HudControlZones.StatusStripPortraitLeftPx, Is.True, "portrait status strip left");
         }
 
         [Test]
@@ -502,7 +518,10 @@ namespace CluckWars.Tests
         [Test]
         public void LandscapeTopBand_IsOneSwitch_330WithTheFade_290Without()
         {
-            // Pending Maestro decision: the switch is HudControlZones.LandscapeTopBandIncludesFade, nothing else.
+            // Maestro 2026-10-23 (1a): the fade is not HUD, 290 px in both orientations. The switch is
+            // HudControlZones.LandscapeTopBandIncludesFade, nothing else.
+            Assert.IsFalse(HudControlZones.LandscapeTopBandIncludesFade, "decision 1a: the landscape fade is excluded");
+            Assert.That(HudControlZones.TopBandLandscapeZonePx, Is.EqualTo(290f), "shipped landscape info zone");
             Assert.That(HudControlZones.TopBandLandscapeZonePx, Is.EqualTo(HudControlZones.LandscapeTopBandIncludesFade
                 ? HudControlZones.TopBandLandscapePx
                 : HudControlZones.TopBandLandscapePx - HudControlZones.TopBandLandscapeFadePx));

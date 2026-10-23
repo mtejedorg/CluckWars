@@ -261,10 +261,12 @@ namespace CluckWars.Visuals
         private static bool _reportedSpriteFallback;
 
         /// <summary>
-        /// One shared URP unlit transparent material for flat world sprites and lines that take their colour per vertex
-        /// (<see cref="FloorRivalArrows"/>). Prefers <see cref="UrpUnlitSpriteShader"/>; if a player build stripped it, falls back
-        /// to <see cref="BuildLineMaterial"/>'s chain (Sprites/Default, what every telegraph already draws with) and says so
-        /// once as a Warn; if that is missing too, its own once-per-session Error fires and this returns null.
+        /// One shared unlit transparent material for flat world meshes that take their colour per vertex
+        /// (<see cref="FloorRivalArrows"/>). Prefers <see cref="UrpUnlitSpriteShader"/> where it is loaded (the Editor); a player
+        /// build does not include it, so there it is <see cref="BuildLineMaterial"/>'s chain (Sprites/Default, what every
+        /// telegraph, range ring and zone ring already draws with, and what the floor ring was verified with on screen). That is
+        /// the expected production path, so it is an Info once, not a Warn; if Sprites/Default is missing too, its own
+        /// once-per-session Error fires and this returns null.
         /// </summary>
         public static Material SharedUnlitSpriteMaterial(ILogService log)
         {
@@ -281,8 +283,8 @@ namespace CluckWars.Visuals
             if (!_reportedSpriteFallback)
             {
                 _reportedSpriteFallback = true;
-                log?.Warn("TelegraphShapes", $"'{UrpUnlitSpriteShader}' is not in this build: floor arrows fall back to the " +
-                    "telegraph line material (Sprites/Default). Add it to Always Included Shaders to use the URP shader.");
+                log?.Info("TelegraphShapes", $"'{UrpUnlitSpriteShader}' not loaded: the floor ring paints with the telegraph " +
+                    "line material (Sprites/Default), as the telegraphs do.");
             }
             return CreateLineMaterial(find, log);
         }

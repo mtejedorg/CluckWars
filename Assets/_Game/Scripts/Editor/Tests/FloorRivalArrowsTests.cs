@@ -10,8 +10,8 @@ using UnityEngine;
 namespace CluckWars.Tests
 {
     /// <summary>
-    /// The floor-arrow prototype (<c>-cw_floorarrows</c>, Maestro 2026-10-22: "put them in the outer circle at the floor", pass 3
-    /// "painted on the floor"): the ring radius per framing, bearing to ring point, the painted decal (placement on the ring,
+    /// The floor-ring rival arrows (Maestro 2026-10-22: "put them in the outer circle at the floor", pass 3 "painted on the
+    /// floor"; production default since decision 2a, 2026-10-23, <c>-cw_edgearrows</c> = dev-only comparison): the ring radius per framing, bearing to ring point, the painted decal (placement on the ring,
     /// yaw-only orientation, shape, rim colour, size vs distance), the arc-length de-overlap, the visibility rule (shared with
     /// the edge chevron), the dev-tools gate, and source guards for lifetime / flat orientation / allocation.
     /// </summary>
@@ -41,13 +41,13 @@ namespace CluckWars.Tests
         }
 
         // Portrait: the 5.6 m lateral half-width binds (0.8 x 5.6). Landscape: the clear depth to the top HUD band binds
-        // (16:9: 4.36 m above the chicken; 20:9: 3.55 m), which the brief's lateral-only rule would have missed.
+        // (290 px band, decision 1a: 16:9 5.19 m above the chicken; 20:9 4.48 m), which a lateral-only rule would miss.
         [TestCase(9f, 16f, 4.48f)]
         [TestCase(9f, 20f, 4.48f)]
         [TestCase(9f, 21f, 4.29f)]    // past the portrait ortho cap: 5.36 m lateral
-        [TestCase(16f, 9f, 3.48f)]
-        [TestCase(20f, 9f, 2.84f)]
-        [TestCase(4f, 3f, 3.70f)]     // tablet: the touch hexes bind (4.63 m away), not the band (4.22 without controls)
+        [TestCase(16f, 9f, 4.15f)]
+        [TestCase(20f, 9f, 3.55f)]
+        [TestCase(4f, 3f, 3.63f)]     // tablet: the touch hexes bind, not the band (linear panel formula, WP8 correction)
         public void RingRadius_PerAspectTable(float w, float h, float expected)
         {
             Assert.AreEqual(expected, RadiusAt(w / h, out _, out _), Tol, $"{w}:{h}");
@@ -369,33 +369,44 @@ namespace CluckWars.Tests
         // ── Dev switch ─────────────────────────────────────────────────────────────────────────
 
         [Test]
-        public void Gate_ProductionInert_DevDefaultFloor_EdgeArrowsRestoresChevrons()
+        public void Switch_FloorEverywhere_OnlyDevEdgeArrowsRestoresChevrons()
         {
-            Assert.IsFalse(FloorRivalArrows.FloorArrowsActive(false, false), "production: always the edge chevrons");
-            Assert.IsFalse(FloorRivalArrows.FloorArrowsActive(false, true));
-            Assert.IsTrue(FloorRivalArrows.FloorArrowsActive(true, false), "dev build, no key: floor arrows by default");
+            // Decision 2a (2026-10-23): the floor ring is the production default; -cw_edgearrows is a dev-only comparison switch.
+            Assert.IsTrue(FloorRivalArrows.FloorArrowsActive(false, false), "production: floor arrows");
+            Assert.IsTrue(FloorRivalArrows.FloorArrowsActive(false, true), "production ignores the dev switch (no CLI switch)");
+            Assert.IsTrue(FloorRivalArrows.FloorArrowsActive(true, false), "dev build, no key: floor arrows");
             Assert.IsFalse(FloorRivalArrows.FloorArrowsActive(true, true), "dev build, -cw_edgearrows: the chevrons");
 
             Assert.IsFalse(FloorRivalArrows.EdgeArrowsRequested, "default: no edge override");
             FloorRivalArrows.EdgeArrowsRequested = true;
-            Assert.IsFalse(FloorRivalArrows.DevEnabled, "-cw_edgearrows turns the floor arrows off");
+            Assert.AreEqual(!DevTools.Available, FloorRivalArrows.Active, "the switch only bites with dev tools (the Editor has them)");
             Assert.IsFalse(FloorRivalArrows.TryRepresent(1, new Vector3(20f, 0f, 20f), Color.red, 1f), "edge: the chevron stays");
             FloorRivalArrows.EdgeArrowsRequested = false;
+            Assert.IsTrue(FloorRivalArrows.Active);
+
+            FloorRivalArrows.EnsureForMatch();   // EditMode: must not create a DontDestroyOnLoad object
             Assert.AreEqual(0, Object.FindObjectsByType<FloorRivalArrows>(FindObjectsSortMode.None).Length, "EditMode: nothing created");
             Assert.IsFalse(FloorRivalArrows.TryRepresent(1, new Vector3(20f, 0f, 20f), Color.red, 1f), "no instance: the chevron stays");
 
             string src = Read("Assets/_Game/Scripts/Visuals/FloorRivalArrows.cs");
-            StringAssert.Contains("public static bool DevEnabled => FloorArrowsActive(DevTools.Available, _edgeArrowsRequested);", src);
-            StringAssert.Contains("if (!DevEnabled || _instance == null) return false;", src);
-            StringAssert.Contains("if (DevEnabled) EnsureInstance();", Body(src, "private static void CreateForDevBuilds()"));
-            StringAssert.Contains("[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]", src,
-                "created in dev builds with or without any -cw_ key (the driver only runs with one)");
+            StringAssert.Contains("public static bool Active => FloorArrowsActive(DevTools.Available, _edgeArrowsRequested);", src);
+            StringAssert.Contains("!(devToolsAvailable && edgeArrowsRequested);", src);
+            StringAssert.Contains("if (!Active || _instance == null) return false;", src);
+            StringAssert.Contains("if (_instance != null || !Active || !Application.isPlaying) return;", Body(src, "public static void EnsureForMatch()"));
+            StringAssert.DoesNotContain("RuntimeInitializeLoadType.AfterSceneLoad", src, "created with the first match, not at boot");
+
+            string indicator = Read("Assets/_Game/Scripts/Visuals/RivalIndicator.cs");
+            string awake = Body(indicator, "private void Awake()");
+            int kill = awake.IndexOf("FeedbackTuning.RivalIndicatorsEnabled", System.StringComparison.Ordinal);
+            int ensure = awake.IndexOf("FloorRivalArrows.EnsureForMatch();", System.StringComparison.Ordinal);
+            int build = awake.IndexOf("BuildGeometry();", System.StringComparison.Ordinal);
+            Assert.That(ensure, Is.GreaterThan(kill).And.LessThan(build), "every indicator ensures the ring, after the kill switch");
 
             string driver = Read("Assets/_Game/Scripts/Diagnostics/AutoTestDriver.cs");
             int apply = driver.IndexOf("private void ApplyScreenshotTools()", System.StringComparison.Ordinal);
             int gate = driver.IndexOf("if (!DevTools.Available)", apply, System.StringComparison.Ordinal);
             int use = driver.IndexOf("FloorRivalArrows.EdgeArrowsRequested =", apply, System.StringComparison.Ordinal);
-            Assert.That(gate, Is.GreaterThan(apply).And.LessThan(use), "the switch is set only past the dev-tools gate");
+            Assert.That(gate, Is.GreaterThan(apply).And.LessThan(use), "the comparison switch is set only past the dev-tools gate");
             StringAssert.Contains("AutoTest arrows=edge", driver);
             StringAssert.Contains("AutoTest arrows=floor", driver);
         }
@@ -414,7 +425,7 @@ namespace CluckWars.Tests
             var edge = AutoTestConfig.FromCommandLine(new[] { "x.exe", "-cw_edgearrows" });
             Assert.IsTrue(edge.EdgeArrows, "bare flag");
             CollectionAssert.IsEmpty(edge.Problems);
-            Assert.IsFalse(AutoTestConfig.FromCommandLine(new[] { "x.exe", "-cw_hud" }).EdgeArrows, "default: floor (dev)");
+            Assert.IsFalse(AutoTestConfig.FromCommandLine(new[] { "x.exe", "-cw_hud" }).EdgeArrows, "default: floor");
             CollectionAssert.Contains(AutoTestConfig.Keys, AutoTestConfig.EdgeArrowsKey);
             var both = AutoTestConfig.FromCommandLine(new[] { "x.exe", "-cw_floorarrows", "-cw_edgearrows" });
             Assert.IsTrue(both.EdgeArrows, "both: the comparison switch wins");
@@ -480,12 +491,11 @@ namespace CluckWars.Tests
         {
             string src = Read("Assets/_Game/Scripts/Visuals/FloorRivalArrows.cs");
 
-            // One root object kept across scenes, created EAGERLY when the switch is set, never from an indicator's LateUpdate.
-            string ensure = Body(src, "private static void EnsureInstance()");
+            // One root object kept across scenes, created by the first indicator's Awake, never from an indicator's LateUpdate.
+            string ensure = Body(src, "public static void EnsureForMatch()");
             StringAssert.Contains("new GameObject(\"FloorRivalArrows\")", ensure);
             StringAssert.Contains("DontDestroyOnLoad(go);", ensure);
-            StringAssert.Contains("if (DevEnabled && Application.isPlaying) EnsureInstance();", src);
-            StringAssert.Contains("if (!DevEnabled || _instance == null) return false;", Body(src, "public static bool TryRepresent("));
+            StringAssert.Contains("if (!Active || _instance == null) return false;", Body(src, "public static bool TryRepresent("));
             StringAssert.DoesNotContain("new GameObject", Body(src, "public static bool TryRepresent("));
             StringAssert.DoesNotContain("ChickenGround.Anchor", src);
             foreach (Match m in Regex.Matches(src, @"SetParent\(([^,]+),"))

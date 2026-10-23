@@ -28,14 +28,14 @@ namespace CluckWars.Visuals
         /// <remarks>
         /// <para>The brief's rule was lateral only: min(4.5, 0.8 x lateral). That holds in portrait (lateral 5.6 binds: 4.48 m),
         /// but in landscape the DEPTH binds: at 30 degrees pitch one viewport height is 2s / sin(pitch) = 22.4 m of ground, and the
-        /// top HUD band (330 panel px) leaves 4.36 m above the chicken at 16:9 and 3.55 m at 20:9, so a 4.5 m ring would lay the
+        /// top HUD band (290 panel px since decision 1a; 330 before) leaves 5.19 m above the chicken at 16:9 and 4.48 m at 20:9, so a 4.5 m ring would lay the
         /// arrows of rivals "up" the screen under the band, the one place a hidden rival's arrow must not be. The same 0.8 share
-        /// of every clear extent keeps the whole ring in the clear viewport: 3.48 m at 16:9, 2.84 m at 20:9
+        /// of every clear extent keeps the whole ring in the clear viewport: 4.15 m at 16:9, 3.58 m at 20:9 (3.48 / 2.84 with the old 330 px band)
         /// (<c>FloorRivalArrowsTests.RingRadius_PerAspectTable</c>).</para>
         /// <para>Iteration 2 (qa): the corner CONTROL zones (joystick, hex buttons, desktop strip) are a fourth extent,
         /// <paramref name="controlDistance"/> = ground distance from the chicken to the nearest one, under the same 0.8 share, so
         /// the ring never runs under a thumb. On phones it does not bind (>= 6.7 m at 16:9, >= 10 m in portrait); on a 4:3
-        /// touch tablet the hex cluster is 4.63 m away and it does (3.70 m instead of 4.22). The status strip is NOT in it:
+        /// touch tablet the hex cluster is 4.63 m away and it does (3.70 m instead of 4.5). The status strip is NOT in it:
         /// its rows come and go, and the radius must not jump with them.</para>
         /// </remarks>
         public static float RingRadius(float lateralHalfExtent, float clearDepthUp, float clearDepthDown,
@@ -224,7 +224,7 @@ namespace CluckWars.Visuals
         /// <summary>Minimum angular separation, degrees, between two arrows on a ring of <paramref name="ringRadius"/>, from
         /// the ring ARC: the widest tail (<see cref="FeedbackTuning.FloorArrowNearLength"/> x
         /// <see cref="FeedbackTuning.FloorArrowWidthRatio"/> = 1.45 m) times <see cref="FeedbackTuning.FloorArrowSpacing"/> =
-        /// 1.66 m of arc: ~21 degrees at 4.48 m, ~34 at 2.84 m. Painted tails on the ring line then never touch.</summary>
+        /// 1.66 m of arc: ~21 degrees at 4.48 m, ~27 at 3.58 m. Painted tails on the ring line then never touch.</summary>
         public static float MinSeparationDegrees(float ringRadius) =>
             MinSeparationArc() / Mathf.Max(0.5f, ringRadius) * Mathf.Rad2Deg;
 
