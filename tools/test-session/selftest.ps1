@@ -230,6 +230,10 @@ Assert ($fu -match 'UI hud scans : 6\b') 'WP8 UI: the summary counts every hud s
 Assert ($fu -match 'INVARIANT=0') 'WP8 UI: layout offenders are not INVARIANT findings'
 $vu = (& (Join-Path $PSScriptRoot 'verify.ps1') -Session $tu -RequireUi *>&1 | Out-String)
 Assert ($LASTEXITCODE -eq 1 -and $vu -match 'VERDICT: FAIL - UI=1') 'WP8 UI: verify fails on a HUD layout offender'
+# WP9: each menu-shot page with offenders is ONE UIMENU finding per source and page, reported but not gated by default.
+Assert ($fu -match 'UIMENU=2\b') 'WP9 UIMENU: the gear page (client1) and the class page (client2) are two findings'
+Assert ((Count $fu "\[UIMENU\] UI layout offenders on the 'gear' menu page on client1: offenders=4 U1=0 U2=4") -eq 1) 'WP9 UIMENU: the finding names page, source and rule counts'
+Assert ($vu -notmatch 'FAIL.*UIMENU') 'WP9 UIMENU: without -RequireMenuClean menu offenders do not fail the run'
 Remove-Item $tu -Recurse -Force
 
 $tu = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-ui-ok-' + [Guid]::NewGuid().ToString('N'))
@@ -240,6 +244,9 @@ Assert ($fu -match 'UI=0\b' -and $fu -notmatch '\[UI\]') 'WP8 UI clean: hud scan
 Assert ($fu -match 'UI hud scans : 2\b') 'WP8 UI clean: two hud scans counted'
 $vu = (& (Join-Path $PSScriptRoot 'verify.ps1') -Session $tu -RequireUi *>&1 | Out-String)
 Assert ($LASTEXITCODE -eq 0 -and $vu -match 'VERDICT: PASS') 'WP8 UI clean: verify -RequireUi passes (a portrait run judged by the same rule)'
+Assert ($fu -match 'UIMENU=1\b') 'WP9 UIMENU: the main page''s offenders are one UIMENU finding'
+$vu = (& (Join-Path $PSScriptRoot 'verify.ps1') -Session $tu -RequireUi -RequireMenuClean *>&1 | Out-String)
+Assert ($LASTEXITCODE -eq 1 -and $vu -match 'VERDICT: FAIL - UIMENU=1') 'WP9 UIMENU: verify -RequireMenuClean fails on a menu page offender'
 Remove-Item $tu -Recurse -Force
 
 $tu = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-ui-none-' + [Guid]::NewGuid().ToString('N'))

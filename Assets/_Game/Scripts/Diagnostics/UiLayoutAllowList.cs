@@ -34,6 +34,11 @@ namespace CluckWars.Diagnostics
     {
         public static readonly UiAllowEntry[] Entries =
         {
+            // ---- U1: overlap by design ------------------------------------------------------------------------------
+            new UiAllowEntry(UiRule.U1, ".cw-ability-card__band", ".cw-ability-badge", 0f,
+                "slot-number badge on a picked deck card: drawn on purpose over the card's top-right corner, so it overlaps the " +
+                "category band's corner by 1-2 px2 (CluckWarsTheme.uss .cw-ability-badge top -16 / right -14; art, not a layout bug)"),
+
             // ---- U2: touch targets ---------------------------------------------------------------------------------
             new UiAllowEntry(UiRule.U2, "Ability2", "Ability3", 0f,
                 "thumb-arc hexes: their 150 px bounding boxes are 10 px apart, but the art is a hexagon (the box corners " +

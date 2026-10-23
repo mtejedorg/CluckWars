@@ -26,11 +26,16 @@
    ----------------------------------------------------------------------------
    MOBILE SIZING CONTRACT  (2026-07-23 Android pass) — READ BEFORE EDITING
    ----------------------------------------------------------------------------
-   Android is the primary target and the app is landscape-locked
-   (ProjectSettings: autorotate portrait = 0). Assets/Resources/PanelSettings
-   is ScaleWithScreenSize, reference 1920x1080, MatchWidthOrHeight 0.5, so
+   Android is the primary target. Phones run in landscape AND portrait (menus
+   auto-rotate; the PORTRAIT block near the end of this sheet holds the
+   portrait overrides, WP9). Assets/Resources/PanelSettings is
+   ScaleWithScreenSize, reference 1920x1080, MatchWidthOrHeight 0.5, which UI
+   Toolkit blends LINEARLY (measured WP8; the sqrt below is the landscape
+   approximation the dp table was derived with, and it holds in landscape):
 
-       scale = sqrt((screenW / 1920) * (screenH / 1080))
+       scale = (screenW / 1920 + screenH / 1080) / 2      ~ sqrt(...) in landscape
+
+   Portrait panels are ~776 x 1724 (9:20) at ~2.2 panel px per dp.
 
    On phones, pixel density rises with resolution, so `scale * 160 / ppi`
    lands in a tight band whatever the handset:
@@ -491,7 +496,7 @@
 .layout--short .cw-menu-cast__art { width: 150px; height: 150px; }
 .layout--short .cw-menu-cast__name { margin-top: 4px; }
 .layout--short .cw-menu-primary { min-height: 132px; }
-.layout--short .cw-menu-secondary-row { margin-top: 14px; }
+.layout--short .cw-menu-secondary-row { margin-top: 16px; }   /* U2: PLAY SOLO -> HOST / JOIN >= 19 px (14 measured 18) */
 .layout--short .cw-menu-hint { margin-top: 12px; }
 /* PLAY SOLO while PLAY AGAIN is the primary: a wood secondary at the HOST / JOIN size.
    Three classes so it beats .layout--short .cw-menu-primary whatever the order. */
@@ -628,20 +633,19 @@
     width: 100%; max-width: 2240px; align-self: center;
 }
 .layout--narrow .cw-pick-body { flex-direction: column; }
-.layout--portrait .cw-pick-body { flex-direction: column; }   /* S0 parity: portrait was --narrow before LayoutClasses; WP9 owns the portrait look */
 
 /* Wide layouts (16:9 desktop, 20:9 phone): the four tiles are a 2x2 grid, so each tile is close to
    square and its chicken fills most of it. A single row of four made tall, narrow tiles with the
    chicken small and a dead colour field above it. Narrow (4:3) keeps one row of four. */
 .cw-class-tiles { flex-direction: row; flex-wrap: wrap; align-content: stretch; flex-grow: 1; flex-basis: 0; min-width: 0; margin-right: 18px; }
 .layout--narrow .cw-class-tiles { flex-wrap: nowrap; flex-grow: 0; flex-basis: auto; height: 330px; margin-right: 0; margin-bottom: 18px; }
-.layout--portrait .cw-class-tiles { flex-wrap: nowrap; flex-grow: 0; flex-basis: auto; height: 330px; margin-right: 0; margin-bottom: 18px; }
 
 /* Portrait tile: class fill (lightened tint, set in C#), ink outline, big
    chicken. Selected = gold border + CardGlowFrame + lift, never colour alone. */
 .cw-class-tile {
     flex-grow: 1; flex-basis: 40%; min-width: 0;
-    margin-left: 7px; margin-right: 7px; margin-top: 7px; margin-bottom: 7px;
+    /* 10 px each side = a 20 px gutter between tiles (U2: adjacent targets >= 19 px / 8 dp; was 14) */
+    margin-left: 10px; margin-right: 10px; margin-top: 10px; margin-bottom: 10px;
     align-items: center; justify-content: flex-end;
     padding-top: 12px; padding-bottom: 14px; padding-left: 8px; padding-right: 8px;
     border-left-width: 5px; border-right-width: 5px; border-top-width: 5px; border-bottom-width: 5px;
@@ -653,7 +657,6 @@
     transition-property: scale, translate; transition-duration: 0.12s;
 }
 .layout--narrow .cw-class-tile { flex-basis: 0; margin-top: 0; margin-bottom: 0; }
-.layout--portrait .cw-class-tile { flex-basis: 0; margin-top: 0; margin-bottom: 0; }
 .cw-class-tile:hover { scale: 1.02 1.02; }
 /* Selected (Phase 4, re-audit items 10 + 19) = scale + gold inner border + an ink ring outside
    + a corner check badge. No translate lift: the stagger entry's inline translate ended on 0 and
@@ -715,7 +718,6 @@
     padding-top: 16px; padding-bottom: 16px; padding-left: 16px; padding-right: 22px;
 }
 .layout--narrow .cw-hero { flex-grow: 1; }
-.layout--portrait .cw-hero { flex-grow: 1; }
 /* Phase 4 (re-audit item 10): stage, bale and chicken ~1.4x the Phase 1 size.
    Round-2 finding 16: a painted backdrop instead of a flat wash - the barn interior (Bg_Loadout,
    cropped to its sunlit doorway, which lands right behind the bird) multiplied by a pale class tint
@@ -733,7 +735,6 @@
 .cw-hero__figure { width: 460px; height: 550px; flex-shrink: 0; align-items: center; justify-content: flex-end; }
 /* 4:3: the stage is ~530 tall, so the block is drawn a little smaller (from its centre). */
 .layout--narrow .cw-hero__figure { scale: 0.9 0.9; }
-.layout--portrait .cw-hero__figure { scale: 0.9 0.9; }
 /* Centred on the chicken's chest (~55% up the 434 px figure, whose box starts 116 px above the
    block's bottom): 116 + 0.55 * 434 - 448 / 2 = ~131. */
 .cw-hero__glow { width: 448px; height: 448px; bottom: 131px; }
@@ -793,7 +794,7 @@
     border-top-left-radius: 16px; border-top-right-radius: 16px;
     border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;
     padding-top: 8px; padding-bottom: 10px; padding-left: 14px; padding-right: 14px;
-    margin-left: 0; margin-right: 12px;
+    margin-left: 0; margin-right: 20px;   /* U2: >= 19 px between the two badges (was 12) */
     transition-property: scale; transition-duration: 0.1s;
 }
 .cw-perk-badge:hover { scale: 1.02 1.02; }
@@ -940,7 +941,7 @@
     border-top-color: rgba(42, 26, 12, 0.55); border-bottom-color: rgba(42, 26, 12, 0.55);
     border-top-left-radius: 18px; border-top-right-radius: 18px;
     border-bottom-left-radius: 18px; border-bottom-right-radius: 18px;
-    margin-left: 8px; margin-right: 8px;
+    margin-left: 10px; margin-right: 10px;   /* U2: a 20 px gutter between slots (was 16) */
     padding-top: 8px; padding-bottom: 8px; padding-left: 26px; padding-right: 12px;
     transition-property: scale, translate; transition-duration: 0.12s;
 }
@@ -988,7 +989,7 @@
 .cw-slot-box__empty-label {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
     font-size: 30px; letter-spacing: 1px; color: rgb(107, 74, 42);
-    padding-left: 0; margin-left: 0;
+    padding-left: 0; margin-left: 8px;   /* clear of the slot-number badge that pokes in at the top-left (U1) */
 }
 /* NEXT caret: gold tag + pointer above the armed slot (shape + word, not colour only). */
 .cw-next-caret {
@@ -1038,6 +1039,9 @@
    scroll). On 4:3 (.layout--narrow) the groups stay side by side and the CARDS wrap inside
    their group (four per line at 290 px): wrapping the class group under the one-card ANY BIRD
    group left a near-empty band across the middle of the page. */
+/* The deck's ScrollView (WP9, CharacterSelect.uxml #DeckScroll): in landscape it neither grows nor shrinks, so it is
+   exactly the deck's height and never scrolls (the deck lays out as before). Portrait lets it shrink (PORTRAIT block). */
+.cw-deck-scroll { flex-grow: 0; flex-shrink: 0; }
 .cw-deck {
     flex-grow: 0; flex-shrink: 0;
     flex-direction: row; flex-wrap: nowrap;
@@ -1047,11 +1051,6 @@
 .layout--narrow .cw-ability-card { width: 290px; flex-shrink: 0; margin-top: 6px; margin-bottom: 6px; }
 .layout--narrow .cw-deck { align-items: flex-start; }   /* the one-row ANY BIRD group sits level with its neighbour, not centred 185 px lower */
 .layout--narrow #CommonRow { flex-shrink: 0; }   /* the class group absorbs the squeeze, so ANY BIRD never clips its card */
-/* S0 parity: the same four rules for portrait, which was --narrow before LayoutClasses (WP6); WP9 owns the portrait look. */
-.layout--portrait .cw-deck-cards { flex-wrap: wrap; justify-content: center; }
-.layout--portrait .cw-ability-card { width: 290px; flex-shrink: 0; margin-top: 6px; margin-bottom: 6px; }
-.layout--portrait .cw-deck { align-items: flex-start; }
-.layout--portrait #CommonRow { flex-shrink: 0; }
 .cw-deck-group {
     flex-shrink: 1; min-width: 0;
     margin-left: 6px; margin-right: 6px; margin-top: 6px; margin-bottom: 6px;
@@ -1075,7 +1074,7 @@
    off the frame; the band cancels it to stay flush. */
 .cw-ability-card {
     width: 226px; flex-shrink: 1; min-width: 0; height: 290px;
-    margin-left: 5px; margin-right: 5px;
+    margin-left: 10px; margin-right: 10px;   /* U2: a 20 px gutter between cards (was 10) */
     align-items: center; justify-content: flex-start;
     padding-bottom: 10px; padding-left: 10px; padding-right: 10px;
     background-color: rgb(255, 248, 232);
@@ -1527,7 +1526,6 @@
 .layout--short .cw-coop-left .cw-lobby-card, .layout--narrow .cw-coop-left .cw-lobby-card {
     padding-top: 16px; padding-bottom: 16px; padding-left: 16px; padding-right: 16px;
 }
-.layout--portrait .cw-coop-left .cw-lobby-card { padding-top: 16px; padding-bottom: 16px; padding-left: 16px; padding-right: 16px; }   /* S0 parity (was --narrow) */
 /* Gold invite-code letter tiles */
 .cw-code-tiles { flex-direction: row; flex-wrap: wrap; margin-top: 12px; }
 .cw-code-tile {
@@ -1565,7 +1563,7 @@
 }
 .cw-lobby-btnrow { align-items: center; margin-top: 4px; }
 .cw-lobby-btnrow .cw-code-tiles { margin-top: 0; margin-right: 8px; flex-wrap: nowrap; }
-.cw-lobby-btnrow .cw-mini-btn { flex-grow: 0; flex-basis: auto; min-width: 140px; margin-right: 0; margin-left: 10px; }
+.cw-lobby-btnrow .cw-mini-btn { flex-grow: 0; flex-basis: auto; min-width: 140px; margin-right: 0; margin-left: 20px; }   /* U2: SHARE / COPY >= 19 px apart */
 /* Join (Phase 4, re-audit item 9): the code entry is centred in the bottom bar under the open
    gate, big and centred; JOIN MATCH stays a disabled wood plank until the code is complete. */
 .cw-join-card { align-items: center; padding-top: 6px; padding-bottom: 10px; padding-left: 24px; padding-right: 24px; }
@@ -1581,7 +1579,6 @@
 .layout--short .cw-join-card .cw-input { min-height: 92px; }
 .layout--short .cw-join-card .cw-input .unity-text-field__input, .layout--short .cw-join-card .cw-input .unity-base-text-field__input { font-size: 56px; }
 .layout--narrow .cw-join-card .cw-input { min-width: 440px; }
-.layout--portrait .cw-join-card .cw-input { min-width: 440px; }   /* S0 parity (was --narrow) */
 
 /* Status pill */
 /* Status line: cream inset, dark text (the status colour is set in C# from
@@ -1645,12 +1642,159 @@
 .cw-dc-status { font-size: 36px; margin-top: 0; margin-bottom: 24px; }
 .cw-dc-actions { flex-direction: row; justify-content: center; margin-top: 16px; }
 .cw-dc-btn { flex-grow: 1; flex-basis: 0; min-height: 132px; margin-left: 12px; margin-right: 12px; }
-.layout--portrait .cw-dc-actions { flex-direction: column; align-items: stretch; }
-.layout--portrait .cw-dc-btn { flex-basis: auto; margin-top: 8px; margin-bottom: 8px; margin-left: 0; margin-right: 0; }
 
 /* ---- Responsive ---------------------------------------------------------- */
-.layout--portrait  .cw-mode-row { flex-direction: column; align-items: stretch; }
 .layout--landscape .cw-mode-row { flex-direction: row; justify-content: center; }
+
+/* ============================================================================
+   PORTRAIT  (WP9; PORTRAIT_AND_LANDSCAPE_SPEC 1.2-1.4, DECISIONS_2026-10-21 C7/C8)
+   ----------------------------------------------------------------------------
+   Base rules above are the shipped landscape look and stay untouched; portrait is
+   overrides only, keyed on .layout--portrait (LayoutClasses, on the menu root and on
+   #LobbyOverlay / #LeaveSheet / #SessionEndOverlay in the match overlays). Panels it is
+   sized for (UI Toolkit scales linearly, spec 0): 776x1724 (9:20, 1080x2400),
+   773x1725 (Pixel 10 Pro), 746x1740 (9:21, the narrowest), 923x1641 (9:16).
+   ~2.2 panel px per dp, so the 116 px / 19 px U2 floors still mean 48 dp / 8 dp.
+   Buttons that are a touch floor here use 124-132 px: at a 1.4 panel scale the pixel
+   snap can shave a 116 px button to 115.4 (UiProbe U2, WP9 first run).
+   ============================================================================ */
+
+/* ---- Shared page header: HOME / BACK at the left, the ribbon centred in the rest ----
+   The landscape header centres the ribbon on the page and floats HOME over its left; on a
+   776 px page "PICK YOUR BIRD" (532 px) would run under HOME. */
+.layout--portrait .cw-page-header { padding-left: 196px; padding-right: 12px; }
+.layout--portrait .cw-page-header .cw-home-btn { left: 16px; min-width: 168px; padding-left: 20px; padding-right: 20px; }
+/* 40 px / 1 tracking + 110 px tails' padding: "PICK YOUR BIRD" (337.6 px at 44 / 2, U3 at 776, WP9 live run) is ~295 px in a
+   >= 318 px ribbon at 9:21 (746). */
+.layout--portrait .cw-page-header .cw-ribbon { padding-left: 110px; padding-right: 110px; }
+.layout--portrait .cw-page-header .cw-ribbon .cw-title { font-size: 40px; letter-spacing: 1px; }
+
+/* ---- Main menu (spec 1.2): title 96 px, cast as a 2x2 grid (C8), full-width actions ----
+   padding-top clears the 124 px gear (top 10). Budget at 9:16 (1641 tall) with PLAY AGAIN and
+   the dev row both shown: 140 + title 181 + cast 474 + actions 952 + 24 = ~1640. */
+.layout--portrait .cw-menu {
+    justify-content: center;
+    padding-top: 140px; padding-bottom: 24px; padding-left: 32px; padding-right: 32px;
+}
+.layout--portrait .cw-menu-title { font-size: 96px; letter-spacing: 4px; }   /* ~595 px wide: inside the 682 px column at 9:21 */
+.layout--portrait .cw-menu-subtitle { font-size: 30px; letter-spacing: 2px; white-space: nowrap; }
+.layout--portrait .cw-menu-cast {
+    flex-wrap: wrap; justify-content: center; align-items: flex-end;
+    width: 100%; margin-top: 24px; margin-bottom: 8px;
+}
+.layout--portrait .cw-menu-cast__item { width: 50%; margin-left: 0; margin-right: 0; margin-bottom: 16px; }
+.layout--portrait .cw-menu-cast__art { width: 160px; height: 160px; }
+.layout--tall .cw-menu-cast__art { width: 180px; height: 180px; }   /* 9:19.5 and taller have the height */
+.layout--portrait .cw-menu-cast__name { margin-top: 6px; }
+.layout--portrait .cw-menu-actions { width: 100%; max-width: 820px; align-items: stretch; }
+.layout--portrait .cw-menu-playagain { align-items: stretch; }
+.layout--portrait .cw-menu-playagain__btn { min-width: 0; }
+.layout--portrait .cw-menu-primary { min-width: 0; min-height: 132px; }
+.layout--portrait .cw-menu .cw-menu-primary.cw-menu-primary--demoted { min-height: 132px; }
+/* HOST / JOIN stack (the column rule is .cw-mode-row's); 10 + 10 px = a 20 px gutter between every action. */
+.layout--portrait .cw-mode-row { flex-direction: column; align-items: stretch; }
+.layout--portrait .cw-menu-secondary-row { margin-top: 10px; }
+.layout--portrait .cw-menu-secondary {
+    min-width: 0; min-height: 132px;
+    margin-left: 0; margin-right: 0; margin-top: 10px; margin-bottom: 10px;
+}
+.layout--portrait .cw-menu-hint { align-self: center; white-space: nowrap; margin-top: 16px; }
+
+/* ---- Settings sheet: full width minus a 16 px gutter; CLOSE in flow beside the ribbon ---- */
+.layout--portrait .cw-sheet {
+    width: auto; max-width: none; align-self: stretch;
+    margin-left: 16px; margin-right: 16px;
+    padding-left: 24px; padding-right: 24px;
+}
+.layout--portrait .cw-sheet__head { justify-content: space-between; }
+.layout--portrait .cw-sheet__head .cw-ribbon { flex-shrink: 1; padding-left: 110px; padding-right: 110px; }
+.layout--portrait .cw-sheet__close {
+    position: relative; left: auto; right: auto; top: auto;
+    min-width: 180px; min-height: 124px; margin-left: 16px;
+    padding-left: 30px; padding-right: 30px;
+}
+
+/* ---- Disconnect sheet (CW-218): full width, a smaller headline, REJOIN over BACK TO MENU ----
+   "YOU WERE DISCONNECTED" at 38 px is ~440 px; with the 110 px tails it fits the 674 px panel at 9:21. */
+.layout--portrait .cw-dc-panel {
+    width: auto; max-width: none; align-self: stretch;
+    margin-left: 16px; margin-right: 16px; padding-left: 20px; padding-right: 20px;
+}
+.layout--portrait .cw-dc-panel .cw-ribbon { padding-left: 110px; padding-right: 110px; }
+.layout--portrait .cw-dc-panel .cw-ribbon .cw-title { font-size: 38px; letter-spacing: 1px; }
+.layout--portrait .cw-dc-actions { flex-direction: column; align-items: stretch; }
+.layout--portrait .cw-dc-btn { flex-basis: auto; margin-top: 10px; margin-bottom: 10px; margin-left: 0; margin-right: 0; }
+
+/* ---- PICK YOUR BIRD (spec 1.3): tiles in one row, then the hero as a column ----
+   Four tiles at 9:21: (746 - 32 - 80) / 4 = 158 px, 144 px inside: "ASSASSIN" at 32 px / 0 tracking
+   (~140) and "Hit & Run" at 30 px (~138) fit. The hero stage takes whatever height the text leaves
+   (min 220) and the figure is laid out in percentages of it, so the bird, bale and light shrink
+   together on a short screen instead of being cropped. */
+.layout--portrait .cw-pick-body { flex-direction: column; padding-left: 16px; padding-right: 16px; }
+.layout--portrait .cw-class-tiles {
+    flex-wrap: nowrap; flex-grow: 0; flex-shrink: 0; flex-basis: auto;
+    height: 260px; margin-right: 0; margin-bottom: 18px;
+}
+.layout--portrait .cw-class-tile { flex-basis: 0; margin-top: 0; margin-bottom: 0; padding-left: 2px; padding-right: 2px; }
+.layout--portrait .cw-class-tile__name { font-size: 32px; letter-spacing: 0; }
+.layout--portrait .cw-hero { flex-grow: 1; flex-direction: column; padding-right: 16px; }
+.layout--portrait .cw-hero__stage {
+    width: auto; flex-grow: 1; flex-shrink: 1; min-height: 220px;
+    margin-right: 0; margin-bottom: 16px;
+}
+.layout--portrait .cw-hero__figure { width: 100%; height: 100%; scale: 1 1; }
+/* The 550 px block's proportions: bale 189/550 = 34% tall, feet 116/550 = 21% up, bird 434/550 = 79%,
+   light 448/550 = 81% tall centred on the chest (131/550 = 24% up). */
+.layout--portrait .cw-hero__platform { left: 0; right: 0; width: auto; height: 34%; }
+.layout--portrait .cw-hero__chicken {
+    position: absolute; left: 0; right: 0; bottom: 21%;
+    width: auto; height: 79%; margin-bottom: 0;
+}
+.layout--portrait .cw-hero__glow {
+    left: 0; right: 0; width: auto; height: 81%; bottom: 24%;
+    -unity-background-scale-mode: scale-to-fit;
+}
+.layout--portrait .cw-hero__text { flex-grow: 0; flex-shrink: 0; flex-basis: auto; }
+
+/* ---- GEAR UP (spec 1.3, decision C7): slots 2x2, the deck is the ONLY region that scrolls ----
+   The deck sits in #DeckScroll (CharacterSelect.uxml); in landscape that ScrollView neither grows nor
+   shrinks, so it is exactly the deck's height and never scrolls. Here it shrinks to the height left
+   between the slots and the bottom bar, so READY is always on screen. The doorway bird gets only
+   leftover height (basis 0; usually none, GearDoorway hides the bird). Cards: three per row, 215-240 px
+   (at 9:21 a card is 195 px inside: DOPPELGANGER at the 28 px step is ~194). */
+.layout--portrait .cw-gear-body { padding-left: 8px; padding-right: 8px; }
+.layout--portrait .cw-slot-box-row { flex-wrap: wrap; margin-top: 0; margin-bottom: 0; }
+/* 24 + 24 px between the rows leaves room for the NEXT caret (44 px above an armed slot). */
+.layout--portrait .cw-slot-box { flex-basis: 40%; margin-top: 24px; margin-bottom: 24px; }
+.layout--portrait .cw-gear-doorway { flex-grow: 1; flex-shrink: 1; flex-basis: 0; }
+.layout--portrait .cw-deck-scroll { flex-shrink: 1; min-height: 0; }
+.layout--portrait .cw-deck { flex-direction: column; align-items: stretch; }
+.layout--portrait .cw-deck-group { margin-left: 0; margin-right: 0; padding-left: 12px; padding-right: 12px; }
+.layout--portrait .cw-deck-cards { flex-wrap: wrap; justify-content: center; }
+.layout--portrait .cw-ability-card {
+    width: auto; flex-basis: 28%; flex-grow: 1; flex-shrink: 0; max-width: 240px;
+    margin-top: 10px; margin-bottom: 10px; padding-left: 4px; padding-right: 4px;
+}
+.layout--portrait .cw-ability-card__band { margin-left: -4px; margin-right: -4px; }   /* flush with the 4 px padding */
+.layout--portrait .cw-gear-bottom { flex-direction: column; align-items: stretch; }
+.layout--portrait .cw-gear-ready { align-self: stretch; min-width: 0; min-height: 132px; margin-left: 0; margin-top: 16px; }
+
+/* ---- THE COOP + waiting room (spec 1.4): seats 2x2, the bottom bar a column ----
+   Status pill (and the invite card for a host), then the READY! / join-code centre, then START full
+   width. The centred variant's 480 px centre floor is dropped; its 96 px floor is READY!'s box. */
+.layout--portrait .cw-lineup { flex-wrap: wrap; align-content: stretch; padding-left: 8px; padding-right: 8px; }
+.layout--portrait .cw-seat { flex-basis: 40%; max-width: none; margin-top: 10px; margin-bottom: 10px; }
+.layout--portrait .cw-seat__stage { min-height: 80px; }
+.layout--portrait .cw-coop-bottom { flex-direction: column; align-items: stretch; padding-left: 16px; padding-right: 16px; }
+.layout--portrait .cw-coop-bottom > .cw-coop-left { flex-direction: column; align-items: stretch; flex-grow: 0; flex-basis: auto; }
+.layout--portrait .cw-coop-left .cw-lobby-card {
+    margin-left: 0; margin-top: 12px;
+    padding-top: 16px; padding-bottom: 16px; padding-left: 16px; padding-right: 16px;
+}
+.layout--portrait .cw-coop-bottom > .cw-coop-center { flex-grow: 0; flex-basis: auto; min-width: 0; }
+.layout--portrait .cw-coop-bottom--centred > .cw-coop-center { min-height: 96px; }
+.layout--portrait .cw-coop-bottom > .cw-coop-right { flex-grow: 0; flex-basis: auto; align-items: stretch; margin-top: 12px; }
+.layout--portrait .cw-coop-right .cw-page-cta { min-width: 0; min-height: 124px; }
 
 /* ============================================================================
    ABILITY ICON SPRITES  (37 : type-name -> Icons/Abilities/Icon_<TypeName>.png)

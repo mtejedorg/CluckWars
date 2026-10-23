@@ -26,6 +26,9 @@ namespace CluckWars.Diagnostics
     /// <para>Read-only: it never writes a style or a class. The one exception is <c>-cw_touchhud</c>, which pins the touch
     /// HUD layout (<see cref="TouchControlsController.DebugForceMode"/>) so a PC run shows, and checks, the phone's thumb
     /// arc instead of the desktop strip.</para>
+    /// <para>What counts as on screen (WP9): an element painted before a near-opaque layer that covers the whole safe area
+    /// (a menu sheet's scrim, GET READY, the results / waiting-room overlays) is hidden, not judged; inside a ScrollView only
+    /// the part in the viewport is judged (<see cref="UiLayoutRules.IsOccluder"/>, <see cref="UiLayoutRules.VisibleInViewport"/>).</para>
     /// <para>Cost: one walk of the visible tree per scan (hidden subtrees are pruned at display:none / opacity 0), text
     /// measured for visible labels only, strings built for offenders only. The scan's ms is in its summary line.</para>
     /// </remarks>
@@ -70,6 +73,8 @@ namespace CluckWars.Diagnostics
             public VisualElement Ve;
             public Rect Rect;
             public bool InScroll;
+            /// <summary>A scroll viewport cuts it: <see cref="Rect"/> is the shown part, and its size is not judged.</summary>
+            public bool Cut;
         }
 
         private struct Cluster
@@ -273,19 +278,25 @@ namespace CluckWars.Diagnostics
             var ownScale = rs.scale.value;
             if (ownScale.x != 1f || ownScale.y != 1f)
                 wb = UiLayoutRules.Unscaled(wb, ownScale.x, ownScale.y);
+            // Inside a ScrollView only the part in its viewport is drawn and takes taps (WP9: the portrait GEAR UP deck).
+            bool cut = false;
+            if (inScroll) wb = UiLayoutRules.VisibleInViewport(wb, clip, out cut);
+
+            // A modal layer (sheet scrim, GET READY, an opaque overlay) hides what was painted before it: drop those items.
+            if (UiLayoutRules.IsOccluder(rs.backgroundColor.a * op, wb, _safe)) DropHiddenUnder(ve, wb);
 
             bool isButton = ve is Button;
             if ((ve is Label || isButton) && !string.IsNullOrWhiteSpace(((TextElement)ve).text))
             {
-                var item = new Item { Ve = ve, Rect = wb, InScroll = inScroll };
+                var item = new Item { Ve = ve, Rect = wb, InScroll = inScroll, Cut = cut };
                 _texts.Add(item);
                 _boxes.Add(item);
             }
-            else if (isButton) _boxes.Add(new Item { Ve = ve, Rect = wb, InScroll = inScroll });
+            else if (isButton) _boxes.Add(new Item { Ve = ve, Rect = wb, InScroll = inScroll, Cut = cut });
 
             bool hex = ve.ClassListContains("cw-hex");
             if (IsTarget(ve, isButton, hex))
-                _targets.Add(new Item { Ve = ve, Rect = hex ? HexRestRect(ve, wb) : wb, InScroll = inScroll });
+                _targets.Add(new Item { Ve = ve, Rect = hex ? HexRestRect(ve, wb) : wb, InScroll = inScroll, Cut = cut });
 
             if (_scope == UiScope.Hud && IsCluster(ve, hex))
                 _clusters.Add(new Cluster
@@ -301,6 +312,15 @@ namespace CluckWars.Diagnostics
                 return;
             }
             WalkChildren(ve, op, inScroll, clip);
+        }
+
+        /// <summary>Items collected so far (painted earlier, under <paramref name="layer"/>) that the layer covers; never its ancestors.</summary>
+        private void DropHiddenUnder(VisualElement layer, Rect cover)
+        {
+            Predicate<Item> hidden = it => !it.Ve.Contains(layer) && UiLayoutRules.HiddenUnder(it.Rect, cover);
+            _texts.RemoveAll(hidden);
+            _boxes.RemoveAll(hidden);
+            _targets.RemoveAll(hidden);
         }
 
         private void WalkChildren(VisualElement ve, float op, bool inScroll, Rect clip)
@@ -379,7 +399,7 @@ namespace CluckWars.Diagnostics
             for (int i = 0; i < _targets.Count; i++)
             {
                 var t = _targets[i];
-                if (UiLayoutRules.TargetTooSmall(t.Rect))
+                if (!t.Cut && UiLayoutRules.TargetTooSmall(t.Rect))
                     Offend(UiRule.U2, t.Ve, t.Rect, null, default, $"size {t.Rect.width:0}x{t.Rect.height:0} (need >= {UiLayoutRules.TouchTargetMinPx:0})");
                 for (int j = i + 1; j < _targets.Count; j++)
                 {
@@ -419,8 +439,9 @@ namespace CluckWars.Diagnostics
                 if (!UiLayoutRules.IsMeasurable(content)) continue;
                 if (rs.whiteSpace == WhiteSpace.Normal)
                 {
+                    var line = te.MeasureTextSize(te.text, 0f, VisualElement.MeasureMode.Undefined, 0f, VisualElement.MeasureMode.Undefined);
                     var m = te.MeasureTextSize(te.text, content.width, VisualElement.MeasureMode.Exactly, 0f, VisualElement.MeasureMode.Undefined);
-                    if (UiLayoutRules.WrappedTextClipped(m.y, content.height))
+                    if (UiLayoutRules.WrappedTextClipped(line.x, content.width, m.y, content.height))
                         Offend(UiRule.U3, te, it.Rect, null, default, $"text height {m.y:0.0} > content {content.height:0.0} \"{Clip(te.text)}\"");
                 }
                 else

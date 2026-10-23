@@ -215,6 +215,48 @@ namespace CluckWars.Diagnostics
         public static bool WrappedTextClipped(float measuredHeight, float contentHeight) =>
             measuredHeight > contentHeight + TextFitTolerancePx;
 
+        /// <summary>
+        /// U3, wrapping text (WP9): clipped only when its one-line width does NOT fit the content box AND the wrapped
+        /// text is taller than the box. A label sized to its own text (a centred class line, the solo hint) gets a box
+        /// exactly its natural width; re-measured "wrap at exactly that width" a sub-pixel rounding breaks it onto two
+        /// lines that the renderer never draws (it renders on one line, verified on the 2400x1080 COOP capture), so a
+        /// text whose single line fits is never clipped.
+        /// </summary>
+        public static bool WrappedTextClipped(float naturalWidth, float contentWidth, float wrappedHeight, float contentHeight) =>
+            TextClipped(naturalWidth, contentWidth) && WrappedTextClipped(wrappedHeight, contentHeight);
+
+        // ---- occlusion (WP9) -----------------------------------------------------------------------------------------
+
+        /// <summary>A layer this opaque (background alpha x inherited opacity) hides what was painted before it.</summary>
+        public const float OccluderMinAlpha = 0.8f;
+
+        /// <summary>
+        /// A modal layer: a near-opaque background (the menu sheets' 0.88 scrim, GET READY's 0.94, the results / waiting room
+        /// overlays) covering the whole safe area. Everything painted before it under its rect is not on screen, so U1-U5 do not
+        /// judge it (the dimmed main menu under the Settings sheet is not "overlapping" the sheet). Only a layer that covers the
+        /// whole safe area counts: a smaller opaque element over a label is exactly the U1 overlap the probe must report.
+        /// </summary>
+        public static bool IsOccluder(float effectiveAlpha, Rect layer, Rect safe) =>
+            effectiveAlpha >= OccluderMinAlpha && IsMeasurable(layer) && IsMeasurable(safe) && Contains(layer, safe, EdgeTolerancePx);
+
+        /// <summary>
+        /// The part of <paramref name="r"/> a scroll viewport shows (WP9: the GEAR UP deck scrolls in portrait). A card cut by
+        /// the viewport's edge is only drawn - and only takes taps - inside it, so U1 / U2 judge that part; <paramref name="cut"/>
+        /// is true when the viewport cuts it, and a cut target is not judged on its size (half a card scrolled away is small
+        /// on screen by design; its full size is judged when it is in view).
+        /// </summary>
+        public static Rect VisibleInViewport(Rect r, Rect viewport, out bool cut)
+        {
+            cut = !Contains(viewport, r, EdgeTolerancePx);
+            if (!cut) return r;
+            float xMin = Mathf.Max(r.xMin, viewport.xMin), yMin = Mathf.Max(r.yMin, viewport.yMin);
+            float xMax = Mathf.Min(r.xMax, viewport.xMax), yMax = Mathf.Min(r.yMax, viewport.yMax);
+            return Rect.MinMaxRect(xMin, yMin, Mathf.Max(xMin, xMax), Mathf.Max(yMin, yMax));
+        }
+
+        /// <summary>An item painted before an occluding <paramref name="layer"/> is hidden when the layer covers all of it.</summary>
+        public static bool HiddenUnder(Rect item, Rect layer) => Contains(layer, item, EdgeTolerancePx);
+
         public static float FontFloor(UiScope scope) => scope == UiScope.Menu ? MenuFontFloorPx : HudFontFloorPx;
 
         /// <summary>U4: <paramref name="effectivePx"/> (resolvedStyle.fontSize x world scale) is under <paramref name="floorPx"/>.</summary>

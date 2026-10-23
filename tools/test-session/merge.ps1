@@ -434,6 +434,11 @@ if ($auraCasts.Count -gt 0 -and $auraSinglePeer -and $auraLocalOk -eq 0) {
 # The whole window size decides nothing here: a -Width/-Height portrait run is judged by exactly the same rule.
 $rxUi = New-Object Text.RegularExpressions.Regex('^ui offenders=(\d+) scope=(\w+)\b.*?\bU1=(\d+) U2=(\d+) U3=(\d+) U4=(\d+) U5=(\d+) U6=(\d+)')
 $uiStats = [ordered]@{}   # src -> counts per scope, first / worst offending hud scan
+# WP9: a menu-shot scan (scope=menu with a page=, i.e. requested by -cw_menushots / capture_orientation.py) with offenders is
+# ONE UIMENU finding per source and page. UIMENU is reported, not gated: verify.ps1 fails on it only with -RequireMenuClean
+# (the scenario gate stays HUD-only until the menu pages are proven clean on every panel size).
+$rxUiPage = New-Object Text.RegularExpressions.Regex('\bpage=([\w-]+)')
+$uiMenuPages = [ordered]@{}   # "src|page" -> first offending menu-shot scan of that page
 foreach ($e in $sorted) {
     if ($e.Source -ne 'UiProbe') { continue }
     $m = $rxUi.Match($e.Message); if (-not $m.Success) { continue }
@@ -444,6 +449,16 @@ foreach ($e in $sorted) {
     $u[$scope]++
     if ($n -le 0) { continue }
     $u["${scope}Bad"]++
+    if ($scope -eq 'menu') {
+        $pg = $rxUiPage.Match($e.Message)
+        if ($pg.Success -and $pg.Groups[1].Value -ne '-') {
+            $key = "$($e.Src)|$($pg.Groups[1].Value)"
+            if (-not $uiMenuPages.Contains($key)) {
+                $uiMenuPages[$key] = @{ E = $e; Page = $pg.Groups[1].Value; N = $n
+                    Rules = "U1=$($m.Groups[3].Value) U2=$($m.Groups[4].Value) U3=$($m.Groups[5].Value) U4=$($m.Groups[6].Value) U5=$($m.Groups[7].Value) U6=$($m.Groups[8].Value)" }
+            }
+        }
+    }
     if ($scope -ne 'hud') { continue }
     if ($null -eq $u.First) { $u.First = $e }
     if ($n -gt $u.WorstN) { $u.WorstN = $n; $u.Worst = "U1=$($m.Groups[3].Value) U2=$($m.Groups[4].Value) U3=$($m.Groups[5].Value) U4=$($m.Groups[6].Value) U5=$($m.Groups[7].Value) U6=$($m.Groups[8].Value)" }
@@ -455,6 +470,10 @@ foreach ($src in $uiStats.Keys) {
     if ($u.hudBad -gt 0) {
         Add-Finding @('UI') $u.First ("UI layout offenders in the in-match HUD on ${src}: $($u.hudBad) of $($u.hud) hud scan(s) (worst: offenders=$($u.WorstN) $($u.Worst)) (expected 0, WP8 U1-U6; the 'ui offender' Warn lines name each one) - first: $($u.First.Message)")
     }
+}
+foreach ($key in $uiMenuPages.Keys) {
+    $mp = $uiMenuPages[$key]
+    Add-Finding @('UIMENU') $mp.E ("UI layout offenders on the '$($mp.Page)' menu page on $($mp.E.Src): offenders=$($mp.N) $($mp.Rules) (expected 0, WP9; the 'ui offender ... page=$($mp.Page)' Warn lines name each one)")
 }
 
 # ---- World-hash parity (CW-216/217 class: spawned objects positioned differently per peer) ---------------------
@@ -635,7 +654,7 @@ $shaMismatch = ($distinct.Count -gt 1)
 # findings.txt
 # ---------------------------------------------------------------------------------------------
 $sortedFindings = $findings | Sort-Object -Property Ticks, Seq
-$catCounts = [ordered]@{ ERROR = 0; WARN = 0; EXCEPTION = 0; PERF = 0; VISUAL = 0; SYNC = 0; GHOST = 0; INVARIANT = 0; UI = 0 }
+$catCounts = [ordered]@{ ERROR = 0; WARN = 0; EXCEPTION = 0; PERF = 0; VISUAL = 0; SYNC = 0; GHOST = 0; INVARIANT = 0; UI = 0; UIMENU = 0 }
 $srcCounts = @{}
 foreach ($f in $findings) {
     foreach ($c in $f.Cats) { $catCounts[$c]++ }
@@ -664,7 +683,7 @@ foreach ($cat in $catCounts.Keys) {
     $items = @($sortedFindings | Where-Object { $_.Cats -contains $cat })
     $r.Add("== $cat ($($items.Count)) ==")
     foreach ($f in $items) {
-        if ($cat -in 'SYNC', 'GHOST', 'INVARIANT', 'UI') { $r.Add("[$cat] $($f.Text)"); continue }
+        if ($cat -in 'SYNC', 'GHOST', 'INVARIANT', 'UI', 'UIMENU') { $r.Add("[$cat] $($f.Text)"); continue }
         $tags = ($f.Cats | ForEach-Object { "[$_]" }) -join ''
         $r.Add("$tags $($f.Text)")
         $n = 0

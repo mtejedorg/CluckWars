@@ -139,6 +139,19 @@ namespace CluckWars.Tests
             Assert.IsFalse(target.ClassListContains(LayoutClasses.Landscape) || target.ClassListContains(LayoutClasses.Portrait));
         }
 
+        [Test]
+        public void BindAll_OnAnUnmeasuredElement_SetsNothingYet_AndSkipsNullTargets()
+        {
+            var measured = new VisualElement();
+            var a = new VisualElement();
+            var b = new VisualElement();
+            Assert.DoesNotThrow(() => LayoutClasses.BindAll(measured, a, null, b));
+            Assert.DoesNotThrow(() => LayoutClasses.BindAll(measured, a, b));   // a re-bind replaces the list
+            Assert.DoesNotThrow(() => LayoutClasses.BindAll(null, a));
+            Assert.DoesNotThrow(() => LayoutClasses.BindAll(measured, null));
+            Assert.IsFalse(a.ClassListContains(LayoutClasses.Landscape) || a.ClassListContains(LayoutClasses.Portrait));
+        }
+
         // ---- One helper, four roots ----------------------------------------------------------------------------------
 
         [Test]
@@ -150,7 +163,7 @@ namespace CluckWars.Tests
             string touch = Read("Assets/_Game/Scripts/Input/TouchControlsController.cs");
 
             StringAssert.Contains("LayoutClasses.Bind(_root);", menu);
-            StringAssert.Contains("LayoutClasses.Bind(_root, _lobbyOverlay);", overlays);
+            StringAssert.Contains("LayoutClasses.BindAll(_root, _lobbyOverlay, _matchEndOverlay, _leaveSheet, _sessionEndOverlay, _introGetReady);", overlays);
             StringAssert.Contains("LayoutClasses.Bind(_root, _topBarRoot ?? _root);", hud);
             StringAssert.Contains("LayoutClasses.Bind(_root, _hudRoot);", touch);
             // The device-mode switch is a different axis and stays its own method.
@@ -166,35 +179,16 @@ namespace CluckWars.Tests
             }
         }
 
-        // ---- S0: the --narrow rule change is visually neutral ---------------------------------------------------------
+        // ---- WP9: portrait has its own rules; the WP6 twins are gone -------------------------------------------------
 
         [Test]
-        public void EveryNarrowMenuRule_HasAnIdenticalPortraitTwin()
+        public void NarrowRules_AreNotCopiedIntoPortrait_AnyMore()
         {
-            // Before LayoutClasses, portrait screens carried --narrow (w/h < 1.55). Now they do not, so each single-line
-            // .layout--narrow rule needs the same declarations under .layout--portrait until WP9 restyles portrait.
+            // WP6 kept a .layout--portrait copy of every single-line .layout--narrow rule ("S0 parity"). WP9 replaced them
+            // with real portrait styles (MenuPortraitLayoutTests pins those); the copies and their markers are gone.
             string css = Read("Assets/UI/Styles/CluckWarsTheme.uss");
-            var narrow = Regex.Matches(css, @"^\.layout--narrow ([^,{]+?)\s*\{([^}]*)\}", RegexOptions.Multiline);
-            Assert.Greater(narrow.Count, 5, "the narrow rules moved; re-point this test");
-            foreach (Match m in narrow)
-            {
-                string selector = m.Groups[1].Value.Trim();
-                string body = Regex.Replace(m.Groups[2].Value, @"\s+", " ").Trim();
-                var twin = Regex.Match(css, @"^\.layout--portrait " + Regex.Escape(selector) + @"\s*\{([^}]*)\}", RegexOptions.Multiline);
-                Assert.IsTrue(twin.Success, $".layout--narrow {selector} has no .layout--portrait twin.");
-                Assert.AreEqual(body, Regex.Replace(twin.Groups[1].Value, @"\s+", " ").Trim(), $"{selector}: twin differs.");
-            }
-            StringAssert.Contains(".layout--portrait .cw-coop-left .cw-lobby-card", css);
-        }
-
-        [Test]
-        public void EveryNarrowWaitingRoomRule_HasAPortraitTwin()
-        {
-            string css = Read("Assets/UI/Styles/MatchOverlays.uss");
-            var narrow = Regex.Matches(css, @"#LobbyOverlay\.layout--narrow ([^,{]+?)\s*[,{]");
-            Assert.AreEqual(4, narrow.Count, "the waiting-room narrow rules moved; re-point this test");
-            foreach (Match m in narrow)
-                StringAssert.Contains("#LobbyOverlay.layout--portrait " + m.Groups[1].Value.Trim() + " {", css);
+            StringAssert.DoesNotContain("S0 parity", css);
+            StringAssert.DoesNotContain("S0 parity", Read("Assets/UI/Styles/MatchOverlays.uss"));
         }
     }
 

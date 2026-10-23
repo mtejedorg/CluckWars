@@ -150,6 +150,13 @@ namespace CluckWars.Tests
             Assert.IsFalse(UiLayoutRules.WrappedTextClipped(80f, 80f));
             Assert.IsTrue(UiLayoutRules.WrappedTextClipped(120f, 80f), "a wrapped paragraph taller than its fixed box");
 
+            // WP9: a wrapping label sized to its own one-line text (seat class line, solo hint) re-measured at exactly that
+            // width breaks onto two lines the renderer never draws: one line that fits is never clipped.
+            Assert.IsFalse(UiLayoutRules.WrappedTextClipped(307f, 307f, 82.7f, 41.8f), "ASSASSIN · Saboteur on the 2400x1080 COOP");
+            Assert.IsFalse(UiLayoutRules.WrappedTextClipped(468.5f, 468f, 88.9f, 44.4f), "within the rounding tolerance");
+            Assert.IsTrue(UiLayoutRules.WrappedTextClipped(600f, 300f, 120f, 80f), "too wide for one line AND too tall wrapped");
+            Assert.IsFalse(UiLayoutRules.WrappedTextClipped(600f, 300f, 80f, 80f), "too wide for one line but the wrapped text fits");
+
             Assert.IsNotNull(UiLayoutAllowList.Find(UiRule.U3, s => s == ".cw-lb-name", null), "leaderboard names ellipsize by design");
             Assert.IsNotNull(UiLayoutAllowList.Find(UiRule.U3, s => s == ".cw-me-pod__name", null), "podium names ellipsize by design");
             Assert.IsNull(UiLayoutAllowList.Find(UiRule.U3, s => s == ".cw-menu-title", null), "the title must be whole");
@@ -168,6 +175,72 @@ namespace CluckWars.Tests
             Assert.IsNotNull(UiLayoutAllowList.Find(UiRule.U4, s => s == ".cw-menu-build", null, 28f), "the build stamp may sit at 28 px");
             Assert.IsNull(UiLayoutAllowList.Find(UiRule.U4, s => s == ".cw-menu-build", null, 24f), "but never under its entry's floor");
             Assert.IsNull(UiLayoutAllowList.Find(UiRule.U4, s => s == ".cw-btn", null, 28f), "a button label is load-bearing");
+        }
+
+        [Test]
+        public void U1_AllowList_CardBadgeOverBandCorner_Only()
+        {
+            Assert.IsNotNull(UiLayoutAllowList.Find(UiRule.U1, s => s == ".cw-ability-card__band", s => s == ".cw-ability-badge"),
+                "the picked card's slot badge sits over the band corner by design");
+            Assert.IsNotNull(UiLayoutAllowList.Find(UiRule.U1, s => s == ".cw-ability-badge", s => s == ".cw-ability-card__band"), "either order");
+            Assert.IsNull(UiLayoutAllowList.Find(UiRule.U1, s => s == ".cw-ability-badge", s => s == ".cw-ability-card__name"),
+                "the badge over the card's name would be a real overlap");
+            Assert.IsNull(UiLayoutAllowList.Find(UiRule.U2, s => s == ".cw-ability-card__band", s => s == ".cw-ability-badge"), "U1 only");
+        }
+
+        // ---- occlusion (WP9) ------------------------------------------------------------------------------------------
+
+        [Test]
+        public void Occluder_IsANearOpaqueLayer_OverTheWholeSafeArea()
+        {
+            var panel = R(0, 0, 776, 1724);
+            var safe = R(0, 86, 776, 1604);
+            Assert.IsTrue(UiLayoutRules.IsOccluder(0.88f, panel, panel), "the Settings / disconnect scrim (rgba .88)");
+            Assert.IsTrue(UiLayoutRules.IsOccluder(0.88f, safe, safe), "a scrim inside the safe-area host covers the safe area");
+            Assert.IsTrue(UiLayoutRules.IsOccluder(1f, panel, safe), "an opaque overlay (results, waiting room)");
+            Assert.IsFalse(UiLayoutRules.IsOccluder(0.45f, panel, panel), "the intro dim lets the arena show");
+            Assert.IsFalse(UiLayoutRules.IsOccluder(0.78f, panel, panel), "an ink plate's alpha is not a modal layer");
+            Assert.IsFalse(UiLayoutRules.IsOccluder(1f, R(100, 100, 300, 120), panel),
+                "a smaller opaque element over a label is the U1 overlap the probe must still report");
+            Assert.IsFalse(UiLayoutRules.IsOccluder(1f, R(0, 0, float.NaN, 10), panel));
+
+            Assert.IsTrue(UiLayoutRules.HiddenUnder(R(1, 263, 770, 155), panel), "the main menu title under the Settings scrim");
+            Assert.IsFalse(UiLayoutRules.HiddenUnder(R(-76, 740, 169, 43), panel), "a label partly off the layer still shows");
+        }
+
+        [Test]
+        public void ScrollViewport_JudgesOnlyTheShownPart_OfACutItem()
+        {
+            var viewport = R(8, 500, 760, 700);   // the portrait GEAR UP deck, READY below it
+            var whole = R(20, 600, 215, 290);
+            Assert.AreEqual(whole, UiLayoutRules.VisibleInViewport(whole, viewport, out bool cut));
+            Assert.IsFalse(cut, "a card wholly in view is judged as it is");
+
+            var low = UiLayoutRules.VisibleInViewport(R(20, 1100, 215, 290), viewport, out cut);
+            Assert.IsTrue(cut, "a card cut by the viewport's bottom edge");
+            Assert.AreEqual(1200f, low.yMax, 1e-3f, "it ends at the viewport edge, not under the bottom bar");
+            Assert.AreEqual(100f, low.height, 1e-3f);
+            Assert.IsFalse(UiLayoutRules.TargetsTooClose(low, R(8, 1236, 760, 132), out _), "so it is not 'overlapping' READY");
+            Probe_SkipsTheSizeOfACutTarget();
+        }
+
+        private static void Probe_SkipsTheSizeOfACutTarget()
+        {
+            string probe = Read("Assets/_Game/Scripts/Diagnostics/UiLayoutProbe.cs");
+            StringAssert.Contains("if (inScroll) wb = UiLayoutRules.VisibleInViewport(wb, clip, out cut);", probe);
+            StringAssert.Contains("if (!t.Cut && UiLayoutRules.TargetTooSmall(t.Rect))", probe);
+        }
+
+        [Test]
+        public void Probe_DropsOnlyItemsPaintedBeforeAnOccluder_AndNeverItsAncestors()
+        {
+            string probe = Read("Assets/_Game/Scripts/Diagnostics/UiLayoutProbe.cs");
+            StringAssert.Contains("if (UiLayoutRules.IsOccluder(rs.backgroundColor.a * op, wb, _safe)) DropHiddenUnder(ve, wb);", probe);
+            StringAssert.Contains("!it.Ve.Contains(layer) && UiLayoutRules.HiddenUnder(it.Rect, cover)", probe);
+            Assert.Less(probe.IndexOf("DropHiddenUnder(ve, wb);", System.StringComparison.Ordinal),
+                probe.IndexOf("bool isButton = ve is Button;", System.StringComparison.Ordinal),
+                "the layer is judged before its own text / target is collected (its children come after it)");
+            StringAssert.Contains("UiLayoutRules.WrappedTextClipped(line.x, content.width, m.y, content.height)", probe);
         }
 
         // ---- U5 -------------------------------------------------------------------------------------------------------

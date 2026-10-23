@@ -1533,6 +1533,15 @@ namespace CluckWars.UI
                 doorway.RegisterCallback<GeometryChangedEvent>(e =>
                     _gearChicken.EnableInClassList("cw-gear-chicken--nofit", !GearDoorway.Fits(e.newRect.height)));
             if (_readyBtn != null) { _readyBtn.clicked += OnReady; OwnCue(_readyBtn); }
+            // WP9 (C7): the deck scrolls in portrait. Pad / keyboard focus moving onto a card below the fold brings it into view.
+            var deckScroll = _loadout.Q<ScrollView>("DeckScroll");
+            if (deckScroll == null)
+                _log?.Error(Source, "CharacterSelect.uxml has no #DeckScroll; in portrait the deck cannot scroll and READY can be pushed off screen.");
+            else
+                deckScroll.RegisterCallback<FocusInEvent>(e =>
+                {
+                    if (e.target is VisualElement ve && deckScroll.contentContainer.Contains(ve)) deckScroll.ScrollTo(ve);
+                });
 
             for (int i = 0; i < _slots.Length; i++)
             {

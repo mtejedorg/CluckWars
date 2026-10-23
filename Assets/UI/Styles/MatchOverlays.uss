@@ -411,7 +411,10 @@
 
 /* Post-match actions: PLAY AGAIN (green) + BACK TO LOBBY (wood), side by side. */
 .cw-me-actions { flex-direction: row; justify-content: center; margin-top: 14px; flex-shrink: 0; }
-.cw-me-action { flex-grow: 1; flex-basis: 0; margin-left: 10px; margin-right: 10px; letter-spacing: 2px; padding-left: 20px; padding-right: 20px; }
+.cw-me-action { flex-grow: 1; flex-basis: 0; margin-left: 10px; margin-right: 10px; letter-spacing: 2px; }
+/* The 20 px side padding never applied: .cw-btn below (same specificity, later) reset it to 44, which left "BACK TO
+   LOBBY" (288 px) in a 286 px box at 1920x1080 (UiProbe U3, WP9). Two classes outrank it; the label stays centred. */
+.cw-me-actions .cw-me-action { padding-left: 20px; padding-right: 20px; }
 .cw-me-restart {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
     font-size: 30px; letter-spacing: 1px; color: rgb(254, 245, 224);
@@ -463,11 +466,17 @@
 #LobbyOverlay.layout--short .cw-page-cta, #LobbyOverlay.layout--narrow .cw-page-cta { min-width: 380px; }
 #LobbyOverlay.layout--short .cw-lobby-btnrow .cw-mini-btn, #LobbyOverlay.layout--narrow .cw-lobby-btnrow .cw-mini-btn { min-width: 116px; margin-left: 6px; padding-left: 8px; padding-right: 8px; }
 #LobbyOverlay.layout--short .cw-coop-left .cw-lobby-card, #LobbyOverlay.layout--narrow .cw-coop-left .cw-lobby-card { margin-left: 8px; padding-top: 16px; padding-bottom: 16px; padding-left: 16px; padding-right: 16px; }
-/* S0 parity: portrait was --narrow before LayoutClasses (WP6), so it keeps the same slimming; WP9 owns the portrait look. */
-#LobbyOverlay.layout--portrait .cw-wr-changebird { min-width: 220px; margin-right: 12px; padding-left: 24px; padding-right: 24px; }
-#LobbyOverlay.layout--portrait .cw-page-cta { min-width: 380px; }
-#LobbyOverlay.layout--portrait .cw-lobby-btnrow .cw-mini-btn { min-width: 116px; margin-left: 6px; padding-left: 8px; padding-right: 8px; }
-#LobbyOverlay.layout--portrait .cw-coop-left .cw-lobby-card { margin-left: 8px; padding-top: 16px; padding-bottom: 16px; padding-left: 16px; padding-right: 16px; }
+/* Portrait (WP9, spec 1.4): the room is THE COOP, so the menu theme's .layout--portrait rules already stack its seats 2x2 and
+   its bottom bar into a column; only the room's own action pair is restyled here. Side by side, sharing the width, where it
+   fits: a non-tall portrait panel (9:16, 923 px) is always >= ~860 px wide, CHANGE BIRD (~300) + START (~420) + 20 need ~740.
+   On a tall phone (9:20 / 9:21, 746-776 px) they stack, CHANGE BIRD over START; that panel has the height for it. */
+#LobbyOverlay.layout--portrait .cw-wr-actions { align-self: stretch; }
+#LobbyOverlay.layout--portrait .cw-wr-changebird { flex-grow: 1; flex-basis: 0; min-width: 0; min-height: 124px; margin-right: 20px; padding-left: 24px; padding-right: 24px; }
+#LobbyOverlay.layout--portrait .cw-page-cta { flex-grow: 1; flex-basis: 0; min-width: 0; min-height: 124px; }
+#LobbyOverlay.layout--tall .cw-wr-actions { flex-direction: column; align-items: stretch; }
+#LobbyOverlay.layout--tall .cw-wr-changebird { flex-basis: auto; margin-right: 0; margin-bottom: 20px; }
+#LobbyOverlay.layout--tall .cw-page-cta { flex-basis: auto; }
+#LobbyOverlay.layout--portrait .cw-lobby-btnrow .cw-mini-btn { min-width: 116px; margin-left: 20px; padding-left: 8px; padding-right: 8px; }
 .cw-wr-changebird { margin-right: 18px; min-width: 300px; }
 
 /* ---- Shared buttons — the menus' cw-btn (CluckWarsTheme.uss), restated for this sheet -------- */
@@ -619,3 +628,39 @@
     -unity-slice-scale: 0.7px;
     padding-top: 18px; padding-bottom: 26px; padding-left: 64px; padding-right: 64px;
 }
+
+/* ============================================================================
+   PORTRAIT  (WP9; PORTRAIT_AND_LANDSCAPE_SPEC 1.6)
+   MatchOverlaysController puts the LayoutClasses shape classes on #MatchEndOverlay, #LeaveSheet,
+   #SessionEndOverlay, #IntroGetReady and #LobbyOverlay (measured on the always-visible overlay root).
+   Landscape is the base rules above, unchanged. Panels: 776x1724, 773x1725, 746x1740, 923x1641.
+   ============================================================================ */
+/* Results: the hero (banner + podium) on top takes the height the board leaves; the board below at full width, sized
+   to its rows. The 800 px board floor (a landscape 4:3 rule) is what crushed the podium. */
+.layout--portrait .cw-me-panel {
+    flex-direction: column;
+    padding-top: 16px; padding-bottom: 16px; padding-left: 16px; padding-right: 16px;
+}
+.layout--portrait .cw-me-hero { margin-right: 0; margin-bottom: 16px; flex-grow: 1; flex-basis: 0; min-height: 0; }
+.layout--portrait .cw-me-ribbon--win .cw-me-ribbon__label { font-size: 48px; }   /* "TIED AT THE TOP!" fits the 714 px column at 9:21 */
+.layout--portrait .cw-me-right {
+    flex-grow: 0; flex-basis: auto; min-width: 0; max-width: none; align-self: stretch;
+    padding-top: 32px; padding-bottom: 28px; padding-left: 24px; padding-right: 24px;
+}
+.layout--portrait .cw-me-rowmid { width: 200px; }
+/* One row of two (spec 1.6): (714 - 48 - 40) / 2 = 313 px each at 9:21; "BACK TO LOBBY" untracked is ~262. */
+.layout--portrait .cw-me-actions .cw-me-action { min-height: 124px; letter-spacing: 0; padding-left: 16px; padding-right: 16px; }
+
+/* LEAVE MATCH? and the session-end panel: full width minus a 16 px gutter; LEAVE's two planks stack. */
+.layout--portrait .cw-leave-panel {
+    width: auto; max-width: none; align-self: stretch;
+    margin-left: 16px; margin-right: 16px; padding-left: 24px; padding-right: 24px;
+}
+.layout--portrait .cw-leave-actions { flex-direction: column; align-items: stretch; }
+.layout--portrait .cw-leave-btn { flex-basis: auto; margin-top: 10px; margin-bottom: 10px; margin-left: 0; margin-right: 0; }
+.layout--portrait .cw-se-panel {
+    width: auto; max-width: none; align-self: stretch;
+    margin-left: 16px; margin-right: 16px; padding-left: 24px; padding-right: 24px;
+}
+.layout--portrait .cw-se-panel .cw-ribbon { min-width: 0; }
+.layout--portrait .cw-se-btn { align-self: stretch; min-width: 0; }

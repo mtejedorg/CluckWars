@@ -454,11 +454,12 @@ namespace CluckWars.UI
             if (_lobbySafe == null) _log?.Error(Source, "MatchOverlays.uxml has no #LobbySafe; the waiting room ignores the safe area.");
             _safeArea = new SafeAreaPadding(_meSafe, _lobbySafe, _sessionEndOverlay, _leaveSheet);
             _root.RegisterCallback<GeometryChangedEvent>(_ => _safeArea.Apply(force: true));
-            // The menu's shape classes (LayoutClasses), measured on the full overlay panel but set on the waiting room
-            // only: its #LobbyOverlay.layout--short / --narrow rules slim THE COOP's bar on phones and 4:3 tablets. They
-            // stay off the overlay root so the intro's GET READY plate keeps its full size (.layout--short
-            // .cw-getready__plate is the menu's rule).
-            if (_lobbyOverlay != null) LayoutClasses.Bind(_root, _lobbyOverlay);
+            // The menu's shape classes (LayoutClasses), measured on the always-visible overlay panel and set on each full-screen
+            // overlay that has orientation rules (WP9): the waiting room (#LobbyOverlay.layout--short / --narrow slim THE COOP's
+            // bar; --portrait stacks it), the results (column in portrait), the LEAVE and session-end sheets and the intro GET
+            // READY card (a smaller plate in portrait). They stay off the overlay root itself; the menu's short-screen plate
+            // rule is scoped to the menu card (#GetReadyCard), so the intro card keeps its full size in landscape.
+            LayoutClasses.BindAll(_root, _lobbyOverlay, _matchEndOverlay, _leaveSheet, _sessionEndOverlay, _introGetReady);
             // The event banner's portrait position (WP7, .cw-eventbanner.layout--portrait). Bind keeps one target per
             // measured element, so this one measures the full-panel #OverlayRoot instead of _root.
             var overlayHost = _root.Q<VisualElement>("OverlayRoot");

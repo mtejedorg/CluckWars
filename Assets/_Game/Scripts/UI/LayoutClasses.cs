@@ -99,5 +99,27 @@ namespace CluckWars.UI
         }
 
         private static void OnGeometry(GeometryChangedEvent evt, VisualElement target) => Apply(target, evt.newRect);
+
+        /// <summary>
+        /// <see cref="Bind"/> for several targets classified from ONE always-visible full-panel element (WP9: the match
+        /// overlays' waiting room, results, LEAVE / session-end sheets and the intro GET READY are siblings that are hidden
+        /// most of the time, so measuring each one itself would lay a freshly shown overlay out once in the wrong shape).
+        /// Null targets are skipped. A re-bind replaces the previous target list on <paramref name="measured"/>; it does not
+        /// touch a single-target <see cref="Bind"/> registered on the same element (a different callback).
+        /// </summary>
+        public static void BindAll(VisualElement measured, params VisualElement[] targets)
+        {
+            if (measured == null || targets == null) return;
+            measured.UnregisterCallback<GeometryChangedEvent, VisualElement[]>(OnGeometryAll);
+            measured.RegisterCallback<GeometryChangedEvent, VisualElement[]>(OnGeometryAll, targets);
+            ApplyAll(targets, measured.layout);
+        }
+
+        private static void OnGeometryAll(GeometryChangedEvent evt, VisualElement[] targets) => ApplyAll(targets, evt.newRect);
+
+        private static void ApplyAll(VisualElement[] targets, Rect panelRect)
+        {
+            for (int i = 0; i < targets.Length; i++) Apply(targets[i], panelRect);
+        }
     }
 }
