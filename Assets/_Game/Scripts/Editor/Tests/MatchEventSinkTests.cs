@@ -724,7 +724,7 @@ namespace CluckWars.Tests
         [Test]
         public void EmitSite_TryActivate_AnnouncesAbilityResolved_BesideTheCastEvent()
         {
-            var body = SourceScan.MethodBody(AbilityControllerPath, "void TryActivate(");
+            var body = SourceScan.MethodBody(AbilityControllerPath, "bool TryActivate(");
             int castEvent = SourceScan.IndexOf(body, "LastCastEventId++", "TryActivate");
             var block = SourceScan.EnclosingBlock(body, castEvent);
 
@@ -753,10 +753,15 @@ namespace CluckWars.Tests
             Assert.IsFalse(body.Any(l => l.Code.Contains("HasStateAuthority")),
                 "The round poll runs on every peer — each peer's progression hears its own round.");
 
-            Assert.IsFalse(SourceScan.CodeLines(GameManagerPath).Any(l => l.Code.Contains("GetChangeDetector(")),
-                "GameManager must not use a ChangeDetector. Solo runs GameMode.Single, where DetectChanges can " +
-                "skip a locally-written property (PlayerBase.LateUpdate), and a missed Ended edge silently " +
-                "loses a round's rewards — only in solo, i.e. the pitch build. Poll in LateUpdate instead.");
+            // A ChangeDetector on the round STATE is the bug this guards against. GameManager's one
+            // detector observes ResetTickRaw (the round-reset event, WP0), a separate property that the
+            // authority writes in Shared mode as well, never State.
+            var readers = SourceScan.CodeLines(GameManagerPath).Where(l => l.Code.Contains("GetPropertyReader<")).ToList();
+            Assert.IsTrue(readers.All(l => l.Code.Contains("nameof(ResetTickRaw)")),
+                "GameManager must not observe State with a ChangeDetector. Solo runs GameMode.Single, where " +
+                "DetectChanges can skip a locally-written property (PlayerBase.LateUpdate), and a missed Ended " +
+                "edge silently loses a round's rewards - only in solo, i.e. the pitch build. Poll in LateUpdate " +
+                "instead. The one allowed detector reads ResetTickRaw only.");
         }
 
         // ==== ReceiveStolen credits exactly what the raw write did =========================
@@ -780,60 +785,47 @@ namespace CluckWars.Tests
         /// as the victim exactly the chicken whose cargo is being drained. For Spine Coat the defender
         /// is the thief, so the victim is the attacker, <c>other</c>.
         /// </summary>
-        private static readonly (string Path, bool CreditBeforeDrain, string Victim)[] StealSites =
+        private static readonly (string Path, string Victim, string Amount)[] StealSites =
         {
-            (AbilitiesDir + "/SnatchAbilitySO.cs",       true,  "targetCtrl"),
-            (AbilitiesDir + "/SneakyStealAbilitySO.cs",  true,  "_scratch[0]"),
-            (AbilitiesDir + "/ScrapAbilitySO.cs",        true,  "_scratch[0]"),
-            (AbilitiesDir + "/RollTrampleAbilitySO.cs",  true,  "_scratch[0]"),
-            (ChickenControllerPath,                      false, "other"), // Spine Coat steal-back
+            (AbilitiesDir + "/SnatchAbilitySO.cs",       "targetCargo", "stolen"),
+            (AbilitiesDir + "/SneakyStealAbilitySO.cs",  "target",      "take"),
+            (AbilitiesDir + "/ScrapAbilitySO.cs",        "victim",      "take"),
+            (AbilitiesDir + "/RollTrampleAbilitySO.cs",  "targetCargo", "stolen"),
+            (ChickenControllerPath,                      "other.Cargo", "stolen"), // Spine Coat steal-back
         };
 
-        /// <summary>Any call to ReceiveStolen, whatever its arguments — used to find callers.</summary>
-        private static readonly Regex AnyCreditCall = new Regex(@"\bReceiveStolen\(");
-        /// <summary>ReceiveStolen(amount, victim) with simple arguments: group 1 = amount, group 2 = victim.</summary>
-        private static readonly Regex CreditCall = new Regex(@"\bReceiveStolen\(\s*(\w+)\s*,\s*([^()]+?)\s*\)");
-        /// <summary>receiver.RPC_DrainStolen(amount, …): group 1 = receiver, group 2 = amount.</summary>
-        private static readonly Regex DrainCall  = new Regex(@"([\w\.\[\]]+)\.RPC_DrainStolen\(\s*(\w+)\s*,");
+        /// <summary>Any call to CreditStealAndDrain, whatever its arguments - used to find callers.</summary>
+        private static readonly Regex AnyCreditCall = new Regex(@"\.CreditStealAndDrain\(");
+        /// <summary>x.CreditStealAndDrain(victimCargo, amount): group 1 = victim cargo expression, group 2 = amount.</summary>
+        private static readonly Regex CreditCall = new Regex(@"\.CreditStealAndDrain\(\s*([\w\.]+)\s*,\s*(\w+)\s*\)");
 
         [Test]
-        public void StealSites_CreditTheDrainedAmount_ToTheDrainedVictim_OnTheOriginalSideOfTheDrain()
+        public void StealSites_CreditTheDrainedAmount_ToTheDrainedVictim()
         {
-            foreach (var (path, creditBeforeDrain, victim) in StealSites)
+            foreach (var (path, victim, amount) in StealSites)
             {
                 var lines = SourceScan.CodeLines(path);
-                var credits = lines.Select((l, i) => (l, i)).Where(x => AnyCreditCall.IsMatch(x.l.Code)).ToList();
-                Assert.AreEqual(1, credits.Count, $"{path}: expected exactly one ReceiveStolen call.");
+                var credits = lines.Where(l => AnyCreditCall.IsMatch(l.Code)).ToList();
+                Assert.AreEqual(1, credits.Count, $"{path}: expected exactly one CreditStealAndDrain call.");
 
-                int ci = credits[0].i;
-                var credit = CreditCall.Match(lines[ci].Code);
-                Assert.IsTrue(credit.Success,
-                    $"{path}:{lines[ci].Number}: expected ReceiveStolen(amount, victim) with simple arguments, got: {lines[ci].Code}");
-
-                int di = creditBeforeDrain ? ci + 1 : ci - 1;
-                string side = creditBeforeDrain ? "immediately after" : "immediately before";
-                Assert.IsTrue(di >= 0 && di < lines.Count && DrainCall.IsMatch(lines[di].Code),
-                    $"{path}:{lines[ci].Number}: RPC_DrainStolen must be the code line {side} ReceiveStolen, " +
-                    "preserving the original credit/drain order.");
-                var drain = DrainCall.Match(lines[di].Code);
-
-                Assert.AreEqual(drain.Groups[2].Value, credit.Groups[1].Value,
-                    $"{path}:{lines[ci].Number}: the thief must be credited the same amount the victim is asked to drain.");
-
-                string creditVictim = credit.Groups[2].Value;
-                Assert.AreEqual(victim, creditVictim,
-                    $"{path}:{lines[ci].Number}: ReceiveStolen must name '{victim}' as the victim, not '{creditVictim}'.");
-
-                // The drained cargo must be the victim's: either '<victim>.Cargo' directly, or a local
-                // assigned from '<victim>.Cargo' earlier in the file.
-                string receiver = drain.Groups[1].Value;
-                bool drainsTheVictim = receiver == victim + ".Cargo" ||
-                    lines.Take(di).Any(l => Regex.IsMatch(l.Code,
-                        $@"\b{Regex.Escape(receiver)}\s*=\s*{Regex.Escape(victim)}\.Cargo\s*;"));
-                Assert.IsTrue(drainsTheVictim,
-                    $"{path}:{lines[di].Number}: RPC_DrainStolen is called on '{receiver}', which is not '{victim}.Cargo' " +
-                    $"nor a local assigned from it — the announced victim would not be the chicken that was robbed.");
+                var call = CreditCall.Match(credits[0].Code);
+                Assert.IsTrue(call.Success,
+                    $"{path}:{credits[0].Number}: expected CreditStealAndDrain(victimCargo, amount) with simple arguments, got: {credits[0].Code}");
+                Assert.AreEqual(victim, call.Groups[1].Value,
+                    $"{path}:{credits[0].Number}: CreditStealAndDrain must name '{victim}' as the robbed cargo; the announced victim is its owner.");
+                Assert.AreEqual(amount, call.Groups[2].Value,
+                    $"{path}:{credits[0].Number}: the thief must be credited the amount variable '{amount}' that was clamped for this steal.");
             }
+        }
+
+        [Test]
+        public void CreditStealAndDrain_CreditsThroughReceiveStolen_SoEveryStealIsAnnounced()
+        {
+            var body = SourceScan.MethodBody(ChickenCargoPath, "void CreditStealAndDrain(");
+            Assert.IsTrue(body.Any(l => l.Code.Contains("ReceiveStolen(")),
+                "CreditStealAndDrain must credit through ReceiveStolen, the one place that announces ResourceStolen.");
+            Assert.IsFalse(body.Any(l => Regex.IsMatch(l.Code, @"Cargo\s*\+=")),
+                "CreditStealAndDrain must not credit cargo by hand; that would skip the ResourceStolen announcement.");
         }
 
         [Test]
@@ -846,7 +838,7 @@ namespace CluckWars.Tests
                 .ToArray();
 
             CollectionAssert.AreEquivalent(StealSites.Select(s => s.Path).ToArray(), callers,
-                "A new ReceiveStolen caller must be added to StealSites here, with its credit/drain order pinned.");
+                "A new CreditStealAndDrain caller must be added to StealSites here, with its victim and amount pinned.");
         }
 
         // ==== The sink binding resolves ======================================================
@@ -958,9 +950,12 @@ namespace CluckWars.Tests
                 $"{Where}: the assassin's own ChickenCargo announces, on the assassin's authority.");
             StringAssert.DoesNotContain("?.AnnounceExecuteSteal", body[announce].Code,
                 $"{Where}: a missing ChickenCargo is a wiring Error (silent-failure rule), not a silent '?.' skip.");
-            int missingCargo = body.FindIndex(announce, l => l.Code.Contains("_log?.Error(") && l.Code.Contains("ChickenCargo"));
-            Assert.IsTrue(missingCargo > announce && missingCargo < transfer,
-                $"{Where}: when the assassin has no ChickenCargo, an Error naming it must be logged before the transfer.");
+            // The execute path refuses up front when a sibling is missing (an Error naming ChickenCargo, then a
+            // return), so by the time it announces, _cargo is known to exist.
+            int guard = body.FindIndex(l => l.Code.Contains("_cargo == null"));
+            int missingCargo = guard < 0 ? -1 : body.FindIndex(guard, l => l.Code.Contains("_log?.Error("));
+            Assert.IsTrue(guard >= 0 && missingCargo > guard && missingCargo < announce,
+                $"{Where}: when the assassin has no ChickenCargo, an Error naming it must be logged (and the execute refused) before the announcement.");
 
             int capture = body.FindIndex(l => Regex.IsMatch(l.Code, $@"^float\s+{Regex.Escape(amount)}\s*=\s*target\.Cargo\.Cargo\s*;$"));
             Assert.GreaterOrEqual(capture, 0, $"{Where}: '{amount}' must be a local read from target.Cargo.Cargo (the victim's replicated cargo).");

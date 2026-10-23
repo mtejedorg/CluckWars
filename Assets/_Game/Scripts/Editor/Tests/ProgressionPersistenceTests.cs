@@ -1065,35 +1065,18 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void MatchOverlaysUxml_HasTheGrainLine_BetweenTheRowsAndTheRestartLine_HiddenByDefault()
+        public void MatchOverlaysUxml_HasTheGrainLine_BetweenTheRowsAndTheActions_HiddenByDefault()
         {
             string uxml = File.ReadAllText(TestAssets.MatchOverlaysUxmlPath);
-            var names = Regex.Matches(uxml, @"name=""(MeRows|MeGrain|MeRestart)""").Cast<Match>().Select(m => m.Groups[1].Value).ToArray();
-            CollectionAssert.AreEqual(new[] { "MeRows", "MeGrain", "MeRestart" }, names,
-                "The Grain line sits between the standings rows and the restart countdown, once. " +
+            var names = Regex.Matches(uxml, @"name=""(MeRows|MeGrain|MeActions)""").Cast<Match>().Select(m => m.Groups[1].Value).ToArray();
+            CollectionAssert.AreEqual(new[] { "MeRows", "MeGrain", "MeActions" }, names,
+                "The Grain line sits between the standings rows and the PLAY AGAIN / BACK TO LOBBY actions, once (nothing restarts on a timer any more). " +
                 "MatchOverlaysController queries it by name.");
 
             var element = Regex.Match(uxml, @"<ui:Label[^>]*name=""MeGrain""[^>]*/>");
             Assert.IsTrue(element.Success, "MeGrain must be a ui:Label.");
             StringAssert.Contains("display: none", element.Value,
                 "The line must start hidden: it shows only once the award exists, never as a placeholder.");
-        }
-
-        [Test]
-        public void TheGrainLine_SharesOneRowWithTheRestartLine()
-        {
-            // A third stacked line made the whole results panel one line taller; the footer row adds no height.
-            var doc = XDocument.Load(TestAssets.MatchOverlaysUxmlPath);
-            var footer = doc.Descendants().SingleOrDefault(e => (string)e.Attribute("name") == "MeFooter");
-            Assert.IsNotNull(footer, "MatchOverlays.uxml must hold a MeFooter element.");
-            CollectionAssert.AreEqual(new[] { "MeGrain", "MeRestart" },
-                footer.Elements().Select(e => (string)e.Attribute("name")).ToArray(),
-                "MeGrain and MeRestart must be MeFooter's children, in that order.");
-            StringAssert.Contains("cw-me-footer", (string)footer.Attribute("class"));
-
-            string uss = File.ReadAllText("Assets/UI/Styles/MatchOverlays.uss");
-            StringAssert.IsMatch(@"\.cw-me-footer\s*\{[^}]*flex-direction:\s*row", uss,
-                ".cw-me-footer must lay its children out in a row.");
         }
     }
 }

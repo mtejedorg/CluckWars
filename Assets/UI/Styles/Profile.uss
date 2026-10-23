@@ -182,7 +182,7 @@
     margin-bottom: 14px;
 }
 .cw-career-stat__value { font-size: 44px; color: rgb(254, 245, 224); -unity-text-align: middle-left; }
-.cw-career-stat__label { font-size: 26px; color: rgb(196, 160, 96); letter-spacing: 1px; -unity-text-align: middle-left; }
+.cw-career-stat__label { font-size: 28px; color: rgb(196, 160, 96); letter-spacing: 1px; -unity-text-align: middle-left; }
 
 /* Recent form: one pip per round, carrying its placement as a digit. */
 .cw-form-strip { flex-direction: row; flex-wrap: wrap; align-items: center; }
@@ -203,7 +203,7 @@
     border-left-color: rgb(245, 200, 66); border-right-color: rgb(245, 200, 66);
     border-top-color: rgb(245, 200, 66); border-bottom-color: rgb(245, 200, 66);
 }
-.cw-form-pip__place { font-size: 26px; color: rgb(212, 190, 158); -unity-text-align: middle-center; }
+.cw-form-pip__place { font-size: 28px; color: rgb(212, 190, 158); -unity-text-align: middle-center; }
 .cw-form-pip--won .cw-form-pip__place { color: rgb(245, 200, 66); }
 
 /* ---- Main-menu identity strip --------------------------------------------- */
@@ -222,7 +222,7 @@
 }
 .cw-id-strip__text { flex-direction: column; justify-content: center; margin-left: 14px; }
 .cw-id-strip__name { font-size: 36px; color: rgb(254, 245, 224); -unity-text-align: middle-left; white-space: nowrap; }
-.cw-id-strip__title { font-size: 26px; color: rgb(245, 200, 66); -unity-text-align: middle-left; white-space: nowrap; }
+.cw-id-strip__title { font-size: 28px; color: rgb(245, 200, 66); -unity-text-align: middle-left; white-space: nowrap; }
 .cw-id-strip__grain { font-size: 32px; color: rgb(196, 160, 96); margin-left: 24px; -unity-text-align: middle-right; }
 
 /* ---- Class-chip mastery ring ---------------------------------------------- */
