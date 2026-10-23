@@ -84,13 +84,15 @@ namespace CluckWars.Abilities
         // rather than inferred from Category, and why a mixed ability stays false.
         public override bool TargetEffectIsPurelyControl => true;
 
+        public override ControlEmission EmittedControl => ControlEmission.Slow(SlowSeconds, SlowFactor);
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;
 
             GatherTargets(caster, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
-                _scratch[i].RPC_ApplyAbilitySlow(SlowSeconds, SlowFactor);
+                _scratch[i].RPC_ApplyAbilitySlow(SlowSeconds, SlowFactor, caster.Id);
         }
 
         public override void OnDeactivate(AbilityContext ctx) { }

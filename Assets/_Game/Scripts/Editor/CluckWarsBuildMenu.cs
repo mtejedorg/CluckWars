@@ -140,6 +140,61 @@ namespace CluckWars.EditorTools
             else Debug.LogError(summary + "  One or more targets did not succeed; see the errors above.");
         }
 
+        /// <summary>
+        /// Test-session build (docs/TEST_SESSION_PLAN_2026-10.md §2): Windows then Android, both compiled with
+        /// <c>CLUCKWARS_DEV_TOOLS</c> so the instrumentation (PerfProbe, Sync heartbeat, Visual probe, net line,
+        /// auto-test, touch overlay) is in. Still <c>BuildOptions.None</c>: a non-development player, so the frame
+        /// times it logs are the ones a player would get. Restores the Windows target afterwards, like Build All.
+        /// </summary>
+        [MenuItem(TestSessionMenuPath, priority = 5)]
+        public static void BuildTestSession()
+        {
+            if (!ValidateScenes()) return;
+            bool windows = false, android = false;
+            _forceDevTools = true;
+            try
+            {
+                windows = DoWindows();
+                android = DoAndroid();
+            }
+            finally
+            {
+                _forceDevTools = false;
+                RestoreWindowsTarget();
+            }
+
+            var summary = $"{LogTag} Test Session build (dev tools) — Windows: {Verdict(windows)}, Android: {Verdict(android)}";
+            if (windows && android) Debug.Log(summary);
+            else Debug.LogError(summary + "  One or more targets did not succeed; see the errors above.");
+        }
+
+        private const string TestSessionMenuPath = "Cluck Wars/Build/Test Session (Windows + Android, dev tools)";
+
+        /// <summary>Command-line switch that turns the dev-tools define on for any build menu entry.</summary>
+        public const string DevToolsArg = "-cwDevTools";
+
+        /// <summary>Environment variable that does the same (value <c>1</c>).</summary>
+        public const string DevToolsEnvVar = "CW_DEV_TOOLS";
+
+        // Set only for the duration of BuildTestSession.
+        private static bool _forceDevTools;
+
+        /// <summary>
+        /// Whether a build gets <c>CLUCKWARS_DEV_TOOLS</c>: the Test Session menu item, <see cref="DevToolsArg"/> on the
+        /// Editor command line (case-insensitive), or <see cref="DevToolsEnvVar"/>=1. Anything else is a production build.
+        /// Pure so a test pins it.
+        /// </summary>
+        public static bool WantsDevTools(bool menuForced, string[] commandLine, string envValue, out string reason)
+        {
+            if (menuForced) { reason = "Test Session menu"; return true; }
+            if (commandLine != null)
+                foreach (var a in commandLine)
+                    if (string.Equals(a, DevToolsArg, StringComparison.OrdinalIgnoreCase)) { reason = DevToolsArg; return true; }
+            if (envValue != null && envValue.Trim() == "1") { reason = DevToolsEnvVar + "=1"; return true; }
+            reason = "production";
+            return false;
+        }
+
         private static bool IsIosEnabled() => EditorPrefs.GetBool(EnableIosPrefKey, false);
 
         [MenuItem("Cluck Wars/Build/Reveal Builds Folder", priority = 20)]
@@ -243,8 +298,31 @@ namespace CluckWars.EditorTools
                 options = BuildOptions.None,
             };
 
-            Debug.Log($"{LogTag} {target} → {Path.GetFullPath(location)}  (scenes: {options.scenes.Length})");
-            var report = BuildPipeline.BuildPlayer(options);
+            bool devTools = WantsDevTools(_forceDevTools, Environment.GetCommandLineArgs(),
+                Environment.GetEnvironmentVariable(DevToolsEnvVar), out var devToolsReason);
+            if (devTools) options.extraScriptingDefines = new[] { CluckWars.Diagnostics.DevTools.Define };
+
+            // A dev-tools build also turns on Frame Timing Stats so PerfProbe can print CPU/GPU frame times
+            // (FrameTimingManager reports 0 without it). Restored after the build: production keeps its setting.
+            bool frameTimingWas = PlayerSettings.enableFrameTimingStats;
+            if (devTools) PlayerSettings.enableFrameTimingStats = true;
+            BuildInfoWriter.DevToolsForNextBuild = devTools;
+
+            Debug.Log($"{LogTag} {target} → {Path.GetFullPath(location)}  (scenes: {options.scenes.Length}, " +
+                      $"devtools={(devTools ? "on" : "off")} [{devToolsReason}]" +
+                      $"{(devTools ? $", define {CluckWars.Diagnostics.DevTools.Define}, frame timing stats on" : string.Empty)})");
+            BuildReport report;
+            try
+            {
+                report = BuildPipeline.BuildPlayer(options);
+            }
+            finally
+            {
+                PlayerSettings.enableFrameTimingStats = frameTimingWas;
+                BuildInfoWriter.DevToolsForNextBuild = false;
+                // The postprocess callback is skipped when a build fails: never leave the generated asset behind.
+                BuildInfoWriter.Cleanup();
+            }
             var succeeded = LogResult(target, location, report);
 
             if (succeeded && target == BuildTarget.iOS)

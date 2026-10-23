@@ -71,6 +71,8 @@ namespace CluckWars.UI
         private void Awake()
         {
             Instance = this;
+            // The round orientation lock (C4) lives exactly as long as the match HUD; added here so no scene edit is needed.
+            if (GetComponent<OrientationPolicy>() == null) gameObject.AddComponent<OrientationPolicy>();
 
             if (_log == null)
             {
@@ -98,6 +100,9 @@ namespace CluckWars.UI
                 _log?.Error(Source, "MatchTopBar.uxml has no #TopBarRoot: no safe-area padding, intro dim or modal hide for the HUD.");
             else
                 _safeArea = new SafeAreaPadding(_topBarRoot);
+            // Shape classes for the top bar's portrait overrides (WP7), measured on the full panel: the bar itself is a band.
+            LayoutClasses.Bind(_root, _topBarRoot ?? _root);
+            SafeAreaSource.LogOnce(_log);
 
             for (int i = 0; i < 4; i++)
             {

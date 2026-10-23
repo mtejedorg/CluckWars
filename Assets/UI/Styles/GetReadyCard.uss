@@ -23,7 +23,9 @@
     padding-top: 0; padding-bottom: 40px; padding-left: 250px; padding-right: 250px;
     align-items: center; justify-content: center;
 }
-.layout--short .cw-getready__plate { height: 176px; -unity-slice-scale: 1.1px; padding-bottom: 32px; padding-left: 200px; padding-right: 200px; }
+/* Short landscape screens: the MENU card only (#GetReadyCard). The intro card (#IntroGetReady) carries the shape classes
+   too since WP9 and keeps its full size in landscape, as before. */
+.layout--short #GetReadyCard .cw-getready__plate { height: 176px; -unity-slice-scale: 1.1px; padding-bottom: 32px; padding-left: 200px; padding-right: 200px; }
 .cw-getready__label {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 104px; letter-spacing: 8px; color: rgb(255, 214, 80);
@@ -32,7 +34,11 @@
     text-shadow: 0px 8px 0px rgba(42, 26, 12, 0.9);
     padding-top: 0; padding-bottom: 0; margin-top: 0; margin-bottom: 0;
 }
-.layout--short .cw-getready__label { font-size: 84px; }
+.layout--short #GetReadyCard .cw-getready__label { font-size: 84px; }
+/* Portrait (WP9, both cards): at full size the plate is 1060 px wide. A 144 px ribbon (tails 151 px at 0.9) and 72 px type
+   make it ~680 px, inside the 746 px panel of a 9:21 phone. */
+.layout--portrait .cw-getready__plate { height: 144px; -unity-slice-scale: 0.9px; padding-bottom: 26px; padding-left: 152px; padding-right: 152px; }
+.layout--portrait .cw-getready__label { font-size: 72px; letter-spacing: 4px; }
 /* "Waiting for P2..." under the plate (finding 13): empty and collapsed until the room waits 3 s. */
 .cw-getready__sub {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");

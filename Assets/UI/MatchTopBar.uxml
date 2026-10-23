@@ -6,7 +6,7 @@
     <ui:VisualElement name="TopBarRoot" class="cw-topbar" picking-mode="Ignore">
         <ui:VisualElement name="TopBarLayout" class="cw-topbar-layout" picking-mode="Ignore">
             
-            <!-- ===== LEFT: Ranked Leaderboard + Target ===== -->
+            <!-- ===== LEFT: Ranked Leaderboard ===== -->
             <ui:VisualElement name="LeaderboardContainer" class="cw-lb-container" picking-mode="Ignore">
                 <ui:VisualElement name="LeaderboardPanel" class="cw-lb-panel" picking-mode="Ignore">
                     
@@ -53,13 +53,13 @@
                     </ui:VisualElement>
 
                 </ui:VisualElement>
-
-                <ui:Label name="WinTargetBadge" text="" class="cw-target-badge" picking-mode="Ignore" />
             </ui:VisualElement>
 
-            <!-- ===== RIGHT: Embossed Timer ===== -->
+            <!-- ===== RIGHT: Embossed Timer + goal pill under it, right-aligned (WP7 / decision C5, both orientations:
+                 the pill no longer hangs under the board into the arena, CW-212) ===== -->
             <ui:VisualElement name="TimerContainer" class="cw-timer-container" picking-mode="Ignore">
                 <ui:Label name="MatchTimer" text="@hud.timer.none" class="cw-timer" picking-mode="Ignore" />
+                <ui:Label name="WinTargetBadge" text="" class="cw-target-badge" picking-mode="Ignore" />
             </ui:VisualElement>
 
         </ui:VisualElement>

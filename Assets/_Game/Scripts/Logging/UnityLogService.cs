@@ -5,8 +5,10 @@ namespace CluckWars.Logging
 {
     /// <summary>
     /// Default <see cref="ILogService"/> implementation that routes to Unity's
-    /// <c>Debug.Log</c> family with our own min-level filter and a uniform format:
-    /// <c>[mm:ss.fff][Level][Source] message</c>.
+    /// <c>Debug.Log</c> family with our own min-level filter and a uniform format
+    /// (<see cref="LogLineFormat"/>): <c>[HH:mm:ss.fff][mm:ss.fff][Level][Source] message</c> —
+    /// UTC wall clock first (merges logs from several devices on one timeline), then the time
+    /// since process start.
     /// </summary>
     public sealed class UnityLogService : ILogService
     {
@@ -44,12 +46,7 @@ namespace CluckWars.Logging
             }
         }
 
-        private static string Format(LogLevel level, string source, string message)
-        {
-            var t = Time.realtimeSinceStartupAsDouble;
-            var minutes = (int)(t / 60d);
-            var seconds = t - minutes * 60d;
-            return $"[{minutes:00}:{seconds:00.000}][{level}][{source}] {message}";
-        }
+        private static string Format(LogLevel level, string source, string message) =>
+            LogLineFormat.Format(DateTime.UtcNow, Time.realtimeSinceStartupAsDouble, level, source, message);
     }
 }

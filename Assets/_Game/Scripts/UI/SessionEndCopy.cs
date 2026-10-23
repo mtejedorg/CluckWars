@@ -42,6 +42,17 @@ namespace CluckWars.UI
         public static string For(ShutdownReason reason) => UiText.Get(ReasonKey(reason));
 
         /// <summary>
+        /// The line once the shutdown has been classified (<see cref="CluckWars.Networking.DisconnectRules.Classify"/>):
+        /// a peer that lost its own connection reads "Lost the signal", even when Fusion's shutdown reason says
+        /// <c>DisconnectedByPluginLogic</c> (CW-218: that is a timed-out client, not a departed host).
+        /// </summary>
+        public static string ReasonKey(CluckWars.Networking.SessionExitKind kind, ShutdownReason reason) =>
+            kind == CluckWars.Networking.SessionExitKind.ConnectionLost ? UiKeys.SessionReasonSignal : ReasonKey(reason);
+
+        /// <summary>The in-voice line for a classified shutdown (<see cref="ReasonKey(CluckWars.Networking.SessionExitKind, ShutdownReason)"/>).</summary>
+        public static string For(CluckWars.Networking.SessionExitKind kind, ShutdownReason reason) => UiText.Get(ReasonKey(kind, reason));
+
+        /// <summary>
         /// The headline key: MATCH OVER only when the round this peer watched had really ended (its result
         /// was on screen) before the session closed; COOP CLOSED for every disconnect or shutdown mid-room
         /// or mid-round.

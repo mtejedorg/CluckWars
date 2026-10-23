@@ -120,6 +120,13 @@ namespace CluckWars.Abilities
                  "dedicated state and trigger.")]
         public CastArchetype CastMotion = CastArchetype.Lunge;
 
+        [Header("Area effect")]
+        [Tooltip("The lasting area this ability leaves behind. None = no lasting area (self-buffs, bursts resolved at " +
+                 "cast). Static AoE = placed once, stays fixed (Feather Trap, Root Egg, Smoke Roost). Aura = follows " +
+                 "the caster (Feather Aura). Data, not code (decisions B1-B3): the tuned numbers stay in the ability's " +
+                 "own fields, read through TryGetAreaEffect.")]
+        public AreaEffectKind AreaKind = AreaEffectKind.None;
+
         [Header("Physics Scans")]
         [Tooltip("Legacy layer mask from the Stage G Physics.OverlapSphere scans. No longer used to find " +
                  "chicken targets — every ability's OnActivate now scans ChickenController.ActiveControllers " +
@@ -270,6 +277,22 @@ namespace CluckWars.Abilities
         /// </remarks>
         public virtual float NominalStealAmount => 0f;
 
+        /// <summary>
+        /// The stun, root or timed slow this ability sends its victims through
+        /// <c>ChickenController.RPC_ApplyStun</c> / <c>RPC_ApplyRoot</c> / <c>RPC_ApplyAbilitySlow</c>,
+        /// as authored (before the victim's passive shortens it). <see cref="Gameplay.ControlEmission.None"/>
+        /// for every ability that sends none.
+        /// </summary>
+        /// <remarks>
+        /// Declared for the same reason as <see cref="NominalStealAmount"/>: the receiver-side bound on
+        /// those RPCs is derived from this across the shipped registry
+        /// (<c>ControlClaimRules.CeilingFor</c>, F4), so an ability that sends control without
+        /// declaring it contributes nothing and its stuns are rejected at the victim.
+        /// <c>ControlClaimRulesTests</c> pins every ability whose source calls one of the three RPCs
+        /// against this override. Root Egg declares its root although the zone sends it.
+        /// </remarks>
+        public virtual Gameplay.ControlEmission EmittedControl => Gameplay.ControlEmission.None;
+
         // ---- Aim descriptor (FEEDBACK.md §4 / §8) ------------------------------
         // One declarative shape per ability, used by every consumer that needs to
         // agree on "what does this ability cover": the hold-to-aim preview, the
@@ -400,10 +423,27 @@ namespace CluckWars.Abilities
         /// resolving a hit at the instant of the cast. Their aim shape is real — it is the
         /// zone's footprint, and the telegraph draws it correctly — but nobody is hit when
         /// the button is released; the hit happens later, in <c>AbilityZone</c>'s own tick.
-        /// Feather Trap and Root Egg. See <see cref="ReportsCastHits"/> for why this needs
-        /// to be declared rather than inferred.
+        /// Feather Trap, Root Egg, Smoke Roost (Static AoE) and Feather Aura (Aura). See
+        /// <see cref="ReportsCastHits"/> for why this needs to be declared rather than inferred.
         /// </summary>
-        public virtual bool PlacesZone => false;
+        /// <remarks>
+        /// <b>Derived from the authored <see cref="AreaKind"/>, no longer a per-ability override:</b> every area
+        /// spawns an <c>AbilityZone</c> (WP4 moved Feather Aura onto a Caster-anchored one). Where only a <i>placed</i>
+        /// zone is meant - one worth dropping on empty ground (<c>BotController</c>'s cast-without-a-target rule, the
+        /// <c>cw_autozone</c> pick) - test <c>AreaKind == AreaEffectKind.StaticAoE</c>, not this.
+        /// </remarks>
+        public bool PlacesZone => AreaKind != AreaEffectKind.None;
+
+        /// <summary>
+        /// The lasting area this ability creates, built from its own serialized fields; false for
+        /// <see cref="AreaEffectKind.None"/>. Overridden by every ability whose <see cref="AreaKind"/> is not None
+        /// (<c>AreaEffectTypeTests</c> pins both directions and that the spec equals the authored fields).
+        /// </summary>
+        public virtual bool TryGetAreaEffect(out AreaEffectSpec spec)
+        {
+            spec = default;
+            return false;
+        }
 
         /// <summary>
         /// Is <c>AbilityController.LastCastHitCount</c> a meaningful hit-vs-whiff verdict for
@@ -492,8 +532,8 @@ namespace CluckWars.Abilities
         /// control is removed may set this true.
         ///
         /// <b>Placed zones are false too</b>, for a different reason: a zone's slow and root
-        /// reach the victim through <c>ChickenController.CheckAbilityZoneSlow</c> /
-        /// <c>CheckAuraSlow</c>, which call <c>ApplySlow</c> directly rather than routing
+        /// reach the victim through <c>ChickenController.CheckAbilityZoneSlow</c>
+        /// (auras included, WP4), which calls <c>ApplySlow</c> directly rather than routing
         /// through <c>ApplyPassiveControlDuration</c> — so immunity does not stop them, and
         /// claiming it would grey out a bracket for an effect that lands.
         /// </remarks>

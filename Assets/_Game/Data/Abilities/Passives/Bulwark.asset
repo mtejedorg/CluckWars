@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.BulwarkPassiveSO
   DisplayName: Bulwark
   ShortLabel: BULW
-  Description: Knockback cut by 75%. Slows, stuns and getting stuck end 35% sooner.
+  Description: Knockback cut by 75%. Stuns, getting stuck and timed slows end 35% sooner.
   Icon: 
   AccentColor: {r: 0.62, g: 0.66, b: 0.72, a: 1}
   Category: 3

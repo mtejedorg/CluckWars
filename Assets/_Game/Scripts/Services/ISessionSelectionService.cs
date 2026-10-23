@@ -63,6 +63,13 @@ namespace CluckWars.Services
         bool OpenClassSelectOnMenuLoad { get; set; }
 
         /// <summary>
+        /// One-shot scene-load handoff like <see cref="OpenLobbyOnMenuLoad"/> (CW-218): set by the match overlay when this
+        /// peer lost its connection mid-session (<c>DisconnectRules.ShowsMenuNotice</c>); <c>MenuUiController</c> reads it
+        /// once, clears it, and opens the "You were disconnected" sheet with REJOIN / BACK TO MENU over the main menu.
+        /// </summary>
+        bool DisconnectNoticeOnMenuLoad { get; set; }
+
+        /// <summary>
         /// Seed of the solo corner permutation (<c>CornerAssignment</c>). The menu rolls it each time THE
         /// COOP opens in solo, so the lobby can colour every seat by the corner it will spawn on and
         /// <c>MatchBootstrapper</c> spawns from the same value (round-2 finding 1).

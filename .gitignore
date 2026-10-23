@@ -169,3 +169,13 @@ Assets/Resources/PerformanceTestRun*
 # Unity crash-recovery scratch scenes — regenerated on crash, never tracked
 /[Aa]ssets/_Recovery/
 /[Aa]ssets/_Recovery.meta
+
+# Multi-device test session captures (logs, screenrecords, screenshots) - local evidence only
+/Captures/
+
+# Build-time generated build stamp (written by the build pipeline; read by the Session log line)
+/Assets/_Game/Resources/BuildInfo.json
+/Assets/_Game/Resources/BuildInfo.json.meta
+
+# ...but the synthetic log fixtures for tools/test-session/selftest.ps1 are tracked
+!/tools/test-session/fixtures/**/*.log

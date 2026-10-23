@@ -1,0 +1,7 @@
+Initialize engine version: 6000.3.14f1
+[10:00:00.000][00:00.900][Info][Session] Session sha=aaa111 date=2026-10-22 platform=WindowsPlayer
+[10:00:02.000][00:02.000][Debug][Chicken] RPC_ApplyStun: stunned for 1.5s.
+[10:00:02.100][00:02.100][Debug][Chicken] RPC_ApplyStun: 0.35s does not outlast the 1.40s left - kept.
+[10:00:03.000][00:03.000][Debug][Chicken] RPC_ApplyRoot: rooted for 2.0s.
+[10:00:04.000][00:04.000][Debug][Chicken] RPC_ApplyAbilitySlow: incoming factor=55% for 2.5s -> factor=55% for 2.5s.
+[10:00:05.000][00:05.000][Warn][Chicken] Chicken(Clone): rejected RPC_TeleportTo((1.0, 0.0, 1.0)) from [Player:2] - only the match authority ([Player:1]) may place chickens.

@@ -37,6 +37,13 @@ namespace CluckWars.Gameplay
         private ChickenCombat _combat;
         private ILogService _log;
         private bool _subscribedToDeath;
+        // MatchSignals.RoundReset (B10): the handler records the reset tick, the authority's next FixedUpdateNetwork
+        // despawns the decoy if it spawned at or before it (RoundResetObservation.OutlivedReset). The reset never
+        // teleports a decoy (RoundTeleportRules.ShouldTeleport), so without this it lingered into the next round.
+        // Re-armed per spawn (pooled). Same leave semantics as AbilityZone: the decoy is a Chicken.prefab variant,
+        // Flags 262145 = DestroyWhenStateAuthorityLeaves, so it goes with its caster's peer.
+        private int _resetTick;
+        private int _spawnTick;
 
         [Inject]
         public void Construct(ILogService log) => _log = log;
@@ -61,6 +68,11 @@ namespace CluckWars.Gameplay
                 _subscribedToDeath = true;
             }
 
+            _resetTick = 0;
+            _spawnTick = Runner.Tick.Raw;
+            MatchSignals.RoundReset -= OnRoundReset;   // never twice, whatever the pool did
+            MatchSignals.RoundReset += OnRoundReset;
+
             // Arm the lifetime timer if the spawner didn't set one.
             if (HasStateAuthority && !LifetimeTimer.IsRunning)
             {
@@ -72,6 +84,7 @@ namespace CluckWars.Gameplay
 
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
+            MatchSignals.RoundReset -= OnRoundReset;
             if (_combat != null && _subscribedToDeath)
             {
                 _combat.OnDeath -= HandleDecoyDeath;
@@ -82,12 +95,21 @@ namespace CluckWars.Gameplay
         public override void FixedUpdateNetwork()
         {
             if (!HasStateAuthority) return;
+            if (RoundResetObservation.OutlivedReset(_spawnTick, _resetTick))
+            {
+                _log?.Info(Source, $"Despawned by the round reset (spawned tick {_spawnTick} <= reset tick {_resetTick}).");
+                Runner.Despawn(Object);
+                return;
+            }
             if (LifetimeTimer.Expired(Runner))
             {
                 _log?.Debug(Source, "Lifetime expired; despawning.");
                 Runner.Despawn(Object);
             }
         }
+
+        /// <summary>Record only; <see cref="FixedUpdateNetwork"/> acts (see <c>_resetTick</c>).</summary>
+        private void OnRoundReset(int resetTick) => _resetTick = resetTick;
 
         private void HandleDecoyDeath()
         {

@@ -14,18 +14,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.WingSlamAbilitySO
   DisplayName: Wing Slam
   ShortLabel: SLAM
-  Description: Slams the ground ahead, stunning rivals within 4.5m for 1.5s.
+  Description: Slams the ground ahead, stunning rivals within 4.5m for 1.3s.
   AccentColor: {r: 0.9, g: 0.4, b: 0.1, a: 1}
   Category: 1
   TerrainTraversal: 0
   SlotKind: 1
   AllowedClasses: 1
   BotRole: 0
-  Duration: 1.5
-  Cooldown: 12
+  Duration: 1.3
+  Cooldown: 8
   SearchMask:
   CastMotion: 1
     serializedVersion: 2
     m_Bits: 256
   StunRadius: 4.5
-  StunDuration: 1.5
+  StunDuration: 1.3

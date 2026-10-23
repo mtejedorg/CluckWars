@@ -25,13 +25,18 @@ namespace CluckWars.Visuals
     /// that gets pinned by tests, and it can only be pinned if it does not need a live
     /// <c>Camera</c> to run.
     ///
-    /// <b>On-screen and off-screen are decided against the full unit rect, not the inset
-    /// one.</b> A rival whose feet are at viewport (0.97, 0.5) is genuinely visible, so it
-    /// keeps its ground ring; the chevron only takes over once the rival has actually left
-    /// the frame. The margin exists solely so that the chevron — which is a chunky piece of
-    /// geometry with its own width — is drawn far enough inside the frame not to be half
-    /// clipped by it. Conflating the two would make the ring wink out while its owner was
-    /// still plainly on screen.
+    /// <b>On-screen and off-screen are decided against the CLEAR VIEWPORT, not the inset
+    /// band.</b> The clear viewport is the unit rect minus the HUD information zones (the
+    /// top band, the status strip while it shows rows: <see cref="HudControlZones.BuildInfoZones"/>).
+    /// That is WP7 / decisions C6 + F6, in both orientations: a rival under the top band is as
+    /// hidden as one past the frame, so it gets the chevron, pinned at the band's lower edge.
+    /// It reverses the earlier contract ("the full unit rect decides"), which still holds for
+    /// the overloads that take no info zones. What has not changed is the other half: a rival
+    /// whose feet are at viewport (0.97, 0.5) is genuinely visible, so it keeps its ground
+    /// ring. The margin exists solely so that the chevron — a chunky piece of geometry with
+    /// its own width — is drawn far enough inside the frame not to be half clipped by it, and
+    /// conflating the two would make the ring wink out while its owner was still plainly on
+    /// screen.
     /// </remarks>
     public static class ScreenEdgeProjection
     {
@@ -263,6 +268,142 @@ namespace CluckWars.Visuals
             return false;
         }
 
+        // ── Clear viewport (HUD information zones, WP7) ─────────────────────────────────────────
+
+        /// <summary>
+        /// The chevron band with every full-width information zone anchored to the top or bottom edge cut off: its edge moves
+        /// to that zone's inner edge, less <paramref name="clearance"/>.y so the whole arrow clears it. That is what pins a
+        /// chevron "at the top band's lower edge" and lets <see cref="EdgeArrowSpread"/> slide along it. Island zones (the
+        /// status strip) do not cut the band; they are avoid zones.
+        /// </summary>
+        public static Rect ClearBand(Rect band, IReadOnlyList<Rect> infoZones, Vector2 clearance)
+        {
+            band = NormaliseBand(band);
+            if (infoZones == null) return band;
+            float yMin = band.yMin, yMax = band.yMax;
+            for (int i = 0; i < infoZones.Count; i++)
+            {
+                Rect z = infoZones[i];
+                if (z.xMin > ZoneEpsilon || z.xMax < 1f - ZoneEpsilon) continue;   // not full width
+                if (z.yMax >= 1f - ZoneEpsilon) yMax = Mathf.Min(yMax, z.yMin - clearance.y);
+                else if (z.yMin <= ZoneEpsilon) yMin = Mathf.Max(yMin, z.yMax + clearance.y);
+            }
+            return NormaliseBand(Rect.MinMaxRect(band.xMin, yMin, band.xMax, yMax));
+        }
+
+        /// <summary>True when <paramref name="p"/> is inside the unit rect and outside every information zone.</summary>
+        public static bool IsInClearViewport(Vector2 p, IReadOnlyList<Rect> infoZones)
+        {
+            if (p.x < 0f || p.x > 1f || p.y < 0f || p.y > 1f) return false;
+            return infoZones == null || !IsInsideAnyZone(p, infoZones, Vector2.zero);
+        }
+
+        /// <summary>
+        /// The clear-viewport form of the zone-aware <see cref="ClampToEdge(Vector2, bool, Rect, IReadOnlyList{Rect}, Vector2, out Vector2, out Vector2)"/>:
+        /// "off screen" means outside the clear viewport (<see cref="IsInClearViewport"/>), and the arrow is placed in
+        /// <see cref="ClearBand"/> and kept out of <paramref name="avoidZones"/> (control zones and info zones together:
+        /// <see cref="HudControlZones.CurrentAvoid"/>). Where the arrow lands, by what hides the target:
+        /// <list type="bullet">
+        /// <item>A full-width edge zone (the top band): <see cref="ClearBand"/> cuts the band at its inner edge, so the arrow
+        /// sits on that edge straight below (above) the target, pointing at it. Also for a target past the frame on that side.</item>
+        /// <item>An island zone (the status strip) the target itself is under: the arrow is pinned to that zone's nearest
+        /// edge (grown by <paramref name="clearance"/>), right next to the hidden rival, the same "at the zone's edge" read as
+        /// the top band. Chosen over sliding to the frame edge because the rival is in the middle of the play field, and an
+        /// arrow at the frame edge would point across the screen at a bird a thumb's width away.</item>
+        /// <item>Off the frame (or an island pin that is blocked): clamped to the band and slid along it out of every avoid
+        /// zone, as before.</item>
+        /// </list>
+        /// </summary>
+        public static bool ClampToClearViewport(Vector2 viewport, bool forceOffScreen, Rect band,
+                                                IReadOnlyList<Rect> infoZones, IReadOnlyList<Rect> avoidZones,
+                                                Vector2 clearance, out Vector2 clamped, out Vector2 bearing)
+        {
+            bool off = forceOffScreen || !IsInClearViewport(viewport, infoZones);
+            Rect clear = ClearBand(band, infoZones, clearance);
+            if (off && TryPinToIslandEdge(viewport, clear, infoZones, avoidZones, clearance, out clamped))
+            {
+                bearing = BearingFrom(clamped, viewport);
+                return true;
+            }
+            return ClampToEdge(viewport, off, clear, avoidZones, clearance, out clamped, out bearing);
+        }
+
+        /// <summary>True when <paramref name="target"/> is under an island info zone (not full width), with the nearest point
+        /// on that zone's grown edge that is inside <paramref name="band"/> and outside every avoid zone.</summary>
+        private static bool TryPinToIslandEdge(Vector2 target, Rect band, IReadOnlyList<Rect> infoZones,
+                                               IReadOnlyList<Rect> avoidZones, Vector2 clearance, out Vector2 pinned)
+        {
+            pinned = target;
+            if (infoZones == null) return false;
+            for (int i = 0; i < infoZones.Count; i++)
+            {
+                Rect z = infoZones[i];
+                if (z.xMin <= ZoneEpsilon && z.xMax >= 1f - ZoneEpsilon) continue;   // full width: ClearBand's job
+                if (!(target.x > z.xMin && target.x < z.xMax && target.y > z.yMin && target.y < z.yMax)) continue;
+
+                float bestSqr = float.MaxValue;
+                bool found = false;
+                ConsiderPin(new Vector2(z.xMin - clearance.x, target.y), target, band, avoidZones, clearance, ref pinned, ref bestSqr, ref found);
+                ConsiderPin(new Vector2(z.xMax + clearance.x, target.y), target, band, avoidZones, clearance, ref pinned, ref bestSqr, ref found);
+                ConsiderPin(new Vector2(target.x, z.yMin - clearance.y), target, band, avoidZones, clearance, ref pinned, ref bestSqr, ref found);
+                ConsiderPin(new Vector2(target.x, z.yMax + clearance.y), target, band, avoidZones, clearance, ref pinned, ref bestSqr, ref found);
+                return found;
+            }
+            return false;
+        }
+
+        private static void ConsiderPin(Vector2 c, Vector2 target, Rect band, IReadOnlyList<Rect> avoidZones, Vector2 clearance,
+                                        ref Vector2 best, ref float bestSqr, ref bool found)
+        {
+            if (c.x < band.xMin - ZoneEpsilon || c.x > band.xMax + ZoneEpsilon ||
+                c.y < band.yMin - ZoneEpsilon || c.y > band.yMax + ZoneEpsilon) return;
+            if (avoidZones != null && IsInsideAnyZone(c, avoidZones, clearance)) return;
+            float d = (c - target).sqrMagnitude;
+            if (!found || d < bestSqr) { best = c; bestSqr = d; found = true; }
+        }
+
+        /// <summary>Share of an on-screen rival's rect at which its nameplate hides and the chevron takes over (spec §1.5).</summary>
+        public const float InfoZoneHideFraction = 0.5f;
+
+        /// <summary>A hidden nameplate comes back only below this share, so a rival walking along the band's edge does not
+        /// flicker between nameplate and chevron (same idea as <see cref="IsPartlyOnScreen"/>'s exit hysteresis).</summary>
+        public const float InfoZoneShowFraction = 0.4f;
+
+        /// <summary>
+        /// Fraction (0..1) of the VISIBLE part of <paramref name="markViewport"/> (a rival's body plus nameplate, viewport
+        /// units, clipped to the unit rect) that lies inside the information zones, and the centre of the largest covered
+        /// piece (inside that zone, so a clear-viewport clamp of it lands on the zone's edge). 0 when nothing is visible.
+        /// The zones do not overlap one another (top band, bottom-left strip), so the pieces add up.
+        /// </summary>
+        public static float InfoZoneCoverage(Rect markViewport, IReadOnlyList<Rect> infoZones, out Vector2 coveredCentre)
+        {
+            Rect vis = Rect.MinMaxRect(Mathf.Max(0f, markViewport.xMin), Mathf.Max(0f, markViewport.yMin),
+                                       Mathf.Min(1f, markViewport.xMax), Mathf.Min(1f, markViewport.yMax));
+            coveredCentre = vis.center;
+            float area = vis.width * vis.height;
+            if (vis.width <= 0f || vis.height <= 0f || area <= 0f || infoZones == null) return 0f;
+
+            float covered = 0f, best = 0f;
+            for (int i = 0; i < infoZones.Count; i++)
+            {
+                Rect z = infoZones[i];
+                float w = Mathf.Min(vis.xMax, z.xMax) - Mathf.Max(vis.xMin, z.xMin);
+                float h = Mathf.Min(vis.yMax, z.yMax) - Mathf.Max(vis.yMin, z.yMin);
+                if (w <= 0f || h <= 0f) continue;
+                float a = w * h;
+                covered += a;
+                if (a <= best) continue;
+                best = a;
+                coveredCentre = new Vector2(Mathf.Max(vis.xMin, z.xMin) + 0.5f * w, Mathf.Max(vis.yMin, z.yMin) + 0.5f * h);
+            }
+            return Mathf.Clamp01(covered / area);
+        }
+
+        /// <summary>Whether a rival with <paramref name="coverage"/> (<see cref="InfoZoneCoverage"/>) counts as under the HUD:
+        /// in at <see cref="InfoZoneHideFraction"/>, back out only below <see cref="InfoZoneShowFraction"/>.</summary>
+        public static bool IsUnderInfoZone(float coverage, bool wasUnder) =>
+            coverage >= (wasUnder ? InfoZoneShowFraction : InfoZoneHideFraction);
+
         private static void Consider(Vector2 c, Vector2 target, Rect band, IReadOnlyList<Rect> zones, Vector2 clearance,
                                      ref Vector2 best, ref float bestSqr, ref bool found)
         {
@@ -333,6 +474,31 @@ namespace CluckWars.Visuals
             if (behind && !cam.orthographic) point = new Vector2(1f - point.x, 1f - point.y);
 
             return ClampToEdge(point, behind, safeArea, avoidZones, clearance, out clamped, out bearing);
+        }
+
+        /// <summary>
+        /// Camera glue over <see cref="ClampToClearViewport"/>: true when <paramref name="worldPos"/> is outside the CLEAR
+        /// viewport (off the frame, behind the camera, or under a HUD information zone), with the chevron's point and bearing.
+        /// Same mirror correction as the other overloads. This is the overload the rival chevron uses (WP7).
+        /// </summary>
+        public static bool TryProject(Camera cam, Vector3 worldPos, Rect safeArea,
+                                      IReadOnlyList<Rect> infoZones, IReadOnlyList<Rect> avoidZones, Vector2 clearance,
+                                      out Vector2 clamped, out Vector2 bearing)
+        {
+            if (cam == null)
+            {
+                clamped = ViewportCentre;
+                bearing = Vector2.up;
+                return false;
+            }
+
+            Vector3 vp = cam.WorldToViewportPoint(worldPos);
+            bool behind = vp.z < 0f;
+
+            var point = new Vector2(vp.x, vp.y);
+            if (behind && !cam.orthographic) point = new Vector2(1f - point.x, 1f - point.y);
+
+            return ClampToClearViewport(point, behind, safeArea, infoZones, avoidZones, clearance, out clamped, out bearing);
         }
 
         /// <summary>The target's viewport point with the same behind-camera mirror correction <see cref="TryProject(Camera, Vector3, Rect, IReadOnlyList{Rect}, Vector2, out Vector2, out Vector2)"/>

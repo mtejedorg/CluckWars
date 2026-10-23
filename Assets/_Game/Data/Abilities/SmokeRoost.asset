@@ -27,6 +27,7 @@ MonoBehaviour:
   Cooldown: 11
   SearchMask:
   CastMotion: 4
+  AreaKind: 1
     serializedVersion: 2
     m_Bits: 256
   ZoneRadius: 4

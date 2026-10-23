@@ -80,14 +80,14 @@ perk.relentless.line,Moves recharge {pct}% faster.
 perk.relentless.detail,Applies to every move except Peck.
 perk.bully.line,"Steal {steal}% more, carry {cap} more."
 perk.thief.line,Every steal grabs {steal}% more.
-perk.slippery.line,Slows and stuns end {pct}% sooner.
-perk.slippery.detail,"Covers slows, stuns and getting stuck."
+perk.slippery.line,"Stuns, getting stuck and timed slows end {pct}% sooner."
+perk.slippery.detail,"Zone, aura, pile and bump slows still apply in full."
 perk.bulwark.line,Barely budges when shoved.
-perk.bulwark.detail,"Knockback cut by {kb}%. Slows, stuns and getting stuck end {cc}% sooner."
+perk.bulwark.detail,"Knockback cut by {kb}%. Stuns, getting stuck and timed slows end {cc}% sooner."
 perk.hoarder.line,Carry {cap} food in one trip.
 perk.hoarder.detail,Carries at least {cap} food.
-perk.featherfoot.line,Raid piles at full speed.
-perk.featherfoot.detail,Food piles never slow you down.
+perk.featherfoot.line,Piles and bumps never slow you.
+perk.featherfoot.detail,Food piles and bumping into rivals never slow you down.
 perk.spoiler.line,+{food} food if time runs out.
 perk.spoiler.detail,"If nobody reaches {goal} before time's up, you bank {food} bonus food first."
 loadout.row.shared,ANY BIRD
@@ -228,3 +228,8 @@ leave.title,LEAVE MATCH?
 leave.body.solo,Paused. Your bird waits right here.
 leave.body.mp,The match keeps going without you.
 leave.keep,KEEP PLAYING
+disconnect.title,YOU WERE DISCONNECTED
+disconnect.rejoining,Rejoining…
+disconnect.rejoinFailed,The match is over or full.
+btn.rejoin,REJOIN
+btn.backToMenu,BACK TO MENU

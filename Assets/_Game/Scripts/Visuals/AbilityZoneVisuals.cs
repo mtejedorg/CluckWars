@@ -144,7 +144,13 @@ namespace CluckWars.Visuals
             Color c = ColorFor(_zone.Effect);
             c.a = RingAlpha * (1f - PulseAmplitude + PulseAmplitude * Mathf.Sin(Time.time * PulseRadPerSecond));
 
-            Vector3 center = transform.position;
+            // The zone's own centre (WP3): a Static AoE's stamp, or an Aura's caster as this peer sees it. An Aura whose
+            // caster is not resolved yet is inert, so it is hidden rather than drawn at the prefab root.
+            if (!_zone.TryGetCenter(out Vector3 center))
+            {
+                _ring.Hide();
+                return;
+            }
             center.y = GroundY;
             _ring.Show(center, _zone.TriggerRadius, c, fraction, drain: true);
         }

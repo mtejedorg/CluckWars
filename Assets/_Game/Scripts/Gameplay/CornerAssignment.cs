@@ -13,9 +13,10 @@ namespace CluckWars.Gameplay
     /// time THE COOP opens, so every session still gets a fresh layout but the menu knows it; the player
     /// takes permutation slot 0 and the three bots slots 1..3 in the Coop's seat order.
     /// Host / Join: the seed is the session name (every peer computes the same permutation) and a player
-    /// takes the slot of their join order. The host is the first to join, so its corner (and, in a fresh
-    /// session, each open seat's) is known once the join code exists; a guest's is not known before it
-    /// joins, so a guest's seats stay neutral in the menu.
+    /// takes slot <c>(PlayerId - 1) mod 4</c> (<see cref="CornerSlotRules"/>, CW-233; not its local roster
+    /// index, which differs per peer while joins are in flight). The host is PlayerId 1, so its corner (and, in
+    /// a fresh session where guests get PlayerIds 2..4, each open seat's) is known once the join code exists;
+    /// a guest's is not known before it joins, so a guest's seats stay neutral in the menu.
     /// </remarks>
     public static class CornerAssignment
     {

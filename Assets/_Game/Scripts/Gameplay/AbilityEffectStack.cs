@@ -13,12 +13,13 @@ namespace CluckWars.Gameplay
     /// <remarks>
     /// Pure and allocation-free after warm-up, so every rule is pinned by EditMode tests. Owned by
     /// <see cref="ChickenController"/>; mutated on the state authority only (abilities run there), and
-    /// <see cref="ChickenController"/> mirrors the networked resolutions (opacity, steal-back, aura).
+    /// <see cref="ChickenController"/> mirrors the networked resolutions (opacity, steal-back).
     ///
     /// Kinds and rules: speed BOOST (&gt;1) = max, speed PENALTY (&lt;1) = min, final = boost * penalty;
-    /// opacity = min; movement lock = any; deposit rate = max; steal-back = any / max amount;
-    /// aura = any, strongest slow. The Underdog Surge multiplier and the victim-side slow are outside
-    /// this rule on purpose.
+    /// opacity = min; movement lock = any; deposit rate = max; steal-back = any / max amount.
+    /// The Underdog Surge multiplier and the victim-side slow are outside this rule on purpose. Feather
+    /// Aura is not on this stack since WP4: it is a Caster-anchored <see cref="AbilityZone"/>, so its
+    /// "only the strongest applies" is the victim's own slow resolution (<c>ApplySlow</c>, min factor).
     /// </remarks>
     public sealed class AbilityEffectStack
     {
@@ -26,7 +27,6 @@ namespace CluckWars.Gameplay
         {
             public int Source;
             public float Value;
-            public float Aux;
         }
 
         private sealed class Channel
@@ -35,15 +35,15 @@ namespace CluckWars.Gameplay
 
             public int Count => _entries.Count;
 
-            public void Set(int source, float value, float aux = 0f)
+            public void Set(int source, float value)
             {
                 for (int i = 0; i < _entries.Count; i++)
                 {
                     if (_entries[i].Source != source) continue;
-                    _entries[i] = new Entry { Source = source, Value = value, Aux = aux };
+                    _entries[i] = new Entry { Source = source, Value = value };
                     return;
                 }
-                _entries.Add(new Entry { Source = source, Value = value, Aux = aux });
+                _entries.Add(new Entry { Source = source, Value = value });
             }
 
             public void Remove(int source)
@@ -73,17 +73,6 @@ namespace CluckWars.Gameplay
                 for (int i = 0; i < _entries.Count; i++) best = Mathf.Min(best, _entries[i].Value);
                 return best;
             }
-
-            /// <summary>The entry with the lowest Value (ties: the later one), if any.</summary>
-            public bool TryGetMin(out Entry min)
-            {
-                min = default;
-                if (_entries.Count == 0) return false;
-                min = _entries[0];
-                for (int i = 1; i < _entries.Count; i++)
-                    if (_entries[i].Value <= min.Value) min = _entries[i];
-                return true;
-            }
         }
 
         /// <summary>Speed-boost sources (every value &gt; 1).</summary>
@@ -94,7 +83,6 @@ namespace CluckWars.Gameplay
         private readonly Channel _lock = new Channel();
         private readonly Channel _deposit = new Channel();
         private readonly Channel _stealBack = new Channel();
-        private readonly Channel _aura = new Channel();
 
         /// <summary>Where a rejected Set* reports. Null in pure tests, where a rejection is only a no-op.</summary>
         public ILogService Log { get; set; }
@@ -179,23 +167,6 @@ namespace CluckWars.Gameplay
         /// <summary>Largest active amount; the legacy default when none.</summary>
         public float StealBackAmount => _stealBack.Max(DefaultStealBackAmount);
 
-        // ---- Aura emitter (kind I) -----------------------------------------------
-
-        public void SetAura(int source, float slowFactor, float radius)
-        {
-            if (ValidSource(source, "Aura")) _aura.Set(source, slowFactor, radius);
-        }
-        public void RemoveAura(int source) => _aura.Remove(source);
-        public bool AuraActive => _aura.Count > 0;
-
-        /// <summary>Strongest (lowest) slow factor and its radius. False when no aura runs.</summary>
-        public bool TryGetAura(out float slowFactor, out float radius)
-        {
-            if (_aura.TryGetMin(out var e)) { slowFactor = e.Value; radius = e.Aux; return true; }
-            slowFactor = 1f; radius = 0f;
-            return false;
-        }
-
         // ---- Whole-stack -----------------------------------------------------------
 
         /// <summary>Drops every modifier of one source — what a slot's deactivation does in one call.</summary>
@@ -206,14 +177,13 @@ namespace CluckWars.Gameplay
             RemoveMovementLock(source);
             RemoveDepositRate(source);
             RemoveStealBack(source);
-            RemoveAura(source);
         }
 
         /// <summary>Round reset: nothing is running any more.</summary>
         public void Clear()
         {
             _boost.Clear(); _penalty.Clear(); _opacity.Clear(); _lock.Clear();
-            _deposit.Clear(); _stealBack.Clear(); _aura.Clear();
+            _deposit.Clear(); _stealBack.Clear();
         }
     }
 

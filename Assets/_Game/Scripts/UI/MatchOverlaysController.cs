@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using CluckWars.Abilities;
+using CluckWars.Diagnostics;
 using CluckWars.Gameplay;
 using CluckWars.Input;
 using CluckWars.Localization;
@@ -146,6 +147,7 @@ namespace CluckWars.UI
         private float           _nextRefresh;
         private bool            _matchEndPopulated;
         private ShutdownReason? _shutdownReason;
+        private SessionExitKind _exitKind;      // DisconnectRules.Classify of _shutdownReason (CW-218)
         private float           _shutdownAtUnscaledTime;
         private bool            _returnTriggered;
         // The round this peer watched had ended (its result was on screen) when the session closed: the
@@ -154,8 +156,6 @@ namespace CluckWars.UI
         // True once BACK TO LOBBY / LEAVE / CHANGE BIRD has started leaving on purpose; suppresses the
         // "Session ended" overlay that the runner shutdown would otherwise raise through HandleShutdown.
         private bool            _leavingToLobby;
-        // MenuUiController.UpdateLayout's .layout--short threshold (panel height), reused for the waiting room.
-        private const float     ShortLayoutHeight = 1100f;
         private const int       ShutdownTimeoutMs = 5000;
 
         // Intro GO flourish — lingers briefly after the countdown hits zero.
@@ -234,6 +234,8 @@ namespace CluckWars.UI
 
         private void OnDestroy()
         {
+            // The cover goes with this scene: nothing may read a stale "cover up" after it.
+            RevealState.ResetForScene();
             if (_network != null) _network.OnShutdown -= HandleShutdown;
             // The stage owns cameras, lights, models and RenderTextures in this scene plus render-
             // pipeline callbacks that would outlive it: always hand them back when the scene goes.
@@ -260,8 +262,22 @@ namespace CluckWars.UI
             _shutdownAtUnscaledTime = Time.unscaledTime;
             var gm = GameManager.Instance;
             _roundEndedAtShutdown   = (gm != null ? gm.State : _watchedState) == MatchState.Ended;
-            _log?.Warn(Source, $"Network shutdown: {reason} (round ended: {_roundEndedAtShutdown}). " +
-                $"Returning to '{_bootstrapSceneName}' in {_disconnectReturnDelay}s.");
+
+            // CW-218: a lost connection (e.g. the app backgrounded past the timeout) goes straight to the menu, which
+            // says "You were disconnected" and offers REJOIN; host-left / closed sessions keep this screen's countdown.
+            var transport = _network?.LastDisconnectReason;
+            _exitKind = DisconnectRules.Classify(reason, transport, leftOnPurpose: false);
+            var mode = _selection != null ? _selection.Mode : SessionMode.Solo;
+            bool menuNotice = DisconnectRules.ShowsMenuNotice(_exitKind, mode);
+            if (menuNotice)   // only for a multiplayer mode, so _selection is there
+            {
+                _selection.DisconnectNoticeOnMenuLoad = true;
+                _sessionEndLeaveNow = true;   // TickSessionEnd loads the menu at once
+            }
+            _log?.Warn(Source, $"Network shutdown: {reason} (transport={(transport.HasValue ? transport.Value.ToString() : "none")}, " +
+                $"exit={_exitKind}, mode={mode}, round ended: {_roundEndedAtShutdown}). " +
+                (menuNotice ? $"Returning to '{_bootstrapSceneName}' now with the disconnect notice."
+                            : $"Returning to '{_bootstrapSceneName}' in {_disconnectReturnDelay}s."));
         }
 
         private void Update()
@@ -437,14 +453,18 @@ namespace CluckWars.UI
             if (_meSafe == null) _log?.Error(Source, "MatchOverlays.uxml has no #MeSafe; the post-match screen ignores the safe area.");
             if (_lobbySafe == null) _log?.Error(Source, "MatchOverlays.uxml has no #LobbySafe; the waiting room ignores the safe area.");
             _safeArea = new SafeAreaPadding(_meSafe, _lobbySafe, _sessionEndOverlay, _leaveSheet);
-            _root.RegisterCallback<GeometryChangedEvent>(evt =>
-            {
-                _safeArea.Apply(force: true);
-                // THE COOP's short-panel tightening (MenuUiController.UpdateLayout), for the waiting room.
-                _lobbyOverlay?.EnableInClassList("layout--short", evt.newRect.height < ShortLayoutHeight);
-                // 4:3 tablets: the bar is slimmed like the phone's (MenuUiController.NarrowLayoutAspect).
-                _lobbyOverlay?.EnableInClassList("layout--narrow", evt.newRect.height > 0f && evt.newRect.width / evt.newRect.height < 1.55f);
-            });
+            _root.RegisterCallback<GeometryChangedEvent>(_ => _safeArea.Apply(force: true));
+            // The menu's shape classes (LayoutClasses), measured on the always-visible overlay panel and set on each full-screen
+            // overlay that has orientation rules (WP9): the waiting room (#LobbyOverlay.layout--short / --narrow slim THE COOP's
+            // bar; --portrait stacks it), the results (column in portrait), the LEAVE and session-end sheets and the intro GET
+            // READY card (a smaller plate in portrait). They stay off the overlay root itself; the menu's short-screen plate
+            // rule is scoped to the menu card (#GetReadyCard), so the intro card keeps its full size in landscape.
+            LayoutClasses.BindAll(_root, _lobbyOverlay, _matchEndOverlay, _leaveSheet, _sessionEndOverlay, _introGetReady);
+            // The event banner's portrait position (WP7, .cw-eventbanner.layout--portrait). Bind keeps one target per
+            // measured element, so this one measures the full-panel #OverlayRoot instead of _root.
+            var overlayHost = _root.Q<VisualElement>("OverlayRoot");
+            if (_eventBanner != null && overlayHost != null) LayoutClasses.Bind(overlayHost, _eventBanner);
+            else _log?.Error(Source, "MatchOverlays.uxml has no #EventBanner or #OverlayRoot: the event banner keeps the landscape spot in portrait, over the ability hexes.");
 
             // Start hidden; state polls flip them on.
             SetShown(_matchEndOverlay, false);
@@ -1306,7 +1326,7 @@ namespace CluckWars.UI
             if (_sessionEndTitle != null)
                 _sessionEndTitle.text = UiText.Get(SessionEndCopy.HeadlineKey(_roundEndedAtShutdown));
             if (_sessionEndReason != null && _shutdownReason.HasValue)
-                _sessionEndReason.text = SessionEndCopy.For(_shutdownReason.Value);
+                _sessionEndReason.text = SessionEndCopy.For(_exitKind, _shutdownReason.Value);
             if (_sessionEndCountdown != null)
                 _sessionEndCountdown.text = UiText.Format(UiKeys.SessionReturning, ("n", Mathf.CeilToInt(remaining)));
 
@@ -1355,12 +1375,19 @@ namespace CluckWars.UI
                     ? Time.unscaledTime
                     : Time.unscaledTime + ArenaCoverRule.FadeSeconds;
                 _arenaCover.AddToClassList("cw-arena-cover--hidden");
+                // Late join: this peer's first reveal lands on a round already past its intro (it never saw the 3-2-1).
+                bool lateJoin = gm != null && (state == MatchState.Ended || (state == MatchState.Active && !gm.IsIntroActive));
                 if (d.HardCap)
                     _log?.Error(Source, $"The arena cover was still up after {ArenaCoverRule.HardCapSeconds:0} s: revealing anyway " +
                         $"(readiness: ready={_arenaReadiness?.IsReady}, pending={_arenaReadiness?.PendingGates}, state={state}).");
                 else
                     _log?.Info(Source, $"Arena revealed (state {state}, ready={(_arenaReadiness == null ? "n/a" : _arenaReadiness.IsReady.ToString())}, " +
                         $"covered {_arenaCoveredSeconds:0.00} s).");
+                // Test-session breadcrumb (item 5): cover off, with what the reveal looked like on this peer.
+                _log?.Info(Source, FormattableString.Invariant($"Cover off: covered={_arenaCoveredSeconds:0.00}s lateJoin={(lateJoin ? 1 : 0)} ") +
+                    FormattableString.Invariant($"reducedMotion={(PlayerPreferences.ReducedMotionEnabled ? 1 : 0)} fade={(PlayerPreferences.ReducedMotionEnabled ? 0f : ArenaCoverRule.FadeSeconds):0.00}s ") +
+                    $"hardCap={(d.HardCap ? 1 : 0)} state={state}");
+                RevealState.NotifyRevealed(PlayerPreferences.ReducedMotionEnabled ? 0f : ArenaCoverRule.FadeSeconds);
             }
 
             if (_arenaRevealed)
@@ -1373,6 +1400,13 @@ namespace CluckWars.UI
             }
 
             SetShown(_arenaCover, d.CoverShown);
+            if (d.CoverShown != RevealState.CoverShown)
+            {
+                // Breadcrumb (item 5): every cover transition before the reveal (the waiting room hides it, Starting shows it).
+                RevealState.CoverShown = d.CoverShown;
+                _log?.Info(Source, $"Cover {(d.CoverShown ? "on" : "off (waiting room / overlay)")}: state={state} " +
+                    FormattableString.Invariant($"ready={(_arenaReadiness == null ? "n/a" : _arenaReadiness.IsReady ? "1" : "0")} covered={_arenaCoveredSeconds:0.00}s"));
+            }
             if (d.CoverShown)
             {
                 _arenaCover.RemoveFromClassList("cw-arena-cover--hidden");
@@ -1403,6 +1437,7 @@ namespace CluckWars.UI
                     "see the MatchBootstrapper / FusionNetworkService errors above.");
             }
             bool getReady = hold == IntroOverlayRule.PreIntro.GetReady && !_shutdownReason.HasValue;
+            TrackGetReadyHold(getReady, gm);
             // GET READY is only the pre-intro card (finding 11): gone on the first digit, never under GO!.
             SetShown(_introGetReady, getReady);
             RefreshWaitingLine(getReady ? gm : null);
@@ -1448,6 +1483,39 @@ namespace CluckWars.UI
             {
                 SetShown(_introOverlay, false);
             }
+        }
+
+        // Breadcrumb (test-session item 5): how long GET READY stayed up each time, read-only.
+        private float _getReadySince = -1f;
+
+        private void TrackGetReadyHold(bool shown, GameManager gm)
+        {
+            if (shown && _getReadySince < 0f) _getReadySince = Time.unscaledTime;
+            else if (!shown && _getReadySince >= 0f)
+            {
+                _log?.Info(Source, FormattableString.Invariant($"GET READY held {Time.unscaledTime - _getReadySince:0.00}s ") +
+                    $"(now {(gm != null ? gm.State.ToString() : "no manager")}, {RevealState.Describe()}).");
+                _getReadySince = -1f;
+            }
+        }
+
+        // ---- Dev auto-test hooks (CluckWars.Diagnostics.AutoTestDriver; dev-tools builds only) ------------------
+        // The same handlers the waiting room's START and the podium's PLAY AGAIN buttons call.
+
+        /// <summary>Waiting room START (host).</summary>
+        public void AutoTestPressStart()
+        {
+            if (!DevTools.Available) { _log?.Warn(Source, "Auto-test START refused: dev tools are not available."); return; }
+            OnLobbyStart();
+        }
+
+        /// <summary>Podium PLAY AGAIN (host), only while the button itself would be enabled.</summary>
+        public void AutoTestPressPlayAgain()
+        {
+            if (!DevTools.Available) { _log?.Warn(Source, "Auto-test PLAY AGAIN refused: dev tools are not available."); return; }
+            var gm = GameManager.Instance;
+            if (gm == null || !gm.CanRequestPlayAgain || _leavingToLobby) return;
+            OnPlayAgain();
         }
 
         private void SetIntroScrim(bool on)

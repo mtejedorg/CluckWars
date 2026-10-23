@@ -576,10 +576,10 @@ namespace CluckWars.Gameplay
 
             int homeCorner = PickSpawnCorner(runner, player);
             if (homeCorner < 0) return;
-            var pos = PickSpawnPosition(runner, player);
+            var pos = SpawnPositionForCorner(homeCorner);
 
             // Defensive: nudge spawn slightly up + per-player horizontally so that
-            // even if PickSpawnPosition collapses to the same XZ (degenerate
+            // even if SpawnPositionForCorner collapses to the same XZ (degenerate
             // SpawnPoints, all-zero fallback, …), two chickens don't spawn
             // perfectly overlapping. CharacterController vs CharacterController
             // collision otherwise leaves the losing chicken drifting in one
@@ -635,51 +635,41 @@ namespace CluckWars.Gameplay
         /// The shuffled corner index (0..3) for a player — single source of truth
         /// shared by spawn-position selection and <c>HomeCornerIndex</c> stamping.
         /// Single mode: the human always takes permutation slot 0 (bots take 1–3).
-        /// Shared mode: prefers the player's sorted-roster slot, then scans forward
-        /// to the first corner not already stamped on a spawned chicken — roster
-        /// position alone collides after a leave + rejoin (slots shift, stamped
-        /// <c>HomeCornerIndex</c> values don't). Returns -1 when all corners are
-        /// taken (5th joiner) so the caller refuses the spawn.
+        /// Shared mode (CW-233): the slot comes from the player's PlayerId
+        /// (<see cref="CornerSlotRules.PreferredSlot"/>), never from its index in this
+        /// peer's view of <c>runner.ActivePlayers</c> — that view depends on which
+        /// joins had arrived, so two joiners could each compute the same index. Then
+        /// <see cref="CornerSlotRules.Resolve"/> scans forward past corners already
+        /// stamped on a live chicken (a rejoin's PlayerId 5+ wraps onto a used slot).
+        /// Returns -1 when all corners are taken (5th joiner) so the caller refuses the spawn.
         /// </summary>
         private int PickSpawnCorner(NetworkRunner runner, PlayerRef player)
         {
             if (runner.GameMode == GameMode.Single) return ShuffledCorner(0);
 
-            // Preferred slot: index among the PlayerId-sorted roster. In a fresh
-            // session this reproduces plain join order (0,1,2,3).
-            var activePlayers = new System.Collections.Generic.List<PlayerRef>(runner.ActivePlayers);
-            activePlayers.Sort((a, b) => a.PlayerId.CompareTo(b.PlayerId));
-            int preferred = Mathf.Max(0, activePlayers.IndexOf(player));
-
-            // Corner truth is the replicated HomeCornerIndex stamps on live
-            // chickens, not the roster. Two players joining in the same instant
-            // can still race to one corner (each hasn't seen the other's chicken
-            // yet) — rare, and GameManager's invariant Warn surfaces it.
-            for (int offset = 0; offset < 4; offset++)
-            {
-                int corner = ShuffledCorner((preferred + offset) % 4);
-                if (!IsCornerOccupied(corner)) return corner;
-            }
-
-            _log?.Error(Source, $"Spawn refused for {player}: all 4 corners are occupied.");
-            return -1;
+            // Residual race: a forward scan only sees replicated chickens, so two joiners whose preferred corners are
+            // both taken (rejoins) can still scan onto the same free one; GameManager's invariant Warn surfaces it.
+            int corner = CornerSlotRules.Resolve(CornerSlotRules.PreferredSlot(player.PlayerId), _cornerPermutation, OccupiedCornerMask());
+            if (corner < 0) _log?.Error(Source, $"Spawn refused for {player}: all 4 corners are occupied.");
+            return corner;
         }
 
-        /// <summary>True when any live, non-decoy chicken has <paramref name="corner"/> stamped.</summary>
-        private static bool IsCornerOccupied(int corner)
+        /// <summary>Bit c set when any live, non-decoy chicken has corner c stamped.</summary>
+        private static int OccupiedCornerMask()
         {
+            int mask = 0;
             var chickens = ChickenController.ActiveControllers;
             for (int i = 0; i < chickens.Count; i++)
             {
                 var c = chickens[i];
                 if (c == null || c.Object == null || !c.Object.IsValid) continue;
                 if (c.IsDecoy) continue;
-                if (c.HomeCornerIndex == corner) return true;
+                if (c.HomeCornerIndex >= 0 && c.HomeCornerIndex < CornerAssignment.Corners) mask |= 1 << c.HomeCornerIndex;
             }
-            return false;
+            return mask;
         }
 
-        private Vector3 PickSpawnPosition(NetworkRunner runner, PlayerRef player)
+        private Vector3 SpawnPositionForCorner(int corner)
         {
             // Prefer MapGenerator's computed corners. Lookup is cached; null check
             // re-resolves if the MapGenerator was added after Start ran.
@@ -687,20 +677,15 @@ namespace CluckWars.Gameplay
             if (_mapGenerator != null && _mapGenerator.SpawnPoints != null && _mapGenerator.SpawnPoints.Count > 0)
             {
                 var points = _mapGenerator.SpawnPoints;
-                int idx = PickSpawnCorner(runner, player);
-                if (idx < 0) return Vector3.zero;
-                return points[idx % points.Count];
+                return points[corner % points.Count];
             }
 
             // Legacy fallback for scenes without a MapGenerator.
             if (_legacySpawnPoints == null || _legacySpawnPoints.Length == 0)
                 return Vector3.zero;
 
-            int legacyIdx = PickSpawnCorner(runner, player);
-            if (legacyIdx < 0) return Vector3.zero;
-            return _legacySpawnPoints[legacyIdx % _legacySpawnPoints.Length] != null
-                ? _legacySpawnPoints[legacyIdx % _legacySpawnPoints.Length].position
-                : Vector3.zero;
+            var legacy = _legacySpawnPoints[corner % _legacySpawnPoints.Length];
+            return legacy != null ? legacy.position : Vector3.zero;
         }
 
         // ---- Corner randomisation -----------------------------------------------

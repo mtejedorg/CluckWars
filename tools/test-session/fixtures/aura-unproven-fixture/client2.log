@@ -1,0 +1,7 @@
+[10:00:00.000][00:00.000][Info][Session] Session sha=eee555 date=2026-10-22 platform=WindowsPlayer
+[10:00:01.000][00:01.000][Info][Invariant] Invariant state WaitingForPlayers->Starting round=1
+[10:00:02.000][00:02.000][Info][Invariant] Invariant state Starting->Active round=1
+[10:00:02.500][00:02.500][Info][Invariant] Invariant ok round=1 phase=start n=40 zn=0 au=0 dc=0
+[10:00:10.000][00:10.000][Info][AutoTest] AutoTest autoaura: cast FeatherAura (slot 2) into B2 at d=1.8 m, 35.0 s left.
+[10:00:13.000][00:13.000][Info][Invariant] Invariant aura owner=P2 victim=B2 remote=1 deep=4 snared=4 verdict=too-few round=1
+[10:00:13.000][00:13.000][Info][Invariant] Invariant aura owner=P2 victim=P2x remote=0 deep=30 snared=30 verdict=ok round=1

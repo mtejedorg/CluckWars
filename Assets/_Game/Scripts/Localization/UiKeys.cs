@@ -284,5 +284,12 @@ namespace CluckWars.Localization
         // ---- Phase 5 chunk 5 (round-2 finding 10: join pill for a half-typed code) ----
         public const string LobbyStatusKeepTyping = "lobby.status.keepTyping";
 
+        // ---- CW-218 (lost connection: "You were disconnected" + REJOIN on the main menu) ----
+        public const string DisconnectTitle = "disconnect.title";
+        public const string DisconnectRejoining = "disconnect.rejoining";
+        public const string DisconnectRejoinFailed = "disconnect.rejoinFailed";
+        public const string BtnRejoin = "btn.rejoin";
+        public const string BtnBackToMenu = "btn.backToMenu";
+
     }
 }

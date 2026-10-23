@@ -627,8 +627,20 @@ footer b{color:var(--text-dim)}
       <b>Verified, not asserted.</b> A pure-C# simulator (<span class="mono">BalanceOracle</span>)
       runs the greedy farming policy against the real pile coordinates, from all four seats, with
       reach-aware legs (deposit radius + pile oval + peck reach), and asserts each class lands
-      within &plusmn;1.5s of its target. Trips are <span class="mono">ceil(40 / CargoCapacity)</span>
+      within &plusmn;0.5s of its target with the exact trip count, reading the shipped assets.
+      Trips are <span class="mono">ceil(40 / CargoCapacity)</span>
       &mdash; which is why Fatty's 35 cargo buys him two trips and Speedy's 10 buys four.
+    </div>
+
+    <div class="note">
+      <b>Specializations are checked too.</b> A passive that changes cargo, banking speed or the
+      Peck cooldown changes the farming run, so the Oracle also runs every shipped specialization
+      through its real hooks. It must hit its class target, or a <em>declared</em> exception with a
+      reason. Two are declared: <b>Hoarder</b> (cargo floor 40 = one trip, 25.82&nbsp;s / 1 trip, by
+      design) and <b>Bully</b> (+2 cargo, 38.77&nbsp;s / 3 trips: the greedy router is
+      non-monotonic at caps 16&ndash;18, an artifact rather than a slower human, to be confirmed in
+      a playtest). Bully's old +6 cargo (30.91&nbsp;s / 2 trips) made him farm like a Speedy, and no
+      test saw it.
     </div>
   </div>
 </section>
@@ -1537,11 +1549,14 @@ footer b{color:var(--text-dim)}
     </div>
 
     <div class="card">
-      <p class="eyebrow" style="margin-bottom:6px">Flagged</p>
-      <h4 style="color:#ff9a5c;margin-bottom:7px">Wing Slam contradicts its own class</h4>
-      <p style="font-size:.85rem;color:var(--text-dim)">At a 12-second cooldown it is the longest in
-        the game &mdash; sitting on the class whose essence is spamming abilities. It is flagged
-        for re-tuning rather than quietly left alone.</p>
+      <p class="eyebrow" style="margin-bottom:6px">Re-tuned &mdash; 2026-10-22, pending playtest</p>
+      <h4 style="color:#ff9a5c;margin-bottom:7px">Wing Slam joins the Standard tier</h4>
+      <p style="font-size:.85rem;color:var(--text-dim)">At 12 seconds it was the longest cooldown in
+        the game, on the class whose essence is spamming abilities. It is now 8&nbsp;s with a
+        1.3&nbsp;s stun (6&nbsp;s with Relentless). Cooldown tiers are Quick 3&ndash;5 / Standard
+        6&ndash;9 / Heavy 10&ndash;12&nbsp;s, and Heavy is reserved for immunity, a hard area stun
+        of at least 1.4&nbsp;s, or an economy burst. If players report being stunned too often,
+        the fallback is 9&nbsp;s / 1.5&nbsp;s.</p>
     </div>
 
     <div class="card">
@@ -1606,7 +1621,7 @@ const CLASSES = [
       ['Every tool is the weaker copy','Scrap takes 3 food where the Assassin’s Sneaky Steal takes 6. Ruffle is ground-only, with no wall traversal, where Speed Burst is Speedy’s own sprint (both are ×1.5 now, and they do not stack). Headbutt shoves less than Cluck Shock.'],
       ['He pays for it in cooldown','Headbutt at 4 s and Snatch-class pressure at 5 s let him press buttons constantly — being second-best at everything is only playable if you get more turns.']
     ],
-    violation:'Wing Slam sits at a 12 s cooldown — the longest in the game, on the class whose entire identity is spamming. The kit contradicts the essence here, and it is flagged for re-tuning.' },
+    violation:'Wing Slam sat at a 12 s cooldown, the longest in the game, on the class whose entire identity is spamming. Re-tuned 2026-10-22 to 8 s (1.3 s stun), pending a human playtest.' },
   { id:'speedy', name:'Speedy', col:'#e85a2a', lt:'#ffb088', glow:'rgba(232,90,42,.45)',
     move:12.15, cargo:10, peckAmt:3, peckCd:0.71, scale:0.85, sct:30, trips:4,
     strategy:'Throughput — many small loads, roams wide',
@@ -1676,10 +1691,10 @@ const ABILITIES = [
      accent:'#cc7333', desc:'Grabs 3 food off the nearest rival within 3.8m.', sig:'The Brute',
      stats:[['Range','3.8 m'],['Steal','3 food'],['Cooldown','5 s']],
      note:'Deliberately weaker than Sneaky Steal. The Bully passive is what makes it worth taking.'}),
-  A({id:'wingslam', name:'Wing Slam', short:'SLAM', cls:['warrior'], cat:1, kind:1, cd:12, dur:1.5,
-     accent:'#e6661a', desc:'Slams the ground ahead, stunning rivals within 4.5m for 1.5s.',
-     stats:[['Stun radius','4.5 m'],['Stun','1.5 s'],['Cooldown','12 s']],
-     flag:'Longest cooldown in the game, on the class whose essence is spamming abilities. Flagged for re-tuning.'}),
+  A({id:'wingslam', name:'Wing Slam', short:'SLAM', cls:['warrior'], cat:1, kind:1, cd:8, dur:1.3,
+     accent:'#e6661a', desc:'Slams the ground ahead, stunning rivals within 4.5m for 1.3s.',
+     stats:[['Stun radius','4.5 m'],['Stun','1.3 s'],['Cooldown','8 s']],
+     note:'Re-tuned 2026-10-22 from 12 s / 1.5 s into the Standard cooldown tier. 6 s with Relentless. Fallback if playtests say stunned too often: 9 s / 1.5 s.'}),
 
   /* ---- SPEEDY ---- */
   A({id:'dustkick', name:'Dust Kick', short:'DUST', cls:['speedy'], cat:1, kind:1, cd:6, dur:0.3,
@@ -1768,22 +1783,22 @@ const ABILITIES = [
 
 const PASSIVES = [
   {id:'bully', name:'Bully', spec:'The Brute', cls:'warrior', accent:'#db4d4d', sig:'scrap',
-   desc:'Steal 40% more, carry 6 more.',
-   stats:[['Steal multiplier','×1.4'],['Bonus cargo','+6']]},
+   desc:'Steal 40% more, carry 2 more.',
+   stats:[['Steal multiplier','×1.4'],['Bonus cargo','+2']]},
   {id:'relentless', name:'Relentless', spec:'The Relentless', cls:'warrior', accent:'#f27340', sig:'headbutt',
    desc:'Moves recharge 25% faster. Applies to every move except Peck.',
    stats:[['Cooldown multiplier','×0.75']]},
   {id:'slippery', name:'Slippery', spec:'The Agile', cls:'speedy', accent:'#59c7f2', sig:null,
-   desc:'Slows, stuns and getting stuck end 40% sooner.',
+   desc:'Stuns, getting stuck and timed slows end 40% sooner.',
    stats:[['Control duration','×0.6']]},
   {id:'featherfoot', name:'Featherfoot', spec:'The Anxious', cls:'speedy', accent:'#8ce0b3', sig:null,
-   desc:'Food piles never slow you down.',
-   stats:[['Pile slow','ignored']]},
+   desc:'Food piles and bumping into rivals never slow you down.',
+   stats:[['Pile slow','ignored'],['Collision slow','ignored']]},
   {id:'hoarder', name:'Hoarder', spec:'The Hauler', cls:'fatty', accent:'#f5b840', sig:null,
    desc:'Carries at least 40 food.',
    stats:[['Minimum capacity','40']]},
   {id:'bulwark', name:'Bulwark', spec:'The Boulder', cls:'fatty', accent:'#9ea8b8', sig:'groundquake',
-   desc:'Knockback cut by 75%. Slows, stuns and getting stuck end 35% sooner.',
+   desc:'Knockback cut by 75%. Stuns, getting stuck and timed slows end 35% sooner.',
    stats:[['Control duration','×0.65'],['Knockback','×0.25']]},
   {id:'spoiler', name:'Spoiler', spec:'The Reaper', cls:'assassin', accent:'#8c6bd9', sig:'markkill',
    desc:'If nobody reaches 40 before time\'s up, you bank 15 bonus food first.',

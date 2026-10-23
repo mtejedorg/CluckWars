@@ -237,7 +237,12 @@ namespace CluckWars.Visuals
         private void ApplyGhostState(float opacity)
         {
             bool wantGhost = _warmupGhost || opacity < GhostOpacityThreshold;
-            if (wantGhost && _ghostedRenderers == null) ApplyGhostMaterials();
+            if (wantGhost && _ghostedRenderers == null)
+            {
+                // Breadcrumb only: the first real ghost of this scene (the warm-up's forced ghost is not a first use).
+                if (!_warmupGhost) CluckWars.Diagnostics.FirstUseMarkers.Note(CluckWars.Diagnostics.FirstUseKind.Invisibility);
+                ApplyGhostMaterials();
+            }
             else if (!wantGhost && _ghostedRenderers != null) RestoreOriginalMaterials();
 
             if (_ghostedRenderers != null) SetGhostShadowsOff(opacity < GhostShadowOpacityThreshold);

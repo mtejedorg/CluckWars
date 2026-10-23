@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using UnityEngine;
+using CluckWars.Abilities;
 using CluckWars.Balance;
 using CluckWars.Gameplay;
 
@@ -85,6 +86,172 @@ namespace CluckWars.Tests
                         $"deposit {config.DepositRatePerSecond}, W {config.FoodTargetToWin}. " +
                         "Stats are solved AGAINST this axiom — re-solve them, do not relax the target.");
                 }
+            }
+        }
+
+        /// <summary>
+        /// The SCT axiom with each shipped <b>specialization</b> equipped (decision A8). The
+        /// naked test above cannot see a passive: Bully's old +6 cargo turned the Warrior's
+        /// 35 s / 3 trips into 30.9 s / 2 and stayed green. Here the <see cref="OracleChicken"/>
+        /// is built through the passive's real hooks (<c>ModifyCargoCapacity</c>,
+        /// <c>ModifyDepositRate</c>, <c>ModifyCooldown</c> on the shipped Peck), with the same
+        /// inputs their production chokepoints feed them, and must land within the shipped
+        /// ±0.5 s band of its class target, or of its <see cref="SpecSctTargets"/> entry when
+        /// it has one.
+        /// </summary>
+        /// <remarks>
+        /// A declared entry REPLACES the class target rather than being a second chance, so a
+        /// declaration that no longer describes its passive (say Bully back to +0, 34.98 s / 3)
+        /// fails too and has to be removed on purpose. Hooks get <c>self = null</c>: they are
+        /// declared pure, which <see cref="ShippedPassives_ValueHooks_TolerateANullSelf"/> pins.
+        /// Classes in <see cref="SctTargets.Exempt"/> (Assassin) cannot forage and are skipped.
+        /// <para>
+        /// Break-it check (2026-10-22): Bully <c>BonusCapacity</c> 2 → 6 gives 30.91 s / 2 trips,
+        /// which matches neither the declared 38.77 s / 3 nor the Warrior's 35 s / 3, so this
+        /// goes red; Hoarder's floor 40 → 35 gives 30.05 s / 2 against the declared 25.82 s / 1,
+        /// red as well.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void RealMap_ShippedPassives_SatisfyTheSctAxiomOrADeclaredTarget()
+        {
+            var config = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
+            var stats = TestAssets.LoadAllIn<ChickenStatsSO>(TestAssets.ClassesDir);
+            var passives = TestAssets.LoadAllIn<PassiveAbilitySO>(TestAssets.AbilitiesDir);
+            var peck = TestAssets.LoadAllIn<PeckAbilitySO>(TestAssets.AbilitiesDir);
+            Assert.AreEqual(1, peck.Count, "Expected exactly one shipped PeckAbilitySO asset.");
+            Assert.GreaterOrEqual(passives.Count, 8, "Fewer shipped passives than the eight specializations.");
+
+            int checkedCount = 0;
+            foreach (var passive in passives)
+            {
+                string className = passive.Subclass.ClassOf().ToString();
+                if (SctTargets.IsExempt(className)) continue;
+
+                var s = stats.Find(x => x.DisplayName == className);
+                Assert.IsNotNull(s, $"{passive.name}: no ChickenStatsSO with DisplayName '{className}'.");
+                var classTarget = System.Array.Find(SctTargets.All, t => t.ClassName == className);
+                Assert.IsNotNull(classTarget.ClassName, $"{passive.name}: class '{className}' is neither governed nor exempt.");
+
+                float capacity = passive.ModifyCargoCapacity(s.CargoCapacity, null);
+                Assert.AreEqual(Mathf.Round(capacity), capacity, 1e-4f,
+                    $"{passive.name} yields a fractional cargo capacity ({capacity}); the Oracle models whole units. " +
+                    "Teach OracleChicken fractional capacity before shipping one.");
+
+                var chicken = new OracleChicken
+                {
+                    MoveSpeed     = s.MoveSpeed,
+                    CargoCapacity = Mathf.RoundToInt(capacity),
+                    PeckAmount    = s.PeckAmount,
+                    PeckCooldown  = passive.ModifyCooldown(s.PeckCooldown, peck[0], null),
+                    DepositRate   = passive.ModifyDepositRate(config.DepositRatePerSecond, null),
+                };
+
+                bool declared = SpecSctTargets.TryGet(passive.Subclass, out var spec);
+                if (declared)
+                    Assert.AreEqual(spec.CargoCapacity, chicken.CargoCapacity,
+                        $"{className} with {passive.name} now carries {chicken.CargoCapacity}, but its SpecSctTargets entry " +
+                        $"was measured at {spec.CargoCapacity}. The Oracle is not monotonic in cargo, so the seconds can still " +
+                        "match by accident: re-measure and get the new number approved.");
+                for (int seat = 0; seat < 4; seat++)
+                {
+                    var result = BalanceOracle.Simulate(ShippedMap.OracleMap(seat), chicken, config.FoodTargetToWin);
+                    string want = declared
+                        ? $"declared {spec.Seconds}s / {spec.Trips} trips ({spec.Reason})"
+                        : $"class target {classTarget.Seconds}s / {classTarget.Trips} trips";
+                    TestContext.WriteLine($"SCT {className}+{passive.name} seat {seat}: {result.SctSeconds:0.00}s / {result.Trips} trips, want {want}");
+
+                    bool ok = declared
+                        ? SpecSctTargets.Within(result, spec, SctTargets.ShippedAssetToleranceSeconds)
+                        : SctTargets.Within(result, classTarget, SctTargets.ShippedAssetToleranceSeconds);
+                    Assert.IsTrue(ok,
+                        $"{className} with {passive.name} (seat {seat}) farms {result.SctSeconds:0.00}s / {result.Trips} trips " +
+                        $"(cap {chicken.CargoCapacity}, peck cd {chicken.PeckCooldown}, deposit {chicken.DepositRate}); want {want} " +
+                        $"±{SctTargets.ShippedAssetToleranceSeconds}s. A passive changed farming speed: either revert it, or get " +
+                        "Maestro's approval and declare the new number in SpecSctTargets with a reason. If the entry no longer " +
+                        "applies (the passive is back on its class target), delete it.");
+                }
+                checkedCount++;
+            }
+            Assert.GreaterOrEqual(checkedCount, 6, "Expected the six farming-class passives (Warrior, Speedy, Fatty x2) to be checked.");
+        }
+
+        /// <summary>
+        /// qa follow-up 10: a declared entry pins the cargo capacity it was measured at, not just
+        /// the seconds. Bully's 38.77 s / 3 is a plateau: caps 16, 17 and 18 all produce it, so
+        /// without this a BonusCapacity of 3 or 4 would pass the time check silently.
+        /// </summary>
+        [Test]
+        public void SpecSctTargets_PinTheCargoCapacityTheyWereMeasuredAt()
+        {
+            var stats = TestAssets.LoadAllIn<ChickenStatsSO>(TestAssets.ClassesDir);
+            var passives = TestAssets.LoadAllIn<PassiveAbilitySO>(TestAssets.AbilitiesDir);
+            foreach (var entry in SpecSctTargets.All)
+            {
+                Assert.Greater(entry.CargoCapacity, 0, $"{entry.Subclass} declares no CargoCapacity.");
+                var passive = passives.Find(p => p.Subclass == entry.Subclass);
+                Assert.IsNotNull(passive, $"No shipped passive for {entry.Subclass}.");
+                string className = entry.Subclass.ClassOf().ToString();
+                var s = stats.Find(x => x.DisplayName == className);
+                Assert.IsNotNull(s, $"No ChickenStatsSO with DisplayName '{className}'.");
+                float capacity = passive.ModifyCargoCapacity(s.CargoCapacity, null);
+                Assert.AreEqual(entry.CargoCapacity, capacity, 1e-4f,
+                    $"{entry.Subclass}: shipped capacity {capacity} differs from the declared {entry.CargoCapacity}.");
+            }
+        }
+
+        /// <summary>
+        /// Every declared entry must name a shipped, governed specialization, once. An entry for
+        /// a passive that no longer exists (or for an exempt class) would never be checked.
+        /// </summary>
+        [Test]
+        public void SpecSctTargets_EveryEntryNamesAShippedGovernedPassive_Once()
+        {
+            var passives = TestAssets.LoadAllIn<PassiveAbilitySO>(TestAssets.AbilitiesDir);
+            var seen = new System.Collections.Generic.HashSet<ChickenSubclass>();
+            foreach (var entry in SpecSctTargets.All)
+            {
+                Assert.IsTrue(seen.Add(entry.Subclass), $"SpecSctTargets declares {entry.Subclass} twice.");
+                Assert.IsTrue(passives.Exists(p => p.Subclass == entry.Subclass),
+                    $"SpecSctTargets declares {entry.Subclass}, but no shipped passive has that Subclass.");
+                Assert.IsFalse(SctTargets.IsExempt(entry.Subclass.ClassOf().ToString()),
+                    $"{entry.Subclass} belongs to an SCT-exempt class; its entry would never be checked.");
+                Assert.IsFalse(string.IsNullOrWhiteSpace(entry.Reason), $"{entry.Subclass} is declared without a reason.");
+            }
+        }
+
+        /// <summary>
+        /// The value hooks are documented as pure functions of their arguments (a passive SO is
+        /// shared by every chicken that equips it). The spec-aware Oracle test relies on that by
+        /// passing <c>self = null</c>; a passive that started reading <c>self</c> must fail here,
+        /// not throw inside the balance test.
+        /// </summary>
+        /// <remarks>
+        /// <c>OnTraversalTick</c> (a per-tick authority callback) and <c>MatchEndBonusFood</c>
+        /// (a match-end resolution that may legitimately read its owner) are left out.
+        /// </remarks>
+        [Test]
+        public void ShippedPassives_ValueHooks_TolerateANullSelf()
+        {
+            var passives = TestAssets.LoadAllIn<PassiveAbilitySO>(TestAssets.AbilitiesDir);
+            var peck = TestAssets.LoadAllIn<PeckAbilitySO>(TestAssets.AbilitiesDir);
+            Assert.AreEqual(1, peck.Count, "Expected exactly one shipped PeckAbilitySO asset.");
+            Assert.GreaterOrEqual(passives.Count, 8, "Fewer shipped passives than the eight specializations.");
+
+            foreach (var p in passives)
+            {
+                Assert.DoesNotThrow(() =>
+                {
+                    p.ModifyCargoCapacity(10f, null);
+                    p.ModifyDepositRate(9f, null);
+                    p.ModifyCooldown(0.8f, peck[0], null);
+                    p.ModifyCooldown(8f, p, null);
+                    p.ModifyControlDuration(1f, null);
+                    p.ModifyKnockback(1f, null);
+                    p.ModifyStealAmount(5f, null);
+                    p.IgnoresPileSlow(null);
+                    p.IgnoresCollisionSlow(null);
+                }, $"{p.name}: a value hook threw with self = null. Hooks are declared pure; read state from the arguments.");
             }
         }
 

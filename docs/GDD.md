@@ -483,12 +483,12 @@ current, shipped state.
 
 | Class | Specialization | Passive | Signature (forced) |
 |---|---|---|---|
-| **Warrior** | The Brute (Bully) | Steals bigger, + cargo room to hold it | **Scrap** (steal on contact) |
+| **Warrior** | The Brute (Bully) | Steals 40% more, +2 cargo room to hold it (was +6 until 2026-10-22, A2/F1; declared SCT 38.77 s / 3 trips in `SpecSctTargets`) | **Scrap** (steal on contact) |
 | | The Relentless | Every move except Peck recharges 25% faster | **Headbutt** (shove + stagger, low cd) |
-| **Speedy** | The Agile (Slippery) | Slows, stuns and getting stuck end 40% sooner | ⏳ *pending — a Peck variant* |
-| | The Anxious (Featherfoot) | Immune to the pile-slow | ⏳ *pending — a Peck variant* |
+| **Speedy** | The Agile (Slippery) | Stuns, getting stuck and timed slows end 40% sooner (zone, aura, pile and bump slows are not shortened) | ⏳ *pending — a Peck variant* |
+| | The Anxious (Featherfoot) | Immune to the pile-slow and the collision slow (A6, 2026-10-21) | ⏳ *pending — a Peck variant* |
 | **Fatty** | The Hauler (Hoarder) | Carries at least a full win's worth | ⏳ *pending — a Peck variant* |
-| | The Boulder (Bulwark) | Knockback cut by 75%; slows, stuns and getting stuck end 35% sooner | **Ground Quake** (stomp leaves the area stuck) |
+| | The Boulder (Bulwark) | Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner | **Ground Quake** (stomp leaves the area stuck) |
 | **Assassin** | The Reaper (Spoiler) | Banks a bonus if the clock expires with no winner | **Death Mark** (the execute, §6.4) |
 | | The Burglar (Thief) | Every steal takes 1.6x more | **Sneaky Steal** |
 
@@ -556,8 +556,10 @@ steal outright: the thief is not credited, so the formula never runs.
 
 Stun is the only state that locks *casting* — which is exactly why it's the qualifier for
 the Assassin execute. Stun duration is authored per-ability (Assassin Ambush 1.0 s, Warrior
-Wing Slam 1.5 s). **Protections:** control immunity (Immovable, Egg Shell) stops the whole ladder; **steal-proof** (Egg Shell, Turtle Mode) is separate and only stops cargo being taken (§7.2). **Slow sources** (collision, pile, ability) are tagged separately so
-passives like Slippery can target one without the others.
+Wing Slam 1.3 s). **Protections:** control immunity (Immovable, Egg Shell) stops the whole ladder; **steal-proof** (Egg Shell, Turtle Mode) is separate and only stops cargo being taken (§7.2). **Slow sources** (collision, pile, ability) are tagged separately so
+passives like Slippery can target one without the others. Today Slippery and Bulwark shorten
+only **timed** effects (stuns, getting stuck, Dust Kick's slow); presence slows (zones,
+Feather Aura, pile, collision) have no duration and apply in full.
 
 ### 6.4 The Assassin execute (the only hard removal)
 
@@ -670,7 +672,7 @@ shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 | | Headbutt 🐏 *(Relentless signature)* | 4 s | Shoves rivals up to 3.6 m ahead and staggers them 0.35 s — deliberately weaker than Cluck Shock; the shortest cooldown pays for it. |
 | | Ruffle 💨 | 5 s | 1.5x speed for 2.5 s — same pace as Speed Burst but longer and ground only (no traversal). |
 | | Scrap 🪝 *(Bully signature)* | 5 s | Grabs 3 food off the nearest carrier within 3.8 m — deliberately weaker than Sneaky Steal. |
-| | Wing Slam 💥 | 12 s | Slams the ground ahead, stunning rivals within 4.5 m for 1.5 s. ⚠️ Longest cooldown in the game, on the class whose essence is spamming — flagged for re-tuning, see §11. |
+| | Wing Slam 💥 | 8 s | Slams the ground ahead, stunning rivals within 4.5 m for 1.3 s. Re-tuned 2026-10-22 from 12 s / 1.5 s (A4, Standard tier §7.3); fallback 9 s / 1.5 s if playtests say "stunned too often". |
 | **Speedy** | Dust Kick 🌫️ | 6 s | Kicks dust **backwards** — the one cone in the game that fires away from facing, so fleeing is the play. Chasers within 4.5 m slow to 55% for 2.5 s. |
 | | Feather Aura 💨 | 7 s | Slows every chicken within 5.4 m to 55% speed for 3 s. |
 | | Feather Trap 🪤 | 7 s | Feather cloud thrown ahead, lasts 5 s; chickens in it slow to 45% speed. |
@@ -721,13 +723,30 @@ caster — "lay it as you flee."
 
 ### 7.3 Cooldown tiers
 
-| Tier | Range |
-|---|---|
-| Short | 3–6 s |
-| Medium | 8–12 s |
+Rewritten 2026-10-22 (decision A9). The old Short 3–6 / Medium 8–12 split left 7 s in no
+tier, and five shipped moves sit on 7.
+
+| Tier | Range | Shipped (cooldown read from the `.asset` files, before passives) |
+|---|---|---|
+| **Quick** | 3–5 s | Roll & Push 3, Snatch 3, Headbutt 4, Ruffle 5, Scrap 5, Feint 5, Sneaky Steal 5, Death Mark 5 |
+| **Standard** | 6–9 s | Dust Kick 6, Speed Burst 6, Shadowstep 6, Dive Bomb 6, Sticky Egg 7, Cluck Shock 7, Feather Aura 7, Feather Trap 7, Spine Coat 8, **Wing Slam 8**, Invisibility 8, Egg Shell 8, Ground Quake 9 |
+| **Heavy** | 10–12 s | Turtle Mode 10, Belly Flop 10, Ambush 10, Smoke Roost 11, Doppelganger 11, Immovable 12, Quick Drop 12 |
+
+**The Heavy rule:** a move earns a Heavy cooldown only if it gives **immunity** (control
+immunity or steal-proofing), a **hard AoE stun of at least 1.4 s**, or an **economy burst**
+(a banking or farming spike). Everything else belongs in Quick or Standard. Under this rule
+Wing Slam (a 120° cone, the smallest stun area in the game) moved to Standard: 12 → 8 s with
+its stun 1.5 → 1.3 s (A4; pre-agreed fallback 9 s / 1.5 s if the human session reports
+"stunned too often").
+
+Known exceptions, deliberately **not** moved until a human 4-player session (any tier move
+other than Wing Slam needs a playtest): Ambush (1.0 s stun), Smoke Roost and Doppelganger
+sit in Heavy without meeting the rule. Peck (per-class, about 0.7–0.8 s) is foraging cadence
+governed by the SCT axiom, not a tiered move.
 
 Exact per-ability values (steal amounts, stun/slow durations, radii, cooldowns) are tuned
-against the Oracle and playtests.
+against the Oracle and playtests. Class passives scale cooldowns at runtime (Relentless
+×0.75, every move but Peck), so a Relentless Warrior's Wing Slam is 6 s.
 
 ### 7.4 Several moves at once (Phase 6)
 
@@ -967,7 +986,7 @@ and a dust puff on the hex, and costs nothing.
 | 1 | Per-ability values (steal/stun/slow/cooldown/radius) | Tuning against Oracle + playtest |
 | 2 | ~~Passive pools reimplementation~~ **Specializations** (§5.3) | **Shipped.** 5 of 8 signatures assigned. The other 3 (Slippery / Featherfoot / Hoarder) need **ordinary** signature abilities — the Peck-variant plan was retired by §7.1's simplified slot model on 2026-09-04 |
 | 2c | **The arena is too big for 4 players in 45 s — you barely see combat** | ⚠️ **Known, accepted for now, must be solved.** Observed in play: four chickens on a 51.3 m square rarely meet, so the control-and-steal systems that the whole v0.4 redesign exists to serve go unexercised. The map reads as a place, but a place built for more players than it has. See §3.9 |
-| 2a | Wing Slam's cd 12 contradicts Warrior's "spams abilities" essence | Flagged, needs re-tuning |
+| 2a | Wing Slam's cd 12 contradicts Warrior's "spams abilities" essence | **Re-tuned 2026-10-22** to 8 s / 1.3 s stun (A4). Confirm in the human 4-player session; fallback 9 s / 1.5 s |
 | 2b | Specialization visual identity (per-spec colour/model) | Designed (§5.3), concepts need regenerating in the shipped house style |
 | 3 | **Last-15 s endgame rule** | Deferred until base loop is fun; 3 candidates parked (Open Bases / center-collapse / Golden Egg). The shipped stand-in is the last-10 s comeback event (§2) |
 | 4 | Currency earn formula | TBD |

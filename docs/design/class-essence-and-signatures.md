@@ -66,8 +66,9 @@ with nothing traded for it.
 specialist's version.** "Expert in nothing" is a number, not flavour text: Warrior's steal is
 worse than the Assassin's, its sprint worse than Speedy's, its shove worse than Fatty's.
 
-⚠️ **Currently violated:** Wing Slam has **cd 12**, the longest cooldown in the game, on the
-class whose identity is spamming. Needs re-tuning.
+~~Currently violated: Wing Slam had cd 12, the longest cooldown in the game.~~ **Resolved
+2026-10-22 (A4):** Wing Slam is 8 s with a 1.3 s stun (Standard tier, GDD §7.3); pending a
+human playtest, fallback 9 s / 1.5 s.
 
 ### Fatty
 > The slow but unstoppable force that carries no matter what. Jumps must be justified in the

@@ -7,7 +7,8 @@ using UnityEngine;
 namespace CluckWars.Tests
 {
     /// <summary>
-    /// CW-022 / CW-008 (Maestro: spread stacked edge arrows = yes; CW-009: the status strip is NOT a safe zone). Two rivals
+    /// CW-022 / CW-008 (Maestro: spread stacked edge arrows = yes). The status strip IS an avoid zone since WP7 (C6 overrode
+    /// CW-009); these fixtures use the control zones alone, and Phase8ChunkDRivalArrowTests sweeps the info zones. Two rivals
     /// pushed off the same screen edge by the same HUD control zone used to clamp to the SAME point and read as one arrow.
     /// <see cref="EdgeArrowSpread"/> is the pure pass that gives each its own slot, inside the band, outside every zone.
     /// </summary>
@@ -146,11 +147,18 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void StatusStrip_IsNotAnArrowSafeZone()
+        public void StatusStrip_IsAnInfoZone_OnlyWhileItHasRows_NeverAControlZone()
         {
-            // CW-009: only controls are zones. Touch = joystick + 4 hexes, desktop = the 4-hex strip.
+            // Control zones are still only controls. Touch = joystick + 4 hexes, desktop = the 4-hex strip.
             Assert.That(Zones(HudDeviceMode.Touch, 16f / 9f).Count, Is.EqualTo(5));
             Assert.That(Zones(HudDeviceMode.KeyboardMouse, 16f / 9f).Count, Is.EqualTo(4));
+
+            // WP7 / C6 reversed CW-009: the status strip is an INFO zone (chevrons avoid it) while it shows rows.
+            var info = new List<Rect>();
+            HudControlZones.BuildInfoZones(info, HudDeviceMode.Touch, 16f / 9f, Vector4.zero, 0);
+            Assert.That(info.Count, Is.EqualTo(1), "no rows: the top band only");
+            HudControlZones.BuildInfoZones(info, HudDeviceMode.Touch, 16f / 9f, Vector4.zero, 2);
+            Assert.That(info.Count, Is.EqualTo(2), "rows showing: the strip is a zone too");
         }
 
         [Test]

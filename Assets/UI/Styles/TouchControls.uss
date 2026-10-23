@@ -370,8 +370,11 @@
 /* 34px = 14.5 dp. Tinted per-row by the controller to the canonical
    stun/root/slow colour, so the strip and the chicken agree on hue as well as
    on glyph. */
+/* No horizontal padding: the Label default (2 px each side) left a 42 px content box, narrower than the 44 px emoji
+   advance (snail / chain), so the glyph was clipped (UiProbe U3, WP8 live run). The 46 px box and its place are unchanged. */
 .cw-status-glyph {
     width: 46px;
+    padding-left: 0; padding-right: 0;
     font-size: 34px;
     -unity-text-align: middle-center;
     color: rgb(254, 245, 224);
@@ -538,6 +541,25 @@
 .cw-edge-glow--armed.cw-edge-glow--bottom { border-top-color:    rgb(42, 26, 12); }
 
 /* ============================================================================
+   PORTRAIT TOUCH LAYOUT  (WP8 live capture, 2026-10-23)
+   The UI Toolkit panel is NOT area-scaled: ScaleWithScreenSize + MatchWidthOrHeight 0.5 is a LINEAR blend,
+   scale = (W/1920 + H/1080) / 2, so a 9:20 phone (1080x2400, Pixel 10 Pro 1080x2410) gets a 776 x 1724 panel,
+   not the 966 x 2147 the WP7 layout was sized for. At 776 px the landscape arc (hexes up to 515 px from the
+   right) ran into the joystick (80..360). Portrait touch uses a 2 x 2 grid instead, same order as the arc
+   (a1 bottom-right, a2 above it, a4 to its left, a3 diagonal): boxes 24 px apart side by side, 25 px apart
+   above (discs with their 80 px rings: 14 / 15 px), the right column 80 px from the edge (the edge-cancel arm
+   band is 36 dp = ~80 panel px on a 9:20 phone), and the stick + status strip 40 px from the left. It fits
+   down to a 746 px panel (9:21). Placed BEFORE the desktop / pad block on purpose: at equal specificity those
+   rules win when the keyboard / pad strip is up. HudControlZones mirrors every number
+   (TouchHexRightBottomPortraitPx, JoystickLeftPortraitPx, StatusStripPortraitLeftPx).
+   ============================================================================ */
+.layout--portrait .cw-joy-base     { left: 40px; }
+.layout--portrait .cw-hex--a1 { right: 80px;  bottom: 95px;  }
+.layout--portrait .cw-hex--a2 { right: 80px;  bottom: 270px; }
+.layout--portrait .cw-hex--a3 { right: 254px; bottom: 270px; }
+.layout--portrait .cw-hex--a4 { right: 254px; bottom: 95px;  }
+
+/* ============================================================================
    DESKTOP / CONTROLLER LAYOUT  (Phase 6 chunk 6, A10)
    TouchControlsController puts .cw-hud--desktop (keyboard + mouse) or .cw-hud--pad (gamepad) on #TouchRoot while
    that is the last-used device, and takes it off the moment a finger touches the screen. The joystick goes; the
@@ -601,3 +623,14 @@
 }
 .cw-hud--desktop .cw-hold-hint, .cw-hud--pad .cw-hold-hint { max-width: 1400px; }
 .cw-hold-hint--on { opacity: 1; }
+
+/* ============================================================================
+   PORTRAIT (WP7, PORTRAIT_AND_LANDSCAPE_SPEC 1.5). TouchControlsController puts
+   .layout--portrait on #TouchRoot (LayoutClasses). The status strip narrows to the
+   joystick's width; the joystick, strip and hexes move in portrait touch (see the
+   PORTRAIT TOUCH LAYOUT block above the desktop rules); hold hint and edge strips
+   are unchanged.
+   HudControlZones mirrors the width (the strip is an info zone while it has rows).
+   ============================================================================ */
+.layout--portrait .cw-status-strip { width: 280px; left: 40px; }   /* left: the portrait touch stick's (40); the desktop strip's is 40 too */
+.layout--portrait .cw-status-value { min-width: 72px; }

@@ -14,6 +14,8 @@ namespace CluckWars.Tests
     /// rect, placement clamped to the INSET rect</b>. Conflating the two is the natural
     /// mistake, and it is invisible in code review: it would make a rival's ground ring wink
     /// out and hand over to an edge chevron while the rival was still plainly in frame.
+    /// Since WP7 the full rect is the CLEAR viewport (the frame minus the HUD info zones) when
+    /// info zones are given; the tests at the bottom pin that form and the 50 % nameplate rule.
     /// </remarks>
     public class ScreenEdgeProjectionTests
     {
@@ -192,6 +194,161 @@ namespace CluckWars.Tests
                 Is.LessThan(FeedbackTuning.RivalChevronSizeFraction),
                 "The margin only has to clear the chevron's own half-size; a margin larger " +
                 "than the chevron would push indicators pointlessly far inboard.");
+        }
+
+        // ── Clear viewport (WP7, decisions C6 / F6): "off screen" = outside the screen minus the HUD info zones ──
+
+        private static readonly Rect TopBand = Rect.MinMaxRect(0f, 0.75f, 1f, 1f);
+        private static readonly Rect Strip = Rect.MinMaxRect(0.05f, 0.30f, 0.20f, 0.40f);
+        private static readonly Vector2 Clr = new Vector2(0.03f, 0.04f);
+        private static readonly Rect Band = ScreenEdgeProjection.UniformSafeArea(Margin);
+
+        private static System.Collections.Generic.List<Rect> InfoZones(params Rect[] zones) =>
+            new System.Collections.Generic.List<Rect>(zones);
+
+        [Test]
+        public void ClearViewport_UnderTheTopBand_IsOffScreen_AndPinnedAtTheBandsLowerEdge()
+        {
+            var info = InfoZones(TopBand);
+            bool off = ScreenEdgeProjection.ClampToClearViewport(new Vector2(0.3f, 0.9f), false, Band, info, info, Clr,
+                out Vector2 clamped, out Vector2 bearing);
+
+            Assert.That(off, Is.True, "a rival under the HUD is as hidden as one past the frame");
+            Assert.That(clamped.x, Is.EqualTo(0.3f).Within(1e-5f), "straight below it");
+            Assert.That(clamped.y, Is.EqualTo(0.75f - Clr.y).Within(1e-5f), "at the band's lower edge, the arrow clear of it");
+            Assert.That(Vector2.Dot(bearing, Vector2.up), Is.GreaterThan(0.9999f));
+        }
+
+        [Test]
+        public void ClearViewport_AboveTheFrame_PinsAtTheSameLowerEdge_NotUnderTheBand()
+        {
+            var info = InfoZones(TopBand);
+            ScreenEdgeProjection.ClampToClearViewport(new Vector2(0.6f, 1.5f), false, Band, info, info, Clr,
+                out Vector2 clamped, out _);
+            Assert.That(clamped.y, Is.EqualTo(0.75f - Clr.y).Within(1e-5f),
+                "the old top-edge spot (1 - margin) is now under the HUD band");
+            Assert.That(ScreenEdgeProjection.IsInsideAnyZone(clamped, info, Clr), Is.False);
+        }
+
+        [Test]
+        public void ClearViewport_ARivalInTheClearArea_IsOnScreen_EvenRightBelowTheBand()
+        {
+            var info = InfoZones(TopBand, Strip);
+            Assert.That(ScreenEdgeProjection.ClampToClearViewport(new Vector2(0.5f, 0.5f), false, Band, info, info, Clr, out _, out _), Is.False);
+            Assert.That(ScreenEdgeProjection.ClampToClearViewport(new Vector2(0.5f, 0.749f), false, Band, info, info, Clr, out _, out _), Is.False);
+            Assert.That(ScreenEdgeProjection.ClampToClearViewport(new Vector2(0.97f, 0.5f), false, Band, info, info, Clr, out _, out _), Is.False,
+                "inside the frame but within the margin is still on screen (unchanged)");
+        }
+
+        [Test]
+        public void ClearViewport_UnderTheStatusStrip_IsPinnedToTheStripsNearestEdge_NextToTheRival()
+        {
+            // W5: an island zone pins the arrow to its own nearest edge (grown by the clearance), like the top band does,
+            // rather than sliding it to the frame edge across the play field.
+            var info = InfoZones(TopBand, Strip);
+            var target = new Vector2(0.12f, 0.37f);   // nearer the strip's top edge than its bottom or right edge
+            bool off = ScreenEdgeProjection.ClampToClearViewport(target, false, Band, info, info, Clr, out Vector2 clamped, out Vector2 bearing);
+            Assert.That(off, Is.True);
+            Assert.That(clamped.x, Is.EqualTo(0.12f).Within(1e-5f), "straight above the rival");
+            Assert.That(clamped.y, Is.EqualTo(Strip.yMax + Clr.y).Within(1e-5f), "on the strip's top edge, the arrow clear of it");
+            Assert.That(ScreenEdgeProjection.IsInsideAnyZone(clamped, info, Clr), Is.False, "never drawn on the strip (the CW-009 case)");
+            Assert.That(Vector2.Dot(bearing, Vector2.down), Is.GreaterThan(0.9999f), "pointing down at the rival");
+        }
+
+        [Test]
+        public void ClearViewport_IslandPinBlockedByAControl_PicksTheNextEdge()
+        {
+            // A control zone right above the strip blocks the top-edge pin: the right edge is used instead.
+            var info = InfoZones(TopBand, Strip);
+            var avoid = InfoZones(TopBand, Strip, Rect.MinMaxRect(0.05f, 0.40f, 0.20f, 0.55f));
+            var target = new Vector2(0.17f, 0.385f);   // the top edge (0.055 away) would win if it were free
+            ScreenEdgeProjection.ClampToClearViewport(target, false, Band, info, avoid, Clr, out Vector2 clamped, out _);
+            Assert.That(clamped.x, Is.EqualTo(Strip.xMax + Clr.x).Within(1e-5f));
+            Assert.That(clamped.y, Is.EqualTo(0.385f).Within(1e-5f));
+            Assert.That(ScreenEdgeProjection.IsInsideAnyZone(clamped, avoid, Clr), Is.False);
+        }
+
+        [Test]
+        public void ClearViewport_OffTheFrameBesideTheStrip_StaysOnTheFrameEdge()
+        {
+            // Hidden by the frame, not by the strip: the arrow stays pinned to the frame and slides out of the strip.
+            var info = InfoZones(TopBand, Strip);
+            var target = new Vector2(-0.4f, 0.35f);
+            bool off = ScreenEdgeProjection.ClampToClearViewport(target, false, Band, info, info, Clr, out Vector2 clamped, out _);
+            Assert.That(off, Is.True);
+            Assert.That(clamped.x, Is.EqualTo(Band.xMin).Within(1e-5f), "on the left frame edge, not floating at the strip's edge");
+            Assert.That(ScreenEdgeProjection.IsInsideAnyZone(clamped, info, Clr), Is.False);
+        }
+
+        [Test]
+        public void ClearViewport_WithNoInfoZones_IsTheOldUnitRectContract()
+        {
+            var none = InfoZones();
+            foreach (var t in new[] { new Vector2(0.5f, 0.5f), new Vector2(0.97f, 0.5f), new Vector2(1.4f, 0.5f), new Vector2(-0.3f, 1.7f) })
+            {
+                bool a = ScreenEdgeProjection.ClampToClearViewport(t, false, Band, none, none, Clr, out Vector2 pa, out Vector2 ba);
+                bool b = ScreenEdgeProjection.ClampToEdge(t, false, Band, out Vector2 pb, out Vector2 bb);
+                Assert.That(a, Is.EqualTo(b), t.ToString());
+                Assert.That(Vector2.Distance(pa, pb), Is.LessThan(1e-6f), t.ToString());
+                Assert.That(Vector2.Distance(ba, bb), Is.LessThan(1e-6f), t.ToString());
+            }
+        }
+
+        [Test]
+        public void ClearBand_CutsOnlyFullWidthEdgeZones()
+        {
+            Rect cut = ScreenEdgeProjection.ClearBand(Band, InfoZones(TopBand, Strip), Clr);
+            Assert.That(cut.yMax, Is.EqualTo(0.75f - Clr.y).Within(1e-5f), "the top band cuts the band");
+            Assert.That(cut.yMin, Is.EqualTo(Band.yMin).Within(1e-5f), "an island zone (the strip) does not");
+            Assert.That(cut.xMin, Is.EqualTo(Band.xMin).Within(1e-5f));
+            Assert.That(cut.xMax, Is.EqualTo(Band.xMax).Within(1e-5f));
+
+            Rect bottom = ScreenEdgeProjection.ClearBand(Band, InfoZones(Rect.MinMaxRect(0f, 0f, 1f, 0.2f)), Clr);
+            Assert.That(bottom.yMin, Is.EqualTo(0.2f + Clr.y).Within(1e-5f), "a full-width bottom zone cuts from below");
+        }
+
+        // ── The 50 % rule: a rival mostly under an info zone hides its nameplate and gets the chevron ──
+
+        [Test]
+        public void Coverage_IsTheVisibleShareInsideTheZones()
+        {
+            var info = InfoZones(TopBand, Strip);
+            Assert.That(ScreenEdgeProjection.InfoZoneCoverage(Rect.MinMaxRect(0.4f, 0.5f, 0.5f, 1.0f), info, out Vector2 c), Is.EqualTo(0.5f).Within(1e-5f));
+            Assert.That(TopBand.Contains(c), Is.True, "the covered piece's centre is inside the zone");
+            Assert.That(c.y, Is.EqualTo(0.875f).Within(1e-5f));
+
+            Assert.That(ScreenEdgeProjection.InfoZoneCoverage(Rect.MinMaxRect(0.4f, 0.8f, 0.5f, 0.9f), info, out _), Is.EqualTo(1f).Within(1e-5f));
+            Assert.That(ScreenEdgeProjection.InfoZoneCoverage(Rect.MinMaxRect(0.4f, 0.5f, 0.5f, 0.6f), info, out _), Is.EqualTo(0f));
+            Assert.That(ScreenEdgeProjection.InfoZoneCoverage(Rect.MinMaxRect(0.4f, 0.5f, 0.5f, 1.5f), info, out _), Is.EqualTo(0.5f).Within(1e-5f),
+                "only the VISIBLE part counts: the half above the frame is not under the HUD");
+            Assert.That(ScreenEdgeProjection.InfoZoneCoverage(Rect.MinMaxRect(1.2f, 0.5f, 1.3f, 0.6f), info, out _), Is.EqualTo(0f), "nothing visible");
+            Assert.That(ScreenEdgeProjection.InfoZoneCoverage(Rect.MinMaxRect(0.10f, 0.30f, 0.15f, 0.40f), info, out _), Is.EqualTo(1f).Within(1e-5f), "the strip counts");
+        }
+
+        [Test]
+        public void UnderTheHud_FromHalf_WithExitHysteresis()
+        {
+            Assert.That(ScreenEdgeProjection.IsUnderInfoZone(0.5f, false), Is.True, ">= 50 % hides the nameplate");
+            Assert.That(ScreenEdgeProjection.IsUnderInfoZone(0.49f, false), Is.False);
+            Assert.That(ScreenEdgeProjection.IsUnderInfoZone(0.45f, true), Is.True, "once under, it stays under until below 40 %");
+            Assert.That(ScreenEdgeProjection.IsUnderInfoZone(0.39f, true), Is.False);
+            Assert.That(ScreenEdgeProjection.InfoZoneShowFraction, Is.LessThan(ScreenEdgeProjection.InfoZoneHideFraction));
+        }
+
+        [Test]
+        public void UnderTheHud_ArrowFromTheCoveredPiece_SitsBelowTheBand_PointingUpAtTheRival()
+        {
+            // The RivalIndicator path: the body's feet are below the band, the nameplate and head are inside it.
+            var info = InfoZones(TopBand);
+            var mark = Rect.MinMaxRect(0.62f, 0.70f, 0.70f, 0.90f);   // 75 % inside
+            float cover = ScreenEdgeProjection.InfoZoneCoverage(mark, info, out Vector2 covered);
+            Assert.That(ScreenEdgeProjection.IsUnderInfoZone(cover, false), Is.True);
+
+            bool off = ScreenEdgeProjection.ClampToClearViewport(covered, true, Band, info, info, Clr, out Vector2 clamped, out Vector2 bearing);
+            Assert.That(off, Is.True);
+            Assert.That(clamped.x, Is.EqualTo(0.66f).Within(1e-5f));
+            Assert.That(clamped.y, Is.EqualTo(0.75f - Clr.y).Within(1e-5f), "at the zone's lower edge, not on the bird's feet");
+            Assert.That(Vector2.Dot(bearing, Vector2.up), Is.GreaterThan(0.9999f));
         }
     }
 }

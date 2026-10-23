@@ -934,7 +934,13 @@ namespace CluckWars.Gameplay
             _ctx.Runner         = Runner;
             _ctx.PrefabRegistry = _prefabRegistry;
 
-            if (!ability.CanActivate(_ctx))
+            // The slot is known to CanActivate too (an Aura refuses while its previous zone from THIS slot is still
+            // live, see FeatherAuraAbilitySO.CanActivate); cleared again right after, as around OnActivate.
+            _ctx.Slot = slot;
+            bool canActivate;
+            try { canActivate = ability.CanActivate(_ctx); }
+            finally { _ctx.Slot = -1; }
+            if (!canActivate)
             {
                 // No log line here on purpose. CanActivate's contract is that the override has
                 // already logged an Error naming the exact missing reference; a second line

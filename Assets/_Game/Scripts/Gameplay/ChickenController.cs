@@ -116,7 +116,7 @@ namespace CluckWars.Gameplay
         private const string Source = "Chicken";
 
         // ---- Passive tuning constants (balance-pass values; Part B / test session) ---
-        private const float CollisionSlowRadius      = 1.2f;  // metres — two chickens touching
+        private const float CollisionSlowRadius      = ContactHysteresis.EnterMeters;  // metres — two chickens touching
         private const float CollisionSlowFactor      = 0.75f; // GDD TBD #7
         private const float PileSlowFactor           = 0.80f; // GDD TBD #6
 
@@ -133,8 +133,6 @@ namespace CluckWars.Gameplay
         /// would be a real slow that no remote peer can see. See <see cref="ApplySlow"/>.
         /// </remarks>
         public const float SlowVfxFlagThreshold = 0.92f;
-        private const float ToughDamageBonus         = 1.25f; // 25% bonus outgoing damage for Tough
-        private const float AuraSlowSearchRadius     = 10f;   // broadphase for CheckAuraSlow
 
         public static readonly System.Collections.Generic.List<ChickenController> ActiveControllers = new System.Collections.Generic.List<ChickenController>();
 
@@ -150,7 +148,18 @@ namespace CluckWars.Gameplay
         private ChickenCargo _cargo;
         private AbilityController _abilities;
         private AssassinExecute _assassin;
+        private AbilityRegistrySO _abilityRegistry;
         private ILogService _log;
+
+        // Receiver-side bounds for the three control RPCs (F4), derived once per spawn from the
+        // shipped ability pool (ResolveControlCeilings). Unknown = no honest bound: the magnitude
+        // and range checks are skipped (logged as an Error), attribution still applies.
+        private ControlClaimRules.Ceiling _stunCeiling = ControlClaimRules.Ceiling.Unknown;
+        private ControlClaimRules.Ceiling _rootCeiling = ControlClaimRules.Ceiling.Unknown;
+        private ControlClaimRules.Ceiling _slowCeiling = ControlClaimRules.Ceiling.Unknown;
+
+        // Collision-slow contact with hysteresis (A11): authority-local, never networked.
+        private bool _inContact;
 
         // True once the class's avatar AND all five clips are bound, i.e. the Animator is really
         // driving the skeleton. Drives ChickenAnimator's two-path split — see SetSkeletalActive.
@@ -320,15 +329,9 @@ namespace CluckWars.Gameplay
         [Networked] public NetworkBool UnderdogSurgeActive { get; set; }
         [Networked] public NetworkBool LeaderBountyActive { get; set; }
 
-        // ---- v0.3 Feather Aura (Networked so every peer sees the caster's state) ---
-
-        /// <summary>True while the Feather Aura ability is active on this chicken.
-        /// Replicated so nearby chickens can self-apply the slow in their own FUN.</summary>
-        [Networked] public bool  AuraSlowActive { get; private set; }
-        /// <summary>World-units radius of the active aura slow effect.</summary>
-        [Networked] public float AuraSlowRadius { get; private set; }
-        /// <summary>Speed multiplier broadcast by the aura (applied to chickens inside the radius).</summary>
-        [Networked] public float AuraSlowFactor { get; private set; }
+        // WP4 (PROTOCOL CHANGE, B4): the Feather Aura triplet (the bool + radius + factor emitter flags) was
+        // removed from this behaviour's networked layout. Feather Aura is a Caster-anchored AbilityZone now, slowed through
+        // CheckAbilityZoneSlow like every zone; all peers must run one SHA.
 
         // ---- v0.3 Control-state fields (GDD §6.4) ----------------------------
 
@@ -475,15 +478,18 @@ namespace CluckWars.Gameplay
         [Networked] public float VerticalVelocity { get; set; }
 
         [Inject]
-        public void Construct(ChickenClassRegistrySO registry, ILogService log)
+        public void Construct(ChickenClassRegistrySO registry, AbilityRegistrySO abilityRegistry, ILogService log)
         {
             _registry = registry;
+            _abilityRegistry = abilityRegistry;
             _log = log;
         }
 
         public override void Spawned()
         {
             ActiveControllers.Add(this);
+            LocalJoinClock.Note(Runner);   // a joiner's first snapshot carries every chicken (root evidence, qa W1)
+            _recentPositions.Clear();      // pooled: a previous life's positions never vouch
             if (_log == null)
             {
                 ProjectContext.Instance.Container.Inject(this);
@@ -498,6 +504,8 @@ namespace CluckWars.Gameplay
             _assassin = GetComponent<AssassinExecute>();
             _activeStats = ResolveStatsForClass(Class);
             Effects.Log = _log;
+            _inContact = false;   // pooled: no contact carried over from a previous life
+            ResolveControlCeilings();
 
             if (_activeStats == null)
             {
@@ -778,6 +786,7 @@ namespace CluckWars.Gameplay
 
             // A round-reset teleport queued by RPC_TeleportTo: first thing, before anything moves or reads the position.
             ApplyPendingTeleport();
+            _recentPositions.Record(Time.realtimeSinceStartup, transform.position);   // root-claim window (local)
 
             // The networked mirrors of the ability effect stack are re-derived every authority tick (each write
             // is change-gated), so their correctness never depends on every mutation site remembering to call
@@ -843,14 +852,12 @@ namespace CluckWars.Gameplay
             if (_cargo != null && _cargo.IsPileSlow && !ignoresPileSlow)
                 ApplySlow(SlowSource.Pile, PileSlowFactor);
 
-            // Ability slow timer (RPC_ApplyAbilitySlow — zones, aura, etc.).
+            // Timed ability slow (RPC_ApplyAbilitySlow; Dust Kick is its only sender - zones and auras slow in
+            // CheckAbilityZoneSlow below, without an RPC).
             if (Runner.SimulationTime < _abilitySlowUntil)
                 ApplySlow(SlowSource.Ability, _abilitySlowFactor);
 
-            // Feather Aura: self-check from nearby casters broadcasting an aura.
-            CheckAuraSlow();
-
-            // Placed-zone slow (Feather Trap).
+            // Zone slow, the WhileInside channel: placed zones (Feather Trap, Smoke Roost) and auras (Feather Aura).
             CheckAbilityZoneSlow();
 
             // General stun timer expiry
@@ -1119,6 +1126,7 @@ namespace CluckWars.Gameplay
             else transform.position = target;
             if (hadController) _characterController.enabled = true;
             VerticalVelocity = 0f;
+            _recentPositions.Clear();   // nothing from the previous round may vouch for a root claim
 
             _log?.Info("Reset", System.FormattableString.Invariant(
                 $"Teleport applied {Object.InputAuthority}{(IsBot ? "/bot" : "")} home={HomeCornerIndex} from={from.x:0.0},{from.z:0.0} to={target.x:0.0},{target.z:0.0}"));
@@ -1219,43 +1227,191 @@ namespace CluckWars.Gameplay
             _log?.Debug(Source, $"RPC_ApplySelfImpulse: impulse={impulse:F2}.");
         }
 
+        // ---- Control RPCs (F4 sender validation + A1 re-application) -----------
+        //
+        // PROTOCOL CHANGE (WP1): all three take the casting chicken's ChickenController id and an
+        // RpcInfo. A claim is judged by ControlClaimRules before anything is applied (see there for
+        // the rules and the trust model); a rejection is a rate-limited Warn with the stable prefix
+        // "rejected RPC_Apply" that tools/test-session/merge.ps1 counts (0 with honest clients).
+        // An accepted claim then merges with what is already running (ControlReapplyRules): it may
+        // extend a stun, root or slow, never cut one short.
+
         /// <summary>
-        /// Applies a timed ability slow, shortened by the equipped specialization's
-        /// <c>ModifyControlDuration</c> (Slippery, Bulwark).
+        /// Applies a timed ability slow from <paramref name="caster"/>, shortened by the equipped
+        /// specialization's <c>ModifyControlDuration</c> (Slippery, Bulwark). Keeps the strongest
+        /// factor and the later expiry of this and any slow already running (A1).
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_ApplyAbilitySlow(float duration, float factor)
+        public void RPC_ApplyAbilitySlow(float duration, float factor, NetworkBehaviourId caster, RpcInfo info = default)
         {
+            if (!AcceptControlClaim(nameof(RPC_ApplyAbilitySlow), ControlKind.Slow, duration, factor, caster, info)) return;
+
             duration = ApplyPassiveControlDuration(duration);
-            _abilitySlowUntil  = Runner.SimulationTime + duration;
-            _abilitySlowFactor = factor;
-            _log?.Debug(Source, $"RPC_ApplyAbilitySlow: factor={factor:P0} for {duration:0.0}s.");
+            double now = Runner.SimulationTime;
+            var merged = ControlReapplyRules.MergeSlow(
+                new ControlReapplyRules.TimedSlow(_abilitySlowFactor, _abilitySlowUntil),
+                new ControlReapplyRules.TimedSlow(factor, now + duration), now);
+            _abilitySlowUntil  = merged.Until;
+            _abilitySlowFactor = merged.Factor;
+            _log?.Debug(Source, $"RPC_ApplyAbilitySlow: incoming factor={factor:P0} for {duration:0.0}s -> " +
+                                $"factor={merged.Factor:P0} for {(merged.Until - now):0.0}s.");
         }
 
         /// <summary>
-        /// Stuns this chicken for <paramref name="seconds"/> seconds — blocks movement,
-        /// casting, and collecting. Shortened by <c>ModifyControlDuration</c>.
+        /// Stuns this chicken for <paramref name="seconds"/> seconds (from <paramref name="caster"/>)
+        /// — blocks movement, casting, and collecting. Shortened by <c>ModifyControlDuration</c>.
+        /// A stun already running for longer is kept (A1).
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_ApplyStun(float seconds)
+        public void RPC_ApplyStun(float seconds, NetworkBehaviourId caster, RpcInfo info = default)
         {
+            if (!AcceptControlClaim(nameof(RPC_ApplyStun), ControlKind.Stun, seconds, 1f, caster, info)) return;
+
             seconds = ApplyPassiveControlDuration(seconds);
+            float remaining = StunRemaining;
+            if (!ControlReapplyRules.IncomingExtends(remaining, seconds))
+            {
+                _log?.Debug(Source, $"RPC_ApplyStun: {seconds:0.00}s does not outlast the {remaining:0.00}s left - kept.");
+                return;
+            }
             IsStunned = true;
             StunTimer = TickTimer.CreateFromSeconds(Runner, seconds);
             _log?.Debug(Source, $"RPC_ApplyStun: stunned for {seconds:0.0}s.");
+
+            // MATCH SUMMARY "Stuns Landed" (F7): real players only, so a decoy's stun is not counted
+            // here (the summary skips decoy rows as well).
+            if (!IsDecoy)
+            {
+                if (TryGetComponent(out ChickenMatchStats stats)) stats.RecordStunTaken();
+                else _log?.Warn(Source, $"{name}: no ChickenMatchStats - stun not counted in MATCH SUMMARY.");
+            }
         }
 
         /// <summary>
-        /// Roots this chicken for <paramref name="duration"/> seconds — movement
-        /// blocked, abilities still castable (GDD §6.4). Shortened by
-        /// <c>ModifyControlDuration</c>.
+        /// Roots this chicken for <paramref name="duration"/> seconds (from <paramref name="caster"/>,
+        /// directly or through a Root Egg it owns) — movement blocked, abilities still castable
+        /// (GDD §6.4). Shortened by <c>ModifyControlDuration</c>. A root already running for longer
+        /// is kept (A1).
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_ApplyRoot(float duration)
+        public void RPC_ApplyRoot(float duration, NetworkBehaviourId caster, RpcInfo info = default)
         {
+            if (!AcceptControlClaim(nameof(RPC_ApplyRoot), ControlKind.Root, duration, 1f, caster, info)) return;
+
             duration = ApplyPassiveControlDuration(duration);
+            float remaining = RootRemaining;
+            if (!ControlReapplyRules.IncomingExtends(remaining, duration))
+            {
+                _log?.Debug(Source, $"RPC_ApplyRoot: {duration:0.00}s does not outlast the {remaining:0.00}s left - kept.");
+                return;
+            }
             RootTimer = TickTimer.CreateFromSeconds(Runner, duration);
             _log?.Debug(Source, $"RPC_ApplyRoot: rooted for {duration:0.0}s.");
+        }
+
+        // One rejection line per sender per 2 s, shared by every chicken (as ChickenCombat's execute rejections).
+        private static readonly CluckWars.Diagnostics.PerKeyRateLimiter ControlRejectionLimiter =
+            new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
+
+        /// <summary>
+        /// Judges a control claim and logs a refusal. True only for an accepted claim.
+        /// </summary>
+        private bool AcceptControlClaim(string rpc, ControlKind kind, float seconds, float factor,
+            NetworkBehaviourId casterId, in RpcInfo info)
+        {
+            var ceiling = CeilingFor(kind);
+            var verdict = JudgeControl(kind, seconds, factor, casterId, info, ceiling, out var caster);
+            if (verdict == ControlClaimRules.Verdict.Accepted) return true;
+
+            if (ControlRejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
+                _log?.Warn(Source, $"{name}: rejected {rpc}(seconds={seconds:0.00}" +
+                    (kind == ControlKind.Slow ? $", factor={factor:0.00}" : string.Empty) +
+                    $", caster={(caster != null ? caster.name : casterId.ToString())}) from {info.Source} ({verdict}) - " +
+                    ControlClaimRules.Describe(verdict, kind, ceiling) +
+                    (held > 0 ? $" (+{held} similar suppressed)" : string.Empty));
+            return false;
+        }
+
+        private ControlClaimRules.Ceiling CeilingFor(ControlKind kind) => kind switch
+        {
+            ControlKind.Stun => _stunCeiling,
+            ControlKind.Root => _rootCeiling,
+            ControlKind.Slow => _slowCeiling,
+            _                => ControlClaimRules.Ceiling.Unknown,
+        };
+
+        /// <summary>Gathers what this (the victim's) authority can see about a control claim and judges it.</summary>
+        private ControlClaimRules.Verdict JudgeControl(ControlKind kind, float seconds, float factor,
+            NetworkBehaviourId casterId, in RpcInfo info, in ControlClaimRules.Ceiling ceiling, out ChickenController caster)
+        {
+            caster = null;
+            var claim = new ControlClaimRules.Claim { Kind = kind, Seconds = seconds, SlowFactor = factor };
+
+            if (Runner != null && Runner.TryFindBehaviour(casterId, out caster) &&
+                caster != null && caster.Object != null && caster.Object.IsValid)
+            {
+                claim.CasterResolved = true;
+                claim.CasterIsVictim = caster == this;
+                claim.CasterIsDecoy = caster.IsDecoy;
+                // Local invoke: the caster is simulated here (solo, bots, the master's own chicken).
+                // Off the wire: the sender must be the caster's state authority (a bot's is the master).
+                claim.SenderSpeaksForCaster = info.IsInvokeLocal
+                    ? caster.Object.HasStateAuthority
+                    : caster.Object.StateAuthority == info.Source;
+
+                // A local invoke has no wire time; a remote one is floored and capped (ExecuteRules).
+                // Two ticks cover the cast resolving a tick before the RPC is applied.
+                float latency = ChickenCombat.SenderLatency(Runner, info);
+                claim.RangeMargin = StealRules.RangeMargin(
+                    ChickenCargo.DriftSpeed(caster) + ChickenCargo.DriftSpeed(this), latency + 2f * Runner.DeltaTime);
+                Vector3 c = caster.transform.position, v = transform.position;
+                claim.PlanarDistance = Mathf.Sqrt((c.x - v.x) * (c.x - v.x) + (c.z - v.z) * (c.z - v.z));
+                // Now, or anywhere this chicken stood within the window the RPC could have been in flight: the zone's
+                // authority judged a lagged copy of us, and a jump right after stepping in (Doppelganger blink, session
+                // 20261023-173009) moved us out before its RPC landed. The zone itself must still vouch either way.
+                float zoneMargin = claim.RangeMargin + ControlClaimRules.RangeSlackMeters;
+                claim.InsideCastersRootZone = kind == ControlKind.Root &&
+                    (AbilityZone.ContainsRootOf(caster, v, zoneMargin, ceiling) || WasRecentlyInsideRootOf(caster, zoneMargin, ceiling));
+            }
+
+            return ControlClaimRules.Evaluate(claim, ceiling);
+        }
+
+        /// <summary>This authority's own positions over the last <see cref="RecentPositions.WindowSeconds"/> (local; root claims only).</summary>
+        private readonly RecentPositions _recentPositions = new RecentPositions();
+
+        /// <summary>Was this chicken inside a Root zone <paramref name="caster"/> owns at any recorded point of the last window?</summary>
+        private bool WasRecentlyInsideRootOf(ChickenController caster, float margin, in ControlClaimRules.Ceiling ceiling)
+        {
+            var c = ceiling;   // an 'in' parameter cannot be captured
+            return _recentPositions.AnyWithinWindow(Time.realtimeSinceStartup, p => AbilityZone.ContainsRootOf(caster, p, margin, c));
+        }
+
+        /// <summary>
+        /// Derives the three control ceilings from the shipped ability pool, once per spawn. A pool
+        /// that yields no bound (registry unbound or empty) leaves the ceiling Unknown, which skips
+        /// the magnitude and range checks rather than rejecting every real stun in the match; the
+        /// attribution check needs no authored data and still stands. Same shape as
+        /// <c>ChickenCargo.ResolveStealBounds</c>.
+        /// </summary>
+        private void ResolveControlCeilings()
+        {
+            var pool = _abilityRegistry != null ? _abilityRegistry.All : null;
+            _stunCeiling = ResolveCeiling(pool, ControlKind.Stun);
+            _rootCeiling = ResolveCeiling(pool, ControlKind.Root);
+            _slowCeiling = ResolveCeiling(pool, ControlKind.Slow);
+        }
+
+        private ControlClaimRules.Ceiling ResolveCeiling(AbilityBaseSO[] pool, ControlKind kind)
+        {
+            var ceiling = ControlClaimRules.CeilingFor(pool, kind);
+            if (ceiling.Known && ceiling.MaxSeconds > 0f && ceiling.MaxReach > 0f) return ceiling;
+
+            _log?.Error(Source, $"{name}: no {kind} bound could be derived from the AbilityRegistry " +
+                $"(known={ceiling.Known}, maxSeconds={ceiling.MaxSeconds:0.00}, maxReach={ceiling.MaxReach:0.00}), so " +
+                $"incoming {kind} RPCs are checked for their sender only, not for duration or range. Check that " +
+                "ProjectInstaller._abilityRegistry is assigned and that every control ability is listed in its All array.");
+            return ControlClaimRules.Ceiling.Unknown;
         }
 
         /// <summary>
@@ -1272,21 +1428,11 @@ namespace CluckWars.Gameplay
 
             bool steal = Effects.StealBackActive;
             if (StealBackActive != steal) StealBackActive = steal;
-
-            if (Effects.TryGetAura(out float factor, out float radius))
-            {
-                if (!Mathf.Approximately(AuraSlowFactor, factor)) AuraSlowFactor = factor;
-                if (!Mathf.Approximately(AuraSlowRadius, radius)) AuraSlowRadius = radius;
-                if (!AuraSlowActive) AuraSlowActive = true; // write last so readers see consistent state
-            }
-            else if (AuraSlowActive)
-            {
-                AuraSlowActive = false;
-            }
         }
 
         /// <summary>
-        /// Resets all v0.3 control states (slow, root, knockback, aura).
+        /// Resets all v0.3 control states (slow, root, knockback). A live aura is a zone: it despawns with its slot
+        /// (<c>EndAllForReset</c> below) and on the round reset signal (B10).
         /// Called by <see cref="GameManager"/> on match restart.
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
@@ -1301,6 +1447,7 @@ namespace CluckWars.Gameplay
             _traversal?.Abort();
             _abilitySlowUntil    = double.MinValue;
             _abilitySlowFactor   = 1f;
+            _inContact           = false;
             RootTimer            = TickTimer.None;
             Rooted               = false;
             IsStunned            = false;
@@ -1357,7 +1504,7 @@ namespace CluckWars.Gameplay
         /// </summary>
         /// <remarks>
         /// Iterates the capped four-entry <see cref="ActiveControllers"/> list with a distance
-        /// test, exactly like <see cref="CheckAuraSlow"/> below and <c>AbilityZone</c>. This was
+        /// test, exactly like <see cref="CheckAbilityZoneSlow"/> below and <c>AbilityZone</c>. This was
         /// the last <c>Physics.OverlapSphere</c> in the per-tick path: it ran a broadphase query
         /// plus a <c>GetComponentInParent</c> per chicken per tick to rediscover a list the class
         /// already keeps. Locked by <c>AbilityAimTests.NoAbilityScript_CallsPhysicsOverlapDirectly</c>.
@@ -1373,9 +1520,20 @@ namespace CluckWars.Gameplay
         /// found them, so a Doppelganger has always slowed whoever walks into it — that is the
         /// point of a decoy. It carries no <c>ChickenCargo</c>, so the steal-back block below
         /// falls through on its own null check.
+        ///
+        /// <b>Hysteresis (A11).</b> The slow follows <see cref="_inContact"/>, which enters at 1.2 m
+        /// and leaves past 1.3 m from the nearest chicken (<see cref="ContactHysteresis"/>), so two
+        /// birds walking side by side at the edge no longer flicker in and out of the slow. The
+        /// Spine Coat steal-back keeps the plain 1.2 m test, one chicken per tick.
+        ///
+        /// <b>Featherfoot (A6).</b> <see cref="Abilities.PassiveAbilitySO.IgnoresCollisionSlow"/> is
+        /// consulted here and only here, and skips only the slow: contact is still tracked and the
+        /// steal-back still runs.
         /// </remarks>
         private void CheckCollisionSlow()
         {
+            float nearestSqr = float.PositiveInfinity;
+            bool touched = false;   // the first chicken inside CollisionSlowRadius this tick, as before
             for (int i = 0; i < ActiveControllers.Count; i++)
             {
                 var other = ActiveControllers[i];
@@ -1386,11 +1544,12 @@ namespace CluckWars.Gameplay
                 if (other.Object == null || !other.Object.IsValid) continue;
                 // Ignore dead chickens (stunned / falling through respawn).
                 if (other.Combat != null && other.Combat.IsDead) continue;
-                if ((other.transform.position - transform.position).sqrMagnitude >
-                    CollisionSlowRadius * CollisionSlowRadius)
-                {
-                    continue;
-                }
+                float sqr = (other.transform.position - transform.position).sqrMagnitude;
+                if (sqr < nearestSqr) nearestSqr = sqr;
+                // The steal-back keeps the plain 1.2 m test and one chicken per tick (A11 adds the
+                // hysteresis band to the slow below, never to the steal).
+                if (touched || sqr > CollisionSlowRadius * CollisionSlowRadius) continue;
+                touched = true;
 
                 if (StealBackActive && other.Cargo != null && Cargo != null)
                 {
@@ -1420,30 +1579,17 @@ namespace CluckWars.Gameplay
                         other.RPC_ApplyKnockback(dir.normalized * StealBackKnockback);
                     }
                 }
-
-                ApplySlow(SlowSource.Collision, CollisionSlowFactor);
-                break; // One other chicken is enough to trigger the slow.
             }
-        }
 
-        /// <summary>
-        /// Checks whether this chicken is inside the aura of any nearby caster with
-        /// <see cref="AuraSlowActive"/> set. Runs locally on this chicken's authority —
-        /// no RPC needed because <c>AuraSlowActive/Radius/Factor</c> are Networked.
-        /// </summary>
-        private void CheckAuraSlow()
-        {
-            for (int i = 0; i < ActiveControllers.Count; i++)
-            {
-                var caster = ActiveControllers[i];
-                if (caster == null || caster == this) continue;
-                if (!caster.AuraSlowActive) continue;
-                float sqr = (caster.transform.position - transform.position).sqrMagnitude;
-                if (sqr <= caster.AuraSlowRadius * caster.AuraSlowRadius)
-                {
-                    ApplySlow(SlowSource.Ability, caster.AuraSlowFactor);
-                }
-            }
+            // Contact with hysteresis (A11): enter at 1.2 m, leave past 1.3 m, from the nearest chicken.
+            _inContact = ContactHysteresis.Update(_inContact, Mathf.Sqrt(nearestSqr));
+            if (!_inContact) return;
+
+            // Featherfoot (A6): the one production call site of the hook. Skips only the slow; the
+            // steal-back above has already run.
+            var passive = Passive;
+            if (passive != null && passive.IgnoresCollisionSlow(this)) return;
+            ApplySlow(SlowSource.Collision, CollisionSlowFactor);
         }
 
         /// <summary>
@@ -1451,16 +1597,25 @@ namespace CluckWars.Gameplay
         /// type <see cref="ZoneEffect.Slow"/> within their trigger radius. Runs
         /// locally — no RPC needed because zones are Networked scene objects.
         /// </summary>
+        /// <remarks>
+        /// The WhileInside channel (B3) of every zone, Static AoE and Aura alike: this chicken's own authority decides,
+        /// every tick, from the zone's <see cref="AbilityZone.TryGetCenter"/> - never its transform (a Caster zone's
+        /// transform only follows in Render). An Aura whose caster this peer cannot resolve has no centre and is skipped.
+        /// Owner and decoys are ignored by the shared zone rule (<see cref="AreaEffectRules.IgnoresChicken"/>, B7); a
+        /// decoy never reaches this method anyway (the <c>IsDecoy</c> return in <see cref="FixedUpdateNetwork"/>).
+        /// Planar distance since B7 (<see cref="AreaEffectRules.IsInside"/>; it was 3D before WP3).
+        /// </remarks>
         private void CheckAbilityZoneSlow()
         {
             for (int i = 0; i < AbilityZone.ActiveZones.Count; i++)
             {
                 var zone = AbilityZone.ActiveZones[i];
                 if (zone == null || zone.Effect != ZoneEffect.Slow) continue;
-                if (zone.OwnerChicken == this.Id) continue; // own Feather Trap never slows the owner (GDD §7.2)
-                float sqr = (zone.transform.position - transform.position).sqrMagnitude;
-                float r   = zone.TriggerRadius;
-                if (sqr <= r * r)
+                if (!zone.HasChannel(AreaEffectChannel.WhileInside)) continue;
+                // Own Feather Trap never slows the owner (GDD §7.2); zones ignore decoys (B7).
+                if (AreaEffectRules.IgnoresChicken(zone.OwnerChicken == this.Id, IsDecoy)) continue;
+                if (!zone.TryGetCenter(out Vector3 center)) continue;
+                if (AreaEffectRules.IsInside(center, zone.TriggerRadius, transform.position))
                     ApplySlow(SlowSource.Ability, zone.SlowFactor);
             }
         }

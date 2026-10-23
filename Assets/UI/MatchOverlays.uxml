@@ -20,7 +20,8 @@
     <ui:VisualElement name="OverlayRoot" class="cw-overlay-host" picking-mode="Ignore">
 
         <!-- Comeback / event banner ("FINAL 10!" + the event, PILES RESTOCKED!): a wood plaque in the lower third between
-             the joystick and the ability buttons, FIRST child so every other overlay draws over it. Never takes a tap.
+             the joystick and the ability buttons (portrait: above the bottom band, MatchOverlays.uss), FIRST child so every
+             other overlay draws over it. Never takes a tap.
              MatchHud decides when (EventBannerFeed); MatchOverlaysController fills and shows it. -->
         <ui:VisualElement name="EventBanner" class="cw-eventbanner" style="display: none;" picking-mode="Ignore">
             <ui:VisualElement class="cw-eventbanner__plaque" picking-mode="Ignore">

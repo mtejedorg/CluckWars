@@ -1132,7 +1132,11 @@ namespace CluckWars.Visuals
         /// <summary>Plays this chicken's white hit-confirm spark. Called locally by the
         /// <i>caster</i>'s <see cref="HitFeedback"/> — not an RPC; both peers reach the
         /// same conclusion from the replicated cast event.</summary>
-        public void PlayHitSpark() => _sparkPS?.Play();
+        public void PlayHitSpark()
+        {
+            CluckWars.Diagnostics.FirstUseMarkers.Note(CluckWars.Diagnostics.FirstUseKind.HitSpark);   // breadcrumb only
+            _sparkPS?.Play();
+        }
 
         private void BuildParticles()
         {

@@ -13,7 +13,7 @@ namespace CluckWars.Tests
 {
     /// <summary>
     /// Guards the pre-commitment wiring gate: <see cref="AbilityBaseSO.CanActivate"/> and the
-    /// four spawning abilities that override it — the three zone placers, plus Doppelganger,
+    /// five spawning abilities that override it — the four zone abilities, plus Doppelganger,
     /// which spawns a NetworkObject without placing a zone. Before the gate existed, a missing
     /// <c>PrefabRegistrySO.AbilityZone</c> cost the player the whole cast <i>and</i> its
     /// cooldown, because the guard sat inside <c>OnActivate</c> — after
@@ -69,7 +69,9 @@ namespace CluckWars.Tests
             // Controller is null throughout: none of CanSpawnZone, and none of the three
             // CanActivate overrides, touch it. Log is null too, so the Error lines those
             // overrides emit no-op via ctx.Log?. rather than needing a fake logger.
-            return new AbilityContext(null) { Runner = runner, PrefabRegistry = registry };
+            // Slot is set the way AbilityController.TryActivate sets it around CanActivate (an Aura's spec refuses a
+            // cast with no valid slot, since it ends with that slot).
+            return new AbilityContext(null) { Runner = runner, PrefabRegistry = registry, Slot = 1 };
         }
 
         private PrefabRegistrySO RegistryWithZone()
@@ -82,12 +84,13 @@ namespace CluckWars.Tests
             return registry;
         }
 
-        /// <summary>The three abilities that place an <c>AbilityZone</c>, as live instances.</summary>
+        /// <summary>The four abilities that spawn an <c>AbilityZone</c> (Feather Aura since WP4), as live instances.</summary>
         private IEnumerable<AbilityBaseSO> ZoneAbilities()
         {
             yield return Track(ScriptableObject.CreateInstance<FeatherTrapAbilitySO>());
             yield return Track(ScriptableObject.CreateInstance<RootEggAbilitySO>());
             yield return Track(ScriptableObject.CreateInstance<SmokeRoostAbilitySO>());
+            yield return Track(ScriptableObject.CreateInstance<FeatherAuraAbilitySO>());
         }
 
         // ---- The three ways the wiring can be broken ----------------------------
@@ -143,6 +146,32 @@ namespace CluckWars.Tests
                     "AbilityZone are all present. A gate that refuses a correctly wired ability " +
                     "would break every zone cast in the game.");
             }
+        }
+
+        // ---- Every area ability (WP3: AreaKind != None) -------------------------
+
+        // WP3 listed Feather Aura here as the one area ability without a zone yet (it ran on the ChickenController aura
+        // triplet). WP4 moved it onto AreaEffectSpawner, so every AreaKind != None is checked with no exception.
+
+        [Test]
+        public void EveryAreaAbility_RefusesWithoutTheAbilityZonePrefab()
+        {
+            var registry = Track(ScriptableObject.CreateInstance<PrefabRegistrySO>());   // AbilityZone unassigned
+            var unwired = ContextWith(InertRunner(), registry);
+            var wired = ContextWith(InertRunner(), RegistryWithZone());
+
+            int checkedCount = 0;
+            foreach (var ability in TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir))
+            {
+                if (ability.AreaKind == AreaEffectKind.None) continue;
+                string src = System.IO.File.ReadAllText($"Assets/_Game/Scripts/Abilities/{ability.GetType().Name}.cs");
+                checkedCount++;
+                StringAssert.Contains("AreaEffectSpawner.Spawn(", src, $"{ability.name} declares an area but never spawns it");
+                Assert.IsFalse(ability.CanActivate(unwired),
+                    $"{ability.name} (AreaKind {ability.AreaKind}) must refuse before the cast when PrefabRegistrySO.AbilityZone is unassigned.");
+                Assert.IsTrue(ability.CanActivate(wired), $"{ability.name} must allow the cast once fully wired.");
+            }
+            Assert.GreaterOrEqual(checkedCount, 4, "Feather Trap, Root Egg, Smoke Roost and Feather Aura at least: the sweep went blind");
         }
 
         // ---- The base default ---------------------------------------------------
@@ -326,9 +355,9 @@ namespace CluckWars.Tests
                     "ability, or a hand-written check for an ability with its own prefab field.");
             }
 
-            Assert.GreaterOrEqual(spawnerCount, 4,
-                "Expected at least the four known spawning abilities (Feather Trap, Root Egg, Smoke " +
-                "Roost, Doppelganger). Fewer means the sweep stopped seeing assets, not that the " +
+            Assert.GreaterOrEqual(spawnerCount, 5,
+                "Expected at least the five known spawning abilities (Feather Trap, Root Egg, Smoke " +
+                "Roost, Feather Aura, Doppelganger). Fewer means the sweep stopped seeing assets, not that the " +
                 "guards are gone.");
         }
 
@@ -357,9 +386,18 @@ namespace CluckWars.Tests
 
             foreach (var file in System.IO.Directory.GetFiles(abilityScriptDir, "*.cs"))
             {
-                if (!System.IO.File.ReadAllText(file).Contains("onBeforeSpawned")) continue;
-
                 var typeName = System.IO.Path.GetFileNameWithoutExtension(file);
+                var text = System.IO.File.ReadAllText(file);
+
+                // WP3: the zone abilities spawn through AreaEffectSpawner, which holds the one onBeforeSpawned block for
+                // zones. The spawner is not an ability (nothing to gate); its callers are.
+                if (typeName == nameof(AreaEffectSpawner))
+                {
+                    Assert.IsFalse(typeof(AbilityBaseSO).IsAssignableFrom(typeof(AreaEffectSpawner)));
+                    continue;
+                }
+                if (!text.Contains("onBeforeSpawned") && !text.Contains("AreaEffectSpawner.Spawn(")) continue;
+
                 Assert.IsTrue(covered.Contains(typeName),
                     $"{typeName} calls runner.Spawn(onBeforeSpawned: …) but is invisible to " +
                     $"{nameof(EverySpawningAbility_OverridesCanActivate)}, so nothing checks that it " +

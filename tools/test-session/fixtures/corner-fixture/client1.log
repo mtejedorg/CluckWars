@@ -1,0 +1,8 @@
+Initialize engine version: 6000.3.14f1
+[10:00:00.000][00:00.900][Info][Session] Session sha=aaa111 date=2026-10-22 platform=WindowsPlayer
+[10:00:01.000][00:01.000][Debug][Sync] Sync t=448 st=Active rem=45.0 | P1:x=-21.6,z=-21.8,hp=1,cg=0,cs=Free ; P2:x=-21.9,z=21.6,hp=1,cg=0,cs=Free ; P3:x=-22.0,z=21.9,hp=1,cg=0,cs=Free ; P4:x=21.9,z=-21.6,hp=1,cg=0,cs=Free | bases=0=0,1=0,2=0,3=0 | piles=10.0,5.0
+[10:00:01.500][00:01.500][Info][Reset] Respawn check chicken=P1 home=2 pos=-21.6,-21.8 dist_to_corner=0.25 round=1
+[10:00:01.500][00:01.500][Info][Reset] Respawn check chicken=P3 home=1 pos=-22.0,21.9 dist_to_corner=0.25 round=1
+[10:00:01.500][00:01.500][Info][Reset] Respawn check chicken=P2 home=1 pos=-21.9,21.6 dist_to_corner=0.25 round=1
+[10:00:01.500][00:01.500][Info][Reset] Respawn check chicken=P4 home=3 pos=21.9,-21.6 dist_to_corner=0.25 round=1
+[10:00:01.600][00:01.600][Info][Reset] Respawn check chicken=P2 home=1 pos=-21.9,21.6 dist_to_corner=0.25 round=1

@@ -42,16 +42,22 @@
                 <ui:VisualElement name="GearChicken" class="cw-chicken cw-gear-chicken" picking-mode="Ignore" />
             </ui:VisualElement>
 
-            <ui:VisualElement name="Deck" class="cw-deck">
-                <ui:VisualElement name="CommonRow" class="cw-deck-group">
-                    <ui:Label name="CommonTitle" text="@loadout.row.shared" class="cw-deck-group__title" />
-                    <ui:VisualElement name="CommonCards" class="cw-deck-cards" />
+            <!-- WP9 (decision C7): the deck is the one region allowed to scroll, in portrait only. #DeckScroll is
+                 exactly the deck's height in landscape (CluckWarsTheme.uss .cw-deck-scroll: no grow, no shrink, so it
+                 never scrolls there); under the portrait layout class it shrinks to the room left above the bottom bar, so
+                 READY never scrolls off. No visible scrollbar: a drag scrolls it on a phone, the wheel on a PC. -->
+            <ui:ScrollView name="DeckScroll" class="cw-deck-scroll" mode="Vertical" horizontal-scroller-visibility="Hidden" vertical-scroller-visibility="Hidden">
+                <ui:VisualElement name="Deck" class="cw-deck">
+                    <ui:VisualElement name="CommonRow" class="cw-deck-group">
+                        <ui:Label name="CommonTitle" text="@loadout.row.shared" class="cw-deck-group__title" />
+                        <ui:VisualElement name="CommonCards" class="cw-deck-cards" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="ClassRow" class="cw-deck-group">
+                        <ui:Label name="ClassTitle" text="" class="cw-deck-group__title" />
+                        <ui:VisualElement name="ClassCards" class="cw-deck-cards" />
+                    </ui:VisualElement>
                 </ui:VisualElement>
-                <ui:VisualElement name="ClassRow" class="cw-deck-group">
-                    <ui:Label name="ClassTitle" text="" class="cw-deck-group__title" />
-                    <ui:VisualElement name="ClassCards" class="cw-deck-cards" />
-                </ui:VisualElement>
-            </ui:VisualElement>
+            </ui:ScrollView>
 
             <!-- Bottom bar: the tapped move's details share the row with READY instead of
                  owning a permanent strip of their own. -->

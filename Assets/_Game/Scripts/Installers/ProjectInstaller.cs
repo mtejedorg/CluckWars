@@ -1,4 +1,5 @@
 using CluckWars.Audio;
+using CluckWars.Diagnostics;
 using CluckWars.Gameplay;
 using CluckWars.Input;
 using CluckWars.Logging;
@@ -61,6 +62,10 @@ namespace CluckWars.Installers
                 .AsSingle()
                 .WithArguments(_logMinLevel);
 
+            // Session stamp (test-session instrumentation, always on): one "Session sha=.. device=.." line at boot and a
+            // "SessionChange" line when the quality tier / Performance Mode changes. Ties every log file to a build + device.
+            Container.BindInterfacesTo<SessionStamp>().AsSingle().NonLazy();
+
             // UGS: real service when the packages are present; NullUGSService in
             // offline/demo builds (define UGS_DISABLED in Project Settings to force null).
 #if UGS_DISABLED
@@ -80,12 +85,29 @@ namespace CluckWars.Installers
             // local player can drive the chicken from either source. The touch HUD is
             // dormant until the Game scene's TouchControlsHud builds itself; on PC the
             // keyboard side dominates, on mobile the touch side does.
+            // A dev-tools build adds the auto-test's fake player (cw_autoplay) as one more provider: dormant unless the
+            // auto-test switches it on, and it only ever produces device-like input on this peer.
+            bool devTools = DevTools.Available;
+            if (devTools) Container.Bind<AutoPlayInputProvider>().FromMethod(_ => new AutoPlayInputProvider()).AsSingle();
             Container.Bind<IInputProvider>()
-                .FromMethod(_ => new CompositeInputProvider(
-                    new KeyboardInputProvider(),
-                    new TouchInputProvider(),
-                    new GamepadInputProvider()))
+                .FromMethod(ctx => devTools
+                    ? new CompositeInputProvider(
+                        new KeyboardInputProvider(),
+                        new TouchInputProvider(),
+                        new GamepadInputProvider(),
+                        ctx.Container.Resolve<AutoPlayInputProvider>())
+                    : new CompositeInputProvider(
+                        new KeyboardInputProvider(),
+                        new TouchInputProvider(),
+                        new GamepadInputProvider()))
                 .AsSingle();
+
+            // Test-session instrumentation (docs/TEST_SESSION_PLAN_2026-10.md §2). Breadcrumbs (first-use marks, scene-load
+            // bookkeeping) are always on; the probes and the auto-test exist only in a dev-tools build. A build without them
+            // still says so once if someone passes cw_* auto-test keys.
+            Container.BindInterfacesTo<RevealBreadcrumbs>().AsSingle().NonLazy();
+            if (devTools) InstallDiagnostics();
+            else Container.BindInterfacesTo<AutoTestGuard>().AsSingle().NonLazy();
 
             // Haptics (Phase 6, A9): the real vibrator on an Android player, nothing anywhere else (desktop, the Editor,
             // tests). The policy (Buzz When Hit, the 200 ms gap) is HapticsService; the device is the platform part.
@@ -200,6 +222,26 @@ namespace CluckWars.Installers
                 ? _fencePerformanceMeshes
                 : ScriptableObject.CreateInstance<FencePerformanceMeshesSO>();
             Container.Bind<FencePerformanceMeshesSO>().FromInstance(fenceMeshes).AsSingle();
+        }
+
+        /// <summary>
+        /// The dev-tools probes, each on its own object under the ProjectContext (so they live across scene loads):
+        /// PerfProbe (Perf), SyncHeartbeat (Sync), VisualProbe (Visual), the auto-test driver (AutoTest) and the
+        /// spawner that puts the DebugHud into the Game scene. All read-only toward gameplay.
+        /// </summary>
+        private void InstallDiagnostics()
+        {
+            // The heavy probes stay off in the Editor unless an auto-test is configured or the Editor toggle is on.
+            HeavyProbes.Enabled = HeavyProbes.Decide(Application.isEditor, AutoTestArgs.Read(null).AnyKey, HeavyProbes.EditorToggle);
+            Container.Bind<PerfProbe>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.Perf").AsSingle().NonLazy();
+            Container.Bind<SyncHeartbeat>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.Sync").AsSingle().NonLazy();
+            Container.Bind<VisualProbe>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.Visual").AsSingle().NonLazy();
+            Container.Bind<InvariantProbe>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.Invariant").AsSingle().NonLazy();
+            // WP8: UI layout rules U1-U6 (UiProbe) and the -cw_menushots page walk that feeds it menu pages.
+            Container.Bind<UiLayoutProbe>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.UiLayout").AsSingle().NonLazy();
+            Container.Bind<MenuShotsDriver>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.MenuShots").AsSingle().NonLazy();
+            Container.Bind<AutoTestDriver>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.AutoTest").AsSingle().NonLazy();
+            Container.Bind<DebugHudSpawner>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.DebugHud").AsSingle().NonLazy();
         }
     }
 }

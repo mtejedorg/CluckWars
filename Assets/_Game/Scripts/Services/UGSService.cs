@@ -38,6 +38,8 @@ namespace CluckWars.Services
         public LobbyInfo CurrentLobby =>
             _currentLobby != null ? ToInfo(_currentLobby) : null;
 
+        public string LastJoinCode { get; private set; }
+
         public UGSService(ILogService log) => _log = log;
 
         // ---- Auth -------------------------------------------------------
@@ -45,7 +47,29 @@ namespace CluckWars.Services
         public async Task InitializeAsync()
         {
             if (_initialized) return;
-            await UnityServices.InitializeAsync();
+            // Dev-tools builds only: cw_profile picks an authentication profile, so two clients on one PC get two
+            // anonymous identities. Unset (and every production build): the default profile, as before.
+            var profile = CluckWars.Diagnostics.DevTools.Available ? CluckWars.Diagnostics.AutoTestArgs.Read(null).Profile : null;
+            try
+            {
+                if (profile != null)
+                {
+                    _log.Info(Source, $"Unity Services profile '{profile}' (cw_profile).");
+                    await UnityServices.InitializeAsync(new InitializationOptions().SetProfile(profile));
+                }
+                else await UnityServices.InitializeAsync();
+            }
+            catch (System.Exception e)
+            {
+                // The aggregate message ("Some services couldn't be initialized") hides the cause (e.g. no linked
+                // project id in a headless build); log every inner exception before rethrowing.
+                for (var inner = e; inner != null; inner = inner.InnerException)
+                    _log.Error(Source, $"UnityServices.InitializeAsync failed: {inner.GetType().Name}: {inner.Message}");
+                if (e is System.AggregateException agg)
+                    foreach (var x in agg.Flatten().InnerExceptions)
+                        _log.Error(Source, $"  inner: {x.GetType().Name}: {x.Message}");
+                throw;
+            }
             _initialized = true;
             _log.Info(Source, "Unity Services initialized.");
         }
@@ -78,6 +102,7 @@ namespace CluckWars.Services
 
             _currentLobby = lobby;
             _isHost       = true;
+            LastJoinCode  = lobby.LobbyCode;
             StartHeartbeat();
 
             _log.Info(Source, $"Lobby created. Name={lobby.Name} Id={lobby.Id} Code={lobby.LobbyCode} MaxPlayers={lobby.MaxPlayers}");
@@ -89,10 +114,45 @@ namespace CluckWars.Services
             await SignInAnonymouslyAsync();
 
             var code  = joinCode.Trim().ToUpper();
-            var lobby = await LobbyService.Instance.JoinLobbyByCodeAsync(code);
+
+            // CW-218 REJOIN: a peer that lost its Fusion connection never left its UGS lobby (nothing calls LeaveLobbyAsync
+            // on a timeout), so it is still a member. Re-read that lobby instead of joining it again, and keep _isHost: a
+            // host that timed out still owns (and heartbeats) the lobby.
+            var member = _currentLobby;
+            if (member != null && string.Equals(member.LobbyCode, code, StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var fresh = await LobbyService.Instance.GetLobbyAsync(member.Id);
+                    _currentLobby = fresh;
+                    LastJoinCode  = fresh.LobbyCode;
+                    _log.Info(Source, $"Already a member of lobby {fresh.Id} (code {fresh.LobbyCode}, host={_isHost}); rejoining without a new lobby join. " +
+                        $"Players={fresh.Players?.Count}/{fresh.MaxPlayers}");
+                    return ToInfo(fresh);
+                }
+                catch (LobbyServiceException e)
+                {
+                    _log.Warn(Source, $"Re-reading lobby {member.Id} failed: Reason={e.Reason} ({(int)e.Reason}) ErrorCode={e.ErrorCode}: {e.Message}");
+                    if (e.Reason == LobbyExceptionReason.LobbyNotFound) throw;   // gone: the caller reports "over or full"
+                    // anything else: fall through to an ordinary join (the SDK resolves an 'already a member' conflict itself)
+                }
+            }
+
+            Lobby lobby;
+            try
+            {
+                lobby = await LobbyService.Instance.JoinLobbyByCodeAsync(code);
+            }
+            catch (LobbyServiceException e)
+            {
+                // Full / gone / already a member / rate limited read apart here; the caller only shows one line.
+                _log.Warn(Source, $"JoinLobbyByCode '{code}' failed: Reason={e.Reason} ({(int)e.Reason}) ErrorCode={e.ErrorCode}: {e.Message}");
+                throw;
+            }
 
             _currentLobby = lobby;
             _isHost       = false;
+            LastJoinCode  = lobby.LobbyCode;
 
             _log.Info(Source, $"Joined lobby by code. Id={lobby.Id} Code={lobby.LobbyCode} Players={lobby.Players?.Count}/{lobby.MaxPlayers}");
             return ToInfo(lobby);
@@ -106,6 +166,7 @@ namespace CluckWars.Services
 
             _currentLobby = joined;
             _isHost       = false;
+            LastJoinCode  = joined.LobbyCode;
 
             _log.Info(Source, $"Joined lobby by id. Id={joined.Id} Code={joined.LobbyCode} Players={joined.Players?.Count}/{joined.MaxPlayers}");
             return ToInfo(joined);
@@ -153,6 +214,36 @@ namespace CluckWars.Services
             {
                 _currentLobby = null;
                 _isHost       = false;
+                LastJoinCode  = null;
+            }
+        }
+
+        public async Task<LobbyAvailability> CheckLobbyAsync(string joinCode)
+        {
+            var lobby = _currentLobby;
+            // Only this client's own lobby can be looked up (by id); anything else is "can't tell", and the join decides.
+            if (!IsSignedIn || lobby == null || string.IsNullOrWhiteSpace(joinCode)
+                || !string.Equals(lobby.LobbyCode, joinCode.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                _log.Info(Source, $"Lobby check for '{joinCode}': not this client's current lobby (or not signed in); unknown.");
+                return LobbyAvailability.Unknown;
+            }
+
+            try
+            {
+                await LobbyService.Instance.GetLobbyAsync(lobby.Id);
+                _log.Info(Source, $"Lobby check: {lobby.Id} still exists.");
+                return LobbyAvailability.Open;
+            }
+            catch (LobbyServiceException e) when (e.Reason == LobbyExceptionReason.LobbyNotFound)
+            {
+                _log.Info(Source, $"Lobby check: {lobby.Id} is gone ({e.Reason}).");
+                return LobbyAvailability.Gone;
+            }
+            catch (Exception e)
+            {
+                _log.Warn(Source, $"Lobby check for {lobby.Id} failed ({e.GetType().Name}: {e.Message}); REJOIN stays offered.");
+                return LobbyAvailability.Unknown;
             }
         }
 
@@ -187,10 +278,16 @@ namespace CluckWars.Services
                 {
                     break;
                 }
+                catch (LobbyServiceException e) when (e.Reason == LobbyExceptionReason.LobbyNotFound)
+                {
+                    _log.Warn(Source, $"Heartbeat: lobby is gone ({e.Reason}) — stopping.");
+                    break;
+                }
                 catch (Exception e)
                 {
-                    _log.Warn(Source, $"Heartbeat failed: {e.Message} — stopping.");
-                    break;
+                    // Keep beating: a transient outage (session-20261021-205856: "(0) Request timeout") used to stop the
+                    // loop for good, so the lobby expired ~30 s later and the host's own REJOIN found it gone (CW-218).
+                    _log.Warn(Source, $"Heartbeat failed: {e.Message} — retrying in {HeartbeatIntervalMs / 1000} s.");
                 }
             }
         }

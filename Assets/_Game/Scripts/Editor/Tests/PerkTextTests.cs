@@ -36,16 +36,16 @@ namespace CluckWars.Tests
                     string thief = $"Every steal grabs {Pct(t.StealMultiplier - 1.0)}% more.";
                     return (thief, thief);
                 case SlipperyPassiveSO s:
-                    return ($"Slows and stuns end {Pct(1.0 - s.DurationMultiplier)}% sooner.",
-                            "Covers slows, stuns and getting stuck.");
+                    return ($"Stuns, getting stuck and timed slows end {Pct(1.0 - s.DurationMultiplier)}% sooner.",
+                            "Zone, aura, pile and bump slows still apply in full.");
                 case BulwarkPassiveSO w:
                     return ("Barely budges when shoved.",
-                            $"Knockback cut by {Pct(1.0 - w.KnockbackMultiplier)}%. Slows, stuns and getting stuck end {Pct(1.0 - w.DurationMultiplier)}% sooner.");
+                            $"Knockback cut by {Pct(1.0 - w.KnockbackMultiplier)}%. Stuns, getting stuck and timed slows end {Pct(1.0 - w.DurationMultiplier)}% sooner.");
                 case HoarderPassiveSO h:
                     int cap = (int)Math.Round(h.MinimumCapacity, MidpointRounding.AwayFromZero);
                     return ($"Carry {cap} food in one trip.", $"Carries at least {cap} food.");
                 case FeatherfootPassiveSO _:
-                    return ("Raid piles at full speed.", "Food piles never slow you down.");
+                    return ("Piles and bumps never slow you.", "Food piles and bumping into rivals never slow you down.");
                 case SpoilerPassiveSO sp:
                     return ($"+{sp.BonusFood} food if time runs out.",
                             $"If nobody reaches {cfg.FoodTargetToWin} before time's up, you bank {sp.BonusFood} bonus food first.");
@@ -63,6 +63,33 @@ namespace CluckWars.Tests
             var all = registry.Passives.ToArray();
             Assert.AreEqual(8, all.Length, "Expected the 8 shipped specializations in the registry.");
             return all;
+        }
+
+        /// <summary>
+        /// ModifyControlDuration only shortens TIMED effects (stuns, roots, Dust Kick's slow).
+        /// Presence slows (zones, Feather Aura, the pile and collision slows) have no duration and
+        /// get no reduction (balance proposal 2026-10 §1.1), so "Slows ... end N% sooner" promised
+        /// coverage of one slow in five. Any slow claim must say "timed slows".
+        /// </summary>
+        private static void AssertNoBlanketSlowClaim(string text, string who)
+        {
+            string lower = text.ToLowerInvariant();
+            Assert.IsFalse(lower.StartsWith("slows") || lower.Contains(" slows, stuns") || lower.Contains("covers slows"),
+                $"{who}: '{text}' claims every slow is shortened; only timed slows are.");
+            if (lower.Contains("slows") && lower.Contains("sooner"))
+                StringAssert.Contains("timed slows", lower, $"{who}: a 'sooner' claim about slows must say 'timed slows'.");
+        }
+
+        [Test]
+        public void ControlDurationPerks_DoNotOverstateSlowCoverage()
+        {
+            foreach (var p in ShippedPassives(out var cfg))
+            {
+                if (!(p is SlipperyPassiveSO) && !(p is BulwarkPassiveSO)) continue;
+                AssertNoBlanketSlowClaim(p.PerkLine(cfg), p.name + " line");
+                AssertNoBlanketSlowClaim(p.PerkDetail(cfg), p.name + " detail");
+                AssertNoBlanketSlowClaim(p.Description, p.name + " description");
+            }
         }
 
         [Test]
@@ -108,7 +135,7 @@ namespace CluckWars.Tests
                 hoarder.MinimumCapacity = 55f;
 
                 Assert.AreEqual("Moves recharge 50% faster.", relentless.PerkLine());
-                Assert.AreEqual("Knockback cut by 90%. Slows, stuns and getting stuck end 50% sooner.", bulwark.PerkDetail());
+                Assert.AreEqual("Knockback cut by 90%. Stuns, getting stuck and timed slows end 50% sooner.", bulwark.PerkDetail());
                 Assert.AreEqual("Carry 55 food in one trip.", hoarder.PerkLine(),
                     "The Hoarder line must carry {cap} from MinimumCapacity, not a fixed phrase.");
             }
@@ -180,10 +207,12 @@ namespace CluckWars.Tests
                         break;
                     case SlipperyPassiveSO s:
                         StringAssert.Contains($"{Pct(1.0 - s.DurationMultiplier)}%", s.Description);
+                        AssertNoBlanketSlowClaim(s.Description, s.name);
                         break;
                     case BulwarkPassiveSO w:
                         StringAssert.Contains($"{Pct(1.0 - w.KnockbackMultiplier)}%", w.Description);
                         StringAssert.Contains($"{Pct(1.0 - w.DurationMultiplier)}%", w.Description);
+                        AssertNoBlanketSlowClaim(w.Description, w.name);
                         break;
                     case BullyPassiveSO b:
                         StringAssert.Contains($"{Pct(b.StealMultiplier - 1.0)}%", b.Description);
@@ -200,6 +229,11 @@ namespace CluckWars.Tests
                         break;
                     case FeatherfootPassiveSO f:
                         StringAssert.Contains("never slow", f.Description);
+                        // A6: the text must name both slows the passive ignores.
+                        Assert.IsTrue(f.IgnoresPileSlow(null) && f.IgnoresCollisionSlow(null),
+                            "Featherfoot ignores the pile slow and the collision slow (A6).");
+                        StringAssert.Contains("piles", f.Description.ToLowerInvariant());
+                        StringAssert.Contains("bumping", f.Description.ToLowerInvariant());
                         break;
                 }
             }

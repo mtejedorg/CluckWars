@@ -696,6 +696,9 @@ namespace CluckWars.Tests
                 nameof(SmokeRoostAbilitySO),
                 nameof(FeatherTrapAbilitySO),
                 nameof(RootEggAbilitySO),
+                // Auras (WP4): a Caster-anchored zone; its OnEnter confirmation in AbilityZone.Render replaces the
+                // cast-time sparks, including for the rivals already inside at the cast (Maestro).
+                nameof(FeatherAuraAbilitySO),
                 // Peck resolves against a pile, never a chicken, so GatherTargets is
                 // always 0 for it. Whiff styling would mark every successful forage as a
                 // miss - the same failure Root Egg had before it was exempted.
@@ -857,7 +860,7 @@ namespace CluckWars.Tests
             // Feather Trap are exempt because they PLACE something, not because they have no
             // shape (they both declare a real ForwardCircle, which is why they never hit the
             // AimShape.None exemption in the first place — the original bug).
-            foreach (var type in new[] { typeof(FeatherTrapAbilitySO), typeof(RootEggAbilitySO) })
+            foreach (var type in new[] { typeof(FeatherTrapAbilitySO), typeof(RootEggAbilitySO), typeof(FeatherAuraAbilitySO) })
             {
                 var probe = (AbilityBaseSO)ScriptableObject.CreateInstance(type);
                 try
@@ -954,7 +957,7 @@ namespace CluckWars.Tests
         ///   chicken-vs-chicken scan still running a broadphase query — plus a
         ///   <c>GetComponentInParent</c> per hit — every tick, per chicken, to rediscover the
         ///   four-entry list the class itself owns. It now iterates
-        ///   <c>ActiveControllers</c> like <c>CheckAuraSlow</c> two methods below it.</item>
+        ///   <c>ActiveControllers</c> like <c>CheckAbilityZoneSlow</c> below it.</item>
         /// </list>
         ///
         /// NOT widened to all of <c>Gameplay/</c> on purpose. <c>ChickenCargo</c> (food piles,

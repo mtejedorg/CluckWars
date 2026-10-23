@@ -1,0 +1,12 @@
+[10:00:00.000][00:00.000][Info][Session] Session sha=ddd444 date=2026-10-22 platform=WindowsPlayer
+[10:00:01.000][00:01.000][Info][Invariant] Invariant state WaitingForPlayers->Starting round=1
+[10:00:02.000][00:02.000][Info][Invariant] Invariant state Starting->Active round=1
+[10:00:02.500][00:02.500][Info][Invariant] Invariant ok round=1 phase=start n=40 zn=0 au=0 dc=0
+[10:00:49.000][00:49.000][Info][AutoTest] AutoTest autozone: casting RootEgg (slot 3) with 1.48 s left.
+[10:00:50.000][00:50.000][Info][Invariant] Invariant state Active->Ended round=1
+[10:00:51.500][00:51.500][Info][Invariant] Invariant state Ended->Starting round=2
+[10:00:51.800][00:51.800][Info][Invariant] World t=1600 static=AAAA0001 n=16 bases=BBBB0001/4 piles=CCCC0001/11 zones=DDDD0001/1 chickens=EEEE0001 m=4 round=2
+[10:00:53.000][00:53.000][Info][Invariant] Invariant state Starting->Active round=2
+[10:00:53.500][00:53.500][Info][Invariant] Invariant ok round=2 phase=start n=40 zn=0 au=0 dc=0
+[10:00:53.800][00:53.800][Info][Invariant] World t=1664 static=AAAA0002 n=15 bases=BBBB0001/4 piles=CCCC0001/11 zones=00000000/0 chickens=EEEE0002 m=4 round=2
+[10:01:00.000][01:00.000][Info][Invariant] World t=1856 static=AAAA0003 n=16 bases=BBBB0001/4 piles=CCCC0001/11 zones=DDDD0003/1 chickens=EEEE0003 m=4 round=2

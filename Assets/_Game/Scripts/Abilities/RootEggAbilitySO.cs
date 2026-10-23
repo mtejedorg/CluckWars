@@ -1,5 +1,4 @@
 using CluckWars.Gameplay;
-using Fusion;
 using UnityEngine;
 using CluckWars.Localization;
 
@@ -48,8 +47,19 @@ namespace CluckWars.Abilities
         // The cast never hits anyone — the egg does, later, in AbilityZone's own tick. With
         // AimForwardOffset 0 and AffectsSelf false the caster is the only chicken inside the
         // shape at cast time and is excluded, so LastCastHitCount is 0 on EVERY cast on open
-        // ground. Without this the whiff styling fired on every correctly-placed egg.
-        public override bool PlacesZone => true;
+        // ground. PlacesZone (derived from AreaKind = StaticAoE, authored on the asset and
+        // defaulted here for fresh instances) keeps the whiff styling off every correct egg.
+        public RootEggAbilitySO() { AreaKind = AreaEffectKind.StaticAoE; }
+
+        public override bool TryGetAreaEffect(out AreaEffectSpec spec)
+        {
+            spec = AreaEffectSpec.StaticRoot(EggRadius, EggLifetime, RootDuration, AimForwardOffset);
+            return true;
+        }
+
+        // The egg's AbilityZone sends this root later (TryTriggerRoot, naming this caster), but the
+        // receiver's bound comes from the ability pool, so the ability declares it (F4).
+        public override ControlEmission EmittedControl => ControlEmission.Root(RootDuration);
 
         // Unassigned wiring, not a gameplay state — CanSpawnZone logs which reference is
         // missing. Sits in CanActivate rather than at the top of OnActivate so the refusal
@@ -60,42 +70,9 @@ namespace CluckWars.Abilities
 
         public override void OnActivate(AbilityContext ctx)
         {
-            var pos = ctx.Controller.transform.position;
-
-            float capLifetime      = EggLifetime;
-            float capRootDuration  = RootDuration;
-            float capRadius        = EggRadius;
-            var   capOwner         = ctx.Controller.Id;
-            // Captured like the rest so the abandoned-spawn report below closes over the logger
-            // rather than over ctx.
-            var   capLog           = ctx.Log;
-
-            ctx.Runner.Spawn(
-                ctx.PrefabRegistry.AbilityZone,
-                pos,
-                Quaternion.identity,
-                inputAuthority: null,
-                onBeforeSpawned: (runner, networkObject) =>
-                {
-                    var zone = networkObject.GetComponent<AbilityZone>();
-                    if (zone == null)
-                    {
-                        capLog?.Error(Source, "Root Egg leaked a zone: the prefab wired to "
-                            + "PrefabRegistrySO.AbilityZone has no AbilityZone component, so its lifetime "
-                            + "timer was never set. The NetworkObject has ALREADY spawned and will now "
-                            + "persist for the rest of the match doing nothing — fix the prefab.");
-                        return;
-                    }
-                    // No NetworkTransform on the zone: its position reaches the other peers only through this stamp.
-                    zone.SpawnPosition    = pos;
-                    zone.HasSpawnPosition = true;
-                    zone.Effect          = ZoneEffect.Root;
-                    zone.OwnerChicken    = capOwner;
-                    zone.RootDuration    = capRootDuration;
-                    zone.NetworkedRadius = capRadius;
-                    zone.LifetimeTimer   = TickTimer.CreateFromSeconds(runner, capLifetime);
-                    // Consumed starts false — AbilityZone.FUN sets it true on first trigger.
-                });
+            var caster = ctx.Controller.transform;
+            TryGetAreaEffect(out var spec);   // offset 0: at the caster's feet
+            AreaEffectSpawner.Spawn(ctx, spec, AreaEffectSpawner.Placement(caster.position, caster.forward, spec), Source, "Root Egg");
         }
 
         public override void OnDeactivate(AbilityContext ctx) { }

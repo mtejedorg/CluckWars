@@ -146,23 +146,6 @@ namespace CluckWars.Tests
             Assert.IsFalse(fx.StealBackActive);
         }
 
-        [Test]
-        public void Aura_IsActiveWhileAnySourceRuns_StrongestSlowWins()
-        {
-            var fx = new AbilityEffectStack();
-            Assert.IsFalse(fx.TryGetAura(out _, out _));
-            fx.SetAura(S0, 0.55f, 4f);
-            fx.SetAura(S1, 0.40f, 3f);
-            Assert.IsTrue(fx.TryGetAura(out float factor, out float radius));
-            Assert.AreEqual(0.40f, factor, 1e-6f);
-            Assert.AreEqual(3f, radius, 1e-6f, "radius comes from the same (strongest) source");
-            fx.RemoveAura(S1);
-            Assert.IsTrue(fx.TryGetAura(out factor, out radius));
-            Assert.AreEqual(0.55f, factor, 1e-6f);
-            fx.RemoveAura(S0);
-            Assert.IsFalse(fx.AuraActive);
-        }
-
         // ---- Whole-stack ---------------------------------------------------------------------------
 
         [Test]
@@ -170,7 +153,7 @@ namespace CluckWars.Tests
         {
             var fx = new AbilityEffectStack();
             fx.SetMoveSpeed(S0, 1.5f); fx.SetOpacity(S0, 0.2f); fx.SetMovementLock(S0);
-            fx.SetDepositRate(S0, 4f); fx.SetStealBack(S0, 4f); fx.SetAura(S0, 0.5f, 3f);
+            fx.SetDepositRate(S0, 4f); fx.SetStealBack(S0, 4f);
             fx.SetMoveSpeed(S1, 1.25f);
             fx.RemoveSource(S0);
             Assert.AreEqual(1.25f, fx.MoveSpeedMultiplier, 1e-6f);
@@ -178,19 +161,18 @@ namespace CluckWars.Tests
             Assert.IsFalse(fx.MovementLocked);
             Assert.AreEqual(1f, fx.DepositRateMultiplier, 1e-6f);
             Assert.IsFalse(fx.StealBackActive);
-            Assert.IsFalse(fx.AuraActive);
         }
 
         [Test]
         public void Clear_ReturnsEveryKindToItsDefault()
         {
             var fx = new AbilityEffectStack();
-            fx.SetMoveSpeed(S0, 3f); fx.SetOpacity(S1, 0.2f); fx.SetMovementLock(S2); fx.SetAura(S3, 0.5f, 3f);
+            fx.SetMoveSpeed(S0, 3f); fx.SetOpacity(S1, 0.2f); fx.SetMovementLock(S2); fx.SetStealBack(S3, 4f);
             fx.Clear();
             Assert.AreEqual(1f, fx.MoveSpeedMultiplier, 1e-6f);
             Assert.AreEqual(1f, fx.Opacity, 1e-6f);
             Assert.IsFalse(fx.MovementLocked);
-            Assert.IsFalse(fx.AuraActive);
+            Assert.IsFalse(fx.StealBackActive);
         }
 
         // ---- Control immunity: keep the later expiry ----------------------------------------------
@@ -287,7 +269,7 @@ namespace CluckWars.Tests
         {
             string src = Read("Assets/_Game/Scripts/Gameplay/AbilityController.cs");
             int fizzle = src.IndexOf("_fizzlePending = true;", StringComparison.Ordinal);
-            int canActivate = src.IndexOf("if (!ability.CanActivate(_ctx))", StringComparison.Ordinal);
+            int canActivate = src.IndexOf("canActivate = ability.CanActivate(_ctx);", StringComparison.Ordinal);
             int call = src.IndexOf("EndStealthAndPeckForCast(slot);", StringComparison.Ordinal);
             int onActivate = src.IndexOf("ability.OnActivate(_ctx);", StringComparison.Ordinal);
             int mask = src.IndexOf("ActiveMask = AbilityRunRules.Begin(ActiveMask, slot);", StringComparison.Ordinal);
@@ -312,7 +294,7 @@ namespace CluckWars.Tests
         }
 
         // The resolved effect properties (MoveSpeedMultiplier, MovementLocked, DepositRateMultiplier, StealBackAmount)
-        // are get-only and the networked mirrors (VisualOpacity, StealBackActive, AuraSlow*) have private setters, so
+        // are get-only and the networked mirrors (VisualOpacity, StealBackActive) have private setters, so
         // the compiler already forbids an ability writing a resolved value; no source scan is needed.
 
         // ---- Run bookkeeping: mask, expiry, stealth break, most recent ---------------------------------
@@ -416,14 +398,14 @@ namespace CluckWars.Tests
             try
             {
                 var fx = new AbilityEffectStack();
-                fx.SetMoveSpeed(S1, 3f); fx.SetOpacity(S1, 0.2f); fx.SetMovementLock(S1); fx.SetAura(S1, 0.5f, 3f);
+                fx.SetMoveSpeed(S1, 3f); fx.SetOpacity(S1, 0.2f); fx.SetMovementLock(S1); fx.SetStealBack(S1, 4f);
                 fx.SetMoveSpeed(S0, 1.25f);
                 int endedHolder = -99;
                 AbilityRunRules.ReleaseSlot(S1, leaky, new AbilityContext(null), fx, h => endedHolder = h);
                 Assert.AreEqual(1.25f, fx.MoveSpeedMultiplier, 1e-6f, "the other slot's modifier survives");
                 Assert.AreEqual(1f, fx.Opacity, 1e-6f);
                 Assert.IsFalse(fx.MovementLocked);
-                Assert.IsFalse(fx.AuraActive);
+                Assert.IsFalse(fx.StealBackActive);
                 Assert.AreEqual(S1, endedHolder, "the traversal hold of the slot is released too");
             }
             finally { UnityEngine.Object.DestroyImmediate(leaky); }
@@ -458,7 +440,7 @@ namespace CluckWars.Tests
             {
                 var fx = new AbilityEffectStack();
                 fx.SetMoveSpeed(S0, 3f); fx.SetOpacity(S1, 0.2f); fx.SetMovementLock(S2); fx.SetStealBack(S3, 4f);
-                fx.SetDepositRate(S3, 4f); fx.SetAura(S2, 0.5f, 3f);
+                fx.SetDepositRate(S3, 4f);
                 byte mask = 0b1111;
                 var ctx = new AbilityContext(null);
                 for (int i = 0; i < 4; i++)
@@ -472,7 +454,6 @@ namespace CluckWars.Tests
                 Assert.AreEqual(1f, fx.Opacity, 1e-6f);
                 Assert.IsFalse(fx.MovementLocked);
                 Assert.IsFalse(fx.StealBackActive);
-                Assert.IsFalse(fx.AuraActive);
                 Assert.AreEqual(1f, fx.DepositRateMultiplier, 1e-6f);
                 for (int i = 0; i < 4; i++) Assert.AreEqual(i, abilities[i].Deactivated);
             }
@@ -499,13 +480,12 @@ namespace CluckWars.Tests
             var log = new RecordingLog();
             var fx = new AbilityEffectStack { Log = log };
             fx.SetMoveSpeed(-1, 3f); fx.SetOpacity(-1, 0.1f); fx.SetMovementLock(-1);
-            fx.SetDepositRate(-1, 4f); fx.SetStealBack(-1, 4f); fx.SetAura(-1, 0.5f, 3f);
-            Assert.AreEqual(6, log.Errors, "each refused Set* reports");
+            fx.SetDepositRate(-1, 4f); fx.SetStealBack(-1, 4f);
+            Assert.AreEqual(5, log.Errors, "each refused Set* reports");
             Assert.AreEqual(1f, fx.MoveSpeedMultiplier, 1e-6f);
             Assert.AreEqual(1f, fx.Opacity, 1e-6f);
             Assert.IsFalse(fx.MovementLocked);
             Assert.IsFalse(fx.StealBackActive);
-            Assert.IsFalse(fx.AuraActive);
             Assert.AreEqual(1f, fx.DepositRateMultiplier, 1e-6f);
         }
 

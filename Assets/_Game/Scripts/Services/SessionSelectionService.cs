@@ -43,6 +43,7 @@ namespace CluckWars.Services
 
         public bool OpenLobbyOnMenuLoad { get; set; }
         public bool OpenClassSelectOnMenuLoad { get; set; }
+        public bool DisconnectNoticeOnMenuLoad { get; set; }
 
         // Random until the menu rolls one, so a Play straight into Game.unity still varies.
         public int SoloCornerSeed { get; set; } = Environment.TickCount;

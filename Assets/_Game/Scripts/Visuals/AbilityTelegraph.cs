@@ -251,6 +251,44 @@ namespace CluckWars.Visuals
             return _sharedSolidLine;
         }
 
+        /// <summary>URP's own unlit sprite shader: one pass with no LightMode tag (drawn by the Universal Renderer's
+        /// SRPDefaultUnlit pass), transparent, reads <c>_MainTex</c> (which SpriteRenderer binds) and the vertex colour (which
+        /// SpriteRenderer.color and LineRenderer colours write). It ships with URP and is the project's default sprite / unlit
+        /// material in <c>UniversalRenderPipelineGlobalSettings</c>.</summary>
+        public const string UrpUnlitSpriteShader = "Universal Render Pipeline/2D/Sprite-Unlit-Default";
+
+        private static Material _sharedUnlitSprite;
+        private static bool _reportedSpriteFallback;
+
+        /// <summary>
+        /// One shared unlit transparent material for flat world meshes that take their colour per vertex
+        /// (<see cref="FloorRivalArrows"/>). Prefers <see cref="UrpUnlitSpriteShader"/> where it is loaded (the Editor); a player
+        /// build does not include it, so there it is <see cref="BuildLineMaterial"/>'s chain (Sprites/Default, what every
+        /// telegraph, range ring and zone ring already draws with, and what the floor ring was verified with on screen). That is
+        /// the expected production path, so it is an Info once, not a Warn; if Sprites/Default is missing too, its own
+        /// once-per-session Error fires and this returns null.
+        /// </summary>
+        public static Material SharedUnlitSpriteMaterial(ILogService log)
+        {
+            if (_sharedUnlitSprite == null) _sharedUnlitSprite = CreateUnlitSpriteMaterial(Shader.Find, log);
+            return _sharedUnlitSprite;
+        }
+
+        /// <summary>Test seam of <see cref="SharedUnlitSpriteMaterial"/>: <paramref name="find"/> stands in for <c>Shader.Find</c>.</summary>
+        public static Material CreateUnlitSpriteMaterial(System.Func<string, Shader> find, ILogService log)
+        {
+            Shader urp = find(UrpUnlitSpriteShader);
+            if (urp != null) return new Material(urp);
+
+            if (!_reportedSpriteFallback)
+            {
+                _reportedSpriteFallback = true;
+                log?.Info("TelegraphShapes", $"'{UrpUnlitSpriteShader}' not loaded: the floor ring paints with the telegraph " +
+                    "line material (Sprites/Default), as the telegraphs do.");
+            }
+            return CreateLineMaterial(find, log);
+        }
+
         /// <summary>Clears the statics between Editor play sessions (domain reload may be off): a destroyed shared material
         /// would otherwise be handed out, and the once-per-session report would never fire again.</summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -258,6 +296,8 @@ namespace CluckWars.Visuals
         {
             _reportedNoLineShader = false;
             _sharedSolidLine = null;
+            _reportedSpriteFallback = false;
+            _sharedUnlitSprite = null;
         }
 
         /// <summary>Test seam: forget the once-per-session report and the shared material.</summary>
@@ -266,6 +306,9 @@ namespace CluckWars.Visuals
             _reportedNoLineShader = false;
             if (_sharedSolidLine != null) Object.DestroyImmediate(_sharedSolidLine);
             _sharedSolidLine = null;
+            _reportedSpriteFallback = false;
+            if (_sharedUnlitSprite != null) Object.DestroyImmediate(_sharedUnlitSprite);
+            _sharedUnlitSprite = null;
         }
 
         /// <summary>Builds a world-space ground LineRenderer, mirroring
@@ -800,7 +843,11 @@ namespace CluckWars.Visuals
             _shapeLine.startColor = _shapeLine.endColor = c;
 
             TelegraphShapes.Apply(_shapeLine, ref _shapeBuf, shape, pos, fwd, radius, forwardOffset, coneAngle);
-            if (!_shapeLine.enabled) _shapeLine.enabled = true;
+            if (!_shapeLine.enabled)
+            {
+                _shapeLine.enabled = true;
+                CluckWars.Diagnostics.FirstUseMarkers.Note(CluckWars.Diagnostics.FirstUseKind.Telegraph);   // breadcrumb only
+            }
             UpdateUnderlays(_shapeBuf, dashed);
 
             bool stalk = TelegraphShapes.NeedsStalk(shape, forwardOffset);

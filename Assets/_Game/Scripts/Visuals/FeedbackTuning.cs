@@ -712,8 +712,8 @@ namespace CluckWars.Visuals
         /// <summary>
         /// How far inside the frame the off-screen chevron is drawn, in viewport units.
         /// Note this does <i>not</i> decide who counts as off screen — see
-        /// <see cref="ScreenEdgeProjection.ClampToEdge"/> for why that is judged against
-        /// the full unit rect. It only stops the chevron's own geometry from being half
+        /// <see cref="ScreenEdgeProjection"/> for why that is judged against the clear
+        /// viewport (the frame minus the HUD info zones). It only stops the chevron's own geometry from being half
         /// clipped by the frame it is pinned to, so it is a hair over half the chevron's
         /// size (<see cref="RivalChevronSizeFraction"/>).
         /// </summary>
@@ -735,6 +735,10 @@ namespace CluckWars.Visuals
         /// <see cref="RivalChevronSafeArea"/>: raising the uniform margin instead would push
         /// the side and bottom chevrons far enough inboard to read as floating in the play
         /// field rather than pinned to the frame.
+        ///
+        /// Since WP7 the top HUD band is an information zone and
+        /// <c>ScreenEdgeProjection.ClearBand</c> cuts the band at its lower edge, which is
+        /// lower than this inset in both orientations; this remains the cap if it ever is not.
         /// </remarks>
         public const float RivalChevronTopHudInset = 0.17f;
 
@@ -811,6 +815,64 @@ namespace CluckWars.Visuals
         /// (<see cref="RivalChevronSizeFraction"/>). 1.2 leaves a visible gap between adjacent arrows. See <c>EdgeArrowSpread</c>.
         /// </summary>
         public const float RivalChevronSpacing = 1.2f;
+
+        // ---- Floor rival arrows: DEV PROTOTYPE (-cw_floorarrows), Maestro 2026-10-22 ---------------------------------
+        // "For the arrows, the best and more immersive way is to put them in the outer circle at the floor." A ring on the
+        // ground round the LOCAL chicken with one arrow per hidden rival, compared side by side with the edge chevrons, which
+        // stay the default. Drawn by FloorRivalArrows; the rules are FloorArrowRules. Nothing reads these in production.
+
+        /// <summary>Preferred ring radius, metres (inside the 5.4 m longest reach, outside every chicken-worn ring).</summary>
+        public const float FloorArrowPreferredRadius = 4.5f;
+
+        /// <summary>The ring never exceeds this share of the smallest clear ground extent from the chicken (lateral half-width,
+        /// depth up to the top HUD band, depth down, distance to the nearest HUD control), so it stays in the clear viewport and
+        /// off the controls: portrait 4.48 m (lateral 5.6 binds), landscape 16:9 4.15 m and 20:9 3.58 m (the 290 px top band binds),
+        /// 4:3 touch 3.70 m (the hexes bind). See FloorArrowRules.RingRadius.</summary>
+        public const float FloorArrowLateralFraction = 0.8f;
+
+        /// <summary>Floor on the radius (nonsense framings only): well outside the rival ring (~1 m) and the identity ring.</summary>
+        public const float FloorArrowMinRadius = 2f;
+
+        /// <summary>Painted arrow length along the bearing, metres of floor (pass 3, Maestro: "painted on the floor"), for a rival
+        /// just beyond the ring and far away: nearer is slightly larger. The tail sits on the ring line, the tip points outward.
+        /// Natural perspective: no foreshortening compensation (an arrow pointing up the screen looks shorter, like the ring).</summary>
+        public const float FloorArrowNearLength = 1.7f;
+        public const float FloorArrowFarLength = 1.3f;
+
+        /// <summary>Arrow width / length: 1.45 m wide near, 1.1 m far (pass 4: the 960x540 shot read as thin darts next to the ring, +17 % length / +25 % width).</summary>
+        public const float FloorArrowWidthRatio = 0.85f;
+
+        /// <summary>How far the chevron's tail notch reaches toward the tip, as a share of the length.</summary>
+        public const float FloorArrowNotch = 0.25f;
+
+        /// <summary>Paint alpha of the arrow fill (the grass shows through), times the rival's VisualOpacity.</summary>
+        public const float FloorArrowPaintAlpha = 0.85f;
+
+        /// <summary>Soft inner fade: the fill's core is this share of <see cref="FloorArrowPaintAlpha"/>, the fill's edge full,
+        /// over <see cref="FloorArrowFadeInset"/> (share of the length) - a worn-paint look, no glow.</summary>
+        public const float FloorArrowCoreAlphaShare = 0.7f;
+        public const float FloorArrowFadeInset = 0.06f;
+
+        /// <summary>The thin dark rim: width as a share of the length (~8 cm at 1.45 m), the tint's own hue at this share of its
+        /// value, at this alpha.</summary>
+        public const float FloorArrowOutlineRatio = 0.055f;
+        public const float FloorArrowOutlineValue = 0.3f;
+        public const float FloorArrowOutlineAlpha = 0.9f;
+
+        /// <summary>Planar distance (metres) at which an arrow reaches its far length; ~half the 51.3 m arena.</summary>
+        public const float FloorArrowFarDistance = 24f;
+
+        /// <summary>Gap between two arrows' tails along the ring ARC, in near-arrow widths: arrows are spread so their tails
+        /// (the widest part, lying on the ring) never touch.</summary>
+        public const float FloorArrowSpacing = 1.15f;
+
+        /// <summary>The painted ring: stroke (metres, plus a 2 cm soft edge either side), alpha and a soft cream, the arrows'
+        /// own paint family. Drawn only while at least one arrow shows (pass 3 call: a permanent ring under the player is one
+        /// more always-on shape next to the reach outlines; shown, it means "rivals out there").</summary>
+        public const float FloorArrowRingWidth = 0.1f;
+        public const float FloorArrowRingSoftEdge = 0.02f;
+        public const float FloorArrowRingAlpha = 0.62f;
+        public static readonly Color FloorArrowRingColor = new Color(1.00f, 0.96f, 0.86f, 1f);
 
         // ================================================================
         // Always-on ability reach overlay — AbilitySlotOverlay

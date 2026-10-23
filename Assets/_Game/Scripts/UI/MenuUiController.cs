@@ -71,6 +71,11 @@ namespace CluckWars.UI
         private VisualElement _backdrop, _backdropTint, _pageHost;
         private VisualElement _mainMenu, _classSelect, _loadout, _lobby;
         private VisualElement _settingsSheet;
+        // CW-218 "You were disconnected" sheet (MainMenu.uxml #DisconnectSheet) and the code REJOIN uses.
+        private VisualElement _disconnectSheet;
+        private Label _disconnectBody, _disconnectStatus;
+        private Button _disconnectRejoinBtn, _disconnectBackBtn;
+        private string _rejoinCode;
         private bool _isBusy;
 
         // ---- Menu juice (Phase 3B): MenuJuice engine, MenuJuicePolicy timings ----
@@ -326,8 +331,11 @@ namespace CluckWars.UI
             _root.UnregisterCallback<ClickEvent>(OnRootClick, TrickleDown.TrickleDown);
             _root.RegisterCallback<ClickEvent>(OnRootClick, TrickleDown.TrickleDown);
 
+            // Shape classes (layout--portrait/landscape/tall/short/narrow) come from the shared helper; this
+            // controller's own geometry hook only re-applies the safe area.
             _root.RegisterCallback<GeometryChangedEvent>(OnRootGeometry);
-            UpdateLayout(_root.resolvedStyle.width, _root.resolvedStyle.height);
+            LayoutClasses.Bind(_root);
+            SafeAreaSource.LogOnce(_log);
 
             // Next on the class screen is never gated (a class is always selected), so a
             // specialization must be too — otherwise a player who skips the pills reaches the
@@ -341,6 +349,7 @@ namespace CluckWars.UI
 
             ShowMainMenu();
             ConsumePostMatchIntent();
+            ConsumeDisconnectNotice();
             RefreshStage();
             _audio.StartMenuMusic();
         }
@@ -399,28 +408,7 @@ namespace CluckWars.UI
         }
 
         // ---- Layout -----------------------------------------------------------
-        private void OnRootGeometry(GeometryChangedEvent evt)
-        {
-            UpdateLayout(evt.newRect.width, evt.newRect.height);
-            _safeArea?.Apply(force: true);
-        }
-
-        // At or below this panel height the pages compress their headers/title (20:9 phones: the
-        // Pixel 9 canvas is ~2157x961; 16:9 at 1080 too, where the main menu with PLAY AGAIN
-        // otherwise touches both edges). Below this aspect the wide two-column pages stack
-        // (4:3 tablets: 2048x1536 -> ~1663x1247).
-        private const float ShortLayoutHeight = 1100f;
-        private const float NarrowLayoutAspect = 1.55f;
-
-        private void UpdateLayout(float w, float h)
-        {
-            if (float.IsNaN(w) || float.IsNaN(h) || w <= 0f || h <= 0f) return;
-            bool landscape = w >= h;
-            _root.EnableInClassList("layout--landscape", landscape);
-            _root.EnableInClassList("layout--portrait", !landscape);
-            _root.EnableInClassList("layout--short", h < ShortLayoutHeight);
-            _root.EnableInClassList("layout--narrow", w / h < NarrowLayoutAspect);
-        }
+        private void OnRootGeometry(GeometryChangedEvent evt) => _safeArea?.Apply(force: true);
 
         // A notch or gesture bar can change Screen.safeArea without the panel's geometry
         // changing (e.g. the system bars toggling), so it is also polled — two struct
@@ -441,6 +429,12 @@ namespace CluckWars.UI
         private void OnBackPressed()
         {
             if (_isBusy || _currentPage == null) return;
+            if (IsDisconnectSheetOpen)
+            {
+                _audio.Back();
+                CloseDisconnectSheet();
+                return;
+            }
             if (_settingsSheet != null && _settingsSheet.style.display == DisplayStyle.Flex)
             {
                 _audio.Back();
@@ -553,7 +547,7 @@ namespace CluckWars.UI
 
         private void SetPage(VisualElement page)
         {
-            if (page != _mainMenu) CloseSettings();
+            if (page != _mainMenu) { CloseSettings(); CloseDisconnectSheet(); }
             var previous = _currentPage;
             _currentPage = page;
             ApplyBackdrop();
@@ -664,6 +658,132 @@ namespace CluckWars.UI
             Bind<Label>(_mainMenu, "BuildStamp", l => l.text = UiText.Format(UiKeys.MainBuild, ("version", Application.version)));
 
             BuildSettingsSheet();
+            BuildDisconnectSheet();
+        }
+
+        // ======================================================================
+        //  DISCONNECT NOTICE (CW-218: lost connection -> "You were disconnected" + REJOIN)
+        // ======================================================================
+        /// <summary>Binds MainMenu.uxml #DisconnectSheet (static markup, hidden until <see cref="ConsumeDisconnectNotice"/>).</summary>
+        private void BuildDisconnectSheet()
+        {
+            _disconnectSheet     = _mainMenu.Q<VisualElement>("DisconnectSheet");
+            _disconnectBody      = _mainMenu.Q<Label>("DisconnectBody");
+            _disconnectStatus    = _mainMenu.Q<Label>("DisconnectStatus");
+            _disconnectRejoinBtn = _mainMenu.Q<Button>("DisconnectRejoinBtn");
+            _disconnectBackBtn   = _mainMenu.Q<Button>("DisconnectBackBtn");
+            if (_disconnectSheet == null || _disconnectBody == null || _disconnectStatus == null || _disconnectRejoinBtn == null || _disconnectBackBtn == null)
+            {
+                _log?.Error(Source, "MainMenu.uxml is missing #DisconnectSheet / #DisconnectBody / #DisconnectStatus / #DisconnectRejoinBtn / #DisconnectBackBtn; " +
+                    "a player who lost the connection lands on the main menu with no message and no REJOIN.");
+                _disconnectSheet = null;
+                return;
+            }
+            _disconnectRejoinBtn.clicked += OnRejoin;
+            OwnCue(_disconnectRejoinBtn);
+            _disconnectBackBtn.clicked += CloseDisconnectSheet;
+            BackCue(_disconnectBackBtn);
+        }
+
+        private bool IsDisconnectSheetOpen =>
+            _disconnectSheet != null && _disconnectSheet.style.display == DisplayStyle.Flex;
+
+        /// <summary>
+        /// The match scene set <see cref="ISessionSelectionService.DisconnectNoticeOnMenuLoad"/> after a lost connection
+        /// (<see cref="CluckWars.Networking.DisconnectRules.ShowsMenuNotice"/>). Read once, cleared at once: opens the sheet
+        /// over the main menu, with REJOIN when there is a session to go back to.
+        /// </summary>
+        private void ConsumeDisconnectNotice()
+        {
+            if (_selection == null || !_selection.DisconnectNoticeOnMenuLoad) return;
+            _selection.DisconnectNoticeOnMenuLoad = false;
+            if (_disconnectSheet == null) return;   // BuildDisconnectSheet already reported the wiring gap
+
+            _rejoinCode = _ugs?.LastJoinCode;
+            bool offered = CluckWars.Networking.DisconnectRules.OffersRejoin(_selection.Mode, _rejoinCode);
+            _log?.Info(Source, $"Disconnect notice: mode {_selection.Mode}, last code '{_rejoinCode ?? "-"}', REJOIN {(offered ? "offered" : "not offered")}.");
+
+            // BuildAll has just shown the main menu (the post-match landing flags are never set alongside this one).
+            SetDisconnectStatus(null);
+            _disconnectBody.style.display = DisplayStyle.Flex;
+            _disconnectRejoinBtn.SetEnabled(true);
+            _disconnectBackBtn.SetEnabled(true);
+            _disconnectRejoinBtn.style.display = offered ? DisplayStyle.Flex : DisplayStyle.None;
+            _disconnectSheet.style.display = DisplayStyle.Flex;
+            if (offered) CheckRejoinLobby(_rejoinCode);
+        }
+
+        /// <summary>Asks the lobby service whether the lobby is still there; only a lobby known to be gone hides REJOIN.</summary>
+        private async void CheckRejoinLobby(string code)
+        {
+            try
+            {
+                var availability = await _ugs.CheckLobbyAsync(code);
+                if (!IsDisconnectSheetOpen || _isBusy || code != _rejoinCode) return;   // closed, or a REJOIN already started
+                if (CluckWars.Networking.DisconnectRules.ShowsRejoin(true, availability)) return;
+                // A lobby that is gone means the match ended (possibly the host-left case a transport reason of Unknown
+                // was read as a lost connection, see DisconnectRules.Classify): no "Lost the signal" claim, only the outcome.
+                _log?.Info(Source, $"Disconnect notice: lobby '{code}' is gone; REJOIN hidden.");
+                _disconnectBody.style.display = DisplayStyle.None;
+                _disconnectRejoinBtn.style.display = DisplayStyle.None;
+                SetDisconnectStatus(UiText.Get(UiKeys.DisconnectRejoinFailed));
+            }
+            catch (Exception e)
+            {
+                // CheckLobbyAsync never throws by contract; anything here is a bug in this method. REJOIN stays up.
+                _log?.Error(Source, $"Disconnect notice: the lobby check faulted: {e}");
+            }
+        }
+
+        /// <summary>
+        /// REJOIN: the same join-by-code flow as THE COOP's JOIN MATCH (UGS lobby, then the match scene joins the Fusion
+        /// session of that name) - a fresh join under the late-join rules, nothing restored. A failure stays on the sheet.
+        /// </summary>
+        private async void OnRejoin()
+        {
+            if (_isBusy || _selection == null || string.IsNullOrWhiteSpace(_rejoinCode)) return;
+            _audio.Tap();
+            _isBusy = true;
+            _disconnectRejoinBtn.SetEnabled(false);
+            _disconnectBackBtn.SetEnabled(false);
+            SetDisconnectStatus(UiText.Get(UiKeys.DisconnectRejoining));
+            _log?.Info(Source, $"REJOIN: joining '{_rejoinCode}' again.");
+            try
+            {
+                var info = await _ugs.JoinLobbyByCodeAsync(_rejoinCode);
+                _selection.Mode = SessionMode.Join;
+                _selection.SessionName = info.JoinCode;
+                _log?.Info(Source, $"REJOIN: lobby '{info.JoinCode}' joined ({info.PlayerCount}/{info.MaxPlayers}); loading the match to join its session.");
+                _isBusy = false;
+                CloseDisconnectSheet();
+                LoadMatchScene(); // re-claims _isBusy until the scene swaps
+            }
+            catch (Exception e)
+            {
+                // The match ending (lobby gone) or filling up is a legal outcome, not a wiring bug: Warn, and say so on the sheet.
+                _autoTestRejoinFailures++;
+                // The lobby service logged its Reason / ErrorCode just before (UGS line); the type tells the rest apart.
+                _log?.Warn(Source, $"REJOIN '{_rejoinCode}' failed: {e.GetType().Name}: {e.Message}" +
+                    (e.InnerException != null ? $" (inner {e.InnerException.GetType().Name}: {e.InnerException.Message})" : string.Empty));
+                _disconnectBody.style.display = DisplayStyle.None;
+                _disconnectRejoinBtn.style.display = DisplayStyle.None;
+                _disconnectBackBtn.SetEnabled(true);
+                SetDisconnectStatus(UiText.Get(UiKeys.DisconnectRejoinFailed));
+                _isBusy = false;
+            }
+        }
+
+        private void SetDisconnectStatus(string text)
+        {
+            if (_disconnectStatus == null) return;
+            _disconnectStatus.text = text ?? string.Empty;
+            _disconnectStatus.style.display = string.IsNullOrEmpty(text) ? DisplayStyle.None : DisplayStyle.Flex;
+        }
+
+        private void CloseDisconnectSheet()
+        {
+            if (!IsDisconnectSheetOpen) return;
+            _disconnectSheet.style.display = DisplayStyle.None;
         }
 
         // ======================================================================
@@ -740,19 +860,10 @@ namespace CluckWars.UI
         /// <summary>
         /// Dev Mode (and so the Ability Lab) exists in development builds and the Editor only, or in
         /// a build compiled with <c>CLUCKWARS_DEV_TOOLS</c>. A release build hides the toggle and
-        /// ignores a Dev Mode preference left over from a development build.
+        /// ignores a Dev Mode preference left over from a development build. The rule itself is
+        /// <see cref="CluckWars.Diagnostics.DevTools.Available"/>, shared with the test-session tools.
         /// </summary>
-        private static bool DevToolsAvailable
-        {
-            get
-            {
-#if CLUCKWARS_DEV_TOOLS
-                return true;
-#else
-                return Debug.isDebugBuild;
-#endif
-            }
-        }
+        private static bool DevToolsAvailable => CluckWars.Diagnostics.DevTools.Available;
 
         /// <summary>
         /// Binds one settings row: seeds its Toggle from the preference and writes changes
@@ -1422,6 +1533,15 @@ namespace CluckWars.UI
                 doorway.RegisterCallback<GeometryChangedEvent>(e =>
                     _gearChicken.EnableInClassList("cw-gear-chicken--nofit", !GearDoorway.Fits(e.newRect.height)));
             if (_readyBtn != null) { _readyBtn.clicked += OnReady; OwnCue(_readyBtn); }
+            // WP9 (C7): the deck scrolls in portrait. Pad / keyboard focus moving onto a card below the fold brings it into view.
+            var deckScroll = _loadout.Q<ScrollView>("DeckScroll");
+            if (deckScroll == null)
+                _log?.Error(Source, "CharacterSelect.uxml has no #DeckScroll; in portrait the deck cannot scroll and READY can be pushed off screen.");
+            else
+                deckScroll.RegisterCallback<FocusInEvent>(e =>
+                {
+                    if (e.target is VisualElement ve && deckScroll.contentContainer.Contains(ve)) deckScroll.ScrollTo(ve);
+                });
 
             for (int i = 0; i < _slots.Length; i++)
             {
@@ -2510,12 +2630,183 @@ namespace CluckWars.UI
                     }
                     catch (Exception e)
                     {
+                        _autoTestJoinFailures++;
                         _log?.Error(Source, $"JoinByCode failed: {e.Message}");
                         if (status != null) status.text = UiText.Get(UiKeys.LobbyErrJoin);
                         _isBusy = false;
                     }
                     break;
             }
+        }
+
+        // ======================================================================
+        //  DEV AUTO-TEST HOOKS (CluckWars.Diagnostics.AutoTestDriver; dev-tools builds only)
+        // ======================================================================
+        // Each hook calls the handler the matching button calls, so an auto-test walks exactly the path a player's taps
+        // walk (selection service, slot model, LastSetup, UGS lobby, scene load). Refused outside a dev-tools build.
+
+        private int _autoTestJoinFailures;
+
+        /// <summary>Pages built and nothing loading: the auto-test may start pressing (after any <c>-cw_menushots</c> walk).</summary>
+        public bool AutoTestIdle => AutoTestPagesReady && !CluckWars.Diagnostics.MenuShotsDriver.Holding;
+
+        /// <summary>Pages built and nothing loading (the menu-shot walk's own readiness; it ignores its own hold).</summary>
+        public bool AutoTestPagesReady => DevToolsAvailable && _lobby != null && _selection != null && !_isBusy;
+
+        /// <summary>
+        /// WP8 <c>-cw_menushots</c>: shows one page for a layout probe + screenshot, without pressing anything. Ids:
+        /// <c>main</c>, <c>settings</c> (the sheet over the main menu), <c>disconnect</c> (the CW-218 sheet, REJOIN shown but
+        /// disabled: there is nothing to rejoin), <c>class</c>, <c>gear</c>, <c>coop</c> (THE COOP in Solo mode) and
+        /// <c>coopjoin</c> (Join mode, the code field). THE COOP is never opened in Host mode here: that creates a UGS lobby.
+        /// </summary>
+        public bool AutoTestShowPage(string id)
+        {
+            if (!AutoTestAllowed("page")) return false;
+            switch (id)
+            {
+                case "main":
+                    CloseSettings();
+                    CloseDisconnectSheet();
+                    ShowMainMenu();
+                    return true;
+                case "settings":
+                    CloseDisconnectSheet();
+                    ShowMainMenu();
+                    OpenSettings();
+                    return _settingsSheet != null;
+                case "disconnect":
+                    CloseSettings();
+                    ShowMainMenu();
+                    if (_disconnectSheet == null) return false;   // BuildDisconnectSheet already reported the wiring gap
+                    SetDisconnectStatus(null);
+                    _disconnectBody.style.display = DisplayStyle.Flex;
+                    _disconnectRejoinBtn.style.display = DisplayStyle.Flex;
+                    _disconnectRejoinBtn.SetEnabled(false);   // ConsumeDisconnectNotice re-enables it for a real notice
+                    _disconnectBackBtn.SetEnabled(true);
+                    _disconnectSheet.style.display = DisplayStyle.Flex;
+                    return true;
+                case "class": ShowClassSelect(); return true;
+                case "gear":  ShowLoadout(); return true;
+                case "coop":
+                case "coopjoin":
+                    _selection.Mode = id == "coop" ? SessionMode.Solo : SessionMode.Join;
+                    _lobbyViaGearUp = true;
+                    ShowLobby();
+                    return true;
+                default:
+                    _log?.Warn(Source, $"Auto-test page '{id}' is not a menu page id.");
+                    return false;
+            }
+        }
+
+        /// <summary>The host's join code once UGS created the lobby (THE COOP's code tiles); empty before.</summary>
+        public string AutoTestJoinCode => _joinCode;
+
+        /// <summary>Failed JOIN MATCH attempts (the auto-test's retry signal).</summary>
+        public int AutoTestJoinFailures => _autoTestJoinFailures;
+
+        private bool AutoTestAllowed(string what)
+        {
+            if (DevToolsAvailable && _selection != null) return true;
+            _log?.Warn(Source, $"Auto-test '{what}' refused: dev tools are not available or the menu is not built.");
+            return false;
+        }
+
+        /// <summary>Main menu HOST / JOIN.</summary>
+        public bool AutoTestChooseMode(SessionMode mode)
+        {
+            if (!AutoTestAllowed("mode")) return false;
+            ChooseMode(mode);
+            return true;
+        }
+
+        /// <summary>PICK YOUR BIRD: the class tile (which also seeds the perk's starters, the pre-filled loadout).</summary>
+        public bool AutoTestPickClass(ChickenClass cls)
+        {
+            if (!AutoTestAllowed("class")) return false;
+            OnClassTileTapped(cls);
+            return _selection.SelectedClass == cls && _selection.Passive != null;
+        }
+
+        /// <summary>PICK YOUR BIRD: NEXT.</summary>
+        public void AutoTestOpenLoadout()
+        {
+            if (AutoTestAllowed("next")) ShowLoadout();
+        }
+
+        /// <summary>
+        /// GEAR UP: taps deck cards in deck order (shared row, then the class row; starters skipped) until every slot is
+        /// filled, as a player tapping the first cards would. Returns the slots still empty and the resulting loadout.
+        /// </summary>
+        public int AutoTestFillLoadout(out string loadout)
+        {
+            loadout = string.Empty;
+            if (!AutoTestAllowed("loadout")) return AbilityController.SlotCount;
+            SyncSlotModel();
+            _slotModel.AutoArmFirstEmpty();
+            foreach (var card in _deckCards.ToArray())
+            {
+                if (_slotModel.Missing == 0) break;
+                if (card.Ability == null || _slotModel.SlotOf(card.Ability) >= 0 || IsPreEquipped(card.Ability)) continue;
+                OnAbilityCardTapped(card.Ability);
+                SyncSlotModel();
+            }
+            SettleFlights();
+            var names = new string[ActiveSlotsForClass];
+            for (int i = 0; i < names.Length; i++) names[i] = GetEquipped(i) != null ? GetEquipped(i).name : "-";
+            loadout = string.Join(",", names);
+            return _slotModel.Missing;
+        }
+
+        /// <summary>GEAR UP: READY (only when the button itself would be enabled).</summary>
+        public bool AutoTestPressReady()
+        {
+            if (!AutoTestAllowed("ready")) return false;
+            SyncSlotModel();
+            if (_slotModel.Missing != 0 || _selection.Passive == null) return false;
+            OnReady();
+            return true;
+        }
+
+        private int _autoTestRejoinFailures;
+
+        /// <summary>Failed REJOIN presses (the auto-test's outcome signal).</summary>
+        public int AutoTestRejoinFailures => _autoTestRejoinFailures;
+
+        /// <summary>The CW-218 "You were disconnected" sheet is on screen.</summary>
+        public bool AutoTestDisconnectSheetOpen => DevToolsAvailable && IsDisconnectSheetOpen;
+
+        /// <summary>The disconnect sheet's REJOIN (only while the button itself is shown and nothing is loading).</summary>
+        public bool AutoTestPressRejoin()
+        {
+            if (!AutoTestAllowed("rejoin")) return false;
+            if (!IsDisconnectSheetOpen || _isBusy || _disconnectRejoinBtn.style.display == DisplayStyle.None) return false;
+            OnRejoin();
+            return true;
+        }
+
+        /// <summary>THE COOP: START (host) or, with a code typed into the join field, JOIN MATCH (guest).</summary>
+        public bool AutoTestPressStartOrJoin(string joinCode)
+        {
+            if (!AutoTestAllowed("start")) return false;
+            if (_selection.Mode == SessionMode.Join)
+            {
+                var field = _lobby.Q<TextField>("LobbyJoinField");
+                if (field == null)
+                {
+                    _log?.Error(Source, "Auto-test JOIN: Lobby.uxml has no #LobbyJoinField.");
+                    return false;
+                }
+                if (!JoinCodeEntry.IsComplete(joinCode))
+                {
+                    // OnStartMatch would only show "enter a code" and return: refuse here so the auto-test does not wait on it.
+                    _log?.Warn(Source, $"Auto-test JOIN refused: '{joinCode}' is not a whole join code.");
+                    return false;
+                }
+                field.value = joinCode;   // the same callback a keyboard runs (upper-case, status pill)
+            }
+            OnStartMatch();
+            return true;
         }
 
         // ======================================================================
