@@ -1576,7 +1576,25 @@ namespace CluckWars.UI
         // class's stats. "Not ready" (journal not yet loaded, or no progression bound) fails open:
         // everything reads as unlocked rather than flash-locking the picker before data arrives.
 
-        private bool RampGatesAnything => _progression != null && _progression.IsReady && !_progression.Unlocks.Ramp.IsComplete;
+        private bool RampGatesAnything => _progression != null && _progression.IsReady && !_progression.Unlocks.Ramp.IsComplete
+                                          && !AutoTestDrivesTheMenu;
+
+        // The test-session harness (dev tools only) picks every card on a fresh profile; a ramp that locked them would
+        // leave its loadout short. Release builds never take this branch.
+        private bool _autoTestMenuRead;
+        private bool _autoTestMenu;
+        private bool AutoTestDrivesTheMenu
+        {
+            get
+            {
+                if (!_autoTestMenuRead)
+                {
+                    _autoTestMenuRead = true;
+                    _autoTestMenu = DevToolsAvailable && CluckWars.Diagnostics.AutoTestArgs.Read(null).WantsMenuFlow;
+                }
+                return _autoTestMenu;
+            }
+        }
 
         private bool IsClassLocked(ChickenClass cls) =>
             RampGatesAnything && !_progression.Unlocks.Ramp.IsRoleUnlocked(UnlockKeyTable.RoleKey(cls));
