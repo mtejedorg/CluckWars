@@ -220,10 +220,25 @@
     border-top-left-radius: 18px; border-top-right-radius: 18px;
     border-bottom-left-radius: 18px; border-bottom-right-radius: 18px;
 }
-.cw-id-strip__text { flex-direction: column; justify-content: center; margin-left: 14px; }
-.cw-id-strip__name { font-size: 36px; color: rgb(254, 245, 224); -unity-text-align: middle-left; white-space: nowrap; }
-.cw-id-strip__title { font-size: 28px; color: rgb(245, 200, 66); -unity-text-align: middle-left; white-space: nowrap; }
-.cw-id-strip__grain { font-size: 32px; color: rgb(196, 160, 96); margin-left: 24px; -unity-text-align: middle-right; }
+/* The strip is a Button (it opens PROFILE): clear the runtime Button's chrome, keep the 116 px touch
+   floor (UiLayoutRules.TouchTargetMinPx, the gear beside it is the same height), and answer a press
+   the way .cw-btn does. */
+#IdentityStrip {
+    margin-left: 0; margin-right: 0; margin-top: 0; margin-bottom: 0;
+    border-left-width: 0; border-right-width: 0; border-top-width: 0; border-bottom-width: 0;
+    min-height: 116px;
+}
+#IdentityStrip:hover  { background-color: rgba(8, 4, 2, 0.86); scale: 1.03 1.03; }
+#IdentityStrip:active { scale: 0.97 0.97; }
+.cw-reduced-motion #IdentityStrip:hover, .cw-reduced-motion #IdentityStrip:active { scale: 1 1; }
+/* Width budget (review 2026-10-24, S3): the strip ends >= 19 px (U2) before the title at 1920x1080 (x 632)
+   and before the gear on a 9:20 portrait panel (x 619). Grain sits under the name rather than beside it, so the
+   longest generated name (FeatheredScarecrow#0000) still fits uncut; the ellipsis is only a backstop. */
+#IdentityStrip { max-width: 570px; padding-top: 6px; padding-bottom: 6px; }
+.cw-id-strip__text { flex-direction: column; justify-content: center; margin-left: 14px; flex-shrink: 1; min-width: 0; }
+.cw-id-strip__name { font-size: 36px; color: rgb(254, 245, 224); -unity-text-align: middle-left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cw-id-strip__title { font-size: 30px; color: rgb(245, 200, 66); -unity-text-align: middle-left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cw-id-strip__grain { font-size: 30px; color: rgb(196, 160, 96); -unity-text-align: middle-left; white-space: nowrap; }
 
 /* ---- Class-chip mastery ring ---------------------------------------------- */
 /* Sits between the chip's name column and its slot pill. Hidden when the

@@ -425,20 +425,14 @@
 
 /* ---- Cast band ------------------------------------------------------------
    The four playable chickens, which are the actual product. Sprites are the
-   same Stage-0 exports the character select uses, so this costs no new art.
-
-   margin-top/margin-bottom (44/48 -> 12/12) and __art (200 -> 150) trimmed as
-   part of the header-row overlap fix — see .cw-menu-hero's comment. Chickens
-   stay clearly the visual centerpiece at 150px; this reclaims vertical
-   budget without touching font sizes or the primary CTA's prominence more
-   than necessary. */
+   same Stage-0 exports the character select uses, so this costs no new art. */
 .cw-menu-cast {
     flex-direction: row; align-items: flex-end; justify-content: center;
     flex-shrink: 0;
-    margin-top: 12px; margin-bottom: 12px;
+    margin-top: 44px; margin-bottom: 48px;
 }
 .cw-menu-cast__item { align-items: center; margin-left: 26px; margin-right: 26px; }
-.cw-menu-cast__art  { width: 150px; height: 150px; }
+.cw-menu-cast__art  { width: 200px; height: 200px; }
 .cw-menu-cast__name {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 30px; letter-spacing: 2px; margin-top: 10px;
@@ -458,15 +452,11 @@
    One primary, two secondary. Three identical pills gave the eye no entry
    point; SOLO is the instant-play path a playtester takes almost every time. */
 .cw-menu-actions { align-items: center; flex-shrink: 0; }
-/* min-height trimmed 148 -> 126 as part of the header-row overlap fix (see
-   .cw-menu-hero) — still comfortably above the 48dp touch-target floor at
-   this UI's scale, and still the tallest, widest control on the page. */
 .cw-menu-primary {
-    min-width: 620px; min-height: 126px;
+    min-width: 620px; min-height: 148px;
     font-size: 58px; letter-spacing: 4px;
 }
-/* margin-top trimmed 20 -> 10 as part of the header-row overlap fix. */
-.cw-menu-secondary-row { flex-direction: row; justify-content: center; margin-top: 10px; }
+.cw-menu-secondary-row { flex-direction: row; justify-content: center; margin-top: 20px; }
 .cw-menu-secondary {
     min-width: 300px;
     font-size: 40px; letter-spacing: 2px;

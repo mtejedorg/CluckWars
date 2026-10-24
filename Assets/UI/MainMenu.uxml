@@ -34,18 +34,19 @@
         <!-- Identity strip (progression): nameplate, mastery emblem and Grain, pinned top-left (the gear is
              top-right). Absolute so it adds no height to the centred page. Hidden entirely while the journal
              has not loaded; display is driven from C# (MenuUiController.RefreshIdentityStrip), so give it no
-             display rule in USS. -->
+             display rule in USS. It is also the way into PROFILE (a Button, so pad / keyboard reach it too): a
+             PROFILE row under HOST/JOIN overflowed the 20:9 and 9:16 menus (review 2026-10-24, B2). -->
         <ui:VisualElement name="MenuHeaderRow" picking-mode="Ignore" style="position: absolute; left: 20px; top: 20px;">
-            <ui:VisualElement name="IdentityStrip" class="cw-id-strip" style="display: none;">
+            <ui:Button name="IdentityStrip" class="cw-id-strip" style="display: none;">
                 <ui:VisualElement name="IdentityEmblem" class="cw-emblem cw-emblem--small">
                     <ui:Label name="IdentityEmblemLevel" text="" class="cw-emblem__level" />
                 </ui:VisualElement>
                 <ui:VisualElement class="cw-id-strip__text">
                     <ui:Label name="IdentityName" text="" class="cw-id-strip__name" />
                     <ui:Label name="IdentityTitle" text="" class="cw-id-strip__title" />
+                    <ui:Label name="IdentityGrain" text="" class="cw-id-strip__grain" />
                 </ui:VisualElement>
-                <ui:Label name="IdentityGrain" text="" class="cw-id-strip__grain" />
-            </ui:VisualElement>
+            </ui:Button>
         </ui:VisualElement>
 
         <!-- ── Title ── -->
@@ -94,9 +95,6 @@
             <ui:VisualElement name="ModeRow" class="cw-mode-row cw-menu-secondary-row">
                 <ui:Button name="HostBtn" text="@btn.host" class="cw-btn cw-btn--wood cw-menu-secondary" />
                 <ui:Button name="JoinBtn" text="@btn.join" class="cw-btn cw-btn--wood cw-menu-secondary" />
-            </ui:VisualElement>
-            <ui:VisualElement name="ProfileRow" class="cw-mode-row cw-menu-secondary-row">
-                <ui:Button name="ProfileBtn" text="@btn.profile" class="cw-btn cw-btn--wood cw-menu-secondary" />
             </ui:VisualElement>
             <ui:Label name="MainMenuHint" text="@main.soloHint" class="cw-body cw-on-art cw-art-plate cw-menu-hint" />
 
