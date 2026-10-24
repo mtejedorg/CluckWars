@@ -64,7 +64,7 @@ Both were restored with `git checkout --`, and the working tree is clean.
   - Screens: `Captures/review-progression-2026-10-24/ramp-b1-30px/<size>/shots/menu-gear-b1<size>.png`.
   - PICK YOUR BIRD is 0 offenders except 3× U1 at 1080x2400 (LOCKED badge vs mastery ring), which is S1's ring placement.
 
-### B2. Main menu overflows the panel at 20:9 landscape (title and hint cut off). This is a regression from develop.
+### B2. Main menu overflows the panel at 20:9 landscape (title and hint cut off). This is a regression from develop. — **FIXED on the review branch (Maestro chose option a; see "B2 fix" below)**
 - The extra `ProfileRow` (`Assets/UI/MainMenu.uxml:98`) adds a fourth action row to a column that develop sized to fill
   the 20:9 panel exactly.
 - Probe at 2400x1080: `ui offender U3 ... el=.cw-title<MainMenuPage [739,-44,654x128] partly off the panel 0,0,2133x960`
@@ -76,6 +76,35 @@ Both were restored with `git checkout --`, and the working tree is clean.
 - Not fixed: this needs a placement decision. Options: (a) make the identity strip itself the PROFILE button and drop
   the row; (b) put PROFILE in the HOST/JOIN row as a third button; (c) a compact `.layout--short` rule for the row.
   (a) costs no vertical space and is where players already look for "my profile".
+
+#### B2 fix (review branch) — also resolves S3 (strip width) and S4 (menu trims)
+- `MainMenu.uxml`:
+  - `#IdentityStrip` is now a `ui:Button`, so the pad and keyboard reach it.
+  - The Grain label moves under the name, in the text column.
+  - `#ProfileRow` / `#ProfileBtn` are gone.
+- `MenuUiController.cs`: `Bind<Button>(_mainMenu, "IdentityStrip", b => b.clicked += ShowProfile)`.
+- `Profile.uss` (`#IdentityStrip`):
+  - Runtime-Button chrome cleared.
+  - 116 px minimum height (`TouchTargetMinPx`).
+  - `max-width: 570px`, which ends ≥ 19 px before the title at 1920x1080 and before the gear on a 9:20 panel.
+  - Name and title ellipsize as a backstop.
+  - Title and Grain go to 30 px (menu floor).
+  - Hover / press scale, off under Reduced Motion.
+- `CluckWarsTheme.uss`: the S4 trims are reverted to develop's values (cast 200 px, margins 44/48, primary 148, row gap 20).
+- `UiText.csv` / `UiKeys.cs`: the now-unused `btn.profile` key is removed.
+- Tests: `ProfilePageTests` drops `ProfileBtn` from the element lists and adds
+  `TheIdentityStrip_IsTheProfileButton_AndTheMenuHasNoProfileRow`.
+- Verified:
+  - EditMode 2724/2724.
+  - `[Build] StandaloneWindows64 OK` (dev tools).
+  - The menu probe reports **0 offenders on main, settings and disconnect at 1920x1080, 2400x1080, 540x1200 (1080x2400)
+    and 540x960**. This holds for a fresh profile and for one seeded with the longest generated name, `FeatheredScarecrow#0000`.
+  - The title and hint are fully on screen at 20:9 again.
+  - Screens: `Captures/review-progression-2026-10-24/b2-final/{fresh,longname}/<size>/shots/menu-main-*.png`.
+- Not verified:
+  - A live click/tap on the strip opening PROFILE. The binding is covered by the test, but no capture presses it.
+  - A strip carrying a record title as well (three text lines).
+  - 9:21 phones.
 
 ---
 
@@ -108,7 +137,7 @@ Both were restored with `git checkout --`, and the working tree is clean.
 - The `AnnounceExecuteSteal` remark "Known gap, not fixed here (2026-09-13)" (`ChickenCargo.cs:689`) describes a bug develop
   fixed (CW-050). It is stale and misleading.
 
-### S3. The hint is clipped at 540x960 portrait (9:16), and the identity strip has no room to grow
+### S3. The hint is clipped at 540x960 portrait (9:16), and the identity strip has no room to grow — **FIXED with B2**
 - `ui offender U3 scope=menu page=main ... el=MainMenuHint<MainMenuPage [227,1593,468x53] partly off the panel 0,0,923x1641`.
   The develop baseline at this size had 0 main-page offenders. Screen: `Captures/review-progression-2026-10-24/portrait/540x960/menu-main-s540x960.png`.
 - The identity strip (`MainMenu.uxml:38`, absolute, `white-space: nowrap`) already **touches the title** at 1920x1080
@@ -118,7 +147,7 @@ Both were restored with `git checkout --`, and the working tree is clean.
   appeared in any run. Needs a max-width with ellipsis, or the name and Grain stacked.
 - Weak spot 4 (9:21, 746 px panel width) was **not captured**. Given the 9:16 result, expect the same clipping or worse there.
 
-### S4. The landscape main-menu trims from the pre-rebase slice-3 fix were kept, but the reason for them is gone
+### S4. The landscape main-menu trims from the pre-rebase slice-3 fix were kept, but the reason for them is gone — **FIXED with B2 (reverted to develop)**
 - `CluckWarsTheme.uss:431-469`: cast art 200→150, cast margins 44/48→12/12, primary min-height 148→126, secondary-row gap
   20→10. All are justified by "the header-row overlap fix — see `.cw-menu-hero`'s comment". That rule no longer exists on
   develop, and the identity strip is now absolute, so it adds no height. These are develop's tuned values silently shrunk

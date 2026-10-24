@@ -32,7 +32,7 @@ namespace CluckWars.Tests
         private const string ProfileControllerPath = "Assets/_Game/Scripts/UI/ProfileController.cs";
 
         /// <summary>Elements whose text is new in slice 3, by their <c>name</c> attribute.</summary>
-        private static readonly string[] NewMainMenuElements = { "IdentityStrip", "ProfileBtn" };
+        private static readonly string[] NewMainMenuElements = { "IdentityStrip" };
 
         // The class tiles' mastery rings are built in MenuUiController.BuildClassSelect (the pick page is
         // a templated tile row now), so they carry no UXML text to scan.
@@ -260,7 +260,7 @@ namespace CluckWars.Tests
             foreach (string required in new[]
                      {
                          "IdentityStrip", "IdentityEmblem", "IdentityEmblemLevel", "IdentityName",
-                         "IdentityTitle", "IdentityGrain", "ProfileBtn",
+                         "IdentityTitle", "IdentityGrain",
                      })
             {
                 CollectionAssert.Contains(menu, required, $"MenuUiController binds #{required} on the main menu.");
@@ -271,6 +271,24 @@ namespace CluckWars.Tests
                 "BuildClassSelect must create each class tile's mastery ring (#Class<Name>Mastery).");
             StringAssert.Contains("ChipNames[i] + \"MasteryLevel\"", controller,
                 "BuildClassSelect must create each mastery ring's level label (#Class<Name>MasteryLevel).");
+        }
+
+        /// <summary>
+        /// Review 2026-10-24, B2: a PROFILE row under HOST/JOIN pushed the title and hint off the 20:9 and 9:16
+        /// menus, so the identity strip is the way into PROFILE: a Button (pad / keyboard reach it), bound to it.
+        /// </summary>
+        [Test]
+        public void TheIdentityStrip_IsTheProfileButton_AndTheMenuHasNoProfileRow()
+        {
+            var root = Load(MainMenuUxml).Root;
+            var strip = root.DescendantsAndSelf().FirstOrDefault(e => (string)e.Attribute("name") == "IdentityStrip");
+            Assert.IsNotNull(strip, "MainMenu.uxml has no #IdentityStrip.");
+            Assert.AreEqual("Button", strip.Name.LocalName, "#IdentityStrip must be a Button so a pad or keyboard can open PROFILE.");
+            Assert.IsFalse(root.DescendantsAndSelf().Any(e => (string)e.Attribute("name") is "ProfileRow" or "ProfileBtn"),
+                "A PROFILE row on the main menu overflows the 20:9 / 9:16 layouts; the identity strip opens PROFILE.");
+
+            string controller = File.ReadAllText("Assets/_Game/Scripts/UI/MenuUiController.cs");
+            StringAssert.Contains("Bind<Button>(_mainMenu, \"IdentityStrip\", b => b.clicked += ShowProfile)", controller);
         }
     }
 }

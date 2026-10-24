@@ -691,7 +691,8 @@ namespace CluckWars.UI
             Bind<Button>(_mainMenu, "JoinBtn", b => b.clicked += () => ChooseMode(SessionMode.Join));
             Bind<Button>(_mainMenu, "AbilityLabBtn", b => b.clicked += OpenAbilityLab);
             Bind<Button>(_mainMenu, "PlayAgainBtn", b => b.clicked += OnPlayAgainFromMenu);
-            Bind<Button>(_mainMenu, "ProfileBtn", b => b.clicked += ShowProfile);
+            // The identity strip is the way into PROFILE (no separate row: it overflowed short menus).
+            Bind<Button>(_mainMenu, "IdentityStrip", b => b.clicked += ShowProfile);
 
             _idStrip            = _mainMenu.Q<VisualElement>("IdentityStrip");
             _idStripEmblem      = _mainMenu.Q<VisualElement>("IdentityEmblem");
