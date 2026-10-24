@@ -425,14 +425,20 @@
 
 /* ---- Cast band ------------------------------------------------------------
    The four playable chickens, which are the actual product. Sprites are the
-   same Stage-0 exports the character select uses, so this costs no new art. */
+   same Stage-0 exports the character select uses, so this costs no new art.
+
+   margin-top/margin-bottom (44/48 -> 12/12) and __art (200 -> 150) trimmed as
+   part of the header-row overlap fix — see .cw-menu-hero's comment. Chickens
+   stay clearly the visual centerpiece at 150px; this reclaims vertical
+   budget without touching font sizes or the primary CTA's prominence more
+   than necessary. */
 .cw-menu-cast {
     flex-direction: row; align-items: flex-end; justify-content: center;
     flex-shrink: 0;
-    margin-top: 44px; margin-bottom: 48px;
+    margin-top: 12px; margin-bottom: 12px;
 }
 .cw-menu-cast__item { align-items: center; margin-left: 26px; margin-right: 26px; }
-.cw-menu-cast__art  { width: 200px; height: 200px; }
+.cw-menu-cast__art  { width: 150px; height: 150px; }
 .cw-menu-cast__name {
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 30px; letter-spacing: 2px; margin-top: 10px;
@@ -452,11 +458,15 @@
    One primary, two secondary. Three identical pills gave the eye no entry
    point; SOLO is the instant-play path a playtester takes almost every time. */
 .cw-menu-actions { align-items: center; flex-shrink: 0; }
+/* min-height trimmed 148 -> 126 as part of the header-row overlap fix (see
+   .cw-menu-hero) — still comfortably above the 48dp touch-target floor at
+   this UI's scale, and still the tallest, widest control on the page. */
 .cw-menu-primary {
-    min-width: 620px; min-height: 148px;
+    min-width: 620px; min-height: 126px;
     font-size: 58px; letter-spacing: 4px;
 }
-.cw-menu-secondary-row { flex-direction: row; justify-content: center; margin-top: 20px; }
+/* margin-top trimmed 20 -> 10 as part of the header-row overlap fix. */
+.cw-menu-secondary-row { flex-direction: row; justify-content: center; margin-top: 10px; }
 .cw-menu-secondary {
     min-width: 300px;
     font-size: 40px; letter-spacing: 2px;
@@ -1840,3 +1850,27 @@
 .cw-hex-icon--bully        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_BullyPassiveSO.png"); }
 .cw-hex-icon--spoiler      { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SpoilerPassiveSO.png"); }
 .cw-hex-icon--thief        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_ThiefPassiveSO.png"); }
+
+/* ---- Ramp lock (progression slice 4) ---------------------------------------
+   A locked class tile or ability card is still rendered, never hidden: dimmed and marked with a
+   LOCKED badge. Descendants are dimmed individually instead of the root, because element opacity
+   is a whole-subtree multiply that would take the badge down with everything else. */
+.cw-class-tile--locked .cw-chicken { opacity: 0.45; }
+.cw-class-tile--locked:hover { scale: 1 1; }
+.cw-ability-card--locked .cw-ability-card__sprite,
+.cw-ability-card--locked .cw-ability-card__icon { opacity: 0.4; }
+.cw-ability-card--locked:hover { scale: 1 1; }
+.cw-chip-lock, .cw-ability-card__lock {
+    position: absolute; top: 6px; left: 6px;
+    padding: 2px 8px;
+    font-size: 28px; -unity-text-align: middle-center;
+    color: rgb(40, 28, 16); background-color: rgb(245, 200, 66);
+    border-top-left-radius: 12px; border-top-right-radius: 12px;
+    border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
+}
+/* Refusal feedback: a locked card or tile flashes a warm-red border when pressed, so "nothing
+   happened" reads as "that press was refused". Toggled in C# (MenuUiController.RefuseLocked). */
+.cw-locked--shake {
+    border-left-color: rgb(214, 88, 70); border-right-color: rgb(214, 88, 70);
+    border-top-color: rgb(214, 88, 70); border-bottom-color: rgb(214, 88, 70);
+}

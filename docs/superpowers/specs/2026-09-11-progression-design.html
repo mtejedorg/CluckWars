@@ -1,0 +1,1266 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cluck Wars Progression</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;700&display=swap">
+
+<style>
+/* Cold galvanised barn-slate ground · corn-gold accent · copper teal for rules · rust for risk */
+:root{
+  --ground:#EDF0EC;--surface:#F8FAF7;--surface-2:#E4E9E3;--surface-3:#D8DFD8;
+  --ink:#1A231E;--ink-2:#3D4A43;--muted:#66746B;
+  --line:#CFD7CF;--line-2:#DFE5DE;
+  --gold:#9A6B10;--gold-bright:#C8901A;--gold-wash:#F5E7C6;
+  --teal:#2A6558;--teal-wash:#DCE9E5;
+  --rust:#9C3524;--rust-wash:#F3DCD6;
+  --plum:#5B3A6E;--plum-wash:#E8DFEE;
+  --shadow:0 1px 2px rgba(26,35,30,.06),0 6px 20px -12px rgba(26,35,30,.28);
+  --f-d:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
+  --f-b:"Source Serif 4",Georgia,serif;
+  --f-m:"JetBrains Mono","SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#101613;--surface:#19211D;--surface-2:#212A25;--surface-3:#2A342E;
+  --ink:#E7ECE7;--ink-2:#BCC7C0;--muted:#8A9791;
+  --line:#2E3A34;--line-2:#252F29;
+  --gold:#E8B348;--gold-bright:#F0C463;--gold-wash:#3A2E14;
+  --teal:#5FB8A2;--teal-wash:#17302B;
+  --rust:#DE7A62;--rust-wash:#3A1F19;
+  --plum:#B392C7;--plum-wash:#2A2033;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -14px rgba(0,0,0,.7);
+}}
+:root[data-theme="dark"]{
+  --ground:#101613;--surface:#19211D;--surface-2:#212A25;--surface-3:#2A342E;
+  --ink:#E7ECE7;--ink-2:#BCC7C0;--muted:#8A9791;
+  --line:#2E3A34;--line-2:#252F29;
+  --gold:#E8B348;--gold-bright:#F0C463;--gold-wash:#3A2E14;
+  --teal:#5FB8A2;--teal-wash:#17302B;
+  --rust:#DE7A62;--rust-wash:#3A1F19;
+  --plum:#B392C7;--plum-wash:#2A2033;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -14px rgba(0,0,0,.7);
+}
+
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--f-b);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:var(--f-d);font-weight:800;line-height:1.15;text-wrap:balance;margin:0}
+p{margin:0;max-width:66ch}
+ul,ol{margin:10px 0;padding-left:20px;max-width:66ch}
+li{margin:4px 0}li::marker{color:var(--muted)}
+code{font-family:var(--f-m);font-size:.85em;background:var(--surface-2);padding:1.5px 5px;border-radius:3.5px}
+strong{font-weight:600;color:var(--ink)}
+button{font-family:inherit}
+:focus-visible{outline:2px solid var(--gold-bright);outline-offset:3px;border-radius:3px}
+
+/* ---- shell ---- */
+.shell{display:grid;grid-template-columns:230px minmax(0,1fr);min-height:100vh}
+.rail{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--surface);padding:22px 14px 28px 20px;display:flex;flex-direction:column;gap:20px}
+.brand .mark{font-family:var(--f-m);font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--teal)}
+.brand h1{font-size:18px;letter-spacing:-.015em;margin:5px 0 4px}
+.brand .sub{font-size:11.5px;color:var(--muted);line-height:1.45}
+.views{display:flex;flex-direction:column;gap:2px}
+.vbtn{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;background:transparent;border:0;cursor:pointer;color:var(--ink-2);text-align:left;font-family:var(--f-d);font-weight:600;font-size:13.5px;width:100%;transition:background .12s}
+.vbtn .vi{font-family:var(--f-m);font-size:9.5px;font-weight:700;color:var(--muted);min-width:16px}
+.vbtn:hover{background:var(--surface-2);color:var(--ink)}
+.vbtn.on{background:var(--gold-wash);color:var(--ink)}
+.vbtn.on .vi{color:var(--gold)}
+.railfoot{margin-top:auto;display:flex;flex-direction:column;gap:9px}
+.themebtn{font-family:var(--f-d);font-weight:600;font-size:11.5px;background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line);border-radius:6px;padding:7px 10px;cursor:pointer;text-align:left}
+.themebtn:hover{color:var(--ink);border-color:var(--muted)}
+.stamp{font-family:var(--f-m);font-size:9.5px;color:var(--muted);line-height:1.6}
+
+main{padding:34px 0 90px;min-width:0}
+.wrap{max-width:900px;margin:0 auto;padding:0 36px}
+.view{display:none}
+.view.on{display:block}
+.vhead{margin-bottom:26px;padding-bottom:20px;border-bottom:1px solid var(--line)}
+.vhead .eb{font-family:var(--f-m);font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--teal);margin-bottom:9px}
+.vhead h2{font-size:clamp(26px,3.4vw,34px);letter-spacing:-.028em;margin-bottom:11px}
+.vhead p{font-size:18px;color:var(--ink-2);line-height:1.5}
+
+.block{margin-bottom:38px}
+.block>h3{font-size:19px;letter-spacing:-.014em;margin-bottom:10px}
+.block>h4{font-family:var(--f-d);font-size:14px;font-weight:600;margin:18px 0 5px}
+.block p+p{margin-top:11px}
+
+/* ---- generic cards ---- */
+.rule-box{border:1.5px solid var(--teal);border-radius:10px;background:var(--teal-wash);padding:19px 21px;margin:14px 0;max-width:68ch}
+.rule-box .rl{font-family:var(--f-d);font-weight:800;font-size:17.5px;line-height:1.3;letter-spacing:-.014em;margin-bottom:8px}
+.rule-box p{font-size:14.5px;color:var(--ink-2)}
+.rule-box.warn{border-color:var(--rust);background:var(--rust-wash)}
+.rule-box.warn .rl{color:var(--rust)}
+.rule-box.gold{border-color:var(--gold-bright);background:var(--gold-wash)}
+.rule-box.gold .rl{color:var(--gold)}
+
+.tw{overflow-x:auto;margin:15px 0;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 13px;text-align:left;border-bottom:1px solid var(--line-2);vertical-align:top}
+th{font-family:var(--f-m);font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);background:var(--surface-2);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-family:var(--f-m);font-variant-numeric:tabular-nums}
+tbody tr:hover td{background:var(--surface-2)}
+.tick{color:var(--teal);font-weight:700}
+.cross{color:var(--muted)}
+
+pre{font-family:var(--f-m);font-size:12.5px;line-height:1.6;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:15px 17px;overflow-x:auto;margin:15px 0;color:var(--ink-2)}
+pre b{color:var(--gold);font-weight:700}
+pre i{color:var(--muted);font-style:normal}
+pre em{color:var(--teal);font-style:normal;font-weight:700}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.card{border:1px solid var(--line);border-radius:9px;padding:15px 17px;background:var(--surface)}
+.card h4{margin:0 0 7px;font-family:var(--f-m);font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:700;color:var(--teal)}
+.card.no h4{color:var(--rust)}
+.card ul{margin:6px 0 0;padding-left:16px;font-size:13.5px;max-width:none}
+.card li{color:var(--ink-2);margin:3px 0}
+.card p{font-size:13.5px;color:var(--ink-2);max-width:none}
+
+.note{font-size:13.5px;color:var(--muted);font-style:italic;max-width:66ch;margin-top:12px}
+
+/* ---- loop diagram ---- */
+.loop{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:9px;margin:18px 0}
+.lnode{border:1px solid var(--line);border-radius:9px;background:var(--surface);padding:13px 14px;cursor:pointer;text-align:left;transition:border-color .13s,background .13s}
+.lnode:hover{border-color:var(--gold-bright);background:var(--surface-2)}
+.lnode.on{border-color:var(--gold-bright);background:var(--gold-wash)}
+.lnode .ln{font-family:var(--f-m);font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px}
+.lnode .lt{font-family:var(--f-d);font-weight:700;font-size:14px;letter-spacing:-.01em;display:block;margin-bottom:4px}
+.lnode .lq{font-size:12px;color:var(--ink-2);line-height:1.4}
+.lnode.on .ln{color:var(--gold)}
+.loopout{border:1px solid var(--line);border-left:3px solid var(--gold-bright);border-radius:0 9px 9px 0;background:var(--surface);padding:15px 18px;min-height:96px}
+.loopout h4{margin:0 0 6px;font-size:16px;font-weight:800;font-family:var(--f-d)}
+.loopout p{font-size:14px;color:var(--ink-2)}
+.loopout .sys{font-family:var(--f-m);font-size:10.5px;color:var(--teal);margin-top:9px;padding-top:8px;border-top:1px dashed var(--line)}
+
+/* ---- calculator ---- */
+.calc{border:1px solid var(--line);border-radius:11px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden;margin:16px 0}
+.calc-h{padding:13px 18px;border-bottom:1px solid var(--line);background:var(--surface-2);display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.calc-h .t{font-family:var(--f-d);font-weight:800;font-size:14.5px}
+.calc-h .f{font-family:var(--f-m);font-size:10px;color:var(--muted)}
+.calc-b{display:grid;grid-template-columns:284px minmax(0,1fr)}
+.knobs{padding:16px 18px;border-right:1px solid var(--line-2);display:flex;flex-direction:column;gap:13px}
+.knob label{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:4px}
+.knob .kn{font-family:var(--f-d);font-weight:600;font-size:12.5px}
+.knob .kv{font-family:var(--f-m);font-size:12.5px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums}
+.knob .kd{font-size:11px;color:var(--muted);line-height:1.4;margin-top:3px;font-family:var(--f-d)}
+input[type=range]{width:100%;accent-color:var(--gold-bright);height:20px;cursor:pointer}
+.mini{font-family:var(--f-d);font-weight:600;font-size:11px;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:5px 9px;cursor:pointer;align-self:flex-start}
+.mini:hover{color:var(--ink);border-color:var(--muted)}
+.out{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.out .tw{margin:0}.out th,.out td{padding:6px 10px;font-size:13.5px}
+.verdict{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface-2)}
+.verdict div{flex:1;padding:10px 13px;border-right:1px solid var(--line-2)}
+.verdict div:last-child{border-right:0}
+.verdict .k{font-family:var(--f-m);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:3px}
+.verdict .v{font-family:var(--f-d);font-weight:800;font-size:18px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.flag{font-size:12.5px;font-family:var(--f-d);padding:9px 12px;border-radius:7px;line-height:1.45}
+.flag.ok{background:var(--teal-wash);color:var(--teal);border:1px solid var(--teal)}
+.flag.warn{background:var(--rust-wash);color:var(--rust);border:1px solid var(--rust)}
+
+.chartbox{border:1px solid var(--line);border-radius:11px;background:var(--surface);padding:16px 18px 10px;margin:16px 0;box-shadow:var(--shadow)}
+canvas{width:100%;height:auto;display:block}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:9px;font-family:var(--f-m);font-size:10px;color:var(--muted)}
+.legend i{display:inline-block;width:11px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+
+/* ---- nameplate builder ---- */
+.np{border:1px solid var(--line);border-radius:11px;background:var(--surface);overflow:hidden;margin:16px 0;box-shadow:var(--shadow)}
+.np-prev{padding:24px;background:linear-gradient(135deg,var(--surface-2),var(--surface-3));display:flex;justify-content:center}
+.plate{width:100%;max-width:420px;border:1.5px solid var(--gold-bright);border-radius:11px;background:var(--surface);padding:14px 17px;display:flex;gap:14px;align-items:center;box-shadow:var(--shadow)}
+.plate .emb{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:23px;border:2px solid var(--gold-bright);background:var(--gold-wash);flex-shrink:0}
+.plate .who{min-width:0;flex:1}
+.plate .nm{font-family:var(--f-d);font-weight:800;font-size:18.5px;letter-spacing:-.02em;line-height:1.2}
+.plate .ti{font-family:var(--f-m);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);margin-top:3px}
+.plate .rk{font-family:var(--f-m);font-size:10px;color:var(--muted);margin-top:4px}
+.np-ctl{padding:15px 18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;border-top:1px solid var(--line-2)}
+.np-ctl .g{display:flex;flex-direction:column;gap:5px}
+.np-ctl .gl{font-family:var(--f-m);font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.opt{background:transparent;border:1px solid var(--line);border-radius:6px;padding:6px 9px;cursor:pointer;text-align:left;font-family:var(--f-d);font-size:12.5px;color:var(--ink-2);display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.opt:hover{border-color:var(--muted);color:var(--ink)}
+.opt.on{border-color:var(--gold-bright);background:var(--gold-wash);color:var(--ink)}
+.opt .src{font-family:var(--f-m);font-size:9.5px;color:var(--muted)}
+.opt.on .src{color:var(--gold)}
+.np-foot{padding:12px 18px;border-top:1px solid var(--line-2);background:var(--surface-2);font-size:13px;color:var(--ink-2)}
+.np-foot b{color:var(--teal);font-family:var(--f-d)}
+
+/* ---- ramp ---- */
+.ramp{display:grid;grid-template-columns:196px minmax(0,1fr);border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--surface);margin:16px 0;box-shadow:var(--shadow)}
+.steps{border-right:1px solid var(--line-2);background:var(--surface-2);padding:7px}
+.step{width:100%;text-align:left;background:transparent;border:0;cursor:pointer;padding:8px 10px;border-radius:6px;display:flex;gap:9px;align-items:baseline;font-family:var(--f-d);color:var(--ink-2)}
+.step .sn{font-family:var(--f-m);font-size:10px;font-weight:700;color:var(--muted)}
+.step .st{font-size:13px;font-weight:600}
+.step:hover{background:var(--surface)}
+.step.on{background:var(--gold-wash);color:var(--ink)}
+.step.on .sn{color:var(--gold)}
+.stepbody{padding:18px 20px;min-height:250px}
+.stepbody .when{font-family:var(--f-m);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--teal);margin-bottom:6px}
+.stepbody h4{margin:0 0 9px;font-size:18px;font-weight:800;font-family:var(--f-d)}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0}
+.chip{font-family:var(--f-m);font-size:10.5px;font-weight:700;border:1px solid var(--gold);color:var(--gold);background:var(--gold-wash);padding:3px 8px;border-radius:20px}
+.chip.q{border-color:var(--line);color:var(--muted);background:var(--surface-2)}
+.why{margin-top:11px;padding:10px 13px;border-left:2.5px solid var(--teal);background:var(--teal-wash);border-radius:0 7px 7px 0;font-size:13px;line-height:1.5}
+.why b{font-family:var(--f-d);color:var(--teal)}
+.objl{font-family:var(--f-m);font-size:11px;color:var(--muted);margin-top:9px;padding-top:8px;border-top:1px dashed var(--line)}
+.objl b{color:var(--teal)}
+
+/* ---- roadmap ---- */
+.rmwrap{display:grid;grid-template-columns:238px minmax(0,1fr);gap:0;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow);margin:16px 0}
+.rmlist{background:var(--surface-2);border-right:1px solid var(--line-2);padding:8px;overflow-y:auto;max-height:640px}
+.sl{width:100%;text-align:left;background:transparent;border:0;border-radius:7px;padding:9px 10px;cursor:pointer;display:flex;gap:9px;align-items:flex-start;margin-bottom:1px}
+.sl:hover{background:var(--surface)}
+.sl.on{background:var(--gold-wash)}
+.sl .si{font-family:var(--f-m);font-size:10px;font-weight:700;color:var(--muted);min-width:20px;padding-top:2px}
+.sl.on .si{color:var(--gold)}
+.sl .sb{min-width:0}
+.sl .sn{font-family:var(--f-d);font-weight:600;font-size:13px;color:var(--ink-2);display:block;line-height:1.25}
+.sl.on .sn{color:var(--ink)}
+.sl .sm{font-family:var(--f-m);font-size:9px;color:var(--muted);display:block;margin-top:3px}
+.sl .bar{height:3px;border-radius:2px;background:var(--line);margin-top:6px;overflow:hidden}
+.sl .bar i{display:block;height:100%;background:var(--teal);width:0}
+.phase{font-family:var(--f-m);font-size:8.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:12px 10px 5px}
+.rmbody{padding:20px 22px;overflow-y:auto;max-height:640px}
+.rmbody .rh{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.rmbody h3{font-size:21px;letter-spacing:-.02em;margin:0}
+.tag{font-family:var(--f-m);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:2.5px 7px;border-radius:4px;background:var(--surface-2);color:var(--muted)}
+.tag.dep{background:var(--plum-wash);color:var(--plum)}
+.tag.now{background:var(--teal-wash);color:var(--teal)}
+.tag.later{background:var(--gold-wash);color:var(--gold)}
+.rmbody .goal{font-size:15px;color:var(--ink-2);margin:8px 0 16px;max-width:62ch}
+.sec{margin-bottom:16px}
+.sec .sh{font-family:var(--f-m);font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--teal);margin-bottom:7px}
+.task{display:flex;gap:9px;align-items:flex-start;padding:5px 0;font-size:13.5px;color:var(--ink-2);cursor:pointer;line-height:1.45}
+.task input{margin:4px 0 0;accent-color:var(--teal);cursor:pointer;flex-shrink:0}
+.task.done span{text-decoration:line-through;opacity:.5}
+.flist{display:flex;flex-direction:column;gap:3px}
+.f{font-family:var(--f-m);font-size:11.5px;color:var(--ink-2);display:flex;gap:8px;align-items:baseline}
+.f .fk{font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:1.5px 5px;border-radius:3px;flex-shrink:0}
+.f .fk.new{background:var(--teal-wash);color:var(--teal)}
+.f .fk.mod{background:var(--gold-wash);color:var(--gold)}
+.done-when{border:1px solid var(--teal);background:var(--teal-wash);border-radius:8px;padding:11px 14px;font-size:13.5px;color:var(--ink-2);line-height:1.5}
+.done-when b{font-family:var(--f-d);color:var(--teal);display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px}
+.rmtop{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.prog{font-family:var(--f-m);font-size:11px;color:var(--muted)}
+.prog b{color:var(--teal)}
+
+/* ---- records filter ---- */
+.recbar{display:flex;gap:7px;flex-wrap:wrap;margin:14px 0 10px}
+.fbtn{font-family:var(--f-d);font-weight:600;font-size:12px;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:5px 12px;cursor:pointer;color:var(--ink-2)}
+.fbtn:hover{border-color:var(--muted);color:var(--ink)}
+.fbtn.on{background:var(--teal-wash);border-color:var(--teal);color:var(--teal)}
+.recs{display:flex;flex-direction:column;gap:6px}
+.rec{border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:10px 14px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.rec .rn{font-family:var(--f-d);font-weight:600;font-size:14px;flex:1;min-width:200px}
+.rec .rt{font-family:var(--f-m);font-size:10.5px;color:var(--gold);font-weight:700}
+.rec .rl{font-family:var(--f-m);font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:2px 7px;border-radius:4px;background:var(--teal-wash);color:var(--teal)}
+.rec .rl.win{background:var(--surface-2);color:var(--muted)}
+
+.risk{border:1px solid var(--line);border-radius:9px;background:var(--surface);padding:14px 17px;margin-bottom:10px}
+.risk .rh2{display:flex;align-items:center;gap:10px;margin-bottom:5px;flex-wrap:wrap}
+.risk .rt2{font-family:var(--f-d);font-weight:600;font-size:14.5px}
+.sev{font-family:var(--f-m);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:2.5px 7px;border-radius:4px}
+.sev.high{background:var(--rust-wash);color:var(--rust)}
+.sev.med{background:var(--gold-wash);color:var(--gold)}
+.sev.low{background:var(--teal-wash);color:var(--teal)}
+.risk p{font-size:13.5px;color:var(--ink-2);max-width:none}
+
+.dec{border-left:2.5px solid var(--plum);background:var(--surface);border:1px solid var(--line);border-left-width:2.5px;border-radius:0 8px 8px 0;padding:12px 15px;margin-bottom:9px}
+.dec .dq{font-family:var(--f-m);font-size:9.5px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--plum);margin-bottom:4px}
+.dec .da{font-family:var(--f-d);font-weight:700;font-size:14.5px;margin-bottom:4px}
+.dec p{font-size:13px;color:var(--ink-2);max-width:none}
+
+@media (max-width:1040px){
+  .shell{grid-template-columns:1fr}
+  .rail{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);flex-direction:row;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 18px}
+  .views{flex-direction:row;flex-wrap:wrap;gap:3px}
+  .vbtn{width:auto;padding:6px 10px}
+  .railfoot{margin-top:0;flex-direction:row;align-items:center}
+  .wrap{padding:0 20px}
+  .calc-b,.rmwrap,.ramp{grid-template-columns:1fr}
+  .knobs,.rmlist{border-right:0;border-bottom:1px solid var(--line-2);max-height:none}
+  .rmbody{max-height:none}
+  .steps{border-right:0;border-bottom:1px solid var(--line-2);display:flex;overflow-x:auto}
+  .step{white-space:nowrap}
+  .grid2{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+</style>
+
+<div class="shell">
+  <aside class="rail">
+    <div class="brand">
+      <span class="mark">Design spec · v4</span>
+      <h1>Cluck&nbsp;Wars Progression</h1>
+      <span class="sub">The meta layer — and the plan to build it.</span>
+    </div>
+    <div class="views" id="views">
+      <button class="vbtn on" data-v="overview" type="button"><span class="vi">01</span>Overview</button>
+      <button class="vbtn" data-v="design" type="button"><span class="vi">02</span>The systems</button>
+      <button class="vbtn" data-v="numbers" type="button"><span class="vi">03</span>Numbers</button>
+      <button class="vbtn" data-v="build" type="button"><span class="vi">04</span>Build plan</button>
+      <button class="vbtn" data-v="rules" type="button"><span class="vi">05</span>Standing rules</button>
+      <button class="vbtn" data-v="risks" type="button"><span class="vi">06</span>Risks &amp; calls</button>
+    </div>
+    <div class="railfoot">
+      <button class="themebtn" id="tbtn" type="button">◐ Switch theme</button>
+      <span class="stamp">Unity 6 · Fusion 2<br>Plan only — nothing built</span>
+    </div>
+  </aside>
+
+  <main><div class="wrap">
+
+<!-- ============ OVERVIEW ============ -->
+<div class="view on" id="v-overview">
+  <div class="vhead">
+    <div class="eb">Overview</div>
+    <h2>Everything the player keeps when the match ends.</h2>
+    <p>Cluck Wars has no progression system today. This designs the whole meta layer — identity, goals, rewards, rhythm and social — plus the plan to build it, with a pitch milestone at slice 4. The game announces what happened; progression listens. The match itself is never modified.</p>
+  </div>
+
+  <div class="block">
+    <h3>The loop, between rounds</h3>
+    <p>Click a beat to see what answers it. Every one is a system below, and they are ordered by how a real session actually unfolds.</p>
+    <div class="loop" id="loop"></div>
+    <div class="loopout" id="loopout"></div>
+  </div>
+
+  <div class="block">
+    <h3>Why the economy came second</h3>
+    <p>A first pass at this designed only currency and rank, and it read as an economy rather than a progression system. The reason is worth stating: <strong>currency is connective tissue, not content.</strong> A player does not return for a number — they return for a goal, a record they nearly have, a collection with a gap in it, and an identity that says something true about how they play.</p>
+    <p>So the ordering here is deliberate. Identity first, then goals, then the rewards that feed them. Grain and Flock Rank are plumbing that makes the rest legible.</p>
+  </div>
+
+  <div class="block">
+    <h3>What the pitch shows, and what comes after</h3>
+    <div class="grid2">
+      <div class="card">
+        <h4>Pitch milestone — slices 0–4, all local</h4>
+        <ul>
+          <li>Profile, generated name, nameplate, titles, emblems</li>
+          <li>Records and career history</li>
+          <li>Weekly goals, a daily first-game task, rested</li>
+          <li>The four-step onboarding ramp</li>
+          <li>Grain on every results screen</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>After the pitch</h4>
+        <ul>
+          <li>Flock Rank ladder and collections</li>
+          <li>Cloud save across devices</li>
+          <li>Friends and quick chat</li>
+          <li>Analytics, then remote config</li>
+        </ul>
+      </div>
+      <div class="card no">
+        <h4>Data shapes only</h4>
+        <ul>
+          <li>Seasons — the reward ladder is already an asset, so a season is a second asset, not a second system</li>
+          <li>The store and Feathers — the wallet exists, nothing is priced</li>
+          <li>Server-side reward authority — the journal keeps the evidence it will need</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note">At the pitch a player can earn, unlock, set goals, see their record and build an identity — all from one local file, with no backend and nothing to operate. Everything after is scale on a loop that already works.</p>
+  </div>
+</div>
+
+<!-- ============ DESIGN ============ -->
+<div class="view" id="v-design">
+  <div class="vhead">
+    <div class="eb">The systems</div>
+    <h2>Identity, goals, rewards, rhythm</h2>
+    <p>Seven systems, in the order a player meets them. Each is a fold or a predicate over the same six-verb event stream, which is why the whole layer costs far less than the list suggests.</p>
+  </div>
+
+  <div class="block">
+    <h3>1 · The nameplate</h3>
+    <p>Assembled from four parts and shown everywhere a player is represented — lobby, scoreboard, results, friends list. Click through the options; the source of each part is what matters.</p>
+    <div class="np">
+      <div class="np-prev"><div class="plate">
+        <div class="emb" id="np-emb">🐔</div>
+        <div class="who">
+          <div class="nm" id="np-nm">SwiftBeak<span style="color:var(--muted);font-weight:600">#2213</span></div>
+          <div class="ti" id="np-ti">The Unbanked</div>
+          <div class="rk" id="np-rk">Flock Rank 12 · Warrior Mastery 7</div>
+        </div>
+      </div></div>
+      <div class="np-ctl">
+        <div class="g"><span class="gl">Title — earn only</span><div id="np-titles"></div></div>
+        <div class="g"><span class="gl">Emblem — class mastery</span><div id="np-embs"></div></div>
+        <div class="g"><span class="gl">Banner — rank or shop</span><div id="np-bans"></div></div>
+      </div>
+      <div class="np-foot" id="np-foot"></div>
+    </div>
+    <div class="rule-box">
+      <div class="rl">Every nameplate carries at least one part that cannot be bought.</div>
+      <p>A stranger reading your plate learns something true about how you play. That single constraint is what stops the identity layer reading as a billboard — and it is why titles and emblems are earn-only while banners are the purchasable slot.</p>
+    </div>
+    <h4>Why this comes before the economy</h4>
+    <p>A skin in a game with no profile is a recolour nobody sees. The nameplate is the canvas that turns every other reward into something worth having. It also means a <strong>small catalogue recombines</strong> — around thirty parts produce hundreds of distinguishable identities, which matters enormously when the art pipeline is the real constraint.</p>
+  </div>
+
+  <div class="block">
+    <h3>2 · Records and titles</h3>
+    <p>Permanent, never expiring, no countdowns. Each is a predicate over the event stream, so authoring cost is near zero — and each awards a title, which lands on the nameplate.</p>
+    <div class="recbar" id="recbar"></div>
+    <div class="recs" id="recs"></div>
+    <p class="note">Filter to “achievable while losing” — most of the list survives, and several are <em>easier</em> that way. A denial game generates steal statistics precisely because you are not winning on banking.</p>
+    <h4>Three deliberate omissions</h4>
+    <ul>
+      <li><strong>No “play 100 rounds” records.</strong> Time served is not a feat, and a record that only measures attendance devalues the ones that measure skill.</li>
+      <li><strong>No hidden records.</strong> The unearned list <em>is</em> the content — it is what a player browses when deciding whether to keep playing.</li>
+      <li><strong>No expiry.</strong> A record you can miss forever is a countdown wearing a trophy.</li>
+    </ul>
+  </div>
+
+  <div class="block">
+    <h3>3 · Career and history</h3>
+    <p>Lifetime totals, a per-class breakdown, a recent-twenty placement strip, personal bests, and the specialization split. It compares the player against their own past and never against strangers.</p>
+    <div class="rule-box">
+      <div class="rl">A global leaderboard tells 99% of players they are nobody. A personal best gives every player something they can beat.</div>
+      <p>This is also the honest raw material for “you improved” — a claim that only lands when it is measured against a number the player recognises as their own.</p>
+    </div>
+    <p><strong>Never show a stat that shames.</strong> No “you were the only player who banked nothing”, no comparative percentile against the population. The career page is a record, not a verdict.</p>
+  </div>
+
+  <div class="block">
+    <h3>4 · Weekly goals and the daily task</h3>
+    <p>Three goals a week, generated from a handful of templates with threshold tiers. Every one is stat-based, outcome-blind and cumulative across the week — placement is never mentioned, so all of them are completable in rounds you lose.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Weekly template · thresholds</th><th>Reads</th><th>Completable losing?</th></tr></thead>
+      <tbody>
+        <tr><td>Bank {100 | 150 | 200} across the week</td><td><code>ResourceBanked</code></td><td><span class="tick">Yes</span></td></tr>
+        <tr><td>Rob {10 | 15} rivals across the week</td><td><code>ResourceStolen</code></td><td><span class="tick">Yes — easier</span></td></tr>
+        <tr><td>Finish a round with more stolen than banked</td><td>Both</td><td><span class="tick">Yes — easier</span></td></tr>
+        <tr><td>Land {15 | 25} control abilities</td><td><code>AbilityResolved</code></td><td><span class="tick">Yes</span></td></tr>
+        <tr><td>Play {20 | 30} rounds</td><td><code>RoundEnded</code></td><td><span class="tick">Yes</span></td></tr>
+      </tbody>
+    </table></div>
+    <h4>Three deliberate omissions, and their replacements</h4>
+    <ul>
+      <li><strong>No countdown.</strong> The refresh day is shown; a ticking timer never is. A visible countdown converts an objective into an obligation.</li>
+      <li><strong>No wins required.</strong> At a 25% win rate a win-goal fails most players through no fault of their own.</li>
+      <li><strong>No streak.</strong> A streak works by loss aversion — it makes <em>not playing</em> cost something, which is hostile to a game whose entire pitch is that a loss costs nothing.</li>
+    </ul>
+    <h4>The daily first-game task</h4>
+    <p>One small single-round task a day — <em>bank 15</em>, <em>steal 5</em>, <em>land two control abilities</em> — shown before your first round. It is the daily reason to open the game, and it pays the daily bonus.</p>
+    <p><strong>It stays open all day.</strong> If it only counted in the first round, a bad first round would burn the day's chance — which makes a loss cost something, the one thing this design refuses. Framed around your first game; failing that game costs nothing. It is hidden while the onboarding ramp runs, because the ramp's own objectives already do that job.</p>
+    <p>Alongside it, <strong>rested ×1.5</strong> on the first three rounds each day. Both are purely additive: skipping a day loses nothing you had.</p>
+  </div>
+
+  <div class="block">
+    <h3>5 · The onboarding ramp</h3>
+    <p>Everyone starts on the same class with its complete kit, learns the game as that chicken, then chooses their second. Click through the steps — each grant was chosen for what it teaches, not for what it is worth.</p>
+    <div class="ramp"><div class="steps" id="steps"></div><div class="stepbody" id="stepbody"></div></div>
+    <h4>Warrior is the tutorial class, and the Assassin is disqualified by construction</h4>
+    <p>The Assassin cannot take Peck at all, so it <em>literally cannot perform the loop the tutorial teaches</em> — and it sits outside the balance model entirely. Fatty is two trips, too few repetitions to teach a loop. Speedy learns farm-and-run and never meets steal or control. Warrior is mid on every axis and its pool is the only one spanning steal, control and utility.</p>
+    <h4>Breadth, not depth</h4>
+    <p>A new player holds a <em>complete</em> kit on one class, not a fraction of a kit. What they lack is roster options — counterpicking and variety, not moment-to-moment capability. In a game with no health bars where every fight is control and theft, a full kit on one class is a real kit. This is the property the ramp's safety rests on.</p>
+    <div class="grid2">
+      <div class="card"><h4>Must</h4><ul>
+        <li>Auto-complete each objective after 3 attempts — ceiling 12 rounds</li>
+        <li>Show locked content, labelled with the step that unlocks it</li>
+        <li>Resolve unlocks at the results screen, never mid-round</li>
+      </ul></div>
+      <div class="card no"><h4>Must not</h4><ul>
+        <li>Put ramp state on the network — a “this one is new” marker in a 4-player free-for-all is a targeting instruction</li>
+        <li>Price locked content — a step name says <em>keep playing</em>, a price says <em>pay us</em></li>
+        <li>Be skippable, by currency or anything else</li>
+        <li>Ever run twice, on any device</li>
+      </ul></div>
+    </div>
+  </div>
+
+  <div class="block">
+    <h3>6 · Collections</h3>
+    <p>Every unlockable in one browsable place — owned <em>and unowned together</em>, each gap naming its source.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Set</th><th>Source</th><th>Buyable?</th></tr></thead>
+      <tbody>
+        <tr><td>Titles</td><td>Records</td><td><span class="cross">Never</span></td></tr>
+        <tr><td>Emblems</td><td>Class mastery</td><td><span class="cross">Never</span></td></tr>
+        <tr><td>Banners</td><td>Flock Rank · shop · seasons</td><td>Yes</td></tr>
+        <tr><td>Chicken skins</td><td>Flock Rank · shop · mastery</td><td>Mostly</td></tr>
+        <tr><td>Emotes</td><td>Flock Rank · shop</td><td>Yes</td></tr>
+        <tr><td>Map moods</td><td>Shop · seasons</td><td>Yes</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>An inventory lists what you own; a collection shows the gaps.</strong> The gaps are what make it a goal, which is why unowned items are displayed with their source rather than hidden until earned.</p>
+  </div>
+
+  <div class="block">
+    <h3>7 · Rhythm, return, and social</h3>
+    <h4>Return hooks — all additive, none breakable</h4>
+    <p>The daily first-game task · rested multiplier · the weekly goal refresh · a “while you were away” summary on a three-day-plus lapse that leads with what you <em>own</em> · personal-best moments · friend activity.</p>
+    <p><strong>Notifications: one per day maximum, off by default, and only for something unpredictable.</strong> “Your goals refreshed” is not news — it happens on schedule and the player knows it.</p>
+    <p><strong>Refused outright:</strong> win streaks, login streaks, timed offers, double-XP windows. Each makes losing or not playing cost something, which deletes the pitch rather than adding retention to it.</p>
+    <h4>Seasons — architected, not shipped</h4>
+    <p>The only thing built now is that <strong>Flock Rank reads its ladder from a data asset</strong>, so a season is a second asset rather than a second system. Four commitments made now so a later season cannot drift: points reset but <strong>rank is retained</strong>; nothing gameplay-relevant is ever seasonal; items return in later rotations rather than being gone forever; and no countdown shorter than a season, never on the results screen.</p>
+    <h4>Social — friends and quick chat</h4>
+    <div class="rule-box">
+      <div class="rl">Nothing a player sends can be anything other than a phrase you wrote.</div>
+      <p>Unmoderatable by construction. No filter to tune, no report queue, no rate limiting, no message logs to retain and delete, and nobody who has to be available to answer abuse reports. It translates once, like any other UI string.</p>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>Where</th><th>Phrases</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>Friends list</td><td>“Play with me?” · “Rematch?” · “One more”</td><td>The invite — the one thing chat genuinely must do here</td></tr>
+        <tr><td>Lobby</td><td>“Hello!” · “Good luck” · “Ready”</td><td>Acknowledging the humans you are about to rob</td></tr>
+        <tr><td>Results</td><td>“Well played” · “Nice steal” · “So close”</td><td>The 45-second game's whole social vocabulary</td></tr>
+      </tbody>
+    </table></div>
+    <p>Expression <em>during</em> a round is already covered by emotes, which are collectible and so double as a reward. Usernames are generated — <code>SwiftBeak#2213</code> is thematic, unique without a uniqueness check, and impossible to make offensive. <strong>A chosen name would be the only free-text surface left in the product</strong>; the recommendation is to ship generated names and add chosen ones only if players ask.</p>
+    <p>Friend leaderboards, not global ones. A top-hundred board is unwinnable for almost everyone; a five-friend board is winnable by everyone in it.</p>
+  </div>
+</div>
+
+<!-- ============ NUMBERS ============ -->
+<div class="view" id="v-numbers">
+  <div class="vhead">
+    <div class="eb">Numbers</div>
+    <h2>Five constants, and what they do</h2>
+    <p>Grain is earned only, never purchasable, never convertible. Every Grain also counts as 1 XP toward Flock Rank, so there is no exchange rate to learn — and these sliders are the only tuning knobs the entire system has. Move them and watch the verdict change.</p>
+  </div>
+
+  <div class="block">
+    <div class="calc">
+      <div class="calc-h">
+        <span class="t">Earn formula — live</span>
+        <span class="f">floor( ( base + perBank×banked + min(perSteal×stolen, 12) + placement ) × rested )</span>
+      </div>
+      <div class="calc-b">
+        <div class="knobs">
+          <div class="knob"><label for="k1"><span class="kn">Participation</span><span class="kv" id="v1">20</span></label>
+            <input type="range" id="k1" min="0" max="40" step="1" value="20">
+            <div class="kd">Paid for finishing, never for joining. The loss floor.</div></div>
+          <div class="knob"><label for="k2"><span class="kn">Per resource banked</span><span class="kv" id="v2">0.40</span></label>
+            <input type="range" id="k2" min="0" max="1.2" step="0.05" value="0.4">
+            <div class="kd">Naturally capped — 40 banked wins the round.</div></div>
+          <div class="knob"><label for="k3"><span class="kn">Per resource stolen</span><span class="kv" id="v3">1.20</span></label>
+            <input type="range" id="k3" min="0" max="3" step="0.1" value="1.2">
+            <div class="kd">Worth more than banking — it is the harder game. Capped at 12.</div></div>
+          <div class="knob"><label for="k4"><span class="kn">1st place bonus</span><span class="kv" id="v4">14</span></label>
+            <input type="range" id="k4" min="0" max="40" step="1" value="14">
+            <div class="kd">2nd / 3rd / 4th scale down at 57% · 36% · 21%.</div></div>
+          <div class="knob"><label for="k5"><span class="kn">Rested multiplier</span><span class="kv" id="v5">1.5×</span></label>
+            <input type="range" id="k5" min="1" max="3" step="0.1" value="1.5">
+            <div class="kd">First 3 rounds daily. Replaces login streaks — nothing can be lost.</div></div>
+          <button class="mini" id="reset" type="button">Reset to proposed values</button>
+        </div>
+        <div class="out">
+          <div class="tw"><table>
+            <thead><tr><th>Round</th><th class="num">Bank</th><th class="num">Steal</th><th class="num">Grain</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table></div>
+          <div class="verdict">
+            <div><span class="k">Best : worst</span><span class="v" id="ratio">—</span></div>
+            <div><span class="k">Avg / round</span><span class="v" id="avg">—</span></div>
+            <div><span class="k">20-min session</span><span class="v" id="sess">—</span></div>
+          </div>
+          <div class="flag ok" id="flag">—</div>
+        </div>
+      </div>
+    </div>
+    <h4>Why the ratio is the design</h4>
+    <p>In a four-player free-for-all the median player loses <strong>75% of rounds by construction</strong>, not by being bad. Around <strong>2:1</strong>, winning is clearly better and losing is clearly still worth the 45 seconds. Past 3:1 you rebuild the sting the short round exists to remove; toward 1:1 outcome stops mattering.</p>
+    <p>Try the second row — an Assassin who banks almost nothing and robs everyone. That player is doing the harder thing and the economy should say so, while the cap stops one dramatic robbery from outpaying a whole round of good play.</p>
+    <h4>It is also the anti-idling system, for free</h4>
+    <p>Participation pays for <em>finishing</em>, so a quitter gets nothing, and neither the bank nor the steal term pays anything for standing still. No separate detection is needed.</p>
+  </div>
+
+  <div class="block">
+    <h3>Flock Rank</h3>
+    <p>One track, fed by every Grain earned. The curve responds to whatever the calculator above says you earn per day.</p>
+    <div class="chartbox">
+      <canvas id="curve" width="860" height="250" role="img" aria-label="Cost of each Flock Rank level and cumulative experience required, flattening to a constant cost above level twenty"></canvas>
+      <div class="legend">
+        <span><i style="background:var(--gold-bright)"></i>Cost of each level</span>
+        <span><i style="background:var(--teal)"></i>Cumulative XP</span>
+        <span id="daysout" style="margin-left:auto;color:var(--gold)"></span>
+      </div>
+    </div>
+    <div class="rule-box gold">
+      <div class="rl">Above level 20 every level costs the same, permanently.</div>
+      <p>A level at 60 costs what a level at 20 cost, so a veteran's twenty minutes is never worth less than a newcomer's. What tapers is reward <em>density</em> — early levels pay a cosmetic each, later ones alternate — but the earn rate never drops. There is no wall, because walls exist to convert frustration into purchases and nothing here is sold to relieve frustration.</p>
+    </div>
+    <p><strong>The first reward lands around round four.</strong> If the first payoff does not arrive inside the first session <em>and</em> the first few minutes, the player never learns the system exists.</p>
+  </div>
+
+  <div class="block">
+    <h3>Two wallets that never touch</h3>
+    <div class="tw"><table>
+      <thead><tr><th>&nbsp;</th><th>Grain</th><th>Feathers</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Source</strong></td><td>Rounds only</td><td>Purchase, plus 25 per Flock Rank level</td></tr>
+        <tr><td><strong>Buys</strong></td><td>Anything that can be recoloured</td><td>Anything modelled, rigged or animated</td></tr>
+        <tr><td><strong>Converts</strong></td><td>Never</td><td>Never</td></tr>
+        <tr><td><strong>Stored as</strong></td><td>One integer</td><td><strong>Two ledgers</strong> — granted and purchased</td></tr>
+      </tbody>
+    </table></div>
+    <p>The split tracks <strong>production cost</strong>, which is the honest thing a paid currency should measure. A recolour is a material swap; a new rigged mesh is a full art-and-rigging pipeline run. That makes the shop defensible to players and removes the need to arbitrate item by item.</p>
+    <div class="rule-box warn">
+      <div class="rl">Feathers cannot ship as a single integer.</div>
+      <p>Purchased currency is not digital content, so unused purchased balance carries a 14-day withdrawal right. With one integer you cannot answer “how many purchased Feathers are still unspent” and will either over-refund or refuse a refund you owe. Two ledgers, spending granted first and then purchased oldest-first. <strong>A seam requirement — retrofitting touches save data, the cloud schema, and every grant site.</strong></p>
+    </div>
+  </div>
+
+  <div class="block">
+    <h3>The one number that cannot be frozen yet</h3>
+    <p>Everything above is per <em>round</em>, but session yield depends on how fast rounds cycle — and that is a matchmaking question, not a progression one. Cycling in place is roughly 51 seconds; returning to matchmaking between rounds is closer to 90. <strong>That is nearly a 2× swing in the whole economy, decided elsewhere.</strong></p>
+    <p>The constants are shaped correctly and the ratios hold either way. Sign off the absolute values once session flow is settled.</p>
+  </div>
+</div>
+
+<!-- ============ BUILD ============ -->
+<div class="view" id="v-build">
+  <div class="vhead">
+    <div class="eb">Build plan</div>
+    <h2>The pitch milestone, then everything after</h2>
+    <p>A pre-flight step, five slices to the pitch, then the rest. Every file and line below was re-checked against the working tree on 10 September. Click a slice for its tasks, files, tests and the condition that means it is finished. Ticks are remembered in this browser.</p>
+  </div>
+  <div class="rmtop">
+    <span class="prog" id="prog">—</span>
+    <button class="mini" id="clearticks" type="button">Clear all ticks</button>
+  </div>
+  <div class="rmwrap">
+    <div class="rmlist" id="rmlist"></div>
+    <div class="rmbody" id="rmbody"></div>
+  </div>
+  <div class="block" style="margin-top:26px">
+    <h3>What checking the code changed</h3>
+    <div class="grid2">
+      <div class="card"><h4>Round end is polled, not detected</h4><p>Solo runs in <code>GameMode.Single</code>, where a <code>ChangeDetector</code> can silently skip locally-written state — <code>PlayerBase</code> already documents this and polls instead. Detecting round end the obvious way would drop rewards <em>only in solo</em>: exactly the pitch build.</p></div>
+      <div class="card"><h4>Your peer runs the bots</h4><p>In solo, bot steals and deposits execute on your machine and reach the announcement interface. So the tracker records every chicken per round and <code>RoundEnded</code> names which one was you — which also makes “rob the round's leader” free.</p></div>
+      <div class="card"><h4>Steals had no chokepoint</h4><p>Five sites credited the thief by hand. One <code>ReceiveStolen</code> method now credits and announces, and a test fails if any steal path writes cargo directly — so a sixth steal ability cannot silently under-pay.</p></div>
+      <div class="card"><h4>The boundary is a test, not a compiler rule</h4><p>Everything compiles into one assembly, so nothing stops gameplay importing progression. Source-scanning tests enforce it instead, a pattern the suite already uses for steal RPCs. With no JSON package installed, the journal is JSON Lines via Unity's built-in serializer.</p></div>
+    </div>
+  </div>
+  <div class="block">
+    <h3>The two slices that change the pitch</h3>
+    <p><strong>Slices 3 and 4 — identity and goals.</strong> No backend, no store, no compliance work, no ongoing operation. Between them they deliver a profile, a nameplate, records, a career, daily goals and the onboarding ramp — everything a player experiences as “this game has progression”. Both are folds over a local journal.</p>
+    <p>Everything before them is plumbing and everything after is scale — which is exactly why the pitch milestone ends at slice 4.</p>
+    <h4>Deliberately not in the plan</h4>
+    <p><strong>Global leaderboards</strong> — a board fed by self-reported peer-to-peer results is a cheat magnet, and unlike a private wallet, cheating it is visible to everyone, which damages trust in the game rather than just the economy. <strong>A battle pass</strong> — a thin pass is worse than none and one cannot be fed monthly yet. <strong>An off-the-shelf economy service</strong> — its value is server-authoritative balances, unavailable here anyway.</p>
+  </div>
+</div>
+
+<!-- ============ RULES ============ -->
+<div class="view" id="v-rules">
+  <div class="vhead">
+    <div class="eb">Standing rules</div>
+    <h2>Directions that outlive this plan</h2>
+    <p>Each of these is the natural next thing somebody will ask for. Written down while nothing is sold, they cost nothing. Written down afterwards, they are an argument. These belong in the project conventions, not just here.</p>
+  </div>
+
+  <div class="block">
+    <h3>The boundary</h3>
+    <div class="rule-box">
+      <div class="rl">The game announces. Progression listens. Gameplay never learns that progression exists.</div>
+      <p>A handful of places that already bank resources, land steals and end rounds each gain a single additive line. Nothing branches on the result, nothing waits for it, and a build without progression binds a do-nothing implementation. That one interface is the entire coupling surface between the two halves of the project.</p>
+    </div>
+<pre><em>// One interface. Injected into gameplay. Null implementation when progression is off.</em>
+<b>IMatchEventSink</b>
+
+  RoundStarted      ( ruleset )
+  ResourceBanked    ( actorId, amount )                    <i>— ChickenCargo.FlushBaseDeposit</i>
+  ResourceStolen    ( actorId, victimActorId, amount )     <i>— ChickenCargo.ReceiveStolen</i>
+  OpponentDisabled  ( actorId )                            <i>— ChickenMatchStats.RPC_CreditKill</i>
+  AbilityResolved   ( actorId, abilityKey, connected )     <i>— AbilityController.TryActivate</i>
+  RoundEnded        ( standings, localActorId, duration )  <i>— GameManager, polled</i></pre>
+    <p><strong>Six verbs carry the entire meta layer.</strong> Every objective, record, career stat and currency award is a predicate or an accumulation over that stream. Nothing downstream needs a seventh.</p>
+    <ul>
+      <li><strong>Announcements are local.</strong> Each fires on the peer owning the action; nothing is sent over the network, so none can desync a round or cost bandwidth.</li>
+      <li><strong>Nothing branches on them.</strong> No return value, no await. Unheard, an announcement is a virtual call into an empty method.</li>
+      <li><strong>The ruleset travels with the round</strong>, so a result recorded today stays interpretable after the rules change.</li>
+    </ul>
+    <div class="grid2">
+      <div class="card"><h4>Progression may</h4><ul>
+        <li>Subscribe to the announcement interface</li>
+        <li>Accumulate what it hears into its own state</li>
+        <li>Own the shell — menu, character select, lobby, profile</li>
+        <li>Gate what the picker offers</li>
+        <li>Add a results line to the existing panel</li>
+      </ul></div>
+      <div class="card no"><h4>Progression may not</h4><ul>
+        <li>Read or write gameplay state directly</li>
+        <li>Send anything back into a running round</li>
+        <li>Change the round lifecycle, timing or restart flow</li>
+        <li>Touch anything the balance solver reads</li>
+        <li>Alter bot behaviour or difficulty</li>
+        <li>Grant anything that changes a stat, ever</li>
+      </ul></div>
+    </div>
+    <h4>The rule with no exceptions</h4>
+    <p>Class stats are <em>solved</em> against a per-class clear-time target, not hand-tuned. A reward as small as “+2% collection rate at Flock Rank 10” puts an unsolved number into a live round and makes the balance model a fiction. It is also exactly how a cosmetic economy turns into pay-to-win. Refused on both grounds — so everything progression grants is <strong>identity</strong>.</p>
+  </div>
+
+  <div class="block">
+    <h3>Storage: a journal, not a balance</h3>
+    <div class="rule-box">
+      <div class="rl">Record what happened. Never record what it earned.</div>
+      <p>Each round appends a record of <em>facts</em> — banked, stolen, placement, class, duration, and the ruleset in force. The wallet, rank, records and unlocks are all computed by folding that journal. They are derived state, never the source of truth.</p>
+    </div>
+    <p>The write order <em>is</em> the design: evaluate, then <strong>append and flush to disk</strong>, then fold and raise events, then fire-and-forget sync. Four things this buys:</p>
+    <ul>
+      <li><strong>Offline play works properly.</strong> Twenty rounds with no network, then signing in on a second device, resolves as a union of both journals by round id, re-folded. The fold is order-independent and ignores duplicates.</li>
+      <li><strong>Rewards cannot be silently dropped.</strong> A sync failure is then a legitimate no-op — the network is down, that is the game working. Only a disk failure is a real error, and that one must reach the player, not a log nobody reads mid-playtest.</li>
+      <li><strong>Records added later credit historical play.</strong> A record shipped in six months evaluates over the whole journal, so a player who already did the thing gets it immediately. Store only a balance and every new record starts everyone at zero.</li>
+      <li><strong>The trust boundary can move without an economy reset.</strong> A server later re-runs the same pure function over the same facts, and every historical round is re-checkable.</li>
+    </ul>
+    <h4>Do not pretend obfuscation is protection</h4>
+    <p>Sign the local file if you like, but only ever as <em>detection</em>. A team that documents obfuscation as anti-tamper stops thinking about the real problem. When a server does land, the cheapest effective check is a clock, not a physics model — rounds cycle roughly every 54 seconds, so no honest account submits more than about 66 an hour.</p>
+    <h4>Conflicts resolve in the player's favour</h4>
+    <p>Spend the same Grain on two devices while offline and the merge honours both unlocks, floors the wallet at zero, and writes an entry recording the shortfall. Revoking content someone is looking at is far worse than a small leak.</p>
+  </div>
+
+  <div class="block">
+    <h3>Compliance — five rules</h3>
+    <div class="rule-box">
+      <div class="rl">1 · No Grain↔Feather conversion, in either direction, ever.</div>
+      <p>European guidance excludes currencies obtainable <em>solely</em> through gameplay from its scope entirely — which is what keeps Grain out of it. The moment an exchange exists, Grain becomes purchasable by another route and drops back in. This single rule is the difference between a defensible one-hop design and the multi-hop structure that drew a $20M settlement elsewhere.</p>
+    </div>
+    <div class="rule-box">
+      <div class="rl">2 · Real-money equivalents always shown, always at the base rate.</div>
+      <p>Every Feather price renders with its euro equivalent adjacent, computed from the smallest pack — never the best-value one. Most storefronts naively use the discounted rate, which understates the true cost. All prices and drips sit on a 50-unit grid so nobody is left holding a stranded balance, and an exact top-up is always available.</p>
+    </div>
+    <div class="rule-box">
+      <div class="rl">3 · Every item also carries a direct real-money price.</div>
+      <p>Buy this skin for €4.49, no currency involved. Regulators have <em>ordered</em> this as a remedy elsewhere; building it from the start turns a remedy into a defence. Pair it with a remote flag that switches Feather sales off while the store keeps working — if the rules tighten, that is an afternoon rather than a rebuild.</p>
+    </div>
+    <div class="rule-box">
+      <div class="rl">4 · Real-money spending is off by default.</div>
+      <p>A cartoon chicken game will be played by children whether or not they are the audience, and “we didn't target them” is not a defence anyone accepts. Spending unlocks only through a parental gate. No countdown offers, ever. Use the platform age-signal API rather than collecting birthdates — asking for a birthdate creates the consent obligation you are trying to satisfy.</p>
+    </div>
+    <div class="rule-box">
+      <div class="rl">5 · No free text anywhere. Hold this line.</div>
+      <p>With quick chat instead of a message box there is nothing to filter, nothing to report, no message logs to retain and later delete, and no children's communications to answer for. The friends graph is still personal data and still needs consent and an age bracket — but that is a form and a flag, not an operations team. A text box added later reinstates every obligation this rule removes.</p>
+    </div>
+    <p class="note">Not legal advice. Get a Spanish consumer-law review before the first euro moves, and cover the friends graph in the same pass.</p>
+  </div>
+
+  <div class="block">
+    <h3>Remote config, in one line</h3>
+    <div class="rule-box">
+      <div class="rl">It may change what things cost and how fast you earn them. It may never change what happens inside a round.</div>
+      <p>Two independent reasons. A remotely-altered match rule means the balance model and the live game disagree while every test still passes. And in a peer-to-peer session, a client with a stale config simulates different rules from its opponents — that is a desync, not a balance question.</p>
+    </div>
+  </div>
+
+  <div class="block">
+    <h3>Naming, so two documents cannot drift</h3>
+    <div class="tw"><table>
+      <thead><tr><th>Term</th><th>Means</th><th>Never</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Grain</strong></td><td>Soft currency, earned only</td><td>Purchasable; convertible</td></tr>
+        <tr><td><strong>Feathers</strong></td><td>Hard currency, purchased + dripped</td><td>An XP track — an earlier research doc used this word for XP, and an agent reading both would wire XP into the paid wallet</td></tr>
+        <tr><td><strong>Flock Rank</strong></td><td>The account XP track</td><td>Per-class; a competitive rank</td></tr>
+        <tr><td><strong>Mastery</strong></td><td>Per-class recognition — a ring and an emblem</td><td>A reward track that pays out</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ============ RISKS ============ -->
+<div class="view" id="v-risks">
+  <div class="vhead">
+    <div class="eb">Risks &amp; calls</div>
+    <h2>What was decided, and what could still bite</h2>
+    <p>The decision log first, because most risks below are consequences of a call rather than accidents. Every one of these was made with its cost visible.</p>
+  </div>
+
+  <div class="block">
+    <h3>Decision log</h3>
+    <div id="decs"></div>
+  </div>
+
+  <div class="block">
+    <h3>Accepted risks</h3>
+    <div class="risk">
+      <div class="rh2"><span class="rt2">Withdrawal-right engineering</span><span class="sev high">Most underestimated</span></div>
+      <p>A real 14-day refund flow with tranche accounting and a separate consent click is work most solo developers never do — and they are quietly non-compliant as a result. It must be in the data model from day one; retrofitting touches save data and every grant site.</p>
+    </div>
+    <div class="risk">
+      <div class="rh2"><span class="rt2">The pressure to add a text box</span><span class="sev med">Watch this one</span></div>
+      <p>Quick chat will feel limiting to somebody within a week of launch, and “just a small text field” is the most reasonable-sounding request in this whole document. It is not small: it reinstates the filter, the report queue, the retention policy and the staffing in a single commit. The phrase set <em>is</em> the compliance posture — treat widening it as a design change and adding free text as a company decision.</p>
+    </div>
+    <div class="risk">
+      <div class="rh2"><span class="rt2">A dropped announcement is silent</span><span class="sev med">Cost of the event model</span></div>
+      <p>A future refactor that moves the deposit path and forgets the emit produces no error, no warning, and a quietly under-paying economy. Mitigated by a test per site, which is why the announcement sites are their own build slice rather than an afterthought.</p>
+    </div>
+    <div class="risk">
+      <div class="rh2"><span class="rt2">A new player meets veterans mid-ramp</span><span class="sev med">Accepted</span></div>
+      <p>The ramp does not gate matchmaking, so a day-three player can face a full roster. Largely defused by the full-kit choice — the gap is breadth, not power — but it is the first thing to watch in a real playtest rather than something to assume away.</p>
+    </div>
+    <div class="risk">
+      <div class="rh2"><span class="rt2">Two currencies in one game</span><span class="sev low">Argued, not immune</span></div>
+      <p>Mixing currencies is named in European guidance. The defence is that only one is purchasable and there is no exchange between them — a genuinely good argument, and one that evaporates the instant anyone ships a conversion.</p>
+    </div>
+    <div class="risk">
+      <div class="rh2"><span class="rt2">Tightening EU rules on in-game currency</span><span class="sev low">Real, long-dated</span></div>
+      <p>Proposed legislation has not landed and realistic binding effect is years out. The worst-case mitigations — a direct real-money path and a kill switch — are already compliance rules 3 and 4. A reason to build the compliant version, not evidence the two-wallet decision was wrong.</p>
+    </div>
+  </div>
+
+  <div class="block">
+    <h3>Open, and owned elsewhere</h3>
+    <ul>
+      <li><strong>Round cadence</strong> — the ~2× economy swing described in Numbers. Belongs to the matchmaking thread.</li>
+      <li><strong>The tutorial scene</strong> — step 0's scripted intro. Nothing resembling it exists in the project; it feeds progression but is not progression, and deserves its own thread.</li>
+      <li><strong>Chosen versus generated usernames</strong> — the last free-text decision, currently recommended as generated.</li>
+    </ul>
+    <h4>What this plan closes</h4>
+    <p>The currency earn formula has been an open design question for the life of the project. This proposes an actual answer, with every constant isolated in one asset so the whole economy can be retuned from a single place after the first real playtest — rather than hunted down across a dozen files.</p>
+  </div>
+</div>
+
+  </div></main>
+</div>
+
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id);};
+
+/* ---------- theme ---------- */
+var root=document.documentElement;
+$("tbtn").addEventListener("click",function(){
+  var cur=root.getAttribute("data-theme");
+  if(!cur){cur=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}
+  root.setAttribute("data-theme",cur==="dark"?"light":"dark");
+  drawCurve();
+});
+
+/* ---------- views ---------- */
+var vbtns=[].slice.call(document.querySelectorAll(".vbtn"));
+vbtns.forEach(function(b){
+  b.addEventListener("click",function(){
+    vbtns.forEach(function(o){o.classList.toggle("on",o===b);});
+    ["overview","design","numbers","build","rules","risks"].forEach(function(v){
+      $("v-"+v).classList.toggle("on",v===b.dataset.v);
+    });
+    window.scrollTo(0,0);
+    if(b.dataset.v==="numbers")drawCurve();
+  });
+});
+
+/* ---------- loop ---------- */
+var LOOP=[
+ {n:"Open the app",q:"Where do I stand?",t:"The shell answers before you tap anything",
+  d:"Nameplate, Grain, this week's three goals and today's first-game task — all on the main menu without navigating. A returning player should learn where they stand in about a second.",s:"Identity · Grain · Weekly goals · Daily task"},
+ {n:"Pick a chicken",q:"Who am I today?",t:"Character select carries the mastery story",
+  d:"Four mastery rings, one per class, so you see your whole relationship with the roster at a glance on the screen where you actually choose. For a new player, locked cards name the ramp step that opens them.",s:"Class mastery · Ramp gating"},
+ {n:"Play 45 seconds",q:"—",t:"Progression is completely absent",
+  d:"Nothing is drawn in the arena. The game only announces what happened — six one-line calls that nothing waits on. The round is too short to spare attention, and a currency popup would evict a steal confirmation.",s:"Announcements only"},
+ {n:"Results",q:"What did that earn?",t:"The delta, and nothing else",
+  d:"One line: Grain earned, plus any record, goal or daily task that ticked. It is written to disk before it is drawn, so skipping the screen can never lose it.",s:"Grain · Records · Goals · Daily task"},
+ {n:"Between rounds",q:"What am I close to?",t:"The lobby is the best unused space in the game",
+  d:"Pure dead time waiting for a fourth. The week's goals and today's task live here at rest, with room to be read — the results panel shows the delta, the lobby shows the state.",s:"Weekly goals · Daily task · Ramp"},
+ {n:"End of session",q:"What have I built?",t:"The profile is the destination",
+  d:"Nameplate, career, records. This is where a session's worth of small numbers becomes something a player recognises as theirs — and the screen that gives cosmetics a reason to exist later.",s:"Identity · Career · Records"},
+ {n:"Tomorrow",q:"Why come back?",t:"Additive hooks only, nothing breakable",
+  d:"A new first-game task appears and rested resets; this week's goals are still waiting. Nothing is lost by skipping a day, a bad first round never burns the task, and no streak has to be protected.",s:"Daily task · Rested · Weekly goals"}
+];
+var loopEl=$("loop"),loopOut=$("loopout");
+function paintLoop(i){
+  var L=LOOP[i];
+  loopOut.innerHTML='<h4>'+L.t+'</h4><p>'+L.d+'</p><div class="sys">'+L.s+'</div>';
+  [].forEach.call(loopEl.children,function(b,j){b.classList.toggle("on",i===j);});
+}
+LOOP.forEach(function(L,i){
+  var b=document.createElement("button");
+  b.type="button";b.className="lnode";
+  b.innerHTML='<span class="ln">'+(i+1)+'</span><span class="lt">'+L.n+'</span><span class="lq">'+L.q+'</span>';
+  b.addEventListener("click",function(){paintLoop(i);});
+  loopEl.appendChild(b);
+});
+paintLoop(0);
+
+/* ---------- nameplate ---------- */
+var TITLES=[
+ {t:"The Unbanked",s:"Win banking under 15"},
+ {t:"Three-Time Thief",s:"Rob 3 rivals in a round"},
+ {t:"Empty Beak",s:"More stolen than banked"},
+ {t:"Full Coop",s:"Bank 40 in one round"}
+];
+var EMBS=[{e:"🐔",s:"Warrior M7"},{e:"🐤",s:"Speedy M4"},{e:"🥚",s:"Fatty M2"},{e:"🗡️",s:"Assassin M1"}];
+var BANS=[{n:"Barnwood",s:"Flock 5"},{n:"Harvest",s:"Flock 12"},{n:"Midnight",s:"Shop"},{n:"First Flock",s:"Season 1"}];
+var pick={t:0,e:0,b:1};
+function opts(host,arr,key,label){
+  host.innerHTML="";
+  arr.forEach(function(o,i){
+    var b=document.createElement("button");
+    b.type="button";b.className="opt"+(pick[key]===i?" on":"");
+    b.innerHTML='<span>'+label(o)+'</span><span class="src">'+o.s+'</span>';
+    b.addEventListener("click",function(){pick[key]=i;paintPlate();});
+    host.appendChild(b);
+  });
+}
+function paintPlate(){
+  $("np-ti").textContent=TITLES[pick.t].t;
+  $("np-emb").textContent=EMBS[pick.e].e;
+  $("np-rk").textContent="Flock Rank 12 · "+EMBS[pick.e].s.replace("M"," Mastery ");
+  $("np-emb").style.borderColor=pick.b===2?"var(--plum)":"var(--gold-bright)";
+  $("np-emb").style.background=pick.b===2?"var(--plum-wash)":"var(--gold-wash)";
+  document.querySelector(".plate").style.borderColor=pick.b===2?"var(--plum)":"var(--gold-bright)";
+  opts($("np-titles"),TITLES,"t",function(o){return o.t;});
+  opts($("np-embs"),EMBS,"e",function(o){return o.e+" "+o.s.split(" ")[0];});
+  opts($("np-bans"),BANS,"b",function(o){return o.n;});
+  $("np-foot").innerHTML='<b>Earned, not bought:</b> the title “'+TITLES[pick.t].t+
+    '” and the '+EMBS[pick.e].s.split(" ")[0]+' emblem. The banner is the only purchasable part on this plate.';
+}
+paintPlate();
+
+/* ---------- records ---------- */
+var RECS=[
+ {n:"Bank 40 in a single round",g:"Foraging",t:"Full Coop",lose:false},
+ {n:"Bank 30 as Speedy",g:"Foraging",t:"Featherweight Hauler",lose:true},
+ {n:"Finish a round never having been robbed",g:"Foraging",t:"Untouchable",lose:true},
+ {n:"Rob three different rivals in one round",g:"Thievery",t:"Three-Time Thief",lose:true},
+ {n:"Steal 20 in a single round",g:"Thievery",t:"Highway Hen",lose:true},
+ {n:"Finish with more stolen than banked",g:"Thievery",t:"Empty Beak",lose:true},
+ {n:"Win a round banking under 15",g:"Denial",t:"The Unbanked",lose:false},
+ {n:"Deny an execute",g:"Denial",t:"Last Feather",lose:true},
+ {n:"Rob the round's leader",g:"Denial",t:"Kingslayer",lose:true},
+ {n:"Win with every class",g:"Mastery",t:"Whole Flock",lose:false},
+ {n:"Win with all eight specializations",g:"Mastery",t:"Coop Scholar",lose:false},
+ {n:"Reach Mastery 10 on any class",g:"Mastery",t:"Devoted",lose:true}
+];
+var recFilter="all";
+var GROUPS=["all","Foraging","Thievery","Denial","Mastery","losing"];
+function paintRecs(){
+  var bar=$("recbar");bar.innerHTML="";
+  GROUPS.forEach(function(g){
+    var b=document.createElement("button");
+    b.type="button";b.className="fbtn"+(recFilter===g?" on":"");
+    b.textContent=g==="all"?"All":(g==="losing"?"Achievable while losing":g);
+    b.addEventListener("click",function(){recFilter=g;paintRecs();});
+    bar.appendChild(b);
+  });
+  var list=$("recs");list.innerHTML="";
+  RECS.filter(function(r){
+    if(recFilter==="all")return true;
+    if(recFilter==="losing")return r.lose;
+    return r.g===recFilter;
+  }).forEach(function(r){
+    var d=document.createElement("div");
+    d.className="rec";
+    d.innerHTML='<span class="rn">'+r.n+'</span><span class="rt">'+r.t+'</span>'+
+      '<span class="rl'+(r.lose?"":" win")+'">'+(r.lose?"Losing OK":"Needs a win")+'</span>';
+    list.appendChild(d);
+  });
+}
+paintRecs();
+
+/* ---------- ramp ---------- */
+var STEPS=[
+ {t:"First Cluck",when:"Round 1 · one button",g:["Warrior","Peck"],l:["3 slots hidden"],
+  d:"The whole loop and nothing else: move, stand on a pile, fill up, walk home, deposit, watch the clock.",
+  o:"ResourceBanked totalling 10 in one round",
+  w:"<b>The objective is derived, not guessed.</b> A Warrior clears 40 in about 35 seconds, so ten uncontested is roughly nine seconds of a 45-second round. A first round has to end in a completed objective, not a loss."},
+ {t:"Getting Robbed",when:"Rounds 2–3 · three buttons",g:["Egg Shell","Headbutt"],l:[],
+  d:"Cargo is a liability, and you can do something about the chicken coming for it. Defence and control arrive together because they answer the same threat.",
+  o:"Headbutt connects twice in one round, or bank 20",
+  w:"<b>Two grants, one lesson.</b> Egg Shell is the one ability every class can take, so it transfers permanently. Headbutt has the shortest cooldown in the game, so a misfire while learning to aim costs four seconds rather than twelve. \u201cConnects\u201d is free to measure — the cast already counts who it reached."},
+ {t:"Your Loadout",when:"Rounds 4–5 · full kit",g:["Scrap","Full Warrior pool","Specialization"],l:[],
+  d:"Theft converts a won fight into resources — and the loadout becomes a decision. A specialization reshapes what you build around.",
+  o:"ResourceStolen totalling 5 in one round",
+  w:"<b>Still the keystone.</b> The player now holds one ability of every category — steal, control, defence, utility — which a test can assert. And the specialization choice is between Scrap and Headbutt, the two abilities they have just used."},
+ {t:"Other Chickens",when:"Rounds 6–8",g:["Fatty","Speedy","Assassin"],l:[],
+  d:"Three more games, suggested one per round in a fixed order, so each new class changes one thing at a time.",
+  o:"RoundStarted once as each remaining class",
+  w:"<b>Fatty first, Assassin last.</b> Fatty moves at exactly the Warrior's speed, so only the cargo axis changes. The Assassin is genuinely bad at farming and sits outside the balance model; handing it over early would teach that this game is about theft."}
+];
+var stepsEl=$("steps"),stepBody=$("stepbody");
+function paintStep(i){
+  var s=STEPS[i];
+  stepBody.innerHTML='<div class="when">'+s.when+'</div><h4>'+s.t+'</h4>'+
+   '<div class="chips">'+s.g.map(function(x){return '<span class="chip">'+x+'</span>';}).join("")+
+   s.l.map(function(x){return '<span class="chip q">'+x+'</span>';}).join("")+'</div>'+
+   '<p style="font-size:14px;color:var(--ink-2)">'+s.d+'</p>'+
+   '<div class="why">'+s.w+'</div>'+
+   '<div class="objl"><b>Objective →</b> '+s.o+'</div>';
+  [].forEach.call(stepsEl.children,function(b,j){b.classList.toggle("on",i===j);});
+}
+STEPS.forEach(function(s,i){
+  var b=document.createElement("button");
+  b.type="button";b.className="step";
+  b.innerHTML='<span class="sn">'+i+'</span><span class="st">'+s.t+'</span>';
+  b.addEventListener("click",function(){paintStep(i);});
+  stepsEl.appendChild(b);
+});
+paintStep(0);
+
+/* ---------- roadmap ---------- */
+var SLICES=[
+{id:"P",n:"Pre-flight — land the in-flight work",ph:"Before anything",dep:"—",when:"now",
+ goal:"50 files (+2,863 / −452) of shipped, green work — the ability-feedback audit, RPC hardening, CastArchetype, Ability Lab — are uncommitted, and they overlap almost every file the next five slices edit. Commit them, then branch from that commit.",
+ tasks:["Unfiltered EditMode run on the current tree — STATE.md records 562/562","Commit the in-flight work via /housekeeping","Create feature/progression from that commit"],
+ files:[],
+ tests:["Unfiltered EditMode run is green before branching"],
+ done:"git status is clean on develop and feature/progression exists. Reverting any progression slice can never take the feedback work with it."},
+{id:"0",n:"Contract & stable keys",ph:"Pitch milestone",dep:"Pre-flight",when:"now",
+ goal:"The seam and the permanent identifiers, before anything persists. Ships nothing visible and changes no behaviour.",
+ tasks:["Create IMatchEventSink with the six verbs","Create the RoundRuleset and RoundStandings types","Create NullMatchEventSink and bind it in ProjectInstaller","Add a fill-once, never-overwrite unlock key to AbilityBaseSO","Add an explicit ChickenClass → key table, never derived from ToString()","Commit a key manifest for the stability test"],
+ files:[["new","Progression/IMatchEventSink.cs"],["new","Progression/NullMatchEventSink.cs"],["new","Progression/RoundTypes.cs"],["new","Progression/UnlockKeyTable.cs"],["mod","Abilities/AbilityBaseSO.cs"],["mod","Installers/ProjectInstaller.cs"],["mod","Editor/Tests/TestAssets.cs"],["new","Editor/Tests/UnlockKeyTests.cs"]],
+ tests:["Every ability asset has a non-empty key","Keys are unique across the asset set","Keys match the committed manifest — a rename fails the suite, not the player"],
+ done:"Suite green (562 + new) and nothing about the game behaves differently."},
+{id:"1",n:"Announcement sites",ph:"Pitch milestone",dep:"Slice 0",when:"now",
+ goal:"The game starts talking: one-line announcements at sites that already do the thing, plus one chokepoint that makes a steal impossible to miss.",
+ tasks:["ResourceBanked in ChickenCargo.FlushBaseDeposit, beside RPC_AddDeposit (ChickenCargo.cs:342)","Add ChickenCargo.ReceiveStolen(amount, victim) — credits the thief and announces","Route all five steal sites through it: Snatch :75, SneakySteal :63, Scrap :77, RollTrample :106, Spine Coat steal-back ChickenController :1205","OpponentDisabled inside ChickenMatchStats.RPC_CreditKill (:45) — runs on the attacker's peer","AbilityResolved beside LastCastEventId++ (AbilityController.cs:674), connected = hitCount > 0 (:640)","RoundStarted / RoundEnded from a LateUpdate poll of GameManager.State — not a ChangeDetector","Standings builder: FoodTotal descending, ties share the better placement","Recording test sink and boundary source-scan tests"],
+ files:[["mod","Gameplay/ChickenCargo.cs"],["mod","Abilities/SnatchAbilitySO.cs"],["mod","Abilities/SneakyStealAbilitySO.cs"],["mod","Abilities/ScrapAbilitySO.cs"],["mod","Abilities/RollTrampleAbilitySO.cs"],["mod","Gameplay/ChickenController.cs"],["mod","Gameplay/ChickenMatchStats.cs"],["mod","Gameplay/AbilityController.cs"],["mod","Gameplay/GameManager.cs"],["new","Editor/Tests/MatchEventSinkTests.cs"],["new","Editor/Tests/ProgressionBoundaryTests.cs"]],
+ tests:["One assertion per announcement site","No Gameplay/ or Abilities/ file references progression beyond the sink","No steal path writes Cargo directly outside ReceiveStolen (Peck foraging allowlisted)","The poll fires exactly once per transition, including the restart path","ReceiveStolen credits exactly what the raw write did"],
+ done:"In a solo round, a recording sink captures all four chickens' streams and RoundEnded names the human."},
+{id:"2",n:"Tracker, journal, Grain",ph:"Pitch milestone",dep:"Slice 1",when:"now",
+ goal:"The first number that persists — and an actual answer to the earn-formula question the GDD has left open.",
+ tasks:["MatchTracker: the real sink, bucketing every actor's events per round","RoundOutcome — facts only, no currency field","ProgressionRules.Evaluate — a pure static function","ProgressionConfigSO: the five earn constants plus the daily-task bonus","JournalStore: JSON Lines via JsonUtility, appended and flushed before anything is shown","IProgressionService + ProgressionService — no Null implementation; IsReady=false hides the UI","Bind in ProjectInstaller with the null-fallback and loud warning _matchConfig uses","One \u201c+N Grain\u201d line on the existing results panel"],
+ files:[["new","Progression/MatchTracker.cs"],["new","Progression/RoundOutcome.cs"],["new","Progression/ProgressionRules.cs"],["new","Progression/ProgressionConfigSO.cs"],["new","Progression/JournalStore.cs"],["new","Progression/ProgressionService.cs"],["new","Data/Progression/ProgressionConfig.asset"],["mod","Installers/ProjectInstaller.cs"],["mod","UI/MatchOverlaysController.cs"]],
+ tests:["Fold is deterministic and order-independent","Evaluate is total — earned zero is not the same as could not evaluate","A torn final line is dropped and reported, never silently","The journal is written before the results panel draws","Expectations read from the loaded config asset, never literals","The new ProjectContext slot resolves to the real asset"],
+ done:"Twenty solo rounds, quit, relaunch — the balance is right. Kill the process mid-results — the award survives."},
+{id:"3",n:"Identity — profile, nameplate, records",ph:"Pitch milestone",dep:"Slice 2",when:"now",
+ goal:"A player becomes somebody. No backend: every screen is a fold over the local journal.",
+ tasks:["Profile page — add it to MenuUiController and turn SetPage's per-page if-chain into a page list","Generated names: adjective + noun + #NNNN, re-rollable","Nameplate composer — name, title, banner, emblem","RecordDefinitionSO + RecordEngine: predicates over the whole journal","Career view — lifetime, per class, recent twenty, personal bests","Mastery rings on the class chips (chip loop MenuUiController.cs:306)","Persistent progression strip on the main menu"],
+ files:[["new","UI/Profile.uxml"],["new","UI/ProfileController.cs"],["new","Progression/NameGenerator.cs"],["new","Progression/RecordDefinitionSO.cs"],["new","Progression/RecordEngine.cs"],["mod","UI/MenuUiController.cs"],["mod","UI/MainMenu.uxml"],["mod","UI/CharacterSelect.uxml"]],
+ tests:["Record predicates are pure and re-evaluable over history","A record added later credits play that already happened","Every nameplate has at least one non-purchasable part","New glyphs are USS shapes or sprites, never codepoints"],
+ done:"Profile, nameplate, records and career all render from local play — and a new record definition credits a player who already earned it."},
+{id:"4",n:"Weekly goals, daily task, ramp",ph:"Pitch milestone",dep:"Slice 3",when:"now",
+ goal:"A reason to come back today and this week, and a guided way in for new players. The pitch milestone ends here.",
+ tasks:["GoalTemplateSO: template × threshold tiers — cumulative tiers for the week, single-round tiers for the daily task","Weekly rotation seeded by ISO week — shows the refresh day, never a ticking countdown","Daily first-game task: one single-round template per day, shown before the first round, open all day","Hide the daily task while the ramp runs — the ramp's objectives are the task","Four RampStepSO assets — asset references, never scene-baked","RampController with the 3-attempt auto-complete","Locked state in MakeAbilityCard, not the RebuildPickRows filter","Gate the class chips; refuse on the press with a reason","Show the week's goals and today's task at rest in the lobby"],
+ files:[["new","Progression/GoalTemplateSO.cs"],["new","Progression/GoalRotation.cs"],["new","Progression/DailyTask.cs"],["new","Progression/RampStepSO.cs"],["new","Progression/RampController.cs"],["mod","UI/MenuUiController.cs"],["mod","UI/CharacterSelect.uxml"],["mod","UI/Lobby.uxml"]],
+ tests:["Ramp loadouts resolve against AbilityRegistrySO.All","After step 3 the player holds every AbilityCategory","Every goal and daily task is completable without placing first","The daily task survives a failed first round","Ramp state is never a networked property","No step can stall past three attempts"],
+ done:"A fresh profile walks the ramp in at most twelve rounds; a returning one gets three weekly goals and a daily task it can complete while losing."},
+{id:"5",n:"Flock Rank, collections, cosmetics",ph:"After the pitch",dep:"Slice 3",when:"later",
+ goal:"The reward ladder and a place for rewards to live. Needs real cosmetic items — a collections screen of placeholders reads worse than none.",
+ tasks:["RewardTrackSO — the ladder as data","Level curve with the flat cap above 20","Collections screen, owned and unowned together","CosmeticItemSO; Grain spending"],
+ files:[["new","Progression/RewardTrackSO.cs"],["new","Progression/CosmeticItemSO.cs"],["new","UI/Collections.uxml"]],
+ tests:["No Feather-priced item references an ability, stat or balance input","A spend never partially applies"],
+ done:"Levelling pays out visible items and the collections screen shows every gap with its source."},
+{id:"6",n:"Cloud save",ph:"After the pitch",dep:"Slice 2",when:"later",
+ goal:"The profile survives a reinstall and follows the player to a second device.",
+ tasks:["Add the Cloud Save package","Boot-time silent sign-in that never blocks the menu","CloudSaveProfileStore and union-merge by round id","Compaction that never removes unsynced entries"],
+ files:[["mod","Services/IUGSService.cs"],["mod","Services/UGSService.cs"],["new","Progression/CloudSaveProfileStore.cs"]],
+ tests:["Merging two disjoint journals equals the sum of both","Sign-in failure leaves the game fully playable"],
+ done:"Offline rounds on Windows and the Pixel 9 merge without loss or double-counting."},
+{id:"7",n:"Social — quick chat, friends",ph:"After the pitch",dep:"Slice 6",when:"later",
+ goal:"Somebody to show the nameplate to. No free text anywhere.",
+ tasks:["Quick-chat phrase set","Friends by code","Age bracket via the platform age-signal API","Friend leaderboards","Optional chosen names behind a denylist"],
+ files:[["new","Social/FriendsService.cs"],["new","Progression/QuickChatSO.cs"]],
+ tests:["No user-authored string is ever transmitted","Below the consent age, the friends list is unreachable"],
+ done:"Two accounts befriend by code and invite each other with a phrase."},
+{id:"8",n:"Analytics, then remote config",ph:"After the pitch",dep:"Slice 5",when:"later",
+ goal:"Measure first, then acquire the ability to retune.",
+ tasks:["About three events per round","Remote config for prices, earn constants and flags only","Consent and age-gate flow"],
+ files:[["new","Progression/ProgressionAnalytics.cs"]],
+ tests:["No remote key can alter a match rule or balance input"],
+ done:"A week of real sessions defends or revises the five constants — as an asset edit, not a build."},
+{id:"9",n:"Seasons, store, server authority",ph:"Post-funding",dep:"Slice 8",when:"later",
+ goal:"Everything involving real money or a server. Deliberately last.",
+ tasks:["A season as a second RewardTrackSO","Feathers two-ledger wallet","A direct real-money path on every item","The 14-day withdrawal flow","Server-side Evaluate"],
+ files:[["new","Progression/FeatherLedger.cs"],["new","Progression/StoreService.cs"]],
+ tests:["Granted Feathers are spent before purchased","No path converts between Grain and Feathers"],
+ done:"A season ships as an asset, and a purchase refunds correctly within fourteen days."}
+];
+
+var TICKKEY="cw-prog-ticks-v2";
+var ticks={};
+try{ticks=JSON.parse(localStorage.getItem(TICKKEY)||"{}")||{};}catch(e){ticks={};}
+function saveTicks(){try{localStorage.setItem(TICKKEY,JSON.stringify(ticks));}catch(e){}}
+
+var curSlice=0;
+function sliceProgress(s){
+  var done=0;
+  s.tasks.forEach(function(_,i){if(ticks[s.id+":"+i])done++;});
+  return {done:done,total:s.tasks.length};
+}
+function paintList(){
+  var host=$("rmlist");host.innerHTML="";
+  var lastPh="";
+  SLICES.forEach(function(s,i){
+    if(s.ph!==lastPh){
+      var h=document.createElement("div");
+      h.className="phase";h.textContent=s.ph;host.appendChild(h);lastPh=s.ph;
+    }
+    var p=sliceProgress(s);
+    var b=document.createElement("button");
+    b.type="button";b.className="sl"+(i===curSlice?" on":"");
+    b.innerHTML='<span class="si">'+(s.id==="P"?"P":"S"+s.id)+'</span><span class="sb"><span class="sn">'+s.n+
+      '</span><span class="sm">'+p.done+' / '+p.total+' tasks</span>'+
+      '<span class="bar"><i style="width:'+(p.total?Math.round(100*p.done/p.total):0)+'%"></i></span></span>';
+    b.addEventListener("click",function(){curSlice=i;paintList();paintSlice();});
+    host.appendChild(b);
+  });
+  var td=0,tt=0;
+  SLICES.forEach(function(s){var p=sliceProgress(s);td+=p.done;tt+=p.total;});
+  $("prog").innerHTML='<b>'+td+'</b> of '+tt+' tasks ticked across '+SLICES.length+' slices';
+}
+function paintSlice(){
+  var s=SLICES[curSlice];
+  var h='<div class="rh"><h3>'+s.n+'</h3><span class="tag">'+(s.id==="P"?"Pre-flight":"Slice "+s.id)+'</span>'+
+    '<span class="tag dep">Depends: '+s.dep+'</span>'+
+    '<span class="tag '+(s.when==="later"?"later":"now")+'">'+(s.when==="later"?"After the pitch":"Pitch milestone")+'</span></div>'+
+    '<p class="goal">'+s.goal+'</p>';
+
+  h+='<div class="sec"><div class="sh">Tasks</div>';
+  s.tasks.forEach(function(t,i){
+    var k=s.id+":"+i,on=!!ticks[k];
+    h+='<label class="task'+(on?" done":"")+'" data-k="'+k+'"><input type="checkbox"'+(on?" checked":"")+'><span>'+t+'</span></label>';
+  });
+  h+='</div>';
+
+  if(s.files.length){h+='<div class="sec"><div class="sh">Files</div><div class="flist">';
+  s.files.forEach(function(f){
+    h+='<div class="f"><span class="fk '+f[0]+'">'+(f[0]==="new"?"new":"mod")+'</span><span>'+f[1]+'</span></div>';
+  });
+  h+='</div></div>';}
+
+  h+='<div class="sec"><div class="sh">Must be tested against</div><ul style="margin-top:4px;font-size:13.5px;color:var(--ink-2)">';
+  s.tests.forEach(function(t){h+='<li>'+t+'</li>';});
+  h+='</ul></div>';
+
+  h+='<div class="done-when"><b>Done when</b>'+s.done+'</div>';
+  $("rmbody").innerHTML=h;
+
+  [].forEach.call($("rmbody").querySelectorAll(".task"),function(l){
+    l.addEventListener("click",function(ev){
+      if(ev.target.tagName!=="INPUT")ev.preventDefault();
+      var k=l.dataset.k;
+      ticks[k]=!ticks[k];
+      if(!ticks[k])delete ticks[k];
+      saveTicks();paintSlice();paintList();
+    });
+  });
+}
+$("clearticks").addEventListener("click",function(){
+  ticks={};saveTicks();paintSlice();paintList();
+});
+paintList();paintSlice();
+
+/* ---------- decisions ---------- */
+var DECS=[
+ {q:"Is this shipping F2P, or a demo?",a:"A retention spine, monetization-ready",
+  r:"Self-contained and complete now, with clean seams for a store later. The funding round is pitched on this working, not on it earning."},
+ {q:"How does progression get its data?",a:"The game announces; progression listens",
+  r:"Six generic verbs through one injected interface. Chosen over reading gameplay state because it survives a franchise reskin, makes objectives predicates rather than plumbing, and is testable with no scene and no networking."},
+ {q:"Does progression gate gameplay content?",a:"Yes — but as an onboarding ramp",
+  r:"Not an economy wall and not a monetization lever. This dissolves the contradiction in gating balanced content: a tutorial sells nothing."},
+ {q:"What does a new account start with?",a:"One class, its full kit, the same for everyone",
+  r:"A fixed first class gives every player identical vocabulary, so the second class is the first real expression of preference. It also makes the gap breadth rather than power."},
+ {q:"Per-class mastery — a track or a display?",a:"Display only",
+  r:"A large-roster competitor measured its per-character grind track at under 12% engagement and deleted it. One thing pays out; everything else recognises."},
+ {q:"One currency or two?",a:"Two — Grain earned, Feathers purchased",
+  r:"Chosen with the cost visible. Defensible because only one is purchasable and they never convert, which keeps it a single hop from money to item."},
+ {q:"Does the ramp gate matchmaking?",a:"No — threads stay separate",
+  r:"Progression never touches session mode. The risk this accepts is listed below; it is largely defused by the full-kit choice."},
+ {q:"How much social?",a:"Friends and quick chat — no free text",
+  r:"Full chat was considered and dropped. Removing the text box removed the filter, the report queue, the retention policy and the staffing — the largest single item in the plan."},
+ {q:"What must exist before the pitch?",a:"Slices 0–4 — identity and goals, all local",
+  r:"No backend, no store, no compliance work, nothing to operate. The rank ladder, collections, cloud save and social follow once the pitch is done."},
+ {q:"How long is the ramp?",a:"Four steps, twelve rounds at most",
+  r:"Compressed from six. The specialization still arrives after the player has used both abilities it chooses between."},
+ {q:"Daily or weekly goals?",a:"Weekly three, plus one daily first-game task",
+  r:"Three cumulative goals a week from template × threshold assets, and one single-round task shown before the day's first round. The task stays open all day, so a bad first round never burns it — a loss still costs nothing."},
+ {q:"Chosen or generated names?",a:"Generated now, chosen later",
+  r:"SwiftBeak#2213 for the pitch. A chosen name, if players ask for one, is a later slice behind a denylist."},
+ {q:"How are steals announced?",a:"Through one ReceiveStolen chokepoint",
+  r:"Five sites credited the thief by hand. One method now credits and announces, and a test forbids direct cargo writes — so a future steal ability cannot silently under-pay."},
+ {q:"What about the uncommitted ability work?",a:"Commit it first, then branch",
+  r:"Some 2,800 lines of shipped, green work overlap almost every file the milestone edits. Progression starts from a clean commit so it can be reviewed and reverted on its own."}
+];
+var decHost=$("decs");
+DECS.forEach(function(d){
+  var el=document.createElement("div");
+  el.className="dec";
+  el.innerHTML='<div class="dq">'+d.q+'</div><div class="da">'+d.a+'</div><p>'+d.r+'</p>';
+  decHost.appendChild(el);
+});
+
+/* ---------- calculator ---------- */
+var DEF={p:20,b:.4,s:1.2,w:14,r:1.5},CAP=12;
+var SCEN=[
+ {n:"1st — ran away with it",b:40,s:6,pl:0},
+ {n:"2nd — robbed everyone",b:4,s:22,pl:1},
+ {n:"3rd — the median round",b:14,s:4,pl:2},
+ {n:"4th — got rolled",b:6,s:0,pl:3}
+];
+var SHARE=[1,.57,.36,.21];
+var lastAvg=39;
+function vals(){return{p:+$("k1").value,b:+$("k2").value,s:+$("k3").value,w:+$("k4").value,r:+$("k5").value};}
+function grain(v,b,s,pl){return Math.floor(v.p+v.b*b+Math.min(v.s*s,CAP)+v.w*SHARE[pl]);}
+function render(){
+  var v=vals();
+  $("v1").textContent=v.p;$("v2").textContent=v.b.toFixed(2);
+  $("v3").textContent=v.s.toFixed(2);$("v4").textContent=v.w;
+  $("v5").textContent=v.r.toFixed(1)+"×";
+  var html="",sum=0,hi=-1,lo=1e9;
+  SCEN.forEach(function(sc){
+    var g=grain(v,sc.b,sc.s,sc.pl);sum+=g;if(g>hi)hi=g;if(g<lo)lo=g;
+    html+="<tr><td>"+sc.n+"</td><td class='num'>"+sc.b+"</td><td class='num'>"+sc.s+
+          "</td><td class='num'><strong>"+g+"</strong></td></tr>";
+  });
+  $("rows").innerHTML=html;
+  var avg=sum/SCEN.length;lastAvg=avg;
+  var ratio=lo>0?hi/lo:Infinity;
+  $("ratio").textContent=lo>0?ratio.toFixed(2)+":1":"∞";
+  $("avg").textContent=Math.round(avg);
+  var sess=Math.round(avg*10+avg*v.r*3);
+  $("sess").textContent=sess.toLocaleString();
+  var f=$("flag");
+  if(lo<=0){f.className="flag warn";
+    f.textContent="A round can pay nothing. In a 4-player free-for-all the median player is last 25% of the time — a zero floor is how you lose them.";}
+  else if(ratio>3){f.className="flag warn";
+    f.textContent="At "+ratio.toFixed(1)+":1 losing costs real progress. That rebuilds the sting the 45-second round exists to remove.";}
+  else if(ratio<1.4){f.className="flag warn";
+    f.textContent="At "+ratio.toFixed(2)+":1 outcome barely registers. There has to be a slope, or placement stops mattering.";}
+  else{f.className="flag ok";
+    f.textContent="Healthy. At "+ratio.toFixed(2)+":1 playing well is clearly better and a bad round is clearly still worth 45 seconds — about "+sess.toLocaleString()+" Grain in a 20-minute sitting.";}
+  drawCurve();
+}
+["k1","k2","k3","k4","k5"].forEach(function(id){$(id).addEventListener("input",render);});
+$("reset").addEventListener("click",function(){
+  $("k1").value=DEF.p;$("k2").value=DEF.b;$("k3").value=DEF.s;$("k4").value=DEF.w;$("k5").value=DEF.r;render();
+});
+
+/* ---------- curve ---------- */
+function levelCost(n){
+  if(n<=1)return 150;if(n===2)return 350;if(n===3)return 600;if(n===4)return 850;
+  if(n<10)return 1100;if(n<20)return 1600;return 2000;
+}
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+function drawCurve(){
+  var c=$("curve");if(!c||!c.clientWidth)return;
+  var dpr=window.devicePixelRatio||1,W0=c.clientWidth,H0=250;
+  c.width=W0*dpr;c.height=H0*dpr;c.style.height=H0+"px";
+  var x=c.getContext("2d");x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,W0,H0);
+  var pL=46,pR=14,pT=14,pB=28,W=W0-pL-pR,H=H0-pT-pB,N=30;
+  var costs=[],cum=[],tot=0;
+  for(var i=1;i<=N;i++){var q=levelCost(i);costs.push(q);tot+=q;cum.push(tot);}
+  var maxC=2000,maxCum=tot;
+  var line=css("--line"),muted=css("--muted"),gold=css("--gold-bright"),teal=css("--teal");
+  x.strokeStyle=line;x.lineWidth=1;x.font='10px "JetBrains Mono",monospace';x.fillStyle=muted;
+  for(var g=0;g<=4;g++){
+    var yy=pT+H-H*g/4;
+    x.beginPath();x.moveTo(pL,yy);x.lineTo(pL+W,yy);x.stroke();
+    x.textAlign="right";x.textBaseline="middle";x.fillText(Math.round(maxC*g/4),pL-8,yy);
+  }
+  x.textAlign="center";x.textBaseline="top";
+  [1,5,10,15,20,25,30].forEach(function(L){x.fillText(L,pL+W*((L-1)/(N-1)),pT+H+7);});
+  x.beginPath();
+  for(var j=0;j<N;j++){var px=pL+W*(j/(N-1)),py=pT+H-H*cum[j]/maxCum;j?x.lineTo(px,py):x.moveTo(px,py);}
+  x.lineTo(pL+W,pT+H);x.lineTo(pL,pT+H);x.closePath();
+  x.fillStyle=teal;x.globalAlpha=.13;x.fill();x.globalAlpha=1;
+  x.beginPath();
+  for(var j2=0;j2<N;j2++){var p2=pL+W*(j2/(N-1)),q2=pT+H-H*cum[j2]/maxCum;j2?x.lineTo(p2,q2):x.moveTo(p2,q2);}
+  x.strokeStyle=teal;x.lineWidth=1.6;x.stroke();
+  x.beginPath();
+  for(var k=0;k<N;k++){var kx=pL+W*(k/(N-1)),ky=pT+H-H*costs[k]/maxC;k?x.lineTo(kx,ky):x.moveTo(kx,ky);}
+  x.strokeStyle=gold;x.lineWidth=2.4;x.lineJoin="round";x.stroke();
+  var fx=pL+W*(19/(N-1));
+  x.setLineDash([3,4]);x.strokeStyle=muted;x.lineWidth=1;
+  x.beginPath();x.moveTo(fx,pT);x.lineTo(fx,pT+H);x.stroke();x.setLineDash([]);
+  x.fillStyle=muted;x.textAlign="left";x.textBaseline="top";x.fillText("flat from 20",fx+6,pT+2);
+  var perDay=lastAvg*10+lastAvg*1.5*3;
+  $("daysout").textContent="At "+Math.round(perDay).toLocaleString()+" Grain a day → level 10 in ~"+
+    Math.max(1,Math.round(7450/perDay))+" days, level 20 in ~"+Math.max(1,Math.round(23450/perDay))+" days";
+}
+window.addEventListener("resize",drawCurve);
+render();
+})();
+</script>

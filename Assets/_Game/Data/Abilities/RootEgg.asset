@@ -28,3 +28,4 @@ MonoBehaviour:
   EggLifetime: 8
   RootDuration: 2
   EggRadius: 1.45
+  _unlockKey: ability.root_egg

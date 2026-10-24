@@ -31,3 +31,4 @@ MonoBehaviour:
     m_Bits: 256
   BonusFood: 15
   Subclass: 7
+  _unlockKey: passive.spoiler

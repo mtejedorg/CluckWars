@@ -162,6 +162,12 @@ namespace CluckWars.Gameplay
                     bool takesCargo = StealRules.CanStealFrom(target);
                     if (takesCargo)
                     {
+                        // Progression counts the execute as a steal of the victim's cargo, never of
+                        // the bounty below. Read BEFORE the RPC: in solo it invokes locally and
+                        // synchronously and zeroes it. Announced here, on this assassin's authority,
+                        // because the transfer body runs on the victim's authority.
+                        float victimCargo = target.Cargo.Cargo;
+                        _cargo.AnnounceExecuteSteal(victimCargo, target);
                         _cargo.ExpectExecuteLoot(target);
                         target.Cargo.RPC_TransferAllToBountyBag(Id);
                     }
