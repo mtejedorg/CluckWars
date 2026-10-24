@@ -1371,7 +1371,7 @@ namespace CluckWars.Gameplay
                 // 20261023-173009) moved us out before its RPC landed. The zone itself must still vouch either way.
                 float zoneMargin = claim.RangeMargin + ControlClaimRules.RangeSlackMeters;
                 claim.InsideCastersRootZone = kind == ControlKind.Root &&
-                    (AbilityZone.ContainsRootOf(caster, v, zoneMargin, ceiling) || WasRecentlyInsideRootOf(caster, zoneMargin, ceiling));
+                    (AbilityZone.ContainsRootOf(caster, v, Time.realtimeSinceStartup, zoneMargin, ceiling) || WasRecentlyInsideRootOf(caster, zoneMargin, ceiling));
             }
 
             return ControlClaimRules.Evaluate(claim, ceiling);
@@ -1384,7 +1384,7 @@ namespace CluckWars.Gameplay
         private bool WasRecentlyInsideRootOf(ChickenController caster, float margin, in ControlClaimRules.Ceiling ceiling)
         {
             var c = ceiling;   // an 'in' parameter cannot be captured
-            return _recentPositions.AnyWithinWindow(Time.realtimeSinceStartup, p => AbilityZone.ContainsRootOf(caster, p, margin, c));
+            return _recentPositions.AnyWithinWindow(Time.realtimeSinceStartup, (t, p) => AbilityZone.ContainsRootOf(caster, p, t, margin, c));
         }
 
         /// <summary>

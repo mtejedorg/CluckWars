@@ -279,6 +279,13 @@ namespace CluckWars.Gameplay
         /// the victim inside the radius clamped to <see cref="Ceiling.MaxZoneRadius"/> (+ <paramref name="margin"/>).
         /// False with no known ceiling.
         /// </summary>
+        /// <summary>
+        /// A recent-position sample may vouch for a zone only if it was recorded at or after this peer first saw the
+        /// zone. A sample from before is the claimant's position at a time the evidence did not exist here, which a
+        /// forged zone (spawned a moment ago, centred where the victim just was) must not be able to retro-justify.
+        /// </summary>
+        public static bool SampleCountsForZone(float sampleTime, float zoneFirstSeenAt) => sampleTime >= zoneFirstSeenAt;
+
         public static bool RootZoneVouches(in RootZoneEvidence z, Vector3 victim, float margin, in Ceiling c)
         {
             if (!c.Known || !(c.MaxZoneRadius > 0f) || !z.SameAuthorityAsCaster || z.IdentityChanged) return false;

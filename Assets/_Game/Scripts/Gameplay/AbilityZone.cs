@@ -325,9 +325,10 @@ namespace CluckWars.Gameplay
         /// <paramref name="caster"/> that is alive on this peer or despawned within <see cref="RecentRootWindowSeconds"/>,
         /// judged by <see cref="ControlClaimRules.RootZoneVouches"/>: same, unchanged state authority as the caster, a
         /// centre where the caster stood when this peer first saw it, inside its authored life, the radius clamped to the
-        /// pool's authored one. Read by <c>ChickenController</c>'s root-claim check.
+        /// pool's authored one, and the position sample (<paramref name="sampleTime"/>) recorded no earlier than this peer first saw
+        /// the zone. Read by <c>ChickenController</c>'s root-claim check.
         /// </summary>
-        public static bool ContainsRootOf(ChickenController caster, Vector3 point, float margin, in ControlClaimRules.Ceiling ceiling)
+        public static bool ContainsRootOf(ChickenController caster, Vector3 point, float sampleTime, float margin, in ControlClaimRules.Ceiling ceiling)
         {
             if (caster == null || caster.Object == null || !caster.Object.IsValid) return false;
             var owner = caster.Id;
@@ -338,6 +339,7 @@ namespace CluckWars.Gameplay
             {
                 var z = ActiveZones[i];
                 if (z == null || !z._seenAsRoot || z._seen.Owner != owner) continue;
+                if (!ControlClaimRules.SampleCountsForZone(sampleTime, z._seen.FirstSeenAt)) continue;
                 if (ControlClaimRules.RootZoneVouches(Evidence(z._seen, authority, now), point, margin, ceiling))
                     return true;
             }
@@ -346,6 +348,7 @@ namespace CluckWars.Gameplay
             {
                 var r = _recentRoots[i];
                 if (r.Owner != owner || now - r.DespawnedAt > RecentRootWindowSeconds) continue;
+                if (!ControlClaimRules.SampleCountsForZone(sampleTime, r.FirstSeenAt)) continue;
                 if (ControlClaimRules.RootZoneVouches(Evidence(r, authority, now), point, margin, ceiling))
                     return true;
             }

@@ -529,12 +529,40 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void RootClaim_ASampleFromBeforeThisPeerSawTheZone_NeverVouches()
+        {
+            // Follow-up hardening (2026-10-24): the 0.5 s window let a zone spawned a moment ago, centred where the
+            // victim had just been, retro-justify a root. Only samples recorded at or after the zone's first local
+            // sighting count.
+            Assert.IsTrue(ControlClaimRules.SampleCountsForZone(10.0f, 10.0f), "recorded the moment it was first seen: counts");
+            Assert.IsTrue(ControlClaimRules.SampleCountsForZone(10.2f, 10.0f), "recorded after: counts");
+            Assert.IsFalse(ControlClaimRules.SampleCountsForZone(9.99f, 10.0f), "recorded before the zone existed here: never");
+
+            var history = new RecentPositions();
+            var egg = new Vector3(-23f, 0f, -10.5f);
+            history.Record(9.90f, egg);                                // victim stood here, no zone known yet
+            history.Record(10.05f, egg + new Vector3(11.7f, 0f, 0f)); // zone first seen at 10.0, victim already away
+            const float firstSeen = 10.0f;
+            Assert.IsFalse(history.AnyWithinWindow(10.2f,
+                (t, p) => ControlClaimRules.SampleCountsForZone(t, firstSeen) && ControlClaimRules.IsInsideZone(egg, 1.45f, p, 0.5f)),
+                "the only in-egg sample predates the sighting, so a forged zone cannot retro-justify the root");
+        }
+
+        [Test]
+        public void AbilityZone_ContainsRootOf_GatesEverySampleOnTheZonesFirstSighting()
+        {
+            string contains = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/AbilityZone.cs", "public static bool ContainsRootOf(");
+            Assert.AreEqual(2, System.Text.RegularExpressions.Regex.Matches(contains, System.Text.RegularExpressions.Regex.Escape("SampleCountsForZone(sampleTime")).Count,
+                "both the live zones and the recently despawned ones must refuse samples from before they were seen");
+        }
+
+        [Test]
         public void RootClaim_RecordsOwnPositions_AndClearsThemOnTeleportAndSpawn()
         {
             const string controller = "Assets/_Game/Scripts/Gameplay/ChickenController.cs";
             string judge = AssassinExecuteCreditTests.MethodBody(controller, "private ControlClaimRules.Verdict JudgeControl(");
             StringAssert.Contains("|| WasRecentlyInsideRootOf(caster, zoneMargin, ceiling))", judge);
-            StringAssert.Contains("AbilityZone.ContainsRootOf(caster, p, margin, c)",
+            StringAssert.Contains("AbilityZone.ContainsRootOf(caster, p, t, margin, c)",
                 AssassinExecuteCreditTests.MethodBody(controller, "private bool WasRecentlyInsideRootOf("), "each past position is judged by the same zone rule");
             StringAssert.Contains("_recentPositions.Record(Time.realtimeSinceStartup, transform.position);",
                 AssassinExecuteCreditTests.MethodBody(controller, "public override void FixedUpdateNetwork()"));

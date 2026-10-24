@@ -46,14 +46,21 @@ namespace CluckWars.Gameplay
         /// True when a sample recorded within <see cref="WindowSeconds"/> before <paramref name="now"/> satisfies
         /// <paramref name="inside"/>. Samples from the future (clock reset) or older than the window never count.
         /// </summary>
-        public bool AnyWithinWindow(float now, System.Func<Vector3, bool> inside)
+        public bool AnyWithinWindow(float now, System.Func<Vector3, bool> inside) =>
+            AnyWithinWindow(now, (_, p) => inside(p));
+
+        /// <summary>
+        /// As above, but the predicate also receives the time the sample was recorded, so a claim can refuse samples
+        /// from before the evidence it leans on existed (a zone this peer had not yet seen).
+        /// </summary>
+        public bool AnyWithinWindow(float now, System.Func<float, Vector3, bool> inside)
         {
             for (int i = 0; i < _count; i++)
             {
                 int k = (_head - 1 - i + Capacity) % Capacity;
                 float age = now - _t[k];
                 if (age < 0f || age > WindowSeconds) continue;
-                if (inside(_p[k])) return true;
+                if (inside(_t[k], _p[k])) return true;
             }
             return false;
         }
