@@ -314,3 +314,7 @@ When the current work is finished: **everything on `develop`, tested, and the `f
 ### Maestro's end-of-work requirement, updated 2026-10-23
 
 "I want all ready, committed, pushed and tested in develop (when done)." This explicitly authorizes a normal (non-force) **push of `develop`** once everything is merged and the full tests pass on `develop` (EditMode unfiltered + scenario matrix). The `feature/progression` branch is rebased onto the new `develop` and tested; **force-pushing the rebased progression branch (head of PR #1) is a rewrite of published history and will be confirmed with Maestro at that moment** (safe alternative: push it under a new name).
+
+### Status 2026-10-24 (end of work)
+
+`develop` pushed (`654cd39`) with the full gate green; `feature/progression` rebased onto it and force-pushed with Maestro's explicit OK (PR #1 head `cfd153ee`). Done after the push: the recent-position hardening (samples older than the zone's first local sighting never vouch; regression `RootClaim_ASampleFromBeforeThisPeerSawTheZone_NeverVouches`). The progression branch's UI/behaviour review is deliberately left for its own thread. See `docs/STATE.md` for the open list.
