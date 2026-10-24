@@ -1857,13 +1857,17 @@
    is a whole-subtree multiply that would take the badge down with everything else. */
 .cw-class-tile--locked .cw-chicken { opacity: 0.45; }
 .cw-class-tile--locked:hover { scale: 1 1; }
-.cw-ability-card--locked .cw-ability-card__sprite,
-.cw-ability-card--locked .cw-ability-card__icon { opacity: 0.4; }
-.cw-ability-card--locked:hover { scale: 1 1; }
+/* --ramp-locked, not --locked: MenuUiController.RefreshDeck already uses --locked for a pre-equipped starter. */
+.cw-ability-card--ramp-locked .cw-ability-card__sprite,
+.cw-ability-card--ramp-locked .cw-ability-card__icon,
+.cw-ability-card--ramp-locked .cw-ability-card__name { opacity: 0.4; }
+.cw-ability-card--ramp-locked:hover { scale: 1 1; }
+.cw-chip-lock { position: absolute; top: 6px; left: 6px; }
+/* In flow under the name, where a starter shows STARTER (a ramp-locked card is never a starter). */
+.cw-ability-card__lock { margin-top: 6px; }
 .cw-chip-lock, .cw-ability-card__lock {
-    position: absolute; top: 6px; left: 6px;
     padding: 2px 8px;
-    font-size: 28px; -unity-text-align: middle-center;
+    font-size: 30px; -unity-text-align: middle-center;   /* UiLayoutRules.MenuFontFloorPx (U4) */
     color: rgb(40, 28, 16); background-color: rgb(245, 200, 66);
     border-top-left-radius: 12px; border-top-right-radius: 12px;
     border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;

@@ -289,7 +289,11 @@ namespace CluckWars.UI
         /// </summary>
         private void OnDisable()
         {
-            if (_progression != null) _progression.OnIdentityChanged -= OnIdentityChanged;
+            if (_progression != null)
+            {
+                _progression.OnIdentityChanged -= OnIdentityChanged;
+                _progression.OnUnlocksChanged -= OnUnlocksChanged;
+            }
             _profileController?.Dispose();
             _profileController = null;
             DisposeStage();
@@ -1086,6 +1090,18 @@ namespace CluckWars.UI
             }
 
             _progression.OnIdentityChanged += OnIdentityChanged;
+            _progression.OnUnlocksChanged += OnUnlocksChanged;
+        }
+
+        /// <summary>
+        /// The journal loaded or a ramp step completed: re-mark the class tiles and deck cards. The deck is
+        /// built once per class, usually before the journal loads, so its locks are only ever set here and in
+        /// RefreshDeck, never at build time.
+        /// </summary>
+        private void OnUnlocksChanged(ProgressionUnlocks unlocks)
+        {
+            if (_currentPage == _classSelect) RefreshClassSelect();
+            if (_deckCards.Count > 0) RefreshDeck();
         }
 
         private void OnIdentityChanged(ProgressionIdentity identity)
@@ -1602,6 +1618,9 @@ namespace CluckWars.UI
         private bool IsAbilityLocked(AbilityBaseSO ab) =>
             ab != null && RampGatesAnything && !_progression.Unlocks.Ramp.IsAbilityUnlocked(ab.UnlockKey);
 
+        // A class starter is equipped whatever the ramp says (Headbutt before step 2), so it never reads as locked.
+        private bool IsRampLockedCard(AbilityBaseSO ab) => IsAbilityLocked(ab) && !IsPreEquipped(ab);
+
         private string RampStepText()
         {
             var ramp = _progression.Unlocks.Ramp;
@@ -1781,7 +1800,7 @@ namespace CluckWars.UI
         {
             public AbilityBaseSO Ability;
             public VisualElement Root, Glow, StarterTag, IconHost;
-            public Label Badge;
+            public Label Badge, RampLock;
         }
 
         private void BuildLoadout()
@@ -1948,7 +1967,7 @@ namespace CluckWars.UI
         private void OnAbilityCardTapped(AbilityBaseSO ab)
         {
             if (_selection == null || ab == null) return;
-            if (IsAbilityLocked(ab))
+            if (IsRampLockedCard(ab))
             {
                 RefuseLocked(_deckCards.Find(c => c.Ability == ab)?.Root, AbilityLockedMessage(ab));
                 return;
@@ -2125,16 +2144,6 @@ namespace CluckWars.UI
             v.Glow.AddToClassList("cw-glow");
             card.Add(v.Glow);
 
-            // Ramp gating (progression slice 4): a locked ability is still a real card in the row, it just
-            // cannot be picked yet. Dimmed rather than hidden, so the player can see what is coming.
-            if (IsAbilityLocked(ab))
-            {
-                card.AddToClassList("cw-ability-card--locked");
-                var lockBadge = new Label(UiText.Get(UiKeys.RampLocked)) { pickingMode = PickingMode.Ignore };
-                lockBadge.AddToClassList("cw-ability-card__lock");
-                card.Add(lockBadge);
-            }
-
             // Category frame: the card border and its top band wear the category colour; the
             // band names it too, so the category never rests on colour alone.
             var catColor = AbilityPalette.CategoryColor(ab.Category);
@@ -2161,6 +2170,14 @@ namespace CluckWars.UI
 
             v.StarterTag = MakeStarterTag();
             card.Add(v.StarterTag);
+
+            // Ramp gating (progression slice 4): a locked ability is still a real card in the row, it just
+            // cannot be picked yet. Built hidden and toggled by RefreshDeck, because the deck is usually
+            // built before the journal has loaded (the ramp fails open until then).
+            v.RampLock = new Label(UiText.Get(UiKeys.RampLocked)) { pickingMode = PickingMode.Ignore };
+            v.RampLock.AddToClassList("cw-ability-card__lock");
+            v.RampLock.style.display = DisplayStyle.None;
+            card.Add(v.RampLock);
 
             // Slot number of a picked card = the in-match button that fires it.
             v.Badge = new Label { pickingMode = PickingMode.Ignore };
@@ -2192,6 +2209,10 @@ namespace CluckWars.UI
                 v.Badge.text = slot >= 0 ? (slot + 1).ToString() : string.Empty;
                 v.Badge.style.display = slot >= 0 ? DisplayStyle.Flex : DisplayStyle.None;
                 v.StarterTag.style.display = starter ? DisplayStyle.Flex : DisplayStyle.None;
+                // Its own class: "--locked" above already means "starter".
+                bool rampLocked = IsRampLockedCard(v.Ability);
+                v.Root.EnableInClassList("cw-ability-card--ramp-locked", rampLocked);
+                if (v.RampLock != null) v.RampLock.style.display = rampLocked ? DisplayStyle.Flex : DisplayStyle.None;
             }
         }
 
