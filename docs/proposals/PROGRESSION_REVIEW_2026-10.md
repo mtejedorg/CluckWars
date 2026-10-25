@@ -154,7 +154,13 @@ Both were restored with `git checkout --`, and the working tree is clean.
   (the U2 gap note on develop asks for ≥ 19 px between PLAY SOLO and HOST/JOIN). Revert to develop's values once B2 is
   solved another way.
 
-### S5. Branch is not on current develop
+### S5. Branch is not on current develop — **FIXED 2026-10-25: rebased onto `aadcd048` (clean, no conflicts)**
+- Gate on the rebased tip:
+  - EditMode 2726/2726.
+  - Production and dev-tools builds `OK`.
+  - Matrix 9/9 PASS, 0 rejected RPCs: solo, shared2, shared4 ×2, hostleave ×2, AutoZone, AutoAura shared4,
+    AutoAura solo. Sessions `Captures/session-20261025-{085952,100104,100427,100745,101104,101520,101933,102249,102607}`.
+- Pre-rebase tip kept as local tag `backup/progression-review-pre-rebase-2026-10-25`.
 - Merge-base is `654cd39d`, not `aadcd048`. Develop's `7dd13b0f` (Root-claim recent-position hardening in
   `ControlClaimRules` / `AbilityZone` / `RecentPositions`) is not in PR #1, so the 2719 count was run without it. A trial
   merge (`git merge-tree`) is clean: only `docs/STATE.md` changed on both sides, and it auto-merges. A plain

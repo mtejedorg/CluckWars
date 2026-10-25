@@ -6,6 +6,27 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ 2026-10-25 - progression reviewed, two blockers fixed, rebased onto `develop` `aadcd048`
+
+- **Review:** `docs/proposals/PROGRESSION_REVIEW_2026-10.md` lists the findings ranked B / S / N, with file:line refs and screenshot paths.
+- **Fixed on the branch:**
+  - **B1:** GEAR UP shows the ramp's ability locks. The badge was hidden under the category band, and the dim used
+    develop's starter class `--locked`. It is now `--ramp-locked`, refreshed on `OnUnlocksChanged`, and the badges are 30 px.
+  - **B2 (Maestro chose option a), also S3 and S4:** the identity strip is the PROFILE button and the PROFILE row is gone.
+    The main menu fits 20:9 and 9:16 again, the strip is width-capped, and develop's menu sizes are restored.
+  - **S5:** the branch is rebased onto `aadcd048`, so it now includes `7dd13b0f`.
+- **Gate:**
+  - EditMode 2726/2726.
+  - Production and dev-tools builds.
+  - Matrix 9/9 PASS, 0 rejected RPCs.
+  - Menu probe: 0 offenders on main/settings/disconnect and GEAR UP at 1920x1080, 2400x1080, 540x1200 and 540x960.
+- **Still open from the review:**
+  - S1: the mastery ring covers the selected tick and, in portrait, the heads; it also overlaps the class LOCKED badge at 9:20.
+  - S2: the execute announce should move to `RPC_CreditExecuteLoot`.
+  - S6: hard-coded UI strings and the `✓` glyph.
+  - S7: a locked class tile's message lands on GEAR UP.
+  - N1-N8, including tidying this file's slice sections.
+
 ## ✅ 2026-10-24 - everything on `develop`, tested; progression rebased (review pending)
 
 - **`develop`** carries the 2026-10-21..23 backlog (WP0-WP9, effect types, portrait/landscape, floor-ring arrows as the default, Doppelganger/Root Egg/Execute hardening, CW-233 corners). Pushed `654cd39`; gate: EditMode 2473/2473, production + dev-tools builds, matrix solo / shared2 / shared4 x2 / hostleave x2 / AutoZone / AutoAura x2 all PASS (0 rejected RPCs), orientation capture 5/5 sizes. The older "working tree ... NOT yet run in Unity" headings below were all superseded by that gate; they are history, not open items.
