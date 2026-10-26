@@ -1,4 +1,5 @@
 using CluckWars.Logging;
+using CluckWars.Progression;
 using Fusion;
 using UnityEngine;
 using Zenject;
@@ -51,16 +52,27 @@ namespace CluckWars.Gameplay
         private static readonly CluckWars.Diagnostics.PerKeyRateLimiter RejectionLimiter =
             new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
 
+        private IMatchEventSink _matchEvents;
         private ILogService _log;
 
         [Inject]
-        public void Construct(ILogService log)
+        public void Construct(IMatchEventSink matchEvents, ILogService log)
         {
+            _matchEvents = matchEvents;
             _log = log;
         }
 
         public override void Spawned()
         {
+            // Both dependencies are project-bound, so ProjectContext alone resolves them.
+            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+
+            if (_matchEvents == null)
+            {
+                _log?.Error(Source, $"{name}: IMatchEventSink was not injected, so this chicken's kills will not be " +
+                    "announced to progression. Check the IMatchEventSink binding in ProjectInstaller.");
+            }
+
             ActiveStats.Add(this);
             if (_log == null)
             {
@@ -132,6 +144,9 @@ namespace CluckWars.Gameplay
             }
 
             Kills++;
+            // Runs on the attacker's state authority, so the actor is this chicken. No Runner.IsForward
+            // guard: Fusion executes an RPC once, on delivery, and never re-runs it in a resimulation.
+            _matchEvents?.OpponentDisabled(MatchActorId.Of(Object));
             _log?.Info(Source, $"{name}: kill credited for executing {victimName} (Kills={Kills}).");
         }
 

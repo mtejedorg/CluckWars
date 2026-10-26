@@ -29,3 +29,4 @@ MonoBehaviour:
     m_Bits: 256
   ShockRadius: 4.5
   ShockDamage: 35
+  _unlockKey: ability.cluck_shock

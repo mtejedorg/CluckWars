@@ -30,3 +30,4 @@ MonoBehaviour:
     m_Bits: 256
   PeckSlotPreEquippedBy: 63
   SignaturePreEquippedBy: 0
+  _unlockKey: ability.peck

@@ -31,3 +31,4 @@ MonoBehaviour:
     m_Bits: 256
   StealMultiplier: 1.6
   Subclass: 8
+  _unlockKey: passive.thief

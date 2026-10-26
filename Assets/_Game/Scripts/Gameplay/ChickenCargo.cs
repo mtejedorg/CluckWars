@@ -1,5 +1,6 @@
 using CluckWars.Audio;
 using CluckWars.Logging;
+using CluckWars.Progression;
 using CluckWars.Visuals;
 using Fusion;
 using UnityEngine;
@@ -149,6 +150,7 @@ namespace CluckWars.Gameplay
         private PrefabRegistrySO _prefabRegistry;
         private MatchConfigSO _matchConfig;
         private AbilityRegistrySO _abilityRegistry;
+        private IMatchEventSink _matchEvents;
 
         // Receiver-side bounds for RPC_DrainStolen, derived once from the shipped ability pool
         // (see ResolveStealBounds). Cached because the derivation walks the whole registry and
@@ -176,7 +178,7 @@ namespace CluckWars.Gameplay
         private static readonly Collider[] _overlapHits = new Collider[32];
 
         [Inject]
-        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry, MatchConfigSO matchConfig, AbilityRegistrySO abilityRegistry)
+        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry, MatchConfigSO matchConfig, AbilityRegistrySO abilityRegistry, IMatchEventSink matchEvents)
         {
             _log = log;
             _audio = audio;
@@ -184,6 +186,7 @@ namespace CluckWars.Gameplay
             _prefabRegistry = prefabRegistry;
             _matchConfig = matchConfig;
             _abilityRegistry = abilityRegistry;
+            _matchEvents = matchEvents;
         }
 
         public override void Spawned()
@@ -196,6 +199,12 @@ namespace CluckWars.Gameplay
                     sceneCtx.Container.Inject(this);
                 else
                     ProjectContext.Instance.Container.Inject(this);
+            }
+
+            if (_matchEvents == null)
+            {
+                _log?.Error(Source, $"{name}: IMatchEventSink was not injected, so this chicken's deposits and " +
+                    "steals will not be announced to progression. Check the IMatchEventSink binding in ProjectInstaller.");
             }
 
             _controller = GetComponent<ChickenController>();
@@ -344,6 +353,8 @@ namespace CluckWars.Gameplay
 
         public void FlushBaseDeposit()
         {
+            float banked = _pendingBaseFood;
+            bool sent = false;
             if (_pendingBaseFood > 0f)
             {
                 if (_activeBaseTarget != null && _activeBaseTarget.Object != null && _activeBaseTarget.Object.IsValid)
@@ -359,11 +370,19 @@ namespace CluckWars.Gameplay
                     }
                     _activeBaseTarget.RPC_AddFood(_pendingBaseFood);
                     GetComponent<ChickenMatchStats>()?.RPC_AddDeposit(_pendingBaseFood);
+                    sent = true;
                 }
                 _pendingBaseFood = 0f;
             }
             _activeBaseTarget = null;
             _baseDepositTicks = 0;
+
+            // One announcement per batched flush that was actually sent, of the amount sent — made
+            // only after the flush state above is fully reset, so no listener can observe or re-enter
+            // a half-flushed batch. It is the attempt: PlayerBase.RPC_AddFood can still refuse it on
+            // the base's authority. Forward ticks only — see ReceiveStolen.
+            if (sent && Runner.IsForward)
+                _matchEvents?.ResourceBanked(MatchActorId.Of(Object), banked);
         }
 
         public void FlushAll()
@@ -599,9 +618,87 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            Cargo += amount;
+            ReceiveStolen(amount, victim._controller);
             _pendingSteals.Record(victim._controller.Id, amount, Time.unscaledTime);
             victim.RPC_DrainStolen(amount, _controller.Id);
+        }
+
+        /// <summary>
+        /// The only way a steal credits the thief. Reached through <see cref="CreditStealAndDrain"/>,
+        /// which every steal path uses (Snatch, Sneaky Steal, Scrap, Roll Trample, Dive Bomb and Spine Coat's
+        /// steal-back in <c>ChickenController.CheckCollisionSlow</c>, where the defender is the thief and
+        /// <paramref name="victim"/> is the attacker). Public only for <c>ProgressionBoundaryTests</c>.
+        /// </summary>
+        /// <remarks>
+        /// <b>Behaviour-identical to the raw <c>Cargo +=</c> it replaced.</b> The credit is the
+        /// first statement and is unconditional — no clamp, no authority check, no early return.
+        /// Every caller has already clamped the amount against its own free space and the
+        /// victim's load, inside a <c>HasStateAuthority</c>-gated tick. <c>ProgressionBoundaryTests</c>
+        /// keeps every steal path coming through here.
+        /// <para>
+        /// <b>The event reports the thief's optimistic credit.</b> The victim's authority can still
+        /// refuse the matching <see cref="RPC_DrainStolen"/> (<c>StealRules</c>), so
+        /// <c>ResourceStolen</c> is what the thief was credited, not what the victim lost.
+        /// </para>
+        /// <para>
+        /// <b>Resimulation — the <c>Runner.IsForward</c> guard on the three tick-driven emits
+        /// (<c>ResourceStolen</c> here, <c>ResourceBanked</c> in <see cref="FlushBaseDeposit"/>,
+        /// <c>AbilityResolved</c> in <c>AbilityController.TryActivate</c>).</b> Fusion resimulates
+        /// only on a client doing prediction, when a newer StateAuthority snapshot arrives; the
+        /// state authority itself is never rolled back. Every emit site runs inside a
+        /// <c>HasStateAuthority</c>-gated <c>FixedUpdateNetwork</c>, so in every mode — Single,
+        /// Shared, Host/Server — it cannot run in a resimulation today, and <c>IsForward</c> is
+        /// always true on these ticks. The guard is kept anyway, because it costs nothing and a
+        /// future prediction change must not double-fire an announcement. The credit itself is
+        /// never guarded.
+        /// </para>
+        /// </remarks>
+        public void ReceiveStolen(float amount, ChickenController victim)
+        {
+            Cargo += amount;
+
+            if (Runner.IsForward)
+                _matchEvents?.ResourceStolen(MatchActorId.Of(Object), MatchActorId.Of(victim), amount);
+        }
+
+        /// <summary>
+        /// Announces an Assassin execute as a steal by this chicken (the assassin) of
+        /// <paramref name="amount"/> from <paramref name="victim"/>. <b>Announce only — no cargo is
+        /// written here.</b> The transfer itself is <see cref="RPC_TransferAllToBountyBag"/> on the
+        /// victim.
+        /// </summary>
+        /// <remarks>
+        /// Called by <c>AssassinExecute.Press</c> on the <b>assassin's</b> state authority, with the
+        /// victim's replicated <see cref="Cargo"/> read <i>before</i> the transfer RPC is sent (in solo
+        /// that RPC invokes locally and synchronously, zeroing it). It cannot live inside the RPC: the
+        /// RPC body runs on the victim's authority, which in Shared PvP is another peer, and an
+        /// announcement there would reach that peer's sink and credit nobody on the assassin's device.
+        /// <para>
+        /// Maestro's ruling (2026-09-12): the execute counts as a steal of the victim's cargo only. The
+        /// flat <c>ExecuteBounty</c> the assassin is also paid is income, not a steal, and never reaches
+        /// this method.
+        /// </para>
+        /// <para>
+        /// Same semantics as every other <c>ResourceStolen</c>: the thief's optimistic credit. Exact in
+        /// solo; in Shared mode it is the assassin peer's latest snapshot of the victim's cargo, which
+        /// can differ from what the victim's authority actually transfers. An execute on an
+        /// empty-handed rival robs nothing, so a non-positive amount is not announced (a kill is a
+        /// separate announcement). Forward ticks only — see <see cref="ReceiveStolen"/>.
+        /// </para>
+        /// <para>
+        /// <b>Known gap, not fixed here (2026-09-13):</b> <c>AssassinExecute.Press</c> passes its own
+        /// <c>Id</c> to <see cref="RPC_TransferAllToBountyBag"/> and <c>RPC_ExecuteRemoval</c>, which
+        /// resolve it as <c>ChickenCargo</c> / <c>ChickenCombat</c>; <c>Runner.TryFindBehaviour&lt;T&gt;</c>
+        /// refuses that (verified in play mode), so the victim's cargo is zeroed without reaching the
+        /// bounty bag and the execute's kill is never credited. See docs/STATE.md, progression slice 2.
+        /// </para>
+        /// </remarks>
+        public void AnnounceExecuteSteal(float amount, ChickenController victim)
+        {
+            if (!(amount > 0f)) return;
+
+            if (Runner.IsForward)
+                _matchEvents?.ResourceStolen(MatchActorId.Of(Object), MatchActorId.Of(victim), amount);
         }
 
         /// <summary>

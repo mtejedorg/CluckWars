@@ -1840,3 +1840,31 @@
 .cw-hex-icon--bully        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_BullyPassiveSO.png"); }
 .cw-hex-icon--spoiler      { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SpoilerPassiveSO.png"); }
 .cw-hex-icon--thief        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_ThiefPassiveSO.png"); }
+
+/* ---- Ramp lock (progression slice 4) ---------------------------------------
+   A locked class tile or ability card is still rendered, never hidden: dimmed and marked with a
+   LOCKED badge. Descendants are dimmed individually instead of the root, because element opacity
+   is a whole-subtree multiply that would take the badge down with everything else. */
+.cw-class-tile--locked .cw-chicken { opacity: 0.45; }
+.cw-class-tile--locked:hover { scale: 1 1; }
+/* --ramp-locked, not --locked: MenuUiController.RefreshDeck already uses --locked for a pre-equipped starter. */
+.cw-ability-card--ramp-locked .cw-ability-card__sprite,
+.cw-ability-card--ramp-locked .cw-ability-card__icon,
+.cw-ability-card--ramp-locked .cw-ability-card__name { opacity: 0.4; }
+.cw-ability-card--ramp-locked:hover { scale: 1 1; }
+.cw-chip-lock { position: absolute; top: 6px; left: 6px; }
+/* In flow under the name, where a starter shows STARTER (a ramp-locked card is never a starter). */
+.cw-ability-card__lock { margin-top: 6px; }
+.cw-chip-lock, .cw-ability-card__lock {
+    padding: 2px 8px;
+    font-size: 30px; -unity-text-align: middle-center;   /* UiLayoutRules.MenuFontFloorPx (U4) */
+    color: rgb(40, 28, 16); background-color: rgb(245, 200, 66);
+    border-top-left-radius: 12px; border-top-right-radius: 12px;
+    border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
+}
+/* Refusal feedback: a locked card or tile flashes a warm-red border when pressed, so "nothing
+   happened" reads as "that press was refused". Toggled in C# (MenuUiController.RefuseLocked). */
+.cw-locked--shake {
+    border-left-color: rgb(214, 88, 70); border-right-color: rgb(214, 88, 70);
+    border-top-color: rgb(214, 88, 70); border-bottom-color: rgb(214, 88, 70);
+}

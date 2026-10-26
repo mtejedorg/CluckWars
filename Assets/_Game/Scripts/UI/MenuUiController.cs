@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using CluckWars.Abilities;
 using CluckWars.Audio;
@@ -8,6 +9,7 @@ using CluckWars.Gameplay;
 using CluckWars.Input;
 using CluckWars.Localization;
 using CluckWars.Logging;
+using CluckWars.Progression;
 using CluckWars.Services;
 using CluckWars.Settings;
 using UnityEngine;
@@ -51,6 +53,7 @@ namespace CluckWars.UI
         // "Loadout" (Assets/UI/CharacterSelect.uxml, reworked in place).
         [SerializeField] private VisualTreeAsset _characterSelectUxml;
         [SerializeField] private VisualTreeAsset _lobbyUxml;
+        [SerializeField] private VisualTreeAsset _profileUxml;
 
         // ---- Injected services ------------------------------------------------
         private ISessionSelectionService _selection;
@@ -63,6 +66,14 @@ namespace CluckWars.UI
         private MenuAudio                _audio = MenuAudio.Silent();
         private IInputProvider           _input;
         private IAudioService            _audioService;   // the volume sliders; null = the sliders only persist
+        private IProgressionService      _progression;
+        private VisualElement            _profile;
+        private ProfileController        _profileController;
+        /// <summary>The main menu's compact nameplate and Grain readout. Hidden until progression loads.</summary>
+        private VisualElement _idStrip, _idStripEmblem;
+        private Label _idStripEmblemLevel, _idStripName, _idStripTitle, _idStripGrain;
+        /// <summary>Per class tile: the mastery ring and its level digit, added at build time.</summary>
+        private readonly Dictionary<ChickenClass, (VisualElement Ring, Label Level)> _chipMastery = new();
 
         // ---- Runtime state ----------------------------------------------------
         private VisualElement _root;
@@ -77,6 +88,9 @@ namespace CluckWars.UI
         private Button _disconnectRejoinBtn, _disconnectBackBtn;
         private string _rejoinCode;
         private bool _isBusy;
+        /// <summary>Per class tile: the lock badge added by the ramp gate (progression slice 4).</summary>
+        private readonly Dictionary<ChickenClass, VisualElement> _tileLocks = new();
+
 
         // ---- Menu juice (Phase 3B): MenuJuice engine, MenuJuicePolicy timings ----
         // Every effect goes through MenuJuice, which is a no-op under Reduced Motion; the callers
@@ -223,8 +237,10 @@ namespace CluckWars.UI
             [InjectOptional] MatchConfigSO matchConfig,
             [InjectOptional] MenuAudio audio,
             [InjectOptional] IInputProvider input,
-            [InjectOptional] IAudioService audioService)
+            [InjectOptional] IAudioService audioService,
+            IProgressionService progression)
         {
+            _progression     = progression;
             _selection       = selection;
             _log             = log;
             _ugs             = ugs;
@@ -264,6 +280,24 @@ namespace CluckWars.UI
             new GameObject("EventSystem",
                 typeof(UnityEngine.EventSystems.EventSystem),
                 typeof(UnityEngine.InputSystem.UI.InputSystemUIInputModule));
+        }
+
+        /// <summary>
+        /// Drops the identity subscriptions. Without this the service — which lives for the whole
+        /// project, across scene loads — would hold a dead menu and its element tree alive, and call
+        /// into it after the Bootstrap scene is gone.
+        /// </summary>
+        private void OnDisable()
+        {
+            if (_progression != null)
+            {
+                _progression.OnIdentityChanged -= OnIdentityChanged;
+                _progression.OnUnlocksChanged -= OnUnlocksChanged;
+            }
+            _profileController?.Dispose();
+            _profileController = null;
+            DisposeStage();
+            DisposeJuice();
         }
 
         private void OnEnable()
@@ -319,11 +353,13 @@ namespace CluckWars.UI
             _classSelect = ClonePage(_classSelectUxml);
             _loadout     = ClonePage(_characterSelectUxml);
             _lobby       = ClonePage(_lobbyUxml);
+            _profile     = ClonePage(_profileUxml);
 
             BuildMainMenu();
             BuildClassSelect();
             BuildLoadout();
             BuildLobby();
+            BuildProfile();
             ApplyReducedMotion();
 
             // One trickle-down hook plays the generic button sound; buttons with their own cue are
@@ -376,8 +412,6 @@ namespace CluckWars.UI
         }
 
         private void LateUpdate() { if (_stage != null) RunOnStage(_stage.Tick); }
-
-        private void OnDisable() { DisposeStage(); DisposeJuice(); }
 
         private void OnDestroy() { DisposeStage(); DisposeJuice(); }
 
@@ -512,9 +546,10 @@ namespace CluckWars.UI
         }
 
         // ---- Navigation -------------------------------------------------------
-        private void ShowMainMenu()    { SetPage(_mainMenu); RefreshDevRow(); RefreshPlayAgain(); }
+        private void ShowMainMenu()    { SetPage(_mainMenu); RefreshDevRow(); RefreshPlayAgain(); RefreshIdentityStrip(); }
         private void ShowClassSelect() { SetPage(_classSelect); RefreshClassSelect(); }
         private void ShowLoadout()     { SetPage(_loadout); RefreshLoadout(); }
+        private void ShowProfile()     { SetPage(_profile); _profileController?.Refresh(); }
         private void ShowLobby()       { SetPage(_lobby); RefreshLobby(); RefreshLobbyBackButton(); }
 
         // True when THE COOP was reached through PICK YOUR BIRD and GEAR UP (READY): its BACK returns to GEAR UP.
@@ -541,10 +576,14 @@ namespace CluckWars.UI
         private int _pageTransitionId;
 
         private int PageOrder(VisualElement page) =>
-            page == _mainMenu ? 0 : page == _classSelect ? 1 : page == _loadout ? 2 : page == _lobby ? 3 : -1;
+            page == _mainMenu ? 0 : page == _classSelect ? 1 : page == _loadout ? 2 : page == _lobby ? 3 : page == _profile ? 1 : -1;
 
-        private IEnumerable<VisualElement> Pages() => new[] { _mainMenu, _classSelect, _loadout, _lobby }.Where(p => p != null);
+        private IEnumerable<VisualElement> Pages() => new[] { _mainMenu, _classSelect, _loadout, _lobby, _profile }.Where(p => p != null);
 
+        /// <summary>
+        /// Shows exactly one page. Iterates <see cref="_pages"/> rather than naming each one, so a page
+        /// added later cannot be left visible under the new one by a forgotten line.
+        /// </summary>
         private void SetPage(VisualElement page)
         {
             if (page != _mainMenu) { CloseSettings(); CloseDisconnectSheet(); }
@@ -652,6 +691,15 @@ namespace CluckWars.UI
             Bind<Button>(_mainMenu, "JoinBtn", b => b.clicked += () => ChooseMode(SessionMode.Join));
             Bind<Button>(_mainMenu, "AbilityLabBtn", b => b.clicked += OpenAbilityLab);
             Bind<Button>(_mainMenu, "PlayAgainBtn", b => b.clicked += OnPlayAgainFromMenu);
+            // The identity strip is the way into PROFILE (no separate row: it overflowed short menus).
+            Bind<Button>(_mainMenu, "IdentityStrip", b => b.clicked += ShowProfile);
+
+            _idStrip            = _mainMenu.Q<VisualElement>("IdentityStrip");
+            _idStripEmblem      = _mainMenu.Q<VisualElement>("IdentityEmblem");
+            _idStripEmblemLevel = _mainMenu.Q<Label>("IdentityEmblemLevel");
+            _idStripName        = _mainMenu.Q<Label>("IdentityName");
+            _idStripTitle       = _mainMenu.Q<Label>("IdentityTitle");
+            _idStripGrain       = _mainMenu.Q<Label>("IdentityGrain");
 
             // Build stamp — a tester reporting a bug from a device otherwise has no
             // way to say which build produced it.
@@ -1014,6 +1062,137 @@ namespace CluckWars.UI
         private void ApplyReducedMotion() =>
             _root?.EnableInClassList("cw-reduced-motion", PlayerPreferences.ReducedMotionEnabled);
 
+        // ======================================================================
+        //  PROFILE
+        // ======================================================================
+
+        /// <summary>
+        /// Builds the profile page and starts listening for identity changes.
+        /// </summary>
+        /// <remarks>
+        /// The listener lives here rather than only on the page, because two other surfaces move with
+        /// the identity: the main menu's strip and the class chips' mastery rings. Both are on pages
+        /// the player may be standing on when a round's records land.
+        /// </remarks>
+        private void BuildProfile()
+        {
+            _profileController?.Dispose();
+            _profileController = new ProfileController(_profile, _progression, _log, RoleLabel, RoleTint);
+
+            Bind<Button>(_profile, "ProfileBackBtn", b => b.clicked += ShowMainMenu);
+
+            if (_progression == null)
+            {
+                // Bound project-wide, so a null is a wiring bug. Said once, here, rather than by every
+                // surface that reads it.
+                _log?.Error(Source, "IProgressionService was not injected, so the profile page, the main menu's " +
+                    "nameplate strip and the class mastery rings all stay hidden.");
+                return;
+            }
+
+            _progression.OnIdentityChanged += OnIdentityChanged;
+            _progression.OnUnlocksChanged += OnUnlocksChanged;
+        }
+
+        /// <summary>
+        /// The journal loaded or a ramp step completed: re-mark the class tiles and deck cards. The deck is
+        /// built once per class, usually before the journal loads, so its locks are only ever set here and in
+        /// RefreshDeck, never at build time.
+        /// </summary>
+        private void OnUnlocksChanged(ProgressionUnlocks unlocks)
+        {
+            if (_currentPage == _classSelect) RefreshClassSelect();
+            if (_deckCards.Count > 0) RefreshDeck();
+        }
+
+        private void OnIdentityChanged(ProgressionIdentity identity)
+        {
+            RefreshIdentityStrip();
+            RefreshClassMastery();
+        }
+
+        /// <summary>The main menu's compact nameplate plus the Grain balance. Hidden until the journal loads.</summary>
+        private void RefreshIdentityStrip()
+        {
+            bool ready = _progression != null && _progression.IsReady;
+            if (_idStrip != null) _idStrip.style.display = ready ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!ready) return;
+
+            var plate = _progression.Identity.Plate;
+
+            if (_idStripName != null)
+            {
+                _idStripName.text = plate.Name ?? string.Empty;
+                _idStripName.style.display = plate.HasName ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+
+            if (_idStripTitle != null)
+            {
+                _idStripTitle.text = plate.TitleText ?? string.Empty;
+                _idStripTitle.style.display = string.IsNullOrEmpty(plate.TitleText) ? DisplayStyle.None : DisplayStyle.Flex;
+            }
+
+            if (_idStripEmblem != null && !string.IsNullOrEmpty(plate.EmblemRoleKey))
+                SetBorder(_idStripEmblem, RoleTint(plate.EmblemRoleKey));
+            if (_idStripEmblemLevel != null)
+                _idStripEmblemLevel.text = plate.EmblemMasteryLevel.ToString(CultureInfo.InvariantCulture);
+            if (_idStripGrain != null)
+                _idStripGrain.text = _progression.Profile.GrainBalance.ToString(CultureInfo.InvariantCulture) + " GRAIN";
+        }
+
+        /// <summary>The mastery ring on each class chip. Hidden until the journal loads.</summary>
+        private void RefreshClassMastery()
+        {
+            bool ready = _progression != null && _progression.IsReady;
+            foreach (var pair in _chipMastery)
+            {
+                var (ring, level) = pair.Value;
+                if (ring == null) continue;
+
+                ring.style.display = ready ? DisplayStyle.Flex : DisplayStyle.None;
+                if (!ready) continue;
+
+                SetBorder(ring, TintOf(pair.Key));
+                if (level != null) level.text = MasteryOf(pair.Key).ToString(CultureInfo.InvariantCulture);
+            }
+        }
+
+        private int MasteryOf(ChickenClass cls)
+        {
+            if (_progression == null) return 0;
+
+            string key = UnlockKeyTable.RoleKey(cls);
+            foreach (var role in _progression.Identity.Roles)
+            {
+                if (string.Equals(role.RoleKey, key, StringComparison.Ordinal)) return role.Level;
+            }
+
+            return 0;
+        }
+
+        /// <summary>The display name of a progression role key — the menu owns the roster's vocabulary.</summary>
+        private static string RoleLabel(string roleKey)
+        {
+            foreach (var cls in Order)
+            {
+                if (string.Equals(UnlockKeyTable.RoleKey(cls), roleKey, StringComparison.Ordinal)) return cls.ToString();
+            }
+
+            // A key from an older build's roster: shown as it was saved rather than dropped, so play
+            // the player actually did stays visible.
+            return roleKey;
+        }
+
+        private Color RoleTint(string roleKey)
+        {
+            foreach (var cls in Order)
+            {
+                if (string.Equals(UnlockKeyTable.RoleKey(cls), roleKey, StringComparison.Ordinal)) return TintOf(cls);
+            }
+
+            return UiGfx.TextSecondary;
+        }
+
         /// <summary>
         /// Shows or hides <c>#DevRow</c> to match
         /// <see cref="PlayerPreferences.DeveloperModeEnabled"/>.
@@ -1244,6 +1423,8 @@ namespace CluckWars.UI
         private void BuildClassSelect()
         {
             _classTiles.Clear();
+            _chipMastery.Clear();
+            _tileLocks.Clear();
             for (int i = 0; i < Order.Length; i++)
             {
                 var cls = Order[i];
@@ -1255,6 +1436,28 @@ namespace CluckWars.UI
                 }
                 _classTiles[cls] = tile;
                 tile.Q<VisualElement>(ChipNames[i] + "Art")?.AddToClassList("cw-chicken--" + KeyOf(cls));
+
+                // Ramp lock badge (progression slice 4): shown only while the ramp gates this class.
+                var lockBadge = new Label(UiText.Get(UiKeys.RampLocked)) { name = ChipNames[i] + "Lock", pickingMode = PickingMode.Ignore };
+                lockBadge.AddToClassList("cw-chip-lock");
+                lockBadge.style.display = DisplayStyle.None;
+                tile.Add(lockBadge);
+                _tileLocks[cls] = lockBadge;
+
+                // Mastery ring (progression): a USS ring with the level inside, in the tile's corner. Hidden
+                // until the journal loads; RefreshClassMastery tints and fills it.
+                var ring = new VisualElement { name = ChipNames[i] + "Mastery", pickingMode = PickingMode.Ignore };
+                ring.AddToClassList("cw-emblem");
+                ring.AddToClassList("cw-emblem--small");
+                ring.style.position = Position.Absolute;
+                ring.style.right = 6;
+                ring.style.top = 6;
+                ring.style.display = DisplayStyle.None;
+                var ringLevel = new Label { name = ChipNames[i] + "MasteryLevel", pickingMode = PickingMode.Ignore };
+                ringLevel.AddToClassList("cw-emblem__level");
+                ring.Add(ringLevel);
+                tile.Add(ring);
+                _chipMastery[cls] = (ring, ringLevel);
                 // Class colour as the full tile fill, lightened so ink text keeps >= 7:1.
                 tile.style.backgroundColor = Lighten(TintOf(cls), 0.5f);
                 tile.RegisterCallback<ClickEvent>(_ => OnClassTileTapped(cls));
@@ -1322,6 +1525,11 @@ namespace CluckWars.UI
         private void OnClassTileTapped(ChickenClass cls)
         {
             if (_selection == null) return;
+            if (IsClassLocked(cls))
+            {
+                RefuseLocked(_classTiles.TryGetValue(cls, out var lockedTile) ? lockedTile : null, ClassLockedMessage(cls));
+                return;
+            }
             if (cls == _selection.SelectedClass && _selection.Passive != null) { _audio.Tap(); RefreshClassSelect(); return; }
             var passive = DefaultPassiveFor(cls);
             if (passive == null)
@@ -1380,6 +1588,83 @@ namespace CluckWars.UI
         /// <summary>Active-ability slots to fill — four for every class.</summary>
         private int ActiveSlotsForClass => AbilityController.SlotCount;
 
+        // ---- Ramp gating (progression slice 4) --------------------------------
+        // The ramp hides/shows what already ships — it never changes an ability's numbers or a
+        // class's stats. "Not ready" (journal not yet loaded, or no progression bound) fails open:
+        // everything reads as unlocked rather than flash-locking the picker before data arrives.
+
+        private bool RampGatesAnything => _progression != null && _progression.IsReady && !_progression.Unlocks.Ramp.IsComplete
+                                          && !AutoTestDrivesTheMenu;
+
+        // The test-session harness (dev tools only) picks every card on a fresh profile; a ramp that locked them would
+        // leave its loadout short. Release builds never take this branch.
+        private bool _autoTestMenuRead;
+        private bool _autoTestMenu;
+        private bool AutoTestDrivesTheMenu
+        {
+            get
+            {
+                if (!_autoTestMenuRead)
+                {
+                    _autoTestMenuRead = true;
+                    _autoTestMenu = DevToolsAvailable && CluckWars.Diagnostics.AutoTestArgs.Read(null).WantsMenuFlow;
+                }
+                return _autoTestMenu;
+            }
+        }
+
+        private bool IsClassLocked(ChickenClass cls) =>
+            RampGatesAnything && !_progression.Unlocks.Ramp.IsRoleUnlocked(UnlockKeyTable.RoleKey(cls));
+
+        private bool IsAbilityLocked(AbilityBaseSO ab) =>
+            ab != null && RampGatesAnything && !_progression.Unlocks.Ramp.IsAbilityUnlocked(ab.UnlockKey);
+
+        // A class starter is equipped whatever the ramp says (Headbutt before step 2), so it never reads as locked.
+        private bool IsRampLockedCard(AbilityBaseSO ab) => IsAbilityLocked(ab) && !IsPreEquipped(ab);
+
+        private string RampStepText()
+        {
+            var ramp = _progression.Unlocks.Ramp;
+            return string.IsNullOrEmpty(ramp.StepName)
+                ? UiText.Format(UiKeys.RampStepFallback, ("n", ramp.StepNumber))
+                : ramp.StepName;
+        }
+
+        private string ClassLockedMessage(ChickenClass cls) =>
+            UiText.Format(UiKeys.RampClassLocked, ("cls", cls.ToString()), ("step", RampStepText()),
+                ("objective", _progression.Unlocks.Ramp.ObjectiveText));
+
+        private string AbilityLockedMessage(AbilityBaseSO ab) =>
+            UiText.Format(UiKeys.RampAbilityLocked,
+                ("ability", !string.IsNullOrEmpty(ab.DisplayName) ? ab.DisplayName : ab.name),
+                ("step", RampStepText()), ("objective", _progression.Unlocks.Ramp.ObjectiveText));
+
+        /// <summary>
+        /// A locked card/chip was pressed: refuse it with visible feedback instead of silently doing
+        /// nothing. The shared ability-detail strip carries the message (there is no separate toast in
+        /// this UI), and the pressed element gets a brief shake so the refusal reads as a response to
+        /// THIS press, not a random label change.
+        /// </summary>
+        private void RefuseLocked(VisualElement pressed, string message)
+        {
+            if (_abilityDetailName != null)
+            {
+                _abilityDetailName.text = UiText.Get(UiKeys.RampLocked);
+                _abilityDetailName.style.color = UiGfx.TextSecondary;
+                _abilityDetailName.style.display = DisplayStyle.Flex;
+            }
+            if (_abilityDetailText != null)
+            {
+                _abilityDetailText.text = message;
+                _abilityDetailText.style.color = UiGfx.TextSecondary;
+            }
+            if (_abilityDetail != null) SetBorder(_abilityDetail, UiGfx.CardBorder);
+
+            if (pressed == null) return;
+            pressed.AddToClassList("cw-locked--shake");
+            pressed.schedule.Execute(() => pressed.RemoveFromClassList("cw-locked--shake")).ExecuteLater(220);
+        }
+
         private static Color TintOf(ChickenClass cls) => Meta[cls].Tint;
 
         private void RefreshClassSelect()
@@ -1387,8 +1672,17 @@ namespace CluckWars.UI
             var cls = Cls;
             var tint = TintOf(cls);
 
+            RefreshClassMastery();
+
             foreach (var kv in _classTiles)
                 kv.Value.EnableInClassList("cw-class-tile--selected", kv.Key == cls);
+            foreach (var kv in _classTiles)
+            {
+                bool locked = IsClassLocked(kv.Key);
+                kv.Value.EnableInClassList("cw-class-tile--locked", locked);
+                if (_tileLocks.TryGetValue(kv.Key, out var badge) && badge != null)
+                    badge.style.display = locked ? DisplayStyle.Flex : DisplayStyle.None;
+            }
 
             if (_previewChicken != null)
             {
@@ -1507,7 +1801,7 @@ namespace CluckWars.UI
         {
             public AbilityBaseSO Ability;
             public VisualElement Root, Glow, StarterTag, IconHost;
-            public Label Badge;
+            public Label Badge, RampLock;
         }
 
         private void BuildLoadout()
@@ -1674,6 +1968,11 @@ namespace CluckWars.UI
         private void OnAbilityCardTapped(AbilityBaseSO ab)
         {
             if (_selection == null || ab == null) return;
+            if (IsRampLockedCard(ab))
+            {
+                RefuseLocked(_deckCards.Find(c => c.Ability == ab)?.Root, AbilityLockedMessage(ab));
+                return;
+            }
             _focusedAbility = ab;
             SyncSlotModel();
             var result = _slotModel.TapCard(ab, IsPreEquipped(ab));
@@ -1873,6 +2172,14 @@ namespace CluckWars.UI
             v.StarterTag = MakeStarterTag();
             card.Add(v.StarterTag);
 
+            // Ramp gating (progression slice 4): a locked ability is still a real card in the row, it just
+            // cannot be picked yet. Built hidden and toggled by RefreshDeck, because the deck is usually
+            // built before the journal has loaded (the ramp fails open until then).
+            v.RampLock = new Label(UiText.Get(UiKeys.RampLocked)) { pickingMode = PickingMode.Ignore };
+            v.RampLock.AddToClassList("cw-ability-card__lock");
+            v.RampLock.style.display = DisplayStyle.None;
+            card.Add(v.RampLock);
+
             // Slot number of a picked card = the in-match button that fires it.
             v.Badge = new Label { pickingMode = PickingMode.Ignore };
             v.Badge.AddToClassList("cw-ability-badge");
@@ -1903,6 +2210,10 @@ namespace CluckWars.UI
                 v.Badge.text = slot >= 0 ? (slot + 1).ToString() : string.Empty;
                 v.Badge.style.display = slot >= 0 ? DisplayStyle.Flex : DisplayStyle.None;
                 v.StarterTag.style.display = starter ? DisplayStyle.Flex : DisplayStyle.None;
+                // Its own class: "--locked" above already means "starter".
+                bool rampLocked = IsRampLockedCard(v.Ability);
+                v.Root.EnableInClassList("cw-ability-card--ramp-locked", rampLocked);
+                if (v.RampLock != null) v.RampLock.style.display = rampLocked ? DisplayStyle.Flex : DisplayStyle.None;
             }
         }
 
@@ -2308,6 +2619,7 @@ namespace CluckWars.UI
             RevealReadyBanner(allReady);
             UpdateLobbyStatus(isSolo, isHost, isJoin);
             RefreshMatchSettings();
+            RefreshDailyTaskCard();
 
             // Host pre-creates the UGS lobby so its join code populates the tiles before START.
             if (isHost)
@@ -2478,6 +2790,34 @@ namespace CluckWars.UI
             var goal = _lobby.Q<Label>("SetGoal");
             if (time != null) time.text = MatchSettingsText.Time(_matchConfig.MatchDurationSeconds);
             if (goal != null) goal.text = MatchSettingsText.Goal(_matchConfig.FoodTargetToWin);
+        }
+
+        /// <summary>
+        /// Shows the day's task (progression slice 4) — before the day's first round, open all day.
+        /// Hidden entirely while the ramp is still running (the plan's own words), and while
+        /// progression has not loaded (fails open: no card rather than a wrong or stale one).
+        /// </summary>
+        private void RefreshDailyTaskCard()
+        {
+            var card = _lobby.Q<VisualElement>("DailyTaskCard");
+            if (card == null) return;
+
+            var task = _progression != null && _progression.IsReady ? _progression.Unlocks.TodaysTask : null;
+            if (task == null)
+            {
+                card.AddToClassList("cw-hidden");
+                return;
+            }
+
+            card.RemoveFromClassList("cw-hidden");
+            var name = _lobby.Q<Label>("DailyTaskName");
+            var desc = _lobby.Q<Label>("DailyTaskDesc");
+            if (name != null)
+            {
+                name.text = task.Completed ? $"✓ {task.DisplayName}" : task.DisplayName;
+                name.style.color = task.Completed ? UiGfx.GreenTop : UiGfx.TextPrimary;
+            }
+            if (desc != null) desc.text = task.Description;
         }
 
         private void UpdateLobbyStatus(bool isSolo, bool isHost, bool isJoin)

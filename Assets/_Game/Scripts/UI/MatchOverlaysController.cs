@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using CluckWars.Abilities;
 using CluckWars.Diagnostics;
+using System.Globalization;
 using CluckWars.Gameplay;
 using CluckWars.Input;
 using CluckWars.Localization;
 using CluckWars.Logging;
 using CluckWars.Networking;
+using CluckWars.Progression;
 using CluckWars.Services;
 using CluckWars.Settings;
 using Fusion;
@@ -59,6 +61,7 @@ namespace CluckWars.UI
         private IInputProvider           _input;        // Esc / Android back / pad Start: LEAVE (waiting room), "Leave match?" (round), BACK TO LOBBY (podium)
         private MenuAudio                _audio = MenuAudio.Silent();
         private ChickenClassRegistrySO   _classRegistry;
+        private IProgressionService      _progression;
 
         // ---- UI element refs (queried once, on bind) ---------------------------
         private VisualElement _root;
@@ -78,6 +81,9 @@ namespace CluckWars.UI
         // Post-match music (finding 7): when the podium appeared and whether the menu bed has started under it.
         private float         _podiumShownAt;
         private bool          _podiumBedStarted;
+        private Label         _meGrain;
+        // The round whose award _meGrain's text was built for, so the text is built once per award.
+        private string        _meGrainRoundId;
 
         private Label         _meRibbon, _meWinSub, _meTargetNote, _meHostNote;
         private Button        _mePlayAgainBtn, _meBackBtn;
@@ -194,7 +200,8 @@ namespace CluckWars.UI
             [InjectOptional] MenuAudio              audio,
             [InjectOptional] ChickenClassRegistrySO classRegistry,
             [InjectOptional] IInputProvider         input,
-            [InjectOptional] IArenaReadiness        arenaReadiness)
+            [InjectOptional] IArenaReadiness        arenaReadiness,
+            IProgressionService      progression)
         {
             _arenaReadiness = arenaReadiness;
             _network       = network;
@@ -205,6 +212,7 @@ namespace CluckWars.UI
             _audio         = audio ?? MenuAudio.Silent();
             _classRegistry = classRegistry;
             _input         = input;
+            _progression   = progression;
         }
 
         // ---- Unity lifecycle ---------------------------------------------------
@@ -223,6 +231,16 @@ namespace CluckWars.UI
             if (_network != null) _network.OnShutdown += HandleShutdown;
             if (_input == null)
                 _log?.Warn(Source, "IInputProvider not injected; Esc / Android back / pad Start will not leave the match (the on-screen buttons still work).");
+            if (_progression == null)
+            {
+                // IProgressionService is always bound project-wide, so a null here is a wiring bug.
+                _log?.Error(Source, "IProgressionService was not injected, so the results panel will never show " +
+                    "the round's Grain. Check the progression bindings in ProjectInstaller.");
+            }
+
+            // An award that exists before this panel does belongs to an earlier session's round: joining a
+            // session already on its results screen fires no RoundStarted, so the service has not cleared it.
+            _staleGrainRoundId = _progression?.LatestAward?.RoundId;
             EnsureEventSystem();
         }
 
@@ -391,6 +409,12 @@ namespace CluckWars.UI
             var celebrationLayer = _root.Q<VisualElement>("MeCelebration");
             if (celebrationLayer != null) _celebration = new MatchCelebration(celebrationLayer);
             else _log?.Error(Source, "MatchOverlays.uxml has no #MeCelebration; the winner celebration will not show.");
+            _meGrain        = _root.Q<Label>("MeGrain");
+            if (_meGrain == null)
+            {
+                _log?.Error(Source, "MatchOverlays.uxml has no Label named 'MeGrain', so the results panel will " +
+                    "never show the round's Grain. Restore the element (see ResultsGrainLineTests).");
+            }
 
             _lobbySafe        = _root.Q<VisualElement>("LobbySafe");
             _codeTiles        = _root.Q<VisualElement>("CodeTiles");
@@ -591,6 +615,7 @@ namespace CluckWars.UI
         {
             bool show = gm != null && gm.State == MatchState.Ended;
             SetShown(_matchEndOverlay, show);
+            RefreshGrainLine(show);
             if (!show)
             {
                 if (_matchEndPopulated) DisposeStage();
@@ -721,6 +746,60 @@ namespace CluckWars.UI
             _log?.Info(Source, $"Leaving the match → loading '{_bootstrapSceneName}'.");
             SceneManager.LoadScene(_bootstrapSceneName);
         }
+
+        /// <summary>
+        /// The one progression line on the results panel. The panel opens here in <c>Update</c>, before
+        /// <c>GameManager.LateUpdate</c> announces <c>RoundEnded</c> that frame, so the award arrives a
+        /// frame after the panel: until then the line is simply absent (no spinner, no placeholder).
+        /// </summary>
+        private void RefreshGrainLine(bool panelShown)
+        {
+            if (_meGrain == null) return;
+
+            bool show = ShowsGrainLine(panelShown, _progression, _staleGrainRoundId, out var award);
+            if (show && award.RoundId != _meGrainRoundId)
+            {
+                _meGrain.text = GrainLineText(award.Grain);
+                _meGrainRoundId = award.RoundId; // built once per award, not per frame
+            }
+            SetShown(_meGrain, show);
+        }
+
+        // The round whose award already existed when this panel was created (captured in Awake): never shown.
+        private string _staleGrainRoundId;
+
+        /// <summary>
+        /// Whether the results panel shows "+N Grain": the panel is up, progression is loaded and has
+        /// recorded a round since this panel was created, and the award is positive.
+        /// </summary>
+        /// <param name="staleRoundId">
+        /// The award that existed when the panel was created. The service clears <c>LatestAward</c> when a
+        /// round opens, but a player who joins a session already on its results screen hears no round open,
+        /// so the previous session's award would otherwise show here.
+        /// </param>
+        /// <remarks>
+        /// <c>RoundAward.Grain</c> is the balance delta. If the device clock went backwards the new
+        /// round can take an earlier round's rested slot, so the delta can be zero or negative; the
+        /// line is then hidden rather than rendered as "+-N". The journal and balance stay exact.
+        /// </remarks>
+        public static bool ShowsGrainLine(bool panelShown, IProgressionService progression, string staleRoundId,
+            out RoundAward award)
+        {
+            award = default;
+            if (!panelShown || progression == null || !progression.IsReady) return false;
+
+            var latest = progression.LatestAward;
+            if (!latest.HasValue || latest.Value.Grain <= 0) return false;
+            if (staleRoundId != null && string.Equals(latest.Value.RoundId, staleRoundId, System.StringComparison.Ordinal))
+                return false;
+
+            award = latest.Value;
+            return true;
+        }
+
+        /// <summary>"+37 Grain". Invariant digits, no separators, no icon (LilitaOne has ~225 glyphs).</summary>
+        public static string GrainLineText(int grain) =>
+            "+" + grain.ToString(CultureInfo.InvariantCulture) + " Grain";
 
         private void PopulateMatchEnd(GameManager gm)
         {

@@ -83,3 +83,4 @@ MonoBehaviour:
   _abilityRegistry: {fileID: 11400000, guid: 0a608378f96412943a62f875f18497c3, type: 2}
   _matchConfig: {fileID: 11400000, guid: 3af469376147c9a45aa293777ed50fc6, type: 2}
   _fencePerformanceMeshes: {fileID: 11400000, guid: 1552c644b002dd944b2db437d0db9288, type: 2}
+  _progressionConfig: {fileID: 11400000, guid: a4f1ebed8ea69de47a65047367ac57c2, type: 2}

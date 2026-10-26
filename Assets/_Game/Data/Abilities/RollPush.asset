@@ -32,3 +32,4 @@ MonoBehaviour:
   PushRadius: 1.9
   PushStrength: 13.5
   RollSpeedMultiplier: 2
+  _unlockKey: ability.roll_push
