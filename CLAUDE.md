@@ -61,7 +61,15 @@ Full diagnostic playbook: `docs/TESTING.md`.
 
 ## Latest tag
 
-`v0.3.0-alpha` (commit `312f511`) — Pre-test polish + build tooling. See `docs/STATE.md` for the full list.
+`v0.4.0-alpha` (commit `aadcd048`, = `main`) — **first release for human testing** (2026-10-26). See `docs/STATE.md`.
+
+## Branches (since v0.4.0-alpha)
+
+- **`main`** = the released build. Only release merges and fixes for that build land here; every release is a tag on `main`.
+- **Fixes for the released build:** branch `fix/<topic>` **from `main`**, merge back into `main`, tag a patch
+  (`v0.4.1-alpha`, ...), then merge `main` into `develop` so the fix is not lost.
+- **`develop`** = features and progression (next release). New work branches `feature/<topic>` **from `develop`** and
+  merges back into `develop`. Never merge `develop` into `main` except to cut the next release.
 
 ---
 

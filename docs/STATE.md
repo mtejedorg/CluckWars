@@ -6,6 +6,17 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🚀 2026-10-26 - `v0.4.0-alpha`: first release for human testing; progression merged into `develop`
+
+- **Release:** `v0.4.0-alpha` is an annotated tag on `aadcd048`. `main` was fast-forwarded to it from `ffc11a3e`.
+  The tagged build is develop as gated on 2026-10-24 (see the entry below that): it does **not** contain progression.
+- **Progression:** `feature/progression` (PR #1, `098ac3d4`) is merged into `develop` with `--no-ff` (merge `72ff782e`).
+  The merged tree is identical to the gated `098ac3d4` (see the next entry).
+- **Branching from now on** (also in `CLAUDE.md`):
+  - Fixes for the playtest build go on `fix/*` from `main`, then `main` is merged into `develop`.
+  - Features and progression go on `feature/*` from `develop`.
+- **Playtest fixes:** none yet.
+
 ## ✅ 2026-10-25 - progression reviewed, two blockers fixed, rebased onto `develop` `aadcd048`
 
 - **Review:** `docs/proposals/PROGRESSION_REVIEW_2026-10.md` lists the findings ranked B / S / N, with file:line refs and screenshot paths.
