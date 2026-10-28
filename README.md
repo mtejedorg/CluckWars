@@ -65,8 +65,8 @@ Each class offers two, chosen once at character select. A specialization grants 
 
 | Class | Specializations |
 |---|---|
-| **Warrior** | The Brute (steals 40% more; signature Scrap), The Relentless (moves recharge 25% faster; signature Headbutt) |
-| **Speedy** | The Agile (stuns and timed slows end 40% sooner), The Anxious (immune to pile and collision slows) |
+| **Warrior** | The Brute (steals 40% more; signature Scrap), The Relentless (every move except Peck recharges 25% faster; signature Headbutt) |
+| **Speedy** | The Agile (stuns, getting stuck and timed slows end 40% sooner), The Anxious (immune to pile and collision slows) |
 | **Fatty** | The Hauler (carries at least a full win's worth), The Boulder (knockback cut by 75%; signature Ground Quake) |
 | **Assassin** | The Reaper (banks a bonus if the clock expires with no winner; signature Death Mark), The Burglar (steals 1.6× more; signature Sneaky Steal) |
 
@@ -76,7 +76,7 @@ Three signatures (Agile, Anxious, Hauler) are not assigned yet.
 
 ## Abilities
 
-29 abilities. Two are shared by every class and the rest belong to one class each. Every player has four active slots. Moves fire on release, with an instant preview while the button is held.
+29 abilities. Egg Shell is the one ability every class can equip. Peck is pre-equipped for the three forager classes (the Assassin cannot forage). Every other ability belongs to one class. Every player has four active slots. Moves fire on release, with an instant preview while the button is held.
 
 - **Shared (2):** Peck, Egg Shell
 - **Warrior (6):** Cluck Shock, Dive Bomb, Headbutt, Ruffle, Scrap, Wing Slam
@@ -96,7 +96,7 @@ Full tables, cooldown tiers and the exact values are on the [mechanics page](htt
 - **Render Pipeline:** Universal Render Pipeline (URP)
 - **Networking:** Photon Fusion 2, Shared Mode now, Server Mode after funding
 - **DI Framework:** Zenject (Extenject)
-- **Backend:** Unity Gaming Services behind `IUGSService`, with a null implementation in the demo
+- **Backend:** Unity Gaming Services behind `IUGSService` (a null implementation can be forced with `UGS_DISABLED`)
 - **Audio:** Unity Audio behind `IAudioService`
 - **Architecture:** MonoBehaviour (no ECS/DOTS)
 
@@ -123,8 +123,7 @@ Networking, UGS, audio, input and logging all sit behind interfaces. See the [te
 │   ├── Prefabs/
 │   ├── Scenes/
 │   └── Art/
-├── Plugins/
-└── Tests/
+└── Plugins/
 ```
 
 ---

@@ -4,7 +4,7 @@
   "slug": "cluckwars",
   "status": "in development",
   "engine": "Unity 6",
-  "blurb": "A four-player free-for-all arena game. Four chicken classes collect food, bank it at their base and steal from rivals in 45-second matches. No hit points: fights are about taking food and buying time. Built in Unity 6 with Photon Fusion 2.",
+  "blurb": "A four-player free-for-all arena game. Players pick one of four chicken classes, collect food, bank it at their base and steal from rivals in 45-second matches. No hit points: fights are about taking food and buying time. Built in Unity 6 with Photon Fusion 2.",
   "tags": ["Unity 6", "C#", "Photon Fusion 2", "Zenject", "URP"],
   "preview": "assets/preview.jpg",
   "site": "https://mtejedorg.github.io/CluckWars/",

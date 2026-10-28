@@ -42,7 +42,7 @@
           <!-- Source: docs/TDD.md §2 -->
           <tr><td>Dependency injection</td><td>Zenject (Extenject)</td></tr>
           <!-- Source: docs/TDD.md §3.2, §5.1 -->
-          <tr><td>Backend</td><td>Unity Gaming Services behind <code>IUGSService</code>, with a null implementation in the demo</td></tr>
+          <tr><td>Backend</td><td>Unity Gaming Services behind <code>IUGSService</code>. A null implementation can be forced with the <code>UGS_DISABLED</code> define.</td></tr>
           <!-- Source: .claude/CLAUDE.md ("UXML/USS only for menu UI"), docs/ART.md (USS styles) -->
           <tr><td>Menu UI</td><td>UI Toolkit (UXML and USS)</td></tr>
           <!-- Source: docs/TDD.md §9.1 -->
@@ -56,9 +56,9 @@
 
   <section id="interfaces">
     <h2>Everything external sits behind an interface</h2>
-    <!-- Source: docs/TDD.md §1, §3.1, §4.2, §7, §8, §10 -->
+    <!-- Source: docs/TDD.md §1, §3.1, §3.3, §4.2, §7, §8, §10 -->
     <p>Gameplay code never calls Fusion, UGS, Unity's input or the audio system directly. It talks to <code>INetworkService</code>, <code>IUGSService</code>, <code>IAudioService</code>, <code>IInputProvider</code> and <code>ILogService</code>. Zenject binds the implementations in a <code>ProjectInstaller</code> that lives on a prefab in <code>Resources</code>, so swapping one is a change to a single <code>To&lt;&gt;()</code> line and no other code.</p>
-    <p>The demo binds null implementations where a service is not needed: <code>NullUGSService</code> and <code>NullAudioService</code> are silent no-ops. Even the offline path goes through Fusion, in its single-player mode, so there is no separate local networking class and no fork between solo and multiplayer spawn logic.</p>
+    <p>Null implementations exist for UGS, which the <code>UGS_DISABLED</code> define forces, and for audio, where <code>NullAudioService</code> is a silent no-op for testing. Even the offline path goes through Fusion, in its single-player mode, so there is no separate local networking class and no fork between solo and multiplayer spawn logic.</p>
   </section>
 
   <section id="injection">
@@ -96,7 +96,7 @@
   <section id="workflow">
     <h2>How it is built</h2>
     <!-- Source: .claude/CLAUDE.md (agent table, tools in scope), file names in .claude/agents/ -->
-    <p>Cluck Wars is built solo with AI coding agents. Claude Code works through the 15 agents defined in <code>.claude/agents</code>: <code>code-architect</code> for planning and review, <code>senior-dev</code> for implementation, <code>qa-reviewer</code> and <code>tester</code>, and specialists for UI, UX, mechanics, level design, 2D and 3D art, VFX, shaders, the render pipeline, audio and narrative. A Unity MCP bridge (AI Game Developer) lets the agents inspect scenes, edit components, take screenshots and run the EditMode tests in the Editor. Larger multi-file changes can also go through Antigravity, using a skill called <code>cravify</code>.</p>
+    <p>Cluck Wars is built solo with AI coding agents. Claude Code works through the agents defined in <code>.claude/agents</code>: <code>code-architect</code> for planning and review, <code>senior-dev</code> for implementation, <code>qa-reviewer</code> and <code>tester</code>, and specialists for UI, UX, mechanics, level design, 2D and 3D art, VFX, shaders, the render pipeline, audio and narrative. A Unity MCP bridge (AI Game Developer) lets the agents inspect scenes, edit components, take screenshots and run the EditMode tests in the Editor. Larger multi-file changes can also go through Antigravity, using a skill called <code>cravify</code>.</p>
   </section>
 </main>
 
