@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cluck Wars: Tech</title>
+<meta name="description" content="How Cluck Wars is built: Unity 6, Photon Fusion 2 in Shared Mode, Zenject, services behind interfaces, ScriptableObject data and the Balance Oracle.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-head">
+  <div class="wrap">
+    <a class="brand" href="index.html">Cluck Wars</a>
+    <nav class="site-nav" aria-label="Site">
+      <a href="index.html">Home</a>
+      <a href="mechanics.html">Mechanics</a>
+      <a href="tech.html" aria-current="page">Tech</a>
+      <a href="https://github.com/mtejedorg/CluckWars">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <h1>Tech</h1>
+    <p class="lede">The stack, the rules that keep it replaceable, and how multiplayer authority works in Photon's Shared Mode.</p>
+  </div>
+
+  <section id="stack">
+    <h2>Stack</h2>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Layer</th><th>Choice</th></tr></thead>
+        <tbody>
+          <!-- Source: docs/TDD.md §2 -->
+          <tr><td>Engine</td><td>Unity 6 (6000.3 LTS), C#</td></tr>
+          <tr><td>Rendering</td><td>Universal Render Pipeline (URP), orthographic isometric camera</td></tr>
+          <tr><td>Architecture</td><td>MonoBehaviour. No ECS or DOTS.</td></tr>
+          <!-- Source: docs/TDD.md §4.1 -->
+          <tr><td>Networking</td><td>Photon Fusion 2. Shared Mode now, Server Mode after funding.</td></tr>
+          <!-- Source: docs/TDD.md §2 -->
+          <tr><td>Dependency injection</td><td>Zenject (Extenject)</td></tr>
+          <!-- Source: docs/TDD.md §3.2, §5.1 -->
+          <tr><td>Backend</td><td>Unity Gaming Services behind <code>IUGSService</code>, with a null implementation in the demo</td></tr>
+          <!-- Source: .claude/CLAUDE.md ("UXML/USS only for menu UI"), docs/ART.md (USS styles) -->
+          <tr><td>Menu UI</td><td>UI Toolkit (UXML and USS)</td></tr>
+          <!-- Source: docs/TDD.md §9.1 -->
+          <tr><td>Platforms</td><td>Windows (primary development target) and Android. iOS after the demo.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- Source: docs/TDD.md §9.2 -->
+    <p class="small muted">Frame-rate targets in the design document are 60 fps on Windows and a stable 30 fps on mid-range Android. They are targets, not measurements.</p>
+  </section>
+
+  <section id="interfaces">
+    <h2>Everything external sits behind an interface</h2>
+    <!-- Source: docs/TDD.md §1, §3.1, §4.2, §7, §8, §10 -->
+    <p>Gameplay code never calls Fusion, UGS, Unity's input or the audio system directly. It talks to <code>INetworkService</code>, <code>IUGSService</code>, <code>IAudioService</code>, <code>IInputProvider</code> and <code>ILogService</code>. Zenject binds the implementations in a <code>ProjectInstaller</code> that lives on a prefab in <code>Resources</code>, so swapping one is a change to a single <code>To&lt;&gt;()</code> line and no other code.</p>
+    <p>The demo binds null implementations where a service is not needed: <code>NullUGSService</code> and <code>NullAudioService</code> are silent no-ops. Even the offline path goes through Fusion, in its single-player mode, so there is no separate local networking class and no fork between solo and multiplayer spawn logic.</p>
+  </section>
+
+  <section id="injection">
+    <h2>Self-injection for networked objects</h2>
+    <!-- Source: docs/TDD.md §3.4 -->
+    <p>Two kinds of object skip Zenject's normal scene injection. The Bootstrap scene has no scene context, and Fusion's <code>Runner.Spawn</code> creates networked objects outside Zenject's lifecycle. Both inject themselves from the project context:</p>
+    <pre><code>if (_log == null) ProjectContext.Instance.Container.Inject(this);</code></pre>
+    <p>The guard must not check <code>ProjectContext.HasInstance</code>. That property is false until something reads <code>.Instance</code> for the first time, and reading <code>.Instance</code> is what loads it.</p>
+  </section>
+
+  <section id="data">
+    <h2>ScriptableObject data and the Balance Oracle</h2>
+    <!-- Source: docs/TDD.md §6.3, §6.6 -->
+    <p>Abilities are ScriptableObject assets derived from <code>AbilityBaseSO</code>. Class stats and match settings are ScriptableObjects too, in <code>Assets/_Game/Data/</code>, and every such type carries the <code>SO</code> suffix.</p>
+    <!-- Source: docs/GDD.md §2.1, §13 -->
+    <p>Class stats are not tuned by hand. Each is solved against a Solo Clear Time target, and the Balance Oracle checks it. The Oracle is a pure-C# simulator. It runs a greedy farming policy on the real pile coordinates, takes reach into account when it measures each leg of a trip, and asserts that every class lands within tolerance of its target from all four seats. It is covered by EditMode tests. The mechanics page explains the axiom and its tolerance bands.</p>
+    <figure>
+      <img src="assets/loadout.jpg" width="1280" height="720" loading="lazy" alt="Capture of the loadout screen titled Gear Up. Four ability slots run along the top, with Sneaky Steal marked as a starter. Below, a shared Any Bird section and an Assassin Only section list abilities tagged Steal, Control, Utility or Defense. A purple Assassin stands in the middle.">
+      <figcaption>Capture of the loadout screen. Abilities are data: each card is built from an ability asset, tagged by category and by the class allowed to equip it.</figcaption>
+    </figure>
+  </section>
+
+  <section id="authority">
+    <h2>Shared Mode authority</h2>
+    <!-- Source: docs/TDD.md §4.1 -->
+    <p>In Shared Mode any device can host, and there is no dedicated server. A dedicated, fully authoritative server is the post-funding Server Mode.</p>
+    <!-- Source: docs/GDD.md §6.1 -->
+    <p>The design follows from that. A cast is a request, not a result: the target's authority checks range, cooldown and legality, with some tolerance, before the effect applies.</p>
+    <!-- Source: docs/GDD.md §7.2 (steal-proof, RPC_DrainStolen) -->
+    <p>Steals work the same way. The thief credits itself optimistically. The victim's side re-checks in <code>RPC_DrainStolen</code>, and if it refuses, the drain is refunded. A race shorter than a network round trip is logged. Steals are therefore clamped by the victim's authority and are not validated by a server.</p>
+    <!-- Source: docs/TDD.md §6.4, §8 -->
+    <p>Animation and audio are local. Each client drives them from state it already observes, and they are never sent over the network.</p>
+  </section>
+
+  <section id="workflow">
+    <h2>How it is built</h2>
+    <!-- Source: .claude/CLAUDE.md (agent table, tools in scope), file names in .claude/agents/ -->
+    <p>Cluck Wars is built solo with AI coding agents. Claude Code works through the 15 agents defined in <code>.claude/agents</code>: <code>code-architect</code> for planning and review, <code>senior-dev</code> for implementation, <code>qa-reviewer</code> and <code>tester</code>, and specialists for UI, UX, mechanics, level design, 2D and 3D art, VFX, shaders, the render pipeline, audio and narrative. A Unity MCP bridge (AI Game Developer) lets the agents inspect scenes, edit components, take screenshots and run the EditMode tests in the Editor. Larger multi-file changes can also go through Antigravity, using a skill called <code>cravify</code>.</p>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <p>Cluck Wars. Figures on this page come from docs/TDD.md and docs/GDD.md in the repository. Where the two disagree, the GDD wins.</p>
+    <p><a href="https://github.com/mtejedorg/CluckWars">github.com/mtejedorg/CluckWars</a></p>
+  </div>
+</footer>
+</body>
+</html>

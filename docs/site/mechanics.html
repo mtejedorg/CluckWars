@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cluck Wars: Mechanics</title>
+<meta name="description" content="How Cluck Wars plays: the 45-second loop, the Solo Clear Time balance axiom, four classes, the steal formula, the control ladder and the 29 abilities.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-head">
+  <div class="wrap">
+    <a class="brand" href="index.html">Cluck Wars</a>
+    <nav class="site-nav" aria-label="Site">
+      <a href="index.html">Home</a>
+      <a href="mechanics.html" aria-current="page">Mechanics</a>
+      <a href="tech.html">Tech</a>
+      <a href="https://github.com/mtejedorg/CluckWars">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <h1>Mechanics</h1>
+    <p class="lede">How a match plays, and why the numbers are what they are. Everything here is read from the game design document (v0.4) in the repository.</p>
+    <ul class="toc" aria-label="On this page">
+      <li><a href="#loop">Loop and win</a></li>
+      <li><a href="#final10">Last 10 seconds</a></li>
+      <li><a href="#sct">Solo Clear Time</a></li>
+      <li><a href="#roster">Roster</a></li>
+      <li><a href="#steal">Steal and control</a></li>
+      <li><a href="#deathmark">Death Mark</a></li>
+      <li><a href="#abilities">Abilities</a></li>
+      <li><a href="#casting">Casting</a></li>
+      <li><a href="#map">Piles, walls, jumps</a></li>
+      <li><a href="#open">Open problem</a></li>
+    </ul>
+  </div>
+
+  <section id="loop">
+    <h2>The loop and the win</h2>
+    <!-- Source: docs/GDD.md §2 (core loop) -->
+    <p>Each player picks a class, a passive and abilities, spawns at their base corner and farms the tiered food piles. Food is carried home and deposited at the base, then the trip repeats. On the way, players steal from loaded rivals, control them, and defend their own haul.</p>
+    <!-- Source: docs/GDD.md §2 (win condition) -->
+    <p>The first player to bank <strong>40 food</strong> wins at once. If nobody does, the most food banked when the <strong>45 second</strong> timer ends wins.</p>
+    <!-- Source: docs/GDD.md §2 (ties at the top, Phase 7) -->
+    <p>The stored tie-break order is food, then KOs, then the lower corner index. Players are never told a coin flip decided anything. If food is level at the top and KOs do not settle it, the end screen reads "TIED AT THE TOP!" and every tied first-place bird is crowned. If KOs settle it, the banner stays "{name} WINS!" with "Tied 1st · won on KOs".</p>
+    <figure>
+      <img src="assets/lobby.jpg" width="1280" height="720" loading="lazy" alt="Capture of the lobby screen, titled The Coop. A strip of house rules reads time 0:45, goal 40 food, mode free-for-all, arena Sunny Farm. Four chickens stand on numbered platforms, each with a player card showing class and four ability icons.">
+      <figcaption>Capture of the lobby. The house rules strip shows the time (0:45) and the goal (40 food).</figcaption>
+    </figure>
+  </section>
+
+  <section id="final10">
+    <h2>The last 10 seconds</h2>
+    <!-- Source: docs/GDD.md §2 (comeback event; MatchConfig.ComebackEventSecondsLeft = 10) -->
+    <p>Once per round, when 10 playable seconds are left (never during the 3-2-1-GO intro), the match authority rolls one of four events. The HUD shows "FINAL 10!" over its name.</p>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Event</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td>Golden Pile</td><td>A 25-food pile appears near the centre.</td></tr>
+          <tr><td>Underdog Surge</td><td>The lowest-banked chicken moves ×1.4.</td></tr>
+          <tr><td>Bounty on the Leader</td><td>Executing the top-banked chicken pays ×2.</td></tr>
+          <tr><td>Restock</td><td>Every pile gets +10, up to its maximum.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="small muted">Golden Pile and Restock add food beyond the 80-food budget described below. The design document calls this a deliberate late-match exception.</p>
+  </section>
+
+  <section id="sct">
+    <h2>The Solo Clear Time axiom</h2>
+    <!-- Source: docs/GDD.md §2.1 -->
+    <p>The balance rule: a naked chicken (no abilities, no passive), alone on the full map and farming greedily, banks the win target in a fixed time, in a fixed number of base trips. Every class stat is solved against that target instead of tuned by feel. Speedy moves at 12.15, not because it feels right, but because Speedy has to clear in 30 seconds.</p>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Class</th><th class="num">Solo Clear Time</th><th class="num">Trips</th><th>Strategy</th></tr></thead>
+        <tbody>
+          <!-- Source: docs/GDD.md §2.1 class table -->
+          <tr><td><span class="tag t-speedy">Speedy</span></td><td class="num">30 s</td><td class="num">4</td><td>Throughput: many small loads, roams wide</td></tr>
+          <tr><td><span class="tag t-fatty">Fatty</span></td><td class="num">30 s</td><td class="num">2</td><td>Payload: one huge sweep, barely returns</td></tr>
+          <tr><td><span class="tag t-warrior">Warrior</span></td><td class="num">35 s</td><td class="num">3</td><td>The ability class: mid stats, leans on the kit</td></tr>
+          <tr><td><span class="tag t-assassin">Assassin</span></td><td class="num">40 s</td><td class="num">4</td><td>Denial: never farms, robs and executes</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- Source: docs/GDD.md §2.1 (trips formula, tolerance bands, Balance Oracle) -->
+    <p>Trips are the win target divided by cargo capacity, rounded up. A pure-C# simulator called the Balance Oracle runs the greedy farming policy on the real pile coordinates and checks each class against its target from all four seats. The design band is ±1.5 s. A tighter ±0.5 s guard applies to the shipped asset values.</p>
+    <!-- Source: docs/GDD.md §2.1 (total map food 80 = 2x win) -->
+    <p>The map holds 80 food, twice the win target, so two players could in theory max out by farming alone. That is why combat exists: it buys time, and stealing is the only mechanic that turns a won fight directly into food.</p>
+  </section>
+
+  <section id="roster">
+    <h2>The roster and its specializations</h2>
+    <div class="tw wide">
+      <table>
+        <thead><tr><th>Class</th><th class="num">Move</th><th class="num">Cargo</th><th class="num">Peck cooldown</th><th>Fantasy</th></tr></thead>
+        <tbody>
+          <!-- Source: docs/GDD.md §5.2 roster table -->
+          <tr><td><span class="tag t-fatty">Fatty</span></td><td class="num">10.125</td><td class="num">35</td><td class="num">0.71 s</td><td>"Slow, but it all fits in the beak."</td></tr>
+          <tr><td><span class="tag t-speedy">Speedy</span></td><td class="num">12.15</td><td class="num">10</td><td class="num">0.71 s</td><td>"If you can't catch me, you can't rob me."</td></tr>
+          <tr><td><span class="tag t-warrior">Warrior</span></td><td class="num">10.125</td><td class="num">14</td><td class="num">0.79 s</td><td>"The farm is a battlefield."</td></tr>
+          <tr><td><span class="tag t-assassin">Assassin</span></td><td class="num">12.15</td><td class="num">10</td><td class="num">cannot forage</td><td>"Blink and your food is gone."</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- Source: docs/GDD.md §5.2 (load-bearing detail; Speedy and terrain) -->
+    <p>Speedy and Assassin share move speed and cargo. They differ on one point: the Assassin cannot forage at all, which is the mechanical reason it denies instead of collecting. Speedy never gets terrain traversal, no jump and no blink, because a fast chicken that can also ignore walls would stop being constrained by the map.</p>
+
+    <h3>Eight specializations</h3>
+    <!-- Source: docs/GDD.md §5.3 -->
+    <p>Each class offers two specializations, chosen once at character select. A specialization grants a permanent passive and, for five of the eight, a signature ability that is equipped for you.</p>
+    <div class="tw wide">
+      <table>
+        <thead><tr><th>Class</th><th>Specialization</th><th>Passive</th><th>Signature</th></tr></thead>
+        <tbody>
+          <tr><td><span class="tag t-warrior">Warrior</span></td><td>The Brute</td><td>Steals 40% more, with 2 extra cargo room to hold it</td><td>Scrap</td></tr>
+          <tr><td><span class="tag t-warrior">Warrior</span></td><td>The Relentless</td><td>Every move except Peck recharges 25% faster</td><td>Headbutt</td></tr>
+          <tr><td><span class="tag t-speedy">Speedy</span></td><td>The Agile</td><td>Stuns, getting stuck and timed slows end 40% sooner</td><td>not yet assigned</td></tr>
+          <tr><td><span class="tag t-speedy">Speedy</span></td><td>The Anxious</td><td>Immune to the pile slow and the collision slow</td><td>not yet assigned</td></tr>
+          <tr><td><span class="tag t-fatty">Fatty</span></td><td>The Hauler</td><td>Carries at least a full win's worth</td><td>not yet assigned</td></tr>
+          <tr><td><span class="tag t-fatty">Fatty</span></td><td>The Boulder</td><td>Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner</td><td>Ground Quake</td></tr>
+          <tr><td><span class="tag t-assassin">Assassin</span></td><td>The Reaper</td><td>Banks a bonus if the clock expires with no winner</td><td>Death Mark</td></tr>
+          <tr><td><span class="tag t-assassin">Assassin</span></td><td>The Burglar</td><td>Every steal takes 1.6× more</td><td>Sneaky Steal</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="small muted">Three signatures are still unassigned. Those three specializations grant their passive only until ordinary signature abilities are chosen for them.</p>
+  </section>
+
+  <section id="steal">
+    <h2>Steal and control</h2>
+    <!-- Source: docs/GDD.md §6.2 -->
+    <p>All chicken-to-chicken interaction is steal or control. There is no basic attack. A steal moves cargo directly from victim to thief; nothing drops on the floor. The amount is capped three ways:</p>
+    <pre><code>stolen = min(steal value, free space, defender cargo)   // never negative</code></pre>
+    <p>A loaded thief has no free space, so it cannot steal. Theft is a rhythm of steal, bank, return, not a drain. A steal-proof bird (Egg Shell or Turtle Mode) refuses every steal, so the formula never runs against it.</p>
+
+    <form class="calc" id="calc" hidden aria-label="Steal calculator">
+      <label>Steal value<input type="number" id="c-steal" min="0" step="1" value="6" inputmode="numeric"></label>
+      <label>Thief free space<input type="number" id="c-free" min="0" step="1" value="10" inputmode="numeric"></label>
+      <label>Defender cargo<input type="number" id="c-cargo" min="0" step="1" value="4" inputmode="numeric"></label>
+      <output id="c-out" for="c-steal c-free c-cargo" aria-live="polite"></output>
+    </form>
+    <div id="calc-static">
+      <p class="small muted">Worked examples:</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th class="num">Steal value</th><th class="num">Thief free space</th><th class="num">Defender cargo</th><th class="num">Stolen</th></tr></thead>
+          <tbody>
+            <tr><td class="num">6</td><td class="num">10</td><td class="num">4</td><td class="num">4</td></tr>
+            <tr><td class="num">6</td><td class="num">3</td><td class="num">20</td><td class="num">3</td></tr>
+            <tr><td class="num">6</td><td class="num">0</td><td class="num">20</td><td class="num">0 (a loaded thief)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h3>The control ladder</h3>
+    <!-- Source: docs/GDD.md §6.3 -->
+    <div class="tw">
+      <table>
+        <thead><tr><th>State</th><th>Move</th><th>Cast abilities</th><th>Collect</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td>Slowed</td><td>reduced</td><td>yes</td><td>yes</td><td>collision, pile, slow abilities</td></tr>
+          <tr><td>Stuck</td><td>no</td><td>yes</td><td>no</td><td>trap abilities</td></tr>
+          <tr><td>Stunned</td><td>no</td><td>no</td><td>no</td><td>stun abilities (Ambush, Wing Slam)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Stun is the only state that locks casting. That is exactly why it is the qualifier for the Assassin's execute. Control immunity (Immovable, Egg Shell) stops the whole ladder; steal-proofing is separate and only stops cargo being taken.</p>
+  </section>
+
+  <section id="deathmark">
+    <h2>Death Mark: one button, two presses</h2>
+    <!-- Source: docs/GDD.md §6.4 -->
+    <p>The Assassin's execute is the only hard removal in the game. Only the Reaper specialization has it, locked into the first of the four ability slots.</p>
+    <div class="tw wide">
+      <table>
+        <thead><tr><th>Stage</th><th>Condition</th><th>Counterplay</th></tr></thead>
+        <tbody>
+          <tr><td>Mark</td><td>First press soft-locks the nearest isolated rival (nobody within 8 m), in facing. The target can see the mark.</td><td>Stay near others.</td></tr>
+          <tr><td>Arm</td><td>2.0 seconds pass with the mark alive.</td><td>Break isolation or leave range and the mark fizzles.</td></tr>
+          <tr><td>Qualify</td><td>The marked target enters a stun, from any source. The button relabels to KILL.</td><td>Don't get stunned; hold a defence.</td></tr>
+          <tr><td>Kill</td><td>Press again while the target is stunned and the Assassin is not.</td><td>A third player can stun the Assassin to deny the kill.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>On success the victim's whole cargo moves to the Assassin as a bounty bag that ignores the capacity limit. The victim is removed for about 2 seconds, then respawns empty. A steal-proof victim keeps its load. If the execute fails, Death Mark takes a reduced cooldown so the Assassin can re-mark quickly.</p>
+  </section>
+
+  <section id="abilities">
+    <h2>The 29 abilities</h2>
+    <!-- Source: docs/GDD.md §7.2 (pool and cooldowns), §7.1 (class-only rule) -->
+    <p>Two abilities are shared by every class, and every other ability belongs to exactly one class. Each player has four active slots. Cooldowns are the shipped values, before passives. Effect text is shortened from the design document.</p>
+
+    <div class="chips" id="chips" role="group" aria-label="Filter abilities by class" hidden>
+      <button type="button" class="chip" data-f="all" aria-pressed="true">All 29</button>
+      <button type="button" class="chip" data-f="shared" aria-pressed="false">Shared 2</button>
+      <button type="button" class="chip" data-f="warrior" aria-pressed="false">Warrior 6</button>
+      <button type="button" class="chip" data-f="speedy" aria-pressed="false">Speedy 6</button>
+      <button type="button" class="chip" data-f="fatty" aria-pressed="false">Fatty 7</button>
+      <button type="button" class="chip" data-f="assassin" aria-pressed="false">Assassin 8</button>
+    </div>
+
+    <div class="tw">
+      <table id="abil">
+        <thead><tr><th>Ability</th><th class="num">Cooldown</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr data-c="shared"><td>Peck <span class="tag t-shared">Shared</span></td><td class="num">0.8 s</td><td>Take a beakful from the pile you stand on. Forced for every forager.</td></tr>
+          <tr data-c="shared"><td>Egg Shell <span class="tag t-shared">Shared</span></td><td class="num">8 s</td><td>Hide in an egg for 2 s. You cannot move, but nobody can push you, stop you or steal your food.</td></tr>
+
+          <tr data-c="warrior"><td>Cluck Shock <span class="tag t-warrior">Warrior</span></td><td class="num">7 s</td><td>A shockwave shoves every rival within 4.5 m away.</td></tr>
+          <tr data-c="warrior"><td>Dive Bomb <span class="tag t-warrior">Warrior</span></td><td class="num">6 s</td><td>A diving lunge that robs 8 food from rivals on contact.</td></tr>
+          <tr data-c="warrior"><td>Headbutt <span class="tag t-warrior">Warrior</span></td><td class="num">4 s</td><td>Shoves rivals up to 3.6 m ahead and staggers them for 0.35 s. Relentless signature.</td></tr>
+          <tr data-c="warrior"><td>Ruffle <span class="tag t-warrior">Warrior</span></td><td class="num">5 s</td><td>1.5× speed for 2.5 s, on the ground only.</td></tr>
+          <tr data-c="warrior"><td>Scrap <span class="tag t-warrior">Warrior</span></td><td class="num">5 s</td><td>Grabs 3 food off the nearest carrier within 3.8 m. Brute signature.</td></tr>
+          <tr data-c="warrior"><td>Wing Slam <span class="tag t-warrior">Warrior</span></td><td class="num">8 s</td><td>Slams the ground ahead, stunning rivals within 4.5 m for 1.3 s.</td></tr>
+
+          <tr data-c="speedy"><td>Dust Kick <span class="tag t-speedy">Speedy</span></td><td class="num">6 s</td><td>Kicks dust backwards. Chasers within 4.5 m slow to 55% for 2.5 s.</td></tr>
+          <tr data-c="speedy"><td>Feather Aura <span class="tag t-speedy">Speedy</span></td><td class="num">7 s</td><td>Slows every chicken within 5.4 m to 55% speed for 3 s.</td></tr>
+          <tr data-c="speedy"><td>Feather Trap <span class="tag t-speedy">Speedy</span></td><td class="num">7 s</td><td>A feather cloud thrown ahead lasts 5 s. Chickens in it slow to 45% speed.</td></tr>
+          <tr data-c="speedy"><td>Feint <span class="tag t-speedy">Speedy</span></td><td class="num">5 s</td><td>A hard sidestep delivered as a knockback impulse. Walls still stop it.</td></tr>
+          <tr data-c="speedy"><td>Quick Drop <span class="tag t-speedy">Speedy</span></td><td class="num">12 s</td><td>Banks food 4× faster for 2 s.</td></tr>
+          <tr data-c="speedy"><td>Speed Burst <span class="tag t-speedy">Speedy</span></td><td class="num">6 s</td><td>A 1.5 s sprint at 1.5× movement speed.</td></tr>
+
+          <tr data-c="fatty"><td>Belly Flop <span class="tag t-fatty">Fatty</span></td><td class="num">10 s</td><td>Launches forward and lands hard, stunning rivals within 4 m for 1.4 s.</td></tr>
+          <tr data-c="fatty"><td>Ground Quake <span class="tag t-fatty">Fatty</span></td><td class="num">9 s</td><td>A stomp that pins everyone within 4.5 m in place for 1.8 s. Boulder signature.</td></tr>
+          <tr data-c="fatty"><td>Immovable <span class="tag t-fatty">Fatty</span></td><td class="num">12 s</td><td>Plant yourself for 3 s. You cannot be stunned, slowed, stuck or shoved.</td></tr>
+          <tr data-c="fatty"><td>Roll &amp; Push <span class="tag t-fatty">Fatty</span></td><td class="num">3 s</td><td>Rolls forward at 2× speed for 0.8 s, shoving chickens out of the path.</td></tr>
+          <tr data-c="fatty"><td>Sticky Egg <span class="tag t-fatty">Fatty</span></td><td class="num">7 s</td><td>Drops a sticky egg. The first chicken to step on it is stuck for 2 s.</td></tr>
+          <tr data-c="fatty"><td>Spine Coat <span class="tag t-fatty">Fatty</span></td><td class="num">8 s</td><td>For 2 s, a rival who bumps into you loses 4 food to you and is knocked away.</td></tr>
+          <tr data-c="fatty"><td>Turtle Mode <span class="tag t-fatty">Fatty</span></td><td class="num">10 s</td><td>Pull into your shell for 3 s. You walk at half speed, but nobody can steal your food.</td></tr>
+
+          <tr data-c="assassin"><td>Ambush <span class="tag t-assassin">Assassin</span></td><td class="num">10 s</td><td>Stuns rivals within 3.6 m for 1 s. Sets up the execute.</td></tr>
+          <tr data-c="assassin"><td>Doppelganger <span class="tag t-assassin">Assassin</span></td><td class="num">11 s</td><td>A decoy copy beside you for 4 s.</td></tr>
+          <tr data-c="assassin"><td>Invisibility <span class="tag t-assassin">Assassin</span></td><td class="num">8 s</td><td>Fades you to a ghostly outline for 4 s. Using a move breaks it.</td></tr>
+          <tr data-c="assassin"><td>Death Mark <span class="tag t-assassin">Assassin</span></td><td class="num">5 s</td><td>The execute. Marks a lone rival within 8 m; stun them, then press again to take everything they carry. Reaper only.</td></tr>
+          <tr data-c="assassin"><td>Shadowstep <span class="tag t-assassin">Assassin</span></td><td class="num">6 s</td><td>Dashes forward at 3× speed for 0.4 s, straight over walls.</td></tr>
+          <tr data-c="assassin"><td>Smoke Roost <span class="tag t-assassin">Assassin</span></td><td class="num">11 s</td><td>A cloud at your feet (4 m, 5.5 s). You fade; rivals inside slow to 55% speed.</td></tr>
+          <tr data-c="assassin"><td>Snatch <span class="tag t-assassin">Assassin</span></td><td class="num">3 s</td><td>Robs 5 food from every rival within 4.3 m ahead and shoves them back.</td></tr>
+          <tr data-c="assassin"><td>Sneaky Steal <span class="tag t-assassin">Assassin</span></td><td class="num">5 s</td><td>Yanks 6 food from the nearest carrier within 5.4 m. Burglar signature.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Cooldown tiers</h3>
+    <!-- Source: docs/GDD.md §7.3 -->
+    <div class="tw wide">
+      <table>
+        <thead><tr><th>Tier</th><th>Range</th><th>Abilities</th></tr></thead>
+        <tbody>
+          <tr><td>Quick</td><td class="num">3 to 5 s</td><td>Roll &amp; Push, Snatch, Headbutt, Ruffle, Scrap, Feint, Sneaky Steal, Death Mark</td></tr>
+          <tr><td>Standard</td><td class="num">6 to 9 s</td><td>Dust Kick, Speed Burst, Shadowstep, Dive Bomb, Sticky Egg, Cluck Shock, Feather Aura, Feather Trap, Spine Coat, Wing Slam, Invisibility, Egg Shell, Ground Quake</td></tr>
+          <tr><td>Heavy</td><td class="num">10 to 12 s</td><td>Turtle Mode, Belly Flop, Ambush, Smoke Roost, Doppelganger, Immovable, Quick Drop</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>A move earns a Heavy cooldown only if it gives immunity (control immunity or steal-proofing), a hard area stun of at least 1.4 s, or an economy burst. Ambush, Smoke Roost and Doppelganger sit in Heavy without meeting that rule, and the design document leaves them there until a human four-player session. Peck is foraging cadence set by the Solo Clear Time axiom, not a tiered move.</p>
+  </section>
+
+  <section id="casting">
+    <h2>Hold to aim, release to use</h2>
+    <!-- Source: docs/GDD.md §10.1 -->
+    <p>An ability always fires on release, never on press. The moment you press, your own screen shows the move's true area on the ground and marks every chicken inside it. What is marked is exactly what gets hit.</p>
+    <p>Past about 125 ms the hold becomes a commitment. Rivals see a wind-up glow at your feet, though not your area, and the stick rotates your aim instead of moving you.</p>
+    <p>Having no target is not illegal. A move that needs a rival and finds none shows a cream dashed ring. Release it anyway and it fizzles: no effect, no cooldown, and the slot re-arms after 0.4 s so it cannot be spammed. A held move can be cancelled without firing or costing its cooldown: drag to the screen edge on touch, Esc or right mouse button on keyboard and mouse, B on a gamepad.</p>
+    <figure>
+      <img src="assets/hold.jpg" width="1200" height="675" loading="lazy" alt="Capture of a yellow chicken with a wedge-shaped aim outline drawn on the grass. A red rival chicken stands beside it and a rival nameplate floats above. Ability buttons are at the right, a scoreboard at top left and the timer reads 00:22.">
+      <figcaption>Capture of a held ability: the aim shape is drawn on the ground and a rival is in range.</figcaption>
+    </figure>
+  </section>
+
+  <section id="map">
+    <h2>Piles, walls and jumps</h2>
+    <h3>Tiered piles</h3>
+    <!-- Source: docs/GDD.md §3.2 -->
+    <div class="tw">
+      <table>
+        <thead><tr><th>Tier</th><th class="num">Piles</th><th class="num">Food each</th><th class="num">Total</th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td>T1 doorstep</td><td class="num">4</td><td class="num">5</td><td class="num">20</td><td>Safe income near your base</td></tr>
+          <tr><td>T2 contested</td><td class="num">4</td><td class="num">10</td><td class="num">40</td><td>Equidistant from two bases</td></tr>
+          <tr><td>T3 centre</td><td class="num">1</td><td class="num">20</td><td class="num">20</td><td>The prize</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>That is 80 food in total, twice the win target. Piles do not respawn, so banked food leaves circulation and the pot visibly shrinks as the match goes on.</p>
+
+    <h3>Walls</h3>
+    <!-- Source: docs/GDD.md §3.4 -->
+    <p>Eight radial walls divide the arena into eight 45 degree sectors, alternating between base sectors and neutral sectors. Each wall has exactly one opening, at one end. The pattern repeats four times, so every player's sector is identical. From your base, the left route is the safe lap: out to the rim, along the edge, past a contested pile. The right route is the risky lap: in past the centre pile.</p>
+
+    <h3>Jumps</h3>
+    <!-- Source: docs/GDD.md §3.5 -->
+    <p>Every jump is a teleport, and there are no obstacle height classes. A jump clears an obstacle only if its length beats the obstacle's span plus 0.8 m of body clearance. A jump that falls short stops flush against the near face, and the cooldown is still spent.</p>
+    <div class="tw wide">
+      <table>
+        <thead><tr><th>Jump</th><th class="num">Length</th><th>Clears</th></tr></thead>
+        <tbody>
+          <tr><td>Short</td><td class="num">5 m</td><td>Every wall, no pile</td></tr>
+          <tr><td>Normal</td><td class="num">10 m</td><td>Walls, and the doorstep and contested piles</td></tr>
+          <tr><td>Big (future)</td><td class="num">18 m</td><td>Also a full centre pile</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- Source: docs/GDD.md §3.6 -->
+    <p>The centre pile shrinks as it empties, and since span is the only thing gating a jump, the map opens up in stages. A full pile needs the big jump. At 75% a normal jump crosses it. At 25% anything does. The prize everyone is fighting over is also the wall protecting it, so the arena dissolves as the match converges.</p>
+  </section>
+
+  <section id="open">
+    <h2>An open problem</h2>
+    <!-- Source: docs/GDD.md §3.9 and §11 item 2c -->
+    <p>The arena is too big for four players in 45 seconds. In play, four chickens rarely run into each other, so a whole match can pass in parallel: everyone farms, everyone banks. The control and steal systems that the v0.4 redesign exists to serve go unexercised. The design document marks this as known, accepted for now, and something that must be solved before the map is called done.</p>
+    <p>The levers it lists, none chosen yet:</p>
+    <ul class="tight">
+      <li>Shrink the arena. Cheapest, but every spatial constant derives from its size, and shrinking alone shortens Solo Clear Time unless speeds come down too.</li>
+      <li>Pull the objectives inward, so routes overlap sooner.</li>
+      <li>Raise the player count. The arena may simply be sized for more players, but that changes the free-for-all maths and the win target.</li>
+      <li>Add interior geometry that funnels traffic through shared corridors.</li>
+    </ul>
+    <p>The design document's reason for waiting: it is not yet known whether the encounter rate is wrong or the readability of encounters is, and guessing costs a re-solve of every derived constant. This is the first question a human playtest has to answer.</p>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <p>Cluck Wars. Figures on this page come from docs/GDD.md (v0.4) in the repository.</p>
+    <p><a href="https://github.com/mtejedorg/CluckWars">github.com/mtejedorg/CluckWars</a></p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  // Ability filter. Without JS the chip bar stays hidden and all 29 rows show.
+  var chips = document.getElementById('chips');
+  var rows = document.querySelectorAll('#abil tbody tr');
+  if (chips && rows.length) {
+    chips.hidden = false;
+    chips.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-f]');
+      if (!b) return;
+      var f = b.getAttribute('data-f');
+      chips.querySelectorAll('button').forEach(function (x) {
+        x.setAttribute('aria-pressed', x === b ? 'true' : 'false');
+      });
+      rows.forEach(function (r) {
+        r.hidden = !(f === 'all' || r.getAttribute('data-c') === f);
+      });
+    });
+  }
+
+  // Steal calculator. Without JS the form stays hidden and the worked examples show.
+  var form = document.getElementById('calc');
+  if (form) {
+    var s = document.getElementById('c-steal');
+    var fr = document.getElementById('c-free');
+    var c = document.getElementById('c-cargo');
+    var out = document.getElementById('c-out');
+    var num = function (el) { var v = parseFloat(el.value); return isFinite(v) ? v : 0; };
+    var run = function () {
+      var r = Math.max(0, Math.min(num(s), num(fr), num(c)));
+      out.innerHTML = 'stolen = <b>' + r + '</b>';
+    };
+    form.hidden = false;
+    form.addEventListener('input', run);
+    form.addEventListener('submit', function (e) { e.preventDefault(); });
+    run();
+  }
+})();
+</script>
+</body>
+</html>
