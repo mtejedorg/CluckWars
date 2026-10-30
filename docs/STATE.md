@@ -6,6 +6,13 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## ✅ 2026-10-30 - Unity MCP 1.5.0 / add-ons 2.0.2 reinstalled after a crashed install; UPM packages bumped (`f528d038`)
+
+- Crashed install had dropped core `com.ivanmurzak.unity.mcp` from the manifest and left `UNITY_MCP_DEPS_8` + old NuGet DLLs. Fix order: strip the 3 add-ons, run Unity once so core's resolver restores `Assets/Plugins/NuGet`, re-add add-ons, set `UNITY_MCP_DEPS_17`. Setting DEPS_17 first fails (CS0234 `ToolTextEscaping`).
+- Also bumped: collab-proxy, ide.rider, ide.visualstudio, inputsystem 1.20.1, services.authentication/core/multiplayer, timeline, visualscripting, ai.navigation. Left alone: ai.assistant (pre-release), URP, test-framework.
+- Verified: headless compile clean, EditMode 2475 (the 7 render tests fail only under `-nographics`; 21/21 with a GPU), Play mode on Bootstrap clean. Not run: matrix / device builds.
+- **MCP 2.0 removed most tools** (`scene-*`, `gameobject-*`, `assets-*`, `editor-application-*`, `console-get-logs`); use `script-execute` or RQL. Agent/skill text that names the old tools is stale.
+
 ## ✅ 2026-10-24 - everything on `develop`, tested; progression rebased (review pending)
 
 - **`develop`** carries the 2026-10-21..23 backlog (WP0-WP9, effect types, portrait/landscape, floor-ring arrows as the default, Doppelganger/Root Egg/Execute hardening, CW-233 corners). Pushed `654cd39`; gate: EditMode 2473/2473, production + dev-tools builds, matrix solo / shared2 / shared4 x2 / hostleave x2 / AutoZone / AutoAura x2 all PASS (0 rejected RPCs), orientation capture 5/5 sizes. The older "working tree ... NOT yet run in Unity" headings below were all superseded by that gate; they are history, not open items.
