@@ -1,320 +1,123 @@
-# Cluck Wars — Product Backlog
-
-**Compiled 2026-10-19** from: `docs/HANDOFF-PHASE8D-2026-10.md`, `docs/superpowers/handoffs/*`, `docs/HANDOFF-COOP-REPORT-QUICKWINS-2026-08.md`, `docs/HANDOFF-NETWORKING-2026-07.md`, `docs/STATE.md` ("Stays open" / "Not verified" / "Outstanding" notes), `docs/ROADMAP.md` (unchecked items + post-demo phases), GitHub PRs, and git branches / worktrees.
-
-**Legend.** Type: Decision · Task · Bug · Verify (needs a device / multiplayer run) · Chore · Epic. Priority: P1 (blocks a test session / ship) · P2 (should do soon) · P3 (nice to have). Suggested owner is the agent the project routing table would use. **"Check first"** = the source note is old and may already be done; confirm before spending time.
-
-Status of the repo at compile time: `develop` @ `cca5e51`, EditMode 1899/1899.
-
----
-
-## 0. Decisions queue (blocks other tickets — Maestro)
-
-| ID | Decision | Recommendation | Unblocks |
-|---|---|---|---|
-| CW-001 | **Doppelganger decoy colours:** keep rival ring + edge arrow grey, or give them the caster's colour (touches gameplay lookups)? | Leave grey (matches nameplate, reveals nothing extra). | closes E1 follow-up |
-| CW-002 | **D12 scarecrow vs coop:** sliding 1.2 m breaks the 4 m arm-tip rule (max slide ≈ 0.15 m). Relax rule to ~3 m for scarecrows, move the coop, or slide the scarecrow off the fence line? | Relax to ~3 m (scarecrows are walk-through). | CW-040 |
-| CW-003 | **D13 rim path visibility:** accept the small gain, or push the first stretch ≥ 3 m off the fence (x ≤ 21.7, a design change)? | Accept unless it still reads wrong on device. | CW-041 |
-| CW-004 | **D17 pad lines** are the ability-cone outline (`AbilitySlotOverlay`), not paths. Keep or remove? | Keep unless playtesters call it noise. | CW-042 |
-| CW-005 | **Arena reveal hold style:** hold on GET READY (shipped) vs a held "3". | Keep GET READY. | closes CW-020 |
-| CW-006 | **Chicken pose during 3-2-1:** chicken lies sprawled at "3" / "2" and stands at GO. Intended? | Decide; pre-existing. | CW-021 |
-| CW-007 | **When does `feature/progression` merge** into `develop` (PR #1 open, conflicting, 164 commits behind)? | Rebase after CW-010, then merge. | CW-010–CW-014 |
-| CW-008 | **Edge-arrow stacking:** two rivals pushed out by the same HUD zone can overlap. Spread them? | Yes, small follow-up. | CW-022 |
-| CW-009 | **Status strip in arrow safe-zones:** include it? (Appears only while a status is active.) | No, until playtest shows overlap. | CW-022 |
-
-**Maestro's answers, 2026-10-21 (asked interactively):**
-
-| ID | Answer |
-|---|---|
-| CW-001 | Keep grey for now; **future goal: the Doppelganger decoy becomes a perfect copy** of its caster (ring, arrow, nameplate). |
-| CW-002 | Relax the arm-tip rule to ~3 m for scarecrows → CW-040 unblocked. |
-| CW-003 | Accept the rim-path gain → CW-041 closed as no change. |
-| CW-004 | Keep the pad lines → CW-042 closed as no change. |
-| CW-005 | Keep GET READY → CW-020 closed. |
-| CW-006 | **Stand up earlier** (chicken must not lie sprawled at "3"/"2") → CW-021 unblocked. |
-| CW-007 | Rebase `feature/progression` after CW-010; no merge/push without asking. |
-| CW-008 | Spread stacked edge arrows → CW-022 unblocked. |
-| CW-009 | No status strip in arrow safe-zones for now. |
-| Smoke Roost | Stays static now, **but implement a follow-caster option** (some future abilities will be auras). |
-| Orientation | **Allow both landscape and portrait** (portrait shows more info; cross-play fairness to be watched) → CW-206/212/219 become portrait-layout work, not a lock. |
-| CW-218 | "You were disconnected" message + Rejoin button (no Fusion session-resume). |
-
----
-
-## 1. Epic — Device & multiplayer verification (Pixel 9 + gamepad session)
-
-Everything Phase 6–8 shipped "pending the hardware session". One session, fresh Windows + Android build (`Cluck Wars / Build / Windows + Android`, `Ctrl+Shift+B`), use the `coop-test` skill for two-peer parts.
-
-| ID | Type | Pri | Title | Source |
-|---|---|---|---|---|
-| CW-100 | Verify | P1 | Fresh Windows + Android build from `develop`; install on Pixel 9 | ROADMAP Phase 6/7 |
-| CW-101 | Verify | P1 | GPU frame time on Mobile tier at the fixed corner **and** centre pile with 4 live chickens, Performance Mode on and off. Decides E5 (Performance Mode scope: soft shadows, render scale, outside props, ~4.5k-tri chicken LOD). Needs a centre-pile / live-bots mode in `measure_phase8_cost.py` (not supported today) | STATE chunk D |
-| CW-102 | Verify | P1 | Arena reveal gate on device: `adb logcat -s Unity:*` → `ArenaReadiness` gate times; first hit spark / Invisibility / rival fence hole / telegraph show no first-use hitch; cover over the touch HUD; Reduced Motion | STATE arena reveal |
-| CW-103 | Verify | P1 | Two-peer reveal sync: host START with a joiner still warming (GET READY holds ≤ 18 s); late joiner into Active stays covered until ready | STATE arena reveal |
-| CW-104 | Verify | P2 | Ghost, fence-hole, haze, grass-detail, mound-occlusion shaders on real GLES3 / Vulkan (no pink / cyan) | STATE chunk D |
-| CW-105 | Verify | P2 | Mobile shadow bias and distance (normal 1→0.4, depth 1→0.5, distance 30→26) | STATE chunk D |
-| CW-106 | Verify | P2 | Performance Mode twin-fence memory | STATE chunk D |
-| CW-107 | Verify | P2 | Haptics (Buzz When Hit + VIBRATE merge), edge-cancel feel, real Android Back, real pad B, parked mouse cursor, two-peer aim replication | STATE Phase 6/7 |
-| CW-108 | Verify | P2 | Real-device UI: notch / safe area, soft-keyboard Done, focus ring after touch, scrollbar thumb drag, hint placement, HUD slider drag, 6-tile invite at long code (crowds SHARE), mastery/menu layouts | STATE Phase 5/7 |
-| CW-109 | Verify | P2 | Host + Join live: waiting line, host-left notice, MP body copy on the Leave sheet (unit-tested only) | STATE Phase 4/6 |
-| CW-110 | Verify | P3 | Pixel 9 legibility of the 0.22 / 0.035 ring stroke | STATE (old) |
-| CW-111 | Verify | P3 | 4-device LAN validation / "third player can't connect" diagnosis; Windows ↔ Android LAN smoke | ROADMAP Phase 2–4 · **Check first** (likely superseded by UGS work) |
-| CW-112 | Verify | P3 | Networking-handoff editor verification checklist (NetworkTransform on Chicken.prefab, master-client departure, batched RPCs) | HANDOFF-NETWORKING · **Check first** |
-| CW-113 | Verify | P2 | Playtest stacked defensive combos (Egg Shell + Turtle; Turtle + Roll & Push + Spine Coat) before any cap | ROADMAP |
-
----
-
-## 2. Epic — Render & load polish (post chunk D)
-
-| ID | Type | Pri | Title | Notes |
-|---|---|---|---|---|
-| CW-020 | Chore | P3 | Close reveal-hold-style decision (CW-005) | |
-| CW-021 | Task | P3 | Chicken stand-up timing during countdown (after CW-006) | `ChickenVisuals` |
-| CW-022 | Task | P2 | Edge arrows: spread stacked arrows; optionally include status strip (CW-008/009) | `RivalIndicator.cs`, `HudControlZones.cs`; ui-designer |
-| CW-023 | Task | P2 | Shader variant warm-up proper: record a `ShaderVariantCollection` / Unity 6 `GraphicsStateCollection` from one Play session (ghost, fence holes, E3 grass detail, D4 hedge/surround, D3 mound occlusion, D8 ring ghost + stencil mark, D14 band) and warm in Bootstrap. Est. ½–1 day. Do after CW-102 shows whether device hitches | render-pipeline-artist |
-| CW-024 | Task | P3 | Extend reveal warm-up to what it skips: floating combat-text font, ability-zone objects (created by first cast), ring ghost | |
-| CW-025 | Bug | P3 | `tools/ui_capture/intro_probe.py` is stale (`RecAudio` lacks `IAudioService.SetMusicVolume`) — fix or delete | tooling |
-| CW-026 | Chore | P3 | Capture/cost tool: add centre-pile + live-bots mode to `measure_phase8_cost.py` (enables CW-101) | tooling |
-| CW-027 | Task | P3 | Look into render CPU rise 0.6–0.8 → 0.9–1.2 ms between capture rounds (likely tool change, was already present with D14 off) | |
-| CW-028 | Bug | P3 | Chicken feet hover ~0.08 m (models seated on capsule bottom) | STATE chunk A follow-up |
-| CW-029 | Bug | P3 | Rival nameplates look rotated in non-match-camera overview captures only | STATE chunk A follow-up (capture artifact?) |
-| CW-030 | Bug | P3 | 1 642-tri fence still shows hairline cracks at post caps up close; `Prop_feed_silo` BoxCollider still sized to the stripped plate | STATE chunk B |
-
----
-
-## 3. Epic — Arena layout leftovers (blocked on decisions)
-
-| ID | Type | Pri | Title | Blocked by |
-|---|---|---|---|---|
-| CW-040 | Task | P3 | D12: separate scarecrows from coops, keeping 4-fold symmetry and A5/C9 rules | CW-002 |
-| CW-041 | Task | P3 | D13: make rim path visible from the owner's seat | CW-003 |
-| CW-042 | Task | P3 | D17: remove / restyle the ability-cone outline across the pad | CW-004 |
-| CW-043 | Task | P3 | Compendium sync: `docs/site/index.html` — "Engine & rendering" bullet (~L1182) is stale vs ART.md §2; pile slow note (~L574) should say "within 1 m of the pile". Republish to artifact 1eP5RtYLXhCBmVziDe9SNZ | — |
-
----
-
-## 4. Epic — Gameplay correctness & branches
-
-| ID | Type | Pri | Title | Notes |
-|---|---|---|---|---|
-| CW-050 | Bug | P1 | **Assassin execute credit** — branch `fix/assassin-execute-credit` (2 commits, 343 lines, `AssassinExecute` / `ChickenCargo` / `ChickenCombat` + tests, worktree `CluckWars-execute`) is **not merged** and 165 commits behind `develop`. Phase 7 security follow-up (`7cb18c6`) touched the same area. **Check first** whether `develop` already fixes it; if not, rebase, `qa-reviewer`, merge; verify bounty on proxy in Shared PvP with a real multi-client run | senior-dev + qa-reviewer |
-| | | | **2026-10-21 status: hand-ported to the working tree on `test/instrumentation-2026-10-20` (uncommitted, see STATE.md).** `develop` did not fix it. The transfer id was already right after 7cb18c6. The bugs were the kill-credit id (`Id` → `_combat.Id`) and the proxy `BountyBag` write. The loot is now reported back from the victim's authority (`RPC_CreditExecuteLoot`, checked like the refund RPC, matched to the ledger, capped). Once this lands, the branch `fix/assassin-execute-credit` + worktree `CluckWars-execute` are superseded: **do not merge them.** **Residual risks:** (1) a compromised victim peer can report less than it drained, which only destroys its own food. It can over-report at most one capacity-capped load, once, inside 2.5 s of a real execute on it. (2) A report later than `StealRules.ExecuteLootWindowSeconds` (2.5 s; the loot makes two relayed trips in Shared Mode, so this is longer than the refund's 1 s) is refused (logged as Warn) and that loot is lost. (3) Pre-existing and out of scope: the execute removal/kill-credit RPCs have no caller check. Tracked as **CW-230**. Still to do: EditMode run + 2-client Shared execute check. | |
-| CW-051 | Bug | P2 | Progression keeps one extra line in `AssassinExecute.Press` (`AnnounceExecuteSteal`) that must be preserved when CW-050 and CW-007 merge | **Re-attach note for CW-010 (after CW-050):** `Press` no longer reads the victim's cargo; the authoritative looted amount now arrives in `ChickenCargo.RPC_CreditExecuteLoot` on the assassin's authority. **Preferred:** call `AnnounceExecuteSteal(allowed, victim)` there, right after `BountyBag += allowed` (both names are in scope there; keep its `Runner.IsForward` guard as-is). This reports what was really stolen, not the lagging proxy read. **If it must stay in `Press`** (the minimal-diff rebase): put `_cargo.AnnounceExecuteSteal(target.Cargo.Cargo, target);` inside `if (takesCargo) { ... }`, BEFORE `_cargo.ExpectExecuteLoot(target)` / `RPC_TransferAllToBountyBag(Id)` (in solo the drain runs synchronously and zeroes it). Drop the progression branch's `_cargo == null` else-branch, because `Press` now returns early with an Error when `_cargo` is null. Keep it out of the steal-proof path: progression's copy predates the gate. Keep the line out of any `BountyBag +=`, or `AssassinExecuteCreditTests.Press_PaysOnlyTheFlatBountyItself_*` fails. |
-| CW-052 | Chore | P3 | Egg Shell defence branch `fix/egg-shell-defence` is at `1fba816` (0 ahead) — Egg Shell is now "Full shell" on `develop`; delete branch + worktree `CluckWars-eggshell` | cleanup |
-| CW-053 | Bug | P2 | Warrior / Speedy / Assassin class passives (Mighty / Bracer / Opportunist) are permanently inert since the 2026-08-13 damage removal; spec screen makes them more visible. Re-design or remove | mechanics-designer; menu handoff §4 |
-| CW-054 | Task | P3 | Peck's reach is untaught (range is pile-relative; needs a pile-side visual) | STATE (old) |
-| CW-055 | Bug | P3 | `AbilityTelegraph.BuildLineMaterial()` silently returns null (magenta) and leaks a Material per instance — add log + shared material | **Check first** |
-| CW-056 | Bug | P3 | `RivalIndicator.Awake` gates self-injection on `ProjectContext.HasInstance` (forbidden by CONVENTIONS) | **Check first** (file was rewritten in E1 / arrows) |
-| CW-057 | Task | P2 | Balance pass from 4-player playtest data: cooldown tiers, pile/collision slow, control durations, passive magnitudes, bot radii and Hunt↔Flee hysteresis (use `BalanceEditorWindow`; guard with the SCT oracle ±0.5 s test) | mechanics-designer; ROADMAP "dedicated test session" |
-| CW-058 | Task | P2 | ~~Wing Slam (12 s, longest CD on the spam class) flagged for re-tuning (GDD §11)~~ **Decided + implemented 2026-10-22 (A4, WP2):** cooldown 8 s, stun 1.3 s (Standard tier, GDD §7.3); fallback 9 s / 1.5 s if the human session reports "stunned too often" | mechanics-designer |
-| CW-059 | Chore | P3 | Roll & Push "knockback" deferred item, weighted/open random bot loadouts from the full registry, probability tables per class | ROADMAP deferred · **Check first** |
-
----
-
-## 5. Epic — Progression (PR #1, `feature/progression`)
-
-State: slices 0–4 done, 809/809 at the time; **PR #1 open, CONFLICTING**, 7 commits ahead / 164 behind `develop`.
-
-| ID | Type | Pri | Title | Notes |
-|---|---|---|---|---|
-| CW-010 | Task | P1 | Decide and execute merge strategy for `feature/progression` (CW-007): rebase onto `develop`, resolve conflicts (Assassin line CW-051, `QualitySettings` schema bump chore commit), re-run full suite | senior-dev |
-| CW-011 | Verify | P2 | Live test: ramp progression, weekly goals / daily task, identity persistence across sessions | |
-| CW-012 | Task | P2 | GDD §8 / §11 rewrite for the shipped progression system | docs; read numbers from `.asset`s and code, never GDD prose |
-| CW-013 | Task | P2 | Compendium `docs/site/index.html` sync for progression (same pass as CW-012) and republish | |
-| CW-014 | Bug | P3 | Mastery ring overlaps class-name last two characters on chips (`CharacterSelect.uxml` / `CluckWarsTheme.uss`) | ui-designer · **Check first** (menu redesign merged since) |
-| CW-015 | Chore | P3 | Remove stale worktree `CluckWars-turtle` / branch `fix/ability-description-damage` (fully merged) | `git worktree remove ../CluckWars-turtle` |
-| CW-016 | Epic | P3 | Post-demo Phase 12: account progression, cosmetic skins (Phase 13 seasonal, Phase 14 flavour themes) | ROADMAP |
-
----
-
-## 6. Epic — Menu redesign (PR #2 merged)
-
-| ID | Type | Pri | Title | Notes |
-|---|---|---|---|---|
-| CW-060 | Verify | P2 | The menu-redesign handoff says the work was verified against the wrong Unity project; later phases (4–7) rebuilt much of the UI, so re-verify the two-step Choose Chicken → Loadout flow in the real Editor (shared callout panel reads OK with 4 cards? `SeedForcedAbilities` equips signature abilities correctly?) | tester · **Check first** |
-| CW-061 | Chore | P3 | Worktree `.claude/worktrees/cluck-wars-menu-ui-a62862` (detached) and branch `claude/cluck-wars-menu-ui-a62862` — remove after CW-060 | cleanup |
-
----
-
-## 7. Epic — Coop-report quick wins (2026-08 handoff)
-
-The handoff's progress log was never filled in. **Check first** each against STATE.md (many appear shipped through Phase 4–7: Quick Play, pre-filled loadout, progressive ramp, nameplates, cargo on body, mastery).
-
-| ID | Type | Pri | Title |
-|---|---|---|---|
-| CW-070 | Verify | P3 | A1 Quick Play button · A2 pre-filled loadout · A3 progressive pool · A5 category filter · A7 first-match-as-tutorial |
-| CW-071 | Verify | P3 | B2 leader wears a target · B3 cargo readable on the body |
-| CW-072 | Verify | P3 | C1c walls ability-permeable by design · C2b loud telegraph for Immovable · C3c "you are marked" warning |
-| CW-073 | Verify | P3 | D1a jitter props/piles per match · D2c per-class mastery stats · D3a local leaderboard / personal bests |
-| CW-074 | Chore | P3 | Fill the handoff's Progress Log or retire the doc |
-
----
-
-## 8. Epic — Infrastructure, networking & release
-
-| ID | Type | Pri | Title | Notes |
-|---|---|---|---|---|
-| CW-080 | Task | P3 | Server-Mode migration (Phase 11): dedicated server, `IsAuthorityPeer` abstraction, UGS Relay only if Photon is replaced (ADR exists) | architecture |
-| CW-081 | Task | P3 | Networking-handoff "out of scope" items: pickup pooling, M5 scatter, other pending design decisions | HANDOFF-NETWORKING §out of scope |
-| CW-082 | Chore | P2 | Resolve ROADMAP stale checkboxes (Phases 2–7 list `[ ]`/`[~]` items that later phases superseded) so the backlog and ROADMAP agree | code-architect |
-| CW-083 | Chore | P3 | Prune old branches: `claude/silly-nobel-b22985`, `recovery-uxml`, `backup/chicken-models-full`, `feat/chicken-models-skeletal-animation` (14 ahead / 217 behind — confirm merged by content, memory says wired) | cleanup |
-| CW-084 | Chore | P3 | `Design/docs/ART.md` and Design tokens JSX still carry old player hexes (P1 is now #3FE8E8) | mirror of claude.ai design project |
-| CW-085 | Chore | P3 | Move stale `Temp/__Backupscenes` aside kept at `..\CluckWars_tmp_backup` — delete when sure | local |
-| CW-086 | Chore | P3 | iOS export is off by default (no Mac); revisit with hardware | CLAUDE.md |
-
----
-
-## Suggested order of attack
-
-1. **CW-001…009 decisions** (15 minutes of Maestro time; unblocks 6 tickets).
-2. **CW-050 / CW-051 / CW-010** — land the two unmerged branches (Assassin execute, progression) while `develop` is quiet.
-3. **Hardware session (Epic 1)** — one sitting covers CW-100…109; its results gate CW-023, CW-101 → E5.
-4. **CW-012/013/043** documentation + compendium pass in one go.
-5. Gameplay balance (CW-057/058) after real 4-player data; progression release (CW-011).
-6. Cleanup tickets (CW-015, 052, 061, 083) any time.
-
----
-
-## 9. Test session 2026-10-20 findings (Pixel 10 Pro + Windows EXE; build `db0cfad+`)
-
-Evidence lives in `Captures/session-<utc>/` (git-ignored). SHA = commit under test. New IDs continue from CW-200.
-
-| ID | Type | Pri | Title | Evidence / notes |
-|---|---|---|---|---|
-| CW-200 | Bug | P1 | **Headless (`-batchmode`) builds carry no UGS cloud project id** → every Host/Join fails with `CreateLobby failed: Some services couldn't be initialized` on Android **and** Windows. `ProjectSettings.asset` has `cloudProjectId:` empty; only a build made from a signed-in Editor injects it. Any CLI/CI build is silently multiplayer-dead. Fix: commit the id (or inject it in `CluckWarsBuildMenu`) and add a build guard that fails when it is empty. Project id `14249009-abbe-423c-8c0c-8391b8974857` (from history) used as a temporary local override for the session. | phone.log / client1.log 19:53Z |
-| CW-201 | Bug | P2 | Headless APK installs as `com.DefaultCompany.CluckWars` (empty `applicationIdentifier`), side by side with the older `com.UnityTechnologies.com.unity.template.urpblank` install; `coop-test` skill and docs still name the old id. Pin the identifier in ProjectSettings and update the skill/docs. | `pm list packages` |
-| CW-202 | Chore | P2 | UGS init failure hid its inner exceptions (diagnosis cost ~15 min). **Fixed** `5c6625a` (logs every inner exception). | |
-| CW-203 | Chore | P3 | Stale-install trap: `start.ps1` launched the old package after installing the new one. **Fixed** `5791ab7`. | |
-| CW-204 | Chore | P3 | A crash during a 14-min IL2CPP build (Kernel-Power 41, no dump, Hyper-V active) cost one build cycle — known PC issue (see memory `hypervisor-crash-known-pc-issue`). Build in smaller steps / avoid concurrent GPU load. | Event log 20:30:36 |
-| CW-205 | Bug | P2 | **Deposit RPC from a chicken that is not at its base.** Session 20:08Z: `RPC_AddFood(0,28)` from `[Player:3]` for corner 3 was **rejected by the host twice** (`no chicken that caller is entitled to speak for is standing at corner 3…`) while P3 (Fatty, cargo 40) was at the arena centre (x≈2, z≈1) and finished the round carrying 39. The server rejection is correct; the open question is *what sent the client-side call* (autoplay fake input? optimistic credit?). Re-test with the corrected autoplay that really deposits; if it reproduces without autoplay, P1. | merged.log 20:10:14Z / 20:10:21Z |
-| CW-206 | Bug | P2 | **Portrait layout of the match HUD (phone lying flat).** `defaultScreenOrientation: 4` (auto-rotate, all four) so the game runs in portrait on the Pixel 10 Pro; coop-test/docs say "landscape-locked" — confirm intent. In portrait the **timer box covers the leaderboard's food-count column** (P2/You rows) and a rival **edge arrow overlaps the SLOW status strip** (CW-009 evidence). Camera framing is tight (chicken fills ~35 % of the width). | shots/phone-…r1-mid.png, mid-match |
-| CW-207 | Bug | P2 | `Non-Legacy animations cannot be sampled outside the Editor without an Animator` — **6 753 warnings in one Windows client log** (one match + menu). Some object samples a non-legacy clip without an Animator in players (silent CPU cost + log spam). Find the owner (`AnimationClip.SampleAnimation` / Animation component on a prop or chicken). | client1.log |
-| CW-208 | Verify | P3 | Load hitches: phone 500 ms in the lobby→match load (frame 414, `WaitingForPlayers`), PC clients 200–355 ms at scene load (menu phase). Expected for scene load but they land *after* the cover? Check the reveal gate hides them (CW-102). | findings.txt PERF |
-| CW-209 | Chore | P3 | Two EXE clients on one PC share the anonymous UGS identity → the 2nd cannot join a lobby the 1st created/joined (`player is already a member of the lobby`). Add a per-process auth profile (dev tools: `-cw_profile N`) so multi-client PC tests are reliable. | client2.log 20:12Z |
-| CW-210 | Chore | P3 | `VisualProbe` outOfBounds rule flagged the intentional `MapSurroundings` art (39 renderers, Warn every 10 s) — probe false positive. Being fixed on the instrumentation branch. | |
-| CW-211 | Verify | P2 | **CW-101 data point (Pixel 10 Pro, Mobile tier, Vulkan, perf mode ON, 30 fps cap):** 4-corner arena at the fixed camera runs `p95=33.5 ms (30 fps)`, `gpu≈3 ms`, 11–12 hitches>50 ms per round (mostly load). GPU headroom large at this quality. Pixel 9 / mid-range data still missing. | phone.log Perf lines |
-| CW-212 | Bug | P2 | **Portrait HUD collisions (4 players, Pixel 10 Pro).** The `★ FIRST TO 40` pill sits on top of the local **"You" nameplate**; the nameplate is oversized (≈50 % of the screen width) and covers the chicken's head; a rival nameplate (**P3**) is half hidden behind the leaderboard; the top-centre class label (`ASSASSIN`) stacks with the HUD. Same root cause as CW-206 (portrait width). | session-203530 shots phone auto2 |
-| CW-213 | Verify | P3 | CW-006 evidence: at countdown **"1"** the local chicken is still the flattened blob (back only) at its base; it stands at GO. Confirms the pose is held through 3-2-1 on device; decide (CW-006). Reveal/fence-fade disc around the chicken looks right (no pink/cyan) — CW-104 partially confirmed on Vulkan (fence holes). | phone auto4 |
-| CW-214 | Bug | P1 | **Test-harness autoplay v2 never forages** (cargo 0 in 4 rounds, host chicken parked at (0,19.5)) — tooling defect on the instrumentation branch, tracked until fixed; see commit log. Not a game bug unless the same stuck position reproduces with a human (check fence at z≈19–21 on the host's side of the arena). | session-203530 Sync lines |
-| CW-215 | Chore | P3 | `merge.ps1` expects `client*.log`; scenario script now writes them accordingly. SHA mismatch flagged between the phone APK (built at `333f673`) and the EXE (`bc370a7`) because a tooling-only commit landed between the two player builds — build both from one SHA next time. | findings.txt |
-| CW-216 | Bug | **P1** | **Remote players cannot bank food in Shared mode.** 4-seat run (host EXE + 2 EXE joiners + Pixel, 3 rounds, session 21:04Z): **all 185** `RPC_AddFood` calls from non-host peers were rejected by the host (`no chicken that caller is entitled to speak for is standing at corner N with a matching HomeCornerIndex`), while the clients logged `Deposited complete` and their autoplay reported "at base" at pos ≈ (8.3, 8.3) — the chickens' corners are at (±22, ±22). Only the Spoiler's end-of-round +15 ever reached a base, so every round ended `total=15,0` with the host as "winner". Hypothesis: the PlayerBase position (or corner↔position mapping) differs between the host and clients. Anti-cheat validation itself looks right; the peers disagree about where the base is. Under investigation (diagnostics + possible fix on `test/instrumentation-2026-10-20`). **Supersedes CW-205.** | session-210430 merged.log (rejections from 21:05:11Z) |
-| CW-216-fix | Bug | P1 | **FIXED on `test/instrumentation-2026-10-20` (`4328d36`, `fix(deposit)`), verified live.** Root cause: `PlayerBase` and `FoodPile` have no `NetworkTransform`, so Fusion does not send their spawn position — every client created all 4 bases at the prefab root (9.47, 0, 9.38) and all 9 piles at the origin; the host validated deposits against the real corners and (correctly) rejected them. Fix: spawn position stamped as a networked value, applied on every non-owner peer. Re-run (4 seats, 3 rounds, 21:29Z, SHA `4328d36` on all 4 devices): **0 rejections** (was 185/185), every peer logs identical `Base corner=.. pos=±21.8,±21.8`, remote clients bank food. **Needs review + merge to `develop` (touches `PlayerBase`, `FoodPile`, `MapGenerator`).** | session-212850 |
-| CW-217 | Bug | P2 | Same defect class: `AbilityZone.prefab` (and likely other spawned world objects without `NetworkTransform`: pickups, decoys, telegraphs?) appear at the prefab root on non-owner peers. Audit every `NetworkObject` prefab that is spawned with a position: either `NetworkTransform` or the new position stamp. Add a prefab guard test (the fix added one for base/pile only). | senior-dev note |
-| CW-102-res | Verify | P1→pass | **CW-102 (reveal gate on device) — PASS on Pixel 10 Pro / Mobile tier / Vulkan.** Arena ready in ≈3.5 s (`Gate Tier 0.9 s, Scene 2.9 s, Warmup/Camera 3.5 s`), GET READY held 3.0 s, late chicken class triggers an overview re-run; **no hitch > 50 ms in any Active/intro frame over 4 rounds** (all 8 hitches fall in menu/loading/lobby/covered). Frame time locked 30 fps: avg 33.3 ms, p95 33.5, p99 33.6, mem ≈ 516 MB. Not yet covered: Reduced Motion, perf-mode OFF. | session-212850 phone.log |
-| CW-103-res | Verify | P1→partial | CW-103 (two-peer reveal sync): 4 peers (3 EXE + phone) joined within 0.6 s of each other; each stayed covered until its own gate finished (phone 3.5 s vs host 2.3 s); `PlayerJoined state=Starting` handled; no desync (Sync pairing: 111 heartbeats/pair, 0 mismatches ≥2 beats). **Late-join into Active not yet tested.** | |
-| CW-101-res | Verify | P1→partial | CW-101: Pixel 10 Pro (not Pixel 9) holds 30 fps with 4 live chickens at the fixed camera, Perf Mode ON (`perfMode=1`): no GPU headroom problem visible (FrameTimingManager reports gpu==frame time because of the 30 fps cap — **not a usable GPU number**; use `dumpsys gfxinfo`/Perfetto for real GPU ms). Perf Mode OFF and centre-pile cases still open. | |
-| CW-112-res | Verify | P2→pass | **Master departure mid-match — PASS.** Host EXE killed 15 s into a round (4 seats, 21:34:36Z): Photon reported the leave after ≈9 s (`OnPlayerLeft` 21:34:45Z), the phone was promoted (`Local peer promoted to Master Client. Re-arming match generators.`), the survivors saw the "Host left mid-round" notice, the match ended normally by timer and the **phone then hosted 3 more full rounds** (auto-loop). No errors/exceptions. Note the 9 s freeze before the notice. | session-213356 |
-| CW-103-res2 | Verify | P1→pass | **Late join into an Active match — PASS.** A 3rd peer joined 18 s into a round: stayed behind the cover (`cover=1`), `Arena ready in 2.27 s`, `GET READY held 1.73 s`, first-use telegraph hitch (417 ms) happened under the cover, no desync afterwards. | session-214247 |
-| CW-218 | Bug | P2 | **No reconnect after a short app interruption.** Backgrounding the app for 12 s (Home, then relaunch) on the Pixel: frame stalled 12.8 s → `OnDisconnectedFromServer reason=Timeout` → `OnShutdown DisconnectedByPluginLogic` → "Network shutdown… Returning to Bootstrap in 5 s" → main menu. A call/notification/app switch > ~10 s ejects a mobile player permanently from the match with no rejoin (and no host-side bot takeover). Decide policy: Fusion rejoin token / keep-alive on `OnApplicationPause`, or at least a "you were disconnected" message with a Rejoin button. | session-213904 phone.log 21:39:55Z |
-| CW-219 | Bug | P2 | **Portrait main menu is clipped** (Pixel, phone lying flat → auto-rotated portrait): the `CLUCK WARS` title is cut at both screen edges, the class row shows `RRIOR` / `ASSAS` (Warrior/Assassin labels cut off). Same root as CW-206/212 (portrait unsupported or not laid out). Either lock to landscape in the manifest (the docs say it is locked) or lay out for portrait. | shots/phone-…after-resume.png |
-| CW-220 | Verify | P3 | Perf Mode OFF, Reduced Motion, Pixel 9, gamepad/haptics (CW-107), notch/safe-area (CW-108), shader sweep (CW-104: no pink/cyan seen on Pixel 10 Pro Vulkan in ≈15 min of play incl. fence-fade, ghost/haze, mound occlusion), shadow bias (CW-105), twin-fence memory (CW-106) — **not covered** by this unattended session (no human at the device; needs eyes). Visual probe reported `offenders=0` in every scan on phone and PC. | |
-| CW-221 | Bug | **P1** | **Second match starts where the first one ended** (reported by Maestro on a manual test, reproduced in the logs). At PLAY AGAIN the **master/host's own chicken is not moved back to its corner**: `ResetWorldForNewRound` calls `RPC_TeleportTo` on every chicken and the host logs `Teleported to (21.8, 0.05, -21.8)`, yet the host chicken is at its old position at the first Active tick of the next round (e.g. P1 parked at (0.1,19.3) at the end of round 1 and at (0.1,19.3) again at round 2 `rem=45.0`), while remote chickens P2–P4 are at their corners. Present in every round ≥ 2 of the three 4-seat sessions. Suspect: the local (same-peer) RPC invocation inside `GameManager.FixedUpdateNetwork` is overwritten by the chicken's own simulation/NetworkTransform state; also verify the Single (solo) path (`InputAuthority.IsRealPlayer` filter at GameManager L919). Fix in progress on the instrumentation branch (`fix(round-reset)`). | session-203530 / 210430 / 212850 Sync lines |
-| CW-222 | Bug | P1 | **Master's chicken diverges across peers** (found late: the `SYNC=93…266` findings of every 4-seat report were not triaged). e.g. `t=640..704 client1 vs client2: chicken P1 x client1=1.9 client2=15.3` (host sees itself 13 m away from where every other peer sees it for ~4 s), more P1 x/z mismatches later. Remote chickens P2–P4 mostly show only `cs` (Slowed vs Free) differences — classify as by-design (local self-applied slow) or fix. Possibly the same root cause as CW-221 (state-authority chicken on the master peer). Under investigation. | session-212850 findings.txt SYNC |
-| CW-223 | Chore | P1 | **Test strategy after the CW-221 miss**: invariants in `merge.ps1` (backtested: flags CW-221 in every earlier session), `verify.ps1` verdict, `scenario-pc.ps1` PC-only mode matrix (solo/shared2/shared4/hostleave × 3 rounds), rules in `docs/TEST_STRATEGY.md`. Pending: in-game `Invariant`/`World`-hash probe + `-cw_autosolo` (senior-dev), then run the full matrix on the fixed build. | docs/TEST_STRATEGY.md |
-| CW-221-fix | Bug | P1 | **FIXED + VERIFIED (`fa4836a`, PC, build `d1d345c`).** Root cause: the round reset ran inside the master's own simulation step and sent each chicken `RPC_TeleportTo`; for chickens the same peer simulates (host's own bird, **all bots, everything in solo**) the RPC executed *locally and immediately*, and the chicken's own network-transform copy of the position put it back. Remote players were fine because their RPC arrives before their own step. Fix: the RPC only records a pending target, applied at the top of the chicken's own `FixedUpdateNetwork` via Fusion's teleport; solo humans now explicitly included. Live: `scenario-pc solo` ×3 rounds and `shared4` ×3 rounds → `Respawn check … dist_to_corner=0.00` for every chicken (incl. host and 3 bots) at every round start, `INVARIANT` corner rules = 0; hostleave likewise. **Needs review + merge.** | session-222101 / 222412 / 222828 |
-| CW-222-res | Bug | P3 | Re-triage of the SYNC findings (senior-dev analysis + my re-run): **69 of 93 were noise** (heartbeat printed `cs=` from owner-local values) — fixed in `d1d345c`. Position mismatches of 1.5–3 m are the owner leading remote peers by interpolation (0.25 s × 7–12 m/s); `merge.ps1` tolerance raised to 3.0 m. **One unexplained outlier**: P1 seen at x=1.9 by the host vs 15.3 by all others at t=640 (13.5 m, ≈1.3 s behind, once, right after GO with a 50–83 ms hitch). Keep watching with the new `World`/`Respawn` lines; not reproduced in 3 later PC runs. | session-212850 |
-| CW-224 | Bug | P2 | **Ability cooldowns are not reset at PLAY AGAIN** (bots **and** humans): `Invariant FAIL cooldowns-zero` at the start of rounds 2–4 in solo (`B3` 3.78 s / 0.72 s) and shared (`P2` 0.66 s, `P3` 3.5 s, `P4` 2.3 s). A chicken starts the new round with an ability still cooling down (up to ~4 s), asymmetrically per seat. Fix in progress (`ChickenCombat/Cargo/Control` are reset; `AbilityController` is not, or is re-armed). Also: probe round label `round=4` for the 3rd looped round (counter increments at Play Again). | session-222101/222412/222828 |
-| CW-217-ev | Bug | P2 | **CW-217 confirmed by the new `World` hash:** in shared4/hostleave the static-world hash (bases, piles, pickups, zones at 0.5 m) **differs between peers on 57/83 ticks** with identical object counts and 0 rejected RPCs → some spawned static object (ability zone / pickup / event pile / decoy) is positioned differently per peer. Now an automatic FAIL (`merge.ps1` INVARIANT "world static hash differs…"). Per-type hashes + audit/fix of every spawned prefab without `NetworkTransform` in progress. | session-222412, 222828 |
-| CW-225 | Verify | P2 | PC mode matrix status (build `d1d345c`, `scenario-pc.ps1`, 3 rounds each): **solo** ran 3 rounds (FAIL only on CW-224), **shared4** 3 rounds (FAIL: CW-224, CW-217), **hostleave** master migration + 3 more rounds (FAIL: CW-224, CW-217). **shared2 not run yet.** Zero rejected deposits, zero exceptions, no corner/cargo/base/pile invariant violations after the CW-221 fix. | verify.ps1 verdicts |
-| CW-224-fix | Bug | P2 | **FIXED + VERIFIED (`bfc8a78`).** Cooldowns, hold-to-aim charge and peck chain are cleared for every chicken (bots included) at PLAY AGAIN. Live (PC, build `f135268`): `cooldowns-zero` failures 0 in solo, shared2, shared4 and hostleave (previously 3–8 per run). Probe round label fixed (`5a0191a`). | session-224647/225001 |
-| CW-217-fix | Bug | **P1** | **FIXED + VERIFIED (`f135268`) — real gameplay bug, not cosmetic.** Ability zones (Feather Trap, Root Egg, Smoke Roost) were neither synced nor stamped, so every non-owner peer placed them at the prefab's default spot; since each chicken tests zone overlap on its owner's peer, **a zone placed by another player never slowed or rooted a remote player.** Golden event pile now stamped at spawn. Per-type `World` hashes added. Live: world-hash disagreement 57/83 ticks → 0 in solo/shared2/shared4/hostleave. A new prefab guard test fails for any spawned NetworkObject prefab lacking `NetworkTransform` or the stamp. **Needs review + merge.** Open question for design: should the Smoke Roost cloud follow its caster? (Treated as static.) | session-222412 → 224647 |
-| CW-225-final | Verify | P1 | **PC mode matrix on build `f135268`, 3 rounds each, `verify.ps1` verdicts:** solo **PASS**, shared2 **PASS**, shared4 **PASS** (0 ERROR/EXCEPTION/SYNC/INVARIANT, 0 rejected RPC, `Invariant ok` at every round start/end), hostleave **FAIL SYNC=2** (watch item CW-226). 12 rounds, 0 exceptions. | verify.ps1 |
-| CW-226 | Bug | P3 | **Watch item after master migration:** `chicken P3 cs client4=Slowed vs client2/3=Free` for 3 consecutive heartbeats (≈6 s) right after the host was killed (22:50:43Z, session 225001). The owner reports "Slowed" while the others (replicated flags) say "Free": a slow state not reaching the other peers, or a stale flag on the owner after master change. Not seen in the three non-migration modes. Reproduce with `scenario-pc.ps1 -Mode hostleave` ×3 before deciding. | session-225001 |
-| CW-226-res | Bug | P3 | **Re-triaged 2026-10-21 (session 150533, 4 SYNC): sampling skew, not replication.** In both findings the disagreeing peer is the chicken's OWNER (client4 owns P2, client2 owns P3) and the value pair swaps between the two heartbeats (owner Free then Slowed, remotes Slowed then Free): the owner prints its newest tick, the others their newest snapshot (~RTT/2 + buffer older), and a pile/collision slow toggled near both heartbeats. The same owner-vs-remote one-beat mismatch shows in non-migration runs too (150220 t=3456). `merge.ps1` now counts a mismatch in any Sync field as persistent only while at least one side stays constant (selftest `cs-fixture`: lag swap and 153100 pile refill not flagged; repeated pair, remote-stuck/owner-flicker and 3-beat 225001 shape flagged). **Still open:** the 225001 shape (owner Slowed, remotes Free, same pair for 3 heartbeats) is still reported and unexplained; the new Sync fields `fl=` (flag changes seen per peer), `own=1`, `src=` decide it next time: owner `fl` high = per-tick oscillation aliasing, `fl` absent on both sides = a flag that never arrived (real bug). | session-150533, 225001 |
-| CW-227 | Chore | P3 | Dev tools: the compact `cw_hud` strip (FPS/p95/hitches/…) sits on the top row of the leaderboard on PC (1st place row half hidden) and makes top-of-screen visual review harder. Move it (bottom-left or above the safe area) or make it a corner badge. | pc-solo shot t18 |
-| CW-228 | Task | P2 | **Add a "mode × round" gate to the normal workflow:** run `scenario-pc.ps1` (solo/shared2/shared4/hostleave) after any change to GameManager, spawning, Fusion or round-reset code and before any playtest; keep `selftest.ps1` green; add a rule to the harness for every bug (rules in `docs/TEST_STRATEGY.md`). Consider wiring `verify.ps1` into a pre-commit/CI job on the Windows build. | docs/TEST_STRATEGY.md |
-| CW-229 | Verify | P2 | **Still to cover (needs eyes or a phone again):** Performance Mode OFF, Reduced Motion, Pixel 9, landscape play on a phone, haptics/pad, notch/safe area, portrait fixes (CW-206/212/219), reconnect policy (CW-218). A PC visual sweep (menus, HUD at 16:9/21:9, windowed 960×540 vs 1920×1080, quality tiers) was only sampled (5 frames of a solo round: arena/leaderboard/arrows/ability bar render correctly; no pink/cyan; `Visual` probe offenders=0 in every scan). | |
-| CW-230 | Bug | P2 | **Execute RPCs have no caller check:** `ChickenCombat.RPC_ExecuteRemoval` and `ChickenMatchStats.RPC_CreditKill` are `RpcSources.All` with no sender validation, so any peer can remove any chicken or add kills to anyone. That was harmless while execute kill credit was broken; since CW-050, kills really count, so the gap now has a payoff. Harden both the way `RPC_TransferAllToBountyBag` is: `RpcInfo` + a `TryResolveExecutor`-style check (caller is the assassin's state authority, and the victim is marked or stunned). Kill credit should only be honoured from the victim's authority. Deliberately not fixed in the CW-050 change. | from CW-050 review |
-| CW-231 | Bug | P2 | **FIXED in working tree, not yet run.** A Death Mark alive at PLAY AGAIN re-armed its 5 s fail cooldown after the reset had cleared every slot (the reset teleport moved the target out of range, the next tick fizzled the mark): `Invariant FAIL cooldowns-zero actual=3.8s who=P3` at rounds 3 and 4 on all peers (P3 = client4's Assassin). Fix: `AssassinExecute.ResetForNewRound()` (no cooldown), called first in `ChickenController.RPC_ResetControlStates`. Test: `RoundTeleportRulesTests...CW231` scans every `TriggerCooldown` caller. Needs: EditMode + shared4 x3 rounds. | session-150220 |
-
----
-
-## 10. Status log, session 2026-10-21 (branch `work/backlog-2026-10-21`, off `test/instrumentation-2026-10-20`; not pushed, not merged)
-
-Baseline: EditMode 1976/1976 (needs the GPU: `-nographics` makes 7 render tests fail with `RenderTexture.Create failed`), `selftest.ps1` OK, solo PASS. After the work: EditMode **2031/2031**, selftest OK.
-
-| ID | Status | Commit | Evidence |
-|---|---|---|---|
-| CW-200 | **Fixed.** `CluckWarsBuildMenu.Build` injects the UGS project id (env `CW_CLOUD_PROJECT_ID`, else `BuildGuards.UgsProjectId`) for the build and restores ProjectSettings; the guard throws `BuildFailedException` when the id is empty/malformed (`BuildGuardsTests`). Live: headless build with no manual override logged `injecting 14249009-…`; shared2/shared4 UGS lobbies formed (player is not multiplayer-dead); `CW_CLOUD_PROJECT_ID=bad` aborted with exit 1. | `5cb5cc0` | cw-build.log, sessions 145909/150220 |
-| CW-201 | **Fixed.** Android + iPhone identifier pinned to `com.cluckwars.game` in ProjectSettings and re-asserted by the build menu; `BuildGuardsTests` fails on `com.DefaultCompany.*`. Docs/scripts updated. Phones need the old installs removed (PlayerPrefs do not carry over). | `5cb5cc0` | |
-| CW-207 | **Fixed.** `MenuChickenStage` destroyed the model's Animator then called `SampleAnimation` every frame (menu chickens were not posed in players). A controller-less Animator is kept (`MenuStageAnimationRules`). `merge.ps1` now flags the engine warning. Live: **0** "Non-Legacy" lines in solo/shared2/shared4/hostleave logs (was 2 597 per solo run). | `de03ac0` | sessions 152453… |
-| CW-050 | **Fixed (needs Maestro OK: adds one RPC, `RPC_CreditExecuteLoot`, so all peers need one build).** Kill credit now resolves (`_combat.Id`), steal-proof targets keep cargo, looted cargo is paid through a bounded, receiver-validated report (2.5 s window). qa-reviewer sign-off. **Not run live** (no Assassin execute in the autoplay); a two-client Shared execute check is still needed. Do not merge `fix/assassin-execute-credit`. | `5b27d6c` | `AssassinExecuteCreditTests` |
-| CW-051 | Re-attach note written (see row above). Waits for CW-010. | | |
-| CW-231 | **Fixed + verified live.** Death Mark alive at PLAY AGAIN re-armed its fail cooldown after the reset. `AssassinExecute.ResetForNewRound()`; rule `RoundTeleportRulesTests…CW231`; in-game `cooldowns-zero` = 0 across solo, shared2, shared4 ×2, hostleave ×3 (was 2 failures in the earlier shared4). | see git log | sessions 152453-154451 |
-| CW-226 | **Classified: sampling skew, not replication, for the shape seen on 2026-10-21** (owner and remotes show the same sequence one heartbeat apart). `merge.ps1` now judges persistence by "one side constant while differing"; selftest fixtures pin lag vs stuck; the original 225001 stuck shape is still flagged. Dev-tools Sync lines now carry `own/src/fl` so a true stuck flag is distinguishable next time. 225001's own cause remains unexplained (not reproduced in 3 + 3 later hostleave runs, 0 stuck). | see git log | verify.ps1: 153100/150533 SYNC=0, 225001 still 2 |
-
-Matrix on the final build (3 rounds each): solo PASS, shared2 PASS, shared4 PASS ×1 / SYNC=3 ×1 (pile refill seen a beat late by clients: lag, now judged correctly), hostleave PASS ×3.
-
-**Needs Maestro:** merge/landing approvals (architect plan: cherry-pick `4328d36 fa4836a bfc8a78 f135268` onto a branch off `develop`, plus a `CancelCharge()` fix at `AbilityController.cs:1101`), the new RPC in CW-050, and the CW-230 hardening decision.
-
-### 2026-10-21 addendum (later in the session)
-
-| ID | Status | Evidence |
-|---|---|---|
-| CW-021 | **Fixed** (`67c745e`): root cause was spawn/reset height (capsule half under the grass until the first `Move` at GO), not the pose. A first attempt (per-tick settle `Move`) was rejected by the matrix (it overwrote the CW-221 teleport: `dist_to_corner=30.84`, 7-28 INVARIANT per run); shipped fix sets the standing height at spawn and in `ApplyPendingTeleport`. Rule `StandingHeightTests`. Final-build matrix: INVARIANT=0 in 6/6 runs. Visual confirmation of "stands at 3" still wants eyes on a PC build. | sessions 163017-164644 |
-| CW-022 / CW-008 | **Fixed** (`838e984`): `EdgeArrowSpread` (pure, 9 tests incl. old-placement stacking proof), flush hardened per qa-reviewer. Needs an eyeball with two rivals behind one HUD zone. | |
-| CW-055 / CW-056 | **Fixed** (`838e984`): shared telegraph line material + one-time Error when the shader is missing + dashed material destroyed; RivalIndicator self-injection without the `HasInstance` gate. `TelegraphMaterialAndInjectionTests`. | |
-| CW-226 | **Closed as by-design (cosmetic).** Write path verified: `ControlFlags` is written by the state authority on change and replicated; the flagged runs (163938, 164644) show both sides changing (`fl=2/2`) — the owner's collision/aura slow toggles at the contact-range edge and the heartbeat samples it a replication delay apart. Only visuals read the remote bit (`ChickenStateOverlays`, `ChickenStatusBadges`, `ControlStateVFX`, `HitFeedback`). `merge.ps1` now treats a side as constant only when its `fl` is 0 at the sample; 163938/164644/153100/150533 re-merge to SYNC=0, the 225001 stuck shape is still flagged. If a doubt remains: add a dev-gated per-transition log to measure the delay. | `tools/test-session` selftest P6 |
-| CW-010 / CW-007 | **Not started.** `feature/progression` rebase is a large conflict job (164+ commits); needs the CW-050 branch landed first and Maestro's go for a local rebase branch. | |
-| CW-012/013/043 | Docs/compendium pass not done (compendium sync is only needed when `.asset` values or design docs change; none changed this session). | |
-| CW-053, CW-057, CW-058 | **Blocked on Maestro:** balance numbers / passive redesign (hard stop rule). | |
-| CW-206/212/219 | Decision: support landscape AND portrait. Large HUD/menu layout task (UXML/USS) — not started; needs a Pixel check. CW-218 rejoin: decision = message + Rejoin button — not started (needs device). Smoke Roost follow-caster option — not started. CW-040 (relax arm-tip rule to ~3 m) — not started. | |
-| CW-082 | Stale ROADMAP boxes confirmed done: `:407` Roll & Push, `:327` UGS link, bot preset rows (`:521,:548,:567`); on-device/LAN items remain open. Not yet edited. | |
-
-### Maestro's decisions, 2026-10-21 (second round, asked one by one with context)
-
-| Topic | Decision |
-|---|---|
-| Landing | Prepare a LOCAL branch off `develop` (4 earlier fixes + `CancelCharge()` fix + this session's fixes); extra CW-050 RPC accepted. No push/merge without a further OK. |
-| CW-230 | **Fix now** (sender validation on `RPC_ExecuteRemoval` / `RPC_CreditKill`), folded into the landing branch. |
-| CW-053 | **Re-design** Mighty / Bracer / Opportunist without damage; proposal document first (with oracle numbers), nothing applied before approval. |
-| CW-057 / CW-058 | **Full oracle-based proposal for both**; nothing applied without approval. |
-| CW-010 | Rebase `feature/progression` on a NEW local branch **after** the landing branch exists. No merge/push. |
-| CW-040 | Do it: relax the scarecrow arm-tip rule to ~3 m, keep symmetry, map tests + screenshot. |
-| Smoke Roost | **Rejected** the per-ability `FollowsCaster` flag. Ability effects get **types**: an **Aura** (follows its caster) and a **Static AoE** (placed and fixed). Needs a design first (effect-type model on the ability assets / zones, how each syncs, how existing zones map). Smoke Roost stays a Static AoE. |
-| Portrait | **Design first** (layout rules per orientation, camera framing for equal visible arena area, test plan), then build; verify in PC window sizes, device later. |
-| CW-218 + CW-082 | Both: disconnect overlay with Rejoin (PC-tested; real Android trigger "needs device") and tick the done ROADMAP boxes. |
-
-### 2026-10-21 addendum 2
-
-| ID | Status |
-|---|---|
-| CW-230 | **Fixed** (see git log): sender validation on `RPC_ExecuteRemoval` / `RPC_CreditKill` (`ExecuteRules`: stun-or-mark-or-recent-mark evidence, range with a 150 ms latency floor, 2.0 s duration cap, pending kill ledger 2.5 s). qa-reviewer sign-off after one round of fixes. EditMode 2081/2081; matrix on the build: solo/shared2/shared4/hostleave all PASS, no rejected lines. **Not run live:** a real two-client Assassin execute (autoplay never executes) — expect 0 rejected `RPC_ExecuteRemoval`/`RPC_CreditKill` lines and `Kills` +1 per execute. |
-| CW-053 | **Premise outdated.** Mighty/Bracer/Opportunist were deleted 2026-08-13 (`62219fc`) and replaced by eight working specializations. Real findings (Featherfoot ≈0.25 s/match; Bully is a hidden farming buff +6 cargo = 34.98→30.91 s; Spoiler can win from 0 food; a new stun replaces a longer running one) and 14 decisions are in `docs/proposals/BALANCE_AND_PASSIVES_2026-10.md`. Nothing applied. |
-| CW-057 / CW-058 | Proposals in the same file (Wing Slam 12→9 s primary, 8 s + 1.3 s stun fallback). Nothing applied. |
-| Smoke Roost / effect types | Design: `docs/proposals/EFFECT_TYPES_AURA_VS_STATIC_AOE.md` (type on the ability asset, aura computed from the caster's replicated position, no NetworkTransform on the zone; found that nameplate/overlays may read Feather Aura's "casting" flag as "slowed"). 9 questions for Maestro. |
-| CW-206/212/219 | Spec: `docs/proposals/PORTRAIT_AND_LANDSCAPE_SPEC.md` (camera ignores aspect: portrait sees 25 % of the 16:9 ground; 6 stages ≈ 6.75 days; 12 decisions). |
-| CW-082 | Partial: five ROADMAP boxes ticked (`bf5067a`). |
-
-### 2026-10-21 addendum 3 (end of session)
-
-| ID | Status |
-|---|---|
-| CW-230 | **Fixed + hardened** (`7677065`): the removal/cargo claim needs a mark AND a stun, each current or recorded on the victim's own authority in **simulation time** (not wall clock: solo pause). Two automated security reviews of the earlier "mark OR stun" rule led to this; residual: the assassin's own authority can still self-execute within bounds (Shared Mode trust model). **Not run live** (autoplay never executes). |
-| CW-218 | **Implemented and run on PC** (`f6fcb7d`): `-cw_autodisconnect 20` froze the joiner 15 s, the host kicked it (`DisconnectedByPluginLogic`, no transport reason on PC), the classifier now reads that as a lost connection, the menu showed the disconnect sheet, the autotest pressed REJOIN, the "already a member of the lobby" path worked, and the player re-entered the session as a late joiner (2 runs). Real Android backgrounding is **needs device**. The scenario's own verdict is FAIL by design (a late joiner appears to the round-start probe as "round 1 start": INVARIANT respawn/base/pile/timer, plus a UGS `LobbyServiceException` warning); add a `disconnect` mode with its own expectations if it should gate. Host lobby heartbeat now survives transient failures. |
-| CW-040 | **Rule done** (`b3403e0`: scarecrows 3 m, other tall props 4 m, test). **Scene slide still needs the Editor** (four scarecrows in `Map.unity`, direction to confirm: see STATE.md). Not closed. |
-| Landing branch | `landing/shared-mode-fixes-2026-10-21` (local, off `develop`): 4 original fixes + `CancelCharge()` + CW-200/201/207/050/231/021/022/055/056/230 + CW-040 rule. EditMode **2021/2021**, production Windows build compiles. Excludes instrumentation, harness, CW-218 (needs the AutoTest code), docs. Two cherry-picked commit messages still mention things not in the branch (diagnostics/proposals). Scenario matrix cannot run there (needs dev tools). |
-| Final work-branch matrix (build with everything, 3 rounds each) | solo / shared2 / shared4 / hostleave = PASS / PASS / PASS / PASS; EditMode 2114/2114. |
-
-### 2026-10-22: proposals decided, implementation plan
-
-All three proposals were decided with Maestro (see `docs/proposals/DECISIONS_2026-10-21.md` for every decision and who made it) and reviewed independently (`docs/proposals/FABLE_REVIEW_AND_CODE_PLAN_2026-10-22.md`: 11 work packages WP0-WP11, two lanes). Implementation runs on branch `feature/effect-types-and-portrait` (off `work/backlog-2026-10-21`).
-
-| ID | Status |
-|---|---|
-| CW-053 / CW-057 / CW-058 | Decided; implemented by WP1/WP2 (balance values, spec-aware oracle test, Wing Slam 8 s / 1.3 s, Bully x1.4 + 2 cargo, Featherfoot, bot radius, hysteresis). |
-| Effect types (Aura vs Static AoE) | Decided; WP0 (round-reset event), WP3 (type model, anchored zone, OnEnter/WhileInside), WP4 (Feather Aura migration); WP5 (Periodic) deferred to the Spine Coat steal aura. |
-| CW-206 / 212 / 219 | Decided; WP6-WP9 (orientation classes, camera framing, portrait HUD, menus). |
-| CW-232 | **Doppelganger fidelity** (new): the decoy is a perfect copy of its caster in the future (ring, arrow, nameplate colours, visibly slowed/rooted/stunned, zones and confirmations treat it as a chicken). Today zones deliberately ignore decoys (pinned by `ZonesIgnoreDecoys` once WP3 lands); that is a known stopgap. |
-
-### Maestro's end-of-work requirement (2026-10-22)
-
-When the current work is finished: **everything on `develop`, tested, and the `feature/progression` branch rebased onto it** (CW-010, CW-007). Plan: merge `feature/effect-types-and-portrait` into local `develop` after the full verification (EditMode unfiltered + the scenario matrix, solo/shared2/shared4/hostleave x 3 rounds), then rebase `feature/progression` onto the new `develop` (backup tag first, resolve conflicts incl. the `AnnounceExecuteSteal` line, re-run the suite and the matrix). Pushing anything, and force-pushing the rebased progression branch (it is the head of PR #1), still needs Maestro's explicit OK.
-
-### Maestro's end-of-work requirement, updated 2026-10-23
-
-"I want all ready, committed, pushed and tested in develop (when done)." This explicitly authorizes a normal (non-force) **push of `develop`** once everything is merged and the full tests pass on `develop` (EditMode unfiltered + scenario matrix). The `feature/progression` branch is rebased onto the new `develop` and tested; **force-pushing the rebased progression branch (head of PR #1) is a rewrite of published history and will be confirmed with Maestro at that moment** (safe alternative: push it under a new name).
-
-### Status 2026-10-24 (end of work)
-
-`develop` pushed (`654cd39`) with the full gate green; `feature/progression` rebased onto it and force-pushed with Maestro's explicit OK (PR #1 head `cfd153ee`). Done after the push: the recent-position hardening (samples older than the zone's first local sighting never vouch; regression `RootClaim_ASampleFromBeforeThisPeerSawTheZone_NeverVouches`). The progression branch's UI/behaviour review is deliberately left for its own thread. See `docs/STATE.md` for the open list.
+# Backlog
+<!-- backlog-skill -->
+One line per item: `- [ ] ID P0-P3 type | text`. Open = `[ ]`, done = `[x]`. Never delete lines (IDs are never reused).
+List open work: `grep "^- \[ \]" BACKLOG.md`. Priorities: P0 crash/data loss, P1 significant pain, P2 improvement, P3 nice-to-have.
+Types: bug task idea decision debt.
+
+- [x] BL-001 P3 decision | CW-001 Doppelganger decoy colours: keep grey stopgap - Superseded by CW-232 (perfect copy of caster) [+2026-10-30] [done 2026-10-30 decided]
+- [x] BL-002 P3 decision | CW-002 Scarecrow arm-tip rule relaxed to 3 m - Rule done in b3403e0; scene slide is CW-040 [+2026-10-30] [done 2026-10-30 rule done b3403e0]
+- [x] BL-003 P3 decision | CW-003 Rim path visibility: accept the small gain - Maestro decision 2026-10-21 [+2026-10-30] [done 2026-10-30 decided]
+- [x] BL-004 P3 decision | CW-004 Pad lines: keep the ability-cone outline - Maestro decision 2026-10-21 [+2026-10-30] [done 2026-10-30 decided]
+- [x] BL-005 P3 decision | CW-005 Arena reveal hold: keep GET READY - Maestro decision 2026-10-21 [+2026-10-30] [done 2026-10-30 decided]
+- [x] BL-006 P3 decision | CW-006 Chicken must stand up earlier during countdown - Maestro decision 2026-10-21; implemented in CW-021 [+2026-10-30] [done 2026-10-30 67c745e]
+- [x] BL-007 P2 decision | CW-007 Rebase feature/progression after landing - Maestro decision; PR #1 merged [+2026-10-30] [done 2026-10-30 PR #1 merged]
+- [x] BL-008 P2 task | CW-008 Spread stacked edge arrows - Fixed in 838e984 (EdgeArrowSpread) [+2026-10-30] [done 2026-10-30 838e984]
+- [x] BL-009 P3 decision | CW-009 No status strip in arrow safe zones for now - Maestro decision 2026-10-21 [+2026-10-30] [done 2026-10-30 decided]
+- [ ] BL-010 P1 task | CW-100 Fresh Windows and Android build; install on Pixel 9 [+2026-10-30]
+- [ ] BL-011 P1 task | CW-101 GPU frame time on Mobile tier: centre pile, Perf Mode on and off - Pixel 10 Pro data holds 30 fps; Perf Mode OFF and centre pile still open. Needs CW-026 mode [+2026-10-30]
+- [x] BL-012 P1 task | CW-102 Arena reveal gate on device - PASS on Pixel 10 Pro Vulkan 2026-10-20; Reduced Motion and Perf Mode OFF still open [+2026-10-30] [done 2026-10-30 PASS 2026-10-20]
+- [x] BL-013 P1 task | CW-103 Two-peer reveal sync and late join - PASS: 4 peers and late join into Active 2026-10-20 [+2026-10-30] [done 2026-10-30 PASS 2026-10-20]
+- [ ] BL-014 P2 task | CW-104 Shaders on real GLES3 and Vulkan: no pink or cyan - Partial: Vulkan clean on Pixel 10 Pro; GLES3 not checked [+2026-10-30]
+- [ ] BL-015 P2 task | CW-105 Mobile shadow bias and distance (1 to 0.4, 1 to 0.5, 30 to 26) [+2026-10-30]
+- [ ] BL-016 P2 task | CW-106 Performance Mode twin-fence memory [+2026-10-30]
+- [ ] BL-017 P2 task | CW-107 Haptics, edge-cancel, Android Back, real pad B, mouse cursor, aim replication [+2026-10-30]
+- [ ] BL-018 P2 task | CW-108 Real-device UI: notch, soft keyboard, focus, scrollbar, HUD slider, invite tiles [+2026-10-30]
+- [ ] BL-019 P2 task | CW-109 Host and Join live: waiting line, host-left notice, Leave sheet copy [+2026-10-30]
+- [ ] BL-020 P3 task | CW-110 Pixel 9 legibility of the 0.22 and 0.035 ring stroke [+2026-10-30]
+- [ ] BL-021 P3 task | CW-111 4-device LAN validation and third-player diagnosis - Likely superseded by UGS; check first [+2026-10-30]
+- [x] BL-022 P2 task | CW-112 Master departure mid-match - PASS 2026-10-20: phone promoted, host-left notice, 3 more rounds [+2026-10-30] [done 2026-10-30 PASS 2026-10-20]
+- [ ] BL-023 P2 task | CW-113 Playtest stacked defensive combos before any cap - Egg Shell + Turtle; Turtle + Roll and Push + Spine Coat [+2026-10-30]
+- [x] BL-024 P3 task | CW-020 Close reveal-hold-style decision - Closed with CW-005 [+2026-10-30] [done 2026-10-30 closed with CW-005]
+- [x] BL-025 P3 bug | CW-021 Chicken stand-up timing during countdown - Fixed in 67c745e; visual check open as CW-213 [+2026-10-30] [done 2026-10-30 67c745e]
+- [x] BL-026 P2 task | CW-022 Edge arrows: spread stacked arrows, status strip - Fixed in 838e984; eyeball with two rivals still open [+2026-10-30] [done 2026-10-30 838e984]
+- [ ] BL-027 P2 task | CW-023 Shader variant warm-up from recorded Play session - Do after device hitch data from CW-102 [+2026-10-30]
+- [ ] BL-028 P3 task | CW-024 Extend reveal warm-up: combat-text font, ability zones, ring ghost [+2026-10-30]
+- [ ] BL-029 P3 bug | CW-025 intro_probe.py stale: RecAudio lacks SetMusicVolume (refs: tools/ui_capture/intro_probe.py) [+2026-10-30]
+- [ ] BL-030 P3 task | CW-026 Centre-pile and live-bots mode in measure_phase8_cost.py - Enables CW-101 centre-pile data (refs: tools/measure_phase8_cost.py) [+2026-10-30]
+- [ ] BL-031 P3 task | CW-027 Render CPU rise 0.6-0.8 to 0.9-1.2 ms between capture rounds [+2026-10-30]
+- [ ] BL-032 P3 bug | CW-028 Chicken feet hover about 0.08 m - Models seated on capsule bottom [+2026-10-30]
+- [ ] BL-033 P3 bug | CW-029 Rival nameplates rotated in overview captures only - Possibly a capture artifact [+2026-10-30]
+- [ ] BL-034 P3 bug | CW-030 Fence hairline cracks at post caps; Prop_feed_silo collider [+2026-10-30]
+- [ ] BL-035 P3 task | CW-040 Scarecrow scene slide in Map.unity - Rule done (3 m); four scarecrows still need moving in the Editor (refs: Assets/_Game/Scenes/Game.unity) [+2026-10-30]
+- [x] BL-036 P3 decision | CW-041 D13 rim path: no change - Closed by Maestro 2026-10-21 [+2026-10-30] [done 2026-10-30 closed]
+- [x] BL-037 P3 decision | CW-042 D17 pad lines: no change - Closed by Maestro 2026-10-21 [+2026-10-30] [done 2026-10-30 closed]
+- [ ] BL-038 P3 task | CW-043 Compendium stale bullets in docs/site/index.html - Engine bullet and pile slow note; republish to artifact (refs: docs/site/index.html) [+2026-10-30]
+- [x] BL-039 P1 bug | CW-050 Assassin execute credit: kill credit and looted cargo - Done in code (5b27d6c, a22dee88); live two-client check is CW-246 [+2026-10-30] [done 2026-10-30 5b27d6c]
+- [x] BL-040 P2 task | CW-051 Progression Assassin announce re-attach - Moot now that progression is on develop; see CW-234 for S2 fix [+2026-10-30] [done 2026-10-30 moot]
+- [x] BL-041 P3 task | CW-052 Egg Shell branch and worktree cleanup - Branch and worktree already gone [+2026-10-30] [done 2026-10-30 gone]
+- [x] BL-042 P2 decision | CW-053 Warrior, Speedy, Assassin passives inert since damage removal - Redesigned in WP2 (Bully x1.4, Featherfoot); premise outdated (refs: docs/proposals/BALANCE_AND_PASSIVES_2026-10.md) [+2026-10-30] [done 2026-10-30 WP2]
+- [ ] BL-043 P3 task | CW-054 Peck reach is untaught (needs pile-side visual) [+2026-10-30]
+- [x] BL-044 P3 bug | CW-055 AbilityTelegraph BuildLineMaterial returns null - Fixed in 838e984 [+2026-10-30] [done 2026-10-30 838e984]
+- [x] BL-045 P3 bug | CW-056 RivalIndicator self-injection gated on HasInstance - Fixed in 838e984 [+2026-10-30] [done 2026-10-30 838e984]
+- [ ] BL-046 P2 task | CW-057 Balance pass from 4-player playtest data - Proposal applied in WP1/WP2; tune from human data with the SCT oracle guard (refs: docs/proposals/BALANCE_AND_PASSIVES_2026-10.md) [+2026-10-30]
+- [ ] BL-047 P2 task | CW-058 Wing Slam cooldown and stun re-tune - Applied: 8 s cooldown, 1.3 s stun; fallback 9 s / 1.5 s if too many stuns [+2026-10-30]
+- [ ] BL-048 P3 idea | CW-059 Roll and Push knockback; weighted and probability bot loadouts - Check first [+2026-10-30]
+- [x] BL-049 P1 task | CW-010 Rebase and merge feature/progression - Done: PR #1 merged, progression on develop [+2026-10-30] [done 2026-10-30 PR #1 merged]
+- [ ] BL-050 P2 task | CW-011 Live test: ramp, weekly goals, daily task, identity persistence [+2026-10-30]
+- [ ] BL-051 P2 task | CW-012 GDD section 8 and 11 rewrite for shipped progression - Read numbers from .asset files, never GDD prose (refs: docs/GDD.md) [+2026-10-30]
+- [ ] BL-052 P2 task | CW-013 Compendium sync for progression - Same pass as CW-012 (refs: docs/site/index.html) [+2026-10-30]
+- [ ] BL-053 P3 bug | CW-014 Mastery ring overlaps class-name last characters on chips - Check first; menu redesign has merged since (refs: Assets/UI/CharacterSelect.uxml) [+2026-10-30]
+- [x] BL-054 P3 task | CW-015 Stale worktree CluckWars-turtle and branch - Already gone [+2026-10-30] [done 2026-10-30 gone]
+- [ ] BL-055 P3 idea | CW-016 Post-demo Phases 12-14: accounts, skins, seasonal, flavour [+2026-10-30]
+- [ ] BL-056 P2 task | CW-060 Re-verify menu redesign in the real Editor - Choose Chicken then Loadout flow, stable slots, pool scroll (refs: docs/superpowers/handoffs/2026-09-17-menu-redesign-verification.md) [+2026-10-30]
+- [x] BL-057 P3 task | CW-061 Menu worktree and branch cleanup - Already gone [+2026-10-30] [done 2026-10-30 gone]
+- [ ] BL-058 P3 task | CW-070 Verify coop quick wins A1 A2 A3 A5 A7 - Many shipped per STATE; check each (refs: docs/HANDOFF-COOP-REPORT-QUICKWINS-2026-08.md) [+2026-10-30]
+- [ ] BL-059 P3 task | CW-071 Verify coop quick wins B2 B3 [+2026-10-30]
+- [ ] BL-060 P3 task | CW-072 Verify coop quick wins C1c C2b C3c [+2026-10-30]
+- [ ] BL-061 P3 task | CW-073 Verify coop quick wins D1a D2c D3a [+2026-10-30]
+- [ ] BL-062 P3 task | CW-074 Fill coop handoff progress log or retire the doc [+2026-10-30]
+- [ ] BL-063 P3 idea | CW-080 Server-mode migration (Phase 11) - Dedicated server, IsAuthorityPeer; ADR exists (refs: docs/adr/0002-server-mode-migration-plan.md) [+2026-10-30]
+- [ ] BL-064 P3 task | CW-081 Networking out-of-scope: pickup pooling, M5 scatter (refs: docs/HANDOFF-NETWORKING-2026-07.md) [+2026-10-30]
+- [ ] BL-065 P2 debt | CW-082 Resolve ROADMAP stale checkboxes - Five boxes ticked; 22 unchecked remain (refs: docs/ROADMAP.md) [+2026-10-30]
+- [x] BL-066 P3 task | CW-083 Prune old branches - Only develop and main remain [+2026-10-30] [done 2026-10-30 gone]
+- [ ] BL-067 P3 debt | CW-084 Design docs and tokens carry old player hexes - P1 is now #3FE8E8 (refs: docs/ART.md) [+2026-10-30]
+- [x] BL-068 P3 task | CW-085 Stale Temp backup folder - Already gone [+2026-10-30] [done 2026-10-30 gone]
+- [ ] BL-069 P3 idea | CW-086 iOS export off by default; revisit with hardware [+2026-10-30]
+- [x] BL-070 P1 bug | CW-200 Headless builds carry no UGS cloud project id - Fixed in 5cb5cc0: build menu injects the id and a guard fails when empty [+2026-10-30] [done 2026-10-30 5cb5cc0]
+- [x] BL-071 P2 bug | CW-201 Pin Android identifier to com.cluckwars.game - Fixed in 5cb5cc0; phones need old installs removed [+2026-10-30] [done 2026-10-30 5cb5cc0]
+- [x] BL-072 P2 debt | CW-202 UGS init failure hid inner exceptions - Fixed in 5c6625a [+2026-10-30] [done 2026-10-30 5c6625a]
+- [x] BL-073 P3 debt | CW-203 Stale-install trap in start.ps1 - Fixed in 5791ab7 [+2026-10-30] [done 2026-10-30 5791ab7]
+- [ ] BL-074 P3 debt | CW-204 Crash during IL2CPP build (Hyper-V); build in smaller steps - Known PC issue, process only [+2026-10-30]
+- [x] BL-075 P2 bug | CW-205 Deposit RPC from chicken not at base - Superseded by CW-216 [+2026-10-30] [done 2026-10-30 superseded by CW-216]
+- [ ] BL-076 P2 bug | CW-206 Portrait match HUD: timer covers leaderboard column - Layout landed in WP6-WP9; verify in Unity (CW-247) [+2026-10-30]
+- [x] BL-077 P2 bug | CW-207 Non-Legacy animation sampling warnings in players - Fixed in de03ac0; 0 warnings in test runs [+2026-10-30] [done 2026-10-30 de03ac0]
+- [ ] BL-078 P3 task | CW-208 Load hitches: phone 500 ms lobby to match, PC 200-355 ms [+2026-10-30]
+- [x] BL-079 P3 debt | CW-209 Two EXE clients share UGS identity - -cw_profile exists in AutoTestConfig and UGSService [+2026-10-30] [done 2026-10-30 cw_profile present in AutoTestConfig]
+- [ ] BL-080 P3 debt | CW-210 VisualProbe false positive on MapSurroundings art [+2026-10-30]
+- [ ] BL-081 P2 task | CW-211 Perf data: Pixel 9 and mid-range data still missing [+2026-10-30]
+- [ ] BL-082 P2 bug | CW-212 Portrait HUD collisions with 4 players - Same root as CW-206; layout in WP7/WP9, verify in Unity [+2026-10-30]
+- [ ] BL-083 P3 task | CW-213 Visual check: chicken stands at countdown 1 - Confirms CW-006 on device; decide if needed [+2026-10-30]
+- [ ] BL-084 P1 bug | CW-214 Test-harness autoplay v2 never forages - Tooling defect on the instrumentation branch; check first [+2026-10-30]
+- [ ] BL-085 P3 debt | CW-215 merge.ps1 log names and APK/EXE SHA mismatch [+2026-10-30]
+- [x] BL-086 P1 bug | CW-216 Remote players cannot bank food in Shared mode - Fixed in bcffe71a (4328d361): bases and piles stand where master spawned them [+2026-10-30] [done 2026-10-30 bcffe71a]
+- [x] BL-087 P1 bug | CW-217 Spawned NetworkObject prefabs lack NetworkTransform - Fixed in f135268 (zones stamped); prefab guard test added [+2026-10-30] [done 2026-10-30 f135268]
+- [ ] BL-088 P2 task | CW-218 No reconnect after short app interruption - Desktop Rejoin done (f6fcb7d); real Android backgrounding needs device [+2026-10-30]
+- [ ] BL-089 P2 bug | CW-219 Portrait main menu clipped (CLUCK WARS title, class labels) - WP9 portrait menus landed; verify in Unity [+2026-10-30]
+- [ ] BL-090 P3 task | CW-220 Not covered: Perf Mode off, Reduced Motion, Pixel 9, notch, pad - Needs a human at a device [+2026-10-30]
+- [x] BL-091 P1 bug | CW-221 Second match starts where the first ended - Fixed in fa4836a: RPC records pending target, applied in own FixedUpdateNetwork [+2026-10-30] [done 2026-10-30 fa4836a]
+- [x] BL-092 P1 bug | CW-222 Master chicken diverges across peers - Fixed in d1d345c with SYNC re-triage; one outlier to watch [+2026-10-30] [done 2026-10-30 d1d345c]
+- [x] BL-093 P1 task | CW-223 Test strategy after the CW-221 miss - Done: docs/TEST_STRATEGY.md, verify.ps1, scenario-pc matrix (refs: docs/TEST_STRATEGY.md) [+2026-10-30] [done 2026-10-30 docs/TEST_STRATEGY.md]
+- [x] BL-094 P2 bug | CW-224 Ability cooldowns not reset at PLAY AGAIN - Fixed in bfc8a78 [+2026-10-30] [done 2026-10-30 bfc8a78]
+- [x] BL-095 P2 task | CW-225 PC mode matrix on develop: solo, shared2, shared4, hostleave - PASS on the final build 2026-10-21 [+2026-10-30] [done 2026-10-30 matrix PASS]
+- [x] BL-096 P3 bug | CW-226 Sync flag mismatch after master migration - Closed as by-design cosmetic (2026-10-21) [+2026-10-30] [done 2026-10-30 closed by design]
+- [ ] BL-097 P3 bug | CW-227 cw_hud strip overlaps the leaderboard on PC (refs: Assets/_Game/Scripts/Diagnostics/AutoTestConfig.cs:43) [+2026-10-30]
+- [ ] BL-098 P2 task | CW-228 Mode x round gate in the normal workflow - scenario-pc and TEST_STRATEGY exist; CI wiring not done (refs: docs/TEST_STRATEGY.md) [+2026-10-30]
+- [ ] BL-099 P2 task | CW-229 Still to cover on eyes or a phone - Perf Mode off, Reduced Motion, landscape phone, notch, portrait fixes, reconnect [+2026-10-30]
+- [x] BL-100 P2 bug | CW-230 Execute RPCs had no caller check - Fixed in 7677065 (ExecuteRules); not run live, see CW-246 [+2026-10-30] [done 2026-10-30 7677065]
+- [x] BL-101 P2 bug | CW-231 Death Mark re-arms cooldown at PLAY AGAIN - Fixed: AssassinExecute.ResetForNewRound [+2026-10-30] [done 2026-10-30 fixed]
+- [ ] BL-102 P2 task | CW-232 Doppelganger fidelity: decoy copies its caster - Decided; zones still ignore decoys as stopgap (AreaEffectRules.cs:58) [+2026-10-30]
+- [ ] BL-103 P2 bug | CW-233 Two joiners share one home corner - Landed d26544fc; never run in Unity or matrix (CW-245) [+2026-10-30]
+- [ ] BL-104 P2 bug | CW-234 Progression: hard-coded English and missing check glyph - Literal GRAIN strings and the check glyph in the daily task (not in any font) (refs: Assets/_Game/Scripts/UI/MenuUiController.cs:2817) [+2026-10-30]
+- [ ] BL-105 P2 bug | CW-235 Progression: mastery ring covers tick, heads and LOCKED badge - Level-0 ring reads like a notification counter; consider hiding level 0 [+2026-10-30]
+- [ ] BL-106 P2 bug | CW-236 Progression: locked class tile message lands on the wrong page - Message shows on GEAR UP, not on PICK YOUR BIRD (refs: Assets/_Game/Scripts/UI/MenuUiController.cs:1648) [+2026-10-30]
+- [ ] BL-107 P3 debt | CW-237 Progression minor findings N1-N8 - Duplicate self-inject, stale comments, RoundEnded race, optimistic steal announce, -progressionDir in release, STATE port summary [+2026-10-30]
+- [ ] BL-108 P3 debt | CW-238 Docs drift: stale progression handoff and parallel backlog - The 2026-10-26 handoff still says PR #1 is open; BACKLOG was duplicated (refs: docs/superpowers/handoffs/2026-09-16-progression-followups.md) [+2026-10-30]
+- [ ] BL-109 P2 task | CW-239 Phase 8 chunk D remainder: reconcile the handoff with STATE - Many items landed since the 2026-10-17 handoff (refs: docs/HANDOFF-PHASE8D-2026-10.md) [+2026-10-30]
+- [ ] BL-110 P3 idea | CW-240 WP5 Periodic effect type - Deferred until the Spine Coat steal aura exists (refs: docs/proposals/FABLE_REVIEW_AND_CODE_PLAN_2026-10-22.md) [+2026-10-30]
+- [ ] BL-111 P3 debt | CW-241 Replace hand-kept set with SpawnsNetworkObject (refs: Assets/_Game/Scripts/Editor/Tests/AbilityWiringGateTests.cs:311) [+2026-10-30]
+- [ ] BL-112 P3 task | CW-242 Reset ColorScheme.asset in the Inspector - Picks up the Phase 10 palette; not checked (refs: docs/ROADMAP.md:328) [+2026-10-30]
+- [ ] BL-113 P2 task | CW-243 Re-verify menu redesign in the real Editor - Two-step flow, stable ability slots, Assassin pool scroll (refs: docs/superpowers/handoffs/2026-09-17-menu-redesign-verification.md) [+2026-10-30]
+- [ ] BL-114 P2 task | CW-244 Networking checklist items not covered by the matrix - Remote-move, intro button-mash, bot-pacing re-measure (refs: docs/HANDOFF-NETWORKING-2026-07.md:365) [+2026-10-30]
+- [ ] BL-115 P2 task | CW-245 Run CW-233 in Unity and the matrix - Two joiners on one corner [+2026-10-30]
+- [ ] BL-116 P2 task | CW-246 Run the execute path live with two clients - Expect 0 rejected RPC_ExecuteRemoval and RPC_CreditKill; Kills +1 per execute [+2026-10-30]
+- [ ] BL-117 P2 task | CW-247 Portrait layouts WP6-WP9 in Unity and capture - EditMode, capture 540x960 and 540x1200, results/leave/waiting room by hand (refs: docs/STATE.md) [+2026-10-30]
