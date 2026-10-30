@@ -98,5 +98,18 @@ namespace CluckWars.Tests
                 Assert.AreEqual(BuildGuards.AppIdentifier, id, $"{target.TargetName} identifier drifted from the pinned id");
             }
         }
+
+        [Test]
+        public void ProjectSettings_BrandingAndIconsAreSet()
+        {
+            Assert.AreNotEqual("DefaultCompany", PlayerSettings.companyName);
+            Assert.AreEqual("Cluck Wars", PlayerSettings.productName);
+            Assert.IsNotNull(PlayerSettings.GetIcons(NamedBuildTarget.Unknown, IconKind.Application)[0], "default (Windows) icon missing");
+            foreach (var kind in new[] { UnityEditor.Android.AndroidPlatformIconKind.Adaptive,
+                                         UnityEditor.Android.AndroidPlatformIconKind.Round,
+                                         UnityEditor.Android.AndroidPlatformIconKind.Legacy })
+                foreach (var icon in PlayerSettings.GetPlatformIcons(BuildTargetGroup.Android, kind))
+                    Assert.IsNotNull(icon.GetTexture(), $"Android {kind} icon {icon.width}x{icon.height} is empty");
+        }
     }
 }
