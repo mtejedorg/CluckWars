@@ -76,3 +76,5 @@ Full diagnostic playbook: `docs/TESTING.md`.
 ## Team
 
 **Maestro** — Senior Engineer, telco background, Unity/C#/Android expertise, Madrid.
+
+<!-- backlog-skill --> Open work lives in `docs/BACKLOG.md` (one line per item; list with `grep "^- \[ \]" docs/BACKLOG.md`; add/close via the `/backlog` skill).
