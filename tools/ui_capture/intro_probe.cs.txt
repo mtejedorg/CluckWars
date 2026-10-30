@@ -11,6 +11,8 @@ public class Intro {
     public void StopMusic() { }
     public bool IsMusicPlaying(AudioClip clip) { return false; }
     public void SetMasterVolume(float volume01) { }
+    public void SetMusicVolume(float volume01) { }
+    public void SetSfxVolume(float volume01) { }
   }
   static List<string> Lines { get { var l = System.AppDomain.CurrentDomain.GetData("intro.lines") as List<string>; if (l == null) { l = new List<string>(); System.AppDomain.CurrentDomain.SetData("intro.lines", l); } return l; } }
   static float Start { get { var o = System.AppDomain.CurrentDomain.GetData("intro.start"); return o == null ? 0f : (float)o; } set { System.AppDomain.CurrentDomain.SetData("intro.start", value); } }
@@ -81,6 +83,8 @@ public class Intro {
     public void StopMusic() { Log("AUDIO stopMusic"); Inner.StopMusic(); }
     public bool IsMusicPlaying(AudioClip clip) { return Inner.IsMusicPlaying(clip); }
     public void SetMasterVolume(float volume01) { Inner.SetMasterVolume(volume01); }
+    public void SetMusicVolume(float volume01) { Inner.SetMusicVolume(volume01); }
+    public void SetSfxVolume(float volume01) { Inner.SetSfxVolume(volume01); }
   }
   sealed class P4 {
     public string Out; public float T0, End; public int Round; public bool CardSeen, CardShot; public string Scene = "", Text = null, StateStr = "";

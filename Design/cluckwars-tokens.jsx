@@ -2,7 +2,7 @@
 // ==================================================
 
 // Color-blind safe player identity colors (Okabe-Ito derived)
-const CW_PLAYER_COLORS = ['#E8751A', '#1A7FC4', '#C4286F', '#0D9E7A'];
+const CW_PLAYER_COLORS = ['#3FE8E8', '#0994E8', '#F7367B', '#17785A'];
 const CW_PLAYER_NAMES = ['P1', 'P2', 'P3', 'P4'];
 
 // Class data from GDD

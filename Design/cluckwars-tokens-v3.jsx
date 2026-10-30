@@ -94,12 +94,12 @@ const CW_ABILITIES_V3 = [
 
 const CW_ABILITY_BY_ID = Object.fromEntries(CW_ABILITIES_V3.map(a => [a.id, a]));
 
-// Player colors (Okabe-Ito) — unchanged from v0.2
+// Player colors (Okabe-Ito) — updated to the shipped PlayerPalette (docs/ART.md)
 const CW_PLAYERS_V3 = [
-  { name:'P1', color:'#E8751A', label:'Sunset Orange' },
-  { name:'P2', color:'#1A7FC4', label:'Ocean Blue' },
-  { name:'P3', color:'#C4286F', label:'Berry Pink' },
-  { name:'P4', color:'#0D9E7A', label:'Forest Teal' },
+  { name:'P1', color:'#3FE8E8', label:'Splash Aqua' },
+  { name:'P2', color:'#0994E8', label:'Ocean Blue' },
+  { name:'P3', color:'#F7367B', label:'Berry Pink' },
+  { name:'P4', color:'#17785A', label:'Forest Teal' },
 ];
 
 Object.assign(window, {
