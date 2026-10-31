@@ -1034,6 +1034,22 @@ namespace CluckWars.Gameplay
         public Abilities.PassiveAbilitySO Passive =>
             _abilities != null ? _abilities.Passive : null;
 
+        // Sneaky Steal's per-victim cooldown. Authority-local, like the press it gates; a proxy preview fails open.
+        private readonly TargetCooldowns<NetworkBehaviourId> _stealLocks = new TargetCooldowns<NetworkBehaviourId>();
+
+        /// <summary>Has this chicken's Sneaky Steal hit <paramref name="victim"/> too recently? False on a proxy.</summary>
+        public bool IsStealLockedOn(ChickenController victim)
+        {
+            if (victim == null || Object == null || !Object.IsValid || !HasStateAuthority) return false;
+            return _stealLocks.Blocks(victim.Id, Runner.SimulationTime);
+        }
+
+        /// <summary>A Sneaky Steal just landed on <paramref name="victim"/>. State authority only (it runs inside the cast).</summary>
+        public void LockStealOn(ChickenController victim, float seconds)
+        {
+            if (victim != null && HasStateAuthority) _stealLocks.Lock(victim.Id, Runner.SimulationTime + seconds);
+        }
+
         /// <summary>This chicken's execute state machine (cached), or null before <c>Spawned</c>.</summary>
         public AssassinExecute Execute => _assassin;
 
@@ -1527,6 +1543,7 @@ namespace CluckWars.Gameplay
             // Drop a live Death Mark first, without its fail cooldown: left in place, the reset teleport makes it
             // fizzle on range next tick and re-arm a 5 s cooldown after the clear below (CW-231).
             _assassin?.ResetForNewRound();
+            _stealLocks.Clear();
             // End running abilities through their own OnDeactivate first (modifiers, traversal holds, ability
             // state), THEN hard-release traversal and clear the stack as a backstop.
             _abilities?.EndAllForReset();

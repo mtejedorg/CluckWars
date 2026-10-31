@@ -20,13 +20,16 @@ namespace CluckWars.Abilities
     {
         public override string DescriptionKey => UiKeys.AbilitySneakyStealDesc;
         public override (string name, object value)[] DescriptionArgs() =>
-            new (string, object)[] { ("n", Num(StealAmount)), ("r", Num(StealRange)) };
+            new (string, object)[] { ("n", Num(StealAmount)), ("r", Num(StealRange)), ("secs", Num(SameVictimCooldownSeconds)) };
 
         [Tooltip("How close an enemy chicken needs to be to steal from. Generous so it feels reliable.")]
         [Min(0.5f)] public float StealRange = 5.4f;
 
         [Tooltip("How much cargo to steal. Capped to the victim's actual cargo and the thief's free space.")]
         [Min(1f)] public float StealAmount = 6f;
+
+        [Tooltip("Seconds before this thief's Sneaky Steal can take from the same bird again. The next nearest rival is fair game.")]
+        [Min(0f)] public float SameVictimCooldownSeconds = 10f;
 
         public override float IndicatorRange => StealRange;
         public override bool RequiresEnemyInRange => true;
@@ -42,7 +45,7 @@ namespace CluckWars.Abilities
         protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)
         {
             var cargo = candidate.Cargo;
-            return cargo != null && cargo.Cargo > 0f;
+            return cargo != null && cargo.Cargo > 0f && !caster.IsStealLockedOn(candidate);
         }
 
         public override void OnActivate(AbilityContext ctx)
@@ -69,6 +72,7 @@ namespace CluckWars.Abilities
             if (take <= 0f) return;
 
             thiefCargo.CreditStealAndDrain(target, take);
+            thief.LockStealOn(_scratch[0], SameVictimCooldownSeconds);
         }
 
         public override void OnDeactivate(AbilityContext ctx)
