@@ -6,6 +6,21 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🛠 2026-10-31 - Spec v2 on `balance`: walls stop abilities, Death Mark is global, the mark can be seen (not merged, not pushed)
+
+- **Base wall, abilities:** `BaseWallRules` + `PlayerBase.WallBetween`, asked in `AbilityBaseSO.WouldAffect`, so previews, telegraphs, IsUsable, bots and the press agree. Zones test centre against victim (scan, slow, confirmation). "Inside" stops 5 cm short of the keep-out radius, so a clamped rival never flickers. Receivers treat a wall as a legal no-op, or a refund for a steal, never a rejected RPC.
+- **Root claim rule:** a root lands only if a zone of the caster passing every evidence filter contains the victim at a recorded sample and is on the same side of every wall as both that sample and the victim's current position; a claim with vouching evidence otherwise is a silent no-op, and one without is judged on reach and the caster-to-victim wall. Three review passes; `ScanRootZonesOf` / `AddRootZone` are the one loop.
+- **Execute receivers:** both halves judge evidence, range, wall in that order. Stun evidence is latency + 0.5 s, not the mark window. The bounty moved to the kill report, so a refused kill pays nothing; the press still spends the 15 s cooldown.
+- **Death Mark:** random living rival anywhere, never the last mark unless it is the only rival, 12 s, arm 0, KillRange 8 m, KillReady only while the target is stunned. Cold trail, home breaks the mark, mark range and isolation are deleted. Bots hunt the mark; a bot holding only a bounty bag now walks it home.
+- **Feedback:** `Visuals/MarkFeedback`, `MatchHud` banner, `RivalIndicator` mark arrow (x2.2, never offered to the floor ring). Seen in real captures at 960x540 and 540x960, GEAR UP Fixed too.
+- **Sneaky Steal:** 10 s per victim (`SameVictimCooldownSeconds`, `TargetCooldowns`), through the shared filter.
+- **Hold-to-aim:** a held ability no longer stops the chicken. An explicit aim faces the bird while it strafes; on one stick moving is how you aim. Not played by hand yet.
+- **Matrix:** `Invariant FAIL base-intrusion`, `Kit equip` lines, merge.ps1 INVARIANT rules, selftest fixture. A session has 4 seats, so all 8 kits need several runs (`-Perk`, `-BotPerks`). Dev: `-cw_markshots`.
+- **Protocol: unchanged** (no `[Networked]` added or removed). `RemovalVerdict` gained a value (local only). All peers still one SHA: behaviour differs across this branch.
+- **Open:** Featherfoot + Quick Drop still fails the band (below): Maestro decides. Android build and matrix scenarios not run.
+
+---
+
 ## 🛠 2026-10-31 - Fixed-kits balance baseline on branch `balance` (not merged, not pushed)
 
 - **Why:** free picking cannot be balanced by hand. `MatchConfigSO.LoadoutMode` ships **Fixed**; Free is byte-for-byte the old behaviour, one switch away. Baseline, not definitive: kits and rule numbers are all data. Kits, rule numbers and the watch list: `docs/balance/human-test-baseline.md`.
@@ -13,7 +28,7 @@ what's shipped, what's in flight, and what's blocked on testing.
 - **Bots:** `FixedKit.RollBotLineup` from `SoloCornerSeed`, so THE COOP shows what spawns: distinct classes, all 8 specs reachable, scene `_botLoadouts` untouched for Free only. A bot's name now follows its class, not its seat (`lobby.bot.4` IronComb is new: a rolled Warrior had no name).
 - **Execute bug found and fixed:** the Mark press charged the slot's 5 s cooldown, equal to the 5 s window, so the Kill press was refused for the mark's whole life and the execute could not land. The Mark branch now frees the slot. `AssassinExecute.SlotIndex` is derived from the slot holding Death Mark. Spoiler bots follow a mark through (`BotTactics.NextMarkStep`): hold the stun while arming, stun, Kill.
 - **Ruffle** 1.3x / 2 s / cd 6. **Rename (display only):** class Sneaky, specs Assassin and Thief. `Classes/Assassin.asset` `DisplayName` deliberately stays "Assassin": no player sees it and `SctTargets` + the Oracle tests key on it.
-- **Anti-chase:** cold trail (`ColdTrail<T>`, 15 s) and home breaks the mark, both through `MarkKillAbilitySO.ExtraTargetFilter`. Execute numbers moved to `MarkKill.asset`, unchanged; every peer reads the one asset, so the CW-230 receiver bounds follow them. No new `[Networked]`; a proxy fails open.
+- **Anti-chase (superseded by spec v2, above):** cold trail (`ColdTrail<T>`, 15 s) and home breaks the mark, both through `MarkKillAbilitySO.ExtraTargetFilter`. Execute numbers moved to `MarkKill.asset`, unchanged; every peer reads the one asset, so the CW-230 receiver bounds follow them. No new `[Networked]`; a proxy fails open.
 - **Base wall:** `BaseKeepOutRules` + `ChickenController.IAfterTick`, each authority clamps itself after every FixedUpdateNetwork and before NetworkTransform captures (verified in Fusion's IL: capture is in `BeforeCopyPreviousState` / `AfterAllTicks`, `StepSimulation` runs those after the tick). `CharacterController.Move`, so no shove through fences. Jumps are teleports, so landings resolve on the landing tick. Skipped while unsticking. **No NavMesh areas:** the NavMesh is baked into binary `Map.unity`, so per-corner areas would force a re-bake of the art scene; bots use `BaseKeepOutRules.SteerAround` (tangent detour) and a target inside a rival wall resolves to just outside. The auto-play harness bird has its own unstick and can lean on a wall while hunting a rival at home.
 - **Protocol: unchanged.** No `[Networked]` field added or removed, no new NetworkBehaviour, no prefab re-bake. All peers should still run one SHA: the wall and the trail are authority-local rules.
 - **Oracle:** naked targets did not move. New opt-in deposit burst on `OracleChicken`. **Featherfoot with Quick Drop = 28.35 s / 4 trips on all four seats, 0.15 s under the 28.5 floor of the +-1.5 s band: it FAILS the SCT test.** Two presses is the maximum the cooldown allows, so this is its best case. Nothing tuned, no tolerance moved, not declared in `SpecSctTargets`; `BalanceOracleTests.RealMap_FeatherfootWithQuickDrop_IsPinnedAtItsMeasuredRun` pins the number. **Maestro decides.**

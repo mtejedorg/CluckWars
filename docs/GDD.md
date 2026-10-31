@@ -571,34 +571,33 @@ it at all, cannot hand-pick it, and cannot execute.
 
 | Stage | Condition | Counterplay |
 |---|---|---|
-| **Mark** | Press → soft-locks the nearest **isolated** rival (no chicken within **8 m**), in facing. Visible to the target. | Stay near others — in an FFA, safety = approaching an enemy |
-| **Arm** | **2.0 s** pass with the mark alive | Break isolation or leave range → mark fizzles |
-| **Qualify** | The marked target enters a **Stun** (his own Ambush, or *any* stun — e.g. a Warrior's Wing Slam) → button lights up **KILL** | Don't get stunned; hold a defence |
-| **Kill** | Press again while target is stunned **and the Assassin is not himself stunned** | **A third party can stun the Assassin to deny the kill** — stun the hunter to save the prey |
+| **Mark** | Press → a random living rival anywhere on the map. The target sees it is marked. | Run; go home, where nothing reaches you |
+| **Hunt** | The Assassin has **12 s** to find it | Keep moving; hold the base |
+| **Stun** | The target is stunned (his own Ambush, or *any* stun) | Don't get stunned; hold a defence |
+| **Kill** | Press again while it is stunned, within **8 m**, with no base wall between, and the Assassin is not stunned | **A third party can stun the Assassin to deny the kill** |
 
 On success the victim's **entire cargo transfers to the Assassin as a capacity-exempt
 "bounty bag"** (he becomes a courier of a stolen win) and the victim is removed ~2 s, then
 respawns empty. (A **steal-proof** victim keeps its load: the execute still removes it and pays
 the bounty, but nothing transfers.) On failure Death Mark takes a **reduced cooldown**, so he re-marks fast.
 
-**Anti-chase (baseline, 2026-10-31).** Two rules keep the mark from becoming a camp. All numbers live on
-`MarkKill.asset` (range 8, arm 2, window 5, fail 5, success 15, isolation 8, trail 15).
-- **Cold trail.** After a mark ends, paid or failed, that rival cannot be marked by this Assassin until he has marked
-  someone else or **15 s** pass. Off when only one real rival is in the match; cleared by a new round. A decoy starts no
-  trail and is not "someone else".
-- **Home breaks the mark.** A marked bird inside its **own** base (deposit radius) ends the mark as a failure, and a
-  rival already home cannot be marked.
+**Spec v2 (Maestro, 2026-10-31).** The press marks a **random living rival anywhere on the
+map**: no mark range, no isolation. Decoys are never picked, and the next mark can never be the last one unless that bird is the
+only rival (no time release; reset each round). The Assassin then finds it, stuns it and presses again. The Kill needs the target
+**stunned now**, the Assassin free to cast, within **KillRange 8 m**, and no base wall between them. The mark lasts **12 s**; arm is 0,
+kept as data, because crossing the map already costs the time. Only expiry, a kill or the target leaving play ends a mark: it survives
+range, crowds and the target going home, where no ability reaches it, so the timer can run out. Expiry costs the fail cooldown (5 s);
+a kill 15 s. All numbers are on `MarkKill.asset`. The bounty is paid on the victim's kill report, so a refused kill pays nothing.
 
-Both refuse in the preview, the telegraph, the button grey-out and the press alike (`MarkKillAbilitySO.ExtraTargetFilter`).
-While a mark runs the slot is free, so the Kill press is possible at all; the mark's cooldown is set by how it ends.
+The Assassin sees stacked chevrons and a ring on the target, a kill-range ring near it, a large edge arrow in the mark colour that nothing
+declines, and a banner with target, distance and time, yellow on **KILL NOW!**. The marked player sees a red **YOU ARE MARKED!** banner.
 
-**The base wall (baseline, 2026-10-31).** A chicken's body cannot stand inside another chicken's claimed base (radius
-`MatchConfigSO.BaseKeepOutRadius`, 2.5 m, equal to the deposit radius today). Your own base is free, an unclaimed base is
-open, and abilities reach across: this moves bodies, not the deposit radius, the steal rules or the Oracle. Walking at
-a wall slides round it; every displacement resolves the same way (blinks, jumps, knockback). A base whose owner left stays
-claimed, keeps its colour and keeps its wall.
-Stun lives in exactly two classes (Assassin + Warrior), which is what makes the deny/enable
-counterplay reachable.
+**The base wall.** A chicken's body cannot stand inside another chicken's claimed base (radius `MatchConfigSO.BaseKeepOutRadius`, 2.5 m),
+and **no ability crosses the wall in either direction**: targeted, cone, area, steal, zones, control, knockback, the execute, Spine
+Coat's steal-back. A walled target shows as grey "in the area, no effect". Zones test zone centre against victim; an aura's centre is
+its caster. Your own base is free for your body, an unclaimed base has no wall, two birds on the same side are not blocked, and self-buffs are
+unaffected. A race (the target stepped through a wall after the cast) is a silent no-op with a refund for a steal, never a rejected
+RPC. Walking at a wall slides round it. A base whose owner left stays claimed, keeps its colour and keeps its wall.
 
 ---
 
@@ -712,7 +711,7 @@ shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 | **Assassin** | Ambush 🗡️ | 10 s | Stuns rivals within 3.6 m for 1 s — sets up his own execute. |
 | | Doppelganger 👥 | 11 s | Decoy copy beside you for 4 s that soaks attacks. |
 | | Invisibility 👻 | 8 s | Fades you to a ghostly outline for 4 s. Using a move breaks it. (Assassin-only now — was also Speedy.) |
-| | Death Mark 🎯 *(Assassin specialization Peck-slot pre-equip; pre-equip-only)* | 5 s | The execute — see §6.4. Marks a lone rival within 8 m; stun them, then press again to take everything they carry. |
+| | Death Mark 🎯 *(Assassin specialization Peck-slot pre-equip; pre-equip-only)* | 5 s | The execute — see §6.4. Marks a random rival anywhere; stun them within 8 m, then press again to take everything they carry. |
 | | Shadowstep 👤 | 6 s | Dashes forward at 3x speed for 0.4 s, straight over walls (Assassin-only — was briefly also Speedy by asset drift, corrected; Speedy is permanently denied all terrain traversal, §5.2). |
 | | Smoke Roost 🌁 | 11 s | Cloud at his own feet (4 m, 5.5 s) — he fades, rivals inside slow to 55% speed. Using a move breaks the fade (the cloud stays). Pairs with Death Mark's isolate-and-execute. |
 | | Snatch 🤏 *(moved from Common)* | 3 s | Robs 5 food from every rival within 4.3 m ahead and shoves them back. Assassin-only now — a universal AoE steal is exactly the Assassin's core, and diluted the class. |

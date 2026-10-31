@@ -35,6 +35,7 @@
            only) switches back to the screen-edge chevrons for comparisons. A/B, same seconds, one run each:
            -ExtraArgs '-cw_shots 15,22,29,36 -cw_zones -cw_shottag floor'                  (default: floor arrows)
            -ExtraArgs '-cw_shots 15,22,29,36 -cw_zones -cw_shottag edge -cw_edgearrows'    (edge chevrons)
+           Death Mark captures: -ExtraArgs '-cw_markshots -cw_perk Assassin_Spoiler' writes mark-hunt, mark-near, mark-kill to <session>shots; a Fatty with -BotPerks of three Spoilers gives mark-victim.
            The log says which one ran ("AutoTest arrows=floor|edge") and the ring radius in use ("Floor ring radius=").
            WP8 layout keys (dev tools): -cw_touchhud (check the phone's thumb-arc HUD instead of the desktop strip),
            -cw_menushots [main,settings,disconnect,class,gear,coop,coopjoin] (menu-<page>.png + one UiProbe scan per page

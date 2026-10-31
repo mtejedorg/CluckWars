@@ -1,6 +1,6 @@
 # Human test baseline: fixed kits
 
-Baseline SHA: `ae35c5f1` on branch `balance` (code and data; this line is the only change after it).
+Baseline: the head of branch `balance` after spec v2 (see `git log balance`); v1 was `ae35c5f1`.
 
 This is a starting point to iterate, not a final roster. Every value below is data: kits on the passive assets (or the Balance
 Editor's kits panel), rule numbers on `MatchConfig.asset` and `MarkKill.asset`. `MatchConfigSO.LoadoutMode = Free` brings back
@@ -28,15 +28,13 @@ Benched, still in the pool: Dive Bomb, Roll & Push, Feather Trap, Egg Shell.
 | Rule | Value | Where |
 |---|---|---|
 | Ruffle | 1.3x, 2 s, cooldown 6 s | `Ruffle.asset` |
-| Death Mark reach | 8 m | `MarkKill.asset` |
-| Arm | 2 s | `MarkKill.asset` |
-| Window | 5 s | `MarkKill.asset` |
+| Death Mark | random rival anywhere, never the last mark unless the only rival | `AssassinExecute` |
+| Kill range | 8 m, target stunned now, no wall between | `MarkKill.asset` |
+| Mark window | 12 s; arm 0 | `MarkKill.asset` |
 | Cooldown after a failed mark | 5 s | `MarkKill.asset` |
 | Cooldown after a kill | 15 s | `MarkKill.asset` |
-| Isolation | 8 m | `MarkKill.asset` |
-| Cold trail | 15 s, off with one real rival | `MarkKill.asset` |
-| Home breaks the mark | inside own deposit radius (2.5 m) | `PlayerBase` |
-| Base wall | 2.5 m round each rival's claimed base | `MatchConfig.asset` |
+| Sneaky Steal, same bird | 10 s | `SneakySteal.asset` |
+| Base wall | 2.5 m round each rival's claimed base; bodies and abilities | `MatchConfig.asset` |
 | Match | 40 food or 45 s | `MatchConfig.asset` |
 
 ## Open decision
@@ -47,12 +45,13 @@ was tuned. Options are Maestro's: accept and declare it, shorten the burst, or s
 
 ## What to watch for
 
-- **Is the execute real now?** Until this baseline the Kill press was refused by the mark's own cooldown, so nobody has ever
-  played the Assassin specialization with a working execute. Watch whether it is too strong, not only whether it works.
-- **Does cold trail end the camping?** A Sneaky should have to change target. With three rivals, does he run out of targets?
-- **Is home too safe?** Does a marked bird just walk home? Does the mark ever land near a corner?
-- **Does the base wall read?** Do players understand why they stopped, or does it feel like a bug? Does anyone feel stuck on it?
-- **Doorstep play.** Abilities still reach across the wall: is standing at the rim a strong steal spot, or a camping spot?
+- **Is the execute real now?** Until this baseline the Kill press was refused by the mark's own cooldown, so nobody has ever played a working execute. Too strong, or too hard to land in a stun of about 1 s?
+- **Can the Assassin find the target?** Arrow, chevrons, banner: is any of it noise? Is 12 s enough to cross the map?
+- **Does the mark feel fair?** It reaches you anywhere, and you see it. Does the marked bird have a real choice, or does everyone just run home?
+- **Is home too safe?** Nothing reaches a bird at home. Does the base become a place to wait out marks, and at what cost in food?
+- **Does the wall read?** Do players understand why a target is grey at the rim, and why they stopped?
+- **Sneaky Steal:** does 10 s per bird push the Thief to new victims, or just idle him in a duel?
+- **Hold to aim:** walking while aiming: does a held move still feel deliberate, or are casts sloppier?
 - **Featherfoot against Slippery:** with Quick Drop in the kit, is one Speedy simply better?
 - **Bully with Ruffle:** is 1.3x for 2 s enough to catch anyone, or is the slot dead?
 - **Thief income:** with no Peck and no stun, does it get food at all against careful players?

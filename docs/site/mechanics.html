@@ -176,15 +176,15 @@
   <section id="deathmark">
     <h2>Death Mark: one button, two presses</h2>
     <!-- Source: docs/GDD.md §6.4 -->
-    <p>The Assassin's execute is the only hard removal in the game. Only the Assassin specialization has it, in the first of the four ability slots. After a mark ends that rival is off limits for 15 s unless another bird is marked first, and a marked bird that reaches its own base ends the mark.</p>
+    <p>The Assassin's execute is the only hard removal in the game. Only the Assassin specialization has it, in the first of the four ability slots. The press marks a random rival anywhere on the map for 12 s; the Assassin must find it, stun it and press again within 8 m. No ability crosses a claimed base wall, so a bird at home cannot be reached and the mark can run out.</p>
     <div class="tw wide">
       <table>
         <thead><tr><th>Stage</th><th>Condition</th><th>Counterplay</th></tr></thead>
         <tbody>
-          <tr><td>Mark</td><td>First press soft-locks the nearest isolated rival (nobody within 8 m), in facing. The target can see the mark.</td><td>Stay near others.</td></tr>
-          <tr><td>Arm</td><td>2.0 seconds pass with the mark alive.</td><td>Break isolation or leave range and the mark fizzles.</td></tr>
-          <tr><td>Qualify</td><td>The marked target enters a stun, from any source. The button relabels to KILL.</td><td>Don't get stunned; hold a defence.</td></tr>
-          <tr><td>Kill</td><td>Press again while the target is stunned and the Assassin is not.</td><td>A third player can stun the Assassin to deny the kill.</td></tr>
+          <tr><td>Mark</td><td>First press marks a random living rival anywhere on the map. The target can see the mark.</td><td>Run, or go home: no ability crosses a base wall.</td></tr>
+          <tr><td>Hunt</td><td>The Assassin has 12 seconds to find it.</td><td>Keep moving.</td></tr>
+          <tr><td>Stun</td><td>The marked target enters a stun, from any source.</td><td>Don't get stunned; hold a defence.</td></tr>
+          <tr><td>Kill</td><td>Press again within 8 m while the target is stunned and the Assassin is not.</td><td>A third player can stun the Assassin to deny the kill.</td></tr>
         </tbody>
       </table>
     </div>
@@ -237,11 +237,11 @@
           <tr data-c="assassin"><td>Ambush <span class="tag t-assassin">Sneaky</span></td><td class="num">10 s</td><td>Stuns rivals within 3.6 m for 1 s. Sets up the execute.</td></tr>
           <tr data-c="assassin"><td>Doppelganger <span class="tag t-assassin">Sneaky</span></td><td class="num">11 s</td><td>A decoy copy beside you for 4 s.</td></tr>
           <tr data-c="assassin"><td>Invisibility <span class="tag t-assassin">Sneaky</span></td><td class="num">8 s</td><td>Fades you to a ghostly outline for 4 s. Using a move breaks it.</td></tr>
-          <tr data-c="assassin"><td>Death Mark <span class="tag t-assassin">Sneaky</span></td><td class="num">5 s</td><td>The execute. Marks a lone rival within 8 m; stun them, then press again to take everything they carry. Reaper only.</td></tr>
+          <tr data-c="assassin"><td>Death Mark <span class="tag t-assassin">Sneaky</span></td><td class="num">5 s</td><td>The execute. Marks a random rival anywhere; within 8 m, stun them, then press again to take everything they carry. Reaper only.</td></tr>
           <tr data-c="assassin"><td>Shadowstep <span class="tag t-assassin">Sneaky</span></td><td class="num">6 s</td><td>Dashes forward at 3× speed for 0.4 s, straight over walls.</td></tr>
           <tr data-c="assassin"><td>Smoke Roost <span class="tag t-assassin">Sneaky</span></td><td class="num">11 s</td><td>A cloud at your feet (4 m, 5.5 s). You fade; rivals inside slow to 55% speed.</td></tr>
           <tr data-c="assassin"><td>Snatch <span class="tag t-assassin">Sneaky</span></td><td class="num">3 s</td><td>Robs 5 food from every rival within 4.3 m ahead and shoves them back.</td></tr>
-          <tr data-c="assassin"><td>Sneaky Steal <span class="tag t-assassin">Sneaky</span></td><td class="num">5 s</td><td>Yanks 6 food from the nearest carrier within 5.4 m. Burglar signature.</td></tr>
+          <tr data-c="assassin"><td>Sneaky Steal <span class="tag t-assassin">Sneaky</span></td><td class="num">5 s</td><td>Yanks 6 food from the nearest carrier within 5.4 m; the same bird only every 10 s. Burglar signature.</td></tr>
         </tbody>
       </table>
     </div>
