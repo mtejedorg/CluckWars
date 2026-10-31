@@ -753,6 +753,34 @@ namespace CluckWars.Visuals
             1f - RivalChevronViewportMargin,
             1f - RivalChevronTopHudInset);
 
+        // ---- Death Mark feedback (MarkFeedback, RivalIndicator, MatchHud) ---------------------------------------------
+
+        /// <summary>The mark's colour: far from all four player colours. Shape carries it too: the stacked chevrons, the banner.</summary>
+        public static readonly Color MarkColor = new Color(1f, 0.16f, 0.78f, 1f);
+        /// <summary>Kill-ready: everything turns this colour, and the banner says so in words.</summary>
+        public static readonly Color MarkKillColor = new Color(1f, 0.92f, 0.1f, 1f);
+        public static readonly Color MarkInk = new Color(0.08f, 0.04f, 0.1f, 1f);
+        /// <summary>Banner plates.</summary>
+        public static readonly Color MarkPlateColor = new Color(0.1f, 0.05f, 0.12f, 0.86f);
+        public static readonly Color MarkVictimPlateColor = new Color(0.72f, 0.05f, 0.1f, 0.92f);
+        public const int MarkSortingOrder = 20;
+        /// <summary>World height of the chevron stack above the target's pivot, world size of one chevron, and their spacing in chevrons.</summary>
+        public const float MarkChevronHeight = 3.1f;
+        public const float MarkChevronSize = 1.15f;
+        public const float MarkChevronSpacing = 0.62f;
+        public const float MarkChevronBob = 0.18f;
+        public const float MarkFootRingRadius = 1.5f;
+        public const float MarkFootRingWidth = 0.2f;
+        public const float MarkKillRingWidth = 0.1f;
+        public const float MarkKillRingAlpha = 0.75f;
+        /// <summary>The kill-range ring shows inside this many kill ranges.</summary>
+        public const float MarkKillRingShowFactor = 2f;
+        public const float MarkPulse = 0.06f;
+        public const float MarkKillPulse = 0.16f;
+        public const float MarkPulseSpeed = 6f;
+        /// <summary>The marked rival's edge arrow, as a multiple of a rival's.</summary>
+        public const float MarkChevronScale = 1.7f;
+
         /// <summary>
         /// Chevron size as a fraction of the viewport's height. A fraction rather than a
         /// world-space length on purpose: it makes the chevron a constant share of the

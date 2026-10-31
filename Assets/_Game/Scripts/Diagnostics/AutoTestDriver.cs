@@ -331,6 +331,7 @@ namespace CluckWars.Diagnostics
 
             TickAutoZone(valid ? gm : null);   // before autoplay: the reservation must hold before its first cast
             TickAutoAura(valid ? gm : null);   // same, and its steer must be set before the fake player decides (AutoTestDriver.Aura.cs)
+            TickMarkShots(valid ? gm : null);  // same: its steer and presses go through the fake player (AutoTestDriver.Mark.cs)
             TickAutoPlay(valid ? gm : null);
             TickShots(valid ? gm : null);
             if (!valid) return;

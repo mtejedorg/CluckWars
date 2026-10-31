@@ -24,9 +24,11 @@ namespace CluckWars.Diagnostics
         public const string AutoAuraKey = "cw_autoaura";
         /// <summary>Fixed kits: see <see cref="Perk"/> and <see cref="BotPerks"/>.</summary>
         public const string PerkKey = "cw_perk", BotPerksKey = "cw_botperks";
+        /// <summary>Dev tools: see <c>AutoTestDriver.Mark.cs</c>.</summary>
+        public const string MarkShotsKey = "cw_markshots";
 
         public static readonly string[] Keys =
-            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey, AutoZoneKey, ShotsKey, ShotTagKey, BandKey, ZonesKey, FloorArrowsKey, EdgeArrowsKey, AutoAuraKey, PerkKey, BotPerksKey };
+            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey, AutoZoneKey, ShotsKey, ShotTagKey, BandKey, ZonesKey, FloorArrowsKey, EdgeArrowsKey, AutoAuraKey, PerkKey, BotPerksKey, MarkShotsKey };
 
         public const ChickenClass DefaultClass = ChickenClass.Warrior;
         public const float DefaultAutoStartTimeout = 90f;
@@ -44,6 +46,8 @@ namespace CluckWars.Diagnostics
         public ChickenSubclass Perk = ChickenSubclass.None;
         /// <summary><c>cw_botperks Warrior_Bully,-,Assassin_Spoiler</c> (dev tools, solo, Fixed): pins bots by index; <c>-</c> rolls.</summary>
         public ChickenSubclass[] BotPerks = new ChickenSubclass[0];
+        /// <summary><c>cw_markshots</c>: photograph the Death Mark feedback (<c>AutoTestDriver.Mark.cs</c>). Needs <c>cw_autoplay</c>.</summary>
+        public bool MarkShots;
         /// <summary>Humans to wait for before the host starts; 0 = not set (a human presses START).</summary>
         public int AutoStart;
         public float AutoStartTimeout = DefaultAutoStartTimeout;
@@ -213,6 +217,7 @@ namespace CluckWars.Diagnostics
                         if (TryParseSubclass(value, out var perk)) cfg.Perk = perk;
                         else cfg.Problems.Add($"{key} '{value}' is not a specialization ({SubclassNames}); using the class's default perk");
                         break;
+                    case MarkShotsKey: cfg.MarkShots = cfg.ParseBool(key, value); break;
                     case BotPerksKey:
                         cfg.BotPerks = ParseBotPerks(value, cfg.Problems);
                         break;

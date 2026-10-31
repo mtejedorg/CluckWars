@@ -177,6 +177,7 @@ namespace CluckWars.Visuals
 
             // The painted floor ring (decision 2a): created by the first indicator of the first match, before any LateUpdate offers.
             FloorRivalArrows.EnsureForMatch();
+            MarkFeedback.EnsureForMatch();
             BuildGeometry();
         }
 
@@ -348,7 +349,11 @@ namespace CluckWars.Visuals
                 return;
             }
 
-            var tint = TintFor(_controller.HomeCornerIndex);
+            // The local Assassin's mark: its own colour, a bigger arrow, and never handed to the floor ring, whose pool and range
+            // rules may decline a rival. This arrow is the one thing that must not go away.
+            bool marked = MarkFeedback.IsMarkedByLocal(_controller);
+            _chevronScale = marked ? FeedbackTuning.MarkChevronScale : 1f;
+            var tint = marked ? FeedbackTuning.MarkColor : TintFor(_controller.HomeCornerIndex);
 
             // On screen = ANY part of the body in frame (with hysteresis on the way out), not just the feet: a bird whose feet
             // are below the bottom edge but whose body is in view is its own indicator and must not also get an arrow on top.
@@ -382,7 +387,7 @@ namespace CluckWars.Visuals
 
             // Dev prototype (-cw_floorarrows): a rival that would get a chevron is offered to the floor ring round the local
             // chicken first; if it is represented there, its chevron is suppressed. Off (production): returns false at once.
-            if (chevron && FloorRivalArrows.TryRepresent(GetInstanceID(), transform.position, tint, opacity))
+            if (chevron && !marked && FloorRivalArrows.TryRepresent(GetInstanceID(), transform.position, tint, opacity))
             {
                 HideChevron(_wasUnderHud, tint, opacity);
             }
@@ -463,7 +468,8 @@ namespace CluckWars.Visuals
             var combat = _controller.Combat;
             if (combat != null && combat.IsDead) return false;
 
-            opacity = Mathf.Clamp01(_controller.VisualOpacity);
+            // Invisibility and Smoke Roost do not hide a mark from its Assassin.
+            opacity = MarkFeedback.IsMarkedByLocal(_controller) ? 1f : Mathf.Clamp01(_controller.VisualOpacity);
             return opacity >= MinVisibleOpacity;
         }
 
@@ -524,7 +530,7 @@ namespace CluckWars.Visuals
 
             float size = ScreenEdgeProjection.ViewportWorldHeight(cam, FeedbackTuning.RivalChevronDepthOffset)
                          * FeedbackTuning.RivalChevronSizeFraction;
-            t.localScale = Vector3.one * Mathf.Max(0.0001f, size);
+            t.localScale = Vector3.one * Mathf.Max(0.0001f, size * _chevronScale);
         }
 
         /// <summary>Test seams: light the ring / chevron for a rival at <paramref name="corner"/> without a
@@ -555,6 +561,12 @@ namespace CluckWars.Visuals
         /// (<see cref="ChevronOutlineSprite"/>) is a rim on that solid shape, not a
         /// replacement for it.
         /// </summary>
+        /// <summary>The chevron art, shared with <see cref="MarkFeedback"/>'s marker.</summary>
+        internal static Sprite ChevronSpriteShared => ChevronSprite();
+        internal static Sprite ChevronInkSpriteShared => ChevronOutlineSprite();
+
+        private float _chevronScale = 1f;
+
         private static Sprite ChevronSprite()
         {
             if (_chevronSprite != null) return _chevronSprite;

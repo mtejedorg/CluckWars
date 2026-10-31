@@ -530,7 +530,7 @@ namespace CluckWars.Tests
         public void Source_RivalIndicatorOffersOnlyWhatWouldBeAChevron()
         {
             string src = Read("Assets/_Game/Scripts/Visuals/RivalIndicator.cs");
-            StringAssert.Contains("if (chevron && FloorRivalArrows.TryRepresent(GetInstanceID(), transform.position, tint, opacity))", src);
+            StringAssert.Contains("if (chevron && !marked && FloorRivalArrows.TryRepresent(GetInstanceID(), transform.position, tint, opacity))", src);
             int offer = src.IndexOf("FloorRivalArrows.TryRepresent(", System.StringComparison.Ordinal);
             int decide = src.IndexOf("if (!chevron) _wasUnderHud = false;", System.StringComparison.Ordinal);
             Assert.That(offer, Is.GreaterThan(decide), "offered after the clear-viewport / under-HUD decision is final");

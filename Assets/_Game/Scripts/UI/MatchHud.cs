@@ -151,6 +151,7 @@ namespace CluckWars.UI
         {
             TickHitFlash();
             PollComebackEvent();
+            TickMarkBanner();
         }
 
         // ---- Hit-flash ---------------------------------------------------------
@@ -192,6 +193,7 @@ namespace CluckWars.UI
             scaler.matchWidthOrHeight  = 0.5f;
 
             BuildHitFlash(canvasGO.transform);       // must be first (z-order: under everything)
+            BuildMarkBanner(canvasGO.transform);
         }
 
         // ---- Hit-flash (full-screen) ------------------------------------------
@@ -206,6 +208,42 @@ namespace CluckWars.UI
             _hitFlash               = go.AddComponent<Image>();
             _hitFlash.color         = new Color(0.95f, 0.20f, 0.20f, 0f);
             _hitFlash.raycastTarget = false;
+        }
+
+        // ---- Death Mark banner (text from MarkFeedback; local, read from replicated state) ------
+
+        private Image _markPlate;
+        private Text  _markText;
+
+        private void BuildMarkBanner(Transform parent)
+        {
+            var go = CreateUI("MarkBanner", parent, out var rt);
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.68f);
+            rt.sizeDelta = new Vector2(980f, 96f);
+            _markPlate = go.AddComponent<Image>();
+            _markPlate.raycastTarget = false;
+            _markText = AddText(go.transform, "MarkBannerText", string.Empty, 50, TextAnchor.MiddleCenter, FontStyle.Bold);
+            var textRt = _markText.rectTransform;
+            textRt.anchorMin = Vector2.zero;
+            textRt.anchorMax = Vector2.one;
+            textRt.offsetMin = textRt.offsetMax = Vector2.zero;
+            go.SetActive(false);
+        }
+
+        private void TickMarkBanner()
+        {
+            if (_markPlate == null) return;
+            var phase = CluckWars.Visuals.MarkFeedback.Phase;
+            bool show = phase != CluckWars.Visuals.MarkPhase.None;
+            if (_markPlate.gameObject.activeSelf != show) _markPlate.gameObject.SetActive(show);
+            if (!show) return;
+
+            bool kill = phase == CluckWars.Visuals.MarkPhase.Kill;
+            _markText.text = CluckWars.Visuals.MarkFeedback.BannerText;
+            _markText.color = kill ? CluckWars.Visuals.FeedbackTuning.MarkInk : DtTextPrimary;
+            _markPlate.color = kill ? CluckWars.Visuals.FeedbackTuning.MarkKillColor
+                : phase == CluckWars.Visuals.MarkPhase.Victim ? CluckWars.Visuals.FeedbackTuning.MarkVictimPlateColor
+                : CluckWars.Visuals.FeedbackTuning.MarkPlateColor;
         }
 
         // ---- Static UI helpers ------------------------------------------------

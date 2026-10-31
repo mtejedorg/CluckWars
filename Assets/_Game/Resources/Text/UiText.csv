@@ -72,7 +72,7 @@ ability.scrap.desc,Grabs {n} food off the nearest rival within {r}m.
 ability.shadowstep.desc,"Dashes forward at {mult}x speed for {secs}s, straight over walls."
 ability.smokeroost.desc,"Drops a choking cloud ({r}m, {secs}s): you fade, rivals inside slow to {pct}% speed. Using a move breaks it."
 ability.snatch.desc,Robs {n} food from every rival within {r}m ahead and shoves them back.
-ability.sneakysteal.desc,Yanks {n} food from the nearest rival within {r}m.
+ability.sneakysteal.desc,Yanks {n} food from the nearest rival within {r}m. Same bird: every {secs}s.
 ability.speedburst.desc,A {secs}s sprint at {mult}x movement speed.
 ability.spinecoat.desc,"For {secs}s, any rival who bumps into you loses {n} food to you and gets knocked away."
 ability.turtlemode.desc,"Pull into your shell for {secs} seconds. You walk slowly, but nobody can steal your food."
@@ -94,6 +94,12 @@ loadout.row.shared,ANY BIRD
 loadout.row.class,{cls} ONLY
 loadout.detail.empty,Tap a move for the details.
 loadout.kit.title,{perk} KIT
+mark.hunt,HUNT {name}  {m} m  {secs}s
+mark.stun,STUN {name}!  {secs}s
+mark.closein,STUNNED: GET CLOSE  {m} m  {secs}s
+mark.walled,{name} IS IN ITS BASE  {secs}s
+mark.kill,KILL NOW!
+mark.victim,YOU ARE MARKED!  {secs}s
 loadout.next,NEXT
 loadout.registryMissing,"No abilities in registry.
 Assign AbilityRegistrySO in ProjectInstaller."
