@@ -18,7 +18,7 @@ what's shipped, what's in flight, and what's blocked on testing.
 - **Hold-to-aim:** a held ability no longer stops the chicken. An explicit aim faces the bird while it strafes; on one stick moving is how you aim. Not played by hand yet.
 - **Matrix:** `Invariant FAIL base-intrusion`, `Kit equip` lines, merge.ps1 INVARIANT rules, selftest fixture. A session has 4 seats, so all 8 kits need several runs (`-Perk`, `-BotPerks`). Dev: `-cw_markshots`.
 - **Protocol: unchanged** (no `[Networked]` added or removed). `RemovalVerdict` gained a value (local only). All peers still one SHA: behaviour differs across this branch. Mixed-SHA consequence: the execute bounty moved to `RPC_CreditKill`, so an Assassin on this build against a victim on an older one still gets it, while an older Assassin pays at the press and a newer victim can refuse the kill.
-- **Open:** Featherfoot + Quick Drop still fails the band (below): Maestro decides. Android build and matrix scenarios not run.
+- **Open:** Featherfoot + Quick Drop still fails the band (below): Maestro decides (BL-119). Gate results above.
 
 ---
 
