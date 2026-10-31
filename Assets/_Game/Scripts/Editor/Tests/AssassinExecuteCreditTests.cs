@@ -131,10 +131,12 @@ namespace CluckWars.Tests
         [Test]
         public void Press_PaysOnlyTheFlatBountyItself_TheLootArrivesByReport()
         {
-            string press = MethodBody(AssassinExecutePath, "public bool Press(");
-            var credits = Regex.Matches(press, @"BountyBag\s*\+=\s*([^;]+);").Cast<Match>().ToArray();
+            StringAssert.DoesNotContain("BountyBag", MethodBody(AssassinExecutePath, "public bool Press("),
+                "the bounty follows the kill report, so a refused removal pays nothing");
+            string pay = MethodBody(AssassinExecutePath, "public void PayExecuteBounty(");
+            var credits = Regex.Matches(pay, @"BountyBag\s*\+=\s*([^;]+);").Cast<Match>().ToArray();
             Assert.AreEqual(1, credits.Length,
-                "Press must write the bounty bag exactly once - the flat execute bounty. Crediting the " +
+                "The bounty bag is written exactly once - the flat execute bounty. Crediting the " +
                 "victim's cargo here reads a lagging proxy and double-pays food the victim banked " +
                 "while stunned in its own base (CW-050).");
             Assert.AreEqual("bounty", credits[0].Groups[1].Value.Trim());
@@ -147,12 +149,10 @@ namespace CluckWars.Tests
             int guard    = press.IndexOf("target.Combat.IsRemoved", StringComparison.Ordinal);
             int transfer = press.IndexOf(TransferCall, StringComparison.Ordinal);
             int removal  = press.IndexOf(RemovalCall, StringComparison.Ordinal);
-            int bounty   = press.IndexOf("BountyBag +=", StringComparison.Ordinal);
 
             Assert.Greater(guard, 0, "Press no longer refuses an incomplete or already-removed victim");
             Assert.Greater(transfer, guard);
             Assert.Greater(removal, guard);
-            Assert.Greater(bounty, guard, "a corpse or a broken prefab must not pay the execute bounty");
         }
 
         // ---- 3. Steal-proof victims keep their cargo, the execute still lands ------------
@@ -178,7 +178,7 @@ namespace CluckWars.Tests
             StringAssert.DoesNotContain(RemovalCall, gated, "a shelled victim is still executed");
             Assert.IsFalse(Regex.IsMatch(gated, BountyBagWrite), "a shelled victim still pays the flat bounty");
             StringAssert.Contains(RemovalCall, press);
-            StringAssert.Contains("ResolveExecuteBounty(target)", press);
+            StringAssert.Contains("PayExecuteBounty(victim)", System.IO.File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenMatchStats.cs"));
         }
 
         // ---- 4. The loot report is bounded and conserved --------------------------------

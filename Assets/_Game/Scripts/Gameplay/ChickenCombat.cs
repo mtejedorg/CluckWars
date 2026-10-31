@@ -190,6 +190,11 @@ namespace CluckWars.Gameplay
         public void RPC_ExecuteRemoval(NetworkBehaviourId assassinId, float duration, RpcInfo info = default)
         {
             var verdict = JudgeRemoval(assassinId, duration, info, out string attackerName);
+            if (ExecuteRules.IsLegalNoOp(verdict))
+            {
+                _log?.Debug(Source, $"{name}: execute from {attackerName} landed across a base wall; no effect.");
+                return;
+            }
             if (verdict != ExecuteRules.RemovalVerdict.Accepted)
             {
                 if (RejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
@@ -237,16 +242,19 @@ namespace CluckWars.Gameplay
                 claim.MarkEverSeen = TrySecondsSinceMarkedBy(execute, out claim.SecondsSinceMarkSeen);
                 claim.StunEverSeen = TrySecondsSinceStunned(out claim.SecondsSinceStunned);
 
-                // Two ticks cover the press landing a tick after the mark's own range check.
-                claim.RangeMargin = StealRules.RangeMargin(
-                    ChickenCargo.DriftSpeed(attackerController) + ChickenCargo.DriftSpeed(_controller),
-                    claim.Latency + 2f * Runner.DeltaTime);
+                claim.RangeMargin = ExecuteRangeMargin(attackerController, claim.Latency);
                 Vector3 a = attacker.transform.position, v = transform.position;
+                claim.WallBetweenThem = PlayerBase.WallBetween(a, v);
                 claim.PlanarDistance = Mathf.Sqrt((a.x - v.x) * (a.x - v.x) + (a.z - v.z) * (a.z - v.z));
             }
 
             return ExecuteRules.EvaluateRemoval(claim);
         }
+
+        /// <summary>The range slack both halves of an execute judge with. Two ticks cover the press landing a tick after its own check.</summary>
+        internal float ExecuteRangeMargin(ChickenController attacker, float latency) =>
+            StealRules.RangeMargin(ChickenCargo.DriftSpeed(attacker) + ChickenCargo.DriftSpeed(_controller),
+                latency + 2f * Runner.DeltaTime);
 
         /// <summary>The RPC sender's latency for allowances: 0 for a local invoke, else the floored RTT.</summary>
         internal float SenderLatency(in RpcInfo info) => SenderLatency(Runner, info);

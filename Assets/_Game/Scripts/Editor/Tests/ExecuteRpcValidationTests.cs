@@ -475,5 +475,24 @@ namespace CluckWars.Tests
             Assert.IsFalse(ExecuteRules.HasExecuteEvidence(true, true, 0f, false, true, 5f, 0f), "a 5 s old stun is no evidence");
             Assert.IsTrue(ExecuteRules.HasExecuteEvidence(true, true, 0f, false, true, 0.3f, 0f), "the press tick's race still passes");
         }
+
+        [Test]
+        public void BothExecuteHalves_JudgeTheWallAndTheRange_AndARaceIsSilent()
+        {
+            CollectionAssert.Contains(System.Enum.GetNames(typeof(ExecuteRules.RemovalVerdict)), "AcrossBaseWall");
+            string cargo = File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenCargo.cs");
+            StringAssert.Contains("PlayerBase.WallBetween(execute.transform.position, transform.position)", cargo);
+            StringAssert.Contains("ExecuteRules.MaxExecuteDistance(", cargo);
+            string combat = File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenCombat.cs");
+            StringAssert.Contains("ExecuteRules.IsLegalNoOp(verdict)", combat);
+        }
+
+        [Test]
+        public void TheBounty_IsPaidOnTheKillReport_SoARefusedExecutePaysNothing()
+        {
+            string press = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/AssassinExecute.cs", "public bool Press(");
+            StringAssert.DoesNotContain("BountyBag +=", press, "a press the victim's authority refuses must leave no half-applied execute");
+            StringAssert.Contains("PayExecuteBounty(", File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenMatchStats.cs"));
+        }
     }
 }

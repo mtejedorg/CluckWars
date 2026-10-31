@@ -78,6 +78,20 @@ namespace CluckWars.Gameplay
             return bounty;
         }
 
+        /// <summary>
+        /// The execute bounty, on this Assassin's authority once the victim's authority reported the kill. Every other Assassin
+        /// income route - Snatch, Sneaky Steal, the cargo transfer - needs the victim to be carrying, so without this an execute
+        /// on an empty-handed rival pays nothing and the class can be starved out early. Paid into the bounty bag rather than
+        /// onto the ground so a bystander cannot vulture it.
+        /// </summary>
+        public void PayExecuteBounty(ChickenController victim)
+        {
+            float bounty = ResolveExecuteBounty(victim);
+            if (bounty <= 0f || _cargo == null) return;
+            _cargo.BountyBag += bounty;
+            _log?.Info(Source, $"Kill Executed! +{bounty:0.#} execute bounty into the bounty bag for {victim.name}.");
+        }
+
         private ChickenController _controller;
         private ChickenCombat _combat;
         private ChickenCargo _cargo;
@@ -208,20 +222,10 @@ namespace CluckWars.Gameplay
                     // MarkedTarget still names the victim: the receiver checks the mark (CW-230).
                     target.Combat.RPC_ExecuteRemoval(_combat.Id, ExecuteRules.RemovalDurationSeconds);
 
-                    // The execute bounty. Every other Assassin income route - Snatch, Sneaky
-                    // Steal, and the cargo transfer above - requires the victim to already be
-                    // carrying, so without this an execute on an empty-handed rival pays
-                    // nothing and the class can be starved out early. Paid into the bounty bag
-                    // rather than onto the ground so a bystander cannot vulture it, and written
-                    // directly because Press() is gated on this Assassin's own StateAuthority.
-                    float bounty = ResolveExecuteBounty(target);
-                    if (bounty > 0f)
-                    {
-                        _cargo.BountyBag += bounty;
-                    }
-
-                    _log?.Info(Source, $"Kill Executed! +{bounty:0.#} execute bounty into the bounty bag, " +
-                        $"{target.name} removed (cargo transfer {(takesCargo ? "requested" : "skipped: steal-proof")}).");
+                    // The execute bounty follows the kill report (PayExecuteBounty), so a removal the victim's
+                    // authority refuses leaves nothing half-applied.
+                    _log?.Info(Source, $"Kill pressed on {target.name} " +
+                        $"(cargo transfer {(takesCargo ? "requested" : "skipped: steal-proof")}).");
                     EndMark();
 
                     if (_abilities != null)

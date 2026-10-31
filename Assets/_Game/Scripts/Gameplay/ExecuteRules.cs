@@ -125,7 +125,15 @@ namespace CluckWars.Gameplay
             NoAssassinExecute,
             NoExecuteEvidence,
             OutOfRange,
+            /// <summary>Not a rejection: the victim stepped through a base wall after the press (<see cref="IsLegalNoOp"/>).</summary>
+            AcrossBaseWall,
         }
+
+        /// <summary>
+        /// A verdict an honest client can produce: the Assassin's press already refuses a walled target, so this is the target
+        /// reaching home inside one round trip. Nothing lands and nothing is logged as a rejection, as with a root (<see cref="BaseWallRules"/>).
+        /// </summary>
+        public static bool IsLegalNoOp(RemovalVerdict v) => v == RemovalVerdict.AcrossBaseWall;
 
         /// <summary>The facts the victim's authority can establish about a removal claim.</summary>
         public struct RemovalClaim
@@ -155,6 +163,8 @@ namespace CluckWars.Gameplay
             public float RangeMargin;
             /// <summary>The attacker's tuned kill range (<c>AssassinExecute.KillRange</c>); 0 = the shipped default.</summary>
             public float KillRange;
+            /// <summary>A claimed base's wall stands between attacker and victim, as this authority sees them.</summary>
+            public bool WallBetweenThem;
         }
 
         /// <summary>True for a finite duration in (0, <see cref="RemovalDurationSeconds"/>].</summary>
@@ -189,6 +199,7 @@ namespace CluckWars.Gameplay
                 return RemovalVerdict.NoExecuteEvidence;
             float killRange = c.KillRange > 0f ? c.KillRange : AssassinExecute.DefaultKillRange;
             if (!(c.PlanarDistance <= MaxExecuteDistance(c.RangeMargin, killRange))) return RemovalVerdict.OutOfRange;
+            if (c.WallBetweenThem) return RemovalVerdict.AcrossBaseWall;
             return RemovalVerdict.Accepted;
         }
 
@@ -204,6 +215,7 @@ namespace CluckWars.Gameplay
                 case RemovalVerdict.NoAssassinExecute:   return "the named attacker has no AssassinExecute.";
                 case RemovalVerdict.NoExecuteEvidence:   return "this chicken has not seen both a recent mark from the attacker and a recent stun on itself.";
                 case RemovalVerdict.OutOfRange:          return "the attacker is too far away to have executed this chicken.";
+                case RemovalVerdict.AcrossBaseWall:      return "a base wall stands between the attacker and this chicken.";
                 default:                                 return "accepted.";
             }
         }

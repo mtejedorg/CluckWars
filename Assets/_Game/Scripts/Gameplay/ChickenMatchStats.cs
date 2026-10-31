@@ -109,7 +109,8 @@ namespace CluckWars.Gameplay
         {
             var claim = new ExecuteRules.KillCreditClaim();
             string victimName = victimId.ToString();
-            if (Runner != null && Runner.TryFindBehaviour(victimId, out ChickenController victim) &&
+            ChickenController victim = null;
+            if (Runner != null && Runner.TryFindBehaviour(victimId, out victim) &&
                 victim != null && victim.Object != null && victim.Object.IsValid)
             {
                 victimName = victim.name;
@@ -133,6 +134,7 @@ namespace CluckWars.Gameplay
 
             Kills++;
             _log?.Info(Source, $"{name}: kill credited for executing {victimName} (Kills={Kills}).");
+            GetComponent<AssassinExecute>()?.PayExecuteBounty(victim);
         }
 
         /// <summary>

@@ -910,9 +910,17 @@ namespace CluckWars.Gameplay
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_TransferAllToBountyBag(NetworkBehaviourId assassinId, RpcInfo info = default)
         {
-            if (!TryResolveExecutor(assassinId, info, out var assassinCargo, out string rejection))
+            if (!TryResolveExecutor(assassinId, info, out var assassinCargo, out bool walled, out string rejection))
             {
                 _log?.Warn(Source, $"{name}: rejected RPC_TransferAllToBountyBag from {info.Source} - {rejection}");
+                return;
+            }
+
+            // Same answer as the removal half, in the same tick: the target reached home inside one round trip.
+            // Nothing was credited yet, so refusing creates no food; the pending record simply expires.
+            if (walled)
+            {
+                _log?.Debug(Source, $"{name}: execute transfer landed across a base wall; no effect.");
                 return;
             }
 
@@ -997,9 +1005,10 @@ namespace CluckWars.Gameplay
         /// message must come from the assassin's state authority.
         /// </summary>
         private bool TryResolveExecutor(NetworkBehaviourId assassinId, in RpcInfo info,
-            out ChickenCargo assassinCargo, out string rejection)
+            out ChickenCargo assassinCargo, out bool walled, out string rejection)
         {
             assassinCargo = null;
+            walled = false;
 
             if (Runner == null || !Runner.TryFindBehaviour(assassinId, out AssassinExecute execute) ||
                 execute == null || execute.Object == null || !execute.Object.IsValid)
@@ -1039,6 +1048,17 @@ namespace CluckWars.Gameplay
                 rejection = $"{name} has not seen both a recent mark from {execute.name} and a recent stun on itself.";
                 return false;
             }
+
+            // The other half of ChickenCombat's verdict: same range bound, same wall, same order.
+            float dx = execute.transform.position.x - transform.position.x, dz = execute.transform.position.z - transform.position.z;
+            var assassinController = execute.GetComponent<ChickenController>();
+            float margin = combat != null ? combat.ExecuteRangeMargin(assassinController, latency) : 0f;
+            if (!(dx * dx + dz * dz <= Mathf.Pow(ExecuteRules.MaxExecuteDistance(margin, execute.KillRange), 2f)))
+            {
+                rejection = $"{execute.name} is too far away to have executed this chicken.";
+                return false;
+            }
+            walled = PlayerBase.WallBetween(execute.transform.position, transform.position);
 
             assassinCargo = execute.GetComponent<ChickenCargo>();
             if (assassinCargo == null || assassinCargo == this)
