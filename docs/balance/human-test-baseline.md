@@ -41,7 +41,7 @@ Benched, still in the pool: Dive Bomb, Roll & Push, Feather Trap, Egg Shell.
 
 **Featherfoot with Quick Drop farms 28.35 s / 4 trips (all four seats), against the Speedy target of 30 s +-1.5 s.** That
 is 0.15 s under the band, and two Quick Drops is the most the 12 s cooldown fits in a run, so it is the kit's best case. Nothing
-was tuned. Options are Maestro's: accept and declare it, shorten the burst, or swap the slot.
+was tuned. Maestro's call, 2026-10-31: keep it for this human test and decide from the results. The options after the test: accept and declare it, shorten the burst, or swap the slot.
 
 ## What to watch for
 
