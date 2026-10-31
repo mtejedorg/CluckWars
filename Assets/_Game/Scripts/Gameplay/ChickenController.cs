@@ -1038,6 +1038,9 @@ namespace CluckWars.Gameplay
         // Sneaky Steal's per-victim cooldown. Authority-local, like the press it gates; a proxy preview fails open.
         private readonly TargetCooldowns<NetworkBehaviourId> _stealLocks = new TargetCooldowns<NetworkBehaviourId>();
 
+        /// <summary>Longer than the render gap to the cast's hit confirmation, well under any steal cooldown, so no cast can miss the lock.</summary>
+        public const float StealLockFeedbackGrace = 0.5f;
+
         /// <summary>Has this chicken's Sneaky Steal hit <paramref name="victim"/> too recently? False on a proxy.</summary>
         public bool IsStealLockedOn(ChickenController victim)
         {
@@ -1048,7 +1051,9 @@ namespace CluckWars.Gameplay
         /// <summary>A Sneaky Steal just landed on <paramref name="victim"/>. State authority only (it runs inside the cast).</summary>
         public void LockStealOn(ChickenController victim, float seconds)
         {
-            if (victim != null && HasStateAuthority) _stealLocks.Lock(victim.Id, Runner.SimulationTime + seconds);
+            if (victim == null || !HasStateAuthority) return;
+            double now = Runner.SimulationTime;
+            _stealLocks.Lock(victim.Id, now + StealLockFeedbackGrace, now + seconds);
         }
 
         /// <summary>This chicken's execute state machine (cached), or null before <c>Spawned</c>.</summary>
