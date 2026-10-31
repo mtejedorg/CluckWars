@@ -37,7 +37,8 @@ namespace CluckWars.Abilities
         [Header("Execute (AssassinExecute reads these)")]
         [Tooltip("The Kill press reaches this far (planar m). The mark itself has no range.")]
         [Min(1f)] public float KillRange = AssassinExecute.DefaultKillRange;
-        [Tooltip("Seconds after the mark before a stun can qualify the target. 0: crossing the map already costs the time.")]
+        [Tooltip("Seconds after the mark before a Kill can qualify. Keep at or above ExecuteRules.MaxLatencySeconds: under it, an " +
+                 "instant Kill on a bird already stunned reaches its authority before the mark does and is rejected.")]
         [Min(0f)] public float ArmSeconds = AssassinExecute.ArmDuration;
         [Tooltip("Seconds from the mark to its expiry.")]
         [Min(0.1f)] public float WindowSeconds = AssassinExecute.WindowDuration;

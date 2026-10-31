@@ -896,8 +896,8 @@ namespace CluckWars.Gameplay
         /// <c>RpcSources.All</c>, so the call is a claim: it is honoured only when the caller is
         /// the assassin's state authority (local invoke on the assassin's authority, or the wire
         /// sender is that authority) AND that assassin's <see cref="AssassinExecute"/> currently
-        /// has this chicken as <c>MarkedTarget</c>. The mark is written at mark time, seconds
-        /// before the execute, so replication lag cannot make a genuine call fail the check.
+        /// has this chicken as <c>MarkedTarget</c>. A Kill cannot qualify until <c>MarkKillAbilitySO.ArmSeconds</c>
+        /// after the mark, which is above the latency cap, so replication lag cannot make a genuine call fail the check.
         /// <para>
         /// <b>Nothing is written to the assassin's cargo from here.</b> This runs on the
         /// VICTIM's authority, where the assassin's cargo is a proxy; a <c>[Networked]</c> write

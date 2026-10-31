@@ -50,10 +50,19 @@ namespace CluckWars.Tests
         {
             var m = TestAssets.Load<MarkKillAbilitySO>(TestAssets.AbilitiesDir + "/MarkKill.asset");
             Assert.AreEqual(8f, m.KillRange);
-            Assert.AreEqual(0f, m.ArmSeconds);
+            Assert.AreEqual(0.6f, m.ArmSeconds);
             Assert.AreEqual(12f, m.WindowSeconds);
             Assert.AreEqual(5f, m.FailCooldownSeconds);
             Assert.AreEqual(15f, m.SuccessCooldownSeconds);
+        }
+
+        [Test]
+        public void TheVictimHasTimeToSeeTheMark_BeforeAKillCanQualify()
+        {
+            // Mark a bird already stunned, Kill at once: the removal's evidence needs the mark on the victim's authority first.
+            var m = TestAssets.Load<MarkKillAbilitySO>(TestAssets.AbilitiesDir + "/MarkKill.asset");
+            Assert.GreaterOrEqual(m.ArmSeconds, ExecuteRules.MaxLatencySeconds);
+            Assert.Less(m.ArmSeconds, m.WindowSeconds);
         }
 
         [Test]

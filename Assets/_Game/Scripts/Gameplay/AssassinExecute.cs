@@ -21,7 +21,8 @@ namespace CluckWars.Gameplay
         private const string Source = "AssassinExecute";
 
         // Today's numbers: the field defaults of MarkKillAbilitySO, and the fallback if no MarkKill asset is registered.
-        public const float ArmDuration = 0f;
+        // Not a gameplay beat: the floor that lets the victim's authority see the replicated mark before a Kill can reach it.
+        public const float ArmDuration = 0.6f;
         public const float WindowDuration = 12.0f;
         public const float DefaultKillRange = 8.0f;
         public const float FailCooldown = 5.0f;
