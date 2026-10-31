@@ -329,35 +329,13 @@ namespace CluckWars.Gameplay
         /// the zone. Read by <c>ChickenController</c>'s root-claim check.
         /// </summary>
         /// <summary>
-        /// Race guard for a root claim that passed: is every live or recent Root zone of <paramref name="caster"/> walled off
-        /// from <paramref name="point"/>? The evidence keeps vouching (so the claim is not a rejected RPC), and this turns it
-        /// into a legal no-op: the victim stepped through a wall after the zone's authority scanned it.
+        /// The evidence and the wall from one loop, so no zone can be read without passing the same filters: only a zone that
+        /// vouches for this sample has a say, and the wall is measured from that sampled position.
         /// </summary>
-        public static bool RootZonesAreWalledFrom(ChickenController caster, Vector3 point)
+        public static ControlClaimRules.RootZoneScan ScanRootZonesOf(ChickenController caster, Vector3 point, float sampleTime, float margin, in ControlClaimRules.Ceiling ceiling)
         {
-            if (caster == null || caster.Object == null || !caster.Object.IsValid) return false;
-            var owner = caster.Id;
-            bool any = false;
-            for (int i = 0; i < ActiveZones.Count; i++)
-            {
-                var z = ActiveZones[i];
-                if (z == null || !z._seenAsRoot || z._seen.Owner != owner) continue;
-                if (!PlayerBase.WallBetween(z._seen.Center, point)) return false;
-                any = true;
-            }
-            for (int i = 0; i < _recentRoots.Count; i++)
-            {
-                var r = _recentRoots[i];
-                if (r.Owner != owner) continue;
-                if (!PlayerBase.WallBetween(r.Center, point)) return false;
-                any = true;
-            }
-            return any;
-        }
-
-        public static bool ContainsRootOf(ChickenController caster, Vector3 point, float sampleTime, float margin, in ControlClaimRules.Ceiling ceiling)
-        {
-            if (caster == null || caster.Object == null || !caster.Object.IsValid) return false;
+            var scan = default(ControlClaimRules.RootZoneScan);
+            if (caster == null || caster.Object == null || !caster.Object.IsValid) return scan;
             var owner = caster.Id;
             var authority = caster.Object.StateAuthority;
             float now = Time.realtimeSinceStartup;
@@ -366,20 +344,20 @@ namespace CluckWars.Gameplay
             {
                 var z = ActiveZones[i];
                 if (z == null || !z._seenAsRoot || z._seen.Owner != owner) continue;
-                if (!ControlClaimRules.SampleCountsForZone(sampleTime, z._seen.FirstSeenAt)) continue;
-                if (ControlClaimRules.RootZoneVouches(Evidence(z._seen, authority, now), point, margin, ceiling))
-                    return true;
+                ControlClaimRules.AddRootZone(ref scan, Evidence(z._seen, authority, now),
+                    ControlClaimRules.SampleCountsForZone(sampleTime, z._seen.FirstSeenAt), point, margin, ceiling,
+                    PlayerBase.WallBetween(z._seen.Center, point));
             }
 
             for (int i = 0; i < _recentRoots.Count; i++)
             {
                 var r = _recentRoots[i];
                 if (r.Owner != owner || now - r.DespawnedAt > RecentRootWindowSeconds) continue;
-                if (!ControlClaimRules.SampleCountsForZone(sampleTime, r.FirstSeenAt)) continue;
-                if (ControlClaimRules.RootZoneVouches(Evidence(r, authority, now), point, margin, ceiling))
-                    return true;
+                ControlClaimRules.AddRootZone(ref scan, Evidence(r, authority, now),
+                    ControlClaimRules.SampleCountsForZone(sampleTime, r.FirstSeenAt), point, margin, ceiling,
+                    PlayerBase.WallBetween(r.Center, point));
             }
-            return false;
+            return scan;
         }
 
         private ILogService _log;

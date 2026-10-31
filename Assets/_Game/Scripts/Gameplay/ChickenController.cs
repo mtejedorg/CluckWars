@@ -1410,14 +1410,13 @@ namespace CluckWars.Gameplay
         private bool CrossedBaseWall(ControlKind kind, ChickenController caster)
         {
             if (caster == null) return false;
-            var at = transform.position;
-            return kind == ControlKind.Root && _lastRootClaimInZone
-                ? AbilityZone.RootZonesAreWalledFrom(caster, at)
-                : PlayerBase.WallBetween(caster.transform.position, at);
+            return kind == ControlKind.Root && _lastRootScan.Vouched
+                ? _lastRootScan.Walled
+                : PlayerBase.WallBetween(caster.transform.position, transform.position);
         }
 
-        // JudgeControl's answer to "did a zone of the caster vouch for this root": read once, by CrossedBaseWall, same tick.
-        private bool _lastRootClaimInZone;
+        // JudgeControl's scan of the caster's Root zones: read once, by CrossedBaseWall, same call.
+        private ControlClaimRules.RootZoneScan _lastRootScan;
 
         /// <summary>Gathers what this (the victim's) authority can see about a control claim and judges it.</summary>
         private ControlClaimRules.Verdict JudgeControl(ControlKind kind, float seconds, float factor,
@@ -1425,7 +1424,7 @@ namespace CluckWars.Gameplay
         {
             caster = null;
             var claim = new ControlClaimRules.Claim { Kind = kind, Seconds = seconds, SlowFactor = factor };
-            _lastRootClaimInZone = false;
+            _lastRootScan = default;
 
             if (Runner != null && Runner.TryFindBehaviour(casterId, out caster) &&
                 caster != null && caster.Object != null && caster.Object.IsValid)
@@ -1450,9 +1449,8 @@ namespace CluckWars.Gameplay
                 // authority judged a lagged copy of us, and a jump right after stepping in (Doppelganger blink, session
                 // 20261023-173009) moved us out before its RPC landed. The zone itself must still vouch either way.
                 float zoneMargin = claim.RangeMargin + ControlClaimRules.RangeSlackMeters;
-                claim.InsideCastersRootZone = kind == ControlKind.Root &&
-                    (AbilityZone.ContainsRootOf(caster, v, Time.realtimeSinceStartup, zoneMargin, ceiling) || WasRecentlyInsideRootOf(caster, zoneMargin, ceiling));
-                _lastRootClaimInZone = claim.InsideCastersRootZone;
+                if (kind == ControlKind.Root) _lastRootScan = ScanRootZones(caster, v, zoneMargin, ceiling);
+                claim.InsideCastersRootZone = _lastRootScan.Vouched;
             }
 
             return ControlClaimRules.Evaluate(claim, ceiling);
@@ -1461,11 +1459,18 @@ namespace CluckWars.Gameplay
         /// <summary>This authority's own positions over the last <see cref="RecentPositions.WindowSeconds"/> (local; root claims only).</summary>
         private readonly RecentPositions _recentPositions = new RecentPositions();
 
-        /// <summary>Was this chicken inside a Root zone <paramref name="caster"/> owns at any recorded point of the last window?</summary>
-        private bool WasRecentlyInsideRootOf(ChickenController caster, float margin, in ControlClaimRules.Ceiling ceiling)
+        /// <summary>The caster's Root zones judged at this chicken's position now and at every recorded point of the last window.</summary>
+        private ControlClaimRules.RootZoneScan ScanRootZones(ChickenController caster, Vector3 now, float margin, in ControlClaimRules.Ceiling ceiling)
         {
             var c = ceiling;   // an 'in' parameter cannot be captured
-            return _recentPositions.AnyWithinWindow(Time.realtimeSinceStartup, (t, p) => AbilityZone.ContainsRootOf(caster, p, t, margin, c));
+            float time = Time.realtimeSinceStartup;
+            var scan = AbilityZone.ScanRootZonesOf(caster, now, time, margin, c);
+            _recentPositions.AnyWithinWindow(time, (t, p) =>
+            {
+                scan.Merge(AbilityZone.ScanRootZonesOf(caster, p, t, margin, c));
+                return false;   // every sample: one that vouches from behind a wall must not end the walk early
+            });
+            return scan;
         }
 
         /// <summary>

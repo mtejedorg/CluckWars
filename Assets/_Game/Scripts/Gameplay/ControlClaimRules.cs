@@ -286,6 +286,36 @@ namespace CluckWars.Gameplay
         /// </summary>
         public static bool SampleCountsForZone(float sampleTime, float zoneFirstSeenAt) => sampleTime >= zoneFirstSeenAt;
 
+        /// <summary>
+        /// What a caster's Root zones say about one claim. A claim that a zone vouched for is walled off unless at least one
+        /// VOUCHING zone is on the victim's side of every base wall; a zone that does not vouch has no say at all.
+        /// </summary>
+        public struct RootZoneScan
+        {
+            public bool Vouched;
+            public bool Unwalled;
+
+            /// <summary>Vouched for, and every zone that did stands across a wall: a legal no-op, never a rejection.</summary>
+            public bool Walled => Vouched && !Unwalled;
+
+            public void Merge(in RootZoneScan other)
+            {
+                Vouched |= other.Vouched;
+                Unwalled |= other.Unwalled;
+            }
+        }
+
+        /// <summary>The one gate a zone passes to count in a <see cref="RootZoneScan"/>: the sample rule and <see cref="RootZoneVouches"/>.</summary>
+        /// <param name="sampleCounts"><see cref="SampleCountsForZone"/> for this zone.</param>
+        /// <param name="walled">A base wall stands between the zone's centre and the sampled victim position.</param>
+        public static void AddRootZone(ref RootZoneScan scan, in RootZoneEvidence z, bool sampleCounts, Vector3 victim,
+            float margin, in Ceiling c, bool walled)
+        {
+            if (!sampleCounts || !RootZoneVouches(z, victim, margin, c)) return;
+            scan.Vouched = true;
+            if (!walled) scan.Unwalled = true;
+        }
+
         public static bool RootZoneVouches(in RootZoneEvidence z, Vector3 victim, float margin, in Ceiling c)
         {
             if (!c.Known || !(c.MaxZoneRadius > 0f) || !z.SameAuthorityAsCaster || z.IdentityChanged) return false;
