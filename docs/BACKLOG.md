@@ -121,3 +121,4 @@ Types: bug task idea decision debt.
 - [ ] BL-115 P2 task | CW-245 Run CW-233 in Unity and the matrix - Two joiners on one corner [+2026-10-30]
 - [ ] BL-116 P2 task | CW-246 Run the execute path live with two clients - Expect 0 rejected RPC_ExecuteRemoval and RPC_CreditKill; Kills +1 per execute. Note 2026-10-31: the Kill press was refused by the mark's own cooldown until branch balance; only testable from there [+2026-10-30]
 - [ ] BL-117 P2 task | CW-247 Portrait layouts WP6-WP9 in Unity and capture - EditMode, capture 540x960 and 540x1200, results/leave/waiting room by hand (refs: docs/STATE.md) [+2026-10-30]
+- [ ] BL-118 P1 task | Decide Featherfoot + Quick Drop vs the SCT band - 28.35 s / 4 trips against Speedy 30 s +-1.5 s; accept and declare it, shorten the burst, or swap the slot; Maestro decides (refs: BalanceOracleTests.RealMap_FeatherfootWithQuickDrop_IsPinnedAtItsMeasuredRun, docs/balance/human-test-baseline.md) [+2026-10-31]
