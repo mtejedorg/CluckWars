@@ -211,7 +211,7 @@ namespace CluckWars.Tests
         public void Removal_AtTheMarkRangeEdgePlusDrift_IsAccepted()
         {
             var c = Genuine();
-            c.PlanarDistance = AssassinExecute.MaxMarkRange + ExecuteRules.RangeSlackMeters + c.RangeMargin - 0.01f;
+            c.PlanarDistance = AssassinExecute.DefaultKillRange + ExecuteRules.RangeSlackMeters + c.RangeMargin - 0.01f;
             Assert.AreEqual(ExecuteRules.RemovalVerdict.Accepted, ExecuteRules.EvaluateRemoval(c));
             c.PlanarDistance = float.NaN;
             Assert.AreEqual(ExecuteRules.RemovalVerdict.OutOfRange, ExecuteRules.EvaluateRemoval(c));

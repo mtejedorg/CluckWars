@@ -8,10 +8,11 @@ namespace CluckWars.Gameplay
 {
     /// <summary>
     /// Assassin Mark/Kill execute state machine (spec §4).
-    /// Mark target -> arm -> qualify on stun -> Kill second press. The numbers are data, on <c>MarkKill.asset</c>.
-    /// Success: transfer ALL cargo to capacity-exempt bounty bag + ~2s target removal.
-    /// Counterplays: crowd breaks isolation (fizzle mark); stun assassin (denies kill); reach your own base (fizzle mark).
-    /// Anti-chase: a mark that ended leaves a cold trail on that rival (<see cref="ColdTrail{TRival}"/>).
+    /// Press: mark a random living rival anywhere (<see cref="MarkPickRules"/>). The Assassin then finds it, stuns it (his
+    /// own Ambush or anyone's stun) and presses again within kill range before the window runs out. The numbers are data, on
+    /// <c>MarkKill.asset</c>. Success: transfer ALL cargo to capacity-exempt bounty bag + ~2s target removal.
+    /// Counterplays: run out the clock; stun the Assassin (denies the kill); reach your own base, where no ability reaches you.
+    /// The mark does not end at home or at any range: only expiry, a kill, or the target leaving play ends it.
     /// </summary>
     [RequireComponent(typeof(ChickenController))]
     [RequireComponent(typeof(NetworkObject))]
@@ -20,11 +21,9 @@ namespace CluckWars.Gameplay
         private const string Source = "AssassinExecute";
 
         // Today's numbers: the field defaults of MarkKillAbilitySO, and the fallback if no MarkKill asset is registered.
-        public const float DefaultIsolationRadius = 8.0f;
-        public const float DefaultColdTrailSeconds = 15.0f;
-        public const float ArmDuration = 2.0f;
-        public const float WindowDuration = 5.0f;
-        public const float MaxMarkRange = 8.0f;
+        public const float ArmDuration = 0f;
+        public const float WindowDuration = 12.0f;
+        public const float DefaultKillRange = 8.0f;
         public const float FailCooldown = 5.0f;
         public const float SuccessCooldown = 15.0f;
 
@@ -49,18 +48,19 @@ namespace CluckWars.Gameplay
         // receiver-side bounds (ExecuteRules, CW-230) and loadouts are not replicated.
         private MarkKillAbilitySO _tuning;
 
-        /// <summary>Tuned reach of the mark (<c>MarkKill.asset</c>).</summary>
-        public float MarkRange => _tuning != null ? _tuning.MarkRange : MaxMarkRange;
+        /// <summary>Tuned reach of the Kill press (<c>MarkKill.asset</c>).</summary>
+        public float KillRange => _tuning != null ? _tuning.KillRange : DefaultKillRange;
         /// <summary>Tuned life of a mark (<c>MarkKill.asset</c>).</summary>
         public float WindowSeconds => _tuning != null ? _tuning.WindowSeconds : WindowDuration;
         private float ArmSeconds => _tuning != null ? _tuning.ArmSeconds : ArmDuration;
         private float FailSeconds => _tuning != null ? _tuning.FailCooldownSeconds : FailCooldown;
         private float SuccessSeconds => _tuning != null ? _tuning.SuccessCooldownSeconds : SuccessCooldown;
-        private float IsolationMeters => _tuning != null ? _tuning.IsolationRadius : DefaultIsolationRadius;
-        private float ColdTrailSeconds => _tuning != null ? _tuning.ColdTrailSeconds : DefaultColdTrailSeconds;
 
-        private readonly ColdTrail<NetworkBehaviourId> _coldTrail = new ColdTrail<NetworkBehaviourId>();
-        private bool _markIsDecoy;
+        // Authority-local: who the last mark was (never picked twice running) and the pick's scratch list.
+        private bool _hasLastMark;
+        private NetworkBehaviourId _lastMark;
+        private readonly System.Collections.Generic.List<NetworkBehaviourId> _candidates =
+            new System.Collections.Generic.List<NetworkBehaviourId>(4);
 
         /// <summary>
         /// Flat food this execute pays on top of the victim's cargo, doubled (by default)
@@ -113,15 +113,8 @@ namespace CluckWars.Gameplay
                     "numbers and ignores any tuning. Register MarkKill.asset.");
         }
 
-        /// <summary>
-        /// Press triggered by the Mark/Kill ability button slot.
-        /// </summary>
-        /// <param name="preResolvedTarget">
-        /// The chicken to mark, already resolved by <c>MarkKillAbilitySO.OnActivate</c>
-        /// through the shared <c>GatherTargets</c> scan. Ignored (and unnecessary) on a Kill
-        /// press, which reads <see cref="MarkedTarget"/> instead.
-        /// </param>
-        public bool Press(ChickenController preResolvedTarget = null)
+        /// <summary>Press triggered by the Mark/Kill ability button slot: the mark, or the Kill once a mark is up.</summary>
+        public bool Press()
         {
             if (!HasStateAuthority) return false;
             if (_controller == null || !ControlRules.CanCast(_controller.CurrentControlState)) return false;
@@ -129,40 +122,32 @@ namespace CluckWars.Gameplay
             if (MarkedTarget == NetworkBehaviourId.None)
             {
                 // ---- Phase 1: Mark ------------------------------------------------
-                // The candidate comes from MarkKillAbilitySO, whose SingleTarget aim shape
-                // resolves to exactly the nearest eligible rival and whose ExtraTargetFilter
-                // applies the very isolation + rival rules this method used to re-implement
-                // with its own Physics.OverlapSphere (in 3D, against a preview that was
-                // planar and had no isolation rule at all — so the preview could mark a
-                // target the press then refused).
-                //
-                // There is deliberately NO fallback scan: a second implementation of those
-                // rules is exactly how the two drifted apart in the first place.
-                if (preResolvedTarget == null)
+                // Decided here, once, by the Assassin's authority; every peer reads the replicated MarkedTarget.
+                GatherMarkCandidates();
+                int pick = MarkPickRules.Pick(_candidates.Count, Random.value);
+                if (pick < 0 || !Runner.TryFindBehaviour(_candidates[pick], out ChickenController chosen))
                 {
-                    _log?.Verbose(Source, "Press: no isolated rival candidate in range.");
+                    _log?.Verbose(Source, "Press: no rival to mark.");
                     return false;
                 }
 
-                MarkedTarget = preResolvedTarget.Id;
-                _markIsDecoy = preResolvedTarget.IsDecoy;
-                _coldTrail.OnMarked(preResolvedTarget.Id, _markIsDecoy);
+                MarkedTarget = chosen.Id;
                 ArmTimer = TickTimer.CreateFromSeconds(Runner, ArmSeconds);
                 WindowTimer = TickTimer.CreateFromSeconds(Runner, WindowSeconds);
                 KillReady = false;
-                // The press just charged this slot's full cooldown (TryActivate sets it before OnActivate), and that
-                // cooldown equals the window, so the Kill press would be refused for the mark's whole life. The slot is
-                // free while a mark runs (IsUsable gates it on KillReady); the outcome then sets the real cooldown.
+                // The press just charged this slot's full cooldown (TryActivate sets it before OnActivate), and the Kill press
+                // comes while it would still run. The slot is free while a mark runs (IsUsable gates it on CanKillNow); the
+                // outcome then sets the real cooldown.
                 if (_abilities != null) _abilities.TriggerCooldown(SlotIndex, 0f);
-                _log?.Info(Source, $"Marked target {preResolvedTarget.name} (Arming {ArmSeconds:0.0}s).");
+                _log?.Info(Source, $"Marked target {chosen.name} (window {WindowSeconds:0.0}s, arm {ArmSeconds:0.0}s).");
                 return true;
             }
             else
             {
                 // ---- Phase 2: Kill Execute ----------------------------------------
-                if (!KillReady)
+                if (!CanKillNow)
                 {
-                    _log?.Verbose(Source, "Press: Kill attempted before target is qualified (must be stunned & armed).");
+                    _log?.Verbose(Source, "Press: Kill refused (target must be stunned, armed, in range and on this side of any base wall).");
                     return false;
                 }
 
@@ -265,45 +250,12 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            // Check distance. Planar XZ, matching AbilityAim / MarkKillAbilitySO's aim shape:
-            // a 3D measure here could fizzle a mark for a height difference the preview never
-            // showed and the flat arena does not have.
-            float dist = PlanarDistance(transform.position, target.transform.position);
-            if (dist > MarkRange)
+            // Qualified only while the target is stunned, right now: the kill needs the stun, not its memory.
+            bool qualified = ArmTimer.Expired(Runner) && target.CurrentControlState == ControlState.Stunned;
+            if (qualified != KillReady)
             {
-                _log?.Info(Source, $"Mark fizzled: target exceeded range ({dist:0.0}m > {MarkRange}m).");
-                FizzleMark();
-                return;
-            }
-
-            // Home is safe: the marked bird reaching its own base ends the hunt.
-            if (IsHome(target))
-            {
-                _log?.Info(Source, "Mark fizzled: target reached its own base.");
-                FizzleMark();
-                return;
-            }
-
-            // Check isolation break (crowd counterplay)
-            if (!IsTargetIsolated(target))
-            {
-                _log?.Info(Source, "Mark fizzled: target isolation broken by nearby chicken.");
-                FizzleMark();
-                return;
-            }
-
-            // Arming check & Stun qualification
-            if (!KillReady)
-            {
-                if (ArmTimer.Expired(Runner))
-                {
-                    // Qualify on target being stunned
-                    if (target.CurrentControlState == ControlState.Stunned)
-                    {
-                        KillReady = true;
-                        _log?.Info(Source, $"Target {target.name} qualified for Kill execute!");
-                    }
-                }
+                KillReady = qualified;
+                if (qualified) _log?.Info(Source, $"Target {target.name} qualified for Kill execute!");
             }
 
             // Window expiry check
@@ -315,81 +267,50 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Is <paramref name="target"/> alone enough to be executed — no third live chicken
-        /// within <paramref name="radius"/> of it? This is the crowd counterplay, and it
-        /// is the rule the Mark/Kill preview never knew about.
+        /// Would a Kill press land now? Target stunned (<see cref="KillReady"/>), Assassin able to cast, within
+        /// <see cref="KillRange"/>, and no base wall between them. Read-only over replicated state, so the button, the HUD and the
+        /// press agree on every peer.
         /// </summary>
-        /// <param name="excludeCaster">
-        /// The assassin, who does not break their own victim's isolation.
-        /// </param>
-        /// <remarks>
-        /// <b>Static, and iterating the registry.</b> Static so
-        /// <c>MarkKillAbilitySO.ExtraTargetFilter</c> can apply the identical rule without a
-        /// <c>GetComponent&lt;AssassinExecute&gt;</c> on every candidate on every HUD poll —
-        /// and registry-based (≤4 entries, planar XZ) rather than a physics query so the
-        /// preview, the usability grey-out and the fizzle check all measure the same thing.
-        /// The old <c>Physics.OverlapSphereNonAlloc</c> version needed two separate collider
-        /// buffers just to avoid clobbering itself mid-iteration; that whole hazard is gone.
-        /// </remarks>
-        public static bool IsIsolated(ChickenController target, ChickenController excludeCaster, float radius)
+        public bool CanKillNow
         {
-            if (target == null) return false;
-
-            float radiusSqr = radius * radius;
-            Vector3 center = target.transform.position;
-
-            var all = ChickenController.ActiveControllers;
-            for (int i = 0; i < all.Count; i++)
+            get
             {
-                var thirdParty = all[i];
-                if (thirdParty == null || thirdParty == target || thirdParty == excludeCaster) continue;
-                if (thirdParty.Combat != null && thirdParty.Combat.IsRemoved) continue;
-
-                // Another live chicken is near the target -> not isolated!
-                if (PlanarSqrDistance(center, thirdParty.transform.position) <= radiusSqr) return false;
+                if (Object == null || !Object.IsValid || !KillReady || MarkedTarget == NetworkBehaviourId.None) return false;
+                if (_controller == null || !ControlRules.CanCast(_controller.CurrentControlState)) return false;
+                if (!Runner.TryFindBehaviour(MarkedTarget, out ChickenController target)) return false;
+                Vector3 me = transform.position, it = target.transform.position;
+                return PlanarDistance(me, it) <= KillRange && !PlayerBase.WallBetween(me, it);
             }
-            return true;
         }
 
-        /// <summary>Instance view of <see cref="IsIsolated"/> for this assassin's own call
-        /// sites, which always exclude themselves.</summary>
-        public bool IsTargetIsolated(ChickenController target) => IsIsolated(target, _controller, IsolationMeters);
-
-        /// <summary>
-        /// True when <paramref name="chicken"/> stands inside its OWN base (deposit radius, planar). Static and read-only over
-        /// replicated data, so the filter, the telegraph and the fizzle check agree on every peer.
-        /// </summary>
-        public static bool IsHome(ChickenController chicken)
+        /// <summary>Is there a rival a press would mark? Authority-local history, so a proxy only counts rivals (fails open).</summary>
+        public bool HasMarkCandidate
         {
-            var obj = chicken != null ? chicken.Object : null;
-            if (obj == null || !obj.IsValid) return false;
-            int corner = chicken.HomeCornerIndex;
-            if (corner < 0) return false;
-
-            var bases = PlayerBase.ActiveBases;
-            for (int i = 0; i < bases.Count; i++)
+            get
             {
-                var b = bases[i];
-                if (b == null || b.Object == null || !b.Object.IsValid || b.CornerIndex != corner) continue;
-                return HomeBreakRules.IsHome(chicken.transform.position, b.transform.position, b.DepositRadius);
+                if (Object == null || !Object.IsValid) return false;
+                GatherMarkCandidates();
+                return _candidates.Count > 0;
             }
-            return false;
         }
 
-        /// <summary>
-        /// Is <paramref name="candidate"/> on this Assassin's cold trail? Authority-local state: anywhere else it fails open
-        /// (the press is judged on the authority anyway), so a proxy preview can only be more generous, never wrong in the
-        /// direction that eats a press.
-        /// </summary>
-        public bool IsColdTrail(ChickenController candidate)
+        /// <summary>Living, non-decoy rivals, anywhere; the last mark filtered out by <see cref="MarkPickRules"/>.</summary>
+        private void GatherMarkCandidates()
         {
-            if (candidate == null || Object == null || !Object.IsValid || !HasStateAuthority) return false;
-
+            _candidates.Clear();
+            int ownCorner = _controller != null ? _controller.HomeCornerIndex : -1;
             int rivals = 0;
             var all = ChickenController.ActiveControllers;
             for (int i = 0; i < all.Count; i++)
-                if (all[i] != null && all[i] != _controller && !all[i].IsDecoy) rivals++;
-            return _coldTrail.Refuses(candidate.Id, Runner.SimulationTime, rivals);
+            {
+                var c = all[i];
+                if (c == null || c == _controller || c.IsDecoy || c.Object == null || !c.Object.IsValid) continue;
+                if (ownCorner >= 0 && c.HomeCornerIndex == ownCorner) continue;   // same corner: an ally
+                rivals++;
+                if (c.Combat != null && c.Combat.IsRemoved) continue;
+                _candidates.Add(c.Id);
+            }
+            MarkPickRules.Filter(_candidates, _hasLastMark, _lastMark, rivals);
         }
 
         private static float PlanarDistance(Vector3 a, Vector3 b) => Mathf.Sqrt(PlanarSqrDistance(a, b));
@@ -412,7 +333,7 @@ namespace CluckWars.Gameplay
         {
             if (!HasStateAuthority) return;
             ResetMark();
-            _coldTrail.Reset();
+            _hasLastMark = false;
         }
 
         private void FizzleMark()
@@ -424,10 +345,11 @@ namespace CluckWars.Gameplay
             }
         }
 
-        /// <summary>A mark ended, paid or failed: it leaves its cold trail. The round reset does not come through here.</summary>
+        /// <summary>A mark ended, paid or failed: its target is the one the next press cannot pick. The round reset does not come through here.</summary>
         private void EndMark()
         {
-            _coldTrail.OnMarkEnded(MarkedTarget, _markIsDecoy, Runner.SimulationTime, ColdTrailSeconds);
+            _lastMark = MarkedTarget;
+            _hasLastMark = true;
             ResetMark();
         }
 

@@ -292,7 +292,7 @@ namespace CluckWars.Tests
                 Assert.AreEqual(AbilityAimShape.ForwardCircle, circle.AimShape);
                 Assert.IsTrue(circle.RotatesToAim);
             }
-            foreach (AbilityBaseSO single in new AbilityBaseSO[] { Make<MarkKillAbilitySO>(), Make<SneakyStealAbilitySO>() })
+            foreach (AbilityBaseSO single in new AbilityBaseSO[] { Make<SneakyStealAbilitySO>() })
             {
                 Assert.AreEqual(AbilityAimShape.SingleTarget, single.AimShape);
                 Assert.IsTrue(single.UsesAim, "Single-target picks by angle to the aim.");

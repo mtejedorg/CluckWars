@@ -67,11 +67,11 @@ namespace CluckWars.Gameplay
     {
         /// <summary>No mark up: the ordinary FSM decides.</summary>
         None = 0,
-        /// <summary>Arming: stay on the target and keep the stun back, a stun now would end before the mark can qualify it.</summary>
-        HoldStun = 1,
-        /// <summary>Armed, target not stunned yet: land a stun.</summary>
+        /// <summary>Hunt the target across the map, keeping the stun back: it is armed only once, and a stun now is wasted.</summary>
+        Hunt = 1,
+        /// <summary>Armed, target in reach and not stunned yet: land a stun.</summary>
         Stun = 2,
-        /// <summary>Qualified: press again.</summary>
+        /// <summary>Stunned and in kill range: press again.</summary>
         Kill = 3,
     }
 
@@ -633,15 +633,14 @@ namespace CluckWars.Gameplay
         // ---- Death Mark follow-through ------------------------------------------
 
         /// <summary>
-        /// The Spoiler bot's second and third beats. The execute only qualifies a target stunned AFTER the arm time, and the
-        /// CastPlan ladder knows none of that: left to it, a bot fires Ambush straight after the mark, the stun is over before
-        /// the mark arms, and the window lapses with the Kill unpressed.
+        /// The Spoiler bot's hunt. A mark lands anywhere on the map, and the CastPlan ladder knows none of that: left to it, a
+        /// bot fires Ambush at whoever is near and walks where the FSM says, so the mark expires unpressed.
         /// </summary>
-        public static BotMarkStep NextMarkStep(bool marked, bool killReady, bool armed)
+        public static BotMarkStep NextMarkStep(bool marked, bool canKill, bool armed, bool stunInReach)
         {
             if (!marked) return BotMarkStep.None;
-            if (killReady) return BotMarkStep.Kill;
-            return armed ? BotMarkStep.Stun : BotMarkStep.HoldStun;
+            if (canKill) return BotMarkStep.Kill;
+            return armed && stunInReach ? BotMarkStep.Stun : BotMarkStep.Hunt;
         }
 
         // ---- Steal guard (Phase 7 chunk D) ------------------------------------

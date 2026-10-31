@@ -227,7 +227,7 @@ namespace CluckWars.Gameplay
                     ? attacker.Object.HasStateAuthority
                     : attacker.Object.StateAuthority == info.Source;
                 claim.AttackerHasExecute = execute != null;
-                if (execute != null) { claim.MarkRange = execute.MarkRange; claim.MarkWindow = execute.WindowSeconds; }
+                if (execute != null) { claim.KillRange = execute.KillRange; claim.MarkWindow = execute.WindowSeconds; }
                 claim.MarkedThisVictim = execute != null && _controller != null && execute.MarkedTarget == _controller.Id;
                 claim.VictimStunned = _controller != null && _controller.IsStunned;
 

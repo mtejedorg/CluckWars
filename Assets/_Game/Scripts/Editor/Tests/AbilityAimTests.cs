@@ -409,7 +409,6 @@ namespace CluckWars.Tests
                     case FeatherTrapAbilitySO x: Assert.AreEqual(x.ZoneRadius, x.AimRadius, tol, $"{a.name}: AimRadius must mirror ZoneRadius."); break;
                     case RootEggAbilitySO x: Assert.AreEqual(x.EggRadius, x.AimRadius, tol, $"{a.name}: AimRadius must mirror EggRadius."); break;
                     case FeatherAuraAbilitySO x: Assert.AreEqual(x.AuraRadius, x.AimRadius, tol, $"{a.name}: AimRadius must mirror AuraRadius."); break;
-                    case MarkKillAbilitySO x: Assert.AreEqual(AssassinExecute.MaxMarkRange, x.AimRadius, tol, $"{a.name}: AimRadius must mirror AssassinExecute.MaxMarkRange."); break;
                     case ShadowstepAbilitySO x: Assert.AreEqual(AbilityBaseSO.JumpLandingRadius, x.AimRadius, tol, $"{a.name}: AimRadius must mirror the shared JumpLandingRadius."); break;
                 }
 
@@ -458,11 +457,8 @@ namespace CluckWars.Tests
             // telegraph marked three and OnActivate acted on _scratch[0] — one. GatherTargets
             // now owns the resolution, so the marks and the hit agree.
             //
-            // Mark/Kill is the subject because it is the SingleTarget ability whose filter can
-            // be satisfied by bare probe chickens. The positions are chosen so BOTH candidates
-            // stay isolated: they are 9 m apart (> the 8 m IsolationRadius) while both sit
-            // inside the caster's 8 m mark range.
-            var probe = ScriptableObject.CreateInstance<MarkKillAbilitySO>();
+            // A plain SingleTarget probe: the shipped ones all filter on cargo, which bare probe chickens lack.
+            var probe = ScriptableObject.CreateInstance<SingleTargetProbeSO>();
             var caster = NewProbeChicken(Vector3.zero, Vector3.forward);
             var near   = NewProbeChicken(new Vector3(4f, 0f, 0f), Vector3.forward);
             var far    = NewProbeChicken(new Vector3(-5f, 0f, 0f), Vector3.forward);
@@ -488,6 +484,14 @@ namespace CluckWars.Tests
                 Destroy(near); Destroy(far); Destroy(caster);
                 UnityEngine.Object.DestroyImmediate(probe);
             }
+        }
+
+        private sealed class SingleTargetProbeSO : AbilityBaseSO
+        {
+            public override AbilityAimShape AimShape => AbilityAimShape.SingleTarget;
+            public override float AimRadius => 8f;
+            public override void OnActivate(AbilityContext ctx) { }
+            public override void OnDeactivate(AbilityContext ctx) { }
         }
 
         [Test]
@@ -635,6 +639,8 @@ namespace CluckWars.Tests
                 nameof(FeintAbilitySO),
                 nameof(QuickDropAbilitySO),
                 nameof(ImmovableAbilitySO),
+                // Death Mark picks its target anywhere on the map; a shape would imply a range it does not have.
+                nameof(MarkKillAbilitySO),
                 // Peck is not a self-buff, but it belongs here for the same reason: its
                 // target is a FoodPile, and the aim-shape system describes areas that
                 // contain CHICKENS. There is no rival to preview, mark, or whiff against,
@@ -692,6 +698,7 @@ namespace CluckWars.Tests
                 nameof(FeintAbilitySO),
                 nameof(QuickDropAbilitySO),
                 nameof(ImmovableAbilitySO),
+                nameof(MarkKillAbilitySO),   // no shape: the target is chosen anywhere, and the mark feedback confirms it
                 // Placed zones.
                 nameof(SmokeRoostAbilitySO),
                 nameof(FeatherTrapAbilitySO),
@@ -751,7 +758,6 @@ namespace CluckWars.Tests
                 // Pure "do something TO a rival" abilities. No rival, no effect at all.
                 nameof(SnatchAbilitySO),        // steals cargo off a specific victim
                 nameof(SneakyStealAbilitySO),   // ditto, from behind
-                nameof(MarkKillAbilitySO),      // marks a specific victim
                 nameof(CluckShockAbilitySO),    // AoE burst; firing into empty air does nothing
                 // Stun bursts are AoE-around-SELF (StunBurstAbilitySO: AimShape.SelfCircle).
                 // They are NOT gap-closers despite sitting near them in the pools — they move

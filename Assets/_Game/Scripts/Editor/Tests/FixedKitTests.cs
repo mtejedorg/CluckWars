@@ -293,25 +293,6 @@ namespace CluckWars.Tests
             }
         }
 
-        [TestCase(false, false, false, BotMarkStep.None)]
-        [TestCase(true, false, false, BotMarkStep.HoldStun)]
-        [TestCase(true, false, true, BotMarkStep.Stun)]
-        [TestCase(true, true, true, BotMarkStep.Kill)]
-        public void NextMarkStep_PlaysTheExecuteInOrder(bool marked, bool killReady, bool armed, BotMarkStep expected) =>
-            Assert.AreEqual(expected, BotTactics.NextMarkStep(marked, killReady, armed));
-
-        [Test]
-        public void TheMarkPress_FreesTheSlot_SoTheKillPressIsNotRefusedByItsOwnCooldown()
-        {
-            var src = File.ReadAllText("Assets/_Game/Scripts/Gameplay/AssassinExecute.cs");
-            int mark = src.IndexOf("MarkedTarget = preResolvedTarget.Id", StringComparison.Ordinal);
-            int free = src.IndexOf("TriggerCooldown(", mark, StringComparison.Ordinal);
-            int done = src.IndexOf("return true;", mark, StringComparison.Ordinal);
-            Assert.Greater(mark, 0);
-            Assert.IsTrue(free > mark && free < done, "the Mark branch must clear the cooldown TryActivate just charged");
-            StringAssert.StartsWith("TriggerCooldown(", src.Substring(free));
-        }
-
         // ---- LastSetup ----------------------------------------------------------------------------------------------
 
         [Test]

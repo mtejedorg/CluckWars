@@ -62,7 +62,7 @@ ability.groundquake.desc,A stomp that leaves everyone within {r}m stuck in place
 ability.headbutt.desc,Shoves rivals up to {r}m ahead and staggers them for {secs}s.
 ability.immovable.desc,"Plant yourself for {secs}s. You can't be stunned, slowed, stuck or shoved."
 ability.invisibility.desc,Fades you to a ghostly outline for {secs}s. Using a move breaks it.
-ability.markkill.desc,"Marks a lone rival within {r}m. Stun them, then press again to take everything they carry."
+ability.markkill.desc,"Marks a random rival anywhere. Stun them within {r}m, then press again to take everything they carry."
 ability.peck.desc,Take a beakful of food from the pile you are standing at.
 ability.quickdrop.desc,Banks food {mult}x faster for {secs}s - cash in at your base.
 ability.rollpush.desc,"Rolls forward at {mult}x speed for {secs}s, shoving chickens out of the path."

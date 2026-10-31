@@ -155,8 +155,8 @@ namespace CluckWars.Gameplay
             public float Latency;
             public float PlanarDistance;
             public float RangeMargin;
-            /// <summary>The attacker's tuned mark range (<c>AssassinExecute.MarkRange</c>); 0 = the shipped default.</summary>
-            public float MarkRange;
+            /// <summary>The attacker's tuned kill range (<c>AssassinExecute.KillRange</c>); 0 = the shipped default.</summary>
+            public float KillRange;
             /// <summary>The attacker's tuned window (<c>AssassinExecute.WindowSeconds</c>); 0 = the shipped default.</summary>
             public float MarkWindow;
         }
@@ -166,8 +166,8 @@ namespace CluckWars.Gameplay
             duration > 0f && duration <= RemovalDurationSeconds + 1e-4f;
 
         /// <summary>Furthest apart a real execute's two chickens can be when the removal lands.</summary>
-        public static float MaxExecuteDistance(float driftMargin, float markRange = AssassinExecute.MaxMarkRange) =>
-            markRange + RangeSlackMeters + Mathf.Max(0f, driftMargin);
+        public static float MaxExecuteDistance(float driftMargin, float killRange = AssassinExecute.DefaultKillRange) =>
+            killRange + RangeSlackMeters + Mathf.Max(0f, driftMargin);
 
         /// <summary>
         /// Decides a removal claim. The evidence rule is the one <c>ChickenCargo.TryResolveExecutor</c>
@@ -192,8 +192,8 @@ namespace CluckWars.Gameplay
                     c.VictimStunned, c.StunEverSeen, c.SecondsSinceStunned, c.Latency,
                     c.MarkWindow > 0f ? c.MarkWindow : RecentStunWindowSeconds))
                 return RemovalVerdict.NoExecuteEvidence;
-            float markRange = c.MarkRange > 0f ? c.MarkRange : AssassinExecute.MaxMarkRange;
-            if (!(c.PlanarDistance <= MaxExecuteDistance(c.RangeMargin, markRange))) return RemovalVerdict.OutOfRange;
+            float killRange = c.KillRange > 0f ? c.KillRange : AssassinExecute.DefaultKillRange;
+            if (!(c.PlanarDistance <= MaxExecuteDistance(c.RangeMargin, killRange))) return RemovalVerdict.OutOfRange;
             return RemovalVerdict.Accepted;
         }
 

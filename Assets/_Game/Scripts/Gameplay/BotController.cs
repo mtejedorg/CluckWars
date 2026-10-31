@@ -240,7 +240,15 @@ namespace CluckWars.Gameplay
             TryStealGuard(cargo);
 
             // A Death Mark in progress owns the bot until it pays or fizzles: see BotTactics.NextMarkStep.
-            if (TryFollowThroughMark()) return;
+            float bag = _cargo != null ? _cargo.BountyBag : 0f;
+            if (TryFollowThroughMark(cargo + bag)) return;
+
+            // An execute pays into the bounty bag, not the beak, so a bot holding only a bag still has to walk it home.
+            if (bag > 0f)
+            {
+                EnterReturnToBase(homePos, $"bag={bag:0}");
+                return;
+            }
 
             // Latch ReturnToBase until all cargo is deposited (IP1). Fire the Bank plan
             // once actually on the base — a deposit accelerator is worthless anywhere else,
@@ -570,33 +578,52 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Stays on the marked rival and plays the rest of the execute: hold the stun while the mark arms, land one once
-        /// it has, press Kill the moment it qualifies. Returns false when this bot has no live mark.
+        /// The Spoiler's loop: mark whenever it can, then hunt the mark across the map (a target at home is approached up to its
+        /// wall, RefreshRivalWalls), stun it, and press Kill. Returns true while a mark owns the bot.
         /// </summary>
-        private bool TryFollowThroughMark()
+        private bool TryFollowThroughMark(float cargoAndBag)
         {
-            if (_execute == null || _abilities == null || _execute.MarkedTarget == NetworkBehaviourId.None) return false;
+            if (_execute == null || _abilities == null) return false;
+
+            if (_execute.MarkedTarget == NetworkBehaviourId.None)
+            {
+                // A loaded bot banks first: a bounty bag is worth more than a new mark.
+                if (cargoAndBag > 0f) return false;
+                for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
+                {
+                    var ability = _abilities.GetSlot(slot);
+                    if (ability is MarkKillAbilitySO && _abilities.IsReady(slot) && ability.IsUsable(_controller) &&
+                        _abilities.BotTryActivate(slot))
+                        _log?.Debug(Source, $"{Who} marked a rival (slot {slot}).");
+                }
+                return false;   // the mark replicates next tick; this think goes on as usual
+            }
             if (!Runner.TryFindBehaviour(_execute.MarkedTarget, out ChickenController mark) || mark == null) return false;
 
             _state      = BotState.Hunt;
             _moveTarget = mark.transform.position;
 
-            var step = BotTactics.NextMarkStep(true, _execute.KillReady, _execute.ArmTimer.Expired(Runner));
-            for (int slot = 0; step != BotMarkStep.HoldStun && slot < _abilities.EquippedSlotCount; slot++)
+            int stunSlot = AbilityController.InvalidSlot;
+            for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
             {
                 var ability = _abilities.GetSlot(slot);
-                bool wanted = step == BotMarkStep.Kill ? ability is MarkKillAbilitySO : FixedKit.EmitsStun(ability);
-                if (!wanted || !_abilities.IsReady(slot) || !ability.IsUsable(_controller)) continue;
-                if (step == BotMarkStep.Stun && !ability.WouldAffect(_controller, mark))
-                {
-                    if (ability.IsDirectionalAim) _faceIntent = mark.transform.position;
-                    continue;
-                }
-                if (_abilities.BotTryActivate(slot))
-                    _log?.Debug(Source, $"{Who} mark {step}: cast slot {slot} ('{ability.name}').");
-                break;
+                if (FixedKit.EmitsStun(ability) && _abilities.IsReady(slot) && ability.IsUsable(_controller)
+                    && ability.WouldAffect(_controller, mark)) stunSlot = slot;
             }
-            if (_state != _prevState) _log?.Debug(Source, $"{Who} → Hunt (following a Death Mark through, {step}).");
+
+            var step = BotTactics.NextMarkStep(true, _execute.CanKillNow, _execute.ArmTimer.ExpiredOrNotRunning(Runner),
+                stunSlot != AbilityController.InvalidSlot);
+            if (step == BotMarkStep.Stun && _abilities.BotTryActivate(stunSlot))
+                _log?.Debug(Source, $"{Who} mark {step}: cast slot {stunSlot}.");
+            if (step == BotMarkStep.Kill)
+                for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
+                    if (_abilities.GetSlot(slot) is MarkKillAbilitySO && _abilities.BotTryActivate(slot))
+                    {
+                        _log?.Debug(Source, $"{Who} mark Kill: cast slot {slot}.");
+                        break;
+                    }
+
+            if (_state != _prevState) _log?.Debug(Source, $"{Who} → Hunt (following a Death Mark, {step}).");
             return true;
         }
 
