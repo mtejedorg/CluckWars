@@ -330,9 +330,10 @@ namespace CluckWars.Gameplay
         /// </summary>
         /// <summary>
         /// The evidence and the wall from one loop, so no zone can be read without passing the same filters: only a zone that
-        /// vouches for this sample has a say, and the wall is measured from that sampled position.
+        /// vouches for this sample has a say. History vouches (<paramref name="point"/>, blink and lag tolerance); the wall is
+        /// always judged where the victim stands now (<paramref name="current"/>): a bird that reached its base is safe.
         /// </summary>
-        public static ControlClaimRules.RootZoneScan ScanRootZonesOf(ChickenController caster, Vector3 point, float sampleTime, float margin, in ControlClaimRules.Ceiling ceiling)
+        public static ControlClaimRules.RootZoneScan ScanRootZonesOf(ChickenController caster, Vector3 point, Vector3 current, float sampleTime, float margin, in ControlClaimRules.Ceiling ceiling)
         {
             var scan = default(ControlClaimRules.RootZoneScan);
             if (caster == null || caster.Object == null || !caster.Object.IsValid) return scan;
@@ -346,7 +347,7 @@ namespace CluckWars.Gameplay
                 if (z == null || !z._seenAsRoot || z._seen.Owner != owner) continue;
                 ControlClaimRules.AddRootZone(ref scan, Evidence(z._seen, authority, now),
                     ControlClaimRules.SampleCountsForZone(sampleTime, z._seen.FirstSeenAt), point, margin, ceiling,
-                    PlayerBase.WallBetween(z._seen.Center, point));
+                    PlayerBase.WallBetween(z._seen.Center, current));
             }
 
             for (int i = 0; i < _recentRoots.Count; i++)
@@ -355,7 +356,7 @@ namespace CluckWars.Gameplay
                 if (r.Owner != owner || now - r.DespawnedAt > RecentRootWindowSeconds) continue;
                 ControlClaimRules.AddRootZone(ref scan, Evidence(r, authority, now),
                     ControlClaimRules.SampleCountsForZone(sampleTime, r.FirstSeenAt), point, margin, ceiling,
-                    PlayerBase.WallBetween(r.Center, point));
+                    PlayerBase.WallBetween(r.Center, current));
             }
             return scan;
         }

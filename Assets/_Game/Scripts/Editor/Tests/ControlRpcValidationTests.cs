@@ -562,7 +562,7 @@ namespace CluckWars.Tests
             const string controller = "Assets/_Game/Scripts/Gameplay/ChickenController.cs";
             string judge = AssassinExecuteCreditTests.MethodBody(controller, "private ControlClaimRules.Verdict JudgeControl(");
             StringAssert.Contains("_lastRootScan = ScanRootZones(caster, v, zoneMargin, ceiling)", judge);
-            StringAssert.Contains("AbilityZone.ScanRootZonesOf(caster, p, t, margin, c)",
+            StringAssert.Contains("AbilityZone.ScanRootZonesOf(caster, p, current, t, margin, c)",
                 AssassinExecuteCreditTests.MethodBody(controller, "private ControlClaimRules.RootZoneScan ScanRootZones("), "each past position is judged by the same zone rule");
             StringAssert.Contains("_recentPositions.Record(Time.realtimeSinceStartup, transform.position);",
                 AssassinExecuteCreditTests.MethodBody(controller, "public override void FixedUpdateNetwork()"));
@@ -758,6 +758,47 @@ namespace CluckWars.Tests
             var none = Scan((VouchingZone(v), false, true));
             Assert.IsFalse(none.Vouched);
             Assert.IsFalse(none.Walled, "nothing vouched: the claim is judged on reach, as a rejection if it fails");
+        }
+
+        /// <summary>
+        /// Maestro's ruling: an honest root landing just after the victim stepped into its base is REFUSED. History may vouch for
+        /// the claim (blink and lag tolerance), but the wall is judged where the victim stands NOW, for every sample.
+        /// </summary>
+        [Test]
+        public void AVictimNowHome_IsWalled_EvenIfAPastSampleWasOnTheZonesSide()
+        {
+            string src = File.ReadAllText("Assets/_Game/Scripts/Gameplay/AbilityZone.cs");
+            StringAssert.Contains("PlayerBase.WallBetween(z._seen.Center, current)", src);
+            StringAssert.Contains("PlayerBase.WallBetween(r.Center, current)", src);
+            StringAssert.DoesNotContain("WallBetween(z._seen.Center, point)", src, "a sampled position never answers the wall");
+            StringAssert.DoesNotContain("WallBetween(r.Center, point)", src, "a sampled position never answers the wall");
+            StringAssert.Contains("AbilityZone.ScanRootZonesOf(caster, p, current, t, margin, c)",
+                AssassinExecuteCreditTests.MethodBody(ControllerPath, "private ControlClaimRules.RootZoneScan ScanRootZones("));
+        }
+
+        [Test]
+        public void TheRuling_ZoneOutsideVictimNowInside_IsWalled_AndSilent()
+        {
+            var baseCentre = new Vector2(20f, 20f);
+            var zone = new Vector3(20f, 0f, 16f);
+            var pastOutside = new Vector3(20f, 0f, 16.5f);
+            var nowHome = new Vector3(20f, 0f, 19f);
+            Assert.IsFalse(BaseWallRules.Blocks(zone, pastOutside, baseCentre, 2.5f), "fixture: the sample was on the zone's side");
+
+            // The past sample vouches; the wall is asked of the current position, whichever sample vouched.
+            var evidence = VouchingZone(pastOutside);
+            evidence.Center = zone;
+            evidence.CasterAtSpawn = zone;
+            var scan = default(ControlClaimRules.RootZoneScan);
+            ControlClaimRules.AddRootZone(ref scan, evidence, true, pastOutside, 1f, Shipped(ControlKind.Root),
+                BaseWallRules.Blocks(zone, nowHome, baseCentre, 2.5f));
+            Assert.IsTrue(scan.Vouched, "still evidence, so never a rejected RPC");
+            Assert.IsTrue(scan.Walled, "and refused: the base is safe");
+
+            string accept = AssassinExecuteCreditTests.MethodBody(ControllerPath, "private bool AcceptControlClaim(");
+            int wall = accept.IndexOf("CrossedBaseWall(kind, caster)", StringComparison.Ordinal);
+            Assert.Less(wall, accept.IndexOf("_log?.Warn", StringComparison.Ordinal), "a no-op, above the rejection line");
+            StringAssert.Contains("_log?.Debug", accept.Substring(wall), "silent: Debug, nothing a merge counts");
         }
 
         [Test]

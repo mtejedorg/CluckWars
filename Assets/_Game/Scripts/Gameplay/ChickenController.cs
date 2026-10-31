@@ -1459,16 +1459,16 @@ namespace CluckWars.Gameplay
         /// <summary>This authority's own positions over the last <see cref="RecentPositions.WindowSeconds"/> (local; root claims only).</summary>
         private readonly RecentPositions _recentPositions = new RecentPositions();
 
-        /// <summary>The caster's Root zones judged at this chicken's position now and at every recorded point of the last window.</summary>
-        private ControlClaimRules.RootZoneScan ScanRootZones(ChickenController caster, Vector3 now, float margin, in ControlClaimRules.Ceiling ceiling)
+        /// <summary>The caster's Root zones: vouched for by this chicken's position now or any recorded point of the last window, walled as of now.</summary>
+        private ControlClaimRules.RootZoneScan ScanRootZones(ChickenController caster, Vector3 current, float margin, in ControlClaimRules.Ceiling ceiling)
         {
             var c = ceiling;   // an 'in' parameter cannot be captured
             float time = Time.realtimeSinceStartup;
-            var scan = AbilityZone.ScanRootZonesOf(caster, now, time, margin, c);
+            var scan = AbilityZone.ScanRootZonesOf(caster, current, current, time, margin, c);
             _recentPositions.AnyWithinWindow(time, (t, p) =>
             {
-                scan.Merge(AbilityZone.ScanRootZonesOf(caster, p, t, margin, c));
-                return false;   // every sample: one that vouches from behind a wall must not end the walk early
+                scan.Merge(AbilityZone.ScanRootZonesOf(caster, p, current, t, margin, c));
+                return false;   // every sample: each can vouch for another zone
             });
             return scan;
         }

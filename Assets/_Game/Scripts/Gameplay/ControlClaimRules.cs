@@ -307,7 +307,7 @@ namespace CluckWars.Gameplay
 
         /// <summary>The one gate a zone passes to count in a <see cref="RootZoneScan"/>: the sample rule and <see cref="RootZoneVouches"/>.</summary>
         /// <param name="sampleCounts"><see cref="SampleCountsForZone"/> for this zone.</param>
-        /// <param name="walled">A base wall stands between the zone's centre and the sampled victim position.</param>
+        /// <param name="walled">A base wall stands between the zone's centre and where the victim stands NOW, whichever sample vouched.</param>
         public static void AddRootZone(ref RootZoneScan scan, in RootZoneEvidence z, bool sampleCounts, Vector3 victim,
             float margin, in Ceiling c, bool walled)
         {
