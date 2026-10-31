@@ -271,11 +271,11 @@ namespace CluckWars.Tests
         [TestCase("Gameplay/ChickenController.cs", "!PlayerBase.WallBetween(center, transform.position)")]
         [TestCase("Gameplay/ChickenController.cs", "!PlayerBase.WallBetween(transform.position, other.transform.position)")]
         [TestCase("Gameplay/ChickenCargo.cs", "PlayerBase.WallBetween(thief.transform.position, transform.position)")]
-        public void EveryEffectPath_AsksTheWall(string file, string call) =>
+        public void EveryEffectPath_AsksTheWall_SourceGuard(string file, string call) =>
             StringAssert.Contains(call, File.ReadAllText("Assets/_Game/Scripts/" + file));
 
         [Test]
-        public void TheZoneAsksTheWall_InTheScanAndTheConfirmation()
+        public void TheZoneAsksTheWall_InTheScanAndTheConfirmation_SourceGuard()
         {
             var src = Src("AbilityZone.cs");
             int scan = src.IndexOf("private void ScanOnEnter()", StringComparison.Ordinal);
@@ -285,7 +285,7 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void AControlClaimAcrossAWall_IsANoOp_NeverARejection()
+        public void AControlClaimAcrossAWall_IsANoOp_NeverARejection_SourceGuard()
         {
             var src = Src("ChickenController.cs");
             int accept = src.IndexOf("private bool AcceptControlClaim(", StringComparison.Ordinal);
@@ -306,14 +306,14 @@ namespace CluckWars.Tests
         private static string Src(string file) => File.ReadAllText("Assets/_Game/Scripts/Gameplay/" + file).Replace("\r\n", "\n");
 
         [Test]
-        public void TheClampRuns_AfterEveryPositionWriter_OnTheChickensOwnAuthority()
+        public void TheClampRuns_AfterEveryPositionWriter_OnTheChickensOwnAuthority_SourceGuard()
         {
             Assert.IsTrue(typeof(Fusion.IAfterTick).IsAssignableFrom(typeof(ChickenController)));
             StringAssert.Contains("if (HasStateAuthority) KeepOutOfRivalBases();", Src("ChickenController.cs"));
         }
 
         [Test]
-        public void TheClamp_GoesThroughTheController_NeverATransformWrite()
+        public void TheClamp_GoesThroughTheController_NeverATransformWrite_SourceGuard()
         {
             var src = Src("ChickenController.cs");
             int start = src.IndexOf("private void KeepOutOfRivalBases()", StringComparison.Ordinal);
@@ -324,7 +324,7 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void Bots_SteerAroundWalls_OnEveryPathResult()
+        public void Bots_SteerAroundWalls_OnEveryPathResult_SourceGuard()
         {
             var src = Src("BotController.cs");
             StringAssert.Contains("BaseKeepOutRules.SteerAround(selfPos, ResolveSteerPoint(selfPos)", src);

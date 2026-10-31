@@ -44,7 +44,7 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void TheMarkedRival_NeverGoesToTheFloorRing_AndStealthDoesNotHideIt()
+        public void TheMarkedRival_NeverGoesToTheFloorRing_AndStealthDoesNotHideIt_SourceGuard()
         {
             var src = File.ReadAllText("Assets/_Game/Scripts/Visuals/RivalIndicator.cs");
             StringAssert.Contains("chevron && !marked && FloorRivalArrows.TryRepresent(", src);
@@ -52,7 +52,7 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void TheFeedback_IsLocal_NoRpcAnywhere() =>
+        public void TheFeedback_IsLocal_NoRpcAnywhere_SourceGuard() =>
             StringAssert.DoesNotContain("[Rpc", File.ReadAllText("Assets/_Game/Scripts/Visuals/MarkFeedback.cs"));
 
         [Test]

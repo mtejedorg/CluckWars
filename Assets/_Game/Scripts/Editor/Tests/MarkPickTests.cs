@@ -46,14 +46,13 @@ namespace CluckWars.Tests
             Assert.AreEqual(expected, MarkPickRules.Pick(count, roll));
 
         [Test]
-        public void ShippedMarkKill_CarriesTheBaselineNumbers()
+        public void ShippedMarkKill_NumbersKeepTheirRelations()
         {
+            // Rules, not values: every number here is meant to be retuned.
             var m = TestAssets.Load<MarkKillAbilitySO>(TestAssets.AbilitiesDir + "/MarkKill.asset");
-            Assert.AreEqual(8f, m.KillRange);
-            Assert.AreEqual(0.6f, m.ArmSeconds);
-            Assert.AreEqual(12f, m.WindowSeconds);
-            Assert.AreEqual(5f, m.FailCooldownSeconds);
-            Assert.AreEqual(15f, m.SuccessCooldownSeconds);
+            Assert.Greater(m.KillRange, 0f);
+            Assert.Greater(m.WindowSeconds, 0f);
+            Assert.GreaterOrEqual(m.SuccessCooldownSeconds, m.FailCooldownSeconds, "a miss must recover no slower than a kill");
         }
 
         [Test]
@@ -96,7 +95,7 @@ namespace CluckWars.Tests
         private static string Execute => File.ReadAllText("Assets/_Game/Scripts/Gameplay/AssassinExecute.cs").Replace("\r\n", "\n");
 
         [Test]
-        public void NothingBreaksAMark_ButExpiryAKillOrALostTarget()
+        public void NothingBreaksAMark_ButExpiryAKillOrALostTarget_SourceGuard()
         {
             var src = Execute;
             int fun = src.IndexOf("public override void FixedUpdateNetwork()", StringComparison.Ordinal);
@@ -108,7 +107,7 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void TheMarkPress_FreesTheSlot_AndTheRoundResetClearsTheHistory()
+        public void TheMarkPress_FreesTheSlot_AndTheRoundResetClearsTheHistory_SourceGuard()
         {
             var src = Execute;
             int mark = src.IndexOf("MarkedTarget = chosen.Id", StringComparison.Ordinal);

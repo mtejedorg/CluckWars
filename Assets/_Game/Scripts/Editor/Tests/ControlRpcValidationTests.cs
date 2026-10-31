@@ -765,7 +765,7 @@ namespace CluckWars.Tests
         /// the claim (blink and lag tolerance), but the wall is judged where the victim stands NOW, for every sample.
         /// </summary>
         [Test]
-        public void AVictimNowHome_IsWalled_EvenIfAPastSampleWasOnTheZonesSide()
+        public void AVictimNowHome_IsWalled_EvenIfAPastSampleWasOnTheZonesSide_SourceGuard()
         {
             string src = File.ReadAllText("Assets/_Game/Scripts/Gameplay/AbilityZone.cs");
             StringAssert.Contains("PlayerBase.WallBetween(z._seen.Center, current)", src);
@@ -814,7 +814,7 @@ namespace CluckWars.Tests
         /// zone cleared the wall for a claim a walled zone had vouched for. Effect and evidence must come from one loop.
         /// </summary>
         [Test]
-        public void RootWallCheck_SharesTheVouchingLoop_NoZoneIsJudgedWithoutTheEvidenceFilters()
+        public void RootWallCheck_SharesTheVouchingLoop_NoZoneIsJudgedWithoutTheEvidenceFilters_SourceGuard()
         {
             string src = File.ReadAllText("Assets/_Game/Scripts/Gameplay/AbilityZone.cs");
             StringAssert.DoesNotContain("RootZonesAreWalledFrom", src, "a second loop over the zones can drift from ContainsRootOf's filters");
@@ -824,7 +824,7 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void ASampleBehindAWall_CannotVouchPastIt_OnEitherLoop()
+        public void ASampleBehindAWall_CannotVouchPastIt_OnEitherLoop_SourceGuard()
         {
             string src = File.ReadAllText("Assets/_Game/Scripts/Gameplay/AbilityZone.cs");
             StringAssert.Contains("PlayerBase.WallBetween(z._seen.Center, point) || PlayerBase.WallBetween(z._seen.Center, current)", src);

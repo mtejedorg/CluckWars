@@ -558,7 +558,7 @@ namespace CluckWars.Tests
         /// facing for directional abilities, so the bird stopped dead. Only bots' own turn-in-place may suppress translation.
         /// </summary>
         [Test]
-        public void HoldingAnAbility_NeverStopsThePlayersMovement()
+        public void HoldingAnAbility_NeverStopsThePlayersMovement_SourceGuard()
         {
             string fun = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/ChickenController.cs", "public override void FixedUpdateNetwork()");
             StringAssert.DoesNotContain("aiming != null, lockFacing", fun, "a charge must not suppress translation");

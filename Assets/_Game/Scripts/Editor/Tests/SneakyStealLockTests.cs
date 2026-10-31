@@ -42,9 +42,10 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void ShippedSneakySteal_Locks10Seconds_ThroughTheSharedFilter()
+        public void ShippedSneakySteal_LocksLongerThanItsCooldown_ThroughTheSharedFilter_SourceGuard()
         {
-            Assert.AreEqual(10f, TestAssets.Load<SneakyStealAbilitySO>(TestAssets.AbilitiesDir + "/SneakySteal.asset").SameVictimCooldownSeconds);
+            var steal = TestAssets.Load<SneakyStealAbilitySO>(TestAssets.AbilitiesDir + "/SneakySteal.asset");
+            Assert.Greater(steal.SameVictimCooldownSeconds, steal.Cooldown, "otherwise the lock never changes a cast");
             var src = File.ReadAllText("Assets/_Game/Scripts/Abilities/SneakyStealAbilitySO.cs");
             StringAssert.Contains("!caster.IsStealLockedOn(candidate)", src);
             StringAssert.Contains("thief.LockStealOn(", src);

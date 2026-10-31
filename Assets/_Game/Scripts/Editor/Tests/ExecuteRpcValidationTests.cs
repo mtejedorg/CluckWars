@@ -477,7 +477,7 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void BothExecuteHalves_JudgeTheWallAndTheRange_AndARaceIsSilent()
+        public void BothExecuteHalves_JudgeTheWallAndTheRange_AndARaceIsSilent_SourceGuard()
         {
             CollectionAssert.Contains(System.Enum.GetNames(typeof(ExecuteRules.RemovalVerdict)), "AcrossBaseWall");
             string cargo = File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenCargo.cs");
@@ -488,7 +488,7 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void TheBounty_IsPaidOnTheKillReport_SoARefusedExecutePaysNothing()
+        public void TheBounty_IsPaidOnTheKillReport_SoARefusedExecutePaysNothing_SourceGuard()
         {
             string press = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/AssassinExecute.cs", "public bool Press(");
             StringAssert.DoesNotContain("BountyBag +=", press, "a press the victim's authority refuses must leave no half-applied execute");
