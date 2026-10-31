@@ -107,6 +107,23 @@ namespace CluckWars.Visuals
         private string _text = string.Empty;
         private float _killRange;
 
+        // The banner is rebuilt only when what it shows changes: this runs every frame, and the text allocates.
+        private MarkPhase _shownPhase;
+        private int _shownSeconds, _shownMeters;
+        private ChickenController _shownTarget;
+
+        private void SetBanner(MarkPhase phase, ChickenController target, int seconds, int meters)
+        {
+            _phase = phase;
+            if (phase == _shownPhase && seconds == _shownSeconds && meters == _shownMeters && target == _shownTarget) return;
+            _shownPhase = phase;
+            _shownSeconds = seconds;
+            _shownMeters = meters;
+            _shownTarget = target;
+            _text = MarkFeedbackRules.Text(phase,
+                target != null ? MatchStandings.DisplayName(false, target.IsBot, target.Class, target.HomeCornerIndex) : null, seconds, meters);
+        }
+
         private LineRenderer _footRing, _rangeRing;
         private readonly SpriteRenderer[] _fills = new SpriteRenderer[ChevronCount];
         private readonly SpriteRenderer[] _inks = new SpriteRenderer[ChevronCount];
@@ -157,11 +174,14 @@ namespace CluckWars.Visuals
         private void Update()
         {
             _target = null;
-            _phase = MarkPhase.None;
-            _text = string.Empty;
-
             var local = FindLocal();
-            if (local == null || local.Runner == null) return;
+            if (ResolveMark(local)) return;
+            SetBanner(MarkPhase.None, null, 0, 0);
+        }
+
+        private bool ResolveMark(ChickenController local)
+        {
+            if (local == null || local.Runner == null) return false;
 
             var exec = local.Execute;
             if (exec != null && exec.MarkedTarget != NetworkBehaviourId.None &&
@@ -171,11 +191,10 @@ namespace CluckWars.Visuals
                 _killRange = exec.KillRange;
                 Vector3 me = local.transform.position, it = target.transform.position;
                 float d = Vector2.Distance(new Vector2(me.x, me.z), new Vector2(it.x, it.z));
-                _phase = MarkFeedbackRules.AssassinPhase(exec.CanKillNow, target.CurrentControlState == ControlState.Stunned,
+                var phase = MarkFeedbackRules.AssassinPhase(exec.CanKillNow, target.CurrentControlState == ControlState.Stunned,
                     d <= exec.KillRange, PlayerBase.WallBetween(me, it));
-                _text = MarkFeedbackRules.Text(_phase, MatchStandings.DisplayName(false, target.IsBot, target.Class, target.HomeCornerIndex),
-                    MarkFeedbackRules.ShownSeconds(exec.WindowTimer.RemainingTime(local.Runner) ?? 0f), Mathf.RoundToInt(d));
-                return;
+                SetBanner(phase, target, MarkFeedbackRules.ShownSeconds(exec.WindowTimer.RemainingTime(local.Runner) ?? 0f), Mathf.RoundToInt(d));
+                return true;
             }
 
             var all = ChickenController.ActiveControllers;
@@ -184,10 +203,10 @@ namespace CluckWars.Visuals
                 var c = all[i];
                 if (c == null || c == local || c.Object == null || !c.Object.IsValid || c.Execute == null) continue;
                 if (c.Execute.MarkedTarget != local.Id) continue;
-                _phase = MarkPhase.Victim;
-                _text = MarkFeedbackRules.Text(_phase, null, MarkFeedbackRules.ShownSeconds(c.Execute.WindowTimer.RemainingTime(local.Runner) ?? 0f), 0);
-                return;
+                SetBanner(MarkPhase.Victim, null, MarkFeedbackRules.ShownSeconds(c.Execute.WindowTimer.RemainingTime(local.Runner) ?? 0f), 0);
+                return true;
             }
+            return false;
         }
 
         private static ChickenController FindLocal()
