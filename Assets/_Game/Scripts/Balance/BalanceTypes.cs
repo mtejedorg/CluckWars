@@ -57,6 +57,12 @@ namespace CluckWars.Balance
         public float PeckAmount;    // food gained per Peck press
         public float PeckCooldown;  // seconds between Peck presses
         public float DepositRate;   // units / second while at base
+
+        // A timed deposit burst (Quick Drop), pressed on arrival whenever it is off cooldown. All zero for the naked
+        // chicken the SCT axiom governs, which is what keeps every class target exactly where it was.
+        public float BurstDepositMultiplier;
+        public float BurstDepositSeconds;
+        public float BurstDepositCooldown;
     }
 
     /// <summary>Simulation output: Solo Clear Time, trip count, and whether the target was reachable.</summary>
