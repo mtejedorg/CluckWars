@@ -6,11 +6,11 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
-## 🧪 2026-10-30 - Unity plugin + Unity CLI Pipeline trial (branch `trial/unity-pipeline`, NOT merged)
+## ✅ 2026-10-30 - Unity plugin + Unity CLI Pipeline adopted alongside the MCP (merged to `main`, `c9f0cb63`)
 
-- Installed `unity@unity-agent-plugin` 0.1.8-beta (user scope; skills only, no MCP). Added `com.unity.pipeline` 0.9.1-exp.1 to the manifest on the trial branch; Editor 6000.3.14f1 connected on port 7800 alongside the `ai-game-developer` MCP with no conflict.
-- Verified through `unity command`: game-view screenshot, `script eval`, console, play mode, asset/GameObject/component reads, EditMode run (2476 tests; 1-2 render-dependent failures, e.g. `Phase8ChunkD1Tests.FullMound_...Mobile_centre`, unconfirmed whether they fail without the Pipeline).
-- Verdict: keep the MCP as the live-Editor driver; use plugin skills for UI Toolkit / URP; CLI only for build/audit/batch/CI. Staying on Unity 6000.3. When-to-use rules are in `.claude/CLAUDE.md` -> Tools in scope.
+- Installed `unity@unity-agent-plugin` 0.1.8-beta (user scope; skills only, no MCP). `com.unity.pipeline` 0.9.1-exp.1 is in the manifest; Editor 6000.3.14f1 connects on port 7800 alongside the `ai-game-developer` MCP with no conflict. **Decision (Maestro): use both** - MCP for live-Editor work, plugin skills for UI Toolkit / URP, CLI/Pipeline for build / Project Auditor / batch / CI.
+- Verified through `unity command`: game-view screenshot, `script eval`, console, play mode, asset/GameObject/component reads, EditMode run. In the live Editor 1-2 tests failed (`Phase8ChunkD1Tests.FullMound_AtTheMatchCamera_Mobile_centre_...`, a render test; hue 200 vs gold 45). **Confirmed not caused by the package:** in batch mode (`unity test`) with the package the test passes alone and the full EditMode suite is 2476/2476. It is Editor-state dependent when run inside a live Editor session.
+- Staying on Unity 6000.3. When-to-use rules: `.claude/CLAUDE.md` -> Tools in scope.
 
 ---
 
