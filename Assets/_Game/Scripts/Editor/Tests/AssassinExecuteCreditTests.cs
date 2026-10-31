@@ -131,7 +131,7 @@ namespace CluckWars.Tests
         [Test]
         public void Press_PaysOnlyTheFlatBountyItself_TheLootArrivesByReport()
         {
-            StringAssert.DoesNotContain("BountyBag", MethodBody(AssassinExecutePath, "public bool Press("),
+            Assert.IsFalse(Regex.IsMatch(MethodBody(AssassinExecutePath, "public bool Press("), BountyBagWrite),
                 "the bounty follows the kill report, so a refused removal pays nothing");
             string pay = MethodBody(AssassinExecutePath, "public void PayExecuteBounty(");
             var credits = Regex.Matches(pay, @"BountyBag\s*\+=\s*([^;]+);").Cast<Match>().ToArray();

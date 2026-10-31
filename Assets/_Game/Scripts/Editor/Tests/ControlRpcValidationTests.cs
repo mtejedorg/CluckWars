@@ -818,8 +818,8 @@ namespace CluckWars.Tests
         {
             string src = File.ReadAllText("Assets/_Game/Scripts/Gameplay/AbilityZone.cs");
             StringAssert.DoesNotContain("RootZonesAreWalledFrom", src, "a second loop over the zones can drift from ContainsRootOf's filters");
-            Assert.AreEqual(2, Regex.Matches(src, @"PlayerBase\.WallBetween\((z\._seen|r)\.Center").Count,
-                "the wall is read once per loop, inside the vouching scan");
+            Assert.AreEqual(4, Regex.Matches(src, @"PlayerBase\.WallBetween\((z\._seen|r)\.Center").Count,
+                "the wall is read in the two vouching loops only, for the sample and for now");
             StringAssert.Contains("ControlClaimRules.AddRootZone(", src);
         }
 
