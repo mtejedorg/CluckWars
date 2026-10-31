@@ -30,7 +30,7 @@ Benched, still in the pool: Dive Bomb, Roll & Push, Feather Trap, Egg Shell.
 | Ruffle | 1.3x, 2 s, cooldown 6 s | `Ruffle.asset` |
 | Death Mark | random rival anywhere, never the last mark unless the only rival | `AssassinExecute` |
 | Kill range | 8 m, target stunned now, no wall between | `MarkKill.asset` |
-| Mark window | 12 s; arm 0 | `MarkKill.asset` |
+| Mark window | 12 s; 0.6 s before a Kill can qualify (replication floor) | `MarkKill.asset` |
 | Cooldown after a failed mark | 5 s | `MarkKill.asset` |
 | Cooldown after a kill | 15 s | `MarkKill.asset` |
 | Sneaky Steal, same bird | 10 s | `SneakySteal.asset` |

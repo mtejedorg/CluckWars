@@ -565,12 +565,6 @@ namespace CluckWars.Visuals
         /// (<see cref="ChevronOutlineSprite"/>) is a rim on that solid shape, not a
         /// replacement for it.
         /// </summary>
-        /// <summary>The chevron art, shared with <see cref="MarkFeedback"/>'s marker.</summary>
-        internal static Sprite ChevronSpriteShared => ChevronSprite();
-        internal static Sprite ChevronInkSpriteShared => ChevronOutlineSprite();
-
-        private float _chevronScale = 1f;
-
         private static Sprite ChevronSprite()
         {
             if (_chevronSprite != null) return _chevronSprite;
@@ -617,6 +611,12 @@ namespace CluckWars.Visuals
         /// Same pixels-per-unit as the fill and <see cref="ChevronOutlinePad"/> texels larger on every side, centred, so it
         /// sits exactly round the fill at the fill's transform.
         /// </summary>
+        /// <summary>The chevron art, shared with <see cref="MarkFeedback"/>'s marker.</summary>
+        internal static Sprite ChevronSpriteShared => ChevronSprite();
+        internal static Sprite ChevronInkSpriteShared => ChevronOutlineSprite();
+
+        private float _chevronScale = 1f;
+
         private static Sprite ChevronOutlineSprite()
         {
             if (_chevronOutlineSprite != null) return _chevronOutlineSprite;

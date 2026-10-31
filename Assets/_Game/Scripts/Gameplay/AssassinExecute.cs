@@ -309,7 +309,7 @@ namespace CluckWars.Gameplay
             for (int i = 0; i < all.Count; i++)
             {
                 var c = all[i];
-                if (c == null || c == _controller || c.IsDecoy || c.Object == null || !c.Object.IsValid) continue;
+                if (c == null || c == _controller || c.Object == null || !c.Object.IsValid || c.IsDecoy) continue;
                 if (ownCorner >= 0 && c.HomeCornerIndex == ownCorner) continue;   // same corner: an ally
                 rivals++;
                 if (c.Combat != null && c.Combat.IsRemoved) continue;

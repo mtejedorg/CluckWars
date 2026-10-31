@@ -181,9 +181,10 @@ namespace CluckWars.Gameplay
         /// <b>Receiver-validated (CW-230).</b> <c>RpcSources.All</c>, so the call is a claim. It is
         /// honoured only when the sender speaks for the named attacker (local invoke: the attacker
         /// is simulated here; off the wire: the sender is its state authority), that attacker has
-        /// an <see cref="AssassinExecute"/> that marked this chicken or this chicken is stunned
+        /// an <see cref="AssassinExecute"/> that marked this chicken and this chicken is stunned
         /// (the rule <c>ChickenCargo.TryResolveExecutor</c> applies to the cargo half), it is
-        /// within execute range, and the duration is the execute's. See <see cref="ExecuteRules"/>.
+        /// within kill range, and the duration is the execute's. A base wall between them is a legal
+        /// no-op, not a rejection. See <see cref="ExecuteRules"/>.
         /// </para>
         /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
@@ -284,8 +285,8 @@ namespace CluckWars.Gameplay
         }
 
         // Victim-side, local, never replicated: when this chicken's own authority last saw itself
-        // stunned. KillReady latches on a stun and outlives it, so an execute can land after the
-        // stun ended; this is the victim's own record that the stun really happened.
+        // stunned. The stun can end between the press and this RPC landing; this is the victim's
+        // own record that it really happened.
         private double _stunnedAt;   // Runner.SimulationTime, see _markSeenAt
         private bool _stunEverSeen;
 

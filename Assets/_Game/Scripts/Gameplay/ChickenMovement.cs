@@ -106,8 +106,7 @@ namespace CluckWars.Gameplay
 
             // Face the explicit aim, else the movement direction — or, turning in place, the raw stick direction
             // (planar is deliberately zeroed above in that case, so read the input directly).
-            // Skip while locked, rooted (aim-rotating is never both true — see the
-            // ControlRules.CanMove gate at the ChickenController call site), or with no input.
+            // Skip while locked or with no direction. A rooted bird turns only for an explicit aim or a bot's turn in place.
             Vector3 faceDir = faceOverride.HasValue ? new Vector3(faceOverride.Value.x, 0f, faceOverride.Value.y)
                 : aimRotateOnly ? new Vector3(input.x, 0f, input.y) : planar;
             if (!lockFacing && !_owner.MovementLocked && (aimRotateOnly || faceOverride.HasValue || !_owner.Rooted) && faceDir.sqrMagnitude > 0.01f)

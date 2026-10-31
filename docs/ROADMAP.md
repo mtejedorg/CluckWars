@@ -596,7 +596,7 @@ Full gameplay improvement plan implemented, compile-verified, and documented. âœ
 ## Fixed-kits balance baseline (2026-10-31, branch `balance`) ðŸ› 
 
 - [x] Eight fixed kits, bots included; Free one switch away (`MatchConfigSO.LoadoutMode`).
-- [x] Ruffle retune, Sneaky / Assassin / Thief rename, cold trail + home breaks the mark, base wall.
+- [x] Ruffle retune, Sneaky / Assassin / Thief rename, base wall (bodies and abilities), global Death Mark (spec v2).
 - [ ] Maestro: decide Featherfoot + Quick Drop (28.35 s / 4 trips, misses SCT by 0.15 s).
 - [ ] Builds + matrix scenarios, then human playtests (`docs/balance/human-test-baseline.md`).
 

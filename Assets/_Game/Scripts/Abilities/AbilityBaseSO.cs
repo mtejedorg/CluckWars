@@ -501,7 +501,8 @@ namespace CluckWars.Abilities
         /// <remarks>
         /// <b>What actually overrides this today</b> — a cargo requirement (Snatch, Sneaky
         /// Steal, Scrap, Roll Trample all reject an empty-handed rival), Dust Kick's rear-arc
-        /// restriction, and Mark/Kill's isolation + rival rules. That is the complete list.
+        /// restriction, and Sneaky Steal's per-victim lock. That is the complete list. (The base wall sits in
+        /// <see cref="WouldAffect"/> itself, for every ability.)
         ///
         /// <b>Immunity is deliberately NOT one of them, and must not become one.</b> A control
         /// -immune chicken (Immovable) is still <i>eligible</i>: it is gathered, it counts

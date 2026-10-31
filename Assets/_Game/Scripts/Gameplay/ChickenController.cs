@@ -1546,8 +1546,8 @@ namespace CluckWars.Gameplay
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_ResetControlStates()
         {
-            // Drop a live Death Mark first, without its fail cooldown: left in place, the reset teleport makes it
-            // fizzle on range next tick and re-arm a 5 s cooldown after the clear below (CW-231).
+            // Drop a live Death Mark first, without its fail cooldown: left in place, it would expire into the new round
+            // and re-arm its cooldown after the clear below (CW-231).
             _assassin?.ResetForNewRound();
             _stealLocks.Clear();
             // End running abilities through their own OnDeactivate first (modifiers, traversal holds, ability

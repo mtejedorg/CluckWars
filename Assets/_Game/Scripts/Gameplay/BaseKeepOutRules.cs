@@ -21,8 +21,8 @@ namespace CluckWars.Gameplay
     }
 
     /// <summary>
-    /// The base wall, pure: a chicken cannot stand inside another chicken's claimed base. Its body only: abilities reach
-    /// across, and nothing here touches the deposit radius or the SCT trip. Deterministic and allocation-free.
+    /// The base wall, pure: a chicken cannot stand inside another chicken's claimed base. This is the body half (abilities
+    /// are <see cref="BaseWallRules"/>), and nothing here touches the deposit radius or the SCT trip. Deterministic and allocation-free.
     /// </summary>
     /// <remarks>
     /// The correction is the nearest point outside every rival disc, so walking at a base keeps the tangential part of the

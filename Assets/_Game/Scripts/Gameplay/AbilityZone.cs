@@ -327,8 +327,7 @@ namespace CluckWars.Gameplay
         /// centre where the caster stood when this peer first saw it, inside its authored life, the radius clamped to the
         /// pool's authored one, and the position sample (<paramref name="sampleTime"/>) recorded no earlier than this peer first saw
         /// the zone. Read by <c>ChickenController</c>'s root-claim check.
-        /// </summary>
-        /// <summary>
+        ///
         /// The evidence and the wall from one loop, so no zone can be read without passing the same filters: only a zone that
         /// vouches for this sample has a say. History vouches (<paramref name="point"/>, blink and lag tolerance), but the zone
         /// clears the wall only if it is on the victim's side both at that sample and now (<paramref name="current"/>).

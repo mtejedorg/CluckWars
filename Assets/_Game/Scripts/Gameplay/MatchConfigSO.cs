@@ -46,8 +46,8 @@ namespace CluckWars.Gameplay
                  "last 10 s). 0 disables it. Read by GameManager through ComebackEventTiming.")]
         [Min(0f)] public float ComebackEventSecondsLeft = 10f;
 
-        [Tooltip("Base wall: a chicken's body cannot stand within this radius of another chicken's claimed base (m). " +
-                 "Own base free, unclaimed bases open, abilities reach across. Independent of PlayerBase.DepositRadius, and " +
+        [Tooltip("Base wall: neither a chicken's body nor any ability crosses this radius round a claimed base (m). " +
+                 "Own base free for the body, unclaimed bases open. Independent of PlayerBase.DepositRadius, and " +
                  "the map keeps it passable: BaseKeepOutTests checks the real layout.")]
         [Min(0f)] public float BaseKeepOutRadius = 2.5f;
 

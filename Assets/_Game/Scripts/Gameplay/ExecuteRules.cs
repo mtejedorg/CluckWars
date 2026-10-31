@@ -23,9 +23,9 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// Extra planar slack on the execute range check, on top of the drift margin. Covers what
-        /// the drift margin does not model: proxy interpolation, the tick between the mark's own
-        /// range check and the press, and both chickens' pivots. A forged call from across the
-        /// arena is still refused; a real one at the edge of the mark is not.
+        /// the drift margin does not model: proxy interpolation, the tick between the press's own
+        /// range check and its arrival, and both chickens' pivots. A forged call from across the
+        /// arena is still refused; a real one at the edge of the kill range is not.
         /// </summary>
         public const float RangeSlackMeters = 1.0f;
 
@@ -97,7 +97,7 @@ namespace CluckWars.Gameplay
         /// </summary>
         /// <remarks>
         /// Trust model: the attacker's own state authority can still self-execute within these
-        /// bounds (skip the arm timer or isolation on a marked, recently stunned victim in range).
+        /// bounds (skip the arm timer on a marked, just stunned victim in range).
         /// Shared Mode trusts each state authority over its own objects; this closes forged calls
         /// from peers that are not, and executes with no real mark + stun behind them.
         /// </remarks>

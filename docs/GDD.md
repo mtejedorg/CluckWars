@@ -584,8 +584,8 @@ the bounty, but nothing transfers.) On failure Death Mark takes a **reduced cool
 **Spec v2 (Maestro, 2026-10-31).** The press marks a **random living rival anywhere on the
 map**: no mark range, no isolation. Decoys are never picked, and the next mark can never be the last one unless that bird is the
 only rival (no time release; reset each round). The Assassin then finds it, stuns it and presses again. The Kill needs the target
-**stunned now**, the Assassin free to cast, within **KillRange 8 m**, and no base wall between them. The mark lasts **12 s**; arm is 0,
-kept as data, because crossing the map already costs the time. Only expiry, a kill or the target leaving play ends a mark: it survives
+**stunned now**, the Assassin free to cast, within **KillRange 8 m**, and no base wall between them. The mark lasts **12 s**. A Kill cannot qualify in the first 0.6 s, which only
+lets the mark reach the victim's authority. Only expiry, a kill or the target leaving play ends a mark: it survives
 range, crowds and the target going home, where no ability reaches it, so the timer can run out. Expiry costs the fail cooldown (5 s);
 a kill 15 s. All numbers are on `MarkKill.asset`. The bounty is paid on the victim's kill report, so a refused kill pays nothing.
 
