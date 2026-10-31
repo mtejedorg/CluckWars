@@ -198,7 +198,7 @@ namespace CluckWars.Gameplay
         // networked, every-peer-visible aim state — once it has survived
         // FeedbackTuning.TapHoldThresholdSeconds. Releasing before then still fires
         // (release ALWAYS fires); it just never paid for a telegraph, target marks, the
-        // opponent-visible wind-up glow, or the aim-rotate movement lock, all four of
+        // opponent-visible wind-up glow, or the turn toward the aim, all four of
         // which gate themselves on ChargingSlot and so need no changes of their own.
         //
         // Deliberately plain fields and not [Networked]: this is a decision the state

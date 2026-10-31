@@ -552,5 +552,18 @@ namespace CluckWars.Tests
             Assert.AreEqual("settings.quickMoves", CluckWars.Localization.UiKeys.SettingsQuickMoves);
             Assert.AreEqual("settings.quickMoves.desc", CluckWars.Localization.UiKeys.SettingsQuickMovesDesc);
         }
+
+        /// <summary>
+        /// Maestro: holding an ability previews its range and the chicken keeps moving. The hold used to turn the stick into
+        /// facing for directional abilities, so the bird stopped dead. Only bots' own turn-in-place may suppress translation.
+        /// </summary>
+        [Test]
+        public void HoldingAnAbility_NeverStopsThePlayersMovement()
+        {
+            string fun = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/ChickenController.cs", "public override void FixedUpdateNetwork()");
+            StringAssert.DoesNotContain("aiming != null, lockFacing", fun, "a charge must not suppress translation");
+            StringAssert.Contains("_movement.Tick(input.Movement, Runner.DeltaTime,", fun, "the stick always walks the bird");
+            StringAssert.Contains("faceOverride:", fun, "an explicit aim turns the bird without moving it");
+        }
     }
 }

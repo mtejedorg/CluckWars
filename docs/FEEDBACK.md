@@ -96,12 +96,13 @@ While the ability button is held:
      is marked only when the bird is both steal-proof and control-immune (Egg Shell); against a
      Turtle the shove still lands.
    - **Self** — never marked. Self-buffs mark the caster's own ring instead.
-3. **Aim rotation** — **once the hold passes `TapHoldThresholdSeconds`**, the
-   movement stick rotates the aim instead of translating the chicken, for
-   directional abilities (cone / forward-offset / capsule / jump). Caster-centred
-   shapes (self-circle, aura, single-target) are rotation-invariant and keep normal
-   movement even on a long hold. A sub-threshold tap never pays this cost at all —
-   that is the "speed" half of the v0.6.1 decision above. The predicate is
+3. **Aim rotation** — **a hold never stops the chicken** (Maestro, 2026-10-31; it used to
+   turn the stick into facing, which froze the bird). Once the hold passes
+   `TapHoldThresholdSeconds`, for directional abilities (cone / forward-offset / capsule /
+   jump), an explicit aim (mouse, right stick) faces the bird while the movement stick
+   strafes it; with no aim given (touch, single stick, keyboard only) the stick steers both,
+   so moving is how you aim. Caster-centred shapes (self-circle, aura, single-target) are
+   rotation-invariant and need neither. The predicate is
    `AbilityBaseSO.IsDirectionalAim`, written as an *exclusion* list so a newly added
    shape is directional by default (a harmless wrong answer) rather than silently
    losing aim-rotate (a broken one).

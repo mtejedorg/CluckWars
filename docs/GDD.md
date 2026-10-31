@@ -879,7 +879,7 @@ the same `WouldAffect` predicate). Release = use it.
 |---|---|---|
 | **Your preview** | shown from the press frame | shown |
 | **Wind-up glow rivals can see** | none | ramps up at your feet (hidden while you are invisible) |
-| **Movement** | full speed | the stick rotates your aim instead of moving you (directional shapes only) |
+| **Movement** | full speed | full speed: an explicit aim faces you while you strafe; with one stick, moving is how you aim |
 
 Rivals see only the glow at your feet — a wind-up tell, not your area. That asymmetry is
 deliberate: counterplay ("he's charging something, disengage") without a solved puzzle.

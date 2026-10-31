@@ -48,22 +48,20 @@ namespace CluckWars.Gameplay
         /// by <c>FusionNetworkService.OnInput</c> — see <paramref name="aimRotateOnly"/>.</param>
         /// <param name="deltaTime">Simulation delta time.</param>
         /// <param name="aimRotateOnly">
-        /// v0.6 hold-to-aim (FEEDBACK.md §2.3): true while the caster is charging a
-        /// directional ability (Cone/ForwardCircle/Jump aim shape). The stick still
-        /// steers <em>facing</em> — the chicken turns to aim — but planar translation is
-        /// suppressed; gravity and knockback keep running exactly as normal so a rooted-
-        /// in-place chicken doesn't float or clip through the floor while aiming.
+        /// Turn in place: the stick steers <em>facing</em> and planar translation is suppressed; gravity and knockback keep
+        /// running. Only a bot lining up a cast uses this (<c>ChickenController.BotFace</c>). A player's hold never does.
         /// </param>
+        /// <param name="faceOverride">A player's explicit aim during a hold: the bird faces it while <paramref name="input"/> walks it.</param>
         /// <param name="lockFacing">Phase 6 chunk 5 (A7): true on the tick an ability has just turned the bird to its aim,
         /// so this tick's movement cannot rotate it again before the rotation replicates.</param>
-        public void Tick(Vector2 input, float deltaTime, bool aimRotateOnly = false, bool lockFacing = false)
+        public void Tick(Vector2 input, float deltaTime, bool aimRotateOnly = false, bool lockFacing = false, Vector2? faceOverride = null)
         {
             var stats = _owner.Stats;
             if (stats == null) return;
 
             // Planar input is ignored when movement is locked (Egg Shell, Turtle Mode, …),
             // when rooted (Rooted blocks horizontal motion but allows ability casts), or
-            // while aim-rotating a directional hold (translation suppressed, facing only).
+            // for a bot turning in place (translation suppressed, facing only).
             var planar = Vector3.zero;
             if (!aimRotateOnly && !_owner.MovementLocked && !_owner.Rooted)
             {
@@ -106,12 +104,13 @@ namespace CluckWars.Gameplay
 
             ClampInsideArena();
 
-            // Face movement direction — or, while aim-rotating, the raw stick direction
+            // Face the explicit aim, else the movement direction — or, turning in place, the raw stick direction
             // (planar is deliberately zeroed above in that case, so read the input directly).
             // Skip while locked, rooted (aim-rotating is never both true — see the
             // ControlRules.CanMove gate at the ChickenController call site), or with no input.
-            Vector3 faceDir = aimRotateOnly ? new Vector3(input.x, 0f, input.y) : planar;
-            if (!lockFacing && !_owner.MovementLocked && (aimRotateOnly || !_owner.Rooted) && faceDir.sqrMagnitude > 0.01f)
+            Vector3 faceDir = faceOverride.HasValue ? new Vector3(faceOverride.Value.x, 0f, faceOverride.Value.y)
+                : aimRotateOnly ? new Vector3(input.x, 0f, input.y) : planar;
+            if (!lockFacing && !_owner.MovementLocked && (aimRotateOnly || faceOverride.HasValue || !_owner.Rooted) && faceDir.sqrMagnitude > 0.01f)
             {
                 var targetRot = Quaternion.LookRotation(faceDir.normalized, Vector3.up);
                 _transform.rotation = Quaternion.RotateTowards(

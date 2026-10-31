@@ -375,8 +375,8 @@ namespace CluckWars.Abilities
         /// <summary>
         /// Does aiming this ability mean aiming a <i>direction</i>? True for every shape
         /// whose footprint moves when the caster turns, which is what
-        /// <c>ChickenController.AimRotatingAbility</c> uses to convert the movement stick into
-        /// facing during a hold (FEEDBACK.md §2.3).
+        /// <c>ChickenController.AimRotatingAbility</c> uses to face an explicit aim during a hold,
+        /// while the stick keeps walking the bird (FEEDBACK.md §2.3).
         /// </summary>
         /// <remarks>
         /// Written as an exclusion list rather than an inclusion list on purpose: this used

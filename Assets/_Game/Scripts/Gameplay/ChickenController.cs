@@ -899,13 +899,15 @@ namespace CluckWars.Gameplay
 
             if (GetInput<PlayerNetworkInput>(out var input))
             {
-                // Aiming a directional move with the mouse / right stick turns the bird toward the aim; otherwise the
-                // movement stick steers the facing, exactly as before (Aim 0).
-                var steer = input.Movement;
+                // A held ability previews, it never stops the bird: the stick always walks. Aiming a directional move with
+                // the mouse / right stick faces the aim while the bird strafes; with no aim given the stick steers both, so
+                // on a single stick moving is how you aim.
                 var aiming = AimRotatingAbility();
-                if (aiming != null && aiming.RotatesToAim && input.Aim != 0) steer = CluckWars.Input.AimQuantizer.Decode(input.Aim);
+                Vector2? face = aiming != null && aiming.RotatesToAim && input.Aim != 0
+                    ? CluckWars.Input.AimQuantizer.Decode(input.Aim)
+                    : (Vector2?)null;
 
-                _movement.Tick(steer, Runner.DeltaTime, aiming != null, lockFacing: _facingLockTick == Runner.Tick.Raw);
+                _movement.Tick(input.Movement, Runner.DeltaTime, lockFacing: _facingLockTick == Runner.Tick.Raw, faceOverride: face);
             }
         }
 
@@ -1000,9 +1002,8 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// v0.6 hold-to-aim (FEEDBACK.md §2.3): true while this chicken is charging an
-        /// ability whose footprint moves when they turn — the movement stick should rotate
-        /// the caster's facing instead of translating them. Reads
+        /// Hold-to-aim (FEEDBACK.md §2.3): the ability this chicken is charging, when its footprint moves as they turn, so
+        /// an explicit aim faces the bird. Movement is unaffected. Reads
         /// <see cref="AbilityController.ChargingAbility"/>, so it only ever fires here on
         /// the StateAuthority path above (bots never reach this — <c>IsBot</c> already
         /// returned earlier — and non-directional shapes fall through to normal movement).
