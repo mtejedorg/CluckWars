@@ -7,6 +7,15 @@ using UnityEngine;
 
 namespace CluckWars.Tests
 {
+    internal static class Vector2Rotate
+    {
+        public static Vector2 Rotate(this Vector2 v, float degrees)
+        {
+            float r = degrees * Mathf.Deg2Rad, c = Mathf.Cos(r), s = Mathf.Sin(r);
+            return new Vector2(v.x * c - v.y * s, v.x * s + v.y * c);
+        }
+    }
+
     /// <summary>The base wall: the pure rule, its bot steering, the wiring, and the geometry checks on the shipped map.</summary>
     public class BaseKeepOutTests
     {
@@ -223,6 +232,66 @@ namespace CluckWars.Tests
             for (int i = 0; i < bases.Length; i++)
                 for (int j = 0; j < bases.Length; j++)
                     if (i != j) Assert.Greater((bases[i] - bases[j]).magnitude - Jitter, Radius);
+        }
+
+        // ---- no ability crosses a wall -------------------------------------------------------------------------------
+
+        private static readonly Vector2 Wall = new Vector2(20f, 20f);
+
+        [Test]
+        public void TheWall_BlocksEitherWay_ButNotAPairOnOneSide()
+        {
+            var inside = new Vector3(20f, 0f, 19f);
+            var outside = new Vector3(20f, 0f, 15f);
+            Assert.IsTrue(BaseWallRules.Blocks(inside, outside, Wall, R));
+            Assert.IsTrue(BaseWallRules.Blocks(outside, inside, Wall, R));
+            Assert.IsFalse(BaseWallRules.Blocks(inside, new Vector3(21f, 0f, 20f), Wall, R), "both inside");
+            Assert.IsFalse(BaseWallRules.Blocks(outside, new Vector3(10f, 0f, 10f), Wall, R), "both outside");
+        }
+
+        [Test]
+        public void AClampedRival_AlwaysReadsOutside_EvenOnAProxyChord()
+        {
+            var keepOut = new[] { Rival };
+            Assert.IsTrue(BaseKeepOutRules.TryCorrect(new Vector3(21f, 0f, 19f), keepOut, 1, Own, out var clamped));
+            Assert.IsFalse(BaseWallRules.IsInside(clamped, Wall, R));
+            // Interpolating between two clamped points 0.3 m apart sags about 5 mm inside the circle.
+            var other = Wall + (new Vector2(clamped.x, clamped.z) - Wall).Rotate(6.9f);
+            var mid = (clamped + new Vector3(other.x, 0f, other.y)) * 0.5f;
+            Assert.Less(Vector2.Distance(new Vector2(mid.x, mid.z), Wall), R);
+            Assert.IsFalse(BaseWallRules.IsInside(mid, Wall, R), "a sliding rival must not flicker in a telegraph");
+        }
+
+        [Test]
+        public void ZeroRadius_MeansNoWall() =>
+            Assert.IsFalse(BaseWallRules.Blocks(new Vector3(20f, 0f, 20f), new Vector3(0f, 0f, 0f), Wall, 0f));
+
+        [TestCase("Abilities/AbilityBaseSO.cs", "WallBetween(caster.transform.position, candidate.transform.position)")]
+        [TestCase("Gameplay/ChickenController.cs", "!PlayerBase.WallBetween(center, transform.position)")]
+        [TestCase("Gameplay/ChickenController.cs", "!PlayerBase.WallBetween(transform.position, other.transform.position)")]
+        [TestCase("Gameplay/ChickenCargo.cs", "PlayerBase.WallBetween(thief.transform.position, transform.position)")]
+        public void EveryEffectPath_AsksTheWall(string file, string call) =>
+            StringAssert.Contains(call, File.ReadAllText("Assets/_Game/Scripts/" + file));
+
+        [Test]
+        public void TheZoneAsksTheWall_InTheScanAndTheConfirmation()
+        {
+            var src = Src("AbilityZone.cs");
+            int scan = src.IndexOf("private void ScanOnEnter()", StringComparison.Ordinal);
+            int add = src.IndexOf("_entered.Add(chicken.Id)", scan, StringComparison.Ordinal);
+            Assert.Less(src.IndexOf("PlayerBase.WallBetween(center", scan, StringComparison.Ordinal), add, "the scan refuses before it consumes");
+            Assert.Greater(src.IndexOf("PlayerBase.WallBetween(center", src.IndexOf("private bool IsCaught(", StringComparison.Ordinal), StringComparison.Ordinal), 0);
+        }
+
+        [Test]
+        public void AControlClaimAcrossAWall_IsANoOp_NeverARejection()
+        {
+            var src = Src("ChickenController.cs");
+            int accept = src.IndexOf("private bool AcceptControlClaim(", StringComparison.Ordinal);
+            int wall = src.IndexOf("CrossedBaseWall(kind, caster)", accept, StringComparison.Ordinal);
+            int warn = src.IndexOf("_log?.Warn", accept, StringComparison.Ordinal);
+            Assert.Greater(wall, accept);
+            Assert.Less(wall, warn, "the wall answer sits inside the Accepted branch, above the rejection log");
         }
 
         // ---- wiring ------------------------------------------------------------------------------------------------

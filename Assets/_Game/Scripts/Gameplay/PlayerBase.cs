@@ -109,6 +109,22 @@ namespace CluckWars.Gameplay
         public float DepositRadius => _depositRadius;
 
         /// <summary>
+        /// Does a claimed base's wall stand between these two points (<see cref="BaseWallRules"/>)? The one question every
+        /// ability path asks, on any peer, from replicated state. An unclaimed base has no wall.
+        /// </summary>
+        public static bool WallBetween(Vector3 a, Vector3 b)
+        {
+            for (int i = 0; i < ActiveBases.Count; i++)
+            {
+                var pb = ActiveBases[i];
+                if (pb == null || pb.Object == null || !pb.Object.IsValid || !pb.IsClaimed || pb._matchConfig == null) continue;
+                Vector3 at = pb.HasSpawnPosition ? pb.SpawnPosition : pb.transform.position;
+                if (BaseWallRules.Blocks(a, b, new Vector2(at.x, at.z), pb._matchConfig.BaseKeepOutRadius)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>
         /// Fills <paramref name="into"/> with every claimed base's keep-out disc as this peer sees it; returns how many. A
         /// base a player left keeps its <see cref="Owner"/> (nothing reassigns it), so it stays claimed, still shows its
         /// colour, and its wall stays: what is drawn is what blocks.

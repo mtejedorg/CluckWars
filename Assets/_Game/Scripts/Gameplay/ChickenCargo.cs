@@ -649,9 +649,11 @@ namespace CluckWars.Gameplay
             // before crediting itself, so reaching this point means the shell went up inside one
             // round trip of the thief's scan (the same sub-RTT race Immovable has). The thief has
             // ALREADY credited itself, so a bare refusal would duplicate food: send the credit back.
-            if (_controller.IsStealProof)
+            // A base wall arrived the same way: the victim stepped through it inside one round trip (BaseWallRules).
+            bool walled = PlayerBase.WallBetween(thief.transform.position, transform.position);
+            if (_controller.IsStealProof || walled)
             {
-                _log?.Info(Source, $"{name}: steal hit a shell that went up inside one round trip — " +
+                _log?.Info(Source, $"{name}: steal hit {(walled ? "a base wall" : "a shell that went up")} inside one round trip — " +
                                    $"refunded {amount:0.00} to {thief.name}.");
                 if (thief.Cargo != null)
                     thief.Cargo.RPC_RefundRefusedSteal(amount, _controller.Id);

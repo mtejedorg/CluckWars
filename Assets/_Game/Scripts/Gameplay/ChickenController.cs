@@ -1380,7 +1380,14 @@ namespace CluckWars.Gameplay
         {
             var ceiling = CeilingFor(kind);
             var verdict = JudgeControl(kind, seconds, factor, casterId, info, ceiling, out var caster);
-            if (verdict == ControlClaimRules.Verdict.Accepted) return true;
+            if (verdict == ControlClaimRules.Verdict.Accepted)
+            {
+                if (!CrossedBaseWall(kind, caster)) return true;
+                // The caster's scan refuses a walled target, so this is a race: the victim stepped through a wall while the
+                // RPC flew. A legal no-op, never a rejection (BaseWallRules).
+                _log?.Debug(Source, $"{name}: {rpc} from {caster.name} landed across a base wall; no effect.");
+                return false;
+            }
 
             if (ControlRejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
                 _log?.Warn(Source, $"{name}: rejected {rpc}(seconds={seconds:0.00}" +
@@ -1399,12 +1406,26 @@ namespace CluckWars.Gameplay
             _                => ControlClaimRules.Ceiling.Unknown,
         };
 
+        /// <summary>A direct effect is judged against the caster; a root may come from a zone, so it is judged against the zone.</summary>
+        private bool CrossedBaseWall(ControlKind kind, ChickenController caster)
+        {
+            if (caster == null) return false;
+            var at = transform.position;
+            return kind == ControlKind.Root && _lastRootClaimInZone
+                ? AbilityZone.RootZonesAreWalledFrom(caster, at)
+                : PlayerBase.WallBetween(caster.transform.position, at);
+        }
+
+        // JudgeControl's answer to "did a zone of the caster vouch for this root": read once, by CrossedBaseWall, same tick.
+        private bool _lastRootClaimInZone;
+
         /// <summary>Gathers what this (the victim's) authority can see about a control claim and judges it.</summary>
         private ControlClaimRules.Verdict JudgeControl(ControlKind kind, float seconds, float factor,
             NetworkBehaviourId casterId, in RpcInfo info, in ControlClaimRules.Ceiling ceiling, out ChickenController caster)
         {
             caster = null;
             var claim = new ControlClaimRules.Claim { Kind = kind, Seconds = seconds, SlowFactor = factor };
+            _lastRootClaimInZone = false;
 
             if (Runner != null && Runner.TryFindBehaviour(casterId, out caster) &&
                 caster != null && caster.Object != null && caster.Object.IsValid)
@@ -1431,6 +1452,7 @@ namespace CluckWars.Gameplay
                 float zoneMargin = claim.RangeMargin + ControlClaimRules.RangeSlackMeters;
                 claim.InsideCastersRootZone = kind == ControlKind.Root &&
                     (AbilityZone.ContainsRootOf(caster, v, Time.realtimeSinceStartup, zoneMargin, ceiling) || WasRecentlyInsideRootOf(caster, zoneMargin, ceiling));
+                _lastRootClaimInZone = claim.InsideCastersRootZone;
             }
 
             return ControlClaimRules.Evaluate(claim, ceiling);
@@ -1610,7 +1632,9 @@ namespace CluckWars.Gameplay
                 if (touched || sqr > CollisionSlowRadius * CollisionSlowRadius) continue;
                 touched = true;
 
-                if (StealBackActive && other.Cargo != null && Cargo != null)
+                // The bodies can touch across a wall (an owner just inside, a rival clamped on it); the steal-back is an ability.
+                if (StealBackActive && other.Cargo != null && Cargo != null &&
+                    !PlayerBase.WallBetween(transform.position, other.transform.position))
                 {
                     if (!_stealBackCooldowns.TryGetValue(other.Id, out var cd) || cd.Expired(Runner))
                     {
@@ -1674,7 +1698,8 @@ namespace CluckWars.Gameplay
                 // Own Feather Trap never slows the owner (GDD §7.2); zones ignore decoys (B7).
                 if (AreaEffectRules.IgnoresChicken(zone.OwnerChicken == this.Id, IsDecoy)) continue;
                 if (!zone.TryGetCenter(out Vector3 center)) continue;
-                if (AreaEffectRules.IsInside(center, zone.TriggerRadius, transform.position))
+                if (AreaEffectRules.IsInside(center, zone.TriggerRadius, transform.position) &&
+                    !PlayerBase.WallBetween(center, transform.position))
                     ApplySlow(SlowSource.Ability, zone.SlowFactor);
             }
         }

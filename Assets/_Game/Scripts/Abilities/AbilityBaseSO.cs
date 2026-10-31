@@ -621,6 +621,8 @@ namespace CluckWars.Abilities
         /// and is what lets the telegraph's grey "in the area, no effect" overlay be the
         /// exact gap between the two.
         ///
+        /// A claimed base's wall between caster and candidate refuses here too (<see cref="Gameplay.BaseWallRules"/>).
+        ///
         /// <b>Eligibility is not selection.</b> For a shape that hits everything it covers
         /// the two coincide, but a <see cref="AbilityAimShape.SingleTarget"/> ability has
         /// several eligible candidates and hits one. <see cref="GatherTargets"/> owns that
@@ -659,6 +661,10 @@ namespace CluckWars.Abilities
             if (candidate.Combat != null && candidate.Combat.IsDead) return false;
 
             if (!IsInAimShape(caster, candidate, forward)) return false;
+
+            // No ability crosses a base wall (BaseWallRules). After the shape, so a walled rival is the grey
+            // "in the area, no effect" gap, and every consumer of this one predicate refuses it alike.
+            if (!isSelf && Gameplay.PlayerBase.WallBetween(caster.transform.position, candidate.transform.position)) return false;
 
             return ExtraTargetFilter(caster, candidate);
         }

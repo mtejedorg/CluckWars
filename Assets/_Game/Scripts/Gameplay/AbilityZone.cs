@@ -328,6 +328,33 @@ namespace CluckWars.Gameplay
         /// pool's authored one, and the position sample (<paramref name="sampleTime"/>) recorded no earlier than this peer first saw
         /// the zone. Read by <c>ChickenController</c>'s root-claim check.
         /// </summary>
+        /// <summary>
+        /// Race guard for a root claim that passed: is every live or recent Root zone of <paramref name="caster"/> walled off
+        /// from <paramref name="point"/>? The evidence keeps vouching (so the claim is not a rejected RPC), and this turns it
+        /// into a legal no-op: the victim stepped through a wall after the zone's authority scanned it.
+        /// </summary>
+        public static bool RootZonesAreWalledFrom(ChickenController caster, Vector3 point)
+        {
+            if (caster == null || caster.Object == null || !caster.Object.IsValid) return false;
+            var owner = caster.Id;
+            bool any = false;
+            for (int i = 0; i < ActiveZones.Count; i++)
+            {
+                var z = ActiveZones[i];
+                if (z == null || !z._seenAsRoot || z._seen.Owner != owner) continue;
+                if (!PlayerBase.WallBetween(z._seen.Center, point)) return false;
+                any = true;
+            }
+            for (int i = 0; i < _recentRoots.Count; i++)
+            {
+                var r = _recentRoots[i];
+                if (r.Owner != owner) continue;
+                if (!PlayerBase.WallBetween(r.Center, point)) return false;
+                any = true;
+            }
+            return any;
+        }
+
         public static bool ContainsRootOf(ChickenController caster, Vector3 point, float sampleTime, float margin, in ControlClaimRules.Ceiling ceiling)
         {
             if (caster == null || caster.Object == null || !caster.Object.IsValid) return false;
@@ -531,6 +558,8 @@ namespace CluckWars.Gameplay
                 if (AreaEffectRules.IgnoresChicken(chicken.Id == OwnerChicken, chicken.IsDecoy)) continue;
                 if (chicken.Combat != null && chicken.Combat.IsRemoved) continue;
                 if (!AreaEffectRules.IsInside(center, radius, chicken.transform.position)) continue;
+                // Zone centre against victim: the egg stays armed for whoever walks in on this side of the wall.
+                if (PlayerBase.WallBetween(center, chicken.transform.position)) continue;
                 if (!_entered.Add(chicken.Id)) continue;   // already fired on this chicken in this life
 
                 // Names the caster, not this zone: the victim's authority checks the sender against the
@@ -723,6 +752,8 @@ namespace CluckWars.Gameplay
 
             var obj = chicken.Object;
             if (obj == null || !obj.IsValid) return false;
+            // A confirmation must not show a hit that did nothing (BaseWallRules, zone centre against victim).
+            if (PlayerBase.WallBetween(center, chicken.transform.position)) return false;
 
             return AreaEffectRules.IsInside(center, radius, chicken.transform.position);
         }
