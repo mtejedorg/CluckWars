@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1607ba97cdb2daa409055a6e00e3e527, type: 3}
   m_Name: Spoiler
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SpoilerPassiveSO
-  DisplayName: Spoiler
-  ShortLabel: SPOI
+  DisplayName: Assassin
+  ShortLabel: ASSN
   Description: "If nobody reaches 40 before time's up, you bank 15 bonus food first."
   Icon: 
   AccentColor: {r: 0.55, g: 0.42, b: 0.85, a: 1}

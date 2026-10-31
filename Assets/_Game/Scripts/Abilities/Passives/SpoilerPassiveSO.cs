@@ -30,8 +30,8 @@ namespace CluckWars.Abilities
 
         public SpoilerPassiveSO()
         {
-            DisplayName = "Spoiler";
-            ShortLabel = "SPOI";
+            DisplayName = "Assassin";
+            ShortLabel = "ASSN";
             AllowedClasses = ChickenClassFlags.Assassin;
         }
 

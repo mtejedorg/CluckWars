@@ -59,7 +59,7 @@
                     <ui:Button name="ClassWarrior"  text="WARRIOR"  class="cw-lab-chip" />
                     <ui:Button name="ClassSpeedy"   text="SPEEDY"   class="cw-lab-chip" />
                     <ui:Button name="ClassFatty"    text="FATTY"    class="cw-lab-chip" />
-                    <ui:Button name="ClassAssassin" text="ASSASSIN" class="cw-lab-chip" />
+                    <ui:Button name="ClassAssassin" text="SNEAKY" class="cw-lab-chip" />
                 </ui:VisualElement>
 
                 <!-- LOADOUT. Pick what the next tap assigns to, then pick the
