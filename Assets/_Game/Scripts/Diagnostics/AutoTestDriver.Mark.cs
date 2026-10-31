@@ -45,7 +45,7 @@ namespace CluckWars.Diagnostics
             if (exec.MarkedTarget == NetworkBehaviourId.None)
             {
                 _autoPlay.SteerOverride = null;
-                if (abilities.IsReady(markSlot)) _autoPlay.Press(markSlot, AutoPlayInputProvider.HoldSeconds);
+                if (abilities.IsReady(markSlot)) PressOnce(markSlot);
                 _markWalkFrom = Time.realtimeSinceStartup;
                 return;
             }
@@ -63,8 +63,18 @@ namespace CluckWars.Diagnostics
             {
                 var a = abilities.GetSlot(s);
                 if (FixedKit.EmitsStun(a) && abilities.IsReady(s) && a.IsUsable(self))
-                    _autoPlay.Press(s, AutoPlayInputProvider.HoldSeconds);
+                    PressOnce(s);
             }
+        }
+
+        // Press restarts the hold, so a press every frame would never release.
+        private float _markPressAt;
+
+        private void PressOnce(int slot)
+        {
+            if (Time.realtimeSinceStartup < _markPressAt) return;
+            _markPressAt = Time.realtimeSinceStartup + AutoPlayInputProvider.HoldSeconds + 0.3f;
+            _autoPlay.Press(slot, AutoPlayInputProvider.HoldSeconds);
         }
 
         private static int SlotOf<T>(AbilityController abilities) where T : AbilityBaseSO
@@ -77,7 +87,7 @@ namespace CluckWars.Diagnostics
         private void MarkShot(ref bool taken, string name)
         {
             if (taken) return;
-            if (++_markFrames < 20) return;   // a few frames into the phase: the first one has no marker yet
+            if (++_markFrames < 8) return;   // a few frames into the phase: the first one has no marker yet
             _markFrames = 0;
             taken = true;
             var path = Path.Combine(_markShotDir, string.Format(CultureInfo.InvariantCulture, "{0}-{1}x{2}.png", name, Screen.width, Screen.height));

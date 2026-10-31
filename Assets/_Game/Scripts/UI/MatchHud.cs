@@ -218,11 +218,14 @@ namespace CluckWars.UI
         private void BuildMarkBanner(Transform parent)
         {
             var go = CreateUI("MarkBanner", parent, out var rt);
-            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.68f);
             rt.sizeDelta = new Vector2(980f, 96f);
             _markPlate = go.AddComponent<Image>();
             _markPlate.raycastTarget = false;
             _markText = AddText(go.transform, "MarkBannerText", string.Empty, 50, TextAnchor.MiddleCenter, FontStyle.Bold);
+            _markText.resizeTextForBestFit = true;   // the longest phase must stay on one line at phone width
+            _markText.resizeTextMinSize = 26;
+            _markText.resizeTextMaxSize = 50;
+            _markText.horizontalOverflow = HorizontalWrapMode.Wrap;
             var textRt = _markText.rectTransform;
             textRt.anchorMin = Vector2.zero;
             textRt.anchorMax = Vector2.one;
@@ -237,6 +240,13 @@ namespace CluckWars.UI
             bool show = phase != CluckWars.Visuals.MarkPhase.None;
             if (_markPlate.gameObject.activeSelf != show) _markPlate.gameObject.SetActive(show);
             if (!show) return;
+
+            // In the free strip of the top band, never over the bird at the centre of the screen.
+            var anchor = Screen.width >= Screen.height
+                ? CluckWars.Visuals.FeedbackTuning.MarkBannerLandscape
+                : CluckWars.Visuals.FeedbackTuning.MarkBannerPortrait;
+            var plate = _markPlate.rectTransform;
+            plate.anchorMin = plate.anchorMax = anchor;
 
             bool kill = phase == CluckWars.Visuals.MarkPhase.Kill;
             _markText.text = CluckWars.Visuals.MarkFeedback.BannerText;

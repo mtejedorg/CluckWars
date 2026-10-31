@@ -518,6 +518,10 @@ namespace CluckWars.Visuals
         /// <paramref name="bearing"/> (viewport axes). Shared by the LateUpdate placement and the spread pass.</summary>
         private void PlaceChevron(Camera cam, Vector2 at, Vector2 bearing)
         {
+            // The clamp assumed a normal arrow: a bigger one steps inward by what it grew, or its tip leaves the screen.
+            float grown = (_chevronScale - 1f) * 0.5f * FeedbackTuning.RivalChevronSizeFraction;
+            at -= new Vector2(bearing.x * grown / Mathf.Max(0.1f, cam.aspect), bearing.y * grown);
+
             float depth = cam.nearClipPlane + FeedbackTuning.RivalChevronDepthOffset;
             var t = _chevron.transform;
             t.position = cam.ViewportToWorldPoint(new Vector3(at.x, at.y, depth));
