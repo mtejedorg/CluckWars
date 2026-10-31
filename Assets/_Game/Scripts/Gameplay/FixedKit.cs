@@ -125,7 +125,8 @@ namespace CluckWars.Gameplay
             var byClass = new SortedDictionary<ChickenClass, List<PassiveAbilitySO>>();
             foreach (var p in passives ?? Enumerable.Empty<PassiveAbilitySO>())
             {
-                if (p == null || !PreEquippedLoadout.TryGetSingleClass(p.AllowedClasses, out var cls)) continue;
+                if (p == null || p.Subclass == ChickenSubclass.None) continue;   // reported by ValidateRoster; a bot needs a real class
+                if (!PreEquippedLoadout.TryGetSingleClass(p.AllowedClasses, out var cls)) continue;
                 if (!byClass.TryGetValue(cls, out var list)) byClass[cls] = list = new List<PassiveAbilitySO>();
                 list.Add(p);
             }

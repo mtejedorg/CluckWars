@@ -536,7 +536,7 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// One bot loadout option. Authored as inspector rows on
+        /// One bot loadout option, <see cref="LoadoutMode.Free"/> only. Authored as inspector rows on
         /// <see cref="MatchBootstrapper"/>; a bot rolls a random preset whose
         /// <see cref="AllowedClasses"/> permits its class. <see cref="Slot2"/> is only
         /// equipped on Assassin bots (the Combo 3rd slot).

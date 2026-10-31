@@ -262,6 +262,14 @@ namespace CluckWars.Tests
             CollectionAssert.AreEqual(new PassiveAbilitySO[3], FixedKit.RollBotLineup(1, 3, null));
         }
 
+        [Test]
+        public void RollBotLineup_SkipsAPassiveWithNoSubclass()
+        {
+            var unnamed = Broken(ChickenSubclass.Warrior_Bully, k => k);
+            unnamed.Subclass = ChickenSubclass.None;
+            CollectionAssert.AreEqual(new PassiveAbilitySO[2], FixedKit.RollBotLineup(1, 2, new[] { unnamed }));
+        }
+
         /// <summary>
         /// "No bot silently idle": every kit ability must be reachable by its class's strategy through a real CastPlan, or by
         /// the two paths outside the plans (Peck at a pile, a steal shell).
