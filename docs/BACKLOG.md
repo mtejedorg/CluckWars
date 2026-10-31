@@ -119,5 +119,5 @@ Types: bug task idea decision debt.
 - [ ] BL-113 P2 task | CW-243 Re-verify menu redesign in the real Editor - Two-step flow, stable ability slots, Assassin pool scroll (refs: docs/superpowers/handoffs/2026-09-17-menu-redesign-verification.md) [+2026-10-30]
 - [ ] BL-114 P2 task | CW-244 Networking checklist items not covered by the matrix - Remote-move, intro button-mash, bot-pacing re-measure (refs: docs/HANDOFF-NETWORKING-2026-07.md:365) [+2026-10-30]
 - [ ] BL-115 P2 task | CW-245 Run CW-233 in Unity and the matrix - Two joiners on one corner [+2026-10-30]
-- [ ] BL-116 P2 task | CW-246 Run the execute path live with two clients - Expect 0 rejected RPC_ExecuteRemoval and RPC_CreditKill; Kills +1 per execute [+2026-10-30]
+- [ ] BL-116 P2 task | CW-246 Run the execute path live with two clients - Expect 0 rejected RPC_ExecuteRemoval and RPC_CreditKill; Kills +1 per execute. Note 2026-10-31: the Kill press was refused by the mark's own cooldown until branch balance; only testable from there [+2026-10-30]
 - [ ] BL-117 P2 task | CW-247 Portrait layouts WP6-WP9 in Unity and capture - EditMode, capture 540x960 and 540x1200, results/leave/waiting room by hand (refs: docs/STATE.md) [+2026-10-30]

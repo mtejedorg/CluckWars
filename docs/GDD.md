@@ -489,8 +489,8 @@ current, shipped state.
 | | The Anxious (Featherfoot) | Immune to the pile-slow and the collision slow (A6, 2026-10-21) | ⏳ *pending — a Peck variant* |
 | **Fatty** | The Hauler (Hoarder) | Carries at least a full win's worth | ⏳ *pending — a Peck variant* |
 | | The Boulder (Bulwark) | Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner | **Ground Quake** (stomp leaves the area stuck) |
-| **Assassin** | The Reaper (Spoiler) | Banks a bonus if the clock expires with no winner | **Death Mark** (the execute, §6.4) |
-| | The Burglar (Thief) | Every steal takes 1.6x more | **Sneaky Steal** |
+| **Sneaky** | The Assassin (Spoiler; was Reaper) | Banks a bonus if the clock expires with no winner | **Death Mark** (the execute, §6.4) |
+| | The Thief (was Burglar) | Every steal takes 1.6x more | **Sneaky Steal** |
 
 **Three signatures are still unassigned — and the plan for them changed on 2026-09-04.**
 Slippery / Featherfoot / Hoarder previously each wanted a Peck *variant* (empty-beak rush,
@@ -504,7 +504,7 @@ economy or escape tools that read as that specialization's fantasy. Until they l
 three grant their passive only, which is the one remaining place where §7.1's "every
 specialization determines a signature" is not yet literally true. Tracked as §11 item 2.
 
-**Why Bully/Relentless and Reaper/Burglar are each amplified only by their own passive:**
+**Why Bully/Relentless and Assassin/Thief are each amplified only by their own passive:**
 Bully makes Scrap's theft worth taking (bigger steal + room to carry it); Relentless
 makes Headbutt genuinely spammable. Neither signature is impressive under the *other*
 passive on purpose — that asymmetry is what makes the specialization choice read as a
@@ -564,9 +564,9 @@ Feather Aura, pile, collision) have no duration and apply in full.
 ### 6.4 The Assassin execute (the only hard removal)
 
 **One button, two presses.** Death Mark (named Mark/Kill until 2026-10-07; the code type is still
-`MarkKillAbilitySO`) is the **Reaper** specialization's forced
-pre-equip (§7.1: its `AllowedClasses` is `None`, so it can only arrive this way) — choosing Reaper equips it automatically,
-locked in slot 0 of the four active slots, leaving three to build with. The Burglar specialization does not carry
+`MarkKillAbilitySO`) is the **Assassin** specialization's forced (class shown as Sneaky, code `ChickenClass.Assassin`)
+pre-equip (§7.1: its `AllowedClasses` is `None`, so it can only arrive this way) — choosing Assassin equips it automatically,
+locked in slot 0 of the four active slots, leaving three to build with. The Thief specialization does not carry
 it at all, cannot hand-pick it, and cannot execute.
 
 | Stage | Condition | Counterplay |
@@ -580,6 +580,23 @@ On success the victim's **entire cargo transfers to the Assassin as a capacity-e
 "bounty bag"** (he becomes a courier of a stolen win) and the victim is removed ~2 s, then
 respawns empty. (A **steal-proof** victim keeps its load: the execute still removes it and pays
 the bounty, but nothing transfers.) On failure Death Mark takes a **reduced cooldown**, so he re-marks fast.
+
+**Anti-chase (baseline, 2026-10-31).** Two rules keep the mark from becoming a camp. All numbers live on
+`MarkKill.asset` (range 8, arm 2, window 5, fail 5, success 15, isolation 8, trail 15).
+- **Cold trail.** After a mark ends, paid or failed, that rival cannot be marked by this Assassin until he has marked
+  someone else or **15 s** pass. Off when only one real rival is in the match; cleared by a new round. A decoy starts no
+  trail and is not "someone else".
+- **Home breaks the mark.** A marked bird inside its **own** base (deposit radius) ends the mark as a failure, and a
+  rival already home cannot be marked.
+
+Both refuse in the preview, the telegraph, the button grey-out and the press alike (`MarkKillAbilitySO.ExtraTargetFilter`).
+While a mark runs the slot is free, so the Kill press is possible at all; the mark's cooldown is set by how it ends.
+
+**The base wall (baseline, 2026-10-31).** A chicken's body cannot stand inside another chicken's claimed base (radius
+`MatchConfigSO.BaseKeepOutRadius`, 2.5 m, equal to the deposit radius today). Your own base is free, an unclaimed base is
+open, and abilities reach across: this moves bodies, not the deposit radius, the steal rules or the Oracle. Walking at
+a wall slides round it; every displacement resolves the same way (blinks, jumps, knockback). A base whose owner left stays
+claimed, keeps its colour and keeps its wall.
 Stun lives in exactly two classes (Assassin + Warrior), which is what makes the deny/enable
 counterplay reachable.
 
@@ -588,6 +605,12 @@ counterplay reachable.
 ## 7. Abilities System
 
 ### 7.1 Rules — two slots are determined for you, the rest you pick
+
+> **Balance baseline, 2026-10-31: fixed kits.** `MatchConfigSO.LoadoutMode` ships **Fixed**: each specialization plays one
+> authored four-ability kit (`PassiveAbilitySO.Kit`), players and bots alike, and GEAR UP is a read-only view of it. The kits
+> and what to watch for are in `docs/balance/human-test-baseline.md`. Everything below is the **Free** mode, unchanged and one
+> switch away; a malformed kit logs an Error and falls back to it. Benched in the pool, on no kit: Dive Bomb, Roll & Push,
+> Feather Trap, Egg Shell. This is a baseline to iterate, not a final roster.
 
 > **Simplified 2026-09-04 (Maestro).** The old wording made slot pressure vary by
 > specialization, which nobody could hold in their head. The model below is uniform: one
@@ -600,7 +623,7 @@ no class has 5 buttons.
 
 > **Revised 2026-10-06 (Maestro) — the pre-equip model.** Every **subclass** (specialization,
 > `ChickenSubclass`) has **two pre-equipped slots**: a **Peck slot** (a Peck variant for a forager,
-> Death Mark for the Reaper) and a **Signature slot**. **The ability owns the assignment**: each ability
+> Death Mark for the Assassin) and a **Signature slot**. **The ability owns the assignment**: each ability
 > carries two flag columns, `PeckSlotPreEquippedBy` and `SignaturePreEquippedBy` (each a
 > `ChickenSubclassFlags` set of subclasses), edited in the Balance Editor's Abilities table ("Peck slot" /
 > "Signature slot"). Two abilities claiming the same slot for one subclass is a flagged data error (runtime
@@ -616,7 +639,7 @@ no class has 5 buttons.
 > Common/Character slot kind is retired. `All` = shared, a single class = that class's own, and
 > **`None` = pre-equip-only**: never in the picker, bot presets or backfill, obtainable only through a slot
 > column. **Peck is None-class** (never hand-picked; forced via the Peck slot column) and so is Death Mark
-> (only the Reaper gets it; the Burglar cannot hand-pick it). A subclass **forages iff its resolved Peck slot
+> (only the Assassin specialization gets it; the Thief cannot hand-pick it). A subclass **forages iff its resolved Peck slot
 > is a Peck**; the one hard rule is that the **Assassin never forages** (Predation axiom), enforced in code
 > rather than by any ability's class mask.
 
@@ -624,7 +647,7 @@ The two pre-equipped slots per subclass are therefore filled by the specializati
 
 | Slot | Determined by | Rule |
 |---|---|---|
-| **Peck slot** | Your **specialization** | The forager's Peck (variant) — or Death Mark for the Reaper. Falls back to the class's plain Peck if left empty. **The Assassin cannot hold a Peck**: a hard rule (`PreEquippedLoadout.ClassMayForage`), not a class mask, and that is the mechanical reason it cannot farm. A Peck is also never a Signature. |
+| **Peck slot** | Your **specialization** | The forager's Peck (variant) — or Death Mark for the Assassin. Falls back to the class's plain Peck if left empty. **The Assassin cannot hold a Peck**: a hard rule (`PreEquippedLoadout.ClassMayForage`), not a class mask, and that is the mechanical reason it cannot farm. A Peck is also never a Signature. |
 | **Signature** | Your **specialization** | One further ability, force-equipped. |
 
 Everything left over is **freely chosen** from the abilities that class may legally equip
@@ -670,7 +693,7 @@ shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 | **Warrior** | Cluck Shock ⚡ | 7 s | A shockwave that shoves every rival within 4.5 m away. |
 | | Dive Bomb 🪽 | 6 s | Diving lunge, robs 8 food from rivals on contact. |
 | | Headbutt 🐏 *(Relentless signature)* | 4 s | Shoves rivals up to 3.6 m ahead and staggers them 0.35 s — deliberately weaker than Cluck Shock; the shortest cooldown pays for it. |
-| | Ruffle 💨 | 5 s | 1.5x speed for 2.5 s — same pace as Speed Burst but longer and ground only (no traversal). |
+| | Ruffle 💨 | 6 s | 1.3x speed for 2 s, ground only (no traversal). Retuned for the fixed-kits baseline (2026-10-31). |
 | | Scrap 🪝 *(Bully signature)* | 5 s | Grabs 3 food off the nearest carrier within 3.8 m — deliberately weaker than Sneaky Steal. |
 | | Wing Slam 💥 | 8 s | Slams the ground ahead, stunning rivals within 4.5 m for 1.3 s. Re-tuned 2026-10-22 from 12 s / 1.5 s (A4, Standard tier §7.3); fallback 9 s / 1.5 s if playtests say "stunned too often". |
 | **Speedy** | Dust Kick 🌫️ | 6 s | Kicks dust **backwards** — the one cone in the game that fires away from facing, so fleeing is the play. Chasers within 4.5 m slow to 55% for 2.5 s. |
@@ -689,7 +712,7 @@ shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 | **Assassin** | Ambush 🗡️ | 10 s | Stuns rivals within 3.6 m for 1 s — sets up his own execute. |
 | | Doppelganger 👥 | 11 s | Decoy copy beside you for 4 s that soaks attacks. |
 | | Invisibility 👻 | 8 s | Fades you to a ghostly outline for 4 s. Using a move breaks it. (Assassin-only now — was also Speedy.) |
-| | Death Mark 🎯 *(Reaper Peck-slot pre-equip; pre-equip-only)* | 5 s | The execute — see §6.4. Marks a lone rival within 8 m; stun them, then press again to take everything they carry. |
+| | Death Mark 🎯 *(Assassin specialization Peck-slot pre-equip; pre-equip-only)* | 5 s | The execute — see §6.4. Marks a lone rival within 8 m; stun them, then press again to take everything they carry. |
 | | Shadowstep 👤 | 6 s | Dashes forward at 3x speed for 0.4 s, straight over walls (Assassin-only — was briefly also Speedy by asset drift, corrected; Speedy is permanently denied all terrain traversal, §5.2). |
 | | Smoke Roost 🌁 | 11 s | Cloud at his own feet (4 m, 5.5 s) — he fades, rivals inside slow to 55% speed. Using a move breaks the fade (the cloud stays). Pairs with Death Mark's isolate-and-execute. |
 | | Snatch 🤏 *(moved from Common)* | 3 s | Robs 5 food from every rival within 4.3 m ahead and shoves them back. Assassin-only now — a universal AoE steal is exactly the Assassin's core, and diluted the class. |
@@ -728,8 +751,8 @@ tier, and five shipped moves sit on 7.
 
 | Tier | Range | Shipped (cooldown read from the `.asset` files, before passives) |
 |---|---|---|
-| **Quick** | 3–5 s | Roll & Push 3, Snatch 3, Headbutt 4, Ruffle 5, Scrap 5, Feint 5, Sneaky Steal 5, Death Mark 5 |
-| **Standard** | 6–9 s | Dust Kick 6, Speed Burst 6, Shadowstep 6, Dive Bomb 6, Sticky Egg 7, Cluck Shock 7, Feather Aura 7, Feather Trap 7, Spine Coat 8, **Wing Slam 8**, Invisibility 8, Egg Shell 8, Ground Quake 9 |
+| **Quick** | 3–5 s | Roll & Push 3, Snatch 3, Headbutt 4, Scrap 5, Feint 5, Sneaky Steal 5, Death Mark 5 |
+| **Standard** | 6–9 s | Ruffle 6, Dust Kick 6, Speed Burst 6, Shadowstep 6, Dive Bomb 6, Sticky Egg 7, Cluck Shock 7, Feather Aura 7, Feather Trap 7, Spine Coat 8, **Wing Slam 8**, Invisibility 8, Egg Shell 8, Ground Quake 9 |
 | **Heavy** | 10–12 s | Turtle Mode 10, Belly Flop 10, Ambush 10, Smoke Roost 11, Doppelganger 11, Immovable 12, Quick Drop 12 |
 
 **The Heavy rule:** a move earns a Heavy cooldown only if it gives **immunity** (control
@@ -763,7 +786,7 @@ different kinds).
 
 | Kind | How several are resolved | Moves |
 |---|---|---|
-| Self speed boost | highest | Speed Burst 1.5, Ruffle 1.5, Shadowstep 3.0, Roll & Push 2.0 |
+| Self speed boost | highest | Speed Burst 1.5, Ruffle 1.3, Shadowstep 3.0, Roll & Push 2.0 |
 | Self speed penalty | lowest | Turtle Mode 0.5 |
 | Stealth opacity | lowest | Invisibility, Smoke Roost (the fade) |
 | Movement lock | any | Egg Shell, Peck |
@@ -826,7 +849,7 @@ Seasonal content is post-demo, contingent on success.
   also sets facing). Keyboard WASD; gamepad left stick.
 - **Abilities:** right-thumb buttons — **4 for every class** (§7.1). 1-2 are forced by
   foraging/your specialization's signature; the rest are freely chosen. The Death Mark
-  button (Reaper only) is **two-press**: first press marks, and it re-labels to **KILL**
+  button (Assassin specialization only) is **two-press**: first press marks, and it re-labels to **KILL**
   when the target qualifies.
 - **Collecting:** stand on a pile and Peck (Peck chain, §10.1). Peck repeats by itself
   until the hold is full.

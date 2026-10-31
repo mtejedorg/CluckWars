@@ -593,6 +593,15 @@ Full gameplay improvement plan implemented, compile-verified, and documented. �
 
 ---
 
+## Fixed-kits balance baseline (2026-10-31, branch `balance`) 🛠
+
+- [x] Eight fixed kits, bots included; Free one switch away (`MatchConfigSO.LoadoutMode`).
+- [x] Ruffle retune, Sneaky / Assassin / Thief rename, cold trail + home breaks the mark, base wall.
+- [ ] Maestro: decide Featherfoot + Quick Drop (28.35 s / 4 trips, misses SCT by 0.15 s).
+- [ ] Builds + matrix scenarios, then human playtests (`docs/balance/human-test-baseline.md`).
+
+---
+
 ## UI audit follow-ups: Phase 6 + Phase 7 (2026-10) ✅ (pending hardware session + builds)
 
 (Note: "Phase 7" here is the 2026-10 UI/feel audit pass, not the older "Phase 7: Game Loop & Balancing" above.)
