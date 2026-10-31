@@ -2123,7 +2123,6 @@ namespace CluckWars.UI
         private int[] _lobbyPermutation;   // null = corners not known yet (a guest, or a host before its code)
         // Sample CPU bots shown in the Solo lobby (you always spawn vs 3 bots).
         private static readonly ChickenClass[] BotClasses = { ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };
-        private static readonly string[]       BotNameKeys = { UiKeys.LobbyBot1, UiKeys.LobbyBot2, UiKeys.LobbyBot3 };
 
         private string _joinCode = string.Empty;
 
@@ -2403,7 +2402,7 @@ namespace CluckWars.UI
                     var rolled = lineup?[i - 1];
                     var bc = rolled != null ? rolled.Subclass.ClassOf() : BotClasses[i - 1];
                     var kit = rolled != null && FixedKit.TryResolve(LoadoutMode.Fixed, rolled, out var rolledKit, out _) ? rolledKit : null;
-                    SetSeat(i, CornerAssignment.LobbySeatCorner(mode, i, _lobbyPermutation), bc, UiText.Get(BotNameKeys[i - 1]), false, true, ready: true,
+                    SetSeat(i, CornerAssignment.LobbySeatCorner(mode, i, _lobbyPermutation), bc, MatchStandings.DisplayName(false, true, bc, i), false, true, ready: true,
                         (IReadOnlyList<AbilityBaseSO>)kit ?? SampleBotAbilities(bc, i));
                 }
                 else

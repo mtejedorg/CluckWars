@@ -196,6 +196,7 @@ namespace CluckWars.Localization
         public const string LobbyBot1 = "lobby.bot.1";
         public const string LobbyBot2 = "lobby.bot.2";
         public const string LobbyBot3 = "lobby.bot.3";
+        public const string LobbyBot4 = "lobby.bot.4";
 
         // ---- Post-match overlay ----
         public const string PostmatchStandings = "postmatch.standings";
