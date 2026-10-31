@@ -766,7 +766,7 @@ namespace CluckWars.Visuals
         public const int MarkSortingOrder = 20;
         /// <summary>Banner centre in viewport fractions: between the standings and the timer in landscape, under the top band in portrait.</summary>
         public static readonly Vector2 MarkBannerLandscape = new Vector2(0.585f, 0.94f);
-        public static readonly Vector2 MarkBannerPortrait = new Vector2(0.5f, 0.76f);
+        public static readonly Vector2 MarkBannerPortrait = new Vector2(0.5f, 0.70f);
         /// <summary>World height of the chevron stack above the target's pivot, world size of one chevron, and their spacing in chevrons.</summary>
         public const float MarkChevronHeight = 3.1f;
         public const float MarkChevronSize = 1.15f;
@@ -782,7 +782,7 @@ namespace CluckWars.Visuals
         public const float MarkKillPulse = 0.16f;
         public const float MarkPulseSpeed = 6f;
         /// <summary>The marked rival's edge arrow, as a multiple of a rival's.</summary>
-        public const float MarkChevronScale = 2.2f;
+        public const float MarkChevronScale = 1.6f;
 
         /// <summary>
         /// Chevron size as a fraction of the viewport's height. A fraction rather than a

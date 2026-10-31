@@ -34,7 +34,7 @@ what's shipped, what's in flight, and what's blocked on testing.
 - **Oracle:** naked targets did not move. New opt-in deposit burst on `OracleChicken`. **Featherfoot with Quick Drop = 28.35 s / 4 trips on all four seats, 0.15 s under the 28.5 floor of the +-1.5 s band: it FAILS the SCT test.** Two presses is the maximum the cooldown allows, so this is its best case. Nothing tuned, no tolerance moved, not declared in `SpecSctTargets`; `BalanceOracleTests.RealMap_FeatherfootWithQuickDrop_IsPinnedAtItsMeasuredRun` pins the number. **Maestro decides.**
 - **Harness:** `-cw_perk <Subclass>`, `-cw_botperks a,-,c`; `scenario-pc.ps1 -Perk / -BotPerks`; `-AutoZone` and `-AutoAura` now ask for Fatty_Hoarder / Speedy_Featherfoot.
 - **Docs:** GDD 6.4 + 7.1, `docs/site/mechanics.html` (numbers from the assets; the site is **NOT republished**), `docs/balance/human-test-baseline.md`. BL-116 (execute live) now has a real path to test.
-- **Gate:** EditMode 2556/2556 in batch; player scripts compile for Windows and Android, production and dev tools. **Not run:** builds, matrix scenarios, autozone/autoaura, GEAR UP screenshots (no Editor: portrait and landscape are unseen; `-cw_menushots gear`). PICK YOUR BIRD hides the two-chip starter row in Fixed. No Maestro prefab wiring needed.
+- **Gate:** EditMode 2556/2556 at the time; spec v2 ended at 2594/2594 in batch; player scripts compile for Windows and Android, production and dev tools. **Not run:** builds, matrix scenarios, autozone/autoaura, GEAR UP screenshots (no Editor: portrait and landscape are unseen; `-cw_menushots gear`). PICK YOUR BIRD hides the two-chip starter row in Fixed. No Maestro prefab wiring needed.
 
 ---
 
