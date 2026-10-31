@@ -7,8 +7,7 @@ namespace CluckWars.Abilities
     /// <b>Warrior.</b> A short burst of pace. Enough to close a gap or leave one.
     /// </summary>
     /// <remarks>
-    /// <b>Deliberately a worse Speed Burst.</b> Speed Burst runs at 2.5x; this runs at 1.5x for
-    /// a shorter window. Speedy is <i>defined</i> as the fastest chicken in the roster, so a
+    /// <b>Deliberately a worse Speed Burst.</b> This runs at 1.3x against Speed Burst's 1.5x. Speedy is <i>defined</i> as the fastest chicken in the roster, so a
     /// Warrior sprint that rivalled it would erase the one thing that class owns outright.
     ///
     /// <b>Grants no traversal, and must not.</b> <c>TerrainTraversal</c> stays None and there is
@@ -29,13 +28,13 @@ namespace CluckWars.Abilities
             Category = AbilityCategory.Utility;
             AllowedClasses = ChickenClassFlags.Warrior;
             BotRole = BotRole.Escape;
-            Duration = 2.5f;
-            Cooldown = 5f;
+            Duration = 2f;
+            Cooldown = 6f;
         }
 
-        [Tooltip("Movement speed multiplier while active. 1.5 against Speed Burst's 2.5 — the "
+        [Tooltip("Movement speed multiplier while active. Stays below Speed Burst: the "
                + "Warrior is never allowed to out-sprint the class built around sprinting.")]
-        [Range(1.05f, 2f)] public float SpeedMultiplier = 1.5f;
+        [Range(1.05f, 2f)] public float SpeedMultiplier = 1.3f;
 
         // Self-buff: nothing to aim at, so the indicator marks the caster's own ring
         // rather than a target area (FEEDBACK.md §2.2).
