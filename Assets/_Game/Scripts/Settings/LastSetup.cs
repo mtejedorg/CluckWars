@@ -64,7 +64,7 @@ namespace CluckWars.Settings
         /// <param name="problem">Why the record was rejected; null when it resolved.</param>
         /// <param name="loadoutMode"><c>MatchConfigSO.LoadoutMode</c>. A malformed kit falls back to the Free checks, as at spawn.</param>
         public static bool TryResolve(LastSetupRecord rec, IEnumerable<AbilityBaseSO> all,
-            out ResolvedLastSetup result, out string problem, LoadoutMode loadoutMode = LoadoutMode.Free)
+            LoadoutMode loadoutMode, out ResolvedLastSetup result, out string problem)
         {
             result = default;
             problem = null;

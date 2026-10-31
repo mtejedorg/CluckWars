@@ -86,7 +86,7 @@ namespace CluckWars.Tests
         }
 
         private static bool Resolve(LastSetupRecord rec, AbilityRegistrySO reg, out ResolvedLastSetup r, out string problem) =>
-            LastSetupResolver.TryResolve(rec, reg.All, out r, out problem);
+            LastSetupResolver.TryResolve(rec, reg.All, LoadoutMode.Free, out r, out problem);
 
         // ---- PlayerPreferences.LastSetup -----------------------------------------------------------
 

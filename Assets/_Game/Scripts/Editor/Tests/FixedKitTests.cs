@@ -307,19 +307,19 @@ namespace CluckWars.Tests
                 Mode = (int)SessionMode.Host,
             };
 
-            Assert.IsTrue(LastSetupResolver.TryResolve(rec, Registry.All, out var r, out var problem, LoadoutMode.Fixed), problem);
+            Assert.IsTrue(LastSetupResolver.TryResolve(rec, Registry.All, LoadoutMode.Fixed, out var r, out var problem), problem);
             Assert.AreEqual(spec, r.Passive);
             Assert.AreEqual(SessionMode.Host, r.Mode);
             CollectionAssert.AreEqual(spec.Kit, r.Slots);
 
-            Assert.IsFalse(LastSetupResolver.TryResolve(rec, Registry.All, out _, out _, LoadoutMode.Free), "Free keeps its strict checks");
+            Assert.IsFalse(LastSetupResolver.TryResolve(rec, Registry.All, LoadoutMode.Free, out _, out _), "Free keeps its strict checks");
         }
 
         [Test]
         public void LastSetup_Fixed_StillRefusesAPerkThatIsGone()
         {
             var rec = new LastSetupRecord { Class = (int)ChickenClass.Speedy, Subclass = 99, Abilities = new string[0], Mode = 0 };
-            Assert.IsFalse(LastSetupResolver.TryResolve(rec, Registry.All, out _, out _, LoadoutMode.Fixed));
+            Assert.IsFalse(LastSetupResolver.TryResolve(rec, Registry.All, LoadoutMode.Fixed, out _, out _));
         }
 
         // ---- harness ------------------------------------------------------------------------------------------------

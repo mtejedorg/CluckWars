@@ -1083,7 +1083,7 @@ namespace CluckWars.UI
             setup = default;
             var record = PlayerPreferences.LastSetup;
             if (record == null) return false;
-            if (LastSetupResolver.TryResolve(record, _abilityRegistry?.All, out setup, out var problem, LoadoutModeNow))
+            if (LastSetupResolver.TryResolve(record, _abilityRegistry?.All, LoadoutModeNow, out setup, out var problem))
                 return true;
 
             if (problem != _reportedLastSetupProblem)
