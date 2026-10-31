@@ -770,8 +770,6 @@ namespace CluckWars.Tests
             string src = File.ReadAllText("Assets/_Game/Scripts/Gameplay/AbilityZone.cs");
             StringAssert.Contains("PlayerBase.WallBetween(z._seen.Center, current)", src);
             StringAssert.Contains("PlayerBase.WallBetween(r.Center, current)", src);
-            StringAssert.DoesNotContain("WallBetween(z._seen.Center, point)", src, "a sampled position never answers the wall");
-            StringAssert.DoesNotContain("WallBetween(r.Center, point)", src, "a sampled position never answers the wall");
             StringAssert.Contains("AbilityZone.ScanRootZonesOf(caster, p, current, t, margin, c)",
                 AssassinExecuteCreditTests.MethodBody(ControllerPath, "private ControlClaimRules.RootZoneScan ScanRootZones("));
         }
@@ -823,6 +821,14 @@ namespace CluckWars.Tests
             Assert.AreEqual(2, Regex.Matches(src, @"PlayerBase\.WallBetween\((z\._seen|r)\.Center").Count,
                 "the wall is read once per loop, inside the vouching scan");
             StringAssert.Contains("ControlClaimRules.AddRootZone(", src);
+        }
+
+        [Test]
+        public void ASampleBehindAWall_CannotVouchPastIt_OnEitherLoop()
+        {
+            string src = File.ReadAllText("Assets/_Game/Scripts/Gameplay/AbilityZone.cs");
+            StringAssert.Contains("PlayerBase.WallBetween(z._seen.Center, point) || PlayerBase.WallBetween(z._seen.Center, current)", src);
+            StringAssert.Contains("PlayerBase.WallBetween(r.Center, point) || PlayerBase.WallBetween(r.Center, current)", src);
         }
     }
 }
