@@ -76,6 +76,12 @@ namespace CluckWars.Services
         /// </summary>
         int SoloCornerSeed { get; set; }
 
+        /// <summary>
+        /// Dev tools (<c>cw_botperks</c>): the specialization each solo bot must play in Fixed mode, by bot index; None or a
+        /// missing entry rolls as usual. Null in every normal session.
+        /// </summary>
+        System.Collections.Generic.IReadOnlyList<ChickenSubclass> DevBotSubclasses { get; set; }
+
         event Action<ChickenClass> OnSelectionChanged;
     }
 }

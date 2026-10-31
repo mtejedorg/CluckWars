@@ -93,6 +93,7 @@ perk.spoiler.detail,"If nobody reaches {goal} before time's up, you bank {food} 
 loadout.row.shared,ANY BIRD
 loadout.row.class,{cls} ONLY
 loadout.detail.empty,Tap a move for the details.
+loadout.kit.title,{perk} KIT
 loadout.next,NEXT
 loadout.registryMissing,"No abilities in registry.
 Assign AbilityRegistrySO in ProjectInstaller."

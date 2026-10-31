@@ -50,8 +50,8 @@ namespace CluckWars.Diagnostics
                     if (_auraSlot < 0)
                     {
                         _auraPhase = AutoAuraPhase.Unavailable;
-                        _log.Warn(Source, "AutoTest autoaura: no Aura in this loadout (Feather Aura is Speedy's); nothing is checked " +
-                            "this run. Use cw_class Speedy.");
+                        _log.Warn(Source, "AutoTest autoaura: no Aura in this loadout (Feather Aura is in the Featherfoot kit); nothing is " +
+                            "checked this run. Use cw_perk Speedy_Featherfoot.");
                         return;
                     }
                     _auraAbility = _auraSlots[_auraSlot].name;

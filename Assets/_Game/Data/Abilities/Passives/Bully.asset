@@ -32,3 +32,8 @@ MonoBehaviour:
   StealMultiplier: 1.4
   BonusCapacity: 2
   Subclass: 2
+  Kit:
+  - {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}
+  - {fileID: 11400000, guid: e9f69599cf314074cae2f9c2464aa28c, type: 2}
+  - {fileID: 11400000, guid: 592cf309ec40b0546833d005b73c5a92, type: 2}
+  - {fileID: 11400000, guid: 91f69ced8ef8027459a6d96250ce5641, type: 2}

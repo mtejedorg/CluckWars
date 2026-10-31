@@ -89,6 +89,7 @@ namespace CluckWars.Gameplay
         private ChickenCombat     _combat;
         private ChickenCargo      _cargo;
         private AbilityController _abilities;
+        private AssassinExecute   _execute;
         private ILogService       _log;
 
         // ---- Strategy -------------------------------------------------------
@@ -157,6 +158,7 @@ namespace CluckWars.Gameplay
             _combat     = GetComponent<ChickenCombat>();
             _cargo      = GetComponent<ChickenCargo>();
             _abilities  = GetComponent<AbilityController>();
+            _execute    = GetComponent<AssassinExecute>();
 
             _profile = BotTactics.ProfileFor(_controller != null ? _controller.Class : ChickenClass.Warrior);
 
@@ -232,6 +234,9 @@ namespace CluckWars.Gameplay
             // Overlay (never returns): a loaded bot with a stealer in reach pulls up a steal-proof
             // shell if it has one ready.
             TryStealGuard(cargo);
+
+            // A Death Mark in progress owns the bot until it pays or fizzles: see BotTactics.NextMarkStep.
+            if (TryFollowThroughMark()) return;
 
             // Latch ReturnToBase until all cargo is deposited (IP1). Fire the Bank plan
             // once actually on the base — a deposit accelerator is worthless anywhere else,
@@ -557,6 +562,37 @@ namespace CluckWars.Gameplay
 
             _log?.Debug(Source, $"{Who} cast slot {bestSlot} ('{chosen.name}', role={chosen.ResolveBotRole()}) " +
                 $"for {situation}.");
+            return true;
+        }
+
+        /// <summary>
+        /// Stays on the marked rival and plays the rest of the execute: hold the stun while the mark arms, land one once
+        /// it has, press Kill the moment it qualifies. Returns false when this bot has no live mark.
+        /// </summary>
+        private bool TryFollowThroughMark()
+        {
+            if (_execute == null || _abilities == null || _execute.MarkedTarget == NetworkBehaviourId.None) return false;
+            if (!Runner.TryFindBehaviour(_execute.MarkedTarget, out ChickenController mark) || mark == null) return false;
+
+            _state      = BotState.Hunt;
+            _moveTarget = mark.transform.position;
+
+            var step = BotTactics.NextMarkStep(true, _execute.KillReady, _execute.ArmTimer.Expired(Runner));
+            for (int slot = 0; step != BotMarkStep.HoldStun && slot < _abilities.EquippedSlotCount; slot++)
+            {
+                var ability = _abilities.GetSlot(slot);
+                bool wanted = step == BotMarkStep.Kill ? ability is MarkKillAbilitySO : FixedKit.EmitsStun(ability);
+                if (!wanted || !_abilities.IsReady(slot) || !ability.IsUsable(_controller)) continue;
+                if (step == BotMarkStep.Stun && !ability.WouldAffect(_controller, mark))
+                {
+                    if (ability.IsDirectionalAim) _faceIntent = mark.transform.position;
+                    continue;
+                }
+                if (_abilities.BotTryActivate(slot))
+                    _log?.Debug(Source, $"{Who} mark {step}: cast slot {slot} ('{ability.name}').");
+                break;
+            }
+            if (_state != _prevState) _log?.Debug(Source, $"{Who} → Hunt (following a Death Mark through, {step}).");
             return true;
         }
 

@@ -49,6 +49,10 @@ namespace CluckWars.Abilities
                  "this passive's single AllowedClasses bit.")]
         public ChickenSubclass Subclass;
 
+        [Tooltip("The four abilities this specialization plays in LoadoutMode.Fixed, in slot order. References to the " +
+                 "pool assets, never copies. Checked by FixedKit (EditMode test + Balance Editor roster panel).")]
+        public AbilityBaseSO[] Kit = Array.Empty<AbilityBaseSO>();
+
         // The Peck-slot / Signature-slot pre-equips are NOT stored here any more. The ability owns
         // the assignment (AbilityBaseSO.PeckSlotPreEquippedBy + SignaturePreEquippedBy), resolved by
         // PreEquippedLoadout.Resolve — so two abilities claiming one slot for a subclass is

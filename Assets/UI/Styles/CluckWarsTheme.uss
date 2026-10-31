@@ -1042,6 +1042,9 @@
 /* The deck's ScrollView (WP9, CharacterSelect.uxml #DeckScroll): in landscape it neither grows nor shrinks, so it is
    exactly the deck's height and never scrolls (the deck lays out as before). Portrait lets it shrink (PORTRAIT block). */
 .cw-deck-scroll { flex-grow: 0; flex-shrink: 0; }
+/* LoadoutMode.Fixed: GEAR UP is a read-only kit. No deck; the doorway bird takes the height it left. */
+.cw-gear-body--fixed .cw-deck-scroll { display: none; }
+.cw-kit-title { -unity-text-align: middle-center; -unity-font-style: bold; font-size: 32px; color: rgb(255, 244, 214); margin-bottom: 8px; flex-shrink: 0; }
 .cw-deck {
     flex-grow: 0; flex-shrink: 0;
     flex-direction: row; flex-wrap: nowrap;

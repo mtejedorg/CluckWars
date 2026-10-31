@@ -31,3 +31,8 @@ MonoBehaviour:
     m_Bits: 256
   BonusFood: 15
   Subclass: 7
+  Kit:
+  - {fileID: 11400000, guid: 585145f2a83ab174d85f6128aa98f927, type: 2}
+  - {fileID: 11400000, guid: f44c970f195417d4e806f462794db2cc, type: 2}
+  - {fileID: 11400000, guid: d5cbb7478daa2d94eb14fc2015dba412, type: 2}
+  - {fileID: 11400000, guid: 15830618b1099fc4393dae0b5ca5390e, type: 2}

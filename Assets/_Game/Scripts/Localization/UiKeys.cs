@@ -127,6 +127,7 @@ namespace CluckWars.Localization
         public const string LoadoutRowShared = "loadout.row.shared";
         [UiArgs("cls")] public const string LoadoutRowClass = "loadout.row.class";
         public const string LoadoutDetailEmpty = "loadout.detail.empty";
+        [UiArgs("perk")] public const string LoadoutKitTitle = "loadout.kit.title";
         public const string LoadoutNext = "loadout.next";
         public const string LoadoutRegistryMissing = "loadout.registryMissing";
         public const string SlotEmpty = "slot.empty";

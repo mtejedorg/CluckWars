@@ -30,3 +30,8 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 256
   Subclass: 4
+  Kit:
+  - {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}
+  - {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
+  - {fileID: 11400000, guid: f2c3f98e23f645109023f309da56e7e3, type: 2}
+  - {fileID: 11400000, guid: d7187d73d27d71c44aadc3f3d55fbab3, type: 2}

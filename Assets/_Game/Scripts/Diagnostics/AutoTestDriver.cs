@@ -67,6 +67,7 @@ namespace CluckWars.Diagnostics
 
             foreach (var p in _cfg.Problems) _log.Warn(Source, "AutoTest config: " + p);
             _log.Info(Source, _cfg.Describe());
+            _log.Info(Source, $"AutoTest kits perk={_cfg.Perk} botperks={(_cfg.BotPerks.Length > 0 ? string.Join(",", _cfg.BotPerks) : "-")}");
             if (_cfg.AutoDisconnect > 0)
                 _log.Info(Source, $"AutoTest autodisconnect={_cfg.AutoDisconnect}s: this peer freezes {AutoTestRules.AutoDisconnectStallSeconds} s " +
                     "into its first multiplayer round, then presses REJOIN (CW-218).");
@@ -180,6 +181,11 @@ namespace CluckWars.Diagnostics
             var mode = _cfg.AutoHost ? SessionMode.Host : _cfg.AutoJoin != null ? SessionMode.Join : SessionMode.Solo;
             _log.Info(Source, $"AutoTest {role}: {mode} button, class {_cfg.Class}.");
             if (!menu.AutoTestChooseMode(mode)) yield break;
+            if (_cfg.BotPerks.Length > 0)
+            {
+                menu.AutoTestForceBots(_cfg.BotPerks);
+                _log.Info(Source, $"AutoTest {role}: bots pinned to {string.Join(",", _cfg.BotPerks)} (None rolls).");
+            }
             yield return new WaitForSecondsRealtime(StepSeconds);
 
             if (!menu.AutoTestPickClass(_cfg.Class))
@@ -188,6 +194,12 @@ namespace CluckWars.Diagnostics
                 yield break;
             }
             yield return new WaitForSecondsRealtime(StepSeconds);
+
+            if (_cfg.Perk != CluckWars.Abilities.ChickenSubclass.None && !menu.AutoTestPickPerk(_cfg.Perk))
+            {
+                _log.Error(Source, $"AutoTest {role}: could not pick perk {_cfg.Perk} for {_cfg.Class}; stopping.");
+                yield break;
+            }
 
             menu.AutoTestOpenLoadout();
             yield return new WaitForSecondsRealtime(StepSeconds);
@@ -543,7 +555,7 @@ namespace CluckWars.Diagnostics
                 {
                     _zonePhase = AutoZonePhase.Unavailable;
                     _log.Warn(Source, "AutoTest autozone: nothing in this loadout outlives a round (no zone ability, no Doppelganger); " +
-                        "nothing is placed this run. Use cw_class Fatty (Root Egg) or Speedy (Feather Trap).");
+                        "nothing is placed this run. Use cw_perk Fatty_Hoarder (Root Egg) or Assassin_Spoiler (Smoke Roost).");
                     return;
                 }
                 _zoneAbility = _zoneSlots[_zoneSlot].name;

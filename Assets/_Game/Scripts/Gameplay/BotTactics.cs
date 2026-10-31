@@ -62,6 +62,19 @@ namespace CluckWars.Gameplay
         Endgame = 2,
     }
 
+    /// <summary>What a bot holding a Death Mark does next (<see cref="BotTactics.NextMarkStep"/>).</summary>
+    public enum BotMarkStep : byte
+    {
+        /// <summary>No mark up: the ordinary FSM decides.</summary>
+        None = 0,
+        /// <summary>Arming: stay on the target and keep the stun back, a stun now would end before the mark can qualify it.</summary>
+        HoldStun = 1,
+        /// <summary>Armed, target not stunned yet: land a stun.</summary>
+        Stun = 2,
+        /// <summary>Qualified: press again.</summary>
+        Kill = 3,
+    }
+
     /// <summary>
     /// The per-class numeric envelope a <see cref="BotStrategy"/> runs inside. Kept
     /// separate from the strategy itself so the <i>shape</i> of the behaviour and its
@@ -615,6 +628,20 @@ namespace CluckWars.Gameplay
             float t = profile.ReturnThreshold;
             if (phase != MatchPhase.Endgame) return Mathf.Clamp01(t);
             return Mathf.Clamp01(leading ? t * 0.55f : Mathf.Min(1f, t * 1.20f));
+        }
+
+        // ---- Death Mark follow-through ------------------------------------------
+
+        /// <summary>
+        /// The Spoiler bot's second and third beats. The execute only qualifies a target stunned AFTER the arm time, and the
+        /// CastPlan ladder knows none of that: left to it, a bot fires Ambush straight after the mark, the stun is over before
+        /// the mark arms, and the window lapses with the Kill unpressed.
+        /// </summary>
+        public static BotMarkStep NextMarkStep(bool marked, bool killReady, bool armed)
+        {
+            if (!marked) return BotMarkStep.None;
+            if (killReady) return BotMarkStep.Kill;
+            return armed ? BotMarkStep.Stun : BotMarkStep.HoldStun;
         }
 
         // ---- Steal guard (Phase 7 chunk D) ------------------------------------

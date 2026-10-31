@@ -110,6 +110,10 @@ namespace CluckWars.Gameplay
                 ArmTimer = TickTimer.CreateFromSeconds(Runner, ArmDuration);
                 WindowTimer = TickTimer.CreateFromSeconds(Runner, WindowDuration);
                 KillReady = false;
+                // The press just charged this slot's full cooldown (TryActivate sets it before OnActivate), and that
+                // cooldown equals the window, so the Kill press would be refused for the mark's whole life. The slot is
+                // free while a mark runs (IsUsable gates it on KillReady); the outcome then sets the real cooldown.
+                if (_abilities != null) _abilities.TriggerCooldown(SlotIndex, 0f);
                 _log?.Info(Source, $"Marked target {preResolvedTarget.name} (Arming {ArmDuration:0.0}s).");
                 return true;
             }

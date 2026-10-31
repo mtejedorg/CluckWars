@@ -96,6 +96,8 @@ namespace CluckWars.Editor
             GUILayout.Space(16);
             DrawRosterIntegrity();
             GUILayout.Space(16);
+            DrawFixedKits();
+            EditorGUILayout.Space(8);
             DrawPreEquippedLoadouts();
             GUILayout.Space(16);
             DrawPreEquippedCompleteness();
@@ -289,6 +291,51 @@ namespace CluckWars.Editor
                 EditorGUILayout.LabelField(ClaimantText(PreEquippedLoadout.SignatureClaimants(_abilities, p.Subclass)), GUILayout.Width(wSlot));
                 EditorGUILayout.EndHorizontal();
             }
+        }
+
+        /// <summary>
+        /// The eight <see cref="LoadoutMode.Fixed"/> kits, editable per slot, plus every <see cref="FixedKit.ValidateRoster"/>
+        /// violation: the same validator the data-integrity test runs, so a kit breaking a rule shows here as it is edited.
+        /// </summary>
+        private void DrawFixedKits()
+        {
+            EditorGUILayout.LabelField("Fixed kits (LoadoutMode.Fixed; authored on each passive, slot order)", EditorStyles.boldLabel);
+            DrawRule();
+
+            const float wSub = 150, wSlot = 150;
+            EditorGUILayout.BeginHorizontal();
+            ColHeader("Subclass", wSub);
+            for (int i = 0; i < AbilityController.SlotCount; i++) ColHeader("Slot " + (i + 1), wSlot);
+            EditorGUILayout.EndHorizontal();
+            DrawRule();
+
+            foreach (var p in _passives)
+            {
+                if (p == null) continue;
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField(p.Subclass.ToString(), GUILayout.Width(wSub));
+                EditorGUI.BeginChangeCheck();
+                var edited = new AbilityBaseSO[AbilityController.SlotCount];
+                for (int i = 0; i < edited.Length; i++)
+                {
+                    var current = p.Kit != null && i < p.Kit.Length ? p.Kit[i] : null;
+                    edited[i] = (AbilityBaseSO)EditorGUILayout.ObjectField(current, typeof(AbilityBaseSO), false, GUILayout.Width(wSlot));
+                }
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(p, "Edit fixed kit");
+                    p.Kit = edited;
+                    EditorUtility.SetDirty(p);
+                }
+                EditorGUILayout.EndHorizontal();
+            }
+
+            var problems = FixedKit.ValidateRoster(_passives, _abilities);
+            if (problems.Count == 0)
+                EditorGUILayout.HelpBox("All kits are legal.", MessageType.Info);
+            else
+                EditorGUILayout.HelpBox("Kit violations (a malformed kit falls back to the Free rules at spawn):\n- " +
+                    string.Join("\n- ", problems), MessageType.Error);
         }
 
         private static string ClaimantText(List<AbilityBaseSO> claims)
@@ -501,6 +548,7 @@ namespace CluckWars.Editor
                 case "AllowedClasses":
                 case "AbilityAnimationClip":
                 // Edited in the "Peck slot" / "Signature slot" columns, so not editable in two places.
+                case "Kit":
                 case "PeckSlotPreEquippedBy":
                 case "SignaturePreEquippedBy":
                     return true;

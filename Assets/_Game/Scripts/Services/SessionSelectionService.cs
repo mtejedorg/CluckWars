@@ -48,6 +48,8 @@ namespace CluckWars.Services
         // Random until the menu rolls one, so a Play straight into Game.unity still varies.
         public int SoloCornerSeed { get; set; } = Environment.TickCount;
 
+        public System.Collections.Generic.IReadOnlyList<ChickenSubclass> DevBotSubclasses { get; set; }
+
         public event Action<ChickenClass> OnSelectionChanged;
     }
 }
