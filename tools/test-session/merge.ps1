@@ -386,6 +386,25 @@ foreach ($src in $ctlRejects.Keys) {
     Add-Finding @('INVARIANT') $r.First ("control RPC rejections on ${src}: $($r.Count) [$((@($r.Kinds.Keys) | Sort-Object) -join ', ')] (expected 0 with honest clients, F4) - first: $($r.First.Message)")
 }
 
+# ---- Fixed kits (balance baseline): every `Kit equip` line must name four abilities, and a kit that fell back to the Free
+# rules (the spawner's Error) is an INVARIANT finding too. The kits a session exercised go in findings.txt, so a run over all 8
+# specializations can be checked by eye (a session has 4 seats, so one session cannot prove all 8).
+$kitsSeen = @{}
+foreach ($e in $sorted) {
+    if ($e.Message -match '\bKit equip subclass=(\S+) slots=(\S*)') {
+        $kitsSeen[$Matches[1]] = 1
+        if (@($Matches[2] -split ',' | Where-Object { $_ }).Count -ne 4) {
+            Add-Finding @('INVARIANT') $e ("kit equipped with the wrong slot count on $($e.Src): $($e.Message)")
+        }
+    }
+    elseif ($e.Message -match 'the fixed kit is unusable') {
+        Add-Finding @('INVARIANT') $e ("fixed kit fell back to the Free rules on $($e.Src): $($e.Message)")
+    }
+    elseif ($e.Message -match '\bInvariant FAIL base-intrusion\b') {
+        Add-Finding @('INVARIANT') $e ("a rival chicken stayed inside a claimed base on $($e.Src): $($e.Message)")
+    }
+}
+
 # ---- Remote aura victim (WP4, the CW-217 lesson: state on a REMOTE peer, not logs) ---------------------------------
 # Every peer's Invariant probe samples each rival deep inside a live Slow aura for its replicated ControlVfx.Snared and,
 # when the aura is gone, logs `Invariant aura owner=<id> victim=<id> remote=<0|1> deep=<n> snared=<m> verdict=<ok|too-few|

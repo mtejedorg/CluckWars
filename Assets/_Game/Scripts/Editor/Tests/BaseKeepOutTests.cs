@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using CluckWars.Diagnostics;
 using CluckWars.Gameplay;
 using NUnit.Framework;
 using UnityEngine;
@@ -293,6 +294,12 @@ namespace CluckWars.Tests
             Assert.Greater(wall, accept);
             Assert.Less(wall, warn, "the wall answer sits inside the Accepted branch, above the rejection log");
         }
+
+        [TestCase(2.34f, 2.5f, true)]
+        [TestCase(2.36f, 2.5f, false)]
+        [TestCase(0f, 0f, false)]
+        public void BaseIntrusion_LeavesRoomForTheClampedEdge(float distance, float radius, bool expected) =>
+            Assert.AreEqual(expected, RoundInvariants.IsBaseIntrusion(distance, radius));
 
         // ---- wiring ------------------------------------------------------------------------------------------------
 

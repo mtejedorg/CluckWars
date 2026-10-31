@@ -402,6 +402,8 @@ namespace CluckWars.Gameplay
             if (FixedKit.TryResolve(ActiveLoadoutMode, passive, out var kit, out var kitProblem))
             {
                 slot0 = kit[0]; slot1 = kit[1]; slot2 = kit[2]; slot3 = kit[3];
+                // merge.ps1 reads this line: it proves a kit equipped, and how many of the 8 a session exercised.
+                _log?.Info(Source, $"Kit equip subclass={passive.Subclass} slots={kit[0].name},{kit[1].name},{kit[2].name},{kit[3].name}");
                 return;
             }
             if (kitProblem != null)

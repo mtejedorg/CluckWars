@@ -1,0 +1,6 @@
+Initialize engine version: 6000.3.14f1
+[10:00:00.000][00:00.900][Info][Session] Session sha=aaa111 date=2026-10-31 platform=WindowsPlayer
+[10:00:01.000][00:01.000][Info][MatchBootstrap] Kit equip subclass=Warrior_Bully slots=Peck,Scrap,Headbutt,Ruffle
+[10:00:01.100][00:01.100][Info][MatchBootstrap] Kit equip subclass=Fatty_Hoarder slots=Peck,TurtleMode
+[10:00:01.200][00:01.200][Error][MatchBootstrap] ResolveLegalLoadout: the fixed kit is unusable (Bully: the kit has 2 abilities, expected 4.) so Warrior loses it and spawns on the Free loadout rules instead.
+[10:00:05.000][00:05.000][Error][Invariant] Invariant FAIL base-intrusion expected=outside actual=inside-corner-1 who=Chicken(Clone) home=2 round=1

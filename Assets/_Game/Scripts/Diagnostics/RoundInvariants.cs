@@ -254,6 +254,18 @@ namespace CluckWars.Diagnostics
 
         public enum AuraVerdict { TooFew, Ok, NotSnared }
 
+        /// <summary>
+        /// How far past the keep-out radius a chicken must be to count as inside a rival base. Its own authority clamps it after every
+        /// tick, so anything this deep is a clamp that did not run (the render pose only interpolates between clamped ticks).
+        /// </summary>
+        public const float BaseIntrusionDepth = 0.15f;
+
+        /// <summary>The wall may lag a tick or two in a real hit (a blink resolves in the tick it lands); longer is a broken wall.</summary>
+        public const float BaseIntrusionSeconds = 0.25f;
+
+        public static bool IsBaseIntrusion(float planarDistance, float keepOutRadius) =>
+            keepOutRadius > 0f && planarDistance < keepOutRadius - BaseIntrusionDepth;
+
         public static bool IsDeepInsideAura(float planarDistance, float radius) => planarDistance <= radius * AuraDeepFraction;
 
         /// <summary>One frame of one victim: leaving the deep core ends the run; a frame counts once the run has settled.</summary>

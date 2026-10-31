@@ -89,11 +89,54 @@ namespace CluckWars.Diagnostics
                 Observe(gm);
                 World(gm);
                 Auras(gm.Runner);
+                BaseWalls(gm);
             }
             catch (Exception e)
             {
                 // A probe must never take the game down; say what broke instead.
                 _log?.Error(Source, $"Invariant probe failed ({e.GetType().Name}: {e.Message}); continuing.");
+            }
+        }
+
+        private readonly Dictionary<uint, float> _intruding = new Dictionary<uint, float>(4);
+        private readonly HashSet<uint> _intrusionReported = new HashSet<uint>();
+        private int _intrusionRound = -1;
+
+        /// <summary>
+        /// No rival chicken ends inside a claimed base. Only chickens this peer holds authority over: that is where the clamp runs and
+        /// the pose has no network lag in it. <c>Invariant FAIL base-intrusion</c> (Error), once per chicken per round.
+        /// </summary>
+        private void BaseWalls(GameManager gm)
+        {
+            if (_intrusionRound != _round) { _intrusionRound = _round; _intruding.Clear(); _intrusionReported.Clear(); }
+            if (!gm.IsMatchRunning || gm.Config == null) { _intruding.Clear(); return; }
+
+            float radius = gm.Config.BaseKeepOutRadius, now = Time.unscaledTime;
+            var bases = PlayerBase.ActiveBases;
+            var all = ChickenController.ActiveControllers;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var c = all[i];
+                if (c == null || c.Object == null || !c.Object.IsValid || !c.HasStateAuthority || c.IsDecoy) continue;
+                if (c.Combat != null && c.Combat.IsRemoved) continue;
+                if (c.Traversal != null && c.Traversal.IsUnsticking) continue;
+
+                uint id = c.Object.Id.Raw;
+                bool inside = false;
+                int corner = -1;
+                for (int b = 0; b < bases.Count && !inside; b++)
+                {
+                    var pb = bases[b];
+                    if (pb == null || pb.Object == null || !pb.Object.IsValid || !pb.IsClaimed || pb.CornerIndex == c.HomeCornerIndex) continue;
+                    Vector3 p = c.transform.position, at = pb.transform.position;
+                    inside = RoundInvariants.IsBaseIntrusion(new Vector2(p.x - at.x, p.z - at.z).magnitude, radius);
+                    corner = pb.CornerIndex;
+                }
+
+                if (!inside) { _intruding.Remove(id); continue; }
+                if (!_intruding.TryGetValue(id, out float since)) { _intruding[id] = now; continue; }
+                if (now - since < RoundInvariants.BaseIntrusionSeconds || !_intrusionReported.Add(id)) continue;
+                _log.Error(Source, $"Invariant FAIL base-intrusion expected=outside actual=inside-corner-{corner} who={c.name} home={c.HomeCornerIndex} round={_round}");
             }
         }
 
