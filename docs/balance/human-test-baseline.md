@@ -1,6 +1,6 @@
 # Human test baseline: fixed kits
 
-Baseline: the head of branch `balance` after spec v2 (see `git log balance`); v1 was `ae35c5f1`.
+Baseline: code at `82d107bc` on branch `balance` (full gate run on it); the commit adding this line is docs only and is the one to tag. v1 was `ae35c5f1`.
 
 This is a starting point to iterate, not a final roster. Every value below is data: kits on the passive assets (or the Balance
 Editor's kits panel), rule numbers on `MatchConfig.asset` and `MarkKill.asset`. `MatchConfigSO.LoadoutMode = Free` brings back
