@@ -126,6 +126,10 @@ namespace CluckWars.Gameplay
         private Vector3     _lastPathTarget = new Vector3(float.MinValue, 0f, float.MinValue);
         private int         _navCorner = -1;
 
+        // The rival base walls, inflated by BaseKeepOutRules.BotClearance: refreshed every tick in Navigate.
+        private static readonly KeepOutCircle[] _keepOut = new KeepOutCircle[8];
+        private int _keepOutCount;
+
         // ---- Perception (cached per think tick) -----------------------------
 
         /// <summary>Nearest living rival, whatever they are carrying. Drives the danger check.</summary>
@@ -694,6 +698,8 @@ namespace CluckWars.Gameplay
                 return;
             }
 
+            RefreshRivalWalls();
+
             var toTarget = _moveTarget - selfPos;
             toTarget.y = 0f;
 
@@ -711,12 +717,29 @@ namespace CluckWars.Gameplay
 
             // Steer along the NavMesh path (walls + solid piles are obstacles);
             // fall back to the direct line when no path resolves.
-            var steer = ResolveSteerPoint(selfPos);
+            var steer = BaseKeepOutRules.SteerAround(selfPos, ResolveSteerPoint(selfPos), _keepOut, _keepOutCount,
+                _controller.HomeCornerIndex, PinwheelLayout.ArenaClampLimit(MapGenerator.ArenaHalfSize));
             var dir   = steer - selfPos;
             dir.y = 0f;
             if (dir.sqrMagnitude < 0.0001f) dir = toTarget;
             dir.Normalize();
             _controller.BotTick(new Vector2(dir.x, dir.z), Runner.DeltaTime);
+        }
+
+        /// <summary>
+        /// The shared NavMesh knows nothing about who owns which base (one bake, and the owner needs its own base walkable),
+        /// so rival walls are handled here. A target inside one (a rival at home, a steal at its doorstep) becomes the nearest
+        /// point just outside: the bot arrives there and stands, instead of grinding the edge with "arrived" never true.
+        /// </summary>
+        private void RefreshRivalWalls()
+        {
+            var config = GameManager.Instance != null ? GameManager.Instance.Config : null;
+            _keepOutCount = config != null ? PlayerBase.GatherKeepOut(_keepOut, config.BaseKeepOutRadius) : 0;
+            for (int i = 0; i < _keepOutCount; i++)
+                _keepOut[i] = _keepOut[i].WithRadius(_keepOut[i].Radius + BaseKeepOutRules.BotClearance);
+
+            if (BaseKeepOutRules.TryCorrect(_moveTarget, _keepOut, _keepOutCount, _controller.HomeCornerIndex, out var outside))
+                _moveTarget = outside;
         }
 
         /// <summary>
@@ -781,7 +804,8 @@ namespace CluckWars.Gameplay
             {
                 float dx = corners[_navCorner].x - selfPos.x;
                 float dz = corners[_navCorner].z - selfPos.z;
-                if (dx * dx + dz * dz > 0.36f) break;
+                bool walled = BaseKeepOutRules.TryCorrect(corners[_navCorner], _keepOut, _keepOutCount, _controller.HomeCornerIndex, out _);
+                if (!walled && dx * dx + dz * dz > 0.36f) break;   // a corner inside a rival wall can never be reached
                 _navCorner++;
             }
             return corners[Mathf.Min(_navCorner, corners.Length - 1)];

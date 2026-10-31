@@ -20,5 +20,6 @@ MonoBehaviour:
   DeathStunSeconds: 5
   DepositRatePerSecond: 9
   ComebackEventSecondsLeft: 10
+  BaseKeepOutRadius: 2.5
   LoadoutMode: 0
   TickRate: 30

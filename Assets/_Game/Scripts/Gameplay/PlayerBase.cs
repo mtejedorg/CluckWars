@@ -108,6 +108,24 @@ namespace CluckWars.Gameplay
 
         public float DepositRadius => _depositRadius;
 
+        /// <summary>
+        /// Fills <paramref name="into"/> with every claimed base's keep-out disc as this peer sees it; returns how many. A
+        /// base a player left keeps its <see cref="Owner"/> (nothing reassigns it), so it stays claimed, still shows its
+        /// colour, and its wall stays: what is drawn is what blocks.
+        /// </summary>
+        public static int GatherKeepOut(KeepOutCircle[] into, float radius)
+        {
+            int n = 0;
+            for (int i = 0; i < ActiveBases.Count && n < into.Length; i++)
+            {
+                var b = ActiveBases[i];
+                if (b == null || b.Object == null || !b.Object.IsValid || !b.IsClaimed) continue;
+                Vector3 at = b.HasSpawnPosition ? b.SpawnPosition : b.transform.position;
+                into[n++] = new KeepOutCircle(new Vector2(at.x, at.z), radius, b.CornerIndex);
+            }
+            return n;
+        }
+
         private static readonly Color UnownedColor = new Color(0.42f, 0.42f, 0.42f, 1f);
 
         // Shader property IDs — cached once so SetPropertyBlock is alloc-free.

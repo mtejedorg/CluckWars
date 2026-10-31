@@ -111,7 +111,7 @@ namespace CluckWars.Gameplay
     /// </remarks>
     [RequireComponent(typeof(NetworkObject))]
     [RequireComponent(typeof(CharacterController))]
-    public sealed class ChickenController : NetworkBehaviour
+    public sealed class ChickenController : NetworkBehaviour, IAfterTick
     {
         private const string Source = "Chicken";
 
@@ -908,6 +908,62 @@ namespace CluckWars.Gameplay
                 _movement.Tick(steer, Runner.DeltaTime, aiming != null, lockFacing: _facingLockTick == Runner.Tick.Raw);
             }
         }
+
+        // ---- The base wall ------------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// Fusion's after-tick hook: runs after every FixedUpdateNetwork of this tick (ours with all its early returns, the
+        /// bot's BotTick, abilities' blinks and jumps, knockback) and before NetworkTransform copies the transform into state
+        /// (it does that in BeforeCopyPreviousState / AfterAllTicks), so a position inside a rival base is never replicated.
+        /// </summary>
+        void IAfterTick.AfterTick()
+        {
+            if (HasStateAuthority) KeepOutOfRivalBases();
+        }
+
+        private static readonly KeepOutCircle[] _keepOutScratch = new KeepOutCircle[8];
+        // A correction that lands short is logged once per incident: pinned against geometry this should never be.
+        private const int KeepOutBlockedWarnTicks = 60;
+        private int _keepOutBlockedTicks;
+
+        /// <summary>
+        /// Each chicken's own authority clamps itself, so the rule costs no RPC. Jumps are teleports (GDD 3.5): the arc is drawn
+        /// by the animator and the transform is already at the landing, so "airborne" needs no case and a landing inside a
+        /// base resolves on the landing tick. Skipped while unsticking: that is the traversal pushing a bird out of geometry,
+        /// and two pushes could pin it; the wall resolves on the first tick after. Decoys never move (FixedUpdateNetwork
+        /// returns before any movement) and stand where their caster stood, so they need no clamp. HomeCornerIndex -1 has no
+        /// exemption, but before the round runs nothing clamps at all.
+        /// </summary>
+        private void KeepOutOfRivalBases()
+        {
+            if (IsDecoy || _characterController == null || !_characterController.enabled) return;
+            if (_traversal != null && _traversal.IsUnsticking) return;
+            if (_combat != null && _combat.IsRemoved) return;
+            var gm = GameManager.Instance;
+            if (gm == null || !gm.IsMatchRunning || gm.Config == null) return;
+
+            int count = PlayerBase.GatherKeepOut(_keepOutScratch, gm.Config.BaseKeepOutRadius);
+            var at = transform.position;
+            if (!BaseKeepOutRules.TryCorrect(at, _keepOutScratch, count, HomeCornerIndex, out var corrected))
+            {
+                _keepOutBlockedTicks = 0;
+                return;
+            }
+
+            // Move, never a transform write: the sweep cannot shove the bird through a fence or wall, however large the step.
+            // The small drop keeps the controller's ground contact, which gravity's isGrounded gate reads next tick.
+            _characterController.Move(new Vector3(corrected.x - at.x, -KeepOutGroundProbe, corrected.z - at.z));
+
+            if (BaseKeepOutRules.TryCorrect(transform.position, _keepOutScratch, count, HomeCornerIndex, out _))
+            {
+                if (++_keepOutBlockedTicks == KeepOutBlockedWarnTicks)
+                    _log?.Warn(Source, $"{name}: the base wall could not move this chicken out of a rival base for " +
+                        $"{KeepOutBlockedWarnTicks} ticks (at {transform.position}); something solid is inside the keep-out ring.");
+            }
+            else _keepOutBlockedTicks = 0;
+        }
+
+        private const float KeepOutGroundProbe = 0.01f;
 
         // Phase 6 chunk 5 (A7), state-authority local: the tick an ability last turned the bird to its aim, and the
         // aim a single-target pick should use while that cast resolves.
