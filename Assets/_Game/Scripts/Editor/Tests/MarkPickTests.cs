@@ -75,15 +75,11 @@ namespace CluckWars.Tests
             var claim = new ExecuteRules.RemovalClaim
             {
                 Duration = ExecuteRules.RemovalDurationSeconds, AttackerResolved = true, SenderSpeaksForAttacker = true,
-                AttackerHasExecute = true, MarkedThisVictim = true, StunEverSeen = true, SecondsSinceStunned = 9f,
-                PlanarDistance = 12f, KillRange = 12f, MarkWindow = 10f,
+                AttackerHasExecute = true, MarkedThisVictim = true, VictimStunned = true,
+                PlanarDistance = 12f, KillRange = 12f,
             };
             Assert.AreEqual(ExecuteRules.RemovalVerdict.Accepted, ExecuteRules.EvaluateRemoval(claim));
 
-            claim.MarkWindow = 5f;
-            Assert.AreEqual(ExecuteRules.RemovalVerdict.NoExecuteEvidence, ExecuteRules.EvaluateRemoval(claim));
-
-            claim.MarkWindow = 10f;
             claim.KillRange = 8f;
             Assert.AreEqual(ExecuteRules.RemovalVerdict.OutOfRange, ExecuteRules.EvaluateRemoval(claim));
         }

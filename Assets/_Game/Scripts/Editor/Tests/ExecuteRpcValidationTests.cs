@@ -67,11 +67,11 @@ namespace CluckWars.Tests
         [Test]
         public void Removal_MarkedNow_StunRecordedRecently_IsAccepted()
         {
-            // KillReady latches on the stun and outlives it (stuns 1-1.5 s, window 5 s).
+            // The press tick can race the end of the stun: a live stun, plus the latency and a short grace.
             var c = NothingCurrent();
             c.MarkedThisVictim = true;
             c.StunEverSeen = true;
-            c.SecondsSinceStunned = 2.5f;
+            c.SecondsSinceStunned = 0.3f;
             Assert.AreEqual(ExecuteRules.RemovalVerdict.Accepted, ExecuteRules.EvaluateRemoval(c));
         }
 
@@ -84,7 +84,7 @@ namespace CluckWars.Tests
             c.MarkEverSeen = true;
             c.SecondsSinceMarkSeen = 0.05f;
             c.StunEverSeen = true;
-            c.SecondsSinceStunned = 2f;
+            c.SecondsSinceStunned = 0.3f;
             Assert.AreEqual(ExecuteRules.RemovalVerdict.Accepted, ExecuteRules.EvaluateRemoval(c));
         }
 
@@ -467,5 +467,13 @@ namespace CluckWars.Tests
                     return slash >= 0 ? l.Substring(0, slash) : l;
                 })
                 .ToArray();
+
+        [Test]
+        public void AStunOlderThanTheGrace_NeverVouchesForAKill()
+        {
+            // The kill needs a live stun: the window is latency + a short grace, never the mark's 12 s.
+            Assert.IsFalse(ExecuteRules.HasExecuteEvidence(true, true, 0f, false, true, 5f, 0f), "a 5 s old stun is no evidence");
+            Assert.IsTrue(ExecuteRules.HasExecuteEvidence(true, true, 0f, false, true, 0.3f, 0f), "the press tick's race still passes");
+        }
     }
 }

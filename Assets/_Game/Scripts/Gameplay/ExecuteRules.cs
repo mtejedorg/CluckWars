@@ -57,11 +57,10 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// How long after the victim's own authority last saw itself stunned the stun still
-        /// qualifies an execute, on top of the latency. KillReady latches on a stun and outlives it
-        /// (stuns 1-1.5 s); the qualifying stun is always inside the mark's window, so the whole
-        /// window is a safe bound.
+        /// qualifies an execute, on top of the latency. KillReady holds only while the target is
+        /// stunned, so the kill needs a live stun; this covers just the press tick racing the end of it.
         /// </summary>
-        public const float RecentStunWindowSeconds = AssassinExecute.WindowDuration;
+        public const float RecentStunWindowSeconds = RecentMarkGraceSeconds;
 
         /// <summary>A latency for allowances: clamped to [0, <see cref="MaxLatencySeconds"/>] (NaN reads as 0).</summary>
         public static float CapLatency(float latency) =>
@@ -102,15 +101,14 @@ namespace CluckWars.Gameplay
         /// Shared Mode trusts each state authority over its own objects; this closes forged calls
         /// from peers that are not, and executes with no real mark + stun behind them.
         /// </remarks>
-        /// <param name="stunWindow">The attacker's tuned mark window; defaults to the shipped one.</param>
         public static bool HasExecuteEvidence(
             bool markedNow, bool markEverSeen, float secondsSinceMarkSeen,
             bool stunnedNow, bool stunEverSeen, float secondsSinceStunned,
-            float latency, float stunWindow = RecentStunWindowSeconds)
+            float latency)
         {
             float l = CapLatency(latency);
             bool mark = markedNow || IsRecent(markEverSeen, secondsSinceMarkSeen, l + RecentMarkGraceSeconds);
-            bool stun = stunnedNow || IsRecent(stunEverSeen, secondsSinceStunned, l + stunWindow);
+            bool stun = stunnedNow || IsRecent(stunEverSeen, secondsSinceStunned, l + RecentStunWindowSeconds);
             return mark && stun;
         }
 
@@ -157,8 +155,6 @@ namespace CluckWars.Gameplay
             public float RangeMargin;
             /// <summary>The attacker's tuned kill range (<c>AssassinExecute.KillRange</c>); 0 = the shipped default.</summary>
             public float KillRange;
-            /// <summary>The attacker's tuned window (<c>AssassinExecute.WindowSeconds</c>); 0 = the shipped default.</summary>
-            public float MarkWindow;
         }
 
         /// <summary>True for a finite duration in (0, <see cref="RemovalDurationSeconds"/>].</summary>
@@ -189,8 +185,7 @@ namespace CluckWars.Gameplay
             if (!c.SenderSpeaksForAttacker) return RemovalVerdict.NotAttributable;
             if (!c.AttackerHasExecute) return RemovalVerdict.NoAssassinExecute;
             if (!HasExecuteEvidence(c.MarkedThisVictim, c.MarkEverSeen, c.SecondsSinceMarkSeen,
-                    c.VictimStunned, c.StunEverSeen, c.SecondsSinceStunned, c.Latency,
-                    c.MarkWindow > 0f ? c.MarkWindow : RecentStunWindowSeconds))
+                    c.VictimStunned, c.StunEverSeen, c.SecondsSinceStunned, c.Latency))
                 return RemovalVerdict.NoExecuteEvidence;
             float killRange = c.KillRange > 0f ? c.KillRange : AssassinExecute.DefaultKillRange;
             if (!(c.PlanarDistance <= MaxExecuteDistance(c.RangeMargin, killRange))) return RemovalVerdict.OutOfRange;

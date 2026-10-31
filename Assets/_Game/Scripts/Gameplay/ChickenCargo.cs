@@ -1021,7 +1021,7 @@ namespace CluckWars.Gameplay
             // stun). AssassinExecute.Press sends this RPC and resets its mark in the same tick, so the
             // replicated MarkedTarget can already read None when the RPC lands, and the stun may be over.
             // Mark AND stun, each either current or recorded recently by this victim's own authority
-            // (KillReady outlives the stun; the mark is cleared in the press tick). Same rule as
+            // (the stun may end in the press tick; the mark is cleared in it). Same rule as
             // ChickenCombat.RPC_ExecuteRemoval: ExecuteRules.HasExecuteEvidence (CW-230).
             var combat = _controller != null ? _controller.Combat : null;
             bool markSeen = false, stunSeen = false;
@@ -1034,7 +1034,7 @@ namespace CluckWars.Gameplay
             }
             if (_controller == null ||
                 !ExecuteRules.HasExecuteEvidence(execute.MarkedTarget == _controller.Id, markSeen, sinceMark,
-                    _controller.IsStunned, stunSeen, sinceStun, latency, execute.WindowSeconds))
+                    _controller.IsStunned, stunSeen, sinceStun, latency))
             {
                 rejection = $"{name} has not seen both a recent mark from {execute.name} and a recent stun on itself.";
                 return false;
