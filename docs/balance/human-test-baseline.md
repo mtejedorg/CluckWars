@@ -1,7 +1,6 @@
 # Human test baseline: fixed kits
 
-Baseline commit: see `git log --oneline balance -- docs/balance/human-test-baseline.md` (the commit that added this line closes
-the baseline work on branch `balance`).
+Baseline SHA: `ae35c5f1` on branch `balance` (code and data; this line is the only change after it).
 
 This is a starting point to iterate, not a final roster. Every value below is data: kits on the passive assets (or the Balance
 Editor's kits panel), rule numbers on `MatchConfig.asset` and `MarkKill.asset`. `MatchConfigSO.LoadoutMode = Free` brings back
