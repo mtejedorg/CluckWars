@@ -978,6 +978,9 @@ namespace CluckWars.Gameplay
         public Abilities.PassiveAbilitySO Passive =>
             _abilities != null ? _abilities.Passive : null;
 
+        /// <summary>This chicken's execute state machine (cached), or null before <c>Spawned</c>.</summary>
+        public AssassinExecute Execute => _assassin;
+
         /// <summary>
         /// Applies a speed penalty from a tagged source. Slippery does NOT reduce slow
         /// magnitude — per GDD §5.2 the passive is duration-only (handled in

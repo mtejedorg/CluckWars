@@ -28,11 +28,27 @@ namespace CluckWars.Abilities
             Cooldown = 5f;
         }
 
-        public override float IndicatorRange => AssassinExecute.MaxMarkRange;
+        [Header("Execute (AssassinExecute reads these)")]
+        [Tooltip("Reach of the mark, and how far the target may get before it fizzles (planar m).")]
+        [Min(1f)] public float MarkRange = AssassinExecute.MaxMarkRange;
+        [Tooltip("Seconds the mark must live before a stun can qualify the target.")]
+        [Min(0f)] public float ArmSeconds = AssassinExecute.ArmDuration;
+        [Tooltip("Seconds from the mark to its expiry.")]
+        [Min(0.1f)] public float WindowSeconds = AssassinExecute.WindowDuration;
+        [Tooltip("Cooldown after a mark that fizzled.")]
+        [Min(0f)] public float FailCooldownSeconds = AssassinExecute.FailCooldown;
+        [Tooltip("Cooldown after a kill.")]
+        [Min(0f)] public float SuccessCooldownSeconds = AssassinExecute.SuccessCooldown;
+        [Tooltip("A third chicken this close to the target breaks the isolation the mark needs (planar m).")]
+        [Min(0f)] public float IsolationRadius = AssassinExecute.DefaultIsolationRadius;
+        [Tooltip("Cold trail: after a mark ends, seconds that rival cannot be marked again unless someone else is marked first.")]
+        [Min(0f)] public float ColdTrailSeconds = AssassinExecute.DefaultColdTrailSeconds;
+
+        public override float IndicatorRange => MarkRange;
         public override bool RequiresEnemyInRange => true;
 
         public override AbilityAimShape AimShape => AbilityAimShape.SingleTarget;
-        public override float AimRadius => AssassinExecute.MaxMarkRange;
+        public override float AimRadius => MarkRange;
 
         /// <summary>
         /// The two rules <c>AssassinExecute.Press</c> enforced privately and the preview knew
@@ -44,6 +60,10 @@ namespace CluckWars.Abilities
         ///
         /// <b>Balance consequence, intended:</b> the button now greys out when no
         /// <i>isolated</i> rival is in range, where before it lit up for any rival at all.
+        ///
+        /// The anti-chase rules live here for the same reason: a rival already home would be marked and fizzle at once
+        /// (<see cref="AssassinExecute.IsHome"/>), and a rival on this Assassin's cold trail must grey the button rather than
+        /// waste the press (<see cref="AssassinExecute.IsColdTrail"/>).
         /// </summary>
         protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)
         {
@@ -53,7 +73,11 @@ namespace CluckWars.Abilities
                 TryGetCorner(candidate, out int candidateCorner) && candidateCorner == casterCorner)
                 return false;
 
-            return AssassinExecute.IsIsolated(candidate, caster);
+            if (AssassinExecute.IsHome(candidate)) return false;
+            var exec = caster != null ? caster.Execute : null;
+            if (exec != null && exec.IsColdTrail(candidate)) return false;
+
+            return AssassinExecute.IsIsolated(candidate, caster, IsolationRadius);
         }
 
         /// <summary>

@@ -1,3 +1,4 @@
+using CluckWars.Abilities;
 using CluckWars.Logging;
 using Fusion;
 using UnityEngine;
@@ -7,10 +8,10 @@ namespace CluckWars.Gameplay
 {
     /// <summary>
     /// Assassin Mark/Kill execute state machine (spec §4).
-    /// Mark target -> 2.0s arm -> qualify on stun -> Kill second press.
-    /// Range = 8m, Isolation = 8m radius around target.
+    /// Mark target -> arm -> qualify on stun -> Kill second press. The numbers are data, on <c>MarkKill.asset</c>.
     /// Success: transfer ALL cargo to capacity-exempt bounty bag + ~2s target removal.
-    /// Counterplays: crowd breaks isolation (fizzle mark); stun assassin (denies kill).
+    /// Counterplays: crowd breaks isolation (fizzle mark); stun assassin (denies kill); reach your own base (fizzle mark).
+    /// Anti-chase: a mark that ended leaves a cold trail on that rival (<see cref="ColdTrail{TRival}"/>).
     /// </summary>
     [RequireComponent(typeof(ChickenController))]
     [RequireComponent(typeof(NetworkObject))]
@@ -18,7 +19,9 @@ namespace CluckWars.Gameplay
     {
         private const string Source = "AssassinExecute";
 
-        public const float IsolationRadius = 8.0f;
+        // Today's numbers: the field defaults of MarkKillAbilitySO, and the fallback if no MarkKill asset is registered.
+        public const float DefaultIsolationRadius = 8.0f;
+        public const float DefaultColdTrailSeconds = 15.0f;
         public const float ArmDuration = 2.0f;
         public const float WindowDuration = 5.0f;
         public const float MaxMarkRange = 8.0f;
@@ -30,7 +33,34 @@ namespace CluckWars.Gameplay
         [Networked] public TickTimer WindowTimer { get; private set; }
         [Networked] public bool KillReady { get; private set; }
 
-        public int SlotIndex { get; set; } = 0;
+        /// <summary>The slot holding Death Mark (kit position 0 today), for the cooldowns only this behaviour decides.</summary>
+        private int SlotIndex
+        {
+            get
+            {
+                if (_abilities != null)
+                    for (int i = 0; i < AbilityController.SlotCount; i++)
+                        if (_abilities.GetSlot(i) is MarkKillAbilitySO) return i;
+                return 0;
+            }
+        }
+
+        // The one MarkKill asset, read through the registry so every peer has it: a proxy needs the same numbers for the
+        // receiver-side bounds (ExecuteRules, CW-230) and loadouts are not replicated.
+        private MarkKillAbilitySO _tuning;
+
+        /// <summary>Tuned reach of the mark (<c>MarkKill.asset</c>).</summary>
+        public float MarkRange => _tuning != null ? _tuning.MarkRange : MaxMarkRange;
+        /// <summary>Tuned life of a mark (<c>MarkKill.asset</c>).</summary>
+        public float WindowSeconds => _tuning != null ? _tuning.WindowSeconds : WindowDuration;
+        private float ArmSeconds => _tuning != null ? _tuning.ArmSeconds : ArmDuration;
+        private float FailSeconds => _tuning != null ? _tuning.FailCooldownSeconds : FailCooldown;
+        private float SuccessSeconds => _tuning != null ? _tuning.SuccessCooldownSeconds : SuccessCooldown;
+        private float IsolationMeters => _tuning != null ? _tuning.IsolationRadius : DefaultIsolationRadius;
+        private float ColdTrailSeconds => _tuning != null ? _tuning.ColdTrailSeconds : DefaultColdTrailSeconds;
+
+        private readonly ColdTrail<NetworkBehaviourId> _coldTrail = new ColdTrail<NetworkBehaviourId>();
+        private bool _markIsDecoy;
 
         /// <summary>
         /// Flat food this execute pays on top of the victim's cargo, doubled (by default)
@@ -54,11 +84,13 @@ namespace CluckWars.Gameplay
         private AbilityController _abilities;
         private ChickenMatchStats _stats;
         private ILogService _log;
+        private AbilityRegistrySO _abilityRegistry;
 
         [Inject]
-        public void Construct(ILogService log)
+        public void Construct(ILogService log, AbilityRegistrySO abilityRegistry)
         {
             _log = log;
+            _abilityRegistry = abilityRegistry;
         }
 
         public override void Spawned()
@@ -73,6 +105,12 @@ namespace CluckWars.Gameplay
             _cargo = GetComponent<ChickenCargo>();
             _abilities = GetComponent<AbilityController>();
             _stats = GetComponent<ChickenMatchStats>();
+
+            foreach (var a in _abilityRegistry != null ? _abilityRegistry.ActiveAbilities : System.Linq.Enumerable.Empty<AbilityBaseSO>())
+                if (a is MarkKillAbilitySO mark) { _tuning = mark; break; }
+            if (_tuning == null)
+                _log?.Error(Source, $"{name}: no MarkKill asset in AbilityRegistrySO, so the execute runs on its built-in " +
+                    "numbers and ignores any tuning. Register MarkKill.asset.");
         }
 
         /// <summary>
@@ -107,14 +145,16 @@ namespace CluckWars.Gameplay
                 }
 
                 MarkedTarget = preResolvedTarget.Id;
-                ArmTimer = TickTimer.CreateFromSeconds(Runner, ArmDuration);
-                WindowTimer = TickTimer.CreateFromSeconds(Runner, WindowDuration);
+                _markIsDecoy = preResolvedTarget.IsDecoy;
+                _coldTrail.OnMarked(preResolvedTarget.Id, _markIsDecoy);
+                ArmTimer = TickTimer.CreateFromSeconds(Runner, ArmSeconds);
+                WindowTimer = TickTimer.CreateFromSeconds(Runner, WindowSeconds);
                 KillReady = false;
                 // The press just charged this slot's full cooldown (TryActivate sets it before OnActivate), and that
                 // cooldown equals the window, so the Kill press would be refused for the mark's whole life. The slot is
                 // free while a mark runs (IsUsable gates it on KillReady); the outcome then sets the real cooldown.
                 if (_abilities != null) _abilities.TriggerCooldown(SlotIndex, 0f);
-                _log?.Info(Source, $"Marked target {preResolvedTarget.name} (Arming {ArmDuration:0.0}s).");
+                _log?.Info(Source, $"Marked target {preResolvedTarget.name} (Arming {ArmSeconds:0.0}s).");
                 return true;
             }
             else
@@ -133,7 +173,7 @@ namespace CluckWars.Gameplay
                     _log?.Error(Source, $"{name}: cannot execute - sibling behaviours missing " +
                         $"(ChickenCargo={_cargo != null}, ChickenCombat={_combat != null}). Check the " +
                         "Chicken prefab still carries both alongside AssassinExecute.");
-                    ResetMark();
+                    EndMark();
                     return false;
                 }
 
@@ -149,7 +189,7 @@ namespace CluckWars.Gameplay
                         _log?.Info(Source, $"Execute aborted: {target.name} is not an executable " +
                             $"target (Cargo={target.Cargo != null}, Combat={target.Combat != null}, " +
                             $"alreadyRemoved={target.Combat != null && target.Combat.IsRemoved}).");
-                        ResetMark();
+                        EndMark();
                         return false;
                     }
 
@@ -197,16 +237,16 @@ namespace CluckWars.Gameplay
 
                     _log?.Info(Source, $"Kill Executed! +{bounty:0.#} execute bounty into the bounty bag, " +
                         $"{target.name} removed (cargo transfer {(takesCargo ? "requested" : "skipped: steal-proof")}).");
-                    ResetMark();
+                    EndMark();
 
                     if (_abilities != null)
                     {
-                        _abilities.TriggerCooldown(SlotIndex, SuccessCooldown);
+                        _abilities.TriggerCooldown(SlotIndex, SuccessSeconds);
                     }
                     return true;
                 }
 
-                ResetMark();
+                EndMark();
                 return false;
             }
         }
@@ -229,9 +269,17 @@ namespace CluckWars.Gameplay
             // a 3D measure here could fizzle a mark for a height difference the preview never
             // showed and the flat arena does not have.
             float dist = PlanarDistance(transform.position, target.transform.position);
-            if (dist > MaxMarkRange)
+            if (dist > MarkRange)
             {
-                _log?.Info(Source, $"Mark fizzled: target exceeded range ({dist:0.0}m > {MaxMarkRange}m).");
+                _log?.Info(Source, $"Mark fizzled: target exceeded range ({dist:0.0}m > {MarkRange}m).");
+                FizzleMark();
+                return;
+            }
+
+            // Home is safe: the marked bird reaching its own base ends the hunt.
+            if (IsHome(target))
+            {
+                _log?.Info(Source, "Mark fizzled: target reached its own base.");
                 FizzleMark();
                 return;
             }
@@ -268,7 +316,7 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// Is <paramref name="target"/> alone enough to be executed — no third live chicken
-        /// within <see cref="IsolationRadius"/> of it? This is the crowd counterplay, and it
+        /// within <paramref name="radius"/> of it? This is the crowd counterplay, and it
         /// is the rule the Mark/Kill preview never knew about.
         /// </summary>
         /// <param name="excludeCaster">
@@ -283,11 +331,11 @@ namespace CluckWars.Gameplay
         /// The old <c>Physics.OverlapSphereNonAlloc</c> version needed two separate collider
         /// buffers just to avoid clobbering itself mid-iteration; that whole hazard is gone.
         /// </remarks>
-        public static bool IsIsolated(ChickenController target, ChickenController excludeCaster)
+        public static bool IsIsolated(ChickenController target, ChickenController excludeCaster, float radius)
         {
             if (target == null) return false;
 
-            float radiusSqr = IsolationRadius * IsolationRadius;
+            float radiusSqr = radius * radius;
             Vector3 center = target.transform.position;
 
             var all = ChickenController.ActiveControllers;
@@ -305,7 +353,44 @@ namespace CluckWars.Gameplay
 
         /// <summary>Instance view of <see cref="IsIsolated"/> for this assassin's own call
         /// sites, which always exclude themselves.</summary>
-        public bool IsTargetIsolated(ChickenController target) => IsIsolated(target, _controller);
+        public bool IsTargetIsolated(ChickenController target) => IsIsolated(target, _controller, IsolationMeters);
+
+        /// <summary>
+        /// True when <paramref name="chicken"/> stands inside its OWN base (deposit radius, planar). Static and read-only over
+        /// replicated data, so the filter, the telegraph and the fizzle check agree on every peer.
+        /// </summary>
+        public static bool IsHome(ChickenController chicken)
+        {
+            var obj = chicken != null ? chicken.Object : null;
+            if (obj == null || !obj.IsValid) return false;
+            int corner = chicken.HomeCornerIndex;
+            if (corner < 0) return false;
+
+            var bases = PlayerBase.ActiveBases;
+            for (int i = 0; i < bases.Count; i++)
+            {
+                var b = bases[i];
+                if (b == null || b.Object == null || !b.Object.IsValid || b.CornerIndex != corner) continue;
+                return HomeBreakRules.IsHome(chicken.transform.position, b.transform.position, b.DepositRadius);
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Is <paramref name="candidate"/> on this Assassin's cold trail? Authority-local state: anywhere else it fails open
+        /// (the press is judged on the authority anyway), so a proxy preview can only be more generous, never wrong in the
+        /// direction that eats a press.
+        /// </summary>
+        public bool IsColdTrail(ChickenController candidate)
+        {
+            if (candidate == null || Object == null || !Object.IsValid || !HasStateAuthority) return false;
+
+            int rivals = 0;
+            var all = ChickenController.ActiveControllers;
+            for (int i = 0; i < all.Count; i++)
+                if (all[i] != null && all[i] != _controller && !all[i].IsDecoy) rivals++;
+            return _coldTrail.Refuses(candidate.Id, Runner.SimulationTime, rivals);
+        }
 
         private static float PlanarDistance(Vector3 a, Vector3 b) => Mathf.Sqrt(PlanarSqrDistance(a, b));
 
@@ -327,15 +412,23 @@ namespace CluckWars.Gameplay
         {
             if (!HasStateAuthority) return;
             ResetMark();
+            _coldTrail.Reset();
         }
 
         private void FizzleMark()
         {
-            ResetMark();
+            EndMark();
             if (_abilities != null)
             {
-                _abilities.TriggerCooldown(SlotIndex, FailCooldown);
+                _abilities.TriggerCooldown(SlotIndex, FailSeconds);
             }
+        }
+
+        /// <summary>A mark ended, paid or failed: it leaves its cold trail. The round reset does not come through here.</summary>
+        private void EndMark()
+        {
+            _coldTrail.OnMarkEnded(MarkedTarget, _markIsDecoy, Runner.SimulationTime, ColdTrailSeconds);
+            ResetMark();
         }
 
         private void ResetMark()

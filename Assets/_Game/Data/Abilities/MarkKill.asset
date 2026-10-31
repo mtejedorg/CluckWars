@@ -29,3 +29,10 @@ MonoBehaviour:
     m_Bits: 256
   PeckSlotPreEquippedBy: 64
   SignaturePreEquippedBy: 0
+  MarkRange: 8
+  ArmSeconds: 2
+  WindowSeconds: 5
+  FailCooldownSeconds: 5
+  SuccessCooldownSeconds: 15
+  IsolationRadius: 8
+  ColdTrailSeconds: 15

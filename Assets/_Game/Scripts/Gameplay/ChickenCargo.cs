@@ -1032,7 +1032,7 @@ namespace CluckWars.Gameplay
             }
             if (_controller == null ||
                 !ExecuteRules.HasExecuteEvidence(execute.MarkedTarget == _controller.Id, markSeen, sinceMark,
-                    _controller.IsStunned, stunSeen, sinceStun, latency))
+                    _controller.IsStunned, stunSeen, sinceStun, latency, execute.WindowSeconds))
             {
                 rejection = $"{name} has not seen both a recent mark from {execute.name} and a recent stun on itself.";
                 return false;

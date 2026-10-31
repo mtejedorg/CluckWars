@@ -102,14 +102,15 @@ namespace CluckWars.Gameplay
         /// Shared Mode trusts each state authority over its own objects; this closes forged calls
         /// from peers that are not, and executes with no real mark + stun behind them.
         /// </remarks>
+        /// <param name="stunWindow">The attacker's tuned mark window; defaults to the shipped one.</param>
         public static bool HasExecuteEvidence(
             bool markedNow, bool markEverSeen, float secondsSinceMarkSeen,
             bool stunnedNow, bool stunEverSeen, float secondsSinceStunned,
-            float latency)
+            float latency, float stunWindow = RecentStunWindowSeconds)
         {
             float l = CapLatency(latency);
             bool mark = markedNow || IsRecent(markEverSeen, secondsSinceMarkSeen, l + RecentMarkGraceSeconds);
-            bool stun = stunnedNow || IsRecent(stunEverSeen, secondsSinceStunned, l + RecentStunWindowSeconds);
+            bool stun = stunnedNow || IsRecent(stunEverSeen, secondsSinceStunned, l + stunWindow);
             return mark && stun;
         }
 
@@ -154,6 +155,10 @@ namespace CluckWars.Gameplay
             public float Latency;
             public float PlanarDistance;
             public float RangeMargin;
+            /// <summary>The attacker's tuned mark range (<c>AssassinExecute.MarkRange</c>); 0 = the shipped default.</summary>
+            public float MarkRange;
+            /// <summary>The attacker's tuned window (<c>AssassinExecute.WindowSeconds</c>); 0 = the shipped default.</summary>
+            public float MarkWindow;
         }
 
         /// <summary>True for a finite duration in (0, <see cref="RemovalDurationSeconds"/>].</summary>
@@ -161,8 +166,8 @@ namespace CluckWars.Gameplay
             duration > 0f && duration <= RemovalDurationSeconds + 1e-4f;
 
         /// <summary>Furthest apart a real execute's two chickens can be when the removal lands.</summary>
-        public static float MaxExecuteDistance(float driftMargin) =>
-            AssassinExecute.MaxMarkRange + RangeSlackMeters + Mathf.Max(0f, driftMargin);
+        public static float MaxExecuteDistance(float driftMargin, float markRange = AssassinExecute.MaxMarkRange) =>
+            markRange + RangeSlackMeters + Mathf.Max(0f, driftMargin);
 
         /// <summary>
         /// Decides a removal claim. The evidence rule is the one <c>ChickenCargo.TryResolveExecutor</c>
@@ -184,9 +189,11 @@ namespace CluckWars.Gameplay
             if (!c.SenderSpeaksForAttacker) return RemovalVerdict.NotAttributable;
             if (!c.AttackerHasExecute) return RemovalVerdict.NoAssassinExecute;
             if (!HasExecuteEvidence(c.MarkedThisVictim, c.MarkEverSeen, c.SecondsSinceMarkSeen,
-                    c.VictimStunned, c.StunEverSeen, c.SecondsSinceStunned, c.Latency))
+                    c.VictimStunned, c.StunEverSeen, c.SecondsSinceStunned, c.Latency,
+                    c.MarkWindow > 0f ? c.MarkWindow : RecentStunWindowSeconds))
                 return RemovalVerdict.NoExecuteEvidence;
-            if (!(c.PlanarDistance <= MaxExecuteDistance(c.RangeMargin))) return RemovalVerdict.OutOfRange;
+            float markRange = c.MarkRange > 0f ? c.MarkRange : AssassinExecute.MaxMarkRange;
+            if (!(c.PlanarDistance <= MaxExecuteDistance(c.RangeMargin, markRange))) return RemovalVerdict.OutOfRange;
             return RemovalVerdict.Accepted;
         }
 
