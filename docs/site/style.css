@@ -160,7 +160,7 @@ ul.tight li, ol.tight li { margin-bottom: 4px; }
    pages, scroll hints on wide tables, no text under 12px, 44px touch targets. Wider screens unchanged. */
 .section-chips { display: none; }
 @media (max-width: 720px) {
-  html { scroll-padding-top: 68px; }
+  html { scroll-padding-top: 76px; }
   body { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
   .site-nav {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
@@ -195,11 +195,16 @@ ul.tight li, ol.tight li { margin-bottom: 4px; }
 
   .chip { min-height: 44px; padding: 0 16px; }
   .btn { display: inline-flex; align-items: center; min-height: 44px; }
-  .site-foot a { display: inline-block; padding: 10px 0; }
+  .site-foot a { display: inline-block; padding: 11px 0; }
+  .brand { display: inline-block; padding: 8px 0; }
+  .calc input { min-height: 44px; }
+  code { font-size: max(0.88em, 12px); }
 
   /* Nothing under 12px */
   .facts span, .tag, thead th { font-size: 0.75rem; }
 
+  /* Between 641 and 720px the page padding is 24px, so the sticky row bleeds 24px */
+  @media (min-width: 641px) { .toc, .section-chips { margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px; } }
   .tw.more-right { -webkit-mask-image: linear-gradient(to right, #000 82%, transparent); mask-image: linear-gradient(to right, #000 82%, transparent); }
   .tw.more-left { -webkit-mask-image: linear-gradient(to left, #000 82%, transparent); mask-image: linear-gradient(to left, #000 82%, transparent); }
   .tw.more-left.more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 15%, #000 85%, transparent); mask-image: linear-gradient(to right, transparent, #000 15%, #000 85%, transparent); }

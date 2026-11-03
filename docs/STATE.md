@@ -8,7 +8,7 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ## 🌐 2026-11-03 - project site (`docs/site/`) phone layout
 
-- Site-only change, no game code. On screens up to 720 px the Home / Mechanics / Tech / GitHub nav becomes a bottom tab bar; the mechanics contents list (moved just outside `.hero` so it can stick) and a contents row built from the Tech page's headings stay pinned at the top and mark the section in view; wide tables fade on the side that still has content; nothing under 12 px; 44 px touch targets.
+- Site-only change, no game code. On screens up to 720 px the Home / Mechanics / Tech / GitHub nav becomes a bottom tab bar; the mechanics contents list (moved just outside `.hero` so it can stick) and a contents row built from the Tech page's headings (long headings carry a short `data-short` chip label) stay pinned at the top and mark the section in view; wide tables fade on the side that still has content and become focusable while they scroll; body text, labels and code are at least 12 px; nav, chips, buttons, calculator inputs and footer links are at least 44 px tall; `viewport-fit=cover` so the safe-area padding applies on iPhones.
 - New `docs/site/phone.js` (no dependencies, shared with the Saint Manick and cvkit sites). Desktop and tablet renders (1280 and 800 px) are pixel-identical to before. No numbers changed, so the compendium Artifact does not need republishing for this.
 
 ---

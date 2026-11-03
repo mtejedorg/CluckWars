@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Cluck Wars: Tech</title>
 <meta name="description" content="How Cluck Wars is built: Unity 6, Photon Fusion 2 in Shared Mode, Zenject, services behind interfaces, ScriptableObject data and the Balance Oracle.">
 <link rel="icon" href="data:,">
@@ -55,7 +55,7 @@
   </section>
 
   <section id="interfaces">
-    <h2>Everything external sits behind an interface</h2>
+    <h2 data-short="Interfaces">Everything external sits behind an interface</h2>
     <!-- Source: docs/TDD.md §1, §3.1, §3.3, §4.2, §7, §8, §10 -->
     <p>Gameplay code never calls Fusion, UGS, Unity's input or the audio system directly. It talks to <code>INetworkService</code>, <code>IUGSService</code>, <code>IAudioService</code>, <code>IInputProvider</code> and <code>ILogService</code>. Zenject binds the implementations in a <code>ProjectInstaller</code> that lives on a prefab in <code>Resources</code>, so swapping one is a change to a single <code>To&lt;&gt;()</code> line and no other code.</p>
     <p>Null implementations exist for UGS, which the <code>UGS_DISABLED</code> define forces, and for audio, where <code>NullAudioService</code> is a silent no-op for testing. Even the offline path goes through Fusion, in its single-player mode, so there is no separate local networking class and no fork between solo and multiplayer spawn logic.</p>
@@ -70,7 +70,7 @@
   </section>
 
   <section id="data">
-    <h2>ScriptableObject data and the Balance Oracle</h2>
+    <h2 data-short="Data &amp; Oracle">ScriptableObject data and the Balance Oracle</h2>
     <!-- Source: docs/TDD.md §6.3, §6.6 -->
     <p>Abilities are ScriptableObject assets derived from <code>AbilityBaseSO</code>. Class stats and match settings are ScriptableObjects too, in <code>Assets/_Game/Data/</code>, and every such type carries the <code>SO</code> suffix.</p>
     <!-- Source: docs/GDD.md §2.1, §13 -->
