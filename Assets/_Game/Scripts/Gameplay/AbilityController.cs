@@ -671,17 +671,18 @@ namespace CluckWars.Gameplay
         /// </remarks>
         public int EquippedSlotCount => SlotCount;
 
-        /// <summary>
-        /// Bot-only activation API. Mirrors the player gates (cooldown / stun) and additionally refuses
-        /// while any of the bot's own slots is running — bots never overlap abilities.
-        /// Returns <c>true</c> if the ability fired this call.
-        /// Must be called from the StateAuthority (bot FSM already guards this).
-        /// </summary>
         /// <summary>The bots' one-at-a-time gate, pure: nothing running, or a press the running ability takes, or an ability
         /// exempt from the rule (<see cref="AbilityBaseSO.BotIgnoresOneAtATime"/>).</summary>
         public static bool BotMayPress(bool anyActive, bool repress, bool ignoresOneAtATime) =>
             !anyActive || repress || ignoresOneAtATime;
 
+        /// <summary>
+        /// Bot-only activation API. Mirrors the player gates (cooldown / stun) and additionally refuses
+        /// while any of the bot's own slots is running (<see cref="BotMayPress"/>: bots never overlap abilities, except
+        /// Turtle Mode's lock press and Death Mark's Kill).
+        /// Returns <c>true</c> if the ability fired this call.
+        /// Must be called from the StateAuthority (bot FSM already guards this).
+        /// </summary>
         public bool BotTryActivate(int slot)
         {
             if (!HasStateAuthority) return false;
