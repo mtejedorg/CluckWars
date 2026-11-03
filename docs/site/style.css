@@ -155,3 +155,57 @@ ul.tight li, ol.tight li { margin-bottom: 4px; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* Phone layout (<= 720px): page tabs at the bottom for thumb reach, sticky section chips on the long
+   pages, scroll hints on wide tables, no text under 12px, 44px touch targets. Wider screens unchanged. */
+.section-chips { display: none; }
+@media (max-width: 720px) {
+  html { scroll-padding-top: 76px; }
+  body { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
+  .site-nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background: rgba(18, 11, 5, 0.95); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    border-top: 1px solid var(--rule);
+  }
+  .site-nav a {
+    display: flex; align-items: center; justify-content: center; min-height: 56px; padding: 0;
+    border: 0; border-radius: 0; border-top: 2px solid transparent; font-size: 0.95rem;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .site-nav a[aria-current="page"] { background: none; color: var(--gold); border-top-color: var(--gold); }
+
+  /* Section chips: the mechanics page's own contents list, or one built from the headings */
+  .toc, .section-chips {
+    position: sticky; top: 0; z-index: 40; display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; scrollbar-width: none;
+    margin: 18px -16px 0; padding: 10px 16px;
+    background: rgba(18, 11, 5, 0.95); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--rule);
+  }
+  .toc::-webkit-scrollbar, .section-chips::-webkit-scrollbar { display: none; }
+  .toc li { flex: 0 0 auto; }
+  .toc a, .section-chips a {
+    display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; white-space: nowrap;
+    border: 1px solid var(--rule); border-radius: 999px; font-size: 0.88rem; text-decoration: none; color: var(--dim);
+  }
+  .toc a.is-active, .section-chips a.is-active { color: #241606; background: linear-gradient(180deg, var(--gold), var(--gold-deep)); border-color: #8a6410; }
+  /* The hero wrapper must not clip the sticky list */
+  .hero { overflow: visible; }
+
+  .chip { min-height: 44px; padding: 0 16px; }
+  .btn { display: inline-flex; align-items: center; min-height: 44px; }
+  .site-foot a { display: inline-block; padding: 11px 0; }
+  .brand { display: inline-block; padding: 8px 0; }
+  .calc input { min-height: 44px; }
+  code { font-size: max(0.88em, 12px); }
+
+  /* Nothing under 12px */
+  .facts span, .tag, thead th { font-size: 0.75rem; }
+
+  /* Between 641 and 720px the page padding is 24px, so the sticky row bleeds 24px */
+  @media (min-width: 641px) { .toc, .section-chips { margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px; } }
+  .tw.more-right { -webkit-mask-image: linear-gradient(to right, #000 82%, transparent); mask-image: linear-gradient(to right, #000 82%, transparent); }
+  .tw.more-left { -webkit-mask-image: linear-gradient(to left, #000 82%, transparent); mask-image: linear-gradient(to left, #000 82%, transparent); }
+  .tw.more-left.more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 15%, #000 85%, transparent); mask-image: linear-gradient(to right, transparent, #000 15%, #000 85%, transparent); }
+}
