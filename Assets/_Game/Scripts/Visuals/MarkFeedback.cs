@@ -179,6 +179,7 @@ namespace CluckWars.Visuals
             input.Distance = FloorArrowRules.PlanarDistance(me, it);
             input.CanKillNow = exec.CanKillNow;
             input.Walled = PlayerBase.WallBetween(me, it);
+            input.TargetShelled = !ExecuteRules.CanBeExecuted(target.IsStealProof);
 
             // Ambush lit: the target inside the equipped Ambush's OWN shape (the hot test's WouldAffect: reach, shape, wall,
             // eligibility, all read from the asset) and the slot ready.

@@ -58,6 +58,12 @@ namespace CluckWars.Gameplay
         private float FailSeconds => _tuning != null ? _tuning.FailCooldownSeconds : FailCooldown;
         private float SuccessSeconds => _tuning != null ? _tuning.SuccessCooldownSeconds : SuccessCooldown;
 
+        // Authority-local: the mark a Kill press ended, kept so a shell refund can restore it (no networked field).
+        private NetworkBehaviourId _pressedTarget;
+        private TickTimer _pressedWindow, _pressedArm;
+        private bool _pressedHadLast;
+        private NetworkBehaviourId _pressedLastMark;
+
         // Authority-local: who the last mark was (never picked twice running) and the pick's scratch list.
         private bool _hasLastMark;
         private NetworkBehaviourId _lastMark;
@@ -228,6 +234,11 @@ namespace CluckWars.Gameplay
                     // authority refuses leaves nothing half-applied.
                     _log?.Info(Source, $"Kill pressed on {target.name} " +
                         $"(cargo transfer {(takesCargo ? "requested" : "skipped: steal-proof")}).");
+                    _pressedTarget = MarkedTarget;
+                    _pressedWindow = WindowTimer;
+                    _pressedArm = ArmTimer;
+                    _pressedHadLast = _hasLastMark;
+                    _pressedLastMark = _lastMark;
                     EndMark();
 
                     if (_abilities != null)
@@ -256,8 +267,9 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            // Qualified only while the target is stunned, right now: the kill needs the stun, not its memory.
-            bool qualified = ArmTimer.Expired(Runner) && target.CurrentControlState == ControlState.Stunned;
+            // Qualified only while the target is stunned, right now: the kill needs the stun, not its memory. Never a shelled one.
+            bool qualified = ArmTimer.Expired(Runner) && target.CurrentControlState == ControlState.Stunned &&
+                             ExecuteRules.CanBeExecuted(target.IsStealProof);
             if (qualified != KillReady)
             {
                 KillReady = qualified;
@@ -284,9 +296,49 @@ namespace CluckWars.Gameplay
                 if (Object == null || !Object.IsValid || !KillReady || MarkedTarget == NetworkBehaviourId.None) return false;
                 if (_controller == null || !ControlRules.CanCast(_controller.CurrentControlState)) return false;
                 if (!Runner.TryFindBehaviour(MarkedTarget, out ChickenController target)) return false;
+                if (!ExecuteRules.CanBeExecuted(target.IsStealProof)) return false;
                 Vector3 me = transform.position, it = target.transform.position;
                 return PlanarDistance(me, it) <= KillRange && !PlayerBase.WallBetween(me, it);
             }
+        }
+
+        /// <summary>
+        /// The victim's authority says this chicken's Kill landed on a shell (raised inside one round trip of the press):
+        /// nothing was removed, credited or paid. Refund: the Kill's cooldown is lifted, and the mark it ended comes back with
+        /// its own timer if it still has time and no new mark replaced it. Receiver-validated like the steal refund: the
+        /// sender must speak for the victim, and a Kill on it must be pending here (consumed once), so it cannot be forged.
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_RefundShelledKill(NetworkBehaviourId victimId, RpcInfo info = default)
+        {
+            if (Runner == null || !Runner.TryFindBehaviour(victimId, out ChickenController victim) || victim == null ||
+                victim.Object == null || !victim.Object.IsValid)
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_RefundShelledKill - no live chicken resolves from {victimId}.");
+                return;
+            }
+            bool attributable = victim != _controller &&
+                (info.IsInvokeLocal ? victim.Object.HasStateAuthority : victim.Object.StateAuthority == info.Source);
+            if (!attributable || _stats == null || !_stats.TryCancelKillCredit(victimId))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_RefundShelledKill from {info.Source} - " +
+                    (attributable ? $"no pending Kill on {victim.name}." : $"{victim.name} is not a victim it speaks for."));
+                return;
+            }
+
+            if (_abilities != null) _abilities.TriggerCooldown(SlotIndex, 0f);
+            bool restored = ExecuteRules.ShouldRestoreShelledMark(MarkedTarget == NetworkBehaviourId.None,
+                _pressedTarget == victimId, !_pressedWindow.ExpiredOrNotRunning(Runner));
+            if (restored)
+            {
+                MarkedTarget = _pressedTarget;
+                ArmTimer = _pressedArm;
+                WindowTimer = _pressedWindow;
+                KillReady = false;
+                _hasLastMark = _pressedHadLast;
+                _lastMark = _pressedLastMark;
+            }
+            _log?.Info(Source, $"Kill on {victim.name} met a shell: refunded" + (restored ? ", mark restored." : " (mark not restored)."));
         }
 
         /// <summary>Is there a rival a press would mark? Authority-local history, so a proxy only counts rivals (fails open).</summary>

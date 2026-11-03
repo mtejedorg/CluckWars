@@ -35,7 +35,7 @@ namespace CluckWars.UI
 
         private ILogService _log;
 
-        private VisualElement _root, _marker, _pointer, _ring, _skull, _lock, _hunterSkull;
+        private VisualElement _root, _marker, _pointer, _ring, _skull, _lock, _shell, _hunterSkull;
         private Label _distance;
         private bool _bound, _reportedMissing;
 
@@ -76,16 +76,17 @@ namespace CluckWars.UI
             _ring = root.Q<VisualElement>("MarkRing");
             _skull = root.Q<VisualElement>("MarkSkull");
             _lock = root.Q<VisualElement>("MarkLock");
+            _shell = root.Q<VisualElement>("MarkShell");
             _distance = root.Q<Label>("MarkDistance");
             _hunterSkull = root.Q<VisualElement>("HunterSkull");
-            if (_root == null || _marker == null || _pointer == null || _ring == null || _skull == null || _lock == null ||
+            if (_root == null || _marker == null || _pointer == null || _ring == null || _skull == null || _lock == null || _shell == null ||
                 _distance == null || _hunterSkull == null)
             {
                 if (!_reportedMissing)
                 {
                     _reportedMissing = true;
                     _log?.Error(Source, "MarkHud.uxml is missing an element (MarkHudRoot, HuntMarker, MarkPointer, MarkRing, MarkSkull, " +
-                        "MarkLock, MarkDistance or HunterSkull): the Death Mark hunt marker and the victim's hunter badge are not drawn.");
+                        "MarkLock, MarkShell, MarkDistance or HunterSkull): the Death Mark hunt marker and the victim's hunter badge are not drawn.");
                 }
                 return;
             }
@@ -168,6 +169,7 @@ namespace CluckWars.UI
 
             Color c = o.MarkerMode == MarkMarkerMode.Kill ? FeedbackTuning.MarkKillColor
                     : o.MarkerMode == MarkMarkerMode.Walled ? FeedbackTuning.MarkWalledColor
+                    : o.MarkerMode == MarkMarkerMode.Shelled ? FeedbackTuning.MarkCream
                     : PlayerPalette.ForCorner(o.TargetCorner);
             if (c != _stateColour || Mathf.Abs(o.MarkerFill01 - _fill) >= 0.004f)
             {
@@ -178,6 +180,7 @@ namespace CluckWars.UI
             }
             _skull.style.unityBackgroundImageTintColor = c;
             SetShown(_lock, o.MarkerMode == MarkMarkerMode.Walled);
+            SetShown(_shell, o.MarkerMode == MarkMarkerMode.Shelled);
 
             // Pointer: down over the target, toward it at the edge. UITK rotates clockwise; the art points down (+y).
             float angle = offScreen ? Mathf.Atan2(-bearing.x, -bearing.y) * Mathf.Rad2Deg : 0f;

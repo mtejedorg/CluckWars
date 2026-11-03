@@ -191,6 +191,14 @@ namespace CluckWars.Gameplay
         public void RPC_ExecuteRemoval(NetworkBehaviourId assassinId, float duration, RpcInfo info = default)
         {
             var verdict = JudgeRemoval(assassinId, duration, info, out string attackerName);
+            if (verdict == ExecuteRules.RemovalVerdict.Shelled)
+            {
+                // Silent, like the steal refund: a shell went up inside one round trip. No removal, no kill credit, no bounty
+                // (both follow the removal); the Assassin gets its Kill back.
+                _log?.Debug(Source, $"{name}: execute from {attackerName} landed on a shell; refused, Kill refunded.");
+                RefundShelledExecute(assassinId);
+                return;
+            }
             if (ExecuteRules.IsLegalNoOp(verdict))
             {
                 _log?.Debug(Source, $"{name}: execute from {attackerName} landed across a base wall; no effect.");
@@ -246,6 +254,7 @@ namespace CluckWars.Gameplay
                 claim.RangeMargin = ExecuteRangeMargin(attackerController, claim.Latency);
                 Vector3 a = attacker.transform.position, v = transform.position;
                 claim.WallBetweenThem = PlayerBase.WallBetween(a, v);
+                claim.VictimShelled = _controller != null && _controller.IsStealProof;
                 claim.PlanarDistance = Mathf.Sqrt((a.x - v.x) * (a.x - v.x) + (a.z - v.z) * (a.z - v.z));
             }
 
@@ -319,6 +328,15 @@ namespace CluckWars.Gameplay
                     execute.MarkedTarget == _controller.Id)
                     _markSeenAt[execute] = now;
             }
+        }
+
+        /// <summary>Victim's authority: tells the Assassin's authority its Kill met a shell (<see cref="AssassinExecute.RPC_RefundShelledKill"/>).</summary>
+        private void RefundShelledExecute(NetworkBehaviourId attackerId)
+        {
+            if (_controller == null || Runner == null) return;
+            if (!Runner.TryFindBehaviour(attackerId, out ChickenCombat attacker) || attacker == null) return;   // left: nothing to refund
+            var execute = attacker.GetComponent<AssassinExecute>();
+            if (execute != null) execute.RPC_RefundShelledKill(_controller.Id);
         }
 
         private void CreditKillToAttacker(NetworkBehaviourId attackerId)

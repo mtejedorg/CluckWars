@@ -127,13 +127,29 @@ namespace CluckWars.Gameplay
             OutOfRange,
             /// <summary>Not a rejection: the victim stepped through a base wall after the press (<see cref="IsLegalNoOp"/>).</summary>
             AcrossBaseWall,
+            /// <summary>Not a rejection: the victim raised a shell (steal-proof) inside one round trip of the press
+            /// (<see cref="CanBeExecuted"/>). Nothing lands; the Assassin's kill cooldown is refunded.</summary>
+            Shelled,
         }
+
+        /// <summary>
+        /// THE rule (Maestro 2026-11): a shelled chicken cannot be executed. Shelled = steal-proof (Turtle Mode's walk and
+        /// lock, Egg Shell), the same flag every thief reads. Stuns, roots and shoves still land on it; only the execute is
+        /// refused. Asked by the Kill gate (<c>AssassinExecute.CanKillNow</c> / <c>KillReady</c>, so the button, the HUD and the
+        /// bots agree) and by the victim's authority (<see cref="EvaluateRemoval"/>, the sub-round-trip race).
+        /// </summary>
+        public static bool CanBeExecuted(bool stealProof) => !stealProof;
+
+        /// <summary>A shell-refunded Kill gives its mark back only when no other mark replaced it, it was the mark the press
+        /// ended, and its window still has time.</summary>
+        public static bool ShouldRestoreShelledMark(bool noMarkNow, bool sameTarget, bool windowLeft) =>
+            noMarkNow && sameTarget && windowLeft;
 
         /// <summary>
         /// A verdict an honest client can produce: the Assassin's press already refuses a walled target, so this is the target
         /// reaching home inside one round trip. Nothing lands and nothing is logged as a rejection, as with a root (<see cref="BaseWallRules"/>).
         /// </summary>
-        public static bool IsLegalNoOp(RemovalVerdict v) => v == RemovalVerdict.AcrossBaseWall;
+        public static bool IsLegalNoOp(RemovalVerdict v) => v == RemovalVerdict.AcrossBaseWall || v == RemovalVerdict.Shelled;
 
         /// <summary>The facts the victim's authority can establish about a removal claim.</summary>
         public struct RemovalClaim
@@ -161,6 +177,8 @@ namespace CluckWars.Gameplay
             public float Latency;
             public float PlanarDistance;
             public float RangeMargin;
+            /// <summary>The victim is steal-proof on its own authority now (<see cref="CanBeExecuted"/>).</summary>
+            public bool VictimShelled;
             /// <summary>The attacker's tuned kill range (<c>AssassinExecute.KillRange</c>); 0 = the shipped default.</summary>
             public float KillRange;
             /// <summary>A claimed base's wall stands between attacker and victim, as this authority sees them.</summary>
@@ -200,6 +218,7 @@ namespace CluckWars.Gameplay
             float killRange = c.KillRange > 0f ? c.KillRange : AssassinExecute.DefaultKillRange;
             if (!(c.PlanarDistance <= MaxExecuteDistance(c.RangeMargin, killRange))) return RemovalVerdict.OutOfRange;
             if (c.WallBetweenThem) return RemovalVerdict.AcrossBaseWall;
+            if (!CanBeExecuted(c.VictimShelled)) return RemovalVerdict.Shelled;
             return RemovalVerdict.Accepted;
         }
 
@@ -216,6 +235,7 @@ namespace CluckWars.Gameplay
                 case RemovalVerdict.NoExecuteEvidence:   return "this chicken has not seen both a recent mark from the attacker and a recent stun on itself.";
                 case RemovalVerdict.OutOfRange:          return "the attacker is too far away to have executed this chicken.";
                 case RemovalVerdict.AcrossBaseWall:      return "a base wall stands between the attacker and this chicken.";
+                case RemovalVerdict.Shelled:             return "this chicken is shelled (steal-proof) and cannot be executed.";
                 default:                                 return "accepted.";
             }
         }

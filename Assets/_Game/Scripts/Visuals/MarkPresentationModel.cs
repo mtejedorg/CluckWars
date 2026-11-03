@@ -24,6 +24,8 @@ namespace CluckWars.Visuals
         Kill = 1,
         /// <summary>A base wall stands between them (grey + lock badge); the ring keeps draining.</summary>
         Walled = 2,
+        /// <summary>The target is shelled (steal-proof) and cannot be executed (cream + shell badge); the ring keeps draining.</summary>
+        Shelled = 3,
     }
 
     /// <summary>One-shot cues of a frame, edge-triggered (several can fire on one frame).</summary>
@@ -72,6 +74,8 @@ namespace CluckWars.Visuals
         public bool AmbushReadyOnTarget;
         /// <summary>A base wall between the Assassin and the target (<c>PlayerBase.WallBetween</c>).</summary>
         public bool Walled;
+        /// <summary>The target is shelled: steal-proof, so <c>ExecuteRules.CanBeExecuted</c> refuses it.</summary>
+        public bool TargetShelled;
 
         // ---- Victim ----------------------------------------------------------------------------------------------
         /// <summary>The hunter is invisible to the victim (Invisibility / Smoke Roost fade).</summary>
@@ -428,6 +432,11 @@ namespace CluckWars.Visuals
             return Mathf.Max(1, Mathf.RoundToInt(drawSeconds / Mathf.Max(1e-3f, FeedbackTuning.MarkDrawStepSeconds)));
         }
 
+        /// <summary>The marker's look, in the order the Kill press judges it: KILL, then a shell (nothing executes it), then a
+        /// base wall, else hunting.</summary>
+        public static MarkMarkerMode MarkerModeFor(bool canKill, bool shelled, bool walled) =>
+            canKill ? MarkMarkerMode.Kill : shelled ? MarkMarkerMode.Shelled : walled ? MarkMarkerMode.Walled : MarkMarkerMode.Hunt;
+
         /// <summary>Seconds shown on the clock: rounds up, so "0" never shows while the mark is alive.</summary>
         public static int ShownSeconds(float remaining) => Mathf.CeilToInt(Mathf.Max(0f, remaining));
 
@@ -481,7 +490,7 @@ namespace CluckWars.Visuals
             }
 
             // The marker, from the lock on.
-            _mode = input.CanKillNow ? MarkMarkerMode.Kill : input.Walled ? MarkMarkerMode.Walled : MarkMarkerMode.Hunt;
+            _mode = MarkerModeFor(input.CanKillNow, input.TargetShelled, input.Walled);
             _fill = input.Window > 0f ? Mathf.Clamp01(input.Remaining / input.Window) : 0f;
             _metres = Mathf.RoundToInt(Mathf.Max(0f, input.Distance));
             if (_locked)

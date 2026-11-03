@@ -54,6 +54,15 @@
     -unity-background-image-tint-color: rgb(254, 245, 224);
 }
 
+/* Shelled only (the target is steal-proof and cannot be executed): the same badge, the Egg Shell icon inked on cream. */
+.cw-mark-shell { background-color: rgb(254, 245, 224); }
+.cw-mark-shell-glyph {
+    width: 28px; height: 28px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_EggShellAbilitySO.png");
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: rgb(20, 10, 26);
+}
+
 /* Off screen only, on the inward vertical side of the disc (the controller moves it above when the bearing points down). */
 /* 34 px, not 32: the 0.85 appear pop must keep it at or above the 28 px HUD floor. 120 px wide fits "999 m" and keeps a
    marker pinned at the edge clearance inside the panel. */
