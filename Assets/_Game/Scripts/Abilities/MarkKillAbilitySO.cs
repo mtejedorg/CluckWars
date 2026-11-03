@@ -46,6 +46,10 @@ namespace CluckWars.Abilities
         [Min(0f)] public float FailCooldownSeconds = AssassinExecute.FailCooldown;
         [Tooltip("Cooldown after a kill.")]
         [Min(0f)] public float SuccessCooldownSeconds = AssassinExecute.SuccessCooldown;
+        [Tooltip("Cooldown Death Mark opens every round on, counted from GO (first round and every PLAY AGAIN). Bots obey it too.")]
+        [Min(0f)] public float RoundStartCooldownSeconds = 4f;
+
+        public override float RoundStartCooldown => RoundStartCooldownSeconds;
 
         public override bool RequiresEnemyInRange => false;
         public override AbilityAimShape AimShape => AbilityAimShape.None;

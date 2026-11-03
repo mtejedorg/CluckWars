@@ -325,6 +325,7 @@ namespace CluckWars.Gameplay
                 _rearmRemaining[i] = AbilityFizzleRules.Advance(_rearmRemaining[i], Runner.DeltaTime);
 
             var gm = GameManager.Instance;
+            ApplyRoundStartCooldowns(gm);
             if (gm == null || !gm.IsMatchRunning)
             {
                 DeactivateAll();
@@ -816,6 +817,28 @@ namespace CluckWars.Gameplay
             3 => Cooldown3,
             _ => default,
         };
+
+        /// <summary>
+        /// While the intro runs, holds every slot with a <see cref="AbilityBaseSO.RoundStartCooldown"/> on a cooldown that ends
+        /// that many seconds after GO (<see cref="RoundStartCooldownRules"/>). Runs every intro tick, so it lands after any slot
+        /// clearing (<see cref="EndAllForReset"/> at PLAY AGAIN, a loadout swap) and nothing wipes it. Authority only (called
+        /// from the authority half of FixedUpdateNetwork); bots get it the same way.
+        /// </summary>
+        private void ApplyRoundStartCooldowns(GameManager gm)
+        {
+            if (gm == null || gm.Object == null || !gm.Object.IsValid || gm.State != MatchState.Active) return;
+            int? introEnd = gm.IntroTimer.TargetTick;
+            if (!introEnd.HasValue) return;
+            int now = Runner.Tick;
+            for (int slot = 0; slot < SlotCount; slot++)
+            {
+                var ability = GetSlot(slot);
+                if (ability == null) continue;
+                int expiry = RoundStartCooldownRules.ExpiryTick(true, introEnd.Value, now, ability.RoundStartCooldown, Runner.DeltaTime);
+                if (expiry < 0 || GetCooldown(slot).TargetTick == expiry) continue;
+                SetCooldown(slot, TickTimer.CreateFromTicks(Runner, expiry - now));
+            }
+        }
 
         private void SetCooldown(int slot, TickTimer timer)
         {

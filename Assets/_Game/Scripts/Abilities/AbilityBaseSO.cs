@@ -199,6 +199,13 @@ namespace CluckWars.Abilities
         public virtual float IndicatorRange => 0f;
 
         /// <summary>
+        /// Seconds this ability stays on cooldown after GO at the start of every round (first round and every PLAY AGAIN);
+        /// 0 = ready at GO, the default. Applied by <c>AbilityController</c> on the caster's state authority
+        /// (<c>RoundStartCooldownRules</c>). Death Mark overrides it from its asset.
+        /// </summary>
+        public virtual float RoundStartCooldown => 0f;
+
+        /// <summary>
         /// True when activating without an enemy inside <see cref="IndicatorRange"/>
         /// would do nothing (Snatch, Sneaky Steal, Cluck Shock, Mark/Kill, the stun
         /// bursts). The HUD greys the button out and <c>AbilityController.TryActivate</c>

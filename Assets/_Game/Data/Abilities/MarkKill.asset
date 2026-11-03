@@ -34,3 +34,4 @@ MonoBehaviour:
   WindowSeconds: 12
   FailCooldownSeconds: 5
   SuccessCooldownSeconds: 15
+  RoundStartCooldownSeconds: 4
