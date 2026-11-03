@@ -91,6 +91,9 @@ namespace CluckWars.Visuals
             return true;
         }
 
+        /// <summary>Root-local metres the label is raised for a taller class model (<see cref="SetHeadLift"/>).</summary>
+        public float HeadLift => _headLift;
+
         /// <summary>Raises the label for a class model drawn taller than the collider (Phase 8 D6).
         /// Root-local metres; presentation only.</summary>
         public void SetHeadLift(float lift)

@@ -94,12 +94,10 @@ loadout.row.shared,ANY BIRD
 loadout.row.class,{cls} ONLY
 loadout.detail.empty,Tap a move for the details.
 loadout.kit.title,{perk} KIT
-mark.hunt,HUNT {name}  {m} m  {secs}s
-mark.stun,STUN {name}!  {secs}s
-mark.closein,STUNNED: GET CLOSE  {m} m  {secs}s
-mark.walled,{name} IS IN ITS BASE  {secs}s
-mark.kill,KILL NOW!
-mark.victim,YOU ARE MARKED!  {secs}s
+mark.hex.kill,KILL
+mark.toast,MARKED!
+mark.clock,{secs}s
+mark.distance,{m} m
 loadout.next,NEXT
 loadout.registryMissing,"No abilities in registry.
 Assign AbilityRegistrySO in ProjectInstaller."

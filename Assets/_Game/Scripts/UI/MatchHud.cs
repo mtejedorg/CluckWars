@@ -34,13 +34,6 @@ namespace CluckWars.UI
         [SerializeField] private float   _refreshInterval     = 0.25f;
         [SerializeField] private Vector2 _referenceResolution = new Vector2(1920f, 1080f);
 
-        // ----------------------------------------------------------------
-        // Design-token palette — Phase 10 redesign (ART.md §6, cluckwars-tokens-v2).
-        // Self-contained so the warm Clash Royale/Supercell look applies regardless
-        // of which ColorSchemeSO asset version is serialised in the scene.
-        // ----------------------------------------------------------------
-        private static readonly Color DtTextPrimary = new Color(1.00f, 0.96f, 0.88f, 1f); // #fef5e0
-
         // ---- UI refs built procedurally ------------------------------------
 
         // The comeback banner ("FINAL 10!" + the event) is a wood plaque in MatchOverlays.uxml (#EventBanner), drawn by
@@ -151,7 +144,6 @@ namespace CluckWars.UI
         {
             TickHitFlash();
             PollComebackEvent();
-            TickMarkBanner();
         }
 
         // ---- Hit-flash ---------------------------------------------------------
@@ -192,8 +184,7 @@ namespace CluckWars.UI
             scaler.referenceResolution = _referenceResolution;
             scaler.matchWidthOrHeight  = 0.5f;
 
-            BuildHitFlash(canvasGO.transform);       // must be first (z-order: under everything)
-            BuildMarkBanner(canvasGO.transform);
+            BuildHitFlash(canvasGO.transform);
         }
 
         // ---- Hit-flash (full-screen) ------------------------------------------
@@ -210,52 +201,6 @@ namespace CluckWars.UI
             _hitFlash.raycastTarget = false;
         }
 
-        // ---- Death Mark banner (text from MarkFeedback; local, read from replicated state) ------
-
-        private Image _markPlate;
-        private Text  _markText;
-
-        private void BuildMarkBanner(Transform parent)
-        {
-            var go = CreateUI("MarkBanner", parent, out var rt);
-            rt.sizeDelta = new Vector2(980f, 96f);
-            _markPlate = go.AddComponent<Image>();
-            _markPlate.raycastTarget = false;
-            _markText = AddText(go.transform, "MarkBannerText", string.Empty, 50, TextAnchor.MiddleCenter, FontStyle.Bold);
-            _markText.resizeTextForBestFit = true;   // the longest phase must stay on one line at phone width
-            _markText.resizeTextMinSize = 26;
-            _markText.resizeTextMaxSize = 50;
-            _markText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            var textRt = _markText.rectTransform;
-            textRt.anchorMin = Vector2.zero;
-            textRt.anchorMax = Vector2.one;
-            textRt.offsetMin = textRt.offsetMax = Vector2.zero;
-            go.SetActive(false);
-        }
-
-        private void TickMarkBanner()
-        {
-            if (_markPlate == null) return;
-            var phase = CluckWars.Visuals.MarkFeedback.Phase;
-            bool show = phase != CluckWars.Visuals.MarkPhase.None;
-            if (_markPlate.gameObject.activeSelf != show) _markPlate.gameObject.SetActive(show);
-            if (!show) return;
-
-            // In the free strip of the top band, never over the bird at the centre of the screen.
-            var anchor = Screen.width >= Screen.height
-                ? CluckWars.Visuals.FeedbackTuning.MarkBannerLandscape
-                : CluckWars.Visuals.FeedbackTuning.MarkBannerPortrait;
-            var plate = _markPlate.rectTransform;
-            plate.anchorMin = plate.anchorMax = anchor;
-
-            bool kill = phase == CluckWars.Visuals.MarkPhase.Kill;
-            _markText.text = CluckWars.Visuals.MarkFeedback.BannerText;
-            _markText.color = kill ? CluckWars.Visuals.FeedbackTuning.MarkInk : DtTextPrimary;
-            _markPlate.color = kill ? CluckWars.Visuals.FeedbackTuning.MarkKillColor
-                : phase == CluckWars.Visuals.MarkPhase.Victim ? CluckWars.Visuals.FeedbackTuning.MarkVictimPlateColor
-                : CluckWars.Visuals.FeedbackTuning.MarkPlateColor;
-        }
-
         // ---- Static UI helpers ------------------------------------------------
 
         private static GameObject CreateUI(string name, Transform parent, out RectTransform rt)
@@ -264,24 +209,6 @@ namespace CluckWars.UI
             go.transform.SetParent(parent, worldPositionStays: false);
             rt = (RectTransform)go.transform;
             return go;
-        }
-
-        private static Text AddText(Transform parent, string name, string content,
-            int fontSize, TextAnchor alignment, FontStyle style)
-        {
-            var go   = CreateUI(name, parent, out _);
-            var text = go.AddComponent<Text>();
-            text.text              = content;
-            text.fontSize          = fontSize;
-            text.color             = DtTextPrimary;
-            text.alignment         = alignment;
-            text.fontStyle         = style;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.verticalOverflow   = VerticalWrapMode.Overflow;
-            text.raycastTarget      = false;
-            text.font               = UiGfx.ChunkyFont();
-            UiGfx.AddShadow(text);
-            return text;
         }
 
         private void PollComebackEvent()

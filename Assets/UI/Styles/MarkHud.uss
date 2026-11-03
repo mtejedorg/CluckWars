@@ -1,0 +1,91 @@
+/* ============================================================================
+   Death Mark HUD (MarkHud.uxml + MarkHudController). Panel px on the shared HUD
+   panel (ScaleWithScreenSize 1920x1080, match 0.5). The C# side writes only
+   style.translate / scale / rotate / opacity / tint per frame; every box is here.
+   Ring and pointer are Painter2D (numbers in FeedbackTuning: MarkRing*, MarkPointer*).
+   ============================================================================ */
+
+.cw-markhud-root {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+}
+
+/* 96 x 96 box, translated so its centre sits on the anchor (the controller subtracts 48). */
+.cw-mark-marker {
+    position: absolute; left: 0; top: 0;
+    width: 96px; height: 96px;
+    display: none;
+}
+
+.cw-mark-pointer, .cw-mark-ring {
+    position: absolute; left: 0; top: 0;
+    width: 96px; height: 96px;
+}
+
+.cw-mark-disc {
+    position: absolute; left: 14px; top: 14px;
+    width: 68px; height: 68px;
+    border-top-left-radius: 34px; border-top-right-radius: 34px;
+    border-bottom-left-radius: 34px; border-bottom-right-radius: 34px;
+    background-color: rgb(20, 10, 26);
+}
+
+/* Glyph_Skull is white: the controller tints it the state colour. */
+.cw-mark-skull {
+    position: absolute; left: 26px; top: 26px;
+    width: 44px; height: 44px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Icons/Glyph_Skull.png");
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+/* Walled only: an ink badge at (+26, +26) from the centre with a cream lock. */
+.cw-mark-lock {
+    position: absolute; left: 57px; top: 57px;
+    width: 34px; height: 34px;
+    border-top-left-radius: 17px; border-top-right-radius: 17px;
+    border-bottom-left-radius: 17px; border-bottom-right-radius: 17px;
+    background-color: rgb(20, 10, 26);
+    align-items: center; justify-content: center;
+    display: none;
+}
+.cw-mark-lock-glyph {
+    width: 24px; height: 24px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Icons/Glyph_Lock.png");
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: rgb(254, 245, 224);
+}
+
+/* Off screen only, on the inward vertical side of the disc (the controller moves it above when the bearing points down). */
+/* 34 px, not 32: the 0.85 appear pop must keep it at or above the 28 px HUD floor. 120 px wide fits "999 m" and keeps a
+   marker pinned at the edge clearance inside the panel. */
+.cw-mark-distance {
+    position: absolute; left: -12px; top: 100px;
+    width: 120px; height: 42px;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 34px;
+    color: rgb(254, 245, 224);
+    -unity-text-outline-width: 4px;
+    -unity-text-outline-color: rgb(42, 26, 12);
+    -unity-text-align: middle-center;
+    white-space: nowrap;
+    padding: 0; margin: 0;
+    display: none;
+}
+.cw-mark-distance--above { top: -46px; }
+
+/* The victim's hunter-skull badge: 44 px ink disc, 3 px border in the hunter's colour (set by the controller), cream skull. */
+.cw-hunter-skull {
+    position: absolute; left: 0; top: 0;
+    width: 44px; height: 44px;
+    border-top-left-radius: 22px; border-top-right-radius: 22px;
+    border-bottom-left-radius: 22px; border-bottom-right-radius: 22px;
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    background-color: rgb(20, 10, 26);
+    align-items: center; justify-content: center;
+    display: none;
+}
+.cw-hunter-skull-glyph {
+    width: 30px; height: 30px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Icons/Glyph_Skull.png");
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: rgb(254, 245, 224);
+}

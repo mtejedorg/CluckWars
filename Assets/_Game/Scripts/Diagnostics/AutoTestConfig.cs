@@ -26,9 +26,12 @@ namespace CluckWars.Diagnostics
         public const string PerkKey = "cw_perk", BotPerksKey = "cw_botperks";
         /// <summary>Dev tools: see <c>AutoTestDriver.Mark.cs</c>.</summary>
         public const string MarkShotsKey = "cw_markshots";
+        /// <summary><c>cw_shotsuper 2</c>: the Death Mark captures render at this multiple of the window (a 540x1200 window
+        /// gives the 1080x2400 phone's exact panel layout at full resolution; the monitor cannot open a 2400 px window).</summary>
+        public const string ShotSuperKey = "cw_shotsuper";
 
         public static readonly string[] Keys =
-            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey, AutoZoneKey, ShotsKey, ShotTagKey, BandKey, ZonesKey, FloorArrowsKey, EdgeArrowsKey, AutoAuraKey, PerkKey, BotPerksKey, MarkShotsKey };
+            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey, AutoZoneKey, ShotsKey, ShotTagKey, BandKey, ZonesKey, FloorArrowsKey, EdgeArrowsKey, AutoAuraKey, PerkKey, BotPerksKey, MarkShotsKey, ShotSuperKey };
 
         public const ChickenClass DefaultClass = ChickenClass.Warrior;
         public const float DefaultAutoStartTimeout = 90f;
@@ -48,6 +51,8 @@ namespace CluckWars.Diagnostics
         public ChickenSubclass[] BotPerks = new ChickenSubclass[0];
         /// <summary><c>cw_markshots</c>: photograph the Death Mark feedback (<c>AutoTestDriver.Mark.cs</c>). Needs <c>cw_autoplay</c>.</summary>
         public bool MarkShots;
+        /// <summary><c>cw_shotsuper</c>: capture supersize for the Death Mark shots (1 = the window's own size).</summary>
+        public int ShotSuper = 1;
         /// <summary>Humans to wait for before the host starts; 0 = not set (a human presses START).</summary>
         public int AutoStart;
         public float AutoStartTimeout = DefaultAutoStartTimeout;
@@ -218,6 +223,7 @@ namespace CluckWars.Diagnostics
                         else cfg.Problems.Add($"{key} '{value}' is not a specialization ({SubclassNames}); using the class's default perk");
                         break;
                     case MarkShotsKey: cfg.MarkShots = cfg.ParseBool(key, value); break;
+                    case ShotSuperKey: cfg.ShotSuper = cfg.ParseInt(key, value, 1, 4, 1); break;
                     case BotPerksKey:
                         cfg.BotPerks = ParseBotPerks(value, cfg.Problems);
                         break;

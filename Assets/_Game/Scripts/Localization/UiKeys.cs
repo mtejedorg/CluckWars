@@ -128,12 +128,10 @@ namespace CluckWars.Localization
         [UiArgs("cls")] public const string LoadoutRowClass = "loadout.row.class";
         public const string LoadoutDetailEmpty = "loadout.detail.empty";
         [UiArgs("perk")] public const string LoadoutKitTitle = "loadout.kit.title";
-        [UiArgs("name", "m", "secs")] public const string MarkHunt = "mark.hunt";
-        [UiArgs("name", "secs")] public const string MarkStun = "mark.stun";
-        [UiArgs("m", "secs")] public const string MarkCloseIn = "mark.closein";
-        [UiArgs("name", "secs")] public const string MarkWalled = "mark.walled";
-        public const string MarkKill = "mark.kill";
-        [UiArgs("secs")] public const string MarkVictim = "mark.victim";
+        public const string MarkHexKill = "mark.hex.kill";
+        public const string MarkToast = "mark.toast";
+        [UiArgs("secs")] public const string MarkClock = "mark.clock";
+        [UiArgs("m")] public const string MarkDistance = "mark.distance";
         public const string LoadoutNext = "loadout.next";
         public const string LoadoutRegistryMissing = "loadout.registryMissing";
         public const string SlotEmpty = "slot.empty";

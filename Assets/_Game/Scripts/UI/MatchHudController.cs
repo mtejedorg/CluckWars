@@ -3,6 +3,7 @@ using CluckWars.Gameplay;
 using CluckWars.Input;
 using CluckWars.Localization;
 using CluckWars.Logging;
+using CluckWars.Visuals;
 using UnityEngine;
 using UnityEngine.UIElements;
 using Zenject;
@@ -45,6 +46,7 @@ namespace CluckWars.UI
             public VisualElement Root;
             public Label         Ord;
             public VisualElement Dot;
+            public VisualElement Skull;   // Death Mark: inside the dot
             public Label         Name;
             public VisualElement BarFill;
             public Label         Score;
@@ -56,6 +58,17 @@ namespace CluckWars.UI
         private VisualElement    _lbPanel;
         private float            _tapOpenUntil;      // unscaled time until which a tap keeps the full board open (phone)
         private readonly bool[]  _rowVisible = new bool[4];
+
+        // Death Mark (from MarkFeedback.Current, applied every frame): which corner each rank row shows, the draw highlight,
+        // the victim's toast and clock pill.
+        private readonly int[]   _rowCorner = { -1, -1, -1, -1 };
+        private int              _localCorner = -1;
+        private VisualElement    _drawHighlight, _markToast, _markClock;
+        private Label            _markClockText;
+        private int              _shownClockSecs = -1;
+        private bool             _boardWantsAll;
+        private int              _boardWantsCorner = -1;
+        private readonly int[]   _drawRows = new int[4];
 
         private PlayerBase[] _bases = System.Array.Empty<PlayerBase>();
         private GameManager  _gameManager;
@@ -111,6 +124,7 @@ namespace CluckWars.UI
                     Root    = _root.Q<VisualElement>($"LbRow{i}"),
                     Ord     = _root.Q<Label>($"LbOrd{i}"),
                     Dot     = _root.Q<VisualElement>($"LbDot{i}"),
+                    Skull   = _root.Q<VisualElement>($"LbSkull{i}"),
                     Name    = _root.Q<Label>($"LbName{i}"),
                     BarFill = _root.Q<VisualElement>($"LbBarFill{i}"),
                     Score   = _root.Q<Label>($"LbScore{i}"),
@@ -125,6 +139,13 @@ namespace CluckWars.UI
                 _nextRefresh = 0f;
             });
             _timer = _root.Q<Label>("MatchTimer");
+            _drawHighlight = _root.Q<VisualElement>("LbDrawHighlight");
+            _markToast = _root.Q<VisualElement>("MarkToast");
+            _markClock = _root.Q<VisualElement>("MarkClock");
+            _markClockText = _root.Q<Label>("MarkClockText");
+            if (_drawHighlight == null || _markToast == null || _markClock == null || _markClockText == null || _lbRows[0].Skull == null)
+                _log?.Error(Source, "MatchTopBar.uxml is missing a Death Mark element (LbDrawHighlight, MarkToast, MarkClock, " +
+                    "MarkClockText or LbSkull0-3): the mark's draw, standings skull, toast or clock pill will not show.");
             _winTargetBadge = _root.Q<Label>("WinTargetBadge");
             // The @key placeholders (ordinals, the timer's --:--) come from the wording dictionary.
             UiText.ResolveTree(_root);
@@ -190,14 +211,111 @@ namespace CluckWars.UI
             }
             _safeArea?.Apply();   // two struct compares a frame unless the safe area moved
 
-            if (Time.unscaledTime < _nextRefresh && _bases.Length > 0 && _gameManager != null)
-                return;
-            _nextRefresh = Time.unscaledTime + _refreshInterval;
+            var mark = MarkFeedback.Current;
+            // The compact phone board must show the marked row, and every row during the draw: refresh at once when that changes.
+            bool wantsAll = mark.DrawShowsAllRows;
+            int wantsCorner = mark.SkullAlpha > 0f ? mark.SkullCorner : -1;
+            if (wantsAll != _boardWantsAll || wantsCorner != _boardWantsCorner)
+            {
+                _boardWantsAll = wantsAll;
+                _boardWantsCorner = wantsCorner;
+                _nextRefresh = 0f;
+            }
 
-            RefreshSceneRefs();
-            RefreshTimer();
-            RefreshScores();
+            if (Time.unscaledTime >= _nextRefresh || _bases.Length == 0 || _gameManager == null)
+            {
+                _nextRefresh = Time.unscaledTime + _refreshInterval;
+                RefreshSceneRefs();
+                RefreshTimer();
+                RefreshScores();
+            }
+            ApplyMark(mark);
         }
+
+        // ---- Death Mark (per frame; every decision is MarkPresentationModel's) ----------------------------------------
+
+        private void ApplyMark(in MarkOutputs o)
+        {
+            for (int rank = 0; rank < 4; rank++)
+            {
+                var skull = _lbRows[rank].Skull;
+                if (skull == null) continue;
+                bool on = o.SkullAlpha > 0f && _rowCorner[rank] >= 0 && _rowCorner[rank] == o.SkullCorner && _rowVisible[rank];
+                SetShown(skull, on);
+                if (on) skull.style.opacity = o.SkullAlpha;
+            }
+
+            ApplyDrawHighlight(o);
+
+            if (_markToast != null)
+            {
+                bool toast = o.ToastAlpha > 0f;
+                SetShown(_markToast, toast);
+                if (toast)
+                {
+                    _markToast.style.opacity = o.ToastAlpha;
+                    _markToast.style.scale = new Scale(new Vector3(o.ToastScale, o.ToastScale, 1f));
+                }
+            }
+
+            if (_markClock != null)
+            {
+                bool clock = o.ClockAlpha > 0f;
+                SetShown(_markClock, clock);
+                if (clock)
+                {
+                    _markClock.style.opacity = o.ClockAlpha;
+                    if (o.ClockSeconds != _shownClockSecs && _markClockText != null)
+                    {
+                        _shownClockSecs = o.ClockSeconds;
+                        _markClockText.text = UiText.Format(UiKeys.MarkClock, ("secs", _shownClockSecs));
+                    }
+                }
+            }
+        }
+
+        /// <summary>The Assassin's draw: step <c>DrawStep</c> of <c>DrawSteps</c> over the visible rows top to bottom, skipping the
+        /// local row and looping, timed so the last step lands on the target's row.</summary>
+        private void ApplyDrawHighlight(in MarkOutputs o)
+        {
+            if (_drawHighlight == null) return;
+            int n = 0, targetAt = -1;
+            if (o.DrawAlpha > 0f)
+            {
+                for (int rank = 0; rank < 4; rank++)
+                {
+                    if (!_rowVisible[rank] || _rowCorner[rank] < 0 || _rowCorner[rank] == _localCorner) continue;
+                    if (_rowCorner[rank] == o.TargetCorner) targetAt = n;
+                    _drawRows[n++] = rank;
+                }
+            }
+            if (n == 0 || targetAt < 0)
+            {
+                SetShown(_drawHighlight, false);
+                return;
+            }
+
+            int back = Mathf.Max(0, o.DrawSteps - 1 - o.DrawStep);
+            int at = ((targetAt - back) % n + n) % n;
+            var row = _lbRows[_drawRows[at]].Root;
+            if (row == null || float.IsNaN(row.layout.y))
+            {
+                SetShown(_drawHighlight, false);
+                return;
+            }
+            SetShown(_drawHighlight, true);
+            _drawHighlight.style.translate = new Translate(0f, row.layout.y);
+            _drawHighlight.style.opacity = o.DrawAlpha;
+            _drawHighlight.style.scale = new Scale(new Vector3(o.DrawScale, o.DrawScale, 1f));
+            _drawHighlight.EnableInClassList("cw-lb-draw--locked", o.DrawLocked);
+        }
+
+        private static void SetShown(VisualElement e, bool shown)
+        {
+            var d = shown ? DisplayStyle.Flex : DisplayStyle.None;
+            if (e.style.display != d) e.style.display = d;
+        }
+
 
         private void RefreshSceneRefs()
         {
@@ -263,6 +381,7 @@ namespace CluckWars.UI
             sorted.Sort((a, b) => b.total.CompareTo(a.total));
 
             int localCorner = LocalCorner();
+            _localCorner = localCorner;
 
             // Phone layout: leader + your row, all four on tap and in the last 10 s (CompactBoardRules).
             var touchHud = TouchControlsController.Instance;
@@ -270,10 +389,13 @@ namespace CluckWars.UI
             SetBoardTappable(compact);
             bool matchActive = _gameManager != null && _gameManager.State == MatchState.Active;
             bool showAll = CompactBoardRules.ShowAll(compact, Time.unscaledTime < _tapOpenUntil, matchActive,
-                matchActive ? _gameManager.TimeRemaining : float.MaxValue);
+                matchActive ? _gameManager.TimeRemaining : float.MaxValue) || _boardWantsAll;   // the Death Mark draw needs every row
             int youRank = -1;
             for (int i = 0; i < sorted.Count; i++) if (sorted[i].corner == localCorner) { youRank = i; break; }
             CompactBoardRules.SelectRows(sorted.Count, youRank, showAll, _rowVisible);
+            // A running Death Mark keeps its marked row on the compact board (three rows at most).
+            for (int i = 0; i < sorted.Count && i < _rowVisible.Length; i++)
+                if (sorted[i].corner == _boardWantsCorner) _rowVisible[i] = true;
 
             // Bars fill toward the MatchConfig goal; without one (already logged at bind) they are
             // relative to the leader instead of a made-up target.
@@ -286,6 +408,7 @@ namespace CluckWars.UI
                 var rowRefs = _lbRows[rank];
                 if (rowRefs.Root == null) continue;
 
+                _rowCorner[rank] = rank < sorted.Count && _rowVisible[rank] ? sorted[rank].corner : -1;
                 if (rank < sorted.Count && _rowVisible[rank])
                 {
                     rowRefs.Root.style.display = DisplayStyle.Flex;

@@ -1,81 +1,36 @@
+using System.Collections.Generic;
+using CluckWars.Abilities;
+using CluckWars.Audio;
 using CluckWars.Gameplay;
-using CluckWars.Localization;
 using CluckWars.Logging;
+using CluckWars.Settings;
 using CluckWars.UI;
 using Fusion;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Zenject;
 
 namespace CluckWars.Visuals
 {
-    /// <summary>What the mark banner says, pure.</summary>
-    public enum MarkPhase : byte
-    {
-        None = 0,
-        /// <summary>Assassin: the target is out of kill range and not stunned.</summary>
-        Hunt = 1,
-        /// <summary>Assassin: in reach, stun it.</summary>
-        Stun = 2,
-        /// <summary>Assassin: it is stunned, get into kill range.</summary>
-        CloseIn = 3,
-        /// <summary>Assassin: it stands behind a base wall; nothing reaches it there.</summary>
-        Walled = 4,
-        /// <summary>Assassin: a press kills now.</summary>
-        Kill = 5,
-        /// <summary>This player is somebody's mark.</summary>
-        Victim = 6,
-    }
-
-    /// <summary>The Assassin's banner, pure, in the order the Kill press judges it.</summary>
-    public static class MarkFeedbackRules
-    {
-        public static MarkPhase AssassinPhase(bool canKill, bool stunned, bool inRange, bool walled)
-        {
-            if (canKill) return MarkPhase.Kill;
-            if (walled) return MarkPhase.Walled;
-            if (stunned) return MarkPhase.CloseIn;
-            return inRange ? MarkPhase.Stun : MarkPhase.Hunt;
-        }
-
-        public static string Text(MarkPhase phase, string name, int seconds, int meters)
-        {
-            switch (phase)
-            {
-                case MarkPhase.Hunt:    return UiText.Format(UiKeys.MarkHunt, ("name", name), ("m", meters), ("secs", seconds));
-                case MarkPhase.Stun:    return UiText.Format(UiKeys.MarkStun, ("name", name), ("secs", seconds));
-                case MarkPhase.CloseIn: return UiText.Format(UiKeys.MarkCloseIn, ("m", meters), ("secs", seconds));
-                case MarkPhase.Walled:  return UiText.Format(UiKeys.MarkWalled, ("name", name), ("secs", seconds));
-                case MarkPhase.Kill:    return UiText.Get(UiKeys.MarkKill);
-                case MarkPhase.Victim:  return UiText.Format(UiKeys.MarkVictim, ("secs", seconds));
-                default:                return string.Empty;
-            }
-        }
-
-        /// <summary>Whole seconds shown: rounds up, so "0" never shows while the mark is alive.</summary>
-        public static int ShownSeconds(float remaining) => Mathf.CeilToInt(Mathf.Max(0f, remaining));
-
-        /// <summary>The kill-range ring only appears once it can inform a decision: within this factor of the range.</summary>
-        public static bool ShowsKillRing(float distance, float killRange) =>
-            distance <= killRange * FeedbackTuning.MarkKillRingShowFactor;
-    }
-
     /// <summary>
-    /// Everything the Assassin and the marked bird see of a Death Mark. Local presentation read from replicated state
-    /// (<c>AssassinExecute.MarkedTarget</c>, its timers, positions) on every frame: no RPC, no networked field.
+    /// The Death Mark presentation adapter: every frame it copies the replicated execute state (<c>AssassinExecute.MarkedTarget</c>,
+    /// its timers, <c>CanKillNow</c>), positions, control state and visibility into <see cref="MarkInputs"/>, steps the pure
+    /// <see cref="MarkPresentationModel"/>, and hands the outputs on: the victim's screen mood (<see cref="MarkScreenEffect"/>),
+    /// the stings (<see cref="IAudioService"/>), and <see cref="Current"/> for the HUD layers (<c>MarkHudController</c>,
+    /// <c>MatchHudController</c>, <c>TouchControlsController</c>, <see cref="RivalIndicator"/>, <see cref="AbilitySlotOverlay"/>).
     /// </summary>
     /// <remarks>
-    /// One scene-root object, like <see cref="FloorRivalArrows"/>: never under a chicken, so <c>ChickenVisuals</c>' renderer scan and
-    /// ghost swap cannot touch it, and the mark stays visible on an invisible target. On the target: a stack of two big chevrons
-    /// over its head (shape, not only hue), a ring at its feet, and the kill-range ring round it when that can inform a decision.
-    /// <see cref="RivalIndicator"/> asks <see cref="IsMarkedByLocal"/> and gives this rival its distinct edge arrow.
-    /// <see cref="UI.MatchHud"/> reads <see cref="Phase"/> for the banner. Only the two people involved see any of it.
+    /// Local presentation only: no RPC, no networked field. One scene-root object created by the first
+    /// <see cref="RivalIndicator"/> to wake (<see cref="EnsureForMatch"/>) and kept across scene loads; any scene unload, disable
+    /// or destroy hard-clears the model and the screen mood, so nothing outlives the match.
     /// </remarks>
-    [DefaultExecutionOrder(FloorRivalArrows.ExecutionOrder + 1)]
+    [DefaultExecutionOrder(ExecutionOrder)]
     public sealed class MarkFeedback : MonoBehaviour
     {
+        /// <summary>Before every HUD Update and every LateUpdate: they read this frame's outputs.</summary>
+        public const int ExecutionOrder = -100;
+
         private const string Source = "MarkFeedback";
-        private const int RingSegments = 64;
-        private const int ChevronCount = 2;
 
         private static MarkFeedback _instance;
 
@@ -91,187 +46,219 @@ namespace CluckWars.Visuals
             _instance = go.AddComponent<MarkFeedback>();
         }
 
-        /// <summary>Is <paramref name="chicken"/> the local player's mark?</summary>
+        /// <summary>This frame's presentation; all clear with no instance.</summary>
+        public static MarkOutputs Current => _instance != null ? _instance._model.Current : CleanOutputs;
+
+        private static readonly MarkOutputs CleanOutputs = new MarkOutputs
+            { MarkerPop = 1f, DrawScale = 1f, ToastScale = 1f, SkullCorner = -1, TargetCorner = -1, HunterCorner = -1 };
+
+        /// <summary>The marked chicken while the local Assassin's mark is shown (kept through the end fade while it exists).</summary>
+        public static ChickenController Target => _instance != null ? _instance._target : null;
+
+        /// <summary>The hunter while the local player is marked.</summary>
+        public static ChickenController Hunter => _instance != null ? _instance._hunter : null;
+
+        /// <summary>Is <paramref name="chicken"/> the local Assassin's mark, with the hunt marker showing? Its own floor arrow
+        /// and edge chevron stand down then: the marker is its arrow.</summary>
         public static bool IsMarkedByLocal(ChickenController chicken) =>
-            _instance != null && chicken != null && _instance._target == chicken;
+            _instance != null && chicken != null && chicken == _instance._target &&
+            _instance._model.Current.Role == MarkRole.Assassin && _instance._model.Current.MarkerAlpha > 0f;
 
-        /// <summary>This frame's banner state.</summary>
-        public static MarkPhase Phase => _instance != null ? _instance._phase : MarkPhase.None;
+        /// <summary>Is <paramref name="chicken"/> the hunter whose arrow must show even while it is invisible (direction only)?</summary>
+        public static bool ForcesArrowFor(ChickenController chicken) =>
+            _instance != null && chicken != null && chicken == _instance._hunter && _instance._model.Current.ForceShowHunter;
 
-        /// <summary>This frame's banner text; empty with no mark involved.</summary>
-        public static string BannerText => _instance != null ? _instance._text : string.Empty;
-
-        private ILogService _log;
-        private ChickenController _target;
-        private MarkPhase _phase;
-        private string _text = string.Empty;
-        private float _killRange;
-
-        // The banner is rebuilt only when what it shows changes: this runs every frame, and the text allocates.
-        private MarkPhase _shownPhase;
-        private int _shownSeconds, _shownMeters;
-        private ChickenController _shownTarget;
-
-        private void SetBanner(MarkPhase phase, ChickenController target, int seconds, int meters)
+        /// <summary>Immediate off for everything (scene unload, disable, destroy). Static so a test can drive it.</summary>
+        public static void ClearPresentation()
         {
-            _phase = phase;
-            if (phase == _shownPhase && seconds == _shownSeconds && meters == _shownMeters && target == _shownTarget) return;
-            _shownPhase = phase;
-            _shownSeconds = seconds;
-            _shownMeters = meters;
-            _shownTarget = target;
-            _text = MarkFeedbackRules.Text(phase,
-                target != null ? MatchStandings.DisplayName(false, target.IsBot, target.Class, target.HomeCornerIndex) : null, seconds, meters);
+            MarkScreenEffect.Clear();
+            if (_instance != null) _instance.HardClear();
         }
 
-        private LineRenderer _footRing, _rangeRing;
-        private readonly SpriteRenderer[] _fills = new SpriteRenderer[ChevronCount];
-        private readonly SpriteRenderer[] _inks = new SpriteRenderer[ChevronCount];
-        private Transform _stack;
+        private ILogService _log;
+        private IAudioService _audio;
+        private AudioRegistrySO _sfx;
+        private bool _missingAudioReported;
+
+        private readonly MarkPresentationModel _model = new MarkPresentationModel();
+        private readonly List<MarkChicken> _snapshot = new List<MarkChicken>(8);
+        private readonly List<ChickenController> _snapshotRefs = new List<ChickenController>(8);
+        private ChickenController _target, _hunter;
+        private long _shownHunterId;
+        private float _introLastSeenAt = float.NegativeInfinity;
 
         [Inject]
-        public void Construct(ILogService log) => _log = log;
+        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO sfx)
+        {
+            _log = log;
+            _audio = audio;
+            _sfx = sfx;
+        }
 
         private void Awake()
         {
             if (_log == null) ProjectContext.Instance.Container.Inject(this);
-
-            var line = TelegraphShapes.SharedSolidLineMaterial(_log);
-            if (line == null)
-                _log?.Error(Source, "No line material: the marked chicken's rings are not drawn; the Assassin still has the edge arrow and the banner.");
-            _footRing = TelegraphShapes.BuildLine(transform, "MarkFootRing", line, FeedbackTuning.MarkFootRingWidth, true);
-            _rangeRing = TelegraphShapes.BuildLine(transform, "MarkKillRing", line, FeedbackTuning.MarkKillRingWidth, true);
-            _footRing.positionCount = _rangeRing.positionCount = RingSegments;
-
-            _stack = new GameObject("MarkChevrons").transform;
-            _stack.SetParent(transform, false);
-            for (int i = 0; i < ChevronCount; i++)
-            {
-                var ink = new GameObject("MarkChevronInk").AddComponent<SpriteRenderer>();
-                ink.transform.SetParent(_stack, false);
-                ink.sprite = RivalIndicator.ChevronInkSpriteShared;
-                ink.color = FeedbackTuning.MarkInk;
-                ink.sortingOrder = FeedbackTuning.MarkSortingOrder;
-                _inks[i] = ink;
-
-                var fill = new GameObject("MarkChevronFill").AddComponent<SpriteRenderer>();
-                fill.transform.SetParent(ink.transform, false);
-                fill.sprite = RivalIndicator.ChevronSpriteShared;
-                fill.sortingOrder = FeedbackTuning.MarkSortingOrder + 1;
-                _fills[i] = fill;
-
-                ink.transform.localPosition = new Vector3(0f, -i * FeedbackTuning.MarkChevronSpacing, 0f);
-            }
-            ShowTargetVisuals(false);
+            SceneManager.sceneUnloaded += OnSceneUnloaded;
         }
+
+        private void OnDisable() => HardClear();
 
         private void OnDestroy()
         {
+            SceneManager.sceneUnloaded -= OnSceneUnloaded;
+            HardClear();
             if (_instance == this) _instance = null;
         }
 
-        /// <summary>Before every <c>LateUpdate</c>: <see cref="RivalIndicator"/> reads the answer there.</summary>
+        private void OnSceneUnloaded(Scene _) => HardClear();
+
+        private void HardClear()
+        {
+            _model.Reset();
+            _target = _hunter = null;
+            _shownHunterId = 0;
+            MarkScreenEffect.Clear();
+        }
+
         private void Update()
         {
-            _target = null;
-            var local = FindLocal();
-            if (ResolveMark(local)) return;
-            SetBanner(MarkPhase.None, null, 0, 0);
+            var o = _model.Step(Gather(), Time.unscaledDeltaTime);
+            if (o.Role == MarkRole.None) _target = _hunter = null;
+            MarkScreenEffect.Set(o.Dim, o.Cold, o.Red);
+            if (o.Events != MarkEvents.None) PlayStings(o);
         }
 
-        private bool ResolveMark(ChickenController local)
-        {
-            if (local == null || local.Runner == null) return false;
+        // ---- Gathering (replicated state -> MarkInputs) ------------------------------------------------------------------
 
-            var exec = local.Execute;
-            if (exec != null && exec.MarkedTarget != NetworkBehaviourId.None &&
-                local.Runner.TryFindBehaviour(exec.MarkedTarget, out ChickenController target) && target != null)
+        private MarkInputs Gather()
+        {
+            var gm = GameManager.Instance;
+            bool gmValid = gm != null && gm.Object != null && gm.Object.IsValid;
+            if (gmValid && gm.IsIntroActive) _introLastSeenAt = Time.unscaledTime;
+
+            var input = new MarkInputs
             {
-                _target = target;
-                _killRange = exec.KillRange;
-                Vector3 me = local.transform.position, it = target.transform.position;
-                float d = Vector2.Distance(new Vector2(me.x, me.z), new Vector2(it.x, it.z));
-                var phase = MarkFeedbackRules.AssassinPhase(exec.CanKillNow, target.CurrentControlState == ControlState.Stunned,
-                    d <= exec.KillRange, PlayerBase.WallBetween(me, it));
-                SetBanner(phase, target, MarkFeedbackRules.ShownSeconds(exec.WindowTimer.RemainingTime(local.Runner) ?? 0f), Mathf.RoundToInt(d));
-                return true;
+                MatchRunning = gmValid && gm.IsMatchRunning,
+                ReducedMotion = PlayerPreferences.ReducedMotionEnabled,
+                BannerMayShow = gmValid && EventBannerTiming.CanShow(gm.IsIntroActive, Time.unscaledTime - _introLastSeenAt),
+            };
+
+            var r = MarkRoleRules.Resolve(Snapshot(), _shownHunterId);
+            if (r.Role == MarkRole.None || !input.MatchRunning)
+            {
+                _shownHunterId = 0;
+                // Keep the refs for the end fade only while the chickens still exist (Unity null for a despawned one).
+                return input;
             }
 
+            var hunter = _snapshotRefs[r.Hunter];
+            var target = _snapshotRefs[r.Target];
+            var local = _snapshotRefs[r.Local];
+            var exec = hunter.Execute;
+            var runner = hunter.Runner;
+
+            input.Role = r.Role;
+            input.MarkKey = r.Key;
+            input.TargetCorner = target.HomeCornerIndex;
+            input.HunterCorner = hunter.HomeCornerIndex;
+            input.Remaining = exec.WindowTimer.RemainingTime(runner) ?? 0f;
+            input.Window = exec.WindowSeconds;
+            input.ArmSeconds = exec.ArmSeconds;
+            _shownHunterId = _snapshot[r.Hunter].Id;
+            _target = r.Role == MarkRole.Assassin ? target : null;
+            _hunter = r.Role == MarkRole.Victim ? hunter : null;
+
+            if (r.Role == MarkRole.Assassin) GatherAssassin(ref input, local, target, exec);
+            else if (r.Role == MarkRole.Victim) GatherVictim(ref input, local, hunter);
+            return input;
+        }
+
+        private static void GatherAssassin(ref MarkInputs input, ChickenController local, ChickenController target, AssassinExecute exec)
+        {
+            Vector3 me = local.transform.position, it = target.transform.position;
+            input.Distance = FloorArrowRules.PlanarDistance(me, it);
+            input.CanKillNow = exec.CanKillNow;
+            input.Walled = PlayerBase.WallBetween(me, it);
+
+            // Ambush lit: the target inside the equipped Ambush's OWN shape (the hot test's WouldAffect: reach, shape, wall,
+            // eligibility, all read from the asset) and the slot ready.
+            var abilities = local.Abilities;
+            if (abilities == null) return;
+            for (int s = 0; s < AbilityController.SlotCount; s++)
+            {
+                if (!(abilities.GetSlot(s) is AmbushAbilitySO ambush)) continue;
+                // "Ready" = a press would fire now (off cooldown, the Assassin free to cast): the refusal table the button uses.
+                input.AmbushReadyOnTarget = abilities.EvaluateRefusal(s) == AbilityRefusal.None &&
+                                            ambush.WouldAffect(local, target, local.transform.forward);
+                break;
+            }
+        }
+
+        private static void GatherVictim(ref MarkInputs input, ChickenController local, ChickenController hunter)
+        {
+            input.HunterDistance = FloorArrowRules.PlanarDistance(local.transform.position, hunter.transform.position);
+            var cam = MatchCamera.Instance != null ? MatchCamera.Instance.Camera : null;
+            input.InnerRadius = FloorRivalArrows.RingRadiusFor(cam);
+            input.HunterInvisible = Mathf.Clamp01(hunter.VisualOpacity) < RivalIndicator.VisibleOpacityThreshold;
+            var indicator = hunter.GetComponent<RivalIndicator>();
+            input.HunterHiddenFromView = indicator != null && indicator.HiddenFromClearViewport;
+        }
+
+        /// <summary>Living, valid, non-decoy chickens, as plain values.</summary>
+        private IReadOnlyList<MarkChicken> Snapshot()
+        {
+            _snapshot.Clear();
+            _snapshotRefs.Clear();
             var all = ChickenController.ActiveControllers;
             for (int i = 0; i < all.Count; i++)
             {
                 var c = all[i];
-                if (c == null || c == local || c.Object == null || !c.Object.IsValid || c.Execute == null) continue;
-                if (c.Execute.MarkedTarget != local.Id) continue;
-                SetBanner(MarkPhase.Victim, null, MarkFeedbackRules.ShownSeconds(c.Execute.WindowTimer.RemainingTime(local.Runner) ?? 0f), 0);
-                return true;
+                if (c == null || c.Object == null || !c.Object.IsValid || c.IsDecoy || c.Execute == null) continue;
+                var exec = c.Execute;
+                bool hasMark = exec.Object != null && exec.Object.IsValid && exec.MarkedTarget != NetworkBehaviourId.None;
+                Vector3 p = c.transform.position;
+                _snapshot.Add(new MarkChicken
+                {
+                    Id = IdOf(c.Id),
+                    Corner = c.HomeCornerIndex,
+                    IsLocal = c.HasInputAuthority,
+                    Removed = c.Combat != null && c.Combat.IsRemoved,
+                    MarkedTargetId = hasMark ? IdOf(exec.MarkedTarget) : 0,
+                    WindowEndTick = hasMark ? exec.WindowTimer.TargetTick ?? 0 : 0,
+                    Position = new Vector2(p.x, p.z),
+                });
+                _snapshotRefs.Add(c);
             }
-            return false;
+            return _snapshot;
         }
 
-        private static ChickenController FindLocal()
-        {
-            var all = ChickenController.ActiveControllers;
-            for (int i = 0; i < all.Count; i++)
-            {
-                var c = all[i];
-                if (c != null && c.Object != null && c.Object.IsValid && c.HasInputAuthority && !c.IsDecoy) return c;
-            }
-            return null;
-        }
+        private static long IdOf(NetworkBehaviourId id) => ((long)id.Object.Raw << 16) | (uint)(id.Behaviour & 0xFFFF);
 
-        private void LateUpdate()
+        // ---- Stings -----------------------------------------------------------------------------------------------------
+
+        private void PlayStings(in MarkOutputs o)
         {
-            var cam = MatchCamera.Instance != null ? MatchCamera.Instance.Camera : Camera.main;
-            if (_target == null || cam == null)
+            if (_audio == null || _sfx == null)
             {
-                ShowTargetVisuals(false);
+                if (!_missingAudioReported)
+                {
+                    _missingAudioReported = true;
+                    _log?.Error(Source, "No IAudioService / AudioRegistrySO injected: the Death Mark stings are silent.");
+                }
                 return;
             }
-
-            ShowTargetVisuals(true);
-            bool kill = _phase == MarkPhase.Kill;
-            Color color = kill ? FeedbackTuning.MarkKillColor : FeedbackTuning.MarkColor;
-            float pulse = 1f + (kill ? FeedbackTuning.MarkKillPulse : FeedbackTuning.MarkPulse)
-                * Mathf.Sin(Time.unscaledTime * FeedbackTuning.MarkPulseSpeed);
-
-            Vector3 at = _target.transform.position;
-            SetRing(_footRing, at, FeedbackTuning.MarkFootRingRadius * pulse, color);
-
-            Vector3 me = cam.transform.position;
-            bool showRange = MarkFeedbackRules.ShowsKillRing(Planar(at, FindLocal()), _killRange);
-            _rangeRing.gameObject.SetActive(showRange);
-            if (showRange) SetRing(_rangeRing, at, _killRange, new Color(color.r, color.g, color.b, FeedbackTuning.MarkKillRingAlpha));
-
-            _stack.position = at + Vector3.up * (FeedbackTuning.MarkChevronHeight +
-                FeedbackTuning.MarkChevronBob * Mathf.Sin(Time.unscaledTime * FeedbackTuning.MarkPulseSpeed));
-            _stack.rotation = Quaternion.LookRotation(cam.transform.forward, -cam.transform.up);   // the art points up: this points it down
-            _stack.localScale = Vector3.one * FeedbackTuning.MarkChevronSize * pulse;
-            for (int i = 0; i < ChevronCount; i++) _fills[i].color = color;
+            if ((o.Events & MarkEvents.DrawTick) != 0)
+                _audio.PlaySFX(_sfx.MarkDrawTick, FeedbackTuning.MarkDrawTickVolume, DrawTickPitch(o.DrawStep));
+            if ((o.Events & MarkEvents.Lock) != 0)
+                _audio.PlaySFX(_sfx.MarkLock, FeedbackTuning.MarkLockVolume, FeedbackTuning.MarkLockPitch);
+            if ((o.Events & MarkEvents.Marked) != 0)
+                _audio.PlaySFX(_sfx.MarkVictim, FeedbackTuning.MarkVictimVolume, FeedbackTuning.MarkVictimPitch);
+            if ((o.Events & MarkEvents.KillReady) != 0)
+                _audio.PlaySFX(_sfx.MarkKillReady, FeedbackTuning.MarkKillReadyVolume, FeedbackTuning.MarkKillReadyPitch);
         }
 
-        private static float Planar(Vector3 a, ChickenController b)
-        {
-            if (b == null) return float.PositiveInfinity;
-            Vector3 p = b.transform.position;
-            return Vector2.Distance(new Vector2(a.x, a.z), new Vector2(p.x, p.z));
-        }
-
-        private void ShowTargetVisuals(bool show)
-        {
-            if (_footRing.gameObject.activeSelf != show) _footRing.gameObject.SetActive(show);
-            if (!show && _rangeRing.gameObject.activeSelf) _rangeRing.gameObject.SetActive(false);
-            if (_stack.gameObject.activeSelf != show) _stack.gameObject.SetActive(show);
-        }
-
-        private static void SetRing(LineRenderer ring, Vector3 center, float radius, Color color)
-        {
-            ring.startColor = ring.endColor = color;
-            for (int i = 0; i < RingSegments; i++)
-            {
-                float a = i * Mathf.PI * 2f / RingSegments;
-                ring.SetPosition(i, new Vector3(center.x + Mathf.Cos(a) * radius, TelegraphShapes.GroundY, center.z + Mathf.Sin(a) * radius));
-            }
-        }
+        /// <summary>The draw tick rises a step per row, capped.</summary>
+        public static float DrawTickPitch(int step) =>
+            Mathf.Min(FeedbackTuning.MarkDrawTickPitchMax, FeedbackTuning.MarkDrawTickPitch + FeedbackTuning.MarkDrawTickPitchStep * Mathf.Max(0, step));
     }
 }

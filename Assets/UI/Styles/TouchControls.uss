@@ -635,3 +635,29 @@
    ============================================================================ */
 .layout--portrait .cw-status-strip { width: 280px; left: 40px; }   /* left: the portrait touch stick's (40); the desktop strip's is 40 too */
 .layout--portrait .cw-status-value { min-width: 72px; }
+
+/* --- Death Mark (TouchControlsController, from MarkFeedback.Current) ---------------------------------------
+   KILL: exactly while a Death Mark press would kill. The fill turns kill-yellow (#FFEB1A, written inline with the
+   other fill tints), the rim cream, and the icon, label, pip and seconds give way to the word. Its 1.15 size is
+   multiplied into the controller's inline scale (a USS scale would be overwritten). Lit Ambush: the target stands in
+   Ambush's own shape and the slot is ready; same yellow fill and cream rim, the icon inked, the pip hidden. */
+.cw-hex-killtext {
+    position: absolute;
+    left: 0; right: 0; top: 0; bottom: 0;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 46px; letter-spacing: 2px;
+    color: rgb(22, 16, 28);
+    -unity-text-align: middle-center;
+    white-space: nowrap;
+    padding: 0; margin: 0;
+    display: none;
+}
+.cw-hex--kill { -unity-background-image-tint-color: rgb(254, 245, 224); }
+.cw-hex--kill .cw-hex-killtext { display: flex; }
+.cw-hex--kill .cw-hex-icon,
+.cw-hex--kill .cw-hex-label,
+.cw-hex--kill .cw-hex-cdnum,
+.cw-hex--kill .cw-hex-pip { visibility: hidden; }
+.cw-hex--lit { -unity-background-image-tint-color: rgb(254, 245, 224); }
+.cw-hex--lit .cw-hex-icon { -unity-background-image-tint-color: rgb(22, 16, 28); }
+.cw-hex--lit .cw-hex-pip { visibility: hidden; }

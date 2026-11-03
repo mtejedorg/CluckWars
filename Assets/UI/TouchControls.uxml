@@ -105,6 +105,7 @@
             <ui:VisualElement name="Icon1" class="cw-hex-icon" picking-mode="Ignore" />
             <ui:Label name="Label1" text="" class="cw-hex-label" picking-mode="Ignore" />
             <ui:Label name="CooldownNum1" text="" class="cw-hex-cdnum" picking-mode="Ignore" />
+            <ui:Label name="KillText1" text="" class="cw-hex-killtext" picking-mode="Ignore" />
             <ui:VisualElement name="StateGlyph1" class="cw-hex-state" picking-mode="Ignore">
                 <ui:VisualElement name="StateBarA1" class="cw-hex-state-bar cw-hex-state-bar--a" picking-mode="Ignore" />
                 <ui:VisualElement name="StateBarB1" class="cw-hex-state-bar cw-hex-state-bar--b" picking-mode="Ignore" />
@@ -127,6 +128,7 @@
             <ui:VisualElement name="Icon2" class="cw-hex-icon" picking-mode="Ignore" />
             <ui:Label name="Label2" text="" class="cw-hex-label" picking-mode="Ignore" />
             <ui:Label name="CooldownNum2" text="" class="cw-hex-cdnum" picking-mode="Ignore" />
+            <ui:Label name="KillText2" text="" class="cw-hex-killtext" picking-mode="Ignore" />
             <ui:VisualElement name="StateGlyph2" class="cw-hex-state" picking-mode="Ignore">
                 <ui:VisualElement name="StateBarA2" class="cw-hex-state-bar cw-hex-state-bar--a" picking-mode="Ignore" />
                 <ui:VisualElement name="StateBarB2" class="cw-hex-state-bar cw-hex-state-bar--b" picking-mode="Ignore" />
@@ -151,6 +153,7 @@
             <ui:VisualElement name="Icon3" class="cw-hex-icon" picking-mode="Ignore" />
             <ui:Label name="Label3" text="" class="cw-hex-label" picking-mode="Ignore" />
             <ui:Label name="CooldownNum3" text="" class="cw-hex-cdnum" picking-mode="Ignore" />
+            <ui:Label name="KillText3" text="" class="cw-hex-killtext" picking-mode="Ignore" />
             <ui:VisualElement name="StateGlyph3" class="cw-hex-state" picking-mode="Ignore">
                 <ui:VisualElement name="StateBarA3" class="cw-hex-state-bar cw-hex-state-bar--a" picking-mode="Ignore" />
                 <ui:VisualElement name="StateBarB3" class="cw-hex-state-bar cw-hex-state-bar--b" picking-mode="Ignore" />
@@ -174,6 +177,7 @@
             <ui:VisualElement name="Icon4" class="cw-hex-icon" picking-mode="Ignore" />
             <ui:Label name="Label4" text="" class="cw-hex-label" picking-mode="Ignore" />
             <ui:Label name="CooldownNum4" text="" class="cw-hex-cdnum" picking-mode="Ignore" />
+            <ui:Label name="KillText4" text="" class="cw-hex-killtext" picking-mode="Ignore" />
             <ui:VisualElement name="StateGlyph4" class="cw-hex-state" picking-mode="Ignore">
                 <ui:VisualElement name="StateBarA4" class="cw-hex-state-bar cw-hex-state-bar--a" picking-mode="Ignore" />
                 <ui:VisualElement name="StateBarB4" class="cw-hex-state-bar cw-hex-state-bar--b" picking-mode="Ignore" />

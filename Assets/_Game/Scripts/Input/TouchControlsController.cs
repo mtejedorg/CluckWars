@@ -143,6 +143,7 @@ namespace CluckWars.Input
             public VisualElement CancelX;    // built in code: the cream X shown while the edge-band cancel is armed
             public VisualElement FizzleSlash;// built in code: the 0.3 s slash flash after a fizzle
             public VisualElement Puff;       // built in code: the Fx_Whiff puff after a fizzle
+            public Label         KillText;   // Death Mark: "KILL" over the hex while a press would kill
         }
         /// <summary>Mirrors <see cref="Gameplay.AbilityController.SlotCount"/> so the hex
         /// cluster and the gameplay slot count cannot drift apart.</summary>
@@ -175,6 +176,16 @@ namespace CluckWars.Input
         private readonly bool[]  _appliedDim  = new bool[SlotCount];
         private readonly float[] _appliedScale = new float[SlotCount];   // the inline scale last written (rest scale x held scale)
         private readonly string[] _appliedCdText = new string[SlotCount]; // desktop cooldown readout cache (tenths under 1 s)
+
+        // Death Mark hexes (MarkFeedback.Current): KILL on the Death Mark hex exactly while a press would kill; Ambush lit while
+        // the target stands in its shape. Found by the equipped ability's type, never by slot number.
+        private readonly bool[]  _markKill = new bool[SlotCount];
+        private readonly bool[]  _markLit  = new bool[SlotCount];
+        private readonly bool[]  _appliedMarkKill = new bool[SlotCount];
+        private readonly bool[]  _appliedMarkLit  = new bool[SlotCount];
+        private readonly float[] _markKillSince = new float[SlotCount];
+        private const string MarkKillClass = "cw-hex--kill";
+        private const string MarkLitClass  = "cw-hex--lit";
 
         // Phase 6 chunk 6: layout mode (A10), haptics (A9) and the first-time hold hint (A1).
         private IInputProvider  _input;
@@ -404,6 +415,7 @@ namespace CluckWars.Input
                     Fill       = _root.Q<VisualElement>($"Fill{n}"),
                     Pip        = _root.Q<VisualElement>($"Pip{n}"),
                     BadgeText  = _root.Q<Label>($"BadgeText{n}"),
+                    KillText   = _root.Q<Label>($"KillText{n}"),
                     Mark       = hex != null ? CategoryMark.Create() : null,
                     Ring       = hex != null ? new HexDurationRing() : null,
                     Chain      = hex != null ? new HexChainRing() : null,
@@ -418,6 +430,10 @@ namespace CluckWars.Input
                     BuildFlashElements(ref _slots[i], hex);
                     if (_slots[i].Fill == null || _slots[i].Pip == null)
                         _log?.Error(Source, $"TouchControls.uxml is missing #Fill{n} or #Pip{n}: that hex draws without its rim / in-range pip.");
+                    if (_slots[i].KillText == null)
+                        _log?.Error(Source, $"TouchControls.uxml is missing #KillText{n}: a Death Mark on that hex shows no KILL word.");
+                    else
+                        _slots[i].KillText.text = UiText.Get(UiKeys.MarkHexKill);
 
                     // Held hex scales up and the others dim with a 60 ms ease-out (A1). Scale/opacity are
                     // written inline from FeedbackTuning; only the transition is declared here, once.
@@ -787,6 +803,7 @@ namespace CluckWars.Input
             var abilities = _localChicken != null ? _localChicken.Abilities : null;
 
             UpdateLayoutMode();
+            UpdateMarkHexes(abilities);
             PollDeniedPress(abilities);
             for (int i = 0; i < SlotCount; i++)
                 _heldSeconds[i] = _held[i] ? _heldSeconds[i] + Time.unscaledDeltaTime : 0f;
@@ -836,8 +853,10 @@ namespace CluckWars.Input
                     hex.EnableInClassList(HeldClass, held);
                 }
 
-                // Rest scale is 1 on the thumb arc and 0.75 on the desktop / pad strip; held multiplies it.
-                float k = HudLayoutRules.HexRestScale(_mode) * (held ? FeedbackTuning.HexHeldScale : 1f);
+                // Rest scale is 1 on the thumb arc and 0.75 on the desktop / pad strip; held multiplies it, and so does the
+                // Death Mark KILL size (written here, not in USS: this inline scale would overwrite a USS one).
+                float k = HudLayoutRules.HexRestScale(_mode) * (held ? FeedbackTuning.HexHeldScale : 1f) *
+                          (_markKill[slot] ? MarkHexRules.KillScale(Time.unscaledTime - _markKillSince[slot], PlayerPreferences.ReducedMotionEnabled) : 1f);
                 if (!Mathf.Approximately(k, _appliedScale[slot]))
                 {
                     _appliedScale[slot] = k;
@@ -901,6 +920,35 @@ namespace CluckWars.Input
             if (strip == null) return;
             strip.style.display = shown ? DisplayStyle.Flex : DisplayStyle.None;
             strip.EnableInClassList("cw-edge-glow--armed", armed);
+        }
+
+        /// <summary>Which hexes carry the Death Mark states this frame, by the equipped ability's type.</summary>
+        private void UpdateMarkHexes(AbilityController abilities)
+        {
+            var mark = MarkFeedback.Current;
+            for (int slot = 0; slot < SlotCount; slot++)
+            {
+                var a = abilities != null ? SlotAbility(abilities, slot) : null;
+                bool kill = mark.KillHex && a is MarkKillAbilitySO;
+                if (kill && !_markKill[slot]) _markKillSince[slot] = Time.unscaledTime;
+                _markKill[slot] = kill;
+                _markLit[slot] = mark.AmbushLit && a is AmbushAbilitySO;
+            }
+        }
+
+        private void ApplyMarkHexClasses(int slot)
+        {
+            var hex = _slots[slot].Hex;
+            if (_markKill[slot] != _appliedMarkKill[slot])
+            {
+                _appliedMarkKill[slot] = _markKill[slot];
+                hex.EnableInClassList(MarkKillClass, _markKill[slot]);
+            }
+            if (_markLit[slot] != _appliedMarkLit[slot])
+            {
+                _appliedMarkLit[slot] = _markLit[slot];
+                hex.EnableInClassList(MarkLitClass, _markLit[slot]);
+            }
         }
 
         private const string HeldClass = "cw-hex--held";
@@ -1023,6 +1071,9 @@ namespace CluckWars.Input
                     tint.a = FeedbackTuning.HexAlphaReady;
                     break;
             }
+            // Death Mark: KILL and lit Ambush paint the fill kill-yellow through this same inline path (USS would be overwritten).
+            if (_markKill[slot] || _markLit[slot]) tint = FeedbackTuning.MarkKillColor;
+            ApplyMarkHexClasses(slot);
             (refs.Fill ?? refs.Hex).style.unityBackgroundImageTintColor = tint;
 
             // Layer 9. The seconds number is only one of the marks this layer can carry

@@ -53,7 +53,8 @@ namespace CluckWars.Gameplay
         public float KillRange => _tuning != null ? _tuning.KillRange : DefaultKillRange;
         /// <summary>Tuned life of a mark (<c>MarkKill.asset</c>).</summary>
         public float WindowSeconds => _tuning != null ? _tuning.WindowSeconds : WindowDuration;
-        private float ArmSeconds => _tuning != null ? _tuning.ArmSeconds : ArmDuration;
+        /// <summary>Tuned arm time of a mark (<c>MarkKill.asset</c>): the Death Mark draw never outlasts it.</summary>
+        public float ArmSeconds => _tuning != null ? _tuning.ArmSeconds : ArmDuration;
         private float FailSeconds => _tuning != null ? _tuning.FailCooldownSeconds : FailCooldown;
         private float SuccessSeconds => _tuning != null ? _tuning.SuccessCooldownSeconds : SuccessCooldown;
 
