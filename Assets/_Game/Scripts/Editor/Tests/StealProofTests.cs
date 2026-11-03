@@ -260,15 +260,18 @@ namespace CluckWars.Tests
         public void TurtleMode_IsStealProofButNotControlImmune_WithTheApprovedNumbers()
         {
             string code = Src("Abilities/TurtleModeAbilitySO.cs");
-            StringAssert.Contains("GrantStealProof(Duration)", Body(code, "public override void OnActivate(", 500));
-            StringAssert.DoesNotContain("GrantControlImmunity", code);
+            // The walk (first press): steal-proof, no control immunity. The lock (second press, Egg Shell folded in) is the
+            // only place control immunity is granted (TurtleModeMergeTests).
+            string walk = Body(code, "public override void OnActivate(", 500);
+            StringAssert.Contains("GrantStealProof(Duration)", walk);
+            StringAssert.DoesNotContain("GrantControlImmunity", walk);
             StringAssert.DoesNotContain("DamageResistance", code);
 
             var turtle = (TurtleModeAbilitySO)Asset("TurtleMode");
             Assert.AreEqual(3f, turtle.Duration, 1e-5f);
             Assert.AreEqual(10f, turtle.Cooldown, 1e-5f);
             Assert.AreEqual(0.5f, turtle.SpeedMultiplier, 1e-5f);
-            Assert.AreEqual("Pull into your shell for 3 seconds. You walk slowly, but nobody can steal your food.", turtle.DescriptionText);
+            Assert.AreEqual("Shell walk 3s, safe from theft and execution. Press again to lock in place for 2s.", turtle.DescriptionText);
             Assert.AreEqual(turtle.DescriptionText, turtle.Description, "stale .asset Description");
             StringAssert.DoesNotContain("DamageResistance", File.ReadAllText("Assets/_Game/Data/Abilities/TurtleMode.asset"));
         }

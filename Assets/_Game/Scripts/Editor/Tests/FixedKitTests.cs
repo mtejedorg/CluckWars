@@ -94,7 +94,7 @@ namespace CluckWars.Tests
 
         [Test]
         public void AForagerWithoutPeck_IsAProblem() =>
-            StringAssert.Contains("Peck", Only(Broken(ChickenSubclass.Fatty_Hoarder, k => { k[0] = Pool<EggShellAbilitySO>(); return k; })));
+            StringAssert.Contains("Peck", Only(Broken(ChickenSubclass.Fatty_Hoarder, k => { k[0] = Pool<HeadbuttAbilitySO>(); return k; })));
 
         [Test]
         public void PeckOnAnAssassin_IsAProblem() =>
@@ -191,7 +191,7 @@ namespace CluckWars.Tests
         [Test]
         public void Fixed_EverySpecializationSpawnsItsKit_WhateverTheSelectionSays()
         {
-            var noise = Pool<EggShellAbilitySO>();
+            var noise = Pool<HeadbuttAbilitySO>();
             foreach (var p in Registry.Passives)
             {
                 var log = new RecordingLog();

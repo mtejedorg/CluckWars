@@ -668,6 +668,14 @@ namespace CluckWars.Gameplay
         /// is the planar distance to the closest rival owning a steal ability
         /// (<see cref="float.MaxValue"/> when none).
         /// </summary>
+        /// <summary>A walking Turtle Mode locks only when a stun or steal threat is right on it.</summary>
+        public const float TurtleLockThreatRadius = 2.5f;
+
+        /// <summary>Lock the shell walk (Turtle Mode's second press): walking, not locked yet, and a rival that can stun or rob
+        /// it within <see cref="TurtleLockThreatRadius"/>.</summary>
+        public static bool ShouldTurtleLock(bool walking, bool locked, float nearestThreatDist) =>
+            walking && !locked && nearestThreatDist <= TurtleLockThreatRadius;
+
         public static bool ShouldStealGuard(float ownCargo, float nearestStealerDist, bool alreadyProof) =>
             !alreadyProof && ownCargo >= StealGuardMinCargo && nearestStealerDist <= StealGuardRadius;
     }

@@ -405,6 +405,15 @@ namespace CluckWars.Gameplay
         public bool IsControlImmune =>
             Runner != null && !ControlImmuneTimer.ExpiredOrNotRunning(Runner);
 
+        /// <summary>Closes the steal-proof and control-immunity windows now (Turtle Mode's lock ended early). Caster's own
+        /// StateAuthority only. Note: also ends an Immovable window running at the same time.</summary>
+        public void EndShellWindows()
+        {
+            if (Runner == null || !HasStateAuthority) return;
+            StealProofTimer = TickTimer.None;
+            ControlImmuneTimer = TickTimer.None;
+        }
+
         /// <summary>Opens a control-immunity window of <paramref name="seconds"/>.</summary>
         /// <remarks>Never shortens a window already open: a re-grant keeps whichever expiry is LATER.</remarks>
         public void GrantControlImmunity(float seconds)

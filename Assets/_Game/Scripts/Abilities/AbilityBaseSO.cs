@@ -206,6 +206,22 @@ namespace CluckWars.Abilities
         public virtual float RoundStartCooldown => 0f;
 
         /// <summary>
+        /// A press while this ability runs is a phase change (Turtle Mode's lock), not a refused re-cast: the slot reads as
+        /// ready for it (no cooldown refusal; a stun still refuses, as for any cast), and <see cref="OnPressWhileActive"/> runs
+        /// instead of a new activation. Nothing else changes: the cooldown keeps running from the first press.
+        /// </summary>
+        public virtual bool AcceptsPressWhileActive => false;
+
+        /// <summary>A press while active (<see cref="AcceptsPressWhileActive"/>), on the caster's state authority. Returns the
+        /// seconds the ability now runs from this tick, or 0 or less to end it now.</summary>
+        public virtual float OnPressWhileActive(AbilityContext ctx) => 0f;
+
+        /// <summary>Retired from the pool (not registered, not pickable, in no kit) but kept in the repo; the roster checks
+        /// treat it as retired, not broken.</summary>
+        [Tooltip("Retired: kept in the repo, out of the registry, every kit and the free pool.")]
+        public bool Retired;
+
+        /// <summary>
         /// True when activating without an enemy inside <see cref="IndicatorRange"/>
         /// would do nothing (Snatch, Sneaky Steal, Cluck Shock, Mark/Kill, the stun
         /// bursts). The HUD greys the button out and <c>AbilityController.TryActivate</c>

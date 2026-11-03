@@ -683,11 +683,15 @@ namespace CluckWars.Gameplay
             var gm = GameManager.Instance;
             if (gm == null || !gm.IsMatchRunning) return false;
             if (_combat != null && _combat.IsRemoved) return false;
-            // Bots keep the one-at-a-time rule: no bot behaviour change, SCT untouched. Players are not gated.
-            if (AnyAbilityActive) return false;
-            if (!IsReady(slot)) return false;
-            TryActivate(slot);
-            return IsSlotActive(slot);
+            // Bots keep the one-at-a-time rule: no bot behaviour change, SCT untouched. Players are not gated. The one exception is
+            // a second press on the ability that is running and takes it (Turtle Mode's lock).
+            var running = IsSlotActive(slot) ? GetSlot(slot) : null;
+            bool repress = running != null && running.AcceptsPressWhileActive;
+            if (!repress && AnyAbilityActive) return false;
+            if (!repress && !IsReady(slot)) return false;
+            bool wasActive = IsSlotActive(slot);
+            bool fired = TryActivate(slot);
+            return repress ? fired : IsSlotActive(slot) && !wasActive;
         }
 
         /// <summary>
@@ -865,7 +869,9 @@ namespace CluckWars.Gameplay
             // A slot that is still running reads as "cooling": re-casting the same slot while it runs stays
             // refused (its cooldown outlasts its duration, so this only guards a Relentless-shortened edge).
             // Other slots running do NOT refuse anything — abilities run concurrently.
-            bool onCooldown = !slotUnavailable &&
+            // A running ability that takes a second press (Turtle Mode's lock) is not "cooling" for that press.
+            bool repress = !slotUnavailable && IsSlotActive(slot) && ability.AcceptsPressWhileActive;
+            bool onCooldown = !slotUnavailable && !repress &&
                               (!GetCooldown(slot).ExpiredOrNotRunning(Runner) || IsSlotActive(slot));
             bool stunned = _controller != null && !ControlRules.CanCast(_controller.CurrentControlState);
             bool noTarget = !slotUnavailable && !onCooldown && !stunned &&
@@ -947,6 +953,21 @@ namespace CluckWars.Gameplay
                 _deniedPressPending = true;
                 _deniedPressSlot = slot;
                 return false;
+            }
+
+            // A press while it runs (Turtle Mode: walk -> lock -> end early): the ability decides the new run time; no new
+            // activation, no cooldown change (it runs from the first press), no cast animation.
+            if (IsSlotActive(slot) && ability.AcceptsPressWhileActive)
+            {
+                float next;
+                _ctx.Slot = slot;
+                try { next = ability.OnPressWhileActive(_ctx); }
+                finally { _ctx.Slot = -1; }
+                if (next > 0f) SetActiveTimer(slot, TickTimer.CreateFromSeconds(Runner, next));
+                else Deactivate(slot);
+                _controller?.SyncAbilityEffects();
+                _log?.Debug(Source, $"Slot {slot} ({ability.DisplayName}) pressed while active -> {(next > 0f ? $"{next:0.0}s more" : "ended")}.");
+                return true;
             }
 
             // Refresh context fields that abilities need for NetworkObject spawning. This has

@@ -75,7 +75,7 @@ ability.snatch.desc,Robs {n} food from every rival within {r}m ahead and shoves 
 ability.sneakysteal.desc,Yanks {n} food from the nearest rival within {r}m. Same bird: every {secs}s.
 ability.speedburst.desc,A {secs}s sprint at {mult}x movement speed.
 ability.spinecoat.desc,"For {secs}s, any rival who bumps into you loses {n} food to you and gets knocked away."
-ability.turtlemode.desc,"Pull into your shell for {secs} seconds. You walk slowly, but nobody can steal your food."
+ability.turtlemode.desc,"Shell walk {secs}s, safe from theft and execution. Press again to lock in place for {lock}s."
 perk.relentless.line,Moves recharge {pct}% faster.
 perk.relentless.detail,Applies to every move except Peck.
 perk.bully.line,"Steal {steal}% more, carry {cap} more."

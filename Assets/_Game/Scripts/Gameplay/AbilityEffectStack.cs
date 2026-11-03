@@ -58,6 +58,12 @@ namespace CluckWars.Gameplay
 
             public void Clear() => _entries.Clear();
 
+            public bool Has(int source)
+            {
+                for (int i = 0; i < _entries.Count; i++) if (_entries[i].Source == source) return true;
+                return false;
+            }
+
             public float Max(float none)
             {
                 if (_entries.Count == 0) return none;
@@ -141,6 +147,8 @@ namespace CluckWars.Gameplay
         }
         public void RemoveMovementLock(int source) => _lock.Remove(source);
         public bool MovementLocked => _lock.Count > 0;
+        /// <summary>Is <paramref name="source"/>'s movement lock on (Turtle Mode: walking or locked)?</summary>
+        public bool HasMovementLock(int source) => _lock.Has(source);
 
         // ---- Deposit rate (kind G) -----------------------------------------------
 

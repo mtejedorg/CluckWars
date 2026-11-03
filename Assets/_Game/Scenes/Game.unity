@@ -468,7 +468,7 @@ MonoBehaviour:
   _botLoadouts:
   - Name: Bruiser
     Passive: {fileID: 0}
-    Slot0: {fileID: 11400000, guid: 0d5566bf334a1c44a9711ea9b34a4ac6, type: 2}
+    Slot0: {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}
     Slot1: {fileID: 11400000, guid: 4c1a8e7b3d2f495d8a01c5e7b2f9d4b1, type: 2}
     Slot2: {fileID: 0}
     Slot3: {fileID: 0}
@@ -489,7 +489,7 @@ MonoBehaviour:
     AllowedClasses: 02
   - Name: Trickster
     Passive: {fileID: 0}
-    Slot0: {fileID: 11400000, guid: 0d5566bf334a1c44a9711ea9b34a4ac6, type: 2}
+    Slot0: {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}
     Slot1: {fileID: 11400000, guid: 02f818d76a9212941bda628e88c11b76, type: 2}
     Slot2: {fileID: 11400000, guid: d5cbb7478daa2d94eb14fc2015dba412, type: 2}
     Slot3: {fileID: 0}
