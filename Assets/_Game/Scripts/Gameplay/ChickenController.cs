@@ -511,6 +511,8 @@ namespace CluckWars.Gameplay
             _cargo = GetComponent<ChickenCargo>();
             _abilities = GetComponent<AbilityController>();
             _assassin = GetComponent<AssassinExecute>();
+            _indicator = GetComponent<CluckWars.Visuals.RivalIndicator>();
+            _nameplate = GetComponent<CluckWars.Visuals.ChickenNameplate>();
             _activeStats = ResolveStatsForClass(Class);
             Effects.Log = _log;
             _inContact = false;   // pooled: no contact carried over from a previous life
@@ -1067,6 +1069,12 @@ namespace CluckWars.Gameplay
 
         /// <summary>This chicken's execute state machine (cached), or null before <c>Spawned</c>.</summary>
         public AssassinExecute Execute => _assassin;
+
+        private CluckWars.Visuals.RivalIndicator _indicator;
+        private CluckWars.Visuals.ChickenNameplate _nameplate;
+        /// <summary>This chicken's rival indicator and nameplate (cached at spawn, presentation readers only; may be null).</summary>
+        public CluckWars.Visuals.RivalIndicator Indicator => _indicator;
+        public CluckWars.Visuals.ChickenNameplate Nameplate => _nameplate;
 
         /// <summary>
         /// Applies a speed penalty from a tagged source. Slippery does NOT reduce slow

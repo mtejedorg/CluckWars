@@ -55,11 +55,11 @@ namespace CluckWars.Tests
             float seconds = MarkKill.RoundStartCooldownSeconds;
             int slot = -1;
             float first = SecondsLeftAtGo(introStartTick: 200, introTicks: 96, seconds, ref slot);
-            Assert.AreEqual(4f, first, Tick, "first round");
+            Assert.AreEqual(seconds, first, Tick, "first round");
 
             slot = 12345;   // a leftover cooldown from round 1, wiped by the reset before the new intro
             float again = SecondsLeftAtGo(introStartTick: 5000, introTicks: 96, seconds, ref slot);
-            Assert.AreEqual(4f, again, Tick, "PLAY AGAIN");
+            Assert.AreEqual(seconds, again, Tick, "PLAY AGAIN");
         }
 
         [Test]

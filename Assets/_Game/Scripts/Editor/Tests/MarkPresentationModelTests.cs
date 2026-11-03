@@ -549,6 +549,44 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void SeveralHunters_ReturningMarksNeverReplay_UpToTheMemory()
+        {
+            var w = new World();
+            long[] hunters = { Rival, Third, Fourth };
+            // Three hunters take turns marking the local player, each mark ending before the next.
+            for (int i = 0; i < hunters.Length; i++)
+            {
+                w.SetMark(hunters[i], Me, windowEnd: 100 + i);
+                Assert.AreNotEqual(MarkEvents.None, w.Run(0.5f, out _) & MarkEvents.Marked, $"hunter {i}: announced");
+                w.ClearMark(hunters[i]);
+                w.Run(0.5f, out _);
+            }
+            // The first one's mark comes back (host migration, a lag flicker): remembered, not replayed.
+            w.SetMark(Rival, Me, windowEnd: 100);
+            Assert.AreEqual(MarkEvents.None, w.Run(1f, out _), "a returning mark replays nothing");
+            Assert.LessOrEqual(3, MarkPresentationModel.AnnouncedMemory);
+        }
+
+        [Test]
+        public void RoleSwitch_TheOldPresentationFadesOut_ThenTheNewOneBegins()
+        {
+            var w = VictimMarked(cold: true);
+            w.Run(1f, out var before);
+            Assert.AreEqual(1f, before.Dim);
+            w.SetMark(Me, Third);                                 // the local player's own mark takes precedence
+            var o = w.Step();
+            Assert.AreEqual(MarkRole.Victim, o.Role, "the victim view fades first");
+            Assert.Less(o.Dim, 1f);
+            Assert.Greater(o.Dim, 0f, "fading, not snapped off");
+            Assert.AreEqual(MarkEvents.None, o.Events);
+            w.Run(FeedbackTuning.MarkEndFadeSeconds, out o);
+            var events = w.Run(1f, out o);
+            Assert.AreEqual(MarkRole.Assassin, o.Role);
+            Assert.AreEqual(0f, o.Dim);
+            Assert.AreNotEqual(MarkEvents.None, events & MarkEvents.Lock, "then the new mark's draw runs");
+        }
+
+        [Test]
         public void ANewMark_DuringTheEndFade_StartsClean()
         {
             var w = VictimMarked(cold: true);

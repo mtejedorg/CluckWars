@@ -28,6 +28,8 @@ namespace CluckWars.Diagnostics
         private const int MarkSettleFrames = 6;
 
         private string _markShotDir;
+        private bool _shotShelled;
+        private float _shellHookAt = -10f;
         private bool _shotDraw, _shotOff, _shotOn, _shotAmbush, _shotKill, _shotWalled, _shotEnd;
         private bool _shotVicMarked, _shotVicFar, _shotVicClose, _shotVicInvisible, _shotVicEnd, _shotRound2;
         private float _markLockedAt = -1f, _markEndedAt = -1f;
@@ -135,6 +137,22 @@ namespace CluckWars.Diagnostics
             if (!o.DrawLocked) { _autoPlay.SteerOverride = self.transform.position.XZ(); return; }
             if (_markLockedAt < 0f) _markLockedAt = now;
 
+            if (o.MarkerMode == MarkMarkerMode.Shelled && Settled("shelled")) Capture(ref _shotShelled, "mark-shelled");
+            // Dev hook (logged): a bot target that owns Turtle Mode raises it once the Assassin is close, through the bot API.
+            if (!_shotShelled && _shotKill && target.IsBot && target.HasStateAuthority && target.Abilities != null &&
+                PlanarDistance(self.transform.position, target.transform.position) <= 6f &&
+                Time.realtimeSinceStartup - _shellHookAt >= 1f)
+            {
+                for (int s = 0; s < AbilityController.SlotCount; s++)
+                {
+                    if (!(target.Abilities.GetSlot(s) is TurtleModeAbilitySO)) continue;
+                    _shellHookAt = Time.realtimeSinceStartup;
+                    bool ok = target.Abilities.BotTryActivate(s);
+                    _log.Info(Source, $"AutoTest markshots dev-hook: Turtle Mode on bot target {target.name} via BotTryActivate -> {ok}");
+                    break;
+                }
+            }
+
             bool firstPassDone = _shotOn && _shotAmbush && _shotKill;
             if (o.MarkerMode == MarkMarkerMode.Walled && Settled("walled")) Capture(ref _shotWalled, "mark-walled");
 
@@ -189,7 +207,10 @@ namespace CluckWars.Diagnostics
             _autoPlay.SteerOverride = self.transform.position.XZ();
 
             if (o.ToastAlpha >= 0.95f) Capture(ref _shotVicMarked, "victim-marked");
-            if (MarkHudController.HunterBadgeShownNow && o.Cold <= 0f && Settled("far")) Capture(ref _shotVicFar, "victim-far");
+            // Far: the darkness at its steady state (dim 1, held >= 0.3 s past its fade-in) and the toast gone, so the frame
+            // shows what the victim lives with for the mark's whole life.
+            if (MarkHudController.HunterBadgeShownNow && o.Cold <= 0f && o.Dim >= 1f && o.ToastAlpha <= 0f &&
+                Settled("far", SteadyFrames)) Capture(ref _shotVicFar, "victim-far");
             if (o.Cold >= 0.99f && o.Red <= 0f && Settled("close")) Capture(ref _shotVicClose, "victim-close-visible");
             if (o.Cold >= 0.99f && o.Red >= 0.99f && Settled("invisible")) Capture(ref _shotVicInvisible, "victim-close-invisible");
 
@@ -222,14 +243,19 @@ namespace CluckWars.Diagnostics
 
         /// <summary>True once the condition named <paramref name="key"/> has held <see cref="MarkSettleFrames"/> frames running
         /// (the UI has caught up). Each key keeps its own run, so several conditions can settle side by side.</summary>
-        private bool Settled(string key)
+        private bool Settled(string key) => Settled(key, MarkSettleFrames);
+
+        /// <summary>~0.3 s at 60 fps.</summary>
+        private const int SteadyFrames = 20;
+
+        private bool Settled(string key, int frames)
         {
             int frame = Time.frameCount;
             _settle.TryGetValue(key, out var run);
             if (run.last == frame - 1) run = (frame, run.count + 1);
             else if (run.last != frame) run = (frame, 1);
             _settle[key] = run;
-            return run.count >= MarkSettleFrames;
+            return run.count >= frames;
         }
 
         private readonly System.Collections.Generic.Dictionary<string, (int last, int count)> _settle =

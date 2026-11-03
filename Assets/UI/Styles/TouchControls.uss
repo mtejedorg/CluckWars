@@ -641,11 +641,12 @@
    other fill tints), the rim cream, and the icon, label, pip and seconds give way to the word. Its 1.15 size is
    multiplied into the controller's inline scale (a USS scale would be overwritten). Lit Ambush: the target stands in
    Ambush's own shape and the slot is ready; same yellow fill and cream rim, the icon inked, the pip hidden. */
+/* Offset down-right of the slot badge (top-left) so the whole word reads; 42 px keeps "KILL" inside the 150 px hex. */
 .cw-hex-killtext {
     position: absolute;
-    left: 0; right: 0; top: 0; bottom: 0;
+    left: 10px; right: 0; top: 18px; bottom: 0;
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 46px; letter-spacing: 2px;
+    font-size: 42px; letter-spacing: 2px;
     color: rgb(22, 16, 28);
     -unity-text-align: middle-center;
     white-space: nowrap;

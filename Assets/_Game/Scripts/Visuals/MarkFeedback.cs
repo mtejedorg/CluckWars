@@ -76,6 +76,15 @@ namespace CluckWars.Visuals
         }
 
         private ILogService _log;
+        private bool _missingIndicatorReported, _missingExecuteReported;
+        private GameManager _seenMatch;
+
+        private void ReportOnce(ref bool reported, string message)
+        {
+            if (reported) return;
+            reported = true;
+            _log?.Error(Source, message);
+        }
         private IAudioService _audio;
         private AudioRegistrySO _sfx;
         private bool _missingAudioReported;
@@ -133,6 +142,12 @@ namespace CluckWars.Visuals
         private MarkInputs Gather()
         {
             var gm = GameManager.Instance;
+            if (gm != null && gm != _seenMatch)
+            {
+                // A new match: its mark keys can repeat the last match's.
+                _seenMatch = gm;
+                _model.ForgetAnnounced();
+            }
             bool gmValid = gm != null && gm.Object != null && gm.Object.IsValid;
             if (gmValid && gm.IsIntroActive) _introLastSeenAt = Time.unscaledTime;
 
@@ -195,13 +210,15 @@ namespace CluckWars.Visuals
             }
         }
 
-        private static void GatherVictim(ref MarkInputs input, ChickenController local, ChickenController hunter)
+        private void GatherVictim(ref MarkInputs input, ChickenController local, ChickenController hunter)
         {
             input.HunterDistance = FloorArrowRules.PlanarDistance(local.transform.position, hunter.transform.position);
             var cam = MatchCamera.Instance != null ? MatchCamera.Instance.Camera : null;
             input.InnerRadius = FloorRivalArrows.RingRadiusFor(cam);
             input.HunterInvisible = Mathf.Clamp01(hunter.VisualOpacity) < RivalIndicator.VisibleOpacityThreshold;
-            var indicator = hunter.GetComponent<RivalIndicator>();
+            var indicator = hunter.Indicator;
+            if (indicator == null) ReportOnce(ref _missingIndicatorReported, $"{hunter.name} has no RivalIndicator: the victim's " +
+                "hunter badge treats it as never off screen (prefab wiring).");
             input.HunterHiddenFromView = indicator != null && indicator.HiddenFromClearViewport;
         }
 
@@ -214,7 +231,13 @@ namespace CluckWars.Visuals
             for (int i = 0; i < all.Count; i++)
             {
                 var c = all[i];
-                if (c == null || c.Object == null || !c.Object.IsValid || c.IsDecoy || c.Execute == null) continue;
+                if (c == null || c.Object == null || !c.Object.IsValid || c.IsDecoy) continue;
+                if (c.Execute == null)
+                {
+                    ReportOnce(ref _missingExecuteReported, $"{c.name} has no AssassinExecute: its marks (and marks on it) are " +
+                        "not shown (prefab wiring).");
+                    continue;
+                }
                 var exec = c.Execute;
                 bool hasMark = exec.Object != null && exec.Object.IsValid && exec.MarkedTarget != NetworkBehaviourId.None;
                 Vector3 p = c.transform.position;

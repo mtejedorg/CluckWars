@@ -141,9 +141,9 @@ namespace CluckWars.Tests
         [Test]
         public void DrawTickPitch_RisesAStepPerRow_Capped()
         {
-            Assert.AreEqual(1.00f, MarkFeedback.DrawTickPitch(0), 1e-4f);
-            Assert.AreEqual(1.05f, MarkFeedback.DrawTickPitch(1), 1e-4f);
-            Assert.AreEqual(1.35f, MarkFeedback.DrawTickPitch(20), 1e-4f);
+            Assert.AreEqual(FeedbackTuning.MarkDrawTickPitch, MarkFeedback.DrawTickPitch(0), 1e-4f);
+            Assert.AreEqual(FeedbackTuning.MarkDrawTickPitch + FeedbackTuning.MarkDrawTickPitchStep, MarkFeedback.DrawTickPitch(1), 1e-4f);
+            Assert.AreEqual(FeedbackTuning.MarkDrawTickPitchMax, MarkFeedback.DrawTickPitch(1000), 1e-4f);
         }
 
         [Test]
@@ -167,6 +167,29 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void ATargetJustUnderTheBand_CountsAsHidden_EdgePinWithPointerAndDistance_SourceGuard()
+        {
+            string src = Read("Assets/_Game/Scripts/UI/MarkerPlacement.cs");
+            StringAssert.DoesNotContain("centre.y = Mathf.Max(centre.y", src, "no longer pushed down onto the target's plate");
+            StringAssert.Contains("if (ScreenEdgeProjection.IsInClearViewport(topVp, info) && centre.y + FeedbackTuning.MarkMarkerBoxHeightPx < panel.y)", src);
+            StringAssert.Contains("centre.x = Mathf.Clamp(centre.x, half, panel.x - half);", src, "on-screen branch clamped to the panel");
+            StringAssert.Contains("target.Nameplate", src, "cached accessors, no per-frame GetComponent");
+            StringAssert.DoesNotContain("GetComponent<", src);
+        }
+
+        [Test]
+        public void TheHunterBadge_SlidesAlongItsArrowOffTheYouPlate()
+        {
+            var plate = new Rect(900f, 500f, 120f, 40f);
+            var at = new Vector2(950f, 520f);
+            var moved = MarkerPlacement.SlideOff(at, 22f, plate, Vector2.up * -1f);   // arrow tip points up the screen
+            Assert.Less(moved.y, at.y);
+            Assert.AreEqual(at.x, moved.x, 1e-3f);
+            Assert.IsFalse(Rect.MinMaxRect(moved.x - 22f, moved.y - 22f, moved.x + 22f, moved.y + 22f).Overlaps(Inflate(plate)));
+            Assert.AreEqual(new Vector2(100f, 100f), MarkerPlacement.SlideOff(new Vector2(100f, 100f), 22f, plate, Vector2.up), "clear: untouched");
+        }
+
+        [Test]
         public void MarkerPinnedUnderTheBand_SlidesOffTheYouPlate_WithoutRising()
         {
             var plate = new Rect(900f, 500f, 120f, 40f);
@@ -185,6 +208,20 @@ namespace CluckWars.Tests
         [Test]
         public void SceneUnload_ClearsTheScreenMood_AndThePresentation()
         {
+            // A live victim mark with darkness on, then what HardClear does on scene unload / disable.
+            var m = new MarkPresentationModel();
+            var marked = new MarkInputs { MatchRunning = true, Role = MarkRole.Victim, MarkKey = 42, Remaining = 7f, Window = 7f,
+                                          ArmSeconds = 0.6f, HunterDistance = 1f, InnerRadius = 4f, BannerMayShow = true };
+            MarkOutputs o = default;
+            for (int i = 0; i < 60; i++) o = m.Step(marked, 1f / 60f);
+            Assert.Greater(o.Dim, 0f);
+            Assert.Greater(o.Cold, 0f);
+            m.Reset();
+            Assert.IsTrue(m.Current.IsClean, "cleared at once, no fade");
+            Assert.IsTrue(m.Step(default, 1f / 60f).IsClean, "and stays clean with nothing to show");
+            // The same mark seen again after an unload is not announced twice (memory survives; a new match forgets it).
+            Assert.AreEqual(MarkEvents.None, m.Step(marked, 1f / 60f).Events & MarkEvents.Marked);
+
             MarkScreenEffect.Set(1f, 1f, 1f);
             MarkFeedback.ClearPresentation();
             Assert.AreEqual(Vector3.zero, MarkScreenEffect.Current);

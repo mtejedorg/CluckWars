@@ -37,7 +37,7 @@ namespace CluckWars.UI
 
         private VisualElement _root, _marker, _pointer, _ring, _skull, _lock, _shell, _hunterSkull;
         private Label _distance;
-        private bool _bound, _reportedMissing;
+        private bool _bound, _reportedMissing, _missingIndicatorReported;
 
         // Ring / pointer paint state.
         private float _fill;
@@ -139,8 +139,9 @@ namespace CluckWars.UI
                 return;
             }
 
+            // Placed only while the mark lives: in the end fade it stays where it was (a respawned target is at its base).
             var target = MarkFeedback.Target;
-            if (target != null &&
+            if (target != null && o.AssassinMarkActive &&
                 MarkerPlacement.Place(cam, panel, target, LocalChicken(), out Vector2 at, out bool off, out Vector2 dir))
             {
                 _markerPanel = at;
@@ -259,8 +260,13 @@ namespace CluckWars.UI
                 SetShown(_hunterSkull, false);
                 return;
             }
-            var indicator = hunter.GetComponent<RivalIndicator>();
-            if (indicator == null || !HunterBadgeViewport(cam, indicator, out Vector2 vp))
+            var indicator = hunter.Indicator;
+            if (indicator == null && !_missingIndicatorReported)
+            {
+                _missingIndicatorReported = true;
+                _log?.Error(Source, $"{hunter.name} has no RivalIndicator: the victim's hunter badge cannot be placed (prefab wiring).");
+            }
+            if (indicator == null || !HunterBadgeViewport(cam, indicator, out Vector2 vp, out Vector2 outward))
             {
                 SetShown(_hunterSkull, false);
                 return;
@@ -271,23 +277,33 @@ namespace CluckWars.UI
                 _hunterSkull.style.borderTopColor = _hunterSkull.style.borderBottomColor = colour;
             _hunterSkull.style.opacity = o.HunterBadgeAlpha;
             float half = _hunterSkull.resolvedStyle.width > 0f ? _hunterSkull.resolvedStyle.width * 0.5f : 22f;
-            _hunterSkull.style.translate = new Translate(vp.x * panel.x - half, (1f - vp.y) * panel.y - half);
+            var at = new Vector2(vp.x * panel.x, (1f - vp.y) * panel.y);
+            // Off the "You" plate: slid along the arrow, toward its tip (outward), until clear.
+            var you = LocalChicken() != null ? LocalChicken().Nameplate : null;
+            if (you != null && you.TryGetPlateViewport(cam, out Rect yvp))
+                at = MarkerPlacement.SlideOff(at, half, MarkerPlacement.ToPanel(yvp, panel), new Vector2(outward.x, -outward.y));
+            _hunterSkull.style.translate = new Translate(at.x - half, at.y - half);
         }
 
         /// <summary>The badge's viewport point: the floor arrow's midpoint (tail + half its length along the bearing, at the
         /// floor), else 0.9 chevron sizes inward from the edge chevron's centre. False when the hunter has no arrow this frame.</summary>
-        private static bool HunterBadgeViewport(Camera cam, RivalIndicator indicator, out Vector2 vp)
+        private static bool HunterBadgeViewport(Camera cam, RivalIndicator indicator, out Vector2 vp, out Vector2 outward)
         {
             vp = default;
+            outward = Vector2.up;
             if (FloorRivalArrows.TryGetArrow(indicator.GetInstanceID(), out Vector3 tail, out Vector3 dir, out float length))
             {
                 Vector3 mid = tail + dir * (length * 0.5f);
                 Vector3 v = cam.WorldToViewportPoint(mid);
+                Vector3 tip = cam.WorldToViewportPoint(mid + dir * length);
                 vp = new Vector2(v.x, v.y);
+                var d = new Vector2(tip.x - v.x, tip.y - v.y);
+                outward = d.sqrMagnitude > 1e-8f ? d.normalized : Vector2.up;
                 return true;
             }
             if (indicator.TryGetChevronViewport(out Vector2 at, out Vector2 bearing))
             {
+                outward = bearing;
                 float inset = FeedbackTuning.MarkHunterBadgeChevronInset * FeedbackTuning.RivalChevronSizeFraction;
                 vp = at - new Vector2(bearing.x * inset / Mathf.Max(0.1f, cam.aspect), bearing.y * inset);
                 return true;

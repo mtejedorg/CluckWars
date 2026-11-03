@@ -295,9 +295,11 @@ namespace CluckWars.Visuals
         private int _clockSeconds;
         private float _sinceSkull;
 
-        // Memory of the last mark that was announced, so the same mark found again never replays.
-        private bool _hasAnnounced;
-        private long _announcedKey;
+        // Memory of the last marks announced (several Death Mark carriers can take turns on this view), so the same mark
+        // found again never replays its draw, toast or stings.
+        public const int AnnouncedMemory = 4;
+        private readonly long[] _announced = new long[AnnouncedMemory];
+        private int _announcedCount, _announcedNext;
 
         private MarkOutputs _out;
         private MarkOutputs _snapshot;
@@ -305,13 +307,32 @@ namespace CluckWars.Visuals
         /// <summary>The last outputs <see cref="Step"/> produced.</summary>
         public MarkOutputs Current => _out;
 
-        /// <summary>Forget everything, including which mark was announced (a new match).</summary>
+        /// <summary>Drop whatever is shown, at once (scene unload, disable). The announced-mark memory survives: only
+        /// <see cref="ForgetAnnounced"/> (a new match: mark keys restart with the ticks) clears it.</summary>
         public void Reset()
         {
             ClearShown();
-            _hasAnnounced = false;
-            _announcedKey = 0;
             _out = default;
+        }
+
+        /// <summary>A new match: its mark keys can repeat the last match's, so nothing counts as announced any more.</summary>
+        public void ForgetAnnounced()
+        {
+            _announcedCount = _announcedNext = 0;
+        }
+
+        private bool WasAnnounced(long key)
+        {
+            for (int i = 0; i < _announcedCount; i++) if (_announced[i] == key) return true;
+            return false;
+        }
+
+        private void RememberAnnounced(long key)
+        {
+            if (WasAnnounced(key)) return;
+            _announced[_announcedNext] = key;
+            _announcedNext = (_announcedNext + 1) % AnnouncedMemory;
+            if (_announcedCount < AnnouncedMemory) _announcedCount++;
         }
 
         public MarkOutputs Step(in MarkInputs input, float dt)
@@ -319,14 +340,16 @@ namespace CluckWars.Visuals
             dt = Mathf.Max(0f, dt);
             bool live = input.MatchRunning && input.Role != MarkRole.None;
 
-            if (live && _showing && input.MarkKey != _key) ClearShown();       // a different mark: start clean
+            bool switching = live && _showing && input.MarkKey != _key;
+            if (switching && _ending) { ClearShown(); switching = false; }   // the old one was already fading: start the new one clean
             if (live && !_showing) Begin(input);
             else if (live && _ending) _ending = false;                       // the same mark came back mid-fade
+            // A different live mark (a role switch, another hunter): the old one fades out first, then the new one begins.
 
             var o = new MarkOutputs { MarkerPop = 1f, DrawScale = 1f, ToastScale = 1f, SkullCorner = -1, TargetCorner = -1, HunterCorner = -1 };
             if (!_showing) { _out = o; return o; }
 
-            if (!live && !_ending)
+            if ((!live || switching) && !_ending)
             {
                 _ending = true;
                 _endT = 0f;
@@ -367,9 +390,8 @@ namespace CluckWars.Visuals
             _role = input.Role;
             _targetCorner = input.TargetCorner;
             _hunterCorner = input.HunterCorner;
-            bool replay = _hasAnnounced && _announcedKey == _key;
-            _hasAnnounced = true;
-            _announcedKey = _key;
+            bool replay = WasAnnounced(_key);
+            RememberAnnounced(_key);
 
             float arm = input.ArmSeconds > 0f ? input.ArmSeconds : FeedbackTuning.MarkDrawSeconds;
             _drawSeconds = DrawDuration(input.ReducedMotion, arm);
