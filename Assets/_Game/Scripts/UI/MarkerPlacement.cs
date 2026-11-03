@@ -75,6 +75,9 @@ namespace CluckWars.UI
             }
             offScreen = true;
             at = new Vector2(clamped.x * panel.x, (1f - clamped.y) * panel.y);
+            // The clamp's edge band is a viewport fraction of the chevron's; the marker and its distance label are wider: keep
+            // the whole of them on the panel.
+            at.x = Mathf.Clamp(at.x, c, panel.x - c);
             return true;
         }
 
