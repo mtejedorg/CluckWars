@@ -865,9 +865,9 @@ namespace CluckWars.Visuals
         // Colours are colour-buffer values: the project is in Gamma space, so they are plain sRGB.
 
         /// <summary>DIM: darkness alpha at the screen centre (kept low: nothing opaque covers the centre).</summary>
-        public const float MarkMoodDimCentre = 0.10f;
+        public const float MarkMoodDimCentre = 0.18f;
         /// <summary>DIM: darkness alpha at the screen corners.</summary>
-        public const float MarkMoodDimEdge = 0.58f;
+        public const float MarkMoodDimEdge = 0.66f;
         /// <summary>Vignette ramp, as a fraction of the centre-to-corner distance: flat centre alpha inside Inner,
         /// smoothstep to the edge alpha at Outer.</summary>
         public const float MarkMoodVignetteInner = 0.22f;
