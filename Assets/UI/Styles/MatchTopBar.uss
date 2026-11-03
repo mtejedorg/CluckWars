@@ -197,6 +197,9 @@
     justify-content: center;
     display: none;
 }
+/* The executed player's BACK IN! (same toast, ink plate, cream rim, no skull). */
+.cw-mark-toast--backin { background-color: rgb(42, 26, 12); border-color: rgb(254, 245, 224); }
+.cw-mark-toast--backin .cw-mark-toast-skull { display: none; }
 .cw-mark-toast-skull {
     width: 48px; height: 48px; flex-shrink: 0;
     margin-right: 12px;

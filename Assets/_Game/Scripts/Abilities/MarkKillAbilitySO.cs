@@ -46,6 +46,9 @@ namespace CluckWars.Abilities
         [Min(0f)] public float FailCooldownSeconds = AssassinExecute.FailCooldown;
         [Tooltip("Cooldown after a kill.")]
         [Min(0f)] public float SuccessCooldownSeconds = AssassinExecute.SuccessCooldown;
+        [Tooltip("Seconds an executed chicken is out (invisible, untargetable) before it respawns at its own base with no cargo. " +
+                 "Every peer reads this asset: the victim's authority refuses a removal claim longer than it.")]
+        [Min(0.1f)] public float RemovalSeconds = AssassinExecute.DefaultRemovalSeconds;
         [Tooltip("Cooldown Death Mark opens every round on, counted from GO (first round and every PLAY AGAIN). Bots obey it too.")]
         [Min(0f)] public float RoundStartCooldownSeconds = 4f;
 

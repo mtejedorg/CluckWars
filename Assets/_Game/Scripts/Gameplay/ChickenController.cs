@@ -1185,6 +1185,38 @@ namespace CluckWars.Gameplay
             _log?.Debug(Source, $"Teleport queued to {position}.");
         }
 
+        /// <summary>State authority only: the same queued teleport the round reset uses (an executed chicken's respawn).</summary>
+        internal void QueueTeleport(Vector3 position)
+        {
+            if (!HasStateAuthority) return;
+            _traversal?.Abort();
+            _pendingTeleport.Request(position);
+        }
+
+        /// <summary>
+        /// This chicken was executed (state authority, at the removal): every running ability ends through its own
+        /// OnDeactivate (cooldowns untouched), then every control state and effect window clears, steal-proof and control
+        /// immunity included, as the round reset does. Nothing of the old life carries into the respawn.
+        /// </summary>
+        public void EndEverythingForRemoval()
+        {
+            if (!HasStateAuthority) return;
+            _abilities?.EndAllForRemoval();
+            _traversal?.Abort();
+            _abilitySlowUntil    = double.MinValue;
+            _abilitySlowFactor   = 1f;
+            _inContact           = false;
+            RootTimer            = TickTimer.None;
+            Rooted               = false;
+            IsStunned            = false;
+            StunTimer            = TickTimer.None;
+            StealProofTimer      = TickTimer.None;
+            ControlImmuneTimer   = TickTimer.None;
+            Effects.Clear();
+            SyncAbilityEffects();
+            ExternalDisplacement = Vector3.zero;
+        }
+
         private PendingTeleport _pendingTeleport;
         private NetworkTransform _networkTransform;
         private bool _networkTransformLooked;

@@ -30,6 +30,7 @@ namespace CluckWars.Gameplay
 
         private ChickenController _controller;
         private ChickenAnimator _animator;
+        private CharacterController _body;
         private AssassinExecute _execute;
         private bool _missingControllerLogged;
         private ChangeDetector _detector;
@@ -93,8 +94,15 @@ namespace CluckWars.Gameplay
 
             if (IsRemoved)
             {
-                if (StunTimer.Expired(Runner))
-                    Respawn(stats);
+                switch (ExecuteRespawnRules.Next(StunTimer.Expired(Runner), _respawnTeleportQueued))
+                {
+                    case ExecuteRespawnStep.QueueTeleport:
+                        QueueRespawnTeleport();
+                        break;
+                    case ExecuteRespawnStep.StandUp:
+                        Respawn(stats);
+                        break;
+                }
             }
         }
 
@@ -109,6 +117,9 @@ namespace CluckWars.Gameplay
                     {
                         var (_, cur) = _stunReader.Read(previous, current);
                         _animator?.SetStunned(cur);
+                        // Out: no body to bump into on any peer (the respawn teleport toggles it around itself and leaves it as found).
+                        if (_body == null) _body = GetComponent<CharacterController>();
+                        if (_body != null && _controller != null && !_controller.IsDecoy) _body.enabled = !cur;
                         if (cur)
                         {
                             _log?.Info(Source, "Execute removal begin.");
@@ -132,6 +143,7 @@ namespace CluckWars.Gameplay
                         else
                         {
                             _log?.Info(Source, "Removal ended; respawned.");
+                            if (HasInputAuthority && _controller != null && !_controller.IsDecoy) LocalRespawnCue.Raise();
                         }
                         break;
                     }
@@ -163,6 +175,11 @@ namespace CluckWars.Gameplay
 
             IsRemoved = true;
             StunTimer = TickTimer.CreateFromSeconds(Runner, duration > 0f ? duration : _stunDuration);
+            _respawnTeleportQueued = false;
+            // Everything this life had ends now: control states, running abilities and their effects (steal-proof, invisibility),
+            // a mark it holds. Cooldowns keep running while it is out.
+            _controller?.EndEverythingForRemoval();
+            _execute?.DropMarkForRemoval();
             CreditKillToAttacker(assassinId);
             OnDeathAuthority?.Invoke(assassinId);
         }
@@ -241,7 +258,7 @@ namespace CluckWars.Gameplay
                     ? attacker.Object.HasStateAuthority
                     : attacker.Object.StateAuthority == info.Source;
                 claim.AttackerHasExecute = execute != null;
-                if (execute != null) { claim.KillRange = execute.KillRange; }
+                if (execute != null) { claim.KillRange = execute.KillRange; claim.MaxDuration = execute.RemovalSeconds; }
                 claim.MarkedThisVictim = execute != null && _controller != null && execute.MarkedTarget == _controller.Id;
                 claim.VictimStunned = _controller != null && _controller.IsStunned;
 
@@ -380,15 +397,53 @@ namespace CluckWars.Gameplay
         {
             IsRemoved = false;
             StunTimer = default;
+            _respawnTeleportQueued = false;   // the round reset's own teleport takes it home
             _markSeenAt.Clear();
             _stunEverSeen = false;
             _log?.Debug(Source, "Reset combat for new match.");
+        }
+
+        // Authority-local: the respawn teleport is queued; the chicken stands up the tick after it lands.
+        private bool _respawnTeleportQueued;
+
+        /// <summary>Out time over: back to its own corner's spawn point through the round reset's teleport (NetworkTransform
+        /// teleport, interpolation suspended, RecentPositions cleared), still removed for that tick so nobody sees it at the
+        /// death spot.</summary>
+        private void QueueRespawnTeleport()
+        {
+            _respawnTeleportQueued = true;
+            var map = FindFirstObjectByType<MapGenerator>();
+            int corner = _controller != null ? _controller.HomeCornerIndex : -1;
+            if (!ExecuteRespawnRules.TrySpawnPoint(corner, map != null ? map.SpawnPoints : null, out Vector3 home))
+            {
+                // A wiring / map bug: no spawn point for this corner. It stands up where it fell rather than staying out.
+                _log?.Error(Source, $"{name}: no spawn point for corner {corner} (map {(map != null ? "has " + map.SpawnPoints.Count : "missing")}); " +
+                    "the executed chicken respawns where it fell.");
+                return;
+            }
+            _controller.QueueTeleport(home + Vector3.up * 0.05f);
         }
 
         private void Respawn(ChickenStatsSO stats)
         {
             IsRemoved = false;
             StunTimer = default;
+            _respawnTeleportQueued = false;
+            var cargo = _controller != null ? _controller.Cargo : null;
+            if (cargo != null) cargo.ClearForRespawn();   // back with nothing: the execute took the load
+
+            float cd = 0f;
+            var abilities = _controller != null ? _controller.Abilities : null;
+            if (abilities != null)
+                for (int s = 0; s < AbilityController.SlotCount; s++) cd = Mathf.Max(cd, abilities.CooldownRemaining(s));
+            var p = transform.position;
+            int home = _controller != null ? _controller.HomeCornerIndex : -1;
+            var map = FindFirstObjectByType<MapGenerator>();
+            float dist = ExecuteRespawnRules.TrySpawnPoint(home, map != null ? map.SpawnPoints : null, out Vector3 sp)
+                ? Vector2.Distance(new Vector2(p.x, p.z), new Vector2(sp.x, sp.z)) : -1f;
+            // Matrix evidence (merge.ps1 / verify.ps1 can key on it): at its base, empty, cooldowns still running.
+            _log?.Info("Reset", System.FormattableString.Invariant(
+                $"Execute respawn chicken={name} home={home} pos={p.x:0.0},{p.z:0.0} dist_to_corner={dist:0.00} cargo={(cargo != null ? cargo.Cargo : 0f):0.00} maxcd={cd:0.00}"));
         }
     }
 }

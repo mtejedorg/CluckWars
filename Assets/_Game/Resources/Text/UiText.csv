@@ -95,6 +95,7 @@ loadout.row.class,{cls} ONLY
 loadout.detail.empty,Tap a move for the details.
 loadout.kit.title,{perk} KIT
 mark.hex.kill,KILL
+hud.backin,BACK IN!
 mark.toast,MARKED!
 mark.clock,{secs}s
 mark.distance,{m} m

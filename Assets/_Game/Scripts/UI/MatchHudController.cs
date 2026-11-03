@@ -64,7 +64,8 @@ namespace CluckWars.UI
         private readonly int[]   _rowCorner = { -1, -1, -1, -1 };
         private int              _localCorner = -1;
         private VisualElement    _drawHighlight, _markToast, _markClock;
-        private Label            _markClockText;
+        private Label            _markClockText, _markToastText;
+        private bool             _toastShowsBackIn;
         private int              _shownClockSecs = -1;
         private bool             _boardWantsAll;
         private int              _boardWantsCorner = -1;
@@ -143,6 +144,7 @@ namespace CluckWars.UI
             _markToast = _root.Q<VisualElement>("MarkToast");
             _markClock = _root.Q<VisualElement>("MarkClock");
             _markClockText = _root.Q<Label>("MarkClockText");
+            _markToastText = _root.Q<Label>("MarkToastText");
             if (_drawHighlight == null || _markToast == null || _markClock == null || _markClockText == null || _lbRows[0].Skull == null)
                 _log?.Error(Source, "MatchTopBar.uxml is missing a Death Mark element (LbDrawHighlight, MarkToast, MarkClock, " +
                     "MarkClockText or LbSkull0-3): the mark's draw, standings skull, toast or clock pill will not show.");
@@ -249,12 +251,21 @@ namespace CluckWars.UI
 
             if (_markToast != null)
             {
-                bool toast = o.ToastAlpha > 0f;
+                // The MARKED! toast, or the local player's BACK IN! after an execute (same plate, ink, no skull).
+                float alpha = o.ToastAlpha, scale = o.ToastScale;
+                bool backIn = alpha <= 0f && BackInToast(LocalRespawnCue.SecondsSince, out alpha, out scale);
+                bool toast = alpha > 0f;
                 SetShown(_markToast, toast);
                 if (toast)
                 {
-                    _markToast.style.opacity = o.ToastAlpha;
-                    _markToast.style.scale = new Scale(new Vector3(o.ToastScale, o.ToastScale, 1f));
+                    if (backIn != _toastShowsBackIn && _markToastText != null)
+                    {
+                        _toastShowsBackIn = backIn;
+                        _markToastText.text = UiText.Get(backIn ? UiKeys.HudBackIn : UiKeys.MarkToast);
+                        _markToast.EnableInClassList("cw-mark-toast--backin", backIn);
+                    }
+                    _markToast.style.opacity = alpha;
+                    _markToast.style.scale = new Scale(new Vector3(scale, scale, 1f));
                 }
             }
 
@@ -308,6 +319,19 @@ namespace CluckWars.UI
             _drawHighlight.style.opacity = o.DrawAlpha;
             _drawHighlight.style.scale = new Scale(new Vector3(o.DrawScale, o.DrawScale, 1f));
             _drawHighlight.EnableInClassList("cw-lb-draw--locked", o.DrawLocked);
+        }
+
+        /// <summary>The BACK IN! toast's alpha / scale <paramref name="since"/> seconds after the respawn: the MARKED! timings.</summary>
+        public static bool BackInToast(float since, out float alpha, out float scale)
+        {
+            alpha = 0f;
+            scale = 1f;
+            float tin = FeedbackTuning.MarkToastInSeconds, hold = FeedbackTuning.MarkToastHoldSeconds, tout = FeedbackTuning.MarkToastOutSeconds;
+            if (!(since >= 0f) || since >= tin + hold + tout) return false;
+            if (since < tin) { alpha = since / tin; scale = Mathf.Lerp(FeedbackTuning.MarkToastScaleFrom, 1f, alpha); }
+            else if (since < tin + hold) alpha = 1f;
+            else alpha = 1f - (since - tin - hold) / tout;
+            return alpha > 0f;
         }
 
         private static void SetShown(VisualElement e, bool shown)

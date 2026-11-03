@@ -907,6 +907,14 @@ namespace CluckWars.Gameplay
         /// this landed is never paid to the assassin as well (CW-050).
         /// </para>
         /// </remarks>
+        /// <summary>An executed chicken stands up at its base with no cargo (the execute took the load). State authority only;
+        /// the bounty bag is its own food and stays.</summary>
+        public void ClearForRespawn()
+        {
+            if (!HasStateAuthority) return;
+            Cargo = 0f;
+        }
+
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_TransferAllToBountyBag(NetworkBehaviourId assassinId, RpcInfo info = default)
         {

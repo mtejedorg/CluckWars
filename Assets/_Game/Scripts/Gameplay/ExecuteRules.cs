@@ -18,8 +18,9 @@ namespace CluckWars.Gameplay
     /// </remarks>
     public static class ExecuteRules
     {
-        /// <summary>How long an execute removes its victim. The only duration Press sends.</summary>
-        public const float RemovalDurationSeconds = 2.0f;
+        /// <summary>The removal bound when the claim names no execute to read it from (fallback, equals MarkKill.asset's
+        /// <c>RemovalSeconds</c>). The live value is <c>AssassinExecute.RemovalSeconds</c>, data.</summary>
+        public const float RemovalDurationSeconds = AssassinExecute.DefaultRemovalSeconds;
 
         /// <summary>
         /// Extra planar slack on the execute range check, on top of the drift margin. Covers what
@@ -155,6 +156,8 @@ namespace CluckWars.Gameplay
         public struct RemovalClaim
         {
             public float Duration;
+            /// <summary>The longest removal the named attacker's execute sends (its <c>RemovalSeconds</c>); 0 = unknown.</summary>
+            public float MaxDuration;
             public bool AttackerResolved;
             public bool AttackerIsVictim;
             public bool AttackerIsDecoy;
@@ -186,8 +189,16 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>True for a finite duration in (0, <see cref="RemovalDurationSeconds"/>].</summary>
-        public static bool IsPlausibleRemovalDuration(float duration) =>
-            duration > 0f && duration <= RemovalDurationSeconds + 1e-4f;
+        public static bool IsPlausibleRemovalDuration(float duration) => IsPlausibleRemovalDuration(duration, RemovalDurationSeconds);
+
+        /// <summary>True for a finite duration in (0, <paramref name="maxSeconds"/>]: the data value the victim's authority
+        /// reads from the attacker's execute (every peer has the one asset). A non-positive bound falls back to the constant,
+        /// never to "anything goes", so a forged long duration is always refused.</summary>
+        public static bool IsPlausibleRemovalDuration(float duration, float maxSeconds)
+        {
+            float max = maxSeconds > 0f ? maxSeconds : RemovalDurationSeconds;
+            return duration > 0f && duration <= max + 1e-4f;
+        }
 
         /// <summary>Furthest apart a real execute's two chickens can be when the removal lands.</summary>
         public static float MaxExecuteDistance(float driftMargin, float killRange = AssassinExecute.DefaultKillRange) =>
@@ -206,7 +217,7 @@ namespace CluckWars.Gameplay
         /// </remarks>
         public static RemovalVerdict EvaluateRemoval(in RemovalClaim c)
         {
-            if (!IsPlausibleRemovalDuration(c.Duration)) return RemovalVerdict.ImplausibleDuration;
+            if (!IsPlausibleRemovalDuration(c.Duration, c.MaxDuration)) return RemovalVerdict.ImplausibleDuration;
             if (!c.AttackerResolved) return RemovalVerdict.AttackerUnresolved;
             if (c.AttackerIsVictim) return RemovalVerdict.SelfExecute;
             if (c.AttackerIsDecoy) return RemovalVerdict.DecoyAttacker;
@@ -226,7 +237,7 @@ namespace CluckWars.Gameplay
         {
             switch (v)
             {
-                case RemovalVerdict.ImplausibleDuration: return $"the duration is not in (0, {RemovalDurationSeconds:0.0}] s.";
+                case RemovalVerdict.ImplausibleDuration: return "the duration is not in (0, the execute's RemovalSeconds] s.";
                 case RemovalVerdict.AttackerUnresolved:  return "no live ChickenCombat resolves from the attacker id.";
                 case RemovalVerdict.SelfExecute:         return "the named attacker is the victim itself.";
                 case RemovalVerdict.DecoyAttacker:       return "the named attacker is a Doppelganger decoy.";

@@ -35,3 +35,4 @@ MonoBehaviour:
   FailCooldownSeconds: 5
   SuccessCooldownSeconds: 15
   RoundStartCooldownSeconds: 4
+  RemovalSeconds: 3

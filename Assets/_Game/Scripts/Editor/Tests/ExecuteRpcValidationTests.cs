@@ -232,7 +232,7 @@ namespace CluckWars.Tests
 
         [TestCase(0f)]
         [TestCase(-1f)]
-        [TestCase(2.5f)]
+        [TestCase(ExecuteRules.RemovalDurationSeconds + 0.5f)]   // just past the execute's own duration
         [TestCase(999f)]
         [TestCase(float.PositiveInfinity)]
         [TestCase(float.NaN)]
@@ -423,8 +423,8 @@ namespace CluckWars.Tests
             string beforeRemoval = press.Substring(expect, removal - expect);
             StringAssert.DoesNotContain("ResetMark()", beforeRemoval,
                 "the mark must still name the victim when the removal is sent (the local receiver checks it)");
-            StringAssert.Contains("RPC_ExecuteRemoval(_combat.Id, ExecuteRules.RemovalDurationSeconds)", press,
-                "a different duration is refused by IsPlausibleRemovalDuration");
+            StringAssert.Contains("RPC_ExecuteRemoval(_combat.Id, RemovalSeconds)", press,
+                "the data value; a longer duration is refused by IsPlausibleRemovalDuration at the same value");
             Assert.IsTrue(ExecuteRules.IsPlausibleRemovalDuration(ExecuteRules.RemovalDurationSeconds));
         }
 

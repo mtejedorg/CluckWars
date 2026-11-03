@@ -1131,6 +1131,16 @@ namespace CluckWars.Gameplay
             if (PeckChainActive) PeckChainActive = false;
         }
 
+        /// <summary>An executed chicken: every running slot ends through its own OnDeactivate and any aim / peck chain is
+        /// dropped. Cooldowns are NOT touched: they keep running while it is out. Authority only.</summary>
+        public void EndAllForRemoval()
+        {
+            if (!HasStateAuthority || !_initialized) return;
+            DeactivateAll();
+            CancelCharge();
+            if (PeckChainActive) PeckChainActive = false;
+        }
+
         /// <summary>
         /// Authority migration (Shared Mode): the effect stack and traversal holders are authority-local, so a
         /// peer that has just gained authority has an EMPTY stack while the networked ActiveMask may still say

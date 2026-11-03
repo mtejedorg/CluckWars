@@ -785,6 +785,9 @@ namespace CluckWars.Visuals
         public const float MarkMarkerKillPulse = 0.08f;
         public const float MarkMarkerKillPulseHz = 6f;
 
+        /// <summary>An executed chicken's body while it is out (0 = gone; it reappears at its base). Its nameplate keeps the skull.</summary>
+        public const float ExecutedOutAlpha = 0f;
+
         /// <summary>Any ending: every output fades to 0 over this long, then the presentation is clean.</summary>
         public const float MarkEndFadeSeconds = 0.3f;
         /// <summary>The standings skull fades in over this long.</summary>

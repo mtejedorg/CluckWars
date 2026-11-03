@@ -27,6 +27,8 @@ namespace CluckWars.Gameplay
         public const float DefaultKillRange = 8.0f;
         public const float FailCooldown = 5.0f;
         public const float SuccessCooldown = 15.0f;
+        /// <summary>Fallback for <see cref="RemovalSeconds"/> (no MarkKill asset registered); equals the asset.</summary>
+        public const float DefaultRemovalSeconds = 3.0f;
 
         [Networked] public NetworkBehaviourId MarkedTarget { get; private set; }
         [Networked] public TickTimer ArmTimer { get; private set; }
@@ -53,6 +55,9 @@ namespace CluckWars.Gameplay
         public float KillRange => _tuning != null ? _tuning.KillRange : DefaultKillRange;
         /// <summary>Tuned life of a mark (<c>MarkKill.asset</c>).</summary>
         public float WindowSeconds => _tuning != null ? _tuning.WindowSeconds : WindowDuration;
+        /// <summary>Tuned time an executed chicken is out before it respawns at its base (<c>MarkKill.asset</c>). The only
+        /// duration Press sends, and the bound the victim's authority judges the claim by.</summary>
+        public float RemovalSeconds => _tuning != null ? _tuning.RemovalSeconds : DefaultRemovalSeconds;
         /// <summary>Tuned arm time of a mark (<c>MarkKill.asset</c>): the Death Mark draw never outlasts it.</summary>
         public float ArmSeconds => _tuning != null ? _tuning.ArmSeconds : ArmDuration;
         private float FailSeconds => _tuning != null ? _tuning.FailCooldownSeconds : FailCooldown;
@@ -228,7 +233,7 @@ namespace CluckWars.Gameplay
                     // because CreditKillToAttacker resolves a ChickenCombat - passing this
                     // behaviour's own Id (CW-050) meant no execute ever scored a kill. Sent while
                     // MarkedTarget still names the victim: the receiver checks the mark (CW-230).
-                    target.Combat.RPC_ExecuteRemoval(_combat.Id, ExecuteRules.RemovalDurationSeconds);
+                    target.Combat.RPC_ExecuteRemoval(_combat.Id, RemovalSeconds);
 
                     // The execute bounty follows the kill report (PayExecuteBounty), so a removal the victim's
                     // authority refuses leaves nothing half-applied.
@@ -387,6 +392,14 @@ namespace CluckWars.Gameplay
         /// on range and <see cref="FizzleMark"/> re-armed a 5 s cooldown AFTER <c>EndAllForReset</c> had cleared every
         /// slot, so the Assassin opened the new round with ~3.8 s left on Death Mark.
         /// </summary>
+        /// <summary>This chicken was executed: a mark it holds ends with it (recorded as the last mark, no cooldown change:
+        /// cooldowns keep running while it is out). Authority only.</summary>
+        public void DropMarkForRemoval()
+        {
+            if (!HasStateAuthority || MarkedTarget == NetworkBehaviourId.None) return;
+            EndMark();
+        }
+
         public void ResetForNewRound()
         {
             if (!HasStateAuthority) return;
