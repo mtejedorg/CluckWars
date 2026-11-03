@@ -61,8 +61,32 @@ namespace CluckWars.Diagnostics
         private readonly List<uint> _auraGone = new List<uint>(4);
         private readonly List<(uint zone, uint victim)> _victimKeys = new List<(uint, uint)>(16);
 
+        private AbilityRegistrySO _abilityRegistry;
+        private float _knownRoundStartCooldown = -1f;
+
         [Inject]
-        public void Construct(ILogService log) => _log = log;
+        public void Construct(ILogService log, AbilityRegistrySO abilityRegistry)
+        {
+            _log = log;
+            _abilityRegistry = abilityRegistry;
+        }
+
+        /// <summary>The largest opening cooldown of any registered ability (Death Mark's), for slots a proxy cannot see.</summary>
+        private float KnownRoundStartCooldown
+        {
+            get
+            {
+                if (_knownRoundStartCooldown >= 0f) return _knownRoundStartCooldown;
+                float max = 0f;
+                if (_abilityRegistry == null)
+                    _log?.Error(Source, "No AbilityRegistrySO bound: a remote chicken's opening cooldown cannot be checked, so the " +
+                        "cooldowns-zero invariant reports it as leftover.");
+                else
+                    foreach (var ab in _abilityRegistry.ActiveAbilities)
+                        if (ab != null) max = Mathf.Max(max, ab.RoundStartCooldown);
+                return _knownRoundStartCooldown = max;
+            }
+        }
 
         private void Start()
         {
@@ -177,8 +201,12 @@ namespace CluckWars.Diagnostics
                     for (int s = 0; s < AbilityController.SlotCount; s++)
                     {
                         var ability = a.GetSlot(s);
-                        cd = Mathf.Max(cd, RoundInvariants.CooldownLeftover(a.CooldownRemaining(s),
-                            ability != null ? ability.RoundStartCooldown : 0f, intro));
+                        float remaining = a.CooldownRemaining(s);
+                        // A remote slot's ability is unknown here (loadouts are not replicated): it may legally hold the
+                        // opening cooldown (Death Mark) or nothing.
+                        cd = Mathf.Max(cd, ability != null
+                            ? RoundInvariants.CooldownLeftover(remaining, ability.RoundStartCooldown, intro)
+                            : RoundInvariants.CooldownLeftoverUnknownSlot(remaining, KnownRoundStartCooldown, intro));
                         if (a.IsSlotActive(s)) active++;
                     }
                 var p = c.transform.position;

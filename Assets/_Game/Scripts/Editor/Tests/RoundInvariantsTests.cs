@@ -79,6 +79,16 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void RoundStart_ARemoteSlotOfUnknownAbility_MayHoldNothingOrTheOpeningCooldown()
+        {
+            // A proxy sees the networked cooldown but not the loadout (shared2 run 2026-11-03: client2 saw the host's Death Mark).
+            Assert.AreEqual(0f, RoundInvariants.CooldownLeftoverUnknownSlot(6.5f, 4f, 2.5f), 1e-4f, "the opening cooldown: fine");
+            Assert.AreEqual(0f, RoundInvariants.CooldownLeftoverUnknownSlot(0f, 4f, 2.5f), 1e-4f, "nothing: fine");
+            Assert.AreEqual(1.5f, RoundInvariants.CooldownLeftoverUnknownSlot(1.5f, 4f, 2.5f), 1e-4f, "a stale cooldown: reported");
+            Assert.AreEqual(3f, RoundInvariants.CooldownLeftoverUnknownSlot(3f, 0f, 2.5f), 1e-4f, "no ability opens on a cooldown: all of it");
+        }
+
+        [Test]
         public void RoundEnd_WinnerMustLead_NoWinnerOnlyOnATie()
         {
             var fails = new List<InvariantFailure>();
