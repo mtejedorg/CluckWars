@@ -71,6 +71,14 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void RoundStart_DeathMarksOwnRoundStartCooldown_IsNotALeftover()
+        {
+            Assert.AreEqual(0f, RoundInvariants.CooldownLeftover(6.5f, 4f, 2.5f), 1e-4f, "intro 2.5 s + 4 s after GO: as asked");
+            Assert.AreEqual(4f, RoundInvariants.CooldownLeftover(4f, 0f, 2.5f), 1e-4f, "any other ability: all of it is left over");
+            Assert.AreEqual(2.5f, RoundInvariants.CooldownLeftover(4f, 4f, 2.5f), 1e-4f, "the rule not applied: reported");
+        }
+
+        [Test]
         public void RoundEnd_WinnerMustLead_NoWinnerOnlyOnATie()
         {
             var fails = new List<InvariantFailure>();

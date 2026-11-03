@@ -11,7 +11,8 @@ namespace CluckWars.Diagnostics
         public int Home;
         public Vector2 Position;
         public float Cargo;
-        /// <summary>Longest remaining cooldown over its ability slots (s).</summary>
+        /// <summary>Longest cooldown left over from the last round over its ability slots (s): see
+        /// <see cref="RoundInvariants.CooldownLeftover"/>.</summary>
         public float MaxCooldown;
         /// <summary>Any control state other than Free (slowed, rooted, stunned).</summary>
         public bool ControlActive;
@@ -42,6 +43,14 @@ namespace CluckWars.Diagnostics
         public const float SpawnToleranceMetres = 2.5f;
         public const float TimerToleranceSeconds = 0.75f;
         public const int ExpectedSoloBots = 3;
+
+        /// <summary>
+        /// The part of a slot's cooldown at round start that the round did not ask for: the whole remaining time, except for an
+        /// ability that opens each round on a cooldown (<c>AbilityBaseSO.RoundStartCooldown</c>, Death Mark), whose slot must hold
+        /// exactly that many seconds after GO (the intro still to run plus the cooldown); the distance from that is the leftover.
+        /// </summary>
+        public static float CooldownLeftover(float remaining, float roundStartCooldown, float introRemaining) =>
+            roundStartCooldown > 0f ? Mathf.Abs(remaining - (introRemaining + roundStartCooldown)) : remaining;
 
         private static string F(float v) => v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
 

@@ -172,10 +172,13 @@ namespace CluckWars.Diagnostics
                 float cd = 0f;
                 int active = 0;
                 var a = c.Abilities;
+                float intro = gm.IntroRemaining;
                 if (a != null)
                     for (int s = 0; s < AbilityController.SlotCount; s++)
                     {
-                        cd = Mathf.Max(cd, a.CooldownRemaining(s));
+                        var ability = a.GetSlot(s);
+                        cd = Mathf.Max(cd, RoundInvariants.CooldownLeftover(a.CooldownRemaining(s),
+                            ability != null ? ability.RoundStartCooldown : 0f, intro));
                         if (a.IsSlotActive(s)) active++;
                     }
                 var p = c.transform.position;
