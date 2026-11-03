@@ -31,7 +31,7 @@ MonoBehaviour:
   SignaturePreEquippedBy: 0
   KillRange: 8
   ArmSeconds: 0.6
-  WindowSeconds: 12
+  WindowSeconds: 7
   FailCooldownSeconds: 5
   SuccessCooldownSeconds: 15
   RoundStartCooldownSeconds: 4
