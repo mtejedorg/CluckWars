@@ -253,7 +253,7 @@ Per-ability mapping (**v0.6.1** — changed values marked ⚠ are live balance c
 | Wing Slam | Cone | 2.5 | 120° | directional, aimable |
 | Peck | Cone | ⚠ 2.4 | ⚠ 140° | ⚠ was SelfCircle r2.0; area 12.57 → 7.04 m² (−44%) |
 | Sneaky Steal | SingleTarget | 3.0 | — | requires cargo; ⚠ now marks only the one it robs |
-| Mark Kill | SingleTarget | 8.0 | — | ⚠ preview now applies isolation + rival rules |
+| Mark Kill | SingleTarget | 8.0 | — | ⚠ preview applies the rival rules (isolation removed by spec v2, 2026-10-31: the mark ignores crowds) |
 | Roll Push | ⚠ Capsule | ⚠ 1.05 | ⚠ 4.0 | ⚠ was ForwardCircle r1.8 @1.2; area 10.18 → 11.86 m² (+17%) |
 | Dive Bomb (`RollTrampleAbilitySO`) | Capsule | 2.05 | 3.25 | shipped values, see the reach note below |
 | Feather Trap | ForwardCircle | 3.6 | 4.5 | placed zone, persists 5 s; shipped values |

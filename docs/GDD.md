@@ -571,10 +571,12 @@ it at all, cannot hand-pick it, and cannot execute.
 
 | Stage | Condition | Counterplay |
 |---|---|---|
-| **Mark** | Press → a random living rival anywhere on the map. The target sees it is marked. | Run; go home, where nothing reaches you |
-| **Hunt** | The Assassin has **12 s** to find it | Keep moving; hold the base |
-| **Stun** | The target is stunned (his own Ambush, or *any* stun) | Don't get stunned; hold a defence |
-| **Kill** | Press again while it is stunned, within **8 m**, with no base wall between, and the Assassin is not stunned | **A third party can stun the Assassin to deny the kill** |
+| **Mark** | Press → a random living rival anywhere on the map. The target sees it is marked. | Reach your base in time, where nothing reaches you |
+| **Hunt** | The Assassin has **12 s** to find it | Escape: stay out of his reach until the timer runs out |
+| **Stun** | The target is stunned (his own Ambush, or *any* stun) | Don't get stunned |
+| **Kill** | Press again while it is stunned, within **8 m**, with no base wall between, and the Assassin is not stunned (a stunned Assassin cannot cast anything) | — |
+
+No isolation: the mark ignores crowds. The only defences are not being stunned, escaping, and reaching your base in time.
 
 On success the victim's **entire cargo transfers to the Assassin as a capacity-exempt
 "bounty bag"** (he becomes a courier of a stolen win) and the victim is removed ~2 s, then
@@ -713,7 +715,7 @@ shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 | | Invisibility 👻 | 8 s | Fades you to a ghostly outline for 4 s. Using a move breaks it. (Assassin-only now — was also Speedy.) |
 | | Death Mark 🎯 *(Assassin specialization Peck-slot pre-equip; pre-equip-only)* | 5 s | The execute — see §6.4. Marks a random rival anywhere; stun them within 8 m, then press again to take everything they carry. |
 | | Shadowstep 👤 | 6 s | Dashes forward at 3x speed for 0.4 s, straight over walls (Assassin-only — was briefly also Speedy by asset drift, corrected; Speedy is permanently denied all terrain traversal, §5.2). |
-| | Smoke Roost 🌁 | 11 s | Cloud at his own feet (4 m, 5.5 s) — he fades, rivals inside slow to 55% speed. Using a move breaks the fade (the cloud stays). Pairs with Death Mark's isolate-and-execute. |
+| | Smoke Roost 🌁 | 11 s | Cloud at his own feet (4 m, 5.5 s) — he fades, rivals inside slow to 55% speed. Using a move breaks the fade (the cloud stays). Pairs with hunting a mark: the target slows inside the cloud, and the Assassin fades. |
 | | Snatch 🤏 *(moved from Common)* | 3 s | Robs 5 food from every rival within 4.3 m ahead and shoves them back. Assassin-only now — a universal AoE steal is exactly the Assassin's core, and diluted the class. |
 | | Sneaky Steal 🤏 *(Thief signature)* | 5 s | Yanks 6 food from the nearest carrier within 5.4 m. The same bird only every 10 s. |
 
