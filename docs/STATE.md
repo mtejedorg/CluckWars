@@ -6,6 +6,13 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🌐 2026-11-03 - project site (`docs/site/`) phone layout
+
+- Site-only change, no game code. On screens up to 720 px the Home / Mechanics / Tech / GitHub nav becomes a bottom tab bar; the mechanics contents list (moved just outside `.hero` so it can stick) and a contents row built from the Tech page's headings stay pinned at the top and mark the section in view; wide tables fade on the side that still has content; nothing under 12 px; 44 px touch targets.
+- New `docs/site/phone.js` (no dependencies, shared with the Saint Manick and cvkit sites). Desktop and tablet renders (1280 and 800 px) are pixel-identical to before. No numbers changed, so the compendium Artifact does not need republishing for this.
+
+---
+
 ## ✅ 2026-10-24 - everything on `develop`, tested; progression rebased (review pending)
 
 - **`develop`** carries the 2026-10-21..23 backlog (WP0-WP9, effect types, portrait/landscape, floor-ring arrows as the default, Doppelganger/Root Egg/Execute hardening, CW-233 corners). Pushed `654cd39`; gate: EditMode 2473/2473, production + dev-tools builds, matrix solo / shared2 / shared4 x2 / hostleave x2 / AutoZone / AutoAura x2 all PASS (0 rejected RPCs), orientation capture 5/5 sizes. The older "working tree ... NOT yet run in Unity" headings below were all superseded by that gate; they are history, not open items.
