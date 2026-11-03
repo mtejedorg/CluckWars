@@ -246,6 +246,17 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void TheDistanceLabel_FlipsAboveWheneverBelowWouldLeaveThePanel()
+        {
+            // The matrix's U3 at 1920x1080: a marker pinned at the bottom-right with the target to the right.
+            Assert.IsTrue(MarkerPlacement.DistanceGoesAbove(1039f, 1080f, Vector2.right));
+            Assert.IsFalse(MarkerPlacement.DistanceGoesAbove(500f, 1080f, Vector2.right), "room below: the inward side");
+            Assert.IsTrue(MarkerPlacement.DistanceGoesAbove(500f, 1080f, Vector2.down), "target below: above the disc");
+            StringAssert.Contains("MarkerPlacement.DistanceGoesAbove(_markerPanel.y, panel.y, bearing)",
+                Read("Assets/_Game/Scripts/UI/MarkHudController.cs"));
+        }
+
+        [Test]
         public void OnScreenTargets_NeverGetTheEdgePin_SourceGuard()
         {
             string src = Read("Assets/_Game/Scripts/UI/MarkerPlacement.cs");

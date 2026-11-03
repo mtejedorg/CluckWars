@@ -192,7 +192,7 @@ namespace CluckWars.UI
             SetShown(_distance, offScreen);
             if (offScreen)
             {
-                _distance.EnableInClassList("cw-mark-distance--above", bearing.y < 0f);
+                _distance.EnableInClassList("cw-mark-distance--above", MarkerPlacement.DistanceGoesAbove(_markerPanel.y, panel.y, bearing));
                 if (o.MarkerMetres != _shownMetres)
                 {
                     _shownMetres = o.MarkerMetres;

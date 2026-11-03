@@ -226,6 +226,14 @@ namespace CluckWars.UI
             return at + direction * FeedbackTuning.MarkMarkerYouPlateMaxRisePx;
         }
 
+        /// <summary>The distance label's lowest extent below the marker centre (MarkHud.uss: 96 px box, label top 100, height 42).</summary>
+        public const float DistanceBelowExtentPx = 94f;
+
+        /// <summary>The distance label goes above the disc when the target is below it (the inward side), and whenever the
+        /// label under the disc would leave the panel. Pure.</summary>
+        public static bool DistanceGoesAbove(float centreY, float panelHeight, Vector2 bearing) =>
+            bearing.y < 0f || centreY + DistanceBelowExtentPx > panelHeight;
+
         /// <summary>A viewport rect as a panel rect (y down).</summary>
         public static Rect ToPanel(Rect vp, Vector2 panel) =>
             Rect.MinMaxRect(vp.xMin * panel.x, (1f - vp.yMax) * panel.y, vp.xMax * panel.x, (1f - vp.yMin) * panel.y);
