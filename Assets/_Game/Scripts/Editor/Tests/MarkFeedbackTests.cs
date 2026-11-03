@@ -166,13 +166,91 @@ namespace CluckWars.Tests
             Assert.IsFalse(MarkerPlacement.Box(moved).Overlaps(Inflate(plate)));
         }
 
+        // ---- Placement round an on-screen target (pure) ----------------------------------------------------------------
+
+        private static MarkerPlacement.MarkerScene Scene(Rect body, Rect? plate = null, Rect? you = null, float clearTop = 290f,
+                                                         params Rect[] avoid)
+        {
+            return new MarkerPlacement.MarkerScene
+            {
+                Panel = new Vector2(1920f, 1080f), Body = body,
+                HasPlate = plate.HasValue, TargetPlate = plate ?? default,
+                HasYou = you.HasValue, You = you ?? default,
+                Others = new System.Collections.Generic.List<Rect>(), ClearTop = clearTop,
+                Avoid = new System.Collections.Generic.List<Rect>(avoid),
+            };
+        }
+
+        private static void AssertClear(MarkerPlacement.MarkerScene s, Vector2 c, MarkerPlacement.MarkerSlot slot)
+        {
+            var box = MarkerPlacement.BoxFor(c, slot);
+            Assert.IsFalse(box.Overlaps(s.Body), "never on the target's body");
+            if (s.HasPlate) Assert.IsFalse(box.Overlaps(s.TargetPlate), "never on the target's plate");
+            if (s.HasYou) Assert.IsFalse(box.Overlaps(Inflate(s.You)), "never on the You plate");
+            Assert.GreaterOrEqual(box.yMin, s.ClearTop, "never under the top band");
+        }
+
         [Test]
-        public void ATargetJustUnderTheBand_CountsAsHidden_EdgePinWithPointerAndDistance_SourceGuard()
+        public void OnScreen_AboveIsClear_ItSitsAbovePointingDown()
+        {
+            var s = Scene(new Rect(900f, 600f, 80f, 100f), plate: new Rect(860f, 540f, 160f, 40f));
+            var above = new Vector2(940f, 540f - 70f);
+            Assert.IsTrue(MarkerPlacement.TryPlaceAround(s, above, out var c, out var slot));
+            Assert.AreEqual(MarkerPlacement.MarkerSlot.Above, slot);
+            Assert.AreEqual(Vector2.down, MarkerPlacement.PointerFor(slot));
+            AssertClear(s, c, slot);
+        }
+
+        [Test]
+        public void AboveBlockedByTheTopBand_ItGoesBelowTheFeet_PointingUp()
+        {
+            // The 1920x1080 kill / walled captures: a target just under the band, its plate in the way above.
+            var s = Scene(new Rect(900f, 330f, 80f, 100f), plate: new Rect(820f, 290f, 240f, 40f));
+            var above = new Vector2(940f, 290f - 70f);                     // would be under the band
+            Assert.IsTrue(MarkerPlacement.TryPlaceAround(s, above, out var c, out var slot));
+            Assert.AreEqual(MarkerPlacement.MarkerSlot.Below, slot);
+            Assert.AreEqual(Vector2.up, MarkerPlacement.PointerFor(slot));
+            Assert.Greater(c.y, s.Body.yMax, "under the target");
+            AssertClear(s, c, slot);
+        }
+
+        [Test]
+        public void AboveBlockedByTheYouPlate_ItGoesBelow()
+        {
+            var s = Scene(new Rect(900f, 600f, 80f, 100f), plate: new Rect(860f, 540f, 160f, 40f), you: new Rect(880f, 450f, 120f, 40f));
+            Assert.IsTrue(MarkerPlacement.TryPlaceAround(s, new Vector2(940f, 470f), out var c, out var slot));
+            Assert.AreEqual(MarkerPlacement.MarkerSlot.Below, slot);
+            AssertClear(s, c, slot);
+        }
+
+        [Test]
+        public void AboveAndBelowBlocked_ItGoesToTheFreeSide()
+        {
+            // Under the band above, a hex cluster right under the feet.
+            var hexes = new Rect(700f, 450f, 500f, 400f);
+            var s = Scene(new Rect(900f, 330f, 80f, 100f), plate: new Rect(820f, 290f, 240f, 40f), clearTop: 290f, avoid: hexes);
+            Assert.IsTrue(MarkerPlacement.TryPlaceAround(s, new Vector2(940f, 220f), out var c, out var slot));
+            Assert.IsTrue(slot == MarkerPlacement.MarkerSlot.Left || slot == MarkerPlacement.MarkerSlot.Right);
+            AssertClear(s, c, slot);
+            Assert.IsFalse(MarkerPlacement.BoxFor(c, slot).Overlaps(hexes));
+            var p = MarkerPlacement.PointerFor(slot);
+            Assert.AreEqual(slot == MarkerPlacement.MarkerSlot.Left ? 1f : -1f, p.x, "pointing at the target");
+        }
+
+        [Test]
+        public void EverySlotBlocked_ReportsIt_ForTheEdgePin()
+        {
+            var wall = new Rect(0f, 0f, 1920f, 1080f);
+            var s = Scene(new Rect(900f, 500f, 80f, 100f), avoid: wall);
+            Assert.IsFalse(MarkerPlacement.TryPlaceAround(s, new Vector2(940f, 400f), out _, out _));
+        }
+
+        [Test]
+        public void OnScreenTargets_NeverGetTheEdgePin_SourceGuard()
         {
             string src = Read("Assets/_Game/Scripts/UI/MarkerPlacement.cs");
-            StringAssert.DoesNotContain("centre.y = Mathf.Max(centre.y", src, "no longer pushed down onto the target's plate");
-            StringAssert.Contains("if (ScreenEdgeProjection.IsInClearViewport(topVp, info) && centre.y + FeedbackTuning.MarkMarkerBoxHeightPx < panel.y)", src);
-            StringAssert.Contains("centre.x = Mathf.Clamp(centre.x, half, panel.x - half);", src, "on-screen branch clamped to the panel");
+            StringAssert.Contains("bool onScreen = vp3.z > 0f && feet.x >= 0f && feet.x <= 1f && feet.y >= 0f && feet.y <= 1f;", src);
+            StringAssert.Contains("if (TryPlaceAround(scene, aboveCentre, out at, out var slot))", src);
             StringAssert.Contains("target.Nameplate", src, "cached accessors, no per-frame GetComponent");
             StringAssert.DoesNotContain("GetComponent<", src);
         }

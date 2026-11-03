@@ -1075,6 +1075,8 @@ namespace CluckWars.Gameplay
         /// <summary>This chicken's rival indicator and nameplate (cached at spawn, presentation readers only; may be null).</summary>
         public CluckWars.Visuals.RivalIndicator Indicator => _indicator;
         public CluckWars.Visuals.ChickenNameplate Nameplate => _nameplate;
+        /// <summary>The CharacterController (the body's footprint, for presentation placement; may be null).</summary>
+        public CharacterController Body => _characterController;
 
         /// <summary>
         /// Applies a speed penalty from a tagged source. Slippery does NOT reduce slow

@@ -184,7 +184,8 @@ namespace CluckWars.UI
             SetShown(_shell, o.MarkerMode == MarkMarkerMode.Shelled);
 
             // Pointer: down over the target, toward it at the edge. UITK rotates clockwise; the art points down (+y).
-            float angle = offScreen ? Mathf.Atan2(-bearing.x, -bearing.y) * Mathf.Rad2Deg : 0f;
+            // The bearing is the pointer's in every placement (down above, up below, sideways beside, at the target off screen).
+            float angle = Mathf.Atan2(-bearing.x, -bearing.y) * Mathf.Rad2Deg;
             _pointer.style.rotate = new Rotate(new Angle(angle, AngleUnit.Degree));
 
             // Distance: off screen only, on the inward vertical side of the disc.
