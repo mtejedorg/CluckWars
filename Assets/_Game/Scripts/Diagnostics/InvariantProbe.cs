@@ -200,10 +200,11 @@ namespace CluckWars.Diagnostics
                 if (a != null)
                     for (int s = 0; s < AbilityController.SlotCount; s++)
                     {
-                        var ability = a.GetSlot(s);
+                        // Only the state authority knows the slot's ability: loadouts are not replicated, and a proxy's
+                        // slots still hold the prefab defaults (shared2 2026-11-03: a proxy read Peck where the host held
+                        // Death Mark). A remote slot may legally hold the opening cooldown or nothing.
+                        var ability = a.HasStateAuthority ? a.GetSlot(s) : null;
                         float remaining = a.CooldownRemaining(s);
-                        // A remote slot's ability is unknown here (loadouts are not replicated): it may legally hold the
-                        // opening cooldown (Death Mark) or nothing.
                         cd = Mathf.Max(cd, ability != null
                             ? RoundInvariants.CooldownLeftover(remaining, ability.RoundStartCooldown, intro)
                             : RoundInvariants.CooldownLeftoverUnknownSlot(remaining, KnownRoundStartCooldown, intro));
