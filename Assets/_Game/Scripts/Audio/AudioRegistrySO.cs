@@ -40,6 +40,16 @@ namespace CluckWars.Audio
         public AudioClip MatchEnd;
         public AudioClip MatchVictory;
 
+        [Header("Death Mark")]
+        [Tooltip("Assassin: short tick per step of the ~0.6 s standings-row highlight; caller raises pitch per step (local 2D).")]
+        public AudioClip MarkDrawTick;
+        [Tooltip("Assassin: lock-on sting when the highlight lands on the target (local 2D).")]
+        public AudioClip MarkLock;
+        [Tooltip("Victim: ominous 'MARKED!' sting when they become the target (local 2D).")]
+        public AudioClip MarkVictim;
+        [Tooltip("Assassin: short sharp sting when the Kill becomes possible; may re-fire as the state toggles (local 2D).")]
+        public AudioClip MarkKillReady;
+
         [Header("Music")]
         public AudioClip MenuMusic;
         public AudioClip MatchMusic;

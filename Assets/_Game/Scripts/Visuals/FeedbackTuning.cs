@@ -784,6 +784,38 @@ namespace CluckWars.Visuals
         /// <summary>The marked rival's edge arrow, as a multiple of a rival's.</summary>
         public const float MarkChevronScale = 1.6f;
 
+        // ---- Death Mark screen mood (MarkScreenEffect / MarkScreenFeature / CWMarkMood.shader) ------------------------
+        // The victim's whole-screen mood, drawn by one full-screen pass on the base game camera before post-processing,
+        // so the HUD (UI overlay camera, Screen Space Overlay canvases, UI Toolkit panels) stays on top and undimmed.
+        // Every alpha below is the value at weight 1; the caller's faded weights (dim01 / cold01 / red01) scale them.
+        // Colours are colour-buffer values: the project is in Gamma space, so they are plain sRGB.
+
+        /// <summary>DIM: darkness alpha at the screen centre (kept low: nothing opaque covers the centre).</summary>
+        public const float MarkMoodDimCentre = 0.10f;
+        /// <summary>DIM: darkness alpha at the screen corners.</summary>
+        public const float MarkMoodDimEdge = 0.58f;
+        /// <summary>Vignette ramp, as a fraction of the centre-to-corner distance: flat centre alpha inside Inner,
+        /// smoothstep to the edge alpha at Outer.</summary>
+        public const float MarkMoodVignetteInner = 0.22f;
+        public const float MarkMoodVignetteOuter = 1.0f;
+        /// <summary>DIM: the darkness colour with the Assassin far away (near-black, a hint of violet).</summary>
+        public static readonly Color MarkMoodDimColour = new Color(0.03f, 0.015f, 0.05f, 1f);
+        /// <summary>COLD: the darkness turns this deep violet as cold01 rises. Kept dark (luma ~0.1) so the edge stays
+        /// darkness, not a violet fog: a lighter violet (0.22, 0.09, 0.46) read brighter than plain DIM in the 960x540 proof.</summary>
+        public static readonly Color MarkMoodColdColour = new Color(0.13f, 0.05f, 0.28f, 1f);
+        /// <summary>COLD: extra darkness alpha added at the edge at cold01 = 1 (the walls close in a little).</summary>
+        public const float MarkMoodColdEdgeBoost = 0.08f;
+        /// <summary>COLD: share of the scene's colour removed at cold01 = 1 (0 = untouched, 1 = greyscale).</summary>
+        public const float MarkMoodColdDesaturation = 0.6f;
+        /// <summary>RED: the tint colour, and its alpha at the edge at red01 = 1 (~7%: felt more than seen).</summary>
+        public static readonly Color MarkMoodRedColour = new Color(0.9f, 0.04f, 0.04f, 1f);
+        public const float MarkMoodRedAmount = 0.07f;
+        /// <summary>RED: centre alpha as a share of the edge alpha (it lives inside the darkness, fainter in the middle).</summary>
+        public const float MarkMoodRedCentreShare = 0.4f;
+        /// <summary>Below this a weight counts as zero: all three under it and no pass is enqueued (zero GPU cost);
+        /// cold under it and the cheap blend-only pass is used instead of the colour-reading one.</summary>
+        public const float MarkMoodOffEpsilon = 1f / 255f;
+
         /// <summary>
         /// Chevron size as a fraction of the viewport's height. A fraction rather than a
         /// world-space length on purpose: it makes the chevron a constant share of the

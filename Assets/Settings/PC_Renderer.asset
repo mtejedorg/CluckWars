@@ -14,6 +14,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.CWHazeFeature
   m_Active: 1
   _shader: {fileID: 4800000, guid: 0a45ae349a012fe4686e2895544067aa, type: 3}
+--- !u!114 &1012419670998625336
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8bfb656e9c1248a0b9395979de467a99, type: 3}
+  m_Name: CWMarkMood
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.MarkScreenFeature
+  m_Active: 1
+  _shader: {fileID: 4800000, guid: 578c0540e86542109e957e9ef300c0c3, type: 3}
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -50,7 +64,8 @@ MonoBehaviour:
   m_RendererFeatures:
   - {fileID: 7833122117494664109}
   - {fileID: -191308462340866106}
-  m_RendererFeatureMap: ad6b866f10d7b46cc67fa593f75558fd
+  - {fileID: 1012419670998625336}
+  m_RendererFeatureMap: ad6b866f10d7b46cc67fa593f75558fd38ac7da553d60c0e
   m_UseNativeRenderPass: 1
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   m_AssetVersion: 2
