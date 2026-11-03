@@ -212,6 +212,13 @@ namespace CluckWars.Abilities
         /// </summary>
         public virtual bool AcceptsPressWhileActive => false;
 
+        /// <summary>
+        /// Bots fire one ability at a time (<c>AbilityController.BotTryActivate</c>). True exempts this one: it is the
+        /// follow-through of a move the bot is still running (Death Mark's Kill lands during the stun of the bot's own Ambush,
+        /// whose run time IS the stun). Players are never gated.
+        /// </summary>
+        public virtual bool BotIgnoresOneAtATime => false;
+
         /// <summary>A press while active (<see cref="AcceptsPressWhileActive"/>), on the caster's state authority. Returns the
         /// seconds the ability now runs from this tick, or 0 or less to end it now.</summary>
         public virtual float OnPressWhileActive(AbilityContext ctx) => 0f;

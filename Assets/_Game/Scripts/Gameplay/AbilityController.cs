@@ -677,17 +677,24 @@ namespace CluckWars.Gameplay
         /// Returns <c>true</c> if the ability fired this call.
         /// Must be called from the StateAuthority (bot FSM already guards this).
         /// </summary>
+        /// <summary>The bots' one-at-a-time gate, pure: nothing running, or a press the running ability takes, or an ability
+        /// exempt from the rule (<see cref="AbilityBaseSO.BotIgnoresOneAtATime"/>).</summary>
+        public static bool BotMayPress(bool anyActive, bool repress, bool ignoresOneAtATime) =>
+            !anyActive || repress || ignoresOneAtATime;
+
         public bool BotTryActivate(int slot)
         {
             if (!HasStateAuthority) return false;
             var gm = GameManager.Instance;
             if (gm == null || !gm.IsMatchRunning) return false;
             if (_combat != null && _combat.IsRemoved) return false;
-            // Bots keep the one-at-a-time rule: no bot behaviour change, SCT untouched. Players are not gated. The one exception is
-            // a second press on the ability that is running and takes it (Turtle Mode's lock).
+            // Bots keep the one-at-a-time rule: no bot behaviour change, SCT untouched. Players are not gated. The exceptions are
+            // a second press on the ability that is running and takes it (Turtle Mode's lock), and an ability that is the
+            // follow-through of a running one (Death Mark's Kill during the bot's own Ambush stun).
             var running = IsSlotActive(slot) ? GetSlot(slot) : null;
             bool repress = running != null && running.AcceptsPressWhileActive;
-            if (!repress && AnyAbilityActive) return false;
+            var pressed = GetSlot(slot);
+            if (!BotMayPress(AnyAbilityActive, repress, pressed != null && pressed.BotIgnoresOneAtATime)) return false;
             if (!repress && !IsReady(slot)) return false;
             bool wasActive = IsSlotActive(slot);
             bool fired = TryActivate(slot);
