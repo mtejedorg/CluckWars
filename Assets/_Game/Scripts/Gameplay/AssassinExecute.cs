@@ -80,6 +80,7 @@ namespace CluckWars.Gameplay
         private readonly System.Collections.Generic.List<NetworkBehaviourId> _candidates =
             new System.Collections.Generic.List<NetworkBehaviourId>(4);
         private readonly System.Collections.Generic.List<float> _weights = new System.Collections.Generic.List<float>(4);
+        private readonly System.Collections.Generic.List<float> _nears = new System.Collections.Generic.List<float>(4);
         private readonly System.Collections.Generic.List<float> _rolls = new System.Collections.Generic.List<float>(4);
 
         /// <summary>
@@ -366,36 +367,42 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// The weighted random pick over the gathered candidates (<see cref="MarkPickRules.PickWeighted"/>): one roll each from
-        /// this authority's RNG, weighted by the planar distance to the candidate's own base over <see cref="PlayerBase.BaseSpan"/>.
-        /// Logs every candidate's weight and score at Debug. -1 when there is nobody.
+        /// this authority's RNG, weighted by the planar distance to the candidate's own base (<c>w</c>) and to this Assassin
+        /// (<c>n</c>), both against <see cref="PlayerBase.BaseSpan"/>. Logs every candidate's w, n and score at Debug. -1 when
+        /// there is nobody.
         /// </summary>
         private int PickWeighted()
         {
             _weights.Clear();
+            _nears.Clear();
             _rolls.Clear();
             float span = PlayerBase.BaseSpan();
             if (span <= 0f && _candidates.Count > 0)
                 _log?.Warn(Source, $"{name}: no base data to weigh the mark by, so the pick is uniform (bases live: {PlayerBase.ActiveBases.Count}).");
+            Vector3 me = transform.position;
             for (int i = 0; i < _candidates.Count; i++)
             {
-                float w = 1f;
-                if (span > 0f && Runner.TryFindBehaviour(_candidates[i], out ChickenController c) &&
-                    PlayerBase.TryGetBaseCentre(c.HomeCornerIndex, out Vector2 home))
+                float w = 1f, a = 1f;
+                if (span > 0f && Runner.TryFindBehaviour(_candidates[i], out ChickenController c))
                 {
                     Vector3 at = c.transform.position;
-                    w = MarkPickRules.HomeFraction(Vector2.Distance(new Vector2(at.x, at.z), home), span);
+                    a = MarkPickRules.AssassinFraction(PlanarDistance(me, at), span);
+                    if (PlayerBase.TryGetBaseCentre(c.HomeCornerIndex, out Vector2 home))
+                        w = MarkPickRules.HomeFraction(Vector2.Distance(new Vector2(at.x, at.z), home), span);
                 }
                 _weights.Add(w);
+                _nears.Add(a);
                 _rolls.Add(Random.value);
             }
-            int pick = MarkPickRules.PickWeighted(_weights, _rolls, Random.value);
+            int pick = MarkPickRules.PickWeighted(_weights, _nears, _rolls, Random.value);
             if (_log != null && _log.IsEnabled(LogLevel.Debug))
             {
                 var sb = new System.Text.StringBuilder("Mark pick:");
                 for (int i = 0; i < _candidates.Count; i++)
                 {
                     string who = Runner.TryFindBehaviour(_candidates[i], out ChickenController c) ? c.name : _candidates[i].ToString();
-                    sb.Append($" {who} w={_weights[i]:0.00} score={MarkPickRules.Score(_rolls[i], _weights[i]):0.000};");
+                    sb.Append($" {who} w={_weights[i]:0.00} n={_nears[i]:0.00} " +
+                              $"score={MarkPickRules.Score(_rolls[i], _weights[i], _nears[i]):0.000};");
                 }
                 _log.Debug(Source, sb.Append(pick >= 0 ? $" -> #{pick}" : " -> nobody").ToString());
             }

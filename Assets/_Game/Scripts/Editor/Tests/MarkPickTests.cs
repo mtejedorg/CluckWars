@@ -45,9 +45,15 @@ namespace CluckWars.Tests
         public void Pick_SpansTheCandidates(int count, float roll, int expected) =>
             Assert.AreEqual(expected, MarkPickRules.Pick(count, roll));
 
-        // ---- Weighted pick: roll * w * w, highest wins -------------------------------------------------------------
+        // ---- Weighted pick: roll * w * w * a, highest wins ---------------------------------------------------------
 
-        private static int Weighted(float[] w, float[] rolls, float fallback = 0.5f) => MarkPickRules.PickWeighted(w, rolls, fallback);
+        /// <summary>The pick with every candidate far from the Assassin (a = 1): the home weighting alone.</summary>
+        private static int Weighted(float[] w, float[] rolls, float fallback = 0.5f)
+        {
+            var far = new float[w.Length];
+            for (int i = 0; i < far.Length; i++) far[i] = 1f;
+            return MarkPickRules.PickWeighted(w, far, rolls, fallback);
+        }
 
         [Test]
         public void FarFromHome_BeatsNearHome_MostOfTheTime()
@@ -141,7 +147,85 @@ namespace CluckWars.Tests
             Assert.AreEqual(1f, MarkPickRules.HomeFraction(90f, 70f), "beyond the span is as far as it gets");
             Assert.AreEqual(0f, MarkPickRules.HomeFraction(-1f, 70f));
             Assert.AreEqual(1f, MarkPickRules.HomeFraction(10f, 0f), "no base data: every candidate weighs the same");
-            Assert.AreEqual(0.25f * 0.8f, MarkPickRules.Score(0.8f, 0.5f), 1e-6f);
+            Assert.AreEqual(0.25f * 0.8f, MarkPickRules.Score(0.8f, 0.5f, 1f), 1e-6f);
+        }
+
+        // ---- The Assassin factor: a = NearFloor + (1 - NearFloor) * n, n = d / (span / 3) clamped ---------------------
+
+        private const float Span = 61.7f;   // the shipped opposite base-to-base distance (PlayerBase.BaseSpan)
+
+        [Test]
+        public void AssassinFraction_RisesFromTheFloor_AndSaturatesAtAThirdOfTheSpan()
+        {
+            Assert.AreEqual(MarkPickRules.NearFloor, MarkPickRules.AssassinFraction(0f, Span), 1e-6f, "on top of him");
+            Assert.AreEqual(0.25f, MarkPickRules.NearFloor);
+            Assert.AreEqual(1f / 3f, MarkPickRules.NearSpanFraction, 1e-6f);
+            float third = Span * MarkPickRules.NearSpanFraction;
+            Assert.AreEqual(0.25f + 0.75f * 0.5f, MarkPickRules.AssassinFraction(third * 0.5f, Span), 1e-5f, "linear in between");
+            Assert.AreEqual(1f, MarkPickRules.AssassinFraction(third, Span), 1e-6f, "saturates at span / 3");
+            Assert.AreEqual(1f, MarkPickRules.AssassinFraction(Span, Span), "and stays there");
+            Assert.AreEqual(MarkPickRules.NearFloor, MarkPickRules.AssassinFraction(-3f, Span), 1e-6f, "a negative distance clamps");
+        }
+
+        [Test]
+        public void AssassinFraction_WithoutBaseData_IsOne_SoThePickStaysUniform()
+        {
+            Assert.AreEqual(1f, MarkPickRules.AssassinFraction(0f, 0f));
+            Assert.AreEqual(1f, MarkPickRules.AssassinFraction(5f, -1f));
+            // No base data: w = 1 and a = 1 for everyone, so the scores are the rolls and the pick is uniform.
+            var rng = new System.Random(5);
+            var hits = new int[3];
+            for (int i = 0; i < 9000; i++)
+            {
+                var a = new[] { MarkPickRules.AssassinFraction(0f, 0f), MarkPickRules.AssassinFraction(10f, 0f), MarkPickRules.AssassinFraction(50f, 0f) };
+                var w = new[] { MarkPickRules.HomeFraction(0f, 0f), MarkPickRules.HomeFraction(5f, 0f), MarkPickRules.HomeFraction(50f, 0f) };
+                hits[MarkPickRules.PickWeighted(w, a, new[] { (float)rng.NextDouble(), (float)rng.NextDouble(), (float)rng.NextDouble() }, 0.5f)]++;
+            }
+            foreach (int h in hits) Assert.That(h, Is.InRange(2700, 3300), $"hits {hits[0]}/{hits[1]}/{hits[2]}");
+        }
+
+        [Test]
+        public void ARivalOnTopOfTheAssassin_AwayFromHome_StillScoresAboveZero()
+        {
+            float a = MarkPickRules.AssassinFraction(0f, Span);
+            Assert.Greater(MarkPickRules.Score(0.5f, 0.6f, a), 0f, "point-blank is disfavoured, never excluded");
+            Assert.AreEqual(0, MarkPickRules.PickWeighted(new[] { 0.6f }, new[] { a }, new[] { 0.5f }, 0.9f),
+                "the only candidate, next to the Assassin, is still marked");
+        }
+
+        [Test]
+        public void AtEqualRollAndHomeWeight_TheFartherRivalWins_UntilTheFactorSaturates()
+        {
+            float near = MarkPickRules.AssassinFraction(4f, Span), far = MarkPickRules.AssassinFraction(18f, Span);
+            Assert.AreEqual(1, MarkPickRules.PickWeighted(new[] { 0.7f, 0.7f }, new[] { near, far }, new[] { 0.5f, 0.5f }, 0f));
+            Assert.AreEqual(0, MarkPickRules.PickWeighted(new[] { 0.7f, 0.7f }, new[] { far, near }, new[] { 0.5f, 0.5f }, 0f));
+            // Beyond span / 3 both weigh 1: a tie, and the first wins it.
+            float sat1 = MarkPickRules.AssassinFraction(25f, Span), sat2 = MarkPickRules.AssassinFraction(55f, Span);
+            Assert.AreEqual(0, MarkPickRules.PickWeighted(new[] { 0.7f, 0.7f }, new[] { sat1, sat2 }, new[] { 0.5f, 0.5f }, 0.99f));
+        }
+
+        [Test]
+        public void ThePointBlankRival_IsPickedAboutAQuarterAsOften_AsAFarOne()
+        {
+            var rng = new System.Random(2026);
+            var w = new[] { 0.8f, 0.8f };
+            var a = new[] { MarkPickRules.AssassinFraction(0f, Span), 1f };
+            int near = 0;
+            for (int i = 0; i < 20000; i++)
+                if (MarkPickRules.PickWeighted(w, a, new[] { (float)rng.NextDouble(), (float)rng.NextDouble() }, 0.5f) == 0) near++;
+            // Two uniform rolls scaled 0.25 and 1: P(0.25 r1 > r2) = 0.25 / 2 = 12.5 %.
+            Assert.That(near, Is.InRange(2100, 2900), $"near won {near} of 20000");
+        }
+
+        [Test]
+        public void ThePress_WeighsByDistanceToTheAssassinToo_SourceGuard()
+        {
+            var src = Execute;
+            int pick = src.IndexOf("private int PickWeighted()", StringComparison.Ordinal);
+            string body = src.Substring(pick, src.IndexOf("\n        }", pick, StringComparison.Ordinal) - pick);
+            StringAssert.Contains("MarkPickRules.AssassinFraction(PlanarDistance(me, at), span)", body);
+            StringAssert.Contains("MarkPickRules.PickWeighted(_weights, _nears, _rolls, Random.value)", body);
+            StringAssert.Contains("n={_nears[i]:0.00}", body, "the Debug line shows w, n and the score");
         }
 
         [Test]
