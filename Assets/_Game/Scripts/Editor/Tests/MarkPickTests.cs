@@ -67,7 +67,7 @@ namespace CluckWars.Tests
         [Test]
         public void TheMarkWindow_LeavesRoomForTheDrawAndAStunAfterTheArm()
         {
-            // Rules for a short mark (Maestro 2026-11: 7 s): the draw ends inside the arm, and after the arm there is room
+            // Rules for a short mark (Maestro 2026-11-04: 4 s): the draw ends inside the arm, and after the arm there is room
             // for the round-start-length hunt plus at least one Ambush stun (StunDuration) before expiry.
             var m = TestAssets.Load<MarkKillAbilitySO>(TestAssets.AbilitiesDir + "/MarkKill.asset");
             var ambush = TestAssets.Load<AmbushAbilitySO>(TestAssets.AbilitiesDir + "/Ambush.asset");
