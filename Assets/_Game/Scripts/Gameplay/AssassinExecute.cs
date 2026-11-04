@@ -74,6 +74,9 @@ namespace CluckWars.Gameplay
         private bool _pressedHadLast;
         private NetworkBehaviourId _pressedLastMark;
 
+        // Authority-local: the "Mark armed" line was written for the live mark.
+        private bool _armLogged;
+
         // Authority-local: who the last mark was (never picked twice running) and the pick's scratch list.
         private bool _hasLastMark;
         private NetworkBehaviourId _lastMark;
@@ -182,7 +185,7 @@ namespace CluckWars.Gameplay
                 // ---- Phase 2: Kill Execute ----------------------------------------
                 if (!CanKillNow)
                 {
-                    _log?.Verbose(Source, "Press: Kill refused (target must be stunned, armed, in range and on this side of any base wall).");
+                    _log?.Info(Source, $"Kill refused: {DescribeKillState()}.");
                     return false;
                 }
 
@@ -245,8 +248,9 @@ namespace CluckWars.Gameplay
 
                     // The execute bounty follows the kill report (PayExecuteBounty), so a removal the victim's
                     // authority refuses leaves nothing half-applied.
-                    _log?.Info(Source, $"Kill pressed on {target.name} " +
-                        $"(cargo transfer {(takesCargo ? "requested" : "skipped: steal-proof")}).");
+                    _log?.Info(Source, $"Kill pressed on {target.name} at {MarkAgeSeconds:0.00} s into the mark " +
+                        $"(arm {ArmSeconds:0.0}, window {WindowSeconds:0.0}), target {target.CurrentControlState} " +
+                        $"({target.StunRemaining:0.00} s left), cargo transfer {(takesCargo ? "requested" : "skipped: steal-proof")}.");
                     _pressedTarget = MarkedTarget;
                     _pressedWindow = WindowTimer;
                     _pressedArm = ArmTimer;
@@ -280,9 +284,16 @@ namespace CluckWars.Gameplay
                 return;
             }
 
+            bool armed = ArmTimer.Expired(Runner);
+            if (armed && !_armLogged)
+            {
+                _armLogged = true;
+                _log?.Info(Source, $"Mark armed: kill live on {target.name} for {(WindowTimer.RemainingTime(Runner) ?? 0f):0.0} s " +
+                    $"(target {target.CurrentControlState}, {target.StunRemaining:0.00} s of stun left).");
+            }
+
             // Qualified only while the target is stunned, right now: the kill needs the stun, not its memory. Never a shelled one.
-            bool qualified = ArmTimer.Expired(Runner) && target.CurrentControlState == ControlState.Stunned &&
-                             ExecuteRules.CanBeExecuted(target.IsStealProof);
+            bool qualified = ExecuteRules.KillQualifies(armed, target.CurrentControlState == ControlState.Stunned, target.IsStealProof);
             if (qualified != KillReady)
             {
                 KillReady = qualified;
@@ -298,21 +309,43 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Would a Kill press land now? Target stunned (<see cref="KillReady"/>), Assassin able to cast, within
-        /// <see cref="KillRange"/>, and no base wall between them. Read-only over replicated state, so the button, the HUD and the
-        /// press agree on every peer.
+        /// Would a Kill press land now? The arm is over and the target is stunned at this moment and not shelled
+        /// (<see cref="ExecuteRules.KillQualifies"/>, asked fresh here: <see cref="KillReady"/> is last tick's answer and can be
+        /// one tick stale against the target's control state), the Assassin able to cast, within <see cref="KillRange"/>, and no
+        /// base wall between them. Read-only over replicated state, so the button, the HUD and the press agree on every peer.
         /// </summary>
         public bool CanKillNow
         {
             get
             {
-                if (Object == null || !Object.IsValid || !KillReady || MarkedTarget == NetworkBehaviourId.None) return false;
+                if (Object == null || !Object.IsValid || MarkedTarget == NetworkBehaviourId.None) return false;
                 if (_controller == null || !ControlRules.CanCast(_controller.CurrentControlState)) return false;
                 if (!Runner.TryFindBehaviour(MarkedTarget, out ChickenController target)) return false;
-                if (!ExecuteRules.CanBeExecuted(target.IsStealProof)) return false;
+                if (!ExecuteRules.KillQualifies(ArmTimer.Expired(Runner), target.CurrentControlState == ControlState.Stunned,
+                        target.IsStealProof)) return false;
                 Vector3 me = transform.position, it = target.transform.position;
                 return PlanarDistance(me, it) <= KillRange && !PlayerBase.WallBetween(me, it);
             }
+        }
+
+        /// <summary>Seconds since the live mark was placed (0 with none), from the replicated window timer.</summary>
+        public float MarkAgeSeconds =>
+            MarkedTarget == NetworkBehaviourId.None || Runner == null ? 0f
+                : Mathf.Max(0f, WindowSeconds - (WindowTimer.RemainingTime(Runner) ?? 0f));
+
+        /// <summary>Seconds until the live mark arms (0 once armed or with no mark), from the replicated arm timer.</summary>
+        public float ArmRemaining =>
+            MarkedTarget == NetworkBehaviourId.None || Runner == null ? 0f : Mathf.Max(0f, ArmTimer.RemainingTime(Runner) ?? 0f);
+
+        /// <summary>Why a Kill press would not land now, for the refusal log line.</summary>
+        private string DescribeKillState()
+        {
+            if (!Runner.TryFindBehaviour(MarkedTarget, out ChickenController target)) return "the mark's target does not resolve";
+            Vector3 me = transform.position, it = target.transform.position;
+            return $"{target.name} at {MarkAgeSeconds:0.00} s into the mark (arm {ArmSeconds:0.0}, window {WindowSeconds:0.0}, " +
+                   $"armed={ArmTimer.Expired(Runner)}), target {target.CurrentControlState} ({target.StunRemaining:0.00} s of stun left), " +
+                   $"shelled={!ExecuteRules.CanBeExecuted(target.IsStealProof)}, {PlanarDistance(me, it):0.0} m (range {KillRange:0.0}), " +
+                   $"walled={PlayerBase.WallBetween(me, it)}, self can cast={_controller != null && ControlRules.CanCast(_controller.CurrentControlState)}";
         }
 
         /// <summary>
@@ -478,6 +511,7 @@ namespace CluckWars.Gameplay
 
         private void ResetMark()
         {
+            _armLogged = false;
             MarkedTarget = NetworkBehaviourId.None;
             ArmTimer = TickTimer.None;
             WindowTimer = TickTimer.None;

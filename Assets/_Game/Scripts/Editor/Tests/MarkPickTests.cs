@@ -242,35 +242,92 @@ namespace CluckWars.Tests
             StringAssert.Contains("MarkPickRules.Filter(_candidates", body);
         }
 
+        // ---- The shipped numbers keep their relations (Maestro 2026-11-04: 3 s arm in a 4 s window) ---------------
+        // Rules, not values: every number here is read from the assets and is meant to be retuned within these rules.
+
+        private static MarkKillAbilitySO ShippedMark => TestAssets.Load<MarkKillAbilitySO>(TestAssets.AbilitiesDir + "/MarkKill.asset");
+        private static AmbushAbilitySO ShippedAmbush => TestAssets.Load<AmbushAbilitySO>(TestAssets.AbilitiesDir + "/Ambush.asset");
+
         [Test]
-        public void ShippedMarkKill_NumbersKeepTheirRelations()
+        public void ShippedMarkKill_TheVictimSeesTheMarkBeforeAKillCanQualify_AndTheDrawEndsInsideTheArm()
         {
-            // Rules, not values: every number here is meant to be retuned.
-            var m = TestAssets.Load<MarkKillAbilitySO>(TestAssets.AbilitiesDir + "/MarkKill.asset");
+            // (a) Mark a bird already stunned, Kill at the arm: the removal's evidence needs the mark on the victim's authority first.
+            var m = ShippedMark;
             Assert.Greater(m.KillRange, 0f);
-            Assert.Greater(m.WindowSeconds, 0f);
-            Assert.GreaterOrEqual(m.SuccessCooldownSeconds, m.FailCooldownSeconds, "a miss must recover no slower than a kill");
-        }
-
-        [Test]
-        public void TheVictimHasTimeToSeeTheMark_BeforeAKillCanQualify()
-        {
-            // Mark a bird already stunned, Kill at once: the removal's evidence needs the mark on the victim's authority first.
-            var m = TestAssets.Load<MarkKillAbilitySO>(TestAssets.AbilitiesDir + "/MarkKill.asset");
             Assert.GreaterOrEqual(m.ArmSeconds, ExecuteRules.MaxLatencySeconds);
-            Assert.Less(m.ArmSeconds, m.WindowSeconds);
+            Assert.LessOrEqual(CluckWars.Visuals.MarkPresentationModel.DrawDuration(false, m.ArmSeconds), m.ArmSeconds);
+            Assert.AreEqual(m.ArmSeconds, AssassinExecute.ArmDuration, "the fallback (no asset registered) matches the asset");
+            Assert.AreEqual(m.WindowSeconds, AssassinExecute.WindowDuration, "the fallback (no asset registered) matches the asset");
+            Assert.AreEqual(m.SuccessCooldownSeconds, AssassinExecute.SuccessCooldown, "the fallback matches the asset");
         }
 
         [Test]
-        public void TheMarkWindow_LeavesRoomForTheDrawAndAStunAfterTheArm()
+        public void ShippedMarkKill_TheKillSpan_CoversALatencyAndAReaction()
         {
-            // Rules for a short mark (Maestro 2026-11-04: 4 s): the draw ends inside the arm, and after the arm there is room
-            // for the round-start-length hunt plus at least one Ambush stun (StunDuration) before expiry.
-            var m = TestAssets.Load<MarkKillAbilitySO>(TestAssets.AbilitiesDir + "/MarkKill.asset");
-            var ambush = TestAssets.Load<AmbushAbilitySO>(TestAssets.AbilitiesDir + "/Ambush.asset");
-            Assert.LessOrEqual(CluckWars.Visuals.MarkPresentationModel.DrawDuration(false, m.ArmSeconds), m.ArmSeconds);
-            Assert.Greater(m.WindowSeconds - m.ArmSeconds, ambush.StunDuration, "a mark shorter than one stun cannot be executed");
-            Assert.AreEqual(m.WindowSeconds, AssassinExecute.WindowDuration, "the fallback (no asset registered) matches the asset");
+            // (b) After the arm the kill is live for Window - Arm: room for the press to cross the wire and a human to press it.
+            var m = ShippedMark;
+            Assert.GreaterOrEqual(m.WindowSeconds - m.ArmSeconds, ExecuteRules.MaxLatencySeconds + ExecuteRules.KillReactionSeconds,
+                $"kill span {m.WindowSeconds - m.ArmSeconds:0.00} s");
+            Assert.AreEqual(0.3f, ExecuteRules.KillReactionSeconds);
+        }
+
+        [Test]
+        public void ShippedMarkKill_TheShortestAmbushStun_CanStillBePressedOn()
+        {
+            // (c) The shortest Ambush stun any shipped passive allows (Slippery 0.6, Bulwark 0.65) still outlasts the press's
+            // trip and a reaction. MinRemoteLatencySeconds: the latency floor the receiver assumes for a remote sender.
+            var ambush = ShippedAmbush;
+            float shortest = ambush.StunDuration;
+            int passives = 0;
+            foreach (string guid in UnityEditor.AssetDatabase.FindAssets("t:PassiveAbilitySO", new[] { TestAssets.AbilitiesDir }))
+            {
+                var p = UnityEditor.AssetDatabase.LoadAssetAtPath<PassiveAbilitySO>(UnityEditor.AssetDatabase.GUIDToAssetPath(guid));
+                if (p == null) continue;
+                passives++;
+                shortest = Mathf.Min(shortest, p.ModifyControlDuration(ambush.StunDuration, null));
+            }
+            Assert.Greater(passives, 0, "no shipped passive found: the scan is broken");
+            Assert.Less(shortest, ambush.StunDuration, "Slippery / Bulwark shorten it: the scan saw them");
+            Assert.GreaterOrEqual(shortest, ExecuteRules.MinRemoteLatencySeconds + ExecuteRules.KillReactionSeconds,
+                $"shortest stun {shortest:0.00} s");
+        }
+
+        [Test]
+        public void ShippedMarkKill_OneAmbushPerHunt()
+        {
+            // (d) Ambush is never ready twice inside one window, and is always back for the next hunt after a miss or a kill.
+            var m = ShippedMark;
+            var ambush = ShippedAmbush;
+            Assert.Greater(ambush.Cooldown, m.WindowSeconds, "one stun per hunt");
+            Assert.LessOrEqual(ambush.Cooldown, m.WindowSeconds + m.FailCooldownSeconds, "ready again by the next mark after a miss");
+            Assert.LessOrEqual(ambush.Cooldown, m.SuccessCooldownSeconds, "ready again by the next mark after a kill");
+        }
+
+        [Test]
+        public void ShippedMarkKill_AtMostThreeKillsARound()
+        {
+            // (e) Kills as fast as the rules allow (each exactly at the arm): a fourth never fits in the round, a third does.
+            var m = ShippedMark;
+            float round = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath).MatchDurationSeconds;
+            float start = m.RoundStartCooldownSeconds, arm = m.ArmSeconds, success = m.SuccessCooldownSeconds;
+            Assert.Greater(start + 4f * arm + 3f * success, round, "a fourth kill would fit");
+            Assert.LessOrEqual(start + 3f * arm + 2f * success, round, "a third kill must fit");
+        }
+
+        [Test]
+        public void ShippedMarkKill_AMissRecoversNoSlowerThanAKill()
+        {
+            // (f)
+            var m = ShippedMark;
+            Assert.GreaterOrEqual(m.SuccessCooldownSeconds, m.FailCooldownSeconds);
+        }
+
+        [Test]
+        public void ShippedMarkKill_ANewMarkOnTheSameVictim_IsANewEpisodeOnTheVictimsClock()
+        {
+            // The victim times the arm from its first sighting; sightings closer than MarkEpisodeGapSeconds are one mark. The same
+            // Assassin cannot re-mark the same victim sooner than a fail cooldown, so a new mark always restarts the age.
+            Assert.Less(ExecuteRules.MarkEpisodeGapSeconds, ShippedMark.FailCooldownSeconds);
         }
 
         [Test]
@@ -293,7 +350,7 @@ namespace CluckWars.Tests
             {
                 Duration = ExecuteRules.RemovalDurationSeconds, AttackerResolved = true, SenderSpeaksForAttacker = true,
                 AttackerHasExecute = true, MarkedThisVictim = true, VictimStunned = true,
-                PlanarDistance = 12f, KillRange = 12f,
+                PlanarDistance = 12f, KillRange = 12f, MarkEverSeen = true, MarkAgeSeconds = 3.1f, ArmSeconds = 3f,
             };
             Assert.AreEqual(ExecuteRules.RemovalVerdict.Accepted, ExecuteRules.EvaluateRemoval(claim));
 

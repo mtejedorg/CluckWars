@@ -207,7 +207,7 @@ namespace CluckWars.Gameplay
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_ExecuteRemoval(NetworkBehaviourId assassinId, float duration, RpcInfo info = default)
         {
-            var verdict = JudgeRemoval(assassinId, duration, info, out string attackerName);
+            var verdict = JudgeRemoval(assassinId, duration, info, out string attackerName, out var claim);
             if (verdict == ExecuteRules.RemovalVerdict.Shelled)
             {
                 // Silent, like the steal refund: a shell went up inside one round trip. No removal, no kill credit, no bounty
@@ -230,6 +230,11 @@ namespace CluckWars.Gameplay
                 return;
             }
 
+            // The rule's evidence, on the victim's own authority (the harness and the playtest logs read this line).
+            _log?.Info(Source, $"{name}: execute from {attackerName} accepted - mark seen on me for {claim.MarkAgeSeconds:0.00} s " +
+                $"(arm {claim.ArmSeconds:0.0} s, allowance {ExecuteRules.ArmAllowanceSeconds:0.0} s), " +
+                (claim.VictimStunned ? "stunned now" : $"stun ended {claim.SecondsSinceStunned:0.00} s ago") +
+                $", {claim.PlanarDistance:0.0} m apart.");
             ExecuteRemoval(assassinId, duration);
         }
 
@@ -239,10 +244,10 @@ namespace CluckWars.Gameplay
 
         /// <summary>Gathers what this (the victim's) authority can see about a removal claim and judges it.</summary>
         private ExecuteRules.RemovalVerdict JudgeRemoval(NetworkBehaviourId attackerId, float duration, in RpcInfo info,
-            out string attackerName)
+            out string attackerName, out ExecuteRules.RemovalClaim claim)
         {
             attackerName = attackerId.ToString();
-            var claim = new ExecuteRules.RemovalClaim { Duration = duration };
+            claim = new ExecuteRules.RemovalClaim { Duration = duration };
 
             if (Runner != null && Runner.TryFindBehaviour(attackerId, out ChickenCombat attacker) &&
                 attacker != null && attacker.Object != null && attacker.Object.IsValid)
@@ -258,14 +263,19 @@ namespace CluckWars.Gameplay
                     ? attacker.Object.HasStateAuthority
                     : attacker.Object.StateAuthority == info.Source;
                 claim.AttackerHasExecute = execute != null;
-                if (execute != null) { claim.KillRange = execute.KillRange; claim.MaxDuration = execute.RemovalSeconds; }
+                if (execute != null)
+                {
+                    claim.KillRange = execute.KillRange;
+                    claim.MaxDuration = execute.RemovalSeconds;
+                    claim.ArmSeconds = execute.ArmSeconds;
+                }
                 claim.MarkedThisVictim = execute != null && _controller != null && execute.MarkedTarget == _controller.Id;
                 claim.VictimStunned = _controller != null && _controller.IsStunned;
 
                 // A local invoke has no wire time (both chickens simulated here); a remote one is
                 // floored because GetPlayerRtt is not confirmed to report remote players in Shared Mode.
                 claim.Latency = SenderLatency(info);
-                claim.MarkEverSeen = TrySecondsSinceMarkedBy(execute, out claim.SecondsSinceMarkSeen);
+                claim.MarkEverSeen = TrySecondsSinceMarkedBy(execute, out claim.SecondsSinceMarkSeen, out claim.MarkAgeSeconds);
                 claim.StunEverSeen = TrySecondsSinceStunned(out claim.SecondsSinceStunned);
 
                 claim.RangeMargin = ExecuteRangeMargin(attackerController, claim.Latency);
@@ -290,23 +300,27 @@ namespace CluckWars.Gameplay
         internal static float SenderLatency(NetworkRunner runner, in RpcInfo info) =>
             info.IsInvokeLocal || runner == null ? 0f : ExecuteRules.RemoteLatency((float)runner.GetPlayerRtt(info.Source));
 
-        // Victim-side, local, never replicated: when this chicken's authority last saw each
-        // attacker's replicated MarkedTarget name it. Lets an execute whose mark was cleared in the
-        // press tick still count as marked after the qualifying stun ended (CW-230 review).
+        // Victim-side, local, never replicated: when this chicken's authority first and last saw each
+        // attacker's replicated MarkedTarget name it. Last lets an execute whose mark was cleared in the
+        // press tick still count as marked after the qualifying stun ended (CW-230 review); first times
+        // the arm on the victim's own clock (ExecuteRules.HasArmEvidence), since the attacker owns ArmTimer.
         // Stored in simulation time (Runner.SimulationTime), like the execute window itself: a solo
         // pause stops ticks but not the wall clock, and must not age these records.
-        private readonly System.Collections.Generic.Dictionary<AssassinExecute, double> _markSeenAt =
-            new System.Collections.Generic.Dictionary<AssassinExecute, double>();
+        private struct MarkSighting { public double First, Last; }
+        private readonly System.Collections.Generic.Dictionary<AssassinExecute, MarkSighting> _markSeenAt =
+            new System.Collections.Generic.Dictionary<AssassinExecute, MarkSighting>();
 
         /// <summary>
-        /// Seconds since this chicken's authority last saw <paramref name="execute"/>'s mark name it.
-        /// False when it never has (or the record was cleared by a round reset).
+        /// Seconds since this chicken's authority last saw <paramref name="execute"/>'s mark name it, and how long that mark had
+        /// been on it by then (first to last sighting, <paramref name="markAge"/>). False when it never has (or the record was
+        /// cleared by a round reset).
         /// </summary>
-        internal bool TrySecondsSinceMarkedBy(AssassinExecute execute, out float seconds)
+        internal bool TrySecondsSinceMarkedBy(AssassinExecute execute, out float seconds, out float markAge)
         {
-            seconds = 0f;
-            if (Runner == null || execute == null || !_markSeenAt.TryGetValue(execute, out double at)) return false;
-            seconds = ExecuteRules.AgeSeconds(Runner.SimulationTime, at);
+            seconds = markAge = 0f;
+            if (Runner == null || execute == null || !_markSeenAt.TryGetValue(execute, out var seen)) return false;
+            seconds = ExecuteRules.AgeSeconds(Runner.SimulationTime, seen.Last);
+            markAge = ExecuteRules.AgeSeconds(seen.Last, seen.First);
             return true;
         }
 
@@ -341,9 +355,10 @@ namespace CluckWars.Gameplay
             for (int i = 0; i < all.Count; i++)
             {
                 var execute = all[i] != null ? all[i]._execute : null;
-                if (execute != null && execute.Object != null && execute.Object.IsValid &&
-                    execute.MarkedTarget == _controller.Id)
-                    _markSeenAt[execute] = now;
+                if (execute == null || execute.Object == null || !execute.Object.IsValid ||
+                    execute.MarkedTarget != _controller.Id) continue;
+                bool same = _markSeenAt.TryGetValue(execute, out var seen) && ExecuteRules.ContinuesMarkEpisode(now, seen.Last);
+                _markSeenAt[execute] = new MarkSighting { First = same ? seen.First : now, Last = now };
             }
         }
 

@@ -1054,10 +1054,10 @@ namespace CluckWars.Gameplay
             // ChickenCombat.RPC_ExecuteRemoval: ExecuteRules.HasExecuteEvidence (CW-230).
             var combat = _controller != null ? _controller.Combat : null;
             bool markSeen = false, stunSeen = false;
-            float sinceMark = 0f, sinceStun = 0f, latency = 0f;
+            float sinceMark = 0f, markAge = 0f, sinceStun = 0f, latency = 0f;
             if (combat != null)
             {
-                markSeen = combat.TrySecondsSinceMarkedBy(execute, out sinceMark);
+                markSeen = combat.TrySecondsSinceMarkedBy(execute, out sinceMark, out markAge);
                 stunSeen = combat.TrySecondsSinceStunned(out sinceStun);
                 latency = combat.SenderLatency(info);
             }
@@ -1066,6 +1066,12 @@ namespace CluckWars.Gameplay
                     _controller.IsStunned, stunSeen, sinceStun, latency))
             {
                 rejection = $"{name} has not seen both a recent mark from {execute.name} and a recent stun on itself.";
+                return false;
+            }
+            // The arm, timed on this chicken's own clock: the same rule as ChickenCombat's NotArmed verdict.
+            if (!ExecuteRules.HasArmEvidence(markSeen, markAge, execute.ArmSeconds))
+            {
+                rejection = $"{name} has seen {execute.name}'s mark for {markAge:0.00} s, under its {execute.ArmSeconds:0.0} s arm.";
                 return false;
             }
 

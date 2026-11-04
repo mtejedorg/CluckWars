@@ -63,6 +63,58 @@ namespace CluckWars.Gameplay
         /// </summary>
         public const float RecentStunWindowSeconds = RecentMarkGraceSeconds;
 
+        /// <summary>
+        /// Seconds a player needs to see the Kill light up and press it. Design floor for the mark's numbers (the kill span after
+        /// the arm, the shortest stun that can still be pressed on), asserted against the shipped assets; no runtime gate reads it.
+        /// </summary>
+        public const float KillReactionSeconds = 0.3f;
+
+        /// <summary>
+        /// How much younger than <c>ArmSeconds</c> the mark may look on the victim's authority when a Kill lands. The victim first
+        /// sees the mark one replication delay after the Assassin placed it, and the Kill's RPC can outrun that delay, so an
+        /// honest Kill at the arm can read a little early there. One latency cap: a Kill pressed earlier than that is a client
+        /// skipping the arm (<see cref="HasArmEvidence"/>).
+        /// </summary>
+        public const float ArmAllowanceSeconds = MaxLatencySeconds;
+
+        /// <summary>
+        /// The victim's authority treats sightings of the same Assassin's mark on it as ONE mark while the gaps between them stay
+        /// within this (a shell refund restoring a mark one round trip later, a dropped tick). A new mark on the same victim by
+        /// the same Assassin is at least a fail cooldown away (pinned by a test), so it always starts a new age.
+        /// </summary>
+        public const float MarkEpisodeGapSeconds = 2f * MaxLatencySeconds;
+
+        /// <summary>
+        /// THE kill rule, Assassin side (Maestro 2026-11-04): the arm is over, the target is stunned at this moment, and it is
+        /// not shelled. A stun that began before the arm and is still running qualifies; one that already ended does not.
+        /// Asked fresh at every read (<c>AssassinExecute.CanKillNow</c>, <c>KillReady</c>), never from a previous tick.
+        /// </summary>
+        public static bool KillQualifies(bool armed, bool targetStunned, bool targetStealProof) =>
+            armed && targetStunned && CanBeExecuted(targetStealProof);
+
+        /// <summary>
+        /// The arm, victim side: this chicken's own authority has watched the attacker's mark on it for at least
+        /// <paramref name="armSeconds"/> less <see cref="ArmAllowanceSeconds"/>. Closes a modified Assassin client that skips its
+        /// own arm timer (the Assassin owns <c>ArmTimer</c>, so the victim cannot trust it). A non-positive
+        /// <paramref name="armSeconds"/> reads as the shipped fallback, never as "no arm".
+        /// </summary>
+        /// <param name="markAgeSeconds">Seconds from the victim's first sighting of this mark to its latest one.</param>
+        public static bool HasArmEvidence(bool markEverSeen, float markAgeSeconds, float armSeconds)
+        {
+            float arm = armSeconds > 0f ? armSeconds : AssassinExecute.ArmDuration;
+            float need = arm - ArmAllowanceSeconds;
+            if (need <= 0f) return true;
+            return markEverSeen && markAgeSeconds >= need;
+        }
+
+        /// <summary>Is a new sighting of a mark at <paramref name="now"/> the same mark as the one last seen at
+        /// <paramref name="lastSeen"/>? (<see cref="MarkEpisodeGapSeconds"/>; a NaN or negative gap starts a new one.)</summary>
+        public static bool ContinuesMarkEpisode(double now, double lastSeen)
+        {
+            double gap = now - lastSeen;
+            return gap >= 0d && gap <= MarkEpisodeGapSeconds;
+        }
+
         /// <summary>A latency for allowances: clamped to [0, <see cref="MaxLatencySeconds"/>] (NaN reads as 0).</summary>
         public static float CapLatency(float latency) =>
             latency > 0f ? (latency < MaxLatencySeconds ? latency : MaxLatencySeconds) : 0f;
@@ -98,7 +150,8 @@ namespace CluckWars.Gameplay
         /// </summary>
         /// <remarks>
         /// Trust model: the attacker's own state authority can still self-execute within these
-        /// bounds (skip the arm timer on a marked, just stunned victim in range).
+        /// bounds (a marked, just stunned victim in range); the arm it cannot skip, because the victim
+        /// times the mark itself (<see cref="HasArmEvidence"/>, asked by both halves next to this).
         /// Shared Mode trusts each state authority over its own objects; this closes forged calls
         /// from peers that are not, and executes with no real mark + stun behind them.
         /// </remarks>
@@ -125,6 +178,8 @@ namespace CluckWars.Gameplay
             NotAttributable,
             NoAssassinExecute,
             NoExecuteEvidence,
+            /// <summary>The mark has not been on this chicken for its arm time (<see cref="HasArmEvidence"/>).</summary>
+            NotArmed,
             OutOfRange,
             /// <summary>Not a rejection: the victim stepped through a base wall after the press (<see cref="IsLegalNoOp"/>).</summary>
             AcrossBaseWall,
@@ -172,6 +227,11 @@ namespace CluckWars.Gameplay
             public bool MarkEverSeen;
             /// <summary>Seconds since the victim last saw that mark (ignored unless <see cref="MarkEverSeen"/>).</summary>
             public float SecondsSinceMarkSeen;
+            /// <summary>Seconds from the victim's first sighting of that mark to its latest (ignored unless <see cref="MarkEverSeen"/>).</summary>
+            public float MarkAgeSeconds;
+            /// <summary>The attacker's tuned arm (<c>AssassinExecute.ArmSeconds</c>, the registry asset every peer reads);
+            /// 0 = the shipped fallback.</summary>
+            public float ArmSeconds;
             /// <summary>The victim's own authority has recorded itself stunned (local record).</summary>
             public bool StunEverSeen;
             /// <summary>Seconds since the victim's authority last saw itself stunned (ignored unless <see cref="StunEverSeen"/>).</summary>
@@ -226,6 +286,7 @@ namespace CluckWars.Gameplay
             if (!HasExecuteEvidence(c.MarkedThisVictim, c.MarkEverSeen, c.SecondsSinceMarkSeen,
                     c.VictimStunned, c.StunEverSeen, c.SecondsSinceStunned, c.Latency))
                 return RemovalVerdict.NoExecuteEvidence;
+            if (!HasArmEvidence(c.MarkEverSeen, c.MarkAgeSeconds, c.ArmSeconds)) return RemovalVerdict.NotArmed;
             float killRange = c.KillRange > 0f ? c.KillRange : AssassinExecute.DefaultKillRange;
             if (!(c.PlanarDistance <= MaxExecuteDistance(c.RangeMargin, killRange))) return RemovalVerdict.OutOfRange;
             if (c.WallBetweenThem) return RemovalVerdict.AcrossBaseWall;
@@ -244,6 +305,7 @@ namespace CluckWars.Gameplay
                 case RemovalVerdict.NotAttributable:     return "the sender is not entitled to act for the named attacker.";
                 case RemovalVerdict.NoAssassinExecute:   return "the named attacker has no AssassinExecute.";
                 case RemovalVerdict.NoExecuteEvidence:   return "this chicken has not seen both a recent mark from the attacker and a recent stun on itself.";
+                case RemovalVerdict.NotArmed:            return "this chicken has not seen the attacker's mark on it for the mark's arm time.";
                 case RemovalVerdict.OutOfRange:          return "the attacker is too far away to have executed this chicken.";
                 case RemovalVerdict.AcrossBaseWall:      return "a base wall stands between the attacker and this chicken.";
                 case RemovalVerdict.Shelled:             return "this chicken is shelled (steal-proof) and cannot be executed.";

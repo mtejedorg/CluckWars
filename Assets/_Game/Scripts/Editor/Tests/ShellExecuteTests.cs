@@ -13,6 +13,7 @@ namespace CluckWars.Tests
         {
             Duration = ExecuteRules.RemovalDurationSeconds, AttackerResolved = true, SenderSpeaksForAttacker = true,
             AttackerHasExecute = true, KillRange = 8f, MarkedThisVictim = true, VictimStunned = true, PlanarDistance = 3f,
+            MarkEverSeen = true, MarkAgeSeconds = 3.1f, ArmSeconds = 3f,
         };
 
         [Test]
@@ -61,8 +62,9 @@ namespace CluckWars.Tests
         public void TheGates_AskTheRule_SourceGuard()
         {
             string exec = File.ReadAllText("Assets/_Game/Scripts/Gameplay/AssassinExecute.cs");
-            StringAssert.Contains("ExecuteRules.CanBeExecuted(target.IsStealProof);", exec);                 // KillReady
-            StringAssert.Contains("if (!ExecuteRules.CanBeExecuted(target.IsStealProof)) return false;", exec); // CanKillNow
+            // KillReady and CanKillNow both ask KillQualifies, which asks CanBeExecuted.
+            Assert.AreEqual(2, System.Text.RegularExpressions.Regex.Matches(exec, @"ExecuteRules\.KillQualifies\(").Count);
+            Assert.IsFalse(ExecuteRules.KillQualifies(armed: true, targetStunned: true, targetStealProof: true));
             StringAssert.Contains("_stats.TryCancelKillCredit(victimId)", exec);                              // refund needs a pending Kill
             string combat = File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenCombat.cs");
             StringAssert.Contains("claim.VictimShelled = _controller != null && _controller.IsStealProof;", combat);

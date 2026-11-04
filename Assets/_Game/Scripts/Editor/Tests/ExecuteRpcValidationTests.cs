@@ -38,6 +38,10 @@ namespace CluckWars.Tests
             VictimStunned = true,
             PlanarDistance = 5f,
             RangeMargin = 0.5f,
+            // The victim's own record of the mark: seen just now, on it for longer than the arm.
+            MarkEverSeen = true,
+            MarkAgeSeconds = 3.1f,
+            ArmSeconds = 3f,
         };
 
         [Test]
@@ -50,6 +54,7 @@ namespace CluckWars.Tests
             var c = Genuine();
             c.MarkedThisVictim = false;
             c.VictimStunned = false;
+            c.MarkEverSeen = false;
             c.Latency = ExecuteRules.RemoteLatency(0.1f);
             return c;
         }
@@ -70,6 +75,7 @@ namespace CluckWars.Tests
             // The press tick can race the end of the stun: a live stun, plus the latency and a short grace.
             var c = NothingCurrent();
             c.MarkedThisVictim = true;
+            c.MarkEverSeen = true;
             c.StunEverSeen = true;
             c.SecondsSinceStunned = 0.3f;
             Assert.AreEqual(ExecuteRules.RemovalVerdict.Accepted, ExecuteRules.EvaluateRemoval(c));
@@ -283,7 +289,8 @@ namespace CluckWars.Tests
             }
 
             string src = string.Join("\n", CodeLines(ChickenCombatPath));
-            StringAssert.Contains("Dictionary<AssassinExecute, double> _markSeenAt", src);
+            StringAssert.Contains("Dictionary<AssassinExecute, MarkSighting> _markSeenAt", src);
+            StringAssert.Contains("private struct MarkSighting { public double First, Last; }", src, "both sightings in simulation time");
             StringAssert.Contains("private double _stunnedAt", src);
         }
 
