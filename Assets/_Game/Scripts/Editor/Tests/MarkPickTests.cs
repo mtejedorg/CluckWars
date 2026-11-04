@@ -382,13 +382,43 @@ namespace CluckWars.Tests
             StringAssert.Contains("_hasLastMark = false", src.Substring(reset, src.IndexOf("\n        }", reset, StringComparison.Ordinal) - reset));
         }
 
-        [TestCase(false, false, false, false, BotMarkStep.None)]
-        [TestCase(true, false, false, true, BotMarkStep.Hunt)]
-        [TestCase(true, false, true, false, BotMarkStep.Hunt)]
-        [TestCase(true, false, true, true, BotMarkStep.Stun)]
-        [TestCase(true, true, true, true, BotMarkStep.Kill)]
-        public void NextMarkStep_HuntsThenStunsThenKills(bool marked, bool canKill, bool armed, bool stunInReach, BotMarkStep expected) =>
-            Assert.AreEqual(expected, BotTactics.NextMarkStep(marked, canKill, armed, stunInReach));
+        // NextMarkStep(marked, canKill, armRemaining, windowRemaining, stunInReach, stunSeconds). A 1 s Ambush with the
+        // 0.25 s lead margin goes out once the arm is at most 0.75 s away.
+        [TestCase(false, false, 0f, 4f, true, 1f, BotMarkStep.None)]
+        [TestCase(true, false, 2.0f, 3.0f, true, 1f, BotMarkStep.Hunt)]     // too early: the stun would end before the arm
+        [TestCase(true, false, 0.76f, 1.76f, true, 1f, BotMarkStep.Hunt)]   // just outside the lead window
+        [TestCase(true, false, 0.75f, 1.75f, true, 1f, BotMarkStep.Stun)]   // the lead window opens at stun - margin
+        [TestCase(true, false, 0.2f, 1.2f, true, 1f, BotMarkStep.Stun)]     // inside it
+        [TestCase(true, false, 0f, 0.6f, true, 1f, BotMarkStep.Stun)]       // armed, time left: stun now
+        [TestCase(true, false, 0f, 0.25f, true, 1f, BotMarkStep.Hunt)]      // armed, but no time to press after it
+        [TestCase(true, false, 0.5f, 1.5f, false, 0f, BotMarkStep.Hunt)]    // nothing in reach
+        [TestCase(true, false, 0.4f, 1.4f, true, 0.6f, BotMarkStep.Hunt)]   // Slippery's 0.6 s stun: arm must be <= 0.35 s away
+        [TestCase(true, false, 0.35f, 1.35f, true, 0.6f, BotMarkStep.Stun)]
+        [TestCase(true, true, 0f, 0.8f, true, 1f, BotMarkStep.Kill)]        // after the arm, stunned: kill
+        [TestCase(true, true, 0f, 0.8f, false, 0f, BotMarkStep.Kill)]
+        public void NextMarkStep_HuntsThenTimesTheStunToTheArmThenKills(bool marked, bool canKill, float armRemaining,
+            float windowRemaining, bool stunInReach, float stunSeconds, BotMarkStep expected) =>
+            Assert.AreEqual(expected, BotTactics.NextMarkStep(marked, canKill, armRemaining, windowRemaining, stunInReach, stunSeconds));
+
+        [Test]
+        public void NextMarkStep_NeverStunsBeforeTheArmLessTheStun()
+        {
+            for (float arm = 3f; arm > 0f; arm -= 0.05f)
+            {
+                var step = BotTactics.NextMarkStep(true, false, arm, arm + 1f, true, 1f);
+                if (arm > 1f - BotTactics.StunLeadMargin + 1e-4f) Assert.AreEqual(BotMarkStep.Hunt, step, $"arm in {arm:0.00} s");
+            }
+            Assert.AreEqual(0.25f, BotTactics.StunLeadMargin);
+        }
+
+        [Test]
+        public void TheBot_MeasuresTheStunOnItsTarget_AndSkipsShellsAndImmunity_SourceGuard()
+        {
+            string body = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/BotController.cs", "private bool TryFollowThroughMark(");
+            StringAssert.Contains("!mark.IsStealProof && !mark.IsControlImmune", body);
+            StringAssert.Contains("passive.ModifyControlDuration(raw, mark)", body);
+            StringAssert.Contains("_execute.ArmTimer.RemainingTime(Runner) ?? 0f", body);
+        }
 
         private static int CountOf(string text, string what)
         {

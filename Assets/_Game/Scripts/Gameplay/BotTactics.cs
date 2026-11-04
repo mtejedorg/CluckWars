@@ -67,9 +67,9 @@ namespace CluckWars.Gameplay
     {
         /// <summary>No mark up: the ordinary FSM decides.</summary>
         None = 0,
-        /// <summary>Hunt the target across the map, keeping the stun back: it is armed only once, and a stun now is wasted.</summary>
+        /// <summary>Hunt the target across the map, keeping the stun back: a stun that ends before the arm is wasted.</summary>
         Hunt = 1,
-        /// <summary>Armed, target in reach and not stunned yet: land a stun.</summary>
+        /// <summary>Target in reach, and a stun cast now still runs when the arm ends: land it.</summary>
         Stun = 2,
         /// <summary>Stunned and in kill range: press again.</summary>
         Kill = 3,
@@ -632,15 +632,26 @@ namespace CluckWars.Gameplay
 
         // ---- Death Mark follow-through ------------------------------------------
 
+        /// <summary>How much of the stun a bot keeps beyond the arm: room for a tick of replication and the Kill press.</summary>
+        public const float StunLeadMargin = 0.25f;
+
         /// <summary>
         /// The Spoiler bot's hunt. A mark lands anywhere on the map, and the CastPlan ladder knows none of that: left to it, a
-        /// bot fires Ambush at whoever is near and walks where the FSM says, so the mark expires unpressed.
+        /// bot fires Ambush at whoever is near and walks where the FSM says, so the mark expires unpressed. The Kill needs the
+        /// stun live at the arm (3 s into a 4 s mark), so the stun goes out only once it will still run
+        /// <see cref="StunLeadMargin"/> past the arm, and while the window has more than that margin left.
         /// </summary>
-        public static BotMarkStep NextMarkStep(bool marked, bool canKill, bool armed, bool stunInReach)
+        /// <param name="armRemaining">Seconds until the mark arms (0 once armed).</param>
+        /// <param name="windowRemaining">Seconds until the mark expires.</param>
+        /// <param name="stunInReach">A ready stun would land on the target now (and the target is neither shelled nor control-immune).</param>
+        /// <param name="stunSeconds">That stun's length on this target, after its passive (Slippery 0.6, Bulwark 0.65).</param>
+        public static BotMarkStep NextMarkStep(bool marked, bool canKill, float armRemaining, float windowRemaining,
+            bool stunInReach, float stunSeconds)
         {
             if (!marked) return BotMarkStep.None;
             if (canKill) return BotMarkStep.Kill;
-            return armed && stunInReach ? BotMarkStep.Stun : BotMarkStep.Hunt;
+            bool lastsPastTheArm = armRemaining <= stunSeconds - StunLeadMargin;
+            return stunInReach && lastsPastTheArm && windowRemaining > StunLeadMargin ? BotMarkStep.Stun : BotMarkStep.Hunt;
         }
 
         // ---- Steal guard (Phase 7 chunk D) ------------------------------------

@@ -603,18 +603,28 @@ namespace CluckWars.Gameplay
             _state      = BotState.Hunt;
             _moveTarget = mark.transform.position;
 
+            // The longest ready stun that would land now, measured on THIS target (its passive shortens it). Never at a shelled
+            // target (it takes the stun but cannot be executed) or a control-immune one (the stun does not land).
             int stunSlot = AbilityController.InvalidSlot;
-            for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
+            float stunSeconds = 0f;
+            bool stunnable = !mark.IsStealProof && !mark.IsControlImmune;
+            for (int slot = 0; stunnable && slot < _abilities.EquippedSlotCount; slot++)
             {
                 var ability = _abilities.GetSlot(slot);
-                if (FixedKit.EmitsStun(ability) && _abilities.IsReady(slot) && ability.IsUsable(_controller)
-                    && ability.WouldAffect(_controller, mark)) stunSlot = slot;
+                if (!FixedKit.EmitsStun(ability) || !_abilities.IsReady(slot) || !ability.IsUsable(_controller)
+                    || !ability.WouldAffect(_controller, mark)) continue;
+                float raw = ability.EmittedControl.Seconds;
+                var passive = mark.Abilities != null ? mark.Abilities.Passive : null;
+                float onTarget = passive != null ? passive.ModifyControlDuration(raw, mark) : raw;
+                if (onTarget > stunSeconds) { stunSeconds = onTarget; stunSlot = slot; }
             }
 
-            var step = BotTactics.NextMarkStep(true, _execute.CanKillNow, _execute.ArmTimer.ExpiredOrNotRunning(Runner),
-                stunSlot != AbilityController.InvalidSlot);
+            float armLeft = _execute.ArmTimer.RemainingTime(Runner) ?? 0f;
+            float windowLeft = _execute.WindowTimer.RemainingTime(Runner) ?? 0f;
+            var step = BotTactics.NextMarkStep(true, _execute.CanKillNow, armLeft, windowLeft,
+                stunSlot != AbilityController.InvalidSlot, stunSeconds);
             if (step == BotMarkStep.Stun && _abilities.BotTryActivate(stunSlot))
-                _log?.Debug(Source, $"{Who} mark {step}: cast slot {stunSlot}.");
+                _log?.Debug(Source, $"{Who} mark {step}: cast slot {stunSlot} ({stunSeconds:0.00} s on {mark.name}, arm in {armLeft:0.00} s).");
             if (step == BotMarkStep.Kill)
                 for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
                     if (_abilities.GetSlot(slot) is MarkKillAbilitySO && _abilities.BotTryActivate(slot))
