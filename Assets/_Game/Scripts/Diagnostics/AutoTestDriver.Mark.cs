@@ -13,9 +13,11 @@ namespace CluckWars.Diagnostics
     /// <c>cw_markshots</c> (dev tools): plays Death Marks so their feedback can be photographed, one screenshot per state the
     /// first time it appears. As the Assassin (<c>-cw_perk Assassin_Spoiler</c>): <c>mark-draw</c> (mid-sweep),
     /// <c>mark-hunt-offscreen</c>, <c>mark-onscreen</c>, <c>mark-ambush-ready</c>, <c>mark-kill</c>, <c>mark-walled</c> (later marks
-    /// walk to the target's base and wait for it to be home), <c>mark-end</c> (0.6 s after a mark ends). As anyone else with
+    /// walk to the target's base and wait for it to be home), <c>mark-end</c> (0.6 s after a mark ends), <c>mark-arming</c> (the
+    /// marker counting down to the arm) and <c>mark-live</c> (just armed). The stun is timed to the arm the way the Spoiler bot
+    /// times it (<see cref="BotTactics.NextMarkStep"/>): it must still run when the 3 s arm ends. As anyone else with
     /// <c>-cw_botperks Assassin_Spoiler,Assassin_Spoiler,Assassin_Spoiler</c>: <c>victim-marked</c>, <c>victim-far</c>,
-    /// <c>victim-close-visible</c>, <c>victim-close-invisible</c>, <c>victim-end</c>. Every run: <c>playagain-clean</c> 2 s into round
+    /// <c>victim-close-visible</c>, <c>victim-close-invisible</c>, <c>victim-end</c>, <c>victim-arming</c>, <c>victim-live</c>. Every run: <c>playagain-clean</c> 2 s into round
     /// 2 (<c>-Rounds 2</c>), and a log line with Death Mark's cooldown at each GO.
     /// </summary>
     /// <remarks>
@@ -32,6 +34,7 @@ namespace CluckWars.Diagnostics
         private float _shellHookAt = -10f;
         private bool _shotDraw, _shotOff, _shotOn, _shotAmbush, _shotKill, _shotWalled, _shotEnd;
         private bool _shotVicMarked, _shotVicFar, _shotVicClose, _shotVicInvisible, _shotVicEnd, _shotRound2;
+        private bool _shotArming, _shotLive, _shotVicArming, _shotVicLive;
         private float _markLockedAt = -1f, _markEndedAt = -1f;
         private MarkRole _lastMarkRole;
         private long _lastMarkHunter;
@@ -178,6 +181,8 @@ namespace CluckWars.Diagnostics
                 !o.AmbushLit && Settled("on"))
                 Capture(ref _shotOn, "mark-onscreen");
             if (o.AmbushLit && Settled("ambush")) Capture(ref _shotAmbush, "mark-ambush-ready");
+            if (MarkHudController.MarkerShownNow && !o.Armed && o.ArmCountdownSeconds <= 2 && Settled("arming")) Capture(ref _shotArming, "mark-arming");
+            if (MarkHudController.MarkerShownNow && o.Armed && o.LiveScale > 1.05f) Capture(ref _shotLive, "mark-live");
 
             if (o.KillHex)
             {
@@ -186,12 +191,23 @@ namespace CluckWars.Diagnostics
                 return;
             }
 
-            // Stun from close, but only once the lit-Ambush state has been photographed.
+            // Stun from close, but only once the lit-Ambush state has been photographed, and only when it will still be running
+            // at the arm (the Spoiler bot's rule): a stun that ends before the arm is a wasted Ambush.
             if (!_shotAmbush && o.AmbushLit) return;
+            float armLeft = exec.ArmRemaining, windowLeft = exec.WindowTimer.RemainingTime(self.Runner) ?? 0f;
+            var passive = target.Abilities != null ? target.Abilities.Passive : null;
             for (int s = 0; s < AbilityController.SlotCount; s++)
             {
                 var a = abilities.GetSlot(s);
-                if (FixedKit.EmitsStun(a) && abilities.IsReady(s) && a.IsUsable(self)) PressOnce(s);
+                if (!FixedKit.EmitsStun(a) || !abilities.IsReady(s) || !a.IsUsable(self)) continue;
+                float secs = passive != null ? passive.ModifyControlDuration(a.EmittedControl.Seconds, target) : a.EmittedControl.Seconds;
+                // Both presses here are held HoldSeconds before they cast, so the hold cancels out; the Kill's ~6 photo frames
+                // (~0.1 s) fit inside the bot rule's StunLeadMargin.
+                if (BotTactics.NextMarkStep(true, false, armLeft, windowLeft, a.WouldAffect(self, target), secs) == BotMarkStep.Stun)
+                {
+                    _log.Info(Source, Inv($"AutoTest markshots stun: slot {s} with the arm {armLeft:0.00} s away, {secs:0.00} s on {target.name}"));
+                    PressOnce(s);
+                }
             }
         }
 
@@ -207,6 +223,8 @@ namespace CluckWars.Diagnostics
             _autoPlay.SteerOverride = self.transform.position.XZ();
 
             if (o.ToastAlpha >= 0.95f) Capture(ref _shotVicMarked, "victim-marked");
+            if (o.ClockAlpha >= 1f && !o.Armed && o.ToastAlpha <= 0f && Settled("vic-arming")) Capture(ref _shotVicArming, "victim-arming");
+            if (o.ClockAlpha >= 1f && o.Armed && o.LiveScale > 1.05f) Capture(ref _shotVicLive, "victim-live");
             // Far: the darkness at its steady state (dim 1, held >= 0.3 s past its fade-in) and the toast gone, so the frame
             // shows what the victim lives with for the mark's whole life.
             if (MarkHudController.HunterBadgeShownNow && o.Cold <= 0f && o.Dim >= 1f && o.ToastAlpha <= 0f &&
