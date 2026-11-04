@@ -572,9 +572,9 @@ it at all, cannot hand-pick it, and cannot execute.
 | Stage | Condition | Counterplay |
 |---|---|---|
 | **Mark** | Press → a living rival anywhere on the map, picked at random but **likelier the farther it is from its own base**. The target sees it is marked. | Reach your base in time, where nothing reaches you |
-| **Hunt** | The Assassin has **4 s** to find it (3.4 s after the arm floor) | Escape: stay out of his reach until the timer runs out |
-| **Stun** | The target is stunned (his own Ambush, or *any* stun) | Don't get stunned |
-| **Kill** | Press again while it is stunned, within **8 m**, with no base wall between, and the Assassin is not stunned (a stunned Assassin cannot cast anything) | — |
+| **Hunt** | The Assassin has **4 s** to find it and close in; the Kill is only possible in the **last 1.0 s** (the 3 s arm is a gameplay beat) | Escape: stay out of his reach until the timer runs out, or walk home |
+| **Stun** | The target must be stunned **when the Kill lands** (his own Ambush, or *any* stun; one that began before the arm and is still running counts) | Don't get stunned |
+| **Kill** | Press again in the last 1.0 s while it is stunned, within **8 m**, with no base wall between, and the Assassin is not stunned (a stunned Assassin cannot cast anything) | — |
 
 No isolation: the mark ignores crowds. The only defences are not being stunned, escaping, and reaching your base in time.
 A shell (Turtle Mode, walk or lock) also makes you unkillable while it lasts: a shelled chicken cannot be executed
@@ -586,28 +586,46 @@ On success the victim's **entire cargo transfers to the Assassin as a capacity-e
 running ability, control state and effect window ends at the removal (stun, root, slow, invisibility, steal-proof, any
 mark it holds); its **cooldowns keep running**. It then **respawns at its own base** (its corner's spawn point, through
 the round reset's teleport, so it never smears across the map and never lands in a rival base) with **no cargo**, and
-sees a short **BACK IN!** cue. On failure Death Mark takes a **reduced cooldown**, so he re-marks fast.
+sees a short **BACK IN!** cue. On failure Death Mark takes a **reduced cooldown** (5 s), so he re-marks fast; after a kill it is **10 s** (15 s until 2026-11-04).
 **Each round opens with Death Mark on a 4 s cooldown at GO** (`RoundStartCooldownSeconds`), PLAY AGAIN included, so
 the first mark is not wasted on targets still at home.
 
 **Spec v2 (Maestro, 2026-10-31).** The press marks a **living rival anywhere on the
 map**, chosen at random and weighted toward birds far from home (see below): no mark range, no isolation. Decoys are never picked, and the next mark can never be the last one unless that bird is the
 only rival (no time release; reset each round). The Assassin then finds it, stuns it and presses again. The Kill needs the target
-**stunned now**, not shelled, the Assassin free to cast, within **KillRange 8 m**, and no base wall between them. The mark lasts **4 s** (12 s until 2026-11-03, 7 s until 2026-11-04). A Kill cannot qualify in the first 0.6 s, which only
-lets the mark reach the victim's authority, so there are 3.4 s to stun and kill. Only expiry, a kill or the target leaving play ends a mark: it survives
+**stunned now**, not shelled, the Assassin free to cast, within **KillRange 8 m**, and no base wall between them. The mark lasts **4 s** (12 s until 2026-11-03, 7 s until 2026-11-04). A Kill cannot qualify before the **arm, 3.0 s** (`ArmSeconds`; 0.6 s until 2026-11-04, then only a replication floor), so the Kill happens in the **last 1.0 s** of the mark. Only expiry, a kill or the target leaving play ends a mark: it survives
 range, crowds and the target going home, where no ability reaches it, so the timer can run out. Expiry costs the fail cooldown (5 s);
-a kill 15 s. All numbers are on `MarkKill.asset`. The bounty is paid on the victim's kill report, so a refused kill pays nothing.
+a kill 10 s (15 s until 2026-11-04). All numbers are on `MarkKill.asset`. The bounty is paid on the victim's kill report, so a refused kill pays nothing.
 
 **Weighted pick (Maestro, 2026-11-04).** A 7 s mark left the victim time to walk home, so the interaction died. The window is 4 s and
-the pick favours birds far from home: each candidate rolls `roll * w * w`, where `w` is its planar distance to its own base over the
-longest base-to-base distance (the diagonal, read from the live bases), clamped to 0..1; the highest score wins. A bird at home
+the pick favours birds far from home and, softly, far from the Assassin: each candidate rolls `roll * w * w * a`. `w` is its planar
+distance to its own base over the longest base-to-base distance (the diagonal, read from the live bases, 61.7 m), clamped to 0..1.
+`a = 0.25 + 0.75 * clamp01(distance to the Assassin / (span / 3))`, where span / 3 is about 20.6 m. A rival next to the Assassin keeps a
+quarter weight, so nobody is unmarkable; marks that start inside the 10.2 m lunge drop from 40% to 27% with the Assassin camping the
+centre, and from 15% to 10% roaming (Monte Carlo, mechanics-designer). The highest score wins. A bird at home
 scores 0 and is never picked while another candidate is away from home; if every score is 0 the pick is uniform, so a mark always
 lands when a rival exists (`MarkPickRules`, authority side, rolls from `UnityEngine.Random`). The last mark is still excluded
 unless it is the only rival. **Stealing from an Assassin:** the bounty bag counts as carried food for every steal (Snatch, Sneaky
 Steal, Scrap, Roll Trample, Spine Coat): a steal drains the beak first, then the bag (`StealRules.Stealable`, `SplitDrain`).
 
+**The 3 s arm and the stun at the kill (Maestro, 2026-11-04).** `ArmSeconds` is 3.0, so the Kill is possible only in the last
+1.0 s of the 4 s window. The stun must be active when the Kill lands; a stun that began before the arm and is still running counts.
+Ambush stuns for 1.0 s (0.6 s on Slippery, 0.65 s on Bulwark), so the Assassin times Ambush into roughly `[arm - stun, window)`.
+The victim's authority times the arm itself (verdict `NotArmed`, allowance 0.5 s) and checks its own stun (stunned on arrival or
+within one capped network latency, verdict `NotStunned`). **Cooldowns:** 4 s at GO, 5 s after a miss, 10 s after a kill. That allows
+at most 3 kills in a 45 s round (press 4, kill 7.3, press 17.3, kill 20.6, press 30.6, kill 33.9; a 4th press at 43.9 cannot arm
+before 45 s); any miss costs 9 s. **Ambush** cooldown is 8 s (was 10), longer than the 4 s window: never a second stun in one hunt,
+and the stun is ready for the next. **Shadowstep** lasts 0.18 s (was 0.25): dash 3 x 12.15 x 0.18 = 6.56 m, lunge with Ambush's 3.6 m
+reach = 10.2 m. With Underdog Surge the dash is 9.19 m, under the 9.85 m gap between two pinwheel arms, so it cannot cross two arms even with Underdog.
+**Walk home.** With a 3 s arm a victim within about 21-29 m of home (class and stun length dependent) who walks home is safe: about
+29-36% of marks. **D5:** a stun lands on a Turtle-walking chicken but it still cannot be executed (steal-proof = shelled), and Turtle's lock and Immovable are control-immune, so
+Hoarder and Bulwark can cover the whole kill span with one well-timed button (open for Maestro). **Bounty economy (D4):** the Assassin earns only from executes (victim cargo
+plus `ExecuteBounty` 5, doubled on the leader only during the rare LeaderBounty event). `MatchConfig.SpoilerBounty` 15 is read by no
+code; what is paid is `Spoiler.asset` BonusFood 15 at timer expiry with no winner. Mean victim cargo is about 5.7, so 3 banked kills are
+about 32 food, 8 short of 40; 2 kills plus the Spoiler bonus about 36.5; 2 kills alone about 21.5. No rule added; `ExecuteBounty` 8 would make 3 kills about 41.
+
 **Feedback (redesign 2026-11-03; all local presentation read from replicated state, every number in `FeedbackTuning`).**
-- **Assassin.** The press runs a ~0.6 s *draw*: a highlight sweeps the standings rows (a tick per row) and locks on the
+- **Assassin.** (The arm reads for every role: a countdown digit on the hunt marker until the arm, KILL stays dark until then, and a sting plays at the arm for each role.) The press runs a ~0.6 s *draw*: a highlight sweeps the standings rows (a tick per row) and locks on the
   target (lock sting); reduced motion skips the sweep. Then **one hunt marker**: a disc with a skull in the **target's own
   player colour**, a ring draining over the mark's life, and the distance beneath. Off screen it is pinned to the edge
   pointing at the target; on screen it sits above the target pointing down, kept off the local You plate and the
@@ -616,13 +634,13 @@ Steal, Scrap, Roll Trample, Spine Coat): a steal drains the beak first, then the
   shows a skull. The Ambush hex lights while the target is inside Ambush's reach (read from the ability); the Death Mark
   hex becomes a big yellow **KILL** exactly while a kill is possible, with a sting. During a mark only the Ambush range
   guide stays on. No banner, no magenta arrow, no chevrons, no kill ring.
-- **Victim.** A short **MARKED!** toast with a sting, then the screen stays **darkened** (heavier at the edges, nothing
+- **Victim.** A short **MARKED!** toast with a sting; the clock pill reads **LIVE IN 3 / 2 / 1** while the mark arms, then a red **LIVE 1s** that pops and pulses. The screen stays **darkened** (heavier at the edges, nothing
   over the centre) for the mark's life; the time left sits beside the match clock and its own row shows the skull. With
   the Assassin outside the inner circle (the floor-arrow ring radius) its rival arrow carries a skull, shown even while
   it is invisible. Inside, no arrow: the darkness turns **cold violet and desaturated**, the same whether it is visible
   or not, plus an almost imperceptible red (~7%) if it is invisible. Hysteresis: in at the ring radius, out only beyond
   1.3x it for 1 s; fades 0.4 s in, 1 s out. No heartbeat.
-- **Everyone else** sees only the skull on the marked player's standings row (information, not a defence).
+- **Everyone else** sees only the skull on the marked player's standings row (information, not a defence); it turns red and pulses at the arm, for observers too.
 - **End of mark:** every ending (kill, expiry, removal, either player leaving, host migration, round reset, match end,
   scene unload) removes everything for all three viewpoints with a 0.3 s fade.
 - Stings (draw tick, lock, marked, kill ready) go through `IAudioService`; **all four are placeholder clips** (brief:
@@ -746,11 +764,11 @@ shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 | | Sticky Egg 🌱 | 7 s | Drops a sticky egg; the first chicken to step on it is STUCK for 2 s. (Was "Root Egg"; the C# type `RootEggAbilitySO` and asset keep the old name.) |
 | | Spine Coat 🦔 | 8 s | For 2 s, any rival who bumps into you (comes within the collision radius) loses 4 food to you and is knocked away. Triggers on proximity, not on being hit. |
 | | Turtle Mode 🐢 | 10 s | **Walk, then lock** (Egg Shell merged in, 2026-11-03). First press: shell walk for 3 s at half speed (0.5x), steal-proof and unkillable; still stunnable, stuck-able, slowable and pushable. Second press during the walk: lock in place for up to 2 s, immobile and immune to stun, root, slow and shove, still steal-proof and unkillable; a third press ends the lock early; the lock ends the ability. A stun during the walk blocks the lock (stuns block casts). The walk ends at 3 s if you never lock, with the full cooldown. Cooldown 10 s from the first press in every path. Fatty only. The hex shows the walk's remaining time. |
-| **Assassin** | Ambush 🗡️ | 10 s | Stuns rivals within 3.6 m for 1 s — sets up his own execute. |
+| **Assassin** | Ambush 🗡️ | 8 s (10 s until 2026-11-04) | Stuns rivals within 3.6 m for 1 s — sets up his own execute. |
 | | Doppelganger 👥 | 11 s | Decoy copy beside you for 4 s that soaks attacks. |
 | | Invisibility 👻 | 8 s | Fades you to a ghostly outline for 4 s. Using a move breaks it. (Assassin-only now — was also Speedy.) |
-| | Death Mark 🎯 *(Assassin specialization Peck-slot pre-equip; pre-equip-only)* | 5 s | The execute — see §6.4. Marks a rival anywhere for 4 s, likelier far from home; stun them within 8 m, then press again to take everything they carry. Opens each round on a 4 s cooldown. |
-| | Shadowstep 👤 | 4 s | Dashes forward at 3x speed for 0.25 s (about 9.1 m; 0.4 s / 6 s until 2026-11-03), straight over walls (Assassin-only — was briefly also Speedy by asset drift, corrected; Speedy is permanently denied all terrain traversal, §5.2). |
+| | Death Mark 🎯 *(Assassin specialization Peck-slot pre-equip; pre-equip-only)* | 5 s (miss; 10 s after a kill) | The execute — see §6.4. Marks a rival anywhere for 4 s, likelier far from home and from the Assassin; the Kill is only possible in the last 1.0 s (3 s arm); stun them within 8 m, then press again to take everything they carry. Opens each round on a 4 s cooldown. |
+| | Shadowstep 👤 | 4 s | Dashes forward at 3x speed for 0.18 s (about 6.6 m; 0.25 s until 2026-11-04, 0.4 s / 6 s until 2026-11-03), straight over walls (Assassin-only — was briefly also Speedy by asset drift, corrected; Speedy is permanently denied all terrain traversal, §5.2). |
 | | Smoke Roost 🌁 | 11 s | Cloud at his own feet (4 m, 5.5 s) — he fades, rivals inside slow to 55% speed. Using a move breaks the fade (the cloud stays). Pairs with hunting a mark: the target slows inside the cloud, and the Assassin fades. |
 | | Snatch 🤏 *(moved from Common)* | 3 s | Robs 5 food from every rival within 4.3 m ahead and shoves them back. Assassin-only now — a universal AoE steal is exactly the Assassin's core, and diluted the class. |
 | | Sneaky Steal 🤏 *(Thief signature)* | 5 s | Yanks 6 food from the nearest carrier within 5.4 m. The same bird only every 10 s. |
@@ -789,8 +807,8 @@ tier, and five shipped moves sit on 7.
 | Tier | Range | Shipped (cooldown read from the `.asset` files, before passives) |
 |---|---|---|
 | **Quick** | 3–5 s | Roll & Push 3, Snatch 3, Headbutt 4, Scrap 5, Feint 5, Sneaky Steal 5, Death Mark 5, Shadowstep 4 |
-| **Standard** | 6–9 s | Ruffle 6, Dust Kick 6, Speed Burst 6, Dive Bomb 6, Sticky Egg 7, Cluck Shock 7, Feather Aura 7, Feather Trap 7, Spine Coat 8, **Wing Slam 8**, Invisibility 8, Ground Quake 9 |
-| **Heavy** | 10–12 s | Turtle Mode 10, Belly Flop 10, Ambush 10, Smoke Roost 11, Doppelganger 11, Immovable 12, Quick Drop 12 |
+| **Standard** | 6–9 s | Ruffle 6, Dust Kick 6, Speed Burst 6, Dive Bomb 6, Sticky Egg 7, Cluck Shock 7, Feather Aura 7, Feather Trap 7, Spine Coat 8, **Wing Slam 8**, Invisibility 8, Ground Quake 9, Ambush 8 |
+| **Heavy** | 10–12 s | Turtle Mode 10, Belly Flop 10, Smoke Roost 11, Doppelganger 11, Immovable 12, Quick Drop 12 |
 
 **The Heavy rule:** a move earns a Heavy cooldown only if it gives **immunity** (control
 immunity or steal-proofing), a **hard AoE stun of at least 1.4 s**, or an **economy burst**
@@ -800,8 +818,8 @@ its stun 1.5 → 1.3 s (A4; pre-agreed fallback 9 s / 1.5 s if the human session
 "stunned too often").
 
 Known exceptions, deliberately **not** moved until a human 4-player session (any tier move
-other than Wing Slam needs a playtest): Ambush (1.0 s stun), Smoke Roost and Doppelganger
-sit in Heavy without meeting the rule. Peck (per-class, about 0.7–0.8 s) is foraging cadence
+other than Wing Slam needs a playtest): Smoke Roost and Doppelganger
+sit in Heavy without meeting the rule (Ambush moved to Standard with its 8 s cooldown, 2026-11-04). Peck (per-class, about 0.7–0.8 s) is foraging cadence
 governed by the SCT axiom, not a tiered move.
 
 Exact per-ability values (steal amounts, stun/slow durations, radii, cooldowns) are tuned

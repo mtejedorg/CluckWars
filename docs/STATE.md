@@ -6,6 +6,26 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🛠 2026-11-04 (later) - Death Mark: 3 s arm, stun live at the kill, pick away from the Assassin (`balance`, commits `012e1ba8`..`7b7aa7d7`, not merged, not pushed)
+
+- **Why:** Maestro's rulings after the 4 s window: the arm becomes a gameplay beat, the kill needs a live stun, the pick also weighs distance to the Assassin, and the cooldowns and dash are retuned. Numbers read from `MarkKill.asset`, `Ambush.asset`, `Shadowstep.asset`, `MatchConfig.asset`. Docs updated: GDD 6.4 and 7.x tables, `docs/balance/human-test-baseline.md`, `docs/site/mechanics.html` (`index.html` has none of these numbers).
+- **Arm:** `ArmSeconds` 0.6 -> **3.0**; a Kill is only possible in the last 1.0 s of the 4 s window. **Stun at the kill:** must be active when the Kill lands; a stun begun before the arm and still running counts. Ambush stun 1.0 s (0.6 s Slippery, 0.65 s Bulwark), so Ambush is timed into roughly [arm - stun, window).
+- **Victim authority:** times the arm itself (verdict `NotArmed`, allowance 0.5 s) and checks its own stun records: stunned when the Kill lands or within one capped network latency (0.15-0.5 s), verdict `NotStunned` (`7b7aa7d7`). Risk: a remote honest press in the last ~RTT of a stun can be refused; watch for `NotStunned` Warn lines in playtests (fix would be a one-tick slack).
+- **Pick:** score `roll * w * w * a`; w = distance to own base / 61.7 m span (0..1); a = 0.25 + 0.75 * clamp01(distance to the Assassin / 20.6 m). A rival next to him keeps a quarter weight. Last-mark exclusion and the all-zero uniform fallback unchanged. Monte Carlo (mechanics-designer): marks starting inside the 10.2 m lunge fall from 40% to 27% (Assassin camping the centre) and from 15% to 10% (roaming).
+- **Cooldowns:** GO 4 s and miss 5 s unchanged; after a kill 15 -> **10 s**. At most 3 kills per 45 s round (press 4, kill 7.3, press 17.3, kill 20.6, press 30.6, kill 33.9; a 4th press at 43.9 cannot arm before 45 s); any miss costs 9 s. **Ambush** cooldown 10 -> **8 s** (data only; above the 4 s window, so never a second stun in one hunt). **Shadowstep** duration 0.25 -> **0.18 s**: dash 6.56 m, lunge with Ambush 10.2 m; with Underdog Surge 9.19 m, under the 9.85 m two-arm gap, so it no longer crosses two pinwheel arms.
+- **Feedback (the arm reads for every role):** victim clock pill "LIVE IN 3/2/1" then a red "LIVE 1s" that pops and pulses; Assassin hunt marker shows a countdown digit until the arm and KILL stays dark until then; the standings skull turns red and pulses at the arm for everyone, observers included; a sting plays at the arm for each role. **Bot:** casts its stun only when it will still run 0.25 s past the arm.
+- **Tests:** EditMode 2781/2781 passing (batch, `unity test`).
+- **Open for Maestro:**
+  - **D4 bounty gap (finding, nothing changed):** the Assassin earns from executes only (victim cargo plus `ExecuteBounty` 5, x2 on the leader only during the rare LeaderBounty event). `MatchConfig.SpoilerBounty` 15 is read by no code; what is paid is `Spoiler.asset` BonusFood 15 at timer expiry with no winner. Mean victim cargo about 5.7: 3 banked kills about 32 food (8 short of 40), 2 kills plus Spoiler 15 about 36.5, 2 kills alone about 21.5. Unruled lever: `ExecuteBounty` 5 -> 8 makes 3 kills about 41. No instant-win rule added.
+  - **D5 shells (recorded, unchanged):** a stun lands on a Turtle-walking chicken but it still cannot be executed (steal-proof = shelled); Turtle's lock and Immovable are control-immune, so no stun lands. Hoarder and Bulwark can cover the whole kill span with one well-timed button.
+  - **Walk home is safe:** with a 3 s arm, a victim within about 21-29 m of home (class and stun length dependent) who walks home is safe: about 29-36% of marks. Intended?
+  - **Pick reading:** please confirm the "inverse" reading of the Assassin-distance factor (far from the Assassin is favoured, a close rival keeps a quarter weight).
+  - **PC scenario run pending:** the `Builds/` EXE predates these commits; a fresh dev-tools build is needed before the scenario matrix and a human pass.
+- **Deferred, unchanged:** D6 Bully, D8 Smoke Roost, D9 bounty bag on kill, D10 Invisibility.
+- **Protocol:** not re-audited in this doc pass; the arm timing and the pick differ in behaviour, so keep all peers on one SHA.
+
+---
+
 ## 🛠 2026-11-04 - Mark window 4 s, far-from-home weighted pick, Assassins can be stolen from (`balance`, not merged, not pushed)
 
 - **Why:** Maestro's playtest: a 7 s mark left the victim time to walk home. He wants the Assassin to rush and the victim to choose; the pick should favour birds far from home; an Assassin carrying food must be stealable.

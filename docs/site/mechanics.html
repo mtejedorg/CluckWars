@@ -176,21 +176,21 @@
   <section id="deathmark">
     <h2>Death Mark: one button, two presses</h2>
     <!-- Source: docs/GDD.md §6.4 -->
-    <p>The Assassin's execute is the only hard removal in the game. Only the Assassin specialization has it, in the first of the four ability slots. The press marks a rival anywhere on the map for 4 s, picked at random but likelier the farther it is from its own base; the Assassin must find it, stun it and press again within 8 m. Each round opens with Death Mark on a 4 s cooldown. No ability crosses a claimed base wall, so a bird at home cannot be reached and the mark can run out.</p>
+    <p>The Assassin's execute is the only hard removal in the game. Only the Assassin specialization has it, in the first of the four ability slots. The press marks a rival anywhere on the map for 4 s, picked at random but likelier the farther it is from its own base and, softly, from the Assassin; the Assassin must find it, stun it and press again within 8 m, in the last second of the mark. Each round opens with Death Mark on a 4 s cooldown. No ability crosses a claimed base wall, so a bird at home cannot be reached and the mark can run out.</p>
     <div class="tw wide">
       <table>
         <thead><tr><th>Stage</th><th>Condition</th><th>Counterplay</th></tr></thead>
         <tbody>
           <tr><td>Mark</td><td>First press marks a living rival anywhere on the map, likelier one far from its own base. The target can see the mark.</td><td>Reach your base in time: no ability crosses a base wall.</td></tr>
-          <tr><td>Hunt</td><td>The Assassin has 4 seconds to find it (3.4 s of them after the 0.6 s arm).</td><td>Escape: stay out of reach until the timer runs out.</td></tr>
-          <tr><td>Stun</td><td>The marked target enters a stun, from any source.</td><td>Don't get stunned.</td></tr>
-          <tr><td>Kill</td><td>Press again within 8 m while the target is stunned, not shelled, and the Assassin is not stunned.</td><td>&mdash;</td></tr>
+          <tr><td>Hunt</td><td>The Assassin has 4 seconds to find it and close in. The mark arms after 3 s: a Kill is only possible in the last 1.0 s.</td><td>Escape: stay out of reach until the timer runs out, or walk home (a victim within about 21 to 29 m of home is safe).</td></tr>
+          <tr><td>Stun</td><td>The marked target must be stunned when the Kill lands, from any source (a stun that began before the arm and is still running counts). Ambush stuns for 1 s, 0.6 s on Slippery, 0.65 s on Bulwark.</td><td>Don't get stunned.</td></tr>
+          <tr><td>Kill</td><td>Press again in the last second, within 8 m, while the target is stunned, not shelled, and the Assassin is not stunned.</td><td>&mdash;</td></tr>
         </tbody>
       </table>
     </div>
     <p>No isolation: the mark ignores crowds. The only defences are not being stunned, escaping, and reaching your base in time. A shell (Turtle Mode) also makes you unkillable while it lasts.</p>
-    <p>On success the victim's whole cargo moves to the Assassin as a bounty bag that ignores the capacity limit. The bag can be stolen like any other load: a steal takes the beak first, then the bag. The victim is out for 3 seconds, then respawns at its own base with no cargo; its cooldowns keep running. If the execute fails, Death Mark takes a reduced cooldown so the Assassin can re-mark quickly.</p>
-    <p>What each player sees: the Assassin gets one marker in the target's own colour (a skull, a draining ring and the distance), a skull on the target's standings row, and a big yellow KILL button exactly while a kill is possible. The marked player gets a MARKED! warning, a darkened screen for as long as the mark lasts, the time left beside the clock, and a skull on the Assassin's arrow; when the Assassin is close the darkness turns cold violet. Everyone else sees only the skull on the standings.</p>
+    <p>On success the victim's whole cargo moves to the Assassin as a bounty bag that ignores the capacity limit. The bag can be stolen like any other load: a steal takes the beak first, then the bag. The victim is out for 3 seconds, then respawns at its own base with no cargo; its cooldowns keep running. If the execute fails, Death Mark takes a reduced cooldown (5 s) so the Assassin can re-mark quickly; after a kill it is 10 s, so a round holds at most three kills.</p>
+    <p>What each player sees: the Assassin gets one marker in the target's own colour (a skull, a draining ring and the distance), a skull on the target's standings row, and a big yellow KILL button exactly while a kill is possible (until the arm the marker shows a countdown digit and KILL stays dark). The marked player gets a MARKED! warning, a darkened screen for as long as the mark lasts, a clock pill reading LIVE IN 3, 2, 1 while the mark arms and then a red, pulsing LIVE 1s, and a skull on the Assassin's arrow; when the Assassin is close the darkness turns cold violet. Everyone else sees only the skull on the standings, which turns red and pulses when the mark goes live. A sting plays at the arm for each role.</p>
   </section>
 
   <section id="abilities">
@@ -235,11 +235,11 @@
           <tr data-c="fatty"><td>Spine Coat <span class="tag t-fatty">Fatty</span></td><td class="num">8 s</td><td>For 2 s, a rival who bumps into you loses 4 food to you and is knocked away.</td></tr>
           <tr data-c="fatty"><td>Turtle Mode <span class="tag t-fatty">Fatty</span></td><td class="num">10 s</td><td>Walk, then lock. Shell walk for 3 s at half speed: nobody can steal your food or execute you, but you can still be stunned. Press again to lock in place for up to 2 s: immobile, nothing pushes or stops you. Cooldown from the first press.</td></tr>
 
-          <tr data-c="assassin"><td>Ambush <span class="tag t-assassin">Sneaky</span></td><td class="num">10 s</td><td>Stuns rivals within 3.6 m for 1 s. Sets up the execute.</td></tr>
+          <tr data-c="assassin"><td>Ambush <span class="tag t-assassin">Sneaky</span></td><td class="num">8 s</td><td>Stuns rivals within 3.6 m for 1 s (0.6 s on Slippery, 0.65 s on Bulwark). Sets up the execute.</td></tr>
           <tr data-c="assassin"><td>Doppelganger <span class="tag t-assassin">Sneaky</span></td><td class="num">11 s</td><td>A decoy copy beside you for 4 s.</td></tr>
           <tr data-c="assassin"><td>Invisibility <span class="tag t-assassin">Sneaky</span></td><td class="num">8 s</td><td>Fades you to a ghostly outline for 4 s. Using a move breaks it.</td></tr>
-          <tr data-c="assassin"><td>Death Mark <span class="tag t-assassin">Sneaky</span></td><td class="num">5 s</td><td>The execute. Marks a rival anywhere for 4 s, likelier far from home; within 8 m, stun them, then press again to take everything they carry. Starts each round on a 4 s cooldown. Assassin only.</td></tr>
-          <tr data-c="assassin"><td>Shadowstep <span class="tag t-assassin">Sneaky</span></td><td class="num">4 s</td><td>Dashes forward at 3× speed for 0.25 s (about 9 m), straight over walls.</td></tr>
+          <tr data-c="assassin"><td>Death Mark <span class="tag t-assassin">Sneaky</span></td><td class="num">5 s</td><td>The execute. Marks a rival anywhere for 4 s, likelier far from home and from you; it goes live after 3 s, so the Kill is in the last second. Cooldown 5 s after a miss, 10 s after a kill. Within 8 m, stun them, then press again to take everything they carry. Starts each round on a 4 s cooldown. Assassin only.</td></tr>
+          <tr data-c="assassin"><td>Shadowstep <span class="tag t-assassin">Sneaky</span></td><td class="num">4 s</td><td>Dashes forward at 3× speed for 0.18 s (about 6.6 m), straight over walls.</td></tr>
           <tr data-c="assassin"><td>Smoke Roost <span class="tag t-assassin">Sneaky</span></td><td class="num">11 s</td><td>A cloud at your feet (4 m, 5.5 s). You fade; rivals inside slow to 55% speed.</td></tr>
           <tr data-c="assassin"><td>Snatch <span class="tag t-assassin">Sneaky</span></td><td class="num">3 s</td><td>Robs 5 food from every rival within 4.3 m ahead and shoves them back.</td></tr>
           <tr data-c="assassin"><td>Sneaky Steal <span class="tag t-assassin">Sneaky</span></td><td class="num">5 s</td><td>Yanks 6 food from the nearest carrier within 5.4 m; the same bird only every 10 s.</td></tr>
@@ -254,12 +254,12 @@
         <thead><tr><th>Tier</th><th>Range</th><th>Abilities</th></tr></thead>
         <tbody>
           <tr><td>Quick</td><td class="num">3 to 5 s</td><td>Roll &amp; Push, Snatch, Headbutt, Shadowstep, Scrap, Feint, Sneaky Steal, Death Mark</td></tr>
-          <tr><td>Standard</td><td class="num">6 to 9 s</td><td>Ruffle, Dust Kick, Speed Burst, Dive Bomb, Sticky Egg, Cluck Shock, Feather Aura, Feather Trap, Spine Coat, Wing Slam, Invisibility, Ground Quake</td></tr>
-          <tr><td>Heavy</td><td class="num">10 to 12 s</td><td>Turtle Mode, Belly Flop, Ambush, Smoke Roost, Doppelganger, Immovable, Quick Drop</td></tr>
+          <tr><td>Standard</td><td class="num">6 to 9 s</td><td>Ruffle, Dust Kick, Speed Burst, Dive Bomb, Sticky Egg, Cluck Shock, Feather Aura, Feather Trap, Spine Coat, Wing Slam, Invisibility, Ambush, Ground Quake</td></tr>
+          <tr><td>Heavy</td><td class="num">10 to 12 s</td><td>Turtle Mode, Belly Flop, Smoke Roost, Doppelganger, Immovable, Quick Drop</td></tr>
         </tbody>
       </table>
     </div>
-    <p>A move earns a Heavy cooldown only if it gives immunity (control immunity or steal-proofing), a hard area stun of at least 1.4 s, or an economy burst. Ambush, Smoke Roost and Doppelganger sit in Heavy without meeting that rule, and the design document leaves them there until a human four-player session. Peck is foraging cadence set by the Solo Clear Time axiom, not a tiered move.</p>
+    <p>A move earns a Heavy cooldown only if it gives immunity (control immunity or steal-proofing), a hard area stun of at least 1.4 s, or an economy burst. Smoke Roost and Doppelganger sit in Heavy without meeting that rule, and the design document leaves them there until a human four-player session. Peck is foraging cadence set by the Solo Clear Time axiom, not a tiered move.</p>
   </section>
 
   <section id="casting">
