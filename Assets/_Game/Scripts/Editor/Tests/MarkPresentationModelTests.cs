@@ -24,6 +24,8 @@ namespace CluckWars.Tests
             public bool MatchRunning = true, ReducedMotion, BannerMayShow = true;
             public bool CanKillNow, AmbushReady, Walled, HunterInvisible, HunterHidden;
             public float Distance = 20f, HunterDistance = 20f, Remaining = 12f, Window = 12f, Arm = 0.6f;
+            /// <summary>Seconds to the arm (the replicated ArmTimer); 0 = armed, the default of the older tests.</summary>
+            public float ArmRemaining;
             public readonly MarkPresentationModel Model = new MarkPresentationModel();
             private long _shownHunter;
 
@@ -50,7 +52,7 @@ namespace CluckWars.Tests
                 var input = new MarkInputs
                 {
                     MatchRunning = MatchRunning, ReducedMotion = ReducedMotion, BannerMayShow = BannerMayShow,
-                    Role = r.Role, MarkKey = r.Key, Remaining = Remaining, Window = Window, ArmSeconds = Arm,
+                    Role = r.Role, MarkKey = r.Key, Remaining = Remaining, Window = Window, ArmSeconds = Arm, ArmRemaining = ArmRemaining,
                     Distance = Distance, CanKillNow = CanKillNow, AmbushReadyOnTarget = AmbushReady, Walled = Walled,
                     HunterInvisible = HunterInvisible, HunterHiddenFromView = HunterHidden, HunterDistance = HunterDistance, InnerRadius = R,
                 };
@@ -584,6 +586,148 @@ namespace CluckWars.Tests
             Assert.AreEqual(MarkRole.Assassin, o.Role);
             Assert.AreEqual(0f, o.Dim);
             Assert.AreNotEqual(MarkEvents.None, events & MarkEvents.Lock, "then the new mark's draw runs");
+        }
+
+        // ---- The arm: kill live (Maestro 2026-11-04, 3 s arm in a 4 s mark) ---------------------------------------------
+
+        /// <summary>Steps a mark through <paramref name="seconds"/> of its life with the replicated timers counting down;
+        /// returns every event seen and the last outputs.</summary>
+        private static MarkEvents LiveFor(World w, float seconds, out MarkOutputs last)
+        {
+            var all = MarkEvents.None;
+            last = default;
+            int n = Mathf.Max(1, Mathf.RoundToInt(seconds / Dt));
+            for (int i = 0; i < n; i++)
+            {
+                last = w.Step();
+                all |= last.Events;
+                w.Remaining = Mathf.Max(0f, w.Remaining - Dt);
+                w.ArmRemaining = Mathf.Max(0f, w.ArmRemaining - Dt);
+            }
+            return all;
+        }
+
+        /// <summary>A fresh 4 s mark with a 3 s arm, in the given role.</summary>
+        private static World FreshMark(MarkRole role)
+        {
+            var w = new World { Window = 4f, Remaining = 4f, Arm = 3f, ArmRemaining = 3f };
+            if (role == MarkRole.Assassin) w.SetMark(Me, Rival);
+            else if (role == MarkRole.Victim) w.SetMark(Rival, Me);
+            else w.SetMark(Rival, Third);
+            return w;
+        }
+
+        [TestCase(MarkRole.Assassin)]
+        [TestCase(MarkRole.Victim)]
+        [TestCase(MarkRole.ThirdParty)]
+        public void Armed_IsFalseBeforeTheArm_AndTrueAfter(MarkRole role)
+        {
+            var w = FreshMark(role);
+            LiveFor(w, 2.9f, out var o);
+            Assert.AreEqual(role, o.Role);
+            Assert.IsFalse(o.Armed, "2.9 s into a 3 s arm");
+            Assert.IsFalse(o.SkullLive);
+            LiveFor(w, 0.2f, out o);
+            Assert.IsTrue(o.Armed, "3.1 s in");
+            Assert.AreEqual(0, o.ArmCountdownSeconds);
+            Assert.IsTrue(o.SkullLive, "the standings skull shows the kill live, for every role");
+        }
+
+        [TestCase(3.0f, 3)]
+        [TestCase(2.4f, 3)]
+        [TestCase(2.0f, 2)]
+        [TestCase(1.01f, 2)]
+        [TestCase(0.01f, 1)]
+        [TestCase(0f, 0)]
+        public void ArmCountdown_RoundsUp_AndIsZeroOnceArmed(float armRemaining, int expected)
+        {
+            var w = FreshMark(MarkRole.Victim);
+            w.ArmRemaining = armRemaining;
+            Assert.AreEqual(expected, w.Step().ArmCountdownSeconds);
+        }
+
+        [TestCase(MarkRole.Assassin)]
+        [TestCase(MarkRole.Victim)]
+        [TestCase(MarkRole.ThirdParty)]
+        public void KillLive_FiresExactlyOncePerMark_AtTheArm(MarkRole role)
+        {
+            var w = FreshMark(role);
+            int fired = 0;
+            float firedAt = -1f;
+            for (int i = 0; i < Mathf.RoundToInt(3.9f / Dt); i++)
+            {
+                var o = w.Step();
+                if ((o.Events & MarkEvents.KillLive) != 0) { fired++; firedAt = i * Dt; }
+                w.Remaining = Mathf.Max(0f, w.Remaining - Dt);
+                w.ArmRemaining = Mathf.Max(0f, w.ArmRemaining - Dt);
+            }
+            Assert.AreEqual(1, fired, role.ToString());
+            Assert.AreEqual(3f, firedAt, 2f * Dt, "at the arm");
+        }
+
+        [Test]
+        public void KillLive_IsNotReplayed_WhenTheSameMarkIsFoundAgain_NorForAMarkFirstSeenArmed()
+        {
+            var w = FreshMark(MarkRole.Victim);
+            Assert.AreNotEqual(MarkEvents.None, LiveFor(w, 3.2f, out _) & MarkEvents.KillLive);
+            var saved = new List<MarkChicken>(w.Chickens);
+            w.Chickens.Clear();                                   // host migration: inputs vanish...
+            LiveFor(w, 0.5f, out var gone);
+            AssertExactlyClean(gone, "faded while away");
+            w.Chickens.AddRange(saved);                           // ...and the same mark comes back, already armed
+            Assert.AreEqual(MarkEvents.None, LiveFor(w, 0.3f, out var o) & MarkEvents.KillLive, "not announced twice");
+            Assert.IsTrue(o.Armed);
+
+            // A view that first meets a mark after its arm (another hunter's mark, now shown) learns it is live, silently.
+            var late = FreshMark(MarkRole.ThirdParty);
+            late.ArmRemaining = 0f;
+            late.Remaining = 0.7f;
+            Assert.AreEqual(MarkEvents.None, LiveFor(late, 0.3f, out o) & MarkEvents.KillLive);
+            Assert.IsTrue(o.Armed && o.SkullLive);
+        }
+
+        [Test]
+        public void VictimClock_CountsDownToTheArm_ThenShowsTheLiveWindow_WithAPop()
+        {
+            var w = FreshMark(MarkRole.Victim);
+            LiveFor(w, 0.5f, out var o);
+            Assert.IsFalse(o.Armed);
+            Assert.AreEqual(3, o.ClockSeconds, "LIVE IN 3 (2.5 s to the arm)");
+            Assert.AreEqual(1f, o.LiveScale, "no beat before the arm");
+            LiveFor(w, 1.0f, out o);
+            Assert.AreEqual(2, o.ClockSeconds, "LIVE IN 2");
+            LiveFor(w, 1.5f + 2f * Dt, out o);                    // just past the arm (3 s in)
+            Assert.IsTrue(o.Armed);
+            Assert.AreEqual(1, o.ClockSeconds, "LIVE 1s: the window's last second");
+            Assert.Greater(o.LiveScale, 1.1f, "the clock pops at the arm");
+            LiveFor(w, 0.5f, out o);
+            Assert.That(o.LiveScale, Is.InRange(1f, 1f + FeedbackTuning.MarkLivePulse + 1e-4f), "then pulses, only upward");
+        }
+
+        [Test]
+        public void TheLiveBeat_IsStillUnderReducedMotion_AndTheAssassinMarkerOnlyPops()
+        {
+            Assert.AreEqual(1f, MarkPresentationModel.LiveScaleAt(0f, pulse: true, reducedMotion: true));
+            Assert.AreEqual(FeedbackTuning.MarkLivePopFrom, MarkPresentationModel.LiveScaleAt(0f, true, false), 1e-5f);
+            Assert.AreEqual(1f, MarkPresentationModel.LiveScaleAt(1.3f, pulse: false, reducedMotion: false), "the marker does not pulse");
+            Assert.AreEqual(1f, MarkPresentationModel.LiveScaleAt(float.PositiveInfinity, true, false));
+        }
+
+        [Test]
+        public void AssassinMarker_StaysDarkUntilTheArm_ThenTurnsToKill()
+        {
+            // CanKillNow is false before the arm (the gate asks the arm), so neither the KILL look nor the hex can show.
+            var w = FreshMark(MarkRole.Assassin);
+            LiveFor(w, 1.5f, out var o);
+            Assert.AreEqual(MarkMarkerMode.Hunt, o.MarkerMode);
+            Assert.IsFalse(o.KillHex);
+            Assert.AreEqual(2, o.ArmCountdownSeconds, "the marker counts down to LIVE");
+            LiveFor(w, 1.6f, out o);
+            w.CanKillNow = true;                                  // armed and stunned
+            o = w.Step();
+            Assert.IsTrue(o.Armed);
+            Assert.AreEqual(MarkMarkerMode.Kill, o.MarkerMode);
+            Assert.IsTrue(o.KillHex);
         }
 
         [Test]

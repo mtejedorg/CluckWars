@@ -67,6 +67,7 @@ namespace CluckWars.UI
         private Label            _markClockText, _markToastText;
         private bool             _toastShowsBackIn;
         private int              _shownClockSecs = -1;
+        private int              _shownClockArmed = -1;   // -1 unknown, 0 arming, 1 armed
         private bool             _boardWantsAll;
         private int              _boardWantsCorner = -1;
         private readonly int[]   _drawRows = new int[4];
@@ -244,7 +245,14 @@ namespace CluckWars.UI
                 if (skull == null) continue;
                 bool on = o.SkullAlpha > 0f && _rowCorner[rank] >= 0 && _rowCorner[rank] == o.SkullCorner && _rowVisible[rank];
                 SetShown(skull, on);
-                if (on) skull.style.opacity = o.SkullAlpha;
+                if (on)
+                {
+                    // Every role sees the kill go live here: the skull turns red and pulses from the arm to the end.
+                    skull.style.opacity = o.SkullAlpha;
+                    skull.style.unityBackgroundImageTintColor = o.SkullLive ? FeedbackTuning.MarkSkullLiveColor : FeedbackTuning.MarkSkullInkColor;
+                    float s = o.SkullLive ? o.LiveScale : 1f;
+                    skull.style.scale = new Scale(new Vector3(s, s, 1f));
+                }
             }
 
             ApplyDrawHighlight(o);
@@ -276,10 +284,17 @@ namespace CluckWars.UI
                 if (clock)
                 {
                     _markClock.style.opacity = o.ClockAlpha;
-                    if (o.ClockSeconds != _shownClockSecs && _markClockText != null)
+                    // Arming: a dark pill counting down to the kill ("LIVE IN 3"); armed: the red pill, popping at the arm and
+                    // pulsing while the kill is live ("LIVE 1s").
+                    float s = o.Armed ? o.LiveScale : 1f;
+                    _markClock.style.scale = new Scale(new Vector3(s, s, 1f));
+                    int armed = o.Armed ? 1 : 0;
+                    if ((o.ClockSeconds != _shownClockSecs || armed != _shownClockArmed) && _markClockText != null)
                     {
                         _shownClockSecs = o.ClockSeconds;
-                        _markClockText.text = UiText.Format(UiKeys.MarkClock, ("secs", _shownClockSecs));
+                        _shownClockArmed = armed;
+                        _markClock.EnableInClassList("cw-mark-clock--arming", !o.Armed);
+                        _markClockText.text = UiText.Format(o.Armed ? UiKeys.MarkClock : UiKeys.MarkClockArming, ("secs", _shownClockSecs));
                     }
                 }
             }

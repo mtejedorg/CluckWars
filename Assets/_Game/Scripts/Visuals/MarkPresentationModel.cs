@@ -41,6 +41,9 @@ namespace CluckWars.Visuals
         Marked = 4,
         /// <summary><c>CanKillNow</c> went false to true (rate-limited).</summary>
         KillReady = 8,
+        /// <summary>The mark armed: the kill is live from now to expiry. Once per mark, every role; never for a mark first seen
+        /// already armed or found again (host migration).</summary>
+        KillLive = 16,
     }
 
     /// <summary>Everything the model needs for one frame, gathered by <see cref="MarkFeedback"/> from replicated state.
@@ -65,6 +68,8 @@ namespace CluckWars.Visuals
         public float Window;
         /// <summary>The mark's arm time (<c>MarkKill.asset</c>): the draw never outlasts it.</summary>
         public float ArmSeconds;
+        /// <summary>Seconds until the mark arms (the replicated <c>ArmTimer</c>), 0 once armed.</summary>
+        public float ArmRemaining;
 
         // ---- Assassin --------------------------------------------------------------------------------------------
         /// <summary>Planar metres from the local Assassin to its target.</summary>
@@ -98,6 +103,14 @@ namespace CluckWars.Visuals
         /// only Ambush's while it holds.</summary>
         public bool AssassinMarkActive;
 
+        /// <summary>The mark has armed: a Kill can land from now on (every role).</summary>
+        public bool Armed;
+        /// <summary>Whole seconds to the arm, rounded up (3, 2, 1) while arming; 0 once armed.</summary>
+        public int ArmCountdownSeconds;
+        /// <summary>Scale of the kill-live beat on the victim's clock and the Assassin's marker: a pop at the arm, then (victim
+        /// clock, standings skull) a pulse while armed; 1 otherwise and under reduced motion.</summary>
+        public float LiveScale;
+
         // Hunt marker (Assassin).
         public float MarkerAlpha;
         /// <summary>Scale of the appear pop (0.85 to 1 over 0.15 s at lock), 1 otherwise.</summary>
@@ -110,6 +123,8 @@ namespace CluckWars.Visuals
         // Standings.
         public int SkullCorner;
         public float SkullAlpha;
+        /// <summary>The standings skull shows the kill as live (red, pulsing by <see cref="LiveScale"/>), every role.</summary>
+        public bool SkullLive;
 
         // Draw highlight (Assassin): step <see cref="DrawStep"/> of <see cref="DrawSteps"/>, the last one is the target's row.
         public float DrawAlpha;
@@ -129,6 +144,7 @@ namespace CluckWars.Visuals
         public float ToastAlpha;
         public float ToastScale;
         public float ClockAlpha;
+        /// <summary>The clock's number: the arm countdown while arming ("LIVE IN 3"), the window's seconds once armed ("LIVE 1s").</summary>
         public int ClockSeconds;
         public float Dim, Cold, Red;
         /// <summary>The hunter's rival arrow carries the skull badge, and shows even while the hunter is invisible.</summary>
@@ -139,7 +155,7 @@ namespace CluckWars.Visuals
 
         /// <summary>Nothing shown at all.</summary>
         public bool IsClean =>
-            Role == MarkRole.None && !AssassinMarkActive && MarkerAlpha == 0f && SkullAlpha == 0f && DrawAlpha == 0f &&
+            Role == MarkRole.None && !AssassinMarkActive && !Armed && !SkullLive && MarkerAlpha == 0f && SkullAlpha == 0f && DrawAlpha == 0f &&
             !AmbushLit && !KillHex && ToastAlpha == 0f && ClockAlpha == 0f && Dim == 0f && Cold == 0f && Red == 0f &&
             HunterBadgeAlpha == 0f && !ForceShowHunter && Events == MarkEvents.None;
     }
@@ -273,6 +289,8 @@ namespace CluckWars.Visuals
         private MarkRole _role;
         private int _targetCorner, _hunterCorner;
         private float _age;               // seconds since this mark was first shown
+        private bool _killLiveDone;       // KillLive fired for this mark, or must never fire (first seen armed, replay)
+        private float _sinceLive;         // seconds since the arm was seen (pop / pulse clock)
 
         // Assassin.
         private float _drawSeconds;
@@ -346,7 +364,7 @@ namespace CluckWars.Visuals
             else if (live && _ending) _ending = false;                       // the same mark came back mid-fade
             // A different live mark (a role switch, another hunter): the old one fades out first, then the new one begins.
 
-            var o = new MarkOutputs { MarkerPop = 1f, DrawScale = 1f, ToastScale = 1f, SkullCorner = -1, TargetCorner = -1, HunterCorner = -1 };
+            var o = new MarkOutputs { MarkerPop = 1f, DrawScale = 1f, ToastScale = 1f, LiveScale = 1f, SkullCorner = -1, TargetCorner = -1, HunterCorner = -1 };
             if (!_showing) { _out = o; return o; }
 
             if ((!live || switching) && !_ending)
@@ -372,6 +390,7 @@ namespace CluckWars.Visuals
             }
 
             _age += dt;
+            StepArm(input, dt, ref o);
             if (_role == MarkRole.Assassin) StepAssassin(input, dt, ref o);
             else if (_role == MarkRole.Victim) StepVictim(input, dt, ref o);
             StepSkull(dt, ref o);
@@ -398,6 +417,8 @@ namespace CluckWars.Visuals
             _drawSteps = DrawStepCount(input.ReducedMotion, _drawSeconds);
             _lastStep = -1;
             _prevCanKill = input.CanKillNow;      // a re-found mark already kill-ready is not a new edge
+            _killLiveDone = replay || ArmedNow(input);   // only an arm watched happening is announced
+            _sinceLive = float.PositiveInfinity;
             _sinceKillSting = float.PositiveInfinity;
             _sinceSkull = 0f;
 
@@ -427,6 +448,8 @@ namespace CluckWars.Visuals
             _sinceLock = 0f;
             _prevCanKill = false;
             _sinceKillSting = float.PositiveInfinity;
+            _killLiveDone = false;
+            _sinceLive = float.PositiveInfinity;
             _mode = MarkMarkerMode.Hunt;
             _fill = 0f;
             _metres = 0;
@@ -461,6 +484,40 @@ namespace CluckWars.Visuals
 
         /// <summary>Seconds shown on the clock: rounds up, so "0" never shows while the mark is alive.</summary>
         public static int ShownSeconds(float remaining) => Mathf.CeilToInt(Mathf.Max(0f, remaining));
+
+        private static bool ArmedNow(in MarkInputs input) => !(input.ArmRemaining > 0f);
+
+        /// <summary>The kill-live beat's scale <paramref name="sinceLive"/> s after the arm: a pop from
+        /// <see cref="FeedbackTuning.MarkLivePopFrom"/> down to 1, then, when <paramref name="pulse"/>, a pulse that only grows
+        /// by up to <see cref="FeedbackTuning.MarkLivePulse"/>. 1 before the arm and under reduced motion.</summary>
+        public static float LiveScaleAt(float sinceLive, bool pulse, bool reducedMotion)
+        {
+            if (reducedMotion || float.IsInfinity(sinceLive) || sinceLive < 0f) return 1f;
+            float pop = FeedbackTuning.MarkLivePopSeconds;
+            if (sinceLive < pop) return Mathf.Lerp(FeedbackTuning.MarkLivePopFrom, 1f, sinceLive / Mathf.Max(1e-4f, pop));
+            if (!pulse) return 1f;
+            float wave = 0.5f - 0.5f * Mathf.Cos((sinceLive - pop) * FeedbackTuning.MarkLivePulseHz * 2f * Mathf.PI);
+            return 1f + FeedbackTuning.MarkLivePulse * wave;
+        }
+
+        // ---- The arm (every role) -----------------------------------------------------------------------------------
+
+        private void StepArm(in MarkInputs input, float dt, ref MarkOutputs o)
+        {
+            bool armed = ArmedNow(input);
+            if (armed && !_killLiveDone)
+            {
+                _killLiveDone = true;
+                _sinceLive = 0f;
+                o.Events |= MarkEvents.KillLive;
+            }
+            else if (armed && !float.IsInfinity(_sinceLive)) _sinceLive += dt;
+            else if (armed) _sinceLive = FeedbackTuning.MarkLivePopSeconds;   // first seen armed: no pop, straight to the pulse
+
+            o.Armed = armed;
+            o.ArmCountdownSeconds = armed ? 0 : ShownSeconds(input.ArmRemaining);
+            o.LiveScale = armed ? LiveScaleAt(_sinceLive, _role != MarkRole.Assassin, input.ReducedMotion) : 1f;
+        }
 
         // ---- Assassin ----------------------------------------------------------------------------------------------
 
@@ -589,7 +646,7 @@ namespace CluckWars.Visuals
             o.Cold = _cold;
             o.Red = _red;
 
-            _clockSeconds = ShownSeconds(input.Remaining);
+            _clockSeconds = o.Armed ? ShownSeconds(input.Remaining) : o.ArmCountdownSeconds;
             o.ClockAlpha = 1f;
             o.ClockSeconds = _clockSeconds;
 
@@ -607,6 +664,7 @@ namespace CluckWars.Visuals
             _sinceSkull += dt;
             o.SkullCorner = _targetCorner;
             o.SkullAlpha = Mathf.Clamp01(_sinceSkull / Mathf.Max(1e-4f, FeedbackTuning.MarkSkullFadeInSeconds));
+            o.SkullLive = o.Armed;
         }
 
         /// <summary>The end fade: the last live frame's values, frozen, times <paramref name="f"/>; nothing boolean survives it.</summary>
@@ -622,6 +680,9 @@ namespace CluckWars.Visuals
             o.MarkerMetres = last.MarkerMetres;
             o.SkullCorner = last.SkullCorner;
             o.SkullAlpha = last.SkullAlpha * f;
+            o.SkullLive = last.SkullLive;
+            o.Armed = last.Armed;
+            o.ArmCountdownSeconds = last.ArmCountdownSeconds;
             o.DrawAlpha = last.DrawAlpha * f;
             o.DrawStep = last.DrawStep;
             o.DrawSteps = last.DrawSteps;

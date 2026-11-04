@@ -97,7 +97,8 @@ loadout.kit.title,{perk} KIT
 mark.hex.kill,KILL
 hud.backin,BACK IN!
 mark.toast,MARKED!
-mark.clock,{secs}s
+mark.clock,LIVE {secs}s
+mark.clock.arming,LIVE IN {secs}
 mark.distance,{m} m
 loadout.next,NEXT
 loadout.registryMissing,"No abilities in registry.

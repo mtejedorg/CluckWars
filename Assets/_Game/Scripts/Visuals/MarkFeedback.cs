@@ -50,7 +50,7 @@ namespace CluckWars.Visuals
         public static MarkOutputs Current => _instance != null ? _instance._model.Current : CleanOutputs;
 
         private static readonly MarkOutputs CleanOutputs = new MarkOutputs
-            { MarkerPop = 1f, DrawScale = 1f, ToastScale = 1f, SkullCorner = -1, TargetCorner = -1, HunterCorner = -1 };
+            { MarkerPop = 1f, DrawScale = 1f, ToastScale = 1f, LiveScale = 1f, SkullCorner = -1, TargetCorner = -1, HunterCorner = -1 };
 
         /// <summary>The marked chicken while the local Assassin's mark is shown (kept through the end fade while it exists).</summary>
         public static ChickenController Target => _instance != null ? _instance._target : null;
@@ -179,6 +179,7 @@ namespace CluckWars.Visuals
             input.Remaining = exec.WindowTimer.RemainingTime(runner) ?? 0f;
             input.Window = exec.WindowSeconds;
             input.ArmSeconds = exec.ArmSeconds;
+            input.ArmRemaining = exec.ArmRemaining;
             _shownHunterId = _snapshot[r.Hunter].Id;
             _target = r.Role == MarkRole.Assassin ? target : null;
             _hunter = r.Role == MarkRole.Victim ? hunter : null;
@@ -279,6 +280,15 @@ namespace CluckWars.Visuals
                 _audio.PlaySFX(_sfx.MarkVictim, FeedbackTuning.MarkVictimVolume, FeedbackTuning.MarkVictimPitch);
             if ((o.Events & MarkEvents.KillReady) != 0)
                 _audio.PlaySFX(_sfx.MarkKillReady, FeedbackTuning.MarkKillReadyVolume, FeedbackTuning.MarkKillReadyPitch);
+            if ((o.Events & MarkEvents.KillLive) != 0)
+            {
+                if (o.Role == MarkRole.Victim)
+                    _audio.PlaySFX(_sfx.MarkVictim, FeedbackTuning.MarkKillLiveVictimVolume, FeedbackTuning.MarkKillLiveVictimPitch);
+                else if (o.Role == MarkRole.Assassin)
+                    _audio.PlaySFX(_sfx.MarkLock, FeedbackTuning.MarkKillLiveAssassinVolume, FeedbackTuning.MarkKillLiveAssassinPitch);
+                else
+                    _audio.PlaySFX(_sfx.MarkLock, FeedbackTuning.MarkKillLiveObserverVolume, FeedbackTuning.MarkKillLiveObserverPitch);
+            }
         }
 
         /// <summary>The draw tick rises a step per row, capped.</summary>

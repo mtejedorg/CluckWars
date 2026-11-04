@@ -132,6 +132,7 @@ namespace CluckWars.Localization
         public const string HudBackIn = "hud.backin";
         public const string MarkToast = "mark.toast";
         [UiArgs("secs")] public const string MarkClock = "mark.clock";
+        [UiArgs("secs")] public const string MarkClockArming = "mark.clock.arming";
         [UiArgs("m")] public const string MarkDistance = "mark.distance";
         public const string LoadoutNext = "loadout.next";
         public const string LoadoutRegistryMissing = "loadout.registryMissing";

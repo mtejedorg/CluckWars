@@ -244,6 +244,11 @@
     border-bottom-left-radius: 22px; border-bottom-right-radius: 22px;
     display: none;
 }
+/* Arming (the 3 s before the kill is live): an ink pill counting down; the red pill above is the live danger state. */
+.cw-mark-clock--arming {
+    background-color: rgb(20, 10, 26);
+    border-color: rgb(184, 13, 26);
+}
 .cw-mark-clock-skull {
     width: 30px; height: 30px; flex-shrink: 0;
     margin-right: 8px;

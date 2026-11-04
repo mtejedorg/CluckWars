@@ -36,8 +36,9 @@ namespace CluckWars.UI
         private ILogService _log;
 
         private VisualElement _root, _marker, _pointer, _ring, _skull, _lock, _shell, _hunterSkull;
-        private Label _distance;
+        private Label _distance, _arm;
         private bool _bound, _reportedMissing, _missingIndicatorReported;
+        private int _shownArm = -1;
 
         // Ring / pointer paint state.
         private float _fill;
@@ -78,15 +79,16 @@ namespace CluckWars.UI
             _lock = root.Q<VisualElement>("MarkLock");
             _shell = root.Q<VisualElement>("MarkShell");
             _distance = root.Q<Label>("MarkDistance");
+            _arm = root.Q<Label>("MarkArm");
             _hunterSkull = root.Q<VisualElement>("HunterSkull");
             if (_root == null || _marker == null || _pointer == null || _ring == null || _skull == null || _lock == null || _shell == null ||
-                _distance == null || _hunterSkull == null)
+                _distance == null || _arm == null || _hunterSkull == null)
             {
                 if (!_reportedMissing)
                 {
                     _reportedMissing = true;
                     _log?.Error(Source, "MarkHud.uxml is missing an element (MarkHudRoot, HuntMarker, MarkPointer, MarkRing, MarkSkull, " +
-                        "MarkLock, MarkShell, MarkDistance or HunterSkull): the Death Mark hunt marker and the victim's hunter badge are not drawn.");
+                        "MarkLock, MarkShell, MarkDistance, MarkArm or HunterSkull): the Death Mark hunt marker and the victim's hunter badge are not drawn.");
                 }
                 return;
             }
@@ -162,7 +164,7 @@ namespace CluckWars.UI
             _marker.style.translate = new Translate(_markerPanel.x - boxHalf, _markerPanel.y - boxHalf);
             _marker.style.opacity = o.MarkerAlpha;
 
-            float scale = o.MarkerPop;
+            float scale = o.MarkerPop * o.LiveScale;   // the arm pops the marker as the kill goes live
             if (o.MarkerMode == MarkMarkerMode.Kill && !PlayerPreferences.ReducedMotionEnabled)
                 scale *= 1f + FeedbackTuning.MarkMarkerKillPulse * 0.5f *
                          (1f + Mathf.Sin(Time.unscaledTime * FeedbackTuning.MarkMarkerKillPulseHz * 2f * Mathf.PI));
@@ -180,6 +182,18 @@ namespace CluckWars.UI
                 _pointer.MarkDirtyRepaint();
             }
             _skull.style.unityBackgroundImageTintColor = c;
+            // Arming: the countdown to the arm sits where the skull will be; the skull (and with it the KILL look) only once live.
+            SetShown(_skull, o.Armed);
+            SetShown(_arm, !o.Armed);
+            if (!o.Armed)
+            {
+                _arm.style.color = c;
+                if (o.ArmCountdownSeconds != _shownArm)
+                {
+                    _shownArm = o.ArmCountdownSeconds;
+                    _arm.text = _shownArm.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                }
+            }
             SetShown(_lock, o.MarkerMode == MarkMarkerMode.Walled);
             SetShown(_shell, o.MarkerMode == MarkMarkerMode.Shelled);
 

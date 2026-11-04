@@ -37,6 +37,20 @@
     -unity-background-scale-mode: scale-to-fit;
 }
 
+/* Arming only (before the kill is live): the countdown to the arm in place of the skull, in the target's colour. */
+.cw-mark-arm {
+    position: absolute; left: 14px; top: 14px;
+    width: 68px; height: 68px;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 40px;
+    color: rgb(254, 245, 224);
+    -unity-text-outline-width: 3px;
+    -unity-text-outline-color: rgb(42, 26, 12);
+    -unity-text-align: middle-center;
+    padding: 0; margin: 0;
+    display: none;
+}
+
 /* Walled only: an ink badge at (+26, +26) from the centre with a cream lock. */
 .cw-mark-lock {
     position: absolute; left: 57px; top: 57px;

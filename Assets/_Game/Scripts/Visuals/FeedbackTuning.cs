@@ -822,6 +822,28 @@ namespace CluckWars.Visuals
         /// <summary>No KillReady sting within this long of the last one.</summary>
         public const float MarkKillReadyMinInterval = 0.4f;
 
+        /// <summary>
+        /// The kill-live beat (the 3 s arm ending, Maestro 2026-11-04: "feedback is critical here"). Stings reuse existing clips:
+        /// the victim hears its MARKED! sting again, higher and louder (the danger it already knows, now live); the Assassin and
+        /// observers hear the draw's lock sting, higher (the observers' quieter: not their fight).
+        /// </summary>
+        public const float MarkKillLiveVictimVolume = 1.0f;
+        public const float MarkKillLiveVictimPitch = 1.15f;
+        public const float MarkKillLiveAssassinVolume = 0.9f;
+        public const float MarkKillLiveAssassinPitch = 1.35f;
+        public const float MarkKillLiveObserverVolume = 0.45f;
+        public const float MarkKillLiveObserverPitch = 1.35f;
+        /// <summary>At the arm the victim's clock and the Assassin's marker pop from this scale back to 1 over
+        /// <see cref="MarkLivePopSeconds"/>.</summary>
+        public const float MarkLivePopFrom = 1.3f;
+        public const float MarkLivePopSeconds = 0.2f;
+        /// <summary>While armed the victim's clock and the standings skull pulse up to 1 + this, at this rate.</summary>
+        public const float MarkLivePulse = 0.12f;
+        public const float MarkLivePulseHz = 4f;
+        /// <summary>The standings skull's tint once the kill is live (the screen mood's red), and its ink tint before.</summary>
+        public static readonly Color MarkSkullLiveColor = new Color(0.9f, 0.04f, 0.04f, 1f);
+        public static readonly Color MarkSkullInkColor = new Color(22f / 255f, 16f / 255f, 28f / 255f, 1f);
+
         /// <summary>Hunt marker geometry, panel px (MarkHud.uss holds the element boxes): ring radius, ink track and colour
         /// arc widths, track alpha, pointer base and how far its tip reaches beyond the ring.</summary>
         public const float MarkRingRadiusPx = 38f;

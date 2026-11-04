@@ -12,6 +12,7 @@
             <ui:VisualElement name="MarkDisc" class="cw-mark-disc" picking-mode="Ignore" />
             <ui:VisualElement name="MarkRing" class="cw-mark-ring" picking-mode="Ignore" />
             <ui:VisualElement name="MarkSkull" class="cw-mark-skull" picking-mode="Ignore" />
+            <ui:Label name="MarkArm" text="" class="cw-mark-arm" picking-mode="Ignore" />
             <ui:VisualElement name="MarkLock" class="cw-mark-lock" picking-mode="Ignore">
                 <ui:VisualElement name="MarkLockGlyph" class="cw-mark-lock-glyph" picking-mode="Ignore" />
             </ui:VisualElement>
