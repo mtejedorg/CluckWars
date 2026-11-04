@@ -336,9 +336,6 @@ namespace CluckWars.Gameplay
         /// here would be unreachable code claiming to defend something.
         /// </para>
         /// </remarks>
-        /// <summary>The specialization's name for the steal log ("Assassin_Thief"), or "-" with none.</summary>
-        private static string SpecOf(ChickenController c) => c != null && c.Passive != null ? c.Passive.Subclass.ToString() : "-";
-
         private void NameTheThief()
         {
             if (_hitFeedback == null || Runner == null) return;
@@ -350,6 +347,9 @@ namespace CluckWars.Gameplay
 
             _hitFeedback.NotifyAttacker(thief.transform.position);
         }
+
+        /// <summary>The specialization's name for the steal log ("Assassin_Thief"), or "-" with none.</summary>
+        private static string SpecOf(ChickenController c) => c != null && c.Passive != null ? c.Passive.Subclass.ToString() : "-";
 
         public void FlushBaseDeposit()
         {
