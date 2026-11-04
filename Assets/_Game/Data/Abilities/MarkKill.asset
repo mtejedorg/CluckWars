@@ -30,9 +30,9 @@ MonoBehaviour:
   PeckSlotPreEquippedBy: 64
   SignaturePreEquippedBy: 0
   KillRange: 8
-  ArmSeconds: 0.6
+  ArmSeconds: 3
   WindowSeconds: 4
   FailCooldownSeconds: 5
-  SuccessCooldownSeconds: 15
+  SuccessCooldownSeconds: 10
   RoundStartCooldownSeconds: 4
   RemovalSeconds: 3

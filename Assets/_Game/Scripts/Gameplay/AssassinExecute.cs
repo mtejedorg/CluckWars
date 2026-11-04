@@ -23,12 +23,15 @@ namespace CluckWars.Gameplay
         private const string Source = "AssassinExecute";
 
         // Today's numbers: the field defaults of MarkKillAbilitySO, and the fallback if no MarkKill asset is registered.
-        // Not a gameplay beat: the floor that lets the victim's authority see the replicated mark before a Kill can reach it.
-        public const float ArmDuration = 0.6f;
+        // The arm IS a gameplay beat (Maestro 2026-11-04): with a 3 s arm in a 4 s window the kill is only possible in the
+        // last ~1 s of the mark, so the victim has 3 s to run, hide or spend a cooldown, and the Assassin has to time his stun
+        // to still be running at the arm. It also stays above ExecuteRules.MaxLatencySeconds, the floor that lets the victim's
+        // authority see the replicated mark before a Kill can reach it.
+        public const float ArmDuration = 3.0f;
         public const float WindowDuration = 4.0f;
         public const float DefaultKillRange = 8.0f;
         public const float FailCooldown = 5.0f;
-        public const float SuccessCooldown = 15.0f;
+        public const float SuccessCooldown = 10.0f;
         /// <summary>Fallback for <see cref="RemovalSeconds"/> (no MarkKill asset registered); equals the asset.</summary>
         public const float DefaultRemovalSeconds = 3.0f;
 
