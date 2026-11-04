@@ -47,6 +47,21 @@ namespace CluckWars.Balance
             float time = 0f;
             int trips = 0;
             int capacity = chicken.CargoCapacity;
+            float burstReadyAt = 0f;
+
+            // Seconds to bank `food` starting now, pressing the deposit burst if the chicken has one and it is ready.
+            float DepositSeconds(float food)
+            {
+                if (chicken.BurstDepositMultiplier <= 1f || chicken.BurstDepositSeconds <= 0f || time < burstReadyAt)
+                    return food / chicken.DepositRate;
+
+                burstReadyAt = time + chicken.BurstDepositCooldown;
+                float fast = chicken.DepositRate * chicken.BurstDepositMultiplier;
+                float burstFood = fast * chicken.BurstDepositSeconds;
+                return food <= burstFood
+                    ? food / fast
+                    : chicken.BurstDepositSeconds + (food - burstFood) / chicken.DepositRate;
+            }
 
             for (int iter = 0; iter < MaxIterations; iter++)
             {
@@ -67,13 +82,13 @@ namespace CluckWars.Balance
                     if (carrying >= needed - Epsilon)
                     {
                         // Win crosses mid-deposit — only count the time to bank `needed`.
-                        time += needed / chicken.DepositRate;
+                        time += DepositSeconds(needed);
                         banked = winTarget;
                         trips++;
                         return new OracleResult { SctSeconds = time, Trips = trips, ReachedTarget = true };
                     }
 
-                    time += carrying / chicken.DepositRate;
+                    time += DepositSeconds(carrying);
                     banked += carrying;
                     carrying = 0f;
                     trips++;

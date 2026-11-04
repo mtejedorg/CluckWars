@@ -72,7 +72,7 @@ golden pile and clears the surge / bounty flags. It used to be a hard-coded T-60
 Pile and Restock add food beyond the §3.2 budget of 80 — a deliberate late-match exception.
 
 **No death.** There is no HP and no damage. A chicken is never "killed" except by the
-Assassin's execute (§6.4), which removes it for ~2 s and respawns it empty. Every other
+Assassin's execute (§6.4), which removes it for 3 s and respawns it empty at its own base. Every other
 interaction is a **steal** or a **control effect** — you take food or buy time, you never
 grind someone down.
 
@@ -489,8 +489,8 @@ current, shipped state.
 | | The Anxious (Featherfoot) | Immune to the pile-slow and the collision slow (A6, 2026-10-21) | ⏳ *pending — a Peck variant* |
 | **Fatty** | The Hauler (Hoarder) | Carries at least a full win's worth | ⏳ *pending — a Peck variant* |
 | | The Boulder (Bulwark) | Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner | **Ground Quake** (stomp leaves the area stuck) |
-| **Assassin** | The Reaper (Spoiler) | Banks a bonus if the clock expires with no winner | **Death Mark** (the execute, §6.4) |
-| | The Burglar (Thief) | Every steal takes 1.6x more | **Sneaky Steal** |
+| **Sneaky** | The Assassin (Spoiler; was Reaper) | Banks a bonus if the clock expires with no winner | **Death Mark** (the execute, §6.4) |
+| | The Thief (was Burglar) | Every steal takes 1.6x more | **Sneaky Steal** |
 
 **Three signatures are still unassigned — and the plan for them changed on 2026-09-04.**
 Slippery / Featherfoot / Hoarder previously each wanted a Peck *variant* (empty-beak rush,
@@ -504,7 +504,7 @@ economy or escape tools that read as that specialization's fantasy. Until they l
 three grant their passive only, which is the one remaining place where §7.1's "every
 specialization determines a signature" is not yet literally true. Tracked as §11 item 2.
 
-**Why Bully/Relentless and Reaper/Burglar are each amplified only by their own passive:**
+**Why Bully/Relentless and Assassin/Thief are each amplified only by their own passive:**
 Bully makes Scrap's theft worth taking (bigger steal + room to carry it); Relentless
 makes Headbutt genuinely spammable. Neither signature is impressive under the *other*
 passive on purpose — that asymmetry is what makes the specialization choice read as a
@@ -543,7 +543,7 @@ Cargo transfers **directly** attacker←→victim — nothing ever drops on the 
 formula self-regulates: a **loaded thief cannot steal** (no free space), so theft is a
 rhythm (steal → bank → return), not a drain. Fatty's 35 cargo can only leave in ≤10–14
 bites, so he *bleeds* under pressure instead of popping, and his defensive abilities are
-what he's actually playing. A **steal-proof** bird (Egg Shell, Turtle Mode, §7.2) refuses every
+what he's actually playing. A **steal-proof** bird (Turtle Mode, §7.2) refuses every
 steal outright: the thief is not credited, so the formula never runs.
 
 ### 6.3 Control ladder
@@ -556,7 +556,7 @@ steal outright: the thief is not credited, so the formula never runs.
 
 Stun is the only state that locks *casting* — which is exactly why it's the qualifier for
 the Assassin execute. Stun duration is authored per-ability (Assassin Ambush 1.0 s, Warrior
-Wing Slam 1.3 s). **Protections:** control immunity (Immovable, Egg Shell) stops the whole ladder; **steal-proof** (Egg Shell, Turtle Mode) is separate and only stops cargo being taken (§7.2). **Slow sources** (collision, pile, ability) are tagged separately so
+Wing Slam 1.3 s). **Protections:** control immunity (Immovable, Turtle Mode's lock) stops the whole ladder; **steal-proof** (Turtle Mode) is separate and only stops cargo being taken (§7.2). **Slow sources** (collision, pile, ability) are tagged separately so
 passives like Slippery can target one without the others. Today Slippery and Bulwark shorten
 only **timed** effects (stuns, getting stuck, Dust Kick's slow); presence slows (zones,
 Feather Aura, pile, collision) have no duration and apply in full.
@@ -564,30 +564,107 @@ Feather Aura, pile, collision) have no duration and apply in full.
 ### 6.4 The Assassin execute (the only hard removal)
 
 **One button, two presses.** Death Mark (named Mark/Kill until 2026-10-07; the code type is still
-`MarkKillAbilitySO`) is the **Reaper** specialization's forced
-pre-equip (§7.1: its `AllowedClasses` is `None`, so it can only arrive this way) — choosing Reaper equips it automatically,
-locked in slot 0 of the four active slots, leaving three to build with. The Burglar specialization does not carry
+`MarkKillAbilitySO`) is the **Assassin** specialization's forced (class shown as Sneaky, code `ChickenClass.Assassin`)
+pre-equip (§7.1: its `AllowedClasses` is `None`, so it can only arrive this way) — choosing Assassin equips it automatically,
+locked in slot 0 of the four active slots, leaving three to build with. The Thief specialization does not carry
 it at all, cannot hand-pick it, and cannot execute.
 
 | Stage | Condition | Counterplay |
 |---|---|---|
-| **Mark** | Press → soft-locks the nearest **isolated** rival (no chicken within **8 m**), in facing. Visible to the target. | Stay near others — in an FFA, safety = approaching an enemy |
-| **Arm** | **2.0 s** pass with the mark alive | Break isolation or leave range → mark fizzles |
-| **Qualify** | The marked target enters a **Stun** (his own Ambush, or *any* stun — e.g. a Warrior's Wing Slam) → button lights up **KILL** | Don't get stunned; hold a defence |
-| **Kill** | Press again while target is stunned **and the Assassin is not himself stunned** | **A third party can stun the Assassin to deny the kill** — stun the hunter to save the prey |
+| **Mark** | Press → a living rival anywhere on the map, picked at random but **likelier the farther it is from its own base**. The target sees it is marked. | Reach your base in time, where nothing reaches you |
+| **Hunt** | The Assassin has **4 s** to find it and close in; the Kill is only possible in the **last 1.0 s** (the 3 s arm is a gameplay beat) | Escape: stay out of his reach until the timer runs out, or walk home |
+| **Stun** | The target must be stunned **when the Kill lands** (his own Ambush, or *any* stun; one that began before the arm and is still running counts) | Don't get stunned |
+| **Kill** | Press again in the last 1.0 s while it is stunned, within **8 m**, with no base wall between, and the Assassin is not stunned (a stunned Assassin cannot cast anything) | — |
+
+No isolation: the mark ignores crowds. The only defences are not being stunned, escaping, and reaching your base in time.
+A shell (Turtle Mode, walk or lock) also makes you unkillable while it lasts: a shelled chicken cannot be executed
+(`ExecuteRules.CanBeExecuted`). It can still be stunned while walking; the mark stays alive and its timer keeps running.
 
 On success the victim's **entire cargo transfers to the Assassin as a capacity-exempt
-"bounty bag"** (he becomes a courier of a stolen win) and the victim is removed ~2 s, then
-respawns empty. (A **steal-proof** victim keeps its load: the execute still removes it and pays
-the bounty, but nothing transfers.) On failure Death Mark takes a **reduced cooldown**, so he re-marks fast.
-Stun lives in exactly two classes (Assassin + Warrior), which is what makes the deny/enable
-counterplay reachable.
+"bounty bag"** (he becomes a courier of a stolen win). The victim is **out for 3 s** (`MarkKill.asset`
+`RemovalSeconds`): invisible, no collisions, untargetable, cannot act or pick up, not counted by any base wall. Every
+running ability, control state and effect window ends at the removal (stun, root, slow, invisibility, steal-proof, any
+mark it holds); its **cooldowns keep running**. It then **respawns at its own base** (its corner's spawn point, through
+the round reset's teleport, so it never smears across the map and never lands in a rival base) with **no cargo**, and
+sees a short **BACK IN!** cue. On failure Death Mark takes a **reduced cooldown** (5 s), so he re-marks fast; after a kill it is **10 s** (15 s until 2026-11-04).
+**Each round opens with Death Mark on a 4 s cooldown at GO** (`RoundStartCooldownSeconds`), PLAY AGAIN included, so
+the first mark is not wasted on targets still at home.
+
+**Spec v2 (Maestro, 2026-10-31).** The press marks a **living rival anywhere on the
+map**, chosen at random and weighted toward birds far from home (see below): no mark range, no isolation. Decoys are never picked, and the next mark can never be the last one unless that bird is the
+only rival (no time release; reset each round). The Assassin then finds it, stuns it and presses again. The Kill needs the target
+**stunned now**, not shelled, the Assassin free to cast, within **KillRange 8 m**, and no base wall between them. The mark lasts **4 s** (12 s until 2026-11-03, 7 s until 2026-11-04). A Kill cannot qualify before the **arm, 3.0 s** (`ArmSeconds`; 0.6 s until 2026-11-04, then only a replication floor), so the Kill happens in the **last 1.0 s** of the mark. Only expiry, a kill or the target leaving play ends a mark: it survives
+range, crowds and the target going home, where no ability reaches it, so the timer can run out. Expiry costs the fail cooldown (5 s);
+a kill 10 s (15 s until 2026-11-04). All numbers are on `MarkKill.asset`. The bounty is paid on the victim's kill report, so a refused kill pays nothing.
+
+**Weighted pick (Maestro, 2026-11-04).** A 7 s mark left the victim time to walk home, so the interaction died. The window is 4 s and
+the pick favours birds far from home and, softly, far from the Assassin: each candidate rolls `roll * w * w * a`. `w` is its planar
+distance to its own base over the longest base-to-base distance (the diagonal, read from the live bases, 61.7 m), clamped to 0..1.
+`a = 0.25 + 0.75 * clamp01(distance to the Assassin / (span / 3))`, where span / 3 is about 20.6 m. A rival next to the Assassin keeps a
+quarter weight, so nobody is unmarkable; marks that start inside the 10.2 m lunge drop from 40% to 27% with the Assassin camping the
+centre, and from 15% to 10% roaming (Monte Carlo, mechanics-designer). The highest score wins. A bird at home
+scores 0 and is never picked while another candidate is away from home; if every score is 0 the pick is uniform, so a mark always
+lands when a rival exists (`MarkPickRules`, authority side, rolls from `UnityEngine.Random`). The last mark is still excluded
+unless it is the only rival. **Stealing from an Assassin:** the bounty bag counts as carried food for every steal (Snatch, Sneaky
+Steal, Scrap, Roll Trample, Spine Coat): a steal drains the beak first, then the bag (`StealRules.Stealable`, `SplitDrain`).
+
+**The 3 s arm and the stun at the kill (Maestro, 2026-11-04).** `ArmSeconds` is 3.0, so the Kill is possible only in the last
+1.0 s of the 4 s window. The stun must be active when the Kill lands; a stun that began before the arm and is still running counts.
+Ambush stuns for 1.0 s (0.6 s on Slippery, 0.65 s on Bulwark), so the Assassin times Ambush into roughly `[arm - stun, window)`.
+The victim's authority times the arm itself (verdict `NotArmed`, allowance 0.5 s) and checks its own stun (stunned on arrival or
+within one capped network latency, verdict `NotStunned`). **Cooldowns:** 4 s at GO, 5 s after a miss, 10 s after a kill. That allows
+at most 3 kills in a 45 s round (press 4, kill 7.3, press 17.3, kill 20.6, press 30.6, kill 33.9; a 4th press at 43.9 cannot arm
+before 45 s); any miss costs 9 s. **Ambush** cooldown is 8 s (was 10), longer than the 4 s window: never a second stun in one hunt,
+and the stun is ready for the next. **Shadowstep** lasts 0.18 s (was 0.25): dash 3 x 12.15 x 0.18 = 6.56 m, lunge with Ambush's 3.6 m
+reach = 10.2 m. With Underdog Surge the dash is 9.19 m, under the 9.85 m gap between two pinwheel arms, so it cannot cross two arms even with Underdog.
+**Walk home.** With a 3 s arm a victim within about 21-29 m of home (class and stun length dependent) who walks home is safe: about
+29-36% of marks. **D5:** a stun lands on a Turtle-walking chicken but it still cannot be executed (steal-proof = shelled), and Turtle's lock and Immovable are control-immune, so
+Hoarder and Bulwark can cover the whole kill span with one well-timed button (open for Maestro). **Bounty economy (D4):** the Assassin earns only from executes (victim cargo
+plus `ExecuteBounty` 5, doubled on the leader only during the rare LeaderBounty event). `MatchConfig.SpoilerBounty` 15 is read by no
+code; what is paid is `Spoiler.asset` BonusFood 15 at timer expiry with no winner. Mean victim cargo is about 5.7, so 3 banked kills are
+about 32 food, 8 short of 40; 2 kills plus the Spoiler bonus about 36.5; 2 kills alone about 21.5. No rule added; `ExecuteBounty` 8 would make 3 kills about 41.
+
+**Feedback (redesign 2026-11-03; all local presentation read from replicated state, every number in `FeedbackTuning`).**
+- **Assassin.** (The arm reads for every role: a countdown digit on the hunt marker until the arm, KILL stays dark until then, and a sting plays at the arm for each role.) The press runs a ~0.6 s *draw*: a highlight sweeps the standings rows (a tick per row) and locks on the
+  target (lock sting); reduced motion skips the sweep. Then **one hunt marker**: a disc with a skull in the **target's own
+  player colour**, a ring draining over the mark's life, and the distance beneath. Off screen it is pinned to the edge
+  pointing at the target; on screen it sits above the target pointing down, kept off the local You plate and the
+  nameplates. It stays visible through Invisibility and Smoke. **Yellow** while a kill is possible, **grey with a lock**
+  while the target is behind a base wall, **cream with a shell** while the target is shelled. The target's standings row
+  shows a skull. The Ambush hex lights while the target is inside Ambush's reach (read from the ability); the Death Mark
+  hex becomes a big yellow **KILL** exactly while a kill is possible, with a sting. During a mark only the Ambush range
+  guide stays on. No banner, no magenta arrow, no chevrons, no kill ring.
+- **Victim.** A short **MARKED!** toast with a sting; the clock pill reads **LIVE IN 3 / 2 / 1** while the mark arms, then a red **LIVE 1s** that pops and pulses. The screen stays **darkened** (heavier at the edges, nothing
+  over the centre) for the mark's life; the time left sits beside the match clock and its own row shows the skull. With
+  the Assassin outside the inner circle (the floor-arrow ring radius) its rival arrow carries a skull, shown even while
+  it is invisible. Inside, no arrow: the darkness turns **cold violet and desaturated**, the same whether it is visible
+  or not, plus an almost imperceptible red (~7%) if it is invisible. Hysteresis: in at the ring radius, out only beyond
+  1.3x it for 1 s; fades 0.4 s in, 1 s out. No heartbeat.
+- **Everyone else** sees only the skull on the marked player's standings row (information, not a defence); it turns red and pulses at the arm, for observers too.
+- **End of mark:** every ending (kill, expiry, removal, either player leaving, host migration, round reset, match end,
+  scene unload) removes everything for all three viewpoints with a 0.3 s fade.
+- Stings (draw tick, lock, marked, kill ready) go through `IAudioService`; **all four are placeholder clips** (brief:
+  `docs/audio/death-mark-cues.md`).
+
+**The base wall.** A chicken's body cannot stand inside another chicken's claimed base (radius `MatchConfigSO.BaseKeepOutRadius`, 2.5 m),
+and **no ability crosses the wall in either direction**: targeted, cone, area, steal, zones, control, knockback, the execute, Spine
+Coat's steal-back. A walled target shows as grey "in the area, no effect". Zones test zone centre against victim; an aura's centre is
+its caster. Your own base is free for your body, an unclaimed base has no wall, two birds on the same side are not blocked, and self-buffs are
+unaffected. A race (the target stepped through a wall after the cast) is a silent no-op with a refund for a steal, never a rejected
+RPC. Walking at a wall slides round it. A base whose owner left stays claimed, keeps its colour and keeps its wall.
 
 ---
 
 ## 7. Abilities System
 
 ### 7.1 Rules — two slots are determined for you, the rest you pick
+
+> **Balance baseline, 2026-10-31: fixed kits.** `MatchConfigSO.LoadoutMode` ships **Fixed**: each specialization plays one
+> authored four-ability kit (`PassiveAbilitySO.Kit`), players and bots alike, and GEAR UP is a read-only view of it. The kits
+> and what to watch for are in `docs/balance/human-test-baseline.md`. Everything below is the **Free** mode, unchanged and one
+> switch away; a malformed kit logs an Error and falls back to it. Benched in the pool, on no kit: Dive Bomb, Roll & Push,
+> Feather Trap. Egg Shell is **retired** (2026-11-03, merged into Turtle Mode; code and asset kept, out of the registry).
+> This is a baseline to iterate, not a final roster.
 
 > **Simplified 2026-09-04 (Maestro).** The old wording made slot pressure vary by
 > specialization, which nobody could hold in their head. The model below is uniform: one
@@ -600,7 +677,7 @@ no class has 5 buttons.
 
 > **Revised 2026-10-06 (Maestro) — the pre-equip model.** Every **subclass** (specialization,
 > `ChickenSubclass`) has **two pre-equipped slots**: a **Peck slot** (a Peck variant for a forager,
-> Death Mark for the Reaper) and a **Signature slot**. **The ability owns the assignment**: each ability
+> Death Mark for the Assassin) and a **Signature slot**. **The ability owns the assignment**: each ability
 > carries two flag columns, `PeckSlotPreEquippedBy` and `SignaturePreEquippedBy` (each a
 > `ChickenSubclassFlags` set of subclasses), edited in the Balance Editor's Abilities table ("Peck slot" /
 > "Signature slot"). Two abilities claiming the same slot for one subclass is a flagged data error (runtime
@@ -616,7 +693,7 @@ no class has 5 buttons.
 > Common/Character slot kind is retired. `All` = shared, a single class = that class's own, and
 > **`None` = pre-equip-only**: never in the picker, bot presets or backfill, obtainable only through a slot
 > column. **Peck is None-class** (never hand-picked; forced via the Peck slot column) and so is Death Mark
-> (only the Reaper gets it; the Burglar cannot hand-pick it). A subclass **forages iff its resolved Peck slot
+> (only the Assassin specialization gets it; the Thief cannot hand-pick it). A subclass **forages iff its resolved Peck slot
 > is a Peck**; the one hard rule is that the **Assassin never forages** (Predation axiom), enforced in code
 > rather than by any ability's class mask.
 
@@ -624,7 +701,7 @@ The two pre-equipped slots per subclass are therefore filled by the specializati
 
 | Slot | Determined by | Rule |
 |---|---|---|
-| **Peck slot** | Your **specialization** | The forager's Peck (variant) — or Death Mark for the Reaper. Falls back to the class's plain Peck if left empty. **The Assassin cannot hold a Peck**: a hard rule (`PreEquippedLoadout.ClassMayForage`), not a class mask, and that is the mechanical reason it cannot farm. A Peck is also never a Signature. |
+| **Peck slot** | Your **specialization** | The forager's Peck (variant) — or Death Mark for the Assassin. Falls back to the class's plain Peck if left empty. **The Assassin cannot hold a Peck**: a hard rule (`PreEquippedLoadout.ClassMayForage`), not a class mask, and that is the mechanical reason it cannot farm. A Peck is also never a Signature. |
 | **Signature** | Your **specialization** | One further ability, force-equipped. |
 
 Everything left over is **freely chosen** from the abilities that class may legally equip
@@ -645,7 +722,8 @@ spec-granted Peck would be a second forager. Per-class foraging variation alread
 where it belongs — in each class's `PeckAmount` / `PeckCooldown`. Those three
 specializations therefore need **ordinary signature abilities** assigned (see §11 item 2).
 - **Eligibility is `AllowedClasses` flags only** (`AbilityBaseSO.AllowedClasses`; the Common/Character
-  slot kind was retired 2026-10-06). **The one shared ability is Egg Shell (every class). Peck is None-class: never picked,
+  slot kind was retired 2026-10-06). **There is no shared ability since 2026-11-03** (Egg Shell, the last one, merged into
+  Turtle Mode; Free pools: Warrior 6, Speedy 6, Fatty 7, Assassin 7). **Peck is None-class: never picked,
   pre-equipped through the Peck slot of every forager specialization.** It used to also hold Speed Burst and Snatch — both turned out
   to be class essences hiding in the shared pool (Speed Burst is Speedy's whole "fastest
   in the game" claim; Snatch is an AoE steal, which is the Assassin's entire income) and
@@ -666,11 +744,11 @@ shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 | | Ability | Cooldown | Effect |
 |---|---|---|---|
 | **Shared** | Peck 🐦 | 0.8 s | Take a beakful from the pile you're standing on. Forced for every forager (§7.1). |
-| | Egg Shell 🥚 | 8 s | "Full shell": hide in an egg for 2 s. You can't move, but nobody can push you, stop you or steal your food (control immunity + steal-proof for the 2 s). |
+| | ~~Egg Shell 🥚~~ | — | **Retired 2026-11-03**: merged into Turtle Mode's lock (below). Code and asset kept, out of the registry. |
 | **Warrior** | Cluck Shock ⚡ | 7 s | A shockwave that shoves every rival within 4.5 m away. |
 | | Dive Bomb 🪽 | 6 s | Diving lunge, robs 8 food from rivals on contact. |
 | | Headbutt 🐏 *(Relentless signature)* | 4 s | Shoves rivals up to 3.6 m ahead and staggers them 0.35 s — deliberately weaker than Cluck Shock; the shortest cooldown pays for it. |
-| | Ruffle 💨 | 5 s | 1.5x speed for 2.5 s — same pace as Speed Burst but longer and ground only (no traversal). |
+| | Ruffle 💨 | 6 s | 1.3x speed for 2 s, ground only (no traversal). Retuned for the fixed-kits baseline (2026-10-31). |
 | | Scrap 🪝 *(Bully signature)* | 5 s | Grabs 3 food off the nearest carrier within 3.8 m — deliberately weaker than Sneaky Steal. |
 | | Wing Slam 💥 | 8 s | Slams the ground ahead, stunning rivals within 4.5 m for 1.3 s. Re-tuned 2026-10-22 from 12 s / 1.5 s (A4, Standard tier §7.3); fallback 9 s / 1.5 s if playtests say "stunned too often". |
 | **Speedy** | Dust Kick 🌫️ | 6 s | Kicks dust **backwards** — the one cone in the game that fires away from facing, so fleeing is the play. Chasers within 4.5 m slow to 55% for 2.5 s. |
@@ -685,15 +763,15 @@ shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 | | Roll & Push 🌀 | 3 s | Rolls forward at 2x speed for 0.8 s, shoving chickens out of the path. |
 | | Sticky Egg 🌱 | 7 s | Drops a sticky egg; the first chicken to step on it is STUCK for 2 s. (Was "Root Egg"; the C# type `RootEggAbilitySO` and asset keep the old name.) |
 | | Spine Coat 🦔 | 8 s | For 2 s, any rival who bumps into you (comes within the collision radius) loses 4 food to you and is knocked away. Triggers on proximity, not on being hit. |
-| | Turtle Mode 🐢 | 10 s | "Shell walk": pull into your shell for 3 s. You walk at half speed (0.5x), but nobody can steal your food (steal-proof). Still stunnable, stuck-able and pushable; no damage resistance (the dead `DamageResistance` field is gone). |
-| **Assassin** | Ambush 🗡️ | 10 s | Stuns rivals within 3.6 m for 1 s — sets up his own execute. |
+| | Turtle Mode 🐢 | 10 s | **Walk, then lock** (Egg Shell merged in, 2026-11-03). First press: shell walk for 3 s at half speed (0.5x), steal-proof and unkillable; still stunnable, stuck-able, slowable and pushable. Second press during the walk: lock in place for up to 2 s, immobile and immune to stun, root, slow and shove, still steal-proof and unkillable; a third press ends the lock early; the lock ends the ability. A stun during the walk blocks the lock (stuns block casts). The walk ends at 3 s if you never lock, with the full cooldown. Cooldown 10 s from the first press in every path. Fatty only. The hex shows the walk's remaining time. |
+| **Assassin** | Ambush 🗡️ | 8 s (10 s until 2026-11-04) | Stuns rivals within 3.6 m for 1 s — sets up his own execute. |
 | | Doppelganger 👥 | 11 s | Decoy copy beside you for 4 s that soaks attacks. |
 | | Invisibility 👻 | 8 s | Fades you to a ghostly outline for 4 s. Using a move breaks it. (Assassin-only now — was also Speedy.) |
-| | Death Mark 🎯 *(Reaper Peck-slot pre-equip; pre-equip-only)* | 5 s | The execute — see §6.4. Marks a lone rival within 8 m; stun them, then press again to take everything they carry. |
-| | Shadowstep 👤 | 6 s | Dashes forward at 3x speed for 0.4 s, straight over walls (Assassin-only — was briefly also Speedy by asset drift, corrected; Speedy is permanently denied all terrain traversal, §5.2). |
-| | Smoke Roost 🌁 | 11 s | Cloud at his own feet (4 m, 5.5 s) — he fades, rivals inside slow to 55% speed. Using a move breaks the fade (the cloud stays). Pairs with Death Mark's isolate-and-execute. |
+| | Death Mark 🎯 *(Assassin specialization Peck-slot pre-equip; pre-equip-only)* | 5 s (miss; 10 s after a kill) | The execute — see §6.4. Marks a rival anywhere for 4 s, likelier far from home and from the Assassin; the Kill is only possible in the last 1.0 s (3 s arm); stun them within 8 m, then press again to take everything they carry. Opens each round on a 4 s cooldown. |
+| | Shadowstep 👤 | 4 s | Dashes forward at 3x speed for 0.18 s (about 6.6 m; 0.25 s until 2026-11-04, 0.4 s / 6 s until 2026-11-03), straight over walls (Assassin-only — was briefly also Speedy by asset drift, corrected; Speedy is permanently denied all terrain traversal, §5.2). |
+| | Smoke Roost 🌁 | 11 s | Cloud at his own feet (4 m, 5.5 s) — he fades, rivals inside slow to 55% speed. Using a move breaks the fade (the cloud stays). Pairs with hunting a mark: the target slows inside the cloud, and the Assassin fades. |
 | | Snatch 🤏 *(moved from Common)* | 3 s | Robs 5 food from every rival within 4.3 m ahead and shoves them back. Assassin-only now — a universal AoE steal is exactly the Assassin's core, and diluted the class. |
-| | Sneaky Steal 🤏 *(Thief signature)* | 5 s | Yanks 6 food from the nearest carrier within 5.4 m. |
+| | Sneaky Steal 🤏 *(Thief signature)* | 5 s | Yanks 6 food from the nearest carrier within 5.4 m. The same bird only every 10 s. |
 
 **Egg Shell and Turtle Mode have a real defensive half (Phase 7, Maestro decision 6).** Both
 grant the new **steal-proof** state (`ChickenController.IsStealProof` / `GrantStealProof`, a
@@ -707,12 +785,12 @@ not:
 - **Snatch** takes nothing from a steal-proof bird but still shoves it (unless it is also
   control-immune, as in Egg Shell). Nearest-target steals (Sneaky Steal, Scrap) do not fall
   through to the next rival.
-- **Death Mark's execute** still removes the bird for ~2 s and still pays its execute bounty,
-  but the victim's load is not transferred.
-- **Egg Shell** is the strongest form: movement locked, control-immune (the same control-immunity
-  timer as Immovable) and steal-proof, for its 2 s (cooldown 8 s, unchanged).
-- **Turtle Mode** is steal-proof only. Slows, stuns, sticky eggs and shoves still land. Values
-  changed with Maestro's approval: duration 2.0 -> 3.0 s, cooldown 8 -> 10 s, speed 0.25 -> 0.5x.
+- **Death Mark's execute** cannot touch a steal-proof bird since 2026-11-03: a shelled chicken
+  cannot be executed (caster gate and the victim's authority; a sub-round-trip race refunds the Kill
+  cooldown and restores the mark).
+- **Turtle Mode's lock** (Egg Shell's old effect, merged 2026-11-03) is the strongest form: movement
+  locked, control-immune (the same control-immunity timer as Immovable) and steal-proof, for up to 2 s.
+- **Turtle Mode's walk** is steal-proof only. Slows, stuns, sticky eggs and shoves still land.
 - **Telegraph:** a rival aiming a steal at a steal-proof bird sees the grey no-effect mark and a
   **SAFE** pop (`hud.pop.safe`), the way Immovable shows IMMUNE.
 - **Bots** raise a shell when a rival with a steal ability is within 5.4 m and the bot carries
@@ -728,9 +806,9 @@ tier, and five shipped moves sit on 7.
 
 | Tier | Range | Shipped (cooldown read from the `.asset` files, before passives) |
 |---|---|---|
-| **Quick** | 3–5 s | Roll & Push 3, Snatch 3, Headbutt 4, Ruffle 5, Scrap 5, Feint 5, Sneaky Steal 5, Death Mark 5 |
-| **Standard** | 6–9 s | Dust Kick 6, Speed Burst 6, Shadowstep 6, Dive Bomb 6, Sticky Egg 7, Cluck Shock 7, Feather Aura 7, Feather Trap 7, Spine Coat 8, **Wing Slam 8**, Invisibility 8, Egg Shell 8, Ground Quake 9 |
-| **Heavy** | 10–12 s | Turtle Mode 10, Belly Flop 10, Ambush 10, Smoke Roost 11, Doppelganger 11, Immovable 12, Quick Drop 12 |
+| **Quick** | 3–5 s | Roll & Push 3, Snatch 3, Headbutt 4, Scrap 5, Feint 5, Sneaky Steal 5, Death Mark 5, Shadowstep 4 |
+| **Standard** | 6–9 s | Ruffle 6, Dust Kick 6, Speed Burst 6, Dive Bomb 6, Sticky Egg 7, Cluck Shock 7, Feather Aura 7, Feather Trap 7, Spine Coat 8, **Wing Slam 8**, Invisibility 8, Ground Quake 9, Ambush 8 |
+| **Heavy** | 10–12 s | Turtle Mode 10, Belly Flop 10, Smoke Roost 11, Doppelganger 11, Immovable 12, Quick Drop 12 |
 
 **The Heavy rule:** a move earns a Heavy cooldown only if it gives **immunity** (control
 immunity or steal-proofing), a **hard AoE stun of at least 1.4 s**, or an **economy burst**
@@ -740,8 +818,8 @@ its stun 1.5 → 1.3 s (A4; pre-agreed fallback 9 s / 1.5 s if the human session
 "stunned too often").
 
 Known exceptions, deliberately **not** moved until a human 4-player session (any tier move
-other than Wing Slam needs a playtest): Ambush (1.0 s stun), Smoke Roost and Doppelganger
-sit in Heavy without meeting the rule. Peck (per-class, about 0.7–0.8 s) is foraging cadence
+other than Wing Slam needs a playtest): Smoke Roost and Doppelganger
+sit in Heavy without meeting the rule (Ambush moved to Standard with its 8 s cooldown, 2026-11-04). Peck (per-class, about 0.7–0.8 s) is foraging cadence
 governed by the SCT axiom, not a tiered move.
 
 Exact per-ability values (steal amounts, stun/slow durations, radii, cooldowns) are tuned
@@ -763,12 +841,12 @@ different kinds).
 
 | Kind | How several are resolved | Moves |
 |---|---|---|
-| Self speed boost | highest | Speed Burst 1.5, Ruffle 1.5, Shadowstep 3.0, Roll & Push 2.0 |
+| Self speed boost | highest | Speed Burst 1.5, Ruffle 1.3, Shadowstep 3.0, Roll & Push 2.0 |
 | Self speed penalty | lowest | Turtle Mode 0.5 |
 | Stealth opacity | lowest | Invisibility, Smoke Roost (the fade) |
-| Movement lock | any | Egg Shell, Peck |
-| Control immunity | later expiry | Immovable, Egg Shell |
-| Steal-proof | later expiry | Egg Shell, Turtle Mode |
+| Movement lock | any | Turtle Mode (lock), Peck |
+| Control immunity | later expiry | Immovable, Turtle Mode (lock) |
+| Steal-proof | later expiry | Turtle Mode (walk and lock) |
 | Steal-back | any; highest amount | Spine Coat |
 | Deposit rate | highest | Quick Drop 4.0 |
 | Wall-phasing tier | highest holder (Barge < Vault < Blink) | the traversal moves |
@@ -786,7 +864,7 @@ Push + Spine Coat robs on proximity (1.2 m), not on being hit; Immovable + Roll 
 a control-immune charge; Speed Burst + Feather Aura is about 3x relative speed against
 chasers inside 5.4 m for 1.5 s. Egg Shell and Turtle Mode protect cargo since Phase 7 (Egg Shell
 is also control-immune; neither has any damage resistance). **Watch in playtest (no caps now):**
-Fatty Egg Shell + Turtle Mode back to back (steal-proof about 5 of every 10 s), Turtle +
+Fatty Egg Shell + Turtle Mode back to back (moot since 2026-11-03: they are one ability), Turtle +
 Roll & Push + Spine Coat, Immovable + Turtle, and Egg Shell inside your own base.
 
 ---
@@ -826,7 +904,7 @@ Seasonal content is post-demo, contingent on success.
   also sets facing). Keyboard WASD; gamepad left stick.
 - **Abilities:** right-thumb buttons — **4 for every class** (§7.1). 1-2 are forced by
   foraging/your specialization's signature; the rest are freely chosen. The Death Mark
-  button (Reaper only) is **two-press**: first press marks, and it re-labels to **KILL**
+  button (Assassin specialization only) is **two-press**: first press marks, and it re-labels to **KILL**
   when the target qualifies.
 - **Collecting:** stand on a pile and Peck (Peck chain, §10.1). Peck repeats by itself
   until the hold is full.
@@ -856,7 +934,7 @@ the same `WouldAffect` predicate). Release = use it.
 |---|---|---|
 | **Your preview** | shown from the press frame | shown |
 | **Wind-up glow rivals can see** | none | ramps up at your feet (hidden while you are invisible) |
-| **Movement** | full speed | the stick rotates your aim instead of moving you (directional shapes only) |
+| **Movement** | full speed | full speed: an explicit aim faces you while you strafe; with one stick, moving is how you aim |
 
 Rivals see only the glow at your feet — a wind-up tell, not your area. That asymmetry is
 deliberate: counterplay ("he's charging something, disengage") without a solved puzzle.

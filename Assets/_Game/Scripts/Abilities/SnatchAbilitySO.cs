@@ -58,7 +58,7 @@ namespace CluckWars.Abilities
         protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)
         {
             var cargo = candidate.Cargo;
-            return cargo != null && cargo.Cargo > 0f;
+            return cargo != null && cargo.Stealable > 0f;
         }
 
         public override void OnActivate(AbilityContext ctx)
@@ -71,14 +71,14 @@ namespace CluckWars.Abilities
             for (int i = 0; i < _scratch.Count; i++)
             {
                 var targetCtrl = _scratch[i];
-                var targetCargo = targetCtrl.Cargo; // ExtraTargetFilter already guaranteed Cargo > 0
+                var targetCargo = targetCtrl.Cargo; // ExtraTargetFilter already guaranteed Stealable > 0
 
                 // Steal-proof victim (Egg Shell / Turtle Mode): skip the steal BEFORE crediting
                 // ourselves — the knockback below is unaffected (ApplyKnockback has its own
                 // control-immunity check).
                 float freeSpace = thiefCargo.Capacity - thiefCargo.Cargo;
                 float stolen = StealRules.CanStealFrom(targetCtrl)
-                    ? StealMath.Clamp(ResolveStealAmount(StealAmount, thief), freeSpace, targetCargo.Cargo)
+                    ? StealMath.Clamp(ResolveStealAmount(StealAmount, thief), freeSpace, targetCargo.Stealable)
                     : 0f;
                 if (stolen > 0f)
                 {

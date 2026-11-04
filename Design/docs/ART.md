@@ -73,10 +73,10 @@ Derived from the Okabe-Ito palette. Validated across protanopia, deuteranopia, a
 
 | Player | Color | Hex | Notes |
 |---|---|---|---|
-| P1 | Sunset Orange | #E8751A | Warm — reads yellow-ish under deuteranopia |
-| P2 | Ocean Blue | #1A7FC4 | Cool — universally distinguishable |
-| P3 | Berry Pink | #C4286F | Bold — reads purple-ish under protanopia |
-| P4 | Forest Teal | #0D9E7A | Green-blue — distinct from all above |
+| P1 | Splash Aqua | #3FE8E8 | Lightest of the four; bright cyan (was Sunset Orange #E8751A) |
+| P2 | Ocean Blue | #0994E8 | Cool — universally distinguishable |
+| P3 | Berry Pink | #F7367B | Bold — reads purple-ish under protanopia |
+| P4 | Forest Teal | #17785A | Green-blue — distinct from all above |
 
 **Never rely on color alone** — always supplement with labels (P1/P2/P3/P4).
 

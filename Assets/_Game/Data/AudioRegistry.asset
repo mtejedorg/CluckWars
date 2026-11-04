@@ -26,6 +26,10 @@ MonoBehaviour:
   MatchStart: {fileID: 0}
   MatchEnd: {fileID: 0}
   MatchVictory: {fileID: 0}
+  MarkDrawTick: {fileID: 8300000, guid: 2a2e14d82023367419cf85c7d54b4cd0, type: 3}
+  MarkLock: {fileID: 8300000, guid: cac7f9a5b88b356499dca4b80c88ab3d, type: 3}
+  MarkVictim: {fileID: 8300000, guid: d45415dc39febc845945050358c7499e, type: 3}
+  MarkKillReady: {fileID: 8300000, guid: 62ef289d415958d4b8f4994b04d49c5b, type: 3}
   MenuMusic: {fileID: 0}
   MatchMusic: {fileID: 8300000, guid: 3977b21a2609fe54198fb293023dfc57, type: 3}
   MatchMusicIntense: {fileID: 8300000, guid: b1d397c071c4d1441b151b8ec5b20c03, type: 3}

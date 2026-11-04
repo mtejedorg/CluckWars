@@ -96,12 +96,13 @@ While the ability button is held:
      is marked only when the bird is both steal-proof and control-immune (Egg Shell); against a
      Turtle the shove still lands.
    - **Self** — never marked. Self-buffs mark the caster's own ring instead.
-3. **Aim rotation** — **once the hold passes `TapHoldThresholdSeconds`**, the
-   movement stick rotates the aim instead of translating the chicken, for
-   directional abilities (cone / forward-offset / capsule / jump). Caster-centred
-   shapes (self-circle, aura, single-target) are rotation-invariant and keep normal
-   movement even on a long hold. A sub-threshold tap never pays this cost at all —
-   that is the "speed" half of the v0.6.1 decision above. The predicate is
+3. **Aim rotation** — **a hold never stops the chicken** (Maestro, 2026-10-31; it used to
+   turn the stick into facing, which froze the bird). Once the hold passes
+   `TapHoldThresholdSeconds`, for directional abilities (cone / forward-offset / capsule /
+   jump), an explicit aim (mouse, right stick) faces the bird while the movement stick
+   strafes it; with no aim given (touch, single stick, keyboard only) the stick steers both,
+   so moving is how you aim. Caster-centred shapes (self-circle, aura, single-target) are
+   rotation-invariant and need neither. The predicate is
    `AbilityBaseSO.IsDirectionalAim`, written as an *exclusion* list so a newly added
    shape is directional by default (a harmless wrong answer) rather than silently
    losing aim-rotate (a broken one).
@@ -252,7 +253,7 @@ Per-ability mapping (**v0.6.1** — changed values marked ⚠ are live balance c
 | Wing Slam | Cone | 2.5 | 120° | directional, aimable |
 | Peck | Cone | ⚠ 2.4 | ⚠ 140° | ⚠ was SelfCircle r2.0; area 12.57 → 7.04 m² (−44%) |
 | Sneaky Steal | SingleTarget | 3.0 | — | requires cargo; ⚠ now marks only the one it robs |
-| Mark Kill | SingleTarget | 8.0 | — | ⚠ preview now applies isolation + rival rules |
+| Mark Kill | SingleTarget | 8.0 | — | ⚠ preview applies the rival rules (isolation removed by spec v2, 2026-10-31: the mark ignores crowds) |
 | Roll Push | ⚠ Capsule | ⚠ 1.05 | ⚠ 4.0 | ⚠ was ForwardCircle r1.8 @1.2; area 10.18 → 11.86 m² (+17%) |
 | Dive Bomb (`RollTrampleAbilitySO`) | Capsule | 2.05 | 3.25 | shipped values, see the reach note below |
 | Feather Trap | ForwardCircle | 3.6 | 4.5 | placed zone, persists 5 s; shipped values |

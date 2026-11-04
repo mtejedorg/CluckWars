@@ -90,7 +90,7 @@ namespace CluckWars.Abilities
         protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)
         {
             var cargo = candidate.Cargo;
-            return cargo != null && cargo.Cargo > 0f;
+            return cargo != null && cargo.Stealable > 0f;
         }
 
         public override void OnActivate(AbilityContext ctx)
@@ -110,7 +110,7 @@ namespace CluckWars.Abilities
             if (targetCargo == null) return;
 
             float freeSpace = thiefCargo.Capacity - thiefCargo.Cargo;
-            float stolen = StealMath.Clamp(ResolveStealAmount(StealAmount, thief), freeSpace, targetCargo.Cargo);
+            float stolen = StealMath.Clamp(ResolveStealAmount(StealAmount, thief), freeSpace, targetCargo.Stealable);
             if (stolen > 0f)
             {
                 // The jump has NOT happened yet — AbilityController.TryActivate defers it until

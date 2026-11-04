@@ -37,6 +37,7 @@ namespace CluckWars.Tests
         [TestCase(ChickenClass.Speedy, UiKeys.LobbyBot1)]
         [TestCase(ChickenClass.Fatty, UiKeys.LobbyBot2)]
         [TestCase(ChickenClass.Assassin, UiKeys.LobbyBot3)]
+        [TestCase(ChickenClass.Warrior, UiKeys.LobbyBot4)]
         public void SoloBots_GetTheCoopsBotName_FromTheirClass_NotTheirCorner(ChickenClass cls, string key)
         {
             for (int corner = 0; corner < 4; corner++)
@@ -44,10 +45,9 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void RemoteHuman_AndAnUnlistedBotClass_FallBackToTheCornerTag()
+        public void RemoteHuman_FallsBackToTheCornerTag()
         {
             Assert.AreEqual(UiText.Format(UiKeys.LobbyPlayerTag, ("n", 3)), MatchStandings.DisplayName(false, false, ChickenClass.Speedy, 2));
-            Assert.AreEqual(UiText.Format(UiKeys.LobbyPlayerTag, ("n", 2)), MatchStandings.DisplayName(false, true, ChickenClass.Warrior, 1));
         }
 
         [Test]

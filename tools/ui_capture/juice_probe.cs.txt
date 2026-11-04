@@ -7,9 +7,13 @@ public class Rec {
     public void PlaySFX(AudioClip clip, float volume = 1f, float pitch = 1f, float delaySeconds = 0f) { Lines.Add("      AUDIO t=" + (Time.unscaledTime - Start).ToString("0.000") + " " + (clip == null ? "null" : clip.name) + " pitch=" + pitch.ToString("0.00")); }
     public void PlayMusic(AudioClip clip, float volume = 1f, bool loop = true, float fadeInSeconds = 0f) { }
     public void FadeOutMusic(float seconds) { }
+    public void SetMusicLevel(float level01, float seconds) { }
+    public void CrossfadeMusic(AudioClip clip, float seconds) { }
     public void StopMusic() { }
     public bool IsMusicPlaying(AudioClip clip) { return false; }
     public void SetMasterVolume(float volume01) { }
+    public void SetMusicVolume(float volume01) { }
+    public void SetSfxVolume(float volume01) { }
   }
   // Every script-execute compiles a NEW assembly, so statics are per call: the shared log and clock live in AppDomain data.
   static List<string> Lines { get { var l = System.AppDomain.CurrentDomain.GetData("rec.lines") as List<string>; if (l == null) { l = new List<string>(); System.AppDomain.CurrentDomain.SetData("rec.lines", l); } return l; } }

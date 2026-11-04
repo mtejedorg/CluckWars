@@ -107,6 +107,12 @@ namespace CluckWars.Gameplay
             return rate;
         }
         public float Fraction => Capacity > 0f ? Mathf.Clamp01(Cargo / Capacity) : 0f;
+
+        /// <summary>What a thief can take from this chicken right now: its cargo plus its bounty bag (<see cref="StealRules.Stealable"/>).</summary>
+        public float Stealable => StealRules.Stealable(Cargo, BountyBag);
+
+        /// <summary><see cref="Stealable"/> as a share of <see cref="Capacity"/>, 0 to 1: how loaded this chicken looks to a thief.</summary>
+        public float StealableFraction => Capacity > 0f ? Mathf.Clamp01(Stealable / Capacity) : 0f;
         public bool IsFull => Cargo >= Capacity;
 
         /// <summary>
@@ -341,6 +347,9 @@ namespace CluckWars.Gameplay
 
             _hitFeedback.NotifyAttacker(thief.transform.position);
         }
+
+        /// <summary>The specialization's name for the steal log ("Assassin_Thief"), or "-" with none.</summary>
+        private static string SpecOf(ChickenController c) => c != null && c.Passive != null ? c.Passive.Subclass.ToString() : "-";
 
         public void FlushBaseDeposit()
         {
@@ -649,9 +658,11 @@ namespace CluckWars.Gameplay
             // before crediting itself, so reaching this point means the shell went up inside one
             // round trip of the thief's scan (the same sub-RTT race Immovable has). The thief has
             // ALREADY credited itself, so a bare refusal would duplicate food: send the credit back.
-            if (_controller.IsStealProof)
+            // A base wall arrived the same way: the victim stepped through it inside one round trip (BaseWallRules).
+            bool walled = PlayerBase.WallBetween(thief.transform.position, transform.position);
+            if (_controller.IsStealProof || walled)
             {
-                _log?.Info(Source, $"{name}: steal hit a shell that went up inside one round trip — " +
+                _log?.Info(Source, $"{name}: steal hit {(walled ? "a base wall" : "a shell that went up")} inside one round trip — " +
                                    $"refunded {amount:0.00} to {thief.name}.");
                 if (thief.Cargo != null)
                     thief.Cargo.RPC_RefundRefusedSteal(amount, _controller.Id);
@@ -660,7 +671,7 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            if (Cargo <= 0f)
+            if (Stealable <= 0f)
             {
                 // Not an attack: the victim banked or lost the load between the thief's scan and
                 // this tick. The thief's optimistic self-credit is corrected by its own clamp
@@ -669,9 +680,11 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            var actual = Mathf.Min(amount, Cargo);
-            Cargo -= actual;
-            if (Cargo < 0f) Cargo = 0f;
+            // The beak first, then the bounty bag (an Assassin's execute pays into the bag): see StealRules.SplitDrain.
+            StealRules.SplitDrain(amount, Cargo, BountyBag, out float fromCargo, out float fromBag);
+            Cargo = Mathf.Max(0f, Cargo - fromCargo);
+            BountyBag = Mathf.Max(0f, BountyBag - fromBag);
+            float actual = fromCargo + fromBag;
 
             // Name the thief for the victim's §3.2 direction cue — see LastThiefId, and
             // NameTheThief for the observation half. Written only HERE, after the drain has
@@ -682,7 +695,8 @@ namespace CluckWars.Gameplay
             LastThiefId = thiefId;
             StealEventId++;
 
-            _log?.Debug(Source, $"Stolen: -{actual:0.00} by {thief.name} → Cargo={Cargo:0.0}.");
+            _log?.Info(Source, $"Stolen: -{actual:0.00} (beak {fromCargo:0.00}, bag {fromBag:0.00}) from {name} [{_controller.Class}/{SpecOf(_controller)}] by {thief.name} " +
+                               $"[{thief.Class}/{SpecOf(thief)}] → Cargo={Cargo:0.0}, BountyBag={BountyBag:0.0}.");
         }
 
         /// <summary>
@@ -894,8 +908,8 @@ namespace CluckWars.Gameplay
         /// <c>RpcSources.All</c>, so the call is a claim: it is honoured only when the caller is
         /// the assassin's state authority (local invoke on the assassin's authority, or the wire
         /// sender is that authority) AND that assassin's <see cref="AssassinExecute"/> currently
-        /// has this chicken as <c>MarkedTarget</c>. The mark is written at mark time, seconds
-        /// before the execute, so replication lag cannot make a genuine call fail the check.
+        /// has this chicken as <c>MarkedTarget</c>. A Kill cannot qualify until <c>MarkKillAbilitySO.ArmSeconds</c>
+        /// after the mark, which is above the latency cap, so replication lag cannot make a genuine call fail the check.
         /// <para>
         /// <b>Nothing is written to the assassin's cargo from here.</b> This runs on the
         /// VICTIM's authority, where the assassin's cargo is a proxy; a <c>[Networked]</c> write
@@ -905,12 +919,28 @@ namespace CluckWars.Gameplay
         /// this landed is never paid to the assassin as well (CW-050).
         /// </para>
         /// </remarks>
+        /// <summary>An executed chicken stands up at its base with no cargo (the execute took the load). State authority only;
+        /// the bounty bag is its own food and stays.</summary>
+        public void ClearForRespawn()
+        {
+            if (!HasStateAuthority) return;
+            Cargo = 0f;
+        }
+
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_TransferAllToBountyBag(NetworkBehaviourId assassinId, RpcInfo info = default)
         {
-            if (!TryResolveExecutor(assassinId, info, out var assassinCargo, out string rejection))
+            if (!TryResolveExecutor(assassinId, info, out var assassinCargo, out bool walled, out string rejection))
             {
                 _log?.Warn(Source, $"{name}: rejected RPC_TransferAllToBountyBag from {info.Source} - {rejection}");
+                return;
+            }
+
+            // Same answer as the removal half, in the same tick: the target reached home inside one round trip.
+            // Nothing was credited yet, so refusing creates no food; the pending record simply expires.
+            if (walled)
+            {
+                _log?.Debug(Source, $"{name}: execute transfer landed across a base wall; no effect.");
                 return;
             }
 
@@ -995,9 +1025,10 @@ namespace CluckWars.Gameplay
         /// message must come from the assassin's state authority.
         /// </summary>
         private bool TryResolveExecutor(NetworkBehaviourId assassinId, in RpcInfo info,
-            out ChickenCargo assassinCargo, out string rejection)
+            out ChickenCargo assassinCargo, out bool walled, out string rejection)
         {
             assassinCargo = null;
+            walled = false;
 
             if (Runner == null || !Runner.TryFindBehaviour(assassinId, out AssassinExecute execute) ||
                 execute == null || execute.Object == null || !execute.Object.IsValid)
@@ -1015,28 +1046,51 @@ namespace CluckWars.Gameplay
                 return false;
             }
 
-            // An execute needs this chicken marked by that assassin AND stunned (KillReady requires the
-            // stun). AssassinExecute.Press sends this RPC and resets its mark in the same tick, so the
-            // replicated MarkedTarget can already read None when the RPC lands, and the stun may be over.
-            // Mark AND stun, each either current or recorded recently by this victim's own authority
-            // (KillReady outlives the stun; the mark is cleared in the press tick). Same rule as
-            // ChickenCombat.RPC_ExecuteRemoval: ExecuteRules.HasExecuteEvidence (CW-230).
+            // An execute needs this chicken marked by that assassin, for the arm, AND stunned when the Kill
+            // lands. AssassinExecute.Press sends this RPC and resets its mark in the same tick, so the
+            // replicated MarkedTarget can already read None when the RPC lands: the mark counts when current
+            // or recorded recently by this victim's own authority. The stun counts only when current or
+            // recorded within one capped latency (the RPC's flight). Same rules, same order, as
+            // ChickenCombat.RPC_ExecuteRemoval: HasMarkEvidence, HasArmEvidence, HasStunAtKill (CW-230).
             var combat = _controller != null ? _controller.Combat : null;
             bool markSeen = false, stunSeen = false;
-            float sinceMark = 0f, sinceStun = 0f, latency = 0f;
+            float sinceMark = 0f, markAge = 0f, sinceStun = 0f, latency = 0f;
             if (combat != null)
             {
-                markSeen = combat.TrySecondsSinceMarkedBy(execute, out sinceMark);
+                markSeen = combat.TrySecondsSinceMarkedBy(execute, out sinceMark, out markAge);
                 stunSeen = combat.TrySecondsSinceStunned(out sinceStun);
                 latency = combat.SenderLatency(info);
             }
             if (_controller == null ||
-                !ExecuteRules.HasExecuteEvidence(execute.MarkedTarget == _controller.Id, markSeen, sinceMark,
-                    _controller.IsStunned, stunSeen, sinceStun, latency))
+                !ExecuteRules.HasMarkEvidence(execute.MarkedTarget == _controller.Id, markSeen, sinceMark, latency))
             {
-                rejection = $"{name} has not seen both a recent mark from {execute.name} and a recent stun on itself.";
+                rejection = $"{name} has not seen a recent mark from {execute.name}.";
                 return false;
             }
+            // The arm, timed on this chicken's own clock: the same rule as ChickenCombat's NotArmed verdict.
+            if (!ExecuteRules.HasArmEvidence(markSeen, markAge, execute.ArmSeconds))
+            {
+                rejection = $"{name} has seen {execute.name}'s mark for {markAge:0.00} s, under its {execute.ArmSeconds:0.0} s arm.";
+                return false;
+            }
+            // The stun, from this chicken's own records only: the same rule as ChickenCombat's NotStunned verdict.
+            if (!ExecuteRules.HasStunAtKill(_controller.IsStunned, stunSeen, sinceStun, latency))
+            {
+                rejection = $"{name} was not stunned when {execute.name}'s Kill landed " +
+                            (stunSeen ? $"(stun ended {sinceStun:0.00} s ago, allowance {ExecuteRules.CapLatency(latency):0.00} s)." : "(never stunned).");
+                return false;
+            }
+
+            // The other half of ChickenCombat's verdict: same range bound, same wall, same order.
+            float dx = execute.transform.position.x - transform.position.x, dz = execute.transform.position.z - transform.position.z;
+            var assassinController = execute.GetComponent<ChickenController>();
+            float margin = combat != null ? combat.ExecuteRangeMargin(assassinController, latency) : 0f;
+            if (!(dx * dx + dz * dz <= Mathf.Pow(ExecuteRules.MaxExecuteDistance(margin, execute.KillRange), 2f)))
+            {
+                rejection = $"{execute.name} is too far away to have executed this chicken.";
+                return false;
+            }
+            walled = PlayerBase.WallBetween(execute.transform.position, transform.position);
 
             assassinCargo = execute.GetComponent<ChickenCargo>();
             if (assassinCargo == null || assassinCargo == this)

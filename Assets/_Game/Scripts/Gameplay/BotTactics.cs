@@ -62,6 +62,19 @@ namespace CluckWars.Gameplay
         Endgame = 2,
     }
 
+    /// <summary>What a bot holding a Death Mark does next (<see cref="BotTactics.NextMarkStep"/>).</summary>
+    public enum BotMarkStep : byte
+    {
+        /// <summary>No mark up: the ordinary FSM decides.</summary>
+        None = 0,
+        /// <summary>Hunt the target across the map, keeping the stun back: a stun that ends before the arm is wasted.</summary>
+        Hunt = 1,
+        /// <summary>Target in reach, and a stun cast now still runs when the arm ends: land it.</summary>
+        Stun = 2,
+        /// <summary>Stunned and in kill range: press again.</summary>
+        Kill = 3,
+    }
+
     /// <summary>
     /// The per-class numeric envelope a <see cref="BotStrategy"/> runs inside. Kept
     /// separate from the strategy itself so the <i>shape</i> of the behaviour and its
@@ -617,6 +630,30 @@ namespace CluckWars.Gameplay
             return Mathf.Clamp01(leading ? t * 0.55f : Mathf.Min(1f, t * 1.20f));
         }
 
+        // ---- Death Mark follow-through ------------------------------------------
+
+        /// <summary>How much of the stun a bot keeps beyond the arm: room for a tick of replication and the Kill press.</summary>
+        public const float StunLeadMargin = 0.25f;
+
+        /// <summary>
+        /// The Spoiler bot's hunt. A mark lands anywhere on the map, and the CastPlan ladder knows none of that: left to it, a
+        /// bot fires Ambush at whoever is near and walks where the FSM says, so the mark expires unpressed. The Kill needs the
+        /// stun live at the arm (3 s into a 4 s mark), so the stun goes out only once it will still run
+        /// <see cref="StunLeadMargin"/> past the arm, and while the window has more than that margin left.
+        /// </summary>
+        /// <param name="armRemaining">Seconds until the mark arms (0 once armed).</param>
+        /// <param name="windowRemaining">Seconds until the mark expires.</param>
+        /// <param name="stunInReach">A ready stun would land on the target now (and the target is neither shelled nor control-immune).</param>
+        /// <param name="stunSeconds">That stun's length on this target, after its passive (Slippery 0.6, Bulwark 0.65).</param>
+        public static BotMarkStep NextMarkStep(bool marked, bool canKill, float armRemaining, float windowRemaining,
+            bool stunInReach, float stunSeconds)
+        {
+            if (!marked) return BotMarkStep.None;
+            if (canKill) return BotMarkStep.Kill;
+            bool lastsPastTheArm = armRemaining <= stunSeconds - StunLeadMargin;
+            return stunInReach && lastsPastTheArm && windowRemaining > StunLeadMargin ? BotMarkStep.Stun : BotMarkStep.Hunt;
+        }
+
         // ---- Steal guard (Phase 7 chunk D) ------------------------------------
 
         /// <summary>A rival with a steal ability this close is about to rob a loaded bot (Sneaky Steal's reach).</summary>
@@ -642,6 +679,14 @@ namespace CluckWars.Gameplay
         /// is the planar distance to the closest rival owning a steal ability
         /// (<see cref="float.MaxValue"/> when none).
         /// </summary>
+        /// <summary>A walking Turtle Mode locks only when a stun or steal threat is right on it.</summary>
+        public const float TurtleLockThreatRadius = 2.5f;
+
+        /// <summary>Lock the shell walk (Turtle Mode's second press): walking, not locked yet, and a rival that can stun or rob
+        /// it within <see cref="TurtleLockThreatRadius"/>.</summary>
+        public static bool ShouldTurtleLock(bool walking, bool locked, float nearestThreatDist) =>
+            walking && !locked && nearestThreatDist <= TurtleLockThreatRadius;
+
         public static bool ShouldStealGuard(float ownCargo, float nearestStealerDist, bool alreadyProof) =>
             !alreadyProof && ownCargo >= StealGuardMinCargo && nearestStealerDist <= StealGuardRadius;
     }

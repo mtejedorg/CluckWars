@@ -111,7 +111,7 @@ namespace CluckWars.Gameplay
     /// </remarks>
     [RequireComponent(typeof(NetworkObject))]
     [RequireComponent(typeof(CharacterController))]
-    public sealed class ChickenController : NetworkBehaviour
+    public sealed class ChickenController : NetworkBehaviour, IAfterTick
     {
         private const string Source = "Chicken";
 
@@ -405,6 +405,15 @@ namespace CluckWars.Gameplay
         public bool IsControlImmune =>
             Runner != null && !ControlImmuneTimer.ExpiredOrNotRunning(Runner);
 
+        /// <summary>Closes the steal-proof and control-immunity windows now (Turtle Mode's lock ended early). Caster's own
+        /// StateAuthority only. Note: also ends an Immovable window running at the same time.</summary>
+        public void EndShellWindows()
+        {
+            if (Runner == null || !HasStateAuthority) return;
+            StealProofTimer = TickTimer.None;
+            ControlImmuneTimer = TickTimer.None;
+        }
+
         /// <summary>Opens a control-immunity window of <paramref name="seconds"/>.</summary>
         /// <remarks>Never shortens a window already open: a re-grant keeps whichever expiry is LATER.</remarks>
         public void GrantControlImmunity(float seconds)
@@ -502,6 +511,8 @@ namespace CluckWars.Gameplay
             _cargo = GetComponent<ChickenCargo>();
             _abilities = GetComponent<AbilityController>();
             _assassin = GetComponent<AssassinExecute>();
+            _indicator = GetComponent<CluckWars.Visuals.RivalIndicator>();
+            _nameplate = GetComponent<CluckWars.Visuals.ChickenNameplate>();
             _activeStats = ResolveStatsForClass(Class);
             Effects.Log = _log;
             _inContact = false;   // pooled: no contact carried over from a previous life
@@ -899,15 +910,73 @@ namespace CluckWars.Gameplay
 
             if (GetInput<PlayerNetworkInput>(out var input))
             {
-                // Aiming a directional move with the mouse / right stick turns the bird toward the aim; otherwise the
-                // movement stick steers the facing, exactly as before (Aim 0).
-                var steer = input.Movement;
+                // A held ability previews, it never stops the bird: the stick always walks. Aiming a directional move with
+                // the mouse / right stick faces the aim while the bird strafes; with no aim given the stick steers both, so
+                // on a single stick moving is how you aim.
                 var aiming = AimRotatingAbility();
-                if (aiming != null && aiming.RotatesToAim && input.Aim != 0) steer = CluckWars.Input.AimQuantizer.Decode(input.Aim);
+                Vector2? face = aiming != null && aiming.RotatesToAim && input.Aim != 0
+                    ? CluckWars.Input.AimQuantizer.Decode(input.Aim)
+                    : (Vector2?)null;
 
-                _movement.Tick(steer, Runner.DeltaTime, aiming != null, lockFacing: _facingLockTick == Runner.Tick.Raw);
+                _movement.Tick(input.Movement, Runner.DeltaTime, lockFacing: _facingLockTick == Runner.Tick.Raw, faceOverride: face);
             }
         }
+
+        // ---- The base wall ------------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// Fusion's after-tick hook: runs after every FixedUpdateNetwork of this tick (ours with all its early returns, the
+        /// bot's BotTick, abilities' blinks and jumps, knockback) and before NetworkTransform copies the transform into state
+        /// (it does that in BeforeCopyPreviousState / AfterAllTicks), so a position inside a rival base is never replicated.
+        /// </summary>
+        void IAfterTick.AfterTick()
+        {
+            if (HasStateAuthority) KeepOutOfRivalBases();
+        }
+
+        private static readonly KeepOutCircle[] _keepOutScratch = new KeepOutCircle[8];
+        // A correction that lands short is logged once per incident: pinned against geometry this should never be.
+        private const int KeepOutBlockedWarnTicks = 60;
+        private int _keepOutBlockedTicks;
+
+        /// <summary>
+        /// Each chicken's own authority clamps itself, so the rule costs no RPC. Jumps are teleports (GDD 3.5): the arc is drawn
+        /// by the animator and the transform is already at the landing, so "airborne" needs no case and a landing inside a
+        /// base resolves on the landing tick. Skipped while unsticking: that is the traversal pushing a bird out of geometry,
+        /// and two pushes could pin it; the wall resolves on the first tick after. Decoys never move (FixedUpdateNetwork
+        /// returns before any movement) and stand where their caster stood, so they need no clamp. HomeCornerIndex -1 has no
+        /// exemption, but before the round runs nothing clamps at all.
+        /// </summary>
+        private void KeepOutOfRivalBases()
+        {
+            if (IsDecoy || _characterController == null || !_characterController.enabled) return;
+            if (_traversal != null && _traversal.IsUnsticking) return;
+            if (_combat != null && _combat.IsRemoved) return;
+            var gm = GameManager.Instance;
+            if (gm == null || !gm.IsMatchRunning || gm.Config == null) return;
+
+            int count = PlayerBase.GatherKeepOut(_keepOutScratch, gm.Config.BaseKeepOutRadius);
+            var at = transform.position;
+            if (!BaseKeepOutRules.TryCorrect(at, _keepOutScratch, count, HomeCornerIndex, out var corrected))
+            {
+                _keepOutBlockedTicks = 0;
+                return;
+            }
+
+            // Move, never a transform write: the sweep cannot shove the bird through a fence or wall, however large the step.
+            // The small drop keeps the controller's ground contact, which gravity's isGrounded gate reads next tick.
+            _characterController.Move(new Vector3(corrected.x - at.x, -KeepOutGroundProbe, corrected.z - at.z));
+
+            if (BaseKeepOutRules.TryCorrect(transform.position, _keepOutScratch, count, HomeCornerIndex, out _))
+            {
+                if (++_keepOutBlockedTicks == KeepOutBlockedWarnTicks)
+                    _log?.Warn(Source, $"{name}: the base wall could not move this chicken out of a rival base for " +
+                        $"{KeepOutBlockedWarnTicks} ticks (at {transform.position}); something solid is inside the keep-out ring.");
+            }
+            else _keepOutBlockedTicks = 0;
+        }
+
+        private const float KeepOutGroundProbe = 0.01f;
 
         // Phase 6 chunk 5 (A7), state-authority local: the tick an ability last turned the bird to its aim, and the
         // aim a single-target pick should use while that cast resolves.
@@ -944,9 +1013,8 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// v0.6 hold-to-aim (FEEDBACK.md §2.3): true while this chicken is charging an
-        /// ability whose footprint moves when they turn — the movement stick should rotate
-        /// the caster's facing instead of translating them. Reads
+        /// Hold-to-aim (FEEDBACK.md §2.3): the ability this chicken is charging, when its footprint moves as they turn, so
+        /// an explicit aim faces the bird. Movement is unaffected. Reads
         /// <see cref="AbilityController.ChargingAbility"/>, so it only ever fires here on
         /// the StateAuthority path above (bots never reach this — <c>IsBot</c> already
         /// returned earlier — and non-directional shapes fall through to normal movement).
@@ -977,6 +1045,38 @@ namespace CluckWars.Gameplay
         /// </remarks>
         public Abilities.PassiveAbilitySO Passive =>
             _abilities != null ? _abilities.Passive : null;
+
+        // Sneaky Steal's per-victim cooldown. Authority-local, like the press it gates; a proxy preview fails open.
+        private readonly TargetCooldowns<NetworkBehaviourId> _stealLocks = new TargetCooldowns<NetworkBehaviourId>();
+
+        /// <summary>Longer than the render gap to the cast's hit confirmation, well under any steal cooldown, so no cast can miss the lock.</summary>
+        public const float StealLockFeedbackGrace = 0.5f;
+
+        /// <summary>Has this chicken's Sneaky Steal hit <paramref name="victim"/> too recently? False on a proxy.</summary>
+        public bool IsStealLockedOn(ChickenController victim)
+        {
+            if (victim == null || Object == null || !Object.IsValid || !HasStateAuthority) return false;
+            return _stealLocks.Blocks(victim.Id, Runner.SimulationTime);
+        }
+
+        /// <summary>A Sneaky Steal just landed on <paramref name="victim"/>. State authority only (it runs inside the cast).</summary>
+        public void LockStealOn(ChickenController victim, float seconds)
+        {
+            if (victim == null || !HasStateAuthority) return;
+            double now = Runner.SimulationTime;
+            _stealLocks.Lock(victim.Id, now + StealLockFeedbackGrace, now + seconds);
+        }
+
+        /// <summary>This chicken's execute state machine (cached), or null before <c>Spawned</c>.</summary>
+        public AssassinExecute Execute => _assassin;
+
+        private CluckWars.Visuals.RivalIndicator _indicator;
+        private CluckWars.Visuals.ChickenNameplate _nameplate;
+        /// <summary>This chicken's rival indicator and nameplate (cached at spawn, presentation readers only; may be null).</summary>
+        public CluckWars.Visuals.RivalIndicator Indicator => _indicator;
+        public CluckWars.Visuals.ChickenNameplate Nameplate => _nameplate;
+        /// <summary>The CharacterController (the body's footprint, for presentation placement; may be null).</summary>
+        public CharacterController Body => _characterController;
 
         /// <summary>
         /// Applies a speed penalty from a tagged source. Slippery does NOT reduce slow
@@ -1102,6 +1202,38 @@ namespace CluckWars.Gameplay
             _traversal?.Abort();
             _pendingTeleport.Request(position);
             _log?.Debug(Source, $"Teleport queued to {position}.");
+        }
+
+        /// <summary>State authority only: the same queued teleport the round reset uses (an executed chicken's respawn).</summary>
+        internal void QueueTeleport(Vector3 position)
+        {
+            if (!HasStateAuthority) return;
+            _traversal?.Abort();
+            _pendingTeleport.Request(position);
+        }
+
+        /// <summary>
+        /// This chicken was executed (state authority, at the removal): every running ability ends through its own
+        /// OnDeactivate (cooldowns untouched), then every control state and effect window clears, steal-proof and control
+        /// immunity included, as the round reset does. Nothing of the old life carries into the respawn.
+        /// </summary>
+        public void EndEverythingForRemoval()
+        {
+            if (!HasStateAuthority) return;
+            _abilities?.EndAllForRemoval();
+            _traversal?.Abort();
+            _abilitySlowUntil    = double.MinValue;
+            _abilitySlowFactor   = 1f;
+            _inContact           = false;
+            RootTimer            = TickTimer.None;
+            Rooted               = false;
+            IsStunned            = false;
+            StunTimer            = TickTimer.None;
+            StealProofTimer      = TickTimer.None;
+            ControlImmuneTimer   = TickTimer.None;
+            Effects.Clear();
+            SyncAbilityEffects();
+            ExternalDisplacement = Vector3.zero;
         }
 
         private PendingTeleport _pendingTeleport;
@@ -1321,7 +1453,14 @@ namespace CluckWars.Gameplay
         {
             var ceiling = CeilingFor(kind);
             var verdict = JudgeControl(kind, seconds, factor, casterId, info, ceiling, out var caster);
-            if (verdict == ControlClaimRules.Verdict.Accepted) return true;
+            if (verdict == ControlClaimRules.Verdict.Accepted)
+            {
+                if (!CrossedBaseWall(kind, caster)) return true;
+                // The caster's scan refuses a walled target, so this is a race: the victim stepped through a wall while the
+                // RPC flew. A legal no-op, never a rejection (BaseWallRules).
+                _log?.Debug(Source, $"{name}: {rpc} from {caster.name} landed across a base wall; no effect.");
+                return false;
+            }
 
             if (ControlRejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
                 _log?.Warn(Source, $"{name}: rejected {rpc}(seconds={seconds:0.00}" +
@@ -1340,12 +1479,25 @@ namespace CluckWars.Gameplay
             _                => ControlClaimRules.Ceiling.Unknown,
         };
 
+        /// <summary>A direct effect is judged against the caster; a root may come from a zone, so it is judged against the zone.</summary>
+        private bool CrossedBaseWall(ControlKind kind, ChickenController caster)
+        {
+            if (caster == null) return false;
+            return kind == ControlKind.Root && _lastRootScan.Vouched
+                ? _lastRootScan.Walled
+                : PlayerBase.WallBetween(caster.transform.position, transform.position);
+        }
+
+        // JudgeControl's scan of the caster's Root zones: read once, by CrossedBaseWall, same call.
+        private ControlClaimRules.RootZoneScan _lastRootScan;
+
         /// <summary>Gathers what this (the victim's) authority can see about a control claim and judges it.</summary>
         private ControlClaimRules.Verdict JudgeControl(ControlKind kind, float seconds, float factor,
             NetworkBehaviourId casterId, in RpcInfo info, in ControlClaimRules.Ceiling ceiling, out ChickenController caster)
         {
             caster = null;
             var claim = new ControlClaimRules.Claim { Kind = kind, Seconds = seconds, SlowFactor = factor };
+            _lastRootScan = default;
 
             if (Runner != null && Runner.TryFindBehaviour(casterId, out caster) &&
                 caster != null && caster.Object != null && caster.Object.IsValid)
@@ -1370,8 +1522,8 @@ namespace CluckWars.Gameplay
                 // authority judged a lagged copy of us, and a jump right after stepping in (Doppelganger blink, session
                 // 20261023-173009) moved us out before its RPC landed. The zone itself must still vouch either way.
                 float zoneMargin = claim.RangeMargin + ControlClaimRules.RangeSlackMeters;
-                claim.InsideCastersRootZone = kind == ControlKind.Root &&
-                    (AbilityZone.ContainsRootOf(caster, v, Time.realtimeSinceStartup, zoneMargin, ceiling) || WasRecentlyInsideRootOf(caster, zoneMargin, ceiling));
+                if (kind == ControlKind.Root) _lastRootScan = ScanRootZones(caster, v, zoneMargin, ceiling);
+                claim.InsideCastersRootZone = _lastRootScan.Vouched;
             }
 
             return ControlClaimRules.Evaluate(claim, ceiling);
@@ -1380,11 +1532,18 @@ namespace CluckWars.Gameplay
         /// <summary>This authority's own positions over the last <see cref="RecentPositions.WindowSeconds"/> (local; root claims only).</summary>
         private readonly RecentPositions _recentPositions = new RecentPositions();
 
-        /// <summary>Was this chicken inside a Root zone <paramref name="caster"/> owns at any recorded point of the last window?</summary>
-        private bool WasRecentlyInsideRootOf(ChickenController caster, float margin, in ControlClaimRules.Ceiling ceiling)
+        /// <summary>The caster's Root zones: vouched for by this chicken's position now or any recorded point of the last window, walled as of now.</summary>
+        private ControlClaimRules.RootZoneScan ScanRootZones(ChickenController caster, Vector3 current, float margin, in ControlClaimRules.Ceiling ceiling)
         {
             var c = ceiling;   // an 'in' parameter cannot be captured
-            return _recentPositions.AnyWithinWindow(Time.realtimeSinceStartup, (t, p) => AbilityZone.ContainsRootOf(caster, p, t, margin, c));
+            float time = Time.realtimeSinceStartup;
+            var scan = AbilityZone.ScanRootZonesOf(caster, current, current, time, margin, c);
+            _recentPositions.AnyWithinWindow(time, (t, p) =>
+            {
+                scan.Merge(AbilityZone.ScanRootZonesOf(caster, p, current, t, margin, c));
+                return false;   // every sample: each can vouch for another zone
+            });
+            return scan;
         }
 
         /// <summary>
@@ -1438,9 +1597,10 @@ namespace CluckWars.Gameplay
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_ResetControlStates()
         {
-            // Drop a live Death Mark first, without its fail cooldown: left in place, the reset teleport makes it
-            // fizzle on range next tick and re-arm a 5 s cooldown after the clear below (CW-231).
+            // Drop a live Death Mark first, without its fail cooldown: left in place, it would expire into the new round
+            // and re-arm its cooldown after the clear below (CW-231).
             _assassin?.ResetForNewRound();
+            _stealLocks.Clear();
             // End running abilities through their own OnDeactivate first (modifiers, traversal holds, ability
             // state), THEN hard-release traversal and clear the stack as a backstop.
             _abilities?.EndAllForReset();
@@ -1551,14 +1711,16 @@ namespace CluckWars.Gameplay
                 if (touched || sqr > CollisionSlowRadius * CollisionSlowRadius) continue;
                 touched = true;
 
-                if (StealBackActive && other.Cargo != null && Cargo != null)
+                // The bodies can touch across a wall (an owner just inside, a rival clamped on it); the steal-back is an ability.
+                if (StealBackActive && other.Cargo != null && Cargo != null &&
+                    !PlayerBase.WallBetween(transform.position, other.transform.position))
                 {
                     if (!_stealBackCooldowns.TryGetValue(other.Id, out var cd) || cd.Expired(Runner))
                     {
                         _stealBackCooldowns[other.Id] = TickTimer.CreateFromSeconds(Runner, 1.0f);
 
                         float attackerFreeSpace = Cargo.Capacity - Cargo.Cargo;
-                        float defenderCargo = other.Cargo.Cargo;
+                        float defenderCargo = other.Cargo.Stealable;
                         // Steal-proof victim (Egg Shell / Turtle Mode): no steal, no self-credit.
                         // The knockback below is unchanged (its own immunity check lives in ApplyKnockback).
                         float stolen = StealRules.CanStealFrom(other)
@@ -1615,7 +1777,8 @@ namespace CluckWars.Gameplay
                 // Own Feather Trap never slows the owner (GDD §7.2); zones ignore decoys (B7).
                 if (AreaEffectRules.IgnoresChicken(zone.OwnerChicken == this.Id, IsDecoy)) continue;
                 if (!zone.TryGetCenter(out Vector3 center)) continue;
-                if (AreaEffectRules.IsInside(center, zone.TriggerRadius, transform.position))
+                if (AreaEffectRules.IsInside(center, zone.TriggerRadius, transform.position) &&
+                    !PlayerBase.WallBetween(center, transform.position))
                     ApplySlow(SlowSource.Ability, zone.SlowFactor);
             }
         }

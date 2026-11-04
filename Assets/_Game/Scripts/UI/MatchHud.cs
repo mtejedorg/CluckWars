@@ -34,13 +34,6 @@ namespace CluckWars.UI
         [SerializeField] private float   _refreshInterval     = 0.25f;
         [SerializeField] private Vector2 _referenceResolution = new Vector2(1920f, 1080f);
 
-        // ----------------------------------------------------------------
-        // Design-token palette — Phase 10 redesign (ART.md §6, cluckwars-tokens-v2).
-        // Self-contained so the warm Clash Royale/Supercell look applies regardless
-        // of which ColorSchemeSO asset version is serialised in the scene.
-        // ----------------------------------------------------------------
-        private static readonly Color DtTextPrimary = new Color(1.00f, 0.96f, 0.88f, 1f); // #fef5e0
-
         // ---- UI refs built procedurally ------------------------------------
 
         // The comeback banner ("FINAL 10!" + the event) is a wood plaque in MatchOverlays.uxml (#EventBanner), drawn by
@@ -191,7 +184,7 @@ namespace CluckWars.UI
             scaler.referenceResolution = _referenceResolution;
             scaler.matchWidthOrHeight  = 0.5f;
 
-            BuildHitFlash(canvasGO.transform);       // must be first (z-order: under everything)
+            BuildHitFlash(canvasGO.transform);
         }
 
         // ---- Hit-flash (full-screen) ------------------------------------------
@@ -216,24 +209,6 @@ namespace CluckWars.UI
             go.transform.SetParent(parent, worldPositionStays: false);
             rt = (RectTransform)go.transform;
             return go;
-        }
-
-        private static Text AddText(Transform parent, string name, string content,
-            int fontSize, TextAnchor alignment, FontStyle style)
-        {
-            var go   = CreateUI(name, parent, out _);
-            var text = go.AddComponent<Text>();
-            text.text              = content;
-            text.fontSize          = fontSize;
-            text.color             = DtTextPrimary;
-            text.alignment         = alignment;
-            text.fontStyle         = style;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.verticalOverflow   = VerticalWrapMode.Overflow;
-            text.raycastTarget      = false;
-            text.font               = UiGfx.ChunkyFont();
-            UiGfx.AddShadow(text);
-            return text;
         }
 
         private void PollComebackEvent()

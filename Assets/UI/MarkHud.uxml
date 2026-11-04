@@ -1,0 +1,30 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTokens.uss" />
+    <ui:Style src="project://database/Assets/UI/Styles/MarkHud.uss" />
+
+    <!-- Death Mark screen-space HUD (MarkHudController, sortingOrder 85: under the top bar 90, the touch HUD 95 and the
+         overlays 100). Nothing here takes a tap. Positions are written per frame with style.translate. -->
+    <ui:VisualElement name="MarkHudRoot" class="cw-markhud-root" picking-mode="Ignore">
+
+        <!-- The Assassin's hunt marker: pinned over the target (pointer down) or at the clear-viewport edge (pointer at it). -->
+        <ui:VisualElement name="HuntMarker" class="cw-mark-marker" picking-mode="Ignore">
+            <ui:VisualElement name="MarkPointer" class="cw-mark-pointer" picking-mode="Ignore" />
+            <ui:VisualElement name="MarkDisc" class="cw-mark-disc" picking-mode="Ignore" />
+            <ui:VisualElement name="MarkRing" class="cw-mark-ring" picking-mode="Ignore" />
+            <ui:VisualElement name="MarkSkull" class="cw-mark-skull" picking-mode="Ignore" />
+            <ui:Label name="MarkArm" text="" class="cw-mark-arm" picking-mode="Ignore" />
+            <ui:VisualElement name="MarkLock" class="cw-mark-lock" picking-mode="Ignore">
+                <ui:VisualElement name="MarkLockGlyph" class="cw-mark-lock-glyph" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="MarkShell" class="cw-mark-lock cw-mark-shell" picking-mode="Ignore">
+                <ui:VisualElement name="MarkShellGlyph" class="cw-mark-shell-glyph" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:Label name="MarkDistance" text="" class="cw-mark-distance" picking-mode="Ignore" />
+        </ui:VisualElement>
+
+        <!-- The victim's badge on the hunter's rival arrow (floor arrow midpoint, or just inside its edge chevron). -->
+        <ui:VisualElement name="HunterSkull" class="cw-hunter-skull" picking-mode="Ignore">
+            <ui:VisualElement name="HunterSkullGlyph" class="cw-hunter-skull-glyph" picking-mode="Ignore" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

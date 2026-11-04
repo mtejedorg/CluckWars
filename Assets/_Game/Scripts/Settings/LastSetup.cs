@@ -41,6 +41,8 @@ namespace CluckWars.Settings
     /// A setup that no longer exists (renamed ability, removed perk), is illegal for its class, or
     /// has the wrong slot count is "no last setup" - never a crash and never an illegal loadout.
     /// Pure (takes the ability list, touches no scene), so the menu and tests share it.
+    /// In <see cref="LoadoutMode.Fixed"/> the stored ability names are ignored: class, perk and mode restore and the slots come
+    /// from the perk's kit, so a record saved under Free still counts as a last setup.
     /// </summary>
     public static class LastSetupResolver
     {
@@ -60,8 +62,9 @@ namespace CluckWars.Settings
 
         /// <param name="all">The registry's <c>All</c> list (abilities and passives).</param>
         /// <param name="problem">Why the record was rejected; null when it resolved.</param>
+        /// <param name="loadoutMode"><c>MatchConfigSO.LoadoutMode</c>. A malformed kit falls back to the Free checks, as at spawn.</param>
         public static bool TryResolve(LastSetupRecord rec, IEnumerable<AbilityBaseSO> all,
-            out ResolvedLastSetup result, out string problem)
+            LoadoutMode loadoutMode, out ResolvedLastSetup result, out string problem)
         {
             result = default;
             problem = null;
@@ -89,6 +92,12 @@ namespace CluckWars.Settings
             if (passive == null) { problem = $"no perk with subclass id {rec.Subclass}"; return false; }
             if (!AbilityRegistrySO.IsAllowedFor(passive, cls) || passive.Subclass.ClassOf() != cls)
             { problem = $"perk '{passive.name}' does not belong to {cls}"; return false; }
+
+            if (FixedKit.TryResolve(loadoutMode, passive, out var kit, out _))
+            {
+                result = new ResolvedLastSetup(cls, passive, kit, mode);
+                return true;
+            }
 
             // Loadout: exactly one name per slot, each a real, distinct, legal active ability.
             if (rec.Abilities == null || rec.Abilities.Length != AbilityController.SlotCount)

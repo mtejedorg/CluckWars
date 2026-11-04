@@ -176,6 +176,91 @@ namespace CluckWars.Tests
             Assert.GreaterOrEqual(checkedCount, 6, "Expected the six farming-class passives (Warrior, Speedy, Fatty x2) to be checked.");
         }
 
+        private static OracleChicken ShippedSpeedy(ChickenSubclass subclass, bool withQuickDrop)
+        {
+            var config = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
+            var s = TestAssets.LoadAllIn<ChickenStatsSO>(TestAssets.ClassesDir).Find(x => x.DisplayName == "Speedy");
+            var passive = TestAssets.LoadAllIn<PassiveAbilitySO>(TestAssets.AbilitiesDir).Find(p => p.Subclass == subclass);
+            var peck = TestAssets.LoadAllIn<PeckAbilitySO>(TestAssets.AbilitiesDir)[0];
+            var chicken = new OracleChicken
+            {
+                MoveSpeed     = s.MoveSpeed,
+                CargoCapacity = Mathf.RoundToInt(passive.ModifyCargoCapacity(s.CargoCapacity, null)),
+                PeckAmount    = s.PeckAmount,
+                PeckCooldown  = passive.ModifyCooldown(s.PeckCooldown, peck, null),
+                DepositRate   = passive.ModifyDepositRate(config.DepositRatePerSecond, null),
+            };
+            if (withQuickDrop)
+            {
+                var drop = TestAssets.LoadAllIn<QuickDropAbilitySO>(TestAssets.AbilitiesDir)[0];
+                chicken.BurstDepositMultiplier = drop.DepositRateMultiplier;
+                chicken.BurstDepositSeconds    = drop.Duration;
+                chicken.BurstDepositCooldown   = passive.ModifyCooldown(drop.Cooldown, drop, null);
+            }
+            return chicken;
+        }
+
+        /// <summary>The burst is opt-in: a chicken with none farms to the very same number, so no naked target can move.</summary>
+        [Test]
+        public void DepositBurst_LeavesANakedRunUntouched_AndOnlyEverShortensOne()
+        {
+            var config = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
+            for (int seat = 0; seat < 4; seat++)
+            {
+                var naked = BalanceOracle.Simulate(ShippedMap.OracleMap(seat), ShippedSpeedy(ChickenSubclass.Speedy_Featherfoot, false), config.FoodTargetToWin);
+                var burst = BalanceOracle.Simulate(ShippedMap.OracleMap(seat), ShippedSpeedy(ChickenSubclass.Speedy_Featherfoot, true), config.FoodTargetToWin);
+                Assert.AreEqual(naked.Trips, burst.Trips);
+                Assert.Less(burst.SctSeconds, naked.SctSeconds);
+            }
+        }
+
+        [Test]
+        public void DepositBurst_IsPiecewise_AndRespectsItsCooldown()
+        {
+            var map = new OracleMap
+            {
+                BasePos = Vector2.zero,
+                Piles = new[] { new OraclePile { Pos = new Vector2(10f, 0f), Food = 100f } },
+            };
+            var plain = new OracleChicken { MoveSpeed = 10f, CargoCapacity = 20, PeckAmount = 20f, PeckCooldown = 1f, DepositRate = 10f };
+            var burst = plain;
+            burst.BurstDepositMultiplier = 4f;
+            burst.BurstDepositSeconds = 0.25f;     // banks 10 of the 20 in 0.25 s, the other 10 at the plain rate
+            burst.BurstDepositCooldown = 100f;     // one press per run
+
+            float plainTime = BalanceOracle.Simulate(map, plain, 40f).SctSeconds;
+            float burstTime = BalanceOracle.Simulate(map, burst, 40f).SctSeconds;
+            Assert.AreEqual(0.75f, plainTime - burstTime, 1e-3f, "one press saves 1 s of plain banking for 0.25 s of burst");
+        }
+
+        /// <summary>
+        /// The one fixed kit whose run the naked axiom does not see: Featherfoot carries Quick Drop, pressed on every arrival
+        /// it is ready, through the real Oracle on the real map from all four seats (the shipped cooldown fits two presses in
+        /// a run however they are timed, so this is also its best case).
+        /// </summary>
+        /// <remarks>
+        /// <b>Measured 2026-10-31: 28.35 s / 4 trips, 0.15 s under the 28.5 floor of the +-1.5 s design band.</b> This pins the
+        /// measurement, it does not approve it: no tolerance moved, nothing is declared in <see cref="SpecSctTargets"/>, and
+        /// the decision is Maestro's (docs/balance/human-test-baseline.md). When the run comes back inside the band the
+        /// IsFalse below goes red on purpose: turn this into a plain <see cref="SctTargets.Within"/> assertion.
+        /// </remarks>
+        [Test]
+        public void RealMap_FeatherfootWithQuickDrop_IsPinnedAtItsMeasuredRun()
+        {
+            const float Measured = 28.35f;
+            var config = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
+            var target = System.Array.Find(SctTargets.All, t => t.ClassName == "Speedy");
+            var chicken = ShippedSpeedy(ChickenSubclass.Speedy_Featherfoot, true);
+            for (int seat = 0; seat < 4; seat++)
+            {
+                var r = BalanceOracle.Simulate(ShippedMap.OracleMap(seat), chicken, config.FoodTargetToWin);
+                TestContext.WriteLine($"Featherfoot+QuickDrop seat {seat}: {r.SctSeconds:0.00}s / {r.Trips} trips");
+                Assert.AreEqual(target.Trips, r.Trips, $"seat {seat}");
+                Assert.AreEqual(Measured, r.SctSeconds, 0.01f, $"seat {seat}: the run moved; re-measure and re-report it");
+                Assert.IsFalse(SctTargets.Within(r, target), "back inside the SCT band: see the remarks, make this a real assertion");
+            }
+        }
+
         /// <summary>
         /// qa follow-up 10: a declared entry pins the cargo capacity it was measured at, not just
         /// the seconds. Bully's 38.77 s / 3 is a plateau: caps 16, 17 and 18 all produce it, so

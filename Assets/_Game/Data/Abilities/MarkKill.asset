@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.MarkKillAbilitySO
   DisplayName: Death Mark
   ShortLabel: EXEC
-  Description: Marks a lone rival within 8m. Stun them, then press again to take everything they carry.
+  Description: Marks a rival, likelier far from home. Stun them within 8m, then press again to take everything they carry.
   AccentColor: {r: 0.9, g: 0.1, b: 0.2, a: 1}
   Category: 1
   TerrainTraversal: 0
@@ -29,3 +29,10 @@ MonoBehaviour:
     m_Bits: 256
   PeckSlotPreEquippedBy: 64
   SignaturePreEquippedBy: 0
+  KillRange: 8
+  ArmSeconds: 3
+  WindowSeconds: 4
+  FailCooldownSeconds: 5
+  SuccessCooldownSeconds: 10
+  RoundStartCooldownSeconds: 4
+  RemovalSeconds: 3

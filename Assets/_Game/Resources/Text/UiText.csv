@@ -31,7 +31,7 @@ label.you,You
 class.warrior.short,WARRIOR
 class.speedy.short,SPEEDY
 class.fatty.short,FATTY
-class.assassin.short,ASSASSIN
+class.assassin.short,SNEAKY
 role.warrior,Brawler
 role.speedy,Hit & Run
 role.fatty,Hauler
@@ -62,7 +62,7 @@ ability.groundquake.desc,A stomp that leaves everyone within {r}m stuck in place
 ability.headbutt.desc,Shoves rivals up to {r}m ahead and staggers them for {secs}s.
 ability.immovable.desc,"Plant yourself for {secs}s. You can't be stunned, slowed, stuck or shoved."
 ability.invisibility.desc,Fades you to a ghostly outline for {secs}s. Using a move breaks it.
-ability.markkill.desc,"Marks a lone rival within {r}m. Stun them, then press again to take everything they carry."
+ability.markkill.desc,"Marks a rival, likelier far from home. Stun them within {r}m, then press again to take everything they carry."
 ability.peck.desc,Take a beakful of food from the pile you are standing at.
 ability.quickdrop.desc,Banks food {mult}x faster for {secs}s - cash in at your base.
 ability.rollpush.desc,"Rolls forward at {mult}x speed for {secs}s, shoving chickens out of the path."
@@ -72,10 +72,10 @@ ability.scrap.desc,Grabs {n} food off the nearest rival within {r}m.
 ability.shadowstep.desc,"Dashes forward at {mult}x speed for {secs}s, straight over walls."
 ability.smokeroost.desc,"Drops a choking cloud ({r}m, {secs}s): you fade, rivals inside slow to {pct}% speed. Using a move breaks it."
 ability.snatch.desc,Robs {n} food from every rival within {r}m ahead and shoves them back.
-ability.sneakysteal.desc,Yanks {n} food from the nearest rival within {r}m.
+ability.sneakysteal.desc,Yanks {n} food from the nearest rival within {r}m. Same bird: every {secs}s.
 ability.speedburst.desc,A {secs}s sprint at {mult}x movement speed.
 ability.spinecoat.desc,"For {secs}s, any rival who bumps into you loses {n} food to you and gets knocked away."
-ability.turtlemode.desc,"Pull into your shell for {secs} seconds. You walk slowly, but nobody can steal your food."
+ability.turtlemode.desc,"Shell walk {secs}s, safe from theft and execution. Press again to lock in place for {lock}s."
 perk.relentless.line,Moves recharge {pct}% faster.
 perk.relentless.detail,Applies to every move except Peck.
 perk.bully.line,"Steal {steal}% more, carry {cap} more."
@@ -93,6 +93,13 @@ perk.spoiler.detail,"If nobody reaches {goal} before time's up, you bank {food} 
 loadout.row.shared,ANY BIRD
 loadout.row.class,{cls} ONLY
 loadout.detail.empty,Tap a move for the details.
+loadout.kit.title,{perk} KIT
+mark.hex.kill,KILL
+hud.backin,BACK IN!
+mark.toast,MARKED!
+mark.clock,LIVE {secs}s
+mark.clock.arming,LIVE IN {secs}
+mark.distance,{m} m
 loadout.next,NEXT
 loadout.registryMissing,"No abilities in registry.
 Assign AbilityRegistrySO in ProjectInstaller."
@@ -157,6 +164,7 @@ countdown.go,GO!
 lobby.bot.1,DashFox
 lobby.bot.2,BrunoB
 lobby.bot.3,PeckNoir
+lobby.bot.4,IronComb
 postmatch.standings,FINAL STANDINGS
 postmatch.wins,{name} WINS!
 postmatch.ended,MATCH ENDED

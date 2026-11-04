@@ -753,6 +753,165 @@ namespace CluckWars.Visuals
             1f - RivalChevronViewportMargin,
             1f - RivalChevronTopHudInset);
 
+        // ---- Death Mark feedback (MarkPresentationModel, MarkFeedback, MarkHudController, the top bar, the hexes) ---------
+        // Maestro's 2026-11 redesign. Every timing below is the model's; the UI controllers only draw its outputs.
+
+        /// <summary>Kill-ready: the hunt marker and the Death Mark hex turn this colour (#FFEB1A).</summary>
+        public static readonly Color MarkKillColor = new Color(1f, 0.92f, 0.1f, 1f);
+        /// <summary>The marker's disc and the skull's ink (#140A1A).</summary>
+        public static readonly Color MarkInk = new Color(0.08f, 0.04f, 0.1f, 1f);
+        /// <summary>The victim's toast and clock plates (#B80D1A).</summary>
+        public static readonly Color MarkVictimPlateColor = new Color(0.72f, 0.05f, 0.1f, 0.92f);
+        /// <summary>The marker while a base wall stands between Assassin and target (#8D8D8D).</summary>
+        public static readonly Color MarkWalledColor = new Color(0.553f, 0.553f, 0.553f, 1f);
+        /// <summary>HUD cream (#FEF5E0) and HUD ink (#2A1A0C), the lit / KILL hex rim and icon.</summary>
+        public static readonly Color MarkCream = new Color(0.996f, 0.961f, 0.878f, 1f);
+        public static readonly Color MarkHexIconInk = new Color(0.086f, 0.063f, 0.11f, 1f);
+
+        /// <summary>The draw: a highlight steps down the standings for this long (never longer than the mark's arm), one row
+        /// per step; under reduced motion the target's row fades in over the shorter time instead.</summary>
+        public const float MarkDrawSeconds = 0.6f;
+        public const float MarkDrawStepSeconds = 0.1f;
+        public const float MarkDrawReducedFadeSeconds = 0.3f;
+        /// <summary>At the lock the highlight pops (1 to this and back) over the pop time, then fades out.</summary>
+        public const float MarkDrawLockPopSeconds = 0.15f;
+        public const float MarkDrawLockPopScale = 1.06f;
+        public const float MarkDrawFadeSeconds = 0.25f;
+
+        /// <summary>The hunt marker appears at the lock with a pop from this scale over this long.</summary>
+        public const float MarkMarkerPopFrom = 0.85f;
+        public const float MarkMarkerPopSeconds = 0.15f;
+        /// <summary>KILL: the marker pulses 1 to 1 + this, at this rate (static under reduced motion).</summary>
+        public const float MarkMarkerKillPulse = 0.08f;
+        public const float MarkMarkerKillPulseHz = 6f;
+
+        /// <summary>An executed chicken's body while it is out (0 = gone; it reappears at its base). Its nameplate keeps the skull.</summary>
+        public const float ExecutedOutAlpha = 0f;
+
+        /// <summary>Any ending: every output fades to 0 over this long, then the presentation is clean.</summary>
+        public const float MarkEndFadeSeconds = 0.3f;
+        /// <summary>The standings skull fades in over this long.</summary>
+        public const float MarkSkullFadeInSeconds = 0.15f;
+
+        /// <summary>The victim's MARKED! toast: in (scale from + opacity), hold, out.</summary>
+        public const float MarkToastInSeconds = 0.15f;
+        public const float MarkToastHoldSeconds = 1.2f;
+        public const float MarkToastOutSeconds = 0.15f;
+        public const float MarkToastScaleFrom = 0.85f;
+
+        /// <summary>The victim's darkness (dim) fades in over this long and stays the mark's whole life.</summary>
+        public const float MarkDimFadeInSeconds = 0.4f;
+        /// <summary>Cold (and red) enter at the inner circle's radius R; they leave only after the hunter has been beyond
+        /// this many R for the delay, continuously, so the edge never flickers. Fades in / out.</summary>
+        public const float MarkColdExitFactor = 1.3f;
+        public const float MarkColdExitDelaySeconds = 1.0f;
+        public const float MarkColdFadeInSeconds = 0.4f;
+        public const float MarkColdFadeOutSeconds = 1.0f;
+
+        /// <summary>Death Mark stings (IAudioService.PlaySFX volume / pitch). DrawTick rises a step per row, capped.</summary>
+        public const float MarkDrawTickVolume = 0.8f;
+        public const float MarkDrawTickPitch = 1.0f;
+        public const float MarkDrawTickPitchStep = 0.05f;
+        public const float MarkDrawTickPitchMax = 1.35f;
+        public const float MarkLockVolume = 0.9f;
+        public const float MarkLockPitch = 1.0f;
+        public const float MarkVictimVolume = 0.9f;
+        public const float MarkVictimPitch = 0.75f;
+        public const float MarkKillReadyVolume = 0.8f;
+        public const float MarkKillReadyPitch = 1.30f;
+        /// <summary>No KillReady sting within this long of the last one.</summary>
+        public const float MarkKillReadyMinInterval = 0.4f;
+
+        /// <summary>
+        /// The kill-live beat (the 3 s arm ending, Maestro 2026-11-04: "feedback is critical here"). Stings reuse existing clips:
+        /// the victim hears its MARKED! sting again, higher and louder (the danger it already knows, now live); the Assassin and
+        /// observers hear the draw's lock sting, higher (the observers' quieter: not their fight).
+        /// </summary>
+        public const float MarkKillLiveVictimVolume = 1.0f;
+        public const float MarkKillLiveVictimPitch = 1.15f;
+        public const float MarkKillLiveAssassinVolume = 0.9f;
+        public const float MarkKillLiveAssassinPitch = 1.35f;
+        public const float MarkKillLiveObserverVolume = 0.45f;
+        public const float MarkKillLiveObserverPitch = 1.35f;
+        /// <summary>At the arm the victim's clock and the Assassin's marker pop from this scale back to 1 over
+        /// <see cref="MarkLivePopSeconds"/>.</summary>
+        public const float MarkLivePopFrom = 1.3f;
+        public const float MarkLivePopSeconds = 0.2f;
+        /// <summary>While armed the victim's clock and the standings skull pulse up to 1 + this, at this rate.</summary>
+        public const float MarkLivePulse = 0.12f;
+        public const float MarkLivePulseHz = 4f;
+        /// <summary>The standings skull's tint once the kill is live (the screen mood's red), and its ink tint before.</summary>
+        public static readonly Color MarkSkullLiveColor = new Color(0.9f, 0.04f, 0.04f, 1f);
+        public static readonly Color MarkSkullInkColor = new Color(22f / 255f, 16f / 255f, 28f / 255f, 1f);
+
+        /// <summary>Hunt marker geometry, panel px (MarkHud.uss holds the element boxes): ring radius, ink track and colour
+        /// arc widths, track alpha, pointer base and how far its tip reaches beyond the ring.</summary>
+        public const float MarkRingRadiusPx = 38f;
+        public const float MarkRingTrackWidthPx = 12f;
+        public const float MarkRingArcWidthPx = 8f;
+        public const float MarkRingTrackAlpha = 0.55f;
+        public const float MarkPointerBasePx = 30f;
+        public const float MarkPointerTipBeyondRingPx = 18f;
+        public const float MarkPointerInkPx = 3f;
+        /// <summary>Marker box (84 x 102 incl. pointer) and placement: half-box, the clearance from the clear-viewport edge,
+        /// the gap above the anchor, the most the marker rises to clear the local "You" plate (inflated by the margin).</summary>
+        public const float MarkMarkerHalfPx = 42f;
+        public const float MarkMarkerBoxWidthPx = 84f;
+        public const float MarkMarkerBoxHeightPx = 102f;
+        public const float MarkMarkerEdgeClearancePx = 64f;
+        /// <summary>Extra vertical clearance at the clear-viewport edge: a full four-row landscape board hangs ~34 px below the
+        /// top information zone (accepted, HudControlZones), and the marker's pointer (56 px from its centre) must not tuck
+        /// under it when it points up at a hidden target.</summary>
+        public const float MarkMarkerTopBandOverhangPx = 34f;
+        public const float MarkMarkerAnchorGapPx = 10f;
+        public const float MarkMarkerYouPlateMarginPx = 8f;
+        public const float MarkMarkerYouPlateMaxRisePx = 96f;
+        /// <summary>World metres above the target's pivot the on-screen marker must clear (badge stack 1.78 + 2 x 0.11 and the
+        /// STUN badge), plus the class model's head lift.</summary>
+        public const float MarkMarkerClearHeight = 2.0f;
+        /// <summary>The victim's hunter-skull badge on the edge chevron fallback: this many chevron sizes inward from its centre.</summary>
+        public const float MarkHunterBadgeChevronInset = 0.9f;
+
+        /// <summary>The Death Mark hex while KILL shows: size (multiplied into the controller's per-frame scale; 1.15 is the
+        /// cap the hex gaps allow), enter pop from / over, idle pulse amplitude and rate (off under reduced motion).</summary>
+        public const float MarkHexKillScale = 1.15f;
+        public const float MarkHexKillPopFrom = 1.22f;
+        public const float MarkHexKillPopSeconds = 0.15f;
+        public const float MarkHexKillPulse = 0.03f;
+        public const float MarkHexKillPulseHz = 3f;
+
+        // ---- Death Mark screen mood (MarkScreenEffect / MarkScreenFeature / CWMarkMood.shader) ------------------------
+        // The victim's whole-screen mood, drawn by one full-screen pass on the base game camera before post-processing,
+        // so the HUD (UI overlay camera, Screen Space Overlay canvases, UI Toolkit panels) stays on top and undimmed.
+        // Every alpha below is the value at weight 1; the caller's faded weights (dim01 / cold01 / red01) scale them.
+        // Colours are colour-buffer values: the project is in Gamma space, so they are plain sRGB.
+
+        /// <summary>DIM: darkness alpha at the screen centre (kept low: nothing opaque covers the centre).</summary>
+        public const float MarkMoodDimCentre = 0.18f;
+        /// <summary>DIM: darkness alpha at the screen corners.</summary>
+        public const float MarkMoodDimEdge = 0.66f;
+        /// <summary>Vignette ramp, as a fraction of the centre-to-corner distance: flat centre alpha inside Inner,
+        /// smoothstep to the edge alpha at Outer.</summary>
+        public const float MarkMoodVignetteInner = 0.22f;
+        public const float MarkMoodVignetteOuter = 1.0f;
+        /// <summary>DIM: the darkness colour with the Assassin far away (near-black, a hint of violet).</summary>
+        public static readonly Color MarkMoodDimColour = new Color(0.03f, 0.015f, 0.05f, 1f);
+        /// <summary>COLD: the darkness turns this deep violet as cold01 rises. Kept dark (luma ~0.1) so the edge stays
+        /// darkness, not a violet fog: a lighter violet (0.22, 0.09, 0.46) read brighter than plain DIM in the 960x540 proof.</summary>
+        public static readonly Color MarkMoodColdColour = new Color(0.13f, 0.05f, 0.28f, 1f);
+        /// <summary>COLD: extra darkness alpha added at the edge at cold01 = 1 (the walls close in a little).</summary>
+        public const float MarkMoodColdEdgeBoost = 0.08f;
+        /// <summary>COLD: share of the scene's colour removed at cold01 = 1 (0 = untouched, 1 = greyscale).</summary>
+        public const float MarkMoodColdDesaturation = 0.6f;
+        /// <summary>RED: the tint colour, and its alpha at the edge at red01 = 1 (~7%: felt more than seen).</summary>
+        public static readonly Color MarkMoodRedColour = new Color(0.9f, 0.04f, 0.04f, 1f);
+        public const float MarkMoodRedAmount = 0.07f;
+        /// <summary>RED: centre alpha as a share of the edge alpha (it lives inside the darkness, fainter in the middle).</summary>
+        public const float MarkMoodRedCentreShare = 0.4f;
+        /// <summary>Below this a weight counts as zero: all three under it and no pass is enqueued (zero GPU cost);
+        /// cold under it and the cheap blend-only pass is used instead of the colour-reading one.</summary>
+        public const float MarkMoodOffEpsilon = 1f / 255f;
+
         /// <summary>
         /// Chevron size as a fraction of the viewport's height. A fraction rather than a
         /// world-space length on purpose: it makes the chevron a constant share of the

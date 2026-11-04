@@ -39,12 +39,13 @@ namespace CluckWars.Gameplay
         [Tooltip("Legacy per-component override. If null, PrefabRegistry.GameManager is used.")]
         [SerializeField] private NetworkObject _gameManagerPrefab;
 
-        [Tooltip("Number of AI bots to spawn in Solo mode (0–3). Bots fill corners 1–3 with classes Speedy / Fatty / Assassin.")]
+        [Tooltip("Number of AI bots to spawn in Solo mode (0–3). Fixed mode rolls each bot's class + specialization (FixedKit.RollBotLineup); Free mode uses Speedy / Fatty / Assassin on corners 1–3.")]
         [Range(0, 3)]
         [SerializeField] private int _soloBotsToSpawn = 3;
 
         [Header("Bot Loadout")]
-        [Tooltip("Curated loadout presets for bots. Each bot rolls a random preset whose " +
+        [Tooltip("LoadoutMode.Free only: Fixed mode bots play the 8 kits and never read these rows. " +
+            "Curated loadout presets for bots. Each bot rolls a random preset whose " +
             "AllowedClasses permits its class (BOT-3). Author rows in the inspector — see " +
             "docs/ROADMAP.md Phase R-Bot BOT-3 for the recommended set " +
             "(Bruiser / Skirmisher / Tank / Trickster / Thief).")]
@@ -68,18 +69,22 @@ namespace CluckWars.Gameplay
         private PrefabRegistrySO _prefabRegistry;
         private ChickenClassRegistrySO _classRegistry;
         private AbilityRegistrySO _abilityRegistry;
+        private MatchConfigSO _matchConfig;
         private ILogService _log;
 
         [Inject]
-        public void Construct(INetworkService networkService, ISessionSelectionService selection, PrefabRegistrySO prefabRegistry, ChickenClassRegistrySO classRegistry, AbilityRegistrySO abilityRegistry, ILogService log)
+        public void Construct(INetworkService networkService, ISessionSelectionService selection, PrefabRegistrySO prefabRegistry, ChickenClassRegistrySO classRegistry, AbilityRegistrySO abilityRegistry, MatchConfigSO matchConfig, ILogService log)
         {
             _networkService = networkService;
             _selection = selection;
             _prefabRegistry = prefabRegistry;
             _classRegistry = classRegistry;
             _abilityRegistry = abilityRegistry;
+            _matchConfig = matchConfig;
             _log = log;
         }
+
+        private LoadoutMode ActiveLoadoutMode => _matchConfig != null ? _matchConfig.LoadoutMode : LoadoutMode.Free;
 
 
         private NetworkObject ResolveChickenPrefab()
@@ -211,8 +216,14 @@ namespace CluckWars.Gameplay
             var chickenPrefab = ResolveChickenPrefab();
             if (chickenPrefab == null) return;
 
-            // Distribute variety: Speedy → corner 1, Fatty → corner 2, Assassin → corner 3.
+            // Free mode: Speedy → corner 1, Fatty → corner 2, Assassin → corner 3.
             var botClasses = new[] { ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };
+            // Fixed mode: the lineup THE COOP showed (same seed, same rule), never the scene presets.
+            bool fixedKits = ActiveLoadoutMode == LoadoutMode.Fixed;
+            var lineup = fixedKits
+                ? FixedKit.RollBotLineup(_selection != null ? _selection.SoloCornerSeed : 0, Mathf.Min(_soloBotsToSpawn, 3),
+                    _abilityRegistry != null ? _abilityRegistry.Passives : null, _selection?.DevBotSubclasses)
+                : null;
 
             var mapGen   = FindFirstObjectByType<MapGenerator>();
             var spawnPts = mapGen != null ? mapGen.SpawnPoints : null;
@@ -222,7 +233,11 @@ namespace CluckWars.Gameplay
             {
                 // Bots take permutation slots 1, 2, 3; slot 0 belongs to the solo player.
                 int     cornerIdx = ShuffledCorner((i + 1) % 4);
-                var     botClass  = botClasses[i % botClasses.Length];
+                var     rolled    = lineup != null ? lineup[i] : null;
+                if (fixedKits && rolled == null)
+                    _log?.Error(Source, $"No specialization rolled for bot {i} (empty AbilityRegistrySO.Passives?): it spawns as " +
+                        $"{botClasses[i % botClasses.Length]} on the Free path instead of a kit.");
+                var     botClass  = rolled != null ? rolled.Subclass.ClassOf() : botClasses[i % botClasses.Length];
                 Vector3 pos       = Vector3.zero;
 
                 if (spawnPts != null && cornerIdx < spawnPts.Count)
@@ -236,8 +251,9 @@ namespace CluckWars.Gameplay
 
                 // Roll a loadout preset OUTSIDE the lambda so the random pick is stable
                 // for this spawn. botClass is loop-local, so capturing it directly is safe.
-                bool haveLoadout = TryPickBotLoadout(botClass, out var loadout);
-                if (!haveLoadout)
+                BotLoadoutPreset loadout = default;
+                bool haveLoadout = rolled == null && TryPickBotLoadout(botClass, out loadout);
+                if (rolled == null && !haveLoadout)
                     _log?.Warn(Source, $"No bot loadout preset available for {botClass} — bot " +
                         "will run ability-less. Author rows on MatchBootstrapper._botLoadouts.");
 
@@ -267,7 +283,7 @@ namespace CluckWars.Gameplay
                         if (abilities != null)
                         {
                             ResolveLegalLoadout(botClass,
-                                haveLoadout ? loadout.Passive : null,
+                                rolled != null ? rolled : haveLoadout ? loadout.Passive : null,
                                 haveLoadout ? loadout.Slot0 : null,
                                 haveLoadout ? loadout.Slot1 : null,
                                 haveLoadout ? loadout.Slot2 : null,
@@ -278,7 +294,7 @@ namespace CluckWars.Gameplay
                     });
 
                 _log?.Info(Source, $"Spawning bot {i}: class={botClass}, corner={cornerIdx}, " +
-                    $"loadout={(haveLoadout ? loadout.DisplayLabel : "(none)")}, pos={pos}.");
+                    $"loadout={(rolled != null ? rolled.name + " kit" : haveLoadout ? loadout.DisplayLabel : "(none)")}, pos={pos}.");
             }
         }
 
@@ -338,7 +354,10 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Sanitises a chosen loadout into a legal one for <paramref name="cls"/>:
+        /// The spawn chokepoint for players AND bots. In <see cref="LoadoutMode.Fixed"/> the specialization's kit IS the loadout
+        /// (<see cref="FixedKit"/>; the selection's abilities are ignored); a malformed kit is an Error and falls through to the
+        /// Free rules below, so a forager still gets its Peck. In Free this
+        /// sanitises a chosen loadout into a legal one for <paramref name="cls"/>:
         /// <see cref="AbilityController.SlotCount"/> distinct, class-legal active abilities
         /// plus a class-legal passive, with the subclass's pre-equips pinned (Peck arrives only
         /// through the Peck slot, and never for a class that fails <c>ClassMayForage</c>).
@@ -379,6 +398,17 @@ namespace CluckWars.Gameplay
             // Passive must exist and be legal for this class; else fall back to the signature.
             if (passive == null || !AbilityRegistrySO.IsAllowedFor(passive, cls))
                 passive = _abilityRegistry.GetDefaultPassiveForClass(cls);
+
+            if (FixedKit.TryResolve(ActiveLoadoutMode, passive, out var kit, out var kitProblem))
+            {
+                slot0 = kit[0]; slot1 = kit[1]; slot2 = kit[2]; slot3 = kit[3];
+                // merge.ps1 reads this line: it proves a kit equipped, and how many of the 8 a session exercised.
+                _log?.Info(Source, $"Kit equip subclass={passive.Subclass} slots={kit[0].name},{kit[1].name},{kit[2].name},{kit[3].name}");
+                return;
+            }
+            if (kitProblem != null)
+                _log?.Error(Source, $"ResolveLegalLoadout: the fixed kit is unusable ({kitProblem}) so {cls} loses it and spawns " +
+                    "on the Free loadout rules instead. Fix the kit in the Balance Editor.");
 
             int activeSlots = AbilityController.SlotCount;
 
@@ -508,7 +538,7 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// One bot loadout option. Authored as inspector rows on
+        /// One bot loadout option, <see cref="LoadoutMode.Free"/> only. Authored as inspector rows on
         /// <see cref="MatchBootstrapper"/>; a bot rolls a random preset whose
         /// <see cref="AllowedClasses"/> permits its class. <see cref="Slot2"/> is only
         /// equipped on Assassin bots (the Combo 3rd slot).

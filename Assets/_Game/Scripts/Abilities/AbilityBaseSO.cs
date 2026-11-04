@@ -199,6 +199,36 @@ namespace CluckWars.Abilities
         public virtual float IndicatorRange => 0f;
 
         /// <summary>
+        /// Seconds this ability stays on cooldown after GO at the start of every round (first round and every PLAY AGAIN);
+        /// 0 = ready at GO, the default. Applied by <c>AbilityController</c> on the caster's state authority
+        /// (<c>RoundStartCooldownRules</c>). Death Mark overrides it from its asset.
+        /// </summary>
+        public virtual float RoundStartCooldown => 0f;
+
+        /// <summary>
+        /// A press while this ability runs is a phase change (Turtle Mode's lock), not a refused re-cast: the slot reads as
+        /// ready for it (no cooldown refusal; a stun still refuses, as for any cast), and <see cref="OnPressWhileActive"/> runs
+        /// instead of a new activation. Nothing else changes: the cooldown keeps running from the first press.
+        /// </summary>
+        public virtual bool AcceptsPressWhileActive => false;
+
+        /// <summary>
+        /// Bots fire one ability at a time (<c>AbilityController.BotTryActivate</c>). True exempts this one: it is the
+        /// follow-through of a move the bot is still running (Death Mark's Kill lands during the stun of the bot's own Ambush,
+        /// whose run time IS the stun). Players are never gated.
+        /// </summary>
+        public virtual bool BotIgnoresOneAtATime => false;
+
+        /// <summary>A press while active (<see cref="AcceptsPressWhileActive"/>), on the caster's state authority. Returns the
+        /// seconds the ability now runs from this tick, or 0 or less to end it now.</summary>
+        public virtual float OnPressWhileActive(AbilityContext ctx) => 0f;
+
+        /// <summary>Retired from the pool (not registered, not pickable, in no kit) but kept in the repo; the roster checks
+        /// treat it as retired, not broken.</summary>
+        [Tooltip("Retired: kept in the repo, out of the registry, every kit and the free pool.")]
+        public bool Retired;
+
+        /// <summary>
         /// True when activating without an enemy inside <see cref="IndicatorRange"/>
         /// would do nothing (Snatch, Sneaky Steal, Cluck Shock, Mark/Kill, the stun
         /// bursts). The HUD greys the button out and <c>AbilityController.TryActivate</c>
@@ -375,8 +405,8 @@ namespace CluckWars.Abilities
         /// <summary>
         /// Does aiming this ability mean aiming a <i>direction</i>? True for every shape
         /// whose footprint moves when the caster turns, which is what
-        /// <c>ChickenController.AimRotatingAbility</c> uses to convert the movement stick into
-        /// facing during a hold (FEEDBACK.md §2.3).
+        /// <c>ChickenController.AimRotatingAbility</c> uses to face an explicit aim during a hold,
+        /// while the stick keeps walking the bird (FEEDBACK.md §2.3).
         /// </summary>
         /// <remarks>
         /// Written as an exclusion list rather than an inclusion list on purpose: this used
@@ -501,7 +531,8 @@ namespace CluckWars.Abilities
         /// <remarks>
         /// <b>What actually overrides this today</b> — a cargo requirement (Snatch, Sneaky
         /// Steal, Scrap, Roll Trample all reject an empty-handed rival), Dust Kick's rear-arc
-        /// restriction, and Mark/Kill's isolation + rival rules. That is the complete list.
+        /// restriction, and Sneaky Steal's per-victim lock. That is the complete list. (The base wall sits in
+        /// <see cref="WouldAffect"/> itself, for every ability.)
         ///
         /// <b>Immunity is deliberately NOT one of them, and must not become one.</b> A control
         /// -immune chicken (Immovable) is still <i>eligible</i>: it is gathered, it counts
@@ -621,6 +652,8 @@ namespace CluckWars.Abilities
         /// and is what lets the telegraph's grey "in the area, no effect" overlay be the
         /// exact gap between the two.
         ///
+        /// A claimed base's wall between caster and candidate refuses here too (<see cref="Gameplay.BaseWallRules"/>).
+        ///
         /// <b>Eligibility is not selection.</b> For a shape that hits everything it covers
         /// the two coincide, but a <see cref="AbilityAimShape.SingleTarget"/> ability has
         /// several eligible candidates and hits one. <see cref="GatherTargets"/> owns that
@@ -659,6 +692,10 @@ namespace CluckWars.Abilities
             if (candidate.Combat != null && candidate.Combat.IsDead) return false;
 
             if (!IsInAimShape(caster, candidate, forward)) return false;
+
+            // No ability crosses a base wall (BaseWallRules). After the shape, so a walled rival is the grey
+            // "in the area, no effect" gap, and every consumer of this one predicate refuses it alike.
+            if (!isSelf && Gameplay.PlayerBase.WallBetween(caster.transform.position, candidate.transform.position)) return false;
 
             return ExtraTargetFilter(caster, candidate);
         }

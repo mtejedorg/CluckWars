@@ -2,6 +2,15 @@ using UnityEngine;
 
 namespace CluckWars.Gameplay
 {
+    /// <summary>How a chicken's four abilities are chosen. The one switch between the balance baseline and free picking.</summary>
+    public enum LoadoutMode : byte
+    {
+        /// <summary>Every specialization plays its authored kit (<see cref="CluckWars.Abilities.PassiveAbilitySO.Kit"/>, <see cref="FixedKit"/>).</summary>
+        Fixed = 0,
+        /// <summary>The pre-baseline rules: two pre-equips (<see cref="PreEquippedLoadout"/>), the rest hand-picked.</summary>
+        Free = 1,
+    }
+
     /// <summary>
     /// Single source of truth for match-wide tunables. Lives at /Assets/_Game/Data/MatchConfig.asset.
     /// </summary>
@@ -36,6 +45,16 @@ namespace CluckWars.Gameplay
                  "once, when this many playable seconds are left (re-audit round 2, decision 2: the " +
                  "last 10 s). 0 disables it. Read by GameManager through ComebackEventTiming.")]
         [Min(0f)] public float ComebackEventSecondsLeft = 10f;
+
+        [Tooltip("Base wall: neither a chicken's body nor any ability crosses this radius round a claimed base (m). " +
+                 "Own base free for the body, unclaimed bases open. Independent of PlayerBase.DepositRadius, and " +
+                 "the map keeps it passable: BaseKeepOutTests checks the real layout.")]
+        [Min(0f)] public float BaseKeepOutRadius = 2.5f;
+
+        [Header("Loadouts")]
+        [Tooltip("Fixed: every specialization plays its authored kit (the balance baseline; players and bots). " +
+                 "Free: the old hand-picked loadouts, unchanged. One switch, read by the spawner, GEAR UP and LastSetup.")]
+        public LoadoutMode LoadoutMode = LoadoutMode.Fixed;
 
         [Header("Networking")]
         // Tick rate lives in NetworkProjectConfig.fusion (Fusion 2 ignores per-session values here)

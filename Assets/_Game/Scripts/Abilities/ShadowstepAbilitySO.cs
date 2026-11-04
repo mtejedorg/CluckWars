@@ -18,12 +18,12 @@ namespace CluckWars.Abilities
         {
             DisplayName = "Shadowstep";
             ShortLabel = "STEP";
-            Description = "Dashes forward at 3x speed for 0.4s, straight over walls.";
+            Description = "Dashes forward at 3x speed for 0.25s, straight over walls.";
             Category = AbilityCategory.Utility;
             TerrainTraversal = TerrainTraversal.Blink;
             AllowedClasses = ChickenClassFlags.Assassin;
-            Duration = 0.4f;
-            Cooldown = 6f;
+            Duration = 0.25f;
+            Cooldown = 4f;
         }
 
         [Tooltip("Speed multiplier applied during the blink dash.")]

@@ -102,10 +102,10 @@ namespace CluckWars.Localization
         [UiArgs("mult", "secs")] public const string AbilityShadowstepDesc = "ability.shadowstep.desc";
         [UiArgs("r", "secs", "pct")] public const string AbilitySmokeRoostDesc = "ability.smokeroost.desc";
         [UiArgs("n", "r")] public const string AbilitySnatchDesc = "ability.snatch.desc";
-        [UiArgs("n", "r")] public const string AbilitySneakyStealDesc = "ability.sneakysteal.desc";
+        [UiArgs("n", "r", "secs")] public const string AbilitySneakyStealDesc = "ability.sneakysteal.desc";
         [UiArgs("secs", "mult")] public const string AbilitySpeedBurstDesc = "ability.speedburst.desc";
         [UiArgs("secs", "n")] public const string AbilitySpineCoatDesc = "ability.spinecoat.desc";
-        [UiArgs("secs")] public const string AbilityTurtleModeDesc = "ability.turtlemode.desc";
+        [UiArgs("secs", "lock")] public const string AbilityTurtleModeDesc = "ability.turtlemode.desc";
 
         // ---- Perks (templated from each passive's own fields) ----
         [UiArgs("pct")] public const string PerkRelentlessLine = "perk.relentless.line";
@@ -127,6 +127,13 @@ namespace CluckWars.Localization
         public const string LoadoutRowShared = "loadout.row.shared";
         [UiArgs("cls")] public const string LoadoutRowClass = "loadout.row.class";
         public const string LoadoutDetailEmpty = "loadout.detail.empty";
+        [UiArgs("perk")] public const string LoadoutKitTitle = "loadout.kit.title";
+        public const string MarkHexKill = "mark.hex.kill";
+        public const string HudBackIn = "hud.backin";
+        public const string MarkToast = "mark.toast";
+        [UiArgs("secs")] public const string MarkClock = "mark.clock";
+        [UiArgs("secs")] public const string MarkClockArming = "mark.clock.arming";
+        [UiArgs("m")] public const string MarkDistance = "mark.distance";
         public const string LoadoutNext = "loadout.next";
         public const string LoadoutRegistryMissing = "loadout.registryMissing";
         public const string SlotEmpty = "slot.empty";
@@ -195,6 +202,7 @@ namespace CluckWars.Localization
         public const string LobbyBot1 = "lobby.bot.1";
         public const string LobbyBot2 = "lobby.bot.2";
         public const string LobbyBot3 = "lobby.bot.3";
+        public const string LobbyBot4 = "lobby.bot.4";
 
         // ---- Post-match overlay ----
         public const string PostmatchStandings = "postmatch.standings";

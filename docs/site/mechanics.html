@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Cluck Wars: Mechanics</title>
-<meta name="description" content="How Cluck Wars plays: the 45-second loop, the Solo Clear Time balance axiom, four classes, the steal formula, the control ladder and the 29 abilities.">
+<meta name="description" content="How Cluck Wars plays: the 45-second loop, the Solo Clear Time balance axiom, four classes, the steal formula, the control ladder and the 28 abilities.">
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -42,7 +42,7 @@
   <section id="loop">
     <h2>The loop and the win</h2>
     <!-- Source: docs/GDD.md §2 (core loop) -->
-    <p>Each player picks a class, a passive and abilities, spawns at their base corner and farms the tiered food piles. Food is carried home and deposited at the base, then the trip repeats. On the way, players steal from loaded rivals, control them, and defend their own haul.</p>
+    <p>Each player picks a class and a specialization, which fixes their four abilities, spawns at their base corner and farms the tiered food piles. Food is carried home and deposited at the base, then the trip repeats. On the way, players steal from loaded rivals, control them, and defend their own haul.</p>
     <!-- Source: docs/GDD.md §2 (win condition) -->
     <p>The first player to bank <strong>40 food</strong> wins at once. If nobody does, the most food banked when the <strong>45 second</strong> timer ends wins.</p>
     <!-- Source: docs/GDD.md §2 (ties at the top, Phase 7) -->
@@ -83,7 +83,7 @@
           <tr><td><span class="tag t-speedy">Speedy</span></td><td class="num">30 s</td><td class="num">4</td><td>Throughput: many small loads, roams wide</td></tr>
           <tr><td><span class="tag t-fatty">Fatty</span></td><td class="num">30 s</td><td class="num">2</td><td>Payload: one huge sweep, barely returns</td></tr>
           <tr><td><span class="tag t-warrior">Warrior</span></td><td class="num">35 s</td><td class="num">3</td><td>The ability class: mid stats, leans on the kit</td></tr>
-          <tr><td><span class="tag t-assassin">Assassin</span></td><td class="num">40 s</td><td class="num">4</td><td>Denial: never farms, robs and executes</td></tr>
+          <tr><td><span class="tag t-assassin">Sneaky</span></td><td class="num">40 s</td><td class="num">4</td><td>Denial: never farms, robs and executes</td></tr>
         </tbody>
       </table>
     </div>
@@ -103,12 +103,12 @@
           <tr><td><span class="tag t-fatty">Fatty</span></td><td class="num">10.125</td><td class="num">35</td><td class="num">0.71 s</td><td>"Slow, but it all fits in the beak."</td></tr>
           <tr><td><span class="tag t-speedy">Speedy</span></td><td class="num">12.15</td><td class="num">10</td><td class="num">0.71 s</td><td>"If you can't catch me, you can't rob me."</td></tr>
           <tr><td><span class="tag t-warrior">Warrior</span></td><td class="num">10.125</td><td class="num">14</td><td class="num">0.79 s</td><td>"The farm is a battlefield."</td></tr>
-          <tr><td><span class="tag t-assassin">Assassin</span></td><td class="num">12.15</td><td class="num">10</td><td class="num">cannot forage</td><td>"Blink and your food is gone."</td></tr>
+          <tr><td><span class="tag t-assassin">Sneaky</span></td><td class="num">12.15</td><td class="num">10</td><td class="num">cannot forage</td><td>"Blink and your food is gone."</td></tr>
         </tbody>
       </table>
     </div>
     <!-- Source: docs/GDD.md §5.2 (load-bearing detail; Speedy and terrain) -->
-    <p>Speedy and Assassin share move speed and cargo. They differ on one point: the Assassin cannot forage at all, which is the mechanical reason it denies instead of collecting. Speedy never gets terrain traversal, no jump and no blink, because a fast chicken that can also ignore walls would stop being constrained by the map.</p>
+    <p>Speedy and Sneaky share move speed and cargo. They differ on one point: Sneaky cannot forage at all, which is the mechanical reason it denies instead of collecting. Speedy never gets terrain traversal, no jump and no blink, because a fast chicken that can also ignore walls would stop being constrained by the map.</p>
 
     <h3>Eight specializations</h3>
     <!-- Source: docs/GDD.md §5.3 -->
@@ -123,8 +123,8 @@
           <tr><td><span class="tag t-speedy">Speedy</span></td><td>The Anxious</td><td>Immune to the pile slow and the collision slow</td><td>not yet assigned</td></tr>
           <tr><td><span class="tag t-fatty">Fatty</span></td><td>The Hauler</td><td>Carries at least a full win's worth</td><td>not yet assigned</td></tr>
           <tr><td><span class="tag t-fatty">Fatty</span></td><td>The Boulder</td><td>Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner</td><td>Ground Quake</td></tr>
-          <tr><td><span class="tag t-assassin">Assassin</span></td><td>The Reaper</td><td>Banks a bonus if the clock expires with no winner</td><td>Death Mark</td></tr>
-          <tr><td><span class="tag t-assassin">Assassin</span></td><td>The Burglar</td><td>Every steal takes 1.6× more</td><td>Sneaky Steal</td></tr>
+          <tr><td><span class="tag t-assassin">Sneaky</span></td><td>The Assassin</td><td>Banks a bonus if the clock expires with no winner</td><td>Death Mark</td></tr>
+          <tr><td><span class="tag t-assassin">Sneaky</span></td><td>The Thief</td><td>Every steal takes 1.6× more</td><td>Sneaky Steal</td></tr>
         </tbody>
       </table>
     </div>
@@ -136,7 +136,7 @@
     <!-- Source: docs/GDD.md §6.2 -->
     <p>All chicken-to-chicken interaction is steal or control. There is no basic attack. A steal moves cargo directly from victim to thief; nothing drops on the floor. The amount is capped three ways:</p>
     <pre><code>stolen = min(steal value, free space, defender cargo)   // never negative</code></pre>
-    <p>A loaded thief has no free space, so it cannot steal. Theft is a rhythm of steal, bank, return, not a drain. A steal-proof bird (Egg Shell or Turtle Mode) refuses every steal, so the formula never runs against it.</p>
+    <p>A loaded thief has no free space, so it cannot steal. Theft is a rhythm of steal, bank, return, not a drain. A steal-proof bird (Turtle Mode, walking or locked) refuses every steal, so the formula never runs against it.</p>
 
     <form class="calc" id="calc" hidden aria-label="Steal calculator">
       <label>Steal value<input type="number" id="c-steal" min="0" step="1" value="6" inputmode="numeric"></label>
@@ -170,39 +170,41 @@
         </tbody>
       </table>
     </div>
-    <p>Stun is the only state that locks casting. That is exactly why it is the qualifier for the Assassin's execute. Control immunity (Immovable, Egg Shell) stops the whole ladder; steal-proofing is separate and only stops cargo being taken.</p>
+    <p>Stun is the only state that locks casting. That is exactly why it is the qualifier for the Assassin's execute. Control immunity (Immovable, Turtle Mode's lock) stops the whole ladder; steal-proofing is separate and only stops cargo being taken.</p>
   </section>
 
   <section id="deathmark">
     <h2>Death Mark: one button, two presses</h2>
     <!-- Source: docs/GDD.md §6.4 -->
-    <p>The Assassin's execute is the only hard removal in the game. Only the Reaper specialization has it, locked into the first of the four ability slots.</p>
+    <p>The Assassin's execute is the only hard removal in the game. Only the Assassin specialization has it, in the first of the four ability slots. The press marks a rival anywhere on the map for 4 s, picked at random but likelier the farther it is from its own base and, softly, from the Assassin; the Assassin must find it, stun it and press again within 8 m, in the last second of the mark. Each round opens with Death Mark on a 4 s cooldown. No ability crosses a claimed base wall, so a bird at home cannot be reached and the mark can run out.</p>
     <div class="tw wide">
       <table>
         <thead><tr><th>Stage</th><th>Condition</th><th>Counterplay</th></tr></thead>
         <tbody>
-          <tr><td>Mark</td><td>First press soft-locks the nearest isolated rival (nobody within 8 m), in facing. The target can see the mark.</td><td>Stay near others.</td></tr>
-          <tr><td>Arm</td><td>2.0 seconds pass with the mark alive.</td><td>Break isolation or leave range and the mark fizzles.</td></tr>
-          <tr><td>Qualify</td><td>The marked target enters a stun, from any source. The button relabels to KILL.</td><td>Don't get stunned; hold a defence.</td></tr>
-          <tr><td>Kill</td><td>Press again while the target is stunned and the Assassin is not.</td><td>A third player can stun the Assassin to deny the kill.</td></tr>
+          <tr><td>Mark</td><td>First press marks a living rival anywhere on the map, likelier one far from its own base. The target can see the mark.</td><td>Reach your base in time: no ability crosses a base wall.</td></tr>
+          <tr><td>Hunt</td><td>The Assassin has 4 seconds to find it and close in. The mark arms after 3 s: a Kill is only possible in the last 1.0 s.</td><td>Escape: stay out of reach until the timer runs out, or walk home (a victim within about 21 to 29 m of home is safe).</td></tr>
+          <tr><td>Stun</td><td>The marked target must be stunned when the Kill lands, from any source (a stun that began before the arm and is still running counts). Ambush stuns for 1 s, 0.6 s on Slippery, 0.65 s on Bulwark.</td><td>Don't get stunned.</td></tr>
+          <tr><td>Kill</td><td>Press again in the last second, within 8 m, while the target is stunned, not shelled, and the Assassin is not stunned.</td><td>&mdash;</td></tr>
         </tbody>
       </table>
     </div>
-    <p>On success the victim's whole cargo moves to the Assassin as a bounty bag that ignores the capacity limit. The victim is removed for about 2 seconds, then respawns empty. A steal-proof victim keeps its load. If the execute fails, Death Mark takes a reduced cooldown so the Assassin can re-mark quickly.</p>
+    <p>No isolation: the mark ignores crowds. The only defences are not being stunned, escaping, and reaching your base in time. A shell (Turtle Mode) also makes you unkillable while it lasts.</p>
+    <p>On success the victim's whole cargo moves to the Assassin as a bounty bag that ignores the capacity limit. The bag can be stolen like any other load: a steal takes the beak first, then the bag. The victim is out for 3 seconds, then respawns at its own base with no cargo; its cooldowns keep running. If the execute fails, Death Mark takes a reduced cooldown (5 s) so the Assassin can re-mark quickly; after a kill it is 10 s, so a round holds at most three kills.</p>
+    <p>What each player sees: the Assassin gets one marker in the target's own colour (a skull, a draining ring and the distance), a skull on the target's standings row, and a big yellow KILL button exactly while a kill is possible (until the arm the marker shows a countdown digit and KILL stays dark). The marked player gets a MARKED! warning, a darkened screen for as long as the mark lasts, a clock pill reading LIVE IN 3, 2, 1 while the mark arms and then a red, pulsing LIVE 1s, and a skull on the Assassin's arrow; when the Assassin is close the darkness turns cold violet. Everyone else sees only the skull on the standings, which turns red and pulses when the mark goes live. A sting plays at the arm for each role.</p>
   </section>
 
   <section id="abilities">
-    <h2>The 29 abilities</h2>
+    <h2>The 28 abilities</h2>
     <!-- Source: docs/GDD.md §7.2 (pool and cooldowns), §7.1 (class-only rule) -->
-    <p>Egg Shell is the one ability every class can equip. Peck is pre-equipped for the three forager classes and never picked by hand; the Assassin cannot forage. Every other ability belongs to exactly one class. Each player has four active slots. Cooldowns are the shipped values, before passives. Effect text is shortened from the design document.</p>
+    <p>No ability is shared any more: Egg Shell, the last one, merged into Turtle Mode on 2026-11-03. Peck is pre-equipped for the three forager classes and never picked by hand; the Assassin cannot forage. Every other ability belongs to exactly one class. Each player has four active slots. Cooldowns are the shipped values, before passives. Effect text is shortened from the design document.</p>
 
     <div class="chips" id="chips" role="group" aria-label="Filter abilities by class" hidden>
-      <button type="button" class="chip" data-f="all" aria-pressed="true">All 29</button>
-      <button type="button" class="chip" data-f="shared" aria-pressed="false">Shared 2</button>
+      <button type="button" class="chip" data-f="all" aria-pressed="true">All 28</button>
+      <button type="button" class="chip" data-f="shared" aria-pressed="false">Shared 1</button>
       <button type="button" class="chip" data-f="warrior" aria-pressed="false">Warrior 6</button>
       <button type="button" class="chip" data-f="speedy" aria-pressed="false">Speedy 6</button>
       <button type="button" class="chip" data-f="fatty" aria-pressed="false">Fatty 7</button>
-      <button type="button" class="chip" data-f="assassin" aria-pressed="false">Assassin 8</button>
+      <button type="button" class="chip" data-f="assassin" aria-pressed="false">Sneaky 8</button>
     </div>
 
     <div class="tw">
@@ -210,12 +212,11 @@
         <thead><tr><th>Ability</th><th class="num">Cooldown</th><th>Effect</th></tr></thead>
         <tbody>
           <tr data-c="shared"><td>Peck <span class="tag t-shared">Shared</span></td><td class="num">0.8 s</td><td>Take a beakful from the pile you stand on. Forced for every forager.</td></tr>
-          <tr data-c="shared"><td>Egg Shell <span class="tag t-shared">Shared</span></td><td class="num">8 s</td><td>Hide in an egg for 2 s. You cannot move, but nobody can push you, stop you or steal your food.</td></tr>
 
           <tr data-c="warrior"><td>Cluck Shock <span class="tag t-warrior">Warrior</span></td><td class="num">7 s</td><td>A shockwave shoves every rival within 4.5 m away.</td></tr>
           <tr data-c="warrior"><td>Dive Bomb <span class="tag t-warrior">Warrior</span></td><td class="num">6 s</td><td>A diving lunge that robs 8 food from rivals on contact.</td></tr>
           <tr data-c="warrior"><td>Headbutt <span class="tag t-warrior">Warrior</span></td><td class="num">4 s</td><td>Shoves rivals up to 3.6 m ahead and staggers them for 0.35 s. Relentless signature.</td></tr>
-          <tr data-c="warrior"><td>Ruffle <span class="tag t-warrior">Warrior</span></td><td class="num">5 s</td><td>1.5× speed for 2.5 s, on the ground only.</td></tr>
+          <tr data-c="warrior"><td>Ruffle <span class="tag t-warrior">Warrior</span></td><td class="num">6 s</td><td>1.3× speed for 2 s, on the ground only.</td></tr>
           <tr data-c="warrior"><td>Scrap <span class="tag t-warrior">Warrior</span></td><td class="num">5 s</td><td>Grabs 3 food off the nearest carrier within 3.8 m. Brute signature.</td></tr>
           <tr data-c="warrior"><td>Wing Slam <span class="tag t-warrior">Warrior</span></td><td class="num">8 s</td><td>Slams the ground ahead, stunning rivals within 4.5 m for 1.3 s.</td></tr>
 
@@ -232,16 +233,16 @@
           <tr data-c="fatty"><td>Roll &amp; Push <span class="tag t-fatty">Fatty</span></td><td class="num">3 s</td><td>Rolls forward at 2× speed for 0.8 s, shoving chickens out of the path.</td></tr>
           <tr data-c="fatty"><td>Sticky Egg <span class="tag t-fatty">Fatty</span></td><td class="num">7 s</td><td>Drops a sticky egg. The first chicken to step on it is stuck for 2 s.</td></tr>
           <tr data-c="fatty"><td>Spine Coat <span class="tag t-fatty">Fatty</span></td><td class="num">8 s</td><td>For 2 s, a rival who bumps into you loses 4 food to you and is knocked away.</td></tr>
-          <tr data-c="fatty"><td>Turtle Mode <span class="tag t-fatty">Fatty</span></td><td class="num">10 s</td><td>Pull into your shell for 3 s. You walk at half speed, but nobody can steal your food.</td></tr>
+          <tr data-c="fatty"><td>Turtle Mode <span class="tag t-fatty">Fatty</span></td><td class="num">10 s</td><td>Walk, then lock. Shell walk for 3 s at half speed: nobody can steal your food or execute you, but you can still be stunned. Press again to lock in place for up to 2 s: immobile, nothing pushes or stops you. Cooldown from the first press.</td></tr>
 
-          <tr data-c="assassin"><td>Ambush <span class="tag t-assassin">Assassin</span></td><td class="num">10 s</td><td>Stuns rivals within 3.6 m for 1 s. Sets up the execute.</td></tr>
-          <tr data-c="assassin"><td>Doppelganger <span class="tag t-assassin">Assassin</span></td><td class="num">11 s</td><td>A decoy copy beside you for 4 s.</td></tr>
-          <tr data-c="assassin"><td>Invisibility <span class="tag t-assassin">Assassin</span></td><td class="num">8 s</td><td>Fades you to a ghostly outline for 4 s. Using a move breaks it.</td></tr>
-          <tr data-c="assassin"><td>Death Mark <span class="tag t-assassin">Assassin</span></td><td class="num">5 s</td><td>The execute. Marks a lone rival within 8 m; stun them, then press again to take everything they carry. Reaper only.</td></tr>
-          <tr data-c="assassin"><td>Shadowstep <span class="tag t-assassin">Assassin</span></td><td class="num">6 s</td><td>Dashes forward at 3× speed for 0.4 s, straight over walls.</td></tr>
-          <tr data-c="assassin"><td>Smoke Roost <span class="tag t-assassin">Assassin</span></td><td class="num">11 s</td><td>A cloud at your feet (4 m, 5.5 s). You fade; rivals inside slow to 55% speed.</td></tr>
-          <tr data-c="assassin"><td>Snatch <span class="tag t-assassin">Assassin</span></td><td class="num">3 s</td><td>Robs 5 food from every rival within 4.3 m ahead and shoves them back.</td></tr>
-          <tr data-c="assassin"><td>Sneaky Steal <span class="tag t-assassin">Assassin</span></td><td class="num">5 s</td><td>Yanks 6 food from the nearest carrier within 5.4 m. Burglar signature.</td></tr>
+          <tr data-c="assassin"><td>Ambush <span class="tag t-assassin">Sneaky</span></td><td class="num">8 s</td><td>Stuns rivals within 3.6 m for 1 s (0.6 s on Slippery, 0.65 s on Bulwark). Sets up the execute.</td></tr>
+          <tr data-c="assassin"><td>Doppelganger <span class="tag t-assassin">Sneaky</span></td><td class="num">11 s</td><td>A decoy copy beside you for 4 s.</td></tr>
+          <tr data-c="assassin"><td>Invisibility <span class="tag t-assassin">Sneaky</span></td><td class="num">8 s</td><td>Fades you to a ghostly outline for 4 s. Using a move breaks it.</td></tr>
+          <tr data-c="assassin"><td>Death Mark <span class="tag t-assassin">Sneaky</span></td><td class="num">5 s</td><td>The execute. Marks a rival anywhere for 4 s, likelier far from home and from you; it goes live after 3 s, so the Kill is in the last second. Cooldown 5 s after a miss, 10 s after a kill. Within 8 m, stun them, then press again to take everything they carry. Starts each round on a 4 s cooldown. Assassin only.</td></tr>
+          <tr data-c="assassin"><td>Shadowstep <span class="tag t-assassin">Sneaky</span></td><td class="num">4 s</td><td>Dashes forward at 3× speed for 0.18 s (about 6.6 m), straight over walls.</td></tr>
+          <tr data-c="assassin"><td>Smoke Roost <span class="tag t-assassin">Sneaky</span></td><td class="num">11 s</td><td>A cloud at your feet (4 m, 5.5 s). You fade; rivals inside slow to 55% speed.</td></tr>
+          <tr data-c="assassin"><td>Snatch <span class="tag t-assassin">Sneaky</span></td><td class="num">3 s</td><td>Robs 5 food from every rival within 4.3 m ahead and shoves them back.</td></tr>
+          <tr data-c="assassin"><td>Sneaky Steal <span class="tag t-assassin">Sneaky</span></td><td class="num">5 s</td><td>Yanks 6 food from the nearest carrier within 5.4 m; the same bird only every 10 s.</td></tr>
         </tbody>
       </table>
     </div>
@@ -252,13 +253,13 @@
       <table>
         <thead><tr><th>Tier</th><th>Range</th><th>Abilities</th></tr></thead>
         <tbody>
-          <tr><td>Quick</td><td class="num">3 to 5 s</td><td>Roll &amp; Push, Snatch, Headbutt, Ruffle, Scrap, Feint, Sneaky Steal, Death Mark</td></tr>
-          <tr><td>Standard</td><td class="num">6 to 9 s</td><td>Dust Kick, Speed Burst, Shadowstep, Dive Bomb, Sticky Egg, Cluck Shock, Feather Aura, Feather Trap, Spine Coat, Wing Slam, Invisibility, Egg Shell, Ground Quake</td></tr>
-          <tr><td>Heavy</td><td class="num">10 to 12 s</td><td>Turtle Mode, Belly Flop, Ambush, Smoke Roost, Doppelganger, Immovable, Quick Drop</td></tr>
+          <tr><td>Quick</td><td class="num">3 to 5 s</td><td>Roll &amp; Push, Snatch, Headbutt, Shadowstep, Scrap, Feint, Sneaky Steal, Death Mark</td></tr>
+          <tr><td>Standard</td><td class="num">6 to 9 s</td><td>Ruffle, Dust Kick, Speed Burst, Dive Bomb, Sticky Egg, Cluck Shock, Feather Aura, Feather Trap, Spine Coat, Wing Slam, Invisibility, Ambush, Ground Quake</td></tr>
+          <tr><td>Heavy</td><td class="num">10 to 12 s</td><td>Turtle Mode, Belly Flop, Smoke Roost, Doppelganger, Immovable, Quick Drop</td></tr>
         </tbody>
       </table>
     </div>
-    <p>A move earns a Heavy cooldown only if it gives immunity (control immunity or steal-proofing), a hard area stun of at least 1.4 s, or an economy burst. Ambush, Smoke Roost and Doppelganger sit in Heavy without meeting that rule, and the design document leaves them there until a human four-player session. Peck is foraging cadence set by the Solo Clear Time axiom, not a tiered move.</p>
+    <p>A move earns a Heavy cooldown only if it gives immunity (control immunity or steal-proofing), a hard area stun of at least 1.4 s, or an economy burst. Smoke Roost and Doppelganger sit in Heavy without meeting that rule, and the design document leaves them there until a human four-player session. Peck is foraging cadence set by the Solo Clear Time axiom, not a tiered move.</p>
   </section>
 
   <section id="casting">
@@ -325,7 +326,7 @@
 
 <script>
 (function () {
-  // Ability filter. Without JS the chip bar stays hidden and all 29 rows show.
+  // Ability filter. Without JS the chip bar stays hidden and all 28 rows show.
   var chips = document.getElementById('chips');
   var rows = document.querySelectorAll('#abil tbody tr');
   if (chips && rows.length) {

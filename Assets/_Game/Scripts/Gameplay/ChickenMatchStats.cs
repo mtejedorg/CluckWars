@@ -79,6 +79,13 @@ namespace CluckWars.Gameplay
         /// <paramref name="victim"/> is now expected. Recorded first because on a shared authority
         /// (solo, bots) the removal and the report back run synchronously inside that call.
         /// </summary>
+        /// <summary>
+        /// Drops the kill report expected from <paramref name="victimId"/> (its execute met a shell). True when one was pending:
+        /// the proof that this chicken really pressed a Kill on it, so a refund cannot be forged.
+        /// </summary>
+        public bool TryCancelKillCredit(NetworkBehaviourId victimId) =>
+            HasStateAuthority && _pendingKills.TryConsume(victimId, 1f, Time.unscaledTime, out _);
+
         public void ExpectKillCredit(ChickenController victim)
         {
             if (!HasStateAuthority || victim == null)
@@ -109,7 +116,8 @@ namespace CluckWars.Gameplay
         {
             var claim = new ExecuteRules.KillCreditClaim();
             string victimName = victimId.ToString();
-            if (Runner != null && Runner.TryFindBehaviour(victimId, out ChickenController victim) &&
+            ChickenController victim = null;
+            if (Runner != null && Runner.TryFindBehaviour(victimId, out victim) &&
                 victim != null && victim.Object != null && victim.Object.IsValid)
             {
                 victimName = victim.name;
@@ -133,6 +141,7 @@ namespace CluckWars.Gameplay
 
             Kills++;
             _log?.Info(Source, $"{name}: kill credited for executing {victimName} (Kills={Kills}).");
+            GetComponent<AssassinExecute>()?.PayExecuteBounty(victim);
         }
 
         /// <summary>

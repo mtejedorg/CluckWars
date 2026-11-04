@@ -5,15 +5,21 @@ using CluckWars.Localization;
 namespace CluckWars.Abilities
 {
     /// <summary>
-    /// Mark/Kill execute (Task 5). Pre-equip-only (AllowedClasses = None): Spoiler gets it as its Peck-slot pre-equip.
-    /// Thin wrapper delegating activation to AssassinExecute.Press().
+    /// Death Mark. Pre-equip-only (AllowedClasses = None). One button, two presses: the first marks a random living rival
+    /// anywhere on the map, the second kills it once it is stunned and in reach. Thin wrapper over <see cref="AssassinExecute"/>,
+    /// which owns the state and decides who is marked; the numbers live here, on the asset.
     /// </summary>
+    /// <remarks>
+    /// <b>No aim shape, on purpose.</b> The mark has no range, so a shape or a ring would lie. <see cref="RequiresEnemyInRange"/>
+    /// is false for the same reason: the press is gated by <see cref="IsUsable"/> alone, which asks the execute state both
+    /// halves. Everything shown about the kill's range is on the target (<c>MarkFeedback</c>).
+    /// </remarks>
     [CreateAssetMenu(fileName = "MarkKill", menuName = "Cluck Wars/Ability/Control/Mark Kill", order = 12)]
     public sealed class MarkKillAbilitySO : AbilityBaseSO
     {
         public override string DescriptionKey => UiKeys.AbilityMarkKillDesc;
         public override (string name, object value)[] DescriptionArgs() =>
-            new (string, object)[] { ("r", Num(IndicatorRange)) };
+            new (string, object)[] { ("r", Num(KillRange)) };
 
         private const string Source = "MarkKill";
 
@@ -21,80 +27,52 @@ namespace CluckWars.Abilities
         {
             DisplayName = "Death Mark";
             ShortLabel = "EXEC";
-            Description = "Marks a lone rival within 8m. Stun them, then press again to take everything they carry.";
+            Description = "Marks a rival, likelier far from home. Stun them within 8m, then press again to take everything they carry.";
             Category = AbilityCategory.Control;
             AllowedClasses = ChickenClassFlags.None; // pre-equip-only: obtainable solely as a subclass pre-equip (Spoiler Peck slot)
             Duration = 0.1f;
             Cooldown = 5f;
         }
 
-        public override float IndicatorRange => AssassinExecute.MaxMarkRange;
-        public override bool RequiresEnemyInRange => true;
+        [Header("Execute (AssassinExecute reads these)")]
+        [Tooltip("The Kill press reaches this far (planar m). The mark itself has no range.")]
+        [Min(1f)] public float KillRange = AssassinExecute.DefaultKillRange;
+        [Tooltip("Seconds after the mark before a Kill can qualify: a gameplay beat (the kill only lands in the last " +
+                 "WindowSeconds - ArmSeconds of the mark), and the victim's authority refuses a Kill on a mark it has seen for " +
+                 "less than ArmSeconds - ExecuteRules.ArmAllowanceSeconds. Keep at or above ExecuteRules.MaxLatencySeconds.")]
+        [Min(0f)] public float ArmSeconds = AssassinExecute.ArmDuration;
+        [Tooltip("Seconds from the mark to its expiry.")]
+        [Min(0.1f)] public float WindowSeconds = AssassinExecute.WindowDuration;
+        [Tooltip("Cooldown after a mark that expired or lost its target.")]
+        [Min(0f)] public float FailCooldownSeconds = AssassinExecute.FailCooldown;
+        [Tooltip("Cooldown after a kill.")]
+        [Min(0f)] public float SuccessCooldownSeconds = AssassinExecute.SuccessCooldown;
+        [Tooltip("Seconds an executed chicken is out (invisible, untargetable) before it respawns at its own base with no cargo. " +
+                 "Every peer reads this asset: the victim's authority refuses a removal claim longer than it.")]
+        [Min(0.1f)] public float RemovalSeconds = AssassinExecute.DefaultRemovalSeconds;
+        [Tooltip("Cooldown Death Mark opens every round on, counted from GO (first round and every PLAY AGAIN). Bots obey it too.")]
+        [Min(0f)] public float RoundStartCooldownSeconds = 4f;
 
-        public override AbilityAimShape AimShape => AbilityAimShape.SingleTarget;
-        public override float AimRadius => AssassinExecute.MaxMarkRange;
+        public override float RoundStartCooldown => RoundStartCooldownSeconds;
 
-        /// <summary>
-        /// The two rules <c>AssassinExecute.Press</c> enforced privately and the preview knew
-        /// nothing about: the target must be <b>isolated</b> (crowd counterplay) and must be
-        /// a <b>rival</b> (not a same-corner ally). Stating them here means <c>WouldAffect</c>,
-        /// the telegraph, <c>IsUsable</c>'s grey-out and the press itself all refuse exactly
-        /// the same chickens — previously the preview would happily mark a rival standing in
-        /// a crowd, and the press would then silently decline.
-        ///
-        /// <b>Balance consequence, intended:</b> the button now greys out when no
-        /// <i>isolated</i> rival is in range, where before it lit up for any rival at all.
-        /// </summary>
-        protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)
-        {
-            // Same-corner chickens are allies; a caster with no corner assigned yet (-1) has
-            // no allies, so everyone is fair game — carried over verbatim from Press().
-            if (TryGetCorner(caster, out int casterCorner) && casterCorner >= 0 &&
-                TryGetCorner(candidate, out int candidateCorner) && candidateCorner == casterCorner)
-                return false;
+        public override bool RequiresEnemyInRange => false;
+        /// <summary>The Kill is pressed during the stun the bot's own Ambush is still running.</summary>
+        public override bool BotIgnoresOneAtATime => true;
+        public override AbilityAimShape AimShape => AbilityAimShape.None;
+        public override bool AffectsEnemies => false;
 
-            return AssassinExecute.IsIsolated(candidate, caster);
-        }
-
-        /// <summary>
-        /// <c>HomeCornerIndex</c> is <c>[Networked]</c>, and this filter runs from the HUD's
-        /// usability poll as well as from the cast — so it can be reached on a chicken whose
-        /// <c>NetworkObject</c> is not (or no longer) valid. Same guard
-        /// <c>AbilityTelegraph.TryGetCharge</c> uses. A corner that cannot be read is treated
-        /// as unassigned, which is the permissive branch <c>Press()</c> already took for -1.
-        /// </summary>
-        private static bool TryGetCorner(ChickenController chicken, out int corner)
-        {
-            corner = -1;
-            var obj = chicken != null ? chicken.Object : null;
-            if (obj == null || !obj.IsValid) return false;
-            corner = chicken.HomeCornerIndex;
-            return true;
-        }
-
-        /// <summary>
-        /// Keeps its own override for the post-mark "kill ready" state — that has
-        /// nothing to do with the aim shape. The pre-mark range half now routes
-        /// through <see cref="AbilityBaseSO.HasAnyTarget"/> instead of a bespoke
-        /// range scan, so it agrees with the preview and <c>AssassinExecute</c>'s own
-        /// candidate search on the same registry.
-        /// </summary>
+        /// <summary>Marked: only a Kill that would land. Unmarked: a rival exists to be marked. Nothing else greys it.</summary>
         public override bool IsUsable(ChickenController caster)
         {
             var exec = caster != null ? caster.GetComponent<AssassinExecute>() : null;
-            if (exec != null && exec.MarkedTarget != Fusion.NetworkBehaviourId.None)
-            {
-                return exec.KillReady;
-            }
-            return HasAnyTarget(caster);
+            if (exec == null) return false;
+            return exec.MarkedTarget != Fusion.NetworkBehaviourId.None ? exec.CanKillNow : exec.HasMarkCandidate;
         }
 
         public override void OnActivate(AbilityContext ctx)
         {
             // Both bail-outs below are wiring errors, not gameplay states, and the press has
-            // already cost the player a cast and its cooldown — so they get logged rather than
-            // eaten. The logger arrives through AbilityContext because ability SOs are assets
-            // Zenject cannot inject; read AbilityContext.Log.
+            // already cost the player a cast and its cooldown, so they get logged rather than eaten.
             var caster = ctx.Controller;
             if (caster == null)
             {
@@ -106,24 +84,12 @@ namespace CluckWars.Abilities
             var exec = caster.GetComponent<AssassinExecute>();
             if (exec == null)
             {
-                ctx.Log?.Error(Source, "Mark/Kill cast lost: the caster has no AssassinExecute component — " +
+                ctx.Log?.Error(Source, "Mark/Kill cast lost: the caster has no AssassinExecute component, " +
                     "add it to the chicken prefab. The cast and its cooldown were consumed with nothing marked.");
                 return;
             }
 
-            // Mark press: hand Press the one target the shared scan resolved. SingleTarget
-            // truncates GatherTargets to the nearest eligible rival, and ExtraTargetFilter
-            // above has already applied the isolation + rival rules, so Press needs no
-            // candidate search of its own. Kill press: MarkedTarget is already set and the
-            // target argument is irrelevant.
-            ChickenController target = null;
-            if (exec.MarkedTarget == Fusion.NetworkBehaviourId.None)
-            {
-                GatherTargets(caster, _scratch);
-                if (_scratch.Count > 0) target = _scratch[0];
-            }
-
-            exec.Press(target);
+            exec.Press();
         }
 
         public override void OnDeactivate(AbilityContext ctx) { }

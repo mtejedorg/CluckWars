@@ -103,6 +103,8 @@ namespace CluckWars.UI
         private readonly PerkBadgeView[] _perkBadges = new PerkBadgeView[2];
         private VisualElement _starterRow;
         private readonly StarterChipView[] _starterChips = new StarterChipView[2];
+        private VisualElement _gearBody;
+        private Label _kitTitle;
 
         // ---- GEAR UP (slots built once; cards once per class) -------------------
         private VisualElement _commonCards, _classCards;
@@ -1081,7 +1083,7 @@ namespace CluckWars.UI
             setup = default;
             var record = PlayerPreferences.LastSetup;
             if (record == null) return false;
-            if (LastSetupResolver.TryResolve(record, _abilityRegistry?.All, out setup, out var problem))
+            if (LastSetupResolver.TryResolve(record, _abilityRegistry?.All, LoadoutModeNow, out setup, out var problem))
                 return true;
 
             if (problem != _reportedLastSetupProblem)
@@ -1456,7 +1458,8 @@ namespace CluckWars.UI
         /// <summary>The selected perk's starters (locked pre-equips), shown once as icon chips.</summary>
         private void RefreshStarterChips(ChickenClass cls, PassiveAbilitySO passive)
         {
-            var starters = StartersFor(cls, passive);
+            // Fixed: no "starters" among free picks; the whole kit is on GEAR UP, the next page.
+            var starters = TryGetKit(out _) ? new List<AbilityBaseSO>() : StartersFor(cls, passive);
             for (int i = 0; i < _starterChips.Length; i++)
             {
                 var chip = _starterChips[i];
@@ -1512,6 +1515,10 @@ namespace CluckWars.UI
 
         private void BuildLoadout()
         {
+            _gearBody          = _loadout.Q<VisualElement>("Body");
+            _kitTitle          = _loadout.Q<Label>("KitTitle");
+            if (_gearBody == null || _kitTitle == null)
+                _log?.Error(Source, "CharacterSelect.uxml has no #Body / #KitTitle; Fixed-mode GEAR UP keeps showing the deck and no specialization name.");
             _commonCards       = _loadout.Q<VisualElement>("CommonCards");
             _classCards        = _loadout.Q<VisualElement>("ClassCards");
             _commonTitle       = _loadout.Q<Label>("CommonTitle");
@@ -1613,9 +1620,36 @@ namespace CluckWars.UI
         {
             RefreshGearChicken();
             EnsureDeck(Cls);
+            ApplyFixedKitView();
             SyncSlotModel();
             _slotModel.AutoArmFirstEmpty();
             RefreshLoadoutState();
+        }
+
+        // ---- Fixed-mode GEAR UP (LoadoutMode.Fixed): a read-only view of the kit -------------------
+        // The slot boxes stay (tapping one shows its details); every one is locked, so nothing arms and no caret shows,
+        // and the deck is hidden by USS (.cw-gear-body--fixed). A malformed kit leaves all of this off: the Free picker
+        // comes back, matching the Free path the spawner falls to.
+
+        private LoadoutMode LoadoutModeNow => _matchConfig != null ? _matchConfig.LoadoutMode : LoadoutMode.Free;
+
+        private bool TryGetKit(out AbilityBaseSO[] kit) =>
+            FixedKit.TryResolve(LoadoutModeNow, _selection?.Passive, out kit, out _);
+
+        /// <summary>Puts the kit into the selection and switches the page between its Fixed and Free faces.</summary>
+        private void ApplyFixedKitView()
+        {
+            bool isFixed = TryGetKit(out var kit);
+            _gearBody?.EnableInClassList("cw-gear-body--fixed", isFixed);
+            if (_kitTitle != null)
+            {
+                _kitTitle.style.display = isFixed ? DisplayStyle.Flex : DisplayStyle.None;
+                if (isFixed) _kitTitle.text = UiText.Format(UiKeys.LoadoutKitTitle, ("perk", _selection.Passive.DisplayName.ToUpperInvariant()));
+            }
+            if (!isFixed) return;
+
+            SeedForcedAbilities();
+            if (Array.IndexOf(kit, _focusedAbility) < 0) _focusedAbility = kit[0];
         }
 
         /// <summary>The doorway bird shows the chosen class: the static render, or the live stage.</summary>
@@ -1675,6 +1709,7 @@ namespace CluckWars.UI
         {
             if (_selection == null || ab == null) return;
             _focusedAbility = ab;
+            if (TryGetKit(out _)) { RefreshLoadoutState(); return; }   // read-only: details, never a swap
             SyncSlotModel();
             var result = _slotModel.TapCard(ab, IsPreEquipped(ab));
             if (result != CardTapResult.Ignored) WriteSlotModel();
@@ -1999,6 +2034,7 @@ namespace CluckWars.UI
         /// 1 (or 0 when there is no Peck slot).</summary>
         private bool IsSlotLocked(int slot)
         {
+            if (TryGetKit(out _)) return true;
             ResolvePreEquips(out var peckSlot, out var signature);
             if (peckSlot != null && slot == 0) return true;
             return signature != null && slot == (peckSlot != null ? 1 : 0);
@@ -2008,6 +2044,7 @@ namespace CluckWars.UI
         private bool IsPreEquipped(AbilityBaseSO ab)
         {
             if (ab == null) return false;
+            if (TryGetKit(out var kit)) return Array.IndexOf(kit, ab) >= 0;
             ResolvePreEquips(out var peckSlot, out var signature);
             return ab == peckSlot || ab == signature;
         }
@@ -2021,6 +2058,12 @@ namespace CluckWars.UI
         private void SeedForcedAbilities()
         {
             if (_selection == null) return;
+
+            if (TryGetKit(out var kit))
+            {
+                for (int i = 0; i < ActiveSlotsForClass; i++) SetEquipped(i, kit[i]);
+                return;
+            }
 
             PreEquippedLoadout.Resolve(Cls, _selection.Passive, _abilityRegistry?.All, PeckAbility, out var peckSlot, out var signature);
 
@@ -2080,7 +2123,6 @@ namespace CluckWars.UI
         private int[] _lobbyPermutation;   // null = corners not known yet (a guest, or a host before its code)
         // Sample CPU bots shown in the Solo lobby (you always spawn vs 3 bots).
         private static readonly ChickenClass[] BotClasses = { ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };
-        private static readonly string[]       BotNameKeys = { UiKeys.LobbyBot1, UiKeys.LobbyBot2, UiKeys.LobbyBot3 };
 
         private string _joinCode = string.Empty;
 
@@ -2346,13 +2388,22 @@ namespace CluckWars.UI
             SetSeat(0, CornerAssignment.LobbySeatCorner(mode, 0, _lobbyPermutation), Cls, UiText.Get(UiKeys.LabelYou), isHost, false, ready: true, mine,
                 showState: WaitingRoomRules.ShowsStatePill(mode, seat: 0));
 
+            // Fixed: the lineup the spawner will roll from the same seed (FixedKit.RollBotLineup), kits and all.
+            var lineup = isSolo && LoadoutModeNow == LoadoutMode.Fixed
+                ? FixedKit.RollBotLineup(_selection != null ? _selection.SoloCornerSeed : 0, _seats.Length - 1,
+                    _abilityRegistry?.Passives, _selection?.DevBotSubclasses)
+                : null;
+
             bool allReady = true;
             for (int i = 1; i < _seats.Length; i++)
             {
                 if (isSolo)
                 {
-                    var bc = BotClasses[i - 1];
-                    SetSeat(i, CornerAssignment.LobbySeatCorner(mode, i, _lobbyPermutation), bc, UiText.Get(BotNameKeys[i - 1]), false, true, ready: true, SampleBotAbilities(bc, i));
+                    var rolled = lineup?[i - 1];
+                    var bc = rolled != null ? rolled.Subclass.ClassOf() : BotClasses[i - 1];
+                    var kit = rolled != null && FixedKit.TryResolve(LoadoutMode.Fixed, rolled, out var rolledKit, out _) ? rolledKit : null;
+                    SetSeat(i, CornerAssignment.LobbySeatCorner(mode, i, _lobbyPermutation), bc, MatchStandings.DisplayName(false, true, bc, i), false, true, ready: true,
+                        (IReadOnlyList<AbilityBaseSO>)kit ?? SampleBotAbilities(bc, i));
                 }
                 else
                 {
@@ -2726,6 +2777,22 @@ namespace CluckWars.UI
             if (!AutoTestAllowed("class")) return false;
             OnClassTileTapped(cls);
             return _selection.SelectedClass == cls && _selection.Passive != null;
+        }
+
+        /// <summary>PICK YOUR BIRD: the perk badge of <paramref name="subclass"/> (<c>cw_perk</c>); its class must be selected.</summary>
+        public bool AutoTestPickPerk(ChickenSubclass subclass)
+        {
+            if (!AutoTestAllowed("perk")) return false;
+            var perk = PerksFor(Cls).FirstOrDefault(p => p.Subclass == subclass);
+            if (perk == null) return false;
+            SelectClassAndPassive(Cls, perk);
+            return _selection.Passive == perk;
+        }
+
+        /// <summary>Pins the solo bots' specializations by index (<c>cw_botperks</c>); read by THE COOP and the spawner.</summary>
+        public void AutoTestForceBots(IReadOnlyList<ChickenSubclass> subclasses)
+        {
+            if (AutoTestAllowed("botperks")) _selection.DevBotSubclasses = subclasses;
         }
 
         /// <summary>PICK YOUR BIRD: NEXT.</summary>

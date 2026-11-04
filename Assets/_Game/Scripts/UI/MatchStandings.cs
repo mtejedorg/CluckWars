@@ -29,7 +29,7 @@ namespace CluckWars.UI
         /// </summary>
         public static readonly ChickenClass[] SoloBotClasses = { ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };
 
-        private static readonly string[] BotNameKeys = { UiKeys.LobbyBot1, UiKeys.LobbyBot2, UiKeys.LobbyBot3 };
+        private static readonly string[] BotNameKeys = { UiKeys.LobbyBot1, UiKeys.LobbyBot2, UiKeys.LobbyBot3, UiKeys.LobbyBot4 };
 
         /// <summary>One chicken's final line: identity plus what it banked.</summary>
         public readonly struct Entry
@@ -57,8 +57,12 @@ namespace CluckWars.UI
         /// </summary>
         public static bool Listed(bool hasChicken, float total) => hasChicken || total > 0f;
 
-        /// <summary>Seat-order index (0..2) of a solo bot of <paramref name="cls"/>, or -1.</summary>
-        public static int BotIndex(ChickenClass cls) => System.Array.IndexOf(SoloBotClasses, cls);
+        /// <summary>
+        /// Name index of a solo bot of <paramref name="cls"/>, or -1: its seat (0..2) in Free, where the seats are fixed, and the
+        /// Warrior's own name after those. Fixed rolls the classes, so a bot's name follows its class, never its seat.
+        /// </summary>
+        public static int BotIndex(ChickenClass cls) =>
+            cls == ChickenClass.Warrior ? SoloBotClasses.Length : System.Array.IndexOf(SoloBotClasses, cls);
 
         /// <summary>What a chicken is called on the overlays: "You", the Coop's bot name, else "P{corner+1}".</summary>
         public static string DisplayName(bool isLocal, bool isBot, ChickenClass cls, int corner)

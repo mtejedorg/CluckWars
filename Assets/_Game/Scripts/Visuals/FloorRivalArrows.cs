@@ -110,6 +110,40 @@ namespace CluckWars.Visuals
             return _instance.Accept(key, rivalPos, tint, opacity);
         }
 
+        /// <summary>
+        /// The ring's radius for <paramref name="cam"/>'s framing: the one value the painted ring uses, and the Death Mark
+        /// victim's inner circle (<see cref="MarkPresentationModel"/>), so the two can never disagree. The preferred radius for
+        /// a missing or non-orthographic camera.
+        /// </summary>
+        public static float RingRadiusFor(Camera cam) =>
+            cam != null && cam.orthographic
+                ? FloorArrowRules.FramingRadius(cam.aspect, cam.orthographicSize, cam.transform.eulerAngles.x,
+                    HudControlZones.CurrentInfo(cam), HudControlZones.Current(cam))
+                : FeedbackTuning.FloorArrowPreferredRadius;
+
+        /// <summary>
+        /// The floor arrow painted this frame for the rival offered under <paramref name="key"/>: its tail on the ring, its
+        /// direction (unit, XZ) and length, at the floor. False when that rival has no floor arrow this frame. Read after this
+        /// behaviour's LateUpdate (<see cref="ExecutionOrder"/>), e.g. by the Death Mark's hunter-skull badge.
+        /// </summary>
+        public static bool TryGetArrow(int key, out Vector3 tail, out Vector3 direction, out float length)
+        {
+            tail = direction = default;
+            length = 0f;
+            if (_instance == null || _instance._paintedFrame != Time.frameCount) return false;
+            for (int i = 0; i < _instance._paintedCount; i++)
+            {
+                if (_instance._keys[i] != key) continue;
+                float b = _instance._spread[i];
+                tail = FloorArrowRules.ArrowTail(_instance._centre, _instance._radius, b);
+                tail.y = ArrowY;
+                direction = FloorArrowRules.Direction(b);
+                length = FloorArrowRules.ArrowLength(_instance._distances[i], _instance._radius);
+                return true;
+            }
+            return false;
+        }
+
         // ── Instance ───────────────────────────────────────────────────────────────────────────
 
         private ILogService _log;
@@ -144,6 +178,10 @@ namespace CluckWars.Visuals
         private Vector3 _centre;
         private float _radius = FeedbackTuning.FloorArrowPreferredRadius;
         private float _loggedRadius = -1f;
+
+        // What was painted this frame (TryGetArrow).
+        private int _paintedFrame = -1;
+        private int _paintedCount;
 
         [Inject]
         public void Construct(ILogService log) => _log = log;
@@ -337,10 +375,7 @@ namespace CluckWars.Visuals
             if (local.Combat.IsRemoved) return;                          // dead or eliminated (IsDead is the same flag)
 
             var cam = mc.Camera;
-            _radius = cam.orthographic   // MatchCamera forces orthographic every frame; anything else gets the preferred radius
-                ? FloorArrowRules.FramingRadius(cam.aspect, cam.orthographicSize, cam.transform.eulerAngles.x,
-                    HudControlZones.CurrentInfo(cam), HudControlZones.Current(cam))
-                : FeedbackTuning.FloorArrowPreferredRadius;
+            _radius = RingRadiusFor(cam);   // MatchCamera forces orthographic every frame; anything else gets the preferred radius
             _centre = local.transform.position;
             _active = true;
 
@@ -356,6 +391,8 @@ namespace CluckWars.Visuals
         {
             PrepareFrame();
             int count = _queueFrame == Time.frameCount ? _count : 0;
+            _paintedFrame = Time.frameCount;
+            _paintedCount = 0;
             if (!_active || count == 0)
             {
                 HideAll();
@@ -367,6 +404,7 @@ namespace CluckWars.Visuals
             SetActive(_ringRenderer, true);
 
             FloorArrowRules.Spread(_bearings, _keys, count, FloorArrowRules.MinSeparationDegrees(_radius), _spread);
+            _paintedCount = count;
             for (int i = 0; i < _arrowRenderers.Length; i++)
             {
                 if (i >= count) { SetActive(_arrowRenderers[i], false); continue; }

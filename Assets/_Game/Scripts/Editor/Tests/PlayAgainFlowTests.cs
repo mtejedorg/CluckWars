@@ -86,7 +86,7 @@ namespace CluckWars.Tests
         }
 
         private static bool Resolve(LastSetupRecord rec, AbilityRegistrySO reg, out ResolvedLastSetup r, out string problem) =>
-            LastSetupResolver.TryResolve(rec, reg.All, out r, out problem);
+            LastSetupResolver.TryResolve(rec, reg.All, LoadoutMode.Free, out r, out problem);
 
         // ---- PlayerPreferences.LastSetup -----------------------------------------------------------
 
@@ -418,9 +418,9 @@ namespace CluckWars.Tests
             // Not built through PreEquippedLoadout.Resolve, so a regression in that helper cannot
             // make the fixture and the resolver agree on a wrong answer. Warrior / Relentless per the
             // shipped data: Peck.PeckSlotPreEquippedBy and Headbutt.SignaturePreEquippedBy name
-            // Relentless, plus one Warrior ability (CluckShock) and one shared one (EggShell).
+            // Relentless, plus one Warrior ability (CluckShock) and one more Warrior one (WingSlam; Egg Shell is retired).
             var reg = Registry();
-            var names = new[] { "Peck", "Headbutt", "CluckShock", "EggShell" };
+            var names = new[] { "Peck", "Headbutt", "CluckShock", "WingSlam" };
             var rec = new LastSetupRecord
             {
                 Class = (int)ChickenClass.Warrior, Subclass = (int)ChickenSubclass.Warrior_Relentless,

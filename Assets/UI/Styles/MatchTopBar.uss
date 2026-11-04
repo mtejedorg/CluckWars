@@ -92,6 +92,7 @@
     border-bottom-left-radius: 19px; border-bottom-right-radius: 19px;
     background-image: url("project://database/Assets/_Game/Art/UI/Atoms/PlayerDotGlossy.png");
     -unity-background-scale-mode: scale-to-fit;
+    align-items: center; justify-content: center;
 }
 
 /* Names, not P# (Phase 4): You / DashFox / BrunoB / PeckNoir / P1-P4, <= 8 chars. 150 px fits
@@ -107,6 +108,29 @@
     width: 150px;
     -unity-text-align: middle-left;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ---- Death Mark (MatchHudController, from MarkFeedback.Current) ---------------------------------------------------
+   The skull inside the marked player's dot (keyed by corner, the rows re-sort), and the Assassin's draw highlight,
+   moved per frame with style.translate over the rows (not at the 4 Hz board refresh). */
+.cw-lb-skull {
+    width: 24px; height: 24px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Icons/Glyph_Skull.png");
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: rgb(22, 16, 28);
+    display: none;
+}
+.cw-lb-draw {
+    position: absolute; left: 10px; right: 10px; top: 0;
+    height: 64px;
+    border-radius: 8px;
+    background-color: rgba(245, 200, 66, 0.35);
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-color: rgb(245, 200, 66);
+    display: none;
+}
+.cw-lb-draw--locked {
+    border-left-width: 5px; border-right-width: 5px; border-top-width: 5px; border-bottom-width: 5px;
 }
 
 /* Progress bar (food / target) */
@@ -151,12 +175,96 @@
 }
 
 /* ============================================================================
+   MIDDLE: THE DEATH MARK VICTIM'S MARKED! TOAST (shown by MatchHudController)
+   ============================================================================ */
+.cw-mark-toast-slot {
+    flex-grow: 1;
+    align-items: center;
+    justify-content: flex-start;
+    margin-left: 16px; margin-right: 16px;
+}
+.cw-mark-toast {
+    flex-direction: row;
+    align-items: center;
+    min-width: 360px; max-width: 90%;
+    height: 88px;
+    padding-top: 12px; padding-bottom: 12px; padding-left: 28px; padding-right: 28px;
+    background-color: rgb(184, 13, 26);
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-color: rgb(42, 26, 12);
+    border-top-left-radius: 14px; border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
+    justify-content: center;
+    display: none;
+}
+/* The executed player's BACK IN! (same toast, ink plate, cream rim, no skull). */
+.cw-mark-toast--backin { background-color: rgb(42, 26, 12); border-color: rgb(254, 245, 224); }
+.cw-mark-toast--backin .cw-mark-toast-skull { display: none; }
+.cw-mark-toast-skull {
+    width: 48px; height: 48px; flex-shrink: 0;
+    margin-right: 12px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Icons/Glyph_Skull.png");
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: rgb(254, 245, 224);
+}
+.cw-mark-toast-text {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 56px; letter-spacing: 2px;
+    color: rgb(254, 245, 224);
+    -unity-text-outline-width: 4px;
+    -unity-text-outline-color: rgb(42, 26, 12);
+    -unity-text-align: middle-left;
+    white-space: nowrap;
+    padding: 0; margin: 0;
+}
+
+/* ============================================================================
    RIGHT: EMBOSSED MATCH TIMER + GOAL PILL (a column, right-aligned)
    ============================================================================ */
 .cw-timer-container {
     flex-direction: column;
     align-items: flex-end;
     justify-content: flex-start;
+}
+
+/* The timer and the Death Mark victim's clock pill: row-reverse puts the pill (second child) left of the timer. */
+.cw-timer-row {
+    flex-direction: row-reverse;
+    align-items: center;
+}
+.cw-mark-clock {
+    flex-direction: row;
+    align-items: center;
+    margin-right: 12px;
+    padding-top: 6px; padding-bottom: 6px; padding-left: 18px; padding-right: 18px;
+    background-color: rgb(184, 13, 26);
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-color: rgb(42, 26, 12);
+    border-top-left-radius: 22px; border-top-right-radius: 22px;
+    border-bottom-left-radius: 22px; border-bottom-right-radius: 22px;
+    display: none;
+}
+/* Arming (the 3 s before the kill is live): an ink pill counting down; the red pill above is the live danger state. */
+.cw-mark-clock--arming {
+    background-color: rgb(20, 10, 26);
+    border-color: rgb(184, 13, 26);
+}
+.cw-mark-clock-skull {
+    width: 30px; height: 30px; flex-shrink: 0;
+    margin-right: 8px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Icons/Glyph_Skull.png");
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: rgb(254, 245, 224);
+}
+.cw-mark-clock-text {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 34px;
+    color: rgb(254, 245, 224);
+    -unity-text-outline-width: 3px;
+    -unity-text-outline-color: rgb(42, 26, 12);
+    -unity-text-align: middle-left;
+    white-space: nowrap;
+    padding: 0; margin: 0;
 }
 
 .cw-timer {
@@ -211,3 +319,18 @@
 .layout--portrait .cw-timer-container { flex-shrink: 0; margin-left: 16px; }
 .layout--portrait .cw-timer { font-size: 44px; padding-top: 8px; padding-bottom: 8px; padding-left: 24px; padding-right: 24px; }
 .layout--portrait .cw-target-badge { font-size: 28px; padding: 6px 18px; }
+
+/* Death Mark, portrait: the 20 px skull in the 32 px dot, the 52 px draw highlight, the toast under the band, the clock
+   pill under the timer (above the goal pill). */
+.layout--portrait .cw-lb-skull { width: 20px; height: 20px; }
+.layout--portrait .cw-lb-draw { height: 52px; }
+.layout--portrait .cw-mark-toast-slot {
+    position: absolute; left: 0; right: 0; top: 100%;
+    margin-left: 0; margin-right: 0;
+}
+.layout--portrait .cw-mark-toast-text { font-size: 48px; }
+.layout--portrait .cw-mark-toast-skull { width: 40px; height: 40px; }
+.layout--portrait .cw-timer-row { flex-direction: column; align-items: flex-end; }
+.layout--portrait .cw-mark-clock { margin-right: 0; margin-top: 10px; align-self: flex-end; }
+.layout--portrait .cw-mark-clock-text { font-size: 28px; }
+.layout--portrait .cw-mark-clock-skull { width: 26px; height: 26px; }

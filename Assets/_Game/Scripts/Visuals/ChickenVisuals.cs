@@ -196,7 +196,7 @@ namespace CluckWars.Visuals
                     // Grey-out + semi-transparent ghost so dead chickens read as
                     // clearly non-interactive without disappearing entirely.
                     c   = Color.Lerp(_currentTint, new Color(0.4f, 0.4f, 0.4f, 1f), 0.75f);
-                    c.a = 0.40f;
+                    c.a = FeedbackTuning.ExecutedOutAlpha;   // executed: gone until it respawns at its base
                 }
                 else
                 {

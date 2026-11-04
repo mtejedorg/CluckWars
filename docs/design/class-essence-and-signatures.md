@@ -47,6 +47,8 @@ contract is the testable half** — if an ability does not serve it, it is in th
 ### Assassin — *"the sneaky one"*
 > Stealing from others, isolating them, catching them, and killing from the shadows.
 
+*Note 2026-11-03 (Maestro): Death Mark has no isolation requirement. The mark ignores crowds; the victim's only defences are not being stunned, escaping, and reaching its base in time.*
+
 **Contract:** every tool needs a *victim*. Setup → payoff, binary outcomes, high skill
 ceiling. The only class that cannot forage (no Peck) — it eats what others carried.
 
@@ -202,7 +204,7 @@ Named by Maestro 2026-08-23: **Reaper** and **Burglar**.
 | | **The Reaper** | **The Burglar** |
 |---|---|---|
 | Passive | **Spoiler** — banks a bonus if the timer expires with no winner | **Thief** — every steal takes 1.6x more |
-| Signature | ✅ **Mark/Kill** — isolate, arm, execute | ✅ **Sneaky Steal** — unavailable to the Reaper |
+| Signature | ✅ **Mark/Kill** — random mark, hunt, stun, execute | ✅ **Sneaky Steal** — unavailable to the Reaper |
 | Fantasy | Patient. Wins the game nobody else finished. | Pure predation. Never farms, only takes. |
 
 ---

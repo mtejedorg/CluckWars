@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.TurtleModeAbilitySO
   DisplayName: Turtle Mode
   ShortLabel: TRT
-  Description: Pull into your shell for 3 seconds. You walk slowly, but nobody can steal your food.
+  Description: Shell walk 3s, safe from theft and execution. Press again to lock in place for 2s.
   AccentColor: {r: 0.55, g: 0.42, b: 0.25, a: 1}
   Category: 2
   TerrainTraversal: 0
@@ -24,3 +24,4 @@ MonoBehaviour:
   Cooldown: 10
   CastMotion: 5
   SpeedMultiplier: 0.5
+  LockSeconds: 2

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using CluckWars.Abilities;
 using CluckWars.Gameplay;
 
 namespace CluckWars.Diagnostics
@@ -21,9 +22,16 @@ namespace CluckWars.Diagnostics
             FloorArrowsKey = "cw_floorarrows", EdgeArrowsKey = "cw_edgearrows";
         /// <summary>WP4: see <see cref="AutoAura"/>.</summary>
         public const string AutoAuraKey = "cw_autoaura";
+        /// <summary>Fixed kits: see <see cref="Perk"/> and <see cref="BotPerks"/>.</summary>
+        public const string PerkKey = "cw_perk", BotPerksKey = "cw_botperks";
+        /// <summary>Dev tools: see <c>AutoTestDriver.Mark.cs</c>.</summary>
+        public const string MarkShotsKey = "cw_markshots";
+        /// <summary><c>cw_shotsuper 2</c>: the Death Mark captures render at this multiple of the window (a 540x1200 window
+        /// gives the 1080x2400 phone's exact panel layout at full resolution; the monitor cannot open a 2400 px window).</summary>
+        public const string ShotSuperKey = "cw_shotsuper";
 
         public static readonly string[] Keys =
-            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey, AutoZoneKey, ShotsKey, ShotTagKey, BandKey, ZonesKey, FloorArrowsKey, EdgeArrowsKey, AutoAuraKey };
+            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey, AutoZoneKey, ShotsKey, ShotTagKey, BandKey, ZonesKey, FloorArrowsKey, EdgeArrowsKey, AutoAuraKey, PerkKey, BotPerksKey, MarkShotsKey, ShotSuperKey };
 
         public const ChickenClass DefaultClass = ChickenClass.Warrior;
         public const float DefaultAutoStartTimeout = 90f;
@@ -34,6 +42,17 @@ namespace CluckWars.Diagnostics
         public ChickenClass Class = DefaultClass;
         /// <summary>True when <c>cw_class</c> was given (valid or not).</summary>
         public bool ClassGiven;
+        /// <summary>
+        /// <c>cw_perk Speedy_Featherfoot</c>: the specialization (a <see cref="ChickenSubclass"/> name) the menu flow picks; it
+        /// sets the class too and wins over a disagreeing <c>cw_class</c>. None = the class's default perk.
+        /// </summary>
+        public ChickenSubclass Perk = ChickenSubclass.None;
+        /// <summary><c>cw_botperks Warrior_Bully,-,Assassin_Spoiler</c> (dev tools, solo, Fixed): pins bots by index; <c>-</c> rolls.</summary>
+        public ChickenSubclass[] BotPerks = new ChickenSubclass[0];
+        /// <summary><c>cw_markshots</c>: photograph the Death Mark feedback (<c>AutoTestDriver.Mark.cs</c>). Needs <c>cw_autoplay</c>.</summary>
+        public bool MarkShots;
+        /// <summary><c>cw_shotsuper</c>: capture supersize for the Death Mark shots (1 = the window's own size).</summary>
+        public int ShotSuper = 1;
         /// <summary>Humans to wait for before the host starts; 0 = not set (a human presses START).</summary>
         public int AutoStart;
         public float AutoStartTimeout = DefaultAutoStartTimeout;
@@ -199,6 +218,15 @@ namespace CluckWars.Diagnostics
                         if (TryParseClass(value, out var cls)) cfg.Class = cls;
                         else cfg.Problems.Add($"{key} '{value}' is not a class ({string.Join("|", Enum.GetNames(typeof(ChickenClass)))}); using {DefaultClass}");
                         break;
+                    case PerkKey:
+                        if (TryParseSubclass(value, out var perk)) cfg.Perk = perk;
+                        else cfg.Problems.Add($"{key} '{value}' is not a specialization ({SubclassNames}); using the class's default perk");
+                        break;
+                    case MarkShotsKey: cfg.MarkShots = cfg.ParseBool(key, value); break;
+                    case ShotSuperKey: cfg.ShotSuper = cfg.ParseInt(key, value, 1, 4, 1); break;
+                    case BotPerksKey:
+                        cfg.BotPerks = ParseBotPerks(value, cfg.Problems);
+                        break;
                     case ProfileKey:
                         cfg.Profile = SanitizeProfile(value);
                         if (cfg.Profile == null) cfg.Problems.Add($"{key} '{value}' has no letters, digits, '-' or '_'; using the default profile");
@@ -226,6 +254,13 @@ namespace CluckWars.Diagnostics
                     case EdgeArrowsKey:       cfg.EdgeArrows = cfg.ParseBool(key, value); break;
                     default: cfg.Problems.Add($"unknown key {kv.Key}"); break;
                 }
+            }
+            if (cfg.Perk != ChickenSubclass.None)
+            {
+                var owner = cfg.Perk.ClassOf();
+                if (cfg.ClassGiven && cfg.Class != owner)
+                    cfg.Problems.Add($"{ClassKey} {cfg.Class} disagrees with {PerkKey} {cfg.Perk}; using {owner}");
+                cfg.Class = owner;
             }
             if (cfg.FloorArrows && cfg.EdgeArrows)
             {
@@ -284,6 +319,33 @@ namespace CluckWars.Diagnostics
                 if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') sb.Append(c);
             }
             return sb.Length > 0 ? sb.ToString() : null;
+        }
+
+        private static string SubclassNames =>
+            string.Join("|", Array.FindAll(Enum.GetNames(typeof(ChickenSubclass)), n => n != nameof(ChickenSubclass.None)));
+
+        /// <summary>A specialization name, case-insensitive. None and numbers are refused.</summary>
+        public static bool TryParseSubclass(string value, out ChickenSubclass subclass)
+        {
+            subclass = ChickenSubclass.None;
+            if (string.IsNullOrEmpty(value) || !char.IsLetter(value[0])) return false;
+            return Enum.TryParse(value, true, out subclass) && Enum.IsDefined(typeof(ChickenSubclass), subclass)
+                && subclass != ChickenSubclass.None;
+        }
+
+        /// <summary>A comma-separated bot lineup by index: a specialization name, or <c>-</c> to leave that bot rolled. Bad items roll and are reported.</summary>
+        public static ChickenSubclass[] ParseBotPerks(string value, ICollection<string> problems)
+        {
+            var list = new List<ChickenSubclass>();
+            foreach (var item in (value ?? string.Empty).Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var name = item.Trim();
+                if (name == "-") { list.Add(ChickenSubclass.None); continue; }
+                if (TryParseSubclass(name, out var subclass)) { list.Add(subclass); continue; }
+                problems?.Add($"{BotPerksKey} item '{item}' is not a specialization ({SubclassNames}); that bot rolls");
+                list.Add(ChickenSubclass.None);
+            }
+            return list.ToArray();
         }
 
         /// <summary>A class name, case-insensitive. Numbers are refused (Enum.TryParse would accept "2").</summary>

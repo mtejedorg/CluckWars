@@ -551,7 +551,7 @@ namespace CluckWars.Tests
         [Test]
         public void AbilityZone_ContainsRootOf_GatesEverySampleOnTheZonesFirstSighting()
         {
-            string contains = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/AbilityZone.cs", "public static bool ContainsRootOf(");
+            string contains = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/AbilityZone.cs", "public static ControlClaimRules.RootZoneScan ScanRootZonesOf(");
             Assert.AreEqual(2, System.Text.RegularExpressions.Regex.Matches(contains, System.Text.RegularExpressions.Regex.Escape("SampleCountsForZone(sampleTime")).Count,
                 "both the live zones and the recently despawned ones must refuse samples from before they were seen");
         }
@@ -561,9 +561,9 @@ namespace CluckWars.Tests
         {
             const string controller = "Assets/_Game/Scripts/Gameplay/ChickenController.cs";
             string judge = AssassinExecuteCreditTests.MethodBody(controller, "private ControlClaimRules.Verdict JudgeControl(");
-            StringAssert.Contains("|| WasRecentlyInsideRootOf(caster, zoneMargin, ceiling))", judge);
-            StringAssert.Contains("AbilityZone.ContainsRootOf(caster, p, t, margin, c)",
-                AssassinExecuteCreditTests.MethodBody(controller, "private bool WasRecentlyInsideRootOf("), "each past position is judged by the same zone rule");
+            StringAssert.Contains("_lastRootScan = ScanRootZones(caster, v, zoneMargin, ceiling)", judge);
+            StringAssert.Contains("AbilityZone.ScanRootZonesOf(caster, p, current, t, margin, c)",
+                AssassinExecuteCreditTests.MethodBody(controller, "private ControlClaimRules.RootZoneScan ScanRootZones("), "each past position is judged by the same zone rule");
             StringAssert.Contains("_recentPositions.Record(Time.realtimeSinceStartup, transform.position);",
                 AssassinExecuteCreditTests.MethodBody(controller, "public override void FixedUpdateNetwork()"));
             StringAssert.Contains("_recentPositions.Clear();", AssassinExecuteCreditTests.MethodBody(controller, "private void ApplyPendingTeleport()"));
@@ -581,8 +581,8 @@ namespace CluckWars.Tests
             StringAssert.Contains("CaptureRootEvidence();", AssassinExecuteCreditTests.MethodBody(zonePath, "public override void Spawned("));
             StringAssert.Contains("ObserveRootEvidence();", AssassinExecuteCreditTests.MethodBody(zonePath, "public override void Render("));
 
-            string contains = AssassinExecuteCreditTests.MethodBody(zonePath, "public static bool ContainsRootOf(");
-            StringAssert.Contains("ControlClaimRules.RootZoneVouches(", contains, "live and recorded zones are judged by the clamped rule");
+            string contains = AssassinExecuteCreditTests.MethodBody(zonePath, "public static ControlClaimRules.RootZoneScan ScanRootZonesOf(");
+            StringAssert.Contains("ControlClaimRules.AddRootZone(", contains, "live and recorded zones are judged by the clamped rule");
             StringAssert.DoesNotContain("IsInsideZone(", contains, "the zone's own radius must never be used unclamped");
             StringAssert.Contains("caster.Object.StateAuthority", contains, "the zone must share the caster's state authority");
         }
@@ -613,7 +613,7 @@ namespace CluckWars.Tests
             string judgeBody = AssassinExecuteCreditTests.MethodBody(ControllerPath, "private ControlClaimRules.Verdict JudgeControl(");
             StringAssert.Contains("caster.Object.StateAuthority == info.Source", judgeBody, "off the wire: the caster's state authority");
             StringAssert.Contains("caster.Object.HasStateAuthority", judgeBody, "local invoke (solo, bots, master): simulated here");
-            StringAssert.Contains("AbilityZone.ContainsRootOf(caster, v,", judgeBody, "a root from a far caster is judged against its own zones");
+            StringAssert.Contains("ScanRootZones(caster, v,", judgeBody, "a root from a far caster is judged against its own zones");
             StringAssert.Contains("ControlClaimRules.Evaluate(claim, ceiling)", judgeBody);
 
             string accept = AssassinExecuteCreditTests.MethodBody(ControllerPath, "private bool AcceptControlClaim(");
@@ -711,5 +711,124 @@ namespace CluckWars.Tests
                     return slash >= 0 ? l.Substring(0, slash) : l;
                 })
                 .ToArray();
+
+        // ---- A root claim and the base wall: only a zone that vouches may clear it ----------------------------------
+
+        private static ControlClaimRules.RootZoneEvidence VouchingZone(Vector3 victim) => new ControlClaimRules.RootZoneEvidence
+        {
+            SameAuthorityAsCaster = true, Center = victim, Radius = 1f, HasCasterAtSpawn = true, CasterAtSpawn = victim,
+            SecondsSinceSeen = 0.1f, RemainingAtFirstSight = -1f,
+        };
+
+        private static ControlClaimRules.RootZoneScan Scan(params (ControlClaimRules.RootZoneEvidence zone, bool sampleCounts, bool walled)[] zones)
+        {
+            var scan = default(ControlClaimRules.RootZoneScan);
+            var c = Shipped(ControlKind.Root);
+            foreach (var (zone, sampleCounts, walled) in zones)
+                ControlClaimRules.AddRootZone(ref scan, zone, sampleCounts, Vector3.zero, 0.5f, c, walled);
+            return scan;
+        }
+
+        [Test]
+        public void AVouchingWalledZone_IsNotClearedByAZoneThatDoesNotVouch()
+        {
+            var v = Vector3.zero;
+            var walledZone = (VouchingZone(v), true, true);
+
+            var stale = VouchingZone(v);
+            stale.IdentityChanged = true;
+            Assert.IsTrue(Scan(walledZone, (stale, true, false)).Walled, "voided evidence has no say");
+
+            var expired = VouchingZone(v);
+            expired.SecondsSinceSeen = 1000f;
+            Assert.IsTrue(Scan(walledZone, (expired, true, false)).Walled, "an expired zone has no say");
+
+            var elsewhere = VouchingZone(new Vector3(30f, 0f, 30f));
+            elsewhere.CasterAtSpawn = elsewhere.Center;
+            Assert.IsTrue(Scan(walledZone, (elsewhere, true, false)).Walled, "a zone that does not contain the victim has no say");
+
+            Assert.IsTrue(Scan(walledZone, (VouchingZone(v), false, false)).Walled, "a sample older than the zone has no say");
+        }
+
+        [Test]
+        public void OneVouchingZoneOnTheVictimsSide_ClearsTheWall_AndNoEvidenceIsNoWallCall()
+        {
+            var v = Vector3.zero;
+            Assert.IsFalse(Scan((VouchingZone(v), true, true), (VouchingZone(v), true, false)).Walled);
+            var none = Scan((VouchingZone(v), false, true));
+            Assert.IsFalse(none.Vouched);
+            Assert.IsFalse(none.Walled, "nothing vouched: the claim is judged on reach, as a rejection if it fails");
+        }
+
+        /// <summary>
+        /// Maestro's ruling: an honest root landing just after the victim stepped into its base is REFUSED. History may vouch for
+        /// the claim (blink and lag tolerance), but the wall is judged where the victim stands NOW, for every sample.
+        /// </summary>
+        [Test]
+        public void AVictimNowHome_IsWalled_EvenIfAPastSampleWasOnTheZonesSide_SourceGuard()
+        {
+            string src = File.ReadAllText("Assets/_Game/Scripts/Gameplay/AbilityZone.cs");
+            StringAssert.Contains("PlayerBase.WallBetween(z._seen.Center, current)", src);
+            StringAssert.Contains("PlayerBase.WallBetween(r.Center, current)", src);
+            StringAssert.Contains("AbilityZone.ScanRootZonesOf(caster, p, current, t, margin, c)",
+                AssassinExecuteCreditTests.MethodBody(ControllerPath, "private ControlClaimRules.RootZoneScan ScanRootZones("));
+        }
+
+        [Test]
+        public void TheRuling_ZoneOutsideVictimNowInside_IsWalled_AndSilent()
+        {
+            var baseCentre = new Vector2(20f, 20f);
+            var zone = new Vector3(20f, 0f, 16f);
+            var pastOutside = new Vector3(20f, 0f, 16.5f);
+            var nowHome = new Vector3(20f, 0f, 19f);
+            Assert.IsFalse(BaseWallRules.Blocks(zone, pastOutside, baseCentre, 2.5f), "fixture: the sample was on the zone's side");
+
+            // The past sample vouches; the wall is asked of the current position, whichever sample vouched.
+            var evidence = VouchingZone(pastOutside);
+            evidence.Center = zone;
+            evidence.CasterAtSpawn = zone;
+            var scan = default(ControlClaimRules.RootZoneScan);
+            ControlClaimRules.AddRootZone(ref scan, evidence, true, pastOutside, 1f, Shipped(ControlKind.Root),
+                BaseWallRules.Blocks(zone, nowHome, baseCentre, 2.5f));
+            Assert.IsTrue(scan.Vouched, "still evidence, so never a rejected RPC");
+            Assert.IsTrue(scan.Walled, "and refused: the base is safe");
+
+            string accept = AssassinExecuteCreditTests.MethodBody(ControllerPath, "private bool AcceptControlClaim(");
+            int wall = accept.IndexOf("CrossedBaseWall(kind, caster)", StringComparison.Ordinal);
+            Assert.Less(wall, accept.IndexOf("_log?.Warn", StringComparison.Ordinal), "a no-op, above the rejection line");
+            StringAssert.Contains("_log?.Debug", accept.Substring(wall), "silent: Debug, nothing a merge counts");
+        }
+
+        [Test]
+        public void TheScan_MergesEverySample()
+        {
+            var scan = default(ControlClaimRules.RootZoneScan);
+            scan.Merge(new ControlClaimRules.RootZoneScan { Vouched = true });
+            Assert.IsTrue(scan.Walled);
+            scan.Merge(new ControlClaimRules.RootZoneScan { Vouched = true, Unwalled = true });
+            Assert.IsFalse(scan.Walled);
+        }
+
+        /// <summary>
+        /// Security review: the wall check looped every zone of the caster with an owner filter only, so an expired or unrelated
+        /// zone cleared the wall for a claim a walled zone had vouched for. Effect and evidence must come from one loop.
+        /// </summary>
+        [Test]
+        public void RootWallCheck_SharesTheVouchingLoop_NoZoneIsJudgedWithoutTheEvidenceFilters_SourceGuard()
+        {
+            string src = File.ReadAllText("Assets/_Game/Scripts/Gameplay/AbilityZone.cs");
+            StringAssert.DoesNotContain("RootZonesAreWalledFrom", src, "a second loop over the zones can drift from ContainsRootOf's filters");
+            Assert.AreEqual(4, Regex.Matches(src, @"PlayerBase\.WallBetween\((z\._seen|r)\.Center").Count,
+                "the wall is read in the two vouching loops only, for the sample and for now");
+            StringAssert.Contains("ControlClaimRules.AddRootZone(", src);
+        }
+
+        [Test]
+        public void ASampleBehindAWall_CannotVouchPastIt_OnEitherLoop_SourceGuard()
+        {
+            string src = File.ReadAllText("Assets/_Game/Scripts/Gameplay/AbilityZone.cs");
+            StringAssert.Contains("PlayerBase.WallBetween(z._seen.Center, point) || PlayerBase.WallBetween(z._seen.Center, current)", src);
+            StringAssert.Contains("PlayerBase.WallBetween(r.Center, point) || PlayerBase.WallBetween(r.Center, current)", src);
+        }
     }
 }

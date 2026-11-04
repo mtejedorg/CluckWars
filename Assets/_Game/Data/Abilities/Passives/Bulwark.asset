@@ -32,3 +32,8 @@ MonoBehaviour:
   DurationMultiplier: 0.65
   KnockbackMultiplier: 0.25
   Subclass: 6
+  Kit:
+  - {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}
+  - {fileID: 11400000, guid: 2a92897e8ee4ea6489a6800817e583b6, type: 2}
+  - {fileID: 11400000, guid: 7e7fb8a070d8cc94cb3fe7aa588ee544, type: 2}
+  - {fileID: 11400000, guid: 34d89e259316bb6458f34ff06f640c5f, type: 2}

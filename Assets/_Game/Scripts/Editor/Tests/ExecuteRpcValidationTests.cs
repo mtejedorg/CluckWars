@@ -38,6 +38,10 @@ namespace CluckWars.Tests
             VictimStunned = true,
             PlanarDistance = 5f,
             RangeMargin = 0.5f,
+            // The victim's own record of the mark: seen just now, on it for longer than the arm.
+            MarkEverSeen = true,
+            MarkAgeSeconds = 3.1f,
+            ArmSeconds = 3f,
         };
 
         [Test]
@@ -50,6 +54,7 @@ namespace CluckWars.Tests
             var c = Genuine();
             c.MarkedThisVictim = false;
             c.VictimStunned = false;
+            c.MarkEverSeen = false;
             c.Latency = ExecuteRules.RemoteLatency(0.1f);
             return c;
         }
@@ -67,11 +72,12 @@ namespace CluckWars.Tests
         [Test]
         public void Removal_MarkedNow_StunRecordedRecently_IsAccepted()
         {
-            // KillReady latches on the stun and outlives it (stuns 1-1.5 s, window 5 s).
+            // An honest press made while the stun was live lands one flight later: the stun may have ended inside that latency.
             var c = NothingCurrent();
             c.MarkedThisVictim = true;
+            c.MarkEverSeen = true;
             c.StunEverSeen = true;
-            c.SecondsSinceStunned = 2.5f;
+            c.SecondsSinceStunned = 0.1f;
             Assert.AreEqual(ExecuteRules.RemovalVerdict.Accepted, ExecuteRules.EvaluateRemoval(c));
         }
 
@@ -79,12 +85,12 @@ namespace CluckWars.Tests
         public void Removal_MarkClearedAndStunOver_BothRecordedWithinWindow_IsAccepted()
         {
             // The CW-230 review race: the victim's peer reads marked=false, stunned=false, but its
-            // own authority saw the mark one tick ago and was itself stunned 2 s ago.
+            // own authority saw the mark one tick ago and was itself stunned within the RPC's flight.
             var c = NothingCurrent();
             c.MarkEverSeen = true;
             c.SecondsSinceMarkSeen = 0.05f;
             c.StunEverSeen = true;
-            c.SecondsSinceStunned = 2f;
+            c.SecondsSinceStunned = 0.1f;
             Assert.AreEqual(ExecuteRules.RemovalVerdict.Accepted, ExecuteRules.EvaluateRemoval(c));
         }
 
@@ -96,7 +102,7 @@ namespace CluckWars.Tests
             c.MarkedThisVictim = true;
             c.MarkEverSeen = true;
             c.SecondsSinceMarkSeen = 0f;
-            Assert.AreEqual(ExecuteRules.RemovalVerdict.NoExecuteEvidence, ExecuteRules.EvaluateRemoval(c));
+            Assert.AreEqual(ExecuteRules.RemovalVerdict.NotStunned, ExecuteRules.EvaluateRemoval(c));
         }
 
         [Test]
@@ -116,11 +122,11 @@ namespace CluckWars.Tests
             c.MarkEverSeen = true;
             c.SecondsSinceMarkSeen = ExecuteRules.MaxLatencySeconds + ExecuteRules.RecentMarkGraceSeconds + 0.1f;
             c.StunEverSeen = true;
-            c.SecondsSinceStunned = ExecuteRules.MaxLatencySeconds + ExecuteRules.RecentStunWindowSeconds + 0.1f;
+            c.SecondsSinceStunned = ExecuteRules.MaxLatencySeconds + 0.1f;
             Assert.AreEqual(ExecuteRules.RemovalVerdict.NoExecuteEvidence, ExecuteRules.EvaluateRemoval(c));
 
             c.SecondsSinceMarkSeen = 0.05f;   // fresh mark, stale stun
-            Assert.AreEqual(ExecuteRules.RemovalVerdict.NoExecuteEvidence, ExecuteRules.EvaluateRemoval(c));
+            Assert.AreEqual(ExecuteRules.RemovalVerdict.NotStunned, ExecuteRules.EvaluateRemoval(c));
         }
 
         [Test]
@@ -134,9 +140,9 @@ namespace CluckWars.Tests
             Assert.AreEqual(ExecuteRules.RemovalVerdict.NoExecuteEvidence, ExecuteRules.EvaluateRemoval(c));
             c.SecondsSinceMarkSeen = 0.05f;
             c.SecondsSinceStunned = float.NaN;
-            Assert.AreEqual(ExecuteRules.RemovalVerdict.NoExecuteEvidence, ExecuteRules.EvaluateRemoval(c));
+            Assert.AreEqual(ExecuteRules.RemovalVerdict.NotStunned, ExecuteRules.EvaluateRemoval(c));
             c.SecondsSinceStunned = -1f;
-            Assert.AreEqual(ExecuteRules.RemovalVerdict.NoExecuteEvidence, ExecuteRules.EvaluateRemoval(c));
+            Assert.AreEqual(ExecuteRules.RemovalVerdict.NotStunned, ExecuteRules.EvaluateRemoval(c));
         }
 
         [Test]
@@ -163,9 +169,9 @@ namespace CluckWars.Tests
         public void CargoHalf_UsesTheSameEvidenceRule_AndTheVictimRecordsMarksAndStunsEachTick()
         {
             string guard = AssassinExecuteCreditTests.MethodBody(Dir + "Gameplay/ChickenCargo.cs", "private bool TryResolveExecutor(");
-            StringAssert.Contains("ExecuteRules.HasExecuteEvidence(execute.MarkedTarget == _controller.Id, markSeen, sinceMark", guard,
+            StringAssert.Contains("ExecuteRules.HasMarkEvidence(execute.MarkedTarget == _controller.Id, markSeen, sinceMark, latency)", guard,
                 "the cargo transfer and the removal must accept and refuse the same executes");
-            StringAssert.Contains("_controller.IsStunned, stunSeen, sinceStun, latency", guard);
+            StringAssert.Contains("ExecuteRules.HasStunAtKill(_controller.IsStunned, stunSeen, sinceStun, latency)", guard);
             StringAssert.Contains("TrySecondsSinceMarkedBy(execute", guard);
             StringAssert.Contains("TrySecondsSinceStunned(", guard);
 
@@ -211,7 +217,7 @@ namespace CluckWars.Tests
         public void Removal_AtTheMarkRangeEdgePlusDrift_IsAccepted()
         {
             var c = Genuine();
-            c.PlanarDistance = AssassinExecute.MaxMarkRange + ExecuteRules.RangeSlackMeters + c.RangeMargin - 0.01f;
+            c.PlanarDistance = AssassinExecute.DefaultKillRange + ExecuteRules.RangeSlackMeters + c.RangeMargin - 0.01f;
             Assert.AreEqual(ExecuteRules.RemovalVerdict.Accepted, ExecuteRules.EvaluateRemoval(c));
             c.PlanarDistance = float.NaN;
             Assert.AreEqual(ExecuteRules.RemovalVerdict.OutOfRange, ExecuteRules.EvaluateRemoval(c));
@@ -232,7 +238,7 @@ namespace CluckWars.Tests
 
         [TestCase(0f)]
         [TestCase(-1f)]
-        [TestCase(2.5f)]
+        [TestCase(ExecuteRules.RemovalDurationSeconds + 0.5f)]   // just past the execute's own duration
         [TestCase(999f)]
         [TestCase(float.PositiveInfinity)]
         [TestCase(float.NaN)]
@@ -283,7 +289,8 @@ namespace CluckWars.Tests
             }
 
             string src = string.Join("\n", CodeLines(ChickenCombatPath));
-            StringAssert.Contains("Dictionary<AssassinExecute, double> _markSeenAt", src);
+            StringAssert.Contains("Dictionary<AssassinExecute, MarkSighting> _markSeenAt", src);
+            StringAssert.Contains("private struct MarkSighting { public double First, Last; }", src, "both sightings in simulation time");
             StringAssert.Contains("private double _stunnedAt", src);
         }
 
@@ -423,8 +430,8 @@ namespace CluckWars.Tests
             string beforeRemoval = press.Substring(expect, removal - expect);
             StringAssert.DoesNotContain("ResetMark()", beforeRemoval,
                 "the mark must still name the victim when the removal is sent (the local receiver checks it)");
-            StringAssert.Contains("RPC_ExecuteRemoval(_combat.Id, ExecuteRules.RemovalDurationSeconds)", press,
-                "a different duration is refused by IsPlausibleRemovalDuration");
+            StringAssert.Contains("RPC_ExecuteRemoval(_combat.Id, RemovalSeconds)", press,
+                "the data value; a longer duration is refused by IsPlausibleRemovalDuration at the same value");
             Assert.IsTrue(ExecuteRules.IsPlausibleRemovalDuration(ExecuteRules.RemovalDurationSeconds));
         }
 
@@ -467,5 +474,33 @@ namespace CluckWars.Tests
                     return slash >= 0 ? l.Substring(0, slash) : l;
                 })
                 .ToArray();
+
+        [Test]
+        public void AStunOlderThanOneLatency_NeverVouchesForAKill()
+        {
+            // The kill needs a live stun (Maestro 2026-11-04): the only slack is the RPC's flight, one capped latency.
+            Assert.IsFalse(ExecuteRules.HasStunAtKill(false, true, 5f, 0f), "a 5 s old stun is no evidence");
+            Assert.IsFalse(ExecuteRules.HasStunAtKill(false, true, 0.3f, 0f), "no grace on a local invoke: the stun must be live");
+            Assert.IsTrue(ExecuteRules.HasStunAtKill(true, false, 0f, 0f), "stunned now");
+        }
+
+        [Test]
+        public void BothExecuteHalves_JudgeTheWallAndTheRange_AndARaceIsSilent_SourceGuard()
+        {
+            CollectionAssert.Contains(System.Enum.GetNames(typeof(ExecuteRules.RemovalVerdict)), "AcrossBaseWall");
+            string cargo = File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenCargo.cs");
+            StringAssert.Contains("PlayerBase.WallBetween(execute.transform.position, transform.position)", cargo);
+            StringAssert.Contains("ExecuteRules.MaxExecuteDistance(", cargo);
+            string combat = File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenCombat.cs");
+            StringAssert.Contains("ExecuteRules.IsLegalNoOp(verdict)", combat);
+        }
+
+        [Test]
+        public void TheBounty_IsPaidOnTheKillReport_SoARefusedExecutePaysNothing_SourceGuard()
+        {
+            string press = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/AssassinExecute.cs", "public bool Press(");
+            StringAssert.DoesNotContain("BountyBag +=", press, "a press the victim's authority refuses must leave no half-applied execute");
+            StringAssert.Contains("PayExecuteBounty(", File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenMatchStats.cs"));
+        }
     }
 }

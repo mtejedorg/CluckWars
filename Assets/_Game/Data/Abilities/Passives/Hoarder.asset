@@ -31,3 +31,8 @@ MonoBehaviour:
     m_Bits: 256
   MinimumCapacity: 40
   Subclass: 5
+  Kit:
+  - {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}
+  - {fileID: 11400000, guid: 5f7b2c8a4d3e495d8a01c5e7b2f9d4e7, type: 2}
+  - {fileID: 11400000, guid: 6b3c8e2a1f4d495d8a01c5e7b2f9d4d5, type: 2}
+  - {fileID: 11400000, guid: 085acf61f49c49d68a044735c873c974, type: 2}

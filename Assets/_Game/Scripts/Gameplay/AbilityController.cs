@@ -198,7 +198,7 @@ namespace CluckWars.Gameplay
         // networked, every-peer-visible aim state — once it has survived
         // FeedbackTuning.TapHoldThresholdSeconds. Releasing before then still fires
         // (release ALWAYS fires); it just never paid for a telegraph, target marks, the
-        // opponent-visible wind-up glow, or the aim-rotate movement lock, all four of
+        // opponent-visible wind-up glow, or the turn toward the aim, all four of
         // which gate themselves on ChargingSlot and so need no changes of their own.
         //
         // Deliberately plain fields and not [Networked]: this is a decision the state
@@ -325,6 +325,7 @@ namespace CluckWars.Gameplay
                 _rearmRemaining[i] = AbilityFizzleRules.Advance(_rearmRemaining[i], Runner.DeltaTime);
 
             var gm = GameManager.Instance;
+            ApplyRoundStartCooldowns(gm);
             if (gm == null || !gm.IsMatchRunning)
             {
                 DeactivateAll();
@@ -670,9 +671,15 @@ namespace CluckWars.Gameplay
         /// </remarks>
         public int EquippedSlotCount => SlotCount;
 
+        /// <summary>The bots' one-at-a-time gate, pure: nothing running, or a press the running ability takes, or an ability
+        /// exempt from the rule (<see cref="AbilityBaseSO.BotIgnoresOneAtATime"/>).</summary>
+        public static bool BotMayPress(bool anyActive, bool repress, bool ignoresOneAtATime) =>
+            !anyActive || repress || ignoresOneAtATime;
+
         /// <summary>
         /// Bot-only activation API. Mirrors the player gates (cooldown / stun) and additionally refuses
-        /// while any of the bot's own slots is running — bots never overlap abilities.
+        /// while any of the bot's own slots is running (<see cref="BotMayPress"/>: bots never overlap abilities, except
+        /// Turtle Mode's lock press and Death Mark's Kill).
         /// Returns <c>true</c> if the ability fired this call.
         /// Must be called from the StateAuthority (bot FSM already guards this).
         /// </summary>
@@ -682,11 +689,17 @@ namespace CluckWars.Gameplay
             var gm = GameManager.Instance;
             if (gm == null || !gm.IsMatchRunning) return false;
             if (_combat != null && _combat.IsRemoved) return false;
-            // Bots keep the one-at-a-time rule: no bot behaviour change, SCT untouched. Players are not gated.
-            if (AnyAbilityActive) return false;
-            if (!IsReady(slot)) return false;
-            TryActivate(slot);
-            return IsSlotActive(slot);
+            // Bots keep the one-at-a-time rule: no bot behaviour change, SCT untouched. Players are not gated. The exceptions are
+            // a second press on the ability that is running and takes it (Turtle Mode's lock), and an ability that is the
+            // follow-through of a running one (Death Mark's Kill during the bot's own Ambush stun).
+            var running = IsSlotActive(slot) ? GetSlot(slot) : null;
+            bool repress = running != null && running.AcceptsPressWhileActive;
+            var pressed = GetSlot(slot);
+            if (!BotMayPress(AnyAbilityActive, repress, pressed != null && pressed.BotIgnoresOneAtATime)) return false;
+            if (!repress && !IsReady(slot)) return false;
+            bool wasActive = IsSlotActive(slot);
+            bool fired = TryActivate(slot);
+            return repress ? fired : IsSlotActive(slot) && !wasActive;
         }
 
         /// <summary>
@@ -817,6 +830,28 @@ namespace CluckWars.Gameplay
             _ => default,
         };
 
+        /// <summary>
+        /// While the intro runs, holds every slot with a <see cref="AbilityBaseSO.RoundStartCooldown"/> on a cooldown that ends
+        /// that many seconds after GO (<see cref="RoundStartCooldownRules"/>). Runs every intro tick, so it lands after any slot
+        /// clearing (<see cref="EndAllForReset"/> at PLAY AGAIN, a loadout swap) and nothing wipes it. Authority only (called
+        /// from the authority half of FixedUpdateNetwork); bots get it the same way.
+        /// </summary>
+        private void ApplyRoundStartCooldowns(GameManager gm)
+        {
+            if (gm == null || gm.Object == null || !gm.Object.IsValid || gm.State != MatchState.Active) return;
+            int? introEnd = gm.IntroTimer.TargetTick;
+            if (!introEnd.HasValue) return;
+            int now = Runner.Tick;
+            for (int slot = 0; slot < SlotCount; slot++)
+            {
+                var ability = GetSlot(slot);
+                if (ability == null) continue;
+                int expiry = RoundStartCooldownRules.ExpiryTick(true, introEnd.Value, now, ability.RoundStartCooldown, Runner.DeltaTime);
+                if (expiry < 0 || GetCooldown(slot).TargetTick == expiry) continue;
+                SetCooldown(slot, TickTimer.CreateFromTicks(Runner, expiry - now));
+            }
+        }
+
         private void SetCooldown(int slot, TickTimer timer)
         {
             if (slot == 0)      Cooldown0 = timer;
@@ -842,7 +877,9 @@ namespace CluckWars.Gameplay
             // A slot that is still running reads as "cooling": re-casting the same slot while it runs stays
             // refused (its cooldown outlasts its duration, so this only guards a Relentless-shortened edge).
             // Other slots running do NOT refuse anything — abilities run concurrently.
-            bool onCooldown = !slotUnavailable &&
+            // A running ability that takes a second press (Turtle Mode's lock) is not "cooling" for that press.
+            bool repress = !slotUnavailable && IsSlotActive(slot) && ability.AcceptsPressWhileActive;
+            bool onCooldown = !slotUnavailable && !repress &&
                               (!GetCooldown(slot).ExpiredOrNotRunning(Runner) || IsSlotActive(slot));
             bool stunned = _controller != null && !ControlRules.CanCast(_controller.CurrentControlState);
             bool noTarget = !slotUnavailable && !onCooldown && !stunned &&
@@ -924,6 +961,21 @@ namespace CluckWars.Gameplay
                 _deniedPressPending = true;
                 _deniedPressSlot = slot;
                 return false;
+            }
+
+            // A press while it runs (Turtle Mode: walk -> lock -> end early): the ability decides the new run time; no new
+            // activation, no cooldown change (it runs from the first press), no cast animation.
+            if (IsSlotActive(slot) && ability.AcceptsPressWhileActive)
+            {
+                float next;
+                _ctx.Slot = slot;
+                try { next = ability.OnPressWhileActive(_ctx); }
+                finally { _ctx.Slot = -1; }
+                if (next > 0f) SetActiveTimer(slot, TickTimer.CreateFromSeconds(Runner, next));
+                else Deactivate(slot);
+                _controller?.SyncAbilityEffects();
+                _log?.Debug(Source, $"Slot {slot} ({ability.DisplayName}) pressed while active -> {(next > 0f ? $"{next:0.0}s more" : "ended")}.");
+                return true;
             }
 
             // Refresh context fields that abilities need for NetworkObject spawning. This has
@@ -1105,6 +1157,16 @@ namespace CluckWars.Gameplay
             DeactivateAll();
             for (int slot = 0; slot < SlotCount; slot++) SetCooldown(slot, TickTimer.None);
             CancelCharge();   // also drops the pending hold, so a held ability cannot fire in the next round
+            if (PeckChainActive) PeckChainActive = false;
+        }
+
+        /// <summary>An executed chicken: every running slot ends through its own OnDeactivate and any aim / peck chain is
+        /// dropped. Cooldowns are NOT touched: they keep running while it is out. Authority only.</summary>
+        public void EndAllForRemoval()
+        {
+            if (!HasStateAuthority || !_initialized) return;
+            DeactivateAll();
+            CancelCharge();
             if (PeckChainActive) PeckChainActive = false;
         }
 

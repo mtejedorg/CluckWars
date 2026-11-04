@@ -77,6 +77,23 @@ namespace CluckWars.Gameplay
         public static bool CanStealFrom(ChickenController victim) => victim != null && !victim.IsStealProof;
 
         /// <summary>
+        /// What a thief can take from a chicken: the food it carries in its beak plus its bounty bag. An Assassin's execute pays
+        /// into the bag, never the beak, so reading the beak alone made a loaded Assassin look empty-handed to every steal.
+        /// </summary>
+        public static float Stealable(float cargo, float bountyBag) => Mathf.Max(0f, cargo) + Mathf.Max(0f, bountyBag);
+
+        /// <summary>
+        /// Splits a steal of <paramref name="amount"/> between a victim's cargo and bounty bag: the beak first, then the bag,
+        /// never more than <see cref="Stealable"/> in all.
+        /// </summary>
+        public static void SplitDrain(float amount, float cargo, float bountyBag, out float fromCargo, out float fromBag)
+        {
+            float want = Mathf.Max(0f, amount);
+            fromCargo = Mathf.Min(want, Mathf.Max(0f, cargo));
+            fromBag = Mathf.Min(want - fromCargo, Mathf.Max(0f, bountyBag));
+        }
+
+        /// <summary>
         /// How much a thief gives back when the victim's authority refused a steal that was
         /// credited optimistically: the refused amount, never more than the thief holds and never
         /// negative.

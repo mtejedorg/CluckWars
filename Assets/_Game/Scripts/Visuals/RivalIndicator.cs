@@ -98,6 +98,9 @@ namespace CluckWars.Visuals
         /// which asserts it against <c>InvisibilityAbilitySO.Opacity</c> rather than a literal.</summary>
         public static float MinVisibleOpacityForTests => MinVisibleOpacity;
 
+        /// <summary>Below this a rival counts as invisible (the Death Mark victim's red mood reads it too).</summary>
+        public static float VisibleOpacityThreshold => MinVisibleOpacity;
+
         /// <summary>Ring sits under the §5.1 control-state overlays (orders 2–5), which are
         /// transient and must win; the rival ring is permanent furniture.</summary>
         private const int RingSortingOrder = 1;
@@ -133,6 +136,20 @@ namespace CluckWars.Visuals
         /// <summary>True while this rival is mostly under a HUD information zone: <see cref="ChickenNameplate"/> hides its
         /// label then, and this indicator draws the chevron at the zone's edge instead (WP7).</summary>
         public bool HidesNameplate => _wasUnderHud;
+
+        /// <summary>This frame's "hidden from the clear viewport" verdict (off the frame or mostly under a HUD information zone):
+        /// exactly when this rival would get an arrow. False while no indicator is shown at all (cloaked, dead, the viewer).</summary>
+        public bool HiddenFromClearViewport { get; private set; }
+
+        /// <summary>Where this rival's edge chevron was last placed (viewport point and bearing), while it shows.</summary>
+        public bool TryGetChevronViewport(out Vector2 at, out Vector2 bearing)
+        {
+            at = _chevronAt;
+            bearing = _chevronBearing;
+            return _chevron != null && _chevron.gameObject.activeSelf;
+        }
+
+        private Vector2 _chevronAt, _chevronBearing;
 
         private SpriteRenderer _ring;
         private SpriteRenderer _ringEdge;      // D9 two-tone edge: ink band + cream rim (GroundRingStyle)
@@ -177,6 +194,7 @@ namespace CluckWars.Visuals
 
             // The painted floor ring (decision 2a): created by the first indicator of the first match, before any LateUpdate offers.
             FloorRivalArrows.EnsureForMatch();
+            MarkFeedback.EnsureForMatch();
             BuildGeometry();
         }
 
@@ -340,7 +358,8 @@ namespace CluckWars.Visuals
             var cam = MatchCamera.Instance != null ? MatchCamera.Instance.Camera : null;
             if (cam == null) cam = Camera.main;
 
-            if (!ShouldShow(cam, out float opacity))
+            HiddenFromClearViewport = false;
+            if (!ShouldShow(cam, out float opacity, out bool forcedHunter))
             {
                 _wasOnScreen = false;
                 _wasUnderHud = false;
@@ -348,6 +367,9 @@ namespace CluckWars.Visuals
                 return;
             }
 
+            // The local Assassin's mark: the hunt marker (MarkHudController) is its arrow, so its own floor arrow and edge
+            // chevron stand down while the marker shows. Its ground ring under it stays (it is on screen then).
+            bool marked = MarkFeedback.IsMarkedByLocal(_controller);
             var tint = TintFor(_controller.HomeCornerIndex);
 
             // On screen = ANY part of the body in frame (with hysteresis on the way out), not just the feet: a bird whose feet
@@ -379,16 +401,28 @@ namespace CluckWars.Visuals
                     out clamped, out bearing);
                 target = chevron ? ScreenEdgeProjection.TargetViewport(cam, transform.position) : default;
             }
+            HiddenFromClearViewport = chevron;
 
-            // Dev prototype (-cw_floorarrows): a rival that would get a chevron is offered to the floor ring round the local
-            // chicken first; if it is represented there, its chevron is suppressed. Off (production): returns false at once.
-            if (chevron && FloorRivalArrows.TryRepresent(GetInstanceID(), transform.position, tint, opacity))
+            if (forcedHunter && !chevron)
+            {
+                // The Death Mark victim's invisible hunter, on screen but beyond the inner circle: direction only. Its floor arrow
+                // (never a ring under a bird the viewer must not see); nothing at all if the floor ring declines.
+                FloorRivalArrows.TryRepresent(GetInstanceID(), transform.position, tint, opacity);
+                HideChevron(false, tint, opacity);
+            }
+            else if (chevron && marked)
             {
                 HideChevron(_wasUnderHud, tint, opacity);
             }
+            // A rival that would get a chevron is offered to the floor ring round the local chicken first; if it is represented
+            // there, its chevron is suppressed (decision 2a). Edge-arrow dev builds: returns false at once.
+            else if (chevron && FloorRivalArrows.TryRepresent(GetInstanceID(), transform.position, tint, opacity))
+            {
+                HideChevron(_wasUnderHud && !forcedHunter, tint, opacity);
+            }
             else if (chevron)
             {
-                ShowChevron(cam, clamped, bearing, tint, opacity, keepRing: _wasUnderHud);
+                ShowChevron(cam, clamped, bearing, tint, opacity, keepRing: _wasUnderHud && !forcedHunter);
                 QueueForSpread(cam, clamped, target);
             }
             else
@@ -451,9 +485,10 @@ namespace CluckWars.Visuals
         /// valid ability target by Maestro's 2026-08-02 call, so an indicator that quietly
         /// skipped decoys would hand every player a free tell for spotting the fake.
         /// </remarks>
-        private bool ShouldShow(Camera cam, out float opacity)
+        private bool ShouldShow(Camera cam, out float opacity, out bool forcedHunter)
         {
             opacity = 0f;
+            forcedHunter = false;
             if (cam == null) return false;
 
             var obj = _controller.Object;
@@ -463,7 +498,10 @@ namespace CluckWars.Visuals
             var combat = _controller.Combat;
             if (combat != null && combat.IsDead) return false;
 
-            opacity = Mathf.Clamp01(_controller.VisualOpacity);
+            // The Death Mark victim's hunter, invisible beyond the inner circle, still shows its arrow (direction only):
+            // the model decides (MarkPresentationModel.ForceShowHunter). Everyone else: Invisibility hides the indicator.
+            forcedHunter = MarkFeedback.ForcesArrowFor(_controller);
+            opacity = forcedHunter ? 1f : Mathf.Clamp01(_controller.VisualOpacity);
             return opacity >= MinVisibleOpacity;
         }
 
@@ -512,6 +550,8 @@ namespace CluckWars.Visuals
         /// <paramref name="bearing"/> (viewport axes). Shared by the LateUpdate placement and the spread pass.</summary>
         private void PlaceChevron(Camera cam, Vector2 at, Vector2 bearing)
         {
+            _chevronAt = at;
+            _chevronBearing = bearing;
             float depth = cam.nearClipPlane + FeedbackTuning.RivalChevronDepthOffset;
             var t = _chevron.transform;
             t.position = cam.ViewportToWorldPoint(new Vector3(at.x, at.y, depth));

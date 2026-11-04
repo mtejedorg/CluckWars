@@ -31,3 +31,8 @@ MonoBehaviour:
     m_Bits: 256
   CooldownMultiplier: 0.75
   Subclass: 1
+  Kit:
+  - {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}
+  - {fileID: 11400000, guid: 592cf309ec40b0546833d005b73c5a92, type: 2}
+  - {fileID: 11400000, guid: 6bbb9c61252f875408fde062c994669c, type: 2}
+  - {fileID: 11400000, guid: 079c14ab0b344ca898f4be63fbf58374, type: 2}

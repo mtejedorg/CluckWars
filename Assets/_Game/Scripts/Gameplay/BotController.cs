@@ -89,6 +89,7 @@ namespace CluckWars.Gameplay
         private ChickenCombat     _combat;
         private ChickenCargo      _cargo;
         private AbilityController _abilities;
+        private AssassinExecute   _execute;
         private ILogService       _log;
 
         // ---- Strategy -------------------------------------------------------
@@ -125,6 +126,10 @@ namespace CluckWars.Gameplay
         private Vector3     _lastPathTarget = new Vector3(float.MinValue, 0f, float.MinValue);
         private int         _navCorner = -1;
 
+        // The rival base walls, inflated by BaseKeepOutRules.BotClearance: refreshed every tick in Navigate.
+        private static readonly KeepOutCircle[] _keepOut = new KeepOutCircle[8];
+        private int _keepOutCount;
+
         // ---- Perception (cached per think tick) -----------------------------
 
         /// <summary>Nearest living rival, whatever they are carrying. Drives the danger check.</summary>
@@ -157,6 +162,7 @@ namespace CluckWars.Gameplay
             _combat     = GetComponent<ChickenCombat>();
             _cargo      = GetComponent<ChickenCargo>();
             _abilities  = GetComponent<AbilityController>();
+            _execute    = GetComponent<AssassinExecute>();
 
             _profile = BotTactics.ProfileFor(_controller != null ? _controller.Class : ChickenClass.Warrior);
 
@@ -231,7 +237,18 @@ namespace CluckWars.Gameplay
 
             // Overlay (never returns): a loaded bot with a stealer in reach pulls up a steal-proof
             // shell if it has one ready.
-            TryStealGuard(cargo);
+            float bag = _cargo != null ? _cargo.BountyBag : 0f;
+            TryStealGuard(cargo + bag);
+
+            // A Death Mark in progress owns the bot until it pays or fizzles: see BotTactics.NextMarkStep.
+            if (TryFollowThroughMark(cargo + bag)) return;
+
+            // An execute pays into the bounty bag, not the beak, so a bot holding only a bag still has to walk it home.
+            if (bag > 0f)
+            {
+                EnterReturnToBase(homePos, $"bag={bag:0}");
+                return;
+            }
 
             // Latch ReturnToBase until all cargo is deposited (IP1). Fire the Bank plan
             // once actually on the base — a deposit accelerator is worthless anywhere else,
@@ -561,26 +578,99 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
+        /// The Spoiler's loop: mark whenever it can, then hunt the mark across the map (a target at home is approached up to its
+        /// wall, RefreshRivalWalls), stun it, and press Kill. Returns true while a mark owns the bot.
+        /// </summary>
+        private bool TryFollowThroughMark(float cargoAndBag)
+        {
+            if (_execute == null || _abilities == null) return false;
+
+            if (_execute.MarkedTarget == NetworkBehaviourId.None)
+            {
+                // A loaded bot banks first: a bounty bag is worth more than a new mark.
+                if (cargoAndBag > 0f) return false;
+                for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
+                {
+                    var ability = _abilities.GetSlot(slot);
+                    if (ability is MarkKillAbilitySO && _abilities.IsReady(slot) && ability.IsUsable(_controller) &&
+                        _abilities.BotTryActivate(slot))
+                        _log?.Debug(Source, $"{Who} marked a rival (slot {slot}).");
+                }
+                return false;   // the mark replicates next tick; this think goes on as usual
+            }
+            if (!Runner.TryFindBehaviour(_execute.MarkedTarget, out ChickenController mark) || mark == null) return false;
+
+            _state      = BotState.Hunt;
+            _moveTarget = mark.transform.position;
+
+            // The longest ready stun that would land now, measured on THIS target (its passive shortens it). Never at a shelled
+            // target (it takes the stun but cannot be executed) or a control-immune one (the stun does not land).
+            int stunSlot = AbilityController.InvalidSlot;
+            float stunSeconds = 0f;
+            bool stunnable = !mark.IsStealProof && !mark.IsControlImmune;
+            for (int slot = 0; stunnable && slot < _abilities.EquippedSlotCount; slot++)
+            {
+                var ability = _abilities.GetSlot(slot);
+                if (!FixedKit.EmitsStun(ability) || !_abilities.IsReady(slot) || !ability.IsUsable(_controller)
+                    || !ability.WouldAffect(_controller, mark)) continue;
+                float raw = ability.EmittedControl.Seconds;
+                var passive = mark.Abilities != null ? mark.Abilities.Passive : null;
+                float onTarget = passive != null ? passive.ModifyControlDuration(raw, mark) : raw;
+                if (onTarget > stunSeconds) { stunSeconds = onTarget; stunSlot = slot; }
+            }
+
+            float armLeft = _execute.ArmTimer.RemainingTime(Runner) ?? 0f;
+            float windowLeft = _execute.WindowTimer.RemainingTime(Runner) ?? 0f;
+            var step = BotTactics.NextMarkStep(true, _execute.CanKillNow, armLeft, windowLeft,
+                stunSlot != AbilityController.InvalidSlot, stunSeconds);
+            if (step == BotMarkStep.Stun && _abilities.BotTryActivate(stunSlot))
+                _log?.Debug(Source, $"{Who} mark {step}: cast slot {stunSlot} ({stunSeconds:0.00} s on {mark.name}, arm in {armLeft:0.00} s).");
+            if (step == BotMarkStep.Kill)
+                for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
+                    if (_abilities.GetSlot(slot) is MarkKillAbilitySO && _abilities.BotTryActivate(slot))
+                    {
+                        _log?.Debug(Source, $"{Who} mark Kill: cast slot {slot}.");
+                        break;
+                    }
+
+            if (_state != _prevState) _log?.Debug(Source, $"{Who} → Hunt (following a Death Mark, {step}).");
+            return true;
+        }
+
+        /// <summary>
         /// Phase 7 chunk D: cast Egg Shell / Turtle Mode (whichever is ready) when a rival that owns a
         /// steal ability is within <see cref="BotTactics.StealGuardRadius"/> and our cargo is worth
         /// protecting. Silent when it cannot fire: no shell equipped or on cooldown is ordinary.
         /// </summary>
         private void TryStealGuard(float cargo)
         {
-            if (_abilities == null || cargo < BotTactics.StealGuardMinCargo) return;
+            if (_abilities == null) return;
 
             var   selfPos = _controller.transform.position;
             var   all     = ChickenController.ActiveControllers;
-            float nearest = float.MaxValue;
+            float nearest = float.MaxValue, nearestThreat = float.MaxValue;
             for (int i = 0; i < all.Count; i++)
             {
                 var c = all[i];
                 if (c == null || c == _controller) continue;
                 if (c.Combat != null && (c.Combat.IsRemoved || c.Combat.IsDead)) continue;
                 float dist = PlanarDistance(selfPos, c.transform.position);
+                bool stealer = HasStealAbility(c);
+                if (dist < nearestThreat && (stealer || HasStunAbility(c))) nearestThreat = dist;
                 if (dist >= nearest || dist > BotTactics.StealGuardRadius) continue;
-                if (HasStealAbility(c)) nearest = dist;
+                if (stealer) nearest = dist;
             }
+
+            // Turtle Mode under way: lock only when a stun or steal threat is right on us (BotTactics.ShouldTurtleLock).
+            for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
+            {
+                if (!(_abilities.GetSlot(slot) is TurtleModeAbilitySO) || !_abilities.IsSlotActive(slot)) continue;
+                bool locked = _controller.Effects.HasMovementLock(slot);
+                if (BotTactics.ShouldTurtleLock(true, locked, nearestThreat) && _abilities.BotTryActivate(slot))
+                    _log?.Debug(Source, $"{Who} Turtle lock: threat at {nearestThreat:0.0} m.");
+                return;
+            }
+            if (cargo < BotTactics.StealGuardMinCargo) return;
 
             if (!BotTactics.ShouldStealGuard(cargo, nearest, _controller.IsStealProof)) return;
 
@@ -593,6 +683,14 @@ namespace CluckWars.Gameplay
                 _log?.Debug(Source, $"{Who} steal guard: cast slot {slot} ('{ability.name}') with cargo={cargo:0.0}, stealer within {nearest:0.0} m.");
                 return;
             }
+        }
+
+        private static bool HasStunAbility(ChickenController chicken)
+        {
+            var a = chicken.Abilities;
+            if (a == null) return false;
+            for (int s = 0; s < AbilityController.SlotCount; s++) if (FixedKit.EmitsStun(a.GetSlot(s))) return true;
+            return false;
         }
 
         private static bool HasStealAbility(ChickenController chicken)
@@ -658,6 +756,8 @@ namespace CluckWars.Gameplay
                 return;
             }
 
+            RefreshRivalWalls();
+
             var toTarget = _moveTarget - selfPos;
             toTarget.y = 0f;
 
@@ -675,12 +775,29 @@ namespace CluckWars.Gameplay
 
             // Steer along the NavMesh path (walls + solid piles are obstacles);
             // fall back to the direct line when no path resolves.
-            var steer = ResolveSteerPoint(selfPos);
+            var steer = BaseKeepOutRules.SteerAround(selfPos, ResolveSteerPoint(selfPos), _keepOut, _keepOutCount,
+                _controller.HomeCornerIndex, PinwheelLayout.ArenaClampLimit(MapGenerator.ArenaHalfSize));
             var dir   = steer - selfPos;
             dir.y = 0f;
             if (dir.sqrMagnitude < 0.0001f) dir = toTarget;
             dir.Normalize();
             _controller.BotTick(new Vector2(dir.x, dir.z), Runner.DeltaTime);
+        }
+
+        /// <summary>
+        /// The shared NavMesh knows nothing about who owns which base (one bake, and the owner needs its own base walkable),
+        /// so rival walls are handled here. A target inside one (a rival at home, a steal at its doorstep) becomes the nearest
+        /// point just outside: the bot arrives there and stands, instead of grinding the edge with "arrived" never true.
+        /// </summary>
+        private void RefreshRivalWalls()
+        {
+            var config = GameManager.Instance != null ? GameManager.Instance.Config : null;
+            _keepOutCount = config != null ? PlayerBase.GatherKeepOut(_keepOut, config.BaseKeepOutRadius) : 0;
+            for (int i = 0; i < _keepOutCount; i++)
+                _keepOut[i] = _keepOut[i].WithRadius(_keepOut[i].Radius + BaseKeepOutRules.BotClearance);
+
+            if (BaseKeepOutRules.TryCorrect(_moveTarget, _keepOut, _keepOutCount, _controller.HomeCornerIndex, out var outside))
+                _moveTarget = outside;
         }
 
         /// <summary>
@@ -745,7 +862,8 @@ namespace CluckWars.Gameplay
             {
                 float dx = corners[_navCorner].x - selfPos.x;
                 float dz = corners[_navCorner].z - selfPos.z;
-                if (dx * dx + dz * dz > 0.36f) break;
+                bool walled = BaseKeepOutRules.TryCorrect(corners[_navCorner], _keepOut, _keepOutCount, _controller.HomeCornerIndex, out _);
+                if (!walled && dx * dx + dz * dz > 0.36f) break;   // a corner inside a rival wall can never be reached
                 _navCorner++;
             }
             return corners[Mathf.Min(_navCorner, corners.Length - 1)];
@@ -801,7 +919,7 @@ namespace CluckWars.Gameplay
                 if (preyRadius <= 0f) continue;
 
                 var   rivalCargo = c.Cargo;
-                float frac       = rivalCargo != null ? rivalCargo.Fraction : 0f;
+                float frac       = rivalCargo != null ? rivalCargo.StealableFraction : 0f;
                 float banked     = BankedShareFor(c, winTarget);
 
                 float priority = BotTactics.TargetPriority(dist, frac, banked, preyRadius, _profile.LeaderFocus);

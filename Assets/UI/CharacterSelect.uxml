@@ -11,7 +11,8 @@
          keeps resolving. Built ONCE (slots) / once per class (cards) by MenuUiController;
          taps only toggle classes and labels. Binding contract (by name):
            BackBtn, ReadyBtn, SlotBox0..3, CommonTitle/CommonCards, ClassTitle/ClassCards,
-           AbilityDetail, AbilityDetailName, AbilityDetailCat, AbilityDetailCd, AbilityDetailText, GearDoorway, GearChicken
+           AbilityDetail, AbilityDetailName, AbilityDetailCat, AbilityDetailCd, AbilityDetailText, GearDoorway, GearChicken,
+           Body, KitTitle
 
          Sizes follow the MOBILE SIZING CONTRACT at the top of CluckWarsTheme.uss. -->
     <ui:Style src="project://database/Assets/UI/Styles/CluckWarsTheme.uss" />
@@ -25,6 +26,10 @@
         </ui:VisualElement>
 
         <ui:VisualElement name="Body" class="cw-gear-body">
+
+            <!-- LoadoutMode.Fixed only: the specialization's name over its read-only kit. Body takes .cw-gear-body- -fixed,
+                 which hides the deck (USS); slot boxes stay tappable for their details. MenuUiController.ApplyFixedKitView. -->
+            <ui:Label name="KitTitle" text="" class="cw-kit-title" style="display: none;" />
 
             <ui:VisualElement name="SlotBoxRow" class="cw-slot-box-row">
                 <ui:Button name="SlotBox0" class="cw-slot-box" />

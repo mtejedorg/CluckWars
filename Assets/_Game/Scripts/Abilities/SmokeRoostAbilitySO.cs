@@ -18,7 +18,7 @@ namespace CluckWars.Abilities
     /// <b>Placed at the caster's feet, not thrown ahead</b> (<c>ForwardOffset</c> is 0, unlike
     /// Feather Trap's 4.5). Thrown, it would be a second Feather Trap for a class that already
     /// out-duels people; underfoot, it is a place to <i>stand</i> — which is what pairs with
-    /// Mark/Kill's isolate-and-execute setup.
+    /// hunting a Death Mark: the target slows inside the cloud while the Assassin fades.
     ///
     /// <b>Concealment is a self-buff, disorientation is a zone, and they are separately
     /// timed.</b> The fade lasts this ability's <c>Duration</c>; the cloud persists for

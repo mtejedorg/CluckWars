@@ -226,7 +226,7 @@ namespace CluckWars.Tests
             StringAssert.Contains("execute.Object.HasStateAuthority", guard);
             StringAssert.Contains("execute.Object.StateAuthority == info.Source", guard);
             // Mark AND stun, each current or recorded recently by the victim (CW-230: KillReady outlives the stun).
-            StringAssert.Contains("ExecuteRules.HasExecuteEvidence(execute.MarkedTarget == _controller.Id, markSeen, sinceMark",
+            StringAssert.Contains("ExecuteRules.HasMarkEvidence(execute.MarkedTarget == _controller.Id, markSeen, sinceMark, latency)",
                 AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/ChickenCargo.cs", "private bool TryResolveExecutor("));
         }
     }

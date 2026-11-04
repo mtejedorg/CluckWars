@@ -12,8 +12,8 @@ PlayerSettings:
   targetDevice: 2
   useOnDemandResources: 0
   accelerometerFrequency: 60
-  companyName: DefaultCompany
-  productName: CluckWars
+  companyName: Cluck Wars
+  productName: Cluck Wars
   defaultCursor: {fileID: 0}
   cursorHotspot: {x: 0, y: 0}
   m_SplashScreenBackgroundColor: {r: 0.12156863, g: 0.12156863, b: 0.1254902, a: 1}
@@ -296,7 +296,14 @@ PlayerSettings:
   AndroidAppBundleSizeToValidate: 200
   AndroidReportGooglePlayAppDependencies: 1
   androidSymbolsSizeThreshold: 800
-  m_BuildTargetIcons: []
+  m_BuildTargetIcons:
+  - m_BuildTarget: 
+    m_Icons:
+    - serializedVersion: 2
+      m_Icon: {fileID: 2800000, guid: 7b8ab8bdc8315a4408083a3db70285b5, type: 3}
+      m_Width: 128
+      m_Height: 128
+      m_Kind: 0
   m_BuildTargetPlatformIcons:
   - m_BuildTarget: iPhone
     m_Icons:
@@ -397,92 +404,116 @@ PlayerSettings:
       m_SubKind: App Store
   - m_BuildTarget: Android
     m_Icons:
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 01716593616e1b04aae618505b8ea47e, type: 3}
+      - {fileID: 2800000, guid: 0a00d1d79211e264cacb4888ab5956f1, type: 3}
       m_Width: 432
       m_Height: 432
       m_Kind: 2
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 01716593616e1b04aae618505b8ea47e, type: 3}
+      - {fileID: 2800000, guid: 0a00d1d79211e264cacb4888ab5956f1, type: 3}
       m_Width: 324
       m_Height: 324
       m_Kind: 2
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 01716593616e1b04aae618505b8ea47e, type: 3}
+      - {fileID: 2800000, guid: 0a00d1d79211e264cacb4888ab5956f1, type: 3}
       m_Width: 216
       m_Height: 216
       m_Kind: 2
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 01716593616e1b04aae618505b8ea47e, type: 3}
+      - {fileID: 2800000, guid: 0a00d1d79211e264cacb4888ab5956f1, type: 3}
       m_Width: 162
       m_Height: 162
       m_Kind: 2
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 01716593616e1b04aae618505b8ea47e, type: 3}
+      - {fileID: 2800000, guid: 0a00d1d79211e264cacb4888ab5956f1, type: 3}
       m_Width: 108
       m_Height: 108
       m_Kind: 2
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 01716593616e1b04aae618505b8ea47e, type: 3}
+      - {fileID: 2800000, guid: 0a00d1d79211e264cacb4888ab5956f1, type: 3}
       m_Width: 81
       m_Height: 81
       m_Kind: 2
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: ff4f5a13f059a7143a7c04e8853fb929, type: 3}
       m_Width: 192
       m_Height: 192
       m_Kind: 1
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: ff4f5a13f059a7143a7c04e8853fb929, type: 3}
       m_Width: 144
       m_Height: 144
       m_Kind: 1
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: ff4f5a13f059a7143a7c04e8853fb929, type: 3}
       m_Width: 96
       m_Height: 96
       m_Kind: 1
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: ff4f5a13f059a7143a7c04e8853fb929, type: 3}
       m_Width: 72
       m_Height: 72
       m_Kind: 1
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: ff4f5a13f059a7143a7c04e8853fb929, type: 3}
       m_Width: 48
       m_Height: 48
       m_Kind: 1
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: ff4f5a13f059a7143a7c04e8853fb929, type: 3}
       m_Width: 36
       m_Height: 36
       m_Kind: 1
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 6740b98c706528e418cad451551d7b61, type: 3}
       m_Width: 192
       m_Height: 192
       m_Kind: 0
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 6740b98c706528e418cad451551d7b61, type: 3}
       m_Width: 144
       m_Height: 144
       m_Kind: 0
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 6740b98c706528e418cad451551d7b61, type: 3}
       m_Width: 96
       m_Height: 96
       m_Kind: 0
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 6740b98c706528e418cad451551d7b61, type: 3}
       m_Width: 72
       m_Height: 72
       m_Kind: 0
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 6740b98c706528e418cad451551d7b61, type: 3}
       m_Width: 48
       m_Height: 48
       m_Kind: 0
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 6740b98c706528e418cad451551d7b61, type: 3}
       m_Width: 36
       m_Height: 36
       m_Kind: 0
@@ -782,25 +813,25 @@ PlayerSettings:
   webWasm2023: 0
   webEnableSubmoduleStrippingCompatibility: 0
   scriptingDefineSymbols:
-    Android: FUSION_WEAVER;FUSION2;FUSION_2;FUSION_2_0;FUSION_2_0_12;FUSION_2_OR_NEWER;FUSION_2_0_OR_NEWER;FUSION_LOGLEVEL_INFO;UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    EmbeddedLinux: UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    GameCoreScarlett: UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    GameCoreXboxOne: UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    Kepler: UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    LinuxHeadlessSimulation: UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    Nintendo Switch: UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    Nintendo Switch 2: UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    PS4: UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    PS5: UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    QNX: UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    Server: UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    Standalone: FUSION_WEAVER;FUSION2;FUSION_2;FUSION_2_0;FUSION_2_0_12;FUSION_2_OR_NEWER;FUSION_2_0_OR_NEWER;FUSION_LOGLEVEL_INFO;UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    VisionOS: UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    WebGL: UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    Windows Store Apps: UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    XboxOne: UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    iPhone: UNITY_MCP_READY;UNITY_MCP_DEPS_8
-    tvOS: UNITY_MCP_READY;UNITY_MCP_DEPS_8
+    Android: FUSION_WEAVER;FUSION2;FUSION_2;FUSION_2_0;FUSION_2_0_12;FUSION_2_OR_NEWER;FUSION_2_0_OR_NEWER;FUSION_LOGLEVEL_INFO;UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    EmbeddedLinux: UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    GameCoreScarlett: UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    GameCoreXboxOne: UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    Kepler: UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    LinuxHeadlessSimulation: UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    Nintendo Switch: UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    Nintendo Switch 2: UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    PS4: UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    PS5: UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    QNX: UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    Server: UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    Standalone: FUSION_WEAVER;FUSION2;FUSION_2;FUSION_2_0;FUSION_2_0_12;FUSION_2_OR_NEWER;FUSION_2_0_OR_NEWER;FUSION_LOGLEVEL_INFO;UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    VisionOS: UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    WebGL: UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    Windows Store Apps: UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    XboxOne: UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    iPhone: UNITY_MCP_READY;UNITY_MCP_DEPS_17
+    tvOS: UNITY_MCP_READY;UNITY_MCP_DEPS_17
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend: {}
@@ -898,7 +929,7 @@ PlayerSettings:
   captureStartupLogs: {}
   activeInputHandler: 1
   windowsGamepadBackendHint: 0
-  cloudProjectId: 
+  cloudProjectId: 14249009-abbe-423c-8c0c-8391b8974857
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
   projectName: 

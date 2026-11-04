@@ -595,7 +595,7 @@ namespace CluckWars.Visuals
         /// already-stunned chicken, and the cast is what just stunned them". No stun ability
         /// has ever overridden <c>ExtraTargetFilter</c>. <c>StunBurstAbilitySO</c>, the base
         /// for Ambush and Wing Slam, does not; the only overrides in the whole pool are Dust
-        /// Kick's rear arc, Mark/Kill's isolation rules, and four <c>Cargo &gt; 0</c> checks.
+        /// Kick's rear arc and four <c>Cargo &gt; 0</c> checks, one of which also reads Sneaky Steal's lock.
         /// The false positive is real, but it is the cargo one the <c>WouldAffect</c> comment
         /// below actually documents: a cast that robs two rivals while a third stands in the
         /// shape holding nothing would print IMMUNE over a chicken whose problem was being

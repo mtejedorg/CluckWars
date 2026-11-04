@@ -288,7 +288,7 @@ namespace CluckWars.Tests
             string src = Read("Assets/_Game/Scripts/Gameplay/AbilityController.cs");
             StringAssert.DoesNotContain("otherAbilityActive", src);
             int bot = src.IndexOf("public bool BotTryActivate", StringComparison.Ordinal);
-            int gate = src.IndexOf("if (AnyAbilityActive) return false;", bot, StringComparison.Ordinal);
+            int gate = src.IndexOf("if (!BotMayPress(AnyAbilityActive, repress,", bot, StringComparison.Ordinal);
             Assert.Greater(bot, 0);
             Assert.Greater(gate, bot, "bots keep refusing while any of their slots runs");
         }

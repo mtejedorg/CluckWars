@@ -35,7 +35,8 @@ namespace CluckWars.Tests
         public void GoalPill_SitsUnderTheTimer_RightAligned_NotUnderTheBoard()
         {
             string xml = Read("Assets/UI/MatchTopBar.uxml");
-            var timerCol = Regex.Match(xml, "name=\"TimerContainer\".*?</ui:VisualElement>", RegexOptions.Singleline).Value;
+            // Up to the pill itself: the timer now sits in a TimerRow beside the Death Mark clock pill.
+            var timerCol = Regex.Match(xml, "name=\"TimerContainer\".*?name=\"WinTargetBadge\"", RegexOptions.Singleline).Value;
             StringAssert.Contains("name=\"MatchTimer\"", timerCol);
             StringAssert.Contains("name=\"WinTargetBadge\"", timerCol, "the pill is in the timer column (USS cannot reparent)");
             Assert.Less(timerCol.IndexOf("MatchTimer"), timerCol.IndexOf("WinTargetBadge"), "under the timer, not above it");

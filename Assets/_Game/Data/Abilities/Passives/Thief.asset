@@ -31,3 +31,8 @@ MonoBehaviour:
     m_Bits: 256
   StealMultiplier: 1.6
   Subclass: 8
+  Kit:
+  - {fileID: 11400000, guid: 7a1d8c4b3e2f495d8a01c5e7b2f9d4f9, type: 2}
+  - {fileID: 11400000, guid: 4c026dfa11fd40cd9914aa8fb37090b6, type: 2}
+  - {fileID: 11400000, guid: 8d2c4a7b1e5f486d8a01c5e7b2f9d4c3, type: 2}
+  - {fileID: 11400000, guid: 02f818d76a9212941bda628e88c11b76, type: 2}

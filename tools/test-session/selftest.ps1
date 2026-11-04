@@ -194,6 +194,16 @@ Assert ((Count $f8 '\[INVARIANT\] control RPC rejections on client2: 1 \[RPC_App
 Assert ($f8 -match 'INVARIANT=2') 'F4: exactly two INVARIANT findings'
 Remove-Item $tmp8 -Recurse -Force
 
+# ---- Fixed kits + base wall: a malformed kit line, a Free fallback and a base intrusion are INVARIANT findings ----
+$tmpKit = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-kit-' + [Guid]::NewGuid().ToString('N'))
+Copy-Item (Join-Path $PSScriptRoot 'fixtures\kit-fixture') $tmpKit -Recurse
+& (Join-Path $PSScriptRoot 'merge.ps1') -Session $tmpKit | Out-Null
+$fKit = Get-Content (Join-Path $tmpKit 'findings.txt') -Raw
+Assert ((Count $fKit '\[INVARIANT\] kit equipped with the wrong slot count') -eq 1) 'kits: a 2-slot kit line is a finding'
+Assert ((Count $fKit '\[INVARIANT\] fixed kit fell back') -eq 1) 'kits: a Free fallback is a finding'
+Assert ((Count $fKit '\[INVARIANT\] a rival chicken stayed inside a claimed base') -eq 1) 'wall: a base intrusion is a finding'
+Remove-Item $tmpKit -Recurse -Force
+
 $tmp9 = Join-Path ([IO.Path]::GetTempPath()) ('cw-selftest-ctl-ok-' + [Guid]::NewGuid().ToString('N'))
 Copy-Item (Join-Path $PSScriptRoot 'fixtures\control-clean-fixture') $tmp9 -Recurse
 & (Join-Path $PSScriptRoot 'merge.ps1') -Session $tmp9 | Out-Null

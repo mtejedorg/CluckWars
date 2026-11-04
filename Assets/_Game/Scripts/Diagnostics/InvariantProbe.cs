@@ -61,8 +61,32 @@ namespace CluckWars.Diagnostics
         private readonly List<uint> _auraGone = new List<uint>(4);
         private readonly List<(uint zone, uint victim)> _victimKeys = new List<(uint, uint)>(16);
 
+        private AbilityRegistrySO _abilityRegistry;
+        private float _knownRoundStartCooldown = -1f;
+
         [Inject]
-        public void Construct(ILogService log) => _log = log;
+        public void Construct(ILogService log, AbilityRegistrySO abilityRegistry)
+        {
+            _log = log;
+            _abilityRegistry = abilityRegistry;
+        }
+
+        /// <summary>The largest opening cooldown of any registered ability (Death Mark's), for slots a proxy cannot see.</summary>
+        private float KnownRoundStartCooldown
+        {
+            get
+            {
+                if (_knownRoundStartCooldown >= 0f) return _knownRoundStartCooldown;
+                float max = 0f;
+                if (_abilityRegistry == null)
+                    _log?.Error(Source, "No AbilityRegistrySO bound: a remote chicken's opening cooldown cannot be checked, so the " +
+                        "cooldowns-zero invariant reports it as leftover.");
+                else
+                    foreach (var ab in _abilityRegistry.ActiveAbilities)
+                        if (ab != null) max = Mathf.Max(max, ab.RoundStartCooldown);
+                return _knownRoundStartCooldown = max;
+            }
+        }
 
         private void Start()
         {
@@ -89,11 +113,54 @@ namespace CluckWars.Diagnostics
                 Observe(gm);
                 World(gm);
                 Auras(gm.Runner);
+                BaseWalls(gm);
             }
             catch (Exception e)
             {
                 // A probe must never take the game down; say what broke instead.
                 _log?.Error(Source, $"Invariant probe failed ({e.GetType().Name}: {e.Message}); continuing.");
+            }
+        }
+
+        private readonly Dictionary<uint, float> _intruding = new Dictionary<uint, float>(4);
+        private readonly HashSet<uint> _intrusionReported = new HashSet<uint>();
+        private int _intrusionRound = -1;
+
+        /// <summary>
+        /// No rival chicken ends inside a claimed base. Only chickens this peer holds authority over: that is where the clamp runs and
+        /// the pose has no network lag in it. <c>Invariant FAIL base-intrusion</c> (Error), once per chicken per round.
+        /// </summary>
+        private void BaseWalls(GameManager gm)
+        {
+            if (_intrusionRound != _round) { _intrusionRound = _round; _intruding.Clear(); _intrusionReported.Clear(); }
+            if (!gm.IsMatchRunning || gm.Config == null) { _intruding.Clear(); return; }
+
+            float radius = gm.Config.BaseKeepOutRadius, now = Time.unscaledTime;
+            var bases = PlayerBase.ActiveBases;
+            var all = ChickenController.ActiveControllers;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var c = all[i];
+                if (c == null || c.Object == null || !c.Object.IsValid || !c.HasStateAuthority || c.IsDecoy) continue;
+                if (c.Combat != null && c.Combat.IsRemoved) continue;
+                if (c.Traversal != null && c.Traversal.IsUnsticking) continue;
+
+                uint id = c.Object.Id.Raw;
+                bool inside = false;
+                int corner = -1;
+                for (int b = 0; b < bases.Count && !inside; b++)
+                {
+                    var pb = bases[b];
+                    if (pb == null || pb.Object == null || !pb.Object.IsValid || !pb.IsClaimed || pb.CornerIndex == c.HomeCornerIndex) continue;
+                    Vector3 p = c.transform.position, at = pb.transform.position;
+                    inside = RoundInvariants.IsBaseIntrusion(new Vector2(p.x - at.x, p.z - at.z).magnitude, radius);
+                    corner = pb.CornerIndex;
+                }
+
+                if (!inside) { _intruding.Remove(id); continue; }
+                if (!_intruding.TryGetValue(id, out float since)) { _intruding[id] = now; continue; }
+                if (now - since < RoundInvariants.BaseIntrusionSeconds || !_intrusionReported.Add(id)) continue;
+                _log.Error(Source, $"Invariant FAIL base-intrusion expected=outside actual=inside-corner-{corner} who={c.name} home={c.HomeCornerIndex} round={_round}");
             }
         }
 
@@ -129,10 +196,18 @@ namespace CluckWars.Diagnostics
                 float cd = 0f;
                 int active = 0;
                 var a = c.Abilities;
+                float intro = gm.IntroRemaining;
                 if (a != null)
                     for (int s = 0; s < AbilityController.SlotCount; s++)
                     {
-                        cd = Mathf.Max(cd, a.CooldownRemaining(s));
+                        // Only the state authority knows the slot's ability: loadouts are not replicated, and a proxy's
+                        // slots still hold the prefab defaults (shared2 2026-11-03: a proxy read Peck where the host held
+                        // Death Mark). A remote slot may legally hold the opening cooldown or nothing.
+                        var ability = a.HasStateAuthority ? a.GetSlot(s) : null;
+                        float remaining = a.CooldownRemaining(s);
+                        cd = Mathf.Max(cd, ability != null
+                            ? RoundInvariants.CooldownLeftover(remaining, ability.RoundStartCooldown, intro)
+                            : RoundInvariants.CooldownLeftoverUnknownSlot(remaining, KnownRoundStartCooldown, intro));
                         if (a.IsSlotActive(s)) active++;
                     }
                 var p = c.transform.position;

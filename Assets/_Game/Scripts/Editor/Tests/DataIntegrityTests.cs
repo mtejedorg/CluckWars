@@ -85,7 +85,7 @@ namespace CluckWars.Tests
                     $"{kv.Key} resolves no default specialization. GetDefaultPassiveForClass prefers the " +
                     "entry flagged IsSignature; if none is flagged for this class it falls back to registry " +
                     "AUTHORING ORDER, which is how Warrior once defaulted to an inert alternative.");
-                Assert.AreEqual(kv.Value, def.DisplayName,
+                Assert.AreEqual(kv.Value, def.name,   // the asset, not the shown name (Spoiler shows as "Assassin")
                     $"{kv.Key}'s default specialization should be {kv.Value} but resolves to " +
                     $"'{def.DisplayName}'. Check which asset carries IsSignature for this class.");
             }

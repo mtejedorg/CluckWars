@@ -292,7 +292,7 @@ namespace CluckWars.Tests
                 Assert.AreEqual(AbilityAimShape.ForwardCircle, circle.AimShape);
                 Assert.IsTrue(circle.RotatesToAim);
             }
-            foreach (AbilityBaseSO single in new AbilityBaseSO[] { Make<MarkKillAbilitySO>(), Make<SneakyStealAbilitySO>() })
+            foreach (AbilityBaseSO single in new AbilityBaseSO[] { Make<SneakyStealAbilitySO>() })
             {
                 Assert.AreEqual(AbilityAimShape.SingleTarget, single.AimShape);
                 Assert.IsTrue(single.UsesAim, "Single-target picks by angle to the aim.");
@@ -551,6 +551,19 @@ namespace CluckWars.Tests
             StringAssert.Contains("settings.quickMoves.desc,Moves fire the moment you tap.", csv);
             Assert.AreEqual("settings.quickMoves", CluckWars.Localization.UiKeys.SettingsQuickMoves);
             Assert.AreEqual("settings.quickMoves.desc", CluckWars.Localization.UiKeys.SettingsQuickMovesDesc);
+        }
+
+        /// <summary>
+        /// Maestro: holding an ability previews its range and the chicken keeps moving. The hold used to turn the stick into
+        /// facing for directional abilities, so the bird stopped dead. Only bots' own turn-in-place may suppress translation.
+        /// </summary>
+        [Test]
+        public void HoldingAnAbility_NeverStopsThePlayersMovement_SourceGuard()
+        {
+            string fun = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/ChickenController.cs", "public override void FixedUpdateNetwork()");
+            StringAssert.DoesNotContain("aiming != null, lockFacing", fun, "a charge must not suppress translation");
+            StringAssert.Contains("_movement.Tick(input.Movement, Runner.DeltaTime,", fun, "the stick always walks the bird");
+            StringAssert.Contains("faceOverride:", fun, "an explicit aim turns the bird without moving it");
         }
     }
 }

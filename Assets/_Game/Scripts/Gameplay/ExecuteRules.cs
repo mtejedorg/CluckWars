@@ -18,14 +18,15 @@ namespace CluckWars.Gameplay
     /// </remarks>
     public static class ExecuteRules
     {
-        /// <summary>How long an execute removes its victim. The only duration Press sends.</summary>
-        public const float RemovalDurationSeconds = 2.0f;
+        /// <summary>The removal bound when the claim names no execute to read it from (fallback, equals MarkKill.asset's
+        /// <c>RemovalSeconds</c>). The live value is <c>AssassinExecute.RemovalSeconds</c>, data.</summary>
+        public const float RemovalDurationSeconds = AssassinExecute.DefaultRemovalSeconds;
 
         /// <summary>
         /// Extra planar slack on the execute range check, on top of the drift margin. Covers what
-        /// the drift margin does not model: proxy interpolation, the tick between the mark's own
-        /// range check and the press, and both chickens' pivots. A forged call from across the
-        /// arena is still refused; a real one at the edge of the mark is not.
+        /// the drift margin does not model: proxy interpolation, the tick between the press's own
+        /// range check and its arrival, and both chickens' pivots. A forged call from across the
+        /// arena is still refused; a real one at the edge of the kill range is not.
         /// </summary>
         public const float RangeSlackMeters = 1.0f;
 
@@ -55,13 +56,58 @@ namespace CluckWars.Gameplay
         /// </summary>
         public const float RecentMarkGraceSeconds = 0.5f;
 
+
         /// <summary>
-        /// How long after the victim's own authority last saw itself stunned the stun still
-        /// qualifies an execute, on top of the latency. KillReady latches on a stun and outlives it
-        /// (stuns 1-1.5 s); the qualifying stun is always inside the mark's window, so the whole
-        /// window is a safe bound.
+        /// Seconds a player needs to see the Kill light up and press it. Design floor for the mark's numbers (the kill span after
+        /// the arm, the shortest stun that can still be pressed on), asserted against the shipped assets; no runtime gate reads it.
         /// </summary>
-        public const float RecentStunWindowSeconds = AssassinExecute.WindowDuration;
+        public const float KillReactionSeconds = 0.3f;
+
+        /// <summary>
+        /// How much younger than <c>ArmSeconds</c> the mark may look on the victim's authority when a Kill lands. The victim first
+        /// sees the mark one replication delay after the Assassin placed it, and the Kill's RPC can outrun that delay, so an
+        /// honest Kill at the arm can read a little early there. One latency cap: a Kill pressed earlier than that is a client
+        /// skipping the arm (<see cref="HasArmEvidence"/>).
+        /// </summary>
+        public const float ArmAllowanceSeconds = MaxLatencySeconds;
+
+        /// <summary>
+        /// The victim's authority treats sightings of the same Assassin's mark on it as ONE mark while the gaps between them stay
+        /// within this (a shell refund restoring a mark one round trip later, a dropped tick). A new mark on the same victim by
+        /// the same Assassin is at least a fail cooldown away (pinned by a test), so it always starts a new age.
+        /// </summary>
+        public const float MarkEpisodeGapSeconds = 2f * MaxLatencySeconds;
+
+        /// <summary>
+        /// THE kill rule, Assassin side (Maestro 2026-11-04): the arm is over, the target is stunned at this moment, and it is
+        /// not shelled. A stun that began before the arm and is still running qualifies; one that already ended does not.
+        /// Asked fresh at every read (<c>AssassinExecute.CanKillNow</c>, <c>KillReady</c>), never from a previous tick.
+        /// </summary>
+        public static bool KillQualifies(bool armed, bool targetStunned, bool targetStealProof) =>
+            armed && targetStunned && CanBeExecuted(targetStealProof);
+
+        /// <summary>
+        /// The arm, victim side: this chicken's own authority has watched the attacker's mark on it for at least
+        /// <paramref name="armSeconds"/> less <see cref="ArmAllowanceSeconds"/>. Closes a modified Assassin client that skips its
+        /// own arm timer (the Assassin owns <c>ArmTimer</c>, so the victim cannot trust it). A non-positive
+        /// <paramref name="armSeconds"/> reads as the shipped fallback, never as "no arm".
+        /// </summary>
+        /// <param name="markAgeSeconds">Seconds from the victim's first sighting of this mark to its latest one.</param>
+        public static bool HasArmEvidence(bool markEverSeen, float markAgeSeconds, float armSeconds)
+        {
+            float arm = armSeconds > 0f ? armSeconds : AssassinExecute.ArmDuration;
+            float need = arm - ArmAllowanceSeconds;
+            if (need <= 0f) return true;
+            return markEverSeen && markAgeSeconds >= need;
+        }
+
+        /// <summary>Is a new sighting of a mark at <paramref name="now"/> the same mark as the one last seen at
+        /// <paramref name="lastSeen"/>? (<see cref="MarkEpisodeGapSeconds"/>; a NaN or negative gap starts a new one.)</summary>
+        public static bool ContinuesMarkEpisode(double now, double lastSeen)
+        {
+            double gap = now - lastSeen;
+            return gap >= 0d && gap <= MarkEpisodeGapSeconds;
+        }
 
         /// <summary>A latency for allowances: clamped to [0, <see cref="MaxLatencySeconds"/>] (NaN reads as 0).</summary>
         public static float CapLatency(float latency) =>
@@ -83,35 +129,32 @@ namespace CluckWars.Gameplay
             everSeen && secondsSince >= 0f && secondsSince <= window;
 
         /// <summary>
-        /// The evidence half of an execute, shared by the removal (<see cref="EvaluateRemoval"/>)
+        /// The mark half of an execute's evidence, shared by the removal (<see cref="EvaluateRemoval"/>)
         /// and the cargo transfer (<c>ChickenCargo.TryResolveExecutor</c>) so both halves accept and
-        /// refuse together. BOTH must hold:
-        /// <list type="bullet">
-        /// <item>the mark: the attacker's replicated mark names this victim now, or the victim's
-        /// authority saw it within <c>latency + RecentMarkGraceSeconds</c>;</item>
-        /// <item>the stun: the victim is stunned now, or its OWN authority recorded itself stunned
-        /// within <c>latency + RecentStunWindowSeconds</c>.</item>
-        /// </list>
-        /// A mark alone (the attacker controls its own MarkedTarget) or a stun alone from nobody
-        /// does not pass. The press-tick race (mark already cleared, stun already over) passes
-        /// because both were recorded locally on the victim.
+        /// refuse together: the attacker's replicated mark names this victim now, or the victim's
+        /// authority saw it within <c>latency + RecentMarkGraceSeconds</c> (Press clears the mark in the
+        /// tick it sends the RPC). Asked with <see cref="HasArmEvidence"/> and <see cref="HasStunAtKill"/>:
+        /// a mark alone (the attacker controls its own MarkedTarget) is never an execute.
         /// </summary>
         /// <remarks>
         /// Trust model: the attacker's own state authority can still self-execute within these
-        /// bounds (skip the arm timer or isolation on a marked, recently stunned victim in range).
+        /// bounds (a marked, stunned victim in range); the arm it cannot skip, because the victim times
+        /// the mark itself, nor the stun, because the victim reads only its own stun records.
         /// Shared Mode trusts each state authority over its own objects; this closes forged calls
         /// from peers that are not, and executes with no real mark + stun behind them.
         /// </remarks>
-        public static bool HasExecuteEvidence(
-            bool markedNow, bool markEverSeen, float secondsSinceMarkSeen,
-            bool stunnedNow, bool stunEverSeen, float secondsSinceStunned,
-            float latency)
-        {
-            float l = CapLatency(latency);
-            bool mark = markedNow || IsRecent(markEverSeen, secondsSinceMarkSeen, l + RecentMarkGraceSeconds);
-            bool stun = stunnedNow || IsRecent(stunEverSeen, secondsSinceStunned, l + RecentStunWindowSeconds);
-            return mark && stun;
-        }
+        public static bool HasMarkEvidence(bool markedNow, bool markEverSeen, float secondsSinceMarkSeen, float latency) =>
+            markedNow || IsRecent(markEverSeen, secondsSinceMarkSeen, CapLatency(latency) + RecentMarkGraceSeconds);
+
+        /// <summary>
+        /// THE kill rule, victim side (Maestro 2026-11-04: "Stun must be active when kill lands"): this chicken's OWN authority
+        /// sees itself stunned as the claim lands, or recorded itself stunned no longer ago than ONE capped latency (the RPC's
+        /// flight for an honest press made while the stun was live). No extra grace. Only the victim's own stun records count,
+        /// never the attacker's KillReady / CanKillNow.
+        /// </summary>
+        /// <param name="latency">The sender's latency (0 for a local invoke); capped at <see cref="MaxLatencySeconds"/>.</param>
+        public static bool HasStunAtKill(bool stunnedNow, bool stunEverSeen, float secondsSinceStunned, float latency) =>
+            stunnedNow || IsRecent(stunEverSeen, secondsSinceStunned, CapLatency(latency));
 
         // ---- RPC_ExecuteRemoval ---------------------------------------------------------
 
@@ -125,13 +168,43 @@ namespace CluckWars.Gameplay
             NotAttributable,
             NoAssassinExecute,
             NoExecuteEvidence,
+            /// <summary>The mark has not been on this chicken for its arm time (<see cref="HasArmEvidence"/>).</summary>
+            NotArmed,
+            /// <summary>This chicken was not stunned when the Kill landed (<see cref="HasStunAtKill"/>).</summary>
+            NotStunned,
             OutOfRange,
+            /// <summary>Not a rejection: the victim stepped through a base wall after the press (<see cref="IsLegalNoOp"/>).</summary>
+            AcrossBaseWall,
+            /// <summary>Not a rejection: the victim raised a shell (steal-proof) inside one round trip of the press
+            /// (<see cref="CanBeExecuted"/>). Nothing lands; the Assassin's kill cooldown is refunded.</summary>
+            Shelled,
         }
+
+        /// <summary>
+        /// THE rule (Maestro 2026-11): a shelled chicken cannot be executed. Shelled = steal-proof (Turtle Mode's walk and
+        /// lock, Egg Shell), the same flag every thief reads. Stuns, roots and shoves still land on it; only the execute is
+        /// refused. Asked by the Kill gate (<c>AssassinExecute.CanKillNow</c> / <c>KillReady</c>, so the button, the HUD and the
+        /// bots agree) and by the victim's authority (<see cref="EvaluateRemoval"/>, the sub-round-trip race).
+        /// </summary>
+        public static bool CanBeExecuted(bool stealProof) => !stealProof;
+
+        /// <summary>A shell-refunded Kill gives its mark back only when no other mark replaced it, it was the mark the press
+        /// ended, and its window still has time.</summary>
+        public static bool ShouldRestoreShelledMark(bool noMarkNow, bool sameTarget, bool windowLeft) =>
+            noMarkNow && sameTarget && windowLeft;
+
+        /// <summary>
+        /// A verdict an honest client can produce: the Assassin's press already refuses a walled target, so this is the target
+        /// reaching home inside one round trip. Nothing lands and nothing is logged as a rejection, as with a root (<see cref="BaseWallRules"/>).
+        /// </summary>
+        public static bool IsLegalNoOp(RemovalVerdict v) => v == RemovalVerdict.AcrossBaseWall || v == RemovalVerdict.Shelled;
 
         /// <summary>The facts the victim's authority can establish about a removal claim.</summary>
         public struct RemovalClaim
         {
             public float Duration;
+            /// <summary>The longest removal the named attacker's execute sends (its <c>RemovalSeconds</c>); 0 = unknown.</summary>
+            public float MaxDuration;
             public bool AttackerResolved;
             public bool AttackerIsVictim;
             public bool AttackerIsDecoy;
@@ -146,6 +219,11 @@ namespace CluckWars.Gameplay
             public bool MarkEverSeen;
             /// <summary>Seconds since the victim last saw that mark (ignored unless <see cref="MarkEverSeen"/>).</summary>
             public float SecondsSinceMarkSeen;
+            /// <summary>Seconds from the victim's first sighting of that mark to its latest (ignored unless <see cref="MarkEverSeen"/>).</summary>
+            public float MarkAgeSeconds;
+            /// <summary>The attacker's tuned arm (<c>AssassinExecute.ArmSeconds</c>, the registry asset every peer reads);
+            /// 0 = the shipped fallback.</summary>
+            public float ArmSeconds;
             /// <summary>The victim's own authority has recorded itself stunned (local record).</summary>
             public bool StunEverSeen;
             /// <summary>Seconds since the victim's authority last saw itself stunned (ignored unless <see cref="StunEverSeen"/>).</summary>
@@ -154,15 +232,29 @@ namespace CluckWars.Gameplay
             public float Latency;
             public float PlanarDistance;
             public float RangeMargin;
+            /// <summary>The victim is steal-proof on its own authority now (<see cref="CanBeExecuted"/>).</summary>
+            public bool VictimShelled;
+            /// <summary>The attacker's tuned kill range (<c>AssassinExecute.KillRange</c>); 0 = the shipped default.</summary>
+            public float KillRange;
+            /// <summary>A claimed base's wall stands between attacker and victim, as this authority sees them.</summary>
+            public bool WallBetweenThem;
         }
 
         /// <summary>True for a finite duration in (0, <see cref="RemovalDurationSeconds"/>].</summary>
-        public static bool IsPlausibleRemovalDuration(float duration) =>
-            duration > 0f && duration <= RemovalDurationSeconds + 1e-4f;
+        public static bool IsPlausibleRemovalDuration(float duration) => IsPlausibleRemovalDuration(duration, RemovalDurationSeconds);
+
+        /// <summary>True for a finite duration in (0, <paramref name="maxSeconds"/>]: the data value the victim's authority
+        /// reads from the attacker's execute (every peer has the one asset). A non-positive bound falls back to the constant,
+        /// never to "anything goes", so a forged long duration is always refused.</summary>
+        public static bool IsPlausibleRemovalDuration(float duration, float maxSeconds)
+        {
+            float max = maxSeconds > 0f ? maxSeconds : RemovalDurationSeconds;
+            return duration > 0f && duration <= max + 1e-4f;
+        }
 
         /// <summary>Furthest apart a real execute's two chickens can be when the removal lands.</summary>
-        public static float MaxExecuteDistance(float driftMargin) =>
-            AssassinExecute.MaxMarkRange + RangeSlackMeters + Mathf.Max(0f, driftMargin);
+        public static float MaxExecuteDistance(float driftMargin, float killRange = AssassinExecute.DefaultKillRange) =>
+            killRange + RangeSlackMeters + Mathf.Max(0f, driftMargin);
 
         /// <summary>
         /// Decides a removal claim. The evidence rule is the one <c>ChickenCargo.TryResolveExecutor</c>
@@ -172,21 +264,25 @@ namespace CluckWars.Gameplay
         /// <b>Why not "marked AND KillReady".</b> Press resets the mark in the same tick it sends
         /// this RPC, and KillReady can turn true one tick before a press, so either replicated value
         /// can be stale when the RPC lands on another peer; KillReady also outlives the stun that
-        /// qualified it. The victim's own local records of the mark and of its stun
-        /// (<see cref="HasExecuteEvidence"/>) cover both.
+        /// qualified it. The victim's own local records of the mark (<see cref="HasMarkEvidence"/>,
+        /// <see cref="HasArmEvidence"/>) and of its stun (<see cref="HasStunAtKill"/>) cover both.
         /// </remarks>
         public static RemovalVerdict EvaluateRemoval(in RemovalClaim c)
         {
-            if (!IsPlausibleRemovalDuration(c.Duration)) return RemovalVerdict.ImplausibleDuration;
+            if (!IsPlausibleRemovalDuration(c.Duration, c.MaxDuration)) return RemovalVerdict.ImplausibleDuration;
             if (!c.AttackerResolved) return RemovalVerdict.AttackerUnresolved;
             if (c.AttackerIsVictim) return RemovalVerdict.SelfExecute;
             if (c.AttackerIsDecoy) return RemovalVerdict.DecoyAttacker;
             if (!c.SenderSpeaksForAttacker) return RemovalVerdict.NotAttributable;
             if (!c.AttackerHasExecute) return RemovalVerdict.NoAssassinExecute;
-            if (!HasExecuteEvidence(c.MarkedThisVictim, c.MarkEverSeen, c.SecondsSinceMarkSeen,
-                    c.VictimStunned, c.StunEverSeen, c.SecondsSinceStunned, c.Latency))
+            if (!HasMarkEvidence(c.MarkedThisVictim, c.MarkEverSeen, c.SecondsSinceMarkSeen, c.Latency))
                 return RemovalVerdict.NoExecuteEvidence;
-            if (!(c.PlanarDistance <= MaxExecuteDistance(c.RangeMargin))) return RemovalVerdict.OutOfRange;
+            if (!HasArmEvidence(c.MarkEverSeen, c.MarkAgeSeconds, c.ArmSeconds)) return RemovalVerdict.NotArmed;
+            if (!HasStunAtKill(c.VictimStunned, c.StunEverSeen, c.SecondsSinceStunned, c.Latency)) return RemovalVerdict.NotStunned;
+            float killRange = c.KillRange > 0f ? c.KillRange : AssassinExecute.DefaultKillRange;
+            if (!(c.PlanarDistance <= MaxExecuteDistance(c.RangeMargin, killRange))) return RemovalVerdict.OutOfRange;
+            if (c.WallBetweenThem) return RemovalVerdict.AcrossBaseWall;
+            if (!CanBeExecuted(c.VictimShelled)) return RemovalVerdict.Shelled;
             return RemovalVerdict.Accepted;
         }
 
@@ -194,14 +290,18 @@ namespace CluckWars.Gameplay
         {
             switch (v)
             {
-                case RemovalVerdict.ImplausibleDuration: return $"the duration is not in (0, {RemovalDurationSeconds:0.0}] s.";
+                case RemovalVerdict.ImplausibleDuration: return "the duration is not in (0, the execute's RemovalSeconds] s.";
                 case RemovalVerdict.AttackerUnresolved:  return "no live ChickenCombat resolves from the attacker id.";
                 case RemovalVerdict.SelfExecute:         return "the named attacker is the victim itself.";
                 case RemovalVerdict.DecoyAttacker:       return "the named attacker is a Doppelganger decoy.";
                 case RemovalVerdict.NotAttributable:     return "the sender is not entitled to act for the named attacker.";
                 case RemovalVerdict.NoAssassinExecute:   return "the named attacker has no AssassinExecute.";
-                case RemovalVerdict.NoExecuteEvidence:   return "this chicken has not seen both a recent mark from the attacker and a recent stun on itself.";
+                case RemovalVerdict.NoExecuteEvidence:   return "this chicken has not seen a recent mark from the attacker.";
+                case RemovalVerdict.NotArmed:            return "this chicken has not seen the attacker's mark on it for the mark's arm time.";
+                case RemovalVerdict.NotStunned:          return "this chicken was not stunned when the Kill landed (nor within one latency of it).";
                 case RemovalVerdict.OutOfRange:          return "the attacker is too far away to have executed this chicken.";
+                case RemovalVerdict.AcrossBaseWall:      return "a base wall stands between the attacker and this chicken.";
+                case RemovalVerdict.Shelled:             return "this chicken is shelled (steal-proof) and cannot be executed.";
                 default:                                 return "accepted.";
             }
         }

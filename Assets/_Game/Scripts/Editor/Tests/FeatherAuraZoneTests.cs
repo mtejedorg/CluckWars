@@ -219,7 +219,7 @@ namespace CluckWars.Tests
 
             // "Aura already up": bots go through the same TryActivate -> CanActivate gate as players (no overlapping
             // auras, see the next test), and also refuse while any of their slots runs.
-            StringAssert.Contains("if (AnyAbilityActive) return false;", Body(AbilityCtlPath, "public bool BotTryActivate(int slot)"));
+            StringAssert.Contains("if (!BotMayPress(AnyAbilityActive, repress,", Body(AbilityCtlPath, "public bool BotTryActivate(int slot)"));
             StringAssert.Contains("TryActivate(slot);", Body(AbilityCtlPath, "public bool BotTryActivate(int slot)"));
         }
 

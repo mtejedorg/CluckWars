@@ -13,10 +13,15 @@
 
 .PARAMETER Mode    solo | shared2 | shared4 | hostleave
 .PARAMETER Rounds  rounds to play (auto-loop). Default 3.
+.PARAMETER Perk      Fixed kits: client1's specialization, -cw_perk <ChickenSubclass> (Warrior_Relentless, Warrior_Bully,
+           Speedy_Slippery, Speedy_Featherfoot, Fatty_Hoarder, Fatty_Bulwark, Assassin_Spoiler, Assassin_Thief). All 8 solo:
+           'Warrior_Relentless','Warrior_Bully','Speedy_Slippery','Speedy_Featherfoot','Fatty_Hoarder','Fatty_Bulwark',
+           'Assassin_Spoiler','Assassin_Thief' | % { .\tools\test-session\scenario-pc.ps1 -Mode solo -Perk $_ }
+.PARAMETER BotPerks  Solo bots by index, -cw_botperks a,b,c ('-' rolls), e.g. -BotPerks 'Assassin_Spoiler,Warrior_Bully,Fatty_Bulwark'.
 .PARAMETER AutoZone  B10: every EXE gets -cw_autozone (each peer casts its zone ability ~1.5 s before every round end and
-           PLAY AGAIN follows 1.5 s later), so the next round-start Invariant line must read zn=0. Root Egg (Fatty) is the
-           reliable carrier (8 s): in solo the class becomes Fatty unless -Class is given; shared2's joiner is a Speedy (Feather
-           Trap, 5 s), shared4/hostleave add a Fatty (joiner 2) and an Assassin (Doppelganger decoy, 4 s, may expire first).
+           PLAY AGAIN follows 1.5 s later), so the next round-start Invariant line must read zn=0. Root Egg (Fatty_Hoarder) is the
+           reliable carrier (8 s): solo plays it unless -Perk or -Class is given; in shared modes joiner 1 plays it (a default
+           Speedy kit has no zone). Peers with nothing to cast log a Warn; that is fine as long as one carrier has a zone.
 .PARAMETER AutoAura  WP4: the Speedy joiner (client2) gets -cw_autoaura: every round it walks into the nearest rival, casts
            Feather Aura there and keeps walking into it; every peer's Invariant probe samples that rival's replicated
            Snared flag, and merge.ps1 requires one 'Invariant aura ... remote=1 ... verdict=ok' line once an aura was cast.
@@ -30,6 +35,7 @@
            only) switches back to the screen-edge chevrons for comparisons. A/B, same seconds, one run each:
            -ExtraArgs '-cw_shots 15,22,29,36 -cw_zones -cw_shottag floor'                  (default: floor arrows)
            -ExtraArgs '-cw_shots 15,22,29,36 -cw_zones -cw_shottag edge -cw_edgearrows'    (edge chevrons)
+           Death Mark captures: -ExtraArgs '-cw_markshots -cw_perk Assassin_Spoiler' writes mark-hunt, mark-near, mark-kill to <session>shots; a Fatty with -BotPerks of three Spoilers gives mark-victim.
            The log says which one ran ("AutoTest arrows=floor|edge") and the ring radius in use ("Floor ring radius=").
            WP8 layout keys (dev tools): -cw_touchhud (check the phone's thumb-arc HUD instead of the desktop strip),
            -cw_menushots [main,settings,disconnect,class,gear,coop,coopjoin] (menu-<page>.png + one UiProbe scan per page
@@ -50,12 +56,17 @@ param(
     [int]$Width = 960,
     [int]$Height = 540,
     [string]$ExtraArgs = '',    # extra EXE args (space separated) for every EXE, e.g. -ExtraArgs '-cw_shots 15,22 -cw_band 290 -cw_zones'
+    [string]$Perk = '',         # client1's specialization (a ChickenSubclass name), e.g. -Perk Speedy_Slippery; sets its class too
+    [string]$BotPerks = '',     # solo bots by index, e.g. -BotPerks 'Warrior_Bully,-,Assassin_Spoiler' ('-' rolls)
     [switch]$NoUiRequirement
 )
-if ($AutoZone -and $Mode -eq 'solo' -and -not $PSBoundParameters.ContainsKey('Class')) { $Class = 'Fatty' }
+# Fixed kits (default LoadoutMode): a class alone no longer owns an ability, so the checks name the subclass that carries it.
+if ($AutoZone -and $Mode -eq 'solo' -and -not $Perk -and -not $PSBoundParameters.ContainsKey('Class')) { $Perk = 'Fatty_Hoarder' }
 $zoneArgs = @(if ($AutoZone) { '-cw_autozone' })
 if ($AutoAura -and $AutoZone) { throw '-AutoAura and -AutoZone both reserve one ability slot; run them separately' }
-if ($AutoAura -and $Mode -eq 'solo' -and -not $PSBoundParameters.ContainsKey('Class')) { $Class = 'Speedy' }
+if ($AutoAura -and $Mode -eq 'solo' -and -not $Perk -and -not $PSBoundParameters.ContainsKey('Class')) { $Perk = 'Speedy_Featherfoot' }
+$perkArgs = @(if ($Perk) { '-cw_perk',$Perk })
+$botArgs  = @(if ($BotPerks) { '-cw_botperks',$BotPerks })
 $auraArgs = @(if ($AutoAura) { '-cw_autoaura' })   # solo: client1; shared modes: the Speedy joiner (client2) only
 $allExtra = @($ExtraArgs -split '\s+' | Where-Object { $_ })
 $ErrorActionPreference = 'Stop'
@@ -86,18 +97,21 @@ function Wait-Code([string]$log) {
 $classes = @('Speedy','Fatty','Assassin')
 switch ($Mode) {
     'solo' {
-        Start-Exe 'client1' (@('-cw_autosolo','-cw_class',$Class,'-cw_autoloop',"$Rounds") + $auraArgs)
+        Start-Exe 'client1' (@('-cw_autosolo','-cw_class',$Class,'-cw_autoloop',"$Rounds") + $perkArgs + $botArgs + $auraArgs)
     }
     default {
         $joiners = switch ($Mode) { 'shared2' { 1 } default { 3 } }
         $humans = $joiners + 1
-        Start-Exe 'client1' @('-cw_autohost','-cw_class',$Class,'-cw_autostart',"$humans",'-cw_autostart_timeout','120','-cw_autoloop',"$Rounds")
+        Start-Exe 'client1' (@('-cw_autohost','-cw_class',$Class,'-cw_autostart',"$humans",'-cw_autostart_timeout','120','-cw_autoloop',"$Rounds") + $perkArgs)
         $code = Wait-Code "$S\client1.log"
         if (-not $code) { throw 'no join code appeared' }
         Write-Host "join code: $code"
         for ($j = 1; $j -le $joiners; $j++) {
-            $jAura = @(if ($j -eq 1) { $auraArgs })   # joiner 1 is the Speedy ($classes[0])
-            Start-Exe "client$($j + 1)" (@('-cw_autojoin',$code,'-cw_class',$classes[($j - 1) % 3],'-cw_autoloop',"$Rounds") + $jAura + @($JoinerExtra -split '\s+' | Where-Object { $_ }))
+            # Joiner 1 is the Speedy ($classes[0]): the Aura / zone carrier. Fixed kits: Aura = Featherfoot; a zone needs another
+            # class, Spoiler's Smoke Roost lives 5.5 s, Hoarder's Root Egg 8 s, so joiner 1 turns Hoarder under -AutoZone.
+            $jAura = @(if ($j -eq 1) { $auraArgs })
+            $jPerk = @(if ($j -eq 1 -and $AutoAura) { '-cw_perk','Speedy_Featherfoot' } elseif ($j -eq 1 -and $AutoZone) { '-cw_perk','Fatty_Hoarder' })
+            Start-Exe "client$($j + 1)" (@('-cw_autojoin',$code,'-cw_class',$classes[($j - 1) % 3],'-cw_autoloop',"$Rounds") + $jPerk + $jAura + @($JoinerExtra -split '\s+' | Where-Object { $_ }))
         }
     }
 }

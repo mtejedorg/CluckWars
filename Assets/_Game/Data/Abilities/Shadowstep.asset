@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.ShadowstepAbilitySO
   DisplayName: Shadowstep
   ShortLabel: STEP
-  Description: Dashes forward at 3x speed for 0.4s, straight over walls.
+  Description: Dashes forward at 3x speed for 0.18s, straight over walls.
   AccentColor: {r: 0.4, g: 0.2, b: 0.9, a: 1}
   Category: 3
   TerrainTraversal: 3
@@ -22,8 +22,8 @@ MonoBehaviour:
   SlotKind: 1
   AllowedClasses: 8
   BotRole: 0
-  Duration: 0.4
-  Cooldown: 6
+  Duration: 0.18
+  Cooldown: 4
   SearchMask:
   CastMotion: 7
     serializedVersion: 2

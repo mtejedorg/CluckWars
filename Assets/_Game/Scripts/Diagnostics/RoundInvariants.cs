@@ -11,7 +11,8 @@ namespace CluckWars.Diagnostics
         public int Home;
         public Vector2 Position;
         public float Cargo;
-        /// <summary>Longest remaining cooldown over its ability slots (s).</summary>
+        /// <summary>Longest cooldown left over from the last round over its ability slots (s): see
+        /// <see cref="RoundInvariants.CooldownLeftover"/>.</summary>
         public float MaxCooldown;
         /// <summary>Any control state other than Free (slowed, rooted, stunned).</summary>
         public bool ControlActive;
@@ -42,6 +43,25 @@ namespace CluckWars.Diagnostics
         public const float SpawnToleranceMetres = 2.5f;
         public const float TimerToleranceSeconds = 0.75f;
         public const int ExpectedSoloBots = 3;
+
+        /// <summary>
+        /// The part of a slot's cooldown at round start that the round did not ask for: the whole remaining time, except for an
+        /// ability that opens each round on a cooldown (<c>AbilityBaseSO.RoundStartCooldown</c>, Death Mark), whose slot must hold
+        /// exactly that many seconds after GO (the intro still to run plus the cooldown); the distance from that is the leftover.
+        /// </summary>
+        public static float CooldownLeftover(float remaining, float roundStartCooldown, float introRemaining) =>
+            roundStartCooldown > 0f ? Mathf.Abs(remaining - (introRemaining + roundStartCooldown)) : remaining;
+
+        /// <summary>
+        /// <see cref="CooldownLeftover"/> for a slot whose ability this peer cannot see: loadouts are not replicated, so a
+        /// proxy does not know which remote slot holds Death Mark. The slot may hold nothing (0) or exactly the opening
+        /// cooldown of any registered ability that has one (<paramref name="knownRoundStartCooldown"/>, the registry's
+        /// largest); the leftover is the distance to the nearer of the two, so a stale cooldown is still reported.
+        /// </summary>
+        public static float CooldownLeftoverUnknownSlot(float remaining, float knownRoundStartCooldown, float introRemaining) =>
+            knownRoundStartCooldown > 0f
+                ? Mathf.Min(remaining, CooldownLeftover(remaining, knownRoundStartCooldown, introRemaining))
+                : remaining;
 
         private static string F(float v) => v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
 
@@ -253,6 +273,18 @@ namespace CluckWars.Diagnostics
         public const float AuraOrphanSeconds = 1.5f;
 
         public enum AuraVerdict { TooFew, Ok, NotSnared }
+
+        /// <summary>
+        /// How far past the keep-out radius a chicken must be to count as inside a rival base. Its own authority clamps it after every
+        /// tick, so anything this deep is a clamp that did not run (the render pose only interpolates between clamped ticks).
+        /// </summary>
+        public const float BaseIntrusionDepth = 0.15f;
+
+        /// <summary>The wall may lag a tick or two in a real hit (a blink resolves in the tick it lands); longer is a broken wall.</summary>
+        public const float BaseIntrusionSeconds = 0.25f;
+
+        public static bool IsBaseIntrusion(float planarDistance, float keepOutRadius) =>
+            keepOutRadius > 0f && planarDistance < keepOutRadius - BaseIntrusionDepth;
 
         public static bool IsDeepInsideAura(float planarDistance, float radius) => planarDistance <= radius * AuraDeepFraction;
 
