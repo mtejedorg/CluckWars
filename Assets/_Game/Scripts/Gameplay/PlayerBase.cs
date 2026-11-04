@@ -142,6 +142,48 @@ namespace CluckWars.Gameplay
             return n;
         }
 
+        /// <summary>Where this base stands as this peer sees it (the stamped spawn position once it arrived).</summary>
+        private Vector2 Centre2D
+        {
+            get { Vector3 at = HasSpawnPosition ? SpawnPosition : transform.position; return new Vector2(at.x, at.z); }
+        }
+
+        /// <summary>The centre of the base of <paramref name="corner"/>, claimed or not; false when no such base is live here.</summary>
+        public static bool TryGetBaseCentre(int corner, out Vector2 centre)
+        {
+            for (int i = 0; i < ActiveBases.Count; i++)
+            {
+                var b = ActiveBases[i];
+                if (b == null || b.Object == null || !b.Object.IsValid || b.CornerIndex != corner) continue;
+                centre = b.Centre2D;
+                return true;
+            }
+            centre = default;
+            return false;
+        }
+
+        /// <summary>
+        /// The longest distance between two live bases (the diagonal: opposite corners), read from where the bases stand, never a
+        /// constant. The farthest a chicken can be from its own base, so it is what "how far from home" is measured against.
+        /// 0 with fewer than two bases.
+        /// </summary>
+        public static float BaseSpan()
+        {
+            float best = 0f;
+            for (int i = 0; i < ActiveBases.Count; i++)
+            {
+                var a = ActiveBases[i];
+                if (a == null || a.Object == null || !a.Object.IsValid) continue;
+                for (int j = i + 1; j < ActiveBases.Count; j++)
+                {
+                    var b = ActiveBases[j];
+                    if (b == null || b.Object == null || !b.Object.IsValid) continue;
+                    best = Mathf.Max(best, Vector2.Distance(a.Centre2D, b.Centre2D));
+                }
+            }
+            return best;
+        }
+
         private static readonly Color UnownedColor = new Color(0.42f, 0.42f, 0.42f, 1f);
 
         // Shader property IDs — cached once so SetPropertyBlock is alloc-free.

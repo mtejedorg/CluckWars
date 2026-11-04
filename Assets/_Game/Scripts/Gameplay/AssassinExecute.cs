@@ -3,12 +3,14 @@ using CluckWars.Logging;
 using Fusion;
 using UnityEngine;
 using Zenject;
+using LogLevel = CluckWars.Logging.LogLevel;
 
 namespace CluckWars.Gameplay
 {
     /// <summary>
     /// Assassin Mark/Kill execute state machine (spec §4).
-    /// Press: mark a random living rival anywhere (<see cref="MarkPickRules"/>). The Assassin then finds it, stuns it (his
+    /// Press: mark a living rival anywhere, picked at random but weighted by how far it is from its own base, never the last
+    /// mark unless it is the only rival (<see cref="MarkPickRules"/>). The Assassin then finds it, stuns it (his
     /// own Ambush or anyone's stun) and presses again within kill range before the window runs out. The numbers are data, on
     /// <c>MarkKill.asset</c>. Success: transfer ALL cargo to capacity-exempt bounty bag + ~2s target removal.
     /// Counterplays: run out the clock; stun the Assassin (denies the kill); reach your own base, where no ability reaches you.
@@ -74,6 +76,8 @@ namespace CluckWars.Gameplay
         private NetworkBehaviourId _lastMark;
         private readonly System.Collections.Generic.List<NetworkBehaviourId> _candidates =
             new System.Collections.Generic.List<NetworkBehaviourId>(4);
+        private readonly System.Collections.Generic.List<float> _weights = new System.Collections.Generic.List<float>(4);
+        private readonly System.Collections.Generic.List<float> _rolls = new System.Collections.Generic.List<float>(4);
 
         /// <summary>
         /// Flat food this execute pays on top of the victim's cargo, doubled (by default)
@@ -151,7 +155,7 @@ namespace CluckWars.Gameplay
                 // ---- Phase 1: Mark ------------------------------------------------
                 // Decided here, once, by the Assassin's authority; every peer reads the replicated MarkedTarget.
                 GatherMarkCandidates();
-                int pick = MarkPickRules.Pick(_candidates.Count, Random.value);
+                int pick = PickWeighted();
                 if (pick < 0 || !Runner.TryFindBehaviour(_candidates[pick], out ChickenController chosen))
                 {
                     _log?.Verbose(Source, "Press: no rival to mark.");
@@ -355,6 +359,44 @@ namespace CluckWars.Gameplay
                 GatherMarkCandidates();
                 return _candidates.Count > 0;
             }
+        }
+
+        /// <summary>
+        /// The weighted random pick over the gathered candidates (<see cref="MarkPickRules.PickWeighted"/>): one roll each from
+        /// this authority's RNG, weighted by the planar distance to the candidate's own base over <see cref="PlayerBase.BaseSpan"/>.
+        /// Logs every candidate's weight and score at Debug. -1 when there is nobody.
+        /// </summary>
+        private int PickWeighted()
+        {
+            _weights.Clear();
+            _rolls.Clear();
+            float span = PlayerBase.BaseSpan();
+            if (span <= 0f && _candidates.Count > 0)
+                _log?.Warn(Source, $"{name}: no base data to weigh the mark by, so the pick is uniform (bases live: {PlayerBase.ActiveBases.Count}).");
+            for (int i = 0; i < _candidates.Count; i++)
+            {
+                float w = 1f;
+                if (span > 0f && Runner.TryFindBehaviour(_candidates[i], out ChickenController c) &&
+                    PlayerBase.TryGetBaseCentre(c.HomeCornerIndex, out Vector2 home))
+                {
+                    Vector3 at = c.transform.position;
+                    w = MarkPickRules.HomeFraction(Vector2.Distance(new Vector2(at.x, at.z), home), span);
+                }
+                _weights.Add(w);
+                _rolls.Add(Random.value);
+            }
+            int pick = MarkPickRules.PickWeighted(_weights, _rolls, Random.value);
+            if (_log != null && _log.IsEnabled(LogLevel.Debug))
+            {
+                var sb = new System.Text.StringBuilder("Mark pick:");
+                for (int i = 0; i < _candidates.Count; i++)
+                {
+                    string who = Runner.TryFindBehaviour(_candidates[i], out ChickenController c) ? c.name : _candidates[i].ToString();
+                    sb.Append($" {who} w={_weights[i]:0.00} score={MarkPickRules.Score(_rolls[i], _weights[i]):0.000};");
+                }
+                _log.Debug(Source, sb.Append(pick >= 0 ? $" -> #{pick}" : " -> nobody").ToString());
+            }
+            return pick;
         }
 
         /// <summary>Living, non-decoy rivals, anywhere; the last mark filtered out by <see cref="MarkPickRules"/>.</summary>

@@ -27,7 +27,7 @@ namespace CluckWars.Abilities
         {
             DisplayName = "Death Mark";
             ShortLabel = "EXEC";
-            Description = "Marks a random rival anywhere. Stun them within 8m, then press again to take everything they carry.";
+            Description = "Marks a rival, likelier far from home. Stun them within 8m, then press again to take everything they carry.";
             Category = AbilityCategory.Control;
             AllowedClasses = ChickenClassFlags.None; // pre-equip-only: obtainable solely as a subclass pre-equip (Spoiler Peck slot)
             Duration = 0.1f;

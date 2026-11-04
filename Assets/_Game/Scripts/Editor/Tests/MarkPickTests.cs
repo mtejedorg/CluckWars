@@ -45,6 +45,119 @@ namespace CluckWars.Tests
         public void Pick_SpansTheCandidates(int count, float roll, int expected) =>
             Assert.AreEqual(expected, MarkPickRules.Pick(count, roll));
 
+        // ---- Weighted pick: roll * w * w, highest wins -------------------------------------------------------------
+
+        private static int Weighted(float[] w, float[] rolls, float fallback = 0.5f) => MarkPickRules.PickWeighted(w, rolls, fallback);
+
+        [Test]
+        public void FarFromHome_BeatsNearHome_MostOfTheTime()
+        {
+            var rng = new System.Random(20261104);
+            var w = new[] { 0.9f, 0.3f };   // far, near
+            int far = 0, near = 0;
+            for (int i = 0; i < 10000; i++)
+            {
+                var rolls = new[] { (float)rng.NextDouble(), (float)rng.NextDouble() };
+                if (Weighted(w, rolls) == 0) far++; else near++;
+            }
+            // Expected far share 1 - 0.09 / (2 * 0.81) = 94.4 %.
+            Assert.Greater(far, 9200, $"far won {far}, near {near}");
+            Assert.Greater(near, 200, "the near one still gets picked now and then: it is weighted, not ranked");
+        }
+
+        [Test]
+        public void AtHome_IsNeverPicked_WhileAnotherCandidateIsAwayFromHome()
+        {
+            var rng = new System.Random(7);
+            var w = new[] { 0f, 0.05f, 0f };
+            for (int i = 0; i < 5000; i++)
+            {
+                var rolls = new[] { (float)rng.NextDouble(), (float)rng.NextDouble(), (float)rng.NextDouble() };
+                if (rolls[1] <= 0f) continue;   // a 0 roll scores 0 too: that is the fallback case, tested apart
+                Assert.AreEqual(1, Weighted(w, rolls, (float)rng.NextDouble()));
+            }
+        }
+
+        [Test]
+        public void EqualWeights_PickUniformly()
+        {
+            var rng = new System.Random(99);
+            var w = new[] { 0.6f, 0.6f, 0.6f };
+            var hits = new int[3];
+            for (int i = 0; i < 9000; i++)
+                hits[Weighted(w, new[] { (float)rng.NextDouble(), (float)rng.NextDouble(), (float)rng.NextDouble() })]++;
+            foreach (int h in hits) Assert.That(h, Is.InRange(2700, 3300), $"hits {hits[0]}/{hits[1]}/{hits[2]}");
+        }
+
+        [Test]
+        public void TheLastMark_IsNeverPicked_EvenWhenItIsTheFarthest()
+        {
+            var list = After(A, 3, A, B, C);   // A is the far one
+            var weights = new List<float>();
+            foreach (int id in list) weights.Add(id == B ? 0.2f : 0.1f);
+            var rng = new System.Random(3);
+            for (int i = 0; i < 2000; i++)
+            {
+                int idx = Weighted(weights.ToArray(), new[] { (float)rng.NextDouble(), (float)rng.NextDouble() });
+                Assert.AreNotEqual(A, list[idx]);
+            }
+        }
+
+        [Test]
+        public void TheOnlyRival_IsPicked_EvenAtHome_AndEvenIfItWasTheLastMark()
+        {
+            var list = After(A, 1, A);
+            CollectionAssert.AreEqual(new[] { A }, list);
+            Assert.AreEqual(0, Weighted(new[] { 0f }, new[] { 0.7f }), "w = 0 scores 0: the uniform fallback still lands the mark");
+        }
+
+        [Test]
+        public void EveryScoreZero_FallsBackToAUniformPick_AndNeverFailsWithACandidate()
+        {
+            // Everyone at home.
+            Assert.AreEqual(0, Weighted(new[] { 0f, 0f, 0f }, new[] { 0.9f, 0.9f, 0.9f }, 0f));
+            Assert.AreEqual(1, Weighted(new[] { 0f, 0f, 0f }, new[] { 0.9f, 0.9f, 0.9f }, 0.5f));
+            Assert.AreEqual(2, Weighted(new[] { 0f, 0f, 0f }, new[] { 0.9f, 0.9f, 0.9f }, 0.999f));
+            // Away from home, but every roll is 0.
+            Assert.AreEqual(1, Weighted(new[] { 1f, 1f, 1f }, new[] { 0f, 0f, 0f }, 0.5f));
+            // Never -1 while a candidate exists, whatever the numbers.
+            var rng = new System.Random(11);
+            for (int i = 0; i < 2000; i++)
+            {
+                int n = 1 + rng.Next(4);
+                var w = new float[n]; var r = new float[n];
+                for (int k = 0; k < n; k++) { w[k] = rng.Next(2) * (float)rng.NextDouble(); r[k] = rng.Next(3) == 0 ? 0f : (float)rng.NextDouble(); }
+                int idx = Weighted(w, r, (float)rng.NextDouble());
+                Assert.That(idx, Is.InRange(0, n - 1));
+            }
+            Assert.AreEqual(-1, Weighted(new float[0], new float[0]), "nobody is still nobody");
+        }
+
+        [Test]
+        public void HomeFraction_IsTheDistanceOverTheBaseSpan_ClampedToUnit()
+        {
+            Assert.AreEqual(0f, MarkPickRules.HomeFraction(0f, 70f));
+            Assert.AreEqual(0.5f, MarkPickRules.HomeFraction(35f, 70f), 1e-6f);
+            Assert.AreEqual(1f, MarkPickRules.HomeFraction(90f, 70f), "beyond the span is as far as it gets");
+            Assert.AreEqual(0f, MarkPickRules.HomeFraction(-1f, 70f));
+            Assert.AreEqual(1f, MarkPickRules.HomeFraction(10f, 0f), "no base data: every candidate weighs the same");
+            Assert.AreEqual(0.25f * 0.8f, MarkPickRules.Score(0.8f, 0.5f), 1e-6f);
+        }
+
+        [Test]
+        public void ThePress_PicksWeighted_AndAnOutOfPlayRivalIsNeverACandidate_SourceGuard()
+        {
+            // GatherMarkCandidates needs a live Fusion runner, so the out-of-play exclusion is pinned on the source; the pure
+            // contract (candidates in, filtered, scored) is tested above.
+            var src = Execute;
+            StringAssert.Contains("int pick = PickWeighted();", src);
+            int gather = src.IndexOf("private void GatherMarkCandidates()", StringComparison.Ordinal);
+            string body = src.Substring(gather, src.IndexOf("\n        }", gather, StringComparison.Ordinal) - gather);
+            StringAssert.Contains("c.Combat != null && c.Combat.IsRemoved) continue;", body);
+            StringAssert.Contains("c.IsDecoy", body);
+            StringAssert.Contains("MarkPickRules.Filter(_candidates", body);
+        }
+
         [Test]
         public void ShippedMarkKill_NumbersKeepTheirRelations()
         {
