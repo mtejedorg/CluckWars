@@ -30,9 +30,10 @@ code and asset kept, out of the registry). Free-mode pools: Warrior 6, Speedy 6,
 | Rule | Value | Where |
 |---|---|---|
 | Ruffle | 1.3x, 2 s, cooldown 6 s | `Ruffle.asset` |
-| Death Mark | random rival anywhere, never the last mark unless the only rival; no isolation | `AssassinExecute` |
+| Death Mark | random rival anywhere, **weighted toward birds far from their own base** (score `roll * w * w`, w = distance to own base over the diagonal base-to-base distance, 0..1; uniform if every score is 0); never the last mark unless the only rival; no isolation | `MarkPickRules`, `AssassinExecute` |
 | Kill range | 8 m, target stunned now and not shelled, no wall between | `MarkKill.asset` |
-| Mark window | **7 s** (was 12); 0.6 s before a Kill can qualify (replication floor) | `MarkKill.asset` |
+| Mark window | **4 s** (was 7, before that 12); 0.6 s before a Kill can qualify (replication floor), so 3.4 s to stun and kill | `MarkKill.asset` |
+| Stealing from an Assassin | the bounty bag counts as carried food for every steal (beak first, then bag) | `StealRules.Stealable`, `SplitDrain` |
 | Death Mark at GO | **4 s cooldown** each round, PLAY AGAIN included | `MarkKill.asset` `RoundStartCooldownSeconds` |
 | Cooldown after a failed mark | 5 s | `MarkKill.asset` |
 | Cooldown after a kill | 15 s | `MarkKill.asset` |
@@ -44,19 +45,13 @@ code and asset kept, out of the registry). Free-mode pools: Warrior 6, Speedy 6,
 | Base wall | 2.5 m round each rival's claimed base; bodies and abilities | `MatchConfig.asset` |
 | Match | 40 food or 45 s | `MatchConfig.asset` |
 
-Map reference for the 7 s mark (computed from the map generator, not measured in the scene): Sneaky speed 12.15 m/s. Opposite
-base by path about 60 m: 4.9 to 5.0 s walking, 4.1 to 4.2 s with Shadowstep used on cooldown. A random target anywhere from a
-corner: 3.0 s on average, 4.4 s at the 90th percentile, 5.6 s at worst (4.6 s with Shadowstep). That is against a target that
-stands still: a fleeing bird at the same speed is never closed on by walking.
-
-## Open decisions
-
-**Featherfoot with Quick Drop farms 28.35 s / 4 trips (all four seats), against the Speedy target of 30 s +-1.5 s.** That
-is 0.15 s under the band, and two Quick Drops is the most the 12 s cooldown fits in a run, so it is the kit's best case. Nothing
-was tuned. Maestro's call, 2026-10-31: keep it for this human test and decide from the results. The options after the test: accept and declare it, shorten the burst, or swap the slot.
-
-**Free-mode pool floor.** With Egg Shell gone, Warrior and Speedy have 6 legal abilities each; the design test
-`EveryClass_HasEnoughLegalAbilities` was relaxed from free picks + 4 to + 3. Fixed kits are unaffected.
+Map reference for the 4 s mark (computed from the asset and class numbers, straight lines, not measured in the scene): Sneaky speed
+12.15 m/s (`Assassin.asset`), arm 0.6 s, so 3.4 s to stun and kill. Walking covers 12.15 x 3.4 = 41.3 m in the kill span (48.6 m in the
+whole 4 s); one Shadowstep (3x for 0.25 s, cooldown 4 s so one per mark) adds 2 x 12.15 x 0.25 = 6.1 m: 47.4 m (54.7 m in 4 s). Bases
+stand 43.6 m apart on adjacent corners and 61.7 m on opposite ones, so walking alone cannot reach even an adjacent base from a
+standing start in 3.4 s (43.6 / 12.15 = 3.6 s) and nothing reaches an opposite base (5.1 s walking, 4.6 s with Shadowstep); the Ambush
+radius (3.6 m) shortens each of those by 0.3 s. The pick favours far birds, so the hunt starts far away: a mark is a rush, and against
+a target that moves at the same speed walking never closes the gap.
 
 **Shadowstep with Underdog Surge.** 0.25 s cannot cross two pinwheel arms (closest pair 9.85 m apart, dash 9.1 m), but
 Underdog Surge (x1.4) makes it about 12.8 m, which can. It can also still cross an arm plus a food pile (7.66 m). Options: 0.18 s
@@ -64,8 +59,10 @@ Underdog Surge (x1.4) makes it about 12.8 m, which can. It can also still cross 
 
 ## What to watch for
 
-- **Is the execute real now?** Too strong, or too hard to land in a stun of about 1 s, in 7 s?
-- **Is 7 s enough?** The whole map is crossable in about 5 s, but only against a bird that stands still. Does the Assassin ever finish a hunt on a target that runs?
+- **Is the execute real now?** Too strong, or too hard to land in a stun of about 1 s, in 4 s?
+- **Rush and doubt:** with 4 s the Assassin must rush and the victim must choose (cooldowns, dodging, running). Does the Assassin ever finish a hunt, and does the victim feel a real choice or only panic? Is 4 s too short to ever land?
+- **The weighting:** does the mark feel aimed at whoever strayed far from home? Does anyone exploit it (hovering at home to be ignored)? Is a bird at home ever marked (it should only happen when everyone is home)?
+- **Stealing from the Assassin:** after an execute the bounty bag can be stolen. Does a loaded Assassin become prey, and does that discourage executes or just make the Assassin bank sooner?
 - **The draw:** does the 0.6 s sweep down the standings read as "the game picked someone", or is it noise?
 - **The hunt marker:** can the Assassin find the target from the one glyph (target colour, distance, ring)? Does it ever sit on a nameplate or the You plate?
 - **KILL:** does the big yellow KILL hex get pressed in time, or do players still miss the window? Does the Ambush hex lighting up help?

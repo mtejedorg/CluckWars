@@ -571,8 +571,8 @@ it at all, cannot hand-pick it, and cannot execute.
 
 | Stage | Condition | Counterplay |
 |---|---|---|
-| **Mark** | Press → a random living rival anywhere on the map. The target sees it is marked. | Reach your base in time, where nothing reaches you |
-| **Hunt** | The Assassin has **7 s** to find it | Escape: stay out of his reach until the timer runs out |
+| **Mark** | Press → a living rival anywhere on the map, picked at random but **likelier the farther it is from its own base**. The target sees it is marked. | Reach your base in time, where nothing reaches you |
+| **Hunt** | The Assassin has **4 s** to find it (3.4 s after the arm floor) | Escape: stay out of his reach until the timer runs out |
 | **Stun** | The target is stunned (his own Ambush, or *any* stun) | Don't get stunned |
 | **Kill** | Press again while it is stunned, within **8 m**, with no base wall between, and the Assassin is not stunned (a stunned Assassin cannot cast anything) | — |
 
@@ -590,13 +590,21 @@ sees a short **BACK IN!** cue. On failure Death Mark takes a **reduced cooldown*
 **Each round opens with Death Mark on a 4 s cooldown at GO** (`RoundStartCooldownSeconds`), PLAY AGAIN included, so
 the first mark is not wasted on targets still at home.
 
-**Spec v2 (Maestro, 2026-10-31).** The press marks a **random living rival anywhere on the
-map**: no mark range, no isolation. Decoys are never picked, and the next mark can never be the last one unless that bird is the
+**Spec v2 (Maestro, 2026-10-31).** The press marks a **living rival anywhere on the
+map**, chosen at random and weighted toward birds far from home (see below): no mark range, no isolation. Decoys are never picked, and the next mark can never be the last one unless that bird is the
 only rival (no time release; reset each round). The Assassin then finds it, stuns it and presses again. The Kill needs the target
-**stunned now**, not shelled, the Assassin free to cast, within **KillRange 8 m**, and no base wall between them. The mark lasts **7 s** (12 s until 2026-11-03). A Kill cannot qualify in the first 0.6 s, which only
-lets the mark reach the victim's authority. Only expiry, a kill or the target leaving play ends a mark: it survives
+**stunned now**, not shelled, the Assassin free to cast, within **KillRange 8 m**, and no base wall between them. The mark lasts **4 s** (12 s until 2026-11-03, 7 s until 2026-11-04). A Kill cannot qualify in the first 0.6 s, which only
+lets the mark reach the victim's authority, so there are 3.4 s to stun and kill. Only expiry, a kill or the target leaving play ends a mark: it survives
 range, crowds and the target going home, where no ability reaches it, so the timer can run out. Expiry costs the fail cooldown (5 s);
 a kill 15 s. All numbers are on `MarkKill.asset`. The bounty is paid on the victim's kill report, so a refused kill pays nothing.
+
+**Weighted pick (Maestro, 2026-11-04).** A 7 s mark left the victim time to walk home, so the interaction died. The window is 4 s and
+the pick favours birds far from home: each candidate rolls `roll * w * w`, where `w` is its planar distance to its own base over the
+longest base-to-base distance (the diagonal, read from the live bases), clamped to 0..1; the highest score wins. A bird at home
+scores 0 and is never picked while another candidate is away from home; if every score is 0 the pick is uniform, so a mark always
+lands when a rival exists (`MarkPickRules`, authority side, rolls from `UnityEngine.Random`). The last mark is still excluded
+unless it is the only rival. **Stealing from an Assassin:** the bounty bag counts as carried food for every steal (Snatch, Sneaky
+Steal, Scrap, Roll Trample, Spine Coat): a steal drains the beak first, then the bag (`StealRules.Stealable`, `SplitDrain`).
 
 **Feedback (redesign 2026-11-03; all local presentation read from replicated state, every number in `FeedbackTuning`).**
 - **Assassin.** The press runs a ~0.6 s *draw*: a highlight sweeps the standings rows (a tick per row) and locks on the
@@ -741,7 +749,7 @@ shipped values (`Assets/_Game/Data/Abilities/*.asset`), not illustrative.
 | **Assassin** | Ambush 🗡️ | 10 s | Stuns rivals within 3.6 m for 1 s — sets up his own execute. |
 | | Doppelganger 👥 | 11 s | Decoy copy beside you for 4 s that soaks attacks. |
 | | Invisibility 👻 | 8 s | Fades you to a ghostly outline for 4 s. Using a move breaks it. (Assassin-only now — was also Speedy.) |
-| | Death Mark 🎯 *(Assassin specialization Peck-slot pre-equip; pre-equip-only)* | 5 s | The execute — see §6.4. Marks a random rival anywhere for 7 s; stun them within 8 m, then press again to take everything they carry. Opens each round on a 4 s cooldown. |
+| | Death Mark 🎯 *(Assassin specialization Peck-slot pre-equip; pre-equip-only)* | 5 s | The execute — see §6.4. Marks a rival anywhere for 4 s, likelier far from home; stun them within 8 m, then press again to take everything they carry. Opens each round on a 4 s cooldown. |
 | | Shadowstep 👤 | 4 s | Dashes forward at 3x speed for 0.25 s (about 9.1 m; 0.4 s / 6 s until 2026-11-03), straight over walls (Assassin-only — was briefly also Speedy by asset drift, corrected; Speedy is permanently denied all terrain traversal, §5.2). |
 | | Smoke Roost 🌁 | 11 s | Cloud at his own feet (4 m, 5.5 s) — he fades, rivals inside slow to 55% speed. Using a move breaks the fade (the cloud stays). Pairs with hunting a mark: the target slows inside the cloud, and the Assassin fades. |
 | | Snatch 🤏 *(moved from Common)* | 3 s | Robs 5 food from every rival within 4.3 m ahead and shoves them back. Assassin-only now — a universal AoE steal is exactly the Assassin's core, and diluted the class. |
