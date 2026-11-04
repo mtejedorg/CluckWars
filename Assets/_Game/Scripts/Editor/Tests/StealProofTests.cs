@@ -101,7 +101,7 @@ namespace CluckWars.Tests
             string body = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_DrainStolen(", 3200);
             int proof  = body.IndexOf("_controller.IsStealProof", StringComparison.Ordinal);
             int refund = body.IndexOf("RPC_RefundRefusedSteal(amount", StringComparison.Ordinal);
-            int drain  = body.IndexOf("Cargo -= actual", StringComparison.Ordinal);
+            int drain  = body.IndexOf("StealRules.SplitDrain(", StringComparison.Ordinal);
             int stamp  = body.IndexOf("StealEventId++", StringComparison.Ordinal);
             Assert.Greater(proof, 0);
             Assert.Greater(refund, proof, "the refund is sent from the refusal branch");

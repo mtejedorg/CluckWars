@@ -56,7 +56,7 @@ namespace CluckWars.Abilities
         protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)
         {
             var cargo = candidate.Cargo;
-            return cargo != null && cargo.Cargo > 0f;
+            return cargo != null && cargo.Stealable > 0f;
         }
 
         public override void OnActivate(AbilityContext ctx)
@@ -77,7 +77,7 @@ namespace CluckWars.Abilities
             var victim = _scratch[0].Cargo;
             if (victim == null) return;
 
-            float take = Mathf.Min(ResolveStealAmount(StealAmount, thief), victim.Cargo, spaceLeft);
+            float take = Mathf.Min(ResolveStealAmount(StealAmount, thief), victim.Stealable, spaceLeft);
             if (take <= 0f) return;
 
             thiefCargo.CreditStealAndDrain(victim, take);

@@ -107,6 +107,12 @@ namespace CluckWars.Gameplay
             return rate;
         }
         public float Fraction => Capacity > 0f ? Mathf.Clamp01(Cargo / Capacity) : 0f;
+
+        /// <summary>What a thief can take from this chicken right now: its cargo plus its bounty bag (<see cref="StealRules.Stealable"/>).</summary>
+        public float Stealable => StealRules.Stealable(Cargo, BountyBag);
+
+        /// <summary><see cref="Stealable"/> as a share of <see cref="Capacity"/>, 0 to 1: how loaded this chicken looks to a thief.</summary>
+        public float StealableFraction => Capacity > 0f ? Mathf.Clamp01(Stealable / Capacity) : 0f;
         public bool IsFull => Cargo >= Capacity;
 
         /// <summary>
@@ -662,7 +668,7 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            if (Cargo <= 0f)
+            if (Stealable <= 0f)
             {
                 // Not an attack: the victim banked or lost the load between the thief's scan and
                 // this tick. The thief's optimistic self-credit is corrected by its own clamp
@@ -671,9 +677,11 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            var actual = Mathf.Min(amount, Cargo);
-            Cargo -= actual;
-            if (Cargo < 0f) Cargo = 0f;
+            // The beak first, then the bounty bag (an Assassin's execute pays into the bag): see StealRules.SplitDrain.
+            StealRules.SplitDrain(amount, Cargo, BountyBag, out float fromCargo, out float fromBag);
+            Cargo = Mathf.Max(0f, Cargo - fromCargo);
+            BountyBag = Mathf.Max(0f, BountyBag - fromBag);
+            float actual = fromCargo + fromBag;
 
             // Name the thief for the victim's §3.2 direction cue — see LastThiefId, and
             // NameTheThief for the observation half. Written only HERE, after the drain has
@@ -684,7 +692,8 @@ namespace CluckWars.Gameplay
             LastThiefId = thiefId;
             StealEventId++;
 
-            _log?.Debug(Source, $"Stolen: -{actual:0.00} by {thief.name} → Cargo={Cargo:0.0}.");
+            _log?.Info(Source, $"Stolen: -{actual:0.00} (beak {fromCargo:0.00}, bag {fromBag:0.00}) from {name} [{_controller.Class}] by {thief.name} " +
+                               $"[{thief.Class}] → Cargo={Cargo:0.0}, BountyBag={BountyBag:0.0}.");
         }
 
         /// <summary>

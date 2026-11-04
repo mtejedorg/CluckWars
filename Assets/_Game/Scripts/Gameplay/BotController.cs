@@ -237,10 +237,10 @@ namespace CluckWars.Gameplay
 
             // Overlay (never returns): a loaded bot with a stealer in reach pulls up a steal-proof
             // shell if it has one ready.
-            TryStealGuard(cargo);
+            float bag = _cargo != null ? _cargo.BountyBag : 0f;
+            TryStealGuard(cargo + bag);
 
             // A Death Mark in progress owns the bot until it pays or fizzles: see BotTactics.NextMarkStep.
-            float bag = _cargo != null ? _cargo.BountyBag : 0f;
             if (TryFollowThroughMark(cargo + bag)) return;
 
             // An execute pays into the bounty bag, not the beak, so a bot holding only a bag still has to walk it home.
@@ -909,7 +909,7 @@ namespace CluckWars.Gameplay
                 if (preyRadius <= 0f) continue;
 
                 var   rivalCargo = c.Cargo;
-                float frac       = rivalCargo != null ? rivalCargo.Fraction : 0f;
+                float frac       = rivalCargo != null ? rivalCargo.StealableFraction : 0f;
                 float banked     = BankedShareFor(c, winTarget);
 
                 float priority = BotTactics.TargetPriority(dist, frac, banked, preyRadius, _profile.LeaderFocus);

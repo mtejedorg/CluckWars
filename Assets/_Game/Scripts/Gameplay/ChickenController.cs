@@ -1720,7 +1720,7 @@ namespace CluckWars.Gameplay
                         _stealBackCooldowns[other.Id] = TickTimer.CreateFromSeconds(Runner, 1.0f);
 
                         float attackerFreeSpace = Cargo.Capacity - Cargo.Cargo;
-                        float defenderCargo = other.Cargo.Cargo;
+                        float defenderCargo = other.Cargo.Stealable;
                         // Steal-proof victim (Egg Shell / Turtle Mode): no steal, no self-credit.
                         // The knockback below is unchanged (its own immunity check lives in ApplyKnockback).
                         float stolen = StealRules.CanStealFrom(other)

@@ -45,7 +45,7 @@ namespace CluckWars.Abilities
         protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)
         {
             var cargo = candidate.Cargo;
-            return cargo != null && cargo.Cargo > 0f && !caster.IsStealLockedOn(candidate);
+            return cargo != null && cargo.Stealable > 0f && !caster.IsStealLockedOn(candidate);
         }
 
         public override void OnActivate(AbilityContext ctx)
@@ -68,7 +68,7 @@ namespace CluckWars.Abilities
             if (target == null) return;
 
             // Optimistic credit: take the smaller of (StealAmount, victim's cargo, our free space).
-            float take = Mathf.Min(ResolveStealAmount(StealAmount, thief), target.Cargo, spaceLeft);
+            float take = Mathf.Min(ResolveStealAmount(StealAmount, thief), target.Stealable, spaceLeft);
             if (take <= 0f) return;
 
             thiefCargo.CreditStealAndDrain(target, take);
