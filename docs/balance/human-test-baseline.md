@@ -62,6 +62,7 @@ Underdog Surge (x1.4) makes it about 12.8 m, which can. It can also still cross 
 - **Is the execute real now?** Too strong, or too hard to land in a stun of about 1 s, in 4 s?
 - **Rush and doubt:** with 4 s the Assassin must rush and the victim must choose (cooldowns, dodging, running). Does the Assassin ever finish a hunt, and does the victim feel a real choice or only panic? Is 4 s too short to ever land?
 - **The weighting:** does the mark feel aimed at whoever strayed far from home? Does anyone exploit it (hovering at home to be ignored)? Is a bird at home ever marked (it should only happen when everyone is home)?
+- **Stealing from a Thief:** a Thief's beak is as stealable as anyone's, even while Invisibility fades him. Do Thieves end up robbing each other and Bullies in loops, and does Invisibility feel like it should protect the loot?
 - **Stealing from the Assassin:** after an execute the bounty bag can be stolen. Does a loaded Assassin become prey, and does that discourage executes or just make the Assassin bank sooner?
 - **The draw:** does the 0.6 s sweep down the standings read as "the game picked someone", or is it noise?
 - **The hunt marker:** can the Assassin find the target from the one glyph (target colour, distance, ring)? Does it ever sit on a nameplate or the You plate?

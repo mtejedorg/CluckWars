@@ -336,6 +336,9 @@ namespace CluckWars.Gameplay
         /// here would be unreachable code claiming to defend something.
         /// </para>
         /// </remarks>
+        /// <summary>The specialization's name for the steal log ("Assassin_Thief"), or "-" with none.</summary>
+        private static string SpecOf(ChickenController c) => c != null && c.Passive != null ? c.Passive.Subclass.ToString() : "-";
+
         private void NameTheThief()
         {
             if (_hitFeedback == null || Runner == null) return;
@@ -692,8 +695,8 @@ namespace CluckWars.Gameplay
             LastThiefId = thiefId;
             StealEventId++;
 
-            _log?.Info(Source, $"Stolen: -{actual:0.00} (beak {fromCargo:0.00}, bag {fromBag:0.00}) from {name} [{_controller.Class}] by {thief.name} " +
-                               $"[{thief.Class}] → Cargo={Cargo:0.0}, BountyBag={BountyBag:0.0}.");
+            _log?.Info(Source, $"Stolen: -{actual:0.00} (beak {fromCargo:0.00}, bag {fromBag:0.00}) from {name} [{_controller.Class}/{SpecOf(_controller)}] by {thief.name} " +
+                               $"[{thief.Class}/{SpecOf(thief)}] → Cargo={Cargo:0.0}, BountyBag={BountyBag:0.0}.");
         }
 
         /// <summary>
