@@ -43,10 +43,12 @@ namespace CluckWars.Tests
             Assert.AreEqual(ExecuteRules.RemovalVerdict.NotAttributable, ExecuteRules.EvaluateRemoval(c));
             c = Genuine();
             c.VictimShelled = true;
-            c.MarkedThisVictim = false;
             c.VictimStunned = false;
-            Assert.AreEqual(ExecuteRules.RemovalVerdict.NoExecuteEvidence, ExecuteRules.EvaluateRemoval(c),
+            Assert.AreEqual(ExecuteRules.RemovalVerdict.NotStunned, ExecuteRules.EvaluateRemoval(c),
                 "the shell no-op (and its refund) is only reachable by a claim that would otherwise have landed");
+            c.MarkedThisVictim = false;
+            c.MarkEverSeen = false;
+            Assert.AreEqual(ExecuteRules.RemovalVerdict.NoExecuteEvidence, ExecuteRules.EvaluateRemoval(c));
         }
 
         [Test]

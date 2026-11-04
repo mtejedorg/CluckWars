@@ -93,6 +93,73 @@ namespace CluckWars.Tests
             Assert.AreEqual(ExecuteRules.RemovalVerdict.Shelled, ExecuteRules.EvaluateRemoval(c));
         }
 
+        // ---- Victim side: the stun must be live when the Kill lands (one capped latency of flight, no grace) ----------
+
+        /// <summary>A claim whose victim is not stunned now and last saw itself stunned <paramref name="endedAgo"/> s ago.</summary>
+        private static ExecuteRules.RemovalClaim StunEnded(float endedAgo, float latency)
+        {
+            var c = Claim(markAge: 3.2f, stunnedNow: false);
+            c.StunEverSeen = true;
+            c.SecondsSinceStunned = endedAgo;
+            c.Latency = latency;
+            return c;
+        }
+
+        [Test]
+        public void Receiver_StunnedNow_IsAccepted() =>
+            Assert.AreEqual(ExecuteRules.RemovalVerdict.Accepted, ExecuteRules.EvaluateRemoval(Claim(markAge: 3.2f, stunnedNow: true)));
+
+        [Test]
+        public void Receiver_StunEndedExactlyOneLatencyAgo_IsAccepted_AndAnEpsilonLater_IsNotStunned()
+        {
+            const float L = 0.3f;   // a remote sender's RTT inside [MinRemoteLatencySeconds, MaxLatencySeconds]
+            Assert.AreEqual(ExecuteRules.RemovalVerdict.Accepted, ExecuteRules.EvaluateRemoval(StunEnded(L, L)));
+            var v = ExecuteRules.EvaluateRemoval(StunEnded(L + 1e-3f, L));
+            Assert.AreEqual(ExecuteRules.RemovalVerdict.NotStunned, v);
+            Assert.IsFalse(ExecuteRules.IsLegalNoOp(v), "logged as a rejection");
+            StringAssert.Contains("not stunned", ExecuteRules.Describe(v));
+            // A local invoke (shared authority: bots, solo) has no flight: the stun must be live, a tick old at most.
+            Assert.AreEqual(ExecuteRules.RemovalVerdict.Accepted, ExecuteRules.EvaluateRemoval(StunEnded(0f, 0f)));
+            Assert.AreEqual(ExecuteRules.RemovalVerdict.NotStunned, ExecuteRules.EvaluateRemoval(StunEnded(0.02f, 0f)));
+        }
+
+        [Test]
+        public void Receiver_NeverStunned_IsNotStunned()
+        {
+            var c = Claim(markAge: 3.2f, stunnedNow: false);
+            c.StunEverSeen = false;
+            c.SecondsSinceStunned = 0f;   // a default age is not "just stunned"
+            c.Latency = ExecuteRules.MaxLatencySeconds;
+            Assert.AreEqual(ExecuteRules.RemovalVerdict.NotStunned, ExecuteRules.EvaluateRemoval(c));
+        }
+
+        [Test]
+        public void Receiver_AHugeLatency_IsCappedAtMaxLatency_ForTheStun()
+        {
+            float max = ExecuteRules.MaxLatencySeconds;
+            Assert.AreEqual(ExecuteRules.RemovalVerdict.Accepted, ExecuteRules.EvaluateRemoval(StunEnded(max, 30f)));
+            Assert.AreEqual(ExecuteRules.RemovalVerdict.NotStunned, ExecuteRules.EvaluateRemoval(StunEnded(max + 1e-3f, 30f)));
+            Assert.AreEqual(ExecuteRules.RemovalVerdict.NotStunned, ExecuteRules.EvaluateRemoval(StunEnded(0.6f, float.PositiveInfinity)));
+        }
+
+        [Test]
+        public void Receiver_TheStunVerdict_ComesAfterTheArm_AndReadsOnlyTheVictimsOwnRecords_SourceGuard()
+        {
+            // Order: an unarmed Kill on an unstunned victim is NotArmed (the arm is the first thing a cheat skips).
+            var c = Claim(markAge: 1.0f, stunnedNow: false);
+            Assert.AreEqual(ExecuteRules.RemovalVerdict.NotArmed, ExecuteRules.EvaluateRemoval(c));
+            const string Combat = "Assets/_Game/Scripts/Gameplay/ChickenCombat.cs";
+            string judge = AssassinExecuteCreditTests.MethodBody(Combat, "private ExecuteRules.RemovalVerdict JudgeRemoval(");
+            StringAssert.Contains("claim.VictimStunned = _controller != null && _controller.IsStunned;", judge);
+            StringAssert.Contains("claim.StunEverSeen = TrySecondsSinceStunned(out claim.SecondsSinceStunned);", judge);
+            StringAssert.DoesNotContain("KillReady", judge);
+            StringAssert.DoesNotContain("CanKillNow", judge);
+            string cargo = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/ChickenCargo.cs", "private bool TryResolveExecutor(");
+            StringAssert.Contains("ExecuteRules.HasStunAtKill(_controller.IsStunned, stunSeen, sinceStun, latency)", cargo);
+            StringAssert.DoesNotContain("KillReady", cargo);
+            StringAssert.DoesNotContain("CanKillNow", cargo);
+        }
+
         [Test]
         public void ArmEvidence_NeedsARecord_AndAFiniteAge()
         {

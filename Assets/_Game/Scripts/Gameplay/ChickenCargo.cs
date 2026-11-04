@@ -1046,12 +1046,12 @@ namespace CluckWars.Gameplay
                 return false;
             }
 
-            // An execute needs this chicken marked by that assassin AND stunned (KillReady requires the
-            // stun). AssassinExecute.Press sends this RPC and resets its mark in the same tick, so the
-            // replicated MarkedTarget can already read None when the RPC lands, and the stun may be over.
-            // Mark AND stun, each either current or recorded recently by this victim's own authority
-            // (the stun may end in the press tick; the mark is cleared in it). Same rule as
-            // ChickenCombat.RPC_ExecuteRemoval: ExecuteRules.HasExecuteEvidence (CW-230).
+            // An execute needs this chicken marked by that assassin, for the arm, AND stunned when the Kill
+            // lands. AssassinExecute.Press sends this RPC and resets its mark in the same tick, so the
+            // replicated MarkedTarget can already read None when the RPC lands: the mark counts when current
+            // or recorded recently by this victim's own authority. The stun counts only when current or
+            // recorded within one capped latency (the RPC's flight). Same rules, same order, as
+            // ChickenCombat.RPC_ExecuteRemoval: HasMarkEvidence, HasArmEvidence, HasStunAtKill (CW-230).
             var combat = _controller != null ? _controller.Combat : null;
             bool markSeen = false, stunSeen = false;
             float sinceMark = 0f, markAge = 0f, sinceStun = 0f, latency = 0f;
@@ -1062,16 +1062,22 @@ namespace CluckWars.Gameplay
                 latency = combat.SenderLatency(info);
             }
             if (_controller == null ||
-                !ExecuteRules.HasExecuteEvidence(execute.MarkedTarget == _controller.Id, markSeen, sinceMark,
-                    _controller.IsStunned, stunSeen, sinceStun, latency))
+                !ExecuteRules.HasMarkEvidence(execute.MarkedTarget == _controller.Id, markSeen, sinceMark, latency))
             {
-                rejection = $"{name} has not seen both a recent mark from {execute.name} and a recent stun on itself.";
+                rejection = $"{name} has not seen a recent mark from {execute.name}.";
                 return false;
             }
             // The arm, timed on this chicken's own clock: the same rule as ChickenCombat's NotArmed verdict.
             if (!ExecuteRules.HasArmEvidence(markSeen, markAge, execute.ArmSeconds))
             {
                 rejection = $"{name} has seen {execute.name}'s mark for {markAge:0.00} s, under its {execute.ArmSeconds:0.0} s arm.";
+                return false;
+            }
+            // The stun, from this chicken's own records only: the same rule as ChickenCombat's NotStunned verdict.
+            if (!ExecuteRules.HasStunAtKill(_controller.IsStunned, stunSeen, sinceStun, latency))
+            {
+                rejection = $"{name} was not stunned when {execute.name}'s Kill landed " +
+                            (stunSeen ? $"(stun ended {sinceStun:0.00} s ago, allowance {ExecuteRules.CapLatency(latency):0.00} s)." : "(never stunned).");
                 return false;
             }
 

@@ -67,7 +67,7 @@ namespace CluckWars.Gameplay
     /// is still refused.
     /// </para>
     /// <para>
-    /// <b>Trust model.</b> As CW-230 (<see cref="ExecuteRules.HasExecuteEvidence"/>): Shared Mode
+    /// <b>Trust model.</b> As CW-230 (<see cref="ExecuteRules.HasMarkEvidence"/>): Shared Mode
     /// trusts each state authority over its own objects, so a peer can still send in-bounds
     /// control from its own chicken without having pressed anything. What is closed is control
     /// from peers that do not own the named caster, and control no shipped ability could produce.
