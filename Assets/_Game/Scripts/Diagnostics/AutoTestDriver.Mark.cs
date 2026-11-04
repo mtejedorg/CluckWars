@@ -164,8 +164,8 @@ namespace CluckWars.Diagnostics
                 return;
             }
 
-            // Hold still for a moment first: the off-screen marker, if the target starts off screen.
-            if (!_shotOff && now - _markLockedAt < 1.5f)
+            // Hold still briefly first: the off-screen marker, if the target starts off screen (0.4 s: the mark lasts 4 s, and the Kill still has to be photographed and pressed).
+            if (!_shotOff && now - _markLockedAt < 0.4f)
             {
                 _autoPlay.SteerOverride = self.transform.position.XZ();
                 if (MarkHudController.MarkerOffScreenNow && Settled("off")) Capture(ref _shotOff, "mark-hunt-offscreen");
