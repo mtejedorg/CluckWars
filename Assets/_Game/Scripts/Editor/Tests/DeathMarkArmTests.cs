@@ -199,14 +199,16 @@ namespace CluckWars.Tests
         // ---- D5: shells and control immunity (recorded, unchanged) -----------------------------------------------------
 
         [Test]
-        public void D5_AShieldWalkingChicken_TakesNoStun_AndCannotBeExecutedAnyway()
+        public void D5_AShieldEgg_TakesNoStun_AndCannotBeExecutedAnyway()
         {
-            // The Shield's walk (Turtle Mode + Immovable, 2026-11-05) is steal-proof AND control-immune (OnActivate), so no stun
-            // lands; and were the bird stunned before the press (immunity clears nothing), the steal-proof flag alone still
-            // refuses the Kill: stunned, armed, in range, still not executable.
-            string turtle = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Abilities/TurtleModeAbilitySO.cs", "public override void OnActivate(");
-            StringAssert.Contains("ctx.Controller.GrantStealProof(Duration);", turtle);
-            StringAssert.Contains("ctx.Controller.GrantControlImmunity(Duration);", turtle);
+            // The Shield's egg (its automatic second phase, Maestro 2026-11-05) is steal-proof AND control-immune, so no stun
+            // lands; and were the bird stunned before (immunity clears nothing), the steal-proof flag alone still refuses the
+            // Kill: stunned, armed, in range, still not executable. The 1 s walk before it is slow-immune only: killable.
+            string egg = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Abilities/TurtleModeAbilitySO.cs", "public override bool OnActiveTick(");
+            StringAssert.Contains("c.GrantStealProof(remainingSeconds);", egg);
+            StringAssert.Contains("c.GrantControlImmunity(remainingSeconds);", egg);
+            string walk = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Abilities/TurtleModeAbilitySO.cs", "public override void OnActivate(");
+            StringAssert.DoesNotContain("GrantStealProof", walk);
             Assert.IsFalse(ExecuteRules.KillQualifies(armed: true, targetStunned: true, targetStealProof: true));
             var c = Claim(markAge: 3.3f);
             c.VictimShelled = true;
@@ -216,9 +218,9 @@ namespace CluckWars.Tests
         [Test]
         public void D5_TurtleLockAndImmovable_AreControlImmune_SoNoStunLands()
         {
-            string lockPress = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Abilities/TurtleModeAbilitySO.cs", "public override float OnPressWhileActive(");
-            StringAssert.Contains("c.GrantControlImmunity(LockSeconds);", lockPress);
-            StringAssert.Contains("c.GrantStealProof(LockSeconds);", lockPress);
+            string egg = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Abilities/TurtleModeAbilitySO.cs", "public override bool OnActiveTick(");
+            StringAssert.Contains("c.GrantControlImmunity(remainingSeconds);", egg);
+            StringAssert.Contains("c.GrantStealProof(remainingSeconds);", egg);
             string immovable = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Abilities/ImmovableAbilitySO.cs", "public override void OnActivate(");
             StringAssert.Contains("ctx.Controller.GrantControlImmunity(Duration);", immovable);
 

@@ -341,6 +341,8 @@ namespace CluckWars.Gameplay
                 return;
             }
 
+            TickFollowUpPhases();
+
             if (!GetInput<PlayerNetworkInput>(out var input)) return;
 
             bool canCast = _controller == null || ControlRules.CanCast(_controller.CurrentControlState);
@@ -482,8 +484,33 @@ namespace CluckWars.Gameplay
                 if (i == peckSlot || !IsSlotActive(i)) continue;
                 var running = GetSlot(i);
                 if (running != null && running.EndsOnNextMove) return true;
+                // Nor cancel a follow-up phase (the Shield's egg, pending or running) the player did not choose to give up.
+                if (HasLiveFollowUp(i, running)) return true;
             }
             return false;
+        }
+
+        // Slots whose follow-up phase was cancelled by another cast this run (authority-local, like the effect stack: an
+        // authority migration ends every run anyway). Cleared when the slot is cast again.
+        private byte _followUpCancelled;
+
+        private bool HasLiveFollowUp(int slot, AbilityBaseSO running) =>
+            running != null && running.HasFollowUpPhase && IsSlotActive(slot) && !AbilityRunRules.IsActive(_followUpCancelled, slot);
+
+        /// <summary>Lets every running follow-up ability advance its own phase (the Shield's walk -> egg). Authority only.</summary>
+        private void TickFollowUpPhases()
+        {
+            bool changed = false;
+            for (int i = 0; i < SlotCount; i++)
+            {
+                var running = GetSlot(i);
+                if (!HasLiveFollowUp(i, running)) continue;
+                float remaining = GetActiveTimer(i).RemainingTime(Runner) ?? 0f;
+                _ctx.Slot = i;
+                try { changed |= running.OnActiveTick(_ctx, remaining); }
+                finally { _ctx.Slot = -1; }
+            }
+            if (changed) _controller?.SyncAbilityEffects();
         }
 
         private void StopPeckChain()
@@ -1010,6 +1037,7 @@ namespace CluckWars.Gameplay
             EndStealthAndPeckForCast(slot);
 
             ActiveMask = AbilityRunRules.Begin(ActiveMask, slot);
+            _followUpCancelled = AbilityRunRules.End(_followUpCancelled, slot);
             // The run time is the ability's own (the Slow aura's is lengthened by a Relentless caster, and its zone ends
             // with this timer); the cooldown starts at the cast either way.
             float activeSeconds = ability.ResolveActiveDuration(_controller);
@@ -1207,6 +1235,23 @@ namespace CluckWars.Gameplay
             for (int i = 0; i < SlotCount; i++)
             {
                 if (AbilityRunRules.IsActive(ended, i)) Deactivate(i);
+            }
+
+            // A follow-up phase (the Shield's egg) is cancelled by any other cast; the ability says how its run goes on.
+            for (int i = 0; i < SlotCount; i++)
+            {
+                var running = GetSlot(i);
+                if (i == castSlot || !HasLiveFollowUp(i, running)) continue;
+                _followUpCancelled = AbilityRunRules.Begin(_followUpCancelled, i);
+                float remaining = GetActiveTimer(i).RemainingTime(Runner) ?? 0f;
+                float next;
+                _ctx.Slot = i;
+                try { next = running.OnOtherCast(_ctx, remaining); }
+                finally { _ctx.Slot = -1; }
+                if (next > 0f) SetActiveTimer(i, TickTimer.CreateFromSeconds(Runner, next));
+                else Deactivate(i);
+                _log?.Debug(Source, $"Slot {i} ({running.DisplayName}) follow-up cancelled by a cast -> " +
+                                    (next > 0f ? $"{next:0.00}s more" : "ended") + ".");
             }
         }
 

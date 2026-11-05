@@ -405,13 +405,35 @@ namespace CluckWars.Gameplay
         public bool IsControlImmune =>
             Runner != null && !ControlImmuneTimer.ExpiredOrNotRunning(Runner);
 
-        /// <summary>Closes the steal-proof and control-immunity windows now (Turtle Mode's lock ended early). Caster's own
-        /// StateAuthority only. Note: also ends an Immovable window running at the same time.</summary>
+        /// <summary>Closes the steal-proof, control-immunity and slow-immunity windows now (the Shield ended early). Caster's
+        /// own StateAuthority only.</summary>
         public void EndShellWindows()
         {
             if (Runner == null || !HasStateAuthority) return;
             StealProofTimer = TickTimer.None;
             ControlImmuneTimer = TickTimer.None;
+            SlowImmuneTimer = TickTimer.None;
+        }
+
+        /// <summary>
+        /// Slow-only immunity (the Shield's 1 s walk, Maestro 2026-11-05): while open, timed ability slows
+        /// (<see cref="RPC_ApplyAbilitySlow"/>) and zone / aura slows (<see cref="CheckAbilityZoneSlow"/>) do not land. Stun,
+        /// root, shove, theft and execution still do. A control-immunity window implies it (<see cref="IsSlowImmune"/>).
+        /// <c>[Networked]</c> like <see cref="ControlImmuneTimer"/>, so every peer agrees.
+        /// </summary>
+        [Networked] private TickTimer SlowImmuneTimer { get; set; }
+
+        /// <summary>True while slows do not land: a slow-immunity window or a full control-immunity window. Readable on every peer.</summary>
+        public bool IsSlowImmune =>
+            IsControlImmune || (Runner != null && !SlowImmuneTimer.ExpiredOrNotRunning(Runner));
+
+        /// <summary>Opens a slow-immunity window of <paramref name="seconds"/>. Never shortens one already open.</summary>
+        public void GrantSlowImmunity(float seconds)
+        {
+            if (Runner == null || seconds <= 0f) return;
+            float open = SlowImmuneTimer.ExpiredOrNotRunning(Runner) ? 0f : (SlowImmuneTimer.RemainingTime(Runner) ?? 0f);
+            if (!ControlImmunityRules.ShouldReplace(open, seconds)) return;
+            SlowImmuneTimer = TickTimer.CreateFromSeconds(Runner, seconds);
         }
 
         /// <summary>Opens a control-immunity window of <paramref name="seconds"/>.</summary>
@@ -1231,6 +1253,7 @@ namespace CluckWars.Gameplay
             StunTimer            = TickTimer.None;
             StealProofTimer      = TickTimer.None;
             ControlImmuneTimer   = TickTimer.None;
+            SlowImmuneTimer      = TickTimer.None;
             Effects.Clear();
             SyncAbilityEffects();
             ExternalDisplacement = Vector3.zero;
@@ -1378,7 +1401,8 @@ namespace CluckWars.Gameplay
         {
             if (!AcceptControlClaim(nameof(RPC_ApplyAbilitySlow), ControlKind.Slow, duration, factor, caster, info)) return;
 
-            duration = ApplyPassiveControlDuration(duration);
+            // The Shield's walk refuses slows only; stun and root still land through ApplyPassiveControlDuration.
+            duration = IsSlowImmune ? 0f : ApplyPassiveControlDuration(duration);
             double now = Runner.SimulationTime;
             var merged = ControlReapplyRules.MergeSlow(
                 new ControlReapplyRules.TimedSlow(_abilitySlowFactor, _abilitySlowUntil),
@@ -1784,9 +1808,9 @@ namespace CluckWars.Gameplay
         /// </remarks>
         private void CheckAbilityZoneSlow()
         {
-            // A control-immunity window (the Shield) refuses the zone slow too, like every other slow (Maestro 2026-11-05:
-            // "immune to stun, slow, root and shove"). Before 2026-11-05 zone slows bypassed immunity.
-            if (IsControlImmune) return;
+            // A slow-immunity window (the Shield's walk) or a control-immunity window (its egg) refuses the zone slow too, like
+            // every other slow (Maestro 2026-11-05). Before 2026-11-05 zone slows bypassed immunity.
+            if (IsSlowImmune) return;
 
             for (int i = 0; i < AbilityZone.ActiveZones.Count; i++)
             {

@@ -202,11 +202,12 @@ namespace CluckWars.Tests
         // ---- (c) the Shield ----------------------------------------------------------------------------------------
 
         [Test]
-        public void Shield_TheWalk_IsStealProofAndControlImmune_ForItsDuration_SourceGuard()
+        public void Shield_TheEgg_IsStealProofAndControlImmune_SourceGuard()
         {
-            string walk = Between(Src("Abilities/TurtleModeAbilitySO.cs"), "public override void OnActivate", "public override float OnPressWhileActive");
-            StringAssert.Contains("GrantStealProof(Duration)", walk, "theft (and so the execute) is refused");
-            StringAssert.Contains("GrantControlImmunity(Duration)", walk, "Immovable's window, the same call");
+            // Simplified 2026-11-05: the walk is slow-immune only (TurtleModeMergeTests); the egg carries the old guarantees.
+            string egg = Between(Src("Abilities/TurtleModeAbilitySO.cs"), "public override bool OnActiveTick", "public override float OnPressWhileActive");
+            StringAssert.Contains("GrantStealProof(remainingSeconds)", egg, "theft (and so the execute) is refused");
+            StringAssert.Contains("GrantControlImmunity(remainingSeconds)", egg, "Immovable's window, the same call");
             Assert.IsFalse(ExecuteRules.CanBeExecuted(stealProof: true));
         }
 
@@ -216,7 +217,7 @@ namespace CluckWars.Tests
             string cc = Src("Gameplay/ChickenController.cs");
             StringAssert.Contains("if (IsControlImmune) return 0f;", Between(cc, "private float ApplyPassiveControlDuration", "// ---- Networking helpers"), "stun, root, ability slow");
             StringAssert.Contains("if (IsControlImmune) return;", Between(cc, "public void ApplyKnockback", "var p = Passive;"), "shove");
-            StringAssert.Contains("if (IsControlImmune) return;", Between(cc, "private void CheckAbilityZoneSlow()", "for (int i = 0;"), "the Slow aura");
+            StringAssert.Contains("if (IsSlowImmune) return;", Between(cc, "private void CheckAbilityZoneSlow()", "for (int i = 0;"), "the Slow aura (control immunity implies slow immunity)");
             StringAssert.Contains("=> victim != null && !victim.IsStealProof", Src("Gameplay/StealRules.cs"), "theft");
         }
 

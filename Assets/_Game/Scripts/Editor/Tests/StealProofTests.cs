@@ -260,17 +260,17 @@ namespace CluckWars.Tests
         public void TurtleMode_IsStealProofAndControlImmune_WithTheApprovedNumbers()
         {
             string code = Src("Abilities/TurtleModeAbilitySO.cs");
-            // The walk (first press): steal-proof and, since the Shield absorbed Immovable (2026-11-05), control-immune.
-            string walk = Body(code, "public override void OnActivate(", 500);
-            StringAssert.Contains("GrantStealProof(Duration)", walk);
-            StringAssert.Contains("GrantControlImmunity(Duration)", walk);
+            // Simplified 2026-11-05: the walk is slow-immune only; the egg that follows is steal-proof and control-immune.
+            string egg = Body(code, "public override bool OnActiveTick(", 700);
+            StringAssert.Contains("GrantStealProof(remainingSeconds)", egg);
+            StringAssert.Contains("GrantControlImmunity(remainingSeconds)", egg);
             StringAssert.DoesNotContain("DamageResistance", code);
 
             var turtle = (TurtleModeAbilitySO)Asset("TurtleMode");
             Assert.AreEqual(3f, turtle.Duration, 1e-5f);
             Assert.AreEqual(10f, turtle.Cooldown, 1e-5f);
             Assert.AreEqual(0.5f, turtle.SpeedMultiplier, 1e-5f);
-            Assert.AreEqual("Shell walk 3s: nobody can rob, kill, stun, slow or shove you. Press again to lock in place for 2s.", turtle.DescriptionText);
+            Assert.AreEqual("Walk 1s immune to slows, then be an egg for 2s: no stun, slow, shove, theft or kill. Press again to stop.", turtle.DescriptionText);
             Assert.AreEqual(turtle.DescriptionText, turtle.Description, "stale .asset Description");
             StringAssert.DoesNotContain("DamageResistance", File.ReadAllText("Assets/_Game/Data/Abilities/TurtleMode.asset"));
         }

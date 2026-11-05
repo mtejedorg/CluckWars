@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.TurtleModeAbilitySO
   DisplayName: Shield
   ShortLabel: SHLD
-  Description: "Shell walk 3s: nobody can rob, kill, stun, slow or shove you. Press again to lock in place for 2s."
+  Description: "Walk 1s immune to slows, then be an egg for 2s: no stun, slow, shove, theft or kill. Press again to stop."
   AccentColor: {r: 0.55, g: 0.42, b: 0.25, a: 1}
   Category: 2
   TerrainTraversal: 0
@@ -24,4 +24,5 @@ MonoBehaviour:
   Cooldown: 10
   CastMotion: 5
   SpeedMultiplier: 0.5
-  LockSeconds: 2
+  WalkSeconds: 1
+  EggSeconds: 2

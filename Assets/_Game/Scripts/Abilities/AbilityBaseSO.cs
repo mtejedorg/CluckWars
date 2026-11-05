@@ -223,6 +223,25 @@ namespace CluckWars.Abilities
         /// seconds the ability now runs from this tick, or 0 or less to end it now.</summary>
         public virtual float OnPressWhileActive(AbilityContext ctx) => 0f;
 
+        /// <summary>
+        /// True for an ability whose run has a timed second phase that the run itself starts (the Shield's egg after its
+        /// walk). <c>AbilityController</c> then calls <see cref="OnActiveTick"/> every authority tick while the slot runs,
+        /// and <see cref="OnOtherCast"/> when another move is cast, until the follow-up is cancelled.
+        /// </summary>
+        public virtual bool HasFollowUpPhase => false;
+
+        /// <summary>
+        /// Every authority tick while the slot runs and its follow-up has not been cancelled, with the run's remaining
+        /// seconds. Returns true when it changed effects the other peers must see (the caller then syncs them).
+        /// </summary>
+        public virtual bool OnActiveTick(AbilityContext ctx, float remainingSeconds) => false;
+
+        /// <summary>
+        /// Another move was successfully cast while this slot runs: the follow-up phase is cancelled for the rest of the
+        /// run (the caller stops ticking it). Returns the seconds the run continues from now, or 0 or less to end it now.
+        /// </summary>
+        public virtual float OnOtherCast(AbilityContext ctx, float remainingSeconds) => 0f;
+
         /// <summary>Retired from the pool (not registered, not pickable, in no kit) but kept in the repo; the roster checks
         /// treat it as retired, not broken.</summary>
         [Tooltip("Retired: kept in the repo, out of the registry, every kit and the free pool.")]

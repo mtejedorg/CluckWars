@@ -648,28 +648,21 @@ namespace CluckWars.Gameplay
 
             var   selfPos = _controller.transform.position;
             var   all     = ChickenController.ActiveControllers;
-            float nearest = float.MaxValue, nearestThreat = float.MaxValue;
+            float nearest = float.MaxValue;
             for (int i = 0; i < all.Count; i++)
             {
                 var c = all[i];
                 if (c == null || c == _controller) continue;
                 if (c.Combat != null && (c.Combat.IsRemoved || c.Combat.IsDead)) continue;
                 float dist = PlanarDistance(selfPos, c.transform.position);
-                bool stealer = HasStealAbility(c);
-                if (dist < nearestThreat && (stealer || HasStunAbility(c))) nearestThreat = dist;
                 if (dist >= nearest || dist > BotTactics.StealGuardRadius) continue;
-                if (stealer) nearest = dist;
+                if (HasStealAbility(c)) nearest = dist;
             }
 
-            // Turtle Mode under way: lock only when a stun or steal threat is right on us (BotTactics.ShouldTurtleLock).
+            // The Shield under way: its egg starts on its own after the walk, and a second press would END it, so a bot
+            // leaves a running Shield alone (Maestro 2026-11-05 simplification; the old second-press lock is gone).
             for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
-            {
-                if (!(_abilities.GetSlot(slot) is TurtleModeAbilitySO) || !_abilities.IsSlotActive(slot)) continue;
-                bool locked = _controller.Effects.HasMovementLock(slot);
-                if (BotTactics.ShouldTurtleLock(true, locked, nearestThreat) && _abilities.BotTryActivate(slot))
-                    _log?.Debug(Source, $"{Who} Turtle lock: threat at {nearestThreat:0.0} m.");
-                return;
-            }
+                if (_abilities.GetSlot(slot) is TurtleModeAbilitySO && _abilities.IsSlotActive(slot)) return;
             if (cargo < BotTactics.StealGuardMinCargo) return;
 
             if (!BotTactics.ShouldStealGuard(cargo, nearest, _controller.IsStealProof)) return;
@@ -683,14 +676,6 @@ namespace CluckWars.Gameplay
                 _log?.Debug(Source, $"{Who} steal guard: cast slot {slot} ('{ability.name}') with cargo={cargo:0.0}, stealer within {nearest:0.0} m.");
                 return;
             }
-        }
-
-        private static bool HasStunAbility(ChickenController chicken)
-        {
-            var a = chicken.Abilities;
-            if (a == null) return false;
-            for (int s = 0; s < AbilityController.SlotCount; s++) if (FixedKit.EmitsStun(a.GetSlot(s))) return true;
-            return false;
         }
 
         private static bool HasStealAbility(ChickenController chicken)
