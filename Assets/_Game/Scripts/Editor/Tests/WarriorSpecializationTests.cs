@@ -66,7 +66,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(5f, bully.ModifyStealAmount(5f, null), "no steal bonus any more");
             Assert.AreEqual(1f, bully.MaxStealMultiplier);
             Assert.AreEqual(14f, bully.ModifyCargoCapacity(14f, null), "no cargo bonus any more");
-            Assert.AreEqual(1f, bully.ModifyControlDuration(1f, null));
+            Assert.AreEqual(1f, bully.ModifyControlDuration(1f, ControlKind.Stun, null));
             Assert.AreEqual(1f, bully.OutgoingControlMultiplier);
         }
 
@@ -75,7 +75,8 @@ namespace CluckWars.Tests
         {
             var relentless = Shipped<RelentlessPassiveSO>();
             var stun = Asset<WingSlamAbilitySO>();
-            Assert.AreEqual(0.75f, relentless.ModifyControlDuration(1f, null), 1e-6f);
+            foreach (var kind in new[] { ControlKind.Stun, ControlKind.Root, ControlKind.Slow })
+                Assert.AreEqual(0.75f, relentless.ModifyControlDuration(1f, kind, null), 1e-6f, kind.ToString());
             Assert.AreEqual(1f, relentless.ModifyKnockback(1f, null), "tenacity is control duration only, no knockback cut");
             Assert.AreEqual(stun.Cooldown, relentless.ModifyCooldown(stun.Cooldown, stun, null), "the cooldown cut moved to Bully");
         }
@@ -96,7 +97,7 @@ namespace CluckWars.Tests
         // ---- Outgoing resolution and the order with the victim's passive -----------------------
 
         [Test]
-        public void ARelentlessStun_OnASlipperyVictim_Is_Authored_x1_3_x0_6()
+        public void ARelentlessStun_OnASlipperyVictim_Is_Authored_x1_3_Only()
         {
             var relentless = Shipped<RelentlessPassiveSO>();
             var slippery = Shipped<SlipperyPassiveSO>();
@@ -105,9 +106,10 @@ namespace CluckWars.Tests
             // Caster's authority, before the RPC.
             float sent = AbilityBaseSO.ResolveOutgoingControlSeconds(stun.StunDuration, relentless);
             Assert.AreEqual(1.3f * 1.3f, sent, 1e-4f);
-            // Victim's authority, on arrival (ChickenController.ApplyPassiveControlDuration).
-            float landed = slippery.ModifyControlDuration(sent, null);
-            Assert.AreEqual(1.3f * 1.3f * 0.6f, landed, 1e-4f);
+            // Victim's authority, on arrival (ChickenController.ApplyPassiveControlDuration). Slippery leaves stuns whole
+            // since Maestro 2026-11-05 (it was x 0.6 before).
+            float landed = slippery.ModifyControlDuration(sent, ControlKind.Stun, null);
+            Assert.AreEqual(1.3f * 1.3f, landed, 1e-4f);
 
             // A caster with no passive, or a passive without the factor, sends the authored stun.
             Assert.AreEqual(stun.StunDuration, AbilityBaseSO.ResolveOutgoingControlSeconds(stun.StunDuration, (PassiveAbilitySO)null));

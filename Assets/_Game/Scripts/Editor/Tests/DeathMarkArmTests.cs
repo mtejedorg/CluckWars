@@ -230,7 +230,7 @@ namespace CluckWars.Tests
             string choke = AssassinExecuteCreditTests.MethodBody(Controller, "private float ApplyPassiveControlDuration(");
             StringAssert.Contains("if (IsControlImmune) return 0f;", choke);
             string stun = AssassinExecuteCreditTests.MethodBody(Controller, "public void RPC_ApplyStun(");
-            int scaled = stun.IndexOf("seconds = ApplyPassiveControlDuration(seconds);", System.StringComparison.Ordinal);
+            int scaled = stun.IndexOf("seconds = ApplyPassiveControlDuration(seconds, ControlKind.Stun);", System.StringComparison.Ordinal);
             int applied = stun.IndexOf("IsStunned = true;", System.StringComparison.Ordinal);
             Assert.Greater(scaled, -1);
             Assert.Greater(applied, scaled, "the immunity is applied before the stun");

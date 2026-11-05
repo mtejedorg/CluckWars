@@ -277,12 +277,12 @@ namespace CluckWars.Tests
 
         [TestCase(ChickenSubclass.Warrior_Bully, "Peck", "Steal", "Stun", "Jump")]          // Maestro 2026-11-05 Warrior rework
         [TestCase(ChickenSubclass.Warrior_Relentless, "Peck", "Steal", "Slow", "Speed")]
-        [TestCase(ChickenSubclass.Speedy_Featherfoot, "Peck", "Speed", "Slow", "Steal")]
+        [TestCase(ChickenSubclass.Speedy_Featherfoot, "Peck", "Speed", "Slow", "Shove")]   // Maestro 2026-11-05: Speedys do not steal
         [TestCase(ChickenSubclass.Speedy_Slippery, "Peck", "Speed", "Slow", "Shove")]
         [TestCase(ChickenSubclass.Fatty_Bulwark, "Peck", "Stun", "Shove", "Shield")]
         [TestCase(ChickenSubclass.Fatty_Hoarder, "Peck", "Shield", "Slow", "Steal")]
-        [TestCase(ChickenSubclass.Assassin_Spoiler, "Death Mark", "Stun", "Jump", "Slow")]
-        [TestCase(ChickenSubclass.Assassin_Thief, "Steal", "Hide", "Jump", "Shove")]
+        [TestCase(ChickenSubclass.Assassin_Spoiler, "Death Mark", "Stun", "Jump", "Hide")]   // Hide replaced Slow, 2026-11-05
+        [TestCase(ChickenSubclass.Assassin_Thief, "Steal", "Hide", "Jump", "Slow")]        // Slow replaced Shove, 2026-11-05
         public void TheKit_ResolvesExactlyAsRuled(ChickenSubclass subclass, string s0, string s1, string s2, string s3)
         {
             var passive = Registry.Passives.Single(p => p.Subclass == subclass);
@@ -311,20 +311,34 @@ namespace CluckWars.Tests
             Assert.AreEqual(5.16f, steal.SnatchRange, 1e-4f);
             Assert.AreEqual(5f, steal.StealAmount);
             Assert.AreEqual(0f, steal.KnockbackStrength);
-            Assert.AreEqual(5f, steal.Cooldown);
+            // Cooldown bands (Maestro 2026-11-05): low 1-3 s, medium 4-6 s, high 7-8 s.
+            Assert.AreEqual(4f, steal.Cooldown);
             var stun = Asset<WingSlamAbilitySO>("WingSlam.asset");
             Assert.AreEqual(5.4f, stun.StunRadius, 1e-4f);
             Assert.AreEqual(1.3f, stun.StunDuration, 1e-4f);
-            Assert.AreEqual(8f, stun.Cooldown);
+            Assert.AreEqual(7f, stun.Cooldown);
             var shove = Asset<CluckShockAbilitySO>("CluckShock.asset");
             Assert.AreEqual(5.4f, shove.ShockRadius, 1e-4f);
             Assert.AreEqual(16.2f, shove.KnockbackForce, 1e-4f);
-            Assert.AreEqual(7f, shove.Cooldown);
+            Assert.AreEqual(5f, shove.Cooldown);
             var slow = Asset<FeatherAuraAbilitySO>("FeatherAura.asset");
             Assert.AreEqual(6.48f, slow.AuraRadius, 1e-4f);
             Assert.AreEqual(0.55f, slow.AuraSlowFactor, 1e-4f);
             Assert.AreEqual(3f, slow.Duration);
-            Assert.AreEqual(7f, slow.Cooldown);
+            Assert.AreEqual(6f, slow.Cooldown);
+            var speed = Asset<SpeedBurstAbilitySO>("SpeedBurst.asset");
+            Assert.AreEqual(1.3f, speed.SpeedMultiplier, 1e-4f);
+            Assert.AreEqual(1.5f, speed.Duration, 1e-4f);
+            Assert.AreEqual(4f, speed.Cooldown);
+            var hide = Asset<InvisibilityAbilitySO>("Invisibility.asset");
+            Assert.AreEqual(2f, hide.Duration, 1e-4f);
+            Assert.AreEqual(4.5f, hide.Cooldown, 1e-4f);
+            Assert.AreEqual(2f, Asset<ShadowstepAbilitySO>("Shadowstep.asset").Cooldown);
+            Assert.AreEqual(8f, Asset<TurtleModeAbilitySO>("TurtleMode.asset").Cooldown);
+            var mark = Asset<MarkKillAbilitySO>("MarkKill.asset");
+            Assert.AreEqual(4f, mark.FailCooldownSeconds);
+            Assert.AreEqual(8f, mark.SuccessCooldownSeconds);
+            Assert.AreEqual(4f, mark.RoundStartCooldownSeconds);
         }
 
         [TestCase("Snatch.asset")]

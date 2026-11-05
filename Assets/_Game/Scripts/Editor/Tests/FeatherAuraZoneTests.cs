@@ -226,14 +226,14 @@ namespace CluckWars.Tests
         [Test]
         public void ASecondAura_IsRefusedWhileTheFirstLives_EvenAtAQuarterCooldown()
         {
-            // The shipped numbers alone (7 s cooldown > 3 s aura) are not the guarantee: a cooldown passive can go to x0.25.
+            // The shipped numbers alone (6 s cooldown > 3 s aura) are not the guarantee: a cooldown passive can go to x0.25.
             var a = Shipped();
             var bully = ScriptableObject.CreateInstance<BullyPassiveSO>();   // the cooldown passive since 2026-11-05
             try
             {
                 bully.CooldownMultiplier = 0.25f;
                 float cd = bully.ModifyCooldown(a.Cooldown, a, null);
-                Assert.AreEqual(1.75f, cd, 1e-4f);
+                Assert.AreEqual(1.5f, cd, 1e-4f);   // 6 s x 0.25 (7 s until 2026-11-05)
                 Assert.Less(cd, a.Duration, "fixture: at x0.25 the cooldown is up while the aura still lives");
             }
             finally { UnityEngine.Object.DestroyImmediate(bully); }

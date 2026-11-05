@@ -307,7 +307,10 @@ namespace CluckWars.Tests
                     p.ModifyDepositRate(9f, null);
                     p.ModifyCooldown(0.8f, peck[0], null);
                     p.ModifyCooldown(8f, p, null);
-                    p.ModifyControlDuration(1f, null);
+                    p.ModifyControlDuration(1f, ControlKind.Stun, null);
+                    p.ModifyControlDuration(1f, ControlKind.Slow, null);
+                    p.ModifyIncomingSlowFactor(0.55f, null);
+                    p.ZoneSlowLifetimeFraction(null);
                     p.ModifyKnockback(1f, null);
                     p.ModifyStealAmount(5f, null);
                     p.IgnoresPileSlow(null);

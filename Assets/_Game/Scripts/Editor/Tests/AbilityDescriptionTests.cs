@@ -113,8 +113,8 @@ namespace CluckWars.Tests
         [Test]
         public void PinnedNumbers_MatchTheShippedAssets()
         {
-            Assert.AreEqual(1.5f, ((SpeedBurstAbilitySO)Active("SpeedBurst")).SpeedMultiplier, 1e-4f);
-            StringAssert.Contains("1.5x", Active("SpeedBurst").DescriptionText);
+            Assert.AreEqual(1.3f, ((SpeedBurstAbilitySO)Active("SpeedBurst")).SpeedMultiplier, 1e-4f);   // 1.5 -> 1.3, Maestro 2026-11-05
+            StringAssert.Contains("1.3x", Active("SpeedBurst").DescriptionText);
             StringAssert.DoesNotContain("2.5x", Active("SpeedBurst").DescriptionText);
 
             Assert.AreEqual(5.4f, ((SneakyStealAbilitySO)Active("SneakySteal")).StealRange, 1e-4f);

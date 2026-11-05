@@ -37,8 +37,8 @@ namespace CluckWars.Tests
                     string thief = $"Every steal grabs {Pct(t.StealMultiplier - 1.0)}% more.";
                     return (thief, thief);
                 case SlipperyPassiveSO s:
-                    return ($"Stuns, getting stuck and timed slows end {Pct(1.0 - s.DurationMultiplier)}% sooner.",
-                            "Zone, aura, pile and bump slows still apply in full.");
+                    return ($"Ability slows on you are {Pct(1.0 - s.Resist)}% weaker and end {Pct(1.0 - s.Resist)}% sooner.",
+                            "Stuns still land in full. Pile and bump slows still apply.");
                 case BulwarkPassiveSO w:
                     return ("Barely budges when shoved.",
                             $"Knockback cut by {Pct(1.0 - w.KnockbackMultiplier)}%. Stuns, getting stuck and timed slows end {Pct(1.0 - w.DurationMultiplier)}% sooner.");
@@ -71,7 +71,9 @@ namespace CluckWars.Tests
         /// ModifyControlDuration only shortens TIMED effects (stuns, roots, Dust Kick's slow).
         /// Presence slows (zones, Feather Aura, the pile and collision slows) have no duration and
         /// get no reduction (balance proposal 2026-10 §1.1), so "Slows ... end N% sooner" promised
-        /// coverage of one slow in five. Any slow claim must say "timed slows".
+        /// coverage of one slow in five. Any slow claim must say "timed slows" — or "ability slows"
+        /// for Slippery, which since 2026-11-05 also cuts zone / aura slows short (its zone window)
+        /// but never the pile or bump slow.
         /// </summary>
         private static void AssertNoBlanketSlowClaim(string text, string who)
         {
@@ -79,7 +81,8 @@ namespace CluckWars.Tests
             Assert.IsFalse(lower.StartsWith("slows") || lower.Contains(" slows, stuns") || lower.Contains("covers slows"),
                 $"{who}: '{text}' claims every slow is shortened; only timed slows are.");
             if (lower.Contains("slows") && lower.Contains("sooner"))
-                StringAssert.Contains("timed slows", lower, $"{who}: a 'sooner' claim about slows must say 'timed slows'.");
+                Assert.IsTrue(lower.Contains("timed slows") || lower.Contains("ability slows"),
+                    $"{who}: a 'sooner' claim about slows must say 'timed slows' or 'ability slows'.");
         }
 
         [Test]
@@ -229,8 +232,9 @@ namespace CluckWars.Tests
                         AssertNoBlanketSlowClaim(r.Description, r.name);
                         break;
                     case SlipperyPassiveSO s:
-                        StringAssert.Contains($"{Pct(1.0 - s.DurationMultiplier)}%", s.Description);
+                        StringAssert.Contains($"{Pct(1.0 - s.Resist)}%", s.Description);
                         AssertNoBlanketSlowClaim(s.Description, s.name);
+                        Assert.AreEqual(s.PerkLine(null), s.Description, "the stored text is the line template");
                         break;
                     case BulwarkPassiveSO w:
                         StringAssert.Contains($"{Pct(1.0 - w.KnockbackMultiplier)}%", w.Description);

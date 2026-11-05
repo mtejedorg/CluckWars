@@ -71,11 +71,18 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void EverySpecialization_HasItsOwnKit()
+        public void EverySpecialization_HasItsOwnKit_ExceptTheTwoSpeedys()
         {
-            var kits = Registry.Passives.Select(p => string.Join(",", p.Kit.Select(a => a.name))).ToList();
-            Assert.AreEqual(8, kits.Count);
+            // Maestro 2026-11-05: Featherfoot swapped Steal for Shove ("Speedys should not steal by design"), which makes its kit
+            // identical to Slippery's. Approved as is: the two Speedys differ by passive only. Every other kit stays distinct.
+            var kits = Registry.Passives
+                .Where(p => p.Subclass != ChickenSubclass.Speedy_Featherfoot)
+                .Select(p => string.Join(",", p.Kit.Select(a => a.name))).ToList();
+            Assert.AreEqual(7, kits.Count);
             Assert.AreEqual(kits.Count, kits.Distinct().Count(), "two specializations play the same kit");
+            var featherfoot = Registry.Passives.Single(p => p.Subclass == ChickenSubclass.Speedy_Featherfoot);
+            var slippery = Registry.Passives.Single(p => p.Subclass == ChickenSubclass.Speedy_Slippery);
+            CollectionAssert.AreEqual(slippery.Kit, featherfoot.Kit, "the approved duplicate; revisit this test if the Speedy kits diverge again");
         }
 
         // ---- break it: each rule must actually fire ------------------------------------------------------------

@@ -37,7 +37,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(2f, t.EggSeconds, "egg");
             Assert.AreEqual(t.WalkSeconds + t.EggSeconds, t.Duration, 1e-5f, "the slot runs walk + egg");
             Assert.AreEqual(0.5f, t.SpeedMultiplier, "walk speed");
-            Assert.AreEqual(10f, t.Cooldown);
+            Assert.AreEqual(8f, t.Cooldown);
             Assert.AreEqual(ChickenClassFlags.All, t.AllowedClasses);
             Assert.AreEqual("Shield", t.DisplayName);
             Assert.IsTrue(t.AcceptsPressWhileActive);
@@ -72,7 +72,7 @@ namespace CluckWars.Tests
         public void SlowImmunity_RefusesTheTimedAndTheZoneSlow_ButNotStunRootOrShove_SourceGuard()
         {
             string cc = Src(ControllerPath);
-            StringAssert.Contains("duration = IsSlowImmune ? 0f : ApplyPassiveControlDuration(duration);",
+            StringAssert.Contains("duration = IsSlowImmune ? 0f : ApplyPassiveControlDuration(duration, ControlKind.Slow);",
                 Between(cc, "public void RPC_ApplyAbilitySlow(", "public void RPC_ApplyStun("), "the timed slow");
             StringAssert.Contains("if (IsSlowImmune) return;", Between(cc, "private void CheckAbilityZoneSlow()", "for (int i = 0;"), "zone / aura slow");
             // Stun, root and shove keep reading the full control-immunity window only.

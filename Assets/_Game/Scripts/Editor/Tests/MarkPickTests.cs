@@ -274,7 +274,8 @@ namespace CluckWars.Tests
         [Test]
         public void ShippedMarkKill_TheShortestAmbushStun_CanStillBePressedOn()
         {
-            // (c) The shortest Ambush stun any shipped passive allows (Slippery 0.6, Bulwark 0.65) still outlasts the press's
+            // (c) The shortest Ambush stun any shipped passive allows (Bulwark 0.65; Slippery no longer shortens stuns since
+            // Maestro 2026-11-05) still outlasts the press's
             // trip and a reaction. MinRemoteLatencySeconds: the latency floor the receiver assumes for a remote sender.
             var ambush = ShippedAmbush;
             float shortest = ambush.StunDuration;
@@ -284,10 +285,10 @@ namespace CluckWars.Tests
                 var p = UnityEditor.AssetDatabase.LoadAssetAtPath<PassiveAbilitySO>(UnityEditor.AssetDatabase.GUIDToAssetPath(guid));
                 if (p == null) continue;
                 passives++;
-                shortest = Mathf.Min(shortest, p.ModifyControlDuration(ambush.StunDuration, null));
+                shortest = Mathf.Min(shortest, p.ModifyControlDuration(ambush.StunDuration, ControlKind.Stun, null));
             }
             Assert.Greater(passives, 0, "no shipped passive found: the scan is broken");
-            Assert.Less(shortest, ambush.StunDuration, "Slippery / Bulwark shorten it: the scan saw them");
+            Assert.Less(shortest, ambush.StunDuration, "Bulwark / Relentless shorten it: the scan saw them");
             Assert.GreaterOrEqual(shortest, ExecuteRules.MinRemoteLatencySeconds + ExecuteRules.KillReactionSeconds,
                 $"shortest stun {shortest:0.00} s");
         }
@@ -304,14 +305,15 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void ShippedMarkKill_AtMostThreeKillsARound()
+        public void ShippedMarkKill_AtMostFourKillsARound()
         {
-            // (e) Kills as fast as the rules allow (each exactly at the arm): a fourth never fits in the round, a third does.
+            // (e) Kills as fast as the rules allow (each exactly at the arm): a fifth never fits in the round, a fourth does.
+            // Three until Maestro's 2026-11-05 cooldown cut (kill cooldown 10 -> 8 s): 4 + 4 x 3 + 3 x 8 = 40 s.
             var m = ShippedMark;
             float round = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath).MatchDurationSeconds;
             float start = m.RoundStartCooldownSeconds, arm = m.ArmSeconds, success = m.SuccessCooldownSeconds;
-            Assert.Greater(start + 4f * arm + 3f * success, round, "a fourth kill would fit");
-            Assert.LessOrEqual(start + 3f * arm + 2f * success, round, "a third kill must fit");
+            Assert.Greater(start + 5f * arm + 4f * success, round, "a fifth kill would fit");
+            Assert.LessOrEqual(start + 4f * arm + 3f * success, round, "a fourth kill must fit");
         }
 
         [Test]
@@ -392,7 +394,7 @@ namespace CluckWars.Tests
         [TestCase(true, false, 0f, 0.6f, true, 1f, BotMarkStep.Stun)]       // armed, time left: stun now
         [TestCase(true, false, 0f, 0.25f, true, 1f, BotMarkStep.Hunt)]      // armed, but no time to press after it
         [TestCase(true, false, 0.5f, 1.5f, false, 0f, BotMarkStep.Hunt)]    // nothing in reach
-        [TestCase(true, false, 0.4f, 1.4f, true, 0.6f, BotMarkStep.Hunt)]   // Slippery's 0.6 s stun: arm must be <= 0.35 s away
+        [TestCase(true, false, 0.4f, 1.4f, true, 0.6f, BotMarkStep.Hunt)]   // a 0.6 s stun: arm must be <= 0.35 s away
         [TestCase(true, false, 0.35f, 1.35f, true, 0.6f, BotMarkStep.Stun)]
         [TestCase(true, true, 0f, 0.8f, true, 1f, BotMarkStep.Kill)]        // after the arm, stunned: kill
         [TestCase(true, true, 0f, 0.8f, false, 0f, BotMarkStep.Kill)]
@@ -416,7 +418,7 @@ namespace CluckWars.Tests
         {
             string body = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/BotController.cs", "private bool TryFollowThroughMark(");
             StringAssert.Contains("!mark.IsStealProof && !mark.IsControlImmune", body);
-            StringAssert.Contains("passive.ModifyControlDuration(raw, mark)", body);
+            StringAssert.Contains("passive.ModifyControlDuration(raw, ControlKind.Stun, mark)", body);
             StringAssert.Contains("_execute.ArmTimer.RemainingTime(Runner) ?? 0f", body);
         }
 
