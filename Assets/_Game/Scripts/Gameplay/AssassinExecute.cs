@@ -29,7 +29,9 @@ namespace CluckWars.Gameplay
         // authority see the replicated mark before a Kill can reach it.
         public const float ArmDuration = 3.0f;
         public const float WindowDuration = 4.0f;
-        public const float DefaultKillRange = 8.0f;
+        // 8 -> 6.2 m (Maestro 2026-11-05): the Stun's reach grew 3.6 -> 5.4 m (+1.8), so the kill range gave the 1.8 m back
+        // and stun reach + kill range stays at its Ambush-era total (3.6 + 8 = 5.4 + 6.2 = 11.6 m).
+        public const float DefaultKillRange = 6.2f;
         public const float FailCooldown = 5.0f;
         public const float SuccessCooldown = 10.0f;
         /// <summary>Fallback for <see cref="RemovalSeconds"/> (no MarkKill asset registered); equals the asset.</summary>

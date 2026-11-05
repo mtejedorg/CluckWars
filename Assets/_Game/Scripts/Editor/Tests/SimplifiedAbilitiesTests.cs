@@ -377,6 +377,20 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void DeathMark_KillRange_GaveBackWhatTheStunsReachGained()
+        {
+            // Maestro 2026-11-05: the Stun reaches 5.4 m against Ambush's 3.6 m, so the kill range dropped 8 -> 6.2 m and
+            // stun reach + kill range stays at its Ambush-era 11.6 m.
+            var mark = Asset<MarkKillAbilitySO>("MarkKill.asset");
+            var stun = Asset<WingSlamAbilitySO>("WingSlam.asset");
+            Assert.AreEqual(6.2f, mark.KillRange, 1e-5f);
+            Assert.AreEqual(AssassinExecute.DefaultKillRange, mark.KillRange, 1e-5f, "constructor default / fallback = asset");
+            Assert.AreEqual(3.6f + 8f, stun.StunRadius + mark.KillRange, 1e-4f);
+            StringAssert.Contains("within 6.2m", mark.DescriptionText);
+            Assert.AreEqual(mark.DescriptionText, mark.Description, "stale .asset Description");
+        }
+
+        [Test]
         public void TheMarkHud_LightsAnyStun_NotAmbushOnly_SourceGuard()
         {
             StringAssert.DoesNotContain("AmbushAbilitySO", Src("Visuals/MarkFeedback.cs"));
