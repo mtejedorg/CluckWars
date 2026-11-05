@@ -56,7 +56,7 @@ roots and placed zones are not lengthened).
 | Slow (SLOW) | `FeatherAura.asset` | 7 s | aura 6.48 m, 55% speed while inside, 3 s |
 | Speed (FAST) | `SpeedBurst.asset` | 6 s | 1.5x for 1.5 s |
 | Jump (JUMP) | `Shadowstep.asset` | 4 s | 3x for 0.18 s (6.56 m), over walls; not Speedy |
-| Shield (SHLD) | `TurtleMode.asset` | 10 s | walk 1 s at 0.5x (steal-proof, unkillable, immune to ability slows only: timed slow, zone, Slow aura), then an automatic egg for 2 s (immobile; immune to stun, slow, root and shove; steal-proof). Press again ends it; casting another move ends the egg only |
+| Shield (SHLD) | `TurtleMode.asset` | 10 s | walk 1 s at 0.5x (immune to ability slows only: timed slow, zone, Slow aura; stun, shove, theft and execution still land), then an automatic egg for 2 s (immobile; immune to stun, slow, root and shove; steal-proof). Press again ends it; casting another move ends the egg only |
 | Hide (HIDE) | `Invisibility.asset` | 8 s | ghostly outline 4 s, opacity 0.2; breaks on the next move |
 | Peck | `Peck.asset` | 0.8 s | per-class amount and cadence (SCT axiom) |
 | Death Mark (EXEC) | `MarkKill.asset` | 5 s | see the rule numbers below; kill range 6.2 m (was 8 m); its stun comes from Stun (1.3 s) |
@@ -78,8 +78,8 @@ Free-mode pools: Warrior, Fatty and Sneaky pick from the 7 everyone-abilities pl
 | Cooldown after a kill | **10 s** (was 15): at most 3 kills per 45 s round (press 4, kill 7.3, press 17.3, kill 20.6, press 30.6, kill 33.9); any miss costs 9 s | `MarkKill.asset` |
 | Stun | 1.3 s (0.78 s on Slippery, 0.845 s on Bulwark), radius 5.4 m, **cooldown 8 s** (longer than the 4 s window, so one stun per hunt, ready for the next; no reset on mark). Replaces Ambush (1.0 s, 3.6 m) as the Spoiler's stun | `WingSlam.asset` |
 | Executed bird | **out 3 s, then respawns at its own base with no cargo**; cooldowns keep running | `MarkKill.asset` `RemovalSeconds` |
-| Shell | a steal-proof bird (Shield walk or egg) **cannot be executed**; the egg also cannot be stunned, the walk can | `ExecuteRules.CanBeExecuted` |
-| Shield | walk 1 s at 0.5x (steal-proof, unkillable, **immune to ability slows only**, zone slows and the Slow aura included; stun, root, shove still land), then egg 2 s automatically (immobile, **immune to stun, slow, root and shove**, steal-proof); press again ends the whole Shield; another cast ends only the egg; auto-Peck does not fire during a live Shield; cooldown 10 s from the cast | `TurtleMode.asset` |
+| Shell | a steal-proof bird (Shield egg) **cannot be executed** or stunned; the Shield walk can be robbed, stunned and executed | `ExecuteRules.CanBeExecuted` |
+| Shield | walk 1 s at 0.5x (**immune to ability slows only**, zone slows and the Slow aura included; stun, root, shove, theft and execution still land), then egg 2 s automatically (immobile, **immune to stun, slow, root and shove**, steal-proof); press again ends the whole Shield; another cast ends only the egg; auto-Peck does not fire during a live Shield; cooldown 10 s from the cast | `TurtleMode.asset` |
 | Jump (Shadowstep) | 3x speed for **0.18 s** (dash 6.56 m), cooldown **4 s**; not for Speedy | `Shadowstep.asset` |
 | Base wall | 2.5 m round each rival's claimed base; bodies and abilities | `MatchConfig.asset` |
 | Match | 40 food or 45 s | `MatchConfig.asset` |

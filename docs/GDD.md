@@ -589,7 +589,7 @@ it at all, cannot hand-pick it, and cannot execute. The Assassin's stun now come
 | **Kill** | Press again in the last 1.0 s while it is stunned, within **6.2 m**, with no base wall between, and the Assassin is not stunned (a stunned Assassin cannot cast anything) | — |
 
 No isolation: the mark ignores crowds. The only defences are not being stunned, escaping, and reaching your base in time.
-A steal-proof Shield (the walk and the egg, §7.2) also makes you unkillable while it lasts: a steal-proof chicken cannot be executed
+A steal-proof Shield egg (§7.2; the walk is not steal-proof) also makes you unkillable while it lasts: a steal-proof chicken cannot be executed
 (`ExecuteRules.CanBeExecuted`). The egg is stun-immune as well, so an egged bird cannot be stunned at all; the mark stays alive and its timer keeps running. A stun can still land on the one-second walk.
 
 On success the victim's **entire cargo transfers to the Assassin as a capacity-exempt
@@ -628,7 +628,7 @@ at most 3 kills in a 45 s round (press 4, kill 7.3, press 17.3, kill 20.6, press
 before 45 s); any miss costs 9 s. **Stun** cooldown is 8 s, longer than the 4 s window: never a second stun in one hunt,
 and the stun is ready for the next. **Jump** (Shadowstep) lasts 0.18 s: dash 3 x 12.15 x 0.18 = 6.56 m. **Reach framing (2026-11-05, later):** Stun's reach plus Death Mark's `KillRange` stays 11.6 m. Ambush era: 3.6 + 8 = 11.6 m; now Stun 5.4 m + `KillRange` 6.2 m = 11.6 m (`MarkKill.asset`; Stun's reach grew 1.8 m, so the kill range gave 1.8 m back). `KillRange` is the planar distance at the Kill press; the code has no lunge term. The percentages below were computed for the Ambush era (10.2 m reach, 1.0 s stun) and are not recomputed. With Underdog Surge the dash is 9.19 m, under the 9.85 m gap between two pinwheel arms, so it cannot cross two arms even with Underdog.
 **Walk home.** With a 3 s arm a victim within about 21-29 m of home (class and stun length dependent) who walks home is safe: about
-29-36% of marks. **D5 (changed twice on 2026-11-05):** Shield is a 1 s slow-immune walk (steal-proof, unkillable) then a 2 s egg (also stun-immune), so one well-timed button covers part of the kill span for Hoarder and Bulwark (open for Maestro). **Bounty economy (D4):** the Assassin earns only from executes (victim cargo
+29-36% of marks. **D5 (changed twice on 2026-11-05):** Shield is a 1 s slow-immune walk (stun, theft and execution still land) then a 2 s egg (steal-proof, unkillable and stun-immune), so one well-timed button covers part of the kill span for Hoarder and Bulwark (open for Maestro). **Bounty economy (D4):** the Assassin earns only from executes (victim cargo
 plus `ExecuteBounty` 5, doubled on the leader only during the rare LeaderBounty event). `MatchConfig.SpoilerBounty` 15 is read by no
 code; what is paid is `Spoiler.asset` BonusFood 15 at timer expiry with no winner. Mean victim cargo is about 5.7, so 3 banked kills are
 about 32 food, 8 short of 40; 2 kills plus the Spoiler bonus about 36.5; 2 kills alone about 21.5. No rule added; `ExecuteBounty` 8 would make 3 kills about 41.
@@ -757,7 +757,7 @@ Ability text follows the `Description` field of each shipped `.asset`. Every num
 | **Slow** | SLOW | 7 s | everyone | Aura: slows every rival within 6.48 m to 55% speed for 3 s. Was Feather Aura (5.4 m, "every chicken"). |
 | **Speed** | FAST | 6 s | everyone | A 1.5 s sprint at 1.5x movement speed. Was Speed Burst; no longer Speedy-only. |
 | **Jump** | JUMP | 4 s | everyone but Speedy | Dashes forward at 3x speed for 0.18 s (about 6.6 m), straight over walls. Unchanged (Shadowstep); Speedy never gets terrain traversal (§5.2). |
-| **Shield** | SHLD | 10 s | everyone | **Walk, then egg, on one press.** Phase 1 (`WalkSeconds` 1): walk at 0.5x speed, steal-proof (so unkillable), immune to ability slows only (timed slow, zone, Slow aura); stun, root, shove still land. Phase 2 (`EggSeconds` 2, starts automatically): cannot move; immune to stun, slow, root and shove; steal-proof and unkillable. Duration 3 s, cooldown 10 s from the cast. Press again to end it. Was Turtle Mode (Fatty-only). |
+| **Shield** | SHLD | 10 s | everyone | **Walk, then egg, on one press.** Phase 1 (`WalkSeconds` 1): walk at 0.5x speed, immune to ability slows only (timed slow, zone, Slow aura); stun, root, shove, theft and execution still land. Phase 2 (`EggSeconds` 2, starts automatically): cannot move; immune to stun, slow, root and shove; steal-proof and unkillable. Duration 3 s, cooldown 10 s from the cast. Press again to end it. Was Turtle Mode (Fatty-only). |
 | **Hide** | HIDE | 8 s | everyone | Fades you to a ghostly outline for 4 s (opacity 0.2). Using a move breaks it. Was Invisibility (Sneaky-only). |
 | **Peck** | PECK | 0.8 s | none (pre-equip) | Take a beakful of food from the pile you are standing at. Forced for every forager. |
 | **Death Mark** | EXEC | 5 s | none (pre-equip) | The execute (§6.4). Marks a rival, likelier far from home; stun them within 6.2 m, then press again to take everything they carry. `KillRange` 8 -> 6.2 m on 2026-11-05 (later); its stun comes from the generic Stun (1.3 s). |
@@ -771,7 +771,7 @@ Control ceilings: with no root and no RPC slow in the registry, a populated regi
 - **Steal** takes nothing from a steal-proof bird.
 - **Death Mark's execute** cannot touch a steal-proof bird (a shelled chicken cannot be executed: caster gate and the victim's authority; a sub-round-trip race refunds the Kill cooldown and restores the mark).
 - **Shield phases** (`TurtleMode.asset`, 2026-11-05 later):
-  - **Walk** (`WalkSeconds` 1): 0.5x speed. A new networked slow-immunity window makes the timed ability slow and the zone / aura slow refuse the bird; stun, root, shove, theft and execution still land (the walk is steal-proof, so cargo and life are safe, but a stun can land). Pile and bump slows still apply (the immunity covers ability slows only).
+  - **Walk** (`WalkSeconds` 1): 0.5x speed. A new networked slow-immunity window makes the timed ability slow and the zone / aura slow refuse the bird; stun, root, shove, theft and execution still land (only the egg is steal-proof). Pile and bump slows still apply (the immunity covers ability slows only).
   - **Egg** (`EggSeconds` 2): starts on its own when the walk ends. The bird cannot move, is immune to stun, slow, root and shove, and steal-proof (so unkillable). Control immunity also refuses zone slows (`CheckAbilityZoneSlow`).
   - **Ending it:** pressing Shield again ends the whole Shield in either phase. Casting any other ability ends only the egg: during the egg the Shield ends; during the walk the pending egg is dropped and the walk runs out. Auto-Peck never fires during a live Shield, while a manual Peck counts as a cast. The old second-press lock is removed; bots no longer press-lock and leave a running Shield alone.
   - Duration 3 s (walk + egg), cooldown 10 s from the cast.
@@ -821,7 +821,7 @@ different kinds).
 | Movement lock | any | Shield (egg), Peck |
 | Slow immunity | later expiry | Shield (walk) |
 | Control immunity | later expiry | Shield (egg) |
-| Steal-proof | later expiry | Shield (walk and egg) |
+| Steal-proof | later expiry | Shield (egg only) |
 | Deposit rate | multiplied | Featherfoot passive 1.5 (permanent) |
 | Wall-phasing tier | highest holder (Barge < Vault < Blink) | Jump |
 | Aura slow | lowest factor, its radius | Slow |
@@ -833,7 +833,7 @@ you cast anything else. Peck counts as a move; a fizzle (§10.1) does not. **Pec
 is an opener for Steal / Stun, not a 4 s cast lock.
 
 **Combos that are now legal on one bird** (flagged for balance, no value changed): Speed + Slow is about 2.7x relative speed against
-chasers inside 6.48 m for 1.5 s; Hide + Steal (the Thief opener); Jump + Stun (the Spoiler dash, 6.56 m, then a 5.4 m stun); Shield + Speed walks at 0.75x while steal-proof. **Watch in playtest (no caps now):** Shield into its egg back to back with the Slow aura nearby (the aura no longer works on a walking or egged bird).
+chasers inside 6.48 m for 1.5 s; Hide + Steal (the Thief opener); Jump + Stun (the Spoiler dash, 6.56 m, then a 5.4 m stun); Shield + Speed walks at 0.75x while slow-immune. **Watch in playtest (no caps now):** Shield into its egg back to back with the Slow aura nearby (the aura no longer works on a walking or egged bird).
 
 ---
 
