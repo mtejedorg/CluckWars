@@ -22,4 +22,5 @@ MonoBehaviour:
   AllowedClasses: 4
   Duration: 2.0
   Cooldown: 8
+  Retired: 1
   CastMotion: 2

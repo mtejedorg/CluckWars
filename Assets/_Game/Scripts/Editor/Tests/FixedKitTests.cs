@@ -94,7 +94,7 @@ namespace CluckWars.Tests
 
         [Test]
         public void AForagerWithoutPeck_IsAProblem() =>
-            StringAssert.Contains("Peck", Only(Broken(ChickenSubclass.Fatty_Hoarder, k => { k[0] = Pool<HeadbuttAbilitySO>(); return k; })));
+            StringAssert.Contains("Peck", Only(Broken(ChickenSubclass.Fatty_Hoarder, k => { k[0] = Pool<CluckShockAbilitySO>(); return k; })));
 
         [Test]
         public void PeckOnAnAssassin_IsAProblem() =>
@@ -102,7 +102,7 @@ namespace CluckWars.Tests
 
         [Test]
         public void TraversalOnASpeedy_IsAProblem() =>
-            StringAssert.Contains("traversal", Only(Broken(ChickenSubclass.Speedy_Slippery, k => { k[3] = Pool<RollPushAbilitySO>(); return k; })));
+            StringAssert.Contains("traversal", Only(Broken(ChickenSubclass.Speedy_Slippery, k => { k[3] = Pool<ShadowstepAbilitySO>(); return k; })));
 
         [Test]
         public void ASpoilerWithoutTheMark_IsAProblem() =>
@@ -122,7 +122,7 @@ namespace CluckWars.Tests
         [Test]
         public void ValidateRoster_ReportsAKitAbilityOutsideTheRegistry()
         {
-            var stray = UnityEngine.Object.Instantiate(Pool<RootEggAbilitySO>());
+            var stray = UnityEngine.Object.Instantiate(Pool<FeatherAuraAbilitySO>());
             stray.name = "Stray";
             _made.Add(stray);
             var passives = Registry.Passives.ToList();
@@ -191,7 +191,7 @@ namespace CluckWars.Tests
         [Test]
         public void Fixed_EverySpecializationSpawnsItsKit_WhateverTheSelectionSays()
         {
-            var noise = Pool<HeadbuttAbilitySO>();
+            var noise = Pool<CluckShockAbilitySO>();
             foreach (var p in Registry.Passives)
             {
                 var log = new RecordingLog();
@@ -352,7 +352,9 @@ namespace CluckWars.Tests
         [Test]
         public void ZoneAndAuraChecks_FindTheirCarrierInTheKit()
         {
-            Assert.GreaterOrEqual(AutoTestRules.PickZoneSlot(Spec(ChickenSubclass.Fatty_Hoarder).Kit), 0);
+            // The 2026-11-05 roster has no placed zone (Feather Trap, Sticky Egg, Smoke Roost are retired), so -AutoZone has
+            // nothing to cast in Fixed mode; the Slow aura is the only area left.
+            foreach (var p in Registry.Passives) Assert.Less(AutoTestRules.PickZoneSlot(p.Kit), 0, p.name);
             Assert.GreaterOrEqual(AutoAuraRules.PickAuraSlot(Spec(ChickenSubclass.Speedy_Featherfoot).Kit.ToList()), 0);
         }
 

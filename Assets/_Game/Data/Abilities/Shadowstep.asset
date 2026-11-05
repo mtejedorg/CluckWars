@@ -12,15 +12,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c8df485b91b2e624baa9de3c89269b98, type: 3}
   m_Name: Shadowstep
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.ShadowstepAbilitySO
-  DisplayName: Shadowstep
-  ShortLabel: STEP
+  DisplayName: Jump
+  ShortLabel: JUMP
   Description: Dashes forward at 3x speed for 0.18s, straight over walls.
   AccentColor: {r: 0.4, g: 0.2, b: 0.9, a: 1}
   Category: 3
   TerrainTraversal: 3
   JumpTier: 0
   SlotKind: 1
-  AllowedClasses: 8
+  AllowedClasses: 13
   BotRole: 0
   Duration: 0.18
   Cooldown: 4

@@ -381,8 +381,8 @@ namespace CluckWars.Gameplay
         [Networked] private TickTimer RootTimer { get; set; }
 
         /// <summary>
-        /// While running, this chicken ignores incoming stun, root, ability-slow and
-        /// knockback outright. Driven by an ability (Immovable), not a passive.
+        /// While running, this chicken ignores incoming stun, root, ability-slow, zone slow and
+        /// knockback outright. Driven by an ability (the Shield, which absorbed Immovable), not a passive.
         /// </summary>
         /// <remarks>
         /// <b>Immunity, not resistance — and that distinction is the design.</b> Passives
@@ -1566,11 +1566,26 @@ namespace CluckWars.Gameplay
             var ceiling = ControlClaimRules.CeilingFor(pool, kind);
             if (ceiling.Known && ceiling.MaxSeconds > 0f && ceiling.MaxReach > 0f) return ceiling;
 
+            // A populated registry with no ability that sends this kind (since 2026-11-05: no root, and the only slow is the
+            // Slow aura's zone, which sends no RPC) is a legal roster, not a wiring bug: the honest bound refuses every claim.
+            if (ceiling.Known && ceiling.MaxSeconds <= 0f && HasAnyAbility(pool))
+            {
+                _log?.Debug(Source, $"{name}: no shipped ability sends {kind}, so every incoming {kind} RPC is refused.");
+                return ceiling;
+            }
+
             _log?.Error(Source, $"{name}: no {kind} bound could be derived from the AbilityRegistry " +
                 $"(known={ceiling.Known}, maxSeconds={ceiling.MaxSeconds:0.00}, maxReach={ceiling.MaxReach:0.00}), so " +
                 $"incoming {kind} RPCs are checked for their sender only, not for duration or range. Check that " +
                 "ProjectInstaller._abilityRegistry is assigned and that every control ability is listed in its All array.");
             return ControlClaimRules.Ceiling.Unknown;
+        }
+
+        private static bool HasAnyAbility(AbilityBaseSO[] pool)
+        {
+            if (pool == null) return false;
+            foreach (var a in pool) if (a != null) return true;
+            return false;
         }
 
         /// <summary>
@@ -1769,6 +1784,10 @@ namespace CluckWars.Gameplay
         /// </remarks>
         private void CheckAbilityZoneSlow()
         {
+            // A control-immunity window (the Shield) refuses the zone slow too, like every other slow (Maestro 2026-11-05:
+            // "immune to stun, slow, root and shove"). Before 2026-11-05 zone slows bypassed immunity.
+            if (IsControlImmune) return;
+
             for (int i = 0; i < AbilityZone.ActiveZones.Count; i++)
             {
                 var zone = AbilityZone.ActiveZones[i];

@@ -5,10 +5,13 @@ using CluckWars.Localization;
 namespace CluckWars.Abilities
 {
     /// <summary>
-    /// Common steal: a forward arc that robs every cargo-carrier it touches and shoves
-    /// them back. Formerly named "Peck" — renamed 2026-08-13 to free that name for the
-    /// foraging ability, which is what a chicken pecking at a pile of grain actually is.
-    /// The asset GUID is unchanged, so every registry and loadout reference survived.
+    /// <b>Steal</b>, the one steal job (Maestro 2026-11-05, "one ability per job"): robs every cargo-carrier in reach.
+    /// Under <see cref="TargetingMode.RangeOnly"/> that is every carrier within <see cref="SnatchRange"/> of the caster;
+    /// the authored 140° arc only returns under Shaped. The shove is data: <see cref="KnockbackStrength"/> 0 (shipped)
+    /// means none, and then the effect is a pure steal (<see cref="TargetEffectIncludesControl"/>). The Thief's bigger
+    /// steal comes from its passive through <c>ResolveStealAmount</c>, not from this asset.
+    /// Formerly "Peck" (renamed 2026-08-13), then "Snatch"; the asset GUID is unchanged, so every reference survived.
+    /// No per-victim lock (that lived in the retired Sneaky Steal).
     /// </summary>
     [CreateAssetMenu(fileName = "Snatch",
         menuName = "Cluck Wars/Ability/Steal/Snatch", order = 7)]
@@ -20,30 +23,31 @@ namespace CluckWars.Abilities
 
         public SnatchAbilitySO()
         {
+            DisplayName = "Steal";
+            ShortLabel = "ROB";
+            Description = "Robs 5 food from every rival within 5.16m.";
             Category = AbilityCategory.Steal;
             AllowedClasses = ChickenClassFlags.All;
+            Duration = 0.3f;
+            Cooldown = 5f;
         }
 
-        [Tooltip("Maximum distance to the target, along the 140° forward arc.")]
-        [Min(0.5f)] public float SnatchRange = 4.3f;
+        [Tooltip("Reach: every carrier within this planar distance of the caster (RangeOnly), or along the 140° arc (Shaped). " +
+                 "5.16 = 4.3 x1.2 (Maestro 2026-11-05).")]
+        [Min(0.5f)] public float SnatchRange = 5.16f;
 
         [Tooltip("Amount of cargo to steal per hit target.")]
         [Min(1f)] public float StealAmount = 5f;
 
-        [Tooltip("Knockback impulse strength (world-units/sec) applied to the hit target. Scaled 6 -> 8.1 (x1.35) with the 2026-08-14 arena/move-speed rescale — see CluckShockAbilitySO.KnockbackForce.")]
-        [Min(0f)] public float KnockbackStrength = 8.1f;
+        [Tooltip("Knockback impulse (world-units/sec) on each robbed rival. 0 = no shove (shipped 2026-11-05: shoving is the Shove job).")]
+        [Min(0f)] public float KnockbackStrength = 0f;
 
         public override float IndicatorRange => SnatchRange;
         public override bool RequiresEnemyInRange => true;
 
         /// <summary>
-        /// Forward arc, not a ring. Snatch is a Common ability every class can equip and it
-        /// robs <i>every</i> carrier it touches, so a full circle meant "press it in a
-        /// pile scrum and take from whoever happens to be behind you". 140° still covers
-        /// everything you are roughly facing — TurnSpeed re-aims in about 0.2 s — so this
-        /// removes the free omnidirectional rob without turning a Common ability into a
-        /// precision test. Range goes up (2.0 → 2.4 m) so the 1v1 case is unchanged to
-        /// better; only the blind-side rob is gone.
+        /// The authored 140° forward arc (Shaped only; RangeOnly reads a circle of <see cref="SnatchRange"/>). Kept as the
+        /// Shaped answer from 2026-08: a full circle meant "press it in a pile scrum and take from whoever is behind you".
         /// </summary>
         public override AbilityAimShape AuthoredAimShape => AbilityAimShape.Cone;
         public override float AimRadius => SnatchRange;
@@ -52,7 +56,7 @@ namespace CluckWars.Abilities
         public override float NominalStealAmount => StealAmount;
 
         public override bool TargetEffectIncludesSteal => true;
-        public override bool TargetEffectIncludesControl => true; // the shove
+        public override bool TargetEffectIncludesControl => KnockbackStrength > 0f; // the shove, when there is one
 
         /// <summary>Only a cargo-carrier is a valid Snatch target — an empty-handed rival in range now gets the "immune / no-effect" telegraph instead of a knockback that used to land anyway.</summary>
         protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)

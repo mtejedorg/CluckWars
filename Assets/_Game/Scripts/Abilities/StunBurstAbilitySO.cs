@@ -30,8 +30,8 @@ namespace CluckWars.Abilities
         // declaring a Cone and leaning on the 360°-degenerates-to-a-circle rule to undo it.
         // (That rule stays in AbilityAim, and stays tested — it is defence-in-depth against
         // a hand-authored 360 in an asset, not something an ability should be routed
-        // through on purpose.) Wing Slam overrides both AimShape and AimConeAngle for its
-        // real directional cone; AimRadius stays here so both subclasses mirror StunRadius.
+        // through on purpose.) Wing Slam overrides both AuthoredAimShape and AuthoredAimConeAngle for its
+        // authored cone (Shaped only; RangeOnly collapses it); AimRadius stays here so both mirror StunRadius.
         public override AbilityAimShape AuthoredAimShape => AbilityAimShape.SelfCircle;
         public override float AimRadius => StunRadius;
 

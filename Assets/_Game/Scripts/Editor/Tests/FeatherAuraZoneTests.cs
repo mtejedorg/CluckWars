@@ -93,7 +93,7 @@ namespace CluckWars.Tests
         {
             var a = Shipped();
             Assert.AreEqual(0.55f, a.AuraSlowFactor, 1e-6f, "slow factor (WP4 moves no number)");
-            Assert.AreEqual(5.4f, a.AuraRadius, 1e-6f, "radius");
+            Assert.AreEqual(6.48f, a.AuraRadius, 1e-6f, "radius (5.4 x1.2, Maestro 2026-11-05)");
             Assert.AreEqual(3f, a.Duration, 1e-6f, "duration");
             Assert.AreEqual(AreaEffectKind.Aura, a.AreaKind);
         }

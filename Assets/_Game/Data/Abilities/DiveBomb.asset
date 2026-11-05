@@ -24,6 +24,7 @@ MonoBehaviour:
   BotRole: 0
   Duration: 0.6
   Cooldown: 6
+  Retired: 1
   CastMotion: 0
   ForwardOffset: 3.25
   SweepRadius: 2.05

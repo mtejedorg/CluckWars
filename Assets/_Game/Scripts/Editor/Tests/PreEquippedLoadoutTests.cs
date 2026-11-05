@@ -280,8 +280,12 @@ namespace CluckWars.Tests
         [Test]
         public void Validate_OffClassAndCannotForage_AreInfoNotesOnly()
         {
+            // An Assassin-only ability as the Warrior's signature (Shadowstep was Assassin-only; since 2026-11-05 Jump is
+            // open to every class but the Speedy, so the fixture pins the flag itself).
+            var offClass = Make<ShadowstepAbilitySO>();
+            offClass.AllowedClasses = ChickenClassFlags.Assassin;
             var reg = Reg(Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Relentless, Slot.Peck),
-                          Claim(Make<ShadowstepAbilitySO>(), ChickenSubclass.Warrior_Relentless, Slot.Signature));
+                          Claim(offClass, ChickenSubclass.Warrior_Relentless, Slot.Signature));
             var issues = PreEquippedLoadout.Validate(Warrior(), reg, Peck());
 
             Assert.IsTrue(Has(issues, PreEquipStatus.OffClassAbility));

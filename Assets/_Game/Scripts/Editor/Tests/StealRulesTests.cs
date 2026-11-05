@@ -46,6 +46,10 @@ namespace CluckWars.Tests
                       .OfType<AbilityBaseSO>()
                       .ToList();
 
+        /// <summary>The assets on disk minus the retired ones (out of the registry on purpose: Egg Shell, and the 17 abilities
+        /// the 2026-11-05 "one ability per job" roster replaced). What the shipped bound must cover.</summary>
+        private static List<AbilityBaseSO> LiveAbilityAssets() => AllAbilityAssets().Where(a => !a.Retired).ToList();
+
         // ---- The magnitude bound -------------------------------------------------
 
         [Test]
@@ -54,7 +58,7 @@ namespace CluckWars.Tests
             // Recomputed from the assets on disk rather than from the registry, so an ability
             // that exists but is missing from the registry shows up here as a bound that is
             // too small — which is what would silently reject its steals in a real match.
-            var assets = AllAbilityAssets();
+            var assets = LiveAbilityAssets();
             Assert.IsNotEmpty(assets, $"No ability assets found under {TestAssets.AbilitiesDir}.");
 
             float biggestAmount     = assets.Max(a => a.NominalStealAmount);
@@ -80,7 +84,7 @@ namespace CluckWars.Tests
             // of its steals gets refused at the victim's authority.
             var registered = new HashSet<AbilityBaseSO>(Registry().All ?? System.Array.Empty<AbilityBaseSO>());
 
-            foreach (var ability in AllAbilityAssets().Where(a => a.NominalStealAmount > 0f))
+            foreach (var ability in LiveAbilityAssets().Where(a => a.NominalStealAmount > 0f))
             {
                 Assert.IsTrue(registered.Contains(ability),
                     $"{ability.name} steals {ability.NominalStealAmount} cargo but is not in " +
@@ -133,7 +137,7 @@ namespace CluckWars.Tests
         // ---- The reach bound -----------------------------------------------------
 
         [Test]
-        public void MaxReach_CoversDiveBombsPositionAfterItsOwnJump()
+        public void MaxReach_OfAPoolWithDiveBomb_CoversItsPositionAfterItsOwnJump()
         {
             // THE trap in this hardening pass. Dive Bomb has a Capsule aim shape, so
             // AbilityController.TryActivate resolves its lane from the take-off pose and defers
@@ -152,11 +156,21 @@ namespace CluckWars.Tests
             float worstCase = diveBomb.ForwardOffset + diveBomb.SweepRadius
                             + nominalJump + JumpResolver.GetMaxExtension(nominalJump);
 
-            Assert.GreaterOrEqual(ShippedMaxReach(), worstCase,
-                $"Dive Bomb can be {worstCase:0.00} m from its victim when the drain lands " +
-                $"(lane {diveBomb.ForwardOffset} + {diveBomb.SweepRadius}, then a jump of up to " +
-                $"{nominalJump + JumpResolver.GetMaxExtension(nominalJump):0.00} m), but the bound only " +
-                $"admits {ShippedMaxReach():0.00} m. Real Dive Bomb steals would be silently refused.");
+            // Dive Bomb is retired (2026-11-05), so this pins the mechanism on a pool that holds it: the day it is registered
+            // again, the receiver's bound must already pay its jump. Shaped only: under RangeOnly the lane is a circle resolved
+            // after the jump, so there is no take-off pose to pay for.
+            var saved = AbilityTargeting.Mode;
+            AbilityTargeting.Mode = TargetingMode.Shaped;
+            try
+            {
+                float bound = StealRules.MaxReach(new AbilityBaseSO[] { diveBomb });
+                Assert.GreaterOrEqual(bound, worstCase,
+                    $"Dive Bomb can be {worstCase:0.00} m from its victim when the drain lands " +
+                    $"(lane {diveBomb.ForwardOffset} + {diveBomb.SweepRadius}, then a jump of up to " +
+                    $"{nominalJump + JumpResolver.GetMaxExtension(nominalJump):0.00} m), but the bound only " +
+                    $"admits {bound:0.00} m. Real Dive Bomb steals would be silently refused.");
+            }
+            finally { AbilityTargeting.Mode = saved; }
         }
 
         [Test]
@@ -164,7 +178,7 @@ namespace CluckWars.Tests
         {
             // The three honestly proximity-gated stealers. They resolve targets at the caster's
             // live position, so their authored AimRadius is the whole story.
-            var assets = AllAbilityAssets();
+            var assets = LiveAbilityAssets();
             float bound = ShippedMaxReach();
 
             foreach (var ability in assets.Where(a => a.NominalStealAmount > 0f && !a.CastPoseIsUnreconstructable))

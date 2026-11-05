@@ -932,7 +932,7 @@ namespace CluckWars.Input
                 bool kill = mark.KillHex && a is MarkKillAbilitySO;
                 if (kill && !_markKill[slot]) _markKillSince[slot] = Time.unscaledTime;
                 _markKill[slot] = kill;
-                _markLit[slot] = mark.AmbushLit && a is AmbushAbilitySO;
+                _markLit[slot] = mark.AmbushLit && FixedKit.EmitsStun(a);
             }
         }
 

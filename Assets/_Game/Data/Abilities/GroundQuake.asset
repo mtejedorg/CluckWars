@@ -25,6 +25,7 @@ MonoBehaviour:
   BotRole: 3
   Duration: 0.4
   Cooldown: 9
+  Retired: 1
   SearchMask:
   CastMotion: 1
     serializedVersion: 2
@@ -32,4 +33,4 @@ MonoBehaviour:
   QuakeRadius: 4.5
   RootSeconds: 1.8
   PeckSlotPreEquippedBy: 0
-  SignaturePreEquippedBy: 32
+  SignaturePreEquippedBy: 0

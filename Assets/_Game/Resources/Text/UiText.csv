@@ -48,14 +48,14 @@ callout.assassin.weak,"Light load, slow beak."
 glyph.plus,+
 glyph.minus,−
 ability.ambush.desc,Stuns rivals within {r}m for {secs}s.
-ability.wingslam.desc,"Slams the ground ahead, stunning rivals within {r}m for {secs}s."
+ability.wingslam.desc,Stuns every rival within {r}m for {secs}s.
 ability.bellyflop.desc,"Launch your whole weight forward and land hard, stunning rivals within {r}m for {secs}s."
-ability.cluckshock.desc,A shockwave that shoves every rival within {r}m away.
+ability.cluckshock.desc,Shoves every rival within {r}m away.
 ability.divebomb.desc,"Dive forward in a lunge and rob {n} food from every rival you touch."
 ability.doppelganger.desc,Spawns a decoy copy beside you for {secs}s to soak up rival attacks.
 ability.dustkick.desc,Kicks dust backwards: chasers within {r}m slow to {pct}% speed for {secs}s.
 ability.eggshell.desc,"Hide in an egg for {secs} seconds. You can't move, but nobody can push you, stop you or steal your food."
-ability.featheraura.desc,Slows every chicken within {r}m to {pct}% speed for {secs}s.
+ability.featheraura.desc,Slows every rival within {r}m to {pct}% speed for {secs}s.
 ability.feathertrap.desc,Throws a feather cloud ahead that lasts {secs}s - chickens in it slow to {pct}% speed.
 ability.feint.desc,A hard sidestep. Walls still stop you.
 ability.groundquake.desc,A stomp that leaves everyone within {r}m stuck in place for {secs}s.
@@ -71,11 +71,11 @@ ability.ruffle.desc,A burst of pace: {mult}x speed for {secs}s. Enough to close 
 ability.scrap.desc,Grabs {n} food off the nearest rival within {r}m.
 ability.shadowstep.desc,"Dashes forward at {mult}x speed for {secs}s, straight over walls."
 ability.smokeroost.desc,"Drops a choking cloud ({r}m, {secs}s): you fade, rivals inside slow to {pct}% speed. Using a move breaks it."
-ability.snatch.desc,Robs {n} food from every rival within {r}m ahead and shoves them back.
+ability.snatch.desc,Robs {n} food from every rival within {r}m.
 ability.sneakysteal.desc,Yanks {n} food from the nearest rival within {r}m. Same bird: every {secs}s.
 ability.speedburst.desc,A {secs}s sprint at {mult}x movement speed.
 ability.spinecoat.desc,"For {secs}s, any rival who bumps into you loses {n} food to you and gets knocked away."
-ability.turtlemode.desc,"Shell walk {secs}s, safe from theft and execution. Press again to lock in place for {lock}s."
+ability.turtlemode.desc,"Shell walk {secs}s: nobody can rob, kill, stun, slow or shove you. Press again to lock in place for {lock}s."
 perk.relentless.line,Moves recharge {pct}% faster.
 perk.relentless.detail,Applies to every move except Peck.
 perk.bully.line,"Steal {steal}% more, carry {cap} more."

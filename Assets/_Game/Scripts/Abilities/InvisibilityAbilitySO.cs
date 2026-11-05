@@ -18,6 +18,17 @@ namespace CluckWars.Abilities
         public override (string name, object value)[] DescriptionArgs() =>
             new (string, object)[] { ("secs", Num(Duration)) };
 
+        public InvisibilityAbilitySO()
+        {
+            DisplayName = "Hide";
+            ShortLabel = "HIDE";
+            Description = "Fades you to a ghostly outline for 4s. Using a move breaks it.";
+            Category = AbilityCategory.Utility;
+            AllowedClasses = ChickenClassFlags.All;
+            Duration = 4f;
+            Cooldown = 8f;
+        }
+
         [Tooltip("Alpha while active. 0 = totally invisible (fragile), 0.2 ≈ ghostly outline (readable).")]
         [Range(0f, 1f)] public float Opacity = 0.2f;
 

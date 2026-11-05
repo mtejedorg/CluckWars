@@ -417,10 +417,10 @@ namespace CluckWars.Tests
         {
             // Not built through PreEquippedLoadout.Resolve, so a regression in that helper cannot
             // make the fixture and the resolver agree on a wrong answer. Warrior / Relentless per the
-            // shipped data: Peck.PeckSlotPreEquippedBy and Headbutt.SignaturePreEquippedBy name
-            // Relentless, plus one Warrior ability (CluckShock) and one more Warrior one (WingSlam; Egg Shell is retired).
+            // shipped data: Peck.PeckSlotPreEquippedBy and CluckShock.SignaturePreEquippedBy name
+            // Relentless (Headbutt's signature moved to the Shove, 2026-11-05), plus two more Warrior-legal abilities.
             var reg = Registry();
-            var names = new[] { "Peck", "Headbutt", "CluckShock", "WingSlam" };
+            var names = new[] { "Peck", "CluckShock", "WingSlam", "SpeedBurst" };
             var rec = new LastSetupRecord
             {
                 Class = (int)ChickenClass.Warrior, Subclass = (int)ChickenSubclass.Warrior_Relentless,

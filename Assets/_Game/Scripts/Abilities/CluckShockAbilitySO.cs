@@ -4,6 +4,10 @@ using CluckWars.Localization;
 
 namespace CluckWars.Abilities
 {
+    /// <summary>
+    /// <b>Shove</b>, the one shove job (Maestro 2026-11-05): knocks every rival within <see cref="ShockRadius"/> away
+    /// from the caster. Already a caster-centred circle, so the targeting mode does not change it.
+    /// </summary>
     [CreateAssetMenu(fileName = "CluckShock",
         menuName = "Cluck Wars/Ability/Control/Cluck Shock", order = 6)]
     public sealed class CluckShockAbilitySO : AbilityBaseSO
@@ -14,12 +18,17 @@ namespace CluckWars.Abilities
 
         public CluckShockAbilitySO()
         {
+            DisplayName = "Shove";
+            ShortLabel = "PUSH";
+            Description = "Shoves every rival within 5.4m away.";
             Category = AbilityCategory.Control;
-            AllowedClasses = ChickenClassFlags.Warrior;
+            AllowedClasses = ChickenClassFlags.All;
+            Duration = 0.5f;
+            Cooldown = 7f;
         }
 
-        [Tooltip("Shock radius around the caster.")]
-        [Min(0.5f)] public float ShockRadius = 4.5f;
+        [Tooltip("Shove radius around the caster. 5.4 = 4.5 x1.2 (Maestro 2026-11-05).")]
+        [Min(0.5f)] public float ShockRadius = 5.4f;
 
         [Tooltip("Knockback impulse (world-units/sec) pushing rivals away. Scaled 12 -> 16.2 (x1.35) with the 2026-08-14 arena/move-speed rescale: this is a velocity added on top of the victim's own movement, so holding it while every MoveSpeed rose 35% would have quietly turned a shove into a nudge the victim can walk out of.")]
         [Min(1f)] public float KnockbackForce = 16.2f;

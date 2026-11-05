@@ -5,7 +5,8 @@ using CluckWars.Localization;
 namespace CluckWars.Abilities
 {
     /// <summary>
-    /// Assassin Utility ability: short Blink dash phasing over walls along facing direction.
+    /// <b>Jump</b> (Maestro 2026-11-05): short Blink dash phasing over walls along the movement direction. Never on a
+    /// Speedy (standing ruling: the SCT trip is measured without terrain traversal), hence its AllowedClasses.
     /// </summary>
     [CreateAssetMenu(fileName = "Shadowstep", menuName = "Cluck Wars/Ability/Utility/Shadowstep", order = 11)]
     public sealed class ShadowstepAbilitySO : AbilityBaseSO
@@ -16,13 +17,13 @@ namespace CluckWars.Abilities
 
         public ShadowstepAbilitySO()
         {
-            DisplayName = "Shadowstep";
-            ShortLabel = "STEP";
-            Description = "Dashes forward at 3x speed for 0.25s, straight over walls.";
+            DisplayName = "Jump";
+            ShortLabel = "JUMP";
+            Description = "Dashes forward at 3x speed for 0.18s, straight over walls.";
             Category = AbilityCategory.Utility;
             TerrainTraversal = TerrainTraversal.Blink;
-            AllowedClasses = ChickenClassFlags.Assassin;
-            Duration = 0.25f;
+            AllowedClasses = ChickenClassFlags.Warrior | ChickenClassFlags.Fatty | ChickenClassFlags.Assassin;
+            Duration = 0.18f;
             Cooldown = 4f;
         }
 

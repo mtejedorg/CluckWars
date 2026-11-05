@@ -24,6 +24,7 @@ MonoBehaviour:
   BotRole: 0
   Duration: 0.8
   Cooldown: 3
+  Retired: 1
   SearchMask:
   CastMotion: 0
     serializedVersion: 2

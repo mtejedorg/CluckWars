@@ -119,8 +119,8 @@ namespace CluckWars.Tests
 
             Assert.AreEqual(5.4f, ((SneakyStealAbilitySO)Active("SneakySteal")).StealRange, 1e-4f);
             StringAssert.Contains("5.4m", Active("SneakySteal").DescriptionText);
-            Assert.AreEqual(5.4f, ((FeatherAuraAbilitySO)Active("FeatherAura")).AuraRadius, 1e-4f);
-            StringAssert.Contains("5.4m", Active("FeatherAura").DescriptionText);
+            Assert.AreEqual(6.48f, ((FeatherAuraAbilitySO)Active("FeatherAura")).AuraRadius, 1e-4f);
+            StringAssert.Contains("6.48m", Active("FeatherAura").DescriptionText);
             StringAssert.DoesNotContain(" 3m", Active("FeatherAura").DescriptionText);
         }
 

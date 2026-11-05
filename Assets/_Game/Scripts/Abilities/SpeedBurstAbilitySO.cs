@@ -15,8 +15,19 @@ namespace CluckWars.Abilities
         public override (string name, object value)[] DescriptionArgs() =>
             new (string, object)[] { ("mult", Num(SpeedMultiplier)), ("secs", Num(Duration)) };
 
-        [Tooltip("Multiplier applied to MoveSpeed while active. 2.5 ≈ doubled top speed without feeling teleporty.")]
-        [Min(1f)] public float SpeedMultiplier = 2.5f;
+        public SpeedBurstAbilitySO()
+        {
+            DisplayName = "Speed";
+            ShortLabel = "FAST";
+            Description = "A 1.5s sprint at 1.5x movement speed.";
+            Category = AbilityCategory.Utility;
+            AllowedClasses = ChickenClassFlags.All;
+            Duration = 1.5f;
+            Cooldown = 6f;
+        }
+
+        [Tooltip("Multiplier applied to MoveSpeed while active.")]
+        [Min(1f)] public float SpeedMultiplier = 1.5f;
 
         // Self-buff, no target area — marks the caster's own ring instead (FEEDBACK.md §2.2).
         public override AbilityAimShape AuthoredAimShape => AbilityAimShape.None;

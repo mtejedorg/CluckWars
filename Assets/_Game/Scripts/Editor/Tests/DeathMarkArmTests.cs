@@ -199,13 +199,14 @@ namespace CluckWars.Tests
         // ---- D5: shells and control immunity (recorded, unchanged) -----------------------------------------------------
 
         [Test]
-        public void D5_ATurtleWalkingChicken_TakesTheStun_ButStillCannotBeExecuted()
+        public void D5_AShieldWalkingChicken_TakesNoStun_AndCannotBeExecutedAnyway()
         {
-            // Turtle Mode's walk is steal-proof and NOT control-immune (TurtleModeAbilitySO.OnActivate), so Ambush's stun lands,
-            // and the steal-proof flag alone refuses the Kill: stunned, armed, in range, still not executable.
+            // The Shield's walk (Turtle Mode + Immovable, 2026-11-05) is steal-proof AND control-immune (OnActivate), so no stun
+            // lands; and were the bird stunned before the press (immunity clears nothing), the steal-proof flag alone still
+            // refuses the Kill: stunned, armed, in range, still not executable.
             string turtle = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Abilities/TurtleModeAbilitySO.cs", "public override void OnActivate(");
             StringAssert.Contains("ctx.Controller.GrantStealProof(Duration);", turtle);
-            StringAssert.DoesNotContain("GrantControlImmunity", turtle);
+            StringAssert.Contains("ctx.Controller.GrantControlImmunity(Duration);", turtle);
             Assert.IsFalse(ExecuteRules.KillQualifies(armed: true, targetStunned: true, targetStealProof: true));
             var c = Claim(markAge: 3.3f);
             c.VictimShelled = true;

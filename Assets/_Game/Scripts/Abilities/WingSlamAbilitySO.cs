@@ -4,7 +4,10 @@ using CluckWars.Localization;
 namespace CluckWars.Abilities
 {
     /// <summary>
-    /// Warrior Control ability: a 1.3 s stun in a 120° cone ahead (Standard cooldown tier, GDD §7.3).
+    /// <b>Stun</b>, the one stun job (Maestro 2026-11-05): every rival within <c>StunRadius</c> of the caster is stunned
+    /// (RangeOnly). The 120° cone ahead is the authored Shaped answer. Sets the same <c>ChickenController.IsStunned</c> as
+    /// every stun (it is a <see cref="StunBurstAbilitySO"/>, like the retired Ambush), so it is the Spoiler's stun for the
+    /// Death Mark kill.
     /// </summary>
     /// <remarks>
     /// Tuned 2026-10-22 (Maestro, decision A4 = proposal WS-A): cooldown 12 → 8 s, stun and
@@ -21,21 +24,19 @@ namespace CluckWars.Abilities
 
         public WingSlamAbilitySO()
         {
-            DisplayName = "Wing Slam";
-            ShortLabel = "SLAM";
-            Description = "Slams the ground ahead, stunning rivals within 4.5m for 1.3s.";
-            AllowedClasses = ChickenClassFlags.Warrior;
-            StunRadius = 4.5f;
+            DisplayName = "Stun";
+            ShortLabel = "STUN";
+            Description = "Stuns every rival within 5.4m for 1.3s.";
+            AllowedClasses = ChickenClassFlags.All;
+            StunRadius = 5.4f;
             StunDuration = 1.3f;
             Duration = 1.3f;
             Cooldown = 8f;
         }
 
         /// <summary>
-        /// Directional, aimable per FEEDBACK.md §4: a 120° forward cone instead of the
-        /// SelfCircle Ambush keeps. Its own <c>StunRadius</c> (4.5 m) and therefore the same
-        /// AimRadius — this is a shape change, not a reach change, and the area drop is the
-        /// price of being able to slam a specific direction.
+        /// The authored shape, read only under <see cref="TargetingMode.Shaped"/>: a 120° forward cone of
+        /// <c>StunRadius</c>. Under RangeOnly it is a circle of the same radius round the caster.
         /// </summary>
         public override AbilityAimShape AuthoredAimShape => AbilityAimShape.Cone;
         public override float AuthoredAimConeAngle => 120f;

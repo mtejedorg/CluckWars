@@ -284,7 +284,7 @@ MonoBehaviour:
   _passive: {fileID: 0}
   _slot0: {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
   _slot1: {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}
-  _slot2: {fileID: 11400000, guid: 141d6483e4594575ae36717f9dd3b056, type: 2}
+  _slot2: {fileID: 11400000, guid: f2c3f98e23f645109023f309da56e7e3, type: 2}
   _slot3: {fileID: 0}
   _ActiveSlot: 0
   _ChargingSlot: 0

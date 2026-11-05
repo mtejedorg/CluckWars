@@ -25,6 +25,7 @@ MonoBehaviour:
   BotRole: 5
   Duration: 0.3
   Cooldown: 5
+  Retired: 1
   SearchMask:
   CastMotion: 3
     serializedVersion: 2
@@ -32,4 +33,4 @@ MonoBehaviour:
   ScrapRange: 3.8
   StealAmount: 3
   PeckSlotPreEquippedBy: 0
-  SignaturePreEquippedBy: 2
+  SignaturePreEquippedBy: 0

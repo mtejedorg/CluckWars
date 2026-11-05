@@ -34,6 +34,6 @@ MonoBehaviour:
   Subclass: 6
   Kit:
   - {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}
-  - {fileID: 11400000, guid: 2a92897e8ee4ea6489a6800817e583b6, type: 2}
-  - {fileID: 11400000, guid: 7e7fb8a070d8cc94cb3fe7aa588ee544, type: 2}
-  - {fileID: 11400000, guid: 34d89e259316bb6458f34ff06f640c5f, type: 2}
+  - {fileID: 11400000, guid: 6bbb9c61252f875408fde062c994669c, type: 2}
+  - {fileID: 11400000, guid: 079c14ab0b344ca898f4be63fbf58374, type: 2}
+  - {fileID: 11400000, guid: 5f7b2c8a4d3e495d8a01c5e7b2f9d4e7, type: 2}

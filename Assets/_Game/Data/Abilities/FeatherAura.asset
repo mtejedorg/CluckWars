@@ -12,18 +12,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0, type: 3}
   m_Name: FeatherAura
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.FeatherAuraAbilitySO
-  DisplayName: Feather Aura
-  ShortLabel: FAU
-  Description: Slows every chicken within 5.4m to 55% speed for 3s.
+  DisplayName: Slow
+  ShortLabel: SLOW
+  Description: Slows every rival within 6.48m to 55% speed for 3s.
   AccentColor: {r: 0.6, g: 0.3, b: 0.9, a: 1}
   Category: 1
   TerrainTraversal: 0
   SlotKind: 1
-  AllowedClasses: 2
+  AllowedClasses: 15
   BotRole: 0
   Duration: 3
   Cooldown: 7
   CastMotion: 2
   AreaKind: 2
-  AuraRadius: 5.4
+  AuraRadius: 6.48
   AuraSlowFactor: 0.55

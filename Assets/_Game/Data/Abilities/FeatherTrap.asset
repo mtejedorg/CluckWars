@@ -23,6 +23,7 @@ MonoBehaviour:
   BotRole: 0
   Duration: 0.3
   Cooldown: 7
+  Retired: 1
   CastMotion: 4
   AreaKind: 1
   ForwardOffset: 4.5

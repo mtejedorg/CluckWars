@@ -30,11 +30,12 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void AmbushLit_AsksTheEquippedAmbushWouldAffect_NoHardcodedReach_SourceGuard()
+        public void StunLit_AsksTheEquippedStunsWouldAffect_NoHardcodedReach_SourceGuard()
         {
+            // Any stun (FixedKit.EmitsStun) since the 2026-11-05 roster retired Ambush for the generic Stun.
             string src = Read("Assets/_Game/Scripts/Visuals/MarkFeedback.cs");
-            StringAssert.Contains("is AmbushAbilitySO ambush", src);
-            StringAssert.Contains("ambush.WouldAffect(local, target, local.transform.forward)", src);
+            StringAssert.Contains("if (!FixedKit.EmitsStun(stun)) continue;", src);
+            StringAssert.Contains("stun.WouldAffect(local, target, local.transform.forward)", src);
             StringAssert.DoesNotContain("3.6", src);
         }
 
@@ -118,7 +119,7 @@ namespace CluckWars.Tests
             string src = Read("Assets/_Game/Scripts/Input/TouchControlsController.cs");
             StringAssert.Contains("(_markKill[slot] ? MarkHexRules.KillScale(", src);
             StringAssert.Contains("a is MarkKillAbilitySO", src);
-            StringAssert.Contains("a is AmbushAbilitySO", src);
+            StringAssert.Contains("FixedKit.EmitsStun(a)", src);
         }
 
         [Test]

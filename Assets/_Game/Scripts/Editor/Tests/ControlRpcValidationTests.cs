@@ -40,7 +40,17 @@ namespace CluckWars.Tests
 
         private static AbilityRegistrySO Registry() => TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
 
+        /// <summary>
+        /// The ceiling over every ability asset on disk, retired ones included. Since the 2026-11-05 roster (one ability per
+        /// job) the registry sends no root and no RPC slow, so the mechanism tests below run against the full set of authored
+        /// emitters (Ambush, Belly Flop, Headbutt, Ground Quake, Root Egg, Dust Kick and the live Stun): the validator code is
+        /// unchanged and must keep working the day one of them is registered again. <see cref="Registered"/> is the shipped bound.
+        /// </summary>
         private static ControlClaimRules.Ceiling Shipped(ControlKind kind) =>
+            ControlClaimRules.CeilingFor(AllAbilityAssets(), kind);
+
+        /// <summary>The bound <c>ChickenController</c> actually derives: the shipped registry.</summary>
+        private static ControlClaimRules.Ceiling Registered(ControlKind kind) =>
             ControlClaimRules.CeilingFor(Registry().All, kind);
 
         private static List<AbilityBaseSO> AllAbilityAssets() =>
@@ -65,14 +75,13 @@ namespace CluckWars.Tests
         public void EveryShippedEmitter_AtItsOwnNumbers_AndTheEdgeOfItsReach_IsAccepted()
         {
             var emitters = Registry().All.Where(a => a != null && a.EmittedControl.Kind != ControlKind.None).ToList();
-            Assert.GreaterOrEqual(emitters.Count, 7, "fewer control emitters in the registry than shipped (Ambush, Wing Slam, " +
-                "Belly Flop, Headbutt, Ground Quake, Root Egg, Dust Kick) - the bound has gone blind to some of them");
+            Assert.GreaterOrEqual(emitters.Count, 1, "the registry's Stun (2026-11-05 roster: the only RPC control emitter) is missing");
 
             foreach (var a in emitters)
             {
                 var e = a.EmittedControl;
                 var claim = Honest(e.Kind, e.Seconds, e.SlowFactor, ControlClaimRules.Reach(a));
-                var verdict = ControlClaimRules.Evaluate(claim, Shipped(e.Kind));
+                var verdict = ControlClaimRules.Evaluate(claim, Registered(e.Kind));
                 Assert.AreEqual(ControlClaimRules.Verdict.Accepted, verdict,
                     $"{a.name}: its own {e.Kind} ({e.Seconds:0.00}s, factor {e.SlowFactor:0.00}) at its reach " +
                     $"{ControlClaimRules.Reach(a):0.00} m is refused ({verdict}) - every real cast of it would be rejected at the victim.");
@@ -83,12 +92,12 @@ namespace CluckWars.Tests
         public void EveryEmitterAssetOnDisk_FitsInsideTheRegistrysCeiling()
         {
             // Recomputed from the assets on disk, as StealRulesTests does, so an ability that exists but
-            // is missing from the registry shows up as a ceiling too small for it.
-            foreach (var a in AllAbilityAssets())
+            // is missing from the registry shows up as a ceiling too small for it. Retired abilities are out of the pool on purpose.
+            foreach (var a in AllAbilityAssets().Where(a => !a.Retired))
             {
                 var e = a.EmittedControl;
                 if (e.Kind == ControlKind.None) continue;
-                var c = Shipped(e.Kind);
+                var c = Registered(e.Kind);
                 Assert.IsTrue(ControlClaimRules.IsPlausibleSeconds(e.Seconds, c), $"{a.name}: {e.Seconds}s is above the registry's {e.Kind} ceiling {c.MaxSeconds}s");
                 Assert.LessOrEqual(ControlClaimRules.Reach(a), c.MaxReach + 1e-4f, $"{a.name}: reach above the registry's {e.Kind} reach");
                 if (e.Kind == ControlKind.Slow)
@@ -97,14 +106,22 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void EveryKind_HasAShippedEmitter_SoItsCeilingIsResolved()
+        public void EveryKind_EitherHasAShippedEmitter_OrRefusesEveryClaim()
         {
+            // 2026-11-05 roster: the Stun is the only RPC control emitter. A kind nobody sends must refuse every claim
+            // (a known ceiling of 0 s), never fall back to Unknown, which would skip the magnitude and range checks.
             foreach (var (rpc, kind) in Rpcs)
             {
-                var c = Shipped(kind);
-                Assert.IsTrue(c.Known && c.MaxSeconds > 0f && c.MaxReach > 0f,
-                    $"{rpc}: no {kind} emitter in the registry, so ChickenController falls back to sender-only checks (and logs an Error).");
+                var c = Registered(kind);
+                Assert.IsTrue(c.Known, rpc);
+                if (c.MaxSeconds > 0f) Assert.Greater(c.MaxReach, 0f, rpc);
+                else Assert.AreEqual(ControlClaimRules.Verdict.ImplausibleDuration,
+                    ControlClaimRules.Evaluate(Honest(kind, 0.5f, 0.5f), c), $"{rpc}: nothing sends it, so nothing is accepted");
             }
+            Assert.Greater(Registered(ControlKind.Stun).MaxSeconds, 0f, "the Stun (Death Mark's kill needs it) is in the registry");
+            string resolve = Src(ControllerPath);
+            StringAssert.Contains("if (ceiling.Known && ceiling.MaxSeconds <= 0f && HasAnyAbility(pool))", resolve,
+                "a legal roster without an emitter refuses everything instead of logging an Error and trusting the sender");
         }
 
         [Test]
@@ -246,7 +263,7 @@ namespace CluckWars.Tests
         {
             foreach (var kind in new[] { ControlKind.Stun, ControlKind.Root })
             {
-                float poolMax = Registry().All.Where(a => a != null && a.EmittedControl.Kind == kind)
+                float poolMax = AllAbilityAssets().Where(a => a != null && a.EmittedControl.Kind == kind)
                                               .Max(a => ControlClaimRules.Reach(a));
                 Assert.AreEqual(poolMax, Shipped(kind).MaxReach, 1e-4f, $"{kind} reach must be exactly the pool's");
             }

@@ -267,7 +267,7 @@ namespace CluckWars.Visuals
             }
 
             var ability = _abilities.GetSlot(slot);
-            // A live Death Mark of the local Assassin: only Ambush's guide stays (the one decision that matters on the hunt);
+            // A live Death Mark of the local Assassin: only the stun's guide stays (the one decision that matters on the hunt);
             // every other guide comes back the frame the mark ends.
             if (!ShowsGuideDuringMark(ability, MarkFeedback.Current.AssassinMarkActive))
             {
@@ -313,9 +313,10 @@ namespace CluckWars.Visuals
             if (!ink.enabled) ink.enabled = true;
         }
 
-        /// <summary>Whether <paramref name="ability"/>'s always-on guide draws while the local Assassin's mark is live: only Ambush's.</summary>
+        /// <summary>Whether <paramref name="ability"/>'s always-on guide draws while the local Assassin's mark is live: only a
+        /// stun's (<see cref="FixedKit.EmitsStun"/>; it was Ambush's before the 2026-11-05 roster).</summary>
         public static bool ShowsGuideDuringMark(AbilityBaseSO ability, bool assassinMarkActive) =>
-            !assassinMarkActive || ability is AmbushAbilitySO;
+            !assassinMarkActive || FixedKit.EmitsStun(ability);
 
         private void HideLine(int slot)
         {

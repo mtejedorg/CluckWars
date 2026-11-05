@@ -12,14 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1b4e8c2a9f6d473d8a51c3e7f0d2b8a6, type: 3}
   m_Name: TurtleMode
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.TurtleModeAbilitySO
-  DisplayName: Turtle Mode
-  ShortLabel: TRT
-  Description: Shell walk 3s, safe from theft and execution. Press again to lock in place for 2s.
+  DisplayName: Shield
+  ShortLabel: SHLD
+  Description: "Shell walk 3s: nobody can rob, kill, stun, slow or shove you. Press again to lock in place for 2s."
   AccentColor: {r: 0.55, g: 0.42, b: 0.25, a: 1}
   Category: 2
   TerrainTraversal: 0
   SlotKind: 1
-  AllowedClasses: 4
+  AllowedClasses: 15
   Duration: 3.0
   Cooldown: 10
   CastMotion: 5

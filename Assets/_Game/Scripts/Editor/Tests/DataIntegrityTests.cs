@@ -1302,16 +1302,18 @@ namespace CluckWars.Tests
         {
             var abilities = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir);
             var plainPeck = abilities.OfType<PeckAbilitySO>().Single();
+            // Signatures moved off the retired abilities to their job's survivor (2026-11-05): Headbutt -> Shove (CluckShock),
+            // Scrap and Sneaky Steal -> Steal (Snatch), Ground Quake -> Stun (WingSlam). Free mode only.
             var expected = new (ChickenSubclass sub, string peck, string sig)[]
             {
-                (ChickenSubclass.Warrior_Relentless,  "Peck",     "Headbutt"),
-                (ChickenSubclass.Warrior_Bully,       "Peck",     "Scrap"),
+                (ChickenSubclass.Warrior_Relentless,  "Peck",     "CluckShock"),
+                (ChickenSubclass.Warrior_Bully,       "Peck",     "Snatch"),
                 (ChickenSubclass.Speedy_Slippery,    "Peck",     "-"),
                 (ChickenSubclass.Speedy_Featherfoot, "Peck",     "-"),
                 (ChickenSubclass.Fatty_Hoarder,     "Peck",     "-"),
-                (ChickenSubclass.Fatty_Bulwark,     "Peck",     "GroundQuake"),
+                (ChickenSubclass.Fatty_Bulwark,     "Peck",     "WingSlam"),
                 (ChickenSubclass.Assassin_Spoiler,     "MarkKill", "-"),
-                (ChickenSubclass.Assassin_Thief,       "-",        "SneakySteal"),
+                (ChickenSubclass.Assassin_Thief,       "-",        "Snatch"),
             };
 
             foreach (var (sub, peck, sig) in expected)

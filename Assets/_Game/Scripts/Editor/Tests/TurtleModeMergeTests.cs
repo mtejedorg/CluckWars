@@ -7,35 +7,36 @@ using UnityEditor;
 
 namespace CluckWars.Tests
 {
-    /// <summary>Turtle Mode absorbs Egg Shell: walk (steal-proof, stunnable) then lock (immune to control); a second press
-    /// through the running ability, the cooldown from the first press, unkillable in both phases; Egg Shell retired.</summary>
+    /// <summary>Turtle Mode absorbs Egg Shell: walk then lock; a second press through the running ability, the cooldown from
+    /// the first press, unkillable in both phases; Egg Shell retired. Since 2026-11-05 it is the Shield, open to every class,
+    /// and the walk is control-immune too (Immovable folded in).</summary>
     public class TurtleModeMergeTests
     {
         private static TurtleModeAbilitySO Turtle => TestAssets.Load<TurtleModeAbilitySO>(TestAssets.AbilitiesDir + "/TurtleMode.asset");
         private static string Src(string f) => File.ReadAllText(f);
 
         [Test]
-        public void TheNumbers_AreData_FattyOnly()
+        public void TheNumbers_AreData_EveryClass()
         {
             var t = Turtle;
             Assert.AreEqual(3f, t.Duration, "walk");
             Assert.AreEqual(0.5f, t.SpeedMultiplier, "walk speed");
             Assert.AreEqual(2f, t.LockSeconds, "lock");
             Assert.AreEqual(10f, t.Cooldown);
-            Assert.AreEqual(ChickenClassFlags.Fatty, t.AllowedClasses);
-            Assert.AreEqual("Turtle Mode", t.DisplayName);
+            Assert.AreEqual(ChickenClassFlags.All, t.AllowedClasses);
+            Assert.AreEqual("Shield", t.DisplayName);
             Assert.IsTrue(t.AcceptsPressWhileActive);
         }
 
         [Test]
-        public void Walk_IsStealProofButStunnable_Lock_IsImmuneToControl_SourceGuard()
+        public void Walk_IsStealProofAndControlImmune_Lock_IsImmobileToo_SourceGuard()
         {
             string s = Src("Assets/_Game/Scripts/Abilities/TurtleModeAbilitySO.cs");
             int act = s.IndexOf("public override void OnActivate", System.StringComparison.Ordinal);
             int press = s.IndexOf("public override float OnPressWhileActive", System.StringComparison.Ordinal);
             string walk = s.Substring(act, press - act), lockPart = s.Substring(press, s.IndexOf("public override void OnDeactivate", System.StringComparison.Ordinal) - press);
             StringAssert.Contains("GrantStealProof(Duration)", walk);
-            StringAssert.DoesNotContain("GrantControlImmunity", walk, "the walk is stunnable");
+            StringAssert.Contains("GrantControlImmunity(Duration)", walk, "the walk is control-immune (Immovable folded in)");
             StringAssert.Contains("GrantControlImmunity(LockSeconds)", lockPart);
             StringAssert.Contains("GrantStealProof(LockSeconds)", lockPart);
             StringAssert.Contains("SetMovementLock(ctx.Slot)", lockPart);

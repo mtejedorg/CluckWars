@@ -4,11 +4,14 @@ using CluckWars.Localization;
 namespace CluckWars.Abilities
 {
     /// <summary>
-    /// Turtle Mode (Fatty), with Egg Shell folded in (Maestro 2026-11): walk, then lock.
+    /// <b>Shield</b> (Maestro 2026-11-05): Turtle Mode with Egg Shell folded in (2026-11) and Immovable folded in (2026-11-05):
+    /// walk, then lock.
     /// <list type="bullet">
     /// <item>First press: the shell walk for <see cref="AbilityBaseSO.Duration"/> (3 s) at <see cref="SpeedMultiplier"/>, steal-proof
-    /// and so unkillable (<c>ExecuteRules.CanBeExecuted</c>); stuns, roots, slows and shoves still land. The cooldown starts here,
-    /// once, for every path.</item>
+    /// and so unkillable (<c>ExecuteRules.CanBeExecuted</c>), and control-immune: no stun, root, slow or shove lands. That is
+    /// Immovable's window, the same <c>ChickenController.GrantControlImmunity</c>, enforced at the same chokepoints
+    /// (<c>ApplyPassiveControlDuration</c>, <c>ApplyKnockback</c>, the zone slow). Like Immovable it does not clear control already
+    /// on him. The cooldown starts here, once, for every path.</item>
     /// <item>Second press during the walk: lock in place for up to <see cref="LockSeconds"/>: immobile, immune to stun / root / slow /
     /// shove (Egg Shell), still steal-proof. A stun blocks the press like any cast. The lock ends the ability: no return to the walk.</item>
     /// <item>Third press: ends the lock early. Never locking: the walk ends at its limit with the full cooldown, no refund.</item>
@@ -36,11 +39,23 @@ namespace CluckWars.Abilities
         public override bool AffectsEnemies => false;
         public override bool AcceptsPressWhileActive => true;
 
+        public TurtleModeAbilitySO()
+        {
+            DisplayName = "Shield";
+            ShortLabel = "SHLD";
+            Description = "Shell walk 3s: nobody can rob, kill, stun, slow or shove you. Press again to lock in place for 2s.";
+            Category = AbilityCategory.Defense;
+            AllowedClasses = ChickenClassFlags.All;
+            Duration = 3f;
+            Cooldown = 10f;
+        }
+
         public override void OnActivate(AbilityContext ctx)
         {
             ctx.Controller.Effects.SetMoveSpeed(ctx.Slot, SpeedMultiplier);
-            // The walk: steal-proof (and so unkillable) for its own length. Deliberately NO control immunity.
+            // The walk: steal-proof (and so unkillable) and control-immune (Immovable's window) for its own length.
             ctx.Controller.GrantStealProof(Duration);
+            ctx.Controller.GrantControlImmunity(Duration);
         }
 
         public override float OnPressWhileActive(AbilityContext ctx)

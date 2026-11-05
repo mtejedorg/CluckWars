@@ -215,7 +215,7 @@ namespace CluckWars.Tests
                     Assert.IsFalse(a.TargetEffectIncludesSteal, $"{a.name} cannot be both purely control and steal.");
             }
             Assert.IsTrue(Asset("Snatch").TargetEffectIncludesSteal);
-            Assert.IsTrue(Asset("Snatch").TargetEffectIncludesControl, "Snatch steals AND shoves");
+            Assert.IsFalse(Asset("Snatch").TargetEffectIncludesControl, "the Steal (Snatch) no longer shoves: KnockbackStrength 0, 2026-11-05");
             foreach (var n in new[] { "SneakySteal", "Scrap", "DiveBomb" })
             {
                 Assert.IsTrue(Asset(n).TargetEffectIncludesSteal, n);
@@ -257,21 +257,20 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void TurtleMode_IsStealProofButNotControlImmune_WithTheApprovedNumbers()
+        public void TurtleMode_IsStealProofAndControlImmune_WithTheApprovedNumbers()
         {
             string code = Src("Abilities/TurtleModeAbilitySO.cs");
-            // The walk (first press): steal-proof, no control immunity. The lock (second press, Egg Shell folded in) is the
-            // only place control immunity is granted (TurtleModeMergeTests).
+            // The walk (first press): steal-proof and, since the Shield absorbed Immovable (2026-11-05), control-immune.
             string walk = Body(code, "public override void OnActivate(", 500);
             StringAssert.Contains("GrantStealProof(Duration)", walk);
-            StringAssert.DoesNotContain("GrantControlImmunity", walk);
+            StringAssert.Contains("GrantControlImmunity(Duration)", walk);
             StringAssert.DoesNotContain("DamageResistance", code);
 
             var turtle = (TurtleModeAbilitySO)Asset("TurtleMode");
             Assert.AreEqual(3f, turtle.Duration, 1e-5f);
             Assert.AreEqual(10f, turtle.Cooldown, 1e-5f);
             Assert.AreEqual(0.5f, turtle.SpeedMultiplier, 1e-5f);
-            Assert.AreEqual("Shell walk 3s, safe from theft and execution. Press again to lock in place for 2s.", turtle.DescriptionText);
+            Assert.AreEqual("Shell walk 3s: nobody can rob, kill, stun, slow or shove you. Press again to lock in place for 2s.", turtle.DescriptionText);
             Assert.AreEqual(turtle.DescriptionText, turtle.Description, "stale .asset Description");
             StringAssert.DoesNotContain("DamageResistance", File.ReadAllText("Assets/_Game/Data/Abilities/TurtleMode.asset"));
         }

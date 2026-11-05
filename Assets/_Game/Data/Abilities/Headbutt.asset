@@ -25,6 +25,7 @@ MonoBehaviour:
   BotRole: 3
   Duration: 0.25
   Cooldown: 4
+  Retired: 1
   SearchMask:
   CastMotion: 0
     serializedVersion: 2
@@ -34,4 +35,4 @@ MonoBehaviour:
   KnockbackForce: 7.5
   StaggerSeconds: 0.35
   PeckSlotPreEquippedBy: 0
-  SignaturePreEquippedBy: 1
+  SignaturePreEquippedBy: 0

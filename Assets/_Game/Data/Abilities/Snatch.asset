@@ -12,23 +12,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7, type: 3}
   m_Name: Snatch
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SnatchAbilitySO
-  DisplayName: Snatch
-  ShortLabel: SNC
-  Description: Robs 5 food from every rival within 4.3m ahead and shoves them back.
+  DisplayName: Steal
+  ShortLabel: ROB
+  Description: Robs 5 food from every rival within 5.16m.
   Icon: 
   AccentColor: {r: 1, g: 0.3, b: 0.1, a: 1}
   Category: 0
   TerrainTraversal: 0
   JumpTier: 0
   SlotKind: 1
-  AllowedClasses: 8
+  AllowedClasses: 15
+  SignaturePreEquippedBy: 130
   BotRole: 0
   Duration: 0.3
-  Cooldown: 3
+  Cooldown: 5
   SearchMask:
   CastMotion: 3
     serializedVersion: 2
     m_Bits: 256
-  SnatchRange: 4.3
+  SnatchRange: 5.16
   StealAmount: 5
-  KnockbackStrength: 8.1
+  KnockbackStrength: 0

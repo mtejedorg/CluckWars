@@ -197,16 +197,18 @@ namespace CluckWars.Visuals
             input.Walled = PlayerBase.WallBetween(me, it);
             input.TargetShelled = !ExecuteRules.CanBeExecuted(target.IsStealProof);
 
-            // Ambush lit: the target inside the equipped Ambush's OWN shape (the hot test's WouldAffect: reach, shape, wall,
-            // eligibility, all read from the asset) and the slot ready.
+            // Stun lit: the target inside the equipped stun's OWN shape (the hot test's WouldAffect: reach, shape, wall,
+            // eligibility, all read from the asset) and the slot ready. Any stun counts (FixedKit.EmitsStun), the rule the kit
+            // validation and the bot's hunt already use; the Ambush-only test went with Ambush (2026-11-05).
             var abilities = local.Abilities;
             if (abilities == null) return;
             for (int s = 0; s < AbilityController.SlotCount; s++)
             {
-                if (!(abilities.GetSlot(s) is AmbushAbilitySO ambush)) continue;
+                var stun = abilities.GetSlot(s);
+                if (!FixedKit.EmitsStun(stun)) continue;
                 // "Ready" = a press would fire now (off cooldown, the Assassin free to cast): the refusal table the button uses.
                 input.AmbushReadyOnTarget = abilities.EvaluateRefusal(s) == AbilityRefusal.None &&
-                                            ambush.WouldAffect(local, target, local.transform.forward);
+                                            stun.WouldAffect(local, target, local.transform.forward);
                 break;
             }
         }

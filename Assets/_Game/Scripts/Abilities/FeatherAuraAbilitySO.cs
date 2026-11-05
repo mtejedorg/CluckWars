@@ -5,8 +5,8 @@ using CluckWars.Localization;
 namespace CluckWars.Abilities
 {
     /// <summary>
-    /// Feather Aura — Control ability. The caster emits a feather cloud for
-    /// <see cref="AbilityBaseSO.Duration"/> seconds. Any chicken within
+    /// <b>Slow</b>, the one slow job (Maestro 2026-11-05), still the Feather Aura mechanic. The caster emits a feather cloud for The caster emits a feather cloud for
+    /// <see cref="AbilityBaseSO.Duration"/> seconds. Any rival within
     /// <see cref="AuraRadius"/> metres is slowed by <see cref="AuraSlowFactor"/>
     /// while the aura is active.
     /// </summary>
@@ -43,8 +43,8 @@ namespace CluckWars.Abilities
 
         private const string Source = "FeatherAura";
 
-        [Tooltip("Radius of the slow aura around the caster.")]
-        [Min(0.5f)] public float AuraRadius = 5.4f;
+        [Tooltip("Radius of the slow aura around the caster. 6.48 = 5.4 x1.2 (Maestro 2026-11-05).")]
+        [Min(0.5f)] public float AuraRadius = 6.48f;
 
         [Tooltip("Speed multiplier applied to chickens inside the aura (< 1 = slower).")]
         [Range(0.1f, 0.9f)] public float AuraSlowFactor = 0.55f;
@@ -53,7 +53,17 @@ namespace CluckWars.Abilities
         public override float AimRadius => AuraRadius;
 
         // Tagged as an Aura (authored on the asset, defaulted here for fresh instances).
-        public FeatherAuraAbilitySO() { AreaKind = AreaEffectKind.Aura; }
+        public FeatherAuraAbilitySO()
+        {
+            DisplayName = "Slow";
+            ShortLabel = "SLOW";
+            Description = "Slows every rival within 6.48m to 55% speed for 3s.";
+            Category = AbilityCategory.Control;
+            AllowedClasses = ChickenClassFlags.All;
+            AreaKind = AreaEffectKind.Aura;
+            Duration = 3f;
+            Cooldown = 7f;
+        }
 
         public override bool TryGetAreaEffect(out AreaEffectSpec spec)
         {
