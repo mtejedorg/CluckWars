@@ -6,6 +6,45 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🛠 2026-11-05 - Simplified abilities: 11 jobs, range-only targeting (`simplify-abilities`, commits `24861d86`..`ab7ee3a1` plus this docs commit, not merged, not pushed)
+
+- **Why:** Maestro, 2026-11-05: the ability set is too complex for a children's game. Two rulings: (1) one ability per job, generic names; (2) every targeted ability hits every rival within its radius of the caster, by distance only. Numbers below are read from `Assets/_Game/Data/Abilities/*.asset` and `MatchConfig.asset`, not from GDD prose. Docs updated: GDD (header, 5.2, 5.3, 6.1, 6.3, 6.4, 7.1-7.4, 10.1, 11, 13), `docs/balance/human-test-baseline.md`, `docs/site/mechanics.html` (`index.html` has no ability data). No artifact was republished.
+- **The 11 abilities** (a survivor keeps its old asset, GUID and icon; short label in brackets):
+
+  | Ability | Asset | Cooldown | Numbers |
+  |---|---|---|---|
+  | Steal (ROB) | `Snatch.asset` | 5 s | robs 5 food from every rival carrier within 5.16 m, no knockback |
+  | Stun (STUN) | `WingSlam.asset` | 8 s | every rival within 5.4 m, 1.3 s |
+  | Shove (PUSH) | `CluckShock.asset` | 7 s | every rival within 5.4 m, knockback force 16.2 |
+  | Slow (SLOW) | `FeatherAura.asset` | 7 s | aura 6.48 m, 55% speed, 3 s |
+  | Speed (FAST) | `SpeedBurst.asset` | 6 s | 1.5x for 1.5 s |
+  | Jump (JUMP) | `Shadowstep.asset` | 4 s | 3x for 0.18 s, over walls; not Speedy (unchanged) |
+  | Shield (SHLD) | `TurtleMode.asset` | 10 s | 3 s shell walk at 0.5x, steal-proof, unkillable and immune to stun/slow/root/shove (the Slow aura too); second press locks 2 s |
+  | Hide (HIDE) | `Invisibility.asset` | 8 s | 4 s ghost, opacity 0.2 |
+  | Peck | `Peck.asset` | 0.8 s | unchanged |
+  | Quick Drop (DROP) | `QuickDrop.asset` | 12 s | 4x deposit rate for 2 s, Speedy only (unchanged) |
+  | Death Mark (EXEC) | `MarkKill.asset` | 5 s | unchanged; its stun now comes from the generic Stun (1.3 s) instead of Ambush |
+
+  Reach is +20% over the previous base (Steal 4.3 -> 5.16 m, Stun/Shove 4.5 -> 5.4 m, Slow 5.4 -> 6.48 m). Steal lost its knockback and its 3 s cooldown became 5 s. **Retired** (`Retired` flag, out of the registry and every kit, asset and code kept, like Egg Shell): Scrap, Dive Bomb, Sneaky Steal, Ambush, Belly Flop, Ground Quake, Headbutt, Roll & Push, Dust Kick, Feather Trap, Sticky Egg (`RootEggAbilitySO`), Smoke Roost, Ruffle, Feint, Immovable, Spine Coat, Doppelganger. Free-mode signatures moved to each job's survivor; `Game.unity` bot rows (Free only) and `Chicken.prefab`'s default slot no longer reference retired assets.
+- **Kits** (`LoadoutMode` Fixed, from `Passives/*.asset`): Bully (Warrior) Peck, Steal, Shove, Speed. Relentless (Warrior) Peck, Stun, Shove, Speed (cooldown x0.75: Stun 6 s, Shove 5.25 s, Speed 4.5 s). Featherfoot (Speedy) Peck, Speed, Slow, Quick Drop. Slippery (Speedy) Peck, Speed, Slow, Shove. Bulwark (Fatty) Peck, Stun, Shove, Shield. Hoarder (Fatty) Peck, Shield, Slow, Steal. Spoiler (Sneaky) Death Mark, Stun, Jump, Slow. Thief (Sneaky) Steal, Hide, Jump, Shove. Per-class differences now come only from stats, `CooldownMultiplier` and the passives. Free-mode pools: 7 everyone-abilities plus Jump (Warrior, Fatty, Sneaky) or plus Quick Drop (Speedy).
+- **TargetingMode switch (`24861d86`):** `MatchConfigSO.TargetingMode` (`RangeOnly` default, `MatchConfig.asset` 0; `Shaped` restores the cones: Steal 140 deg arc, Stun 120 deg cone), pushed once by `ProjectInstaller` into the static `AbilityTargeting.Mode` (ability SOs are not injected; like `HeavyProbes.Enabled`). The seam is `AbilityBaseSO`: abilities override `AuthoredAimShape` / `AuthoredAimForwardOffset` / `AuthoredAimConeAngle`, and `AimShape` / `AimForwardOffset` / `AimConeAngle` are resolved, collapsing Cone, SelfCircle, ForwardCircle, Capsule and SingleTarget to a caster SelfCircle (offset 0, 360) under RangeOnly. Placed zones, Aura, Jump and None never change; every consumer (gather, telegraph, range guides, bots, receiver bounds, aim rotation) already read the resolved values. Base walls still block every ability.
+- **Shield and the zone slow (`c9e3b33f`):** Shield = Turtle Mode plus Immovable's window: the walk also calls `GrantControlImmunity(Duration)`, so the same chokepoints refuse stun, root, slow and shove. `CheckAbilityZoneSlow` now refuses a control-immune chicken too; **before, zone slows ignored immunity.** The Slow aura is the only slow left.
+- **Control ceilings:** with no root and no RPC slow in the registry, `ResolveCeiling` now yields a known 0 s ceiling for those kinds and refuses every such claim at Debug level, instead of an Error per spawn and an Unknown ceiling that trusted the sender.
+- **Death Mark HUD:** the Mark HUD, the touch hex and the range guide looked for `AmbushAbilitySO`; they now accept any stun (`FixedKit.EmitsStun`), the rule kit validation and the bot hunt already used.
+- **Tests:** EditMode 2826/2826 passing (batch). Tests that encoded the old roster were updated (validation mechanisms run against every authored asset, retired included, or under Shaped; shipped bounds against the live registry); `ab7ee3a1` pins the roster, range-only targeting and the Shield.
+- **Build/scenario:** pending.
+- **Open for Maestro:**
+  - **Short labels:** ROB / STUN / PUSH / SLOW / FAST / JUMP / SHLD / HIDE are my choice; confirm or rename.
+  - **Shield blocks the Slow aura** (and every other control, including stun): intended? It makes Hoarder and Bulwark untouchable for the 3 s walk plus the 2 s lock, and a shelled bird can no longer be stunned, so the D5 note about stunning a Turtle walker is obsolete.
+  - **Quick Drop stays Speedy-only** (Featherfoot only, in the kits): confirm, or open it to everyone like the other ten.
+  - **Descriptions are worded for RangeOnly** ("every rival within 5.4m"): under `Shaped` the text would be wrong, since the templates do not read the mode.
+  - **Slow stays an aura zone** (Feather Aura: 55% while inside, 3 s) rather than a one-shot 3 s slow on everyone in range; a one-shot would be simpler to read for children.
+  - **The `-AutoZone` harness has nothing to cast:** with the zone abilities retired (Feather Trap, Sticky Egg) the registry has no placed-zone ability left to cast; it needs a new target or retiring (not investigated here).
+  - **Death Mark numbers not recomputed:** the walk-home band (21-29 m) and the lunge-share percentages (27% / 10%) were derived with Ambush (1.0 s, 3.6 m); with Stun (1.3 s, 5.4 m) the Spoiler's lunge is Jump 6.56 m + 5.4 m = 11.96 m. Needs the mechanics-designer's Monte Carlo again.
+- **Protocol:** unchanged; the old shapes and retired abilities are still in the build, so keep all peers on one SHA.
+
+---
+
 ## 🛠 2026-11-04 (later) - Death Mark: 3 s arm, stun live at the kill, pick away from the Assassin (`balance`, commits `012e1ba8`..`7b7aa7d7`, not merged, not pushed)
 
 - **Why:** Maestro's rulings after the 4 s window: the arm becomes a gameplay beat, the kill needs a live stun, the pick also weighs distance to the Assassin, and the cooldowns and dash are retuned. Numbers read from `MarkKill.asset`, `Ambush.asset`, `Shadowstep.asset`, `MatchConfig.asset`. Docs updated: GDD 6.4 and 7.x tables, `docs/balance/human-test-baseline.md`, `docs/site/mechanics.html` (`index.html` has none of these numbers).
