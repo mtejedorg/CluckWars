@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Cluck Wars: Mechanics</title>
-<meta name="description" content="How Cluck Wars plays: the 45-second loop, the Solo Clear Time balance axiom, four classes, the steal formula, the control ladder and the 11 abilities.">
+<meta name="description" content="How Cluck Wars plays: the 45-second loop, the Solo Clear Time balance axiom, four classes, the steal formula, the control ladder and the 10 abilities.">
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -117,9 +117,9 @@
       <table>
         <thead><tr><th>Class</th><th>Specialization</th><th>Passive</th><th>Kit</th></tr></thead>
         <tbody>
-          <tr><td><span class="tag t-warrior">Warrior</span></td><td>Bully</td><td>Steals 40% more, with 2 extra cargo room to hold it</td><td>Peck, Steal, Shove, Speed</td></tr>
-          <tr><td><span class="tag t-warrior">Warrior</span></td><td>Relentless</td><td>Every move except Peck recharges 25% faster (Stun 6 s, Shove 5.25 s, Speed 4.5 s)</td><td>Peck, Stun, Shove, Speed</td></tr>
-          <tr><td><span class="tag t-speedy">Speedy</span></td><td>Featherfoot</td><td>Immune to the pile slow and the collision slow</td><td>Peck, Speed, Slow, Quick Drop</td></tr>
+          <tr><td><span class="tag t-warrior">Warrior</span></td><td>Bully</td><td>Every move except Peck recharges 25% faster (Steal 3.75 s, Stun 6 s, Jump 3 s)</td><td>Peck, Steal, Stun, Jump</td></tr>
+          <tr><td><span class="tag t-warrior">Warrior</span></td><td>Relentless</td><td>Your stuns and slows last 30% longer (Stun 1.69 s, Slow aura 3.9 s); stuns, getting stuck and timed slows on you end 25% sooner</td><td>Peck, Steal, Slow, Speed</td></tr>
+          <tr><td><span class="tag t-speedy">Speedy</span></td><td>Featherfoot</td><td>You bank food 50% faster; immune to the pile slow and the collision slow</td><td>Peck, Speed, Slow, Steal</td></tr>
           <tr><td><span class="tag t-speedy">Speedy</span></td><td>Slippery</td><td>Stuns, getting stuck and timed slows end 40% sooner</td><td>Peck, Speed, Slow, Shove</td></tr>
           <tr><td><span class="tag t-fatty">Fatty</span></td><td>Bulwark</td><td>Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner</td><td>Peck, Stun, Shove, Shield</td></tr>
           <tr><td><span class="tag t-fatty">Fatty</span></td><td>Hoarder</td><td>Carries at least 40 food, a full win's worth</td><td>Peck, Shield, Slow, Steal</td></tr>
@@ -136,7 +136,7 @@
     <!-- Source: docs/GDD.md §6.2 -->
     <p>All chicken-to-chicken interaction is steal or control. There is no basic attack. A steal moves cargo directly from victim to thief; nothing drops on the floor. The amount is capped three ways:</p>
     <pre><code>stolen = min(steal value, free space, defender cargo)   // never negative</code></pre>
-    <p>A loaded thief has no free space, so it cannot steal. Theft is a rhythm of steal, bank, return, not a drain. A steal-proof bird (Shield, walking or locked) refuses every steal, so the formula never runs against it.</p>
+    <p>A loaded thief has no free space, so it cannot steal. Theft is a rhythm of steal, bank, return, not a drain. A steal-proof bird (Shield, walking or egged) refuses every steal, so the formula never runs against it.</p>
 
     <form class="calc" id="calc" hidden aria-label="Steal calculator">
       <label>Steal value<input type="number" id="c-steal" min="0" step="1" value="6" inputmode="numeric"></label>
@@ -165,18 +165,18 @@
         <thead><tr><th>State</th><th>Move</th><th>Cast abilities</th><th>Collect</th><th>Source</th></tr></thead>
         <tbody>
           <tr><td>Slowed</td><td>reduced</td><td>yes</td><td>yes</td><td>collision, pile, the Slow aura</td></tr>
-          <tr><td>Stuck</td><td>no</td><td>yes</td><td>no</td><td>none in the current 11</td></tr>
+          <tr><td>Stuck</td><td>no</td><td>yes</td><td>no</td><td>none in the current 10</td></tr>
           <tr><td>Stunned</td><td>no</td><td>no</td><td>no</td><td>the Stun ability (1.3 s)</td></tr>
         </tbody>
       </table>
     </div>
-    <p>Stun is the only state that locks casting. That is exactly why it is the qualifier for the Assassin's execute. Control immunity (Shield, walking and locked) stops the whole ladder; steal-proofing is separate and only stops cargo being taken.</p>
+    <p>Stun is the only state that locks casting. That is exactly why it is the qualifier for the Assassin's execute. The Shield egg is immune to the whole ladder, while the Shield walk is immune to ability slows only; steal-proofing is separate and only stops cargo being taken. A Relentless caster lengthens the stuns and slows it applies by 30% (a Relentless stun lasts 1.69 s), applied before the victim's own shortening; roots and placed zones are not lengthened.</p>
   </section>
 
   <section id="deathmark">
     <h2>Death Mark: one button, two presses</h2>
     <!-- Source: docs/GDD.md §6.4 -->
-    <p>The Assassin's execute is the only hard removal in the game. Only the Assassin specialization has it, in the first of the four ability slots. The press marks a rival anywhere on the map for 4 s, picked at random but likelier the farther it is from its own base and, softly, from the Assassin; the Assassin must find it, stun it and press again within 8 m, in the last second of the mark. Each round opens with Death Mark on a 4 s cooldown. No ability crosses a claimed base wall, so a bird at home cannot be reached and the mark can run out.</p>
+    <p>The Assassin's execute is the only hard removal in the game. Only the Assassin specialization has it, in the first of the four ability slots. The press marks a rival anywhere on the map for 4 s, picked at random but likelier the farther it is from its own base and, softly, from the Assassin; the Assassin must find it, stun it and press again within 6.2 m, in the last second of the mark. Each round opens with Death Mark on a 4 s cooldown. No ability crosses a claimed base wall, so a bird at home cannot be reached and the mark can run out.</p>
     <div class="tw wide">
       <table>
         <thead><tr><th>Stage</th><th>Condition</th><th>Counterplay</th></tr></thead>
@@ -184,24 +184,24 @@
           <tr><td>Mark</td><td>First press marks a living rival anywhere on the map, likelier one far from its own base. The target can see the mark.</td><td>Reach your base in time: no ability crosses a base wall.</td></tr>
           <tr><td>Hunt</td><td>The Assassin has 4 seconds to find it and close in. The mark arms after 3 s: a Kill is only possible in the last 1.0 s.</td><td>Escape: stay out of reach until the timer runs out, or walk home (a victim within about 21 to 29 m of home is safe).</td></tr>
           <tr><td>Stun</td><td>The marked target must be stunned when the Kill lands, from any source (a stun that began before the arm and is still running counts). Stun lasts 1.3 s, 0.78 s on Slippery, 0.845 s on Bulwark.</td><td>Don't get stunned.</td></tr>
-          <tr><td>Kill</td><td>Press again in the last second, within 8 m, while the target is stunned, not shelled, and the Assassin is not stunned.</td><td>&mdash;</td></tr>
+          <tr><td>Kill</td><td>Press again in the last second, within 6.2 m, while the target is stunned, not shelled, and the Assassin is not stunned.</td><td>&mdash;</td></tr>
         </tbody>
       </table>
     </div>
-    <p>No isolation: the mark ignores crowds. The only defences are not being stunned, escaping, and reaching your base in time. A shell (Shield) also makes you unkillable, and unstunnable, while it lasts.</p>
+    <p>No isolation: the mark ignores crowds. The only defences are not being stunned, escaping, and reaching your base in time. A Shield also makes you unkillable while it lasts, and its egg (the last 2 of its 3 seconds) makes you unstunnable too. Stun reach (5.4 m) plus kill range (6.2 m) is 11.6 m.</p>
     <p>On success the victim's whole cargo moves to the Assassin as a bounty bag that ignores the capacity limit. The bag can be stolen like any other load: a steal takes the beak first, then the bag. The victim is out for 3 seconds, then respawns at its own base with no cargo; its cooldowns keep running. If the execute fails, Death Mark takes a reduced cooldown (5 s) so the Assassin can re-mark quickly; after a kill it is 10 s, so a round holds at most three kills.</p>
     <p>What each player sees: the Assassin gets one marker in the target's own colour (a skull, a draining ring and the distance), a skull on the target's standings row, and a big yellow KILL button exactly while a kill is possible (until the arm the marker shows a countdown digit and KILL stays dark). The marked player gets a MARKED! warning, a darkened screen for as long as the mark lasts, a clock pill reading LIVE IN 3, 2, 1 while the mark arms and then a red, pulsing LIVE 1s, and a skull on the Assassin's arrow; when the Assassin is close the darkness turns cold violet. Everyone else sees only the skull on the standings, which turns red and pulses when the mark goes live. A sting plays at the arm for each role.</p>
   </section>
 
   <section id="abilities">
-    <h2>The 11 abilities</h2>
+    <h2>The 10 abilities</h2>
     <!-- Source: docs/GDD.md §7.2 (pool and cooldowns), §6.1 (range-only targeting) -->
-    <p>Simplified on 2026-11-05: one ability per job, with plain names. Every targeted ability hits every rival within its radius of you, by distance only: there is no cone and no aiming at a single rival. Seventeen older moves are retired. Each player has four active slots, filled by the kit of the chosen specialization. Cooldowns are the shipped values, before passives.</p>
+    <p>Simplified on 2026-11-05: one ability per job, with plain names. Every targeted ability hits every rival within its radius of you, by distance only: there is no cone and no aiming at a single rival. Nineteen older moves are retired (Quick Drop's banking bonus is now a permanent Featherfoot passive). Each player has four active slots, filled by the kit of the chosen specialization. Cooldowns are the shipped values, before passives.</p>
 
     <div class="chips" id="chips" role="group" aria-label="Filter abilities by who can use them" hidden>
-      <button type="button" class="chip" data-f="all" aria-pressed="true">All 11</button>
+      <button type="button" class="chip" data-f="all" aria-pressed="true">All 10</button>
       <button type="button" class="chip" data-f="everyone" aria-pressed="false">Everyone 7</button>
-      <button type="button" class="chip" data-f="limited" aria-pressed="false">Limited 4</button>
+      <button type="button" class="chip" data-f="limited" aria-pressed="false">Limited 3</button>
     </div>
 
     <div class="tw">
@@ -213,13 +213,12 @@
           <tr data-c="everyone"><td>Shove <span class="tag t-shared">Everyone</span></td><td class="num">7 s</td><td>Shoves every rival within 5.4 m away.</td></tr>
           <tr data-c="everyone"><td>Slow <span class="tag t-shared">Everyone</span></td><td class="num">7 s</td><td>Slows every rival within 6.48 m to 55% speed for 3 s.</td></tr>
           <tr data-c="everyone"><td>Speed <span class="tag t-shared">Everyone</span></td><td class="num">6 s</td><td>A 1.5 s sprint at 1.5&times; movement speed.</td></tr>
-          <tr data-c="everyone"><td>Shield <span class="tag t-shared">Everyone</span></td><td class="num">10 s</td><td>Walk, then lock. Shell walk for 3 s at half speed: nobody can rob, kill, stun, slow or shove you, the Slow aura included. Press again to lock in place for 2 s. Cooldown from the first press.</td></tr>
+          <tr data-c="everyone"><td>Shield <span class="tag t-shared">Everyone</span></td><td class="num">10 s</td><td>Walk, then egg, on one press. First second: walk at half speed, nobody can rob or kill you and slows (the Slow aura included) do not work, but a stun still lands. Then an egg for 2 s that starts by itself: you cannot move, and nobody can rob, kill, stun, slow or shove you. Press again to stop; using another move ends the egg. Cooldown from the cast.</td></tr>
           <tr data-c="everyone"><td>Hide <span class="tag t-shared">Everyone</span></td><td class="num">8 s</td><td>Fades you to a ghostly outline for 4 s. Using a move breaks it.</td></tr>
 
           <tr data-c="limited"><td>Jump <span class="tag t-shared">Not Speedy</span></td><td class="num">4 s</td><td>Dashes forward at 3&times; speed for 0.18 s (about 6.6 m), straight over walls.</td></tr>
-          <tr data-c="limited"><td>Quick Drop <span class="tag t-speedy">Speedy</span></td><td class="num">12 s</td><td>Banks food 4&times; faster for 2 s.</td></tr>
           <tr data-c="limited"><td>Peck <span class="tag t-shared">Pre-equipped</span></td><td class="num">0.8 s</td><td>Take a beakful from the pile you stand on. Forced for every forager.</td></tr>
-          <tr data-c="limited"><td>Death Mark <span class="tag t-assassin">Spoiler</span></td><td class="num">5 s</td><td>The execute. Marks a rival anywhere for 4 s, likelier far from home and from you; it goes live after 3 s, so the Kill is in the last second. Cooldown 5 s after a miss, 10 s after a kill. Within 8 m, stun them, then press again to take everything they carry. Starts each round on a 4 s cooldown.</td></tr>
+          <tr data-c="limited"><td>Death Mark <span class="tag t-assassin">Spoiler</span></td><td class="num">5 s</td><td>The execute. Marks a rival anywhere for 4 s, likelier far from home and from you; it goes live after 3 s, so the Kill is in the last second. Cooldown 5 s after a miss, 10 s after a kill. Within 6.2 m, stun them, then press again to take everything they carry. Starts each round on a 4 s cooldown.</td></tr>
         </tbody>
       </table>
     </div>
@@ -232,11 +231,11 @@
         <tbody>
           <tr><td>Quick</td><td class="num">3 to 5 s</td><td>Jump, Steal, Death Mark</td></tr>
           <tr><td>Standard</td><td class="num">6 to 9 s</td><td>Speed, Shove, Slow, Stun, Hide</td></tr>
-          <tr><td>Heavy</td><td class="num">10 to 12 s</td><td>Shield, Quick Drop</td></tr>
+          <tr><td>Heavy</td><td class="num">10 s</td><td>Shield</td></tr>
         </tbody>
       </table>
     </div>
-    <p>A move earns a Heavy cooldown only if it gives immunity (control immunity or steal-proofing), a hard area stun of at least 1.4 s, or an economy burst. Peck is foraging cadence set by the Solo Clear Time axiom, not a tiered move.</p>
+    <p>A move earns a Heavy cooldown only if it gives immunity (control immunity or steal-proofing), a hard area stun of at least 1.4 s, or an economy burst (none left since Quick Drop was retired). Peck is foraging cadence set by the Solo Clear Time axiom, not a tiered move.</p>
   </section>
 
   <section id="casting">
@@ -303,7 +302,7 @@
 
 <script>
 (function () {
-  // Ability filter. Without JS the chip bar stays hidden and all 11 rows show.
+  // Ability filter. Without JS the chip bar stays hidden and all 10 rows show.
   var chips = document.getElementById('chips');
   var rows = document.querySelectorAll('#abil tbody tr');
   if (chips && rows.length) {

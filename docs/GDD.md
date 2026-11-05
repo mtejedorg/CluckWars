@@ -14,7 +14,7 @@ Defense / Utility** with an `AllowedClasses`-gated model (shared / class-only / 
 `docs/superpowers/specs/2026-07-24-cluck-wars-core-redesign-design.md` and
 `…/2026-07-25-ability-pool-rewrite-design.md`.
 
-**Update 2026-11-05 (Maestro) - simplified abilities.** The ability set was too complex for a children's game: the registry now holds **11 abilities, one per job** (Steal, Stun, Shove, Slow, Speed, Jump, Shield, Hide, Peck, Quick Drop, Death Mark), and **every targeted ability hits every rival within its radius of the caster, by distance only** (range-only targeting, §6.1). The eight fixed kits were rewritten (§5.3). Retired moves are marked retired rather than deleted from history.
+**Update 2026-11-05 (Maestro) - simplified abilities.** The ability set was too complex for a children's game: the registry now holds **10 active abilities, one per job** (Steal, Stun, Shove, Slow, Speed, Jump, Shield, Hide, Peck, Death Mark; Quick Drop was retired later the same day and became a Featherfoot passive, section 5.3), and **every targeted ability hits every rival within its radius of the caster, by distance only** (range-only targeting, §6.1). The eight fixed kits were rewritten (§5.3). Retired moves are marked retired rather than deleted from history. **Later the same day (Maestro):** the Warrior became the all-rounder (Bully and Relentless reworked, outgoing crowd-control multiplier, §5.3), Shield became a slow-immune walk followed by an automatic egg (§7.2), Quick Drop was retired in favour of a permanent Featherfoot banking bonus, and Death Mark's kill range went from 8 m to 6.2 m (§6.4).
 
 *Earlier: v0.3 removed the basic attack; v0.2 added the 2.5D visual direction. See git
 history for the pre-0.4 document.*
@@ -486,13 +486,13 @@ current, shipped state.
 > **Rewritten 2026-11-05.** Under the fixed-kits baseline (`LoadoutMode` Fixed) every specialization plays one authored four-ability kit
 > (`PassiveAbilitySO.Kit`), so the old "signature + pending Peck variant" column is gone: all eight specializations have a full kit and the
 > "three unassigned signatures" gap is closed. Per-class differences now come only from stats, `CooldownMultiplier` and the passives.
-> Kits are in `Assets/_Game/Data/Abilities/Passives/*.asset`; cooldowns are the base values, then Relentless's x0.75 where it applies.
+> Kits are in `Assets/_Game/Data/Abilities/Passives/*.asset`; cooldowns are the base values, then Bully's x0.75 where it applies (every move except Peck).
 
 | Class | Specialization | Passive | Kit (slot order) |
 |---|---|---|---|
-| **Warrior** | The Brute (Bully) | Steals 40% more, +2 cargo room to hold it | Peck, **Steal**, **Shove**, **Speed** |
-| | The Relentless | Every move except Peck recharges 25% faster (x0.75: Stun 6 s, Shove 5.25 s, Speed 4.5 s) | Peck, **Stun**, **Shove**, **Speed** |
-| **Speedy** | The Anxious (Featherfoot) | Immune to the pile-slow and the collision slow | Peck, **Speed**, **Slow**, **Quick Drop** |
+| **Warrior** | The Brute (Bully) | Every move except Peck recharges 25% faster (`CooldownMultiplier` 0.75: Steal 3.75 s, Stun 6 s, Jump 3 s) | Peck, **Steal**, **Stun**, **Jump** |
+| | The Relentless | Your stuns and slows last 30% longer (`OutgoingDurationMultiplier` 1.3: Stun 1.69 s, the Slow aura runs 3.9 s); stuns, getting stuck and timed slows on you end 25% sooner (`DurationMultiplier` 0.75, no knockback cut) | Peck, **Steal**, **Slow**, **Speed** |
+| **Speedy** | The Anxious (Featherfoot) | You bank food 50% faster (`DepositRateMultiplier` 1.5, permanent); immune to the pile-slow and the collision slow | Peck, **Speed**, **Slow**, **Steal** |
 | | The Agile (Slippery) | Stuns, getting stuck and timed slows end 40% sooner (zone, aura, pile and bump slows are not shortened) | Peck, **Speed**, **Slow**, **Shove** |
 | **Fatty** | The Boulder (Bulwark) | Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner | Peck, **Stun**, **Shove**, **Shield** |
 | | The Hauler (Hoarder) | Carries at least 40 food (a full win's worth) | Peck, **Shield**, **Slow**, **Steal** |
@@ -502,11 +502,21 @@ current, shipped state.
 The old signatures (Scrap, Headbutt, Ground Quake, Sneaky Steal) are retired (2026-11-05). The class shows as Sneaky; in code it is still `ChickenClass.Assassin`.
 The Spoiler passive asset's display name is "Assassin".
 
-**Why Bully/Relentless and Assassin/Thief are each amplified only by their own passive:**
-Bully makes Steal worth taking (bigger steal + room to carry it); Relentless
-makes Stun and Shove genuinely spammable. Neither kit is impressive under the *other*
-passive on purpose - that asymmetry is what makes the specialization choice read as a
-build, not a stat tweak.
+**The Warrior is the all-rounder (Maestro, 2026-11-05, later).** Both Warrior kits carry Peck, Steal, one
+crowd control and one mobility move; the old "defend a pile" identity is gone. **Bully** is the cooldown spammer
+(every move except Peck recharges 25% faster; the old steal x1.4 and +2 cargo were removed, and its declared
+Solo Clear Time exception with them, so it farms like the naked Warrior: Oracle 34.98 s / 3 trips on every seat).
+**Relentless** is tenacity plus stronger crowd control, and it stays the Warrior's signature. Two multipliers
+on one passive: `DurationMultiplier` 0.75 shortens the stuns, getting-stuck and timed slows that land on it (the same
+`ModifyControlDuration` mechanism as Slippery and Bulwark, no knockback cut), and `OutgoingDurationMultiplier`
+1.3 lengthens the stuns and slows it applies. The caster's factor is applied first, then the victim's: a Relentless
+stun on a Slippery bird lasts 1.3 x 1.3 x 0.6 = 1.014 s. The Slow aura's run time is its crowd control, so it
+runs 3.9 s (cooldown still 7 s, from the cast). Roots and placed zones are not lengthened. Because receivers
+check claims against a ceiling, the stun and slow ceilings are multiplied by the strongest outgoing factor among
+the shipped passives (stun ceiling 1.3 x 1.3 = 1.69 s). Relentless's Oracle result is 34.98 s / 3 trips.
+**Featherfoot** (Speedy) lost Quick Drop and gained a permanent 1.5x banking rate instead (Oracle 28.54 s / 4 trips
+on all seats against the Speedy target 30 s, so it is a declared exception in `SpecSctTargets`, pending Maestro's
+human session). Assassin/Thief remain amplified only by their own passive.
 
 **Visual identity (per-specialization colour/model) is designed, not shipped.**
 `docs/design/class-essence-and-signatures.md` §"Visual identity" specifies Speedy's
@@ -558,10 +568,10 @@ steal outright: the thief is not credited, so the formula never runs.
 | **Stunned** | ❌ | **❌** | ❌ | the Stun ability |
 
 Stun is the only state that locks *casting* — which is exactly why it's the qualifier for
-the Assassin execute. There is one stun, 1.3 s (`WingSlam.asset`, now called Stun; 0.78 s against Slippery, 0.845 s against Bulwark). **Protections:** control immunity (Shield, walk and lock since 2026-11-05) stops the whole ladder; **steal-proof** (Shield) is separate and only stops cargo being taken (§7.2). **Slow sources** (collision, pile, ability) are tagged separately so
+the Assassin execute. There is one stun, 1.3 s (`WingSlam.asset`, now called Stun; 0.78 s against Slippery, 0.845 s against Bulwark, 1.69 s from a Relentless caster, 1.014 s from Relentless against Slippery). **Protections:** control immunity (the Shield egg stops the whole ladder; the Shield walk stops ability slows only, §7.2); **steal-proof** (Shield) is separate and only stops cargo being taken (§7.2). **Slow sources** (collision, pile, ability) are tagged separately so
 passives like Slippery can target one without the others. Today Slippery and Bulwark shorten
 only **timed** effects (stuns, getting stuck); presence slows (zones,
-the Slow aura, pile, collision) have no duration and apply in full. Getting stuck has no source in the shipped registry (Sticky Egg and Feather Trap are retired). A control-immune bird (Shield) now also refuses zone slows; before 2026-11-05 zone slows ignored immunity.
+the Slow aura, pile, collision) have no duration and apply in full. Getting stuck has no source in the shipped registry (Sticky Egg and Feather Trap are retired). A control-immune bird (the egg) now also refuses zone slows; before 2026-11-05 zone slows ignored immunity. **Control ceilings and Relentless:** receivers cap incoming stun and slow claims at the shipped ceiling multiplied by the largest `OutgoingDurationMultiplier` among the shipped passives (1.3 today, so the stun ceiling is 1.69 s); the root ceiling does not move.
 
 ### 6.4 The Assassin execute (the only hard removal)
 
@@ -576,11 +586,11 @@ it at all, cannot hand-pick it, and cannot execute. The Assassin's stun now come
 | **Mark** | Press → a living rival anywhere on the map, picked at random but **likelier the farther it is from its own base**. The target sees it is marked. | Reach your base in time, where nothing reaches you |
 | **Hunt** | The Assassin has **4 s** to find it and close in; the Kill is only possible in the **last 1.0 s** (the 3 s arm is a gameplay beat) | Escape: stay out of his reach until the timer runs out, or walk home |
 | **Stun** | The target must be stunned **when the Kill lands** (his own Stun, or *any* stun; one that began before the arm and is still running counts) | Don't get stunned |
-| **Kill** | Press again in the last 1.0 s while it is stunned, within **8 m**, with no base wall between, and the Assassin is not stunned (a stunned Assassin cannot cast anything) | — |
+| **Kill** | Press again in the last 1.0 s while it is stunned, within **6.2 m**, with no base wall between, and the Assassin is not stunned (a stunned Assassin cannot cast anything) | — |
 
 No isolation: the mark ignores crowds. The only defences are not being stunned, escaping, and reaching your base in time.
-A shell (Shield, walk or lock) also makes you unkillable while it lasts: a shelled chicken cannot be executed
-(`ExecuteRules.CanBeExecuted`). Since 2026-11-05 the walk is also stun-immune, so a shelled bird cannot be stunned at all; the mark stays alive and its timer keeps running.
+A steal-proof Shield (the walk and the egg, §7.2) also makes you unkillable while it lasts: a steal-proof chicken cannot be executed
+(`ExecuteRules.CanBeExecuted`). The egg is stun-immune as well, so an egged bird cannot be stunned at all; the mark stays alive and its timer keeps running. A stun can still land on the one-second walk.
 
 On success the victim's **entire cargo transfers to the Assassin as a capacity-exempt
 "bounty bag"** (he becomes a courier of a stolen win). The victim is **out for 3 s** (`MarkKill.asset`
@@ -595,7 +605,7 @@ the first mark is not wasted on targets still at home.
 **Spec v2 (Maestro, 2026-10-31).** The press marks a **living rival anywhere on the
 map**, chosen at random and weighted toward birds far from home (see below): no mark range, no isolation. Decoys are never picked, and the next mark can never be the last one unless that bird is the
 only rival (no time release; reset each round). The Assassin then finds it, stuns it and presses again. The Kill needs the target
-**stunned now**, not shelled, the Assassin free to cast, within **KillRange 8 m**, and no base wall between them. The mark lasts **4 s** (12 s until 2026-11-03, 7 s until 2026-11-04). A Kill cannot qualify before the **arm, 3.0 s** (`ArmSeconds`; 0.6 s until 2026-11-04, then only a replication floor), so the Kill happens in the **last 1.0 s** of the mark. Only expiry, a kill or the target leaving play ends a mark: it survives
+**stunned now**, not shelled, the Assassin free to cast, within **KillRange 6.2 m** (8 m until 2026-11-05), and no base wall between them. The mark lasts **4 s** (12 s until 2026-11-03, 7 s until 2026-11-04). A Kill cannot qualify before the **arm, 3.0 s** (`ArmSeconds`; 0.6 s until 2026-11-04, then only a replication floor), so the Kill happens in the **last 1.0 s** of the mark. Only expiry, a kill or the target leaving play ends a mark: it survives
 range, crowds and the target going home, where no ability reaches it, so the timer can run out. Expiry costs the fail cooldown (5 s);
 a kill 10 s (15 s until 2026-11-04). All numbers are on `MarkKill.asset`. The bounty is paid on the victim's kill report, so a refused kill pays nothing.
 
@@ -603,7 +613,7 @@ a kill 10 s (15 s until 2026-11-04). All numbers are on `MarkKill.asset`. The bo
 the pick favours birds far from home and, softly, far from the Assassin: each candidate rolls `roll * w * w * a`. `w` is its planar
 distance to its own base over the longest base-to-base distance (the diagonal, read from the live bases, 61.7 m), clamped to 0..1.
 `a = 0.25 + 0.75 * clamp01(distance to the Assassin / (span / 3))`, where span / 3 is about 20.6 m. A rival next to the Assassin keeps a
-quarter weight, so nobody is unmarkable; marks that start inside the 10.2 m lunge drop from 40% to 27% with the Assassin camping the
+quarter weight, so nobody is unmarkable; marks that start inside the old 10.2 m reach (Ambush era) drop from 40% to 27% with the Assassin camping the
 centre, and from 15% to 10% roaming (Monte Carlo, mechanics-designer). The highest score wins. A bird at home
 scores 0 and is never picked while another candidate is away from home; if every score is 0 the pick is uniform, so a mark always
 lands when a rival exists (`MarkPickRules`, authority side, rolls from `UnityEngine.Random`). The last mark is still excluded
@@ -616,10 +626,9 @@ The victim's authority times the arm itself (verdict `NotArmed`, allowance 0.5 s
 within one capped network latency, verdict `NotStunned`). **Cooldowns:** 4 s at GO, 5 s after a miss, 10 s after a kill. That allows
 at most 3 kills in a 45 s round (press 4, kill 7.3, press 17.3, kill 20.6, press 30.6, kill 33.9; a 4th press at 43.9 cannot arm
 before 45 s); any miss costs 9 s. **Stun** cooldown is 8 s, longer than the 4 s window: never a second stun in one hunt,
-and the stun is ready for the next. **Jump** (Shadowstep) lasts 0.18 s: dash 3 x 12.15 x 0.18 = 6.56 m, lunge with Stun's 5.4 m
-reach = 11.96 m (was 10.2 m with Ambush's 3.6 m; the percentages below were computed for 10.2 m and a 1.0 s stun and are not recomputed). With Underdog Surge the dash is 9.19 m, under the 9.85 m gap between two pinwheel arms, so it cannot cross two arms even with Underdog.
+and the stun is ready for the next. **Jump** (Shadowstep) lasts 0.18 s: dash 3 x 12.15 x 0.18 = 6.56 m. **Reach framing (2026-11-05, later):** Stun's reach plus Death Mark's `KillRange` stays 11.6 m. Ambush era: 3.6 + 8 = 11.6 m; now Stun 5.4 m + `KillRange` 6.2 m = 11.6 m (`MarkKill.asset`; Stun's reach grew 1.8 m, so the kill range gave 1.8 m back). `KillRange` is the planar distance at the Kill press; the code has no lunge term. The percentages below were computed for the Ambush era (10.2 m reach, 1.0 s stun) and are not recomputed. With Underdog Surge the dash is 9.19 m, under the 9.85 m gap between two pinwheel arms, so it cannot cross two arms even with Underdog.
 **Walk home.** With a 3 s arm a victim within about 21-29 m of home (class and stun length dependent) who walks home is safe: about
-29-36% of marks. **D5 (changed 2026-11-05):** Shield's walk is now stun-immune as well as steal-proof, so a shelled bird can neither be stunned nor executed, and Hoarder and Bulwark can cover the whole kill span with one well-timed button (open for Maestro). **Bounty economy (D4):** the Assassin earns only from executes (victim cargo
+29-36% of marks. **D5 (changed twice on 2026-11-05):** Shield is a 1 s slow-immune walk (steal-proof, unkillable) then a 2 s egg (also stun-immune), so one well-timed button covers part of the kill span for Hoarder and Bulwark (open for Maestro). **Bounty economy (D4):** the Assassin earns only from executes (victim cargo
 plus `ExecuteBounty` 5, doubled on the leader only during the rare LeaderBounty event). `MatchConfig.SpoilerBounty` 15 is read by no
 code; what is paid is `Spoiler.asset` BonusFood 15 at timer expiry with no winner. Mean victim cargo is about 5.7, so 3 banked kills are
 about 32 food, 8 short of 40; 2 kills plus the Spoiler bonus about 36.5; 2 kills alone about 21.5. No rule added; `ExecuteBounty` 8 would make 3 kills about 41.
@@ -665,9 +674,9 @@ RPC. Walking at a wall slides round it. A base whose owner left stays claimed, k
 > This is a baseline to iterate, not a final roster.
 
 > **Simplified 2026-11-05 (Maestro): 11 abilities, one per job.** The class-owned pool wording in §7.1 is **history** except where this
-> note and the new §7.2 table say otherwise. Free mode now draws on the 11: Warrior, Fatty and Sneaky can pick
-> the 7 everyone-abilities plus Jump (8); Speedy the 7 plus Quick Drop (8); Peck and Death Mark stay pre-equip-only. Seventeen moves were
-> retired (listed under the §7.2 table), and the §7.3 / §7.4 tables are rewritten to the 11.
+> note and the new §7.2 table say otherwise. Free mode now draws on the 10 actives: Warrior, Fatty and Sneaky can pick
+> the 7 everyone-abilities plus Jump (8); Speedy the 7 only (Quick Drop was retired later on 2026-11-05); Peck and Death Mark stay pre-equip-only. Nineteen moves are
+> now retired (listed under the §7.2 table), and the §7.3 / §7.4 tables are rewritten to the 10.
 
 > **Simplified 2026-09-04 (Maestro).** The old wording made slot pressure vary by
 > specialization, which nobody could hold in their head. The model below is uniform: one
@@ -736,57 +745,60 @@ specializations therefore need **ordinary signature abilities** assigned (see §
   pre-equip-only (`None`) abilities no subclass references.
 - Every ability is balanced against the others — monetization must never be pay-to-win.
 
-### 7.2 The pool - 11 abilities, one per job (2026-11-05)
+### 7.2 The pool - 10 active abilities, one per job (2026-11-05)
 
 Ability text follows the `Description` field of each shipped `.asset`. Every number below is read from `Assets/_Game/Data/Abilities/*.asset` (before passives). The asset file names are the old ones (the survivor keeps its asset, GUID and icon): Steal is `Snatch.asset`, Stun `WingSlam.asset`, Shove `CluckShock.asset`, Slow `FeatherAura.asset`, Speed `SpeedBurst.asset`, Jump `Shadowstep.asset`, Shield `TurtleMode.asset`, Hide `Invisibility.asset`, Death Mark `MarkKill.asset`. Generic names, short labels (ROB, STUN, PUSH, SLOW, FAST, JUMP, SHLD, HIDE) and description templates came in the same change. All reach figures are a radius around the caster (range-only targeting, §6.1).
 
 | Ability | Short | Cooldown | Who can pick it | Effect |
 |---|---|---|---|---|
-| **Steal** | ROB | 5 s | everyone | Robs 5 food from every rival carrier within 5.16 m (Bully x1.4, Thief x1.6); no knockback. Was Snatch: 4.3 m ahead, cooldown 3 s, with knockback, Assassin-only. |
+| **Steal** | ROB | 5 s | everyone | Robs 5 food from every rival carrier within 5.16 m (Thief x1.6); no knockback. Was Snatch: 4.3 m ahead, cooldown 3 s, with knockback, Assassin-only. |
 | **Stun** | STUN | 8 s | everyone | Stuns every rival within 5.4 m for 1.3 s. Was Wing Slam (4.5 m, 120 deg cone). Also the Spoiler's way to qualify a Death Mark kill. |
 | **Shove** | PUSH | 7 s | everyone | Shoves every rival within 5.4 m away (knockback force 16.2). Was Cluck Shock (4.5 m). |
 | **Slow** | SLOW | 7 s | everyone | Aura: slows every rival within 6.48 m to 55% speed for 3 s. Was Feather Aura (5.4 m, "every chicken"). |
 | **Speed** | FAST | 6 s | everyone | A 1.5 s sprint at 1.5x movement speed. Was Speed Burst; no longer Speedy-only. |
 | **Jump** | JUMP | 4 s | everyone but Speedy | Dashes forward at 3x speed for 0.18 s (about 6.6 m), straight over walls. Unchanged (Shadowstep); Speedy never gets terrain traversal (§5.2). |
-| **Shield** | SHLD | 10 s | everyone | **Walk, then lock.** First press: shell walk for 3 s at 0.5x speed; steal-proof, unkillable **and immune to stun, slow, root and shove, including the Slow aura**. Press again during the walk: lock in place for up to 2 s (a third press ends it early). Cooldown 10 s from the first press. Was Turtle Mode (Fatty-only; the walk was steal-proof only). |
+| **Shield** | SHLD | 10 s | everyone | **Walk, then egg, on one press.** Phase 1 (`WalkSeconds` 1): walk at 0.5x speed, steal-proof (so unkillable), immune to ability slows only (timed slow, zone, Slow aura); stun, root, shove still land. Phase 2 (`EggSeconds` 2, starts automatically): cannot move; immune to stun, slow, root and shove; steal-proof and unkillable. Duration 3 s, cooldown 10 s from the cast. Press again to end it. Was Turtle Mode (Fatty-only). |
 | **Hide** | HIDE | 8 s | everyone | Fades you to a ghostly outline for 4 s (opacity 0.2). Using a move breaks it. Was Invisibility (Sneaky-only). |
 | **Peck** | PECK | 0.8 s | none (pre-equip) | Take a beakful of food from the pile you are standing at. Forced for every forager. |
-| **Quick Drop** | DROP | 12 s | Speedy only | Banks food 4x faster for 2 s. Unchanged. |
-| **Death Mark** | EXEC | 5 s | none (pre-equip) | The execute (§6.4). Marks a rival, likelier far from home; stun them within 8 m, then press again to take everything they carry. Unchanged; its stun now comes from the generic Stun (1.3 s). |
+| **Death Mark** | EXEC | 5 s | none (pre-equip) | The execute (§6.4). Marks a rival, likelier far from home; stun them within 6.2 m, then press again to take everything they carry. `KillRange` 8 -> 6.2 m on 2026-11-05 (later); its stun comes from the generic Stun (1.3 s). |
 
-**Retired 2026-11-05** (the `Retired` flag, out of the registry and every kit, asset and code kept, like Egg Shell): Scrap, Dive Bomb, Sneaky Steal, Ambush, Belly Flop, Ground Quake, Headbutt, Roll & Push, Dust Kick, Feather Trap, Sticky Egg (`RootEggAbilitySO`), Smoke Roost, Ruffle, Feint, Immovable, Spine Coat, Doppelganger. Egg Shell was retired earlier (2026-11-03). Their old numbers are in git history; the rest of this section describes only the 11.
+**Retired 2026-11-05** (the `Retired` flag, out of the registry and every kit, asset and code kept, like Egg Shell): Scrap, Dive Bomb, Sneaky Steal, Ambush, Belly Flop, Ground Quake, Headbutt, Roll & Push, Dust Kick, Feather Trap, Sticky Egg (`RootEggAbilitySO`), Smoke Roost, Ruffle, Feint, Immovable, Spine Coat, Doppelganger. **Quick Drop** (`QuickDrop.asset`, `Retired` 1, out of the registry) was retired later the same day: its 4x banking burst became Featherfoot's permanent 1.5x `DepositRateMultiplier` (19 retired in all, 10 active). Egg Shell was retired earlier (2026-11-03). Their old numbers are in git history; the rest of this section describes only the 10.
 
 Control ceilings: with no root and no RPC slow in the registry, a populated registry yields a known 0 s ceiling for those kinds, so every such claim is refused at Debug level (it used to log an Error per spawn and leave an Unknown ceiling that trusted the sender).
 
-**Shield has a real defensive half (Phase 7, Maestro decision 6; extended 2026-11-05).** It grants the **steal-proof** state (`ChickenController.IsStealProof` / `GrantStealProof`, a networked timer; recasting keeps the later end). While steal-proof, nothing can take the bird's cargo: Steal and Death Mark's execute check it *before* crediting the thief, so no food is created or duplicated; the victim's side re-checks in `RPC_DrainStolen` / `RPC_TransferAllToBountyBag` (sub-RTT race, logged; a refused optimistic drain is refunded). Details:
+**Shield has a real defensive half (Phase 7, Maestro decision 6; reworked into walk-then-egg 2026-11-05).** It grants the **steal-proof** state (`ChickenController.IsStealProof` / `GrantStealProof`, a networked timer; recasting keeps the later end). While steal-proof, nothing can take the bird's cargo: Steal and Death Mark's execute check it *before* crediting the thief, so no food is created or duplicated; the victim's side re-checks in `RPC_DrainStolen` / `RPC_TransferAllToBountyBag` (sub-RTT race, logged; a refused optimistic drain is refunded). Details:
 
 - **Steal** takes nothing from a steal-proof bird.
 - **Death Mark's execute** cannot touch a steal-proof bird (a shelled chicken cannot be executed: caster gate and the victim's authority; a sub-round-trip race refunds the Kill cooldown and restores the mark).
-- **Shield is control-immune for the walk and the lock** (2026-11-05; it took Immovable's window via `GrantControlImmunity(Duration)`): stun, root, slow and shove are refused at the same chokepoints, and `CheckAbilityZoneSlow` now refuses a control-immune chicken too (it used to bypass immunity). The Slow aura is the only slow left, so a shelled bird is immune to it.
+- **Shield phases** (`TurtleMode.asset`, 2026-11-05 later):
+  - **Walk** (`WalkSeconds` 1): 0.5x speed. A new networked slow-immunity window makes the timed ability slow and the zone / aura slow refuse the bird; stun, root, shove, theft and execution still land (the walk is steal-proof, so cargo and life are safe, but a stun can land). Pile and bump slows still apply (the immunity covers ability slows only).
+  - **Egg** (`EggSeconds` 2): starts on its own when the walk ends. The bird cannot move, is immune to stun, slow, root and shove, and steal-proof (so unkillable). Control immunity also refuses zone slows (`CheckAbilityZoneSlow`).
+  - **Ending it:** pressing Shield again ends the whole Shield in either phase. Casting any other ability ends only the egg: during the egg the Shield ends; during the walk the pending egg is dropped and the walk runs out. Auto-Peck never fires during a live Shield, while a manual Peck counts as a cast. The old second-press lock is removed; bots no longer press-lock and leave a running Shield alone.
+  - Duration 3 s (walk + egg), cooldown 10 s from the cast.
 - **Telegraph:** a rival aiming a steal at a steal-proof bird sees the grey no-effect mark and a **SAFE** pop (`hud.pop.safe`).
 - **Bots** raise a shell when a rival with a steal ability is within 5.4 m and the bot carries 5 or more food.
 
 ### 7.3 Cooldown tiers
 
-Rewritten 2026-10-22 (decision A9), reduced to the 11 on 2026-11-05.
+Rewritten 2026-10-22 (decision A9), reduced to the 10 actives on 2026-11-05.
 
 | Tier | Range | Shipped (cooldown read from the `.asset` files, before passives) |
 |---|---|---|
 | **Quick** | 3-5 s | Jump 4, Steal 5, Death Mark 5 |
 | **Standard** | 6-9 s | Speed 6, Shove 7, Slow 7, Stun 8, Hide 8 |
-| **Heavy** | 10-12 s | Shield 10, Quick Drop 12 |
+| **Heavy** | 10-12 s | Shield 10 |
 
 **The Heavy rule:** a move earns a Heavy cooldown only if it gives **immunity** (control
 immunity or steal-proofing), a **hard AoE stun of at least 1.4 s**, or an **economy burst**
-(a banking or farming spike). Both Heavy moves meet it (Shield: immunity; Quick Drop: economy). Everything else belongs in Quick or Standard.
+(a banking or farming spike). The one Heavy move meets it (Shield: immunity; Quick Drop, the economy Heavy, is retired). Everything else belongs in Quick or Standard.
 The earlier exceptions (Smoke Roost, Doppelganger) are retired. Stun (1.3 s) sits in Standard: 12 -> 8 s with
 its stun 1.5 -> 1.3 s (A4; pre-agreed fallback 9 s / 1.5 s if the human session reports
 "stunned too often"). Peck (per-class, about 0.7-0.8 s) is foraging cadence
 governed by the SCT axiom, not a tiered move.
 
 Exact per-ability values (steal amounts, stun/slow durations, radii, cooldowns) are tuned
-against the Oracle and playtests. Class passives scale cooldowns at runtime (Relentless
-x0.75, every move but Peck), so a Relentless Warrior's Stun is 6 s, Shove 5.25 s and Speed 4.5 s.
+against the Oracle and playtests. Class passives scale cooldowns at runtime (Bully
+x0.75, every move but Peck), so a Bully Warrior's Steal is 3.75 s, Stun 6 s and Jump 3 s; Relentless leaves cooldowns alone (its Slow aura just runs 3.9 s).
 
 ### 7.4 Several moves at once (Phase 6)
 
@@ -806,10 +818,11 @@ different kinds).
 | Self speed boost | highest | Speed 1.5, Jump 3.0 |
 | Self speed penalty | lowest | Shield 0.5 (the walk) |
 | Stealth opacity | lowest | Hide |
-| Movement lock | any | Shield (lock), Peck |
-| Control immunity | later expiry | Shield (walk and lock) |
-| Steal-proof | later expiry | Shield (walk and lock) |
-| Deposit rate | highest | Quick Drop 4.0 |
+| Movement lock | any | Shield (egg), Peck |
+| Slow immunity | later expiry | Shield (walk) |
+| Control immunity | later expiry | Shield (egg) |
+| Steal-proof | later expiry | Shield (walk and egg) |
+| Deposit rate | multiplied | Featherfoot passive 1.5 (permanent) |
 | Wall-phasing tier | highest holder (Barge < Vault < Blink) | Jump |
 | Aura slow | lowest factor, its radius | Slow |
 
@@ -820,7 +833,7 @@ you cast anything else. Peck counts as a move; a fizzle (§10.1) does not. **Pec
 is an opener for Steal / Stun, not a 4 s cast lock.
 
 **Combos that are now legal on one bird** (flagged for balance, no value changed): Speed + Slow is about 2.7x relative speed against
-chasers inside 6.48 m for 1.5 s; Hide + Steal (the Thief opener); Jump + Stun (the Spoiler lunge, 11.96 m); Shield + Speed walks at 0.75x while untouchable. **Watch in playtest (no caps now):** Shield into its lock back to back with the Slow aura nearby (the aura no longer works on a shelled bird).
+chasers inside 6.48 m for 1.5 s; Hide + Steal (the Thief opener); Jump + Stun (the Spoiler dash, 6.56 m, then a 5.4 m stun); Shield + Speed walks at 0.75x while steal-proof. **Watch in playtest (no caps now):** Shield into its egg back to back with the Slow aura nearby (the aura no longer works on a walking or egged bird).
 
 ---
 
@@ -1079,7 +1092,7 @@ Reflects the four committed v0.4 plans (`docs/superpowers/plans/`).
   (darker surround + hedge bank, calmer grass). Not verified on hardware: Pixel 9 touch feel and
   GPU frame time, a real pad B, Android Back.
 
-- **Simplified abilities (2026-11-05) - on `simplify-abilities`, not merged.** 11 abilities, 8 new kits, range-only targeting (`MatchConfigSO.TargetingMode`), Shield also immune to stun/slow/root/shove (zone slows included). See `docs/STATE.md`.
+- **Simplified abilities (2026-11-05) - on `simplify-abilities`, not merged.** 11 abilities, 8 new kits, range-only targeting (`MatchConfigSO.TargetingMode`), Shield later reworked into a slow-immune walk then an egg. Later the same day: Warrior all-rounder rework, Quick Drop retired into a Featherfoot passive, Death Mark kill range 6.2 m. See `docs/STATE.md`.
 
 **Known gaps:** passive pools (§5.3) still carry the pre-0.4 set; endgame rule deferred;
 the Oracle re-solve rests on the simulator's model refinement (bank a winning load without
