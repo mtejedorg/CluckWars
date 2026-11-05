@@ -510,8 +510,8 @@ carries Slow instead of Shove, and the Spoiler Hide instead of Slow.
 **Slippery reworked (Maestro, 2026-11-05, later).** It no longer shortens stuns (the stun is the Speedy's weakness) or
 roots. It resists ability slows only, with one value (`Resist` 0.6) for strength and duration: the slow's reduction is
 scaled by 0.6 (factor' = 1 - (1 - factor) x 0.6, so the 55% Slow aura holds a Slippery bird at 73%), a timed ability
-slow lasts x0.6, and a slow zone or aura slows a Slippery bird only during the first 60% of the zone's lifetime (3 s
-aura: the first 1.8 s; a Relentless 3.9 s aura: the first 2.34 s). The pile slow and the bump slow are not resisted.
+slow lasts x0.6, and a slow zone or aura, which has no duration, slows it at the weaker strength for as long as it
+stands inside (the first-60%-of-the-zone's-life window was removed the same day; the zone rule is open, BL-123). The pile slow and the bump slow are not resisted.
 
 **The Warrior is the all-rounder (Maestro, 2026-11-05, later).** Both Warrior kits carry Peck, Steal, one
 crowd control and one mobility move; the old "defend a pile" identity is gone. **Bully** is the cooldown spammer
@@ -585,8 +585,8 @@ the Assassin execute. There is one stun, 1.3 s (`WingSlam.asset`, now called Stu
 passives like Slippery can target one without the others. Bulwark and Relentless shorten
 only **timed** effects (stuns, getting stuck, timed slows); presence slows (zones,
 the Slow aura, pile, collision) have no duration and apply to them in full. **Slippery** (2026-11-05, later) resists
-ability slows only: weaker (reduction x0.6), timed ones x0.6 shorter, and a zone or aura slows it only during the first
-60% of the zone's lifetime (the zone's networked lifetime and timer, judged on the victim's authority). Stuns, roots, pile
+ability slows only: weaker (reduction x0.6), timed ones x0.6 shorter; a zone or aura slows it at the weaker strength while it is inside
+(no lifetime window, removed 2026-11-05, BL-123). Stuns, roots, pile
 and bump slows land on it in full. Getting stuck has no source in the shipped registry (Sticky Egg and Feather Trap are retired). A control-immune bird (the egg) now also refuses zone slows; before 2026-11-05 zone slows ignored immunity. **Control ceilings and Relentless:** receivers cap incoming stun and slow claims at the shipped ceiling multiplied by the largest `OutgoingDurationMultiplier` among the shipped passives (1.3 today, so the stun ceiling is 1.69 s); the root ceiling does not move.
 
 ### 6.4 The Assassin execute (the only hard removal)

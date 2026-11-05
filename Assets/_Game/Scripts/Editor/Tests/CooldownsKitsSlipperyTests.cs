@@ -133,13 +133,12 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void OnlySlippery_ResistsSlowStrength_OrCutsZonesShort_AndBulwarkRelentlessStillShortenEveryKind()
+        public void OnlySlippery_ResistsSlowStrength_AndBulwarkRelentlessStillShortenEveryKind()
         {
             foreach (var p in Registry.Passives)
             {
                 if (p is SlipperyPassiveSO) continue;
                 Assert.AreEqual(0.55f, p.ModifyIncomingSlowFactor(0.55f, null), 1e-6f, p.name);
-                Assert.AreEqual(1f, p.ZoneSlowLifetimeFraction(null), p.name);
             }
             var bulwark = Shipped<BulwarkPassiveSO>();
             var relentless = Shipped<RelentlessPassiveSO>();
@@ -151,40 +150,14 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void ZoneWindow_ASlipperyChicken_IsSlowedOnlyDuringTheFirst60Percent()
+        public void SlowZones_HaveNoLifetimeWindow_SlipperyGetsTheWeakerSlowOnly_SourceGuard()
         {
-            float window = Shipped<SlipperyPassiveSO>().ZoneSlowLifetimeFraction(null);
-            Assert.AreEqual(0.6f, window, 1e-6f);
-
-            // The plain aura: 3 s life, slowed for the first 1.8 s.
-            float life = Asset<FeatherAuraAbilitySO>().Duration;
-            Assert.IsTrue(AreaEffectRules.SlowsDuringWindow(AreaEffectRules.AgeFraction(life, life), window), "at the cast");
-            Assert.IsTrue(AreaEffectRules.SlowsDuringWindow(AreaEffectRules.AgeFraction(life, life - 1.75f), window), "1.75 s in");
-            Assert.IsFalse(AreaEffectRules.SlowsDuringWindow(AreaEffectRules.AgeFraction(life, life - 1.85f), window), "1.85 s in");
-
-            // A Relentless aura lives 3.9 s, so the cut-off moves with it: slowed for the first 2.34 s.
-            var aura = Asset<FeatherAuraAbilitySO>();
-            Assert.IsTrue(aura.ActiveDurationIsOutgoingControl, "the aura's life is its slow, so Relentless lengthens it");
-            float relentlessLife = AbilityBaseSO.ResolveOutgoingControlSeconds(aura.Duration, Shipped<RelentlessPassiveSO>());
-            Assert.AreEqual(3.9f, relentlessLife, 1e-4f);
-            Assert.IsTrue(AreaEffectRules.SlowsDuringWindow(AreaEffectRules.AgeFraction(relentlessLife, relentlessLife - 2.3f), window), "2.3 s in");
-            Assert.IsFalse(AreaEffectRules.SlowsDuringWindow(AreaEffectRules.AgeFraction(relentlessLife, relentlessLife - 2.4f), window), "2.4 s in");
-
-            // Everyone else is slowed for the whole life.
-            Assert.IsTrue(AreaEffectRules.SlowsDuringWindow(AreaEffectRules.AgeFraction(life, 0.01f), 1f), "window 1 = whole life");
-            // An unstamped lifetime reads as young (only AreaEffectSpawner spawns zones, and it always stamps).
-            Assert.AreEqual(0f, AreaEffectRules.AgeFraction(0f, 0f));
-        }
-
-        [Test]
-        public void TheZoneLifetime_IsStampedWithTheTimer_SourceGuard()
-        {
-            string spawner = Src(ScriptsDir + "/Abilities/AreaEffectSpawner.cs");
-            StringAssert.Contains("zone.LifetimeTimer   = TickTimer.CreateFromSeconds(runner, capSpec.Lifetime);", spawner);
-            StringAssert.Contains("zone.LifetimeSeconds = capSpec.Lifetime;", spawner);
-            string zone = Src(ScriptsDir + "/Gameplay/AbilityZone.cs");
-            StringAssert.Contains("[Networked] public float LifetimeSeconds { get; set; }", zone);
-            StringAssert.Contains("AreaEffectRules.AgeFraction(LifetimeSeconds, LifetimeTimer.RemainingTime(Runner) ?? 0f)", zone);
+            // Maestro 2026-11-05 removed the first-60%-of-the-zone's-life window (BL-123 holds the open duration rule).
+            string cc = Src(ControllerPath);
+            string zoneLoop = Between(cc, "private void CheckAbilityZoneSlow()", "private ChickenStatsSO ResolveStatsForClass");
+            StringAssert.DoesNotContain("AgeFraction", zoneLoop);
+            StringAssert.DoesNotContain("LifetimeSeconds", Src(ScriptsDir + "/Gameplay/AbilityZone.cs"));
+            Assert.IsNull(typeof(PassiveAbilitySO).GetMethod("ZoneSlowLifetimeFraction"));
         }
 
         [Test]
@@ -198,10 +171,6 @@ namespace CluckWars.Tests
             Assert.AreEqual(1, Regex.Matches(cc, @"ApplySlow\(SlowSource\.Ability").Count, "only ApplyAbilitySlow writes the Ability source");
             StringAssert.Contains("ApplyAbilitySlow(_abilitySlowFactor);", cc, "the timed ability slow");
             StringAssert.Contains("ApplyAbilitySlow(zone.SlowFactor);", Between(cc, "private void CheckAbilityZoneSlow()", "private ChickenStatsSO ResolveStatsForClass"), "the zone / aura slow");
-            // The zone window is read in the zone loop, before the slow.
-            string zoneLoop = Between(cc, "private void CheckAbilityZoneSlow()", "private ChickenStatsSO ResolveStatsForClass");
-            StringAssert.Contains("ZoneSlowLifetimeFraction(this)", zoneLoop);
-            StringAssert.Contains("AreaEffectRules.SlowsDuringWindow(zone.AgeFraction, window)", zoneLoop);
             // Pile and bump slows are applied as authored.
             StringAssert.Contains("ApplySlow(SlowSource.Pile, PileSlowFactor);", cc);
             StringAssert.Contains("ApplySlow(SlowSource.Collision, CollisionSlowFactor);", cc);
@@ -219,7 +188,6 @@ namespace CluckWars.Tests
                 .Select(f => File.ReadAllText(f)).ToArray();
             int Calls(string pattern) => production.Sum(s => Regex.Matches(s, pattern).Count);
             Assert.AreEqual(1, Calls(@"\.ModifyIncomingSlowFactor\("), "ModifyIncomingSlowFactor: one chokepoint");
-            Assert.AreEqual(1, Calls(@"\.ZoneSlowLifetimeFraction\("), "ZoneSlowLifetimeFraction: one chokepoint");
         }
 
         [Test]

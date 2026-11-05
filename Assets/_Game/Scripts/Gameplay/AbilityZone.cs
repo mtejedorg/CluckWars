@@ -131,16 +131,6 @@ namespace CluckWars.Gameplay
         /// <summary>How the zone applies its effect over time (B3). Root Egg: OnEnter; the slows: WhileInside.</summary>
         [Networked] public AreaEffectChannel Channels { get; set; }
 
-        /// <summary>
-        /// The lifetime <see cref="LifetimeTimer"/> was started with (seconds, a Relentless aura's lengthening included), stamped
-        /// with it by <c>AreaEffectSpawner</c>. A TickTimer keeps only its end, so the zone's age needs this
-        /// (<see cref="AgeFraction"/>, Slippery's slow window, Maestro 2026-11-05). Protocol change: one more 4-byte word.
-        /// </summary>
-        [Networked] public float LifetimeSeconds { get; set; }
-
-        /// <summary>0 at the spawn, 1 when the lifetime runs out (<see cref="AreaEffectRules.AgeFraction"/>), on this peer's tick.</summary>
-        public float AgeFraction => AreaEffectRules.AgeFraction(LifetimeSeconds, LifetimeTimer.RemainingTime(Runner) ?? 0f);
-
         private bool _placed;
 
         /// <summary>OnEnter, on the authority: who this zone life has already fired on (cleared per spawn; pooled).</summary>

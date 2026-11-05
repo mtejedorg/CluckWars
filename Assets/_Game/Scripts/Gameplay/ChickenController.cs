@@ -1828,10 +1828,6 @@ namespace CluckWars.Gameplay
             // every other slow (Maestro 2026-11-05). Before 2026-11-05 zone slows bypassed immunity.
             if (IsSlowImmune) return;
 
-            // The passive may limit each zone to the first part of its life (Slippery: slowed only in the first 60%).
-            var passive = Passive;
-            float window = passive != null ? passive.ZoneSlowLifetimeFraction(this) : 1f;
-
             for (int i = 0; i < AbilityZone.ActiveZones.Count; i++)
             {
                 var zone = AbilityZone.ActiveZones[i];
@@ -1840,7 +1836,6 @@ namespace CluckWars.Gameplay
                 // Own Feather Trap never slows the owner (GDD §7.2); zones ignore decoys (B7).
                 if (AreaEffectRules.IgnoresChicken(zone.OwnerChicken == this.Id, IsDecoy)) continue;
                 if (!zone.TryGetCenter(out Vector3 center)) continue;
-                if (!AreaEffectRules.SlowsDuringWindow(zone.AgeFraction, window)) continue;
                 if (AreaEffectRules.IsInside(center, zone.TriggerRadius, transform.position) &&
                     !PlayerBase.WallBetween(center, transform.position))
                     ApplyAbilitySlow(zone.SlowFactor);

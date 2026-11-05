@@ -127,16 +127,6 @@ namespace CluckWars.Abilities
         public virtual float ModifyIncomingSlowFactor(float factor, ChickenController self) => factor;
 
         /// <summary>
-        /// The share of a slow zone's (or aura's) lifetime during which it slows this chicken, from the zone's spawn: 1 = for
-        /// its whole life. A zone slows per tick while inside, so it has no per-victim duration to shorten; this is the zone
-        /// form of <see cref="ModifyControlDuration"/> for slows. Slippery returns 0.6 (Maestro 2026-11-05: the aura slow
-        /// "lasts 40% less").
-        /// Chokepoint: <c>ChickenController.CheckAbilityZoneSlow</c>, judged from the zone's networked lifetime
-        /// (<c>AbilityZone.AgeFraction</c>).
-        /// </summary>
-        public virtual float ZoneSlowLifetimeFraction(ChickenController self) => 1f;
-
-        /// <summary>
         /// Factor on the stuns and slows this chicken APPLIES to others (Relentless, 2026-11-05). 1 for every
         /// passive that does not lengthen its own crowd control.
         /// Chokepoint: <c>AbilityBaseSO.ResolveOutgoingControlSeconds</c>, which every stun / slow sender calls.

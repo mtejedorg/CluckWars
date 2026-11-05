@@ -10,19 +10,20 @@ namespace CluckWars.Abilities
     /// (Maestro 2026-11-05; before that it shortened every stun, root and timed slow by 40%).
     /// </summary>
     /// <remarks>
-    /// One <see cref="Resist"/> value drives all three hooks, so the strength and the duration can never drift apart:
+    /// One <see cref="Resist"/> value drives both hooks, so the strength and the duration can never drift apart:
     /// <list type="bullet">
     ///   <item>Strength: the slow's reduction is scaled by it, factor' = 1 - (1 - factor) x 0.6 (a 0.55 slow becomes 0.73).</item>
     ///   <item>Timed ability slow (<c>RPC_ApplyAbilitySlow</c>): its duration x 0.6.</item>
-    ///   <item>Zone / aura slow: it slows a Slippery chicken only during the first 60% of the zone's lifetime (a Relentless
-    ///   aura's lengthened 3.9 s included: slowed for the first 2.34 s).</item>
     /// </list>
+    /// A slow zone or aura gets the weaker slow only: it slows while the chicken is inside and stops the moment it leaves, so
+    /// there is no duration to shorten (Maestro 2026-11-05 removed the first-60%-of-the-zone's-life window; how "40% shorter"
+    /// applies to zones is undecided, BL-123).
     /// </remarks>
     [CreateAssetMenu(fileName = "Slippery", menuName = "Cluck Wars/Passive/Slippery", order = 10)]
     public sealed class SlipperyPassiveSO : PassiveAbilitySO
     {
-        [Tooltip("How much of an ability slow sticks: its strength (the speed it takes away), a timed slow's duration and the " +
-                 "share of a slow zone's lifetime that slows this chicken are all multiplied by it. 0.6 = 40% weaker and 40% " +
+        [Tooltip("How much of an ability slow sticks: its strength (the speed it takes away), and a timed slow's duration are " +
+                 "both multiplied by it (a slow zone gets the weaker slow only). 0.6 = 40% weaker and 40% " +
                  "shorter. Stuns, roots, pile and bump slows are not resisted.")]
         [Range(0.1f, 1f)] public float Resist = 0.6f;
 
@@ -40,8 +41,6 @@ namespace CluckWars.Abilities
 
         public override float ModifyIncomingSlowFactor(float factor, ChickenController self) =>
             1f - (1f - factor) * Resist;
-
-        public override float ZoneSlowLifetimeFraction(ChickenController self) => Resist;
 
         public override string PerkLineKey => UiKeys.PerkSlipperyLine;
         public override string PerkDetailKey => UiKeys.PerkSlipperyDetail;

@@ -26,7 +26,7 @@ the old Shield (walk 3 s plus a lock) or Quick Drop are rewritten; nothing else 
 (low 1-3 s, medium 4-6 s, high 7-8 s): Jump 2, Steal 4, Speed 4 (and 1.3x, was 1.5x), Hide 4.5 (and 2 s, was 4 s), Shove 5, Slow 6, Stun 7,
 Shield 8, Death Mark 4 after a miss and 8 after a kill (was 5 / 10). Kits: Featherfoot Shove for Steal (Speedys do not steal; its kit now equals
 Slippery's), Thief Slow for Shove, Spoiler Hide for Slow. Slippery no longer shortens stuns or roots: ability slows on it are 40% weaker and
-end 40% sooner (a zone or the Slow aura slows it only during the first 60% of the zone's life). Sneaky (Assassin) speed 12.15 -> 11.1
+end 40% sooner (timed slows only; a zone or the Slow aura gives the weaker slow for as long as it stands inside, BL-123). Sneaky (Assassin) speed 12.15 -> 11.1
 (SCT-exempt). The tables below are rewritten to these numbers.
 
 This is a starting point to iterate, not a final roster. Every value below is data: kits on the passive assets (or the Balance
@@ -54,8 +54,7 @@ All reach figures are a radius around the caster. Cooldowns are the asset values
 (Steal 3 s, Stun 5.25 s, Jump 1.5 s). Relentless leaves cooldowns alone: its stuns and slows last 30% longer (Stun 1.3 -> 1.69 s, the Slow aura
 3 -> 3.9 s, cooldown 6 s), and stuns, getting stuck and timed slows on it end 25% sooner (a Relentless stun on Slippery: the full 1.69 s, Slippery
 no longer shortens stuns; roots and placed zones are not lengthened). Slippery: ability slows on it are 40% weaker (the 55% aura holds it at 73%)
-and end 40% sooner (timed slows x0.6; a zone or aura slows it only during the first 60% of the zone's life: 1.8 s of a 3 s aura, 2.34 s of a
-Relentless 3.9 s aura); stuns, getting stuck, pile and bump slows land in full.
+and end 40% sooner (timed slows x0.6; a zone or aura has no duration, so it gets the weaker slow for as long as it stands inside, BL-123); stuns, getting stuck, pile and bump slows land in full.
 
 | Ability (short) | Asset | Cooldown | Numbers |
 |---|---|---|---|

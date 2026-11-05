@@ -13,7 +13,7 @@ namespace CluckWars.Abilities
     /// <b>Stamp order and values are the copies' own, byte for byte:</b> <c>SpawnPosition</c>, <c>HasSpawnPosition</c>,
     /// <c>Effect</c>, <c>OwnerChicken</c>, then <c>SlowFactor</c> (slow zones) or <c>RootDuration</c> (root zones), then
     /// <c>NetworkedRadius</c> and <c>LifetimeTimer</c>. The three WP3 fields (<c>Anchor</c>, <c>SourceSlot</c>,
-    /// <c>Channels</c>) are appended after them, then <c>LifetimeSeconds</c> (2026-11-05). The stamp is the only way the zone's position reaches other peers: the
+    /// <c>Channels</c>) are appended after them. The stamp is the only way the zone's position reaches other peers: the
     /// prefab has no NetworkTransform (CW-217, <c>SpawnPlacementTests</c>).
     /// <para>
     /// Callers gate on <c>ctx.CanSpawnZone</c> in their <c>CanActivate</c> (the pre-commitment wiring gate); the refusals
@@ -115,8 +115,6 @@ namespace CluckWars.Abilities
                     zone.Anchor          = capSpec.Anchor;
                     zone.SourceSlot      = capSlot;
                     zone.Channels        = capSpec.Channels;
-                    // Appended after WP3: the lifetime the timer started from, for the zone's age (Slippery's slow window).
-                    zone.LifetimeSeconds = capSpec.Lifetime;
                     // Consumed starts false — AbilityZone.FUN sets it true on a Root zone's first trigger.
                 });
             return true;
