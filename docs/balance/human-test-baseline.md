@@ -20,7 +20,7 @@ all-rounder: Bully is the cooldown spammer (every move except Peck x0.75; kit Pe
 automatic 2 s egg. (3) Quick Drop is retired: Featherfoot banks 50% faster permanently (kit Peck, Speed, Slow, Steal), 10 active abilities. (4) Death Mark's
 kill range is 6.2 m. Balance Oracle (all four seats): Bully 34.98 s / 3 trips, Relentless 34.98 s / 3, Slippery 30.02 s / 4, Featherfoot 28.54 s / 4 (declared
 exception against the Speedy target 30 s, pending this session), Bulwark 30.05 s / 2, Hoarder 25.82 s / 1 (declared). Rows below that still describe
-the old Shield (walk 3 s plus a lock) or Quick Drop are rewritten; nothing else moved. Build/scenario: pending.
+the old Shield (walk 3 s plus a lock) or Quick Drop are rewritten; nothing else moved. Build/scenario: dev-tools build 2026-11-05 17:00, PC solo scenario (Thief vs Featherfoot, Relentless, Bulwark) PASS.
 
 This is a starting point to iterate, not a final roster. Every value below is data: kits on the passive assets (or the Balance
 Editor's kits panel), rule numbers on `MatchConfig.asset`, `MarkKill.asset`, `WingSlam.asset` (Stun), `Snatch.asset` (Steal), `CluckShock.asset` (Shove), `FeatherAura.asset` (Slow), `TurtleMode.asset` (Shield) and `Shadowstep.asset` (Jump).
