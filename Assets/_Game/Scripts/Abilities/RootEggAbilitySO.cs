@@ -12,8 +12,8 @@ namespace CluckWars.Abilities
     /// despawns automatically.
     /// </summary>
     /// <remarks>
-    /// Speedy's Slippery passive reduces the root duration applied to the target
-    /// (handled inside <see cref="ChickenController.RPC_ApplyRoot"/>).
+    /// Speedy's Slippery passive does <em>not</em> shorten roots (Maestro 2026-11-05: it resists
+    /// ability slows only); Bulwark and Relentless do, inside <see cref="ChickenController.RPC_ApplyRoot"/>.
     ///
     /// Cooldown tier: Medium. Requires <see cref="PrefabRegistrySO.AbilityZone"/>
     /// to be assigned.
@@ -31,7 +31,7 @@ namespace CluckWars.Abilities
         [Tooltip("Seconds before the egg despawns if no chicken triggers it.")]
         [Min(0.5f)] public float EggLifetime = 8.0f;
 
-        [Tooltip("How long the triggered chicken is rooted (seconds, before Slippery reduction).")]
+        [Tooltip("How long the triggered chicken is rooted (seconds, before a Bulwark / Relentless victim shortens it).")]
         [Min(0.1f)] public float RootDuration = 2.0f;
 
         [Tooltip("Trigger radius within which a chicken activates the root.")]

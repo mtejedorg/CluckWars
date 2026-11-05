@@ -81,8 +81,8 @@ perk.relentless.detail,"Your stuns and slows last {out}% longer. Stuns, getting 
 perk.bully.line,Moves recharge {pct}% faster.
 perk.bully.detail,Applies to every move except Peck.
 perk.thief.line,Every steal grabs {steal}% more.
-perk.slippery.line,"Stuns, getting stuck and timed slows end {pct}% sooner."
-perk.slippery.detail,"Zone, aura, pile and bump slows still apply in full."
+perk.slippery.line,Ability slows on you are {pct}% weaker and end {pct}% sooner.
+perk.slippery.detail,Stuns still land in full. Pile and bump slows still apply.
 perk.bulwark.line,Barely budges when shoved.
 perk.bulwark.detail,"Knockback cut by {kb}%. Stuns, getting stuck and timed slows end {cc}% sooner."
 perk.hoarder.line,Carry {cap} food in one trip.

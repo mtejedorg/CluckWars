@@ -111,9 +111,30 @@ namespace CluckWars.Abilities
         // add a hook, wire it at one place only — two call sites means the effect applies
         // twice for anyone who reads the code and assumes the other one is the real one.
 
-        /// <summary>Scale the duration of an incoming control effect (slow / root / stun).
+        /// <summary>Scale the duration of an incoming timed control effect of <paramref name="kind"/> (a timed ability slow,
+        /// a root or a stun). The kind lets a passive resist some kinds only: Slippery shortens slows and leaves stuns and
+        /// roots whole (Maestro 2026-11-05); Bulwark and Relentless shorten every kind.
         /// Chokepoint: <c>ChickenController.ApplyPassiveControlDuration</c>.</summary>
-        public virtual float ModifyControlDuration(float seconds, ChickenController self) => seconds;
+        public virtual float ModifyControlDuration(float seconds, ControlKind kind, ChickenController self) => seconds;
+
+        /// <summary>
+        /// Scale the strength of an incoming ABILITY slow: <paramref name="factor"/> is the speed multiplier the slow sets
+        /// (0.55 = 55% speed), and the return is the one this chicken actually moves at. Pile and bump slows never reach it.
+        /// Chokepoint: <c>ChickenController.ApplyAbilitySlow</c>, the only writer of <see cref="SlowSource.Ability"/>, which
+        /// both the timed ability slow (<c>RPC_ApplyAbilitySlow</c>) and every zone / aura slow (<c>CheckAbilityZoneSlow</c>)
+        /// go through each tick.
+        /// </summary>
+        public virtual float ModifyIncomingSlowFactor(float factor, ChickenController self) => factor;
+
+        /// <summary>
+        /// The share of a slow zone's (or aura's) lifetime during which it slows this chicken, from the zone's spawn: 1 = for
+        /// its whole life. A zone slows per tick while inside, so it has no per-victim duration to shorten; this is the zone
+        /// form of <see cref="ModifyControlDuration"/> for slows. Slippery returns 0.6 (Maestro 2026-11-05: the aura slow
+        /// "lasts 40% less").
+        /// Chokepoint: <c>ChickenController.CheckAbilityZoneSlow</c>, judged from the zone's networked lifetime
+        /// (<c>AbilityZone.AgeFraction</c>).
+        /// </summary>
+        public virtual float ZoneSlowLifetimeFraction(ChickenController self) => 1f;
 
         /// <summary>
         /// Factor on the stuns and slows this chicken APPLIES to others (Relentless, 2026-11-05). 1 for every
@@ -129,7 +150,8 @@ namespace CluckWars.Abilities
         /// <para>
         /// Order with the victim's <see cref="ModifyControlDuration"/>: the caster's factor is applied first, on the
         /// caster's authority, before the RPC; the victim's shortening is applied on arrival. A Relentless stun on a
-        /// Slippery victim lasts authored x 1.3 x 0.6.
+        /// Slippery victim lasts authored x 1.3 (Slippery no longer shortens stuns); a Relentless aura slow on a Slippery
+        /// victim lives 3 x 1.3 = 3.9 s and slows it only for the first 0.6 x 3.9 = 2.34 s.
         /// </para>
         /// </remarks>
         public virtual float OutgoingControlMultiplier => 1f;

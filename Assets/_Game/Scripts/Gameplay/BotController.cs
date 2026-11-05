@@ -603,7 +603,7 @@ namespace CluckWars.Gameplay
             _state      = BotState.Hunt;
             _moveTarget = mark.transform.position;
 
-            // The longest ready stun that would land now, measured on THIS target (its passive shortens it). Never at a shelled
+            // The longest ready stun that would land now, measured on THIS target (its passive may shorten it: Bulwark, Relentless; Slippery no longer does). Never at a shelled
             // target (it takes the stun but cannot be executed) or a control-immune one (the stun does not land).
             int stunSlot = AbilityController.InvalidSlot;
             float stunSeconds = 0f;
@@ -615,7 +615,7 @@ namespace CluckWars.Gameplay
                     || !ability.WouldAffect(_controller, mark)) continue;
                 float raw = AbilityBaseSO.ResolveOutgoingControlSeconds(ability.EmittedControl.Seconds, _controller);   // the caster's Relentless, then the target's passive
                 var passive = mark.Abilities != null ? mark.Abilities.Passive : null;
-                float onTarget = passive != null ? passive.ModifyControlDuration(raw, mark) : raw;
+                float onTarget = passive != null ? passive.ModifyControlDuration(raw, ControlKind.Stun, mark) : raw;
                 if (onTarget > stunSeconds) { stunSeconds = onTarget; stunSlot = slot; }
             }
 

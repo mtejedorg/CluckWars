@@ -386,7 +386,7 @@ namespace CluckWars.Gameplay
         /// </summary>
         /// <remarks>
         /// <b>Immunity, not resistance — and that distinction is the design.</b> Passives
-        /// already shorten control (Slippery, Bulwark) by scaling duration through
+        /// already shorten control (Bulwark, Relentless; Slippery its slows) by scaling duration through
         /// <see cref="ApplyPassiveControlDuration"/>. Scaling can never reach zero, so a
         /// resistance-shaped Immovable would just be a bigger Bulwark. Fatty's essence is the
         /// "unstoppable force", which only reads if there is a window where control simply
@@ -888,7 +888,7 @@ namespace CluckWars.Gameplay
             // Timed ability slow (RPC_ApplyAbilitySlow; Dust Kick is its only sender - zones and auras slow in
             // CheckAbilityZoneSlow below, without an RPC).
             if (Runner.SimulationTime < _abilitySlowUntil)
-                ApplySlow(SlowSource.Ability, _abilitySlowFactor);
+                ApplyAbilitySlow(_abilitySlowFactor);
 
             // Zone slow, the WhileInside channel: placed zones (Feather Trap, Smoke Roost) and auras (Feather Aura).
             CheckAbilityZoneSlow();
@@ -1101,9 +1101,8 @@ namespace CluckWars.Gameplay
         public CharacterController Body => _characterController;
 
         /// <summary>
-        /// Applies a speed penalty from a tagged source. Slippery does NOT reduce slow
-        /// magnitude — per GDD §5.2 the passive is duration-only (handled in
-        /// <see cref="RPC_ApplyAbilitySlow"/> / <see cref="RPC_ApplyRoot"/>).
+        /// Applies a speed penalty from a tagged source, as authored: a passive's resistance to ABILITY slows is applied
+        /// one step earlier, in <see cref="ApplyAbilitySlow"/> (the only caller passing <see cref="SlowSource.Ability"/>).
         /// Call <em>after</em> resetting <c>SlowMultiplier = 1f</c> at the top of
         /// each tick.
         /// </summary>
@@ -1130,6 +1129,22 @@ namespace CluckWars.Gameplay
         {
             _activeSlowSources |= source;
             SlowMultiplier = Mathf.Min(SlowMultiplier, factor);
+        }
+
+        /// <summary>
+        /// The one place an ABILITY slow touches this chicken's speed, every tick it holds: the timed ability slow
+        /// (<see cref="RPC_ApplyAbilitySlow"/>'s merged factor) and each zone / aura slow (<see cref="CheckAbilityZoneSlow"/>).
+        /// The specialization's <c>ModifyIncomingSlowFactor</c> (Slippery) is applied here and nowhere else; pile and bump
+        /// slows call <see cref="ApplySlow"/> directly and are never resisted.
+        /// </summary>
+        /// <remarks>
+        /// Scaling the stored factor at application rather than on the RPC's arrival keeps <c>ControlReapplyRules.MergeSlow</c>
+        /// comparing authored factors, and the scaling is monotonic, so "the strongest slow wins" is the same either way.
+        /// </remarks>
+        private void ApplyAbilitySlow(float factor)
+        {
+            var p = Passive;
+            ApplySlow(SlowSource.Ability, p != null ? p.ModifyIncomingSlowFactor(factor, this) : factor);
         }
 
         /// <summary>
@@ -1187,12 +1202,12 @@ namespace CluckWars.Gameplay
         /// the chokepoint rather than in each RPC means a control effect added later is immune
         /// by default instead of silently bypassing Immovable.
         /// </remarks>
-        private float ApplyPassiveControlDuration(float seconds)
+        private float ApplyPassiveControlDuration(float seconds, ControlKind kind)
         {
             if (IsControlImmune) return 0f;
 
             var p = _abilities != null ? _abilities.Passive : null;
-            return p != null ? p.ModifyControlDuration(seconds, this) : seconds;
+            return p != null ? p.ModifyControlDuration(seconds, kind, this) : seconds;
         }
 
         // ---- Networking helpers ----------------------------------------------
@@ -1393,7 +1408,8 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// Applies a timed ability slow from <paramref name="caster"/>, shortened by the equipped
-        /// specialization's <c>ModifyControlDuration</c> (Slippery, Bulwark). Keeps the strongest
+        /// specialization's <c>ModifyControlDuration</c> (Slippery, Bulwark, Relentless); Slippery also weakens it, per tick, in
+        /// <see cref="ApplyAbilitySlow"/>. Keeps the strongest
         /// factor and the later expiry of this and any slow already running (A1).
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
@@ -1402,7 +1418,7 @@ namespace CluckWars.Gameplay
             if (!AcceptControlClaim(nameof(RPC_ApplyAbilitySlow), ControlKind.Slow, duration, factor, caster, info)) return;
 
             // The Shield's walk refuses slows only; stun and root still land through ApplyPassiveControlDuration.
-            duration = IsSlowImmune ? 0f : ApplyPassiveControlDuration(duration);
+            duration = IsSlowImmune ? 0f : ApplyPassiveControlDuration(duration, ControlKind.Slow);
             double now = Runner.SimulationTime;
             var merged = ControlReapplyRules.MergeSlow(
                 new ControlReapplyRules.TimedSlow(_abilitySlowFactor, _abilitySlowUntil),
@@ -1415,7 +1431,7 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// Stuns this chicken for <paramref name="seconds"/> seconds (from <paramref name="caster"/>)
-        /// — blocks movement, casting, and collecting. Shortened by <c>ModifyControlDuration</c>.
+        /// — blocks movement, casting, and collecting. Shortened by <c>ModifyControlDuration</c> (Bulwark, Relentless; not Slippery).
         /// A stun already running for longer is kept (A1).
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
@@ -1423,7 +1439,7 @@ namespace CluckWars.Gameplay
         {
             if (!AcceptControlClaim(nameof(RPC_ApplyStun), ControlKind.Stun, seconds, 1f, caster, info)) return;
 
-            seconds = ApplyPassiveControlDuration(seconds);
+            seconds = ApplyPassiveControlDuration(seconds, ControlKind.Stun);
             float remaining = StunRemaining;
             if (!ControlReapplyRules.IncomingExtends(remaining, seconds))
             {
@@ -1446,7 +1462,7 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Roots this chicken for <paramref name="duration"/> seconds (from <paramref name="caster"/>,
         /// directly or through a Root Egg it owns) — movement blocked, abilities still castable
-        /// (GDD §6.4). Shortened by <c>ModifyControlDuration</c>. A root already running for longer
+        /// (GDD §6.4). Shortened by <c>ModifyControlDuration</c> (Bulwark, Relentless; not Slippery). A root already running for longer
         /// is kept (A1).
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
@@ -1454,7 +1470,7 @@ namespace CluckWars.Gameplay
         {
             if (!AcceptControlClaim(nameof(RPC_ApplyRoot), ControlKind.Root, duration, 1f, caster, info)) return;
 
-            duration = ApplyPassiveControlDuration(duration);
+            duration = ApplyPassiveControlDuration(duration, ControlKind.Root);
             float remaining = RootRemaining;
             if (!ControlReapplyRules.IncomingExtends(remaining, duration))
             {
@@ -1812,6 +1828,10 @@ namespace CluckWars.Gameplay
             // every other slow (Maestro 2026-11-05). Before 2026-11-05 zone slows bypassed immunity.
             if (IsSlowImmune) return;
 
+            // The passive may limit each zone to the first part of its life (Slippery: slowed only in the first 60%).
+            var passive = Passive;
+            float window = passive != null ? passive.ZoneSlowLifetimeFraction(this) : 1f;
+
             for (int i = 0; i < AbilityZone.ActiveZones.Count; i++)
             {
                 var zone = AbilityZone.ActiveZones[i];
@@ -1820,9 +1840,10 @@ namespace CluckWars.Gameplay
                 // Own Feather Trap never slows the owner (GDD §7.2); zones ignore decoys (B7).
                 if (AreaEffectRules.IgnoresChicken(zone.OwnerChicken == this.Id, IsDecoy)) continue;
                 if (!zone.TryGetCenter(out Vector3 center)) continue;
+                if (!AreaEffectRules.SlowsDuringWindow(zone.AgeFraction, window)) continue;
                 if (AreaEffectRules.IsInside(center, zone.TriggerRadius, transform.position) &&
                     !PlayerBase.WallBetween(center, transform.position))
-                    ApplySlow(SlowSource.Ability, zone.SlowFactor);
+                    ApplyAbilitySlow(zone.SlowFactor);
             }
         }
 

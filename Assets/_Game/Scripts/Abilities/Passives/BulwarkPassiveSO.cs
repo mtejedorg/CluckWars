@@ -24,7 +24,7 @@ namespace CluckWars.Abilities
             AllowedClasses = ChickenClassFlags.Fatty;
         }
 
-        public override float ModifyControlDuration(float seconds, ChickenController self) =>
+        public override float ModifyControlDuration(float seconds, ControlKind kind, ChickenController self) =>
             seconds * DurationMultiplier;
 
         public override float ModifyKnockback(float strength, ChickenController self) =>

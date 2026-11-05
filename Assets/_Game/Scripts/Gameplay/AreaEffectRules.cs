@@ -76,6 +76,20 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
+        /// How far through its life a zone is: 0 at the spawn, 1 when its lifetime runs out. From the networked lifetime and
+        /// the networked timer's remaining time, so every peer's tick agrees. A zone with no stamped lifetime (only
+        /// <c>AreaEffectSpawner</c> spawns zones and it always stamps one) reads 0, i.e. as young.
+        /// </summary>
+        public static float AgeFraction(float lifetimeSeconds, float remainingSeconds) =>
+            lifetimeSeconds > 0f ? Mathf.Clamp01(1f - remainingSeconds / lifetimeSeconds) : 0f;
+
+        /// <summary>
+        /// A slow zone slows a chicken while its age is inside that chicken's window
+        /// (<c>PassiveAbilitySO.ZoneSlowLifetimeFraction</c>: 1 = its whole life, Slippery 0.6 = the first 60%).
+        /// </summary>
+        public static bool SlowsDuringWindow(float ageFraction, float window) => window >= 1f || ageFraction < window;
+
+        /// <summary>
         /// No overlapping auras (WP4 qa): a live Caster zone that ends with slot <paramref name="zoneSlot"/> of the same
         /// owner blocks a new cast from that slot. Needed because a running slot refuses a re-cast but the zone only
         /// notices its slot ended on its own next authority tick: a cooldown shorter than the aura (Bully can take

@@ -200,7 +200,7 @@ namespace CluckWars.Diagnostics
             {
                 var a = abilities.GetSlot(s);
                 if (!FixedKit.EmitsStun(a) || !abilities.IsReady(s) || !a.IsUsable(self)) continue;
-                float secs = passive != null ? passive.ModifyControlDuration(a.EmittedControl.Seconds, target) : a.EmittedControl.Seconds;
+                float secs = passive != null ? passive.ModifyControlDuration(a.EmittedControl.Seconds, ControlKind.Stun, target) : a.EmittedControl.Seconds;
                 // Both presses here are held HoldSeconds before they cast, so the hold cancels out; the Kill's ~6 photo frames
                 // (~0.1 s) fit inside the bot rule's StunLeadMargin.
                 if (BotTactics.NextMarkStep(true, false, armLeft, windowLeft, a.WouldAffect(self, target), secs) == BotMarkStep.Stun)

@@ -33,7 +33,7 @@ namespace CluckWars.Abilities
 
         public override bool IsSignature => true;
 
-        public override float ModifyControlDuration(float seconds, ChickenController self) =>
+        public override float ModifyControlDuration(float seconds, ControlKind kind, ChickenController self) =>
             seconds * DurationMultiplier;
 
         public override float OutgoingControlMultiplier => OutgoingDurationMultiplier;

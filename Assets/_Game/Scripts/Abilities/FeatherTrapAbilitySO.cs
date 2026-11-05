@@ -15,8 +15,9 @@ namespace CluckWars.Abilities
     /// Slow is applied passively: each chicken's authority calls
     /// <see cref="ChickenController.CheckAbilityZoneSlow"/> every
     /// <c>FixedUpdateNetwork</c> tick — no per-tick RPC overhead.
-    /// Speedy's Slippery passive does <em>not</em> reduce zone-slow duration
-    /// (zones persist independently of the target). Cooldown tier: Medium.
+    /// Speedy's Slippery passive weakens the slow and only lets the zone slow it during the
+    /// first 60% of the zone's lifetime (<c>PassiveAbilitySO.ZoneSlowLifetimeFraction</c>,
+    /// Maestro 2026-11-05). Cooldown tier: Medium.
     ///
     /// Requires <see cref="PrefabRegistrySO.AbilityZone"/> to be assigned.
     /// </remarks>

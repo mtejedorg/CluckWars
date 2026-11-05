@@ -644,7 +644,7 @@ namespace CluckWars.Gameplay
         /// <param name="armRemaining">Seconds until the mark arms (0 once armed).</param>
         /// <param name="windowRemaining">Seconds until the mark expires.</param>
         /// <param name="stunInReach">A ready stun would land on the target now (and the target is neither shelled nor control-immune).</param>
-        /// <param name="stunSeconds">That stun's length on this target, after its passive (Slippery 0.6, Bulwark 0.65).</param>
+        /// <param name="stunSeconds">That stun's length on this target, after its passive (Bulwark 0.65, Relentless 0.75; Slippery leaves stuns whole since 2026-11-05).</param>
         public static BotMarkStep NextMarkStep(bool marked, bool canKill, float armRemaining, float windowRemaining,
             bool stunInReach, float stunSeconds)
         {
