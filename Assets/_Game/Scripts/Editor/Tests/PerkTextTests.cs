@@ -45,8 +45,9 @@ namespace CluckWars.Tests
                 case HoarderPassiveSO h:
                     int cap = (int)Math.Round(h.MinimumCapacity, MidpointRounding.AwayFromZero);
                     return ($"Carry {cap} food in one trip.", $"Carries at least {cap} food.");
-                case FeatherfootPassiveSO _:
-                    return ("Piles and bumps never slow you.", "Food piles and bumping into rivals never slow you down.");
+                case FeatherfootPassiveSO f:
+                    return ($"Bank {Pct(f.DepositRateMultiplier - 1.0)}% faster. Piles and bumps never slow you.",
+                            $"You bank food {Pct(f.DepositRateMultiplier - 1.0)}% faster, and food piles and bumping into rivals never slow you down.");
                 case SpoilerPassiveSO sp:
                     return ($"+{sp.BonusFood} food if time runs out.",
                             $"If nobody reaches {cfg.FoodTargetToWin} before time's up, you bank {sp.BonusFood} bonus food first.");
@@ -251,6 +252,8 @@ namespace CluckWars.Tests
                         break;
                     case FeatherfootPassiveSO f:
                         StringAssert.Contains("never slow", f.Description);
+                        StringAssert.Contains($"bank food {Pct(f.DepositRateMultiplier - 1.0)}% faster", f.Description);
+                        Assert.AreEqual(f.PerkDetail(null), f.Description, "the stored text is the detail template");
                         // A6: the text must name both slows the passive ignores.
                         Assert.IsTrue(f.IgnoresPileSlow(null) && f.IgnoresCollisionSlow(null),
                             "Featherfoot ignores the pile slow and the collision slow (A6).");

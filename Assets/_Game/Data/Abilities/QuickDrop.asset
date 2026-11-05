@@ -30,3 +30,4 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 256
   DepositRateMultiplier: 4
+  Retired: 1

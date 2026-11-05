@@ -244,15 +244,15 @@ namespace CluckWars.Tests
             { "Jump", typeof(ShadowstepAbilitySO) },
             { "Shield", typeof(TurtleModeAbilitySO) },
             { "Hide", typeof(InvisibilityAbilitySO) },
-            { "Quick Drop", typeof(QuickDropAbilitySO) },
             { "Death Mark", typeof(MarkKillAbilitySO) },
         };
 
         [Test]
-        public void TheRegistry_HoldsExactlyTheElevenJobs()
+        public void TheRegistry_HoldsExactlyTheTenJobs()
         {
+            // 11 on 2026-11-05, then Quick Drop became Featherfoot's passive the same day.
             var actives = Registry.ActiveAbilities.ToList();
-            Assert.AreEqual(11, actives.Count, string.Join(", ", actives.Select(a => a.name)));
+            Assert.AreEqual(10, actives.Count, string.Join(", ", actives.Select(a => a.name)));
             foreach (var job in Jobs)
             {
                 var a = actives.SingleOrDefault(x => x.GetType() == job.Value);
@@ -267,7 +267,7 @@ namespace CluckWars.Tests
         {
             var registered = new HashSet<AbilityBaseSO>(Registry.All);
             var retired = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir).Where(a => a.Retired).ToList();
-            Assert.AreEqual(18, retired.Count, "the 17 replaced on 2026-11-05 plus Egg Shell");
+            Assert.AreEqual(19, retired.Count, "the 17 replaced on 2026-11-05, Egg Shell, and Quick Drop (now Featherfoot's passive)");
             foreach (var a in retired)
             {
                 Assert.IsFalse(registered.Contains(a), a.name);
@@ -277,7 +277,7 @@ namespace CluckWars.Tests
 
         [TestCase(ChickenSubclass.Warrior_Bully, "Peck", "Steal", "Stun", "Jump")]          // Maestro 2026-11-05 Warrior rework
         [TestCase(ChickenSubclass.Warrior_Relentless, "Peck", "Steal", "Slow", "Speed")]
-        [TestCase(ChickenSubclass.Speedy_Featherfoot, "Peck", "Speed", "Slow", "Quick Drop")]
+        [TestCase(ChickenSubclass.Speedy_Featherfoot, "Peck", "Speed", "Slow", "Steal")]
         [TestCase(ChickenSubclass.Speedy_Slippery, "Peck", "Speed", "Slow", "Shove")]
         [TestCase(ChickenSubclass.Fatty_Bulwark, "Peck", "Stun", "Shove", "Shield")]
         [TestCase(ChickenSubclass.Fatty_Hoarder, "Peck", "Shield", "Slow", "Steal")]

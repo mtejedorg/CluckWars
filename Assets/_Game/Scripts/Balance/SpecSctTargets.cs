@@ -51,6 +51,14 @@ namespace CluckWars.Balance
                 Reason = "Designed: cargo floor 40 = the win target, so a perfect run is one trip " +
                          "(Fatty signature fantasy). 4.2 s faster than the naked Fatty by intent.",
             },
+            new SpecSctTarget
+            {
+                Subclass = ChickenSubclass.Speedy_Featherfoot, Seconds = 28.54f, Trips = 4, CargoCapacity = 10,
+                Reason = "Maestro 2026-11-05: Quick Drop folded into Featherfoot as a permanent deposit rate x1.5 " +
+                         "(9 -> 13.5 food/s). 1.46 s faster than the naked Speedy by intent, inside the +-1.5 s " +
+                         "design band (the retired Quick Drop kit measured 28.35 s, just outside it). To be " +
+                         "confirmed by the human 4-player session.",
+            },
             // Warrior_Bully's entry (38.77 s / 3 at cap 16, its old +2 cargo) was removed 2026-11-05: the reworked
             // Bully (Maestro) changes no cargo, deposit or Peck cadence, so it farms as the naked Warrior again.
         };

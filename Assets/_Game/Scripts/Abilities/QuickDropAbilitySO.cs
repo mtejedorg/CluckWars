@@ -4,8 +4,9 @@ using CluckWars.Localization;
 namespace CluckWars.Abilities
 {
     /// <summary>
-    /// <b>Speedy.</b> Dumps the whole beakful into the base in one motion instead of unloading
-    /// at a walk.
+    /// <b>Retired 2026-11-05</b> (Maestro): its job became Featherfoot's permanent deposit-rate multiplier
+    /// (<see cref="FeatherfootPassiveSO.DepositRateMultiplier"/>). Kept in the repo, out of the registry and every kit.
+    /// Was: <b>Speedy.</b> Dumps the whole beakful into the base in one motion instead of unloading at a walk.
     /// </summary>
     /// <remarks>
     /// <b>This was a passive until 2026-08-23, and moving it is a balance fix, not a

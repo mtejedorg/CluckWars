@@ -5,7 +5,7 @@ using UnityEngine;
 namespace CluckWars.Abilities
 {
     /// <summary>
-    /// <b>Speedy alternative.</b> Immune to the pile-slow and the collision slow, so a contested
+    /// <b>Speedy alternative.</b> Banks faster, and is immune to the pile-slow and the collision slow, so a contested
     /// pile can be raided at full speed and a chaser cannot drag it down by bumping into it.
     /// </summary>
     /// <remarks>
@@ -18,10 +18,20 @@ namespace CluckWars.Abilities
     /// nobody to blame, and Featherfoot is the "nothing slows my feet" fork. Ability slows
     /// (Feather Trap, Dust Kick, auras) still land. Needs a human playtest for chase feel.
     /// </para>
+    /// <para>
+    /// <b>Quick Drop folded in (Maestro 2026-11-05):</b> the retired ability's job is now this passive's permanent
+    /// <see cref="DepositRateMultiplier"/> (x1.5, against the old 4x-for-2s burst), read by the deposit chokepoint
+    /// <c>ChickenCargo.ResolveDepositRate</c> on the authority. It moves banking time, so the Balance Oracle measures it
+    /// through <see cref="ModifyDepositRate"/> (<c>RealMap_ShippedPassives_SatisfyTheSctAxiomOrADeclaredTarget</c>).
+    /// </para>
     /// </remarks>
     [CreateAssetMenu(fileName = "Featherfoot", menuName = "Cluck Wars/Passive/Featherfoot", order = 11)]
     public sealed class FeatherfootPassiveSO : PassiveAbilitySO
     {
+        [Tooltip("Permanent multiplier on banking speed at the own base (Quick Drop's job since 2026-11-05). 1.5 = 50% faster. " +
+                 "Feeds Solo Clear Time: re-run the Balance Oracle, never hand-tune.")]
+        [Range(1f, 4f)] public float DepositRateMultiplier = 1.5f;
+
         public FeatherfootPassiveSO()
         {
             DisplayName = "Featherfoot";
@@ -33,7 +43,12 @@ namespace CluckWars.Abilities
 
         public override bool IgnoresCollisionSlow(ChickenController self) => true;
 
+        public override float ModifyDepositRate(float perSecond, ChickenController self) =>
+            perSecond * DepositRateMultiplier;
+
         public override string PerkLineKey => UiKeys.PerkFeatherfootLine;
         public override string PerkDetailKey => UiKeys.PerkFeatherfootDetail;
+        public override (string name, object value)[] PerkArgs(MatchConfigSO match) =>
+            new (string, object)[] { ("pct", Percent(DepositRateMultiplier - 1f)) };
     }
 }

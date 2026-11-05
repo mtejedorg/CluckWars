@@ -233,33 +233,9 @@ namespace CluckWars.Tests
             Assert.AreEqual(0.75f, plainTime - burstTime, 1e-3f, "one press saves 1 s of plain banking for 0.25 s of burst");
         }
 
-        /// <summary>
-        /// The one fixed kit whose run the naked axiom does not see: Featherfoot carries Quick Drop, pressed on every arrival
-        /// it is ready, through the real Oracle on the real map from all four seats (the shipped cooldown fits two presses in
-        /// a run however they are timed, so this is also its best case).
-        /// </summary>
-        /// <remarks>
-        /// <b>Measured 2026-10-31: 28.35 s / 4 trips, 0.15 s under the 28.5 floor of the +-1.5 s design band.</b> This pins the
-        /// measurement, it does not approve it: no tolerance moved, nothing is declared in <see cref="SpecSctTargets"/>, and
-        /// the decision is Maestro's (docs/balance/human-test-baseline.md). When the run comes back inside the band the
-        /// IsFalse below goes red on purpose: turn this into a plain <see cref="SctTargets.Within"/> assertion.
-        /// </remarks>
-        [Test]
-        public void RealMap_FeatherfootWithQuickDrop_IsPinnedAtItsMeasuredRun()
-        {
-            const float Measured = 28.35f;
-            var config = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
-            var target = System.Array.Find(SctTargets.All, t => t.ClassName == "Speedy");
-            var chicken = ShippedSpeedy(ChickenSubclass.Speedy_Featherfoot, true);
-            for (int seat = 0; seat < 4; seat++)
-            {
-                var r = BalanceOracle.Simulate(ShippedMap.OracleMap(seat), chicken, config.FoodTargetToWin);
-                TestContext.WriteLine($"Featherfoot+QuickDrop seat {seat}: {r.SctSeconds:0.00}s / {r.Trips} trips");
-                Assert.AreEqual(target.Trips, r.Trips, $"seat {seat}");
-                Assert.AreEqual(Measured, r.SctSeconds, 0.01f, $"seat {seat}: the run moved; re-measure and re-report it");
-                Assert.IsFalse(SctTargets.Within(r, target), "back inside the SCT band: see the remarks, make this a real assertion");
-            }
-        }
+        // RealMap_FeatherfootWithQuickDrop_IsPinnedAtItsMeasuredRun was removed 2026-11-05: Quick Drop is retired and its job
+        // is Featherfoot's permanent deposit multiplier, which RealMap_ShippedPassives_SatisfyTheSctAxiomOrADeclaredTarget
+        // measures through ModifyDepositRate like every other passive.
 
         /// <summary>
         /// qa follow-up 10: a declared entry pins the cargo capacity it was measured at, not just

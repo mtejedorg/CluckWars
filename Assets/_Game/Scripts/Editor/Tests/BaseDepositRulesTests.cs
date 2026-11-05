@@ -63,6 +63,16 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void MaxDepositRateMultiplier_CoversThePassiveTimesTheStrongestAbility()
+        {
+            // ChickenCargo.ResolveDepositRate multiplies the passive (Featherfoot x1.5 since 2026-11-05, Quick Drop's job) by
+            // the ability stack, so the receiver's bound must admit the product, retired Quick Drop included.
+            float passive = TestAssets.LoadAllIn<PassiveAbilitySO>(TestAssets.AbilitiesDir).Max(p => p.ModifyDepositRate(1f, null));
+            Assert.AreEqual(1.5f, passive, 1e-5f, "Featherfoot's shipped deposit multiplier is the strongest passive one");
+            Assert.LessOrEqual(passive * MaxAuthoredDepositRateMultiplier(), BaseDepositRules.MaxDepositRateMultiplier);
+        }
+
+        [Test]
         public void MaxDepositRateMultiplier_CoversEveryAuthoredAbility()
         {
             // The bound is derived from this ceiling, so a new deposit-rate ability authored
