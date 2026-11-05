@@ -86,7 +86,7 @@ namespace CluckWars.Gameplay
         {
             /// <summary>The pool was available. False skips the magnitude and range checks (the caller logs it as an Error).</summary>
             public readonly bool Known;
-            /// <summary>Longest authored duration. 0 when nothing in the pool produces the effect: every claim is then refused.</summary>
+            /// <summary>Longest authored duration, times the pool's strongest outgoing-control passive for stun and slow (<see cref="MaxOutgoingControlMultiplier"/>). 0 when nothing in the pool produces the effect: every claim is then refused.</summary>
             public readonly float MaxSeconds;
             /// <summary>Strongest authored slow factor (smallest multiplier); 1 for stun/root.</summary>
             public readonly float MinSlowFactor;
@@ -143,7 +143,26 @@ namespace CluckWars.Gameplay
                 }
             }
             if (kind == ControlKind.Slow && maxReach > 0f) maxReach += SlowReachHeadroomMeters;
+            if (kind == ControlKind.Stun || kind == ControlKind.Slow) maxSeconds *= MaxOutgoingControlMultiplier(pool);
             return new Ceiling(true, maxSeconds, minFactor, maxReach, zoneRadius, zonePlacement, zoneLifetime);
+        }
+
+        /// <summary>
+        /// The largest <see cref="PassiveAbilitySO.OutgoingControlMultiplier"/> any passive in <paramref name="pool"/>
+        /// declares (Relentless 1.3), never below 1. Stuns and slows are sent already lengthened by the CASTER's passive
+        /// (<c>AbilityBaseSO.ResolveOutgoingControlSeconds</c>) and the victim's peer does not know a remote caster's
+        /// passive, so the stun and slow duration ceilings are the authored maximum times this pool-wide worst case.
+        /// Derived from the shipped data, like <see cref="StealRules.MaxSingleSteal"/>'s steal multiplier. Roots are
+        /// not lengthened by any passive, so their ceiling (and the Root Egg zone's lifetime evidence) does not move.
+        /// </summary>
+        public static float MaxOutgoingControlMultiplier(IEnumerable<AbilityBaseSO> pool)
+        {
+            float max = 1f;
+            if (pool == null) return max;
+            foreach (var ability in pool)
+                if (ability is PassiveAbilitySO passive)
+                    max = Mathf.Max(max, passive.OutgoingControlMultiplier);
+            return max;
         }
 
         // ---- Root-zone evidence (security review 2026-10-22, hardened in WP3) ---------------
@@ -430,7 +449,7 @@ namespace CluckWars.Gameplay
             {
                 case Verdict.ImplausibleDuration:
                     return ceiling.Known
-                        ? $"the duration is not in (0, {ceiling.MaxSeconds:0.00}] s, the longest {kind} any ability in the pool applies."
+                        ? $"the duration is not in (0, {ceiling.MaxSeconds:0.00}] s, the longest {kind} any ability in the pool applies (with the strongest outgoing-control passive)."
                         : "the duration is not a positive finite number.";
                 case Verdict.ImplausibleFactor:
                     return ceiling.Known

@@ -90,9 +90,10 @@ namespace CluckWars.Abilities
         {
             var caster = ctx.Controller;
 
+            float slow = ResolveOutgoingControlSeconds(SlowSeconds, caster);
             GatherTargets(caster, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
-                _scratch[i].RPC_ApplyAbilitySlow(SlowSeconds, SlowFactor, caster.Id);
+                _scratch[i].RPC_ApplyAbilitySlow(slow, SlowFactor, caster.Id);
         }
 
         public override void OnDeactivate(AbilityContext ctx) { }

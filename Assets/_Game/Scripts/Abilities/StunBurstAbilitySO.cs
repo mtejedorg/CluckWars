@@ -5,7 +5,7 @@ namespace CluckWars.Abilities
 {
     /// <summary>
     /// Shared base class for AoE-around-self stun abilities (Ambush & Wing Slam).
-    /// Calls target.Controller.RPC_ApplyStun(StunDuration, caster) for each rival in radius.
+    /// Calls target.Controller.RPC_ApplyStun(StunDuration x the caster's outgoing-control factor, caster) for each rival in radius.
     /// </summary>
     public abstract class StunBurstAbilitySO : AbilityBaseSO
     {
@@ -48,11 +48,13 @@ namespace CluckWars.Abilities
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;
+            // The caster's Relentless lengthens the stun here, on its own authority; the victim's ceiling allows for it.
+            float stun = ResolveOutgoingControlSeconds(StunDuration, caster);
 
             GatherTargets(caster, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
             {
-                _scratch[i].RPC_ApplyStun(StunDuration, caster.Id);
+                _scratch[i].RPC_ApplyStun(stun, caster.Id);
             }
         }
 

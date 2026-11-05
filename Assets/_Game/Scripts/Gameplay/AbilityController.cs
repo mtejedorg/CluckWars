@@ -137,9 +137,10 @@ namespace CluckWars.Gameplay
         {
             if (!IsSlotActive(slot)) return 0f;
             var ability = GetSlot(slot);
-            if (ability == null || ability.Duration <= 0f) return 0f;
+            float duration = ability != null ? ability.ResolveActiveDuration(_controller) : 0f;
+            if (duration <= 0f) return 0f;
             float remaining = GetActiveTimer(slot).RemainingTime(Runner) ?? 0f;
-            return Mathf.Clamp01(remaining / ability.Duration);
+            return Mathf.Clamp01(remaining / duration);
         }
 
         /// <summary>
@@ -155,7 +156,7 @@ namespace CluckWars.Gameplay
                 {
                     var ability = GetSlot(i);
                     float remaining = IsSlotActive(i) ? GetActiveTimer(i).RemainingTime(Runner) ?? 0f : 0f;
-                    _elapsedScratch[i] = (ability != null ? ability.Duration : 0f) - remaining;
+                    _elapsedScratch[i] = (ability != null ? ability.ResolveActiveDuration(_controller) : 0f) - remaining;
                 }
                 return AbilityRunRules.MostRecent(ActiveMask, _elapsedScratch, InvalidSlot);
             }
@@ -724,12 +725,12 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// The cooldown <paramref name="slot"/> will actually charge this chicken if fired
         /// now — the ability's per-caster value with the class specialization applied
-        /// (Relentless). 0 for an empty slot.
+        /// (Bully). 0 for an empty slot.
         /// </summary>
         /// <remarks>
         /// Exposed for <c>BotTactics.ScoreCastCandidate</c>, which breaks ties inside one
         /// <see cref="BotRole"/> by preferring the cheaper tool. It has to be the
-        /// <i>resolved</i> value rather than <c>AbilityBaseSO.Cooldown</c>: a Relentless
+        /// <i>resolved</i> value rather than <c>AbilityBaseSO.Cooldown</c>: a Bully
         /// Warrior's Wing Slam is materially cheaper than the authored number, and ranking
         /// on the raw field would have the bot avoid the very ability its specialization
         /// exists to make spammable.
@@ -766,7 +767,7 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// The cooldown this chicken actually pays for <paramref name="ability"/>: the
-        /// ability's own per-caster value, then the class specialization's say (Relentless).
+        /// ability's own per-caster value, then the class specialization's say (Bully).
         /// </summary>
         /// <remarks>
         /// Every cooldown read in this class goes through here — the timer that starts the
@@ -875,7 +876,7 @@ namespace CluckWars.Gameplay
             slotUnavailable |= ability == null;
 
             // A slot that is still running reads as "cooling": re-casting the same slot while it runs stays
-            // refused (its cooldown outlasts its duration, so this only guards a Relentless-shortened edge).
+            // refused (its cooldown outlasts its duration, so this only guards a Bully-shortened edge).
             // Other slots running do NOT refuse anything — abilities run concurrently.
             // A running ability that takes a second press (Turtle Mode's lock) is not "cooling" for that press.
             bool repress = !slotUnavailable && IsSlotActive(slot) && ability.AcceptsPressWhileActive;
@@ -1009,7 +1010,10 @@ namespace CluckWars.Gameplay
             EndStealthAndPeckForCast(slot);
 
             ActiveMask = AbilityRunRules.Begin(ActiveMask, slot);
-            SetActiveTimer(slot, TickTimer.CreateFromSeconds(Runner, ability.Duration));
+            // The run time is the ability's own (the Slow aura's is lengthened by a Relentless caster, and its zone ends
+            // with this timer); the cooldown starts at the cast either way.
+            float activeSeconds = ability.ResolveActiveDuration(_controller);
+            SetActiveTimer(slot, TickTimer.CreateFromSeconds(Runner, activeSeconds));
             SetCooldown(slot, TickTimer.CreateFromSeconds(Runner, ResolveCooldownFor(ability)));
             LastCastSlot = slot;
 
@@ -1080,7 +1084,7 @@ namespace CluckWars.Gameplay
             }
             _audio?.PlaySFX(_audioReg != null ? _audioReg.AbilityActivate : null);
             LastCastEventId++; // wraps at 255 by design (byte overflow) — a one-shot signal, not a counter
-            _log?.Info(Source, $"Activated slot {slot} ({ability.DisplayName}) for {ability.Duration:0.00}s, " +
+            _log?.Info(Source, $"Activated slot {slot} ({ability.DisplayName}) for {activeSeconds:0.00}s, " +
                 $"CD {ResolveCooldownFor(ability):0.00}s, hits={hitCount}.");
             _castSlotThisTick = slot;
             return true;

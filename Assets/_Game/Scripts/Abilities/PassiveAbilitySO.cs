@@ -115,6 +115,25 @@ namespace CluckWars.Abilities
         /// Chokepoint: <c>ChickenController.ApplyPassiveControlDuration</c>.</summary>
         public virtual float ModifyControlDuration(float seconds, ChickenController self) => seconds;
 
+        /// <summary>
+        /// Factor on the stuns and slows this chicken APPLIES to others (Relentless, 2026-11-05). 1 for every
+        /// passive that does not lengthen its own crowd control.
+        /// Chokepoint: <c>AbilityBaseSO.ResolveOutgoingControlSeconds</c>, which every stun / slow sender calls.
+        /// </summary>
+        /// <remarks>
+        /// A constant per asset, not a hook with a <c>self</c> argument, on purpose: the receiver-side bound on the
+        /// control RPCs (<c>ControlClaimRules.CeilingFor</c>) must know the worst case across the shipped registry
+        /// with no caster to probe, exactly like <see cref="MaxStealMultiplier"/>. One value read by both the sender
+        /// and the ceiling means the two can never disagree. A future passive whose factor varies with match state
+        /// must split this into a hook and a declared maximum, as steals are.
+        /// <para>
+        /// Order with the victim's <see cref="ModifyControlDuration"/>: the caster's factor is applied first, on the
+        /// caster's authority, before the RPC; the victim's shortening is applied on arrival. A Relentless stun on a
+        /// Slippery victim lasts authored x 1.3 x 0.6.
+        /// </para>
+        /// </remarks>
+        public virtual float OutgoingControlMultiplier => 1f;
+
         /// <summary>Scale an incoming knockback impulse.
         /// Chokepoint: <c>ChickenController.ApplyKnockback</c>.</summary>
         public virtual float ModifyKnockback(float strength, ChickenController self) => strength;

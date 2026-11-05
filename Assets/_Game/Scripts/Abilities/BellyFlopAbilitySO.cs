@@ -84,11 +84,12 @@ namespace CluckWars.Abilities
             var caster = ctx.Controller;
             var landing = caster.transform.position;
 
+            float stun = ResolveOutgoingControlSeconds(StunSeconds, caster);
             GatherTargets(caster, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
             {
                 var victim = _scratch[i];
-                victim.RPC_ApplyStun(StunSeconds, caster.Id);
+                victim.RPC_ApplyStun(stun, caster.Id);
 
                 if (KnockbackForce <= 0f) continue;
 

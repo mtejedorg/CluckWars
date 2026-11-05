@@ -27,9 +27,17 @@ namespace CluckWars.Abilities
     /// <b>No overlapping auras, explicitly:</b> <see cref="CanActivate"/> refuses while a live aura of this caster still
     /// ends with this slot (<see cref="AreaEffectRules.BlocksRecast"/>). The shipped numbers would already prevent it
     /// (Cooldown 7 s &gt; Duration 3 s, and a running slot refuses a re-cast), but a cooldown passive can shorten the
-    /// cooldown below the aura (Relentless goes to x0.25), and the old zone only sees its slot end on its next authority
+    /// cooldown below the aura (Bully's field goes to x0.25), and the old zone only sees its slot end on its next authority
     /// tick. Pinned by <c>FeatherAuraZoneTests.ASecondAura_IsRefusedWhileTheFirstLives_EvenAtAQuarterCooldown</c>. Bots
     /// get the same refusal through <c>BotTryActivate</c>, so they need no extra "aura already up" guard.
+    /// </para>
+    /// <para>
+    /// <b>Relentless (2026-11-05):</b> the aura's run time IS the slow it inflicts
+    /// (<see cref="ActiveDurationIsOutgoingControl"/>), so a Relentless caster's outgoing-control factor (x1.3) lengthens
+    /// the slot's active time AND the zone's lifetime together (<see cref="AbilityBaseSO.ResolveActiveDuration"/>: 3 s
+    /// becomes 3.9 s). The zone still ends with the slot; the cooldown is unchanged and still starts at the cast (7 s, so
+    /// still longer than the aura). <see cref="TryGetAreaEffect"/> stays the authored spec (no caster); only the
+    /// cast-time spec is scaled. The victim applies the zone slow while inside with no RPC and no duration ceiling.
     /// </para>
     /// Cooldown tier: Medium.
     /// </remarks>
@@ -65,6 +73,8 @@ namespace CluckWars.Abilities
             Cooldown = 7f;
         }
 
+        public override bool ActiveDurationIsOutgoingControl => true;
+
         public override bool TryGetAreaEffect(out AreaEffectSpec spec)
         {
             spec = AreaEffectSpec.AuraSlow(AuraRadius, Duration, AuraSlowFactor);
@@ -99,7 +109,8 @@ namespace CluckWars.Abilities
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;
-            TryGetAreaEffect(out var spec);
+            // Same run time AbilityController gave the slot (ResolveActiveDuration), so the zone and the slot end together.
+            var spec = AreaEffectSpec.AuraSlow(AuraRadius, ResolveActiveDuration(caster), AuraSlowFactor);
             // An Aura's position only seeds its transform; its centre is the caster (AbilityZone.TryGetCenter).
             AreaEffectSpawner.Spawn(ctx, spec, AreaEffectSpawner.Placement(caster.transform.position, caster.transform.forward, spec),
                 Source, "Feather Aura");

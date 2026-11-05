@@ -68,6 +68,7 @@ namespace CluckWars.Abilities
         {
             var caster = ctx.Controller;
             var origin = caster.transform.position;
+            float stagger = ResolveOutgoingControlSeconds(StaggerSeconds, caster);
 
             GatherTargets(caster, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
@@ -79,7 +80,7 @@ namespace CluckWars.Abilities
                 if (dir.sqrMagnitude < 0.001f) dir = caster.transform.forward;
 
                 victim.RPC_ApplyKnockback(dir.normalized * KnockbackForce);
-                victim.RPC_ApplyStun(StaggerSeconds, caster.Id);
+                victim.RPC_ApplyStun(stagger, caster.Id);
             }
         }
 

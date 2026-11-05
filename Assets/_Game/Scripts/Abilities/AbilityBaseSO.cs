@@ -279,7 +279,7 @@ namespace CluckWars.Abilities
         /// <summary>
         /// How much cargo <paramref name="caster"/> actually takes for a nominal
         /// <paramref name="baseAmount"/>, after its class specialization has had a say
-        /// (Bully, Thief). The single chokepoint every stealing ability calls, so a passive
+        /// (Thief). The single chokepoint every stealing ability calls, so a passive
         /// that scales steals cannot apply to some of them and miss others.
         /// </summary>
         protected static float ResolveStealAmount(float baseAmount, Gameplay.ChickenController caster)
@@ -287,6 +287,35 @@ namespace CluckWars.Abilities
             var passive = caster != null ? caster.Passive : null;
             return passive != null ? passive.ModifyStealAmount(baseAmount, caster) : baseAmount;
         }
+
+        /// <summary>
+        /// How long a stun or slow <paramref name="caster"/> sends actually lasts before the victim's passive has its
+        /// say: the authored <paramref name="baseSeconds"/> times the caster's
+        /// <see cref="PassiveAbilitySO.OutgoingControlMultiplier"/> (Relentless). The single chokepoint every stun /
+        /// slow sender calls on the CASTER's state authority, before the RPC (or, for the Slow aura, before the zone
+        /// and the slot's run time are set; see <see cref="ResolveActiveDuration"/>).
+        /// </summary>
+        public static float ResolveOutgoingControlSeconds(float baseSeconds, Gameplay.ChickenController caster) =>
+            ResolveOutgoingControlSeconds(baseSeconds, caster != null ? caster.Passive : null);
+
+        /// <summary>Pure form of <see cref="ResolveOutgoingControlSeconds(float, Gameplay.ChickenController)"/>, for EditMode.</summary>
+        public static float ResolveOutgoingControlSeconds(float baseSeconds, PassiveAbilitySO casterPassive) =>
+            casterPassive != null ? baseSeconds * casterPassive.OutgoingControlMultiplier : baseSeconds;
+
+        /// <summary>
+        /// True when this ability's run time IS the crowd control it inflicts, so the caster's outgoing-control
+        /// factor lengthens the run itself (the Slow aura: the zone ends with the slot). False for everything else.
+        /// </summary>
+        public virtual bool ActiveDurationIsOutgoingControl => false;
+
+        /// <summary>
+        /// How long <paramref name="caster"/>'s slot runs when this ability is cast: <see cref="Duration"/>, scaled by
+        /// <see cref="ResolveOutgoingControlSeconds(float, Gameplay.ChickenController)"/> when
+        /// <see cref="ActiveDurationIsOutgoingControl"/>. Read by <c>AbilityController</c> for the run timer and the
+        /// ring drain, so the two always agree. The cooldown is not affected and still starts at the cast.
+        /// </summary>
+        public float ResolveActiveDuration(Gameplay.ChickenController caster) =>
+            ActiveDurationIsOutgoingControl ? ResolveOutgoingControlSeconds(Duration, caster) : Duration;
 
         /// <summary>
         /// Cargo this ability takes off a rival per hit, before <see cref="ResolveStealAmount"/>

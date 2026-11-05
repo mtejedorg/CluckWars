@@ -613,7 +613,7 @@ namespace CluckWars.Gameplay
                 var ability = _abilities.GetSlot(slot);
                 if (!FixedKit.EmitsStun(ability) || !_abilities.IsReady(slot) || !ability.IsUsable(_controller)
                     || !ability.WouldAffect(_controller, mark)) continue;
-                float raw = ability.EmittedControl.Seconds;
+                float raw = AbilityBaseSO.ResolveOutgoingControlSeconds(ability.EmittedControl.Seconds, _controller);   // the caster's Relentless, then the target's passive
                 var passive = mark.Abilities != null ? mark.Abilities.Passive : null;
                 float onTarget = passive != null ? passive.ModifyControlDuration(raw, mark) : raw;
                 if (onTarget > stunSeconds) { stunSeconds = onTarget; stunSlot = slot; }

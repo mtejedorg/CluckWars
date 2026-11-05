@@ -274,8 +274,8 @@ namespace CluckWars.Tests
             }
         }
 
-        [TestCase(ChickenSubclass.Warrior_Bully, "Peck", "Steal", "Shove", "Speed")]
-        [TestCase(ChickenSubclass.Warrior_Relentless, "Peck", "Stun", "Shove", "Speed")]
+        [TestCase(ChickenSubclass.Warrior_Bully, "Peck", "Steal", "Stun", "Jump")]          // Maestro 2026-11-05 Warrior rework
+        [TestCase(ChickenSubclass.Warrior_Relentless, "Peck", "Steal", "Slow", "Speed")]
         [TestCase(ChickenSubclass.Speedy_Featherfoot, "Peck", "Speed", "Slow", "Quick Drop")]
         [TestCase(ChickenSubclass.Speedy_Slippery, "Peck", "Speed", "Slow", "Shove")]
         [TestCase(ChickenSubclass.Fatty_Bulwark, "Peck", "Stun", "Shove", "Shield")]
@@ -365,7 +365,8 @@ namespace CluckWars.Tests
             Assert.AreEqual(1.3f, stun.EmittedControl.Seconds, 1e-4f);
 
             // The stun goes out through the one stun RPC, whose authority sets the networked IsStunned that ExecuteRules reads.
-            StringAssert.Contains("RPC_ApplyStun(StunDuration, caster.Id)", Src("Abilities/StunBurstAbilitySO.cs"));
+            StringAssert.Contains("float stun = ResolveOutgoingControlSeconds(StunDuration, caster);", Src("Abilities/StunBurstAbilitySO.cs"));
+            StringAssert.Contains("RPC_ApplyStun(stun, caster.Id)", Src("Abilities/StunBurstAbilitySO.cs"));
             StringAssert.Contains("IsStunned = true;", Src("Gameplay/ChickenController.cs"));
             Assert.IsTrue(ExecuteRules.HasStunAtKill(stunnedNow: true, stunEverSeen: true, secondsSinceStunned: 0f, latency: 0.1f));
 
