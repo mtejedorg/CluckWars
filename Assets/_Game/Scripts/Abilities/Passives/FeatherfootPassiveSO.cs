@@ -20,7 +20,8 @@ namespace CluckWars.Abilities
     /// </para>
     /// <para>
     /// <b>Quick Drop folded in (Maestro 2026-11-05):</b> the retired ability's job is now this passive's permanent
-    /// <see cref="DepositRateMultiplier"/> (x1.5, against the old 4x-for-2s burst), read by the deposit chokepoint
+    /// <see cref="DepositRateMultiplier"/> (x1.1, against the old 4x-for-2s burst; first shipped at x1.5, tuned down the same day by Maestro so the
+    /// farming run lands on the Speedy SCT target: 29.62 s against 30 s +-0.5, no declared exception), read by the deposit chokepoint
     /// <c>ChickenCargo.ResolveDepositRate</c> on the authority. It moves banking time, so the Balance Oracle measures it
     /// through <see cref="ModifyDepositRate"/> (<c>RealMap_ShippedPassives_SatisfyTheSctAxiomOrADeclaredTarget</c>).
     /// </para>
@@ -28,9 +29,9 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "Featherfoot", menuName = "Cluck Wars/Passive/Featherfoot", order = 11)]
     public sealed class FeatherfootPassiveSO : PassiveAbilitySO
     {
-        [Tooltip("Permanent multiplier on banking speed at the own base (Quick Drop's job since 2026-11-05). 1.5 = 50% faster. " +
+        [Tooltip("Permanent multiplier on banking speed at the own base (Quick Drop's job since 2026-11-05). 1.1 = 10% faster. " +
                  "Feeds Solo Clear Time: re-run the Balance Oracle, never hand-tune.")]
-        [Range(1f, 4f)] public float DepositRateMultiplier = 1.5f;
+        [Range(1f, 4f)] public float DepositRateMultiplier = 1.1f;
 
         public FeatherfootPassiveSO()
         {

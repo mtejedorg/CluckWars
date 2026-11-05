@@ -17,9 +17,9 @@ Roll & Push, Dust Kick, Feather Trap, Sticky Egg, Smoke Roost, Ruffle, Feint, Im
 **Update 2026-11-05, later (branch `simplify-abilities`, code through `e358a1c0`, not merged):** Maestro ruled four more changes. (1) The Warrior is the
 all-rounder: Bully is the cooldown spammer (every move except Peck x0.75; kit Peck, Steal, Stun, Jump), Relentless has tougher and stronger crowd control
 (incoming stun / getting stuck / timed slow x0.75, outgoing stun and slow x1.3; kit Peck, Steal, Slow, Speed). (2) Shield is a 1 s slow-immune walk then an
-automatic 2 s egg. (3) Quick Drop is retired: Featherfoot banks 50% faster permanently (kit Peck, Speed, Slow, Steal), 10 active abilities. (4) Death Mark's
-kill range is 6.2 m. Balance Oracle (all four seats): Bully 34.98 s / 3 trips, Relentless 34.98 s / 3, Slippery 30.02 s / 4, Featherfoot 28.54 s / 4 (declared
-exception against the Speedy target 30 s, pending this session), Bulwark 30.05 s / 2, Hoarder 25.82 s / 1 (declared). Rows below that still describe
+automatic 2 s egg. (3) Quick Drop is retired: Featherfoot banks 10% faster permanently (kit Peck, Speed, Slow, Steal), 10 active abilities. (4) Death Mark's
+kill range is 6.2 m. Balance Oracle (all four seats): Bully 34.98 s / 3 trips, Relentless 34.98 s / 3, Slippery 30.02 s / 4, Featherfoot 29.62 s / 4 (x1.1 banking, on
+the Speedy target 30 s; first shipped at x1.5 = 28.54 s, tuned down by Maestro), Bulwark 30.05 s / 2, Hoarder 25.82 s / 1 (declared). Rows below that still describe
 the old Shield (walk 3 s plus a lock) or Quick Drop are rewritten; nothing else moved. Build/scenario: dev-tools build 2026-11-05 17:00, PC solo scenario (Thief vs Featherfoot, Relentless, Bulwark) PASS.
 
 This is a starting point to iterate, not a final roster. Every value below is data: kits on the passive assets (or the Balance
@@ -108,7 +108,7 @@ New for 2026-11-05 (simplified abilities):
 - **One ability per job:** can a child say what each of the 11 does from its name and short label (ROB, STUN, PUSH, SLOW, FAST, JUMP, SHLD, HIDE)? Is Steal on five of eight kits too samey?
 - **Steal without knockback:** Steal robs 5 from every carrier in 5.16 m and does not push. Do Thieves and Hoarders feel safe afterwards, and does a Bully (Steal every 3.75 s) still outpace everyone?
 - **Slow aura:** 6.48 m, 55%, 3 s. Is the aura (a zone around you) understood, or do players expect a one-shot slow?
-- **Featherfoot banking speed:** deposits are 50% faster for good. Does the banking feel noticeably quicker, and does Featherfoot now beat Slippery? (Oracle: 28.54 s against the Speedy target 30 s, a declared exception awaiting this session.)
+- **Featherfoot banking speed:** deposits are 10% faster for good (Oracle 29.62 s, on the Speedy target 30 s). Is the bonus noticeable at all, or does Featherfoot read only as "piles and bumps never slow me"? If it feels like nothing, say so: a bigger bonus needs a declared exception or a cost elsewhere.
 - **Relentless longer crowd control:** do your stuns (1.69 s) and Slow aura (3.9 s) feel stronger, and do you shrug off rivals' stuns and timed slows (x0.75)? Is it too strong against Slippery (1.014 s stuns)?
 - **Bully cooldowns:** with every move except Peck recharging 25% faster, does the Warrior feel like the cooldown spammer, and does it stay an all-rounder rather than a thief?
 - **Kits at a glance:** Bully (Stun, Jump) and Relentless (Slow, Speed) differ by crowd control and mobility; Bulwark/Hoarder by Stun+Shove vs Slow+Steal. Do these pairs play differently?

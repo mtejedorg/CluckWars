@@ -492,7 +492,7 @@ current, shipped state.
 |---|---|---|---|
 | **Warrior** | The Brute (Bully) | Every move except Peck recharges 25% faster (`CooldownMultiplier` 0.75: Steal 3.75 s, Stun 6 s, Jump 3 s) | Peck, **Steal**, **Stun**, **Jump** |
 | | The Relentless | Your stuns and slows last 30% longer (`OutgoingDurationMultiplier` 1.3: Stun 1.69 s, the Slow aura runs 3.9 s); stuns, getting stuck and timed slows on you end 25% sooner (`DurationMultiplier` 0.75, no knockback cut) | Peck, **Steal**, **Slow**, **Speed** |
-| **Speedy** | The Anxious (Featherfoot) | You bank food 50% faster (`DepositRateMultiplier` 1.5, permanent); immune to the pile-slow and the collision slow | Peck, **Speed**, **Slow**, **Steal** |
+| **Speedy** | The Anxious (Featherfoot) | You bank food 10% faster (`DepositRateMultiplier` 1.1, permanent); immune to the pile-slow and the collision slow | Peck, **Speed**, **Slow**, **Steal** |
 | | The Agile (Slippery) | Stuns, getting stuck and timed slows end 40% sooner (zone, aura, pile and bump slows are not shortened) | Peck, **Speed**, **Slow**, **Shove** |
 | **Fatty** | The Boulder (Bulwark) | Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner | Peck, **Stun**, **Shove**, **Shield** |
 | | The Hauler (Hoarder) | Carries at least 40 food (a full win's worth) | Peck, **Shield**, **Slow**, **Steal** |
@@ -514,9 +514,10 @@ stun on a Slippery bird lasts 1.3 x 1.3 x 0.6 = 1.014 s. The Slow aura's run tim
 runs 3.9 s (cooldown still 7 s, from the cast). Roots and placed zones are not lengthened. Because receivers
 check claims against a ceiling, the stun and slow ceilings are multiplied by the strongest outgoing factor among
 the shipped passives (stun ceiling 1.3 x 1.3 = 1.69 s). Relentless's Oracle result is 34.98 s / 3 trips.
-**Featherfoot** (Speedy) lost Quick Drop and gained a permanent 1.5x banking rate instead (Oracle 28.54 s / 4 trips
-on all seats against the Speedy target 30 s, so it is a declared exception in `SpecSctTargets`, pending Maestro's
-human session). Assassin/Thief remain amplified only by their own passive.
+**Featherfoot** (Speedy) lost Quick Drop and gained a permanent banking rate instead. It shipped at 1.5x (Oracle 28.54 s / 4 trips,
+1.46 s under the Speedy target 30 s); Maestro had it tuned to **1.1x** the same day, which lands on the target
+(29.62 s / 4 trips on all seats, inside +-0.5 s), so Featherfoot has no `SpecSctTargets` exception. The naked Speedy
+run is 30.02 s, so any bonus above about 1.13x leaves the target. Assassin/Thief remain amplified only by their own passive.
 
 **Visual identity (per-specialization colour/model) is designed, not shipped.**
 `docs/design/class-essence-and-signatures.md` §"Visual identity" specifies Speedy's
@@ -762,7 +763,7 @@ Ability text follows the `Description` field of each shipped `.asset`. Every num
 | **Peck** | PECK | 0.8 s | none (pre-equip) | Take a beakful of food from the pile you are standing at. Forced for every forager. |
 | **Death Mark** | EXEC | 5 s | none (pre-equip) | The execute (§6.4). Marks a rival, likelier far from home; stun them within 6.2 m, then press again to take everything they carry. `KillRange` 8 -> 6.2 m on 2026-11-05 (later); its stun comes from the generic Stun (1.3 s). |
 
-**Retired 2026-11-05** (the `Retired` flag, out of the registry and every kit, asset and code kept, like Egg Shell): Scrap, Dive Bomb, Sneaky Steal, Ambush, Belly Flop, Ground Quake, Headbutt, Roll & Push, Dust Kick, Feather Trap, Sticky Egg (`RootEggAbilitySO`), Smoke Roost, Ruffle, Feint, Immovable, Spine Coat, Doppelganger. **Quick Drop** (`QuickDrop.asset`, `Retired` 1, out of the registry) was retired later the same day: its 4x banking burst became Featherfoot's permanent 1.5x `DepositRateMultiplier` (19 retired in all, 10 active). Egg Shell was retired earlier (2026-11-03). Their old numbers are in git history; the rest of this section describes only the 10.
+**Retired 2026-11-05** (the `Retired` flag, out of the registry and every kit, asset and code kept, like Egg Shell): Scrap, Dive Bomb, Sneaky Steal, Ambush, Belly Flop, Ground Quake, Headbutt, Roll & Push, Dust Kick, Feather Trap, Sticky Egg (`RootEggAbilitySO`), Smoke Roost, Ruffle, Feint, Immovable, Spine Coat, Doppelganger. **Quick Drop** (`QuickDrop.asset`, `Retired` 1, out of the registry) was retired later the same day: its 4x banking burst became Featherfoot's permanent `DepositRateMultiplier` (1.5x, tuned to 1.1x the same day) (19 retired in all, 10 active). Egg Shell was retired earlier (2026-11-03). Their old numbers are in git history; the rest of this section describes only the 10.
 
 Control ceilings: with no root and no RPC slow in the registry, a populated registry yields a known 0 s ceiling for those kinds, so every such claim is refused at Debug level (it used to log an Error per spawn and leave an Unknown ceiling that trusted the sender).
 
@@ -822,7 +823,7 @@ different kinds).
 | Slow immunity | later expiry | Shield (walk) |
 | Control immunity | later expiry | Shield (egg) |
 | Steal-proof | later expiry | Shield (egg only) |
-| Deposit rate | multiplied | Featherfoot passive 1.5 (permanent) |
+| Deposit rate | multiplied | Featherfoot passive 1.1 (permanent) |
 | Wall-phasing tier | highest holder (Barge < Vault < Blink) | Jump |
 | Aura slow | lowest factor, its radius | Slow |
 
