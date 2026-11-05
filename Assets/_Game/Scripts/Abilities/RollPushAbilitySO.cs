@@ -55,13 +55,13 @@ namespace CluckWars.Abilities
         /// point-blank (and slightly behind), and the long thin axis matches what a roll
         /// actually does: plough a line, not detonate a circle.
         /// </summary>
-        public override AbilityAimShape AimShape => AbilityAimShape.Capsule;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.Capsule;
 
         /// <summary>A movement ability: its direction follows where the player moves, never the aim
         /// (Phase 6 chunk 5, A7).</summary>
         public override bool FollowsMovementNotAim => true;
         public override float AimRadius => PushRadius;
-        public override float AimForwardOffset => ForwardOffset;
+        public override float AuthoredAimForwardOffset => ForwardOffset;
 
         // FEEDBACK.md §2.2 / §3.2 case 15. The only thing a target receives is the shove; the roll speed-up is the caster's own.
         // See AbilityBaseSO.TargetEffectIsPurelyControl for why this is declared

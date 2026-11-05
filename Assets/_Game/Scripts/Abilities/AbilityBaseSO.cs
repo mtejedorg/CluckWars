@@ -342,8 +342,21 @@ namespace CluckWars.Abilities
         /// for its decoy-spawn teleport but is a pure self-buff with no target area
         /// (AffectsSelf below), so an implicit "JumpTier != None ⇒ Jump" default
         /// would have silently mis-classified it as an offensive ability.
+        /// <para>
+        /// <b>Authored, not resolved.</b> Every consumer reads <see cref="AimShape"/>, which is this shape after the project's
+        /// <see cref="AbilityTargeting.Mode"/>: under <see cref="TargetingMode.RangeOnly"/> a victim-picking shape collapses
+        /// to a caster-centred circle of <see cref="AimRadius"/>.
+        /// </para>
         /// </summary>
-        public virtual AbilityAimShape AimShape => AbilityAimShape.None;
+        public virtual AbilityAimShape AuthoredAimShape => AbilityAimShape.None;
+
+        /// <summary>True when the live <see cref="AbilityTargeting.Mode"/> turns this ability's authored shape into a plain
+        /// circle round the caster (<see cref="AbilityTargeting.Collapses"/>).</summary>
+        public bool IsRangeOnlyCollapsed => AbilityTargeting.Collapses(AuthoredAimShape, PlacesZone, AbilityTargeting.Mode);
+
+        /// <summary>The shape every consumer reads: <see cref="AuthoredAimShape"/>, or <see cref="AbilityAimShape.SelfCircle"/>
+        /// when <see cref="IsRangeOnlyCollapsed"/>.</summary>
+        public AbilityAimShape AimShape => IsRangeOnlyCollapsed ? AbilityAimShape.SelfCircle : AuthoredAimShape;
 
         /// <summary>Radius of the circle/cone/landing ring. Falls back to <see cref="IndicatorRange"/> so most abilities need only one override.</summary>
         public virtual float AimRadius => IndicatorRange;
@@ -361,12 +374,20 @@ namespace CluckWars.Abilities
         ///   shape always touches the caster, because the near cap is centred on them.</item>
         /// </list>
         /// Under both readings total forward reach is <c>AimForwardOffset + AimRadius</c>.
-        /// Ignored by the caster-centred shapes.
+        /// Ignored by the caster-centred shapes. 0 when <see cref="IsRangeOnlyCollapsed"/>; authored in
+        /// <see cref="AuthoredAimForwardOffset"/>.
         /// </summary>
-        public virtual float AimForwardOffset => 0f;
+        public float AimForwardOffset => IsRangeOnlyCollapsed ? 0f : AuthoredAimForwardOffset;
 
-        /// <summary>Full arc in degrees for <see cref="AbilityAimShape.Cone"/>. 360 degenerates to a full circle.</summary>
-        public virtual float AimConeAngle => 360f;
+        /// <summary>The authored <see cref="AimForwardOffset"/>, before the targeting mode.</summary>
+        public virtual float AuthoredAimForwardOffset => 0f;
+
+        /// <summary>Full arc in degrees for <see cref="AbilityAimShape.Cone"/>. 360 degenerates to a full circle; always 360 when
+        /// <see cref="IsRangeOnlyCollapsed"/>. Authored in <see cref="AuthoredAimConeAngle"/>.</summary>
+        public float AimConeAngle => IsRangeOnlyCollapsed ? 360f : AuthoredAimConeAngle;
+
+        /// <summary>The authored <see cref="AimConeAngle"/>, before the targeting mode.</summary>
+        public virtual float AuthoredAimConeAngle => 360f;
 
         /// <summary>
         /// Must this ability's aim shape be resolved from the caster's pose <i>before</i>
@@ -563,10 +584,9 @@ namespace CluckWars.Abilities
         /// control is removed may set this true.
         ///
         /// <b>Placed zones are false too</b>, for a different reason: a zone's slow and root
-        /// reach the victim through <c>ChickenController.CheckAbilityZoneSlow</c>
-        /// (auras included, WP4), which calls <c>ApplySlow</c> directly rather than routing
-        /// through <c>ApplyPassiveControlDuration</c> — so immunity does not stop them, and
-        /// claiming it would grey out a bracket for an effect that lands.
+        /// reach the victim later, through <c>ChickenController.CheckAbilityZoneSlow</c>
+        /// (auras included, WP4), not at the cast, so there is no cast-time hit to grey out.
+        /// (Since 2026-11-05 that check also refuses a control-immune chicken.)
         /// </remarks>
         public virtual bool TargetEffectIsPurelyControl => false;
 

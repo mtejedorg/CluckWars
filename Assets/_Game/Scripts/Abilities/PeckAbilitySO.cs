@@ -59,7 +59,7 @@ namespace CluckWars.Abilities
 
         /// <summary>Peck targets a pile, never a chicken, so it declares no aim shape and is
         /// exempt from the whiff/hit styling that keys off one.</summary>
-        public override AbilityAimShape AimShape => AbilityAimShape.None;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.None;
         public override bool RequiresEnemyInRange => false;
 
         /// <summary>Casting any other move cancels the 0.4 s lock (the food was already credited on peck start).</summary>

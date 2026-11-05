@@ -49,7 +49,7 @@ namespace CluckWars.Abilities
         [Tooltip("Speed multiplier applied to chickens inside the aura (< 1 = slower).")]
         [Range(0.1f, 0.9f)] public float AuraSlowFactor = 0.55f;
 
-        public override AbilityAimShape AimShape => AbilityAimShape.Aura;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.Aura;
         public override float AimRadius => AuraRadius;
 
         // Tagged as an Aura (authored on the asset, defaulted here for fresh instances).

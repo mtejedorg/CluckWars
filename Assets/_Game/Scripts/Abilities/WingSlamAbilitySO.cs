@@ -37,7 +37,7 @@ namespace CluckWars.Abilities
         /// AimRadius — this is a shape change, not a reach change, and the area drop is the
         /// price of being able to slam a specific direction.
         /// </summary>
-        public override AbilityAimShape AimShape => AbilityAimShape.Cone;
-        public override float AimConeAngle => 120f;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.Cone;
+        public override float AuthoredAimConeAngle => 120f;
     }
 }

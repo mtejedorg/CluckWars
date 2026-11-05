@@ -56,6 +56,12 @@ namespace CluckWars.Gameplay
                  "Free: the old hand-picked loadouts, unchanged. One switch, read by the spawner, GEAR UP and LastSetup.")]
         public LoadoutMode LoadoutMode = LoadoutMode.Fixed;
 
+        [Header("Targeting")]
+        [Tooltip("RangeOnly (Maestro 2026-11-05): every targeted ability hits every rival within its radius of the caster, " +
+                 "by planar distance only (no cone, forward offset or single pick). Shaped: each ability's authored shape. " +
+                 "Pushed once into AbilityTargeting.Mode by ProjectInstaller; every peer reads this one asset.")]
+        public CluckWars.Abilities.TargetingMode TargetingMode = CluckWars.Abilities.TargetingMode.RangeOnly;
+
         [Header("Networking")]
         // Tick rate lives in NetworkProjectConfig.fusion (Fusion 2 ignores per-session values here)
 

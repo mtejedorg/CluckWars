@@ -428,18 +428,18 @@ namespace CluckWars.Tests
             {
                 switch (a)
                 {
-                    case RollPushAbilitySO x: Assert.AreEqual(x.ForwardOffset, x.AimForwardOffset, tol, $"{a.name}"); break;
-                    case RollTrampleAbilitySO x: Assert.AreEqual(x.ForwardOffset, x.AimForwardOffset, tol, $"{a.name}"); break;
-                    case FeatherTrapAbilitySO x: Assert.AreEqual(x.ForwardOffset, x.AimForwardOffset, tol, $"{a.name}"); break;
+                    case RollPushAbilitySO x: Assert.AreEqual(x.ForwardOffset, x.AuthoredAimForwardOffset, tol, $"{a.name}"); break;
+                    case RollTrampleAbilitySO x: Assert.AreEqual(x.ForwardOffset, x.AuthoredAimForwardOffset, tol, $"{a.name}"); break;
+                    case FeatherTrapAbilitySO x: Assert.AreEqual(x.ForwardOffset, x.AuthoredAimForwardOffset, tol, $"{a.name}"); break;
                     case RootEggAbilitySO x: Assert.AreEqual(0f, x.AimForwardOffset, tol, $"{a.name}: Root Egg spawns at the caster's own feet — no offset."); break;
                 }
 
                 // A capsule reads AimForwardOffset as its AXIS LENGTH, not as a detached
                 // centre. A negative length would clamp to 0 and silently collapse the lane
                 // into a circle on the caster; a zero radius would make it a zero-width line.
-                if (a.AimShape == AbilityAimShape.Capsule)
+                if (a.AuthoredAimShape == AbilityAimShape.Capsule)
                 {
-                    Assert.GreaterOrEqual(a.AimForwardOffset, 0f,
+                    Assert.GreaterOrEqual(a.AuthoredAimForwardOffset, 0f,
                         $"{a.name}: a Capsule's AimForwardOffset is its axis length and must not be negative — " +
                         "it would clamp to 0 and degenerate the lane to a SelfCircle.");
                     Assert.Greater(a.AimRadius, 0f,
@@ -458,6 +458,9 @@ namespace CluckWars.Tests
             // now owns the resolution, so the marks and the hit agree.
             //
             // A plain SingleTarget probe: the shipped ones all filter on cargo, which bare probe chickens lack.
+            // Shaped only: under RangeOnly (2026-11-05) a SingleTarget collapses to "every rival in range".
+            var savedMode = AbilityTargeting.Mode;
+            AbilityTargeting.Mode = TargetingMode.Shaped;
             var probe = ScriptableObject.CreateInstance<SingleTargetProbeSO>();
             var caster = NewProbeChicken(Vector3.zero, Vector3.forward);
             var near   = NewProbeChicken(new Vector3(4f, 0f, 0f), Vector3.forward);
@@ -480,6 +483,7 @@ namespace CluckWars.Tests
             }
             finally
             {
+                AbilityTargeting.Mode = savedMode;
                 Unregister(caster, near, far);
                 Destroy(near); Destroy(far); Destroy(caster);
                 UnityEngine.Object.DestroyImmediate(probe);
@@ -488,7 +492,7 @@ namespace CluckWars.Tests
 
         private sealed class SingleTargetProbeSO : AbilityBaseSO
         {
-            public override AbilityAimShape AimShape => AbilityAimShape.SingleTarget;
+            public override AbilityAimShape AuthoredAimShape => AbilityAimShape.SingleTarget;
             public override float AimRadius => 8f;
             public override void OnActivate(AbilityContext ctx) { }
             public override void OnDeactivate(AbilityContext ctx) { }

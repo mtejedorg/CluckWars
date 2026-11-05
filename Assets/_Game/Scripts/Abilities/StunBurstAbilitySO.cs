@@ -32,7 +32,7 @@ namespace CluckWars.Abilities
         // a hand-authored 360 in an asset, not something an ability should be routed
         // through on purpose.) Wing Slam overrides both AimShape and AimConeAngle for its
         // real directional cone; AimRadius stays here so both subclasses mirror StunRadius.
-        public override AbilityAimShape AimShape => AbilityAimShape.SelfCircle;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.SelfCircle;
         public override float AimRadius => StunRadius;
 
         // FEEDBACK.md §2.2 / §3.2 case 15. The stun is the entire target effect for both

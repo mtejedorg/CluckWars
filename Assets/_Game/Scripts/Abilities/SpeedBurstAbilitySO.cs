@@ -19,7 +19,7 @@ namespace CluckWars.Abilities
         [Min(1f)] public float SpeedMultiplier = 2.5f;
 
         // Self-buff, no target area — marks the caster's own ring instead (FEEDBACK.md §2.2).
-        public override AbilityAimShape AimShape => AbilityAimShape.None;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.None;
 
         /// <summary>A movement ability: its direction follows where the player moves, never the aim
         /// (Phase 6 chunk 5, A7).</summary>

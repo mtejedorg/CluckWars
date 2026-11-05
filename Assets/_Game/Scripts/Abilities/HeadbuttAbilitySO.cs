@@ -53,9 +53,9 @@ namespace CluckWars.Abilities
         public override float IndicatorRange => Reach;
         public override bool RequiresEnemyInRange => true;
 
-        public override AbilityAimShape AimShape => AbilityAimShape.Cone;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.Cone;
         public override float AimRadius => Reach;
-        public override float AimConeAngle => ConeAngle;
+        public override float AuthoredAimConeAngle => ConeAngle;
 
         // FEEDBACK.md §2.2 / §3.2 case 15. Knockback plus a stagger stun — both refused by Immovable, nothing left over.
         // See AbilityBaseSO.TargetEffectIsPurelyControl for why this is declared

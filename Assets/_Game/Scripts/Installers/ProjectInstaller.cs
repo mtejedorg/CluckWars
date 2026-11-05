@@ -208,6 +208,9 @@ namespace CluckWars.Installers
                 ? _matchConfig
                 : ScriptableObject.CreateInstance<MatchConfigSO>();
             Container.Bind<MatchConfigSO>().FromInstance(matchConfig).AsSingle();
+            // Ability SOs read the targeting rule from static code with no context, so it is pushed once, here, before any
+            // scene loads (AbilityTargeting remarks). Every peer installs the same asset.
+            CluckWars.Abilities.AbilityTargeting.Mode = matchConfig.TargetingMode;
             if (_matchConfig == null)
             {
                 Debug.LogWarning(

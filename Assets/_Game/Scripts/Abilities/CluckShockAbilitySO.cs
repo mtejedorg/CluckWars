@@ -27,7 +27,7 @@ namespace CluckWars.Abilities
         public override float IndicatorRange => ShockRadius;
         public override bool RequiresEnemyInRange => true;
 
-        public override AbilityAimShape AimShape => AbilityAimShape.SelfCircle;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.SelfCircle;
         public override float AimRadius => ShockRadius;
 
         // FEEDBACK.md §2.2 / §3.2 case 15. Knockback and nothing else, so an Immovable rival is shoved by nothing at all.

@@ -45,7 +45,7 @@ namespace CluckWars.Abilities
         public override float IndicatorRange => ScrapRange;
         public override bool RequiresEnemyInRange => true;
 
-        public override AbilityAimShape AimShape => AbilityAimShape.SingleTarget;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.SingleTarget;
         public override float AimRadius => ScrapRange;
 
         public override float NominalStealAmount => StealAmount;

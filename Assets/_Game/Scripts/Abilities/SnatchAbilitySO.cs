@@ -45,9 +45,9 @@ namespace CluckWars.Abilities
         /// precision test. Range goes up (2.0 → 2.4 m) so the 1v1 case is unchanged to
         /// better; only the blind-side rob is gone.
         /// </summary>
-        public override AbilityAimShape AimShape => AbilityAimShape.Cone;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.Cone;
         public override float AimRadius => SnatchRange;
-        public override float AimConeAngle => 140f;
+        public override float AuthoredAimConeAngle => 140f;
 
         public override float NominalStealAmount => StealAmount;
 

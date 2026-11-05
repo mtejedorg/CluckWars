@@ -65,13 +65,13 @@ namespace CluckWars.Abilities
         /// put the hit lane 5 m past the press point — the ability flew over everything it
         /// was aimed at and hit whatever happened to be at the far end.
         /// </summary>
-        public override AbilityAimShape AimShape => AbilityAimShape.Capsule;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.Capsule;
 
         /// <summary>A movement ability: its direction follows where the player moves, never the aim
         /// (Phase 6 chunk 5, A7).</summary>
         public override bool FollowsMovementNotAim => true;
         public override float AimRadius => SweepRadius;
-        public override float AimForwardOffset => ForwardOffset;
+        public override float AuthoredAimForwardOffset => ForwardOffset;
 
         /// <summary>
         /// <inheritdoc cref="AbilityBaseSO.NominalStealAmount"/>

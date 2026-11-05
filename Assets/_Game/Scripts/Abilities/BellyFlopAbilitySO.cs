@@ -69,7 +69,7 @@ namespace CluckWars.Abilities
         /// </summary>
         public override bool RequiresEnemyInRange => false;
 
-        public override AbilityAimShape AimShape => AbilityAimShape.SelfCircle;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.SelfCircle;
         public override float AimRadius => ImpactRadius;
 
         // FEEDBACK.md §2.2 / §3.2 case 15. Stun plus knockback — both refused by Immovable, nothing left over.

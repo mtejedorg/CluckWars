@@ -42,7 +42,7 @@ namespace CluckWars.Abilities
         [Min(1f)] public float SidestepImpulse = 11f;
 
         // Self-only: nothing is aimed at, so the indicator marks the caster's own ring.
-        public override AbilityAimShape AimShape => AbilityAimShape.None;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.None;
         public override bool AffectsSelf => true;
         public override bool AffectsEnemies => false;
 

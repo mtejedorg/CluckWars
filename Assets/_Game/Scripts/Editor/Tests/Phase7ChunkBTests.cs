@@ -249,8 +249,13 @@ namespace CluckWars.Tests
         {
             // Both the preview (AbilityTelegraph / AbilitySlotOverlay) and the release (AbilityController.ApplyAimForFire)
             // call AbilityAimForward.Resolve with the same inputs; this pins what it answers for each device.
+            // Wing Slam's authored cone: Shaped (under RangeOnly, 2026-11-05, no shipped move turns to the aim).
+            var savedMode = AbilityTargeting.Mode;
+            AbilityTargeting.Mode = TargetingMode.Shaped;
             var slam = TestAssets.Load<AbilityBaseSO>("Assets/_Game/Data/Abilities/WingSlam.asset");
-            Assert.IsTrue(slam.UsesAim && slam.RotatesToAim, "precondition: a directional, turn-to-aim move");
+            bool directional = slam.UsesAim && slam.RotatesToAim;
+            if (!directional) AbilityTargeting.Mode = savedMode;
+            Assert.IsTrue(directional, "precondition: a directional, turn-to-aim move");
 
             var caster = Probe(Vector3.zero, Vector3.forward);
             var rival = Probe(new Vector3(Mathf.Sin(25f * Mathf.Deg2Rad), 0f, Mathf.Cos(25f * Mathf.Deg2Rad)) * 3f, Vector3.back);
@@ -288,6 +293,7 @@ namespace CluckWars.Tests
             }
             finally
             {
+                AbilityTargeting.Mode = savedMode;
                 ChickenController.ActiveControllers.Remove(caster);
                 ChickenController.ActiveControllers.Remove(rival);
                 Object.DestroyImmediate(caster.gameObject);

@@ -77,7 +77,7 @@ namespace CluckWars.Abilities
             return true;
         }
 
-        public override AbilityAimShape AimShape => AbilityAimShape.SelfCircle;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.SelfCircle;
         public override float AimRadius => ZoneRadius;
         public override bool AffectsSelf => true;
 

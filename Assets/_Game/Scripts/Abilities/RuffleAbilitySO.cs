@@ -38,7 +38,7 @@ namespace CluckWars.Abilities
 
         // Self-buff: nothing to aim at, so the indicator marks the caster's own ring
         // rather than a target area (FEEDBACK.md §2.2).
-        public override AbilityAimShape AimShape => AbilityAimShape.None;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.None;
         public override bool AffectsSelf => true;
         public override bool AffectsEnemies => false;
 

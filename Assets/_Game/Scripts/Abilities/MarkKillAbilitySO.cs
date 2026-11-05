@@ -58,7 +58,7 @@ namespace CluckWars.Abilities
         public override bool RequiresEnemyInRange => false;
         /// <summary>The Kill is pressed during the stun the bot's own Ambush is still running.</summary>
         public override bool BotIgnoresOneAtATime => true;
-        public override AbilityAimShape AimShape => AbilityAimShape.None;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.None;
         public override bool AffectsEnemies => false;
 
         /// <summary>Marked: only a Kill that would land. Unmarked: a rival exists to be marked. Nothing else greys it.</summary>

@@ -29,13 +29,13 @@ namespace CluckWars.Abilities
         [Tooltip("Speed multiplier applied during the blink dash.")]
         [Range(1.5f, 4f)] public float SpeedMultiplier = 3.0f;
 
-        public override AbilityAimShape AimShape => AbilityAimShape.Jump;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.Jump;
 
         /// <summary>A movement ability: its direction follows where the player moves, never the aim
         /// (Phase 6 chunk 5, A7).</summary>
         public override bool FollowsMovementNotAim => true;
         public override float AimRadius => JumpLandingRadius;
-        public override float AimForwardOffset => JumpResolver.GetNominalDistance(JumpTier);
+        public override float AuthoredAimForwardOffset => JumpResolver.GetNominalDistance(JumpTier);
 
         /// <summary>
         /// Shadowstep touches nobody — it is a pure mobility cast. It inherited

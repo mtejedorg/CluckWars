@@ -62,7 +62,7 @@ namespace CluckWars.Abilities
         /// </summary>
         public override bool RequiresEnemyInRange => false;
 
-        public override AbilityAimShape AimShape => AbilityAimShape.SelfCircle;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.SelfCircle;
         public override float AimRadius => Reach;
 
         /// <summary>Only rivals in the rear arc eat the dust.</summary>

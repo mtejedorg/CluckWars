@@ -22,4 +22,5 @@ MonoBehaviour:
   ComebackEventSecondsLeft: 10
   BaseKeepOutRadius: 2.5
   LoadoutMode: 0
+  TargetingMode: 0
   TickRate: 30

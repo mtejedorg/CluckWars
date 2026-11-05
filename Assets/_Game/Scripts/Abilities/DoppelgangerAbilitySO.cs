@@ -44,7 +44,7 @@ namespace CluckWars.Abilities
         // because the asset also carries a JumpTier (its short Blink hop) — a future
         // reader skimming JumpTier=Big should not have to wonder whether that implies
         // an offensive Jump shape; it does not.
-        public override AbilityAimShape AimShape => AbilityAimShape.None;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.None;
         public override bool AffectsSelf => true;
         public override bool AffectsEnemies => false;
 

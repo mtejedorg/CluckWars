@@ -281,6 +281,15 @@ namespace CluckWars.Tests
         [Test]
         public void DirectionalShapes_UseAndRotateToAim_SingleTargetOnlyPicks()
         {
+            // The authored shapes, so Shaped (2026-11-05: RangeOnly turns these into caster circles; SimplifiedAbilitiesTests).
+            var savedMode = AbilityTargeting.Mode;
+            AbilityTargeting.Mode = TargetingMode.Shaped;
+            try { DirectionalShapesUnderShaped(); }
+            finally { AbilityTargeting.Mode = savedMode; }
+        }
+
+        private void DirectionalShapesUnderShaped()
+        {
             foreach (AbilityBaseSO cone in new AbilityBaseSO[] { Make<WingSlamAbilitySO>(), Make<HeadbuttAbilitySO>(), Make<SnatchAbilitySO>() })
             {
                 Assert.AreEqual(AbilityAimShape.Cone, cone.AimShape);

@@ -45,9 +45,9 @@ namespace CluckWars.Abilities
         // Places a zone rather than hitting targets directly, so OnActivate has no
         // GatherTargets loop — this descriptor exists purely so the hold-to-aim
         // preview (Stage 3) can draw the zone's real footprint before it's thrown.
-        public override AbilityAimShape AimShape => AbilityAimShape.ForwardCircle;
+        public override AbilityAimShape AuthoredAimShape => AbilityAimShape.ForwardCircle;
         public override float AimRadius => ZoneRadius;
-        public override float AimForwardOffset => ForwardOffset;
+        public override float AuthoredAimForwardOffset => ForwardOffset;
 
         // The cast lands a cloud, not a hit — chickens are slowed later, by the zone. A trap
         // thrown at empty ground (the normal, correct play) reports 0 targets, so cast-time
