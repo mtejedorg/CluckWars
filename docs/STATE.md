@@ -6,7 +6,47 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🛠 2026-11-05 (latest) - Shorter cooldowns, three kit swaps, Slippery resists ability slows only, Sneaky 11.1 (`simplify-abilities`, commits `5cac4b43`..`b53dc3fb` + docs, not merged, not pushed)
+
+- **Why:** Maestro, same day: cooldowns are too long for a 45 s match; bands low 1-3 s, medium 4-6 s, high 7-8 s. Speedys should not steal. The stun should be the Speedy's weakness, so Slippery stops shortening it. Numbers below are read from the shipped `.asset` files. Docs updated: GDD (header, 5.1, 5.3, 6.3, 6.4, 7.2-7.4), `docs/balance/human-test-baseline.md`, `docs/site/mechanics.html`. No artifact republished.
+- **Cooldowns (`5cac4b43`; SO constructor defaults and descriptions moved with the assets):**
+
+  | Ability | Asset | Cooldown | Other |
+  |---|---|---|---|
+  | Jump | `Shadowstep.asset` | 4 -> **2 s** | |
+  | Steal | `Snatch.asset` | 5 -> **4 s** | |
+  | Speed | `SpeedBurst.asset` | 6 -> **4 s** | `SpeedMultiplier` 1.5 -> **1.3**, duration 1.5 s unchanged |
+  | Hide | `Invisibility.asset` | 8 -> **4.5 s** | `Duration` 4 -> **2 s** |
+  | Shove | `CluckShock.asset` | 7 -> **5 s** | |
+  | Slow | `FeatherAura.asset` | 7 -> **6 s** | aura 3 s unchanged |
+  | Stun | `WingSlam.asset` | 8 -> **7 s** | |
+  | Shield | `TurtleMode.asset` | 10 -> **8 s** | walk 1 s + egg 2 s unchanged |
+  | Death Mark | `MarkKill.asset` | `FailCooldownSeconds` 5 -> **4**, `SuccessCooldownSeconds` 10 -> **8** | `RoundStartCooldownSeconds` 4 unchanged; `AssassinExecute.FailCooldown` / `SuccessCooldown` fallbacks moved too. At most 4 kills a round now (was 3) |
+  | Peck | `Peck.asset` | unchanged | |
+
+  Bully (x0.75): Steal 3 s, Stun 5.25 s, Jump 1.5 s. `MarkKill.asset` `Cooldown: 5` was left at 5: it does not mirror `FailCooldownSeconds` in code. It is the generic per-cast cooldown `AbilityController.TryActivate` charges on every press, which `AssassinExecute.Press` clears at once (0 on a mark) and replaces with the fail / success cooldown on the outcome; it sticks only if a press marks nothing (unreachable through `IsUsable`). It is also the denominator of the HUD cooldown ring (`TouchControlsController`: `total = equipped.Cooldown`), the loadout "short / medium" badge (`<= 6`) and the DebugHud column, so after a 4 s fail the ring now starts at 80% and after an 8 s kill it sits full for the first 3 s. Setting it to 4 would make the fail ring exact.
+- **Kits (`17bea6ee`):** Featherfoot Peck, Speed, Slow, **Shove** (Steal out); Thief Steal, Hide, Jump, **Slow** (Shove out); Spoiler Death Mark, Stun, Jump, **Hide** (Slow out). Only slot 4 changed in each, so slot roles hold. Featherfoot's kit equals Slippery's: `FixedKitTests.EverySpecialization_HasItsOwnKit` demanded distinct kits; it now exempts the approved Speedy pair (the runtime `FixedKit` validator has no distinctness rule). Bots: casting is role-based (`BotTactics.CastPlan` by `BotRole`), so a missing role is skipped, not a silent no-op. The Speedy Runner profile never hunts (`huntRadius` 0), so Featherfoot losing Steal changes nothing there (Slippery already played this kit). The Spoiler's mark loop needs only Death Mark plus a stun (still there). Thief keeps Steal, so the Predator stalk standoff still works. `Game.unity` bot rows are Free-mode only.
+- **Slippery (`a078b0ad`):** `SlipperyPassiveSO.Resist` 0.6 (was `DurationMultiplier`, asset field renamed). Hooks:
+  - `PassiveAbilitySO.ModifyControlDuration(seconds, ControlKind kind, self)`: the kind is new. Bulwark (0.65) and Relentless (0.75) still shorten every kind; Slippery shortens `Slow` only (x0.6) and returns stuns and roots whole. Chokepoint `ChickenController.ApplyPassiveControlDuration(seconds, kind)`; also read by `BotController.TryFollowThroughMark` and `AutoTestDriver.Mark` with `ControlKind.Stun`.
+  - New `ModifyIncomingSlowFactor(factor, self)`, identity by default; Slippery returns `1 - (1 - factor) x 0.6` (the 0.55 aura becomes 0.73). One chokepoint: the new private `ChickenController.ApplyAbilitySlow(factor)`, the only writer of `SlowSource.Ability`, called every tick by the timed ability slow (`_abilitySlowFactor`, merged raw so `MergeSlow` still compares authored factors) and by each zone / aura slow in `CheckAbilityZoneSlow`. Pile and bump slows call `ApplySlow` directly: not resisted.
+  - New `ZoneSlowLifetimeFraction(self)`, 1 by default, Slippery 0.6. Chokepoint `CheckAbilityZoneSlow`: a zone slows the chicken only while `AreaEffectRules.SlowsDuringWindow(zone.AgeFraction, window)`. **Aura cut-off:** `AbilityZone` gains `[Networked] float LifetimeSeconds`, stamped by `AreaEffectSpawner` next to `LifetimeTimer` (protocol change: one more word); `AgeFraction = 1 - LifetimeTimer.RemainingTime / LifetimeSeconds`, so it is deterministic on the victim's own state authority. The lifetime includes Relentless lengthening: a plain aura slows a Slippery bird for its first 1.8 s; a Relentless 3.9 s aura for the first 2.34 s.
+  - Order unchanged: caster factor (Relentless 1.3) on the sender, victim factor on arrival. `ControlClaimRules` / RPC ceilings judge the claim before the victim's passive, so they did not change. A Relentless stun on Slippery is now 1.69 s (was 1.014); the shortest shipped stun factor is Bulwark 0.65 (`MarkPickTests` updated).
+  - Perk text: "Ability slows on you are 40% weaker and end 40% sooner." / "Stuns still land in full. Pile and bump slows still apply." (asset `Description` = the line).
+- **Sneaky (Assassin) speed (`bcc86cb9`):** `Assassin.asset` `MoveSpeed` 12.15 -> **11.1** (SCT-exempt). Nothing pinned the Assassin's 12.15 (the 12.15 test pins are Speedy's); docs that derived reach from it (Jump dash 6.56 -> 5.99 m, map reference, Underdog dash 9.19 -> 8.39 m) were updated; the walk-home percentages were not recomputed.
+- **Balance Oracle (all four seats, unchanged):** Bully 34.98 s / 3, Relentless 34.98 s / 3, Slippery 30.02 s / 4, Featherfoot 29.62 s / 4, Bulwark 30.05 s / 2, Hoarder 25.82 s / 1 (declared); naked Warrior 34.98, Speedy 30.02, Fatty 30.05.
+- **Tests (`b53dc3fb`):** new `CooldownsKitsSlipperyTests` (cooldowns, Speed / Hide, Death Mark fallbacks, Bully examples, kits, Slippery stun / root / timed slow / strength 0.55 -> 0.73, other passives identity, zone window incl. Relentless 3.9 s, `LifetimeSeconds` stamp, one-chokepoint source guards, pile / bump not resisted, Sneaky 11.1). Batch EditMode **2858/2858** passing, 0 skipped (was 2842).
+- **Not done:** no build and no scenario run for this batch.
+- **Open for Maestro:**
+  1. **Roots are not resisted by Slippery** (no root is in the active registry today, so it changes nothing yet). Confirm.
+  2. **Featherfoot's kit == Slippery's kit** (Peck, Speed, Slow, Shove); the Speedys differ by passive only. Confirm, or give one of them a different fourth move.
+  3. **Aura "lasts 40% less"** was implemented as: a Slippery bird is slowed by a zone only during the first 60% of that zone's life (Relentless lengthening included), on top of the 40% weaker slow. Confirm this reading.
+  4. **`MarkKill.asset` `Cooldown` 5** (the HUD ring denominator, see above): set it to 4 so the post-fail ring is exact?
+
+---
+
 ## 🛠 2026-11-05 (later) - Warrior rework, Shield phases, Quick Drop -> Featherfoot passive, Death Mark 6.2 m (`simplify-abilities`, commits `db332185`..`e358a1c0` + docs, not merged, not pushed)
+
+> **Partly superseded by the entry above** (same day, latest): cooldowns, Speed 1.3x, Hide 2 s, the Featherfoot / Thief / Spoiler kits, Slippery (no longer shortens stuns) and the Sneaky speed changed.
 
 - **Why:** Maestro, same day, after reading the first simplification: the Warrior had no identity beyond "steals and defends a pile"; Shield was a 3 s walk with a second-press lock nobody would find; Quick Drop was a Speedy-only button for one stat; Death Mark's reach had grown 1.8 m with the new Stun. Numbers below are read from the shipped `.asset` files and code constants, not GDD prose. Docs updated: GDD (header, 5.3, 6.3, 6.4, 7.1-7.4, 11), `docs/balance/human-test-baseline.md`, `docs/site/mechanics.html`. This entry supersedes the Shield, Quick Drop, Bully, Relentless, Featherfoot and Death Mark rows of the entry below (the 11-ability table there is history; 10 abilities are active now).
 - **Warrior = all-rounder (`db332185`, `43eb4064`, tests `8d305ffc`):** both kits are Peck + Steal + one crowd control + one mobility move. **Bully**: `CooldownMultiplier` 0.75 (Peck excluded); `StealMultiplier` and `BonusCapacity` removed; kit Peck, Steal, Stun, Jump (Steal 3.75 s, Stun 6 s, Jump 3 s); its `SpecSctTargets` exception is gone, it farms like the naked Warrior. **Relentless** (still the Warrior signature): incoming stun / root / timed-slow `DurationMultiplier` 0.75 (no knockback cut) plus new `PassiveAbilitySO.OutgoingDurationMultiplier` 1.3 (its stuns and slows last 30% longer); kit Peck, Steal, Slow, Speed. The Slow aura runs 3.9 s under Relentless (cooldown still 7 s, from the cast). Order is caster factor then victim factor: a Relentless stun on Slippery = 1.3 x 1.3 x 0.6 = 1.014 s. Senders resolve the factor through `AbilityBaseSO.ResolveOutgoingControlSeconds` / `ResolveActiveDuration` before each stun / slow RPC (Stun, Belly Flop, Headbutt, Dust Kick, the aura). `ControlClaimRules.CeilingFor` multiplies the stun and slow ceilings by the largest outgoing factor among shipped passives (stun ceiling 1.69 s); the root ceiling does not move. The old "defend a pile" identity is gone.
