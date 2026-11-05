@@ -22,11 +22,11 @@ namespace CluckWars.Abilities
         {
             DisplayName = "Hide";
             ShortLabel = "HIDE";
-            Description = "Fades you to a ghostly outline for 4s. Using a move breaks it.";
+            Description = "Fades you to a ghostly outline for 2s. Using a move breaks it.";
             Category = AbilityCategory.Utility;
             AllowedClasses = ChickenClassFlags.All;
-            Duration = 4f;
-            Cooldown = 8f;
+            Duration = 2f;
+            Cooldown = 4.5f;
         }
 
         [Tooltip("Alpha while active. 0 = totally invisible (fragile), 0.2 ≈ ghostly outline (readable).")]

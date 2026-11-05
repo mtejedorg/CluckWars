@@ -31,7 +31,7 @@ namespace CluckWars.Abilities
             StunRadius = 5.4f;
             StunDuration = 1.3f;
             Duration = 1.3f;
-            Cooldown = 8f;
+            Cooldown = 7f;
         }
 
         /// <summary>

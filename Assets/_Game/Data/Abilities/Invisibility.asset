@@ -14,13 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.InvisibilityAbilitySO
   DisplayName: Hide
   ShortLabel: HIDE
-  Description: Fades you to a ghostly outline for 4s. Using a move breaks it.
+  Description: Fades you to a ghostly outline for 2s. Using a move breaks it.
   AccentColor: {r: 0.55, g: 0.85, b: 0.85, a: 1}
   Category: 3
   TerrainTraversal: 0
   SlotKind: 1
   AllowedClasses: 15
-  Duration: 4.0
-  Cooldown: 8
+  Duration: 2
+  Cooldown: 4.5
   CastMotion: 6
   Opacity: 0.2

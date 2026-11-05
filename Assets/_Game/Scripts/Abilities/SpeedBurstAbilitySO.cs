@@ -19,15 +19,15 @@ namespace CluckWars.Abilities
         {
             DisplayName = "Speed";
             ShortLabel = "FAST";
-            Description = "A 1.5s sprint at 1.5x movement speed.";
+            Description = "A 1.5s sprint at 1.3x movement speed.";
             Category = AbilityCategory.Utility;
             AllowedClasses = ChickenClassFlags.All;
             Duration = 1.5f;
-            Cooldown = 6f;
+            Cooldown = 4f;
         }
 
         [Tooltip("Multiplier applied to MoveSpeed while active.")]
-        [Min(1f)] public float SpeedMultiplier = 1.5f;
+        [Min(1f)] public float SpeedMultiplier = 1.3f;
 
         // Self-buff, no target area — marks the caster's own ring instead (FEEDBACK.md §2.2).
         public override AbilityAimShape AuthoredAimShape => AbilityAimShape.None;

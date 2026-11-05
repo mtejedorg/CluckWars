@@ -51,7 +51,7 @@ namespace CluckWars.Abilities
             Category = AbilityCategory.Defense;
             AllowedClasses = ChickenClassFlags.All;
             Duration = 3f;
-            Cooldown = 10f;
+            Cooldown = 8f;
         }
 
         public override void OnActivate(AbilityContext ctx)

@@ -23,7 +23,7 @@ MonoBehaviour:
   SignaturePreEquippedBy: 1
   BotRole: 0
   Duration: 0.5
-  Cooldown: 7
+  Cooldown: 5
   SearchMask:
   CastMotion: 2
     serializedVersion: 2

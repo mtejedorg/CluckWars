@@ -24,7 +24,7 @@ namespace CluckWars.Abilities
             TerrainTraversal = TerrainTraversal.Blink;
             AllowedClasses = ChickenClassFlags.Warrior | ChickenClassFlags.Fatty | ChickenClassFlags.Assassin;
             Duration = 0.18f;
-            Cooldown = 4f;
+            Cooldown = 2f;
         }
 
         [Tooltip("Speed multiplier applied during the blink dash.")]

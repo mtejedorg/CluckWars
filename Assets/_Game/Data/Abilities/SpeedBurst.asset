@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SpeedBurstAbilitySO
   DisplayName: Speed
   ShortLabel: FAST
-  Description: A 1.5s sprint at 1.5x movement speed.
+  Description: A 1.5s sprint at 1.3x movement speed.
   Icon: 
   AccentColor: {r: 0.3, g: 0.85, b: 0.95, a: 1}
   Category: 3
@@ -24,9 +24,9 @@ MonoBehaviour:
   AllowedClasses: 15
   BotRole: 0
   Duration: 1.5
-  Cooldown: 6
+  Cooldown: 4
   CastMotion: 6
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
-  SpeedMultiplier: 1.5
+  SpeedMultiplier: 1.3

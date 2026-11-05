@@ -70,7 +70,7 @@ namespace CluckWars.Abilities
             AllowedClasses = ChickenClassFlags.All;
             AreaKind = AreaEffectKind.Aura;
             Duration = 3f;
-            Cooldown = 7f;
+            Cooldown = 6f;
         }
 
         public override bool ActiveDurationIsOutgoingControl => true;

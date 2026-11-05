@@ -32,7 +32,7 @@ MonoBehaviour:
   KillRange: 6.2
   ArmSeconds: 3
   WindowSeconds: 4
-  FailCooldownSeconds: 5
-  SuccessCooldownSeconds: 10
+  FailCooldownSeconds: 4
+  SuccessCooldownSeconds: 8
   RoundStartCooldownSeconds: 4
   RemovalSeconds: 3

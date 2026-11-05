@@ -24,7 +24,7 @@ namespace CluckWars.Abilities
             Category = AbilityCategory.Control;
             AllowedClasses = ChickenClassFlags.All;
             Duration = 0.5f;
-            Cooldown = 7f;
+            Cooldown = 5f;
         }
 
         [Tooltip("Shove radius around the caster. 5.4 = 4.5 x1.2 (Maestro 2026-11-05).")]

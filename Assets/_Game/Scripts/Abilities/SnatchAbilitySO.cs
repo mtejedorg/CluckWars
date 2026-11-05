@@ -29,7 +29,7 @@ namespace CluckWars.Abilities
             Category = AbilityCategory.Steal;
             AllowedClasses = ChickenClassFlags.All;
             Duration = 0.3f;
-            Cooldown = 5f;
+            Cooldown = 4f;
         }
 
         [Tooltip("Reach: every carrier within this planar distance of the caster (RangeOnly), or along the 140° arc (Shaped). " +

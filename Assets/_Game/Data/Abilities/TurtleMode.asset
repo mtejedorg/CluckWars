@@ -21,7 +21,7 @@ MonoBehaviour:
   SlotKind: 1
   AllowedClasses: 15
   Duration: 3.0
-  Cooldown: 10
+  Cooldown: 8
   CastMotion: 5
   SpeedMultiplier: 0.5
   WalkSeconds: 1

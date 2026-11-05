@@ -22,7 +22,7 @@ MonoBehaviour:
   AllowedClasses: 15
   BotRole: 0
   Duration: 3
-  Cooldown: 7
+  Cooldown: 6
   CastMotion: 2
   AreaKind: 2
   AuraRadius: 6.48

@@ -23,7 +23,7 @@ MonoBehaviour:
   AllowedClasses: 13
   BotRole: 0
   Duration: 0.18
-  Cooldown: 4
+  Cooldown: 2
   SearchMask:
   CastMotion: 7
     serializedVersion: 2
