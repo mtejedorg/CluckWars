@@ -51,14 +51,8 @@ namespace CluckWars.Balance
                 Reason = "Designed: cargo floor 40 = the win target, so a perfect run is one trip " +
                          "(Fatty signature fantasy). 4.2 s faster than the naked Fatty by intent.",
             },
-            new SpecSctTarget
-            {
-                Subclass = ChickenSubclass.Warrior_Bully, Seconds = 38.77f, Trips = 3, CargoCapacity = 16,
-                Reason = "Maestro 2026-10-22 (A2/F1): steal x1.4 plus a symbolic +2 cargo (14 -> 16). " +
-                         "The greedy nearest-pile router is non-monotonic in cargo (caps 16-18 all give " +
-                         "38.77 s / 3, cap 15 gives 31.65 s): a router artifact, not a real slowdown of a " +
-                         "human. To be confirmed by the human 4-player session.",
-            },
+            // Warrior_Bully's entry (38.77 s / 3 at cap 16, its old +2 cargo) was removed 2026-11-05: the reworked
+            // Bully (Maestro) changes no cargo, deposit or Peck cadence, so it farms as the naked Warrior again.
         };
 
         /// <summary>The declared entry for <paramref name="subclass"/>, if there is one.</summary>

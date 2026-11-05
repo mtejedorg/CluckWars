@@ -72,7 +72,7 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// Cargo the chicken can hold, after its class specialization has had a say.
-        /// Hoarder raises it to a full win's worth; Bully adds enough to hold a bigger steal.
+        /// Hoarder raises it to a full win's worth.
         /// </summary>
         public float Capacity
         {

@@ -12,7 +12,7 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "Thief", menuName = "Cluck Wars/Passive/Thief", order = 18)]
     public sealed class ThiefPassiveSO : PassiveAbilitySO
     {
-        [Tooltip("Multiplier on cargo taken per steal. Higher than Bully's because it is the " +
+        [Tooltip("Multiplier on cargo taken per steal. The only steal passive since 2026-11-05: it is the " +
                  "Assassin's only sustained income between executes.")]
         [Min(1f)] public float StealMultiplier = 1.6f;
 

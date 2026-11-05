@@ -215,11 +215,12 @@ namespace CluckWars.Tests
         [Test]
         public void Free_TheKitIsNotRead()
         {
-            var bully = Spec(ChickenSubclass.Warrior_Bully);
+            // Relentless since 2026-11-05: Jump, the Warrior's only class (non-shared) ability, is in the Bully kit now.
+            var relentless = Spec(ChickenSubclass.Warrior_Relentless);
             var log = new RecordingLog();
-            var chosen = Registry.GetClassAbilitiesForClass(ChickenClass.Warrior).Where(a => !bully.Kit.Contains(a)).ToArray();
-            Assert.IsNotEmpty(chosen, "test fixture: a Warrior ability outside the Bully kit");
-            CollectionAssert.Contains(Spawn(LoadoutMode.Free, ChickenClass.Warrior, bully, log, chosen[0]), chosen[0]);
+            var chosen = Registry.GetClassAbilitiesForClass(ChickenClass.Warrior).Where(a => !relentless.Kit.Contains(a)).ToArray();
+            Assert.IsNotEmpty(chosen, "test fixture: a Warrior ability outside the Relentless kit");
+            CollectionAssert.Contains(Spawn(LoadoutMode.Free, ChickenClass.Warrior, relentless, log, chosen[0]), chosen[0]);
         }
 
         // ---- bots ---------------------------------------------------------------------------------------------------

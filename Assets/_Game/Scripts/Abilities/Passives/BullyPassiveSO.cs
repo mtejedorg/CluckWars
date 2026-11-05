@@ -5,30 +5,25 @@ using UnityEngine;
 namespace CluckWars.Abilities
 {
     /// <summary>
-    /// <b>Warrior alternative.</b> Steals bigger, and carries enough extra cargo to hold what
-    /// it takes. The magnitude axis to Relentless's frequency axis.
+    /// <b>Warrior alternative: the spammer.</b> Abilities come back faster. Kit: Peck, Steal, Stun, Jump.
     /// </summary>
     /// <remarks>
-    /// The extra capacity is not a throwaway: a steal is clamped to the thief's free space,
-    /// so raising the steal amount without raising capacity would quietly do nothing for a
-    /// Warrior who is already carrying a load.
+    /// <b>Reworked 2026-11-05 (Maestro).</b> The Warrior is the all-rounder: a bit of steal, crowd control, pecking
+    /// and movement, each weaker than the specialist's. Bully took over the cooldown reduction Relentless had
+    /// (x0.75); its old steal x1.4 and +2 cargo were dropped, so it farms exactly like a naked Warrior and needs no
+    /// <c>SpecSctTargets</c> exception any more.
     /// <para>
-    /// <b>Bonus cut 6 → 2 on 2026-10-22</b> (Maestro, decisions A2/F1; the steal ×1.4 stays).
-    /// +6 made a Bully farm like a Speedy (Oracle 30.9 s / 2 trips against the Warrior's
-    /// 35 s / 3). +2 is outside the ±0.5 s guard on the slow side, which is a greedy-router
-    /// artifact rather than a real slowdown, so it is a DECLARED target in
-    /// <c>SpecSctTargets</c> and the spec-aware Oracle test pins it. Changing this number
-    /// changes that test.
+    /// ⚠️ <b>Deliberately excludes Peck.</b> Peck is an ability with a cooldown like any other, so a blanket
+    /// reduction would hand the Warrior ~25% more farming throughput, an effect that lives entirely outside the
+    /// Balance Oracle's naked axiom. This is a combat passive; making it a farming passive by accident is exactly
+    /// the drift the Oracle exists to catch.
     /// </para>
     /// </remarks>
     [CreateAssetMenu(fileName = "Bully", menuName = "Cluck Wars/Passive/Bully", order = 16)]
     public sealed class BullyPassiveSO : PassiveAbilitySO
     {
-        [Tooltip("Multiplier on cargo taken per steal.")]
-        [Min(1f)] public float StealMultiplier = 1.4f;
-
-        [Tooltip("Extra cargo capacity, so the bigger steal has somewhere to go.")]
-        [Min(0f)] public float BonusCapacity = 2f;
+        [Tooltip("Multiplier on ability cooldowns. 0.75 = 25% faster. Does NOT apply to Peck.")]
+        [Range(0.25f, 1f)] public float CooldownMultiplier = 0.75f;
 
         public BullyPassiveSO()
         {
@@ -37,16 +32,15 @@ namespace CluckWars.Abilities
             AllowedClasses = ChickenClassFlags.Warrior;
         }
 
-        public override float ModifyStealAmount(float amount, ChickenController self) =>
-            amount * StealMultiplier;
-
-        public override float MaxStealMultiplier => StealMultiplier;
-
-        public override float ModifyCargoCapacity(float capacity, ChickenController self) =>
-            capacity + BonusCapacity;
-
         public override string PerkLineKey => UiKeys.PerkBullyLine;
+        public override string PerkDetailKey => UiKeys.PerkBullyDetail;
         public override (string name, object value)[] PerkArgs(MatchConfigSO match) =>
-            new (string, object)[] { ("steal", Percent(StealMultiplier - 1f)), ("cap", Mathf.RoundToInt(BonusCapacity)) };
+            new (string, object)[] { ("pct", Percent(1f - CooldownMultiplier)) };
+
+        public override float ModifyCooldown(float seconds, AbilityBaseSO ability, ChickenController self)
+        {
+            if (ability is PeckAbilitySO) return seconds; // foraging cadence is the Oracle's, not ours
+            return seconds * CooldownMultiplier;
+        }
     }
 }

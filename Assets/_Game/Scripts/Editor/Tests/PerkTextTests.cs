@@ -27,11 +27,12 @@ namespace CluckWars.Tests
             switch (p)
             {
                 case RelentlessPassiveSO r:
-                    return ($"Moves recharge {Pct(1.0 - r.CooldownMultiplier)}% faster.",
-                            "Applies to every move except Peck.");
+                    return ($"Your stuns and slows last {Pct(r.OutgoingDurationMultiplier - 1.0)}% longer.",
+                            $"Your stuns and slows last {Pct(r.OutgoingDurationMultiplier - 1.0)}% longer. " +
+                            $"Stuns, getting stuck and timed slows on you end {Pct(1.0 - r.DurationMultiplier)}% sooner.");
                 case BullyPassiveSO b:
-                    string bully = $"Steal {Pct(b.StealMultiplier - 1.0)}% more, carry {(int)Math.Round(b.BonusCapacity, MidpointRounding.AwayFromZero)} more.";
-                    return (bully, bully);
+                    return ($"Moves recharge {Pct(1.0 - b.CooldownMultiplier)}% faster.",
+                            "Applies to every move except Peck.");
                 case ThiefPassiveSO t:
                     string thief = $"Every steal grabs {Pct(t.StealMultiplier - 1.0)}% more.";
                     return (thief, thief);
@@ -85,7 +86,7 @@ namespace CluckWars.Tests
         {
             foreach (var p in ShippedPassives(out var cfg))
             {
-                if (!(p is SlipperyPassiveSO) && !(p is BulwarkPassiveSO)) continue;
+                if (!(p is SlipperyPassiveSO) && !(p is BulwarkPassiveSO) && !(p is RelentlessPassiveSO)) continue;
                 AssertNoBlanketSlowClaim(p.PerkLine(cfg), p.name + " line");
                 AssertNoBlanketSlowClaim(p.PerkDetail(cfg), p.name + " detail");
                 AssertNoBlanketSlowClaim(p.Description, p.name + " description");
@@ -125,16 +126,21 @@ namespace CluckWars.Tests
         {
             // The point of templating: a balance edit can never leave stale prose behind.
             var relentless = ScriptableObject.CreateInstance<RelentlessPassiveSO>();
+            var bully = ScriptableObject.CreateInstance<BullyPassiveSO>();
             var bulwark = ScriptableObject.CreateInstance<BulwarkPassiveSO>();
             var hoarder = ScriptableObject.CreateInstance<HoarderPassiveSO>();
             try
             {
-                relentless.CooldownMultiplier = 0.5f;
+                bully.CooldownMultiplier = 0.5f;
+                relentless.OutgoingDurationMultiplier = 1.5f;
+                relentless.DurationMultiplier = 0.6f;
                 bulwark.DurationMultiplier = 0.5f;
                 bulwark.KnockbackMultiplier = 0.1f;
                 hoarder.MinimumCapacity = 55f;
 
-                Assert.AreEqual("Moves recharge 50% faster.", relentless.PerkLine());
+                Assert.AreEqual("Moves recharge 50% faster.", bully.PerkLine());
+                Assert.AreEqual("Your stuns and slows last 50% longer. Stuns, getting stuck and timed slows on you end 40% sooner.",
+                    relentless.PerkDetail());
                 Assert.AreEqual("Knockback cut by 90%. Stuns, getting stuck and timed slows end 50% sooner.", bulwark.PerkDetail());
                 Assert.AreEqual("Carry 55 food in one trip.", hoarder.PerkLine(),
                     "The Hoarder line must carry {cap} from MinimumCapacity, not a fixed phrase.");
@@ -142,6 +148,7 @@ namespace CluckWars.Tests
             finally
             {
                 UnityEngine.Object.DestroyImmediate(relentless);
+                UnityEngine.Object.DestroyImmediate(bully);
                 UnityEngine.Object.DestroyImmediate(bulwark);
                 UnityEngine.Object.DestroyImmediate(hoarder);
             }
@@ -163,15 +170,29 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void RelentlessAsset_Description_IsTheLinePlusTheDetail_WithTheCurrentNumbers()
+        public void BullyAsset_Description_IsTheLinePlusTheDetail_WithTheCurrentNumbers()
         {
-            // Round-4 finding 18: the asset said "Every move except Peck recharges 25% faster." while the menu line said
-            // "Moves recharge 25% faster." Pinned like Spoiler: the stored text is the two templates, joined.
+            // Round-4 finding 18 (then on Relentless, whose cooldown cut moved to Bully on 2026-11-05): the asset and the
+            // menu line must not drift. Pinned like Spoiler: the stored text is the two templates, joined.
+            foreach (var p in ShippedPassives(out var cfg))
+            {
+                if (!(p is BullyPassiveSO b)) continue;
+                Assert.AreEqual($"Moves recharge {Pct(1.0 - b.CooldownMultiplier)}% faster. Applies to every move except Peck.", b.Description);
+                Assert.AreEqual(b.PerkLine(cfg) + " " + b.PerkDetail(cfg), b.Description);
+                return;
+            }
+            Assert.Fail("No Bully in the ability registry.");
+        }
+
+        [Test]
+        public void RelentlessAsset_Description_IsTheDetail_WithTheCurrentNumbers()
+        {
             foreach (var p in ShippedPassives(out var cfg))
             {
                 if (!(p is RelentlessPassiveSO r)) continue;
-                Assert.AreEqual($"Moves recharge {Pct(1.0 - r.CooldownMultiplier)}% faster. Applies to every move except Peck.", r.Description);
-                Assert.AreEqual(r.PerkLine(cfg) + " " + r.PerkDetail(cfg), r.Description);
+                Assert.AreEqual($"Your stuns and slows last {Pct(r.OutgoingDurationMultiplier - 1.0)}% longer. " +
+                                $"Stuns, getting stuck and timed slows on you end {Pct(1.0 - r.DurationMultiplier)}% sooner.", r.Description);
+                Assert.AreEqual(r.PerkDetail(cfg), r.Description);
                 return;
             }
             Assert.Fail("No Relentless in the ability registry.");
@@ -202,8 +223,9 @@ namespace CluckWars.Tests
                 switch (p)
                 {
                     case RelentlessPassiveSO r:
-                        StringAssert.Contains($"{Pct(1.0 - r.CooldownMultiplier)}%", r.Description);
-                        StringAssert.Contains("except Peck", r.Description);
+                        StringAssert.Contains($"{Pct(r.OutgoingDurationMultiplier - 1.0)}% longer", r.Description);
+                        StringAssert.Contains($"{Pct(1.0 - r.DurationMultiplier)}% sooner", r.Description);
+                        AssertNoBlanketSlowClaim(r.Description, r.name);
                         break;
                     case SlipperyPassiveSO s:
                         StringAssert.Contains($"{Pct(1.0 - s.DurationMultiplier)}%", s.Description);
@@ -215,8 +237,8 @@ namespace CluckWars.Tests
                         AssertNoBlanketSlowClaim(w.Description, w.name);
                         break;
                     case BullyPassiveSO b:
-                        StringAssert.Contains($"{Pct(b.StealMultiplier - 1.0)}%", b.Description);
-                        StringAssert.Contains($"carry {(int)Math.Round(b.BonusCapacity, MidpointRounding.AwayFromZero)} more", b.Description);
+                        StringAssert.Contains($"{Pct(1.0 - b.CooldownMultiplier)}%", b.Description);
+                        StringAssert.Contains("except Peck", b.Description);
                         break;
                     case ThiefPassiveSO t:
                         StringAssert.Contains($"{Pct(t.StealMultiplier - 1.0)}%", t.Description);

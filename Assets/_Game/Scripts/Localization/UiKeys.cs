@@ -108,9 +108,10 @@ namespace CluckWars.Localization
         [UiArgs("secs", "lock")] public const string AbilityTurtleModeDesc = "ability.turtlemode.desc";
 
         // ---- Perks (templated from each passive's own fields) ----
-        [UiArgs("pct")] public const string PerkRelentlessLine = "perk.relentless.line";
-        public const string PerkRelentlessDetail = "perk.relentless.detail";
-        [UiArgs("steal", "cap")] public const string PerkBullyLine = "perk.bully.line";
+        [UiArgs("out")] public const string PerkRelentlessLine = "perk.relentless.line";
+        [UiArgs("out", "in")] public const string PerkRelentlessDetail = "perk.relentless.detail";
+        [UiArgs("pct")] public const string PerkBullyLine = "perk.bully.line";
+        public const string PerkBullyDetail = "perk.bully.detail";
         [UiArgs("steal")] public const string PerkThiefLine = "perk.thief.line";
         [UiArgs("pct")] public const string PerkSlipperyLine = "perk.slippery.line";
         public const string PerkSlipperyDetail = "perk.slippery.detail";

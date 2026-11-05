@@ -11,7 +11,7 @@ namespace CluckWars.Abilities
     /// </summary>
     /// <remarks>
     /// Tuned 2026-10-22 (Maestro, decision A4 = proposal WS-A): cooldown 12 → 8 s, stun and
-    /// Duration 1.5 → 1.3 s. With Relentless (×0.75) that is 6 s, about 21.7 % stun uptime per
+    /// Duration 1.5 → 1.3 s. With Bully (×0.75 cooldown) that is 6 s, about 21.7 % stun uptime per
     /// target. <b>Pre-agreed fallback (WS-B):</b> if the human session reports "stunned too
     /// often", go to cooldown 9 s with StunDuration and Duration 1.5 s (those three fields in
     /// WingSlam.asset, plus these defaults). Keep the asset and these defaults equal so a freshly

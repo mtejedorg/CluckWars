@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.BullyPassiveSO
   DisplayName: Bully
   ShortLabel: BULY
-  Description: Steal 40% more, carry 2 more.
+  Description: Moves recharge 25% faster. Applies to every move except Peck.
   Icon: 
   AccentColor: {r: 0.86, g: 0.3, b: 0.3, a: 1}
   Category: 3
@@ -29,11 +29,10 @@ MonoBehaviour:
   CastMotion: 8
     serializedVersion: 2
     m_Bits: 256
-  StealMultiplier: 1.4
-  BonusCapacity: 2
+  CooldownMultiplier: 0.75
   Subclass: 2
   Kit:
   - {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}
   - {fileID: 11400000, guid: 4c026dfa11fd40cd9914aa8fb37090b6, type: 2}
-  - {fileID: 11400000, guid: 079c14ab0b344ca898f4be63fbf58374, type: 2}
-  - {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
+  - {fileID: 11400000, guid: 6bbb9c61252f875408fde062c994669c, type: 2}
+  - {fileID: 11400000, guid: d5cbb7478daa2d94eb14fc2015dba412, type: 2}
