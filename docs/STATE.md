@@ -6,7 +6,12 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
-## 🛠 2026-11-05 (latest) - Shorter cooldowns, three kit swaps, Slippery resists ability slows only, Sneaky 11.1 (`simplify-abilities`, commits `5cac4b43`..`b53dc3fb` + docs, not merged, not pushed)
+## 🛠 2026-11-06 - Play Store internal-testing bundle build (`simplify-abilities`, not merged, not pushed)
+
+- New menu `Cluck Wars / Build / Android Play Store bundle (.aab)` (`CluckWarsBuildMenu.BuildPlayStore`, batch-callable): signed `.aab` with versionCode = minutes since 2026-01-01 UTC, upload key from `CW_KEYSTORE_PATH` / `CW_KEYSTORE_PASS` (+ optional `CW_KEY_ALIAS`, `CW_KEY_PASS`). ProjectSettings is restored after the build; `*.jks`/`*.keystore` gitignored. Tests: `PlayStoreBuildTests`.
+- Not done yet: the upload keystore, the Play Console app and the first upload are Maestro's (steps in `docs/TESTING.md`, "Play Store internal testing"). No `.aab` has been built yet.
+
+## 🛠 2026-11-05 - Shorter cooldowns, three kit swaps, Slippery resists ability slows only, Sneaky 11.1 (`simplify-abilities`, commits `5cac4b43`..`b53dc3fb` + docs, not merged, not pushed)
 
 - **Why:** Maestro, same day: cooldowns are too long for a 45 s match; bands low 1-3 s, medium 4-6 s, high 7-8 s. Speedys should not steal. The stun should be the Speedy's weakness, so Slippery stops shortening it. Numbers below are read from the shipped `.asset` files. Docs updated: GDD (header, 5.1, 5.3, 6.3, 6.4, 7.2-7.4), `docs/balance/human-test-baseline.md`, `docs/site/mechanics.html`. No artifact republished.
 - **Cooldowns (`5cac4b43`; SO constructor defaults and descriptions moved with the assets):**

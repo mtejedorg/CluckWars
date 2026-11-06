@@ -15,6 +15,7 @@ Single-keypress builds from the Unity Editor:
 | `Cluck Wars / Build / Windows` | `Ctrl+Shift+W` | `Builds/Windows/CluckWars.exe` |
 | `Cluck Wars / Build / Android` | `Ctrl+Shift+A` | `Builds/Android/CluckWars-<version>.apk` |
 | `Cluck Wars / Build / Windows + Android` | `Ctrl+Shift+B` | both, sequential |
+| `Cluck Wars / Build / Android Play Store bundle (.aab)` | — | `Builds/Android/CluckWars-<version>-<versionCode>.aab`, signed (see below) |
 | `Cluck Wars / Build / Reveal Builds Folder` | — | opens `Builds/` |
 
 The Android build forces:
@@ -24,6 +25,30 @@ The Android build forces:
 - `buildAppBundle = false` (`.apk`, sideload-friendly — not `.aab`)
 
 `Builds/` is gitignored. APK filename embeds `PlayerSettings.bundleVersion`.
+
+### Play Store internal testing (builds arrive as Play updates)
+
+`Cluck Wars / Build / Android Play Store bundle (.aab)` builds a signed bundle,
+`Builds/Android/CluckWars-<version>-<versionCode>.aab`. Batch form:
+`Unity.exe -batchmode -quit -projectPath . -executeMethod CluckWars.EditorTools.CluckWarsBuildMenu.BuildPlayStore -logFile build.log`
+(add `-cwDevTools` for an instrumented build; a failure exits non-zero).
+
+- **versionCode** = minutes since 2026-01-01 UTC, so every bundle outranks the last one and Play
+  offers it as an update. It is set for the build only; ProjectSettings keeps `AndroidBundleVersionCode: 1`.
+- **Signing** comes from environment variables, never from the repo or ProjectSettings:
+  `CW_KEYSTORE_PATH`, `CW_KEYSTORE_PASS`, optional `CW_KEY_ALIAS` (default `upload`) and `CW_KEY_PASS`
+  (default = keystore password). Missing ones fail the build with the variable's name. `*.jks` / `*.keystore` are gitignored.
+
+One-time setup (Maestro):
+1. Make the upload key, outside the repo, and back it up (losing it means a key-reset request to Google):
+   `"C:\Program Files\Unity\Hub\Editor\6000.3.14f1\Editor\Data\PlaybackEngines\AndroidPlayer\OpenJDK\bin\keytool.exe" -genkeypair -v -keystore %USERPROFILE%\keys\cluckwars-upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000`
+2. Set the variables (`setx CW_KEYSTORE_PATH %USERPROFILE%\keys\cluckwars-upload.jks`, `setx CW_KEYSTORE_PASS …`), then restart Unity Hub/Editor so it sees them.
+3. Play Console: create the app with package `com.cluckwars.game`, keep **Play App Signing** on (Google holds the app key, ours is only the upload key).
+4. Test and release → Testing → **Internal testing**: add a tester list (your Google account), upload the first `.aab`, roll out, and open the opt-in link on the phone.
+
+Each later build: upload the new `.aab` as a new internal-testing release; the phone gets it as a normal Play update
+(minutes after rollout). A sideloaded APK of `com.cluckwars.game` is signed with a different key, so uninstall it
+once before the first install from Play.
 
 ### Prerequisites
 

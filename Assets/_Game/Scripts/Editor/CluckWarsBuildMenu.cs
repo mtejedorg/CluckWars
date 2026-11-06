@@ -195,6 +195,147 @@ namespace CluckWars.EditorTools
             return false;
         }
 
+        // ---- Play Store bundle (internal testing) -------------------------------
+
+        private const string PlayStoreMenuPath = "Cluck Wars/Build/Android Play Store bundle (.aab)";
+
+        /// <summary>Upload-keystore path. The keystore and its passwords never live in the repo or in ProjectSettings.</summary>
+        public const string KeystorePathEnvVar = "CW_KEYSTORE_PATH";
+        /// <summary>Upload-keystore password.</summary>
+        public const string KeystorePassEnvVar = "CW_KEYSTORE_PASS";
+        /// <summary>Key alias inside the keystore; defaults to <see cref="DefaultKeyAlias"/>.</summary>
+        public const string KeyAliasEnvVar = "CW_KEY_ALIAS";
+        /// <summary>Key password; defaults to the keystore password (keytool's PKCS12 default makes them equal).</summary>
+        public const string KeyPassEnvVar = "CW_KEY_PASS";
+        public const string DefaultKeyAlias = "upload";
+
+        /// <summary>versionCode epoch: codes are minutes since this instant, so every bundle outranks the last one.</summary>
+        public static readonly DateTime VersionCodeEpochUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        /// <summary>Google Play's ceiling for versionCode.</summary>
+        public const int MaxPlayVersionCode = 2100000000;
+
+        /// <summary>Upload-key settings resolved from the environment.</summary>
+        public readonly struct PlaySigning
+        {
+            public readonly string KeystorePath, KeystorePass, KeyAlias, KeyPass;
+            public PlaySigning(string path, string pass, string alias, string keyPass)
+            { KeystorePath = path; KeystorePass = pass; KeyAlias = alias; KeyPass = keyPass; }
+        }
+
+        /// <summary>
+        /// Builds a signed Android App Bundle for Google Play internal testing: <c>Builds/Android/CluckWars-&lt;version&gt;-&lt;code&gt;.aab</c>.
+        /// The upload key comes from <see cref="KeystorePathEnvVar"/> and friends; the versionCode is minutes since
+        /// <see cref="VersionCodeEpochUtc"/>, so each upload is accepted as an update. ProjectSettings is left as it was.
+        /// In -batchmode a failure throws, so the Editor exits non-zero.
+        /// </summary>
+        [MenuItem(PlayStoreMenuPath, priority = 7)]
+        public static void BuildPlayStore()
+        {
+            bool ok = false;
+            try
+            {
+                ok = ValidateScenes() && DoPlayStore();
+            }
+            finally
+            {
+                RestoreWindowsTarget();
+            }
+
+            var summary = $"{LogTag} Play Store bundle — {Verdict(ok)}";
+            if (ok) Debug.Log(summary);
+            else
+            {
+                Debug.LogError(summary + "  See the errors above.");
+                if (Application.isBatchMode) throw new BuildFailedException(summary);
+            }
+        }
+
+        /// <summary>
+        /// The versionCode for a new Play bundle: minutes since <see cref="VersionCodeEpochUtc"/>, and always above
+        /// <paramref name="current"/>. Pure so a test pins it.
+        /// </summary>
+        public static int PlayVersionCode(DateTime utcNow, int current)
+        {
+            long minutes = (long)Math.Floor((utcNow.ToUniversalTime() - VersionCodeEpochUtc).TotalMinutes);
+            long code = Math.Max(minutes, (long)current + 1);
+            return (int)Math.Min(Math.Max(code, 1), MaxPlayVersionCode);
+        }
+
+        /// <summary>
+        /// Reads the upload-key settings through <paramref name="env"/>. Returns false with a reason naming the
+        /// missing variable. Pure so a test pins it.
+        /// </summary>
+        public static bool TryResolvePlaySigning(Func<string, string> env, out PlaySigning signing, out string error)
+        {
+            signing = default;
+            string path = env(KeystorePathEnvVar)?.Trim();
+            string pass = env(KeystorePassEnvVar);
+            if (string.IsNullOrEmpty(path)) { error = $"{KeystorePathEnvVar} is not set (path to the upload keystore)."; return false; }
+            if (string.IsNullOrEmpty(pass)) { error = $"{KeystorePassEnvVar} is not set (upload keystore password)."; return false; }
+            string alias = env(KeyAliasEnvVar)?.Trim();
+            string keyPass = env(KeyPassEnvVar);
+            signing = new PlaySigning(path, pass,
+                string.IsNullOrEmpty(alias) ? DefaultKeyAlias : alias,
+                string.IsNullOrEmpty(keyPass) ? pass : keyPass);
+            error = null;
+            return true;
+        }
+
+        private static bool DoPlayStore()
+        {
+            if (!TryResolvePlaySigning(Environment.GetEnvironmentVariable, out var signing, out var error))
+            {
+                Debug.LogError($"{LogTag} Play Store bundle needs an upload key: {error} " +
+                               "Google Play rejects bundles signed with the debug key. See docs/TESTING.md, \"Play Store internal testing\".");
+                return false;
+            }
+            if (!File.Exists(signing.KeystorePath))
+            {
+                Debug.LogError($"{LogTag} Upload keystore not found at '{signing.KeystorePath}' ({KeystorePathEnvVar}).");
+                return false;
+            }
+
+            ConfigureAndroidPlayerSettings();
+
+            // Everything below is restored afterwards: the key path and versionCode must not become a ProjectSettings diff,
+            // and the plain Android build stays an unsigned-by-us .apk.
+            int codeWas = PlayerSettings.Android.bundleVersionCode;
+            bool customWas = PlayerSettings.Android.useCustomKeystore;
+            string storeWas = PlayerSettings.Android.keystoreName, aliasWas = PlayerSettings.Android.keyaliasName;
+            string storePassWas = PlayerSettings.Android.keystorePass, aliasPassWas = PlayerSettings.Android.keyaliasPass;
+
+            int code = PlayVersionCode(DateTime.UtcNow, codeWas);
+            try
+            {
+                PlayerSettings.Android.bundleVersionCode = code;
+                PlayerSettings.Android.useCustomKeystore = true;
+                PlayerSettings.Android.keystoreName = Path.GetFullPath(signing.KeystorePath);
+                PlayerSettings.Android.keystorePass = signing.KeystorePass;
+                PlayerSettings.Android.keyaliasName = signing.KeyAlias;
+                PlayerSettings.Android.keyaliasPass = signing.KeyPass;
+                EditorUserBuildSettings.buildAppBundle = true;
+
+                Debug.Log($"{LogTag} Play Store bundle: versionCode {code}, versionName {PlayerSettings.bundleVersion}, key alias '{signing.KeyAlias}'.");
+                var file = $"CluckWars-{SanitizedVersion()}-{code}.aab";
+                bool ok = Build(BuildTarget.Android, AndroidSubdir, file);
+                if (ok)
+                    Debug.Log($"{LogTag} Upload {Path.GetFullPath(Path.Combine(BuildsRoot, AndroidSubdir, file))} in Play Console → " +
+                              "Test and release → Testing → Internal testing → Create new release. Testers get it as a Play update.");
+                return ok;
+            }
+            finally
+            {
+                PlayerSettings.Android.bundleVersionCode = codeWas;
+                PlayerSettings.Android.useCustomKeystore = customWas;
+                PlayerSettings.Android.keystoreName = storeWas;
+                PlayerSettings.Android.keystorePass = storePassWas;
+                PlayerSettings.Android.keyaliasName = aliasWas;
+                PlayerSettings.Android.keyaliasPass = aliasPassWas;
+                EditorUserBuildSettings.buildAppBundle = false;
+            }
+        }
+
         private static bool IsIosEnabled() => EditorPrefs.GetBool(EnableIosPrefKey, false);
 
         [MenuItem("Cluck Wars/Build/Reveal Builds Folder", priority = 20)]
@@ -523,7 +664,7 @@ namespace CluckWars.EditorTools
                 PlayerSettings.SetApplicationIdentifier(named, AppIdentifier);
             }
 
-            // .apk for sideloading the demo. Flip to AAB later if we go through Play Store.
+            // .apk for sideloading. The Play Store bundle (BuildPlayStore) flips this to AAB for its own build only.
             // Android-only setting — deliberately absent from the iOS path.
             EditorUserBuildSettings.buildAppBundle = false;
         }

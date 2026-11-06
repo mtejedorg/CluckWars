@@ -92,6 +92,10 @@ mono_crash.*
 *.ipa
 *.exe
 *.aab
+
+# Play upload keys (never commit)
+*.jks
+*.keystore
 *.unitypackage
 *.unitypackage.meta
 *.app
