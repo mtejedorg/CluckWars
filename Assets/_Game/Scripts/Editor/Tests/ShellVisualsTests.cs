@@ -207,9 +207,9 @@ namespace CluckWars.Tests
             Assert.IsNotNull(shellRoot, "the shell hangs off the chicken ROOT, not the animated model");
             var renderers = shellRoot.GetComponentsInChildren<MeshRenderer>(true);
             Assert.AreEqual(2, renderers.Length, "cup and cap only (the whole egg is discarded)");
-            var shared = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Game/Art/Materials/Egg_Shell_Placeholder.mat");
+            var shared = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Game/Art/Materials/Egg_Shell.mat");
             Assert.IsNotNull(shared);
-            Assert.AreEqual("Universal Render Pipeline/Lit", shared.shader.name);
+            Assert.AreEqual("Cluck Wars/Egg Shell", shared.shader.name);
             foreach (var r in renderers)
             {
                 Assert.AreSame(shared, r.sharedMaterial, r.name + ": shared material, never an instance");

@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Egg_Shell
+  m_Shader: {fileID: 4800000, guid: ccb4460fca5471c4da64c6bbcbc554c9, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _CrackTex:
+        m_Texture: {fileID: 2800000, guid: 4fe2ea8398bc0bd4eaabf13a3a7fb2c1, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SpeckleTex:
+        m_Texture: {fileID: 2800000, guid: b314f5e4d093c4d4ebcce7ebf75955c1, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Crack: 0
+    - _RimPower: 3
+    - _RimStrength: 0.25
+    - _Smoothness: 0.35
+    - _SpeckleTiling: 2
+    - _StripeEdgePixels: 2
+    - _StripeHalfHeight: 0.03
+    m_Colors:
+    - _BaseColor: {r: 0.98, g: 0.94, b: 0.86, a: 1}
+    - _InkColor: {r: 0.165, g: 0.102, b: 0.047, a: 1}
+    - _StripeCenters: {r: 0.3, g: 0.7, b: 0, a: 0}
+    - _StripeColor: {r: 1, g: 0.45, b: 0.2, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

@@ -27,8 +27,8 @@ namespace CluckWars.Visuals
     /// to its own bank accumulator; this component never writes the model transform.
     /// <b>Overlays.</b> It never asks the stun stars, the status ring, the badges or the nameplate to hide anything: a stun cannot
     /// land during the egg (control immunity), so there is nothing to suppress (pinned by <c>ShellVisualsTests</c>).
-    /// <b>Material.</b> One shared URP Lit placeholder with a MaterialPropertyBlock (<c>_BaseColor</c>, <c>_Crack</c>,
-    /// <c>_StripeColor</c>); D3 swaps in the shader that reads the last two.
+    /// <b>Material.</b> One shared <c>Egg_Shell.mat</c> (<c>Cluck Wars/Egg Shell</c>, D3) with a MaterialPropertyBlock
+    /// (<c>_BaseColor</c>, <c>_Crack</c>, <c>_StripeColor</c>); the stripe bands read UV.v = whole-egg height, so the two halves need no offset.
     /// </remarks>
     [RequireComponent(typeof(ChickenController))]
     public sealed class ChickenShellVisuals : MonoBehaviour
@@ -112,7 +112,7 @@ namespace CluckWars.Visuals
 
         [Tooltip("Art/Meshes/Fx/EggShell.fbx: EggShell_Top (pivot at the seam) and EggShell_Bottom; EggShell_Whole is discarded.")]
         [SerializeField] private GameObject _shellModel;
-        [Tooltip("The shared URP Lit placeholder (Art/Materials/Egg_Shell_Placeholder.mat). Never instanced; per-chicken values go through a MaterialPropertyBlock.")]
+        [Tooltip("The shared Egg Shell material (Art/Materials/Egg_Shell.mat, shader Cluck Wars/Egg Shell). Never instanced; per-chicken values go through a MaterialPropertyBlock.")]
         [SerializeField] private Material _shellMaterial;
 
         // ---- Runtime state ------------------------------------------------------------

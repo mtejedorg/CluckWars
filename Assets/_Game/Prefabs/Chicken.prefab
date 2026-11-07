@@ -554,4 +554,4 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ChickenShellVisuals
   _shellModel: {fileID: 919132149155446097, guid: df14afcaeda73ba48acef7e309c8101d, type: 3}
-  _shellMaterial: {fileID: 2100000, guid: 8ce3e65a68a92ab4e94add68008ec6bc, type: 2}
+  _shellMaterial: {fileID: 2100000, guid: 13ed1564bb399b84fa76b9db992d1e4b, type: 2}
