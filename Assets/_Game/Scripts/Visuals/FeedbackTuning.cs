@@ -1803,6 +1803,40 @@ namespace CluckWars.Visuals
         public const float HideBlinkDimAlpha = 0.15f;
         public const float HideBlinkSteadyAlpha = 0.5f;
 
+        // ---- Peck chip (D11, vfx.md 2.7) -------------------------------------------------------------
+
+        /// <summary>Pile chip: gold <c>Fx_Corn</c> kernels (5; 3, fading at the beak with no travel, under Reduced Motion) from the
+        /// mound top toward the pecker's beak. Pile-owned system <c>VFX_PileKernel</c>, at most
+        /// <see cref="PeckKernelMaxPerPile"/> live per pile (4 piles = 32 of the arena budget).</summary>
+        public const int PeckKernelCount = 5;
+        public const int PeckKernelCountReduced = 3;
+        public const float PeckKernelSeconds = 0.25f;
+        public const float PeckKernelSpeed = 3f;
+        public const float PeckKernelGravity = 0.5f;
+        public const float PeckKernelSize = 0.12f;
+        public const float PeckKernelScatter = 0.12f;
+        public const int PeckKernelSortingOrder = 5;
+        public const int PeckKernelMaxPerPile = 8;
+
+        /// <summary>The beak: this far ahead of the pecker, and this high above the grass (metres).</summary>
+        public const float PeckBeakDistance = 0.9f;
+        public const float PeckBeakHeight = 0.45f;
+
+        /// <summary>Contact puff: straw-cream dust at the contact point (3, or 2 fading in place), ground band (order 2).</summary>
+        public const int PeckPuffCount = 3;
+        public const int PeckPuffCountReduced = 2;
+        public const float PeckPuffSeconds = 0.25f;
+        public const float PeckPuffSpeed = 0.5f;
+        public const float PeckPuffSizeMin = 0.25f;
+        public const float PeckPuffSizeMax = 0.35f;
+        public const float PeckPuffScatter = 0.12f;
+        public const float PeckPuffHeight = 0.08f;
+        public static readonly Color PeckPuffColor = new Color(0.90f, 0.85f, 0.65f, 1f);
+
+        /// <summary>Mound squash: pile Y scale x this, back to 1 over <see cref="PeckSquashSeconds"/> (none under Reduced Motion).</summary>
+        public const float PeckSquashScaleY = 0.94f;
+        public const float PeckSquashSeconds = 0.12f;
+
         // ---- Particle budget (batch D, vfx.md 0.2) --------------------------------------------------
 
         /// <summary>Hard cap on ParticleSystems per chicken (one draw call each on the shared Fx material).</summary>

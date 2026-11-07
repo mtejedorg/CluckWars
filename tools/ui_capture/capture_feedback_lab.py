@@ -66,11 +66,17 @@ public class FB {
   public static string DummyStunned() { return Others().Any(c => c.IsStunned) ? "1" : "0"; }
   public static string ProbeBegin(string tag) { return CluckWars.EditorTools.ParticleProbe.Begin(tag); }
   public static string ProbeEnd(string tag) { return CluckWars.EditorTools.ParticleProbe.End(); }
+  static FoodPile NearestPile() { var l = Local(); return FoodPile.ActivePiles.Where(p => p != null && p.Object != null && p.Object.IsValid).OrderBy(p => p.DistanceToSurface(l.transform.position)).FirstOrDefault(); }
+  public static string Park() { var l = Local(); var pile = NearestPile(); if (l == null || pile == null) return "no pile"; var pos = pile.SurfaceApproachPoint(l.transform.position, 0.4f); pos.y = l.transform.position.y; typeof(ChickenController).GetMethod("QueueTeleport", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(l, new object[] { pos }); return "park -> " + pos.ToString("0.00") + " pile " + pile.transform.position.ToString("0.00"); }
+  public static string FacePile() { var l = Local(); var pile = NearestPile(); if (l == null || pile == null) return "no pile"; l.FaceNow(pile.transform.position - l.transform.position); return "face reach=" + pile.IsWithinCollectRange(l.transform.position) + " dist=" + pile.DistanceToSurface(l.transform.position).ToString("0.00") + " amount=" + pile.Amount.ToString("0.0"); }
+  public static string PeckProbeBegin() { return CluckWars.EditorTools.PeckEdgeProbe.Begin(); }
+  public static string PeckProbeEnd() { return CluckWars.EditorTools.PeckEdgeProbe.End(); }
   public static string Info() { var l = Local(); if (l == null) return "no local"; var a = l.Abilities;
     string self = "SELF ctrl=" + l.CurrentControlState + " stunned=" + l.IsStunned + " opacity=" + l.VisualOpacity.ToString("0.00") + " stealProof=" + l.IsStealProof + " cargo=" + l.Cargo.Cargo.ToString("0.0")
       + " active=" + string.Join("", Enumerable.Range(0,4).Select(i => a.IsSlotActive(i) ? "1" : "0")) + " cd=" + string.Join("/", Enumerable.Range(0,4).Select(i => a.CooldownRemaining(i).ToString("0.0"))) + " charging=" + a.ChargingSlot + " lastHits=" + a.LastCastHitCount + " castId=" + a.LastCastEventId + " castAb=" + (a.LastCastAbility != null ? a.LastCastAbility.name : "-");
     string oth = string.Join(" | ", Others().Select(c => "DUMMY ctrl=" + c.CurrentControlState + " stunned=" + c.IsStunned + " flags=" + c.ControlFlags + " cargo=" + c.Cargo.Cargo.ToString("0.0") + " dist=" + Vector3.Distance(c.transform.position, l.transform.position).ToString("0.0")));
-    return self + " || " + oth + " ts=" + Time.timeScale; }
+    var pl = NearestPile(); string pileInfo = pl != null ? " || PILE amount=" + pl.Amount.ToString("0.0") + " reach=" + pl.IsWithinCollectRange(l.transform.position) : "";
+    return self + " || " + oth + pileInfo + " ts=" + Time.timeScale; }
 }"""
 SIG = {"Res": ["w", "h"], "RespawnAs": ["cls"], "Loadout": ["a", "b", "c", "d"], "Hold": ["slot"], "Release": ["slot"], "Cast": ["slot"], "TimeScale": ["v"], "Stick": ["x", "y"], "ProbeBegin": ["tag"], "ProbeEnd": ["tag"]}
 
@@ -247,7 +253,21 @@ def main():
     if want("peck"):
         log(cs("Loadout", "Peck", "WingSlam", "Snatch", "SpeedBurst"))
         time.sleep(2)
-        ability(0, "peck", after=((0.5, "3_impact"), (1.5, "4_after")))
+        # Park step: Peck only bites a pile in reach, so teleport the bird to the pile edge and face it first. Without a pile in
+        # reach the press shows only the refusal (the must-not-emit case), which is not what this sequence is for.
+        for attempt in range(6):   # the queued teleport lands on the bird next state-authority tick; retry until the pile is in reach
+            log(" ", cs("Park"))
+            time.sleep(1.2)
+            r = str(cs("FacePile"))
+            log(" ", r)
+            if "reach=True" in r:
+                break
+        time.sleep(0.5)
+        log(" ", cs("FacePile"))
+        shot("peck_0_parked")
+        cs("PeckProbeBegin")
+        ability(0, "peck", after=((0.12, "3a_squash"), (0.5, "3_impact"), (1.5, "4_after")))
+        log("  peck edges |", cs("PeckProbeEnd"))
     # Loadout D: the Assassin hunt (Death Mark). Paw marker + HUNT! pop on the hunter side.
     if want("hunt"):
         log(cs("RespawnAs", "Assassin"))

@@ -1,4 +1,7 @@
+using System.Collections.Generic;
+using CluckWars.Abilities;
 using CluckWars.Gameplay;
+using CluckWars.Settings;
 using UnityEngine;
 using Zenject;
 
@@ -121,6 +124,22 @@ namespace CluckWars.Visuals
         private MaterialPropertyBlock _propertyBlock;
         private ColorSchemeSO _colors;
 
+        // ---- Peck chip (D11): local, observed from the replicated Amount; nothing here is networked ----
+        private float _lastAmount = float.NaN;
+        private float _squashStart = -1f;            // Time.unscaledTime of the bite; < 0 = none
+        private MeshRenderer _moundRenderer;
+        private ParticleSystem _chipPS;
+        private ParticleSystem.EmitParams _chipEmit;  // cached: every emit rewrites it, nothing allocates
+        private static readonly List<float> s_candDistance = new List<float>(8);
+        private static readonly List<bool> s_candOpen = new List<bool>(8);
+        private static readonly List<ChickenController> s_candidates = new List<ChickenController>(8);
+
+        /// <summary>Name of the pile-owned kernel system.</summary>
+        public const string KernelSystemName = "VFX_PileKernel";
+
+        /// <summary>The pile kernel system (null until the first bite is seen).</summary>
+        public ParticleSystem KernelSystem => _chipPS;
+
         [Inject]
         public void Construct(ColorSchemeSO colors) => _colors = colors;
 
@@ -156,7 +175,9 @@ namespace CluckWars.Visuals
         /// Pose of the mound root (pile-root local). Food present: Y scale by fill height, widest ring seated on the ground.
         /// Empty: the scattered-grain mesh is authored in footprint space, so scale 1, lifted just above the disc.
         /// </summary>
-        public void MoundPose(bool showEmptyMesh, float ratio, out Vector3 scale, out Vector3 localPosition)
+        /// <param name="squash">Peck-bite squash factor (D11, <see cref="PeckBeatRules.SquashFactor"/>): multiplies the fill height, so the
+        /// squash and the fill scale go out as ONE write and the widest ring stays seated. 1 = none (and ignored for the empty mesh).</param>
+        public void MoundPose(bool showEmptyMesh, float ratio, out Vector3 scale, out Vector3 localPosition, float squash = 1f)
         {
             if (showEmptyMesh)
             {
@@ -164,7 +185,7 @@ namespace CluckWars.Visuals
                 localPosition = new Vector3(0f, _emptyLift, 0f);
                 return;
             }
-            float height = MoundHeight(ratio);
+            float height = MoundHeight(ratio) * squash;
             scale = new Vector3(1f, height, 1f);
             localPosition = new Vector3(0f, _widestRingDepth * height, 0f);
         }
@@ -192,6 +213,7 @@ namespace CluckWars.Visuals
             float ratio = _pile.MaxAmount > 0f ? Mathf.Clamp01(_pile.Amount / _pile.MaxAmount) : 0f;
 
             bool empty = _pile.Amount <= 0f;
+            ObservePeck(_pile.Amount);
             if (_moundFilter != null && _fullMesh != null && _emptyMesh != null && (empty != _showingEmpty || _moundFilter.sharedMesh == null))
             {
                 _showingEmpty = empty;
@@ -200,7 +222,9 @@ namespace CluckWars.Visuals
 
             if (_meshRoot != null)
             {
-                MoundPose(empty && _emptyMesh != null, ratio, out var scale, out var pos);
+                float squash = _squashStart >= 0f ? PeckBeatRules.SquashFactor(Time.unscaledTime - _squashStart, PlayerPreferences.ReducedMotionEnabled) : 1f;
+                if (squash >= 1f) _squashStart = -1f;
+                MoundPose(empty && _emptyMesh != null, ratio, out var scale, out var pos, squash);
                 _meshRoot.localScale = scale;
                 _meshRoot.localPosition = pos;
             }
@@ -280,9 +304,147 @@ namespace CluckWars.Visuals
             band.localRotation = Quaternion.identity;
         }
 
+        private void OnDisable()
+        {
+            _lastAmount = float.NaN;
+            _squashStart = -1f;
+        }
+
         private void OnDestroy()
         {
             if (_bandMesh != null) Destroy(_bandMesh);
+        }
+
+        // ---- Peck chip (D11, vfx.md 2.7) ----------------------------------------------------------
+
+        /// <summary>
+        /// Edge poller on the replicated <c>Amount</c> (first observation seeds the baseline, so a late join never replays a bite). A drop
+        /// is a Peck only if some bird in reach has its Peck slot active: the beat belongs to that bird (nearest when several), and with
+        /// no pecker nothing plays (a steal drain, or an empty-pile press that shows only the refusal).
+        /// </summary>
+        private void ObservePeck(float amount)
+        {
+            bool dropped = PeckBeatRules.AmountDropped(_lastAmount, amount);
+            _lastAmount = amount;
+            if (!dropped) return;
+            var pecker = FindPecker();
+            if (pecker != null) PlayPeckBeat(pecker);
+        }
+
+        /// <summary>The bird whose Peck window is open at this pile (nearest when several), or null.</summary>
+        private ChickenController FindPecker()
+        {
+            s_candidates.Clear();
+            s_candDistance.Clear();
+            s_candOpen.Clear();
+            var list = ChickenController.ActiveControllers;
+            for (int i = 0; i < list.Count; i++)
+            {
+                var c = list[i];
+                if (c == null || c.IsDecoy || c.Object == null || !c.Object.IsValid || c.Abilities == null) continue;
+                Vector3 pos = c.transform.position;
+                if (!_pile.IsWithinCollectRange(pos)) continue;
+                s_candidates.Add(c);
+                s_candDistance.Add(_pile.DistanceToSurface(pos));
+                s_candOpen.Add(PeckWindowOpen(c.Abilities));
+            }
+            int pick = PeckBeatRules.PickPecker(s_candDistance, s_candOpen);
+            return pick >= 0 ? s_candidates[pick] : null;
+        }
+
+        /// <summary>True while the bird Peck slot (the slot holding a <see cref="PeckAbilitySO"/>) is running: the 0.4 s commitment window.</summary>
+        public static bool PeckWindowOpen(AbilityController abilities)
+        {
+            for (int i = 0; i < AbilityController.SlotCount; i++)
+                if (abilities.IsSlotActive(i) && abilities.GetSlot(i) is PeckAbilitySO) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// The bite beat: squash the mound, puff straw-cream dust at the contact point and fly kernels from the mound top to the pecker
+        /// beak. Nothing for a hidden or faded pecker (the gate is the one every bird-attached emitter asks).
+        /// </summary>
+        private void PlayPeckBeat(ChickenController pecker)
+        {
+            if (FoodChunkFlight.IsQuiet(pecker)) return;
+            bool reduced = PlayerPreferences.ReducedMotionEnabled;
+            if (!reduced && !_showingEmpty) _squashStart = Time.unscaledTime;
+
+            var vfx = pecker.GetComponent<ChickenVFX>();
+            Vector3 contact = _pile.SurfaceApproachPoint(pecker.transform.position, 0f);
+            contact.y = transform.position.y + FeedbackTuning.PeckPuffHeight;
+            if (vfx != null) vfx.EmitPeckPuff(contact);
+
+            if (!EnsureKernelSystem(vfx)) return;
+            Vector3 beak = PeckBeatRules.BeakPoint(pecker.transform.position, pecker.transform.forward, ChickenGround.GroundWorldY(pecker));
+            Vector3 top = MoundTop();
+            Vector3 start = PeckBeatRules.KernelStart(top, beak, reduced);
+            Vector3 velocity = PeckBeatRules.KernelVelocity(top, beak, reduced);
+            _chipEmit.applyShapeToPosition = false;
+            _chipEmit.startLifetime = FeedbackTuning.PeckKernelSeconds;
+            _chipEmit.startSize = FeedbackTuning.PeckKernelSize;
+            _chipEmit.startColor = FeedbackPalette.Current.PeckAccent;
+            int n = PeckBeatRules.KernelCount(reduced);
+            for (int i = 0; i < n; i++)
+            {
+                Vector2 scatter = Random.insideUnitCircle * FeedbackTuning.PeckKernelScatter;
+                _chipEmit.position = start + new Vector3(scatter.x, 0f, scatter.y);
+                _chipEmit.velocity = velocity;
+                _chipEmit.rotation = Random.Range(0f, 360f);
+                _chipPS.Emit(_chipEmit, 1);
+            }
+        }
+
+        /// <summary>World point on top of the mound (renderer bounds: follows the fill height and any squash), else the pile root.</summary>
+        private Vector3 MoundTop()
+        {
+            if (_moundRenderer == null && _moundFilter != null) _moundRenderer = _moundFilter.GetComponent<MeshRenderer>();
+            if (_moundRenderer != null)
+            {
+                var b = _moundRenderer.bounds;
+                return new Vector3(b.center.x, b.max.y, b.center.z);
+            }
+            return transform.position + Vector3.up * MoundHeight(_pile.MaxAmount > 0f ? _pile.Amount / _pile.MaxAmount : 0f);
+        }
+
+        /// <summary>
+        /// Builds the pile kernel system on first use: a child, world simulation space, the shared Fx material (taken from the pecker
+        /// <see cref="ChickenVFX"/>, never an instance), sprite mode over Fx_Corn, maxParticles <see cref="FeedbackTuning.PeckKernelMaxPerPile"/>,
+        /// no shape, no prewarm. False when the sprite or material is not available yet (nothing plays, nothing throws).
+        /// </summary>
+        private bool EnsureKernelSystem(ChickenVFX vfx)
+        {
+            if (_chipPS != null) return true;
+            var corn = FoodChunkFlight.CornSprite;
+            var mat = vfx != null ? vfx.ParticleMaterial : null;
+            if (corn == null || mat == null) return false;
+
+            var go = new GameObject(KernelSystemName);
+            go.transform.SetParent(transform, worldPositionStays: false);
+            _chipPS = go.AddComponent<ParticleSystem>();
+            _chipPS.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = _chipPS.main;
+            main.loop = false;
+            main.playOnAwake = false;
+            main.prewarm = false;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.scalingMode = ParticleSystemScalingMode.Local;   // the pile root footprint scale never reaches the kernels
+            main.gravityModifier = FeedbackTuning.PeckKernelGravity;
+            main.maxParticles = FeedbackTuning.PeckKernelMaxPerPile;
+            main.startSpeed = 0f;
+            var em = _chipPS.emission;
+            em.enabled = true;
+            em.rateOverTime = 0f;
+            var sh = _chipPS.shape;
+            sh.enabled = false;
+            var rend = go.GetComponent<ParticleSystemRenderer>();
+            rend.renderMode = ParticleSystemRenderMode.Billboard;
+            rend.sortingOrder = FeedbackTuning.PeckKernelSortingOrder;
+            rend.sharedMaterial = mat;
+            ChickenVFX.ApplySprites(_chipPS, corn);
+            ChickenVFX.AddFadeOut(_chipPS);
+            _chipPS.Play();   // stays playing: Emit() adds particles, there is no timeline
+            return true;
         }
 
         private void ApplyGlow(float alpha)

@@ -118,6 +118,7 @@ namespace CluckWars.Tests
         [TestCase("SlowAuraFeedback.cs")]
         [TestCase("ControlStateVFX.cs")]
         [TestCase("FoodChunkFlight.cs")]
+        [TestCase("FoodPileVisuals.cs")]
         public void EveryEmittingMethod_IsGated_OrReachedOnlyThroughGatedCallers(string file)
         {
             string src = File.ReadAllText(Path.Combine(Path.GetDirectoryName(Application.dataPath), VisualsDir + file));

@@ -54,6 +54,9 @@ namespace CluckWars.Visuals
         /// <summary>Movers the pool holds (0 before first use).</summary>
         public static int PoolSize => s_instance != null && s_instance._pool != null ? s_instance._pool.Length : 0;
 
+        /// <summary>The shared Fx_Corn sprite (registered by the first chicken to wake; null before that).</summary>
+        public static Sprite CornSprite => s_cornSprite;
+
         /// <summary>Whether a pool exists on this peer.</summary>
         public static bool HasInstance => s_instance != null;
 

@@ -202,6 +202,7 @@ namespace CluckWars.Visuals
         private FxEmit  _skidDust, _shoveRing;
         private FxEmit  _stealArrival;
         private FxEmit  _stunBonk;
+        private FxEmit  _peckPuff;
 
         // ── Hide poofs (D9): edge of "is this bird faded", seeded on first observation ──
         private bool _hideInitialized;
@@ -316,6 +317,15 @@ namespace CluckWars.Visuals
                 SpeedMin = FeedbackTuning.HidePoofFeatherSpeed, SpeedMax = FeedbackTuning.HidePoofFeatherSpeed,
                 LifeMin = FeedbackTuning.HidePoofFeatherLifeSeconds, LifeMax = FeedbackTuning.HidePoofFeatherLifeSeconds,
                 Shape = FxShape.Cone, Radius = 0.1f, ConeAngle = 25f, Axis = Vector3.up, Gravity = 0f, RandomRotation = true,
+            };
+            // Peck puff (D11): straw-cream dust at the pile contact point.
+            _peckPuff = new FxEmit
+            {
+                Count = FeedbackTuning.PeckPuffCount, Color = FeedbackTuning.PeckPuffColor,
+                SizeMin = FeedbackTuning.PeckPuffSizeMin, SizeMax = FeedbackTuning.PeckPuffSizeMax,
+                SpeedMin = FeedbackTuning.PeckPuffSpeed, SpeedMax = FeedbackTuning.PeckPuffSpeed,
+                LifeMin = FeedbackTuning.PeckPuffSeconds, LifeMax = FeedbackTuning.PeckPuffSeconds,
+                Shape = FxShape.Disc, Radius = FeedbackTuning.PeckPuffScatter, Gravity = 0f, RandomRotation = true,
             };
             // Steal arrival (D7): gold sparkles at the thief when the kernels land.
             _stealArrival = new FxEmit
@@ -608,6 +618,20 @@ namespace CluckWars.Visuals
             e.Count = StunBeatRules.BonkCount(reduced);
             e.SpeedMin = e.SpeedMax = StunBeatRules.BonkSpeed(reduced);
             EmitDust(in e, FeedbackTuning.StunBonkHeight);
+        }
+
+        /// <summary>
+        /// The Peck contact puff (D11): 3 straw-cream dust at the pile contact point (2, fading in place, under Reduced Motion). Called
+        /// by the pile when its Amount dropped inside this bird Peck window; nothing on a hidden or faded bird.
+        /// </summary>
+        public void EmitPeckPuff(Vector3 contact)
+        {
+            if (_controller == null || FoodChunkFlight.IsQuiet(_controller)) return;
+            bool reduced = PlayerPreferences.ReducedMotionEnabled;
+            var e = _peckPuff;
+            e.Count = PeckBeatRules.PuffCount(reduced);
+            if (reduced) e.SpeedMin = e.SpeedMax = 0f;
+            EmitDustAt(in e, contact);
         }
 
         /// <summary>The caster half: accent sparkles in a ring at body height (8, or 4 fading in place under Reduced Motion).</summary>
