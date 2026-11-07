@@ -539,6 +539,7 @@ namespace CluckWars.Gameplay
             _assassin = GetComponent<AssassinExecute>();
             _indicator = GetComponent<CluckWars.Visuals.RivalIndicator>();
             _nameplate = GetComponent<CluckWars.Visuals.ChickenNameplate>();
+            _statusBadges = GetComponent<CluckWars.Visuals.ChickenStatusBadges>();
             _activeStats = ResolveStatsForClass(Class);
             Effects.Log = _log;
             _inContact = false;   // pooled: no contact carried over from a previous life
@@ -1102,6 +1103,13 @@ namespace CluckWars.Gameplay
         /// <summary>This chicken's rival indicator and nameplate (cached at spawn, presentation readers only; may be null).</summary>
         public CluckWars.Visuals.RivalIndicator Indicator => _indicator;
         public CluckWars.Visuals.ChickenNameplate Nameplate => _nameplate;
+        private CluckWars.Visuals.ChickenStatusBadges _statusBadges;
+        /// <summary>This bird's badge stack (cached at spawn; may be null).</summary>
+        public CluckWars.Visuals.ChickenStatusBadges StatusBadges => _statusBadges;
+        /// <summary>Where a floating pop over this bird starts: its pivot plus the pop height, above any shown badge rows
+        /// (cached sibling, no per-call lookup; the floor alone when the bird has no badge stack).</summary>
+        public Vector3 PopAnchor => CluckWars.Visuals.FloatingCombatText.PopSpawnPosition(
+            transform.position, _statusBadges != null ? _statusBadges.CurrentStackTopLocalY : 0f);
         /// <summary>The CharacterController (the body's footprint, for presentation placement; may be null).</summary>
         public CharacterController Body => _characterController;
 

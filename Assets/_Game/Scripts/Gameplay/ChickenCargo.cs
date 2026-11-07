@@ -278,7 +278,7 @@ namespace CluckWars.Gameplay
                 if (delta < 0f && IsDepositing) continue;
 
                 FloatingCombatText.SpawnCargoPop(_controller,
-                    transform.position + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight, delta);
+                    _controller.PopAnchor, delta);
 
                 if (delta < 0f) _hitFeedback?.NotifyCargoLoss(-delta);
             }

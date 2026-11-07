@@ -39,7 +39,11 @@ namespace CluckWars.UI
                 var scene = BuildScene(cam, panel, target, local, info, hasYou, you);
                 var plate = target.Nameplate;
                 float lift = plate != null ? plate.HeadLift : 0f;
-                Vector3 head = cam.WorldToViewportPoint(pos + Vector3.up * (FeedbackTuning.MarkMarkerClearHeight + lift));
+                // The floor, raised to the top of whatever badge rows the target shows right now (read from the cached sibling).
+                float clear = FeedbackTuning.MarkMarkerClearHeight + lift;
+                var badges = target.StatusBadges;
+                if (badges != null) clear = Mathf.Max(clear, badges.CurrentStackTopLocalY);
+                Vector3 head = cam.WorldToViewportPoint(pos + Vector3.up * clear);
                 float anchorY = head.y;
                 if (plate != null && plate.TryGetPlateViewport(cam, out Rect pr)) anchorY = Mathf.Max(anchorY, pr.yMax);
                 float above = FeedbackTuning.MarkMarkerAnchorGapPx + FeedbackTuning.MarkPointerTipBeyondRingPx + FeedbackTuning.MarkMarkerHalfPx;

@@ -39,13 +39,13 @@ namespace CluckWars.Visuals
     ///   <item><b>pill top + <see cref="FeedbackTuning.StatusBadgeStackPillGap"/> and up — this badge stack,</b> anchored
     ///   to the pill (<see cref="ChickenNameplate.TryGetPillTopAnchor"/>) rather than a constant, so the taller local pill
     ///   is cleared too; <see cref="FeedbackTuning.StatusBadgeStackBaseHeight"/> is the fallback with no nameplate</item>
-    ///   <item>2.75 → 3.85 — floating combat text (<see cref="FloatingCombatText"/>,
-    ///   spawning at <see cref="FeedbackTuning.FloatingTextSpawnHeight"/> and rising by
-    ///   <see cref="FeedbackTuning.FloatingTextRiseDistance"/>)</item>
+    ///   <item>above the shown rows — floating combat text (<see cref="FloatingCombatText"/>), spawning at
+    ///   <c>max(<see cref="FeedbackTuning.FloatingTextSpawnHeight"/>, <see cref="CurrentStackTopLocalY"/> +
+    ///   <see cref="FeedbackTuning.FloatingTextStackClearance"/>)</c> and rising by
+    ///   <see cref="FeedbackTuning.FloatingTextRiseDistance"/></item>
     /// </list>
     /// Rows grow upward by <see cref="FeedbackTuning.StatusBadgeRowSpacing"/>, capped at
-    /// <see cref="FeedbackTuning.StatusBadgeMaxRows"/> rows, and the stack top stays under the floating-text floor
-    /// (<c>StatusBadgeLayoutTests</c>). The worst case on one bird is
+    /// <see cref="FeedbackTuning.StatusBadgeMaxRows"/> rows; pops clear whatever rows are shown (<c>StatusBadgeLayoutTests</c>). The worst case on one bird is
     /// stun + slow + zoom (the egg refuses both controls, the waddle refuses slows), so three
     /// rows stay enough.
     ///
@@ -89,9 +89,9 @@ namespace CluckWars.Visuals
         /// (feedback batch D0).</summary>
         public const int SortingOrder = 0;
 
-        /// <summary>Badge text size: 0.026 x 1.3 to match the larger glyph and row pitch (batch D0b), about two thirds of
-        /// the nameplate's characterSize (0.05), so three rows fit the band between the pill and the floating text.</summary>
-        private const float CharacterSize = 0.0338f;
+        /// <summary>Badge text size: 0.0338 (D0b) x 0.30/0.17 (D0c) to match the 0.30 glyph, so the row text cap height
+        /// tracks the glyph; about 1.2x the nameplate's characterSize (0.05).</summary>
+        private const float CharacterSize = 0.0596f;
         private const int   FontSize      = 64;
 
         /// <summary>Duration of the scale punch when a badge first appears — the
@@ -167,6 +167,33 @@ namespace CluckWars.Visuals
             _value         = new float[rows];
 
             BuildStack(rows);
+        }
+
+        /// <summary>
+        /// Top edge of the badge rows this bird shows right now (or is about to show this frame), in the chicken's pivot-local Y:
+        /// metres above its pivot, the same space pops spawn in (<c>pivot + Vector3.up * y</c>). Computed on demand from the live
+        /// status set (<see cref="CollectActive"/>), not from last frame's layout, so a pop spawned on the very edge that adds a
+        /// row already clears it. Conversion: the stack is anchored at the pill top along the billboard axis, which tilts toward
+        /// the camera, so the pivot-local Y of the bottom row is that anchor's world Y minus the pivot's world Y, and each row
+        /// offset in the root's space adds its vertical component, <c>offset * _stackRoot.up.y</c> (the bird is upright and not
+        /// scaled in Y). With no rows (or a hidden bird or a decoy, which show none) it is the fallback base
+        /// (<see cref="FeedbackTuning.StatusBadgeStackBaseHeight"/> plus the head lift).
+        /// </summary>
+        public float CurrentStackTopLocalY
+        {
+            get
+            {
+                float baseY = FeedbackTuning.StatusBadgeStackBaseHeight + _headLift;
+                if (_controller == null || _stackRoot == null) return baseY;
+                var obj = _controller.Object;
+                if (obj == null || !obj.IsValid || _controller.IsDecoy || HiddenVisibilityRules.IsHiddenFor(_controller)) return baseY;
+                int count = CollectActive();
+                if (count == 0) return baseY;
+                float bottomY = _nameplate != null && _nameplate.TryGetPillTopAnchor(FeedbackTuning.StatusBadgeStackPillGap, out Vector3 world)
+                    ? world.y - transform.position.y
+                    : baseY;
+                return bottomY + StackTopInRoot(count) * _stackRoot.up.y;
+            }
         }
 
         /// <summary>Raises the badge stack for a class model drawn taller than the collider (Phase 8 D6).
@@ -282,6 +309,11 @@ namespace CluckWars.Visuals
             // The pill's size differs between the local "You" pill and a rival's, and eases during GET READY, so re-read it.
             PlaceStack();
         }
+
+        /// <summary>Top edge of <paramref name="rows"/> shown rows in the stack root's own space: the bottom row's centre is the
+        /// root origin, each further row one spacing up, plus half a glyph.</summary>
+        public static float StackTopInRoot(int rows) =>
+            FeedbackTuning.StatusBadgeRowSpacing * Mathf.Max(0, rows - 1) + FeedbackTuning.StatusBadgeGlyphSize * 0.5f;
 
         // ---- Pure rules (public static so the EditMode tests drive them without a runner) ----------
 

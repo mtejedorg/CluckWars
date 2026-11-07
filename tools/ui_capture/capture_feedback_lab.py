@@ -200,7 +200,7 @@ def main():
             ability(2, "shove", after=((0.3, "3_impact"), (0.8, "4_after"), (2.0, "5_late")))
         if want("slow"):
             ability(3, "slow", after=((0.6, "3_impact"), (3.0, "4_after"), (7.0, "5_late")))
-        if ONLY is None:
+        if want("stun"):
             stun_then_slow("badges_stun_slow")
     # Loadout B: the self moves
     if want("speed", "jump", "shield", "hide"):

@@ -548,7 +548,7 @@ namespace CluckWars.Visuals
                         // A pure-control ability bounced off control immunity: IMMUNE. Anything else
                         // that is nullified was a steal refused by the steal-proof state: SAFE.
                         FloatingCombatText.Spawn(
-                            victim.transform.position + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight,
+                            victim.PopAnchor,
                             ability.TargetEffectIsPurelyControl ? UiText.Get(UiKeys.HudPopImmune) : UiText.Get(UiKeys.HudPopSafe),
                             FeedbackTuning.NeutralNoEffectColor);
                         continue;
@@ -559,7 +559,7 @@ namespace CluckWars.Visuals
                     if (ability.TargetEffectIncludesSteal && victim.IsStealProof)
                     {
                         FloatingCombatText.Spawn(
-                            victim.transform.position + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight,
+                            victim.PopAnchor,
                             UiText.Get(UiKeys.HudPopSafe),
                             FeedbackTuning.NeutralNoEffectColor);
                     }
@@ -649,7 +649,7 @@ namespace CluckWars.Visuals
                 if (!ability.WouldAffect(_controller, candidate)) continue;
 
                 FloatingCombatText.Spawn(
-                    candidate.transform.position + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight,
+                    candidate.PopAnchor,
                     UiText.Get(UiKeys.HudPopImmune),
                     FeedbackTuning.NeutralNoEffectColor);
             }
@@ -1105,8 +1105,7 @@ namespace CluckWars.Visuals
             FloatingCombatText.Spawn(TextAnchorPoint(), text, FeedbackTuning.CanonicalSlowColor);
         }
 
-        private Vector3 TextAnchorPoint() =>
-            transform.position + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight;
+        private Vector3 TextAnchorPoint() => _controller.PopAnchor;
 
         // ---- Execute / removal (§3.4) -----------------------------------------
 

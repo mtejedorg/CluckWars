@@ -48,53 +48,76 @@ namespace CluckWars.Tests
 
         private static float Row1Centre(float pillTop) => pillTop + FeedbackTuning.StatusBadgeStackPillGap;
 
-        private static float StackTop(float pillTop) =>
-            Row1Centre(pillTop)
-            + FeedbackTuning.StatusBadgeRowSpacing * (FeedbackTuning.StatusBadgeMaxRows - 1)
-            + FeedbackTuning.StatusBadgeGlyphSize * 0.5f;
+        /// <summary>Pivot-local top of <paramref name="rows"/> shown rows over a pill topping out at <paramref name="pillTop"/>
+        /// (an upright bird: the same arithmetic ChickenStatusBadges.CurrentStackTopLocalY does through the root transform).</summary>
+        private static float StackTop(float pillTop, int rows) => Row1Centre(pillTop) + ChickenStatusBadges.StackTopInRoot(rows);
 
         [Test]
         public void FirstRowClearsTheTallestNameplatePill()
         {
             float pillTop = LocalPillTop();
             float row1Bottom = Row1Centre(pillTop) - FeedbackTuning.StatusBadgeGlyphSize * 0.5f;
-            // The 0.08 gap is a hair under the glyph's half height (0.085); the sprite art keeps a transparent margin of
-            // that order, and the D0b captures show the visible glyph and text clear of the pill. Allow exactly that sliver.
-            const float SpriteMargin = 0.01f;
-            Assert.GreaterOrEqual(row1Bottom, pillTop - SpriteMargin,
+            Assert.GreaterOrEqual(row1Bottom, pillTop,
                 "row 1 must sit on or above the local pill so the badges never cover or garble the name (pill top " + pillTop + ")");
         }
 
-        [Test]
-        public void StackTopStaysUnderTheFloatingTextFloor()
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(3)]
+        public void PopSpawnClearsTheShownStack(int rows)
         {
-            float top = StackTop(LocalPillTop());
-            Assert.Less(top, FeedbackTuning.FloatingTextSpawnHeight, "pops start above the full badge stack (top " + top + ")");
+            float pillTop = LocalPillTop();
+            // 0 rows: the stack is hidden, CurrentStackTopLocalY is the 2.12 fallback base.
+            float top = rows == 0 ? FeedbackTuning.StatusBadgeStackBaseHeight : StackTop(pillTop, rows);
+            float spawn = FloatingCombatText.PopSpawnHeight(top);
+            Assert.GreaterOrEqual(spawn, top + FeedbackTuning.FloatingTextStackClearance - 1e-5f, "pops start above the stack top " + top);
+            Assert.GreaterOrEqual(spawn, FeedbackTuning.FloatingTextSpawnHeight, "the spawn floor holds");
+        }
+
+        [Test]
+        public void SpawnHeightGrowsWithTheRowsAndFloorsWithNone()
+        {
+            float pillTop = LocalPillTop();
+            Assert.AreEqual(FeedbackTuning.FloatingTextSpawnHeight, FloatingCombatText.PopSpawnHeight(0f), 1e-5f);
+            Assert.Greater(FloatingCombatText.PopSpawnHeight(StackTop(pillTop, 3)), FloatingCombatText.PopSpawnHeight(StackTop(pillTop, 1)) - 1e-5f);
         }
 
         [Test]
         public void FallbackBaseClearsTheTallestPillToo()
         {
             float pillTop = LocalPillTop();
-            Assert.GreaterOrEqual(FeedbackTuning.StatusBadgeStackBaseHeight - FeedbackTuning.StatusBadgeGlyphSize * 0.5f, pillTop - 0.05f,
-                "the no-nameplate fallback should sit near the pill too");
+            // Only birds with no nameplate use the fallback (batch D0c keeps 2.12): its bottom row centre must still be at or above the pill top.
+            Assert.GreaterOrEqual(FeedbackTuning.StatusBadgeStackBaseHeight, pillTop,
+                "the no-nameplate fallback row should not sit inside the pill");
         }
 
         [Test]
-        public void SelfPopSpawnsAtTheFloatingTextConstant()
+        public void GlyphIsAtLeastTheAskedPhoneSize()
+        {
+            Assert.AreEqual(0.30f, FeedbackTuning.StatusBadgeGlyphSize, 1e-5f);
+            Assert.GreaterOrEqual(FeedbackTuning.StatusBadgeRowSpacing, FeedbackTuning.StatusBadgeGlyphSize * 0.85f,
+                "rows must not collide beyond the sprites' transparent margins");
+        }
+
+        [Test]
+        public void PopSpawnPositionPinsXzAndAddsTheLocalHeight()
         {
             var pivot = new Vector3(3f, 0.25f, -4f);
-            Vector3 p = FloatingCombatText.PopSpawnPosition(pivot);
-            Assert.AreEqual(FeedbackTuning.FloatingTextSpawnHeight, p.y - pivot.y, 1e-5f);
-            Assert.AreEqual(pivot.x, p.x, 1e-5f);
-            Assert.AreEqual(pivot.z, p.z, 1e-5f);
+            Vector3 floor = FloatingCombatText.PopSpawnPosition(pivot, 0f);
+            Assert.AreEqual(FeedbackTuning.FloatingTextSpawnHeight, floor.y - pivot.y, 1e-5f);
+            Assert.AreEqual(pivot.x, floor.x, 1e-5f);
+            Assert.AreEqual(pivot.z, floor.z, 1e-5f);
+            Vector3 high = FloatingCombatText.PopSpawnPosition(pivot, 3f);
+            Assert.AreEqual(3f + FeedbackTuning.FloatingTextStackClearance, high.y - pivot.y, 1e-5f);
         }
 
         [Test]
         public void MarkMarkerClearsTheBadgeStack()
         {
-            Assert.GreaterOrEqual(FeedbackTuning.MarkMarkerClearHeight, StackTop(LocalPillTop()),
-                "the on-screen mark marker must clear the badge stack");
+            // MarkerPlacement raises the floor to ChickenStatusBadges.CurrentStackTopLocalY when rows show, so the constant
+            // only has to clear the empty-stack fallback.
+            Assert.GreaterOrEqual(FeedbackTuning.MarkMarkerClearHeight, FeedbackTuning.StatusBadgeStackBaseHeight,
+                "the marker floor clears the badge stack fallback base");
         }
     }
 }

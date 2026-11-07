@@ -351,10 +351,16 @@ namespace CluckWars.Visuals
         /// well above <c>ChickenWorldBars</c>'s 1.16 cargo bar, so a number never spawns on
         /// top of the name or the cargo readout it is describing. Combined with
         /// <see cref="FloatingTextRiseDistance"/> (1.1) the text travels 2.50 → 3.60, which
-        /// starts above the full status-badge stack (see <see cref="StatusBadgeStackPillGap"/>)
-        /// that sits over the nameplate pill. Raised 2.50 → 2.75 in batch D0b with the larger rows.
+        /// starts above the status-badge stack (see <see cref="StatusBadgeStackPillGap"/>)
+        /// that sits over the nameplate pill. This is only the <b>floor</b>: a bird with badge rows showing spawns its
+        /// pops at <c>max(this, stack top + <see cref="FloatingTextStackClearance"/>)</c>
+        /// (<c>FloatingCombatText.PopSpawnHeight</c>), so the 0.30 m rows of batch D0c never sit under a pop.
+        /// Back at 2.50 in D0c (it was raised to 2.75 in D0b to clear the rows; now the rows push it up themselves).
         /// </summary>
-        public const float FloatingTextSpawnHeight = 2.75f;
+        public const float FloatingTextSpawnHeight = 2.50f;
+
+        /// <summary>Clearance, pivot-local metres, between the top of the shown badge stack and a pop's spawn point (batch D0c).</summary>
+        public const float FloatingTextStackClearance = 0.10f;
 
         /// <summary>
         /// Smallest cargo change, in food units, that earns a floating <c>±N 🌽</c> popup.
@@ -528,18 +534,19 @@ namespace CluckWars.Visuals
         /// pill, which is taller than a rival's, is cleared as well. The on-character ladder, bottom to top: cargo bar
         /// 1.16 (<c>ChickenWorldBars</c>) → nameplate 1.70 (<c>ChickenNameplate</c>, a pill centred there) → badge
         /// rows (bottom row centre = pill top + <see cref="StatusBadgeStackPillGap"/>, three rows
-        /// <see cref="StatusBadgeRowSpacing"/> apart) → floating combat text 2.75 (<see cref="FloatingTextSpawnHeight"/>,
-        /// rising to 3.85). <see cref="StatusBadgeMaxRows"/> is the invariant that keeps the stack under that floor
-        /// (guarded by <c>StatusBadgeLayoutTests</c>).
+        /// <see cref="StatusBadgeRowSpacing"/> apart) → floating combat text, at least <see cref="FloatingTextSpawnHeight"/>
+        /// and always above the rows currently shown (<c>ChickenStatusBadges.CurrentStackTopLocalY</c>; guarded by
+        /// <c>StatusBadgeLayoutTests</c>).
         /// </summary>
         public const float StatusBadgeStackBaseHeight = 2.12f;
 
-        /// <summary>Gap between the nameplate pill's top and the centre of the bottom badge row (batch D0b).</summary>
-        public const float StatusBadgeStackPillGap = 0.08f;
+        /// <summary>Gap between the nameplate pill's top and the centre of the bottom badge row (batch D0b 0.08; D0c 0.16 = half the
+        /// 0.30 glyph plus a hair, so the bottom row's glyph sits on or above the pill).</summary>
+        public const float StatusBadgeStackPillGap = 0.16f;
 
-        /// <summary>Vertical spacing between status badge rows. See
-        /// <see cref="StatusBadgeStackBaseHeight"/> for the budget this has to fit.</summary>
-        public const float StatusBadgeRowSpacing = 0.15f;
+        /// <summary>Vertical spacing between status badge rows (batch D0c: 0.15 → 0.26, so the 0.30 glyphs overlap only
+        /// through their transparent margins). See <see cref="StatusBadgeStackBaseHeight"/> for the budget this has to fit.</summary>
+        public const float StatusBadgeRowSpacing = 0.26f;
 
         /// <summary>
         /// Maximum simultaneous status badges. Three, because stun / root / slow are
@@ -552,9 +559,9 @@ namespace CluckWars.Visuals
         public const int StatusBadgeMaxRows = 3;
 
         /// <summary>Height (world metres) of the state glyph sprite on a status badge row (feedback batch C3).
-        /// Batch D0b: 0.13 → 0.17 (about 24 px on a phone); the
-        /// row pitch is 0.15, so rows touch only through their transparent margins.</summary>
-        public const float StatusBadgeGlyphSize = 0.17f;
+        /// Batch D0b: 0.13 → 0.17 (measured only 10-13 px at 2400x1080); batch D0c: 0.17 → 0.30 (24-28 px). The row text
+        /// scales with it (<c>ChickenStatusBadges.CharacterSize</c>), row pitch is <see cref="StatusBadgeRowSpacing"/>.</summary>
+        public const float StatusBadgeGlyphSize = 0.30f;
 
         /// <summary>Gap between a badge row's glyph sprite and its text.</summary>
         public const float StatusBadgeGlyphGap = 0.02f;
@@ -894,8 +901,9 @@ namespace CluckWars.Visuals
         public const float MarkMarkerAnchorGapPx = 10f;
         public const float MarkMarkerYouPlateMarginPx = 8f;
         public const float MarkMarkerYouPlateMaxRisePx = 96f;
-        /// <summary>World metres above the target's pivot the on-screen marker must clear (the badge stack top, below the
-        /// 2.75 floating-text floor, and the STUN badge), plus the class model's head lift.</summary>
+        /// <summary>Floor, in world metres above the target's pivot, the on-screen marker must clear, plus the class model's head
+        /// lift. A target with badge rows showing raises it to the stack top (<c>MarkerPlacement</c> reads
+        /// <c>ChickenStatusBadges.CurrentStackTopLocalY</c>).</summary>
         public const float MarkMarkerClearHeight = 2.75f;
         /// <summary>The victim's hunter-skull badge on the edge chevron fallback: this many chevron sizes inward from its centre.</summary>
         public const float MarkHunterBadgeChevronInset = 0.9f;

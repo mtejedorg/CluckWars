@@ -140,13 +140,20 @@ namespace CluckWars.Visuals
         {
             if (!IsSelfPopTarget(controller)) return false;
             string text = args == null || args.Length == 0 ? UiText.Get(key) : UiText.Format(key, args);
-            Spawn(PopSpawnPosition(controller.transform.position), text, color);
+            Spawn(controller.PopAnchor, text, color);
             return true;
         }
 
-        /// <summary>Where a pop over a bird at <paramref name="pivot"/> starts: <see cref="FeedbackTuning.FloatingTextSpawnHeight"/>
-        /// above it, over the whole badge stack.</summary>
-        public static Vector3 PopSpawnPosition(Vector3 pivot) => pivot + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight;
+        /// <summary>Pivot-local height a pop starts at: <see cref="FeedbackTuning.FloatingTextSpawnHeight"/> as the floor, or
+        /// <see cref="FeedbackTuning.FloatingTextStackClearance"/> above <paramref name="stackTopLocalY"/>
+        /// (<c>ChickenStatusBadges.CurrentStackTopLocalY</c>) when the shown badge rows reach higher.</summary>
+        public static float PopSpawnHeight(float stackTopLocalY) =>
+            Mathf.Max(FeedbackTuning.FloatingTextSpawnHeight, stackTopLocalY + FeedbackTuning.FloatingTextStackClearance);
+
+        /// <summary>Where a pop over a bird at <paramref name="pivot"/> whose badge stack tops out at
+        /// <paramref name="stackTopLocalY"/> starts: <see cref="PopSpawnHeight"/> above the pivot, clear of every shown row.</summary>
+        public static Vector3 PopSpawnPosition(Vector3 pivot, float stackTopLocalY) =>
+            pivot + Vector3.up * PopSpawnHeight(stackTopLocalY);
 
         /// <summary>
         /// The cargo popup for <paramref name="controller"/>'s change of <paramref name="delta"/>: on the
