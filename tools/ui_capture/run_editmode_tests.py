@@ -26,6 +26,8 @@ if sc:
     s = json.dumps(sc)
     print(s[:4000])
 print(text[:6000])
-ok = ("failed: 0" in (text + json.dumps(sc or {})).lower()) or ("\"failed\": 0" in json.dumps(sc or {}).lower())
+summary = ((sc or {}).get("result") or {}).get("Summary") or {}
+ok = summary.get("Status") == "Passed" and summary.get("FailedTests") == 0 and (summary.get("TotalTests") or 0) > 0
+print("SUMMARY:", json.dumps(summary))
 print("VERDICT:", "GREEN" if ok else "CHECK OUTPUT")
 sys.exit(0 if ok else 1)
