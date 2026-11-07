@@ -111,7 +111,7 @@ namespace CluckWars.Tests
             var names = _systems.Select(p => p.name).ToArray();
             CollectionAssert.AreEquivalent(
                 new[] { ChickenVFX.DustSystemName, ChickenVFX.FeatherSystemName, ChickenVFX.SparkleSystemName, ChickenVFX.ShardSystemName, ChickenVFX.StreakSystemName }, names,
-                "D4 families: Dust, Feather, Sparkle, Shard, Streak (Kernel arrives with its item)");
+                "D5 families: Dust, Feather, Sparkle, Shard, Streak (Kernel arrives with its item)");
             int total = _systems.Sum(p => p.main.maxParticles);
             Assert.LessOrEqual(total, FeedbackTuning.ParticlesPerChickenCap,
                 "sum of maxParticles over the families must stay within the per-chicken cap");
@@ -130,7 +130,7 @@ namespace CluckWars.Tests
             Assert.IsTrue(streak.sizeOverLifetime.enabled, "size 0.30 -> 0");
             Assert.AreEqual(ChickenVFX.StreakMaxParticles, streak.main.maxParticles);
             StringAssert.Contains("Fx_SpeedLine", AssetDatabase.GetAssetPath(streak.textureSheetAnimation.GetSprite(0)));
-            Assert.AreEqual(64, total, "the five families are pinned to the 64 per-chicken cap (7+16+20+3+18)");
+            Assert.AreEqual(64, total, "the five families are pinned to the 64 per-chicken cap (12+12+20+3+17)");
         }
 
         [Test]

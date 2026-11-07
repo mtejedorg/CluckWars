@@ -1453,6 +1453,32 @@ namespace CluckWars.Visuals
         /// </remarks>
         public const float JumpTravelMaxResidual = 14f;
 
+        // ---- Jump beats (batch D5, vfx.md 2.6) ----------------------------------------------------------
+
+        /// <summary>Launch dust ring at the pre-jump position.</summary>
+        public const int JumpLaunchDustCount = 6;
+        public const float JumpLaunchDustRadius = 0.3f;
+        public const float JumpLaunchDustSeconds = 0.3f;
+        /// <summary>Two feathers thrown up from the launch.</summary>
+        public const int JumpLaunchFeatherCount = 2;
+        public const float JumpLaunchFeatherSpeed = 1.5f;
+        public const float JumpLaunchFeatherSeconds = 0.4f;
+        /// <summary>Accent sparkles along the chord at the animator's half-sine height (t = 0.1..0.9).</summary>
+        public const int JumpArcDotCount = 5;
+        public const float JumpArcDotSeconds = 0.25f;
+        public const float JumpArcDotSize = 0.12f;
+        /// <summary>Body-centre height the arc lift is added to (the dots ride the bird, not the ground).</summary>
+        public const float JumpArcDotBaseHeight = 0.4f;
+        /// <summary>A jump that moved the model less than this draws no arc dots (a proxy whose pivot already slid).</summary>
+        public const float JumpArcMinChord = 0.5f;
+        /// <summary>Landing dust at the pivot after <see cref="JumpTravelSettleSeconds"/>.</summary>
+        public const int JumpLandingDustCount = 8;
+        public const float JumpLandingDustSeconds = 0.3f;
+        /// <summary>Reduced Motion: launch and landing dust are this many puffs, fading in place (no travel, no arc, no feathers).</summary>
+        public const int JumpReducedDustCount = 3;
+        /// <summary>A teleport-jump event within this long of a Jump slot edge is the same jump (not a second beat set or HOP!).</summary>
+        public const float JumpPathDedupeSeconds = 0.6f;
+
         // ---- Egg Shell body (batch D2, vfx.md 1.2-1.5) -----------------------------------------------
 
         /// <summary>World height of the egg at class scale 1 (the authored mesh is 1 m, so it is scaled by this x the egg scale).</summary>

@@ -213,7 +213,12 @@ def main():
             ability(0, "speed", after=((0.6, "3_impact"), (2.5, "4_after")))
             cs("Stick", "0", "0")
         if want("jump"):
-            ability(1, "jump", after=((0.25, "3_impact"), (1.0, "4_after")))
+            # The shipped Jump is a 3x dash: it only moves while the stick is held. Hold it through the cast. Launch puffs at the
+            # edge, arc dots + landing dust at the 0.18 s end (0.6 s real at timeScale 0.3).
+            cs("Stick", "-1", "0")
+            time.sleep(0.3)
+            ability(1, "jump", after=((0.25, "3_impact"), (0.5, "3b_air"), (0.8, "3c_landing"), (1.4, "4_after")))
+            cs("Stick", "0", "0")
         if want("shield"):
             cs("Stick", "0", "1")
             time.sleep(0.2)

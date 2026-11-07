@@ -110,6 +110,8 @@ namespace CluckWars.Visuals
         // Self-pop edges (B4, spec D7b) — see ObserveSelfPops. Seeded on first observation.
         private bool _popsInitialized;
         private bool _wasSpeedActive;
+        private bool _wasJumpSlotActive;
+        private float _lastSlotHopTime = -100f;
         private bool _wasFaded;
         private bool _wasShellActive;
         private bool _inEgg;
@@ -170,6 +172,7 @@ namespace CluckWars.Visuals
 
             bool speed  = ActiveSlotOf<SpeedBurstAbilitySO>() != AbilityController.InvalidSlot;
             bool shell  = ActiveSlotOf<TurtleModeAbilitySO>() != AbilityController.InvalidSlot;
+            bool jump   = ActiveSlotOf<ShadowstepAbilitySO>() != AbilityController.InvalidSlot;
             bool immune = _controller.IsControlImmune;
             bool faded  = IsFadedOpacity(_controller.VisualOpacity);
 
@@ -177,6 +180,7 @@ namespace CluckWars.Visuals
             {
                 _popsInitialized = true;
                 _wasSpeedActive  = speed;
+                _wasJumpSlotActive = jump;
                 _wasFaded        = faded;
                 _wasShellActive  = shell;
                 _inEgg           = shell && immune;
@@ -184,6 +188,13 @@ namespace CluckWars.Visuals
             }
 
             if (speed && !_wasSpeedActive) SelfPop(UiKeys.HudPopFast, AccentKey.Speed);
+            // HOP! for the shipped Jump (a dash with no JumpEventId): the rising edge of its slot. The event path skips inside the dedupe window.
+            if (JumpBeatRules.SlotEdge(_wasJumpSlotActive, jump) == JumpBeatRules.Edge.Launch)
+            {
+                _lastSlotHopTime = Time.time;
+                SelfPop(UiKeys.HudPopHop, AccentKey.Jump);
+            }
+            _wasJumpSlotActive = jump;
             if (faded && !_wasFaded)       SelfPop(UiKeys.HudPopPoof, AccentKey.Hide);
             _wasSpeedActive = speed;
             _wasFaded       = faded;
@@ -513,7 +524,7 @@ namespace CluckWars.Visuals
 
             _lastJumpEventId = id;
             // HOP! is a word, not motion, so it is not gated by Reduced Motion (owner's screen only).
-            SelfPop(UiKeys.HudPopHop, AccentKey.Jump);
+            if (!JumpBeatRules.EventPathDeduped(Time.time, _lastSlotHopTime)) SelfPop(UiKeys.HudPopHop, AccentKey.Jump);
             if (PlayerPreferences.ReducedMotionEnabled) return;
 
             _jumpImpactDelay = FeedbackTuning.JumpTravelSettleSeconds;

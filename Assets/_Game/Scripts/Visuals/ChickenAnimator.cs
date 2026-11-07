@@ -294,6 +294,25 @@ namespace CluckWars.Visuals
         /// </summary>
         public float ExtraPitchDegrees { get; set; }
 
+        /// <summary>Counts every observed jump edge (even under Reduced Motion, which only skips the lead-in). The jump
+        /// beats in <c>ChickenVFX</c> poll this instead of re-deriving the pre-jump position.</summary>
+        public int JumpBeatSerial { get; private set; }
+
+        /// <summary>Where the model stood on the ground (pivot height) the frame before the latest jump edge.</summary>
+        public Vector3 JumpLaunchWorld { get; private set; }
+
+        /// <summary>The arc's strength for a travel of <paramref name="distance"/> metres: the squared ratio to a full
+        /// short jump (dead zone for the centimetre residual of an interpolated proxy).</summary>
+        public static float JumpArcScale(float distance)
+        {
+            float ratio = Mathf.Clamp01(distance / FeedbackTuning.JumpTravelFullArcDistance);
+            return ratio * ratio;
+        }
+
+        /// <summary>The model's half-sine lift at travel fraction <paramref name="t01"/> (0 = launch, 1 = landing).</summary>
+        public static float JumpArcLift(float t01, float arcScale) =>
+            FeedbackTuning.JumpTravelArcHeight * arcScale * Mathf.Sin(Mathf.Clamp01(t01) * Mathf.PI);
+
         /// <summary>
         /// Uniform scale multiplier composed into the model's scale by another component (the Egg Shell shrinks the bird to fit
         /// inside the egg). 1 = rest. The animator stays the only writer of the model transform.
@@ -379,6 +398,12 @@ namespace CluckWars.Visuals
             // Nothing to measure against on the very first frame after a (re)bind.
             if (!_modelWorldPositionSeeded) return;
 
+            // Published for the jump beats before the Reduced Motion return: those beats have their own variant.
+            var launch = _previousModelWorldPosition;
+            launch.y = transform.position.y;
+            JumpLaunchWorld = launch;
+            JumpBeatSerial++;
+
             // Honoured here rather than at the write, so a player with this on gets the shipped
             // teleport untouched — no lead-in, no lift, not even a one-frame partial. The
             // accessibility panel's vestibular readers actively prefer the snap; this effect is
@@ -407,8 +432,7 @@ namespace CluckWars.Visuals
 
             // Squared so the ramp has a dead zone: a proxy peer whose pivot was interpolated
             // measures a residual of centimetres, and that must buy no arc at all.
-            float ratio = Mathf.Clamp01(distance / FeedbackTuning.JumpTravelFullArcDistance);
-            _travelArcScale = ratio * ratio;
+            _travelArcScale = JumpArcScale(distance);
         }
 
         /// <summary>
@@ -453,7 +477,7 @@ namespace CluckWars.Visuals
             float ease = 1f - t;
             ease = ease * ease * ease;
 
-            float lift = FeedbackTuning.JumpTravelArcHeight * _travelArcScale * Mathf.Sin(t * Mathf.PI);
+            float lift = JumpArcLift(t, _travelArcScale);
             return _travelAnchor * ease + Vector3.up * lift;
         }
 

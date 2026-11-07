@@ -36,6 +36,8 @@ namespace CluckWars.Visuals
             Cone,
             /// <summary>Random point in a horizontal disc, drifting radially outward in the plane.</summary>
             Disc,
+            /// <summary>Evenly spaced points on a circle of <see cref="FxEmit.Radius"/>, flying radially (the launch ring).</summary>
+            Ring,
         }
 
         /// <summary>
@@ -98,32 +100,33 @@ namespace CluckWars.Visuals
         // ---- Budget (maxParticles per family; sum = ParticlesPerChickenCap minus headroom) ----
 
         /// <summary>
-        /// Dust family cap: the 6-puff death puff and the Speed stride dust (spec max 8) share it. Was 12; D4 took 5 for the
-        /// Streak family (a dead bird does not sprint and the stride dust is spec-capped at 8, so 7 only clips the densest
-        /// sprint by one puff).
+        /// Dust family cap: the 6-puff death puff, the Speed stride dust (spec max 8) and the D5 jump beats (launch ring 6 + landing 8
+        /// one settle later, so 14 demanded while the launch tail lives). Was 7: D5 took 5 (from Feather 4, Streak 1) so the families
+        /// still sum 64. The only clip is the two last landing puffs while the launch ring is still fading.
         /// </summary>
-        public const int DustMaxParticles = 7;
+        public const int DustMaxParticles = 12;
         /// <summary>
-        /// Feather family cap: 10 death feathers + the 14-feather execute burst of HitFeedback. Was 24; D4 took 8: the
-        /// execute burst still fits whole (16), only the death-plus-execute coincidence clips, and that kill is a one-frame
-        /// moment, not a sprint.
+        /// Feather family cap: 10 death feathers + the 14-feather execute burst of HitFeedback + the 2 launch feathers of a jump.
+        /// Was 16 (D4): D5 took 4 for Dust, so the death-plus-execute coincidence clips as before and the execute burst alone
+        /// loses its last 2 of 14 feathers (a kill moment, drifting cream feathers, not readable). Launch feathers fit with a death.
         /// </summary>
-        public const int FeatherMaxParticles = 16;
+        public const int FeatherMaxParticles = 12;
         /// <summary>
         /// Sparkle family cap: ability burst 16 + hit 8 + cargo ring (~7 live) + hit-confirm 10 rarely coincide. Was 28; D2
         /// took 3 for the Shard family and D4 took 5 for Streak so the five families still sum to the 64 per-chicken cap (the
         /// old cap was already below the four-way coincidence, so the clip is the same rare, invisible case). 20 keeps the
-        /// cast burst 16 plus 4 of the Speed edge's 6 feet sparkles, the only coincidence that happens on every cast.
+        /// cast burst 16 plus 4 of the Speed edge's 6 feet sparkles, the only coincidence that happens on every cast. A Jump cast adds the 5 arc dots (D5): they are emitted before the cast burst in the same LateUpdate, so the burst loses its last sparkle, not an arc dot.
         /// </summary>
         public const int SparkleMaxParticles = 20;
         /// <summary>Shard family cap: the three egg shards of a hatch (real gravity, spin).</summary>
         public const int ShardMaxParticles = 3;
         /// <summary>
         /// Streak family cap (the Speed wind lines): 6 per metre x 0.25 s lifetime is 20 live at the boosted Warrior's 13 m/s
-        /// and 24 at the boosted Speedy, so 18 thins the very fastest sprint by a quarter (streaks live 0.25 s, the density
-        /// loss is not readable). Spec max was 24; the five families are pinned to sum 64 (7 + 16 + 20 + 3 + 18).
+        /// and 24 at the boosted Speedy, so 17 thins the very fastest sprint by under a third (streaks live 0.25 s, the density
+        /// loss is not readable). Spec max was 24; the five families are pinned to sum 64 (12 + 12 + 20 + 3 + 17); the D5 cut to 17 is the least the
+        /// density test accepts (70 % of the 24 live at the boosted Speedy).
         /// </summary>
-        public const int StreakMaxParticles = 18;
+        public const int StreakMaxParticles = 17;
 
         public const string DustSystemName = "VFX_Dust";
         public const string FeatherSystemName = "VFX_Feather";
@@ -174,6 +177,15 @@ namespace CluckWars.Visuals
         private float   _streakAccum, _speedDustAccum;
         private float   _leanBlend;
         private FxEmit  _speedDust, _speedEdge;
+
+        // ── Jump beats (D5): polled from ChickenAnimator.JumpBeatSerial, landing scheduled by a timestamp ──
+        private bool    _jumpInitialized;
+        private int     _lastJumpBeatSerial;
+        private bool    _wasJumpSlotActive;
+        private Vector3 _slotJumpLaunch;
+        private float   _lastSlotJumpTime = -100f;
+        private float   _jumpLandAt = -1f;       // Time.time of the pending landing dust; < 0 = none
+        private FxEmit  _jumpLaunchDust, _jumpLaunchFeather, _jumpLandDust;
 
         // ── Replicated one-shot cast baseline (see ObserveCastEvent) ────────────
         // HitFeedback and AbilityRangeIndicator reset their equivalent "_castInitialized"
@@ -228,6 +240,26 @@ namespace CluckWars.Visuals
 
         private void BuildPresets()
         {
+            var cream = FeedbackPalette.Current.CreamColor;
+            _jumpLaunchDust = new FxEmit
+            {
+                Count = FeedbackTuning.JumpLaunchDustCount, Color = cream, SizeMin = 0.28f, SizeMax = 0.36f,
+                SpeedMin = 0.9f, SpeedMax = 1.2f, LifeMin = FeedbackTuning.JumpLaunchDustSeconds, LifeMax = FeedbackTuning.JumpLaunchDustSeconds,
+                Shape = FxShape.Ring, Radius = FeedbackTuning.JumpLaunchDustRadius, Gravity = 0f,
+            };
+            _jumpLaunchFeather = new FxEmit
+            {
+                Count = FeedbackTuning.JumpLaunchFeatherCount, Color = cream, SizeMin = 0.30f, SizeMax = 0.40f,
+                SpeedMin = FeedbackTuning.JumpLaunchFeatherSpeed, SpeedMax = FeedbackTuning.JumpLaunchFeatherSpeed,
+                LifeMin = FeedbackTuning.JumpLaunchFeatherSeconds, LifeMax = FeedbackTuning.JumpLaunchFeatherSeconds,
+                Shape = FxShape.Cone, Radius = 0.1f, ConeAngle = 20f, Axis = Vector3.up, Gravity = 0f, RandomRotation = true,
+            };
+            _jumpLandDust = new FxEmit
+            {
+                Count = FeedbackTuning.JumpLandingDustCount, Color = cream, SizeMin = 0.30f, SizeMax = 0.45f,
+                SpeedMin = 0.8f, SpeedMax = 1.6f, LifeMin = FeedbackTuning.JumpLandingDustSeconds, LifeMax = FeedbackTuning.JumpLandingDustSeconds,
+                Shape = FxShape.Disc, Radius = 0.25f, Gravity = 0f,
+            };
             _speedDust = new FxEmit
             {
                 Count = 1, Color = new Color(0.98f, 0.94f, 0.84f, FeedbackTuning.SpeedDustAlpha),
@@ -304,6 +336,7 @@ namespace CluckWars.Visuals
             _wasRemoved = isRemoved;
 
             ObserveSpeedBody(hidden, isRemoved);
+            ObserveJumpBeats(hidden);
 
             // Ability activation: AccentColor burst + caster micro-shake on cast. Detection used to be a rising-edge
             // test on the old single ActiveSlot (since retired: abilities now run concurrently on a per-slot mask).
@@ -433,6 +466,132 @@ namespace CluckWars.Visuals
         /// One wind streak left behind at hip height: a point in the 0.3 (across) x 0.1 (along) box at the bird's tail, with a
         /// tiny backward velocity (a zero-velocity Stretched Billboard has no direction to stretch along).
         /// </summary>
+        // ---- Jump beats (D5, vfx.md 2.6) ---------------------------------------------
+
+        /// <summary>
+        /// Two triggers, one beat set per jump. (1) The shipped Jump (<c>ShadowstepAbilitySO</c>, a 3x dash with no teleport, so
+        /// <c>JumpEventId</c> never moves): the replicated active edge of its slot. false to true emits the launch dust and
+        /// feathers at the root, true to false emits the accent arc dots along the launch-to-landing chord and the landing dust at
+        /// the root (no settle delay: the dash is real movement, the body is already there). (2) Teleport jumps (<c>JumpTier</c> above
+        /// None) via <see cref="ChickenAnimator.JumpBeatSerial"/>: launch on the edge, arc with it, landing one settle later. The
+        /// slot path wins inside <see cref="FeedbackTuning.JumpPathDedupeSeconds"/>. Both seed on first observation. Never touches the hit
+        /// flash or recoil (a jump is a self-move: the SelfImpulse path stays as is).
+        /// </summary>
+        private void ObserveJumpBeats(bool hidden)
+        {
+            if (_animator == null || _controller == null) return;
+
+            var abObj = _abilities != null ? _abilities.Object : null;
+            bool slotKnown = abObj != null && abObj.IsValid;
+            bool slotActive = slotKnown && JumpSlotActive();
+            int serial = _animator.JumpBeatSerial;
+            if (!_jumpInitialized)
+            {
+                if (!slotKnown) return;   // the slot mask is only readable once the abilities object is valid
+                _jumpInitialized = true;
+                _lastJumpBeatSerial = serial;
+                _wasJumpSlotActive = slotActive;
+                return;
+            }
+
+            bool reduced = PlayerPreferences.ReducedMotionEnabled;
+            bool quiet = JumpSuppressed(hidden) || (_combat != null && _combat.IsRemoved);
+
+            if (slotKnown)
+            {
+                switch (JumpBeatRules.SlotEdge(_wasJumpSlotActive, slotActive))
+                {
+                    case JumpBeatRules.Edge.Launch:
+                        _slotJumpLaunch = transform.position;
+                        _lastSlotJumpTime = Time.time;
+                        if (!quiet) EmitJumpLaunchPuff(_slotJumpLaunch, reduced);
+                        break;
+                    case JumpBeatRules.Edge.Land:
+                        _lastSlotJumpTime = Time.time;
+                        if (!quiet)
+                        {
+                            EmitJumpArc(_slotJumpLaunch, transform.position, reduced);
+                            EmitJumpLandingDust(reduced);
+                        }
+                        break;
+                }
+                _wasJumpSlotActive = slotActive;
+            }
+
+            if (serial != _lastJumpBeatSerial)
+            {
+                _lastJumpBeatSerial = serial;
+                if (!JumpBeatRules.EventPathDeduped(Time.time, _lastSlotJumpTime))
+                {
+                    // The landing is scheduled even when this frame emit is gated: the gate is re-checked when it fires.
+                    _jumpLandAt = Time.time + FeedbackTuning.JumpTravelSettleSeconds;
+                    if (!quiet)
+                    {
+                        EmitJumpLaunchPuff(_animator.JumpLaunchWorld, reduced);
+                        EmitJumpArc(_animator.JumpLaunchWorld, transform.position, reduced);
+                    }
+                }
+            }
+
+            if (_jumpLandAt >= 0f && Time.time >= _jumpLandAt)
+            {
+                _jumpLandAt = -1f;
+                if (!quiet) EmitJumpLandingDust(reduced);
+            }
+        }
+
+        private bool JumpSlotActive()
+        {
+            for (int i = 0; i < AbilityController.SlotCount; i++)
+                if (_abilities.GetSlot(i) is ShadowstepAbilitySO && _abilities.IsSlotActive(i)) return true;
+            return false;
+        }
+
+        private bool JumpSuppressed(bool hidden) => hidden || ControlStateVFX.IsFadedOpacity(_controller.VisualOpacity);
+
+        private void EmitJumpLaunchPuff(Vector3 launch, bool reduced)
+        {
+            var dust = _jumpLaunchDust;
+            dust.Count = JumpBeatRules.LaunchDustCount(reduced);
+            if (reduced) dust.SpeedMin = dust.SpeedMax = 0f;
+            EmitDustAt(in dust, launch + Vector3.up * 0.05f);
+
+            int feathers = JumpBeatRules.LaunchFeatherCount(reduced);
+            if (feathers > 0)
+            {
+                var f = _jumpLaunchFeather;
+                f.Count = feathers;
+                EmitFeathersAt(in f, launch + Vector3.up * 0.3f);
+            }
+        }
+
+        private void EmitJumpLandingDust(bool reduced)
+        {
+            var land = _jumpLandDust;
+            land.Count = JumpBeatRules.LandingDustCount(reduced);
+            if (reduced) land.SpeedMin = land.SpeedMax = 0f;
+            EmitDustAt(in land, transform.position + Vector3.up * 0.05f);
+        }
+
+        private void EmitJumpArc(Vector3 launch, Vector3 landing, bool reduced)
+        {
+            int dots = JumpBeatRules.ArcDotCount(reduced);
+            Vector3 chord = landing - launch; chord.y = 0f;
+            if (dots <= 0 || !JumpBeatRules.DrawsArc(chord.magnitude) || _sparklePS == null) return;
+            Color accent = FeedbackPalette.Current.Accent(AccentKey.Jump);
+            _ep.applyShapeToPosition = false;
+            _ep.velocity = Vector3.zero;
+            _ep.startLifetime = FeedbackTuning.JumpArcDotSeconds;
+            _ep.startSize = FeedbackTuning.JumpArcDotSize;
+            _ep.startColor = accent;
+            _ep.rotation = 0f;
+            for (int i = 0; i < dots; i++)
+            {
+                _ep.position = JumpBeatRules.ArcDotPoint(launch, landing, i, dots);
+                _sparklePS.Emit(_ep, 1);
+            }
+        }
+
         private void EmitStreak(Vector3 rootPos, Vector3 moveDir, Color color)
         {
             if (_streakPS == null) return;
@@ -517,6 +676,13 @@ namespace CluckWars.Visuals
                         float tilt = Random.Range(Mathf.Min(e.ConeMinAngle, e.ConeAngle), e.ConeAngle) * Mathf.Deg2Rad;
                         float az = Random.Range(0f, Mathf.PI * 2f);
                         dir = rot * new Vector3(Mathf.Sin(tilt) * Mathf.Cos(az), Mathf.Cos(tilt), Mathf.Sin(tilt) * Mathf.Sin(az));
+                        break;
+                    }
+                    case FxShape.Ring:
+                    {
+                        float a = (i + Random.Range(-0.2f, 0.2f)) / e.Count * Mathf.PI * 2f;
+                        dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+                        offset = dir * e.Radius;
                         break;
                     }
                     case FxShape.Disc:
