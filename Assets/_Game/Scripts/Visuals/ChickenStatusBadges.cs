@@ -34,17 +34,18 @@ namespace CluckWars.Visuals
     /// <b>Vertical band, and why this one.</b> The on-character stack is crowded:
     /// <list type="bullet">
     ///   <item>1.16 — cargo bar (<see cref="ChickenWorldBars"/>)</item>
-    ///   <item>1.70 — nameplate (<see cref="ChickenNameplate"/>)</item>
-    ///   <item><b>2.12 → 2.40 — this badge stack, wholly above the nameplate pill (1.48-1.93)</b></item>
-    ///   <item>2.50 → 3.60 — floating combat text (<see cref="FloatingCombatText"/>,
+    ///   <item>1.70 — nameplate (<see cref="ChickenNameplate"/>), a pill whose top differs between the local "You"
+    ///   pill and a rival's</item>
+    ///   <item><b>pill top + <see cref="FeedbackTuning.StatusBadgeStackPillGap"/> and up — this badge stack,</b> anchored
+    ///   to the pill (<see cref="ChickenNameplate.TryGetPillTopAnchor"/>) rather than a constant, so the taller local pill
+    ///   is cleared too; <see cref="FeedbackTuning.StatusBadgeStackBaseHeight"/> is the fallback with no nameplate</item>
+    ///   <item>2.75 → 3.85 — floating combat text (<see cref="FloatingCombatText"/>,
     ///   spawning at <see cref="FeedbackTuning.FloatingTextSpawnHeight"/> and rising by
     ///   <see cref="FeedbackTuning.FloatingTextRiseDistance"/>)</item>
     /// </list>
-    /// That leaves a 0.10-unit gap between the stack top and the floating-text floor, and
-    /// the stack is sized to fit inside it: bottom row at
-    /// <see cref="FeedbackTuning.StatusBadgeStackBaseHeight"/>, growing upward by
-    /// <see cref="FeedbackTuning.StatusBadgeRowSpacing"/>, capped at
-    /// <see cref="FeedbackTuning.StatusBadgeMaxRows"/> rows. The worst case on one bird is
+    /// Rows grow upward by <see cref="FeedbackTuning.StatusBadgeRowSpacing"/>, capped at
+    /// <see cref="FeedbackTuning.StatusBadgeMaxRows"/> rows, and the stack top stays under the floating-text floor
+    /// (<c>StatusBadgeLayoutTests</c>). The worst case on one bird is
     /// stun + slow + zoom (the egg refuses both controls, the waddle refuses slows), so three
     /// rows stay enough.
     ///
@@ -84,14 +85,13 @@ namespace CluckWars.Visuals
         [SerializeField] private Sprite _glyphSpeeding;
 
         /// <summary>Sorting order of the glyph sprite and the row text: 0, as shipped. The stack
-        /// (2.12-2.40) sits above the nameplate pill, so nothing overlaps and no sorting fight exists
+        /// (pill top + 0.08 and up) sits above the nameplate pill, so nothing overlaps and no sorting fight exists
         /// (feedback batch D0).</summary>
         public const int SortingOrder = 0;
 
-        /// <summary>Badge text size. About half the nameplate's characterSize (0.05) so
-        /// three rows fit the band between the nameplate and the floating text — see the class
-        /// remarks.</summary>
-        private const float CharacterSize = 0.026f;
+        /// <summary>Badge text size: 0.026 x 1.3 to match the larger glyph and row pitch (batch D0b), about two thirds of
+        /// the nameplate's characterSize (0.05), so three rows fit the band between the pill and the floating text.</summary>
+        private const float CharacterSize = 0.0338f;
         private const int   FontSize      = 64;
 
         /// <summary>Duration of the scale punch when a badge first appears — the
@@ -119,6 +119,8 @@ namespace CluckWars.Visuals
         public enum Badge : byte { None = 0, Stun = 1, Root = 2, Slow = 3, Waddle = 4, Egg = 5, Hidden = 6, Speed = 7 }
 
         private ChickenController _controller;
+        private ChickenNameplate _nameplate;   // the stack sits on its pill; absent: StatusBadgeStackBaseHeight
+        private float _headLift;
         private AbilityController _abilities;
         private ILogService _log;
 
@@ -151,6 +153,7 @@ namespace CluckWars.Visuals
         {
             _controller = GetComponent<ChickenController>();
             _abilities  = GetComponent<AbilityController>();
+            _nameplate  = GetComponent<ChickenNameplate>();
 
             int rows = Mathf.Max(1, FeedbackTuning.StatusBadgeMaxRows);
             _rows          = new TextMesh[rows];
@@ -170,7 +173,19 @@ namespace CluckWars.Visuals
         /// Root-local metres; presentation only.</summary>
         public void SetHeadLift(float lift)
         {
-            if (_stackRoot != null) _stackRoot.localPosition = new Vector3(0f, FeedbackTuning.StatusBadgeStackBaseHeight + lift, 0f);
+            _headLift = lift;
+            if (_stackRoot != null) PlaceStack();
+        }
+
+        /// <summary>Places the stack: its bottom row <see cref="FeedbackTuning.StatusBadgeStackPillGap"/> above the
+        /// nameplate's pill top along the label's billboard axis (the nameplate already carries the head lift), or at the
+        /// constant base plus the lift when there is no fitted nameplate. Call after the stack's own billboard.</summary>
+        private void PlaceStack()
+        {
+            if (_nameplate != null && _nameplate.TryGetPillTopAnchor(FeedbackTuning.StatusBadgeStackPillGap, out Vector3 world))
+                _stackRoot.position = world;
+            else
+                _stackRoot.localPosition = new Vector3(0f, FeedbackTuning.StatusBadgeStackBaseHeight + _headLift, 0f);
         }
 
         private void BuildStack(int rows)
@@ -264,6 +279,8 @@ namespace CluckWars.Visuals
             UpdateEntryPunch(count);
             LayoutAndFill(count);
             BillboardToCamera();
+            // The pill's size differs between the local "You" pill and a rival's, and eases during GET READY, so re-read it.
+            PlaceStack();
         }
 
         // ---- Pure rules (public static so the EditMode tests drive them without a runner) ----------

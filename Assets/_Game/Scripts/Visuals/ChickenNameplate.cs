@@ -97,6 +97,31 @@ namespace CluckWars.Visuals
             return true;
         }
 
+        /// <summary>Height of the local "You" pill around a label of <paramref name="textHeight"/>.</summary>
+        public static float YouPillHeight(float textHeight) => textHeight + YouPillPadding.y * 2f;
+
+        /// <summary>Root-local Y of a pill's top edge for an upright label: the label's Y plus the pill's centre and half
+        /// height (label space) scaled by the label's scale. The layout tests use it as the conservative world-Y bound
+        /// (a billboarded label only tilts away from it).</summary>
+        public static float PillTopLocalY(float labelLocalY, float pillCentreY, float pillHalfHeight, float labelScale) =>
+            labelLocalY + (pillCentreY + pillHalfHeight) * labelScale;
+
+        /// <summary>
+        /// World point <paramref name="gap"/> metres above the visible pill's top edge, measured up the label's own
+        /// billboarded axis (the "You" pill on the local bird, the rival pill otherwise; whatever the last fit made it).
+        /// Measuring along the label's axis, not world Y, keeps the gap the same on screen at any camera pitch, which is
+        /// what the status badge stack needs to sit on the pill. False until the first fit.
+        /// </summary>
+        public bool TryGetPillTopAnchor(float gap, out Vector3 world)
+        {
+            world = default;
+            if (_textTransform == null || _plateHalfSize == Vector2.zero) return false;
+            // TransformPoint carries the label's and its parents' scale, so a scaled bird keeps the same proportions.
+            float labelScale = Mathf.Max(1e-4f, _textTransform.localScale.y);
+            world = _textTransform.TransformPoint(new Vector3(0f, _plateCentreLocal.y + _plateHalfSize.y + gap / labelScale, 0f));
+            return true;
+        }
+
         /// <summary>Root-local metres the label is raised for a taller class model (<see cref="SetHeadLift"/>).</summary>
         public float HeadLift => _headLift;
 
@@ -341,7 +366,7 @@ namespace CluckWars.Visuals
             if (isLocal)
             {
                 if (_youPill == null) return;
-                _youPill.size = size + new Vector2(glyphExtra, 0f) + YouPillPadding * 2f;
+                _youPill.size = new Vector2(size.x + glyphExtra + YouPillPadding.x * 2f, YouPillHeight(size.y));
                 _youPill.transform.localPosition = centre + Vector3.right * (glyphExtra * 0.5f);
                 _plateCentreLocal = _youPill.transform.localPosition;
                 _plateHalfSize = _youPill.size * 0.5f;

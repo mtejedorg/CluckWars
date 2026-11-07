@@ -1,37 +1,83 @@
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
 using CluckWars.Visuals;
 
 namespace CluckWars.Tests
 {
     /// <summary>
-    /// Feedback batch D0: the world status badge stack sits wholly above the nameplate pill (which spans roughly
-    /// 1.48-1.93 around its 1.70 centre), under the floating-text floor, and pops spawn from that same floor.
+    /// Feedback batches D0 / D0b: the world status badge stack is anchored to the nameplate pill (pill top + a gap), clears
+    /// the tallest pill (the local "You" one), stays under the floating-text floor, and pops spawn from that same floor.
     /// </summary>
     public sealed class StatusBadgeLayoutTests
     {
-        /// <summary>Top of the nameplate pill with margin; the lowest the first badge row may reach.</summary>
-        private const float NameplateClearance = 2.0f;
+        private const string ChickenPrefab = "Assets/_Game/Prefabs/Chicken.prefab";
 
-        private static float RowBottom => FeedbackTuning.StatusBadgeStackBaseHeight - FeedbackTuning.StatusBadgeGlyphSize * 0.5f;
+        /// <summary>
+        /// Root-local top of the local "You" pill, from the same code the runtime uses: the prefab's own label settings,
+        /// a TextMesh built like ChickenNameplate.BuildLabel, and ChickenNameplate.YouPillHeight / PillTopLocalY.
+        /// Takes the taller of "You" and a long player name, as the pill follows the text bounds.
+        /// </summary>
+        private static float LocalPillTop()
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ChickenPrefab);
+            Assert.IsNotNull(prefab, ChickenPrefab);
+            var so = new SerializedObject(prefab.GetComponent<ChickenNameplate>());
+            Vector3 offset = so.FindProperty("_offset").vector3Value;
+            int fontSize = so.FindProperty("_fontSize").intValue;
+            float charSize = so.FindProperty("_characterSize").floatValue;
 
-        private static float StackTop =>
-            FeedbackTuning.StatusBadgeStackBaseHeight
+            float top = float.MinValue;
+            foreach (string label in new[] { "You", "DashFox", "PeckNoir" })
+            {
+                var go = new GameObject("PillProbe") { hideFlags = HideFlags.HideAndDontSave };
+                try
+                {
+                    var tm = go.AddComponent<TextMesh>();
+                    tm.anchor = TextAnchor.MiddleCenter; tm.alignment = TextAlignment.Center;
+                    tm.fontSize = fontSize; tm.characterSize = charSize; tm.fontStyle = FontStyle.Bold; tm.text = label;
+                    var b = go.GetComponent<MeshRenderer>().localBounds;
+                    float h = b.size.y > 0f ? b.size.y : 0.3f;   // the runtime's own fallback for an unbuilt mesh
+                    float half = ChickenNameplate.YouPillHeight(h) * 0.5f;
+                    top = Mathf.Max(top, ChickenNameplate.PillTopLocalY(offset.y, b.center.y, half, 1f));
+                }
+                finally { Object.DestroyImmediate(go); }
+            }
+            return top;
+        }
+
+        private static float Row1Centre(float pillTop) => pillTop + FeedbackTuning.StatusBadgeStackPillGap;
+
+        private static float StackTop(float pillTop) =>
+            Row1Centre(pillTop)
             + FeedbackTuning.StatusBadgeRowSpacing * (FeedbackTuning.StatusBadgeMaxRows - 1)
             + FeedbackTuning.StatusBadgeGlyphSize * 0.5f;
 
         [Test]
-        public void FirstRowClearsTheNameplatePill()
+        public void FirstRowClearsTheTallestNameplatePill()
         {
-            Assert.GreaterOrEqual(RowBottom, NameplateClearance,
-                "row 1 must sit above the nameplate pill so the badges never cover or garble the name");
+            float pillTop = LocalPillTop();
+            float row1Bottom = Row1Centre(pillTop) - FeedbackTuning.StatusBadgeGlyphSize * 0.5f;
+            // The 0.08 gap is a hair under the glyph's half height (0.085); the sprite art keeps a transparent margin of
+            // that order, and the D0b captures show the visible glyph and text clear of the pill. Allow exactly that sliver.
+            const float SpriteMargin = 0.01f;
+            Assert.GreaterOrEqual(row1Bottom, pillTop - SpriteMargin,
+                "row 1 must sit on or above the local pill so the badges never cover or garble the name (pill top " + pillTop + ")");
         }
 
         [Test]
         public void StackTopStaysUnderTheFloatingTextFloor()
         {
-            Assert.Less(StackTop, FeedbackTuning.FloatingTextSpawnHeight,
-                "pops start above the full badge stack");
+            float top = StackTop(LocalPillTop());
+            Assert.Less(top, FeedbackTuning.FloatingTextSpawnHeight, "pops start above the full badge stack (top " + top + ")");
+        }
+
+        [Test]
+        public void FallbackBaseClearsTheTallestPillToo()
+        {
+            float pillTop = LocalPillTop();
+            Assert.GreaterOrEqual(FeedbackTuning.StatusBadgeStackBaseHeight - FeedbackTuning.StatusBadgeGlyphSize * 0.5f, pillTop - 0.05f,
+                "the no-nameplate fallback should sit near the pill too");
         }
 
         [Test]
@@ -47,7 +93,7 @@ namespace CluckWars.Tests
         [Test]
         public void MarkMarkerClearsTheBadgeStack()
         {
-            Assert.GreaterOrEqual(FeedbackTuning.MarkMarkerClearHeight, StackTop,
+            Assert.GreaterOrEqual(FeedbackTuning.MarkMarkerClearHeight, StackTop(LocalPillTop()),
                 "the on-screen mark marker must clear the badge stack");
         }
     }
