@@ -32,6 +32,7 @@ public class FB {
   public static string Cast(string slot) { var l = Local(); return "cast=" + l.Abilities.BotTryActivate(int.Parse(slot)); }
   public static string TimeScale(string v) { Time.timeScale = float.Parse(v, CultureInfo.InvariantCulture); return "ts=" + Time.timeScale; }
   public static string Stick(string x, string y) { var h = TouchControlsController.Instance; var ci = CultureInfo.InvariantCulture; F("_movement").SetValue(h, new Vector2(float.Parse(x, ci), float.Parse(y, ci))); return "stick " + x + "," + y; }
+  public static string RespawnAs(string cls) { Lab().RespawnPlayerAs((ChickenClass)System.Enum.Parse(typeof(ChickenClass), cls)); return "respawn " + cls; }
   public static string ResetDummies() { foreach (var d in Lab().Dummies) d.ResetNow("capture"); return "reset"; }
   public static string ClearCooldowns() { var l = Local(); for (int i = 0; i < 4; i++) l.Abilities.TriggerCooldown(i, 0.01f); return "cd cleared"; }
   public static string Info() { var l = Local(); if (l == null) return "no local"; var a = l.Abilities;
@@ -40,7 +41,7 @@ public class FB {
     string oth = string.Join(" | ", Others().Select(c => "DUMMY ctrl=" + c.CurrentControlState + " stunned=" + c.IsStunned + " cargo=" + c.Cargo.Cargo.ToString("0.0") + " dist=" + Vector3.Distance(c.transform.position, l.transform.position).ToString("0.0")));
     return self + " || " + oth + " ts=" + Time.timeScale; }
 }"""
-SIG = {"Loadout": ["a", "b", "c", "d"], "Hold": ["slot"], "Release": ["slot"], "Cast": ["slot"], "TimeScale": ["v"], "Stick": ["x", "y"]}
+SIG = {"RespawnAs": ["cls"], "Loadout": ["a", "b", "c", "d"], "Hold": ["slot"], "Release": ["slot"], "Cast": ["slot"], "TimeScale": ["v"], "Stick": ["x", "y"]}
 
 LOG = open(os.path.join(OUT, "capture.log"), "a", encoding="utf-8")
 
@@ -91,6 +92,15 @@ def ability(slot, tag, after=((0.5, "3_impact"), (1.5, "4_after")), ts="0.3"):
     time.sleep(1.5)
 
 
+def wait_player(cls):
+    for _ in range(60):
+        s = str(cs("State"))
+        if "player=True" in s and "class=" + cls in s:
+            break
+        time.sleep(1)
+    time.sleep(2)
+
+
 def main():
     bridge.init()
     log("state:", cs("State"))
@@ -132,6 +142,22 @@ def main():
     log(cs("Loadout", "Peck", "WingSlam", "Snatch", "SpeedBurst"))
     time.sleep(2)
     ability(0, "peck", after=((0.5, "3_impact"), (1.5, "4_after")))
+    # Loadout D: the Assassin hunt (Death Mark). Paw marker + HUNT! pop on the hunter side.
+    log(cs("RespawnAs", "Assassin"))
+    wait_player("Assassin")
+    log(cs("Loadout", "MarkKill", "WingSlam", "Shadowstep", "Invisibility"))
+    time.sleep(2)
+    cs("TimeScale", "1")
+    log(" ", cs("Hold", "0"))
+    time.sleep(0.7)
+    shot("hunt_1_hold")
+    log(" ", cs("Release", "0"))
+    shot("hunt_2_cast")
+    time.sleep(3)
+    shot("hunt_3_live")
+    log(cs("ResetDummies"))
+    log(cs("RespawnAs", "Warrior"))
+    wait_player("Warrior")
     cs("TimeScale", "1")
     log("done:", cs("Info"))
 
