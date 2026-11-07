@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Settings;
 using UnityEngine;
 
 namespace CluckWars.Visuals
@@ -60,6 +61,7 @@ namespace CluckWars.Visuals
         [SerializeField] private float _starSpinSpeed = 180f;
 
         private const int StarCount   = 3;
+        private const float StarBaseScale = 0.26f;
         private const int StreakCount = 4;
 
         /// <summary>How fast a streak travels from the chicken's heel out to its tail, in
@@ -109,6 +111,13 @@ namespace CluckWars.Visuals
         private ChickenCargo      _cargo;
 
         private Transform      _starRoot;
+        private SpriteRenderer[] _stars;
+        private float          _headLift;
+
+        // Stun beats (D10): edge state of "is this bird stunned" (pure, see StunStarTimeline).
+        private StunStarTimeline _starTimeline;
+        private float _appliedScale = -1f, _appliedAlpha = -1f;
+        private bool  _starsFaced;
         private SpriteRenderer _slowBlob;
         private SpriteRenderer _rootBlob;
         private SpriteRenderer _rootShackle;
@@ -140,6 +149,7 @@ namespace CluckWars.Visuals
         /// Root-local metres; presentation only.</summary>
         public void SetHeadLift(float lift)
         {
+            _headLift = lift;
             if (_starRoot != null) _starRoot.localPosition = new Vector3(0f, _starHeight + lift, 0f);
         }
 
@@ -149,6 +159,7 @@ namespace CluckWars.Visuals
             root.transform.SetParent(transform, worldPositionStays: false);
             root.transform.localPosition = new Vector3(0f, _starHeight, 0f);
             _starRoot = root.transform;
+            _stars = new SpriteRenderer[StarCount];
 
             for (int i = 0; i < StarCount; i++)
             {
@@ -163,6 +174,7 @@ namespace CluckWars.Visuals
                 sr.sprite       = StarSprite();
                 sr.color        = new Color(1f, 0.86f, 0.25f, 1f); // cartoon gold
                 sr.sortingOrder = 120;
+                _stars[i] = sr;
             }
 
             _starRoot.gameObject.SetActive(false);
@@ -241,14 +253,11 @@ namespace CluckWars.Visuals
             bool slowed  = live && !stunned && !rooted && IsSlowed(flags);
             bool snared  = slowed && IsSnared(flags);
 
-            SetActive(_starRoot != null ? _starRoot.gameObject : null, stunned);
+            UpdateStars(live, stunned);
             SetActive(_rootBlob != null ? _rootBlob.gameObject : null, rooted);
             SetActive(_rootShackle != null ? _rootShackle.gameObject : null, rooted);
             SetActive(_slowBlob != null ? _slowBlob.gameObject : null, slowed);
             SetActive(_streakRoot != null ? _streakRoot.gameObject : null, slowed);
-
-            if (stunned && _starRoot != null)
-                _starRoot.Rotate(Vector3.up, _starSpinSpeed * Time.deltaTime, Space.Self);
 
             // The root shackle is deliberately left alone here — no spin, no pulse. Its
             // stillness is the §1.3 shape channel against stun's orbit; animating it would
@@ -277,6 +286,56 @@ namespace CluckWars.Visuals
 
             TrackMovement();
             if (slowed) UpdateStreaks();
+        }
+
+        /// <summary>
+        /// The stun stars (D10): pop in (0 to 1 with overshoot) on the Stunned rising edge, orbit while stunned, and on the falling edge
+        /// stop orbiting, fall and fade. A new stun landing mid-fall restarts cleanly (position, alpha and the pop all reset on the edge).
+        /// Reduced Motion: alpha fade in, fade in place out. Edge-driven off the replicated flags, local, allocation-free.
+        /// </summary>
+        private void UpdateStars(bool live, bool stunned)
+        {
+            if (_starRoot == null) return;
+
+            var f = _starTimeline.Step(live, stunned, Time.time, PlayerPreferences.ReducedMotionEnabled);
+            SetActive(_starRoot.gameObject, f.Visible);
+            if (!f.Visible) return;
+
+            _starRoot.localPosition = new Vector3(0f, _starHeight + _headLift + f.OffsetY, 0f);
+            if (f.Orbit) _starRoot.Rotate(Vector3.up, _starSpinSpeed * Time.deltaTime, Space.Self);
+            ApplyStars(f.Scale, f.Alpha);
+            FaceStars(!f.Orbit);
+        }
+
+        /// <summary>While the stars fall they are frozen mid-orbit, which can leave a flat star edge-on to the camera (a sliver). Face
+        /// them to the camera for the drop; back to the orbit pose (identity under the spinning root) when a stun starts again.</summary>
+        private void FaceStars(bool toCamera)
+        {
+            if (_stars == null || (!toCamera && !_starsFaced)) return;
+            var cam = toCamera ? Camera.main : null;
+            if (toCamera && cam == null) return;
+            _starsFaced = toCamera;
+            for (int i = 0; i < _stars.Length; i++)
+            {
+                if (_stars[i] == null) continue;
+                var t = _stars[i].transform;
+                if (toCamera) t.rotation = cam.transform.rotation;
+                else t.localRotation = Quaternion.identity;
+            }
+        }
+
+        private void ApplyStars(float scale, float alpha)
+        {
+            if (_stars == null || (scale == _appliedScale && alpha == _appliedAlpha)) return;
+            _appliedScale = scale;
+            _appliedAlpha = alpha;
+            var color = new Color(1f, 0.86f, 0.25f, alpha);
+            for (int i = 0; i < _stars.Length; i++)
+            {
+                if (_stars[i] == null) continue;
+                _stars[i].transform.localScale = Vector3.one * (StarBaseScale * scale);
+                _stars[i].color = color;
+            }
         }
 
         /// <summary>

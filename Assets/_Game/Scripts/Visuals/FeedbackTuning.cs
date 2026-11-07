@@ -1674,6 +1674,45 @@ namespace CluckWars.Visuals
         public const float StealArrivalSparkleSpeed = 1.2f;
         public const float StealArrivalSparkleHeight = 1.0f;
 
+        // ---- Stun beats (D10, vfx.md 2.2) ------------------------------------------------------------
+
+        /// <summary>Star pop-in on the Stunned rising edge: scale 0 to <see cref="StunStarPopOvershoot"/> (reached at
+        /// <see cref="StunStarPopPeakFraction"/> of the time) and back to 1 over <see cref="StunStarPopSeconds"/>. Reduced Motion:
+        /// full size, alpha fades in over <see cref="StunStarFadeInSecondsReduced"/>.</summary>
+        public const float StunStarPopSeconds = 0.15f;
+        public const float StunStarPopOvershoot = 1.25f;
+        public const float StunStarPopPeakFraction = 0.6f;
+        public const float StunStarFadeInSecondsReduced = 0.15f;
+
+        /// <summary>Star drop-off on the falling edge: the stars stop orbiting, fall <see cref="StunStarDropMetres"/> (gravity, so
+        /// quadratic in time) and fade over <see cref="StunStarDropSeconds"/>. Reduced Motion: fade in place over the shorter time.</summary>
+        public const float StunStarDropSeconds = 0.30f;
+        public const float StunStarDropMetres = 0.4f;
+        public const float StunStarDropSecondsReduced = 0.20f;
+
+        /// <summary>Caster wing-slam arcs (<c>Fx_Whiff</c> FoodChunkFlight movers): one each side at this distance and height, scale
+        /// start to end over the life (static under Reduced Motion), Stun accent at this alpha, tilted outward by the roll.</summary>
+        public const int StunArcCount = 2;
+        public const float StunArcSideMetres = 0.9f;
+        public const float StunArcHeight = 0.85f;
+        public const float StunArcSeconds = 0.18f;
+        public const float StunArcScaleStart = 0.5f;
+        public const float StunArcScaleEnd = 1.3f;
+        public const float StunArcSize = 0.7f;
+        public const float StunArcAlpha = 0.8f;
+        public const float StunArcRollDegrees = 55f;
+        public const int StunArcSortingOrder = 5;
+
+        /// <summary>Victim bonk puff: cream dust at the head (4, or 2 fading in place under Reduced Motion).</summary>
+        public const int StunBonkCount = 4;
+        public const int StunBonkCountReduced = 2;
+        public const float StunBonkHeight = 1.5f;
+        public const float StunBonkSeconds = 0.25f;
+        public const float StunBonkSpeed = 0.8f;
+        public const float StunBonkSizeMin = 0.28f;
+        public const float StunBonkSizeMax = 0.40f;
+        public const float StunBonkScatter = 0.18f;
+
         // ---- Slow aura (D8, vfx.md 2.4) --------------------------------------------------------------
 
         /// <summary>Ground heights of the aura outline (the order-0 band, same floor as every ring) and the edge band (order 1).</summary>

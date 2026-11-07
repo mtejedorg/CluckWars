@@ -63,12 +63,13 @@ public class FB {
   public static string RespawnAs(string cls) { Lab().RespawnPlayerAs((ChickenClass)System.Enum.Parse(typeof(ChickenClass), cls)); return "respawn " + cls; }
   public static string ResetDummies() { foreach (var d in Lab().Dummies) d.ResetNow("capture"); return "reset"; }
   public static string ClearCooldowns() { var l = Local(); for (int i = 0; i < 4; i++) l.Abilities.TriggerCooldown(i, 0.01f); return "cd cleared"; }
+  public static string DummyStunned() { return Others().Any(c => c.IsStunned) ? "1" : "0"; }
   public static string ProbeBegin(string tag) { return CluckWars.EditorTools.ParticleProbe.Begin(tag); }
   public static string ProbeEnd(string tag) { return CluckWars.EditorTools.ParticleProbe.End(); }
   public static string Info() { var l = Local(); if (l == null) return "no local"; var a = l.Abilities;
     string self = "SELF ctrl=" + l.CurrentControlState + " stunned=" + l.IsStunned + " opacity=" + l.VisualOpacity.ToString("0.00") + " stealProof=" + l.IsStealProof + " cargo=" + l.Cargo.Cargo.ToString("0.0")
-      + " active=" + string.Join("", Enumerable.Range(0,4).Select(i => a.IsSlotActive(i) ? "1" : "0")) + " cd=" + string.Join("/", Enumerable.Range(0,4).Select(i => a.CooldownRemaining(i).ToString("0.0"))) + " charging=" + a.ChargingSlot + " lastHits=" + a.LastCastHitCount;
-    string oth = string.Join(" | ", Others().Select(c => "DUMMY ctrl=" + c.CurrentControlState + " stunned=" + c.IsStunned + " cargo=" + c.Cargo.Cargo.ToString("0.0") + " dist=" + Vector3.Distance(c.transform.position, l.transform.position).ToString("0.0")));
+      + " active=" + string.Join("", Enumerable.Range(0,4).Select(i => a.IsSlotActive(i) ? "1" : "0")) + " cd=" + string.Join("/", Enumerable.Range(0,4).Select(i => a.CooldownRemaining(i).ToString("0.0"))) + " charging=" + a.ChargingSlot + " lastHits=" + a.LastCastHitCount + " castId=" + a.LastCastEventId + " castAb=" + (a.LastCastAbility != null ? a.LastCastAbility.name : "-");
+    string oth = string.Join(" | ", Others().Select(c => "DUMMY ctrl=" + c.CurrentControlState + " stunned=" + c.IsStunned + " flags=" + c.ControlFlags + " cargo=" + c.Cargo.Cargo.ToString("0.0") + " dist=" + Vector3.Distance(c.transform.position, l.transform.position).ToString("0.0")));
     return self + " || " + oth + " ts=" + Time.timeScale; }
 }"""
 SIG = {"Res": ["w", "h"], "RespawnAs": ["cls"], "Loadout": ["a", "b", "c", "d"], "Hold": ["slot"], "Release": ["slot"], "Cast": ["slot"], "TimeScale": ["v"], "Stick": ["x", "y"], "ProbeBegin": ["tag"], "ProbeEnd": ["tag"]}
@@ -120,7 +121,7 @@ def write_particles():
             f.write(tag + ": " + line + "\n")
 
 
-def ability(slot, tag, after=((0.5, "3_impact"), (1.5, "4_after")), ts="0.3"):
+def ability(slot, tag, after=((0.5, "3_impact"), (1.5, "4_after")), ts="0.3", hook=None):
     log("==", tag, "slot", slot)
     probe_begin(tag)
     cs("TimeScale", ts)
@@ -134,12 +135,25 @@ def ability(slot, tag, after=((0.5, "3_impact"), (1.5, "4_after")), ts="0.3"):
         while time.time() - t0 < delay:
             time.sleep(0.05)
         shot(tag + "_" + suffix)
+    if hook:
+        hook(tag)
     probe_end(tag)
     cs("TimeScale", "1")
     time.sleep(0.5)
     log(" ", cs("ResetDummies"))
     log(" ", cs("ClearCooldowns"))
     time.sleep(1.5)
+
+
+def stun_end_frames(tag):
+    """Wait for the dummy stun to run out (the Fusion timer, real time), then catch the drop-off straight away."""
+    t0 = time.time()
+    while "\"1\"" in str(cs("DummyStunned")) and time.time() - t0 < 14:
+        pass
+    shot(tag + "_6_drop_a")
+    shot(tag + "_6_drop_b")
+    time.sleep(0.8)
+    shot(tag + "_7_late")
 
 
 def stun_then_slow(tag):
@@ -195,7 +209,7 @@ def main():
         if want("steal"):
             ability(0, "steal", after=((0.15, "3a_grab"), (0.4, "3_impact"), (0.65, "3b_flight"), (0.9, "3c_arrive"), (1.2, "4_after"), (1.55, "4a_arrive"), (1.9, "4b_arrive")))
         if want("stun"):
-            ability(1, "stun", after=((0.4, "3_impact"), (1.5, "4_after"), (3.5, "5_late")))
+            ability(1, "stun", after=((0.4, "3_impact"), (0.9, "3b_mid")), hook=stun_end_frames)
         if want("shove"):
             ability(2, "shove", after=((0.3, "3_impact"), (0.8, "4_after"), (2.0, "5_late")))
         if want("slow"):

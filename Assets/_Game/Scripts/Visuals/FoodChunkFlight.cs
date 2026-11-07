@@ -37,6 +37,8 @@ namespace CluckWars.Visuals
             public float Roll;
             public float BaseScale;
             public Color Tint;
+            public int Order;          // sorting order of the renderer
+            public float ScaleStart, ScaleEnd, Alpha;   // whiff arcs only
         }
 
         private static FoodChunkFlight s_instance;
@@ -108,6 +110,7 @@ namespace CluckWars.Visuals
                 m.Lateral = side * (spread * FeedbackTuning.StealChunkSpread);
                 m.Thief = thief;
                 m.ThiefVfx = thiefVfx;
+                m.Order = FeedbackTuning.StealChunkSortingOrder;
                 m.Arrives = i == n - 1;
                 m.Roll = i * 120f;
                 m.Tint = gold;
@@ -148,9 +151,57 @@ namespace CluckWars.Visuals
                 m.Arrives = false;
                 m.Roll = s * FeedbackTuning.StealWhiffSpreadDegrees;
                 m.Tint = FeedbackTuning.StealWhiffColor;
+                m.Order = FeedbackTuning.StealChunkSortingOrder;
+                m.ScaleStart = FeedbackTuning.StealWhiffScaleStart;
+                m.ScaleEnd = FeedbackTuning.StealWhiffScaleEnd;
+                m.Alpha = FeedbackTuning.StealWhiffAlpha;
                 m.Life = FeedbackTuning.StealWhiffSeconds;
                 m.Age = 0f;
                 m.BaseScale = FeedbackTuning.StealWhiffSize / SpriteWidth(s_whiffSprite);
+                m.Renderer.sprite = s_whiffSprite;
+                pool.Activate(m);
+            }
+        }
+
+        /// <summary>
+        /// The caster half of a Wing Slam (D10): <see cref="FeedbackTuning.StunArcCount"/> arcs, one each side of the caster, in the
+        /// Stun accent. Nothing on a quiet (hidden or faded) caster. The caller gates on <see cref="StunBeatRules.WhiffArcsApply"/>.
+        /// </summary>
+        public static void PlayStunArcs(ChickenController caster, Color accent)
+        {
+            if (caster == null || s_whiffSprite == null || !Application.isPlaying) return;
+            if (IsQuiet(caster)) return;
+            var pool = EnsureInstance();
+            if (pool == null) return;
+
+            bool reduced = PlayerPreferences_Reduced();
+            Transform t = caster.transform;
+            Vector3 right = t.right; right.y = 0f;
+            right = right.sqrMagnitude > 1e-4f ? right.normalized : Vector3.right;
+            int n = FeedbackTuning.StunArcCount;
+            for (int i = 0; i < n; i++)
+            {
+                float side = n > 1 ? (i / (float)(n - 1)) * 2f - 1f : 1f;   // -1 (left), +1 (right)
+                var m = pool.Take();
+                if (m == null) return;
+                m.Kind = Kind.Whiff;
+                m.Reduced = reduced;
+                m.Route = StealBeatRules.ChunkRoute.ToThief;
+                m.Start = t.position + right * (side * FeedbackTuning.StunArcSideMetres) + Vector3.up * FeedbackTuning.StunArcHeight;
+                m.End = m.Start;
+                m.Lateral = Vector3.zero;
+                m.Thief = null;
+                m.ThiefVfx = null;
+                m.Arrives = false;
+                m.Roll = -side * FeedbackTuning.StunArcRollDegrees;
+                m.Tint = new Color(accent.r, accent.g, accent.b, 1f);
+                m.Order = FeedbackTuning.StunArcSortingOrder;
+                m.ScaleStart = FeedbackTuning.StunArcScaleStart;
+                m.ScaleEnd = FeedbackTuning.StunArcScaleEnd;
+                m.Alpha = FeedbackTuning.StunArcAlpha;
+                m.Life = FeedbackTuning.StunArcSeconds;
+                m.Age = 0f;
+                m.BaseScale = FeedbackTuning.StunArcSize / SpriteWidth(s_whiffSprite);
                 m.Renderer.sprite = s_whiffSprite;
                 pool.Activate(m);
             }
@@ -212,6 +263,7 @@ namespace CluckWars.Visuals
         {
             if (!m.Live) { m.Live = true; _live++; }
             m.Root.gameObject.SetActive(true);
+            m.Renderer.sortingOrder = m.Order;
             m.Renderer.enabled = m.Age >= 0f;
             Apply(m, Camera.main);
         }
@@ -256,10 +308,10 @@ namespace CluckWars.Visuals
             {
                 pos = m.Start;
                 // Reduced Motion: alpha only, no growth.
-                float s = m.Reduced ? 0.5f * (FeedbackTuning.StealWhiffScaleStart + FeedbackTuning.StealWhiffScaleEnd)
-                                    : Mathf.Lerp(FeedbackTuning.StealWhiffScaleStart, FeedbackTuning.StealWhiffScaleEnd, t);
+                float s = m.Reduced ? 0.5f * (m.ScaleStart + m.ScaleEnd)
+                                    : Mathf.Lerp(m.ScaleStart, m.ScaleEnd, t);
                 scale *= s;
-                c.a = FeedbackTuning.StealWhiffAlpha * (1f - t);
+                c.a = m.Alpha * (1f - t);
                 roll = m.Roll;
             }
             else

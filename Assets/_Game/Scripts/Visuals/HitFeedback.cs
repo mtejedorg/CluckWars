@@ -419,6 +419,7 @@ namespace CluckWars.Visuals
             {
                 anyEntered = true;
                 stunEntered = true;
+                if (_vfx != null) _vfx.EmitStunBonk();   // D10: gates on the hidden / faded bird itself
                 if (showText) SpawnControlText(UiText.Get(UiKeys.HudPopStun), _controller.StunRemaining, FeedbackTuning.CanonicalStunColor);
             }
             if (rooted && !_wasRooted)
@@ -483,6 +484,9 @@ namespace CluckWars.Visuals
 
             var ability = _abilities.LastCastAbility ?? _lastChargingAbility;
             if (ability == null) return;
+
+            // Stun (D10): the swing arcs read from across the arena, hit or whiff, and only for the Wing Slam itself.
+            if (StunBeatRules.WhiffArcsApply(ability)) PlayStunArcs();
 
             // Abilities whose cast-time target count is not a hit/whiff verdict at all sit
             // this beat out: self-buffs (no aim shape to gather from) and placed zones
@@ -1101,6 +1105,13 @@ namespace CluckWars.Visuals
             Vector3 beak = _controller.transform.position + fwd * FeedbackTuning.StealGrabBeakDistance;
             beak.y += FeedbackTuning.StealGrabLineHeight;
             FoodChunkFlight.PlayWhiff(_controller, beak, fwd);
+        }
+
+        /// <summary>The caster half of a Wing Slam (D10): two accent arcs, one each side. Nothing on a hidden or faded caster.</summary>
+        private void PlayStunArcs()
+        {
+            if (_controller == null || FoodChunkFlight.IsQuiet(_controller)) return;
+            FoodChunkFlight.PlayStunArcs(_controller, FeedbackPalette.Current.Accent(AccentKey.Stun));
         }
 
         /// <summary>The victim half of a robbery, off the replicated <c>StealEventId</c> edge (called from <see cref="ChickenCargo"/>

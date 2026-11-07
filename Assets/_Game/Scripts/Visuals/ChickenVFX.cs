@@ -201,6 +201,7 @@ namespace CluckWars.Visuals
         private int     _skidBudget;
         private FxEmit  _skidDust, _shoveRing;
         private FxEmit  _stealArrival;
+        private FxEmit  _stunBonk;
 
         // ── Hide poofs (D9): edge of "is this bird faded", seeded on first observation ──
         private bool _hideInitialized;
@@ -324,6 +325,15 @@ namespace CluckWars.Visuals
                 SpeedMin = FeedbackTuning.StealArrivalSparkleSpeed, SpeedMax = FeedbackTuning.StealArrivalSparkleSpeed,
                 LifeMin = FeedbackTuning.StealArrivalSparkleLifeSeconds, LifeMax = FeedbackTuning.StealArrivalSparkleLifeSeconds,
                 Shape = FxShape.Ring, Radius = 0.3f, Gravity = 0f,
+            };
+            // Stun bonk (D10): cream dust at the victim head on the Stunned rising edge.
+            _stunBonk = new FxEmit
+            {
+                Count = FeedbackTuning.StunBonkCount, Color = cream,
+                SizeMin = FeedbackTuning.StunBonkSizeMin, SizeMax = FeedbackTuning.StunBonkSizeMax,
+                SpeedMin = FeedbackTuning.StunBonkSpeed, SpeedMax = FeedbackTuning.StunBonkSpeed,
+                LifeMin = FeedbackTuning.StunBonkSeconds, LifeMax = FeedbackTuning.StunBonkSeconds,
+                Shape = FxShape.Disc, Radius = FeedbackTuning.StunBonkScatter, Gravity = 0f, RandomRotation = true,
             };
             _speedDust = new FxEmit
             {
@@ -584,6 +594,20 @@ namespace CluckWars.Visuals
             e.Count = StealBeatRules.ArrivalSparkles(StealBeatRules.ChunkRoute.ToThief, reduced);
             if (reduced) e.SpeedMin = e.SpeedMax = 0f;
             EmitSparkles(in e, FeedbackTuning.StealArrivalSparkleHeight);
+        }
+
+        /// <summary>
+        /// The Stun victim's bonk puff (D10): 4 cream dust at the head, rising 0.8 m/s over 0.25 s (2, fading in place, under Reduced
+        /// Motion). Called on the replicated Stunned rising edge; nothing on a hidden or faded bird.
+        /// </summary>
+        public void EmitStunBonk()
+        {
+            if (_controller == null || FoodChunkFlight.IsQuiet(_controller)) return;
+            bool reduced = PlayerPreferences.ReducedMotionEnabled;
+            var e = _stunBonk;
+            e.Count = StunBeatRules.BonkCount(reduced);
+            e.SpeedMin = e.SpeedMax = StunBeatRules.BonkSpeed(reduced);
+            EmitDust(in e, FeedbackTuning.StunBonkHeight);
         }
 
         /// <summary>The caster half: accent sparkles in a ring at body height (8, or 4 fading in place under Reduced Motion).</summary>
