@@ -177,6 +177,20 @@ namespace CluckWars.Input
         private readonly float[] _appliedScale = new float[SlotCount];   // the inline scale last written (rest scale x held scale)
         private readonly string[] _appliedCdText = new string[SlotCount]; // desktop cooldown readout cache (tenths under 1 s)
 
+        // A4 caster-side stun countdown (CasterStunCountdownRules): the last cast observed off the replicated
+        // LastCastEventId one-shot (baseline-seeded per local chicken), and the per-frame verdict the Stun hex reads.
+        private ChickenController _stunCastFor;
+        private byte  _stunCastSeenId;
+        private bool  _stunCastIsWingSlam;
+        private int   _stunCastHits;
+        private float _stunCastAt;
+        private float _stunCastSeconds;
+        private float[] _rivalStun = new float[4];   // grows only when more rivals exist than it holds
+        private bool  _casterStunShow;
+        private int   _casterStunTenths;
+        private readonly bool[] _stunDigitShown     = new bool[SlotCount];
+        private readonly int[]  _appliedStunTenths  = new int[SlotCount];
+
         // Death Mark hexes (MarkFeedback.Current): KILL on the Death Mark hex exactly while a press would kill; Ambush lit while
         // the target stands in its shape. Found by the equipped ability's type, never by slot number.
         private readonly bool[]  _markKill = new bool[SlotCount];
@@ -804,6 +818,7 @@ namespace CluckWars.Input
 
             UpdateLayoutMode();
             UpdateMarkHexes(abilities);
+            UpdateCasterStunCountdown(abilities);
             PollDeniedPress(abilities);
             for (int i = 0; i < SlotCount; i++)
                 _heldSeconds[i] = _held[i] ? _heldSeconds[i] + Time.unscaledDeltaTime : 0f;
@@ -933,6 +948,54 @@ namespace CluckWars.Input
                 if (kill && !_markKill[slot]) _markKillSince[slot] = Time.unscaledTime;
                 _markKill[slot] = kill;
                 _markLit[slot] = mark.AmbushLit && FixedKit.EmitsStun(a);
+            }
+        }
+
+        /// <summary>
+        /// A4: watches the local bird's casts and decides, once a frame, whether the Stun hex shows the victims'
+        /// remaining stun (<see cref="CasterStunCountdownRules"/>; its remarks hold the "his victims" approximation).
+        /// Reads replicated state only (<c>LastCastEventId</c>, <c>LastCastAbility</c>, <c>LastCastHitCount</c>, the
+        /// rivals' <c>StunRemaining</c>); no allocation once the rival buffer fits.
+        /// </summary>
+        private void UpdateCasterStunCountdown(AbilityController abilities)
+        {
+            _casterStunShow = false;
+            if (abilities == null || _localChicken == null) { _stunCastFor = null; return; }
+
+            byte id = abilities.LastCastEventId;
+            if (_stunCastFor != _localChicken)
+            {
+                // Baseline: a cast that happened before this HUD bound to the bird is not "his last stun" to count.
+                _stunCastFor = _localChicken;
+                _stunCastSeenId = id;
+                _stunCastIsWingSlam = false;
+            }
+            else if (id != _stunCastSeenId)
+            {
+                _stunCastSeenId = id;
+                var stun = abilities.LastCastAbility as WingSlamAbilitySO;
+                _stunCastIsWingSlam = stun != null;
+                _stunCastHits = abilities.LastCastHitCount;
+                _stunCastAt = Time.unscaledTime;   // Fusion timers ignore timeScale, so unscaled time tracks StunRemaining
+                _stunCastSeconds = stun != null ? AbilityBaseSO.ResolveOutgoingControlSeconds(stun.StunDuration, _localChicken) : 0f;
+            }
+            if (!_stunCastIsWingSlam) return;
+
+            var all = ChickenController.ActiveControllers;
+            if (_rivalStun.Length < all.Count) _rivalStun = new float[all.Count];
+            int n = 0;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var c = all[i];
+                if (c == null || c == _localChicken || c.Object == null || !c.Object.IsValid) continue;
+                _rivalStun[n++] = c.StunRemaining;
+            }
+
+            if (CasterStunCountdownRules.TryGetSeconds(true, _stunCastHits, Time.unscaledTime - _stunCastAt,
+                    _stunCastSeconds, _rivalStun, n, out float seconds))
+            {
+                _casterStunShow = true;
+                _casterStunTenths = CasterStunCountdownRules.Tenths(seconds);
             }
         }
 
@@ -1078,7 +1141,7 @@ namespace CluckWars.Input
 
             // Layer 9. The seconds number is only one of the marks this layer can carry
             // now; the others are drawn shapes toggled by the refusal class in USS.
-            RefreshCenterMark(slot, refusal, remaining);
+            RefreshCenterMark(slot, equipped, refusal, remaining);
         }
 
         /// <summary>
@@ -1126,12 +1189,17 @@ namespace CluckWars.Input
         /// inside the <see cref="FeedbackTuning.BadgeCountdownTextUpdateHz"/> budget, so
         /// gating on the value itself is strictly tighter than gating on the clock.
         /// </summary>
-        private void RefreshCenterMark(int slot, AbilityRefusal refusal, float remaining)
+        private void RefreshCenterMark(int slot, AbilityBaseSO equipped, AbilityRefusal refusal, float remaining)
         {
             var refs = _slots[slot];
             if (refs.CdNum == null) return;
 
             var mark = HudFeedbackStyle.CenterMark(refusal);
+
+            // A4: the victims' remaining stun takes the centre over the cooldown seconds (the cooldown is necessarily
+            // running: he just cast) on the touch arc and the desktop / pad strip alike. The cooldown clip and the
+            // duration ring are separate layers and keep drawing. A "you are stunned" cross keeps the centre.
+            if (RefreshCasterStunDigit(slot, equipped, mark)) return;
 
             // With drawn marks, the label is the seconds readout and nothing else; with
             // the glyph fallback it also carries ⃠ / ✕ (text written in ApplyRefusalState).
@@ -1158,6 +1226,42 @@ namespace CluckWars.Input
             if (seconds == _appliedCdSeconds[slot]) return;
             _appliedCdSeconds[slot] = seconds;
             refs.CdNum.text = seconds.ToString();
+        }
+
+        /// <summary>
+        /// A4: writes the caster-side stun digit into the layer-9 label in the stun colour while
+        /// <see cref="UpdateCasterStunCountdown"/> says so, reformatting only when the shown tenth moves. Returns true
+        /// while the digit owns the label. On hand-back it restores the stylesheet colour and forces the cooldown
+        /// readout to repaint.
+        /// </summary>
+        private bool RefreshCasterStunDigit(int slot, AbilityBaseSO equipped, HexCenterMark mark)
+        {
+            var label = _slots[slot].CdNum;
+            bool show = _casterStunShow && equipped is WingSlamAbilitySO && mark != HexCenterMark.StunnedCross;
+
+            if (!show)
+            {
+                if (!_stunDigitShown[slot]) return false;
+                _stunDigitShown[slot] = false;
+                label.style.color = new StyleColor(StyleKeyword.Null);
+                _appliedCdSeconds[slot] = int.MinValue;
+                _appliedCdText[slot] = null;
+                return false;
+            }
+
+            if (!_stunDigitShown[slot])
+            {
+                _stunDigitShown[slot] = true;
+                _appliedStunTenths[slot] = int.MinValue;
+                label.style.color = FeedbackTuning.CanonicalStunColor;
+                label.style.display = DisplayStyle.Flex;
+            }
+            if (_casterStunTenths != _appliedStunTenths[slot])
+            {
+                _appliedStunTenths[slot] = _casterStunTenths;
+                label.text = CasterStunCountdownRules.Format(_casterStunTenths);
+            }
+            return true;
         }
 
         /// <summary>
@@ -1205,6 +1309,7 @@ namespace CluckWars.Input
             // layer-9 label carries the character instead of the drawn shape. Clearing
             // the inline colour hands the label back to the stylesheet's warm white
             // rather than baking a second copy of that colour here.
+            _stunDigitShown[slot] = false;   // the writes below replace the A4 digit's colour; let it re-apply next frame
             if (refs.CdNum == null) return;
             switch (mark)
             {

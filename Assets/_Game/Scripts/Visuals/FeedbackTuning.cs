@@ -1306,6 +1306,13 @@ namespace CluckWars.Visuals
         /// <summary>Opacity of every hex that is NOT the one being held.</summary>
         public const float HexOthersWhileHeldAlpha = 0.6f;
 
+        /// <summary>
+        /// A4 caster-side stun countdown: how much later than the cast's own stun length a rival's stun may still be
+        /// counted as this caster's. Covers the hop from the caster's cast to the victim's state authority applying the
+        /// stun (the RPC), so a victim stunned a few ticks late still reads. Presentation only.
+        /// </summary>
+        public const float CasterStunCountdownSlackSeconds = 0.35f;
+
         /// <summary>Length of the single scale pop the in-range pip plays when it lights.</summary>
         public const float HexPipPopSeconds = 0.2f;
 
