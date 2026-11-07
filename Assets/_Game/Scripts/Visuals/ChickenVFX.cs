@@ -1,5 +1,6 @@
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
+using CluckWars.Settings;
 using UnityEngine;
 
 namespace CluckWars.Visuals
@@ -91,26 +92,44 @@ namespace CluckWars.Visuals
         [SerializeField] private Sprite[] _featherSprites = new Sprite[0];
         [Tooltip("Fx_EggShard_1..3: picked at random per particle (the Egg Shell hatch).")]
         [SerializeField] private Sprite[] _shardSprites = new Sprite[0];
+        [Tooltip("Fx_SpeedLine: the Speed wind streak (Stretched Billboard).")]
+        [SerializeField] private Sprite _speedLineSprite;
 
         // ---- Budget (maxParticles per family; sum = ParticlesPerChickenCap minus headroom) ----
 
-        /// <summary>Dust family cap: the 6-puff death puff; later ground puffs share it.</summary>
-        public const int DustMaxParticles = 12;
-        /// <summary>Feather family cap: 10 death feathers + HitFeedback's 14-feather execute burst.</summary>
-        public const int FeatherMaxParticles = 24;
+        /// <summary>
+        /// Dust family cap: the 6-puff death puff and the Speed stride dust (spec max 8) share it. Was 12; D4 took 5 for the
+        /// Streak family (a dead bird does not sprint and the stride dust is spec-capped at 8, so 7 only clips the densest
+        /// sprint by one puff).
+        /// </summary>
+        public const int DustMaxParticles = 7;
+        /// <summary>
+        /// Feather family cap: 10 death feathers + the 14-feather execute burst of HitFeedback. Was 24; D4 took 8: the
+        /// execute burst still fits whole (16), only the death-plus-execute coincidence clips, and that kill is a one-frame
+        /// moment, not a sprint.
+        /// </summary>
+        public const int FeatherMaxParticles = 16;
         /// <summary>
         /// Sparkle family cap: ability burst 16 + hit 8 + cargo ring (~7 live) + hit-confirm 10 rarely coincide. Was 28; D2
-        /// took 3 for the Shard family so the four families still sum to the 64 per-chicken cap (the old cap was already
-        /// below that four-way coincidence, so the clip is the same rare, invisible case).
+        /// took 3 for the Shard family and D4 took 5 for Streak so the five families still sum to the 64 per-chicken cap (the
+        /// old cap was already below the four-way coincidence, so the clip is the same rare, invisible case). 20 keeps the
+        /// cast burst 16 plus 4 of the Speed edge's 6 feet sparkles, the only coincidence that happens on every cast.
         /// </summary>
-        public const int SparkleMaxParticles = 25;
+        public const int SparkleMaxParticles = 20;
         /// <summary>Shard family cap: the three egg shards of a hatch (real gravity, spin).</summary>
         public const int ShardMaxParticles = 3;
+        /// <summary>
+        /// Streak family cap (the Speed wind lines): 6 per metre x 0.25 s lifetime is 20 live at the boosted Warrior's 13 m/s
+        /// and 24 at the boosted Speedy, so 18 thins the very fastest sprint by a quarter (streaks live 0.25 s, the density
+        /// loss is not readable). Spec max was 24; the five families are pinned to sum 64 (7 + 16 + 20 + 3 + 18).
+        /// </summary>
+        public const int StreakMaxParticles = 18;
 
         public const string DustSystemName = "VFX_Dust";
         public const string FeatherSystemName = "VFX_Feather";
         public const string SparkleSystemName = "VFX_Sparkle";
         public const string ShardSystemName = "VFX_Shard";
+        public const string StreakSystemName = "VFX_Streak";
 
         /// <summary>Cargo-full ring: emitted from a ticking loop in LateUpdate while the bird is full.</summary>
         private const float CargoRingRate = 12f;
@@ -123,6 +142,7 @@ namespace CluckWars.Visuals
         public Sprite SparkleSprite => _sparkleSprite;
         public Sprite[] FeatherSprites => _featherSprites;
         public Sprite[] ShardSprites => _shardSprites;
+        public Sprite SpeedLineSprite => _speedLineSprite;
 
         private static Material s_sharedMaterial;
 
@@ -135,6 +155,8 @@ namespace CluckWars.Visuals
         private ParticleSystem _featherPS;
         private ParticleSystem _sparklePS;
         private ParticleSystem _shardPS;
+        private ParticleSystem _streakPS;
+        private ChickenAnimator _animator;
         private ParticleSystem.EmitParams _ep;   // cached: every emit rewrites it, nothing allocates
 
         // Effect presets built once from the serialized counts and colours.
@@ -144,6 +166,14 @@ namespace CluckWars.Visuals
         private bool  _wasRemoved;
         private bool  _wasCargoFull;
         private float _cargoRingAccum;
+
+        // ── Speed body cue (D4): edge + distance accumulators, see ObserveSpeedBody ──
+        private bool    _speedInitialized;
+        private bool    _wasSpeedActive;
+        private Vector3 _speedPrevPos;
+        private float   _streakAccum, _speedDustAccum;
+        private float   _leanBlend;
+        private FxEmit  _speedDust, _speedEdge;
 
         // ── Replicated one-shot cast baseline (see ObserveCastEvent) ────────────
         // HitFeedback and AbilityRangeIndicator reset their equivalent "_castInitialized"
@@ -167,6 +197,7 @@ namespace CluckWars.Visuals
             _combat     = GetComponent<ChickenCombat>();
             _cargo      = GetComponent<ChickenCargo>();
             _abilities  = GetComponent<AbilityController>();
+            _animator   = GetComponent<ChickenAnimator>();
 
             if (_particleMaterial != null) s_sharedMaterial = _particleMaterial;
             var mat = _particleMaterial != null ? _particleMaterial : BuildMaterial();
@@ -174,6 +205,8 @@ namespace CluckWars.Visuals
             _featherPS = BuildFamily(FeatherSystemName, mat, BodyFxSortingOrder, FeatherMaxParticles, _featherSprites);
             _sparklePS = BuildFamily(SparkleSystemName, mat, BodyFxSortingOrder, SparkleMaxParticles, _sparkleSprite);
             _shardPS   = BuildFamily(ShardSystemName, mat, BodyFxSortingOrder, ShardMaxParticles, _shardSprites);
+            _streakPS  = BuildFamily(StreakSystemName, mat, BodyFxSortingOrder, StreakMaxParticles, _speedLineSprite);
+            ConfigureStreakFamily(_streakPS);
 
             // Shards keep real gravity (the other families bake theirs into the launch velocity) and tumble: callers
             // emit them with Gravity 0 and the system pulls them down.
@@ -195,6 +228,21 @@ namespace CluckWars.Visuals
 
         private void BuildPresets()
         {
+            _speedDust = new FxEmit
+            {
+                Count = 1, Color = new Color(0.98f, 0.94f, 0.84f, FeedbackTuning.SpeedDustAlpha),
+                SizeMin = FeedbackTuning.SpeedDustSize, SizeMax = FeedbackTuning.SpeedDustSize,
+                SpeedMin = 0f, SpeedMax = 0f, LifeMin = FeedbackTuning.SpeedDustLifeSeconds, LifeMax = FeedbackTuning.SpeedDustLifeSeconds,
+                Shape = FxShape.Disc, Radius = 0.15f, Gravity = 0f,
+            };
+            // Colour overwritten per cast with the Speed accent.
+            _speedEdge = new FxEmit
+            {
+                Count = FeedbackTuning.SpeedEdgeSparkleCount, Color = Color.white, SizeMin = 0.22f, SizeMax = 0.34f,
+                SpeedMin = 0.8f, SpeedMax = 1.6f, LifeMin = FeedbackTuning.SpeedEdgeSparkleLifeSeconds, LifeMax = FeedbackTuning.SpeedEdgeSparkleLifeSeconds,
+                Shape = FxShape.Disc, Radius = 0.25f, Gravity = 0f,
+            };
+
             _hitBurst = new FxEmit
             {
                 Count = _hitCount, Color = _hitColor, SizeMin = 0.24f, SizeMax = 0.40f,
@@ -255,6 +303,8 @@ namespace CluckWars.Visuals
 
             _wasRemoved = isRemoved;
 
+            ObserveSpeedBody(hidden, isRemoved);
+
             // Ability activation: AccentColor burst + caster micro-shake on cast. Detection used to be a rising-edge
             // test on the old single ActiveSlot (since retired: abilities now run concurrently on a per-slot mask).
             // That was broken three ways: (1) a short ability can set and clear its active flag inside a single
@@ -294,6 +344,136 @@ namespace CluckWars.Visuals
                 _lastCargo    = cargo;
                 _wasCargoFull = isCargoFull;
             }
+        }
+
+        // ---- Speed body cue (D4, vfx.md 2.5) ---------------------------------------
+
+        private void OnDisable()
+        {
+            if (_animator != null) _animator.ExtraPitchDegrees = 0f;
+        }
+
+        /// <summary>
+        /// The Speed body cue, observed from replicated state (the slot active mask) and the bird's own planar motion: a
+        /// local effect on every peer, no RPC. The first observation only seeds the edge baseline, so a late join into a
+        /// running burst gets the streaks (state) but not the "go!" sparkles (edge). Streaks and stride dust are emitted by
+        /// distance travelled (the root moves through Fusion, so rate-over-distance is accumulated here), placed along the
+        /// path of the frame; emission stops the frame the slot goes inactive or the bird slows below half its MoveSpeed.
+        /// Nothing emits on a hidden or faded bird. The +6 degree lean goes through <see cref="ChickenAnimator.ExtraPitchDegrees"/>
+        /// (the animator lean saturates at the base MoveSpeed, so the 1.3x burst adds none of its own).
+        /// </summary>
+        private void ObserveSpeedBody(bool hidden, bool removed)
+        {
+            Vector3 pos = transform.position;
+            Vector3 delta = pos - _speedPrevPos;
+            Vector3 prev = _speedPrevPos;
+            _speedPrevPos = pos;
+            delta.y = 0f;
+
+            var abObj = _abilities != null ? _abilities.Object : null;
+            if (abObj == null || !abObj.IsValid || _controller == null) return;
+
+            SpeedBurstAbilitySO speedSO = null;
+            for (int i = 0; i < AbilityController.SlotCount; i++)
+            {
+                if (_abilities.GetSlot(i) is SpeedBurstAbilitySO s && _abilities.IsSlotActive(i)) { speedSO = s; break; }
+            }
+            bool active = speedSO != null && !removed;
+
+            if (!_speedInitialized)
+            {
+                _speedInitialized = true;
+                _wasSpeedActive = active;
+                return;
+            }
+
+            bool suppressed = hidden || ControlStateVFX.IsFadedOpacity(_controller.VisualOpacity);
+            bool reduced = PlayerPreferences.ReducedMotionEnabled;
+
+            if (active && !_wasSpeedActive && !suppressed)
+            {
+                var edge = _speedEdge;
+                edge.Color = speedSO.AccentColor;
+                EmitSparkles(in edge, 0.1f);
+            }
+            _wasSpeedActive = active;
+
+            float dt = Time.unscaledDeltaTime;
+            float planar = dt > 1e-5f ? delta.magnitude / dt : 0f;
+            var stats = _controller.Stats;
+            bool running = active && stats != null && SpeedBodyCueRules.ShouldRun(true, planar, stats.MoveSpeed);
+
+            if (running && !suppressed)
+            {
+                float step = SpeedBodyCueRules.StepMetres(delta.magnitude);
+                Vector3 dir = delta / Mathf.Max(delta.magnitude, 1e-5f);
+                int streaks = SpeedBodyCueRules.Take(ref _streakAccum, step, SpeedBodyCueRules.StreaksPerMetre(reduced));
+                int dust = SpeedBodyCueRules.Take(ref _speedDustAccum, step, SpeedBodyCueRules.DustPerMetre(reduced));
+                Color accent = speedSO.AccentColor;
+                accent.a = FeedbackTuning.SpeedStreakAlpha;
+                for (int i = 0; i < streaks; i++)
+                    EmitStreak(Vector3.Lerp(prev, pos, (i + 1f) / (streaks + 1f)), dir, accent);
+                for (int i = 0; i < dust; i++)
+                    EmitDustAt(in _speedDust, Vector3.Lerp(prev, pos, (i + 1f) / (dust + 1f)) + Vector3.up * 0.05f);
+            }
+            else
+            {
+                _streakAccum = 0f;
+                _speedDustAccum = 0f;
+            }
+
+            if (_animator != null)
+            {
+                _leanBlend = Mathf.MoveTowards(_leanBlend, running ? 1f : 0f, FeedbackTuning.SpeedLeanBlendPerSecond * Time.unscaledDeltaTime);
+                _animator.ExtraPitchDegrees = FeedbackTuning.SpeedLeanExtraDegrees * _leanBlend;
+            }
+        }
+
+        /// <summary>
+        /// One wind streak left behind at hip height: a point in the 0.3 (across) x 0.1 (along) box at the bird's tail, with a
+        /// tiny backward velocity (a zero-velocity Stretched Billboard has no direction to stretch along).
+        /// </summary>
+        private void EmitStreak(Vector3 rootPos, Vector3 moveDir, Color color)
+        {
+            if (_streakPS == null) return;
+            Vector3 right = new Vector3(moveDir.z, 0f, -moveDir.x);
+            Vector3 p = rootPos - moveDir * (FeedbackTuning.SpeedStreakTailOffset + Random.Range(-0.5f, 0.5f) * FeedbackTuning.SpeedStreakBoxAlong)
+                        + right * (Random.Range(-0.5f, 0.5f) * FeedbackTuning.SpeedStreakBoxAcross);
+            p.y = rootPos.y + Random.Range(FeedbackTuning.SpeedStreakMinHeight, FeedbackTuning.SpeedStreakMaxHeight);
+            _ep.applyShapeToPosition = false;
+            _ep.position = p;
+            _ep.velocity = -moveDir * FeedbackTuning.SpeedStreakBackSpeed;
+            _ep.startLifetime = FeedbackTuning.SpeedStreakLifeSeconds;
+            _ep.startSize = FeedbackTuning.SpeedStreakSize;
+            _ep.startColor = color;
+            _ep.rotation = 0f;
+            _streakPS.Emit(_ep, 1);
+        }
+
+        /// <summary>
+        /// Streak family: Stretched Billboard (speed scale 0.12, length scale raised from the spec 1 so the streak reads
+        /// as a line), size 0.30 to 0 and alpha 0.7 to 0 over the life (linear), instead of the shared late fade.
+        /// </summary>
+        private static void ConfigureStreakFamily(ParticleSystem ps)
+        {
+            if (ps == null) return;
+            var rend = ps.GetComponent<ParticleSystemRenderer>();
+            rend.renderMode = ParticleSystemRenderMode.Stretch;
+            rend.velocityScale = FeedbackTuning.SpeedStreakSpeedScale;
+            rend.lengthScale = FeedbackTuning.SpeedStreakLengthScale;
+            rend.cameraVelocityScale = 0f;
+
+            var sol = ps.sizeOverLifetime;
+            sol.enabled = true;
+            sol.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
+
+            var col = ps.colorOverLifetime;
+            col.enabled = true;
+            var g = new Gradient();
+            g.SetKeys(
+                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) });
+            col.color = new ParticleSystem.MinMaxGradient(g);
         }
 
         // ---- Emit API (used by later batch-D items and HitFeedback) --------------

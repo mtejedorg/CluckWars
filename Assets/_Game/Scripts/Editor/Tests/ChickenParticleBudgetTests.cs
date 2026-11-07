@@ -110,8 +110,8 @@ namespace CluckWars.Tests
         {
             var names = _systems.Select(p => p.name).ToArray();
             CollectionAssert.AreEquivalent(
-                new[] { ChickenVFX.DustSystemName, ChickenVFX.FeatherSystemName, ChickenVFX.SparkleSystemName, ChickenVFX.ShardSystemName }, names,
-                "D2 families: Dust, Feather, Sparkle, Shard (Streak/Kernel arrive with their items)");
+                new[] { ChickenVFX.DustSystemName, ChickenVFX.FeatherSystemName, ChickenVFX.SparkleSystemName, ChickenVFX.ShardSystemName, ChickenVFX.StreakSystemName }, names,
+                "D4 families: Dust, Feather, Sparkle, Shard, Streak (Kernel arrives with its item)");
             int total = _systems.Sum(p => p.main.maxParticles);
             Assert.LessOrEqual(total, FeedbackTuning.ParticlesPerChickenCap,
                 "sum of maxParticles over the families must stay within the per-chicken cap");
@@ -121,6 +121,16 @@ namespace CluckWars.Tests
             Assert.AreEqual(3, shard.main.maxParticles, "the three egg shards");
             Assert.AreEqual(1f, shard.main.gravityModifier.constant, "shards keep real gravity 1");
             Assert.IsTrue(shard.rotationOverLifetime.enabled, "shards spin");
+            var streak = _systems.Single(p => p.name == ChickenVFX.StreakSystemName);
+            var streakRend = streak.GetComponent<ParticleSystemRenderer>();
+            Assert.AreEqual(ChickenVFX.BodyFxSortingOrder, streakRend.sortingOrder, "streaks are body-height FX");
+            Assert.AreEqual(ParticleSystemRenderMode.Stretch, streakRend.renderMode, "streaks are Stretched Billboards");
+            Assert.AreEqual(0.12f, streakRend.velocityScale, 1e-4f, "stretch speed scale 0.12");
+            Assert.AreEqual(ParticleSystemSimulationSpace.World, streak.main.simulationSpace, "left behind in world space");
+            Assert.IsTrue(streak.sizeOverLifetime.enabled, "size 0.30 -> 0");
+            Assert.AreEqual(ChickenVFX.StreakMaxParticles, streak.main.maxParticles);
+            StringAssert.Contains("Fx_SpeedLine", AssetDatabase.GetAssetPath(streak.textureSheetAnimation.GetSprite(0)));
+            Assert.AreEqual(64, total, "the five families are pinned to the 64 per-chicken cap (7+16+20+3+18)");
         }
 
         [Test]

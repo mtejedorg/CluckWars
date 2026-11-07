@@ -289,6 +289,12 @@ namespace CluckWars.Visuals
         public float ExtraRollDegrees { get; set; }
 
         /// <summary>
+        /// Extra forward pitch (degrees, + = nose down) composed into the lean by another component (the Speed body cue adds
+        /// 6 degrees while the burst runs). A plain value its owner rewrites; the animator stays the only writer of the model transform.
+        /// </summary>
+        public float ExtraPitchDegrees { get; set; }
+
+        /// <summary>
         /// Uniform scale multiplier composed into the model's scale by another component (the Egg Shell shrinks the bird to fit
         /// inside the egg). 1 = rest. The animator stays the only writer of the model transform.
         /// </summary>
@@ -488,7 +494,7 @@ namespace CluckWars.Visuals
             // (Quaternion.LookRotation on the root transform), so a plain local pitch is always
             // "forward" — no parent-space direction conversion needed. Banking rolls into the
             // turn the root is making.
-            float pitch = _leanMaxDegrees * _smoothedSpeed01;
+            float pitch = _leanMaxDegrees * _smoothedSpeed01 + ExtraPitchDegrees;
             float roll  = -_bankMaxDegrees * _smoothedYawRate01 + ExtraRollDegrees;
 
             // ---- The single write ----
@@ -528,7 +534,7 @@ namespace CluckWars.Visuals
             scaleY *= 1f + _hopSquashStretch * (arc - 0.5f) * 2f * hopWeight;
 
             // Lean into movement, and bank into the turn.
-            pitch += _leanMaxDegrees * moving * notStunned;
+            pitch += (_leanMaxDegrees * moving + ExtraPitchDegrees) * notStunned;
             roll  += -_bankMaxDegrees * _smoothedYawRate01 * notStunned;
             roll  += ExtraRollDegrees * notStunned;
 

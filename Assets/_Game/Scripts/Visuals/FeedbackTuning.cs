@@ -1521,6 +1521,41 @@ namespace CluckWars.Visuals
         public const float ShellYolkAlpha = 0.7f;
         public const float ShellFeatherAlpha = 0.9f;
 
+        // ---- Speed body cue (D4, vfx.md 2.5) --------------------------------------------------------
+
+        /// <summary>The cue runs while the Speed slot is active and the planar speed is above this fraction of the class MoveSpeed.</summary>
+        public const float SpeedCueRunFraction = 0.5f;
+        /// <summary>Wind streaks per metre travelled (none under Reduced Motion).</summary>
+        public const float SpeedStreakPerMetre = 6f;
+        public const float SpeedStreakLifeSeconds = 0.25f;
+        public const float SpeedStreakSize = 0.30f;
+        public const float SpeedStreakAlpha = 0.7f;
+        /// <summary>Streaks spawn between these heights (hip height) in a 0.3 (across) x 0.1 (along) box at the tail.</summary>
+        public const float SpeedStreakMinHeight = 0.55f;
+        public const float SpeedStreakMaxHeight = 0.80f;
+        public const float SpeedStreakBoxAcross = 0.30f;
+        public const float SpeedStreakBoxAlong = 0.10f;
+        /// <summary>How far behind the bird root the streak box sits.</summary>
+        public const float SpeedStreakTailOffset = 0.45f;
+        /// <summary>Stretched Billboard: speed scale 0.12 (spec) and the length scale (spec 1.0; raised, see ChickenVFX).</summary>
+        public const float SpeedStreakSpeedScale = 0.12f;
+        public const float SpeedStreakLengthScale = 3f;
+        /// <summary>Tiny backward velocity that gives the Stretched Billboard a direction (the streak is left behind, not thrown).</summary>
+        public const float SpeedStreakBackSpeed = 2f;
+        public const float SpeedDustPerMetre = 2f;
+        public const float SpeedDustPerMetreReduced = 1f;
+        public const float SpeedDustSize = 0.22f;
+        public const float SpeedDustLifeSeconds = 0.30f;
+        public const float SpeedDustAlpha = 0.5f;
+        /// <summary>Active edge: accent sparkles at the feet ("go!").</summary>
+        public const int SpeedEdgeSparkleCount = 6;
+        public const float SpeedEdgeSparkleLifeSeconds = 0.20f;
+        /// <summary>Extra forward pitch while the cue runs (the animator lean saturates at the base MoveSpeed, so a 1.3x burst adds none).</summary>
+        public const float SpeedLeanExtraDegrees = 6f;
+        public const float SpeedLeanBlendPerSecond = 10f;
+        /// <summary>Per-frame distance clamp for the emitters (a respawn teleport must not dump a thousand particles).</summary>
+        public const float SpeedCueMaxStepMetres = 1.5f;
+
         // ---- Particle budget (batch D, vfx.md 0.2) --------------------------------------------------
 
         /// <summary>Hard cap on ParticleSystems per chicken (one draw call each on the shared Fx material).</summary>
