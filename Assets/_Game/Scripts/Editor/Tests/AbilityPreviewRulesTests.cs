@@ -1,5 +1,6 @@
 using System.IO;
 using System.Linq;
+using CluckWars.Abilities;
 using CluckWars.Gameplay;
 using CluckWars.Visuals;
 using NUnit.Framework;
@@ -205,6 +206,63 @@ namespace CluckWars.Tests
 
             string src = Read("Assets/_Game/Scripts/Visuals/ControlStateVFX.cs");
             StringAssert.Contains("if (IsFaded(_controller)) charging = 0;", src);
+        }
+
+        // ---- A2: a slow on a slow-immune target previews as no effect ------------
+        //
+        // IsSlowImmune reads a [Networked] TickTimer against a live Runner, which an EditMode probe never has, so the
+        // immune half is pinned by the derivation (which abilities are slow-only, from the shipped assets) plus the
+        // one-line routing in IsEffectNullified; the non-immune half is a real call (ControlImmunityFeedbackTests uses
+        // the same split for IsControlImmune).
+
+        private static AbilityBaseSO ShippedAbility(string name) =>
+            TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir).First(a => a.name == name);
+
+        [Test]
+        public void SlowOnlyAbilities_AreExactlyTheSlowSources_FromTheShippedAssets()
+        {
+            var slowOnly = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir)
+                .Where(a => a.TargetEffectIsOnlySlow).Select(a => a.name).OrderBy(n => n).ToArray();
+            CollectionAssert.AreEqual(new[] { "DustKick", "FeatherAura", "FeatherTrap", "SmokeRoost" }, slowOnly,
+                "the slow aura, the slow zones and the timed slow are every effect IsSlowImmune refuses");
+
+            Assert.IsFalse(ShippedAbility("WingSlam").TargetEffectIsOnlySlow, "a stun is not a slow: the walker is still stunned");
+            Assert.IsFalse(ShippedAbility("RootEgg").TargetEffectIsOnlySlow, "a root zone is not a slow zone");
+            Assert.IsFalse(ShippedAbility("Snatch").TargetEffectIsOnlySlow, "a steal is not a slow");
+        }
+
+        [Test]
+        public void IsEffectNullified_AsksSlowImmunity_ForASlowOnlyEffect_BeforeControlImmunity()
+        {
+            string src = Read("Assets/_Game/Scripts/Abilities/AbilityBaseSO.cs");
+            int start = src.IndexOf("public bool IsEffectNullified(", System.StringComparison.Ordinal);
+            Assert.Greater(start, 0, "IsEffectNullified moved or was renamed");
+            string body = src.Substring(start, 700);
+
+            int slowAt = body.IndexOf("if (TargetEffectIsOnlySlow) return candidate.IsSlowImmune;", System.StringComparison.Ordinal);
+            int controlAt = body.IndexOf("if (TargetEffectIsPurelyControl) return candidate.IsControlImmune;", System.StringComparison.Ordinal);
+            Assert.Greater(slowAt, 0, "a slow aimed at a slow-immune walker must read NoEffect (grey) in the telegraph");
+            Assert.Greater(controlAt, slowAt,
+                "the slow check must come first: Dust Kick is also purely control, and the walker is only slow-immune");
+        }
+
+        [Test]
+        public void IsEffectNullified_IsFalse_ForANonImmuneTarget_OfASlowOrAStun()
+        {
+            var caster = new GameObject("A2_Caster").AddComponent<ChickenController>();
+            var target = new GameObject("A2_Target").AddComponent<ChickenController>();
+            try
+            {
+                Assert.IsFalse(target.IsSlowImmune, "precondition: an unspawned probe is not slow-immune");
+                Assert.IsFalse(ShippedAbility("FeatherAura").IsEffectNullified(caster, target), "the Slow lands: a valid mark");
+                Assert.IsFalse(ShippedAbility("DustKick").IsEffectNullified(caster, target), "the timed slow lands");
+                Assert.IsFalse(ShippedAbility("WingSlam").IsEffectNullified(caster, target), "the Stun lands");
+            }
+            finally
+            {
+                Object.DestroyImmediate(caster.gameObject);
+                Object.DestroyImmediate(target.gameObject);
+            }
         }
 
         // ---- Art import + prefab wiring -----------------------------------------

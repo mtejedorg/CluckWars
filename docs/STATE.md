@@ -6,6 +6,12 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🛠 2026-11-07 - Feedback implementation (`simplify-abilities`, batches A and B of `docs/superpowers/plans/2026-11-07-ability-feedback-implementation-plan.md`, not merged, not pushed)
+
+| Item | Status | Commit | Notes |
+|---|---|---|---|
+| A1 hidden bird | done | `37729428` | `HiddenVisibilityRules.AlphaFor` over `IsFadedOpacity` gates buff ring, identity ring, cargo bar, nameplate, badges, ChickenVFX, HitFeedback flash/sparks/motion lines on remote peers; local bird floor 0.45 (`FeedbackTuning.LocalHiddenOpacityFloor`). Not gated yet: floating text at a hidden victim, removal feathers. Suite 2882/2882 |
+
 ## 🎨 2026-11-06 - Ability feedback, state cues and icons: design review + generated assets (`simplify-abilities`, design only, nothing implemented)
 
 - **Why:** Maestro, 2026-11-06: with the kit down to 10 generic moves, bring feedback and icons to production level: "non invasive but completely clear", one unmistakable icon per ability and per state; the Shield ("egg shell") must show a clear slow-walk cue and an egg closing around the chicken. Names may change to fit the game.

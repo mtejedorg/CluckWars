@@ -670,6 +670,9 @@ namespace CluckWars.Abilities
         public bool IsEffectNullified(Gameplay.ChickenController caster, Gameplay.ChickenController candidate)
         {
             if (candidate == null || candidate == caster) return false;
+            // A2: a slow-only effect is refused by the narrower slow immunity (the Shield's walk), which a
+            // control-immunity window implies; checked first so the walker reads grey too.
+            if (TargetEffectIsOnlySlow) return candidate.IsSlowImmune;
             if (TargetEffectIsPurelyControl) return candidate.IsControlImmune;
             if (!TargetEffectIncludesSteal) return false;
             return candidate.IsStealProof && (!TargetEffectIncludesControl || candidate.IsControlImmune);
@@ -681,6 +684,19 @@ namespace CluckWars.Abilities
         /// target (Egg Shell, Turtle Mode) refuses it.
         /// </summary>
         public virtual bool TargetEffectIncludesSteal => false;
+
+        /// <summary>
+        /// Is a slow the whole of this ability's effect on a target? Derived from what the ability already
+        /// authors, so it cannot drift: a slow zone or aura (<see cref="TryGetAreaEffect"/> with
+        /// <see cref="ZoneEffect.Slow"/>; Feather Aura, Feather Trap, Smoke Roost) or a pure-control cast whose
+        /// emission is a timed slow (Dust Kick). Exactly the effects <c>ChickenController.IsSlowImmune</c> refuses
+        /// (<c>RPC_ApplyAbilitySlow</c> and <c>CheckAbilityZoneSlow</c>), so <see cref="IsEffectNullified"/> asks
+        /// that window for them. Presentation only: eligibility and resolution never read it.
+        /// </summary>
+        public bool TargetEffectIsOnlySlow =>
+            TryGetAreaEffect(out var spec)
+                ? spec.Effect == ZoneEffect.Slow
+                : TargetEffectIsPurelyControl && EmittedControl.Kind == ControlKind.Slow;
 
         /// <summary>
         /// Does the effect on a target ALSO include a control effect (knockback / stun / root / slow)
